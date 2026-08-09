@@ -21,19 +21,21 @@ the attack paths' `atk_kind` tags.
 One base tensor per fact, seat-indexed; every legacy name is a view:
 
 - `civ_*  [B, 1+R]` — per-seat scalars (treasury, techs, faith, gpp,
-  cap_tile, …). Bare names are row 0, `r_*` names are rows 1+.
-- `cty_*  [B, 1+R+S, RC]` — the city block. Row 0 with the `:C` view is
-  seat 0, `rc_*` views are the civ rows, city-states sit in the minor
-  section.
+  cap_tile, …). Bare names are row 0, `civ_only_*` names are rows 1+.
+- `city_*  [B, 1+R+S, RC]` — the city block. Row 0 with the `:C` view
+  is seat 0, `civ_city_*` views are the civ rows, city-states sit in
+  the minor section (`citystate_*` views).
 - `unit_*` — one merged unit pool; `p_/v_/u_` are range views,
   `unit_seat` holds the owner.
 - Tile planes: `tile_seat` + `tile_city` (owner seat + city id — TS's
   `ownerSeat`/`ownerCity` pair), `centre_slot_at` (owning seat's city
-  slot at a centre). `owner`, `civ_at`, `cs_at`, `center_at`, `rc_at`
-  are cached DERIVED properties keyed on `_tile_owner_ver` — never
-  write them; write the stored planes and bump the version.
+  slot at a centre). `owner`, `civ_at`, `citystate_at`, `center_at`,
+  `civ_city_at` are cached DERIVED properties keyed on
+  `_tile_owner_ver` — never write them; write the stored planes and
+  bump the version.
 - Relations: `war/ww/ww_turns` over the compact seat-row space,
-  `rr_*` civ↔civ matrices, `csr_*` (seat, city-state) pairs.
+  `civ_pair_*` civ↔civ matrices, `seat_citystate_*` (seat, city-state)
+  pairs.
 
 `_MUTABLE` in `simbase.py` registers BASES only; `snapshot()`/`restore()`
 round-trip them and `restore()` copies in place so views never dangle.

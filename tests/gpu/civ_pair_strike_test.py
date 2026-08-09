@@ -1,6 +1,6 @@
 """A civ city's WALLS fire at an enemy CIV's unit.
 
-    python tests/gpu/cc_strike_test.py
+    python tests/gpu/civ_pair_strike_test.py
 
 In Civ 6 a city with at least Ancient Walls gains a ranged strike, and that
 strike picks the weakest modified-strength unit in range — a rule about combat
@@ -48,9 +48,9 @@ def build():
 
 def setup(sim, at_war: bool) -> tuple[int, int]:
     """Walled STRIKER city, a VICTIM warrior in range, nothing else that can hit it."""
-    j = next(j for j in range(sim.RC) if bool(sim.rc_alive[0, STRIKER, j]))
-    ctr = int(sim.rc_center[0, STRIKER, j])
-    sim.rc_bldg[0, STRIKER, j, sim._walls_bidx] = True
+    j = next(j for j in range(sim.RC) if bool(sim.civ_city_alive[0, STRIKER, j]))
+    ctr = int(sim.civ_city_center[0, STRIKER, j])
+    sim.civ_city_bldg[0, STRIKER, j, sim._walls_bidx] = True
 
     # a free land tile at range 1..2 of that centre
     tile = -1
@@ -85,8 +85,8 @@ def setup(sim, at_war: bool) -> tuple[int, int]:
     sim.occ_mil[0, tile] = slot + sim.POOL_LO["v"]
     sim.v_next[0] += 1
 
-    sim.cc_war[0, STRIKER, VICTIM] = at_war
-    sim.cc_war[0, VICTIM, STRIKER] = at_war
+    sim.civ_pair_war[0, STRIKER, VICTIM] = at_war
+    sim.civ_pair_war[0, VICTIM, STRIKER] = at_war
     sim.sync_war()
     return slot, tile
 

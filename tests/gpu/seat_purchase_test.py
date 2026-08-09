@@ -16,7 +16,7 @@ spec); the building branch keeps its peace-cost reserve.
 The scenarios drive `_seat_phase()` directly on a single-batch CPU sim with
 the civ forced to PEACE and its city queues cleared, so the ONLY structural
 moves the phase can make are the three buys: v_next only advances on a unit
-spawn, rc_alive only grows on a settler found, rc_bldg only gains on a
+spawn, civ_city_alive only grows on a settler found, civ_city_bldg only gains on a
 building buy.
 """
 
@@ -39,11 +39,11 @@ def build(rules, path):
 
 
 def n_rc(sim) -> int:
-    return int(sim.rc_alive[0, R].sum())
+    return int(sim.civ_city_alive[0, R].sum())
 
 
 def n_bldg(sim) -> int:
-    return int(sim.rc_bldg[0, R].sum())
+    return int(sim.civ_city_bldg[0, R].sum())
 
 
 def v_next(sim) -> int:
@@ -56,9 +56,9 @@ def mil_count(sim) -> int:
 
 
 def cap_center(sim) -> int:
-    cap = sim.rc_is_cap[0, R]
-    slot = int(cap.long().argmax()) if bool(cap.any()) else int(sim.rc_alive[0, R].long().argmax())
-    return int(sim.rc_center[0, R, slot])
+    cap = sim.civ_city_is_cap[0, R]
+    slot = int(cap.long().argmax()) if bool(cap.any()) else int(sim.civ_city_alive[0, R].long().argmax())
+    return int(sim.civ_city_center[0, R, slot])
 
 
 def settler_price(sim) -> float:
@@ -73,10 +73,10 @@ def unit_price(sim, idx: int) -> float:
 def prep_peace(sim) -> None:
     """Force the civ to PEACE and clear its city queues so no queue item
     can complete this phase — the only moves left are the gold buys."""
-    sim.rc_current[:, R] = -1
-    sim.rc_progress[:, R] = 0.0
-    sim.rc_cost[:, R] = 0.0
-    sim.r_atwar[:, R] = False
+    sim.civ_city_current[:, R] = -1
+    sim.civ_city_progress[:, R] = 0.0
+    sim.civ_city_cost[:, R] = 0.0
+    sim.civ_only_atwar[:, R] = False
     sim.sync_war()  # a poke must write the legacy stores too
 
 
@@ -90,8 +90,8 @@ def empty_land_tiles(sim, k: int) -> list[int]:
         & (sim.barb_at[0] < 0)
         & (sim.pmil_at[0] < 0)
         & (sim.pciv_at[0] < 0)
-        & (sim.rc_at[0] < 0)
-        & (sim.cs_at[0] < 0)
+        & (sim.civ_city_at[0] < 0)
+        & (sim.citystate_at[0] < 0)
         & (sim.owner[0] < 0)
         & (sim.civ_at[0] < 0)
     ).nonzero(as_tuple=True)[0].tolist()
@@ -153,14 +153,14 @@ def main() -> None:
     bids = [b["id"] for b in json.loads((FIXTURES / "rules.json").read_text())["buildings"]]
     mon = bids.index("MONUMENT")
     assert int(sim.rules_dev.b_unlock[mon]) == -1 and int(sim.rules_dev.b_unlock_civic[mon]) == -1, "MONUMENT unexpectedly gated"
-    sim.rc_bldg[0, R, :, mon] = False
-    sim.r_treasury[0, R] = 10_000.0
+    sim.civ_city_bldg[0, R, :, mon] = False
+    sim.civ_only_treasury[0, R] = 10_000.0
     b0, c0, vn0 = n_bldg(sim), n_rc(sim), v_next(sim)
     sim._seat_phase()
     assert n_bldg(sim) == b0 + 1, f"building priority: expected +1 building, got {n_bldg(sim) - b0}"
     assert n_rc(sim) == c0, "building priority: a settler was founded too (not one-per-turn)"
     assert v_next(sim) == vn0, "building priority: a unit was bought too (not one-per-turn)"
-    assert bool(sim.rc_bldg[0, R, :, mon].any()), "the bought building was not MONUMENT"
+    assert bool(sim.civ_city_bldg[0, R, :, mon].any()), "the bought building was not MONUMENT"
     print("  1 priority building > settler/unit OK (one purchase, MONUMENT)")
 
     # -- 2: SETTLER threshold + priority settler > unit --------------------
@@ -168,10 +168,10 @@ def main() -> None:
     # the settler price. The settler must found and the unit must NOT fire.
     sim.restore(base)
     prep_peace(sim)
-    sim.rc_bldg[0, R] = True
+    sim.civ_city_bldg[0, R] = True
     assert n_rc(sim) < sim.rules.seats["maxCities"], "civ already at city cap — pick an earlier turn"
     price_s = settler_price(sim)
-    sim.r_treasury[0, R] = price_s
+    sim.civ_only_treasury[0, R] = price_s
     c0, vn0 = n_rc(sim), v_next(sim)
     sim._seat_phase()
     assert n_rc(sim) == c0 + 1, "settler at price: no city founded"
@@ -181,8 +181,8 @@ def main() -> None:
     # just below the price: settler unaffordable → no found (threshold)
     sim.restore(base)
     prep_peace(sim)
-    sim.rc_bldg[0, R] = True
-    sim.r_treasury[0, R] = settler_price(sim) - 1.0
+    sim.civ_city_bldg[0, R] = True
+    sim.civ_only_treasury[0, R] = settler_price(sim) - 1.0
     c0 = n_rc(sim)
     sim._seat_phase()
     assert n_rc(sim) == c0, "settler threshold: founded below the price"
@@ -192,21 +192,21 @@ def main() -> None:
     # all techs unlocked, no building, settler unaffordable (treasury < its
     # price), military below quota. The bought type tracks the treasury.
     cases = []
-    if sim._r_horseman >= 0 and ho_t >= 0:
-        cases.append((unit_price(sim, sim._r_horseman), sim._r_horseman, "HORSEMAN"))
-    if sim._r_spearman >= 0 and sp_t >= 0:
-        cases.append((unit_price(sim, sim._r_spearman), sim._r_spearman, "SPEARMAN"))
+    if sim._civ_only_horseman >= 0 and ho_t >= 0:
+        cases.append((unit_price(sim, sim._civ_only_horseman), sim._civ_only_horseman, "HORSEMAN"))
+    if sim._civ_only_spearman >= 0 and sp_t >= 0:
+        cases.append((unit_price(sim, sim._civ_only_spearman), sim._civ_only_spearman, "SPEARMAN"))
     cases.append((unit_price(sim, warr), warr, "WARRIOR"))
     for tre, want_idx, label in cases:
         sim.restore(base)
         prep_peace(sim)
-        sim.rc_bldg[0, R] = True
+        sim.civ_city_bldg[0, R] = True
         if sp_t >= 0:
-            sim.r_techs[0, R, sp_t] = True
+            sim.civ_only_techs[0, R, sp_t] = True
         if ar_t >= 0:
-            sim.r_techs[0, R, ar_t] = True
+            sim.civ_only_techs[0, R, ar_t] = True
         if ho_t >= 0:
-            sim.r_techs[0, R, ho_t] = True
+            sim.civ_only_techs[0, R, ho_t] = True
         # resource-gated picks need strategic ACCESS — plant the required
         # resource + matching completed improvement on an owned tile
         # (restore() wipes it each iteration, so grant per-case).
@@ -238,7 +238,7 @@ def main() -> None:
             sim.pillaged[0, t] = False
         assert tre < settler_price(sim), f"{label} price {tre} not below the settler price — scenario invalid"
         assert mil_count(sim) < 2 * n_rc(sim), "military already at quota — pick an earlier turn"
-        sim.r_treasury[0, R] = tre
+        sim.civ_only_treasury[0, R] = tre
         vn0 = v_next(sim)
         sim._seat_phase()
         assert v_next(sim) == vn0 + 1, f"{label}: no unit spawned at {tre:.0f} gold"
@@ -251,14 +251,14 @@ def main() -> None:
     # though gold, room and a clear spawn tile are all present.
     sim.restore(base)
     prep_peace(sim)
-    sim.rc_bldg[0, R] = True
+    sim.civ_city_bldg[0, R] = True
     quota = 2 * n_rc(sim)
     need = quota - mil_count(sim)
     assert need >= 0
     if need > 0:
         inject_mil(sim, empty_land_tiles(sim, need), warr)
     assert mil_count(sim) >= quota
-    sim.r_treasury[0, R] = unit_price(sim, warr)  # affordable, but the quota is met
+    sim.civ_only_treasury[0, R] = unit_price(sim, warr)  # affordable, but the quota is met
     vn0, c0 = v_next(sim), n_rc(sim)
     sim._seat_phase()
     assert v_next(sim) == vn0, "quota gate: bought a unit at/above 2× cities"
@@ -271,22 +271,22 @@ def main() -> None:
     # rung is DRIVEN-only, so with no kind-3 intent stashed it cannot fire here.
     sim.restore(base)
     prep_peace(sim)
-    sim.rc_bldg[0, R] = True
-    sim.r_treasury[0, R] = unit_price(sim, warr)
+    sim.civ_city_bldg[0, R] = True
+    sim.civ_only_treasury[0, R] = unit_price(sim, warr)
     vn0 = v_next(sim)
     sim._seat_phase()  # free-spot twin: warrior spawns
     assert v_next(sim) == vn0 + 1, "refund control: warrior did not spawn with a free spot"
-    treasury_spawn = float(sim.r_treasury[0, R])
+    treasury_spawn = float(sim.civ_only_treasury[0, R])
 
     sim.restore(base)
     prep_peace(sim)
-    sim.rc_bldg[0, R] = True
-    sim.r_treasury[0, R] = unit_price(sim, warr)
+    sim.civ_city_bldg[0, R] = True
+    sim.civ_only_treasury[0, R] = unit_price(sim, warr)
     block_spawn(sim)
     vn0 = v_next(sim)
     sim._seat_phase()  # blocked twin: no spot -> refund
     assert v_next(sim) == vn0, "refund: a unit spawned despite every spot blocked"
-    treasury_refund = float(sim.r_treasury[0, R])
+    treasury_refund = float(sim.civ_only_treasury[0, R])
     # WARRIOR upkeep is 0, so the refund keeps exactly its gold price
     assert abs((treasury_refund - treasury_spawn) - unit_price(sim, warr)) < 1e-6, (
         f"refund kept {treasury_refund - treasury_spawn} gold, want {unit_price(sim, warr)}"

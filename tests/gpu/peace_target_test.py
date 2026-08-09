@@ -82,11 +82,11 @@ def run(ranged: bool) -> None:
     p = place(sim, pl_tile, seat0=True)
 
     # civ 0 is AT PEACE with seat 0, and AT WAR with civ 1.
-    sim.r_atwar[0, 0] = False
+    sim.civ_only_atwar[0, 0] = False
     sim.sync_war()  # close the poke under transpose
     if sim.R > 1:
-        sim.cc_war[0, 0, 1] = True
-        sim.cc_war[0, 1, 0] = True
+        sim.civ_pair_war[0, 0, 1] = True
+        sim.civ_pair_war[0, 1, 0] = True
         sim.sync_war()  # close the poke under transpose
 
     before = int(sim.p_hp[0, p])
@@ -107,7 +107,7 @@ def run(ranged: bool) -> None:
 
     # ...and the SAME attack lands once war is declared, so the assertion above
     # is about the peace treaty and not about a broken scenario.
-    sim.r_atwar[0, 0] = True
+    sim.civ_only_atwar[0, 0] = True
     sim.sync_war()  # close the poke under transpose
     if ranged:
         sim._hostile_ranged_strike(att, tgt, "v", v)

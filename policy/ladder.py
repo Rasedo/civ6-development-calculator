@@ -266,7 +266,7 @@ def pick_war(mask: torch.Tensor, ctx: dict, rng: dict) -> torch.Tensor:
         & ctx["has_cities"]
         & (ctx["peace_turns"] > 20)
         & (ctx["prox"] <= 9)
-        & (ctx["gang"] | (ctx["r_str"] > ctx["p_str"] * 1.3))
+        & (ctx["gang"] | (ctx["civ_only_str"] > ctx["p_str"] * 1.3))
         & (rng["dow"] < 0.08 * (0.5 + ctx["aggression"]))
     )
     out = torch.where((out < 0) & dow, torch.zeros_like(out), out)
@@ -409,7 +409,7 @@ def pick_production(
                 if idx < 0 or u_lo + idx >= W:
                     continue
                 # every one of these is ONE PER SEAT and the engine's gate reads
-                # rc_current LIVE, so it retires the moment any city queues one.
+                # civ_city_current LIVE, so it retires the moment any city queues one.
                 # The mask is a snapshot taken before the walk and keeps saying
                 # "legal" for the rest of them, so without this the ladder
                 # queues a builder, an engineer or a galley in every idle city

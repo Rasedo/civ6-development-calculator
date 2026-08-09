@@ -232,7 +232,7 @@ def main() -> None:
     assert int(ladder.pick_production(mk([u1, eng]), cls, ROSTER, atcap)[0, 0]) == -1
     assert int(ladder.pick_production(mk([u1, gal]), cls, ROSTER, atcap)[0, 0]) == gal
 
-    # each solo tier is ONE PER SEAT and the engine's gate reads rc_current
+    # each solo tier is ONE PER SEAT and the engine's gate reads civ_city_current
     # live, so it retires mid-walk. Two idle cities both offered a builder must
     # NOT both take one — the second falls through to the army.
     solo = ladder.pick_production(mk2([[u0, u1], [u0, u1]]), cls, ROSTER)
@@ -378,7 +378,7 @@ def main() -> None:
     wm = torch.zeros(1, 2 * R2, dtype=torch.bool)
     base_ctx = {
         "has_cities": torch.tensor([True]), "peace_turns": torch.tensor([25]),
-        "prox": torch.tensor([5]), "r_str": torch.tensor([100.0]),
+        "prox": torch.tensor([5]), "civ_only_str": torch.tensor([100.0]),
         "p_str": torch.tensor([50.0]), "gang": torch.tensor([False]),
         "aggression": torch.tensor([0.5]),
     }
@@ -395,7 +395,7 @@ def main() -> None:
     far = dict(base_ctx); far["prox"] = torch.tensor([10])
     assert int(ladder.pick_war(wm, far, lo_rng)[0]) == -1
     # the gang arm opens the DoW without the strength edge
-    weak = dict(base_ctx); weak["r_str"] = torch.tensor([10.0]); weak["gang"] = torch.tensor([True])
+    weak = dict(base_ctx); weak["civ_only_str"] = torch.tensor([10.0]); weak["gang"] = torch.tensor([True])
     assert int(ladder.pick_war(wm, weak, lo_rng)[0]) == 0
     # sue: legal + rng under 0.25 -> col R; over -> -1
     wm2 = torch.zeros(1, 2 * R2, dtype=torch.bool)

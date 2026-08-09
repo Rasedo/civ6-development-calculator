@@ -113,9 +113,9 @@ def _civ_seats(sim) -> list[int]:
 
 def _city_rows(sim, b: int) -> list[tuple[int, int]]:
     """(seat, slot) for every LIVING city of a civ seat. Dead slots keep stale
-    values — capture clears `cty_alive` and the queue planes but not pop/hp/
+    values — capture clears `city_alive` and the queue planes but not pop/hp/
     loyalty — so the alive mask is load-bearing, not cosmetic."""
-    alive = sim.cty_alive[b].tolist()
+    alive = sim.city_alive[b].tolist()
     rows = []
     for c in _civ_seats(sim):
         width = sim.C if c == 0 else sim.RC
@@ -127,8 +127,8 @@ def _unit_rows(sim, b: int) -> list[int]:
     return [i for i, a in enumerate(sim.unit_alive[b].tolist()) if a]
 
 
-def _cs_rows(sim, b: int) -> list[int]:
-    alive = sim.cs_alive[b].tolist()
+def _citystate_rows(sim, b: int) -> list[int]:
+    alive = sim.citystate_alive[b].tolist()
     return [s for s in range(sim.S) if alive[s]]
 
 
@@ -142,7 +142,7 @@ def group_rows(sim, b: int, group: str) -> list:
     if group == "seat":
         return _civ_seats(sim)
     if group == "cityState":
-        return _cs_rows(sim, b)
+        return _citystate_rows(sim, b)
     if group == "city":
         return _city_rows(sim, b)
     if group == "unit":
@@ -160,7 +160,7 @@ def group_keys(sim, b: int, group: str, rows: list) -> list[int]:
     if group == "cityState":
         return list(rows)
     if group == "city":
-        centre = sim.cty_center[b].tolist()
+        centre = sim.city_center[b].tolist()
         return [centre[c][s] for c, s in rows]
     if group == "unit":
         tile = sim.unit_tile[b].tolist()
@@ -259,7 +259,7 @@ def _civ_only(plane: str, absent):
     return get
 
 
-def _cc_relation(plane: str, live):
+def _civ_pair_relation(plane: str, live):
     """A civ<->civ [R, R] relation read as a per-seat set of ABSOLUTE
     opponent seats. Seat 0 has no row at all, which is the gap."""
     def get(sim, b, rows):
@@ -294,7 +294,7 @@ SEAT = {
     "techProgress": _civ_scalar("civ_tech_prog"),
     "civicProgress": _civ_scalar("civ_civic_prog"),
     "cityCount": lambda sim, b, rows: [
-        sum(1 for a in sim.cty_alive[b, c].tolist()[: (sim.C if c == 0 else sim.RC)] if a) for c in rows
+        sum(1 for a in sim.city_alive[b, c].tolist()[: (sim.C if c == 0 else sim.RC)] if a) for c in rows
     ],
     "wars": lambda sim, b, rows: [_wars_of(sim, b, c) for c in rows],
     "warTurns": lambda sim, b, rows: [int(sim.war_turns[b, _seat_row(sim, c)]) for c in rows],
@@ -316,27 +316,27 @@ SEAT = {
     ],
     # --- the declared gaps (extracted, census-covered, skipped by default) ---
     "scienceTotal": lambda sim, b, rows: [float(sim.science_total[b]) if c == 0 else 0.0 for c in rows],
-    "tilesPurchased": _civ_only("r_tiles_purchased", 0),
-    "nextCityId": _civ_only("r_next_city_id", 0),
-    "prophets": _civ_only("r_prophets", 0),
-    "beliefPantheon": _civ_only("r_pantheon", -1),
-    "beliefFollower": _civ_only("r_follower", -1),
-    "beliefFounder": _civ_only("r_founder", -1),
-    "beliefEnhancer": _civ_only("r_enhancer", -1),
-    "formalWars": _cc_relation("cc_warkind", lambda v: bool(v)),
-    "denounced": _cc_relation("cc_denounced", lambda v: v >= 0),
-    "allies": _cc_relation("cc_allied", lambda v: bool(v)),
+    "tilesPurchased": _civ_only("civ_only_tiles_purchased", 0),
+    "nextCityId": _civ_only("civ_only_next_city_id", 0),
+    "prophets": _civ_only("civ_only_prophets", 0),
+    "beliefPantheon": _civ_only("civ_only_pantheon", -1),
+    "beliefFollower": _civ_only("civ_only_follower", -1),
+    "beliefFounder": _civ_only("civ_only_founder", -1),
+    "beliefEnhancer": _civ_only("civ_only_enhancer", -1),
+    "formalWars": _civ_pair_relation("civ_pair_warkind", lambda v: bool(v)),
+    "denounced": _civ_pair_relation("civ_pair_denounced", lambda v: v >= 0),
+    "allies": _civ_pair_relation("civ_pair_allied", lambda v: bool(v)),
 }
 
 
-def _cs_plane(plane: str, minor: bool):
+def _citystate_plane(plane: str, minor: bool):
     """A city-state fact. `minor` planes live in the CITY block's minor section
-    (row _CTY_MINOR0 + s, slot 0) — a city-state's one city is a city like any
+    (row _CITY_MINOR0 + s, slot 0) — a city-state's one city is a city like any
     other; the rest are [B, S] planes of their own."""
     def get(sim, b, rows):
         t = getattr(sim, plane)[b].tolist()
         if minor:
-            m0 = sim._CTY_MINOR0
+            m0 = sim._CITY_MINOR0
             return [t[m0 + s][0] for s in rows]
         return [t[s] for s in rows]
     return get
@@ -351,17 +351,17 @@ def _csr(plane: str):
 
 
 CITY_STATE = {
-    "type": lambda sim, b, rows: [int(sim.cs_type[b, s]) for s in rows],
-    "centerIndex": _cs_plane("cty_center", True),
-    "population": _cs_plane("cty_pop", True),
-    "hp": _cs_plane("cty_hp", True),
-    "envoys": _csr("csr_envoys"),
-    "met": _csr("csr_met"),
-    "questKind": _csr("csr_quest"),
-    "questIssued": _csr("csr_quest_issued"),
-    "questCamp": _csr("csr_quest_camp"),
-    "questDistrict": lambda sim, b, rows: [int(sim.cs_quest_district[b, s]) for s in rows],
-    "lastLevyTurn": lambda sim, b, rows: [int(sim.cs_last_levy[b, s]) for s in rows],
+    "type": lambda sim, b, rows: [int(sim.citystate_type[b, s]) for s in rows],
+    "centerIndex": _citystate_plane("city_center", True),
+    "population": _citystate_plane("city_pop", True),
+    "hp": _citystate_plane("city_hp", True),
+    "envoys": _csr("seat_citystate_envoys"),
+    "met": _csr("seat_citystate_met"),
+    "questKind": _csr("seat_citystate_quest"),
+    "questIssued": _csr("seat_citystate_quest_issued"),
+    "questCamp": _csr("seat_citystate_quest_camp"),
+    "questDistrict": lambda sim, b, rows: [int(sim.citystate_quest_district[b, s]) for s in rows],
+    "lastLevyTurn": lambda sim, b, rows: [int(sim.citystate_last_levy[b, s]) for s in rows],
     "warTurns": lambda sim, b, rows: [
         int(sim.war_turns[b, _seat_row(sim, 100 + s)]) for s in rows
     ],
@@ -377,34 +377,34 @@ def _cty(plane: str):
 
 CITY = {
     "seat": lambda sim, b, rows: [c for c, _ in rows],
-    "population": _cty("cty_pop"),
-    "hp": _cty("cty_hp"),
-    "outerHp": _cty("cty_outer_hp"),
-    "isCapital": _cty("cty_is_cap"),
-    "foodBox": _cty("cty_growth"),
-    "cultureBox": _cty("cty_cbox"),
-    "tilesAcquired": _cty("cty_acquired"),
-    "loyalty": _cty("cty_loyalty"),
+    "population": _cty("city_pop"),
+    "hp": _cty("city_hp"),
+    "outerHp": _cty("city_outer_hp"),
+    "isCapital": _cty("city_is_cap"),
+    "foodBox": _cty("city_growth"),
+    "cultureBox": _cty("city_cbox"),
+    "tilesAcquired": _cty("city_acquired"),
+    "loyalty": _cty("city_loyalty"),
     "buildings": lambda sim, b, rows: [
-        [i for i, on in enumerate(sim.cty_bldg[b, c, s].tolist()) if on] for c, s in rows
+        [i for i, on in enumerate(sim.city_bldg[b, c, s].tolist()) if on] for c, s in rows
     ],
     "productionBank": lambda sim, b, rows: [
-        float(sim.prod_bank[b, s]) if c == 0 else float(sim.rc_prod_bank[b, c - 1, s]) for c, s in rows
+        float(sim.prod_bank[b, s]) if c == 0 else float(sim.civ_city_prod_bank[b, c - 1, s]) for c, s in rows
     ],
     "queueFront": lambda sim, b, rows: [
-        [int(sim.cty_current[b, c, s]), int(sim.cty_qtile[b, c, s])] for c, s in rows
+        [int(sim.city_current[b, c, s]), int(sim.city_qtile[b, c, s])] for c, s in rows
     ],
-    "queueProgress": _cty("cty_progress"),
-    "queueCost": _cty("cty_cost"),
-    "followedReligion": _cty("cty_followed"),
+    "queueProgress": _cty("city_progress"),
+    "queueCost": _cty("city_cost"),
+    "followedReligion": _cty("city_followed"),
     "religionPressure": lambda sim, b, rows: [
-        [int(x) for x in sim.cty_pressure[b, c, s].tolist()] for c, s in rows
+        [int(x) for x in sim.city_pressure[b, c, s].tolist()] for c, s in rows
     ],
-    "greatWorksWriting": _cty("cty_gw_writing"),
-    "greatWorksArt": _cty("cty_gw_art"),
-    "greatWorksMusic": _cty("cty_gw_music"),
-    "relics": _cty("cty_relics"),
-    "artifacts": _cty("cty_artifacts"),
+    "greatWorksWriting": _cty("city_gw_writing"),
+    "greatWorksArt": _cty("city_gw_art"),
+    "greatWorksMusic": _cty("city_gw_music"),
+    "relics": _cty("city_relics"),
+    "artifacts": _cty("city_artifacts"),
 }
 
 

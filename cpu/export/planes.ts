@@ -131,7 +131,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       cs: isCityStateSeat(tileSeat(t)) ? cityStateOfSeat(tileSeat(t)) : -1,
       // (#96 tail: the `rv`/`rci` civ-territory keys are DELETED — format-2
       // worlds have no civ cities at t0, so both were provably all -1; the
-      // engine starts its tile_seat civ half and rc_tile_id registry empty.)
+      // engine starts its tile_seat civ half and tile_city registry empty.)
       // C1-B4b-2: Water Mill gates on a river at CIV-SEAT centers too
       riv: hasRiver(t) ? 1 : 0,
       // C1-B5b-iii: water housing IF a center stood here (fresh 5 /

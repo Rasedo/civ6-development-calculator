@@ -21,10 +21,10 @@ class SimMinors:
             return
         # The seat-0 <-> city-state war clock ticks FIRST, exactly where
         # cityStatePhase does — before meeting/influence/envoys.
-        self.cs_war_turns.add_(self.cs_atwar.long())
-        r = self.rules.cs
-        self.cs_met.logical_or_(self.cs_alive)
-        any_met = self.cs_met.any(dim=1)
+        self.citystate_war_turns.add_(self.citystate_atwar.long())
+        r = self.rules.citystate
+        self.citystate_met.logical_or_(self.citystate_alive)
+        any_met = self.citystate_met.any(dim=1)
         # Seat 0's adopted-government influence tier joins the flat rate
         # (cityStates.ts `INFLUENCE_PER_TURN + GOV_INFLUENCE_TIER`); tier 0
         # while government adoption is switched off.
@@ -51,47 +51,47 @@ class SimMinors:
         else:
             own_tbl = None
         for s in range(self.S):
-            act = self.cs_alive[:, s] & self.cs_met[:, s]
+            act = self.citystate_alive[:, s] & self.citystate_met[:, s]
             # Resolve: clear-the-camp, or a buildDistrict quest for a district
             # seat 0 has since completed. Trade-route quests are uncompletable.
-            camp_gone = ~((self.camp_tile == self.cs_quest_camp[:, s].unsqueeze(1)) & (self.camp_tile >= 0)).any(dim=1)
-            resolved_camp = act & (self.cs_quest[:, s] == 1) & camp_gone
+            camp_gone = ~((self.camp_tile == self.citystate_quest_camp[:, s].unsqueeze(1)) & (self.camp_tile >= 0)).any(dim=1)
+            resolved_camp = act & (self.citystate_quest[:, s] == 1) & camp_gone
             if own_tbl is not None:
-                # cs_quest_district holds a DISTRICT-TYPE index (the CS type's
+                # citystate_quest_district holds a DISTRICT-TYPE index (the CS type's
                 # own district, what the seat-generic issuer writes) — NOT an
                 # askable-list index, so it must not be read through own_tbl.
-                qd = self.cs_quest_district[:, s]
+                qd = self.citystate_quest_district[:, s]
                 _tc_r = self.tile_city.clamp(min=0)
                 _live_r = self.alive.gather(1, _tc_r) & (self.tile_city >= 0)
                 owns_asked = ((self.district == qd.unsqueeze(1)) & self.district_complete & _live_r & ~self.district_dead).any(dim=1) & (qd >= 0)
             else:
                 owns_asked = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-            resolved_dist = act & (self.cs_quest[:, s] == 3) & owns_asked
+            resolved_dist = act & (self.citystate_quest[:, s] == 3) & owns_asked
             resolved = resolved_camp | resolved_dist
             if bool(resolved.any()):
                 rows = resolved.nonzero(as_tuple=True)[0]
-                self.cs_quest[rows, s] = 0
-                self.cs_quest_issued[rows, s] = self.turn
-                self.cs_envoys[rows, s] += int(r.get("questEnvoys", 1))
+                self.citystate_quest[rows, s] = 0
+                self.citystate_quest_issued[rows, s] = self.turn
+                self.citystate_envoys[rows, s] += int(r.get("questEnvoys", 1))
                 self._eff_version += 1  # quest envoys move capital yields too
             # ZERO-DRAW issue, matching _seat_quest_phase: fixed order
             # clearCamp -> buildDistrict -> sendTradeRoute, with the district
-            # the CS TYPE's own (_cs_didx) rather than a draw from a flat
+            # the CS TYPE's own (_citystate_didx) rather than a draw from a flat
             # askable list. Issuing must not move the shared PRNG.
-            due = act & (self.cs_quest[:, s] == 0) & (self.turn - self.cs_quest_issued[:, s] >= cooldown)
+            due = act & (self.citystate_quest[:, s] == 0) & (self.turn - self.citystate_quest_issued[:, s] >= cooldown)
             # clearCamp: NEAREST camp within 6, ties to the lowest tile index
             # (key = dist*(T+1)+tile, the shared issueQuest key).
-            cdist = self.pair_dist[self.cs_center[:, s].unsqueeze(1), self.camp_tile.clamp(min=0)].to(torch.long)
+            cdist = self.pair_dist[self.citystate_center[:, s].unsqueeze(1), self.camp_tile.clamp(min=0)].to(torch.long)
             near = (self.camp_tile >= 0) & (cdist <= 6)
             has_camp = near.any(dim=1)
             span_q = self.T + 1
             key_c = torch.where(near, cdist * span_q + self.camp_tile.clamp(min=0), torch.full_like(cdist, 10**18))
             camp_idx = self.camp_tile.gather(1, key_c.argmin(dim=1).unsqueeze(1)).squeeze(1)
             # buildDistrict: the CS type's own district, unless already complete.
-            # _cs_didx is a DISTRICT-TYPE index; own_tbl is keyed by ASKABLE
+            # _citystate_didx is a DISTRICT-TYPE index; own_tbl is keyed by ASKABLE
             # index. They are different index spaces, so the ownership test
             # reads the district plane directly (the civ path's own shape).
-            di_p = self._cs_didx[:, s]
+            di_p = self._citystate_didx[:, s]
             if self.districts_on:
                 # The test is whether a LIVE CITY OF THIS SEAT lists the
                 # district, not whether the seat happens to own the tile —
@@ -116,20 +116,20 @@ class SimMinors:
             issued = want_camp | want_dist | want_trade
             if bool(issued.any()):
                 rows = issued.nonzero(as_tuple=True)[0]
-                self.cs_quest[rows, s] = kind[rows]
-                self.cs_quest_issued[rows, s] = self.turn
+                self.citystate_quest[rows, s] = kind[rows]
+                self.citystate_quest_issued[rows, s] = self.turn
                 if bool(want_camp.any()):
                     cr = want_camp.nonzero(as_tuple=True)[0]
-                    self.cs_quest_camp[cr, s] = camp_idx[cr]
+                    self.citystate_quest_camp[cr, s] = camp_idx[cr]
                 if bool(want_dist.any()):
                     dr = want_dist.nonzero(as_tuple=True)[0]
-                    self.cs_quest_district[dr, s] = di_p[dr]
+                    self.citystate_quest_district[dr, s] = di_p[dr]
 
         if self.turn % 12 == 0:
-            self.cs_pop.copy_(torch.where(self.cs_alive, (self.cs_pop + 1).clamp(max=10), self.cs_pop))
+            self.citystate_pop.copy_(torch.where(self.citystate_alive, (self.citystate_pop + 1).clamp(max=10), self.citystate_pop))
         # siege recovery — +10/turn toward maxHp (cityStatePhase tail).
-        cs_max = int(self.rules.cs.get("maxHp", 150))
-        self.cs_hp.copy_(torch.where(self.cs_alive & (self.cs_hp < cs_max), (self.cs_hp + 10).clamp(max=cs_max), self.cs_hp))
+        citystate_max = int(self.rules.citystate.get("maxHp", 150))
+        self.citystate_hp.copy_(torch.where(self.citystate_alive & (self.citystate_hp < citystate_max), (self.citystate_hp + 10).clamp(max=citystate_max), self.citystate_hp))
 
     # --- civ-seat units -----------------------------------------------------------
 
@@ -147,7 +147,7 @@ class SimMinors:
         # CARTOGRAPHY). type_idx may be scalar or [B].
         ti_n = (type_idx if type_idx.dim() > 0 else type_idx.expand(self.B)).clamp(min=0, max=self.NU - 1)
         naval_m = self.unit_naval[ti_n] & mask
-        cart_r = self.r_techs[:, civ, self._cartography_tech] if self._cartography_tech >= 0 else None
+        cart_r = self.civ_only_techs[:, civ, self._cartography_tech] if self._cartography_tech >= 0 else None
         found, spot = self._first_free_spot(at_tile, "v", civ=civ, naval_mask=naval_m, cart=cart_r)
         can = mask & found
         if not bool(can.any()):
@@ -183,23 +183,23 @@ class SimMinors:
         melee_cs = torch.where(
             can & (self._p_rng_str[ti] == 0),
             self._p_combat[ti],
-            torch.zeros_like(self.r_best_melee[:, civ]),
+            torch.zeros_like(self.civ_only_best_melee[:, civ]),
         )
-        self.r_best_melee[:, civ] = torch.maximum(self.r_best_melee[:, civ], melee_cs)
+        self.civ_only_best_melee[:, civ] = torch.maximum(self.civ_only_best_melee[:, civ], melee_cs)
         return can
 
     def _wonder_base_ok(self, r: int, j: int) -> torch.Tensor:
         """[B, T] wonder-tile base predicate for city (r, j) — ONE body shared
         by the scripted pick, seat_masks and the driven apply, because
         placement legality that exists twice drifts twice."""
-        d_ctr = self.pair_dist[self.rc_center[:, r, j].clamp(min=0)]  # [B, T]
+        d_ctr = self.pair_dist[self.civ_city_center[:, r, j].clamp(min=0)]  # [B, T]
         return (
             (self.civ_at == r)
-            & (self.tile_city == self.rc_id[:, r, j].unsqueeze(1))  # THIS city's registry
+            & (self.tile_city == self.civ_city_id[:, r, j].unsqueeze(1))  # THIS city's registry
             & (d_ctr <= 3)
             & (self.district < 0)
             & (self.built_wonder < 0)
-            & (self.rc_at < 0)
+            & (self.civ_city_at < 0)
             & (self.center_at < 0)
             & (self.res_priority <= 1)
         )
@@ -215,9 +215,9 @@ class SimMinors:
             return None
         ok = torch.ones(self.B, dtype=torch.bool, device=self.device)
         if int(wrow.get("ut", -1)) >= 0:
-            ok = ok & self.r_techs[:, r, int(wrow["ut"])]
+            ok = ok & self.civ_only_techs[:, r, int(wrow["ut"])]
         if int(wrow.get("uc", -1)) >= 0:
-            ok = ok & self.r_civics[:, r, int(wrow["uc"])]
+            ok = ok & self.civ_only_civics[:, r, int(wrow["uc"])]
         return ok
 
     def _wonder_cand(self, r: int, j: int, wi: int, base_ok: torch.Tensor) -> torch.Tensor:
@@ -253,19 +253,19 @@ class SimMinors:
         fresh_rs = (self.res_priority[rows_w, bwt] == 1) & ~self.res_stripped[rows_w, bwt]
         self.res_stripped[rows_w, bwt] = self.res_stripped[rows_w, bwt] | (self.res_priority[rows_w, bwt] == 1)
         self._withdraw_sea_adj(rows_w[fresh_rs], bwt[fresh_rs])
-        self.rc_wonder[rows_w, r, j, wi] = bwt
+        self.civ_city_wonder[rows_w, r, j, wi] = bwt
         code_w = 1 + self.NU + len(self._scaffold) + self.rules_dev.b_cost.shape[0] + len(self._proj_rows) + wi
-        self.rc_current[:, r, j] = torch.where(has_w, torch.full_like(self.rc_current[:, r, j], code_w), self.rc_current[:, r, j])
-        self.rc_cost[:, r, j] = torch.where(has_w, torch.full_like(self.rc_cost[:, r, j], float(wrow["cost"])), self.rc_cost[:, r, j])
-        self.rc_progress[:, r, j] = torch.where(has_w, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
+        self.civ_city_current[:, r, j] = torch.where(has_w, torch.full_like(self.civ_city_current[:, r, j], code_w), self.civ_city_current[:, r, j])
+        self.civ_city_cost[:, r, j] = torch.where(has_w, torch.full_like(self.civ_city_cost[:, r, j], float(wrow["cost"])), self.civ_city_cost[:, r, j])
+        self.civ_city_progress[:, r, j] = torch.where(has_w, torch.zeros_like(self.civ_city_progress[:, r, j]), self.civ_city_progress[:, r, j])
         self._eff_version += 1  # a pave: features/improvements changed under the caches
 
     def _seat_proj_cost(self, r: int) -> torch.Tensor:
         """The project cost — max(round(15·speed), round(dCost·0.5)) on THIS
         civ's research; the districtCostIn twin the phase hoists."""
         dcp = self.rules.district_cost
-        t_pct_r = self.r_techs[:, r].to(torch.float64).mean(dim=1)
-        c_pct_r = self.r_civics[:, r].to(torch.float64).mean(dim=1)
+        t_pct_r = self.civ_only_techs[:, r].to(torch.float64).mean(dim=1)
+        c_pct_r = self.civ_only_civics[:, r].to(torch.float64).mean(dim=1)
         d_cost = torch.floor(dcp.get("base", 32) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct_r, c_pct_r)))
         p_floor = float(round(15 * self.rules.game_speed))
         return torch.maximum(torch.full_like(d_cost, p_floor), js_round(d_cost * 0.5))

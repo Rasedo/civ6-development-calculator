@@ -162,9 +162,9 @@ class SimEconomy:
         civics = self.civ_civics.gather(1, civ.view(-1, 1, 1).expand(-1, 1, C)).squeeze(1)
         era = self._civ_era(techs, civics).clamp(0, formal.numel() - 1)
         rr = (row >= 1) & (row <= self.R) & (foe_row >= 1) & (foe_row <= self.R)
-        n = self.cc_warkind.shape[1]
+        n = self.civ_pair_warkind.shape[1]
         flat = (row.clamp(1, max(n, 1)) - 1) * n + (foe_row.clamp(1, max(n, 1)) - 1)
-        kind = self.cc_warkind.reshape(self.B, -1).gather(1, flat.unsqueeze(1)).squeeze(1) & rr
+        kind = self.civ_pair_warkind.reshape(self.B, -1).gather(1, flat.unsqueeze(1)).squeeze(1) & rr
         return torch.where(kind, formal[era], surprise[era])
 
     def _ww_battle(self, hit: torch.Tensor, a_row, d_row, tile: torch.Tensor,
@@ -216,9 +216,9 @@ class SimEconomy:
             # too, and unowned ground is foreign. `friendlyLand`'s twin.
             _own = owner == self._ROW_SEAT.gather(0, self_row.clamp(min=0))
             _rr = (self_row >= 1) & (self_row <= self.R) & (owner >= 1) & (owner <= self.R)
-            _n = self.cc_allied.shape[1]
+            _n = self.civ_pair_allied.shape[1]
             _fl = (self_row.clamp(1, max(_n, 1)) - 1) * _n + (owner.clamp(1, max(_n, 1)) - 1)
-            _ally = self.cc_allied.reshape(self.B, -1).gather(1, _fl.unsqueeze(1)).squeeze(1) & _rr
+            _ally = self.civ_pair_allied.reshape(self.B, -1).gather(1, _fl.unsqueeze(1)).squeeze(1) & _rr
             at_home = (_own | _ally) & (not city)
             gain = base * torch.where(at_home, 1, abroad)
             if died is not None:
@@ -259,7 +259,7 @@ class SimEconomy:
                 continue
             self.ww[:, i, j] = torch.where(mask, (self.ww[:, i, j] - shed).clamp(min=0), self.ww[:, i, j])
 
-    def _cs_suzerain_release(self, r: int, peace: torch.Tensor) -> None:
+    def _citystate_suzerain_release(self, r: int, peace: torch.Tensor) -> None:
         """Making peace with a civ ALSO ends the wars its city-states were
         dragged into — the `makePeace` loop that walks `state.cityStates` and
         clears every `cs.atWar` whose suzerain is that civ.
@@ -268,22 +268,22 @@ class SimEconomy:
         strictly above seat 0, strictly above every other civ."""
         if self.S <= 0 or not bool(peace.any()):
             return
-        suz_min = int(self.rules.cs.get("suzerainEnvoys", 3))
-        _oth = self.cs_r_envoys.clone()
+        suz_min = int(self.rules.citystate.get("suzerainEnvoys", 3))
+        _oth = self.civ_only_citystate_envoys.clone()
         _oth[:, r] = -1
-        r_suz = (
-            (self.cs_r_envoys[:, r] >= suz_min)
-            & (self.cs_r_envoys[:, r] > self.cs_envoys)
-            & (self.cs_r_envoys[:, r] > _oth.max(dim=1).values)
-            & self.cs_alive
+        civ_only_suz = (
+            (self.civ_only_citystate_envoys[:, r] >= suz_min)
+            & (self.civ_only_citystate_envoys[:, r] > self.citystate_envoys)
+            & (self.civ_only_citystate_envoys[:, r] > _oth.max(dim=1).values)
+            & self.citystate_alive
         )
-        rel = r_suz & self.cs_atwar & peace.unsqueeze(1)
+        rel = civ_only_suz & self.citystate_atwar & peace.unsqueeze(1)
         if not bool(rel.any()):
             return
-        self.cs_atwar &= ~rel
-        # `cs_war_turns` is a VIEW of `war_turns` — a rebind orphans it, so the
+        self.citystate_atwar &= ~rel
+        # `citystate_war_turns` is a VIEW of `war_turns` — a rebind orphans it, so the
         # clock must be written IN PLACE.
-        self.cs_war_turns.masked_fill_(rel, 0)
+        self.citystate_war_turns.masked_fill_(rel, 0)
         _cs0 = 1 + max(self.R, 1)
         for _s in range(self.S):
             self._ww_peace(rel[:, _s], 0, _cs0 + _s)
@@ -329,7 +329,7 @@ class SimEconomy:
             return torch.zeros(self.B, dtype=torch.long, device=self.device)
         return (self.p_alive & (self.p_type == self._settler_idx)).sum(dim=1)
 
-    def _r_settlers_of(self, r: int) -> torch.Tensor:
+    def _civ_only_settlers_of(self, r: int) -> torch.Tensor:
         """[B] civ r's LIVE settler units."""
         if self._settler_idx < 0:
             return torch.zeros(self.B, dtype=torch.long, device=self.device)
@@ -369,11 +369,11 @@ class SimEconomy:
 
     def _seat_district_discounted(self, r: int, di: int) -> torch.Tensor:
         """districtDiscounted from THIS civ seat's own research trees and
-        rc_dist_tile registry."""
+        civ_city_dist_tile registry."""
         if not bool(self._is_specialty[di]):
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        U = self._unlocked_specialty_count(self.r_techs[:, r], self.r_civics[:, r])
-        placed = self.rc_dist_tile[:, r]  # [B, RC, nD] tile per (city, type)
+        U = self._unlocked_specialty_count(self.civ_only_techs[:, r], self.civ_only_civics[:, r])
+        placed = self.civ_city_dist_tile[:, r]  # [B, RC, nD] tile per (city, type)
         n = (placed[:, :, di] >= 0).sum(dim=1)
         tiles_f = placed.clamp(min=0).reshape(self.B, -1)
         comp = (placed >= 0) & self.district_complete.gather(1, tiles_f).reshape(placed.shape)
@@ -702,7 +702,7 @@ class SimEconomy:
     def _adj_district_count(self) -> torch.Tensor:
         """[B, T] number of adjacent COMPLETED districts — the DISTRICT
         adjacency source. Counts seat 0 city centers (center_at), specialty
-        districts (self.district) and civ-seat city centers (rc_at, which
+        districts (self.district) and civ-seat city centers (civ_city_at, which
         carry tile.district='CITY_CENTER' in TS). No owner filter, mirroring
         matchesAdjacency('DISTRICT')."""
         if self._adjd_cache is not None and self._adjd_cache[0] == self._eff_version:
@@ -710,7 +710,7 @@ class SimEconomy:
         nb = self.neigh
         nbc = nb.clamp(min=0)
         on_map = (nb >= 0).unsqueeze(0)  # [1, T, 6]
-        is_d = ((self.center_at[:, nbc] >= 0) | ((self.district[:, nbc] >= 0) & self.district_complete[:, nbc]) | (self.rc_at[:, nbc] >= 0)) & on_map
+        is_d = ((self.center_at[:, nbc] >= 0) | ((self.district[:, nbc] >= 0) & self.district_complete[:, nbc]) | (self.civ_city_at[:, nbc] >= 0)) & on_map
         out = is_d.sum(dim=2)  # [B, T]
         self._adjd_cache = (self._eff_version, out)
         return out
@@ -724,7 +724,7 @@ class SimEconomy:
         nb = self.neigh
         nbc = nb.clamp(min=0)
         on_map = (nb >= 0).unsqueeze(0)
-        is_c = ((self.center_at[:, nbc] >= 0) | (self.rc_at[:, nbc] >= 0)) & on_map
+        is_c = ((self.center_at[:, nbc] >= 0) | (self.civ_city_at[:, nbc] >= 0)) & on_map
         out = is_c.sum(dim=2)
         self._adjc_cache = (self._eff_version, out)
         return out
@@ -1019,16 +1019,16 @@ class SimEconomy:
         district legal where the placer rejects it.
         """
         B, T, dev = self.B, self.T, self.device
-        center = self.rc_center[:, r, j].clamp(min=0)
+        center = self.civ_city_center[:, r, j].clamp(min=0)
         surface = self.coastal_water if placement == 2 else self.d_usable
         d_center = self.pair_dist[center]  # [B, T]
         elig = (
             (self.civ_at == r)
-            & (self.tile_city == self.rc_id[:, r, j].unsqueeze(1))  # THIS city's registry, not merely civ-owned
+            & (self.tile_city == self.civ_city_id[:, r, j].unsqueeze(1))  # THIS city's registry, not merely civ-owned
             & surface
             & (self.district < 0)
             & (self.built_wonder < 0)
-            & (self.rc_at < 0)  # sibling centers carry district='CITY_CENTER' in TS
+            & (self.civ_city_at < 0)  # sibling centers carry district='CITY_CENTER' in TS
             & (self.improvement < 0)
             & (d_center <= 3)
         )
@@ -1050,7 +1050,7 @@ class SimEconomy:
         eligibility (civ-owned via civ_at, district-usable, empty,
         unimproved, within radius 3 of THIS city's center, not the center) —
         and it QUEUES rather than completes: tile paved (district set,
-        complete stays False), rc_qtile remembers the completion target, the
+        complete stays False), civ_city_qtile remembers the completion target, the
         per-city registry gains the type. Returns the placed mask."""
         elig, adjf = self._district_elig_civ(r, j, di, placement)
         T = self.T
@@ -1060,8 +1060,8 @@ class SimEconomy:
         if bool(place.any()):
             rows = place.nonzero(as_tuple=True)[0]
             self.district[rows, best[rows]] = di
-            self.rc_qtile[rows, r, j] = best[rows]
-            self.rc_dist_tile[rows, r, j, di] = best[rows]
+            self.civ_city_qtile[rows, r, j] = best[rows]
+            self.civ_city_dist_tile[rows, r, j, di] = best[rows]
             self.improvement[rows, best[rows]] = -1  # queueDistrict clears it
             # The civ-seat pave strips a bonus resource too (queueDistrict's
             # rule); fresh sea strips withdraw their lent SEA_RESOURCE
@@ -1073,7 +1073,7 @@ class SimEconomy:
             self._eff_version += 1
         return place
 
-    def _place_c_works(self, can_col: torch.Tensor, culture_val: torch.Tensor, kind: int) -> None:
+    def _place_seat0_works(self, can_col: torch.Tensor, culture_val: torch.Tensor, kind: int) -> None:
         """placeGreatWorks for seat 0: distribute gwWorks works per earning
         game across seat 0's cities in state.cities order (city_seq rank),
         lowest slot first, into the AMPHITHEATER (writing) or kind's building
@@ -1115,39 +1115,39 @@ class SimEconomy:
         if bool((alloc != 0).any()):
             self._eff_version += 1
 
-    def _place_rc_works(self, r: int, hit: torch.Tensor, culture_val: torch.Tensor, kind: int) -> None:
+    def _place_civ_works(self, r: int, hit: torch.Tensor, culture_val: torch.Tensor, kind: int) -> None:
         """placeGreatWorks for civ seat r: distribute gwWorks works across its
         cities in rc slot order (= the seat's cities array order), lowest slot
         first; overflow charges fall back to the instant culture lump on this
         seat's civic progress. Every slot write bumps _eff_version."""
         bcol, nslots, nworks = self._gw_bidx[kind], self._gw_slots_k[kind], self._gw_works_k[kind]
         if bcol < 0:
-            self.r_civic_prog[:, r] = self.r_civic_prog[:, r] + hit.double() * nworks * culture_val
+            self.civ_only_civic_prog[:, r] = self.civ_only_civic_prog[:, r] + hit.double() * nworks * culture_val
             return
-        used = (self.rc_gw_writing, self.rc_gw_art, self.rc_gw_music)[kind][:, r]  # [B, RC]
-        cap = self.rc_bldg[:, r, :, bcol].long() * nslots  # [B, RC]
+        used = (self.civ_city_gw_writing, self.civ_city_gw_art, self.civ_city_gw_music)[kind][:, r]  # [B, RC]
+        cap = self.civ_city_bldg[:, r, :, bcol].long() * nslots  # [B, RC]
         # Plus COMPLETED-WONDER slots, the civ-seat twin of the seat-0 term.
         # Civ seats DO carry a per-city wonder registry, so this reads
-        # rc_wonder directly instead of going via tile ownership — the same
+        # civ_city_wonder directly instead of going via tile ownership — the same
         # source and completeness test the Petra block uses.
         if getattr(self, "_wond_gw", None) is not None and int(self._wond_gw[:, kind].sum()) > 0:
-            wreg = self.rc_wonder[:, r]  # [B, RC, nW]
+            wreg = self.civ_city_wonder[:, r]  # [B, RC, nW]
             compw = (wreg >= 0) & self.built_wonder_complete.gather(
                 1, wreg.clamp(min=0).reshape(self.B, -1)
             ).reshape_as(wreg)
             cap = cap + (compw.long() * self._wond_gw[:, kind].reshape(1, 1, -1)).sum(dim=2)
-        openc = (cap - used).clamp(min=0) * self.rc_alive[:, r].long()  # [B, RC]
+        openc = (cap - used).clamp(min=0) * self.civ_city_alive[:, r].long()  # [B, RC]
         W = nworks * hit.long()  # [B]
         prefix = openc.cumsum(dim=1) - openc  # exclusive prefix in slot order
         alloc = (W.unsqueeze(1) - prefix).clamp(min=0).minimum(openc)  # [B, RC]
         overflow = (W - alloc.sum(dim=1)).clamp(min=0)  # [B]
         if kind == 0:
-            self.rc_gw_writing[:, r] = self.rc_gw_writing[:, r] + alloc
+            self.civ_city_gw_writing[:, r] = self.civ_city_gw_writing[:, r] + alloc
         elif kind == 1:
-            self.rc_gw_art[:, r] = self.rc_gw_art[:, r] + alloc
+            self.civ_city_gw_art[:, r] = self.civ_city_gw_art[:, r] + alloc
         else:
-            self.rc_gw_music[:, r] = self.rc_gw_music[:, r] + alloc
-        self.r_civic_prog[:, r] = self.r_civic_prog[:, r] + overflow.double() * culture_val
+            self.civ_city_gw_music[:, r] = self.civ_city_gw_music[:, r] + alloc
+        self.civ_only_civic_prog[:, r] = self.civ_only_civic_prog[:, r] + overflow.double() * culture_val
         if bool((alloc != 0).any()):
             self._eff_version += 1
 
@@ -1188,7 +1188,7 @@ class SimEconomy:
             cf = can.to(self.dtype)
             # WRITER/MUSICIAN culture is slotted as Great Works (deferred
             # +2/turn), not applied instantly — mask those columns out of the
-            # standard civic add; _place_c_works handles their slot fill +
+            # standard civic add; _place_seat0_works handles their slot fill +
             # overflow lump below.
             cf_cult = cf.clone()
             for _kcls in self._gw_cls:  # WRITER / ARTIST / MUSICIAN
@@ -1223,7 +1223,7 @@ class SimEconomy:
             # cities (eff holds the pre-increment person's culture).
             for _k, _kcls in enumerate(self._gw_cls):  # kind order 0/1/2
                 if _kcls >= 0:
-                    self._place_c_works(can[:, _kcls], eff[:, _kcls, 1], _k)
+                    self._place_seat0_works(can[:, _kcls], eff[:, _kcls, 1], _k)
             # A GENERAL/ADMIRAL claim spawns its support unit (civilian, 4 MP)
             # at seat 0's CAPITAL, on top of the instant effect — the
             # applyGreatPersonEffect mirror. Zero RNG. The capital is `is_cap`,
@@ -1233,7 +1233,7 @@ class SimEconomy:
                     sm = can[:, gcls] & _cap_live  # TS: spawn only if a capital exists
                     if bool(sm.any()):
                         cap_site = self.site.gather(1, _cap_col.unsqueeze(1)).squeeze(1)
-                        self._spawn_p(sm, cap_site, torch.full((B,), guidx, dtype=torch.long, device=dev))
+                        self._spawn_seat0(sm, cap_site, torch.full((B,), guidx, dtype=torch.long, device=dev))
                         self._gen_ver += 1
 
     def _spread_religious_pressure(self) -> None:
@@ -1246,8 +1246,8 @@ class SimEconomy:
 
         KILL hygiene: dead/absent slots are zeroed each turn (torch.where on the
         alive mask), so a razed-then-reused slot starts fresh — the TS mirror is
-        the fresh City object a founded/flipped city gets. cty_pressure/cty_followed
-        permute with their city in _reclaim_rc, so pressure tracks the CITY, not
+        the fresh City object a founded/flipped city gets. city_pressure/city_followed
+        permute with their city in _reclaim_civ_cities, so pressure tracks the CITY, not
         the slot, through compaction."""
         B, O = self.B, self._O
         # Itinerant Preachers: per-religion range — base + the religion's
@@ -1255,26 +1255,26 @@ class SimEconomy:
         # founding path assigns it an enhancer.
         RANGE = torch.full((B, O), int(self._pressure_range), dtype=torch.long, device=self.device)
         if self.R > 0 and self._enh_any:
-            RANGE[:, 1 : 1 + self.R] += self._enh["presR"][self.r_enhancer + 1].long()
+            RANGE[:, 1 : 1 + self.R] += self._enh["presR"][self.civ_only_enhancer + 1].long()
         founded = self.holy_tile >= 0  # [B, O]
         ht = self.holy_tile.clamp(min=0)  # [B, O] valid tile idx (masked where unfounded)
         # ONE flip for every seat.
         NSC = 1 + max(self.R, 0)
-        cen = self.cty_center[:, :NSC].clamp(min=0)                     # [B, NSC, RC]
+        cen = self.city_center[:, :NSC].clamp(min=0)                     # [B, NSC, RC]
         d_all = self.pair_dist[cen.unsqueeze(3), ht.reshape(B, 1, 1, O)].to(torch.long)
-        liv = self.cty_alive[:, :NSC]                                    # [B, NSC, RC]
+        liv = self.city_alive[:, :NSC]                                    # [B, NSC, RC]
         add = (d_all <= RANGE.reshape(B, 1, 1, O)) & founded.reshape(B, 1, 1, O) & liv.unsqueeze(3)
-        self.cty_pressure[:, :NSC].copy_(
-            torch.where(liv.unsqueeze(3), self.cty_pressure[:, :NSC] + add.long(), torch.zeros_like(self.cty_pressure[:, :NSC]))
+        self.city_pressure[:, :NSC].copy_(
+            torch.where(liv.unsqueeze(3), self.city_pressure[:, :NSC] + add.long(), torch.zeros_like(self.city_pressure[:, :NSC]))
         )
-        tot = self.cty_pressure[:, :NSC].sum(dim=3)
-        best = self.cty_pressure[:, :NSC].argmax(dim=3)                  # ties -> lowest id
+        tot = self.city_pressure[:, :NSC].sum(dim=3)
+        best = self.city_pressure[:, :NSC].argmax(dim=3)                  # ties -> lowest id
         # EXODUS pays era score each time a city CONVERTS; compare against the
         # PRE-flip follow set, exactly like `wasFollowed`.
-        was = self.cty_followed[:, :NSC].clone()
-        self.cty_followed[:, :NSC].copy_(torch.where(liv & (tot > 0), best, torch.full_like(best, -1)))
+        was = self.city_followed[:, :NSC].clone()
+        self.city_followed[:, :NSC].copy_(torch.where(liv & (tot > 0), best, torch.full_like(best, -1)))
         for _g in range(self._O):
-            _conv = (self.cty_followed[:, :NSC] == _g) & (was != _g) & liv
+            _conv = (self.city_followed[:, :NSC] == _g) & (was != _g) & liv
             if bool(_conv.any()):
                 self._dedication_event(_g, 3, _conv.reshape(B, -1).sum(dim=1))  # per CITY
 
@@ -1295,34 +1295,34 @@ class SimEconomy:
         dev = self.device
         # per-tile followed religion of the OWNING city (-1 none)
         tfol = torch.full((B, T), -1, dtype=torch.long, device=dev)
-        pf = self.cty_followed[:, 0, :self.C].gather(1, self.owner.clamp(min=0))  # [B, T]
+        pf = self.city_followed[:, 0, :self.C].gather(1, self.owner.clamp(min=0))  # [B, T]
         tfol = torch.where((self.tile_seat == 0) & self.alive.gather(1, self.owner.clamp(min=0)), pf, tfol)
         if self.R > 0:
             for r in range(self.R):
                 for j in range(self.RC):
-                    if not bool(self.rc_alive[:, r, j].any()):
+                    if not bool(self.civ_city_alive[:, r, j].any()):
                         continue
-                    ring = (self.civ_at == r) & (self.tile_city == self.rc_id[:, r, j].unsqueeze(1)) & self.rc_alive[:, r, j].unsqueeze(1)
-                    tfol = torch.where(ring, self.cty_followed[:, r + 1, j].unsqueeze(1).expand(B, T), tfol)
+                    ring = (self.civ_at == r) & (self.tile_city == self.civ_city_id[:, r, j].unsqueeze(1)) & self.civ_city_alive[:, r, j].unsqueeze(1)
+                    tfol = torch.where(ring, self.city_followed[:, r + 1, j].unsqueeze(1).expand(B, T), tfol)
         terr = tfol.unsqueeze(1) == torch.arange(O, device=dev).reshape(1, O, 1)  # [B, O, T]
         # near3: dilate FOLLOWING city centers by justWarRange (scatter_add
         # then >0 — a masked bool scatter would clobber tile 0 via the clamp)
         near3 = torch.zeros(B, O, T, dtype=torch.bool, device=dev)
         off3 = tiles_within_offsets(self._just_war_range).to(dev)
         pc_win = tiles_from_offsets(self.site.clamp(min=0).reshape(-1), off3, self.W, self.H).reshape(B, self.C, -1)  # [B, C, M]
-        rc_win = None
+        civ_city_win = None
         if self.R > 0:
-            rc_win = tiles_from_offsets(self.rc_center.clamp(min=0).reshape(-1), off3, self.W, self.H).reshape(B, self.R * self.RC, -1)
+            civ_city_win = tiles_from_offsets(self.civ_city_center.clamp(min=0).reshape(-1), off3, self.W, self.H).reshape(B, self.R * self.RC, -1)
         for g in range(O):
             srci = torch.zeros(B, T, dtype=torch.long, device=dev)
-            fol_c = self.alive & (self.cty_followed[:, 0, :self.C] == g)  # [B, C]
+            fol_c = self.alive & (self.city_followed[:, 0, :self.C] == g)  # [B, C]
             if bool(fol_c.any()):
                 w = torch.where(fol_c.unsqueeze(2), pc_win, torch.full_like(pc_win, -1)).reshape(B, -1)
                 srci.scatter_add_(1, w.clamp(min=0), (w >= 0).long())
             if self.R > 0:
-                fol_rc = self.rc_alive & (self.cty_followed[:, 1:1 + self.R] == g)  # [B, R, RC]
+                fol_rc = self.civ_city_alive & (self.city_followed[:, 1:1 + self.R] == g)  # [B, R, RC]
                 if bool(fol_rc.any()):
-                    wr = torch.where(fol_rc.reshape(B, -1).unsqueeze(2), rc_win, torch.full_like(rc_win, -1)).reshape(B, -1)
+                    wr = torch.where(fol_rc.reshape(B, -1).unsqueeze(2), civ_city_win, torch.full_like(civ_city_win, -1)).reshape(B, -1)
                     srci.scatter_add_(1, wr.clamp(min=0), (wr >= 0).long())
             near3[:, g] = srci > 0
         out = (near3, terr)
@@ -1335,11 +1335,11 @@ class SimEconomy:
         barbarian/none). Seat 0's units carry no religion — holy_tile[:, 0] is
         never set — so the seat-0 term is structurally 0 and omitted at the
         call sites. Returns f64 [B]."""
-        if not self._enh_combat_any or self.R == 0 or not bool((self.r_enhancer >= 0).any()):
+        if not self._enh_combat_any or self.R == 0 or not bool((self.civ_only_enhancer >= 0).any()):
             return torch.zeros(self.B, dtype=torch.float64, device=self.device)
         cr = civ_r.clamp(min=0, max=self.R - 1)
-        has = (civ_r >= 0) & self.r_religion_done.gather(1, cr.unsqueeze(1)).squeeze(1)
-        eidx = self.r_enhancer.gather(1, cr.unsqueeze(1)).squeeze(1) + 1  # [B] 0 = pad
+        has = (civ_r >= 0) & self.civ_only_religion_done.gather(1, cr.unsqueeze(1)).squeeze(1)
+        eidx = self.civ_only_enhancer.gather(1, cr.unsqueeze(1)).squeeze(1) + 1  # [B] 0 = pad
         eidx = torch.where(has, eidx, torch.zeros_like(eidx))
         g = (cr + 1).unsqueeze(1)  # religion id [B, 1]
         near3, terr = self._rel_combat_planes()
@@ -1353,11 +1353,11 @@ class SimEconomy:
         """Enhancer DEFENDER adders (Just War near + Defender of the Faith on
         following-city territory) for unit defenders of civ index civ_r ([B],
         -1 = barbarian/seat 0/none). f64 [B]."""
-        if not self._enh_combat_any or self.R == 0 or not bool((self.r_enhancer >= 0).any()):
+        if not self._enh_combat_any or self.R == 0 or not bool((self.civ_only_enhancer >= 0).any()):
             return torch.zeros(self.B, dtype=torch.float64, device=self.device)
         cr = civ_r.clamp(min=0, max=self.R - 1)
-        has = (civ_r >= 0) & self.r_religion_done.gather(1, cr.unsqueeze(1)).squeeze(1)
-        eidx = self.r_enhancer.gather(1, cr.unsqueeze(1)).squeeze(1) + 1
+        has = (civ_r >= 0) & self.civ_only_religion_done.gather(1, cr.unsqueeze(1)).squeeze(1)
+        eidx = self.civ_only_enhancer.gather(1, cr.unsqueeze(1)).squeeze(1) + 1
         eidx = torch.where(has, eidx, torch.zeros_like(eidx))
         g = (cr + 1).unsqueeze(1)
         near3, terr = self._rel_combat_planes()
@@ -1492,7 +1492,7 @@ class SimEconomy:
         home = here == seat
         # A city CENTRE here — any seat's; `home` already restricts it to this
         # one, and the one-owner invariant makes a centre tile its own seat's.
-        center = (self.center_at.gather(1, t) >= 0) | (self.rc_at.gather(1, t) >= 0)
+        center = (self.center_at.gather(1, t) >= 0) | (self.civ_city_at.gather(1, t) >= 0)
         camp = (self.camp_tile.unsqueeze(2) == t.unsqueeze(1)).any(dim=1) if pre == "u" else None
         heal = torch.where(home & center, torch.full_like(t, 20),
                torch.where(home, torch.full_like(t, 15),
@@ -1891,9 +1891,9 @@ class SimEconomy:
         # LIVE, else religion 0 = -1 follower = no add). Its building-yield
         # adds (Feed the World / Choral Music) land at the buildings position
         # (pre-amenity), like cityBuildingYields' beliefAdd. Computed fresh
-        # (not cached): the term is pop-free but cty_followed can change
+        # (not cached): the term is pop-free but city_followed can change
         # between turns without an _eff_version bump.
-        _pcfol = self._follower_id_for(self._city_rel_c()) if self._bel_any else None
+        _pcfol = self._follower_id_for(self._city_rel_seat0()) if self._bel_any else None
         if _pcfol is not None:
             # (.to(self.dtype): the fol tables are f64 for the civ-seat paths;
             # this walk runs in self.dtype — f32 under gumbel/training, where
@@ -1907,7 +1907,7 @@ class SimEconomy:
                 # addends in catalog order (same adds, same association as the
                 # miss path below).
                 d_addends = cc["d_addends"]
-                cs_city6 = cc["cs_city6"]
+                citystate_city6 = cc["citystate_city6"]
                 ship_add = cc["ship_add"]
                 d_maint = cc["d_maint"]
                 has_aq = cc["has_aq"]
@@ -1945,16 +1945,16 @@ class SimEconomy:
                 # cityBuildingYields exactly. Scatter per (building, channel),
                 # pre-amenity-factor.
                 nBc = self.buildings.shape[2]
-                cs_city6 = torch.zeros(B, C, 6, dtype=self.dtype, device=dev)
+                citystate_city6 = torch.zeros(B, C, 6, dtype=self.dtype, device=dev)
                 if self.S > 0:
-                    _acs = self.cs_alive.to(self.dtype)  # [B, S]
-                    per3 = (self.cs_envoys >= 3).to(self.dtype) * self._cs_district_bonus * _acs * (self._cs_b1idx >= 0).to(self.dtype)
-                    per6 = (self.cs_envoys >= 6).to(self.dtype) * self._cs_district_bonus * _acs * (self._cs_b2idx >= 0).to(self.dtype)
-                    cs_bld6f = torch.zeros(B, nBc * 6, dtype=self.dtype, device=dev)
-                    cs_bld6f.scatter_add_(1, self._cs_b1idx.clamp(min=0) * 6 + self._cs_yidx, per3)
-                    cs_bld6f.scatter_add_(1, self._cs_b2idx.clamp(min=0) * 6 + self._cs_yidx, per6)
-                    cs_bld6 = cs_bld6f.reshape(B, nBc, 6)
-                    cs_city6 = torch.einsum("bcn,bnk->bck", bf_live, cs_bld6)  # [B, C, 6] — pillaged/regional dark via bf_live
+                    _acs = self.citystate_alive.to(self.dtype)  # [B, S]
+                    per3 = (self.citystate_envoys >= 3).to(self.dtype) * self._citystate_district_bonus * _acs * (self._citystate_b1idx >= 0).to(self.dtype)
+                    per6 = (self.citystate_envoys >= 6).to(self.dtype) * self._citystate_district_bonus * _acs * (self._citystate_b2idx >= 0).to(self.dtype)
+                    citystate_bld6f = torch.zeros(B, nBc * 6, dtype=self.dtype, device=dev)
+                    citystate_bld6f.scatter_add_(1, self._citystate_b1idx.clamp(min=0) * 6 + self._citystate_yidx, per3)
+                    citystate_bld6f.scatter_add_(1, self._citystate_b2idx.clamp(min=0) * 6 + self._citystate_yidx, per6)
+                    citystate_bld6 = citystate_bld6f.reshape(B, nBc, 6)
+                    citystate_city6 = torch.einsum("bcn,bnk->bck", bf_live, citystate_bld6)  # [B, C, 6] — pillaged/regional dark via bf_live
                 # For each PLACED district with an adjacencyYield: floor(static
                 # + 0.5*adjacent-districts) into its yield column, including
                 # the type-specific dynamic sources (mine/quarry for the
@@ -2018,7 +2018,7 @@ class SimEconomy:
                         reg_am = reg_am + _hf * rd.b_amenities[_n]
             for yc_a, adj_add in d_addends:
                 total[:, :, yc_a] = total[:, :, yc_a] + adj_add
-            total = total + cs_city6  # CS envoy district adds (channel columns, all types)
+            total = total + citystate_city6  # CS envoy district adds (channel columns, all types)
             if reg_y is not None:
                 total = total + reg_y  # regional-building yields (pre-tier, the buildings position)
             # Follower Work Ethic — Holy Site floored adjacency ALSO yields
@@ -2061,9 +2061,9 @@ class SimEconomy:
         # City-state envoy bonuses land on the capital (mods.capitalYields),
         # summed before the amenity multiplier like every other bonus.
         if self.S > 0:
-            tier1 = ((self.cs_envoys >= 1) & self.cs_alive).to(self.dtype) * self.rules.cs.get("capitalBonus", 2)
+            tier1 = ((self.citystate_envoys >= 1) & self.citystate_alive).to(self.dtype) * self.rules.citystate.get("capitalBonus", 2)
             cap_bonus = torch.zeros(B, 6, dtype=self.dtype, device=dev)
-            cap_bonus.scatter_add_(1, self._cs_yidx, tier1)
+            cap_bonus.scatter_add_(1, self._citystate_yidx, tier1)
             # Key on the CAPITAL FLAG, not column 0: TS applies
             # mods.capitalYields via `if (city.isCapital)`, and palace
             # relocation can re-crown any surviving column. Adding 0.0 to
@@ -2071,17 +2071,17 @@ class SimEconomy:
             _cap_m = self.is_cap.to(self.dtype).unsqueeze(2)  # [B, C, 1]
             total += cap_bonus.unsqueeze(1) * _cap_m
             # The suzerain's per-CS unique perk — a flat +suzerainYield in the
-            # CS's live channel (cs_suz_key, -1 = descoped) to whichever seat
+            # CS's live channel (citystate_suz_key, -1 = descoped) to whichever seat
             # holds the STRICT suzerain contest (csSuzerainCapitalBonus).
             # Seat 0 here — the isSuzerain twin (>= suz_min, strictly > every
             # civ seat).
-            suz_min = int(self.rules.cs.get("suzerainEnvoys", 3))
-            p_suz = (self.cs_envoys >= suz_min) & self.cs_alive
+            suz_min = int(self.rules.citystate.get("suzerainEnvoys", 3))
+            p_suz = (self.citystate_envoys >= suz_min) & self.citystate_alive
             if self.R > 0:
-                p_suz = p_suz & (self.cs_envoys > self.cs_r_envoys.max(dim=1).values)
-            suz_val = p_suz.to(self.dtype) * self._cs_suz_amt * (self.cs_suz_key >= 0).to(self.dtype)  # [B, S]
+                p_suz = p_suz & (self.citystate_envoys > self.civ_only_citystate_envoys.max(dim=1).values)
+            suz_val = p_suz.to(self.dtype) * self._citystate_suz_amt * (self.citystate_suz_key >= 0).to(self.dtype)  # [B, S]
             suz_bonus = torch.zeros(B, 6, dtype=self.dtype, device=dev)
-            suz_bonus.scatter_add_(1, self.cs_suz_key.clamp(min=0), suz_val)
+            suz_bonus.scatter_add_(1, self.citystate_suz_key.clamp(min=0), suz_val)
             total += suz_bonus.unsqueeze(1) * _cap_m  # capital FLAG, not column 0
 
         # Seat 0's adopted government + slotted policies — cityYields to every
@@ -2202,7 +2202,7 @@ class SimEconomy:
             store = {"b_y": b_y, "amen_b": amen_b, "maint_b": maint_b, "house_b": house_b, "bf_live": bf_live}
             if self.districts_on:
                 store["d_addends"] = d_addends
-                store["cs_city6"] = cs_city6
+                store["citystate_city6"] = citystate_city6
                 store["ship_add"] = ship_add
                 store["d_maint"] = d_maint
                 store["has_aq"] = has_aq
@@ -2252,15 +2252,15 @@ class SimEconomy:
         rd = self.rules_dev
         w = rd.score_yield_weights
         B = self.B
-        pop_term = (self.rc_pop[:, r] * self.rc_alive[:, r].long()).sum(dim=1).to(self.dtype) * self.rules.score_pop_weight
+        pop_term = (self.civ_city_pop[:, r] * self.civ_city_alive[:, r].long()).sum(dim=1).to(self.dtype) * self.rules.score_pop_weight
         yt = torch.zeros(B, dtype=torch.float64, device=self.device)
         for j in range(self.RC):
-            mask = self.rc_alive[:, r, j]
+            mask = self.civ_city_alive[:, r, j]
             if not bool(mask.any()):
                 continue
             f, pr, sc, cu, _g, _fa = self._seat_city_yields(r, j, mask)
             yt = yt + f * float(w[0]) + pr * float(w[1]) + sc * float(w[3]) + cu * float(w[4])
-            bgf = self.rc_bldg[:, r, j].double() @ rd.b_yields.double()  # [B, 6]
+            bgf = self.civ_city_bldg[:, r, j].double() @ rd.b_yields.double()  # [B, 6]
             yt = yt + bgf[:, 2] * float(w[2]) + bgf[:, 5] * float(w[5])
         return pop_term + yt.to(self.dtype)
 
@@ -2277,7 +2277,7 @@ class SimEconomy:
         # TS association: per city — pop×popWeight FIRST, then the six yields
         # in key order (empireScore's per-city loop).
         yt = torch.zeros(B, dtype=torch.float64, device=self.device)
-        if not bool(self.rc_alive[:, r].any()):
+        if not bool(self.civ_city_alive[:, r].any()):
             return yt.to(self.dtype)
         # ONE batched pass replaces the RC per-j _seat_city_yields calls (each
         # a full window gather + ~30 plane gathers + topk); the per-j
@@ -2286,18 +2286,18 @@ class SimEconomy:
         # leader() included — through this one body.
         F, PR, SC, CU, GO, FA = self._seat_city_yields_all(r)
         for j in range(self.RC):
-            mask = self.rc_alive[:, r, j]
+            mask = self.civ_city_alive[:, r, j]
             if not bool(mask.any()):
                 continue
-            yt = yt + (self.rc_pop[:, r, j] * self.rc_alive[:, r, j].long()).double() * pw
+            yt = yt + (self.civ_city_pop[:, r, j] * self.civ_city_alive[:, r, j].long()).double() * pw
             yt = yt + F[:, j] * float(w[0]) + PR[:, j] * float(w[1]) + GO[:, j] * float(w[2]) + SC[:, j] * float(w[3]) + CU[:, j] * float(w[4]) + FA[:, j] * float(w[5])
         return yt.to(self.dtype)
 
-    def _rc_spec_count(self, r: int) -> torch.Tensor:
+    def _civ_city_spec_count(self, r: int) -> torch.Tensor:
         """[B, RC] — COMPLETED SPECIALTY districts per city of civ seat r, the
         `completedDistrictCount(specialtyOnly)` twin: countsTowardLimit AND
         districtComplete, CITY_CENTER excluded by countsTowardLimit."""
-        reg = self.rc_dist_tile[:, r]  # [B, RC, nD]
+        reg = self.civ_city_dist_tile[:, r]  # [B, RC, nD]
         comp = (reg >= 0) & self.district_complete.gather(1, reg.clamp(min=0).reshape(self.B, -1)).reshape(reg.shape)
         return (comp & self._is_specialty.reshape(1, 1, -1)).sum(dim=2)
 
@@ -2317,8 +2317,8 @@ class SimEconomy:
         frozen amen_yf and mid-phase sequencing are per-city by spec."""
         rd = self.rules_dev
         B, RC = self.B, self.RC
-        alive = self.rc_alive[:, r]  # [B, RC]
-        centers = self.rc_center[:, r]  # [B, RC]
+        alive = self.civ_city_alive[:, r]  # [B, RC]
+        centers = self.civ_city_center[:, r]  # [B, RC]
         g = self._rcy_globals()
         # Window cache: centers move only on found/capture/transfer/
         # compaction, and every such site bumps _eff_version, so the per-r
@@ -2337,7 +2337,7 @@ class SimEconomy:
 
         districted = (
             (self.center_at.gather(1, tc) >= 0)
-            | (self.rc_at.gather(1, tc) >= 0)
+            | (self.civ_city_at.gather(1, tc) >= 0)
             | (self.district.gather(1, tc) >= 0)
             | (self.built_wonder.gather(1, tc) >= 0)  # wonder tiles are not workable
         ).reshape(B, RC, M)
@@ -2347,7 +2347,7 @@ class SimEconomy:
             # PER-CITY, not civ-level: the registry entry must be THIS city,
             # mirroring `t.cityId === city.id`. Without it two adjacent cities
             # of the same civ seat can both work one tile.
-            & (gat(self.tile_city) == self.rc_id[:, r].unsqueeze(2))
+            & (gat(self.tile_city) == self.civ_city_id[:, r].unsqueeze(2))
             & gat(self.work_ok)
             & (tiles != centers.unsqueeze(2))
             & ~districted
@@ -2356,10 +2356,10 @@ class SimEconomy:
         p_plane = g["p_plane"]
         ty_oth = g["ty_oth"]
         oth_sc = g["oth_score"]
-        _has_bel = self._r_has_beliefs(r)
+        _has_bel = self._civ_only_has_beliefs(r)
         # Per-rc FOLLOWER-belief id [B, RC] (followed religion when LIVE, else
         # owner r+1).
-        _fol_rc = self._follower_id_for(self._rc_rel(r)) if _has_bel else None
+        _fol_rc = self._follower_id_for(self._civ_city_rel(r)) if _has_bel else None
         featP = None
         if _has_bel:
             featP = self._belief_feat_plane(r)
@@ -2370,7 +2370,7 @@ class SimEconomy:
         f = gat(f_plane).double()
         p = gat(p_plane).double()
         if self._mine_boost_tech.numel() > 0 and self.MINE >= 0:
-            boost_r = (self.r_techs[:, r][:, self._mine_boost_tech].to(self.dtype) * self._mine_boost_amt).sum(dim=1).double()
+            boost_r = (self.civ_only_techs[:, r][:, self._mine_boost_tech].to(self.dtype) * self._mine_boost_amt).sum(dim=1).double()
             mine_here = (gat(self.improvement) == self.MINE) & ~gat(self.pillaged)
             p = p + mine_here.double() * boost_r.reshape(B, 1, 1)
         w = g["w"]
@@ -2385,12 +2385,12 @@ class SimEconomy:
         _ns_all = torch.zeros(B, RC, dtype=torch.long, device=self.device)
         _sa_all = torch.zeros(B, RC, 6, dtype=torch.float64, device=self.device)
         for _j in range(RC):
-            _n1, _a1 = self._rc_specialists(r, _j, top_vals[:, _j], self.rc_pop[:, r, _j])
+            _n1, _a1 = self._civ_city_specialists(r, _j, top_vals[:, _j], self.civ_city_pop[:, r, _j])
             _ns_all[:, _j] = _n1
             _sa_all[:, _j] = _a1
         take = (
             torch.arange(M, device=self.device).reshape(1, 1, M)
-            < (self.rc_pop[:, r] - _ns_all).clamp(min=0).unsqueeze(2)
+            < (self.civ_city_pop[:, r] - _ns_all).clamp(min=0).unsqueeze(2)
         ) & (top_vals > -1e17)
         f_sel = f.gather(2, top_idx) * take.double()
         p_sel = p.gather(2, top_idx) * take.double()
@@ -2441,7 +2441,7 @@ class SimEconomy:
         # Petra (the any-j guard is safe: absent cities add exact 0)
         compw = None
         if self._wond_n:
-            wreg = self.rc_wonder[:, r]  # [B, RC, nW]
+            wreg = self.civ_city_wonder[:, r]  # [B, RC, nW]
             compw = (wreg >= 0) & self.built_wonder_complete.gather(1, wreg.clamp(min=0).reshape(B, -1)).reshape_as(wreg)
             hasP = (compw & self._wond_petra.reshape(1, 1, -1)).any(dim=2)  # [B, RC]
             if bool(hasP.any()):
@@ -2460,7 +2460,7 @@ class SimEconomy:
         # WATER MILL, the civ-seat twin of the seat-0 term: farm-improved
         # BONUS resources gain +1 food, POST-selection over the worked set
         # like Petra above.
-        wm_r = self.rc_bldg[:, r][:, :, rd.b_farmbonus]  # [B, RC, n]
+        wm_r = self.civ_city_bldg[:, r][:, :, rd.b_farmbonus]  # [B, RC, n]
         if wm_r.numel() and bool(wm_r.any()):
             has_wm = wm_r.any(dim=2)  # [B, RC]
             sel_t = tc3.gather(2, top_idx).reshape(B, RC * M)
@@ -2473,7 +2473,7 @@ class SimEconomy:
         # Completed-district floored adjacency. State is frozen here
         # (post-step), so ONE _adj_district_count serves every j.
         if self.districts_on:
-            reg = self.rc_dist_tile[:, r]  # [B, RC, nD]
+            reg = self.civ_city_dist_tile[:, r]  # [B, RC, nD]
             if bool((reg >= 0).any()):
                 for di, dd in enumerate(self.districts_cat):
                     yc = int(dd.get("adjYield", -1))
@@ -2505,7 +2505,7 @@ class SimEconomy:
                         faith = faith + add
         # Building yields (int-valued matmul: exact in any order)
         if self.districts_on:
-            selb = self.rc_bldg[:, r] & ~self._rc_bdark(self.rc_dist_tile[:, r]) & ~self._b_regional.reshape(1, 1, -1)  # [B, RC, NB] (pillaged dark; regional delivered by range)
+            selb = self.civ_city_bldg[:, r] & ~self._civ_city_bdark(self.civ_city_dist_tile[:, r]) & ~self._b_regional.reshape(1, 1, -1)  # [B, RC, NB] (pillaged dark; regional delivered by range)
             if bool(selb.any()):
                 add6 = selb.double() @ self.rules_dev.b_yields.double()  # [B, RC, 6]
                 food = food + add6[:, :, 0]
@@ -2527,14 +2527,14 @@ class SimEconomy:
                     faith = faith + badd[:, :, 5]
                 # SHIPYARD: the completed Harbor's LIVE floor(adjacency)
                 if self._harbor_idx >= 0 and self._shipyard_bidx >= 0:
-                    hb_tile = self.rc_dist_tile[:, r, :, self._harbor_idx]  # [B, RC]
+                    hb_tile = self.civ_city_dist_tile[:, r, :, self._harbor_idx]  # [B, RC]
                     has_sy = alive & selb[:, :, self._shipyard_bidx] & (hb_tile >= 0)
                     has_sy = has_sy & self.district_complete.gather(1, hb_tile.clamp(min=0))
                     if bool(has_sy.any()):
                         hadj = self._district_adj_floor(self._harbor_idx).gather(1, hb_tile.clamp(min=0)).double()  # (memoised)
                         prod = prod + torch.where(has_sy, hadj, torch.zeros_like(hadj))
         # PALACE on the capital slot — the per-j twin's add, j-batched.
-        _isc_palA = (self.rc_is_cap[:, r] & alive).double()  # [B, RC]
+        _isc_palA = (self.civ_city_is_cap[:, r] & alive).double()  # [B, RC]
         if bool((_isc_palA != 0).any()):
             _pal6A = self._palace_y.double()
             food = food + _pal6A[0] * _isc_palA
@@ -2570,10 +2570,10 @@ class SimEconomy:
         if _has_bel:
             perF = self._bel_add("perF", r)  # [B, 7]
             perC = self._bel_add("perC", r)  # [B, 6]
-            followers = (self.rc_pop[:, r] * self.rc_alive[:, r].long()).sum(dim=1).double()
+            followers = (self.civ_city_pop[:, r] * self.civ_city_alive[:, r].long()).sum(dim=1).double()
             times = torch.where(perF[:, 0] > 0, torch.floor(followers / perF[:, 0].clamp(min=1)), torch.zeros_like(followers))
-            capY = perF[:, 1:] * times.unsqueeze(1) + perC * self.rc_alive[:, r].sum(dim=1).double().unsqueeze(1)
-            isc = (self.rc_is_cap[:, r] & alive).double()  # [B, RC]
+            capY = perF[:, 1:] * times.unsqueeze(1) + perC * self.civ_city_alive[:, r].sum(dim=1).double().unsqueeze(1)
+            isc = (self.civ_city_is_cap[:, r] & alive).double()  # [B, RC]
             food = food + capY[:, 0].unsqueeze(1) * isc
             prod = prod + capY[:, 1].unsqueeze(1) * isc
             gold = gold + capY[:, 2].unsqueeze(1) * isc
@@ -2586,9 +2586,9 @@ class SimEconomy:
         # (getModifiers layers gov+policy into these mods).
         _gym = None  # bound only inside the branch below
         if self._gov_has_effects:
-            gcity, gcap, _gh, _gym, *_ = self._gov_policy_mods_cached(r, self.r_civics[:, r])  # housing is applied on the housing path; slots stay unconsumed here
+            gcity, gcap, _gh, _gym, *_ = self._gov_policy_mods_cached(r, self.civ_only_civics[:, r])  # housing is applied on the housing path; slots stay unconsumed here
             acell = alive.double()  # [B, RC]
-            gisc = (self.rc_is_cap[:, r] & alive).double()  # [B, RC]
+            gisc = (self.civ_city_is_cap[:, r] & alive).double()  # [B, RC]
             food = food + gcity[:, 0].unsqueeze(1) * acell + gcap[:, 0].unsqueeze(1) * gisc
             prod = prod + gcity[:, 1].unsqueeze(1) * acell + gcap[:, 1].unsqueeze(1) * gisc
             gold = gold + gcity[:, 2].unsqueeze(1) * acell + gcap[:, 2].unsqueeze(1) * gisc
@@ -2599,36 +2599,36 @@ class SimEconomy:
         # tier-1 (>=3) / tier-2 (>=6) BUILDINGS, the capital yield at 1+
         # envoys, and the suzerain's per-CS unique perk. Integer-valued adds
         # in f64: batching is exact.
-        if self.S > 0 and bool((self.cs_r_envoys[:, r] > 0).any()):
-            _acs = self.cs_alive.double()
-            _isc = (self.rc_is_cap[:, r] & alive).double()  # [B, RC]
-            # 3/6-envoy BUILDING adds — the rc_bldg presence with
+        if self.S > 0 and bool((self.civ_only_citystate_envoys[:, r] > 0).any()):
+            _acs = self.citystate_alive.double()
+            _isc = (self.civ_city_is_cap[:, r] & alive).double()  # [B, RC]
+            # 3/6-envoy BUILDING adds — the civ_city_bldg presence with
             # pillaged-dark + regional-skip, so pillage/regional match
             # cityBuildingYields exactly.
             _cols6 = None
             if self.districts_on:
-                selb_cs = self.rc_bldg[:, r] & ~self._rc_bdark(self.rc_dist_tile[:, r]) & ~self._b_regional.reshape(1, 1, -1)  # [B, RC, NB]
+                selb_cs = self.civ_city_bldg[:, r] & ~self._civ_city_bdark(self.civ_city_dist_tile[:, r]) & ~self._b_regional.reshape(1, 1, -1)  # [B, RC, NB]
                 if bool(selb_cs.any()):
                     _nBc = selb_cs.shape[2]
-                    per3 = (self.cs_r_envoys[:, r] >= 3).double() * self._cs_district_bonus * _acs * (self._cs_b1idx >= 0).double()
-                    per6 = (self.cs_r_envoys[:, r] >= 6).double() * self._cs_district_bonus * _acs * (self._cs_b2idx >= 0).double()
+                    per3 = (self.civ_only_citystate_envoys[:, r] >= 3).double() * self._citystate_district_bonus * _acs * (self._citystate_b1idx >= 0).double()
+                    per6 = (self.civ_only_citystate_envoys[:, r] >= 6).double() * self._citystate_district_bonus * _acs * (self._citystate_b2idx >= 0).double()
                     csb6f = torch.zeros(B, _nBc * 6, dtype=torch.float64, device=self.device)
-                    csb6f.scatter_add_(1, self._cs_b1idx.clamp(min=0) * 6 + self._cs_yidx, per3)
-                    csb6f.scatter_add_(1, self._cs_b2idx.clamp(min=0) * 6 + self._cs_yidx, per6)
+                    csb6f.scatter_add_(1, self._citystate_b1idx.clamp(min=0) * 6 + self._citystate_yidx, per3)
+                    csb6f.scatter_add_(1, self._citystate_b2idx.clamp(min=0) * 6 + self._citystate_yidx, per6)
                     csb6 = csb6f.reshape(B, _nBc, 6)
                     _cs6_all = torch.einsum("bjn,bnk->bjk", selb_cs.double(), csb6)  # [B, RC, 6]
                     _cols6 = [_cs6_all[:, :, _k] for _k in range(6)]
-            tier1_r = ((self.cs_r_envoys[:, r] >= 1) & self.cs_alive).double() * float(self.rules.cs.get("capitalBonus", 2))
+            tier1_r = ((self.civ_only_citystate_envoys[:, r] >= 1) & self.citystate_alive).double() * float(self.rules.citystate.get("capitalBonus", 2))
             capb_r = torch.zeros(B, 6, dtype=torch.float64, device=self.device)
-            capb_r.scatter_add_(1, self._cs_yidx, tier1_r)
+            capb_r.scatter_add_(1, self._citystate_yidx, tier1_r)
             # Suzerain unique perk — this seat's STRICT isSuzerain
             # (>= suz_min, > seat 0, > every other civ seat).
-            suz_min = int(self.rules.cs.get("suzerainEnvoys", 3))
-            _oth = self.cs_r_envoys.clone()
+            suz_min = int(self.rules.citystate.get("suzerainEnvoys", 3))
+            _oth = self.civ_only_citystate_envoys.clone()
             _oth[:, r] = -1
-            r_suz = (self.cs_r_envoys[:, r] >= suz_min) & (self.cs_r_envoys[:, r] > self.cs_envoys) & (self.cs_r_envoys[:, r] > _oth.max(dim=1).values) & self.cs_alive
-            suz_valr = r_suz.double() * self._cs_suz_amt * (self.cs_suz_key >= 0).double()  # [B, S]
-            capb_r.scatter_add_(1, self.cs_suz_key.clamp(min=0), suz_valr)
+            civ_only_suz = (self.civ_only_citystate_envoys[:, r] >= suz_min) & (self.civ_only_citystate_envoys[:, r] > self.citystate_envoys) & (self.civ_only_citystate_envoys[:, r] > _oth.max(dim=1).values) & self.citystate_alive
+            suz_valr = civ_only_suz.double() * self._citystate_suz_amt * (self.citystate_suz_key >= 0).double()  # [B, S]
+            capb_r.scatter_add_(1, self.citystate_suz_key.clamp(min=0), suz_valr)
             if _cols6 is not None:
                 food = food + _cols6[0]
                 prod = prod + _cols6[1]
@@ -2660,18 +2660,18 @@ class SimEconomy:
         # long tensor promotes to the DEFAULT dtype, not f64. Association
         # mirrors greatWorkCulture.
         cul = cul + (
-            self._gw_cul_k[0] * self.rc_gw_writing[:, r].double()
-            + self._gw_cul_k[1] * self.rc_gw_art[:, r].double()
-            + self._gw_cul_k[2] * self.rc_gw_music[:, r].double()
+            self._gw_cul_k[0] * self.civ_city_gw_writing[:, r].double()
+            + self._gw_cul_k[1] * self.civ_city_gw_art[:, r].double()
+            + self._gw_cul_k[2] * self.civ_city_gw_music[:, r].double()
         ) * alive.double()
         # RELIC faith, at the same position as the seat-0 term.
-        faith = faith + self._relic_faith * self.rc_relics[:, r].double() * alive.double()
+        faith = faith + self._relic_faith * self.civ_city_relics[:, r].double() * alive.double()
         # Golden PEN, BRUSH AND VOICE — +1 Culture per COMPLETED SPECIALTY
         # district, keyed on THIS seat's own dedication. PRE-TIER, like every
         # other culture term here, so it rides `yf`.
         _pb_r = self._golden_ded(r + 1, self._ded_pen_brush)
         if bool(_pb_r.any()):
-            _spec_r = self._rc_spec_count(r)
+            _spec_r = self._civ_city_spec_count(r)
             cul = cul + _pb_r.to(cul.dtype).unsqueeze(1) * _spec_r.to(cul.dtype) * alive.to(cul.dtype)
         # FRESH amenity tier on the external-caller path — one call replaces
         # RC identical per-j calls; elementwise scaling is exact. The economy
@@ -2680,7 +2680,7 @@ class SimEconomy:
         # The CITIZENS bucket sits INSIDE the tier, where computeCityStats
         # puts it: the Amenities yield modifier applies to the city's whole
         # non-food output.
-        _popa = self.rc_pop[:, r].double()  # [B, RC]
+        _popa = self.civ_city_pop[:, r].double()  # [B, RC]
         sci = sci + self.rules.citizen_science * _popa
         cul = cul + self.rules.citizen_culture * _popa
         yf = amen_yf if amen_yf is not None else self._seat_amenity(r)[2]  # [B, RC]
@@ -2735,7 +2735,7 @@ class SimEconomy:
         and written only AT its iteration, after its yields are consumed.
         BUILDINGS are NOT own-column — a regional building completed/bought
         at j's iteration reaches LATER columns via _seat_regional — so every
-        rc_bldg write site bumps _eff_version. The one live read a snapshot
+        civ_city_bldg write site bumps _eff_version. The one live read a snapshot
         cannot honor is capY's seat-total follower pop under beliefs; the
         economy loop keeps the per-j path for capital columns in that case
         (see the call site). Post-phase callers (trace/leader/civ_score) stay
@@ -2766,7 +2766,7 @@ class SimEconomy:
         cols = [self.empire_score()] + [self.civ_empire_score(r) for r in range(self.R)]
         scores = torch.stack(cols, dim=1)  # [B, 1+R]
         has_city = torch.stack(
-            [self.alive.any(dim=1)] + [self.rc_alive[:, r].any(dim=1) for r in range(self.R)], dim=1)
+            [self.alive.any(dim=1)] + [self.civ_city_alive[:, r].any(dim=1) for r in range(self.R)], dim=1)
         fenced = torch.where(has_city, scores, torch.full_like(scores, float("-inf")))
         pick = torch.where(has_city.any(dim=1), first_argmax(fenced), first_argmax(scores))
         return torch.where(self.winner >= 0, self.winner, pick)
@@ -2774,7 +2774,7 @@ class SimEconomy:
     def _domination(self) -> torch.Tensor:
         """[B] the unified civ id holding EVERY original capital (civ_cap_tile),
         else -1. Owner of a capital tile: 0 if a seat-0 city is centered there
-        (center_at>=0), else rc_at+1 (civ index -> civ id), else -1 (razed).
+        (center_at>=0), else civ_city_at+1 (civ index -> civ id), else -1 (razed).
         Mirrors dominationWinner: a solo game (R==0) never dominates; any
         unowned or split capital -> -1."""
         B, dev = self.B, self.device
@@ -2782,7 +2782,7 @@ class SimEconomy:
             return torch.full((B,), -1, dtype=torch.long, device=dev)
         caps = self.civ_cap_tile[:, : 1 + self.R]  # [B, 1+R] capitalTiles — survives rc compaction
         p_owns = self.center_at.gather(1, caps) >= 0
-        rv = self.rc_at.gather(1, caps)  # civ index or -1
+        rv = self.civ_city_at.gather(1, caps)  # civ index or -1
         owner = torch.where(p_owns, torch.zeros_like(rv), torch.where(rv >= 0, rv + 1, torch.full_like(rv, -1)))
         bad = (owner < 0).any(dim=1) | (owner != owner[:, :1]).any(dim=1)
         return torch.where(bad, torch.full((B,), -1, dtype=torch.long, device=dev), owner[:, 0])

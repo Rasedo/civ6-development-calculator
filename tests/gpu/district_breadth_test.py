@@ -18,7 +18,7 @@ Covered:
      hex distance 6 and NOT at 7; dedup (two Factories -> +3 once); pillaged
      source is dark; another seat never receives.
   d. exclusiveWith: a city owning BARRACKS never queues STABLE (and the
-     converse) — poke rc_bldg + read the picker's queue mask.
+     converse) — poke civ_city_bldg + read the picker's queue mask.
   e. Worship faith-buy: religionFounded + Temple + complete Holy Site + >=114
      faith -> the WORSHIP_BUILDINGS[(r+1)%5] row is set and faith drops by
      EXACTLY 114 (two-run BUY-vs-OWN diff, isolating the debit); no Temple -> no
@@ -69,7 +69,7 @@ def free_tiles(sim, n: int, banned=(), need_neighbors: int = 0) -> list[int]:
     for t in range(sim.T):
         if t in banned:
             continue
-        if int(sim.center_at[0, t]) >= 0 or int(sim.rc_at[0, t]) >= 0 or int(sim.cs_at[0, t]) >= 0:
+        if int(sim.center_at[0, t]) >= 0 or int(sim.civ_city_at[0, t]) >= 0 or int(sim.citystate_at[0, t]) >= 0:
             continue
         if int(sim.district[0, t]) >= 0 or int(sim.built_wonder[0, t]) >= 0:
             continue
@@ -209,12 +209,12 @@ def poke_regional_channel(rules, rj, path):
 
     # wipe any organic regional presence for this seat
     for n in sim._reg_bidx:
-        sim.rc_bldg[:, r, :, n] = False
-    sim.rc_dist_tile[:, r, :, IZ] = -1
+        sim.civ_city_bldg[:, r, :, n] = False
+    sim.civ_city_dist_tile[:, r, :, IZ] = -1
 
     SRC1, SRC2, RECV = 5, 6, 7  # dedicated slots (avoid clobbering live cities)
     for s in (SRC1, SRC2, RECV):
-        sim.rc_alive[0, r, s] = True
+        sim.civ_city_alive[0, r, s] = True
 
     # source district tiles + a receiver center at distance exactly 6 from src1
     A = -1
@@ -231,10 +231,10 @@ def poke_regional_channel(rules, rj, path):
     sim.district[0, A] = IZ
     sim.district_complete[0, A] = True
     sim.district_pillaged[0, A] = False
-    sim.rc_center[0, r, SRC1] = A
-    sim.rc_dist_tile[0, r, SRC1, IZ] = A
-    sim.rc_bldg[0, r, SRC1, FAC] = True
-    sim.rc_center[0, r, RECV] = C6
+    sim.civ_city_center[0, r, SRC1] = A
+    sim.civ_city_dist_tile[0, r, SRC1, IZ] = A
+    sim.civ_city_bldg[0, r, SRC1, FAC] = True
+    sim.civ_city_center[0, r, RECV] = C6
 
     # -- single source, receiver in range 6 -> +3 production
     reg = sim._seat_regional(r)
@@ -242,19 +242,19 @@ def poke_regional_channel(rules, rj, path):
     assert abs(float(reg[0][0, RECV, 1]) - fac_prod) < 1e-9, "Factory did not deliver +3 to a range-6 receiver"
 
     # -- receiver at range 7 -> nothing
-    sim.rc_center[0, r, RECV] = C7
+    sim.civ_city_center[0, r, RECV] = C7
     reg7 = sim._seat_regional(r)
     got7 = 0.0 if reg7 is None else float(reg7[0][0, RECV, 1])
     assert got7 == 0.0, f"Factory reached a range-7 receiver ({got7})"
 
     # -- dedup: a SECOND Factory (src2) also in range -> still +3, not +6
-    sim.rc_center[0, r, RECV] = C6
+    sim.civ_city_center[0, r, RECV] = C6
     sim.district[0, B] = IZ
     sim.district_complete[0, B] = True
     sim.district_pillaged[0, B] = False
-    sim.rc_center[0, r, SRC2] = B
-    sim.rc_dist_tile[0, r, SRC2, IZ] = B
-    sim.rc_bldg[0, r, SRC2, FAC] = True
+    sim.civ_city_center[0, r, SRC2] = B
+    sim.civ_city_dist_tile[0, r, SRC2, IZ] = B
+    sim.civ_city_bldg[0, r, SRC2, FAC] = True
     reg2 = sim._seat_regional(r)
     assert abs(float(reg2[0][0, RECV, 1]) - fac_prod) < 1e-9, "two Factories must dedup to +3 (not stack)"
 
@@ -272,11 +272,11 @@ def poke_regional_channel(rules, rj, path):
 
 def poke_exclusive_with(rules, rj, path):
     """d. exclusiveWith (Barracks/Stable): a city that owns BARRACKS can never
-    QUEUE STABLE, and vice versa. Poke rc_bldg + read the picker's queue mask
+    QUEUE STABLE, and vice versa. Poke civ_city_bldg + read the picker's queue mask
     (seat_masks -> production[:, j, 0:NB])."""
     sim = build(rules, path)
     r, j = 0, 0
-    assert bool(sim.rc_alive[0, r, j]), "civ capital slot must be alive"
+    assert bool(sim.civ_city_alive[0, r, j]), "civ capital slot must be alive"
     BAR, STA = bidx(rj, "BARRACKS"), bidx(rj, "STABLE")
     EN = didx(rj, "ENCAMPMENT")
     b_bar, b_sta = rj["buildings"][BAR], rj["buildings"][STA]
@@ -284,16 +284,16 @@ def poke_exclusive_with(rules, rj, path):
 
     # unlock both + a completed Encampment (their required district), city idle
     if b_bar["unlockTech"] >= 0:
-        sim.r_techs[0, r, b_bar["unlockTech"]] = True
+        sim.civ_only_techs[0, r, b_bar["unlockTech"]] = True
     if b_sta["unlockTech"] >= 0:
-        sim.r_techs[0, r, b_sta["unlockTech"]] = True
+        sim.civ_only_techs[0, r, b_sta["unlockTech"]] = True
     T = free_tiles(sim, 1)[0]
     sim.district[0, T] = EN
     sim.district_complete[0, T] = True
-    sim.rc_dist_tile[0, r, j, EN] = T
-    sim.rc_current[0, r, j] = -1  # idle
-    sim.rc_bldg[0, r, j, BAR] = False
-    sim.rc_bldg[0, r, j, STA] = False
+    sim.civ_city_dist_tile[0, r, j, EN] = T
+    sim.civ_city_current[0, r, j] = -1  # idle
+    sim.civ_city_bldg[0, r, j, BAR] = False
+    sim.civ_city_bldg[0, r, j, STA] = False
 
     def queue_col(b):
         return bool(sim.seat_masks(r)["production"][0, j, b])
@@ -301,12 +301,12 @@ def poke_exclusive_with(rules, rj, path):
     assert queue_col(STA), "STABLE must be queueable when neither exclusive is owned"
     assert queue_col(BAR), "BARRACKS must be queueable when neither exclusive is owned"
     # own BARRACKS -> STABLE masked out (excl); BARRACKS itself masked (have)
-    sim.rc_bldg[0, r, j, BAR] = True
+    sim.civ_city_bldg[0, r, j, BAR] = True
     assert not queue_col(STA), "owning BARRACKS must forbid queuing STABLE (exclusiveWith)"
     assert not queue_col(BAR), "owning BARRACKS must forbid re-queuing BARRACKS (have)"
     # converse: own STABLE -> BARRACKS masked out
-    sim.rc_bldg[0, r, j, BAR] = False
-    sim.rc_bldg[0, r, j, STA] = True
+    sim.civ_city_bldg[0, r, j, BAR] = False
+    sim.civ_city_bldg[0, r, j, STA] = True
     assert not queue_col(BAR), "owning STABLE must forbid queuing BARRACKS (exclusiveWith)"
     print("  d exclusiveWith OK (BARRACKS<->STABLE mutually mask the queue)")
 
@@ -319,55 +319,55 @@ def poke_worship_buy(rules, rj, path):
     without the Temple does not buy."""
     sim = build(rules, path)
     r, j = 0, 0
-    assert bool(sim.rc_alive[0, r, j]), "civ capital must be alive"
+    assert bool(sim.civ_city_alive[0, r, j]), "civ capital must be alive"
     TEMPLE, HS = sim._temple_bidx, sim._hs_idx
     wb = sim._worship_bidx[(r + 1) % len(sim._worship_bidx)]
     cost = sim._worship_cost
     assert TEMPLE >= 0 and HS >= 0 and wb >= 0, "worship anchors missing from export"
 
     # make city j the SOLE eligible city; found the religion; strip beliefs so
-    # r_religion_done is the only lever gating the buy (income identical across
+    # civ_only_religion_done is the only lever gating the buy (income identical across
     # the two runs).
-    sim.r_religion_done[:, r] = True
-    sim.r_pantheon_done[:, r] = True   # skip the pantheon-buy faith drain
-    sim.r_prophets[:, r] = 0           # skip enhancer / (re)founding branches
-    sim.r_pantheon[:, r] = -1
-    sim.r_follower[:, r] = -1
-    sim.r_faith[:, r] = 500.0
-    sim.rc_bldg[:, r, :, TEMPLE] = False           # only city j has the Temple
-    sim.rc_bldg[:, r, :, wb] = False
-    sim.rc_bldg[0, r, j, TEMPLE] = True
+    sim.civ_only_religion_done[:, r] = True
+    sim.civ_only_pantheon_done[:, r] = True   # skip the pantheon-buy faith drain
+    sim.civ_only_prophets[:, r] = 0           # skip enhancer / (re)founding branches
+    sim.civ_only_pantheon[:, r] = -1
+    sim.civ_only_follower[:, r] = -1
+    sim.civ_only_faith[:, r] = 500.0
+    sim.civ_city_bldg[:, r, :, TEMPLE] = False           # only city j has the Temple
+    sim.civ_city_bldg[:, r, :, wb] = False
+    sim.civ_city_bldg[0, r, j, TEMPLE] = True
     T_hs = free_tiles(sim, 1)[0]
     sim.district[0, T_hs] = didx(rj, "HOLY_SITE")
     sim.district_complete[0, T_hs] = True
     sim.district_pillaged[0, T_hs] = False
-    sim.rc_dist_tile[:, r, :, HS] = -1
-    sim.rc_dist_tile[0, r, j, HS] = T_hs
+    sim.civ_city_dist_tile[:, r, :, HS] = -1
+    sim.civ_city_dist_tile[0, r, j, HS] = T_hs
 
     base = sim.snapshot()
 
     # run BUY: the worship building is purchased this phase
     sim._seat_phase()
-    faith_buy = float(sim.r_faith[0, r])
-    bought = bool(sim.rc_bldg[0, r, j, wb])
+    faith_buy = float(sim.civ_only_faith[0, r])
+    bought = bool(sim.civ_city_bldg[0, r, j, wb])
     assert bought, "founder with Temple + complete Holy Site + faith did not buy its worship building"
 
     # control OWN: same state, but the city already owns the worship building ->
     # no purchase, yet identical worship-building income. faith_own - faith_buy
     # isolates the flat 114 debit.
     sim.restore(base)
-    sim.rc_bldg[0, r, j, wb] = True
+    sim.civ_city_bldg[0, r, j, wb] = True
     sim._seat_phase()
-    faith_own = float(sim.r_faith[0, r])
+    faith_own = float(sim.civ_only_faith[0, r])
     assert abs((faith_own - faith_buy) - cost) < 1e-6, (
         f"worship debit not exactly {cost} faith (own {faith_own} - buy {faith_buy} = {faith_own - faith_buy})"
     )
 
     # no Temple -> no buy at all
     sim.restore(base)
-    sim.rc_bldg[0, r, j, TEMPLE] = False
+    sim.civ_city_bldg[0, r, j, TEMPLE] = False
     sim._seat_phase()
-    assert not bool(sim.rc_bldg[0, r, j, wb]), "a founder WITHOUT the Temple must not buy a worship building"
+    assert not bool(sim.civ_city_bldg[0, r, j, wb]), "a founder WITHOUT the Temple must not buy a worship building"
     print(f"  e worship faith-buy OK (row {wb}=WORSHIP[(r+1)%5], -{cost} faith exact; no-Temple no-buy)")
 
 
@@ -377,23 +377,23 @@ def poke_civ_palace(rules, rj, path):
     batched twin agree column-for-column; housing/amenity are wired."""
     sim = build(rules, path)
     r, j = 0, 0
-    assert bool(sim.rc_alive[0, r, j]) and bool(sim.rc_is_cap[0, r, j]), "civ slot 0 must be a live capital"
+    assert bool(sim.civ_city_alive[0, r, j]) and bool(sim.civ_city_is_cap[0, r, j]), "civ slot 0 must be a live capital"
     py = sim._palace_y  # [food, prod, gold, sci, cul, faith]
     assert py.tolist() == [0, 2, 5, 2, 1, 0], f"palace yields drifted: {py.tolist()}"
 
     # neutralise the OTHER capital-only terms (gov / beliefs / CS-envoy) so the
-    # rc_is_cap toggle isolates the palace; pass amen_yf=1 so nothing scales.
+    # civ_city_is_cap toggle isolates the palace; pass amen_yf=1 so nothing scales.
     sim._gov_has_effects = False
-    sim.r_pantheon[:, r] = -1
-    sim.r_follower[:, r] = -1
-    sim.cs_r_envoys[:, r] = 0
+    sim.civ_only_pantheon[:, r] = -1
+    sim.civ_only_follower[:, r] = -1
+    sim.civ_only_citystate_envoys[:, r] = 0
     one = torch.ones(sim.B, dtype=torch.float64)
-    mask = sim.rc_alive[:, r, j]
+    mask = sim.civ_city_alive[:, r, j]
 
     y_cap = sim._seat_city_yields(r, j, mask, amen_yf=one)  # (food,prod,sci,cul,gold,faith)
-    sim.rc_is_cap[0, r, j] = False
+    sim.civ_city_is_cap[0, r, j] = False
     y_non = sim._seat_city_yields(r, j, mask, amen_yf=one)
-    sim.rc_is_cap[0, r, j] = True
+    sim.civ_city_is_cap[0, r, j] = True
     diff = [float(y_cap[k][0] - y_non[k][0]) for k in range(6)]
     # return order: food, prod, sci, cul, gold, faith
     assert diff == [0.0, 2.0, 2.0, 1.0, 5.0, 0.0], f"palace-row contribution wrong: {diff}"
@@ -401,8 +401,8 @@ def poke_civ_palace(rules, rj, path):
     # per-j path == the batched twin, column-for-column, on the poked state
     af = sim._seat_amenity(r)[2]  # [B, RC]
     allc = sim._seat_city_yields_all(r, amen_yf=af)  # 6 x [B, RC]
-    for jj in sim.rc_alive[0, r].nonzero(as_tuple=True)[0].tolist():
-        m = sim.rc_alive[:, r, jj]
+    for jj in sim.civ_city_alive[0, r].nonzero(as_tuple=True)[0].tolist():
+        m = sim.civ_city_alive[:, r, jj]
         pj = sim._seat_city_yields(r, jj, m, amen_yf=af[:, jj])
         for k in range(6):
             a, b = float(pj[k][0]), float(allc[k][0, jj])
@@ -411,9 +411,9 @@ def poke_civ_palace(rules, rj, path):
     # housing / amenity constants wired; the palace amenity never lowers the tier
     assert sim._palace_housing == 1.0 and sim._palace_amenities == 1.0, "palace housing/amenity must be +1/+1"
     yf_on = float(sim._seat_amenity(r)[2][0, j])
-    sim.rc_is_cap[0, r, j] = False
+    sim.civ_city_is_cap[0, r, j] = False
     yf_off = float(sim._seat_amenity(r)[2][0, j])
-    sim.rc_is_cap[0, r, j] = True
+    sim.civ_city_is_cap[0, r, j] = True
     assert yf_on >= yf_off, "the palace amenity must not reduce the capital's amenity factor"
     print("  f civ PALACE OK (+2p/+5g/+2s/+1c capital row; per-j==batched twin; housing/amenity wired)")
 
@@ -424,7 +424,7 @@ def poke_gp_district_accrual(rules, rj, path):
     owns a COMPLETED district of that type."""
     sim = build(rules, path)
     r, j = 0, 0
-    assert bool(sim.rc_alive[0, r, j]), "civ capital must be alive"
+    assert bool(sim.civ_city_alive[0, r, j]), "civ capital must be alive"
     IZ, EN, TS = didx(rj, "INDUSTRIAL_ZONE"), didx(rj, "ENCAMPMENT"), didx(rj, "THEATER_SQUARE")
 
     # one representative GP class per district, via GP_CLASS_DISTRICT
@@ -435,7 +435,7 @@ def poke_gp_district_accrual(rules, rj, path):
         assert cls is not None, f"no GP class maps to district {dcls}"
         targets.append((cls, dcls))
 
-    # prevent the shared-pool earn/consume from decrementing r_gpp mid-phase
+    # prevent the shared-pool earn/consume from decrementing civ_only_gpp mid-phase
     for cls, _ in targets:
         sim.gp_earned[:, cls] = int(sim._gp_roster[cls])
 
@@ -445,12 +445,12 @@ def poke_gp_district_accrual(rules, rj, path):
         sim.district[0, T] = dcls
         sim.district_complete[0, T] = True
         sim.district_pillaged[0, T] = False
-        sim.rc_dist_tile[0, r, j, dcls] = T
-        before[cls] = float(sim.r_gpp[0, r, cls])
+        sim.civ_city_dist_tile[0, r, j, dcls] = T
+        before[cls] = float(sim.civ_only_gpp[0, r, cls])
 
     sim._seat_phase()
     for cls, dcls in targets:
-        after = float(sim.r_gpp[0, r, cls])
+        after = float(sim.civ_only_gpp[0, r, cls])
         assert after > before[cls], (
             f"GP class {cls} (district {dcls}) accrued nothing: {before[cls]} -> {after}"
         )

@@ -53,7 +53,7 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   blocker is gone — the appeal plane exists (the Seaside Resort pays
   gold = appeal) — so this is now ordinary district plumbing on both
   engines. (The other old A-9 residual, palace relocation on capital
-  loss, has since landed: `_relocate_palace_c` / `_relocate_palace_rc`.)
+  loss, has since landed: `_relocate_palace_seat0` / `_relocate_palace_civ`.)
 - **A-11r. Trade-route tails.** (1) Seat 0's GPU route machinery:
   storage is seat-indexed (`seat_routes` / `seat_route_exp` /
   `seat_route_dest`, row 0 allocated) but the seat-0 rows' gated reach
@@ -164,8 +164,8 @@ Landed behind the compile bar only, in dependency order of suspicion:
 3. serve_gate checkpoint/resume (#101) — exercise a resume against a
    fresh run before trusting it for diagnosis.
 4. The storage renumbering + #109 city-block unification (one base per
-   fact; `tile_city`, `centre_slot_at`, `cty_dist_tile`, `cty_wonder`,
-   `cty_prod_bank`, `civ_cap_tile`) — behaviour-preserving by intent,
+   fact; `tile_city`, `centre_slot_at`, `city_dist_tile`, `city_wonder`,
+   `city_prod_bank`, `civ_cap_tile`) — behaviour-preserving by intent,
    proven only by digests.
 5. The protagonist relabel (#75) and the vocabulary purge (identifier
    renames, kind tags to pool letters) — behaviour-preserving by

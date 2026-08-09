@@ -190,7 +190,7 @@ export function placeSeats(state: GameState, count?: number): void {
     // Push BEFORE the starting warrior
     // spawns so spawnUnit's bestMeleeCS chokepoint can find the seat —
     // "strongest melee ever FIELDED" includes the starting army (defense
-    // 20 from turn 0; the GPU seeds r_best_melee from the fixture pools).
+    // 20 from turn 0; the GPU seeds civ_only_best_melee from the fixture pools).
     state.seats.push(actor); // #51/S1.3j: seats IS the storage — seats[r+1] is actor r
     spawnUnit(state, 'WARRIOR', tile.index, actor.seat);
   });
@@ -1210,7 +1210,7 @@ export function seatPhase(state: GameState, seat: number): void {
       // sendTradeRoute] against this seat's state — NO nextRandom, so the
       // seat 0 quest path's draw count is untouched (the deferral's stated
       // risk removed by construction). questIssuedTurn clock defaults to 0
-      // (the GPU cs_r_quest_issued zeros init) → first issue at turn≥cooldown.
+      // (the GPU civ_only_citystate_quest_issued zeros init) → first issue at turn≥cooldown.
       for (const cs of state.cityStates) {
         if (!hasMet(cs, actor.seat)) continue;
         const rq = (cs.seatQuest ??= []);

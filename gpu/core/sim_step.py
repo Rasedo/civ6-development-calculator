@@ -52,22 +52,22 @@ class SimStep:
                 decl = ok & (w < self.R)
                 if bool(decl.any()):
                     oh = torch.nn.functional.one_hot(w.clamp(min=0, max=self.R - 1), self.R).bool() & decl.unsqueeze(1)
-                    self.r_atwar.logical_or_(oh)
-                    self.war[:, 1:1 + self.r_atwar.shape[1], 0] |= oh
-                    self.r_warturns.copy_(torch.where(oh, torch.zeros_like(self.r_warturns), self.r_warturns))
+                    self.civ_only_atwar.logical_or_(oh)
+                    self.war[:, 1:1 + self.civ_only_atwar.shape[1], 0] |= oh
+                    self.civ_only_warturns.copy_(torch.where(oh, torch.zeros_like(self.civ_only_warturns), self.civ_only_warturns))
                 pea = ok & (w >= self.R)
                 if bool(pea.any()):
                     ri = (w - self.R).clamp(min=0, max=self.R - 1)
                     rr = self.rules.seats
-                    cost = rr.get("peaceGold0", 150) + rr.get("peaceGoldSlope", 10) * self.r_warturns.gather(
+                    cost = rr.get("peaceGold0", 150) + rr.get("peaceGoldSlope", 10) * self.civ_only_warturns.gather(
                         1, ri.unsqueeze(1)
                     ).squeeze(1).to(self.dtype)
                     oh = torch.nn.functional.one_hot(ri, self.R).bool() & pea.unsqueeze(1)
                     self.treasury.copy_(torch.where(pea, self.treasury - cost, self.treasury))
-                    self.r_atwar.logical_and_(~oh)
-                    self.war[:, 1:1 + self.r_atwar.shape[1], 0] &= ~oh
-                    self.r_warturns.copy_(torch.where(oh, torch.zeros_like(self.r_warturns), self.r_warturns))
-                    self.r_peaceturns.copy_(torch.where(oh, torch.zeros_like(self.r_peaceturns), self.r_peaceturns))
+                    self.civ_only_atwar.logical_and_(~oh)
+                    self.war[:, 1:1 + self.civ_only_atwar.shape[1], 0] &= ~oh
+                    self.civ_only_warturns.copy_(torch.where(oh, torch.zeros_like(self.civ_only_warturns), self.civ_only_warturns))
+                    self.civ_only_peaceturns.copy_(torch.where(oh, torch.zeros_like(self.civ_only_peaceturns), self.civ_only_peaceturns))
 
         # --- seat-0 unit orders (before the turn advances) ----------------------
         if units is not None and self.units_mode:
@@ -99,7 +99,7 @@ class SimStep:
                     ok = (e_act >= 0) & self.envoy_mask().gather(1, e_act.clamp(min=0).unsqueeze(1)).squeeze(1)
                     if bool(ok.any()):
                         rows = ok.nonzero(as_tuple=True)[0]
-                        self.cs_envoys[rows, e_act[rows]] += 1
+                        self.citystate_envoys[rows, e_act[rows]] += 1
                         self.envoys_avail.sub_(ok.long())
                         self._eff_version += 1
 
@@ -327,7 +327,7 @@ class SimStep:
             if self._settler_idx >= 0 and bool(made_settler.any()):
                 # Completion SPAWNS the settler at the city — a unit like any
                 # other; WHERE it founds is a later FOUND_CITY order.
-                self._spawn_p(made_settler, self.site[bidx, col], torch.full((B,), self._settler_idx, dtype=torch.long, device=dev))
+                self._spawn_seat0(made_settler, self.site[bidx, col], torch.full((B,), self._settler_idx, dtype=torch.long, device=dev))
             # A completed Settler costs the city 1 pop; the dirty flag
             # refreshes later cities' totals.
             self.pop[bidx, col] = torch.where(made_settler, (self.pop[bidx, col] - 1).clamp(min=1), self.pop[bidx, col])
@@ -346,7 +346,7 @@ class SimStep:
                 # clamp max too: unmasked rows may hold district codes.
                 # A trained military unit inherits city `col`'s Encampment training XP (best tier).
                 xp_col = (self.buildings[bidx, col, :].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
-                self._spawn_p(made_unit, self.site[bidx, col], (cur_c - self.UNIT_BASE).clamp(min=0, max=self.NU - 1), init_xp=xp_col)
+                self._spawn_seat0(made_unit, self.site[bidx, col], (cur_c - self.UNIT_BASE).clamp(min=0, max=self.NU - 1), init_xp=xp_col)
                 if self._builder_idx >= 0:
                     # a completed builder moves the cost escalator
                     made_b = made_unit & (cur_c == self.UNIT_BASE + self._builder_idx)
@@ -422,7 +422,7 @@ class SimStep:
                 if adj_own is None:
                     owner_nb = self.owner.gather(1, neigh_flat).reshape(B, T, 6)
                     adj_own = ((owner_nb == col.reshape(B, 1, 1)) & neigh_valid).any(dim=2)
-                cand_b = (self.owner == -1) & (self.cs_at < 0) & (self.civ_at < 0) & (dist_c <= 5) & adj_own
+                cand_b = (self.owner == -1) & (self.citystate_at < 0) & (self.civ_at < 0) & (dist_c <= 5) & adj_own
                 # order: dist asc, resource priority desc, yield sum desc, index asc
                 # priority reads LIVE — a paved bonus resource is GONE, and an
                 # orphaned pave is unowned and claimable.
@@ -447,8 +447,8 @@ class SimStep:
                     # booleans a dense re-derive would produce.
                     nb_b = self.neigh[best[rows]]  # [n, 6]
                     ok_b = nb_b >= 0
-                    cc_b = rows.unsqueeze(1).expand_as(nb_b)
-                    adj_own[cc_b[ok_b], nb_b[ok_b]] = True
+                    civ_pair_b = rows.unsqueeze(1).expand_as(nb_b)
+                    adj_own[civ_pair_b[ok_b], nb_b[ok_b]] = True
                     cb = self.culture_box[bidx, col]
                     self.culture_box[bidx, col] = torch.where(expand, cb - cost_b, cb)
                     self.tiles_acquired[bidx, col] = self.tiles_acquired[bidx, col] + expand.long()
@@ -470,7 +470,7 @@ class SimStep:
         self.science_total.add_(sci_add)
         self.culture_total.add_(cul_add)
         # Seat 0's per-turn faith income, banked in the same city walk as
-        # gold/science/culture (the civ-seat twin is `r_faith + faith_sum`).
+        # gold/science/culture (the civ-seat twin is `civ_only_faith + faith_sum`).
         self.faith.add_(fth_add)
         # TOURISM — accumulated ONCE per turn at the seat level, right after
         # the city loop and BEFORE the loyalty collapses.
@@ -489,7 +489,7 @@ class SimStep:
         # declare-war grievance path reaches seat 0; the CAPTURE accrual does
         # mirror, in _capture_civ_city.
         self.p_warmonger.copy_(torch.where(
-            (self.p_warmonger > 0) & ~self.r_atwar.any(dim=1),
+            (self.p_warmonger > 0) & ~self.civ_only_atwar.any(dim=1),
             self.p_warmonger - 1,
             self.p_warmonger,
         ))
@@ -586,12 +586,12 @@ class SimStep:
                 self._reclaim_pool("p")
         if self.R > 0:
             # rc high-water = last-alive slot + 1 (what the next append uses)
-            rc_hw = (self.rc_alive.long() * (torch.arange(self.RC, device=dev).reshape(1, 1, -1) + 1)).amax(dim=2)
-            if int(rc_hw.max()) >= self._rc_reclaim_at:
-                self._reclaim_rc()
+            civ_city_hw = (self.civ_city_alive.long() * (torch.arange(self.RC, device=dev).reshape(1, 1, -1) + 1)).amax(dim=2)
+            if int(civ_city_hw.max()) >= self._civ_city_reclaim_at:
+                self._reclaim_civ_cities()
             # After compaction (the riskiest registry reshuffle) and all of
             # this step's placements/captures — env-gated, so free when off.
-            if self._rc_reg_check:
+            if self._civ_city_reg_check:
                 self._check_rc_registry_invariant()
 
         # Religious pressure spread — after all foundings/settles/flips and the
@@ -659,7 +659,7 @@ class SimStep:
             self.era_score.add_(_es)
             self.faith.copy_(self.faith + _fa[:, 0].to(self.faith.dtype))
             if self.R > 0:
-                self.r_faith.copy_(self.r_faith + _fa[:, 1 : 1 + self.R].to(self.r_faith.dtype))
+                self.civ_only_faith.copy_(self.civ_only_faith + _fa[:, 1 : 1 + self.R].to(self.civ_only_faith.dtype))
         dom = self._domination()
         # A science victory (3, seat 0) / defeat (4, a civ seat) set during
         # THIS turn's project completions takes precedence over the

@@ -102,7 +102,7 @@ def _buy_row(sim, seat: int, bc: dict, rk, rj, b: int) -> list:
     drift: [centre, bIdx, settlerOk, unitOk, tileOk, tile, tileCentre,
     worshipCentre, religKind, religCentre, levyIdx]."""
     def ctr(j: int) -> int:
-        return int(sim.rc_center[b, seat - 1, j]) if j >= 0 else -1
+        return int(sim.civ_city_center[b, seat - 1, j]) if j >= 0 else -1
     return [
         ctr(int(bc["jj"][b])) if bool(bc["can_building"][b]) else -1,
         int(bc["bb"][b]) if bool(bc["can_building"][b]) else -1,
@@ -133,7 +133,7 @@ def _field_name(i: int, S: int, R: int, C: int, NT: int, NC: int) -> str:
         return f"empire.{ladder.EMP_FIELDS[i]}"
     i -= ladder.EMP
     if i < ladder.PER_CS * S:
-        return f"cs[{i // ladder.PER_CS}].{i % ladder.PER_CS}"
+        return f"citystate[{i // ladder.PER_CS}].{i % ladder.PER_CS}"
     i -= ladder.PER_CS * S
     if i < ladder.PER_CIV * R:
         return f"civ[{i // ladder.PER_CIV}].{i % ladder.PER_CIV}"
@@ -183,7 +183,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     dig_dumped = False
     for r in seats:
         drive.take_seat(sim, r)
-    NT, NC = sim.r_techs.shape[2], sim.r_civics.shape[2]
+    NT, NC = sim.civ_only_techs.shape[2], sim.civ_only_civics.shape[2]
     ctx_lo = env.observe(1).shape[1] - ladder.CTX_SEAT
 
     # Resume restores the GPU from its turn-T snapshot BEFORE the children
@@ -432,7 +432,7 @@ def main() -> None:
     dig_dumped = False
     for r in seats:
         drive.take_seat(sim, r)
-    NT, NC = sim.r_techs.shape[2], sim.r_civics.shape[2]
+    NT, NC = sim.civ_only_techs.shape[2], sim.civ_only_civics.shape[2]
     ctx_lo = env.observe(1).shape[1] - ladder.CTX_SEAT
 
     # Resume — the batched path's twin (GPU snapshot + TS state dump).
@@ -531,7 +531,7 @@ def main() -> None:
                                 print(f"  tile {_dt}: owner {int(sim.owner[0, _dt])} tile_seat {int(sim.tile_seat[0, _dt])}"
                                       f" water {bool(sim.water[0, _dt])} imp {int(sim.improvement[0, _dt])}"
                                       f" dist {int(sim.district[0, _dt])} wond {int(sim.built_wonder[0, _dt])}"
-                                      f" vc {int(sim.rc_at[0, _dt])} pill {bool(sim.pillaged[0, _dt])}"
+                                      f" vc {int(sim.civ_city_at[0, _dt])} pill {bool(sim.pillaged[0, _dt])}"
                                       f" dpill {bool(sim.district_pillaged[0, _dt])} farm {bool(sim.farm_flat[0, _dt])}"
                                       f" mine {bool(sim.mine_ok[0, _dt])} lumber {bool(sim.lumber_ok[0, _dt])}"
                                       f" res {int(sim.res_imp[0, _dt])}")

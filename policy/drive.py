@@ -55,7 +55,7 @@ def _prod_ctx(blocks: dict, sim, seat: int) -> dict:
     # nothing TS-facing leaks. Seat 0 is a seat like any other here, except
     # that its city cap is the world's physical slot count rather than the
     # ladder's stop-expanding heuristic.
-    is_cap = sim.is_cap if seat == 0 else sim.rc_is_cap[:, seat - 1]
+    is_cap = sim.is_cap if seat == 0 else sim.civ_city_is_cap[:, seat - 1]
     n_cities = ctx[:, 0].long()
     cap = sim.C if seat == 0 else int(sim.rules.seats.get("maxCities", 6))
     return {
@@ -85,7 +85,7 @@ def _blocks(env, sim, r: int) -> dict:
     obs = env.observe(r + 1)  # env._seat_civ's inverse: seat k>0 is civ k-1
     # tech/civic widths come off the live tensors — there is no NT/NC scalar,
     # and hardcoding one here would be the second copy that always drifts.
-    return ladder.split(obs, sim.S, sim.R, sim.C, sim.r_techs.shape[2], sim.r_civics.shape[2])
+    return ladder.split(obs, sim.S, sim.R, sim.C, sim.civ_only_techs.shape[2], sim.civ_only_civics.shape[2])
 
 
 #: ACTION FILE SCHEMA v2 — THE FILE IS THE INTERFACE.
@@ -197,17 +197,17 @@ def _spread_targets(sim, seat: int) -> torch.Tensor:
     # structurally empty for it.
     if seat == 0:
         return out
-    done = sim.r_religion_done[:, seat - 1]
+    done = sim.civ_only_religion_done[:, seat - 1]
     if not bool(done.any()):
         return out
     g = seat
     T = sim.T
     acc = torch.zeros(B, T, dtype=torch.long, device=sim.device)
-    acc.scatter_add_(1, sim.site.clamp(min=0), (sim.alive & (sim.cty_followed[:, 0, :sim.C] != g)).long())
+    acc.scatter_add_(1, sim.site.clamp(min=0), (sim.alive & (sim.city_followed[:, 0, :sim.C] != g)).long())
     if sim.R > 0:
         acc.scatter_add_(
-            1, sim.rc_center.clamp(min=0).reshape(B, -1),
-            (sim.rc_alive & (sim.cty_followed[:, 1:1 + sim.R, :sim.RC] != g)).long().reshape(B, -1),
+            1, sim.civ_city_center.clamp(min=0).reshape(B, -1),
+            (sim.civ_city_alive & (sim.city_followed[:, 1:1 + sim.R, :sim.RC] != g)).long().reshape(B, -1),
         )
     tm = acc > 0
     if not bool(tm.any()):
@@ -315,12 +315,12 @@ def _seat_envoys(sim, seat: int):
         return None
     if seat == 0:
         avail_e = sim.envoys_avail.clone()
-        met_live_e = sim.cs_met[:, : sim.S] & sim.cs_alive[:, : sim.S]
-        mine6_e = sim.cs_envoys[:, : sim.S].double() / 6.0
+        met_live_e = sim.citystate_met[:, : sim.S] & sim.citystate_alive[:, : sim.S]
+        mine6_e = sim.citystate_envoys[:, : sim.S].double() / 6.0
     else:
-        avail_e = sim.r_envoys_avail[:, seat - 1].clone()
-        met_live_e = sim.cs_r_met[:, seat - 1, : sim.S] & sim.cs_alive[:, : sim.S]
-        mine6_e = sim.cs_r_envoys[:, seat - 1, : sim.S].double() / 6.0
+        avail_e = sim.civ_only_envoys_avail[:, seat - 1].clone()
+        met_live_e = sim.civ_only_citystate_met[:, seat - 1, : sim.S] & sim.citystate_alive[:, : sim.S]
+        mine6_e = sim.civ_only_citystate_envoys[:, seat - 1, : sim.S].double() / 6.0
     picks_e = []
     for _ke in range(6):  # bank bound: accrual grants <=1/turn + quest grants
         can_e = met_live_e.any(dim=1) & (avail_e > 0)
@@ -348,7 +348,7 @@ def _war_ctx(blocks: dict) -> dict:
         "has_cities": ctx[:, 12] > 0.5,
         "peace_turns": ctx[:, 10].long(),
         "prox": ctx[:, 7].long(),
-        "r_str": ctx[:, 6],
+        "civ_only_str": ctx[:, 6],
         "p_str": ctx[:, 5],
         "gang": ctx[:, 8] > 0.5,
         "aggression": ctx[:, 9],
@@ -362,23 +362,23 @@ def _buy_ctx(sim, r: int) -> dict:
     gold rungs' own scans). settler_ok mirrors the settler rung's own gate
     (city cap + price, no reserve). The unit quota compares decide-time
     planes: live + queued military < 2x alive cities."""
-    active = sim.r_alive[:, r] & (sim.rc_alive[:, r].sum(dim=1) > 0)
+    active = sim.civ_only_alive[:, r] & (sim.civ_city_alive[:, r].sum(dim=1) > 0)
     jj, bb, can_b, price, _ = sim._seat_buy_candidates(r, active)
     rr = sim.rules.seats
-    n_cities = sim.rc_alive[:, r].sum(dim=1)
-    _sq = (sim.rc_alive[:, r] & (sim.rc_current[:, r] == 0)).sum(dim=1)
+    n_cities = sim.civ_city_alive[:, r].sum(dim=1)
+    _sq = (sim.civ_city_alive[:, r] & (sim.civ_city_current[:, r] == 0)).sum(dim=1)
     sett_cost = (rr.get("settlerBase", 48) + rr.get("settlerPer", 18)
-                 * (n_cities - 1 + sim._r_settlers_of(r) + _sq).clamp(min=0).double()) * sim.rules.gold_purchase_mult
+                 * (n_cities - 1 + sim._civ_only_settlers_of(r) + _sq).clamp(min=0).double()) * sim.rules.gold_purchase_mult
     # the buy SPAWNS a unit at the capital (else first city), which must have
     # the pop to pay — the TS driver's tripwire mirrors this exactly.
-    _cap_is = sim.rc_is_cap[:, r]
-    _spawn_slot = torch.where(_cap_is.any(dim=1), _cap_is.long().argmax(dim=1), sim.rc_alive[:, r].long().argmax(dim=1))
-    _spawn_pop = sim.rc_pop[:, r].gather(1, _spawn_slot.unsqueeze(1)).squeeze(1)
-    settler_ok = active & (_spawn_pop >= 2) & sim._afford(sim.r_treasury[:, r], sett_cost)
+    _cap_is = sim.civ_city_is_cap[:, r]
+    _spawn_slot = torch.where(_cap_is.any(dim=1), _cap_is.long().argmax(dim=1), sim.civ_city_alive[:, r].long().argmax(dim=1))
+    _spawn_pop = sim.civ_city_pop[:, r].gather(1, _spawn_slot.unsqueeze(1)).squeeze(1)
+    settler_ok = active & (_spawn_pop >= 2) & sim._afford(sim.civ_only_treasury[:, r], sett_cost)
     cand_u = sim._seat_buy_unit_candidates(r, sim._seat_trainable_units(r))
     vt_all = sim.v_type.clamp(min=0, max=sim.NU - 1)
     mil_live = sim.v_alive & (sim.v_civ == r) & (sim._p_combat[vt_all] > 0)
-    qcur = sim.rc_current[:, r]
+    qcur = sim.civ_city_current[:, r]
     q_ty = (qcur - 1).clamp(min=0, max=sim.NU - 1)
     q_mil = (qcur >= 1) & (qcur <= sim.NU) & (sim._p_combat[q_ty] > 0)
     n_mil = mil_live.sum(dim=1) + q_mil.sum(dim=1)
@@ -394,7 +394,7 @@ def _buy_ctx(sim, r: int) -> dict:
     # is the policy gate and it joins HERE (the scripted block's own
     # condition), not in the engines' re-validation.
     levy_ok, levy_cs = sim._seat_levy_candidate(r, active)
-    levy_ok = levy_ok & sim.r_atwar[:, r]
+    levy_ok = levy_ok & sim.civ_only_atwar[:, r]
     return {"jj": jj, "bb": bb, "can_building": can_b, "price": price,
             "settler_ok": settler_ok, "unit_ok": unit_ok,
             "tile_ok": tile_ok, "tile": tile_t, "tile_j": tile_j,
@@ -412,7 +412,7 @@ def _geo_turn(sim):
     deterministic; everything here is POLICY — proximity and strength
     thresholds, the gang bypass, war-weariness pacing, id-order scanning —
     and the engine arms re-validate only the RULES. Returns (denounce
-    [B,R,R] bool, ally [B,R,R] bool from the lower index, cc_war [B,R] long
+    [B,R,R] bool, ally [B,R,R] bool from the lower index, civ_pair_war [B,R] long
     target, peace [B,R,R] bool from the lower index)."""
     B, R, dev = sim.B, sim.R, sim.device
     den = torch.zeros(B, R, R, dtype=torch.bool, device=dev)
@@ -422,15 +422,15 @@ def _geo_turn(sim):
     if R < 2:
         return den, ally, war, peace
     rr = sim.rules.seats
-    n_c = sim.rc_alive.sum(dim=2)
-    alive_civ = sim.r_alive[:, :R] & (n_c > 0)  # [B, R]
-    rstr = sim._cc_strengths()
+    n_c = sim.civ_city_alive.sum(dim=2)
+    alive_civ = sim.civ_only_alive[:, :R] & (n_c > 0)  # [B, R]
+    rstr = sim._civ_pair_strengths()
     prox_max = int(rr.get("dowProximity", 9))
     prox = {}
     for a in range(R):
         for b in range(R):
             if a != b:
-                prox[a, b] = sim._cc_proximity(a, b)
+                prox[a, b] = sim._civ_pair_proximity(a, b)
     # DENOUNCE: every eligible directed pair — a nearer, weaker-scoring civ
     # not yet at war (the declare family's gates at the WEAKER strength bar,
     # so the stamp reliably precedes the war).
@@ -440,20 +440,20 @@ def _geo_turn(sim):
                 continue
             den[:, a, b] = (
                 alive_civ[:, a] & alive_civ[:, b]
-                & (sim.cc_denounced[:, a, b] < 0) & ~sim.cc_war[:, a, b]
+                & (sim.civ_pair_denounced[:, a, b] < 0) & ~sim.civ_pair_war[:, a, b]
                 & (prox[a, b] <= prox_max) & (rstr[:, a] > rstr[:, b])
             )
     # ALLIANCE (lower-index proposal): peace-era pairs with no grudge — the
     # stored stamps AND this turn's fresh denouncements — and no grievances.
-    if int(sim.turn) >= sim._cc_ally_min_peace:
+    if int(sim.turn) >= sim._civ_pair_ally_min_peace:
         for a in range(R):
             for b in range(a + 1, R):
                 ally[:, a, b] = (
                     alive_civ[:, a] & alive_civ[:, b]
-                    & ~sim.cc_war[:, a, b] & ~sim.cc_allied[:, a, b]
-                    & (sim.cc_denounced[:, a, b] < 0) & (sim.cc_denounced[:, b, a] < 0)
+                    & ~sim.civ_pair_war[:, a, b] & ~sim.civ_pair_allied[:, a, b]
+                    & (sim.civ_pair_denounced[:, a, b] < 0) & (sim.civ_pair_denounced[:, b, a] < 0)
                     & ~den[:, a, b] & ~den[:, b, a]
-                    & (sim.r_warmonger[:, a] <= 0) & (sim.r_warmonger[:, b] <= 0)
+                    & (sim.civ_only_warmonger[:, a] <= 0) & (sim.civ_only_warmonger[:, b] <= 0)
                 )
     # DECLARE: aggressor index asc, first eligible target asc, ONE new war
     # per civ per turn (both sides); the gang bypass (a warmonger target
@@ -464,7 +464,7 @@ def _geo_turn(sim):
     ratio = float(rr.get("dowStrengthRatio", 1.3))
     ww_cap = int(rr.get("dowWwMax", 6))
     peace_ww = int(rr.get("peaceWw", 10))
-    allied_eff = sim.cc_allied[:, :R, :R].clone()
+    allied_eff = sim.civ_pair_allied[:, :R, :R].clone()
     brk = den | den.transpose(1, 2)
     allied_eff = (allied_eff & ~brk) | ally | ally.transpose(1, 2)
     used = torch.zeros(B, R, dtype=torch.bool, device=dev)
@@ -477,8 +477,8 @@ def _geo_turn(sim):
                 continue
             declare = (
                 aggr_ok & alive_civ[:, b] & ~used[:, b]
-                & ~sim.cc_war[:, a, b] & (prox[a, b] <= prox_max)
-                & ((rstr[:, a] > rstr[:, b] * ratio) | (sim.r_warmonger[:, b] >= sim._wm_gang))
+                & ~sim.civ_pair_war[:, a, b] & (prox[a, b] <= prox_max)
+                & ((rstr[:, a] > rstr[:, b] * ratio) | (sim.civ_only_warmonger[:, b] >= sim._wm_gang))
                 & (ww[:, b] <= peace_ww)
                 & ~allied_eff[:, a, b]
             )
@@ -492,7 +492,7 @@ def _geo_turn(sim):
     # like the sue verb: a decision decides from its observation.
     for a in range(R):
         for b in range(a + 1, R):
-            peace[:, a, b] = sim.cc_war[:, a, b] & ((ww[:, a] > peace_ww) | (ww[:, b] > peace_ww))
+            peace[:, a, b] = sim.civ_pair_war[:, a, b] & ((ww[:, a] > peace_ww) | (ww[:, b] > peace_ww))
     return den, ally, war, peace
 
 
@@ -502,7 +502,7 @@ def geo_decide_and_apply(sim):
     return the tensors for wire extraction (_extract_geo per seat row)."""
     den, ally, war, peace = _geo_turn(sim)
     for r in range(sim.R):
-        sim.apply_geo(r, denounce=den[:, r], ally=ally[:, r], cc_war=war[:, r], cc_peace=peace[:, r])
+        sim.apply_geo(r, denounce=den[:, r], ally=ally[:, r], civ_pair_war=war[:, r], civ_pair_peace=peace[:, r])
     return den, ally, war, peace
 
 
@@ -614,7 +614,7 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
         # terrain/occupancy legality is the PHASE's re-validation problem.
         wt = getattr(sim, "_vplan_wt", None)
         if wt is None or wt.get("r") != r:
-            hp_r = sim.r_atwar[:, r]
+            hp_r = sim.civ_only_atwar[:, r]
             ac = torch.full((B2,), r, dtype=torch.long, device=sim.device)
             tgts = torch.full((B2, N2), -1, dtype=torch.long, device=sim.device)
             for n in range(N2):
@@ -673,8 +673,8 @@ def _extract_record(sim, r: int, prod, tech, civic, war, env_seq, seq, buy, wors
     # production as [centreTile, col] PAIRS (see SCHEMA_VERSION); the centre
     # is the cross-engine city key.
     _pr = prod[b]
-    _ctr = sim.rc_center[b, r]
-    _alive_c = sim.rc_alive[b, r]
+    _ctr = sim.civ_city_center[b, r]
+    _alive_c = sim.civ_city_alive[b, r]
     prod_pairs = [
         [int(_ctr[j]), int(_pr[j])]
         for j in range(min(int(_pr.shape[0]), int(_ctr.shape[0])))
@@ -695,8 +695,8 @@ def _extract_record(sim, r: int, prod, tech, civic, war, env_seq, seq, buy, wors
     # buildingIdx] for a building purchase. OPTIONAL field: absent = none.
     if buy is not None and int(buy[0][b]) == 0:
         _bj = int(buy[1][b])
-        if 0 <= _bj < int(sim.rc_center.shape[2]) and bool(sim.rc_alive[b, r, _bj]):
-            rec["buy"] = [0, int(sim.rc_center[b, r, _bj]), int(buy[2][b])]
+        if 0 <= _bj < int(sim.civ_city_center.shape[2]) and bool(sim.civ_city_alive[b, r, _bj]):
+            rec["buy"] = [0, int(sim.civ_city_center[b, r, _bj]), int(buy[2][b])]
     elif buy is not None and int(buy[0][b]) == 1:
         rec["buy"] = [1, -1, -1]  # SETTLER: no city key, the site scan decides
     elif buy is not None and int(buy[0][b]) == 2:
@@ -705,20 +705,20 @@ def _extract_record(sim, r: int, prod, tech, civic, war, env_seq, seq, buy, wors
         # TILE: [3, tileIndex, centreTile] — the city keyed by CENTRE like
         # kind 0 (a/b at decide time are tile, slot).
         _tj = int(buy[2][b])
-        if 0 <= _tj < int(sim.rc_center.shape[2]) and bool(sim.rc_alive[b, r, _tj]):
-            rec["buy"] = [3, int(buy[1][b]), int(sim.rc_center[b, r, _tj])]
+        if 0 <= _tj < int(sim.civ_city_center.shape[2]) and bool(sim.civ_city_alive[b, r, _tj]):
+            rec["buy"] = [3, int(buy[1][b]), int(sim.civ_city_center[b, r, _tj])]
     # kinds 4-6, the FAITH purchases — [kind, centreTile] entries in apply
     # order (worship first, then the one religious unit). OPTIONAL field:
     # absent = no faith purchase this turn.
     bf = []
     if worship is not None:
         _wj = int(worship[b])
-        if 0 <= _wj < int(sim.rc_center.shape[2]) and bool(sim.rc_alive[b, r, _wj]):
-            bf.append([4, int(sim.rc_center[b, r, _wj])])
+        if 0 <= _wj < int(sim.civ_city_center.shape[2]) and bool(sim.civ_city_alive[b, r, _wj]):
+            bf.append([4, int(sim.civ_city_center[b, r, _wj])])
     if relig is not None and int(relig[0][b]) in (5, 6):
         _rj = int(relig[1][b])
-        if 0 <= _rj < int(sim.rc_center.shape[2]) and bool(sim.rc_alive[b, r, _rj]):
-            bf.append([int(relig[0][b]), int(sim.rc_center[b, r, _rj])])
+        if 0 <= _rj < int(sim.civ_city_center.shape[2]) and bool(sim.civ_city_alive[b, r, _rj]):
+            bf.append([int(relig[0][b]), int(sim.civ_city_center[b, r, _rj])])
     if bf:
         rec["buyFaith"] = bf
     # kind 7, the LEVY — the CS index (the shared CS vocabulary, like the
@@ -740,7 +740,7 @@ def replay_seat(sim, r: int, rec: dict) -> None:
     # [centreTile, col] pairs -> per-slot columns via THIS sim's centres.
     prod = torch.full((sim.B, sim.RC), -1, dtype=torch.long, device=dev)
     for centre, col in rec["production"]:
-        hit = (sim.rc_center[:, r] == int(centre)) & sim.rc_alive[:, r]
+        hit = (sim.civ_city_center[:, r] == int(centre)) & sim.civ_city_alive[:, r]
         prod = torch.where(hit, torch.full_like(prod, int(col)), prod)
     tech = None if rec["tech"] is None else torch.tensor(rec["tech"], dtype=torch.long, device=dev)
     civic = None if rec["civic"] is None else torch.tensor(rec["civic"], dtype=torch.long, device=dev)
@@ -754,8 +754,8 @@ def replay_seat(sim, r: int, rec: dict) -> None:
     buy = None
     if _bv is not None and int(_bv[0]) == 0:
         hitj = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
-        for j in range(int(sim.rc_center.shape[2])):
-            m = (sim.rc_center[:, r, j] == int(_bv[1])) & sim.rc_alive[:, r, j]
+        for j in range(int(sim.civ_city_center.shape[2])):
+            m = (sim.civ_city_center[:, r, j] == int(_bv[1])) & sim.civ_city_alive[:, r, j]
             hitj = torch.where(m, torch.full_like(hitj, j), hitj)
         kind0 = torch.where(hitj >= 0, torch.zeros_like(hitj), torch.full_like(hitj, -1))
         buy = (kind0, hitj, torch.full((sim.B,), int(_bv[2]), dtype=torch.long, device=dev))
@@ -769,16 +769,16 @@ def replay_seat(sim, r: int, rec: dict) -> None:
         # TILE: [3, tileIndex, centreTile] -> (kind, tile, slot) by centre
         # resolution (match by centre + alive, never by slot).
         hitj = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
-        for j in range(int(sim.rc_center.shape[2])):
-            m3 = (sim.rc_center[:, r, j] == int(_bv[2])) & sim.rc_alive[:, r, j]
+        for j in range(int(sim.civ_city_center.shape[2])):
+            m3 = (sim.civ_city_center[:, r, j] == int(_bv[2])) & sim.civ_city_alive[:, r, j]
             hitj = torch.where(m3, torch.full_like(hitj, j), hitj)
         kind3 = torch.where(hitj >= 0, torch.full_like(hitj, 3), torch.full_like(hitj, -1))
         buy = (kind3, torch.full((sim.B,), int(_bv[1]), dtype=torch.long, device=dev), hitj)
 
     def _centre_slot(centre: int) -> torch.Tensor:
         hj = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
-        for j in range(int(sim.rc_center.shape[2])):
-            mm = (sim.rc_center[:, r, j] == centre) & sim.rc_alive[:, r, j]
+        for j in range(int(sim.civ_city_center.shape[2])):
+            mm = (sim.civ_city_center[:, r, j] == centre) & sim.civ_city_alive[:, r, j]
             hj = torch.where(mm, torch.full_like(hj, j), hj)
         return hj
 
@@ -813,9 +813,9 @@ def replay_seat(sim, r: int, rec: dict) -> None:
     if rec.get("ally"):
         geo_kwargs["ally"] = _geo_mask(rec["ally"])
     if rec.get("geoWar") is not None:
-        geo_kwargs["cc_war"] = torch.full((sim.B,), int(rec["geoWar"]), dtype=torch.long, device=dev)
+        geo_kwargs["civ_pair_war"] = torch.full((sim.B,), int(rec["geoWar"]), dtype=torch.long, device=dev)
     if rec.get("geoPeace"):
-        geo_kwargs["cc_peace"] = _geo_mask(rec["geoPeace"])
+        geo_kwargs["civ_pair_peace"] = _geo_mask(rec["geoPeace"])
     if geo_kwargs:
         sim.apply_geo(r, **geo_kwargs)
     # draw order: replay stashes exactly as the driver does; the PHASE

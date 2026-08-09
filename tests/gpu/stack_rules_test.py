@@ -86,7 +86,7 @@ def test_spawn_probe_obeys_encampments() -> None:
     sim.district_complete[0, t] = True
     sim.district_pillaged[0, t] = False
     sim.encamp_hp[0, t] = 100
-    sim.r_atwar[0, 0] = True
+    sim.civ_only_atwar[0, 0] = True
     sim.sync_war()  # close the poke under transpose
 
     if not bool(sim._encamp_live()[0, t]):

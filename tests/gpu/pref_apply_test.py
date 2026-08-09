@@ -39,7 +39,7 @@ def main() -> None:
     path = sorted(FIXTURES.glob("seed*.json"))[0]
     sim = fresh(rules, path)
     r, j = 0, 0
-    assert bool(sim.rc_alive[0, r, j]), "civ 0 capital must exist by t25"
+    assert bool(sim.civ_city_alive[0, r, j]), "civ 0 capital must exist by t25"
     sim.controlled[0, r] = True
 
     NB = sim.rules_dev.b_cost.shape[0]
@@ -49,9 +49,9 @@ def main() -> None:
     NEG = float("-inf")
 
     def idle_city():
-        sim.rc_current[0, r, j] = -1
-        sim.rc_progress[0, r, j] = 0.0
-        sim.rc_cost[0, r, j] = 0.0
+        sim.civ_city_current[0, r, j] = -1
+        sim.civ_city_progress[0, r, j] = 0.0
+        sim.civ_city_cost[0, r, j] = 0.0
 
     def pref(ranked):
         """ranked = columns best-first; everything else is -inf (ruled out)."""
@@ -69,7 +69,7 @@ def main() -> None:
     b1 = legal_b[1] if len(legal_b) > 1 else b0
     sim.apply_seat_actions(r, production_pref=pref([b0, b1]))
     sim._consume_driven_picks(r)
-    got = int(sim.rc_current[0, r, j])
+    got = int(sim.civ_city_current[0, r, j])
     assert got == 1 + sim.NU + nS + b0, f"top-ranked legal column must win, got {got}"
     print("  1 top-ranked legal column wins OK")
 
@@ -79,11 +79,11 @@ def main() -> None:
     # rejects on. The district column stays legal in the mask we hand over.
     sim2 = fresh(rules, path)
     sim2.controlled[0, r] = True
-    sim2.rc_current[0, r, j] = -1
-    sim2.rc_progress[0, r, j] = 0.0
-    sim2.rc_cost[0, r, j] = 0.0
-    ctr = int(sim2.rc_center[0, r, j])
-    own = ((sim2.tile_city[0] == sim2.rc_id[0, r, j]) & (sim2.district[0] < 0)).nonzero(as_tuple=True)[0]
+    sim2.civ_city_current[0, r, j] = -1
+    sim2.civ_city_progress[0, r, j] = 0.0
+    sim2.civ_city_cost[0, r, j] = 0.0
+    ctr = int(sim2.civ_city_center[0, r, j])
+    own = ((sim2.tile_city[0] == sim2.civ_city_id[0, r, j]) & (sim2.district[0] < 0)).nonzero(as_tuple=True)[0]
     for t in own.tolist():
         if t != ctr:
             sim2.district[0, t] = 0        # occupied -> no tile can take a new one
@@ -94,7 +94,7 @@ def main() -> None:
     d_col = D0                              # rank it FIRST even though it cannot land
     sim2.apply_seat_actions(r, production_pref=pref([d_col, legal_b2[0]]))
     sim2._consume_driven_picks(r)
-    got2 = int(sim2.rc_current[0, r, j])
+    got2 = int(sim2.civ_city_current[0, r, j])
     assert got2 != -1, "#87 REGRESSION: an unplaceable top pick left the city IDLE"
     assert got2 == 1 + sim2.NU + nS + legal_b2[0], f"fallback must be the policy's OWN next rank, got {got2}"
     print("  2 unplaceable top pick falls to the policy's next rank (not idle) OK")
@@ -102,13 +102,13 @@ def main() -> None:
     # -- 3: ranks run dry -> the city stays idle, nothing is invented -------
     sim3 = fresh(rules, path)
     sim3.controlled[0, r] = True
-    sim3.rc_current[0, r, j] = -1
-    sim3.rc_progress[0, r, j] = 0.0
-    sim3.rc_cost[0, r, j] = 0.0
+    sim3.civ_city_current[0, r, j] = -1
+    sim3.civ_city_progress[0, r, j] = 0.0
+    sim3.civ_city_cost[0, r, j] = 0.0
     p_none = torch.full((1, sim3.RC, W), NEG, dtype=torch.float64)
     sim3.apply_seat_actions(r, production_pref=p_none)
     sim3._consume_driven_picks(r)
-    assert int(sim3.rc_current[0, r, j]) == -1, "an all -inf ranking must queue NOTHING"
+    assert int(sim3.civ_city_current[0, r, j]) == -1, "an all -inf ranking must queue NOTHING"
     print("  3 exhausted ranking queues nothing (the engine never invents a pick) OK")
 
     # -- 4: a PURCHASE is attempted once, not once per rank -----------------
@@ -117,22 +117,22 @@ def main() -> None:
     # treasury may or may not afford it, but it must not move TWICE.
     sim4 = fresh(rules, path)
     sim4.controlled[0, r] = True
-    sim4.rc_current[0, r, j] = -1
-    sim4.rc_progress[0, r, j] = 0.0
-    sim4.rc_cost[0, r, j] = 0.0
+    sim4.civ_city_current[0, r, j] = -1
+    sim4.civ_city_progress[0, r, j] = 0.0
+    sim4.civ_city_cost[0, r, j] = 0.0
     base_w = NB + 2 + sim4.NU + nS
     if W > base_w:
-        sim4.r_treasury[0, r] = 100000.0
-        t0 = float(sim4.r_treasury[0, r])
+        sim4.civ_only_treasury[0, r] = 100000.0
+        t0 = float(sim4.civ_only_treasury[0, r])
         m4 = sim4.seat_masks(r)["production"][0, j]
         buys = [c for c in range(base_w, W) if bool(m4[c])]
         if buys:
             sim4.apply_seat_actions(r, production_pref=pref([buys[0], 0]))
             sim4._consume_driven_picks(r)
-            spent = t0 - float(sim4.r_treasury[0, r])
+            spent = t0 - float(sim4.civ_only_treasury[0, r])
             one = spent
-            sim4.r_treasury[0, r] = t0
-            sim4.rc_current[0, r, j] = -1
+            sim4.civ_only_treasury[0, r] = t0
+            sim4.civ_city_current[0, r, j] = -1
             sim4.apply_seat_actions(r, production=torch.full((1, sim4.RC), -1, dtype=torch.long))
             sim4._consume_driven_picks(r)
             assert one >= 0.0, "purchase spent a negative amount"
@@ -164,10 +164,10 @@ def main() -> None:
             continue  # no adjacency arm to satisfy
         if bool((base5 & ((sim5.wok[0] >> _wi) & 1).bool()).any()):
             wi5 = _wi
-            sim5.r_techs[0, r5, int(_wrow["ut"])] = True
+            sim5.civ_only_techs[0, r5, int(_wrow["ut"])] = True
             break
     assert wi5 is not None, "#88: fixture has no forceable wonder candidate near r0c0"
-    sim5.rc_current[0, r5, j5] = -1  # these columns are idle-gated like every base column
+    sim5.civ_city_current[0, r5, j5] = -1  # these columns are idle-gated like every base column
     m5 = sim5.seat_masks(r5)["production"]
     assert bool(m5[0, j5, w_lo5 + wi5]), "#88: the granted wonder column must read legal"
     prod5 = torch.full((1, sim5.RC), -1, dtype=torch.long)
@@ -175,32 +175,32 @@ def main() -> None:
     sim5.apply_seat_actions(r5, production=prod5)
     sim5._consume_driven_picks(r5)
     code_w5 = 1 + sim5.NU + nS5 + NB5 + len(sim5._proj_rows) + wi5
-    assert int(sim5.rc_current[0, r5, j5]) == code_w5, "wonder code must queue via the shared helper"
-    assert int(sim5.rc_wonder[0, r5, j5, wi5]) >= 0, "the pave must register the tile"
+    assert int(sim5.civ_city_current[0, r5, j5]) == code_w5, "wonder code must queue via the shared helper"
+    assert int(sim5.civ_city_wonder[0, r5, j5, wi5]) >= 0, "the pave must register the tile"
     assert bool((sim5.built_wonder[0] == wi5).any()), "built_wonder plane must carry the in-flight pave"
     # cross-seat one-per-world: a fresh sim where ANOTHER civ already paved it
     sim6 = fresh(rules, path)
     sim6.controlled[0, r5] = True
-    sim6.r_techs[0, r5, int(sim6._wond_rows[wi5]["ut"])] = True  # same grant — the CLAIM must be the only blocker
-    sim6.rc_current[0, r5, j5] = -1
+    sim6.civ_only_techs[0, r5, int(sim6._wond_rows[wi5]["ut"])] = True  # same grant — the CLAIM must be the only blocker
+    sim6.civ_city_current[0, r5, j5] = -1
     free6 = int((sim6.built_wonder[0] < 0).nonzero(as_tuple=True)[0][0])
     sim6.built_wonder[0, free6] = wi5  # any tile, any owner — wonderExists is global
     m6 = sim6.seat_masks(r5)["production"]
     assert not bool(m6[0, j5, w_lo5 + wi5]), "mask must read the claim"
     sim6.apply_seat_actions(r5, production=prod5)
     sim6._consume_driven_picks(r5)
-    assert int(sim6.rc_current[0, r5, j5]) != code_w5, "apply must REFUSE the claimed wonder (cross-seat)"
+    assert int(sim6.civ_city_current[0, r5, j5]) != code_w5, "apply must REFUSE the claimed wonder (cross-seat)"
     # PROJECT: plant a completed district matching base project 0, then apply
     sim7 = fresh(rules, path)
     sim7.controlled[0, r5] = True
     prow7 = sim7._proj_rows[0]
     d_i7 = int(prow7["d"])
-    ctr7 = int(sim7.rc_center[0, r5, j5])
+    ctr7 = int(sim7.civ_city_center[0, r5, j5])
     dt7 = next(int(t) for t in range(sim7.T) if int(sim7.civ_at[0, t]) == r5 and int(sim7.district[0, t]) < 0 and t != ctr7 and int(sim7.built_wonder[0, t]) < 0)
     sim7.district[0, dt7] = d_i7
     sim7.district_complete[0, dt7] = True
-    sim7.rc_dist_tile[0, r5, j5, d_i7] = dt7
-    sim7.rc_current[0, r5, j5] = -1
+    sim7.civ_city_dist_tile[0, r5, j5, d_i7] = dt7
+    sim7.civ_city_current[0, r5, j5] = -1
     m7 = sim7.seat_masks(r5)["production"]
     p_lo7 = w_lo5 + sim7._wond_n
     assert bool(m7[0, j5, p_lo7]), "#88: base project 0 must be legal on its completed district"
@@ -208,8 +208,8 @@ def main() -> None:
     prod7[0, j5] = p_lo7
     sim7.apply_seat_actions(r5, production=prod7)
     sim7._consume_driven_picks(r5)
-    assert int(sim7.rc_current[0, r5, j5]) == 1 + sim7.NU + nS5 + NB5 + 0, "project code must queue"
-    assert float(sim7.rc_cost[0, r5, j5]) > 0, "project cost must lock"
+    assert int(sim7.civ_city_current[0, r5, j5]) == 1 + sim7.NU + nS5 + NB5 + 0, "project code must queue"
+    assert float(sim7.civ_city_cost[0, r5, j5]) > 0, "project cost must lock"
     print("  5 #88 wonder queues via shared scan, one-per-world refuses cross-seat, project queues OK")
 
     # -- 6: the lite=True contract (the driver's fast path) -----------------

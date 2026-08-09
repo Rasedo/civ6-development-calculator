@@ -35,8 +35,8 @@ def build():
     assert sim.R >= 2, "needs two civs to poke simultaneous wars"
     for _ in range(20):
         sim.step()
-    sim.r_atwar[:] = False
-    sim.cc_war[:] = False
+    sim.civ_only_atwar[:] = False
+    sim.civ_pair_war[:] = False
     sim.sync_war()  # close the pokes under transpose
     sim.ww[:] = 0
     sim.ww_turn[:] = -1
@@ -115,10 +115,10 @@ def main() -> None:
 
     # --- a CITY-STATE is a real opponent but holds no accumulator ---------
     sim.ww[:] = 0
-    cs_row = 1 + sim.R
-    sim._ww_battle(one(sim), 0, cs_row, away, city=True)
-    assert int(sim.ww[0, 0, cs_row]) > 0, "warring a minor wears you down normally"
-    assert int(sim.ww[0, cs_row, :].sum()) == 0, "a minor keeps no accumulator"
+    citystate_row = 1 + sim.R
+    sim._ww_battle(one(sim), 0, citystate_row, away, city=True)
+    assert int(sim.ww[0, 0, citystate_row]) > 0, "warring a minor wears you down normally"
+    assert int(sim.ww[0, citystate_row, :].sum()) == 0, "a minor keeps no accumulator"
     print("  a city-state is a valid opponent and holds nothing itself")
 
     # --- wars score SEPARATELY; only the worst is felt --------------------
@@ -137,13 +137,13 @@ def main() -> None:
     sim.ww[:, 0, 1] = 1000
     sim.ww[:, 0, 2] = 1000
     sim.ww_turn[:, 0, 1] = int(sim.turn)  # blood was spilled against civ 0
-    sim.r_atwar[:, 0] = True
+    sim.civ_only_atwar[:, 0] = True
     sim.sync_war()
     sim._ww_decay(0)
     assert int(sim.ww[0, 0, 1]) == 1000, "a war fought THIS turn does not decay"
     assert int(sim.ww[0, 0, 2]) == 1000 - int(rww["decayAtWar"]), int(sim.ww[0, 0, 2])
     sim.turn += 1
-    sim.r_atwar[:, 0] = False
+    sim.civ_only_atwar[:, 0] = False
     sim.sync_war()
     sim._ww_decay(0)
     assert int(sim.ww[0, 0, 1]) == 1000 - int(rww["decayAtPeace"]), int(sim.ww[0, 0, 1])
@@ -181,7 +181,7 @@ def main() -> None:
 
     # --- a war DECLARED but never fought costs nothing -------------------
     sim = build()
-    sim.r_atwar[:, 0] = True
+    sim.civ_only_atwar[:, 0] = True
     sim.sync_war()
     for _ in range(30):
         sim.step()

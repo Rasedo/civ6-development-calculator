@@ -43,14 +43,14 @@ POKE_OMP = 2
 POKE_COST = {
     "great_works": 2.7, "religion_gp": 3.2, "government": 3.3,
     "relics": 3.4, "trade2": 3.5, "bankruptcy": 3.7, "domination": 3.8,
-    "culture_victory": 4.3, "space_race": 4.8, "encampment": 4.9, "cs_verbs": 6.6,
-    "cs_bonus": 7.9, "seat_purchase": 9.2, "rc_registry": 12.4, "controlled": 13.8,
+    "culture_victory": 4.3, "space_race": 4.8, "encampment": 4.9, "citystate_verbs": 6.6,
+    "citystate_bonus": 7.9, "seat_purchase": 9.2, "civ_city_registry": 12.4, "controlled": 13.8,
     "combat_mod": 17.1, "ranged": 18.5, "occupancy": 21.0,
     "governors": 22.2, "war_weariness": 23.2, "geopolitics": 23.8, "seat": 29.0,
     "gp_aura": 31.6, "war": 32.5, "purchase": 38.8, "religion2": 51.7,
     "naval": 53.7, "districts": 87.9, "watermill": 12.0, "fort": 6.0,
-    "festival": 4.0, "cs_war": 6.0, "snapshot": 30.0, "golden_move": 3.0, "pref_apply": 8.0, "seat_verbs": 10.0, "drive": 60.0,
-    "cc_strike": 12.0,
+    "festival": 4.0, "citystate_war": 6.0, "snapshot": 30.0, "golden_move": 3.0, "pref_apply": 8.0, "seat_verbs": 10.0, "drive": 60.0,
+    "civ_pair_strike": 12.0,
     "spawn_reclaim": 6.0,
     "city_first": 14.0,
 }
@@ -203,7 +203,7 @@ def main() -> int:
                 ("occupancy", [py, "tests/gpu/occupancy_test.py"], 4),
                 ("domination", [py, "tests/gpu/domination_test.py"], 4),
                 ("peace_target", [py, "tests/gpu/peace_target_test.py"], 2),  # no attack without a war
-                ("cc_strike", [py, "tests/gpu/cc_strike_test.py"], 2),  # a civ city fires on an enemy civ
+                ("civ_pair_strike", [py, "tests/gpu/civ_pair_strike_test.py"], 2),  # a civ city fires on an enemy civ
                 ("spawn_reclaim", [py, "tests/gpu/spawn_reclaim_test.py"], 2),  # a reclaimed slot hands on no drowned unit's MP
                 ("city_first", [py, "tests/gpu/city_first_test.py"], 2),  # a garrison shields no city
                 ("stack_rules", [py, "tests/gpu/stack_rules_test.py"], 2),  # cross-domain stacking + Encampment spawn wall
@@ -221,17 +221,17 @@ def main() -> int:
                 ("culture_victory", [py, "tests/gpu/culture_victory_test.py"], 4),  # the culture win, which the serve gate never reaches
                 ("relics", [py, "tests/gpu/relics_test.py"], 4),  # martyr relics — temple slots, faith + tourism
                 ("festival", [py, "tests/gpu/festival_test.py"], 4),  # Festival pays THREE GP classes at 0.11 (serve gate never reaches it)
-                ("cs_war", [py, "tests/gpu/cs_war_test.py"], 4),  # seat-0 <-> city-state war gates the attack mask
+                ("citystate_war", [py, "tests/gpu/citystate_war_test.py"], 4),  # seat-0 <-> city-state war gates the attack mask
                 ("snapshot", [py, "tests/gpu/snapshot_restore_test.py"], 4),  # _MUTABLE round-trip + step determinism (the ONLY lane that restores)
                 ("naval", [py, "tests/gpu/naval_test.py"], 4),  # naval surfaces the serve gate never reaches
                 ("districts", [py, "tests/gpu/district_breadth_test.py"], 4),  # district catalog breadth
-                ("rc_registry", [py, "tests/gpu/rc_registry_test.py"], 4),  # civ district/tile registry consistency
+                ("civ_city_registry", [py, "tests/gpu/civ_city_registry_test.py"], 4),  # civ district/tile registry consistency
                 ("religion2", [py, "tests/gpu/religion2_test.py"], 4),  # missionary / enhancer / religious-victory surfaces
                 ("encampment", [py, "tests/gpu/encampment_test.py"], 4),  # Encampment strike + training XP + specialist surfaces
                 ("great_works", [py, "tests/gpu/great_works_test.py"], 4),  # Writer/Musician Great-Work slots + yield
                 ("gp_aura", [py, "tests/gpu/gp_aura_test.py"], 4),  # Great General/Admiral spawn/walk/aura/capture (GENERAL unreachable in the gate)
-                ("cs_bonus", [py, "tests/gpu/cs_bonus_test.py"], 4),  # CS envoy building re-key + suzerain perk (6-envoy tier unreachable in the gate)
-                ("cs_verbs", [py, "tests/gpu/cs_verbs_test.py"], 4),  # civ levy + civ city-state quests
+                ("citystate_bonus", [py, "tests/gpu/citystate_bonus_test.py"], 4),  # CS envoy building re-key + suzerain perk (6-envoy tier unreachable in the gate)
+                ("citystate_verbs", [py, "tests/gpu/citystate_verbs_test.py"], 4),  # civ levy + civ city-state quests
                 ("trade2", [py, "tests/gpu/trade2_test.py"], 4),  # international routes + route duration surfaces
                 ("geopolitics", [py, "tests/gpu/geopolitics_test.py"], 4),  # per-pair wars + casus belli + civ-to-civ city transfer
                 ("governors", [py, "tests/gpu/governors_test.py"], 4),  # era-score hooks + Ages loyalty modulation + governor anchors

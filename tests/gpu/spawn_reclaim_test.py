@@ -94,7 +94,7 @@ def main() -> None:
     tile2 = free_land(sim2)
     m2 = torch.zeros(sim2.B, dtype=torch.bool)
     m2[0] = True
-    sim2._spawn_p(m2, torch.full((sim2.B,), tile2, dtype=torch.long),
+    sim2._spawn_seat0(m2, torch.full((sim2.B,), tile2, dtype=torch.long),
                        torch.full((sim2.B,), 2, dtype=torch.long))  # WARRIOR
     check(sim2, "p", slot2, "seat-0 military (warrior)")
 

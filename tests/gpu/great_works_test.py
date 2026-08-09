@@ -7,7 +7,7 @@ WRITER inside 250t is uncommon; MUSEUM even rarer):
     (Amphitheater 2, Art Museum 3, Broadcast Center 1);
   * per-city tensors (gw_writing/gw_art/gw_music + the rc_ twins) exist
     with matched shapes and round-trip through snapshot()/restore() (_MUTABLE);
-  * _place_c_works / _place_rc_works: deterministic lowest-city then
+  * _place_seat0_works / _place_civ_works: deterministic lowest-city then
     lowest-slot fill into the matching building, cap at that kind's slots,
     overflow charges degrade to the instant culture lump;
   * the per-work culture/turn building-tier yield is LIVE and
@@ -15,7 +15,7 @@ WRITER inside 250t is uncommon; MUSEUM even rarer):
     linearly per work);
   * WRITER/MUSICIAN earned through _advance_great_people apply NO instant
     civic lump when a slot exists;
-  * _reclaim_rc carries a city's works with it through slot compaction.
+  * _reclaim_civ_cities carries a city's works with it through slot compaction.
 
 Follows the religion_gp_test pattern: load rules + a fixture, drive the GPU
 BatchSim, assert on its internal tensors.
@@ -63,30 +63,30 @@ def main() -> None:
 
     # --- tensor shapes -----------------------------------------------------
     assert sim.gw_writing.shape == (B, C) and sim.gw_art.shape == (B, C) and sim.gw_music.shape == (B, C)
-    assert sim.rc_gw_writing.shape == sim.rc_alive.shape
-    assert sim.rc_gw_music.shape == sim.rc_alive.shape
-    assert sim.rc_gw_art.shape == sim.rc_alive.shape
-    assert bool((sim.gw_writing == 0).all()) and bool((sim.rc_gw_writing == 0).all()), "fresh: no works"
+    assert sim.civ_city_gw_writing.shape == sim.civ_city_alive.shape
+    assert sim.civ_city_gw_music.shape == sim.civ_city_alive.shape
+    assert sim.civ_city_gw_art.shape == sim.civ_city_alive.shape
+    assert bool((sim.gw_writing == 0).all()) and bool((sim.civ_city_gw_writing == 0).all()), "fresh: no works"
 
     if not sim.districts_on:
         print("GREAT-WORKS OK (districts off — placement paths skipped)")
         return
 
-    # --- _place_c_works: single Writer fills 2 Amphitheater slots ------
+    # --- _place_seat0_works: single Writer fills 2 Amphitheater slots ------
     assert bool(sim.alive[:, 0].all()), "fixture capital (city 0) must be alive"
     sim.gw_writing.zero_(); sim.gw_art.zero_(); sim.gw_music.zero_()
     sim.buildings[:, 0, amph] = True  # capital gets an Amphitheater
     civic0 = sim.civic_prog.clone()
     ver0 = sim._eff_version
     cval = torch.full((B,), 45.0, dtype=torch.float64)  # Li Bai's culture value
-    sim._place_c_works(torch.ones(B, dtype=torch.bool), cval, 0)
+    sim._place_seat0_works(torch.ones(B, dtype=torch.bool), cval, 0)
     assert bool((sim.gw_writing[:, 0] == 2).all()), "both works must slot into the Amphitheater"
     assert bool((sim.civic_prog == civic0).all()), "a fully-slotted Writer applies NO instant lump"
     assert sim._eff_version > ver0, "a slot write must bump _eff_version (yield-bearing state)"
 
     # --- overflow: a second Writer finds no open slot -> instant lump -------
     civic1 = sim.civic_prog.clone()
-    sim._place_c_works(torch.ones(B, dtype=torch.bool), cval, 0)
+    sim._place_seat0_works(torch.ones(B, dtype=torch.bool), cval, 0)
     assert bool((sim.gw_writing[:, 0] == 2).all()), "slots stay capped at gwSlots (2)"
     assert bool((sim.civic_prog - civic1 == 90.0).all()), "both overflow charges -> 2 x 45 lump"
 
@@ -98,11 +98,11 @@ def main() -> None:
         # First Writer -> all 2 into the LOWER city_seq (capital = seq 0).
         cap = int(sim.city_seq[0, 0]); nxt = int(sim.city_seq[0, 1])
         lo, hi = (0, 1) if cap < nxt else (1, 0)
-        sim._place_c_works(torch.ones(B, dtype=torch.bool), cval, 0)
+        sim._place_seat0_works(torch.ones(B, dtype=torch.bool), cval, 0)
         assert bool((sim.gw_writing[:, lo] == 2).all()), "the lowest-seq city fills first"
         assert bool((sim.gw_writing[:, hi] == 0).all()), "the higher-seq city stays empty"
         # Second Writer -> spills into the higher-seq city.
-        sim._place_c_works(torch.ones(B, dtype=torch.bool), cval, 0)
+        sim._place_seat0_works(torch.ones(B, dtype=torch.bool), cval, 0)
         assert bool((sim.gw_writing[:, hi] == 2).all()), "overflow spills to the next city"
         sim.buildings[:, 1, amph] = False
 
@@ -147,12 +147,12 @@ def main() -> None:
     sim.buildings[:, 0, museum] = True
     sim.buildings[:, 0, broadcast] = False
     civic2 = sim.civic_prog.clone()
-    sim._place_c_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 50.0, dtype=torch.float64), 2)
+    sim._place_seat0_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 50.0, dtype=torch.float64), 2)
     assert bool((sim.gw_music[:, 0] == 0).all()), "no BROADCAST CENTER -> music works do not slot"
     assert bool((sim.civic_prog - civic2 == 100.0).all()), "music works overflow to the lump (2 x 50)"
     sim.buildings[:, 0, broadcast] = True
     civic3 = sim.civic_prog.clone()
-    sim._place_c_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 50.0, dtype=torch.float64), 2)
+    sim._place_seat0_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 50.0, dtype=torch.float64), 2)
     assert bool((sim.gw_music[:, 0] == 1).all()), "the Broadcast Center holds exactly ONE music work"
     assert bool((sim.civic_prog - civic3 == 50.0).all()), "the second music work overflows to the lump"
 
@@ -161,12 +161,12 @@ def main() -> None:
     sim.gw_writing.zero_(); sim.gw_art.zero_(); sim.gw_music.zero_()
     sim.buildings[:, 0, museum] = False
     civicA = sim.civic_prog.clone()
-    sim._place_c_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 20.0, dtype=torch.float64), 1)
+    sim._place_seat0_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 20.0, dtype=torch.float64), 1)
     assert bool((sim.gw_art[:, 0] == 0).all()), "no ART MUSEUM -> art works do not slot"
     assert bool((sim.civic_prog - civicA == 60.0).all()), "all 3 art works overflow (3 x 20)"
     sim.buildings[:, 0, museum] = True
     civicB = sim.civic_prog.clone()
-    sim._place_c_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 20.0, dtype=torch.float64), 1)
+    sim._place_seat0_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 20.0, dtype=torch.float64), 1)
     assert bool((sim.gw_art[:, 0] == 3).all()), "one Artist fills the Art Museum's 3 slots exactly"
     assert bool((sim.civic_prog == civicB).all()), "a fully-slotted Artist applies no lump"
 
@@ -181,43 +181,43 @@ def main() -> None:
     assert bool((sim.gw_writing[:, 0] == 2).all()), "earned Writer's works slot into the Amphitheater"
     assert bool((sim.civic_prog == civicE).all()), "a slotted earned Writer applies NO instant culture lump"
 
-    # --- civ-seat placement: _place_rc_works fills rc slots + overflows ---
-    if sim.R > 0 and bool(sim.rc_alive[:, 0, 0].any()):
+    # --- civ-seat placement: _place_civ_works fills rc slots + overflows ---
+    if sim.R > 0 and bool(sim.civ_city_alive[:, 0, 0].any()):
         r = 0
-        live = sim.rc_alive[:, r, 0]
-        sim.rc_gw_writing.zero_(); sim.rc_gw_art.zero_(); sim.rc_gw_music.zero_()
-        sim.rc_bldg[:, r, 0, amph] = True
-        rc0 = sim.r_civic_prog[:, r].clone()
-        sim._place_rc_works(r, torch.ones(B, dtype=torch.bool), torch.full((B,), 45.0, dtype=torch.float64), 0)
-        assert bool((sim.rc_gw_writing[live, r, 0] == 2).all()), "civ Writer slots into its Amphitheater"
-        assert bool(((sim.r_civic_prog[:, r] - rc0)[live] == 0).all()), "a slotted civ Writer applies no lump"
+        live = sim.civ_city_alive[:, r, 0]
+        sim.civ_city_gw_writing.zero_(); sim.civ_city_gw_art.zero_(); sim.civ_city_gw_music.zero_()
+        sim.civ_city_bldg[:, r, 0, amph] = True
+        rc0 = sim.civ_only_civic_prog[:, r].clone()
+        sim._place_civ_works(r, torch.ones(B, dtype=torch.bool), torch.full((B,), 45.0, dtype=torch.float64), 0)
+        assert bool((sim.civ_city_gw_writing[live, r, 0] == 2).all()), "civ Writer slots into its Amphitheater"
+        assert bool(((sim.civ_only_civic_prog[:, r] - rc0)[live] == 0).all()), "a slotted civ Writer applies no lump"
         # A dead rc slot cannot slot -> the whole person overflows to a lump.
         if bool((~live).any()):
-            assert bool(((sim.r_civic_prog[:, r] - rc0)[~live] == 90.0).all()), "no live slot -> civ overflow lump"
+            assert bool(((sim.civ_only_civic_prog[:, r] - rc0)[~live] == 90.0).all()), "no live slot -> civ overflow lump"
 
     # --- snapshot / restore round-trips the Great-Works tensors (_MUTABLE) --
     sim.gw_writing[0, 0] = 2
-    sim.rc_gw_music[0, 0, 0] = 1 if sim.R > 0 else 0
+    sim.civ_city_gw_music[0, 0, 0] = 1 if sim.R > 0 else 0
     snap = sim.snapshot()
     sim.gw_writing[0, 0] = 0
-    sim.rc_gw_music[0, 0, 0] = 0
+    sim.civ_city_gw_music[0, 0, 0] = 0
     sim.restore(snap)
     assert int(sim.gw_writing[0, 0]) == 2, "gw_writing not preserved across snapshot"
     if sim.R > 0:
-        assert int(sim.rc_gw_music[0, 0, 0]) == 1, "rc_gw_music not preserved across snapshot"
+        assert int(sim.civ_city_gw_music[0, 0, 0]) == 1, "civ_city_gw_music not preserved across snapshot"
 
-    # --- _reclaim_rc carries a city's works with its slot -------------------
+    # --- _reclaim_civ_cities carries a city's works with its slot -------------------
     if sim.R > 0 and RC >= 2:
         # Make slot 1 the only live city (slot 0 dead) with a known work count,
         # then compact: the living city must move to slot 0 carrying its works.
-        sim.rc_gw_writing.zero_(); sim.rc_gw_art.zero_(); sim.rc_gw_music.zero_()
-        sim.rc_alive[0, 0, :] = False
-        sim.rc_alive[0, 0, 1] = True
-        sim.rc_gw_writing[0, 0, 1] = 2
-        sim.rc_gw_music[0, 0, 1] = 1
-        sim._reclaim_rc()
-        assert int(sim.rc_gw_writing[0, 0, 0]) == 2, "works must ride the slot permutation (writing)"
-        assert int(sim.rc_gw_music[0, 0, 0]) == 1, "works must ride the slot permutation (music)"
+        sim.civ_city_gw_writing.zero_(); sim.civ_city_gw_art.zero_(); sim.civ_city_gw_music.zero_()
+        sim.civ_city_alive[0, 0, :] = False
+        sim.civ_city_alive[0, 0, 1] = True
+        sim.civ_city_gw_writing[0, 0, 1] = 2
+        sim.civ_city_gw_music[0, 0, 1] = 1
+        sim._reclaim_civ_cities()
+        assert int(sim.civ_city_gw_writing[0, 0, 0]) == 2, "works must ride the slot permutation (writing)"
+        assert int(sim.civ_city_gw_music[0, 0, 0]) == 1, "works must ride the slot permutation (music)"
 
     print("GREAT-WORKS OK")
 

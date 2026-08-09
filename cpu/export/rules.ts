@@ -76,7 +76,7 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
   cdef: def.effects.combatDefendFollowing ?? 0,  // Defender of the Faith
   cvs: def.effects.combatVsUnitInFollowing ?? 0,  // Crusade
   // B6-S2 missionary channels — pre-rounded INTEGERS so both engines read the
-  // identical value (the GPU indexes these by r_enhancer + a base-value pad):
+  // identical value (the GPU indexes these by civ_only_enhancer + a base-value pad):
   mchg: def.effects.missionaryChargeBonus ?? 0,  // Scripture +1 charge
   mlump: Math.round(SPREAD_PRESSURE * (def.effects.spreadPressureMult ?? 1)),  // Scripture 15, base 10
   mcost: Math.round((UNITS.MISSIONARY?.cost ?? 0) * (def.effects.missionaryCostMult ?? 1)),  // Holy Order 42, base 60

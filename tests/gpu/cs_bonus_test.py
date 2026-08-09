@@ -1,16 +1,16 @@
 """City-state envoy/suzerain bonus self-test.
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
-    python tests/gpu/cs_bonus_test.py
+    python tests/gpu/citystate_bonus_test.py
 
 Scripted parity is the primary correctness bar; these pokes cover the part of
 the surface the gate reaches only partially (seat 0 rarely passes ~5 envoys
 in-gate, so the 6-envoy tier-2 building lane and the suzerain contest edges are
 exercised HERE):
 
-  1. Catalog: _cs_b1idx / _cs_b2idx map each CS type to its tier-1 / tier-2
-     BUILDING catalog index (csEnvoyBonuses), _cs_suz_amt == 3, and the per-CS
-     suzerain channel (cs_suz_key) round-trips from the fixture.
+  1. Catalog: _citystate_b1idx / _citystate_b2idx map each CS type to its tier-1 / tier-2
+     BUILDING catalog index (csEnvoyBonuses), _citystate_suz_amt == 3, and the per-CS
+     suzerain channel (citystate_suz_key) round-trips from the fixture.
   2. Seat-0 envoy BUILDING bonus: a city holding the CS type's tier-1 building
      collects +districtBonus in the CS channel at >=3 envoys; the tier-2
      building collects a second +districtBonus at >=6; the bonus lands in the
@@ -18,7 +18,7 @@ exercised HERE):
      a PILLAGED district darkens it (bf_live mirror of TS cityBuildingYields).
   3. Seat-0 suzerain perk: a shipped-channel CS that seat 0 is STRICTLY
      suzerain of adds +suzerainYield to the CAPITAL in its channel; a descoped
-     CS (cs_suz_key = -1) adds nothing; losing the contest (a civ seat with
+     CS (citystate_suz_key = -1) adds nothing; losing the contest (a civ seat with
      more envoys) removes the perk.
   4. Civ mirror: the same building bonus + suzerain perk on the civ yield
      path (_seat_city_yields_all), off that civ seat's envoy counts.
@@ -53,16 +53,16 @@ def _force_scientific_cs0(sim) -> None:
     """Make CS slot 0 a scientific CS (LIBRARY / UNIVERSITY / science channel)
     by overriding the derived per-CS index tensors — deterministic regardless
     of the fixture's placed type."""
-    sim._cs_b1idx[0, 0] = bidx("LIBRARY")
-    sim._cs_b2idx[0, 0] = bidx("UNIVERSITY")
-    sim._cs_yidx[0, 0] = SCIENCE
-    sim.cs_alive[0, 0] = True
-    sim.cs_met[0, 0] = True
+    sim._citystate_b1idx[0, 0] = bidx("LIBRARY")
+    sim._citystate_b2idx[0, 0] = bidx("UNIVERSITY")
+    sim._citystate_yidx[0, 0] = SCIENCE
+    sim.citystate_alive[0, 0] = True
+    sim.citystate_met[0, 0] = True
 
 
 def test_catalog(rules, path) -> None:
     sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
-    cs = rules.cs
+    cs = rules.citystate
     # per-type tier indices match the rules export
     for t in range(len(cs["typeB1Idx"])):
         # find a CS of type t (if any) and verify its derived index
@@ -75,11 +75,11 @@ def test_catalog(rules, path) -> None:
     # religious = type 5 → SHRINE / TEMPLE
     assert cs["typeB1Idx"][5] == bidx("SHRINE"), "religious tier-1 must be SHRINE"
     assert cs["typeB2Idx"][5] == bidx("TEMPLE"), "religious tier-2 must be TEMPLE"
-    assert float(sim._cs_suz_amt) == 3.0, f"suzerain amount = {float(sim._cs_suz_amt)}, want 3"
+    assert float(sim._citystate_suz_amt) == 3.0, f"suzerain amount = {float(sim._citystate_suz_amt)}, want 3"
     # per-CS suzerain channel round-trips from the fixture
     f = load_fixture(path)
     for s, csr in enumerate(f.get("cityStates", [])):
-        assert int(sim.cs_suz_key[0, s]) == int(csr.get("suzKey", -1)), f"cs_suz_key[{s}] mismatch"
+        assert int(sim.citystate_suz_key[0, s]) == int(csr.get("suzKey", -1)), f"citystate_suz_key[{s}] mismatch"
     print(f"  catalog OK: scientific→LIBRARY/UNIVERSITY, religious→SHRINE/TEMPLE, suzAmt=3, {len(BUILDING_IDS)} bldgs")
 
 
@@ -90,13 +90,13 @@ def test_building_bonus(rules, path) -> None:
     _force_scientific_cs0(sim)
     # kill any other CS so only CS0 contributes
     if sim.S > 1:
-        sim.cs_alive[0, 1:] = False
+        sim.citystate_alive[0, 1:] = False
     li, ui = bidx("LIBRARY"), bidx("UNIVERSITY")
     sim.buildings[0, 0, li] = True
     sim.buildings[0, 0, ui] = True
 
     def sci0(envoys: int) -> tuple[float, float]:
-        sim.cs_envoys[0, 0] = envoys
+        sim.citystate_envoys[0, 0] = envoys
         sim._eff_version += 1
         total, _, _, _ = sim._city_totals(lux=None)
         return float(total[0, 0, SCIENCE]), float(total[0, 0, FOOD])
@@ -124,7 +124,7 @@ def test_building_pillage(rules, path) -> None:
         sim.step()
     _force_scientific_cs0(sim)
     if sim.S > 1:
-        sim.cs_alive[0, 1:] = False
+        sim.citystate_alive[0, 1:] = False
     if not sim.districts_on:
         print("  pillage test SKIPPED (districts off)")
         return
@@ -149,7 +149,7 @@ def test_building_pillage(rules, path) -> None:
     sim.buildings[0, 0, li] = True
 
     def sci0(envoys: int) -> float:
-        sim.cs_envoys[0, 0] = envoys
+        sim.citystate_envoys[0, 0] = envoys
         sim._eff_version += 1
         total, _, _, _ = sim._city_totals(lux=None)
         return float(total[0, 0, SCIENCE])
@@ -174,15 +174,15 @@ def test_suzerain(rules, path) -> None:
         sim.step()
     _force_scientific_cs0(sim)
     if sim.S > 1:
-        sim.cs_alive[0, 1:] = False
+        sim.citystate_alive[0, 1:] = False
     # seat 0 STRICTLY suzerain of CS0: 4 envoys, civ seats at 0
-    sim.cs_envoys[0, 0] = 4
+    sim.citystate_envoys[0, 0] = 4
     if sim.R > 0:
-        sim.cs_r_envoys[0, :, 0] = 0
-    suz_amt = float(sim._cs_suz_amt)
+        sim.civ_only_citystate_envoys[0, :, 0] = 0
+    suz_amt = float(sim._citystate_suz_amt)
 
     def cap_sci(suz_key: int) -> float:
-        sim.cs_suz_key[0, 0] = suz_key
+        sim.citystate_suz_key[0, 0] = suz_key
         sim._eff_version += 1
         total, _, _, _ = sim._city_totals(lux=None)
         return float(total[0, 0, SCIENCE])
@@ -194,8 +194,8 @@ def test_suzerain(rules, path) -> None:
 
     # contest lost: a civ seat out-envoys seat 0 -> no perk
     if sim.R > 0:
-        sim.cs_suz_key[0, 0] = SCIENCE
-        sim.cs_r_envoys[0, 0, 0] = 9  # civ 0 dominates
+        sim.citystate_suz_key[0, 0] = SCIENCE
+        sim.civ_only_citystate_envoys[0, 0, 0] = 9  # civ 0 dominates
         sim._eff_version += 1
         total, _, _, _ = sim._city_totals(lux=None)
         contested = float(total[0, 0, SCIENCE])
@@ -211,21 +211,21 @@ def test_civ_bonus(rules, path) -> None:
         print("  civ test SKIPPED (no civs)")
         return
     r = 0
-    live = (sim.rc_alive[0, r]).nonzero(as_tuple=True)[0]
+    live = (sim.civ_city_alive[0, r]).nonzero(as_tuple=True)[0]
     if len(live) == 0:
         print("  civ test SKIPPED (civ 0 has no cities)")
         return
     j = int(live[0])
     _force_scientific_cs0(sim)
     if sim.S > 1:
-        sim.cs_alive[0, 1:] = False
+        sim.citystate_alive[0, 1:] = False
     li, ui = bidx("LIBRARY"), bidx("UNIVERSITY")
-    sim.rc_bldg[0, r, j, li] = True
-    sim.rc_bldg[0, r, j, ui] = True
+    sim.civ_city_bldg[0, r, j, li] = True
+    sim.civ_city_bldg[0, r, j, ui] = True
 
     def rsci(renvoys: int, suz_key: int = -1) -> float:
-        sim.cs_r_envoys[0, r, 0] = renvoys
-        sim.cs_suz_key[0, 0] = suz_key
+        sim.civ_only_citystate_envoys[0, r, 0] = renvoys
+        sim.citystate_suz_key[0, 0] = suz_key
         sim._eff_version += 1
         # _seat_city_yields_all returns (food, prod, sci, cul, gold, faith).
         food, prod, sci, cul, gold, faith = sim._seat_city_yields_all(r)
@@ -240,10 +240,10 @@ def test_civ_bonus(rules, path) -> None:
 
     # civ suzerain perk on the CAPITAL: force this rc to be the capital and
     # make the civ seat strictly suzerain (envoys 4, every other seat at 0)
-    sim.rc_is_cap[0, r, j] = True
-    sim.cs_envoys[0, 0] = 0
-    sim.cs_r_envoys[0, :, 0] = 0
-    sim.cs_r_envoys[0, r, 0] = 4
+    sim.civ_city_is_cap[0, r, j] = True
+    sim.citystate_envoys[0, 0] = 0
+    sim.civ_only_citystate_envoys[0, :, 0] = 0
+    sim.civ_only_citystate_envoys[0, r, 0] = 4
     ship = rsci(4, suz_key=SCIENCE)
     desc = rsci(4, suz_key=-1)
     assert ship > desc + 1e-9, f"civ suzerain perk did not add to the capital ({desc}->{ship})"
@@ -255,7 +255,7 @@ def main() -> None:
     paths = sorted(FIXTURES.glob("seed*.json"))
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
     p = paths[0]
-    print(f"cs_bonus_test on {p.name}:")
+    print(f"citystate_bonus_test on {p.name}:")
     test_catalog(rules, p)
     test_building_bonus(rules, p)
     test_building_pillage(rules, p)

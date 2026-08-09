@@ -366,7 +366,7 @@
       "Seat.cities"
      ],
      "planes": [
-      "cty_alive"
+      "city_alive"
      ]
     },
     {
@@ -551,7 +551,7 @@
       "Seat.tilesPurchased"
      ],
      "planes": [
-      "r_tiles_purchased"
+      "civ_only_tiles_purchased"
      ],
      "gap": "seat 0's row of `civ_tiles_purchased` exists but nothing writes it until the seat-0 purchase wire; comparison opens with it."
     },
@@ -562,7 +562,7 @@
       "Seat.nextCityId"
      ],
      "planes": [
-      "r_next_city_id"
+      "civ_only_next_city_id"
      ],
      "gap": "the GPU keeps a city-id allocator for civ seats only. Nothing joins on the id (the city key is the center tile), so this only ever pins the allocator itself."
     },
@@ -573,7 +573,7 @@
       "Seat.gpEarned"
      ],
      "planes": [
-      "r_prophets"
+      "civ_only_prophets"
      ],
      "gap": "seat 0's row of `civ_prophets` exists but the seat-0 great-prophet mechanics still derive per read; comparison opens with them."
     },
@@ -584,10 +584,10 @@
       "ReligionState.pantheon"
      ],
      "planes": [
-      "r_pantheon",
-      "r_pantheon_done"
+      "civ_only_pantheon",
+      "civ_only_pantheon_done"
      ],
-     "gap": "belief IDENTITY is stored per civ (`r_pantheon`/`r_follower`/`r_founder`/`r_enhancer`); seat 0 has only the global claimed masks, so its own belief cannot be read back."
+     "gap": "belief IDENTITY is stored per civ (`civ_only_pantheon`/`civ_only_follower`/`civ_only_founder`/`civ_only_enhancer`); seat 0 has only the global claimed masks, so its own belief cannot be read back."
     },
     {
      "name": "beliefFollower",
@@ -596,7 +596,7 @@
       "ReligionState.follower"
      ],
      "planes": [
-      "r_follower"
+      "civ_only_follower"
      ],
      "gap": "seat 0's belief row exists but its founding mechanics do not write it yet (see beliefPantheon)."
     },
@@ -607,8 +607,8 @@
       "ReligionState.founder"
      ],
      "planes": [
-      "r_founder",
-      "r_religion_done"
+      "civ_only_founder",
+      "civ_only_religion_done"
      ],
      "gap": "seat 0's belief row exists but its founding mechanics do not write it yet (see beliefPantheon)."
     },
@@ -619,8 +619,8 @@
       "ReligionState.enhancer"
      ],
      "planes": [
-      "r_enhancer",
-      "r_enhancer_done"
+      "civ_only_enhancer",
+      "civ_only_enhancer_done"
      ],
      "gap": "seat 0's belief row exists but its founding mechanics do not write it yet (see beliefPantheon)."
     },
@@ -631,7 +631,7 @@
       "Seat.formalWars"
      ],
      "planes": [
-      "cc_warkind"
+      "civ_pair_warkind"
      ],
      "gap": "casus belli is stored as an [R, R] civ<->civ matrix; there is no seat-0 row, so seat 0's formal wars read empty. The fix is widening it to the war matrix's seat space, the way `war` itself already is."
     },
@@ -642,7 +642,7 @@
       "Seat.denounced"
      ],
      "planes": [
-      "cc_denounced"
+      "civ_pair_denounced"
      ],
      "gap": "[R, R] civ<->civ only, no seat-0 row (see formalWars)."
     },
@@ -653,7 +653,7 @@
       "Seat.allies"
      ],
      "planes": [
-      "cc_allied"
+      "civ_pair_allied"
      ],
      "gap": "[R, R] civ<->civ only, no seat-0 row (see formalWars)."
     }
@@ -682,7 +682,7 @@
       "CityState.centerIndex"
      ],
      "planes": [
-      "cty_center"
+      "city_center"
      ]
     },
     {
@@ -692,7 +692,7 @@
       "CityState.population"
      ],
      "planes": [
-      "cty_pop"
+      "city_pop"
      ]
     },
     {
@@ -702,7 +702,7 @@
       "CityState.hp"
      ],
      "planes": [
-      "cty_hp"
+      "city_hp"
      ]
     },
     {
@@ -712,7 +712,7 @@
       "CityState.envoys"
      ],
      "planes": [
-      "csr_envoys"
+      "seat_citystate_envoys"
      ],
      "note": "a vector over civ seats in seat order — one store for every seat, which is what makes the suzerain contest one comparison."
     },
@@ -723,7 +723,7 @@
       "CityState.met"
      ],
      "planes": [
-      "csr_met"
+      "seat_citystate_met"
      ]
     },
     {
@@ -735,7 +735,7 @@
       "CityStateQuest.kind"
      ],
      "planes": [
-      "csr_quest"
+      "seat_citystate_quest"
      ]
     },
     {
@@ -746,7 +746,7 @@
       "CityState.seatQuestIssuedTurn"
      ],
      "planes": [
-      "csr_quest_issued"
+      "seat_citystate_quest_issued"
      ]
     },
     {
@@ -756,7 +756,7 @@
       "CityStateQuest.campIndex"
      ],
      "planes": [
-      "csr_quest_camp"
+      "seat_citystate_quest_camp"
      ]
     },
     {
@@ -766,9 +766,9 @@
       "CityStateQuest.district"
      ],
      "planes": [
-      "cs_quest_district"
+      "citystate_quest_district"
      ],
-     "gap": "TS names the asked-for district by DistrictId; the GPU stores an index into the ASKABLE-district subset (`cs_quest_district`, 0 = CAMPUS). The two are different lists, so the numbers only agree by accident."
+     "gap": "TS names the asked-for district by DistrictId; the GPU stores an index into the ASKABLE-district subset (`citystate_quest_district`, 0 = CAMPUS). The two are different lists, so the numbers only agree by accident."
     },
     {
      "name": "lastLevyTurn",
@@ -777,7 +777,7 @@
       "CityState.lastLevyTurn"
      ],
      "planes": [
-      "cs_last_levy"
+      "citystate_last_levy"
      ]
     },
     {
@@ -813,7 +813,7 @@
       "City.population"
      ],
      "planes": [
-      "cty_pop"
+      "city_pop"
      ]
     },
     {
@@ -823,7 +823,7 @@
       "City.hp"
      ],
      "planes": [
-      "cty_hp"
+      "city_hp"
      ]
     },
     {
@@ -833,7 +833,7 @@
       "City.outerHp"
      ],
      "planes": [
-      "cty_outer_hp"
+      "city_outer_hp"
      ]
     },
     {
@@ -843,7 +843,7 @@
       "City.isCapital"
      ],
      "planes": [
-      "cty_is_cap"
+      "city_is_cap"
      ]
     },
     {
@@ -853,7 +853,7 @@
       "City.foodBox"
      ],
      "planes": [
-      "cty_growth"
+      "city_growth"
      ]
     },
     {
@@ -863,7 +863,7 @@
       "City.cultureBox"
      ],
      "planes": [
-      "cty_cbox"
+      "city_cbox"
      ]
     },
     {
@@ -873,7 +873,7 @@
       "City.tilesAcquired"
      ],
      "planes": [
-      "cty_acquired"
+      "city_acquired"
      ]
     },
     {
@@ -883,7 +883,7 @@
       "City.loyalty"
      ],
      "planes": [
-      "cty_loyalty"
+      "city_loyalty"
      ]
     },
     {
@@ -893,9 +893,9 @@
       "City.buildings"
      ],
      "planes": [
-      "cty_bldg"
+      "city_bldg"
      ],
-     "note": "the SET of building indices in cpu/core/prodLayout.ts order — the order rules.json ships and the GPU's cty_bldg column order."
+     "note": "the SET of building indices in cpu/core/prodLayout.ts order — the order rules.json ships and the GPU's city_bldg column order."
     },
     {
      "name": "productionBank",
@@ -905,7 +905,7 @@
      ],
      "planes": [
       "prod_bank",
-      "rc_prod_bank"
+      "civ_city_prod_bank"
      ]
     },
     {
@@ -915,17 +915,17 @@
       "City.queue"
      ],
      "planes": [
-      "cty_current",
-      "cty_qtile"
+      "city_current",
+      "city_qtile"
      ],
-     "note": "the front item as a production-layout column plus its target tile. The GPU queue is depth ONE — cty_current holds a single item — so anything TS has queued behind the front has no twin to compare."
+     "note": "the front item as a production-layout column plus its target tile. The GPU queue is depth ONE — city_current holds a single item — so anything TS has queued behind the front has no twin to compare."
     },
     {
      "name": "queueProgress",
      "compare": "milli",
      "covers": [],
      "planes": [
-      "cty_progress"
+      "city_progress"
      ]
     },
     {
@@ -933,7 +933,7 @@
      "compare": "milli",
      "covers": [],
      "planes": [
-      "cty_cost"
+      "city_cost"
      ]
     },
     {
@@ -943,7 +943,7 @@
       "City.followedReligion"
      ],
      "planes": [
-      "cty_followed"
+      "city_followed"
      ]
     },
     {
@@ -953,7 +953,7 @@
       "City.religionPressure"
      ],
      "planes": [
-      "cty_pressure"
+      "city_pressure"
      ]
     },
     {
@@ -963,7 +963,7 @@
       "City.greatWorksWriting"
      ],
      "planes": [
-      "cty_gw_writing"
+      "city_gw_writing"
      ]
     },
     {
@@ -973,7 +973,7 @@
       "City.greatWorksArt"
      ],
      "planes": [
-      "cty_gw_art"
+      "city_gw_art"
      ]
     },
     {
@@ -983,7 +983,7 @@
       "City.greatWorksMusic"
      ],
      "planes": [
-      "cty_gw_music"
+      "city_gw_music"
      ]
     },
     {
@@ -993,7 +993,7 @@
       "City.relics"
      ],
      "planes": [
-      "cty_relics"
+      "city_relics"
      ]
     },
     {
@@ -1003,7 +1003,7 @@
       "City.artifacts"
      ],
      "planes": [
-      "cty_artifacts"
+      "city_artifacts"
      ]
     }
    ]
@@ -1394,7 +1394,7 @@
    },
    {
     "path": "City.id",
-    "why": "per-seat city id. The join key is the CENTER TILE, because ids are per-seat and the GPU keeps one only for civ rows (`rc_id`)."
+    "why": "per-seat city id. The join key is the CENTER TILE, because ids are per-seat and the GPU keeps one only for civ rows (`civ_city_id`)."
    },
    {
     "path": "City.name",
@@ -1418,7 +1418,7 @@
    },
    {
     "path": "City.districts",
-    "why": "the per-city district REGISTRY. The placements themselves are compared per tile (tile.district + tile.districtComplete); the registry exists on the GPU only for civ cities (`rc_dist_tile`), so there is no symmetric object."
+    "why": "the per-city district REGISTRY. The placements themselves are compared per tile (tile.district + tile.districtComplete); the registry exists on the GPU only for civ cities (`civ_city_dist_tile`), so there is no symmetric object."
    },
    {
     "path": "City.wonders",
@@ -1587,11 +1587,11 @@
     "why": "the city_seq allocator (see city_seq)."
    },
    {
-    "plane": "rc_id",
+    "plane": "civ_city_id",
     "why": "civ city slot ids; the city join key is the center tile."
    },
    {
-    "plane": "rc_at",
+    "plane": "civ_city_at",
     "why": "the civ index at a civ centre — a cached derived property over centre_slot_at + tile_seat, both covered."
    },
    {
@@ -1619,12 +1619,12 @@
     "why": "which seats are driven from outside rather than by the built-in AI — a harness flag, not game state."
    },
    {
-    "plane": "rc_dist_tile",
+    "plane": "civ_city_dist_tile",
     "why": "the per-civ-city district registry (see the City.districts exclusion); placements are compared per tile."
    },
    {
-    "plane": "rc_wonder",
-    "why": "the per-civ-city wonder registry (see rc_dist_tile)."
+    "plane": "civ_city_wonder",
+    "why": "the per-civ-city wonder registry (see civ_city_dist_tile)."
    },
    {
     "plane": "dscaffold_placed",

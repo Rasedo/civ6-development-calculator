@@ -9,7 +9,7 @@ bar — these pokes are gate-unreachable-surface coverage):
 
   1. Training-XP catalog: _b_train_xp exports 5/5/10/15 for
      BARRACKS/STABLE/ARMORY/MILITARY_ACADEMY and 0 for every other building.
-  2. Training XP wiring: _spawn_p / _spawn_seat_unit honour init_xp — a
+  2. Training XP wiring: _spawn_seat0 / _spawn_seat_unit honour init_xp — a
      MILITARY unit inherits the city's best Encampment tier, a civilian stays
      at 0.
   3. The ADDITIONAL Encampment strike: a seat-0 city owning a COMPLETE
@@ -64,13 +64,13 @@ def test_training_xp_wiring(rules, path) -> None:
 
     # MILITARY: inherits init_xp
     slot0 = int(sim.p_next[0])
-    sim._spawn_p(torch.tensor([True]), ctr, torch.tensor([mil_ty]), init_xp=init)
+    sim._spawn_seat0(torch.tensor([True]), ctr, torch.tensor([mil_ty]), init_xp=init)
     assert int(sim.p_next[0]) == slot0 + 1, "military unit did not spawn"
     assert int(sim.p_xp[0, slot0]) == 10, f"military trained XP = {int(sim.p_xp[0, slot0])}, want 10"
 
     # CIVILIAN: stays 0 even under init_xp
     slot1 = int(sim.p_next[0])
-    sim._spawn_p(torch.tensor([True]), ctr, torch.tensor([bld_ty]), init_xp=init)
+    sim._spawn_seat0(torch.tensor([True]), ctr, torch.tensor([bld_ty]), init_xp=init)
     assert int(sim.p_next[0]) == slot1 + 1, "builder did not spawn"
     assert int(sim.p_xp[0, slot1]) == 0, f"civilian trained XP = {int(sim.p_xp[0, slot1])}, want 0"
 
@@ -124,7 +124,7 @@ def build_strike_scene(rules, path):
     sim.v_type[0, vslot] = strong_ty
     sim.v_civ[0, vslot] = 0
     sim.v_emb[0, vslot] = False
-    sim.r_atwar[0, 0] = True
+    sim.civ_only_atwar[0, 0] = True
     sim.sync_war()  # close the war matrix under transpose
     return sim, enc_tile, tgt, vslot
 
@@ -184,12 +184,12 @@ def test_civ_encamp_prod_mult(rules, path) -> None:
         print("  civ encampmentProdMult SKIPPED (no gov effects / no Encampment scaffold)")
         return
     r = 0
-    live = (sim.rc_alive[0, r]).nonzero(as_tuple=True)[0]
+    live = (sim.civ_city_alive[0, r]).nonzero(as_tuple=True)[0]
     if not len(live):
         print("  civ encampmentProdMult SKIPPED (no live civ city)")
         return
     j = int(live[0])
-    _ad, _has = sim._adopted_gov(sim.r_civics[:, r])
+    _ad, _has = sim._adopted_gov(sim.civ_only_civics[:, r])
     if not bool(_has[0]):
         print("  civ encampmentProdMult SKIPPED (civ has adopted no government)")
         return
@@ -198,15 +198,15 @@ def test_civ_encamp_prod_mult(rules, path) -> None:
 
     def _run(mult):
         s = _prep()
-        s.rc_current[0, r, j] = enc_code
-        s.rc_cost[0, r, j] = 1e9      # never completes, so progress stays readable
-        s.rc_progress[0, r, j] = 0.0
-        s.rc_prod_bank[0, r, j] = 0.0
+        s.civ_city_current[0, r, j] = enc_code
+        s.civ_city_cost[0, r, j] = 1e9      # never completes, so progress stays readable
+        s.civ_city_progress[0, r, j] = 0.0
+        s.civ_city_prod_bank[0, r, j] = 0.0
         s._gov_encamp[:] = 1.0
         s._gov_encamp[gi] = mult
         s._eff_version += 1           # the gov/policy mods cache keys on this
         s.step()
-        return float(s.rc_progress[0, r, j])
+        return float(s.civ_city_progress[0, r, j])
 
     plain, doubled = _run(1.0), _run(2.0)
     assert plain > 0, "the civ city produced nothing — poke cannot measure the multiplier"

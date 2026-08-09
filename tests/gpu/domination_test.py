@@ -2,7 +2,7 @@
 `dominationWinner` (tests/cpu/victory/domination.test.ts). The gate never
 triggers a domination — no seat holds every capital there — so parity alone
 cannot validate the semantics. This lane hand-pokes ownership of the capital
-tiles (seat 0's site[0] + each civ's rc_center[:,:,0]) and asserts the winner.
+tiles (seat 0's site[0] + each civ's civ_city_center[:,:,0]) and asserts the winner.
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/domination_test.py
@@ -42,7 +42,7 @@ def main() -> int:
         return 0
 
     pcap = int(sim.site[0, 0])
-    rcaps = [int(sim.rc_center[0, r, 0]) for r in range(sim.R)]
+    rcaps = [int(sim.civ_city_center[0, r, 0]) for r in range(sim.R)]
 
     # 1. Split at founding — seat 0 holds its own, each civ holds theirs -> -1.
     assert dom(sim) == -1, f"split capitals should be -1, got {dom(sim)}"

@@ -20,7 +20,7 @@ semantics the TS poke does:
   * the divisor scales with the number of civs;
   * a CITYLESS civ cannot win on tourism banked while it was alive;
   * a RELIGIOUS victory outranks a culture one on the same turn;
-  * r_culture is _MUTABLE (snapshot/restore round-trip).
+  * civ_only_culture is _MUTABLE (snapshot/restore round-trip).
 """
 
 from __future__ import annotations
@@ -63,10 +63,10 @@ def main() -> None:
         s.tourism_total = torch.tensor([tour[0]], dtype=s.tourism_total.dtype)
         s.culture_total = torch.tensor([cul[0]], dtype=s.culture_total.dtype)
         for r in range(s.R):
-            s.r_tourism[:, r] = tour[r + 1]
-            s.r_culture[:, r] = cul[r + 1]
+            s.civ_only_tourism[:, r] = tour[r + 1]
+            s.civ_only_culture[:, r] = cul[r + 1]
             if alive_civs is not None and not alive_civs[r]:
-                s.rc_alive[:, r] = False
+                s.civ_city_alive[:, r] = False
         return int(s._culture_victor()[0]), s
 
     # --- 1) seat 0 out-touring every civ WINS ------------------------------
@@ -114,21 +114,21 @@ def main() -> None:
     assert int(gated[0]) == -1, "a religious win must suppress the culture check"
 
     # --- 8) the culture plane round-trips (snapshot/restore) ---------------
-    # `culture_total` and `r_culture` are the two halves of ONE
+    # `culture_total` and `civ_only_culture` are the two halves of ONE
     # `civ_culture [B, 1+R]` plane, so the BASE is what carries the state.
     # Registering a view beside its base would restore into fresh storage and
     # orphan the other half.
     assert "civ_culture" in _MUTABLE, "civ_culture must be registered in _MUTABLE"
-    assert "r_culture" not in _MUTABLE, "r_culture is a VIEW of civ_culture"
+    assert "civ_only_culture" not in _MUTABLE, "civ_only_culture is a VIEW of civ_culture"
     s = _sim(1)
-    assert s.r_culture.data_ptr() == s.civ_culture[:, 1:].data_ptr(), (
-        "r_culture must share storage with civ_culture[:, 1:]"
+    assert s.civ_only_culture.data_ptr() == s.civ_culture[:, 1:].data_ptr(), (
+        "civ_only_culture must share storage with civ_culture[:, 1:]"
     )
-    s.r_culture[:, 0] = 1234.5
+    s.civ_only_culture[:, 0] = 1234.5
     snap = s.snapshot()
-    s.r_culture[:, 0] = 0.0
+    s.civ_only_culture[:, 0] = 0.0
     s.restore(snap)
-    assert float(s.r_culture[0, 0]) == 1234.5, "r_culture must survive snapshot/restore"
+    assert float(s.civ_only_culture[0, 0]) == 1234.5, "civ_only_culture must survive snapshot/restore"
 
     print("culture victory OK — 7/8 semantics + _MUTABLE round-trip")
 

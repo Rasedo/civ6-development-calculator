@@ -202,7 +202,7 @@ def test_integrated(sim, p, code, name) -> None:
             has_vm = vms >= 0
             vc = int(sim.v_civ[0, vms]) if has_vm else -1
             if civ_def:
-                atwar = bool(sim.r_atwar[0, dciv])
+                atwar = bool(sim.civ_only_atwar[0, dciv])
                 hostile = has_b or (has_pm and atwar)
                 friendly = has_vm and vc == dciv
             else:  # barbarian defender: any non-barb military is hostile

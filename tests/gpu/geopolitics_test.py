@@ -13,14 +13,14 @@ re-validate and execute; plus _seat_phase and _transfer_rc_to_rc. Thresholds
 come from rules.json (never hardcoded).
 
 Covered:
-  a. Substrate: cc_war/cc_warkind symmetric with a false diagonal; all three
-     pair tensors (incl. the directed cc_denounced) survive snapshot/restore
+  a. Substrate: civ_pair_war/civ_pair_warkind symmetric with a false diagonal; all three
+     pair tensors (incl. the directed civ_pair_denounced) survive snapshot/restore
      (_MUTABLE coverage).
   b. Denounce: strictly-stronger + in-proximity + not-at-war stamps the turn;
      the weaker side never stamps back; a grudge is set ONCE (no re-stamp); an
      at-war pair does not stamp.
   c. DoW kind: a stamp >= formalWarMinTurns old makes the war FORMAL; a younger
-     stamp or no stamp is SURPRISE; cc_war writes are symmetric.
+     stamp or no stamp is SURPRISE; civ_pair_war writes are symmetric.
   d. Anti-thrash: a target past peaceWw is never declared on (the same-turn
      sue-out thrash); a war-weary aggressor (>= dowWwMax) opens no front.
   e. Peace: EITHER side past peaceWw ends the war and clears the FORMAL flag
@@ -89,23 +89,23 @@ def build(rules, path, steps: int = 18, dtype=torch.float64):
 
 def clear_pairs(sim):
     """Wipe every pair-war artifact so a poke starts from a clean matrix."""
-    sim.cc_war[:] = False
+    sim.civ_pair_war[:] = False
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
-    sim.cc_warkind[:] = False
-    sim.cc_denounced[:] = -1
+    sim.civ_pair_warkind[:] = False
+    sim.civ_pair_denounced[:] = -1
     sim.ww[:] = 0
-    sim.r_atwar[:] = False
+    sim.civ_only_atwar[:] = False
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
 
 
 def keep_capital_only(sim, r) -> int:
     """Reduce civ seat r to its FIRST alive slot (strength = 8, one center).
-    Returns that slot. Alive-masked readers everywhere make the bare rc_alive
+    Returns that slot. Alive-masked readers everywhere make the bare civ_city_alive
     flip safe."""
-    slots = sim.rc_alive[0, r].nonzero(as_tuple=True)[0].tolist()
+    slots = sim.civ_city_alive[0, r].nonzero(as_tuple=True)[0].tolist()
     assert slots, f"civ {r} has no alive city at the poke turn"
     for s in slots[1:]:
-        sim.rc_alive[0, r, s] = False
+        sim.civ_city_alive[0, r, s] = False
     return slots[0]
 
 
@@ -119,14 +119,14 @@ def controlled_pair(rules, path, extra_for_a: bool = True):
     ja = keep_capital_only(sim, 0)
     jb = keep_capital_only(sim, 1)
     if extra_for_a:
-        ctr_b = int(sim.rc_center[0, 1, jb])
+        ctr_b = int(sim.civ_city_center[0, 1, jb])
         nb = [int(x) for x in sim.neigh[ctr_b].tolist() if x >= 0]
         assert nb, "civ 1's capital has no on-map neighbour"
-        spare = (~sim.rc_alive[0, 0]).nonzero(as_tuple=True)[0]
+        spare = (~sim.civ_city_alive[0, 0]).nonzero(as_tuple=True)[0]
         assert len(spare), "no free rc slot for the spare city"
         s = int(spare[0])
-        sim.rc_alive[0, 0, s] = True
-        sim.rc_center[0, 0, s] = nb[0]
+        sim.civ_city_alive[0, 0, s] = True
+        sim.civ_city_center[0, 0, s] = nb[0]
     clear_pairs(sim)
     return sim, ja, jb
 
@@ -136,21 +136,21 @@ def poke_substrate(rules, path):
     """a. Pair-matrix shape/symmetry + _MUTABLE snapshot/restore coverage."""
     sim = build(rules, path)
     R = sim.R
-    assert sim.cc_war.dtype == torch.bool and sim.cc_warkind.dtype == torch.bool
-    assert sim.cc_denounced.dtype == torch.long
+    assert sim.civ_pair_war.dtype == torch.bool and sim.civ_pair_warkind.dtype == torch.bool
+    assert sim.civ_pair_denounced.dtype == torch.long
     diag = torch.arange(R)
-    assert not bool(sim.cc_war[0, diag, diag].any()), "cc_war diagonal must stay false"
-    assert bool((sim.cc_war[0, :R, :R] == sim.cc_war[0, :R, :R].T).all()), "organic cc_war must be symmetric"
-    assert bool((sim.cc_warkind[0, :R, :R] == sim.cc_warkind[0, :R, :R].T).all()), "organic cc_warkind must be symmetric"
+    assert not bool(sim.civ_pair_war[0, diag, diag].any()), "civ_pair_war diagonal must stay false"
+    assert bool((sim.civ_pair_war[0, :R, :R] == sim.civ_pair_war[0, :R, :R].T).all()), "organic civ_pair_war must be symmetric"
+    assert bool((sim.civ_pair_warkind[0, :R, :R] == sim.civ_pair_warkind[0, :R, :R].T).all()), "organic civ_pair_warkind must be symmetric"
 
     snap = sim.snapshot()
-    w0, k0, d0 = sim.cc_war.clone(), sim.cc_warkind.clone(), sim.cc_denounced.clone()
-    sim.cc_war[:] = True
+    w0, k0, d0 = sim.civ_pair_war.clone(), sim.civ_pair_warkind.clone(), sim.civ_pair_denounced.clone()
+    sim.civ_pair_war[:] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
-    sim.cc_warkind[:] = True
-    sim.cc_denounced[:] = 7
+    sim.civ_pair_warkind[:] = True
+    sim.civ_pair_denounced[:] = 7
     sim.restore(snap)
-    assert bool((sim.cc_war == w0).all()) and bool((sim.cc_warkind == k0).all()) and bool((sim.cc_denounced == d0).all()), (
+    assert bool((sim.civ_pair_war == w0).all()) and bool((sim.civ_pair_warkind == k0).all()) and bool((sim.civ_pair_denounced == d0).all()), (
         "pair tensors must round-trip snapshot/restore (_MUTABLE)"
     )
     print("  a substrate OK (bool/bool/long, false diagonal, symmetric, snapshot-covered)")
@@ -161,18 +161,18 @@ def poke_denounce(rules, path):
     sim, _, _ = controlled_pair(rules, path)
     t = int(sim.turn)
     geo_denounce(sim)
-    assert int(sim.cc_denounced[0, 0, 1]) == t, "stronger civ 0 must stamp its grudge with the current turn"
-    assert int(sim.cc_denounced[0, 1, 0]) == -1, "the strictly-weaker side must never stamp back"
+    assert int(sim.civ_pair_denounced[0, 0, 1]) == t, "stronger civ 0 must stamp its grudge with the current turn"
+    assert int(sim.civ_pair_denounced[0, 1, 0]) == -1, "the strictly-weaker side must never stamp back"
 
-    sim.cc_denounced[0, 0, 1] = 3  # grudge persistence: set once, never re-stamped
+    sim.civ_pair_denounced[0, 0, 1] = 3  # grudge persistence: set once, never re-stamped
     geo_denounce(sim)
-    assert int(sim.cc_denounced[0, 0, 1]) == 3, "an existing grudge must not be re-stamped"
+    assert int(sim.civ_pair_denounced[0, 0, 1]) == 3, "an existing grudge must not be re-stamped"
 
-    sim.cc_denounced[0, 0, 1] = -1
-    sim.cc_war[0, 0, 1] = sim.cc_war[0, 1, 0] = True  # at-war pairs skip
+    sim.civ_pair_denounced[0, 0, 1] = -1
+    sim.civ_pair_war[0, 0, 1] = sim.civ_pair_war[0, 1, 0] = True  # at-war pairs skip
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     geo_denounce(sim)
-    assert int(sim.cc_denounced[0, 0, 1]) == -1, "an at-war pair must not denounce"
+    assert int(sim.civ_pair_denounced[0, 0, 1]) == -1, "an at-war pair must not denounce"
     print("  b denounce OK (turn-stamped, directed, once, war-gated)")
 
 
@@ -182,19 +182,19 @@ def poke_dow_kind(rules, path):
     fmin = int(sim.rules.seats.get("formalWarMinTurns", 5))
     t = int(sim.turn)
 
-    sim.cc_denounced[0, 0, 1] = t - fmin  # exactly at the bar -> FORMAL
+    sim.civ_pair_denounced[0, 0, 1] = t - fmin  # exactly at the bar -> FORMAL
     geo_declare(sim)
-    assert bool(sim.cc_war[0, 0, 1]) and bool(sim.cc_war[0, 1, 0]), "DoW must write cc_war symmetrically"
-    assert bool(sim.cc_warkind[0, 0, 1]) and bool(sim.cc_warkind[0, 1, 0]), "an old-grudge war must be FORMAL"
+    assert bool(sim.civ_pair_war[0, 0, 1]) and bool(sim.civ_pair_war[0, 1, 0]), "DoW must write civ_pair_war symmetrically"
+    assert bool(sim.civ_pair_warkind[0, 0, 1]) and bool(sim.civ_pair_warkind[0, 1, 0]), "an old-grudge war must be FORMAL"
 
     clear_pairs(sim)
-    sim.cc_denounced[0, 0, 1] = t - (fmin - 1)  # one turn too fresh -> SURPRISE
+    sim.civ_pair_denounced[0, 0, 1] = t - (fmin - 1)  # one turn too fresh -> SURPRISE
     geo_declare(sim)
-    assert bool(sim.cc_war[0, 0, 1]) and not bool(sim.cc_warkind[0, 0, 1]), "a fresh-grudge war must be SURPRISE"
+    assert bool(sim.civ_pair_war[0, 0, 1]) and not bool(sim.civ_pair_warkind[0, 0, 1]), "a fresh-grudge war must be SURPRISE"
 
     clear_pairs(sim)  # no grudge at all -> SURPRISE
     geo_declare(sim)
-    assert bool(sim.cc_war[0, 0, 1]) and not bool(sim.cc_warkind[0, 0, 1]), "a no-grudge war must be SURPRISE"
+    assert bool(sim.civ_pair_war[0, 0, 1]) and not bool(sim.civ_pair_warkind[0, 0, 1]), "a no-grudge war must be SURPRISE"
     print(f"  c DoW kind OK (FORMAL at stamp age >= {fmin}, else SURPRISE; symmetric writes)")
 
 
@@ -206,12 +206,12 @@ def poke_anti_thrash(rules, path):
 
     sim.ww[0, 2, 1] = peace_ww + 1  # target would sue out the same turn
     geo_declare(sim)
-    assert not bool(sim.cc_war[0, 0, 1]), "a target past peaceWw must never be declared on (same-turn thrash)"
+    assert not bool(sim.civ_pair_war[0, 0, 1]), "a target past peaceWw must never be declared on (same-turn thrash)"
 
     clear_pairs(sim)
     sim.ww[0, 1, 2] = ww_max  # war-weary aggressor opens no front
     geo_declare(sim)
-    assert not bool(sim.cc_war[0, 0, 1]), "an aggressor at dowWwMax must not declare"
+    assert not bool(sim.civ_pair_war[0, 0, 1]), "an aggressor at dowWwMax must not declare"
     print(f"  d anti-thrash OK (target ww > {peace_ww} skipped; aggressor ww >= {ww_max} inert)")
 
 
@@ -219,20 +219,20 @@ def poke_peace(rules, path):
     """e. Peace on EITHER side's weariness; kind clears, grudge survives."""
     sim, _, _ = controlled_pair(rules, path)
     peace_ww = int(sim.rules.seats.get("peaceWw", 10))
-    sim.cc_war[0, 0, 1] = sim.cc_war[0, 1, 0] = True
+    sim.civ_pair_war[0, 0, 1] = sim.civ_pair_war[0, 1, 0] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
-    sim.cc_warkind[0, 0, 1] = sim.cc_warkind[0, 1, 0] = True
-    sim.cc_denounced[0, 0, 1] = 2
+    sim.civ_pair_warkind[0, 0, 1] = sim.civ_pair_warkind[0, 1, 0] = True
+    sim.civ_pair_denounced[0, 0, 1] = 2
 
     sim.ww[0, 1, 2] = peace_ww  # at the bar, not past -> war persists
     geo_peace(sim)
-    assert bool(sim.cc_war[0, 0, 1]), "peace must not fire AT the threshold (strictly greater)"
+    assert bool(sim.civ_pair_war[0, 0, 1]), "peace must not fire AT the threshold (strictly greater)"
 
     sim.ww[0, 1, 2] = peace_ww + 1
     geo_peace(sim)
-    assert not bool(sim.cc_war[0, 0, 1]) and not bool(sim.cc_war[0, 1, 0]), "peace must clear cc_war both directions"
-    assert not bool(sim.cc_warkind[0, 0, 1]) and not bool(sim.cc_warkind[0, 1, 0]), "the ended war's FORMAL flag must clear"
-    assert int(sim.cc_denounced[0, 0, 1]) == 2, "the denouncement grudge must SURVIVE the peace"
+    assert not bool(sim.civ_pair_war[0, 0, 1]) and not bool(sim.civ_pair_war[0, 1, 0]), "peace must clear civ_pair_war both directions"
+    assert not bool(sim.civ_pair_warkind[0, 0, 1]) and not bool(sim.civ_pair_warkind[0, 1, 0]), "the ended war's FORMAL flag must clear"
+    assert int(sim.civ_pair_denounced[0, 0, 1]) == 2, "the denouncement grudge must SURVIVE the peace"
     print(f"  e peace OK (fires past ww {peace_ww}, either side; kind cleared, grudge kept)")
 
 
@@ -250,7 +250,7 @@ def poke_ww_differential(rules, path):
 
     # a war DECLARED is not a war FOUGHT: under the per-battle model a fresh war
     # with no battle in it costs both sides NOTHING.
-    sim.cc_war[0, 0, 1] = sim.cc_war[0, 1, 0] = True  # SURPRISE (kind False)
+    sim.civ_pair_war[0, 0, 1] = sim.civ_pair_war[0, 1, 0] = True  # SURPRISE (kind False)
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     snap = sim.snapshot()
     sim._seat_phase()
@@ -270,7 +270,7 @@ def poke_ww_differential(rules, path):
     # FORMAL vs SURPRISE picks the era COLUMN, not a multiplier; at Ancient the
     # two columns are equal (16 = 16).
     sim.restore(snap)
-    sim.cc_warkind[0, 0, 1] = sim.cc_warkind[0, 1, 0] = True  # FORMAL
+    sim.civ_pair_warkind[0, 0, 1] = sim.civ_pair_warkind[0, 1, 0] = True  # FORMAL
     formal = int(sim._ww_era_base(torch.tensor([1]), torch.tensor([2]))[0])
     sim.restore(snap)
     surprise = int(sim._ww_era_base(torch.tensor([1]), torch.tensor([2]))[0])
@@ -280,7 +280,7 @@ def poke_ww_differential(rules, path):
 
     # full peace drains four times faster than a phoney war
     sim.restore(snap)
-    sim.cc_war[0, 0, 1] = sim.cc_war[0, 1, 0] = False
+    sim.civ_pair_war[0, 0, 1] = sim.civ_pair_war[0, 1, 0] = False
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     sim.ww[0, 1, 2] = at_peace + 3
     sim._seat_phase()
@@ -288,8 +288,8 @@ def poke_ww_differential(rules, path):
 
     # the seat-0 war axis behaves identically — weariness is not seat-dependent
     sim.restore(snap)
-    sim.cc_war[0, 0, 1] = sim.cc_war[0, 1, 0] = False
-    sim.r_atwar[0, 0] = True
+    sim.civ_pair_war[0, 0, 1] = sim.civ_pair_war[0, 1, 0] = False
+    sim.civ_only_atwar[0, 0] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     sim.ww[0, 1, 0] = at_war + 11
     sim._seat_phase()
@@ -305,30 +305,30 @@ def poke_transfer(rules, path):
     """g. _transfer_rc_to_rc: loser hygiene, POOL-END append, tile re-key,
     _eff_version bump, _check_rc_registry_invariant green."""
     sim = build(rules, path)
-    r_from = next(r for r in range(sim.R) if bool(sim.rc_alive[0, r].any()))
-    r_to = next(r for r in range(sim.R) if r != r_from)
-    j = int(sim.rc_alive[0, r_from].nonzero(as_tuple=True)[0][0])
-    c_t = int(sim.rc_center[0, r_from, j])
-    id_from = int(sim.rc_id[0, r_from, j])
-    id_next = int(sim.r_next_city_id[0, r_to])
-    own = (sim.tile_city[0] == id_from) & (sim.civ_at[0] == r_from)
+    civ_only_from = next(r for r in range(sim.R) if bool(sim.civ_city_alive[0, r].any()))
+    civ_only_to = next(r for r in range(sim.R) if r != civ_only_from)
+    j = int(sim.civ_city_alive[0, civ_only_from].nonzero(as_tuple=True)[0][0])
+    c_t = int(sim.civ_city_center[0, civ_only_from, j])
+    id_from = int(sim.civ_city_id[0, civ_only_from, j])
+    id_next = int(sim.civ_only_next_city_id[0, civ_only_to])
+    own = (sim.tile_city[0] == id_from) & (sim.civ_at[0] == civ_only_from)
     n_own = int(own.sum())
-    occ = sim.rc_alive[0, r_to].nonzero(as_tuple=True)[0]
+    occ = sim.civ_city_alive[0, civ_only_to].nonzero(as_tuple=True)[0]
     exp_slot = int(occ.max()) + 1 if len(occ) else 0
     ev0 = sim._eff_version
 
-    sim._transfer_rc_to_rc(0, r_from, j, r_to)
+    sim._transfer_rc_to_rc(0, civ_only_from, j, civ_only_to)
 
-    assert not bool(sim.rc_alive[0, r_from, j]), "the loser slot must die"
-    assert int(sim.rc_bldg[0, r_from, j].sum()) == 0 and int(sim.rc_current[0, r_from, j]) == -1, (
+    assert not bool(sim.civ_city_alive[0, civ_only_from, j]), "the loser slot must die"
+    assert int(sim.civ_city_bldg[0, civ_only_from, j].sum()) == 0 and int(sim.civ_city_current[0, civ_only_from, j]) == -1, (
         "loser-slot hygiene: buildings/queue wiped"
     )
-    assert bool((sim.rc_dist_tile[0, r_from, j] == -1).all()), "loser-slot hygiene: district registry wiped"
-    assert bool(sim.rc_alive[0, r_to, exp_slot]), "the receiver must append at the END of the alive pool"
-    assert int(sim.rc_center[0, r_to, exp_slot]) == c_t and not bool(sim.rc_is_cap[0, r_to, exp_slot])
-    assert int(sim.rc_id[0, r_to, exp_slot]) == id_next and int(sim.r_next_city_id[0, r_to]) == id_next + 1
-    assert int(sim.rc_at[0, c_t]) == r_to, "the center tile must re-seat to the receiver"
-    rekeyed = (sim.tile_city[0] == id_next) & (sim.civ_at[0] == r_to)
+    assert bool((sim.civ_city_dist_tile[0, civ_only_from, j] == -1).all()), "loser-slot hygiene: district registry wiped"
+    assert bool(sim.civ_city_alive[0, civ_only_to, exp_slot]), "the receiver must append at the END of the alive pool"
+    assert int(sim.civ_city_center[0, civ_only_to, exp_slot]) == c_t and not bool(sim.civ_city_is_cap[0, civ_only_to, exp_slot])
+    assert int(sim.civ_city_id[0, civ_only_to, exp_slot]) == id_next and int(sim.civ_only_next_city_id[0, civ_only_to]) == id_next + 1
+    assert int(sim.civ_city_at[0, c_t]) == civ_only_to, "the center tile must re-seat to the receiver"
+    rekeyed = (sim.tile_city[0] == id_next) & (sim.civ_at[0] == civ_only_to)
     assert int(rekeyed.sum()) == n_own, (
         f"A-17: exactly the flipping city's {n_own} tiles must re-key to the receiver ({int(rekeyed.sum())})"
     )
@@ -337,19 +337,19 @@ def poke_transfer(rules, path):
     # population survivor. Both are real yield-bearing changes, so assert the
     # bump happened and stayed within those two known writes.
     _bumped = sim._eff_version - ev0
-    _relocated = bool(sim.rc_is_cap[0, r_from].any())
+    _relocated = bool(sim.civ_city_is_cap[0, civ_only_from].any())
     assert 1 <= _bumped <= 2, f"the transfer must bump _eff_version (got {_bumped})"
     assert _bumped == (2 if _relocated else 1), (
         f"expected {'transfer + palace relocation' if _relocated else 'transfer only'}, got {_bumped} bumps"
     )
     sim._check_rc_registry_invariant()  # raises on any registry drift
-    print(f"  g transfer OK (slot {j} r{r_from} -> pool-end slot {exp_slot} r{r_to}, {n_own} tiles re-keyed, registry green)")
+    print(f"  g transfer OK (slot {j} r{civ_only_from} -> pool-end slot {exp_slot} r{civ_only_to}, {n_own} tiles re-keyed, registry green)")
 
 
 def poke_float32(rules, path):
     """h. A float32 build steps 30 turns with the pair machinery live."""
     sim = build(rules, path, steps=30, dtype=torch.float32)
-    assert sim.cc_war.dtype == torch.bool and sim.cc_warkind.dtype == torch.bool and sim.cc_denounced.dtype == torch.long
+    assert sim.civ_pair_war.dtype == torch.bool and sim.civ_pair_warkind.dtype == torch.bool and sim.civ_pair_denounced.dtype == torch.long
     print("  h float32 dtype OK (30 turns, pair tensors dtype-stable, no walk crash)")
 
 
@@ -384,7 +384,7 @@ def main() -> None:
 
     # --- seat 0's grievance twin ---------------------------------------------
     from core.engine import _MUTABLE as _MUT2
-    # `p_warmonger` and `r_warmonger` are the two halves of ONE
+    # `p_warmonger` and `civ_only_warmonger` are the two halves of ONE
     # `civ_warmonger [B, 1+R]` plane, so the BASE is what carries the state
     # through a snapshot. Registering a view beside its base would restore into
     # fresh storage and orphan the other half.
@@ -402,7 +402,7 @@ def main() -> None:
     s3.restore(_snap)
     assert int(s3.p_warmonger[0]) == 7, "p_warmonger must survive snapshot/restore"
     # decay only at peace on EVERY axis, floored at 0
-    s3.r_atwar[:] = False
+    s3.civ_only_atwar[:] = False
     s3.sync_war()  # a poke writes one cell; close the war matrix under transpose
     s3.p_warmonger[:] = 2
     s3.step()
@@ -413,22 +413,22 @@ def main() -> None:
     print("seat-0 grievances OK — _MUTABLE, decay, floor")
 
     # --- DIPLOMATIC FAVOR ----------------------------------------------------
-    for _f in ("diplo_favor", "r_diplo_favor"):
+    for _f in ("diplo_favor", "civ_only_diplo_favor"):
         assert _round_trips(_f, _MUT2), f"{_f} must round-trip through _MUTABLE"
     s4 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     assert s4._favor_per_suz == 1, f"GS pays 1 favor per suzerainty, got {s4._favor_per_suz}"
     # the suzerain tests: >= suzerainEnvoys AND strictly more than every civ seat
-    suz_min = int(s4.rules.cs.get("suzerainEnvoys", 3))
-    s4.cs_envoys.zero_(); s4.cs_r_envoys.zero_()
+    suz_min = int(s4.rules.citystate.get("suzerainEnvoys", 3))
+    s4.citystate_envoys.zero_(); s4.civ_only_citystate_envoys.zero_()
     assert int(s4._suzerain_count()[0]) == 0, "no envoys -> no suzerainties"
-    s4.cs_envoys[:, 0] = suz_min - 1
+    s4.citystate_envoys[:, 0] = suz_min - 1
     assert int(s4._suzerain_count()[0]) == 0, "below the envoy minimum is not suzerainty"
-    s4.cs_envoys[:, 0] = suz_min
+    s4.citystate_envoys[:, 0] = suz_min
     assert int(s4._suzerain_count()[0]) == 1, "at the minimum with no civ contest -> suzerain"
     if s4.R > 0:
-        s4.cs_r_envoys[:, 0, 0] = suz_min  # a TIE leaves no suzerain (real Civ 6)
+        s4.civ_only_citystate_envoys[:, 0, 0] = suz_min  # a TIE leaves no suzerain (real Civ 6)
         assert int(s4._suzerain_count()[0]) == 0, "a tie must leave NO suzerain"
-        s4.cs_r_envoys[:, 0, 0] = suz_min + 1
+        s4.civ_only_citystate_envoys[:, 0, 0] = suz_min + 1
         assert int(s4._civ_suzerain_count(0)[0]) == 1, "the strictly-higher civ is suzerain"
         assert int(s4._suzerain_count()[0]) == 0, "... and seat 0 is not"
     # the accrual itself: tier + suzerainties, and it is CUMULATIVE
@@ -445,7 +445,7 @@ def main() -> None:
     print("diplomatic favor OK — suzerain contest, tie rule, tier+suz accrual, _MUTABLE")
 
     # --- the WORLD CONGRESS + the DIPLOMATIC victory -------------------------
-    for _f in ("congress_sessions", "diplo_points", "r_diplo_points"):
+    for _f in ("congress_sessions", "diplo_points", "civ_only_diplo_points"):
         assert _round_trips(_f, _MUT2), f"{_f} must round-trip through _MUTABLE"
     s6 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     assert s6._congress_interval == 30, f"GS convenes every 30 turns, got {s6._congress_interval}"
@@ -460,7 +460,7 @@ def main() -> None:
 
     # a session turn but nobody is Medieval -> still nothing
     s6.turn = s6._congress_interval
-    s6.techs.zero_(); s6.r_techs.zero_(); s6.civics.zero_(); s6.r_civics.zero_()
+    s6.techs.zero_(); s6.civ_only_techs.zero_(); s6.civics.zero_(); s6.civ_only_civics.zero_()
     s6._world_congress()
     assert int(s6.congress_sessions[0]) == 0, "pre-Medieval sessions must not convene"
     assert int(s6.diplo_favor[0]) == 50, "... and must not spend favor"
@@ -474,13 +474,13 @@ def main() -> None:
             break
     assert _era_ok is not None, "no tech reaches the Medieval era — check the era table"
     if s6.R > 0:
-        s6.r_diplo_favor[:, 0] = 90  # the civ seat outspends seat 0, 90 vs 50
+        s6.civ_only_diplo_favor[:, 0] = 90  # the civ seat outspends seat 0, 90 vs 50
     s6._world_congress()
     assert int(s6.congress_sessions[0]) == 1, "the session must convene"
     assert int(s6.diplo_favor[0]) == 0, "every commitment is spent"
     if s6.R > 0:
-        assert int(s6.r_diplo_favor[0, 0]) == 0, "the winner's favor is spent too"
-        assert int(s6.r_diplo_points[0, 0]) == s6._dvp_per_res, "the largest commitment takes the point"
+        assert int(s6.civ_only_diplo_favor[0, 0]) == 0, "the winner's favor is spent too"
+        assert int(s6.civ_only_diplo_points[0, 0]) == s6._dvp_per_res, "the largest commitment takes the point"
         assert int(s6.diplo_points[0]) == 0, "the loser takes nothing"
 
     # a TIE keeps the LOWER seat id (seat 0)
@@ -489,17 +489,17 @@ def main() -> None:
     s7.techs.zero_(); s7.techs[:, _era_ok] = True
     s7.diplo_favor[:] = 25
     if s7.R > 0:
-        s7.r_diplo_favor[:, 0] = 25
+        s7.civ_only_diplo_favor[:, 0] = 25
     s7._world_congress()
     assert int(s7.diplo_points[0]) == s7._dvp_per_res, "a tie must go to the lower civ id"
     if s7.R > 0:
-        assert int(s7.r_diplo_points[0, 0]) == 0
+        assert int(s7.civ_only_diplo_points[0, 0]) == 0
 
     # zero favor everywhere: the session counts but awards nothing
     s8 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     s8.turn = s8._congress_interval
     s8.techs.zero_(); s8.techs[:, _era_ok] = True
-    s8.diplo_favor.zero_(); s8.r_diplo_favor.zero_()
+    s8.diplo_favor.zero_(); s8.civ_only_diplo_favor.zero_()
     s8._world_congress()
     assert int(s8.congress_sessions[0]) == 1 and int(s8.diplo_points[0]) == 0, "no favor -> no award"
 
@@ -511,7 +511,7 @@ def main() -> None:
     assert int(s9._diplomatic_victor()[0]) == 0, "seat 0 wins at the threshold"
     if s9.R > 0:
         s9.diplo_points.zero_()
-        s9.r_diplo_points[:, 0] = s9._dvp_win
+        s9.civ_only_diplo_points[:, 0] = s9._dvp_win
         assert int(s9._diplomatic_victor()[0]) == 1, "a civ wins at the threshold"
     print("world congress OK — schedule, Medieval gate, vote, tie rule, spend, DVP, victory")
 

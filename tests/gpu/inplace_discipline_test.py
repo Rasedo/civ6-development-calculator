@@ -70,33 +70,33 @@ _CIV_FIELDS = (
 )
 ALIASED: frozenset[str] = frozenset(
     [f"{pre}_{plane}" for pre in ("p", "v", "u") for plane in _POOL_PLANES]
-    + [f for n in _CIV_FIELDS for f in (n, f"r_{n}")]
+    + [f for n in _CIV_FIELDS for f in (n, f"civ_only_{n}")]
     # the three legacy war names are SLICES of `war`. A rebind detaches the
     # relation from the matrix every reader consults, and every gate stays
     # green while the two halves drift apart.
-    + ["r_atwar", "cc_war", "cs_atwar"]
-    # the five (civ, city-state) relations — cs_x is row 0 of csr_x and cs_r_x
+    + ["civ_only_atwar", "civ_pair_war", "citystate_atwar"]
+    # the five (civ, city-state) relations — citystate_x is row 0 of seat_citystate_x and civ_only_citystate_x
     # is rows 1.., so a rebind detaches one side of the relation from the
     # other and every gate stays green.
-    + [f"cs_{n}" for n in ("met", "envoys", "quest", "quest_camp", "quest_issued")]
-    + [f"cs_r_{n}" for n in ("met", "envoys", "quest", "quest_camp", "quest_issued")]
+    + [f"citystate_{n}" for n in ("met", "envoys", "quest", "quest_camp", "quest_issued")]
+    + [f"citystate_r_{n}" for n in ("met", "envoys", "quest", "quest_camp", "quest_issued")]
     # a minor's city is the city block's minor section, so these four are views
     # like every other city field.
-    + ["cs_alive", "cs_center", "cs_pop", "cs_hp"]
+    + ["citystate_alive", "citystate_center", "citystate_pop", "citystate_hp"]
     # the five pairs whose two sides never shared a name.
-    + ["culture_total", "r_culture", "faith", "r_faith", "tourism_total",
-       "r_tourism", "p_warmonger", "r_warmonger", "gp_points", "r_gpp"]
+    + ["culture_total", "civ_only_culture", "faith", "civ_only_faith", "tourism_total",
+       "civ_only_tourism", "p_warmonger", "civ_only_warmonger", "gp_points", "civ_only_gpp"]
     # the seat-indexed war clocks.
-    + ["r_warturns", "r_peaceturns", "cs_war_turns"]
+    + ["civ_only_warturns", "civ_only_peaceturns", "citystate_war_turns"]
     # the city block's seat-0 and civ views (the base itself is registered).
     + ["alive", "site", "pop", "city_hp", "outer_hp", "is_cap", "loyalty",
        "tiles_acquired", "food_box", "culture_box", "current", "progress",
        "cur_cost", "q_dtile", "gw_writing", "gw_art", "gw_music", "relics",
        "artifacts", "buildings"]
-    + ["rc_alive", "rc_center", "rc_pop", "rc_hp", "rc_outer_hp", "rc_is_cap",
-       "rc_loyalty", "rc_acquired", "rc_growth", "rc_cbox", "rc_current",
-       "rc_progress", "rc_cost", "rc_qtile", "rc_gw_writing", "rc_gw_art",
-       "rc_gw_music", "rc_relics", "rc_artifacts", "rc_bldg"]
+    + ["civ_city_alive", "civ_city_center", "civ_city_pop", "civ_city_hp", "civ_city_outer_hp", "civ_city_is_cap",
+       "civ_city_loyalty", "civ_city_acquired", "civ_city_growth", "civ_city_cbox", "civ_city_current",
+       "civ_city_progress", "civ_city_cost", "civ_city_qtile", "civ_city_gw_writing", "civ_city_gw_art",
+       "civ_city_gw_music", "civ_city_relics", "civ_city_artifacts", "civ_city_bldg"]
 )
 
 

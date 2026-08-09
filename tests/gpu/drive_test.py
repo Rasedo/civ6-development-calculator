@@ -29,10 +29,10 @@ WARMUP = 10
 
 def seat_state(sim, r=0):
     return {
-        "cities": int(sim.rc_alive[0, r].sum()),
+        "cities": int(sim.civ_city_alive[0, r].sum()),
         "units": int((sim.v_alive[0] & (sim.v_civ[0] == r)).sum()),
-        "techs": int(sim.r_techs[0, r].sum()),
-        "civics": int(sim.r_civics[0, r].sum()),
+        "techs": int(sim.civ_only_techs[0, r].sum()),
+        "civics": int(sim.civ_only_civics[0, r].sum()),
     }
 
 
@@ -96,8 +96,8 @@ def main() -> None:
     rep = seat_state(c.sim)
     assert rep == got, f"replay diverged from the driven run: {rep} vs {got}"
     assert bool((b.sim.v_tile == c.sim.v_tile).all()), "replay put units on different tiles"
-    assert bool((b.sim.rc_current == c.sim.rc_current).all()), "replay left different city queues"
-    assert bool((b.sim.r_treasury == c.sim.r_treasury).all()), "replay diverged on treasury"
+    assert bool((b.sim.civ_city_current == c.sim.civ_city_current).all()), "replay left different city queues"
+    assert bool((b.sim.civ_only_treasury == c.sim.civ_only_treasury).all()), "replay diverged on treasury"
     print("  action file replays to IDENTICAL state (no ladder, no picker) OK")
     print("DRIVE OK")
 

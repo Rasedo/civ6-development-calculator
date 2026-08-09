@@ -137,7 +137,7 @@ class SimMasks:
 
     def envoy_mask(self) -> torch.Tensor:
         """[B, S] city-states an available envoy could back right now."""
-        return self.cs_alive & self.cs_met & (self.envoys_avail > 0).unsqueeze(1)
+        return self.citystate_alive & self.citystate_met & (self.envoys_avail > 0).unsqueeze(1)
 
     def war_mask(self) -> torch.Tensor:
         """[B, 2R] seat-0 diplomacy actions: columns 0..R-1 declare war on that
@@ -150,12 +150,12 @@ class SimMasks:
         if self.R == 0 or not self._rl_war_active:
             return torch.zeros(B, 2 * R, dtype=torch.bool, device=dev)
         rr = self.rules.seats
-        declare = self.r_alive & ~self.r_atwar
-        cost = rr.get("peaceGold0", 150) + rr.get("peaceGoldSlope", 10) * self.r_warturns.to(self.dtype)
+        declare = self.civ_only_alive & ~self.civ_only_atwar
+        cost = rr.get("peaceGold0", 150) + rr.get("peaceGoldSlope", 10) * self.civ_only_warturns.to(self.dtype)
         peace = (
-            self.r_alive
-            & self.r_atwar
-            & (self.r_warturns >= rr.get("warMinTurns", 14))  # ONE min-war-turns rule, every seat
+            self.civ_only_alive
+            & self.civ_only_atwar
+            & (self.civ_only_warturns >= rr.get("warMinTurns", 14))  # ONE min-war-turns rule, every seat
             & self._afford(self.treasury.unsqueeze(1), cost)
         )
         return torch.cat([declare, peace], dim=1)
@@ -251,26 +251,26 @@ class SimMasks:
         counts, the shared GP pool) read the same global state every seat's
         check does, so one formula serves every seat. Runs at the civ's block
         top; policy rows aren't exported."""
-        alive = self.rc_alive[:, r]
+        alive = self.civ_city_alive[:, r]
         pop_sum = None
         for row in self.rules.boosts:
             kind = row["kind"]
             if kind == "building":
-                pred = (self.rc_bldg[:, r, :, row["b"]] & alive).sum(dim=1) >= row["count"]
+                pred = (self.civ_city_bldg[:, r, :, row["b"]] & alive).sum(dim=1) >= row["count"]
             elif kind == "cityPop":
-                pred = ((self.rc_pop[:, r] >= row["pop"]) & alive).any(dim=1)
+                pred = ((self.civ_city_pop[:, r] >= row["pop"]) & alive).any(dim=1)
             elif kind == "totalPop":
                 if pop_sum is None:
-                    pop_sum = (self.rc_pop[:, r] * alive.to(self.rc_pop.dtype)).sum(dim=1)
+                    pop_sum = (self.civ_city_pop[:, r] * alive.to(self.civ_city_pop.dtype)).sum(dim=1)
                 pred = pop_sum >= row["pop"]
             elif kind == "coastalCity":
-                pred = (alive & self.coastal_land.gather(1, self.rc_center[:, r].clamp(min=0))).any(dim=1)
+                pred = (alive & self.coastal_land.gather(1, self.civ_city_center[:, r].clamp(min=0))).any(dim=1)
             elif kind == "cities":
                 pred = alive.sum(dim=1) >= row["count"]
             elif kind == "greatPeople":
                 pred = (self.gp_earned.sum(dim=1) if row["cls"] < 0 else self.gp_earned[:, row["cls"]]) >= row["count"]
             elif kind == "tech":
-                pred = self.r_techs[:, r, row["t"]]
+                pred = self.civ_only_techs[:, r, row["t"]]
             elif kind == "anyWonderBuilt":
                 pred = self.built_wonder_complete.any(dim=1)  # the same global scan
             elif kind == "nearNaturalWonder":
@@ -284,7 +284,7 @@ class SimMasks:
                 pred = on.sum(dim=1) >= row["count"]
             elif kind == "district":
                 dtype = row.get("dtype", -1)
-                dt = self.rc_dist_tile[:, r]  # [B, RC, nD] registry tiles
+                dt = self.civ_city_dist_tile[:, r]  # [B, RC, nD] registry tiles
                 comp = self.district_complete.gather(1, dt.clamp(min=0).reshape(self.B, -1)).reshape_as(dt)
                 on = (dt >= 0) & comp & alive.unsqueeze(2)
                 if dtype < 0:
@@ -299,12 +299,12 @@ class SimMasks:
                 continue
             hit = active & pred
             if row["target"] == "tech":
-                _new_rt = hit & ~self.r_techs[:, r, row["idx"]] & ~self.r_tech_boosted[:, r, row["idx"]]
-                self.r_tech_boosted[:, r, row["idx"]] |= hit & ~self.r_techs[:, r, row["idx"]]
+                _new_rt = hit & ~self.civ_only_techs[:, r, row["idx"]] & ~self.civ_only_tech_boosted[:, r, row["idx"]]
+                self.civ_only_tech_boosted[:, r, row["idx"]] |= hit & ~self.civ_only_techs[:, r, row["idx"]]
                 self._dedication_event(r + 1, 1, _new_rt)  # civ EUREKA
             else:
-                _new_rc = hit & ~self.r_civics[:, r, row["idx"]] & ~self.r_civic_boosted[:, r, row["idx"]]
-                self.r_civic_boosted[:, r, row["idx"]] |= hit & ~self.r_civics[:, r, row["idx"]]
+                _new_rc = hit & ~self.civ_only_civics[:, r, row["idx"]] & ~self.civ_only_civic_boosted[:, r, row["idx"]]
+                self.civ_only_civic_boosted[:, r, row["idx"]] |= hit & ~self.civ_only_civics[:, r, row["idx"]]
                 self._dedication_event(r + 1, 2, _new_rc)  # civ INSPIRATION
 
     # --- barbarians (phase 4a) ----------------------------------------------------
@@ -523,23 +523,23 @@ class SimMasks:
 
         Hostility mirrors `unitsHostile` exactly, which is to say it is
         civsAtWar(prober, owner) plus "barbarians are hostile to everyone":
-        seat 0 is hostile to at-war civs, a civ to seat 0 when `r_atwar` and to
-        another civ when `cc_war`. `seat` may be an int or a [B, 1] tensor (the
+        seat 0 is hostile to at-war civs, a civ to seat 0 when `civ_only_atwar` and to
+        another civ when `civ_pair_war`. `seat` may be an int or a [B, 1] tensor (the
         war-march probes per slot)."""
         live = self._encamp_live()  # [B, T]
         tensor_seat = torch.is_tensor(seat)
         if not tensor_seat and seat == BARB_SEAT:
             return live  # barbarians are hostile to every owner
-        r_at = self.civ_at  # [B, T] owning civ, else -1
+        civ_only_at = self.civ_at  # [B, T] owning civ, else -1
         if not tensor_seat and seat == 0:
-            war_r = self.r_atwar.gather(1, r_at.clamp(min=0))
-            return live & (r_at >= 0) & war_r
+            war_r = self.civ_only_atwar.gather(1, civ_only_at.clamp(min=0))
+            return live & (civ_only_at >= 0) & war_r
         # The Encampment OWNER's seat per tile, then the one shared hostility
         # question.
         owner_seat = torch.where(
-            r_at >= 0,
-            r_at + 1,                                   # a civ's district
-            torch.where(self.tile_seat == 0, torch.zeros_like(r_at), torch.full_like(r_at, -1)),
+            civ_only_at >= 0,
+            civ_only_at + 1,                                   # a civ's district
+            torch.where(self.tile_seat == 0, torch.zeros_like(civ_only_at), torch.full_like(civ_only_at, -1)),
         )
         return live & self._seats_hostile(seat, owner_seat)
 
@@ -688,7 +688,7 @@ class SimMasks:
         self.occ_mil[(rows, spot[rows])] = slot + simbase.P_MAX + simbase.U_MAX
         self.next_slot[rows] += 1
 
-    def _spawn_p(self, mask: torch.Tensor, at_tile: torch.Tensor, type_idx: torch.Tensor, init_xp: torch.Tensor | None = None) -> None:
+    def _spawn_seat0(self, mask: torch.Tensor, at_tile: torch.Tensor, type_idx: torch.Tensor, init_xp: torch.Tensor | None = None) -> None:
         """A trained unit appears at/near its city center (spawnUnit). init_xp
         (a [B] long tensor) seeds a MILITARY unit's starting XP from its city's
         Encampment training buildings; civilians stay at 0."""
@@ -775,16 +775,16 @@ class SimMasks:
         t = tile.clamp(min=0)
         era = self._civ_era(self.techs, self.civics)  # [B] seat 0's era
         if self.S > 0:
-            _cs_s = self.cs_at.gather(1, t.unsqueeze(1)).squeeze(1)
-            _cs_ctr = (_cs_s >= 0) & (
-                self.cs_center.gather(1, _cs_s.clamp(min=0).unsqueeze(1)).squeeze(1) == t)
+            _citystate_s = self.citystate_at.gather(1, t.unsqueeze(1)).squeeze(1)
+            _citystate_ctr = (_citystate_s >= 0) & (
+                self.citystate_center.gather(1, _citystate_s.clamp(min=0).unsqueeze(1)).squeeze(1) == t)
         else:
-            _cs_ctr = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            _citystate_ctr = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         # TS keeps ONE tile map, so `t.district` is set for EVERY seat's
         # district and `markAntiquitySite` refuses them all. The GPU splits the
         # fact: `self.district` is seat 0's, while a civ's live in the
-        # `rc_dist_tile` registry — both must be refused.
-        _rv_dist = (self.rc_dist_tile == t.view(self.B, 1, 1, 1)).any(3).any(2).any(1)
+        # `civ_city_dist_tile` registry — both must be refused.
+        _rv_dist = (self.civ_city_dist_tile == t.view(self.B, 1, 1, 1)).any(3).any(2).any(1)
         okr = (
             mask
             & (tile >= 0)
@@ -795,11 +795,11 @@ class SimMasks:
             # TS refuses a dig on ANY tile carrying a district, and `foundCity`
             # sets `tile.district = 'CITY_CENTER'` (so do both capture paths).
             # The GPU's `district` plane does NOT encode centres — they live in
-            # `center_at` / `rc_at` (cf. the adjacency scan, which spells out
-            # `center_at >= 0 | district >= 0 | rc_at >= 0`), so both are named
+            # `center_at` / `civ_city_at` (cf. the adjacency scan, which spells out
+            # `center_at >= 0 | district >= 0 | civ_city_at >= 0`), so both are named
             # here.
             & (self.center_at.gather(1, t.unsqueeze(1)).squeeze(1) < 0)  # seat 0's centre
-            & (self.rc_at.gather(1, t.unsqueeze(1)).squeeze(1) < 0)  # civ centre
+            & (self.civ_city_at.gather(1, t.unsqueeze(1)).squeeze(1) < 0)  # civ centre
             # NOTE: a CITY-STATE centre is deliberately NOT excluded. TS sets
             # `tile.district = 'CITY_CENTER'` on seat-0 founding, on both
             # capture paths and on CIV founding, but NOT for a city-state,
@@ -881,7 +881,7 @@ class SimMasks:
         land = torch.where(cw.expand(B, 6), nbc, c.unsqueeze(1).expand(B, 6))
         dl = torch.where(cw.expand(B, 6), (dirs + 3) % 6, dirs)
         bit = ((self.cliff_mask.gather(1, land) >> dl) & 1).bool()
-        free = (self.center_at.gather(1, land) >= 0) | (self.rc_at.gather(1, land) >= 0)
+        free = (self.center_at.gather(1, land) >= 0) | (self.civ_city_at.gather(1, land) >= 0)
         if self._harbor_idx >= 0 and own is not None:
             free = free | ((self.district.gather(1, land) == self._harbor_idx) & own.gather(1, land))
         return trans & bit & ~free
@@ -907,7 +907,7 @@ class SimMasks:
         dl = torch.where(cw, (di + 3) % 6, di)
         bit = ((self.cliff_mask.gather(1, land.unsqueeze(1)).squeeze(1) >> dl) & 1).bool()
         free = (self.center_at.gather(1, land.unsqueeze(1)).squeeze(1) >= 0) | (
-            self.rc_at.gather(1, land.unsqueeze(1)).squeeze(1) >= 0
+            self.civ_city_at.gather(1, land.unsqueeze(1)).squeeze(1) >= 0
         )
         # SOURCED: the Harbor exception is OWNER-ONLY — "when YOUR units use it
         # they will be able to pass the Cliffs... Enemy units won't." Callers
@@ -938,7 +938,7 @@ class SimMasks:
             if civ is None:
                 self.treasury[b] += reward
             else:
-                self.r_treasury[b, int(civ[b])] += float(reward)
+                self.civ_only_treasury[b, int(civ[b])] += float(reward)
 
     # --- seat-0 unit actions (phase 4b) ---------------------------------------
 
@@ -986,11 +986,11 @@ class SimMasks:
         pciv = (c_seat == 0).reshape(B, simbase.P_MAX, 6)
         vm_here = (m_seat > 0) & (m_seat != BARB_SEAT)
         vm_civ = (m_seat - 1).clamp(min=0, max=max(self.R - 1, 0))
-        vm_war = (vm_here & self.r_atwar.gather(1, vm_civ)).reshape(B, simbase.P_MAX, 6)
+        vm_war = (vm_here & self.civ_only_atwar.gather(1, vm_civ)).reshape(B, simbase.P_MAX, 6)
         vm_any = vm_here.reshape(B, simbase.P_MAX, 6)
         # at-war civ CITY CENTERS are melee targets (attackTargets).
-        rcn = self.rc_at.gather(1, nbc)
-        rc_war = ((rcn >= 0) & self.r_atwar.gather(1, rcn.clamp(min=0).clamp(max=max(self.R - 1, 0)))).reshape(B, simbase.P_MAX, 6)
+        rcn = self.civ_city_at.gather(1, nbc)
+        civ_city_war = ((rcn >= 0) & self.civ_only_atwar.gather(1, rcn.clamp(min=0).clamp(max=max(self.R - 1, 0)))).reshape(B, simbase.P_MAX, 6)
         vc_civ_n = ((c_seat > 0) & (c_seat != BARB_SEAT)).reshape(B, simbase.P_MAX, 6)
         passable = self.passable.gather(1, nbc).reshape(B, simbase.P_MAX, 6)
         on_map = nb >= 0
@@ -1002,13 +1002,13 @@ class SimMasks:
         alive = self.p_alive.unsqueeze(2) & (self.p_mp > 0).unsqueeze(2)
         move = on_map & passable & ~barb & ~vm_any & ~vc_civ_n & ~dom & alive
         can_fight = (self._p_combat[self.p_type] > 0).unsqueeze(2)
-        # rangedAttack bombards cities too, so rc_war is a target for every
+        # rangedAttack bombards cities too, so civ_city_war is a target for every
         # fighter. City-state centres join once seat 0 has DECLARED war
-        # (cs_atwar); the war gate is what keeps a PEACEFUL city-state from ever
+        # (citystate_atwar); the war gate is what keeps a PEACEFUL city-state from ever
         # being offered as a target.
-        csn = self.cs_at.gather(1, nbc)
-        cs_war = ((csn >= 0) & self.cs_atwar.gather(1, csn.clamp(min=0))).reshape(B, simbase.P_MAX, 6)
-        attack = on_map & (barb | vm_war | rc_war | cs_war) & can_fight & alive
+        csn = self.citystate_at.gather(1, nbc)
+        citystate_war = ((csn >= 0) & self.citystate_atwar.gather(1, csn.clamp(min=0))).reshape(B, simbase.P_MAX, 6)
+        attack = on_map & (barb | vm_war | civ_city_war | citystate_war) & can_fight & alive
         hold = self.p_alive.unsqueeze(2)
         # 13/14/15: build FARM / MINE / LUMBER_MILL — a builder with charges
         # standing on an owned, unimproved, non-center tile where that
@@ -1087,14 +1087,14 @@ class SimMasks:
         # non-centre unpillaged district.
         _pt = self.p_tile.clamp(min=0)
         _rv_t = self.civ_at.gather(1, _pt)
-        _enemy = ((_rv_t >= 0) & self.r_atwar.gather(1, _rv_t.clamp(min=0))) | (self.cs_at.gather(1, _pt) >= 0)
+        _enemy = ((_rv_t >= 0) & self.civ_only_atwar.gather(1, _rv_t.clamp(min=0))) | (self.citystate_at.gather(1, _pt) >= 0)
         _has_imp = (self.improvement.gather(1, _pt) >= 0) & ~self.pillaged.gather(1, _pt)
         _has_dis = (
             (self.district.gather(1, _pt) >= 0)
             & self.district_complete.gather(1, _pt)
             & ~self.district_pillaged.gather(1, _pt)
             & (self.center_at.gather(1, _pt) < 0)
-            & (self.rc_at.gather(1, _pt) < 0)
+            & (self.civ_city_at.gather(1, _pt) < 0)
         )
         pillage = (
             self.p_alive & (self._p_combat[self.p_type] > 0) & _enemy & (_has_imp | _has_dis)
@@ -1181,7 +1181,7 @@ class SimMasks:
             _vt_mv = self.v_type.gather(1, sc).clamp(min=0, max=self.NU - 1)
             _is_nav_mv = self.unit_naval[_vt_mv].unsqueeze(2)
             _cart_r = (
-                self.r_techs[:, r, self._cartography_tech]
+                self.civ_only_techs[:, r, self._cartography_tech]
                 if self._cartography_tech >= 0
                 else torch.zeros(B, dtype=torch.bool, device=dev)
             ).view(B, 1, 1)
@@ -1189,7 +1189,7 @@ class SimMasks:
             # at peace. Military embarks on SHIPBUILDING; CARTOGRAPHY only opens
             # OCEAN, so both techs are terms of this gate.
             _ship_r = (
-                self.r_techs[:, r, self._shipbuilding_tech]
+                self.civ_only_techs[:, r, self._shipbuilding_tech]
                 if self._shipbuilding_tech >= 0
                 else torch.zeros(B, dtype=torch.bool, device=dev)
             ).view(B, 1, 1)
@@ -1199,9 +1199,9 @@ class SimMasks:
                 & _ship_r
                 & ~_is_nav_mv
                 # AT WAR WITH ANYONE: the war walker has no per-enemy term
-                # (running it IS the war context), so gating on r_atwar alone
+                # (running it IS the war context), so gating on civ_only_atwar alone
                 # (war with seat 0) would refuse every civ-vs-civ embark.
-                & (self.r_atwar[:, r] | self.cc_war[:, r].any(dim=1)).view(B, 1, 1)
+                & (self.civ_only_atwar[:, r] | self.civ_pair_war[:, r].any(dim=1)).view(B, 1, 1)
             )
         else:
             _wgate = torch.zeros(B, simbase.P_MAX, 6, dtype=torch.bool, device=dev)
@@ -1209,14 +1209,14 @@ class SimMasks:
         # ATTACK. Occupancy-based blocking never sees centre TILES, so the
         # centre block is spelled out here. Own-civ centres stay enterable
         # (garrisoning your own city is legal).
-        _rvc_mv = self.rc_at.gather(1, nbc).reshape(B, simbase.P_MAX, 6)
+        _rvc_mv = self.civ_city_at.gather(1, nbc).reshape(B, simbase.P_MAX, 6)
         # only ENEMY centres are closed, so a NEUTRAL civ's centre is walkable:
-        # the vc arm gates on cc_war. Seat 0's centres stay blocked (no
+        # the vc arm gates on civ_pair_war. Seat 0's centres stay blocked (no
         # capture-by-walk).
         _rvc_war_mv = (
             (_rvc_mv >= 0)
             & (_rvc_mv != r)
-            & self.cc_war[:, r].gather(1, _rvc_mv.clamp(min=0).reshape(B, -1)).reshape(B, simbase.P_MAX, 6)
+            & self.civ_pair_war[:, r].gather(1, _rvc_mv.clamp(min=0).reshape(B, -1)).reshape(B, simbase.P_MAX, 6)
         )
         # NO city-state term: the march's step scan has no centre term at all
         # ("can't be entered" lives in the TARGET-stop logic, not the step
@@ -1258,7 +1258,7 @@ class SimMasks:
                 _clf = self._cliff_block_dirs(tile[:, _n].clamp(min=0), nb[:, _n], _own_r)
                 move[:, _n] = move[:, _n] & ~_clf
         can_fight = (self._p_combat[self.v_type.gather(1, sc)] > 0).unsqueeze(2)
-        at_war = self.r_atwar[:, r].reshape(B, 1, 1)
+        at_war = self.civ_only_atwar[:, r].reshape(B, 1, 1)
         p_target = (pmil | pciv | (self.center_at.gather(1, nbc) >= 0).reshape(B, simbase.P_MAX, 6)) & at_war
         # the MELEE-only target classes:
         #   * enemy AT-WAR civ UNITS (a civ's ranged never attacks enemy civs)
@@ -1272,41 +1272,41 @@ class SimMasks:
         # CIVILIANS are war targets too. rcn (the civilian map's civ slots) was
         # computed above for the stacking terms and is reused here.
         _rvcivC_nb = torch.where(rcn >= 0, self.v_civ.gather(1, rcn.clamp(min=0)), torch.full_like(rcn, -1))
-        _cc_u = (
-            ((_vciv_nb >= 0) & self.cc_war[:, r].gather(1, _vciv_nb.clamp(min=0)))
-            | ((_rvcivC_nb >= 0) & self.cc_war[:, r].gather(1, _rvcivC_nb.clamp(min=0)))
+        _civ_pair_u = (
+            ((_vciv_nb >= 0) & self.civ_pair_war[:, r].gather(1, _vciv_nb.clamp(min=0)))
+            | ((_rvcivC_nb >= 0) & self.civ_pair_war[:, r].gather(1, _rvcivC_nb.clamp(min=0)))
         ).reshape(B, simbase.P_MAX, 6)
-        _rvc_nb = self.rc_at.gather(1, nbc)
-        _cc_c = ((_rvc_nb >= 0) & self.cc_war[:, r].gather(1, _rvc_nb.clamp(min=0))).reshape(B, simbase.P_MAX, 6)
+        _rvc_nb = self.civ_city_at.gather(1, nbc)
+        _civ_pair_c = ((_rvc_nb >= 0) & self.civ_pair_war[:, r].gather(1, _rvc_nb.clamp(min=0))).reshape(B, simbase.P_MAX, 6)
         S_ = self.S
         _suz_min = int(self.rules.cityStates.get("suzerainMin", 3)) if hasattr(self.rules, "cityStates") and isinstance(getattr(self.rules, "cityStates", None), dict) else 3
         _suz_p = (
-            (self.cs_envoys[:, :S_] >= _suz_min)
-            & (self.cs_envoys[:, :S_] > self.cs_r_envoys[:, :, :S_].max(dim=1).values)
-            & self.cs_alive[:, :S_]
+            (self.citystate_envoys[:, :S_] >= _suz_min)
+            & (self.citystate_envoys[:, :S_] > self.civ_only_citystate_envoys[:, :, :S_].max(dim=1).values)
+            & self.citystate_alive[:, :S_]
         )
-        _cs_nb = self.cs_at.gather(1, nbc)
-        _cs_ctr = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
-        _cs_ctr.scatter_(1, self.cs_center[:, :S_].clamp(min=0), _suz_p)
-        _cs_tgt = (_cs_ctr.gather(1, nbc) & (_cs_nb >= 0)).reshape(B, simbase.P_MAX, 6) & at_war
-        cc_target = (_cc_u | _cc_c | _cs_tgt) & _melee_att
+        _citystate_nb = self.citystate_at.gather(1, nbc)
+        _citystate_ctr = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
+        _citystate_ctr.scatter_(1, self.citystate_center[:, :S_].clamp(min=0), _suz_p)
+        _citystate_tgt = (_citystate_ctr.gather(1, nbc) & (_citystate_nb >= 0)).reshape(B, simbase.P_MAX, 6) & at_war
+        civ_pair_target = (_civ_pair_u | _civ_pair_c | _citystate_tgt) & _melee_att
         # EMBARKED UNITS CANNOT ATTACK — the war act's own gate is
         # `attack = act & ... & ~v_emb`.
         _emb_att = self.v_emb.gather(1, sc).unsqueeze(2)
-        attack = on_map & (barb | p_target | cc_target) & can_fight & ~_emb_att & alive
+        attack = on_map & (barb | p_target | civ_pair_target) & can_fight & ~_emb_att & alive
         hold = present.unsqueeze(2)
         tc = tile.clamp(min=0)  # `chop` below reads this outside the branch
         _res_cols_r: list[torch.Tensor] = []
         if self.improvements_on and self._builder_idx >= 0:
-            hf = self.r_civics[:, r, self._hillfarms_civic].unsqueeze(1) if self._hillfarms_civic >= 0 else torch.zeros(B, 1, dtype=torch.bool, device=dev)
-            mining = self.r_techs[:, r, self._mine_unlock_tech].unsqueeze(1) if self._mine_unlock_tech >= 0 else torch.zeros(B, 1, dtype=torch.bool, device=dev)
-            constr = self.r_techs[:, r, self._lumber_unlock_tech].unsqueeze(1) if self._lumber_unlock_tech >= 0 else torch.zeros(B, 1, dtype=torch.bool, device=dev)
+            hf = self.civ_only_civics[:, r, self._hillfarms_civic].unsqueeze(1) if self._hillfarms_civic >= 0 else torch.zeros(B, 1, dtype=torch.bool, device=dev)
+            mining = self.civ_only_techs[:, r, self._mine_unlock_tech].unsqueeze(1) if self._mine_unlock_tech >= 0 else torch.zeros(B, 1, dtype=torch.bool, device=dev)
+            constr = self.civ_only_techs[:, r, self._lumber_unlock_tech].unsqueeze(1) if self._lumber_unlock_tech >= 0 else torch.zeros(B, 1, dtype=torch.bool, device=dev)
             here_ok = (
                 present
                 & (self.v_type.gather(1, sc) == self._builder_idx)
                 & (self.v_charges.gather(1, sc) > 0)
                 & (self.civ_at.gather(1, tc) == r)
-                & (self.rc_at.gather(1, tc) < 0)
+                & (self.civ_city_at.gather(1, tc) < 0)
                 & (self.improvement.gather(1, tc) < 0)
                 & (self.district.gather(1, tc) < 0)
                 & (self.built_wonder.gather(1, tc) < 0)  # an in-flight wonder pave refuses improvements
@@ -1327,7 +1327,7 @@ class SimMasks:
             for _k in range(3, self._imp_unlock.numel()):
                 _ut = int(self._imp_unlock[_k])
                 _unl = (
-                    self.r_techs[:, r, _ut].unsqueeze(1) if _ut >= 0
+                    self.civ_only_techs[:, r, _ut].unsqueeze(1) if _ut >= 0
                     else torch.ones(B, 1, dtype=torch.bool, device=dev)
                 )
                 if self.SEASIDE >= 0 and _k == self.SEASIDE:
@@ -1339,7 +1339,7 @@ class SimMasks:
         # CIV's removal tech in, unstripped.
         ftr_t = self.tile_ftr.gather(1, tc)
         ftu_t = self.tile_ftu.gather(1, tc)
-        unlocked = self.r_techs[:, r, :].gather(1, ftu_t.clamp(min=0)) & (ftu_t >= 0)
+        unlocked = self.civ_only_techs[:, r, :].gather(1, ftu_t.clamp(min=0)) & (ftu_t >= 0)
         chop = (is_civ.squeeze(2) & (self.v_charges.gather(1, sc) > 0) & (ftr_t > 0) & unlocked & ~self.feat_stripped.gather(1, tc)).unsqueeze(2)
         # the same MP gate `unit_action_mask` applies — one rule, both seats.
         has_mp = (self.v_mp.gather(1, sc) > 0).unsqueeze(2)
@@ -1363,8 +1363,8 @@ class SimMasks:
         # district. Enemy for a civ = seat 0's land while at war with it, or any
         # city-state's.
         _enemy_r = (
-            ((self.owner.gather(1, tc) >= 0) & self.r_atwar[:, r].unsqueeze(1))
-            | (self.cs_at.gather(1, tc) >= 0)
+            ((self.owner.gather(1, tc) >= 0) & self.civ_only_atwar[:, r].unsqueeze(1))
+            | (self.citystate_at.gather(1, tc) >= 0)
         )
         _has_imp_r = (self.improvement.gather(1, tc) >= 0) & ~self.pillaged.gather(1, tc)
         _has_dis_r = (
@@ -1372,7 +1372,7 @@ class SimMasks:
             & self.district_complete.gather(1, tc)
             & ~self.district_pillaged.gather(1, tc)
             & (self.center_at.gather(1, tc) < 0)
-            & (self.rc_at.gather(1, tc) < 0)
+            & (self.civ_city_at.gather(1, tc) < 0)
         )
         _mil_r = self._p_combat[self.v_type.gather(1, sc).clamp(min=0)] > 0
         pillage_r = (present & _mil_r & _enemy_r & (_has_imp_r | _has_dis_r)).unsqueeze(2)
@@ -1394,7 +1394,7 @@ class SimMasks:
         _barb_ring = (_rms == BARB_SEAT).reshape(B, simbase.P_MAX, 12)
         _pu_ring = ((_rms == 0) | (_rcs == 0)).reshape(B, simbase.P_MAX, 12)
         _pc_ring = (self.center_at.gather(1, ringc) >= 0).reshape(B, simbase.P_MAX, 12)
-        _hp_sn = self.r_atwar[:, r].view(B, 1, 1)
+        _hp_sn = self.civ_only_atwar[:, r].view(B, 1, 1)
         snipe_r = (
             present.unsqueeze(2)
             & _rngd_sn.unsqueeze(2)
@@ -1455,7 +1455,7 @@ class SimMasks:
         radius stay POLICY and live in gpu/ladder.py.
 
         One body for every seat: seat 0 passes `site`/`p_tile`, a civ passes
-        `rc_center[:, r]`/its slot-mapped tiles.
+        `civ_city_center[:, r]`/its slot-mapped tiles.
         """
         B, N = tile.shape
         dev, dt = self.device, self.dtype
@@ -1532,11 +1532,11 @@ class SimMasks:
         B, dev = self.B, self.device
         present = smap >= 0
         tiles = self.v_tile.gather(1, sc)
-        hp_r = self.r_atwar[:, r]
-        # cc_war is [b, ownCiv, otherCiv] with 0-based civ indices (see the
-        # picker's `cc_war[arange, ac, r2]`), so row r, not 1+r.
-        cc_any = self.cc_war[:, r].any(dim=1) if self.R > 0 else torch.zeros(B, dtype=torch.bool, device=dev)
-        at_war = hp_r | cc_any
+        hp_r = self.civ_only_atwar[:, r]
+        # civ_pair_war is [b, ownCiv, otherCiv] with 0-based civ indices (see the
+        # picker's `civ_pair_war[arange, ac, r2]`), so row r, not 1+r.
+        civ_pair_any = self.civ_pair_war[:, r].any(dim=1) if self.R > 0 else torch.zeros(B, dtype=torch.bool, device=dev)
+        at_war = hp_r | civ_pair_any
         ac = torch.full((B,), r, dtype=torch.long, device=dev)
         war_tgt = torch.full((B, smap.shape[1]), -1, dtype=torch.long, device=dev)
         if bool(at_war.any()):
@@ -1548,7 +1548,7 @@ class SimMasks:
                 war_tgt[:, n] = torch.where(has, tgt_n, war_tgt[:, n])
         return self._unit_obs(
             tiles, present,
-            self.rc_center[:, r], self.rc_alive[:, r],
+            self.civ_city_center[:, r], self.civ_city_alive[:, r],
             self.v_mp.gather(1, sc), self.v_charges.gather(1, sc),
             self.v_type.gather(1, sc),
             at_war=at_war, war_tgt=war_tgt,

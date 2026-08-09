@@ -3,7 +3,7 @@
 The `controlled [B, R]` mask hands a civ's DECISIONS to an external
 writer while every mechanic keeps running: the scripted picker, research
 auto-pick and unit AI must skip controlled civs; choices written
-directly into rc_current / r_cur_tech must persist, progress, and
+directly into civ_city_current / civ_only_cur_tech must persist, progress, and
 complete through the ordinary machinery. Poked directly — no organic
 controller drives a seat here.
 """
@@ -27,30 +27,30 @@ def main() -> None:
         sim.step()
 
     r = 0
-    assert bool(sim.rc_alive[0, r, 0]), "civ 0 capital must exist by t25"
+    assert bool(sim.civ_city_alive[0, r, 0]), "civ 0 capital must exist by t25"
     sim.controlled[0, r] = True
 
     # 1. research: clear the current pick; auto-pick must NOT refill it
-    sim.r_cur_tech[0, r] = -1
-    prog0 = float(sim.r_tech_prog[0, r])
+    sim.civ_only_cur_tech[0, r] = -1
+    prog0 = float(sim.civ_only_tech_prog[0, r])
     sim.step()
-    assert int(sim.r_cur_tech[0, r]) == -1, "auto-pick must skip a controlled civ"
-    assert float(sim.r_tech_prog[0, r]) >= prog0, "progress must still BANK while undecided (manual-mode mirror)"
+    assert int(sim.civ_only_cur_tech[0, r]) == -1, "auto-pick must skip a controlled civ"
+    assert float(sim.civ_only_tech_prog[0, r]) >= prog0, "progress must still BANK while undecided (manual-mode mirror)"
 
     # 2. write a tech pick; the advance must honor it
-    avail = sim._available_mask(sim.r_techs[:, r], sim._prereq_t)[0]
+    avail = sim._available_mask(sim.civ_only_techs[:, r], sim._prereq_t)[0]
     pick = int(avail.nonzero(as_tuple=True)[0][0])
-    sim.r_cur_tech[0, r] = pick
+    sim.civ_only_cur_tech[0, r] = pick
     sim.step()
-    assert int(sim.r_cur_tech[0, r]) == pick or bool(sim.r_techs[0, r, pick]), "written tech pick must persist or complete"
+    assert int(sim.civ_only_cur_tech[0, r]) == pick or bool(sim.civ_only_techs[0, r, pick]), "written tech pick must persist or complete"
 
     # 3. production: idle a city, confirm the picker leaves it idle
     j = 0
-    sim.rc_current[0, r, j] = -1
-    sim.rc_progress[0, r, j] = 0.0
-    sim.rc_cost[0, r, j] = 0.0
+    sim.civ_city_current[0, r, j] = -1
+    sim.civ_city_progress[0, r, j] = 0.0
+    sim.civ_city_cost[0, r, j] = 0.0
     sim.step()
-    assert int(sim.rc_current[0, r, j]) == -1, "picker must not queue for a controlled civ"
+    assert int(sim.civ_city_current[0, r, j]) == -1, "picker must not queue for a controlled civ"
 
     # 4. write a WARRIOR queue item; the completion machinery must run it.
     #    Park the civ's OTHER cities idle first so the +1 isolates THIS
@@ -58,21 +58,21 @@ def main() -> None:
     #    it was scripted, and the fixture holds near-done sibling unit queues
     #    (a global +1 would over-constrain the trajectory).
     w = sim._warrior_idx
-    sim.rc_current[0, r, :] = -1
-    sim.r_treasury[0, r] = 0.0  # no gold unit/settler buy to inflate the count
-    sim.rc_current[0, r, j] = w + 1
-    sim.rc_cost[0, r, j] = float(sim._p_cost[w])
-    sim.rc_progress[0, r, j] = float(sim._p_cost[w]) - 0.5  # one turn from done
+    sim.civ_city_current[0, r, :] = -1
+    sim.civ_only_treasury[0, r] = 0.0  # no gold unit/settler buy to inflate the count
+    sim.civ_city_current[0, r, j] = w + 1
+    sim.civ_city_cost[0, r, j] = float(sim._p_cost[w])
+    sim.civ_city_progress[0, r, j] = float(sim._p_cost[w]) - 0.5  # one turn from done
     units_before = int((sim.v_alive[0] & (sim.v_civ[0] == r)).sum())
     sim.step()
-    done = int(sim.rc_current[0, r, j]) == -1
+    done = int(sim.civ_city_current[0, r, j]) == -1
     units_after = int((sim.v_alive[0] & (sim.v_civ[0] == r)).sum())
     assert done and units_after == units_before + 1, "written queue item must complete and spawn through the ordinary machinery"
 
     # 5. the OTHER civ stays fully scripted (its queue keeps working)
     other = 1 if sim.R > 1 else 0
     if other != r:
-        busy = int((sim.rc_current[0, other] >= 0).sum())
+        busy = int((sim.civ_city_current[0, other] >= 0).sum())
         assert busy > 0, "the scripted civ must keep queueing"
 
     # 6. mask-driven random control runs indefinitely and legally — every
@@ -101,7 +101,7 @@ def main() -> None:
         sim2.apply_seat_actions(0, production=pa, tech=ta, civic=ca)
         sim2._consume_driven_picks(0)
         sim2.step()
-    assert bool(sim2.rc_alive[0, 0].any()), "controlled civ must survive random play"
+    assert bool(sim2.civ_city_alive[0, 0].any()), "controlled civ must survive random play"
     assert float(sim2.empire_score()[0]) > 0, "world must keep scoring"
 
     # --- the driver plane covers EVERY seat, seat 0 included ----------------

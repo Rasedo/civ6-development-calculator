@@ -131,7 +131,7 @@ def tile_within(sim, ctr: int, dist: int, banned=()) -> int:
     for t in range(sim.T):
         if t == ctr or t in banned:
             continue
-        if int(sim.center_at[0, t]) >= 0 or int(sim.rc_at[0, t]) >= 0 or int(sim.cs_at[0, t]) >= 0:
+        if int(sim.center_at[0, t]) >= 0 or int(sim.civ_city_at[0, t]) >= 0 or int(sim.citystate_at[0, t]) >= 0:
             continue
         if int(sim.pair_dist[ctr, t]) != dist:
             continue
@@ -149,7 +149,7 @@ def adj_free(sim, t: int, banned=()) -> int:
         n = int(sim.neigh[t][d])
         if n < 0 or n in banned:
             continue
-        if int(sim.center_at[0, n]) >= 0 or int(sim.rc_at[0, n]) >= 0 or int(sim.cs_at[0, n]) >= 0:
+        if int(sim.center_at[0, n]) >= 0 or int(sim.civ_city_at[0, n]) >= 0 or int(sim.citystate_at[0, n]) >= 0:
             continue
         if not bool(sim.passable[0, n]):
             continue
@@ -268,7 +268,7 @@ def poke_aura_in_combat(rules, rj, path):
         nonlocal gi
         gi = sim._general_unit_idx
         clear_all_units(sim)
-        sim.r_atwar[:, 0] = True
+        sim.civ_only_atwar[:, 0] = True
         sim.sync_war()  # a poked war write lands in one cell; mirror the pair
         ctr = int(sim.site[0, 0])
         # the seat-0 defender at a free tile; a civ attacker adjacent to it
@@ -317,7 +317,7 @@ def poke_capture(rules, rj, path):
     sim = build(rules, path)
     gi = sim._general_unit_idx
     clear_all_units(sim)
-    sim.r_atwar[:, 0] = True
+    sim.civ_only_atwar[:, 0] = True
     sim.sync_war()  # a poked war write lands in one cell; mirror the pair
     ctr = int(sim.site[0, 0])
     gtile = tile_within(sim, ctr, 4)

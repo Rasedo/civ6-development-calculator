@@ -78,9 +78,9 @@ def main() -> None:
     import ladder as _lay
     _base = _lay.EMP + _lay.PER_CS * s2.S + _lay.PER_CIV * s2.R
     for name, plane, col, scale in (
-        ("treasury", s2.r_treasury, 8, 200.0),
-        ("influence", s2.r_influence, 10, 100.0),
-        ("envoysAvail", s2.r_envoys_avail, 9, 5.0),
+        ("treasury", s2.civ_only_treasury, 8, 200.0),
+        ("influence", s2.civ_only_influence, 10, 100.0),
+        ("envoysAvail", s2.civ_only_envoys_avail, 9, 5.0),
     ):
         plane[0, 0] = 0.0
         lo = float(e2.observe(1)[0, col])
@@ -89,9 +89,9 @@ def main() -> None:
         assert abs(lo) < 1e-9 and abs(hi - 1.0) < 1e-9, (
             f"civ obs field {col} ({name}) must READ its plane: {lo} -> {hi}"
         )
-    s2.rc_loyalty[0, 0, 0] = 42.0
+    s2.civ_city_loyalty[0, 0, 0] = 42.0
     assert abs(float(e2.observe(1)[0, _base + 7]) - 0.42) < 1e-9, (
-        "civ per-city loyalty must READ rc_loyalty, not render a constant"
+        "civ per-city loyalty must READ civ_city_loyalty, not render a constant"
     )
     if s2._settler_idx >= 0:
         base5 = float(e2.observe(1)[0, 5])
@@ -118,7 +118,7 @@ def main() -> None:
     # (b) with no winner and NOBODY holding a city (a t0 world), the pick
     # falls back to the plain score leader — the same deterministic
     # first_argmax tie-break, so the two reads must agree exactly
-    assert not bool(s3.alive[0].any()) and not bool(s3.rc_alive[0].any()), (
+    assert not bool(s3.alive[0].any()) and not bool(s3.civ_city_alive[0].any()), (
         "t0 fixture grew cities — re-derive this scenario"
     )
     assert int(s3.protagonist()[0]) == int(s3.leader()[0]), (
@@ -126,7 +126,7 @@ def main() -> None:
     )
     # (c) seat 0 cityless while a civ holds a city: the pick fences on
     # holding a city, so the surviving civ wins REGARDLESS of raw score
-    s3.rc_alive[0, 0, 0] = True
+    s3.civ_city_alive[0, 0, 0] = True
     assert int(s3.protagonist()[0]) == 1, (
         "a dead seat 0 must yield the protagonist to the surviving civ"
     )

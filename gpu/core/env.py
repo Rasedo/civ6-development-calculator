@@ -240,17 +240,17 @@ class BatchEnv:
         )  # [B, 15]
         cs = torch.stack(
             [
-                s.cs_met.to(d),
-                s.cs_envoys.to(d) / 6.0,
-                (s.cs_quest > 0).to(d),
+                s.citystate_met.to(d),
+                s.citystate_envoys.to(d) / 6.0,
+                (s.citystate_quest > 0).to(d),
             ],
             dim=2,
-        ) * s.cs_alive.unsqueeze(2).to(d)  # [B, S, 3] — captured city-states render ZEROS
+        ) * s.citystate_alive.unsqueeze(2).to(d)  # [B, S, 3] — captured city-states render ZEROS
         cv = torch.stack(
             [
-                (s.r_alive & s.r_atwar).to(d),
-                s.r_warturns.to(d) / 14.0,
-                (s.rc_alive.sum(dim=2) * s.r_alive.long()).to(d) / 6.0,
+                (s.civ_only_alive & s.civ_only_atwar).to(d),
+                s.civ_only_warturns.to(d) / 14.0,
+                (s.civ_city_alive.sum(dim=2) * s.civ_only_alive.long()).to(d) / 6.0,
             ],
             dim=2,
         )  # [B, R, 3]
@@ -302,9 +302,9 @@ class BatchEnv:
             n_units = s.p_alive.sum(dim=1) + q_u.sum(dim=1)
             n_rng = (mil & rng_t[pt]).sum(dim=1) + (q_mil & rng_t[q_ty]).sum(dim=1)
             n_mel = (mil & ~rng_t[pt]).sum(dim=1) + (q_mil & ~rng_t[q_ty]).sum(dim=1)
-            at_opp = s.r_atwar.any(dim=1) if s.R > 0 else torch.zeros(B, dtype=torch.bool, device=dev)
+            at_opp = s.civ_only_atwar.any(dim=1) if s.R > 0 else torch.zeros(B, dtype=torch.bool, device=dev)
             # ONE strength formula for every seat — nCities*8 + own-unit
-            # combat, the `_cc_strengths` text.
+            # combat, the `_civ_pair_strengths` text.
             own_str = n_cities * 8 + (s.p_alive.to(torch.long) * s._p_combat[pt]).sum(dim=1)
             z = torch.zeros(B, dtype=d, device=dev)
             return torch.stack([
@@ -313,8 +313,8 @@ class BatchEnv:
                 z, own_str.to(d), z, z, z, z,
                 at_opp.to(d), z,
             ], dim=1)
-        n_cities = s.rc_alive[:, r].sum(dim=1)
-        qcur = s.rc_current[:, r]
+        n_cities = s.civ_city_alive[:, r].sum(dim=1)
+        qcur = s.civ_city_current[:, r]
         q_ty = (qcur - 1).clamp(min=0, max=s.NU - 1)
         q_u = (qcur >= 1) & (qcur <= s.NU)
         q_mil = q_u & (s._p_combat[q_ty] > 0)
@@ -325,22 +325,22 @@ class BatchEnv:
         n_rng = (mil & rng_t[vt]).sum(dim=1) + (q_mil & rng_t[q_ty]).sum(dim=1)
         n_mel = (mil & ~rng_t[vt]).sum(dim=1) + (q_mil & ~rng_t[q_ty]).sum(dim=1)
         # The SAME 8-per-city text: this civ seat's view of seat 0, on the one
-        # ruler `r_str` below also uses.
+        # ruler `civ_only_str` below also uses.
         p_str = s.alive.sum(dim=1) * 8 + (s.p_alive.to(torch.long) * s._p_combat[s.p_type.clamp(min=0, max=s.NU - 1)]).sum(dim=1)
         own_cs = mine.to(torch.long) * s._p_combat[vt]
-        r_str = torch.floor(n_cities.double() * 8 + own_cs.sum(dim=1).double() + 0.5)
+        civ_only_str = torch.floor(n_cities.double() * 8 + own_cs.sum(dim=1).double() + 0.5)
         d_pr = s.pair_dist[
-            s.site.clamp(min=0).unsqueeze(2), s.rc_center[:, r].clamp(min=0).unsqueeze(1)
+            s.site.clamp(min=0).unsqueeze(2), s.civ_city_center[:, r].clamp(min=0).unsqueeze(1)
         ].to(torch.long)
-        pair_ok = s.alive.unsqueeze(2) & s.rc_alive[:, r].unsqueeze(1)
+        pair_ok = s.alive.unsqueeze(2) & s.civ_city_alive[:, r].unsqueeze(1)
         prox = torch.where(pair_ok, d_pr, 999).reshape(B, -1).min(dim=1).values
         gang = s.p_warmonger >= s._wm_gang
-        atwar_any = s.r_atwar[:, r] | (s.cc_war[:, r].any(dim=1) if s.R > 0 else torch.zeros(B, dtype=torch.bool, device=dev))
+        atwar_any = s.civ_only_atwar[:, r] | (s.civ_pair_war[:, r].any(dim=1) if s.R > 0 else torch.zeros(B, dtype=torch.bool, device=dev))
         return torch.stack([
             n_cities.to(d), n_units.to(d), n_mel.to(d), n_rng.to(d),
-            (n_cities * 2 + torch.where(s.r_atwar[:, r], 3, 1)).to(d),
-            p_str.to(d), r_str.to(d), prox.to(d),
-            gang.to(d), s.r_aggression[:, r].to(d), s.r_peaceturns[:, r].to(d),
+            (n_cities * 2 + torch.where(s.civ_only_atwar[:, r], 3, 1)).to(d),
+            p_str.to(d), civ_only_str.to(d), prox.to(d),
+            gang.to(d), s.civ_only_aggression[:, r].to(d), s.civ_only_peaceturns[:, r].to(d),
             atwar_any.to(d), (s.alive.sum(dim=1) > 0).to(d),
         ], dim=1)
 
@@ -384,31 +384,31 @@ class BatchEnv:
         # shifts down when a city dies, and a live city can sit in a slot >= C
         # after flips and captures, so the width cannot be sliced to C before
         # ordering. Gather the first C living slots (stable = founding order).
-        _ordR = torch.argsort((~s.rc_alive[:, r]).long(), dim=1, stable=True)[:, :C]  # [B, C] slot ids
-        pop = s.rc_pop[:, r].gather(1, _ordR).to(d)
-        alive = s.rc_alive[:, r].gather(1, _ordR)
-        needs = s._growth_needed(s.rc_pop[:, r].gather(1, _ordR)).clamp(min=1)
-        denom = s.rc_cost[:, r].gather(1, _ordR).clamp(min=1)
-        _cur = s.rc_current[:, r].gather(1, _ordR)
+        _ordR = torch.argsort((~s.civ_city_alive[:, r]).long(), dim=1, stable=True)[:, :C]  # [B, C] slot ids
+        pop = s.civ_city_pop[:, r].gather(1, _ordR).to(d)
+        alive = s.civ_city_alive[:, r].gather(1, _ordR)
+        needs = s._growth_needed(s.civ_city_pop[:, r].gather(1, _ordR)).clamp(min=1)
+        denom = s.civ_city_cost[:, r].gather(1, _ordR).clamp(min=1)
+        _cur = s.civ_city_current[:, r].gather(1, _ordR)
         per_city = torch.stack(
             [
                 alive.to(d),
                 pop / 10.0,
-                s.rc_growth[:, r].gather(1, _ordR).to(d) / needs.to(d),
-                torch.where(_cur >= 0, s.rc_progress[:, r].gather(1, _ordR).to(d) / denom.to(d), torch.zeros_like(pop)),
-                s.rc_cbox[:, r].gather(1, _ordR).to(d) / s._border_cost(s.rc_acquired[:, r].gather(1, _ordR)).clamp(min=1).to(d),
+                s.civ_city_growth[:, r].gather(1, _ordR).to(d) / needs.to(d),
+                torch.where(_cur >= 0, s.civ_city_progress[:, r].gather(1, _ordR).to(d) / denom.to(d), torch.zeros_like(pop)),
+                s.civ_city_cbox[:, r].gather(1, _ordR).to(d) / s._border_cost(s.civ_city_acquired[:, r].gather(1, _ordR)).clamp(min=1).to(d),
                 torch.where(
                     alive,
-                    ((s.tile_city.unsqueeze(1) == s.rc_id[:, r].gather(1, _ordR).unsqueeze(2))
-                     & (s.civ_at == r).unsqueeze(1)).sum(dim=2).to(d),  # rc_id is PER-CIV — gate by owner plane
+                    ((s.tile_city.unsqueeze(1) == s.civ_city_id[:, r].gather(1, _ordR).unsqueeze(2))
+                     & (s.civ_at == r).unsqueeze(1)).sum(dim=2).to(d),  # civ_city_id is PER-CIV — gate by owner plane
                     torch.zeros(B, C, dtype=d, device=dev),
                 ) / 20.0,
-                torch.where(alive, s.rc_hp[:, r].gather(1, _ordR).to(d), torch.zeros_like(pop)) / 200.0,
-                s.rc_loyalty[:, r].gather(1, _ordR).to(d) / 100.0,
+                torch.where(alive, s.civ_city_hp[:, r].gather(1, _ordR).to(d), torch.zeros_like(pop)) / 200.0,
+                s.civ_city_loyalty[:, r].gather(1, _ordR).to(d) / 100.0,
                 (_cur >= 0).to(d),
                 # The production LADDER branches on isCapital — only the
                 # capital queues a settler.
-                s.rc_is_cap[:, r].gather(1, _ordR).to(d),
+                s.civ_city_is_cap[:, r].gather(1, _ordR).to(d),
             ],
             dim=2,
         ) * alive.unsqueeze(2).to(d)  # [B, C, 10] — dead rows ZERO, the TS zero-fill twin
@@ -416,18 +416,18 @@ class BatchEnv:
         emp = torch.stack(
             [
                 torch.full((B,), float(s.turn) / self.horizon, dtype=d, device=dev),
-                s.r_techs[:, r].sum(dim=1).to(d) / max(s.r_techs.shape[2], 1),
-                s.r_civics[:, r].sum(dim=1).to(d) / max(s.r_civics.shape[2], 1),
-                s.r_tech_prog[:, r].to(d) / 50.0,
-                s.r_civic_prog[:, r].to(d) / 50.0,
+                s.civ_only_techs[:, r].sum(dim=1).to(d) / max(s.civ_only_techs.shape[2], 1),
+                s.civ_only_civics[:, r].sum(dim=1).to(d) / max(s.civ_only_civics.shape[2], 1),
+                s.civ_only_tech_prog[:, r].to(d) / 50.0,
+                s.civ_only_civic_prog[:, r].to(d) / 50.0,
                 # Field 5 is this seat's LIVE settler units and field 6 how
                 # many are QUEUED — the same two meanings seat 0 renders.
-                s._r_settlers_of(r).to(d),
-                (s.rc_current[:, r] == 0).sum(dim=1).to(d),
-                s.rc_alive[:, r].sum(dim=1).to(d) / C,
-                (s.r_treasury[:, r] / 200.0).clamp(max=5.0),
-                s.r_envoys_avail[:, r].to(d) / 5.0,
-                s.r_influence[:, r].to(d) / 100.0,
+                s._civ_only_settlers_of(r).to(d),
+                (s.civ_city_current[:, r] == 0).sum(dim=1).to(d),
+                s.civ_city_alive[:, r].sum(dim=1).to(d) / C,
+                (s.civ_only_treasury[:, r] / 200.0).clamp(max=5.0),
+                s.civ_only_envoys_avail[:, r].to(d) / 5.0,
+                s.civ_only_influence[:, r].to(d) / 100.0,
                 s.n_camps.to(d) / 5.0,
                 s.u_alive.sum(dim=1).to(d) / 10.0,
                 n_own_units / 10.0,
@@ -439,17 +439,17 @@ class BatchEnv:
             ],
             dim=1,
         )  # [B, 15]
-        # THIS SEAT'S OWN courtship view (cs_r_met / cs_r_envoys). The quest
+        # THIS SEAT'S OWN courtship view (civ_only_citystate_met / civ_only_citystate_envoys). The quest
         # column stays zero — quests are a seat-0 mechanic, and TS renders 0
         # for civ seats too. Captured city-states zero out.
         cs = torch.stack(
             [
-                s.cs_r_met[:, r, : s.S].to(d),
-                s.cs_r_envoys[:, r, : s.S].to(d) / 6.0,
+                s.civ_only_citystate_met[:, r, : s.S].to(d),
+                s.civ_only_citystate_envoys[:, r, : s.S].to(d) / 6.0,
                 torch.zeros(B, s.S, dtype=d, device=dev),
             ],
             dim=2,
-        ) * s.cs_alive.unsqueeze(2).to(d)
+        ) * s.citystate_alive.unsqueeze(2).to(d)
         # OPPONENTS, seat-symmetric: every OTHER civ seat in ascending seat
         # order, and the war field is THIS seat's war with that opponent — read
         # off the symmetric `war` matrix, so no seat is privileged. The twin is
@@ -462,7 +462,7 @@ class BatchEnv:
             if o == 0:
                 cities = s.alive.sum(dim=1).to(d)
             else:
-                cities = (s.rc_alive[:, o - 1].sum(dim=1) * s.r_alive[:, o - 1].long()).to(d)
+                cities = (s.civ_city_alive[:, o - 1].sum(dim=1) * s.civ_only_alive[:, o - 1].long()).to(d)
             opp_cols.append(
                 torch.stack(
                     [
@@ -485,12 +485,12 @@ class BatchEnv:
         # away should change which branch a policy walks toward now, and masking
         # to the legal frontier would delete exactly that signal.
         return torch.cat([emp, cs.reshape(B, -1), cv.reshape(B, -1), per_city.reshape(B, -1),
-                          torch.stack(self._escalators(r + 1, s.r_techs[:, r], s.r_civics[:, r],
-                                                      s.r_builders_trained[:, r] if hasattr(s, "r_builders_trained")
+                          torch.stack(self._escalators(r + 1, s.civ_only_techs[:, r], s.civ_only_civics[:, r],
+                                                      s.civ_only_builders_trained[:, r] if hasattr(s, "civ_only_builders_trained")
                                                       else torch.zeros(B, dtype=torch.long, device=dev),
                                                       torch.zeros(B, dtype=d, device=dev)), dim=1),
-                          s._eff_cost(s.rules_dev.t_cost.unsqueeze(0).expand(B, -1), s.r_tech_boosted[:, r], r + 1).to(d) / 1000.0,
-                          s._eff_cost(s.rules_dev.c_cost.unsqueeze(0).expand(B, -1), s.r_civic_boosted[:, r], r + 1, is_civic=True).to(d) / 1000.0,
+                          s._eff_cost(s.rules_dev.t_cost.unsqueeze(0).expand(B, -1), s.civ_only_tech_boosted[:, r], r + 1).to(d) / 1000.0,
+                          s._eff_cost(s.rules_dev.c_cost.unsqueeze(0).expand(B, -1), s.civ_only_civic_boosted[:, r], r + 1, is_civic=True).to(d) / 1000.0,
                           self._ctx_block(r)], dim=1)
 
     def unit_features(self, seat: int = 0) -> torch.Tensor:

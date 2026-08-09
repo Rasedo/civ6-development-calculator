@@ -471,25 +471,25 @@ _MUTABLE = [
     "district_dead",  # captured districts are paved-but-dead
     "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "founded_n", "city_seq", "city_seq_next",  # TS array-order rank per column
-    "civ_cap_tile",  # capitalTiles — capital identity + the domination anchor (cap_tile / r_cap_tile are views)
+    "civ_cap_tile",  # capitalTiles — capital identity + the domination anchor (cap_tile / civ_only_cap_tile are views)
     # `tile_seat` is STATE — the city-state part of tile ownership is stored
-    # only here (`cs_at` is a view of it), so it must round-trip.
+    # only here (`citystate_at` is a view of it), so it must round-trip.
     "tile_seat", "tile_city",
-    "cs_quest_district",
-    "cs_last_levy",  # levy cooldown
+    "citystate_quest_district",
+    "citystate_last_levy",  # levy cooldown
     "influence",
-    "cc_warkind", "cc_denounced", "cc_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "seat_ext", "cty_prod_bank",
-    "cty_dist_tile",
+    "civ_pair_warkind", "civ_pair_denounced", "civ_pair_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "seat_ext", "city_prod_bank",
+    "city_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
-    "seat_route_dest",  # international dest CENTER TILE (>=0), else -1 (domestic/CS) — SEAT-indexed; r_route_dest is the [:, 1:] view
-    "rc_id",
+    "seat_route_dest",  # international dest CENTER TILE (>=0), else -1 (domestic/CS) — SEAT-indexed; civ_only_route_dest is the [:, 1:] view
+    "civ_city_id",
     "v_civ", "v_next",
     "gp_earned", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
     "pan_claimed", "fol_claimed", "fou_claimed",  # belief-claim masks
     "enh_claimed",  # enhancer-claim mask
-    "holy_tile", "cty_pressure", "cty_followed",  # ONE seat-indexed pressure+followed plane pair
+    "holy_tile", "city_pressure", "city_followed",  # ONE seat-indexed pressure+followed plane pair
     "antiquity",  # ANTIQUITY SITES (bool tile plane)
-    "built_wonder", "built_wonder_complete", "cty_wonder",  # world wonders + the per-city registry
+    "built_wonder", "built_wonder_complete", "city_wonder",  # world wonders + the per-city registry
     "fertility", "drought", "improvement", "pillaged", "district", "dscaffold_placed",
     "district_pillaged",  # raided-dark districts (tile plane, reclaim-safe)
     "d_static_adj",  # mutated when an in-game founding clears the center tile's removable feature
@@ -497,21 +497,21 @@ _MUTABLE = [
     # into them — snapshot/restore round-trips one tensor per plane instead of
     # three, and a view can never be half-restored.
     "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_emb", "unit_seat", "occ_mil", "occ_civ", "war", "ww", "ww_turn",
-    # per-seat scalar bases (the x / r_x views live on these)
+    # per-seat scalar bases (the x / civ_only_x views live on these)
     "civ_best_melee", "civ_builders_trained", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted",
     "civ_enhancer", "civ_enhancer_done", "civ_follower", "civ_founder", "civ_next_city_id",
     "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_tiles_purchased",
-    # the (civ, city-state) relation bases — cs_x is row 0 and cs_r_x rows 1..,
+    # the (civ, city-state) relation bases — citystate_x is row 0 and civ_only_citystate_x rows 1..,
     # both VIEWS, so only the base may be registered.
-    "csr_met", "csr_envoys", "csr_quest", "csr_quest_camp", "csr_quest_issued",
+    "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_camp", "seat_citystate_quest_issued",
     # more seat-indexed scalar bases; the per-family names are VIEWS of these,
     # so only the base may be registered.
     "civ_culture", "civ_faith", "civ_tourism", "civ_warmonger", "civ_gpp",
     # the CITY BLOCK bases. The block has a MAJOR and a MINOR section, and no
     # single family view reaches both — registering the base is the only
     # spelling that stays complete when the block grows a section.
-    "cty_alive", "cty_center", "cty_pop", "cty_hp", "cty_outer_hp", "cty_is_cap", "cty_loyalty", "cty_acquired", "cty_growth", "cty_cbox", "cty_current", "cty_progress", "cty_cost", "cty_qtile", "cty_gw_writing", "cty_gw_art", "cty_gw_music", "cty_relics", "cty_artifacts", "cty_bldg",
-    # the two seat-indexed war clocks (r_warturns / cs_war_turns /
-    # r_peaceturns are VIEWS of these).
+    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_is_cap", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts", "city_bldg",
+    # the two seat-indexed war clocks (civ_only_warturns / citystate_war_turns /
+    # civ_only_peaceturns are VIEWS of these).
     "war_turns", "peace_turns",
 ]

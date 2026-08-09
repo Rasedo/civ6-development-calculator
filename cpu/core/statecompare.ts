@@ -164,7 +164,7 @@ const idx = (m: Map<string, number>, id: string | null | undefined): number =>
   id == null ? -1 : m.get(id) ?? -1;
 
 /** The front queue item as a PRODUCTION COLUMN in the shared layout
- *  (cpu/core/prodLayout.ts), which is the space the GPU's `cty_current` uses.
+ *  (cpu/core/prodLayout.ts), which is the space the GPU's `city_current` uses.
  *  -1 = an empty queue, matching the GPU's idle slot. */
 function queueColumn(q: City['queue'][number] | undefined): number {
   if (!q) return -1;
@@ -199,7 +199,7 @@ function queueTile(q: City['queue'][number] | undefined): number {
   return q.kind === 'district' || q.kind === 'wonder' ? q.tileIndex : -1;
 }
 
-/** The price of the front queue item, the way the GPU's `cty_cost` holds it.
+/** The price of the front queue item, the way the GPU's `city_cost` holds it.
  *  Settler/project/district items carry their own `cost`; a unit item may LOCK
  *  one (escalated builders) and otherwise takes the roster price; building and
  *  wonder items carry none at all and are priced from the catalog. The same
