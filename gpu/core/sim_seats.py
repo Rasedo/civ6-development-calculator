@@ -3896,8 +3896,9 @@ class SimSeats:
     def _seat_cs_phase(self, r: int, active: torch.Tensor) -> None:
         """CS diplomacy from a civ seat — the seatPhase block after boost
         detection. Meet by PROXIMITY (a living city center or unit of this civ
-        within meetRange of the CS center; civ seats have no fog, while seat 0
-        meets via isExplored), then the influence→envoy accrual (flat rate + the
+        within meetRange of the CS center; TS gates meeting on isExplored for
+        every seat, but fog is OFF in gated worlds and the GPU models no fog
+        yet, so proximity is the whole rule here), then the influence→envoy accrual (flat rate + the
         adopted government's tier), then the scripted greedy assignment:
         neediest met CS by THIS civ's own envoys, ties to the lowest id, until
         the bank is spent (the envoys*64+id key)."""
@@ -4189,8 +4190,8 @@ class SimSeats:
 
         # international: rows that WANT a route but found no domestic/CS
         # candidate consider a SEAT-0 city — NEAREST-city preference (min hex
-        # distance; ties keep from-asc, city-asc order). Civ seats have no fog,
-        # so seat 0 is always known; civ→civ routes are out of scope.
+        # distance; ties keep from-asc, city-asc order). Fog is off in gated
+        # worlds, so seat 0 is always known; civ→civ routes are out of scope.
         intl_want = want & (kmax < 0)
         C = self.C
         if bool(intl_want.any()) and C > 0:
