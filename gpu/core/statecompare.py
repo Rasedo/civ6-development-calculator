@@ -259,7 +259,7 @@ def _civ_only(plane: str, absent):
     return get
 
 
-def _rr_relation(plane: str, live):
+def _cc_relation(plane: str, live):
     """A civ<->civ [R, R] relation read as a per-seat set of ABSOLUTE
     opponent seats. Seat 0 has no row at all, which is the gap."""
     def get(sim, b, rows):
@@ -323,9 +323,9 @@ SEAT = {
     "beliefFollower": _civ_only("r_follower", -1),
     "beliefFounder": _civ_only("r_founder", -1),
     "beliefEnhancer": _civ_only("r_enhancer", -1),
-    "formalWars": _rr_relation("rr_warkind", lambda v: bool(v)),
-    "denounced": _rr_relation("rr_denounced", lambda v: v >= 0),
-    "allies": _rr_relation("rr_allied", lambda v: bool(v)),
+    "formalWars": _cc_relation("cc_warkind", lambda v: bool(v)),
+    "denounced": _cc_relation("cc_denounced", lambda v: v >= 0),
+    "allies": _cc_relation("cc_allied", lambda v: bool(v)),
 }
 
 

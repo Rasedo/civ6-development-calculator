@@ -246,7 +246,7 @@ class BatchEnv:
             ],
             dim=2,
         ) * s.cs_alive.unsqueeze(2).to(d)  # [B, S, 3] — captured city-states render ZEROS
-        riv = torch.stack(
+        cv = torch.stack(
             [
                 (s.r_alive & s.r_atwar).to(d),
                 s.r_warturns.to(d) / 14.0,
@@ -264,7 +264,7 @@ class BatchEnv:
         # what the full vector buys is PLANNING — a boosted tech several prereqs
         # away should change which branch a policy walks toward now, and masking
         # to the legal frontier would delete exactly that signal.
-        return torch.cat([emp, cs.reshape(B, -1), riv.reshape(B, -1), per_city.reshape(B, -1),
+        return torch.cat([emp, cs.reshape(B, -1), cv.reshape(B, -1), per_city.reshape(B, -1),
                           torch.stack(self._escalators(0, s.techs, s.civics, s.builders_trained,
                                                       # settlerCost counts cities-1 + LIVE + LIVE-QUEUED settlers,
                                                       # the queued count being (current == the settler column)
@@ -304,7 +304,7 @@ class BatchEnv:
             n_mel = (mil & ~rng_t[pt]).sum(dim=1) + (q_mil & ~rng_t[q_ty]).sum(dim=1)
             at_opp = s.r_atwar.any(dim=1) if s.R > 0 else torch.zeros(B, dtype=torch.bool, device=dev)
             # ONE strength formula for every seat — nCities*8 + own-unit
-            # combat, the `_rr_strengths` text.
+            # combat, the `_cc_strengths` text.
             own_str = n_cities * 8 + (s.p_alive.to(torch.long) * s._p_combat[pt]).sum(dim=1)
             z = torch.zeros(B, dtype=d, device=dev)
             return torch.stack([
@@ -335,7 +335,7 @@ class BatchEnv:
         pair_ok = s.alive.unsqueeze(2) & s.rc_alive[:, r].unsqueeze(1)
         prox = torch.where(pair_ok, d_pr, 999).reshape(B, -1).min(dim=1).values
         gang = s.p_warmonger >= s._wm_gang
-        atwar_any = s.r_atwar[:, r] | (s.rr_war[:, r].any(dim=1) if s.R > 0 else torch.zeros(B, dtype=torch.bool, device=dev))
+        atwar_any = s.r_atwar[:, r] | (s.cc_war[:, r].any(dim=1) if s.R > 0 else torch.zeros(B, dtype=torch.bool, device=dev))
         return torch.stack([
             n_cities.to(d), n_units.to(d), n_mel.to(d), n_rng.to(d),
             (n_cities * 2 + torch.where(s.r_atwar[:, r], 3, 1)).to(d),
@@ -473,7 +473,7 @@ class BatchEnv:
                     dim=1,
                 )
             )
-        riv = torch.stack(opp_cols, dim=1)  # [B, R, 3]
+        cv = torch.stack(opp_cols, dim=1)  # [B, R, 3]
         # EFFECTIVE research cost per option — the quantity the decision
         # actually uses, not the boost flag it derives from. Emitting flags
         # would force the policy to apply `boosted ? base*(1-frac) : base`
@@ -484,7 +484,7 @@ class BatchEnv:
         # what the full vector buys is PLANNING — a boosted tech several prereqs
         # away should change which branch a policy walks toward now, and masking
         # to the legal frontier would delete exactly that signal.
-        return torch.cat([emp, cs.reshape(B, -1), riv.reshape(B, -1), per_city.reshape(B, -1),
+        return torch.cat([emp, cs.reshape(B, -1), cv.reshape(B, -1), per_city.reshape(B, -1),
                           torch.stack(self._escalators(r + 1, s.r_techs[:, r], s.r_civics[:, r],
                                                       s.r_builders_trained[:, r] if hasattr(s, "r_builders_trained")
                                                       else torch.zeros(B, dtype=torch.long, device=dev),

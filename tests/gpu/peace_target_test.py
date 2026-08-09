@@ -77,16 +77,16 @@ def scenario(sim):
 
 def run(ranged: bool) -> None:
     sim = build()
-    rv_tile, pl_tile = scenario(sim)
-    v = place(sim, rv_tile, seat0=False)
+    v_tile, pl_tile = scenario(sim)
+    v = place(sim, v_tile, seat0=False)
     p = place(sim, pl_tile, seat0=True)
 
     # civ 0 is AT PEACE with seat 0, and AT WAR with civ 1.
     sim.r_atwar[0, 0] = False
     sim.sync_war()  # close the poke under transpose
     if sim.R > 1:
-        sim.rr_war[0, 0, 1] = True
-        sim.rr_war[0, 1, 0] = True
+        sim.cc_war[0, 0, 1] = True
+        sim.cc_war[0, 1, 0] = True
         sim.sync_war()  # close the poke under transpose
 
     before = int(sim.p_hp[0, p])

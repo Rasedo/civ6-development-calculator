@@ -287,7 +287,7 @@ export const APOSTLE_CAP = 1;
  * theological combat and both were invisible until an apostle existed:
  *
  * 1. STALE OCCUPANCY. A killed unit had `v_alive = False` set but its
- *    occupancy plane (`rvciv_at` / `rv_at`) was never cleared, while TS's
+ *    occupancy plane (`vciv_at` / `vmil_at`) was never cleared, while TS's
  *    `disbandUnit` drops the unit outright. The corpse blocked its tile
  *    FOREVER t87 alive=False hp=0 yet occ363 still read its slot),
  *    rerouting another civ's missionary and costing it a spread.

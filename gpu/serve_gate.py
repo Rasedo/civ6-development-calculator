@@ -531,7 +531,7 @@ def main() -> None:
                                 print(f"  tile {_dt}: owner {int(sim.owner[0, _dt])} tile_seat {int(sim.tile_seat[0, _dt])}"
                                       f" water {bool(sim.water[0, _dt])} imp {int(sim.improvement[0, _dt])}"
                                       f" dist {int(sim.district[0, _dt])} wond {int(sim.built_wonder[0, _dt])}"
-                                      f" rvc {int(sim.rc_at[0, _dt])} pill {bool(sim.pillaged[0, _dt])}"
+                                      f" vc {int(sim.rc_at[0, _dt])} pill {bool(sim.pillaged[0, _dt])}"
                                       f" dpill {bool(sim.district_pillaged[0, _dt])} farm {bool(sim.farm_flat[0, _dt])}"
                                       f" mine {bool(sim.mine_ok[0, _dt])} lumber {bool(sim.lumber_ok[0, _dt])}"
                                       f" res {int(sim.res_imp[0, _dt])}")

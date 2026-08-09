@@ -305,7 +305,7 @@ export function buildRules() {
       // S3: governors — stateless greedy loyalty anchors.
       govCivicsPerTitle: GOV_CIVICS_PER_TITLE,
       govMaxTitles: GOV_MAX_TITLES,
-      rrAllyMinPeace: ALLY_MIN_PEACE, rrWarmongerDow: WARMONGER_DOW, rrWarmongerCapture: WARMONGER_CAPTURE, rrWarmongerGang: WARMONGER_GANG, diplomaticFavorPerSuzerain: DIPLO_FAVOR_PER_SUZERAIN, congressInterval: CONGRESS_INTERVAL, congressMinEra: CONGRESS_MIN_ERA, dvpPerResolution: DVP_PER_RESOLUTION, diploVictoryPoints: DIPLO_VICTORY_POINTS, dedicationPayoutsLive: DEDICATION_PAYOUTS_LIVE, dedMonumentality: DED_MONUMENTALITY, dedFreeInquiry: DED_FREE_INQUIRY, dedPenBrush: DED_PEN_BRUSH_AND_VOICE, dedExodus: DED_EXODUS, heroicDedications: HEROIC_DEDICATIONS, dedEventScore: [...DED_EVENT_SCORE], dedicationFaith: DEDICATION_FAITH, goldenMoveBonus: GOLDEN_MOVE_BONUS, dedicationEraScore: DEDICATION_ERA_SCORE, governorLoyalty: GOVERNOR_LOYALTY,
+      allyMinPeace: ALLY_MIN_PEACE, warmongerDow: WARMONGER_DOW, warmongerCapture: WARMONGER_CAPTURE, warmongerGang: WARMONGER_GANG, diplomaticFavorPerSuzerain: DIPLO_FAVOR_PER_SUZERAIN, congressInterval: CONGRESS_INTERVAL, congressMinEra: CONGRESS_MIN_ERA, dvpPerResolution: DVP_PER_RESOLUTION, diploVictoryPoints: DIPLO_VICTORY_POINTS, dedicationPayoutsLive: DEDICATION_PAYOUTS_LIVE, dedMonumentality: DED_MONUMENTALITY, dedFreeInquiry: DED_FREE_INQUIRY, dedPenBrush: DED_PEN_BRUSH_AND_VOICE, dedExodus: DED_EXODUS, heroicDedications: HEROIC_DEDICATIONS, dedEventScore: [...DED_EVENT_SCORE], dedicationFaith: DEDICATION_FAITH, goldenMoveBonus: GOLDEN_MOVE_BONUS, dedicationEraScore: DEDICATION_ERA_SCORE, governorLoyalty: GOVERNOR_LOYALTY,
     },
     boosts: boostRows,
     // City-state rules (mirrors data/cityStates.ts; covered scope only — the
@@ -407,11 +407,11 @@ export function buildRules() {
       civicEra: civicList.map((c) => Math.max(0, ERAS.indexOf(c.era))),
       warMinTurns: WAR_MIN_TURNS,
       // A-19/B-33 (S2): pairwise civ-seat↔civ-seat DoW/peace gates (zero-draw).
-      rrDowProximity: DOW_PROXIMITY,
-      rrDowStrengthRatio: DOW_STRENGTH_RATIO,
-      rrDowWwMax: DOW_WW_MAX,
-      rrPeaceWw: PEACE_WW,
-      rrFormalMinTurns: FORMAL_WAR_MIN_TURNS, // B-22 (S3)
+      dowProximity: DOW_PROXIMITY,
+      dowStrengthRatio: DOW_STRENGTH_RATIO,
+      dowWwMax: DOW_WW_MAX,
+      peaceWw: PEACE_WW,
+      formalWarMinTurns: FORMAL_WAR_MIN_TURNS, // B-22 (S3)
       // Diplomacy (V-W1): sueForPeace gates on warTurns >= warMinTurns — ONE
       // and costs PEACE_GOLD_COST(warTurns) — exported as its linear params.
       // C1-B3b: research consumers — the production divisor, defense per

@@ -21,7 +21,7 @@ import type { GameState } from '../../../cpu/core/types';
 // Civ 6, where a city's strike picks its target by combat strength and a war
 // suspends the enemy's trade regardless of who the enemy is.
 //
-// The GPU twin for the strike is gpu/rr_strike_test.py (it needs a walled
+// The GPU twin for the strike is tests/gpu/cc_strike_test.py (it needs a walled
 // civ city, which is a fixture-state poke). What is tested here is the
 // PREDICATE both mechanics now share, plus the raid end to end.
 

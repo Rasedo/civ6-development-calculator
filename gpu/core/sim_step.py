@@ -447,8 +447,8 @@ class SimStep:
                     # booleans a dense re-derive would produce.
                     nb_b = self.neigh[best[rows]]  # [n, 6]
                     ok_b = nb_b >= 0
-                    rr_b = rows.unsqueeze(1).expand_as(nb_b)
-                    adj_own[rr_b[ok_b], nb_b[ok_b]] = True
+                    cc_b = rows.unsqueeze(1).expand_as(nb_b)
+                    adj_own[cc_b[ok_b], nb_b[ok_b]] = True
                     cb = self.culture_box[bidx, col]
                     self.culture_box[bidx, col] = torch.where(expand, cb - cost_b, cb)
                     self.tiles_acquired[bidx, col] = self.tiles_acquired[bidx, col] + expand.long()
@@ -485,7 +485,7 @@ class SimStep:
         self.diplo_favor.add_(self._adopted_gov_tier(self.civics) + self._favor_per_suz * self._suzerain_count())
         # Seat 0's grievances decay by 1 each turn at peace with EVERY civ seat
         # (floor 0), immediately after the tourism accumulator. The
-        # +RR_WARMONGER_DOW accrual on declaring has no twin here because no
+        # +WARMONGER_DOW accrual on declaring has no twin here because no
         # declare-war grievance path reaches seat 0; the CAPTURE accrual does
         # mirror, in _capture_civ_city.
         self.p_warmonger.copy_(torch.where(

@@ -478,7 +478,7 @@ _MUTABLE = [
     "cs_quest_district",
     "cs_last_levy",  # levy cooldown
     "influence",
-    "rr_warkind", "rr_denounced", "rr_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "seat_ext", "cty_prod_bank",
+    "cc_warkind", "cc_denounced", "cc_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "seat_ext", "cty_prod_bank",
     "cty_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dest",  # international dest CENTER TILE (>=0), else -1 (domestic/CS) — SEAT-indexed; r_route_dest is the [:, 1:] view

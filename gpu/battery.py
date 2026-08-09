@@ -50,7 +50,7 @@ POKE_COST = {
     "gp_aura": 31.6, "war": 32.5, "purchase": 38.8, "religion2": 51.7,
     "naval": 53.7, "districts": 87.9, "watermill": 12.0, "fort": 6.0,
     "festival": 4.0, "cs_war": 6.0, "snapshot": 30.0, "golden_move": 3.0, "pref_apply": 8.0, "seat_verbs": 10.0, "drive": 60.0,
-    "rr_strike": 12.0,
+    "cc_strike": 12.0,
     "spawn_reclaim": 6.0,
     "city_first": 14.0,
 }
@@ -203,7 +203,7 @@ def main() -> int:
                 ("occupancy", [py, "tests/gpu/occupancy_test.py"], 4),
                 ("domination", [py, "tests/gpu/domination_test.py"], 4),
                 ("peace_target", [py, "tests/gpu/peace_target_test.py"], 2),  # no attack without a war
-                ("rr_strike", [py, "tests/gpu/rr_strike_test.py"], 2),  # a civ city fires on an enemy civ
+                ("cc_strike", [py, "tests/gpu/cc_strike_test.py"], 2),  # a civ city fires on an enemy civ
                 ("spawn_reclaim", [py, "tests/gpu/spawn_reclaim_test.py"], 2),  # a reclaimed slot hands on no drowned unit's MP
                 ("city_first", [py, "tests/gpu/city_first_test.py"], 2),  # a garrison shields no city
                 ("stack_rules", [py, "tests/gpu/stack_rules_test.py"], 2),  # cross-domain stacking + Encampment spawn wall

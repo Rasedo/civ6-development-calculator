@@ -74,7 +74,7 @@ ALIASED: frozenset[str] = frozenset(
     # the three legacy war names are SLICES of `war`. A rebind detaches the
     # relation from the matrix every reader consults, and every gate stays
     # green while the two halves drift apart.
-    + ["r_atwar", "rr_war", "cs_atwar"]
+    + ["r_atwar", "cc_war", "cs_atwar"]
     # the five (civ, city-state) relations — cs_x is row 0 of csr_x and cs_r_x
     # is rows 1.., so a rebind detaches one side of the relation from the
     # other and every gate stays green.

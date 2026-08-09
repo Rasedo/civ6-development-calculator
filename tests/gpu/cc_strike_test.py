@@ -1,6 +1,6 @@
 """A civ city's WALLS fire at an enemy CIV's unit.
 
-    python tests/gpu/rr_strike_test.py
+    python tests/gpu/cc_strike_test.py
 
 In Civ 6 a city with at least Ancient Walls gains a ranged strike, and that
 strike picks the weakest modified-strength unit in range — a rule about combat
@@ -85,8 +85,8 @@ def setup(sim, at_war: bool) -> tuple[int, int]:
     sim.occ_mil[0, tile] = slot + sim.POOL_LO["v"]
     sim.v_next[0] += 1
 
-    sim.rr_war[0, STRIKER, VICTIM] = at_war
-    sim.rr_war[0, VICTIM, STRIKER] = at_war
+    sim.cc_war[0, STRIKER, VICTIM] = at_war
+    sim.cc_war[0, VICTIM, STRIKER] = at_war
     sim.sync_war()
     return slot, tile
 

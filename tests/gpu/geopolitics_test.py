@@ -13,17 +13,17 @@ re-validate and execute; plus _seat_phase and _transfer_rc_to_rc. Thresholds
 come from rules.json (never hardcoded).
 
 Covered:
-  a. Substrate: rr_war/rr_warkind symmetric with a false diagonal; all three
-     pair tensors (incl. the directed rr_denounced) survive snapshot/restore
+  a. Substrate: cc_war/cc_warkind symmetric with a false diagonal; all three
+     pair tensors (incl. the directed cc_denounced) survive snapshot/restore
      (_MUTABLE coverage).
   b. Denounce: strictly-stronger + in-proximity + not-at-war stamps the turn;
      the weaker side never stamps back; a grudge is set ONCE (no re-stamp); an
      at-war pair does not stamp.
-  c. DoW kind: a stamp >= rrFormalMinTurns old makes the war FORMAL; a younger
-     stamp or no stamp is SURPRISE; rr_war writes are symmetric.
-  d. Anti-thrash: a target past rrPeaceWw is never declared on (the same-turn
-     sue-out thrash); a war-weary aggressor (>= rrDowWwMax) opens no front.
-  e. Peace: EITHER side past rrPeaceWw ends the war and clears the FORMAL flag
+  c. DoW kind: a stamp >= formalWarMinTurns old makes the war FORMAL; a younger
+     stamp or no stamp is SURPRISE; cc_war writes are symmetric.
+  d. Anti-thrash: a target past peaceWw is never declared on (the same-turn
+     sue-out thrash); a war-weary aggressor (>= dowWwMax) opens no front.
+  e. Peace: EITHER side past peaceWw ends the war and clears the FORMAL flag
      both directions; the denouncement grudge SURVIVES the peace.
   f. Weariness through the real _seat_phase accrual: a declared but UNFOUGHT
      war accrues nothing and decays at the at-war rate, full peace decays four
@@ -58,8 +58,8 @@ import drive
 # the unwanted intents are dropped so a forced-state case stays isolated.
 def geo_denounce(sim) -> None:
     drive.geo_decide_and_apply(sim)
-    sim._driven_rr_war = None
-    sim._driven_rr_peace = None
+    sim._driven_geo_war = None
+    sim._driven_geo_peace = None
     sim._geo_denounce_and_ally()
 
 
@@ -67,7 +67,7 @@ def geo_declare(sim) -> None:
     drive.geo_decide_and_apply(sim)
     sim._driven_denounce = None
     sim._driven_ally = None
-    sim._driven_rr_peace = None
+    sim._driven_geo_peace = None
     sim._geo_declare_wars()
 
 
@@ -75,7 +75,7 @@ def geo_peace(sim) -> None:
     drive.geo_decide_and_apply(sim)
     sim._driven_denounce = None
     sim._driven_ally = None
-    sim._driven_rr_war = None
+    sim._driven_geo_war = None
     sim._geo_make_peace()
 
 
@@ -89,10 +89,10 @@ def build(rules, path, steps: int = 18, dtype=torch.float64):
 
 def clear_pairs(sim):
     """Wipe every pair-war artifact so a poke starts from a clean matrix."""
-    sim.rr_war[:] = False
+    sim.cc_war[:] = False
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
-    sim.rr_warkind[:] = False
-    sim.rr_denounced[:] = -1
+    sim.cc_warkind[:] = False
+    sim.cc_denounced[:] = -1
     sim.ww[:] = 0
     sim.r_atwar[:] = False
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
@@ -136,21 +136,21 @@ def poke_substrate(rules, path):
     """a. Pair-matrix shape/symmetry + _MUTABLE snapshot/restore coverage."""
     sim = build(rules, path)
     R = sim.R
-    assert sim.rr_war.dtype == torch.bool and sim.rr_warkind.dtype == torch.bool
-    assert sim.rr_denounced.dtype == torch.long
+    assert sim.cc_war.dtype == torch.bool and sim.cc_warkind.dtype == torch.bool
+    assert sim.cc_denounced.dtype == torch.long
     diag = torch.arange(R)
-    assert not bool(sim.rr_war[0, diag, diag].any()), "rr_war diagonal must stay false"
-    assert bool((sim.rr_war[0, :R, :R] == sim.rr_war[0, :R, :R].T).all()), "organic rr_war must be symmetric"
-    assert bool((sim.rr_warkind[0, :R, :R] == sim.rr_warkind[0, :R, :R].T).all()), "organic rr_warkind must be symmetric"
+    assert not bool(sim.cc_war[0, diag, diag].any()), "cc_war diagonal must stay false"
+    assert bool((sim.cc_war[0, :R, :R] == sim.cc_war[0, :R, :R].T).all()), "organic cc_war must be symmetric"
+    assert bool((sim.cc_warkind[0, :R, :R] == sim.cc_warkind[0, :R, :R].T).all()), "organic cc_warkind must be symmetric"
 
     snap = sim.snapshot()
-    w0, k0, d0 = sim.rr_war.clone(), sim.rr_warkind.clone(), sim.rr_denounced.clone()
-    sim.rr_war[:] = True
+    w0, k0, d0 = sim.cc_war.clone(), sim.cc_warkind.clone(), sim.cc_denounced.clone()
+    sim.cc_war[:] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
-    sim.rr_warkind[:] = True
-    sim.rr_denounced[:] = 7
+    sim.cc_warkind[:] = True
+    sim.cc_denounced[:] = 7
     sim.restore(snap)
-    assert bool((sim.rr_war == w0).all()) and bool((sim.rr_warkind == k0).all()) and bool((sim.rr_denounced == d0).all()), (
+    assert bool((sim.cc_war == w0).all()) and bool((sim.cc_warkind == k0).all()) and bool((sim.cc_denounced == d0).all()), (
         "pair tensors must round-trip snapshot/restore (_MUTABLE)"
     )
     print("  a substrate OK (bool/bool/long, false diagonal, symmetric, snapshot-covered)")
@@ -161,78 +161,78 @@ def poke_denounce(rules, path):
     sim, _, _ = controlled_pair(rules, path)
     t = int(sim.turn)
     geo_denounce(sim)
-    assert int(sim.rr_denounced[0, 0, 1]) == t, "stronger civ 0 must stamp its grudge with the current turn"
-    assert int(sim.rr_denounced[0, 1, 0]) == -1, "the strictly-weaker side must never stamp back"
+    assert int(sim.cc_denounced[0, 0, 1]) == t, "stronger civ 0 must stamp its grudge with the current turn"
+    assert int(sim.cc_denounced[0, 1, 0]) == -1, "the strictly-weaker side must never stamp back"
 
-    sim.rr_denounced[0, 0, 1] = 3  # grudge persistence: set once, never re-stamped
+    sim.cc_denounced[0, 0, 1] = 3  # grudge persistence: set once, never re-stamped
     geo_denounce(sim)
-    assert int(sim.rr_denounced[0, 0, 1]) == 3, "an existing grudge must not be re-stamped"
+    assert int(sim.cc_denounced[0, 0, 1]) == 3, "an existing grudge must not be re-stamped"
 
-    sim.rr_denounced[0, 0, 1] = -1
-    sim.rr_war[0, 0, 1] = sim.rr_war[0, 1, 0] = True  # at-war pairs skip
+    sim.cc_denounced[0, 0, 1] = -1
+    sim.cc_war[0, 0, 1] = sim.cc_war[0, 1, 0] = True  # at-war pairs skip
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     geo_denounce(sim)
-    assert int(sim.rr_denounced[0, 0, 1]) == -1, "an at-war pair must not denounce"
+    assert int(sim.cc_denounced[0, 0, 1]) == -1, "an at-war pair must not denounce"
     print("  b denounce OK (turn-stamped, directed, once, war-gated)")
 
 
 def poke_dow_kind(rules, path):
-    """c. DoW FORMAL iff the aggressor's stamp is >= rrFormalMinTurns old."""
+    """c. DoW FORMAL iff the aggressor's stamp is >= formalWarMinTurns old."""
     sim, _, _ = controlled_pair(rules, path)
-    fmin = int(sim.rules.seats.get("rrFormalMinTurns", 5))
+    fmin = int(sim.rules.seats.get("formalWarMinTurns", 5))
     t = int(sim.turn)
 
-    sim.rr_denounced[0, 0, 1] = t - fmin  # exactly at the bar -> FORMAL
+    sim.cc_denounced[0, 0, 1] = t - fmin  # exactly at the bar -> FORMAL
     geo_declare(sim)
-    assert bool(sim.rr_war[0, 0, 1]) and bool(sim.rr_war[0, 1, 0]), "DoW must write rr_war symmetrically"
-    assert bool(sim.rr_warkind[0, 0, 1]) and bool(sim.rr_warkind[0, 1, 0]), "an old-grudge war must be FORMAL"
+    assert bool(sim.cc_war[0, 0, 1]) and bool(sim.cc_war[0, 1, 0]), "DoW must write cc_war symmetrically"
+    assert bool(sim.cc_warkind[0, 0, 1]) and bool(sim.cc_warkind[0, 1, 0]), "an old-grudge war must be FORMAL"
 
     clear_pairs(sim)
-    sim.rr_denounced[0, 0, 1] = t - (fmin - 1)  # one turn too fresh -> SURPRISE
+    sim.cc_denounced[0, 0, 1] = t - (fmin - 1)  # one turn too fresh -> SURPRISE
     geo_declare(sim)
-    assert bool(sim.rr_war[0, 0, 1]) and not bool(sim.rr_warkind[0, 0, 1]), "a fresh-grudge war must be SURPRISE"
+    assert bool(sim.cc_war[0, 0, 1]) and not bool(sim.cc_warkind[0, 0, 1]), "a fresh-grudge war must be SURPRISE"
 
     clear_pairs(sim)  # no grudge at all -> SURPRISE
     geo_declare(sim)
-    assert bool(sim.rr_war[0, 0, 1]) and not bool(sim.rr_warkind[0, 0, 1]), "a no-grudge war must be SURPRISE"
+    assert bool(sim.cc_war[0, 0, 1]) and not bool(sim.cc_warkind[0, 0, 1]), "a no-grudge war must be SURPRISE"
     print(f"  c DoW kind OK (FORMAL at stamp age >= {fmin}, else SURPRISE; symmetric writes)")
 
 
 def poke_anti_thrash(rules, path):
     """d. The two DoW guards: weary target, weary aggressor."""
     sim, _, _ = controlled_pair(rules, path)
-    peace_ww = int(sim.rules.seats.get("rrPeaceWw", 10))
-    ww_max = int(sim.rules.seats.get("rrDowWwMax", 6))
+    peace_ww = int(sim.rules.seats.get("peaceWw", 10))
+    ww_max = int(sim.rules.seats.get("dowWwMax", 6))
 
     sim.ww[0, 2, 1] = peace_ww + 1  # target would sue out the same turn
     geo_declare(sim)
-    assert not bool(sim.rr_war[0, 0, 1]), "a target past rrPeaceWw must never be declared on (same-turn thrash)"
+    assert not bool(sim.cc_war[0, 0, 1]), "a target past peaceWw must never be declared on (same-turn thrash)"
 
     clear_pairs(sim)
     sim.ww[0, 1, 2] = ww_max  # war-weary aggressor opens no front
     geo_declare(sim)
-    assert not bool(sim.rr_war[0, 0, 1]), "an aggressor at rrDowWwMax must not declare"
+    assert not bool(sim.cc_war[0, 0, 1]), "an aggressor at dowWwMax must not declare"
     print(f"  d anti-thrash OK (target ww > {peace_ww} skipped; aggressor ww >= {ww_max} inert)")
 
 
 def poke_peace(rules, path):
     """e. Peace on EITHER side's weariness; kind clears, grudge survives."""
     sim, _, _ = controlled_pair(rules, path)
-    peace_ww = int(sim.rules.seats.get("rrPeaceWw", 10))
-    sim.rr_war[0, 0, 1] = sim.rr_war[0, 1, 0] = True
+    peace_ww = int(sim.rules.seats.get("peaceWw", 10))
+    sim.cc_war[0, 0, 1] = sim.cc_war[0, 1, 0] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
-    sim.rr_warkind[0, 0, 1] = sim.rr_warkind[0, 1, 0] = True
-    sim.rr_denounced[0, 0, 1] = 2
+    sim.cc_warkind[0, 0, 1] = sim.cc_warkind[0, 1, 0] = True
+    sim.cc_denounced[0, 0, 1] = 2
 
     sim.ww[0, 1, 2] = peace_ww  # at the bar, not past -> war persists
     geo_peace(sim)
-    assert bool(sim.rr_war[0, 0, 1]), "peace must not fire AT the threshold (strictly greater)"
+    assert bool(sim.cc_war[0, 0, 1]), "peace must not fire AT the threshold (strictly greater)"
 
     sim.ww[0, 1, 2] = peace_ww + 1
     geo_peace(sim)
-    assert not bool(sim.rr_war[0, 0, 1]) and not bool(sim.rr_war[0, 1, 0]), "peace must clear rr_war both directions"
-    assert not bool(sim.rr_warkind[0, 0, 1]) and not bool(sim.rr_warkind[0, 1, 0]), "the ended war's FORMAL flag must clear"
-    assert int(sim.rr_denounced[0, 0, 1]) == 2, "the denouncement grudge must SURVIVE the peace"
+    assert not bool(sim.cc_war[0, 0, 1]) and not bool(sim.cc_war[0, 1, 0]), "peace must clear cc_war both directions"
+    assert not bool(sim.cc_warkind[0, 0, 1]) and not bool(sim.cc_warkind[0, 1, 0]), "the ended war's FORMAL flag must clear"
+    assert int(sim.cc_denounced[0, 0, 1]) == 2, "the denouncement grudge must SURVIVE the peace"
     print(f"  e peace OK (fires past ww {peace_ww}, either side; kind cleared, grudge kept)")
 
 
@@ -250,7 +250,7 @@ def poke_ww_differential(rules, path):
 
     # a war DECLARED is not a war FOUGHT: under the per-battle model a fresh war
     # with no battle in it costs both sides NOTHING.
-    sim.rr_war[0, 0, 1] = sim.rr_war[0, 1, 0] = True  # SURPRISE (kind False)
+    sim.cc_war[0, 0, 1] = sim.cc_war[0, 1, 0] = True  # SURPRISE (kind False)
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     snap = sim.snapshot()
     sim._seat_phase()
@@ -270,7 +270,7 @@ def poke_ww_differential(rules, path):
     # FORMAL vs SURPRISE picks the era COLUMN, not a multiplier; at Ancient the
     # two columns are equal (16 = 16).
     sim.restore(snap)
-    sim.rr_warkind[0, 0, 1] = sim.rr_warkind[0, 1, 0] = True  # FORMAL
+    sim.cc_warkind[0, 0, 1] = sim.cc_warkind[0, 1, 0] = True  # FORMAL
     formal = int(sim._ww_era_base(torch.tensor([1]), torch.tensor([2]))[0])
     sim.restore(snap)
     surprise = int(sim._ww_era_base(torch.tensor([1]), torch.tensor([2]))[0])
@@ -280,7 +280,7 @@ def poke_ww_differential(rules, path):
 
     # full peace drains four times faster than a phoney war
     sim.restore(snap)
-    sim.rr_war[0, 0, 1] = sim.rr_war[0, 1, 0] = False
+    sim.cc_war[0, 0, 1] = sim.cc_war[0, 1, 0] = False
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     sim.ww[0, 1, 2] = at_peace + 3
     sim._seat_phase()
@@ -288,7 +288,7 @@ def poke_ww_differential(rules, path):
 
     # the seat-0 war axis behaves identically — weariness is not seat-dependent
     sim.restore(snap)
-    sim.rr_war[0, 0, 1] = sim.rr_war[0, 1, 0] = False
+    sim.cc_war[0, 0, 1] = sim.cc_war[0, 1, 0] = False
     sim.r_atwar[0, 0] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     sim.ww[0, 1, 0] = at_war + 11
@@ -349,7 +349,7 @@ def poke_transfer(rules, path):
 def poke_float32(rules, path):
     """h. A float32 build steps 30 turns with the pair machinery live."""
     sim = build(rules, path, steps=30, dtype=torch.float32)
-    assert sim.rr_war.dtype == torch.bool and sim.rr_warkind.dtype == torch.bool and sim.rr_denounced.dtype == torch.long
+    assert sim.cc_war.dtype == torch.bool and sim.cc_warkind.dtype == torch.bool and sim.cc_denounced.dtype == torch.long
     print("  h float32 dtype OK (30 turns, pair tensors dtype-stable, no walk crash)")
 
 

@@ -163,14 +163,14 @@ export interface SeatActionRecord {
   levy?: number | null;
   /** #107 GEOPOLITICS — targets are CIV indices, 0-based (seat = index+1),
    * the same index space as the observation's civ block. `denounce`:
-   * grudge stamps this turn. `ally` / `rrPeace` name a PAIR and ride the
+   * grudge stamps this turn. `ally` / `geoPeace` name a PAIR and ride the
    * LOWER civ index's record (the applying arm writes both sides).
-   * `rrWar`: the one civ↔civ declaration. Every arm re-validates its
+   * `geoWar`: the one civ↔civ declaration. Every arm re-validates its
    * rules; the choosing thresholds are the driver's policy. */
   denounce?: number[];
   ally?: number[];
-  rrWar?: number | null;
-  rrPeace?: number[];
+  geoWar?: number | null;
+  geoPeace?: number[];
 }
 
 /** turn -> SEAT id -> that seat's record. Seat 0 is a key like any other. */
@@ -406,7 +406,7 @@ export interface Seat {
    *
    * The GPU's twin is one symmetric `war[b, i, j]` matrix over its own compact
    * seat index. Neither engine reads the other; both flatten their storage
-   * into the `rrWarMask` trace column (bit i = the i-th civ above seat 0) and
+   * into the `geoWarMask` trace column (bit i = the i-th civ above seat 0) and
    * the gate compares those numbers, so the BIT ORDER is what has to agree.
    */
   wars: number[];

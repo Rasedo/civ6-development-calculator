@@ -72,7 +72,7 @@ def split(obs: torch.Tensor, n_cs: int, n_civs: int, n_cities: int,
     emp = obs[:, :i]
     cs = obs[:, i:i + PER_CS * n_cs].reshape(b, n_cs, PER_CS)
     i += PER_CS * n_cs
-    riv = obs[:, i:i + PER_CIV * n_civs].reshape(b, n_civs, PER_CIV)
+    cv = obs[:, i:i + PER_CIV * n_civs].reshape(b, n_civs, PER_CIV)
     i += PER_CIV * n_civs
     city = obs[:, i:i + PER_CITY * n_cities].reshape(b, n_cities, PER_CITY)
     i += PER_CITY * n_cities
@@ -90,7 +90,7 @@ def split(obs: torch.Tensor, n_cs: int, n_civs: int, n_cities: int,
     ctx = obs[:, i:i + CTX_SEAT]  # raw decide-time scalars
     i += CTX_SEAT
     assert i == obs.shape[1], f"observation width {obs.shape[1]} != layout {i}"
-    return {"empire": emp, "cs": cs, "civ": riv, "city": city,
+    return {"empire": emp, "cs": cs, "civ": cv, "city": city,
             "escalators": esc, "costTech": boost_t, "costCivic": boost_c,
             "ctx": ctx}
 

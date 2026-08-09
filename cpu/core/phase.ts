@@ -1123,7 +1123,7 @@ export function seatPhase(state: GameState, seat: number): void {
   for (const actor of state.seats) {
     if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
     const recG = state.seatActions?.[state.turn - 1]?.[actor.seat];
-    const tj = recG?.rrWar;
+    const tj = recG?.geoWar;
     if (tj === undefined || tj === null || tj < 0) continue;
     const target = seatOf(state, tj + 1);
     if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
@@ -1839,7 +1839,7 @@ export function seatPhase(state: GameState, seat: number): void {
   for (const actor of state.seats) {
     if (!isCiv(actor.seat)) continue;
     const recG = state.seatActions?.[state.turn - 1]?.[actor.seat];
-    for (const tj of recG?.rrPeace ?? []) {
+    for (const tj of recG?.geoPeace ?? []) {
       const target = seatOf(state, tj + 1);
       if (!target || !isCiv(target.seat)) continue;
       if (!civsAtWar(state, actor.seat, target.seat)) continue;

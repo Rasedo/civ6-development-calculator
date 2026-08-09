@@ -55,7 +55,7 @@ def scaffold_p0(sim):
 
 def radius3_usable(sim, center, exclude=()):
     """On-map tiles within radius 3 of center that _place_district_civ's elig
-    would accept BUT for ownership: d_usable, empty (district/wonder/rvcity/
+    would accept BUT for ownership: d_usable, empty (district/wonder/civ centre/
     improvement all clear), not the center."""
     ds = sim.pair_dist[center]
     out = []

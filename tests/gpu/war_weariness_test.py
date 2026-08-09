@@ -36,7 +36,7 @@ def build():
     for _ in range(20):
         sim.step()
     sim.r_atwar[:] = False
-    sim.rr_war[:] = False
+    sim.cc_war[:] = False
     sim.sync_war()  # close the pokes under transpose
     sim.ww[:] = 0
     sim.ww_turn[:] = -1

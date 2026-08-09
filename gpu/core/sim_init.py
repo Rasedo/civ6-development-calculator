@@ -287,11 +287,11 @@ class SimInit:
         self.register_alias("r_aggression", lambda sim: sim.civ_aggression[:, 1:])
         # The seat-0/civ vector and the civ/civ block are SLICES of the war
         # matrix (allocated in `_alloc_war` above), not tensors of their own:
-        # `r_atwar[b, r]` and `rr_war[b, i, j]` address the matrix's own memory.
+        # `r_atwar[b, r]` and `cc_war[b, i, j]` address the matrix's own memory.
         self.r_atwar = self.war[:, 0, 1:1 + r_pad]
         self.register_alias("r_atwar", lambda sim: sim.war[:, 0, 1:1 + max(sim.R, 1)])
-        self.rr_war = self.war[:, 1:1 + r_pad, 1:1 + r_pad]
-        self.register_alias("rr_war", lambda sim: sim.war[:, 1:1 + max(sim.R, 1), 1:1 + max(sim.R, 1)])
+        self.cc_war = self.war[:, 1:1 + r_pad, 1:1 + r_pad]
+        self.register_alias("cc_war", lambda sim: sim.war[:, 1:1 + max(sim.R, 1), 1:1 + max(sim.R, 1)])
 
         # ------------------------------------------------------------------
         # PER-SEAT SCALARS. One `civ_x [B, 1+R]` plane per fact, addressed
@@ -329,17 +329,17 @@ class SimInit:
             [[float(cv.get("treasury", 0.0)) for cv in f["civs"] if int(cv["seat"]) > 0][:r_pad]
              + [0.0] * max(0, r_pad - (len(f["civs"]) - 1))
              for f in fixtures], dtype=dtype, device=device))
-        # Per-PAIR casus belli. rr_warkind[b, i, j] = the (i, j) civ/civ war is
-        # FORMAL (denounced >= rrFormalMinTurns earlier); False = SURPRISE
-        # (default). Symmetric, only meaningful where rr_war. rr_denounced[b, i,
+        # Per-PAIR casus belli. cc_warkind[b, i, j] = the (i, j) civ/civ war is
+        # FORMAL (denounced >= formalWarMinTurns earlier); False = SURPRISE
+        # (default). Symmetric, only meaningful where cc_war. cc_denounced[b, i,
         # j] = the turn i denounced j (a directed grudge, -1 = none, never
         # reset). Both start empty (no civ/civ war exists at t0), so there is no
         # exporter load. _MUTABLE for snapshot/restore.
-        self.rr_warkind = torch.zeros(B, r_pad, r_pad, dtype=torch.bool, device=device)
-        self.rr_denounced = torch.full((B, r_pad, r_pad), -1, dtype=torch.long, device=device)
+        self.cc_warkind = torch.zeros(B, r_pad, r_pad, dtype=torch.bool, device=device)
+        self.cc_denounced = torch.full((B, r_pad, r_pad), -1, dtype=torch.long, device=device)
         # civ/civ ALLIANCES, symmetric. Allies never declare war on each other;
         # a denouncement or a war breaks it.
-        self.rr_allied = torch.zeros_like(self.rr_denounced, dtype=torch.bool)
+        self.cc_allied = torch.zeros_like(self.cc_denounced, dtype=torch.bool)
         # World Congress sessions held.
         self.congress_sessions = torch.zeros(B, dtype=torch.long, device=device)
         # Per-seat era-score accumulator on unified civ ids (col 0 = seat 0,
@@ -356,11 +356,11 @@ class SimInit:
             for c, v in enumerate(esi[: 1 + r_pad]):
                 self.era_score[b, c] = int(v)
         _er = rules.eras
-        self._rr_ally_min_peace = int((rules.seats.get("eras") or {}).get("rrAllyMinPeace", 30))
+        self._cc_ally_min_peace = int((rules.seats.get("eras") or {}).get("allyMinPeace", 30))
         _er2 = rules.seats.get("eras") or {}
-        self._wm_dow = int(_er2.get("rrWarmongerDow", 4))
-        self._wm_cap = int(_er2.get("rrWarmongerCapture", 3))
-        self._wm_gang = int(_er2.get("rrWarmongerGang", 6))
+        self._wm_dow = int(_er2.get("warmongerDow", 4))
+        self._wm_cap = int(_er2.get("warmongerCapture", 3))
+        self._wm_gang = int(_er2.get("warmongerGang", 6))
         self._favor_per_suz = int(_er2.get("diplomaticFavorPerSuzerain", 1))
         # The WORLD CONGRESS schedule + victory threshold.
         self._congress_interval = int(_er2.get("congressInterval", 30))
@@ -1633,7 +1633,7 @@ class SimInit:
         The absolute space is sparse — a dense 201x201 per game would be 40KB —
         so `_seat_row` maps absolute seat -> row in one gather.
 
-        Allocated BEFORE `r_atwar` / `rr_war` / `cs_atwar`, which are slices of
+        Allocated BEFORE `r_atwar` / `cc_war` / `cs_atwar`, which are slices of
         it rather than tensors beside it."""
         self.NS = 1 + r_pad + s_pad + 1
         self.BARB_ROW = 1 + r_pad + s_pad
@@ -1674,14 +1674,14 @@ class SimInit:
     def sync_war(self) -> None:
         """Close the war matrix under TRANSPOSE.
 
-        A write through `r_atwar` / `rr_war` / `cs_atwar` lands in one cell of
+        A write through `r_atwar` / `cc_war` / `cs_atwar` lands in one cell of
         the matrix; the mirror cell of the pair still has to be written.
 
         The UPPER triangle is authoritative and is mirrored down. Deliberately
         NOT an OR: a write that makes PEACE clears one cell, and ORing the
         transpose back in would hand the war straight over again. All three
         names live in the upper triangle — row 0 for r_atwar/cs_atwar, the a<b
-        half for rr_war. Idempotent; call it as often as you like."""
+        half for cc_war. Idempotent; call it as often as you like."""
         w = self.war
         keep = torch.triu(
             torch.ones(self.NS, self.NS, dtype=torch.bool, device=w.device), diagonal=1
@@ -1693,7 +1693,7 @@ class SimInit:
 
         Checked every step under CIV6_ALIAS_CHECK=1."""
         w = self.war
-        # r_atwar / rr_war / cs_atwar ARE the matrix, so there is no separate
+        # r_atwar / cc_war / cs_atwar ARE the matrix, so there is no separate
         # store to cross-check against. SYMMETRY is the property code can
         # break: every write through one of those names touches one cell of a
         # pair, and the mirror has to be written too.

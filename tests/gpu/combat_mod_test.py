@@ -198,15 +198,15 @@ def test_integrated(sim, p, code, name) -> None:
                 continue
             has_b = int(sim.barb_at[0, nt]) >= 0
             has_pm = int(sim.pmil_at[0, nt]) >= 0
-            rvs = int(sim.vmil_at[0, nt])
-            has_rv = rvs >= 0
-            rvc = int(sim.v_civ[0, rvs]) if has_rv else -1
+            vms = int(sim.vmil_at[0, nt])
+            has_vm = vms >= 0
+            vc = int(sim.v_civ[0, vms]) if has_vm else -1
             if civ_def:
                 atwar = bool(sim.r_atwar[0, dciv])
                 hostile = has_b or (has_pm and atwar)
-                friendly = has_rv and rvc == dciv
+                friendly = has_vm and vc == dciv
             else:  # barbarian defender: any non-barb military is hostile
-                hostile = has_pm or has_rv
+                hostile = has_pm or has_vm
                 friendly = has_b
             if hostile and nt != here:  # exclude the attacker (seat-0 mil at here)
                 flank += 1

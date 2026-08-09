@@ -162,9 +162,9 @@ class SimEconomy:
         civics = self.civ_civics.gather(1, civ.view(-1, 1, 1).expand(-1, 1, C)).squeeze(1)
         era = self._civ_era(techs, civics).clamp(0, formal.numel() - 1)
         rr = (row >= 1) & (row <= self.R) & (foe_row >= 1) & (foe_row <= self.R)
-        n = self.rr_warkind.shape[1]
+        n = self.cc_warkind.shape[1]
         flat = (row.clamp(1, max(n, 1)) - 1) * n + (foe_row.clamp(1, max(n, 1)) - 1)
-        kind = self.rr_warkind.reshape(self.B, -1).gather(1, flat.unsqueeze(1)).squeeze(1) & rr
+        kind = self.cc_warkind.reshape(self.B, -1).gather(1, flat.unsqueeze(1)).squeeze(1) & rr
         return torch.where(kind, formal[era], surprise[era])
 
     def _ww_battle(self, hit: torch.Tensor, a_row, d_row, tile: torch.Tensor,
@@ -216,9 +216,9 @@ class SimEconomy:
             # too, and unowned ground is foreign. `friendlyLand`'s twin.
             _own = owner == self._ROW_SEAT.gather(0, self_row.clamp(min=0))
             _rr = (self_row >= 1) & (self_row <= self.R) & (owner >= 1) & (owner <= self.R)
-            _n = self.rr_allied.shape[1]
+            _n = self.cc_allied.shape[1]
             _fl = (self_row.clamp(1, max(_n, 1)) - 1) * _n + (owner.clamp(1, max(_n, 1)) - 1)
-            _ally = self.rr_allied.reshape(self.B, -1).gather(1, _fl.unsqueeze(1)).squeeze(1) & _rr
+            _ally = self.cc_allied.reshape(self.B, -1).gather(1, _fl.unsqueeze(1)).squeeze(1) & _rr
             at_home = (_own | _ally) & (not city)
             gain = base * torch.where(at_home, 1, abroad)
             if died is not None:
@@ -622,11 +622,11 @@ class SimEconomy:
         if er_rows:
             rows = torch.cat(er_rows)
             nb = self.neigh[torch.cat(er_volc)]  # [R, 6]
-            rr6 = rows.unsqueeze(1).expand(-1, 6).reshape(-1)
+            row6 = rows.unsqueeze(1).expand(-1, 6).reshape(-1)
             nbf = nb.reshape(-1)
             on = nbf >= 0
-            self._scorch(rr6[on], nbf[on])
-            self._fertilize_counted(rr6[on], nbf[on])
+            self._scorch(row6[on], nbf[on])
+            self._fertilize_counted(row6[on], nbf[on])
 
         r = self._next_random(every)
         hit, tile = self._pick_static(r < 0.02, self._droughtc_list)
@@ -634,11 +634,11 @@ class SimEconomy:
             rows = hit.nonzero(as_tuple=True)[0]
             area = tiles_from_offsets(tile[rows], self._off2, self.W, self.H)  # [R, 19]
             M = area.shape[1]
-            rrm = rows.unsqueeze(1).expand(-1, M).reshape(-1)
+            rowm = rows.unsqueeze(1).expand(-1, M).reshape(-1)
             af = area.reshape(-1)
-            on = (af >= 0) & ~self.water[rrm, af.clamp(min=0)]
+            on = (af >= 0) & ~self.water[rowm, af.clamp(min=0)]
             flat = self.drought.reshape(-1)
-            gi = rrm[on] * self.T + af[on]
+            gi = rowm[on] * self.T + af[on]
             flat.scatter_reduce_(0, gi, torch.full_like(gi, 8), reduce="amax")
 
         r = self._next_random(every)
@@ -647,12 +647,12 @@ class SimEconomy:
             rows = hit.nonzero(as_tuple=True)[0]
             area = tiles_from_offsets(tile[rows], self._off1, self.W, self.H)  # [R, 7]
             M = area.shape[1]
-            rrm = rows.unsqueeze(1).expand(-1, M).reshape(-1)
+            rowm = rows.unsqueeze(1).expand(-1, M).reshape(-1)
             af = area.reshape(-1)
             valid = af >= 0
-            self._scorch(rrm[valid], af[valid])  # a storm scorches its whole area
-            on = valid & self.desert[rrm, af.clamp(min=0)]
-            self._fertilize(rrm[on], af[on])  # ...and deposits silt on desert tiles
+            self._scorch(rowm[valid], af[valid])  # a storm scorches its whole area
+            on = valid & self.desert[rowm, af.clamp(min=0)]
+            self._fertilize(rowm[on], af[on])  # ...and deposits silt on desert tiles
 
     def _buildable(self, include_worship: bool = False) -> torch.Tensor:
         """[B, C, NB] buildings each city could queue now: unlocked (tech), not

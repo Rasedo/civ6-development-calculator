@@ -42,7 +42,7 @@ class SimPhase:
             # War weariness SETTLES here: accrual happens per BATTLE as the
             # fighting resolves, so what is left for the block top is the
             # decay. The same function every seat calls, on this civ's row.
-            # rr_war is fixed for the turn by the phase-top declaration pass,
+            # cc_war is fixed for the turn by the phase-top declaration pass,
             # so the "at war with somebody" test inside is stable.
             self._ww_decay(r + 1, active)
             # Eurekas/inspirations from this seat — the TS twin runs at the
@@ -924,16 +924,16 @@ class SimPhase:
                     & self.r_atwar[:, r].unsqueeze(1)
                 )
                 # An adjacent AT-WAR civ seat's unit (military or civilian)
-                # besieges this city too — the symmetric unitsHostile. rr_war[:,
+                # besieges this city too — the symmetric unitsHostile. cc_war[:,
                 # r] is gathered by the neighbour's civ index, read straight off
                 # its seat; own-civ units (== r) never besiege.
-                rvn = torch.where((_ha_s > 0) & (_ha_s != BARB_SEAT), _ha_m, torch.full_like(_ha_m, -1))
-                rvcn = torch.where((_ha_cs > 0) & (_ha_cs != BARB_SEAT), _ha_c, torch.full_like(_ha_c, -1))
-                rvn_civ = torch.where(rvn >= 0, _ha_s - 1, torch.full_like(rvn, -1))
-                rvcn_civ = torch.where(rvcn >= 0, _ha_cs - 1, torch.full_like(rvcn, -1))
-                war_rvn = (rvn >= 0) & (rvn_civ != r) & self.rr_war[:, r].gather(1, rvn_civ.clamp(min=0))
-                war_rvcn = (rvcn >= 0) & (rvcn_civ != r) & self.rr_war[:, r].gather(1, rvcn_civ.clamp(min=0))
-                hostile_adj = hostile_adj | war_rvn | war_rvcn
+                vmn = torch.where((_ha_s > 0) & (_ha_s != BARB_SEAT), _ha_m, torch.full_like(_ha_m, -1))
+                vcn = torch.where((_ha_cs > 0) & (_ha_cs != BARB_SEAT), _ha_c, torch.full_like(_ha_c, -1))
+                vmn_civ = torch.where(vmn >= 0, _ha_s - 1, torch.full_like(vmn, -1))
+                vcn_civ = torch.where(vcn >= 0, _ha_cs - 1, torch.full_like(vcn, -1))
+                war_vmn = (vmn >= 0) & (vmn_civ != r) & self.cc_war[:, r].gather(1, vmn_civ.clamp(min=0))
+                war_vcn = (vcn >= 0) & (vcn_civ != r) & self.cc_war[:, r].gather(1, vcn_civ.clamp(min=0))
+                hostile_adj = hostile_adj | war_vmn | war_vcn
                 besieged_j = ((nbh >= 0) & hostile_adj).any(dim=1)
                 self.rc_hp[:, r, j] = torch.where(
                     cact & ~besieged_j, (self.rc_hp[:, r, j] + heal).clamp(max=rr.get("cityMaxHp", 200)), self.rc_hp[:, r, j]
@@ -1068,7 +1068,7 @@ class SimPhase:
             _fav_r = self._adopted_gov_tier(self.r_civics[:, r]) + self._favor_per_suz * self._civ_suzerain_count(r)
             self.r_diplo_favor[:, r] = torch.where(active, self.r_diplo_favor[:, r] + _fav_r, self.r_diplo_favor[:, r])
             # grievances DECAY by 1 per turn at peace, on every axis
-            _at_peace = ~self.r_atwar[:, r] & ~self.rr_war[:, r].any(dim=1)
+            _at_peace = ~self.r_atwar[:, r] & ~self.cc_war[:, r].any(dim=1)
             self.r_warmonger[:, r] = torch.where(
                 active & _at_peace & (self.r_warmonger[:, r] > 0),
                 self.r_warmonger[:, r] - 1,
@@ -1224,15 +1224,15 @@ class SimPhase:
             rf_ = self._next_random(ropen)  # follower first, founder second — the TS draw order
             ro_ = self._next_random(ropen)
             if bool(ropen.any()) and self._bel_any:
-                rrow = ropen.nonzero(as_tuple=True)[0]
+                orow = ropen.nonzero(as_tuple=True)[0]
                 for claimed_m, ids_t, rnd in ((self.fol_claimed, self.r_follower, rf_), (self.fou_claimed, self.r_founder, ro_)):
                     n_open = (~claimed_m).sum(dim=1)
                     k = torch.floor(rnd * n_open.to(torch.float64)).to(torch.long)
                     cum = (~claimed_m).long().cumsum(dim=1)
                     sel = (~claimed_m) & (cum == (k + 1).unsqueeze(1))
                     bid = sel.long().argmax(dim=1)
-                    claimed_m[rrow, bid[rrow]] = True
-                    ids_t[rrow, r] = bid[rrow]
+                    claimed_m[orow, bid[orow]] = True
+                    ids_t[orow, r] = bid[orow]
                 self._bel_version += 1  # follower/founder change -> _bel_add / _belief_feat_plane invalidate
             self.claimed_f_n.add_(ropen.long())
             self.claimed_o_n.add_(ropen.long())
@@ -1289,7 +1289,7 @@ class SimPhase:
             # pea = ~atw_any, so both engines drop the conditional draw in
             # lockstep.
             atw = active & self.r_atwar[:, r]
-            atw_any = atw | (active & self.rr_war[:, r, : self.R].any(dim=1))
+            atw_any = atw | (active & self.cc_war[:, r, : self.R].any(dim=1))
             self.r_warturns[:, r] = self.r_warturns[:, r] + atw.long()
             # This seat's live slots, computed once (deaths only shrink
             # mid-loop; neither loop spawns) — the war AND peace walks reuse it.

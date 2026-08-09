@@ -631,7 +631,7 @@
       "Seat.formalWars"
      ],
      "planes": [
-      "rr_warkind"
+      "cc_warkind"
      ],
      "gap": "casus belli is stored as an [R, R] civ<->civ matrix; there is no seat-0 row, so seat 0's formal wars read empty. The fix is widening it to the war matrix's seat space, the way `war` itself already is."
     },
@@ -642,7 +642,7 @@
       "Seat.denounced"
      ],
      "planes": [
-      "rr_denounced"
+      "cc_denounced"
      ],
      "gap": "[R, R] civ<->civ only, no seat-0 row (see formalWars)."
     },
@@ -653,7 +653,7 @@
       "Seat.allies"
      ],
      "planes": [
-      "rr_allied"
+      "cc_allied"
      ],
      "gap": "[R, R] civ<->civ only, no seat-0 row (see formalWars)."
     }
@@ -1512,7 +1512,7 @@
    },
    {
     "plane": "center_at",
-    "why": "the tile -> city-center index. Derived from cty_center, which is covered."
+    "why": "seat 0's city slot at a centre tile — a cached derived property over centre_slot_at + tile_seat, both covered."
    },
    {
     "plane": "tdef",
@@ -1591,8 +1591,8 @@
     "why": "civ city slot ids; the city join key is the center tile."
    },
    {
-    "plane": "rvcity_at",
-    "why": "which civ's civ city centre sits on a tile — derived from cty_center, which is covered."
+    "plane": "rc_at",
+    "why": "the civ index at a civ centre — a cached derived property over centre_slot_at + tile_seat, both covered."
    },
    {
     "plane": "occ_mil",
