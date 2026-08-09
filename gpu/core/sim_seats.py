@@ -1538,8 +1538,8 @@ class SimSeats:
         # so it cannot drift from civsAtWar, and is built once here.
         # TS asks `routeRaidedAt(state, [origin, dest], seat)`, which walks every
         # unit for EVERY endpoint, so this mask must feed ALL THREE endpoint
-        # scans below — the civ's own cities, a city-state destination, and a
-        # seat-0 city destination.
+        # scans below — the civ's own cities, a city-state destination, and an
+        # international destination (any other major's city).
         _v_host = None
         if self.civ_unit_tile.numel():
             _hv = self.war[:, int(self._seat_row[r + 1]), :].gather(1, self._seat_row[self.civ_unit_seat.clamp(min=0)])  # [B, V]
@@ -1594,29 +1594,50 @@ class SimSeats:
             inc.scatter_add_(1, from_j * 6 + 2, citystate_gold * pc)
             ycol = self._citystate_yidx[:, :S].gather(1, citystate_s)  # [B, K] specialty column per route
             inc.scatter_add_(1, from_j * 6 + ycol, citystate_spec * pc)
-        # international legs: a route to a seat-0 city (civ_only_route_dest = the dest
-        # CENTER TILE, >=0) pays intlGold + dest completed specialty count to
-        # GOLD only. Suspended while at war with seat 0 (destination-seat
-        # interdiction) or while a barbarian prowls within 3 of either endpoint.
+        # international legs: a route to ANY OTHER MAJOR's city
+        # (civ_only_route_dest = the dest CENTER TILE, >=0) pays intlGold +
+        # dest completed specialty count to GOLD only. Suspended while at war
+        # with the DESTINATION seat (interdiction shortcut, the proven seat-0
+        # convention) or while a hostile prowls within 3 of either endpoint.
         rd_i = self.civ_only_route_dest[:, r]  # [B, K] dest center tile (>=0 = intl)
         intl = act & (rd_i >= 0)
         if bool(intl.any()):
+            K_i = rd_i.shape[1]
             dest_tile = rd_i.clamp(min=0)  # [B, K]
-            dest_slot = self.center_at.gather(1, dest_tile)  # [B, K] seat-0 city slot (-1 = gone)
-            valid_dest = dest_slot >= 0
-            # per seat-0-city completed specialty district count [B, C]
+            dest_slot = self.center_at.gather(1, dest_tile)  # [B, K] seat-0 city slot (-1 = none)
+            d_civ = self.civ_city_at.gather(1, dest_tile)  # [B, K] dest CIV index (-1 = none)
+            is_p_dest = dest_slot >= 0
+            is_v_dest = ~is_p_dest & (d_civ >= 0) & (d_civ != r)
+            valid_dest = is_p_dest | is_v_dest
+            # completed specialty districts, tile-keyed once for both dest kinds
             own_spec = (self.district >= 0) & self._is_specialty[self.district.clamp(min=0)] & self.district_complete
+            # per seat-0-city count [B, C]
             p_city_spec = torch.zeros(B, self.C, dtype=torch.long, device=self.device).scatter_add_(
                 1, self.owner.clamp(min=0), (own_spec & (self.tile_seat == 0)).long()
             )  # [B, C]
-            spec_dest = p_city_spec.gather(1, dest_slot.clamp(min=0))  # [B, K]
+            # per civ-dest count: this route's dest city's own tiles (id-keyed
+            # via tile_city — per-seat ids collide across seats, so the civ
+            # index qualifies the match)
+            dcid = self.tile_city.gather(1, dest_tile)  # [B, K] dest city id
+            v_spec = (
+                (own_spec & (self.civ_at >= 0)).unsqueeze(1)
+                & (self.civ_at.unsqueeze(1) == d_civ.reshape(B, K_i, 1))
+                & (self.tile_city.unsqueeze(1) == dcid.reshape(B, K_i, 1))
+            ).sum(dim=2)  # [B, K]
+            spec_dest = torch.where(is_p_dest, p_city_spec.gather(1, dest_slot.clamp(min=0)), v_spec)
             gold_i = (self._trade_intl_gold + spec_dest).double()
-            # seat-0 arm off: `pays_i` already requires PEACE with seat 0, so a
-            # seat-0 unit term cannot change the answer. A hostile CIV can, and
-            # routeRaidedAt counts one.
-            near_dest = _near_of(dest_tile, seat0_arm=False)
+            # seat-0 arm off for SEAT-0 destinations: `pays_i` already requires
+            # PEACE with seat 0 there, so a seat-0 unit term cannot change the
+            # answer. A CIV-dest leg keeps the seat-0 arm — a seat-0 unit at
+            # war with this civ interdicts like any hostile.
+            near_dest = torch.where(is_p_dest, _near_of(dest_tile, seat0_arm=False), _near_of(dest_tile))
+            atwar_dest = torch.where(
+                is_p_dest,
+                self.civ_only_atwar[:, r].reshape(B, 1).expand(B, K_i),
+                self.civ_pair_war[:, r].gather(1, d_civ.clamp(min=0)),
+            )
             raided_i = near.gather(1, from_j) | near_dest
-            pays_i = act & intl & has_from & valid_dest & ~self.civ_only_atwar[:, r].reshape(B, 1) & ~raided_i
+            pays_i = act & intl & has_from & valid_dest & ~atwar_dest & ~raided_i
             inc.scatter_add_(1, from_j * 6 + 2, gold_i * pays_i.double())
         inc = inc.reshape(B, RC, 6)
         self._seat_route_cache = (key, inc)
@@ -4193,44 +4214,56 @@ class SimSeats:
             self._lay_trade_road(rows, _o, _d)
 
         # international: rows that WANT a route but found no domestic/CS
-        # candidate consider a SEAT-0 city — NEAREST-city preference (min hex
-        # distance; ties keep from-asc, city-asc order). Fog is off in gated
-        # worlds, so seat 0 is always known; civ→civ routes are out of scope.
+        # candidate consider ANY OTHER MAJOR's city whose centre this civ has
+        # EXPLORED (fog is the meeting rule here, as for city-states) —
+        # NEAREST-city preference (min hex distance; ties keep from-asc,
+        # dest-asc in the TS state.seats scan order: seat 0's cities first,
+        # then the other civ seats by id). civ↔civ routes exist since the
+        # geopolitics verbs did; the old civs-cannot-meet descope is dead.
         intl_want = want & (kmax < 0)
         C = self.C
         if bool(intl_want.any()) and C > 0:
-            psite = self.site.clamp(min=0)  # [B, C] seat-0 city center tiles
-            palive = self.alive  # [B, C]
+            dctr_l = [self.site.clamp(min=0)]  # seat 0's centres lead the scan
+            dalv_l = [self.alive]
+            for r2 in range(self.R):
+                if r2 == r:
+                    continue
+                dctr_l.append(self.civ_city_center[:, r2].clamp(min=0))
+                dalv_l.append(self.civ_city_alive[:, r2])
+            dctr = torch.cat(dctr_l, dim=1)  # [B, D] dest centre tiles
+            dalv = torch.cat(dalv_l, dim=1)  # [B, D]
+            D = dctr.shape[1]
             centers = self.civ_city_center[:, r].clamp(min=0)  # [B, RC]
-            d_ip = self.pair_dist[centers.unsqueeze(2), psite.unsqueeze(1)]  # [B, RC, C]
+            d_ip = self.pair_dist[centers.unsqueeze(2), dctr.unsqueeze(1)]  # [B, RC, D]
             rts = self.civ_only_routes[:, r]  # [B, K, 2]
             rd = self.civ_only_route_dest[:, r]  # [B, K]
             act2 = rts[:, :, 0] >= 0  # [B, K]
-            # already-connected: an ACTIVE intl route from rc i to seat-0 tile c
+            # already-connected: an ACTIVE intl route from rc i to dest tile d
             exists_ip = (
                 (rts[:, :, 0].reshape(B, 1, 1, -1) == ids.reshape(B, RC, 1, 1))
-                & (rd.reshape(B, 1, 1, -1) == psite.reshape(B, 1, C, 1))
+                & (rd.reshape(B, 1, 1, -1) == dctr.reshape(B, 1, D, 1))
                 & act2.reshape(B, 1, 1, -1)
-            ).any(dim=3)  # [B, RC, C] (rd is -1 for domestic/CS → never == psite>=0)
+            ).any(dim=3)  # [B, RC, D] (rd is -1 for domestic/CS → never == dctr>=0)
             valid_ip = (
                 alive.unsqueeze(2)
-                & palive.unsqueeze(1)
+                & dalv.unsqueeze(1)
+                & self._explored_at(r + 1, dctr).unsqueeze(1)  # isExplored gate
                 & (d_ip <= self._trade_range)
                 & ~exists_ip
                 & intl_want.reshape(B, 1, 1)
             )
             BIG = 1 << 30
-            dkey = torch.where(valid_ip, d_ip.long(), torch.full((B, RC, C), BIG, dtype=torch.long, device=dev))
-            df = dkey.reshape(B, RC * C)  # i-major = from-asc, dest-city-asc
+            dkey = torch.where(valid_ip, d_ip.long(), torch.full((B, RC, D), BIG, dtype=torch.long, device=dev))
+            df = dkey.reshape(B, RC * D)  # i-major = from-asc, dest-asc (scan order)
             dmin, _ = df.min(dim=1)
-            firsti = torch.where(df == dmin.unsqueeze(1), torch.arange(RC * C, device=dev).reshape(1, -1), torch.full((1, RC * C), RC * C, device=dev)).min(dim=1).values
+            firsti = torch.where(df == dmin.unsqueeze(1), torch.arange(RC * D, device=dev).reshape(1, -1), torch.full((1, RC * D), RC * D, device=dev)).min(dim=1).values
             doi = intl_want & (dmin < BIG)
             if bool(doi.any()):
                 rows = doi.nonzero(as_tuple=True)[0]
-                i_pick = (firsti[rows] // C)
-                c_pick = (firsti[rows] % C)
+                i_pick = (firsti[rows] // D)
+                c_pick = (firsti[rows] % D)
                 from_id = ids[rows, i_pick]
-                dest_tile = psite[rows, c_pick]
+                dest_tile = dctr[rows, c_pick]
                 slot = _free_slot(rows)
                 self.civ_only_routes[rows, r, slot, 0] = from_id
                 self.civ_only_routes[rows, r, slot, 1] = -1  # intl: dest carried in civ_only_route_dest
@@ -4248,13 +4281,19 @@ class SimSeats:
 
     def _expire_seat_routes(self, r: int) -> None:
         """Drop civ r's routes whose expiresTurn has arrived, plus any
-        international route whose destination is no longer a live seat-0 city
-        center (the tradeRoutes filter twin). Consumers gate on active
-        (civ_only_routes[..., 0] >= 0), so this is idempotent per turn."""
+        international route whose destination is no longer a live MAJOR city
+        centre (the tradeRoutes filter twin — seat-0 centres via center_at,
+        civ centres via civ_city_at). Consumers gate on active
+        (civ_only_routes[..., 0] >= 0), so this is idempotent per turn.
+        KNOWN CORNER vs TS: the dest is stored as a TILE, not (seat, city),
+        so a dest CAPTURED by another major still reads as a live centre here
+        while TS's (toSeat, toSeatCity) filter drops the route — closing it
+        needs a route-store schema change (the body-merge slice)."""
         act3 = self.civ_only_routes[:, r, :, 0] >= 0
         expired = act3 & (self.civ_only_route_exp[:, r] >= 0) & (self.civ_only_route_exp[:, r] <= int(self.turn))
         rd3 = self.civ_only_route_dest[:, r]
-        dest_gone = act3 & (rd3 >= 0) & (self.center_at.gather(1, rd3.clamp(min=0)) < 0)
+        rd3c = rd3.clamp(min=0)
+        dest_gone = act3 & (rd3 >= 0) & (self.center_at.gather(1, rd3c) < 0) & (self.civ_city_at.gather(1, rd3c) < 0)
         drop = expired | dest_gone  # [B, K]
         if bool(drop.any()):
             self.civ_only_routes[:, r][drop] = -1
