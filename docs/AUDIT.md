@@ -54,18 +54,22 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   gold = appeal) — so this is now ordinary district plumbing on both
   engines. (The other old A-9 residual, palace relocation on capital
   loss, has since landed: `_relocate_palace` (one body, every seat row).)
-- **A-11r. Trade-route tails.** (1) Seat 0's GPU route machinery:
-  storage is seat-indexed (`seat_routes` / `seat_route_exp` /
-  `seat_route_dest`, row 0 allocated) but the seat-0 rows' gated reach
-  is unproven — measure at the freeze-lift hunt. (2) civ↔civ routes
-  were descoped when civs could not meet each other; that reason is
-  dead (civ↔civ war, denounce and alliance all exist), so the descope
-  is now unjustified. (3) The international leg is gate-unreachable
-  under current decisions (0 routes form in-gate; poke-proven only).
-  (4) No seat's wire carries a trade-route DECISION — route creation is
-  an eager rule; a route verb is P8-surface work. (5) No physical
-  Trader unit — routes lay roads (`layTradeRoad` / `_lay_trade_road`)
-  but nothing walks, so a route cannot be plundered en route.
+- **A-11r. Trade-route tails.** (1) ~~seat-0 machinery~~ LIVE: seat 0
+  picks (`_seat0_trade_phase`, city_seq-rank scan order), earns
+  (`_seat0_route_income` at the cityTradeYields position in
+  `_city_totals`) and expires row 0 — measure REACH at the freeze-lift
+  hunt. (2) ~~civ↔civ descope~~ DEAD: the intl arm routes to ANY other
+  major's EXPLORED city on both engines (fog is the meeting rule).
+  (3) The international leg was gate-unreachable under old decisions —
+  re-measure at the hunt (exploration gating changed the candidate
+  set). (4) No seat's wire carries a trade-route DECISION — route
+  creation is an eager rule; a route verb is P8-surface work. (5) No
+  physical Trader unit — routes lay roads (`layTradeRoad` /
+  `_lay_trade_road`) but nothing walks, so a route cannot be plundered
+  en route. (6) GPU intl dests are stored as TILES, so a dest captured
+  by another major keeps paying until expiry where TS's
+  (toSeat, toSeatCity) filter drops it — route-store schema change,
+  with the body merges.
 - **A-26. Seat-0 mask-policy exclusions have NO TS twin — the last
   per-seat action-surface asymmetries, all GPU-mask-side.** TS
   mechanics are seat-generic everywhere surveyed: `trainableUnits` /

@@ -2111,6 +2111,12 @@ class SimEconomy:
         tier_idx = torch.full_like(self.pop, len(self.rules.amenity_tiers) - 1)
         for i in reversed(range(len(self.rules.amenity_tiers))):
             tier_idx = torch.where(balance >= self.rules.amenity_tiers[i][0], torch.full_like(tier_idx, i), tier_idx)
+        # TRADE — cityTradeYields joins the totals LAST of the addYields
+        # sequence (tiles, districts, buildings, citizens, bonuses, trade),
+        # BEFORE the amenity tier scales the non-food columns.
+        _rt0 = self._seat0_route_income()
+        if _rt0 is not None:
+            total = total + _rt0.to(self.dtype)
         total[:, :, 1:] *= yield_f.unsqueeze(2)  # non-food × amenity factor
         # Government yieldMult AFTER the tier factor — the computeCityStats
         # order (tier.yieldFactor, then the m.yieldMult loop).
