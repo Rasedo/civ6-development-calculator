@@ -201,7 +201,6 @@ export interface GameState {
    *  people are unique individuals, so the denial set is global. Each seat's
    *  own recruits are in `Seat.gpEarned`. */
   claimedGreatPeople: string[];
-  tradeRoutes: TradeRoute[];
   /**
    * Units mode: improvements/chops need real builders, units exist on the
    * map. Off = classic calculator behavior (free instant improvements).
@@ -422,8 +421,10 @@ export interface Seat {
   allies: number[];
   /** This seat's trade routes. `from` is always one of its own city ids;
    *  domestic routes set `to` (own city id), routes to a met city-state set
-   *  `toCs`, and international routes set `toSeatCity` (a city id in the
-   *  destination seat). `expiresTurn` is start + TRADE_ROUTE_DURATION. */
+   *  `toCs`, and international routes set `toSeat` (the destination's
+   *  ABSOLUTE seat id) + `toSeatCity` (a city id in that seat).
+   *  `expiresTurn` is start + TRADE_ROUTE_DURATION. The ONE route store,
+   *  whatever the seat — seat 0's routes are seats[0]'s list. */
   tradeRoutes?: { from: number; to?: number; toCs?: number; toSeat?: number; toSeatCity?: number; expiresTurn?: number }[];
 }
 
@@ -497,9 +498,6 @@ export interface CityState extends Seat {
   /** The seats that have MET this city-state — one store, whatever the seat.
    *  Contact is a precondition for envoys, trade and quests. */
   met: number[];
-  quest: CityStateQuest | null;
-  /** Turn the current quest was issued (for reissue pacing). */
-  questIssuedTurn: number;
   /** Turns elapsed since seat 0 declared on this city-state; gates when
    *  peace may be offered. */
   cityStateWarTurns?: number;
@@ -507,11 +505,12 @@ export interface CityState extends Seat {
   hp?: number;
   /** Turn of seat 0's last militaristic levy here (cooldown). */
   lastLevyTurn?: number;
-  /** The per-seat quest, indexed by civ index. The kind is the first
+  /** The per-seat quest, keyed by ABSOLUTE SEAT (index 0 = seat 0, r+1 =
+   *  civ r — the GPU's seat-row geometry). The kind is the first
    *  satisfiable option in a fixed order, no RNG. */
   seatQuest?: (CityStateQuest | null)[];
   /** Turn each seat's quest was last issued or cleared — the reissue
-   *  cooldown clock, mirroring `questIssuedTurn`. */
+   *  cooldown clock, seat-keyed like `seatQuest`. */
   seatQuestIssuedTurn?: number[];
 }
 

@@ -24,8 +24,6 @@ function addCs(state: GameState, id: number): CityState {
     population: 4,
     envoys: {},
     met: [0],
-    quest: null,
-    questIssuedTurn: 0,
   } as CityState;
   state.cityStates.push(cityState);
   return cityState;

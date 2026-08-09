@@ -9,7 +9,7 @@
 import type { City, DistrictId, GameState, ImprovementId, SeatActionRecord, Seat, Tile, Unit } from './types';
 import { advanceGreatPeople } from './greatPeople';
 import { completeQueueItem } from './production';
-import { revealAround } from './fog';
+import { isExplored, revealAround } from './fog';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { isWater, isImpassable } from '../../world/query';
 import { nextRandom } from './rand';
@@ -24,7 +24,7 @@ import { getModifiers } from './effects';
  // Seat specialist yields
 import { routeYields, cityStateRouteYields, TRADE_ROUTE_RANGE, TRADE_ROUTE_DURATION, tradeCapacity } from './trade';
 import { addEnvoys, hasMet, isSuzerain, issueQuest, questSatisfied, setMet } from './cityStates';
-import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CITY_STATE_MEET_RANGE, QUEST_COOLDOWN, QUEST_ENVOYS } from '../data/cityStates';
+import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS } from '../data/cityStates';
 import { computeAdoption } from './effects';
 import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import type { RuleResult } from './rules';
@@ -655,9 +655,10 @@ export function transferCity(
     loser.cities = loser.cities.filter((c) => c.id !== civCity.id);
     relocatePalace(loser.cities);
     // Routes die with their endpoint (the receiver starts route-less).
+    // Foreign routes INTO this city self-heal at the loop's dead-destination
+    // filter — city ids are per-seat, so no other list can name this one.
     if (loser.tradeRoutes) loser.tradeRoutes = loser.tradeRoutes.filter((x) => x.from !== civCity.id && x.to !== civCity.id);
   }
-  state.tradeRoutes = state.tradeRoutes.filter((x) => x.from !== civCity.id && x.to !== civCity.id);
   // CONQUEST razes at the winner's city cap — the city simply
   // ceases (tiles freed, centre unpaved, no plunder). Loyalty flips stay
   // uncapped. This arm lived only on the seat 0 path; a seat taking a seat
@@ -827,7 +828,10 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
     addEnvoys(cityState, actor.seat, 1);
   }
   const warCol = rec.war;
-  if (warCol !== null && warCol !== undefined && warCol >= 0) {
+  // Self-guard: the war column's target IS seat 0 (the single-axis residual
+  // WAR_COLUMN_SEAT documents), so seat 0's own record can never mean it —
+  // seat 0 declares on civs through the geoWar arm like every seat.
+  if (warCol !== null && warCol !== undefined && warCol >= 0 && actor.seat !== WAR_COLUMN_SEAT) {
     const Rw = state.seats.length - 1;
     if (warCol === 0 && !civsAtWar(state, actor.seat, WAR_COLUMN_SEAT)) {
       setWar(state, actor.seat, WAR_COLUMN_SEAT, true);
@@ -1061,7 +1065,8 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
 }
 
 export function seatPhase(state: GameState, seat: number): void {
-  if (state.seats.length - 1 === 0) return;
+  // No early-out on a civ-less roster: seat 0's OWN turn (economy, upkeep,
+  // diplomacy, quests) runs through the loop below like every seat's.
 
   // Seat units get their movement in this phase (like barbarians).
   // An EMBARKED land unit moves on the flat EMBARK_MOVES pool (not its
@@ -1158,31 +1163,23 @@ export function seatPhase(state: GameState, seat: number): void {
     // research loops below).
     detectBoosts(state, actor.seat);
 
-    // City-state diplomacy from that seat's seat — meet by
-    // PROXIMITY (a city or unit within CITY_STATE_MEET_RANGE; opponents have no fog),
-    // then the seat 0's influence→envoy accrual (cityStatePhase mirror:
-    // flat rate + the adopted government's tier), then the scripted
-    // greedy assignment (neediest met CS by OWN envoys, ties lowest id).
+    // City-state diplomacy — meet, influence→envoy accrual (flat rate +
+    // the adopted government's tier), quests. ONE body for every seat.
     // T1 PERF: this seat's units are invariant from here through the
     // composition count below — no unit spawns/disbands occur in the CS-meet
     // block or the pre-turn count loop (the buy/war/peace loops that DO mutate
-    // the list come later), so one filtered list is shared across the three
-    // uses (CS-meet proximity, unitCount, melee/ranged tally).
+    // the list come later), so one filtered list is shared across the
+    // uses (unitCount, melee/ranged tally).
     const seatUnitList = unitsOf(state, actor.seat);
     {
+      // Meet by EXPLORATION — a city-state is met the moment its centre is
+      // out of this seat's fog. Fog off (or not yet accrued) = instant, so
+      // in a fogless world every seat knows every city-state; with fogOfWar
+      // live, meeting is earned by scouting, the real Civ 6 rule. This
+      // replaced the proximity surrogate when every seat got a fog plane.
       for (const cityState of state.cityStates) {
         if (hasMet(cityState, actor.seat)) continue;
-        const ct = state.map.tiles[cityState.centerIndex];
-        const near =
-          actor.cities.some((civCity) => {
-            const t = state.map.tiles[civCity.centerIndex];
-            return hexDistance(t.col, t.row, ct.col, ct.row) <= CITY_STATE_MEET_RANGE;
-          }) ||
-          seatUnitList.some((u) => {
-            const t = state.map.tiles[u.tileIndex];
-            return hexDistance(t.col, t.row, ct.col, ct.row) <= CITY_STATE_MEET_RANGE;
-          });
-        if (near) {
+        if (isExplored(state, actor.seat, cityState.centerIndex)) {
           setMet(cityState, actor.seat);
           state.eventLog.push(`${actor.name} met the city-state of ${cityState.name}.`);
         }
@@ -1200,34 +1197,31 @@ export function seatPhase(state: GameState, seat: number): void {
         }
       }
 
-      // CIV SEAT city-state quests — the ZERO-DRAW twin of
-      // cityStatePhase's quest loop, at the accrual position (right
-      // after the greedy envoy assignment). Each MET CS keeps ONE quest per
-      // seat (cityState.seatQuest[seat.id]); a satisfied one resolves here
-      // (+QUEST_ENVOYS to THIS seat's envoys — the accrual channel), else a
-      // new one issues on cooldown expiry. The kind is DETERMINISTIC: the
-      // FIRST SATISFIABLE option in the fixed order [clearCamp, buildDistrict,
-      // sendTradeRoute] against this seat's state — NO nextRandom, so the
-      // seat 0 quest path's draw count is untouched (the deferral's stated
-      // risk removed by construction). questIssuedTurn clock defaults to 0
-      // (the GPU civ_only_citystate_quest_issued zeros init) → first issue at turn≥cooldown.
+      // City-state quests — each MET CS keeps ONE quest per seat
+      // (cityState.seatQuest[actor.seat], SEAT-keyed: row 0 is seat 0, the
+      // GPU base geometry); a satisfied one resolves here (+QUEST_ENVOYS to
+      // THIS seat's envoys — the accrual channel), else a new one issues on
+      // cooldown expiry. The kind is DETERMINISTIC: the FIRST SATISFIABLE
+      // option in the fixed order [clearCamp, buildDistrict, sendTradeRoute]
+      // against this seat's state — NO nextRandom. questIssuedTurn clock
+      // defaults to 0 → first issue at turn≥cooldown.
       for (const cityState of state.cityStates) {
         if (!hasMet(cityState, actor.seat)) continue;
         const rq = (cityState.seatQuest ??= []);
         const rqi = (cityState.seatQuestIssuedTurn ??= []);
-        const cur = rq[indexOfSeat(actor.seat)] ?? null;
+        const cur = rq[actor.seat] ?? null;
         if (cur) {
-          if (questSatisfied(state, cityState, cur, seat, { tradeRoutes: actor.tradeRoutes, cities: actor.cities })) {
-            rq[indexOfSeat(actor.seat)] = null;
-            rqi[indexOfSeat(actor.seat)] = state.turn;
+          if (questSatisfied(state, cityState, cur, actor.seat, { tradeRoutes: actor.tradeRoutes, cities: actor.cities })) {
+            rq[actor.seat] = null;
+            rqi[actor.seat] = state.turn;
             addEnvoys(cityState, actor.seat, QUEST_ENVOYS);
             state.eventLog.push(`${cityState.name} quest complete for ${actor.name}: +${QUEST_ENVOYS} envoy.`);
           }
-        } else if (state.turn - (rqi[indexOfSeat(actor.seat)] ?? 0) >= QUEST_COOLDOWN) {
-          const q = issueQuest(state, cityState, seat, { tradeRoutes: actor.tradeRoutes, cities: actor.cities });  // #96: one issuer, every seat
+        } else if (state.turn - (rqi[actor.seat] ?? 0) >= QUEST_COOLDOWN) {
+          const q = issueQuest(state, cityState, actor.seat, { tradeRoutes: actor.tradeRoutes, cities: actor.cities });  // #96: one issuer, every seat
           if (q) {
-            rq[indexOfSeat(actor.seat)] = q;
-            rqi[indexOfSeat(actor.seat)] = state.turn;
+            rq[actor.seat] = q;
+            rqi[actor.seat] = state.turn;
           }
         }
       }
@@ -1436,7 +1430,7 @@ export function seatPhase(state: GameState, seat: number): void {
     {
       const routes = (actor.tradeRoutes ??= []);
       if (routes.length < tradeCapacity(state, actor.seat) && actor.cities.length >= 1) {
-        let best: { from: number; to?: number; toCs?: number; toSeatCity?: number; ySum: number } | null = null;
+        let best: { from: number; to?: number; toCs?: number; toSeat?: number; toSeatCity?: number; ySum: number } | null = null;
         for (const from of actor.cities) {
           const ft = state.map.tiles[from.centerIndex];
           for (const to of actor.cities) {
@@ -1459,30 +1453,34 @@ export function seatPhase(state: GameState, seat: number): void {
           }
         }
         // international: considered AFTER domestic + CS (only when no
-        // domestic/CS candidate exists) — a route to a seat 0 city, gold-heavy
-        // and picked by NEAREST-city preference (min hex distance; ties keep
-        // the first in from-asc, seat 0-city-asc order). Other seats always know
-        // the seat 0 (no fog); seat→seat routes stay descoped (opponents don't
-        // meet each other's cities).
+        // domestic/CS candidate exists) — a route to ANY OTHER major seat's
+        // city whose centre this seat has EXPLORED (fog is the meeting rule
+        // here, as for city-states), gold-heavy and picked by NEAREST-city
+        // preference (min hex distance; ties keep the first in from-asc,
+        // target-seat-asc, city-asc order).
         if (!best) {
-          let bestIntl: { from: number; toSeatCity: number; d: number } | null = null;
+          let bestIntl: { from: number; toSeat: number; toSeatCity: number; d: number } | null = null;
           for (const from of actor.cities) {
             const ft = state.map.tiles[from.centerIndex];
-            for (const pc of seatOf(state, seat)!.cities) {
-              if (routes.some((x) => x.from === from.id && x.toSeatCity === pc.id)) continue;
-              const pt = state.map.tiles[pc.centerIndex];
-              const d = hexDistance(ft.col, ft.row, pt.col, pt.row);
-              if (d > TRADE_ROUTE_RANGE) continue;
-              if (!bestIntl || d < bestIntl.d) bestIntl = { from: from.id, toSeatCity: pc.id, d };
+            for (const other of state.seats) {
+              if (other.seat === actor.seat) continue;
+              for (const pc of other.cities) {
+                if (!isExplored(state, actor.seat, pc.centerIndex)) continue;
+                if (routes.some((x) => x.from === from.id && x.toSeat === other.seat && x.toSeatCity === pc.id)) continue;
+                const pt = state.map.tiles[pc.centerIndex];
+                const d = hexDistance(ft.col, ft.row, pt.col, pt.row);
+                if (d > TRADE_ROUTE_RANGE) continue;
+                if (!bestIntl || d < bestIntl.d) bestIntl = { from: from.id, toSeat: other.seat, toSeatCity: pc.id, d };
+              }
             }
           }
-          if (bestIntl) best = { from: bestIntl.from, toSeatCity: bestIntl.toSeatCity, ySum: 0 };
+          if (bestIntl) best = { from: bestIntl.from, toSeat: bestIntl.toSeat, toSeatCity: bestIntl.toSeatCity, ySum: 0 };
         }
         if (best) {
           const route: { from: number; to?: number; toCs?: number; toSeat?: number; toSeatCity?: number; expiresTurn: number } =
             { from: best.from, expiresTurn: state.turn + TRADE_ROUTE_DURATION };
           if (best.toCs !== undefined) route.toCs = best.toCs;
-          else if (best.toSeatCity !== undefined) { route.toSeat = seat; route.toSeatCity = best.toSeatCity; }
+          else if (best.toSeatCity !== undefined) { route.toSeat = best.toSeat; route.toSeatCity = best.toSeatCity; }
           else route.to = best.to!;
           routes.push(route);
           // The seat route's Trader lays road along its land path.
@@ -1492,18 +1490,18 @@ export function seatPhase(state: GameState, seat: number): void {
             route.toCs !== undefined
               ? state.cityStates.find((c) => c.id === route.toCs)?.centerIndex ?? -1
               : route.toSeatCity !== undefined
-              ? seatOf(state, route.toSeat ?? seat)?.cities.find((c) => c.id === route.toSeatCity)?.centerIndex ?? -1
+              ? seatOf(state, route.toSeat ?? NO_SEAT)?.cities.find((c) => c.id === route.toSeatCity)?.centerIndex ?? -1
               : actor.cities.find((c) => c.id === route.to)?.centerIndex ?? -1;
           if (fromRc && destIdx >= 0) layTradeRoad(state, fromRc.centerIndex, destIdx);
         }
       }
       // duration: after the pick, drop routes whose expiresTurn has
       // arrived — the freed capacity re-picks NEXT turn (zero draws). Also
-      // drop international routes whose seat 0 destination no longer exists.
+      // drop international routes whose destination city no longer exists.
       actor.tradeRoutes = routes.filter(
         (x) =>
           (x.expiresTurn === undefined || x.expiresTurn > state.turn) &&
-          (x.toSeatCity === undefined || (seatOf(state, x.toSeat ?? seat)?.cities ?? []).some((c) => c.id === x.toSeatCity)),
+          (x.toSeatCity === undefined || (seatOf(state, x.toSeat ?? NO_SEAT)?.cities ?? []).some((c) => c.id === x.toSeatCity)),
       );
     }
 
@@ -1829,7 +1827,11 @@ export function seatPhase(state: GameState, seat: number): void {
     } else {
       actor.peaceTurns += 1;
     }
-    if (recU) applySeatUnitOrders(state, actor, recU.units, seat);
+    // Seat 0's units ride the TRIPLES schema and are applied by the driver
+    // pre-endTurn (the GPU steps them at the top of step() the same way);
+    // reading triples as per-unit rows here would dispatch garbage. The one
+    // unit-wire fork left — unify the schema to route it too (#108).
+    if (recU && actor.seat !== 0) applySeatUnitOrders(state, actor, recU.units, seat);
   }
 
   // #107: the civ↔civ PEACE arm — after every seat acted, the pair named

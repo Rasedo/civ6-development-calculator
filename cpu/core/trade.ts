@@ -115,11 +115,13 @@ export function routeRaided(state: GameState, from: City, to: City, seat: number
   return routeRaidedAt(state, [from.centerIndex, to.centerIndex], seat);
 }
 
-/** All trade income for a city (sum of its outgoing, unraided routes). */
+/** All trade income for a city (sum of its outgoing, unraided routes).
+ *  Routes live on the OWNING seat (`Seat.tradeRoutes`) — city ids are
+ *  per-seat, so reading any other seat's list would collide. */
 export function cityTradeYields(state: GameState, city: City): Yields {
   const seat = city.seat;
   const out = emptyYields();
-  for (const route of state.tradeRoutes) {
+  for (const route of seatOf(state, seat)?.tradeRoutes ?? []) {
     if (route.from !== city.id) continue;
     if (route.toCs !== undefined) {
       const cityState = state.cityStates.find((c) => c.id === route.toCs);
@@ -129,10 +131,11 @@ export function cityTradeYields(state: GameState, city: City): Yields {
       continue;
     }
     if (route.toSeat !== undefined) {
-      // international: a seat-0 route to a met seat's city — gold only.
+      // international: a route to another major seat's city — gold only.
       // Suspended while at war with that seat (destination-civ interdiction)
-      // or while hostiles prowl either endpoint.
-      const civSeat = seatOf(state, seatOfIndex(route.toSeat));
+      // or while hostiles prowl either endpoint. `toSeat` is the ABSOLUTE
+      // seat id, the one encoding every store uses.
+      const civSeat = seatOf(state, route.toSeat);
       const civCity = civSeat?.cities.find((c) => c.id === route.toSeatCity);
       if (civSeat && civCity && !civsAtWar(state, civSeat.seat, seat) && !routeRaidedAt(state, [city.centerIndex, civCity.centerIndex], seat)) {
         addYields(out, routeYieldsInternational(state, civCity));
@@ -142,10 +145,10 @@ export function cityTradeYields(state: GameState, city: City): Yields {
     const dest = seatOf(state, seat)!.cities.find((c) => c.id === route.to);
     if (dest && !routeRaided(state, city, dest, seat)) {
       addYields(out, routeYields(state, dest));
-      // Extra yields when the destination city
-      // follows seat 0's religion (religion id 0) — the twin's rule.
+      // Extra yields when the destination city follows the OWNER's
+      // religion (religion ids are seat ids) — the enhancer belief's rule.
       const relT = seatOf(state, seat)!.religion;
-      if (relT?.founded && relT.enhancer && dest.followedReligion === 0) {
+      if (relT?.founded && relT.enhancer && dest.followedReligion === seat) {
         const tr = ENHANCER_BELIEFS[relT.enhancer]?.effects.tradeReligionYields;
         if (tr) addYields(out, tr);
       }
@@ -159,10 +162,11 @@ export function canAddTradeRoute(state: GameState, from: number, to: number, sea
   const a = seatOf(state, seat)!.cities.find((c) => c.id === from);
   const b = seatOf(state, seat)!.cities.find((c) => c.id === to);
   if (!a || !b) return { ok: false, reason: 'No such city.' };
-  if (state.tradeRoutes.length >= tradeCapacity(state, seat)) {
+  const routes = seatOf(state, seat)!.tradeRoutes ?? [];
+  if (routes.length >= tradeCapacity(state, seat)) {
     return { ok: false, reason: `No spare trading capacity (${tradeCapacity(state, seat)} in use).` };
   }
-  if (state.tradeRoutes.some((r) => r.from === from && r.to === to)) {
+  if (routes.some((r) => r.from === from && r.to === to)) {
     return { ok: false, reason: 'That route already runs.' };
   }
   const ta = state.map.tiles[a.centerIndex];
@@ -176,7 +180,7 @@ export function canAddTradeRoute(state: GameState, from: number, to: number, sea
 export function addTradeRoute(state: GameState, from: number, to: number, seat: number): RuleResult {
   const check = canAddTradeRoute(state, from, to, seat);
   if (!check.ok) return check;
-  state.tradeRoutes.push({ from, to, expiresTurn: state.turn + TRADE_ROUTE_DURATION });
+  (seatOf(state, seat)!.tradeRoutes ??= []).push({ from, to, expiresTurn: state.turn + TRADE_ROUTE_DURATION });
   // The route's Trader lays road along its land path.
   layRouteRoad(state, from, seatOf(state, seat)!.cities.find((c) => c.id === to)?.centerIndex ?? -1, seat);
   return { ok: true };
@@ -196,10 +200,11 @@ export function canAddCsTradeRoute(state: GameState, from: number, cityStateId: 
   const cityState = state.cityStates.find((c) => c.id === cityStateId);
   if (!a || !cityState) return { ok: false, reason: 'No such city / city-state.' };
   if (!hasMet(cityState, seat)) return { ok: false, reason: 'You have not met this city-state yet.' };
-  if (state.tradeRoutes.length >= tradeCapacity(state, seat)) {
+  const routes = seatOf(state, seat)!.tradeRoutes ?? [];
+  if (routes.length >= tradeCapacity(state, seat)) {
     return { ok: false, reason: `No spare trading capacity (${tradeCapacity(state, seat)} in use).` };
   }
-  if (state.tradeRoutes.some((r) => r.from === from && r.toCs === cityStateId)) {
+  if (routes.some((r) => r.from === from && r.toCs === cityStateId)) {
     return { ok: false, reason: 'That route already runs.' };
   }
   const ta = state.map.tiles[a.centerIndex];
@@ -213,7 +218,7 @@ export function canAddCsTradeRoute(state: GameState, from: number, cityStateId: 
 export function addCsTradeRoute(state: GameState, from: number, cityStateId: number, seat: number): RuleResult {
   const check = canAddCsTradeRoute(state, from, cityStateId, seat);
   if (!check.ok) return check;
-  state.tradeRoutes.push({ from, to: -1, toCs: cityStateId, expiresTurn: state.turn + TRADE_ROUTE_DURATION });
+  (seatOf(state, seat)!.tradeRoutes ??= []).push({ from, to: -1, toCs: cityStateId, expiresTurn: state.turn + TRADE_ROUTE_DURATION });
   layRouteRoad(state, from, state.cityStates.find((c) => c.id === cityStateId)?.centerIndex ?? -1, seat); // B-23 (#71)
   return { ok: true };
 }
@@ -225,10 +230,11 @@ export function canAddIntlTradeRoute(state: GameState, from: number, seatCiv: nu
   const civSeat = seatOf(state, seatOfIndex(seatCiv));
   const civCity = civSeat?.cities.find((c) => c.id === seatCity);
   if (!a || !civSeat || !civCity) return { ok: false, reason: 'No such city / actor city.' };
-  if (state.tradeRoutes.length >= tradeCapacity(state, seat)) {
+  const routes = seatOf(state, seat)!.tradeRoutes ?? [];
+  if (routes.length >= tradeCapacity(state, seat)) {
     return { ok: false, reason: `No spare trading capacity (${tradeCapacity(state, seat)} in use).` };
   }
-  if (state.tradeRoutes.some((r) => r.from === from && r.toSeat === seatCiv && r.toSeatCity === seatCity)) {
+  if (routes.some((r) => r.from === from && r.toSeat === seatOfIndex(seatCiv) && r.toSeatCity === seatCity)) {
     return { ok: false, reason: 'That route already runs.' };
   }
   const ta = state.map.tiles[a.centerIndex];
@@ -242,7 +248,7 @@ export function canAddIntlTradeRoute(state: GameState, from: number, seatCiv: nu
 export function addIntlTradeRoute(state: GameState, from: number, seatCiv: number, seatCity: number, seat: number): RuleResult {
   const check = canAddIntlTradeRoute(state, from, seatCiv, seatCity, seat);
   if (!check.ok) return check;
-  state.tradeRoutes.push({ from, to: -1, toSeat: seatCiv, toSeatCity: seatCity, expiresTurn: state.turn + TRADE_ROUTE_DURATION });
+  (seatOf(state, seat)!.tradeRoutes ??= []).push({ from, to: -1, toSeat: seatOfIndex(seatCiv), toSeatCity: seatCity, expiresTurn: state.turn + TRADE_ROUTE_DURATION });
   layRouteRoad(
     state,
     from,
@@ -252,21 +258,3 @@ export function addIntlTradeRoute(state: GameState, from: number, seatCiv: numbe
   return { ok: true };
 }
 
-/** Duration: drop seat 0's routes whose expiresTurn has arrived; the
- * owner re-picks next turn. Called from endTurn AFTER the turn's production so
- * a route freed this turn is re-pickable next turn (zero draws). */
-export function expireTradeRoutes(state: GameState): void {
-  state.tradeRoutes = state.tradeRoutes.filter(
-    (r) => r.expiresTurn === undefined || r.expiresTurn > state.turn,
-  );
-}
-
-export function removeTradeRoute(state: GameState, index: number): void {
-  state.tradeRoutes.splice(index, 1);
-}
-
-/** Drop routes that exceed capacity (e.g. after loading an edited save). */
-export function enforceTradeCapacity(state: GameState, seat: number): void {
-  const cap = tradeCapacity(state, seat);
-  if (state.tradeRoutes.length > cap) state.tradeRoutes.length = cap;
-}

@@ -948,7 +948,6 @@ function attackCityState(state: GameState, attacker: Unit, cityState: CityState,
 /** Conquest of a city-state: it joins your empire; its envoys die with it. */
 export function captureCityState(state: GameState, cityState: CityState, seat: number): void {
   state.cityStates = state.cityStates.filter((c) => c.id !== cityState.id);
-  state.tradeRoutes = state.tradeRoutes.filter((r) => r.toCs !== cityState.id);
   // A route dies with its endpoint, for whichever seat holds it.
   for (const sx of state.seats) {
     sx.tradeRoutes = sx.tradeRoutes?.filter((x) => x.toCs !== cityState.id);
@@ -1009,7 +1008,6 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
  * MAX_CITIES_PER_SEAT raze rule, routes pruned with the endpoint. */
 export function captureCityStateFor(state: GameState, actor: Seat, cityState: CityState): void {
   state.cityStates = state.cityStates.filter((c) => c.id !== cityState.id);
-  state.tradeRoutes = state.tradeRoutes.filter((r) => r.toCs !== cityState.id);
   for (const sx of state.seats) {
     sx.tradeRoutes = sx.tradeRoutes?.filter((x) => x.toCs !== cityState.id);
   }

@@ -3,6 +3,7 @@ import { cityStateOfSeat, emptySeat, isCityStateSeat, seatOf, seatOfCityState, s
 import { makeState, tileAtCoords } from '../helpers';
 import { createGame, foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
 import { canFoundCity } from '../../../cpu/core/rules';
+import { seatPhase } from '../../../cpu/core/phase';
 import { borderCandidates, computeCityStats } from '../../../cpu/core/city';
 import { tilesWithin, hexDistance } from '../../../world/hex';
 import { assignEnvoy, cityStatePhase, cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus, envoyBonusDelta, envoysOf, isSuzerain } from '../../../cpu/core/cityStates';
@@ -26,8 +27,6 @@ function addCs(
     population: 3,
     envoys: {},
     met: [0],
-    quest: null,
-    questIssuedTurn: 0,
     ...opts,
   };
   for (const t of tilesWithin(state.map, col, row, 1)) setTileOwner(t, seatOfCityState(cityState.id));
@@ -179,16 +178,16 @@ describe('quests and trade', () => {
     const state = makeState();
     const city = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;
     const cityState = addCs(state, 9, 9);
-    cityState.quest = { kind: 'buildDistrict', district: 'CAMPUS' };
-    cityStatePhase(state, 0);
+    cityState.seatQuest = [{ kind: 'buildDistrict', district: 'CAMPUS' }];
+    seatPhase(state, 0);
     expect(envoysOf(cityState, 0)).toBe(0); // not built yet
     const campus = tileAtCoords(state.map, 6, 5);
     campus.district = 'CAMPUS';
     campus.districtComplete = true;
     city.districts.push({ type: 'CAMPUS', tileIndex: campus.index });
-    cityStatePhase(state, 0);
+    seatPhase(state, 0);
     expect(envoysOf(cityState, 0)).toBe(1);
-    expect(cityState.quest).toBeNull();
+    expect(cityState.seatQuest[0]).toBeNull();
   });
 
   it('routes to city-states pay gold plus their specialty', () => {

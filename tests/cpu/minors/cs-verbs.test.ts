@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { cityStateOfSeat, emptySeat, indexOfSeat, isCityStateSeat, seatOfCityState, seatOfIndex, setTileOwner, setWar, tileSeat, unitsOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
-import { cityStatePhase, envoysOf, isSuzerain, setMet } from '../../../cpu/core/cityStates';
+import { envoysOf, isSuzerain, setMet } from '../../../cpu/core/cityStates';
 import { hexDistance, tilesWithin } from '../../../world/hex';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, QUEST_ENVOYS, QUEST_COOLDOWN, CITY_STATE_TYPE_DISTRICT } from '../../../cpu/data/cityStates';
 import type { CityState, CityStateType, GameState, Seat, City } from '../../../cpu/core/types';
@@ -87,8 +87,6 @@ function addCs(state: GameState, col: number, row: number, opts: Partial<CitySta
     population: 3,
     envoys: {},
     met: [],
-    quest: null,
-    questIssuedTurn: 0,
     ...opts,
   };
   for (const t of tilesWithin(state.map, col, row, 1)) setTileOwner(t, seatOfCityState(cityState.id));
@@ -288,20 +286,20 @@ describe('A-12 (B8-L): SEAT-0 quest draw-count neutrality', () => {
     expect(state.rngState).toBe(rng0);
   });
 
-  it('cityStatePhase issues a seat-0 quest drawing ZERO — the seats share one issuer', () => {
+  it('the seatPhase loop issues a seat-0 quest drawing ZERO — the seats share one issuer', () => {
     // ONE issuer, and it is deterministic: fixed order, with the district
     // keyed to the CS's OWN type. Every seat issues quests without touching
     // the shared PRNG, so quest issuance can never shift a draw count.
     const state = makeState(makeMap(24, 24));
     state.turn = 20;
     const cityState = addCs(state, 16, 10, { type: 'scientific', met: [0] });
-    cityState.questIssuedTurn = state.turn - QUEST_COOLDOWN; // due to issue
+    cityState.seatQuestIssuedTurn = [state.turn - QUEST_COOLDOWN]; // due to issue
     state.barbSeat.camps = [];
     const rng0 = state.rngState;
-    cityStatePhase(state, 0);
-    expect(cityState.quest).not.toBeNull();
+    seatPhase(state, 0);
+    expect(cityState.seatQuest?.[0]).not.toBeNull();
     // scientific -> the type's own district, not a draw from a flat list
-    expect(cityState.quest?.kind).toBe('buildDistrict');
+    expect(cityState.seatQuest?.[0]?.kind).toBe('buildDistrict');
     expect(state.rngState).toBe(rng0); // ZERO draws
   });
 });

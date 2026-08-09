@@ -16,36 +16,32 @@
  */
 import { appendFileSync, writeFileSync } from 'node:fs';
 import type { DistrictId, GameState, Tile } from '../core/types';
-import { allCities, civHasStrategic, civsAtWar, seatOf, tileBelongsTo, tileOwnedByCiv, tileSeat } from '../core/seats';
+import { allCities, civHasStrategic, civsAtWar, seatOf, tileOwnedByCiv, tileSeat } from '../core/seats';
 import { hasRiver, isWater } from '../../world/query';
 import { GOLD_PURCHASE_MULT } from '../data/constants';
 import { PEACE_GOLD_COST } from '../data/seats';
 import { SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
 import { BUY_UNITS } from '../core/phase';
-import { buildingFaithCost, endTurn, goldAffordable, queueBuilding, queueDistrict, queueSettler, setTechResearch, setCivicResearch, settlerCost, tilePurchaseCost } from '../core/game';
-import { queueUnit } from '../core/units';
-import { assignEnvoy, isSuzerain } from '../core/cityStates';
+import { buildingFaithCost, endTurn, goldAffordable, settlerCost, tilePurchaseCost } from '../core/game';
+import { isSuzerain } from '../core/cityStates';
 import { pickBorderTile } from '../core/city';
 import { WORSHIP_BUILDINGS, MISSIONARY_CAP, APOSTLE_CAP, ENHANCER_BELIEFS } from '../data/religion';
 import { LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { applyUnitOrders } from '../core/unitOrders';
 import { observeSeat } from '../core/observe';
 import { stateDigest, groupDump } from '../core/statecompare';
-import { canPlaceDistrict, validImprovementsIn } from '../core/rules';
-import { districtAdjacency } from '../core/yields';
+import { validImprovementsIn } from '../core/rules';
 import { computeUnlocksIn, getModifiers } from '../core/effects';
 import { hexDistance } from '../../world/hex';
 import { prodLayout } from '../core/prodLayout';
 import { UNITS } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 
-/** One seat's decisions for one turn, as they arrive on the wire. */
+/** The slice of seat 0's record the driver still applies itself: unit
+ *  orders in the TRIPLES schema (see the apply site). Every other verb in
+ *  the record routes through the seatPhase loop via state.seatActions. */
 interface Seat0Rec {
-  production?: [number, number][];
-  tech?: number | null;
-  civic?: number | null;
   units?: [number, number, number][];
-  envoys?: number[];
 }
 
 export interface DriverOpts {
@@ -65,13 +61,6 @@ export interface DriverOpts {
 }
 
 /** Play `turns` turns, taking every decision from the server. */
-/**
- * Seat 0's record arrives on the wire like every other seat's, but its
- * ROUTING into `state.seatActions` is not wired yet — the blocks below still
- * read it out separately. That is an unfinished wire, not a rule: the engine
- * gives this seat no standing the others lack.
- */
-const UNROUTED_SEAT = 0;
 
 export async function runDriver(o: DriverOpts): Promise<void> {
   const { state, seed, turns: N_TURNS, cityMax: CITY_MAX, cityStateMax: CITY_STATE_MAX, civMax: CIV_MAX } = o;
@@ -104,14 +93,14 @@ for (let t = 0; t < N_TURNS; t++) {
       // — the gate compares the shared gate, not TS's richer plane.
       const jr0: number[] = [];
       const sr0: number[] = [];
-      const owns0 = (t: Tile) => tileSeat(t) === UNROUTED_SEAT;
-      const unl0 = computeUnlocksIn(seatOf(state, UNROUTED_SEAT)!.research);
+      const owns0 = (t: Tile) => tileSeat(t) === 0;
+      const unl0 = computeUnlocksIn(seatOf(state, 0)!.research);
       const jobTiles0 = state.map.tiles.filter((t) =>
         owns0(t) && !isWater(t)
         && (t.pillaged || t.districtPillaged
           || (!t.improvement && validImprovementsIn(t, { unlocks: unl0, ownsTile: owns0, map: state.map }).length > 0)));
       for (const u of state.units) {
-        if (u.seat !== UNROUTED_SEAT) continue;
+        if (u.seat !== 0) continue;
         let jt = -1;
         if (UNITS[u.type]?.charges !== undefined && (u.charges ?? 0) > 0) {
           const ut = state.map.tiles[u.tileIndex];
@@ -128,7 +117,7 @@ for (let t = 0; t < N_TURNS; t++) {
       spreadsMsg['0'] = sr0;
       if (process.env.CIV6_SERVE_DEBUG_JOB0 && state.turn === Number(process.env.CIV6_SERVE_DEBUG_JOB0)) {
         for (const u of state.units) {
-          if (u.seat !== UNROUTED_SEAT) continue;
+          if (u.seat !== 0) continue;
           appendFileSync('.claude/scratchpad/job0_ts.txt', JSON.stringify({
             unit: u.type, tile: u.tileIndex, charges: u.charges ?? null, moves: u.movesLeft,
           }) + String.fromCharCode(10));
@@ -139,7 +128,7 @@ for (let t = 0; t < N_TURNS; t++) {
             ti, terrain: t0d.terrain, elev: t0d.elevation, feature: t0d.feature,
             res: t0d.resource, district: t0d.district, wonder: t0d.wonder,
             builtWonder: t0d.builtWonder, imp: t0d.improvement, pill: t0d.pillaged,
-            owns: tileSeat(t0d) === UNROUTED_SEAT,
+            owns: tileSeat(t0d) === 0,
             valid: validImprovementsIn(t0d, { unlocks: unl0, ownsTile: owns0, map: state.map }),
           }) + String.fromCharCode(10));
         }
@@ -296,7 +285,7 @@ for (let t = 0; t < N_TURNS; t++) {
         // seat 0) is the POLICY gate; the rule body levyUnits has no war
         // test. First eligible CS in order.
         let levyIdx = -1;
-        if (civsAtWar(state, civSeat.seat, UNROUTED_SEAT) && goldAffordable(civSeat.treasury ?? 0, LEVY_GOLD_COST)) {
+        if (civsAtWar(state, civSeat.seat, 0) && goldAffordable(civSeat.treasury ?? 0, LEVY_GOLD_COST)) {
           for (let ci = 0; ci < state.cityStates.length; ci++) {
             const csl = state.cityStates[ci];
             if (csl.type !== 'militaristic') continue;
@@ -315,10 +304,9 @@ for (let t = 0; t < N_TURNS; t++) {
     o.send({ t: state.turn, obs, jobs: jobsMsg, spreads: spreadsMsg, buys: buysMsg });
     const msg = JSON.parse(await o.recv()) as { recs?: Record<string, unknown> };
     if (msg.recs && Object.keys(msg.recs).length) {
-      // The rec keys are SEAT ids; `seatActions` storage is still indexed by
-      // the legacy 0-based civ index (seat - 1) until the great
-      // rename sweeps the planes. Seat-0 records queue here for the
-      // routing slice (held here until seat 0's record is routed too).
+      // The rec keys are SEAT ids and storage is seat-keyed too — the
+      // seatPhase loop reads state.seatActions[turn][actor.seat] for EVERY
+      // seat, 0 included. Only seat 0's unit triples are applied off-loop.
       const bySeat: Record<number, unknown> = {};
       for (const [sid, rec] of Object.entries(msg.recs)) {
         bySeat[Number(sid)] = rec;
@@ -327,73 +315,25 @@ for (let t = 0; t < N_TURNS; t++) {
       seat0rec = (msg.recs as Record<string, Seat0Rec | undefined>)['0'] ?? null;
     }
   }
-  if (seat0rec?.envoys) {
-    // Seat 0's ENVOY picks off the wire (CS slot indices, the
-    // seat records' own convention) through the same assignEnvoy — met
-    // and availability re-validated inside it, refusals soft on both
-    // engines. #100: the scripted greedy fallback is DELETED — a seat
-    // with no record assigns nothing, like every other verb.
-    for (const cityStateIdx of seat0rec.envoys) {
-      const cs0 = state.cityStates[cityStateIdx];
-      if (cs0) assignEnvoy(state, cs0.id, UNROUTED_SEAT);
-    }
+  if (seat0rec?.units) {
+    // UNITS only — the ONE seat-0 verb still applied off-loop. Seat 0's unit
+    // orders ride the TRIPLES schema ([tile, action, civilianFlag]); the
+    // seatPhase walkers read per-unit ROWS, so routing them there means
+    // unifying the unit wire first (#108). Position is load-bearing: the GPU
+    // steps seat-0 units at the top of step(), before the production
+    // section's district scan reads tile.improvement — a same-turn build
+    // must precede the scan on BOTH engines. rangedActive mirrors
+    // _rl_ranged_active (constant True).
+    applyUnitOrders(state, seat0rec.units, true, o.improvementIds as unknown as string[], 0);
   }
-  if (seat0rec) {
-    // SEAT 0 DRIVEN: the wire's picks apply through the same queue
-    // functions; the scripted chain below stands down entirely. Base
-    // classes v1 (the scripted seat 0's own expressiveness); the
-    // wonder/project/purchase arms port with the replay dispatch next.
-    // UNITS FIRST — the rollout replayer's proven order (the GPU steps units at the
-    // top of step(), before the production section's district scan reads
-    // tile.improvement; a same-turn build must precede the scan on BOTH
-    // engines). rangedActive mirrors _rl_ranged_active (constant True).
-    if (seat0rec.units) applyUnitOrders(state, seat0rec.units, true, o.improvementIds as unknown as string[], UNROUTED_SEAT);
-    const pl0 = prodLayout();
-    for (const [centre0, a0] of (seat0rec.production ?? [])) {
-      const city = seatOf(state, UNROUTED_SEAT)!.cities.find((c) => c.centerIndex === centre0);
-      if (!city || city.queue.length > 0 || a0 < 0) continue;
-      if (a0 < pl0.NB) {
-        const bid0 = pl0.buildings[a0];
-        if (bid0) queueBuilding(state, city.id, bid0, 0);
-      } else if (a0 === pl0.NB) {
-        queueSettler(state, city.id, 0);
-      } else if (a0 >= pl0.NB + 2 && a0 < pl0.NB + 2 + pl0.NU) {
-        const uid0 = pl0.units[a0 - pl0.NB - 2];
-        if (uid0) queueUnit(state, city.id, uid0, UNROUTED_SEAT);
-      } else if (a0 >= pl0.NB + 2 + pl0.NU && a0 < pl0.NB + 2 + pl0.NU + o.scaffoldDistricts.length) {
-        // the replay's own placement scan: best floor(adjacency), ties
-        // lowest tile, canPlaceDistrict re-validated live.
-        const did0 = o.scaffoldDistricts[a0 - pl0.NB - 2 - pl0.NU].id;
-        // VERBATIM the rollout replayer's proven arm (9018 t63: my floored scan with
-        // an explicit tiebreak picked 860 where the proven raw-adjacency
-        // first-wins scan and the GPU picked 817 — one placement rule,
-        // copied not paraphrased).
-        let best0 = -1;
-        let bestAdj0 = -1;
-        for (const tile of state.map.tiles) {
-          if (!tileBelongsTo(tile, city) || tile.improvement) continue;
-          if (!canPlaceDistrict(state, city, did0, tile.index).ok) continue;
-          const adj0 = districtAdjacency(state.map, tile, did0);
-          if (adj0 > bestAdj0) {
-            bestAdj0 = adj0;
-            best0 = tile.index;
-          }
-        }
-        if (best0 >= 0) queueDistrict(state, city.id, did0, best0, 0);
-      }
-    }
-    if (seat0rec.tech != null && o.techList[seat0rec.tech]) setTechResearch(state, o.techList[seat0rec.tech].id, 0);
-    if (seat0rec.civic != null && o.civicList[seat0rec.civic]) setCivicResearch(state, o.civicList[seat0rec.civic].id, 0);
-  }
-  // (#51 deletions: the scripted production chain and the scripted builder
-  // walker are GONE — every UNROUTED_SEAT-0 verb arrives on the wire; a turn with no
-  // rec-0 queues nothing, and the trace compare names any drift.)
+  // Every OTHER seat-0 verb (production, tech, civic, envoys, buys, geo) is
+  // consumed by the seatPhase loop from state.seatActions like every seat's.
   // CIV6_EXPORT_DEBUG=<seed>: narrate that seed's turn events for diagnosis.
   const evBefore = state.eventLog.length;
   endTurn(state, 0);
   if (process.env.CIV6_EXPORT_DEBUG === String(seed)) {
     for (const line of state.eventLog.slice(evBefore)) console.log(`t${state.turn - 1} ${line}`);
-    console.log(`t${state.turn - 1} cities=${seatOf(state, UNROUTED_SEAT)!.cities.length} pop=${seatOf(state, UNROUTED_SEAT)!.cities.map((c) => c.population).join(',')}`);
+    console.log(`t${state.turn - 1} cities=${seatOf(state, 0)!.cities.length} pop=${seatOf(state, 0)!.cities.map((c) => c.population).join(',')}`);
   }
   // #105 (owner override): the TRACE is DELETED — the state-compare digest
   // IS the per-turn comparison, always on.

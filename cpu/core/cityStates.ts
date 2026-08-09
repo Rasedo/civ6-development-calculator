@@ -12,13 +12,12 @@ import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from '../../world/hex';
 import { isWater, isImpassable, hasFreshWater } from '../../world/query';
 import { nextRandom } from './rand';
-import { isExplored } from './fog';
 import type { RuleResult } from './rules';
 import { WAR_MIN_TURNS } from '../data/seats';
 import { TERRAINS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_BUILDINGS, CITY_STATE_NAMES, CITY_STATE_MAX_HP, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_LIVE, CITY_STATE_SUZERAIN_YIELD, SUZERAIN_ENVOYS, QUEST_COOLDOWN, QUEST_ENVOYS, GOV_INFLUENCE_TIER, CITY_STATE_TYPE_DISTRICT } from '../data/cityStates';
+import { CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_BUILDINGS, CITY_STATE_NAMES, CITY_STATE_MAX_HP, CITY_STATE_CAPITAL_BONUS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_LIVE, CITY_STATE_SUZERAIN_YIELD, SUZERAIN_ENVOYS, CITY_STATE_TYPE_DISTRICT } from '../data/cityStates';
 import { warWearinessPeace } from './weariness';
 
 const ok: RuleResult = { ok: true };
@@ -100,8 +99,6 @@ export function placeCityStateAt(
     population: 3,
     envoys: {},
     met: [],
-    quest: null,
-    questIssuedTurn: 0,
   };
   for (const t of tilesWithin(state.map, tile.col, tile.row, 1)) {
     if (tileSeat(t) === NO_SEAT) setTileOwner(t, seatOfCityState(cityState.id));
@@ -277,7 +274,7 @@ export function questSatisfied(
     case 'clearCamp':
       return quest.campIndex !== undefined && !state.barbSeat.camps.includes(quest.campIndex);
     case 'sendTradeRoute':
-      return (owner ? (owner.tradeRoutes ?? []) : state.tradeRoutes).some((r) => r.toCs === cityState.id);
+      return (owner?.tradeRoutes ?? seatOf(state, seat)?.tradeRoutes ?? []).some((r) => r.toCs === cityState.id);
     case 'buildDistrict':
       return (owner?.cities ?? seatOf(state, seat)!.cities).some((c) =>
         c.districts.some(
@@ -306,7 +303,7 @@ export function issueQuest(
 ): CityStateQuest | null {
   const center = state.map.tiles[cityState.centerIndex];
   const cities = owner?.cities ?? seatOf(state, seat)!.cities;
-  const routes = owner ? (owner.tradeRoutes ?? []) : state.tradeRoutes;
+  const routes = owner?.tradeRoutes ?? seatOf(state, seat)?.tradeRoutes ?? [];
   // clearCamp — the NEAREST camp within range 6, ties to the LOWEST tile
   // index (the deterministic key hexDist*(nTiles+1)+tile).
   let campIndex: number | undefined;
@@ -408,49 +405,15 @@ export function cityStatePhase(state: GameState, seat: number): void {
 
   // Tick the seat 0 <-> city-state war clock — the Seat.warTurns
   // twin. Peace unlocks at WAR_MIN_TURNS (one constant, every seat).
+  // (The single-axis residual: like Seat.warTurns this clock only measures
+  // war against WAR_COLUMN_SEAT; civ <-> CS wars ride the suzerain drag.)
   for (const cityState of state.cityStates) {
     if (civsAtWar(state, cityState.seat, seat)) cityState.cityStateWarTurns = (cityState.cityStateWarTurns ?? 0) + 1;
   }
 
-  // Meeting: fog lifted near their center (or fog off entirely).
-  for (const cityState of state.cityStates) {
-    if (!hasMet(cityState, seat) && isExplored(state, seat, cityState.centerIndex)) {
-      setMet(cityState, seat);
-      state.eventLog.push(`Met the city-state of ${cityState.name} (${cityState.type}).`);
-    }
-  }
-
-  // Influence → envoys (only once someone can receive them).
-  if (state.cityStates.some((cityState) => hasMet(cityState, seat))) {
-    const govNow = seatOf(state, seat)!.government.current;
-    const tier = govNow ? GOV_INFLUENCE_TIER[govNow] ?? 0 : 0;
-    seatOf(state, seat)!.influencePoints += INFLUENCE_PER_TURN + tier;
-    while (seatOf(state, seat)!.influencePoints >= ENVOY_COST) {
-      seatOf(state, seat)!.influencePoints -= ENVOY_COST;
-      seatOf(state, seat)!.envoysAvailable += 1;
-      state.eventLog.push('Earned an envoy.');
-    }
-  }
-
-  // Quests: resolve finished ones, issue new ones on a cooldown.
-  for (const cityState of state.cityStates) {
-    if (!hasMet(cityState, seat)) continue;
-    if (cityState.quest) {
-      if (questSatisfied(state, cityState, cityState.quest, seat)) {
-        cityState.quest = null;
-        cityState.questIssuedTurn = state.turn;
-        addEnvoys(cityState, seat, QUEST_ENVOYS);
-        state.eventLog.push(`${cityState.name} quest complete: +${QUEST_ENVOYS} envoy.`);
-      }
-    } else if (state.turn - cityState.questIssuedTurn >= QUEST_COOLDOWN) {
-      const quest = issueQuest(state, cityState, seat);
-      if (quest) {
-        cityState.quest = quest;
-        cityState.questIssuedTurn = state.turn;
-        state.eventLog.push(`${cityState.name} asks: ${questLabel(quest)}.`);
-      }
-    }
-  }
+  // Seat diplomacy — meets, influence -> envoys, quests — happens in the
+  // seatPhase loop, ONE body for every seat (seat 0 included). This phase
+  // is the city-states' OWN turn only.
 
   // Cosmetic slow growth + siege recovery.
   if (state.turn % 12 === 0) {

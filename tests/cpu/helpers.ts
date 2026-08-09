@@ -51,7 +51,6 @@ export function makeState(map: GameMap = makeMap()): GameState {
     turn: 1,
     sandbox: false,
     claimedGreatPeople: [],
-    tradeRoutes: [],
     unitsMode: false,
     units: [],
     nextUnitId: 0,

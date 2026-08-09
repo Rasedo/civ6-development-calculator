@@ -40,7 +40,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import type { City, CityState, GameState, Seat, Tile, Unit } from './types';
-import { indexOfSeat, prophetsOf } from './seats';
+import { prophetsOf } from './seats';
 import { questFor } from './observe';
 import { envoysOf } from './cityStates';
 import { prodLayout } from './prodLayout';
@@ -366,13 +366,15 @@ const CITY_STATE_G: Record<string, Extractor> = {
     }),
   ),
   questIssued: overCityStates((cityState, st) =>
-    perCiv(st, (seat) => (seat === 0 ? cityState.questIssuedTurn : cityState.seatQuestIssuedTurn?.[indexOfSeat(seat)] ?? 0)),
+    perCiv(st, (seat) => cityState.seatQuestIssuedTurn?.[seat] ?? 0),
   ),
   questCamp: overCityStates((cityState, st) => perCiv(st, (seat) => questFor(cityState, seat)?.campIndex ?? -1)),
-  questDistrict: overCityStates((cityState) => {
-    const d = cityState.quest?.district;
-    return d === undefined ? -1 : PLACEABLE_DISTRICTS.indexOf(d);
-  }),
+  questDistrict: overCityStates((cityState, st) =>
+    perCiv(st, (seat) => {
+      const d = questFor(cityState, seat)?.district;
+      return d === undefined ? -1 : PLACEABLE_DISTRICTS.indexOf(d);
+    }),
+  ),
   lastLevyTurn: overCityStates((cityState) => cityState.lastLevyTurn ?? -LEVY_COOLDOWN),
   warTurns: overCityStates((cityState) => cityState.cityStateWarTurns ?? 0),
 };

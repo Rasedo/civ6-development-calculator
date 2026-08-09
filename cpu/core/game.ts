@@ -4,7 +4,7 @@
  * the end-of-turn loop, and serialization.
  */
 
-import type { City, DistrictId, GameState, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, Unit, Seat } from './types';
+import type { City, DistrictId, GameState, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, Seat } from './types';
 import { greatPeopleEarned } from './greatPeople';
 import { generateMap } from '../../world/mapgen';
 import { tilesWithin, hexDistance } from '../../world/hex';
@@ -12,15 +12,14 @@ import { acquireTile, borderCandidates, citySpecialistSlots } from './city';
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots } from './effects';
 import type { Modifiers, Unlocks } from './effects';
-import { detectBoosts, effectiveResearchCostIn } from './boosts';
-import { spawnUnit, refreshUnits, unitMaintenance, trainableUnits, disbandUnit, builderCost, settlerCount } from './units';
+import { effectiveResearchCostIn } from './boosts';
+import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, builderCost, settlerCount } from './units';
 import { barbarianPhase, encampmentTrainXp } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
 import { placeSeats, seatPhase, worldCongress, nextCityName } from './phase';
 import { commitProduction, commitResearch } from './seatTurn';
-import { expireTradeRoutes } from './trade';
 import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS } from '../data/seats';
 import { addEraScore, eraBoundary, applyDedications, dedicationEvent, goldenBoostBonus } from './eras';
 import { UNITS, WALLS_HP, ENCAMPMENT_HP, CITY_MAX_HP } from '../data/units';
@@ -121,7 +120,6 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     turn: 1,
     sandbox,
     claimedGreatPeople: [],
-    tradeRoutes: [],
     unitsMode,
     units: [],
     nextUnitId: 0,
@@ -130,7 +128,11 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     disasters: false,
     gameOver: false, // GV-2
     victoryType: 0, // GV-4/GV-3
-    fogOfWar: false,
+    // FOG IS LIVE in units mode, for every seat: reveals accrue from the
+    // first spawn (placement happens after creation, so starts are seen),
+    // meets/settling/camp-rise all gate on the explored planes. The classic
+    // calculator (no units) has nothing to scout with — fog stays off.
+    fogOfWar: unitsMode,
     eventLog: [],
     cityStates: [],
     // The seat 0 is seat 0 and holds the SAME shape a seat does.
@@ -176,8 +178,8 @@ function cityName(id: number): string {
 /**
  * THE founding mutation, for every seat.
  *
- * The one asymmetry left inside it is `revealAround`: fog is modelled for a
- * single seat, so only that seat's founding lifts it.
+ * `revealAround` lifts the FOUNDER's fog only — fog is per-seat, and one
+ * seat's founding never scouts for another.
  *
  * The OWNER is PASSED, never re-derived from the seat. An earlier attempt
  * resolved it via `citiesOf(state, seat)`, whose `seatOf(...)?.cities ??
@@ -823,39 +825,17 @@ export function setPolicy(state: GameState, slotIndex: number, policyId: string 
 
 
 export function endTurn(state: GameState, seat: number): void {
-  detectBoosts(state, seat);
-  if (state.unitsMode) refreshUnits(state);
-  // Every seat's turn runs through the SAME body — see `phase.ts:seatPhase`,
-  // which loops the seat roster. Nothing here belongs to one seat.
-
+  // Every seat's turn — boosts, upkeep, bankruptcy, economy, verbs — runs
+  // through ONE body: `phase.ts:seatPhase` loops the seat roster, seat 0
+  // included. Nothing here belongs to one seat; this function only holds
+  // the GLOBAL schedule around that loop.
   if (state.unitsMode) {
-    seatOf(state, seat)!.treasury -= unitMaintenance(state, seat);
-    // bankruptcy: an insolvent treasury disbands ONE unit per turn (Civ 6
-    // rule) — the priciest seat 0 unit, tie -> lowest id (= oldest spawn; a
-    // deterministic order the GPU shares slot-for-slot, both append-only). No
-    // refund; the eased upkeep pulls the treasury back over the next turns.
-    if (Math.round(seatOf(state, seat)!.treasury * 1000) < 0) {
-      // GS: test at milli precision — the treasury accumulates non-dyadic 0.05-unit
-      // gold, so a sub-milli float drift must not spuriously trip < 0 vs the GPU.
-      let victim: Unit | undefined;
-      for (const u of state.units) {
-        if (u.seat !== seat) continue;
-        const m = UNITS[u.type]?.maintenance ?? 0;
-        if (m <= 0) continue;
-        const vm = victim ? UNITS[victim.type]?.maintenance ?? 0 : 0;
-        if (!victim || m > vm || (m === vm && u.id < victim.id)) victim = u;
-      }
-      if (victim) disbandUnit(state, victim.id);
-    }
+    refreshUnits(state);
     barbarianPhase(state, seat);
   }
   if (state.disasters) disasterPhase(state);
   cityStatePhase(state, seat);
   seatPhase(state, seat);
-
-  // duration: expire the seat 0's due trade routes after the turn's
-  // phases — the freed capacity re-picks next turn (arithmetic, zero draws).
-  expireTradeRoutes(state);
 
 
   // Religious pressure spread — after all foundings/settles/flips this
@@ -1132,7 +1112,13 @@ export function deserialize(json: string): GameState {
     t.builtWonder ??= null;
     t.builtWonderComplete ??= false;
   }
-  state.tradeRoutes ??= [];
+  // Routes live on the owning seat now; a legacy save kept seat 0's on the
+  // GameState — fold them in (and drop the dead key so serialize round-trips).
+  const legacyRoutes = (state as unknown as { tradeRoutes?: Seat['tradeRoutes'] }).tradeRoutes;
+  if (legacyRoutes?.length && !state.seats[0]?.tradeRoutes?.length && state.seats[0]) {
+    state.seats[0].tradeRoutes = legacyRoutes;
+  }
+  delete (state as unknown as { tradeRoutes?: unknown }).tradeRoutes;
   state.unitsMode ??= false;
   state.units ??= [];
   state.nextUnitId ??= 0;

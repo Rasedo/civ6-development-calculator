@@ -89,8 +89,6 @@ function addCs(state: GameState, col: number, row: number, type: CityStateType, 
     population: 3,
     envoys: { [0]: envoys },
     met: [0],
-    quest: null,
-    questIssuedTurn: 0,
   };
   for (const t of tilesWithin(state.map, col, row, 1)) setTileOwner(t, seatOfCityState(cityState.id));
   state.cityStates.push(cityState);

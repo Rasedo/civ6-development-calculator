@@ -730,7 +730,6 @@
      "name": "questKind",
      "compare": "exact",
      "covers": [
-      "CityState.quest",
       "CityState.seatQuest",
       "CityStateQuest.kind"
      ],
@@ -742,7 +741,6 @@
      "name": "questIssued",
      "compare": "exact",
      "covers": [
-      "CityState.questIssuedTurn",
       "CityState.seatQuestIssuedTurn"
      ],
      "planes": [
@@ -766,7 +764,7 @@
       "CityStateQuest.district"
      ],
      "planes": [
-      "citystate_quest_district"
+      "seat_citystate_quest_district"
      ],
      "gap": "TS names the asked-for district by DistrictId; the GPU stores an index into the ASKABLE-district subset (`citystate_quest_district`, 0 = CAMPUS). The two are different lists, so the numbers only agree by accident."
     },
@@ -1331,10 +1329,6 @@
    {
     "path": "GameState.plannedSettles",
     "why": "TS's queued auto-found tiles. The GPU expresses the same intent as a static candidate-site table plus `next_site_ptr`. The FOUNDINGS the two produce are compared (the `city` group); the plan behind them is not the same object."
-   },
-   {
-    "path": "GameState.tradeRoutes",
-    "why": "the global mirror of the per-seat routes. `seat.routeCount` compares the count; route CONTENTS are excluded for the reason given on TradeRoute.from."
    },
    {
     "path": "GameMap.width",

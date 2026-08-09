@@ -510,8 +510,6 @@ describe('civ CS trade routes (A-12b)', () => {
       population: 3,
       envoys: {},
       met: [0],
-      quest: null,
-      questIssuedTurn: 0,
       ...opts,
     };
     for (const t of tilesWithin(state.map, col, row, 1)) setTileOwner(t, seatOfCityState(cityState.id)); // placement's territory tags (cityStateAt resolves by tile cityStateId)

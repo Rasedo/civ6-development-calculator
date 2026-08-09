@@ -3,7 +3,7 @@ import { cityStateOfSeat, emptySeat, indexOfSeat, isCityStateSeat, seatOfIndex, 
 import { makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { tilesWithin } from '../../../world/hex';
-import { tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, specialtyDistricts, expireTradeRoutes, TRADE_ROUTE_DURATION, INTL_ROUTE_GOLD } from '../../../cpu/core/trade';
+import { tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, specialtyDistricts, TRADE_ROUTE_DURATION, INTL_ROUTE_GOLD } from '../../../cpu/core/trade';
 import { seatPhase } from '../../../cpu/core/phase';
 import type { City, GameState, Seat } from '../../../cpu/core/types';
 
@@ -136,22 +136,22 @@ describe('B-23 route duration', () => {
     const { state, origin, dest } = twoCitySandbox();
     state.turn = 7;
     expect(addTradeRoute(state, origin.id, dest.id, 0).ok).toBe(true);
-    expect(state.tradeRoutes[0].expiresTurn).toBe(7 + TRADE_ROUTE_DURATION);
+    expect(state.seats[0].tradeRoutes![0].expiresTurn).toBe(7 + TRADE_ROUTE_DURATION);
   });
 
-  it('expireTradeRoutes drops routes at/after expiry, keeps the rest, zero draws', () => {
+  it('the seatPhase loop drops routes at/after expiry, keeps the rest, zero draws', () => {
     const { state, origin, dest } = twoCitySandbox();
     state.turn = 1;
     addTradeRoute(state, origin.id, dest.id, 0); // expires at 1 + DURATION
-    expect(state.tradeRoutes.length).toBe(1);
+    expect(state.seats[0].tradeRoutes!.length).toBe(1);
 
     state.turn = TRADE_ROUTE_DURATION; // still one turn short of expiry
-    expireTradeRoutes(state);
-    expect(state.tradeRoutes.length).toBe(1);
+    seatPhase(state, 0);
+    expect(state.seats[0].tradeRoutes!.length).toBe(1);
 
     state.turn = 1 + TRADE_ROUTE_DURATION; // expiry turn reached
-    expireTradeRoutes(state);
-    expect(state.tradeRoutes.length).toBe(0);
+    seatPhase(state, 0);
+    expect(state.seats[0].tradeRoutes!.length).toBe(0);
   });
 });
 

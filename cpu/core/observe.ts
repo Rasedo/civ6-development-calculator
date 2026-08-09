@@ -11,7 +11,7 @@
  * every seat.
  */
 import type { City, CityState, CityStateQuest, GameState, QueueItem } from './types';
-import { atWarWithAny, citiesOf, civsAtWar, indexOfSeat, isBarbSeat, seatOf, tileCity, tileSeat } from './seats';
+import { atWarWithAny, citiesOf, civsAtWar, isBarbSeat, seatOf, tileCity, tileSeat } from './seats';
 import { seatStrength, seatProximity } from './phase';
 import { WARMONGER_GANG } from '../data/seats';
 import { envoysOf, hasMet } from './cityStates';
@@ -33,10 +33,10 @@ import { CIVICS } from '../data/civics';
  */
 const CTX_PAIR_SEAT = 0;
 
-/** This seat's live quest at a city-state, if any. Seat 0's sits in `quest`;
- *  every other civ's in the per-civ `seatQuest` slot. */
+/** This seat's live quest at a city-state, if any — one seat-keyed store,
+ *  whatever the seat. */
 export function questFor(cityState: CityState, seat: number): CityStateQuest | null {
-  return seat === 0 ? cityState.quest : cityState.seatQuest?.[indexOfSeat(seat)] ?? null;
+  return cityState.seatQuest?.[seat] ?? null;
 }
 
 export function observeSeat(state: GameState, seat: number, cityMax: number, horizon: number, cityStateMax?: number): number[] {
@@ -65,9 +65,8 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
   ];
   // S1(c): FIXED S slots by t0 id, ZEROS when captured (the trace
   // tables' own convention — iterating the live array narrowed the vector
-  // after a CS capture). Each slot renders THE SEAT'S OWN view: seat met
-  // is cityState.seatMet (the envoy-verb plane), envoysOf is seat-keyed already,
-  // and quests are a seat-0-only mechanic (zero for opponents, both engines).
+  // after a CS capture). Each slot renders THE SEAT'S OWN view: met,
+  // envoys and quest are all seat-keyed stores, one row per seat.
   const cityState: number[] = [];
   const nCs = cityStateMax ?? (state.cityStates ?? []).length;
   for (let i = 0; i < nCs; i++) {
