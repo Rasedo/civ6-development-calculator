@@ -11,26 +11,57 @@ from . import simbase  # the PATCHABLE globals (POOL_MAX/SEAT0_POOL_MAX/_ALIAS_C
 
 
 class SimPhase:
-    def _seat_phase(self) -> None:
-        """Runs the civ seats in id order — the seatPhase twin.
+    def _seat_phase(
+        self,
+        production: torch.Tensor | None = None,
+        tech: torch.Tensor | None = None,
+        civic: torch.Tensor | None = None,
+        envoy: torch.Tensor | None = None,
+        war: torch.Tensor | None = None,
+    ) -> None:
+        """Runs EVERY seat in id order — the seatPhase twin. Row 0 (seat 0,
+        driven by the wire arguments) takes its turn first through _seat0_row;
+        the civ rows follow through the loop below, one body each.
 
-        Per civ: queue picks for the pre-turn city set, then per-city economy
-        (yields, growth, queue progress/completion — settlers and units spawn
-        at their own city), border growth, great-people/pantheon/belief races
+        Per seat: ww decay, boosts, CS diplomacy/quests, record picks, the
+        buy ladder, trade, per-city economy (yields, growth, queue progress/
+        completion — settlers and units spawn at their own city), border
+        growth, loyalty, research, upkeep, great-people/pantheon/belief races
         (draws), then war or peace acts with their end-of-branch rolls."""
-        if self.R == 0:
-            return
         rr, B, dev = self.rules.seats, self.B, self.device
-        # Freeze the civ aura MP here: the seatPhase movesLeft reset position,
-        # ahead of any general war-walk, so both engines read the same
-        # pre-move general positions.
-        self._refresh_aura_mp_civ()
-        # The geopolitics arms run BEFORE the per-civ loop — denounce and
+        # Freeze the MAJORS' aura MP here: the seatPhase movesLeft reset
+        # covers every isCiv unit — seat 0's pool included — ahead of any
+        # general war-walk, so both engines read the same pre-move general
+        # positions.
+        if self.units_mode:
+            self._refresh_aura_mp()
+            self._reset_mp("seat0")
+        if self.R > 0:
+            self._refresh_aura_mp_civ()
+        # The geopolitics arms run BEFORE the per-seat loop — denounce and
         # alliance first (a fresh grudge blocks a same-turn alliance and
-        # starts the formal clock), then the civ↔civ declarations (the war
-        # is live for both civs' war-acts this turn); peace at the tail.
-        self._geo_denounce_and_ally()
-        self._geo_declare_wars()
+        # starts the formal clock), then the declarations in ACTOR order
+        # (seat 0's declare arm leads, then the civ↔civ pass — the war is
+        # live for both sides' war-acts this turn); peace at the tail.
+        if self.R > 0:
+            self._geo_denounce_and_ally()
+        # Seat 0 declares through the geo pass like every seat (the rec.war
+        # self-guard's twin: its own war column can never mean itself). The
+        # arm re-validates against the LIVE mask at this position.
+        if war is not None and self._rl_war_active and self.R > 0:
+            w0 = war.to(torch.long)
+            ok0 = self.alive.any(dim=1) & (w0 >= 0) & self.war_mask().gather(1, w0.clamp(min=0).unsqueeze(1)).squeeze(1)
+            decl = ok0 & (w0 < self.R)
+            if bool(decl.any()):
+                oh = torch.nn.functional.one_hot(w0.clamp(min=0, max=self.R - 1), self.R).bool() & decl.unsqueeze(1)
+                self.civ_only_atwar.logical_or_(oh)
+                self.war[:, 1:1 + self.civ_only_atwar.shape[1], 0] |= oh
+                self.civ_only_warturns.copy_(torch.where(oh, torch.zeros_like(self.civ_only_warturns), self.civ_only_warturns))
+        if self.R > 0:
+            self._geo_declare_wars()
+        # ROW 0: seat 0's whole turn, through the same body order as every
+        # civ row below (the TS loop iterates state.seats — seat 0 first).
+        self._seat0_row(production=production, tech=tech, civic=civic, envoy=envoy)
         for r in range(self.R):
             n_cities = self.civ_city_alive[:, r].sum(dim=1)
             active = self.civ_only_alive[:, r] & (n_cities > 0)
@@ -1006,6 +1037,9 @@ class SimPhase:
             # the same way for every seat. Research picks ride the wire.
             rdv = self.rules_dev
             self.civ_only_tech_prog[:, r] = torch.where(active, self.civ_only_tech_prog[:, r] + sci_sum, self.civ_only_tech_prog[:, r])
+            # LIFETIME science — Seat.scienceTotal's twin, beside the stream
+            # add (the same row of seat_science_total seat 0's add writes).
+            self.civ_only_science_total[:, r] = torch.where(active, self.civ_only_science_total[:, r] + sci_sum.to(self.dtype), self.civ_only_science_total[:, r])
             self.civ_only_treasury[:, r] = torch.where(active, self.civ_only_treasury[:, r] + gold_sum, self.civ_only_treasury[:, r])
             self.civ_only_faith[:, r] = torch.where(active, self.civ_only_faith[:, r] + faith_sum, self.civ_only_faith[:, r])
             # Unit upkeep + the bankruptcy rule, identical for every seat:
@@ -1323,9 +1357,28 @@ class SimPhase:
         # load-bearing for R=1 configs.
         self._seat_route_cache = None
 
-        # The civ↔civ PEACE arm runs AFTER every civ acted — the wire
-        # decision at the pass's own tail position.
-        self._geo_make_peace()
+        # The PEACE pass runs AFTER every seat acted, in actor order — seat
+        # 0's sue-for-peace arm leads (the geoPeace pass position), then the
+        # civ↔civ pairs. Re-validated against the LIVE mask; the gold
+        # schedule is the seat-0 war verb's own rule (the TS geoPeace arm
+        # carries no terms — a WAR_COLUMN_SEAT-family residual).
+        if war is not None and self._rl_war_active and self.R > 0:
+            w0p = war.to(torch.long)
+            okp = self.alive.any(dim=1) & (w0p >= 0) & self.war_mask().gather(1, w0p.clamp(min=0).unsqueeze(1)).squeeze(1)
+            pea = okp & (w0p >= self.R)
+            if bool(pea.any()):
+                ri = (w0p - self.R).clamp(min=0, max=self.R - 1)
+                cost = rr.get("peaceGold0", 150) + rr.get("peaceGoldSlope", 10) * self.civ_only_warturns.gather(
+                    1, ri.unsqueeze(1)
+                ).squeeze(1).to(self.dtype)
+                oh = torch.nn.functional.one_hot(ri, self.R).bool() & pea.unsqueeze(1)
+                self.treasury.copy_(torch.where(pea, self.treasury - cost, self.treasury))
+                self.civ_only_atwar.logical_and_(~oh)
+                self.war[:, 1:1 + self.civ_only_atwar.shape[1], 0] &= ~oh
+                self.civ_only_warturns.copy_(torch.where(oh, torch.zeros_like(self.civ_only_warturns), self.civ_only_warturns))
+                self.civ_only_peaceturns.copy_(torch.where(oh, torch.zeros_like(self.civ_only_peaceturns), self.civ_only_peaceturns))
+        if self.R > 0:
+            self._geo_make_peace()
 
     def _apply_loyalty_and_flips(self, tier_idx: torch.Tensor, pop_before: torch.Tensor) -> None:
         """Applies seat-0 loyalty inside the city loop, then the deferred flips.

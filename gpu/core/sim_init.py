@@ -1267,7 +1267,6 @@ class SimInit:
         )
 
         # --- dynamic state ------------------------------------------------------
-        z = lambda *shape, dt=dtype: torch.zeros(*shape, dtype=dt, device=device)
         self.turn = 1
         self.alive[:, 0] = True
         self.pop[:, 0] = 1
@@ -1327,7 +1326,14 @@ class SimInit:
         self.civ_city_prod_bank = self.city_prod_bank[:, 1:1 + max(self.R, 1)]
         self.register_alias("prod_bank", lambda sim: sim.city_prod_bank[:, 0, :sim.C])
         self.register_alias("civ_city_prod_bank", lambda sim: sim.city_prod_bank[:, 1:1 + max(sim.R, 1)])
-        self.science_total = z(B)
+        # LIFETIME science — Seat.scienceTotal on the seat axis (row 0 =
+        # seat 0, rows 1..R the civ seats), accrued beside each row's
+        # techProgress stream add in the seatPhase loop.
+        self.seat_science_total = torch.zeros(B, 1 + max(self.R, 1), dtype=dtype, device=device)
+        self.science_total = self.seat_science_total[:, 0]
+        self.civ_only_science_total = self.seat_science_total[:, 1:1 + max(self.R, 1)]
+        self.register_alias("science_total", lambda sim: sim.seat_science_total[:, 0])
+        self.register_alias("civ_only_science_total", lambda sim: sim.seat_science_total[:, 1:1 + max(sim.R, 1)])
 
         # --- the hostile world: barbarians ----------------------------------------
         self.units_mode = bool(f0.get("unitsMode", 0))

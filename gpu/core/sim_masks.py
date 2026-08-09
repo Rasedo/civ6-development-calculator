@@ -162,10 +162,12 @@ class SimMasks:
 
     # --- eureka detection --------------------------------------------------------
 
-    def _detect_boosts(self) -> None:
-        """Mirrors detectBoosts: flag every satisfied, unresearched,
-        un-boosted condition. Runs where detectBoosts does — the start of
-        the turn, before anything advances."""
+    def _detect_boosts(self, active0: torch.Tensor | None = None) -> None:
+        """Mirrors detectBoosts from seat 0's seat: flag every satisfied,
+        unresearched, un-boosted condition. Runs at row 0's block top in the
+        seatPhase loop (the position every seat shares); `active0` is the TS
+        loop's eliminated-actor continue — a cityless seat 0 detects
+        nothing."""
         pop_sum = None
         for row in self.rules.boosts:
             kind = row["kind"]
@@ -233,6 +235,8 @@ class SimMasks:
                     pred = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             else:
                 continue
+            if active0 is not None:
+                pred = pred & active0
             if row["target"] == "tech":
                 # FREE INQUIRY pays era score per EUREKA — fire only on the rows
                 # where the boost NEWLY lands (the TS `newly` twin).

@@ -1759,6 +1759,10 @@ export function seatPhase(state: GameState, seat: number): void {
     };
     pickNext();
     rsr.techProgress += sciSum;
+    // LIFETIME science — the cultureTotal pattern, beside the stream add.
+    // Every seat accrues (the GPU twin is seat_science_total rows 0..R);
+    // lump grants (applyLumpGrant, goody maps) add to the same field.
+    actor.scienceTotal = (actor.scienceTotal ?? 0) + sciSum;
     // Boosted techs complete at the discounted cost, like the seat 0's
     // advanceResearch (effectiveResearchCostIn — same rounding).
     while (rsr.tech && rsr.techProgress >= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech)) {

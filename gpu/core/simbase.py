@@ -462,7 +462,7 @@ def pool_view(snap: dict, pre: str, plane: str):
 # round-trips.
 _MUTABLE = [
     "workable",
-    "science_total",
+    "seat_science_total",  # science_total / civ_only_science_total are its row views
     "civic_boosted",
     "rng_state", "centre_slot_at", "tdef", "tmove",
     "next_slot", "camp_tile", "n_camps", "game_over",

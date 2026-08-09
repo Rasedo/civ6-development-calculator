@@ -1127,14 +1127,17 @@ class SimEconomy:
         if bool((alloc != 0).any()):
             self._eff_version += 1
 
-    def _advance_great_people(self) -> None:
-        """advanceGreatPeople for seat 0 (runs after research, after seatPhase
-        has claimed): each class accrues 1 + (its district's built buildings)
-        per city owning a completed district of its type, earns the n-th person
-        at gp_costs[n] from the shared gp_earned pool, and applies its effect —
-        science→current tech, culture→current civic, gold→treasury,
-        production→capital build head. Only Campus/Holy Site/Commercial Hub are
-        placeable, so only Scientist/Prophet/Merchant ever accrue."""
+    def _advance_great_people(self, active0: torch.Tensor | None = None) -> None:
+        """advanceGreatPeople for seat 0 — row 0's loop position, after the
+        research tail (the civ rows claimed at their own positions): each
+        class accrues 1 + (its district's built buildings) per city owning a
+        completed district of its type, earns the n-th person at gp_costs[n]
+        from the shared gp_earned pool, and applies its effect — science →
+        current tech, culture → current civic, gold → treasury, production →
+        capital build head. Only Campus/Holy Site/Commercial Hub are
+        placeable, so only Scientist/Prophet/Merchant ever accrue. `active0`
+        is the TS loop's eliminated-actor continue: a cityless seat 0 neither
+        accrues (its district term is already tile-gated) nor claims."""
         if not self.districts_on or self._gp_nc == 0:
             return
         B, C, dev, nCls = self.B, self.C, self.device, self._gp_nc
@@ -1150,6 +1153,8 @@ class SimEconomy:
         # Golden EXODUS — +4 Great PROPHET points per turn, empire-wide.
         if 0 <= self._prophet_cls < self._gp_nc:
             _ex = self._golden_ded(0, self._ded_exodus)
+            if active0 is not None:
+                _ex = _ex & active0
             self.gp_points[:, self._prophet_cls] = (
                 self.gp_points[:, self._prophet_cls] + _ex.to(self.dtype) * 4.0
             )
@@ -1158,6 +1163,8 @@ class SimEconomy:
             earned = self.gp_earned[:, :nCls]
             cost = self._gp_costs[earned.clamp(max=self._gp_costs.shape[0] - 1)]  # [B,nCls] gpCost(earned)
             can = (earned < self._gp_roster[:nCls].unsqueeze(0)) & (self.gp_points >= cost)
+            if active0 is not None:
+                can = can & active0.unsqueeze(1)
             if not bool(can.any()):
                 break
             eff = self._gp_effects[torch.arange(nCls, device=dev).reshape(1, nCls), earned.clamp(max=maxN - 1)]  # [B,nCls,5] (col 4 = faith)

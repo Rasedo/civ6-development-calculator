@@ -1573,14 +1573,18 @@ class SimOrders:
                     ok, torch.full_like(here, p), here, tgt, dirs, 0, civ,
                 )
 
-    def _bankrupt_disband(self) -> None:
+    def _bankrupt_disband(self, active0: torch.Tensor | None = None) -> None:
         """Disband ONE seat-0 unit per turn while the treasury is insolvent.
 
         The priciest alive unit goes; ties break to the lowest slot (= oldest,
         matching TS's lowest id, since both spawn orders are append-only).
         Only upkeep>0 units (military) are candidates, and there is no refund.
+        `active0` is the TS loop's eliminated-actor continue — a cityless
+        seat 0 pays no upkeep and disbands nothing.
         """
         insolvent = js_round(self.treasury * 1000) < 0  # [B] test at MILLI precision: sub-milli non-dyadic gold drift must not trip the < 0 boundary here but not on TS
+        if active0 is not None:
+            insolvent = insolvent & active0
         if not bool(insolvent.any()):
             return
         P = self.seat0_unit_alive.shape[1]

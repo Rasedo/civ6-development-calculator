@@ -551,9 +551,8 @@
       "Seat.scienceTotal"
      ],
      "planes": [
-      "science_total"
-     ],
-     "gap": "the GPU stores `science_total` for seat 0 only; no seat above 0 has a lifetime-science plane (docs/AUDIT.md)."
+      "seat_science_total"
+     ]
     },
     {
      "name": "tilesPurchased",

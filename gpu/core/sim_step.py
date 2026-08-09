@@ -38,50 +38,232 @@ class SimStep:
         envoy (validated; -1 = none).
         war: [B] long (ignored while _rl_war_active is off) — 0..R-1 declare
         war on that civ seat, R..2R-1 sue for peace with it, -1 none. Applied
-        FIRST, before unit orders, so a same-turn declaration legalizes
-        attacks at execution; the pre-step masks lag it by one turn.
+        at the GEO pass positions inside _seat_phase (declare at the phase
+        top, peace at the tail) — seat 0 declares through the geo pass like
+        every seat, AFTER this step's unit orders ran, so a same-turn
+        declaration legalizes nothing until next turn (the TS schedule).
         """
-        r, B, C, T, dev = self.rules, self.B, self.C, self.T, self.device
-        rd = self.rules_dev
-
-        # --- seat-0 diplomacy (gated) --------------------------------------------
-        if war is not None and self._rl_war_active and self.R > 0:
-            w = war.to(torch.long)
-            ok = (w >= 0) & self.war_mask().gather(1, w.clamp(min=0).unsqueeze(1)).squeeze(1)
-            if bool(ok.any()):
-                decl = ok & (w < self.R)
-                if bool(decl.any()):
-                    oh = torch.nn.functional.one_hot(w.clamp(min=0, max=self.R - 1), self.R).bool() & decl.unsqueeze(1)
-                    self.civ_only_atwar.logical_or_(oh)
-                    self.war[:, 1:1 + self.civ_only_atwar.shape[1], 0] |= oh
-                    self.civ_only_warturns.copy_(torch.where(oh, torch.zeros_like(self.civ_only_warturns), self.civ_only_warturns))
-                pea = ok & (w >= self.R)
-                if bool(pea.any()):
-                    ri = (w - self.R).clamp(min=0, max=self.R - 1)
-                    rr = self.rules.seats
-                    cost = rr.get("peaceGold0", 150) + rr.get("peaceGoldSlope", 10) * self.civ_only_warturns.gather(
-                        1, ri.unsqueeze(1)
-                    ).squeeze(1).to(self.dtype)
-                    oh = torch.nn.functional.one_hot(ri, self.R).bool() & pea.unsqueeze(1)
-                    self.treasury.copy_(torch.where(pea, self.treasury - cost, self.treasury))
-                    self.civ_only_atwar.logical_and_(~oh)
-                    self.war[:, 1:1 + self.civ_only_atwar.shape[1], 0] &= ~oh
-                    self.civ_only_warturns.copy_(torch.where(oh, torch.zeros_like(self.civ_only_warturns), self.civ_only_warturns))
-                    self.civ_only_peaceturns.copy_(torch.where(oh, torch.zeros_like(self.civ_only_peaceturns), self.civ_only_peaceturns))
+        dev = self.device
 
         # --- seat-0 unit orders (before the turn advances) ----------------------
         if units is not None and self.units_mode:
             self._apply_unit_actions(units)
 
-        # --- war weariness: seat-0 accrual ---------------------------------------
-        # Accrue once per turn while at war with any LIVE civ seat; decay 4× in
-        # peace. Mirrors endTurn's top-of-turn update in game.ts, which runs
-        # AFTER this seat's unit orders — a capture that eliminates the last
-        # at-war civ seat must flip ww to DECAY the same turn. The war verb and
-        # last turn's civ phase both precede this point, exactly like TS.
-        # Seat 0 settles through the same `_ww_decay` every civ seat calls, on
-        # row 0; there is no seat-0-specific rule.
-        self._ww_decay(0)
+        # --- refreshUnits: heal only units that spent NO MP since their last
+        # refresh — +20 in a friendly city (barbs: on their camp), +15 own
+        # territory, +10 neutral ground, +5 foreign-owned land. The heal
+        # precedes the MP reset, so seat-0 orders from THIS step and
+        # hostile-phase acts from the PREVIOUS step both gate. -------------------
+        if self.units_mode:
+            cap = self.rules.combat.get("unitHp", 100)
+            # ONE heal rule, three pools. See _seat_heal.
+            for _pre in ("barb", "civ", "seat0"):
+                _hp = getattr(self, f"{_pre}_unit_hp")
+                _hp.copy_(torch.where(
+                    getattr(self, f"{_pre}_unit_alive") & ~self._spent_mp(_pre),
+                    (_hp + self._seat_heal(_pre)).clamp(max=cap), _hp,
+                ))
+            # FORTIFY: co-located with the heal and keyed on the EXACT SAME
+            # gate (movesLeft >= movesFull = spent no MP since the last
+            # refresh). A live MILITARY unit that stayed put digs in (+1, cap
+            # 2); a move or attack resets it. Civilians and NAVAL units never
+            # fortify. ONE rule, three pools — every pool can hold a hull, so
+            # the naval gate applies to all three.
+            for _pre in ("barb", "civ", "seat0"):
+                _alive = getattr(self, f"{_pre}_unit_alive")
+                _typ = getattr(self, f"{_pre}_unit_type")
+                _spent = self._spent_mp(_pre)
+                _fort = getattr(self, f"{_pre}_unit_fortify")
+                _mil = (self._type_combat[_typ] > 0) & ~self.unit_naval[_typ]
+                _fort.copy_(torch.where(
+                    _alive & _mil & ~_spent, (_fort + 1).clamp(max=2),
+                    torch.where(_alive & _mil & _spent, torch.zeros_like(_fort), _fort),
+                ))
+            # The movesLeft reset: a fresh turn begins, granting
+            # `full + generalAuraMP`. The aura is FROZEN here, inside the
+            # refreshUnits mirror, so every later walker reads the snapshot
+            # rather than the live (by then possibly moved) generals.
+            self._refresh_aura_mp()
+            # The movesLeft/movesFull reset itself, for ALL THREE pools —
+            # refreshUnits loops every unit regardless of seat. The MAJORS'
+            # pools (seat0 + civ) then re-reset at the seatPhase top with the
+            # aura re-frozen there (the TS reset loop covers every isCiv
+            # unit), and the barb pool at the barbarian phase.
+            for _pre in ("seat0", "civ", "barb"):
+                self._reset_mp(_pre)
+
+        # --- the hostile world, then the city-states' own turn --------------------
+        # endTurn's global schedule: refreshUnits (above) -> barbarianPhase ->
+        # disasterPhase -> cityStatePhase (the CS seats' OWN turn) -> seatPhase
+        # (EVERY major's turn, row 0 first) -> religion spread -> the boundary
+        # tail. Seat 0's turn lives in _seat0_row, called by _seat_phase.
+        if self.units_mode:
+            self._barbarian_phase()
+        if self.disasters:
+            self._disaster_phase()
+        self._city_state_phase()
+        self._seat_phase(production=production, tech=tech, civic=civic, envoy=envoy, war=war)
+
+        # --- Dead-slot reclamation, at the step END and never the top:
+        # callers sample slot-keyed unit actions from the PRE-step masks, so
+        # the layout must hold from unit_action_mask() through this step's
+        # applies. Stable compaction is otherwise behavior-invariant (the TS
+        # arrays splice; living relative order is the spec). Fires when a
+        # pool's high-water nears its cap, or constantly under
+        # CIV6_RECLAIM_AT.
+        if self.units_mode:
+            if int(self.next_slot.max()) >= self._reclaim_at:
+                self._reclaim_pool("barb")
+            if int(self.civ_unit_next.max()) >= self._reclaim_at:
+                self._reclaim_pool("civ")
+            if int(self.seat0_unit_next.max()) >= self._reclaim_at:
+                self._reclaim_pool("seat0")
+        if self.R > 0:
+            # rc high-water = last-alive slot + 1 (what the next append uses)
+            civ_city_hw = (self.civ_city_alive.long() * (torch.arange(self.RC, device=dev).reshape(1, 1, -1) + 1)).amax(dim=2)
+            if int(civ_city_hw.max()) >= self._civ_city_reclaim_at:
+                self._reclaim_civ_cities()
+            # After compaction (the riskiest registry reshuffle) and all of
+            # this step's placements/captures — env-gated, so free when off.
+            if self._civ_city_reg_check:
+                self._check_rc_registry_invariant()
+
+        # Religious pressure spread — after all foundings/settles/flips and the
+        # rc compaction, mirroring endTurn's tail.
+        self._spread_religious_pressure()
+
+        self._ww_audit()
+        self.turn += 1
+        # Era boundary — the eraBoundary mirror, run right after the turn
+        # increment. Every seat's Age for the NEW era comes from the just-ended
+        # window's score (Dark < darkT ≤ Normal < goldenT ≤ Golden), THEN the
+        # window resets. Padded/dead seats get Dark from score 0 — harmless:
+        # their factor only ever multiplies alive-masked zero contributions.
+        if self._era_len > 0 and self.turn % self._era_len == 0:
+            # Roads reach the CLASSICAL tier (bridges) at the first era
+            # boundary, latched at the same site TS latches it.
+            self.road_bridged = True
+            sc = self.era_score
+            # The PREVIOUS age, the Heroic test's substrate. CLONED because
+            # civ_age is written IN PLACE below — a bare reference would read
+            # back the NEW age and the Dark->Golden test could never fire.
+            _was = self.civ_age.clone()
+            self.civ_age.copy_(torch.where(
+                sc < self._era_dark,
+                torch.zeros_like(self.civ_age),
+                torch.where(sc >= self._era_gold, torch.full_like(self.civ_age, 2), torch.ones_like(self.civ_age)),
+            ))
+            # DEDICATIONS. One per seat per era, except the HEROIC age —
+            # Dark -> Golden — which grants heroicDedications. The current age
+            # alone cannot tell a Heroic age from an ordinary Golden one, which
+            # is why prev_age is substrate. prev_age is preallocated in
+            # __init__; write it rather than rebind it, so it stays the same
+            # tensor for aliasing and _MUTABLE.
+            self.prev_age.copy_(_was)
+            self.dedications.copy_(torch.where(
+                (_was == 0) & (self.civ_age == 2),
+                torch.full_like(self.dedications, self._heroic_ded),
+                torch.ones_like(self.dedications),
+            ))
+            # Commit to NAMED dedications — the stateless round-robin twin:
+            # catalog index (era + civ + k) % N, taking `dedications[c]`
+            # entries (three on a Heroic age).
+            _era_i = int(self.turn // self._era_len)
+            self.ded_picks[:] = -1
+            for _c in range(1 + self.R):
+                for _k in range(self.ded_picks.shape[2]):
+                    _take = self.dedications[:, _c] > _k
+                    self.ded_picks[:, _c, _k] = torch.where(
+                        _take,
+                        torch.full_like(self.ded_picks[:, _c, _k], (_era_i + _c + _k) % self._n_ded),
+                        torch.full_like(self.ded_picks[:, _c, _k], -1),
+                    )
+            self.era_score[:] = 0
+        # The WORLD CONGRESS convenes on the same post-increment turn number
+        # the era boundary uses.
+        self._world_congress()
+        # DEDICATION payouts, every turn, immediately after eraBoundary. A
+        # GOLDEN/HEROIC age pays faith; a DARK or NORMAL age pays era score
+        # (the climb-out dedication). Both scale with the dedication COUNT, so
+        # a Heroic age pays triple. Zero-draw, integer-only.
+        if self._ded_payouts_live and (self._ded_faith > 0 or self._ded_era > 0):
+            _gold = self.civ_age == 2
+            _fa = torch.where(_gold, self.dedications * self._ded_faith, torch.zeros_like(self.dedications))
+            _es = torch.where(_gold, torch.zeros_like(self.dedications), self.dedications * self._ded_era)
+            self.era_score.add_(_es)
+            self.faith.copy_(self.faith + _fa[:, 0].to(self.faith.dtype))
+            if self.R > 0:
+                self.civ_only_faith.copy_(self.civ_only_faith + _fa[:, 1 : 1 + self.R].to(self.civ_only_faith.dtype))
+        dom = self._domination()
+        # A science victory (3, seat 0) / defeat (4, a civ seat) set during
+        # THIS turn's project completions takes precedence over the
+        # domination/score recompute and is preserved.
+        space_won = (self.victory_type == 3) | (self.victory_type == 4)
+        rel = self._religious_victor()  # on the follow set the spread just flipped
+        # CULTURE victory, evaluated only where religion did not already win.
+        cul = torch.where(rel >= 0, torch.full_like(rel, -1), self._culture_victor())
+        # DIPLOMATIC victory, evaluated only where neither religion nor culture
+        # already won.
+        dip = torch.where((rel >= 0) | (cul >= 0), torch.full_like(rel, -1), self._diplomatic_victor())
+        self.game_over = space_won | (dom >= 0) | (rel >= 0) | (cul >= 0) | (dip >= 0) | (self.turn > self.rules.turn_limit)
+        # precedence space > domination > religion (5/6) > culture (7/8) > DIPLOMATIC (9/10) > score
+        rel_vt = torch.where(rel == 0, torch.full_like(rel, 5), torch.full_like(rel, 6))
+        cul_vt = torch.where(cul == 0, torch.full_like(cul, 7), torch.full_like(cul, 8))
+        dip_vt = torch.where(dip == 0, torch.full_like(dip, 9), torch.full_like(dip, 10))
+        self.victory_type.copy_(torch.where(space_won, self.victory_type, torch.where(dom >= 0, torch.full_like(dom, 2), torch.where(rel >= 0, rel_vt, torch.where(cul >= 0, cul_vt, torch.where(dip >= 0, dip_vt, torch.where(self.game_over, torch.ones_like(dom), torch.zeros_like(dom))))))))
+        # leader() is a full score pass over every seat and only matters where
+        # a game just ENDED; winner stays -1 for running games either way.
+        lead = self.leader() if bool(self.game_over.any()) else torch.full_like(dom, -1)
+        self.winner = torch.where(dom >= 0, dom, torch.where(self.game_over, lead, torch.full_like(dom, -1)))
+
+        if simbase._ALIAS_CHECK:
+            self._check_state_discipline()
+
+    def _seat0_row(
+        self,
+        production: torch.Tensor | None = None,
+        tech: torch.Tensor | None = None,
+        civic: torch.Tensor | None = None,
+        envoy: torch.Tensor | None = None,
+    ) -> None:
+        """Seat 0's turn — ROW 0 of the seatPhase loop, in the civ arm's
+        proven internal order: ww decay -> boosts -> CS diplomacy + quests ->
+        the driven picks (tech/civic/envoys/production incl. purchases) ->
+        trade -> the city econ walk -> loyalty flips -> the research/upkeep/
+        accumulator tail -> great people -> the war counters. The war verb
+        does NOT apply here: seat 0 declares and sues at the GEO pass
+        positions in _seat_phase, like every seat (the rec.war self-guard's
+        twin). An actor with no cities takes no turn (the TS loop's
+        eliminated-actor continue) — active0 gates every seat-level arm;
+        the city walks are alive-masked already, so their zero sums need no
+        gate."""
+        r, B, C, T, dev = self.rules, self.B, self.C, self.T, self.device
+        rd = self.rules_dev
+        active0 = self.alive.any(dim=1)  # actor.cities.length > 0
+
+        # --- war weariness: the block-top decay (warWearinessTurn), the same
+        # call every civ row makes on its own row. The pairwise war state is
+        # fixed for the turn by the phase-top declare pass.
+        self._ww_decay(0, active0)
+
+        # --- eurekas: detectBoosts at the row's own block top ------------------
+        self._detect_boosts(active0)
+
+        # --- CS diplomacy (meet/influence/quests) — the loop-body position ----
+        self._seat0_cs_phase(active0)
+
+        # --- the driven picks (the applySeatActionRecord position: tech,
+        # civic, envoys, then production; the civ arm applies its picks at the
+        # loop top, a proven-commuting position) -------------------------------
+        # --- research choice (validated; -1 or invalid = keep pending) ---------
+        if tech is not None:
+            t_act = tech.to(torch.long)
+            ok = active0 & (self.cur_tech == -1) & (t_act >= 0) & self._available_mask(self.techs, self._prereq_t).gather(1, t_act.clamp(min=0).unsqueeze(1)).squeeze(1)
+            self.cur_tech.copy_(torch.where(ok, t_act, self.cur_tech))
+        if civic is not None:
+            c_act = civic.to(torch.long)
+            ok = active0 & (self.cur_civic == -1) & (c_act >= 0) & self._available_mask(self.civics, self._prereq_c).gather(1, c_act.clamp(min=0).unsqueeze(1)).squeeze(1)
+            self.cur_civic.copy_(torch.where(ok, c_act, self.cur_civic))
 
         # --- envoys --------------------------------------------------------------
         if self.S > 0:
@@ -96,7 +278,7 @@ class SimStep:
                     e_seq = e_seq.unsqueeze(1)
                 for _ek in range(int(e_seq.shape[1])):
                     e_act = e_seq[:, _ek]
-                    ok = (e_act >= 0) & self.envoy_mask().gather(1, e_act.clamp(min=0).unsqueeze(1)).squeeze(1)
+                    ok = active0 & (e_act >= 0) & self.envoy_mask().gather(1, e_act.clamp(min=0).unsqueeze(1)).squeeze(1)
                     if bool(ok.any()):
                         rows = ok.nonzero(as_tuple=True)[0]
                         self.citystate_envoys[rows, e_act[rows]] += 1
@@ -193,60 +375,10 @@ class SimStep:
                                 self.progress[:, c] = torch.where(placed, torch.zeros_like(self.progress[:, c]), self.progress[:, c])
                                 self.q_dtile[:, c] = torch.where(placed, best, self.q_dtile[:, c])
 
-        # --- research choice (validated; -1 or invalid = keep pending) ---------
-        if tech is not None:
-            t_act = tech.to(torch.long)
-            ok = (self.cur_tech == -1) & (t_act >= 0) & self._available_mask(self.techs, self._prereq_t).gather(1, t_act.clamp(min=0).unsqueeze(1)).squeeze(1)
-            self.cur_tech.copy_(torch.where(ok, t_act, self.cur_tech))
-        if civic is not None:
-            c_act = civic.to(torch.long)
-            ok = (self.cur_civic == -1) & (c_act >= 0) & self._available_mask(self.civics, self._prereq_c).gather(1, c_act.clamp(min=0).unsqueeze(1)).squeeze(1)
-            self.cur_civic.copy_(torch.where(ok, c_act, self.cur_civic))
-
-        # --- eurekas (mirrors detectBoosts at the start of endTurn) ------------
-        self._detect_boosts()
-
-        # --- refreshUnits: heal only units that spent NO MP since their last
-        # refresh — +20 in a friendly city (barbs: on their camp), +15 own
-        # territory, +10 neutral ground, +5 foreign-owned land. The heal
-        # precedes the MP reset, so seat-0 orders from THIS step and
-        # hostile-phase acts from the PREVIOUS step both gate. -------------------
-        if self.units_mode:
-            cap = self.rules.combat.get("unitHp", 100)
-            # ONE heal rule, three pools. See _seat_heal.
-            for _pre in ("barb", "civ", "seat0"):
-                _hp = getattr(self, f"{_pre}_unit_hp")
-                _hp.copy_(torch.where(
-                    getattr(self, f"{_pre}_unit_alive") & ~self._spent_mp(_pre),
-                    (_hp + self._seat_heal(_pre)).clamp(max=cap), _hp,
-                ))
-            # FORTIFY: co-located with the heal and keyed on the EXACT SAME
-            # gate (movesLeft >= movesFull = spent no MP since the last
-            # refresh). A live MILITARY unit that stayed put digs in (+1, cap
-            # 2); a move or attack resets it. Civilians and NAVAL units never
-            # fortify. ONE rule, three pools — every pool can hold a hull, so
-            # the naval gate applies to all three.
-            for _pre in ("barb", "civ", "seat0"):
-                _alive = getattr(self, f"{_pre}_unit_alive")
-                _typ = getattr(self, f"{_pre}_unit_type")
-                _spent = self._spent_mp(_pre)
-                _fort = getattr(self, f"{_pre}_unit_fortify")
-                _mil = (self._type_combat[_typ] > 0) & ~self.unit_naval[_typ]
-                _fort.copy_(torch.where(
-                    _alive & _mil & ~_spent, (_fort + 1).clamp(max=2),
-                    torch.where(_alive & _mil & _spent, torch.zeros_like(_fort), _fort),
-                ))
-            # The movesLeft reset: a fresh turn begins, granting
-            # `full + generalAuraMP`. The aura is FROZEN here, inside the
-            # refreshUnits mirror, so every later walker reads the snapshot
-            # rather than the live (by then possibly moved) generals.
-            self._refresh_aura_mp()
-            # The movesLeft/movesFull reset itself, for ALL THREE pools —
-            # refreshUnits loops every unit regardless of seat, and the phases
-            # below (seatPhase, barbarianPhase) then overwrite the two hostile
-            # pools.
-            for _pre in ("seat0", "civ", "barb"):
-                self._reset_mp(_pre)
+        # Trade — the route pick + expiry arm sits HERE (the seatPhase
+        # position, between the buy block and the city loop). Seat 0's twin
+        # body lands with the trade-unification slice; until then seat 0
+        # forms no routes (AUDIT A-11r).
 
         # --- worked tiles + city yields: the PER-CITY interleave ------------------
         # endTurn recomputes computeCityStats FRESH for every city inside its
@@ -467,34 +599,6 @@ class SimStep:
             cul_add = cul_add + t_c[:, 4]
             fth_add = fth_add + t_c[:, 5]  # faith rides the same walk
 
-        self.treasury.add_(gold_add)
-        self.science_total.add_(sci_add)
-        self.culture_total.add_(cul_add)
-        # Seat 0's per-turn faith income, banked in the same city walk as
-        # gold/science/culture (the civ-seat twin is `civ_only_faith + faith_sum`).
-        self.faith.add_(fth_add)
-        # TOURISM — accumulated ONCE per turn at the seat level, right after
-        # the city loop and BEFORE the loyalty collapses.
-        self.tourism_total.copy_(self.tourism_total + self._tourism_of(
-            self.gw_writing, self.gw_art, self.gw_music, self.alive, self.tile_seat == 0, self._civ_era(self.techs, self.civics),
-            self.relics,
-            self.techs[:, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,
-            self.artifacts,
-        ))
-        # DIPLOMATIC FAVOR — government TIER + suzerainties, once per turn at
-        # the seat level.
-        self.diplo_favor.add_(self._adopted_gov_tier(self.civics) + self._favor_per_suz * self._suzerain_count(0))
-        # Seat 0's grievances decay by 1 each turn at peace with EVERY civ seat
-        # (floor 0), immediately after the tourism accumulator. The
-        # +WARMONGER_DOW accrual on declaring has no twin here because no
-        # declare-war grievance path reaches seat 0; the CAPTURE accrual does
-        # mirror, in _capture_civ_city.
-        self.warmonger.copy_(torch.where(
-            (self.warmonger > 0) & ~self.civ_only_atwar.any(dim=1),
-            self.warmonger - 1,
-            self.warmonger,
-        ))
-
         # --- loyalty & defections (right after the city loop) ------------------------------
         self._apply_loyalty_and_flips(tier_fresh, pop_loyal)
         # Every POST-WALK consumer (empire_score, the state digest) must see
@@ -504,25 +608,32 @@ class SimStep:
         # frozen-map yields; only the cached totals must not leak past the walk.
         self._eff_version += 1
 
-        # --- the hostile world (after the city loop, before research) ----------------------
-        if self.units_mode:
-            self.treasury.sub_((self.seat0_unit_alive.to(self.dtype) * self._type_maintenance[self.seat0_unit_type]).sum(dim=1))
-            self._bankrupt_disband()  # after upkeep, before the barb phase
-            self._barbarian_phase()
-        if self.disasters:
-            self._disaster_phase()
-        self._city_state_phase()
-        self._seat_phase()
-
         # --- research ---------------------------------------------------------------------
         # The research streams use the same per-city FRESH sums the city loop
-        # accumulated (turnScience/turnCulture in game.ts). An empty research
-        # slot stays empty without a pick — there is no auto-research.
+        # accumulated (sciSum/culSum in phase.ts's loop body). An empty
+        # research slot stays empty without a pick — there is no auto-research.
         turn_science = sci_add
         turn_culture = cul_add
         self.tech_prog.add_(turn_science)
+        # LIFETIME science — Seat.scienceTotal's twin, beside the stream add.
+        # Every seat accrues; the civ rows ride seat_science_total rows 1..R.
+        self.science_total.add_(sci_add)
+        self.treasury.add_(gold_add)
+        # Seat 0's per-turn faith income, banked in the same city walk as
+        # gold/science/culture (the civ-seat twin is `civ_only_faith + faith_sum`).
+        self.faith.add_(fth_add)
+        # Unit upkeep + the bankruptcy rule, at the loop position every seat
+        # shares (right after the gold lands). An eliminated seat 0 charges
+        # nothing — the TS loop skips it entirely.
+        if self.units_mode:
+            self.treasury.sub_(torch.where(
+                active0,
+                (self.seat0_unit_alive.to(self.dtype) * self._type_maintenance[self.seat0_unit_type]).sum(dim=1),
+                torch.zeros_like(self.treasury),
+            ))
+            self._bankrupt_disband(active0)
         for _ in range(RESEARCH_LOOPS):
-            active = self.cur_tech >= 0
+            active = active0 & (self.cur_tech >= 0)
             eff = self._eff_cost(
                 rd.t_cost.gather(0, self.cur_tech.clamp(min=0)),
                 self.tech_boosted.gather(1, self.cur_tech.clamp(min=0).unsqueeze(1)).squeeze(1),
@@ -541,12 +652,38 @@ class SimStep:
             self.cur_tech.copy_(torch.where(fin, torch.full_like(self.cur_tech, -1), self.cur_tech))
         # Banked progress only drains once the tree is exhausted (mirrors
         # advanceResearch; progress banks while the slot is undecided).
-        no_tech = (self.cur_tech == -1) & ~self._available_mask(self.techs, self._prereq_t).any(dim=1)
+        no_tech = active0 & (self.cur_tech == -1) & ~self._available_mask(self.techs, self._prereq_t).any(dim=1)
         self.tech_prog.copy_(torch.where(no_tech, torch.minimum(self.tech_prog, torch.zeros_like(self.tech_prog)), self.tech_prog))
-
+        # TOURISM — once per turn at the seat level, AFTER this turn's TECH
+        # completions (the wonder term reads the seat's era off completed
+        # research) and BEFORE any civic completes — the position the civ
+        # arm proved.
+        self.tourism_total.copy_(self.tourism_total + self._tourism_of(
+            self.gw_writing, self.gw_art, self.gw_music, self.alive, self.tile_seat == 0, self._civ_era(self.techs, self.civics),
+            self.relics,
+            self.techs[:, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,
+            self.artifacts,
+        ))
+        # DIPLOMATIC FAVOR — government TIER + suzerainties, once per turn at
+        # the seat level.
+        _fav0 = self._adopted_gov_tier(self.civics) + self._favor_per_suz * self._suzerain_count(0)
+        self.diplo_favor.add_(torch.where(active0, _fav0, torch.zeros_like(_fav0)))
+        # Seat 0's grievances decay by 1 each turn at peace with EVERY civ seat
+        # (floor 0), immediately after the tourism accumulator. The
+        # +WARMONGER_DOW accrual on declaring has no twin here because no
+        # declare-war grievance path reaches seat 0; the CAPTURE accrual does
+        # mirror, in _capture_civ_city.
+        self.warmonger.copy_(torch.where(
+            active0 & (self.warmonger > 0) & ~self.civ_only_atwar.any(dim=1),
+            self.warmonger - 1,
+            self.warmonger,
+        ))
         self.civic_prog.add_(turn_culture)
+        # LIFETIME culture — the cultureTotal twin, beside civicProgress (the
+        # loop position every seat shares).
+        self.culture_total.add_(cul_add)
         for _ in range(RESEARCH_LOOPS):
-            active = self.cur_civic >= 0
+            active = active0 & (self.cur_civic >= 0)
             eff = self._eff_cost(
                 rd.c_cost.gather(0, self.cur_civic.clamp(min=0)),
                 self.civic_boosted.gather(1, self.cur_civic.clamp(min=0).unsqueeze(1)).squeeze(1),
@@ -562,126 +699,16 @@ class SimStep:
             self._eff_version += 1
             self.civic_prog.copy_(torch.where(fin, self.civic_prog - eff, self.civic_prog))
             self.cur_civic.copy_(torch.where(fin, torch.full_like(self.cur_civic, -1), self.cur_civic))
-        no_civic = (self.cur_civic == -1) & ~self._available_mask(self.civics, self._prereq_c).any(dim=1)
+        no_civic = active0 & (self.cur_civic == -1) & ~self._available_mask(self.civics, self._prereq_c).any(dim=1)
         self.civic_prog.copy_(torch.where(no_civic, torch.minimum(self.civic_prog, torch.zeros_like(self.civic_prog)), self.civic_prog))
 
-        # Seat 0's great people (advanceGreatPeople) — after research,
-        # mirroring endTurn's order (the civ seats claimed earlier this step).
-        # Science/culture bank toward the next turn's tech/civic;
-        # gold/production apply now.
-        self._advance_great_people()
+        # Great people (advanceGreatPeople) — after the research tail, the
+        # loop position every seat shares.
+        self._advance_great_people(active0)
 
-        # --- Dead-slot reclamation, at the step END and never the top:
-        # callers sample slot-keyed unit actions from the PRE-step masks, so
-        # the layout must hold from unit_action_mask() through this step's
-        # applies. Stable compaction is otherwise behavior-invariant (the TS
-        # arrays splice; living relative order is the spec). Fires when a
-        # pool's high-water nears its cap, or constantly under
-        # CIV6_RECLAIM_AT.
-        if self.units_mode:
-            if int(self.next_slot.max()) >= self._reclaim_at:
-                self._reclaim_pool("barb")
-            if int(self.civ_unit_next.max()) >= self._reclaim_at:
-                self._reclaim_pool("civ")
-            if int(self.seat0_unit_next.max()) >= self._reclaim_at:
-                self._reclaim_pool("seat0")
-        if self.R > 0:
-            # rc high-water = last-alive slot + 1 (what the next append uses)
-            civ_city_hw = (self.civ_city_alive.long() * (torch.arange(self.RC, device=dev).reshape(1, 1, -1) + 1)).amax(dim=2)
-            if int(civ_city_hw.max()) >= self._civ_city_reclaim_at:
-                self._reclaim_civ_cities()
-            # After compaction (the riskiest registry reshuffle) and all of
-            # this step's placements/captures — env-gated, so free when off.
-            if self._civ_city_reg_check:
-                self._check_rc_registry_invariant()
-
-        # Religious pressure spread — after all foundings/settles/flips and the
-        # rc compaction, mirroring endTurn's tail.
-        self._spread_religious_pressure()
-
-        self._ww_audit()
-        self.turn += 1
-        # Era boundary — the eraBoundary mirror, run right after the turn
-        # increment. Every seat's Age for the NEW era comes from the just-ended
-        # window's score (Dark < darkT ≤ Normal < goldenT ≤ Golden), THEN the
-        # window resets. Padded/dead seats get Dark from score 0 — harmless:
-        # their factor only ever multiplies alive-masked zero contributions.
-        if self._era_len > 0 and self.turn % self._era_len == 0:
-            # Roads reach the CLASSICAL tier (bridges) at the first era
-            # boundary, latched at the same site TS latches it.
-            self.road_bridged = True
-            sc = self.era_score
-            # The PREVIOUS age, the Heroic test's substrate. CLONED because
-            # civ_age is written IN PLACE below — a bare reference would read
-            # back the NEW age and the Dark->Golden test could never fire.
-            _was = self.civ_age.clone()
-            self.civ_age.copy_(torch.where(
-                sc < self._era_dark,
-                torch.zeros_like(self.civ_age),
-                torch.where(sc >= self._era_gold, torch.full_like(self.civ_age, 2), torch.ones_like(self.civ_age)),
-            ))
-            # DEDICATIONS. One per seat per era, except the HEROIC age —
-            # Dark -> Golden — which grants heroicDedications. The current age
-            # alone cannot tell a Heroic age from an ordinary Golden one, which
-            # is why prev_age is substrate. prev_age is preallocated in
-            # __init__; write it rather than rebind it, so it stays the same
-            # tensor for aliasing and _MUTABLE.
-            self.prev_age.copy_(_was)
-            self.dedications.copy_(torch.where(
-                (_was == 0) & (self.civ_age == 2),
-                torch.full_like(self.dedications, self._heroic_ded),
-                torch.ones_like(self.dedications),
-            ))
-            # Commit to NAMED dedications — the stateless round-robin twin:
-            # catalog index (era + civ + k) % N, taking `dedications[c]`
-            # entries (three on a Heroic age).
-            _era_i = int(self.turn // self._era_len)
-            self.ded_picks[:] = -1
-            for _c in range(1 + self.R):
-                for _k in range(self.ded_picks.shape[2]):
-                    _take = self.dedications[:, _c] > _k
-                    self.ded_picks[:, _c, _k] = torch.where(
-                        _take,
-                        torch.full_like(self.ded_picks[:, _c, _k], (_era_i + _c + _k) % self._n_ded),
-                        torch.full_like(self.ded_picks[:, _c, _k], -1),
-                    )
-            self.era_score[:] = 0
-        # The WORLD CONGRESS convenes on the same post-increment turn number
-        # the era boundary uses.
-        self._world_congress()
-        # DEDICATION payouts, every turn, immediately after eraBoundary. A
-        # GOLDEN/HEROIC age pays faith; a DARK or NORMAL age pays era score
-        # (the climb-out dedication). Both scale with the dedication COUNT, so
-        # a Heroic age pays triple. Zero-draw, integer-only.
-        if self._ded_payouts_live and (self._ded_faith > 0 or self._ded_era > 0):
-            _gold = self.civ_age == 2
-            _fa = torch.where(_gold, self.dedications * self._ded_faith, torch.zeros_like(self.dedications))
-            _es = torch.where(_gold, torch.zeros_like(self.dedications), self.dedications * self._ded_era)
-            self.era_score.add_(_es)
-            self.faith.copy_(self.faith + _fa[:, 0].to(self.faith.dtype))
-            if self.R > 0:
-                self.civ_only_faith.copy_(self.civ_only_faith + _fa[:, 1 : 1 + self.R].to(self.civ_only_faith.dtype))
-        dom = self._domination()
-        # A science victory (3, seat 0) / defeat (4, a civ seat) set during
-        # THIS turn's project completions takes precedence over the
-        # domination/score recompute and is preserved.
-        space_won = (self.victory_type == 3) | (self.victory_type == 4)
-        rel = self._religious_victor()  # on the follow set the spread just flipped
-        # CULTURE victory, evaluated only where religion did not already win.
-        cul = torch.where(rel >= 0, torch.full_like(rel, -1), self._culture_victor())
-        # DIPLOMATIC victory, evaluated only where neither religion nor culture
-        # already won.
-        dip = torch.where((rel >= 0) | (cul >= 0), torch.full_like(rel, -1), self._diplomatic_victor())
-        self.game_over = space_won | (dom >= 0) | (rel >= 0) | (cul >= 0) | (dip >= 0) | (self.turn > self.rules.turn_limit)
-        # precedence space > domination > religion (5/6) > culture (7/8) > DIPLOMATIC (9/10) > score
-        rel_vt = torch.where(rel == 0, torch.full_like(rel, 5), torch.full_like(rel, 6))
-        cul_vt = torch.where(cul == 0, torch.full_like(cul, 7), torch.full_like(cul, 8))
-        dip_vt = torch.where(dip == 0, torch.full_like(dip, 9), torch.full_like(dip, 10))
-        self.victory_type.copy_(torch.where(space_won, self.victory_type, torch.where(dom >= 0, torch.full_like(dom, 2), torch.where(rel >= 0, rel_vt, torch.where(cul >= 0, cul_vt, torch.where(dip >= 0, dip_vt, torch.where(self.game_over, torch.ones_like(dom), torch.zeros_like(dom))))))))
-        # leader() is a full score pass over every seat and only matters where
-        # a game just ENDED; winner stays -1 for running games either way.
-        lead = self.leader() if bool(self.game_over.any()) else torch.full_like(dom, -1)
-        self.winner = torch.where(dom >= 0, dom, torch.where(self.game_over, lead, torch.full_like(dom, -1)))
-
-        if simbase._ALIAS_CHECK:
-            self._check_state_discipline()
+        # War counters — the loop's war/peace arm, row 0. warTurns counts
+        # war-with-WAR_COLUMN_SEAT only and a seat is never at war with
+        # itself, so seat 0's warTurns never moves; peaceTurns ticks while at
+        # war with NO civ seat (atWarWithAny reads Seat.wars — the majors'
+        # list — so a city-state war does not hold it back).
+        self.peace_turns[:, 0] += (active0 & ~self.civ_only_atwar.any(dim=1)).long()

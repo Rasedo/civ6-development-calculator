@@ -12,23 +12,36 @@ from . import simbase  # the PATCHABLE globals (POOL_MAX/SEAT0_POOL_MAX/_ALIAS_C
 
 class SimMinors:
     def _city_state_phase(self) -> None:
-        """Mirrors the OLD cityStatePhase seat-0 arm draw for draw: meeting
-        (by EXPLORATION — fog is live) → influence → envoys → quest
-        resolve/issue per city-state in id order → cosmetic growth every 12
-        turns. SCHEDULE DEBT: TS moved seat 0's diplomacy into the seatPhase
-        loop (row 0's block, AFTER the CS seats' own turn); this body still
-        sits at the CS-phase position — the seat0-schedule slice moves it.
-        The city-states' OWN turn (war clock, growth, recovery) stays here."""
+        """The city-states' OWN turn — the cityStatePhase twin: the seat-0
+        war clock, cosmetic growth every 12 turns, siege recovery. Every
+        seat's CS DIPLOMACY (meet/influence/quests) runs in the seatPhase
+        loop instead — row 0 through _seat0_cs_phase, civ rows through
+        _seat_cs_phase/_seat_quest_phase."""
         if self.S == 0:
             return
         # The seat-0 <-> city-state war clock ticks FIRST, exactly where
-        # cityStatePhase does — before meeting/influence/envoys.
+        # cityStatePhase does.
         self.citystate_war_turns.add_(self.citystate_atwar.long())
+        if self.turn % 12 == 0:
+            self.citystate_pop.copy_(torch.where(self.citystate_alive, (self.citystate_pop + 1).clamp(max=10), self.citystate_pop))
+        # siege recovery — +10/turn toward maxHp (cityStatePhase tail).
+        citystate_max = int(self.rules.citystate.get("maxHp", 150))
+        self.citystate_hp.copy_(torch.where(self.citystate_alive & (self.citystate_hp < citystate_max), (self.citystate_hp + 10).clamp(max=citystate_max), self.citystate_hp))
+
+    def _seat0_cs_phase(self, active0: torch.Tensor) -> None:
+        """Seat 0's CS diplomacy at the seatPhase loop-body position (row 0's
+        block): meet by EXPLORATION → influence + envoy conversion → quest
+        resolve/issue per city-state in id order. The _seat_cs_phase +
+        _seat_quest_phase twin over seat-0 planes. `active0` is the TS loop's
+        eliminated-actor `continue`: a cityless seat 0 meets, accrues and
+        quests nothing."""
+        if self.S == 0:
+            return
         r = self.rules.citystate
         # Meet by EXPLORATION — one rule for every seat: a city-state is met
         # the moment its centre is out of this seat's fog (fog off = instant).
-        self.citystate_met.logical_or_(self.citystate_alive & self._explored_at(0, self.citystate_center.clamp(min=0)))
-        any_met = self.citystate_met.any(dim=1)
+        self.citystate_met.logical_or_(active0.unsqueeze(1) & self.citystate_alive & self._explored_at(0, self.citystate_center.clamp(min=0)))
+        any_met = active0 & self.citystate_met.any(dim=1)
         # Seat 0's adopted-government influence tier joins the flat rate
         # (cityStates.ts `INFLUENCE_PER_TURN + GOV_INFLUENCE_TIER`); tier 0
         # while government adoption is switched off.
@@ -55,7 +68,7 @@ class SimMinors:
         else:
             own_tbl = None
         for s in range(self.S):
-            act = self.citystate_alive[:, s] & self.citystate_met[:, s]
+            act = active0 & self.citystate_alive[:, s] & self.citystate_met[:, s]
             # Resolve: clear-the-camp, or a buildDistrict quest for a district
             # seat 0 has since completed. Trade-route quests are uncompletable.
             camp_gone = ~((self.camp_tile == self.citystate_quest_camp[:, s].unsqueeze(1)) & (self.camp_tile >= 0)).any(dim=1)
@@ -128,12 +141,6 @@ class SimMinors:
                 if bool(want_dist.any()):
                     dr = want_dist.nonzero(as_tuple=True)[0]
                     self.citystate_quest_district[dr, s] = di_p[dr]
-
-        if self.turn % 12 == 0:
-            self.citystate_pop.copy_(torch.where(self.citystate_alive, (self.citystate_pop + 1).clamp(max=10), self.citystate_pop))
-        # siege recovery — +10/turn toward maxHp (cityStatePhase tail).
-        citystate_max = int(self.rules.citystate.get("maxHp", 150))
-        self.citystate_hp.copy_(torch.where(self.citystate_alive & (self.citystate_hp < citystate_max), (self.citystate_hp + 10).clamp(max=citystate_max), self.citystate_hp))
 
     # --- civ-seat units -----------------------------------------------------------
 

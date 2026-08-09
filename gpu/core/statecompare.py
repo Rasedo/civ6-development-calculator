@@ -318,7 +318,7 @@ SEAT = {
         sum(1 for r in sim.seat_routes[b, _seat_row(sim, c)].tolist() if r[0] >= 0) for c in rows
     ],
     # --- the declared gaps (extracted, census-covered, skipped by default) ---
-    "scienceTotal": lambda sim, b, rows: [float(sim.science_total[b]) if c == 0 else 0.0 for c in rows],
+    "scienceTotal": lambda sim, b, rows: [float(sim.seat_science_total[b, _seat_row(sim, c)]) for c in rows],
     "tilesPurchased": _civ_only("civ_only_tiles_purchased", 0),
     "nextCityId": _civ_only("civ_only_next_city_id", 0),
     "prophets": _civ_only("civ_only_prophets", 0),

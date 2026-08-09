@@ -95,12 +95,16 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   captures, spawns, foundings, t0 load — see `_reveal_around`'s
   docstring). Residuals: (1) the goody-hut maps reward has no twin
   because the GPU has NO goody-hut mechanic (check hut placement in
-  gate worlds at the hunt — TS's goody path draws RNG); (2) the GPU
-  still runs seat 0's whole turn inline in `step()` before the barb/CS
-  phases while TS's seatPhase loop owns rows 0..R — the schedule-move
-  spec is in .claude/HANDOFF.md; (3) the WAR_COLUMN_SEAT family
-  (warTurns/peaceTurns/cityStateWarTurns + the war-column wire layout)
-  is the last structural seat-0 bilateralism.
+  gate worlds at the hunt — TS's goody path draws RNG); (2) ~~the GPU
+  schedule~~ MOVED (slice 6): `step()` runs the endTurn global schedule
+  and `_seat_phase` owns rows 0..R (`_seat0_row` is row 0's block, in
+  the civ arm's proven internal order, `active0`-gated like the TS
+  eliminated-actor continue; seat-0 declare/peace ride the geo-pass
+  positions; scienceTotal + peaceTurns row 0 unified) — still open from
+  that family: the seat-0 TRADE arm + the civ intl-route staleness
+  (HANDOFF item 2b) and the quest/influence/upkeep body merges; (3) the
+  WAR_COLUMN_SEAT family (warTurns/peaceTurns/cityStateWarTurns + the
+  war-column wire layout) is the last structural seat-0 bilateralism.
 
 ## B. Fidelity vs real Civ 6 — open residuals
 
