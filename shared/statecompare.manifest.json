@@ -554,7 +554,7 @@
      "planes": [
       "r_tiles_purchased"
      ],
-     "gap": "the GPU's tile-purchase escalator is `r_tiles_purchased`, indexed by civ; seat 0 has no plane."
+     "gap": "seat 0's row of `civ_tiles_purchased` exists but nothing writes it until the seat-0 purchase wire; comparison opens with it."
     },
     {
      "name": "nextCityId",
@@ -576,7 +576,7 @@
      "planes": [
       "r_prophets"
      ],
-     "gap": "`r_prophets` is civ-indexed; seat 0's prophet count is derived per read on the GPU and has no plane."
+     "gap": "seat 0's row of `civ_prophets` exists but the seat-0 great-prophet mechanics still derive per read; comparison opens with them."
     },
     {
      "name": "beliefPantheon",
@@ -599,7 +599,7 @@
      "planes": [
       "r_follower"
      ],
-     "gap": "civ-indexed; seat 0 has no plane (see beliefPantheon)."
+     "gap": "seat 0's belief row exists but its founding mechanics do not write it yet (see beliefPantheon)."
     },
     {
      "name": "beliefFounder",
@@ -611,7 +611,7 @@
       "r_founder",
       "r_religion_done"
      ],
-     "gap": "civ-indexed; seat 0 has no plane (see beliefPantheon)."
+     "gap": "seat 0's belief row exists but its founding mechanics do not write it yet (see beliefPantheon)."
     },
     {
      "name": "beliefEnhancer",
@@ -623,7 +623,7 @@
       "r_enhancer",
       "r_enhancer_done"
      ],
-     "gap": "civ-indexed; seat 0 has no plane (see beliefPantheon)."
+     "gap": "seat 0's belief row exists but its founding mechanics do not write it yet (see beliefPantheon)."
     },
     {
      "name": "formalWars",

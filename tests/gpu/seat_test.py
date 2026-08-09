@@ -93,10 +93,16 @@ def main() -> None:
     assert abs(float(e2.observe(1)[0, _base + 7]) - 0.42) < 1e-9, (
         "civ per-city loyalty must READ rc_loyalty, not render a constant"
     )
-    s2.r_settlers[0, 0] = 3
-    assert abs(float(e2.observe(1)[0, 5]) - 3.0) < 1e-9, (
-        "obs field 5 is the seat's BANKED settlers for every seat (r_settlers)"
-    )
+    if s2._settler_idx >= 0:
+        base5 = float(e2.observe(1)[0, 5])
+        sl = int(s2.v_next[0])
+        s2.v_alive[0, sl] = True
+        s2.v_civ[0, sl] = 0
+        s2.v_type[0, sl] = s2._settler_idx
+        s2.v_next[0] += 1
+        assert abs(float(e2.observe(1)[0, 5]) - base5 - 1.0) < 1e-9, (
+            "obs field 5 is the seat's LIVE settler count, derived from the pool"
+        )
     print("  #51/S8.1c civ observation reads live state (treasury/influence/"
           "envoys/loyalty/settlers) OK")
 

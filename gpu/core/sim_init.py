@@ -282,8 +282,17 @@ class SimInit:
         # adjacency; -999 = compute normally. Mirrors the two early returns in
         # cpu/core/appeal.ts tileAppeal.
         self.appeal_over = torch.tensor([[int(t.get("apo", -999)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
-        self.r_alive = torch.zeros(B, r_pad, dtype=torch.bool, device=device)  # static: placed at creation
-        self.r_aggression = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
+        # Existence + temperament on the seat axis (row 0 = seat 0). Static:
+        # placed at creation, never mutated, so neither base is snapshot-
+        # registered. r_-view-only — `alive` names seat 0's city plane until
+        # the city block itself unifies.
+        self.civ_alive = torch.zeros(B, 1 + r_pad, dtype=torch.bool, device=device)
+        self.civ_alive[:, 0] = True
+        self.r_alive = self.civ_alive[:, 1:]
+        self.register_alias("r_alive", lambda sim: sim.civ_alive[:, 1:])
+        self.civ_aggression = torch.zeros(B, 1 + r_pad, dtype=torch.float64, device=device)
+        self.r_aggression = self.civ_aggression[:, 1:]
+        self.register_alias("r_aggression", lambda sim: sim.civ_aggression[:, 1:])
         # The seat-0/civ vector and the civ/civ block are SLICES of the war
         # matrix (allocated in `_alloc_war` above), not tensors of their own:
         # `r_atwar[b, r]` and `rr_war[b, i, j]` address the matrix's own memory.
@@ -305,6 +314,15 @@ class SimInit:
             ("diplo_points", torch.long, 0), ("envoys_avail", torch.long, 0),
             ("influence", dtype, 0), ("tech_prog", dtype, 0),
             ("treasury", dtype, 0),
+            # The belief/religion identity row, the city-id allocator and the
+            # tile-purchase escalator ride the same seat axis. Seat 0's rows
+            # exist from here on; the mechanics that write them arrive with
+            # the seat-0 religion work and the seat-0 purchase wire.
+            ("enhancer", torch.long, -1), ("enhancer_done", torch.bool, 0),
+            ("follower", torch.long, -1), ("founder", torch.long, -1),
+            ("next_city_id", torch.long, 0), ("pantheon", torch.long, -1),
+            ("pantheon_done", torch.bool, 0), ("prophets", torch.long, 0),
+            ("religion_done", torch.bool, 0), ("tiles_purchased", torch.long, 0),
         )
         for _nm, _dt, _fill in _civ_scalars:
             _base = torch.full((B, 1 + r_pad), _fill, dtype=_dt, device=device)
@@ -426,10 +444,6 @@ class SimInit:
         # counts toward the cap and the one-per-type rule (city.districts in TS).
         nd_b4 = max(len(rules.districts or []), 1)
         self.rc_dist_tile = torch.full((B, r_pad, rc_pad, nd_b4), -1, dtype=torch.long, device=device)
-        self.r_pantheon_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
-        self.r_religion_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
-        self.r_prophets = torch.zeros(B, r_pad, dtype=torch.long, device=device)  # religion gate
-        self.r_next_city_id = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # Districts on CAPTURED territory are DEAD — the tiles stay paved but
         # the conquering city's registry holds only CITY_CENTER (no
         # yields/upkeep/counts; the paving still blocks).
@@ -568,11 +582,6 @@ class SimInit:
         # channels are the separate `_enh` table below.
         self.enh_claimed = torch.zeros(B, max(len(_bl.get("enhancers", [])), 1), dtype=torch.bool, device=device)
         self._enh_any = len(_bl.get("enhancers", [])) > 0
-        self.r_pantheon = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
-        self.r_follower = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
-        self.r_founder = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
-        self.r_enhancer = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
-        self.r_enhancer_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         # Religious pressure spread. Religions are indexed in the unified civ
         # space: 0 = seat 0, i+1 = civ i. holy_tile[:, g] = religion g's frozen
         # holy tile (its founding capital center) or -1. The per-city integer
@@ -632,7 +641,6 @@ class SimInit:
         self._missionary_idx = int(_bl.get("missionaryIdx", -1))
         self._missionary_cap = int(_bl.get("missionaryCap", 2))
         # APOSTLE + theological combat.
-        self.r_tiles_purchased = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         self._apostle_idx = int(_bl.get("apostleIdx", -1))
         self._apostle_cost = float(_bl.get("apostleCost", 200))
         self._apostle_cap = int(_bl.get("apostleCap", 1))

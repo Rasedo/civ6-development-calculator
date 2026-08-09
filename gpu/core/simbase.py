@@ -487,15 +487,14 @@ _MUTABLE = [
     "rc_tile_id", "rc_at",  # rc_tile_id = per-rc tile registry (rc_id-keyed)
     "rr_warkind", "rr_denounced", "rr_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "seat_ext", "prod_bank", "rc_prod_bank",
     "rc_dist_tile",
-    "r_tiles_purchased",  # the civ-seat tile-purchase cost escalator
-    "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_prophets", "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
+    "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dest",  # international dest CENTER TILE (>=0), else -1 (domestic/CS) — SEAT-indexed; r_route_dest is the [:, 1:] view
     "rc_id",
     "cap_tile_civ",  # rc.isCapital + capitalTiles[r+1] — explicit, compaction-safe
     "v_civ", "v_next",
     "gp_earned", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
-    "pan_claimed", "fol_claimed", "fou_claimed", "r_pantheon", "r_follower", "r_founder",  # belief identity
-    "enh_claimed", "r_enhancer", "r_enhancer_done",  # enhancer race
+    "pan_claimed", "fol_claimed", "fou_claimed",  # belief-claim masks
+    "enh_claimed",  # enhancer-claim mask
     "holy_tile", "cty_pressure", "cty_followed",  # ONE seat-indexed pressure+followed plane pair
     "antiquity",  # ANTIQUITY SITES (bool tile plane)
     "built_wonder", "built_wonder_complete", "rc_wonder",  # world wonders
@@ -508,6 +507,8 @@ _MUTABLE = [
     "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_emb", "unit_seat", "occ_mil", "occ_civ", "war", "ww", "ww_turn",
     # per-seat scalar bases (the x / r_x views live on these)
     "civ_best_melee", "civ_builders_trained", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted",
+    "civ_enhancer", "civ_enhancer_done", "civ_follower", "civ_founder", "civ_next_city_id",
+    "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_tiles_purchased",
     # the (civ, city-state) relation bases — cs_x is row 0 and cs_r_x rows 1..,
     # both VIEWS, so only the base may be registered.
     "csr_met", "csr_envoys", "csr_quest", "csr_quest_camp", "csr_quest_issued",
