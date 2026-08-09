@@ -375,10 +375,9 @@ class SimStep:
                                 self.progress[:, c] = torch.where(placed, torch.zeros_like(self.progress[:, c]), self.progress[:, c])
                                 self.q_dtile[:, c] = torch.where(placed, best, self.q_dtile[:, c])
 
-        # Trade — the route pick + expiry arm sits HERE (the seatPhase
-        # position, between the buy block and the city loop). Seat 0's twin
-        # body lands with the trade-unification slice; until then seat 0
-        # forms no routes (AUDIT A-11r).
+        # Trade — the route pick + expiry arm at the seatPhase position
+        # (between the buy block and the city loop), row 0's body.
+        self._seat0_trade_phase(active0)
 
         # --- worked tiles + city yields: the PER-CITY interleave ------------------
         # endTurn recomputes computeCityStats FRESH for every city inside its

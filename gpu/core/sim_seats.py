@@ -4279,6 +4279,177 @@ class SimSeats:
         # expiring route, which is why the early returns above call it too.
         self._expire_seat_routes(r)
 
+    def _seat0_trade_phase(self, active0: torch.Tensor) -> None:
+        """Seat 0's trade arm — the seatPhase loop-body position (row 0's
+        block): ONE new route per turn while under capacity, then expiry.
+        The _seat_trade_phase twin over seat-0 planes, writing
+        seat_routes[:, 0] with the shared encoding (from/to = seat-0 city
+        COLUMNS, CS dest -(2+s), intl dest -1 + centre tile in
+        seat_route_dest). Capacity mirrors tradeCapacity: FOREIGN_TRADE +
+        Market-or-Lighthouse per living city + completed Colossus/GZ +
+        trade-CS suzerainty. ORDER: TS scans actor.cities in ARRAY order,
+        which for seat 0 is city_seq order, NOT column order (foundings
+        reuse holes) — so ties break on an explicit seq-rank key, unlike the
+        civ arm whose slots are append-only."""
+        B, C, S, dev = self.B, self.C, self.S, self.device
+        want = active0 & (self.alive.sum(dim=1) >= 1)
+        rts0 = self.seat_routes[:, 0]  # [B, K, 2]
+        if not bool(want.any()):
+            self._expire_seat0_routes()
+            return
+        cap = torch.zeros(B, dtype=torch.long, device=dev)
+        if self._trade_ftc >= 0:
+            cap = cap + self.civics[:, self._trade_ftc].long()
+        mkt0 = torch.zeros(B, C, dtype=torch.bool, device=dev)
+        if self._trade_mkt >= 0:
+            mkt0 = mkt0 | self.buildings[:, :, self._trade_mkt]
+        if self._trade_lgh >= 0:
+            mkt0 = mkt0 | self.buildings[:, :, self._trade_lgh]
+        cap = cap + (mkt0 & self.alive).sum(dim=1)
+        for wi in self._trade_wonders:
+            cap = cap + ((self.built_wonder == wi) & self.built_wonder_complete & (self.tile_seat == 0)).sum(dim=1)
+        if S > 0:
+            trade_ti = int(self.rules.citystate.get("tradeIdx", -1))
+            suz_min = int(self.rules.citystate.get("suzerainEnvoys", 3))
+            mine0 = self.citystate_envoys[:, :S]  # [B, S] seat 0's envoys
+            civ_max = self.civ_only_citystate_envoys[:, :, :S].max(dim=1).values if self.R > 0 else torch.zeros_like(mine0)
+            suz0 = (mine0 >= suz_min) & (mine0 > civ_max) & self.citystate_alive[:, :S]
+            cap = cap + (suz0 & (self.citystate_type[:, :S] == trade_ti)).sum(dim=1)
+        used = (rts0[:, :, 0] >= 0).sum(dim=1)
+        want = want & (used < cap)
+        if not bool(want.any()):
+            self._expire_seat0_routes()
+            return
+        # dest score: routeYields food+prod = 2 + 2*floor(destCompletedSpecialty/2)
+        own_spec0 = (self.district >= 0) & self._is_specialty[self.district.clamp(min=0)] & self.district_complete & (self.tile_seat == 0)
+        spec0 = torch.zeros(B, C, dtype=torch.long, device=dev).scatter_add_(1, self.owner.clamp(min=0), own_spec0.long())
+        ysum0 = 2 + 2 * (spec0 // 2)  # [B, C]
+        sites = self.site.clamp(min=0)  # [B, C]
+        d00 = self.pair_dist[sites.unsqueeze(2), sites.unsqueeze(1)]  # [B, C, C]
+        cols = torch.arange(C, device=dev)
+        exists0 = (
+            (rts0[:, :, 0].reshape(B, 1, 1, -1) == cols.reshape(1, C, 1, 1))
+            & (rts0[:, :, 1].reshape(B, 1, 1, -1) == cols.reshape(1, 1, C, 1))
+        ).any(dim=3)  # [B, C, C]
+        eye0 = torch.eye(C, dtype=torch.bool, device=dev).reshape(1, C, C)
+        valid0 = (
+            self.alive.unsqueeze(2) & self.alive.unsqueeze(1) & ~eye0
+            & (d00 <= self._trade_range) & ~exists0 & want.reshape(B, 1, 1)
+        )
+        # seq-rank tie-break: rank[c] = this column's position in city_seq
+        # order among LIVE cities (dead columns sort last, masked anyway).
+        seq_key = torch.where(self.alive, self.city_seq, self.city_seq + 10**6)
+        rank = torch.empty(B, C, dtype=torch.long, device=dev)
+        rank.scatter_(1, seq_key.argsort(dim=1, stable=True), cols.expand(B, C))
+        W2 = C + max(S, 0)
+        # key = score·BIG − scan position (from-rank major, then dests: own
+        # cities by rank, then CS by index) → argmax = strictly-greater-wins,
+        # ties keep the FIRST pair in the TS scan order.
+        BIGT = C * W2 + 1
+        tie00 = rank.reshape(B, C, 1) * W2 + rank.reshape(B, 1, C)
+        key0 = torch.where(valid0, ysum0.reshape(B, 1, C).expand(B, C, C) * BIGT - tie00, torch.full((B, C, C), -(10**12), dtype=torch.long, device=dev))
+        if S > 0:
+            _tr0 = self.rules.trade or {}
+            ysum_cs0 = int(_tr0.get("cityStateRouteGold", 3)) + int(_tr0.get("cityStateRouteSpec", 1))
+            csc0 = self.citystate_center[:, :S].clamp(min=0)
+            d_cs0 = self.pair_dist[sites.unsqueeze(2), csc0.unsqueeze(1)]  # [B, C, S]
+            citystate_to0 = -(2 + torch.arange(S, device=dev))
+            exists_cs0 = (
+                (rts0[:, :, 0].reshape(B, 1, 1, -1) == cols.reshape(1, C, 1, 1))
+                & (rts0[:, :, 1].reshape(B, 1, 1, -1) == citystate_to0.reshape(1, 1, S, 1))
+            ).any(dim=3)  # [B, C, S]
+            valid_cs0 = (
+                self.alive.unsqueeze(2)
+                & (self.citystate_met[:, :S] & self.citystate_alive[:, :S]).unsqueeze(1)
+                & (d_cs0 <= self._trade_range) & ~exists_cs0 & want.reshape(B, 1, 1)
+            )
+            tie_cs0 = rank.reshape(B, C, 1) * W2 + C + torch.arange(S, device=dev).reshape(1, 1, S)
+            key_cs0 = torch.where(valid_cs0, ysum_cs0 * BIGT - tie_cs0, torch.full((B, C, S), -(10**12), dtype=torch.long, device=dev))
+            key0 = torch.cat([key0, key_cs0], dim=2)  # [B, C, W2]
+        kf0 = key0.reshape(B, C * W2)
+        kmax0, karg0 = kf0.max(dim=1)
+        K0 = rts0.shape[1]
+        exp_val0 = int(self.turn) + self._trade_duration
+
+        def _free_slot0(rws: torch.Tensor) -> torch.Tensor:
+            free = self.seat_routes[rws, 0, :, 0] < 0
+            s_ = torch.where(free, torch.arange(K0, device=dev).reshape(1, -1), torch.full((1, K0), K0, device=dev)).min(dim=1).values
+            assert int(s_.max()) < K0, "seat_routes row-0 columns exhausted — raise K above the capacity bound"
+            return s_
+
+        do0 = want & (kmax0 > -(10**12))
+        if bool(do0.any()):
+            rows = do0.nonzero(as_tuple=True)[0]
+            i_pick = karg0[rows] // W2
+            jj_pick = karg0[rows] % W2
+            to_enc = torch.where(jj_pick < C, jj_pick.clamp(max=C - 1), -(2 + (jj_pick - C)))
+            slot = _free_slot0(rows)
+            self.seat_routes[rows, 0, slot, 0] = i_pick
+            self.seat_routes[rows, 0, slot, 1] = to_enc
+            self.seat_route_dest[rows, 0, slot] = -1
+            self.seat_route_exp[rows, 0, slot] = exp_val0
+            _o0 = sites[rows, i_pick]
+            _d0 = torch.where(
+                jj_pick < C,
+                sites[rows, jj_pick.clamp(max=C - 1)],
+                self.citystate_center[rows, (jj_pick - C).clamp(min=0, max=max(S - 1, 0))],
+            )
+            self._lay_trade_road(rows, _o0, _d0)
+        # international: no domestic/CS candidate → the nearest EXPLORED
+        # other-major city (the TS scan: seat 0's actor sees civ seats only).
+        intl_want0 = want & (kmax0 <= -(10**12))
+        if bool(intl_want0.any()) and self.R > 0:
+            vctr = self.civ_city_center.reshape(B, -1).clamp(min=0)  # [B, R*RC] civ centres, seat-asc city-asc
+            valv = self.civ_city_alive.reshape(B, -1)
+            Dv = vctr.shape[1]
+            rd0 = self.seat_route_dest[:, 0]  # [B, K]
+            act0r = rts0[:, :, 0] >= 0
+            exists_i0 = (
+                (rts0[:, :, 0].reshape(B, 1, 1, -1) == cols.reshape(1, C, 1, 1))
+                & (rd0.reshape(B, 1, 1, -1) == vctr.reshape(B, 1, Dv, 1))
+                & act0r.reshape(B, 1, 1, -1)
+            ).any(dim=3)  # [B, C, Dv]
+            d_i0 = self.pair_dist[sites.unsqueeze(2), vctr.unsqueeze(1)]  # [B, C, Dv]
+            valid_i0 = (
+                self.alive.unsqueeze(2) & valv.unsqueeze(1)
+                & self._explored_at(0, vctr).unsqueeze(1)
+                & (d_i0 <= self._trade_range) & ~exists_i0 & intl_want0.reshape(B, 1, 1)
+            )
+            # nearest-first, ties by (from seq-rank, dest scan position)
+            BIGD = C * Dv + 1
+            tie_i0 = rank.reshape(B, C, 1) * Dv + torch.arange(Dv, device=dev).reshape(1, 1, Dv)
+            ikey = torch.where(valid_i0, d_i0.long() * BIGD + tie_i0, torch.full((B, C, Dv), 10**15, dtype=torch.long, device=dev))
+            ifl = ikey.reshape(B, C * Dv)
+            imin, iarg = ifl.min(dim=1)
+            doi0 = intl_want0 & (imin < 10**15)
+            if bool(doi0.any()):
+                rows = doi0.nonzero(as_tuple=True)[0]
+                i_pick = iarg[rows] // Dv
+                c_pick = iarg[rows] % Dv
+                slot = _free_slot0(rows)
+                self.seat_routes[rows, 0, slot, 0] = i_pick
+                self.seat_routes[rows, 0, slot, 1] = -1
+                self.seat_route_dest[rows, 0, slot] = vctr[rows, c_pick]
+                self.seat_route_exp[rows, 0, slot] = exp_val0
+                self._lay_trade_road(rows, sites[rows, i_pick], vctr[rows, c_pick])
+        self._expire_seat0_routes()
+
+    def _expire_seat0_routes(self) -> None:
+        """Row 0 of _expire_seat_routes: drop seat 0's due routes and any
+        intl route whose dest is no longer a live CIV city centre (the same
+        tile-keyed test, with the same captured-dest corner)."""
+        act0 = self.seat_routes[:, 0, :, 0] >= 0
+        exp0 = self.seat_route_exp[:, 0]
+        expired = act0 & (exp0 >= 0) & (exp0 <= int(self.turn))
+        rd0 = self.seat_route_dest[:, 0]
+        rd0c = rd0.clamp(min=0)
+        dest_gone = act0 & (rd0 >= 0) & (self.civ_city_at.gather(1, rd0c) < 0) & (self.center_at.gather(1, rd0c) < 0)
+        drop = expired | dest_gone
+        if bool(drop.any()):
+            self.seat_routes[:, 0][drop] = -1
+            self.seat_route_dest[:, 0][drop] = -1
+            self.seat_route_exp[:, 0][drop] = -1
+
     def _expire_seat_routes(self, r: int) -> None:
         """Drop civ r's routes whose expiresTurn has arrived, plus any
         international route whose destination is no longer a live MAJOR city
