@@ -441,9 +441,8 @@ def _tile(plane: str):
 
 def _owner_city(sim, b, rows):
     seat = sim.tile_seat[b].tolist()
-    pcity = sim.tile_city[b].tolist()
-    rcity = sim.rc_tile_id[b].tolist()
-    return [pcity[t] if seat[t] == 0 else (rcity[t] if 0 < seat[t] < 100 else -1) for t in rows]
+    city = sim.tile_city[b].tolist()
+    return [city[t] if 0 <= seat[t] < 100 else -1 for t in rows]
 
 
 TILE = {

@@ -470,7 +470,7 @@ _MUTABLE = [
     "workable",
     "science_total",
     "civic_boosted",
-    "rng_state", "center_at", "tdef", "tmove",
+    "rng_state", "centre_slot_at", "tdef", "tmove",
     "next_slot", "camp_tile", "n_camps", "game_over",
     "victory_type", "winner", "space_done",  # space-race chain progress
     "p_next", "warrior_trained", "builder_trained",
@@ -484,9 +484,8 @@ _MUTABLE = [
     "cs_quest_district",
     "cs_last_levy",  # levy cooldown
     "influence",
-    "rc_tile_id", "rc_at",  # rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "rr_warkind", "rr_denounced", "rr_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "seat_ext", "prod_bank", "rc_prod_bank",
-    "rc_dist_tile",
+    "rr_warkind", "rr_denounced", "rr_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "seat_ext", "cty_prod_bank",
+    "cty_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dest",  # international dest CENTER TILE (>=0), else -1 (domestic/CS) — SEAT-indexed; r_route_dest is the [:, 1:] view
     "rc_id",
@@ -497,7 +496,7 @@ _MUTABLE = [
     "enh_claimed",  # enhancer-claim mask
     "holy_tile", "cty_pressure", "cty_followed",  # ONE seat-indexed pressure+followed plane pair
     "antiquity",  # ANTIQUITY SITES (bool tile plane)
-    "built_wonder", "built_wonder_complete", "rc_wonder",  # world wonders
+    "built_wonder", "built_wonder_complete", "cty_wonder",  # world wonders + the per-city registry
     "fertility", "drought", "improvement", "pillaged", "district", "dscaffold_placed",
     "district_pillaged",  # raided-dark districts (tile plane, reclaim-safe)
     "d_static_adj",  # mutated when an in-game founding clears the center tile's removable feature

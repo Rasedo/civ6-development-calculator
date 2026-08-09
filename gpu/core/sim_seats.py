@@ -412,7 +412,7 @@ class SimSeats:
                             nbs: torch.Tensor | None = None) -> torch.Tensor:
         """[B, K] — the borderCandidates adjacency twin: any of the 6
         neighbours is a tile of THIS city (seat- AND id-matched via the
-        rc_tile_id registry — the n.cityId === city.id check). `cid` is the
+        tile_city registry — the n.cityId === city.id check). `cid` is the
         per-row rc_id of the city; `nbs` may be passed to reuse a scan's
         neighbour tensor."""
         if nbs is None:
@@ -420,7 +420,7 @@ class SimSeats:
         nbf = nbs.clamp(min=0).reshape(self.B, -1)
         return (
             (self.civ_at.gather(1, nbf).reshape(self.B, -1, 6) == r)
-            & (self.rc_tile_id.gather(1, nbf).reshape(self.B, -1, 6) == cid.reshape(self.B, 1, 1))
+            & (self.tile_city.gather(1, nbf).reshape(self.B, -1, 6) == cid.reshape(self.B, 1, 1))
             & (nbs >= 0)
         ).any(dim=2)
 
@@ -1724,7 +1724,7 @@ class SimSeats:
             (tiles >= 0)
             & (self.civ_at.gather(1, tc) == r)
             # PER-CITY (see the _all twin).
-            & (self.rc_tile_id.gather(1, tc) == self.rc_id[:, r, j].unsqueeze(1))
+            & (self.tile_city.gather(1, tc) == self.rc_id[:, r, j].unsqueeze(1))
             & self.work_ok.gather(1, tc)
             & (tiles != center.unsqueeze(1))
             & ~districted
@@ -2262,7 +2262,7 @@ class SimSeats:
     def _transfer_rc_to_rc(self, b: int, r_from: int, j: int, r_to: int) -> None:
         """A loyalty flip between civ seats — pop ×0.75 floor 1, fresh boxes,
         CITY_CENTER-only registry, half HP, and the city's own tiles re-tag
-        through the rc_tile_id registry. The loser slot dies with full
+        through the tile_city registry. The loser slot dies with full
         queue/registry hygiene."""
         # taking a civ's city earns GRIEVANCES.
         self.r_warmonger[b, r_to] += self._wm_cap
@@ -2315,7 +2315,7 @@ class SimSeats:
         # exactly the flipping city's tiles re-tag (registry scan). rc_id is read
         # before the hygiene writes; the slot's id field is never reset on death.
         id_from = int(self.rc_id[b, r_from, j])
-        own_t = (self.rc_tile_id[b] == id_from) & (self.civ_at[b] == r_from)
+        own_t = (self.tile_city[b] == id_from) & (self.civ_at[b] == r_from)
         # the loser's routes die with their endpoint; the receiver starts
         # route-less (the from.tradeRoutes filter twin).
         kill = (self.r_routes[b, r_from, :, 0] == id_from) | (self.r_routes[b, r_from, :, 1] == id_from)
@@ -2326,7 +2326,7 @@ class SimSeats:
         self._tile_owner_ver += 1  # one storage: nothing else to retag
         # re-tagged tiles register to the receiving rc (its id is
         # assigned below from r_next_city_id — same value, read here first)
-        self.rc_tile_id[b] = torch.where(own_t, torch.full_like(self.rc_tile_id[b], int(self.r_next_city_id[b, r_to])), self.rc_tile_id[b])
+        self.tile_city[b] = torch.where(own_t, torch.full_like(self.tile_city[b], int(self.r_next_city_id[b, r_to])), self.tile_city[b])
         occ = self.rc_alive[b, r_to].nonzero(as_tuple=True)[0]
         slot = int(occ.max()) + 1 if len(occ) else 0
         assert slot < self.RC, "civ city slots exhausted - raise RC (compaction already ran; this is true living capacity)"
@@ -2359,7 +2359,7 @@ class SimSeats:
         self.rc_outer_hp[b, r_to, slot] = 0  # walls (if any) kept at outer pool 0
         self.rc_id[b, r_to, slot] = int(self.r_next_city_id[b, r_to])
         self.r_next_city_id[b, r_to] += 1
-        self.rc_at[b, c_t] = r_to
+        self.centre_slot_at[b, c_t] = slot
         self._eff_version += 1
 
     def _seat_border_key(self, r: int, j: int, center: torch.Tensor):
@@ -2422,7 +2422,7 @@ class SimSeats:
         unowned tiles, with water, impassables and natural wonders all claimable
         like borderCandidates). The yield sum uses the CIV's planes:
         strip-adjusted food/prod plus its own farm-adjacency and mine boosts.
-        Adjacency is PER-CITY via the rc_tile_id registry, mirroring
+        Adjacency is PER-CITY via the tile_city registry, mirroring
         borderCandidates' n.cityId === city.id check."""
         self.rc_cbox[:, r, j] = torch.where(cact, self.rc_cbox[:, r, j] + cul_c, self.rc_cbox[:, r, j])
         B = self.B
@@ -2460,7 +2460,7 @@ class SimSeats:
                 nb_flat = nbs.clamp(min=0).reshape(B, -1)
                 adj_own = (
                     (self.civ_at.gather(1, nb_flat).reshape(B, -1, 6) == r)
-                    & (self.rc_tile_id.gather(1, nb_flat).reshape(B, -1, 6) == self.rc_id[:, r, j].reshape(B, 1, 1))
+                    & (self.tile_city.gather(1, nb_flat).reshape(B, -1, 6) == self.rc_id[:, r, j].reshape(B, 1, 1))
                     & (nbs >= 0)
                 ).any(dim=2)
             ok = (tiles >= 0) & unowned & adj_own & ready.unsqueeze(1)
@@ -2473,7 +2473,7 @@ class SimSeats:
                 spot = tiles[rows, best[rows]]
                 self.tile_seat[rows, spot] = r + 1  # tile ownership lives in tile_seat
                 self._tile_owner_ver += 1  # one storage: nothing else to retag
-                self.rc_tile_id[rows, spot] = self.rc_id[rows, r, j]  # claim registers to THIS city
+                self.tile_city[rows, spot] = self.rc_id[rows, r, j]  # claim registers to THIS city
                 # invalidate the batched-yields cache ONLY if this claim
                 # can change a later column — i.e. the spot lands inside a
                 # LATER same-civ city's radius-3 worked window (columns <= j
@@ -2589,10 +2589,10 @@ class SimSeats:
         self.rc_id[rows, r, slot] = self.r_next_city_id[rows, r]
         _new_cid = self.r_next_city_id[rows, r].clone()  # this city's persistent id
         self.r_next_city_id[rows, r] += 1
-        self.rc_at[rows, s_idx] = r
+        self.centre_slot_at[rows, s_idx] = slot
         self.tile_seat[rows, s_idx] = r + 1  # tile ownership lives in tile_seat
         self._tile_owner_ver += 1  # one storage: nothing else to retag
-        self.rc_tile_id[rows, s_idx] = _new_cid
+        self.tile_city[rows, s_idx] = _new_cid
         # Founding strips like foundCity: the removable feature dies (tdef drops
         # to the hills component, feature yields vanish via feat_stripped, the
         # lent district adjacency withdraws) and the improvement dies with it.
@@ -2630,7 +2630,7 @@ class SimSeats:
             )
             self.tile_seat[rows[free], n_d[free]] = r + 1  # tile ownership lives in tile_seat
             self._tile_owner_ver += 1  # one storage: nothing else to retag
-            self.rc_tile_id[rows[free], n_d[free]] = _new_cid[free]  # ring joins the founder's registry
+            self.tile_city[rows[free], n_d[free]] = _new_cid[free]  # ring joins the founder's registry
         self._eff_version += 1  # feat_stripped / d_static_adj changed
 
     def _hostile_vs_unit(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int) -> None:
@@ -3023,6 +3023,31 @@ class SimSeats:
             )
             self._civ_at_ver = self._tile_owner_ver
         return self._civ_at_cache
+
+    @property
+    def center_at(self) -> torch.Tensor:
+        """[B, T] — seat 0's city SLOT at its centre tiles, -1 elsewhere: the
+        seat-generic centre registry (centre_slot_at) masked to seat-0 tiles.
+        Cached on _tile_owner_ver — every centre write co-occurs with an
+        ownership write, so the version covers both."""
+        if self._center_at_ver != self._tile_owner_ver:
+            self._center_at_cache = torch.where(
+                self.tile_seat == PLAYER_SEAT, self.centre_slot_at,
+                torch.full_like(self.centre_slot_at, -1))
+            self._center_at_ver = self._tile_owner_ver
+        return self._center_at_cache
+
+    @property
+    def rc_at(self) -> torch.Tensor:
+        """[B, T] — the civ INDEX at a civ centre, -1 elsewhere: the centre
+        registry joined with civ_at (a centre tile is owned by its city, so
+        the tile's seat names the civ). Cached on _tile_owner_ver."""
+        if self._rc_at_ver != self._tile_owner_ver:
+            self._rc_at_cache = torch.where(
+                self.centre_slot_at >= 0, self.civ_at,
+                torch.full_like(self.centre_slot_at, -1))
+            self._rc_at_ver = self._tile_owner_ver
+        return self._rc_at_cache
 
     @property
     def cs_at(self) -> torch.Tensor:

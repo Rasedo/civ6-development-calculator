@@ -292,7 +292,7 @@ class SimPhase:
                         self.r_treasury[_rows, r] -= cost_t[_rows]
                         self.tile_seat[_rows, tt5[_rows]] = r + 1  # civ tile ownership lives in tile_seat
                         self._tile_owner_ver += 1  # one storage: nothing else to retag
-                        self.rc_tile_id[_rows, tt5[_rows]] = self.rc_id[_rows, r, jt5[_rows]]
+                        self.tile_city[_rows, tt5[_rows]] = self.rc_id[_rows, r, jt5[_rows]]
                         self.rc_acquired[_rows, r, jt5[_rows]] += 1
                         self.r_tiles_purchased[_rows, r] += 1
                         self._eff_version += 1
@@ -435,7 +435,7 @@ class SimPhase:
                 # exactly one. Keying on the civ alone would pay one Farm to
                 # every same-civ city holding it in a radius-3 window.
                 # https://civilization.fandom.com/wiki/Housing_(Civ6)
-                _own_rc = self.rc_tile_id.gather(1, w3f).reshape_as(win3a)  # [B, RC, M]
+                _own_rc = self.tile_city.gather(1, w3f).reshape_as(win3a)  # [B, RC, M]
                 imp_own = (
                     (win3a >= 0)
                     & (self.civ_at.gather(1, w3f).reshape_as(win3a) == r)
@@ -457,7 +457,7 @@ class SimPhase:
                 _rh, _ = self._cond_house_amen(_gpm[8], _gpm[9], _rc_all_d, self._rc_spec_count(r))
                 housing = housing + _rh
                 # Appeal-based NEIGHBORHOOD housing (the computeHousing twin).
-                # rc tiles are keyed by the per-city registry rc_tile_id, so
+                # rc tiles are keyed by the per-city registry tile_city, so
                 # sum per rc SLOT over its own tiles.
                 if self._nbhd_didx >= 0:
                     _ap = self._tile_appeal()
@@ -467,7 +467,7 @@ class SimPhase:
                     _nb_ok = (self.district == self._nbhd_didx) & self.district_complete & ~self.district_pillaged
                     _mine = _nb_ok & (self.civ_at == r)
                     _srcd = (_hv * _mine.long()).double()
-                    _rid = self.rc_tile_id  # [B, T] persistent rc id, -1 = none
+                    _rid = self.tile_city  # [B, T] persistent rc id, -1 = none
                     _nbh = torch.zeros_like(housing)
                     for _j in range(self.RC):
                         _idj = self.rc_id[:, r, _j].unsqueeze(1)  # [B, 1]
@@ -1437,18 +1437,17 @@ class SimPhase:
             self.tile_city[b] = torch.where(owned, torch.full_like(self.tile_city[b], -1), self.tile_city[b])
             self.tile_seat[b] = torch.where(owned, torch.full_like(self.tile_seat[b], NO_SEAT), self.tile_seat[b])  # seat + which city: the two halves TS calls ownerSeat/ownerCity
             self._tile_owner_ver += 1
-            self.center_at[b, s_t] = -1
+            self.centre_slot_at[b, s_t] = -1
             self.district[b, s_t] = -1
             self.district_complete[b, s_t] = False
             self._eff_version += 1
             return False
-        self.tile_city[b] = torch.where(owned, torch.full_like(self.tile_city[b], -1), self.tile_city[b])
         self.tile_seat[b] = torch.where(owned, torch.full_like(self.tile_seat[b], w_ + 1), self.tile_seat[b])  # seat + which city: the two halves TS calls ownerSeat/ownerCity
         self._tile_owner_ver += 1
-        # The defecting city's tiles register to the receiving rc; the id is
-        # assigned below from r_next_city_id, the same value read here first.
-        self.rc_tile_id[b] = torch.where(owned, torch.full_like(self.rc_tile_id[b], int(self.r_next_city_id[b, w_])), self.rc_tile_id[b])
-        self.center_at[b, self.site[b, c]] = -1
+        # The defecting city's tiles re-key to the receiving city's id (read
+        # here from r_next_city_id, assigned to the slot below).
+        self.tile_city[b] = torch.where(owned, torch.full_like(self.tile_city[b], int(self.r_next_city_id[b, w_])), self.tile_city[b])
+        self.centre_slot_at[b, self.site[b, c]] = -1
         # ...and joins the winner at last-alive+1, NOT the alive count: a
         # capture hole would make the count point at a live city. TS appends,
         # so new cities iterate last.
@@ -1500,7 +1499,7 @@ class SimPhase:
         self.rc_bldg[b, w_, slot, :] = b30_bldg
         self.rc_outer_hp[b, w_, slot] = 0  # walls (if any) arrive with an empty outer pool
         self.r_next_city_id[b, w_] += 1
-        self.rc_at[b, self.site[b, c]] = w_
+        self.centre_slot_at[b, self.site[b, c]] = slot
         self._eff_version += 1  # the receiver just gained rc_bldg/districts/tiles mid-phase
         return True
 
@@ -1612,7 +1611,7 @@ class SimPhase:
         self.tile_seat[rows, s_idx] = PLAYER_SEAT
         self._tile_owner_ver += 1
         self.workable[rows, s_idx] = False
-        self.center_at[rows, s_idx] = c_new
+        self.centre_slot_at[rows, s_idx] = c_new
         # foundCity strips the removable feature (defense/movement drop to the
         # hills component; unremovable features survive LIVE).
         frm_f = self.feat_removable[rows, s_idx]
@@ -1880,18 +1879,18 @@ class SimPhase:
         """Machine-checks district/wonder <-> tile-registry coherence for every alive civ city.
 
         Env-gated via self._rc_reg_check, so it costs nothing on the hot path
-        when off. Two directions of the rc_tile_id contract:
+        when off. Two directions of the tile_city contract:
 
           (1) FORWARD: every district tile (rc_dist_tile) and wonder tile
               (rc_wonder) an rc lists registers BACK to that rc — its
-              rc_tile_id equals rc_id (a district/wonder sits on a tile owned
+              tile_city equals rc_id (a district/wonder sits on a tile owned
               by THAT city). A tile registered to a SIBLING fails here.
           (2) BACKWARD: every populated registry cell points at a tile whose
               civ_at is a live civ (no dangling index into re-owned/razed
               land). The registry never lists a tile it does not own.
 
         Raises AssertionError naming (game, civ, slot, kind, di/wi, tile,
-        expected id, actual rc_tile_id) on the first violation."""
+        expected id, actual tile_city) on the first violation."""
         if self.R == 0:
             return
         B = self.B
@@ -1903,8 +1902,8 @@ class SimPhase:
                 has = (reg >= 0) & alive
                 if not bool(has.any()):
                     continue
-                # rc_tile_id at the listed tile, per cell
-                rt = self.rc_tile_id.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape_as(reg)  # [B, RC, K]
+                # tile_city at the listed tile, per cell
+                rt = self.tile_city.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape_as(reg)  # [B, RC, K]
                 ra = self.civ_at.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape_as(reg)
                 bad_fwd = has & (rt != expect)  # (1) registers to a sibling / no one
                 bad_bwd = has & (ra < 0)        # (2) tile no longer civ-owned
@@ -1916,6 +1915,6 @@ class SimPhase:
                     raise AssertionError(
                         f"A-24 registry incoherence: game={b} civ={r} slot={j} "
                         f"{name}[{k}] tile={tile} expected_id={int(self.rc_id[b, r, j])} "
-                        f"actual_rc_tile_id={int(self.rc_tile_id[b, tile])} "
+                        f"actual_rc_tile_id={int(self.tile_city[b, tile])} "
                         f"civ_at={int(self.civ_at[b, tile])} turn={self.turn}"
                     )

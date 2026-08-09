@@ -591,7 +591,7 @@ class SimOrders:
             # TS removes the City object, so no stale rc_* row may survive.
             self.rc_alive[b, r, j] = False
             self.rc_is_cap[b, r, j] = False  # capital identity dies with the city (cap_tile_civ keeps the tile)
-            self.rc_at[b, c_t] = -1
+            self.centre_slot_at[b, c_t] = -1
             self.rc_dist_tile[b, r, j, :] = -1
             self.rc_wonder[b, r, j, :] = -1
             self.rc_bldg[b, r, j, :] = False
@@ -614,7 +614,7 @@ class SimOrders:
             # (TS `tileBelongsTo`): a radius sweep would leak the outer ring
             # as orphaned civ territory and steal sibling cities' frontage.
             cid = int(self.rc_id[b, r, j])
-            ring = (self.rc_tile_id[b] == cid) & (self.civ_at[b] == r)
+            ring = (self.tile_city[b] == cid) & (self.civ_at[b] == r)
             # routes die with their endpoint (the TS filter twin)
             kill = (self.r_routes[b, r, :, 0] == cid) | (self.r_routes[b, r, :, 1] == cid)
             self.r_routes[b, r][kill] = -1
@@ -622,7 +622,7 @@ class SimOrders:
             self.r_route_exp[b, r][kill] = -1
             self.tile_seat[b] = torch.where(ring, torch.full_like(self.tile_seat[b], NO_SEAT), self.tile_seat[b])  # civ tile ownership lives in tile_seat
             self._tile_owner_ver += 1
-            self.rc_tile_id[b] = torch.where(ring, torch.full_like(self.rc_tile_id[b], -1), self.rc_tile_id[b])
+            self.tile_city[b] = torch.where(ring, torch.full_like(self.tile_city[b], -1), self.tile_city[b])
             # TS APPENDS the captured city, so the slot is the founding
             # HIGH-WATER mark (founded_n) — last-alive+1 would land in the
             # newest hole when the most recent city was the one that died.
@@ -647,7 +647,7 @@ class SimOrders:
             self.site[b, c_new] = c_t
             # A captured city carries no banked production (TS pushes a fresh City literal); `prod_bank` is slot-indexed, so a reused slot must be cleared.
             self.prod_bank[b, c_new] = 0
-            self.center_at[b, c_t] = c_new
+            self.centre_slot_at[b, c_t] = c_new
             _take = ring & (self.tile_seat[b] == NO_SEAT)
             self.tile_city[b] = torch.where(_take, torch.full_like(self.tile_city[b], c_new), self.tile_city[b])
             self.tile_seat[b] = torch.where(_take, torch.full_like(self.tile_seat[b], PLAYER_SEAT), self.tile_seat[b])
@@ -761,7 +761,7 @@ class SimOrders:
             self.site[b, c_new] = c_t
             # A captured city carries no banked production (TS pushes a fresh City literal); `prod_bank` is slot-indexed, so a reused slot must be cleared.
             self.prod_bank[b, c_new] = 0
-            self.center_at[b, c_t] = c_new
+            self.centre_slot_at[b, c_t] = c_new
             _take = ring & (self.tile_seat[b] == NO_SEAT)
             self.tile_city[b] = torch.where(_take, torch.full_like(self.tile_city[b], c_new), self.tile_city[b])
             self.tile_seat[b] = torch.where(_take, torch.full_like(self.tile_seat[b], PLAYER_SEAT), self.tile_seat[b])
@@ -830,7 +830,7 @@ class SimOrders:
             new_id = int(self.r_next_city_id[b, r])
             self.tile_seat[b] = torch.where(ring, torch.full_like(self.tile_seat[b], r + 1), self.tile_seat[b])  # civ tile ownership lives in tile_seat
             self._tile_owner_ver += 1
-            self.rc_tile_id[b] = torch.where(ring, torch.full_like(self.rc_tile_id[b], new_id), self.rc_tile_id[b])
+            self.tile_city[b] = torch.where(ring, torch.full_like(self.tile_city[b], new_id), self.tile_city[b])
             self.rc_alive[b, r, slot] = True
             self.era_score[b, r + 1] += self._era_pts["conquer"]  # gained a city (the raze path continues above)
             self.rc_is_cap[b, r, slot] = False
@@ -852,7 +852,7 @@ class SimOrders:
             self.rc_wonder[b, r, slot, :] = -1
             self.rc_bldg[b, r, slot, :] = False
             self.r_next_city_id[b, r] += 1
-            self.rc_at[b, c_t] = r
+            self.centre_slot_at[b, c_t] = slot
         self._eff_version += 1
 
     def _init_center_live(self, b: int, c_new: int, c_t: int) -> None:

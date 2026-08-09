@@ -252,7 +252,6 @@ class SimInit:
         # (per-civ ids, meaningful only where civ_at >= 0). Keyed on the ID, not
         # the slot, so _reclaim_rc compaction needs no tile-plane remap. No civ
         # city exists at t0, so it starts empty.
-        self.rc_tile_id = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.water = torch.tensor([[t.get("wt", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.nwonder = torch.tensor([[t.get("nw", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.fresh_water = torch.tensor([[t.get("fw", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
@@ -443,7 +442,17 @@ class SimInit:
         # type, -1 = none. A queued district already occupies its column, so it
         # counts toward the cap and the one-per-type rule (city.districts in TS).
         nd_b4 = max(len(rules.districts or []), 1)
-        self.rc_dist_tile = torch.full((B, r_pad, rc_pad, nd_b4), -1, dtype=torch.long, device=device)
+        # The district-tile registry on the city-block seat axis (row 0 =
+        # seat 0, rows 1.. = the civ seats; city-states pave no districts, so
+        # no CS rows). Seat 0's row is allocated and snapshot-covered but
+        # mechanics-quiet: its readers derive districts from the tile planes
+        # (both engines do — the registry exists for civ slot compaction,
+        # which seat-0 slots do not have). One base, one geometry.
+        self.cty_dist_tile = torch.full((B, 1 + r_pad, rc_pad, nd_b4), -1, dtype=torch.long, device=device)
+        self.rc_dist_tile = self.cty_dist_tile[:, 1:]
+        self.dist_tile = self.cty_dist_tile[:, 0, :C]
+        self.register_alias("rc_dist_tile", lambda sim: sim.cty_dist_tile[:, 1:])
+        self.register_alias("dist_tile", lambda sim: sim.cty_dist_tile[:, 0, :sim.C])
         # Districts on CAPTURED territory are DEAD — the tiles stay paved but
         # the conquering city's registry holds only CITY_CENTER (no
         # yields/upkeep/counts; the paving still blocks).
@@ -454,7 +463,7 @@ class SimInit:
         # slot — _reclaim_rc compaction permutes slots underneath.
         self.cap_tile_civ = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # Trade routes — (from_id, to_id) rc-id pairs, -1 = empty column.
-        # Id-keyed like rc_tile_id, so _reclaim_rc slot permutations never touch
+        # Id-keyed like tile_city, so _reclaim_rc slot permutations never touch
         # it. K must cover the real capacity bound (tradeCapacity):
         # FOREIGN_TRADE 1 + maxCities MARKET/LIGHTHOUSE + 2 wonders (COLOSSUS,
         # GREAT_ZIMBABWE) + one per suzerained TRADE city-state, plus slack.
@@ -489,7 +498,10 @@ class SimInit:
         # needed. cs_r_quest_issued starts at 0, so the first issue is at
         # turn >= questCooldown.
 
-        self.rc_at = torch.full((B, T), -1, dtype=torch.long, device=device)  # civ id at civ centers
+        # THE CENTRE REGISTRY, seat-generic: the owning seat's city SLOT at
+        # any major centre tile, -1 elsewhere. The seat is tile_seat's, the
+        # id is tile_city's; center_at / rc_at are cached derived views.
+        self.centre_slot_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         # ---------------------------------------------------------------------
         # ONE UNIT POOL. p_*, v_* and u_* are three DISJOINT CONTIGUOUS SLOT
         # RANGES of one tensor per plane:
@@ -688,7 +700,13 @@ class SimInit:
         self._fp_fid = int(_wd.get("fpFid", -1))
         self.built_wonder = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.built_wonder_complete = torch.zeros(B, T, dtype=torch.bool, device=device)
-        self.rc_wonder = torch.full((B, r_pad, rc_pad, max(self._wond_n, 1)), -1, dtype=torch.long, device=device)
+        # The wonder-tile registry, same seat-axis shape and the same
+        # mechanics-quiet seat-0 row as cty_dist_tile above.
+        self.cty_wonder = torch.full((B, 1 + r_pad, rc_pad, max(self._wond_n, 1)), -1, dtype=torch.long, device=device)
+        self.rc_wonder = self.cty_wonder[:, 1:]
+        self.wonder_reg = self.cty_wonder[:, 0, :C]
+        self.register_alias("rc_wonder", lambda sim: sim.cty_wonder[:, 1:])
+        self.register_alias("wonder_reg", lambda sim: sim.cty_wonder[:, 0, :sim.C])
         self.res_id = torch.tensor([[t.get("rid", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.desert = torch.tensor([[t.get("des", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.wok = torch.tensor([[t.get("wok", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
@@ -721,7 +739,7 @@ class SimInit:
                     self.rc_pop[b, rid, j] = rc["pop"]
                     self.rc_hp[b, rid, j] = rr.get("cityMaxHp", 200)
                     self.rc_id[b, rid, j] = rc["id"]
-                    self.rc_at[b, rc["center"]] = rid
+                    self.centre_slot_at[b, rc["center"]] = j
                 self.r_next_city_id[b, rid] = len(cv.get("cities", []))
                 for u_ in cv["units"]:
                     v = int(self.v_next[b])
@@ -1246,6 +1264,10 @@ class SimInit:
         self._cs_at_cache: torch.Tensor | None = None
         self._civ_at_ver = -1
         self._civ_at_cache: torch.Tensor | None = None
+        self._center_at_ver = -1
+        self._center_at_cache: torch.Tensor | None = None
+        self._rc_at_ver = -1
+        self._rc_at_cache: torch.Tensor | None = None
         self._owner_ver = -1
         self._owner_cache: torch.Tensor | None = None
         # `tile_seat` is STATE, not a cache. The seat-0 and civ parts mirror
@@ -1279,11 +1301,15 @@ class SimInit:
         self._temple_bidx = int(rules.temple_bidx)
         self._worship_cost = float(rules.worship_faith_cost)
         self._shrine_bidx = int(rules.shrine_bidx)  # missionary buy gate
-        self.prod_bank = z(B, C)  # chop production banked while the queue is empty
-        # The civ-side twin, allocated beside it rather than folded into the
-        # `cty_*` table above: that table is fixture-loaded and this field has
-        # no fixture key — a civ city always starts with an empty bank.
-        self.rc_prod_bank = torch.zeros(B, max(self.R, 1), self.RC, dtype=dtype, device=device)
+        # The completion-overflow / chop bank on the city-block seat axis
+        # (row 0 = seat 0, rows 1.. = the civ seats, then the city-state rows
+        # for family-shape consistency; every city starts with an empty bank,
+        # so unlike the fixture-loaded cty_* table it allocates plain).
+        self.cty_prod_bank = torch.zeros(B, 1 + max(self.R, 1) + max(self.S, 1), self.RC, dtype=dtype, device=device)
+        self.prod_bank = self.cty_prod_bank[:, 0, :C]
+        self.rc_prod_bank = self.cty_prod_bank[:, 1:1 + max(self.R, 1)]
+        self.register_alias("prod_bank", lambda sim: sim.cty_prod_bank[:, 0, :sim.C])
+        self.register_alias("rc_prod_bank", lambda sim: sim.cty_prod_bank[:, 1:1 + max(sim.R, 1)])
         self.science_total = z(B)
 
         # --- the hostile world: barbarians ----------------------------------------
@@ -1294,7 +1320,6 @@ class SimInit:
         self.K = int(self.max_camps.max().item()) if self.units_mode else 0
         # The in-state mulberry32, one u32 per game, mirrored draw for draw.
         self.rng_state = torch.tensor([f.get("rngInit", 0) for f in fixtures], dtype=torch.int64, device=device)
-        self.center_at = torch.full((B, T), -1, dtype=torch.long, device=device)  # city slot at tile (none at t0)
         # Tile -> unit-slot occupancy stacking mirrors tileFreeForUnit: a
         # foreign unit blocks a tile entirely; among one seat's own units, one
         # military + one civilian may share.

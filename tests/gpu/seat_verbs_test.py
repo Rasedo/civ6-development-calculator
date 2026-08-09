@@ -79,7 +79,8 @@ def main() -> None:
     sim.improvement[0, tile] = -1
     sim.district[0, tile] = -1
     sim.built_wonder[0, tile] = -1
-    sim.rc_at[0, tile] = -1
+    sim.centre_slot_at[0, tile] = -1
+    sim._tile_owner_ver += 1
     ut = int(sim._imp_unlock[k])
     if ut >= 0:
         sim.r_techs[0, r, ut] = True

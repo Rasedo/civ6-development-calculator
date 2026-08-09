@@ -195,7 +195,7 @@ class SimMinors:
         d_ctr = self.pair_dist[self.rc_center[:, r, j].clamp(min=0)]  # [B, T]
         return (
             (self.civ_at == r)
-            & (self.rc_tile_id == self.rc_id[:, r, j].unsqueeze(1))  # THIS city's registry
+            & (self.tile_city == self.rc_id[:, r, j].unsqueeze(1))  # THIS city's registry
             & (d_ctr <= 3)
             & (self.district < 0)
             & (self.built_wonder < 0)

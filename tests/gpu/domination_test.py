@@ -50,25 +50,29 @@ def main() -> int:
     # 2. Seat 0 holds every capital (every civ's captured) -> 0.
     s = build(rules, path)
     for ct in rcaps:
-        s.rc_at[0, ct] = -1
-        s.center_at[0, ct] = 1  # a seat-0 city sits here now (>=0 is all _domination reads)
+        s.centre_slot_at[0, ct] = 1  # a seat-0 city sits here now
+        s.tile_seat[0, ct] = 0       # the centre's owner names the seat
+    s._tile_owner_ver += 1           # direct plane pokes must invalidate the derived views
     assert dom(s) == 0, f"player domination should be 0, got {dom(s)}"
 
     # 3. Civ 0 holds every capital (seat 0's + civ 1's captured) -> civ id 1.
     s = build(rules, path)
-    s.center_at[0, pcap] = -1
-    s.rc_at[0, pcap] = 0  # civ index 0 took seat 0's capital
+    s.centre_slot_at[0, pcap] = 0
+    s.tile_seat[0, pcap] = 1  # civ index 0 took seat 0's capital
     for r in range(1, sim.R):
-        s.rc_at[0, rcaps[r]] = 0  # ...and every other civ capital
+        s.centre_slot_at[0, rcaps[r]] = 0
+        s.tile_seat[0, rcaps[r]] = 1  # ...and every other civ capital
+    s._tile_owner_ver += 1
     assert dom(s) == 1, f"civ-0 domination should be 1, got {dom(s)}"
 
     # 4. A razed capital (no city on the tile) blocks domination -> -1.
     s = build(rules, path)
     for ct in rcaps:
-        s.rc_at[0, ct] = -1
-        s.center_at[0, ct] = 1  # seat 0 would otherwise hold all...
-    s.center_at[0, rcaps[0]] = -1  # ...but civ 0's capital was razed
-    s.rc_at[0, rcaps[0]] = -1
+        s.centre_slot_at[0, ct] = 1
+        s.tile_seat[0, ct] = 0  # seat 0 would otherwise hold all...
+    s.centre_slot_at[0, rcaps[0]] = -1  # ...but civ 0's capital was razed
+    s.tile_seat[0, rcaps[0]] = -1
+    s._tile_owner_ver += 1
     assert dom(s) == -1, f"razed capital should block domination, got {dom(s)}"
 
     print("domination OK — split/-player/-civ/-razed all match dominationWinner")

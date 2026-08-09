@@ -1024,7 +1024,7 @@ class SimEconomy:
         d_center = self.pair_dist[center]  # [B, T]
         elig = (
             (self.civ_at == r)
-            & (self.rc_tile_id == self.rc_id[:, r, j].unsqueeze(1))  # THIS city's registry, not merely civ-owned
+            & (self.tile_city == self.rc_id[:, r, j].unsqueeze(1))  # THIS city's registry, not merely civ-owned
             & surface
             & (self.district < 0)
             & (self.built_wonder < 0)
@@ -1302,7 +1302,7 @@ class SimEconomy:
                 for j in range(self.RC):
                     if not bool(self.rc_alive[:, r, j].any()):
                         continue
-                    ring = (self.civ_at == r) & (self.rc_tile_id == self.rc_id[:, r, j].unsqueeze(1)) & self.rc_alive[:, r, j].unsqueeze(1)
+                    ring = (self.civ_at == r) & (self.tile_city == self.rc_id[:, r, j].unsqueeze(1)) & self.rc_alive[:, r, j].unsqueeze(1)
                     tfol = torch.where(ring, self.cty_followed[:, r + 1, j].unsqueeze(1).expand(B, T), tfol)
         terr = tfol.unsqueeze(1) == torch.arange(O, device=dev).reshape(1, O, 1)  # [B, O, T]
         # near3: dilate FOLLOWING city centers by justWarRange (scatter_add
@@ -2347,7 +2347,7 @@ class SimEconomy:
             # PER-CITY, not civ-level: the registry entry must be THIS city,
             # mirroring `t.cityId === city.id`. Without it two adjacent cities
             # of the same civ seat can both work one tile.
-            & (gat(self.rc_tile_id) == self.rc_id[:, r].unsqueeze(2))
+            & (gat(self.tile_city) == self.rc_id[:, r].unsqueeze(2))
             & gat(self.work_ok)
             & (tiles != centers.unsqueeze(2))
             & ~districted

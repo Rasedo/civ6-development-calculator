@@ -311,7 +311,7 @@ def poke_transfer(rules, path):
     c_t = int(sim.rc_center[0, r_from, j])
     id_from = int(sim.rc_id[0, r_from, j])
     id_next = int(sim.r_next_city_id[0, r_to])
-    own = (sim.rc_tile_id[0] == id_from) & (sim.civ_at[0] == r_from)
+    own = (sim.tile_city[0] == id_from) & (sim.civ_at[0] == r_from)
     n_own = int(own.sum())
     occ = sim.rc_alive[0, r_to].nonzero(as_tuple=True)[0]
     exp_slot = int(occ.max()) + 1 if len(occ) else 0
@@ -328,7 +328,7 @@ def poke_transfer(rules, path):
     assert int(sim.rc_center[0, r_to, exp_slot]) == c_t and not bool(sim.rc_is_cap[0, r_to, exp_slot])
     assert int(sim.rc_id[0, r_to, exp_slot]) == id_next and int(sim.r_next_city_id[0, r_to]) == id_next + 1
     assert int(sim.rc_at[0, c_t]) == r_to, "the center tile must re-seat to the receiver"
-    rekeyed = (sim.rc_tile_id[0] == id_next) & (sim.civ_at[0] == r_to)
+    rekeyed = (sim.tile_city[0] == id_next) & (sim.civ_at[0] == r_to)
     assert int(rekeyed.sum()) == n_own, (
         f"A-17: exactly the flipping city's {n_own} tiles must re-key to the receiver ({int(rekeyed.sum())})"
     )

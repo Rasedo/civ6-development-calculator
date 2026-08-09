@@ -399,7 +399,7 @@ class BatchEnv:
                 s.rc_cbox[:, r].gather(1, _ordR).to(d) / s._border_cost(s.rc_acquired[:, r].gather(1, _ordR)).clamp(min=1).to(d),
                 torch.where(
                     alive,
-                    ((s.rc_tile_id.unsqueeze(1) == s.rc_id[:, r].gather(1, _ordR).unsqueeze(2))
+                    ((s.tile_city.unsqueeze(1) == s.rc_id[:, r].gather(1, _ordR).unsqueeze(2))
                      & (s.civ_at == r).unsqueeze(1)).sum(dim=2).to(d),  # rc_id is PER-CIV — gate by owner plane
                     torch.zeros(B, C, dtype=d, device=dev),
                 ) / 20.0,

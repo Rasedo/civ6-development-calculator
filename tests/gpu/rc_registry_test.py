@@ -4,7 +4,7 @@
     $env:PYTHONUTF8='1'; python tests/gpu/rc_registry_test.py
 
 A civ district (and wonder) may only be placed on a tile whose registry entry
-(rc_tile_id) is THIS city (rc_id) — not merely a tile owned by the civ. A
+(tile_city) is THIS city (rc_id) — not merely a tile owned by the civ. A
 sibling's registered tile is NOT a valid site. These pokes drive the engine
 twin (_place_district_civ) and the env-gated consistency scan
 (_check_rc_registry_invariant) that the forced-compaction gate also exercises.
@@ -13,7 +13,7 @@ Covered:
   a. PLACEMENT RULE: with the whole work radius owned by the civ but registered
      to a SIBLING, _place_district_civ REFUSES; flip the one candidate's
      registry to THIS city and it places, and the paved tile registers back to
-     this rc (rc_dist_tile <-> rc_tile_id).
+     this rc (rc_dist_tile <-> tile_city).
   b. NEVER PICKS A SIBLING TILE: with a sibling-registered tile of MAXIMAL
      adjacency and a lower-adjacency own-registered tile both eligible, the
      picker chooses the OWN tile (the sibling tile is invisible to elig).
@@ -78,7 +78,7 @@ def poke_placement_rule(rules, path):
     """a. The whole work radius is civ-owned but registered to a SIBLING ->
     _place_district_civ must place NOTHING. Flip the one candidate's registry
     to THIS city -> it places, and the paved tile registers back
-    (rc_dist_tile == tile, rc_tile_id[tile] == rc_id)."""
+    (rc_dist_tile == tile, tile_city[tile] == rc_id)."""
     sim = build(rules, path)
     r, j = 0, 0
     assert bool(sim.rc_alive[0, r, j]), "capital slot must be alive"
@@ -97,7 +97,7 @@ def poke_placement_rule(rules, path):
     sim.civ_at[0, in_radius] = -1
     T = cands[0]
     sim.civ_at[0, T] = r
-    sim.rc_tile_id[0, T] = sib_id
+    sim.tile_city[0, T] = sib_id
 
     placed = sim._place_district_civ(r, j, di, torch.tensor([True]), 0)
     assert not bool(placed[0]), "district placed on a SIBLING-registered tile (A-24 bug)"
@@ -105,12 +105,12 @@ def poke_placement_rule(rules, path):
     assert int(sim.rc_dist_tile[0, r, j, di]) < 0, "registry gained a sibling tile"
 
     # Now register the same tile to THIS city -> placement succeeds and is coherent.
-    sim.rc_tile_id[0, T] = own_id
+    sim.tile_city[0, T] = own_id
     placed2 = sim._place_district_civ(r, j, di, torch.tensor([True]), 0)
     assert bool(placed2[0]), "district refused its OWN registered tile"
     assert int(sim.district[0, T]) == di, "own tile not paved"
     assert int(sim.rc_dist_tile[0, r, j, di]) == T, "registry did not record the paved tile"
-    assert int(sim.rc_tile_id[0, T]) == own_id, "paved tile does not register back to this rc"
+    assert int(sim.tile_city[0, T]) == own_id, "paved tile does not register back to this rc"
     print(f"  a placement rule OK (sibling tile {T} refused; own-registered tile paved, di={di})")
 
 
@@ -132,8 +132,8 @@ def poke_never_picks_sibling(rules, path):
     T_sib, T_own = cands[0], cands[1]
     for t in (T_sib, T_own):
         sim.civ_at[0, t] = r
-    sim.rc_tile_id[0, T_sib] = sib_id
-    sim.rc_tile_id[0, T_own] = own_id
+    sim.tile_city[0, T_sib] = sib_id
+    sim.tile_city[0, T_own] = own_id
 
     # Give the sibling tile a huge adjacency edge; if it were eligible it would
     # win the argmax. The own tile must still be the one paved.
@@ -145,7 +145,7 @@ def poke_never_picks_sibling(rules, path):
     assert bool(placed[0]), "no placement with an own-registered tile available"
     chosen = int(sim.rc_dist_tile[0, r, j, di])
     assert chosen == T_own, f"picker chose a non-own tile {chosen} (own was {T_own})"
-    assert int(sim.rc_tile_id[0, chosen]) == own_id, "chosen tile registers to a sibling"
+    assert int(sim.tile_city[0, chosen]) == own_id, "chosen tile registers to a sibling"
     print(f"  b never-picks-sibling OK (chose own tile {T_own}, not sibling {T_sib})")
 
 
@@ -178,22 +178,22 @@ def poke_invariant_scan(rules, path):
         center = int(sim.rc_center[0, r, j])
         T = radius3_usable(sim, center)[0]
         sim.civ_at[0, T] = r
-        sim.rc_tile_id[0, T] = int(sim.rc_id[0, r, j])
+        sim.tile_city[0, T] = int(sim.rc_id[0, r, j])
         sim.district[0, T] = di
         sim.rc_dist_tile[0, r, j, di] = T
         sim._check_rc_registry_invariant()  # planted reference is coherent
     tile = int(sim.rc_dist_tile[0, r, j, di])
-    good_id = int(sim.rc_tile_id[0, tile])
+    good_id = int(sim.tile_city[0, tile])
 
     # forward violation: the tile now registers to a sibling
-    sim.rc_tile_id[0, tile] = good_id + 9999
+    sim.tile_city[0, tile] = good_id + 9999
     raised = False
     try:
         sim._check_rc_registry_invariant()
     except AssertionError:
         raised = True
     assert raised, "scan missed a forward (sibling-registered) incoherence"
-    sim.rc_tile_id[0, tile] = good_id
+    sim.tile_city[0, tile] = good_id
     sim._check_rc_registry_invariant()  # repaired
 
     # backward violation: the tile is no longer owned by any civ
@@ -248,7 +248,7 @@ def poke_capture_luxury_pool(rules, path):
     sim.improvement[0, t] = req
     sim.pillaged[0, t] = False
     sim.civ_at[0, t] = r
-    sim.rc_tile_id[0, t] = cid
+    sim.tile_city[0, t] = cid
 
     have = torch.zeros(sim.B, sim.C, dtype=sim.dtype)
     need = torch.full((sim.B, sim.C), 10.0, dtype=sim.dtype)

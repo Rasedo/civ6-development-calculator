@@ -83,7 +83,7 @@ def main() -> None:
     sim2.rc_progress[0, r, j] = 0.0
     sim2.rc_cost[0, r, j] = 0.0
     ctr = int(sim2.rc_center[0, r, j])
-    own = ((sim2.rc_tile_id[0] == sim2.rc_id[0, r, j]) & (sim2.district[0] < 0)).nonzero(as_tuple=True)[0]
+    own = ((sim2.tile_city[0] == sim2.rc_id[0, r, j]) & (sim2.district[0] < 0)).nonzero(as_tuple=True)[0]
     for t in own.tolist():
         if t != ctr:
             sim2.district[0, t] = 0        # occupied -> no tile can take a new one

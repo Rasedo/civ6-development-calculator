@@ -1139,10 +1139,9 @@
       "Tile.ownerCity"
      ],
      "planes": [
-      "tile_city",
-      "rc_tile_id"
+      "tile_city"
      ],
-     "note": "TS keeps ONE ownerCity beside ownerSeat; the GPU splits it — `tile_city` carries seat 0's city index and `rc_tile_id` carries every other seat's, both in that seat's own city-id space. The extractor reads whichever the tile's owner selects."
+     "note": "ONE ownerCity beside ownerSeat on both engines: `tile_city` carries the owning city's id for every seat, in that seat's own city-id space; `tile_seat` says whose."
     },
     {
      "name": "improvement",
