@@ -655,6 +655,16 @@ class SimOrders:
             # with the new owner, maintenance and yields included.
             live_ring = ring & (self.district[b] >= 0) & self.district_complete[b]
             self.district_dead[b] = self.district_dead[b] & ~live_ring
+            # The row-0 registry adopts the kept infrastructure — TS derives
+            # the fresh City's districts from tiles (complete = listed =
+            # live); wonders mirror the captor rebuild in
+            # _transfer_city_to_civ (no completeness test).
+            self.dist_tile[b, c_new, :] = -1
+            for _t in live_ring.nonzero(as_tuple=True)[0].tolist():
+                self.dist_tile[b, c_new, int(self.district[b, _t])] = _t
+            self.wonder_reg[b, c_new, :] = -1
+            for _t in (ring & (self.built_wonder[b] >= 0)).nonzero(as_tuple=True)[0].tolist():
+                self.wonder_reg[b, c_new, int(self.built_wonder[b, _t])] = _t
             self.pop[b, c_new] = pop
             self.food_box[b, c_new] = 0.0
             self.culture_box[b, c_new] = 0.0
@@ -773,6 +783,8 @@ class SimOrders:
             self.progress[b, c_new] = 0.0
             self.cur_cost[b, c_new] = 0.0
             self.q_dtile[b, c_new] = -1
+            self.dist_tile[b, c_new, :] = -1  # row-0 registry hygiene (a CS city carries no districts/wonders)
+            self.wonder_reg[b, c_new, :] = -1
             self.warrior_trained[b, c_new] = False
             self.buildings[b, c_new] = False
             self.outer_hp[b, c_new] = 0  # no walls: the buildings plane was wiped

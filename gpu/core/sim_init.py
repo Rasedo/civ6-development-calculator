@@ -453,10 +453,10 @@ class SimInit:
         nd_b4 = max(len(rules.districts or []), 1)
         # The district-tile registry on the city-block seat axis (row 0 =
         # seat 0, rows 1.. = the civ seats; city-states pave no districts, so
-        # no CS rows). Seat 0's row is allocated and snapshot-covered but
-        # mechanics-quiet: its readers derive districts from the tile planes
-        # (both engines do — the registry exists for civ slot compaction,
-        # which seat-0 slots do not have). One base, one geometry.
+        # no CS rows). EVERY row is live: writes at queue (_place_district /
+        # _place_district_civ), the capture rebuilds, and clears at every
+        # city-exit path; _district_discounted and _quest_owns_dist read one
+        # body over city_dist_tile[:, row]. One base, one geometry.
         self.city_dist_tile = torch.full((B, 1 + r_pad, civ_city_pad, nd_b4), -1, dtype=torch.long, device=device)
         self.civ_city_dist_tile = self.city_dist_tile[:, 1:]
         self.dist_tile = self.city_dist_tile[:, 0, :C]
@@ -714,8 +714,9 @@ class SimInit:
         self._fp_fid = int(_wd.get("fpFid", -1))
         self.built_wonder = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.built_wonder_complete = torch.zeros(B, T, dtype=torch.bool, device=device)
-        # The wonder-tile registry, same seat-axis shape and the same
-        # mechanics-quiet seat-0 row as city_dist_tile above.
+        # The wonder-tile registry, same seat-axis shape and row liveness as
+        # city_dist_tile above (row 0 fills only via capture — seat 0 cannot
+        # queue wonders, the #83 action-surface gap).
         self.city_wonder = torch.full((B, 1 + r_pad, civ_city_pad, max(self._wond_n, 1)), -1, dtype=torch.long, device=device)
         self.civ_city_wonder = self.city_wonder[:, 1:]
         self.wonder_reg = self.city_wonder[:, 0, :C]

@@ -1418,7 +1418,7 @@
    },
    {
     "path": "City.districts",
-    "why": "the per-city district REGISTRY. The placements themselves are compared per tile (tile.district + tile.districtComplete); the registry exists on the GPU only for civ cities (`civ_city_dist_tile`), so there is no symmetric object."
+    "why": "the per-city district REGISTRY. The placements themselves are compared per tile (tile.district + tile.districtComplete); the GPU registry (`city_dist_tile`, every seat row) is derived bookkeeping over those same tiles, so comparing it would double-count the planes."
    },
    {
     "path": "City.wonders",
@@ -1620,7 +1620,7 @@
    },
    {
     "plane": "civ_city_dist_tile",
-    "why": "the per-civ-city district registry (see the City.districts exclusion); placements are compared per tile."
+    "why": "the seat-axis district registry, civ rows (see the City.districts exclusion); placements are compared per tile. Row 0 (`dist_tile`) is excluded the same way — the extractor never reads either."
    },
    {
     "plane": "civ_city_wonder",

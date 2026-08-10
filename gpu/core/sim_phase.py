@@ -1456,6 +1456,10 @@ class SimPhase:
         self.is_cap[b, c] = False  # identity dies with the city (a refound sets it fresh)
         self.pop[b, c] = 0
         self.current[b, c] = -1
+        # the row-0 registry rows die with the city — the receiver rebuilds
+        # its own below, and the conquest-raze path needs the clear too
+        self.dist_tile[b, c, :] = -1
+        self.wonder_reg[b, c, :] = -1
         # relocatePalace runs right after the cities filter — BEFORE the
         # cityHp/route prune and BEFORE the conquest-raze early return below.
         self._relocate_palace(torch.tensor([b], dtype=torch.long, device=self.device), torch.tensor([0], dtype=torch.long, device=self.device))
@@ -1636,6 +1640,8 @@ class SimPhase:
         self.outer_hp[rows, c_new] = 0
         self.cur_cost[rows, c_new] = 0.0
         self.q_dtile[rows, c_new] = -1
+        self.dist_tile[rows, c_new, :] = -1  # row-0 registry hygiene
+        self.wonder_reg[rows, c_new, :] = -1
         # founded_n bumps only for append slots — a hole-fallback founding
         # reuses a dead column.
         self.founded_n[rows] += (c_new == self.founded_n[rows]).long()

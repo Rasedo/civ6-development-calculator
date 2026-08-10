@@ -866,7 +866,7 @@ class SimSeats:
                     if not bool(want_d.any()):
                         continue
                     # discount read BEFORE the placement registers
-                    disc = self._seat_district_discounted(r, di)
+                    disc = self._district_discounted(r + 1, di)
                     d_cost_si = torch.where(disc, torch.floor(d_cost * 0.6), d_cost)
                     placed = self._place_district_civ(r, j, di, want_d, plc)
                     if bool(placed.any()):
@@ -3993,30 +3993,20 @@ class SimSeats:
 
     def _quest_owns_dist(self, row: int) -> torch.Tensor:
         """[B, S] — does seat-row `row` own a COMPLETE district of each CS's
-        asked type (the CS type's own, _citystate_didx) in a LIVE city:
-        questSatisfied's buildDistrict and issueQuest's `alreadyBuilt`. Civ
-        rows read the city registry; row 0 reads the tile planes (no seat-0
-        registry yet — the registry write-through collapses this branch)."""
+        asked type (the CS type's own, _citystate_didx):
+        questSatisfied's buildDistrict and issueQuest's `alreadyBuilt`. ONE
+        registry read for every row — city_dist_tile[:, row]; dead columns
+        are cleared at every city-exit path, so no alive gate is needed."""
         B, S = self.B, self.S
         if not self.districts_on:
             return torch.zeros(B, S, dtype=torch.bool, device=self.device)
-        if row == 0:
-            di0 = self._citystate_didx[:, :S]  # [B, S]
-            # a seat-0 tile's tile_city is the owning COLUMN — but only where
-            # tile_seat == 0 (civ tiles hold per-seat city IDS there), so the
-            # seat gate comes first.
-            col = torch.where(self.tile_seat == 0, self.tile_city, torch.zeros_like(self.tile_city)).clamp(min=0, max=self.C - 1)
-            live0 = (self.tile_seat == 0) & (self.tile_city >= 0) & self.alive.gather(1, col)
-            ok_t = self.district_complete & ~self.district_dead & live0  # [B, T]
-            return ((self.district.unsqueeze(1) == di0.unsqueeze(2)) & ok_t.unsqueeze(1)).any(dim=2)
-        r = row - 1
-        dt = self.civ_city_dist_tile[:, r]  # [B, RC, nD]
-        nD = dt.shape[2]
+        dt = self.city_dist_tile[:, row]  # [B, cols, nD]
+        nCol, nD = dt.shape[1], dt.shape[2]
         di = self._citystate_didx[:, :S].clamp(min=0, max=nD - 1)  # [B, S]
-        own_tile = dt.unsqueeze(1).expand(B, S, self.RC, nD).gather(
-            3, di.reshape(B, S, 1, 1).expand(B, S, self.RC, 1)
-        ).squeeze(3)  # [B, S, RC] tile of the CS-type district per civ city
-        own_dc = self.district_complete.gather(1, own_tile.clamp(min=0).reshape(B, -1)).reshape(B, S, self.RC)
+        own_tile = dt.unsqueeze(1).expand(B, S, nCol, nD).gather(
+            3, di.reshape(B, S, 1, 1).expand(B, S, nCol, 1)
+        ).squeeze(3)  # [B, S, cols] tile of the CS-type district per city
+        own_dc = self.district_complete.gather(1, own_tile.clamp(min=0).reshape(B, -1)).reshape(B, S, nCol)
         return ((own_tile >= 0) & own_dc).any(dim=2)  # [B, S]
 
     def _seat_quest_phase(self, row: int, active: torch.Tensor) -> None:

@@ -349,32 +349,22 @@ class SimEconomy:
         )  # [B, nD]
         return (unl & self._is_specialty.unsqueeze(0)).sum(dim=1)
 
-    def _district_discounted(self, di: int) -> torch.Tensor:
-        """districtDiscounted for seat 0: [B] bool — 40% off type di while the
-        seat has PLACED fewer of it than ceil(D/U) with D = COMPLETED
-        specialty districts owned, U = unlocked specialty types, D ≥ U."""
+    def _district_discounted(self, row: int, di: int) -> torch.Tensor:
+        """districtDiscounted for seat-row `row` (0 = seat 0, r+1 = civ r):
+        [B] bool — 40% off specialty type di while the seat has PLACED fewer
+        of it than ceil(D/U) with D = COMPLETED specialty districts in the
+        row's city registry, U = its OWN unlocked specialty types, D ≥ U."""
         if not bool(self._is_specialty[di]):
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        U = self._unlocked_specialty_count(self.techs, self.civics)
-        own = (self.tile_seat == 0) & ~self.district_dead  # captured = dead, uncounted
-        spec_t = (self.district >= 0) & self._is_specialty[self.district.clamp(min=0)]
-        D = (own & spec_t & self.district_complete).sum(dim=1)
-        n = (own & (self.district == di)).sum(dim=1)
-        thresh = torch.div(D + U.clamp(min=1) - 1, U.clamp(min=1), rounding_mode="floor")  # ceil(D/U)
-        return (U > 0) & (D >= U) & (n < thresh)
-
-    def _seat_district_discounted(self, r: int, di: int) -> torch.Tensor:
-        """districtDiscounted from THIS civ seat's own research trees and
-        civ_city_dist_tile registry."""
-        if not bool(self._is_specialty[di]):
-            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        U = self._unlocked_specialty_count(self.civ_only_techs[:, r], self.civ_only_civics[:, r])
-        placed = self.civ_city_dist_tile[:, r]  # [B, RC, nD] tile per (city, type)
+        techs2 = self.techs if row == 0 else self.civ_only_techs[:, row - 1]
+        civics2 = self.civics if row == 0 else self.civ_only_civics[:, row - 1]
+        U = self._unlocked_specialty_count(techs2, civics2)
+        placed = self.city_dist_tile[:, row]  # [B, cols, nD] tile per (city, type)
         n = (placed[:, :, di] >= 0).sum(dim=1)
         tiles_f = placed.clamp(min=0).reshape(self.B, -1)
         comp = (placed >= 0) & self.district_complete.gather(1, tiles_f).reshape(placed.shape)
         D = (comp & self._is_specialty.reshape(1, 1, -1)).sum(dim=(1, 2))
-        thresh = torch.div(D + U.clamp(min=1) - 1, U.clamp(min=1), rounding_mode="floor")
+        thresh = torch.div(D + U.clamp(min=1) - 1, U.clamp(min=1), rounding_mode="floor")  # ceil(D/U)
         return (U > 0) & (D >= U) & (n < thresh)
 
     def _available_mask(self, done: torch.Tensor, prereq: torch.Tensor) -> torch.Tensor:
@@ -995,6 +985,7 @@ class SimEconomy:
             bt = best[rows]
             self.district[rows, bt] = di
             self.district_complete[rows, bt] = False  # queued, not complete
+            self.dist_tile[rows, c, di] = bt  # row-0 registry, written at queue like the civ arm's
             self._strip_feature_at(rows, bt)  # queueDistrict: tile.feature = null
             # queueDistrict removes a bonus resource (only priority-1 tiles
             # carrying a resource are eligible at all); a FRESH sea strip

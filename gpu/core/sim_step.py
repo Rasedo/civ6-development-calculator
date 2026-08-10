@@ -368,7 +368,7 @@ class SimStep:
                         want = (ac == dbase + si) & has_tech & under_cap & not_owned
                         if bool(want.any()):
                             # the discount reads BEFORE the placement registers
-                            disc = self._district_discounted(di)
+                            disc = self._district_discounted(0, di)
                             d_cost_si = torch.where(disc, torch.floor(d_cost * 0.6), d_cost)
                             placed, best = self._place_district(di, want, c, plc)
                             if bool(placed.any()):
