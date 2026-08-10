@@ -1766,6 +1766,15 @@ class SimEconomy:
             # (assignWorkedTiles uses tileScore WITH the bonus).
             tile_score = tile_score + self._farmadj_food() * float(rd.focus_base[0])
             self._score_cache = (self._eff_version, tile_score)
+        # Seat 0's OWN belief tile adds (#73) — joined FRESH, never into the
+        # _eff_version-keyed caches above (claims bump _bel_version only).
+        # TS adds them inside tileYields, so they ride the worked yields, the
+        # selection score, and the centre rebuild below — the civ walk's
+        # f_plane/p_plane/ty_oth/oth_sc shape.
+        featP0 = self._belief_feat_plane(0).to(self.dtype) if self._seat_has_beliefs(0) else None
+        if featP0 is not None:
+            eff_y = eff_y + featP0
+            tile_score = tile_score + (featP0 * rd.focus_base).sum(dim=2)
         tiles = tiles_from_offsets(self.site.clamp(min=0).reshape(-1), self._off3, self.W, self.H).reshape(B, C, -1)
         M = tiles.shape[2]
         tc = tiles.clamp(min=0)
@@ -1860,6 +1869,19 @@ class SimEconomy:
             cf = torch.where(self.drought.gather(1, sitec) > 0, (cf - 1).clamp(min=0), cf)
             center_y = self.center_yields.clone()
             center_y[:, :, 0] = torch.maximum(cf, torch.full_like(cf, float(r.center_min_food)))
+        if featP0 is not None:
+            # Belief adds sit INSIDE tileYields on TS, so the centre's
+            # min-clamps apply AFTER them — the stored (post-clamp)
+            # center_yields cannot express that. Rebuild the centre from the
+            # effective tile plane (featP0 already joined; disasters ride
+            # eff_y), exactly the civ path's max(plane@ctr, min) shape. Only
+            # an UNREMOVABLE feature (floodplains) survives founding to carry
+            # a belief add here.
+            sitec_b = self.site.clamp(min=0)
+            eff_c = eff_y.gather(1, sitec_b.unsqueeze(2).expand(-1, -1, 6))  # [B, C, 6]
+            center_y = eff_c.clone()
+            center_y[:, :, 0] = torch.maximum(eff_c[:, :, 0], torch.full_like(eff_c[:, :, 0], float(r.center_min_food)))
+            center_y[:, :, 1] = torch.maximum(eff_c[:, :, 1], torch.full_like(eff_c[:, :, 1], float(r.center_min_production)))
         total = worked_y + center_y + self.is_cap.unsqueeze(2).to(self.dtype) * self._palace_y.reshape(1, 1, 6) + b_y
         # Per-city FOLLOWER-belief id for seat 0 (from followedReligion when
         # LIVE, else religion 0 = -1 follower = no add). Its building-yield
@@ -1874,6 +1896,11 @@ class SimEconomy:
             # the raw f64 table would break the einsum. No-op under parity f64.)
             _fol_by = torch.einsum("bcn,bcnk->bck", bf_live, self._fol_tab("bldgY", _pcfol).to(self.dtype))  # dark buildings excluded
             total = total + _fol_by
+        if featP0 is not None:
+            # Seat 0's OWN pantheon+founder building adds (Stewardship) — the
+            # _bel_add_pf half beside the per-city follower half above, the
+            # civ walk's bldgY position.
+            total = total + torch.einsum("bcn,bnk->bck", bf_live, self._bel_add_pf("bldgY", 0).to(self.dtype))
         reg_y = reg_am = None  # set by the districts_on block; regional buildings need a district
         if self.districts_on:
             if cc is not None:
@@ -2058,6 +2085,18 @@ class SimEconomy:
             suz_bonus.scatter_add_(1, self.citystate_suz_key.clamp(min=0), suz_val)
             total += suz_bonus.unsqueeze(1) * _cap_m  # capital FLAG, not column 0
 
+        # Founder capital incomes — perF (per-N-followers empire-wide) + perC
+        # (per live city), landing on the CAPITAL like the civ walk's block.
+        # Followers = own live pop sum (city religion follows the owner when
+        # uncoupled). Integer f64 adds pre-amenity-factor: association-safe.
+        if featP0 is not None:
+            perF0 = self._bel_add("perF", 0).to(self.dtype)  # [B, 7] = N, then 6 yields
+            perC0 = self._bel_add("perC", 0).to(self.dtype)  # [B, 6]
+            fol0 = (self.pop * self.alive.long()).sum(dim=1).to(self.dtype)
+            times0 = torch.where(perF0[:, 0] > 0, torch.floor(fol0 / perF0[:, 0].clamp(min=1)), torch.zeros_like(fol0))
+            capY0 = perF0[:, 1:] * times0.unsqueeze(1) + perC0 * self.alive.sum(dim=1).to(self.dtype).unsqueeze(1)
+            total += capY0.unsqueeze(1) * (self.is_cap & self.alive).to(self.dtype).unsqueeze(2)
+
         # Seat 0's adopted government + slotted policies — cityYields to every
         # city, capitalYields to the capital (computeCityStats' `bonuses`),
         # summed pre-amenity-factor. Food (col 0) is left unscaled by the
@@ -2090,6 +2129,11 @@ class SimEconomy:
         if _pcfol is not None and self.districts_on:
             _zen = self._fol_tab("zen", _pcfol).to(self.dtype)  # [B, C, 2] = min, amenities
             amen_have = amen_have + torch.where(spec_count.to(self.dtype) >= _zen[:, :, 0], _zen[:, :, 1], torch.zeros_like(_zen[:, :, 1]))
+        if featP0 is not None:
+            # River Goddess — pantheon amenities on river CENTERS; joins the
+            # TIER balance only (the luxury ranking above stays
+            # building-amenities-based), the civ walk's position.
+            amen_have = amen_have + self._bel_add("river", 0)[:, 0].to(self.dtype).unsqueeze(1) * self.tile_river.gather(1, self.site.clamp(min=0)).to(self.dtype)
         # The flat empire-wide war-weariness drag lands after the luxury grant
         # (`have -= warWearinessPenalty(...)`), below in `balance`.
         if gpc_amen is not None:
@@ -2153,6 +2197,10 @@ class SimEconomy:
         # (computeHousing beliefHousing), keyed per-city on the followed religion.
         if _pcfol is not None:
             housing = housing + torch.einsum("bcn,bcn->bc", bf_live, self._fol_tab("bldgH", _pcfol).to(self.dtype))  # dark buildings excluded
+        if featP0 is not None:
+            # River Goddess' housing half on river CENTERS (computeHousing
+            # beliefHousing), beside the follower bldgH add like the civ walk.
+            housing = housing + self._bel_add("river", 0)[:, 1].to(self.dtype).unsqueeze(1) * self.tile_river.gather(1, self.site.clamp(min=0)).to(self.dtype)
         if self.improvements_on:
             # +catalog housing per owned improvement within the work radius
             # (pillaged or not — computeHousing does not gate on pillaged,

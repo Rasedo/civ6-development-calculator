@@ -398,7 +398,28 @@ class SimStep:
         # leaves pop unchanged forces a spurious recompute of identical values
         # (bit-exact, rare).
         _pop_dirty = False
-        y_sum = self._eff_yields().sum(dim=2) * ((self.district < 0) & (self.built_wonder < 0)).to(self.dtype)  # paved/wondered tiles yield 0 (tileYields, yields.ts)
+        # Seat 0's belief hoists (ids are static inside the walk — claims live
+        # in the phase, not here): Fertility Rites rides the growth chain,
+        # Religious Settlements scales the border cost (js_round(base * mult),
+        # the city.ts form), and the tile-add plane rides the border ySum like
+        # the civ pick key (pickBorderTile's ctx carries the seat's modifiers).
+        _bel0 = self._seat_has_beliefs(0)
+        gmul0 = self._bel_mul("growth", 0).to(self.dtype) if _bel0 else None
+        _bmul0 = self._bel_mul("border", 0).to(self.dtype) if _bel0 else None
+        _featsum0 = self._belief_feat_plane(0).sum(dim=2).to(self.dtype) if _bel0 else None
+
+        def _border_ysum() -> torch.Tensor:
+            # The border-pick ranking plane, ONE construct for the walk-entry
+            # compute and both mid-walk refreshes: tileYields carries
+            # FARM-ADJACENCY food (a raze can free farmland onto the frontier)
+            # and the belief tile adds; paved/wondered tiles yield 0
+            # (tileYields, yields.ts).
+            ys = self._eff_yields().sum(dim=2) + self._farmadj_food()
+            if _featsum0 is not None:
+                ys = ys + _featsum0
+            return ys * ((self.district < 0) & (self.built_wonder < 0)).to(self.dtype)
+
+        y_sum = _border_ysum()
         # Loyalty mirrors the loop-top view: city c's tier and pop are captured
         # FRESH at its own iteration (post earlier cities' same-turn mutations,
         # pre its own production/growth) — applyLoyalty runs at the top of the
@@ -428,10 +449,7 @@ class SimStep:
                 total, housing, growth_f, tier_idx = self._city_totals(lux=lux0)
                 _tot_ver = self._eff_version
                 _pop_dirty = False
-                # tileYields carries FARM-ADJACENCY food (yields.ts), which the
-                # border ySum must include — a raze can free farmland onto the
-                # frontier. Same plane the walk's scoring uses.
-                y_sum = (self._eff_yields().sum(dim=2) + self._farmadj_food()) * ((self.district < 0) & (self.built_wonder < 0)).to(self.dtype)  # paved/wondered tiles yield 0 (tileYields, yields.ts)
+                y_sum = _border_ysum()
             tier_fresh[bidx, col] = tier_idx[bidx, col]
             pop_loyal[bidx, col] = self.pop[bidx, col]
             t_c = total[bidx, col]  # [B, 6] this city's FRESH yields
@@ -516,7 +534,11 @@ class SimStep:
             surplus = t_c[:, 0] - popf_c * r.food_per_citizen
             head = housing[bidx, col] - popf_c
             hf = torch.where(head >= 2, 1.0, torch.where(head >= 1, 0.5, 0.25).to(self.dtype)).to(self.dtype)
-            effective = torch.where(surplus > 0, surplus * hf * growth_f[bidx, col], surplus)
+            _gf_c = surplus * hf * growth_f[bidx, col]
+            if gmul0 is not None:
+                # left-to-right like computeCityStats: ((s×hf)×tier)×growthMult
+                _gf_c = _gf_c * gmul0
+            effective = torch.where(surplus > 0, _gf_c, surplus)
             self.food_box[bidx, col] = self.food_box[bidx, col] + effective
             need = self._growth_needed(pop_c0)  # stats.growthNeeded: loop-top pop
             alive_c = self.alive[bidx, col]
@@ -540,15 +562,14 @@ class SimStep:
                 total, housing, growth_f, tier_idx = self._city_totals(lux=lux0)
                 _tot_ver = self._eff_version
                 _pop_dirty = False
-                # tileYields carries FARM-ADJACENCY food (yields.ts), which the
-                # border ySum must include — a raze can free farmland onto the
-                # frontier. Same plane the walk's scoring uses.
-                y_sum = (self._eff_yields().sum(dim=2) + self._farmadj_food()) * ((self.district < 0) & (self.built_wonder < 0)).to(self.dtype)  # paved/wondered tiles yield 0 (tileYields, yields.ts)
+                y_sum = _border_ysum()
             self.culture_box[bidx, col] = self.culture_box[bidx, col] + t_c[:, 4]
             dist_c = self.dist[bidx, col]  # [B, T] — static per city, hoisted out of the claim loop
             adj_own = None  # dense on the first ready iteration, then incremental
             for _ in range(BORDER_LOOPS):
                 cost_b = self._border_cost(self.tiles_acquired[bidx, col])
+                if _bmul0 is not None:
+                    cost_b = js_round(cost_b * _bmul0)
                 ready = self.alive[bidx, col] & (self.culture_box[bidx, col] >= cost_b)
                 if not ready.any():
                     break
