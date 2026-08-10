@@ -1573,40 +1573,54 @@ class SimOrders:
                     ok, torch.full_like(here, p), here, tgt, dirs, 0, civ,
                 )
 
-    def _bankrupt_disband(self, active0: torch.Tensor | None = None) -> None:
-        """Disband ONE seat-0 unit per turn while the treasury is insolvent.
+    def _seat_upkeep_and_bankruptcy(self, row: int, active: torch.Tensor) -> None:
+        """Unit upkeep + the bankruptcy rule for ONE seat row (0 = seat 0,
+        r+1 = civ r), at the loop position right after the seat's gold lands:
+        charge maintenance for every living unit of this seat off the POOLED
+        planes, then disband while insolvent. An eliminated actor charges
+        nothing (the TS loop's eliminated-actor continue)."""
+        if not self.units_mode:
+            return
+        mine = self.unit_alive & (self.unit_seat == row)
+        upkeep = (self._type_maintenance[self.unit_type.clamp(min=0, max=self.NU - 1)] * mine.to(self.dtype)).sum(dim=1)
+        tre = self.civ_treasury[:, row]
+        self.civ_treasury[:, row] = torch.where(active, tre - upkeep, tre)
+        self._bankrupt_disband(row, active)
 
-        The priciest alive unit goes; ties break to the lowest slot (= oldest,
-        matching TS's lowest id, since both spawn orders are append-only).
-        Only upkeep>0 units (military) are candidates, and there is no refund.
-        `active0` is the TS loop's eliminated-actor continue — a cityless
-        seat 0 pays no upkeep and disbands nothing.
-        """
-        insolvent = js_round(self.treasury * 1000) < 0  # [B] test at MILLI precision: sub-milli non-dyadic gold drift must not trip the < 0 boundary here but not on TS
-        if active0 is not None:
-            insolvent = insolvent & active0
+    def _bankrupt_disband(self, row: int = 0, active: torch.Tensor | None = None) -> None:
+        """Disband ONE unit of seat-row `row` per turn while its treasury is
+        insolvent — milli-rounded test (sub-milli non-dyadic gold drift must
+        not trip the < 0 boundary here but not on TS). The priciest alive
+        unit goes; ties break to the lowest slot (= oldest, matching TS's
+        lowest id: every pool appends, and one seat's units live in ONE pool
+        range, so global slot order is its spawn order). Only upkeep>0 units
+        are candidates, and there is no refund. `active` is the TS loop's
+        eliminated-actor continue."""
+        insolvent = js_round(self.civ_treasury[:, row] * 1000) < 0  # [B]
+        if active is not None:
+            insolvent = insolvent & active
         if not bool(insolvent.any()):
             return
-        P = self.seat0_unit_alive.shape[1]
-        maint = self._type_maintenance[self.seat0_unit_type]  # [B, P] upkeep per slot
-        cand = self.seat0_unit_alive & (maint > 0)
-        slots = torch.arange(P, device=self.device, dtype=maint.dtype).unsqueeze(0)  # [1, P]
-        # maximize (upkeep, -slot): upkeep*(P+1) - slot lets upkeep dominate, tie -> lowest slot
-        score = torch.where(cand, maint * float(P + 1) - slots, torch.full_like(maint, -1e30))
+        maint = self._type_maintenance[self.unit_type.clamp(min=0, max=self.NU - 1)]  # [B, W]
+        cand = self.unit_alive & (self.unit_seat == row) & (maint > 0)
+        W = cand.shape[1]
+        slots = torch.arange(W, device=self.device, dtype=maint.dtype).unsqueeze(0)  # [1, W]
+        # maximize (upkeep, -slot): upkeep*(W+1) - slot lets upkeep dominate, tie -> lowest slot
+        score = torch.where(cand, maint * float(W + 1) - slots, torch.full_like(maint, -1e30))
         victim = score.argmax(dim=1)  # [B]
         do_kill = insolvent & cand.any(dim=1)
         if not bool(do_kill.any()):
             return
         rows = do_kill.nonzero(as_tuple=True)[0]
         vslot = victim[rows]
-        vtile = self.seat0_unit_tile[rows, vslot]
-        vciv = self._type_civilian[self.seat0_unit_type[rows, vslot]]  # clear military vs civilian occupancy
+        vtile = self.unit_tile[rows, vslot]
+        vciv = self._type_civilian[self.unit_type[rows, vslot].clamp(min=0, max=self.NU - 1)]  # clear military vs civilian occupancy
         mil = ~vciv
         if bool(mil.any()):
             self.military_at[(rows[mil], vtile[mil])] = -1
         if bool(vciv.any()):
             self.civilian_at[(rows[vciv], vtile[vciv])] = -1
-        self.seat0_unit_alive[rows, vslot] = False
+        self.unit_alive[rows, vslot] = False
 
     def _barb_reset_mp(self) -> None:
         """Reset barbarian MP: `u.movesLeft = UNITS[u.type].moves`.

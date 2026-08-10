@@ -774,9 +774,9 @@
       "CityStateQuest.district"
      ],
      "planes": [
-      "seat_citystate_quest_district"
+      "seat_citystate_quest"
      ],
-     "gap": "TS names the asked-for district by DistrictId; the GPU stores an index into the ASKABLE-district subset (`citystate_quest_district`, 0 = CAMPUS). The two are different lists, so the numbers only agree by accident."
+     "gap": "Both engines DERIVE the asked district (a kind-3 quest always asks the CS type's own): TS digests PLACEABLE_DISTRICTS.indexOf(quest.district), the GPU digests _citystate_didx (a districts_cat index). Different lists — the numbers only agree where the orders coincide."
     },
     {
      "name": "lastLevyTurn",

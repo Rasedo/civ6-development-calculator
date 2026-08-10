@@ -249,8 +249,10 @@ class SimStep:
         # --- eurekas: detectBoosts at the row's own block top ------------------
         self._detect_boosts(active0)
 
-        # --- CS diplomacy (meet/influence/quests) — the loop-body position ----
-        self._seat0_cs_phase(active0)
+        # --- CS diplomacy (meet/influence) + quests — the loop-body position,
+        # through the SAME shared bodies every civ row calls (row 0) ----------
+        self._seat_influence_phase(0, active0)
+        self._seat_quest_phase(0, active0)
 
         # --- the driven picks (the applySeatActionRecord position: tech,
         # civic, envoys, then production; the civ arm applies its picks at the
@@ -621,16 +623,9 @@ class SimStep:
         # Seat 0's per-turn faith income, banked in the same city walk as
         # gold/science/culture (the civ-seat twin is `civ_only_faith + faith_sum`).
         self.faith.add_(fth_add)
-        # Unit upkeep + the bankruptcy rule, at the loop position every seat
-        # shares (right after the gold lands). An eliminated seat 0 charges
-        # nothing — the TS loop skips it entirely.
-        if self.units_mode:
-            self.treasury.sub_(torch.where(
-                active0,
-                (self.seat0_unit_alive.to(self.dtype) * self._type_maintenance[self.seat0_unit_type]).sum(dim=1),
-                torch.zeros_like(self.treasury),
-            ))
-            self._bankrupt_disband(active0)
+        # Unit upkeep + the bankruptcy rule — the ONE pooled body every seat
+        # row calls at this position (right after the gold lands).
+        self._seat_upkeep_and_bankruptcy(0, active0)
         for _ in range(RESEARCH_LOOPS):
             active = active0 & (self.cur_tech >= 0)
             eff = self._eff_cost(

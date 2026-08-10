@@ -15,8 +15,9 @@ class SimMinors:
         """The city-states' OWN turn — the cityStatePhase twin: the seat-0
         war clock, cosmetic growth every 12 turns, siege recovery. Every
         seat's CS DIPLOMACY (meet/influence/quests) runs in the seatPhase
-        loop instead — row 0 through _seat0_cs_phase, civ rows through
-        _seat_cs_phase/_seat_quest_phase."""
+        loop instead — ONE body per fact for every row:
+        _seat_influence_phase + _seat_quest_phase (row 0 called from
+        _seat0_row, civ rows via _seat_cs_phase)."""
         if self.S == 0:
             return
         # The seat-0 <-> city-state war clock ticks FIRST, exactly where
@@ -27,120 +28,6 @@ class SimMinors:
         # siege recovery — +10/turn toward maxHp (cityStatePhase tail).
         citystate_max = int(self.rules.citystate.get("maxHp", 150))
         self.citystate_hp.copy_(torch.where(self.citystate_alive & (self.citystate_hp < citystate_max), (self.citystate_hp + 10).clamp(max=citystate_max), self.citystate_hp))
-
-    def _seat0_cs_phase(self, active0: torch.Tensor) -> None:
-        """Seat 0's CS diplomacy at the seatPhase loop-body position (row 0's
-        block): meet by EXPLORATION → influence + envoy conversion → quest
-        resolve/issue per city-state in id order. The _seat_cs_phase +
-        _seat_quest_phase twin over seat-0 planes. `active0` is the TS loop's
-        eliminated-actor `continue`: a cityless seat 0 meets, accrues and
-        quests nothing."""
-        if self.S == 0:
-            return
-        r = self.rules.citystate
-        # Meet by EXPLORATION — one rule for every seat: a city-state is met
-        # the moment its centre is out of this seat's fog (fog off = instant).
-        self.citystate_met.logical_or_(active0.unsqueeze(1) & self.citystate_alive & self._explored_at(0, self.citystate_center.clamp(min=0)))
-        any_met = active0 & self.citystate_met.any(dim=1)
-        # Seat 0's adopted-government influence tier joins the flat rate
-        # (cityStates.ts `INFLUENCE_PER_TURN + GOV_INFLUENCE_TIER`); tier 0
-        # while government adoption is switched off.
-        per_turn = float(r.get("influencePerTurn", 3))
-        if self._gov_live:
-            per_turn = per_turn + self._adopted_gov_tier(self.civics).to(self.dtype)
-        self.influence.copy_(self.influence + torch.where(any_met, per_turn, torch.zeros_like(self.influence)))
-        cost = float(r.get("envoyCost", 100))
-        for _ in range(3):
-            earn = any_met & (self.influence >= cost)
-            if not bool(earn.any()):
-                break
-            self.influence.copy_(torch.where(earn, self.influence - cost, self.influence))
-            self.envoys_avail.add_(earn.long())
-
-        cooldown = int(r.get("questCooldown", 12))
-        # "seat 0 owns a live complete district of askable type a" is constant
-        # across the s loop (quest resolution never touches the district
-        # planes) — one [B, nAskable] table per turn, gathered per s below,
-        # instead of 2·S full [B, T] scans.
-        if self._askable.numel() > 0 and self.districts_on:
-            own_live = self.district_complete & (self.tile_seat == 0) & ~self.district_dead  # [B, T]
-            own_tbl = ((self.district.unsqueeze(2) == self._askable.reshape(1, 1, -1)) & own_live.unsqueeze(2)).any(dim=1)  # [B, nA]
-        else:
-            own_tbl = None
-        for s in range(self.S):
-            act = active0 & self.citystate_alive[:, s] & self.citystate_met[:, s]
-            # Resolve: clear-the-camp, or a buildDistrict quest for a district
-            # seat 0 has since completed. Trade-route quests are uncompletable.
-            camp_gone = ~((self.camp_tile == self.citystate_quest_camp[:, s].unsqueeze(1)) & (self.camp_tile >= 0)).any(dim=1)
-            resolved_camp = act & (self.citystate_quest[:, s] == 1) & camp_gone
-            if own_tbl is not None:
-                # citystate_quest_district holds a DISTRICT-TYPE index (the CS type's
-                # own district, what the seat-generic issuer writes) — NOT an
-                # askable-list index, so it must not be read through own_tbl.
-                qd = self.citystate_quest_district[:, s]
-                _tc_r = self.tile_city.clamp(min=0)
-                _live_r = self.alive.gather(1, _tc_r) & (self.tile_city >= 0)
-                owns_asked = ((self.district == qd.unsqueeze(1)) & self.district_complete & _live_r & ~self.district_dead).any(dim=1) & (qd >= 0)
-            else:
-                owns_asked = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-            resolved_dist = act & (self.citystate_quest[:, s] == 3) & owns_asked
-            resolved = resolved_camp | resolved_dist
-            if bool(resolved.any()):
-                rows = resolved.nonzero(as_tuple=True)[0]
-                self.citystate_quest[rows, s] = 0
-                self.citystate_quest_issued[rows, s] = self.turn
-                self.citystate_envoys[rows, s] += int(r.get("questEnvoys", 1))
-                self._eff_version += 1  # quest envoys move capital yields too
-            # ZERO-DRAW issue, matching _seat_quest_phase: fixed order
-            # clearCamp -> buildDistrict -> sendTradeRoute, with the district
-            # the CS TYPE's own (_citystate_didx) rather than a draw from a flat
-            # askable list. Issuing must not move the shared PRNG.
-            due = act & (self.citystate_quest[:, s] == 0) & (self.turn - self.citystate_quest_issued[:, s] >= cooldown)
-            # clearCamp: NEAREST camp within 6, ties to the lowest tile index
-            # (key = dist*(T+1)+tile, the shared issueQuest key).
-            cdist = self.pair_dist[self.citystate_center[:, s].unsqueeze(1), self.camp_tile.clamp(min=0)].to(torch.long)
-            near = (self.camp_tile >= 0) & (cdist <= 6)
-            has_camp = near.any(dim=1)
-            span_q = self.T + 1
-            key_c = torch.where(near, cdist * span_q + self.camp_tile.clamp(min=0), torch.full_like(cdist, 10**18))
-            camp_idx = self.camp_tile.gather(1, key_c.argmin(dim=1).unsqueeze(1)).squeeze(1)
-            # buildDistrict: the CS type's own district, unless already complete.
-            # _citystate_didx is a DISTRICT-TYPE index; own_tbl is keyed by ASKABLE
-            # index. They are different index spaces, so the ownership test
-            # reads the district plane directly (the civ path's own shape).
-            di_p = self._citystate_didx[:, s]
-            if self.districts_on:
-                # The test is whether a LIVE CITY OF THIS SEAT lists the
-                # district, not whether the seat happens to own the tile —
-                # those diverge the moment a district tile changes hands.
-                # tile_city is the owning city column, so gate on it being alive.
-                _tc = self.tile_city.clamp(min=0)
-                _city_live = self.alive.gather(1, _tc) & (self.tile_city >= 0)
-                own_live_q = self.district_complete & _city_live & ~self.district_dead
-                owns_type = ((self.district == di_p.unsqueeze(1)) & own_live_q).any(dim=1)
-            else:
-                owns_type = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-            want_camp = due & has_camp
-            want_dist = due & ~has_camp & ~owns_type
-            # seat 0's own routes: dest encoding -(2 + s) for city-state s.
-            # seat_routes covers every seat, so this arm needs no per-seat fork.
-            has_route = (self.seat_routes[:, 0, :, 1] == -(2 + s)).any(dim=1)
-            want_trade = due & ~has_camp & owns_type & ~has_route
-            kind = torch.where(want_camp, torch.ones(self.B, dtype=torch.long, device=self.device),
-                   torch.where(want_dist, torch.full((self.B,), 3, dtype=torch.long, device=self.device),
-                   torch.where(want_trade, torch.full((self.B,), 2, dtype=torch.long, device=self.device),
-                               torch.zeros(self.B, dtype=torch.long, device=self.device))))
-            issued = want_camp | want_dist | want_trade
-            if bool(issued.any()):
-                rows = issued.nonzero(as_tuple=True)[0]
-                self.citystate_quest[rows, s] = kind[rows]
-                self.citystate_quest_issued[rows, s] = self.turn
-                if bool(want_camp.any()):
-                    cr = want_camp.nonzero(as_tuple=True)[0]
-                    self.citystate_quest_camp[cr, s] = camp_idx[cr]
-                if bool(want_dist.any()):
-                    dr = want_dist.nonzero(as_tuple=True)[0]
-                    self.citystate_quest_district[dr, s] = di_p[dr]
 
     # --- civ-seat units -----------------------------------------------------------
 

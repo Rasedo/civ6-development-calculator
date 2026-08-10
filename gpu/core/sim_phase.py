@@ -85,8 +85,8 @@ class SimPhase:
             # CS quests resolve/issue right after the envoy accrual (the
             # seatPhase quest block sits at the tail of the same CS block), so
             # a completed quest's envoy is visible to the levy suzerain test
-            # later this phase.
-            self._seat_quest_phase(r, active)
+            # later this phase. Row addressing: civ r is seat row r+1.
+            self._seat_quest_phase(r + 1, active)
             # Queue PICKS for the PRE-TURN city set, in slot order: the FIRST
             # idle city takes the settler (one in flight per civ), everyone
             # else trains units up to the cap. Counts update sequentially, like
@@ -1042,28 +1042,10 @@ class SimPhase:
             self.civ_only_science_total[:, r] = torch.where(active, self.civ_only_science_total[:, r] + sci_sum.to(self.dtype), self.civ_only_science_total[:, r])
             self.civ_only_treasury[:, r] = torch.where(active, self.civ_only_treasury[:, r] + gold_sum, self.civ_only_treasury[:, r])
             self.civ_only_faith[:, r] = torch.where(active, self.civ_only_faith[:, r] + faith_sum, self.civ_only_faith[:, r])
-            # Unit upkeep + the bankruptcy rule, identical for every seat:
-            # milli-rounded test, disband the priciest-upkeep unit, tie →
-            # lowest slot = spawn order, no refund. Runs right after the gold
-            # lands, before war marches.
-            mine_r = self.civ_unit_alive & (self.civ_unit_civ == r)
-            upkeep_r = (self._type_maintenance[self.civ_unit_type.clamp(min=0, max=self.NU - 1)] * mine_r.to(self.dtype)).sum(dim=1)
-            self.civ_only_treasury[:, r] = torch.where(active, self.civ_only_treasury[:, r] - upkeep_r, self.civ_only_treasury[:, r])
-            broke_r = active & (js_round(self.civ_only_treasury[:, r] * 1000) < 0)
-            if bool(broke_r.any()):
-                vm = self._type_maintenance[self.civ_unit_type.clamp(min=0, max=self.NU - 1)]  # [B, simbase.POOL_MAX]
-                slots_ar = torch.arange(self.civ_unit_alive.shape[1], device=dev, dtype=self.dtype).reshape(1, -1)
-                key_v = torch.where(mine_r & (vm > 0), vm * 4096 - slots_ar, torch.full_like(vm, -1.0))
-                best_v, victim = key_v.max(dim=1)
-                kill = broke_r & (best_v > 0)
-                if bool(kill.any()):
-                    kr = kill.nonzero(as_tuple=True)[0]
-                    vs = victim[kr]
-                    vt = self.civ_unit_tile[kr, vs]
-                    is_civ_v = self._type_charges[self.civ_unit_type[kr, vs]] > 0
-                    self.civ_unit_alive[kr, vs] = False
-                    self.military_at[(kr[~is_civ_v], vt[~is_civ_v])] = -1
-                    self.civilian_at[(kr[is_civ_v], vt[is_civ_v])] = -1
+            # Unit upkeep + the bankruptcy rule — the ONE pooled body every
+            # seat row calls at this position (right after the gold lands,
+            # before war marches).
+            self._seat_upkeep_and_bankruptcy(r + 1, active)
             for _ in range(RESEARCH_LOOPS):
                 curt = self.civ_only_cur_tech[:, r]
                 # boosted techs complete at the discounted cost (_eff_cost —

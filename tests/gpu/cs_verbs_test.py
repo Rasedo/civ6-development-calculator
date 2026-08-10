@@ -242,7 +242,7 @@ def main() -> None:
     # ensure R does NOT already own the CS-type district complete (wipe registry row)
     sim.civ_city_dist_tile[0, R, :, di] = -1
     rng0 = sim.rng_state.clone()
-    sim._seat_quest_phase(R, active_mask(sim))
+    sim._seat_quest_phase(R + 1, active_mask(sim))  # seat ROW: civ R is row R+1
     assert int(sim.civ_only_citystate_quest[0, R, S0]) == 3, f"Q1: expected buildDistrict (3), got {int(sim.civ_only_citystate_quest[0, R, S0])}"
     assert torch.equal(sim.rng_state, rng0), "Q1: the quest phase drew RNG (must be zero-draw)"
     print("  Q1 ISSUE buildDistrict OK (deterministic, zero-draw)")
@@ -258,7 +258,7 @@ def main() -> None:
     sim.camp_tile[:] = -1
     sim.camp_tile[0, 0] = near_tile
     rng0 = sim.rng_state.clone()
-    sim._seat_quest_phase(R, active_mask(sim))
+    sim._seat_quest_phase(R + 1, active_mask(sim))  # seat ROW: civ R is row R+1
     assert int(sim.civ_only_citystate_quest[0, R, S0]) == 1, f"Q2: expected clearCamp (1), got {int(sim.civ_only_citystate_quest[0, R, S0])}"
     assert int(sim.civ_only_citystate_quest_camp[0, R, S0]) == near_tile, "Q2: clearCamp recorded the wrong camp tile"
     assert torch.equal(sim.rng_state, rng0), "Q2: clearCamp issue drew RNG"
@@ -276,7 +276,7 @@ def main() -> None:
     env0 = int(sim.civ_only_citystate_envoys[0, R, S0])
     q_env = int(sim.rules.citystate["questEnvoys"])
     rng0 = sim.rng_state.clone()
-    sim._seat_quest_phase(R, active_mask(sim))
+    sim._seat_quest_phase(R + 1, active_mask(sim))  # seat ROW: civ R is row R+1
     assert int(sim.civ_only_citystate_quest[0, R, S0]) == 0, "Q3: satisfied clearCamp not cleared"
     assert int(sim.civ_only_citystate_envoys[0, R, S0]) == env0 + q_env, "Q3: questEnvoys not paid to the civ"
     assert torch.equal(sim.rng_state, rng0), "Q3: resolution drew RNG"
@@ -296,7 +296,7 @@ def main() -> None:
     sim.civ_only_citystate_quest_issued[0, R, S0] = T
     env0 = int(sim.civ_only_citystate_envoys[0, R, S0])
     rng0 = sim.rng_state.clone()
-    sim._seat_quest_phase(R, active_mask(sim))
+    sim._seat_quest_phase(R + 1, active_mask(sim))  # seat ROW: civ R is row R+1
     assert int(sim.civ_only_citystate_quest[0, R, S0]) == 0, "Q4: satisfied buildDistrict not cleared"
     assert int(sim.civ_only_citystate_envoys[0, R, S0]) == env0 + q_env, "Q4: questEnvoys not paid"
     assert torch.equal(sim.rng_state, rng0), "Q4: buildDistrict resolution drew RNG"
@@ -309,7 +309,7 @@ def main() -> None:
     sim.civ_only_citystate_met[0, R, s1] = False  # not met
     sim.civ_only_citystate_quest[0, R, s1] = 0
     sim.civ_only_citystate_quest_issued[0, R, s1] = 0
-    sim._seat_quest_phase(R, active_mask(sim))
+    sim._seat_quest_phase(R + 1, active_mask(sim))  # seat ROW: civ R is row R+1
     assert int(sim.civ_only_citystate_quest[0, R, s1]) == 0, "Q5: an unmet CS issued a civ quest"
     print("  Q5 unmet-CS gate OK (no quest without contact)")
 

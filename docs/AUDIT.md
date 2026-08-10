@@ -104,9 +104,11 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   and `_seat_phase` owns rows 0..R (`_seat0_row` is row 0's block, in
   the civ arm's proven internal order, `active0`-gated like the TS
   eliminated-actor continue; seat-0 declare/peace ride the geo-pass
-  positions; scienceTotal + peaceTurns row 0 unified) — still open from
-  that family: the seat-0 TRADE arm + the civ intl-route staleness
-  (HANDOFF item 2b) and the quest/influence/upkeep body merges; (3) the
+  positions; scienceTotal + peaceTurns row 0 unified; trade unified in
+  slices 7a-c; the quest/influence/upkeep BODY MERGES landed in slice 8
+  — one row-generic body each, citystate_quest_district deleted) —
+  that family is CLOSED except the tile-keyed route-dest corner
+  (A-11r(6)); (3) the
   WAR_COLUMN_SEAT family (warTurns/peaceTurns/cityStateWarTurns + the
   war-column wire layout) is the last structural seat-0 bilateralism.
 

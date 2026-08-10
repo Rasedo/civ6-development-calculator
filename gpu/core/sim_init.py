@@ -189,7 +189,8 @@ class SimInit:
         # The (seat, city-state) relations live on `seat_citystate_*` [B, 1+R, S] planes
         # allocated below, once r_pad is known — `citystate_met` is `[:, 0]` and
         # `civ_only_citystate_met` is `[:, 1:]` of ONE tensor, and so on.
-        self.citystate_quest_district = torch.full((B, s_pad), -1, dtype=torch.long, device=device)  # askable idx of a buildDistrict quest (0=CAMPUS)
+        # (the asked-for district is never stored: it is always the CS type's
+        # own — _citystate_didx — so quest resolve/digest both re-derive it)
         # LEVY cooldown — per CS, SHARED across seats (the TS cs.lastLevyTurn
         # twin). Init to -levyCooldown so a never-levied CS reads cooldown-ready
         # (turn - (-cd) >= cd for turn >= 0).
@@ -1069,7 +1070,8 @@ class SimInit:
         # Combat log hooks (inert unless rollout --log sets the batch)
         self._log_combat_b: int | None = None
         self._combat_events: list[str] = []
-        self._askable = torch.tensor(sc.get("askable", []), dtype=torch.long, device=device)  # CS-quest askable idx -> district-type idx
+        # (the CS-quest "askable" list is no longer consumed: the asked
+        # district is always the CS type's own, _citystate_didx)
         self.d_usable = torch.tensor(
             [[t.get("du", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
         )  # [B, T] district-placeable land — static part of canPlaceDistrict

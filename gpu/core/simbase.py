@@ -475,7 +475,6 @@ _MUTABLE = [
     # `tile_seat` is STATE — the city-state part of tile ownership is stored
     # only here (`citystate_at` is a view of it), so it must round-trip.
     "tile_seat", "tile_city",
-    "citystate_quest_district",
     "citystate_last_levy",  # levy cooldown
     "influence",
     "civ_pair_warkind", "civ_pair_denounced", "civ_pair_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "seat_ext", "city_prod_bank",

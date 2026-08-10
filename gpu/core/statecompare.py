@@ -363,7 +363,11 @@ CITY_STATE = {
     "questKind": _csr("seat_citystate_quest"),
     "questIssued": _csr("seat_citystate_quest_issued"),
     "questCamp": _csr("seat_citystate_quest_camp"),
-    "questDistrict": lambda sim, b, rows: [int(sim.citystate_quest_district[b, s]) for s in rows],
+    # The asked district is DERIVED, not stored: a kind-3 quest always asks
+    # the CS type's own district (_citystate_didx), for every seat row.
+    "questDistrict": lambda sim, b, rows: [
+        [int(sim._citystate_didx[b, s]) if int(sim.seat_citystate_quest[b, c, s]) == 3 else -1
+         for c in _civ_seats(sim)] for s in rows],
     "lastLevyTurn": lambda sim, b, rows: [int(sim.citystate_last_levy[b, s]) for s in rows],
     "warTurns": lambda sim, b, rows: [
         int(sim.war_turns[b, _seat_row(sim, 100 + s)]) for s in rows

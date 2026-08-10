@@ -3926,50 +3926,54 @@ class SimSeats:
             self.civ_unit_xp[:, u] = torch.where(city_att | unit_att, self.civ_unit_xp[:, u] + XP_ATTACK, self.civ_unit_xp[:, u])
         return city_att | unit_att
 
-    def _seat_cs_phase(self, r: int, active: torch.Tensor) -> None:
-        """CS diplomacy from a civ seat — the seatPhase block after boost
-        detection. Meet by EXPLORATION (isExplored at the CS centre — fog is
-        live for every seat), then the influence→envoy accrual (flat rate +
-        the adopted government's tier), then the driven envoy picks at the
-        post-accrual position."""
+    def _seat_influence_phase(self, row: int, active: torch.Tensor) -> None:
+        """Meet + influence → envoy conversion for ONE seat row (0 = seat 0,
+        r+1 = civ r) — the seatPhase CS-diplomacy accrual, one body for every
+        seat. Meet is by EXPLORATION (isExplored at the CS centre — fog is
+        live; the proximity surrogate is deleted, scouting is what meets, the
+        real Civ 6 rule). The accrual is influencePerTurn + this seat's own
+        adopted-government tier (computeAdoption on ITS civics). CONVERSION
+        IS A RULE: Civ 6 grants the envoy the moment the meter fills,
+        assigned or not — WHERE it goes is the wire's decision, applied at
+        each row's own pick position."""
         if self.S == 0:
             return
         B, S, dev = self.B, self.S, self.device
         rr = self.rules.citystate
         csc = self.citystate_center[:, :S].clamp(min=0)  # [B, S]
-        # Meet by EXPLORATION — one rule for every seat, fog is live: a
-        # city-state is met the moment its centre is out of this civ's fog.
-        # (The proximity surrogate — "cities or units within meetRange" — is
-        # deleted; scouting is what meets now, the real Civ 6 rule.)
-        near = self._explored_at(r + 1, csc)  # [B, S]
-        newly = active.unsqueeze(1) & self.citystate_alive[:, :S] & ~self.civ_only_citystate_met[:, r, :S] & near
-        self.civ_only_citystate_met[:, r, :S] = self.civ_only_citystate_met[:, r, :S] | newly
-        met_live = self.civ_only_citystate_met[:, r, :S] & self.citystate_alive[:, :S]
+        met = self.seat_citystate_met[:, row, :S]
+        newly = active.unsqueeze(1) & self.citystate_alive[:, :S] & ~met & self._explored_at(row, csc)
+        self.seat_citystate_met[:, row, :S] = met | newly
+        met_live = self.seat_citystate_met[:, row, :S] & self.citystate_alive[:, :S]
         any_met = active & met_live.any(dim=1)
         if not bool(any_met.any()):
             return
+        civics = self.civics if row == 0 else self.civ_only_civics[:, row - 1]
         pt = torch.full((B,), float(rr.get("influencePerTurn", 3)), dtype=torch.float64, device=dev)
         if self._gov_live:
-            # the civ's adopted government tier, derived from ITS civics — the
-            # computeAdoption twin
-            pt = pt + self._adopted_gov_tier(self.civ_only_civics[:, r]).double()
-        self.civ_only_influence[:, r] = self.civ_only_influence[:, r] + torch.where(any_met, pt, torch.zeros_like(pt))
-        # CONVERSION IS A RULE, for every seat: Civ 6 grants the envoy the moment
-        # the meter fills, assigned or not. Only the greedy ASSIGNMENT below is
-        # policy, so it must never gate the conversion loop.
-        pol_met = any_met & torch.zeros(self.B, dtype=torch.bool, device=self.device)  # scripted arm off
+            pt = pt + self._adopted_gov_tier(civics).double()
+        self.civ_influence[:, row] = self.civ_influence[:, row] + torch.where(any_met, pt, torch.zeros_like(pt)).to(self.civ_influence.dtype)
         cost = float(rr.get("envoyCost", 100))
         for _ in range(3):  # the conversion loop's bound
-            earn = any_met & (self.civ_only_influence[:, r] >= cost)
+            earn = any_met & (self.civ_influence[:, row] >= cost)
             if not bool(earn.any()):
                 break
-            self.civ_only_influence[:, r] = torch.where(earn, self.civ_only_influence[:, r] - cost, self.civ_only_influence[:, r])
-            self.civ_only_envoys_avail[:, r] = self.civ_only_envoys_avail[:, r] + earn.long()
-        # the DRIVEN envoy picks consume HERE, at the scripted loops' exact
-        # post-accrual position, so every threshold reader (suzerainty, and the
-        # favor it feeds) sees the same within-turn sequence on both engines.
-        # BANK ONLY: conversion is an eager rule above, so a decide-time pick can
-        # never exceed the bank.
+            self.civ_influence[:, row] = torch.where(earn, self.civ_influence[:, row] - cost, self.civ_influence[:, row])
+            self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] + earn.long()
+
+    def _seat_cs_phase(self, r: int, active: torch.Tensor) -> None:
+        """CS diplomacy from a civ seat — the seatPhase block after boost
+        detection: the shared meet/influence/conversion body on this row,
+        then the driven envoy picks at the post-accrual position."""
+        if self.S == 0:
+            return
+        S = self.S
+        self._seat_influence_phase(r + 1, active)
+        # the DRIVEN envoy picks consume HERE, at the post-accrual position,
+        # so every threshold reader (suzerainty, and the favor it feeds) sees
+        # the same within-turn sequence on both engines. BANK ONLY:
+        # conversion is an eager rule above, so a decide-time pick can never
+        # exceed the bank.
         _dse = getattr(self, "_driven_envoys", None)
         if _dse is not None and r in _dse:
             _env_s = _dse.pop(r)
@@ -3986,45 +3990,26 @@ class SimSeats:
                     continue
                 self.civ_only_envoys_avail[:, r] = self.civ_only_envoys_avail[:, r] - land_e.long()
                 self.civ_only_citystate_envoys[:, r, :S].scatter_add_(1, citystate_i.unsqueeze(1), land_e.long().unsqueeze(1))
-        for _ in range(4):  # assignment until spent (bank grows ≤1/turn)
-            can = pol_met & (self.civ_only_envoys_avail[:, r] > 0)
-            if not bool(can.any()):
-                return
-            key = torch.where(
-                met_live,
-                self.civ_only_citystate_envoys[:, r, :S] * 64 + torch.arange(S, device=dev).reshape(1, -1),
-                torch.full((B, S), 10**9, dtype=torch.long, device=dev),
-            )
-            pick = key.argmin(dim=1)
-            rows = can.nonzero(as_tuple=True)[0]
-            self.civ_only_citystate_envoys[rows, r, pick[rows]] += 1
-            self.civ_only_envoys_avail[:, r] = self.civ_only_envoys_avail[:, r] - can.long()
 
-    def _seat_quest_phase(self, r: int, active: torch.Tensor) -> None:
-        """Civ-seat city-state quests — the ZERO-DRAW twin of the cityStatePhase
-        quest loop (issueQuest / questSatisfied), called right after
-        _seat_cs_phase at the accrual position. Each MET CS keeps ONE quest per
-        civ (civ_only_citystate_quest[:, r]); a satisfied one resolves here (+questEnvoys to
-        this civ's civ_only_citystate_envoys — a yield-bearing write, so _eff_version bumps),
-        else a new one issues on cooldown expiry. The kind is DETERMINISTIC, with
-        no RNG unlike seat 0's 2-draw path: the FIRST SATISFIABLE option in the
-        fixed order [clearCamp (nearest camp ≤6, ties lowest tile idx),
-        buildDistrict (the CS type's district, from _citystate_didx), sendTradeRoute]."""
-        if self.S == 0:
-            return
-        B, S, dev = self.B, self.S, self.device
-        rr = self.rules.citystate
-        cooldown = int(rr.get("questCooldown", 12))
-        q_env = int(rr.get("questEnvoys", 1))
-        csc = self.citystate_center[:, :S].clamp(min=0)  # [B, S]
-        met_live = self.civ_only_citystate_met[:, r, :S] & self.citystate_alive[:, :S]
-        act = active.unsqueeze(1) & met_live  # [B, S]
-        if not bool(act.any()):
-            return
-        # --- civ state used by BOTH resolve and issue (loop-invariant) -----
-        # buildDistrict target = the CS type's district (_citystate_didx), owned
-        # COMPLETE by any of THIS civ's cities — questSatisfied's buildDistrict
-        # and issueQuest's `alreadyBuilt`.
+    def _quest_owns_dist(self, row: int) -> torch.Tensor:
+        """[B, S] — does seat-row `row` own a COMPLETE district of each CS's
+        asked type (the CS type's own, _citystate_didx) in a LIVE city:
+        questSatisfied's buildDistrict and issueQuest's `alreadyBuilt`. Civ
+        rows read the city registry; row 0 reads the tile planes (no seat-0
+        registry yet — the registry write-through collapses this branch)."""
+        B, S = self.B, self.S
+        if not self.districts_on:
+            return torch.zeros(B, S, dtype=torch.bool, device=self.device)
+        if row == 0:
+            di0 = self._citystate_didx[:, :S]  # [B, S]
+            # a seat-0 tile's tile_city is the owning COLUMN — but only where
+            # tile_seat == 0 (civ tiles hold per-seat city IDS there), so the
+            # seat gate comes first.
+            col = torch.where(self.tile_seat == 0, self.tile_city, torch.zeros_like(self.tile_city)).clamp(min=0, max=self.C - 1)
+            live0 = (self.tile_seat == 0) & (self.tile_city >= 0) & self.alive.gather(1, col)
+            ok_t = self.district_complete & ~self.district_dead & live0  # [B, T]
+            return ((self.district.unsqueeze(1) == di0.unsqueeze(2)) & ok_t.unsqueeze(1)).any(dim=2)
+        r = row - 1
         dt = self.civ_city_dist_tile[:, r]  # [B, RC, nD]
         nD = dt.shape[2]
         di = self._citystate_didx[:, :S].clamp(min=0, max=nD - 1)  # [B, S]
@@ -4032,9 +4017,37 @@ class SimSeats:
             3, di.reshape(B, S, 1, 1).expand(B, S, self.RC, 1)
         ).squeeze(3)  # [B, S, RC] tile of the CS-type district per civ city
         own_dc = self.district_complete.gather(1, own_tile.clamp(min=0).reshape(B, -1)).reshape(B, S, self.RC)
-        owns_dist = ((own_tile >= 0) & own_dc).any(dim=2)  # [B, S]
-        # sendTradeRoute: this civ routes to CS s (civ_only_routes dest == -(2+s)).
-        route_dest = self.civ_only_routes[:, r, :, 1]  # [B, K_routes]
+        return ((own_tile >= 0) & own_dc).any(dim=2)  # [B, S]
+
+    def _seat_quest_phase(self, row: int, active: torch.Tensor) -> None:
+        """City-state quests for ONE seat row (0 = seat 0, r+1 = civ r) — the
+        ZERO-DRAW twin of the seatPhase quest loop (issueQuest /
+        questSatisfied), called right after the CS-diplomacy accrual. Each
+        MET CS keeps ONE quest per seat (seat_citystate_quest[:, row]); a
+        satisfied one resolves here (+questEnvoys to this seat's
+        seat_citystate_envoys — a yield-bearing write, so _eff_version
+        bumps), else a new one issues on cooldown expiry. The kind is
+        DETERMINISTIC — no RNG: the FIRST SATISFIABLE option in the fixed
+        order [clearCamp (nearest camp ≤6, ties lowest tile idx),
+        buildDistrict (the CS type's district, from _citystate_didx),
+        sendTradeRoute]. The asked district is NOT stored — it is always the
+        CS type's own, so resolve re-derives it (the old seat-0
+        citystate_quest_district plane is dead)."""
+        if self.S == 0:
+            return
+        B, S, dev = self.B, self.S, self.device
+        rr = self.rules.citystate
+        cooldown = int(rr.get("questCooldown", 12))
+        q_env = int(rr.get("questEnvoys", 1))
+        csc = self.citystate_center[:, :S].clamp(min=0)  # [B, S]
+        met_live = self.seat_citystate_met[:, row, :S] & self.citystate_alive[:, :S]
+        act = active.unsqueeze(1) & met_live  # [B, S]
+        if not bool(act.any()):
+            return
+        # --- seat state used by BOTH resolve and issue (loop-invariant) -----
+        owns_dist = self._quest_owns_dist(row)  # [B, S]
+        # sendTradeRoute: this seat routes to CS s (route dest == -(2+s)).
+        route_dest = self.seat_routes[:, row, :, 1]  # [B, K_routes]
         s_ar = torch.arange(S, device=dev)
         has_route = (route_dest.unsqueeze(1) == (-(2 + s_ar)).reshape(1, S, 1)).any(dim=2)  # [B, S]
         # clearCamp: the NEAREST camp within range 6, ties to the lowest tile
@@ -4048,32 +4061,32 @@ class SimSeats:
         camp_nearest = torch.where(has_camp, self.camp_tile.gather(1, best_k), torch.full((B, S), -1, dtype=torch.long, device=dev))
 
         # --- RESOLVE existing quests (questSatisfied) ------------------------
-        cur = self.civ_only_citystate_quest[:, r, :S]  # [B, S]
+        cur = self.seat_citystate_quest[:, row, :S]  # [B, S]
         camp_gone = ~(
-            (self.camp_tile.unsqueeze(1) == self.civ_only_citystate_quest_camp[:, r, :S].unsqueeze(2)) & (self.camp_tile >= 0).unsqueeze(1)
+            (self.camp_tile.unsqueeze(1) == self.seat_citystate_quest_camp[:, row, :S].unsqueeze(2)) & (self.camp_tile >= 0).unsqueeze(1)
         ).any(dim=2)  # [B, S]
         res_camp = act & (cur == 1) & camp_gone
         res_trade = act & (cur == 2) & has_route
         res_dist = act & (cur == 3) & owns_dist
         resolved = res_camp | res_trade | res_dist
         if bool(resolved.any()):
-            self.civ_only_citystate_quest[:, r, :S] = torch.where(resolved, torch.zeros_like(cur), cur)
-            self.civ_only_citystate_quest_issued[:, r, :S] = torch.where(resolved, torch.full_like(cur, self.turn), self.civ_only_citystate_quest_issued[:, r, :S])
-            self.civ_only_citystate_envoys[:, r, :S] = self.civ_only_citystate_envoys[:, r, :S] + resolved.long() * q_env
-            self._eff_version += 1  # envoy bonuses feed this civ's city yields this phase
+            self.seat_citystate_quest[:, row, :S] = torch.where(resolved, torch.zeros_like(cur), cur)
+            self.seat_citystate_quest_issued[:, row, :S] = torch.where(resolved, torch.full_like(cur, self.turn), self.seat_citystate_quest_issued[:, row, :S])
+            self.seat_citystate_envoys[:, row, :S] = self.seat_citystate_envoys[:, row, :S] + resolved.long() * q_env
+            self._eff_version += 1  # envoy bonuses feed this seat's city yields this phase
 
         # --- ISSUE on cooldown (deterministic first-satisfiable) ------------
-        cur2 = self.civ_only_citystate_quest[:, r, :S]  # resolved ones now 0
-        due = act & (cur2 == 0) & (self.turn - self.civ_only_citystate_quest_issued[:, r, :S] >= cooldown)  # [B, S]
+        cur2 = self.seat_citystate_quest[:, row, :S]  # resolved ones now 0
+        due = act & (cur2 == 0) & (self.turn - self.seat_citystate_quest_issued[:, row, :S] >= cooldown)  # [B, S]
         if bool(due.any()):
             want_camp = due & has_camp
             want_dist = due & ~has_camp & ~owns_dist
             want_trade = due & ~has_camp & owns_dist & ~has_route
             new_kind = want_camp.long() * 1 + want_dist.long() * 3 + want_trade.long() * 2  # 0 = nothing applies
             issued = new_kind > 0
-            self.civ_only_citystate_quest[:, r, :S] = torch.where(issued, new_kind, cur2)
-            self.civ_only_citystate_quest_issued[:, r, :S] = torch.where(issued, torch.full_like(cur2, self.turn), self.civ_only_citystate_quest_issued[:, r, :S])
-            self.civ_only_citystate_quest_camp[:, r, :S] = torch.where(want_camp, camp_nearest, self.civ_only_citystate_quest_camp[:, r, :S])
+            self.seat_citystate_quest[:, row, :S] = torch.where(issued, new_kind, cur2)
+            self.seat_citystate_quest_issued[:, row, :S] = torch.where(issued, torch.full_like(cur2, self.turn), self.seat_citystate_quest_issued[:, row, :S])
+            self.seat_citystate_quest_camp[:, row, :S] = torch.where(want_camp, camp_nearest, self.seat_citystate_quest_camp[:, row, :S])
 
     def _seat_trade_phase(self, r: int, active: torch.Tensor) -> None:
         """ONE new domestic route per civ per turn while under capacity — the
