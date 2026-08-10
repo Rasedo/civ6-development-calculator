@@ -125,6 +125,25 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   (A-11r(6)); (3) the
   WAR_COLUMN_SEAT family (warTurns/peaceTurns/cityStateWarTurns + the
   war-column wire layout) is the last structural seat-0 bilateralism.
+- **A-27. The SLOT-REGIME split (#110)** — the deepest remaining seat-0
+  structural deviation: seat 0 stores city COLUMN indices in
+  `tile_city` (hole-reuse slots + `city_seq` acquisition ranking)
+  where civ rows store PERSISTENT ids (`civ_city_id`, append +
+  `_reclaim_civ_cities`); TS is id-based for EVERY seat
+  (`setTileOwner`/`tileBelongsTo` on `c.id`), so the civ side is the
+  faithful mirror and row 0 moves onto it. The full id-space consumer
+  audit lives at `.claude/scratchpad/slot-regime-audit.md`. The
+  `tile.ownerCity` digest field compares the two spaces byte-for-byte
+  against TS TODAY and passes only by append-counter coincidence
+  (`founded_n` vs `nextCityId++`) — it becomes the refactor's proof.
+  TWO PRE-EXISTING LATENTS the audit found, both live NOW: (1) **no
+  seat-0 route prune on city death** — `_transfer_city_to_civ` kills
+  the city but never touches `seat_routes[:, 0]`, so a hole-reuse
+  founding inherits the dead city's route (`_expire_seat0_routes`
+  only drops expired/dest-gone; the civ arm prunes by id); (2)
+  **`centre_slot_at`'s civ slot values go stale after every
+  `_reclaim_civ_cities`** — unread today only because `civ_city_at`
+  tests `>= 0`, a tripwire for any future value-reader.
 
 ## B. Fidelity vs real Civ 6 — open residuals
 
