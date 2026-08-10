@@ -244,6 +244,12 @@ Landed behind the compile bar only, in dependency order of suspicion:
    now compare row-0 in the fatal digest. Plus the walk-entry border
    ySum fix (behaviour-CHANGING: the first border pick of every walk
    gains farm-adjacency food).
+7. The GP-race body merge (slice 14) — ONE _advance_great_people(row,
+   active) for every seat. Civ rows are transcription-identical; row
+   0 SWITCHED accrual mechanism (tile-plane scan → the seat-axis
+   registry) and claim shape (all-classes batch → per-class loops),
+   both argued value-identical (slice 9's registry write-through
+   invariant; integer effects). The serve run is the proof.
 
 Hunt discipline: scripted-reachability first (the digest gate names the
 turn), checkpoint-bracket from the nearest earlier checkpoint, full
