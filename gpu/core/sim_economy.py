@@ -1140,7 +1140,11 @@ class SimEconomy:
             has_d = (((self.district == d) & self.district_complete & ~self.district_dead & ~self.district_pillaged).unsqueeze(2) & owner_oh).any(dim=1)  # [B,C] city owns a completed LIVE district d (pillaged earns no GPP)
             in_d = self._b_req_district == d  # [NB] buildings of district d
             bcount = self.buildings[:, :, in_d].to(self.dtype).sum(dim=2)  # [B,C]
-            self.gp_points[:, cls] = self.gp_points[:, cls] + (has_d.to(self.dtype) * (1.0 + bcount)).sum(dim=1)
+            # Divine Spark — the belief's flat GPP joins the per-city term
+            # (1 + gppFlat + buildings), the greatPersonPointsPerTurn form.
+            _gflat0 = (self._bel_add("gpp", 0)[:, cls].to(self.dtype).unsqueeze(1)
+                       if self._bel_any and cls < self._bel["pan"]["gpp"].shape[1] else 0.0)
+            self.gp_points[:, cls] = self.gp_points[:, cls] + (has_d.to(self.dtype) * (1.0 + _gflat0 + bcount)).sum(dim=1)
         # Golden EXODUS — +4 Great PROPHET points per turn, empire-wide.
         if 0 <= self._prophet_cls < self._gp_nc:
             _ex = self._golden_ded(0, self._ded_exodus)
@@ -1192,6 +1196,10 @@ class SimEconomy:
                     self.prod_bank[_nb, _cap_col[_nb]] = self.prod_bank[_nb, _cap_col[_nb]] + prod[_nb]
             self.gp_points.sub_(cost * cf)
             self.gp_earned[:, :nCls] = earned + can.long()
+            # A recruited PROPHET feeds the belief races (prophetsOf counts
+            # claims, never consumed) — the civ arm's civ_only_prophets twin.
+            if 0 <= self._prophet_cls < nCls:
+                self.prophets.add_(can[:, self._prophet_cls].long())
             self.era_score[:, 0] += can.long().sum(dim=1) * self._era_pts["gp"]  # per GP earned
             # Slot the earned WRITER/MUSICIAN's Great Works into seat 0's
             # cities (eff holds the pre-increment person's culture).

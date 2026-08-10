@@ -317,15 +317,17 @@ SEAT = {
     "routeCount": lambda sim, b, rows: [
         sum(1 for r in sim.seat_routes[b, _seat_row(sim, c)].tolist() if r[0] >= 0) for c in rows
     ],
+    # Belief facts — row-addressed pair planes, seat 0 included (#73: every
+    # seat claims through the one belief-race body).
+    "prophets": _civ_scalar("civ_prophets"),
+    "beliefPantheon": _civ_scalar("civ_pantheon"),
+    "beliefFollower": _civ_scalar("civ_follower"),
+    "beliefFounder": _civ_scalar("civ_founder"),
+    "beliefEnhancer": _civ_scalar("civ_enhancer"),
     # --- the declared gaps (extracted, census-covered, skipped by default) ---
     "scienceTotal": lambda sim, b, rows: [float(sim.seat_science_total[b, _seat_row(sim, c)]) for c in rows],
     "tilesPurchased": _civ_only("civ_only_tiles_purchased", 0),
     "nextCityId": _civ_only("civ_only_next_city_id", 0),
-    "prophets": _civ_only("civ_only_prophets", 0),
-    "beliefPantheon": _civ_only("civ_only_pantheon", -1),
-    "beliefFollower": _civ_only("civ_only_follower", -1),
-    "beliefFounder": _civ_only("civ_only_founder", -1),
-    "beliefEnhancer": _civ_only("civ_only_enhancer", -1),
     "formalWars": _civ_pair_relation("civ_pair_warkind", lambda v: bool(v)),
     "denounced": _civ_pair_relation("civ_pair_denounced", lambda v: v >= 0),
     "allies": _civ_pair_relation("civ_pair_allied", lambda v: bool(v)),

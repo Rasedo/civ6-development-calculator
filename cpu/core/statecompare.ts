@@ -335,15 +335,17 @@ const SEAT: Record<string, Extractor> = {
   gpPoints: overSeats((s) => GP_CLASSES.map((c) => s.gpp[c] ?? 0)),
   spaceProjects: overSeats((s) => s.spaceProjects.length),
   routeCount: overSeats((s) => (s.tradeRoutes ?? []).length),
-  // --- the declared gaps (extracted, census-covered, skipped by default) ---
-  scienceTotal: overSeats((s) => s.scienceTotal),
-  tilesPurchased: overSeats((s) => s.tilesPurchased),
-  nextCityId: overSeats((s) => s.nextCityId),
+  // Belief facts — every seat row, seat 0 included (#73: one belief-race
+  // body for all seats).
   prophets: overSeats((s) => prophetsOf(s)),
   beliefPantheon: overSeats((s) => idx(PANTHEON_IDX, s.religion.pantheon)),
   beliefFollower: overSeats((s) => idx(FOLLOWER_IDX, s.religion.follower)),
   beliefFounder: overSeats((s) => idx(FOUNDER_IDX, s.religion.founder)),
   beliefEnhancer: overSeats((s) => idx(ENHANCER_IDX, s.religion.enhancer)),
+  // --- the declared gaps (extracted, census-covered, skipped by default) ---
+  scienceTotal: overSeats((s) => s.scienceTotal),
+  tilesPurchased: overSeats((s) => s.tilesPurchased),
+  nextCityId: overSeats((s) => s.nextCityId),
   formalWars: overSeats((s) => [...s.formalWars].sort((a, b) => a - b)),
   denounced: overSeats((s) =>
     Object.keys(s.denounced)

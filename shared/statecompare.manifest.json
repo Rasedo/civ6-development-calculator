@@ -561,7 +561,7 @@
       "Seat.tilesPurchased"
      ],
      "planes": [
-      "civ_only_tiles_purchased"
+      "civ_tiles_purchased"
      ],
      "gap": "seat 0's row of `civ_tiles_purchased` exists but nothing writes it until the seat-0 purchase wire; comparison opens with it."
     },
@@ -572,7 +572,7 @@
       "Seat.nextCityId"
      ],
      "planes": [
-      "civ_only_next_city_id"
+      "civ_next_city_id"
      ],
      "gap": "the GPU keeps a city-id allocator for civ seats only. Nothing joins on the id (the city key is the center tile), so this only ever pins the allocator itself."
     },
@@ -583,9 +583,8 @@
       "Seat.gpEarned"
      ],
      "planes": [
-      "civ_only_prophets"
-     ],
-     "gap": "seat 0's row of `civ_prophets` exists but the seat-0 great-prophet mechanics still derive per read; comparison opens with them."
+      "civ_prophets"
+     ]
     },
     {
      "name": "beliefPantheon",
@@ -594,10 +593,9 @@
       "ReligionState.pantheon"
      ],
      "planes": [
-      "civ_only_pantheon",
-      "civ_only_pantheon_done"
-     ],
-     "gap": "belief IDENTITY is stored per civ (`civ_only_pantheon`/`civ_only_follower`/`civ_only_founder`/`civ_only_enhancer`); seat 0 has only the global claimed masks, so its own belief cannot be read back."
+      "civ_pantheon",
+      "civ_pantheon_done"
+     ]
     },
     {
      "name": "beliefFollower",
@@ -606,9 +604,8 @@
       "ReligionState.follower"
      ],
      "planes": [
-      "civ_only_follower"
-     ],
-     "gap": "seat 0's belief row exists but its founding mechanics do not write it yet (see beliefPantheon)."
+      "civ_follower"
+     ]
     },
     {
      "name": "beliefFounder",
@@ -617,10 +614,9 @@
       "ReligionState.founder"
      ],
      "planes": [
-      "civ_only_founder",
-      "civ_only_religion_done"
-     ],
-     "gap": "seat 0's belief row exists but its founding mechanics do not write it yet (see beliefPantheon)."
+      "civ_founder",
+      "civ_religion_done"
+     ]
     },
     {
      "name": "beliefEnhancer",
@@ -629,10 +625,9 @@
       "ReligionState.enhancer"
      ],
      "planes": [
-      "civ_only_enhancer",
-      "civ_only_enhancer_done"
-     ],
-     "gap": "seat 0's belief row exists but its founding mechanics do not write it yet (see beliefPantheon)."
+      "civ_enhancer",
+      "civ_enhancer_done"
+     ]
     },
     {
      "name": "formalWars",
@@ -912,8 +907,7 @@
       "City.productionBank"
      ],
      "planes": [
-      "prod_bank",
-      "civ_city_prod_bank"
+      "city_prod_bank"
      ]
     },
     {
@@ -1511,8 +1505,8 @@
     "why": "citizen-workability. TS derives it per read from terrain plus district/wonder occupancy (core/query.ts) and stores nothing; the inputs are covered (tile.district, tile.builtWonder, tile.improvement)."
    },
    {
-    "plane": "center_at",
-    "why": "seat 0's city slot at a centre tile — a cached derived property over centre_slot_at + tile_seat, both covered."
+    "plane": "centre_slot_at",
+    "why": "the city slot at a centre tile, every seat row — the join key behind the per-city groups; the centers themselves are covered (City.centerIndex / the site planes)."
    },
    {
     "plane": "tdef",
@@ -1591,10 +1585,6 @@
     "why": "civ city slot ids; the city join key is the center tile."
    },
    {
-    "plane": "civ_city_at",
-    "why": "the civ index at a civ centre — a cached derived property over centre_slot_at + tile_seat, both covered."
-   },
-   {
     "plane": "military_at",
     "why": "the tile -> unit occupancy index, derived from unit_tile and unit_alive; it is the unit group's join key, not a separate fact."
    },
@@ -1619,12 +1609,12 @@
     "why": "which seats are driven from outside rather than by the built-in AI — a harness flag, not game state."
    },
    {
-    "plane": "civ_city_dist_tile",
-    "why": "the seat-axis district registry, civ rows (see the City.districts exclusion); placements are compared per tile. Row 0 (`dist_tile`) is excluded the same way — the extractor never reads either."
+    "plane": "city_dist_tile",
+    "why": "the seat-axis district registry, every row (see the City.districts exclusion); placements are compared per tile, so the registry is a join cache, not a separate fact."
    },
    {
-    "plane": "civ_city_wonder",
-    "why": "the per-civ-city wonder registry (see civ_city_dist_tile)."
+    "plane": "city_wonder",
+    "why": "the seat-axis per-city wonder registry (see city_dist_tile)."
    },
    {
     "plane": "dscaffold_placed",

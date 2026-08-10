@@ -139,19 +139,37 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   belief RACES (nothing pushed claimedPantheons/claimedBeliefs, the
   claim rule had no caller) while the GPU twin stayed live — every
   digest and the RNG stream would have diverged at the first civ claim.
-  RESTORED at the advanceGreatPeople position in the seatPhase loop
-  (civ rows only), gates and draw order mirroring the GPU's
-  popen/ropen/eopen shapes. Seat
-  0 has faith income + worship spending but CANNOT FOUND a pantheon or
-  religion on the GPU — the `civ_pantheon`/`civ_follower`/`civ_founder`/
-  `civ_enhancer`/`civ_prophets`/`civ_religion_done` seat-0 rows are
-  allocated and waiting; #73 also needs the seat-0 economy walk to grow
-  the belief-effect hooks the civ walk reads through `_bel_add` (~15
-  sites) and `_advance_great_people` to count row-0 prophets. Until it lands, seat 0 fields no religious
-  units (see A-26). KNOWN LATENT: a religious-unit lifecycle drift
-  (recorded when APOSTLE_BUY was still a flag) becomes reachable the
-  moment the driver emits faith-buy kind 6 — expect it at its causal
-  turn in the first post-freeze serve hunt.
+  RESTORED at the advanceGreatPeople position in the seatPhase loop,
+  gates and draw order mirroring the GPU's popen/ropen/eopen shapes.
+  SEAT 0 ACTIVATED 2026-08-10 (#73 slices 13a-13c): ONE row-generic
+  claim body (`_seat_belief_claims(row)` / the TS block with its
+  seat-0 gate deleted) runs for every seat at the advanceGreatPeople
+  position; seat 0 banks prophets at recruit, accrues Divine Spark
+  GPP, and its effect hooks sit in the seat-0 yield walk at the civ
+  walk's positions (feat plane, bldgY pf, perF/perC, River Goddess
+  amenity+housing, Fertility Rites growth, Religious Settlements
+  border cost). The TS UI verbs now PUSH what they take
+  (choosePantheon/foundReligion → the claimed pools), so the pool IS
+  the exclusion on both engines. The five belief facts + prophets
+  compare row-0 in the FATAL digest (gap keys removed). NOT yet in
+  the seat-0 walk: the completed-wonder family (`_wond_cy` flat
+  yields, `_wond_grow` growth product, `fpw` Divine Inspiration) —
+  wonders reach seat 0 only by CAPTURE (#83: neither seat can build
+  them), so a captured wonder pays yields on civ rows and NOTHING on
+  row 0; the city-block base unification collapses this with the
+  walks themselves. Until religious-unit production wires up, seat 0
+  fields no religious units (see A-26). KNOWN LATENT: a
+  religious-unit lifecycle drift (recorded when APOSTLE_BUY was still
+  a flag) becomes reachable the moment the driver emits faith-buy
+  kind 6 — expect it at its causal turn in the first post-freeze
+  serve hunt. HUNT-WATCH: seat-0 claims join the RNG stream at row
+  0's loop position the first turn faith >= 25 — any stream
+  misalignment surfaces as an rng-digest divergence AT that turn, and
+  the walk-entry border ySum fix closes a latent red: the GPU's FIRST
+  border pick of every walk ranked without farm-adjacency food where
+  TS includes it (the two refresh sites had it, the entry site did
+  not — now one `_border_ysum` construct), so border claims move
+  wherever seat 0 had Feudalism-tier farms.
 - **B-20r. Tourism tails.** Tourism, Great Works of writing/music/ART,
   relics, artifacts + archaeology (Archaeologist, antiquity sites,
   museum slots) and the wonder-era term all exist and are digest-
@@ -219,6 +237,13 @@ Landed behind the compile bar only, in dependency order of suspicion:
 5. The protagonist relabel (#75) and the vocabulary purge (identifier
    renames, spelled storage families and kind tags) — behaviour-preserving by
    intent.
+6. The seat-0 belief ACTIVATION (#73, B-18r) — seat 0 joins the RNG
+   draw stream at row 0's loop position the first turn its faith
+   reaches the pantheon cost, and every belief effect hook in the
+   seat-0 walk goes live with it; the five belief facts + prophets
+   now compare row-0 in the fatal digest. Plus the walk-entry border
+   ySum fix (behaviour-CHANGING: the first border pick of every walk
+   gains farm-adjacency food).
 
 Hunt discipline: scripted-reachability first (the digest gate names the
 turn), checkpoint-bracket from the nearest earlier checkpoint, full

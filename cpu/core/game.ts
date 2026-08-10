@@ -1234,6 +1234,7 @@ export function choosePantheon(state: GameState, beliefId: string, seat: number)
   }
   if (!state.sandbox) seatOf(state, seat)!.faith -= PANTHEON_FAITH_COST;
   seatOf(state, seat)!.religion.pantheon = beliefId;
+  state.claimedPantheons.push(beliefId); // every claim path pushes what it takes — the pool IS the exclusion
   addEraScore(state, seat, ERA_SCORE_PANTHEON); // B-24: seat 0 verb — gate-unreachable, TS-only (actor hook mirrors)
   return { ok: true };
 }
@@ -1269,6 +1270,7 @@ export function foundReligion(
   seatOf(state, seat)!.religion.name = choice.name || RELIGION_NAMES[0];
   seatOf(state, seat)!.religion.follower = choice.follower;
   seatOf(state, seat)!.religion.founder = choice.founder;
+  state.claimedBeliefs.push(choice.follower, choice.founder); // pushed like the eager race's picks
   seatOf(state, seat)!.religion.worship = choice.worship;
   // Freeze the holy tile (the capital's center) — the pressure source.
   seatOf(state, seat)!.religion.holyTile = (seatOf(state, seat)!.cities.find((c) => c.isCapital) ?? seatOf(state, seat)!.cities[0])?.centerIndex ?? null;

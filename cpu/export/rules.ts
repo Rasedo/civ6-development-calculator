@@ -447,13 +447,13 @@ export function buildRules() {
       gpRoster: GP_CLASSES.map((c) => GREAT_PEOPLE[c].length),
       // Seat-0 great-people (advanceGreatPeople): per class, the PLACEABLE_DISTRICTS
       // idx that accrues its points, and each person's instant effect
-      // [science→tech, culture→civic, gold→treasury, production→capital]. Seat 0
-      // draws from the SAME gp_earned pool the civ-seat race consumes (opponents claim in
-      // seatPhase first, then seat 0), so only classDistrict + effects are new.
+      // [science→tech, culture→civic, gold→treasury, production→capital]. Every
+      // seat draws from the SAME gp_earned pool at its own loop position
+      // (rows in seat order), so only classDistrict + effects are new.
       gpClassDistrict: GP_CLASSES.map((c) => PLACEABLE_DISTRICTS.indexOf(GP_CLASS_DISTRICT[c])),
       gpEffects: GP_CLASSES.map((c) =>
-        // P5/S5: col 4 = faith (Prophets) — the civ-seat pantheon's funding;
-        // seat 0's GPU faith stays unmodeled (no consumer — worship is TS-only).
+        // col 4 = faith (Prophets) — pantheon/worship funding for EVERY seat
+        // row (#73: seat 0 banks it and claims through the same belief races).
         GREAT_PEOPLE[c].map((p) => [p.effect.science ?? 0, p.effect.culture ?? 0, p.effect.gold ?? 0, p.effect.productionToCapital ?? 0, p.effect.faith ?? 0]),
       ),
       // B7-G (B-8): Great General / Great Admiral spawn-at-claim + aura anchors.

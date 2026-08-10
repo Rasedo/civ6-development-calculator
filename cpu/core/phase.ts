@@ -1818,73 +1818,63 @@ export function seatPhase(state: GameState, seat: number): void {
     // Races: great people, then pantheons and beliefs.
     advanceGreatPeople(state, actor.seat);
 
-    // The BELIEF RACES — eager rules for the civ rows (seat 0's founding is
-    // the #73 gap; until it lands on the GPU, row 0 claims nothing on either
-    // engine). Identities are POLICY draws from the open pools; every gate
-    // and draw mirrors the GPU's popen/ropen/eopen shapes, so the streams
-    // stay aligned. Restored: the mega-batch deleted this rule while its GPU
-    // twin (the _seat_phase claim blocks) stayed live.
-    if (actor.seat !== 0) {
-      // Pantheon: costs PANTHEON_FAITH_COST from this seat's own faith.
-      if (actor.religion.pantheon === null && (actor.faith ?? 0) >= PANTHEON_FAITH_COST) {
-        const open = Object.keys(PANTHEONS).filter(
-          (id) => id !== seatOf(state, 0)!.religion.pantheon && !state.claimedPantheons.includes(id),
-        );
-        if (open.length > 0) {
-          actor.faith = (actor.faith ?? 0) - PANTHEON_FAITH_COST;
-          const pick = open[Math.floor(nextRandom(state) * open.length)];
-          state.claimedPantheons.push(pick);
-          addEraScore(state, actor.seat, ERA_SCORE_PANTHEON);
-          actor.religion.pantheon = pick; // the id IS the claim; effects apply via getModifiers
-          state.eventLog.push(`${actor.name} founded a pantheon (${PANTHEONS[pick].name} is taken).`);
-        }
+    // The BELIEF RACES — eager rules for EVERY seat row, seat 0 included
+    // (#73). Identities are POLICY draws from the open pools; every gate and
+    // draw mirrors the GPU's row-generic _seat_belief_claims (the
+    // popen/ropen/eopen shapes), so the streams stay aligned. The open pools
+    // are purely the claimed lists — every claim path (this block AND the
+    // seat-0 UI verbs) pushes what it takes.
+    // Pantheon: costs PANTHEON_FAITH_COST from this seat's own faith.
+    if (actor.religion.pantheon === null && (actor.faith ?? 0) >= PANTHEON_FAITH_COST) {
+      const open = Object.keys(PANTHEONS).filter((id) => !state.claimedPantheons.includes(id));
+      if (open.length > 0) {
+        actor.faith = (actor.faith ?? 0) - PANTHEON_FAITH_COST;
+        const pick = open[Math.floor(nextRandom(state) * open.length)];
+        state.claimedPantheons.push(pick);
+        addEraScore(state, actor.seat, ERA_SCORE_PANTHEON);
+        actor.religion.pantheon = pick; // the id IS the claim; effects apply via getModifiers
+        state.eventLog.push(`${actor.name} founded a pantheon (${PANTHEONS[pick].name} is taken).`);
       }
-      // Religion: the canFoundReligion gates — a pantheon, a completed Holy
-      // Site, an earned Prophet. Follower drawn FIRST, founder second (the
-      // GPU's rf_/ro_ order).
-      if (
-        !actor.religion.founded &&
-        actor.religion.pantheon !== null &&
-        prophetsOf(actor) > 0 &&
-        actor.cities.some((c) =>
-          c.districts.some((d) => d.type === 'HOLY_SITE' && state.map.tiles[d.tileIndex].districtComplete),
-        )
-      ) {
-        const followers = Object.keys(FOLLOWER_BELIEFS).filter(
-          (id) => id !== seatOf(state, 0)!.religion.follower && !state.claimedBeliefs.includes(id),
-        );
-        const founders = Object.keys(FOUNDER_BELIEFS).filter(
-          (id) => id !== seatOf(state, 0)!.religion.founder && !state.claimedBeliefs.includes(id),
-        );
-        if (followers.length > 0 && founders.length > 0) {
-          const fPick = followers[Math.floor(nextRandom(state) * followers.length)];
-          const oPick = founders[Math.floor(nextRandom(state) * founders.length)];
-          state.claimedBeliefs.push(fPick);
-          state.claimedBeliefs.push(oPick);
-          actor.religion.founded = true;
-          addEraScore(state, actor.seat, ERA_SCORE_RELIGION);
-          actor.religion.follower = fPick;
-          actor.religion.founder = oPick;
-          // Freeze the holy tile (the LIVE capital's center at founding, else
-          // the first live city) — the source of this religion's pressure.
-          actor.religion.holyTile = (actor.cities.find((c) => c.isCapital) ?? actor.cities[0])?.centerIndex ?? null;
-          const name = RELIGION_NAMES[actor.seat % RELIGION_NAMES.length];
-          state.eventLog.push(`${actor.name} founded ${name} — two beliefs left the pool.`);
-        }
+    }
+    // Religion: the canFoundReligion gates — a pantheon, a completed Holy
+    // Site, an earned Prophet. Follower drawn FIRST, founder second (the
+    // GPU's rf_/ro_ order).
+    if (
+      !actor.religion.founded &&
+      actor.religion.pantheon !== null &&
+      prophetsOf(actor) > 0 &&
+      actor.cities.some((c) =>
+        c.districts.some((d) => d.type === 'HOLY_SITE' && state.map.tiles[d.tileIndex].districtComplete),
+      )
+    ) {
+      const followers = Object.keys(FOLLOWER_BELIEFS).filter((id) => !state.claimedBeliefs.includes(id));
+      const founders = Object.keys(FOUNDER_BELIEFS).filter((id) => !state.claimedBeliefs.includes(id));
+      if (followers.length > 0 && founders.length > 0) {
+        const fPick = followers[Math.floor(nextRandom(state) * followers.length)];
+        const oPick = founders[Math.floor(nextRandom(state) * founders.length)];
+        state.claimedBeliefs.push(fPick);
+        state.claimedBeliefs.push(oPick);
+        actor.religion.founded = true;
+        addEraScore(state, actor.seat, ERA_SCORE_RELIGION);
+        actor.religion.follower = fPick;
+        actor.religion.founder = oPick;
+        // Freeze the holy tile (the LIVE capital's center at founding, else
+        // the first live city) — the source of this religion's pressure.
+        actor.religion.holyTile = (actor.cities.find((c) => c.isCapital) ?? actor.cities[0])?.centerIndex ?? null;
+        const name = RELIGION_NAMES[actor.seat % RELIGION_NAMES.length];
+        state.eventLog.push(`${actor.name} founded ${name} — two beliefs left the pool.`);
       }
-      // Enhancer: a SECOND earned Prophet claims an enhancer belief, denying
-      // it from the shared pool (the follower/founder mirror). The draw sits
-      // AFTER the founder draw — the GPU's _next_random(eopen) position.
-      if (actor.religion.founded && actor.religion.enhancer == null && prophetsOf(actor) >= 2) {
-        const enhancers = Object.keys(ENHANCER_BELIEFS).filter(
-          (id) => id !== seatOf(state, 0)!.religion.enhancer && !(state.claimedEnhancers ?? []).includes(id),
-        );
-        if (enhancers.length > 0) {
-          const ePick = enhancers[Math.floor(nextRandom(state) * enhancers.length)];
-          (state.claimedEnhancers ??= []).push(ePick);
-          actor.religion.enhancer = ePick; // identity kept — effects apply
-          state.eventLog.push(`${actor.name} enhanced its religion (${ENHANCER_BELIEFS[ePick].name} is taken).`);
-        }
+    }
+    // Enhancer: a SECOND earned Prophet claims an enhancer belief, denying
+    // it from the shared pool (the follower/founder mirror). The draw sits
+    // AFTER the founder draw — the GPU's _next_random(eopen) position.
+    if (actor.religion.founded && actor.religion.enhancer == null && prophetsOf(actor) >= 2) {
+      const enhancers = Object.keys(ENHANCER_BELIEFS).filter((id) => !(state.claimedEnhancers ?? []).includes(id));
+      if (enhancers.length > 0) {
+        const ePick = enhancers[Math.floor(nextRandom(state) * enhancers.length)];
+        (state.claimedEnhancers ??= []).push(ePick);
+        actor.religion.enhancer = ePick; // identity kept — effects apply
+        state.eventLog.push(`${actor.name} enhanced its religion (${ENHANCER_BELIEFS[ePick].name} is taken).`);
       }
     }
 

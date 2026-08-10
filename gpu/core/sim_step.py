@@ -721,6 +721,11 @@ class SimStep:
         # loop position every seat shares.
         self._advance_great_people(active0)
 
+        # The BELIEF RACES (pantheon / religion / enhancer) — the row-generic
+        # body the civ rows call at this same position (#73). RNG-neutral
+        # until an open-mask fires.
+        self._seat_belief_claims(0, active0)
+
         # War counters — the loop's war/peace arm, row 0. warTurns counts
         # war-with-WAR_COLUMN_SEAT only and a seat is never at war with
         # itself, so seat 0's warTurns never moves; peaceTurns ticks while at
