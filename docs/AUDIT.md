@@ -85,10 +85,24 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   of it is gate-visible: the exclusions live in the decider's masks, so
   identical records reach both engines. Burn-down: adopt the capability
   gate on BOTH mask families (kills the galley column), give seat 0 the
-  snipe dispatch, let #73/#74 unlock spread/embark. Each is a behaviour
+  snipe dispatch, let #73 unlock spread. Each is a behaviour
   round with rollout churn — needs the serve gate live. DEBT markers
   sit at the four sim_masks.py sites. Seat-0 columns for tile buy and
   faith purchases (the #104 wire kinds) belong to the same family.
+  #74 RESOLVED 2026-08-10: seat-0 EMBARK-on-order is refused on BOTH
+  engines by design — the seat-0 chassis is walkPath, whose final-step
+  tileFreeForUnit call passes allowEmbark FALSE, where the civ
+  record-apply passes at-war && SHIPBUILDING; the asymmetry dies with
+  the #108 wire unification, which routes seat 0 through the same
+  applier. The REAL divergences were in the GPU's seat-0 move arm and
+  are fixed: a NAVAL hull now takes the water plane (OCEAN behind
+  CARTOGRAPHY) where `passable` froze every seat-0 ship, stepUnit's
+  cliff refusal now fires on the disembark transition, and walkPath's
+  movesLeft > 0 loop gate now refuses the free 0-MP disembark
+  (_step_verb's all-remaining-MP cost reads 0 >= 0 without it).
+  Gate-reachability note: seat 0 fields no ships in driven games
+  (naval training/purchase masked, this family), so the naval arm is
+  poke-covered only until the galley column dies.
 
 - **A-27. The seat0-merge round's live tail.** Fog is ACTIVE
   (`fogOfWar = unitsMode` at creation) and FULLY twinned at the reveal

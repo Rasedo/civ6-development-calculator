@@ -1570,15 +1570,43 @@ class SimOrders:
                 continue
             dirs = a.clamp(min=0, max=5)
             tgt = nb.gather(1, dirs.unsqueeze(1)).squeeze(1)
+            tc_mv = tgt.clamp(min=0)
             civ = self._type_civilian[self.seat0_unit_type[:, p]]
             # `_blocked_for` IS tileFreeForUnit: foreign units block, an own
             # unit of the SAME domain blocks, own cross-domain units stack, and
             # a live enemy Encampment bars the step (walkPath's blockedByEnemy).
+            #
+            # Terrain = tileFreeForUnit through the seat-0 chassis (walkPath's
+            # final-step call, allowEmbark FALSE): a NAVAL hull takes the water
+            # plane with OCEAN behind seat 0's CARTOGRAPHY, a land unit the
+            # land plane — so embark-on-order is refused on BOTH engines (the
+            # civ appliers' war-gated allowEmb arm reaches seat 0 with the #108
+            # wire unification). A capture-carried EMBARKED unit may still walk
+            # ASHORE: the land target passes, and _step_verb owns the
+            # transition — which is why stepUnit's cliff refusal and
+            # walkPath's movesLeft > 0 loop gate must sit here too.
+            _ty_mv = self.seat0_unit_type[:, p].clamp(min=0, max=self.NU - 1)
+            _nav_mv = self.unit_naval[_ty_mv]
+            terr_ok = self.passable.gather(1, tc_mv.unsqueeze(1)).squeeze(1)
+            if bool(_nav_mv.any()):
+                _cart_p = (
+                    self.techs[:, self._cartography_tech]
+                    if self._cartography_tech >= 0
+                    else torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                )
+                _wp_p = self.wpass.gather(1, tc_mv.unsqueeze(1)).squeeze(1) & (
+                    ~self.ocean_tile.gather(1, tc_mv.unsqueeze(1)).squeeze(1) | _cart_p
+                )
+                terr_ok = torch.where(_nav_mv, _wp_p, terr_ok)
+            _clf_p = self._cliff_block_dirs(here.clamp(min=0), nb, self.tile_seat == 0)
+            _clf_mv = _clf_p.gather(1, dirs.unsqueeze(1)).squeeze(1)
             ok = (
                 mv
                 & (tgt >= 0)
-                & self.passable.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1)
-                & ~self._blocked_for(tgt.clamp(min=0).unsqueeze(1), 0, is_civilian=civ).squeeze(1)
+                & terr_ok
+                & ~self._blocked_for(tc_mv.unsqueeze(1), 0, is_civilian=civ).squeeze(1)
+                & ~_clf_mv
+                & (self.seat0_unit_mp[:, p] > 0)
             )
             if bool(ok.any()):
                 self._step_verb(  # the shared step contract
