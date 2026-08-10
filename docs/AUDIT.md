@@ -120,11 +120,20 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   strike, training XP.
 - **B-18r. Seat-0 religion (#73).** Civ-seat religion is complete
   (pantheon/founder/enhancer races, pressure, missionaries, apostles,
-  theological combat, worship buildings, faith buys on the wire). Seat
+  theological combat, worship buildings, faith buys on the wire).
+  CAUGHT 2026-08-10: the #96 mega-batch deleted the TS side of the
+  belief RACES (nothing pushed claimedPantheons/claimedBeliefs, the
+  claim rule had no caller) while the GPU twin stayed live — every
+  digest and the RNG stream would have diverged at the first civ claim.
+  RESTORED at the advanceGreatPeople position in the seatPhase loop
+  (civ rows only), gates and draw order mirroring the GPU's
+  popen/ropen/eopen shapes. Seat
   0 has faith income + worship spending but CANNOT FOUND a pantheon or
   religion on the GPU — the `civ_pantheon`/`civ_follower`/`civ_founder`/
   `civ_enhancer`/`civ_prophets`/`civ_religion_done` seat-0 rows are
-  allocated and waiting. Until it lands, seat 0 fields no religious
+  allocated and waiting; #73 also needs the seat-0 economy walk to grow
+  the belief-effect hooks the civ walk reads through `_bel_add` (~15
+  sites) and `_advance_great_people` to count row-0 prophets. Until it lands, seat 0 fields no religious
   units (see A-26). KNOWN LATENT: a religious-unit lifecycle drift
   (recorded when APOSTLE_BUY was still a flag) becomes reachable the
   moment the driver emits faith-buy kind 6 — expect it at its causal

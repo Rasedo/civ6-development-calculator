@@ -233,11 +233,11 @@ def main() -> None:
         assert bool(((pf + folrow - full).abs().sum() == 0)), "pan+founder + follower must reconstruct the full bldgY"
         # flag routing: LIVE -> followedReligion; INERT -> owner religion.
         if sim._b18_couple:
-            assert bool((sim._city_rel_seat0() == sim.city_followed[:, 0, :sim.C]).all()), "LIVE: seat 0 draws followedReligion"
-            assert bool((sim._civ_city_rel(1) == sim.city_followed[:, 1 + 1]).all()), "LIVE: civ draws civ_city_followed"
+            assert bool((sim._city_rel(0) == sim.city_followed[:, 0, :sim.C]).all()), "LIVE: seat 0 draws followedReligion"
+            assert bool((sim._city_rel(2) == sim.city_followed[:, 1 + 1]).all()), "LIVE: civ draws civ_city_followed"
         else:
-            assert bool((sim._city_rel_seat0() == 0).all()), "INERT: seat 0 draws religion 0"
-            assert bool((sim._civ_city_rel(1) == 2).all()), "INERT: civ 1 draws owner religion 2"
+            assert bool((sim._city_rel(0) == 0).all()), "INERT: seat 0 draws religion 0"
+            assert bool((sim._city_rel(2) == 2).all()), "INERT: civ 1 draws owner religion 2"
 
     print("SLICE-Q RELIGION+GP OK")
     print("SLICE-U FOLLOWER-COUPLING OK")

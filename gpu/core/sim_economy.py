@@ -1867,7 +1867,7 @@ class SimEconomy:
         # (pre-amenity), like cityBuildingYields' beliefAdd. Computed fresh
         # (not cached): the term is pop-free but city_followed can change
         # between turns without an _eff_version bump.
-        _pcfol = self._follower_id_for(self._city_rel_seat0()) if self._bel_any else None
+        _pcfol = self._follower_id_for(self._city_rel(0)) if self._bel_any else None
         if _pcfol is not None:
             # (.to(self.dtype): the fol tables are f64 for the civ-seat paths;
             # this walk runs in self.dtype — f32 under gumbel/training, where
@@ -2339,7 +2339,7 @@ class SimEconomy:
         _has_bel = self._civ_only_has_beliefs(r)
         # Per-rc FOLLOWER-belief id [B, RC] (followed religion when LIVE, else
         # owner r+1).
-        _fol_rc = self._follower_id_for(self._civ_city_rel(r)) if _has_bel else None
+        _fol_rc = self._follower_id_for(self._city_rel(r + 1)) if _has_bel else None
         featP = None
         if _has_bel:
             featP = self._belief_feat_plane(r)

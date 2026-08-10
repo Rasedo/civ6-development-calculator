@@ -1392,19 +1392,15 @@ class SimSeats:
         table's trailing dims."""
         return self._bel["fol"][key][fol_id + 1]
 
-    def _city_rel_seat0(self) -> torch.Tensor:
-        """The religion id each SEAT-0 city draws its follower belief from —
-        followedReligion when the coupling is LIVE, else seat 0's religion id 0."""
+    def _city_rel(self, row: int) -> torch.Tensor:
+        """The religion id each of seat-row `row`'s cities draws its follower
+        belief from — followedReligion when the coupling is LIVE, else the
+        row's OWN religion id (which IS the row: seat 0 = 0, civ r = r+1).
+        Row 0 keeps its C-width column contract; civ rows are RC-wide."""
         if self._b18_couple:
-            return self.city_followed[:, 0, :self.C]
-        return torch.zeros(self.B, self.C, dtype=torch.long, device=self.device)
-
-    def _civ_city_rel(self, r: int) -> torch.Tensor:
-        """The religion id each civ-r city [B, RC] draws its follower belief from
-        — civ_city_followed when the coupling is LIVE, else the owner religion r+1."""
-        if self._b18_couple:
-            return self.city_followed[:, r + 1]
-        return torch.full((self.B, self.RC), r + 1, dtype=torch.long, device=self.device)
+            return self.city_followed[:, 0, :self.C] if row == 0 else self.city_followed[:, row]
+        ncol = self.C if row == 0 else self.RC
+        return torch.full((self.B, ncol), row, dtype=torch.long, device=self.device)
 
     def _belief_feat_plane(self, r: int) -> torch.Tensor:
         """[B, T, 6] belief TILE adds — featureYields at tiles with a LIVE feature
@@ -1714,7 +1710,7 @@ class SimSeats:
         # coupling is LIVE, else the owner religion r+1, which is byte-identical
         # to _bel_add's fol term). pan/founder stay per-civ via _bel_add and
         # _bel_add_pf.
-        _fol_j = self._follower_id_for(self._civ_city_rel(r)[:, j]) if _has_bel else None
+        _fol_j = self._follower_id_for(self._city_rel(r + 1)[:, j]) if _has_bel else None
         if _has_bel:
             featP = self._belief_feat_plane(r)
             f_plane = f_plane + featP[:, :, 0]
@@ -2208,7 +2204,7 @@ class SimSeats:
             extra = self._bel_add("river", r)[:, 0].unsqueeze(1) * self.tile_river.gather(1, ctr).double()
             # Zen Meditation keys per-city on the followed religion's follower
             # belief (the owner religion when uncoupled: byte-identical).
-            zen_rc = self._fol_tab("zen", self._follower_id_for(self._civ_city_rel(r)))  # [B, RC, 2] = min, amenities
+            zen_rc = self._fol_tab("zen", self._follower_id_for(self._city_rel(r + 1)))  # [B, RC, 2] = min, amenities
             zmin, zamt = zen_rc[:, :, 0], zen_rc[:, :, 1]  # each [B, RC]
             if bool((zamt != 0).any()):
                 dt_ = self.civ_city_dist_tile[:, r]

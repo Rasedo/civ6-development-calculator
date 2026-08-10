@@ -436,7 +436,7 @@ class SimPhase:
             # bit-exact in any shape.
             _gmul_r = self._bel_mul("growth", r) if _rcy_bel else 1.0
             _riv_h = self._bel_add("river", r)[:, 1] if _rcy_bel else None
-            _fol_h_rc = self._follower_id_for(self._civ_city_rel(r)) if _rcy_bel else None
+            _fol_h_rc = self._follower_id_for(self._city_rel(r + 1)) if _rcy_bel else None
             _ctr_r = self.civ_city_center[:, r].clamp(min=0)  # [B, RC]
 
             def _g5_hm() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
