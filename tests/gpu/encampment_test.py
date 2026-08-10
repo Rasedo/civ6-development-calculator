@@ -9,7 +9,7 @@ bar — these pokes are gate-unreachable-surface coverage):
 
   1. Training-XP catalog: _b_train_xp exports 5/5/10/15 for
      BARRACKS/STABLE/ARMORY/MILITARY_ACADEMY and 0 for every other building.
-  2. Training XP wiring: _spawn_seat0 / _spawn_seat_unit honour init_xp — a
+  2. Training XP wiring: _spawn_unit honours init_xp on every row — a
      MILITARY unit inherits the city's best Encampment tier, a civilian stays
      at 0.
   3. The ADDITIONAL Encampment strike: a seat-0 city owning a COMPLETE
@@ -64,19 +64,19 @@ def test_training_xp_wiring(rules, path) -> None:
 
     # MILITARY: inherits init_xp
     slot0 = int(sim.seat0_unit_next[0])
-    sim._spawn_seat0(torch.tensor([True]), ctr, torch.tensor([mil_ty]), init_xp=init)
+    sim._spawn_unit(0, torch.tensor([True]), ctr, torch.tensor([mil_ty]), init_xp=init)
     assert int(sim.seat0_unit_next[0]) == slot0 + 1, "military unit did not spawn"
     assert int(sim.seat0_unit_xp[0, slot0]) == 10, f"military trained XP = {int(sim.seat0_unit_xp[0, slot0])}, want 10"
 
     # CIVILIAN: stays 0 even under init_xp
     slot1 = int(sim.seat0_unit_next[0])
-    sim._spawn_seat0(torch.tensor([True]), ctr, torch.tensor([bld_ty]), init_xp=init)
+    sim._spawn_unit(0, torch.tensor([True]), ctr, torch.tensor([bld_ty]), init_xp=init)
     assert int(sim.seat0_unit_next[0]) == slot1 + 1, "builder did not spawn"
     assert int(sim.seat0_unit_xp[0, slot1]) == 0, f"civilian trained XP = {int(sim.seat0_unit_xp[0, slot1])}, want 0"
 
-    # CIV SEAT mirror: _spawn_seat_unit is military-only, honours init_xp
+    # CIV SEAT mirror: the same body on row 1 (civ 0) honours init_xp
     vslot = int(sim.civ_unit_next[0])
-    sim._spawn_seat_unit(torch.tensor([True]), ctr, torch.tensor([mil_ty]), 0, init_xp=torch.tensor([15]))
+    sim._spawn_unit(1, torch.tensor([True]), ctr, torch.tensor([mil_ty]), init_xp=torch.tensor([15]))
     assert int(sim.civ_unit_next[0]) == vslot + 1, "civ unit did not spawn"
     assert int(sim.civ_unit_xp[0, vslot]) == 15, f"civ trained XP = {int(sim.civ_unit_xp[0, vslot])}, want 15"
     print("  training-XP wiring OK: military inherits tier XP (p=10, v=15), civilian stays 0")

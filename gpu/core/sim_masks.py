@@ -614,7 +614,7 @@ class SimMasks:
         """Mirrors spawnUnit's placement probe: the anchor if free, else the
         first free neighbor in direction order (the stable distance sort
         keeps exactly that order). side: 'barb' | 'seat0' | 'civ';
-        civ_mask [B] bool (side 'seat0' only) — True = civilian probe.
+        civ_mask [B] bool (either major side) — True = civilian probe.
         naval_mask [B] bool marks rows spawning a NAVAL unit — those probe over
         enterable WATER (wpass; OCEAN needs the owner's CARTOGRAPHY, passed as
         cart [B]) instead of the land plane, so ships land on water.
@@ -631,7 +631,7 @@ class SimMasks:
         if side == "seat0":
             blocked = self._blocked_for(cand7, 0, is_civilian=civ_mask)
         elif side == "civ" and civ is not None:
-            blocked = self._blocked_for(cand7, civ + 1)
+            blocked = self._blocked_for(cand7, civ + 1, is_civilian=False if civ_mask is None else civ_mask)
         else:
             blocked = self._blocked_for(cand7, BARB_SEAT)
         terr = self.passable.gather(1, okc)
@@ -726,67 +726,90 @@ class SimMasks:
         ex = self.seat_explored[:, seat_row] if isinstance(seat_row, int) else self.seat_explored[torch.arange(self.B, device=self.device), seat_row]
         return ex.gather(1, tiles.clamp(min=0).reshape(self.B, -1)).reshape(tiles.shape)
 
-    def _spawn_seat0(self, mask: torch.Tensor, at_tile: torch.Tensor, type_idx: torch.Tensor, init_xp: torch.Tensor | None = None) -> None:
-        """A trained unit appears at/near its city center (spawnUnit). init_xp
-        (a [B] long tensor) seeds a MILITARY unit's starting XP from its city's
-        Encampment training buildings; civilians stay at 0."""
+    def _spawn_unit(self, row: int, mask: torch.Tensor, at_tile: torch.Tensor, type_idx, init_xp: torch.Tensor | None = None, charges: torch.Tensor | None = None) -> torch.Tensor:
+        """spawnUnit for any major seat row (0 = seat 0, r+1 = civ r): the
+        unit appears at/near `at_tile` (the first free spot in direction
+        order). ONE body over the pooled planes via the pool prefix; the
+        roster's civilian bit picks the occupancy plane (and zeroes the
+        military-only fields), and naval types probe water with OCEAN gated
+        on this row's own CARTOGRAPHY. type_idx: int or [B] long. init_xp
+        ([B] long) seeds a MILITARY unit's starting XP from its city's
+        Encampment training buildings — civilians stay 0. charges ([B]
+        long) overrides the roster charge count (the MISSIONARY buy's
+        SCRIPTURE +1). Returns the LANDED mask — a caller that paid refunds
+        where no spot was free."""
         if not bool(mask.any()):
-            return
-        civ = self._type_civilian[type_idx.clamp(min=0)]
-        # naval units probe over water, OCEAN gated on seat 0's CARTOGRAPHY.
-        ti_pn = type_idx.clamp(min=0, max=self.NU - 1)
-        naval_mp = self.unit_naval[ti_pn] & mask
-        cart_p = self.techs[:, self._cartography_tech] if self._cartography_tech >= 0 else None
-        found, spot = self._first_free_spot(at_tile, "seat0", civ, naval_mask=naval_mp, cart=cart_p)
+            return torch.zeros_like(mask)
+        if isinstance(type_idx, int):
+            type_idx = torch.full((self.B,), type_idx, dtype=torch.long, device=self.device)
+        elif type_idx.dim() == 0:
+            type_idx = type_idx.expand(self.B)
+        pre = "seat0" if row == 0 else "civ"
+        is_civ_u = self._type_civilian[type_idx.clamp(min=0)]
+        # clamp max too: unmasked rows may hold district queue codes.
+        ti_n = type_idx.clamp(min=0, max=self.NU - 1)
+        naval_m = self.unit_naval[ti_n] & mask
+        techs2 = self.techs if row == 0 else self.civ_only_techs[:, row - 1]
+        cart = techs2[:, self._cartography_tech] if self._cartography_tech >= 0 else None
+        found, spot = self._first_free_spot(at_tile, pre, civ_mask=is_civ_u, civ=row - 1, naval_mask=naval_m, cart=cart)
         can = mask & found
         if not bool(can.any()):
-            return
+            return can
         rows = can.nonzero(as_tuple=True)[0]
-        slot = self.seat0_unit_next[rows]
-        assert int(slot.max()) < simbase.SEAT0_POOL_MAX, "p slot pool exhausted — raise simbase.SEAT0_POOL_MAX"
-        self.seat0_unit_alive[rows, slot] = True
-        self.seat0_unit_type[rows, slot] = type_idx[rows]
-        self.seat0_unit_tile[rows, slot] = spot[rows]
-        self._reveal_around(rows, 0, spot[rows], 2)  # spawnUnit's revealAround (SIGHT_RANGE)
-        self.seat0_unit_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
-        self.seat0_unit_fortify[rows, slot] = 0  # a fresh (possibly reclaimed) slot starts undug
+        nxt = getattr(self, f"{pre}_unit_next")
+        slot = nxt[rows]
+        if row == 0:
+            assert int(slot.max()) < simbase.SEAT0_POOL_MAX, "p slot pool exhausted — raise simbase.SEAT0_POOL_MAX"
+        else:
+            assert int(slot.max()) < simbase.POOL_MAX, "civ slot pool exhausted — raise simbase.POOL_MAX"
+        getattr(self, f"{pre}_unit_alive")[rows, slot] = True
+        if row > 0:
+            # a reclaimed civ slot may have held ANOTHER civ's unit
+            self.civ_unit_civ[rows, slot] = row - 1
+            self.civ_unit_seat[rows, slot] = row
+        getattr(self, f"{pre}_unit_type")[rows, slot] = type_idx[rows]
+        getattr(self, f"{pre}_unit_tile")[rows, slot] = spot[rows]
+        self._reveal_around(rows, row, spot[rows], 2)  # spawnUnit's revealAround (SIGHT_RANGE)
+        getattr(self, f"{pre}_unit_hp")[rows, slot] = self.rules.combat.get("unitHp", 100)
+        getattr(self, f"{pre}_unit_fortify")[rows, slot] = 0  # a fresh (possibly reclaimed) slot starts undug
         if init_xp is None:
-            self.seat0_unit_xp[rows, slot] = 0  # a fresh (possibly reclaimed) slot starts at 0 xp
+            getattr(self, f"{pre}_unit_xp")[rows, slot] = 0  # a fresh (possibly reclaimed) slot starts at 0 xp
         else:
             # MILITARY rows inherit the training city's Encampment XP; civilians stay 0.
-            self.seat0_unit_xp[rows, slot] = torch.where(civ[rows], torch.zeros_like(slot), init_xp[rows])
+            getattr(self, f"{pre}_unit_xp")[rows, slot] = torch.where(is_civ_u[rows], torch.zeros_like(slot), init_xp[rows])
         # a unit spawned MID-turn has no frozen grant yet — TS leaves movesFull
         # undefined until its first refreshUnits and the `?? full` fallback
         # means no aura, so 0 is the faithful mirror (and it scrubs a reclaimed
         # slot's stale value).
-        self.seat0_unit_aura_mp[rows, slot] = 0
-        self.seat0_unit_emb[rows, slot] = False  # a fresh (possibly reclaimed) slot is ashore
+        getattr(self, f"{pre}_unit_aura_mp")[rows, slot] = 0
+        getattr(self, f"{pre}_unit_emb")[rows, slot] = False  # a fresh (possibly reclaimed) slot is ashore
         # BEFORE _full_mp, which READS `emb`: a reclaimed slot carries the dead
         # occupant's flag, and _full_mp overrides an embarked unit's pool to the
         # flat EMBARK_MOVES. The pool itself is `def.moves` plus the seat's
         # golden dedication.
-        _m = self._full_mp("seat0")[rows, slot]
-        self.seat0_unit_mp[rows, slot] = _m
-        self.seat0_unit_mp_full[rows, slot] = _m
-        self.seat0_unit_charges[rows, slot] = self._type_charges[type_idx[rows]]
-        civ_rows = civ[rows]
-        mil_rows = rows[~civ_rows]
+        _m = self._full_mp(pre)[rows, slot]
+        getattr(self, f"{pre}_unit_mp")[rows, slot] = _m
+        getattr(self, f"{pre}_unit_mp_full")[rows, slot] = _m
+        getattr(self, f"{pre}_unit_charges")[rows, slot] = self._type_charges[type_idx[rows]] if charges is None else charges[rows]
+        off = 0 if row == 0 else simbase.SEAT0_POOL_MAX  # merged-pool index of this pool's slot 0
+        cu_rows = is_civ_u[rows]
+        mil_rows = rows[~cu_rows]
         if len(mil_rows) > 0:
-            self.military_at[(mil_rows, spot[mil_rows])] = self.seat0_unit_next[mil_rows]
-        cv_rows = rows[civ_rows]
+            self.military_at[(mil_rows, spot[mil_rows])] = nxt[mil_rows] + off
+        cv_rows = rows[cu_rows]
         if len(cv_rows) > 0:
-            self.civilian_at[(cv_rows, spot[cv_rows])] = self.seat0_unit_next[cv_rows]
-        self.seat0_unit_next[rows] += 1
-        # track the strongest MELEE ever fielded (city defense).
-        # Gated on `can` like TS — a no-spot spawn never lands the unit.
-        # clamp max too: unmasked rows may hold district queue codes.
-        tim = type_idx.clamp(min=0, max=self.NU - 1)
+            self.civilian_at[(cv_rows, spot[cv_rows])] = nxt[cv_rows] + off
+        nxt[rows] += 1
+        # track the seat's strongest MELEE ever fielded (city defense) — a
+        # civilian's combat 0 never raises it. Gated on `can` like TS: a
+        # no-spot spawn never lands the unit.
         melee_cs = torch.where(
-            can & (self._type_ranged_strength[tim] == 0),
-            self._type_combat[tim],
-            torch.zeros_like(self.best_melee),
+            can & (self._type_ranged_strength[ti_n] == 0),
+            self._type_combat[ti_n],
+            torch.zeros_like(self.civ_best_melee[:, row]),
         )
-        self.best_melee.copy_(torch.maximum(self.best_melee, melee_cs))
+        self.civ_best_melee[:, row] = torch.maximum(self.civ_best_melee[:, row], melee_cs)
+        return can
 
 
     def _dig_at(self, gd: torch.Tensor, td: torch.Tensor) -> None:

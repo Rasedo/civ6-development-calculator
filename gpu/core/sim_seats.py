@@ -810,7 +810,7 @@ class SimSeats:
                                * (n_cities2.double() - 1 + self._civ_only_settlers_of(r) + _sq2).clamp(min=0)) * mult
                     ok_ps = is_ps2 & (self.civ_city_pop[:, r, j] >= 2) & self._afford(self.civ_only_treasury[:, r], s_cost2)
                     if bool(ok_ps.any()):
-                        landed_ps = self._spawn_seat_civilian(ok_ps, self.civ_city_center[:, r, j], r, type_idx=self._settler_idx)
+                        landed_ps = self._spawn_unit(r + 1, ok_ps, self.civ_city_center[:, r, j], self._settler_idx)
                         self.civ_only_treasury[:, r] = torch.where(landed_ps, self.civ_only_treasury[:, r] - s_cost2, self.civ_only_treasury[:, r])
                         self.civ_city_pop[:, r, j] = torch.where(landed_ps, (self.civ_city_pop[:, r, j] - 1).clamp(min=1), self.civ_city_pop[:, r, j])
                 pu_i = pb_i - (NBn + 1)
@@ -833,9 +833,9 @@ class SimSeats:
                         if bool(is_mil.any()):
                             # a purchased military unit inherits city j's Encampment training XP (best tier).
                             xp_rj = (self.civ_city_bldg[:, r, j, :].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
-                            landed = landed | self._spawn_seat_unit(is_mil, ctr, ui, r, init_xp=xp_rj)
+                            landed = landed | self._spawn_unit(r + 1, is_mil, ctr, ui, init_xp=xp_rj)
                         if bool(is_bldr.any()):
-                            landed_civ = self._spawn_seat_civilian(is_bldr, ctr, r)
+                            landed_civ = self._spawn_unit(r + 1, is_bldr, ctr, self._builder_idx)
                             landed = landed | landed_civ
                             self.civ_only_builders_trained[:, r] = self.civ_only_builders_trained[:, r] + landed_civ.long()
                         self.civ_only_treasury[:, r] = torch.where(landed, self.civ_only_treasury[:, r] - cost_u, self.civ_only_treasury[:, r])
@@ -971,50 +971,6 @@ class SimSeats:
         nb = self.neigh.clamp(min=0)
         adj = (host[:, nb] & (self.neigh >= 0).unsqueeze(0)).any(dim=2)
         return base & adj
-
-    def _spawn_seat_civilian(self, mask: torch.Tensor, at_tile: torch.Tensor, civ: int, type_idx: int | None = None, charges: torch.Tensor | None = None) -> torch.Tensor:
-        """Spawn a civ CIVILIAN (default BUILDER) — the civilian twin of
-        _spawn_seat_unit, with civilian blocking and charges seeded from the
-        roster. type_idx/charges override for the MISSIONARY buy (charges [B]
-        carries the SCRIPTURE +1 per game).
-        Returns the LANDED mask; purchases refund when no spawn spot exists."""
-        if not bool(mask.any()):
-            return torch.zeros_like(mask)
-        cand7 = torch.cat([at_tile.unsqueeze(1), self.neigh[at_tile.clamp(min=0)]], dim=1)
-        okc = cand7.clamp(min=0)
-        ok7 = (cand7 >= 0) & self.passable.gather(1, okc) & ~self._blocked_for(cand7, civ + 1, is_civilian=True)
-        first = torch.where(ok7, torch.arange(7, device=self.device), 7).min(dim=1).values
-        spot = cand7.gather(1, first.clamp(max=6).unsqueeze(1)).squeeze(1)
-        can = mask & (first < 7)
-        if not bool(can.any()):
-            return can
-        rows = can.nonzero(as_tuple=True)[0]
-        slot = self.civ_unit_next[rows]
-        assert int(slot.max()) < simbase.POOL_MAX, "civ slot pool exhausted — raise simbase.POOL_MAX"
-        ti = self._builder_idx if type_idx is None else type_idx
-        self.civ_unit_alive[rows, slot] = True
-        self.civ_unit_civ[rows, slot] = civ
-        self.civ_unit_seat[rows, slot] = civ + 1  # civ index i lives at seat i+1
-        self.civ_unit_type[rows, slot] = ti
-        self.civ_unit_tile[rows, slot] = spot[rows]
-        self._reveal_around(rows, civ + 1, spot[rows], 2)  # spawnUnit's revealAround (SIGHT_RANGE)
-        self.civ_unit_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
-        self.civ_unit_fortify[rows, slot] = 0  # civilian never fortifies; keep the (reclaimed) slot clean
-        self.civ_unit_xp[rows, slot] = 0  # civilian never fights; keep the (reclaimed) slot at 0 xp
-        self.civ_unit_aura_mp[rows, slot] = 0  # civilian never auras; keep the (reclaimed) slot clean
-        self.civ_unit_emb[rows, slot] = False  # a fresh (possibly reclaimed) slot is ashore
-        # The civ_unit_emb clear above MUST precede _full_mp, which READS it: a
-        # reclaimed slot carries the dead occupant's `emb`, and _full_mp
-        # overrides an embarked unit's pool to the flat EMBARK_MOVES. Reachable
-        # only once a slot is REUSED, i.e. after a compaction.
-        # `movesLeft: def.moves` + the seat's golden dedication.
-        _m = self._full_mp("civ")[rows, slot]
-        self.civ_unit_mp[rows, slot] = _m
-        self.civ_unit_mp_full[rows, slot] = _m
-        self.civ_unit_charges[rows, slot] = self._type_charges[ti] if charges is None else charges[rows]
-        self.civilian_at[(rows, spot[rows])] = slot + simbase.SEAT0_POOL_MAX
-        self.civ_unit_next[rows] += 1
-        return can
 
     def _theological_combat(self, r: int, act: torch.Tensor) -> torch.Tensor:
         """The theological-combat mirror. For each APOSTLE slot of

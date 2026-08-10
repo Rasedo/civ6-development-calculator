@@ -460,7 +460,7 @@ class SimStep:
             if self._settler_idx >= 0 and bool(made_settler.any()):
                 # Completion SPAWNS the settler at the city — a unit like any
                 # other; WHERE it founds is a later FOUND_CITY order.
-                self._spawn_seat0(made_settler, self.site[bidx, col], torch.full((B,), self._settler_idx, dtype=torch.long, device=dev))
+                self._spawn_unit(0, made_settler, self.site[bidx, col], self._settler_idx)
             # A completed Settler costs the city 1 pop; the dirty flag
             # refreshes later cities' totals.
             self.pop[bidx, col] = torch.where(made_settler, (self.pop[bidx, col] - 1).clamp(min=1), self.pop[bidx, col])
@@ -479,7 +479,7 @@ class SimStep:
                 # clamp max too: unmasked rows may hold district codes.
                 # A trained military unit inherits city `col`'s Encampment training XP (best tier).
                 xp_col = (self.buildings[bidx, col, :].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
-                self._spawn_seat0(made_unit, self.site[bidx, col], (cur_c - self.UNIT_BASE).clamp(min=0, max=self.NU - 1), init_xp=xp_col)
+                self._spawn_unit(0, made_unit, self.site[bidx, col], (cur_c - self.UNIT_BASE).clamp(min=0, max=self.NU - 1), init_xp=xp_col)
                 if self._builder_idx >= 0:
                     # a completed builder moves the cost escalator
                     made_b = made_unit & (cur_c == self.UNIT_BASE + self._builder_idx)

@@ -1494,7 +1494,7 @@ class SimInit:
 
         # Seat 0's t0 units seed the p-pool HERE — after the roster tables and
         # the pool planes exist. Slot order is the file's unit order (the wire
-        # contract); charges/MP mirror _spawn_seat0's writes, minus the spot
+        # contract); charges/MP mirror _spawn_unit's writes, minus the spot
         # search (the file tile is the tile).
         for b, f in enumerate(fixtures):
             for cv in f["civs"]:

@@ -161,7 +161,7 @@ class SimPhase:
                 want_ds = dbuy_s.pop(r) & active & self.controlled[:, r] & ~bought_r5 \
                     & (n_cities > 0) & (pop_s >= 2) & self._afford(self.civ_only_treasury[:, r], sett_price5)
                 if bool(want_ds.any()):
-                    landed_ds = self._spawn_seat_civilian(want_ds, ctr_s, r, type_idx=self._settler_idx)
+                    landed_ds = self._spawn_unit(r + 1, want_ds, ctr_s, self._settler_idx)
                     self.civ_only_treasury[:, r] = torch.where(landed_ds, self.civ_only_treasury[:, r] - sett_price5, self.civ_only_treasury[:, r])
                     # purchased settlers cost the spawn city a pop (real Civ 6)
                     _bidx_ds = torch.arange(self.B, device=dev)
@@ -172,7 +172,7 @@ class SimPhase:
             # MILITARY UNIT — nothing else bought and live+queued military
             # under the quota (2× cities). Buy the STRONGEST affordable
             # trainable military unit (highest _type_combat, ties to lowest unit
-            # index = table order), spawned via _spawn_seat_unit at the capital
+            # index = table order), spawned via _spawn_unit at the capital
             # (else the first alive city); pay only where it LANDED (no free
             # spot = refund).
             mil_count5 = n_melee + n_ranged
@@ -202,7 +202,7 @@ class SimPhase:
                     # A bought military unit inherits the SPAWN city's (capital, else first alive) Encampment training XP.
                     bidx5 = torch.arange(self.B, device=self.device)
                     xp_cap5 = (self.civ_city_bldg[bidx5, r, spawn_slot5].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
-                    landed_u5 = self._spawn_seat_unit(elig_u5, ctr5, pick_ty5, r, init_xp=xp_cap5)
+                    landed_u5 = self._spawn_unit(r + 1, elig_u5, ctr5, pick_ty5, init_xp=xp_cap5)
                     price_u5 = self._type_cost.gather(0, pick_ty5).double() * mult_r5
                     self.civ_only_treasury[:, r] = torch.where(landed_u5, self.civ_only_treasury[:, r] - price_u5, self.civ_only_treasury[:, r])
                     bought_r5 = bought_r5 | landed_u5
@@ -261,7 +261,7 @@ class SimPhase:
                     if bool(buy_m5.any()):
                         at_m5 = self.civ_city_center[bidx_m, r, jm5].clamp(min=0)
                         chg_m5 = self._type_charges[self._missionary_idx] + self._enh["mchg"][self.civ_only_enhancer[:, r] + 1]
-                        landed_m5 = self._spawn_seat_civilian(buy_m5, at_m5, r, type_idx=self._missionary_idx, charges=chg_m5)
+                        landed_m5 = self._spawn_unit(r + 1, buy_m5, at_m5, self._missionary_idx, charges=chg_m5)
                         self.civ_only_faith[:, r] = torch.where(landed_m5, self.civ_only_faith[:, r] - mcost5, self.civ_only_faith[:, r])
                         _bought_relig = _bought_relig | landed_m5
             # Kind 6: the APOSTLE buy — the missionary block's twin, run AFTER
@@ -286,7 +286,7 @@ class SimPhase:
                     buy_a = want_a & self.civ_city_alive[bidx_a, r, ja5] & self.civ_city_bldg[bidx_a, r, ja5, self._shrine_bidx] & hs_oka
                     if bool(buy_a.any()):
                         at_a = self.civ_city_center[bidx_a, r, ja5].clamp(min=0)
-                        landed_a = self._spawn_seat_civilian(buy_a, at_a, r, type_idx=self._apostle_idx, charges=self._type_charges[self._apostle_idx].expand(self.B))
+                        landed_a = self._spawn_unit(r + 1, buy_a, at_a, self._apostle_idx, charges=self._type_charges[self._apostle_idx].expand(self.B))
                         self.civ_only_faith[:, r] = torch.where(landed_a, self.civ_only_faith[:, r] - acost, self.civ_only_faith[:, r])
             # Kind 3: TILE PURCHASE — the LAST rung of the gold ladder, a wire
             # DECISION. Position matters: the buy sits in the gold block, which
@@ -370,7 +370,7 @@ class SimPhase:
                         ltype = self._civ_only_spearman if self.turn > int(self.rules.combat.get("spearmanAfterTurn", 60)) else self._warrior_idx
                         ltype_t = torch.full((self.B,), ltype, dtype=torch.long, device=dev)
                         for _ in range(levy_units_n):
-                            self._spawn_seat_unit(do_l, at_l, ltype_t, r)  # best-effort; refunds nothing (TS pays before spawnUnit)
+                            self._spawn_unit(r + 1, do_l, at_l, ltype_t)  # best-effort; refunds nothing (TS pays before spawnUnit)
                         self.civ_only_treasury[:, r] = torch.where(do_l, self.civ_only_treasury[:, r] - levy_cost, self.civ_only_treasury[:, r])
                         rows_l = do_l.nonzero(as_tuple=True)[0]
                         self.citystate_last_levy[rows_l, sl5[rows_l]] = self.turn
@@ -677,11 +677,11 @@ class SimPhase:
                                 found_s, (self.civ_city_pop[:, r, j] - 1).clamp(min=1), self.civ_city_pop[:, r, j]
                             )
                             if self._settler_idx >= 0:
-                                self._spawn_seat_civilian(found_s, self.civ_city_center[:, r, j], r, type_idx=self._settler_idx)
+                                self._spawn_unit(r + 1, found_s, self.civ_city_center[:, r, j], self._settler_idx)
                         spawn_u = done_q & (cur >= 1) & (cur <= self.NU)
                         is_bldr = spawn_u & (cur - 1 == self._builder_idx)
                         if bool(is_bldr.any()):
-                            self._spawn_seat_civilian(is_bldr, self.civ_city_center[:, r, j], r)
+                            self._spawn_unit(r + 1, is_bldr, self.civ_city_center[:, r, j], self._builder_idx)
                             self.civ_only_builders_trained[:, r] = self.civ_only_builders_trained[:, r] + is_bldr.long()
                         spawn_u = spawn_u & ~is_bldr
                         # The MILITARY ENGINEER is a CIVILIAN chassis (charges,
@@ -691,12 +691,12 @@ class SimPhase:
                         if self._seat_eng_live and self._eng_idx >= 0:
                             is_eng = spawn_u & (cur - 1 == self._eng_idx)
                             if bool(is_eng.any()):
-                                self._spawn_seat_civilian(is_eng, self.civ_city_center[:, r, j], r, type_idx=self._eng_idx)
+                                self._spawn_unit(r + 1, is_eng, self.civ_city_center[:, r, j], self._eng_idx)
                             spawn_u = spawn_u & ~is_eng
                         if bool(spawn_u.any()):
                             # A trained military unit inherits city j's Encampment training XP (best tier).
                             xp_rj = (self.civ_city_bldg[:, r, j, :].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
-                            self._spawn_seat_unit(spawn_u, self.civ_city_center[:, r, j], (cur - 1).clamp(min=0), r, init_xp=xp_rj)
+                            self._spawn_unit(r + 1, spawn_u, self.civ_city_center[:, r, j], (cur - 1).clamp(min=0), init_xp=xp_rj)
                         # a finished district completes its paved tile
                         nS_b4 = len(self._scaffold)
                         done_d = done_q & (cur > self.NU) & (cur <= self.NU + nS_b4)
@@ -1202,7 +1202,7 @@ class SimPhase:
                         guidx = self._general_unit_idx if cls == self._general_cls else self._admiral_unit_idx
                         if bool(hit.any()):
                             cap_t = torch.where(self.civ_city_is_cap[:, r] & self.civ_city_alive[:, r], self.civ_city_center[:, r], torch.full_like(self.civ_city_center[:, r], -1)).max(dim=1).values
-                            self._spawn_seat_civilian(hit & (cap_t >= 0), cap_t, r, type_idx=guidx)
+                            self._spawn_unit(r + 1, hit & (cap_t >= 0), cap_t, guidx)
                             self._gen_ver += 1
 
             # Pantheon / religion claims. The picks' IDENTITIES matter: the
@@ -1773,7 +1773,7 @@ class SimPhase:
                 can = is_ps & (self.pop[:, c] >= 2) & self._afford(self.treasury, s_cost) & found_ps
                 self.treasury.copy_(torch.where(can, self.treasury - s_cost, self.treasury))
                 if bool(can.any()):
-                    self._spawn_seat0(can, self.site[:, c], torch.full((self.B,), self._settler_idx, dtype=torch.long, device=self.device))
+                    self._spawn_unit(0, can, self.site[:, c], self._settler_idx)
                 self.pop[:, c] = torch.where(can, (self.pop[:, c] - 1).clamp(min=1), self.pop[:, c])  # purchased settlers cost the pop too
                 settlers_live = settlers_live + can.long()
             # --- buy a unit (purchaseUnit: trainable ∧ gold ∧ a free spawn
@@ -1800,7 +1800,7 @@ class SimPhase:
                     self.treasury.copy_(torch.where(can, self.treasury - cost, self.treasury))
                     # a purchased military unit inherits city c's Encampment training XP (best tier)
                     xp_c = (self.buildings[:, c, :].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
-                    self._spawn_seat0(can, self.site[:, c], utp, init_xp=xp_c)
+                    self._spawn_unit(0, can, self.site[:, c], utp, init_xp=xp_c)
                     if self._builder_idx >= 0:
                         # …and move it for every later slot (purchaseUnit)
                         self.builders_trained.add_((can & (utp == self._builder_idx)).long())

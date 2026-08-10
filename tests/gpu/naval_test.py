@@ -7,7 +7,7 @@ The scripted parity rollout reaches almost none of the naval combat surface:
 seat 0 builds no ships and the civ galley policy rarely fights. These pokes pin
 those semantics the same way space_race_test / war_test do: build a BatchSim
 from a fixture, force the state in-memory, then drive the EXACT engine twin
-(_apply_unit_actions, _barbarian_phase pcstk, _seat_phase rcstk, _spawn_seat0,
+(_apply_unit_actions, _barbarian_phase pcstk, _seat_phase rcstk, _spawn_unit,
 _flank_support) and assert TS-mirroring behaviour.
 
 Covered here (all gate-unreachable):
@@ -15,7 +15,7 @@ Covered here (all gate-unreachable):
   2. GALLEY naval melee — CAPTURE a coastal city-state.
   3. QUADRIREME range-1 bombard — a civ UNIT (no retaliation, no advance).
   4. QUADRIREME range-1 bombard — a civ CITY (HP floors at 1, never captures).
-  5. SEAT-0 naval — spawn on WATER (_spawn_seat0 naval probe) + attack; plus
+  5. SEAT-0 naval — spawn on WATER (_spawn_unit naval probe) + attack; plus
      the MOVE-verb limit: the controlled MOVE verb cannot step a ship onto
      water, because its apply reads the land `passable` plane, not wpass.
   6. OCEAN gate — a naval mover's spawn probe is blocked over OCEAN pre-
@@ -334,7 +334,7 @@ def poke_seat0_naval(rules, path, GALLEY, WARRIOR):
     assert wt >= 0 and wt != anchor
     force_water(sim, wt)
     n0 = int(sim.seat0_unit_next[0])
-    sim._spawn_seat0(torch.tensor([True]), torch.tensor([anchor]), torch.tensor([GALLEY]))
+    sim._spawn_unit(0, torch.tensor([True]), torch.tensor([anchor]), torch.tensor([GALLEY]))
     assert int(sim.seat0_unit_next[0]) == n0 + 1, "seat-0 galley failed to spawn"
     gslot = n0
     assert bool(sim.wpass[0, int(sim.seat0_unit_tile[0, gslot])]), "naval unit must spawn on WATER"
@@ -372,7 +372,7 @@ def poke_seat0_naval(rules, path, GALLEY, WARRIOR):
 
 
 def poke_ocean_gate(rules, path, GALLEY):
-    """6. OCEAN gate for a naval mover (the _spawn_seat0 naval probe shares the
+    """6. OCEAN gate for a naval mover (the _spawn_unit naval probe shares the
     exact `wpass & (~ocean | cartography)` gate as the war-march water step):
     an OCEAN spot is refused pre-CARTOGRAPHY, allowed post-; COAST is ungated."""
     cart = None
@@ -404,12 +404,12 @@ def poke_ocean_gate(rules, path, GALLEY):
     # pre-CARTOGRAPHY: the ocean spot is gated out -> no spawn.
     sim.techs[0, cart] = False
     n0 = int(sim.seat0_unit_next[0])
-    sim._spawn_seat0(torch.tensor([True]), torch.tensor([anchor]), torch.tensor([GALLEY]))
+    sim._spawn_unit(0, torch.tensor([True]), torch.tensor([anchor]), torch.tensor([GALLEY]))
     assert int(sim.seat0_unit_next[0]) == n0, "ship spawned on OCEAN without CARTOGRAPHY"
 
     # post-CARTOGRAPHY: the ocean spot opens -> the ship lands there.
     sim.techs[0, cart] = True
-    sim._spawn_seat0(torch.tensor([True]), torch.tensor([anchor]), torch.tensor([GALLEY]))
+    sim._spawn_unit(0, torch.tensor([True]), torch.tensor([anchor]), torch.tensor([GALLEY]))
     assert int(sim.seat0_unit_next[0]) == n0 + 1, "ship failed to spawn on OCEAN with CARTOGRAPHY"
     assert int(sim.seat0_unit_tile[0, n0]) == ot, "the ship must land on the (now-enterable) ocean tile"
 
@@ -424,7 +424,7 @@ def poke_ocean_gate(rules, path, GALLEY):
     force_water(sim2, ct, ocean=False)  # COAST
     sim2.techs[0, cart] = False
     m0 = int(sim2.seat0_unit_next[0])
-    sim2._spawn_seat0(torch.tensor([True]), torch.tensor([anchor2]), torch.tensor([GALLEY]))
+    sim2._spawn_unit(0, torch.tensor([True]), torch.tensor([anchor2]), torch.tensor([GALLEY]))
     assert int(sim2.seat0_unit_next[0]) == m0 + 1, "COAST spawn must NOT need CARTOGRAPHY"
     print("  6 OCEAN gate OK (pre-CART blocked, post-CART allowed; COAST ungated)")
 

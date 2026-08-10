@@ -101,7 +101,7 @@ def empty_land_tiles(sim, k: int) -> list[int]:
 
 def inject_mil(sim, tiles: list[int], type_idx: int) -> None:
     """Append civ-R military units on the given empty tiles (the
-    _spawn_seat_unit field writes, minus the free-spot probe)."""
+    _spawn_unit field writes, minus the free-spot probe)."""
     for t in tiles:
         slot = int(sim.civ_unit_next[0])
         sim.civ_unit_alive[0, slot] = True
@@ -117,7 +117,7 @@ def inject_mil(sim, tiles: list[int], type_idx: int) -> None:
 
 def block_spawn(sim) -> None:
     """Occupy the capital center + every neighbor with an (inert-at-peace)
-    seat-0 military marker so _spawn_seat_unit finds no free spot."""
+    seat-0 military marker so _spawn_unit finds no free spot."""
     ctr = cap_center(sim)
     tiles = [ctr] + [int(n) for n in sim.neigh[ctr].tolist() if n >= 0]
     for t in tiles:

@@ -1131,7 +1131,7 @@ class SimEconomy:
         accrues (its district term is already tile-gated) nor claims."""
         if not self.districts_on or self._gp_nc == 0:
             return
-        B, C, dev, nCls = self.B, self.C, self.device, self._gp_nc
+        C, dev, nCls = self.C, self.device, self._gp_nc
         owner_oh = torch.nn.functional.one_hot(self.owner.clamp(min=0), C).bool() & (self.tile_seat == 0).unsqueeze(2)  # [B,T,C]
         for cls in range(nCls):
             d = int(self._gp_class_district[cls])
@@ -1207,7 +1207,7 @@ class SimEconomy:
                     sm = can[:, gcls] & _cap_live  # TS: spawn only if a capital exists
                     if bool(sm.any()):
                         cap_site = self.site.gather(1, _cap_col.unsqueeze(1)).squeeze(1)
-                        self._spawn_seat0(sm, cap_site, torch.full((B,), guidx, dtype=torch.long, device=dev))
+                        self._spawn_unit(0, sm, cap_site, guidx)
                         self._gen_ver += 1
 
     def _spread_religious_pressure(self) -> None:

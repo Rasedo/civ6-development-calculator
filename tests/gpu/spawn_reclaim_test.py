@@ -84,8 +84,8 @@ def main() -> None:
     mask = torch.zeros(sim.B, dtype=torch.bool)
     mask[0] = True
     at = torch.full((sim.B,), tile, dtype=torch.long)
-    sim._spawn_seat_civilian(mask, at, 0, type_idx=sim._missionary_idx,
-                         charges=torch.full((sim.B,), 3, dtype=torch.long))
+    sim._spawn_unit(1, mask, at, sim._missionary_idx,
+                    charges=torch.full((sim.B,), 3, dtype=torch.long))
     check(sim, "civ", slot, "civ civilian (missionary)")
 
     # --- the seat-0 pool, same ordering rule --------------------------------
@@ -94,8 +94,8 @@ def main() -> None:
     tile2 = free_land(sim2)
     m2 = torch.zeros(sim2.B, dtype=torch.bool)
     m2[0] = True
-    sim2._spawn_seat0(m2, torch.full((sim2.B,), tile2, dtype=torch.long),
-                       torch.full((sim2.B,), 2, dtype=torch.long))  # WARRIOR
+    sim2._spawn_unit(0, m2, torch.full((sim2.B,), tile2, dtype=torch.long),
+                     torch.full((sim2.B,), 2, dtype=torch.long))  # WARRIOR
     check(sim2, "seat0", slot2, "seat-0 military (warrior)")
 
     print("SPAWN RECLAIM OK — a reclaimed slot hands on no drowned unit's movement pool")

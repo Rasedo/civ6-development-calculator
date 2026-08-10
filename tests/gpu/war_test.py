@@ -246,7 +246,7 @@ def test_cs_siege(rules, path):
         mel = next(i for i in range(len(sim._type_combat)) if float(sim._type_combat[i]) > 0 and float(sim._type_ranged_strength[i]) == 0)
         nb = sim.neigh[ctr]
         spot = next(int(nb[d]) for d in range(6) if int(nb[d]) >= 0 and int(sim.pmil_at[0, int(nb[d])]) < 0 and int(sim.center_at[0, int(nb[d])]) < 0)
-        sim._spawn_seat0(torch.tensor([True]), torch.tensor([spot]), torch.tensor([mel]))
+        sim._spawn_unit(0, torch.tensor([True]), torch.tensor([spot]), torch.tensor([mel]))
         p_ = int(sim.seat0_unit_next[0]) - 1
         assert bool(sim.seat0_unit_alive[0, p_]), "spawn failed"
     act = _place_next_to(sim, p_, ctr)
