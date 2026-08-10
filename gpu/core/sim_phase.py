@@ -1496,6 +1496,14 @@ class SimPhase:
         # relocatePalace runs right after the cities filter — BEFORE the
         # cityHp/route prune and BEFORE the conquest-raze early return below.
         self._relocate_palace(torch.tensor([b], dtype=torch.long, device=self.device), torch.tensor([0], dtype=torch.long, device=self.device))
+        # Routes die with their endpoint — transferCity's loser.tradeRoutes
+        # filter, the same kill the civ arms already run (row 0 encodes
+        # from/to as COLUMNS until the #110 id flip; a hole-reuse founding
+        # would otherwise inherit the dead city's route).
+        kill0 = (self.seat_routes[b, 0, :, 0] == c) | (self.seat_routes[b, 0, :, 1] == c)
+        self.seat_routes[b, 0][kill0] = -1
+        self.seat_route_dest[b, 0][kill0] = -1
+        self.seat_route_exp[b, 0][kill0] = -1
         owned = self.owner[b] == c
         # Snapshot the transferring city's COMPLETE placeable-district and
         # wonder tiles from the LIVE owner mask (CITY_CENTER is never in the
@@ -1681,6 +1689,10 @@ class SimPhase:
         self.era_score[rows, 0] += self._era_pts["found"]  # the foundCity moment
         self.city_seq[rows, c_new] = self.city_seq_next[rows]
         self.city_seq_next[rows] += 1
+        # Persistent id — foundCityAt's `nextCityId++`, dual-written while
+        # the column regime stays authoritative (#110 slice 1).
+        self.city_id[rows, 0, c_new] = self.next_city_id[rows]
+        self.next_city_id[rows] += 1
         self.is_cap[rows, c_new] = new_cap
         self.cap_tile[rows] = torch.where(new_cap, s_idx, self.cap_tile[rows])
         # Claim the center (unconditionally, as foundCity does) plus any

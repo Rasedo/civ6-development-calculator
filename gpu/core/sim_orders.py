@@ -627,6 +627,11 @@ class SimOrders:
                 self.seat_explored[b, 0] |= self.pair_dist[c_t] <= 3
             self.city_seq[b, c_new] = int(self.city_seq_next[b])
             self.city_seq_next[b] += 1
+            # Persistent id — the receiver's `nextCityId++` (transferCity /
+            # the CS annex), dual-written while the column regime stays
+            # authoritative (#110 slice 1).
+            self.city_id[b, 0, c_new] = int(self.next_city_id[b])
+            self.next_city_id[b] += 1
             self.is_cap[b, c_new] = False  # captured cities are never capitals (TS isCapital: false)
             self.site[b, c_new] = c_t
             # A captured city carries no banked production (TS pushes a fresh City literal); `prod_bank` is slot-indexed, so a reused slot must be cleared.
@@ -753,6 +758,11 @@ class SimOrders:
                 self.seat_explored[b, 0] |= self.pair_dist[c_t] <= 3
             self.city_seq[b, c_new] = int(self.city_seq_next[b])
             self.city_seq_next[b] += 1
+            # Persistent id — the receiver's `nextCityId++` (transferCity /
+            # the CS annex), dual-written while the column regime stays
+            # authoritative (#110 slice 1).
+            self.city_id[b, 0, c_new] = int(self.next_city_id[b])
+            self.next_city_id[b] += 1
             self.is_cap[b, c_new] = False  # captured cities are never capitals (TS isCapital: false)
             self.site[b, c_new] = c_t
             # A captured city carries no banked production (TS pushes a fresh City literal); `prod_bank` is slot-indexed, so a reused slot must be cleared.

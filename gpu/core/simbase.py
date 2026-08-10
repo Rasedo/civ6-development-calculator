@@ -481,7 +481,7 @@ _MUTABLE = [
     "city_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dest",  # international dest CENTER TILE (>=0), else -1 (domestic/CS) — SEAT-indexed; civ_only_route_dest is the [:, 1:] view
-    "civ_city_id",
+    "city_id",
     "civ_unit_civ", "civ_unit_next",
     "gp_earned", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
     "pan_claimed", "fol_claimed", "fou_claimed",  # belief-claim masks

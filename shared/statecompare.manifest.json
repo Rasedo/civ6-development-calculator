@@ -1581,8 +1581,8 @@
     "why": "the city_seq allocator (see city_seq)."
    },
    {
-    "plane": "civ_city_id",
-    "why": "civ city slot ids; the city join key is the center tile."
+    "plane": "city_id",
+    "why": "persistent city ids on the seat axis (TS City.id); the digest's city join key is the center tile, and the allocator itself is pinned by the nextCityId field."
    },
    {
     "plane": "military_at",

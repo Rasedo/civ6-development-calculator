@@ -466,7 +466,15 @@ class SimInit:
         # the conquering city's registry holds only CITY_CENTER (no
         # yields/upkeep/counts; the paving still blocks).
         self.district_dead = torch.zeros(B, T, dtype=torch.bool, device=device)
-        self.civ_city_id = torch.zeros(B, r_pad, civ_city_pad, dtype=torch.long, device=device)
+        # Persistent city ids on the seat axis (row 0 = seat 0, rows 1.. =
+        # the civ seats) — the TS City.id, allocated per seat from
+        # civ_next_city_id. Row 0 is DUAL-WRITTEN for now (#110 slice 1):
+        # the seat-0 regime still keys tiles by COLUMN; the ids exist so
+        # the tile_city flip and the row-0 reclaim can land in later
+        # slices without a storage change.
+        self.city_id = torch.zeros(B, 1 + r_pad, civ_city_pad, dtype=torch.long, device=device)
+        self.civ_city_id = self.city_id[:, 1:]
+        self.register_alias("civ_city_id", lambda sim: sim.city_id[:, 1:])
         # capitalTiles, seat-indexed: only an isCapital founding (t0 or a
         # total-collapse refound) writes a row. The capital is an identity
         # (city_is_cap), not a slot — _reclaim_civ_cities compaction permutes slots
