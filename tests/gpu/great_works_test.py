@@ -7,7 +7,7 @@ WRITER inside 250t is uncommon; MUSEUM even rarer):
     (Amphitheater 2, Art Museum 3, Broadcast Center 1);
   * per-city tensors (gw_writing/gw_art/gw_music + the rc_ twins) exist
     with matched shapes and round-trip through snapshot()/restore() (_MUTABLE);
-  * _place_seat0_works / _place_civ_works: deterministic lowest-city then
+  * _place_works(row, ...): deterministic lowest-city then
     lowest-slot fill into the matching building, cap at that kind's slots,
     overflow charges degrade to the instant culture lump;
   * the per-work culture/turn building-tier yield is LIVE and
@@ -72,7 +72,7 @@ def main() -> None:
         print("GREAT-WORKS OK (districts off — placement paths skipped)")
         return
 
-    # --- _place_seat0_works: single Writer fills 2 Amphitheater slots ------
+    # --- _place_works row 0: single Writer fills 2 Amphitheater slots ------
     assert bool(sim.alive[:, 0].all()), "fixture capital (city 0) must be alive"
     sim.gw_writing.zero_(); sim.gw_art.zero_(); sim.gw_music.zero_()
     sim.buildings[:, 0, amph] = True  # capital gets an Amphitheater
@@ -176,7 +176,7 @@ def main() -> None:
     civicE = sim.civic_prog.clone()
     earned0 = sim.gp_earned[:, wc].clone()
     sim.gp_points[:, wc] = 100.0  # >= gpCost(0) = 60
-    sim._advance_great_people()
+    sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
     assert bool((sim.gp_earned[:, wc] == earned0 + 1).all()), "Writer not earned"
     assert bool((sim.gw_writing[:, 0] == 2).all()), "earned Writer's works slot into the Amphitheater"
     assert bool((sim.civic_prog == civicE).all()), "a slotted earned Writer applies NO instant culture lump"

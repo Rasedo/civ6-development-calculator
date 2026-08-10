@@ -144,7 +144,7 @@ def main() -> None:
         earned0 = sim.gp_earned[:, 7].clone()
         gw0 = (sim.gw_writing + sim.gw_music).sum().item()
         sim.gp_points[:, 7] = 100.0  # >= gpCost(0) = 60
-        sim._advance_great_people()
+        sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
         assert bool((sim.gp_earned[:, 7] == earned0 + 1).all()), "Writer not earned"
         d_civic = (sim.civic_prog - civic0)
         assert bool((d_civic == 90.0).all()), f"Writer overflow lump wrong (want 2×45): {d_civic.tolist()}"
@@ -162,7 +162,7 @@ def main() -> None:
         faith0 = sim.faith.clone()
         pe0 = sim.gp_earned[:, pc].clone()
         sim.gp_points[:, pc] = 100.0  # >= gpCost(0) = 60, earns one Prophet
-        sim._advance_great_people()
+        sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
         assert bool((sim.gp_earned[:, pc] == pe0 + 1).all()), "Prophet not earned"
         d_faith = sim.faith - faith0
         assert bool((d_faith == 100.0).all()), f"seat-0 faith bank wrong: {d_faith.tolist()}"

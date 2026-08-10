@@ -1116,94 +1116,9 @@ class SimPhase:
             # Builder verbs and missionary SPREAD verbs ride the wire; their
             # phase.ts call positions are here, builders then missionaries.
 
-            # Great-people race (no draws): accrue, claim from the shared pool.
-            for cls in range(self._gp_nc):  # all GP classes (incl Admiral/General)
-                # Accrual = 1 + (that district's buildings) per city owning a
-                # COMPLETED district of the class, so a seat accrues nothing
-                # until its first Campus/Holy Site/Commercial Hub completes.
-                d_cls = int(self._gp_class_district[cls]) if cls < self._gp_nc else -1
-                if d_cls >= 0 and self.districts_on:
-                    reg_c = self.civ_city_dist_tile[:, r, :, d_cls]  # [B, RC]
-                    comp_c = (reg_c >= 0) & self.district_complete.gather(1, reg_c.clamp(min=0)) & ~self.district_pillaged.gather(1, reg_c.clamp(min=0))  # a pillaged district earns no GPP
-                    bmask_c = (self.rules_dev.b_req_district == d_cls).reshape(1, 1, -1)
-                    nb_of = (self.civ_city_bldg[:, r] & bmask_c).sum(dim=2)  # [B, RC]
-                    # Divine Spark: the belief's flat GPP joins the per-city
-                    # term (1 + gppFlat + buildings), the
-                    # greatPersonPointsPerTurn form.
-                    if self._bel_any and cls < self._bel["pan"]["gpp"].shape[1]:
-                        gflat = self._bel_add("gpp", r + 1)[:, cls].double().unsqueeze(1)  # [B, 1]
-                    else:
-                        gflat = torch.zeros(B, 1, dtype=torch.float64, device=dev)
-                    pts = (comp_c.double() * (1.0 + gflat + nb_of.double())).sum(dim=1)
-                else:
-                    pts = torch.zeros(B, dtype=torch.float64, device=dev)
-                # Golden EXODUS pays +4 PROPHET points a turn, seat-wide and
-                # district-free — greatPersonPointsPerTurn adds it OUTSIDE its
-                # per-city loop, so it joins `pts` before the `pts > 0` guard,
-                # not after.
-                if cls == self._prophet_cls:
-                    pts = pts + self._golden_ded(r + 1, self._ded_exodus).double() * 4.0
-                self.civ_only_gpp[:, r, cls] = torch.where(
-                    active & (pts > 0), self.civ_only_gpp[:, r, cls] + pts, self.civ_only_gpp[:, r, cls]
-                )
-                # Claim loop: overflow is KEPT (gpp −= cost, not zeroed) and
-                # the person's effect lands in this seat's own streams (tech/
-                # civic progress, treasury, faith, the capital's build head),
-                # mirroring _advance_great_people. PROPHETs gate the
-                # religion.
-                maxN = self._gp_effects.shape[1]
-                for _ in range(maxN):
-                    earned_c = self.gp_earned[:, cls]
-                    has_person = earned_c < self._gp_roster[cls]
-                    gcost = self._gp_costs[earned_c.clamp(max=self._gp_costs.shape[0] - 1)]
-                    hit = active & has_person & (self.civ_only_gpp[:, r, cls] >= gcost)
-                    if not bool(hit.any()):
-                        break
-                    hf = hit.to(torch.float64)
-                    eff = self._gp_effects[cls, earned_c.clamp(max=maxN - 1)]  # [B, 5]
-                    self.civ_only_tech_prog[:, r] = self.civ_only_tech_prog[:, r] + eff[:, 0].double() * hf
-                    # WRITER/ARTIST/MUSICIAN culture is slotted as Great Works
-                    # into this seat's cities (deferred per-kind culture);
-                    # overflow charges fall back to the instant lump inside
-                    # _place_civ_works.
-                    _kind = self._gw_cls.index(cls) if cls in self._gw_cls else -1
-                    if _kind >= 0:
-                        self._place_works(r + 1, hit, eff[:, 1].double(), _kind)
-                    else:
-                        self.civ_only_civic_prog[:, r] = self.civ_only_civic_prog[:, r] + eff[:, 1].double() * hf
-                    self.civ_only_treasury[:, r] = self.civ_only_treasury[:, r] + eff[:, 2].double() * hf
-                    prod_fx = eff[:, 3].double() * hf
-                    if bool((prod_fx != 0).any()):
-                        # The capital's build head (cities.find(isCapital),
-                        # queue non-empty). civ_city_is_cap identifies it because
-                        # compaction can move the capital off slot 0; at most
-                        # one flag per (b, r), so the masked add lands on
-                        # exactly the capital's head or nowhere.
-                        _capa = self.civ_city_is_cap[:, r] & self.civ_city_alive[:, r]
-                        capm = _capa & (self.civ_city_current[:, r] >= 0)
-                        self.civ_city_progress[:, r] = self.civ_city_progress[:, r] + torch.where(capm, prod_fx.unsqueeze(1), torch.zeros_like(self.civ_city_progress[:, r]))
-                        # the phase.ts twin: bank it rather than drop it when
-                        # the capital has nothing queued
-                        _capb = _capa & (self.civ_city_current[:, r] < 0)
-                        self.civ_city_prod_bank[:, r] = self.civ_city_prod_bank[:, r] + torch.where(
-                            _capb, prod_fx.unsqueeze(1), torch.zeros_like(self.civ_city_prod_bank[:, r]))
-                    if self._gp_effects.shape[2] > 4:
-                        self.civ_only_faith[:, r] = self.civ_only_faith[:, r] + eff[:, 4].double() * hf
-                    if cls == self._prophet_cls:
-                        self.civ_only_prophets[:, r] = self.civ_only_prophets[:, r] + hit.long()
-                    self.civ_only_gpp[:, r, cls] = torch.where(hit, self.civ_only_gpp[:, r, cls] - gcost, self.civ_only_gpp[:, r, cls])
-                    self.gp_earned[:, cls] = self.gp_earned[:, cls] + hit.long()
-                    self.era_score[:, r + 1] += hit.long() * self._era_pts["gp"]  # per GP earned
-                    # A GENERAL/ADMIRAL claim spawns its support unit
-                    # (civilian, 4 MP) at the seat's capital (civ_city_is_cap
-                    # center), on top of the instant effect — the phase.ts
-                    # spawn-at-claim mirror. Draws no RNG.
-                    if (cls == self._general_cls and self._general_unit_idx >= 0) or (cls == self._admiral_cls and self._admiral_unit_idx >= 0):
-                        guidx = self._general_unit_idx if cls == self._general_cls else self._admiral_unit_idx
-                        if bool(hit.any()):
-                            cap_t = torch.where(self.civ_city_is_cap[:, r] & self.civ_city_alive[:, r], self.civ_city_center[:, r], torch.full_like(self.civ_city_center[:, r], -1)).max(dim=1).values
-                            self._spawn_unit(r + 1, hit & (cap_t >= 0), cap_t, guidx)
-                            self._gen_ver += 1
+            # Great-people race (advanceGreatPeople) — ONE row-generic body,
+            # shared with row 0 (which calls it at its own loop position).
+            self._advance_great_people(r + 1, active)
 
             # The BELIEF RACES (pantheon / religion / enhancer) — one
             # row-generic body per fact, shared with row 0 (#73).
@@ -1278,6 +1193,108 @@ class SimPhase:
                 self.civ_only_peaceturns.copy_(torch.where(oh, torch.zeros_like(self.civ_only_peaceturns), self.civ_only_peaceturns))
         if self.R > 0:
             self._geo_make_peace()
+
+    def _advance_great_people(self, row: int, active: torch.Tensor) -> None:
+        """advanceGreatPeople(state, seat) — ONE body for every seat row
+        (0 = seat 0, r+1 = civ r), at the shared loop position after the
+        research tail. Accrual per class: 1 + beliefGppFlat + (that
+        district's built buildings) per city owning a COMPLETED unpillaged
+        district of the class, read through the seat-axis registry
+        (captured districts never ENTER a registry, so the tile plane's
+        district_dead needs no gate here). Claims come from the SHARED
+        earned pool at gpCost(earned), overflow kept; effects land in this
+        row's own streams (tech/civic progress, treasury, faith, the
+        capital's build head); WRITER/ARTIST/MUSICIAN culture slots Great
+        Works; GENERAL/ADMIRAL spawn at the capital; a PROPHET banks for
+        the belief races. No RNG draws."""
+        if self._gp_nc == 0:
+            return
+        B, dev = self.B, self.device
+        for cls in range(self._gp_nc):  # all GP classes (incl Admiral/General)
+            # Accrual = 1 + (that district's buildings) per city owning a
+            # COMPLETED district of the class, so a seat accrues nothing
+            # until its first Campus/Holy Site/Commercial Hub completes.
+            d_cls = int(self._gp_class_district[cls]) if cls < self._gp_nc else -1
+            if d_cls >= 0 and self.districts_on:
+                reg_c = self.city_dist_tile[:, row, :, d_cls]  # [B, cols]
+                comp_c = (reg_c >= 0) & self.district_complete.gather(1, reg_c.clamp(min=0)) & ~self.district_pillaged.gather(1, reg_c.clamp(min=0))  # a pillaged district earns no GPP
+                bmask_c = (self.rules_dev.b_req_district == d_cls).reshape(1, 1, -1)
+                nb_of = (self.city_bldg[:, row] & bmask_c).sum(dim=2)  # [B, cols]
+                # Divine Spark: the belief's flat GPP joins the per-city
+                # term (1 + gppFlat + buildings), the
+                # greatPersonPointsPerTurn form.
+                if self._bel_any and cls < self._bel["pan"]["gpp"].shape[1]:
+                    gflat = self._bel_add("gpp", row)[:, cls].double().unsqueeze(1)  # [B, 1]
+                else:
+                    gflat = torch.zeros(B, 1, dtype=torch.float64, device=dev)
+                pts = (comp_c.double() * (1.0 + gflat + nb_of.double())).sum(dim=1)
+            else:
+                pts = torch.zeros(B, dtype=torch.float64, device=dev)
+            # Golden EXODUS pays +4 PROPHET points a turn, seat-wide and
+            # district-free — greatPersonPointsPerTurn adds it OUTSIDE its
+            # per-city loop, so it joins `pts` before the `pts > 0` guard,
+            # not after.
+            if cls == self._prophet_cls:
+                pts = pts + self._golden_ded(row, self._ded_exodus).double() * 4.0
+            self.civ_gpp[:, row, cls] = torch.where(
+                active & (pts > 0), self.civ_gpp[:, row, cls] + pts, self.civ_gpp[:, row, cls]
+            )
+            # Claim loop: overflow is KEPT (gpp −= cost, not zeroed) and
+            # the person's effect lands in this seat's own streams,
+            # mirroring applyGreatPersonEffect. PROPHETs gate the religion.
+            maxN = self._gp_effects.shape[1]
+            for _ in range(maxN):
+                earned_c = self.gp_earned[:, cls]
+                has_person = earned_c < self._gp_roster[cls]
+                gcost = self._gp_costs[earned_c.clamp(max=self._gp_costs.shape[0] - 1)]
+                hit = active & has_person & (self.civ_gpp[:, row, cls] >= gcost)
+                if not bool(hit.any()):
+                    break
+                hf = hit.to(torch.float64)
+                eff = self._gp_effects[cls, earned_c.clamp(max=maxN - 1)]  # [B, 5]
+                self.civ_tech_prog[:, row] = self.civ_tech_prog[:, row] + eff[:, 0].double() * hf
+                # WRITER/ARTIST/MUSICIAN culture is slotted as Great Works
+                # into this seat's cities (deferred per-kind culture);
+                # overflow charges fall back to the instant lump inside
+                # _place_works.
+                _kind = self._gw_cls.index(cls) if cls in self._gw_cls else -1
+                if _kind >= 0:
+                    self._place_works(row, hit, eff[:, 1].double(), _kind)
+                else:
+                    self.civ_civic_prog[:, row] = self.civ_civic_prog[:, row] + eff[:, 1].double() * hf
+                self.civ_treasury[:, row] = self.civ_treasury[:, row] + eff[:, 2].double() * hf
+                prod_fx = eff[:, 3].double() * hf
+                if bool((prod_fx != 0).any()):
+                    # The capital's build head (cities.find(isCapital),
+                    # queue non-empty). city_is_cap identifies it because
+                    # compaction can move the capital off slot 0; at most
+                    # one flag per (b, row), so the masked add lands on
+                    # exactly the capital's head or nowhere.
+                    _capa = self.city_is_cap[:, row] & self.city_alive[:, row]
+                    capm = _capa & (self.city_current[:, row] >= 0)
+                    self.city_progress[:, row] = self.city_progress[:, row] + torch.where(capm, prod_fx.unsqueeze(1), torch.zeros_like(self.city_progress[:, row]))
+                    # the phase.ts twin: bank it rather than drop it when
+                    # the capital has nothing queued
+                    _capb = _capa & (self.city_current[:, row] < 0)
+                    self.city_prod_bank[:, row] = self.city_prod_bank[:, row] + torch.where(
+                        _capb, prod_fx.unsqueeze(1), torch.zeros_like(self.city_prod_bank[:, row]))
+                if self._gp_effects.shape[2] > 4:
+                    self.civ_faith[:, row] = self.civ_faith[:, row] + eff[:, 4].double() * hf
+                if cls == self._prophet_cls:
+                    self.civ_prophets[:, row] = self.civ_prophets[:, row] + hit.long()
+                self.civ_gpp[:, row, cls] = torch.where(hit, self.civ_gpp[:, row, cls] - gcost, self.civ_gpp[:, row, cls])
+                self.gp_earned[:, cls] = self.gp_earned[:, cls] + hit.long()
+                self.era_score[:, row] += hit.long() * self._era_pts["gp"]  # per GP earned
+                # A GENERAL/ADMIRAL claim spawns its support unit
+                # (civilian, 4 MP) at the seat's capital (city_is_cap
+                # center), on top of the instant effect — the phase.ts
+                # spawn-at-claim mirror. Draws no RNG.
+                if (cls == self._general_cls and self._general_unit_idx >= 0) or (cls == self._admiral_cls and self._admiral_unit_idx >= 0):
+                    guidx = self._general_unit_idx if cls == self._general_cls else self._admiral_unit_idx
+                    if bool(hit.any()):
+                        cap_t = torch.where(self.city_is_cap[:, row] & self.city_alive[:, row], self.city_center[:, row], torch.full_like(self.city_center[:, row], -1)).max(dim=1).values
+                        self._spawn_unit(row, hit & (cap_t >= 0), cap_t, guidx)
+                        self._gen_ver += 1
 
     def _seat_belief_claims(self, row: int, active: torch.Tensor) -> None:
         """The BELIEF RACES for ONE seat row (0 = seat 0, r+1 = civ r), at the

@@ -196,12 +196,13 @@ def poke_seat0_spawn(rules, rj, path):
         sim.district_dead[0, dt] = False
         sim.district_pillaged[0, dt] = False
         sim.owner[0, dt] = 0
+        sim.city_dist_tile[0, 0, 0, d] = dt  # accrual reads the seat-axis registry
         # fund EXACTLY one person (gpCost(0)); the +1 district accrual keeps the
         # leftover well under gpCost(1), so the claim loop fires exactly once.
         sim.gp_earned[:, cls] = 0
         sim.gp_points[0, cls] = float(sim._gp_costs[0])
         before = int((sim.seat0_unit_alive[0] & (sim.seat0_unit_type[0] == uidx)).sum())
-        sim._advance_great_people()
+        sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
         after = int((sim.seat0_unit_alive[0] & (sim.seat0_unit_type[0] == uidx)).sum())
         assert after == before + 1, f"seat-0 {nm} claim did not spawn exactly one unit ({before}->{after})"
         # spawned at/adjacent to the capital, civilian, 1 charge (not military)

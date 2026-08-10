@@ -718,8 +718,8 @@ class SimStep:
         self.civic_prog.copy_(torch.where(no_civic, torch.minimum(self.civic_prog, torch.zeros_like(self.civic_prog)), self.civic_prog))
 
         # Great people (advanceGreatPeople) — after the research tail, the
-        # loop position every seat shares.
-        self._advance_great_people(active0)
+        # loop position every seat shares, through the ONE row-generic body.
+        self._advance_great_people(0, active0)
 
         # The BELIEF RACES (pantheon / religion / enhancer) — the row-generic
         # body the civ rows call at this same position (#73). RNG-neutral
