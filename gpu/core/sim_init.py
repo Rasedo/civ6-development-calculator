@@ -24,8 +24,10 @@ class SimInit:
         self.B, self.W, self.H = B, f0["width"], f0["height"]
         T = self.W * self.H
         self.T = T
-        C = len(f0["cities"])
-        assert all(len(f["cities"]) == C for f in fixtures), "fixtures must share a city-slot count"
+        # Seat 0's column head-room: the TS city cap. Format-2 fixtures carry
+        # no city data (settler starts — nothing is pre-founded), so the slot
+        # count is a rules fact, not a fixture fact.
+        C = int(rules.seats.get("maxCities", 6))
         self.C = C
         # ------------------------------------------------------------------
         # THE CITY BLOCK. Twenty city facts, one `city_x [B, 1+R+S, RC]` plane
@@ -468,10 +470,9 @@ class SimInit:
         self.district_dead = torch.zeros(B, T, dtype=torch.bool, device=device)
         # Persistent city ids on the seat axis (row 0 = seat 0, rows 1.. =
         # the civ seats) — the TS City.id, allocated per seat from
-        # civ_next_city_id. Row 0 is DUAL-WRITTEN for now (#110 slice 1):
-        # the seat-0 regime still keys tiles by COLUMN; the ids exist so
-        # the tile_city flip and the row-0 reclaim can land in later
-        # slices without a storage change.
+        # civ_next_city_id. tile_city stores THESE ids for every seat
+        # (#110 slice 2); consumers that speak seat-0 column space resolve
+        # through the `owner` cache's id→slot match.
         self.city_id = torch.zeros(B, 1 + r_pad, civ_city_pad, dtype=torch.long, device=device)
         self.civ_city_id = self.city_id[:, 1:]
         self.register_alias("civ_city_id", lambda sim: sim.city_id[:, 1:])
@@ -1279,10 +1280,10 @@ class SimInit:
 
         # --- dynamic state ------------------------------------------------------
         self.turn = 1
-        self.alive[:, 0] = True
-        self.pop[:, 0] = 1
-        # The fixture's owner column is a CITY index; it seeds `tile_city`, and
-        # `tile_seat` gets 0 wherever it is set.
+        # Settler starts: NO pre-founded city for any seat — every city arrives
+        # through a FOUND verb, allocating its persistent id (nextCityId++).
+        # ownerInit ships TS City.ids per tile (all -1 in a t0 world); it seeds
+        # `tile_city`, and `tile_seat` gets 0 wherever it is set.
         self.tile_city = torch.tensor([f["ownerInit"] for f in fixtures], dtype=torch.long, device=device)  # [B, T]
         # Bumped by EVERY write to owner / civ_at; keys the derived views below.
         # Not a tensor — python state, so it is not in _MUTABLE.

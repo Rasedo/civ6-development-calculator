@@ -1497,14 +1497,16 @@ class SimPhase:
         # cityHp/route prune and BEFORE the conquest-raze early return below.
         self._relocate_palace(torch.tensor([b], dtype=torch.long, device=self.device), torch.tensor([0], dtype=torch.long, device=self.device))
         # Routes die with their endpoint — transferCity's loser.tradeRoutes
-        # filter, the same kill the civ arms already run (row 0 encodes
-        # from/to as COLUMNS until the #110 id flip; a hole-reuse founding
-        # would otherwise inherit the dead city's route).
-        kill0 = (self.seat_routes[b, 0, :, 0] == c) | (self.seat_routes[b, 0, :, 1] == c)
+        # filter, the same id-keyed kill the civ arms run (a hole-reuse
+        # founding would otherwise inherit the dead city's route).
+        cid0 = int(self.city_id[b, 0, c])
+        kill0 = (self.seat_routes[b, 0, :, 0] == cid0) | (self.seat_routes[b, 0, :, 1] == cid0)
         self.seat_routes[b, 0][kill0] = -1
         self.seat_route_dest[b, 0][kill0] = -1
         self.seat_route_exp[b, 0][kill0] = -1
-        owned = self.owner[b] == c
+        # tileBelongsTo(t, 0, id): direct, not via `owner` — the alive clear
+        # above would blank the id→slot match a fresh cache derives from.
+        owned = (self.tile_seat[b] == 0) & (self.tile_city[b] == cid0)
         # Snapshot the transferring city's COMPLETE placeable-district and
         # wonder tiles from the LIVE owner mask (CITY_CENTER is never in the
         # district plane, so it is excluded) plus its buildings row, BEFORE the
@@ -1689,15 +1691,16 @@ class SimPhase:
         self.era_score[rows, 0] += self._era_pts["found"]  # the foundCity moment
         self.city_seq[rows, c_new] = self.city_seq_next[rows]
         self.city_seq_next[rows] += 1
-        # Persistent id — foundCityAt's `nextCityId++`, dual-written while
-        # the column regime stays authoritative (#110 slice 1).
-        self.city_id[rows, 0, c_new] = self.next_city_id[rows]
+        # Persistent id — foundCityAt's `nextCityId++`; tile_city stores it
+        # (TS ownerCity), the column stays a storage address only.
+        new_id0 = self.next_city_id[rows].clone()
+        self.city_id[rows, 0, c_new] = new_id0
         self.next_city_id[rows] += 1
         self.is_cap[rows, c_new] = new_cap
         self.cap_tile[rows] = torch.where(new_cap, s_idx, self.cap_tile[rows])
         # Claim the center (unconditionally, as foundCity does) plus any
         # unowned first-ring tiles; the center becomes a district tile.
-        self.tile_city[rows, s_idx] = c_new
+        self.tile_city[rows, s_idx] = new_id0
         self.tile_seat[rows, s_idx] = 0
         self._tile_owner_ver += 1
         self.workable[rows, s_idx] = False
@@ -1728,7 +1731,7 @@ class SimPhase:
                 & (self.citystate_at[rows, ndc] < 0)
                 & (self.civ_at[rows, ndc] < 0)
             )
-            self.tile_city[rows[free_nb], n_d[free_nb]] = c_new[free_nb]
+            self.tile_city[rows[free_nb], n_d[free_nb]] = new_id0[free_nb]
             self.tile_seat[rows[free_nb], n_d[free_nb]] = 0
             self._tile_owner_ver += 1
         self._eff_version += 1  # d_static_adj changed

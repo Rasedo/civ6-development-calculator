@@ -628,9 +628,9 @@ class SimOrders:
             self.city_seq[b, c_new] = int(self.city_seq_next[b])
             self.city_seq_next[b] += 1
             # Persistent id — the receiver's `nextCityId++` (transferCity /
-            # the CS annex), dual-written while the column regime stays
-            # authoritative (#110 slice 1).
-            self.city_id[b, 0, c_new] = int(self.next_city_id[b])
+            # the CS annex); tile_city stores the id (TS ownerCity).
+            new_id0 = int(self.next_city_id[b])
+            self.city_id[b, 0, c_new] = new_id0
             self.next_city_id[b] += 1
             self.is_cap[b, c_new] = False  # captured cities are never capitals (TS isCapital: false)
             self.site[b, c_new] = c_t
@@ -638,9 +638,9 @@ class SimOrders:
             self.prod_bank[b, c_new] = 0
             self.centre_slot_at[b, c_t] = c_new
             _take = ring & (self.tile_seat[b] == NO_SEAT)
-            self.tile_city[b] = torch.where(_take, torch.full_like(self.tile_city[b], c_new), self.tile_city[b])
+            self.tile_city[b] = torch.where(_take, torch.full_like(self.tile_city[b], new_id0), self.tile_city[b])
             self.tile_seat[b] = torch.where(_take, torch.zeros_like(self.tile_seat[b]), self.tile_seat[b])
-            self.tile_city[b, c_t] = c_new
+            self.tile_city[b, c_t] = new_id0
             self.tile_seat[b, c_t] = 0  # seat + which city: TS's setTileOwner pair
             self._tile_owner_ver += 1
             # Conquest KEEPS the captured city's COMPLETE districts: the tiles
@@ -759,9 +759,9 @@ class SimOrders:
             self.city_seq[b, c_new] = int(self.city_seq_next[b])
             self.city_seq_next[b] += 1
             # Persistent id — the receiver's `nextCityId++` (transferCity /
-            # the CS annex), dual-written while the column regime stays
-            # authoritative (#110 slice 1).
-            self.city_id[b, 0, c_new] = int(self.next_city_id[b])
+            # the CS annex); tile_city stores the id (TS ownerCity).
+            new_id0 = int(self.next_city_id[b])
+            self.city_id[b, 0, c_new] = new_id0
             self.next_city_id[b] += 1
             self.is_cap[b, c_new] = False  # captured cities are never capitals (TS isCapital: false)
             self.site[b, c_new] = c_t
@@ -769,9 +769,9 @@ class SimOrders:
             self.prod_bank[b, c_new] = 0
             self.centre_slot_at[b, c_t] = c_new
             _take = ring & (self.tile_seat[b] == NO_SEAT)
-            self.tile_city[b] = torch.where(_take, torch.full_like(self.tile_city[b], c_new), self.tile_city[b])
+            self.tile_city[b] = torch.where(_take, torch.full_like(self.tile_city[b], new_id0), self.tile_city[b])
             self.tile_seat[b] = torch.where(_take, torch.zeros_like(self.tile_seat[b]), self.tile_seat[b])
-            self.tile_city[b, c_t] = c_new
+            self.tile_city[b, c_t] = new_id0
             self.tile_seat[b, c_t] = 0  # seat + which city: TS's setTileOwner pair
             self._tile_owner_ver += 1
             self.pop[b, c_new] = pop

@@ -2965,15 +2965,24 @@ class SimSeats:
 
     @property
     def owner(self) -> torch.Tensor:
-        """[B, T] — which SEAT-0 city owns each tile, -1 for nobody.
+        """[B, T] — the seat-0 city SLOT owning each tile, -1 for nobody.
 
         Not a plain view of `tile_seat`: it answers a different question, not
         "whose tile" but "whose CITY", TS's `ownerCity` beside its `ownerSeat`.
-        `tile_city` is the second half of that pair, and `owner` is the two read
-        together."""
+        `tile_city` stores the PERSISTENT city id for every seat (#110), while
+        the ~30 consumers here speak column space — so the derivation matches
+        row 0's id registry, ALIVE columns only (dead and never-founded columns
+        hold stale ids and the zeros init; ids are per-seat monotonic, so an
+        alive match is unique)."""
         if self._owner_ver != self._tile_owner_ver:
+            ids0 = self.city_id[:, 0, : self.C]  # [B, C]
+            m = (
+                (self.tile_seat == 0).unsqueeze(2)
+                & (self.tile_city.unsqueeze(2) == ids0.unsqueeze(1))
+                & self.alive.unsqueeze(1)
+            )  # [B, T, C]
             self._owner_cache = torch.where(
-                self.tile_seat == 0, self.tile_city,
+                m.any(dim=2), m.long().argmax(dim=2),
                 torch.full_like(self.tile_city, -1),
             )
             self._owner_ver = self._tile_owner_ver
@@ -4240,9 +4249,9 @@ class SimSeats:
         """Seat 0's trade arm — the seatPhase loop-body position (row 0's
         block): ONE new route per turn while under capacity, then expiry.
         The _seat_trade_phase twin over seat-0 planes, writing
-        seat_routes[:, 0] with the shared encoding (from/to = seat-0 city
-        COLUMNS, CS dest -(2+s), intl dest -1 + centre tile in
-        seat_route_dest). Capacity mirrors tradeCapacity: FOREIGN_TRADE +
+        seat_routes[:, 0] with the shared encoding (from/to = PERSISTENT
+        city ids like the civ rows, CS dest -(2+s), intl dest -1 + centre
+        tile in seat_route_dest). Capacity mirrors tradeCapacity: FOREIGN_TRADE +
         Market-or-Lighthouse per living city + completed Colossus/GZ +
         trade-CS suzerainty. ORDER: TS scans actor.cities in ARRAY order,
         which for seat 0 is city_seq order, NOT column order (foundings
@@ -4284,9 +4293,12 @@ class SimSeats:
         sites = self.site.clamp(min=0)  # [B, C]
         d00 = self.pair_dist[sites.unsqueeze(2), sites.unsqueeze(1)]  # [B, C, C]
         cols = torch.arange(C, device=dev)
+        # routes hold persistent ids; stale ids at dead columns are masked by
+        # the alive gates in every valid* below
+        ids0 = self.city_id[:, 0, :C]  # [B, C]
         exists0 = (
-            (rts0[:, :, 0].reshape(B, 1, 1, -1) == cols.reshape(1, C, 1, 1))
-            & (rts0[:, :, 1].reshape(B, 1, 1, -1) == cols.reshape(1, 1, C, 1))
+            (rts0[:, :, 0].reshape(B, 1, 1, -1) == ids0.reshape(B, C, 1, 1))
+            & (rts0[:, :, 1].reshape(B, 1, 1, -1) == ids0.reshape(B, 1, C, 1))
         ).any(dim=3)  # [B, C, C]
         eye0 = torch.eye(C, dtype=torch.bool, device=dev).reshape(1, C, C)
         valid0 = (
@@ -4312,7 +4324,7 @@ class SimSeats:
             d_cs0 = self.pair_dist[sites.unsqueeze(2), csc0.unsqueeze(1)]  # [B, C, S]
             citystate_to0 = -(2 + torch.arange(S, device=dev))
             exists_cs0 = (
-                (rts0[:, :, 0].reshape(B, 1, 1, -1) == cols.reshape(1, C, 1, 1))
+                (rts0[:, :, 0].reshape(B, 1, 1, -1) == ids0.reshape(B, C, 1, 1))
                 & (rts0[:, :, 1].reshape(B, 1, 1, -1) == citystate_to0.reshape(1, 1, S, 1))
             ).any(dim=3)  # [B, C, S]
             valid_cs0 = (
@@ -4339,9 +4351,9 @@ class SimSeats:
             rows = do0.nonzero(as_tuple=True)[0]
             i_pick = karg0[rows] // W2
             jj_pick = karg0[rows] % W2
-            to_enc = torch.where(jj_pick < C, jj_pick.clamp(max=C - 1), -(2 + (jj_pick - C)))
+            to_enc = torch.where(jj_pick < C, ids0[rows, jj_pick.clamp(max=C - 1)], -(2 + (jj_pick - C)))
             slot = _free_slot0(rows)
-            self.seat_routes[rows, 0, slot, 0] = i_pick
+            self.seat_routes[rows, 0, slot, 0] = ids0[rows, i_pick]
             self.seat_routes[rows, 0, slot, 1] = to_enc
             self.seat_route_dest[rows, 0, slot] = -1
             self.seat_route_exp[rows, 0, slot] = exp_val0
@@ -4362,7 +4374,7 @@ class SimSeats:
             rd0 = self.seat_route_dest[:, 0]  # [B, K]
             act0r = rts0[:, :, 0] >= 0
             exists_i0 = (
-                (rts0[:, :, 0].reshape(B, 1, 1, -1) == cols.reshape(1, C, 1, 1))
+                (rts0[:, :, 0].reshape(B, 1, 1, -1) == ids0.reshape(B, C, 1, 1))
                 & (rd0.reshape(B, 1, 1, -1) == vctr.reshape(B, 1, Dv, 1))
                 & act0r.reshape(B, 1, 1, -1)
             ).any(dim=3)  # [B, C, Dv]
@@ -4384,7 +4396,7 @@ class SimSeats:
                 i_pick = iarg[rows] // Dv
                 c_pick = iarg[rows] % Dv
                 slot = _free_slot0(rows)
-                self.seat_routes[rows, 0, slot, 0] = i_pick
+                self.seat_routes[rows, 0, slot, 0] = ids0[rows, i_pick]
                 self.seat_routes[rows, 0, slot, 1] = -1
                 self.seat_route_dest[rows, 0, slot] = vctr[rows, c_pick]
                 self.seat_route_exp[rows, 0, slot] = exp_val0
@@ -4411,11 +4423,19 @@ class SimSeats:
             return None
         B, C, S, dev = self.B, self.C, self.S, self.device
         K = rr0.shape[1]
-        from_c = rr0[:, :, 0].clamp(min=0, max=C - 1)  # origin COLUMN
-        has_from = act & self.alive.gather(1, from_c)
+        # from/to hold PERSISTENT ids — resolve to columns by matching row 0's
+        # id registry, alive columns only (an unresolved ref reads column 0,
+        # dead by the has_* gates below). The income scatters are per-COLUMN.
+        ids0 = self.city_id[:, 0, :C]  # [B, C]
+        live1 = self.alive.unsqueeze(1)  # [B, 1, C]
+        fm = (rr0[:, :, 0].unsqueeze(2) == ids0.unsqueeze(1)) & live1  # [B, K, C]
+        from_c = fm.long().argmax(dim=2)  # origin COLUMN
+        has_from = act & fm.any(dim=2)
         is_cs = rr0[:, :, 1] <= -2
         is_dom = act & (rr0[:, :, 1] >= 0)
-        dest_c = rr0[:, :, 1].clamp(min=0, max=C - 1)
+        dm = (rr0[:, :, 1].unsqueeze(2) == ids0.unsqueeze(1)) & live1  # [B, K, C]
+        dest_c = dm.long().argmax(dim=2)  # domestic dest COLUMN
+        has_dest = dm.any(dim=2)
         citystate_s = (-rr0[:, :, 1] - 2).clamp(min=0)
         sites = self.site.clamp(min=0)
 
@@ -4438,7 +4458,7 @@ class SimSeats:
         spec0 = torch.zeros(B, C, dtype=torch.long, device=dev).scatter_add_(1, self.owner.clamp(min=0), own_spec0.long())
         if bool(is_dom.any()):
             per0 = (1 + spec0.gather(1, dest_c) // 2).double()
-            pays_d = is_dom & has_from & self.alive.gather(1, dest_c) & ~(near_from | _near0(sites.gather(1, dest_c)))
+            pays_d = is_dom & has_from & has_dest & ~(near_from | _near0(sites.gather(1, dest_c)))
             pd = pays_d.double()
             inc.scatter_add_(1, from_c * 6 + 0, per0 * pd)
             inc.scatter_add_(1, from_c * 6 + 1, per0 * pd)

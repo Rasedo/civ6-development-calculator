@@ -8,9 +8,8 @@
  *
  * FORMAT 2 (#71): there are NO pre-founded major cities and NO planned
  * sites — every civ starts as its file units (settler + warrior), carried in
- * `civs[]` (one array; civ 0 is not special). The GPU engine still expects a
- * pre-founded capital (format 1) and must refuse these files loudly until its
- * catch-up lands (#71 GPU half + #102).
+ * `civs[]` (one array; civ 0 is not special). load_fixture refuses any other
+ * format.
  */
 import type { GameState } from '../core/types';
 import { YIELD_KEYS } from '../core/types';
@@ -367,7 +366,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
   const ownerInit = map.tiles.map((t) => (tileSeat(t) === 0 ? tileCity(t) : -1));
 
   return {
-    format: 2, // #71: settler starts — the GPU refuses this until its catch-up
+    format: 2, // #71: settler starts
     seed: world.gen.seed,
     width: map.width,
     height: map.height,
@@ -391,7 +390,6 @@ export function buildFixture(state: GameState, world: WorldFile): object {
         .filter((u) => u.seat === s.seat)
         .map((u) => ({ type: unitRosterIdx.get(u.type) ?? 0, tile: u.tileIndex })),
     })),
-    cities: [], // format 1 carried the capital + planned-site metas; both died with #71
     tiles,
     ownerInit,
     eraScoreInit: state.seats.map((s) => s.eraScore ?? 0),

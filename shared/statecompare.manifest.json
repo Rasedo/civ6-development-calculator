@@ -573,8 +573,7 @@
      ],
      "planes": [
       "civ_next_city_id"
-     ],
-     "gap": "the GPU keeps a city-id allocator for civ seats only. Nothing joins on the id (the city key is the center tile), so this only ever pins the allocator itself."
+     ]
     },
     {
      "name": "prophets",

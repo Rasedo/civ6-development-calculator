@@ -126,24 +126,37 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   WAR_COLUMN_SEAT family (warTurns/peaceTurns/cityStateWarTurns + the
   war-column wire layout) is the last structural seat-0 bilateralism.
 - **A-27. The SLOT-REGIME split (#110)** — the deepest remaining seat-0
-  structural deviation: seat 0 stores city COLUMN indices in
-  `tile_city` (hole-reuse slots + `city_seq` acquisition ranking)
-  where civ rows store PERSISTENT ids (`civ_city_id`, append +
-  `_reclaim_civ_cities`); TS is id-based for EVERY seat
-  (`setTileOwner`/`tileBelongsTo` on `c.id`), so the civ side is the
-  faithful mirror and row 0 moves onto it. The full id-space consumer
-  audit lives at `.claude/scratchpad/slot-regime-audit.md`. The
-  `tile.ownerCity` digest field compares the two spaces byte-for-byte
-  against TS TODAY and passes only by append-counter coincidence
-  (`founded_n` vs `nextCityId++`) — it becomes the refactor's proof.
-  TWO PRE-EXISTING LATENTS the audit found, both live NOW: (1) **no
-  seat-0 route prune on city death** — `_transfer_city_to_civ` kills
-  the city but never touches `seat_routes[:, 0]`, so a hole-reuse
-  founding inherits the dead city's route (`_expire_seat0_routes`
-  only drops expired/dest-gone; the civ arm prunes by id); (2)
-  **`centre_slot_at`'s civ slot values go stale after every
-  `_reclaim_civ_cities`** — unread today only because `civ_city_at`
-  tests `>= 0`, a tripwire for any future value-reader.
+  structural deviation: seat 0 keyed `tile_city` by COLUMN index where
+  civ rows store PERSISTENT ids; TS is id-based for EVERY seat
+  (`setTileOwner`/`tileBelongsTo` on `c.id`). The full id-space
+  consumer audit lives at `.claude/scratchpad/slot-regime-audit.md`.
+  **SLICES 1-2 SHIPPED 2026-08-10**: `city_id [B, 1+R, RC]` (row 0 =
+  seat 0, `civ_city_id` a view), every seat-0 creation site allocates
+  `next_city_id++` (the exact TS `nextCityId++` mirror) and writes THE
+  ID into `tile_city` (found / border claim / both captures);
+  `sim_seats.owner` derives slot-of-tile by matching row 0's id
+  registry (alive columns only, cached on `_tile_owner_ver`), so its
+  ~30 column-space consumers are untouched; `seat_routes[:, 0]`
+  from/to hold ids like the civ arm (`_seat0_route_income` resolves
+  ids back to columns for its per-column scatters);
+  `_transfer_city_to_civ` computes `owned` by the direct
+  `tileBelongsTo(t, 0, id)` match. The `tile.ownerCity` digest is now
+  a REAL byte-exact id proof (was append-counter coincidence), and
+  `nextCityId` lost its manifest gap — the whole pair row joins the
+  fatal digest. Audit latent (1) (no seat-0 route prune on city
+  death) FIXED in slice 1; latent (2) (**`centre_slot_at`'s civ slot
+  values go stale after every `_reclaim_civ_cities`** — unread today
+  only because `civ_city_at` tests `>= 0`) still stands, slice 3's
+  business. REMAINING: slice 3 = the row-0 reclaim + delete
+  `city_seq`/`city_seq_next`/`walk_ord`; then the founding bodies and
+  the two yield walks merge. BONUS CATCH (freeze-backlog break): the
+  format-2 exporter ships no `cities` key, but `sim_init` still
+  derived `C` from it and PRE-FOUNDED a ghost capital at column 0
+  (`alive[:, 0] = True`) — the first regenerated fixture would have
+  crashed at load, and the ghost (holding the zeros-init id 0) would
+  have stolen the first real city's tiles under the id match. `C` now
+  comes from `rules.seats.maxCities` (same value, 6) and nothing is
+  pre-founded (settler starts, the tests' own t0 contract).
 
 ## B. Fidelity vs real Civ 6 — open residuals
 
@@ -269,6 +282,18 @@ Landed behind the compile bar only, in dependency order of suspicion:
    registry) and claim shape (all-classes batch → per-class loops),
    both argued value-identical (slice 9's registry write-through
    invariant; integer effects). The serve run is the proof.
+8. THE ID FLIP (#110 slices 1-2) — `tile_city` row-0 values are now
+   persistent ids (found / border claim / both captures allocate
+   `next_city_id++`), `owner` derives slot-of-tile from the id match,
+   seat-0 routes store ids, and seat-0 routes die with their city.
+   `tile.ownerCity` becomes a REAL byte-exact proof and `nextCityId`
+   joins the fatal digest (gap dropped) — expect the FIRST divergence
+   here if any creation path misses an allocation. Also
+   behaviour-fixing: `C` now reads `rules.seats.maxCities` and the
+   sim_init ghost capital (`alive[:, 0] = True` with no id, no site,
+   no tiles — a format-1 remnant that would have crashed the format-2
+   load at `C = len(f["cities"]) = 0`) is DELETED; t0 starts cityless
+   on both engines.
 
 Hunt discipline: scripted-reachability first (the digest gate names the
 turn), checkpoint-bracket from the nearest earlier checkpoint, full

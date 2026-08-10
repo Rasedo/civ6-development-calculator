@@ -324,10 +324,12 @@ SEAT = {
     "beliefFollower": _civ_scalar("civ_follower"),
     "beliefFounder": _civ_scalar("civ_founder"),
     "beliefEnhancer": _civ_scalar("civ_enhancer"),
+    # The per-seat city-id allocator — row 0 allocates like every civ row
+    # (#110: tile_city stores the ids), so the whole pair row is pinned.
+    "nextCityId": _civ_scalar("civ_next_city_id"),
     # --- the declared gaps (extracted, census-covered, skipped by default) ---
     "scienceTotal": lambda sim, b, rows: [float(sim.seat_science_total[b, _seat_row(sim, c)]) for c in rows],
     "tilesPurchased": _civ_only("civ_only_tiles_purchased", 0),
-    "nextCityId": _civ_only("civ_only_next_city_id", 0),
     "formalWars": _civ_pair_relation("civ_pair_warkind", lambda v: bool(v)),
     "denounced": _civ_pair_relation("civ_pair_denounced", lambda v: v >= 0),
     "allies": _civ_pair_relation("civ_pair_allied", lambda v: bool(v)),

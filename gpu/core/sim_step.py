@@ -592,8 +592,8 @@ class SimStep:
                 expand = ready & has_cand
                 if expand.any():
                     rows = expand.nonzero(as_tuple=True)[0]
-                    self.tile_city[rows, best[rows]] = col[rows]
-                    self.tile_seat[rows, best[rows]] = 0  # seat + which city: the two halves of ownerSeat/ownerCity
+                    self.tile_city[rows, best[rows]] = self.city_id[rows, 0, col[rows]]
+                    self.tile_seat[rows, best[rows]] = 0  # seat + which city: the two halves of ownerSeat/ownerCity (persistent id)
                     self._tile_owner_ver += 1
                     self._reveal_around(rows, 0, best[rows], 1)  # acquireTile's revealAround(seat, tile, 1)
                     # Each claim flips ONE tile (-1 → col, per the cand_b
