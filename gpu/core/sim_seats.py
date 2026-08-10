@@ -1316,66 +1316,68 @@ class SimSeats:
         g["f_r"][r] = f_plane
         return f_plane
 
-    def _civ_only_has_beliefs(self, r: int) -> bool:
-        """Fast path: most civs/turns carry no claimed beliefs (a founder
-        implies a follower, so pantheon|follower covers all three)."""
-        return self._bel_any and bool(((self.civ_only_pantheon[:, r] >= 0) | (self.civ_only_follower[:, r] >= 0)).any())
+    def _seat_has_beliefs(self, row: int) -> bool:
+        """Fast path: most seats/turns carry no claimed beliefs (a founder
+        implies a follower, so pantheon|follower covers all three).
+        Row-keyed: 0 = seat 0, r+1 = civ r."""
+        return self._bel_any and bool(((self.civ_pantheon[:, row] >= 0) | (self.civ_follower[:, row] >= 0)).any())
 
-    def _bel_add(self, key: str, r: int) -> torch.Tensor:
-        """Civ r's summed ADDITIVE belief effect rows (pantheon + follower +
-        founder; unclaimed ids land on the zero pad row). Memoised on
-        _bel_version — the only mutable inputs are civ_only_pantheon/civ_only_follower/
-        civ_only_founder[:,r], which change solely at the belief-claim sites and at
-        restore/reset, each of which bumps _bel_version. Consumers read-only."""
+    def _bel_add(self, key: str, row: int) -> torch.Tensor:
+        """Seat-row `row`'s summed ADDITIVE belief effect rows (pantheon +
+        follower + founder; unclaimed ids land on the zero pad row). Memoised
+        on _bel_version — the only mutable inputs are civ_pantheon/
+        civ_follower/civ_founder[:, row], which change solely at the
+        belief-claim sites and at restore/reset, each of which bumps
+        _bel_version. Consumers read-only."""
         if self._bel_add_memo is None or self._bel_add_memo[0] != self._bel_version:
             self._bel_add_memo = (self._bel_version, {})
         d = self._bel_add_memo[1]
-        mk = ("add", key, r)
+        mk = ("add", key, row)
         v = d.get(mk)
         if v is None:
             v = (
-                self._bel["pan"][key][self.civ_only_pantheon[:, r] + 1]
-                + self._bel["fol"][key][self.civ_only_follower[:, r] + 1]
-                + self._bel["fou"][key][self.civ_only_founder[:, r] + 1]
+                self._bel["pan"][key][self.civ_pantheon[:, row] + 1]
+                + self._bel["fol"][key][self.civ_follower[:, row] + 1]
+                + self._bel["fou"][key][self.civ_founder[:, row] + 1]
             )
             d[mk] = v
         return v
 
-    def _bel_mul(self, key: str, r: int) -> torch.Tensor:
+    def _bel_mul(self, key: str, row: int) -> torch.Tensor:
         """The MULTIPLICATIVE twin of _bel_add (pad row = 1.0) — border/growth."""
         return (
-            self._bel["pan"][key][self.civ_only_pantheon[:, r] + 1]
-            * self._bel["fol"][key][self.civ_only_follower[:, r] + 1]
-            * self._bel["fou"][key][self.civ_only_founder[:, r] + 1]
+            self._bel["pan"][key][self.civ_pantheon[:, row] + 1]
+            * self._bel["fol"][key][self.civ_follower[:, row] + 1]
+            * self._bel["fou"][key][self.civ_founder[:, row] + 1]
         )
 
-    def _bel_add_pf(self, key: str, r: int) -> torch.Tensor:
-        """The pantheon + FOUNDER additive rows ONLY (NO follower) — the per-civ
-        remainder, since the follower channel is a per-city lookup keyed on the
-        followed religion. Used for bldgY (founder Stewardship keeps its
-        Library/University/Market/Bank adds per-civ). Memoised on _bel_version,
-        sharing _bel_add's memo under a disjoint key tag."""
+    def _bel_add_pf(self, key: str, row: int) -> torch.Tensor:
+        """The pantheon + FOUNDER additive rows ONLY (NO follower) — the
+        per-seat remainder, since the follower channel is a per-city lookup
+        keyed on the followed religion. Used for bldgY (founder Stewardship
+        keeps its Library/University/Market/Bank adds per-seat). Memoised on
+        _bel_version, sharing _bel_add's memo under a disjoint key tag."""
         if self._bel_add_memo is None or self._bel_add_memo[0] != self._bel_version:
             self._bel_add_memo = (self._bel_version, {})
         d = self._bel_add_memo[1]
-        mk = ("pf", key, r)
+        mk = ("pf", key, row)
         v = d.get(mk)
         if v is None:
             v = (
-                self._bel["pan"][key][self.civ_only_pantheon[:, r] + 1]
-                + self._bel["fou"][key][self.civ_only_founder[:, r] + 1]
+                self._bel["pan"][key][self.civ_pantheon[:, row] + 1]
+                + self._bel["fou"][key][self.civ_founder[:, row] + 1]
             )
             d[mk] = v
         return v
 
     def _follower_by_rel(self) -> torch.Tensor:
-        """[B, O] follower-belief id per religion id (religion 0 belongs to seat 0
-        and always reads -1, since seat 0 never founds here; i+1 = civ i's
-        civ_only_follower). Pad id -1 gathers the neutral row 0 in the follower
-        tables."""
+        """[B, O] follower-belief id per religion id — religion g is founded
+        by seat row g (0 = seat 0, i+1 = civ i), so the map IS the
+        civ_follower base. Pad id -1 gathers the neutral row 0 in the
+        follower tables."""
         fbr = torch.full((self.B, self._O), -1, dtype=torch.long, device=self.device)
-        if self.R > 0:
-            fbr[:, 1:1 + self.R] = self.civ_only_follower[:, :self.R]
+        n = min(self._O, self.civ_follower.shape[1])
+        fbr[:, :n] = self.civ_follower[:, :n]
         return fbr
 
     def _follower_id_for(self, rel: torch.Tensor) -> torch.Tensor:
@@ -1402,26 +1404,26 @@ class SimSeats:
         ncol = self.C if row == 0 else self.RC
         return torch.full((self.B, ncol), row, dtype=torch.long, device=self.device)
 
-    def _belief_feat_plane(self, r: int) -> torch.Tensor:
+    def _belief_feat_plane(self, row: int) -> torch.Tensor:
         """[B, T, 6] belief TILE adds — featureYields at tiles with a LIVE feature
         (fid >= 0 and not stripped), plus improvementOnResource at unpillaged
         improvements on a LIVE resource (category = the res priority code), plus
         improvementYields at unpillaged improvements. TS adds all three inside
         tileYields, so they ride every consumer: worked-tile picks and yields,
-        scores, the border ySum.
+        scores, the border ySum. Row-keyed (0 = seat 0, r+1 = civ r).
 
-        Cached single-slot on (r, _eff_version, _bel_version). Belief inputs bump
-        _bel_version at claims/restore; tile inputs (feat_id/feat_stripped/
+        Cached single-slot on (row, _eff_version, _bel_version). Belief inputs
+        bump _bel_version at claims/restore; tile inputs (feat_id/feat_stripped/
         improvement/pillaged/res_stripped/res_priority) bump _eff_version at their
         mutation sites. All consumers read-only."""
-        key = (r, self._eff_version, self._bel_version)
+        key = (row, self._eff_version, self._bel_version)
         if self._belief_feat_cache is not None and self._belief_feat_cache[0] == key:
             return self._belief_feat_cache[1]
-        featA = self._bel_add("featY", r)  # [B, nFeat, 6]
+        featA = self._bel_add("featY", row)  # [B, nFeat, 6]
         plane = featA.gather(1, self.feat_id.clamp(min=0).unsqueeze(2).expand(-1, -1, 6))
         live = ((self.feat_id >= 0) & ~self.feat_stripped).unsqueeze(2).to(plane.dtype)
         plane = plane * live
-        impA = self._bel_add("impRes", r)  # [B, 4, 6] rows by category code
+        impA = self._bel_add("impRes", row)  # [B, 4, 6] rows by category code
         cat = torch.where(
             (self.improvement >= 0) & ~self.pillaged & ~self.res_stripped,
             self.res_priority.clamp(max=3),
@@ -1431,7 +1433,7 @@ class SimSeats:
         # belief improvementYields, gathered by the tile's improvement
         # (unpillaged; no resource condition — TS keys on the improvement
         # alone). The gather pad (idx 0 = FARM) is masked dead by imp_live.
-        impY = self._bel_add("impY", r)  # [B, nImp, 6]
+        impY = self._bel_add("impY", row)  # [B, nImp, 6]
         imp_live = ((self.improvement >= 0) & ~self.pillaged).unsqueeze(2).to(plane.dtype)
         plane = plane + impY.gather(1, self.improvement.clamp(min=0).unsqueeze(2).expand(-1, -1, 6)) * imp_live
         self._belief_feat_cache = (key, plane)
@@ -1705,14 +1707,14 @@ class SimSeats:
         # this civ's belief featureYields join every tile column (TS
         # adds them inside tileYields) — worked picks, scores and yields all
         # see them; the score adds stay exact (dyadic ints, f64).
-        _has_bel = self._civ_only_has_beliefs(r)
+        _has_bel = self._seat_has_beliefs(r + 1)
         # this city's FOLLOWER-belief id (from its followed religion when the
         # coupling is LIVE, else the owner religion r+1, which is byte-identical
         # to _bel_add's fol term). pan/founder stay per-civ via _bel_add and
         # _bel_add_pf.
         _fol_j = self._follower_id_for(self._city_rel(r + 1)[:, j]) if _has_bel else None
         if _has_bel:
-            featP = self._belief_feat_plane(r)
+            featP = self._belief_feat_plane(r + 1)
             f_plane = f_plane + featP[:, :, 0]
             p_plane = p_plane + featP[:, :, 1]
             ty_oth = ty_oth + featP
@@ -1906,7 +1908,7 @@ class SimSeats:
                     # part (Feed the World / Choral Music) keys per-city. The
                     # building keys are disjoint and the rows integer, so summing
                     # the two einsums is bit-identical to one combined pass.
-                    badd = torch.einsum("bn,bnk->bk", selb.double(), self._bel_add_pf("bldgY", r))
+                    badd = torch.einsum("bn,bnk->bk", selb.double(), self._bel_add_pf("bldgY", r + 1))
                     badd = badd + torch.einsum("bn,bnk->bk", selb.double(), self._fol_tab("bldgY", _fol_j))
                     food = food + badd[:, 0]
                     prod = prod + badd[:, 1]
@@ -1968,8 +1970,8 @@ class SimSeats:
         # + perCity) land on the capital BEFORE the tier scaling, at
         # computeCityStats' capitalYields position.
         if _has_bel:
-            perF = self._bel_add("perF", r)  # [B, 7] = per, then the 6 yields
-            perC = self._bel_add("perC", r)  # [B, 6]
+            perF = self._bel_add("perF", r + 1)  # [B, 7] = per, then the 6 yields
+            perC = self._bel_add("perC", r + 1)  # [B, 6]
             followers = (self.civ_city_pop[:, r] * self.civ_city_alive[:, r].long()).sum(dim=1).double()
             times = torch.where(perF[:, 0] > 0, torch.floor(followers / perF[:, 0].clamp(min=1)), torch.zeros_like(followers))
             capY = perF[:, 1:] * times.unsqueeze(1) + perC * self.civ_city_alive[:, r].sum(dim=1).double().unsqueeze(1)
@@ -2196,12 +2198,12 @@ class SimSeats:
                 1, self.civ_city_dist_tile[:, r].clamp(min=0).reshape(B, -1)).reshape_as(self.civ_city_dist_tile[:, r])).sum(dim=2)
             _, _civ_only_cond_amen = self._cond_house_amen(_g_hid, _g_nd, _civ_city_all, self._civ_city_spec_count(r))
             have = have + _g_amen.unsqueeze(1) + _civ_only_cond_amen
-        if self._civ_only_has_beliefs(r):
+        if self._seat_has_beliefs(r + 1):
             # River Goddess (river centers) + Zen Meditation (2+ completed
             # specialty districts) join the TIER balance ONLY — the luxury-grant
             # RANKING stays building-amenities-based.
             ctr = self.civ_city_center[:, r].clamp(min=0)
-            extra = self._bel_add("river", r)[:, 0].unsqueeze(1) * self.tile_river.gather(1, ctr).double()
+            extra = self._bel_add("river", r + 1)[:, 0].unsqueeze(1) * self.tile_river.gather(1, ctr).double()
             # Zen Meditation keys per-city on the followed religion's follower
             # belief (the owner religion when uncoupled: byte-identical).
             zen_rc = self._fol_tab("zen", self._follower_id_for(self._city_rel(r + 1)))  # [B, RC, 2] = min, amenities
@@ -2336,7 +2338,7 @@ class SimSeats:
         cannot drift apart. Loop-invariant: claims mutate ownership only, never
         the key. Returns (tiles, tc, nbs, key0)."""
         B = self.B
-        _bmul = self._bel_mul("border", r) if self._civ_only_has_beliefs(r) else None
+        _bmul = self._bel_mul("border", r + 1) if self._seat_has_beliefs(r + 1) else None
         tiles = tiles_from_offsets(center, self._off5, self.W, self.H)  # [B, M]
         tc = tiles.clamp(min=0)
         nbs = self.neigh[tc.reshape(-1)].reshape(B, -1, 6)  # [B, M, 6]
@@ -2358,10 +2360,10 @@ class SimSeats:
                 y_oth = y_oth + self._tile_appeal().clamp(min=0).to(self.dtype) * (
                     (self.improvement == self.SEASIDE).to(self.dtype) * live_imp
                 )
-        if _bmul is not None or self._civ_only_has_beliefs(r):
+        if _bmul is not None or self._seat_has_beliefs(r + 1):
             # belief featureYields ride the pick key too — pickBorderTile's ctx
             # carries the seat's modifiers
-            featP = self._belief_feat_plane(r)
+            featP = self._belief_feat_plane(r + 1)
             f_plane = f_plane + featP[:, :, 0]
             p_plane = p_plane + featP[:, :, 1]
             y_oth = y_oth + featP[:, :, 2:].sum(dim=2)
@@ -2396,7 +2398,7 @@ class SimSeats:
         # Religious Settlements — Math.round(base * borderCostMult), the
         # city.ts:507 form. Without beliefs the mult is 1 and js_round of the
         # integral base curve is exact, so the expression is unchanged.
-        _bmul = self._bel_mul("border", r) if self._civ_only_has_beliefs(r) else None
+        _bmul = self._bel_mul("border", r + 1) if self._seat_has_beliefs(r + 1) else None
         def _civ_city_cost():
             base = self._border_cost(self.civ_city_acquired[:, r, j])
             return js_round(base * _bmul) if _bmul is not None else base

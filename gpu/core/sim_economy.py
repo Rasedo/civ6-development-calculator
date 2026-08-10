@@ -2336,13 +2336,13 @@ class SimEconomy:
         p_plane = g["p_plane"]
         ty_oth = g["ty_oth"]
         oth_sc = g["oth_score"]
-        _has_bel = self._civ_only_has_beliefs(r)
+        _has_bel = self._seat_has_beliefs(r + 1)
         # Per-rc FOLLOWER-belief id [B, RC] (followed religion when LIVE, else
         # owner r+1).
         _fol_rc = self._follower_id_for(self._city_rel(r + 1)) if _has_bel else None
         featP = None
         if _has_bel:
-            featP = self._belief_feat_plane(r)
+            featP = self._belief_feat_plane(r + 1)
             f_plane = f_plane + featP[:, :, 0]
             p_plane = p_plane + featP[:, :, 1]
             ty_oth = ty_oth + featP
@@ -2497,7 +2497,7 @@ class SimEconomy:
                 if _has_bel:  # belief building adds (int rows)
                     # founder (Stewardship) per-seat + follower (Feed the World
                     # / Choral Music) per-city; disjoint int keys => exact split.
-                    badd = torch.einsum("bjn,bnk->bjk", selb.double(), self._bel_add_pf("bldgY", r))
+                    badd = torch.einsum("bjn,bnk->bjk", selb.double(), self._bel_add_pf("bldgY", r + 1))
                     badd = badd + torch.einsum("bjn,bjnk->bjk", selb.double(), self._fol_tab("bldgY", _fol_rc))
                     food = food + badd[:, :, 0]
                     prod = prod + badd[:, :, 1]
@@ -2548,8 +2548,8 @@ class SimEconomy:
                 faith = faith + self._fol_tab("fpw", _fol_rc) * compw.sum(dim=2).double()  # per-city Divine Inspiration
         # Founder capital incomes (per-seat values, applied at the capital)
         if _has_bel:
-            perF = self._bel_add("perF", r)  # [B, 7]
-            perC = self._bel_add("perC", r)  # [B, 6]
+            perF = self._bel_add("perF", r + 1)  # [B, 7]
+            perC = self._bel_add("perC", r + 1)  # [B, 6]
             followers = (self.civ_city_pop[:, r] * self.civ_city_alive[:, r].long()).sum(dim=1).double()
             times = torch.where(perF[:, 0] > 0, torch.floor(followers / perF[:, 0].clamp(min=1)), torch.zeros_like(followers))
             capY = perF[:, 1:] * times.unsqueeze(1) + perC * self.civ_city_alive[:, r].sum(dim=1).double().unsqueeze(1)

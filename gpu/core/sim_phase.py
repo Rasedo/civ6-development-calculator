@@ -423,7 +423,7 @@ class SimPhase:
             # precomputed columns equal a per-j compute.
             cact_all = active.unsqueeze(1) & alive_c  # [B, RC]
             cact_any_l = cact_all.any(dim=0).tolist()
-            _rcy_bel = self._civ_only_has_beliefs(r)  # capital fallback gate (capY live-pop)
+            _rcy_bel = self._seat_has_beliefs(r + 1)  # capital fallback gate (capY live-pop)
             # The per-j housing/maintenance/growth-need math, batched over j.
             # Inputs are planes (eff-covered), own-column registries (a city's
             # own completions land at the END of its iteration, after these
@@ -434,8 +434,8 @@ class SimPhase:
             # (_eff_version, _claim_version) moves — the same key discipline as
             # the yields cache. Every batched sum is dyadic/int-valued:
             # bit-exact in any shape.
-            _gmul_r = self._bel_mul("growth", r) if _rcy_bel else 1.0
-            _riv_h = self._bel_add("river", r)[:, 1] if _rcy_bel else None
+            _gmul_r = self._bel_mul("growth", r + 1) if _rcy_bel else 1.0
+            _riv_h = self._bel_add("river", r + 1)[:, 1] if _rcy_bel else None
             _fol_h_rc = self._follower_id_for(self._city_rel(r + 1)) if _rcy_bel else None
             _ctr_r = self.civ_city_center[:, r].clamp(min=0)  # [B, RC]
 
@@ -1131,7 +1131,7 @@ class SimPhase:
                     # term (1 + gppFlat + buildings), the
                     # greatPersonPointsPerTurn form.
                     if self._bel_any and cls < self._bel["pan"]["gpp"].shape[1]:
-                        gflat = self._bel_add("gpp", r)[:, cls].double().unsqueeze(1)  # [B, 1]
+                        gflat = self._bel_add("gpp", r + 1)[:, cls].double().unsqueeze(1)  # [B, 1]
                     else:
                         gflat = torch.zeros(B, 1, dtype=torch.float64, device=dev)
                     pts = (comp_c.double() * (1.0 + gflat + nb_of.double())).sum(dim=1)
@@ -1205,92 +1205,9 @@ class SimPhase:
                             self._spawn_unit(r + 1, hit & (cap_t >= 0), cap_t, guidx)
                             self._gen_ver += 1
 
-            # Pantheon / religion claims. The picks' IDENTITIES matter: the
-            # effects apply to this seat. The draw takes the k-th OPEN id in
-            # data order — open[floor(rand * open.length)], the open list
-            # filtering the claimed pool. The pantheon costs pantheonFaithCost
-            # from this seat's own faith (deducted only when a pick lands);
-            # religion needs the canFoundReligion gates — pantheon, completed
-            # Holy Site, an earned Prophet.
-            pfc = float(rr.get("pantheonFaithCost", 25))
-            pdue = active & ~self.civ_only_pantheon_done[:, r] & (self.civ_only_faith[:, r] >= pfc)
-            popen = pdue & (self.pantheon_claimed_n < rr.get("pantheonPool", 8))
-            rp_ = self._next_random(popen)
-            if bool(popen.any()) and self._bel_any:
-                n_open = (~self.pan_claimed).sum(dim=1)
-                k = torch.floor(rp_ * n_open.to(torch.float64)).to(torch.long)
-                cum = (~self.pan_claimed).long().cumsum(dim=1)
-                sel = (~self.pan_claimed) & (cum == (k + 1).unsqueeze(1))
-                pid = sel.long().argmax(dim=1)
-                prow = popen.nonzero(as_tuple=True)[0]
-                self.pan_claimed[prow, pid[prow]] = True
-                self.civ_only_pantheon[prow, r] = pid[prow]
-                self._bel_version += 1  # belief change -> _bel_add / _belief_feat_plane invalidate
-            self.civ_only_faith[:, r] = torch.where(popen, self.civ_only_faith[:, r] - pfc, self.civ_only_faith[:, r])
-            self.pantheon_claimed_n.add_(popen.long())
-            self.civ_only_pantheon_done[:, r] = self.civ_only_pantheon_done[:, r] | popen
-            self.era_score[:, r + 1] += popen.long() * self._era_pts["pantheon"]
-            d_hs = int(self._gp_class_district[self._prophet_cls]) if self._prophet_cls < self._gp_nc else -1
-            if d_hs >= 0 and self.districts_on:
-                reg_hs = self.civ_city_dist_tile[:, r, :, d_hs]  # [B, RC]
-                has_hs = ((reg_hs >= 0) & self.district_complete.gather(1, reg_hs.clamp(min=0))).any(dim=1)
-            else:
-                has_hs = torch.zeros(B, dtype=torch.bool, device=dev)
-            rdue = active & ~self.civ_only_religion_done[:, r] & self.civ_only_pantheon_done[:, r] & (self.civ_only_prophets[:, r] > 0) & has_hs
-            ropen = rdue & (self.claimed_f_n < rr.get("followerPool", 8)) & (self.claimed_o_n < rr.get("founderPool", 8))
-            rf_ = self._next_random(ropen)  # follower first, founder second — the TS draw order
-            ro_ = self._next_random(ropen)
-            if bool(ropen.any()) and self._bel_any:
-                orow = ropen.nonzero(as_tuple=True)[0]
-                for claimed_m, ids_t, rnd in ((self.fol_claimed, self.civ_only_follower, rf_), (self.fou_claimed, self.civ_only_founder, ro_)):
-                    n_open = (~claimed_m).sum(dim=1)
-                    k = torch.floor(rnd * n_open.to(torch.float64)).to(torch.long)
-                    cum = (~claimed_m).long().cumsum(dim=1)
-                    sel = (~claimed_m) & (cum == (k + 1).unsqueeze(1))
-                    bid = sel.long().argmax(dim=1)
-                    claimed_m[orow, bid[orow]] = True
-                    ids_t[orow, r] = bid[orow]
-                self._bel_version += 1  # follower/founder change -> _bel_add / _belief_feat_plane invalidate
-            self.claimed_f_n.add_(ropen.long())
-            self.claimed_o_n.add_(ropen.long())
-            self.civ_only_religion_done[:, r] = self.civ_only_religion_done[:, r] | ropen
-            self.era_score[:, r + 1] += ropen.long() * self._era_pts["religion"]
-            # Freeze this religion's holy tile at founding — it is the pressure
-            # source. civ_only_religion_done latches, so ropen fires once and the tile
-            # never re-writes. The tile is the LIVE capital at founding time,
-            # else the FIRST LIVE CITY (`cities.find(isCapital) ?? cities[0]`);
-            # a static capital tile would go stale when the capital fell before
-            # founding.
-            _civ_city_alv = self.civ_city_alive[:, r]
-            _civ_city_cap = self.civ_city_is_cap[:, r] & _civ_city_alv
-            _h_slot = torch.where(_civ_city_cap.any(dim=1), _civ_city_cap.long().argmax(dim=1), _civ_city_alv.long().argmax(dim=1))
-            _holy = self.civ_city_center[:, r].gather(1, _h_slot.unsqueeze(1)).squeeze(1)
-            _holy = torch.where(_civ_city_alv.any(dim=1), _holy, torch.full_like(_holy, -1))  # ?? null
-            self.holy_tile[:, r + 1] = torch.where(ropen, _holy, self.holy_tile[:, r + 1])
-
-            # Enhance the founded religion: a SECOND earned Prophet claims an
-            # enhancer belief, denying it from the shared pool (the mirror of
-            # the follower/founder claim). The draw sits AFTER the founder
-            # draw, gated on religionFounded && !enhancerClaimed &&
-            # prophets >= 2 && pool-open, and advances only where eopen, so it
-            # is RNG-neutral when it never fires. The effects are live: presR
-            # (pressure range), tradeRel (route income), cnear/cdef/cvs
-            # (combat CS) read civ_only_enhancer through the _enh tables.
-            edue = active & self.civ_only_religion_done[:, r] & ~self.civ_only_enhancer_done[:, r] & (self.civ_only_prophets[:, r] >= 2)
-            eopen = edue & (self.claimed_e_n < rr.get("enhancerPool", 0))
-            re_ = self._next_random(eopen)  # third belief draw — after follower/founder
-            if bool(eopen.any()) and self._enh_any:
-                erow = eopen.nonzero(as_tuple=True)[0]
-                n_open = (~self.enh_claimed).sum(dim=1)
-                k = torch.floor(re_ * n_open.to(torch.float64)).to(torch.long)
-                cum = (~self.enh_claimed).long().cumsum(dim=1)
-                sel = (~self.enh_claimed) & (cum == (k + 1).unsqueeze(1))
-                eid = sel.long().argmax(dim=1)
-                self.enh_claimed[erow, eid[erow]] = True
-                self.civ_only_enhancer[erow, r] = eid[erow]
-                self._bel_version += 1  # an enhancer claim moves the belief epoch too
-            self.claimed_e_n.add_(eopen.long())
-            self.civ_only_enhancer_done[:, r] = self.civ_only_enhancer_done[:, r] | eopen
+            # The BELIEF RACES (pantheon / religion / enhancer) — one
+            # row-generic body per fact, shared with row 0 (#73).
+            self._seat_belief_claims(r + 1, active)
 
             # Great General moves ride the wire; their phase.ts call position
             # is here, BEFORE the war loop, so the aura reflects the advanced
@@ -1361,6 +1278,105 @@ class SimPhase:
                 self.civ_only_peaceturns.copy_(torch.where(oh, torch.zeros_like(self.civ_only_peaceturns), self.civ_only_peaceturns))
         if self.R > 0:
             self._geo_make_peace()
+
+    def _seat_belief_claims(self, row: int, active: torch.Tensor) -> None:
+        """The BELIEF RACES for ONE seat row (0 = seat 0, r+1 = civ r), at the
+        loop position right after the GP race. The picks' IDENTITIES matter:
+        the effects apply to this seat. The draw takes the k-th OPEN id in
+        data order — open[floor(rand * open.length)], the open list filtering
+        the claimed pool. The pantheon costs pantheonFaithCost from this
+        seat's own faith (deducted only when a pick lands); religion needs
+        the canFoundReligion gates — pantheon, completed Holy Site (the
+        seat-axis registry), an earned Prophet; the enhancer a SECOND
+        Prophet. Each draw advances only where its own open-mask fires, so
+        the RNG stream stays aligned with the TS block turn by turn."""
+        rr, B, dev = self.rules.seats, self.B, self.device
+        pfc = float(rr.get("pantheonFaithCost", 25))
+        pdue = active & ~self.civ_pantheon_done[:, row] & (self.civ_faith[:, row] >= pfc)
+        popen = pdue & (self.pantheon_claimed_n < rr.get("pantheonPool", 8))
+        rp_ = self._next_random(popen)
+        if bool(popen.any()) and self._bel_any:
+            n_open = (~self.pan_claimed).sum(dim=1)
+            k = torch.floor(rp_ * n_open.to(torch.float64)).to(torch.long)
+            cum = (~self.pan_claimed).long().cumsum(dim=1)
+            sel = (~self.pan_claimed) & (cum == (k + 1).unsqueeze(1))
+            pid = sel.long().argmax(dim=1)
+            prow = popen.nonzero(as_tuple=True)[0]
+            self.pan_claimed[prow, pid[prow]] = True
+            self.civ_pantheon[prow, row] = pid[prow]
+            self._bel_version += 1  # belief change -> _bel_add / _belief_feat_plane invalidate
+        self.civ_faith[:, row] = torch.where(popen, self.civ_faith[:, row] - pfc, self.civ_faith[:, row])
+        self.pantheon_claimed_n.add_(popen.long())
+        self.civ_pantheon_done[:, row] = self.civ_pantheon_done[:, row] | popen
+        self.era_score[:, row] += popen.long() * self._era_pts["pantheon"]
+        d_hs = int(self._gp_class_district[self._prophet_cls]) if self._prophet_cls < self._gp_nc else -1
+        if d_hs >= 0 and self.districts_on:
+            reg_hs = self.city_dist_tile[:, row, :, d_hs]  # [B, cols]
+            has_hs = ((reg_hs >= 0) & self.district_complete.gather(1, reg_hs.clamp(min=0))).any(dim=1)
+        else:
+            has_hs = torch.zeros(B, dtype=torch.bool, device=dev)
+        rdue = active & ~self.civ_religion_done[:, row] & self.civ_pantheon_done[:, row] & (self.civ_prophets[:, row] > 0) & has_hs
+        ropen = rdue & (self.claimed_f_n < rr.get("followerPool", 8)) & (self.claimed_o_n < rr.get("founderPool", 8))
+        rf_ = self._next_random(ropen)  # follower first, founder second — the TS draw order
+        ro_ = self._next_random(ropen)
+        if bool(ropen.any()) and self._bel_any:
+            orow = ropen.nonzero(as_tuple=True)[0]
+            for claimed_m, ids_t, rnd in ((self.fol_claimed, self.civ_follower, rf_), (self.fou_claimed, self.civ_founder, ro_)):
+                n_open = (~claimed_m).sum(dim=1)
+                k = torch.floor(rnd * n_open.to(torch.float64)).to(torch.long)
+                cum = (~claimed_m).long().cumsum(dim=1)
+                sel = (~claimed_m) & (cum == (k + 1).unsqueeze(1))
+                bid = sel.long().argmax(dim=1)
+                claimed_m[orow, bid[orow]] = True
+                ids_t[orow, row] = bid[orow]
+            self._bel_version += 1  # follower/founder change -> _bel_add / _belief_feat_plane invalidate
+        self.claimed_f_n.add_(ropen.long())
+        self.claimed_o_n.add_(ropen.long())
+        self.civ_religion_done[:, row] = self.civ_religion_done[:, row] | ropen
+        self.era_score[:, row] += ropen.long() * self._era_pts["religion"]
+        # Freeze this religion's holy tile at founding — it is the pressure
+        # source. civ_religion_done latches, so ropen fires once and the tile
+        # never re-writes. The tile is the LIVE capital at founding time,
+        # else the FIRST LIVE CITY (`cities.find(isCapital) ?? cities[0]`);
+        # a static capital tile would go stale when the capital fell before
+        # founding. The city planes are still split by row (the city-block
+        # base unification collapses this branch).
+        if row == 0:
+            _alv = self.alive
+            _cap = self.is_cap & _alv
+            _ctr = self.site
+        else:
+            _alv = self.civ_city_alive[:, row - 1]
+            _cap = self.civ_city_is_cap[:, row - 1] & _alv
+            _ctr = self.civ_city_center[:, row - 1]
+        _h_slot = torch.where(_cap.any(dim=1), _cap.long().argmax(dim=1), _alv.long().argmax(dim=1))
+        _holy = _ctr.gather(1, _h_slot.unsqueeze(1)).squeeze(1)
+        _holy = torch.where(_alv.any(dim=1), _holy, torch.full_like(_holy, -1))  # ?? null
+        self.holy_tile[:, row] = torch.where(ropen, _holy, self.holy_tile[:, row])
+
+        # Enhance the founded religion: a SECOND earned Prophet claims an
+        # enhancer belief, denying it from the shared pool (the mirror of
+        # the follower/founder claim). The draw sits AFTER the founder
+        # draw, gated on religionFounded && !enhancerClaimed &&
+        # prophets >= 2 && pool-open, and advances only where eopen, so it
+        # is RNG-neutral when it never fires. The effects are live: presR
+        # (pressure range), tradeRel (route income), cnear/cdef/cvs
+        # (combat CS) read civ_enhancer through the _enh tables.
+        edue = active & self.civ_religion_done[:, row] & ~self.civ_enhancer_done[:, row] & (self.civ_prophets[:, row] >= 2)
+        eopen = edue & (self.claimed_e_n < rr.get("enhancerPool", 0))
+        re_ = self._next_random(eopen)  # third belief draw — after follower/founder
+        if bool(eopen.any()) and self._enh_any:
+            erow = eopen.nonzero(as_tuple=True)[0]
+            n_open = (~self.enh_claimed).sum(dim=1)
+            k = torch.floor(re_ * n_open.to(torch.float64)).to(torch.long)
+            cum = (~self.enh_claimed).long().cumsum(dim=1)
+            sel = (~self.enh_claimed) & (cum == (k + 1).unsqueeze(1))
+            eid = sel.long().argmax(dim=1)
+            self.enh_claimed[erow, eid[erow]] = True
+            self.civ_enhancer[erow, row] = eid[erow]
+            self._bel_version += 1  # an enhancer claim moves the belief epoch too
+        self.claimed_e_n.add_(eopen.long())
+        self.civ_enhancer_done[:, row] = self.civ_enhancer_done[:, row] | eopen
 
     def _apply_loyalty_and_flips(self, tier_idx: torch.Tensor, pop_before: torch.Tensor) -> None:
         """Applies seat-0 loyalty inside the city loop, then the deferred flips.
