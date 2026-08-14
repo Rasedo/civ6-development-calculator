@@ -56,8 +56,7 @@ def main() -> None:
     assert sim.R >= 1, "need a civ"
     r, j = 0, 0
     assert bool(sim.civ_only_alive[0, r]) and bool(sim.civ_city_alive[0, r, j]), "civ capital must be alive"
-    NBc = sim.rules_dev.b_cost.shape[0]
-    code = 1 + sim.NU + len(sim._scaffold) + NBc + pi_fest
+    code = sim.PROJECT_BASE + pi_fest
     cost = 100.0
     sim.civ_city_current[0, r, j] = code
     sim.civ_city_cost[0, r, j] = cost

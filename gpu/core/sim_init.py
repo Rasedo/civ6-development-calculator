@@ -1418,7 +1418,16 @@ class SimInit:
         # Trainable roster tables (index = position in rules.units).
         ru = rules.units or [{"id": "WARRIOR", "cost": 40, "combat": 20, "maintenance": 0, "civilian": 0, "requiresTech": -1}]
         self.NU = len(ru)
+        # THE PRODUCTION LAYOUT (cpu/core/prodLayout.ts), named once. It is the
+        # space the wire's action codes ride in, the space `city_current`
+        # stores its queue head in for EVERY seat row, and the space the state
+        # compare's queueColumn twin decodes — one layout, so a code cannot
+        # mean one thing on row 0 and another on a civ row.
         self.UNIT_BASE = NB + 2  # production action codes NB+2 … NB+1+NU train units
+        self.DISTRICT_BASE = NB + 2 + self.NU
+        self.PURCHASE_BASE = self.DISTRICT_BASE + len(self._scaffold)
+        self.WONDER_BASE = self.PURCHASE_BASE + NB + 1 + self.NU
+        self.PROJECT_BASE = self.WONDER_BASE + self._wond_n
         self._type_cost = torch.tensor([u["cost"] for u in ru], dtype=dtype, device=device)
         self._type_combat = torch.tensor([u["combat"] for u in ru], dtype=torch.long, device=device)
         self._type_maintenance = torch.tensor([u["maintenance"] for u in ru], dtype=dtype, device=device)

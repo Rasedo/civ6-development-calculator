@@ -173,23 +173,36 @@ def main() -> None:
     assert seen_new == 37, f"expected all 37 Round-B2 cards present, saw {seen_new}"
 
     # 8) The MEDIEVAL_FAIRES "run 4 policy cards" inspiration: drive
-    #    _detect_boosts and assert it fires at >=4 slotted policies, not below.
-    #    Seat-0 only (the civ-seat boost detector has no 'policies' arm).
+    #    _detect_seat_boosts and assert it fires at >=4 slotted policies, not
+    #    below. ONE detector serves every row, so the lane also proves a CIV
+    #    row reads its OWN slotted-policy count.
     mf_idx = civ_idx["MEDIEVAL_FAIRES"]
     simp = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     simp.civics.copy_(civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "MILITARY_TRADITION", "POLITICAL_PHILOSOPHY", "STATE_WORKFORCE", "EARLY_EMPIRE", "CIVIL_SERVICE", "DIVINE_RIGHT"]))
     _, _, _, _, slp, *_ = simp._gov_policy_mods(simp.civics)
     assert int(slp[0].sum()) >= 4, "MONARCHY config must slot >=4 policies to arm the inspiration"
     simp.civic_boosted[:] = False
-    simp._detect_boosts()
+    simp._detect_seat_boosts(0, torch.ones(simp.B, dtype=torch.bool))
     assert bool(simp.civic_boosted[0, mf_idx]), "MEDIEVAL_FAIRES inspiration fires at 4+ slotted policies"
     simn = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     simn.civics.copy_(civics_with(["CODE_OF_LAWS"]))
     _, _, _, _, sln, *_ = simn._gov_policy_mods(simn.civics)
     assert int(sln[0].sum()) < 4, "CHIEFDOM+CODE_OF_LAWS slots <4 policies"
     simn.civic_boosted[:] = False
-    simn._detect_boosts()
+    simn._detect_seat_boosts(0, torch.ones(simn.B, dtype=torch.bool))
     assert not bool(simn.civic_boosted[0, mf_idx]), "MEDIEVAL_FAIRES does NOT fire below 4 slotted policies"
+    # ...and the same row on a CIV seat: the policies condition is keyed on
+    # that seat's own civics, not on seat 0's.
+    if simp.R > 0:
+        simr = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+        simr.civ_only_civics[:, 0].copy_(civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "MILITARY_TRADITION", "POLITICAL_PHILOSOPHY", "STATE_WORKFORCE", "EARLY_EMPIRE", "CIVIL_SERVICE", "DIVINE_RIGHT"]))
+        simr.civ_only_civic_boosted[:] = False
+        simr._detect_seat_boosts(1, torch.ones(simr.B, dtype=torch.bool))
+        assert bool(simr.civ_only_civic_boosted[0, 0, mf_idx]), (
+            "MEDIEVAL_FAIRES never fires for a CIV seat — the policies condition "
+            "is still seat-0-only"
+        )
+        assert not bool(simr.civic_boosted[0, mf_idx]), "a civ's inspiration landed on seat 0's row"
 
     print("government_test OK — adoption, slot fill incl. wildcard overflow, housingAll, influence tier, B-13 new-card slotting + inert-channel proof + MEDIEVAL_FAIRES policies inspiration")
 

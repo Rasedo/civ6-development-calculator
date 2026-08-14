@@ -60,7 +60,7 @@ def main() -> None:
     w = sim._warrior_idx
     sim.civ_city_current[0, r, :] = -1
     sim.civ_only_treasury[0, r] = 0.0  # no gold unit/settler buy to inflate the count
-    sim.civ_city_current[0, r, j] = w + 1
+    sim.civ_city_current[0, r, j] = sim.UNIT_BASE + w
     sim.civ_city_cost[0, r, j] = float(sim._type_cost[w])
     sim.civ_city_progress[0, r, j] = float(sim._type_cost[w]) - 0.5  # one turn from done
     units_before = int((sim.major_unit_alive[0] & ((sim.major_unit_seat[0] - 1) == r)).sum())

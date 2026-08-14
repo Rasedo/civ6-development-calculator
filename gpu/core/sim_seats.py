@@ -80,14 +80,14 @@ class SimSeats:
             ok_u = tr_u_r & (self._type_combat.unsqueeze(0) > 0) & ~self.unit_naval.unsqueeze(0)
             if self.improvements_on and self._builder_idx >= 0:
                 has_alive = (self.major_unit_alive & (self.major_unit_seat == r + 1) & (self.major_unit_type == self._builder_idx)).any(dim=1)
-                has_q = ((self.civ_city_current[:, r] == self._builder_idx + 1) & self.civ_city_alive[:, r]).any(dim=1)  # alive-masked
+                has_q = ((self.civ_city_current[:, r] == self.UNIT_BASE + self._builder_idx) & self.civ_city_alive[:, r]).any(dim=1)  # alive-masked
                 ok_u[:, self._builder_idx] = ~(has_alive | has_q) & self._civ_job_mask(r).any(dim=1)
             # MILITARY ENGINEER: one per civ (live or queued), and only while a
             # FORT job exists. Combat 0 keeps it out of both lanes above, so this
             # column is the only way a net can express one.
             if self._seat_eng_live and self._eng_idx >= 0:
                 has_alive_e = (self.major_unit_alive & (self.major_unit_seat == r + 1) & (self.major_unit_type == self._eng_idx)).any(dim=1)
-                has_q_e = ((self.civ_city_current[:, r] == self._eng_idx + 1) & self.civ_city_alive[:, r]).any(dim=1)
+                has_q_e = ((self.civ_city_current[:, r] == self.UNIT_BASE + self._eng_idx) & self.civ_city_alive[:, r]).any(dim=1)
                 ok_u[:, self._eng_idx] = ~(has_alive_e | has_q_e) & self._seat_fort_job_mask_r(r).any(dim=1)
             # GALLEY: SAILING plus a naval-capable CITY (center adjacent to water
             # OR a completed Harbor), and the civ owns zero naval units live or
@@ -106,7 +106,8 @@ class SimSeats:
                 vt_allm = self.major_unit_type.clamp(min=0, max=self.NU - 1)
                 naval_live_g = (self.major_unit_alive & (self.major_unit_seat == r + 1) & self.unit_naval[vt_allm]).any(dim=1)
                 qcur_g = self.civ_city_current[:, r]
-                q_nav_g = (qcur_g >= 1) & (qcur_g <= self.NU) & self.civ_city_alive[:, r] & self.unit_naval[(qcur_g - 1).clamp(min=0, max=self.NU - 1)]
+                q_nav_g = (qcur_g >= self.UNIT_BASE) & (qcur_g < self.UNIT_BASE + self.NU) & self.civ_city_alive[:, r] \
+                    & self.unit_naval[(qcur_g - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)]
                 ok_u[:, self._galley_idx] = (
                     has_sail_g & (coastal_jg | harbor_jg) & ~(naval_live_g | q_nav_g.any(dim=1))
                 )
@@ -358,7 +359,7 @@ class SimSeats:
             for bi6, excl6 in enumerate(self.rules.b_excl_buildings):  # exclusiveWith
                 if excl6:
                     ok6[:, bi6] &= ~have6[:, torch.tensor(excl6, device=dev, dtype=torch.long)].any(dim=1)
-            qb6 = self.civ_city_current[:, r, j6] - (1 + self.NU + len(self._scaffold))
+            qb6 = self.civ_city_current[:, r, j6]  # a BUILDING head is its own column, 0..NB-1
             is_qb = (qb6 >= 0) & (qb6 < NB6)
             if bool(is_qb.any()):
                 rows_q = is_qb.nonzero(as_tuple=True)[0]
@@ -652,7 +653,7 @@ class SimSeats:
         if pref.dim() != 3:
             raise AssertionError(f"production_pref must be [B, RC, W], got {tuple(pref.shape)}")
         RCj = min(int(pref.shape[1]), self.RC)
-        base_w = self.rules_dev.b_cost.shape[0] + 2 + self.NU + len(self._scaffold)
+        base_w = self.PURCHASE_BASE
         order = pref.argsort(dim=2, descending=True)  # [B, RC, W]
         scores = pref.gather(2, order)
         live = torch.isfinite(scores)
@@ -695,7 +696,7 @@ class SimSeats:
             is_b = act & (a < NBn)
             if bool(is_b.any()):
                 bi = a.clamp(min=0, max=NBn - 1)
-                self.civ_city_current[:, r, j] = torch.where(is_b, 1 + self.NU + nS + bi, self.civ_city_current[:, r, j])
+                self.civ_city_current[:, r, j] = torch.where(is_b, bi, self.civ_city_current[:, r, j])
                 self.civ_city_cost[:, r, j] = torch.where(is_b, rdv.b_cost.gather(0, bi).double(), self.civ_city_cost[:, r, j])
                 self.civ_city_progress[:, r, j] = torch.where(is_b, torch.zeros_like(self.civ_city_progress[:, r, j]), self.civ_city_progress[:, r, j])
             # settler = NB
@@ -705,14 +706,14 @@ class SimSeats:
                 # the exporter ships this knob as "settlerPer" — read it under
                 # that key so the cost tracks the export.
                 settle_cost = js_round(rr.get("settlerBase", 48) + rr.get("settlerPer", 18) * (n_cities.double() - 1).clamp(min=0))
-                self.civ_city_current[:, r, j] = torch.where(is_s, torch.zeros_like(self.civ_city_current[:, r, j]), self.civ_city_current[:, r, j])
+                self.civ_city_current[:, r, j] = torch.where(is_s, torch.full_like(self.civ_city_current[:, r, j], self.SETTLER), self.civ_city_current[:, r, j])
                 self.civ_city_cost[:, r, j] = torch.where(is_s, settle_cost, self.civ_city_cost[:, r, j])
                 self.civ_city_progress[:, r, j] = torch.where(is_s, torch.zeros_like(self.civ_city_progress[:, r, j]), self.civ_city_progress[:, r, j])
             # WONDER/PROJECT codes sit past the purchase block. The code names
             # WHICH wonder/project; the engine re-runs the WHOLE legality —
             # one-per-world is CROSS-SEAT (any seat may have claimed it since the
             # mask was taken), so the apply refuses rather than double-building.
-            w_lo = NBn + 2 + self.NU + nS + NBn + 1 + self.NU
+            w_lo = self.WONDER_BASE
             nW_a = self._wond_n if self.districts_on else 0
             nP_a = len(self._proj_rows) if self.districts_on else 0
             is_w = act & (a >= w_lo) & (a < w_lo + nW_a)
@@ -732,7 +733,7 @@ class SimSeats:
                     if not bool(rows_a.any()):
                         continue
                     self._queue_civ_wonder_at(r, j, wi_a, rows_a, cand_a)
-            p_lo = w_lo + nW_a
+            p_lo = self.PROJECT_BASE
             is_p = act & (a >= p_lo) & (a < p_lo + nP_a)
             if bool(is_p.any()):
                 pc_a = self._seat_proj_cost(r)
@@ -749,7 +750,7 @@ class SimSeats:
                     rows_p = is_p & (a == pcode) & has_pa
                     if not bool(rows_p.any()):
                         continue
-                    code_pr = 1 + self.NU + nS + NBn + pi_a
+                    code_pr = self.PROJECT_BASE + pi_a
                     self.civ_city_current[:, r, j] = torch.where(rows_p, torch.full_like(self.civ_city_current[:, r, j], code_pr), self.civ_city_current[:, r, j])
                     self.civ_city_cost[:, r, j] = torch.where(rows_p, pc_a, self.civ_city_cost[:, r, j])
                     self.civ_city_progress[:, r, j] = torch.where(rows_p, torch.zeros_like(self.civ_city_progress[:, r, j]), self.civ_city_progress[:, r, j])
@@ -757,7 +758,7 @@ class SimSeats:
             # base..base+NB-1, then the settler column, then units. Purchases
             # bypass the idle gate and revalidate LIVE: the treasury may have
             # drained on an earlier slot in this same walk.
-            base_w = NBn + 2 + self.NU + nS
+            base_w = self.PURCHASE_BASE
             pa = production[:, j].to(torch.long)
             mult = self.rules.gold_purchase_mult
             can_p = (pa >= base_w) & (pa < w_lo) & self.controlled[:, r] & self.civ_city_alive[:, r, j]  # wonder/project codes sit past the purchases
@@ -804,7 +805,7 @@ class SimSeats:
                 if bool(is_ps2.any()) and self._settler_idx >= 0:
                     sr2 = self.rules.seats
                     n_cities2 = self.civ_city_alive[:, r].sum(dim=1)
-                    _sq2 = (self.civ_city_alive[:, r] & (self.civ_city_current[:, r] == 0)).sum(dim=1)
+                    _sq2 = (self.civ_city_alive[:, r] & (self.civ_city_current[:, r] == self.SETTLER)).sum(dim=1)
                     s_cost2 = (sr2.get("settlerBase", 48) + sr2.get("settlerPer", 18)
                                * (n_cities2.double() - 1 + self._seat_settlers(r + 1) + _sq2).clamp(min=0)) * mult
                     ok_ps = is_ps2 & (self.civ_city_pop[:, r, j] >= 2) & self._afford(self.civ_only_treasury[:, r], s_cost2)
@@ -848,11 +849,11 @@ class SimSeats:
                     # (earlier j-slots' queues are already in civ_city_current).
                     rb_n = self.civ_only_builders_trained[:, r]  # ALREADY PRODUCED only — a queued item has produced nothing
                     cost_q = torch.where(ui == self._builder_idx, self._builder_cost(rb_n).double(), cost_q)
-                self.civ_city_current[:, r, j] = torch.where(is_u, ui + 1, self.civ_city_current[:, r, j])
+                self.civ_city_current[:, r, j] = torch.where(is_u, self.UNIT_BASE + ui, self.civ_city_current[:, r, j])
                 self.civ_city_cost[:, r, j] = torch.where(is_u, cost_q, self.civ_city_cost[:, r, j])
                 self.civ_city_progress[:, r, j] = torch.where(is_u, torch.zeros_like(self.civ_city_progress[:, r, j]), self.civ_city_progress[:, r, j])
             # scaffold districts: NB+2+NU..
-            is_d = act & (a >= NBn + 2 + self.NU) & (a < NBn + 2 + self.NU + nS)
+            is_d = act & (a >= self.DISTRICT_BASE) & (a < self.DISTRICT_BASE + nS)
             if bool(is_d.any()) and self.districts_on and self._scaffold:
                 # district cost: floor(base·(1+9·max(t%, c%))) off THIS civ's own
                 # trees — the same formula every other site uses.
@@ -869,7 +870,7 @@ class SimSeats:
                     d_cost_si = torch.where(disc, torch.floor(d_cost * 0.6), d_cost)
                     placed = self._place_district_civ(r, j, di, want_d, plc)
                     if bool(placed.any()):
-                        self.civ_city_current[:, r, j] = torch.where(placed, torch.full_like(self.civ_city_current[:, r, j], 1 + self.NU + si), self.civ_city_current[:, r, j])
+                        self.civ_city_current[:, r, j] = torch.where(placed, torch.full_like(self.civ_city_current[:, r, j], self.DISTRICT_BASE + si), self.civ_city_current[:, r, j])
                         self.civ_city_cost[:, r, j] = torch.where(placed, d_cost_si, self.civ_city_cost[:, r, j])
                         self.civ_city_progress[:, r, j] = torch.where(placed, torch.zeros_like(self.civ_city_progress[:, r, j]), self.civ_city_progress[:, r, j])
 

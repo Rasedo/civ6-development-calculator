@@ -78,9 +78,8 @@ def main() -> None:
     sim2 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     r, j = 0, 0
     assert bool(sim2.civ_only_alive[0, r]) and bool(sim2.civ_city_alive[0, r, j]), "civ capital must be alive at turn 0"
-    NBc = sim2.rules_dev.b_cost.shape[0]
     pi_exo = space[-1][0]
-    exo_code = 1 + sim2.NU + len(sim2._scaffold) + NBc + pi_exo
+    exo_code = sim2.PROJECT_BASE + pi_exo
     sim2.civ_city_current[0, r, j] = exo_code
     sim2.civ_city_cost[0, r, j] = 1.0
     sim2.civ_city_progress[0, r, j] = 1.0e6

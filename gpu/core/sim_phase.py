@@ -76,7 +76,7 @@ class SimPhase:
             self._ww_decay(r + 1, active)
             # Eurekas/inspirations from this seat — the TS twin runs at the
             # same point (the seat's block top).
-            self._detect_seat_boosts(r, active)
+            self._detect_seat_boosts(r + 1, active)
             # The CS-diplomacy block sits right after boost detection — the
             # seatPhase position.
             self._seat_cs_phase(r, active)
@@ -110,8 +110,8 @@ class SimPhase:
             n_ranged = (mil_live & rng_type[vt_all]).sum(dim=1)
             n_melee = (mil_live & ~rng_type[vt_all]).sum(dim=1)
             qcur = self.civ_city_current[:, r]
-            q_ty = (qcur - 1).clamp(min=0, max=self.NU - 1)
-            q_mil = (qcur >= 1) & (qcur <= self.NU) & (self._type_combat[q_ty] > 0)
+            q_ty = (qcur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
+            q_mil = (qcur >= self.UNIT_BASE) & (qcur < self.UNIT_BASE + self.NU) & (self._type_combat[q_ty] > 0)
             n_ranged = n_ranged + (q_mil & rng_type[q_ty]).sum(dim=1)
             n_melee = n_melee + (q_mil & ~rng_type[q_ty]).sum(dim=1)
             # Production picks arrive on the wire (_consume_driven_picks
@@ -143,7 +143,7 @@ class SimPhase:
             # kind-1 intent reaches this rung.
             mult_r5 = self.rules.gold_purchase_mult
             n_cities = self.civ_city_alive[:, r].sum(dim=1)
-            _sq_r = (self.civ_city_alive[:, r] & (self.civ_city_current[:, r] == 0)).sum(dim=1)
+            _sq_r = (self.civ_city_alive[:, r] & (self.civ_city_current[:, r] == self.SETTLER)).sum(dim=1)
             sett_price5 = (
                 rr.get("settlerBase", 48)
                 + rr.get("settlerPer", 18)
@@ -563,17 +563,12 @@ class SimPhase:
                     # one of its buildings), not on the seat.
                     _rem = self._gov_mods(r + 1)[5] if self._gov_has_effects else None
                     if _rem is not None:
-                        # The civ-seat production space has its OWN encoding,
-                        # distinct from seat 0's: 0 settler, 1..NU units,
-                        # 1+NU+si a scaffold/district, 1+NU+nS+bi a building.
-                        # Decode a building index from it, never off seat 0's
-                        # layout, or unit codes read as building indices.
-                        _nS = len(self._scaffold)
-                        _bi = cur - (1 + self.NU + _nS)
-                        _enc_i = (_bi >= 0) & (_bi < self.NB) & (
-                            self._b_req_district[_bi.clamp(min=0, max=self.NB - 1)] == self._encamp_didx)
+                        # A BUILDING head is its own production column (0..NB-1)
+                        # on every row, so one decode serves every seat.
+                        _enc_i = (cur >= 0) & (cur < self.NB) & (
+                            self._b_req_district[cur.clamp(min=0, max=self.NB - 1)] == self._encamp_didx)
                         if self._encamp_si >= 0:
-                            _enc_i = _enc_i | (cur == 1 + self.NU + self._encamp_si)
+                            _enc_i = _enc_i | (cur == self.DISTRICT_BASE + self._encamp_si)
                         prod = torch.where(_enc_i, prod * _rem, prod)
                     self.civ_city_progress[:, r, j] = torch.where(
                         has_q, self.civ_city_progress[:, r, j] + prod + self.civ_city_prod_bank[:, r, j], self.civ_city_progress[:, r, j])
@@ -591,7 +586,7 @@ class SimPhase:
                             done_q, self.civ_city_prod_bank[:, r, j] + _rovf, self.civ_city_prod_bank[:, r, j])
                         self.civ_city_progress[:, r, j] = torch.where(done_q, torch.zeros_like(self.civ_city_progress[:, r, j]), self.civ_city_progress[:, r, j])
                         self.civ_city_cost[:, r, j] = torch.where(done_q, torch.zeros_like(self.civ_city_cost[:, r, j]), self.civ_city_cost[:, r, j])
-                        found_s = done_q & (cur == 0)
+                        found_s = done_q & (cur == self.SETTLER)
                         if bool(found_s.any()):
                             # A completed settler is a UNIT: it spawns at the
                             # city and the producing city pays 1 pop (floored
@@ -602,8 +597,8 @@ class SimPhase:
                             )
                             if self._settler_idx >= 0:
                                 self._spawn_unit(r + 1, found_s, self.civ_city_center[:, r, j], self._settler_idx)
-                        spawn_u = done_q & (cur >= 1) & (cur <= self.NU)
-                        is_bldr = spawn_u & (cur - 1 == self._builder_idx)
+                        spawn_u = done_q & (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU)
+                        is_bldr = spawn_u & (cur - self.UNIT_BASE == self._builder_idx)
                         if bool(is_bldr.any()):
                             self._spawn_unit(r + 1, is_bldr, self.civ_city_center[:, r, j], self._builder_idx)
                             self.civ_only_builders_trained[:, r] = self.civ_only_builders_trained[:, r] + is_bldr.long()
@@ -613,17 +608,17 @@ class SimPhase:
                         # like the Builder — the military spawner would leave
                         # it without charges. Charges come from the roster.
                         if self._seat_eng_live and self._eng_idx >= 0:
-                            is_eng = spawn_u & (cur - 1 == self._eng_idx)
+                            is_eng = spawn_u & (cur - self.UNIT_BASE == self._eng_idx)
                             if bool(is_eng.any()):
                                 self._spawn_unit(r + 1, is_eng, self.civ_city_center[:, r, j], self._eng_idx)
                             spawn_u = spawn_u & ~is_eng
                         if bool(spawn_u.any()):
                             # A trained military unit inherits city j's Encampment training XP (best tier).
                             xp_rj = (self.civ_city_bldg[:, r, j, :].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
-                            self._spawn_unit(r + 1, spawn_u, self.civ_city_center[:, r, j], (cur - 1).clamp(min=0), init_xp=xp_rj)
+                            self._spawn_unit(r + 1, spawn_u, self.civ_city_center[:, r, j], (cur - self.UNIT_BASE).clamp(min=0), init_xp=xp_rj)
                         # a finished district completes its paved tile
                         nS_b4 = len(self._scaffold)
-                        done_d = done_q & (cur > self.NU) & (cur <= self.NU + nS_b4)
+                        done_d = done_q & (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + nS_b4)
                         if bool(done_d.any()):
                             dr = done_d.nonzero(as_tuple=True)[0]
                             dtile = self.civ_city_qtile[:, r, j]
@@ -643,10 +638,10 @@ class SimPhase:
                         # a finished building joins the registry (bounded
                         # above: project codes sit past NB)
                         NBc = self.rules_dev.b_cost.shape[0]
-                        done_b = done_q & (cur > self.NU + nS_b4) & (cur <= self.NU + nS_b4 + NBc)
+                        done_b = done_q & (cur >= 0) & (cur < NBc)
                         if bool(done_b.any()):
                             br = done_b.nonzero(as_tuple=True)[0]
-                            bi_done = (cur - 1 - self.NU - nS_b4).clamp(min=0)
+                            bi_done = cur.clamp(min=0, max=NBc - 1)
                             self.civ_city_bldg[br, r, j, bi_done[br]] = True
                             # A completed REGIONAL building reaches OTHER
                             # cities' yields THIS phase (TS accrues later
@@ -660,10 +655,9 @@ class SimPhase:
                         # a finished wonder completes its tile (effects read
                         # built_wonder_complete live from the registry)
                         if self._wond_n:
-                            base_w = self.NU + nS_b4 + NBc + len(self._proj_rows)
-                            done_w = done_q & (cur > base_w)
+                            done_w = done_q & (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + self._wond_n)
                             if bool(done_w.any()):
-                                wi_done = (cur - 1 - base_w).clamp(min=0)
+                                wi_done = (cur - self.WONDER_BASE).clamp(min=0)
                                 wr_ = done_w.nonzero(as_tuple=True)[0]
                                 wt_ = self.civ_city_wonder[wr_, r, j, wi_done[wr_]]
                                 self.built_wonder_complete[wr_, wt_.clamp(min=0)] = True
@@ -673,9 +667,9 @@ class SimPhase:
                         # A finished project pays js_round(cost×frac) into the
                         # CIV's own streams + GPP (the completeProject twin).
                         if self._proj_rows:
-                            done_p = done_q & (cur > self.NU + nS_b4 + NBc) & (cur <= self.NU + nS_b4 + NBc + len(self._proj_rows))
+                            done_p = done_q & (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
                             if bool(done_p.any()):
-                                pi_done = (cur - 1 - self.NU - nS_b4 - NBc).clamp(min=0)
+                                pi_done = (cur - self.PROJECT_BASE).clamp(min=0)
                                 amt_y = js_round(cost_locked * self._proj_yf)
                                 for pi_, prow in enumerate(self._proj_rows):
                                     hitp = done_p & (pi_done == pi_)
@@ -1411,7 +1405,7 @@ class SimPhase:
         """
         r, rd, C = self.rules, self.rules_dev, self.RC
         mult = r.gold_purchase_mult
-        pbase = self.UNIT_BASE + self.NU + len(self._scaffold)
+        pbase = self.PURCHASE_BASE
         n_cities = self.alive.sum(dim=1)
         # live counters: settlers-in-production from EARLIER turns (pending
         # cities are -1 and building/unit codes never write SETTLER)…

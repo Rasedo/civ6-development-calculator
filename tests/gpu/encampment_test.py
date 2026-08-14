@@ -194,7 +194,7 @@ def test_civ_encamp_prod_mult(rules, path) -> None:
         print("  civ encampmentProdMult SKIPPED (civ has adopted no government)")
         return
     gi = int(_ad[0])
-    enc_code = 1 + sim.NU + sim._encamp_si
+    enc_code = sim.DISTRICT_BASE + sim._encamp_si
 
     def _run(mult):
         s = _prep()

@@ -163,156 +163,105 @@ class SimMasks:
 
     # --- eureka detection --------------------------------------------------------
 
-    def _detect_boosts(self, active0: torch.Tensor | None = None) -> None:
-        """Mirrors detectBoosts from seat 0's seat: flag every satisfied,
-        unresearched, un-boosted condition. Runs at row 0's block top in the
-        seatPhase loop (the position every seat shares); `active0` is the TS
-        loop's eliminated-actor continue — a cityless seat 0 detects
-        nothing."""
+    def _detect_seat_boosts(self, row: int, active: torch.Tensor) -> None:
+        """detectBoosts for seat row `row` (0 = seat 0, r+1 = civ r) — ONE
+        body, because `checkSatisfied` is seat-generic in TS: every condition
+        reads either THIS seat's cities/research/territory or a map-global
+        fact, and no arm asks which seat is asking.
+
+        Runs at the row's own block top in the seatPhase loop. `active` is the
+        TS loop's eliminated-actor continue — a cityless seat detects nothing.
+        """
+        alive = self.city_alive[:, row]
+        pop = self.city_pop[:, row]
         pop_sum = None
-        for row in self.rules.boosts:
-            kind = row["kind"]
+        for brow in self.rules.boosts:
+            kind = brow["kind"]
             if kind == "building":
-                # detectBoosts counts buildings in LIVE cities only (it iterates
-                # state.cities). A razed/lost city leaves a dead slot whose stale
-                # buildings must NOT count — mask by self.alive or a leftover
-                # Market inflates e.g. the GUILDS "build 2 Markets" inspiration.
-                pred = (self.buildings[:, :, row["b"]].bool() & self.alive).sum(dim=1) >= row["count"]
+                # checkSatisfied counts buildings in LIVE cities only (it
+                # iterates citiesOf). A razed/lost city leaves a dead slot
+                # whose stale buildings must NOT count — a leftover Market
+                # would inflate the GUILDS "build 2 Markets" inspiration.
+                pred = (self.city_bldg[:, row, :, brow["b"]] & alive).sum(dim=1) >= brow["count"]
             elif kind == "cityPop":
-                pred = ((self.pop >= row["pop"]) & self.alive).any(dim=1)
+                pred = ((pop >= brow["pop"]) & alive).any(dim=1)
             elif kind == "totalPop":
                 if pop_sum is None:
-                    pop_sum = (self.pop * self.alive.to(self.pop.dtype)).sum(dim=1)
-                pred = pop_sum >= row["pop"]
+                    pop_sum = (pop * alive.to(pop.dtype)).sum(dim=1)
+                pred = pop_sum >= brow["pop"]
             elif kind == "coastalCity":
                 # isCoastalLand at each live centre, read off the static tile
-                # plane (`site` is -1 on a dead slot, which `alive` masks out).
-                pred = (self.alive & self.coastal_land.gather(1, self.site.clamp(min=0))).any(dim=1)
+                # plane (a dead slot's centre is masked out by `alive`).
+                pred = (alive & self.coastal_land.gather(1, self.city_center[:, row].clamp(min=0))).any(dim=1)
             elif kind == "cities":
-                pred = self.alive.sum(dim=1) >= row["count"]
+                pred = alive.sum(dim=1) >= brow["count"]
             elif kind == "greatPeople":
-                pred = (self.gp_earned.sum(dim=1) if row["cls"] < 0 else self.gp_earned[:, row["cls"]]) >= row["count"]
+                # state.claimedGreatPeople is GLOBAL — the same pool answers
+                # for every seat.
+                pred = (self.gp_earned.sum(dim=1) if brow["cls"] < 0 else self.gp_earned[:, brow["cls"]]) >= brow["count"]
             elif kind == "tech":
-                pred = self.techs[:, row["t"]]
+                pred = self.civ_techs[:, row, brow["t"]]
             elif kind == "anyWonderBuilt":
                 pred = self.built_wonder_complete.any(dim=1)  # global scan, every seat
             elif kind == "nearNaturalWonder":
-                pred = ((self.tile_seat == 0) & self.wonder_near).any(dim=1)
+                pred = ((self.tile_seat == row) & self.wonder_near).any(dim=1)
             elif kind == "improvement":
-                # count tiles with this improvement (on a resource, if the
-                # condition requires it) — pillaged still counts, like
-                # detectBoosts. Only FARM is buildable in covered scope.
-                on = self.improvement == row["imp"]
-                if row.get("onResource"):
+                # a GLOBAL tile scan — TS walks state.map.tiles with no owner
+                # filter (pillaged still counts), so one formula serves every
+                # seat.
+                on = self.improvement == brow["imp"]
+                if brow.get("onResource"):
                     on = on & (self.res_priority > 0)
-                pred = on.sum(dim=1) >= row["count"]
+                pred = on.sum(dim=1) >= brow["count"]
             elif kind == "district":
-                # completed districts of a type (dtype>=0) or any specialty
-                # (dtype<0). Only specialty districts live in self.district (>=0).
-                dtype = row.get("dtype", -1)
+                # The CITY REGISTRY is the list TS walks (`c.districts` of
+                # citiesOf(seat)), gated on the TILE's districtComplete. A
+                # captured district leaves the registry with its city, so the
+                # registry needs no liveness term of its own.
+                dtype = brow.get("dtype", -1)
+                dt = self.city_dist_tile[:, row]  # [B, RC, nD] registry tiles
+                comp = self.district_complete.gather(1, dt.clamp(min=0).reshape(self.B, -1)).reshape_as(dt)
+                on = (dt >= 0) & comp & alive.unsqueeze(2)
                 if dtype < 0:
                     # boosts.ts: with no check.type, only districts that COUNT
-                    # TOWARD THE LIMIT qualify (specialty) — aqueducts/neighborhoods
-                    # and other support districts are excluded. A specific dtype
-                    # counts regardless (matching check.type).
-                    dsel = (self.district >= 0) & self._is_specialty[self.district.clamp(min=0)]
+                    # TOWARD THE LIMIT qualify (specialty) — aqueducts and the
+                    # other support districts are excluded.
+                    if brow.get("distinct"):
+                        # CIVIL_ENGINEERING: distinct specialty TYPES across cities.
+                        pred = (on.any(dim=1) & self._is_specialty.reshape(1, -1)).sum(dim=1) >= brow["count"]
+                    else:
+                        pred = (on & self._is_specialty.reshape(1, 1, -1)).sum(dim=(1, 2)) >= brow["count"]
                 else:
-                    dsel = self.district == dtype
-                on = dsel & self.district_complete & (self.tile_seat == 0) & ~self.district_dead  # seat 0's eurekas count seat 0's live districts
-                if row.get("distinct"):
-                    # CIVIL_ENGINEERING: count DISTINCT types, not instances.
-                    _cntt = torch.zeros(self.B, len(self.districts_cat), dtype=torch.long, device=self.device)
-                    _cntt.scatter_add_(1, self.district.clamp(min=0), on.long())
-                    pred = (_cntt > 0).sum(dim=1) >= row["count"]
-                else:
-                    pred = on.sum(dim=1) >= row["count"]
+                    pred = on[:, :, dtype].sum(dim=1) >= brow["count"]
             elif kind == "policies":
-                # "run N policy cards" (MEDIEVAL_FAIRES, count 4). checkSatisfied
-                # counts non-null state.government.policies entries = the seat's
-                # slotted-policy count. Gated on _gov_has_effects (no adoption
-                # => empty government.policies => 0).
+                # "run N policy cards" (MEDIEVAL_FAIRES, count 4).
+                # checkSatisfied counts this SEAT's non-null government.policies
+                # entries. A seat with no policy machinery reads 0 and the row
+                # goes live by itself the day that seat gets cards.
                 if self._gov_has_effects and self._npol:
-                    slotted = self._gov_mods(0)[4]
-                    pred = slotted.sum(dim=1) >= row["count"]
+                    pred = self._gov_mods(row)[4].sum(dim=1) >= brow["count"]
                 else:
                     pred = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             else:
                 continue
-            if active0 is not None:
-                pred = pred & active0
-            if row["target"] == "tech":
-                # FREE INQUIRY pays era score per EUREKA — fire only on the rows
-                # where the boost NEWLY lands (the TS `newly` twin).
-                _new_t = pred & ~self.techs[:, row["idx"]] & ~self.tech_boosted[:, row["idx"]]
-                self.tech_boosted[:, row["idx"]] |= pred & ~self.techs[:, row["idx"]]
-                self._dedication_event(0, 1, _new_t)
+            hit = active & pred
+            idx = brow["idx"]
+            if brow["target"] == "tech":
+                # FREE INQUIRY pays era score per EUREKA — fire only where the
+                # boost NEWLY lands (the TS `newly` twin).
+                done = self.civ_techs[:, row, idx]
+                # `newly` must be materialised BEFORE the |=: the boosted
+                # slice is a VIEW, so an in-place or would answer the
+                # already-updated plane and every era-score event would vanish.
+                newly = hit & ~done & ~self.civ_tech_boosted[:, row, idx]
+                self.civ_tech_boosted[:, row, idx] |= hit & ~done
+                self._dedication_event(row, 1, newly)
             else:
                 # PEN BRUSH AND VOICE pays era score per INSPIRATION.
-                _new_c = pred & ~self.civics[:, row["idx"]] & ~self.civic_boosted[:, row["idx"]]
-                self.civic_boosted[:, row["idx"]] |= pred & ~self.civics[:, row["idx"]]
-                self._dedication_event(0, 2, _new_c)
-
-    def _detect_seat_boosts(self, r: int, active: torch.Tensor) -> None:
-        """detectBoosts from civ r's seat: the same condition rows read that
-        civ's cities/research/territory, while the map-global rows (improvement
-        counts, the shared GP pool) read the same global state every seat's
-        check does, so one formula serves every seat. Runs at the civ's block
-        top; policy rows aren't exported."""
-        alive = self.civ_city_alive[:, r]
-        pop_sum = None
-        for row in self.rules.boosts:
-            kind = row["kind"]
-            if kind == "building":
-                pred = (self.civ_city_bldg[:, r, :, row["b"]] & alive).sum(dim=1) >= row["count"]
-            elif kind == "cityPop":
-                pred = ((self.civ_city_pop[:, r] >= row["pop"]) & alive).any(dim=1)
-            elif kind == "totalPop":
-                if pop_sum is None:
-                    pop_sum = (self.civ_city_pop[:, r] * alive.to(self.civ_city_pop.dtype)).sum(dim=1)
-                pred = pop_sum >= row["pop"]
-            elif kind == "coastalCity":
-                pred = (alive & self.coastal_land.gather(1, self.civ_city_center[:, r].clamp(min=0))).any(dim=1)
-            elif kind == "cities":
-                pred = alive.sum(dim=1) >= row["count"]
-            elif kind == "greatPeople":
-                pred = (self.gp_earned.sum(dim=1) if row["cls"] < 0 else self.gp_earned[:, row["cls"]]) >= row["count"]
-            elif kind == "tech":
-                pred = self.civ_only_techs[:, r, row["t"]]
-            elif kind == "anyWonderBuilt":
-                pred = self.built_wonder_complete.any(dim=1)  # the same global scan
-            elif kind == "nearNaturalWonder":
-                pred = ((self.civ_at == r) & self.wonder_near).any(dim=1)
-            elif kind == "improvement":
-                # global tile scan — TS scans state.map.tiles with no owner
-                # filter, so every seat runs one formula
-                on = self.improvement == row["imp"]
-                if row.get("onResource"):
-                    on = on & (self.res_priority > 0)
-                pred = on.sum(dim=1) >= row["count"]
-            elif kind == "district":
-                dtype = row.get("dtype", -1)
-                dt = self.civ_city_dist_tile[:, r]  # [B, RC, nD] registry tiles
-                comp = self.district_complete.gather(1, dt.clamp(min=0).reshape(self.B, -1)).reshape_as(dt)
-                on = (dt >= 0) & comp & alive.unsqueeze(2)
-                if dtype < 0:
-                    if row.get("distinct"):
-                        # CIVIL_ENGINEERING: distinct specialty TYPES across cities.
-                        pred = (on.any(dim=1) & self._is_specialty.reshape(1, -1)).sum(dim=1) >= row["count"]
-                    else:
-                        pred = (on & self._is_specialty.reshape(1, 1, -1)).sum(dim=(1, 2)) >= row["count"]
-                else:
-                    pred = on[:, :, dtype].sum(dim=1) >= row["count"]
-            else:
-                continue
-            hit = active & pred
-            if row["target"] == "tech":
-                _new_rt = hit & ~self.civ_only_techs[:, r, row["idx"]] & ~self.civ_only_tech_boosted[:, r, row["idx"]]
-                self.civ_only_tech_boosted[:, r, row["idx"]] |= hit & ~self.civ_only_techs[:, r, row["idx"]]
-                self._dedication_event(r + 1, 1, _new_rt)  # civ EUREKA
-            else:
-                _new_rc = hit & ~self.civ_only_civics[:, r, row["idx"]] & ~self.civ_only_civic_boosted[:, r, row["idx"]]
-                self.civ_only_civic_boosted[:, r, row["idx"]] |= hit & ~self.civ_only_civics[:, r, row["idx"]]
-                self._dedication_event(r + 1, 2, _new_rc)  # civ INSPIRATION
+                done = self.civ_civics[:, row, idx]
+                newly = hit & ~done & ~self.civ_civic_boosted[:, row, idx]
+                self.civ_civic_boosted[:, row, idx] |= hit & ~done
+                self._dedication_event(row, 2, newly)
 
     # --- barbarians (phase 4a) ----------------------------------------------------
 

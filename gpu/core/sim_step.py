@@ -251,7 +251,7 @@ class SimStep:
         self._ww_decay(0, active0)
 
         # --- eurekas: detectBoosts at the row's own block top ------------------
-        self._detect_boosts(active0)
+        self._detect_seat_boosts(0, active0)
 
         # --- CS diplomacy (meet/influence) + quests — the loop-body position,
         # through the SAME shared bodies every civ row calls (row 0) ----------
@@ -355,7 +355,7 @@ class SimStep:
             # range at NB+2+NU+si). Cities in slot order, adjacency recomputed
             # at each placement.
             if self.districts_on and self._scaffold and self._rl_district_active:
-                dbase = self.UNIT_BASE + self.NU  # district action base code (NB+2+NU)
+                dbase = self.DISTRICT_BASE
                 dcp = self.rules.district_cost
                 # floor(base·(1 + scale·max(tech%, civic%)))
                 t_pct = self.techs.sum(dim=1).double() / float(rd.t_cost.shape[0])
@@ -464,7 +464,7 @@ class SimStep:
                 emult_p = self._gov_mods(0)[5]
                 en_item = (cur_c >= 0) & (cur_c < self.NB) & (self._b_req_district[cur_c.clamp(min=0, max=self.NB - 1)] == self._encamp_didx)
                 if self._encamp_si >= 0:
-                    en_item = en_item | (cur_c == self.UNIT_BASE + self.NU + self._encamp_si)
+                    en_item = en_item | (cur_c == self.DISTRICT_BASE + self._encamp_si)
                 prod_add = torch.where(en_item, t_c[:, 1] * emult_p, t_c[:, 1])
             self.progress[bidx, col] = torch.where(has_item, self.progress[bidx, col] + prod_add + self.prod_bank[bidx, col], self.progress[bidx, col])
             self.prod_bank[bidx, col] = torch.where(has_item, torch.zeros_like(self.prod_bank[bidx, col]), self.prod_bank[bidx, col])
@@ -499,7 +499,7 @@ class SimStep:
                     self.builders_trained.add_(made_b.long())
             # A finished district completes its paved tile (the tile was
             # reserved at queue time in q_dtile).
-            made_district = done & (cur_c >= self.UNIT_BASE + self.NU)
+            made_district = done & (cur_c >= self.DISTRICT_BASE) & (cur_c < self.PURCHASE_BASE)
             if bool(made_district.any()):
                 db_ = made_district.nonzero(as_tuple=True)[0]
                 _dt = self.q_dtile[db_, col[db_]].clamp(min=0)

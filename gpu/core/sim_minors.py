@@ -97,7 +97,7 @@ class SimMinors:
         self.res_stripped[rows_w, bwt] = self.res_stripped[rows_w, bwt] | (self.res_priority[rows_w, bwt] == 1)
         self._withdraw_sea_adj(rows_w[fresh_rs], bwt[fresh_rs])
         self.civ_city_wonder[rows_w, r, j, wi] = bwt
-        code_w = 1 + self.NU + len(self._scaffold) + self.rules_dev.b_cost.shape[0] + len(self._proj_rows) + wi
+        code_w = self.WONDER_BASE + wi
         self.civ_city_current[:, r, j] = torch.where(has_w, torch.full_like(self.civ_city_current[:, r, j], code_w), self.civ_city_current[:, r, j])
         self.civ_city_cost[:, r, j] = torch.where(has_w, torch.full_like(self.civ_city_cost[:, r, j], float(wrow["cost"])), self.civ_city_cost[:, r, j])
         self.civ_city_progress[:, r, j] = torch.where(has_w, torch.zeros_like(self.civ_city_progress[:, r, j]), self.civ_city_progress[:, r, j])

@@ -70,7 +70,7 @@ def main() -> None:
     sim.apply_seat_actions(r, production_pref=pref([b0, b1]))
     sim._consume_driven_picks(r)
     got = int(sim.civ_city_current[0, r, j])
-    assert got == 1 + sim.NU + nS + b0, f"top-ranked legal column must win, got {got}"
+    assert got == b0, f"top-ranked legal column must win, got {got}"
     print("  1 top-ranked legal column wins OK")
 
     # -- 2: the top choice cannot land, so the NEXT rank does --------------
@@ -96,7 +96,7 @@ def main() -> None:
     sim2._consume_driven_picks(r)
     got2 = int(sim2.civ_city_current[0, r, j])
     assert got2 != -1, "#87 REGRESSION: an unplaceable top pick left the city IDLE"
-    assert got2 == 1 + sim2.NU + nS + legal_b2[0], f"fallback must be the policy's OWN next rank, got {got2}"
+    assert got2 == legal_b2[0], f"fallback must be the policy's OWN next rank, got {got2}"
     print("  2 unplaceable top pick falls to the policy's next rank (not idle) OK")
 
     # -- 3: ranks run dry -> the city stays idle, nothing is invented -------
@@ -174,7 +174,7 @@ def main() -> None:
     prod5[0, j5] = w_lo5 + wi5
     sim5.apply_seat_actions(r5, production=prod5)
     sim5._consume_driven_picks(r5)
-    code_w5 = 1 + sim5.NU + nS5 + NB5 + len(sim5._proj_rows) + wi5
+    code_w5 = sim5.WONDER_BASE + wi5
     assert int(sim5.civ_city_current[0, r5, j5]) == code_w5, "wonder code must queue via the shared helper"
     assert int(sim5.civ_city_wonder[0, r5, j5, wi5]) >= 0, "the pave must register the tile"
     assert bool((sim5.built_wonder[0] == wi5).any()), "built_wonder plane must carry the in-flight pave"
@@ -208,7 +208,7 @@ def main() -> None:
     prod7[0, j5] = p_lo7
     sim7.apply_seat_actions(r5, production=prod7)
     sim7._consume_driven_picks(r5)
-    assert int(sim7.civ_city_current[0, r5, j5]) == 1 + sim7.NU + nS5 + NB5 + 0, "project code must queue"
+    assert int(sim7.civ_city_current[0, r5, j5]) == sim7.PROJECT_BASE + 0, "project code must queue"
     assert float(sim7.civ_city_cost[0, r5, j5]) > 0, "project cost must lock"
     print("  5 #88 wonder queues via shared scan, one-per-world refuses cross-seat, project queues OK")
 

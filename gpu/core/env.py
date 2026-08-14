@@ -319,8 +319,8 @@ class BatchEnv:
             ], dim=1)
         n_cities = s.civ_city_alive[:, r].sum(dim=1)
         qcur = s.civ_city_current[:, r]
-        q_ty = (qcur - 1).clamp(min=0, max=s.NU - 1)
-        q_u = (qcur >= 1) & (qcur <= s.NU)
+        q_ty = (qcur - s.UNIT_BASE).clamp(min=0, max=s.NU - 1)
+        q_u = (qcur >= s.UNIT_BASE) & (qcur < s.UNIT_BASE + s.NU)
         q_mil = q_u & (s._type_combat[q_ty] > 0)
         vt = s.major_unit_type.clamp(min=0, max=s.NU - 1)
         mine = s.major_unit_alive & (s.major_unit_seat == r + 1)
@@ -400,7 +400,7 @@ class BatchEnv:
                 # Field 5 is this seat's LIVE settler units and field 6 how
                 # many are QUEUED — the same two meanings seat 0 renders.
                 s._seat_settlers(r + 1).to(d),
-                (s.civ_city_current[:, r] == 0).sum(dim=1).to(d),
+                (s.civ_city_current[:, r] == s.SETTLER).sum(dim=1).to(d),
                 s.civ_city_alive[:, r].sum(dim=1).to(d) / C,
                 (s.civ_only_treasury[:, r] / 200.0).clamp(max=5.0),
                 s.civ_only_envoys_avail[:, r].to(d) / 5.0,

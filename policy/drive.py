@@ -360,7 +360,7 @@ def _buy_ctx(sim, r: int) -> dict:
     jj, bb, can_b, price, _ = sim._seat_buy_candidates(r, active)
     rr = sim.rules.seats
     n_cities = sim.civ_city_alive[:, r].sum(dim=1)
-    _sq = (sim.civ_city_alive[:, r] & (sim.civ_city_current[:, r] == 0)).sum(dim=1)
+    _sq = (sim.civ_city_alive[:, r] & (sim.civ_city_current[:, r] == sim.SETTLER)).sum(dim=1)
     sett_cost = (rr.get("settlerBase", 48) + rr.get("settlerPer", 18)
                  * (n_cities - 1 + sim._seat_settlers(r + 1) + _sq).clamp(min=0).double()) * sim.rules.gold_purchase_mult
     # the buy SPAWNS a unit at the capital (else first city), which must have
@@ -374,8 +374,8 @@ def _buy_ctx(sim, r: int) -> dict:
     mil_live = (sim.major_unit_alive & (sim.major_unit_seat == r + 1)
                 & (sim._type_combat[vt_all] > 0))
     qcur = sim.civ_city_current[:, r]
-    q_ty = (qcur - 1).clamp(min=0, max=sim.NU - 1)
-    q_mil = (qcur >= 1) & (qcur <= sim.NU) & (sim._type_combat[q_ty] > 0)
+    q_ty = (qcur - sim.UNIT_BASE).clamp(min=0, max=sim.NU - 1)
+    q_mil = (qcur >= sim.UNIT_BASE) & (qcur < sim.UNIT_BASE + sim.NU) & (sim._type_combat[q_ty] > 0)
     n_mil = mil_live.sum(dim=1) + q_mil.sum(dim=1)
     unit_ok = active & (n_mil < 2 * n_cities) & cand_u.any(dim=1)
     # kind 3, the TILE candidate — first slot in order with a border
