@@ -129,6 +129,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     disasters: false,
     gameOver: false, // GV-2
     victoryType: 0, // GV-4/GV-3
+    victoryRow: -1,
     // FOG IS LIVE in units mode, for every seat: reveals accrue from the
     // first spawn (placement happens after creation, so starts are seen),
     // meets/settling/camp-rise all gate on the explored planes. The classic
@@ -863,43 +864,48 @@ export function endTurn(state: GameState, seat: number): void {
   // otherwise the score victory fires at TURN_LIMIT. Detection only — no freeze
   // Detection is indicator-only, so with no domination this stays inert.
   const dom = dominationWinner(state);
-  // A science victory/defeat (3/4) set during this turn's project
-  // completions takes precedence over the domination/score recompute.
-  const spaceWon = state.victoryType === 3 || state.victoryType === 4;
+  // A SCIENCE victory set during this turn's project completions takes
+  // precedence over the domination/score recompute, winner and all.
+  const spaceWon = state.victoryType === 3;
   // Religious victory — checked on the follow set the spread above just
   // flipped (real-time predominance, the domination pattern: live recompute,
-  // no freeze). Precedence space > domination > religion > score; 5 = the
-  // seat 0's religion wins, 6 = a seat religion wins (defeat).
+  // no freeze). Precedence space > domination > religion > score.
   const rel = religiousVictor(state);
-  // CULTURE victory, checked LAST of the real conditions —
-  // precedence space > domination > religion > culture > score. 7 = the
-  // seat 0 wins on tourism, 8 = a seat does (defeat).
+  // CULTURE victory, checked after religion —
+  // precedence space > domination > religion > culture > score.
   const cul = rel >= 0 ? -1 : cultureVictor(state);
   // DIPLOMATIC victory — 20 Diplomatic Victory Points, real
   // Civ 6's threshold. Checked LAST of the real conditions: precedence is
-  // space > domination > religion > culture > DIPLOMATIC > score. 9 = the
-  // seat 0 wins, 10 = a seat does (defeat).
+  // space > domination > religion > culture > DIPLOMATIC > score.
   const dip = rel >= 0 || cul >= 0 ? -1 : diplomaticVictor(state);
   state.gameOver = spaceWon || dom >= 0 || rel >= 0 || cul >= 0 || dip >= 0 || state.turn > TURN_LIMIT;
+  // The KIND and the WINNER are two facts and travel separately. Every victor
+  // above already returns the winning seat; the odd/even code pairs this
+  // replaces threw that away and kept only "was it seat 0".
   state.victoryType = spaceWon
     ? state.victoryType
     : dom >= 0
       ? 2
       : rel >= 0
-        ? rel === 0
-          ? 5
-          : 6
+        ? 4
         : cul >= 0
-          ? cul === 0
-            ? 7
-            : 8
+          ? 5
           : dip >= 0
-            ? dip === 0
-              ? 9
-              : 10
+            ? 6
             : state.gameOver
               ? 1
               : 0;
+  state.victoryRow = spaceWon
+    ? (state.victoryRow ?? -1)
+    : dom >= 0
+      ? dom
+      : rel >= 0
+        ? rel
+        : cul >= 0
+          ? cul
+          : dip >= 0
+            ? dip
+            : -1;
 }
 
 /**

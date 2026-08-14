@@ -980,14 +980,11 @@ class SimSeats:
             & (self.improvement < 0)
             & (self.district < 0)
             & (self.built_wonder < 0)  # an in-flight wonder pave refuses jobs (validImprovementsIn twin)
-            & (self.civ_city_at < 0)
-            # A seat-0 centre is a CITY_CENTER district TS-side, refused by
-            # validImprovementsIn like any pave, but it lives in center_at rather
-            # than `district`. A no-op for seats >= 1 (a seat-0 centre never sits
-            # in civ territory; captured cities ride civ_city_at), REQUIRED for seat 0:
-            # a mid-game city founded on statically-farmable ground would
-            # otherwise read farm_flat=True forever.
-            & (self.center_at < 0)
+            # A city CENTRE is a CITY_CENTER district TS-side, refused by
+            # validImprovementsIn like any pave, but it lives in the centre
+            # registry rather than `district` — so a mid-game city founded on
+            # statically-farmable ground stops reading farm_flat=True forever.
+            & (self.centre_slot_at < 0)
             & ok
         ) | (owned & self.pillaged) | (owned & self.district_pillaged)  # pillaged district = repair job
 
@@ -1018,10 +1015,10 @@ class SimSeats:
             & (self.improvement < 0)
             & (self.district < 0)
             & (self.built_wonder < 0)
-            & (self.civ_city_at < 0)
-            # a seat-0 centre is a CITY_CENTER pave that lives in `center_at`
-            # rather than `district` — the same term _job_mask_core carries.
-            & (self.center_at < 0)
+            # a city CENTRE is a CITY_CENTER pave that lives in the centre
+            # registry rather than `district` — the same term _job_mask_core
+            # carries.
+            & (self.centre_slot_at < 0)
         )
         if not bool(base.any()):
             return base
@@ -2328,11 +2325,7 @@ class SimSeats:
         # canFoundCity: static legality (land / passable / no natural wonder /
         # no oasis = settle_ok), unowned by ANY seat, no district or wonder,
         # >= CITY_MIN_DIST from EVERY centre, and under the seat city cap.
-        unowned = (
-            (self.owner.gather(1, tc.unsqueeze(1)).squeeze(1) < 0)
-            & (self.citystate_at.gather(1, tc.unsqueeze(1)).squeeze(1) < 0)
-            & (self.civ_at.gather(1, tc.unsqueeze(1)).squeeze(1) < 0)
-        )
+        unowned = self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1) < 0
         okt = (
             (tile >= 0) & unowned
             & self.settle_ok.gather(1, tc.unsqueeze(1)).squeeze(1)
@@ -2453,9 +2446,7 @@ class SimSeats:
                 # coastal city must own its harbor water or the Harbor line is
                 # unreachable
                 on_map
-                & (self.owner[rows, ndc] < 0)
-                & (self.citystate_at[rows, ndc] < 0)
-                & (self.civ_at[rows, ndc] < 0)
+                & (self.tile_seat[rows, ndc] < 0)
             )
             self.tile_seat[rows[free], n_d[free]] = seat
             self.tile_city[rows[free], n_d[free]] = _new_cid[free]  # ring joins the founder's registry
@@ -2694,30 +2685,35 @@ class SimSeats:
         """[B, T] — the MERGED slot of `seat`'s CIVILIAN unit per tile."""
         return self._occ_slot_of(self.civilian_at, seat)
 
-    @property
-    def owner(self) -> torch.Tensor:
-        """[B, T] — the seat-0 city SLOT owning each tile, -1 for nobody.
+    def city_slot_at(self, row: int) -> torch.Tensor:
+        """[B, T] — seat `row`'s city SLOT owning each tile, -1 for nobody.
 
         Not a plain view of `tile_seat`: it answers a different question, not
         "whose tile" but "whose CITY", TS's `ownerCity` beside its `ownerSeat`.
         `tile_city` stores the PERSISTENT city id for every seat (#110), while
-        the ~30 consumers here speak column space — so the derivation matches
-        row 0's id registry, ALIVE columns only (dead and never-founded columns
+        the consumers speak column space — so the derivation matches the row's
+        own id registry, ALIVE columns only (dead and never-founded columns
         hold stale ids and the zeros init; ids are per-seat monotonic, so an
-        alive match is unique)."""
-        if self._owner_ver != self._tile_owner_ver:
-            ids0 = self.city_id[:, 0, : self.RC]  # [B, C]
+        alive match is unique).
+
+        Cached per row on `_tile_owner_ver`. The ownership TEST is
+        `tile_seat == row` and needs none of this; ask here only when the
+        answer has to be a city SLOT."""
+        hit = self._city_slot_cache.get(row)
+        if hit is None or hit[0] != self._tile_owner_ver:
+            ids = self.city_id[:, row, : self.RC]  # [B, RC]
             m = (
-                (self.tile_seat == 0).unsqueeze(2)
-                & (self.tile_city.unsqueeze(2) == ids0.unsqueeze(1))
-                & self.city_alive[:, 0].unsqueeze(1)
-            )  # [B, T, C]
-            self._owner_cache = torch.where(
+                (self.tile_seat == row).unsqueeze(2)
+                & (self.tile_city.unsqueeze(2) == ids.unsqueeze(1))
+                & self.city_alive[:, row].unsqueeze(1)
+            )  # [B, T, RC]
+            out = torch.where(
                 m.any(dim=2), m.long().argmax(dim=2),
                 torch.full_like(self.tile_city, -1),
             )
-            self._owner_ver = self._tile_owner_ver
-        return self._owner_cache
+            self._city_slot_cache[row] = (self._tile_owner_ver, out)
+            return out
+        return hit[1]
 
     @property
     def civ_at(self) -> torch.Tensor:
@@ -2735,23 +2731,15 @@ class SimSeats:
         return self._civ_at_cache
 
     @property
-    def center_at(self) -> torch.Tensor:
-        """[B, T] — seat 0's city SLOT at its centre tiles, -1 elsewhere: the
-        seat-generic centre registry (centre_slot_at) masked to seat-0 tiles.
-        Cached on _tile_owner_ver — every centre write co-occurs with an
-        ownership write, so the version covers both."""
-        if self._center_at_ver != self._tile_owner_ver:
-            self._center_at_cache = torch.where(
-                self.tile_seat == 0, self.centre_slot_at,
-                torch.full_like(self.centre_slot_at, -1))
-            self._center_at_ver = self._tile_owner_ver
-        return self._center_at_cache
-
-    @property
     def civ_city_at(self) -> torch.Tensor:
         """[B, T] — the civ INDEX at a civ centre, -1 elsewhere: the centre
         registry joined with civ_at (a centre tile is owned by its city, so
-        the tile's seat names the civ). Cached on _tile_owner_ver."""
+        the tile's seat names the civ). Cached on _tile_owner_ver.
+
+        `centre_slot_at >= 0` is the seat-generic "a major's centre stands
+        here" and answers most of what this used to be asked; what is left is
+        the barbarian target scan, whose civ-vs-seat-0 split is a TS rule
+        difference (#111 s4 note in AUDIT)."""
         if self._civ_city_at_ver != self._tile_owner_ver:
             self._civ_city_at_cache = torch.where(
                 self.centre_slot_at >= 0, self.civ_at,
@@ -2780,17 +2768,16 @@ class SimSeats:
 
         Two consumers reading different ownership answers would each pick a
         different winner, so this runs every step under CIV6_ALIAS_CHECK."""
-        # All three of `owner`, `civ_at` and `citystate_at` are views of `tile_seat`
-        # (+ `tile_city`), so one-owner is a property of the ENCODING rather than
-        # an agreement between planes. The count below can only be 0 or 1 by
-        # construction; it stays as a cheap tripwire against a future write
-        # reintroducing a second store.
+        # `civ_at` and `citystate_at` are views of `tile_seat`, so one-owner is
+        # a property of the ENCODING rather than an agreement between planes.
+        # The count below can only be 0 or 1 by construction; it stays as a
+        # cheap tripwire against a future write reintroducing a second store.
         n = (self.tile_seat == 0).long() + (self.civ_at >= 0).long() + (self.citystate_at >= 0).long()
         if not bool((n <= 1).all()):
             b, t = [int(x[0]) for x in (n > 1).nonzero(as_tuple=True)]
             raise AssertionError(
                 f"TILE OWNER DRIFT: game {b} tile {t} is claimed by "
-                f"{int(n[b, t])} seats at once — owner={int(self.owner[b, t])}, "
+                f"{int(n[b, t])} seats at once — tile_seat={int(self.tile_seat[b, t])}, "
                 f"civ_at={int(self.civ_at[b, t])}, citystate_at={int(self.citystate_at[b, t])}"
             )
 
@@ -4065,7 +4052,7 @@ class SimSeats:
         expired = act & (exp >= 0) & (exp <= int(self.turn))
         rd = self.seat_route_dest[:, row]
         rdc = rd.clamp(min=0)
-        dest_gone = act & (rd >= 0) & (self.center_at.gather(1, rdc) < 0) & (self.civ_city_at.gather(1, rdc) < 0)
+        dest_gone = act & (rd >= 0) & (self.centre_slot_at.gather(1, rdc) < 0)
         drop = expired | dest_gone  # [B, K]
         if bool(drop.any()):
             self.seat_routes[:, row][drop] = -1

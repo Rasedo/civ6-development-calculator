@@ -86,19 +86,22 @@ def main() -> None:
     last_step = sim2._space_step[pi_exo]
     sim2._seat_phase()
     assert bool(sim2.space_done[0, r + 1, last_step]), "civ's victory step must land in space_done"
-    assert int(sim2.victory_type[0]) == 4, f"a civ completing the race is victoryType 4, got {int(sim2.victory_type[0])}"
+    assert int(sim2.victory_type[0]) == 3, f"a science win is victoryType 3 whoever flies it, got {int(sim2.victory_type[0])}"
+    assert int(sim2.victory_row[0]) == r + 1, f"victoryRow must name the seat that launched, got {int(sim2.victory_row[0])}"
     assert bool(sim2.game_over[0]), "the game must be over on a civ science win"
 
-    # --- 4) the endTurn recompute preserves a science win/defeat ----------
-    #   game.ts: spaceWon = victoryType in {3,4} takes precedence over the
-    #   domination/score recompute. A game NOT in a space victory recomputes
-    #   normally (running game -> 0 at an early, sub-limit turn).
-    for vt in (3, 4):
+    # --- 4) the endTurn recompute preserves a science win -----------------
+    #   game.ts: spaceWon = victoryType 3 takes precedence over the
+    #   domination/score recompute, winner and all. A game NOT in a space
+    #   victory recomputes normally (running game -> 0 at an early turn).
+    for wrow in (0, 1):
         s = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-        s.victory_type[:] = vt
+        s.victory_type[:] = 3
+        s.victory_row[:] = wrow
         s.step()
-        assert int(s.victory_type[0]) == vt, f"recompute must PRESERVE victoryType {vt}, got {int(s.victory_type[0])}"
-        assert bool(s.game_over[0]), f"a science victory ({vt}) ends the game"
+        assert int(s.victory_type[0]) == 3, f"recompute must PRESERVE victoryType 3, got {int(s.victory_type[0])}"
+        assert int(s.victory_row[0]) == wrow, f"recompute must PRESERVE the victor row {wrow}, got {int(s.victory_row[0])}"
+        assert bool(s.game_over[0]), "a science victory ends the game"
     s0 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     s0.step()  # early turn, no dom, below the turn limit
     assert int(s0.victory_type[0]) == 0 and not bool(s0.game_over[0]), "a running game recomputes to victoryType 0 / not over"

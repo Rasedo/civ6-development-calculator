@@ -103,19 +103,21 @@ describe('B-22 world congress', () => {
 });
 
 describe('B-22/B-25 diplomatic victory', () => {
-  it('20 points wins for seat 0 (victoryType 9)', () => {
+  it('20 points wins, for whichever seat holds them', () => {
     const state = newGame(1);
     seatOf(state, 0)!.diplomaticPoints = DIPLO_VICTORY_POINTS;
     endTurn(state, 0);
-    expect(state.victoryType).toBe(9);
+    expect(state.victoryType).toBe(6);
+    expect(state.victoryRow).toBe(0);
     expect(state.gameOver).toBe(true);
   });
 
-  it('a civ reaching 20 is a DEFEAT (victoryType 10)', () => {
+  it('a civ reaching 20 wins the SAME way — only the victor differs', () => {
     const state = newGame(1);
     (state.seats[(0) + 1] as Seat).diplomaticPoints = DIPLO_VICTORY_POINTS;
     endTurn(state, 0);
-    expect(state.victoryType).toBe(10);
+    expect(state.victoryType).toBe(6);
+    expect(state.victoryRow).toBe(1);
     expect(state.gameOver).toBe(true);
   });
 
@@ -123,7 +125,8 @@ describe('B-22/B-25 diplomatic victory', () => {
     const state = newGame(1);
     seatOf(state, 0)!.diplomaticPoints = DIPLO_VICTORY_POINTS - 1;
     endTurn(state, 0);
-    expect(state.victoryType).not.toBe(9);
+    expect(state.victoryType).not.toBe(6);
+    expect(state.victoryRow).toBe(-1);
     expect(state.gameOver).toBe(false);
   });
 
@@ -137,6 +140,6 @@ describe('B-22/B-25 diplomatic victory', () => {
     // ... and on diplomacy
     seatOf(state, 0)!.diplomaticPoints = DIPLO_VICTORY_POINTS;
     endTurn(state, 0);
-    expect(state.victoryType).toBe(7); // culture ranks first
+    expect(state.victoryType).toBe(5); // culture ranks first
   });
 });

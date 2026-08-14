@@ -107,7 +107,7 @@ def tile_within(sim, ctr: int, dist: int, banned=()) -> int:
     for t in range(sim.T):
         if t == ctr or t in banned:
             continue
-        if int(sim.center_at[0, t]) >= 0 or int(sim.civ_city_at[0, t]) >= 0 or int(sim.citystate_at[0, t]) >= 0:
+        if int(sim.centre_slot_at[0, t]) >= 0 or int(sim.citystate_at[0, t]) >= 0:
             continue
         if int(sim.pair_dist[ctr, t]) != dist:
             continue
@@ -124,7 +124,7 @@ def adj_free(sim, t: int, banned=()) -> int:
         n = int(sim.neigh[t][d])
         if n < 0 or n in banned:
             continue
-        if int(sim.center_at[0, n]) >= 0 or int(sim.civ_city_at[0, n]) >= 0 or int(sim.citystate_at[0, n]) >= 0:
+        if int(sim.centre_slot_at[0, n]) >= 0 or int(sim.citystate_at[0, n]) >= 0:
             continue
         if not bool(sim.passable[0, n]):
             continue
@@ -167,7 +167,7 @@ def poke_seat0_spawn(rules, rj, path):
         sim.district_complete[0, dt] = True
         sim.district_dead[0, dt] = False
         sim.district_pillaged[0, dt] = False
-        sim.owner[0, dt] = 0
+        sim.tile_seat[0, dt] = 0
         sim.city_dist_tile[0, 0, 0, d] = dt  # accrual reads the seat-axis registry
         # fund EXACTLY one person (gpCost(0)); the +1 district accrual keeps the
         # leftover well under gpCost(1), so the claim loop fires exactly once.

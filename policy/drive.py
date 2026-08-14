@@ -372,9 +372,7 @@ def _buy_ctx(sim, row: int) -> dict:
     military < 2x alive cities."""
     alive_row = sim.city_alive[:, row]
     n_cities = alive_row.sum(dim=1)
-    active = sim.seat_ext[:, row] & (n_cities > 0)
-    if row > 0:
-        active = active & sim.civ_alive[:, row]
+    active = sim.seat_ext[:, row] & (n_cities > 0) & sim.civ_alive[:, row]
     jj, bb, can_b, price, _ = sim._seat_buy_candidates(row, active)
     _sq = (alive_row & (sim.city_current[:, row] == sim.SETTLER)).sum(dim=1)
     sett_cost = (sim.rules.settler_base + sim.rules.settler_per_city

@@ -201,7 +201,7 @@ def empty_land(sim, k: int) -> list[int]:
         & (sim.civilian_at[0] < 0)
         & (sim.barb_at[0] < 0)
         & (sim.civ_city_at[0] < 0)
-        & (sim.center_at[0] < 0)
+        & (sim.centre_slot_at[0] < 0)
         & (sim.tile_seat[0] < 0)
     ).nonzero(as_tuple=True)[0].tolist()
     assert len(free) >= k, "not enough empty land tiles to inject"
@@ -331,7 +331,7 @@ def case_tile(sim, base, row: int) -> None:
 def endow_worship(sim, row: int, j: int) -> None:
     """Plant buyWorshipBuilding's three city gates: a COMPLETE Holy Site in
     THIS city's registry, its Temple prerequisite, and a founded religion."""
-    owned = ((sim.tile_seat[0] == row) & (sim.district[0] < 0) & (sim.center_at[0] < 0)
+    owned = ((sim.tile_seat[0] == row) & (sim.district[0] < 0) & (sim.centre_slot_at[0] < 0)
              & (sim.built_wonder[0] < 0)).nonzero(as_tuple=True)[0]
     assert len(owned), f"row {row}: city owns no free tile for a HOLY_SITE"
     t = int(owned[0])

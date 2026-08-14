@@ -136,7 +136,7 @@ def test_building_pillage(rules, path) -> None:
     if campus_idx is None:
         print("  pillage test SKIPPED (no CAMPUS district)")
         return
-    owned = ((sim.owner[0] == 0) & (sim.district[0] < 0)).nonzero(as_tuple=True)[0]
+    owned = ((sim.city_slot_at(0)[0] == 0) & (sim.district[0] < 0)).nonzero(as_tuple=True)[0]
     if len(owned) == 0:
         print("  pillage test SKIPPED (no free owned tile)")
         return

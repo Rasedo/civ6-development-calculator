@@ -769,7 +769,7 @@ class SimEconomy:
     def _adj_district_count(self) -> torch.Tensor:
         """[B, T] number of adjacent COMPLETED districts — the DISTRICT
         adjacency source. Counts seat 0 city centers (center_at), specialty
-        districts (self.district) and civ-seat city centers (civ_city_at, which
+        districts (self.district) and MAJOR city centres (centre_slot_at, which
         carry tile.district='CITY_CENTER' in TS). No owner filter, mirroring
         matchesAdjacency('DISTRICT')."""
         if self._adjd_cache is not None and self._adjd_cache[0] == self._eff_version:
@@ -777,21 +777,20 @@ class SimEconomy:
         nb = self.neigh
         nbc = nb.clamp(min=0)
         on_map = (nb >= 0).unsqueeze(0)  # [1, T, 6]
-        is_d = ((self.center_at[:, nbc] >= 0) | ((self.district[:, nbc] >= 0) & self.district_complete[:, nbc]) | (self.civ_city_at[:, nbc] >= 0)) & on_map
+        is_d = ((self.centre_slot_at[:, nbc] >= 0) | ((self.district[:, nbc] >= 0) & self.district_complete[:, nbc])) & on_map
         out = is_d.sum(dim=2)  # [B, T]
         self._adjd_cache = (self._eff_version, out)
         return out
 
     def _adj_center_count(self) -> torch.Tensor:
-        """[B, T] adjacent CITY_CENTER districts (seat 0 centers + civ-seat
-        centers) — the CITY_CENTER adjacency source.
-        matchesAdjacency('CITY_CENTER')."""
+        """[B, T] adjacent CITY_CENTER districts, whichever seat holds them —
+        the CITY_CENTER adjacency source. matchesAdjacency('CITY_CENTER')."""
         if self._adjc_cache is not None and self._adjc_cache[0] == self._eff_version:
             return self._adjc_cache[1]
         nb = self.neigh
         nbc = nb.clamp(min=0)
         on_map = (nb >= 0).unsqueeze(0)
-        is_c = ((self.center_at[:, nbc] >= 0) | (self.civ_city_at[:, nbc] >= 0)) & on_map
+        is_c = (self.centre_slot_at[:, nbc] >= 0) & on_map
         out = is_c.sum(dim=2)
         self._adjc_cache = (self._eff_version, out)
         return out
@@ -1113,12 +1112,18 @@ class SimEconomy:
         open slot anywhere overflow to the seat's instant culture lump on its
         current civic. Every slot write bumps _eff_version (yield-bearing).
 
-        The completed-WONDER slot term (Great Library +2 writing) still has
-        two sources: row 0 attributes wonders by TILE OWNERSHIP (its wonder
-        registry rows carry no writes yet), a civ row reads its
-        civ_city_wonder registry — the same source the Petra block uses."""
+        The completed-WONDER slot term (Great Library +2 writing) reads the
+        `city_wonder` registry for EVERY row — the same source `_completed_
+        wonders` and the Petra block use. Row 0 used to be attributed by tile
+        ownership instead, on the premise that its registry rows carried no
+        writes; that has been false since the wonder column went live for every
+        seat and `_queue_wonder_at(row, ...)` started writing row 0's.
+
+        The overflow lump accumulates in f64 on every row. It used to compute
+        in the ENGINE dtype on row 0, so an f32 lane rounded seat 0's addend
+        before adding it to a plane every other row fed in full precision."""
         bcol, nslots, nworks = self._gw_bidx[kind], self._gw_slots_k[kind], self._gw_works_k[kind]
-        dt = self.dtype if row == 0 else torch.float64  # the civ yield paths run f64
+        dt = torch.float64
         civic = self.civ_civic_prog
         if bcol < 0:  # building absent from the catalog: every charge overflows
             civic[:, row] = civic[:, row] + hit.to(dt) * nworks * culture_val
@@ -1127,18 +1132,11 @@ class SimEconomy:
         used = gw_base[:, row]  # [B, RC]
         cap = self.city_bldg[:, row, :, bcol].long() * nslots  # [B, RC] (a city holds 1 such building max)
         if getattr(self, "_wond_gw", None) is not None and int(self._wond_gw[:, kind].sum()) > 0:
-            if row == 0:
-                wsl = self._wond_gw[:, kind]  # [nW]
-                live_w = (self.built_wonder >= 0) & self.built_wonder_complete  # [B, T]
-                tile_sl = torch.where(live_w, wsl[self.built_wonder.clamp(min=0)], torch.zeros_like(self.built_wonder))
-                for c in range(self.RC):
-                    cap[:, c] = cap[:, c] + (tile_sl * (self.owner == c).long()).sum(dim=1)
-            else:
-                wreg = self.city_wonder[:, row]  # [B, RC, nW]
-                compw = (wreg >= 0) & self.built_wonder_complete.gather(
-                    1, wreg.clamp(min=0).reshape(self.B, -1)
-                ).reshape_as(wreg)
-                cap = cap + (compw.long() * self._wond_gw[:, kind].reshape(1, 1, -1)).sum(dim=2)
+            wreg = self.city_wonder[:, row]  # [B, RC, nW]
+            compw = (wreg >= 0) & self.built_wonder_complete.gather(
+                1, wreg.clamp(min=0).reshape(self.B, -1)
+            ).reshape_as(wreg)
+            cap = cap + (compw.long() * self._wond_gw[:, kind].reshape(1, 1, -1)).sum(dim=2)
         alive = self.city_alive[:, row]  # [B, RC]
         openc = (cap - used).clamp(min=0) * alive.long()  # [B, RC] open slots per live city
         W = nworks * hit.long()  # [B] works to place this earn
@@ -1405,7 +1403,7 @@ class SimEconomy:
         home = here == seat
         # A city CENTRE here — any seat's; `home` already restricts it to this
         # one, and the one-owner invariant makes a centre tile its own seat's.
-        center = (self.center_at.gather(1, t) >= 0) | (self.civ_city_at.gather(1, t) >= 0)
+        center = self.centre_slot_at.gather(1, t) >= 0
         camp = (self.camp_tile.unsqueeze(2) == t.unsqueeze(1)).any(dim=1) if pre == "barb" else None
         heal = torch.where(home & center, torch.full_like(t, 20),
                torch.where(home, torch.full_like(t, 15),
@@ -2111,16 +2109,16 @@ class SimEconomy:
     def _domination(self) -> torch.Tensor:
         """[B] the unified civ id holding EVERY original capital (civ_cap_tile),
         else -1. Owner of a capital tile: 0 if a seat-0 city is centered there
-        (center_at>=0), else civ_city_at+1 (civ index -> civ id), else -1 (razed).
-        Mirrors dominationWinner: a solo game (R==0) never dominates; any
-        unowned or split capital -> -1."""
+        a centre stands there, and `tile_seat` names its holder (a centre tile
+        belongs to its own city). Mirrors dominationWinner: a solo game (R==0)
+        never dominates; any unowned or split capital -> -1."""
         B, dev = self.B, self.device
         if self.R == 0:
             return torch.full((B,), -1, dtype=torch.long, device=dev)
         caps = self.civ_cap_tile[:, : 1 + self.R]  # [B, 1+R] capitalTiles — survives rc compaction
-        p_owns = self.center_at.gather(1, caps) >= 0
-        rv = self.civ_city_at.gather(1, caps)  # civ index or -1
-        owner = torch.where(p_owns, torch.zeros_like(rv), torch.where(rv >= 0, rv + 1, torch.full_like(rv, -1)))
+        held = self.centre_slot_at.gather(1, caps) >= 0
+        seat_at = self.tile_seat.gather(1, caps)
+        owner = torch.where(held, seat_at, torch.full_like(seat_at, -1))
         bad = (owner < 0).any(dim=1) | (owner != owner[:, :1]).any(dim=1)
         return torch.where(bad, torch.full((B,), -1, dtype=torch.long, device=dev), owner[:, 0])
 

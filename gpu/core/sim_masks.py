@@ -387,24 +387,20 @@ class SimMasks:
         has nothing to do with whether an Encampment's owner is hostile to it.
 
         Hostility mirrors `unitsHostile` exactly, which is to say it is
-        civsAtWar(prober, owner) plus "barbarians are hostile to everyone":
-        seat 0 is hostile to at-war civs, a civ to seat 0 when `civ_only_atwar` and to
-        another civ when `civ_pair_war`. `seat` may be an int or a [B, 1] tensor (the
-        war-march probes per slot)."""
+        civsAtWar(prober, owner) plus "barbarians are hostile to everyone", and
+        `_seats_hostile` is that one question — including the "never hostile to
+        yourself" arm the seat-0 fast path here used to state a second time.
+        `seat` may be an int or a [B, 1] tensor (the war-march probes per
+        slot)."""
         live = self._encamp_live()  # [B, T]
-        tensor_seat = torch.is_tensor(seat)
-        if not tensor_seat and seat == BARB_SEAT:
+        if not torch.is_tensor(seat) and seat == BARB_SEAT:
             return live  # barbarians are hostile to every owner
-        civ_only_at = self.civ_at  # [B, T] owning civ, else -1
-        if not tensor_seat and seat == 0:
-            war_r = self.civ_only_atwar.gather(1, civ_only_at.clamp(min=0))
-            return live & (civ_only_at >= 0) & war_r
-        # The Encampment OWNER's seat per tile, then the one shared hostility
-        # question.
+        # The Encampment OWNER's seat per tile. Only a MAJOR ever paves one, so
+        # the major rows ARE the domain and a city-state / unowned tile reads
+        # -1 (nobody), which `_seats_hostile` refuses.
         owner_seat = torch.where(
-            civ_only_at >= 0,
-            civ_only_at + 1,                                   # a civ's district
-            torch.where(self.tile_seat == 0, torch.zeros_like(civ_only_at), torch.full_like(civ_only_at, -1)),
+            (self.tile_seat >= 0) & (self.tile_seat <= self.R),
+            self.tile_seat, torch.full_like(self.tile_seat, -1),
         )
         return live & self._seats_hostile(seat, owner_seat)
 
@@ -735,11 +731,8 @@ class SimMasks:
             # TS refuses a dig on ANY tile carrying a district, and `foundCity`
             # sets `tile.district = 'CITY_CENTER'` (so do both capture paths).
             # The GPU's `district` plane does NOT encode centres — they live in
-            # `center_at` / `civ_city_at` (cf. the adjacency scan, which spells out
-            # `center_at >= 0 | district >= 0 | civ_city_at >= 0`), so both are named
-            # here.
-            & (self.center_at.gather(1, t.unsqueeze(1)).squeeze(1) < 0)  # seat 0's centre
-            & (self.civ_city_at.gather(1, t.unsqueeze(1)).squeeze(1) < 0)  # civ centre
+            # the seat-generic centre registry, so it is named here too.
+            & (self.centre_slot_at.gather(1, t.unsqueeze(1)).squeeze(1) < 0)  # any major's centre
             # NOTE: a CITY-STATE centre is deliberately NOT excluded. TS sets
             # `tile.district = 'CITY_CENTER'` on seat-0 founding, on both
             # capture paths and on CIV founding, but NOT for a city-state,
@@ -821,7 +814,7 @@ class SimMasks:
         land = torch.where(cw.expand(B, 6), nbc, c.unsqueeze(1).expand(B, 6))
         dl = torch.where(cw.expand(B, 6), (dirs + 3) % 6, dirs)
         bit = ((self.cliff_mask.gather(1, land) >> dl) & 1).bool()
-        free = (self.center_at.gather(1, land) >= 0) | (self.civ_city_at.gather(1, land) >= 0)
+        free = self.centre_slot_at.gather(1, land) >= 0
         if self._harbor_idx >= 0 and own is not None:
             free = free | ((self.district.gather(1, land) == self._harbor_idx) & own.gather(1, land))
         return trans & bit & ~free
@@ -846,9 +839,7 @@ class SimMasks:
         di = dir_i if torch.is_tensor(dir_i) else torch.full_like(c, int(dir_i))
         dl = torch.where(cw, (di + 3) % 6, di)
         bit = ((self.cliff_mask.gather(1, land.unsqueeze(1)).squeeze(1) >> dl) & 1).bool()
-        free = (self.center_at.gather(1, land.unsqueeze(1)).squeeze(1) >= 0) | (
-            self.civ_city_at.gather(1, land.unsqueeze(1)).squeeze(1) >= 0
-        )
+        free = self.centre_slot_at.gather(1, land.unsqueeze(1)).squeeze(1) >= 0
         # SOURCED: the Harbor exception is OWNER-ONLY — "when YOUR units use it
         # they will be able to pass the Cliffs... Enemy units won't." Callers
         # pass `own` = the tiles this mover's civ holds; without it a Harbor

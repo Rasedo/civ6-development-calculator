@@ -181,9 +181,13 @@ export interface GameState {
   seats: Seat[];
   /** true once TURN_LIMIT turns are played (or a victory fires). */
   gameOver?: boolean;
-  /** 0 none, 1 score (TURN_LIMIT), 2 domination (all capitals), 3 science
-   *  (space race), 4 science-defeat (another civ launched first). */
+  /** WHAT ended the game: 0 none, 1 score (TURN_LIMIT), 2 domination (all
+   *  capitals), 3 science (space race), 4 religion, 5 culture, 6 diplomatic.
+   *  It names the CONDITION and nothing about who met it. */
   victoryType?: number;
+  /** WHO won it — the seat, or -1 where the condition named no victor (a
+   *  TURN_LIMIT end has a score leader, not a winner). */
+  victoryRow?: number;
   /** Have roads reached the CLASSICAL tier (bridges)? Latched true at the
    *  first era boundary; a road-to-road step then pays no river charge. */
   roadBridges?: boolean;

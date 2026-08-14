@@ -192,6 +192,7 @@ GAME = {
     "rng": lambda sim, b, rows: [int(sim.rng_state[b])],
     "gameOver": lambda sim, b, rows: [1 if bool(sim.game_over[b]) else 0],
     "victoryType": lambda sim, b, rows: [int(sim.victory_type[b])],
+    "victoryRow": lambda sim, b, rows: [int(sim.victory_row[b])],
     "congressSessions": lambda sim, b, rows: [int(sim.congress_sessions[b])],
     "roadBridges": lambda sim, b, rows: [1 if sim.road_bridged else 0],
     "pantheonsClaimed": lambda sim, b, rows: [int(sim.pantheon_claimed_n[b])],

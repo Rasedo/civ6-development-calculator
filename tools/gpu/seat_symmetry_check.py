@@ -56,12 +56,7 @@ FORK_ALLOW = {
     ("sim_seats.py", "apply_geo"): "#111 s5 — the ONE row->civ-pair conversion",
     ("drive.py", "geo_decide_and_apply"): "#111 s5 — civ-pair planes have no seat-0 row",
     ("drive.py", "_extract_geo"): "#111 s5 — the record's civ-pair targets",
-    ("drive.py", "_buy_ctx"): "#111 s3 — the civ_only_alive liveness fork",
-    ("sim_phase.py", "_seat_belief_claims"): "#111 s3 — the holy-tile city-plane fork",
-    ("sim_masks.py", "_encamp_block_plane"): "#111 s3 — the seat-0 hostility fast path",
-    ("sim_init.py", "__init__"): "#111 s3 — the fixture load skips seat 0",
-    ("sim_economy.py", "_place_works"): "#111 s3 — the wonder-slot source + dtype forks",
-    ("sim_economy.py", "_ww_era_base"): "#111 s3 — civ-vs-civ war-weariness range test",
+    ("sim_economy.py", "_ww_era_base"): "#111 s5 — civ_pair_warkind has no seat-0 row",
     ("sim_phase.py", "_seat_city_produce"): "#111 s4 — victory_type is scored vs seat 0",
     ("sim_seats.py", "seat_masks"): "#111 s5 — the WAR_COLUMN_SEAT head fork",
 }

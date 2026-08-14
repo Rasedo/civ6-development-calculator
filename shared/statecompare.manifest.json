@@ -73,6 +73,16 @@
      ]
     },
     {
+     "name": "victoryRow",
+     "compare": "exact",
+     "covers": [
+      "GameState.victoryRow"
+     ],
+     "planes": [
+      "victory_row"
+     ]
+    },
+    {
      "name": "congressSessions",
      "compare": "exact",
      "covers": [

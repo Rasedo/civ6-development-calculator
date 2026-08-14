@@ -19,9 +19,10 @@ import { applyLumpYield } from './economy';
 /**
  * A finished PROJECT pays out, for whichever seat owns the city.
  *
- * `victoryType` is reported from seat 0's point of view — 3 when seat 0
- * launches, 4 when anyone else does (seat 0 has lost the race) — because the
- * field is an observation of seat 0's outcome, not a property of the winner.
+ * `victoryType` names the CONDITION (3 = science) and `victoryRow` the seat
+ * that met it. They used to be one field reported from seat 0's point of view,
+ * which made the end of the game a property of one seat rather than of the
+ * game.
  */
 export function completeProject(state: GameState, city: City, projectId: string, cost: number): void {
   const def = PROJECTS[projectId];
@@ -34,9 +35,8 @@ export function completeProject(state: GameState, city: City, projectId: string,
     if (!owner.spaceProjects.includes(projectId)) owner.spaceProjects.push(projectId);
     state.eventLog.push(`${city.name} completed ${def.name}.`);
     if (def.victory) {
-      // `city.seat === seat` — the local was `city.seat`, so this always read
-      // 3 and a RIVAL's launch was reported as seat 0's own victory.
-      state.victoryType = city.seat === 0 ? 3 : 4;
+      state.victoryType = 3;
+      state.victoryRow = city.seat;
       state.gameOver = true;
       state.eventLog.push('Science Victory! The Exoplanet Expedition has launched.');
     }

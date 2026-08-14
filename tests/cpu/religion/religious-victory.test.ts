@@ -7,7 +7,7 @@ import { settleFirstCity } from '../helpers';
 // religious victory (predominance in EVERY alive civ, >half of each
 // civ's cities). Gate-unreachable at 250t on the current seeds (ambient +1
 // pressure and 10/15 missionary lumps don't flip majorities everywhere by the
-// horizon), so these pokes pin the semantics: the 5/6 victoryType directions,
+// horizon), so these pokes pin the semantics: victoryType 4 and its victor,
 // the not-every-civ refusal, and the cityless-civ exclusion.
 
 function newGame(opponents = 1) {
@@ -33,24 +33,26 @@ function pressAll(state: ReturnType<typeof newGame>, g: number, amount = 500) {
 }
 
 describe('B6-S3 religious victory', () => {
-  it('a civ religion predominant in every civ is a DEFEAT (victoryType 6)', () => {
+  it('a civ religion predominant in every civ wins for THAT civ', () => {
     const state = newGame(1);
     const civSeat = (state.seats[(0) + 1] as Seat);
     civSeat.religion.founded = true;
     civSeat.religion.holyTile = civSeat.cities[0].centerIndex;
     pressAll(state, 1);
     endTurn(state, 0);
-    expect(state.victoryType).toBe(6);
+    expect(state.victoryType).toBe(4);
+    expect(state.victoryRow).toBe(1);
     expect(state.gameOver).toBe(true);
   });
 
-  it("seat 0's religion predominant everywhere wins (victoryType 5)", () => {
+  it("seat 0's religion predominant everywhere wins the SAME way", () => {
     const state = newGame(1);
     seatOf(state, 0)!.religion.founded = true;
     seatOf(state, 0)!.religion.holyTile = seatOf(state, 0)!.cities[0].centerIndex;
     pressAll(state, 0);
     endTurn(state, 0);
-    expect(state.victoryType).toBe(5);
+    expect(state.victoryType).toBe(4);
+    expect(state.victoryRow).toBe(0);
     expect(state.gameOver).toBe(true);
   });
 
@@ -79,7 +81,8 @@ describe('B6-S3 religious victory', () => {
     civSeat.religion.holyTile = civSeat.cities[0].centerIndex;
     pressAll(state, 1);
     endTurn(state, 0);
-    expect(state.victoryType).toBe(6);
+    expect(state.victoryType).toBe(4);
+    expect(state.victoryRow).toBe(1);
     expect(state.gameOver).toBe(true);
   });
 });

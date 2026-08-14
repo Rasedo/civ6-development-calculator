@@ -29,7 +29,7 @@ Covered (all gate-unreachable):
      follows this civ seat's religion.
   9. Religious victor (direct) — seat 0 wins with 0, a civ seat wins with g, the
      not-every-seat refusal (-1), and the cityless-seat exclusion.
- 10. Religious victor (through-step) — a step flips victory_type to 5 (seat 0)
+ 10. Religious victor (through-step) — a step flips victory_type to 4 (religion)
      and to 6 (a civ seat), game_over set.
 """
 
@@ -82,7 +82,7 @@ def free_tiles(sim, n: int, banned=()) -> list[int]:
     for t in range(sim.T):
         if t in banned:
             continue
-        if int(sim.center_at[0, t]) >= 0 or int(sim.civ_city_at[0, t]) >= 0 or int(sim.citystate_at[0, t]) >= 0:
+        if int(sim.centre_slot_at[0, t]) >= 0 or int(sim.citystate_at[0, t]) >= 0:
             continue
         if int(sim.district[0, t]) >= 0 or int(sim.built_wonder[0, t]) >= 0 or int(sim.improvement[0, t]) >= 0:
             continue
@@ -101,7 +101,7 @@ def free_neighbor(sim, ctr: int, banned=()) -> int:
         t = int(sim.neigh[ctr][d])
         if t < 0 or t in banned:
             continue
-        if int(sim.center_at[0, t]) >= 0 or int(sim.civ_city_at[0, t]) >= 0 or int(sim.citystate_at[0, t]) >= 0:
+        if int(sim.centre_slot_at[0, t]) >= 0 or int(sim.citystate_at[0, t]) >= 0:
             continue
         if not bool(sim.passable[0, t]):
             continue
@@ -459,7 +459,7 @@ def poke_combat_cs(rules, rj, path):
     assert bool(sim.city_alive[0, 0, c])
     ctr = int(sim.city_center[0, 0, c])
     sim.city_followed[0, 0, c] = g
-    sim.owner[0, ctr] = c  # the center tile is seat-0-owned -> terr[g, ctr] true
+    sim.tile_seat[0, ctr] = 0  # the center tile is seat-0-owned -> terr[g, ctr] true
     sim._rel_planes_cache = None
     seat = torch.tensor([g])  # a religion's id IS its founder's seat
     bt = torch.tensor([ctr])
@@ -597,7 +597,7 @@ def poke_victor_direct(rules, rj, path):
 def poke_victor_through_step(rules, rj, path):
     """10. Through a real step: preload pressure so _spread_religious_pressure
     flips every seat's cities to g, then _religious_victor at the step tail sets
-    victory_type 5 (seat 0) / 6 (a civ seat) and game_over."""
+    victory_type 4 (religion), victory_row = the winner, and game_over."""
     def drive(g, want_vt):
         sim = build(rules, path, steps=12)
         # freeze expansion so no fresh 0-pressure city breaks the majority: kill
@@ -635,11 +635,13 @@ def poke_victor_through_step(rules, rj, path):
         return sim
 
     sim = drive(0, 5)
-    assert int(sim.victory_type[0]) == 5, f"seat-0 religious victory must set victory_type 5 (got {int(sim.victory_type[0])})"
+    assert int(sim.victory_type[0]) == 4, f"a religious victory is victory_type 4 (got {int(sim.victory_type[0])})"
+    assert int(sim.victory_row[0]) == 0, f"victory_row must name seat 0 (got {int(sim.victory_row[0])})"
     assert bool(sim.game_over[0]), "seat-0 religious victory must end the game"
 
     sim2 = drive(1, 6)
-    assert int(sim2.victory_type[0]) == 6, f"civ religious victory must set victory_type 6 (got {int(sim2.victory_type[0])})"
+    assert int(sim2.victory_type[0]) == 4, f"a religious victory is victory_type 4 (got {int(sim2.victory_type[0])})"
+    assert int(sim2.victory_row[0]) >= 1, f"victory_row must name the winning civ row (got {int(sim2.victory_row[0])})"
     assert bool(sim2.game_over[0]), "civ religious victory must end the game"
     print("  10 religious victor (through-step) OK (seat 0 -> 5, civ -> 6, game_over)")
 

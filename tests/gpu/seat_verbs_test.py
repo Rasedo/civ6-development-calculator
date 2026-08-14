@@ -110,7 +110,7 @@ def main() -> None:
     slot, tile = a_civ_soldier(sim, r)
     assert slot is not None, "no civ military unit by t30"
     sim.civ_only_atwar[0, r] = True
-    sim.owner[0, tile] = 0            # seat-0 land (the enemy plane)
+    sim.tile_seat[0, tile] = 0        # seat-0 land (the enemy plane)
     sim.civ_at[0, tile] = -1
     sim.improvement[0, tile] = 0
     sim.pillaged[0, tile] = False
@@ -124,7 +124,7 @@ def main() -> None:
     sim = fresh(rules, path)
     slot, tile = a_civ_soldier(sim, r)
     sim.civ_only_atwar[0, r] = True
-    sim.owner[0, tile] = -1
+    sim.tile_seat[0, tile] = -1
     sim.citystate_at[0, tile] = -1
     sim.civ_at[0, tile] = r          # OWN land
     sim.improvement[0, tile] = 0
@@ -210,7 +210,7 @@ def main() -> None:
     sim6.seat_ext[0, r + 1] = True
     sl6, t6 = a_civ_soldier(sim6, r)
     sim6.civ_only_atwar[0, r] = True
-    sim6.owner[0, t6] = 0
+    sim6.tile_seat[0, t6] = 0
     sim6.civ_at[0, t6] = -1
     sim6.improvement[0, t6] = 0
     sim6.pillaged[0, t6] = False

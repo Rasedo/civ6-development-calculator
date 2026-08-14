@@ -606,16 +606,15 @@ class SimPhase:
                     for g_i in (int(x) for x in g_list):
                         if 0 <= g_i < self.civ_gpp.shape[2]:
                             self.civ_gpp[:, row, g_i] = torch.where(hit, self.civ_gpp[:, row, g_i] + amt_g, self.civ_gpp[:, row, g_i])
-                    # A space-race step records chain progress; completing the
-                    # VICTORY step ends the game — a seat-0 win when seat 0
-                    # flies it, a seat-0 DEFEAT when a rival does (the
-                    # domination mirror). Space rows carry y=g=-1, so the
-                    # yield/GPP blocks above are no-ops for them.
+                    # A space-race step records chain progress; completing
+                    # the VICTORY step ends the game — for whichever seat flew
+                    # it. Space rows carry y=g=-1, so the yield/GPP blocks
+                    # above are no-ops for them.
                     if int(prow.get("sp", 0)):
                         self.space_done[hit, row, self._space_step[pidx]] = True
                         if pidx in self._space_victory_idx:
-                            vt = 3 if row == 0 else 4
-                            self.victory_type.copy_(torch.where(hit, torch.full_like(self.victory_type, vt), self.victory_type))
+                            self.victory_type.copy_(torch.where(hit, torch.full_like(self.victory_type, 3), self.victory_type))
+                            self.victory_row.copy_(torch.where(hit, torch.full_like(self.victory_row, row), self.victory_row))
                             self.game_over.logical_or_(hit)
 
     def _seat_city_fire_and_heal(self, row: int, col: torch.Tensor, act: torch.Tensor) -> None:
@@ -945,16 +944,10 @@ class SimPhase:
         # never re-writes. The tile is the LIVE capital at founding time,
         # else the FIRST LIVE CITY (`cities.find(isCapital) ?? cities[0]`);
         # a static capital tile would go stale when the capital fell before
-        # founding. The city planes are still split by row (the city-block
-        # base unification collapses this branch).
-        if row == 0:
-            _alv = self.city_alive[:, 0]
-            _cap = self.city_is_cap[:, 0] & _alv
-            _ctr = self.city_center[:, 0]
-        else:
-            _alv = self.city_alive[:, row]
-            _cap = self.city_is_cap[:, row] & _alv
-            _ctr = self.city_center[:, row]
+        # founding.
+        _alv = self.city_alive[:, row]
+        _cap = self.city_is_cap[:, row] & _alv
+        _ctr = self.city_center[:, row]
         _h_slot = torch.where(_cap.any(dim=1), _cap.long().argmax(dim=1), _alv.long().argmax(dim=1))
         _holy = _ctr.gather(1, _h_slot.unsqueeze(1)).squeeze(1)
         _holy = torch.where(_alv.any(dim=1), _holy, torch.full_like(_holy, -1))  # ?? null

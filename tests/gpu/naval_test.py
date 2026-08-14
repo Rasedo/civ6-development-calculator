@@ -114,7 +114,7 @@ def order(sim, slot: int, code: int, row: int = 0) -> torch.Tensor:
 def is_center(sim, t: int) -> bool:
     """True iff tile t IS a seat-0 city / civ-city / city-state CENTER
     (territory tiles around a center are NOT centers)."""
-    if int(sim.center_at[0, t]) >= 0 or int(sim.civ_city_at[0, t]) >= 0:
+    if int(sim.centre_slot_at[0, t]) >= 0:
         return True
     s = int(sim.citystate_at[0, t])
     return s >= 0 and int(sim.citystate_center[0, s]) == t
@@ -204,9 +204,9 @@ def poke_galley_city(rules, path, GALLEY):
     sim._apply_seat_unit_actions(0, order(sim, slot, 6 + d))
     assert not bool(sim.city_alive[0, r + 1, j]), "coastal city at 1 HP not captured by the galley"
     assert int(sim.city_alive[0, 0].sum()) == ncity0 + 1, "capture must found a seat-0 city"
-    c_new = int(sim.center_at[0, ctr])
+    c_new = int(sim.centre_slot_at[0, ctr])
     assert c_new >= 0 and bool(sim.city_alive[0, 0, c_new]), "captured center must map to the new city"
-    assert int(sim.owner[0, ctr]) == c_new, "captured center tile must transfer to seat 0"
+    assert int(sim.city_slot_at(0)[0, ctr]) == c_new, "captured center tile must transfer to seat 0"
     print(f"  1 galley captures a coastal city OK (hp {hp0}->batter->1->captured, city {c_new})")
 
 
@@ -246,8 +246,8 @@ def poke_galley_cs(rules, path, GALLEY):
     sim._apply_seat_unit_actions(0, order(sim, slot, 6 + d))
     assert not bool(sim.citystate_alive[0, s]), "CS at 1 HP not captured by the galley"
     assert int(sim.city_alive[0, 0].sum()) >= ncity0 + 1, "CS capture must found a seat-0 city"
-    c_new = int(sim.center_at[0, ctr])
-    assert c_new >= 0 and int(sim.owner[0, ctr]) == c_new, "captured CS center must transfer"
+    c_new = int(sim.centre_slot_at[0, ctr])
+    assert c_new >= 0 and int(sim.city_slot_at(0)[0, ctr]) == c_new, "captured CS center must transfer"
     assert int(sim.city_pop[0, 0, c_new]) == max(1, (pop_before * 3) // 4), "captured pop x0.75 (min 1)"
     print(f"  2 galley captures a city-state OK (pop {pop_before}->{int(sim.city_pop[0, 0, c_new])}, city {c_new})")
 
@@ -578,12 +578,12 @@ def poke_flank_support(rules, path, GALLEY):
         nb = sim.neigh[t]
         if any(int(nb[d]) < 0 for d in range(6)):
             continue
-        if int(sim.center_at[0, t]) >= 0:
+        if int(sim.centre_slot_at[0, t]) >= 0:
             continue
         ok = True
         for d in range(6):
             n = int(nb[d])
-            if any(int(m[0, n]) >= 0 for m in (sim.military_at, sim.civilian_at, sim.center_at, sim.citystate_at, sim.civ_city_at)):
+            if any(int(m[0, n]) >= 0 for m in (sim.military_at, sim.civilian_at, sim.centre_slot_at, sim.citystate_at)):
                 ok = False
                 break
         if ok:

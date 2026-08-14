@@ -69,7 +69,7 @@ def free_tiles(sim, n: int, banned=(), need_neighbors: int = 0) -> list[int]:
     for t in range(sim.T):
         if t in banned:
             continue
-        if int(sim.center_at[0, t]) >= 0 or int(sim.civ_city_at[0, t]) >= 0 or int(sim.citystate_at[0, t]) >= 0:
+        if int(sim.centre_slot_at[0, t]) >= 0 or int(sim.citystate_at[0, t]) >= 0:
             continue
         if int(sim.district[0, t]) >= 0 or int(sim.built_wonder[0, t]) >= 0:
             continue
@@ -165,7 +165,7 @@ def _try_encampment_placement(rules, rj, path) -> bool:
         # actually filters something)
         site_c = int(sim.city_center[0, 0, c])
         base_elig = (
-            (sim.owner[0] == c)
+            (sim.city_slot_at(0)[0] == c)
             & sim.d_usable[0]
             & (sim.district[0] < 0)
             & (sim.built_wonder[0] < 0)

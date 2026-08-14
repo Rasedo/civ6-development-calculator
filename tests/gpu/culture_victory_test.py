@@ -13,8 +13,8 @@ orders apart and scripted parity proves only the ACCUMULATOR (rCulture is a
 compared trace column). This lane is the bar for the CHECK, and it pins the same
 semantics the TS poke does:
 
-  * seat 0 wins -> victory_type 7 (+ game_over);
-  * a civ wins  -> victory_type 8 (the DEFEAT direction);
+  * a culture win is victory_type 5 whoever takes it (+ game_over), and
+    victory_row names the winning seat — no code says "seat 0 lost";
   * EQUAL counts do not win (the bar is strictly greater);
   * it must beat EVERY other civ, not just one;
   * the divisor scales with the number of civs;
@@ -130,7 +130,7 @@ def main() -> None:
     s.restore(snap)
     assert float(s.civ_culture[0, 1]) == 1234.5, "civ_only_culture must survive snapshot/restore"
 
-    print("culture victory OK — 7/8 semantics + _MUTABLE round-trip")
+    print("culture victory OK — kind 5 + a named victor + _MUTABLE round-trip")
 
 
 if __name__ == "__main__":

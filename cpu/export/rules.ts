@@ -577,7 +577,7 @@ export function buildRules() {
       // B-25 (Round B3, Slice W): the space-race chain now SHIPS to the GPU.
       // Every row carries sp (space flag) / vic (victory step) plus the tech
       // gate (rt = techs-table idx) and previous-step link (rp = projects-table
-      // idx) so the GPU mirrors the sequence + the science victoryType 3/4.
+      // idx) so the GPU mirrors the sequence + the science victoryType 3.
       // Space rows sit LAST (chain order): the civ-seat greedy pick resolves to a
       // base project first, and the scripted seat 0 never queues projects, so
       // the chain is inert in-gate (gate-unreachable at 250t) — proven by the

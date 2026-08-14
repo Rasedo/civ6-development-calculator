@@ -39,7 +39,7 @@ function cultureFor(n: number) {
 }
 
 describe('B-25 culture victory', () => {
-  it('seat 0 out-touring every civ wins (victoryType 7)', () => {
+  it('seat 0 out-touring every civ wins the culture victory', () => {
     const state = newGame(1);
     const civSeat = (state.seats[(0) + 1] as Seat);
     seatOf(state, 0)!.tourism = tourismFor(5, 2);
@@ -47,11 +47,12 @@ describe('B-25 culture victory', () => {
     civSeat.cultureTotal = cultureFor(4); // 5 visiting > 4 domestic
     civSeat.tourism = 0;
     endTurn(state, 0);
-    expect(state.victoryType).toBe(7);
+    expect(state.victoryType).toBe(5);
+    expect(state.victoryRow).toBe(0);
     expect(state.gameOver).toBe(true);
   });
 
-  it('a civ out-touring everyone is a DEFEAT (victoryType 8)', () => {
+  it('a civ out-touring everyone wins the SAME way — only the victor differs', () => {
     const state = newGame(1);
     const civSeat = (state.seats[(0) + 1] as Seat);
     civSeat.tourism = tourismFor(9, 2);
@@ -59,7 +60,8 @@ describe('B-25 culture victory', () => {
     seatOf(state, 0)!.cultureTotal = cultureFor(3); // civ 9 visiting > seat-0 3 domestic
     seatOf(state, 0)!.tourism = 0;
     endTurn(state, 0);
-    expect(state.victoryType).toBe(8);
+    expect(state.victoryType).toBe(5);
+    expect(state.victoryRow).toBe(1);
     expect(state.gameOver).toBe(true);
   });
 
@@ -71,7 +73,7 @@ describe('B-25 culture victory', () => {
     civSeat.cultureTotal = cultureFor(4); // 4 visiting vs 4 domestic — not a win
     civSeat.tourism = 0;
     endTurn(state, 0);
-    expect(state.victoryType).not.toBe(7);
+    expect(state.victoryType).not.toBe(5);
     expect(state.gameOver).toBe(false);
   });
 
@@ -83,7 +85,7 @@ describe('B-25 culture victory', () => {
     (state.seats[(1) + 1] as Seat).cultureTotal = cultureFor(9); // NOT beaten
     for (const civSeat of state.seats.slice(1)) civSeat.tourism = 0;
     endTurn(state, 0);
-    expect(state.victoryType).not.toBe(7);
+    expect(state.victoryType).not.toBe(5);
     expect(state.gameOver).toBe(false);
   });
 
@@ -96,7 +98,7 @@ describe('B-25 culture victory', () => {
     (two.seats[(0) + 1] as Seat).cultureTotal = cultureFor(5);
     (two.seats[(0) + 1] as Seat).tourism = 0;
     endTurn(two, 0);
-    expect(two.victoryType).toBe(7); // 6 > 5
+    expect(two.victoryType).toBe(5); // 6 > 5
 
     const three = newGame(2);
     seatOf(three, 0)!.tourism = tourismFor(6, 2); // same raw tourism as above
@@ -106,7 +108,7 @@ describe('B-25 culture victory', () => {
       civSeat.tourism = 0;
     }
     endTurn(three, 0);
-    expect(three.victoryType).not.toBe(7); // only 4 visiting now — 4 < 5
+    expect(three.victoryType).not.toBe(5); // only 4 visiting now — 4 < 5
   });
 
   it('a CITYLESS civ cannot win on tourism it banked while alive', () => {
@@ -118,13 +120,13 @@ describe('B-25 culture victory', () => {
     seatOf(state, 0)!.cultureTotal = cultureFor(3);
     seatOf(state, 0)!.tourism = 0;
     endTurn(state, 0);
-    expect(state.victoryType).not.toBe(8);
+    expect(state.victoryType).not.toBe(5);
   });
 
   it('a RELIGIOUS victory outranks a culture one on the same turn', () => {
     const state = newGame(1);
     const civSeat = (state.seats[(0) + 1] as Seat);
-    // Civ religion predominant everywhere → victoryType 6 …
+    // Civ religion predominant everywhere → victoryType 4 (religion) …
     civSeat.religion.founded = true;
     civSeat.religion.holyTile = civSeat.cities[0].centerIndex;
     const all = [...seatOf(state, 0)!.cities, ...civSeat.cities];
@@ -139,6 +141,6 @@ describe('B-25 culture victory', () => {
     civSeat.cultureTotal = cultureFor(4);
     civSeat.tourism = 0;
     endTurn(state, 0);
-    expect(state.victoryType).toBe(6);
+    expect(state.victoryType).toBe(4);
   });
 });

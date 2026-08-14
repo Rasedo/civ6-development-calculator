@@ -468,7 +468,7 @@ _MUTABLE = [
     "seat_science_total",  # science_total / civ_only_science_total are its row views
     "rng_state", "centre_slot_at", "tdef", "tmove",
     "next_slot", "camp_tile", "n_camps", "game_over",
-    "victory_type", "winner", "space_done",  # space-race chain progress
+    "victory_type", "victory_row", "winner", "space_done",  # space-race chain progress
     "district_dead",  # captured districts are paved-but-dead
     "civ_cap_tile",  # capitalTiles — capital identity + the domination anchor (cap_tile / civ_only_cap_tile are views)
     # `tile_seat` is STATE — the city-state part of tile ownership is stored

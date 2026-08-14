@@ -201,7 +201,7 @@ def _place_next_to(sim, p_, ctr):
     nb = sim.neigh[ctr]
     for d in range(6):
         t_ = int(nb[d])
-        if t_ >= 0 and int(sim.military_at[0, t_]) < 0 and int(sim.center_at[0, t_]) < 0:
+        if t_ >= 0 and int(sim.military_at[0, t_]) < 0 and int(sim.centre_slot_at[0, t_]) < 0:
             old = int(sim.major_unit_tile[0, p_])
             sim.military_at[0, old] = -1
             sim.major_unit_tile[0, p_] = t_
@@ -239,7 +239,7 @@ def test_cs_siege(rules, path):
         # the scripted autopilot trains no military here — spawn a melee unit
         mel = next(i for i in range(len(sim._type_combat)) if float(sim._type_combat[i]) > 0 and float(sim._type_ranged_strength[i]) == 0)
         nb = sim.neigh[ctr]
-        spot = next(int(nb[d]) for d in range(6) if int(nb[d]) >= 0 and int(sim.military_at[0, int(nb[d])]) < 0 and int(sim.center_at[0, int(nb[d])]) < 0)
+        spot = next(int(nb[d]) for d in range(6) if int(nb[d]) >= 0 and int(sim.military_at[0, int(nb[d])]) < 0 and int(sim.centre_slot_at[0, int(nb[d])]) < 0)
         sim._spawn_unit(0, torch.tensor([True]), torch.tensor([spot]), torch.tensor([mel]))
         p_ = int(sim.unit_next[0]) - 1
         assert bool(sim.major_unit_alive[0, p_]), "spawn failed"
@@ -280,9 +280,9 @@ def test_cs_siege(rules, path):
     # capture (+2 total); the capture itself is pinned by the
     # center_at/owner/pop assertions below.
     assert int(sim.city_alive[0, 0].sum()) >= ncity0 + 1, "capture must found a seat-0 city"
-    c_new = int(sim.center_at[0, ctr])
+    c_new = int(sim.centre_slot_at[0, ctr])
     assert c_new >= 0 and bool(sim.city_alive[0, 0, c_new]), "center must map to the new city"
-    assert int(sim.owner[0, ctr]) == c_new, "center tile must transfer"
+    assert int(sim.city_slot_at(0)[0, ctr]) == c_new, "center tile must transfer"
     assert int(sim.citystate_at[0, ctr]) == -1, "cityStateId territory must clear"
     assert int(sim.city_pop[0, 0, c_new]) == max(1, (pop_before * 3) // 4), "pop x0.75 (min 1)"
     assert int(sim.city_hp[0, 0, c_new]) in (100, 120), "captured city starts at half HP (+20 same-turn heal allowed)"

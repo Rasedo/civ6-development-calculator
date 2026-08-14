@@ -99,7 +99,7 @@ def build_strike_scene(rules, path):
     sim.barb_unit_alive[0, :] = False
     sim.n_camps[0] = sim.max_camps[0]
     # an OWNED non-center tile with no district -> plant a complete Encampment
-    owned = ((sim.owner[0] == 0) & (sim.district[0] < 0)).nonzero(as_tuple=True)[0]
+    owned = ((sim.city_slot_at(0)[0] == 0) & (sim.district[0] < 0)).nonzero(as_tuple=True)[0]
     assert len(owned) > 0, "no free owned tile to place the Encampment"
     enc_tile = int(owned[0])
     sim.district[0, enc_tile] = sim._encamp_didx

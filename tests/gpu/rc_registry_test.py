@@ -226,7 +226,7 @@ def poke_capture_luxury_pool(rules, path):
 
     # an in-roster luxury spec whose id is NOT already active for seat 0
     # (a duplicate would not change the unique-luxury count)
-    act = (sim.lux_id[0] >= 0) & (sim.owner[0] >= 0) & (sim.improvement[0] == sim.lux_req[0])
+    act = (sim.lux_id[0] >= 0) & (sim.tile_seat[0] == 0) & (sim.improvement[0] == sim.lux_req[0])
     active_ids = set(sim.lux_id[0][act].tolist())
     src = next(
         (t for t in range(sim.T) if int(sim.lux_id[0, t]) >= 0 and int(sim.lux_req[0, t]) >= 0
@@ -239,9 +239,9 @@ def poke_capture_luxury_pool(rules, path):
     # plant it IMPROVED on a free tile registered to the civ city
     t = next(
         tt for tt in range(sim.T)
-        if int(sim.owner[0, tt]) < 0 and int(sim.civ_at[0, tt]) < 0 and int(sim.citystate_at[0, tt]) < 0
+        if int(sim.tile_seat[0, tt]) < 0
         and int(sim.lux_id[0, tt]) < 0 and int(sim.district[0, tt]) < 0 and int(sim.improvement[0, tt]) < 0
-        and int(sim.center_at[0, tt]) < 0 and int(sim.civ_city_at[0, tt]) < 0
+        and int(sim.centre_slot_at[0, tt]) < 0
     )
     sim.lux_id[0, t] = lid
     sim.lux_req[0, t] = req
@@ -255,9 +255,9 @@ def poke_capture_luxury_pool(rules, path):
     base = float(sim._luxury_amenities(0, have, need).sum())
 
     sim._transfer_city(0, r + 1, j, 0, conquest=True)  # civ r is block row r+1
-    c_new = int(sim.center_at[0, c_t])
+    c_new = int(sim.centre_slot_at[0, c_t])
     assert c_new >= 0 and bool(sim.city_alive[0, 0, c_new]), "capture did not land a seat-0 city"
-    assert int(sim.owner[0, t]) == c_new, "the luxury tile did not re-own to the captured city (A-17 ring)"
+    assert int(sim.city_slot_at(0)[0, t]) == c_new, "the luxury tile did not re-own to the captured city (A-17 ring)"
     after = float(sim._luxury_amenities(0, have, need).sum())
     assert after >= base + 1.0, f"captured improved luxury did not feed the seat-0 pool ({base} -> {after})"
     sim._check_rc_registry_invariant()  # the handover leaves the registry coherent

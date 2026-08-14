@@ -72,7 +72,7 @@ def empty_land_tiles(sim, k: int) -> list[int]:
     free = (
         sim.passable[0]
         & (sim.military_at[0] < 0) & (sim.civilian_at[0] < 0) & (sim.civ_city_at[0] < 0)
-        & (sim.citystate_at[0] < 0) & (sim.owner[0] < 0) & (sim.civ_at[0] < 0)
+        & (sim.tile_seat[0] < 0)
     ).nonzero(as_tuple=True)[0].tolist()
     assert len(free) >= k, "not enough empty land tiles to inject"
     return free[:k]

@@ -52,7 +52,7 @@ describe('B-25 science victory', () => {
     expect(avail).toEqual(['LAUNCH_MOON_LANDING']);
   });
 
-  it('completing the whole chain sets victoryType 3 (seat-0 science win)', () => {
+  it('completing the whole chain sets victoryType 3, won by the launching seat', () => {
     const { state, city } = newGameWithCampus();
     seatOf(state, 0)!.research.techs.push(...GATING_TECHS);
     for (const id of CHAIN) {
@@ -62,15 +62,17 @@ describe('B-25 science victory', () => {
       expect(seatOf(state, 0)!.spaceProjects).toContain(id);
     }
     expect(state.victoryType).toBe(3);
+    expect(state.victoryRow).toBe(0);
     expect(state.gameOver).toBe(true);
   });
 
-  it('a civ finishing the race first is a science DEFEAT (victoryType 4)', () => {
+  it('a civ finishing the race first wins the SAME way — only the victor differs', () => {
     const { state } = newGameWithCampus(1);
     const civCity = (state.seats[(0) + 1] as Seat).cities[0];
     civCity.queue = [{ kind: 'project', project: 'EXOPLANET_EXPEDITION', progress: 100000, cost: 1 }];
     endTurn(state, 0);
-    expect(state.victoryType).toBe(4);
+    expect(state.victoryType).toBe(3);
+    expect(state.victoryRow).toBe(1);
     expect(state.gameOver).toBe(true);
   });
 });

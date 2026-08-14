@@ -697,7 +697,7 @@ class SimOrders:
             # candidates too.
             rcc_w = self.city_center[wr, 1:1 + max(self.R, 1)].reshape(len(wr), -1)
             near_rc_w = ((self.pair_dist[rcc_w.clamp(min=0)] < 5) & self.city_alive[wr, 1:1 + max(self.R, 1)].reshape(len(wr), -1).unsqueeze(2)).any(dim=1)
-            cand_w = self.camp_ok[wr] & (self.owner[wr] == -1) & (self.citystate_at[wr] < 0) & (self.civ_at[wr] < 0) & ~near_city_w & ~near_rc_w & (self.district[wr] < 0) & (self.built_wonder[wr] < 0)  # a live builtWonder excludes the tile too
+            cand_w = self.camp_ok[wr] & (self.tile_seat[wr] < 0) & ~near_city_w & ~near_rc_w & (self.district[wr] < 0) & (self.built_wonder[wr] < 0)  # a live builtWonder excludes the tile too
             if self.fog_of_war:
                 # camps rise IN THE FOG — only on tiles dark to EVERY major
                 # seat (unexploredByAll; combat.ts's preferFog term).
@@ -814,7 +814,13 @@ class SimOrders:
             here = self.barb_unit_tile[:, u]
             nb = self.neigh[here]  # [B, 6]
             nbc = nb.clamp(min=0)
-            ctr = self.center_at.gather(1, nbc)
+            # A seat-0 centre and a civ centre are BOTH melee targets, but
+            # they enter the priority differently below — a lone civilian
+            # defends a civ centre and does not defend a seat-0 one. That is a
+            # TS rule difference (`meleeAttack`), not a storage one, so the two
+            # predicates stay separate until the fidelity call is made.
+            _nb_ctr = self.centre_slot_at.gather(1, nbc) >= 0
+            ctr = _nb_ctr & (self.tile_seat.gather(1, nbc) == 0)
             # A NON-BARBARIAN unit is adjacent (a barbarian is not a target for
             # a barbarian). Civilians are never barbarian, so only the military
             # plane needs the seat test.
@@ -825,7 +831,7 @@ class SimOrders:
             # An adjacent LIVE Encampment is a melee target for a barbarian too
             # (hostile to every owner) — attackTargets' encampTarget.
             enc_nb = self._encamp_block(nb, BARB_SEAT) if self._encamp_didx >= 0 else None
-            valid = (nb >= 0) & ((ctr >= 0) | has_unit | vc | (enc_nb if enc_nb is not None else False))
+            valid = (nb >= 0) & (ctr | has_unit | vc | (enc_nb if enc_nb is not None else False))
             tkey = torch.where(valid, nb, T + 1)
             target_tile = tkey.min(dim=1).values
             # A RANGED raider (ARCHER/CROSSBOWMAN) scans its FULL range
@@ -847,7 +853,7 @@ class SimOrders:
                     & (d_all <= rng_u.unsqueeze(1))
                     & (
                         self._nonbarb_unit_plane()
-                        | (self.center_at >= 0) | (self.civ_city_at >= 0)
+                        | (self.centre_slot_at >= 0)
                     )
                 )
                 civ_only_key = torch.where(civ_only_valid, self._arangeT.unsqueeze(0).expand(B, T), torch.full((B, T), T + 1, dtype=torch.long, device=dev))
@@ -856,7 +862,8 @@ class SimOrders:
             ttc = target_tile.clamp(max=T - 1)
             # meleeAttack routes seat-0 centre tiles to the city even with a
             # garrison; units defend everywhere else.
-            tgt_city = self.center_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
+            tgt_city = (self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0) & (
+                self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1) == 0)
             # a NON-BARBARIAN unit stands on the target tile
             has_u = self._nonbarb_unit_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
             # A CIV centre is attacked THROUGH its garrison, exactly as a
@@ -867,13 +874,13 @@ class SimOrders:
             _civ_only = has_u & ~_has_mil
             _rvc_here = self.civ_city_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0
             _city_wins = _rvc_here & ~_civ_only
-            city_att = attack & ~rngd & (tgt_city >= 0)
-            unit_att = attack & ~rngd & (tgt_city < 0) & has_u & ~_city_wins
-            vc_att = attack & ~rngd & (tgt_city < 0) & _city_wins
+            city_att = attack & ~rngd & tgt_city
+            unit_att = attack & ~rngd & ~tgt_city & has_u & ~_city_wins
+            vc_att = attack & ~rngd & ~tgt_city & _city_wins
             enc_att = (
                 attack
                 & ~rngd
-                & (tgt_city < 0)
+                & ~tgt_city
                 & ~has_u
                 & ~_rvc_here
                 & self._encamp_block(ttc.unsqueeze(1), BARB_SEAT).squeeze(1)
@@ -914,9 +921,10 @@ class SimOrders:
                 h_imp = self.improvement.gather(1, here.unsqueeze(1)).squeeze(1) >= 0
                 h_unpil = ~self.pillaged.gather(1, here.unsqueeze(1)).squeeze(1)
                 # barbarians raid CIV improvements too
-                h_owned = (self.owner.gather(1, here.unsqueeze(1)).squeeze(1) >= 0) | (
-                    self.civ_at.gather(1, here.unsqueeze(1)).squeeze(1) >= 0
-                )
+                # barbarians raid any MAJOR's improvements; a city-state's
+                # are not in hostileUnitAct's set.
+                _h_seat = self.tile_seat.gather(1, here.unsqueeze(1)).squeeze(1)
+                h_owned = (_h_seat >= 0) & (_h_seat <= self.R)
                 pillage = act & ~attack & h_imp & h_unpil & h_owned
                 if bool(pillage.any()):
                     rows = pillage.nonzero(as_tuple=True)[0]
@@ -938,9 +946,8 @@ class SimOrders:
                 h_dist = self.district.gather(1, here.unsqueeze(1)).squeeze(1)
                 h_dcomp = self.district_complete.gather(1, here.unsqueeze(1)).squeeze(1)
                 h_dunpil = ~self.district_pillaged.gather(1, here.unsqueeze(1)).squeeze(1)
-                h_downed = (self.owner.gather(1, here.unsqueeze(1)).squeeze(1) >= 0) | (
-                    self.civ_at.gather(1, here.unsqueeze(1)).squeeze(1) >= 0
-                )
+                _hd_seat = self.tile_seat.gather(1, here.unsqueeze(1)).squeeze(1)
+                h_downed = (_hd_seat >= 0) & (_hd_seat <= self.R)
                 dist_pillage = act & ~attack & ~pillage & (h_dist >= 0) & h_dcomp & h_dunpil & h_downed
                 if bool(dist_pillage.any()):
                     rows = dist_pillage.nonzero(as_tuple=True)[0]

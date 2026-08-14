@@ -59,7 +59,7 @@ def main() -> None:
     #   capital holds no specialty district, so gold = intlGold(3).
     assert sim.R >= 1 and bool(sim.city_alive[0, 1, 0]), "need a live civ capital"
     dest_tile = int(sim.city_center[0, 0, 0])  # seat 0's capital centre tile
-    assert int(sim.center_at[0, dest_tile]) == 0 and bool(sim.city_alive[0, 0, 0]), "seat-0 capital must own its center"
+    assert int(sim.centre_slot_at[0, dest_tile]) == 0 and int(sim.tile_seat[0, dest_tile]) == 0 and bool(sim.city_alive[0, 0, 0]), "seat-0 capital must own its center"
     sim.seat_routes[0, 1, 0, 0] = int(sim.city_id[0, 1, 0])  # origin = civ capital
     sim.seat_routes[0, 1, 0, 1] = -1                        # intl: dest carried below
     sim.seat_route_dest[0, 1, 0] = dest_tile
@@ -85,8 +85,8 @@ def main() -> None:
     sim.sync_war()  # close the poke under transpose
 
     # a completed specialty district at the destination adds 1 gold each
-    own = (sim.owner[0] == 0)  # capital-owned tiles
-    cand = ((sim.district[0] < 0) & own & ~sim.center_at[0].ge(0)).nonzero(as_tuple=True)[0]
+    own = (sim.city_slot_at(0)[0] == 0)  # capital-owned tiles
+    cand = ((sim.district[0] < 0) & own & ~sim.centre_slot_at[0].ge(0)).nonzero(as_tuple=True)[0]
     if len(cand) > 0:
         spec_idx = next((i for i, d in enumerate(sim.districts_cat) if d.get("countsTowardLimit", True)), 0)
         t = int(cand[0])
@@ -115,7 +115,7 @@ def main() -> None:
 
     # --- 4) dest-gone: an intl route to a vanished centre is dropped -------
     s2 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    empty_tile = int((s2.center_at[0] < 0).nonzero(as_tuple=True)[0][0])  # not a seat-0 centre
+    empty_tile = int((s2.centre_slot_at[0] < 0).nonzero(as_tuple=True)[0][0])  # no seat's centre
     s2.seat_routes[0, 1, 0, 0] = int(s2.city_id[0, 1, 0])
     s2.seat_routes[0, 1, 0, 1] = -1
     s2.seat_route_dest[0, 1, 0] = empty_tile

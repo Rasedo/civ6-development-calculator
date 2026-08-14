@@ -250,6 +250,7 @@ const GAME: Record<string, Extractor> = {
   rng: (s) => [s.rngState >>> 0],
   gameOver: (s) => [s.gameOver ? 1 : 0],
   victoryType: (s) => [s.victoryType ?? 0],
+  victoryRow: (s) => [s.victoryRow ?? -1],
   congressSessions: (s) => [s.congressSessions ?? 0],
   roadBridges: (s) => [s.roadBridges ? 1 : 0],
   pantheonsClaimed: (s) => [s.claimedPantheons.length],
