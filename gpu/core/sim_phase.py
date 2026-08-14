@@ -1,4 +1,4 @@
-"""The seat phase: rules processing for the civ seats (yields, growth, borders, completion, loyalty, transfers).
+"""The seat phase: EVERY seat's turn (yields, growth, borders, completion, loyalty, transfers).
 
 One mixin of BatchSim (assembled in engine.py); state and helpers live on
 self / gpu/core/simbase.py.
@@ -12,19 +12,17 @@ from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must
 
 class SimPhase:
     def _seat_phase(self, war: torch.Tensor | None = None) -> None:
-        """Runs EVERY seat in id order — the seatPhase twin. Row 0 takes its
-        turn first through _seat0_row; the civ rows follow through the loop
-        below, one body each. Every row's DECISIONS arrive through the same
-        stash (`_stash_record` / `_stash_buy`, keyed by absolute row), so the
-        only wire argument left here is `war` — seat 0's declare column, which
-        applies at the geo pass below rather than at the record position.
+        """Runs EVERY seat in id order — the seatPhase twin. This function holds
+        the schedule AROUND the seat loop (the MP reset, the geopolitics arms,
+        the peace pass); every row's turn itself is ONE call to _seat_row.
+        Decisions arrive through the same stash for every row (`_stash_record`
+        / `_stash_buy`, keyed by absolute row), so the only wire argument left
+        here is `war` — seat 0's declare column, which applies at the geo pass
+        below rather than at the record position.
 
-        Per seat: ww decay, boosts, CS diplomacy/quests, record picks, the
-        buy ladder, trade, per-city economy (yields, growth, queue progress/
-        completion — settlers and units spawn at their own city), border
-        growth, loyalty, research, upkeep, great-people/pantheon/belief races
-        (draws), then war or peace acts with their end-of-branch rolls."""
-        rr, B, dev = self.rules.seats, self.B, self.device
+        What remains per-row in this file is the war-or-peace tail: the civ
+        counters and the driven unit-sequence replay (WAR_COLUMN_SEAT)."""
+        rr = self.rules.seats
         # Freeze the MAJORS' aura MP here: the seatPhase movesLeft reset
         # covers every isCiv unit — seat 0's pool included — ahead of any
         # general war-walk, so both engines read the same pre-move general
@@ -53,172 +51,16 @@ class SimPhase:
                 self.civ_only_warturns.copy_(torch.where(oh, torch.zeros_like(self.civ_only_warturns), self.civ_only_warturns))
         if self.R > 0:
             self._geo_declare_wars()
-        # ROW 0: seat 0's whole turn, through the same body order as every
-        # civ row below (the TS loop iterates state.seats — seat 0 first).
-        self._seat0_row()
+        # THE SEAT LOOP — state.seats in id order, seat 0 first, ONE body per
+        # row. Row 0's war/peace tail is its peace counter alone: warTurns
+        # counts war with WAR_COLUMN_SEAT and a seat is never at war with
+        # itself, and row 0's unit orders replay in the order phase, not here.
+        act0 = self._seat_row(0)
+        self.peace_turns[:, 0] += (act0 & ~self.civ_only_atwar.any(dim=1)).long()
         for r in range(self.R):
-            n_cities = self.civ_city_alive[:, r].sum(dim=1)
-            active = self.civ_only_alive[:, r] & (n_cities > 0)
+            active = self._seat_row(r + 1)
             if not bool(active.any()):
-                # TS's eliminated-actor `continue` — but the record intents are
-                # for THIS turn and must not survive into the next one.
-                self._seat_record_apply(r + 1, active)
                 continue
-            # War weariness SETTLES here: accrual happens per BATTLE as the
-            # fighting resolves, so what is left for the block top is the
-            # decay. The same function every seat calls, on this civ's row.
-            # civ_pair_war is fixed for the turn by the phase-top declaration pass,
-            # so the "at war with somebody" test inside is stable.
-            self._ww_decay(r + 1, active)
-            # Eurekas/inspirations from this seat — the TS twin runs at the
-            # same point (the seat's block top).
-            self._detect_seat_boosts(r + 1, active)
-            # The CS-diplomacy block sits right after boost detection — the
-            # seatPhase position. Row addressing: civ r is seat row r+1.
-            self._seat_influence_phase(r + 1, active)
-            # CS quests resolve/issue right after the envoy accrual (the
-            # seatPhase quest block sits at the tail of the same CS block), so
-            # a completed quest's envoy is visible to the levy suzerain test
-            # later this phase.
-            self._seat_quest_phase(r + 1, active)
-            # THE RECORD: tech, civic, envoys, production — one body, every seat
-            # row, at applySeatActionRecord's own position.
-            self._seat_record_apply(r + 1, active)
-            # THE gold/faith block — one body, every seat row.
-            self._seat_buy_ladder(r + 1, active)
-            # The trade creation block sits between the buy block and the
-            # city-loop snapshot — the seatPhase position.
-            self._seat_trade_phase(r + 1, active)
-            # The city-loop snapshot is taken AFTER the buy block (the
-            # [...civ.cities] discipline): a bought-settler newborn acts this
-            # turn (amenity + yields), a queue-completion newborn (founded
-            # inside the loop, later) does not.
-            alive_c = self.civ_city_alive[:, r].clone()
-
-            sci_sum = torch.zeros(B, dtype=torch.float64, device=dev)
-            cul_sum = torch.zeros(B, dtype=torch.float64, device=dev)
-            gold_sum = torch.zeros(B, dtype=torch.float64, device=dev)
-            faith_sum = torch.zeros(B, dtype=torch.float64, device=dev)
-            # THE loop-top stats snapshot — one body, every seat row. Every
-            # column below reads THIS map: yields, amenity tier, effective food
-            # surplus and growth need all freeze here, and nothing inside the
-            # loop refreshes them.
-            total, eff, need, tier_idx = self._seat_city_stats(r + 1)
-            # This civ's governor seats for THIS turn — the loop-top
-            # governorPicks mirror (quantized milli loyalty snapshot, ties by
-            # slot index == TS array order; alive-masked).
-            _titles_r = (self.civ_only_civics[:, r].sum(dim=1) // self._gov_per).clamp(max=self._gov_max)  # [B]
-            _q_rloy = js_round(self.civ_city_loyalty[:, r] * 1000).long()
-            _gk = torch.where(self.civ_city_alive[:, r], _q_rloy * 64 + torch.arange(self.RC, device=dev).reshape(1, -1), torch.full_like(_q_rloy, 1 << 40))
-            _gr = torch.empty_like(_gk)
-            _gr.scatter_(1, _gk.argsort(dim=1, stable=True), torch.arange(self.RC, device=dev).expand(B, self.RC))
-            civ_city_gov = (_gr < _titles_r.unsqueeze(1)) & self.civ_city_alive[:, r]  # [B, RC]
-            civ_city_flip = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
-            # One guard sync for the whole economy loop: alive_c is a pre-loop
-            # CLONE (a queue-completion newborn founded inside the loop does not
-            # act this turn — the [...civ.cities] discipline above) and `active`
-            # is a loop-invariant local.
-            cact_all = active.unsqueeze(1) & alive_c  # [B, RC]
-            cact_any_l = cact_all.any(dim=0).tolist()
-            for j in range(self.RC):
-                if not cact_any_l[j]:
-                    continue
-                cact = cact_all[:, j]  # post-buy snapshot (a bought settler's city acts this turn)
-                jc = torch.full((B,), j, dtype=torch.long, device=dev)
-                # City loyalty at the loop top (before yields/growth) — own =
-                # THIS civ, foreign = seat 0 + every other civ; LIVE pops
-                # (earlier slots in this loop have already grown, the TS
-                # mid-loop mirror). The capital is immune, identified by
-                # civ_city_is_cap per BATCH because compaction can move it off slot 0.
-                cap_j = self.civ_city_is_cap[:, r, j]
-                pin = cact & cap_j
-                if bool(pin.any()):
-                    self.civ_city_loyalty[:, r, j] = torch.where(pin, torch.full_like(self.civ_city_loyalty[:, r, j], 100.0), self.civ_city_loyalty[:, r, j])
-                ncap = cact & ~cap_j
-                if bool(ncap.any()):
-                    lrng = int(rr.get("loyaltyRange", 9))
-                    lscale = float(rr.get("loyaltyScale", 20))
-                    here_j = self.civ_city_center[:, r, j].clamp(min=0)
-                    # Per-SOURCE-seat age factors. Terms are multiples of 0.5,
-                    # so the f64 sum is exact and association-free.
-                    f_own = self._age_factor[self.civ_age[:, r + 1]]
-                    d_own = self.pair_dist[here_j.unsqueeze(1), self.civ_city_center[:, r].clamp(min=0)].to(torch.float64)
-                    own_p = ((lrng + 1 - d_own).clamp(min=0) * self.civ_city_pop[:, r].double() * self.civ_city_alive[:, r].double()).sum(dim=1) * f_own
-                    d_pl = self.pair_dist[here_j.unsqueeze(1), self.site.clamp(min=0)].to(torch.float64)
-                    for_p = ((lrng + 1 - d_pl).clamp(min=0) * self.pop.double() * self.alive.double()).sum(dim=1) * self._age_factor[self.civ_age[:, 0]]
-                    others = self.alive.any(dim=1)
-                    oth = [r2 for r2 in range(self.R) if r2 != r]
-                    if oth:
-                        ctr_o = self.civ_city_center[:, oth].reshape(B, -1)
-                        alive_o = self.civ_city_alive[:, oth].reshape(B, -1)
-                        d_o = self.pair_dist[here_j.unsqueeze(1), ctr_o.clamp(min=0)].to(torch.float64)
-                        sub_o = ((lrng + 1 - d_o).clamp(min=0) * self.civ_city_pop[:, oth].reshape(B, -1).double() * alive_o.double()).reshape(B, len(oth), self.RC).sum(dim=2)
-                        f_oth = self._age_factor[self.civ_age[:, [r2 + 1 for r2 in oth]]]  # [B, len(oth)]
-                        for_p = for_p + (sub_o * f_oth).sum(dim=1)
-                        others = others | alive_o.any(dim=1)
-                    tot_p = own_p + for_p
-                    press = torch.where(tot_p > 0, lscale * (own_p - for_p) / tot_p.clamp(min=1e-9), torch.zeros_like(tot_p))
-                    delta_l = press + self._loyalty_amenity[tier_idx[:, j].clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)].double() + civ_city_gov[:, j].double() * self._gov_loy
-                    upd_l = ncap & others
-                    nxt_l = (self.civ_city_loyalty[:, r, j] + delta_l).clamp(min=0, max=float(rr.get("loyaltyMax", 100)))
-                    self.civ_city_loyalty[:, r, j] = torch.where(upd_l, nxt_l, self.civ_city_loyalty[:, r, j])
-                    civ_city_flip[:, j] = upd_l & (self.civ_city_loyalty[:, r, j] <= 0)
-                # The empire streams, in seatPhase's own order. ASSOCIATION
-                # MATTERS: TS `sciSum += y.science + 0.7*pop` desugars to
-                # sciSum + (y.science + 0.7*pop) — the city term sums FIRST.
-                # (cul_sum + cul) + 0.3*pop is one ulp off and flips completions
-                # when a cost lands inside it. The citizens' term is already
-                # inside the snapshot's science/culture, and inside the amenity
-                # tier with it.
-                # `total.gold` is ALREADY net of the city's upkeep — the walk
-                # subtracts cityMaintenance where computeCityStats does, so
-                # phase.ts adds stats.total.gold straight in.
-                gold_sum = torch.where(cact, gold_sum + total[:, j, 2], gold_sum)
-                faith_sum = torch.where(cact, faith_sum + total[:, j, 5], faith_sum)
-                sci_sum = torch.where(cact, sci_sum + total[:, j, 3], sci_sum)
-                cul_c = torch.where(cact, total[:, j, 4], torch.zeros_like(total[:, j, 4]))
-                cul_sum = torch.where(cact, cul_sum + cul_c, cul_sum)
-                # seatGrowth, then the queue, then borders, then the city's own
-                # defense — four shared bodies, one call each, every seat row.
-                self._seat_city_growth(r + 1, jc, cact, eff[:, j], need[:, j])
-                self._seat_city_produce(r + 1, jc, cact, total[:, j, 1])
-                self._seat_border_growth(r + 1, jc, cact, cul_c)
-                self._seat_city_fire_and_heal(r + 1, jc, cact)
-
-            # Loyalty collapses resolve after the city loop, to the
-            # max-pressure seat (first_argmax over [seat 0, civ 0, civ 1, ...],
-            # so seat 0 wins ties, then civs by id).
-            if bool(civ_city_flip.any()):
-                lrng = int(rr.get("loyaltyRange", 9))
-                # Every slot is walked, slot 0 included: compaction can move a
-                # survivor into slot 0, so slot 0 is not capital-by-
-                # construction. civ_city_flip is only ever set for non-capitals.
-                for j2 in range(self.RC):
-                    fl = civ_city_flip[:, j2] & self.civ_city_alive[:, r, j2]
-                    if not bool(fl.any()):
-                        continue
-                    here_j = self.civ_city_center[:, r, j2].clamp(min=0)
-                    d_pl = self.pair_dist[here_j.unsqueeze(1), self.site.clamp(min=0)].to(torch.float64)
-                    p_pl = ((lrng + 1 - d_pl).clamp(min=0) * self.pop.double() * self.alive.double()).sum(dim=1)
-                    press_all = [p_pl]
-                    for r2 in range(self.R):
-                        if r2 == r:
-                            press_all.append(torch.full_like(p_pl, -1.0))
-                        else:
-                            d_o = self.pair_dist[here_j.unsqueeze(1), self.civ_city_center[:, r2].clamp(min=0)].to(torch.float64)
-                            press_all.append(((lrng + 1 - d_o).clamp(min=0) * self.civ_city_pop[:, r2].double() * self.civ_city_alive[:, r2].double()).sum(dim=1))
-                    winner = first_argmax(torch.stack(press_all, dim=1))  # index 0 = seat 0
-                    for b in fl.nonzero(as_tuple=True)[0].tolist():
-                        # `winner` indexes [seat 0, civ 0, civ 1, ...] — already
-                        # the block row. A flip is never a conquest, so it never
-                        # razes and never plunders, whoever receives.
-                        self._transfer_city(b, r + 1, j2, int(winner[b]), conquest=False)
-
-
-            # The seat block's TAIL — banking, upkeep, research, tourism,
-            # favor, grievances, the great-people and belief races: ONE body,
-            # every seat row, on this row's own city sums.
-            self._seat_research_tail(r + 1, active, sci_sum, cul_sum, gold_sum, faith_sum)
 
             # Builder verbs and missionary SPREAD verbs ride the wire; their
             # phase.ts call positions are here, builders then missionaries.
@@ -361,6 +203,212 @@ class SimPhase:
         def_e = def_e + self._gen_aura_cs(_def_seat, tt, d_emb | _def_nav).to(def_e.dtype)
         self._city_strike_resolve(strike, tt, d_slot, d_seat, _okm, _okc, is_vet_mil,
                                   atk_cs, def_e, def_hp, row, key)
+
+    def _seat_row(self, row: int) -> torch.Tensor:
+        """ONE seat's turn — the seatPhase loop body, for ANY major seat row
+        (0 = seat 0, r+1 = civ r). Returns the row's `active` mask so the
+        caller can drive its war-or-peace tail.
+
+        In seatPhase order: the war-weariness decay, boost detection,
+        city-state diplomacy and quests, the recorded picks, the gold/faith
+        ladder, trade, the per-city block (loyalty, the empire streams, growth,
+        the queue, border growth, the city's own defense), the loyalty
+        collapses, then the research/upkeep/tourism/great-people tail.
+
+        What the CALLER still owns is the war-or-peace tail: its counters and
+        its driven unit-sequence replay still differ between row 0 and a civ
+        row (the WAR_COLUMN_SEAT residual)."""
+        B, dev = self.B, self.device
+        active = self.civ_alive[:, row] & self.city_alive[:, row].any(dim=1)
+        if not bool(active.any()):
+            # TS's eliminated-actor `continue` — but the record intents are
+            # for THIS turn and must not survive into the next one.
+            self._seat_record_apply(row, active)
+            return active
+        # War weariness SETTLES here: accrual happens per BATTLE as the
+        # fighting resolves, so what is left for the block top is the
+        # decay. The same function every seat calls, on its own row.
+        # civ_pair_war is fixed for the turn by the phase-top declaration pass,
+        # so the "at war with somebody" test inside is stable.
+        self._ww_decay(row, active)
+        # Eurekas/inspirations from this seat — the TS twin runs at the
+        # same point (the seat's block top).
+        self._detect_seat_boosts(row, active)
+        # The CS-diplomacy block sits right after boost detection — the
+        # seatPhase position.
+        self._seat_influence_phase(row, active)
+        # CS quests resolve/issue right after the envoy accrual (the
+        # seatPhase quest block sits at the tail of the same CS block), so
+        # a completed quest's envoy is visible to the levy suzerain test
+        # later this phase.
+        self._seat_quest_phase(row, active)
+        # THE RECORD: tech, civic, envoys, production — one body, every seat
+        # row, at applySeatActionRecord's own position.
+        self._seat_record_apply(row, active)
+        # THE gold/faith block — one body, every seat row.
+        self._seat_buy_ladder(row, active)
+        # The trade creation block sits between the buy block and the
+        # city-loop snapshot — the seatPhase position.
+        self._seat_trade_phase(row, active)
+        # The city-loop snapshot is taken AFTER the buy block (the
+        # [...actor.cities] discipline): a bought-settler newborn acts this
+        # turn (amenity + yields), a queue-completion newborn (founded
+        # inside the loop, later) does not.
+        alive_c = self.city_alive[:, row].clone()
+
+        sci_sum = torch.zeros(B, dtype=torch.float64, device=dev)
+        cul_sum = torch.zeros(B, dtype=torch.float64, device=dev)
+        gold_sum = torch.zeros(B, dtype=torch.float64, device=dev)
+        faith_sum = torch.zeros(B, dtype=torch.float64, device=dev)
+        # THE loop-top stats snapshot — one body, every seat row. Every
+        # column below reads THIS map: yields, amenity tier, effective food
+        # surplus and growth need all freeze here, and nothing inside the
+        # loop refreshes them.
+        total, eff, need, tier_idx = self._seat_city_stats(row)
+        gov = self._seat_governor_seats(row)  # [B, RC]
+        flip = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
+        # One guard sync for the whole economy loop: alive_c is a pre-loop
+        # CLONE (a queue-completion newborn founded inside the loop does not
+        # act this turn — the [...actor.cities] discipline above) and `active`
+        # is a loop-invariant local.
+        cact_all = active.unsqueeze(1) & alive_c  # [B, RC]
+        cact_any_l = cact_all.any(dim=0).tolist()
+        for j in range(self.RC):
+            if not cact_any_l[j]:
+                continue
+            cact = cact_all[:, j]  # post-buy snapshot (a bought settler's city acts this turn)
+            jc = torch.full((B,), j, dtype=torch.long, device=dev)
+            # City loyalty at its loop-top position — one body, every seat row.
+            flip[:, j] = self._seat_city_loyalty(row, jc, cact, tier_idx[:, j], gov[:, j])
+            # The empire streams, in seatPhase's own order. ASSOCIATION
+            # MATTERS: TS `sciSum += y.science + 0.7*pop` desugars to
+            # sciSum + (y.science + 0.7*pop) — the city term sums FIRST.
+            # (cul_sum + cul) + 0.3*pop is one ulp off and flips completions
+            # when a cost lands inside it. The citizens' term is already
+            # inside the snapshot's science/culture, and inside the amenity
+            # tier with it.
+            # `total.gold` is ALREADY net of the city's upkeep — the walk
+            # subtracts cityMaintenance where computeCityStats does, so
+            # phase.ts adds stats.total.gold straight in.
+            gold_sum = torch.where(cact, gold_sum + total[:, j, 2], gold_sum)
+            faith_sum = torch.where(cact, faith_sum + total[:, j, 5], faith_sum)
+            sci_sum = torch.where(cact, sci_sum + total[:, j, 3], sci_sum)
+            cul_c = torch.where(cact, total[:, j, 4], torch.zeros_like(total[:, j, 4]))
+            cul_sum = torch.where(cact, cul_sum + cul_c, cul_sum)
+            # seatGrowth, then the queue, then borders, then the city's own
+            # defense — four shared bodies, one call each, every seat row.
+            self._seat_city_growth(row, jc, cact, eff[:, j], need[:, j])
+            self._seat_city_produce(row, jc, cact, total[:, j, 1])
+            self._seat_border_growth(row, jc, cact, cul_c)
+            self._seat_city_fire_and_heal(row, jc, cact)
+
+        # Loyalty collapses resolve after the city loop — one body, every
+        # seat row.
+        self._seat_loyalty_flips(row, flip)
+        # The seat block's TAIL — banking, upkeep, research, tourism,
+        # favor, grievances, the great-people and belief races: ONE body,
+        # every seat row, on this row's own city sums.
+        self._seat_research_tail(row, active, sci_sum, cul_sum, gold_sum, faith_sum)
+        return active
+
+    def _seat_governor_seats(self, row: int) -> torch.Tensor:
+        """[B, RC] — seat row `row`'s governor-held cities for THIS turn, the
+        loop-top governorPicks mirror. Rank the row's ALIVE cities on QUANTIZED
+        milli loyalty (a raw-f64 ranking is float-association fragile), ties by
+        column index == TS array order (#110), and seat the top
+        governorTitles(civics) of them. Read once per seat block, before any
+        loyalty moves."""
+        dev, B, RC = self.device, self.B, self.RC
+        titles = (self.civ_civics[:, row].sum(dim=1) // self._gov_per).clamp(max=self._gov_max)  # [B]
+        alive = self.city_alive[:, row]
+        q = js_round(self.city_loyalty[:, row] * 1000).long()
+        key = torch.where(alive, q * 256 + torch.arange(RC, device=dev).reshape(1, -1), torch.full_like(q, 1 << 40))
+        rank = torch.empty_like(key)
+        rank.scatter_(1, key.argsort(dim=1, stable=True), torch.arange(RC, device=dev).expand(B, RC))
+        return (rank < titles.unsqueeze(1)) & alive
+
+    def _seat_city_loyalty(self, row: int, col: torch.Tensor, act: torch.Tensor,
+                           tier: torch.Tensor, gov: torch.Tensor) -> torch.Tensor:
+        """applyLoyalty for ONE column of seat row `row`; returns the FLIP mask.
+
+        Loyalty only moves while SOMEBODY ELSE holds a city. A capital pins to
+        loyaltyMax — and only past that guard, which is where applyLoyalty puts
+        it. Everything else takes nearby population pressure scaled per SOURCE
+        seat by that seat's own age factor, plus the amenity term and the
+        governor bonus.
+
+        Pops are read LIVE, which is why this is a per-city body and not a
+        batched pass: cities EARLIER in this seat's loop have already grown,
+        later ones have not, and seats later in the seat loop have not taken
+        their turn at all. Every pressure term is pop x an integer weight and
+        every age factor is a half, so the subtotals are exact and their sum
+        order does not matter."""
+        B, dev, F = self.B, self.device, torch.float64
+        bidx, nrow = self._bidx, 1 + self.R
+        rr = self.rules.seats
+        rng = int(rr.get("loyaltyRange", 9))
+        scale = float(rr.get("loyaltyScale", 20))
+        lmax = float(rr.get("loyaltyMax", 100))
+        # "somebody else holds a city": the majors that EXIST and hold one,
+        # this row excluded.
+        held = self.city_alive[:, :nrow].any(dim=2) & self.civ_alive[:, :nrow]  # [B, 1+R]
+        others = torch.cat((held[:, :row], held[:, row + 1:]), dim=1)
+        others = others.any(dim=1) if others.shape[1] else torch.zeros(B, dtype=torch.bool, device=dev)
+        here = self.city_center[bidx, row, col].clamp(min=0)  # [B]
+        ctr = self.city_center[:, :nrow].reshape(B, -1).clamp(min=0)
+        d = self.pair_dist[here.unsqueeze(1), ctr].to(F)
+        w = ((rng + 1 - d).clamp(min=0)
+             * self.city_pop[:, :nrow].reshape(B, -1).double()
+             * self.city_alive[:, :nrow].reshape(B, -1).double())
+        sub = w.reshape(B, nrow, self.RC).sum(dim=2) * self._age_factor[self.civ_age[:, :nrow]]  # [B, 1+R]
+        own = sub[:, row]
+        keep = torch.ones(nrow, dtype=F, device=dev)
+        keep[row] = 0.0  # own is not foreign; a 0.0 term leaves the sum exact
+        foreign = (sub * keep.reshape(1, -1)).sum(dim=1)
+        tot = own + foreign
+        press = torch.where(tot > 0, scale * (own - foreign) / tot.clamp(min=1e-9), torch.zeros_like(tot))
+        delta = (press
+                 + self._loyalty_amenity[tier.clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)].double()
+                 + gov.double() * self._gov_loy)
+        loy = self.city_loyalty[bidx, row, col]
+        upd = act & others
+        nxt = torch.where(upd, (loy + delta).clamp(min=0, max=lmax), loy)
+        cap = self.city_is_cap[bidx, row, col]
+        self.city_loyalty[bidx, row, col] = torch.where(upd & cap, torch.full_like(nxt, lmax), nxt)
+        return upd & ~cap & (self.city_loyalty[bidx, row, col] <= 0)
+
+    def _seat_loyalty_flips(self, row: int, flip: torch.Tensor) -> None:
+        """flipCity for every column of seat row `row` that hit 0 — resolved
+        AFTER the seat's city loop, the TS defectors-list position.
+
+        The city defects to the major seat exerting the most RAW pressure: no
+        age factor here, which is flipCity's deliberate difference from
+        loyaltyDelta. Its own owner is excluded (a city does not defect to
+        itself) and so is a seat that does not exist; a seat that EXISTS but
+        holds no city still exerts 0 and still beats the sentinel, exactly as
+        the TS scan's `best = -1` does. Ties go to the lowest seat id (the
+        strict-`>` scan == first_argmax).
+
+        Defections resolve in ARRAY order with pressures read LIVE: an earlier
+        transfer moves pops a later one must see."""
+        nrow = 1 + self.R
+        rng = int(self.rules.seats.get("loyaltyRange", 9))
+        for j in range(self.RC):
+            fl = flip[:, j] & self.city_alive[:, row, j]
+            if not bool(fl.any()):
+                continue
+            for b in fl.nonzero(as_tuple=True)[0].tolist():
+                here = int(self.city_center[b, row, j])
+                d = self.pair_dist[here, self.city_center[b, :nrow].reshape(-1).clamp(min=0)].to(torch.float64)
+                w = ((rng + 1 - d).clamp(min=0)
+                     * self.city_pop[b, :nrow].reshape(-1).double()
+                     * self.city_alive[b, :nrow].reshape(-1).double())
+                press = w.reshape(nrow, self.RC).sum(dim=1)
+                press = torch.where(self.civ_alive[b, :nrow], press, torch.full_like(press, -1.0))
+                press[row] = -1.0
+                # A flip is never a conquest, so it never razes and never
+                # plunders, whoever receives.
+                self._transfer_city(b, row, j, int(first_argmax(press.unsqueeze(0))[0]), conquest=False)
 
     def _seat_city_growth(self, row: int, col: torch.Tensor, act: torch.Tensor,
                           eff: torch.Tensor, need: torch.Tensor) -> None:
@@ -915,88 +963,6 @@ class SimPhase:
             self._bel_version += 1  # an enhancer claim moves the belief epoch too
         self.claimed_e_n.add_(eopen.long())
         self.civ_enhancer_done[:, row] = self.civ_enhancer_done[:, row] | eopen
-
-    def _apply_loyalty_and_flips(self, tier_idx: torch.Tensor, pop_before: torch.Tensor) -> None:
-        """Applies seat-0 loyalty inside the city loop, then the deferred flips.
-
-        Mirrors applyLoyalty. City c's own-pressure mixes pops: cities EARLIER
-        in the loop already grew this turn, later ones did not. Capitals pin to
-        100. A city at 0 defects to the highest-pressure civ (ties → lowest
-        id)."""
-        if self.R == 0:
-            return
-        B, C, dev = self.B, self.RC, self.device
-        any_rc = (self.civ_city_alive.any(dim=2) & self.civ_only_alive).any(dim=1)
-        if not bool(any_rc.any()):
-            return
-        rng = int(self.rules.seats.get("loyaltyRange", 9))
-        scale = float(self.rules.seats.get("loyaltyScale", 20))
-        sitec = self.site.clamp(min=0)
-        d_cc = self.pair_dist[sitec.unsqueeze(2), sitec.unsqueeze(1)].to(self.dtype)
-        # d_cc[b, c, c'] = dist(site[c], site[c']) — weight by source c'
-        w = (rng + 1 - d_cc).clamp(min=0)
-        # "Earlier in the loop" is ARRAY order — column order under
-        # append+reclaim (#110): an earlier column is an array-earlier city.
-        cols_e = torch.arange(C, device=dev)
-        earlier = (cols_e.reshape(1, C, 1) > cols_e.reshape(1, 1, C)).expand(B, C, C)  # [B, c, c'] → c' earlier than c
-        pop_mix = torch.where(earlier, self.pop.unsqueeze(1).to(self.dtype), pop_before.unsqueeze(1).to(self.dtype))
-        # Contributions scale by the SOURCE seat's age factor (the loyaltyDelta
-        # mirror: per-seat subtotal × factor — halves-exact in this dtype, so
-        # grouping stays association-free).
-        f_age = self._age_factor[self.civ_age].to(self.dtype)  # [B, 1+R]
-        own = (w * pop_mix * self.alive.unsqueeze(1).to(self.dtype)).sum(dim=2) * f_age[:, 0].unsqueeze(1)
-        # foreign pressure from civ-seat cities, per SOURCE civ × its factor
-        civ_city_flat = self.civ_city_center.reshape(B, -1).clamp(min=0)
-        civ_city_live = self.civ_city_alive.reshape(B, -1)
-        d_cr = self.pair_dist[sitec.unsqueeze(2), civ_city_flat.unsqueeze(1)].to(self.dtype)
-        wf = (rng + 1 - d_cr).clamp(min=0)
-        foreign_r = (
-            wf.reshape(B, C, self.R, self.RC)
-            * self.civ_city_pop.reshape(B, 1, self.R, self.RC).to(self.dtype)
-            * self.civ_city_alive.reshape(B, 1, self.R, self.RC).to(self.dtype)
-        ).sum(dim=3)  # [B, C, R]
-        foreign = (foreign_r * f_age[:, 1 : 1 + self.R].unsqueeze(1)).sum(dim=2)
-        tot = own + foreign
-        pressure = torch.where(tot > 0, scale * (own - foreign) / tot.clamp(min=1e-9), torch.zeros_like(tot))
-        # Seat 0's governor seats — the seatPhase governorPicks mirror. Rank
-        # alive cities on QUANTIZED milli loyalty (raw-f64 ranking is
-        # float-association-fragile), ties by TS array position = column
-        # order (#110). Pick from the PRE-update snapshot.
-        titles_p = (self.civics.sum(dim=1) // self._gov_per).clamp(max=self._gov_max)  # [B]
-        q_loy = js_round(self.loyalty * 1000).long()
-        gov_key = torch.where(self.alive, q_loy * 256 + cols_e, torch.full_like(q_loy, 1 << 40))
-        gov_rank = torch.empty_like(gov_key)
-        gov_rank.scatter_(1, gov_key.argsort(dim=1, stable=True), torch.arange(C, device=dev).expand(B, C))
-        gov_b = (gov_rank < titles_p.unsqueeze(1)) & self.alive
-        delta = pressure + self._loyalty_amenity[tier_idx.clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)] + gov_b.to(self.dtype) * self._gov_loy
-        upd = self.alive & any_rc.unsqueeze(1)
-        nxt = (self.loyalty + delta).clamp(min=0, max=float(self.rules.seats.get("loyaltyMax", 100)))
-        self.loyalty.copy_(torch.where(upd, nxt, self.loyalty))
-        # pin/guard by IDENTITY (isCapital), not column 0
-        cap_pin = upd & self.is_cap
-        self.loyalty.copy_(torch.where(cap_pin, torch.full_like(self.loyalty, 100.0), self.loyalty))
-        flip = upd & (self.loyalty <= 0) & ~self.is_cap
-        if not bool(flip.any()):
-            return
-        # Winner per flipping city: the civ with the most pressure (ties →
-        # lowest id; zero pressure still wins over the -1 sentinel).
-        # Defectors resolve in ACQUISITION order (the TS array-order loop) with
-        # pressures read LIVE per defection — an earlier transfer moves pops
-        # that later defections must see.
-        pairs: list[tuple[int, int]] = []
-        for c in range(C):
-            for b in flip[:, c].nonzero(as_tuple=True)[0].tolist():
-                pairs.append((b, c))
-        for b, c in sorted(pairs):
-            site_c = int(self.site[b, c])
-            d_rc1 = self.pair_dist[site_c, civ_city_flat[b].clamp(min=0)].to(self.dtype)
-            wr = (rng + 1 - d_rc1).clamp(min=0) * self.civ_city_pop[b].reshape(-1).to(self.dtype) * civ_city_live[b].to(self.dtype)
-            press_r = wr.reshape(self.R if self.R > 0 else 1, self.RC).sum(dim=1)
-            press_r = torch.where(self.civ_only_alive[b], press_r, torch.full_like(press_r, -1.0))
-            winner = int(first_argmax(press_r.unsqueeze(0))[0])  # ties -> lowest civ id (the strict-`>` scan)
-            self._transfer_city(b, 0, c, winner + 1, conquest=False)  # civ w is block row w+1
-
-    # --- one full turn -----------------------------------------------------------
 
     #: Every per-slot plane a captured unit must carry. One list, so a NEW
     #: plane cannot be silently forgotten by a capture. Ownership-reset planes

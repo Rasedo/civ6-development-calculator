@@ -7,7 +7,7 @@ capital immunity ride inside the loyalty loops).
 
 Every poke builds a BatchSim from a fixture, forces state in-memory, then
 drives the exact engine twin (_transfer_city, the step-tail era boundary,
-_apply_loyalty_and_flips, _seat_phase). EVERY constant comes from rules.json
+_seat_city_loyalty/_seat_loyalty_flips, _seat_phase). EVERY constant comes from rules.json
 through the engine's own loaders (sim._era_len/_era_dark/_era_gold/_era_pts/
 _gov_per/_gov_max/_gov_loy/_age_factor) — nothing is hardcoded.
 
@@ -26,7 +26,7 @@ Covered:
   d. Governor pick: titles = min(govMax, civics//perTitle) sit in the LOWEST-
      loyalty alive cities (+GOVERNOR_LOYALTY), ties → lower slot index. The civ
      path via _seat_phase two-run diff (a boundary tie resolves to the lower
-     slot); the seat-0 path via _apply_loyalty_and_flips two-run diff.
+     slot); the seat-0 path via the same bodies driven at row 0.
   e. Golden reachability: forcing era_score[0] ≥ goldenT across a boundary
      flips seat 0 to Golden (the axis the scripted gate never reaches) — then
      its OWN-pressure term scales ×1.5 vs Normal.
@@ -71,8 +71,8 @@ def add_seat0_city(sim, col: int, tile: int, pop: int, loy: float) -> None:
 def recon_seat0_next(sim, c: int, tier_idx_c: int, picked: bool) -> float:
     """Closed-form applyLoyalty for seat-0 city c: every source contribution
     scaled by its seat's age factor, then pressure + amenity + governor,
-    clamped. Matches _apply_loyalty_and_flips when pop_before == pop, which is
-    where its pop_mix collapses to pop."""
+    clamped. The engine twin is _seat_city_loyalty, which reads the same LIVE
+    pops this reconstruction does."""
     rng = int(sim.rules.seats.get("loyaltyRange", 9))
     scale = float(sim.rules.seats.get("loyaltyScale", 20))
     af = sim._age_factor.tolist()
@@ -100,6 +100,22 @@ def recon_seat0_next(sim, c: int, tier_idx_c: int, picked: bool) -> float:
     if bool(sim.is_cap[0, c]):
         return 100.0
     return max(0.0, min(100.0, float(sim.loyalty[0, c]) + press + amen + gov))
+
+
+def apply_loyalty_row(sim, tier, row: int = 0) -> None:
+    """The seat block's loyalty pass for one seat row, with an explicit amenity
+    TIER map: the loop-top governor seats, then applyLoyalty per living column
+    in array order (pops read live, the engine's own order), then the flips.
+    Exactly what _seat_row does around _seat_city_loyalty."""
+    gov = sim._seat_governor_seats(row)
+    flip = torch.zeros(sim.B, sim.RC, dtype=torch.bool)
+    for j in range(sim.RC):
+        act = sim.city_alive[:, row, j]
+        if not bool(act.any()):
+            continue
+        jc = torch.full((sim.B,), j, dtype=torch.long)
+        flip[:, j] = sim._seat_city_loyalty(row, jc, act, tier[:, j], gov[:, j])
+    sim._seat_loyalty_flips(row, flip)
 
 
 def two_city_setup(rules, path):
@@ -197,7 +213,6 @@ def poke_age_pressure(rules, path):
     OWN factor — every term is a multiple of ½ (exact f64)."""
     sim, cols = two_city_setup(rules, path)
     tier = torch.zeros(sim.B, sim.RC, dtype=torch.long)
-    pop_before = sim.pop.clone()
     snap = sim.snapshot()
     combos = [(1, 1, 1), (0, 1, 1), (2, 1, 1), (1, 0, 0), (1, 2, 2)]
     for combo in combos:
@@ -205,7 +220,7 @@ def poke_age_pressure(rules, path):
         for i in range(1 + sim.R):
             sim.civ_age[0, i] = combo[i] if i < len(combo) else 1
         exp = {c: recon_seat0_next(sim, c, 0, False) for c in range(sim.RC) if bool(sim.alive[0, c])}
-        sim._apply_loyalty_and_flips(tier, pop_before)
+        apply_loyalty_row(sim, tier)
         for c in exp:
             got = float(sim.loyalty[0, c])
             assert q(exp[c]) == q(got), f"age {combo} city {c}: recon {exp[c]:.5f} != engine {got:.5f}"
@@ -266,16 +281,15 @@ def poke_governor_seat0(rules, path):
     city; two-run diff (titles 1 vs 0) isolates the +GOVERNOR_LOYALTY."""
     sim, cols = two_city_setup(rules, path)  # loyalties 55, 59; capital 100
     tier = torch.zeros(sim.B, sim.RC, dtype=torch.long)
-    pop_before = sim.pop.clone()
     gov = sim._gov_loy
     weakest = min(cols, key=lambda c: (q(float(sim.loyalty[0, c])), c))  # ties by array position = column (#110)
     sim.civics[0, : sim._gov_per] = True  # titles 1
     snap = sim.snapshot()
-    sim._apply_loyalty_and_flips(tier, pop_before)
+    apply_loyalty_row(sim, tier)
     with_gov = {c: float(sim.loyalty[0, c]) for c in range(sim.RC) if bool(sim.alive[0, c])}
     sim.restore(snap)
     sim.civics[:] = False  # titles 0
-    sim._apply_loyalty_and_flips(tier, pop_before)
+    apply_loyalty_row(sim, tier)
     no_gov = {c: float(sim.loyalty[0, c]) for c in with_gov}
     for c in with_gov:
         d = with_gov[c] - no_gov[c]
@@ -310,16 +324,15 @@ def poke_seat0_golden(rules, path):
     # confirm the engine matches Golden exactly (own term × af[2]=1.5).
     sim2, cols = two_city_setup(rules, path)
     tier = torch.zeros(sim2.B, sim2.RC, dtype=torch.long)
-    pop_before = sim2.pop.clone()
     snap = sim2.snapshot()
     sim2.civ_age[0, 0] = 1
     exp_norm = {c: recon_seat0_next(sim2, c, 0, False) for c in cols}
-    sim2._apply_loyalty_and_flips(tier, pop_before)
+    apply_loyalty_row(sim2, tier)
     got_norm = {c: float(sim2.loyalty[0, c]) for c in cols}
     sim2.restore(snap)
     sim2.civ_age[0, 0] = 2  # seat 0 Golden
     exp_gold = {c: recon_seat0_next(sim2, c, 0, False) for c in cols}
-    sim2._apply_loyalty_and_flips(tier, pop_before)
+    apply_loyalty_row(sim2, tier)
     got_gold = {c: float(sim2.loyalty[0, c]) for c in cols}
     af = sim2._age_factor.tolist()
     for c in cols:
@@ -332,8 +345,8 @@ def poke_seat0_golden(rules, path):
 
 def poke_capital_immunity(rules, path):
     """f. A capital that ranks LOWEST (so it IS governor-picked) still pins at
-    LOYALTY_MAX — on both seat families (the civ path in _seat_phase, seat 0 in
-    _apply_loyalty_and_flips)."""
+    LOYALTY_MAX — on both seat families (the civ path through _seat_phase,
+    seat 0 through the same loyalty bodies driven at row 0)."""
     lmax = float(rules.seats.get("loyaltyMax", 100))
     # a civ capital
     sim = build(rules, path)
@@ -352,7 +365,7 @@ def poke_capital_immunity(rules, path):
     sim2.loyalty[0, pcap] = 5.0
     sim2.civics[0, : sim2._gov_per] = True
     tier = torch.zeros(sim2.B, sim2.RC, dtype=torch.long)
-    sim2._apply_loyalty_and_flips(tier, sim2.pop.clone())
+    apply_loyalty_row(sim2, tier)
     assert float(sim2.loyalty[0, pcap]) == lmax, f"a governor-picked seat-0 capital must pin at {lmax}"
     print(f"  f capital immunity OK (governor-picked capitals pin at {lmax}, both engines)")
 
