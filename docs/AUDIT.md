@@ -208,6 +208,30 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   differently (no such pair exists in the catalog today — Ruhr is
   production, Big Ben gold; a third would make it live).
 
+- **A-28. Specialists were a GPU-ONLY decision — DELETED 2026-08-14.**
+  Found in the same term-by-term read as A-27 slice 4, and the sharpest
+  reminder yet that a comment is not a source: `_civ_city_specialists`
+  opened with *"TS merges open specialist slots into the SAME ranking
+  as the tiles and takes the top population"*, and the rules exporter
+  shipped `specialistYields` under *"the GPU merges these into its
+  worked-tile ranking so opponents assign specialists exactly as TS
+  does"*. TS does no such thing. `assignWorkedTiles` ranks
+  `workableTiles` only; `effectiveSpecialists` reads
+  `city.specialists`, which ONLY `setSpecialists` — a UI verb — ever
+  writes, so it is `{}` in every simulated game for every seat. The
+  GPU was displacing worked tiles with slots whenever a slot's
+  focus-weighted score beat the marginal tile: reachable at any
+  Industrial Zone / Commercial Hub / Harbor (score 4) in a city
+  working desert or tundra, and CERTAIN once a city's pop exceeds its
+  owned workable tiles (the displaced key is then -1e18). Deleted
+  rather than mirrored into TS: assigning a citizen is a CHOICE, and
+  after #102 neither engine takes a choice without a wire record —
+  the same ruling #98/#103 applied to envoys and to gold/faith. The
+  greedy, `_spec_yields`, the `specialist_yields` rules field and the
+  export key are all gone; TS keeps the manual verb and its tests.
+  TO REOPEN THE MECHANIC: a wire column, beside #83's wonders and
+  #97's district placement — not an engine rule.
+
 ## B. Fidelity vs real Civ 6 — open residuals
 
 - **B-17r. Encampment:** ranged-vs-district strikes are out of scope

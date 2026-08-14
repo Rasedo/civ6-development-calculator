@@ -15,7 +15,7 @@ import type { ImprovementId } from '../core/types';
 import { GENERAL_AURA_CS, GENERAL_AURA_RANGE, BARB_SCOUT_OPENER_LIVE } from '../core/combat';
 import { GENERAL_AURA_MP } from '../core/aura'; // #70/S3 (B-8)
 import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_BUILDINGS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_YIELD, CITY_STATE_MAX_HP, CITY_STATE_MEET_RANGE, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
-import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_CULTURE, ARTIFACT_TOURISM, SPECIALIST_YIELDS } from '../data/greatPeople';
+import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_CULTURE, ARTIFACT_TOURISM } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, type BeliefEffects } from '../data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -768,13 +768,9 @@ export function buildRules() {
     // (-1 = none); adjacency `src` indexes ADJ_SRC (static: mountain/rainforest/
     // woods/reef/naturalWonder/river/seaResource; dynamic: builtWonder/district/
     // cityCenter/harbor/mineOrQuarry). Cost is flat in this model.
-    // A-22 (2026-07-27): the SPECIALIST yield per district, parallel to
-    // `districts` — 6 columns in YIELD_KEYS order, all-zero for a district with
-    // no specialist row. The GPU merges these into its worked-tile ranking so
-    // opponents assign specialists exactly as TS does.
-    specialistYields: PLACEABLE_DISTRICTS.map((id) =>
-      YIELD_KEYS.map((k) => (SPECIALIST_YIELDS as any)[id]?.[k] ?? 0),
-    ),
+    // Specialist yields do NOT ship: assigning a citizen to a district slot is
+    // a manual verb (setSpecialists), nothing in the turn loop writes
+    // city.specialists, so every citizen works a tile on both engines.
     districts: PLACEABLE_DISTRICTS.map((id, idx) => {
       const d = DISTRICTS[id];
       return {

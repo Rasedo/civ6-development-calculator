@@ -2351,17 +2351,12 @@ class SimEconomy:
         # topk picks the identical set in the identical order.
         key = torch.where(valid, s * 1e6 - tiles.double(), torch.tensor(-1e18, dtype=torch.float64, device=self.device))
         top_vals, top_idx = key.topk(M, dim=2)
-        # The batched twin of the specialist merge — same predicate, applied
-        # per city column so the two paths cannot drift.
-        _ns_all = torch.zeros(B, RC, dtype=torch.long, device=self.device)
-        _sa_all = torch.zeros(B, RC, 6, dtype=torch.float64, device=self.device)
-        for _j in range(RC):
-            _n1, _a1 = self._civ_city_specialists(r, _j, top_vals[:, _j], self.civ_city_pop[:, r, _j])
-            _ns_all[:, _j] = _n1
-            _sa_all[:, _j] = _a1
+        # No specialists: assigning a citizen to a district slot is a manual
+        # act on both engines (setSpecialists is a UI verb; nothing in the turn
+        # loop writes city.specialists), so every citizen works a tile.
         take = (
             torch.arange(M, device=self.device).reshape(1, 1, M)
-            < (self.civ_city_pop[:, r] - _ns_all).clamp(min=0).unsqueeze(2)
+            < self.civ_city_pop[:, r].unsqueeze(2)
         ) & (top_vals > -1e17)
         f_sel = f.gather(2, top_idx) * take.double()
         p_sel = p.gather(2, top_idx) * take.double()
@@ -2391,19 +2386,19 @@ class SimEconomy:
             c_go = c_go + featC[:, :, 2]
             c_fa = c_fa + featC[:, :, 5]
         if self._dyadic_fp:
-            food = cf + f_sel.sum(dim=2) + _sa_all[:, :, 0]
-            prod = cp + p_sel.sum(dim=2) + _sa_all[:, :, 1]
-            sci = c_sc + sc_sel.sum(dim=2) + _sa_all[:, :, 3]
-            cul = c_cu + cu_sel.sum(dim=2) + _sa_all[:, :, 4]
-            gold = c_go + go_sel.sum(dim=2) + _sa_all[:, :, 2]
-            faith = c_fa + fa_sel.sum(dim=2) + _sa_all[:, :, 5]
+            food = cf + f_sel.sum(dim=2)
+            prod = cp + p_sel.sum(dim=2)
+            sci = c_sc + sc_sel.sum(dim=2)
+            cul = c_cu + cu_sel.sum(dim=2)
+            gold = c_go + go_sel.sum(dim=2)
+            faith = c_fa + fa_sel.sum(dim=2)
         else:
-            food = cf + _sa_all[:, :, 0]
-            prod = cp + _sa_all[:, :, 1]
-            sci = c_sc + _sa_all[:, :, 3]
-            gold = c_go + _sa_all[:, :, 2]
-            faith = c_fa + _sa_all[:, :, 5]
-            cul = c_cu + _sa_all[:, :, 4]
+            food = cf
+            prod = cp
+            sci = c_sc
+            gold = c_go
+            faith = c_fa
+            cul = c_cu
             for m in range(M):  # sequential adds mirror the per-j (TS) loop's rounding
                 food = food + f_sel[:, :, m]
                 prod = prod + p_sel[:, :, m]

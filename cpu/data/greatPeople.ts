@@ -369,7 +369,14 @@ export const SPECIALIST_YIELDS: Partial<Record<DistrictId, Partial<Record<'food'
   // citizen specialist for the Encampment — this is the model stylization, a
   // production/gold garrison yield consistent with the district's character).
   // Data-driven: citySpecialistSlots keys off SPECIALIST_YIELDS, so this row
-  // is the whole change. Specialists are never assigned in the scripted gate
-  // (setSpecialists is a manual/UI action), so this is inert for parity.
+  // is the whole change.
+  //
+  // THIS WHOLE TABLE IS UI-ONLY. setSpecialists is a manual verb and nothing
+  // in the turn loop writes city.specialists, so effectiveSpecialists is empty
+  // in every simulated game and every citizen works a tile. The table is NOT
+  // exported to the GPU: it once was, and the GPU auto-assigned slots off it
+  // by a greedy that TS has no counterpart for — a decision no seat made
+  // (deleted 2026-08-14, AUDIT A-28). Turning specialists into a real choice
+  // means a WIRE column, not an engine rule.
   ENCAMPMENT: { production: 1, gold: 1 },
 };

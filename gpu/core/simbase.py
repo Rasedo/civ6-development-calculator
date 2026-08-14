@@ -102,7 +102,6 @@ class Rules:
     projects: dict  # {rows: [{d, y, g}], yieldFraction, gppFraction} in data order
     wonders: dict  # {rows: [{cost, ut, uc, cy, growAll, petra, mult, adjD, adjR}], fpFid} in data order
     improvements: dict  # FARM food/housing, builder roster idx, hillFarms civic
-    specialist_yields: list  # per-district specialist yields [nD, 6]
     districts: list  # catalog [{id, idx, cost, adjYield, adjacency, housing, ...}]
     governments: list  # [{id, tier, unlockCivic, slots:[m,e,d,w], cityYields[6], capitalYields[6]}] table order
     policies: list  # [{id, kind, unlockCivic, cityYields[6], capitalYields[6]}] table order
@@ -181,7 +180,6 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         projects=r.get("projects", {}),
         wonders=r.get("wonders", {}),
         improvements=r.get("improvements", {}),
-        specialist_yields=r.get("specialistYields", []),
         districts=r.get("districts", []),
         governments=r.get("governments", []),
         policies=r.get("policies", []),

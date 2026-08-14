@@ -1612,56 +1612,6 @@ class SimSeats:
         breq = self._b_req_district  # [NB]
         return pil[..., breq.clamp(min=0)] & (breq >= 0)  # [..., NB]
 
-    def _civ_city_specialists(self, r: int, j: int, top_vals: torch.Tensor, pop: torch.Tensor):
-        """(nSpec [B], yields [B, 6]) for civ r's city j.
-
-        Open slots per district = that city's buildings belonging to it, and
-        the district must be registered, COMPLETE and unpillaged. Each
-        slot is scored with the same `focus_base` weighting the tile ranking
-        uses, so the two are directly comparable; slots are consumed in
-        score-descending district order (ties by district index), exactly the
-        order TS sorts them in."""
-        nD = self._spec_yields.shape[0]
-        B, dev = self.B, self.device
-        nspec = torch.zeros(B, dtype=torch.long, device=dev)
-        add = torch.zeros(B, 6, dtype=torch.float64, device=dev)
-        if nD == 0 or self.civ_city_bldg.shape[3] == 0:
-            return nspec, add
-        # `sc_d` and the district ORDER depend only on the rules, and this runs
-        # hundreds of times per turn, so both are cached rather than re-sorted
-        # per call. Identical values either way, so the result is bit-exact.
-        cache = getattr(self, "_spec_order_cache", None)
-        if cache is None:
-            w = self.rules_dev.focus_base.double()
-            sc_d = (self._spec_yields.double() * w.reshape(1, 6)).sum(dim=1)  # [nD]
-            order = sorted(range(nD), key=lambda d: (-float(sc_d[d]), d))
-            order = [d for d in order if float(sc_d[d]) > 0.0]
-            cache = (sc_d, order)
-            self._spec_order_cache = cache
-        sc_d, order = cache
-        dt = self.civ_city_dist_tile[:, r, j]  # [B, nD]
-        live = (
-            (dt >= 0)
-            & self.district_complete.gather(1, dt.clamp(min=0))
-            & ~self.district_pillaged.gather(1, dt.clamp(min=0))
-        )
-        nb = self.civ_city_bldg.shape[3]
-        req = self._b_req_district[:nb]
-        kkm = top_vals.shape[1]
-        for d in order:  # pre-filtered to sc_d > 0 by the cache above
-            cnt = (self.civ_city_bldg[:, r, j] & (req == d).unsqueeze(0)).sum(dim=1) * live[:, d].long()
-            if not bool((cnt > 0).any()):
-                continue
-            for _k in range(int(cnt.max().item())):
-                idx = (pop - nspec - 1).clamp(min=0, max=max(kkm - 1, 0))
-                t_key = top_vals.gather(1, idx.unsqueeze(1)).squeeze(1)
-                # no tile left to displace -> that slot's civ is -1e18
-                t_key = torch.where((pop - nspec - 1) < 0, torch.full_like(t_key, -1e18), t_key)
-                cond = (_k < cnt) & (nspec < pop) & ((sc_d[d] * 1e6 - float(self.T)) > t_key)
-                nspec = nspec + cond.long()
-                add = add + cond.double().unsqueeze(1) * self._spec_yields[d].double().unsqueeze(0)
-        return nspec, add
-
     def _seat_city_yields(self, r: int, j: int, mask: torch.Tensor, amen_yf: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """The computeCityStats twin for a civ seat — the real citizen path under
         defaultModifiers. Candidates = owned, citizen-workable (water yes,
@@ -1740,15 +1690,10 @@ class SimSeats:
         key = torch.where(valid, s * 1e6 - tiles.double(), torch.tensor(-1e18, dtype=torch.float64, device=self.device))
         kk = M  # no pop cap — a city's pop may exceed the window's tile count
         top_vals, top_idx = key.topk(kk, dim=1)
-        # SPECIALISTS. TS merges open specialist slots
-        # into the SAME ranking as the tiles and takes the top `population`.
-        # Equivalent (and cheaper here): count how many slots outrank the tile
-        # they would displace, shrink the tile take by that many, and add their
-        # yields. Ties go to TILES because a slot's tie index (>= T) always
-        # exceeds any tile index in `s * 1e6 - tileIndex`.
-        _pop_j = self.civ_city_pop[:, r, j]
-        _nspec, _spec_add = self._civ_city_specialists(r, j, top_vals, _pop_j)
-        take = (torch.arange(kk, device=self.device).unsqueeze(0) < (_pop_j - _nspec).clamp(min=0).unsqueeze(1)) & (top_vals > -1e17)
+        # No specialists: assigning a citizen to a district slot is a manual
+        # act on both engines (setSpecialists is a UI verb; nothing in the turn
+        # loop writes city.specialists), so every citizen works a tile.
+        take = (torch.arange(kk, device=self.device).unsqueeze(0) < self.civ_city_pop[:, r, j].unsqueeze(1)) & (top_vals > -1e17)
         f_sel = f.gather(1, top_idx) * take.double()
         p_sel = p.gather(1, top_idx) * take.double()
         # science/culture columns ride the same selection (static
@@ -1798,20 +1743,13 @@ class SimSeats:
             cul = c_cu + cu_sel.sum(dim=1)
             gold = c_go + go_sel.sum(dim=1)
             faith = c_fa + fa_sel.sum(dim=1)
-            # the specialists that displaced tiles pay their yields.
-            food = food + _spec_add[:, 0]
-            prod = prod + _spec_add[:, 1]
-            gold = gold + _spec_add[:, 2]
-            sci = sci + _spec_add[:, 3]
-            cul = cul + _spec_add[:, 4]
-            faith = faith + _spec_add[:, 5]
         else:
-            food = cf + _spec_add[:, 0]
-            prod = cp + _spec_add[:, 1]
-            sci = c_sc + _spec_add[:, 3]
-            gold = c_go + _spec_add[:, 2]
-            faith = c_fa + _spec_add[:, 5]
-            cul = c_cu + _spec_add[:, 4]
+            food = cf
+            prod = cp
+            sci = c_sc
+            gold = c_go
+            faith = c_fa
+            cul = c_cu
             for m in range(kk):  # sequential adds mirror the TS loop's rounding
                 food = food + f_sel[:, m]
                 prod = prod + p_sel[:, m]

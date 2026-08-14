@@ -943,12 +943,6 @@ class SimInit:
         # resources, unreachable in both engines).
         irows = imp.get("rows", [])
         nI = max(len(ids), 1)
-        # Per-district SPECIALIST yields [nD, 6], parallel to the districts
-        # catalog (all-zero where a district has no row).
-        _sy = list(rules.specialist_yields or [])
-        if not _sy:
-            _sy = [[0.0] * 6] * max(len(rules.districts), 1)
-        self._spec_yields = torch.tensor(_sy, dtype=dtype, device=device)  # [nD, 6]
         self._imp_yields = torch.zeros(nI, 6, dtype=dtype, device=device)
         self._imp_housing = torch.zeros(nI, dtype=dtype, device=device)
         self._imp_unlock = torch.full((nI,), -1, dtype=torch.long, device=device)
