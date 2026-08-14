@@ -28,8 +28,8 @@ Covered:
      twin agree column-for-column; housing/amenity wired.
   g. GP accrual: ENGINEER/GENERAL/ARTIST GPP accrue for a seat owning a
      completed IZ/ENCAMPMENT/THEATER_SQUARE (via GP_CLASS_DISTRICT).
-  h. Dtype: the building planes (_b_local_f/_b_regional/_b_worship) and the
-     walk's reg_y/reg_am terms are consistent under dtype=torch.float32.
+  h. Dtype: the building masks (_b_regional/_b_worship) stay bool and the
+     walk's regional terms are consistent under dtype=torch.float32.
 """
 
 from __future__ import annotations
@@ -460,13 +460,13 @@ def poke_gp_district_accrual(rules, rj, path):
 
 
 def poke_float32_dtype(rules, path):
-    """h. The building planes (_b_local_f/_b_regional/_b_worship) and the walk's
-    reg_y/reg_am terms are consistent under a float32 build: 30 turns at
-    dtype=torch.float32 with no dtype-mismatch crash."""
+    """h. The building masks (_b_regional/_b_worship) and the walk's regional
+    terms are consistent under a float32 build: 30 turns at
+    dtype=torch.float32 with no dtype-mismatch crash. The walk itself is f64
+    on every row and casts on return, so it carries no dtype-following mask."""
     sim = build(rules, path, steps=30, dtype=torch.float32)
-    assert sim._b_local_f.dtype == torch.float32, "walk-dtype local-building mask must follow the sim dtype"
     assert sim._b_regional.dtype == torch.bool and sim._b_worship.dtype == torch.bool, "regional/worship masks are bool"
-    # the walk reg_y/reg_am blocks fired during the 30 steps without a crash
+    # the walk's regional blocks fired during the 30 steps without a crash
 
     # The tie-break key (worked-tile pick, _auto_pick) is forced to f64 even in
     # an f32 build, and that CONSTRUCT is what is asserted — not end-to-end

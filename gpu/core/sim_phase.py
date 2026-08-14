@@ -432,14 +432,14 @@ class SimPhase:
             # bit-exact in any shape.
             _gmul_r = self._bel_mul("growth", r + 1) if _rcy_bel else 1.0
 
-            def _g5_hm() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-                maint, housing = self._seat_housing(r + 1)  # THE shared body
+            def _g5_hm() -> tuple[torch.Tensor, torch.Tensor]:
+                housing = self._seat_housing(r + 1)[1]  # THE shared body
                 p64a = self.civ_city_pop[:, r].double()
                 need = torch.floor(15 + 8 * (p64a - 1) + (p64a - 1).clamp(min=0) ** 1.5)
-                return maint, housing, need
+                return housing, need
 
             _h_key = None
-            maint_all = housing_all = need_all = None
+            housing_all = need_all = None
             for j in range(self.RC):
                 if not cact_any_l[j]:
                     continue
@@ -509,15 +509,13 @@ class SimPhase:
                 sci_sum = torch.where(cact, sci_sum + sci, sci_sum)
                 cul_c = cul  # pre-growth pop; feeds civics AND this city's border box
                 cul_sum = torch.where(cact, cul_sum + cul_c, cul_sum)
-                # Net of the city's upkeep — completed districts + buildings
-                # (TS: y.gold - maintenance as ONE term inside the +=).
-                # Batched above; the key check re-runs the batch after a
-                # mid-loop eff/claim event.
+                # `gold_y` is ALREADY net of the city's upkeep — the walk
+                # subtracts cityMaintenance where computeCityStats does, so
+                # phase.ts adds stats.total.gold straight in.
                 if _h_key != (self._eff_version, self._claim_version):
                     _h_key = (self._eff_version, self._claim_version)
-                    maint_all, housing_all, need_all = _g5_hm()
-                maint_j = maint_all[:, j]
-                gold_sum = torch.where(cact, gold_sum + (gold_y - maint_j), gold_sum)
+                    housing_all, need_all = _g5_hm()
+                gold_sum = torch.where(cact, gold_sum + gold_y, gold_sum)
                 faith_sum = torch.where(cact, faith_sum + faith_y, faith_sum)
                 # Growth accounting: true surplus (can be negative), the
                 # unscaled Civ 6 curve, grow SUBTRACTS the need, starvation

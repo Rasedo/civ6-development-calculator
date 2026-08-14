@@ -1223,7 +1223,6 @@ class SimInit:
         self._gen_aura_cache = None  # ((turn,_gen_ver), (land [B,O,T], sea [B,O,T]) | None)
         self._eff_cache: tuple[int, torch.Tensor] | None = None
         self._food_cache: tuple[int, torch.Tensor] | None = None
-        self._score_cache: tuple[int, torch.Tensor] | None = None
         self._nprod_cache: tuple[int, torch.Tensor] | None = None
         # Civ-phase caches, same single-slot-by-key shape as _rcy_globals.
         self._seat_route_cache = None   # ((turn,r,_eff_version,_rp_kill_version), [B,RC]|None)
@@ -1309,7 +1308,6 @@ class SimInit:
         self._b_regional = rules.b_regional.to(device)  # [NB] bool
         self._reg_bidx = [i for i in range(NB) if bool(self._b_regional[i])]
         self._regional_range = int(rules.regional_range)
-        self._b_local_f = (~self._b_regional).to(dtype)  # walk-dtype local-building mask
         # Worship buildings are faith-purchase-only — every production/gold
         # picker masks them; only the worship faith-buy sets their civ_city_bldg bits.
         self._b_worship = rules.b_worship.to(device)  # [NB] bool
@@ -1482,10 +1480,6 @@ class SimInit:
         self._fadjf_cache = None
         self._rcy_cache = None
         self._bld_cache = None
-        # _city_totals walk-scoped sub-term cache (building einsums, district
-        # adjacency/CS addends, upkeep + housing pieces) — keyed on
-        # _eff_version, READ only by the step() walk's lux-frozen recomputes.
-        self._ct_cache = None
         self._arangeNB = torch.arange(NB, device=device)
 
         # Seat 0's t0 units seed the p-pool HERE — after the roster tables and
@@ -1539,12 +1533,10 @@ class SimInit:
         self._eff_version += 1  # fertility/drought just changed under the cache
         self._eff_cache = None
         self._food_cache = None
-        self._score_cache = None
         self._nprod_cache = None
         self._adjd_cache = self._adjc_cache = self._adjh_cache = None
         self._dadj_cache = None
         self._fadjq_cache = self._fadjf_cache = self._rcy_cache = self._bld_cache = None
-        self._ct_cache = None
         # Beliefs/units are back to pristine — bump the counters and drop the
         # civ-phase caches (the bel_add memo is keyed on _bel_version alone).
         self._bel_version += 1
@@ -1789,12 +1781,10 @@ class SimInit:
         self._eff_version += 1
         self._eff_cache = None
         self._food_cache = None
-        self._score_cache = None
         self._nprod_cache = None
         self._adjd_cache = self._adjc_cache = self._adjh_cache = None
         self._dadj_cache = None
         self._fadjq_cache = self._fadjf_cache = self._rcy_cache = self._bld_cache = None
-        self._ct_cache = None
         # The restored snapshot may carry different beliefs/units — bump the
         # counters and drop the civ-phase caches.
         self._bel_version += 1

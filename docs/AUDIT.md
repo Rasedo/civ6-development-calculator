@@ -381,6 +381,83 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   entry, its manifest exclusion and its exporter field are gone
   (146 → 145 planes, 23 → 22 excluded).
 
+- **A-35. ONE `_seat_route_income(row)` — seat 0 gains MESSENGER OF THE
+  GODS, and specialtyDistricts becomes a registry read — 2026-08-14.**
+  `cityTradeYields` is one body in TS for every seat; the GPU had two,
+  and the seat-0 copy was missing the enhancer belief's
+  `tradeReligionYields` on domestic routes. `civ_enhancer[:, 0]` is a
+  live plane (seat 0 claims beliefs through the row-generic body since
+  #73), so seat 0 could hold the Messenger and be paid nothing for it —
+  REACHABLE, and a freeze-lift hunt target. Two more fixes ride along:
+  `specialtyDistricts` walks `city.districts`, so the dest bonus is a
+  DISTRICT REGISTRY read on both the origin row (row 0 scanned tiles)
+  and a foreign international destination (BOTH bodies scanned tiles,
+  O(B·K·T)); and `routeRaidedAt` is ONE predicate — `isBarbSeat(u.seat)
+  || (u.seat !== seat && civsAtWar(u.seat, seat))` — which
+  `_route_raided_near(row, tiles)` asks of the war matrix, whose false
+  diagonal drops the row's own units without a special case. The
+  seat-0/civ hostile-arm split and the `seat0_arm=False` optimisation
+  are gone; the `unitsMode` early-return (row 0's, absent on civ rows)
+  is kept because TS has it. The intl DEST resolves by tileBelongsTo's
+  own pair — the centre tile's `(tile_seat, tile_city)` against the
+  block registry — so one expression serves every dest seat, and the
+  known captured-dest corner (the dest is a TILE, not `(toSeat,
+  toSeatCity)`) now reads identically on every row. `_expire_seat_routes`
+  merged the same way.
+
+- **A-36. THE WALK IS ONE BODY — `_seat_city_walk(row, j)` — 2026-08-14.**
+  `_city_totals` (row 0, `[B, C, 6]`, engine dtype), `_seat_city_yields_all`
+  (civ, six `[B, RC]`, f64) and `_seat_city_yields` (civ, per-j, `[B]`)
+  were three transcriptions of `computeCityStats`. They are now three
+  thin wrappers over one f64 body that takes a seat ROW and an optional
+  single COLUMN. What the merge settled:
+
+  - **BUCKET ORDER.** TS sums `tiles + districts + buildings + citizens
+    + bonuses + trade`, then scales tier → `m.yieldMult` → wonder
+    `cityYieldMult`, then `total.gold -= maintenance`. NEITHER old body
+    had it: row 0 added great works / artifacts / golden-pen / relics
+    (buildings-bucket terms) AFTER citizens, and the civ walk added
+    citizens LAST of everything. `CITIZEN_CULTURE` is 0.3 — the only
+    non-dyadic term in the walk — so those positions are worth a ulp of
+    culture each, and a ulp of culture flips a border-growth `ceil`.
+    Every bucket now accumulates on its own and joins the total once,
+    which is also why `bonuses` is pre-summed rather than added in five
+    pieces.
+  - **MAINTENANCE.** `computeCityStats` returns gold NET of
+    `cityMaintenance`; row 0 subtracted it, the civ walk did not and the
+    economy loop subtracted it afterwards. That left `civ_empire_score`
+    reading PRE-maintenance gold where `empire_score` read post — a real
+    scoring divergence on every civ seat. The walk subtracts it for
+    every row and the loop's `- maint_j` is gone.
+  - **workableTiles.** `tileBelongsTo(t, city)` is `tileSeat(t) ===
+    city.seat && tileCity(t) === city.id` — ONE pair on every row now
+    that `tile_city` holds persistent ids (#110 slice 2). Row 0's
+    `owner == slot` + `dist <= 3` and the civ's `civ_at == r` +
+    `center_at`/`civ_city_at` decomposition both collapse into it; the
+    remaining tests are TS's own four.
+  - **TILE CONTEXT.** Row 0 scored candidates off `_eff_yields()` with
+    farm adjacency added AFTER the weighted sum; TS applies farmAdjTier
+    inside `tileYields`, so it belongs in the food plane before the
+    weight — the civ composition. Row 0 now takes it, along with the
+    f64 focus weights and the `s * 1e6 - index` tie-break.
+  - **NON-DYADIC FALLBACK.** The `not _dyadic_fp` branch summed only
+    food/production/science/culture in BOTH bodies — worked-tile gold
+    and faith were silently dropped. It loops all six now. Dead code in
+    every shipped world (all yields are dyadic), live if one ever is not.
+  - **`districts_on`.** Row 0 summed building yields whatever the
+    district catalog held; the civ walk gated them behind
+    `districts_on`. Building yields are building-keyed, so the gate is
+    gone.
+  - Deleted with the two bodies: `_ct_cache` (row 0's walk-scoped
+    sub-term store, and with it a follower-freshness argument),
+    `_score_cache`, and `_b_local_f`. The walk runs f64 on every row and
+    casts on return, so there is no walk-dtype building mask left.
+
+  KNOWN AND NOT FIXED HERE: the walk calls `_seat_housing(row)` for
+  maintenance while `_city_totals` / `_g5_hm` call it again for housing
+  — two cheap passes, left for #81 rather than a new memo with a new
+  staleness surface.
+
 ## B. Fidelity vs real Civ 6 — open residuals
 
 - **B-17r. Encampment:** ranged-vs-district strikes are out of scope
