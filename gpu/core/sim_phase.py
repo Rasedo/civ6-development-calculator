@@ -411,11 +411,7 @@ class SimPhase:
             # a settler founding only rewrites an all--1 free slot, product
             # term 1.0 either way) drops the cache and the next j recomputes
             # the same expression on the fresh state.
-            gw_cache = None
-            if self._wond_n:
-                wregG = self.civ_city_wonder[:, r]  # [B, RC, nW]
-                compG = (wregG >= 0) & self.built_wonder_complete.gather(1, wregG.clamp(min=0).reshape(B, -1)).reshape_as(wregG)
-                gw_cache = torch.where(compG, self._wond_grow.reshape(1, 1, -1).expand_as(compG).double(), torch.ones_like(compG, dtype=torch.float64)).prod(dim=2).prod(dim=1)
+            gw_cache = self._wonder_growth_mult(self._completed_wonders(r + 1))
             # One guard sync for the whole economy loop. This is exact because
             # alive_c is a pre-loop CLONE (a queue-completion newborn founded
             # inside the loop does not act this turn — the [...civ.cities]
@@ -608,17 +604,19 @@ class SimPhase:
                 # chain like computeCityStats (hf × tier × growthMult). Hoisted
                 # (belief ids are static mid-loop, claims are post-phase);
                 # gmul rebinds below, never mutates in place.
-                gmul = _gmul_r
-                # Hanging Gardens — the civ-wide completed-wonder growth
+                # Hanging Gardens — the seat-wide completed-wonder growth
                 # product, LIVE per city; hoisted per r above and recomputed
-                # when a completion drops the cache.
-                if self._wond_n:
-                    if gw_cache is None:
-                        wregG = self.civ_city_wonder[:, r]  # [B, RC, nW]
-                        compG = (wregG >= 0) & self.built_wonder_complete.gather(1, wregG.clamp(min=0).reshape(B, -1)).reshape_as(wregG)
-                        gw_cache = torch.where(compG, self._wond_grow.reshape(1, 1, -1).expand_as(compG).double(), torch.ones_like(compG, dtype=torch.float64)).prod(dim=2).prod(dim=1)
-                    gmul = gmul * gw_cache
-                self.civ_city_growth[:, r, j] = torch.where(cact, self.civ_city_growth[:, r, j] + torch.where(surplus > 0, surplus * hfac * amen_gf[:, j] * gmul, surplus), self.civ_city_growth[:, r, j])
+                # when a completion drops the cache. It stays a SEPARATE factor
+                # instead of folding into gmul: computeCityStats multiplies
+                # surplus × housing × tier × empireGrowthMult × m.growthMult
+                # left to right, and (X × hg) × mgrowth is not X × (hg × mgrowth).
+                if self._wond_n and gw_cache is None:
+                    gw_cache = self._wonder_growth_mult(self._completed_wonders(r + 1))
+                _gf_j = surplus * hfac * amen_gf[:, j]
+                if gw_cache is not None:
+                    _gf_j = _gf_j * gw_cache
+                _gf_j = _gf_j * _gmul_r
+                self.civ_city_growth[:, r, j] = torch.where(cact, self.civ_city_growth[:, r, j] + torch.where(surplus > 0, _gf_j, surplus), self.civ_city_growth[:, r, j])
                 need = need_all[:, j]  # pre-growth pop == the batch's entry value for this column
                 grow = cact & (self.civ_city_growth[:, r, j] >= need)
                 self.civ_city_pop[:, r, j] = self.civ_city_pop[:, r, j] + grow.long()

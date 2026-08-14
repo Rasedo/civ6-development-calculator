@@ -25,7 +25,7 @@ import { goldenCulturePerDistrict } from './eras';
 import { SPECIALIST_YIELDS, greatWorkCulture, greatWorkTourism, relicFaith, relicTourism, artifactCulture, artifactTourism, GW_PRINTING_TECH } from '../data/greatPeople';
 import { warWearinessPenalty } from '../data/seats';
 import { RESOURCES } from '../../world/resources';
-import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, type AmenityTier } from '../data/constants';
+import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, REGIONAL_RANGE, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, type AmenityTier } from '../data/constants';
 import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf, tileClaimed } from './seats';
 import { wwMax } from './weariness';
 
@@ -381,7 +381,7 @@ export function empireGrowthMult(state: GameState, seat: number): number {
   return mult;
 }
 
-/** Amenities reaching `city` from regional wonders (Colosseum). */
+/** Amenities reaching `city` from regional wonders (Great Bath, Alhambra, Colosseum). */
 function wonderRegionalAmenities(state: GameState, city: City): number {
   const center = state.map.tiles[city.centerIndex];
   let n = 0;
@@ -390,7 +390,10 @@ function wonderRegionalAmenities(state: GameState, city: City): number {
       const amt = w.def.effects?.regionalAmenities;
       if (!amt) continue;
       const t = state.map.tiles[w.tileIndex];
-      if (hexDistance(t.col, t.row, center.col, center.row) <= 6) n += amt;
+      // Measured from the WONDER TILE, not from the city holding it, and on
+      // the same REGIONAL_RANGE regional buildings use — one knob, so the two
+      // reaches cannot drift (the GPU reads `regionalRange` for both).
+      if (hexDistance(t.col, t.row, center.col, center.row) <= REGIONAL_RANGE) n += amt;
     }
   }
   return n;

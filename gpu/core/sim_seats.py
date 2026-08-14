@@ -2114,6 +2114,49 @@ class SimSeats:
             torch.where(mask, faith, z),
         )
 
+    def _completed_wonders(self, row: int) -> torch.Tensor | None:
+        """[B, cols, nW] — completedWonders(state, city) for every column of
+        seat `row`: a registry entry whose tile carries a COMPLETE wonder.
+        cols = C on row 0, RC on a civ row. None when the catalog is empty."""
+        if not self._wond_n:
+            return None
+        cols = self.C if row == 0 else self.RC
+        reg = self.city_wonder[:, row, :cols]
+        return (reg >= 0) & self.built_wonder_complete.gather(1, reg.clamp(min=0).reshape(self.B, -1)).reshape_as(reg)
+
+    def _wonder_growth_mult(self, compw: torch.Tensor | None) -> torch.Tensor | None:
+        """[B] f64 — empireGrowthMult: the product of growthAllMult over every
+        COMPLETE wonder the seat holds (Hanging Gardens 1.15). Empire-wide, so
+        it is identical for every city of the row."""
+        if compw is None:
+            return None
+        return torch.where(
+            compw, self._wond_grow.reshape(1, 1, -1).expand_as(compw).double(), torch.ones_like(compw, dtype=torch.float64)
+        ).prod(dim=2).prod(dim=1)
+
+    def _wonder_regional_amenities(self, row: int, compw: torch.Tensor | None) -> torch.Tensor | None:
+        """[B, cols] f64 — wonderRegionalAmenities: every COMPLETE wonder held
+        by one of this seat's live cities pays its regionalAmenities to each
+        live city centre within regional_range of the WONDER TILE (TS measures
+        from the wonder, not from the city that holds it). No dedup — a wonder
+        is unique world-wide. Joins the TIER balance only; the luxury ranking's
+        baseHave is buildings + regional BUILDINGS (city.ts luxuryAmenities).
+        None when no reaching wonder stands."""
+        if compw is None or not bool((self._wond_regam > 0).any()):
+            return None
+        B, cols = self.B, compw.shape[1]
+        alive = self.city_alive[:, row, :cols]
+        src = compw & alive.unsqueeze(2) & (self._wond_regam > 0).reshape(1, 1, -1)
+        if not bool(src.any()):
+            return None
+        nW = compw.shape[2]
+        st = self.city_wonder[:, row, :cols].clamp(min=0).reshape(B, cols * nW)  # source tiles
+        ctr = self.city_center[:, row, :cols].clamp(min=0)  # [B, cols] receivers
+        dd = self.pair_dist[st.unsqueeze(2), ctr.unsqueeze(1)]  # [B, cols*nW, cols]
+        hit = src.reshape(B, cols * nW).unsqueeze(2) & (dd <= self._regional_range)
+        amt = self._wond_regam.reshape(1, 1, nW).expand(B, cols, nW).reshape(B, cols * nW, 1)
+        return (hit.double() * amt).sum(dim=1) * alive.double()
+
     def _seat_regional(self, r: int) -> tuple[torch.Tensor, torch.Tensor] | None:
         """The regionalEffects twin for a civ seat: each regional building owned
         by one of this civ's cities whose source district (civ_city_dist_tile of the
@@ -2198,6 +2241,11 @@ class SimSeats:
                 1, self.civ_city_dist_tile[:, r].clamp(min=0).reshape(B, -1)).reshape_as(self.civ_city_dist_tile[:, r])).sum(dim=2)
             _, _civ_only_cond_amen = self._cond_house_amen(_g_hid, _g_nd, _civ_city_all, self._civ_city_spec_count(r))
             have = have + _g_amen.unsqueeze(1) + _civ_only_cond_amen
+        # Regional WONDER amenities (Great Bath / Alhambra / Colosseum) join the
+        # TIER balance after the grant — city.ts leaves them out of baseHave.
+        _wregam = self._wonder_regional_amenities(r + 1, self._completed_wonders(r + 1))
+        if _wregam is not None:
+            have = have + _wregam
         if self._seat_has_beliefs(r + 1):
             # River Goddess (river centers) + Zen Meditation (2+ completed
             # specialty districts) join the TIER balance ONLY — the luxury-grant

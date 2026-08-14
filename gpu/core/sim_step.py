@@ -412,6 +412,12 @@ class SimStep:
         # the civ pick key (pickBorderTile's ctx carries the seat's modifiers).
         _bel0 = self._seat_has_beliefs(0)
         gmul0 = self._bel_mul("growth", 0).to(self.dtype) if _bel0 else None
+        # Hanging Gardens (empireGrowthMult) — seat 0's completed-wonder growth
+        # product, the civ loop's gw_cache twin. Wonders reach row 0 only by
+        # CAPTURE (#83), which resolves in the order phase, so hoisting it out
+        # of the city walk reads the same state every column would.
+        _hg = self._wonder_growth_mult(self._completed_wonders(0))
+        hg0 = None if _hg is None else _hg.to(self.dtype)
         _bmul0 = self._bel_mul("border", 0).to(self.dtype) if _bel0 else None
         _featsum0 = self._belief_feat_plane(0).sum(dim=2).to(self.dtype) if _bel0 else None
 
@@ -542,8 +548,11 @@ class SimStep:
             head = housing[bidx, col] - popf_c
             hf = torch.where(head >= 2, 1.0, torch.where(head >= 1, 0.5, 0.25).to(self.dtype)).to(self.dtype)
             _gf_c = surplus * hf * growth_f[bidx, col]
+            if hg0 is not None:
+                _gf_c = _gf_c * hg0  # Hanging Gardens (empireGrowthMult)
             if gmul0 is not None:
-                # left-to-right like computeCityStats: ((s×hf)×tier)×growthMult
+                # left-to-right like computeCityStats:
+                # ((s×hf)×tier)×empireGrowthMult×growthMult
                 _gf_c = _gf_c * gmul0
             effective = torch.where(surplus > 0, _gf_c, surplus)
             self.food_box[bidx, col] = self.food_box[bidx, col] + effective

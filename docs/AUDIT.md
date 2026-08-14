@@ -173,6 +173,40 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   have stolen the first real city's tiles under the id match. `C` now
   comes from `rules.seats.maxCities` (same value, 6) and nothing is
   pre-founded (settler starts, the tests' own t0 contract).
+  **SLICE 4 SHIPPED 2026-08-14 — THE WONDER FAMILY, EVERY SEAT.**
+  Walking `computeCityStats` term by term against `_city_totals`
+  turned up SIX terms the seat-0 walk never had and one neither walk
+  had. Row 0 now pays, at the TS positions: PETRA over the worked set
+  (the centre can never qualify — founding sets its district to
+  CITY_CENTER, so TS's `!t.district` arm is dead there); the completed
+  wonders' flat `cityYields` and the belief `faithPerWonder`, in the
+  buildings bucket; the `cityYieldMult` product, LAST of the three
+  scalings (tier → government yieldMult → wonders) and before
+  maintenance; and `empireGrowthMult` (Hanging Gardens) in the growth
+  chain. Every one of these is REACHABLE on row 0: seat 0 cannot queue
+  a wonder (#83) but INHERITS the whole registry on capture
+  (`sim_orders`' `wonder_reg[b, c_new, ...] = _t` rebuild), so a
+  captured Petra/Ruhr/Big Ben paid on civ rows and nothing on row 0.
+  The seventh, `wonderRegionalAmenities`, was missing from BOTH GPU
+  walks: the rules export shipped `regionalAmenities` and nothing read
+  it, on the stale premise that the Colosseum's Entertainment Complex
+  is unplaceable — true, but the Great Bath (river, cost 90) and the
+  Alhambra (hills + Encampment) reach, and both are buildable. It now
+  joins the tier balance on every row AFTER the luxury grant, because
+  `luxuryAmenities`' baseHave is buildings + regional BUILDINGS only.
+  Three row-generic bodies carry it — `_completed_wonders(row)`,
+  `_wonder_growth_mult`, `_wonder_regional_amenities(row, compw)` —
+  and the civ walk, the civ amenity path and the civ growth loop were
+  repointed at them, so the two rows cannot drift again.
+  ASSOCIATION FIX found by the same walk: the civ growth loop folded
+  Hanging Gardens into `gmul` (`X × (hg × mgrowth)`) where
+  computeCityStats multiplies left to right
+  (`(X × hg) × mgrowth`) — both engines now use the TS order.
+  RESIDUAL: TS applies `cityYieldMult` in `city.wonders` BUILD order,
+  the registry is keyed by wonder id and cannot express that, so two
+  multipliers on the SAME channel in one city can associate
+  differently (no such pair exists in the catalog today — Ruhr is
+  production, Big Ben gold; a third would make it live).
 
 ## B. Fidelity vs real Civ 6 — open residuals
 
@@ -199,13 +233,10 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   border cost). The TS UI verbs now PUSH what they take
   (choosePantheon/foundReligion → the claimed pools), so the pool IS
   the exclusion on both engines. The five belief facts + prophets
-  compare row-0 in the FATAL digest (gap keys removed). NOT yet in
-  the seat-0 walk: the completed-wonder family (`_wond_cy` flat
-  yields, `_wond_grow` growth product, `fpw` Divine Inspiration) —
-  wonders reach seat 0 only by CAPTURE (#83: neither seat can build
-  them), so a captured wonder pays yields on civ rows and NOTHING on
-  row 0; the city-block base unification collapses this with the
-  walks themselves. Until religious-unit production wires up, seat 0
+  compare row-0 in the FATAL digest (gap keys removed). The
+  completed-wonder family that was missing here (`_wond_cy`,
+  `_wond_grow`, `fpw`) SHIPPED 2026-08-14 — see A-27 slice 4.
+  Until religious-unit production wires up, seat 0
   fields no religious units (see A-26). KNOWN LATENT: a
   religious-unit lifecycle drift (recorded when APOSTLE_BUY was still
   a flag) becomes reachable the moment the driver emits faith-buy

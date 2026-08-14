@@ -522,9 +522,11 @@ export function buildRules() {
     // per-tile `wok` bitmask below; LIVE terms (ownership, occupancy,
     // radius, non-bonus resource, adjacent completed district, adjacent
     // un-stripped resource, world uniqueness) are the engine's job.
-    // extraWildcardSlot (Forbidden City) is skipped — no civ-seat government;
-    // regionalAmenities (Colosseum) ships but its district is unplaceable
-    // in scope. Costs are already speed-scaled in the data file.
+    // extraWildcardSlot (Forbidden City) is skipped — no civ-seat government.
+    // regionalAmenities is LIVE on both engines: the Colosseum's Entertainment
+    // Complex is out of the placeable set, but the Great Bath (river) and the
+    // Alhambra (hills + Encampment) both reach. Costs are already speed-scaled
+    // in the data file.
     wonders: {
       // B-20 (#71): the era each wonder first became available (its unlock's
       // era), parallel to `rows` — the GPU indexes it by wonder index.

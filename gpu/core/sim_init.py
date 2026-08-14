@@ -735,6 +735,11 @@ class SimInit:
             self._wond_mult = torch.tensor([w["mult"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW, 6]
             self._wond_grow = torch.tensor([w["growAll"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
             self._wond_petra = torch.tensor([bool(w.get("petra", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)  # [nW]
+            # wonderRegionalAmenities — amenities a COMPLETE wonder pays to every
+            # same-seat city centre within regional_range (Great Bath 1, Alhambra
+            # 2, Colosseum 1). Reaches the tier balance only, never the luxury
+            # ranking's baseHave (city.ts luxuryAmenities).
+            self._wond_regam = torch.tensor([float(w.get("regionalAmenities", 0)) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
             # Per-wonder Great Work slots [nW, 3] in kind order (writing, art,
             # music), additive with the GW_BUILDINGS slots.
             self._wond_gw = torch.tensor([list(w.get("gwslots", [0, 0, 0])) for w in self._wond_rows], dtype=torch.long, device=device)

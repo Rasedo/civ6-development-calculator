@@ -1728,6 +1728,27 @@ class SimEconomy:
             wm_w = (elig.unsqueeze(1).expand(B, C, T).gather(2, top_tile) & take).to(self.dtype).sum(dim=2)
             worked_y[:, :, 0] = worked_y[:, :, 0] + wm_w * has_wm.to(self.dtype)
 
+        # PETRA — +2 food / +2 gold / +1 production on each WORKED
+        # non-floodplain desert tile without a district (petraBonus). Scanned
+        # post-selection beside the Water Mill above; TS also calls
+        # petraBonus(center), but founding sets the centre's district to
+        # CITY_CENTER, so its `!t.district` arm can never fire there.
+        compw = self._completed_wonders(0)  # [B, C, nW] | None — the capture inheritance
+        if compw is not None and bool(compw.any()):
+            hasP = (compw & self._wond_petra.reshape(1, 1, -1)).any(dim=2)  # [B, C]
+            if bool(hasP.any()):
+                st = top_tile.reshape(B, -1)
+                qual = (
+                    self.desert.gather(1, st).reshape(B, C, k)
+                    & (self.feat_id.gather(1, st).reshape(B, C, k) != self._fp_fid)
+                    & (self.district.gather(1, st).reshape(B, C, k) < 0)
+                    & take
+                )
+                nq = (qual & hasP.unsqueeze(2)).sum(dim=2).to(self.dtype)
+                worked_y[:, :, 0] = worked_y[:, :, 0] + 2.0 * nq
+                worked_y[:, :, 2] = worked_y[:, :, 2] + 2.0 * nq
+                worked_y[:, :, 1] = worked_y[:, :, 1] + nq
+
         # Walk-scoped sub-term cache. The step() walk's guard-triggered
         # recomputes (lux is not None — the frozen luxMap path) mostly fire on
         # POP-only changes; every term below that doesn't read pop is then
@@ -1925,6 +1946,14 @@ class SimEconomy:
                 total[:, :, 1] = total[:, :, 1] + hs_adj * self._fol_tab("we", _pcfol).to(self.dtype)
             if ship_add is not None:
                 total[:, :, 1] = total[:, :, 1] + ship_add
+        # Completed WONDERS pay their flat cityYields into the buildings
+        # bucket, and the belief faithPerWonder (Divine Inspiration) pays per
+        # wonder held — the civ walk's pair, unconditional on districts_on
+        # because a wonder is not a district.
+        if compw is not None and bool(compw.any()):
+            total = total + (compw.to(self.dtype) @ self._wond_cy.to(self.dtype))
+            if _pcfol is not None:
+                total[:, :, 5] = total[:, :, 5] + self._fol_tab("fpw", _pcfol).to(self.dtype) * compw.sum(dim=2).to(self.dtype)
         popf = self.pop.to(self.dtype)
         total[:, :, 3] += popf * r.citizen_science
         total[:, :, 4] += popf * r.citizen_culture
@@ -2020,6 +2049,12 @@ class SimEconomy:
         lux_add = self._luxury_amenities(amen_have, amen_need) if lux is None else lux  # improved luxuries
         self._last_lux = lux_add  # the walk freezes this (one luxMap per turn)
         amen_have = amen_have + lux_add
+        # Regional WONDER amenities (Great Bath / Alhambra / Colosseum) — AFTER
+        # the grant: city.ts's baseHave is buildings + regional BUILDINGS only,
+        # so a reaching wonder must not re-rank the luxury distribution.
+        _wregam = self._wonder_regional_amenities(0, compw)
+        if _wregam is not None:
+            amen_have = amen_have + _wregam.to(self.dtype)
         # Follower Zen Meditation — +amenities where the city's completed
         # specialty count meets the belief's min, keyed per-city on the
         # followed religion. Integer terms => the balance sum stays exact.
@@ -2054,6 +2089,17 @@ class SimEconomy:
         # order (tier.yieldFactor, then the m.yieldMult loop).
         if gpc_ymult is not None:
             total = total * gpc_ymult.unsqueeze(1)
+        # WONDER yield multipliers LAST of the three scalings (Ruhr production,
+        # Big Ben gold) — the civ walk's explicit wonder-id-order product. TS
+        # walks city.wonders in BUILD order; the registry is keyed by wonder id
+        # and cannot express that, so two multipliers on the SAME channel in one
+        # city can associate differently (AUDIT A-27 residual).
+        if compw is not None and bool(compw.any()):
+            ones6 = torch.ones(1, 1, 6, dtype=self.dtype, device=dev)
+            wmm = torch.ones(B, C, 6, dtype=self.dtype, device=dev)
+            for wi in range(compw.shape[2]):
+                wmm = wmm * torch.where(compw[:, :, wi : wi + 1], self._wond_mult[wi].reshape(1, 1, 6).to(self.dtype), ones6)
+            total = total * wmm
         maint_b = cc["maint_b"] if cc is not None else torch.einsum("bcn,n->bc", bf, rd.b_maintenance)
         maintenance = self.base_maintenance + maint_b
         if self.districts_on:
@@ -2364,10 +2410,8 @@ class SimEconomy:
                 sci = sci + sc_sel[:, :, m]
                 cul = cul + cu_sel[:, :, m]
         # Petra (the any-j guard is safe: absent cities add exact 0)
-        compw = None
-        if self._wond_n:
-            wreg = self.civ_city_wonder[:, r]  # [B, RC, nW]
-            compw = (wreg >= 0) & self.built_wonder_complete.gather(1, wreg.clamp(min=0).reshape(B, -1)).reshape_as(wreg)
+        compw = self._completed_wonders(r + 1)  # [B, RC, nW] | None — the shared body
+        if compw is not None:
             hasP = (compw & self._wond_petra.reshape(1, 1, -1)).any(dim=2)  # [B, RC]
             if bool(hasP.any()):
                 sel_tiles = tc3.gather(2, top_idx)  # [B, RC, M] the worked tiles
