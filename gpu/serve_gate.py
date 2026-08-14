@@ -136,7 +136,7 @@ def _field_name(i: int, S: int, R: int, C: int, NT: int, NC: int) -> str:
         return f"citystate[{i // ladder.PER_CS}].{i % ladder.PER_CS}"
     i -= ladder.PER_CS * S
     if i < ladder.PER_CIV * R:
-        return f"civ[{i // ladder.PER_CIV}].{i % ladder.PER_CIV}"
+        return f"civ[{i // ladder.PER_CIV}].{ladder.PER_CIV_FIELDS[i % ladder.PER_CIV]}"
     i -= ladder.PER_CIV * R
     if i < ladder.PER_CITY * C:
         return f"city[{i // ladder.PER_CITY}].{i % ladder.PER_CITY}"

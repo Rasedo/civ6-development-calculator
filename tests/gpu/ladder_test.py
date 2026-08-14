@@ -372,14 +372,18 @@ def main() -> None:
           "drift, stop radius, hold vs no-instruction)")
 
     # --- the WAR verb: pick_war ----------------------------------------------
-    # mask [B, 2R] col0 = declare legal, colR = sue legal; ctx carries the DoW
-    # conditions; rng comes from the driver's policy stream.
+    # mask [B, 2R]: column k declares on opponent k, column R+k sues it. The
+    # opponent terms of ctx are [B, R] — one per opponent, so the pick can
+    # CHOOSE; the asker's own terms are [B].
     R2 = 2
     wm = torch.zeros(1, 2 * R2, dtype=torch.bool)
     base_ctx = {
-        "has_cities": torch.tensor([True]), "peace_turns": torch.tensor([25]),
-        "prox": torch.tensor([5]), "civ_only_str": torch.tensor([100.0]),
-        "p_str": torch.tensor([50.0]), "gang": torch.tensor([False]),
+        "has_cities": torch.tensor([[True, True]]),
+        "prox": torch.tensor([[5, 5]]),
+        "opp_str": torch.tensor([[50.0, 50.0]]),
+        "gang": torch.tensor([[False, False]]),
+        "own_str": torch.tensor([100.0]),
+        "peace_turns": torch.tensor([25]),
         "aggression": torch.tensor([0.5]),
     }
     lo_rng = {"dow": torch.tensor([0.01]), "peace": torch.tensor([0.01])}
@@ -392,17 +396,28 @@ def main() -> None:
     # rng above the DoW chance -> no declaration
     assert int(ladder.pick_war(wm, base_ctx, hi_rng)[0]) == -1
     # a failed condition kills it regardless of rng (proximity)
-    far = dict(base_ctx); far["prox"] = torch.tensor([10])
+    far = dict(base_ctx); far["prox"] = torch.tensor([[10, 10]])
     assert int(ladder.pick_war(wm, far, lo_rng)[0]) == -1
     # the gang arm opens the DoW without the strength edge
-    weak = dict(base_ctx); weak["civ_only_str"] = torch.tensor([10.0]); weak["gang"] = torch.tensor([True])
+    weak = dict(base_ctx)
+    weak["opp_str"] = torch.tensor([[500.0, 500.0]]); weak["gang"] = torch.tensor([[True, True]])
     assert int(ladder.pick_war(wm, weak, lo_rng)[0]) == 0
-    # sue: legal + rng under 0.25 -> col R; over -> -1
+    # PER-OPPONENT: opponent 0 is unreachable, opponent 1 is not — the pick
+    # must name column 1, which the single-axis ctx could never express.
+    wm_both = torch.ones(1, 2 * R2, dtype=torch.bool)
+    wm_both[0, R2:] = False  # nobody to sue
+    pick = dict(base_ctx); pick["prox"] = torch.tensor([[10, 5]])
+    assert int(ladder.pick_war(wm_both, pick, lo_rng)[0]) == 1
+    # and the LOWEST legal opponent wins the tie
+    assert int(ladder.pick_war(wm_both, base_ctx, lo_rng)[0]) == 0
+    # sue: legal + rng under 0.25 -> col R+k; over -> -1. The sue arm is
+    # legality-only, so the second opponent is chosen by the mask alone.
     wm2 = torch.zeros(1, 2 * R2, dtype=torch.bool)
-    wm2[0, R2] = True
-    assert int(ladder.pick_war(wm2, base_ctx, lo_rng)[0]) == R2
+    wm2[0, R2 + 1] = True
+    assert int(ladder.pick_war(wm2, base_ctx, lo_rng)[0]) == R2 + 1
     assert int(ladder.pick_war(wm2, base_ctx, hi_rng)[0]) == -1
-    print("  k #93 war verb OK (declare gates + rng arms, gang bypass, sue at 0.25, mask-gated)")
+    print("  k #93 war verb OK (declare gates + rng arms, gang bypass, sue at 0.25, "
+          "per-opponent choice, mask-gated)")
 
     # -- l: purchase priority — BUILDING > SETTLER > UNIT > TILE, one kind --
     can_b = torch.tensor([True, False, False, False, False])

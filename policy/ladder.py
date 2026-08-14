@@ -29,28 +29,41 @@ EMP_FIELDS = (
     "camps", "barbs", "units", "rangedUnits",
 )
 PER_CS = 3    # met, envoys/6, hasQuest
-PER_CIV = 3  # atWar, warTurns/14, cities/6
+# THE OPPONENT BLOCK — one column per OTHER major, in ascending seat order,
+# everything measured from the asker's own point of view. The last four are
+# RAW and unscaled for the same reason the ctx block is: the DoW policy
+# compares them exactly.
+PER_CIV = 7
+PER_CIV_FIELDS = (
+    "atWar",          # 0/1: this seat is at war with that opponent
+    "warTurns",       # THAT war's own clock / 14
+    "cities",         # the opponent's city count / 6
+    "oppStr",         # opponent strength: cities*8 + Σ combat (the DoW site)
+    "prox",           # min pairwise dist(own centres, theirs); 999 = none
+    "gang",           # 0/1: their warmonger >= the gang threshold
+    "oppHasCities",   # 0/1: they hold any city (the DoW precondition)
+)
 ESCALATORS = 3  # district, settler, builder — the only NON-static prices
 # The CTX block: the decide-time counters no mask can express, carried IN
 # the observation so a TS client can render them too. RAW, UNSCALED values
 # on purpose — the ladder compares them exactly (melee < cities*2 …) and a
 # /10-scale round-trip is not bit-stable in f64. Trailing block, so every
 # other offset is fixed.
-CTX_SEAT = 13
+#
+# Everything here is the ASKER'S OWN. What is measured against an opponent
+# lives in the opponent block above, one column per opponent, so a policy can
+# compare them; a seat has one aggression and one peace clock, and those stay.
+CTX_SEAT = 9
 CTX_FIELDS = (
     "nCities",        # alive city count, raw
     "nUnitsWQ",       # live units + QUEUED units (current in the unit range)
     "nMeleeWQ",       # live+queued military, rangedStrength == 0
     "nRangedWQ",      # live+queued military, rangedStrength > 0
-    "unitCap",        # cities*2 + (atWarWithOpponent ? 3 : 1)
-    "oppStr",         # opponent strength: cities*10 + Σ combat (the DoW site)
+    "unitCap",        # cities*2 + (atWarWithAny ? 3 : 1)
     "ownStr",         # floor(ownCities*8 + Σ own combat + 0.5)
-    "prox",           # min pairwise dist(own centres, opponent centres); 999 = none
-    "gang",           # 0/1: opponent warmonger >= the gang threshold
-    "aggression",     # this seat's aggression (0 for seat 0)
-    "peaceTurns",     # turns since last war with the opponent
+    "aggression",     # this seat's aggression
+    "peaceTurns",     # turns this seat has been at war with nobody
     "atWarAny",       # 0/1: at war with ANYONE (the embark/cap arm's term)
-    "oppHasCities",   # 0/1: the opponent holds any city (the DoW precondition)
 )
 PER_CITY = 10  # alive, pop/10, foodBox/need, progress/cost, cultureBox/cost,
               # ownedTiles/20, hp/200, loyalty/100, hasQueue, isCapital
@@ -239,17 +252,23 @@ def pick_war(mask: torch.Tensor, ctx: dict, rng: dict) -> torch.Tensor:
     """[B] long — the WAR verb: declare on an opponent, or sue it for peace.
 
     `mask` is seat_masks['war'] [B, 2R] over `war_targets(row)` — the other
-    majors in ascending seat order, the same layout for every seat. This
-    picker still reads only column 0 and column R, the FIRST such opponent,
-    because `ctx` describes ONE opponent; the per-opponent observation that
-    would let it compare them is #111 s6.
+    majors in ascending seat order, the same layout for every seat. Column k
+    DECLARES on the k-th such opponent (both alive, at peace); column R+k SUES
+    that same one (at war, THAT war's clock >= min, peace gold affordable).
+    Legality is the engine's. Everything else here is POLICY: the sue chance
+    (0.25), the DoW conditions (that opponent has cities, this seat has been
+    at peace > 20 turns, proximity <= 9, their warmonger-gang OR a 1.3x
+    strength edge over THEM) and the DoW chance (0.08 · (0.5 + aggression)).
 
-    Col 0 = DECLARE legal (both alive, at peace), col R = SUE legal (at war,
-    THAT war's clock >= min, peace gold affordable) — LEGALITY, engine-owned.
-    Everything else here is POLICY:
-    the sue chance (0.25), the DoW conditions (the opponent has cities,
-    peaceTurns > 20, proximity <= 9, warmonger-gang OR a 1.3x strength edge)
-    and the DoW chance (0.08 · (0.5 + aggression)).
+    `ctx` mixes two shapes and the distinction is the point: the opponent
+    terms (`opp_str`, `prox`, `gang`, `has_cities`) are [B, R], one column per
+    opponent, so this compares them; the asker's own (`own_str`,
+    `peace_turns`, `aggression`) are [B].
+
+    ONE ROLL each, whatever the field: a seat gets one sue chance and one DoW
+    chance per turn, and the chosen target is the lowest-index opponent that
+    passes. Rolling per opponent would make a seat with four neighbours four
+    times as belligerent as one with a single neighbour.
 
     `rng` carries {'dow': [B], 'peace': [B]} floats from the DRIVER's own
     policy stream. THE ENGINES' SHARED STREAM IS NEVER TOUCHED: a driven
@@ -257,26 +276,26 @@ def pick_war(mask: torch.Tensor, ctx: dict, rng: dict) -> torch.Tensor:
     and both engines' scripted rolls stand down for driven seats, so
     draw-count parity is untouched by construction.
 
-    Returns the war-head column (0 = declare on the first opponent,
-    R = sue that opponent) or -1.
+    Returns the war-head column, or -1.
     """
     B, W2 = mask.shape
-    R = max(W2 // 2, 1)
+    R = W2 // 2
     out = torch.full((B,), -1, dtype=torch.long, device=mask.device)
+    if R == 0:
+        return out  # a lone major has nobody to declare on
     # the scripted order: the war branch's sue roll runs before the peace
     # branch's DoW roll, and a seat is only ever in one branch
-    sue = mask[:, R] & (rng["peace"] < 0.25)
-    out = torch.where(sue, torch.full_like(out, R), out)
-    dow = (
-        mask[:, 0]
+    sue_k = first_legal(mask[:, R:] & (rng["peace"] < 0.25).unsqueeze(1))
+    out = torch.where(sue_k >= 0, R + sue_k, out)
+    dow_k = first_legal(
+        mask[:, :R]
         & ctx["has_cities"]
-        & (ctx["peace_turns"] > 20)
         & (ctx["prox"] <= 9)
-        & (ctx["gang"] | (ctx["civ_only_str"] > ctx["p_str"] * 1.3))
-        & (rng["dow"] < 0.08 * (0.5 + ctx["aggression"]))
+        & (ctx["gang"] | (ctx["own_str"].unsqueeze(1) > ctx["opp_str"] * 1.3))
+        & (ctx["peace_turns"] > 20).unsqueeze(1)
+        & (rng["dow"] < 0.08 * (0.5 + ctx["aggression"])).unsqueeze(1)
     )
-    out = torch.where((out < 0) & dow, torch.zeros_like(out), out)
-    return out
+    return torch.where((out < 0) & (dow_k >= 0), dow_k, out)
 
 
 def unit_roster(units: list[dict]) -> dict:

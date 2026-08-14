@@ -24,15 +24,6 @@ import { TECHS } from '../data/techs';
 import { UNITS } from '../data/units';
 import { CIVICS } from '../data/civics';
 
-/**
- * The seat the ctx block's PAIRWISE columns (proximity, gang, aggression,
- * peaceTurns) are measured against. The wire carries ONE such axis, and this
- * is the seat on its far side; that seat's own row would be self-referential,
- * so it renders zero. An unfinished wire, not a rule — nothing in the engine
- * gives this seat any other standing.
- */
-const CTX_PAIR_SEAT = 0;
-
 /** This seat's live quest at a city-state, if any — one seat-keyed store,
  *  whatever the seat. */
 export function questFor(cityState: CityState, seat: number): CityStateQuest | null {
@@ -79,9 +70,14 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
     );
   }
   // THE OPPONENT BLOCK, seat-symmetric: every OTHER civ seat in ascending
-  // seat order, and the war field is MY war with that opponent. For seat 0
-  // this is seats 1..R, which is what it has always been; for any other seat
-  // the slots are every civ but itself, read from its own point of view.
+  // seat order — the war head's own target order, so column k here and column
+  // k of the head name the same seat. Everything is read from THIS seat's
+  // point of view.
+  //
+  // The last four are the DoW terms. They used to be a single pairwise
+  // reading in the ctx block, measured against one fixed seat, which is why a
+  // policy could not choose WHICH opponent to declare on (#111 s6). RAW and
+  // unscaled, like the ctx block and for the same reason.
   //
   // `gpu/core/env.py:BatchEnv.observe` renders the identical layout — the two
   // engines must move together here, and the gate compares them field for
@@ -93,6 +89,10 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
       civsAtWar(state, o.seat, seat) ? 1 : 0,
       warTurnsWith(state, seat, o.seat) / 14.0,
       o.cities.length / 6.0,
+      seatStrength(state, o.seat),
+      Math.min(seatProximity(state, o.seat, seat), 999),
+      ((o.warmonger ?? 0) >= WARMONGER_GANG) ? 1 : 0,
+      o.cities.length > 0 ? 1 : 0,
     );
   }
   const per: number[] = [];
@@ -145,8 +145,8 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
   // S1(a): the CTX block — ladder.CTX_FIELDS, RAW and unscaled (the
   // ladder compares these exactly; a /10 scale does not round-trip
   // bit-stably in f64). Formulas are the SCRIPTED SITES' own — the GPU twin
-  // is env._ctx_block. Seat 0 zeroes the DoW-specific quintet exactly as
-  // the GPU does (seat 0 has no scripted DoW policy).
+  // is env._ctx_block. Everything here is THIS seat's own, for every seat
+  // alike; what is measured against an opponent lives in the opponent block.
   const own = state.units.filter((u) => u.seat === seat);
   const qHeads = cities.map((c) => c.queue[0]).filter((q): q is QueueItem => !!q && q.kind === 'unit');
   const qMil = qHeads.filter((q) => ((UNITS[(q as { unit: string }).unit]?.combat ?? 0) > 0));
@@ -156,33 +156,18 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
     + qMil.filter((q) => isRngType((q as { unit: string }).unit)).length;
   const nMeleeWQ = ownMil.filter((u) => !isRngType(u.type)).length
     + qMil.filter((q) => !isRngType((q as { unit: string }).unit)).length;
-  // The DoW quintet below is PAIRWISE — oppStr, proximity, gang, aggression,
-  // peaceTurns and oppHasCities are all measured against `CTX_PAIR_SEAT`,
-  // because the wire carries one such axis and this is the seat it names. That
-  // seat's own row would be self-referential, so it renders zero. An unfinished
-  // wire, not a rule: nothing in the engine gives that seat any other standing.
-  //
-  // Read `opp` for the far side and `me` for this seat, and keep them straight:
-  // oppStr / gang / oppHasCities describe the OPPONENT (the DoW policy compares
-  // own strength against theirs and gangs up on their warmongering), while
-  // aggression and peaceTurns are this seat's own.
   const me = seatOf(state, seat);
-  const opp = seat === CTX_PAIR_SEAT ? undefined : seatOf(state, CTX_PAIR_SEAT);
-  const atOpp = atWarWithAny(state, seat);
+  const atAny = atWarWithAny(state, seat);
   const ctx: number[] = [
     cities.length,
     own.length + qHeads.length,
     nMeleeWQ,
     nRangedWQ,
-    cities.length * 2 + (atOpp ? 3 : 1),
-    opp ? seatStrength(state, CTX_PAIR_SEAT) : 0,
+    cities.length * 2 + (atAny ? 3 : 1),
     seatStrength(state, seat),
-    opp ? Math.min(seatProximity(state, CTX_PAIR_SEAT, seat), 999) : 0,
-    opp ? (((opp.warmonger ?? 0) >= WARMONGER_GANG) ? 1 : 0) : 0,
-    opp ? (me?.aggression ?? 0) : 0,
-    opp ? (me?.peaceTurns ?? 0) : 0,
-    atOpp ? 1 : 0,
-    opp ? (opp.cities.length > 0 ? 1 : 0) : 0,
+    me?.aggression ?? 0,
+    me?.peaceTurns ?? 0,
+    atAny ? 1 : 0,
   ];
   return [...emp, ...cityState, ...riv, ...per, ...esc, ...costT, ...costC, ...ctx];
 }

@@ -43,11 +43,6 @@ def n_unit_acts(rules: Rules) -> int:
 from .rng import hash_keys
 
 _M32 = (1 << 32) - 1
-#: The seat the ctx block's PAIRWISE columns are measured against — the
-#: `cpu/core/observe.ts` CTX_PAIR_SEAT twin. The wire carries ONE such axis and
-#: this is the seat on its far side; that seat's own row would be
-#: self-referential, so it renders zero. An unfinished wire, not a rule.
-CTX_PAIR_SEAT = 0
 UNIT_FEATURES = 8
 
 
@@ -261,26 +256,45 @@ class BatchEnv:
             dim=2,
         ) * s.citystate_alive.unsqueeze(2).to(d)  # [B, S, 3]
         # OPPONENTS, seat-symmetric: every OTHER major seat in ascending seat
-        # order, and the war field is THIS seat's war with that opponent — read
-        # off the symmetric `war` matrix, so no seat is privileged. A roster slot
-        # with no seat renders zeros (TS walks `state.seats`, which has no such
-        # entry); the width stays R for every asker.
+        # order — `war_targets(row)`, the war head's own order, so column k
+        # here and column k of the head name the same seat. Everything is read
+        # from THIS seat's point of view off symmetric stores, so no seat is
+        # privileged. A roster slot with no seat renders zeros (TS walks
+        # `state.seats`, which has no such entry); the width stays R for every
+        # asker.
+        #
+        # The last four are the DoW terms. They were a single pairwise sextet
+        # in the ctx block, measured against one fixed seat, which is why a
+        # policy could not choose WHICH opponent to declare on (#111 s6). RAW
+        # and unscaled, like the ctx block and for the same reason.
         opp_cols = []
         for o in range(1 + s.R):
             if o == row:
                 continue
             ex = s.civ_alive[:, o]
+            o_alive = s.city_alive[:, o]
+            n_opp_cities = o_alive.sum(dim=1) * ex.long()
+            pair_ok = o_alive.unsqueeze(2) & alive.unsqueeze(1)
+            d_pr = s.pair_dist[
+                s.city_center[:, o].clamp(min=0).unsqueeze(2),
+                s.city_center[:, row].clamp(min=0).unsqueeze(1),
+            ].to(torch.long)
             opp_cols.append(
                 torch.stack(
                     [
                         (s.war[:, row, o] & ex).to(d),
                         s.war_turns[:, row, o].to(d) / 14.0,
-                        (s.city_alive[:, o].sum(dim=1) * ex.long()).to(d) / 6.0,
+                        n_opp_cities.to(d) / 6.0,
+                        torch.where(ex, self._seat_strength(o), torch.zeros_like(ex, dtype=torch.long)).to(d),
+                        torch.where(pair_ok, d_pr, 999).reshape(B, -1).min(dim=1).values.to(d),
+                        ((s.civ_warmonger[:, o] >= s._wm_gang) & ex).to(d),
+                        (n_opp_cities > 0).to(d),
                     ],
                     dim=1,
                 )
             )
-        cv = torch.stack(opp_cols, dim=1) if opp_cols else torch.zeros(B, 0, 3, dtype=d, device=dev)
+        cv = (torch.stack(opp_cols, dim=1) if opp_cols
+              else torch.zeros(B, 0, 7, dtype=d, device=dev))  # ladder.PER_CIV
         # EFFECTIVE research cost per option — the quantity the decision
         # actually uses, not the boost flag it derives from. Emitting flags
         # would force the policy to apply `boosted ? base*(1-frac) : base`
@@ -315,18 +329,14 @@ class BatchEnv:
         unscaled, because the ladder compares them exactly and scaled floats do
         not round-trip bit-stably; the formulas are the scripted sites' own.
 
-        The DoW-specific sextet (oppStr / prox / gang / aggression /
-        peaceTurns / oppHasCities) is PAIRWISE, measured against
-        CTX_PAIR_SEAT — the wire carries one such axis. That seat's own row
-        would be self-referential and renders zero, exactly as
-        `cpu/core/observe.ts` does. Read `oppStr`, `gang` and `oppHasCities` as
-        the OPPONENT's (the policy gangs up on their warmongering and compares
-        strength against theirs); `aggression` and `peaceTurns` are this seat's
-        own."""
+        Everything here is the ASKER'S OWN, for every row alike. What is
+        measured against an opponent (their strength, the closest city pair,
+        their warmonger gang, whether they hold a city) lives in the OPPONENT
+        block, one column per opponent, so the policy can compare them; those
+        four used to sit here as a single pairwise reading against one fixed
+        seat, which rendered zeros on that seat's own row."""
         s = self.sim
         d = s.dtype
-        B = s.B
-        dev = s.device
         rng_t = s._type_ranged_strength > 0
         alive = s.city_alive[:, row]
         n_cities = alive.sum(dim=1)
@@ -345,27 +355,13 @@ class BatchEnv:
         # It feeds BOTH the unit cap and the atWarAny column, as TS's one
         # `atWarWithAny(state, seat)` feeds both.
         at_war = s.war[:, row, : 1 + s.R].any(dim=1)
-        z = torch.zeros(B, dtype=d, device=dev)
-        if row == CTX_PAIR_SEAT:
-            opp_str = prox = gang = aggr = peace = has_cities = z
-        else:
-            opp_str = self._seat_strength(CTX_PAIR_SEAT).to(d)
-            pair_ok = s.city_alive[:, CTX_PAIR_SEAT].unsqueeze(2) & alive.unsqueeze(1)
-            d_pr = s.pair_dist[
-                s.city_center[:, CTX_PAIR_SEAT].clamp(min=0).unsqueeze(2),
-                s.city_center[:, row].clamp(min=0).unsqueeze(1),
-            ].to(torch.long)
-            prox = torch.where(pair_ok, d_pr, 999).reshape(B, -1).min(dim=1).values.to(d)
-            gang = (s.civ_warmonger[:, CTX_PAIR_SEAT] >= s._wm_gang).to(d)
-            aggr = s.civ_aggression[:, row].to(d)
-            peace = s.peace_turns[:, row].to(d)
-            has_cities = (s.city_alive[:, CTX_PAIR_SEAT].sum(dim=1) > 0).to(d)
         return torch.stack([
             n_cities.to(d), n_units.to(d), n_mel.to(d), n_rng.to(d),
             (n_cities * 2 + torch.where(at_war, 3, 1)).to(d),
-            opp_str, self._seat_strength(row).to(d), prox,
-            gang, aggr, peace,
-            at_war.to(d), has_cities,
+            self._seat_strength(row).to(d),
+            s.civ_aggression[:, row].to(d),
+            s.peace_turns[:, row].to(d),
+            at_war.to(d),
         ], dim=1)
 
     def unit_features(self, seat: int = 0) -> torch.Tensor:

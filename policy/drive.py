@@ -325,19 +325,24 @@ def _seat_envoys(sim, seat: int):
 
 
 def _war_ctx(blocks: dict) -> dict:
-    """The DoW policy's inputs, read from the OBSERVATION's ctx block —
-    env._ctx_block renders the scripted war-declaration site's own formulas
-    (strengths, closest city pair, the warmonger-gang term, aggression), so
-    the policy consumes only what a client observation carries."""
-    ctx = blocks["ctx"]
+    """The DoW policy's inputs, read from the OBSERVATION — the engines render
+    the scripted war-declaration site's own formulas (strengths, closest city
+    pair, the warmonger-gang term, aggression), so the policy consumes only
+    what a client observation carries.
+
+    Two blocks, two shapes. The OPPONENT block is [B, R, PER_CIV], one column
+    per other major in ascending seat order — the same order the war head
+    uses, so column k here and column k of the mask name the same seat. The
+    CTX block is the asker's own."""
+    ctx, cv = blocks["ctx"], blocks["civ"]
     return {
-        "has_cities": ctx[:, 12] > 0.5,
-        "peace_turns": ctx[:, 10].long(),
-        "prox": ctx[:, 7].long(),
-        "civ_only_str": ctx[:, 6],
-        "p_str": ctx[:, 5],
-        "gang": ctx[:, 8] > 0.5,
-        "aggression": ctx[:, 9],
+        "opp_str": cv[:, :, 3],
+        "prox": cv[:, :, 4].long(),
+        "gang": cv[:, :, 5] > 0.5,
+        "has_cities": cv[:, :, 6] > 0.5,
+        "own_str": ctx[:, 5],
+        "aggression": ctx[:, 6],
+        "peace_turns": ctx[:, 7].long(),
     }
 
 
