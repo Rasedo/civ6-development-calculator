@@ -1417,8 +1417,7 @@ class SimInit:
         # mean one thing on row 0 and another on a civ row.
         self.UNIT_BASE = NB + 2  # production action codes NB+2 … NB+1+NU train units
         self.DISTRICT_BASE = NB + 2 + self.NU
-        self.PURCHASE_BASE = self.DISTRICT_BASE + len(self._scaffold)
-        self.WONDER_BASE = self.PURCHASE_BASE + NB + 1 + self.NU
+        self.WONDER_BASE = self.DISTRICT_BASE + len(self._scaffold)
         self.PROJECT_BASE = self.WONDER_BASE + self._wond_n
         self._type_cost = torch.tensor([u["cost"] for u in ru], dtype=dtype, device=device)
         self._type_combat = torch.tensor([u["combat"] for u in ru], dtype=torch.long, device=device)

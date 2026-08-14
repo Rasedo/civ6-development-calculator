@@ -36,7 +36,7 @@ the spec; the GPU engine mirrors it turn-exactly. Never widen tolerances.
    stale — say so).
 6. **Commit per stage, push**, with a message that names what the gates
    caught. Update the task record. Poke self-tests for paths the
-   random rollout can't reach organically (the purchase_test /
+   random rollout can't reach organically (the buy_wire_test /
    occupancy_test / controlled_test pattern) and wire them into
    `gpu/battery.py`.
 

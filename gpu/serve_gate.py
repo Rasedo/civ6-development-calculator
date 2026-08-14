@@ -274,14 +274,12 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                             flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit,tileOk,tile,tileC,worshipC,religKind,religC,levy]: GPU {gb_all[b]} vs TS {tb}")
             if bad:
                 break
-            # SEAT 0 runs the same verbs as every seat; production is limited
-            # to the base classes.
+            # SEAT 0 runs the same verbs as every seat, over the same mask —
+            # wonder and project columns included, which TS applies through the
+            # same seat-generic applySeatActionRecord arms.
             m0 = env.masks(0)
             blocks0 = ladder.split(env.observe(0), sim.S, sim.R, sim.RC, NT, NC)
-            pm0 = m0["production"].clone()
-            _base_w0 = NB + 2 + sim.NU + len(sim._scaffold)
-            pm0[:, :, _base_w0:] = False
-            prod0 = ladder.pick_production(pm0, classes, roster, drive._prod_ctx(blocks0, sim, 0))
+            prod0 = ladder.pick_production(m0["production"], classes, roster, drive._prod_ctx(blocks0, sim, 0))
             # ALWAYS tensors, -1 where no pick: None would mean "not driven" to
             # the step, and the GPU's auto-research would fire while the TS
             # child accrued against a null.
@@ -546,14 +544,11 @@ def main() -> None:
                         break
         if obs_bails:
             break
-        # SEAT 0 runs the same verbs as every seat: production limited to the
-        # base classes, envoys scripted on BOTH SIDES.
+        # SEAT 0 runs the same verbs as every seat, over the same mask — the
+        # batched path's twin block.
         m0 = env.masks(0)
         blocks0 = ladder.split(env.observe(0), sim.S, sim.R, sim.RC, NT, NC)
-        pm0 = m0["production"].clone()
-        _base_w0 = NB + 2 + sim.NU + len(sim._scaffold)
-        pm0[:, :, _base_w0:] = False
-        prod0 = ladder.pick_production(pm0, classes, roster, drive._prod_ctx(blocks0, sim, 0))
+        prod0 = ladder.pick_production(m0["production"], classes, roster, drive._prod_ctx(blocks0, sim, 0))
         # ALWAYS tensors, -1 where no pick: None would mean "not driven" to the
         # step, and the GPU's auto-research would fire while the TS child
         # accrued against a null.

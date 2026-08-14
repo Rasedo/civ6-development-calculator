@@ -32,8 +32,8 @@ class SimStep:
         production: [B, RC] long — per-city action in the ONE production
         layout every seat row uses (cpu/core/prodLayout.ts): [0, NB)
         buildings, SETTLER, IDLE, the roster units, the scaffold districts,
-        then the purchase block (buy that building / a settler / that unit
-        with gold).
+        the world wonders and the district projects. Spending is not here — it
+        rides `buy`/`worship`/`relig`/`levy` below.
         tech/civic: [B] long picks applied where the research slot is empty
         (validated against the masks; -1 = no pick).
         units: [B, simbase.UNIT_SLOTS] long unit orders (0–5 move, 6–11 attack, 12
@@ -300,11 +300,10 @@ class SimStep:
                         self._eff_version += 1
 
         # --- production choice ---------------------------------------------------
-        # ONE body for every seat row: the queue arms, the districts, the
-        # wonders/projects and the purchase block all live in
-        # _apply_seat_production, which walks the cities in SLOT order because
-        # settler prices, the builder escalator and the treasury are all
-        # order-coupled across a seat's cities.
+        # ONE body for every seat row: the queue arms, the districts and the
+        # wonders/projects all live in _apply_seat_production, which walks the
+        # cities in SLOT order because settler prices and the builder escalator
+        # are order-coupled across a seat's cities.
         if production is not None:
             self._apply_seat_production(0, production)
 
@@ -430,7 +429,7 @@ class SimStep:
                     self.builders_trained.add_(made_b.long())
             # A finished district completes its paved tile (the tile was
             # reserved at queue time in q_dtile).
-            made_district = done & (cur_c >= self.DISTRICT_BASE) & (cur_c < self.PURCHASE_BASE)
+            made_district = done & (cur_c >= self.DISTRICT_BASE) & (cur_c < self.WONDER_BASE)
             if bool(made_district.any()):
                 db_ = made_district.nonzero(as_tuple=True)[0]
                 _dt = self.q_dtile[db_, col[db_]].clamp(min=0)

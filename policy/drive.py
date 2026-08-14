@@ -551,11 +551,7 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
     """The BATCHED decision core — masks, ladder picks, the virtual planner,
     the draw-free applies and the useq stash. Returns the per-verb decision
     tensors; extraction is the caller's per-row problem."""
-    # lite=True skips the purchase-column legality scan — the ladder has no
-    # purchase class (`prod_classes` never names those columns), so the
-    # driver never reads them. Same width, identical base + wonder/project
-    # columns, purchases zeroed; contract asserted in pref_apply_test.
-    m = sim.seat_masks(r, lite=True)
+    m = sim.seat_masks(r)
     blocks = _blocks(env, sim, r)
     prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(blocks, sim, r + 1))
     tech = ladder.pick_research(blocks, m["tech"], "tech") if bool(m["tech"].any()) else None

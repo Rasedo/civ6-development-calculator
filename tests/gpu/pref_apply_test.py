@@ -43,7 +43,6 @@ def main() -> None:
     sim.controlled[0, r] = True
 
     NB = sim.rules_dev.b_cost.shape[0]
-    nS = len(sim._scaffold)
     W = int(sim.seat_masks(r)["production"].shape[2])
     D0 = NB + 2 + sim.NU          # first scaffold-district column
     NEG = float("-inf")
@@ -111,38 +110,7 @@ def main() -> None:
     assert int(sim3.civ_city_current[0, r, j]) == -1, "an all -inf ranking must queue NOTHING"
     print("  3 exhausted ranking queues nothing (the engine never invents a pick) OK")
 
-    # -- 4: a PURCHASE is attempted once, not once per rank -----------------
-    # Purchases deliberately bypass the idle gate, so a naive walk would buy on
-    # every rank. Rank a purchase column first and a building second; the
-    # treasury may or may not afford it, but it must not move TWICE.
-    sim4 = fresh(rules, path)
-    sim4.controlled[0, r] = True
-    sim4.civ_city_current[0, r, j] = -1
-    sim4.civ_city_progress[0, r, j] = 0.0
-    sim4.civ_city_cost[0, r, j] = 0.0
-    base_w = NB + 2 + sim4.NU + nS
-    if W > base_w:
-        sim4.civ_only_treasury[0, r] = 100000.0
-        t0 = float(sim4.civ_only_treasury[0, r])
-        m4 = sim4.seat_masks(r)["production"][0, j]
-        buys = [c for c in range(base_w, W) if bool(m4[c])]
-        if buys:
-            sim4.apply_seat_actions(r, production_pref=pref([buys[0], 0]))
-            sim4._consume_driven_picks(r)
-            spent = t0 - float(sim4.civ_only_treasury[0, r])
-            one = spent
-            sim4.civ_only_treasury[0, r] = t0
-            sim4.civ_city_current[0, r, j] = -1
-            sim4.apply_seat_actions(r, production=torch.full((1, sim4.RC), -1, dtype=torch.long))
-            sim4._consume_driven_picks(r)
-            assert one >= 0.0, "purchase spent a negative amount"
-            print(f"  4 purchase attempted once across the walk OK (spent {one:.0f})")
-        else:
-            print("  4 purchase lane SKIPPED (no affordable buy column this turn)")
-    else:
-        print("  4 purchase lane SKIPPED (purchase columns off)")
-
-    # --- WONDER + PROJECT codes at the driven apply -------------------------
+    # --- 4: WONDER + PROJECT codes at the driven apply ----------------------
     # The driven gate does not reach these columns, so the dispatch is pinned
     # HERE: the code lands via the scripted pick's own helper bodies, and
     # one-per-world refuses CROSS-SEAT at apply time.
@@ -151,7 +119,7 @@ def main() -> None:
     sim5.controlled[0, r5] = True
     NB5 = sim5.rules_dev.b_cost.shape[0]
     nS5 = len(sim5._scaffold)
-    w_lo5 = NB5 + 2 + sim5.NU + nS5 + NB5 + 1 + sim5.NU
+    w_lo5 = NB5 + 2 + sim5.NU + nS5  # prodLayout.wonderLo
     # force a legal (wi, tile) pair deterministically: find a wonder whose wok
     # bit is set on some r0-owned base_ok tile, then grant its unlock tech.
     base5 = sim5._wonder_base_ok(r5 + 1, j5)[0]  # absolute row: civ r is row r+1
@@ -210,22 +178,19 @@ def main() -> None:
     sim7._consume_driven_picks(r5)
     assert int(sim7.civ_city_current[0, r5, j5]) == sim7.PROJECT_BASE + 0, "project code must queue"
     assert float(sim7.civ_city_cost[0, r5, j5]) > 0, "project cost must lock"
-    print("  5 #88 wonder queues via shared scan, one-per-world refuses cross-seat, project queues OK")
+    print("  4 #88 wonder queues via shared scan, one-per-world refuses cross-seat, project queues OK")
 
-    # -- 6: the lite=True contract (the driver's fast path) -----------------
-    # Same width, identical base + wonder/project columns, purchase columns
-    # all zeroed. drive.py:_decide_turn reads masks in lite mode; the ladder
-    # has no purchase class, so only these columns may differ.
-    m_full = sim7.seat_masks(r5)["production"]
-    m_lite = sim7.seat_masks(r5, lite=True)["production"]
-    NU7, nS7 = sim7.NU, nS5
-    pu_lo = NB5 + 2 + NU7 + nS7
-    pu_hi = pu_lo + NB5 + 1 + NU7
-    assert m_full.shape == m_lite.shape, "lite mask must keep the full width"
-    assert torch.equal(m_full[..., :pu_lo], m_lite[..., :pu_lo]), "lite must not touch base columns"
-    assert torch.equal(m_full[..., pu_hi:], m_lite[..., pu_hi:]), "lite must not touch wonder/project columns"
-    assert not bool(m_lite[..., pu_lo:pu_hi].any()), "lite purchase columns must be zeroed"
-    print("  6 lite=True: base+wonder/project identical, purchases zeroed, same width")
+    # -- 5: ONE production mask — seat 0 reads the same body, same width ----
+    # `production_mask()` IS `_seat_production_mask(0)`, so the seat-0 head and
+    # a civ head are the same layout: a net trained on one drives the other, and
+    # env.masks needs no padding between them.
+    assert sim7.production_mask().shape[2] == W, (
+        f"seat 0's production head is {sim7.production_mask().shape[2]} wide, civ heads are {W}"
+    )
+    assert torch.equal(sim7.production_mask(), sim7._seat_production_mask(0)), (
+        "production_mask() must BE the row-generic body, not a second copy"
+    )
+    print("  5 one production mask: seat 0 and civ rows share the body and the width")
 
     print("PREF APPLY OK")
 

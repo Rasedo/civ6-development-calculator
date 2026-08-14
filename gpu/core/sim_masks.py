@@ -12,85 +12,13 @@ from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must
 
 class SimMasks:
     def production_mask(self) -> torch.Tensor:
-        """[B, RC, PURCHASE_BASE + NB+1+NU] valid production actions for seat
-        0's idle cities, in the ONE production layout every seat row uses
-        (cpu/core/prodLayout.ts): [0, NB) buildings, SETTLER, IDLE, the roster
-        units, the scaffold districts, then the gold-purchase block (building /
-        settler / unit), which is NOT idle-gated because it buys rather than
-        queues.
+        """[B, RC, W] valid production actions for seat 0's idle cities.
 
-        Every column asks a row-generic legality body — `_seat_buildable`,
-        `_trainable_units`, `_district_elig` — the SAME ones the civ mask and
-        the shared apply ask, so no seat sees a different legality and mask and
-        apply cannot drift. The wonder and project columns exist for the civ
-        rows only; seat 0's head is still the narrower one (task #83).
-        """
-        B, C, dev = self.B, self.RC, self.device
-        pend = self.alive & (self.current == -1)
-        # SETTLER: any city over the pop gate, as queueSettler allows. IDLE is
-        # always legal.
-        settler_col = (self.city_pop[:, 0] >= self.rules.settler_pop_gate).unsqueeze(2)
-        idle_col = torch.ones(B, C, 1, dtype=torch.bool, device=dev)
-        bld_q = self._seat_buildable(0)
-        tr_city = self._trainable_units(0)
-        cols = [bld_q, settler_col, idle_col, tr_city]
-        nS = len(self._scaffold)
-        if nS:
-            dcols = torch.zeros(B, C, nS, dtype=torch.bool, device=dev)
-            if self.districts_on and self._scaffold:
-                for c in range(C):
-                    reg_c = self.city_dist_tile[:, 0, c]  # [B, nD] THIS city's registry
-                    spec_cnt = ((reg_c >= 0) & self._is_specialty.reshape(1, -1)).sum(dim=1)
-                    cap_c = torch.div(self.city_pop[:, 0, c] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(pop)
-                    for si, (di, utech, uciv, plc) in enumerate(self._scaffold):
-                        has_tech = (self.techs[:, utech] if utech >= 0
-                                    else (self.civics[:, uciv] if uciv >= 0
-                                          else torch.ones(B, dtype=torch.bool, device=dev)))  # kind-aware
-                        under_cap = (spec_cnt < cap_c) if bool(self._is_specialty[di]) else torch.ones(B, dtype=torch.bool, device=dev)
-                        # The PLACEMENT SCAN runs HERE, not lazily at apply
-                        # time: without it the mask is optimistic, calling a
-                        # district legal on the gate tests alone while the apply
-                        # also demands a tile that can take it.
-                        can_place = self._district_elig(0, c, di, plc)[0].any(dim=1)
-                        dcols[:, c, si] = has_tech & (reg_c[:, di] < 0) & under_cap & can_place
-            cols.append(dcols)
-        # Purchases. Gold is OPTIMISTIC here and RE-validated at apply in slot
-        # order (earlier slots drain the shared treasury and a bought settler
-        # raises the next slot's price); a unit also needs a free spawn tile
-        # there — TS refunds when spawnUnit finds none.
-        mult = self.rules.gold_purchase_mult
-        tre = self.treasury
-        # purchaseBuilding wants buildingCompletable (the district FINISHED) and
-        # gold; the seat's own WORSHIP building is the one faith column, priced
-        # flat and gated by buyWorshipBuilding's city rules.
-        pb = self._seat_buildable(0, True) & self._afford(tre.reshape(B, 1, 1), self.rules_dev.b_cost.reshape(1, 1, -1) * mult)
-        wb0 = self._worship_bidx_of(0)
-        if wb0 >= 0:
-            pb[:, :, wb0] = (
-                self.religion_done.unsqueeze(1) & self._worship_city_ok(0)
-                & self._afford(self.faith, self._worship_cost).unsqueeze(1)
-            )
-        n_cities = self.alive.sum(dim=1, keepdim=True)
-        queued_s = (self.current == self.SETTLER).sum(dim=1, keepdim=True)
-        s_cost = self.rules.settler_base + self.rules.settler_per_city * (
-            n_cities - 1 + self._seat_settlers(0).unsqueeze(1) + queued_s
-        ).clamp(min=0).to(self.dtype)
-        ps = (self._afford(tre.unsqueeze(1), s_cost * mult).unsqueeze(2)
-              & (self.city_pop[:, 0] >= self.rules.settler_pop_gate).unsqueeze(2))
-        u_cost = self._type_cost.unsqueeze(0).expand(B, -1)
-        if self._builder_idx >= 0:
-            # the builder column prices off the live escalator, like TS
-            # unitPurchaseCost at mask time.
-            u_cost = u_cost.clone()
-            u_cost[:, self._builder_idx] = self._builder_cost(self.builders_trained)  # ALREADY PRODUCED only — a queued item has produced nothing
-        pu = tr_city & self._afford(tre.unsqueeze(1), u_cost * mult).unsqueeze(1)
-        cols.append(torch.cat([pb, ps, pu], dim=2))
-        # the base columns are idle-gated; the purchase block is not.
-        base_w = self.PURCHASE_BASE
-        out = torch.cat(cols, dim=2)
-        out[:, :, :base_w] &= pend.unsqueeze(2)
-        out[:, :, base_w:] &= self.alive.unsqueeze(2)
-        return out
+        Seat 0's row of `_seat_production_mask` — the ONE body every seat row
+        asks, in the ONE production layout (cpu/core/prodLayout.ts). Seat 0 has
+        no mask of its own: a second body is how a seat quietly acquires its own
+        legality."""
+        return self._seat_production_mask(0)
 
     def tech_mask(self) -> torch.Tensor:
         """[B, NT] valid research picks; all-False where research is busy."""

@@ -1,6 +1,6 @@
 """Occupancy self-test — the seat-aware stacking rules.
 
-The stacking predicates are POKED directly (the purchase_test pattern):
+The stacking predicates are POKED directly (the buy_wire_test pattern):
 manufacture a civ civilian, assert every probe direction, prove
 snapshot/restore round-trips the occupancy planes, then let a long run produce
 organic builders and check plane/slot coherence against them.

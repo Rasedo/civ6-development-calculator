@@ -188,7 +188,7 @@ def pick_research(blocks: dict, mask: torch.Tensor, kind: str) -> torch.Tensor:
 
 #: Production action classes, in the ladder's priority order. The engine
 #: encoding is: buildings [0, NB), SETTLER = NB, IDLE = NB+1,
-#: units [NB+2, NB+2+NU), districts above those, purchases last.
+#: units [NB+2, NB+2+NU), then the districts, the wonders and the projects.
 #:
 #: MILITARY_ENGINEER and the GALLEY are single-column tiers like the builder:
 #: combat 0 or naval, so neither can ever win an army lane and without its own
@@ -316,11 +316,10 @@ def prod_classes(NB: int, NU: int, n_scaffold: int, n_wonder: int = 0, n_project
     the action encoding, or it drifts from the engine the way every other
     duplicated definition in this codebase has.
 
-    WONDER and PROJECT columns sit past the purchase block, so no purchase
-    consumer renumbers. Zero widths (the defaults) make both tiers vanish.
+    Zero widths (the defaults) make the wonder and project tiers vanish.
     """
     ub = NB + 2
-    w_lo = ub + NU + n_scaffold + NB + 1 + NU  # past the purchase block
+    w_lo = ub + NU + n_scaffold
     return {
         "building": (0, NB),
         "settler": (NB, NB + 1),

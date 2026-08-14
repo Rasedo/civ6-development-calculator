@@ -62,7 +62,7 @@ its own gate-stage.
 
 - Behavior-preserving prep (extractions) → byte-identical fixture hash.
 - New inert state → unchanged hash + a poke test if no organic path
-  exercises it (`purchase_test`/`occupancy_test` pattern), wired into
+  exercises it (`buy_wire_test`/`occupancy_test` pattern), wired into
   the battery.
 - Behavior change → regenerate fixtures, both gates, fresh baselines in
   docs/ROADMAP.md §Training log, and a **canary**: name the observable that MUST diverge

@@ -12,15 +12,14 @@
  *     NB + 1             IDLE (queue nothing)
  *     [NB+2, NB+2+NU)    train that roster unit
  *     [NB+2+NU, +nS)     place that scaffold district
- *     [purchaseLo, +NB+1+NU)  gold purchases (buy building / settler / unit)
  *     [wonderLo, +nW)    queue that world wonder (#88; placement re-scanned)
  *     [projectLo, +nP)   run that district project (#88; BASE rows only —
  *                        space-race rows keep their column for layout
  *                        stability but no mask ever offers them; the space
  *                        chain is its own queue path with its own gate)
- * note: wonders/projects APPEND after the purchase block deliberately —
- * inserting before it would renumber every purchase consumer (pref-apply,
- * rollout decode) for zero gain.
+ * There is no PURCHASE block: gold and faith spending is the BUY WIRE (#103,
+ * #104 — kinds 0-7, one purchase per seat per turn), which every seat records
+ * and both engines re-validate at the gold block's own phase position.
  */
 import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
 import { SCAFFOLD_DISTRICTS } from '../data/districts';
@@ -74,7 +73,6 @@ export interface ProdLayout {
   idleCol: number;
   unitLo: number;
   districtLo: number;
-  purchaseLo: number;
   wonderLo: number;
   projectLo: number;
   width: number;
@@ -88,8 +86,7 @@ export function prodLayout(): ProdLayout {
   const NB = buildings.length;
   const NU = units.length;
   const nS = SCAFFOLD_DISTRICTS.length;
-  const purchaseLo = NB + 2 + NU + nS;
-  const wonderLo = purchaseLo + NB + 1 + NU;
+  const wonderLo = NB + 2 + NU + nS;
   const projectLo = wonderLo + wonders.length;
   return {
     NB,
@@ -102,7 +99,6 @@ export function prodLayout(): ProdLayout {
     idleCol: NB + 1,
     unitLo: NB + 2,
     districtLo: NB + 2 + NU,
-    purchaseLo,
     wonderLo,
     projectLo,
     width: projectLo + projects.length,

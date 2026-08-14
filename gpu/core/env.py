@@ -103,14 +103,10 @@ class BatchEnv:
             r = self._seat_civ(seat)
             s = self.sim
             m = s.seat_masks(r)
-            prod = m["production"][:, : s.RC]  # city axis mirrors seat 0's width
-            pw = s.production_mask().shape[2]
-            if prod.shape[2] < pw:  # purchase block active: pad all-False
-                pad = torch.zeros(s.B, prod.shape[1], pw - prod.shape[2], dtype=torch.bool, device=s.device)
-                prod = torch.cat([prod, pad], dim=2)
             return {
                 "war": m["war"],  # [B, 2R]: column 0 declares, column R sues for peace
-                "production": prod,
+                # ONE production body for every seat — same width, no padding.
+                "production": m["production"][:, : s.RC],
                 "tech": m["tech"],
                 "civic": m["civic"],
                 "units": s._seat_unit_mask(r + 1),

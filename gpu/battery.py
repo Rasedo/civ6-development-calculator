@@ -44,10 +44,10 @@ POKE_COST = {
     "great_works": 2.7, "religion_gp": 3.2, "government": 3.3,
     "relics": 3.4, "trade2": 3.5, "bankruptcy": 3.7, "domination": 3.8,
     "culture_victory": 4.3, "space_race": 4.8, "encampment": 4.9, "citystate_verbs": 6.6,
-    "citystate_bonus": 7.9, "seat_purchase": 9.2, "civ_city_registry": 12.4, "controlled": 13.8,
+    "citystate_bonus": 7.9, "buy_wire": 9.2, "civ_city_registry": 12.4, "controlled": 13.8,
     "combat_mod": 17.1, "ranged": 18.5, "occupancy": 21.0,
     "governors": 22.2, "war_weariness": 23.2, "geopolitics": 23.8, "seat": 29.0,
-    "gp_aura": 31.6, "war": 32.5, "purchase": 38.8, "religion2": 51.7,
+    "gp_aura": 31.6, "war": 32.5, "religion2": 51.7,
     "naval": 53.7, "districts": 87.9, "watermill": 12.0, "fort": 6.0,
     "festival": 4.0, "citystate_war": 6.0, "snapshot": 30.0, "golden_move": 3.0, "pref_apply": 8.0, "seat_verbs": 10.0, "drive": 60.0,
     "civ_pair_strike": 12.0,
@@ -195,8 +195,7 @@ def main() -> int:
                 ("serve", [py, "gpu/serve_gate.py", "--batched", "--turns", "250"], 6),
             ],
             [
-                ("purchase", [py, "tests/gpu/purchase_test.py"], 4),
-                ("seat_purchase", [py, "tests/gpu/seat_purchase_test.py"], 4),
+                ("buy_wire", [py, "tests/gpu/buy_wire_test.py"], 4),  # kinds 0-7, every seat row
                 ("war", [py, "tests/gpu/war_test.py"], 4),
                 ("ranged", [py, "tests/gpu/ranged_test.py"], 4),
                 ("combat_mod", [py, "tests/gpu/combat_mod_test.py"], 4),  # wounded + river

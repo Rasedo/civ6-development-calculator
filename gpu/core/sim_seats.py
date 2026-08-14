@@ -11,43 +11,38 @@ from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must
 
 
 class SimSeats:
-    def seat_masks(self, r: int, lite: bool = False) -> dict[str, torch.Tensor]:
-        """A controlled civ seat's decision space, in the shared head layouts
-        so one net serves every seat.
+    def _seat_production_mask(self, row: int) -> torch.Tensor:
+        """[B, RC, W] — THE production decision space, for seat row `row`.
 
-        production [B, RC, W], per city slot, in column order: NB queue-building
-        columns, 1 settler, 1 idle, NU train-unit columns, nScaffold district
-        columns (all six idle-gated), then the gold-purchase block (NB building /
-        1 settler / NU unit, not idle-gated), then nW wonder and nP project
-        columns (idle-gated). tech [B, NT] / civic [B, NC] = available picks
-        where cur == -1. war [B, 2R]: column 0 declares, column R sues for peace.
+        ONE body for every seat, in the ONE production layout
+        (cpu/core/prodLayout.ts): NB queue-building columns, 1 settler, 1 idle,
+        NU train-unit columns, nScaffold district columns, then nW wonder and
+        nP project columns — every one idle-gated. Gold and faith spending is
+        NOT here: it is the BUY WIRE, decided per seat per turn.
 
-        Masks read the CURRENT state — call before step(); apply_seat_actions()
-        writes the choices the seat phase honors. lite=True zeroes the purchase
-        block for the driver, whose ladder has no purchase class."""
+        Every column asks a row-generic legality body — `_seat_buildable`,
+        `_trainable_units`, `_district_elig`, `_wonder_cand` — the SAME ones the
+        shared apply re-validates against, so mask and apply cannot drift and no
+        seat sees a legality another seat does not.
+
+        Masks read the CURRENT state — call before step()."""
         B, dev = self.B, self.device
-        rdv = self.rules_dev
-        NBn = rdv.b_cost.shape[0]
         nS = len(self._scaffold)
-        alive = self.civ_city_alive[:, r]  # [B, RC]
-        idle = alive & (self.civ_city_current[:, r] == -1)
-        # buildings / units: the row-generic legality bodies the APPLY asks too,
-        # so mask and apply cannot drift. QUEUE legality wants the district
-        # merely PLACED (availableBuildings); the purchase columns below want it
-        # FINISHED (buildingCompletable).
-        bld_q = self._seat_buildable(r + 1)  # [B, RC, NB]
-        bld_p = self._seat_buildable(r + 1, True)
-        tr_city = self._trainable_units(r + 1)  # [B, RC, NU]
+        alive = self.city_alive[:, row]  # [B, RC]
+        idle = alive & (self.city_current[:, row] == -1)
+        # buildings / units: the row-generic legality bodies the APPLY asks too.
+        # QUEUE legality wants the district merely PLACED (availableBuildings),
+        # which is what these columns offer.
+        bld_q = self._seat_buildable(row)  # [B, RC, NB]
+        tr_city = self._trainable_units(row)  # [B, RC, NU]
         prod_cols = []
         for j in range(self.RC):
             ok_b = bld_q[:, j]
-            # settler: ANY city, as queueSettler allows. This column carries
-            # LEGALITY only. The one-settler-in-flight and city-cap terms are
-            # POLICY and live in the scripted picker and in gpu/ladder.py's ctx
-            # (`settler_queued`, `city_cap`); mask and picker may diverge on
-            # policy, never on legality.
-            n_cities = self.civ_city_alive[:, r].sum(dim=1)
-            ok_s = torch.ones(B, 1, dtype=torch.bool, device=dev)
+            # SETTLER: queueSettler's own rule — a 1-pop city may not train one.
+            # This column carries LEGALITY only; the one-settler-in-flight and
+            # city-cap terms are POLICY and live in gpu/ladder.py's ctx
+            # (`settler_queued`, `city_cap`).
+            ok_s = (self.city_pop[:, row, j] >= self.rules.settler_pop_gate).unsqueeze(1)
             # units: `trainableUnits` for this row and city — the SAME body the
             # apply re-validates against — narrowed to the MILITARY LAND lane
             # the production ladder selects from. Naval hulls get the dedicated
@@ -57,26 +52,26 @@ class SimSeats:
             tr_j = tr_city[:, j]  # [B, NU]
             ok_u = tr_j & (self._type_combat.unsqueeze(0) > 0) & ~self.unit_naval.unsqueeze(0)
             if self.improvements_on and self._builder_idx >= 0:
-                has_alive = (self.major_unit_alive & (self.major_unit_seat == r + 1) & (self.major_unit_type == self._builder_idx)).any(dim=1)
-                has_q = ((self.civ_city_current[:, r] == self.UNIT_BASE + self._builder_idx) & self.civ_city_alive[:, r]).any(dim=1)  # alive-masked
-                ok_u[:, self._builder_idx] = tr_j[:, self._builder_idx] & ~(has_alive | has_q) & self._civ_job_mask(r).any(dim=1)
-            # MILITARY ENGINEER: one per civ (live or queued), and only while a
+                has_alive = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._builder_idx)).any(dim=1)
+                has_q = ((self.city_current[:, row] == self.UNIT_BASE + self._builder_idx) & alive).any(dim=1)  # alive-masked
+                ok_u[:, self._builder_idx] = tr_j[:, self._builder_idx] & ~(has_alive | has_q) & self._seat_job_mask(row).any(dim=1)
+            # MILITARY ENGINEER: one per seat (live or queued), and only while a
             # FORT job exists. Combat 0 keeps it out of both lanes above, so this
             # column is the only way a net can express one.
             if self._seat_eng_live and self._eng_idx >= 0:
-                has_alive_e = (self.major_unit_alive & (self.major_unit_seat == r + 1) & (self.major_unit_type == self._eng_idx)).any(dim=1)
-                has_q_e = ((self.civ_city_current[:, r] == self.UNIT_BASE + self._eng_idx) & self.civ_city_alive[:, r]).any(dim=1)
-                ok_u[:, self._eng_idx] = tr_j[:, self._eng_idx] & ~(has_alive_e | has_q_e) & self._seat_fort_job_mask_r(r).any(dim=1)
+                has_alive_e = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._eng_idx)).any(dim=1)
+                has_q_e = ((self.city_current[:, row] == self.UNIT_BASE + self._eng_idx) & alive).any(dim=1)
+                ok_u[:, self._eng_idx] = tr_j[:, self._eng_idx] & ~(has_alive_e | has_q_e) & self._seat_fort_job_mask(row).any(dim=1)
             # GALLEY: SAILING plus a naval-capable CITY (center adjacent to water
-            # OR a completed Harbor), and the civ owns zero naval units live or
+            # OR a completed Harbor), and the seat owns zero naval units live or
             # queued. Per-city, hence inside this j loop. ~unit_naval above
             # excludes every hull, so this is the only column that floats a ship.
             if self._galley_idx >= 0 and self._sailing_tech >= 0:
-                has_sail_g = self.civ_only_techs[:, r, self._sailing_tech]
+                has_sail_g = self.civ_techs[:, row, self._sailing_tech]
                 vt_allm = self.major_unit_type.clamp(min=0, max=self.NU - 1)
-                naval_live_g = (self.major_unit_alive & (self.major_unit_seat == r + 1) & self.unit_naval[vt_allm]).any(dim=1)
-                qcur_g = self.civ_city_current[:, r]
-                q_nav_g = (qcur_g >= self.UNIT_BASE) & (qcur_g < self.UNIT_BASE + self.NU) & self.civ_city_alive[:, r] \
+                naval_live_g = (self.major_unit_alive & (self.major_unit_seat == row) & self.unit_naval[vt_allm]).any(dim=1)
+                qcur_g = self.city_current[:, row]
+                q_nav_g = (qcur_g >= self.UNIT_BASE) & (qcur_g < self.UNIT_BASE + self.NU) & alive \
                     & self.unit_naval[(qcur_g - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)]
                 # cityNavalCapable rides in tr_j (a hull column is False in a
                 # landlocked city); the rest is the ladder's own policy.
@@ -86,83 +81,37 @@ class SimSeats:
             # scaffold districts: placeable NOW
             ok_d = torch.zeros(B, nS, dtype=torch.bool, device=dev)
             if self.districts_on and self._scaffold:
-                cap_max = torch.div(self.civ_city_pop[:, r, j] - 1, 3, rounding_mode="floor") + 1
-                spec_cnt = ((self.civ_city_dist_tile[:, r, j] >= 0) & self._is_specialty).sum(dim=1)
+                cap_max = torch.div(self.city_pop[:, row, j] - 1, 3, rounding_mode="floor") + 1
+                spec_cnt = ((self.city_dist_tile[:, row, j] >= 0) & self._is_specialty).sum(dim=1)
                 for si, (di, utech, uciv, plc) in enumerate(self._scaffold):
-                    has_tech = self.civ_only_techs[:, r, utech] if utech >= 0 else (self.civ_only_civics[:, r, uciv] if uciv >= 0 else torch.ones(B, dtype=torch.bool, device=dev))  # kind-aware
-                    not_owned = self.civ_city_dist_tile[:, r, j, di] < 0
+                    has_tech = self.civ_techs[:, row, utech] if utech >= 0 else (self.civ_civics[:, row, uciv] if uciv >= 0 else torch.ones(B, dtype=torch.bool, device=dev))  # kind-aware
+                    not_owned = self.city_dist_tile[:, row, j, di] < 0
                     under_cap = (spec_cnt < cap_max) if bool(self._is_specialty[di]) else torch.ones(B, dtype=torch.bool, device=dev)
                     # The PLACEMENT SCAN runs HERE, not lazily at apply time:
                     # without it the mask is optimistic, calling a district legal
-                    # on the gate tests alone while the picker also demands a tile
+                    # on the gate tests alone while the apply also demands a tile
                     # that can take it (and otherwise falls through to a BUILDING).
                     # The predicate is shared with _place_district so the two
                     # cannot drift.
-                    can_place = self._district_elig(r + 1, j, di, plc)[0].any(dim=1)
+                    can_place = self._district_elig(row, j, di, plc)[0].any(dim=1)
                     ok_d[:, si] = has_tech & not_owned & under_cap & can_place
-            row = torch.cat([ok_b, ok_s, torch.ones(B, 1, dtype=torch.bool, device=dev), ok_u, ok_d], dim=1)
-            # The purchase block (building / settler / unit at goldPurchaseMult x
-            # cost from the CIV's shared treasury) is NOT idle-gated, matching
-            # seat 0's purchase columns. The settler column is priced off the
-            # civ's own curve; its apply founds immediately (civ seats have no
-            # settler bank) and refunds when no valid site exists.
-            # The driver's ladder names no purchase class, so computing the
-            # affordability + re-validation columns costs it nothing but time:
-            # `lite=True` zeroes them, the net/pref surfaces keep the full mask.
-            if lite:
-                pb = torch.zeros(B, NBn, dtype=torch.bool, device=dev)
-                ps = torch.zeros(B, 1, dtype=torch.bool, device=dev)
-                pu = torch.zeros(B, self.NU, dtype=torch.bool, device=dev)
-            else:
-                mult = self.rules.gold_purchase_mult
-                ext_r = self.controlled[:, r].unsqueeze(1)
-                # purchaseBuilding wants buildingCompletable (the district
-                # FINISHED) and gold; the seat's own WORSHIP building is the one
-                # faith column, priced flat and gated by buyWorshipBuilding.
-                afford_b = self._afford(self.civ_only_treasury[:, r].unsqueeze(1), (rdv.b_cost.double() * mult).unsqueeze(0))
-                pb = bld_p[:, j] & afford_b & ext_r
-                wb_r = self._worship_bidx_of(r + 1)
-                if wb_r >= 0:
-                    pb[:, wb_r] = (
-                        self.civ_only_religion_done[:, r] & self._worship_city_ok(r + 1)[:, j]
-                        & self._afford(self.civ_only_faith[:, r], self._worship_cost) & self.controlled[:, r]
-                    )
-                # purchaseSettler: the LIVE escalating price, and the pop gate —
-                # the settler spawns at THIS city, which pays the pop.
-                s_cost_r = self.rules.settler_base + self.rules.settler_per_city * (
-                    n_cities - 1 + self._seat_settlers(r + 1) + (alive & (self.civ_city_current[:, r] == self.SETTLER)).sum(dim=1)
-                ).clamp(min=0).to(self.dtype)
-                ps = (
-                    (self.civ_city_pop[:, r, j] >= self.rules.settler_pop_gate)
-                    & self._afford(self.civ_only_treasury[:, r], s_cost_r * mult)
-                    & self.controlled[:, r]
-                ).unsqueeze(1)
-                u_cost_r = self._type_cost.double().unsqueeze(0).expand(B, -1)
-                if self._builder_idx >= 0:
-                    # the builder column prices off THIS seat's escalator
-                    rb_n = self.civ_only_builders_trained[:, r]  # ALREADY PRODUCED only — a queued item has produced nothing
-                    u_cost_r = u_cost_r.clone()
-                    u_cost_r[:, self._builder_idx] = self._builder_cost(rb_n).double()
-                afford_u = self._afford(self.civ_only_treasury[:, r].unsqueeze(1), u_cost_r * mult)
-                # purchaseUnit funnels through trainableUnits — the FULL lane,
-                # not the production ladder's military-land narrowing.
-                pu = tr_j & afford_u & ext_r
+            base_j = torch.cat([ok_b, ok_s, torch.ones(B, 1, dtype=torch.bool, device=dev), ok_u, ok_d], dim=1)
             # WONDER columns [nW]: unlock + one-per-world (in-flight tiles count,
-            # like wonderExists) + a live placement candidate — the scripted
-            # pick's own scan bodies. No capital-only term: that is the scripted
-            # chain's policy, and any city may raise an unlocked wonder.
+            # like wonderExists) + a live placement candidate — placeSeatWonder's
+            # own scan bodies. No capital-only term: any city may raise an
+            # unlocked wonder.
             nW_m = self._wond_n if self.districts_on else 0
             ok_w = torch.zeros(B, max(nW_m, 0), dtype=torch.bool, device=dev)
             if nW_m > 0:
-                base_okm = self._wonder_base_ok(r + 1, j)
+                base_okm = self._wonder_base_ok(row, j)
                 for wi in range(nW_m):
-                    unl_w = self._wonder_unlock_ok(r + 1, wi)
+                    unl_w = self._wonder_unlock_ok(row, wi)
                     if unl_w is None or not bool(unl_w.any()):
                         continue
                     okc_m = unl_w & ~(self.built_wonder == wi).any(dim=1)
                     if not bool(okc_m.any()):
                         continue
-                    ok_w[:, wi] = okc_m & self._wonder_cand(r + 1, j, wi, base_okm).any(dim=1)
+                    ok_w[:, wi] = okc_m & self._wonder_cand(row, j, wi, base_okm).any(dim=1)
             # PROJECT columns [nP]: BASE rows only (district complete on THIS
             # city). Space/victory rows keep their column for layout stability
             # but never read True — their chain (requiresTech, requiresProject,
@@ -173,13 +122,27 @@ class SimSeats:
                 if int(prow_m.get("sp", 0)) or int(prow_m.get("vic", 0)):
                     continue
                 d_im = int(prow_m.get("d", -1))
-                if d_im < 0 or d_im >= self.civ_city_dist_tile.shape[3]:
+                if d_im < 0 or d_im >= self.city_dist_tile.shape[3]:
                     continue
-                regp_m = self.civ_city_dist_tile[:, r, j, d_im]
+                regp_m = self.city_dist_tile[:, row, j, d_im]
                 ok_p[:, pi_m] = (regp_m >= 0) & self.district_complete.gather(1, regp_m.clamp(min=0).unsqueeze(1)).squeeze(1)
             idle_j = idle[:, j].unsqueeze(1)
-            prod_cols.append(torch.cat([row & idle_j, pb, ps, pu, ok_w & idle_j, ok_p & idle_j], dim=1))
-        production = torch.stack(prod_cols, dim=1)  # [B, RC, base + NB+1+NU purchase]
+            prod_cols.append(torch.cat([base_j & idle_j, ok_w & idle_j, ok_p & idle_j], dim=1))
+        return torch.stack(prod_cols, dim=1)  # [B, RC, W]
+
+    def seat_masks(self, r: int) -> dict[str, torch.Tensor]:
+        """A controlled civ seat's decision space, in the shared head layouts
+        so one net serves every seat.
+
+        production [B, RC, W] is `_seat_production_mask` — the ONE body every
+        seat row asks, seat 0 included. tech [B, NT] / civic [B, NC] = available
+        picks where cur == -1. war [B, 2R]: column 0 declares, column R sues for
+        peace.
+
+        Masks read the CURRENT state — call before step(); apply_seat_actions()
+        writes the choices the seat phase honors."""
+        B, dev = self.B, self.device
+        production = self._seat_production_mask(r + 1)
         tech = self._available_mask(self.civ_only_techs[:, r], self._prereq_t) & (self.civ_only_cur_tech[:, r] == -1).unsqueeze(1)
         civic = self._available_mask(self.civ_only_civics[:, r], self._prereq_c) & (self.civ_only_cur_civic[:, r] == -1).unsqueeze(1)
         # symmetric war head (seat-invariant [B, 2R] layout): a civ seat's only
@@ -727,8 +690,8 @@ class SimSeats:
 
         Walks the ranking best-first, re-running the ordinary apply for whatever
         is still idle. The pass is idempotent (its `act` gate needs
-        `civ_city_current == -1`), so a city that landed on an earlier rank is simply
-        skipped by later ones — no bookkeeping, no partial rollback.
+        `city_current == -1`), so a city that landed on an earlier rank is
+        simply skipped by later ones — no bookkeeping, no partial rollback.
 
         The ENGINE NEVER CHOOSES. Every column it tries came from the policy's
         own ranking; all this does is discover which of them the live state
@@ -737,10 +700,7 @@ class SimSeats:
         priority chain back inside the engine.
 
         `-inf` marks a column the policy rules out; the walk stops offering a
-        city anything once its ranks run dry. PURCHASES are attempted on the
-        first pass only — they deliberately bypass the idle gate, so re-offering
-        them each rank would buy once per rank. Blanking them to -1 disables the
-        branch, which keys on `>= base_w`.
+        city anything once its ranks run dry.
 
         `max_tries` bounds the walk. Districts are the only realistic failure, so
         it terminates on rank 0 or 1 in practice; the cap exists so a pathological
@@ -749,7 +709,6 @@ class SimSeats:
         if pref.dim() != 3:
             raise AssertionError(f"production_pref must be [B, RC, W], got {tuple(pref.shape)}")
         RCj = min(int(pref.shape[1]), self.RC)
-        base_w = self.PURCHASE_BASE
         order = pref.argsort(dim=2, descending=True)  # [B, RC, W]
         scores = pref.gather(2, order)
         live = torch.isfinite(scores)
@@ -760,13 +719,6 @@ class SimSeats:
             code = order[:, :RCj, k].clone()
             code = torch.where(live[:, :RCj, k], code, torch.full_like(code, -1))
             if k > 0:
-                # purchases already had their one attempt on rank 0. The bound is
-                # the purchase RANGE only — wonder/project columns sit above it,
-                # are idle-gated like base columns, and must stay offered on
-                # later ranks (a wonder whose tile was claimed falls through to
-                # the next preference).
-                _pw_hi = base_w + self.rules_dev.b_cost.shape[0] + 1 + self.NU
-                code = torch.where((code >= base_w) & (code < _pw_hi), torch.full_like(code, -1), code)
                 code = torch.where(idle, code, torch.full_like(code, -1))
             if not bool((code >= 0).any()):
                 return
@@ -778,15 +730,13 @@ class SimSeats:
         was given.
 
         The walk is SEQUENTIAL because the decisions are order-coupled: a
-        queued OR bought settler raises the next slot's settlerCost, a bought
-        builder moves the builder escalator, and every purchase drains the one
-        treasury. TS applies a seat's recorded entries in the same slot order.
+        queued settler raises the next slot's settlerCost and a queued builder
+        moves the builder escalator. TS applies a seat's recorded entries in the
+        same slot order.
 
         Idempotent across passes by construction — the `act` gate needs
         `city_current == -1`, so a city assigned by an earlier pass is untouched
-        by a later one, which is what the preference walk relies on. PURCHASE
-        columns deliberately do NOT share the idle gate (they buy rather than
-        queue), so the walk blanks them after its first pass instead.
+        by a later one, which is what the preference walk relies on.
 
         Every gate below is the TS rule re-validated AT APPLY, never a mask term
         trusted from before the walk: the mask is a snapshot, and an earlier
@@ -796,7 +746,6 @@ class SimSeats:
         rls = self.rules
         NBn = rdv.b_cost.shape[0]
         nS = len(self._scaffold)
-        mult = rls.gold_purchase_mult
         ext = self.seat_ext[:, row]
         alive_row = self.city_alive[:, row]
         n_cities = alive_row.sum(dim=1)
@@ -921,86 +870,6 @@ class SimSeats:
                     self.city_current[:, row, j] = torch.where(rows_p, torch.full_like(cur_j, self.PROJECT_BASE + pi_a), self.city_current[:, row, j])
                     self.city_cost[:, row, j] = torch.where(rows_p, pc_a, self.city_cost[:, row, j])
                     self.city_progress[:, row, j] = torch.where(rows_p, torch.zeros_like(self.city_progress[:, row, j]), self.city_progress[:, row, j])
-            # --- the GOLD/FAITH purchase block ------------------------------
-            # Purchase codes live past the base width — buildings first, then
-            # the settler column, then the units. They bypass the idle gate and
-            # revalidate LIVE: the treasury may have drained on an earlier slot
-            # of this same walk.
-            can_p = (a >= self.PURCHASE_BASE) & (a < self.WONDER_BASE) & ext & alive_j
-            if not bool(can_p.any()):
-                continue
-            pb_i = a - self.PURCHASE_BASE
-            # --- buy a BUILDING. purchaseBuilding gates on availableBuildings
-            # AND buildingCompletable (the district must be FINISHED); a
-            # WORSHIP building is not sold here at all — buyWorshipBuilding is
-            # its one path, and it charges FAITH at the flat worship price for
-            # THIS seat's own religion building.
-            is_pb = can_p & (pb_i >= 0) & (pb_i < NBn)
-            if bool(is_pb.any()):
-                bi = pb_i.clamp(min=0, max=NBn - 1)
-                _isw = self._b_worship.gather(0, bi)
-                cost_b = rdv.b_cost.gather(0, bi).double() * mult
-                gold_ok = (self._seat_buildable(row, True)[:, j].gather(1, bi.unsqueeze(1)).squeeze(1)
-                           & self._afford(self.civ_treasury[:, row], cost_b))
-                wb = self._worship_bidx_of(row)
-                if wb >= 0:
-                    _wcost = torch.full_like(cost_b, self._worship_cost)
-                    faith_ok = ((bi == wb) & self.civ_religion_done[:, row] & self._worship_city_ok(row)[:, j]
-                                & self._afford(self.civ_faith[:, row], _wcost))
-                else:
-                    _wcost = torch.zeros_like(cost_b)
-                    faith_ok = torch.zeros_like(gold_ok)
-                ok_now = is_pb & torch.where(_isw, faith_ok, gold_ok)
-                if bool(ok_now.any()):
-                    rows_ = ok_now.nonzero(as_tuple=True)[0]
-                    self.city_bldg[rows_, row, j, bi[rows_]] = True
-                    self._eff_version += 1  # a bought building reaches this turn's later masks and yields
-                    if self._walls_bidx >= 0:
-                        wm = rows_[bi[rows_] == self._walls_bidx]
-                        if len(wm) > 0:
-                            self.city_outer_hp[wm, row, j] = self._walls_hp
-                    self.civ_faith[:, row] = torch.where(ok_now & _isw, self.civ_faith[:, row] - _wcost, self.civ_faith[:, row])
-                    self.civ_treasury[:, row] = torch.where(ok_now & ~_isw, self.civ_treasury[:, row] - cost_b, self.civ_treasury[:, row])
-            # --- buy a SETTLER. It SPAWNS at this city, which pays the pop; no
-            # free tile = refund (the spawnUnit convention). Founding is a
-            # later FOUND_CITY order.
-            is_ps = can_p & (pb_i == NBn)
-            if bool(is_ps.any()) and self._settler_idx >= 0:
-                s_cost2 = (rls.settler_base + rls.settler_per_city * (
-                    n_cities - 1 + settlers_live + queued_s
-                ).clamp(min=0).to(self.dtype)) * mult
-                ok_ps = (is_ps & (self.city_pop[:, row, j] >= rls.settler_pop_gate)
-                         & self._afford(self.civ_treasury[:, row], s_cost2))
-                if bool(ok_ps.any()):
-                    at_ps = self.city_center[:, row, j].clamp(min=0)
-                    landed_ps = self._spawn_unit(row, ok_ps, at_ps, self._settler_idx)
-                    self.civ_treasury[:, row] = torch.where(landed_ps, self.civ_treasury[:, row] - s_cost2, self.civ_treasury[:, row])
-                    self.city_pop[:, row, j] = torch.where(landed_ps, (self.city_pop[:, row, j] - 1).clamp(min=1), self.city_pop[:, row, j])
-                    settlers_live = settlers_live + landed_ps.long()
-            # --- buy a UNIT (purchaseUnit -> trainableUnits): tech, civic,
-            # strategic access, naval capability, never a faith/spawn-only
-            # chassis, the gold, and a free spawn tile.
-            pu_i = pb_i - (NBn + 1)
-            is_pu = can_p & (pu_i >= 0) & (pu_i < self.NU)
-            if bool(is_pu.any()):
-                ui = pu_i.clamp(min=0, max=self.NU - 1)
-                cost_u = self._type_cost.gather(0, ui).double() * mult
-                if self._builder_idx >= 0:
-                    # a bought builder prices off the LIVE escalator
-                    cost_u = torch.where(ui == self._builder_idx,
-                                         self._builder_cost(self.civ_builders_trained[:, row]).double() * mult, cost_u)
-                ok_now = (is_pu & self._trainable_units(row)[:, j].gather(1, ui.unsqueeze(1)).squeeze(1)
-                          & self._afford(self.civ_treasury[:, row], cost_u))
-                if bool(ok_now.any()):
-                    ctr = self.city_center[:, row, j].clamp(min=0)
-                    # a purchased MILITARY unit inherits this city's Encampment
-                    # training XP; the roster's civilian bit drops it again.
-                    xp_j = (self.city_bldg[:, row, j, :].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
-                    landed = self._spawn_unit(row, ok_now, ctr, ui, init_xp=xp_j)
-                    self.civ_treasury[:, row] = torch.where(landed, self.civ_treasury[:, row] - cost_u, self.civ_treasury[:, row])
-                    if self._builder_idx >= 0:
-                        # ...and move the escalator for every later slot
-                        self.civ_builders_trained[:, row] = self.civ_builders_trained[:, row] + (landed & (ui == self._builder_idx)).long()
 
     def _civ_job_mask(self, r: int) -> torch.Tensor:
         """[B, T] tiles a civ-r builder could work NOW: civ-owned and either
@@ -1055,21 +924,24 @@ class SimSeats:
             & ok
         ) | (owned & self.pillaged) | (owned & self.district_pillaged)  # pillaged district = repair job
 
-    def _seat_fort_job_mask_r(self, r: int, techs: torch.Tensor | None = None) -> torch.Tensor:
-        """[B, T]: the MILITARY ENGINEER's job set. Owned, LAND, unimproved,
-        un-districted, not a centre, FORT unlocked, and ADJACENT to a tile held
-        by a seat this civ is AT WAR with. ONE mask serves all three consumers —
-        the production arm, the engineer's build-here test and its walk target —
-        and the TS twin likewise uses a single predicate; three separate ones
-        would drift."""
+    def _seat_fort_job_mask(self, row: int, techs: torch.Tensor | None = None) -> torch.Tensor:
+        """[B, T]: the MILITARY ENGINEER's job set for seat row `row`. Owned,
+        LAND, unimproved, un-districted, not a centre, FORT unlocked, and
+        ADJACENT to a tile held by a major seat this row is AT WAR with.
+
+        ONE body for every seat: ownership reads `tile_seat == row` and
+        hostility reads the row's OWN LINE of the war matrix, which is a single
+        seat space with row 0 in it. The FORT terms themselves are
+        validImprovementsIn's MILITARY_ENGINEER arm; the adjacency term is the
+        production ladder's policy for WHEN a seat wants one."""
         B = self.B
         dev = self.device
         if self.FORT < 0 or self._eng_idx < 0:
             return torch.zeros(B, self.T, dtype=torch.bool, device=dev)
-        tk = techs if techs is not None else self.civ_only_techs[:, r]
+        tk = techs if techs is not None else self.civ_techs[:, row]
         ut = int(self._imp_unlock[self.FORT])
         unl = tk[:, ut].unsqueeze(1) if ut >= 0 else torch.ones(B, 1, dtype=torch.bool, device=dev)
-        owned = self.civ_at == r
+        owned = self.tile_seat == row
         base = (
             owned
             & unl
@@ -1080,22 +952,20 @@ class SimSeats:
             & (self.district < 0)
             & (self.built_wonder < 0)
             & (self.civ_city_at < 0)
+            # a seat-0 centre is a CITY_CENTER pave that lives in `center_at`
+            # rather than `district` — the same term _job_mask_core carries.
+            & (self.center_at < 0)
         )
         if not bool(base.any()):
             return base
-        # hostile territory: seat 0's tiles while at war with seat 0, plus the
-        # tiles of any civ seat this one is at war with (the civsAtWar test,
-        # applied per tile owner).
+        # hostile territory: the tiles of every MAJOR seat this row is at war
+        # with (the civsAtWar test, applied per tile owner). Compact war row ==
+        # absolute seat for the majors, so one loop covers seat 0 and the civs.
         host = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
-        at_war_pl = self.civ_only_atwar[:, r].unsqueeze(1)
-        host = host | ((self.tile_seat == 0) & at_war_pl)
-        for r2 in range(self.R):
-            if r2 == r:
+        for other in range(1 + self.R):
+            if other == row:
                 continue
-            pair = self.civ_pair_war[:, r, r2].unsqueeze(1) if self.civ_pair_war is not None else None
-            if pair is None:
-                continue
-            host = host | ((self.civ_at == r2) & pair)
+            host = host | ((self.tile_seat == other) & self.war[:, row, other].unsqueeze(1))
         nb = self.neigh.clamp(min=0)
         adj = (host[:, nb] & (self.neigh >= 0).unsqueeze(0)).any(dim=2)
         return base & adj
