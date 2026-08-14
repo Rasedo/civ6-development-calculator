@@ -67,7 +67,7 @@ def main() -> None:
     # farm-improved BONUS resource. Rewriting the planes directly is the point
     # — it removes the dependence on a seed happening to generate the setup.
     own0 = sim.owner[0] == c0
-    body = own0 & (sim.district[0] < 0) & (sim.built_wonder[0] < 0) & sim.workable[0]
+    body = own0 & (sim.district[0] < 0) & (sim.built_wonder[0] < 0) & sim.work_ok[0]
     n_elig = int(body.sum())
     assert n_elig > 0, "city 0 owns no plain workable tiles to convert"
     sim.improvement[0][body] = sim.FARM

@@ -459,7 +459,6 @@ def pool_view(snap: dict, pre: str, plane: str):
 # The mutable state tensors — everything reset() restores and snapshot()
 # round-trips.
 _MUTABLE = [
-    "workable",
     "seat_science_total",  # science_total / civ_only_science_total are its row views
     "civic_boosted",
     "rng_state", "centre_slot_at", "tdef", "tmove",

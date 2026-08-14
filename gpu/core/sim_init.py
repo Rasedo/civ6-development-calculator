@@ -94,7 +94,6 @@ class SimInit:
 
         # --- static map -------------------------------------------------------
         self.tile_yields = ften(lambda f: [t["y"] for t in f["tiles"]], (T, 6))
-        self.workable = torch.tensor([[t["workable"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.res_priority = torch.tensor([[t["res"] for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.wonder_near = torch.tensor([[t.get("wnear", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.coastal_land = torch.tensor([[t.get("cl", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)  # isCoastalLand (coastalCity eurekas)

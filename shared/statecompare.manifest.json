@@ -1500,10 +1500,6 @@
     "why": "the winner is DERIVED, not stored, on the TS side — domination first, else the score leader once the game is over, recomputed per read. Comparing the GPU's cache means recomputing that derivation in the adapter, which is exactly what gpu-trace.ts's `winner` column already does. The manifest describes STATE; derived quantities are compared by the observation and by the trace."
    },
    {
-    "plane": "workable",
-    "why": "citizen-workability. TS derives it per read from terrain plus district/wonder occupancy (core/query.ts) and stores nothing; the inputs are covered (tile.district, tile.builtWonder, tile.improvement)."
-   },
-   {
     "plane": "centre_slot_at",
     "why": "the city slot at a centre tile, every seat row — the join key behind the per-city groups; the centers themselves are covered (City.centerIndex / the site planes)."
    },

@@ -63,7 +63,6 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     const y = tileYields(ctx, t.district ? { ...t, district: null } : t);
     return {
       y: YIELD_KEYS.map((k) => Math.round(y[k] * 1000) / 1000),
-      workable: !isImpassable(t) && !t.district ? 1 : 0,
       res: t.resource ? (RESOURCES[t.resource].category === 'luxury' ? 3 : RESOURCES[t.resource].category === 'strategic' ? 2 : 1) : 0,
       // near a natural wonder (for the ASTROLOGY-style eureka)
       wnear: t.wonder !== null || neighbors(map, t).some((n) => n.wonder !== null) ? 1 : 0,

@@ -2739,18 +2739,18 @@ class SimSeats:
         return found
 
     def _found_seat0_caches(self, rows: torch.Tensor, c_new: torch.Tensor, s_idx: torch.Tensor, new_cap: torch.Tensor) -> None:
-        """Row 0's founding-time SITE CACHES — the [B, C] statics the seat-0
-        walk still reads instead of deriving per tile (palace maintenance,
-        water housing, coastal/river flags, the per-city distance table), plus
-        the centre's `workable` clear, which is how that walk excludes the
-        centre where the civ walk uses a `tiles != centre` predicate. They
-        exist only because the two yield walks are still two; they die with
-        the walk merge. The centre YIELDS left in slice 7 — they derive from
-        eff_y at the site now, like the civ walk's."""
+        """Row 0's three surviving founding-time SITE CACHES — the [B, C]
+        statics the seat-0 walk still reads instead of deriving per tile:
+        `coastal` (isCoastalLand at the centre), `river_center` (hasRiver) and
+        `dist` (the per-city hex-distance table, shared with the district
+        placement scan). They exist only because the two yield walks are still
+        two; they die with the walk merge. The centre YIELDS left in slice 7,
+        palace maintenance and water housing in slice 9, and the centre's
+        `workable` clear with the plane itself — the civ walk's `tiles !=
+        centre` predicate says the same thing without a mutation."""
         self.coastal[rows, c_new] = self.coastal_land[rows, s_idx]
         self.river_center[rows, c_new] = self.tile_river[rows, s_idx]
         self.dist[rows, c_new] = self.pair_dist[s_idx]
-        self.workable[rows, s_idx] = False
 
     def _hostile_vs_unit(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int) -> None:
         """Shared melee resolution for a hostile attacker (barb slot u of

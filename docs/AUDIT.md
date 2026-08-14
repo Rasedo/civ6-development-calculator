@@ -366,6 +366,21 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   thing. `_found_seat0_caches` is down to `coastal` / `river_center` /
   `dist` plus the centre `workable` clear.
 
+- **A-34. `workable` was a THIRD name for `!isImpassable` — DELETED
+  2026-08-14.** `workableTiles` filters on `tileBelongsTo && index !==
+  centerIndex && !district && !builtWonder && !isImpassable`. The civ
+  walk spells that out; row 0 spelled it out too AND gated on a mutable
+  `workable` plane exported as `!isImpassable(t) && !t.district` — a t0
+  snapshot of a live fact, whose `!t.district` half never updated
+  (the walk re-tests `district < 0` live) and whose one mutation was
+  the founding `workable[site] = False`. That clear is redundant twice
+  over: the own city's centre is already excluded by `tiles != site`,
+  and a NEIGHBOUR's centre by `owner == slot` (a centre tile registers
+  to its own city). Seat 0 now reads `work_ok` — the same
+  `!isImpassable` the civ rows read — and the plane, its `_MUTABLE`
+  entry, its manifest exclusion and its exporter field are gone
+  (146 → 145 planes, 23 → 22 excluded).
+
 ## B. Fidelity vs real Civ 6 — open residuals
 
 - **B-17r. Encampment:** ranged-vs-district strikes are out of scope

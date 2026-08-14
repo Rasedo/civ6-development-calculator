@@ -1670,7 +1670,7 @@ class SimEconomy:
         cand = (
             (tiles >= 0)
             & (self.owner.gather(1, tcf).reshape(B, C, M) == slot_ids)
-            & self.workable.gather(1, tcf).reshape(B, C, M)
+            & self.work_ok.gather(1, tcf).reshape(B, C, M)  # !isImpassable — workableTiles' own test
             & (self.dist.gather(2, tc) <= 3)
             & (tiles != self.site.unsqueeze(2))
             & (self.district.gather(1, tcf).reshape(B, C, M) < 0)  # district tiles are paved (mirrors workableTiles !t.district)
