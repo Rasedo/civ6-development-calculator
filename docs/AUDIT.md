@@ -491,6 +491,96 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   the culture claim, the gold tile purchase and the wire's tile-buy
   candidate all build ONE pick key from ONE plane composition.
 
+- **A-38. THE SEAT LOOP IS ONE BODY — `_seat_row(row)` — 2026-08-14.**
+  `_seat0_row` is deleted; `_seat_phase` calls `_seat_row(0)` and then
+  `_seat_row(r + 1)` per civ. Every rule in a seat's turn now has one
+  transcription: `_ww_decay`, `_detect_seat_boosts`,
+  `_seat_influence_phase`, `_seat_quest_phase`, `_seat_record_apply`,
+  `_seat_buy_ladder`, `_seat_trade_phase`, `_seat_city_stats`,
+  `_seat_governor_seats`, `_seat_city_loyalty`, `_seat_city_growth`,
+  `_seat_city_produce`, `_seat_border_growth`,
+  `_seat_city_fire_and_heal`, `_seat_loyalty_flips`,
+  `_seat_research_tail`, `_seat_war_peace_tail`.
+
+  What is still seat-0-shaped is WIRE-level, not rule-level: `step()`'s
+  action interface, and the unit-order REPLAY position (row 0's triples
+  apply pre-turn, a civ's per-unit rows apply in-phase). TS carries the
+  same fork — `if (recU && actor.seat !== 0)` — and it is #108.
+
+- **A-39. THE CITY-STATS SNAPSHOT is the rule, on every row —
+  2026-08-14. BEHAVIOUR CHANGE, hunt-watch.** `seatPhase` fills a
+  `cityStats` map for every one of the seat's cities BEFORE its loop and
+  reads it inside (`cityStats.get(city.id)`), so a completion, a border
+  claim or a growth landing at column j does NOT reach column j+1's
+  yields, housing, amenity tier or growth factor that turn. Real Civ 6
+  agrees: a turn's yields bank off the state the turn opened with, and a
+  building finished this turn pays from the next one.
+
+  Both GPU rows instead recomputed mid-walk behind an
+  `(_eff_version, _claim_version)` key — row 0 through `_city_totals`
+  plus a `_pop_dirty` flag and a frozen `lux` parameter, the civ rows
+  through `_rcy_all_cached` plus a per-j escape hatch for capital columns
+  under beliefs. That modelled game.ts's endTurn city loop, which no
+  longer exists (endTurn holds only the global schedule). One
+  `_seat_city_stats(row)` returns computeCityStats' own fields — total,
+  effectiveFoodSurplus, growthNeeded, amenity tier — once per seat block.
+  `_rcy_all_cached`, `_last_lux`, `_seat_amenity`'s `lux` parameter and
+  `_city_totals`' recompute role are all gone; `_city_totals` survives as
+  the post-phase readers' view.
+
+  The empireGrowthMult and Fertility-Rites factors fold into
+  `effectiveFoodSurplus` at their place in computeCityStats' left-to-right
+  chain, which is what retires the `gw_cache` invalidation and the two
+  per-row belief hoists.
+
+- **A-40. Seat 0 could not COMPLETE a wonder or a project.**
+  `_apply_seat_production` has queued wonders and projects on every row
+  since the mask gained those columns, but row 0's per-city block knew
+  only settlers, units, buildings and districts: a completed seat-0
+  wonder cleared the head, banked the overflow, and was never registered
+  in `built_wonder_complete` nor paid its era score; a completed seat-0
+  project paid no yield, no great-person points and no space-race step.
+  `_seat_city_produce(row, col, act, prod)` is the one completeQueueItem.
+  It also zeroes `city_cost` on completion, which row 0 did not — a
+  compared digest field, since TS reads 0 off an empty queue.
+
+  Smaller things the same merge settled: the civ encampmentProdMult had
+  no `_encamp_didx >= 0` guard (with no Encampment in the catalog every
+  building whose requirement is -1 would have taken the multiplier); the
+  Builder/Military-Engineer civilian spawn split was unnecessary
+  (`_spawn_unit` reads the roster's civilian bit itself); `prod_sum` in
+  the economy loop accumulated and was never read.
+
+- **A-41. Loyalty, three disagreements.** `_seat_governor_seats`,
+  `_seat_city_loyalty` and `_seat_loyalty_flips` replace row 0's batched
+  `_apply_loyalty_and_flips` and the civ arm's inline block.
+  (1) A civ CAPITAL pinned to loyaltyMax unconditionally, where
+  `applyLoyalty` puts the pin AFTER the "somebody ELSE holds a city"
+  guard — with no other seat holding a city nothing moves, pin included.
+  (2) A flip could go to a roster slot with no SEAT: `flipCity` scans
+  `state.seats`, so a non-existent civ is not a candidate; the civ arm
+  gave it a real 0 pressure, which beats the `best = -1` sentinel and
+  wins an uncontested defection. A seat that EXISTS and holds no city
+  still exerts 0 and still wins — that is TS's own scan.
+  (3) Row 0 computed pressures in the engine dtype, the civ rows in f64.
+
+  Row 0's batched pass had to reconstruct "cities earlier in the loop
+  already grew" with an `earlier` matrix mixing live and pre-loop pops.
+  At the per-city position the live read IS the rule and the matrix is
+  gone.
+
+- **A-42. The war/peace counters were never seat-specific.** seatPhase's
+  tail is `if (atWarWithAny(actor)) { if (civsAtWar(actor, seat))
+  warTurns += 1 } else { peaceTurns += 1 }`.
+  `_seat_war_peace_tail(row, active)` reads both off the war MATRIX:
+  `war[:, row, 0]` is war with WAR_COLUMN_SEAT and
+  `war[:, row, :1 + R].any()` is atWarWithAny over the majors. Row 0
+  needs no rule of its own — its column against itself is structurally
+  False, which is exactly why `civsAtWar(state, 0, 0)` never fires. Also
+  closed here: an eliminated seat drained its RECORD stash but not its
+  BUY stash, so a spending intent named on the turn a seat lost its last
+  city would have fired on a later turn.
+
 ## B. Fidelity vs real Civ 6 — open residuals
 
 - **B-17r. Encampment:** ranged-vs-district strikes are out of scope
@@ -640,6 +730,26 @@ Landed behind the compile bar only, in dependency order of suspicion:
    splice-now backstop and the founding path asserts its dense-layout
    precondition — a red assert there names the schedule position that
    broke it.
+
+10. THE SEAT LOOP (#51 slices 5g-5j, A-38..A-42) — the biggest
+   behaviour-changing block in this backlog, four items:
+   (a) **The city-stats SNAPSHOT (A-39).** No row recomputes its
+       economy mid-walk any more. Every seat's yields, housing,
+       amenity tier, effective food surplus and growth need freeze at
+       its loop top. Expect this to move numbers on BOTH engines' civ
+       rows and seat 0 alike; the TS oracle already had it.
+   (b) **Seat 0's cities stopped firing and healing TWICE (5g).** TS's
+       `barbarianPhase` ran a second walls strike, Encampment strike
+       and +40 heal over seat 0's cities on top of the seatPhase
+       block. Both copies are deleted; the seat-0 heal per turn HALVES
+       and its two strike draws MOVE a phase later. RNG-stream
+       affecting.
+   (c) **Row 0 grows before it builds (5g)**, and its wonder/project
+       completions now actually land (A-40) — the second is only
+       reachable if the driver picks those columns, so measure REACH.
+   (d) **The loyalty pin/flip fixes (A-41)** change who receives a
+       defection in a roster with a non-existent civ slot, and stop a
+       civ capital pinning in a one-seat world.
 
 Hunt discipline: scripted-reachability first (the digest gate names the
 turn), checkpoint-bracket from the nearest earlier checkpoint, full

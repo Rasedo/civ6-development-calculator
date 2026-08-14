@@ -1,4 +1,9 @@
-"""step(): the turn loop and seat-0's half of it.
+"""step(): the global turn schedule, and the WIRE seat 0's decisions arrive on.
+
+Seat 0's TURN is not here — it is `_seat_phase`'s row-0 call, the same body
+every seat takes. What is seat-0-shaped in this file is the action interface
+(the step() arguments) and the unit-order replay position, which rides the
+triples schema rather than the per-unit rows a civ uses (#108).
 
 One mixin of BatchSim (assembled in engine.py); state and helpers live on
 self / gpu/core/simbase.py.
