@@ -680,7 +680,7 @@ class SimOrders:
         # city (seat 0 or a civ seat), so only a fully citiless world skips the
         # roll. The short-circuit is part of the draw-count contract. A second
         # draw picks the spot, and only if any candidate exists.
-        any_city = self.alive.any(dim=1) | self.civ_city_alive.reshape(B, -1).any(dim=1)
+        any_city = self.city_alive[:, 0].any(dim=1) | self.city_alive[:, 1:1 + max(self.R, 1)].reshape(B, -1).any(dim=1)
         can_roll = any_city & (self.n_camps < self.max_camps)
         r1 = self._next_random(can_roll)
         want = can_roll & (r1 < cb.get("campSpawnChance", 0.08))
@@ -689,14 +689,14 @@ class SimOrders:
             # on the want sub-batch (boolean/integer ops row-restrict exactly;
             # the RNG calls keep their full-B masks unchanged).
             wr = want.nonzero(as_tuple=True)[0]
-            near_city_w = ((self.pair_dist[self.site[wr].clamp(min=0)] < 5) & self.alive[wr].unsqueeze(2)).any(dim=1)  # [n, T]
+            near_city_w = ((self.pair_dist[self.city_center[wr, 0].clamp(min=0)] < 5) & self.city_alive[wr, 0].unsqueeze(2)).any(dim=1)  # [n, T]
             # campCandidates excludes t.district LIVE: camp_ok is static, but
             # paves are not, and an orphaned pave left over from a razed city
             # would pad the set and shift the draw-indexed camp spot.
             # Camps rise away from EVERY seat, so live CIV city centres repel
             # candidates too.
-            rcc_w = self.civ_city_center[wr].reshape(len(wr), -1)
-            near_rc_w = ((self.pair_dist[rcc_w.clamp(min=0)] < 5) & self.civ_city_alive[wr].reshape(len(wr), -1).unsqueeze(2)).any(dim=1)
+            rcc_w = self.city_center[wr, 1:1 + max(self.R, 1)].reshape(len(wr), -1)
+            near_rc_w = ((self.pair_dist[rcc_w.clamp(min=0)] < 5) & self.city_alive[wr, 1:1 + max(self.R, 1)].reshape(len(wr), -1).unsqueeze(2)).any(dim=1)
             cand_w = self.camp_ok[wr] & (self.owner[wr] == -1) & (self.citystate_at[wr] < 0) & (self.civ_at[wr] < 0) & ~near_city_w & ~near_rc_w & (self.district[wr] < 0) & (self.built_wonder[wr] < 0)  # a live builtWonder excludes the tile too
             if self.fog_of_war:
                 # camps rise IN THE FOG — only on tiles dark to EVERY major
@@ -968,12 +968,12 @@ class SimOrders:
             else:
                 has_imp = torch.zeros_like(act)
                 imp_tgt = here.clamp(min=0)
-            dc = self.pair_dist[here.unsqueeze(1), self.site.clamp(min=0)].to(torch.long)  # [B, C]
+            dc = self.pair_dist[here.unsqueeze(1), self.city_center[:, 0].clamp(min=0)].to(torch.long)  # [B, C]
             # Distance ties break by TS ARRAY order — column order under
             # append+reclaim (#110).
-            ckey = torch.where(self.alive, dc * 4096 + torch.arange(self.RC, device=self.device), 10**9)
+            ckey = torch.where(self.city_alive[:, 0], dc * 4096 + torch.arange(self.RC, device=self.device), 10**9)
             city_min = ckey.min(dim=1).values
-            city_tgt = self.site.gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
+            city_tgt = self.city_center[:, 0].gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
             tgt = torch.where(has_imp, imp_tgt, city_tgt)
             has_tgt = has_imp | (city_min < 10**9)
             d_here = self.pair_dist[here, tgt].to(torch.long)

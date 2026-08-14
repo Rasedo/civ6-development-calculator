@@ -137,7 +137,7 @@ class BatchEnv:
         is that seat's score delta."""
         if seat != 0:
             r = self._seat_civ(seat)
-            self.sim.controlled[:, r] = True
+            self.sim.seat_ext[:, r + 1] = True
             self.sim.apply_seat_actions(r, production=production, tech=tech, civic=civic, war=war)
             if units is not None:
                 self.sim._apply_seat_unit_actions(r + 1, units)

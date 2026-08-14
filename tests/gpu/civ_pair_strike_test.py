@@ -48,9 +48,9 @@ def build():
 
 def setup(sim, at_war: bool) -> tuple[int, int]:
     """Walled STRIKER city, a VICTIM warrior in range, nothing else that can hit it."""
-    j = next(j for j in range(sim.RC) if bool(sim.civ_city_alive[0, STRIKER, j]))
-    ctr = int(sim.civ_city_center[0, STRIKER, j])
-    sim.civ_city_bldg[0, STRIKER, j, sim._walls_bidx] = True
+    j = next(j for j in range(sim.RC) if bool(sim.city_alive[0, STRIKER + 1, j]))
+    ctr = int(sim.city_center[0, STRIKER + 1, j])
+    sim.city_bldg[0, STRIKER + 1, j, sim._walls_bidx] = True
 
     # a free land tile at range 1..2 of that centre
     tile = -1

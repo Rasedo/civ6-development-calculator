@@ -102,10 +102,10 @@ def keep_capital_only(sim, r) -> int:
     """Reduce civ seat r to its FIRST alive slot (strength = 8, one center).
     Returns that slot. Alive-masked readers everywhere make the bare civ_city_alive
     flip safe."""
-    slots = sim.civ_city_alive[0, r].nonzero(as_tuple=True)[0].tolist()
+    slots = sim.city_alive[0, r + 1].nonzero(as_tuple=True)[0].tolist()
     assert slots, f"civ {r} has no alive city at the poke turn"
     for s in slots[1:]:
-        sim.civ_city_alive[0, r, s] = False
+        sim.city_alive[0, r + 1, s] = False
     return slots[0]
 
 
@@ -119,14 +119,14 @@ def controlled_pair(rules, path, extra_for_a: bool = True):
     ja = keep_capital_only(sim, 0)
     jb = keep_capital_only(sim, 1)
     if extra_for_a:
-        ctr_b = int(sim.civ_city_center[0, 1, jb])
+        ctr_b = int(sim.city_center[0, 2, jb])
         nb = [int(x) for x in sim.neigh[ctr_b].tolist() if x >= 0]
         assert nb, "civ 1's capital has no on-map neighbour"
-        spare = (~sim.civ_city_alive[0, 0]).nonzero(as_tuple=True)[0]
+        spare = (~sim.city_alive[0, 1]).nonzero(as_tuple=True)[0]
         assert len(spare), "no free rc slot for the spare city"
         s = int(spare[0])
-        sim.civ_city_alive[0, 0, s] = True
-        sim.civ_city_center[0, 0, s] = nb[0]
+        sim.city_alive[0, 1, s] = True
+        sim.city_center[0, 1, s] = nb[0]
     clear_pairs(sim)
     return sim, ja, jb
 
@@ -305,28 +305,28 @@ def poke_transfer(rules, path):
     """g. _transfer_city: loser hygiene, POOL-END append, tile re-key,
     _eff_version bump, _check_rc_registry_invariant green."""
     sim = build(rules, path)
-    civ_only_from = next(r for r in range(sim.R) if bool(sim.civ_city_alive[0, r].any()))
+    civ_only_from = next(r for r in range(sim.R) if bool(sim.city_alive[0, r + 1].any()))
     civ_only_to = next(r for r in range(sim.R) if r != civ_only_from)
-    j = int(sim.civ_city_alive[0, civ_only_from].nonzero(as_tuple=True)[0][0])
-    c_t = int(sim.civ_city_center[0, civ_only_from, j])
-    id_from = int(sim.civ_city_id[0, civ_only_from, j])
-    id_next = int(sim.civ_only_next_city_id[0, civ_only_to])
+    j = int(sim.city_alive[0, civ_only_from + 1].nonzero(as_tuple=True)[0][0])
+    c_t = int(sim.city_center[0, civ_only_from + 1, j])
+    id_from = int(sim.city_id[0, civ_only_from + 1, j])
+    id_next = int(sim.civ_next_city_id[0, civ_only_to + 1])
     own = (sim.tile_city[0] == id_from) & (sim.civ_at[0] == civ_only_from)
     n_own = int(own.sum())
-    occ = sim.civ_city_alive[0, civ_only_to].nonzero(as_tuple=True)[0]
+    occ = sim.city_alive[0, civ_only_to + 1].nonzero(as_tuple=True)[0]
     exp_slot = int(occ.max()) + 1 if len(occ) else 0
     ev0 = sim._eff_version
 
     sim._transfer_city(0, civ_only_from + 1, j, civ_only_to + 1, conquest=False)
 
-    assert not bool(sim.civ_city_alive[0, civ_only_from, j]), "the loser slot must die"
-    assert int(sim.civ_city_bldg[0, civ_only_from, j].sum()) == 0 and int(sim.civ_city_current[0, civ_only_from, j]) == -1, (
+    assert not bool(sim.city_alive[0, civ_only_from + 1, j]), "the loser slot must die"
+    assert int(sim.city_bldg[0, civ_only_from + 1, j].sum()) == 0 and int(sim.city_current[0, civ_only_from + 1, j]) == -1, (
         "loser-slot hygiene: buildings/queue wiped"
     )
-    assert bool((sim.civ_city_dist_tile[0, civ_only_from, j] == -1).all()), "loser-slot hygiene: district registry wiped"
-    assert bool(sim.civ_city_alive[0, civ_only_to, exp_slot]), "the receiver must append at the END of the alive pool"
-    assert int(sim.civ_city_center[0, civ_only_to, exp_slot]) == c_t and not bool(sim.civ_city_is_cap[0, civ_only_to, exp_slot])
-    assert int(sim.civ_city_id[0, civ_only_to, exp_slot]) == id_next and int(sim.civ_only_next_city_id[0, civ_only_to]) == id_next + 1
+    assert bool((sim.city_dist_tile[0, civ_only_from + 1, j] == -1).all()), "loser-slot hygiene: district registry wiped"
+    assert bool(sim.city_alive[0, civ_only_to + 1, exp_slot]), "the receiver must append at the END of the alive pool"
+    assert int(sim.city_center[0, civ_only_to + 1, exp_slot]) == c_t and not bool(sim.city_is_cap[0, civ_only_to + 1, exp_slot])
+    assert int(sim.city_id[0, civ_only_to + 1, exp_slot]) == id_next and int(sim.civ_next_city_id[0, civ_only_to + 1]) == id_next + 1
     assert int(sim.civ_city_at[0, c_t]) == civ_only_to, "the center tile must re-seat to the receiver"
     rekeyed = (sim.tile_city[0] == id_next) & (sim.civ_at[0] == civ_only_to)
     assert int(rekeyed.sum()) == n_own, (
@@ -337,7 +337,7 @@ def poke_transfer(rules, path):
     # population survivor. Both are real yield-bearing changes, so assert the
     # bump happened and stayed within those two known writes.
     _bumped = sim._eff_version - ev0
-    _relocated = bool(sim.civ_city_is_cap[0, civ_only_from].any())
+    _relocated = bool(sim.city_is_cap[0, civ_only_from + 1].any())
     assert 1 <= _bumped <= 2, f"the transfer must bump _eff_version (got {_bumped})"
     assert _bumped == (2 if _relocated else 1), (
         f"expected {'transfer + palace relocation' if _relocated else 'transfer only'}, got {_bumped} bumps"
@@ -391,25 +391,25 @@ def main() -> None:
     assert "civ_warmonger" in _MUT2, "civ_warmonger must be registered in _MUTABLE"
     assert "warmonger" not in _MUT2, "warmonger is a VIEW of civ_warmonger"
     s3 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    assert s3.warmonger.shape == (1,), s3.warmonger.shape
-    assert s3.warmonger.data_ptr() == s3.civ_warmonger.data_ptr(), (
+    assert s3.civ_warmonger[:, 0].shape == (1,), s3.civ_warmonger[:, 0].shape
+    assert s3.civ_warmonger[:, 0].data_ptr() == s3.civ_warmonger.data_ptr(), (
         "warmonger must share storage with civ_warmonger[:, 0]"
     )
     # snapshot/restore round-trip
-    s3.warmonger[:] = 7
+    s3.civ_warmonger[:, 0] = 7
     _snap = s3.snapshot()
-    s3.warmonger[:] = 0
+    s3.civ_warmonger[:, 0] = 0
     s3.restore(_snap)
-    assert int(s3.warmonger[0]) == 7, "warmonger must survive snapshot/restore"
+    assert int(s3.civ_warmonger[0, 0]) == 7, "warmonger must survive snapshot/restore"
     # decay only at peace on EVERY axis, floored at 0
     s3.civ_only_atwar[:] = False
     s3.sync_war()  # a poke writes one cell; close the war matrix under transpose
-    s3.warmonger[:] = 2
+    s3.civ_warmonger[:, 0] = 2
     s3.step()
-    assert int(s3.warmonger[0]) <= 1, "grievances must decay at peace"
-    s3.warmonger[:] = 0
+    assert int(s3.civ_warmonger[0, 0]) <= 1, "grievances must decay at peace"
+    s3.civ_warmonger[:, 0] = 0
     s3.step()
-    assert int(s3.warmonger[0]) == 0, "decay floors at zero"
+    assert int(s3.civ_warmonger[0, 0]) == 0, "decay floors at zero"
     print("seat-0 grievances OK — _MUTABLE, decay, floor")
 
     # --- DIPLOMATIC FAVOR ----------------------------------------------------
@@ -419,28 +419,28 @@ def main() -> None:
     assert s4._favor_per_suz == 1, f"GS pays 1 favor per suzerainty, got {s4._favor_per_suz}"
     # the suzerain tests: >= suzerainEnvoys AND strictly more than every civ seat
     suz_min = int(s4.rules.citystate.get("suzerainEnvoys", 3))
-    s4.citystate_envoys.zero_(); s4.civ_only_citystate_envoys.zero_()
+    s4.seat_citystate_envoys[:, 0].zero_(); s4.seat_citystate_envoys[:, 1:].zero_()
     assert int(s4._suzerain_count(0)[0]) == 0, "no envoys -> no suzerainties"
-    s4.citystate_envoys[:, 0] = suz_min - 1
+    s4.seat_citystate_envoys[:, 0, 0] = suz_min - 1
     assert int(s4._suzerain_count(0)[0]) == 0, "below the envoy minimum is not suzerainty"
-    s4.citystate_envoys[:, 0] = suz_min
+    s4.seat_citystate_envoys[:, 0, 0] = suz_min
     assert int(s4._suzerain_count(0)[0]) == 1, "at the minimum with no civ contest -> suzerain"
     if s4.R > 0:
-        s4.civ_only_citystate_envoys[:, 0, 0] = suz_min  # a TIE leaves no suzerain (real Civ 6)
+        s4.seat_citystate_envoys[:, 1, 0] = suz_min  # a TIE leaves no suzerain (real Civ 6)
         assert int(s4._suzerain_count(0)[0]) == 0, "a tie must leave NO suzerain"
-        s4.civ_only_citystate_envoys[:, 0, 0] = suz_min + 1
+        s4.seat_citystate_envoys[:, 1, 0] = suz_min + 1
         assert int(s4._suzerain_count(1)[0]) == 1, "the strictly-higher civ is suzerain"
         assert int(s4._suzerain_count(0)[0]) == 0, "... and seat 0 is not"
     # the accrual itself: tier + suzerainties, and it is CUMULATIVE
     s5 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    f0 = int(s5.diplo_favor[0])
+    f0 = int(s5.civ_diplo_favor[0, 0])
     s5.step()
-    f1 = int(s5.diplo_favor[0])
+    f1 = int(s5.civ_diplo_favor[0, 0])
     assert f1 >= f0, "favor never decreases"
-    exp = int(s5._adopted_gov_tier(s5.civics)[0]) + s5._favor_per_suz * int(s5._suzerain_count(0)[0])
+    exp = int(s5._adopted_gov_tier(s5.civ_civics[:, 0])[0]) + s5._favor_per_suz * int(s5._suzerain_count(0)[0])
     s5.step()
-    assert int(s5.diplo_favor[0]) - f1 == exp, (
-        f"favor step must be tier+suzerainties ({exp}), got {int(s5.diplo_favor[0]) - f1}"
+    assert int(s5.civ_diplo_favor[0, 0]) - f1 == exp, (
+        f"favor step must be tier+suzerainties ({exp}), got {int(s5.civ_diplo_favor[0, 0]) - f1}"
     )
     print("diplomatic favor OK — suzerain contest, tie rule, tier+suz accrual, _MUTABLE")
 
@@ -453,65 +453,65 @@ def main() -> None:
     assert s6._dvp_win == 20, f"GS diplomatic victory is 20 points, got {s6._dvp_win}"
 
     # not a session turn -> nothing happens, favor untouched
-    s6.diplo_favor[:] = 50
+    s6.civ_diplo_favor[:, 0] = 50
     s6.turn = s6._congress_interval + 1
     s6._world_congress()
-    assert int(s6.congress_sessions[0]) == 0 and int(s6.diplo_favor[0]) == 50, "off-interval turns must do nothing"
+    assert int(s6.congress_sessions[0]) == 0 and int(s6.civ_diplo_favor[0, 0]) == 50, "off-interval turns must do nothing"
 
     # a session turn but nobody is Medieval -> still nothing
     s6.turn = s6._congress_interval
-    s6.techs.zero_(); s6.civ_only_techs.zero_(); s6.civics.zero_(); s6.civ_only_civics.zero_()
+    s6.civ_techs[:, 0].zero_(); s6.civ_techs[:, 1:].zero_(); s6.civ_civics[:, 0].zero_(); s6.civ_civics[:, 1:].zero_()
     s6._world_congress()
     assert int(s6.congress_sessions[0]) == 0, "pre-Medieval sessions must not convene"
-    assert int(s6.diplo_favor[0]) == 50, "... and must not spend favor"
+    assert int(s6.civ_diplo_favor[0, 0]) == 50, "... and must not spend favor"
 
     # force Medieval via a tech whose era clears the bar, then run one session
     _era_ok = None
-    for _t in range(s6.techs.shape[1]):
-        s6.techs.zero_(); s6.techs[:, _t] = True
-        if int(s6._civ_era(s6.techs, s6.civics)[0]) >= s6._congress_min_era:
+    for _t in range(s6.civ_techs.shape[2]):
+        s6.civ_techs[:, 0].zero_(); s6.civ_techs[:, 0, _t] = True
+        if int(s6._civ_era(s6.civ_techs[:, 0], s6.civ_civics[:, 0])[0]) >= s6._congress_min_era:
             _era_ok = _t
             break
     assert _era_ok is not None, "no tech reaches the Medieval era — check the era table"
     if s6.R > 0:
-        s6.civ_only_diplo_favor[:, 0] = 90  # the civ seat outspends seat 0, 90 vs 50
+        s6.civ_diplo_favor[:, 1] = 90  # the civ seat outspends seat 0, 90 vs 50
     s6._world_congress()
     assert int(s6.congress_sessions[0]) == 1, "the session must convene"
-    assert int(s6.diplo_favor[0]) == 0, "every commitment is spent"
+    assert int(s6.civ_diplo_favor[0, 0]) == 0, "every commitment is spent"
     if s6.R > 0:
-        assert int(s6.civ_only_diplo_favor[0, 0]) == 0, "the winner's favor is spent too"
-        assert int(s6.civ_only_diplo_points[0, 0]) == s6._dvp_per_res, "the largest commitment takes the point"
-        assert int(s6.diplo_points[0]) == 0, "the loser takes nothing"
+        assert int(s6.civ_diplo_favor[0, 1]) == 0, "the winner's favor is spent too"
+        assert int(s6.civ_diplo_points[0, 1]) == s6._dvp_per_res, "the largest commitment takes the point"
+        assert int(s6.civ_diplo_points[0, 0]) == 0, "the loser takes nothing"
 
     # a TIE keeps the LOWER seat id (seat 0)
     s7 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     s7.turn = s7._congress_interval
-    s7.techs.zero_(); s7.techs[:, _era_ok] = True
-    s7.diplo_favor[:] = 25
+    s7.civ_techs[:, 0].zero_(); s7.civ_techs[:, 0, _era_ok] = True
+    s7.civ_diplo_favor[:, 0] = 25
     if s7.R > 0:
-        s7.civ_only_diplo_favor[:, 0] = 25
+        s7.civ_diplo_favor[:, 1] = 25
     s7._world_congress()
-    assert int(s7.diplo_points[0]) == s7._dvp_per_res, "a tie must go to the lower civ id"
+    assert int(s7.civ_diplo_points[0, 0]) == s7._dvp_per_res, "a tie must go to the lower civ id"
     if s7.R > 0:
-        assert int(s7.civ_only_diplo_points[0, 0]) == 0
+        assert int(s7.civ_diplo_points[0, 1]) == 0
 
     # zero favor everywhere: the session counts but awards nothing
     s8 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     s8.turn = s8._congress_interval
-    s8.techs.zero_(); s8.techs[:, _era_ok] = True
-    s8.diplo_favor.zero_(); s8.civ_only_diplo_favor.zero_()
+    s8.civ_techs[:, 0].zero_(); s8.civ_techs[:, 0, _era_ok] = True
+    s8.civ_diplo_favor[:, 0].zero_(); s8.civ_diplo_favor[:, 1:].zero_()
     s8._world_congress()
-    assert int(s8.congress_sessions[0]) == 1 and int(s8.diplo_points[0]) == 0, "no favor -> no award"
+    assert int(s8.congress_sessions[0]) == 1 and int(s8.civ_diplo_points[0, 0]) == 0, "no favor -> no award"
 
     # the victory check itself
     s9 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    s9.diplo_points[:] = s9._dvp_win - 1
+    s9.civ_diplo_points[:, 0] = s9._dvp_win - 1
     assert int(s9._diplomatic_victor()[0]) == -1, "one point short is not a win"
-    s9.diplo_points[:] = s9._dvp_win
+    s9.civ_diplo_points[:, 0] = s9._dvp_win
     assert int(s9._diplomatic_victor()[0]) == 0, "seat 0 wins at the threshold"
     if s9.R > 0:
-        s9.diplo_points.zero_()
-        s9.civ_only_diplo_points[:, 0] = s9._dvp_win
+        s9.civ_diplo_points[:, 0].zero_()
+        s9.civ_diplo_points[:, 1] = s9._dvp_win
         assert int(s9._diplomatic_victor()[0]) == 1, "a civ wins at the threshold"
     print("world congress OK — schedule, Medieval gate, vote, tie rule, spend, DVP, victory")
 

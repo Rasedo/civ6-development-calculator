@@ -399,7 +399,7 @@ CITY = {
         [i for i, on in enumerate(sim.city_bldg[b, c, s].tolist()) if on] for c, s in rows
     ],
     "productionBank": lambda sim, b, rows: [
-        float(sim.prod_bank[b, s]) if c == 0 else float(sim.civ_city_prod_bank[b, c - 1, s]) for c, s in rows
+        float(sim.city_prod_bank[b, c, s]) for c, s in rows
     ],
     "queueFront": lambda sim, b, rows: [
         [int(sim.city_current[b, c, s]), int(sim.city_qtile[b, c, s])] for c, s in rows

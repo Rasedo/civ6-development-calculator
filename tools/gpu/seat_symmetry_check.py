@@ -58,6 +58,15 @@ FORK_ALLOW = {
     ("sim_seats.py", "_civ_pair_strengths"): "#111 s2 — civ-pair loop over civ indices",
     ("sim_seats.py", "_world_congress"): "#111 s2 — civ-index loop",
     ("sim_seats.py", "_diplomatic_victor"): "#111 s2 — civ-index loop",
+    ("sim_seats.py", "_culture_victor"): "#111 s2 — civ-index loop",
+    ("sim_seats.py", "_civ_job_mask"): "#111 s3 — dies with _seat_job_mask",
+    ("sim_economy.py", "civ_score"): "#111 s4 — folds into seat_score(row)",
+    ("sim_economy.py", "civ_empire_score"): "#111 s4 — folds into seat_score(row)",
+    ("sim_economy.py", "protagonist"): "#111 s4 — civ-index loop",
+    ("sim_phase.py", "_check_rc_registry_invariant"): "#111 s2 — civ-index loop",
+    ("drive.py", "take_seat"): "#111 s2 — takes a civ index",
+    ("drive.py", "replay_seat"): "#111 s2 — takes a civ index",
+    ("drive.py", "_centre_slot"): "#111 s2 — takes a civ index",
     ("sim_phase.py", "_seat_phase"): "#111 s2 — the civ loop's r+1 lifts",
     ("drive.py", "_blocks"): "#111 s2 — takes a civ index",
     ("drive.py", "_decide_turn"): "#111 s2 — civ-index loop",
@@ -276,8 +285,20 @@ def defined_attrs() -> tuple[set[str], list[str], set[str]]:
 
 
 #: receivers that ARE the sim in this codebase. `self` inside gpu/core is the
-#: sim; `sim`/`s` are its conventional names at every call site.
+#: sim; the pokes build several at once and name them `sim`, `s`, `s2`, `sim3`.
+SIM_RX = re.compile(r"^(?:self|sim[a-z_0-9]*|s[0-9]*)$")
 SIM_RECEIVERS = ("sim", "s", "self")
+#: what a call has to be NAMED to count as building a sim.
+_SIM_CTOR = re.compile(r"(?i)^(batchsim|build|make_sim|new_sim|_build)$")
+
+
+def _callee(call: ast.Call) -> str:
+    f = call.func
+    if isinstance(f, ast.Name):
+        return f.id
+    if isinstance(f, ast.Attribute):
+        return f.attr
+    return ""
 
 READER_SKIP_FILES = {"rng.py"}
 
@@ -333,7 +354,7 @@ def external_binds() -> set[str]:
             for t in tg:
                 for sub in ([t] if not isinstance(t, (ast.Tuple, ast.List)) else t.elts):
                     if (isinstance(sub, ast.Attribute) and isinstance(sub.value, ast.Name)
-                            and sub.value.id in SIM_RECEIVERS):
+                            and SIM_RX.match(sub.value.id)):
                         out.add(sub.attr)
     return out
 
@@ -355,6 +376,15 @@ def unresolved_reads(known: set[str], shapes: list[str]) -> list[tuple[str, int,
             if in_core:
                 recv.add("self")
             recv.add("sim")
+            # the pokes build several sims at once (`s2`, `sim3`, `simr`);
+            # only a CONSTRUCTOR call binds one, or `s = x.clamp(...)` would
+            # make every tensor method look like a dangling sim attribute.
+            recv |= {n.targets[0].id for n in ast.walk(fn)
+                     if isinstance(n, ast.Assign) and len(n.targets) == 1
+                     and isinstance(n.targets[0], ast.Name)
+                     and SIM_RX.match(n.targets[0].id)
+                     and isinstance(n.value, ast.Call)
+                     and _SIM_CTOR.match(_callee(n.value))}
             body = fn.body if isinstance(fn, ast.Module) else fn.body
             for node in [x for b in body for x in ast.walk(b)]:
                 if not (isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)):

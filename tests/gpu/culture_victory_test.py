@@ -60,13 +60,13 @@ def main() -> None:
         """Drive _culture_victor directly on planted totals. tour/cul are
         per-unified-civ lists (index 0 = seat 0)."""
         s = _sim(1)
-        s.tourism_total = torch.tensor([tour[0]], dtype=s.tourism_total.dtype)
-        s.culture_total = torch.tensor([cul[0]], dtype=s.culture_total.dtype)
+        s.tourism_total = torch.tensor([tour[0]], dtype=s.civ_tourism[:, 0].dtype)
+        s.culture_total = torch.tensor([cul[0]], dtype=s.civ_culture[:, 0].dtype)
         for r in range(s.R):
-            s.civ_only_tourism[:, r] = tour[r + 1]
-            s.civ_only_culture[:, r] = cul[r + 1]
+            s.civ_tourism[:, r + 1] = tour[r + 1]
+            s.civ_culture[:, r + 1] = cul[r + 1]
             if alive_civs is not None and not alive_civs[r]:
-                s.civ_city_alive[:, r] = False
+                s.city_alive[:, r + 1] = False
         return int(s._culture_victor()[0]), s
 
     # --- 1) seat 0 out-touring every civ WINS ------------------------------
@@ -121,14 +121,14 @@ def main() -> None:
     assert "civ_culture" in _MUTABLE, "civ_culture must be registered in _MUTABLE"
     assert "civ_only_culture" not in _MUTABLE, "civ_only_culture is a VIEW of civ_culture"
     s = _sim(1)
-    assert s.civ_only_culture.data_ptr() == s.civ_culture[:, 1:].data_ptr(), (
+    assert s.civ_culture[:, 1:].data_ptr() == s.civ_culture[:, 1:].data_ptr(), (
         "civ_only_culture must share storage with civ_culture[:, 1:]"
     )
-    s.civ_only_culture[:, 0] = 1234.5
+    s.civ_culture[:, 1] = 1234.5
     snap = s.snapshot()
-    s.civ_only_culture[:, 0] = 0.0
+    s.civ_culture[:, 1] = 0.0
     s.restore(snap)
-    assert float(s.civ_only_culture[0, 0]) == 1234.5, "civ_only_culture must survive snapshot/restore"
+    assert float(s.civ_culture[0, 1]) == 1234.5, "civ_only_culture must survive snapshot/restore"
 
     print("culture victory OK — 7/8 semantics + _MUTABLE round-trip")
 

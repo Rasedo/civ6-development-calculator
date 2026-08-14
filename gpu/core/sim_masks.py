@@ -60,13 +60,13 @@ class SimMasks:
         if self.R == 0 or not self._rl_war_active:
             return torch.zeros(B, 2 * R, dtype=torch.bool, device=dev)
         rr = self.rules.seats
-        declare = self.civ_only_alive & ~self.civ_only_atwar
+        declare = self.civ_alive[:, 1:] & ~self.civ_only_atwar
         cost = rr.get("peaceGold0", 150) + rr.get("peaceGoldSlope", 10) * self.civ_only_warturns.to(self.dtype)
         peace = (
-            self.civ_only_alive
+            self.civ_alive[:, 1:]
             & self.civ_only_atwar
             & (self.civ_only_warturns >= rr.get("warMinTurns", 14))  # ONE min-war-turns rule, every seat
-            & self._afford(self.treasury.unsqueeze(1), cost)
+            & self._afford(self.civ_treasury[:, 0].unsqueeze(1), cost)
         )
         return torch.cat([declare, peace], dim=1)
 
@@ -713,7 +713,7 @@ class SimMasks:
         if not bool(mask.any()):
             return
         t = tile.clamp(min=0)
-        era = self._civ_era(self.techs, self.civics)  # [B] seat 0's era
+        era = self._civ_era(self.civ_techs[:, 0], self.civ_civics[:, 0])  # [B] seat 0's era
         if self.S > 0:
             _citystate_s = self.citystate_at.gather(1, t.unsqueeze(1)).squeeze(1)
             _citystate_ctr = (_citystate_s >= 0) & (
@@ -724,7 +724,7 @@ class SimMasks:
         # district and `markAntiquitySite` refuses them all. The GPU splits the
         # fact: `self.district` is seat 0's, while a civ's live in the
         # `civ_city_dist_tile` registry — both must be refused.
-        _rv_dist = (self.civ_city_dist_tile == t.view(self.B, 1, 1, 1)).any(3).any(2).any(1)
+        _rv_dist = (self.city_dist_tile[:, 1:] == t.view(self.B, 1, 1, 1)).any(3).any(2).any(1)
         okr = (
             mask
             & (tile >= 0)

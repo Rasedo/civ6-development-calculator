@@ -60,7 +60,7 @@ def test_training_xp_wiring(rules, path) -> None:
     assert not bool(sim._type_civilian[mil_ty]) and float(sim._type_combat[mil_ty]) > 0, "no military unit type found"
     bld_ty = sim._builder_idx
     assert bld_ty >= 0 and bool(sim._type_civilian[bld_ty]), "builder type not civilian"
-    ctr = sim.site[:, 0].clamp(min=0)
+    ctr = sim.city_center[:, 0, 0].clamp(min=0)
     init = torch.tensor([10], dtype=torch.long)  # pretend the city holds ARMORY (best tier 10)
 
     # MILITARY: inherits init_xp
@@ -91,7 +91,7 @@ def build_strike_scene(rules, path):
     # advance a little so the seat-0 city has borders/tiles
     for _ in range(6):
         sim.step()
-    ctr = int(sim.site[0, 0])
+    ctr = int(sim.city_center[0, 0, 0])
     assert ctr >= 0, "no seat-0 capital"
     # clear barbs so the civ unit is the unambiguous nearest hostile
     _pl = sim.military_at[0]  # clear only this pool's entries
@@ -163,8 +163,8 @@ def test_strike(rules, path) -> None:
     # --- walls + Encampment: rolls TWICE, walls (cstk) BEFORE Encampment (estk)
     sim3, enc3, tgt3, v3 = build_strike_scene(rules, path)
     assert sim3._walls_bidx >= 0, "ANCIENT_WALLS not exported"
-    sim3.buildings[0, 0, sim3._walls_bidx] = True
-    sim3.outer_hp[0, 0] = 0  # let the roll land on the unit, not the wall pool
+    sim3.city_bldg[0, 0, 0, sim3._walls_bidx] = True
+    sim3.city_outer_hp[0, 0, 0] = 0  # let the roll land on the unit, not the wall pool
     sim3._log_combat_b = 0
     sim3._combat_events = []
     fire(sim3)
@@ -192,12 +192,12 @@ def test_civ_encamp_prod_mult(rules, path) -> None:
         print("  civ encampmentProdMult SKIPPED (no gov effects / no Encampment scaffold)")
         return
     r = 0
-    live = (sim.civ_city_alive[0, r]).nonzero(as_tuple=True)[0]
+    live = (sim.city_alive[0, r + 1]).nonzero(as_tuple=True)[0]
     if not len(live):
         print("  civ encampmentProdMult SKIPPED (no live civ city)")
         return
     j = int(live[0])
-    _ad, _has = sim._adopted_gov(sim.civ_only_civics[:, r])
+    _ad, _has = sim._adopted_gov(sim.civ_civics[:, r + 1])
     if not bool(_has[0]):
         print("  civ encampmentProdMult SKIPPED (civ has adopted no government)")
         return
@@ -206,15 +206,15 @@ def test_civ_encamp_prod_mult(rules, path) -> None:
 
     def _run(mult):
         s = _prep()
-        s.civ_city_current[0, r, j] = enc_code
-        s.civ_city_cost[0, r, j] = 1e9      # never completes, so progress stays readable
-        s.civ_city_progress[0, r, j] = 0.0
-        s.civ_city_prod_bank[0, r, j] = 0.0
+        s.city_current[0, r + 1, j] = enc_code
+        s.city_cost[0, r + 1, j] = 1e9      # never completes, so progress stays readable
+        s.city_progress[0, r + 1, j] = 0.0
+        s.city_prod_bank[0, r + 1, j] = 0.0
         s._gov_encamp[:] = 1.0
         s._gov_encamp[gi] = mult
         s._eff_version += 1           # the gov/policy mods cache keys on this
         s.step()
-        return float(s.civ_city_progress[0, r, j])
+        return float(s.city_progress[0, r + 1, j])
 
     plain, doubled = _run(1.0), _run(2.0)
     assert plain > 0, "the civ city produced nothing — poke cannot measure the multiplier"

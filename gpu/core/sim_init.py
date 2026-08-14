@@ -26,21 +26,19 @@ class SimInit:
         self.T = T
         # ------------------------------------------------------------------
         # THE CITY BLOCK. Twenty city facts, one `city_x [B, 1+R+S, RC]` plane
-        # each, addressed through per-seat-family VIEWS:
+        # each. There are NO family views: every reader indexes the base by ROW
+        # (#111), because a second name for a row is a second way to write a
+        # body that only serves one seat.
         #     seat 0:      city_x[:, 0]
         #     civ seats:   city_x[:, 1:1+R]
         #     city-states: city_x[:, 1+R:, 0]   (carved out further below)
-        # ONE COLUMN WIDTH for every seat row (#68 step 3): row 0 used to hold
-        # `maxCities` columns where the civ rows hold RC, which forked a `cols =
-        # C if row == 0 else RC` out of every row-generic body — and left row 0
-        # unable to receive the uncapped loyalty flip its own rules allow.
+        # ONE COLUMN WIDTH for every seat row: the block is RC wide on every
+        # row, so no body carries a `cols = ... if row == 0` and row 0 can
+        # receive the uncapped loyalty flip its own rules allow.
         # Float planes take `dtype`, so this arithmetic is f32 in the f32 lanes.
-        # Two facts carry a seat-0 fill of their own: hp starts at cityMaxHp
-        # where the civ rows start at 0, and `site` starts at -1 where
-        # civ_city_center starts at 0. A `None` seat-0 name means row 0 has no
-        # view of its own and every reader says `city_x[:, 0]` — the direction
-        # this block is travelling in, since a seat-0 alias is one more name a
-        # row-generic body can be written against by accident.
+        # Two facts open ROW 0 differently — hp starts at cityMaxHp where the
+        # other rows start at 0, and `center` starts at -1 where they start at
+        # 0 — which is a FILL, not a fork: every reader is the same expression.
         # ------------------------------------------------------------------
         self.R = int(f0.get("civMax", 0))
         # City COLUMNS per seat row — ONE width, exported by the TS engine as
@@ -60,44 +58,33 @@ class SimInit:
         _rp, _rcp, _sp = max(self.R, 1), self.RC, max(self.S, 1)
         self._CITY_MINOR0 = 1 + _rp
         self._aliases: dict = {}
-        for _k, _pa, _ra, _dt, _rf, _pf, _ex in (
-            ("alive", "alive", "civ_city_alive", torch.bool, False, None, None),
-            ("center", "site", "civ_city_center", torch.long, 0, -1, None),
-            ("pop", "pop", "civ_city_pop", torch.long, 0, None, None),
-            ("hp", None, "civ_city_hp", torch.long, 0, int((rules.combat or {}).get("cityMaxHp", 200)), None),
-            ("outer_hp", "outer_hp", "civ_city_outer_hp", torch.long, 0, None, None),
-            ("is_cap", "is_cap", "civ_city_is_cap", torch.bool, False, None, None),
-            ("loyalty", "loyalty", "civ_city_loyalty", dtype, 100.0, None, None),
-            ("acquired", "tiles_acquired", "civ_city_acquired", torch.long, 0, None, None),
-            ("growth", "food_box", "civ_city_growth", dtype, 0, None, None),
-            ("cbox", "culture_box", "civ_city_cbox", dtype, 0, None, None),
-            ("current", "current", "civ_city_current", torch.long, -1, None, None),
-            ("progress", "progress", "civ_city_progress", dtype, 0, None, None),
-            ("cost", "cur_cost", "civ_city_cost", dtype, 0, None, None),
-            ("qtile", "q_dtile", "civ_city_qtile", torch.long, -1, None, None),
-            ("gw_writing", "gw_writing", "civ_city_gw_writing", torch.long, 0, None, None),
-            ("gw_art", "gw_art", "civ_city_gw_art", torch.long, 0, None, None),
-            ("gw_music", "gw_music", "civ_city_gw_music", torch.long, 0, None, None),
-            ("relics", "relics", "civ_city_relics", torch.long, 0, None, None),
-            ("artifacts", "artifacts", "civ_city_artifacts", torch.long, 0, None, None),
-            ("bldg", "buildings", "civ_city_bldg", torch.bool, False, None, max(len(rules.b_cost), 1)),
+        for _k, _dt, _rf, _pf, _ex in (
+            ("alive", torch.bool, False, None, None),
+            ("center", torch.long, 0, -1, None),
+            ("pop", torch.long, 0, None, None),
+            ("hp", torch.long, 0, int((rules.combat or {}).get("cityMaxHp", 200)), None),
+            ("outer_hp", torch.long, 0, None, None),
+            ("is_cap", torch.bool, False, None, None),
+            ("loyalty", dtype, 100.0, None, None),
+            ("acquired", torch.long, 0, None, None),
+            ("growth", dtype, 0, None, None),
+            ("cbox", dtype, 0, None, None),
+            ("current", torch.long, -1, None, None),
+            ("progress", dtype, 0, None, None),
+            ("cost", dtype, 0, None, None),
+            ("qtile", torch.long, -1, None, None),
+            ("gw_writing", torch.long, 0, None, None),
+            ("gw_art", torch.long, 0, None, None),
+            ("gw_music", torch.long, 0, None, None),
+            ("relics", torch.long, 0, None, None),
+            ("artifacts", torch.long, 0, None, None),
+            ("bldg", torch.bool, False, None, max(len(rules.b_cost), 1)),
         ):
             _shape = (B, 1 + _rp + _sp, _rcp) + ((_ex,) if _ex else ())
             _base = torch.full(_shape, _rf, dtype=_dt, device=device)
-            # A seat-0 name equal to the base's would SHADOW it: the base is
-            # bound first and the view second, so `city_x` would silently
-            # become row 0 and every `city_x[b, row, col]` in a row-generic
-            # body would index a 2-D tensor. `hp` shipped exactly that.
-            assert _pa != f"city_{_k}", f"city block: seat-0 name {_pa!r} shadows the merged base"
             setattr(self, f"city_{_k}", _base)
-            _pv = _base[:, 0]
-            if _pf is not None:
-                _pv.fill_(_pf)
-            if _pa is not None:
-                setattr(self, _pa, _pv)
-                self.register_alias(_pa, lambda sim, k=_k: getattr(sim, f"city_{k}")[:, 0])
-            setattr(self, _ra, _base[:, 1:1 + _rp])
-            self.register_alias(_ra, lambda sim, k=_k, rp=_rp: getattr(sim, f"city_{k}")[:, 1:1 + rp])
+            if _pf is not None:  # two facts open row 0 differently (hp, centre)
+                _base[:, 0].fill_(_pf)
 
         def ften(getter, shape_tail=()):
             return torch.tensor([getter(f) for f in fixtures], dtype=dtype, device=device).reshape(B, *shape_tail)
@@ -286,26 +273,17 @@ class SimInit:
         # cpu/core/appeal.ts tileAppeal.
         self.appeal_over = torch.tensor([[int(t.get("apo", -999)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # Existence + temperament on the seat axis (row 0 = seat 0). Static:
-        # placed at creation, never mutated, so neither base is snapshot-
-        # registered. r_-view-only — `alive` names seat 0's city plane until
-        # the city block itself unifies.
+        # placed at creation, never mutated, so the base is not snapshot-
+        # registered.
         self.civ_alive = torch.zeros(B, 1 + r_pad, dtype=torch.bool, device=device)
         self.civ_alive[:, 0] = True
-        self.civ_only_alive = self.civ_alive[:, 1:]
-        self.register_alias("civ_only_alive", lambda sim: sim.civ_alive[:, 1:])
         # Per-seat FOG — Seat.explored's twin. Row 0 = seat 0, r+1 = civ r;
         # a tile is dark until a reveal (spawn/walk/found/growth/capture)
         # lifts it for THAT seat. Accrues only with fog_of_war (the
         # revealAround gate), and the t0 unit loads below seed the start
         # disks exactly as the seeder's spawn reveals did.
         self.seat_explored = torch.zeros(B, 1 + r_pad, self.T, dtype=torch.bool, device=device)
-        self.explored = self.seat_explored[:, 0]
-        self.civ_only_explored = self.seat_explored[:, 1:]
-        self.register_alias("explored", lambda sim: sim.seat_explored[:, 0])
-        self.register_alias("civ_only_explored", lambda sim: sim.seat_explored[:, 1:])
         self.civ_aggression = torch.zeros(B, 1 + r_pad, dtype=torch.float64, device=device)
-        self.civ_only_aggression = self.civ_aggression[:, 1:]
-        self.register_alias("civ_only_aggression", lambda sim: sim.civ_aggression[:, 1:])
         # The seat-0/civ vector and the civ/civ block are SLICES of the war
         # matrix (allocated in `_alloc_war` above), not tensors of their own:
         # `civ_only_atwar[b, r]` and `civ_pair_war[b, i, j]` address the matrix's own memory.
@@ -315,10 +293,9 @@ class SimInit:
         self.register_alias("civ_pair_war", lambda sim: sim.war[:, 1:1 + max(sim.R, 1), 1:1 + max(sim.R, 1)])
 
         # ------------------------------------------------------------------
-        # PER-SEAT SCALARS. One `civ_x [B, 1+R]` plane per fact, addressed
-        # through VIEWS:
-        #     self.x   = civ_x[:, 0]      seat 0
-        #     self.civ_only_x = civ_x[:, 1:]     the civ seats
+        # PER-SEAT SCALARS. One `civ_x [B, 1+R]` plane per fact, addressed by
+        # ROW and by nothing else (#111): `civ_x[:, 0]` is seat 0, `civ_x[:, 1:]`
+        # the civ seats, `civ_x[:, row]` whichever seat is asking.
         # ------------------------------------------------------------------
         _civ_scalars = (
             ("best_melee", torch.long, 0), ("builders_trained", torch.long, 0),
@@ -338,15 +315,10 @@ class SimInit:
             ("religion_done", torch.bool, 0), ("tiles_purchased", torch.long, 0),
         )
         for _nm, _dt, _fill in _civ_scalars:
-            _base = torch.full((B, 1 + r_pad), _fill, dtype=_dt, device=device)
-            setattr(self, f"civ_{_nm}", _base)
-            setattr(self, _nm, _base[:, 0])
-            setattr(self, f"civ_only_{_nm}", _base[:, 1:])
-            self.register_alias(_nm, lambda sim, k=_nm: getattr(sim, f"civ_{k}")[:, 0])
-            self.register_alias(f"civ_only_{_nm}", lambda sim, k=_nm: getattr(sim, f"civ_{k}")[:, 1:])
+            setattr(self, f"civ_{_nm}", torch.full((B, 1 + r_pad), _fill, dtype=_dt, device=device))
         # civ_only_treasury's opening balance — the fixture's `civs[]` is seat-ordered
         # with seat 0 first; rows 1+ are the civ seats.
-        self.civ_only_treasury.copy_(torch.tensor(
+        self.civ_treasury[:, 1:].copy_(torch.tensor(
             [[float(cv.get("treasury", 0.0)) for cv in f["civs"] if int(cv["seat"]) > 0][:r_pad]
              + [0.0] * max(0, r_pad - (len(f["civs"]) - 1))
              for f in fixtures], dtype=dtype, device=device))
@@ -436,27 +408,19 @@ class SimInit:
         # because their width is only known once the rules tables are read.
         for _nm, _w in (("techs", nt_b3), ("civics", nc_b3),
                         ("tech_boosted", nt_b3), ("civic_boosted", nc_b3)):
-            _base = torch.zeros(B, 1 + r_pad, _w, dtype=torch.bool, device=device)
-            setattr(self, f"civ_{_nm}", _base)
-            setattr(self, _nm, _base[:, 0])
-            setattr(self, f"civ_only_{_nm}", _base[:, 1:])
-            self.register_alias(_nm, lambda sim, k=_nm: getattr(sim, f"civ_{k}")[:, 0])
-            self.register_alias(f"civ_only_{_nm}", lambda sim, k=_nm: getattr(sim, f"civ_{k}")[:, 1:])
+            setattr(self, f"civ_{_nm}", torch.zeros(B, 1 + r_pad, _w, dtype=torch.bool, device=device))
         # WHO DRIVES EACH SEAT — one column per seat row, False = the built-in
         # AI, True = actions supplied from outside. The scripted picker,
         # research auto-pick and unit AI skip an externally driven seat;
-        # externally written choices (civ_city_current, civ_only_cur_*) are honored by the
-        # existing mechanics. `controlled` is the VIEW of the civ columns. Only
-        # `seat_ext` is _MUTABLE-registered — registering a view as well would
-        # double-restore it (the citystate_atwar contract, asserted in citystate_war_test).
+        # externally written choices (city_current, civ_cur_*) are honored by
+        # the existing mechanics. Row 0 is `seat_ext[:, 0]` and a civ is
+        # `seat_ext[:, r + 1]` — one plane, no view.
         self.seat_ext = torch.zeros(B, 1 + r_pad + s_pad + 1, dtype=torch.bool, device=device)
         # Row 0 is driven from outside from the moment the world exists: the
         # decision server IS seat 0's only driver (#93). Saying so here is what
         # lets `_apply_seat_unit_actions` gate on `seat_ext[:, row]` for every
         # seat instead of carrying a "row 0 needs no permission" branch.
         self.seat_ext[:, 0] = True
-        self.controlled = self.seat_ext[:, 1:1 + r_pad]
-        self.register_alias("controlled", lambda sim: sim.seat_ext[:, 1:1 + max(sim.R, 1)])
         # Civ-city district registry [.., nD]: the tile of each placed district
         # type, -1 = none. A queued district already occupies its column, so it
         # counts toward the cap and the one-per-type rule (city.districts in TS).
@@ -468,10 +432,6 @@ class SimInit:
         # city-exit path; _district_discounted and _quest_owns_dist read one
         # body over city_dist_tile[:, row]. One base, one geometry.
         self.city_dist_tile = torch.full((B, 1 + r_pad, civ_city_pad, nd_b4), -1, dtype=torch.long, device=device)
-        self.civ_city_dist_tile = self.city_dist_tile[:, 1:]
-        self.dist_tile = self.city_dist_tile[:, 0]
-        self.register_alias("civ_city_dist_tile", lambda sim: sim.city_dist_tile[:, 1:])
-        self.register_alias("dist_tile", lambda sim: sim.city_dist_tile[:, 0])
         # Districts on CAPTURED territory are DEAD — the tiles stay paved but
         # the conquering city's registry holds only CITY_CENTER (no
         # yields/upkeep/counts; the paving still blocks).
@@ -482,8 +442,6 @@ class SimInit:
         # (#110 slice 2); consumers that speak seat-0 column space resolve
         # through the `owner` cache's id→slot match.
         self.city_id = torch.zeros(B, 1 + r_pad, civ_city_pad, dtype=torch.long, device=device)
-        self.civ_city_id = self.city_id[:, 1:]
-        self.register_alias("civ_city_id", lambda sim: sim.city_id[:, 1:])
         # capitalTiles, seat-indexed: only an isCapital founding (t0 or a
         # total-collapse refound) writes a row. The capital is an identity
         # (city_is_cap), not a slot — _reclaim_cities compaction permutes slots
@@ -491,8 +449,6 @@ class SimInit:
         # it); cap_tile / civ_only_cap_tile are the row views.
         self.civ_cap_tile = torch.zeros(B, 1 + r_pad, dtype=torch.long, device=device)
         self.civ_cap_tile[:, 0] = -1
-        self.cap_tile = self.civ_cap_tile[:, 0]
-        self.civ_only_cap_tile = self.civ_cap_tile[:, 1:]
         # Trade routes — (from_id, to_id) rc-id pairs, -1 = empty column.
         # Id-keyed like tile_city, so _reclaim_cities slot permutations never touch
         # it. K must cover the real capacity bound (tradeCapacity):
@@ -506,8 +462,6 @@ class SimInit:
         # seat-generic rule (the shared CS-quest issuer) ask "do I already route
         # to this city-state?" without caring which seat is asking.
         self.seat_routes = torch.full((B, 1 + r_pad + s_pad + 1, k_routes, 2), -1, dtype=torch.long, device=device)
-        self.civ_only_routes = self.seat_routes[:, 1:1 + r_pad]
-        self.register_alias("civ_only_routes", lambda sim: sim.seat_routes[:, 1:1 + max(sim.R, 1)])
         # Parallel per-route metadata (same slot layout as civ_only_routes[..., :]).
         # civ_only_route_dest holds an international route's destination city CENTER
         # TILE (>=0); -1 marks domestic/CS (dest decoded from civ_only_routes[..., 1]).
@@ -515,10 +469,6 @@ class SimInit:
         # a free slot.
         self.seat_route_dest = torch.full((B, 1 + r_pad + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
         self.seat_route_exp = torch.full((B, 1 + r_pad + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
-        self.civ_only_route_dest = self.seat_route_dest[:, 1:1 + r_pad]
-        self.civ_only_route_exp = self.seat_route_exp[:, 1:1 + r_pad]
-        self.register_alias("civ_only_route_dest", lambda sim: sim.seat_route_dest[:, 1:1 + max(sim.R, 1)])
-        self.register_alias("civ_only_route_exp", lambda sim: sim.seat_route_exp[:, 1:1 + max(sim.R, 1)])
         # Seat <-> city-state diplomacy: the envoys/met planes plus the
         # influence/envoy-bank accumulators. Nothing at t0 (every seat starts
         # unmet, zero everywhere).
@@ -740,10 +690,6 @@ class SimInit:
         # city_dist_tile above (row 0 fills only via capture — seat 0 cannot
         # queue wonders, the #83 action-surface gap).
         self.city_wonder = torch.full((B, 1 + r_pad, civ_city_pad, max(self._wond_n, 1)), -1, dtype=torch.long, device=device)
-        self.civ_city_wonder = self.city_wonder[:, 1:]
-        self.wonder_reg = self.city_wonder[:, 0]
-        self.register_alias("civ_city_wonder", lambda sim: sim.city_wonder[:, 1:])
-        self.register_alias("wonder_reg", lambda sim: sim.city_wonder[:, 0])
         self.res_id = torch.tensor([[t.get("rid", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.desert = torch.tensor([[t.get("des", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.wok = torch.tensor([[t.get("wok", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
@@ -771,18 +717,18 @@ class SimInit:
                 if seat == 0:
                     continue  # seat 0's units seed the pool below, once the roster tables exist
                 rid = seat - 1
-                self.civ_only_alive[b, rid] = True
-                self.civ_only_aggression[b, rid] = cv["aggression"]
+                self.civ_alive[b, rid + 1] = True
+                self.civ_aggression[b, rid + 1] = cv["aggression"]
                 # Nothing is pre-founded — `cities` is [] and every city arrives
                 # through a FOUND verb; the loop stays for the shape.
                 for j, rc in enumerate(cv.get("cities", [])):
-                    self.civ_city_alive[b, rid, j] = True
-                    self.civ_city_center[b, rid, j] = rc["center"]
-                    self.civ_city_pop[b, rid, j] = rc["pop"]
-                    self.civ_city_hp[b, rid, j] = rr.get("cityMaxHp", 200)
-                    self.civ_city_id[b, rid, j] = rc["id"]
+                    self.city_alive[b, rid + 1, j] = True
+                    self.city_center[b, rid + 1, j] = rc["center"]
+                    self.city_pop[b, rid + 1, j] = rc["pop"]
+                    self.city_hp[b, rid + 1, j] = rr.get("cityMaxHp", 200)
+                    self.city_id[b, rid + 1, j] = rc["id"]
                     self.centre_slot_at[b, rc["center"]] = j
-                self.civ_only_next_city_id[b, rid] = len(cv.get("cities", []))
+                self.civ_next_city_id[b, rid + 1] = len(cv.get("cities", []))
                 for u_ in cv["units"]:
                     v = int(self.unit_next[b])
                     self.major_unit_alive[b, v] = True
@@ -1325,18 +1271,10 @@ class SimInit:
         # for family-shape consistency; every city starts with an empty bank,
         # so unlike the fixture-loaded city_* table it allocates plain).
         self.city_prod_bank = torch.zeros(B, 1 + max(self.R, 1) + max(self.S, 1), self.RC, dtype=dtype, device=device)
-        self.prod_bank = self.city_prod_bank[:, 0]
-        self.civ_city_prod_bank = self.city_prod_bank[:, 1:1 + max(self.R, 1)]
-        self.register_alias("prod_bank", lambda sim: sim.city_prod_bank[:, 0])
-        self.register_alias("civ_city_prod_bank", lambda sim: sim.city_prod_bank[:, 1:1 + max(sim.R, 1)])
         # LIFETIME science — Seat.scienceTotal on the seat axis (row 0 =
         # seat 0, rows 1..R the civ seats), accrued beside each row's
         # techProgress stream add in the seatPhase loop.
         self.seat_science_total = torch.zeros(B, 1 + max(self.R, 1), dtype=dtype, device=device)
-        self.science_total = self.seat_science_total[:, 0]
-        self.civ_only_science_total = self.seat_science_total[:, 1:1 + max(self.R, 1)]
-        self.register_alias("science_total", lambda sim: sim.seat_science_total[:, 0])
-        self.register_alias("civ_only_science_total", lambda sim: sim.seat_science_total[:, 1:1 + max(sim.R, 1)])
 
         # --- the hostile world: barbarians ----------------------------------------
         self.units_mode = bool(f0.get("unitsMode", 0))
@@ -1632,42 +1570,33 @@ class SimInit:
         ("quest_issued", torch.long, 0),
     )
 
-    #: (key, seat-0 name, civ name, dtype, trailing dim) for the per-seat
-    #: scalars whose two views carry different NAMES. `dtype=None` takes the
+    #: (key, dtype, trailing-dim attribute) for the per-seat scalars whose
+    #: width is only known after the rules load. `dtype=None` takes the
     #: engine's dtype.
     _CIV_PAIR_FIELDS = (
-        ("culture", "culture_total", "civ_only_culture", None, None),
-        ("faith", "faith", "civ_only_faith", None, None),
-        ("tourism", "tourism_total", "civ_only_tourism", torch.long, None),
-        ("warmonger", "warmonger", "civ_only_warmonger", torch.long, None),
-        ("gpp", "gp_points", "civ_only_gpp", None, "_gp_nc"),
+        ("culture", None, None),
+        ("faith", None, None),
+        ("tourism", torch.long, None),
+        ("warmonger", torch.long, None),
+        ("gpp", None, "_gp_nc"),
     )
 
     def _alloc_civ_pairs(self, B: int, r_pad: int, dtype, device) -> None:
         """Allocate one plane per fact, seat 0 at row 0 and the civ seats after.
 
         `dtype=None` means the merged plane takes the engine's dtype."""
-        for _k, _pa, _ra, _dt, _ex in self._CIV_PAIR_FIELDS:
+        for _k, _dt, _ex in self._CIV_PAIR_FIELDS:
             _w = getattr(self, _ex) if _ex else None
             _shape = (B, 1 + r_pad) + ((_w,) if _w else ())
-            _base = torch.zeros(_shape, dtype=_dt or dtype, device=device)
-            setattr(self, f"civ_{_k}", _base)
-            setattr(self, _pa, _base[:, 0])
-            setattr(self, _ra, _base[:, 1:])
-            self.register_alias(_pa, lambda sim, k=_k: getattr(sim, f"civ_{k}")[:, 0])
-            self.register_alias(_ra, lambda sim, k=_k: getattr(sim, f"civ_{k}")[:, 1:])
+            setattr(self, f"civ_{_k}", torch.zeros(_shape, dtype=_dt or dtype, device=device))
 
     def _alloc_cs_pairs(self, B: int, r_pad: int, s_pad: int, device) -> None:
-        """Allocate one plane per (seat, city-state) relation.
+        """Allocate one plane per (seat, city-state) relation, [B, 1+R, S].
 
-        `citystate_<name>` is the row-0 view and `civ_only_citystate_<name>` the rows-1.. view."""
+        Row 0 is seat 0 and row r+1 is civ r — no view either side."""
         for _nm, _dt, _fill in self._CS_PAIR_FIELDS:
-            _base = torch.full((B, 1 + r_pad, s_pad), _fill, dtype=_dt, device=device)
-            setattr(self, f"seat_citystate_{_nm}", _base)
-            setattr(self, f"citystate_{_nm}", _base[:, 0])
-            setattr(self, f"civ_only_citystate_{_nm}", _base[:, 1:])
-            self.register_alias(f"citystate_{_nm}", lambda sim, k=_nm: getattr(sim, f"seat_citystate_{k}")[:, 0])
-            self.register_alias(f"civ_only_citystate_{_nm}", lambda sim, k=_nm: getattr(sim, f"seat_citystate_{k}")[:, 1:])
+            setattr(self, f"seat_citystate_{_nm}",
+                    torch.full((B, 1 + r_pad, s_pad), _fill, dtype=_dt, device=device))
 
     def _alloc_war(self, B: int, r_pad: int, s_pad: int, device) -> None:
         """ONE war relation: `war[b, i, j]`, symmetric, covering every pair.

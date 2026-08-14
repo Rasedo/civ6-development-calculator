@@ -55,15 +55,15 @@ def main() -> None:
     sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     assert sim.R >= 1, "need a civ"
     r, j = 0, 0
-    assert bool(sim.civ_only_alive[0, r]) and bool(sim.civ_city_alive[0, r, j]), "civ capital must be alive"
+    assert bool(sim.civ_alive[0, r + 1]) and bool(sim.city_alive[0, r + 1, j]), "civ capital must be alive"
     code = sim.PROJECT_BASE + pi_fest
     cost = 100.0
-    sim.civ_city_current[0, r, j] = code
-    sim.civ_city_cost[0, r, j] = cost
-    sim.civ_city_progress[0, r, j] = 1.0e6
-    before = sim.civ_only_gpp[0, r].clone()
+    sim.city_current[0, r + 1, j] = code
+    sim.city_cost[0, r + 1, j] = cost
+    sim.city_progress[0, r + 1, j] = 1.0e6
+    before = sim.civ_gpp[0, r + 1].clone()
     sim._seat_phase()
-    delta = (sim.civ_only_gpp[0, r] - before).tolist()
+    delta = (sim.civ_gpp[0, r + 1] - before).tolist()
 
     want_each = round(cost * 0.11)
     paid = {g: int(delta[g]) for g in frow["gs"]}

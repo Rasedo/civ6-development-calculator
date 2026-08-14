@@ -263,8 +263,7 @@
       "Seat.influencePoints"
      ],
      "planes": [
-      "civ_influence",
-      "influence"
+      "civ_influence"
      ]
     },
     {
@@ -326,8 +325,7 @@
      ],
      "planes": [
       "civ_tech_boosted",
-      "civ_civic_boosted",
-      "civic_boosted"
+      "civ_civic_boosted"
      ]
     },
     {

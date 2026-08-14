@@ -56,16 +56,16 @@ def main() -> None:
     assert paths, "no fixtures — run the exporter first"
     sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     assert sim._gp_nc == 9, f"engine n_gp must be 9, got {sim._gp_nc}"
-    assert sim.gp_earned.shape[1] == 9 and sim.gp_points.shape[1] == 9
-    assert sim.civ_only_gpp.shape[2] == 9, "civ gpp tensor must be n_gp wide"
+    assert sim.gp_earned.shape[1] == 9 and sim.civ_gpp.shape[2] == 9
+    assert sim.civ_gpp.shape[2] == 9, "civ gpp tensor must be n_gp wide"
     assert list(sim._gp_costs.tolist()) == [float(x) for x in ladder]
 
     # --- enhancer race state is wired (mirror of follower/founder) ---------
     assert sim._enh_any, "enhancer pool must be non-empty"
     assert sim.enh_claimed.shape[1] == 7, f"enh pool mask width: {sim.enh_claimed.shape[1]}"
-    assert sim.civ_only_enhancer.shape == sim.civ_only_follower.shape, "civ_only_enhancer must mirror civ_only_follower"
-    assert sim.civ_only_enhancer_done.shape == sim.civ_only_religion_done.shape
-    assert bool((sim.civ_only_enhancer == -1).all()) and int(sim.claimed_e_n.sum()) == 0, "fresh: no enhancer claimed"
+    assert sim.civ_enhancer[:, 1:].shape == sim.civ_follower[:, 1:].shape, "civ_only_enhancer must mirror civ_only_follower"
+    assert sim.civ_enhancer_done[:, 1:].shape == sim.civ_religion_done[:, 1:].shape
+    assert bool((sim.civ_enhancer[:, 1:] == -1).all()) and int(sim.claimed_e_n.sum()) == 0, "fresh: no enhancer claimed"
     # The k-th-open picker (the exact inline arithmetic of the enhancer claim):
     # with idx 1 & 4 pre-claimed the open ids are {0,2,3,5,6}; a draw giving
     # k = 2 selects the 3rd open id = idx 3.
@@ -83,15 +83,15 @@ def main() -> None:
     assert sim.holy_tile.shape[1] == sim._O and sim._O == 1 + sim.R
     assert sim.city_pressure[:, 0, :sim.RC].shape == (sim.B, sim.RC, sim._O)
     assert sim.city_followed[:, 0, :sim.RC].shape == (sim.B, sim.RC)
-    assert sim.city_pressure[:, 1:1 + sim.R].shape[3] == sim._O and sim.city_followed[:, 1:1 + sim.R].shape == sim.civ_city_alive.shape
+    assert sim.city_pressure[:, 1:1 + sim.R].shape[3] == sim._O and sim.city_followed[:, 1:1 + sim.R].shape == sim.city_alive[:, 1:1 + max(sim.R, 1)].shape
     if sim.R >= 2 and sim._O >= 3:
         sim.city_pressure[:, 0, :sim.RC].zero_()
         sim.city_followed[:, 0, :sim.RC].fill_(-1)
         sim.holy_tile.fill_(-1)
-        assert bool(sim.alive[:, 0].all()), "fixture city 0 (capital) must be alive"
+        assert bool(sim.city_alive[:, 0, 0].all()), "fixture city 0 (capital) must be alive"
         # Religions 1 & 2 both found their holy city AT city 0's center (dist 0,
         # always in range) -> equal pressure each turn -> a permanent tie.
-        c0 = sim.site[:, 0].clone()
+        c0 = sim.city_center[:, 0, 0].clone()
         sim.holy_tile[:, 1] = c0
         sim.holy_tile[:, 2] = c0
         sim._spread_religious_pressure()
@@ -107,17 +107,17 @@ def main() -> None:
         sim._spread_religious_pressure()  # r1 -> 5, r2 -> 10
         assert bool((sim.city_followed[:, 0, 0] == 2).all()), "majority pressure must flip to religion 2"
         # KILL hygiene: a razed city's pressure row is zeroed, follows nothing.
-        sim.alive[:, 0] = False
+        sim.city_alive[:, 0, 0] = False
         sim._spread_religious_pressure()
         assert bool((sim.city_pressure[:, 0, 0, :] == 0).all()), "dead-slot pressure must reset (KILL hygiene)"
         assert bool((sim.city_followed[:, 0, 0] == -1).all()), "dead city follows nothing"
-        sim.alive[:, 0] = True
+        sim.city_alive[:, 0, 0] = True
         # rc side: a dead civ-city slot is likewise zeroed and follows nothing.
         sim.city_pressure[:, 1:1 + sim.R].zero_()
         sim.city_followed[:, 1:1 + sim.R].fill_(-1)
         sim.city_pressure[:, 0 + 1, 0, 1] = 7  # stale pressure on a (possibly dead) slot
         sim._spread_religious_pressure()
-        dead_rc = ~sim.civ_city_alive[:, 0, 0]
+        dead_rc = ~sim.city_alive[:, 1, 0]
         if bool(dead_rc.any()):
             assert bool((sim.city_pressure[dead_rc, 0 + 1, 0, :] == 0).all()), "dead rc-slot pressure must reset"
             assert bool((sim.city_followed[dead_rc, 0 + 1, 0] == -1).all()), "dead rc city follows nothing"
@@ -140,15 +140,15 @@ def main() -> None:
     # instant culture lump (2 works × first-era effect 45 = 90) and no slot is
     # occupied.
     if sim.districts_on:
-        civic0 = sim.civic_prog.clone()
+        civic0 = sim.civ_civic_prog[:, 0].clone()
         earned0 = sim.gp_earned[:, 7].clone()
-        gw0 = (sim.gw_writing + sim.gw_music).sum().item()
-        sim.gp_points[:, 7] = 100.0  # >= gpCost(0) = 60
+        gw0 = (sim.city_gw_writing[:, 0] + sim.city_gw_music[:, 0]).sum().item()
+        sim.civ_gpp[:, 0, 7] = 100.0  # >= gpCost(0) = 60
         sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
         assert bool((sim.gp_earned[:, 7] == earned0 + 1).all()), "Writer not earned"
-        d_civic = (sim.civic_prog - civic0)
+        d_civic = (sim.civ_civic_prog[:, 0] - civic0)
         assert bool((d_civic == 90.0).all()), f"Writer overflow lump wrong (want 2×45): {d_civic.tolist()}"
-        assert (sim.gw_writing + sim.gw_music).sum().item() == gw0, "no AMPHITHEATER -> no slotted work"
+        assert (sim.city_gw_writing[:, 0] + sim.city_gw_music[:, 0]).sum().item() == gw0, "no AMPHITHEATER -> no slotted work"
 
     # --- a seat-0 PROPHET banks its faith-column effect ---------------------
     # Confucius (PROPHET class 3, roster idx 0) carries fx.faith = 100; the TS
@@ -159,36 +159,36 @@ def main() -> None:
         assert sim._gp_effects.shape[2] > 4, "gpEffects must carry the faith column"
         pc = int(rr["prophetCls"])  # 3
         assert float(sim._gp_effects[pc, 0, 4]) == 100.0, "Confucius faith effect changed"
-        faith0 = sim.faith.clone()
+        faith0 = sim.civ_faith[:, 0].clone()
         pe0 = sim.gp_earned[:, pc].clone()
-        sim.gp_points[:, pc] = 100.0  # >= gpCost(0) = 60, earns one Prophet
+        sim.civ_gpp[:, 0, pc] = 100.0  # >= gpCost(0) = 60, earns one Prophet
         sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
         assert bool((sim.gp_earned[:, pc] == pe0 + 1).all()), "Prophet not earned"
-        d_faith = sim.faith - faith0
+        d_faith = sim.civ_faith[:, 0] - faith0
         assert bool((d_faith == 100.0).all()), f"seat-0 faith bank wrong: {d_faith.tolist()}"
 
     # snapshot/restore round-trips the GP tensors + the faith bank
     # and the enhancer race state (all registered in _MUTABLE).
     sim.enh_claimed[0, 2] = True  # give the enhancer state something to restore
-    sim.civ_only_enhancer[0, 0] = 2
-    sim.civ_only_enhancer_done[0, 0] = True
+    sim.civ_enhancer[0, 1] = 2
+    sim.civ_enhancer_done[0, 1] = True
     sim.claimed_e_n[0] = 1
     sim.holy_tile[0, 0] = 42  # pressure state to restore
     sim.city_pressure[0, 0, 0, 0] = 5
     sim.city_followed[0, 0, 0] = 0
     snap = sim.snapshot()
     sim.gp_earned[:, 7] = 0
-    sim.faith[:] = -1.0
+    sim.civ_faith[:, 0] = -1.0
     sim.enh_claimed[0, 2] = False
-    sim.civ_only_enhancer[0, 0] = -1
+    sim.civ_enhancer[0, 1] = -1
     sim.claimed_e_n[0] = 9
     sim.holy_tile[0, 0] = -1
     sim.city_pressure[0, 0, 0, 0] = 0
     sim.city_followed[0, 0, 0] = -1
     sim.restore(snap)
     assert int(sim.gp_earned[0, 7]) >= 1, "gp_earned not preserved across snapshot"
-    assert float(sim.faith[0]) >= 100.0, "faith not preserved across snapshot"
-    assert bool(sim.enh_claimed[0, 2]) and int(sim.civ_only_enhancer[0, 0]) == 2 and int(sim.claimed_e_n[0]) == 1, \
+    assert float(sim.civ_faith[0, 0]) >= 100.0, "faith not preserved across snapshot"
+    assert bool(sim.enh_claimed[0, 2]) and int(sim.civ_enhancer[0, 1]) == 2 and int(sim.claimed_e_n[0]) == 1, \
         "enhancer race state not preserved across snapshot"
     assert int(sim.holy_tile[0, 0]) == 42 and int(sim.city_pressure[0, 0, 0, 0]) == 5 and int(sim.city_followed[0, 0, 0]) == 0, \
         "pressure-spread state not preserved across snapshot"
@@ -203,8 +203,8 @@ def main() -> None:
         _bid = [b["id"] for b in _braw]
         sh, te = _bid.index("SHRINE"), _bid.index("TEMPLE")
         # follower belief ids (data order): WORK_ETHIC 0, FEED_THE_WORLD 1.
-        sim.civ_only_follower[:, 0] = 0  # civ 0 -> WORK_ETHIC
-        sim.civ_only_follower[:, 1] = 1  # civ 1 -> FEED_THE_WORLD
+        sim.civ_follower[:, 1] = 0  # civ 0 -> WORK_ETHIC
+        sim.civ_follower[:, 2] = 1  # civ 1 -> FEED_THE_WORLD
         fbr = sim._follower_by_rel()
         assert bool((fbr[:, 0] == -1).all()), "seat-0 religion (col 0) never founds in-gate -> no follower"
         assert bool((fbr[:, 1] == 0).all()) and bool((fbr[:, 2] == 1).all()), "religion id -> founding civ's follower"
@@ -229,7 +229,7 @@ def main() -> None:
         # founder (Stewardship) stays per-civ: _bel_add_pf excludes the follower.
         pf = sim._bel_add_pf("bldgY", 0)  # [B, NB, 6]
         full = sim._bel_add("bldgY", 0)
-        folrow = sim._bel["fol"]["bldgY"][sim.civ_only_follower[:, 0] + 1]
+        folrow = sim._bel["fol"]["bldgY"][sim.civ_follower[:, 1] + 1]
         assert bool(((pf + folrow - full).abs().sum() == 0)), "pan+founder + follower must reconstruct the full bldgY"
         # flag routing: LIVE -> followedReligion; INERT -> owner religion.
         if sim._b18_couple:

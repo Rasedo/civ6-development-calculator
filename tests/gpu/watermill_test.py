@@ -60,7 +60,7 @@ def main() -> None:
     assert len(wm_cols) == 1, f"expected exactly one farm-bonus building (the Water Mill), got {wm_cols}"
     wm = wm_cols[0]
 
-    alive = sim.alive[0].nonzero().flatten().tolist()
+    alive = sim.city_alive[0, 0].nonzero().flatten().tolist()
     c0, c1 = alive[0], alive[1]
 
     # Make every tile c0 owns an eligible one: FARM improvement carrying a
@@ -78,7 +78,7 @@ def main() -> None:
     base0, base1 = food_of(sim, c0), food_of(sim, c1)
 
     # (a) + (b): grant the building to c0 ONLY.
-    sim.buildings[0, c0, wm] = True
+    sim.city_bldg[0, 0, c0, wm] = True
     sim._eff_version += 1
     got0, got1 = food_of(sim, c0), food_of(sim, c1)
     delta = got0 - base0
@@ -87,10 +87,10 @@ def main() -> None:
     # base food (+1). Read the base from the rules rather than hardcoding it, so
     # a re-source of the building's yields cannot silently invalidate the lane.
     base_food = float(sim.rules_dev.b_yields[wm][0])
-    worked = min(int(sim.pop[0, c0]), n_elig)  # the center is never eligible (it carries no improvement)
+    worked = min(int(sim.city_pop[0, 0, c0]), n_elig)  # the center is never eligible (it carries no improvement)
     assert abs(delta - (worked + base_food)) < 1e-9, (
         f"Water Mill food delta {delta} != worked eligible tiles {worked} + its own base food "
-        f"{base_food} (pop {int(sim.pop[0, c0])}, eligible owned {n_elig})"
+        f"{base_food} (pop {int(sim.city_pop[0, 0, c0])}, eligible owned {n_elig})"
     )
     assert delta > 0, "the bonus never fired — lane proves nothing"
     assert abs(got1 - base1) < 1e-12, (

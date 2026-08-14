@@ -134,11 +134,11 @@ class SimStep:
         # compacts whenever it holds a hole (deaths are rare; a dense layout
         # keeps the append head in range); civ rows at their high-water
         # threshold. ONE body compacts all rows together.
-        hw0 = (self.alive.long() * (torch.arange(self.RC, device=dev).reshape(1, -1) + 1)).amax(dim=1)
-        need_rc = bool((hw0 > self.alive.sum(dim=1)).any())
+        hw0 = (self.city_alive[:, 0].long() * (torch.arange(self.RC, device=dev).reshape(1, -1) + 1)).amax(dim=1)
+        need_rc = bool((hw0 > self.city_alive[:, 0].sum(dim=1)).any())
         if self.R > 0 and not need_rc:
             # rc high-water = last-alive slot + 1 (what the next append uses)
-            civ_city_hw = (self.civ_city_alive.long() * (torch.arange(self.RC, device=dev).reshape(1, 1, -1) + 1)).amax(dim=2)
+            civ_city_hw = (self.city_alive[:, 1:1 + max(self.R, 1)].long() * (torch.arange(self.RC, device=dev).reshape(1, 1, -1) + 1)).amax(dim=2)
             need_rc = int(civ_city_hw.max()) >= self._civ_city_reclaim_at
         if need_rc:
             self._reclaim_cities()
@@ -214,9 +214,9 @@ class SimStep:
             _fa = torch.where(_gold, self.dedications * self._ded_faith, torch.zeros_like(self.dedications))
             _es = torch.where(_gold, torch.zeros_like(self.dedications), self.dedications * self._ded_era)
             self.era_score.add_(_es)
-            self.faith.copy_(self.faith + _fa[:, 0].to(self.faith.dtype))
+            self.civ_faith[:, 0].copy_(self.civ_faith[:, 0] + _fa[:, 0].to(self.civ_faith[:, 0].dtype))
             if self.R > 0:
-                self.civ_only_faith.copy_(self.civ_only_faith + _fa[:, 1 : 1 + self.R].to(self.civ_only_faith.dtype))
+                self.civ_faith[:, 1:].copy_(self.civ_faith[:, 1:] + _fa[:, 1 : 1 + self.R].to(self.civ_faith[:, 1:].dtype))
         dom = self._domination()
         # A science victory (3, seat 0) / defeat (4, a civ seat) set during
         # THIS turn's project completions takes precedence over the

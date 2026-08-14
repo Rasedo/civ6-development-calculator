@@ -48,57 +48,57 @@ def main() -> None:
     for f in ("relics", "civ_city_relics"):
         assert f not in _MUTABLE, f"{f} is a VIEW of city_relics"
         assert getattr(sim, f).data_ptr() >= sim.city_relics.data_ptr()
-    sim.relics[:, 0] = 1
+    sim.city_relics[:, 0, 0] = 1
     snap = sim.snapshot()
-    sim.relics[:, 0] = 0
+    sim.city_relics[:, 0, 0] = 0
     sim.restore(snap)
-    assert int(sim.relics[0, 0]) == 1, "relics must survive snapshot/restore"
-    sim.relics[:, 0] = 0
+    assert int(sim.city_relics[0, 0, 0]) == 1, "relics must survive snapshot/restore"
+    sim.city_relics[:, 0, 0] = 0
 
     # --- 3) placement: LOWEST city holding a temple with a free slot --------
     b = sim._relic_bidx
-    sim.relics.zero_()
-    sim.buildings[:, :, b] = False
-    sim.alive[:, :] = True
-    sim.buildings[:, 1, b] = True  # only city 1 has a temple
-    sim.buildings[:, 2, b] = True  # ... and city 2
+    sim.city_relics[:, 0].zero_()
+    sim.city_bldg[:, 0, :, b] = False
+    sim.city_alive[:, 0, :] = True
+    sim.city_bldg[:, 0, 1, b] = True  # only city 1 has a temple
+    sim.city_bldg[:, 0, 2, b] = True  # ... and city 2
     rows = torch.zeros(1, dtype=torch.long)
     sim._grant_relic(rows, torch.zeros(1, dtype=torch.long))
-    assert int(sim.relics[0, 0]) == 0, "a city with no temple must be skipped"
-    assert int(sim.relics[0, 1]) == 1, "the LOWEST temple city takes the relic"
-    assert int(sim.relics[0, 2]) == 0, "later temple cities are untouched"
+    assert int(sim.city_relics[0, 0, 0]) == 0, "a city with no temple must be skipped"
+    assert int(sim.city_relics[0, 0, 1]) == 1, "the LOWEST temple city takes the relic"
+    assert int(sim.city_relics[0, 0, 2]) == 0, "later temple cities are untouched"
 
     # a FULL slot is skipped for the next city
     sim._grant_relic(rows, torch.zeros(1, dtype=torch.long))
-    assert int(sim.relics[0, 1]) == 1, "a full slot must not overfill"
-    assert int(sim.relics[0, 2]) == 1, "the next open temple takes it"
+    assert int(sim.city_relics[0, 0, 1]) == 1, "a full slot must not overfill"
+    assert int(sim.city_relics[0, 0, 2]) == 1, "the next open temple takes it"
 
     # no open slot anywhere -> the relic is LOST (no crash, no overfill)
-    before = int(sim.relics.sum())
+    before = int(sim.city_relics[:, 0].sum())
     sim._grant_relic(rows, torch.zeros(1, dtype=torch.long))
-    assert int(sim.relics.sum()) == before, "a relic with no slot must be dropped, not stuffed"
+    assert int(sim.city_relics[:, 0].sum()) == before, "a relic with no slot must be dropped, not stuffed"
 
     # a DEAD city is not a home
-    sim.relics.zero_()
-    sim.alive[:, 1] = False
+    sim.city_relics[:, 0].zero_()
+    sim.city_alive[:, 0, 1] = False
     sim._grant_relic(rows, torch.zeros(1, dtype=torch.long))
-    assert int(sim.relics[0, 1]) == 0, "a dead city must never hold a relic"
-    assert int(sim.relics[0, 2]) == 1, "placement falls through to the next live temple city"
+    assert int(sim.city_relics[0, 0, 1]) == 0, "a dead city must never hold a relic"
+    assert int(sim.city_relics[0, 0, 2]) == 1, "placement falls through to the next live temple city"
 
     # --- 4) the tourism term actually counts relics ------------------------
     s2 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    era = s2._civ_era(s2.techs, s2.civics)
-    base = s2._tourism_of(s2.gw_writing, s2.gw_art, s2.gw_music, s2.alive, s2.owner >= 0, era)
-    s2.alive[:, 0] = True
-    s2.relics.zero_()
-    s2.relics[:, 0] = 2
-    with_relics = s2._tourism_of(s2.gw_writing, s2.gw_art, s2.gw_music, s2.alive, s2.owner >= 0, era, s2.relics)
+    era = s2._civ_era(s2.civ_techs[:, 0], s2.civ_civics[:, 0])
+    base = s2._tourism_of(s2.city_gw_writing[:, 0], s2.city_gw_art[:, 0], s2.city_gw_music[:, 0], s2.city_alive[:, 0], s2.owner >= 0, era)
+    s2.city_alive[:, 0, 0] = True
+    s2.city_relics[:, 0].zero_()
+    s2.city_relics[:, 0, 0] = 2
+    with_relics = s2._tourism_of(s2.city_gw_writing[:, 0], s2.city_gw_art[:, 0], s2.city_gw_music[:, 0], s2.city_alive[:, 0], s2.owner >= 0, era, s2.city_relics[:, 0])
     assert int(with_relics[0] - base[0]) == 2 * s2._relic_tour, (
         f"two relics must add {2 * s2._relic_tour} tourism, got {int(with_relics[0] - base[0])}"
     )
     # ... and a DEAD city's relics pay nothing
-    s2.alive[:, 0] = False
-    dead = s2._tourism_of(s2.gw_writing, s2.gw_art, s2.gw_music, s2.alive, s2.owner >= 0, era, s2.relics)
+    s2.city_alive[:, 0, 0] = False
+    dead = s2._tourism_of(s2.city_gw_writing[:, 0], s2.city_gw_art[:, 0], s2.city_gw_music[:, 0], s2.city_alive[:, 0], s2.owner >= 0, era, s2.city_relics[:, 0])
     assert int(dead[0] - base[0]) == 0, "a lost city must stop paying relic tourism"
 
     # --- 5) the works SURVIVE a transfer and a slot compaction --------------
@@ -109,29 +109,29 @@ def main() -> None:
     #   b. _CITY_SLOT_FIELDS must name every work plane, or a compaction leaves
     #      one behind at the old index.
     s3 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    if s3.R >= 2 and int(s3.civ_city_alive[0, 0].sum()) >= 1:
-        j = int(s3.civ_city_alive[0, 0].nonzero()[0])
-        s3.civ_city_relics[0, 0, j] = 1
-        s3.civ_city_gw_art[0, 0, j] = 2
-        s3.civ_city_gw_writing[0, 0, j] = 3
-        s3.civ_city_gw_music[0, 0, j] = 1
+    if s3.R >= 2 and int(s3.city_alive[0, 1].sum()) >= 1:
+        j = int(s3.city_alive[0, 1].nonzero()[0])
+        s3.city_relics[0, 1, j] = 1
+        s3.city_gw_art[0, 1, j] = 2
+        s3.city_gw_writing[0, 1, j] = 3
+        s3.city_gw_music[0, 1, j] = 1
         # plant a ghost in the slot the receiver will land on, so "carried"
         # cannot be confused with "inherited the reused slot's leftovers"
-        occ = s3.civ_city_alive[0, 1].nonzero().flatten()
+        occ = s3.city_alive[0, 2].nonzero().flatten()
         dest = int(occ.max()) + 1 if len(occ) else 0
         if dest < s3.RC:
-            s3.civ_city_relics[0, 1, dest] = 7
-            s3.civ_city_gw_art[0, 1, dest] = 7
+            s3.city_relics[0, 2, dest] = 7
+            s3.city_gw_art[0, 2, dest] = 7
             s3._transfer_city(0, 1, j, 2, conquest=False)
-            assert int(s3.civ_city_relics[0, 1, dest]) == 1, (
-                f"the flipped city must carry its ONE relic, got {int(s3.civ_city_relics[0, 1, dest])} "
+            assert int(s3.city_relics[0, 2, dest]) == 1, (
+                f"the flipped city must carry its ONE relic, got {int(s3.city_relics[0, 2, dest])} "
                 "(7 means the receiving slot kept a dead city's ghost)"
             )
-            assert int(s3.civ_city_gw_art[0, 1, dest]) == 2, "art must ride the transfer"
-            assert int(s3.civ_city_gw_writing[0, 1, dest]) == 3, "writing must ride the transfer"
-            assert int(s3.civ_city_gw_music[0, 1, dest]) == 1, "music must ride the transfer"
-            assert int(s3.civ_city_relics[0, 0, j]) == 0, "the dead source slot must not keep a relic"
-            assert int(s3.civ_city_gw_art[0, 0, j]) == 0, "the dead source slot must not keep art"
+            assert int(s3.city_gw_art[0, 2, dest]) == 2, "art must ride the transfer"
+            assert int(s3.city_gw_writing[0, 2, dest]) == 3, "writing must ride the transfer"
+            assert int(s3.city_gw_music[0, 2, dest]) == 1, "music must ride the transfer"
+            assert int(s3.city_relics[0, 1, j]) == 0, "the dead source slot must not keep a relic"
+            assert int(s3.city_gw_art[0, 1, j]) == 0, "the dead source slot must not keep art"
             print("  #79a works+relics ride the rc->rc transfer, source slot cleared OK")
 
     # b. compaction must permute ALL FOUR planes with their city.
@@ -148,7 +148,7 @@ def main() -> None:
         for _ in range(60):
             s4.step()
             for r in range(s4.R):
-                if int(s4.civ_city_alive[0, r].sum()) >= 2:
+                if int(s4.city_alive[0, r + 1].sum()) >= 2:
                     civ_only_pick = r
                     break
             if civ_only_pick >= 0:
@@ -157,21 +157,21 @@ def main() -> None:
             break
     assert civ_only_pick >= 0, "no fixture reaches a civ with two cities — cannot exercise compaction"
     if True:
-        live = s4.civ_city_alive[0, civ_only_pick].nonzero().flatten().tolist()
+        live = s4.city_alive[0, civ_only_pick + 1].nonzero().flatten().tolist()
         lo, hi = live[0], live[1]
-        s4.civ_city_relics[0, civ_only_pick, hi] = 5
-        s4.civ_city_gw_art[0, civ_only_pick, hi] = 4
-        keep_id = int(s4.civ_city_id[0, civ_only_pick, hi])
-        s4.civ_city_alive[0, civ_only_pick, lo] = False  # kill the lower slot -> `hi` compacts down
+        s4.city_relics[0, civ_only_pick + 1, hi] = 5
+        s4.city_gw_art[0, civ_only_pick + 1, hi] = 4
+        keep_id = int(s4.city_id[0, civ_only_pick + 1, hi])
+        s4.city_alive[0, civ_only_pick + 1, lo] = False  # kill the lower slot -> `hi` compacts down
         s4._reclaim_cities()
-        where = (s4.civ_city_alive[0, civ_only_pick] & (s4.civ_city_id[0, civ_only_pick] == keep_id)).nonzero().flatten()
+        where = (s4.city_alive[0, civ_only_pick + 1] & (s4.city_id[0, civ_only_pick + 1] == keep_id)).nonzero().flatten()
         assert len(where) == 1, "the surviving city vanished from the registry"
         k = int(where[0])
-        assert int(s4.civ_city_relics[0, civ_only_pick, k]) == 5, (
+        assert int(s4.city_relics[0, civ_only_pick + 1, k]) == 5, (
             f"the relic must follow its city through compaction (slot {hi}->{k}), "
-            f"got {int(s4.civ_city_relics[0, civ_only_pick, k])}"
+            f"got {int(s4.city_relics[0, civ_only_pick + 1, k])}"
         )
-        assert int(s4.civ_city_gw_art[0, civ_only_pick, k]) == 4, "art must follow its city through compaction"
+        assert int(s4.city_gw_art[0, civ_only_pick + 1, k]) == 4, "art must follow its city through compaction"
         print("  #79b all four work planes ride the slot compaction OK")
 
     print("relics OK — constants, placement, dead-city masking, tourism term, _MUTABLE, #79 transfer+compaction")

@@ -42,9 +42,9 @@ def civ_centre(sim) -> tuple[int, int]:
     """An ALIVE civ city centre, and a free land neighbour to attack from."""
     for r in range(sim.R):
         for j in range(sim.RC):
-            if not bool(sim.civ_city_alive[0, r, j]):
+            if not bool(sim.city_alive[0, r + 1, j]):
                 continue
-            ctr = int(sim.civ_city_center[0, r, j])
+            ctr = int(sim.city_center[0, r + 1, j])
             for nb in sim.neigh[ctr].tolist():
                 if nb < 0 or not bool(sim.passable[0, nb]):
                     continue
@@ -112,8 +112,8 @@ def run(civilian: bool, military: bool = False) -> tuple[int, int, bool]:
     p = put_p_melee(sim, from_tile)
 
     r, j = next((r, j) for r in range(sim.R) for j in range(sim.RC)
-                if bool(sim.civ_city_alive[0, r, j]) and int(sim.civ_city_center[0, r, j]) == ctr)
-    hp0 = int(sim.civ_city_hp[0, r, j])
+                if bool(sim.city_alive[0, r + 1, j]) and int(sim.city_center[0, r + 1, j]) == ctr)
+    hp0 = int(sim.city_hp[0, r + 1, j])
     g_hp0 = int(sim.major_unit_hp[0, g])
 
     # the melee action toward the centre
@@ -125,7 +125,7 @@ def run(civilian: bool, military: bool = False) -> tuple[int, int, bool]:
     sim._apply_seat_unit_actions(0, act)
 
     dead = not bool(sim.major_unit_alive[0, g])
-    return hp0 - int(sim.civ_city_hp[0, r, j]), (g_hp0 if dead else g_hp0 - int(sim.major_unit_hp[0, g])), not dead
+    return hp0 - int(sim.city_hp[0, r + 1, j]), (g_hp0 if dead else g_hp0 - int(sim.major_unit_hp[0, g])), not dead
 
 
 def main() -> None:

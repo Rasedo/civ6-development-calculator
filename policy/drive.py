@@ -75,7 +75,7 @@ def _prod_ctx(blocks: dict, sim, seat: int) -> dict:
 
 def take_seat(sim, r: int) -> None:
     """Hand civ `r` (seat r+1) to the ladder for the rest of the run."""
-    sim.controlled[:, r] = True
+    sim.seat_ext[:, r + 1] = True
 
 
 def _blocks(env, sim, r: int) -> dict:
@@ -88,7 +88,7 @@ def _blocks(env, sim, r: int) -> dict:
     obs = env.observe(r + 1)  # env._seat_civ's inverse: seat k>0 is civ k-1
     # tech/civic widths come off the live tensors — there is no NT/NC scalar,
     # and hardcoding one here would be the second copy that always drifts.
-    return ladder.split(obs, sim.S, sim.R, sim.RC, sim.civ_only_techs.shape[2], sim.civ_only_civics.shape[2])
+    return ladder.split(obs, sim.S, sim.R, sim.RC, sim.civ_techs.shape[2], sim.civ_civics.shape[2])
 
 
 #: ACTION FILE SCHEMA v2 — THE FILE IS THE INTERFACE.
@@ -374,7 +374,7 @@ def _buy_ctx(sim, row: int) -> dict:
     n_cities = alive_row.sum(dim=1)
     active = sim.seat_ext[:, row] & (n_cities > 0)
     if row > 0:
-        active = active & sim.civ_only_alive[:, row - 1]
+        active = active & sim.civ_alive[:, row]
     jj, bb, can_b, price, _ = sim._seat_buy_candidates(row, active)
     _sq = (alive_row & (sim.city_current[:, row] == sim.SETTLER)).sum(dim=1)
     sett_cost = (sim.rules.settler_base + sim.rules.settler_per_city
@@ -429,8 +429,8 @@ def _geo_turn(sim):
     if R < 2:
         return den, ally, war, peace
     rr = sim.rules.seats
-    n_c = sim.civ_city_alive.sum(dim=2)
-    alive_civ = sim.civ_only_alive[:, :R] & (n_c > 0)  # [B, R]
+    n_c = sim.city_alive[:, 1:1 + max(sim.R, 1)].sum(dim=2)
+    alive_civ = sim.civ_alive[:, 1:R + 1] & (n_c > 0)  # [B, R]
     rstr = sim._civ_pair_strengths()
     prox_max = int(rr.get("dowProximity", 9))
     prox = {}
@@ -460,7 +460,7 @@ def _geo_turn(sim):
                     & ~sim.civ_pair_war[:, a, b] & ~sim.civ_pair_allied[:, a, b]
                     & (sim.civ_pair_denounced[:, a, b] < 0) & (sim.civ_pair_denounced[:, b, a] < 0)
                     & ~den[:, a, b] & ~den[:, b, a]
-                    & (sim.civ_only_warmonger[:, a] <= 0) & (sim.civ_only_warmonger[:, b] <= 0)
+                    & (sim.civ_warmonger[:, a + 1] <= 0) & (sim.civ_warmonger[:, b + 1] <= 0)
                 )
     # DECLARE: aggressor index asc, first eligible target asc, ONE new war
     # per civ per turn (both sides); the gang bypass (a warmonger target
@@ -485,7 +485,7 @@ def _geo_turn(sim):
             declare = (
                 aggr_ok & alive_civ[:, b] & ~used[:, b]
                 & ~sim.civ_pair_war[:, a, b] & (prox[a, b] <= prox_max)
-                & ((rstr[:, a] > rstr[:, b] * ratio) | (sim.civ_only_warmonger[:, b] >= sim._wm_gang))
+                & ((rstr[:, a] > rstr[:, b] * ratio) | (sim.civ_warmonger[:, b + 1] >= sim._wm_gang))
                 & (ww[:, b] <= peace_ww)
                 & ~allied_eff[:, a, b]
             )
@@ -665,8 +665,8 @@ def _extract_record(sim, r: int, prod, tech, civic, war, env_seq, seq, buy, wors
     # production as [centreTile, col] PAIRS (see SCHEMA_VERSION); the centre
     # is the cross-engine city key.
     _pr = prod[b]
-    _ctr = sim.civ_city_center[b, r]
-    _alive_c = sim.civ_city_alive[b, r]
+    _ctr = sim.city_center[b, r + 1]
+    _alive_c = sim.city_alive[b, r + 1]
     prod_pairs = [
         [int(_ctr[j]), int(_pr[j])]
         for j in range(min(int(_pr.shape[0]), int(_ctr.shape[0])))
@@ -746,7 +746,7 @@ def replay_seat(sim, r: int, rec: dict) -> None:
     # [centreTile, col] pairs -> per-slot columns via THIS sim's centres.
     prod = torch.full((sim.B, sim.RC), -1, dtype=torch.long, device=dev)
     for centre, col in rec["production"]:
-        hit = (sim.civ_city_center[:, r] == int(centre)) & sim.civ_city_alive[:, r]
+        hit = (sim.city_center[:, r + 1] == int(centre)) & sim.city_alive[:, r + 1]
         prod = torch.where(hit, torch.full_like(prod, int(col)), prod)
     tech = None if rec["tech"] is None else torch.tensor(rec["tech"], dtype=torch.long, device=dev)
     civic = None if rec["civic"] is None else torch.tensor(rec["civic"], dtype=torch.long, device=dev)
@@ -760,8 +760,8 @@ def replay_seat(sim, r: int, rec: dict) -> None:
     buy = None
     if _bv is not None and int(_bv[0]) == 0:
         hitj = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
-        for j in range(int(sim.civ_city_center.shape[2])):
-            m = (sim.civ_city_center[:, r, j] == int(_bv[1])) & sim.civ_city_alive[:, r, j]
+        for j in range(sim.RC):
+            m = (sim.city_center[:, r + 1, j] == int(_bv[1])) & sim.city_alive[:, r + 1, j]
             hitj = torch.where(m, torch.full_like(hitj, j), hitj)
         kind0 = torch.where(hitj >= 0, torch.zeros_like(hitj), torch.full_like(hitj, -1))
         buy = (kind0, hitj, torch.full((sim.B,), int(_bv[2]), dtype=torch.long, device=dev))
@@ -775,16 +775,16 @@ def replay_seat(sim, r: int, rec: dict) -> None:
         # TILE: [3, tileIndex, centreTile] -> (kind, tile, slot) by centre
         # resolution (match by centre + alive, never by slot).
         hitj = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
-        for j in range(int(sim.civ_city_center.shape[2])):
-            m3 = (sim.civ_city_center[:, r, j] == int(_bv[2])) & sim.civ_city_alive[:, r, j]
+        for j in range(sim.RC):
+            m3 = (sim.city_center[:, r + 1, j] == int(_bv[2])) & sim.city_alive[:, r + 1, j]
             hitj = torch.where(m3, torch.full_like(hitj, j), hitj)
         kind3 = torch.where(hitj >= 0, torch.full_like(hitj, 3), torch.full_like(hitj, -1))
         buy = (kind3, torch.full((sim.B,), int(_bv[1]), dtype=torch.long, device=dev), hitj)
 
     def _centre_slot(centre: int) -> torch.Tensor:
         hj = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
-        for j in range(int(sim.civ_city_center.shape[2])):
-            mm = (sim.civ_city_center[:, r, j] == centre) & sim.civ_city_alive[:, r, j]
+        for j in range(sim.RC):
+            mm = (sim.city_center[:, r + 1, j] == centre) & sim.city_alive[:, r + 1, j]
             hj = torch.where(mm, torch.full_like(hj, j), hj)
         return hj
 

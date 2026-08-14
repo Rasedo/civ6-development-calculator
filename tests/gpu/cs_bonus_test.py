@@ -57,7 +57,7 @@ def _force_scientific_cs0(sim) -> None:
     sim._citystate_b2idx[0, 0] = bidx("UNIVERSITY")
     sim._citystate_yidx[0, 0] = SCIENCE
     sim.citystate_alive[0, 0] = True
-    sim.citystate_met[0, 0] = True
+    sim.seat_citystate_met[0, 0, 0] = True
 
 
 def test_catalog(rules, path) -> None:
@@ -92,11 +92,11 @@ def test_building_bonus(rules, path) -> None:
     if sim.S > 1:
         sim.citystate_alive[0, 1:] = False
     li, ui = bidx("LIBRARY"), bidx("UNIVERSITY")
-    sim.buildings[0, 0, li] = True
-    sim.buildings[0, 0, ui] = True
+    sim.city_bldg[0, 0, 0, li] = True
+    sim.city_bldg[0, 0, 0, ui] = True
 
     def sci0(envoys: int) -> tuple[float, float]:
-        sim.citystate_envoys[0, 0] = envoys
+        sim.seat_citystate_envoys[0, 0, 0] = envoys
         sim._eff_version += 1
         total, _, _, _ = sim._city_totals()
         return float(total[0, 0, SCIENCE]), float(total[0, 0, FOOD])
@@ -110,8 +110,8 @@ def test_building_bonus(rules, path) -> None:
     print(f"  seat-0 building bonus OK: science {s1:.2f}(1e) -> {s3:.2f}(3e) -> {s6:.2f}(6e), food flat")
 
     # control: no LIBRARY -> the 3-envoy tier-1 bonus vanishes
-    sim.buildings[0, 0, li] = False
-    sim.buildings[0, 0, ui] = False
+    sim.city_bldg[0, 0, 0, li] = False
+    sim.city_bldg[0, 0, 0, ui] = False
     s1b, _ = sci0(1)
     s3b, _ = sci0(3)
     assert abs(s3b - s1b) < 1e-9, f"3-envoy bonus fired with NO tier-1 building ({s1b}->{s3b})"
@@ -146,10 +146,10 @@ def test_building_pillage(rules, path) -> None:
     sim.district_pillaged[0, ct] = False
     sim.district_dead[0, ct] = False
     li = bidx("LIBRARY")
-    sim.buildings[0, 0, li] = True
+    sim.city_bldg[0, 0, 0, li] = True
 
     def sci0(envoys: int) -> float:
-        sim.citystate_envoys[0, 0] = envoys
+        sim.seat_citystate_envoys[0, 0, 0] = envoys
         sim._eff_version += 1
         total, _, _, _ = sim._city_totals()
         return float(total[0, 0, SCIENCE])
@@ -176,9 +176,9 @@ def test_suzerain(rules, path) -> None:
     if sim.S > 1:
         sim.citystate_alive[0, 1:] = False
     # seat 0 STRICTLY suzerain of CS0: 4 envoys, civ seats at 0
-    sim.citystate_envoys[0, 0] = 4
+    sim.seat_citystate_envoys[0, 0, 0] = 4
     if sim.R > 0:
-        sim.civ_only_citystate_envoys[0, :, 0] = 0
+        sim.seat_citystate_envoys[0, 1:, 0] = 0
     suz_amt = float(sim._citystate_suz_amt)
 
     def cap_sci(suz_key: int) -> float:
@@ -195,7 +195,7 @@ def test_suzerain(rules, path) -> None:
     # contest lost: a civ seat out-envoys seat 0 -> no perk
     if sim.R > 0:
         sim.citystate_suz_key[0, 0] = SCIENCE
-        sim.civ_only_citystate_envoys[0, 0, 0] = 9  # civ 0 dominates
+        sim.seat_citystate_envoys[0, 1, 0] = 9  # civ 0 dominates
         sim._eff_version += 1
         total, _, _, _ = sim._city_totals()
         contested = float(total[0, 0, SCIENCE])
@@ -211,7 +211,7 @@ def test_civ_bonus(rules, path) -> None:
         print("  civ test SKIPPED (no civs)")
         return
     r = 0
-    live = (sim.civ_city_alive[0, r]).nonzero(as_tuple=True)[0]
+    live = (sim.city_alive[0, r + 1]).nonzero(as_tuple=True)[0]
     if len(live) == 0:
         print("  civ test SKIPPED (civ 0 has no cities)")
         return
@@ -220,11 +220,11 @@ def test_civ_bonus(rules, path) -> None:
     if sim.S > 1:
         sim.citystate_alive[0, 1:] = False
     li, ui = bidx("LIBRARY"), bidx("UNIVERSITY")
-    sim.civ_city_bldg[0, r, j, li] = True
-    sim.civ_city_bldg[0, r, j, ui] = True
+    sim.city_bldg[0, r + 1, j, li] = True
+    sim.city_bldg[0, r + 1, j, ui] = True
 
     def rsci(renvoys: int, suz_key: int = -1) -> float:
-        sim.civ_only_citystate_envoys[0, r, 0] = renvoys
+        sim.seat_citystate_envoys[0, r + 1, 0] = renvoys
         sim.citystate_suz_key[0, 0] = suz_key
         sim._eff_version += 1
         # _seat_city_yields_all returns (food, prod, sci, cul, gold, faith).
@@ -240,10 +240,10 @@ def test_civ_bonus(rules, path) -> None:
 
     # civ suzerain perk on the CAPITAL: force this rc to be the capital and
     # make the civ seat strictly suzerain (envoys 4, every other seat at 0)
-    sim.civ_city_is_cap[0, r, j] = True
-    sim.citystate_envoys[0, 0] = 0
-    sim.civ_only_citystate_envoys[0, :, 0] = 0
-    sim.civ_only_citystate_envoys[0, r, 0] = 4
+    sim.city_is_cap[0, r + 1, j] = True
+    sim.seat_citystate_envoys[0, 0, 0] = 0
+    sim.seat_citystate_envoys[0, 1:, 0] = 0
+    sim.seat_citystate_envoys[0, r + 1, 0] = 4
     ship = rsci(4, suz_key=SCIENCE)
     desc = rsci(4, suz_key=-1)
     assert ship > desc + 1e-9, f"civ suzerain perk did not add to the capital ({desc}->{ship})"

@@ -16,15 +16,15 @@ from core import BatchSim, load_rules, load_fixture, FIXTURES
 pool = [load_fixture(p) for p in sorted(FIXTURES.glob("seed*.json"))[:24]]
 sim = BatchSim(pool, load_rules(), device="cpu", dtype=torch.float64)
 B = sim.B
-peak = sim.alive.sum(dim=1).clone()
+peak = sim.city_alive[:, 0].sum(dim=1).clone()
 ever_war = torch.zeros(B, dtype=torch.bool)
 loss_at_war = 0
 loss_at_peace = 0
-prev = sim.alive.sum(dim=1).clone()
+prev = sim.city_alive[:, 0].sum(dim=1).clone()
 
 for t in range(1, 301):
     sim.step()
-    cur = sim.alive.sum(dim=1)
+    cur = sim.city_alive[:, 0].sum(dim=1)
     atwar = sim.war[:, 0, : 1 + sim.R].any(dim=1)
     ever_war |= atwar
     peak = torch.maximum(peak, cur)
@@ -33,7 +33,7 @@ for t in range(1, 301):
     loss_at_peace += int((lost * ~atwar).sum())
     prev = cur.clone()
 
-final = sim.alive.sum(dim=1)
+final = sim.city_alive[:, 0].sum(dim=1)
 declined = (final < peak)
 print(f"games: {B}")
 print(f"games that lost cities from peak: {int(declined.sum())}")

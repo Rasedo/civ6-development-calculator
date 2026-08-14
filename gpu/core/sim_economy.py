@@ -437,7 +437,7 @@ class SimEconomy:
         out = base
         if self.MINE >= 0:
             if self._mine_boost_tech.numel() > 0:
-                researched = self.techs[:, self._mine_boost_tech].to(self.dtype)  # [B, K]
+                researched = self.civ_techs[:, 0, self._mine_boost_tech].to(self.dtype)  # [B, K]
                 boost = (researched * self._mine_boost_amt).sum(dim=1)            # [B]
             else:
                 boost = torch.zeros(self.B, dtype=self.dtype, device=self.device)
@@ -1132,7 +1132,7 @@ class SimEconomy:
                 for c in range(self.RC):
                     cap[:, c] = cap[:, c] + (tile_sl * (self.owner == c).long()).sum(dim=1)
             else:
-                wreg = self.civ_city_wonder[:, row - 1]  # [B, RC, nW]
+                wreg = self.city_wonder[:, row]  # [B, RC, nW]
                 compw = (wreg >= 0) & self.built_wonder_complete.gather(
                     1, wreg.clamp(min=0).reshape(self.B, -1)
                 ).reshape_as(wreg)
@@ -1168,7 +1168,7 @@ class SimEconomy:
         # founding path assigns it an enhancer.
         RANGE = torch.full((B, O), int(self._pressure_range), dtype=torch.long, device=self.device)
         if self.R > 0 and self._enh_any:
-            RANGE[:, 1 : 1 + self.R] += self._enh["presR"][self.civ_only_enhancer + 1].long()
+            RANGE[:, 1 : 1 + self.R] += self._enh["presR"][self.civ_enhancer[:, 1:] + 1].long()
         founded = self.holy_tile >= 0  # [B, O]
         ht = self.holy_tile.clamp(min=0)  # [B, O] valid tile idx (masked where unfounded)
         # ONE flip for every seat.
@@ -1628,7 +1628,7 @@ class SimEconomy:
         if not self.improvements_on:
             out = z
         else:
-            tier = self._farmadj_tier(self.civics, self.techs)
+            tier = self._farmadj_tier(self.civ_civics[:, 0], self.civ_techs[:, 0])
             if not bool((tier > 0).any()):
                 out = z
             else:
@@ -2051,12 +2051,12 @@ class SimEconomy:
         rd = self.rules_dev
         w = rd.score_yield_weights
         pw = float(self.rules.score_pop_weight)
-        ord_ = torch.argsort((~self.alive).long(), dim=1, stable=True)
+        ord_ = torch.argsort((~self.city_alive[:, 0]).long(), dim=1, stable=True)
         bidx = self._bidx
         score = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for s in range(self.RC):
             col = ord_[:, s]
-            score = score + (self.pop[bidx, col] * self.alive[bidx, col].long()).to(self.dtype) * pw
+            score = score + (self.city_pop[bidx, 0, col] * self.city_alive[bidx, 0, col].long()).to(self.dtype) * pw
             t_c = total[bidx, col]
             for k in range(6):
                 score = score + t_c[:, k] * float(w[k])
@@ -2071,15 +2071,15 @@ class SimEconomy:
         rd = self.rules_dev
         w = rd.score_yield_weights
         B = self.B
-        pop_term = (self.civ_city_pop[:, r] * self.civ_city_alive[:, r].long()).sum(dim=1).to(self.dtype) * self.rules.score_pop_weight
+        pop_term = (self.city_pop[:, r + 1] * self.city_alive[:, r + 1].long()).sum(dim=1).to(self.dtype) * self.rules.score_pop_weight
         yt = torch.zeros(B, dtype=torch.float64, device=self.device)
         for j in range(self.RC):
-            mask = self.civ_city_alive[:, r, j]
+            mask = self.city_alive[:, r + 1, j]
             if not bool(mask.any()):
                 continue
             f, pr, sc, cu, _g, _fa = self._seat_city_yields(r, j, mask)
             yt = yt + f * float(w[0]) + pr * float(w[1]) + sc * float(w[3]) + cu * float(w[4])
-            bgf = self.civ_city_bldg[:, r, j].double() @ rd.b_yields.double()  # [B, 6]
+            bgf = self.city_bldg[:, r + 1, j].double() @ rd.b_yields.double()  # [B, 6]
             yt = yt + bgf[:, 2] * float(w[2]) + bgf[:, 5] * float(w[5])
         return pop_term + yt.to(self.dtype)
 
@@ -2096,7 +2096,7 @@ class SimEconomy:
         # TS association: per city — pop×popWeight FIRST, then the six yields
         # in key order (empireScore's per-city loop).
         yt = torch.zeros(B, dtype=torch.float64, device=self.device)
-        if not bool(self.civ_city_alive[:, r].any()):
+        if not bool(self.city_alive[:, r + 1].any()):
             return yt.to(self.dtype)
         # ONE batched pass replaces the RC per-j _seat_city_yields calls (each
         # a full window gather + ~30 plane gathers + topk); the per-j
@@ -2105,10 +2105,10 @@ class SimEconomy:
         # leader() included — through this one body.
         F, PR, SC, CU, GO, FA = self._seat_city_yields_all(r)
         for j in range(self.RC):
-            mask = self.civ_city_alive[:, r, j]
+            mask = self.city_alive[:, r + 1, j]
             if not bool(mask.any()):
                 continue
-            yt = yt + (self.civ_city_pop[:, r, j] * self.civ_city_alive[:, r, j].long()).double() * pw
+            yt = yt + (self.city_pop[:, r + 1, j] * self.city_alive[:, r + 1, j].long()).double() * pw
             yt = yt + F[:, j] * float(w[0]) + PR[:, j] * float(w[1]) + GO[:, j] * float(w[2]) + SC[:, j] * float(w[3]) + CU[:, j] * float(w[4]) + FA[:, j] * float(w[5])
         return yt.to(self.dtype)
 
@@ -2140,7 +2140,7 @@ class SimEconomy:
         cols = [self.empire_score()] + [self.civ_empire_score(r) for r in range(self.R)]
         scores = torch.stack(cols, dim=1)  # [B, 1+R]
         has_city = torch.stack(
-            [self.alive.any(dim=1)] + [self.civ_city_alive[:, r].any(dim=1) for r in range(self.R)], dim=1)
+            [self.city_alive[:, 0].any(dim=1)] + [self.city_alive[:, r + 1].any(dim=1) for r in range(self.R)], dim=1)
         fenced = torch.where(has_city, scores, torch.full_like(scores, float("-inf")))
         pick = torch.where(has_city.any(dim=1), first_argmax(fenced), first_argmax(scores))
         return torch.where(self.winner >= 0, self.winner, pick)

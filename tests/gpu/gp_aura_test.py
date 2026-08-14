@@ -157,11 +157,11 @@ def poke_seat0_spawn(rules, rj, path):
     for uidx, cls, nm in ((sim0._general_unit_idx, sim0._general_cls, "GENERAL"),
                           (sim0._admiral_unit_idx, sim0._admiral_cls, "ADMIRAL")):
         sim = build(rules, path)
-        assert bool(sim.alive[0, 0]), "seat-0 capital (slot 0) must be alive"
+        assert bool(sim.city_alive[0, 0, 0]), "seat-0 capital (slot 0) must be alive"
         # a completed, owned district of this class so the class accrues + claims
         d = int(sim._gp_class_district[cls])
         assert d >= 0
-        dt = tile_within(sim, int(sim.site[0, 0]), 2)
+        dt = tile_within(sim, int(sim.city_center[0, 0, 0]), 2)
         assert dt >= 0
         sim.district[0, dt] = d
         sim.district_complete[0, dt] = True
@@ -172,14 +172,14 @@ def poke_seat0_spawn(rules, rj, path):
         # fund EXACTLY one person (gpCost(0)); the +1 district accrual keeps the
         # leftover well under gpCost(1), so the claim loop fires exactly once.
         sim.gp_earned[:, cls] = 0
-        sim.gp_points[0, cls] = float(sim._gp_costs[0])
+        sim.civ_gpp[0, 0, cls] = float(sim._gp_costs[0])
         before = int((sim.major_unit_alive[0] & (sim.major_unit_type[0] == uidx)).sum())
         sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
         after = int((sim.major_unit_alive[0] & (sim.major_unit_type[0] == uidx)).sum())
         assert after == before + 1, f"seat-0 {nm} claim did not spawn exactly one unit ({before}->{after})"
         # spawned at/adjacent to the capital, civilian, 1 charge (not military)
         u = (sim.major_unit_alive[0] & (sim.major_unit_type[0] == uidx)).nonzero(as_tuple=True)[0][-1].item()
-        cap = int(sim.site[0, 0])
+        cap = int(sim.city_center[0, 0, 0])
         assert int(sim.pair_dist[cap, int(sim.major_unit_tile[0, u])]) <= 1, f"{nm} not spawned at the capital"
         assert bool(sim._type_civilian[uidx]) and int(sim.major_unit_charges[0, u]) >= 1, f"{nm} must be a civilian (charges>=1)"
     print("  2 seat-0 spawn-at-claim OK — GENERAL + ADMIRAL born at the capital")
@@ -194,7 +194,7 @@ def poke_aura_helper(rules, rj, path):
     CS = sim._gen_aura_cs_val
     clear_all_units(sim)
     # a seat-0 GENERAL at ctr; probe tiles at distance 2 (in range) and 3 (out).
-    ctr = int(sim.site[0, 0])
+    ctr = int(sim.city_center[0, 0, 0])
     place_civilian(sim, 0, ctr, gi)  # seat-0 general at ctr
     t1 = tile_within(sim, ctr, 2, banned=[ctr])
     t3 = tile_within(sim, ctr, 3, banned=[ctr, t1])
@@ -219,7 +219,7 @@ def poke_aura_helper(rules, rj, path):
     # ADMIRAL: auras a NAVAL unit, not a LAND unit
     sim2 = build(rules, path)
     clear_all_units(sim2)
-    ctr2 = int(sim2.site[0, 0])
+    ctr2 = int(sim2.city_center[0, 0, 0])
     place_civilian(sim2, 0, ctr2, ai)  # seat-0 admiral
     tt = tile_within(sim2, ctr2, 2, banned=[ctr2])
     s_nav = float(sim2._gen_aura_cs(civ0, torch.tensor([tt]), torch.ones(B, dtype=torch.bool))[0])
@@ -243,7 +243,7 @@ def poke_aura_in_combat(rules, rj, path):
         clear_all_units(sim)
         sim.civ_only_atwar[:, 0] = True
         sim.sync_war()  # a poked war write lands in one cell; mirror the pair
-        ctr = int(sim.site[0, 0])
+        ctr = int(sim.city_center[0, 0, 0])
         # the seat-0 defender at a free tile; a civ attacker adjacent to it
         dtile = tile_within(sim, ctr, 4)
         atile = adj_free(sim, dtile, banned=[ctr])
@@ -292,7 +292,7 @@ def poke_capture(rules, rj, path):
     clear_all_units(sim)
     sim.civ_only_atwar[:, 0] = True
     sim.sync_war()  # a poked war write lands in one cell; mirror the pair
-    ctr = int(sim.site[0, 0])
+    ctr = int(sim.city_center[0, 0, 0])
     gtile = tile_within(sim, ctr, 4)
     atile = adj_free(sim, gtile, banned=[ctr])
     assert gtile >= 0 and atile >= 0

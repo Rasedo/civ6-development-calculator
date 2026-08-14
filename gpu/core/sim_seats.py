@@ -205,7 +205,7 @@ class SimSeats:
         if war is not None:
             Rw = max(self.R, 1)
             w = war.to(torch.long)
-            declare = (w == 0) & self.controlled[:, r] & self.civ_only_alive[:, r] & ~self.civ_only_atwar[:, r]
+            declare = (w == 0) & self.seat_ext[:, r + 1] & self.civ_alive[:, r + 1] & ~self.civ_only_atwar[:, r]
             if bool(declare.any()):
                 self.civ_only_atwar[:, r] = self.civ_only_atwar[:, r] | declare
                 self.war[:, 1 + r, 0] |= declare  # the store IS war[0, 1+r]; this writes the MIRROR cell
@@ -215,12 +215,12 @@ class SimSeats:
             sr = self.rules.seats
             pcost_c = sr.get("peaceGold0", 150) + sr.get("peaceGoldSlope", 10) * self.civ_only_warturns[:, r].to(torch.float64)
             peace = (
-                (w == Rw) & self.controlled[:, r] & self.civ_only_atwar[:, r]
+                (w == Rw) & self.seat_ext[:, r + 1] & self.civ_only_atwar[:, r]
                 & (self.civ_only_warturns[:, r] >= sr.get("warMinTurns", 14))
-                & self._afford(self.civ_only_treasury[:, r], pcost_c)
+                & self._afford(self.civ_treasury[:, r + 1], pcost_c)
             )
             if bool(peace.any()):
-                self.civ_only_treasury[:, r] = torch.where(peace, self.civ_only_treasury[:, r] - pcost_c, self.civ_only_treasury[:, r])
+                self.civ_treasury[:, r + 1] = torch.where(peace, self.civ_treasury[:, r + 1] - pcost_c, self.civ_treasury[:, r + 1])
                 self.civ_only_atwar[:, r] = self.civ_only_atwar[:, r] & ~peace
                 self._ww_peace(peace, 0, r + 1)  # -2000 on the treaty (the makePeace twin)
                 self._citystate_suzerain_release(r, peace)
@@ -950,16 +950,16 @@ class SimSeats:
         so no water term is needed). The hasJob twin under the civ's unlocks.
         Reads LIVE research: both engines decide pre-turn, so no mid-phase
         snapshot exists to pass."""
-        return self._job_mask_core(self.civ_only_techs[:, r], self.civ_only_civics[:, r], self.civ_at == r)
+        return self._job_mask_core(self.civ_techs[:, r + 1], self.civ_civics[:, r + 1], self.civ_at == r)
 
     def _seat_job_mask(self, seat: int) -> torch.Tensor:
         """The ONE builder-job predicate for ANY seat. Seat 0 routes its own
-        planes (owner >= 0, self.techs/self.civics); seats k >= 1 route the
+        planes (owner >= 0, self.civ_techs[:, 0]/self.civ_civics[:, 0]); seats k >= 1 route the
         r-planes. Both run the SAME _job_mask_core text, so the predicate cannot
         fork by seat."""
         if seat >= 1:
             return self._civ_job_mask(seat - 1)
-        return self._job_mask_core(self.techs, self.civics, self.owner >= 0)
+        return self._job_mask_core(self.civ_techs[:, 0], self.civ_civics[:, 0], self.owner >= 0)
 
     def _job_mask_core(self, tk: torch.Tensor, cv: torch.Tensor, owned: torch.Tensor) -> torch.Tensor:
         farm = self.farm_flat | (self.farm_hill & cv[:, self._hillfarms_civic].unsqueeze(1)) if self._hillfarms_civic >= 0 else self.farm_flat
@@ -1245,38 +1245,38 @@ class SimSeats:
         fires = (self.turn % self._congress_interval) == 0
         if not fires:
             return
-        era_ok = self._civ_era(self.techs, self.civics) >= self._congress_min_era
+        era_ok = self._civ_era(self.civ_techs[:, 0], self.civ_civics[:, 0]) >= self._congress_min_era
         for r in range(self.R):
-            era_ok = era_ok | (self._civ_era(self.civ_only_techs[:, r], self.civ_only_civics[:, r]) >= self._congress_min_era)
+            era_ok = era_ok | (self._civ_era(self.civ_techs[:, r + 1], self.civ_civics[:, r + 1]) >= self._congress_min_era)
         if not bool(era_ok.any()):
             return
         self.congress_sessions.add_(era_ok.long())
         # the ascending scan: strictly-greater keeps the LOWER id on a tie
-        best = self.diplo_favor.clone()
+        best = self.civ_diplo_favor[:, 0].clone()
         win = torch.where(best > 0, torch.zeros_like(best), torch.full_like(best, -1))
         for r in range(self.R):
-            v = self.civ_only_diplo_favor[:, r]
+            v = self.civ_diplo_favor[:, r + 1]
             take = (v > 0) & (v > best)
             win = torch.where(take, torch.full_like(win, r + 1), win)
             best = torch.where(take, v, best)
         # commitments are spent whether or not they won (only where the
         # session actually convened)
-        self.diplo_favor.copy_(torch.where(era_ok, torch.zeros_like(self.diplo_favor), self.diplo_favor))
+        self.civ_diplo_favor[:, 0].copy_(torch.where(era_ok, torch.zeros_like(self.civ_diplo_favor[:, 0]), self.civ_diplo_favor[:, 0]))
         for r in range(self.R):
-            self.civ_only_diplo_favor[:, r] = torch.where(era_ok, torch.zeros_like(self.civ_only_diplo_favor[:, r]), self.civ_only_diplo_favor[:, r])
-        self.diplo_points.add_((era_ok & (win == 0)).long() * self._dvp_per_res)
+            self.civ_diplo_favor[:, r + 1] = torch.where(era_ok, torch.zeros_like(self.civ_diplo_favor[:, r + 1]), self.civ_diplo_favor[:, r + 1])
+        self.civ_diplo_points[:, 0].add_((era_ok & (win == 0)).long() * self._dvp_per_res)
         for r in range(self.R):
-            self.civ_only_diplo_points[:, r] = self.civ_only_diplo_points[:, r] + (era_ok & (win == r + 1)).long() * self._dvp_per_res
+            self.civ_diplo_points[:, r + 1] = self.civ_diplo_points[:, r + 1] + (era_ok & (win == r + 1)).long() * self._dvp_per_res
 
     def _diplomatic_victor(self) -> torch.Tensor:
         """The `diplomaticVictor` mirror: [B] the lowest seat id holding
         >= diploVictoryPoints Diplomatic Victory Points and still holding a
         city; -1 none."""
         winner = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
-        ok = self.alive.any(dim=1) & (self.diplo_points >= self._dvp_win)
+        ok = self.city_alive[:, 0].any(dim=1) & (self.civ_diplo_points[:, 0] >= self._dvp_win)
         winner = torch.where(ok, torch.zeros_like(winner), winner)
         for r in range(self.R):
-            okr = self.civ_city_alive[:, r].any(dim=1) & (self.civ_only_diplo_points[:, r] >= self._dvp_win)
+            okr = self.city_alive[:, r + 1].any(dim=1) & (self.civ_diplo_points[:, r + 1] >= self._dvp_win)
             winner = torch.where((winner < 0) & okr, torch.full_like(winner, r + 1), winner)
         return winner
 
@@ -1317,13 +1317,13 @@ class SimSeats:
         B, dev = self.B, self.device
         n_civs = 1 + self.R
         vis_div = n_civs * self._tourism_per_visitor
-        alive = [self.alive.any(dim=1)]
-        tour = [self.tourism_total]
-        cul = [self.culture_total]
+        alive = [self.city_alive[:, 0].any(dim=1)]
+        tour = [self.civ_tourism[:, 0]]
+        cul = [self.civ_culture[:, 0]]
         for r in range(self.R):
-            alive.append(self.civ_city_alive[:, r].any(dim=1))
-            tour.append(self.civ_only_tourism[:, r])
-            cul.append(self.civ_only_culture[:, r])
+            alive.append(self.city_alive[:, r + 1].any(dim=1))
+            tour.append(self.civ_tourism[:, r + 1])
+            cul.append(self.civ_culture[:, r + 1])
         visiting = [torch.div(t.long(), vis_div, rounding_mode="floor") for t in tour]
         domestic = [
             torch.div(js_round(c * 1000).long(), 1000 * self._culture_per_tourist, rounding_mode="floor")
@@ -2720,7 +2720,7 @@ class SimSeats:
             m = (
                 (self.tile_seat == 0).unsqueeze(2)
                 & (self.tile_city.unsqueeze(2) == ids0.unsqueeze(1))
-                & self.alive.unsqueeze(1)
+                & self.city_alive[:, 0].unsqueeze(1)
             )  # [B, T, C]
             self._owner_cache = torch.where(
                 m.any(dim=2), m.long().argmax(dim=2),
@@ -2992,16 +2992,16 @@ class SimSeats:
         else:
             has_imp = torch.zeros(B, dtype=torch.bool, device=dev)
             imp_tgt = hc
-        dc = self.pair_dist[hc.unsqueeze(1), self.site.clamp(min=0)].to(torch.long)
+        dc = self.pair_dist[hc.unsqueeze(1), self.city_center[:, 0].clamp(min=0)].to(torch.long)
         # Distance ties break by the FOUNDING sequence (TS array order), NOT the
         # slot index — the same rule the barbarian twin uses.
         # Seat-0 cities are march targets only at war with seat 0 (hp); a civ
         # ALSO marches to its at-war ENEMY civs' cities (key
         # d*16384 + civIdx*2048 + centerTile), with seat 0 winning ties.
-        ckey = torch.where(self.alive & hpT, dc * 4096 + torch.arange(self.RC, device=self.device), 10**9)
+        ckey = torch.where(self.city_alive[:, 0] & hpT, dc * 4096 + torch.arange(self.RC, device=self.device), 10**9)
         city_min = ckey.min(dim=1).values
         pc_dist = torch.div(city_min, 4096, rounding_mode="floor")  # seat-0 city distance (1e9//4096 stays huge)
-        city_tgt = self.site.gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
+        city_tgt = self.city_center[:, 0].gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
         civ_city_key_min = torch.full((B,), 10**18, dtype=torch.long, device=dev)
         civ_city_tgt = hc.clone()
         for r2 in range(self.R):
@@ -3009,8 +3009,8 @@ class SimSeats:
             if not bool(war2.any()):
                 continue
             for j in range(self.RC):
-                ct2 = self.civ_city_center[:, r2, j].clamp(min=0)
-                alive2 = self.civ_city_alive[:, r2, j] & war2
+                ct2 = self.city_center[:, r2 + 1, j].clamp(min=0)
+                alive2 = self.city_alive[:, r2 + 1, j] & war2
                 d2 = self.pair_dist[hc, ct2].to(torch.long)
                 key2 = torch.where(alive2, d2 * (2048 * 8) + r2 * 2048 + ct2, torch.full_like(d2, 10**18))
                 upd = key2 < civ_city_key_min
@@ -3753,7 +3753,7 @@ class SimSeats:
         any_met = active & met_live.any(dim=1)
         if not bool(any_met.any()):
             return
-        civics = self.civics if row == 0 else self.civ_only_civics[:, row - 1]
+        civics = self.civ_civics[:, 0] if row == 0 else self.civ_civics[:, row]
         pt = torch.full((B,), float(rr.get("influencePerTurn", 3)), dtype=torch.float64, device=dev)
         if self._gov_live:
             pt = pt + self._adopted_gov_tier(civics).double()
@@ -4079,7 +4079,7 @@ class SimSeats:
         civ seat (civilians carry combat 0). Feeds the DoW/peace arms; computed
         pre-phase, before this turn's spawns and combat."""
         B, dev = self.B, self.device
-        n_c = self.civ_city_alive.sum(dim=2)  # [B, R]
+        n_c = self.city_alive[:, 1:1 + max(self.R, 1)].sum(dim=2)  # [B, R]
         rstr = torch.zeros(B, self.R, dtype=torch.float64, device=dev)
         vt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
         for r in range(self.R):
@@ -4092,9 +4092,9 @@ class SimSeats:
         cityless) — the seatPairProximity twin."""
         B = self.B
         d_ab = self.pair_dist[
-            self.civ_city_center[:, a].clamp(min=0).unsqueeze(2), self.civ_city_center[:, b].clamp(min=0).unsqueeze(1)
+            self.city_center[:, a + 1].clamp(min=0).unsqueeze(2), self.city_center[:, b + 1].clamp(min=0).unsqueeze(1)
         ].to(torch.long)  # [B, RC, RC]
-        pair_ok = self.civ_city_alive[:, a].unsqueeze(2) & self.civ_city_alive[:, b].unsqueeze(1)
+        pair_ok = self.city_alive[:, a + 1].unsqueeze(2) & self.city_alive[:, b + 1].unsqueeze(1)
         return torch.where(pair_ok, d_ab, 999).reshape(B, -1).min(dim=1).values
 
     def apply_geo(self, r: int, denounce: torch.Tensor | None = None,
@@ -4139,8 +4139,8 @@ class SimSeats:
         astash = getattr(self, "_driven_ally", None)
         if not dstash and not astash:
             return
-        n_c = self.civ_city_alive.sum(dim=2)
-        alive_civ = self.civ_only_alive[:, : self.R] & (n_c > 0)  # [B, R]
+        n_c = self.city_alive[:, 1:1 + max(self.R, 1)].sum(dim=2)
+        alive_civ = self.civ_alive[:, 1:self.R + 1] & (n_c > 0)  # [B, R]
         if dstash:
             for a in sorted(dstash.keys()):
                 want = dstash.pop(a)  # [B, R]
@@ -4170,7 +4170,7 @@ class SimSeats:
                         want[:, b] & alive_civ[:, a] & alive_civ[:, b]
                         & ~self.civ_pair_war[:, a, b] & ~self.civ_pair_allied[:, a, b]
                         & (self.civ_pair_denounced[:, a, b] < 0) & (self.civ_pair_denounced[:, b, a] < 0)
-                        & (self.civ_only_warmonger[:, a] <= 0) & (self.civ_only_warmonger[:, b] <= 0)
+                        & (self.civ_warmonger[:, a + 1] <= 0) & (self.civ_warmonger[:, b + 1] <= 0)
                     )
                     if bool(form.any()):
                         self.civ_pair_allied[:, a, b] = self.civ_pair_allied[:, a, b] | form
@@ -4190,8 +4190,8 @@ class SimSeats:
         if not stash:
             return
         formal_min = int(self.rules.seats.get("formalWarMinTurns", 5))
-        n_c = self.civ_city_alive.sum(dim=2)
-        alive_civ = self.civ_only_alive[:, : self.R] & (n_c > 0)
+        n_c = self.city_alive[:, 1:1 + max(self.R, 1)].sum(dim=2)
+        alive_civ = self.civ_alive[:, 1:self.R + 1] & (n_c > 0)
         for a in sorted(stash.keys()):
             want = stash.pop(a)  # [B] long target
             for b in range(self.R):
@@ -4204,7 +4204,7 @@ class SimSeats:
                 if bool(declare.any()):
                     self.civ_pair_war[:, a, b] = self.civ_pair_war[:, a, b] | declare
                     self.civ_pair_war[:, b, a] = self.civ_pair_war[:, b, a] | declare
-                    self.civ_only_warmonger[:, a] = self.civ_only_warmonger[:, a] + declare.long() * self._wm_dow
+                    self.civ_warmonger[:, a + 1] = self.civ_warmonger[:, a + 1] + declare.long() * self._wm_dow
                     dt = self.civ_pair_denounced[:, a, b]
                     formal = declare & (dt >= 0) & ((int(self.turn) - dt) >= formal_min)
                     self.civ_pair_warkind[:, a, b] = torch.where(declare, formal, self.civ_pair_warkind[:, a, b])

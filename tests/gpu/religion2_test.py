@@ -138,12 +138,12 @@ def place_missionary(sim, r: int, t: int, charges: int) -> int:
 def isolate_faith(sim, r: int) -> None:
     """Strip every faith lever on civ seat r except the one under test: founded
     religion, no pantheon/enhancer (re)founding drains, no beliefs."""
-    sim.civ_only_religion_done[:, r] = True
-    sim.civ_only_pantheon_done[:, r] = True
-    sim.civ_only_prophets[:, r] = 0
-    sim.civ_only_pantheon[:, r] = -1
-    sim.civ_only_follower[:, r] = -1
-    sim.civ_only_enhancer[:, r] = -1
+    sim.civ_religion_done[:, r + 1] = True
+    sim.civ_pantheon_done[:, r + 1] = True
+    sim.civ_prophets[:, r + 1] = 0
+    sim.civ_pantheon[:, r + 1] = -1
+    sim.civ_follower[:, r + 1] = -1
+    sim.civ_enhancer[:, r + 1] = -1
 
 
 def make_holy_site(sim, r: int, j: int) -> int:
@@ -154,17 +154,17 @@ def make_holy_site(sim, r: int, j: int) -> int:
     sim.district[0, T_hs] = HS
     sim.district_complete[0, T_hs] = True
     sim.district_pillaged[0, T_hs] = False
-    sim.civ_city_dist_tile[:, r, :, HS] = -1
-    sim.civ_city_dist_tile[0, r, j, HS] = T_hs
+    sim.city_dist_tile[:, r + 1, :, HS] = -1
+    sim.city_dist_tile[0, r + 1, j, HS] = T_hs
     return T_hs
 
 
 def follow_all(sim, g: int) -> None:
     """Force every alive city (seat 0 + the civ seats) to follow religion g, so
     a fresh missionary finds NO target and keeps its full charges."""
-    sim.city_followed[0, 0, :sim.RC] = torch.where(sim.alive[0], torch.full_like(sim.city_followed[0, 0, :sim.RC], g), sim.city_followed[0, 0, :sim.RC])
+    sim.city_followed[0, 0, :sim.RC] = torch.where(sim.city_alive[0, 0], torch.full_like(sim.city_followed[0, 0, :sim.RC], g), sim.city_followed[0, 0, :sim.RC])
     if sim.R > 0:
-        sim.city_followed[0, 1:1 + sim.R, :sim.RC] = torch.where(sim.civ_city_alive[0], torch.full_like(sim.city_followed[0, 1:1 + sim.R, :sim.RC], g), sim.city_followed[0, 1:1 + sim.R, :sim.RC])
+        sim.city_followed[0, 1:1 + sim.R, :sim.RC] = torch.where(sim.city_alive[0, 1:1 + max(sim.R, 1)], torch.full_like(sim.city_followed[0, 1:1 + sim.R, :sim.RC], g), sim.city_followed[0, 1:1 + sim.R, :sim.RC])
 
 
 def live_missionaries(sim, r: int) -> list[int]:
@@ -179,20 +179,20 @@ def poke_missionary_buy(rules, rj, path):
     60 (read as a BUY-vs-NO-BUY diff); base charges 3."""
     sim = build(rules, path)
     r, j = 0, 0
-    assert bool(sim.civ_city_alive[0, r, j]), "civ capital slot must be alive"
+    assert bool(sim.city_alive[0, r + 1, j]), "civ capital slot must be alive"
     assert sim._missionary_idx >= 0 and sim._shrine_bidx >= 0 and sim._hs_idx >= 0, "missionary anchors missing"
     SHRINE, TEMPLE = sim._shrine_bidx, sim._temple_bidx
 
     isolate_faith(sim, r)
-    sim.civ_only_faith[:, r] = 60.0
+    sim.civ_faith[:, r + 1] = 60.0
     clear_missionaries(sim, r)
-    sim.civ_city_bldg[:, r, :, SHRINE] = False
-    sim.civ_city_bldg[0, r, j, SHRINE] = True
+    sim.city_bldg[:, r + 1, :, SHRINE] = False
+    sim.city_bldg[0, r + 1, j, SHRINE] = True
     if TEMPLE >= 0:
-        sim.civ_city_bldg[:, r, :, TEMPLE] = False  # no worship buy competes for the faith
+        sim.city_bldg[:, r + 1, :, TEMPLE] = False  # no worship buy competes for the faith
     make_holy_site(sim, r, j)
     follow_all(sim, r + 1)  # spawned missionary finds no target -> keeps full charges
-    ctr = int(sim.civ_city_center[0, r, j])
+    ctr = int(sim.city_center[0, r + 1, j])
     # clear the MERGED planes: p_/v_/u_ are DERIVED read-only views, so a
     # subscript write to one lands in a temporary and is silently discarded.
     sim.military_at[0, ctr] = -1
@@ -205,7 +205,7 @@ def poke_missionary_buy(rules, rj, path):
     u = ms[0]
     assert int(sim.major_unit_tile[0, u]) == ctr, f"missionary not spawned at the buying city center ({int(sim.major_unit_tile[0, u])} != {ctr})"
     assert int(sim.major_unit_charges[0, u]) == 3, f"base missionary must carry 3 charges, got {int(sim.major_unit_charges[0, u])}"
-    faith_buy = float(sim.civ_only_faith[0, r])
+    faith_buy = float(sim.civ_faith[0, r + 1])
 
     # control: keep the SHRINE (so its faith income is IDENTICAL) but fill the
     # missionary cap with inert 0-charge units so NO buy fires. The faith delta
@@ -215,7 +215,7 @@ def poke_missionary_buy(rules, rj, path):
         place_missionary(sim, r, t, charges=0)
     sim._seat_phase()
     assert len(live_missionaries(sim, r)) == 2, "cap control must not buy a 3rd missionary"
-    faith_nobuy = float(sim.civ_only_faith[0, r])
+    faith_nobuy = float(sim.civ_faith[0, r + 1])
     assert abs((faith_nobuy - faith_buy) - 60.0) < 1e-6, (
         f"missionary debit not exactly 60 faith (nobuy {faith_nobuy} - buy {faith_buy} = {faith_nobuy - faith_buy})"
     )
@@ -236,25 +236,25 @@ def poke_missionary_pricing(rules, rj, path):
     def one_buy(enh_idx: int, faith0: float):
         s = build(rules, path)
         isolate_faith(s, r)
-        s.civ_only_enhancer[:, r] = enh_idx
-        s.civ_only_faith[:, r] = faith0
+        s.civ_enhancer[:, r + 1] = enh_idx
+        s.civ_faith[:, r + 1] = faith0
         clear_missionaries(s, r)
-        s.civ_city_bldg[:, r, :, SHRINE] = False
-        s.civ_city_bldg[0, r, j, SHRINE] = True
+        s.city_bldg[:, r + 1, :, SHRINE] = False
+        s.city_bldg[0, r + 1, j, SHRINE] = True
         if TEMPLE >= 0:
-            s.civ_city_bldg[:, r, :, TEMPLE] = False
+            s.city_bldg[:, r + 1, :, TEMPLE] = False
         make_holy_site(s, r, j)
         follow_all(s, r + 1)
         base = s.snapshot()
         s._seat_phase()
         ms = live_missionaries(s, r)
         # debit diff vs a cap-filled control (Shrine kept -> identical income)
-        faith_buy = float(s.civ_only_faith[0, r])
+        faith_buy = float(s.civ_faith[0, r + 1])
         s.restore(base)
         for t in free_tiles(s, 2):
             place_missionary(s, r, t, charges=0)
         s._seat_phase()
-        debit = float(s.civ_only_faith[0, r]) - faith_buy
+        debit = float(s.civ_faith[0, r + 1]) - faith_buy
         return ms, debit
 
     # HOLY_ORDER: 42 faith affords the buy; the debit is exactly 42.
@@ -266,13 +266,13 @@ def poke_missionary_pricing(rules, rj, path):
     s2 = build(rules, path)
     E2 = enh_rows(s2)
     isolate_faith(s2, r)
-    s2.civ_only_enhancer[:, r] = E2["SCRIPTURE"]
-    s2.civ_only_faith[:, r] = 60.0
+    s2.civ_enhancer[:, r + 1] = E2["SCRIPTURE"]
+    s2.civ_faith[:, r + 1] = 60.0
     clear_missionaries(s2, r)
-    s2.civ_city_bldg[:, r, :, SHRINE] = False
-    s2.civ_city_bldg[0, r, j, SHRINE] = True
+    s2.city_bldg[:, r + 1, :, SHRINE] = False
+    s2.city_bldg[0, r + 1, j, SHRINE] = True
     if TEMPLE >= 0:
-        s2.civ_city_bldg[:, r, :, TEMPLE] = False
+        s2.city_bldg[:, r + 1, :, TEMPLE] = False
     make_holy_site(s2, r, j)
     follow_all(s2, r + 1)
     s2._seat_phase()
@@ -291,13 +291,13 @@ def poke_missionary_gating(rules, rj, path):
         s = build(rules, path)
         SH, TE = s._shrine_bidx, s._temple_bidx
         isolate_faith(s, r)
-        s.civ_only_faith[:, r] = 500.0
+        s.civ_faith[:, r + 1] = 500.0
         clear_missionaries(s, r)
-        s.civ_city_bldg[:, r, :, SH] = False
+        s.city_bldg[:, r + 1, :, SH] = False
         if with_shrine:
-            s.civ_city_bldg[0, r, j, SH] = True
+            s.city_bldg[0, r + 1, j, SH] = True
         if TE >= 0:
-            s.civ_city_bldg[:, r, :, TE] = False
+            s.city_bldg[:, r + 1, :, TE] = False
         T_hs = make_holy_site(s, r, j)
         s.district_complete[0, T_hs] = hs_complete
         s.district_pillaged[0, T_hs] = hs_pillaged
@@ -341,7 +341,7 @@ def drive_spread(sim, r: int, u: int, target: int) -> None:
     applier — the engine half of the verb (re-validated, draws from the shared
     stream), with the column encoded exactly as the driver encodes it
     (SPREAD_HERE when standing on the target, else + direction + 1)."""
-    sim.controlled[:, r] = True
+    sim.seat_ext[:, r + 1] = True
     smap = sim._seat_slot_map(r + 1)
     row = int((smap[0] == u).nonzero(as_tuple=True)[0][0])
     here = int(sim.major_unit_tile[0, u])
@@ -365,13 +365,13 @@ def poke_missionary_spread(rules, rj, path):
         g = r + 1
         clear_missionaries(sim, r)
         if enh_idx is not None:
-            sim.civ_only_enhancer[:, r] = E[enh_idx]
+            sim.civ_enhancer[:, r + 1] = E[enh_idx]
         c = 0
-        assert bool(sim.alive[0, c])
-        ctr = int(sim.site[0, c])
+        assert bool(sim.city_alive[0, 0, c])
+        ctr = int(sim.city_center[0, 0, c])
         sim.city_followed[0, 0, c] = 0 if g != 0 else 1  # target follows != g
         if sim.R > 0:  # every civ city follows g, so the seat-0 city is the only target
-            sim.city_followed[0, 1:1 + sim.R, :sim.RC] = torch.where(sim.civ_city_alive[0], torch.full_like(sim.city_followed[0, 1:1 + sim.R, :sim.RC], g), sim.city_followed[0, 1:1 + sim.R, :sim.RC])
+            sim.city_followed[0, 1:1 + sim.R, :sim.RC] = torch.where(sim.city_alive[0, 1:1 + max(sim.R, 1)], torch.full_like(sim.city_followed[0, 1:1 + sim.R, :sim.RC], g), sim.city_followed[0, 1:1 + sim.R, :sim.RC])
         nb = free_neighbor(sim, ctr)
         assert nb >= 0, "no free neighbour of the target center"
         u = place_missionary(sim, r, nb, charges=charges)
@@ -421,8 +421,8 @@ def poke_presr(rules, rj, path):
     sim.holy_tile[0, g] = A
     S2, S3 = 5, 6
     for s, ct in ((S2, C2), (S3, C3)):
-        sim.civ_city_alive[0, r, s] = True
-        sim.civ_city_center[0, r, s] = ct
+        sim.city_alive[0, r + 1, s] = True
+        sim.city_center[0, r + 1, s] = ct
         sim.city_pressure[0, r + 1, s] = 0
 
     def spread_get():
@@ -432,12 +432,12 @@ def poke_presr(rules, rj, path):
         return int(sim.city_pressure[0, r + 1, S2, g]), int(sim.city_pressure[0, r + 1, S3, g])
 
     # WITH ITINERANT: range base+2 -> receiver at base+2 gets +1, base+3 nothing.
-    sim.civ_only_enhancer[:, r] = E["ITINERANT"]
+    sim.civ_enhancer[:, r + 1] = E["ITINERANT"]
     p2, p3 = spread_get()
     assert p2 == 1 and p3 == 0, f"ITINERANT range wrong (base+2 {p2}, base+3 {p3})"
 
     # WITHOUT the enhancer: range base -> the base+2 receiver gets nothing.
-    sim.civ_only_enhancer[:, r] = -1
+    sim.civ_enhancer[:, r + 1] = -1
     p2n, _ = spread_get()
     assert p2n == 0, f"unenhanced religion reached base+2 ({p2n}) — presR leaked"
     print(f"  6 ITINERANT presR OK (range {base} -> {base + 2}; base+2 in, base+3 out)")
@@ -452,28 +452,28 @@ def poke_combat_cs(rules, rj, path):
     r = 0
     g = r + 1
     E = enh_rows(sim)
-    sim.civ_only_religion_done[:, r] = True
+    sim.civ_religion_done[:, r + 1] = True
     # seat-0 city 0 follows g; its center is the battle tile (near3 + terr both
     # true there — each enhancer isolates its own channel via the zero terms).
     c = 0
-    assert bool(sim.alive[0, c])
-    ctr = int(sim.site[0, c])
+    assert bool(sim.city_alive[0, 0, c])
+    ctr = int(sim.city_center[0, 0, c])
     sim.city_followed[0, 0, c] = g
     sim.owner[0, ctr] = c  # the center tile is seat-0-owned -> terr[g, ctr] true
     sim._rel_planes_cache = None
     seat = torch.tensor([g])  # a religion's id IS its founder's seat
     bt = torch.tensor([ctr])
 
-    sim.civ_only_enhancer[:, r] = E["JUST_WAR"]
+    sim.civ_enhancer[:, r + 1] = E["JUST_WAR"]
     atk = float(sim._rel_atk_cs(seat, bt)[0])
     dfn = float(sim._rel_def_cs(seat, bt)[0])
     assert atk == 10.0 and dfn == 10.0, f"JUST_WAR near adder wrong (atk {atk}, def {dfn})"
 
-    sim.civ_only_enhancer[:, r] = E["CRUSADE"]
+    sim.civ_enhancer[:, r + 1] = E["CRUSADE"]
     atk_c = float(sim._rel_atk_cs(seat, bt)[0])
     assert atk_c == 10.0, f"CRUSADE attack-on-territory adder wrong ({atk_c})"
 
-    sim.civ_only_enhancer[:, r] = E["DEFENDER"]
+    sim.civ_enhancer[:, r + 1] = E["DEFENDER"]
     dfn_d = float(sim._rel_def_cs(seat, bt)[0])
     assert dfn_d == 5.0, f"DEFENDER defend-on-territory adder wrong ({dfn_d})"
 
@@ -485,8 +485,8 @@ def poke_combat_cs(rules, rj, path):
     assert zb == 0.0, f"a barbarian must get no religious combat bonus ({zb})"
 
     # no founded religion -> no adder either.
-    sim.civ_only_religion_done[:, r] = False
-    sim.civ_only_enhancer[:, r] = E["JUST_WAR"]
+    sim.civ_religion_done[:, r + 1] = False
+    sim.civ_enhancer[:, r + 1] = E["JUST_WAR"]
     z2 = float(sim._rel_atk_cs(seat, bt)[0])
     assert z2 == 0.0, f"unfounded religion must give no combat bonus ({z2})"
     print("  7 enhancer combat CS OK (JUST_WAR +10 atk/def, CRUSADE +10 atk, DEFENDER +5 def)")
@@ -500,7 +500,7 @@ def poke_messenger_route(rules, rj, path):
     r = 0
     g = r + 1
     E = enh_rows(sim)
-    sim.civ_only_religion_done[:, r] = True
+    sim.civ_religion_done[:, r + 1] = True
     sim.civ_only_atwar[:, r] = False
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     sim.barb_unit_alive[:] = False
@@ -510,18 +510,18 @@ def poke_messenger_route(rules, rj, path):
     FROM, DEST = 5, 6
     tiles = free_tiles(sim, 2)
     for s, ct in ((FROM, tiles[0]), (DEST, tiles[1])):
-        sim.civ_city_alive[0, r, s] = True
-        sim.civ_city_center[0, r, s] = ct
-        sim.civ_city_dist_tile[0, r, s] = -1  # no specialty districts -> per = 1
-    sim.civ_city_id[0, r, FROM] = 4100
-    sim.civ_city_id[0, r, DEST] = 4101
+        sim.city_alive[0, r + 1, s] = True
+        sim.city_center[0, r + 1, s] = ct
+        sim.city_dist_tile[0, r + 1, s] = -1  # no specialty districts -> per = 1
+    sim.city_id[0, r + 1, FROM] = 4100
+    sim.city_id[0, r + 1, DEST] = 4101
     sim.city_followed[0, r + 1, DEST] = g  # destination follows this civ's religion
-    sim.civ_only_routes[:, r] = -1
-    sim.civ_only_routes[0, r, 0, 0] = 4100
-    sim.civ_only_routes[0, r, 0, 1] = 4101
+    sim.seat_routes[:, r + 1] = -1
+    sim.seat_routes[0, r + 1, 0, 0] = 4100
+    sim.seat_routes[0, r + 1, 0, 1] = 4101
 
     def income(enh_idx):
-        sim.civ_only_enhancer[:, r] = enh_idx
+        sim.civ_enhancer[:, r + 1] = enh_idx
         sim._seat_route_cache = None
         inc = sim._seat_route_income(r + 1)
         assert inc is not None, "route income None with a live domestic route"
@@ -551,13 +551,13 @@ def poke_victor_direct(rules, rj, path):
     def set_follow(pg, rg_map):
         """pg = seat 0's religion; rg_map[ri] = each civ seat's religion (None
         leaves that seat cityless)."""
-        sim.city_followed[0, 0, :sim.RC] = torch.where(sim.alive[0], torch.full_like(sim.city_followed[0, 0, :sim.RC], pg), torch.full_like(sim.city_followed[0, 0, :sim.RC], -1))
+        sim.city_followed[0, 0, :sim.RC] = torch.where(sim.city_alive[0, 0], torch.full_like(sim.city_followed[0, 0, :sim.RC], pg), torch.full_like(sim.city_followed[0, 0, :sim.RC], -1))
         for ri in range(sim.R):
             val = rg_map.get(ri, None)
             if val is None:
-                sim.civ_city_alive[0, ri] = False
+                sim.city_alive[0, ri + 1] = False
             else:
-                sim.city_followed[0, ri + 1] = torch.where(sim.civ_city_alive[0, ri], torch.full_like(sim.city_followed[0, ri + 1], val), torch.full_like(sim.city_followed[0, ri + 1], -1))
+                sim.city_followed[0, ri + 1] = torch.where(sim.city_alive[0, ri + 1], torch.full_like(sim.city_followed[0, ri + 1], val), torch.full_like(sim.city_followed[0, ri + 1], -1))
 
     # seat 0 wins: religion 0 founded, everyone follows 0.
     sim.holy_tile[0] = -1
@@ -569,9 +569,9 @@ def poke_victor_direct(rules, rj, path):
     sim2 = build(rules, path)
     sim2.holy_tile[0] = -1
     sim2.holy_tile[0, g] = 0
-    sim2.city_followed[0, 0, :sim2.RC] = torch.where(sim2.alive[0], torch.full_like(sim2.city_followed[0, 0, :sim2.RC], g), torch.full_like(sim2.city_followed[0, 0, :sim2.RC], -1))
+    sim2.city_followed[0, 0, :sim2.RC] = torch.where(sim2.city_alive[0, 0], torch.full_like(sim2.city_followed[0, 0, :sim2.RC], g), torch.full_like(sim2.city_followed[0, 0, :sim2.RC], -1))
     for ri in range(sim2.R):
-        sim2.city_followed[0, ri + 1] = torch.where(sim2.civ_city_alive[0, ri], torch.full_like(sim2.city_followed[0, ri + 1], g), torch.full_like(sim2.city_followed[0, ri + 1], -1))
+        sim2.city_followed[0, ri + 1] = torch.where(sim2.city_alive[0, ri + 1], torch.full_like(sim2.city_followed[0, ri + 1], g), torch.full_like(sim2.city_followed[0, ri + 1], -1))
     assert int(sim2._religious_victor()[0]) == g, f"civ religion {g} must win"
 
     # refusal: g founded and predominant in seat 0's cities, but a civ seat with
@@ -580,16 +580,16 @@ def poke_victor_direct(rules, rj, path):
     sim3 = build(rules, path)
     sim3.holy_tile[0] = -1
     sim3.holy_tile[0, g] = 0
-    sim3.city_followed[0, 0, :sim3.C] = torch.where(sim3.alive[0], torch.full_like(sim3.city_followed[0, 0, :sim3.C], g), torch.full_like(sim3.city_followed[0, 0, :sim3.C], -1))
-    assert bool(sim3.civ_city_alive[0, 0].any()), "civ 0 must hold a city for the refusal shape"
-    sim3.city_followed[0, 0 + 1] = torch.where(sim3.civ_city_alive[0, 0], torch.full_like(sim3.city_followed[0, 0 + 1], g + 1), torch.full_like(sim3.city_followed[0, 0 + 1], -1))
+    sim3.city_followed[0, 0, :sim3.RC] = torch.where(sim3.city_alive[0, 0], torch.full_like(sim3.city_followed[0, 0, :sim3.RC], g), torch.full_like(sim3.city_followed[0, 0, :sim3.RC], -1))
+    assert bool(sim3.city_alive[0, 1].any()), "civ 0 must hold a city for the refusal shape"
+    sim3.city_followed[0, 0 + 1] = torch.where(sim3.city_alive[0, 1], torch.full_like(sim3.city_followed[0, 0 + 1], g + 1), torch.full_like(sim3.city_followed[0, 0 + 1], -1))
     for ri in range(1, sim3.R):
-        sim3.city_followed[0, ri + 1] = torch.where(sim3.civ_city_alive[0, ri], torch.full_like(sim3.city_followed[0, ri + 1], g), torch.full_like(sim3.city_followed[0, ri + 1], -1))
+        sim3.city_followed[0, ri + 1] = torch.where(sim3.city_alive[0, ri + 1], torch.full_like(sim3.city_followed[0, ri + 1], g), torch.full_like(sim3.city_followed[0, ri + 1], -1))
     assert int(sim3._religious_victor()[0]) == -1, "a dissenting civ civ must refuse the victory"
 
     # cityless exclusion: the same dissenting seat, but eliminated (no cities),
     # drops out of the every-seat test -> g wins.
-    sim3.civ_city_alive[0, 0] = False
+    sim3.city_alive[0, 1] = False
     assert int(sim3._religious_victor()[0]) == g, "a cityless civ must be excluded from the every-civ requirement"
     print("  9 religious victor (direct) OK (seat 0, civ g, refusal -1, cityless excluded)")
 
@@ -617,20 +617,20 @@ def poke_victor_through_step(rules, rj, path):
         _pl = sim.military_at  # clear only this pool's entries
         _pl[(_pl >= sim.POOL_LO["barb"]) & (_pl < sim.POOL_HI["barb"])] = -1
         if sim.R > 0:
-            sim.civ_city_current[:] = -1
-            sim.civ_city_progress[:] = 0.0
-            sim.civ_city_cost[:] = 1.0e9
-            sim.civ_only_treasury[:] = 0.0
-            sim.civ_only_faith[:] = 0.0
-            sim.controlled[:] = False
+            sim.city_current[:, 1:1 + max(sim.R, 1)] = -1
+            sim.city_progress[:, 1:1 + max(sim.R, 1)] = 0.0
+            sim.city_cost[:, 1:1 + max(sim.R, 1)] = 1.0e9
+            sim.civ_treasury[:, 1:] = 0.0
+            sim.civ_faith[:, 1:] = 0.0
+            sim.seat_ext[:, 1:1 + max(sim.R, 1)] = False
         # only religion g founded; preload an overwhelming g-pressure everywhere.
         sim.holy_tile[0] = -1
-        sim.holy_tile[0, g] = int(sim.site[0, sim.alive[0].nonzero(as_tuple=True)[0][0]]) if g == 0 else 0
+        sim.holy_tile[0, g] = int(sim.city_center[0, 0, sim.city_alive[0, 0].nonzero(as_tuple=True)[0][0]]) if g == 0 else 0
         sim.city_pressure[0, 0, :sim.RC] = 0
-        sim.city_pressure[0, 0, :sim.RC, g] = torch.where(sim.alive[0], torch.full((sim.RC,), 9000, dtype=sim.city_pressure[:, 0].dtype), torch.zeros(sim.RC, dtype=sim.city_pressure[:, 0].dtype))
+        sim.city_pressure[0, 0, :sim.RC, g] = torch.where(sim.city_alive[0, 0], torch.full((sim.RC,), 9000, dtype=sim.city_pressure[:, 0].dtype), torch.zeros(sim.RC, dtype=sim.city_pressure[:, 0].dtype))
         if sim.R > 0:
             sim.city_pressure[0, 1:1 + sim.R, :sim.RC] = 0
-            sim.city_pressure[0, 1:1 + sim.R, :sim.RC, g] = torch.where(sim.civ_city_alive[0], torch.full((sim.R, sim.RC), 9000, dtype=sim.city_pressure.dtype), torch.zeros((sim.R, sim.RC), dtype=sim.city_pressure.dtype))
+            sim.city_pressure[0, 1:1 + sim.R, :sim.RC, g] = torch.where(sim.city_alive[0, 1:1 + max(sim.R, 1)], torch.full((sim.R, sim.RC), 9000, dtype=sim.city_pressure.dtype), torch.zeros((sim.R, sim.RC), dtype=sim.city_pressure.dtype))
         sim.step()
         return sim
 

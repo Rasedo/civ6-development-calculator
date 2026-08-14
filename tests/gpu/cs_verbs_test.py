@@ -43,15 +43,15 @@ def unit_next(sim) -> int:
 
 
 def active_mask(sim) -> torch.Tensor:
-    return sim.civ_only_alive[:, R] & (sim.civ_city_alive[:, R].sum(dim=1) > 0)
+    return sim.civ_alive[:, R + 1] & (sim.city_alive[:, R + 1].sum(dim=1) > 0)
 
 
 def clear_queues(sim) -> None:
     """No queue item can complete this phase (isolates the buy/levy block)."""
     for r in (R, OTHER):
-        sim.civ_city_current[:, r] = -1
-        sim.civ_city_progress[:, r] = 0.0
-        sim.civ_city_cost[:, r] = 0.0
+        sim.city_current[:, r + 1] = -1
+        sim.city_progress[:, r + 1] = 0.0
+        sim.city_cost[:, r + 1] = 0.0
 
 
 def make_suzerain_mil(sim, s: int, envoys: int = 5) -> None:
@@ -60,10 +60,10 @@ def make_suzerain_mil(sim, s: int, envoys: int = 5) -> None:
     mil = int(sim.rules.citystate["militaristicIdx"])
     sim.citystate_type[0, s] = mil
     sim.citystate_alive[0, s] = True
-    sim.civ_only_citystate_met[0, R, s] = True
-    sim.civ_only_citystate_envoys[0, R, s] = envoys
-    sim.civ_only_citystate_envoys[0, OTHER, s] = 0
-    sim.citystate_envoys[0, s] = 0
+    sim.seat_citystate_met[0, R + 1, s] = True
+    sim.seat_citystate_envoys[0, R + 1, s] = envoys
+    sim.seat_citystate_envoys[0, OTHER + 1, s] = 0
+    sim.seat_citystate_envoys[0, 0, s] = 0
 
 
 def empty_land_tiles(sim, k: int) -> list[int]:
@@ -87,7 +87,7 @@ def meet_quota(sim, r: int) -> None:
     """Inject WARRIORs (far away) until r's military hits the 2×-cities quota,
     so the gold-buy unit branch (warrior ×mult = 96 < levy 120) can't fire and
     drain the treasury before the levy runs."""
-    quota = 2 * int(sim.civ_city_alive[0, r].sum())
+    quota = 2 * int(sim.city_alive[0, r + 1].sum())
     need = max(0, quota - mil_count(sim, r))
     if need == 0:
         return
@@ -125,7 +125,7 @@ def prep_levy(sim, s: int, envoys: int = 5) -> None:
     sim.civ_only_atwar[0, R] = True
     sim.civ_only_atwar[0, OTHER] = False
     sim.sync_war()  # a poke must write the legacy stores too
-    sim.civ_only_treasury[0, OTHER] = 0.0  # the shared unit_next pool must not grow from OTHER's buys
+    sim.civ_treasury[0, OTHER + 1] = 0.0  # the shared unit_next pool must not grow from OTHER's buys
     make_suzerain_mil(sim, s, envoys)
     meet_quota(sim, R)
 
@@ -134,7 +134,7 @@ def stash_levy(sim, s: int) -> None:
     """The levy is a wire DECISION — stash the kind-7 intent the driver would
     emit for R (the engine arm re-validates militaristic/suzerain/cooldown/
     afford on its own; at-war is the DRIVER's policy gate)."""
-    sim.controlled[0, R] = True
+    sim.seat_ext[0, R + 1] = True
     sim._stash_buy(R + 1, levy=torch.full((sim.B,), s, dtype=torch.long, device=sim.device))  # civ R is seat row R+1
 
 
@@ -148,7 +148,7 @@ def main() -> None:
     sim = build(rules, path)
     for _ in range(25):
         sim.step()
-    assert int(sim.civ_city_alive[0, R].sum()) >= 1, "civ 0 has no cities after 25 turns"
+    assert int(sim.city_alive[0, R + 1].sum()) >= 1, "civ 0 has no cities after 25 turns"
     assert sim.S >= 1, "fixture has no city-states"
     base = sim.snapshot()
 
@@ -168,7 +168,7 @@ def main() -> None:
     sim.restore(base)
     prep_levy(sim, S0)
     stash_levy(sim, S0)
-    sim.civ_only_treasury[0, R] = cost  # exactly the levy price
+    sim.civ_treasury[0, R + 1] = cost  # exactly the levy price
     vn0 = unit_next(sim)
     sim._seat_phase()
     assert int(sim.citystate_last_levy[0, S0]) == T, f"L1 levy: citystate_last_levy not stamped ({int(sim.citystate_last_levy[0, S0])} != {T})"
@@ -183,7 +183,7 @@ def main() -> None:
     sim.civ_only_atwar[0, R] = False
     sim.sync_war()  # a poke must write the legacy stores too
     stash_levy(sim, S0)
-    sim.civ_only_treasury[0, R] = cost
+    sim.civ_treasury[0, R + 1] = cost
     sim._seat_phase()
     assert int(sim.citystate_last_levy[0, S0]) == T, "L2: the engine arm refused a stashed levy at peace (at-war is not a rule)"
     print("  L2 at-peace intent OK (the engine executes; at-war gating is the driver's)")
@@ -192,7 +192,7 @@ def main() -> None:
     sim.restore(base)
     prep_levy(sim, S0, envoys=2)  # below suzerainEnvoys
     stash_levy(sim, S0)
-    sim.civ_only_treasury[0, R] = cost
+    sim.civ_treasury[0, R + 1] = cost
     sim._seat_phase()
     assert int(sim.citystate_last_levy[0, S0]) != T, "L3: a non-suzerain civ levied"
     print("  L3 not-suzerain gate OK (2 envoys < suzerain minimum)")
@@ -201,7 +201,7 @@ def main() -> None:
     sim.restore(base)
     prep_levy(sim, S0)
     stash_levy(sim, S0)
-    sim.civ_only_treasury[0, R] = cost - 0.001
+    sim.civ_treasury[0, R + 1] = cost - 0.001
     sim._seat_phase()
     assert int(sim.citystate_last_levy[0, S0]) != T, "L4: levied below the gold cost"
     print("  L4 affordability gate OK (no levy one milli-unit below cost)")
@@ -211,7 +211,7 @@ def main() -> None:
     sim.restore(base)
     prep_levy(sim, S0)
     stash_levy(sim, S0)
-    sim.civ_only_treasury[0, R] = cost
+    sim.civ_treasury[0, R + 1] = cost
     sim.citystate_last_levy[0, S0] = T - (cd - 1)  # one turn short of ready
     vn0 = unit_next(sim)
     sim._seat_phase()
@@ -223,7 +223,7 @@ def main() -> None:
     sim.restore(base)
     prep_levy(sim, S0)
     stash_levy(sim, S0)
-    sim.civ_only_treasury[0, R] = cost
+    sim.civ_treasury[0, R + 1] = cost
     sim.citystate_last_levy[0, S0] = T - cd
     sim._seat_phase()
     assert int(sim.citystate_last_levy[0, S0]) == T, "L5 ready: no levy exactly at cooldown expiry"
@@ -233,24 +233,24 @@ def main() -> None:
     # -- Q1: ISSUE buildDistrict (deterministic, no camp, not owned) --------
     sim.restore(base)
     make_suzerain_mil(sim, S0, envoys=3)  # met + alive; district-type env irrelevant here
-    sim.civ_only_citystate_quest[0, R, S0] = 0
-    sim.civ_only_citystate_quest_issued[0, R, S0] = 0  # cooldown long passed (turn ≥ questCooldown)
+    sim.seat_citystate_quest[0, R + 1, S0] = 0
+    sim.seat_citystate_quest_issued[0, R + 1, S0] = 0  # cooldown long passed (turn ≥ questCooldown)
     # no barb camp near this CS → clearCamp not offered; buildDistrict first.
     sim.camp_tile[:] = -1
     di = int(sim._citystate_didx[0, S0])
     # ensure R does NOT already own the CS-type district complete (wipe registry row)
-    sim.civ_city_dist_tile[0, R, :, di] = -1
+    sim.city_dist_tile[0, R + 1, :, di] = -1
     rng0 = sim.rng_state.clone()
     sim._seat_quest_phase(R + 1, active_mask(sim))  # seat ROW: civ R is row R+1
-    assert int(sim.civ_only_citystate_quest[0, R, S0]) == 3, f"Q1: expected buildDistrict (3), got {int(sim.civ_only_citystate_quest[0, R, S0])}"
+    assert int(sim.seat_citystate_quest[0, R + 1, S0]) == 3, f"Q1: expected buildDistrict (3), got {int(sim.seat_citystate_quest[0, R + 1, S0])}"
     assert torch.equal(sim.rng_state, rng0), "Q1: the quest phase drew RNG (must be zero-draw)"
     print("  Q1 ISSUE buildDistrict OK (deterministic, zero-draw)")
 
     # -- Q2: ISSUE clearCamp takes precedence when a camp is in range -------
     sim.restore(base)
     make_suzerain_mil(sim, S0, envoys=3)
-    sim.civ_only_citystate_quest[0, R, S0] = 0
-    sim.civ_only_citystate_quest_issued[0, R, S0] = 0
+    sim.seat_citystate_quest[0, R + 1, S0] = 0
+    sim.seat_citystate_quest_issued[0, R + 1, S0] = 0
     # plant a camp adjacent to the CS center (within range 6)
     ctr = int(sim.citystate_center[0, S0])
     near_tile = int(sim.neigh[ctr][0])
@@ -258,8 +258,8 @@ def main() -> None:
     sim.camp_tile[0, 0] = near_tile
     rng0 = sim.rng_state.clone()
     sim._seat_quest_phase(R + 1, active_mask(sim))  # seat ROW: civ R is row R+1
-    assert int(sim.civ_only_citystate_quest[0, R, S0]) == 1, f"Q2: expected clearCamp (1), got {int(sim.civ_only_citystate_quest[0, R, S0])}"
-    assert int(sim.civ_only_citystate_quest_camp[0, R, S0]) == near_tile, "Q2: clearCamp recorded the wrong camp tile"
+    assert int(sim.seat_citystate_quest[0, R + 1, S0]) == 1, f"Q2: expected clearCamp (1), got {int(sim.seat_citystate_quest[0, R + 1, S0])}"
+    assert int(sim.seat_citystate_quest_camp[0, R + 1, S0]) == near_tile, "Q2: clearCamp recorded the wrong camp tile"
     assert torch.equal(sim.rng_state, rng0), "Q2: clearCamp issue drew RNG"
     print("  Q2 ISSUE clearCamp precedence OK (nearest camp recorded, zero-draw)")
 
@@ -268,16 +268,16 @@ def main() -> None:
     make_suzerain_mil(sim, S0, envoys=3)
     ctr = int(sim.citystate_center[0, S0])
     near_tile = int(sim.neigh[ctr][0])
-    sim.civ_only_citystate_quest[0, R, S0] = 1
-    sim.civ_only_citystate_quest_camp[0, R, S0] = near_tile
-    sim.civ_only_citystate_quest_issued[0, R, S0] = T  # fresh — resolution is cooldown-independent
+    sim.seat_citystate_quest[0, R + 1, S0] = 1
+    sim.seat_citystate_quest_camp[0, R + 1, S0] = near_tile
+    sim.seat_citystate_quest_issued[0, R + 1, S0] = T  # fresh — resolution is cooldown-independent
     sim.camp_tile[:] = -1  # the camp is GONE → satisfied
-    env0 = int(sim.civ_only_citystate_envoys[0, R, S0])
+    env0 = int(sim.seat_citystate_envoys[0, R + 1, S0])
     q_env = int(sim.rules.citystate["questEnvoys"])
     rng0 = sim.rng_state.clone()
     sim._seat_quest_phase(R + 1, active_mask(sim))  # seat ROW: civ R is row R+1
-    assert int(sim.civ_only_citystate_quest[0, R, S0]) == 0, "Q3: satisfied clearCamp not cleared"
-    assert int(sim.civ_only_citystate_envoys[0, R, S0]) == env0 + q_env, "Q3: questEnvoys not paid to the civ"
+    assert int(sim.seat_citystate_quest[0, R + 1, S0]) == 0, "Q3: satisfied clearCamp not cleared"
+    assert int(sim.seat_citystate_envoys[0, R + 1, S0]) == env0 + q_env, "Q3: questEnvoys not paid to the civ"
     assert torch.equal(sim.rng_state, rng0), "Q3: resolution drew RNG"
     print(f"  Q3 RESOLVE clearCamp OK (+{q_env} envoy to R, quest cleared, zero-draw)")
 
@@ -286,18 +286,18 @@ def main() -> None:
     make_suzerain_mil(sim, S0, envoys=3)
     di = int(sim._citystate_didx[0, S0])
     # grant R a COMPLETE district of the CS type in its first alive city
-    j = int(sim.civ_city_alive[0, R].long().argmax())
-    dtile = int(sim.civ_city_center[0, R, j])  # any owned tile; mark complete
-    sim.civ_city_dist_tile[0, R, j, di] = dtile
+    j = int(sim.city_alive[0, R + 1].long().argmax())
+    dtile = int(sim.city_center[0, R + 1, j])  # any owned tile; mark complete
+    sim.city_dist_tile[0, R + 1, j, di] = dtile
     sim.district_complete[0, dtile] = True
     sim.district_pillaged[0, dtile] = False
-    sim.civ_only_citystate_quest[0, R, S0] = 3
-    sim.civ_only_citystate_quest_issued[0, R, S0] = T
-    env0 = int(sim.civ_only_citystate_envoys[0, R, S0])
+    sim.seat_citystate_quest[0, R + 1, S0] = 3
+    sim.seat_citystate_quest_issued[0, R + 1, S0] = T
+    env0 = int(sim.seat_citystate_envoys[0, R + 1, S0])
     rng0 = sim.rng_state.clone()
     sim._seat_quest_phase(R + 1, active_mask(sim))  # seat ROW: civ R is row R+1
-    assert int(sim.civ_only_citystate_quest[0, R, S0]) == 0, "Q4: satisfied buildDistrict not cleared"
-    assert int(sim.civ_only_citystate_envoys[0, R, S0]) == env0 + q_env, "Q4: questEnvoys not paid"
+    assert int(sim.seat_citystate_quest[0, R + 1, S0]) == 0, "Q4: satisfied buildDistrict not cleared"
+    assert int(sim.seat_citystate_envoys[0, R + 1, S0]) == env0 + q_env, "Q4: questEnvoys not paid"
     assert torch.equal(sim.rng_state, rng0), "Q4: buildDistrict resolution drew RNG"
     print(f"  Q4 RESOLVE buildDistrict OK (+{q_env} envoy on owned district, zero-draw)")
 
@@ -305,11 +305,11 @@ def main() -> None:
     sim.restore(base)
     s1 = 0
     sim.citystate_alive[0, s1] = True
-    sim.civ_only_citystate_met[0, R, s1] = False  # not met
-    sim.civ_only_citystate_quest[0, R, s1] = 0
-    sim.civ_only_citystate_quest_issued[0, R, s1] = 0
+    sim.seat_citystate_met[0, R + 1, s1] = False  # not met
+    sim.seat_citystate_quest[0, R + 1, s1] = 0
+    sim.seat_citystate_quest_issued[0, R + 1, s1] = 0
     sim._seat_quest_phase(R + 1, active_mask(sim))  # seat ROW: civ R is row R+1
-    assert int(sim.civ_only_citystate_quest[0, R, s1]) == 0, "Q5: an unmet CS issued a civ quest"
+    assert int(sim.seat_citystate_quest[0, R + 1, s1]) == 0, "Q5: an unmet CS issued a civ quest"
     print("  Q5 unmet-CS gate OK (no quest without contact)")
 
     print("CS VERBS (A-12 civ levy + quests) OK")

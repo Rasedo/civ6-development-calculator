@@ -61,11 +61,11 @@ def q(x: float) -> int:
 
 def add_seat0_city(sim, col: int, tile: int, pop: int, loy: float) -> None:
     # Array position IS the column under append+reclaim (#110).
-    sim.alive[0, col] = True
-    sim.is_cap[0, col] = False
-    sim.site[0, col] = tile
-    sim.pop[0, col] = pop
-    sim.loyalty[0, col] = loy
+    sim.city_alive[0, 0, col] = True
+    sim.city_is_cap[0, 0, col] = False
+    sim.city_center[0, 0, col] = tile
+    sim.city_pop[0, 0, col] = pop
+    sim.city_loyalty[0, 0, col] = loy
 
 
 def recon_seat0_next(sim, c: int, tier_idx_c: int, picked: bool) -> float:
@@ -76,30 +76,30 @@ def recon_seat0_next(sim, c: int, tier_idx_c: int, picked: bool) -> float:
     rng = int(sim.rules.seats.get("loyaltyRange", 9))
     scale = float(sim.rules.seats.get("loyaltyScale", 20))
     af = sim._age_factor.tolist()
-    sc = int(sim.site[0, c])
+    sc = int(sim.city_center[0, 0, c])
     own = 0.0
     for cp in range(sim.RC):
-        if not bool(sim.alive[0, cp]):
+        if not bool(sim.city_alive[0, 0, cp]):
             continue
-        w = max(0.0, rng + 1 - float(sim.pair_dist[sc, int(sim.site[0, cp])]))
-        own += float(sim.pop[0, cp]) * w
+        w = max(0.0, rng + 1 - float(sim.pair_dist[sc, int(sim.city_center[0, 0, cp])]))
+        own += float(sim.city_pop[0, 0, cp]) * w
     own_eff = own * af[int(sim.civ_age[0, 0])]
     for_eff = 0.0
     for r in range(sim.R):
         sub = 0.0
         for j in range(sim.RC):
-            if not bool(sim.civ_city_alive[0, r, j]):
+            if not bool(sim.city_alive[0, r + 1, j]):
                 continue
-            w = max(0.0, rng + 1 - float(sim.pair_dist[sc, int(sim.civ_city_center[0, r, j])]))
-            sub += float(sim.civ_city_pop[0, r, j]) * w
+            w = max(0.0, rng + 1 - float(sim.pair_dist[sc, int(sim.city_center[0, r + 1, j])]))
+            sub += float(sim.city_pop[0, r + 1, j]) * w
         for_eff += sub * af[int(sim.civ_age[0, r + 1])]
     tot = own_eff + for_eff
     press = scale * (own_eff - for_eff) / tot if tot > 0 else 0.0
     amen = float(sim._loyalty_amenity[tier_idx_c])
     gov = sim._gov_loy if picked else 0.0
-    if bool(sim.is_cap[0, c]):
+    if bool(sim.city_is_cap[0, 0, c]):
         return 100.0
-    return max(0.0, min(100.0, float(sim.loyalty[0, c]) + press + amen + gov))
+    return max(0.0, min(100.0, float(sim.city_loyalty[0, 0, c]) + press + amen + gov))
 
 
 def apply_loyalty_row(sim, tier, row: int = 0) -> None:
@@ -123,9 +123,9 @@ def two_city_setup(rules, path):
     neighbours, civics wiped (titles 0). Returns (sim, [non-cap cols])."""
     sim = build(rules, path)
     sim.major_unit_alive[:] = False
-    cap = int(sim.is_cap[0].nonzero()[0])
-    nb = [int(x) for x in sim.neigh[int(sim.site[0, cap])].tolist() if x >= 0]
-    free = (~sim.alive[0]).nonzero(as_tuple=True)[0].tolist()
+    cap = int(sim.city_is_cap[0, 0].nonzero()[0])
+    nb = [int(x) for x in sim.neigh[int(sim.city_center[0, 0, cap])].tolist() if x >= 0]
+    free = (~sim.city_alive[0, 0]).nonzero(as_tuple=True)[0].tolist()
     cols = free[:2]
     add_seat0_city(sim, cols[0], nb[0], 4, 55.0)
     add_seat0_city(sim, cols[1], nb[1], 4, 59.0)
@@ -135,17 +135,17 @@ def two_city_setup(rules, path):
     # the Golden x1.5 assertion unable to fire whatever the starting loyalty.
     # Plant a civ city in range rather than hoping a fixture parks one there.
     if sim.R > 0:
-        cap_tile = int(sim.site[0, cap])
+        cap_tile = int(sim.city_center[0, 0, cap])
         near = next(
             (t for t in range(sim.T)
              if 1 <= int(sim.pair_dist[cap_tile, t]) <= 3 and bool(sim.passable[0, t])),
             -1,
         )
         assert near >= 0, "no tile in loyalty range of the capital to plant a civ city on"
-        sim.civ_city_alive[0, 0, 0] = True
-        sim.civ_city_center[0, 0, 0] = near
-        sim.civ_city_pop[0, 0, 0] = 6
-    sim.civics[:] = False
+        sim.city_alive[0, 1, 0] = True
+        sim.city_center[0, 1, 0] = near
+        sim.city_pop[0, 1, 0] = 6
+    sim.civ_civics[:, 0] = False
     return sim, cols
 
 
@@ -160,9 +160,9 @@ def poke_event_hooks(rules, path):
         assert sim._era_pts[k] == int(er.get(k, d)), f"_era_pts[{k}] must mirror rules.json"
 
     conquer = sim._era_pts["conquer"]
-    civ_only_from = next(r for r in range(sim.R) if bool(sim.civ_city_alive[0, r].any()))
+    civ_only_from = next(r for r in range(sim.R) if bool(sim.city_alive[0, r + 1].any()))
     civ_only_to = next(r for r in range(sim.R) if r != civ_only_from)
-    j = int(sim.civ_city_alive[0, civ_only_from].nonzero(as_tuple=True)[0][0])
+    j = int(sim.city_alive[0, civ_only_from + 1].nonzero(as_tuple=True)[0][0])
     before = sim.era_score[0].clone()
     sim._transfer_city(0, civ_only_from + 1, j, civ_only_to + 1, conquest=False)
     delta = (sim.era_score[0] - before).tolist()
@@ -219,10 +219,10 @@ def poke_age_pressure(rules, path):
         sim.restore(snap)
         for i in range(1 + sim.R):
             sim.civ_age[0, i] = combo[i] if i < len(combo) else 1
-        exp = {c: recon_seat0_next(sim, c, 0, False) for c in range(sim.RC) if bool(sim.alive[0, c])}
+        exp = {c: recon_seat0_next(sim, c, 0, False) for c in range(sim.RC) if bool(sim.city_alive[0, 0, c])}
         apply_loyalty_row(sim, tier)
         for c in exp:
-            got = float(sim.loyalty[0, c])
+            got = float(sim.city_loyalty[0, 0, c])
             assert q(exp[c]) == q(got), f"age {combo} city {c}: recon {exp[c]:.5f} != engine {got:.5f}"
     print(f"  c age pressure OK (factors {sim._age_factor.tolist()} reconstructed exactly across {len(combos)} age combos)")
 
@@ -234,36 +234,36 @@ def poke_governor_civ(rules, path):
     sim = build(rules, path)
     sim.major_unit_alive[:] = False
     r = 0
-    slots = sim.civ_city_alive[0, r].nonzero(as_tuple=True)[0].tolist()
-    cap = next(s for s in slots if bool(sim.civ_city_is_cap[0, r, s]))
-    noncap = [s for s in slots if not bool(sim.civ_city_is_cap[0, r, s])]
+    slots = sim.city_alive[0, r + 1].nonzero(as_tuple=True)[0].tolist()
+    cap = next(s for s in slots if bool(sim.city_is_cap[0, r + 1, s]))
+    noncap = [s for s in slots if not bool(sim.city_is_cap[0, r + 1, s])]
     # ensure ≥3 non-caps so a rank-1 tie has a discriminating loser
-    nb = [int(x) for x in sim.neigh[int(sim.civ_city_center[0, r, cap])].tolist() if x >= 0]
+    nb = [int(x) for x in sim.neigh[int(sim.city_center[0, r + 1, cap])].tolist() if x >= 0]
     ni = 0
     while len(noncap) < 3:
-        s = int((~sim.civ_city_alive[0, r]).nonzero(as_tuple=True)[0][0])
-        sim.civ_city_alive[0, r, s] = True
-        sim.civ_city_is_cap[0, r, s] = False
-        sim.civ_city_center[0, r, s] = nb[ni]
-        sim.civ_city_pop[0, r, s] = 3
-        sim.civ_city_id[0, r, s] = int(sim.civ_only_next_city_id[0, r]); sim.civ_only_next_city_id[0, r] += 1
+        s = int((~sim.city_alive[0, r + 1]).nonzero(as_tuple=True)[0][0])
+        sim.city_alive[0, r + 1, s] = True
+        sim.city_is_cap[0, r + 1, s] = False
+        sim.city_center[0, r + 1, s] = nb[ni]
+        sim.city_pop[0, r + 1, s] = 3
+        sim.city_id[0, r + 1, s] = int(sim.civ_next_city_id[0, r + 1]); sim.civ_next_city_id[0, r + 1] += 1
         noncap.append(s); ni += 1
     noncap = sorted(noncap)[:3]
     gov = sim._gov_loy
-    sim.civ_city_loyalty[0, r, cap] = 90.0
-    sim.civ_city_loyalty[0, r, noncap[0]] = 20.0          # rank 0 (distinct)
-    sim.civ_city_loyalty[0, r, noncap[1]] = 30.0          # rank 1 — tie…
-    sim.civ_city_loyalty[0, r, noncap[2]] = 30.0          # …with rank 2 (loses on slot index)
+    sim.city_loyalty[0, r + 1, cap] = 90.0
+    sim.city_loyalty[0, r + 1, noncap[0]] = 20.0          # rank 0 (distinct)
+    sim.city_loyalty[0, r + 1, noncap[1]] = 30.0          # rank 1 — tie…
+    sim.city_loyalty[0, r + 1, noncap[2]] = 30.0          # …with rank 2 (loses on slot index)
     snap = sim.snapshot()
 
     def run(nc):
         sim.restore(snap)
-        sim.civ_only_civics[0, r, :] = False
+        sim.civ_civics[0, r + 1, :] = False
         if nc:
-            sim.civ_only_civics[0, r, :nc] = True
-        titles = int((sim.civ_only_civics[0, r].sum() // sim._gov_per).clamp(max=sim._gov_max))
+            sim.civ_civics[0, r + 1, :nc] = True
+        titles = int((sim.civ_civics[0, r + 1].sum() // sim._gov_per).clamp(max=sim._gov_max))
         sim._seat_phase()
-        return titles, {s: float(sim.civ_city_loyalty[0, r, s]) for s in [cap] + noncap}
+        return titles, {s: float(sim.city_loyalty[0, r + 1, s]) for s in [cap] + noncap}
 
     t0, l0 = run(0)
     t2, l2 = run(2 * sim._gov_per)  # civics → titles 2
@@ -282,15 +282,15 @@ def poke_governor_seat0(rules, path):
     sim, cols = two_city_setup(rules, path)  # loyalties 55, 59; capital 100
     tier = torch.zeros(sim.B, sim.RC, dtype=torch.long)
     gov = sim._gov_loy
-    weakest = min(cols, key=lambda c: (q(float(sim.loyalty[0, c])), c))  # ties by array position = column (#110)
-    sim.civics[0, : sim._gov_per] = True  # titles 1
+    weakest = min(cols, key=lambda c: (q(float(sim.city_loyalty[0, 0, c])), c))  # ties by array position = column (#110)
+    sim.civ_civics[0, 0, : sim._gov_per] = True  # titles 1
     snap = sim.snapshot()
     apply_loyalty_row(sim, tier)
-    with_gov = {c: float(sim.loyalty[0, c]) for c in range(sim.RC) if bool(sim.alive[0, c])}
+    with_gov = {c: float(sim.city_loyalty[0, 0, c]) for c in range(sim.RC) if bool(sim.city_alive[0, 0, c])}
     sim.restore(snap)
-    sim.civics[:] = False  # titles 0
+    sim.civ_civics[:, 0] = False  # titles 0
     apply_loyalty_row(sim, tier)
-    no_gov = {c: float(sim.loyalty[0, c]) for c in with_gov}
+    no_gov = {c: float(sim.city_loyalty[0, 0, c]) for c in with_gov}
     for c in with_gov:
         d = with_gov[c] - no_gov[c]
         if c == weakest:
@@ -328,12 +328,12 @@ def poke_seat0_golden(rules, path):
     sim2.civ_age[0, 0] = 1
     exp_norm = {c: recon_seat0_next(sim2, c, 0, False) for c in cols}
     apply_loyalty_row(sim2, tier)
-    got_norm = {c: float(sim2.loyalty[0, c]) for c in cols}
+    got_norm = {c: float(sim2.city_loyalty[0, 0, c]) for c in cols}
     sim2.restore(snap)
     sim2.civ_age[0, 0] = 2  # seat 0 Golden
     exp_gold = {c: recon_seat0_next(sim2, c, 0, False) for c in cols}
     apply_loyalty_row(sim2, tier)
-    got_gold = {c: float(sim2.loyalty[0, c]) for c in cols}
+    got_gold = {c: float(sim2.city_loyalty[0, 0, c]) for c in cols}
     af = sim2._age_factor.tolist()
     for c in cols:
         assert q(exp_norm[c]) == q(got_norm[c]) and q(exp_gold[c]) == q(got_gold[c]), (
@@ -352,21 +352,21 @@ def poke_capital_immunity(rules, path):
     sim = build(rules, path)
     sim.major_unit_alive[:] = False
     r = 0
-    cap = next(s for s in sim.civ_city_alive[0, r].nonzero(as_tuple=True)[0].tolist() if bool(sim.civ_city_is_cap[0, r, s]))
-    sim.civ_city_loyalty[0, r, cap] = 5.0                 # lowest → would be picked
-    sim.civ_only_civics[0, r, : sim._gov_per] = True       # titles 1
+    cap = next(s for s in sim.city_alive[0, r + 1].nonzero(as_tuple=True)[0].tolist() if bool(sim.city_is_cap[0, r + 1, s]))
+    sim.city_loyalty[0, r + 1, cap] = 5.0                 # lowest → would be picked
+    sim.civ_civics[0, r + 1, : sim._gov_per] = True       # titles 1
     sim._seat_phase()
-    assert float(sim.civ_city_loyalty[0, r, cap]) == lmax, f"a governor-picked civ capital must pin at {lmax}"
+    assert float(sim.city_loyalty[0, r + 1, cap]) == lmax, f"a governor-picked civ capital must pin at {lmax}"
 
     # the seat-0 capital
     sim2 = build(rules, path)
     sim2.major_unit_alive[:] = False
-    pcap = int(sim2.is_cap[0].nonzero()[0])
-    sim2.loyalty[0, pcap] = 5.0
-    sim2.civics[0, : sim2._gov_per] = True
+    pcap = int(sim2.city_is_cap[0, 0].nonzero()[0])
+    sim2.city_loyalty[0, 0, pcap] = 5.0
+    sim2.civ_civics[0, 0, : sim2._gov_per] = True
     tier = torch.zeros(sim2.B, sim2.RC, dtype=torch.long)
     apply_loyalty_row(sim2, tier)
-    assert float(sim2.loyalty[0, pcap]) == lmax, f"a governor-picked seat-0 capital must pin at {lmax}"
+    assert float(sim2.city_loyalty[0, 0, pcap]) == lmax, f"a governor-picked seat-0 capital must pin at {lmax}"
     print(f"  f capital immunity OK (governor-picked capitals pin at {lmax}, both engines)")
 
 

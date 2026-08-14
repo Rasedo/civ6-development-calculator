@@ -77,12 +77,12 @@ def main() -> None:
     assert sim.R >= 1, "need at least one civ for the defeat path"
     sim2 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     r, j = 0, 0
-    assert bool(sim2.civ_only_alive[0, r]) and bool(sim2.civ_city_alive[0, r, j]), "civ capital must be alive at turn 0"
+    assert bool(sim2.civ_alive[0, r + 1]) and bool(sim2.city_alive[0, r + 1, j]), "civ capital must be alive at turn 0"
     pi_exo = space[-1][0]
     exo_code = sim2.PROJECT_BASE + pi_exo
-    sim2.civ_city_current[0, r, j] = exo_code
-    sim2.civ_city_cost[0, r, j] = 1.0
-    sim2.civ_city_progress[0, r, j] = 1.0e6
+    sim2.city_current[0, r + 1, j] = exo_code
+    sim2.city_cost[0, r + 1, j] = 1.0
+    sim2.city_progress[0, r + 1, j] = 1.0e6
     last_step = sim2._space_step[pi_exo]
     sim2._seat_phase()
     assert bool(sim2.space_done[0, r + 1, last_step]), "civ's victory step must land in space_done"

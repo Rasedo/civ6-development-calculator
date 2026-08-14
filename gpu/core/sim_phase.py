@@ -42,7 +42,7 @@ class SimPhase:
         # arm re-validates against the LIVE mask at this position.
         if war is not None and self._rl_war_active and self.R > 0:
             w0 = war.to(torch.long)
-            ok0 = self.alive.any(dim=1) & (w0 >= 0) & self.war_mask().gather(1, w0.clamp(min=0).unsqueeze(1)).squeeze(1)
+            ok0 = self.city_alive[:, 0].any(dim=1) & (w0 >= 0) & self.war_mask().gather(1, w0.clamp(min=0).unsqueeze(1)).squeeze(1)
             decl = ok0 & (w0 < self.R)
             if bool(decl.any()):
                 oh = torch.nn.functional.one_hot(w0.clamp(min=0, max=self.R - 1), self.R).bool() & decl.unsqueeze(1)
@@ -84,14 +84,14 @@ class SimPhase:
             # pre-step. War rows here, peace rows at the peace loop below.
             _dsq = getattr(self, "_driven_useq", None)
             if _dsq is not None and r in _dsq:
-                _rows_w = atw_any & self.controlled[:, r]
+                _rows_w = atw_any & self.seat_ext[:, r + 1]
                 if bool(_rows_w.any()):
                     _ord_w = torch.where(_rows_w.view(-1, 1, 1), _dsq[r], torch.full_like(_dsq[r], -1))
                     self.apply_seat_unit_sequence(r + 1, _ord_w)
             # Suing for peace rides the wire's war verb.
             pea = active & ~atw_any  # a seat at ANY war neither patrols nor rolls the seat-0 declaration
             if _dsq is not None and r in _dsq:
-                _rows_p = pea & self.controlled[:, r]
+                _rows_p = pea & self.seat_ext[:, r + 1]
                 if bool(_rows_p.any()):
                     _ord_p = torch.where(_rows_p.view(-1, 1, 1), _dsq[r], torch.full_like(_dsq[r], -1))
                     self.apply_seat_unit_sequence(r + 1, _ord_p)
@@ -112,7 +112,7 @@ class SimPhase:
         # carries no terms — a WAR_COLUMN_SEAT-family residual).
         if war is not None and self._rl_war_active and self.R > 0:
             w0p = war.to(torch.long)
-            okp = self.alive.any(dim=1) & (w0p >= 0) & self.war_mask().gather(1, w0p.clamp(min=0).unsqueeze(1)).squeeze(1)
+            okp = self.city_alive[:, 0].any(dim=1) & (w0p >= 0) & self.war_mask().gather(1, w0p.clamp(min=0).unsqueeze(1)).squeeze(1)
             pea = okp & (w0p >= self.R)
             if bool(pea.any()):
                 ri = (w0p - self.R).clamp(min=0, max=self.R - 1)
@@ -120,7 +120,7 @@ class SimPhase:
                     1, ri.unsqueeze(1)
                 ).squeeze(1).to(self.dtype)
                 oh = torch.nn.functional.one_hot(ri, self.R).bool() & pea.unsqueeze(1)
-                self.treasury.copy_(torch.where(pea, self.treasury - cost, self.treasury))
+                self.civ_treasury[:, 0].copy_(torch.where(pea, self.civ_treasury[:, 0] - cost, self.civ_treasury[:, 0]))
                 self.civ_only_atwar.logical_and_(~oh)
                 self.war[:, 1:1 + self.civ_only_atwar.shape[1], 0] &= ~oh
                 self.civ_only_warturns.copy_(torch.where(oh, torch.zeros_like(self.civ_only_warturns), self.civ_only_warturns))
@@ -947,13 +947,13 @@ class SimPhase:
         # founding. The city planes are still split by row (the city-block
         # base unification collapses this branch).
         if row == 0:
-            _alv = self.alive
-            _cap = self.is_cap & _alv
-            _ctr = self.site
+            _alv = self.city_alive[:, 0]
+            _cap = self.city_is_cap[:, 0] & _alv
+            _ctr = self.city_center[:, 0]
         else:
-            _alv = self.civ_city_alive[:, row - 1]
-            _cap = self.civ_city_is_cap[:, row - 1] & _alv
-            _ctr = self.civ_city_center[:, row - 1]
+            _alv = self.city_alive[:, row]
+            _cap = self.city_is_cap[:, row] & _alv
+            _ctr = self.city_center[:, row]
         _h_slot = torch.where(_cap.any(dim=1), _cap.long().argmax(dim=1), _alv.long().argmax(dim=1))
         _holy = _ctr.gather(1, _h_slot.unsqueeze(1)).squeeze(1)
         _holy = torch.where(_alv.any(dim=1), _holy, torch.full_like(_holy, -1))  # ?? null
@@ -1133,8 +1133,8 @@ class SimPhase:
             return
         B = self.B
         for r in range(self.R):
-            expect = self.civ_city_id[:, r].unsqueeze(2)  # [B, RC, 1] this rc's id
-            alive = self.civ_city_alive[:, r].unsqueeze(2)  # [B, RC, 1]
+            expect = self.city_id[:, r + 1].unsqueeze(2)  # [B, RC, 1] this rc's id
+            alive = self.city_alive[:, r + 1].unsqueeze(2)  # [B, RC, 1]
             for name in ("civ_city_dist_tile", "civ_city_wonder"):
                 reg = getattr(self, name)[:, r]  # [B, RC, K] tile per (city, type/slot)
                 has = (reg >= 0) & alive
@@ -1152,7 +1152,7 @@ class SimPhase:
                     tile = int(reg[b, j, k])
                     raise AssertionError(
                         f"A-24 registry incoherence: game={b} civ={r} slot={j} "
-                        f"{name}[{k}] tile={tile} expected_id={int(self.civ_city_id[b, r, j])} "
+                        f"{name}[{k}] tile={tile} expected_id={int(self.city_id[b, r + 1, j])} "
                         f"actual_rc_tile_id={int(self.tile_city[b, tile])} "
                         f"civ_at={int(self.civ_at[b, tile])} turn={self.turn}"
                     )

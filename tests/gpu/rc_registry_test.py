@@ -48,7 +48,7 @@ def scaffold_p0(sim):
     """First scaffold district with placement code 0 (plain best-adjacency) that
     the live capital does NOT already own — so a place can be observed."""
     for (di, _ut, _uc, plc) in sim._scaffold:
-        if plc == 0 and int(sim.civ_city_dist_tile[0, 0, 0, di]) < 0:
+        if plc == 0 and int(sim.city_dist_tile[0, 1, 0, di]) < 0:
             return di
     raise AssertionError("no placement-0 scaffold district free on the capital")
 
@@ -81,10 +81,10 @@ def poke_placement_rule(rules, path):
     (civ_city_dist_tile == tile, tile_city[tile] == civ_city_id)."""
     sim = build(rules, path)
     r, j = 0, 0
-    assert bool(sim.civ_city_alive[0, r, j]), "capital slot must be alive"
+    assert bool(sim.city_alive[0, r + 1, j]), "capital slot must be alive"
     di = scaffold_p0(sim)
-    center = int(sim.civ_city_center[0, r, j])
-    own_id = int(sim.civ_city_id[0, r, j])
+    center = int(sim.city_center[0, r + 1, j])
+    own_id = int(sim.city_id[0, r + 1, j])
     sib_id = own_id + 9999  # a value no real registration carries
 
     cands = radius3_usable(sim, center)
@@ -102,14 +102,14 @@ def poke_placement_rule(rules, path):
     placed = sim._place_district(r + 1, j, di, torch.tensor([True]), 0)
     assert not bool(placed[0]), "district placed on a SIBLING-registered tile (A-24 bug)"
     assert int(sim.district[0, T]) < 0, "sibling tile was paved despite the refusal"
-    assert int(sim.civ_city_dist_tile[0, r, j, di]) < 0, "registry gained a sibling tile"
+    assert int(sim.city_dist_tile[0, r + 1, j, di]) < 0, "registry gained a sibling tile"
 
     # Now register the same tile to THIS city -> placement succeeds and is coherent.
     sim.tile_city[0, T] = own_id
     placed2 = sim._place_district(r + 1, j, di, torch.tensor([True]), 0)
     assert bool(placed2[0]), "district refused its OWN registered tile"
     assert int(sim.district[0, T]) == di, "own tile not paved"
-    assert int(sim.civ_city_dist_tile[0, r, j, di]) == T, "registry did not record the paved tile"
+    assert int(sim.city_dist_tile[0, r + 1, j, di]) == T, "registry did not record the paved tile"
     assert int(sim.tile_city[0, T]) == own_id, "paved tile does not register back to this rc"
     print(f"  a placement rule OK (sibling tile {T} refused; own-registered tile paved, di={di})")
 
@@ -121,8 +121,8 @@ def poke_never_picks_sibling(rules, path):
     sim = build(rules, path)
     r, j = 0, 0
     di = scaffold_p0(sim)
-    center = int(sim.civ_city_center[0, r, j])
-    own_id = int(sim.civ_city_id[0, r, j])
+    center = int(sim.city_center[0, r + 1, j])
+    own_id = int(sim.city_id[0, r + 1, j])
     sib_id = own_id + 9999
 
     cands = radius3_usable(sim, center)
@@ -143,7 +143,7 @@ def poke_never_picks_sibling(rules, path):
     # rely on elig excluding the sibling tile — assert the CHOSEN tile is own.)
     placed = sim._place_district(r + 1, j, di, torch.tensor([True]), 0)
     assert bool(placed[0]), "no placement with an own-registered tile available"
-    chosen = int(sim.civ_city_dist_tile[0, r, j, di])
+    chosen = int(sim.city_dist_tile[0, r + 1, j, di])
     assert chosen == T_own, f"picker chose a non-own tile {chosen} (own was {T_own})"
     assert int(sim.tile_city[0, chosen]) == own_id, "chosen tile registers to a sibling"
     print(f"  b never-picks-sibling OK (chose own tile {T_own}, not sibling {T_sib})")
@@ -163,8 +163,8 @@ def poke_invariant_scan(rules, path):
     # scan still passes before corrupting it.
     r = j = di = None
     for rr in range(sim.R):
-        for jj in sim.civ_city_alive[0, rr].nonzero(as_tuple=True)[0].tolist():
-            row = sim.civ_city_dist_tile[0, rr, jj]
+        for jj in sim.city_alive[0, rr + 1].nonzero(as_tuple=True)[0].tolist():
+            row = sim.city_dist_tile[0, rr + 1, jj]
             hit = (row >= 0).nonzero(as_tuple=True)[0]
             if len(hit):
                 r, j, di = rr, jj, int(hit[0])
@@ -173,16 +173,16 @@ def poke_invariant_scan(rules, path):
             break
     if r is None:
         r, j = 0, 0
-        assert bool(sim.civ_city_alive[0, r, j]), "capital slot must be alive"
+        assert bool(sim.city_alive[0, r + 1, j]), "capital slot must be alive"
         di = scaffold_p0(sim)
-        center = int(sim.civ_city_center[0, r, j])
+        center = int(sim.city_center[0, r + 1, j])
         T = radius3_usable(sim, center)[0]
         sim.civ_at[0, T] = r
-        sim.tile_city[0, T] = int(sim.civ_city_id[0, r, j])
+        sim.tile_city[0, T] = int(sim.city_id[0, r + 1, j])
         sim.district[0, T] = di
-        sim.civ_city_dist_tile[0, r, j, di] = T
+        sim.city_dist_tile[0, r + 1, j, di] = T
         sim._check_rc_registry_invariant()  # planted reference is coherent
-    tile = int(sim.civ_city_dist_tile[0, r, j, di])
+    tile = int(sim.city_dist_tile[0, r + 1, j, di])
     good_id = int(sim.tile_city[0, tile])
 
     # forward violation: the tile now registers to a sibling
@@ -218,11 +218,11 @@ def poke_capture_luxury_pool(rules, path):
     FISHING_BOATS improvement is absent from the GPU catalog) is inert in BOTH
     engines, so the poke picks an in-roster spec."""
     sim = build(rules, path)
-    r = next(rr for rr in range(sim.R) if bool(sim.civ_city_alive[0, rr].any()))
-    j = int(sim.civ_city_alive[0, r].nonzero(as_tuple=True)[0][0])
-    c_t = int(sim.civ_city_center[0, r, j])
-    cid = int(sim.civ_city_id[0, r, j])
-    assert int(sim.alive[0].sum()) < 6, "seat 0 at the city cap — capture would raze; pick an earlier turn"
+    r = next(rr for rr in range(sim.R) if bool(sim.city_alive[0, rr + 1].any()))
+    j = int(sim.city_alive[0, r + 1].nonzero(as_tuple=True)[0][0])
+    c_t = int(sim.city_center[0, r + 1, j])
+    cid = int(sim.city_id[0, r + 1, j])
+    assert int(sim.city_alive[0, 0].sum()) < 6, "seat 0 at the city cap — capture would raze; pick an earlier turn"
 
     # an in-roster luxury spec whose id is NOT already active for seat 0
     # (a duplicate would not change the unique-luxury count)
@@ -256,7 +256,7 @@ def poke_capture_luxury_pool(rules, path):
 
     sim._transfer_city(0, r + 1, j, 0, conquest=True)  # civ r is block row r+1
     c_new = int(sim.center_at[0, c_t])
-    assert c_new >= 0 and bool(sim.alive[0, c_new]), "capture did not land a seat-0 city"
+    assert c_new >= 0 and bool(sim.city_alive[0, 0, c_new]), "capture did not land a seat-0 city"
     assert int(sim.owner[0, t]) == c_new, "the luxury tile did not re-own to the captured city (A-17 ring)"
     after = float(sim._luxury_amenities(0, have, need).sum())
     assert after >= base + 1.0, f"captured improved luxury did not feed the seat-0 pool ({base} -> {after})"

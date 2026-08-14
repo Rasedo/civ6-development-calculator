@@ -41,8 +41,8 @@ def main() -> int:
         print(f"SKIP domination — fixture has {sim.R} civs, need >=2")
         return 0
 
-    pcap = int(sim.site[0, 0])
-    rcaps = [int(sim.civ_city_center[0, r, 0]) for r in range(sim.R)]
+    pcap = int(sim.city_center[0, 0, 0])
+    rcaps = [int(sim.city_center[0, r + 1, 0]) for r in range(sim.R)]
 
     # 1. Split at founding — seat 0 holds its own, each civ holds theirs -> -1.
     assert dom(sim) == -1, f"split capitals should be -1, got {dom(sim)}"

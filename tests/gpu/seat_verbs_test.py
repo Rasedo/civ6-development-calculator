@@ -57,7 +57,7 @@ def order(sim, r, slot, col):
     row = int((smap == slot).nonzero(as_tuple=True)[0][0])
     acts = torch.full((1, smap.shape[0]), -1, dtype=torch.long)
     acts[0, row] = col
-    sim.controlled[0, r] = True
+    sim.seat_ext[0, r + 1] = True
     sim._apply_seat_unit_actions(r, acts)
 
 
@@ -83,7 +83,7 @@ def main() -> None:
     sim._tile_owner_ver += 1
     ut = int(sim._imp_unlock[k])
     if ut >= 0:
-        sim.civ_only_techs[0, r, ut] = True
+        sim.civ_techs[0, r + 1, ut] = True
     ch0 = int(sim.major_unit_charges[0, slot])
     order(sim, r, slot, res_lo + (k - 3))
     assert int(sim.improvement[0, tile]) == k, (
@@ -139,7 +139,7 @@ def main() -> None:
     # and the engine walks it, validating each step — it never extends a move.
     def setup():
         s2 = fresh(rules, path)
-        s2.controlled[0, r] = True
+        s2.seat_ext[0, r + 1] = True
         sl = next(
             v for v in range(s2.major_unit_alive.shape[1])
             if bool(s2.major_unit_alive[0, v]) and int(s2.major_unit_seat[0, v]) == r + 1
@@ -207,7 +207,7 @@ def main() -> None:
     # PILLAGE then a move: the move must NOT happen (mp spent), which is what
     # keeps the sequence from smuggling a free action after a turn-ending verb.
     sim6 = fresh(rules, path)
-    sim6.controlled[0, r] = True
+    sim6.seat_ext[0, r + 1] = True
     sl6, t6 = a_civ_soldier(sim6, r)
     sim6.civ_only_atwar[0, r] = True
     sim6.owner[0, t6] = 0
@@ -229,7 +229,7 @@ def main() -> None:
     # Execution, not legality: the strike must DAMAGE the target. A legal
     # column that executes nothing would teach a net that sniping is worthless.
     sim7 = fresh(rules, path)
-    sim7.controlled[0, r] = True
+    sim7.seat_ext[0, r + 1] = True
     sl7b, t7 = a_civ_soldier(sim7, r)
     assert sl7b is not None
     # retype to ARCHER via the roster index in the sim's own tables
@@ -265,7 +265,7 @@ def main() -> None:
     # sails where the mask (and TS) moves it: naval water is cartography-gated
     # and war-free, and a land step is refused at the apply.
     sim8 = fresh(rules, path)
-    sim8.controlled[0, r] = True
+    sim8.seat_ext[0, r + 1] = True
     sl8, t8 = a_civ_soldier(sim8, r)
     assert sl8 is not None
     ni = next(i for i in range(sim8.NU) if bool(sim8.unit_naval[i]))

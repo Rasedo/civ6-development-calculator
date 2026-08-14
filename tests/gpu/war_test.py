@@ -56,7 +56,7 @@ def test_inert_when_off(rules, path):
     d = drift(sim, snap_all(ref))
     assert not d, f"war=None path must not depend on the flag: {d}"
     # the live mask offers declarations at peace (civs exist on this seed)
-    if bool(sim.civ_only_alive.any()):
+    if bool(sim.civ_alive[:, 1:].any()):
         assert bool(sim.war_mask().any()), "live war_mask should offer choices with civs alive"
     print("  activation OK (scripted path flag-independent; live mask non-degenerate)")
 
@@ -96,11 +96,11 @@ def test_peace(rules, path):
     rr = sim.rules.seats
     need = int(rr.get("peaceMinWarTurns", 8))
     for _ in range(need):
-        sim.treasury[:] = 0.0  # isolate the warTurns gate (a rich-enough world opens the gold gate mid-wait)
+        sim.civ_treasury[:, 0] = 0.0  # isolate the warTurns gate (a rich-enough world opens the gold gate mid-wait)
         assert not bool(sim.war_mask()[0, sim.R]), "peace column open too soon"
         sim.step()
     assert bool(sim.civ_only_atwar[0, 0]), "war ended prematurely (civ auto-peace?)"
-    sim.treasury[:] = RICH
+    sim.civ_treasury[:, 0] = RICH
     m = sim.war_mask()[0]
     assert bool(m[sim.R]), "peace column should be open now (rich + warTurns >= min)"
     wt = int(sim.civ_only_warturns[0, 0])
@@ -111,7 +111,7 @@ def test_peace(rules, path):
     after = snap_all(sim)
     # equivalence: poke sueForPeace's exact effect, then step plain
     sim.restore(snap)
-    sim.treasury -= cost  # IN PLACE — treasury is a view of civ_treasury
+    sim.civ_treasury[:, 0] -= cost  # IN PLACE — treasury is a view of civ_treasury
     sim.civ_only_atwar[:, 0] = False
     sim.sync_war()  # a poke must write the legacy stores too
     # the war MATRIX is the representation the engine reads — poke it too
@@ -123,7 +123,7 @@ def test_peace(rules, path):
     d = drift(sim, after)
     assert not d, f"peace != poked sueForPeace + plain step: {d}"
     # broke → column closed
-    sim.treasury[:] = 0.0
+    sim.civ_treasury[:, 0] = 0.0
     sim.civ_only_atwar[:, 0] = True
     sim.sync_war()  # a poke must write the legacy stores too
     # the war MATRIX is the representation the engine reads — poke it too
@@ -142,7 +142,7 @@ def test_capture_plunder(rules, path):
     sim = build(rules, path)
     for _ in range(20):
         sim.step()
-    idx = sim.civ_city_alive[0].nonzero()
+    idx = sim.city_alive[0, 1:1 + max(sim.R, 1)].nonzero()
     assert len(idx), "no civ city by t20 on this seed"
     r = int(idx[0, 0])
     sim.civ_only_atwar[0, r] = True
@@ -152,32 +152,32 @@ def test_capture_plunder(rules, path):
     sim.war[0, 1 + (r), 0] = True
     caps = 0
     # capture civ r's cities one by one until eliminated (or seat 0 is full)
-    while bool(sim.civ_city_alive[0, r].any()) and bool((~sim.alive[0]).any()):
-        jj = int(sim.civ_city_alive[0, r].nonzero()[0, 0])
-        t0 = float(sim.treasury[0])
+    while bool(sim.city_alive[0, r + 1].any()) and bool((~sim.city_alive[0, 0]).any()):
+        jj = int(sim.city_alive[0, r + 1].nonzero()[0, 0])
+        t0 = float(sim.civ_treasury[0, 0])
         sim._transfer_city(0, r + 1, jj, 0, conquest=True)
         caps += 1
-        assert float(sim.treasury[0]) == t0 + 40.0, "capture must plunder +40 (TS combat.ts:354)"
-        if bool(sim.civ_city_alive[0, r].any()):
+        assert float(sim.civ_treasury[0, 0]) == t0 + 40.0, "capture must plunder +40 (TS combat.ts:354)"
+        if bool(sim.city_alive[0, r + 1].any()):
             assert bool(sim.civ_only_atwar[0, r]), "war continues while the civ holds cities"
         else:
             assert not bool(sim.civ_only_atwar[0, r]), "last city captured -> the war must end"
-    eliminated = not bool(sim.civ_city_alive[0, r].any())
+    eliminated = not bool(sim.city_alive[0, r + 1].any())
     assert caps >= 1, "no captures exercised"
     assert eliminated, "seat-0 slots filled before elimination — last-city branch untested on this seed"
     # raze path: fake a full empire — every seat-0 city slot occupied
-    idx2 = sim.civ_city_alive[0].nonzero()
+    idx2 = sim.city_alive[0, 1:1 + max(sim.R, 1)].nonzero()
     if len(idx2):
         r2, j2 = int(idx2[0, 0]), int(idx2[0, 1])
-        sim.alive[0, :] = True
+        sim.city_alive[0, 0, :] = True
         sim.civ_only_atwar[0, r2] = True
         sim.sync_war()  # a poke must write the legacy stores too
         # the war MATRIX is the representation the engine reads — poke it too
         sim.war[0, 0, 1 + (r2)] = True
         sim.war[0, 1 + (r2), 0] = True
-        t1 = float(sim.treasury[0])
+        t1 = float(sim.civ_treasury[0, 0])
         sim._transfer_city(0, r2 + 1, j2, 0, conquest=True)
-        assert float(sim.treasury[0]) == t1, "raze must not plunder"
+        assert float(sim.civ_treasury[0, 0]) == t1, "raze must not plunder"
         assert bool(sim.civ_only_atwar[0, r2]), "raze must not end the war (TS early return)"
     print(f"  capture plunder OK ({caps} captures: +40 each, war ends on the last; raze: neither)")
 
@@ -273,21 +273,21 @@ def test_cs_siege(rules, path):
     ua = torch.full((1, sim.major_unit_alive.shape[1]), -1, dtype=torch.long)
     ua[0, p_] = act
     pop_before = int(sim.citystate_pop[0, s])
-    ncity0 = int(sim.alive[0].sum())
+    ncity0 = int(sim.city_alive[0, 0].sum())
     sim.step(units=ua)
     assert not bool(sim.citystate_alive[0, s]), "CS at 1 hp must fall to the next hit"
     # >= not ==: an organic settler founding can land in the same step as the
     # capture (+2 total); the capture itself is pinned by the
     # center_at/owner/pop assertions below.
-    assert int(sim.alive[0].sum()) >= ncity0 + 1, "capture must found a seat-0 city"
+    assert int(sim.city_alive[0, 0].sum()) >= ncity0 + 1, "capture must found a seat-0 city"
     c_new = int(sim.center_at[0, ctr])
-    assert c_new >= 0 and bool(sim.alive[0, c_new]), "center must map to the new city"
+    assert c_new >= 0 and bool(sim.city_alive[0, 0, c_new]), "center must map to the new city"
     assert int(sim.owner[0, ctr]) == c_new, "center tile must transfer"
     assert int(sim.citystate_at[0, ctr]) == -1, "cityStateId territory must clear"
-    assert int(sim.pop[0, c_new]) == max(1, (pop_before * 3) // 4), "pop x0.75 (min 1)"
+    assert int(sim.city_pop[0, 0, c_new]) == max(1, (pop_before * 3) // 4), "pop x0.75 (min 1)"
     assert int(sim.city_hp[0, 0, c_new]) in (100, 120), "captured city starts at half HP (+20 same-turn heal allowed)"
     assert not bool(sim.envoy_mask()[0, s]), "dead CS must leave the envoy mask"
-    print(f"  cs siege OK (hp {hp0} -> {int(sim.citystate_hp[0, s])} on hit; capture: pop {pop_before} -> {int(sim.pop[0, c_new])}, city {c_new})")
+    print(f"  cs siege OK (hp {hp0} -> {int(sim.citystate_hp[0, s])} on hit; capture: pop {pop_before} -> {int(sim.city_pop[0, 0, c_new])}, city {c_new})")
 
 
 def main() -> None:

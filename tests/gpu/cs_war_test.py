@@ -102,10 +102,10 @@ def main() -> None:
     r = 0
     s2.citystate_atwar[b, cs] = True
     s2.citystate_war_turns[b, cs] = 7
-    s2.civ_only_citystate_envoys[b, r, cs] = suz_min + 2   # this civ is the strict suzerain
-    s2.citystate_envoys[b, cs] = 0
-    if s2.civ_only_citystate_envoys.shape[1] > 1:
-        s2.civ_only_citystate_envoys[b, 1:, cs] = 0
+    s2.seat_citystate_envoys[b, r + 1, cs] = suz_min + 2   # this civ is the strict suzerain
+    s2.seat_citystate_envoys[b, 0, cs] = 0
+    if s2.R > 1:
+        s2.seat_citystate_envoys[b, 2:, cs] = 0
     _citystate_row = 1 + max(s2.R, 1) + cs
     s2.ww[b, 0, _citystate_row] = 900.0
     s2.sync_war()
@@ -121,7 +121,7 @@ def main() -> None:
 
     # a civ that is NOT the suzerain releases nothing
     s2.citystate_atwar[b, cs] = True
-    s2.civ_only_citystate_envoys[b, r, cs] = 0
+    s2.seat_citystate_envoys[b, r + 1, cs] = 0
     s2.sync_war()
     s2._citystate_suzerain_release(r, _peace)
     assert bool(s2.citystate_atwar[b, cs]), "a non-suzerain's peace must NOT free the city-state"

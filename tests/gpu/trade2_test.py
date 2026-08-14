@@ -48,22 +48,22 @@ def main() -> None:
     assert sim._trade_intl_gold == 3 and sim._trade_duration == 20, "engine trade consts mismatch"
     assert "seat_route_dest" in _MUTABLE and "seat_route_exp" in _MUTABLE, "route tensors must be _MUTABLE (#51: SEAT-indexed bases; civ_only_route_* are views)"
     B = sim.B
-    K = sim.civ_only_routes.shape[2]
-    assert sim.civ_only_route_dest.shape == (B, sim.civ_only_routes.shape[1], K), "civ_only_route_dest shape"
-    assert sim.civ_only_route_exp.shape == (B, sim.civ_only_routes.shape[1], K), "civ_only_route_exp shape"
-    assert sim.civ_only_route_dest.dtype == torch.long and sim.civ_only_route_exp.dtype == torch.long, "route metadata dtype"
-    assert sim.civ_only_route_dest.dtype == sim.civ_only_routes.dtype, "civ_only_route_dest dtype must match civ_only_routes"
+    K = sim.seat_routes.shape[2]
+    assert sim.seat_route_dest[:, 1:1 + max(sim.R, 1)].shape == (B, max(sim.R, 1), K), "civ_only_route_dest shape"
+    assert sim.seat_route_exp[:, 1:1 + max(sim.R, 1)].shape == (B, max(sim.R, 1), K), "civ_only_route_exp shape"
+    assert sim.seat_route_dest[:, 1:1 + max(sim.R, 1)].dtype == torch.long and sim.seat_route_exp[:, 1:1 + max(sim.R, 1)].dtype == torch.long, "route metadata dtype"
+    assert sim.seat_route_dest[:, 1:1 + max(sim.R, 1)].dtype == sim.seat_routes[:, 1:1 + max(sim.R, 1)].dtype, "civ_only_route_dest dtype must match civ_only_routes"
 
     # --- 2) international income: intlGold + dest specialty, gold only -----
     #   Plant a civ-capital route to seat 0's capital centre tile. At t0 that
     #   capital holds no specialty district, so gold = intlGold(3).
-    assert sim.R >= 1 and bool(sim.civ_city_alive[0, 0, 0]), "need a live civ capital"
-    dest_tile = int(sim.site[0, 0])  # seat 0's capital centre tile
-    assert int(sim.center_at[0, dest_tile]) == 0 and bool(sim.alive[0, 0]), "seat-0 capital must own its center"
-    sim.civ_only_routes[0, 0, 0, 0] = int(sim.civ_city_id[0, 0, 0])  # origin = civ capital
-    sim.civ_only_routes[0, 0, 0, 1] = -1                        # intl: dest carried below
-    sim.civ_only_route_dest[0, 0, 0] = dest_tile
-    sim.civ_only_route_exp[0, 0, 0] = int(sim.turn) + sim._trade_duration
+    assert sim.R >= 1 and bool(sim.city_alive[0, 1, 0]), "need a live civ capital"
+    dest_tile = int(sim.city_center[0, 0, 0])  # seat 0's capital centre tile
+    assert int(sim.center_at[0, dest_tile]) == 0 and bool(sim.city_alive[0, 0, 0]), "seat-0 capital must own its center"
+    sim.seat_routes[0, 1, 0, 0] = int(sim.city_id[0, 1, 0])  # origin = civ capital
+    sim.seat_routes[0, 1, 0, 1] = -1                        # intl: dest carried below
+    sim.seat_route_dest[0, 1, 0] = dest_tile
+    sim.seat_route_exp[0, 1, 0] = int(sim.turn) + sim._trade_duration
     sim.civ_only_atwar[0, 0] = False
     sim.sync_war()  # close the poke under transpose
     sim._seat_route_cache = None
@@ -99,37 +99,37 @@ def main() -> None:
 
     # --- 3) duration expiry: due route dropped, future route kept ----------
     s = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    fid = int(s.civ_city_id[0, 0, 0])
-    s.civ_only_routes[0, 0, 0, 0] = fid
-    s.civ_only_routes[0, 0, 0, 1] = int(s.civ_city_id[0, 0, 0])  # (any active dest; expiry keys on exp only)
-    s.civ_only_route_dest[0, 0, 0] = -1
-    s.civ_only_route_exp[0, 0, 0] = int(s.turn)  # due now (exp <= turn)
-    s.civ_only_routes[0, 0, 1, 0] = fid
-    s.civ_only_routes[0, 0, 1, 1] = int(s.civ_city_id[0, 0, 0])
-    s.civ_only_route_dest[0, 0, 1] = -1
-    s.civ_only_route_exp[0, 0, 1] = int(s.turn) + 5  # future
+    fid = int(s.city_id[0, 1, 0])
+    s.seat_routes[0, 1, 0, 0] = fid
+    s.seat_routes[0, 1, 0, 1] = int(s.city_id[0, 1, 0])  # (any active dest; expiry keys on exp only)
+    s.seat_route_dest[0, 1, 0] = -1
+    s.seat_route_exp[0, 1, 0] = int(s.turn)  # due now (exp <= turn)
+    s.seat_routes[0, 1, 1, 0] = fid
+    s.seat_routes[0, 1, 1, 1] = int(s.city_id[0, 1, 0])
+    s.seat_route_dest[0, 1, 1] = -1
+    s.seat_route_exp[0, 1, 1] = int(s.turn) + 5  # future
     s._expire_seat_routes(1)
-    assert int(s.civ_only_routes[0, 0, 0, 0]) == -1, "a due route (exp <= turn) must be dropped"
-    assert int(s.civ_only_route_exp[0, 0, 0]) == -1, "dropped slot's exp must reset"
-    assert int(s.civ_only_routes[0, 0, 1, 0]) == fid, "a future route must survive expiry"
+    assert int(s.seat_routes[0, 1, 0, 0]) == -1, "a due route (exp <= turn) must be dropped"
+    assert int(s.seat_route_exp[0, 1, 0]) == -1, "dropped slot's exp must reset"
+    assert int(s.seat_routes[0, 1, 1, 0]) == fid, "a future route must survive expiry"
 
     # --- 4) dest-gone: an intl route to a vanished centre is dropped -------
     s2 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     empty_tile = int((s2.center_at[0] < 0).nonzero(as_tuple=True)[0][0])  # not a seat-0 centre
-    s2.civ_only_routes[0, 0, 0, 0] = int(s2.civ_city_id[0, 0, 0])
-    s2.civ_only_routes[0, 0, 0, 1] = -1
-    s2.civ_only_route_dest[0, 0, 0] = empty_tile
-    s2.civ_only_route_exp[0, 0, 0] = int(s2.turn) + s2._trade_duration  # not yet expired
+    s2.seat_routes[0, 1, 0, 0] = int(s2.city_id[0, 1, 0])
+    s2.seat_routes[0, 1, 0, 1] = -1
+    s2.seat_route_dest[0, 1, 0] = empty_tile
+    s2.seat_route_exp[0, 1, 0] = int(s2.turn) + s2._trade_duration  # not yet expired
     s2._expire_seat_routes(1)
-    assert int(s2.civ_only_routes[0, 0, 0, 0]) == -1, "an intl route to a tile that is not a seat-0 center must be dropped"
+    assert int(s2.seat_routes[0, 1, 0, 0]) == -1, "an intl route to a tile that is not a seat-0 center must be dropped"
 
     # --- 5) the route tensors ride snapshot/restore ------------------------
     s3 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     snap = s3.snapshot()
-    s3.civ_only_route_dest[0, 0, 0] = 123
-    s3.civ_only_route_exp[0, 0, 0] = 999
+    s3.seat_route_dest[0, 1, 0] = 123
+    s3.seat_route_exp[0, 1, 0] = 999
     s3.restore(snap)
-    assert int(s3.civ_only_route_dest[0, 0, 0]) == -1 and int(s3.civ_only_route_exp[0, 0, 0]) == -1, "restore must roll back route metadata"
+    assert int(s3.seat_route_dest[0, 1, 0]) == -1 and int(s3.seat_route_exp[0, 1, 0]) == -1, "restore must roll back route metadata"
 
     print("trade2_test OK — intl gold(+specialty)/gold-only/war-suspend, duration expiry, dest-gone prune, _MUTABLE round-trip")
 

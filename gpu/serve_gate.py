@@ -183,7 +183,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     dig_dumped = False
     for r in seats:
         drive.take_seat(sim, r)
-    NT, NC = sim.civ_only_techs.shape[2], sim.civ_only_civics.shape[2]
+    NT, NC = sim.civ_techs.shape[2], sim.civ_civics.shape[2]
     ctx_lo = env.observe(1).shape[1] - ladder.CTX_SEAT
 
     # Resume restores the GPU from its turn-T snapshot BEFORE the children
@@ -316,8 +316,8 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                 recs = {str(r + 1): {**drive._extract_record(sim, r, *per_seat[r], b),
                                      **drive._extract_geo(geo, r, b)} for r in seats}
                 recs["0"] = {
-                    "production": [[int(sim.site[b, c]), int(prod0[b, c])] for c in range(sim.RC)
-                                   if int(prod0[b, c]) >= 0 and bool(sim.alive[b, c])],
+                    "production": [[int(sim.city_center[b, 0, c]), int(prod0[b, c])] for c in range(sim.RC)
+                                   if int(prod0[b, c]) >= 0 and bool(sim.city_alive[b, 0, c])],
                     "tech": None if int(tech0[b]) < 0 else int(tech0[b]),
                     "civic": None if int(civic0[b]) < 0 else int(civic0[b]),
                     "units": [[_pt_l[b][_sm0_l[b][n]], v, int(_pc_l[b][_sm0_l[b][n]])]
@@ -432,7 +432,7 @@ def main() -> None:
     dig_dumped = False
     for r in seats:
         drive.take_seat(sim, r)
-    NT, NC = sim.civ_only_techs.shape[2], sim.civ_only_civics.shape[2]
+    NT, NC = sim.civ_techs.shape[2], sim.civ_civics.shape[2]
     ctx_lo = env.observe(1).shape[1] - ladder.CTX_SEAT
 
     # Resume — the batched path's twin (GPU snapshot + TS state dump).
@@ -570,8 +570,8 @@ def main() -> None:
         recs = {str(r + 1): {**drive._extract_record(sim, r, *per_seat[r], 0),
                              **drive._extract_geo(geo, r, 0)} for r in seats}
         recs["0"] = {
-            "production": [[int(sim.site[0, c]), int(prod0[0, c])] for c in range(sim.RC)
-                           if int(prod0[0, c]) >= 0 and bool(sim.alive[0, c])],
+            "production": [[int(sim.city_center[0, 0, c]), int(prod0[0, c])] for c in range(sim.RC)
+                           if int(prod0[0, c]) >= 0 and bool(sim.city_alive[0, 0, c])],
             "tech": None if int(tech0[0]) < 0 else int(tech0[0]),
             "civic": None if int(civic0[0]) < 0 else int(civic0[0]),
             "units": [[_pt_l[_sm0_l[n]], v, int(_pc_l[_sm0_l[n]])]

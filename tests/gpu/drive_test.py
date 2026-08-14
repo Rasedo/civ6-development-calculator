@@ -29,10 +29,10 @@ WARMUP = 10
 
 def seat_state(sim, r=0):
     return {
-        "cities": int(sim.civ_city_alive[0, r].sum()),
+        "cities": int(sim.city_alive[0, r + 1].sum()),
         "units": int((sim.major_unit_alive[0] & ((sim.major_unit_seat[0] - 1) == r)).sum()),
-        "techs": int(sim.civ_only_techs[0, r].sum()),
-        "civics": int(sim.civ_only_civics[0, r].sum()),
+        "techs": int(sim.civ_techs[0, r + 1].sum()),
+        "civics": int(sim.civ_civics[0, r + 1].sum()),
     }
 
 
@@ -54,7 +54,7 @@ def main() -> None:
     got = seat_state(b.sim)
 
     assert len(log) == TURNS, f"driver logged {len(log)} turns, expected {TURNS}"
-    assert bool(b.sim.controlled[0, 0]), "the driven seat must be marked controlled"
+    assert bool(b.sim.seat_ext[0, 1]), "the driven seat must be marked controlled"
     print(f"  scripted: {ref}")
     print(f"  ladder  : {got}")
 
@@ -96,8 +96,8 @@ def main() -> None:
     rep = seat_state(c.sim)
     assert rep == got, f"replay diverged from the driven run: {rep} vs {got}"
     assert bool((b.sim.major_unit_tile == c.sim.major_unit_tile).all()), "replay put units on different tiles"
-    assert bool((b.sim.civ_city_current == c.sim.civ_city_current).all()), "replay left different city queues"
-    assert bool((b.sim.civ_only_treasury == c.sim.civ_only_treasury).all()), "replay diverged on treasury"
+    assert bool((b.sim.city_current[:, 1:1 + max(b.sim.R, 1)] == c.sim.city_current[:, 1:1 + max(c.sim.R, 1)]).all()), "replay left different city queues"
+    assert bool((b.sim.civ_treasury[:, 1:] == c.sim.civ_treasury[:, 1:]).all()), "replay diverged on treasury"
     print("  action file replays to IDENTICAL state (no ladder, no picker) OK")
     print("DRIVE OK")
 
