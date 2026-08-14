@@ -1891,7 +1891,7 @@ class SimSeats:
             housing = housing + self._cond_house_amen(gm[8], gm[9], all_d, spec_d)[0]
         return maint, torch.where(alive, housing, torch.zeros_like(housing))
 
-    def _seat_amenity(self, row: int, lux: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def _seat_amenity(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """THE amenity body, for every seat row (0 = seat 0, r+1 = civ r) —
         computeCityStats' amenity half, in f64.
 
@@ -1903,12 +1903,10 @@ class SimSeats:
         follower Zen Meditation and pantheon River Goddess. War weariness is
         subtracted last.
 
-        `lux` FREEZES the luxury map: TS endTurn computes luxuryAmenities ONCE
-        before its city loop and feeds that map to every city's fresh
-        computeCityStats, so a guard-triggered recompute inside the walk must
-        not re-rank with mid-walk pops. Returns (tier_idx, growth_f, yield_f,
-        lux_add), each [B, cols]; the factors are f64 and a caller running
-        self.dtype casts them."""
+        Returns (tier_idx, growth_f, yield_f, lux_add), each [B, cols]; the
+        factors are f64 and a caller running self.dtype casts them. The seat
+        block calls this ONCE per row, at its loop top (_seat_city_stats), so
+        the luxury ranking freezes there for the whole walk."""
         cols = self.RC
         rd = self.rules_dev
         alive = self.city_alive[:, row, :cols]
@@ -1929,7 +1927,7 @@ class SimSeats:
         if _regional is not None:
             have = have + _regional[1]
         need = torch.ceil((self.city_pop[:, row, :cols].double() - 2) / 2).clamp(min=0)
-        lux_add = self._luxury_amenities(row, have, need) if lux is None else lux.double()
+        lux_add = self._luxury_amenities(row, have, need)
         # this seat's OWN government/policy flat amenities and the newDeal
         # specialty rule — computeCityStats' two arms.
         if self._gov_has_effects:

@@ -95,15 +95,15 @@ class SimPhase:
             # inside the loop, later) does not.
             alive_c = self.civ_city_alive[:, r].clone()
 
-            # phase-top unlock snapshot
-            prod_sum = torch.zeros(B, dtype=torch.float64, device=dev)
             sci_sum = torch.zeros(B, dtype=torch.float64, device=dev)
             cul_sum = torch.zeros(B, dtype=torch.float64, device=dev)
             gold_sum = torch.zeros(B, dtype=torch.float64, device=dev)
             faith_sum = torch.zeros(B, dtype=torch.float64, device=dev)
-            # The amenity map freezes at the loop top (the luxMap discipline)
-            # — loyalty, growth and yields all read it.
-            amen_tidx, amen_gf, amen_yf, _ = self._seat_amenity(r + 1)
+            # THE loop-top stats snapshot — one body, every seat row. Every
+            # column below reads THIS map: yields, amenity tier, effective food
+            # surplus and growth need all freeze here, and nothing inside the
+            # loop refreshes them.
+            total, eff, need, tier_idx = self._seat_city_stats(r + 1)
             # This civ's governor seats for THIS turn — the loop-top
             # governorPicks mirror (quantized milli loyalty snapshot, ties by
             # slot index == TS array order; alive-masked).
@@ -114,45 +114,17 @@ class SimPhase:
             _gr.scatter_(1, _gk.argsort(dim=1, stable=True), torch.arange(self.RC, device=dev).expand(B, self.RC))
             civ_city_gov = (_gr < _titles_r.unsqueeze(1)) & self.civ_city_alive[:, r]  # [B, RC]
             civ_city_flip = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
-            # The Hanging-Gardens growth product reads the CIV-wide wonder
-            # registry — identical for every j, so it is hoisted per r. A
-            # wonder COMPLETION mid-loop (the only in-loop write to its inputs:
-            # a settler founding only rewrites an all--1 free slot, product
-            # term 1.0 either way) drops the cache and the next j recomputes
-            # the same expression on the fresh state.
-            gw_cache = self._wonder_growth_mult(self._completed_wonders(r + 1))
-            # One guard sync for the whole economy loop. This is exact because
-            # alive_c is a pre-loop CLONE (a queue-completion newborn founded
-            # inside the loop does not act this turn — the [...civ.cities]
-            # discipline above) and `active` is a loop-invariant local, so the
-            # precomputed columns equal a per-j compute.
+            # One guard sync for the whole economy loop: alive_c is a pre-loop
+            # CLONE (a queue-completion newborn founded inside the loop does not
+            # act this turn — the [...civ.cities] discipline above) and `active`
+            # is a loop-invariant local.
             cact_all = active.unsqueeze(1) & alive_c  # [B, RC]
             cact_any_l = cact_all.any(dim=0).tolist()
-            _rcy_bel = self._seat_has_beliefs(r + 1)  # capital fallback gate (capY live-pop)
-            # The per-j housing/maintenance/growth-need math, batched over j.
-            # Inputs are planes (eff-covered), own-column registries (a city's
-            # own completions land at the END of its iteration, after these
-            # values are consumed — no cross-column write exists), and ONE live
-            # edge: civ_at at window tiles in the improvement-housing term (a
-            # mid-loop border claim can put an ORPHANED improvement into a
-            # later city's window), so the batch recomputes when
-            # (_eff_version, _claim_version) moves — the same key discipline as
-            # the yields cache. Every batched sum is dyadic/int-valued:
-            # bit-exact in any shape.
-            _gmul_r = self._bel_mul("growth", r + 1) if _rcy_bel else 1.0
-
-            def _g5_hm() -> tuple[torch.Tensor, torch.Tensor]:
-                housing = self._seat_housing(r + 1)[1]  # THE shared body
-                p64a = self.civ_city_pop[:, r].double()
-                need = torch.floor(15 + 8 * (p64a - 1) + (p64a - 1).clamp(min=0) ** 1.5)
-                return housing, need
-
-            _h_key = None
-            housing_all = need_all = None
             for j in range(self.RC):
                 if not cact_any_l[j]:
                     continue
                 cact = cact_all[:, j]  # post-buy snapshot (a bought settler's city acts this turn)
+                jc = torch.full((B,), j, dtype=torch.long, device=dev)
                 # City loyalty at the loop top (before yields/growth) — own =
                 # THIS civ, foreign = seat 0 + every other civ; LIVE pops
                 # (earlier slots in this loop have already grown, the TS
@@ -186,246 +158,32 @@ class SimPhase:
                         others = others | alive_o.any(dim=1)
                     tot_p = own_p + for_p
                     press = torch.where(tot_p > 0, lscale * (own_p - for_p) / tot_p.clamp(min=1e-9), torch.zeros_like(tot_p))
-                    delta_l = press + self._loyalty_amenity[amen_tidx[:, j].clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)].double() + civ_city_gov[:, j].double() * self._gov_loy
+                    delta_l = press + self._loyalty_amenity[tier_idx[:, j].clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)].double() + civ_city_gov[:, j].double() * self._gov_loy
                     upd_l = ncap & others
                     nxt_l = (self.civ_city_loyalty[:, r, j] + delta_l).clamp(min=0, max=float(rr.get("loyaltyMax", 100)))
                     self.civ_city_loyalty[:, r, j] = torch.where(upd_l, nxt_l, self.civ_city_loyalty[:, r, j])
                     civ_city_flip[:, j] = upd_l & (self.civ_city_loyalty[:, r, j] <= 0)
-                # Column j of the keyed batched twin stands in for a per-j pass
-                # (see _rcy_all_cached's exactness argument). The one
-                # snapshot-vs-live divergence is capY's civ-total follower pop
-                # under beliefs — TS sums pops LIVE at the capital's own loop
-                # position, so capital columns take the per-j path.
-                if _rcy_bel and bool(self.civ_city_is_cap[:, r, j].any()):
-                    food, prod, sci, cul, gold_y, faith_y = self._seat_city_yields(r, j, cact, amen_yf=amen_yf[:, j])
-                else:
-                    F6 = self._rcy_all_cached(r, amen_yf)
-                    zj = torch.zeros_like(F6[0][:, j])
-                    food = torch.where(cact, F6[0][:, j], zj)
-                    prod = torch.where(cact, F6[1][:, j], zj)
-                    sci = torch.where(cact, F6[2][:, j], zj)
-                    cul = torch.where(cact, F6[3][:, j], zj)
-                    gold_y = torch.where(cact, F6[4][:, j], zj)
-                    faith_y = torch.where(cact, F6[5][:, j], zj)
-                prod_sum = torch.where(cact, prod_sum + prod, prod_sum)
-                # Tile/center columns plus the citizens' contribution.
-                # ASSOCIATION MATTERS: TS `sciSum += y.science + 0.7*pop`
-                # desugars to sciSum + (y.science + 0.7*pop) — the city term
-                # sums FIRST. (cul_sum + cul) + 0.3*pop is one ulp off and
-                # flips completions when a cost lands inside it. The citizens'
-                # term is already inside sci/cul, and inside the amenity tier
-                # with it.
-                sci_sum = torch.where(cact, sci_sum + sci, sci_sum)
-                cul_c = cul  # pre-growth pop; feeds civics AND this city's border box
-                cul_sum = torch.where(cact, cul_sum + cul_c, cul_sum)
-                # `gold_y` is ALREADY net of the city's upkeep — the walk
+                # The empire streams, in seatPhase's own order. ASSOCIATION
+                # MATTERS: TS `sciSum += y.science + 0.7*pop` desugars to
+                # sciSum + (y.science + 0.7*pop) — the city term sums FIRST.
+                # (cul_sum + cul) + 0.3*pop is one ulp off and flips completions
+                # when a cost lands inside it. The citizens' term is already
+                # inside the snapshot's science/culture, and inside the amenity
+                # tier with it.
+                # `total.gold` is ALREADY net of the city's upkeep — the walk
                 # subtracts cityMaintenance where computeCityStats does, so
                 # phase.ts adds stats.total.gold straight in.
-                if _h_key != (self._eff_version, self._claim_version):
-                    _h_key = (self._eff_version, self._claim_version)
-                    housing_all, need_all = _g5_hm()
-                gold_sum = torch.where(cact, gold_sum + gold_y, gold_sum)
-                faith_sum = torch.where(cact, faith_sum + faith_y, faith_sum)
-                # Growth accounting: true surplus (can be negative), the
-                # unscaled Civ 6 curve, grow SUBTRACTS the need, starvation
-                # shrinks (pop floor 1, box reset). Housing throttles positive
-                # surplus (housingGrowthFactor). The whole housing chain
-                # (water/aqueduct, building housing, windowed improvement
-                # housing, belief housing) is batched in _g5_hm above; the
-                # dyadic/int-valued sums make the batched shapes bit-exact.
-                housing_j = housing_all[:, j]
-                head_j = housing_j - self.civ_city_pop[:, r, j].double()
-                hfac = torch.where(head_j >= 2, torch.ones_like(head_j), torch.where(head_j >= 1, torch.full_like(head_j, 0.5), torch.full_like(head_j, 0.25)))
-                surplus = food - self.rules.food_per_citizen * self.civ_city_pop[:, r, j].double()
-                # Fertility Rites — the belief growth multiplier rides the
-                # chain like computeCityStats (hf × tier × growthMult). Hoisted
-                # (belief ids are static mid-loop, claims are post-phase);
-                # gmul rebinds below, never mutates in place.
-                # Hanging Gardens — the seat-wide completed-wonder growth
-                # product, LIVE per city; hoisted per r above and recomputed
-                # when a completion drops the cache. It stays a SEPARATE factor
-                # instead of folding into gmul: computeCityStats multiplies
-                # surplus × housing × tier × empireGrowthMult × m.growthMult
-                # left to right, and (X × hg) × mgrowth is not X × (hg × mgrowth).
-                if self._wond_n and gw_cache is None:
-                    gw_cache = self._wonder_growth_mult(self._completed_wonders(r + 1))
-                _gf_j = surplus * hfac * amen_gf[:, j]
-                if gw_cache is not None:
-                    _gf_j = _gf_j * gw_cache
-                _gf_j = _gf_j * _gmul_r
-                self.civ_city_growth[:, r, j] = torch.where(cact, self.civ_city_growth[:, r, j] + torch.where(surplus > 0, _gf_j, surplus), self.civ_city_growth[:, r, j])
-                need = need_all[:, j]  # pre-growth pop == the batch's entry value for this column
-                grow = cact & (self.civ_city_growth[:, r, j] >= need)
-                self.civ_city_pop[:, r, j] = self.civ_city_pop[:, r, j] + grow.long()
-                self.civ_city_growth[:, r, j] = torch.where(grow, self.civ_city_growth[:, r, j] - need, self.civ_city_growth[:, r, j])
-                starve = cact & ~grow & (self.civ_city_growth[:, r, j] < 0)
-                self.civ_city_pop[:, r, j] = torch.where(starve, (self.civ_city_pop[:, r, j] - 1).clamp(min=1), self.civ_city_pop[:, r, j])
-                self.civ_city_growth[:, r, j] = torch.where(starve, torch.zeros_like(self.civ_city_growth[:, r, j]), self.civ_city_growth[:, r, j])
-                # Queue progress + completion; a completed unit spawns at THIS
-                # city, drawing no RNG. Clear-then-resolve mirrors the TS
-                # shift-then-act order.
-                cur = self.civ_city_current[:, r, j].clone()
-                has_q = cact & (cur >= 0)
-                if bool(has_q.any()):
-                    # The bank pays in right after the production add, where
-                    # phase.ts spends it. Then this civ's OWN
-                    # encampmentProdMult, on the queue head only: the
-                    # multiplier keys on the ITEM (an Encampment district or
-                    # one of its buildings), not on the seat.
-                    _rem = self._gov_mods(r + 1)[5] if self._gov_has_effects else None
-                    if _rem is not None:
-                        # A BUILDING head is its own production column (0..NB-1)
-                        # on every row, so one decode serves every seat.
-                        _enc_i = (cur >= 0) & (cur < self.NB) & (
-                            self._b_req_district[cur.clamp(min=0, max=self.NB - 1)] == self._encamp_didx)
-                        if self._encamp_si >= 0:
-                            _enc_i = _enc_i | (cur == self.DISTRICT_BASE + self._encamp_si)
-                        prod = torch.where(_enc_i, prod * _rem, prod)
-                    self.civ_city_progress[:, r, j] = torch.where(
-                        has_q, self.civ_city_progress[:, r, j] + prod + self.civ_city_prod_bank[:, r, j], self.civ_city_progress[:, r, j])
-                    self.civ_city_prod_bank[:, r, j] = torch.where(
-                        has_q, torch.zeros_like(self.civ_city_prod_bank[:, r, j]), self.civ_city_prod_bank[:, r, j])
-                    done_q = has_q & (self.civ_city_progress[:, r, j] >= self.civ_city_cost[:, r, j])
-                    if bool(done_q.any()):
-                        cost_locked = self.civ_city_cost[:, r, j].clone()  # the project lump reads the LOCKED cost
-                        self.civ_city_current[:, r, j] = torch.where(done_q, torch.full_like(cur, -1), self.civ_city_current[:, r, j])
-                        # BANK the overflow — the phase.ts twin. Most city
-                        # completions carry some, so dropping it would be a
-                        # large standing production leak.
-                        _rovf = (self.civ_city_progress[:, r, j] - self.civ_city_cost[:, r, j]).clamp(min=0)
-                        self.civ_city_prod_bank[:, r, j] = torch.where(
-                            done_q, self.civ_city_prod_bank[:, r, j] + _rovf, self.civ_city_prod_bank[:, r, j])
-                        self.civ_city_progress[:, r, j] = torch.where(done_q, torch.zeros_like(self.civ_city_progress[:, r, j]), self.civ_city_progress[:, r, j])
-                        self.civ_city_cost[:, r, j] = torch.where(done_q, torch.zeros_like(self.civ_city_cost[:, r, j]), self.civ_city_cost[:, r, j])
-                        found_s = done_q & (cur == self.SETTLER)
-                        if bool(found_s.any()):
-                            # A completed settler is a UNIT: it spawns at the
-                            # city and the producing city pays 1 pop (floored
-                            # at 1). WHERE it founds is a later FOUND_CITY
-                            # order.
-                            self.civ_city_pop[:, r, j] = torch.where(
-                                found_s, (self.civ_city_pop[:, r, j] - 1).clamp(min=1), self.civ_city_pop[:, r, j]
-                            )
-                            if self._settler_idx >= 0:
-                                self._spawn_unit(r + 1, found_s, self.civ_city_center[:, r, j], self._settler_idx)
-                        spawn_u = done_q & (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU)
-                        is_bldr = spawn_u & (cur - self.UNIT_BASE == self._builder_idx)
-                        if bool(is_bldr.any()):
-                            self._spawn_unit(r + 1, is_bldr, self.civ_city_center[:, r, j], self._builder_idx)
-                            self.civ_only_builders_trained[:, r] = self.civ_only_builders_trained[:, r] + is_bldr.long()
-                        spawn_u = spawn_u & ~is_bldr
-                        # The MILITARY ENGINEER is a CIVILIAN chassis (charges,
-                        # no combat), so it spawns through the civilian path
-                        # like the Builder — the military spawner would leave
-                        # it without charges. Charges come from the roster.
-                        if self._seat_eng_live and self._eng_idx >= 0:
-                            is_eng = spawn_u & (cur - self.UNIT_BASE == self._eng_idx)
-                            if bool(is_eng.any()):
-                                self._spawn_unit(r + 1, is_eng, self.civ_city_center[:, r, j], self._eng_idx)
-                            spawn_u = spawn_u & ~is_eng
-                        if bool(spawn_u.any()):
-                            # A trained military unit inherits city j's Encampment training XP (best tier).
-                            xp_rj = (self.civ_city_bldg[:, r, j, :].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
-                            self._spawn_unit(r + 1, spawn_u, self.civ_city_center[:, r, j], (cur - self.UNIT_BASE).clamp(min=0), init_xp=xp_rj)
-                        # a finished district completes its paved tile
-                        nS_b4 = len(self._scaffold)
-                        done_d = done_q & (cur >= self.DISTRICT_BASE) & (cur < self.DISTRICT_BASE + nS_b4)
-                        if bool(done_d.any()):
-                            dr = done_d.nonzero(as_tuple=True)[0]
-                            dtile = self.civ_city_qtile[:, r, j]
-                            _dt = dtile[dr].clamp(min=0)
-                            self.district_complete[dr, _dt] = True
-                            # MONUMENTALITY fires on the district completion.
-                            _monr = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-                            _monr[dr] = True
-                            self._dedication_event(r + 1, 0, _monr)
-                            # a completed ENCAMPMENT musters its garrison
-                            _enc = self.district[dr, _dt] == self._encamp_didx
-                            self.encamp_hp[dr, _dt] = torch.where(
-                                _enc, torch.full_like(_dt, self._encamp_hp_max), self.encamp_hp[dr, _dt]
-                            )
-                            self.civ_city_qtile[dr, r, j] = -1
-                            self._eff_version += 1
-                        # a finished building joins the registry (bounded
-                        # above: project codes sit past NB)
-                        NBc = self.rules_dev.b_cost.shape[0]
-                        done_b = done_q & (cur >= 0) & (cur < NBc)
-                        if bool(done_b.any()):
-                            br = done_b.nonzero(as_tuple=True)[0]
-                            bi_done = cur.clamp(min=0, max=NBc - 1)
-                            self.civ_city_bldg[br, r, j, bi_done[br]] = True
-                            # A completed REGIONAL building reaches OTHER
-                            # cities' yields THIS phase (TS accrues later
-                            # cities live), so an civ_city_bldg write must
-                            # invalidate the economy caches.
-                            self._eff_version += 1
-                            if self._walls_bidx >= 0:
-                                wm = br[bi_done[br] == self._walls_bidx]
-                                if len(wm) > 0:
-                                    self.civ_city_outer_hp[wm, r, j] = self._walls_hp
-                        # a finished wonder completes its tile (effects read
-                        # built_wonder_complete live from the registry)
-                        if self._wond_n:
-                            done_w = done_q & (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + self._wond_n)
-                            if bool(done_w.any()):
-                                wi_done = (cur - self.WONDER_BASE).clamp(min=0)
-                                wr_ = done_w.nonzero(as_tuple=True)[0]
-                                wt_ = self.civ_city_wonder[wr_, r, j, wi_done[wr_]]
-                                self.built_wonder_complete[wr_, wt_.clamp(min=0)] = True
-                                self.era_score[wr_, r + 1] += self._era_pts["wonder"]
-                                self._eff_version += 1
-                                gw_cache = None  # the hoisted growth product changed
-                        # A finished project pays js_round(cost×frac) into the
-                        # CIV's own streams + GPP (the completeProject twin).
-                        if self._proj_rows:
-                            done_p = done_q & (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
-                            if bool(done_p.any()):
-                                pi_done = (cur - self.PROJECT_BASE).clamp(min=0)
-                                amt_y = js_round(cost_locked * self._proj_yf)
-                                for pi_, prow in enumerate(self._proj_rows):
-                                    hitp = done_p & (pi_done == pi_)
-                                    if not bool(hitp.any()):
-                                        continue
-                                    y_i = int(prow.get("y", -1))
-                                    if y_i == 3:
-                                        self.civ_only_tech_prog[:, r] = torch.where(hitp, self.civ_only_tech_prog[:, r] + amt_y, self.civ_only_tech_prog[:, r])
-                                    elif y_i == 4:
-                                        self.civ_only_civic_prog[:, r] = torch.where(hitp, self.civ_only_civic_prog[:, r] + amt_y, self.civ_only_civic_prog[:, r])
-                                    elif y_i == 2:
-                                        self.civ_only_treasury[:, r] = torch.where(hitp, self.civ_only_treasury[:, r] + amt_y, self.civ_only_treasury[:, r])
-                                    elif y_i == 5:
-                                        self.civ_only_faith[:, r] = torch.where(hitp, self.civ_only_faith[:, r] + amt_y, self.civ_only_faith[:, r])
-                                    # Pay EVERY listed class at THIS row's rate
-                                    # — the Festival pays Writer/Artist/
-                                    # Musician at 0.11 each, every other
-                                    # project one class at 0.22. `gs`/`gf` fall
-                                    # back to a single `g` + the global
-                                    # fraction when the row omits them.
-                                    amt_g = js_round(cost_locked * float(prow.get("gf", self._proj_gf)))
-                                    g_list = prow.get("gs")
-                                    if not g_list:
-                                        g_one = int(prow.get("g", -1))
-                                        g_list = [g_one] if g_one >= 0 else []
-                                    for g_i in (int(x) for x in g_list):
-                                        if 0 <= g_i < self.civ_only_gpp.shape[2]:
-                                            self.civ_only_gpp[:, r, g_i] = torch.where(hitp, self.civ_only_gpp[:, r, g_i] + amt_g, self.civ_only_gpp[:, r, g_i])
-                                    # A space-race step records chain progress
-                                    # (space_done, seat r+1); completing the
-                                    # VICTORY step ends the game as a seat-0
-                                    # DEFEAT — victory_type 4, the
-                                    # domination-defeat mirror. Space rows
-                                    # carry y=g=-1, so the yield/GPP blocks
-                                    # above are no-ops for them.
-                                    if int(prow.get("sp", 0)):
-                                        self.space_done[hitp, r + 1, self._space_step[pi_]] = True
-                                        if pi_ in self._space_victory_idx:
-                                            self.victory_type.copy_(torch.where(hitp, torch.full_like(self.victory_type, 4), self.victory_type))
-                                            self.game_over.logical_or_(hitp)
-                self._seat_border_growth(r + 1, torch.full((B,), j, dtype=torch.long, device=self.device), cact, cul_c)
-                # THE CITY'S OWN DEFENSE: walls strike, Encampment strike,
-                # then the unbesieged heal — ONE body, every seat row, at this
-                # per-city position.
-                self._seat_city_fire_and_heal(r + 1, torch.full((B,), j, dtype=torch.long, device=self.device), cact)
+                gold_sum = torch.where(cact, gold_sum + total[:, j, 2], gold_sum)
+                faith_sum = torch.where(cact, faith_sum + total[:, j, 5], faith_sum)
+                sci_sum = torch.where(cact, sci_sum + total[:, j, 3], sci_sum)
+                cul_c = torch.where(cact, total[:, j, 4], torch.zeros_like(total[:, j, 4]))
+                cul_sum = torch.where(cact, cul_sum + cul_c, cul_sum)
+                # seatGrowth, then the queue, then borders, then the city's own
+                # defense — four shared bodies, one call each, every seat row.
+                self._seat_city_growth(r + 1, jc, cact, eff[:, j], need[:, j])
+                self._seat_city_produce(r + 1, jc, cact, total[:, j, 1])
+                self._seat_border_growth(r + 1, jc, cact, cul_c)
+                self._seat_city_fire_and_heal(r + 1, jc, cact)
 
             # Loyalty collapses resolve after the city loop, to the
             # max-pressure seat (first_argmax over [seat 0, civ 0, civ 1, ...],
@@ -603,6 +361,194 @@ class SimPhase:
         def_e = def_e + self._gen_aura_cs(_def_seat, tt, d_emb | _def_nav).to(def_e.dtype)
         self._city_strike_resolve(strike, tt, d_slot, d_seat, _okm, _okc, is_vet_mil,
                                   atk_cs, def_e, def_hp, row, key)
+
+    def _seat_city_growth(self, row: int, col: torch.Tensor, act: torch.Tensor,
+                          eff: torch.Tensor, need: torch.Tensor) -> None:
+        """seatGrowth — bank the effective surplus, then grow OR starve. ONE
+        body, every seat row, at the per-city seatPhase position (after this
+        city's yields, before its queue).
+
+        `eff` and `need` are THIS column's snapshot effectiveFoodSurplus and
+        growthNeeded (_seat_city_stats): the housing, amenity-tier, wonder and
+        belief factors are already folded into `eff`, and `need` reads the pop
+        the turn opened with.
+
+        The two arms are EXCLUSIVE (seatGrowth's `else if`): a city that grows
+        never starves the same turn. Starvation floors the pop at 1 and empties
+        the box."""
+        bidx = self._bidx
+        old = self.city_growth[bidx, row, col]
+        box = old + eff
+        grow = act & (box >= need)
+        starve = act & ~grow & (box < 0)
+        nxt = torch.where(grow, box - need, torch.where(starve, torch.zeros_like(box), box))
+        self.city_growth[bidx, row, col] = torch.where(act, nxt, old)
+        pop = self.city_pop[bidx, row, col] + grow.long()
+        self.city_pop[bidx, row, col] = torch.where(starve, (pop - 1).clamp(min=1), pop)
+
+    def _seat_city_produce(self, row: int, col: torch.Tensor, act: torch.Tensor,
+                           prod: torch.Tensor) -> None:
+        """The queue head's turn — the production add, the banked chop, the
+        completion and every completion's payout. ONE body, every seat row, at
+        the per-city seatPhase position (after growth, before border growth).
+
+        The GPU queue is depth ONE: `city_current < 0` IS an empty queue, so a
+        completion always banks its overflow rather than carrying it (the TS
+        twin declares the same loss — banked overflow pays a turn late).
+
+        Row 0 ran a short copy of this that knew settlers, units, buildings and
+        districts only. Three things fell through it: a seat-0 WONDER completed
+        into nothing (the head cleared, the overflow banked, the wonder was
+        never registered and no era score was paid), a seat-0 PROJECT paid no
+        yield, no great-person points and no space-race step, and the head's
+        `city_cost` was left standing where TS reads 0 off an empty queue."""
+        bidx = self._bidx
+        cur = self.city_current[bidx, row, col].clone()
+        has_q = act & (cur >= 0)
+        if not bool(has_q.any()):
+            return
+        # The seat's own encampmentProdMult, on the queue head only: the
+        # multiplier keys on the ITEM (an Encampment district or one of its
+        # buildings), not on the seat. A building head is its own production
+        # column (0..NB-1) on every row, so one decode serves every seat.
+        if self._gov_has_effects and self._encamp_didx >= 0:
+            em = self._gov_mods(row)[5]
+            enc_i = (cur >= 0) & (cur < self.NB) & (
+                self._b_req_district[cur.clamp(min=0, max=self.NB - 1)] == self._encamp_didx)
+            if self._encamp_si >= 0:
+                enc_i = enc_i | (cur == self.DISTRICT_BASE + self._encamp_si)
+            prod = torch.where(enc_i, prod * em, prod)
+        # VETERANCY multiplies FIRST, then the banked chop adds unmultiplied —
+        # phase.ts spends the bank right after the production add.
+        prog = self.city_progress[bidx, row, col]
+        bank = self.city_prod_bank[bidx, row, col]
+        self.city_progress[bidx, row, col] = torch.where(has_q, prog + prod + bank, prog)
+        self.city_prod_bank[bidx, row, col] = torch.where(has_q, torch.zeros_like(bank), bank)
+        cost = self.city_cost[bidx, row, col].clone()  # the project lump reads the LOCKED cost
+        done = has_q & (self.city_progress[bidx, row, col] >= cost)
+        if not bool(done.any()):
+            return
+        # queue.shift() — the head clears BEFORE completeQueueItem runs, and an
+        # empty queue reads cost 0 on the TS side of the digest.
+        self.city_current[bidx, row, col] = torch.where(done, torch.full_like(cur, -1), self.city_current[bidx, row, col])
+        ovf = (self.city_progress[bidx, row, col] - cost).clamp(min=0)
+        self.city_prod_bank[bidx, row, col] = torch.where(done, self.city_prod_bank[bidx, row, col] + ovf, self.city_prod_bank[bidx, row, col])
+        self.city_progress[bidx, row, col] = torch.where(done, torch.zeros_like(prog), self.city_progress[bidx, row, col])
+        self.city_cost[bidx, row, col] = torch.where(done, torch.zeros_like(cost), cost)
+        ctr = self.city_center[bidx, row, col]
+
+        # --- SETTLER: a unit like any other. It spawns at the city and the city
+        # pays 1 pop (floored at 1); WHERE it founds is a later FOUND_CITY order.
+        made_s = done & (cur == self.SETTLER)
+        if bool(made_s.any()):
+            pop = self.city_pop[bidx, row, col]
+            self.city_pop[bidx, row, col] = torch.where(made_s, (pop - 1).clamp(min=1), pop)
+            if self._settler_idx >= 0:
+                self._spawn_unit(row, made_s, ctr, self._settler_idx)
+
+        # --- UNITS. _spawn_unit reads the roster's civilian bit itself, so the
+        # Builder and the Military Engineer arrive with their charges and a
+        # civilian's 0 xp through this one call; a military unit inherits the
+        # city's best Encampment training tier.
+        made_u = done & (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU)
+        if bool(made_u.any()):
+            ui = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
+            xp = (self.city_bldg[bidx, row, col, :].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
+            self._spawn_unit(row, made_u, ctr, ui, init_xp=xp)
+            if self._builder_idx >= 0:
+                # a completed builder moves this seat's cost escalator
+                made_b = made_u & (ui == self._builder_idx)
+                self.civ_builders_trained[:, row] = self.civ_builders_trained[:, row] + made_b.long()
+
+        # --- DISTRICT: the paved tile completes (reserved at queue time in
+        # city_qtile) and an Encampment musters its garrison.
+        made_d = done & (cur >= self.DISTRICT_BASE) & (cur < self.WONDER_BASE)
+        if bool(made_d.any()):
+            dr = made_d.nonzero(as_tuple=True)[0]
+            dt = self.city_qtile[bidx, row, col][dr].clamp(min=0)
+            self.district_complete[dr, dt] = True
+            # MONUMENTALITY pays era score per SPECIALTY district completed
+            # (a city centre is never queued here).
+            mon = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            mon[dr] = True
+            self._dedication_event(row, 0, mon)
+            enc = self.district[dr, dt] == self._encamp_didx
+            self.encamp_hp[dr, dt] = torch.where(enc, torch.full_like(dt, self._encamp_hp_max), self.encamp_hp[dr, dt])
+            self.city_qtile[bidx, row, col] = torch.where(made_d, torch.full_like(cur, -1), self.city_qtile[bidx, row, col])
+            self._eff_version += 1
+
+        # --- BUILDING: it joins the registry (bounded above — district,
+        # wonder and project codes all sit past NB).
+        made_b2 = done & (cur >= 0) & (cur < self.NB)
+        if bool(made_b2.any()):
+            br = made_b2.nonzero(as_tuple=True)[0]
+            bi = cur.clamp(min=0, max=self.NB - 1)
+            self.city_bldg[br, row, col[br], bi[br]] = True
+            # A completed REGIONAL building reaches OTHER cities' yields, so
+            # the caches must see the write even though this turn's own walk
+            # reads the loop-top snapshot.
+            self._eff_version += 1
+            if self._walls_bidx >= 0:
+                # ANCIENT_WALLS fills the outer pool
+                wm = br[bi[br] == self._walls_bidx]
+                if len(wm) > 0:
+                    self.city_outer_hp[wm, row, col[wm]] = self._walls_hp
+
+        # --- WONDER: the tile completes (effects read built_wonder_complete
+        # live off the registry) and the seat banks the era score.
+        if self._wond_n:
+            made_w = done & (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + self._wond_n)
+            if bool(made_w.any()):
+                wr = made_w.nonzero(as_tuple=True)[0]
+                wi = (cur - self.WONDER_BASE).clamp(min=0)
+                wt = self.city_wonder[bidx, row, col, :][wr, wi[wr]]
+                self.built_wonder_complete[wr, wt.clamp(min=0)] = True
+                self.era_score[wr, row] += self._era_pts["wonder"]
+                self._eff_version += 1
+
+        # --- PROJECT: js_round(cost × frac) into the seat's own streams plus
+        # the great-person points (the completeProject twin).
+        if self._proj_rows:
+            made_p = done & (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
+            if bool(made_p.any()):
+                pi = (cur - self.PROJECT_BASE).clamp(min=0)
+                amt_y = js_round(cost * self._proj_yf)
+                for pidx, prow in enumerate(self._proj_rows):
+                    hit = made_p & (pi == pidx)
+                    if not bool(hit.any()):
+                        continue
+                    y_i = int(prow.get("y", -1))
+                    if y_i == 3:
+                        self.civ_tech_prog[:, row] = torch.where(hit, self.civ_tech_prog[:, row] + amt_y, self.civ_tech_prog[:, row])
+                    elif y_i == 4:
+                        self.civ_civic_prog[:, row] = torch.where(hit, self.civ_civic_prog[:, row] + amt_y, self.civ_civic_prog[:, row])
+                    elif y_i == 2:
+                        self.civ_treasury[:, row] = torch.where(hit, self.civ_treasury[:, row] + amt_y, self.civ_treasury[:, row])
+                    elif y_i == 5:
+                        self.civ_faith[:, row] = torch.where(hit, self.civ_faith[:, row] + amt_y, self.civ_faith[:, row])
+                    # Pay EVERY listed class at THIS row's rate — the Festival
+                    # pays Writer/Artist/Musician at 0.11 each, every other
+                    # project one class at 0.22. `gs`/`gf` fall back to a
+                    # single `g` + the global fraction when the row omits them.
+                    amt_g = js_round(cost * float(prow.get("gf", self._proj_gf)))
+                    g_list = prow.get("gs")
+                    if not g_list:
+                        g_one = int(prow.get("g", -1))
+                        g_list = [g_one] if g_one >= 0 else []
+                    for g_i in (int(x) for x in g_list):
+                        if 0 <= g_i < self.civ_gpp.shape[2]:
+                            self.civ_gpp[:, row, g_i] = torch.where(hit, self.civ_gpp[:, row, g_i] + amt_g, self.civ_gpp[:, row, g_i])
+                    # A space-race step records chain progress; completing the
+                    # VICTORY step ends the game — a seat-0 win when seat 0
+                    # flies it, a seat-0 DEFEAT when a rival does (the
+                    # domination mirror). Space rows carry y=g=-1, so the
+                    # yield/GPP blocks above are no-ops for them.
+                    if int(prow.get("sp", 0)):
+                        self.space_done[hit, row, self._space_step[pidx]] = True
+                        if pidx in self._space_victory_idx:
+                            vt = 3 if row == 0 else 4
+                            self.victory_type.copy_(torch.where(hit, torch.full_like(self.victory_type, vt), self.victory_type))
+                            self.game_over.logical_or_(hit)
 
     def _seat_city_fire_and_heal(self, row: int, col: torch.Tensor, act: torch.Tensor) -> None:
         """A city's WALLS strike, its ADDITIONAL Encampment strike and the
@@ -1012,7 +958,7 @@ class SimPhase:
         foreign = (foreign_r * f_age[:, 1 : 1 + self.R].unsqueeze(1)).sum(dim=2)
         tot = own + foreign
         pressure = torch.where(tot > 0, scale * (own - foreign) / tot.clamp(min=1e-9), torch.zeros_like(tot))
-        # Seat 0's governor seats — the endTurn governorPicks mirror. Rank
+        # Seat 0's governor seats — the seatPhase governorPicks mirror. Rank
         # alive cities on QUANTIZED milli loyalty (raw-f64 ranking is
         # float-association-fragile), ties by TS array position = column
         # order (#110). Pick from the PRE-update snapshot.

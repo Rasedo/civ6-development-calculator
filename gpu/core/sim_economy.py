@@ -1651,12 +1651,10 @@ class SimEconomy:
 
         The walk runs in f64 on every row; row 0's f32 lane casts on return.
 
-        j: one column, for the economy loop's mid-phase per-city pass — the
-           state it reads has moved since the batched call, and its frozen
-           amenity factor is per-city by spec.
+        j: one column, for the per-city callers outside the seat block.
         amen_yf: [B, n] the tier's yieldFactor. The caller ranks amenities,
-           because TS's endTurn ranks luxuryAmenities ONCE per turn and feeds
-           that same map to every city's fresh computeCityStats."""
+           because seatPhase ranks luxuryAmenities ONCE per seat turn and feeds
+           that same map to every one of that seat's cities."""
         rd = self.rules_dev
         B, dev, F64 = self.B, self.device, torch.float64
         cols = self.RC
@@ -1982,19 +1980,56 @@ class SimEconomy:
         # Dead columns contribute nothing (their static centre yields preload).
         return torch.where(alive.unsqueeze(2), total, torch.zeros_like(total))
 
-    def _city_totals(self, lux: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Seat 0's (total [B, C, 6], housing [B, C], growth_f [B, C],
-        tier_idx [B, C]) — row 0's call into THE walk, cast back to the engine
-        dtype for the f32 lanes.
+    def _seat_city_stats(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """THE loop-top city-stats SNAPSHOT for seat row `row`: the twin of
+        seatPhase's `for (const c of actor.cities) cityStats.set(c.id,
+        computeCityStats(state, c, luxMap, seatMods))`, one call for the whole
+        block. Returns the CityStats fields the walk consumes —
+        (total [B, RC, 6], eff_surplus [B, RC], need [B, RC], tier_idx [B, RC]),
+        all f64.
 
-        lux: an optional FROZEN luxury-amenity map [B, C]. TS endTurn computes
-        luxuryAmenities(state) ONCE before its city loop and feeds that same map
-        to every city's fresh computeCityStats — so the city walk's
-        guard-triggered recomputes must NOT re-rank luxuries with mid-walk pops,
-        which can split an amenity tier. The freshly computed map is stashed on
-        _last_lux for the walk to freeze."""
-        tier_idx, growth_f, yield_f, lux_add = self._seat_amenity(0, lux=lux)
-        self._last_lux = lux_add
+        THE SNAPSHOT IS THE RULE, and it is the same rule for every row. A
+        completion, a border claim or a growth landing at column j does NOT
+        reach column j+1's yields, housing, amenity tier or growth factor this
+        turn: seatPhase computes the whole map before it mutates anything, and
+        real Civ 6 banks a turn's yields off the state the turn opened with — a
+        building finished this turn pays from the next one.
+
+        Both rows used to recompute mid-walk behind an (_eff_version,
+        _claim_version) key, one through _city_totals and one through a keyed
+        cache with a capital-belief escape hatch. That modelled a game.ts
+        endTurn city loop which no longer exists — seat 0 takes its turn
+        through seatPhase like every seat — and it was the last place where
+        two rows could read two different economies."""
+        tier_idx, growth_f, yield_f, _lux = self._seat_amenity(row)
+        total = self._seat_city_walk(row, amen_yf=yield_f)
+        housing = self._seat_housing(row)[1]
+        pop = self.city_pop[:, row, : self.RC].double()
+        surplus = total[:, :, 0] - pop * self.rules.food_per_citizen
+        head = housing - pop
+        hf = torch.where(head >= 2, torch.ones_like(head),
+                         torch.where(head >= 1, torch.full_like(head, 0.5), torch.full_like(head, 0.25)))
+        # computeCityStats' own chain, left to right: surplus × housing ×
+        # amenity tier × empireGrowthMult × growthMult. The order is worth a
+        # real ulp — (x × hangingGardens) × fertilityRites is not
+        # x × (hangingGardens × fertilityRites) — and a completion flips on it.
+        eff = surplus * hf * growth_f
+        hg = self._wonder_growth_mult(self._completed_wonders(row))
+        if hg is not None:
+            eff = eff * hg.unsqueeze(1)  # empireGrowthMult (Hanging Gardens)
+        if self._seat_has_beliefs(row):
+            eff = eff * self._bel_mul("growth", row).unsqueeze(1)  # Fertility Rites
+        # Only a POSITIVE surplus is scaled; starvation is the raw deficit.
+        eff = torch.where(surplus > 0, eff, surplus)
+        need = torch.floor(15 + 8 * (pop - 1) + (pop - 1).clamp(min=0) ** 1.5)
+        return total, eff, need, tier_idx
+
+    def _city_totals(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Seat 0's (total [B, C, 6], housing [B, C], growth_f [B, C],
+        tier_idx [B, C]) — the POST-PHASE readers' view (empire_score, the
+        probes), cast back to the engine dtype for the f32 lanes. The seat
+        block itself reads _seat_city_stats(0)."""
+        tier_idx, growth_f, yield_f, _lux = self._seat_amenity(0)
         total = self._seat_city_walk(0, amen_yf=yield_f)
         return total.to(self.dtype), self._seat_housing(0)[1].to(self.dtype), growth_f.to(self.dtype), tier_idx
 
@@ -2080,31 +2115,6 @@ class SimEconomy:
         yf = amen_yf if amen_yf is not None else self._seat_amenity(r + 1)[2]
         t = self._seat_city_walk(r + 1, amen_yf=yf)
         return t[:, :, 0], t[:, :, 1], t[:, :, 3], t[:, :, 4], t[:, :, 2], t[:, :, 5]
-
-    def _rcy_all_cached(self, r: int, amen_yf: torch.Tensor) -> tuple:
-        """The economy loop's keyed slot over the batched twin (with the
-        loop's FROZEN amenity factors). Key exactness — every mid-loop
-        mutation that can change a LATER column's yields bumps a component:
-        completions/paves/founding/civic-completion (_eff_version), belief
-        claims (_bel_version), the economy strike-kill (_rp_kill_version,
-        the route raided-mask), border claims landing inside a later
-        same-seat window (_claim_version — civ_at is the valid-mask input;
-        claims elsewhere, and any r0 claim seen by r1, cannot flip a valid
-        bit: a claimed tile goes -1 -> r0, never == r1). Pop is own-column
-        and written only AT its iteration, after its yields are consumed.
-        BUILDINGS are NOT own-column — a regional building completed/bought
-        at j's iteration reaches LATER columns via _seat_regional — so every
-        civ_city_bldg write site bumps _eff_version. The one live read a snapshot
-        cannot honor is capY's seat-total follower pop under beliefs; the
-        economy loop keeps the per-j path for capital columns in that case
-        (see the call site). Post-phase callers (trace/leader/civ_score) stay
-        on the raw twin: fresh amenity factors, post-war state."""
-        key = (self.turn, r, self._eff_version, self._bel_version, self._rp_kill_version, self._claim_version)
-        if self._rcy_all_cache is not None and self._rcy_all_cache[0] == key:
-            return self._rcy_all_cache[1]
-        out = self._seat_city_yields_all(r, amen_yf=amen_yf)
-        self._rcy_all_cache = (key, out)
-        return out
 
     def leader(self) -> torch.Tensor:
         """[B] the current score-leader as a unified civ id — 0 = seat 0,

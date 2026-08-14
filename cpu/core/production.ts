@@ -24,7 +24,6 @@ import { applyLumpYield } from './economy';
  * field is an observation of seat 0's outcome, not a property of the winner.
  */
 export function completeProject(state: GameState, city: City, projectId: string, cost: number): void {
-  const seat = city.seat;
   const def = PROJECTS[projectId];
   if (!def) return;
   const owner = seatOf(state, city.seat);
@@ -35,7 +34,9 @@ export function completeProject(state: GameState, city: City, projectId: string,
     if (!owner.spaceProjects.includes(projectId)) owner.spaceProjects.push(projectId);
     state.eventLog.push(`${city.name} completed ${def.name}.`);
     if (def.victory) {
-      state.victoryType = city.seat === seat ? 3 : 4;
+      // `city.seat === seat` — the local was `city.seat`, so this always read
+      // 3 and a RIVAL's launch was reported as seat 0's own victory.
+      state.victoryType = city.seat === 0 ? 3 : 4;
       state.gameOver = true;
       state.eventLog.push('Science Victory! The Exoplanet Expedition has launched.');
     }

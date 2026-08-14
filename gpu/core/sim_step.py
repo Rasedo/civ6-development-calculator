@@ -245,8 +245,14 @@ class SimStep:
         twin). An actor with no cities takes no turn (the TS loop's
         eliminated-actor continue) — active0 gates every seat-level arm;
         the city walks are alive-masked already, so their zero sums need no
-        gate."""
-        r, B, C, dev = self.rules, self.B, self.RC, self.device
+        gate.
+
+        The per-city block below is the civ arm's, column for column: one
+        loop-top stats snapshot, then growth, the queue, borders and the city's
+        own defense through the four shared bodies. What is left in this file is
+        the row-0 LOYALTY shape (batched pressures, flips after the loop) and
+        the peace counter."""
+        B, C, dev = self.B, self.RC, self.device
         active0 = self.alive.any(dim=1)  # actor.cities.length > 0
 
         # --- war weariness: the block-top decay (warWearinessTurn), the same
@@ -276,208 +282,53 @@ class SimStep:
         # (between the buy block and the city loop), row 0's body.
         self._seat_trade_phase(0, active0)
 
-        # --- worked tiles + city yields: the PER-CITY interleave ------------------
-        # endTurn recomputes computeCityStats FRESH for every city inside its
-        # loop, so an EARLIER city's mid-turn mutation — a district/building
-        # completion shifting a later city's adjacency gold, a growth
-        # reshuffling the luxury ranking, a border claim — feeds every LATER
-        # city's APPLIED yields the same turn. Mirror with an invalidation-gated
-        # recompute: totals refresh only when _eff_version moved or a pop
-        # changed since the last compute (completions/claims bump the version;
-        # growth rides the pop dirty flag).
-        total, housing, growth_f, tier_idx = self._city_totals()
-        lux0 = self._last_lux  # frozen for the whole walk (luxMap semantics)
-        # The recompute guard: an _eff_version move (completion, purchase,
-        # civic) OR a border CLAIM (_claim_version — a claimed tile widens a
-        # later city's workable window) OR a pop change.
-        _tot_ver = (self._eff_version, self._claim_version)
-        # Pop changes ride a dirty FLAG set at the walk's only pop writes
-        # (settler completion, growth, starvation). A clamp-at-1 write that
-        # leaves pop unchanged forces a spurious recompute of identical values
-        # (bit-exact, rare).
-        _pop_dirty = False
-        # Seat 0's belief hoist (ids are static inside the walk — claims live
-        # in the phase, not here): Fertility Rites rides the growth chain. The
-        # border-claim beliefs (Religious Settlements' cost multiplier, the
-        # tile-add plane in the pick key) live in _seat_border_growth with the
-        # rest of the claim.
-        _bel0 = self._seat_has_beliefs(0)
-        gmul0 = self._bel_mul("growth", 0).to(self.dtype) if _bel0 else None
-        # Hanging Gardens (empireGrowthMult) — seat 0's completed-wonder growth
-        # product, the civ loop's gw_cache twin. Wonders reach row 0 only by
-        # CAPTURE (#83), which resolves in the order phase, so hoisting it out
-        # of the city walk reads the same state every column would.
-        _hg = self._wonder_growth_mult(self._completed_wonders(0))
-        hg0 = None if _hg is None else _hg.to(self.dtype)
-        # Loyalty mirrors the loop-top view: city c's tier and pop are captured
-        # FRESH at its own iteration (post earlier cities' same-turn mutations,
-        # pre its own production/growth) — applyLoyalty runs at the top of the
-        # per-city block; the flips still resolve after the loop.
-        tier_fresh = tier_idx.clone()
+        # --- the per-city block, the seatPhase loop's own shape --------------
+        # THE loop-top stats snapshot — one body, every seat row. Every column
+        # below reads THIS map: yields, amenity tier, effective food surplus and
+        # growth need all freeze here, and nothing inside the loop refreshes
+        # them. Row 0 used to re-run _city_totals mid-walk behind an
+        # (_eff_version, _claim_version) key so a completion could feed a later
+        # city the same turn; that modelled a game.ts endTurn city loop which no
+        # longer exists.
+        total, eff, need, tier_idx = self._seat_city_stats(0)
+        # The city-loop snapshot is taken AFTER the buy block (the
+        # [...actor.cities] discipline): a bought-settler newborn acts this turn,
+        # a queue-completion newborn (founded inside the loop, later) does not.
+        alive_c = self.alive.clone()
+        # Loyalty reads the FROZEN tier and the loop-top pops; the flips still
+        # resolve after the loop.
         pop_loyal = self.pop.clone()
-        gold_add = torch.zeros(B, dtype=self.dtype, device=dev)
-        sci_add = torch.zeros(B, dtype=self.dtype, device=dev)
-        cul_add = torch.zeros(B, dtype=self.dtype, device=dev)
-        fth_add = torch.zeros(B, dtype=self.dtype, device=dev)
-        # The TS side iterates state.cities in ARRAY order (splice on death,
-        # push on found/capture) — which IS slot order under append+reclaim
-        # (#110). Every cross-city coupling in this walk — a completion's
-        # _eff_version bump feeding a later city's totals, a border claim
-        # consuming a shared candidate tile, spawn-spot contention, the
-        # accumulators' float association — depends on that order, so walk
-        # living columns first, in column order (per-batch gathers).
-        # Dead/unfounded columns sort last and stay masked no-ops. Cities
-        # cannot be founded or die inside the walk, so the order is fixed here.
-        walk_ord = torch.argsort((~self.alive).long(), dim=1, stable=True)
-        bidx = self._bidx
-        for s_rank in range(C):
-            col = walk_ord[:, s_rank]  # [B] — each game's s_rank-th living city (TS array order)
-            if (self._eff_version, self._claim_version) != _tot_ver or _pop_dirty:
-                total, housing, growth_f, tier_idx = self._city_totals(lux=lux0)
-                _tot_ver = (self._eff_version, self._claim_version)
-                _pop_dirty = False
-            tier_fresh[bidx, col] = tier_idx[bidx, col]
-            pop_loyal[bidx, col] = self.pop[bidx, col]
-            t_c = total[bidx, col]  # [B, 6] this city's FRESH yields
-            popf_c = self.pop[bidx, col].to(self.dtype)
-            pop_c0 = self.pop[bidx, col].clone()  # loop-top pop — stats.growthNeeded freezes here
+        gold_add = torch.zeros(B, dtype=torch.float64, device=dev)
+        sci_add = torch.zeros(B, dtype=torch.float64, device=dev)
+        cul_add = torch.zeros(B, dtype=torch.float64, device=dev)
+        fth_add = torch.zeros(B, dtype=torch.float64, device=dev)
+        # TS iterates state.cities in ARRAY order (splice on death, push on
+        # found/capture) — which IS ascending slot order under append+reclaim
+        # (#110), holes and all: a hole is a city already spliced out. Walking
+        # columns in index order and skipping the dead ones visits exactly the
+        # array, in its order, which is what the accumulators' float association
+        # and the border walk's shared-candidate contention depend on.
+        cact_all = active0.unsqueeze(1) & alive_c  # [B, C]
+        cact_any_l = cact_all.any(dim=0).tolist()
+        for j in range(C):
+            if not cact_any_l[j]:
+                continue
+            cact = cact_all[:, j]
+            jc = torch.full((B,), j, dtype=torch.long, device=dev)
+            gold_add = torch.where(cact, gold_add + total[:, j, 2], gold_add)
+            fth_add = torch.where(cact, fth_add + total[:, j, 5], fth_add)
+            sci_add = torch.where(cact, sci_add + total[:, j, 3], sci_add)
+            cul_c = torch.where(cact, total[:, j, 4], torch.zeros_like(total[:, j, 4]))
+            cul_add = torch.where(cact, cul_add + cul_c, cul_add)
+            # seatGrowth, then the queue, then borders, then the city's own
+            # defense — four shared bodies, one call each, every seat row.
+            self._seat_city_growth(0, jc, cact, eff[:, j], need[:, j])
+            self._seat_city_produce(0, jc, cact, total[:, j, 1])
+            self._seat_border_growth(0, jc, cact, cul_c)
+            self._seat_city_fire_and_heal(0, jc, cact)
 
-            # --- growth: BEFORE the queue, the seatPhase order ------------------
-            # game.ts runs seatGrowth and only THEN the queue block. The order
-            # is observable: a settler completion costs a pop with a floor of 1,
-            # so growing then shrinking is not the same city as shrinking then
-            # growing when the city sits at pop 1.
-            surplus = t_c[:, 0] - popf_c * r.food_per_citizen
-            head = housing[bidx, col] - popf_c
-            hf = torch.where(head >= 2, 1.0, torch.where(head >= 1, 0.5, 0.25).to(self.dtype)).to(self.dtype)
-            _gf_c = surplus * hf * growth_f[bidx, col]
-            if hg0 is not None:
-                _gf_c = _gf_c * hg0  # Hanging Gardens (empireGrowthMult)
-            if gmul0 is not None:
-                # left-to-right like computeCityStats:
-                # ((s×hf)×tier)×empireGrowthMult×growthMult
-                _gf_c = _gf_c * gmul0
-            effective = torch.where(surplus > 0, _gf_c, surplus)
-            self.food_box[bidx, col] = self.food_box[bidx, col] + effective
-            need = self._growth_needed(pop_c0)  # stats.growthNeeded: loop-top pop
-            alive_c = self.alive[bidx, col]
-            grow = alive_c & (self.food_box[bidx, col] >= need)
-            self.pop[bidx, col] = self.pop[bidx, col] + grow.long()
-            fb = self.food_box[bidx, col]
-            self.food_box[bidx, col] = torch.where(grow, fb - need, fb)
-            starve = alive_c & ~grow & (self.food_box[bidx, col] < 0)
-            self.pop[bidx, col] = torch.where(starve, (self.pop[bidx, col] - 1).clamp(min=1), self.pop[bidx, col])
-            fb2 = self.food_box[bidx, col]
-            self.food_box[bidx, col] = torch.where(starve, torch.zeros_like(fb2), fb2)
-            # --- production (this city's column) -----------------------------------
-            cur_c = self.current[bidx, col]
-            has_item = cur_c >= 0
-            # Banked chop production pays into the head the moment a build
-            # exists (game.ts consumes productionBank inside the production
-            # add). VETERANCY: production toward an ENCAMPMENT item (the
-            # district or its buildings) is multiplied FIRST, then the bank
-            # adds unmultiplied — that order matters.
-            prod_add = t_c[:, 1]
-            if self._gov_has_effects and self._encamp_didx >= 0:
-                emult_p = self._gov_mods(0)[5]
-                en_item = (cur_c >= 0) & (cur_c < self.NB) & (self._b_req_district[cur_c.clamp(min=0, max=self.NB - 1)] == self._encamp_didx)
-                if self._encamp_si >= 0:
-                    en_item = en_item | (cur_c == self.DISTRICT_BASE + self._encamp_si)
-                prod_add = torch.where(en_item, t_c[:, 1] * emult_p, t_c[:, 1])
-            self.progress[bidx, col] = torch.where(has_item, self.progress[bidx, col] + prod_add + self.prod_bank[bidx, col], self.progress[bidx, col])
-            self.prod_bank[bidx, col] = torch.where(has_item, torch.zeros_like(self.prod_bank[bidx, col]), self.prod_bank[bidx, col])
-            done = has_item & (self.progress[bidx, col] >= self.cur_cost[bidx, col])
-            made_settler = done & (cur_c == self.SETTLER)
-            if self._settler_idx >= 0 and bool(made_settler.any()):
-                # Completion SPAWNS the settler at the city — a unit like any
-                # other; WHERE it founds is a later FOUND_CITY order.
-                self._spawn_unit(0, made_settler, self.site[bidx, col], self._settler_idx)
-            # A completed Settler costs the city 1 pop; the dirty flag
-            # refreshes later cities' totals.
-            self.pop[bidx, col] = torch.where(made_settler, (self.pop[bidx, col] - 1).clamp(min=1), self.pop[bidx, col])
-            made_building = done & (cur_c < self.NB)
-            if bool(made_building.any()):
-                bi = made_building.nonzero(as_tuple=True)[0]
-                self.buildings[bi, col[bi], cur_c[bi]] = True
-                # completing ANCIENT_WALLS fills the outer pool.
-                if self._walls_bidx >= 0:
-                    wm = bi[cur_c[bi] == self._walls_bidx]
-                    if len(wm) > 0:
-                        self.outer_hp[wm, col[wm]] = self._walls_hp
-                self._eff_version += 1  # its yields join LATER cities' totals this turn
-            made_unit = done & (cur_c >= self.UNIT_BASE) & (cur_c < self.UNIT_BASE + self.NU)
-            if bool(made_unit.any()):
-                # clamp max too: unmasked rows may hold district codes.
-                # A trained military unit inherits city `col`'s Encampment training XP (best tier).
-                xp_col = (self.buildings[bidx, col, :].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
-                self._spawn_unit(0, made_unit, self.site[bidx, col], (cur_c - self.UNIT_BASE).clamp(min=0, max=self.NU - 1), init_xp=xp_col)
-                if self._builder_idx >= 0:
-                    # a completed builder moves the cost escalator
-                    made_b = made_unit & (cur_c == self.UNIT_BASE + self._builder_idx)
-                    self.builders_trained.add_(made_b.long())
-            # A finished district completes its paved tile (the tile was
-            # reserved at queue time in q_dtile).
-            made_district = done & (cur_c >= self.DISTRICT_BASE) & (cur_c < self.WONDER_BASE)
-            if bool(made_district.any()):
-                db_ = made_district.nonzero(as_tuple=True)[0]
-                _dt = self.q_dtile[db_, col[db_]].clamp(min=0)
-                self.district_complete[db_, _dt] = True
-                # MONUMENTALITY pays era score per SPECIALTY district completed
-                # (a city centre is never queued here).
-                _mon = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-                _mon[db_] = True
-                self._dedication_event(0, 0, _mon)
-                # a completed ENCAMPMENT musters its garrison.
-                _enc = self.district[db_, _dt] == self._encamp_didx
-                self.encamp_hp[db_, _dt] = torch.where(
-                    _enc, torch.full_like(_dt, self._encamp_hp_max), self.encamp_hp[db_, _dt]
-                )
-                self.q_dtile[db_, col[db_]] = -1
-                self._eff_version += 1
-            self.current[bidx, col] = torch.where(done, torch.full_like(cur_c, -1), cur_c)
-            # Completion OVERFLOW is BANKED. game.ts carries it into a queued
-            # item where one exists and banks otherwise; a single-slot build
-            # head always has an empty queue after a completion, so the bank is
-            # the only branch reachable here.
-            _ovf = (self.progress[bidx, col] - self.cur_cost[bidx, col]).clamp(min=0)
-            self.prod_bank[bidx, col] = torch.where(done, self.prod_bank[bidx, col] + _ovf, self.prod_bank[bidx, col])
-            self.progress[bidx, col] = torch.where(done, torch.zeros_like(self.progress[bidx, col]), self.progress[bidx, col])
-            # all three pop-write masks of this rank in one host check
-            if bool((made_settler | grow | starve).any()):
-                _pop_dirty = True
-
-            # --- borders (later cities see earlier claims) -------------------
-            # pickBorderTile reads the LIVE map: refresh the yield ranking if
-            # THIS city's own completion/growth just changed it (the box add
-            # itself stays the loop-top stats value).
-            if (self._eff_version, self._claim_version) != _tot_ver or _pop_dirty:
-                total, housing, growth_f, tier_idx = self._city_totals(lux=lux0)
-                _tot_ver = (self._eff_version, self._claim_version)
-                _pop_dirty = False
-            # Cultural border growth — THE shared body, row 0's call.
-            self._seat_border_growth(0, col, self.alive[bidx, col], t_c[:, 4])
-
-            # THE CITY'S OWN DEFENSE: walls strike, Encampment strike, then the
-            # unbesieged heal — ONE body, every seat row, at this per-city
-            # position. Row 0's copy used to run a phase earlier inside
-            # _barbarian_phase; it is gone from both engines.
-            self._seat_city_fire_and_heal(0, col, self.alive[bidx, col])
-
-            # --- empire accumulators (FRESH values; the seq-order walk makes
-            # each game's float association match game.ts exactly) ------------
-            gold_add = gold_add + t_c[:, 2]
-            sci_add = sci_add + t_c[:, 3]
-            cul_add = cul_add + t_c[:, 4]
-            fth_add = fth_add + t_c[:, 5]  # faith rides the same walk
-
-        # --- loyalty & defections (right after the city loop) ------------------------------
-        self._apply_loyalty_and_flips(tier_fresh, pop_loyal)
-        # Every POST-WALK consumer (empire_score, the state digest) must see
-        # FRESH stats: computeCityStats re-ranks luxuryAmenities LIVE, so a
-        # mid-walk pop change can move a luxury grant and flip amenity tiers
-        # away from the walk's FROZEN map. The walk's accumulators keep the
-        # frozen-map yields; only the cached totals must not leak past the walk.
-        self._eff_version += 1
+        # --- loyalty & defections (right after the city loop) ----------------
+        self._apply_loyalty_and_flips(tier_idx, pop_loyal)
 
         # --- the seat block's TAIL: banking, upkeep, research, tourism,
         # favor, grievances, the great-people and belief races. ONE body,

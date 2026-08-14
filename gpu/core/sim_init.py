@@ -1238,7 +1238,6 @@ class SimInit:
         self._belief_feat_cache = None   # ((r,_eff_version,_bel_version), [B,T,6])
         self._bel_add_memo = None        # (_bel_version, {(fn,key,r): tensor})
         self._gov_pol_cache = None       # (_eff_version, {seat_tag: 5-tuple})
-        self._rcy_all_cache = None       # ((turn,r,eff,bel,kill,claim), 6-tuple [B,RC])
         self._dadj_cache = None          # (_eff_version, {di: floored [B,T] adjacency})
         # Static candidate lists for _pick_static: the k-th candidate in
         # tile order, so a pick is one gather instead of a [B, T] cumsum.
@@ -1582,7 +1581,6 @@ class SimInit:
         self._claim_version += 1
         self._seat_route_cache = self._belief_feat_cache = None
         self._bel_add_memo = self._gov_pol_cache = None
-        self._rcy_all_cache = None
 
     # ---- state discipline: the aliasing safety net ---------------------------
     #
@@ -1828,7 +1826,6 @@ class SimInit:
         self._claim_version += 1
         self._seat_route_cache = self._belief_feat_cache = None
         self._bel_add_memo = self._gov_pol_cache = None
-        self._rcy_all_cache = None
 
     @staticmethod
     def _prereq_matrix(prereqs: list, n: int) -> torch.Tensor:

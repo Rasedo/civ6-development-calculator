@@ -98,7 +98,7 @@ def test_building_bonus(rules, path) -> None:
     def sci0(envoys: int) -> tuple[float, float]:
         sim.citystate_envoys[0, 0] = envoys
         sim._eff_version += 1
-        total, _, _, _ = sim._city_totals(lux=None)
+        total, _, _, _ = sim._city_totals()
         return float(total[0, 0, SCIENCE]), float(total[0, 0, FOOD])
 
     s1, f1 = sci0(1)   # capital bonus only (no building tier yet)
@@ -151,7 +151,7 @@ def test_building_pillage(rules, path) -> None:
     def sci0(envoys: int) -> float:
         sim.citystate_envoys[0, 0] = envoys
         sim._eff_version += 1
-        total, _, _, _ = sim._city_totals(lux=None)
+        total, _, _, _ = sim._city_totals()
         return float(total[0, 0, SCIENCE])
 
     s3_live = sci0(3)
@@ -184,7 +184,7 @@ def test_suzerain(rules, path) -> None:
     def cap_sci(suz_key: int) -> float:
         sim.citystate_suz_key[0, 0] = suz_key
         sim._eff_version += 1
-        total, _, _, _ = sim._city_totals(lux=None)
+        total, _, _, _ = sim._city_totals()
         return float(total[0, 0, SCIENCE])
 
     ship = cap_sci(SCIENCE)   # shipped science channel
@@ -197,7 +197,7 @@ def test_suzerain(rules, path) -> None:
         sim.citystate_suz_key[0, 0] = SCIENCE
         sim.civ_only_citystate_envoys[0, 0, 0] = 9  # civ 0 dominates
         sim._eff_version += 1
-        total, _, _, _ = sim._city_totals(lux=None)
+        total, _, _, _ = sim._city_totals()
         contested = float(total[0, 0, SCIENCE])
         assert abs(contested - desc) < 1e-9, f"suzerain perk paid while contest LOST ({contested} vs {desc})"
         print("  seat-0 suzerain CONTEST OK: a civ out-envoys seat 0 -> no perk")
