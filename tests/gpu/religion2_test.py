@@ -521,7 +521,7 @@ def poke_messenger_route(rules, rj, path):
     def income(enh_idx):
         sim.civ_only_enhancer[:, r] = enh_idx
         sim._seat_route_cache = None
-        inc = sim._seat_route_income(r)
+        inc = sim._seat_route_income(r + 1)
         assert inc is not None, "route income None with a live domestic route"
         # engine yield order: food, prod, gold, sci, cul, faith
         return float(inc[0, FROM, 2]), float(inc[0, FROM, 5])

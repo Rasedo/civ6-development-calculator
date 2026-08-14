@@ -67,7 +67,7 @@ def main() -> None:
     sim.civ_only_atwar[0, 0] = False
     sim.sync_war()  # close the poke under transpose
     sim._seat_route_cache = None
-    inc = sim._seat_route_income(0)
+    inc = sim._seat_route_income(1)
     assert inc is not None, "income must resolve with an active route"
     gold = float(inc[0, 0, 2])
     assert abs(gold - 3.0) < 1e-9, f"peace intl income should be intlGold=3, got {gold}"
@@ -79,7 +79,7 @@ def main() -> None:
     sim.civ_only_atwar[0, 0] = True
     sim.sync_war()  # close the poke under transpose
     sim._seat_route_cache = None
-    inc = sim._seat_route_income(0)
+    inc = sim._seat_route_income(1)
     assert inc is None or abs(float(inc[0, 0, 2])) < 1e-9, "intl income must be suspended at war"
     sim.civ_only_atwar[0, 0] = False
     sim.sync_war()  # close the poke under transpose
@@ -94,7 +94,7 @@ def main() -> None:
         sim.district_complete[0, t] = True
         sim._eff_version += 1
         sim._seat_route_cache = None
-        inc = sim._seat_route_income(0)
+        inc = sim._seat_route_income(1)
         assert abs(float(inc[0, 0, 2]) - 4.0) < 1e-9, f"one dest specialty → 3+1 gold, got {float(inc[0, 0, 2])}"
 
     # --- 3) duration expiry: due route dropped, future route kept ----------
@@ -108,7 +108,7 @@ def main() -> None:
     s.civ_only_routes[0, 0, 1, 1] = int(s.civ_city_id[0, 0, 0])
     s.civ_only_route_dest[0, 0, 1] = -1
     s.civ_only_route_exp[0, 0, 1] = int(s.turn) + 5  # future
-    s._expire_seat_routes(0)
+    s._expire_seat_routes(1)
     assert int(s.civ_only_routes[0, 0, 0, 0]) == -1, "a due route (exp <= turn) must be dropped"
     assert int(s.civ_only_route_exp[0, 0, 0]) == -1, "dropped slot's exp must reset"
     assert int(s.civ_only_routes[0, 0, 1, 0]) == fid, "a future route must survive expiry"
@@ -120,7 +120,7 @@ def main() -> None:
     s2.civ_only_routes[0, 0, 0, 1] = -1
     s2.civ_only_route_dest[0, 0, 0] = empty_tile
     s2.civ_only_route_exp[0, 0, 0] = int(s2.turn) + s2._trade_duration  # not yet expired
-    s2._expire_seat_routes(0)
+    s2._expire_seat_routes(1)
     assert int(s2.civ_only_routes[0, 0, 0, 0]) == -1, "an intl route to a tile that is not a seat-0 center must be dropped"
 
     # --- 5) the route tensors ride snapshot/restore ------------------------

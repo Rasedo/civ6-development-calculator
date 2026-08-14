@@ -2001,7 +2001,7 @@ class SimEconomy:
         # TRADE — cityTradeYields joins the totals LAST of the addYields
         # sequence (tiles, districts, buildings, citizens, bonuses, trade),
         # BEFORE the amenity tier scales the non-food columns.
-        _rt0 = self._seat0_route_income()
+        _rt0 = self._seat_route_income(0)
         if _rt0 is not None:
             total = total + _rt0.to(self.dtype)
         total[:, :, 1:] *= yield_f.unsqueeze(2)  # non-food × amenity factor
@@ -2461,7 +2461,7 @@ class SimEconomy:
             faith = faith + capb_r[:, 5].unsqueeze(1) * _isc
         # Outgoing unraided route income — pre-tier, the per-j twin's position
         # (integer-valued adds in f64: batching is exact).
-        _route_inc = self._seat_route_income(r)
+        _route_inc = self._seat_route_income(r + 1)
         if _route_inc is not None:
             a6 = alive.double()
             food = food + _route_inc[:, :, 0] * a6
