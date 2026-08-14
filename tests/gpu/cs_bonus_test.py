@@ -228,7 +228,7 @@ def test_civ_bonus(rules, path) -> None:
         sim.citystate_suz_key[0, 0] = suz_key
         sim._eff_version += 1
         # _seat_city_yields_all returns (food, prod, sci, cul, gold, faith).
-        food, prod, sci, cul, gold, faith = sim._seat_city_yields_all(r)
+        food, prod, sci, cul, gold, faith = sim._seat_city_yields_all(r + 1)
         return float(sci[0, j])
 
     r1 = rsci(1)   # capital-only (this rc may not be the capital -> possibly 0)

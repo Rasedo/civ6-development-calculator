@@ -41,13 +41,13 @@ def main() -> None:
     assert names[sim._relic_bidx] == "TEMPLE", f"relic slot building is {names[sim._relic_bidx]}, want TEMPLE"
 
     # --- 2) _MUTABLE registration + snapshot/restore ------------------------
-    # `relics` and `civ_city_relics` are the seat-0 and civ VIEWS of one `city_relics`
-    # plane, which also carries a MINOR section neither view reaches — so the
-    # BASE is what has to be registered.
+    # ONE `city_relics` plane, addressed by row. The seat-0 and civ family
+    # views are gone (#111): a second name for a fact is what let a fork look
+    # like two different expressions, so their absence is the assertion.
     assert "city_relics" in _MUTABLE, "city_relics must be registered in _MUTABLE"
     for f in ("relics", "civ_city_relics"):
-        assert f not in _MUTABLE, f"{f} is a VIEW of city_relics"
-        assert getattr(sim, f).data_ptr() >= sim.city_relics.data_ptr()
+        assert not hasattr(sim, f), f"{f} is a resurrected view of city_relics — address the row"
+        assert f not in _MUTABLE, f"{f} is not a plane"
     sim.city_relics[:, 0, 0] = 1
     snap = sim.snapshot()
     sim.city_relics[:, 0, 0] = 0

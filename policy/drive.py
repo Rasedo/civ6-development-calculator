@@ -73,19 +73,19 @@ def _prod_ctx(blocks: dict, sim, seat: int) -> dict:
     }
 
 
-def take_seat(sim, r: int) -> None:
-    """Hand civ `r` (seat r+1) to the ladder for the rest of the run."""
-    sim.seat_ext[:, r + 1] = True
+def take_seat(sim, row: int) -> None:
+    """Hand seat `row` to the ladder for the rest of the run."""
+    sim.seat_ext[:, row] = True
 
 
-def _blocks(env, sim, r: int) -> dict:
+def _blocks(env, sim, row: int) -> dict:
     """The seat's OBSERVATION, sliced into the blocks the ladder reads.
 
     Goes through `env.observe(seat)` and `ladder.split` rather than reaching into
     engine tensors — the observation is the seat's whole view of the world, and
     a policy that peeks past it is not a policy that a net could replace.
     """
-    obs = env.observe(r + 1)  # env._seat_civ's inverse: seat k>0 is civ k-1
+    obs = env.observe(row)
     # tech/civic widths come off the live tensors — there is no NT/NC scalar,
     # and hardcoding one here would be the second copy that always drifts.
     return ladder.split(obs, sim.S, sim.R, sim.RC, sim.civ_techs.shape[2], sim.civ_civics.shape[2])
@@ -96,7 +96,7 @@ def _blocks(env, sim, r: int) -> dict:
 #: Both engines parse this, so it records DECISIONS, never derived state: a
 #: replay must be able to reproduce the run without re-deriving anything the
 #: policy knew. Per turn, per driven seat:
-#:     {"turn": t, "r<civ>": {
+#:     {"turn": t, "s<seatRow>": {
 #:         "production": [[centreTile, col], ...]  one pair per city that acts
 #:         "tech": col | None       None = no pick
 #:         "civic": col | None
@@ -119,21 +119,21 @@ SCHEMA_VERSION = 2
 _M32 = 0xFFFFFFFF
 
 
-def _policy_rand(seed: int, turn: int, r: int, salt: int) -> float:
+def _policy_rand(seed: int, turn: int, row: int, salt: int) -> float:
     """ONE mulberry32 draw from the DRIVER's policy stream, keyed on (game
-    seed, turn, civ, salt). Deterministic — the same engine always
+    seed, turn, seat row, salt). Deterministic — the same engine always
     re-records the same file — and fully separate from the engines' shared
     rule stream, whose draw-count parity a policy decision must not move."""
-    a = (seed * 2654435761 ^ turn * 40503 ^ r * 97 ^ salt * 1013904223) & _M32
+    a = (seed * 2654435761 ^ turn * 40503 ^ row * 97 ^ salt * 1013904223) & _M32
     a = (a + 0x6D2B79F5) & _M32
     t = ((a ^ (a >> 15)) * (1 | a)) & _M32
     t = (((t + (((t ^ (t >> 7)) * (61 | t)) & _M32)) & _M32) ^ t) & _M32
     return ((t ^ (t >> 14)) & _M32) / 4294967296.0
 
 
-def _policy_rng(sim, seeds: list, turn: int, r: int, salt: int) -> torch.Tensor:
+def _policy_rng(sim, seeds: list, turn: int, row: int, salt: int) -> torch.Tensor:
     return torch.tensor(
-        [_policy_rand(int(s_), turn, r, salt) for s_ in seeds],
+        [_policy_rand(int(s_), turn, row, salt) for s_ in seeds],
         dtype=torch.float64, device=sim.device,
     )
 
@@ -509,14 +509,16 @@ def geo_decide_and_apply(sim):
     return the tensors for wire extraction (_extract_geo per seat row)."""
     den, ally, war, peace = _geo_turn(sim)
     for r in range(sim.R):
-        sim.apply_geo(r, denounce=den[:, r], ally=ally[:, r], civ_pair_war=war[:, r], civ_pair_peace=peace[:, r])
+        sim.apply_geo(r + 1, denounce=den[:, r], ally=ally[:, r], civ_pair_war=war[:, r], civ_pair_peace=peace[:, r])
     return den, ally, war, peace
 
 
-def _extract_geo(geo, r: int, b: int) -> dict:
-    """Civ r's geo record fields for batch row b — CIV-index targets, absent
+def _extract_geo(geo, row: int, b: int) -> dict:
+    """Seat `row`'s geo record fields for batch row b — the TARGETS are still
+    civ indices, since the civ-pair planes have no seat-0 row (#111 s5); absent
     keys = no intent (the wire's optional-field convention)."""
     den, ally, war, peace = geo
+    r = row - 1
     out = {}
     dl = den[b, r].nonzero(as_tuple=True)[0].tolist()
     if dl:
@@ -532,21 +534,21 @@ def _extract_geo(geo, r: int, b: int) -> dict:
     return out
 
 
-def decide_and_apply(env, sim, r: int, roster: dict, classes: dict, max_steps: int = 4) -> dict:
+def decide_and_apply(env, sim, row: int, roster: dict, classes: dict, max_steps: int = 4) -> dict:
     """One turn's decisions for one driven seat, returned in the action-file
     schema so a replay can reproduce them exactly. B=1 callers only — the
     batched recorder extracts every row via `_extract_record`."""
-    prod, tech, civic, war, env_seq, seq, buy, worship, relig, levy = _decide_turn(env, sim, r, roster, classes, max_steps)
-    return _extract_record(sim, r, prod, tech, civic, war, env_seq, seq, buy, worship, relig, levy, 0)
+    prod, tech, civic, war, env_seq, seq, buy, worship, relig, levy = _decide_turn(env, sim, row, roster, classes, max_steps)
+    return _extract_record(sim, row, prod, tech, civic, war, env_seq, seq, buy, worship, relig, levy, 0)
 
 
-def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int = 4, seeds=None, turn=None):
+def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int = 4, seeds=None, turn=None):
     """The BATCHED decision core — masks, ladder picks, the virtual planner,
     the draw-free applies and the useq stash. Returns the per-verb decision
     tensors; extraction is the caller's per-row problem."""
-    m = sim.seat_masks(r + 1)
-    blocks = _blocks(env, sim, r)
-    prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(blocks, sim, r + 1))
+    m = sim.seat_masks(row)
+    blocks = _blocks(env, sim, row)
+    prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(blocks, sim, row))
     tech = ladder.pick_research(blocks, m["tech"], "tech") if bool(m["tech"].any()) else None
     civic = ladder.pick_research(blocks, m["civic"], "civic") if bool(m["civic"].any()) else None
     # the WAR verb: the ladder decides from the driver's own policy stream;
@@ -558,20 +560,20 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
     war = None
     if seeds is not None and turn is not None:
         rng_w = {
-            "dow": _policy_rng(sim, seeds, turn, r, 1),
-            "peace": _policy_rng(sim, seeds, turn, r, 2),
+            "dow": _policy_rng(sim, seeds, turn, row, 1),
+            "peace": _policy_rng(sim, seeds, turn, row, 2),
         }
         war = ladder.pick_war(m["war"], _war_ctx(blocks), rng_w)
     env_seq = None
     if seeds is not None and turn is not None and sim.S > 0:
-        env_seq = _seat_envoys(sim, r + 1)
+        env_seq = _seat_envoys(sim, row)
     # the PURCHASE verbs — priority over the candidates from the engines' one
     # legality bodies; the engine stashes and consumes each intent at its own
     # phase sub-position, re-validating there. The gold buy is ONE kind per
     # turn (kind 3's a/b = tile, slot); the faith buys and the levy ride
     # beside it (separate currencies / the diplomacy action).
-    buy, worship, relig, levy = _decide_buys(sim, r + 1)
-    sim.apply_seat_actions(r, production=prod, tech=tech, civic=civic, war=war, envoys=env_seq,
+    buy, worship, relig, levy = _decide_buys(sim, row)
+    sim.apply_seat_actions(row, production=prod, tech=tech, civic=civic, war=war, envoys=env_seq,
                            buy=buy, worship=worship, relig=relig, levy=levy)
 
     # units, and the draw order: the driver PLANS, the PHASE executes.
@@ -584,10 +586,10 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
     # exactly like the scripted walkers. The phase executes the stash at the
     # walkers' position and RE-VALIDATES every rank: an illegal later step
     # refuses, never substitutes.
-    orders0, job_t, spread_t, um, uo = _seat_unit_orders(sim, r + 1)
+    orders0, job_t, spread_t, um, uo = _seat_unit_orders(sim, row)
     B2, N2 = orders0.shape
     ranks = [orders0]
-    smap = sim._seat_slot_map(r + 1)
+    smap = sim._seat_slot_map(row)
     cur = sim.unit_tile.gather(1, smap.clamp(min=0))
     # per-row destination: the war target when at war, else the nearest own
     # centre (the same two rules the ladder's own branches follow)
@@ -605,17 +607,15 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
         # respecting the stop radius. Distances are read-only pair_dist plans;
         # terrain/occupancy legality is the PHASE's re-validation problem.
         wt = getattr(sim, "_vplan_wt", None)
-        if wt is None or wt.get("r") != r:
-            hp_r = sim.civ_only_atwar[:, r]
-            ac = torch.full((B2,), r, dtype=torch.long, device=sim.device)
+        if wt is None or wt.get("row") != row:
             tgts = torch.full((B2, N2), -1, dtype=torch.long, device=sim.device)
             for n in range(N2):
                 if not bool((smap[:, n] >= 0).any()):
                     break
-                tgt_n, hi, hpc, hrc = sim._war_march_target(cur[:, n].clamp(min=0), ac, hp_r)
+                tgt_n, hi, hpc, hrc = sim._war_march_target(cur[:, n].clamp(min=0), row)
                 has = (hi | hpc | hrc)
                 tgts[:, n] = torch.where(has, tgt_n, tgts[:, n])
-            sim._vplan_wt = {"r": r, "tgts": tgts}
+            sim._vplan_wt = {"row": row, "tgts": tgts}
         tgts = sim._vplan_wt["tgts"]
         # nearest own centre per row (peace drift target)
         for n in range(N2):
@@ -649,11 +649,11 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
     seq = torch.stack(ranks, dim=2) if K2 > 1 else ranks[0].unsqueeze(2)
     if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
         sim._driven_useq = {}
-    sim._driven_useq[r] = seq
+    sim._driven_useq[row] = seq
     return prod, tech, civic, war, env_seq, seq, buy, worship, relig, levy
 
 
-def _extract_record(sim, r: int, prod, tech, civic, war, env_seq, seq, buy, worship, relig, levy, b: int) -> dict:
+def _extract_record(sim, row: int, prod, tech, civic, war, env_seq, seq, buy, worship, relig, levy, b: int) -> dict:
     """One batch row's record, in the action-file schema.
 
     Two per-row conventions:
@@ -665,8 +665,8 @@ def _extract_record(sim, r: int, prod, tech, civic, war, env_seq, seq, buy, wors
     # production as [centreTile, col] PAIRS (see SCHEMA_VERSION); the centre
     # is the cross-engine city key.
     _pr = prod[b]
-    _ctr = sim.city_center[b, r + 1]
-    _alive_c = sim.city_alive[b, r + 1]
+    _ctr = sim.city_center[b, row]
+    _alive_c = sim.city_alive[b, row]
     prod_pairs = [
         [int(_ctr[j]), int(_pr[j])]
         for j in range(min(int(_pr.shape[0]), int(_ctr.shape[0])))
@@ -683,7 +683,7 @@ def _extract_record(sim, r: int, prod, tech, civic, war, env_seq, seq, buy, wors
     # this row's envoy assignment sequence (CS indices), possibly empty.
     _e = [] if env_seq is None else [int(x) for x in env_seq[b].tolist() if int(x) >= 0]
     rec = {"production": prod_pairs, "tech": _t, "civic": _c, "war": _w, "envoys": _e, "units": rows}
-    rec.update(_buy_record_fields(sim, r + 1, b, buy, worship, relig, levy))
+    rec.update(_buy_record_fields(sim, row, b, buy, worship, relig, levy))
     return rec
 
 
@@ -734,8 +734,8 @@ def _buy_record_fields(sim, row: int, b: int, buy, worship, relig, levy) -> dict
     return out
 
 
-def replay_seat(sim, r: int, rec: dict) -> None:
-    """Apply ONE recorded turn for seat `r` without consulting the ladder.
+def replay_seat(sim, row: int, rec: dict) -> None:
+    """Apply ONE recorded turn for seat `row` without consulting the ladder.
 
     This is the half of the interface the TS engine has to implement. It must
     touch no policy at all — if a replay needs to ask the ladder anything, the
@@ -746,7 +746,7 @@ def replay_seat(sim, r: int, rec: dict) -> None:
     # [centreTile, col] pairs -> per-slot columns via THIS sim's centres.
     prod = torch.full((sim.B, sim.RC), -1, dtype=torch.long, device=dev)
     for centre, col in rec["production"]:
-        hit = (sim.city_center[:, r + 1] == int(centre)) & sim.city_alive[:, r + 1]
+        hit = (sim.city_center[:, row] == int(centre)) & sim.city_alive[:, row]
         prod = torch.where(hit, torch.full_like(prod, int(col)), prod)
     tech = None if rec["tech"] is None else torch.tensor(rec["tech"], dtype=torch.long, device=dev)
     civic = None if rec["civic"] is None else torch.tensor(rec["civic"], dtype=torch.long, device=dev)
@@ -761,7 +761,7 @@ def replay_seat(sim, r: int, rec: dict) -> None:
     if _bv is not None and int(_bv[0]) == 0:
         hitj = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
         for j in range(sim.RC):
-            m = (sim.city_center[:, r + 1, j] == int(_bv[1])) & sim.city_alive[:, r + 1, j]
+            m = (sim.city_center[:, row, j] == int(_bv[1])) & sim.city_alive[:, row, j]
             hitj = torch.where(m, torch.full_like(hitj, j), hitj)
         kind0 = torch.where(hitj >= 0, torch.zeros_like(hitj), torch.full_like(hitj, -1))
         buy = (kind0, hitj, torch.full((sim.B,), int(_bv[2]), dtype=torch.long, device=dev))
@@ -776,7 +776,7 @@ def replay_seat(sim, r: int, rec: dict) -> None:
         # resolution (match by centre + alive, never by slot).
         hitj = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
         for j in range(sim.RC):
-            m3 = (sim.city_center[:, r + 1, j] == int(_bv[2])) & sim.city_alive[:, r + 1, j]
+            m3 = (sim.city_center[:, row, j] == int(_bv[2])) & sim.city_alive[:, row, j]
             hitj = torch.where(m3, torch.full_like(hitj, j), hitj)
         kind3 = torch.where(hitj >= 0, torch.full_like(hitj, 3), torch.full_like(hitj, -1))
         buy = (kind3, torch.full((sim.B,), int(_bv[1]), dtype=torch.long, device=dev), hitj)
@@ -784,7 +784,7 @@ def replay_seat(sim, r: int, rec: dict) -> None:
     def _centre_slot(centre: int) -> torch.Tensor:
         hj = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
         for j in range(sim.RC):
-            mm = (sim.city_center[:, r + 1, j] == centre) & sim.city_alive[:, r + 1, j]
+            mm = (sim.city_center[:, row, j] == centre) & sim.city_alive[:, row, j]
             hj = torch.where(mm, torch.full_like(hj, j), hj)
         return hj
 
@@ -802,7 +802,7 @@ def replay_seat(sim, r: int, rec: dict) -> None:
     # kind 7, the LEVY — the CS index rides verbatim.
     _lv = rec.get("levy")
     levy = None if _lv is None else torch.full((sim.B,), int(_lv), dtype=torch.long, device=dev)
-    sim.apply_seat_actions(r, production=prod, tech=tech, civic=civic, war=war, envoys=env_seq,
+    sim.apply_seat_actions(row, production=prod, tech=tech, civic=civic, war=war, envoys=env_seq,
                            buy=buy, worship=worship, relig=relig, levy=levy)
     # the GEOPOLITICS intents (civ-index targets) stash for the phase's own
     # pass positions.
@@ -823,7 +823,7 @@ def replay_seat(sim, r: int, rec: dict) -> None:
     if rec.get("geoPeace"):
         geo_kwargs["civ_pair_peace"] = _geo_mask(rec["geoPeace"])
     if geo_kwargs:
-        sim.apply_geo(r, **geo_kwargs)
+        sim.apply_geo(row, **geo_kwargs)
     # draw order: replay stashes exactly as the driver does; the PHASE
     # executes at the walkers' position, so recorder and replayer share one
     # draw order by construction.
@@ -836,25 +836,25 @@ def replay_seat(sim, r: int, rec: dict) -> None:
     if ranks:
         if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
             sim._driven_useq = {}
-        sim._driven_useq[r] = torch.stack(ranks, dim=2)
+        sim._driven_useq[row] = torch.stack(ranks, dim=2)
 
 
 def replay(env, log: list, seats=None) -> None:
     """Re-run a recorded game from the action file alone. No ladder, no picker."""
     sim = env.sim
-    seats = list(range(sim.R)) if seats is None else list(seats)
-    for r in seats:
-        take_seat(sim, r)
+    seats = list(range(1, 1 + sim.R)) if seats is None else list(seats)
+    for row in seats:
+        take_seat(sim, row)
     for turn_rec in log:
-        for r in seats:
-            key = f"r{r}"
+        for row in seats:
+            key = f"s{row}"
             if key in turn_rec:
-                replay_seat(sim, r, turn_rec[key])
+                replay_seat(sim, row, turn_rec[key])
         sim.step()
 
 
 def drive(env, turns: int, seats=None, record: Path | None = None) -> list:
-    """Run `turns` turns with `seats` (default: every civ) driven by the ladder.
+    """Run `turns` turns with `seats` (default: every civ row) driven by the ladder.
 
     THE FILE IS THE INTERFACE: when `record` is given the chosen actions are
     written out, which is what lets the TS engine replay the identical
@@ -877,24 +877,24 @@ def drive_batched(env, turns: int, seats=None, seeds=None) -> list:
     """
     sim = env.sim
     B = sim.B
-    seats = list(range(sim.R)) if seats is None else list(seats)
+    seats = list(range(1, 1 + sim.R)) if seats is None else list(seats)
     NB = sim.rules_dev.b_cost.shape[0]
     classes = ladder.prod_classes(NB, sim.NU, len(sim._scaffold), sim._wond_n if sim.districts_on else 0, len(sim._proj_rows) if sim.districts_on else 0)
     rj = json.loads((Path(__file__).resolve().parent.parent / "seeder" / "worlds" / "rules.json").read_text(encoding="utf-8"))
     roster = ladder.unit_roster(rj["units"])
-    for r in seats:
-        take_seat(sim, r)
+    for row in seats:
+        take_seat(sim, row)
     logs = [[] for _ in range(B)]
     # the policy stream keys on the GAME seed — the caller passes them
     # (BatchEnv keeps no fixture list). Absent -> per-row index fallback,
     # deterministic but seed-blind; the recording surfaces always pass them.
     game_seeds = list(seeds) if seeds is not None else list(range(B))
     for t in range(turns):
-        per_seat = {r: _decide_turn(env, sim, r, roster, classes, seeds=game_seeds, turn=t) for r in seats}
+        per_seat = {row: _decide_turn(env, sim, row, roster, classes, seeds=game_seeds, turn=t) for row in seats}
         for b in range(B):
             turn_rec = {"turn": t}
-            for r in seats:
-                turn_rec[f"r{r}"] = _extract_record(sim, r, *per_seat[r], b)
+            for row in seats:
+                turn_rec[f"s{row}"] = _extract_record(sim, row, *per_seat[row], b)
             logs[b].append(turn_rec)
         sim.step()
     return logs

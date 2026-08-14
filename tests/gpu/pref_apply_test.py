@@ -68,7 +68,7 @@ def main() -> None:
     assert legal_b, "no legal building in the capital at t25 — pick another turn"
     b0 = legal_b[0]
     b1 = legal_b[1] if len(legal_b) > 1 else b0
-    sim.apply_seat_actions(r, production_pref=pref([b0, b1]))
+    sim.apply_seat_actions(r + 1, production_pref=pref([b0, b1]))
     sim._seat_record_apply(r + 1, ACTIVE)
     got = int(sim.city_current[0, r + 1, j])
     assert got == b0, f"top-ranked legal column must win, got {got}"
@@ -93,7 +93,7 @@ def main() -> None:
     legal_b2 = [c for c in range(NB) if bool(m2[c])]
     assert legal_b2, "no legal building for the fallback rank"
     d_col = D0                              # rank it FIRST even though it cannot land
-    sim2.apply_seat_actions(r, production_pref=pref([d_col, legal_b2[0]]))
+    sim2.apply_seat_actions(r + 1, production_pref=pref([d_col, legal_b2[0]]))
     sim2._seat_record_apply(r + 1, ACTIVE)
     got2 = int(sim2.city_current[0, r + 1, j])
     assert got2 != -1, "#87 REGRESSION: an unplaceable top pick left the city IDLE"
@@ -107,7 +107,7 @@ def main() -> None:
     sim3.city_progress[0, r + 1, j] = 0.0
     sim3.city_cost[0, r + 1, j] = 0.0
     p_none = torch.full((1, sim3.RC, W), NEG, dtype=torch.float64)
-    sim3.apply_seat_actions(r, production_pref=p_none)
+    sim3.apply_seat_actions(r + 1, production_pref=p_none)
     sim3._seat_record_apply(r + 1, ACTIVE)
     assert int(sim3.city_current[0, r + 1, j]) == -1, "an all -inf ranking must queue NOTHING"
     print("  3 exhausted ranking queues nothing (the engine never invents a pick) OK")
@@ -142,7 +142,7 @@ def main() -> None:
     assert bool(m5[0, j5, w_lo5 + wi5]), "#88: the granted wonder column must read legal"
     prod5 = torch.full((1, sim5.RC), -1, dtype=torch.long)
     prod5[0, j5] = w_lo5 + wi5
-    sim5.apply_seat_actions(r5, production=prod5)
+    sim5.apply_seat_actions(r5 + 1, production=prod5)
     sim5._seat_record_apply(r5 + 1, ACTIVE)
     code_w5 = sim5.WONDER_BASE + wi5
     assert int(sim5.city_current[0, r5 + 1, j5]) == code_w5, "wonder code must queue via the shared helper"
@@ -157,7 +157,7 @@ def main() -> None:
     sim6.built_wonder[0, free6] = wi5  # any tile, any owner — wonderExists is global
     m6 = sim6.seat_masks(r5 + 1)["production"]
     assert not bool(m6[0, j5, w_lo5 + wi5]), "mask must read the claim"
-    sim6.apply_seat_actions(r5, production=prod5)
+    sim6.apply_seat_actions(r5 + 1, production=prod5)
     sim6._seat_record_apply(r5 + 1, ACTIVE)
     assert int(sim6.city_current[0, r5 + 1, j5]) != code_w5, "apply must REFUSE the claimed wonder (cross-seat)"
     # PROJECT: plant a completed district matching base project 0, then apply
@@ -176,7 +176,7 @@ def main() -> None:
     assert bool(m7[0, j5, p_lo7]), "#88: base project 0 must be legal on its completed district"
     prod7 = torch.full((1, sim7.RC), -1, dtype=torch.long)
     prod7[0, j5] = p_lo7
-    sim7.apply_seat_actions(r5, production=prod7)
+    sim7.apply_seat_actions(r5 + 1, production=prod7)
     sim7._seat_record_apply(r5 + 1, ACTIVE)
     assert int(sim7.city_current[0, r5 + 1, j5]) == sim7.PROJECT_BASE + 0, "project code must queue"
     assert float(sim7.city_cost[0, r5 + 1, j5]) > 0, "project cost must lock"

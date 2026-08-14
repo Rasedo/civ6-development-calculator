@@ -172,7 +172,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     seeds = [int(fx["seed"]) for fx in fixtures]
     env = BatchEnv(fixtures, rules, device="cpu", dtype=torch.float64)
     sim = env.sim
-    seats = list(range(sim.R))
+    seats = list(range(1, 1 + sim.R))
     NB = sim.rules_dev.b_cost.shape[0]
     classes = ladder.prod_classes(NB, sim.NU, len(sim._scaffold), sim._wond_n if sim.districts_on else 0, len(sim._proj_rows) if sim.districts_on else 0)
     rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
@@ -181,8 +181,8 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     sc_man = statecompare.load_manifest()
     statecompare.check_extractors(sc_man)
     dig_dumped = False
-    for r in seats:
-        drive.take_seat(sim, r)
+    for row in seats:
+        drive.take_seat(sim, row)
     NT, NC = sim.civ_techs.shape[2], sim.civ_civics.shape[2]
     ctx_lo = env.observe(1).shape[1] - ladder.CTX_SEAT
 
@@ -237,8 +237,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     try:
         for t in range(t0, turns):
             msgs = [read_msg(ch) for ch in children]  # barrier
-            for seat in [0] + [r + 1 for r in seats]:
-                r = seat - 1
+            for seat in [0] + seats:
                 gobs_all = env.observe(seat)
                 gj_all = drive._builder_jobs(sim, seat).tolist()
                 gs_all = drive._spread_targets(sim, seat).tolist()
@@ -311,10 +310,10 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             # The geopolitics decide ONCE per turn (the declare scan couples
             # the civ seats), stashed GPU-side and merged into every record.
             geo = drive.geo_decide_and_apply(sim)
-            per_seat = {r: drive._decide_turn(env, sim, r, roster, classes, seeds=seeds, turn=t) for r in seats}
+            per_seat = {row: drive._decide_turn(env, sim, row, roster, classes, seeds=seeds, turn=t) for row in seats}
             for b, ch in enumerate(children):
-                recs = {str(r + 1): {**drive._extract_record(sim, r, *per_seat[r], b),
-                                     **drive._extract_geo(geo, r, b)} for r in seats}
+                recs = {str(row): {**drive._extract_record(sim, row, *per_seat[row], b),
+                                   **drive._extract_geo(geo, row, b)} for row in seats}
                 recs["0"] = {
                     "production": [[int(sim.city_center[b, 0, c]), int(prod0[b, c])] for c in range(sim.RC)
                                    if int(prod0[b, c]) >= 0 and bool(sim.city_alive[b, 0, c])],
@@ -422,7 +421,7 @@ def main() -> None:
     fx = load_fixture(FIXTURES / f"seed{args.seed}.json")
     env = BatchEnv([fx], rules, device="cpu", dtype=torch.float64)
     sim = env.sim
-    seats = list(range(sim.R))
+    seats = list(range(1, 1 + sim.R))
     NB = sim.rules_dev.b_cost.shape[0]
     classes = ladder.prod_classes(NB, sim.NU, len(sim._scaffold), sim._wond_n if sim.districts_on else 0, len(sim._proj_rows) if sim.districts_on else 0)
     rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
@@ -430,8 +429,8 @@ def main() -> None:
     sc_man = statecompare.load_manifest()
     statecompare.check_extractors(sc_man)
     dig_dumped = False
-    for r in seats:
-        drive.take_seat(sim, r)
+    for row in seats:
+        drive.take_seat(sim, row)
     NT, NC = sim.civ_techs.shape[2], sim.civ_civics.shape[2]
     ctx_lo = env.observe(1).shape[1] - ladder.CTX_SEAT
 
@@ -499,7 +498,7 @@ def main() -> None:
         # slot-map row (TS rows = live units in mirrored order; GPU rows beyond
         # the live count must be -1). EVERY seat rides `_seat_slot_map` now,
         # so no seat needs a compaction of its own.
-        for seat in [0] + [r + 1 for r in seats]:
+        for seat in [0] + seats:
             gj = drive._builder_jobs(sim, seat)[0].tolist()
             gs = drive._spread_targets(sim, seat)[0].tolist()
             tj = msg.get("jobs", {}).get(str(seat), [])
@@ -566,9 +565,9 @@ def main() -> None:
         buy0, worship0, relig0, levy0 = drive._decide_buys(sim, 0)  # seat 0's own gold/faith verbs
         # The geopolitics decide ONCE per turn — the batched path's twin.
         geo = drive.geo_decide_and_apply(sim)
-        per_seat = {r: drive._decide_turn(env, sim, r, roster, classes, seeds=[args.seed], turn=t) for r in seats}
-        recs = {str(r + 1): {**drive._extract_record(sim, r, *per_seat[r], 0),
-                             **drive._extract_geo(geo, r, 0)} for r in seats}
+        per_seat = {row: drive._decide_turn(env, sim, row, roster, classes, seeds=[args.seed], turn=t) for row in seats}
+        recs = {str(row): {**drive._extract_record(sim, row, *per_seat[row], 0),
+                           **drive._extract_geo(geo, row, 0)} for row in seats}
         recs["0"] = {
             "production": [[int(sim.city_center[0, 0, c]), int(prod0[0, c])] for c in range(sim.RC)
                            if int(prod0[0, c]) >= 0 and bool(sim.city_alive[0, 0, c])],

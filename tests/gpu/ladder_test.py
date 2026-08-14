@@ -60,13 +60,13 @@ def main() -> None:
     assert got.tolist() == [1, -1], f"lowest-legal tie-break broke: {got.tolist()}"
     print("  b lowest-index tie-break OK (and -1 when no option is legal)")
 
-    t0, sc0 = int(s.turn), float(s.empire_score()[0])
+    t0, sc0 = int(s.turn), float(s.seat_score(0)[0])
     for _ in range(20):
         a = ladder.decide(env.observe(0), env.masks(0), layout)
         env.step(production=a["production"], tech=a["tech"], civic=a["civic"], seat=0)
     assert int(s.turn) >= t0 + 20, "the ladder must advance the world"
-    assert float(s.empire_score()[0]) > sc0, "a driven empire should grow"
-    print(f"  c ladder drove 20 turns (score {sc0:.1f} -> {float(s.empire_score()[0]):.1f}) OK")
+    assert float(s.seat_score(0)[0]) > sc0, "a driven empire should grow"
+    print(f"  c ladder drove 20 turns (score {sc0:.1f} -> {float(s.seat_score(0)[0]):.1f}) OK")
 
     # --- the ENVOY verb ------------------------------------------------------
     # Greedy assignment: the neediest MET city-state by OWN envoys, ties to the

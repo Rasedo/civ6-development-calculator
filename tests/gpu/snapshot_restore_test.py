@@ -35,16 +35,16 @@ def main() -> None:
     for _ in range(30):
         sim.step()
     snap = sim.snapshot()
-    before = sim.empire_score().clone()
+    before = sim.seat_score(0).clone()
     for _ in range(10):
         sim.step()
-    assert not torch.equal(before, sim.empire_score()), "advance didn't change state (vacuous)"
+    assert not torch.equal(before, sim.seat_score(0)), "advance didn't change state (vacuous)"
 
     sim.restore(snap)
     drift = [k for k in _MUTABLE if not torch.equal(getattr(sim, k), snap["mut"][k])]
     assert not drift, f"restore not bit-exact for: {drift}"
     assert sim.turn == snap["turn"], "turn not restored"
-    assert torch.equal(sim.empire_score(), before), "empire_score not restored"
+    assert torch.equal(sim.seat_score(0), before), "seat_score not restored"
 
     # determinism: two steps from the same restored state must match bit-for-bit
     sim.restore(snap)

@@ -27,12 +27,12 @@ TURNS = 120
 WARMUP = 10
 
 
-def seat_state(sim, r=0):
+def seat_state(sim, row=1):
     return {
-        "cities": int(sim.city_alive[0, r + 1].sum()),
-        "units": int((sim.major_unit_alive[0] & ((sim.major_unit_seat[0] - 1) == r)).sum()),
-        "techs": int(sim.civ_techs[0, r + 1].sum()),
-        "civics": int(sim.civ_civics[0, r + 1].sum()),
+        "cities": int(sim.city_alive[0, row].sum()),
+        "units": int((sim.major_unit_alive[0] & (sim.major_unit_seat[0] == row)).sum()),
+        "techs": int(sim.civ_techs[0, row].sum()),
+        "civics": int(sim.civ_civics[0, row].sum()),
     }
 
 
@@ -50,7 +50,7 @@ def main() -> None:
     b = BatchEnv([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
     for _ in range(WARMUP):
         b.sim.step()
-    log = drive.drive(b, TURNS, seats=[0])
+    log = drive.drive(b, TURNS, seats=[1])
     got = seat_state(b.sim)
 
     assert len(log) == TURNS, f"driver logged {len(log)} turns, expected {TURNS}"
@@ -92,7 +92,7 @@ def main() -> None:
     c = BatchEnv([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
     for _ in range(WARMUP):
         c.sim.step()
-    drive.replay(c, log, seats=[0])
+    drive.replay(c, log, seats=[1])
     rep = seat_state(c.sim)
     assert rep == got, f"replay diverged from the driven run: {rep} vs {got}"
     assert bool((b.sim.major_unit_tile == c.sim.major_unit_tile).all()), "replay put units on different tiles"

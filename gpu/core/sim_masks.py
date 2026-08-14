@@ -1302,17 +1302,12 @@ class SimMasks:
         present = smap >= 0
         tiles = self.unit_tile.gather(1, sc)
         at_war = self.war[:, row].any(dim=1)
-        # `_war_march_target` still asks the two questions separately: which
-        # seats this row fights (`ac`, its own row) and whether seat 0 is among
-        # them.
-        ac = torch.full((B,), row, dtype=torch.long, device=dev)
-        hp_r = self.war[:, row, 0]
         war_tgt = torch.full((B, smap.shape[1]), -1, dtype=torch.long, device=dev)
         if bool(at_war.any()):
             for n in range(int(present.any(dim=0).sum())):
                 if not bool(present[:, n].any()):
                     break
-                tgt_n, hi, hpc, hrc = self._war_march_target(tiles[:, n].clamp(min=0), ac, hp_r)
+                tgt_n, hi, hpc, hrc = self._war_march_target(tiles[:, n].clamp(min=0), row)
                 has = (hi | hpc | hrc) & present[:, n] & at_war
                 war_tgt[:, n] = torch.where(has, tgt_n, war_tgt[:, n])
         return self._unit_obs(

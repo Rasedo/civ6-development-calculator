@@ -113,7 +113,7 @@ def main() -> None:
 
     _peace = torch.zeros(s2.B, dtype=torch.bool)
     _peace[b] = True
-    s2._citystate_suzerain_release(r, _peace)
+    s2._citystate_suzerain_release(r + 1, _peace)
     assert not bool(s2.citystate_atwar[b, cs]), "the suzerain's peace must end the city-state's war"
     assert int(s2.citystate_war_turns[b, cs]) == 0, "the war clock must reset"
     assert float(s2.ww[b, 0, _citystate_row]) == max(0.0, 900.0 - shed), "seat 0 must shed the treaty amount"
@@ -123,7 +123,7 @@ def main() -> None:
     s2.citystate_atwar[b, cs] = True
     s2.seat_citystate_envoys[b, r + 1, cs] = 0
     s2.sync_war()
-    s2._citystate_suzerain_release(r, _peace)
+    s2._citystate_suzerain_release(r + 1, _peace)
     assert bool(s2.citystate_atwar[b, cs]), "a non-suzerain's peace must NOT free the city-state"
     print("  c suzerain release: war ends, clock resets through the view, -%d ww OK" % shed)
 

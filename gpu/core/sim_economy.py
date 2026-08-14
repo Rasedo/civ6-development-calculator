@@ -260,23 +260,25 @@ class SimEconomy:
                 continue
             self.ww[:, i, j] = torch.where(mask, (self.ww[:, i, j] - shed).clamp(min=0), self.ww[:, i, j])
 
-    def _citystate_suzerain_release(self, r: int, peace: torch.Tensor) -> None:
-        """Making peace with a civ ALSO ends the wars its city-states were
-        dragged into — the `makePeace` loop that walks `state.cityStates` and
-        clears every `cs.atWar` whose suzerain is that civ.
+    def _citystate_suzerain_release(self, row: int, peace: torch.Tensor) -> None:
+        """Making peace with seat row `row` ALSO ends the wars its city-states
+        were dragged into — the `makePeace` loop that walks `state.cityStates`
+        and clears every `cs.atWar` whose suzerain is that seat.
 
         The suzerain test is `isSuzerain`'s: at least `suzerainEnvoys`,
         strictly above seat 0, strictly above every other civ."""
         if self.S <= 0 or not bool(peace.any()):
             return
-        rel = self._suzerain_mask(r + 1) & self.citystate_atwar & peace.unsqueeze(1)
+        _cs0 = 1 + max(self.R, 1)
+        cs = slice(_cs0, _cs0 + max(self.S, 1))
+        rel = self._suzerain_mask(row) & self.war[:, 0, cs] & peace.unsqueeze(1)
         if not bool(rel.any()):
             return
-        self.citystate_atwar &= ~rel
-        # `citystate_war_turns` is a VIEW of `war_turns` — a rebind orphans it, so the
-        # clock must be written IN PLACE.
-        self.citystate_war_turns.masked_fill_(rel, 0)
-        _cs0 = 1 + max(self.R, 1)
+        # The war matrix is the store; write the cell and its mirror, and the
+        # clock IN PLACE (a rebind would orphan every other view of it).
+        self.war[:, 0, cs] &= ~rel
+        self.war[:, cs, 0] &= ~rel
+        self.war_turns[:, cs].masked_fill_(rel, 0)
         for _s in range(self.S):
             self._ww_peace(rel[:, _s], 0, _cs0 + _s)
 
@@ -2031,94 +2033,56 @@ class SimEconomy:
 
     def _city_totals(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Seat 0's (total [B, C, 6], housing [B, C], growth_f [B, C],
-        tier_idx [B, C]) — the POST-PHASE readers' view (empire_score, the
-        probes), cast back to the engine dtype for the f32 lanes. The seat
-        block itself reads _seat_city_stats(0)."""
+        tier_idx [B, C]) — the POST-PHASE PROBES' view, cast back to the engine
+        dtype for the f32 lanes. The seat block itself reads
+        _seat_city_stats(0), and the score reads _seat_city_yields_all."""
         tier_idx, growth_f, yield_f, _lux = self._seat_amenity(0)
         total = self._seat_city_walk(0, amen_yf=yield_f)
         return total.to(self.dtype), self._seat_housing(0)[1].to(self.dtype), growth_f.to(self.dtype), tier_idx
 
-    def empire_score(self) -> torch.Tensor:
-        """[B] — mirrors empireScore(state, seat 0, 'balanced') with the TS
-        ASSOCIATION — per city: pop×popWeight, then each yield×weight in key
-        order. Science rides non-dyadic 0.7s, so the sum ORDER is worth a real
-        ±1 ulp, enough to flip the leader. TS iterates state.cities in ARRAY
-        order (splice on death, push on found) — slot order under
-        append+reclaim (#110), so the sum walks living columns first, in
-        column order. Dead columns sort last and add exact 0.0
-        (association-neutral)."""
-        total, _, _, _ = self._city_totals()
+    def seat_score(self, row: int) -> torch.Tensor:
+        """[B] — empireScore(state, seat, 'balanced') for ANY seat row, in the
+        TS ASSOCIATION: per city, pop×popWeight first, then the six yields in
+        key order. Science rides non-dyadic 0.7s, so the sum ORDER is worth a
+        real ±1 ulp — enough to flip the leader.
+
+        TS iterates state.cities in ARRAY order (splice on death, push on
+        found), which is slot order under append+reclaim; the living-first sort
+        keeps that true even mid-step, and dead columns add exact 0.0
+        (association-neutral).
+
+        Accumulates in f64 like the TS doubles it mirrors, then casts once.
+        (Row 0 used to accumulate in the ENGINE dtype and the civ rows in f64,
+        so in an f32 lane `leader()` compared an f32-rounded seat 0 against f64
+        rivals. One body, one precision.)"""
         rd = self.rules_dev
         w = rd.score_yield_weights
         pw = float(self.rules.score_pop_weight)
-        ord_ = torch.argsort((~self.city_alive[:, 0]).long(), dim=1, stable=True)
+        alive = self.city_alive[:, row]
+        yt = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        if not bool(alive.any()):
+            return yt.to(self.dtype)
+        # ONE batched walk replaces the RC per-column calls (each a full window
+        # gather + ~30 plane gathers + topk); the per-column ACCUMULATION below
+        # keeps the loop's exact order and association.
+        F, PR, SC, CU, GO, FA = self._seat_city_yields_all(row)
+        ord_ = torch.argsort((~alive).long(), dim=1, stable=True)
         bidx = self._bidx
-        score = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for s in range(self.RC):
             col = ord_[:, s]
-            score = score + (self.city_pop[bidx, 0, col] * self.city_alive[bidx, 0, col].long()).to(self.dtype) * pw
-            t_c = total[bidx, col]
-            for k in range(6):
-                score = score + t_c[:, k] * float(w[k])
-        return score
-
-    def civ_score(self, r: int) -> torch.Tensor:
-        """[B] — the reward-shaping analog of empire_score for civ seat r:
-        pop × popWeight + per-city (food, production, science, culture) dotted
-        with the balanced weights, plus building gold/faith (the only civ-seat
-        sources of those columns in scope). Comparable in scale to
-        empire_score, but see civ_empire_score for the clean mirror."""
-        rd = self.rules_dev
-        w = rd.score_yield_weights
-        B = self.B
-        pop_term = (self.city_pop[:, r + 1] * self.city_alive[:, r + 1].long()).sum(dim=1).to(self.dtype) * self.rules.score_pop_weight
-        yt = torch.zeros(B, dtype=torch.float64, device=self.device)
-        for j in range(self.RC):
-            mask = self.city_alive[:, r + 1, j]
-            if not bool(mask.any()):
-                continue
-            f, pr, sc, cu, _g, _fa = self._seat_city_yields(r, j, mask)
-            yt = yt + f * float(w[0]) + pr * float(w[1]) + sc * float(w[3]) + cu * float(w[4])
-            bgf = self.city_bldg[:, r + 1, j].double() @ rd.b_yields.double()  # [B, 6]
-            yt = yt + bgf[:, 2] * float(w[2]) + bgf[:, 5] * float(w[5])
-        return pop_term + yt.to(self.dtype)
-
-    def civ_empire_score(self, r: int) -> torch.Tensor:
-        """[B] the CLEAN balanced empire score for civ seat r — the exact
-        mirror of empire_score('balanced') (Σcity pop*popWeight +
-        Σ_k yields[k]·balanced_weight over ALL SIX yields, worked+building
-        gold/faith via _seat_city_yields). NOT civ_score (the reward helper).
-        Used for the winner/leader."""
-        rd = self.rules_dev
-        w = rd.score_yield_weights
-        B = self.B
-        pw = float(self.rules.score_pop_weight)
-        # TS association: per city — pop×popWeight FIRST, then the six yields
-        # in key order (empireScore's per-city loop).
-        yt = torch.zeros(B, dtype=torch.float64, device=self.device)
-        if not bool(self.city_alive[:, r + 1].any()):
-            return yt.to(self.dtype)
-        # ONE batched pass replaces the RC per-j _seat_city_yields calls (each
-        # a full window gather + ~30 plane gathers + topk); the per-j
-        # ACCUMULATION below keeps the loop's exact j order and op association
-        # (this sum order is worth a real ±1 ulp). Serves every consumer —
-        # leader() included — through this one body.
-        F, PR, SC, CU, GO, FA = self._seat_city_yields_all(r)
-        for j in range(self.RC):
-            mask = self.city_alive[:, r + 1, j]
-            if not bool(mask.any()):
-                continue
-            yt = yt + (self.city_pop[:, r + 1, j] * self.city_alive[:, r + 1, j].long()).double() * pw
-            yt = yt + F[:, j] * float(w[0]) + PR[:, j] * float(w[1]) + GO[:, j] * float(w[2]) + SC[:, j] * float(w[3]) + CU[:, j] * float(w[4]) + FA[:, j] * float(w[5])
+            yt = yt + (self.city_pop[bidx, row, col] * alive[bidx, col].long()).double() * pw
+            yt = (yt + F[bidx, col] * float(w[0]) + PR[bidx, col] * float(w[1])
+                  + GO[bidx, col] * float(w[2]) + SC[bidx, col] * float(w[3])
+                  + CU[bidx, col] * float(w[4]) + FA[bidx, col] * float(w[5]))
         return yt.to(self.dtype)
 
-    def _seat_city_yields_all(self, r: int, amen_yf: torch.Tensor | None = None) -> tuple[torch.Tensor, ...]:
-        """Civ seat r's six [B, RC] yield channels — THE walk's civ-row call,
-        unpacked as (food, production, science, culture, gold, faith). The
-        economy loop passes its loop-top FROZEN amenity factors; every other
-        caller (trace/leader/civ_score, post-phase) ranks fresh."""
-        yf = amen_yf if amen_yf is not None else self._seat_amenity(r + 1)[2]
-        t = self._seat_city_walk(r + 1, amen_yf=yf)
+    def _seat_city_yields_all(self, row: int, amen_yf: torch.Tensor | None = None) -> tuple[torch.Tensor, ...]:
+        """Seat row `row`'s six [B, RC] yield channels — THE walk, unpacked as
+        (food, production, science, culture, gold, faith). The economy loop
+        passes its loop-top FROZEN amenity factors; every other caller
+        (trace/leader/score, post-phase) ranks fresh."""
+        yf = amen_yf if amen_yf is not None else self._seat_amenity(row)[2]
+        t = self._seat_city_walk(row, amen_yf=yf)
         return t[:, :, 0], t[:, :, 1], t[:, :, 3], t[:, :, 4], t[:, :, 2], t[:, :, 5]
 
     def leader(self) -> torch.Tensor:
@@ -2126,7 +2090,7 @@ class SimEconomy:
         r+1 = civ index r. Ties → lowest id (seat 0 first, then the lowest
         civ index), matching TS's strict-`>` scan — via first_argmax
         (torch.argmax's tie pick is unspecified)."""
-        cols = [self.empire_score()] + [self.civ_empire_score(r) for r in range(self.R)]
+        cols = [self.seat_score(row) for row in range(1 + self.R)]
         return first_argmax(torch.stack(cols, dim=1))
 
     def protagonist(self) -> torch.Tensor:
@@ -2137,10 +2101,9 @@ class SimEconomy:
         horizon, so no single seat's fate invalidates a seed. Read-side
         only: nothing in the simulation consults it, and the wire records
         every seat, so any pick has a complete trajectory to read."""
-        cols = [self.empire_score()] + [self.civ_empire_score(r) for r in range(self.R)]
+        cols = [self.seat_score(row) for row in range(1 + self.R)]
         scores = torch.stack(cols, dim=1)  # [B, 1+R]
-        has_city = torch.stack(
-            [self.city_alive[:, 0].any(dim=1)] + [self.city_alive[:, r + 1].any(dim=1) for r in range(self.R)], dim=1)
+        has_city = self.city_alive[:, : 1 + self.R].any(dim=2)  # [B, 1+R]
         fenced = torch.where(has_city, scores, torch.full_like(scores, float("-inf")))
         pick = torch.where(has_city.any(dim=1), first_argmax(fenced), first_argmax(scores))
         return torch.where(self.winner >= 0, self.winner, pick)

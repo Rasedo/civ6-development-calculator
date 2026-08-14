@@ -173,7 +173,7 @@ class SimSeats:
 
     def apply_seat_actions(
         self,
-        r: int,
+        row: int,
         production: torch.Tensor | None = None,
         tech: torch.Tensor | None = None,
         civic: torch.Tensor | None = None,
@@ -185,8 +185,8 @@ class SimSeats:
         relig: tuple | None = None,  # kinds 5/6: (kind [B], slot [B]) — the religious-unit faith buy
         levy: torch.Tensor | None = None,  # kind 7: CS index to levy (-1 = none)
     ) -> None:
-        """Write a civ seat's choices BEFORE step(). Codes use the seat_masks
-        layout; -1 = no action. Queue writes mirror the picker's exact
+        """Write seat ROW `row`'s choices BEFORE step(). Codes use the
+        seat_masks layout; -1 = no action. Queue writes mirror the picker's exact
         cost/progress semantics (districts run the same placement scan).
 
         `production` [B, RC] is a single code per city. `production_pref`
@@ -205,35 +205,38 @@ class SimSeats:
         if war is not None:
             Rw = max(self.R, 1)
             w = war.to(torch.long)
-            declare = (w == 0) & self.seat_ext[:, r + 1] & self.civ_alive[:, r + 1] & ~self.civ_only_atwar[:, r]
+            # WAR_COLUMN_SEAT: this row's head declares on / sues to seat 0,
+            # so its war cell is war[0, row] and its clocks are indexed by row.
+            atw = self.war[:, 0, row]
+            declare = (w == 0) & self.seat_ext[:, row] & self.civ_alive[:, row] & ~atw
             if bool(declare.any()):
-                self.civ_only_atwar[:, r] = self.civ_only_atwar[:, r] | declare
-                self.war[:, 1 + r, 0] |= declare  # the store IS war[0, 1+r]; this writes the MIRROR cell
-                self.civ_only_warturns[:, r] = torch.where(declare, torch.zeros_like(self.civ_only_warturns[:, r]), self.civ_only_warturns[:, r])
-            # peace costs the civ seat the same schedule every seat pays, out of
-            # civ_only_treasury (the mask prices it; the apply re-validates it).
+                self.war[:, 0, row] |= declare
+                self.war[:, row, 0] |= declare  # the MIRROR cell
+                self.war_turns[:, row] = torch.where(declare, torch.zeros_like(self.war_turns[:, row]), self.war_turns[:, row])
+            # peace costs this row the same schedule every seat pays, out of its
+            # own treasury (the mask prices it; the apply re-validates it).
             sr = self.rules.seats
-            pcost_c = sr.get("peaceGold0", 150) + sr.get("peaceGoldSlope", 10) * self.civ_only_warturns[:, r].to(torch.float64)
+            pcost_c = sr.get("peaceGold0", 150) + sr.get("peaceGoldSlope", 10) * self.war_turns[:, row].to(torch.float64)
             peace = (
-                (w == Rw) & self.seat_ext[:, r + 1] & self.civ_only_atwar[:, r]
-                & (self.civ_only_warturns[:, r] >= sr.get("warMinTurns", 14))
-                & self._afford(self.civ_treasury[:, r + 1], pcost_c)
+                (w == Rw) & self.seat_ext[:, row] & self.war[:, 0, row]
+                & (self.war_turns[:, row] >= sr.get("warMinTurns", 14))
+                & self._afford(self.civ_treasury[:, row], pcost_c)
             )
             if bool(peace.any()):
-                self.civ_treasury[:, r + 1] = torch.where(peace, self.civ_treasury[:, r + 1] - pcost_c, self.civ_treasury[:, r + 1])
-                self.civ_only_atwar[:, r] = self.civ_only_atwar[:, r] & ~peace
-                self._ww_peace(peace, 0, r + 1)  # -2000 on the treaty (the makePeace twin)
-                self._citystate_suzerain_release(r, peace)
-                self.war[:, 1 + r, 0] &= ~peace  # the store IS war[0, 1+r]; this writes the MIRROR cell
-                self.civ_only_warturns[:, r] = torch.where(peace, torch.zeros_like(self.civ_only_warturns[:, r]), self.civ_only_warturns[:, r])
-                self.civ_only_peaceturns[:, r] = torch.where(peace, torch.zeros_like(self.civ_only_peaceturns[:, r]), self.civ_only_peaceturns[:, r])
+                self.civ_treasury[:, row] = torch.where(peace, self.civ_treasury[:, row] - pcost_c, self.civ_treasury[:, row])
+                self.war[:, 0, row] &= ~peace
+                self._ww_peace(peace, 0, row)  # -2000 on the treaty (the makePeace twin)
+                self._citystate_suzerain_release(row, peace)
+                self.war[:, row, 0] &= ~peace  # the MIRROR cell
+                self.war_turns[:, row] = torch.where(peace, torch.zeros_like(self.war_turns[:, row]), self.war_turns[:, row])
+                self.peace_turns[:, row] = torch.where(peace, torch.zeros_like(self.peace_turns[:, row]), self.peace_turns[:, row])
         # everything else STASHES and applies at the RECORD POSITION inside the
-        # seat phase. Every stash is keyed by the ABSOLUTE seat row, so seat 0's
-        # own intents (set by step()) share the dicts and the bodies that drain
+        # seat phase. Every stash is keyed by the seat row, so seat 0's own
+        # intents (set by step()) share the dicts and the bodies that drain
         # them.
-        self._stash_record(r + 1, tech=tech, civic=civic, envoys=envoys,
+        self._stash_record(row, tech=tech, civic=civic, envoys=envoys,
                            production=production, pref=production_pref)
-        self._stash_buy(r + 1, buy=buy, worship=worship, relig=relig, levy=levy)
+        self._stash_buy(row, buy=buy, worship=worship, relig=relig, levy=levy)
 
     def _stash_record(self, row: int, tech=None, civic=None, envoys=None,
                       production=None, pref=None) -> None:
@@ -940,26 +943,21 @@ class SimSeats:
                     self.city_cost[:, row, j] = torch.where(rows_p, pc_a, self.city_cost[:, row, j])
                     self.city_progress[:, row, j] = torch.where(rows_p, torch.zeros_like(self.city_progress[:, row, j]), self.city_progress[:, row, j])
 
-    def _civ_job_mask(self, r: int) -> torch.Tensor:
-        """[B, T] tiles a civ-r builder could work NOW: civ-owned and either
-        BUILDABLE (unimproved, un-districted, not a center — FARM baseline with
-        the hillFarms civic gate, MINE/LUMBER on the civ's unlock techs, and the
-        resource roster QUARRY/PASTURE/CAMP/PLANTATION/OIL_WELL on THEIR unlock
-        techs) or PILLAGED (repair jobs — the pillaged branch consults no
-        validity gates, since pillage implies a live improvement implies land,
-        so no water term is needed). The hasJob twin under the civ's unlocks.
-        Reads LIVE research: both engines decide pre-turn, so no mid-phase
-        snapshot exists to pass."""
-        return self._job_mask_core(self.civ_techs[:, r + 1], self.civ_civics[:, r + 1], self.civ_at == r)
+    def _seat_job_mask(self, row: int) -> torch.Tensor:
+        """[B, T] tiles seat `row`'s builder could work NOW: owned by that seat
+        and either BUILDABLE (unimproved, un-districted, not a center — FARM
+        baseline with the hillFarms civic gate, MINE/LUMBER on the seat's unlock
+        techs, and the resource roster QUARRY/PASTURE/CAMP/PLANTATION/OIL_WELL
+        on THEIR unlock techs) or PILLAGED (repair jobs — the pillaged branch
+        consults no validity gates, since pillage implies a live improvement
+        implies land, so no water term is needed). The hasJob twin under the
+        seat's own unlocks.
 
-    def _seat_job_mask(self, seat: int) -> torch.Tensor:
-        """The ONE builder-job predicate for ANY seat. Seat 0 routes its own
-        planes (owner >= 0, self.civ_techs[:, 0]/self.civ_civics[:, 0]); seats k >= 1 route the
-        r-planes. Both run the SAME _job_mask_core text, so the predicate cannot
-        fork by seat."""
-        if seat >= 1:
-            return self._civ_job_mask(seat - 1)
-        return self._job_mask_core(self.civ_techs[:, 0], self.civ_civics[:, 0], self.owner >= 0)
+        Reads LIVE research: both engines decide pre-turn, so no mid-phase
+        snapshot exists to pass. The OWNERSHIP term is what used to fork —
+        `owner >= 0` for row 0 against `civ_at == r` for a civ — and both are
+        `tile_seat == row`."""
+        return self._job_mask_core(self.civ_techs[:, row], self.civ_civics[:, row], self.tile_seat == row)
 
     def _job_mask_core(self, tk: torch.Tensor, cv: torch.Tensor, owned: torch.Tensor) -> torch.Tensor:
         farm = self.farm_flat | (self.farm_hill & cv[:, self._hillfarms_civic].unsqueeze(1)) if self._hillfarms_civic >= 0 else self.farm_flat
@@ -1245,39 +1243,34 @@ class SimSeats:
         fires = (self.turn % self._congress_interval) == 0
         if not fires:
             return
-        era_ok = self._civ_era(self.civ_techs[:, 0], self.civ_civics[:, 0]) >= self._congress_min_era
-        for r in range(self.R):
-            era_ok = era_ok | (self._civ_era(self.civ_techs[:, r + 1], self.civ_civics[:, r + 1]) >= self._congress_min_era)
+        era_ok = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        for row in range(1 + self.R):
+            era_ok = era_ok | (self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]) >= self._congress_min_era)
         if not bool(era_ok.any()):
             return
         self.congress_sessions.add_(era_ok.long())
         # the ascending scan: strictly-greater keeps the LOWER id on a tie
         best = self.civ_diplo_favor[:, 0].clone()
         win = torch.where(best > 0, torch.zeros_like(best), torch.full_like(best, -1))
-        for r in range(self.R):
-            v = self.civ_diplo_favor[:, r + 1]
+        for row in range(1, 1 + self.R):
+            v = self.civ_diplo_favor[:, row]
             take = (v > 0) & (v > best)
-            win = torch.where(take, torch.full_like(win, r + 1), win)
+            win = torch.where(take, torch.full_like(win, row), win)
             best = torch.where(take, v, best)
         # commitments are spent whether or not they won (only where the
         # session actually convened)
-        self.civ_diplo_favor[:, 0].copy_(torch.where(era_ok, torch.zeros_like(self.civ_diplo_favor[:, 0]), self.civ_diplo_favor[:, 0]))
-        for r in range(self.R):
-            self.civ_diplo_favor[:, r + 1] = torch.where(era_ok, torch.zeros_like(self.civ_diplo_favor[:, r + 1]), self.civ_diplo_favor[:, r + 1])
-        self.civ_diplo_points[:, 0].add_((era_ok & (win == 0)).long() * self._dvp_per_res)
-        for r in range(self.R):
-            self.civ_diplo_points[:, r + 1] = self.civ_diplo_points[:, r + 1] + (era_ok & (win == r + 1)).long() * self._dvp_per_res
+        for row in range(1 + self.R):
+            self.civ_diplo_favor[:, row] = torch.where(era_ok, torch.zeros_like(self.civ_diplo_favor[:, row]), self.civ_diplo_favor[:, row])
+            self.civ_diplo_points[:, row] = self.civ_diplo_points[:, row] + (era_ok & (win == row)).long() * self._dvp_per_res
 
     def _diplomatic_victor(self) -> torch.Tensor:
         """The `diplomaticVictor` mirror: [B] the lowest seat id holding
         >= diploVictoryPoints Diplomatic Victory Points and still holding a
         city; -1 none."""
         winner = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
-        ok = self.city_alive[:, 0].any(dim=1) & (self.civ_diplo_points[:, 0] >= self._dvp_win)
-        winner = torch.where(ok, torch.zeros_like(winner), winner)
-        for r in range(self.R):
-            okr = self.city_alive[:, r + 1].any(dim=1) & (self.civ_diplo_points[:, r + 1] >= self._dvp_win)
-            winner = torch.where((winner < 0) & okr, torch.full_like(winner, r + 1), winner)
+        for row in range(1 + self.R):
+            okr = self.city_alive[:, row].any(dim=1) & (self.civ_diplo_points[:, row] >= self._dvp_win)
+            winner = torch.where((winner < 0) & okr, torch.full_like(winner, row), winner)
         return winner
 
     def _dedication_event(self, civ: int, kind: int, count: torch.Tensor) -> None:
@@ -1317,13 +1310,10 @@ class SimSeats:
         B, dev = self.B, self.device
         n_civs = 1 + self.R
         vis_div = n_civs * self._tourism_per_visitor
-        alive = [self.city_alive[:, 0].any(dim=1)]
-        tour = [self.civ_tourism[:, 0]]
-        cul = [self.civ_culture[:, 0]]
-        for r in range(self.R):
-            alive.append(self.city_alive[:, r + 1].any(dim=1))
-            tour.append(self.civ_tourism[:, r + 1])
-            cul.append(self.civ_culture[:, r + 1])
+        nrow = 1 + self.R
+        alive = [self.city_alive[:, row].any(dim=1) for row in range(nrow)]
+        tour = [self.civ_tourism[:, row] for row in range(nrow)]
+        cul = [self.civ_culture[:, row] for row in range(nrow)]
         visiting = [torch.div(t.long(), vis_div, rounding_mode="floor") for t in tour]
         domestic = [
             torch.div(js_round(c * 1000).long(), 1000 * self._culture_per_tourist, rounding_mode="floor")
@@ -1699,16 +1689,16 @@ class SimSeats:
         breq = self._b_req_district  # [NB]
         return pil[..., breq.clamp(min=0)] & (breq >= 0)  # [..., NB]
 
-    def _seat_city_yields(self, r: int, j: int, mask: torch.Tensor, amen_yf: torch.Tensor | None = None) -> tuple[torch.Tensor, ...]:
-        """ONE COLUMN of THE walk for civ seat r — the economy loop's mid-phase
-        per-city pass, which reads state the batched call could not have seen
-        (an earlier column's completion, claim or purchase). Returns (food,
-        production, science, culture, gold, faith), each [B], zeroed outside
-        `mask` — the post-buy ACTIVE snapshot, a subset of alive, which the
-        walk has already masked against. amen_yf is the loop's FROZEN factor
-        for this column."""
-        yf = amen_yf.unsqueeze(1) if amen_yf is not None else self._seat_amenity(r + 1)[2][:, j:j + 1]
-        t = self._seat_city_walk(r + 1, j, amen_yf=yf)[:, 0]  # [B, 6]
+    def _seat_city_yields(self, row: int, j: int, mask: torch.Tensor, amen_yf: torch.Tensor | None = None) -> tuple[torch.Tensor, ...]:
+        """ONE COLUMN of THE walk for seat row `row` — the economy loop's
+        mid-phase per-city pass, which reads state the batched call could not
+        have seen (an earlier column's completion, claim or purchase). Returns
+        (food, production, science, culture, gold, faith), each [B], zeroed
+        outside `mask` — the post-buy ACTIVE snapshot, a subset of alive, which
+        the walk has already masked against. amen_yf is the loop's FROZEN
+        factor for this column."""
+        yf = amen_yf.unsqueeze(1) if amen_yf is not None else self._seat_amenity(row)[2][:, j:j + 1]
+        t = self._seat_city_walk(row, j, amen_yf=yf)[:, 0]  # [B, 6]
         z = torch.zeros_like(t[:, 0])
         return (
             torch.where(mask, t[:, 0], z),
@@ -2965,17 +2955,24 @@ class SimSeats:
         war_c = civ_c & self._seats_hostile(seat, c_seat)
         return war_m, war_c
 
-    def _war_march_target(self, hc: torch.Tensor, ac: torch.Tensor, hp: torch.Tensor):
-        """The war-march DESTINATION for units at `hc` of civs `ac` (hp = at war
-        with seat 0) — the nearest unpillaged enemy improvement or complete
-        district within 13, else the nearest enemy city, with seat 0 winning
-        ties and distance ties breaking on the founding sequence.
+    def _war_march_target(self, hc: torch.Tensor, row: int):
+        """The war-march DESTINATION for seat `row`'s units standing at `hc` —
+        the nearest unpillaged enemy improvement or complete district within 13,
+        else the nearest enemy city, with seat 0 winning ties and distance ties
+        breaking on the founding sequence.
 
-        ONE implementation shared by the per-unit OBSERVATION and the scripted
-        picker; separate copies would drift.
+        The row indexes the war matrix directly, so who this seat fights is read
+        here rather than passed in: `hp` (at war with seat 0) is one cell of the
+        row, and the enemy-city walk reads the rest of it. Row 0 finds `hp`
+        false on its own diagonal and marches to at-war civs' cities alone,
+        which is what "seat 0 owns the improvements" means.
+
+        ONE implementation shared by the per-unit OBSERVATION and the driver;
+        separate copies would drift.
         Returns (tgt, has_imp, has_pc, has_rc).
         """
         B, T, dev = self.B, self.T, self.device
+        hp = self.war[:, row, 0]
         arangeT = torch.arange(T, device=dev)
         # the improvement/district march targets SEAT-0 tiles only while at war
         # with seat 0 (hp) — a civ at war only with other civs heads for their
@@ -2995,30 +2992,31 @@ class SimSeats:
         dc = self.pair_dist[hc.unsqueeze(1), self.city_center[:, 0].clamp(min=0)].to(torch.long)
         # Distance ties break by the FOUNDING sequence (TS array order), NOT the
         # slot index — the same rule the barbarian twin uses.
-        # Seat-0 cities are march targets only at war with seat 0 (hp); a civ
+        # Seat-0 cities are march targets only at war with seat 0 (hp); a seat
         # ALSO marches to its at-war ENEMY civs' cities (key
-        # d*16384 + civIdx*2048 + centerTile), with seat 0 winning ties.
+        # d*32768 + seatRow*2048 + centerTile — the ordering TS walks, distance
+        # then seat then centre), with seat 0 winning ties.
         ckey = torch.where(self.city_alive[:, 0] & hpT, dc * 4096 + torch.arange(self.RC, device=self.device), 10**9)
         city_min = ckey.min(dim=1).values
         pc_dist = torch.div(city_min, 4096, rounding_mode="floor")  # seat-0 city distance (1e9//4096 stays huge)
         city_tgt = self.city_center[:, 0].gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
         civ_city_key_min = torch.full((B,), 10**18, dtype=torch.long, device=dev)
         civ_city_tgt = hc.clone()
-        for r2 in range(self.R):
-            war2 = self.civ_pair_war[torch.arange(B, device=dev), ac, r2]  # [B]; diagonal false -> r2==ac safe
+        for row2 in range(1, 1 + self.R):
+            war2 = self.war[:, row, row2]  # [B]; the diagonal is false, so row2 == row is safe
             if not bool(war2.any()):
                 continue
             for j in range(self.RC):
-                ct2 = self.city_center[:, r2 + 1, j].clamp(min=0)
-                alive2 = self.city_alive[:, r2 + 1, j] & war2
+                ct2 = self.city_center[:, row2, j].clamp(min=0)
+                alive2 = self.city_alive[:, row2, j] & war2
                 d2 = self.pair_dist[hc, ct2].to(torch.long)
-                key2 = torch.where(alive2, d2 * (2048 * 8) + r2 * 2048 + ct2, torch.full_like(d2, 10**18))
+                key2 = torch.where(alive2, d2 * (2048 * 16) + row2 * 2048 + ct2, torch.full_like(d2, 10**18))
                 upd = key2 < civ_city_key_min
                 civ_city_key_min = torch.where(upd, key2, civ_city_key_min)
                 civ_city_tgt = torch.where(upd, ct2, civ_city_tgt)
         has_pc = city_min < 10**9
         has_rc = civ_city_key_min < 10**18
-        civ_city_dist = torch.div(civ_city_key_min, 2048 * 8, rounding_mode="floor")
+        civ_city_dist = torch.div(civ_city_key_min, 2048 * 16, rounding_mode="floor")
         # seat 0 wins ties (pc_dist <= civ_city_dist); else the nearest enemy civ city
         city_target = torch.where(has_pc & (~has_rc | (pc_dist <= civ_city_dist)), city_tgt, civ_city_tgt)
         tgt = torch.where(has_imp, imp_tgt, city_target)
@@ -3753,7 +3751,7 @@ class SimSeats:
         any_met = active & met_live.any(dim=1)
         if not bool(any_met.any()):
             return
-        civics = self.civ_civics[:, 0] if row == 0 else self.civ_civics[:, row]
+        civics = self.civ_civics[:, row]
         pt = torch.full((B,), float(rr.get("influencePerTurn", 3)), dtype=torch.float64, device=dev)
         if self._gov_live:
             pt = pt + self._adopted_gov_tier(civics).double()
@@ -4097,17 +4095,26 @@ class SimSeats:
         pair_ok = self.city_alive[:, a + 1].unsqueeze(2) & self.city_alive[:, b + 1].unsqueeze(1)
         return torch.where(pair_ok, d_ab, 999).reshape(B, -1).min(dim=1).values
 
-    def apply_geo(self, r: int, denounce: torch.Tensor | None = None,
+    def apply_geo(self, row: int, denounce: torch.Tensor | None = None,
                   ally: torch.Tensor | None = None,
                   civ_pair_war: torch.Tensor | None = None,
                   civ_pair_peace: torch.Tensor | None = None) -> None:
-        """Stash civ r's GEOPOLITICS intents for this turn, consumed at
+        """Stash seat `row`'s GEOPOLITICS intents for this turn, consumed at
         the phase's own pass positions (_geo_denounce_and_ally and
         _geo_declare_wars at the phase top, _geo_make_peace at the tail) and
         re-validated there. denounce/ally/civ_pair_peace are [B, R] bool target
         masks; civ_pair_war is [B] long (the one target civ, -1 = none). ally and
         civ_pair_peace name a PAIR — the driver emits them on the LOWER civ
-        index's record; the arm writes both sides either way."""
+        index's record; the arm writes both sides either way.
+
+        Callers speak rows; the CIV-PAIR conversion is this one line, because
+        `civ_pair_denounced` / `civ_pair_allied` / `civ_pair_warkind` are
+        [B, R, R] planes with NO seat-0 row — civ<->civ diplomacy is a space
+        seat 0 cannot enter. The fix is seat-PAIR planes over the whole war
+        matrix, with the war head (#111 s5); until then this is where the two
+        index spaces meet, and nowhere else.
+        """
+        r = row - 1
         if denounce is not None:
             if getattr(self, "_driven_denounce", None) is None:
                 self._driven_denounce = {}

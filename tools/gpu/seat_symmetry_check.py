@@ -50,32 +50,14 @@ FORK_ALLOW = {
     # --- WIRE LIMITS, named ------------------------------------------------
     ("env.py", "step"): "#108 — row 0's action interface + unit-order replay position",
     # --- BURN-DOWN (#111). Delete the entry with the stage that closes it. --
-    ("env.py", "_seat_civ"): "#111 s2 — the civ-index API this maps into",
-    ("sim_economy.py", "_citystate_suzerain_release"): "#111 s2 — takes a civ index",
-    ("sim_economy.py", "_seat_city_yields_all"): "#111 s2 — takes a civ index",
-    ("sim_seats.py", "_seat_city_yields"): "#111 s2 — takes a civ index",
-    ("sim_seats.py", "apply_seat_actions"): "#111 s2 — takes a civ index",
-    ("sim_seats.py", "_civ_pair_strengths"): "#111 s2 — civ-pair loop over civ indices",
-    ("sim_seats.py", "_world_congress"): "#111 s2 — civ-index loop",
-    ("sim_seats.py", "_diplomatic_victor"): "#111 s2 — civ-index loop",
-    ("sim_seats.py", "_culture_victor"): "#111 s2 — civ-index loop",
-    ("sim_seats.py", "_civ_job_mask"): "#111 s3 — dies with _seat_job_mask",
-    ("sim_economy.py", "civ_score"): "#111 s4 — folds into seat_score(row)",
-    ("sim_economy.py", "civ_empire_score"): "#111 s4 — folds into seat_score(row)",
-    ("sim_economy.py", "protagonist"): "#111 s4 — civ-index loop",
-    ("sim_phase.py", "_check_rc_registry_invariant"): "#111 s2 — civ-index loop",
-    ("drive.py", "take_seat"): "#111 s2 — takes a civ index",
-    ("drive.py", "replay_seat"): "#111 s2 — takes a civ index",
-    ("drive.py", "_centre_slot"): "#111 s2 — takes a civ index",
-    ("sim_phase.py", "_seat_phase"): "#111 s2 — the civ loop's r+1 lifts",
-    ("drive.py", "_blocks"): "#111 s2 — takes a civ index",
-    ("drive.py", "_decide_turn"): "#111 s2 — civ-index loop",
-    ("drive.py", "_extract_record"): "#111 s2 — takes a civ index",
-    ("drive.py", "_geo_turn"): "#111 s2 — civ-pair loop over civ indices",
+    ("sim_seats.py", "_civ_pair_strengths"): "#111 s5 — civ-pair planes have no seat-0 row",
+    ("sim_seats.py", "_civ_pair_proximity"): "#111 s5 — civ-pair planes have no seat-0 row",
+    ("drive.py", "_geo_turn"): "#111 s5 — civ-pair planes have no seat-0 row",
+    ("sim_seats.py", "apply_geo"): "#111 s5 — the ONE row->civ-pair conversion",
+    ("drive.py", "geo_decide_and_apply"): "#111 s5 — civ-pair planes have no seat-0 row",
+    ("drive.py", "_extract_geo"): "#111 s5 — the record's civ-pair targets",
     ("drive.py", "_buy_ctx"): "#111 s3 — the civ_only_alive liveness fork",
     ("sim_phase.py", "_seat_belief_claims"): "#111 s3 — the holy-tile city-plane fork",
-    ("sim_seats.py", "_seat_influence_phase"): "#111 s3 — the civics alias fork",
-    ("sim_seats.py", "_seat_job_mask"): "#111 s3 — routes row 0 to _civ_job_mask",
     ("sim_masks.py", "_encamp_block_plane"): "#111 s3 — the seat-0 hostility fast path",
     ("sim_init.py", "__init__"): "#111 s3 — the fixture load skips seat 0",
     ("sim_economy.py", "_place_works"): "#111 s3 — the wonder-slot source + dtype forks",
@@ -191,6 +173,20 @@ def _loop_bound_strings(var: str, loops: list[ast.For], tables: dict[str, object
             if isinstance(v, str):
                 got.add(v)
     return got
+
+
+def enclosing_for(scope: ast.AST, node: ast.AST) -> list[ast.For]:
+    """The `for` statements wrapping `node` inside `scope`, innermost first."""
+    parent: dict[int, ast.AST] = {}
+    for p in ast.walk(scope):
+        for c in ast.iter_child_nodes(p):
+            parent[id(c)] = p
+    out, cur = [], parent.get(id(node))
+    while cur is not None:
+        if isinstance(cur, ast.For):
+            out.append(cur)
+        cur = parent.get(id(cur))
+    return out
 
 
 def defined_attrs() -> tuple[set[str], list[str], set[str]]:
@@ -399,6 +395,28 @@ def unresolved_reads(known: set[str], shapes: list[str]) -> list[tuple[str, int,
                 hit = (str(path.relative_to(ROOT)), node.lineno, f"{node.value.id}.{a}")
                 if hit not in bad:
                     bad.append(hit)
+            # `getattr(self, "x")` and `for name in ("a", "b"): getattr(self,
+            # name)` read attributes the dotted scan cannot see — which is how
+            # two planes deleted by the alias purge kept a live reader.
+            for node in [x for b in body for x in ast.walk(b)]:
+                if not (isinstance(node, ast.Call) and _callee(node) == "getattr"):
+                    continue
+                if not (node.args and isinstance(node.args[0], ast.Name) and node.args[0].id in recv):
+                    continue
+                if len(node.args) > 2:
+                    continue  # a default makes the read total
+                names: set[str] = set()
+                key = node.args[1] if len(node.args) > 1 else None
+                if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                    names.add(key.value)
+                elif isinstance(key, ast.Name):
+                    names |= _loop_bound_strings(key.id, enclosing_for(fn, node), {})
+                for a in names:
+                    if a in known or a.startswith("__") or any(rx.match(a) for rx in shape_res):
+                        continue
+                    hit = (str(path.relative_to(ROOT)), node.lineno, f"getattr(…, {a!r})")
+                    if hit not in bad:
+                        bad.append(hit)
     return sorted(set(bad))
 
 

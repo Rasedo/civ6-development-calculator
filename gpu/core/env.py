@@ -59,7 +59,7 @@ class BatchEnv:
         # it would optimize turns the scoreboard never sees.
         self.horizon = int(rules.turn_limit) if horizon is None else horizon
         self._episode = 0
-        self._last_score = self.sim.empire_score()
+        self._score_prev: dict[int, torch.Tensor] = {}
         s = self.sim
         # odd-r offset → axial, for hex distances in unit features
         t = torch.arange(s.T, device=s.device)
@@ -83,22 +83,17 @@ class BatchEnv:
             h = hash_keys(scramble, torch.arange(s.B, dtype=torch.int64), self._episode)
             s.rng_state.copy_((h & _M32).to(s.rng_state.dtype).to(s.device))
             self._episode += 1
-        self._last_score = self.sim.empire_score()
+        self._score_prev.clear()
         return self.observe()
 
-    def _seat_civ(self, seat: int) -> int:
-        """Seat k>0 -> civ index k-1, for the interfaces that still speak civ
-        indices (apply_seat_actions, civ_score)."""
-        r = seat - 1
-        if r < 0 or r >= self.sim.R:
-            raise ValueError(f"seat {seat} out of range (O = {self.sim.R + 1})")
-        return r
-
     def _row(self, seat: int) -> int:
-        """The seat's ROW in the merged planes — 0 for seat 0, r+1 for civ r,
-        which is also its index in the war matrix. Every mask and observation
-        body below takes this and nothing else."""
-        return 0 if seat == 0 else self._seat_civ(seat) + 1
+        """A major's SEAT ID IS ITS ROW in every merged plane — seat 0 is row 0
+        and civ r is seat r+1 is row r+1 — which is also its index in the war
+        matrix. All this does is bounds-check; the engine speaks rows and
+        nothing below converts."""
+        if not 0 <= seat <= self.sim.R:
+            raise ValueError(f"seat {seat} out of range (O = {self.sim.R + 1})")
+        return seat
 
     def masks(self, seat: int = 0) -> dict[str, torch.Tensor]:
         """The seat's decision space: production [B, C, NB+2+NU], tech [B, NT],
@@ -132,28 +127,30 @@ class BatchEnv:
         seat: int = 0,
     ) -> tuple[torch.Tensor, torch.Tensor, bool]:
         """Returns (obs [B, F], reward [B], done). done is batch-wide —
-        lockstep fixed-horizon episodes; the caller resets. Seat k>0: the
-        actions route into that civ seat BEFORE the world steps, and the reward
-        is that seat's score delta."""
-        if seat != 0:
-            r = self._seat_civ(seat)
-            self.sim.seat_ext[:, r + 1] = True
-            self.sim.apply_seat_actions(r, production=production, tech=tech, civic=civic, war=war)
+        lockstep fixed-horizon episodes; the caller resets. The reward is THIS
+        seat's `seat_score` delta, one body for every row.
+
+        The one seat-0 distinction left in this file is the ACTION INTERFACE
+        (#108): row 0's triples ride `step()` and apply pre-turn, a civ's rows
+        apply in-phase. TS carries the same fork, and closing it is wire work.
+        """
+        row = self._row(seat)
+        prev = self._score_prev.get(row)
+        if prev is None:
+            prev = self.sim.seat_score(row)
+        if row != 0:
+            self.sim.seat_ext[:, row] = True
+            self.sim.apply_seat_actions(row, production=production, tech=tech,
+                                        civic=civic, war=war, envoys=envoy)
             if units is not None:
-                self.sim._apply_seat_unit_actions(r + 1, units)
-            prev = getattr(self, "_last_civ_score", None)
-            if prev is None or prev.get("r") != r:
-                prev = {"r": r, "score": self.sim.civ_score(r)}
+                self.sim._apply_seat_unit_actions(row, units)
             self.sim.step()
-            score = self.sim.civ_score(r)
-            reward = score - prev["score"]
-            self._last_civ_score = {"r": r, "score": score}
-            return self.observe(seat), reward, self.sim.turn > self.horizon
-        self.sim.step(production=production, tech=tech, civic=civic, units=units, envoy=envoy, war=war)
-        score = self.sim.empire_score()
-        reward = score - self._last_score
-        self._last_score = score
-        return self.observe(seat), reward, self.sim.turn > self.horizon
+        else:
+            self.sim.step(production=production, tech=tech, civic=civic,
+                          units=units, envoy=envoy, war=war)
+        score = self.sim.seat_score(row)
+        self._score_prev[row] = score
+        return self.observe(seat), score - prev, self.sim.turn > self.horizon
 
     def _escalators(self, techs, civics, builders, settler_cost) -> list:
         """The three production costs that ESCALATE with a seat's own state —

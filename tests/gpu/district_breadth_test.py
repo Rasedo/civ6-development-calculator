@@ -392,9 +392,9 @@ def poke_civ_palace(rules, rj, path):
     one = torch.ones(sim.B, dtype=torch.float64)
     mask = sim.city_alive[:, r + 1, j]
 
-    y_cap = sim._seat_city_yields(r, j, mask, amen_yf=one)  # (food,prod,sci,cul,gold,faith)
+    y_cap = sim._seat_city_yields(r + 1, j, mask, amen_yf=one)  # (food,prod,sci,cul,gold,faith)
     sim.city_is_cap[0, r + 1, j] = False
-    y_non = sim._seat_city_yields(r, j, mask, amen_yf=one)
+    y_non = sim._seat_city_yields(r + 1, j, mask, amen_yf=one)
     sim.city_is_cap[0, r + 1, j] = True
     diff = [float(y_cap[k][0] - y_non[k][0]) for k in range(6)]
     # return order: food, prod, sci, cul, gold, faith
@@ -402,10 +402,10 @@ def poke_civ_palace(rules, rj, path):
 
     # per-j path == the batched twin, column-for-column, on the poked state
     af = sim._seat_amenity(r + 1)[2]  # [B, RC]
-    allc = sim._seat_city_yields_all(r, amen_yf=af)  # 6 x [B, RC]
+    allc = sim._seat_city_yields_all(r + 1, amen_yf=af)  # 6 x [B, RC]
     for jj in sim.city_alive[0, r + 1].nonzero(as_tuple=True)[0].tolist():
         m = sim.city_alive[:, r + 1, jj]
-        pj = sim._seat_city_yields(r, jj, m, amen_yf=af[:, jj])
+        pj = sim._seat_city_yields(r + 1, jj, m, amen_yf=af[:, jj])
         for k in range(6):
             a, b = float(pj[k][0]), float(allc[k][0, jj])
             assert abs(a - b) < 1e-9, f"per-j vs batched twin disagree (city {jj}, col {k}): {a} != {b}"

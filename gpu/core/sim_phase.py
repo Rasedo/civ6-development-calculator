@@ -54,10 +54,11 @@ class SimPhase:
         # THE SEAT LOOP — state.seats in id order, seat 0 first, ONE body per
         # row. All that is left outside _seat_row is the driven unit-sequence
         # REPLAY: row 0's unit orders ride the triples schema and replay in the
-        # order phase, a civ's ride per-unit rows and replay here (#108).
-        self._seat_row(0)
-        for r in range(self.R):
-            active = self._seat_row(r + 1)
+        # order phase, a civ's ride per-unit rows and replay here (#108) — so
+        # row 0 simply never has a `_driven_useq` entry and the block below is
+        # a no-op on it. No branch encodes that; the stash key does.
+        for row in range(1 + self.R):
+            active = self._seat_row(row)
             if not bool(active.any()):
                 continue
 
@@ -74,7 +75,7 @@ class SimPhase:
             # at war with ANYONE takes the WAR branch, whose act scans every
             # at-war seat's units and cities. The counters this branch used to
             # carry now ride _seat_war_peace_tail, inside the seat's own block.
-            atw_any = active & self.war[:, r + 1, :1 + self.R].any(dim=1)
+            atw_any = active & self.war[:, row, :1 + self.R].any(dim=1)
             # This seat's live slots, computed once (deaths only shrink
             # mid-loop; neither loop spawns) — the war AND peace walks reuse it.
             # Replayed unit acts fire HERE, at the walkers' own position in the
@@ -83,18 +84,18 @@ class SimPhase:
             # in-phase replay. Draw-free actions (production/tech/civic) stay
             # pre-step. War rows here, peace rows at the peace loop below.
             _dsq = getattr(self, "_driven_useq", None)
-            if _dsq is not None and r in _dsq:
-                _rows_w = atw_any & self.seat_ext[:, r + 1]
+            if _dsq is not None and row in _dsq:
+                _rows_w = atw_any & self.seat_ext[:, row]
                 if bool(_rows_w.any()):
-                    _ord_w = torch.where(_rows_w.view(-1, 1, 1), _dsq[r], torch.full_like(_dsq[r], -1))
-                    self.apply_seat_unit_sequence(r + 1, _ord_w)
+                    _ord_w = torch.where(_rows_w.view(-1, 1, 1), _dsq[row], torch.full_like(_dsq[row], -1))
+                    self.apply_seat_unit_sequence(row, _ord_w)
             # Suing for peace rides the wire's war verb.
             pea = active & ~atw_any  # a seat at ANY war neither patrols nor rolls the seat-0 declaration
-            if _dsq is not None and r in _dsq:
-                _rows_p = pea & self.seat_ext[:, r + 1]
+            if _dsq is not None and row in _dsq:
+                _rows_p = pea & self.seat_ext[:, row]
                 if bool(_rows_p.any()):
-                    _ord_p = torch.where(_rows_p.view(-1, 1, 1), _dsq[r], torch.full_like(_dsq[r], -1))
-                    self.apply_seat_unit_sequence(r + 1, _ord_p)
+                    _ord_p = torch.where(_rows_p.view(-1, 1, 1), _dsq[row], torch.full_like(_dsq[row], -1))
+                    self.apply_seat_unit_sequence(row, _ord_p)
             # War declarations arrive on the wire.
 
         # Drop the route-income cache at phase end: its key
@@ -1119,40 +1120,38 @@ class SimPhase:
         Env-gated via self._civ_city_reg_check, so it costs nothing on the hot path
         when off. Two directions of the tile_city contract:
 
-          (1) FORWARD: every district tile (civ_city_dist_tile) and wonder tile
-              (civ_city_wonder) an rc lists registers BACK to that rc — its
-              tile_city equals civ_city_id (a district/wonder sits on a tile owned
+          (1) FORWARD: every district tile (city_dist_tile) and wonder tile
+              (city_wonder) a city lists registers BACK to that city — its
+              tile_city equals city_id (a district/wonder sits on a tile owned
               by THAT city). A tile registered to a SIBLING fails here.
-          (2) BACKWARD: every populated registry cell points at a tile whose
-              civ_at is a live civ (no dangling index into re-owned/razed
-              land). The registry never lists a tile it does not own.
+          (2) BACKWARD: every populated registry cell points at a tile this row
+              still owns (no dangling index into re-owned/razed land). The
+              registry never lists a tile it does not own.
 
-        Raises AssertionError naming (game, civ, slot, kind, di/wi, tile,
+        Raises AssertionError naming (game, seat, slot, kind, di/wi, tile,
         expected id, actual tile_city) on the first violation."""
-        if self.R == 0:
-            return
         B = self.B
-        for r in range(self.R):
-            expect = self.city_id[:, r + 1].unsqueeze(2)  # [B, RC, 1] this rc's id
-            alive = self.city_alive[:, r + 1].unsqueeze(2)  # [B, RC, 1]
-            for name in ("civ_city_dist_tile", "civ_city_wonder"):
-                reg = getattr(self, name)[:, r]  # [B, RC, K] tile per (city, type/slot)
+        for row in range(1 + self.R):
+            expect = self.city_id[:, row].unsqueeze(2)  # [B, RC, 1] this city's id
+            alive = self.city_alive[:, row].unsqueeze(2)  # [B, RC, 1]
+            for name in ("city_dist_tile", "city_wonder"):
+                reg = getattr(self, name)[:, row]  # [B, RC, K] tile per (city, type/slot)
                 has = (reg >= 0) & alive
                 if not bool(has.any()):
                     continue
                 # tile_city at the listed tile, per cell
                 rt = self.tile_city.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape_as(reg)  # [B, RC, K]
-                ra = self.civ_at.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape_as(reg)
+                ra = self.tile_seat.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape_as(reg)
                 bad_fwd = has & (rt != expect)  # (1) registers to a sibling / no one
-                bad_bwd = has & (ra < 0)        # (2) tile no longer civ-owned
+                bad_bwd = has & (ra != row)     # (2) tile no longer owned by this seat
                 bad = bad_fwd | bad_bwd
                 if bool(bad.any()):
                     idx = bad.nonzero(as_tuple=False)[0]
                     b, j, k = int(idx[0]), int(idx[1]), int(idx[2])
                     tile = int(reg[b, j, k])
                     raise AssertionError(
-                        f"A-24 registry incoherence: game={b} civ={r} slot={j} "
-                        f"{name}[{k}] tile={tile} expected_id={int(self.city_id[b, r + 1, j])} "
-                        f"actual_rc_tile_id={int(self.tile_city[b, tile])} "
-                        f"civ_at={int(self.civ_at[b, tile])} turn={self.turn}"
+                        f"A-24 registry incoherence: game={b} seat={row} slot={j} "
+                        f"{name}[{k}] tile={tile} expected_id={int(self.city_id[b, row, j])} "
+                        f"actual_city_tile_id={int(self.tile_city[b, tile])} "
+                        f"tile_seat={int(self.tile_seat[b, tile])} turn={self.turn}"
                     )
