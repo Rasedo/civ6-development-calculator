@@ -645,12 +645,35 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   drops `pcty`: `_assault_city` has been one body since the city-assault
   merge and NEITHER engine issues that key.
 
-- **A-46. `_theological_combat` was a mirror of a rule TS does not have.**
-  The GPU body walked every APOSTLE slot resolving religious combat; it had
-  no caller, and `theologicalCombat` does not exist in `cpu/` at all (only
-  the data — `religiousStrength`, the martyr-relic prose — survives).
-  Deleted. Theological combat is now recorded as a B-side gap on BOTH
-  engines rather than as GPU machinery pretending to mirror something.
+- **A-46. THEOLOGICAL COMBAT was a MODELLED rule that lost its home — it is
+  a phase now, on every seat.** Both engines had it and it was hunted to
+  parity (`src/core/rivals.ts:theologicalCombat` against the GPU's
+  `_theological_combat`; the B-18 defender pick was moved from unit id to
+  ARRAY order to close a real divergence). It fired inside the SCRIPTED
+  missionary pass, which stood down for a driven seat on both sides —
+  TS `if (!recU) rivalMissionaryActions(...)`, GPU `active & ~controlled`.
+  Once the wire owned every decision the pass never ran again, and the
+  restructure deleted TS's body along with `rivals.ts`; the GPU's survived
+  as an orphan with no caller.
+
+  It is restored as an eager RULE, `theologicalCombatPhase(state)` /
+  `_theological_combat_phase()`, at ONE schedule position on both engines:
+  after every seat's turn, before the pressure spread reads the swing. That
+  is deliberate — the fight was never a choice, so it needs no wire column,
+  and a phase belongs to no seat and inherits no replay-position fork. Two
+  things change against the old behaviour, both in the merge's direction:
+  **it runs for EVERY seat now** (the scripted version was civ-seats-only,
+  which was itself a seat-0 distinction), and it runs for DRIVEN seats,
+  which is all of them.
+
+  It stays ZERO-DRAW (damage is the religious-strength difference, no RNG
+  multiplier), so its position cannot move the stream — but deaths, relics
+  and the pressure swing are all live state. **BEHAVIOUR CHANGE,
+  hunt-watch: this is a mechanic switching from OFF to ON.**
+
+  Reachability first: it needs two adjacent religious units of different
+  religions, so measure whether the gate reaches it at all before reading
+  anything into a green run.
 
 - **A-47. THE t0 TILE-OWNERSHIP PAIR (`ownerSeatInit` / `ownerInit`),
   fixture FORMAT 3.** `planes.ts` exported `tileSeat(t) === 0 ? tileCity(t)
@@ -762,15 +785,16 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   ~14× tourism gap (B-20r).
 - **B-26r. Barbarian camp-spawn escalation** beyond the melee ladder
   (cliffs, ranged barbs and naval barbs all landed).
-- **B-27r. THEOLOGICAL COMBAT is absent from BOTH engines.** Real Civ 6
-  resolves religious combat between apostles/missionaries on religious
-  strength, and the loser dies; ours never fights — a religious unit is
-  only ever killed by ordinary combat or by expiry. The data is all
-  present and inert (`religiousStrength` on the roster, the martyr-relic
-  rule in greatPeople.ts, the relic/tourism constants), so this is a
-  missing RESOLVER, not a missing model. Recorded on A-46's deletion of the
-  GPU's caller-less mirror: until TS grows the rule there is nothing for
-  the GPU to mirror.
+- **B-27r. THEOLOGICAL COMBAT — LIVE again (A-46), with three recorded
+  simplifications.** The resolver is back on both engines as a phase.
+  What still deviates from real Civ 6: (1) it is DETERMINISTIC — real Civ 6
+  rolls, ours takes theoBaseDamage plus the strength difference with no RNG
+  multiplier, because a conditional draw would have to be mirrored
+  draw-for-draw across engines; (2) only APOSTLES initiate — real Civ 6 also
+  allows Inquisitors, which we do not model; (3) promotions are unmodeled, so
+  EVERY fallen apostle martyrs into a relic where real Civ 6 needs the MARTYR
+  promotion — a recorded OVERSTATEMENT of relic frequency (see the RELIC_*
+  comment in data/greatPeople).
 
 - **B-D. UNSOURCED DATA VALUES — a residual class, not one item.**
   Mechanics are sourced item by item; the DATA layer largely is not:
@@ -880,6 +904,13 @@ Landed behind the compile bar only, in dependency order of suspicion:
        every GPU world. The first serve run is the first thing that can
        see it; if CS tiles read empty at t0 on the GPU, the pair is not
        reaching `tile_seat`.
+   (e) **THEOLOGICAL COMBAT is ON (A-46)** — a mechanic switching from
+       inert to live, on every seat, at a new schedule position between
+       the seat loop and the pressure spread. Zero-draw, so the stream
+       cannot move; deaths, relics and the pressure swing can. MEASURE
+       REACHABILITY FIRST: it needs two adjacent religious units of
+       different religions, and a gate that never puts two apostles side
+       by side proves nothing about it.
 
 Hunt discipline: scripted-reachability first (the digest gate names the
 turn), checkpoint-bracket from the nearest earlier checkpoint, full

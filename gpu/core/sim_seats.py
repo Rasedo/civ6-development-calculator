@@ -1039,6 +1039,137 @@ class SimSeats:
         adj = (host[:, nb] & (self.neigh >= 0).unsqueeze(0)).any(dim=2)
         return base & adj
 
+    def _theological_combat_phase(self) -> None:
+        """THEOLOGICAL COMBAT — ONE pass, every seat, at one schedule position.
+
+        The `theologicalCombatPhase` twin. Only an APOSTLE initiates, and only
+        against an ADJACENT religious unit of a DIFFERENT religion (religion id
+        == the founding seat, so the test is a seat compare). Both sides take
+        theoBaseDamage plus the religious-strength difference scaled by
+        theoDamage, floored at 1; a unit at 0 HP dies; the loser's religion
+        sheds theoPressureSwing in every city within theoPressureRange of the
+        fallen unit while the winner's gains it. ZERO-DRAW by construction, so
+        this pass cannot move the RNG stream.
+
+        ORDER: slot order for the attacker walk AND the defender pick — the
+        twin of TS's `state.units` array order. A dead attacker (killed earlier
+        in this same pass, as somebody's defender) is skipped by `alive`.
+
+        It is a PHASE, not a verb: the fight was never a choice. It used to
+        live inside the scripted missionary walk on both engines, which ran
+        only for civ seats and only while that seat was undriven — when the
+        wire took every decision both copies went inert together. Here it
+        belongs to no seat and inherits no replay-position fork.
+        """
+        if self._apostle_idx < 0 or not self.units_mode:
+            return
+        U = self.major_unit_alive.shape[1]
+        rs = self._rel_strength
+        nrow = 1 + self.R
+        sw = int(self._theo_swing)
+        for u in range(U):
+            att = self.major_unit_alive[:, u] & (self.major_unit_type[:, u] == self._apostle_idx)
+            if not bool(att.any()):
+                continue
+            a_seat = self.major_unit_seat[:, u]
+            a_str = rs[self.major_unit_type[:, u].clamp(min=0)]
+            d = self.pair_dist[self.major_unit_tile[:, u].clamp(min=0).unsqueeze(1),
+                               self.major_unit_tile.clamp(min=0)]  # [B, U]
+            elig = (
+                self.major_unit_alive & (d == 1)
+                & (self.major_unit_seat != a_seat.unsqueeze(1))
+                & (rs[self.major_unit_type.clamp(min=0)] > 0)
+            ) & att.unsqueeze(1)
+            if not bool(elig.any()):
+                continue
+            first = elig & (elig.long().cumsum(dim=1) == 1)  # lowest slot = TS array order
+            rows = first.any(dim=1).nonzero(as_tuple=True)[0]
+            if rows.numel() == 0:
+                continue
+            j = first.long().argmax(dim=1)
+            d_str = (rs[self.major_unit_type.clamp(min=0)] * first.long()).sum(dim=1)
+            to_def = (self._theo_base + self._theo_dmg * (a_str - d_str)).clamp(min=1)
+            to_atk = (self._theo_base + self._theo_dmg * (d_str - a_str)).clamp(min=1)
+            hp = self.major_unit_hp
+            hp[rows, j[rows]] = hp[rows, j[rows]] - to_def[rows].to(hp.dtype)
+            hp[rows, u] = hp[rows, u] - to_atk[rows].to(hp.dtype)
+            self.major_unit_mp[rows, u] = 0  # the turn is spent (TS movesLeft = 0)
+            def_dead = hp[rows, j[rows]] <= 0
+            atk_dead = hp[rows, u] <= 0
+            # PRESSURE SWING at the fallen unit's tile. When BOTH fall, TS's
+            # ternary takes the defender-dead branch — attacker wins, defender
+            # loses, and the swing centres on the DEFENDER's tile.
+            any_dead = def_dead | atk_dead
+            if bool(any_dead.any()):
+                win = torch.where(def_dead, a_seat[rows], self.major_unit_seat[rows, j[rows]])
+                los = torch.where(def_dead, self.major_unit_seat[rows, j[rows]], a_seat[rows])
+                dead_tile = torch.where(def_dead, self.major_unit_tile[rows, j[rows]],
+                                        self.major_unit_tile[rows, u])
+                dr, dt = rows[any_dead], dead_tile[any_dead]
+                wr, lr = win[any_dead], los[any_dead]
+                n = dr.numel()
+                ctr = self.city_center[dr][:, :nrow]  # [n, 1+R, RC]
+                near = (
+                    self.pair_dist[ctr.clamp(min=0).reshape(n, -1), dt.unsqueeze(1)]
+                    .reshape(n, nrow, self.RC) <= self._theo_range
+                ) & self.city_alive[dr][:, :nrow]
+                for k in range(n):
+                    # ONE seat-wide [NS, RC] mask so the pressure write is a
+                    # single advanced-index assignment on the base plane.
+                    msk = torch.zeros_like(self.city_alive[dr[k]])
+                    msk[:nrow] = near[k]
+                    if not bool(msk.any()):
+                        continue
+                    self.city_pressure[dr[k], msk, wr[k]] += sw
+                    _cur = self.city_pressure[dr[k], msk, lr[k]]
+                    self.city_pressure[dr[k], msk, lr[k]] = (_cur - sw).clamp(min=0)
+            # RELICS — every APOSTLE that falls here martyrs (promotions are
+            # unmodeled and this routine is zero-draw, so MARTYR is assumed:
+            # a recorded overstatement). Granted BEFORE the disbands and in
+            # TS's order, defender then attacker, so slot placement is
+            # order-exact. A dead MISSIONARY yields nothing; the attacker is
+            # always an apostle.
+            if self._relic_bidx >= 0:
+                if bool(def_dead.any()):
+                    _dr = rows[def_dead]
+                    _dj = j[_dr]
+                    _ap = self.major_unit_type[_dr, _dj] == self._apostle_idx
+                    if bool(_ap.any()):
+                        self._grant_relic(_dr[_ap], self.major_unit_seat[_dr[_ap], _dj[_ap]])
+                if bool(atk_dead.any()):
+                    _ar = rows[atk_dead]
+                    self._grant_relic(_ar, a_seat[_ar])
+            # A killed unit must also LEAVE ITS TILE: TS's `disbandUnit` drops
+            # it from `state.units` entirely, so clearing `alive` alone would
+            # leave the occupancy plane pointing at the corpse and block the
+            # tile forever for every other seat's movers. NO dig site — the TS
+            # twin calls raw `disbandUnit`, not `killUnit`.
+            if bool(def_dead.any()):
+                _dd = rows[def_dead]
+                self.major_unit_alive[_dd, j[_dd]] = False
+                self._vacate_major(_dd, j[_dd])
+            if bool(atk_dead.any()):
+                _ad = rows[atk_dead]
+                self.major_unit_alive[_ad, u] = False
+                self._vacate_major(_ad, torch.full_like(_ad, u))
+        self._eff_version += 1  # relics and followed-religion feed yields
+
+    def _vacate_major(self, rows: torch.Tensor, slots: torch.Tensor) -> None:
+        """Clear whichever occupancy plane points at these MAJOR slots. A slot
+        whose unit is gone must not keep holding its tile — religious units are
+        civilians, but clearing both planes means a military defender can never
+        leak either."""
+        if rows.numel() == 0:
+            return
+        t = self.major_unit_tile[rows, slots]
+        lo = self.POOL_LO["major"]
+        civ = self.civilian_at[rows, t] == slots + lo
+        if bool(civ.any()):
+            self.civilian_at[(rows[civ], t[civ])] = -1
+        mil = self.military_at[rows, t] == slots + lo
+        if bool(mil.any()):
+            self.military_at[(rows[mil], t[mil])] = -1
+
     def _grant_relic(self, rows: torch.Tensor, civ: torch.Tensor) -> None:
         """The `placeRelic` mirror: hand each row's seat ONE relic, placed in the
         LOWEST city holding a TEMPLE with a free relic slot — city ARRAY order,

@@ -109,8 +109,9 @@ class SimStep:
         # --- the hostile world, then the city-states' own turn --------------------
         # endTurn's global schedule: refreshUnits (above) -> barbarianPhase ->
         # disasterPhase -> cityStatePhase (the CS seats' OWN turn) -> seatPhase
-        # (EVERY major's turn, row 0 first) -> religion spread -> the boundary
-        # tail. Seat 0's turn is _seat_phase's row-0 call, like every seat's.
+        # (EVERY major's turn, row 0 first) -> theological combat -> religion
+        # spread -> the boundary tail. Seat 0's turn is _seat_phase's row-0
+        # call, like every seat's.
         if self.units_mode:
             self._barbarian_phase()
         if self.disasters:
@@ -146,8 +147,12 @@ class SimStep:
             # this step's placements/captures — env-gated, so free when off.
             self._check_rc_registry_invariant()
 
-        # Religious pressure spread — after all foundings/settles/flips and the
-        # rc compaction, mirroring endTurn's tail.
+        # THEOLOGICAL COMBAT, then the religious pressure spread — the fight
+        # first, so the turn's spread reads the swing the fallen unit caused.
+        # Both run after all foundings/settles/flips and the rc compaction,
+        # mirroring endTurn's tail. The fight is ZERO-DRAW, so its position
+        # cannot move the stream.
+        self._theological_combat_phase()
         self._spread_religious_pressure()
 
         self._ww_audit()

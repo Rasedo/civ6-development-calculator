@@ -4,8 +4,9 @@
  * the end-of-turn loop, and serialization.
  */
 
-import type { City, DistrictId, GameState, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, Seat } from './types';
+import type { City, DistrictId, GameState, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, Seat, Unit } from './types';
 import { greatPeopleEarned } from './greatPeople';
+import { placeRelic } from '../data/greatPeople';
 import { generateMap } from '../../world/mapgen';
 import { tilesWithin, hexDistance } from '../../world/hex';
 import { acquireTile, borderCandidates, citySpecialistSlots } from './city';
@@ -31,10 +32,10 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, MISSIONARY_CAP, APOSTLE_CAP } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, MISSIONARY_CAP, APOSTLE_CAP, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE } from '../data/religion';
 import { PROJECTS, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
-import { BARB_SEAT, allCities, allSeats, citiesOf, emptySeat, seatOf, seatOfCityState, setTileOwner, tileClaimed } from './seats';
+import { BARB_SEAT, allCities, allSeats, citiesOf, emptySeat, seatOf, seatOfCityState, setTileOwner, tileClaimed, unitSeat } from './seats';
 
 /** the game is over once this many turns are played (score victory at
  * the limit; domination can end it earlier). Config for the horizon. */
@@ -838,8 +839,11 @@ export function endTurn(state: GameState, seat: number): void {
   seatPhase(state, seat);
 
 
-  // Religious pressure spread — after all foundings/settles/flips this
-  // turn, so both engines scan the same final city + holy-tile set.
+  // THEOLOGICAL COMBAT, then the religious pressure spread — the fight first,
+  // so the turn's spread reads the swing the fallen unit caused. Both run
+  // after all foundings/settles/flips, so both engines scan the same final
+  // city + holy-tile set.
+  theologicalCombatPhase(state);
   spreadReligiousPressure(state);
 
   state.turn += 1;
@@ -1015,6 +1019,87 @@ function religiousVictor(state: GameState): number {
  * objects (founded/flipped cities) carry no pressure — the reset-on-birth KILL
  * hygiene, mirrored on the GPU by zeroing dead/absent slots each turn.
  */
+/**
+ * THEOLOGICAL COMBAT — ONE pass, every seat, at one point in the schedule.
+ *
+ * Only an APOSTLE initiates (real Civ 6 also allows Inquisitors — out of
+ * scope), and only against an ADJACENT religious unit of a DIFFERENT religion.
+ * Both sides take THEO_BASE_DAMAGE plus the RELIGIOUS-STRENGTH difference
+ * scaled by THEO_DAMAGE; a unit at 0 HP dies; the loser's religion sheds
+ * THEO_PRESSURE_SWING in every city within THEO_PRESSURE_RANGE of the fallen
+ * unit while the winner's gains it. DELIBERATELY ZERO-DRAW (see THEO_DAMAGE):
+ * a conditional RNG draw here would have to be mirrored draw-for-draw on both
+ * engines.
+ *
+ * ORDER is `state.units` ARRAY order for both the attacker walk and the
+ * defender pick — this codebase's shared convention, which the GPU mirrors
+ * with slot order (capture moves a unit to the END of both). An id tie-break
+ * was the B-18 parity bug: after a capture an id no longer reflects array
+ * position.
+ *
+ * WHY IT IS A PHASE AND NOT A VERB: the fight was never a choice — an apostle
+ * standing next to an enemy apostle fought, before it could spread. It used to
+ * live inside the SCRIPTED missionary walk, so it ran only for civ seats and
+ * only while that seat was undriven (`if (!recU)`); when the wire took every
+ * decision both engines' copies went inert together and the body was deleted
+ * with the walker. Restored here as an eager RULE at ONE schedule position —
+ * after every seat's turn, before the pressure spread reads the swing — so it
+ * belongs to no seat and inherits no replay-position fork.
+ */
+function theologicalCombatPhase(state: GameState): void {
+  const nRel = state.seats.length;
+  const relStr = (u: Unit): number => UNITS[u.type]?.religiousStrength ?? 0;
+  // The attacker walk snapshots the array: a death splices `state.units`, and
+  // a live iteration would skip the unit that slid into the gap.
+  for (const att of [...state.units]) {
+    if (att.type !== 'APOSTLE' || att.hp <= 0) continue;
+    if (!state.units.includes(att)) continue; // already fell this pass
+    const at = state.map.tiles[att.tileIndex];
+    const g = unitSeat(att);
+    let def: Unit | null = null;
+    for (const u of state.units) {
+      if (relStr(u) <= 0) continue;
+      if (unitSeat(u) === g) continue; // same religion — no contest
+      const ut = state.map.tiles[u.tileIndex];
+      if (hexDistance(at.col, at.row, ut.col, ut.row) !== 1) continue;
+      def = u;
+      break;
+    }
+    if (!def) continue;
+    const atkStr = relStr(att);
+    const defStr = relStr(def);
+    def.hp -= Math.max(1, THEO_BASE_DAMAGE + THEO_DAMAGE * (atkStr - defStr));
+    att.hp -= Math.max(1, THEO_BASE_DAMAGE + THEO_DAMAGE * (defStr - atkStr));
+    att.movesLeft = 0;
+    const loserRel = def.hp <= 0 ? unitSeat(def) : att.hp <= 0 ? g : -1;
+    const winnerRel = def.hp <= 0 ? g : att.hp <= 0 ? unitSeat(def) : -1;
+    if (winnerRel >= 0) {
+      const dt = state.map.tiles[def.hp <= 0 ? def.tileIndex : att.tileIndex];
+      for (const c of allCities(state)) {
+        const ct = state.map.tiles[c.centerIndex];
+        if (hexDistance(dt.col, dt.row, ct.col, ct.row) > THEO_PRESSURE_RANGE) continue;
+        let pres = c.religionPressure;
+        if (!pres || pres.length !== nRel) {
+          pres = new Array(nRel).fill(0);
+          c.religionPressure = pres;
+        }
+        pres[winnerRel] += THEO_PRESSURE_SWING;
+        if (loserRel >= 0) pres[loserRel] = Math.max(0, pres[loserRel] - THEO_PRESSURE_SWING);
+      }
+    }
+    // RELICS. Real Civ 6 creates one when an Apostle killed here carried the
+    // MARTYR promotion; promotions are unmodeled and this routine is
+    // zero-draw, so every dead APOSTLE martyrs — a recorded overstatement (see
+    // the RELIC_* comment in data/greatPeople). A dead MISSIONARY yields
+    // nothing. Granted in the SAME order as the two disbands below (defender
+    // first, then attacker) so slot placement is order-exact across engines.
+    if (def.hp <= 0 && def.type === 'APOSTLE') placeRelic(citiesOf(state, unitSeat(def)));
+    if (att.hp <= 0) placeRelic(citiesOf(state, g)); // the attacker is always an APOSTLE
+    if (def.hp <= 0) disbandUnit(state, def.id);
+    if (att.hp <= 0) disbandUnit(state, att.id);
+  }
+}
+
 function spreadReligiousPressure(state: GameState): void {
   const R = state.seats.length - 1;
   const nRel = 1 + R;
