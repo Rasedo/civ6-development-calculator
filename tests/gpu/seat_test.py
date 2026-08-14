@@ -61,7 +61,7 @@ def main() -> None:
         obs1, rew1, done1 = a.step(production=pa, tech=ta, civic=ca, seat=1)
         assert obs1.shape == oa.shape and not torch.isnan(obs1).any() and not torch.isnan(rew1).any()
     # --- a civ's observation must READ its state, not zero it ---------------
-    # `_observe_civ` has to take treasury, envoys, influence and loyalty off
+    # `observe` has to take treasury, envoys, influence and loyalty off
     # the planes; a constant there is invisible to every gate, because parity
     # compares trace columns and an observation is not one. This lane is the
     # only thing standing between that renderer and silent drift.

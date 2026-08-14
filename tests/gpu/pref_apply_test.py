@@ -45,7 +45,7 @@ def main() -> None:
     sim.controlled[0, r] = True
 
     NB = sim.rules_dev.b_cost.shape[0]
-    W = int(sim.seat_masks(r)["production"].shape[2])
+    W = int(sim.seat_masks(r + 1)["production"].shape[2])
     D0 = NB + 2 + sim.NU          # first scaffold-district column
     NEG = float("-inf")
 
@@ -63,7 +63,7 @@ def main() -> None:
 
     # -- 1: the top choice LANDS -> it is taken, later ranks are ignored ----
     idle_city()
-    m = sim.seat_masks(r)["production"][0, j]
+    m = sim.seat_masks(r + 1)["production"][0, j]
     legal_b = [c for c in range(NB) if bool(m[c])]
     assert legal_b, "no legal building in the capital at t25 — pick another turn"
     b0 = legal_b[0]
@@ -89,7 +89,7 @@ def main() -> None:
         if t != ctr:
             sim2.district[0, t] = 0        # occupied -> no tile can take a new one
     sim2._eff_version += 1
-    m2 = sim2.seat_masks(r)["production"][0, j]
+    m2 = sim2.seat_masks(r + 1)["production"][0, j]
     legal_b2 = [c for c in range(NB) if bool(m2[c])]
     assert legal_b2, "no legal building for the fallback rank"
     d_col = D0                              # rank it FIRST even though it cannot land
@@ -138,7 +138,7 @@ def main() -> None:
             break
     assert wi5 is not None, "#88: fixture has no forceable wonder candidate near r0c0"
     sim5.civ_city_current[0, r5, j5] = -1  # these columns are idle-gated like every base column
-    m5 = sim5.seat_masks(r5)["production"]
+    m5 = sim5.seat_masks(r5 + 1)["production"]
     assert bool(m5[0, j5, w_lo5 + wi5]), "#88: the granted wonder column must read legal"
     prod5 = torch.full((1, sim5.RC), -1, dtype=torch.long)
     prod5[0, j5] = w_lo5 + wi5
@@ -155,7 +155,7 @@ def main() -> None:
     sim6.civ_city_current[0, r5, j5] = -1
     free6 = int((sim6.built_wonder[0] < 0).nonzero(as_tuple=True)[0][0])
     sim6.built_wonder[0, free6] = wi5  # any tile, any owner — wonderExists is global
-    m6 = sim6.seat_masks(r5)["production"]
+    m6 = sim6.seat_masks(r5 + 1)["production"]
     assert not bool(m6[0, j5, w_lo5 + wi5]), "mask must read the claim"
     sim6.apply_seat_actions(r5, production=prod5)
     sim6._seat_record_apply(r5 + 1, ACTIVE)
@@ -171,7 +171,7 @@ def main() -> None:
     sim7.district_complete[0, dt7] = True
     sim7.civ_city_dist_tile[0, r5, j5, d_i7] = dt7
     sim7.civ_city_current[0, r5, j5] = -1
-    m7 = sim7.seat_masks(r5)["production"]
+    m7 = sim7.seat_masks(r5 + 1)["production"]
     p_lo7 = w_lo5 + sim7._wond_n
     assert bool(m7[0, j5, p_lo7]), "#88: base project 0 must be legal on its completed district"
     prod7 = torch.full((1, sim7.RC), -1, dtype=torch.long)

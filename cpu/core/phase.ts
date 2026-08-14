@@ -230,16 +230,18 @@ function nearestDistance(state: GameState, a: number, bs: number[]): number {
   return best;
 }
 
-/** Distance between the closest seat 0-city / seat-city pair. */
-export function seatProximity(state: GameState, actor: Seat): number {
-  const seat = actor.seat;
-  if (seatOf(state, seat)!.cities.length === 0 || actor.cities.length === 0) return Infinity;
+/**
+ * Distance between the closest city pair of TWO seats — Infinity when either
+ * holds none. A PAIR question, so it takes both sides: it used to read `actor`
+ * for both and answer 0 for anybody holding a city.
+ */
+export function seatProximity(state: GameState, a: number, b: number): number {
+  const ca = citiesOf(state, a);
+  const cb = citiesOf(state, b);
+  if (ca.length === 0 || cb.length === 0) return Infinity;
   let best = Infinity;
-  for (const c of seatOf(state, seat)!.cities) {
-    best = Math.min(
-      best,
-      nearestDistance(state, c.centerIndex, actor.cities.map((civCity) => civCity.centerIndex)),
-    );
+  for (const c of ca) {
+    best = Math.min(best, nearestDistance(state, c.centerIndex, cb.map((o) => o.centerIndex)));
   }
   return best;
 }

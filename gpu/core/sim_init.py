@@ -190,9 +190,8 @@ class SimInit:
                 self.citystate_center[b, s] = cs["center"]
                 self.citystate_pop[b, s] = cs["pop"]
                 self.citystate_suz_key[b, s] = cs.get("suzKey", -1)
-        # A city-state's tile ownership lives in `tile_seat` (seeded below, once
-        # `owner` and `civ_at` exist); `citystate_at` is a derived view.
-        self._citystate_at_init = torch.tensor([[t.get("cs", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        # A city-state's tile ownership lives in `tile_seat` (seeded below off
+        # the wire's `ownerSeatInit` plane); `citystate_at` is a derived view.
         # The (seat, city-state) relations live on `seat_citystate_*` [B, 1+R, S] planes
         # allocated below, once r_pad is known — `citystate_met` is `[:, 0]` and
         # `civ_only_citystate_met` is `[:, 1:]` of ONE tensor, and so on.
@@ -1276,10 +1275,14 @@ class SimInit:
 
         # --- dynamic state ------------------------------------------------------
         self.turn = 1
-        # Settler starts: NO pre-founded city for any seat — every city arrives
-        # through a FOUND verb, allocating its persistent id (nextCityId++).
-        # ownerInit ships TS City.ids per tile (all -1 in a t0 world); it seeds
-        # `tile_city`, and `tile_seat` gets 0 wherever it is set.
+        # THE t0 TILE-OWNERSHIP PAIR, seat-generic and shipped as a pair:
+        # `ownerSeatInit` is TS's `ownerSeat` per tile (NO_SEAT for nobody,
+        # 100+ for a city-state) and `ownerInit` its `ownerCity` — the owning
+        # city's PERSISTENT id within that seat, -1 for none. Settler starts
+        # mean no major holds a tile at t0, so `ownerInit` is all -1 and
+        # `ownerSeatInit` carries only the city-state rings; but the pair is the
+        # contract, and reading only seat 0's half is how a civ's ring would be
+        # dropped on load.
         self.tile_city = torch.tensor([f["ownerInit"] for f in fixtures], dtype=torch.long, device=device)  # [B, T]
         # Bumped by EVERY write to owner / civ_at; keys the derived views below.
         # Not a tensor — python state, so it is not in _MUTABLE.
@@ -1294,18 +1297,11 @@ class SimInit:
         self._civ_city_at_cache: torch.Tensor | None = None
         self._owner_ver = -1
         self._owner_cache: torch.Tensor | None = None
-        # `tile_seat` is STATE, not a cache. The seat-0 and civ parts mirror
-        # `owner` / `civ_at` (checked every step), but the CITY-STATE part is
-        # stored ONLY here — `citystate_at` is a view of it. No civ tile exists at t0,
-        # so only the city-state and seat-0 arms are seeded.
-        self.tile_seat = torch.where(
-            self._citystate_at_init >= 0, self._citystate_at_init + 100,
-            torch.where(
-                self.tile_city >= 0, torch.zeros_like(self.tile_city),
-                torch.full_like(self.tile_city, NO_SEAT),
-            ),
-        )
-        del self._citystate_at_init
+        # `tile_seat` is STATE, not a cache: `owner` / `civ_at` / `citystate_at`
+        # are all VIEWS of it. It loads straight off the wire's own seat plane —
+        # ONE composition, no per-class arm to forget.
+        self.tile_seat = torch.tensor(
+            [f["ownerSeatInit"] for f in fixtures], dtype=torch.long, device=device)  # [B, T]
         self._b_req_district = rules.b_req_district.to(device)  # [NB] required district idx (-1 none)
         self._b_req_buildings = rules.b_req_buildings  # list of prereq-building-index lists
         self._b_excl_buildings = rules.b_excl_buildings  # exclusive-sibling index lists

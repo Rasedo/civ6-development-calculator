@@ -130,36 +130,46 @@ class SimSeats:
             prod_cols.append(torch.cat([base_j & idle_j, ok_w & idle_j, ok_p & idle_j], dim=1))
         return torch.stack(prod_cols, dim=1)  # [B, RC, W]
 
-    def seat_masks(self, r: int) -> dict[str, torch.Tensor]:
-        """A controlled civ seat's decision space, in the shared head layouts
-        so one net serves every seat.
+    def seat_masks(self, row: int) -> dict[str, torch.Tensor]:
+        """Seat ROW `row`'s decision space, in the shared head layouts so one
+        net serves every seat — ONE body, seat 0 among them.
 
-        production [B, RC, W] is `_seat_production_mask` — the ONE body every
-        seat row asks, seat 0 included. tech [B, NT] / civic [B, NC] = available
-        picks where cur == -1. war [B, 2R]: column 0 declares, column R sues for
-        peace.
+        production [B, RC, W] is `_seat_production_mask`; tech [B, NT] and
+        civic [B, NC] are `_seat_tech_mask` / `_seat_civic_mask` (available
+        picks where that row's slot is idle); envoy [B, S] is
+        `_seat_envoy_mask` — EVERY seat courts city-states
+        (`_seat_influence_phase` banks the influence, `_seat_record_apply`
+        spends it on any row), so no seat's envoy head is structurally empty.
+
+        THE WAR HEAD is the one place a row still forks, and the fork is
+        WAR_COLUMN_SEAT's, not seat 0's standing: the wire carries ONE war
+        axis, so a civ row's [B, 2R] head declares on / sues to that seat
+        (column 0 / column R) while that seat's own head names WHICH civ.
+        Closing it is wire work, not a rule difference.
 
         Masks read the CURRENT state — call before step(); apply_seat_actions()
         writes the choices the seat phase honors."""
         B, dev = self.B, self.device
-        production = self._seat_production_mask(r + 1)
-        tech = self._available_mask(self.civ_only_techs[:, r], self._prereq_t) & (self.civ_only_cur_tech[:, r] == -1).unsqueeze(1)
-        civic = self._available_mask(self.civ_only_civics[:, r], self._prereq_c) & (self.civ_only_cur_civic[:, r] == -1).unsqueeze(1)
-        # symmetric war head (seat-invariant [B, 2R] layout): a civ seat's only
-        # opponent under war rules is seat 0 — column 0 = declare (alive, at
-        # peace), column R = sue for peace (warTurns >= min AND the same gold
-        # schedule every seat pays, charged against civ_only_treasury).
-        sr = self.rules.seats
-        Rw = max(self.R, 1)
-        war = torch.zeros(B, 2 * Rw, dtype=torch.bool, device=dev)
-        war[:, 0] = self.civ_only_alive[:, r] & ~self.civ_only_atwar[:, r]
-        pcost_m = sr.get("peaceGold0", 150) + sr.get("peaceGoldSlope", 10) * self.civ_only_warturns[:, r].to(torch.float64)
-        war[:, Rw] = (
-            self.civ_only_alive[:, r] & self.civ_only_atwar[:, r]
-            & (self.civ_only_warturns[:, r] >= sr.get("warMinTurns", 14))
-            & self._afford(self.civ_only_treasury[:, r], pcost_m)
-        )
-        return {"production": production, "tech": tech, "civic": civic, "war": war}
+        production = self._seat_production_mask(row)
+        tech = self._seat_tech_mask(row)
+        civic = self._seat_civic_mask(row)
+        envoy = self._seat_envoy_mask(row)
+        if row == 0:
+            war = self.war_mask()
+        else:
+            sr = self.rules.seats
+            Rw = max(self.R, 1)
+            war = torch.zeros(B, 2 * Rw, dtype=torch.bool, device=dev)
+            atw = self.war[:, row, 0]
+            war[:, 0] = self.civ_alive[:, row] & ~atw
+            pcost_m = sr.get("peaceGold0", 150) + sr.get("peaceGoldSlope", 10) * self.war_turns[:, row].to(torch.float64)
+            war[:, Rw] = (
+                self.civ_alive[:, row] & atw
+                & (self.war_turns[:, row] >= sr.get("warMinTurns", 14))
+                & self._afford(self.civ_treasury[:, row], pcost_m)
+            )
+        return {"production": production, "tech": tech, "civic": civic,
+                "envoy": envoy, "war": war}
 
     def apply_seat_actions(
         self,
@@ -536,6 +546,30 @@ class SimSeats:
         q_mil = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU) & (self._type_combat[q_ty] > 0) & self.city_alive[:, row]
         return live + q_mil.sum(dim=1)
 
+    def _settler_cost(self, n_cities: torch.Tensor, live: torch.Tensor,
+                      queued: torch.Tensor) -> torch.Tensor:
+        """settlerCost — the ONE transcription, for every seat and caller.
+
+        `settlerBase + settlerPerCity * max(0, cities - 1 + LIVE settlers +
+        QUEUED settlers)`. TS calls it afresh per commit, so the production walk
+        feeds its own RUNNING queued count (a settler queued at column j raises
+        the price for column j+1) while the buy ladder and the observation feed
+        a plain snapshot."""
+        return self.rules.settler_base + self.rules.settler_per_city * (
+            n_cities - 1 + live + queued
+        ).clamp(min=0).to(self.dtype)
+
+    def _seat_settler_cost(self, row: int) -> torch.Tensor:
+        """[B] the settler price seat row `row` faces right now — the counts
+        read off the merged city block, then `_settler_cost`. Read by the buy
+        ladder and by the observation, so what a seat PAYS and what its policy
+        SEES cannot drift."""
+        alive_row = self.city_alive[:, row]
+        return self._settler_cost(
+            alive_row.sum(dim=1), self._seat_settlers(row),
+            (alive_row & (self.city_current[:, row] == self.SETTLER)).sum(dim=1),
+        )
+
     def _seat_buy_ladder(self, row: int, active: torch.Tensor) -> None:
         """THE gold/faith spending block for seat row `row`, at the seatPhase
         position (after the production picks, before the trade block) — ONE
@@ -584,10 +618,7 @@ class SimSeats:
         spawn_slot = torch.where(has_cap, cap_is.long().argmax(dim=1), alive_row.long().argmax(dim=1))
         bidx = torch.arange(B, device=dev)
         if kind is not None and self._settler_idx >= 0:
-            _sq = (alive_row & (self.city_current[:, row] == self.SETTLER)).sum(dim=1)
-            sett_price = (self.rules.settler_base + self.rules.settler_per_city * (
-                n_cities - 1 + self._seat_settlers(row) + _sq
-            ).clamp(min=0).to(self.dtype)) * mult
+            sett_price = self._seat_settler_cost(row) * mult
             ctr_s = self.city_center[bidx, row, spawn_slot].clamp(min=0)
             pop_s = self.city_pop[bidx, row, spawn_slot]
             want_s = (kind == 1) & active & ext & ~bought & (n_cities > 0) \
@@ -817,9 +848,7 @@ class SimSeats:
             # queueSettler: a city under the pop gate may not train one.
             is_s = act & (a == self.SETTLER) & (self.city_pop[:, row, j] >= rls.settler_pop_gate)
             if bool(is_s.any()):
-                s_cost = rls.settler_base + rls.settler_per_city * (
-                    n_cities - 1 + settlers_live + queued_s
-                ).clamp(min=0).to(self.dtype)
+                s_cost = self._settler_cost(n_cities, settlers_live, queued_s)
                 self.city_current[:, row, j] = torch.where(is_s, torch.full_like(cur_j, self.SETTLER), self.city_current[:, row, j])
                 self.city_cost[:, row, j] = torch.where(is_s, s_cost, self.city_cost[:, row, j])
                 self.city_progress[:, row, j] = torch.where(is_s, torch.zeros_like(self.city_progress[:, row, j]), self.city_progress[:, row, j])
@@ -1010,157 +1039,28 @@ class SimSeats:
         adj = (host[:, nb] & (self.neigh >= 0).unsqueeze(0)).any(dim=2)
         return base & adj
 
-    def _theological_combat(self, r: int, act: torch.Tensor) -> torch.Tensor:
-        """The theological-combat mirror. For each APOSTLE slot of
-        civ r flagged in `act` (slot order), find an ADJACENT religious unit
-        of a DIFFERENT religion, damage both by the RELIGIOUS-STRENGTH
-        difference, kill at 0 HP, and swing pressure in cities within
-        theoPressureRange of the fallen unit. Returns [B, U] — the slots that
-        fought and therefore skip the spread/walk (the TS `continue`).
-
-        Target pick is the LOWEST SLOT among adjacent enemies, which is the
-        v-pool's spawn order and so mirrors TS's lowest-unit-id. Zero RNG."""
-        fought = torch.zeros_like(act)
-        if not bool(act.any()):
-            return fought
-        U = self.major_unit_alive.shape[1]
-        rs = self._rel_strength
-        for u in range(U):
-            a_on = act[:, u] & self.major_unit_alive[:, u]
-            if not bool(a_on.any()):
-                continue
-            a_tile = self.major_unit_tile[:, u]
-            a_str = rs[self.major_unit_type[:, u].clamp(min=0)]
-            # adjacency + different religion + carries religious strength
-            d = self.pair_dist[a_tile.unsqueeze(1), self.major_unit_tile]  # [B, U]
-            elig = (
-                self.major_unit_alive & (d == 1) & (self.major_unit_seat != r + 1)
-                & (rs[self.major_unit_type.clamp(min=0)] > 0)
-            )
-            elig = elig & a_on.unsqueeze(1)
-            if not bool(elig.any()):
-                continue
-            first = elig & (elig.long().cumsum(dim=1) == 1)  # lowest slot
-            has = first.any(dim=1)
-            d_str = (rs[self.major_unit_type.clamp(min=0)] * first.long()).sum(dim=1)
-            to_def = (self._theo_base + self._theo_dmg * (a_str - d_str)).clamp(min=1)
-            to_atk = (self._theo_base + self._theo_dmg * (d_str - a_str)).clamp(min=1)
-            rows = has.nonzero(as_tuple=True)[0]
-            if rows.numel() == 0:
-                continue
-            j = first.long().argmax(dim=1)  # defender slot
-            self.major_unit_hp[rows, j[rows]] = self.major_unit_hp[rows, j[rows]] - to_def[rows].to(self.major_unit_hp.dtype)
-            self.major_unit_hp[rows, u] = self.major_unit_hp[rows, u] - to_atk[rows].to(self.major_unit_hp.dtype)
-            self.major_unit_mp[rows, u] = 0  # the turn is spent (TS movesLeft = 0)
-            fought[rows, u] = True
-            def_dead = self.major_unit_hp[rows, j[rows]] <= 0
-            atk_dead = self.major_unit_hp[rows, u] <= 0
-            # pressure swing at the fallen unit's tile
-            win_rel = torch.where(def_dead, torch.full_like(j[rows], r + 1), self.major_unit_seat[rows, j[rows]])
-            los_rel = torch.where(def_dead, self.major_unit_seat[rows, j[rows]], torch.full_like(j[rows], r + 1))
-            any_dead = def_dead | atk_dead
-            dead_tile = torch.where(def_dead, self.major_unit_tile[rows, j[rows]], self.major_unit_tile[rows, u])
-            if bool(any_dead.any()):
-                dr = rows[any_dead]
-                dt = dead_tile[any_dead]
-                wr = win_rel[any_dead]
-                lr = los_rel[any_dead]
-                sw = int(self._theo_swing)
-                dpc = self.pair_dist[self.site[dr].clamp(min=0), dt.unsqueeze(1)]  # [n, C]
-                near_pc = (dpc <= self._theo_range) & self.alive[dr]
-                for _k in range(dr.numel()):
-                    m = near_pc[_k]
-                    # ONE seat-wide [NS, RC] mask, written once for all seats.
-                    msk = torch.zeros_like(self.city_alive[dr[_k]])
-                    msk[0, : self.RC] = m
-                    drc = self.pair_dist[self.civ_city_center[dr[_k]].clamp(min=0), dt[_k]]  # [R, RC]
-                    msk[1:1 + self.R] = (drc <= self._theo_range) & self.civ_city_alive[dr[_k]]
-                    if bool(msk.any()):
-                        self.city_pressure[dr[_k], msk, wr[_k]] += sw
-                        self.city_pressure[dr[_k], msk, lr[_k]] = (self.city_pressure[dr[_k], msk, lr[_k]] - sw).clamp(min=0)
-            # A killed unit must also LEAVE ITS TILE: `disbandUnit` drops it from
-            # `state.units` entirely, so clearing major_unit_alive alone would leave the
-            # occupancy plane pointing at the corpse and block the tile forever
-            # for every other seat's movers. Religious units are civilians, but
-            # clear whichever plane actually points at the slot so a military
-            # defender can never leak either.
-            def _vacate(_rws: torch.Tensor, _slots: torch.Tensor) -> None:
-                if _rws.numel() == 0:
-                    return
-                _t = self.major_unit_tile[_rws, _slots]
-                _c = self.civilian_at[_rws, _t] == _slots + self.POOL_LO["major"]
-                if bool(_c.any()):
-                    self.civilian_at[(_rws[_c], _t[_c])] = -1
-                _m = self.military_at[_rws, _t] == _slots + self.POOL_LO["major"]
-                if bool(_m.any()):
-                    self.military_at[(_rws[_m], _t[_m])] = -1
-
-            # RELICS — an APOSTLE killed in theological combat martyrs and hands
-            # its owner a relic. Granted BEFORE the disbands and in the TS order
-            # (defender first, then attacker) so slot placement is order-exact.
-            # A dead MISSIONARY yields nothing; the attacker is always an apostle.
-            if self._relic_bidx >= 0 and self._apostle_idx >= 0:
-                if bool(def_dead.any()):
-                    _dr = rows[def_dead]
-                    _ap = self.major_unit_type[_dr, j[_dr]] == self._apostle_idx
-                    if bool(_ap.any()):
-                        self._grant_relic(_dr[_ap], self.major_unit_seat[_dr[_ap], j[_dr][_ap]])
-                if bool(atk_dead.any()):
-                    _ar = rows[atk_dead]
-                    self._grant_relic(_ar, torch.full_like(_ar, r + 1))
-            if bool(def_dead.any()):
-                dd = rows[def_dead]
-                # NO dig here. THEOLOGICAL combat's TS twin (the apostle /
-                # missionary exchange in phase.ts) calls raw `disbandUnit`, not
-                # `killUnit`, so no antiquity site is created for a religious
-                # death and adding one here over-digs against TS. Whether real
-                # Civ 6 leaves a dig for theological combat is UNSOURCED, so
-                # changing it needs its own verification on both engines.
-                self.major_unit_alive[dd, j[dd]] = False
-                _vacate(dd, j[dd])
-            if bool(atk_dead.any()):
-                ad = rows[atk_dead]
-                self.major_unit_alive[ad, u] = False
-                _vacate(ad, torch.full_like(ad, u))
-        return fought
-
     def _grant_relic(self, rows: torch.Tensor, civ: torch.Tensor) -> None:
-        """The `placeRelic` mirror: hand each row's seat (`civ` [n]: 0 = seat 0,
-        r+1 = civ r) ONE relic, placed in the LOWEST city holding a TEMPLE with a
-        free relic slot — city ARRAY order, which the dense city/rc slot order
-        mirrors. A relic that finds no slot is LOST, as TS discards the return
-        value the same way."""
+        """The `placeRelic` mirror: hand each row's seat ONE relic, placed in the
+        LOWEST city holding a TEMPLE with a free relic slot — city ARRAY order,
+        which the dense city/rc slot order mirrors. A relic that finds no slot is
+        LOST, as TS discards the return value the same way.
+
+        `civ` [n] IS the seat's ROW in the merged city block (0 = seat 0,
+        r+1 = civ r), so one walk places every seat's relic."""
         if rows.numel() == 0 or self._relic_bidx < 0:
             return
-        pl = civ == 0
-        if bool(pl.any()):
-            pr = rows[pl]
-            placed = torch.zeros(pr.numel(), dtype=torch.bool, device=self.device)
-            for c in range(self.RC):
-                take = (
-                    ~placed
-                    & self.alive[pr, c]
-                    & self.buildings[pr, c, self._relic_bidx].bool()
-                    & (self.relics[pr, c] < self._relic_slots)
-                )
-                if bool(take.any()):
-                    self.relics[pr[take], c] += 1
-                    placed = placed | take
-        rv = ~pl
-        if bool(rv.any()) and self.R > 0:
-            rr = rows[rv]
-            rc = (civ[rv] - 1).clamp(min=0, max=max(self.R - 1, 0))
-            placed = torch.zeros(rr.numel(), dtype=torch.bool, device=self.device)
-            for j in range(self.RC):
-                take = (
-                    ~placed
-                    & self.civ_city_alive[rr, rc, j]
-                    & self.civ_city_bldg[rr, rc, j, self._relic_bidx].bool()
-                    & (self.civ_city_relics[rr, rc, j] < self._relic_slots)
-                )
-                if bool(take.any()):
-                    self.civ_city_relics[rr[take], rc[take], j] += 1
-                    placed = placed | take
+        row = civ.clamp(min=0, max=self.R)
+        placed = torch.zeros(rows.numel(), dtype=torch.bool, device=self.device)
+        for j in range(self.RC):
+            take = (
+                ~placed
+                & self.city_alive[rows, row, j]
+                & self.city_bldg[rows, row, j, self._relic_bidx].bool()
+                & (self.city_relics[rows, row, j] < self._relic_slots)
+            )
+            if bool(take.any()):
+                self.city_relics[rows[take], row[take], j] += 1
+                placed = placed | take
         self._eff_version += 1  # relics are a yield-bearing write (faith)
 
     def _religious_victor(self) -> torch.Tensor:
@@ -1169,20 +1069,18 @@ class SimSeats:
         following g; -1 none. Requires g founded (holy_tile set) and at least one
         living seat. At most one g can predominate within a seat, so the
         ascending scan needs no tie-break."""
-        B, O = self.B, self._O
-        npl = self.alive.sum(dim=1)  # [B] seat-0 cities
-        n_r = self.civ_city_alive.sum(dim=2) if self.R > 0 else None  # [B, R]
-        any_civ = npl > 0
-        if self.R > 0:
-            any_civ = any_civ | (n_r > 0).any(dim=1)
+        B, O, nrow = self.B, self._O, 1 + self.R
+        # ONE walk over the majors — rows 0..R of the merged city block, seat 0
+        # among them. `n` is each seat's city count; a seat holding none is
+        # vacuously converted, which is what `cities.length === 0` gives TS.
+        alive = self.city_alive[:, :nrow]                # [B, 1+R, RC]
+        fol = self.city_followed[:, :nrow, : self.RC]    # [B, 1+R, RC]
+        n = alive.sum(dim=2)                             # [B, 1+R]
+        any_seat = (n > 0).any(dim=1)
         winner = torch.full((B,), -1, dtype=torch.long, device=self.device)
         for g in range(O):
-            founded_g = self.holy_tile[:, g] >= 0
-            nf = (self.alive & (self.city_followed[:, 0, :self.RC] == g)).sum(dim=1)
-            ok = founded_g & any_civ & ((npl == 0) | (2 * nf > npl))
-            if self.R > 0:
-                nf_r = (self.civ_city_alive & (self.city_followed[:, 1:1 + self.R] == g)).sum(dim=2)  # [B, R]
-                ok = ok & ((n_r == 0) | (2 * nf_r > n_r)).all(dim=1)
+            nf = (alive & (fol == g)).sum(dim=2)         # [B, 1+R]
+            ok = (self.holy_tile[:, g] >= 0) & any_seat & ((n == 0) | (2 * nf > n)).all(dim=1)
             winner = torch.where((winner < 0) & ok, torch.full_like(winner, g), winner)
         return winner
 
@@ -3002,10 +2900,11 @@ class SimSeats:
         describes a unit standing in the CITY, not on this district), its own
         garrison pool takes the damage, and the attacker never advances.
 
-        The roll KEY differs by target owner ('penc' vs 'renc'), so the two
-        owner classes roll under DISJOINT masks. Rows are independent games and
-        `_damage_roll` advances only masked rows, so every attacking row still
-        draws exactly twice, in TS's order (damage-to-district, then counter)."""
+        ONE roll key whoever owns the district: `enc` for the damage and `encc`
+        for the counter. The key used to split by owner seat, which was the last
+        place the combat log claimed a seat-0 Encampment is fought differently —
+        it is not, and the defense floor above is already one row-generic read.
+        Draw ORDER is TS's: damage-to-district, then counter."""
         a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
         a_occ = self.military_at
         atk_cs = self._type_combat[a_type[:, u]]
@@ -3029,19 +2928,9 @@ class SimSeats:
             atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
             atk_e = atk_e + (self._rel_atk_cs(a_seat[:, u], tc).to(atk_e.dtype) if self._city_rel_live else 0)
             atk_e = atk_e + self._gen_aura_cs(a_seat[:, u], a_tile[:, u], atk_naval).to(atk_e.dtype)
-        p_att, civ_only_att = att & (hseat == 0), att & (hseat != 0)
         diff, cdiff = atk_e - def_cs, def_cs - atk_e
-        # CAREFUL: _damage_roll returns a value on EVERY row — only the RNG
-        # ADVANCE is masked. Each roll must therefore be gated to its own rows
-        # before the two owner classes are combined; summing them raw would
-        # roughly DOUBLE both the damage dealt and the counter taken.
-        _z = torch.zeros_like(tc)
-        _dp = self._damage_roll(p_att, diff, k="penc", tile=tc)
-        _sp = self._damage_roll(p_att, cdiff, k="pencc", tile=tc)
-        _dr = self._damage_roll(civ_only_att, diff, k="renc", tile=tc)
-        _sr = self._damage_roll(civ_only_att, cdiff, k="rencc", tile=tc)
-        d_enc = torch.where(p_att, _dp, _z) + torch.where(civ_only_att, _dr, _z)
-        d_self = torch.where(p_att, _sp, _z) + torch.where(civ_only_att, _sr, _z)
+        d_enc = self._damage_roll(att, diff, k="enc", tile=tc)
+        d_self = self._damage_roll(att, cdiff, k="encc", tile=tc)
         if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
             a_xp[:, u] = torch.where(att, a_xp[:, u] + XP_ATTACK, a_xp[:, u])
         rows = att.nonzero(as_tuple=True)[0]
@@ -3109,9 +2998,8 @@ class SimSeats:
 
         The DEFENDER is read off the seat-generic registries: `tile_seat` names
         the holder row at a centre tile and `centre_slot_at` names its column,
-        so the same two gathers serve every row. TS has one `cityAssault` with
-        one roll-key pair; the GPU used to have two bodies and a phantom
-        'pcty'/'pctyc' pair for a seat-0 defender.
+        so the same two gathers serve every row, under TS's one `cityAssault`
+        roll-key pair ('rcty'/'rctyc') whoever the defender is.
 
         The only per-CLASS terms are the ones TS's own `assaultAtkCS` keys on,
         never pool accidents:

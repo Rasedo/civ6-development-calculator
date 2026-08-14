@@ -240,9 +240,10 @@ def load_fixture(path: Path) -> dict:
     """Load one seed fixture — THE chokepoint every fixture-consuming lane
     shares, so staleness is checked exactly once, here:
 
-    - anything but `format` 2 (settler starts: no pre-founded majors, one
-      `civs[]` array carrying each seat's t0 units) is REFUSED loudly rather
-      than half-read into a world this engine cannot represent;
+    - anything but `format` 3 (settler starts: no pre-founded majors, one
+      `civs[]` array carrying each seat's t0 units; tile ownership as the
+      `ownerSeatInit`/`ownerInit` pair) is REFUSED loudly rather than half-read
+      into a world this engine cannot represent;
     - a fixture whose `srcStamp` disagrees with the rules.json beside it is a
       MIXED SET (half re-exported), which reads exactly like an engine
       divergence.
@@ -250,11 +251,12 @@ def load_fixture(path: Path) -> dict:
     p = Path(path)
     f = json.loads(p.read_text())
     fmt = f.get("format", 1)
-    if fmt != 2:
+    if fmt != 3:
         raise RuntimeError(
-            f"{p.name}: fixture format {fmt} — this engine runs FORMAT 2 (settler starts, #71/#106: "
-            "no pre-founded majors, one `civs[]` array carrying each seat's t0 units). Regenerate with "
-            "`npm run seed && npm run export`."
+            f"{p.name}: fixture format {fmt} — this engine runs FORMAT 3 (settler starts, #71/#106: "
+            "no pre-founded majors, one `civs[]` array carrying each seat's t0 units; #51: tile "
+            "ownership as the seat-generic `ownerSeatInit`/`ownerInit` pair, replacing the per-tile "
+            "city-state key). Regenerate with `npm run seed && npm run export`."
         )
     fx_stamp = f.get("srcStamp")
     rules_stamp = _rules_stamp_for(p.parent)
@@ -288,8 +290,8 @@ UNIT_SLOTS = 256
 
 # The absolute SEAT space, shared with cpu/core/seats.ts.
 # Every damage-roll key that OPENS a battle. The paired counter-roll keys
-# (melc, cstyc, pctyc, rctyc, pencc, rencc) are the SAME battle from the other
-# side and must not be counted twice.
+# (melc, cstyc, rctyc, encc) are the SAME battle from the other side and must
+# not be counted twice.
 #
 # `warWearinessBattle` needs a hook at every one of these, and this set is the
 # enumeration a grep is not: `_ww_audit` makes the engine prove at runtime that
@@ -299,10 +301,8 @@ WW_BATTLE_KEYS = frozenset({
     "rng",      # p_ ranged vs a unit or a lone civilian
     "vrng",     # hostile ranged vs a unit
     "csty",     # melee vs a city-state centre - seat 0 AND a civ seat
-    "pcty",     # hostile melee assault on a seat-0 city
-    "rcty",     # melee assault on a civ-seat city - seat 0, barb AND civ
-    "penc",     # melee assault on a seat-0 Encampment district
-    "renc",     # ...and on a civ-seat one
+    "rcty",     # melee assault on ANY seat's city - the one cityAssault
+    "enc",      # melee assault on ANY seat's Encampment district
     "vrngc",    # hostile ranged vs a seat-0 city
     "rngrc",    # seat-0 ranged vs a civ-seat city
     "rngcs",    # seat-0 ranged vs a city-state centre

@@ -14,7 +14,7 @@
 import type { GameState } from '../core/types';
 import { YIELD_KEYS } from '../core/types';
 import type { WorldFile } from '../../world/file';
-import { cityStateOfSeat, isCityStateSeat, tileCity, tileSeat } from '../core/seats';
+import { tileCity, tileSeat } from '../core/seats';
 import { makeYieldCtx } from '../core/effects';
 import { tileYields, districtAdjacency } from '../core/yields';
 import { terrainDefense } from '../core/combat';
@@ -124,12 +124,9 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // statically camp-eligible (dynamic exclusions — ownership, distance
       // to cities/camps — are the engine's job; mirrors campCandidates)
       camp: !isWater(t) && !isImpassable(t) && !t.wonder && !t.district && !t.builtWonder && !t.goodyHut ? 1 : 0,
-      // city-state territory (static — placed at game creation)
-      // #51/S1.3i: derived from the ONE seat field; the fixture keys are unchanged
-      cityState: isCityStateSeat(tileSeat(t)) ? cityStateOfSeat(tileSeat(t)) : -1,
-      // (#96 tail: the `civSeat`/`rci` civ-territory keys are DELETED — format-2
-      // worlds have no civ cities at t0, so both were provably all -1; the
-      // engine starts its tile_seat civ half and tile_city registry empty.)
+      // (tile OWNERSHIP — seat and owning city — is the `ownerSeatInit` /
+      // `ownerInit` pair below, one plane each for the whole map, city-state
+      // rings included. It used to be a per-tile `cs` key beside them.)
       // C1-B4b-2: Water Mill gates on a river at CIV-SEAT centers too
       riv: hasRiver(t) ? 1 : 0,
       // C1-B5b-iii: water housing IF a center stood here (fresh 5 /
@@ -361,11 +358,17 @@ export function buildFixture(state: GameState, world: WorldFile): object {
   const landTiles = map.tiles.filter((t) => !isWater(t)).length;
   const maxCamps = Math.max(1, Math.floor(landTiles / 120));
 
-  // No seat owns territory at t0 (city-state rings are the `cityState` plane).
-  const ownerInit = map.tiles.map((t) => (tileSeat(t) === 0 ? tileCity(t) : -1));
+  // TILE OWNERSHIP, shipped as the PAIR the engines store: `ownerSeatInit` is
+  // `ownerSeat` per tile (NO_SEAT for nobody, 100+ for a city-state) and
+  // `ownerInit` is `ownerCity` — the owning city's persistent id within that
+  // seat, -1 when none. Settler starts mean no MAJOR holds a tile at t0, so
+  // ownerInit is all -1 today and ownerSeatInit carries only the city-state
+  // rings; reading one seat's half is how the other seats' rings get dropped.
+  const ownerSeatInit = map.tiles.map((t) => tileSeat(t));
+  const ownerInit = map.tiles.map((t) => tileCity(t));
 
   return {
-    format: 2, // #71: settler starts
+    format: 3, // #71 settler starts; #51 the ownerSeatInit/ownerInit pair
     seed: world.gen.seed,
     width: map.width,
     height: map.height,
@@ -390,6 +393,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
         .map((u) => ({ type: unitRosterIdx.get(u.type) ?? 0, tile: u.tileIndex })),
     })),
     tiles,
+    ownerSeatInit,
     ownerInit,
     eraScoreInit: state.seats.map((s) => s.eraScore ?? 0),
     worldHash: world.worldHash,

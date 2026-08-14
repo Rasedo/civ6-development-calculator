@@ -60,7 +60,7 @@ python gpu/tools/logdiff.py          # prints the FIRST divergent line
   yields), RT (civ-seat totals, fai, terr + tsum shape-checksum), RC (queue
   kind/cost/progress, loy, cb, til, hp, yields), CB (EVERY damage roll:
   k = the TS call-site tag [mel/melc, rng, rngrc, rngcs, rcty/rctyc,
-  csty/cstyc, pcty/pctyc], t = target tile, c = the rng counter BEFORE
+  csty/cstyc, enc/encc, cstk, estk], t = target tile, c = the rng counter BEFORE
   the draw — absolute stream position, aligns draws even when sequences
   slip — plus diff, rand·1e6, dmg; from the damageRoll/_damage_roll
   chokepoints; catches reordered/extra rolls invisible to the rng

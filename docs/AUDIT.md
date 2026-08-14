@@ -581,6 +581,108 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   BUY stash, so a spending intent named on the turn a seat lost its last
   city would have fired on a later turn.
 
+- **A-43. THE OBSERVATION IS ONE RENDERER — `observe(seat)` — 2026-08-14.**
+  `_observe_civ` is DELETED; `observe` and `_ctx_block` take the seat's ROW
+  and read nothing that names a particular seat, the twin of
+  `cpu/core/observe.ts`'s one `observeSeat`. `masks()` lost both arms too:
+  every seat goes through `seat_masks(row)` + `_seat_unit_mask(row)`.
+
+  **SIX DIVERGENCES the merge forced a decision on. Each was settled against
+  the TS source, and each moves numbers — hunt-watch at freeze lift:**
+  1. **A civ seat's `envoy` mask was hardcoded all-False**, under the comment
+     "civ seats have no envoys". False: `_seat_influence_phase` banks
+     influence on every row and `_seat_record_apply` spends it on any row.
+     `seat_masks` now returns `_seat_envoy_mask(row)`.
+  2. **The quest column rendered 0 for civ seats**, under the comment "quests
+     are a seat-0 mechanic, and TS renders 0 for civ seats too". Also false:
+     `questFor(cityState, seat)` reads a SEAT-KEYED store and
+     `seatPhase` issues on every row (phase.ts, "#96: one issuer, every
+     seat"), exactly as `seat_citystate_quest[:, row]` does.
+  3. **`esc[1]` (settlerCost) was zeros for a civ seat** where
+     `observeSeat` calls `settlerCost(state, seat)` live. The escalator now
+     rides `_seat_settler_cost(row)` — the same body the BUY LADDER pays
+     from, so price-paid and price-seen cannot drift.
+  4. **A civ seat's `unitCap` counted only its war with WAR_COLUMN_SEAT**
+     where TS's term is `atWarWithAny(state, seat)`. One `at_war` term now
+     feeds both ctx[4] (unitCap) and ctx[11] (atWarAny), read off this row's
+     line of the war matrix over the majors.
+  5. **ctx[5] `oppStr` was ZERO for seat 0 and TS rendered max-over-others
+     for everybody.** `pick_war` compares own strength against the seat it
+     DECLARES on, so the field is the PAIR seat's strength: TS now renders
+     `seatStrength(state, CTX_PAIR_SEAT)` (0 on that seat's own row, as the
+     GPU always did), and ctx[8] `gang` reads the OPPONENT's warmonger
+     rather than the asker's own.
+  6. **ctx[12] `oppHasCities` read the ASKER's cities** —
+     `seatOf(state, seat)!.cities.length`, a self-comparison against a field
+     `ladder.CTX_FIELDS` documents as "the opponent holds any city". It is
+     CTX_PAIR_SEAT's city count now, which is what the GPU rendered.
+
+  Smaller things settled by the same merge: seat 0's queued-settler and
+  queued-unit counts now gate on a LIVING city (TS reduces over
+  `seat.cities`); the opponent block renders R columns for every asker,
+  where both old arms mis-sized it at R = 0; owned-tiles is ONE derivation
+  off the (`tile_seat`, `tile_city`) pair; and the DEAD `obs_size` property
+  is gone (it claimed 14 empire and 9 per-city fields where the layout has
+  15 and 10, and carried no escalator, research-cost or ctx block at all
+  — `policy/ladder.py`'s widths are the one layout definition).
+
+- **A-44. `seatProximity` measured a seat against ITSELF.** It took one
+  `Seat` and used `seatOf(state, actor.seat)` for the far side too, so it
+  returned 0 for anybody holding a city and Infinity otherwise — the DoW
+  policy's `prox <= 9` gate was therefore satisfied by every seat with a
+  city, whatever the map. It takes two seats now
+  (`seatProximity(state, CTX_PAIR_SEAT, seat)`), which is what the GPU's
+  pair-distance twin always computed. **BEHAVIOUR CHANGE on the TS side of
+  the DoW verb, hunt-watch.**
+
+- **A-45. THE ENCAMPMENT ROLL KEY, and two phantom keys.**
+  `encampmentDefense` returned `owner.seat === 0 ? 'penc' : 'renc'` and the
+  GPU mirrored it with FOUR `_damage_roll` calls under two disjoint owner
+  masks. An Encampment is fought the same way on every seat's territory —
+  the defense floor is already one row-generic read — so it is one
+  `'enc'`/`'encc'` pair on both engines, two rolls, and
+  `encampmentDefense` no longer returns a key at all. `WW_BATTLE_KEYS` also
+  drops `pcty`: `_assault_city` has been one body since the city-assault
+  merge and NEITHER engine issues that key.
+
+- **A-46. `_theological_combat` was a mirror of a rule TS does not have.**
+  The GPU body walked every APOSTLE slot resolving religious combat; it had
+  no caller, and `theologicalCombat` does not exist in `cpu/` at all (only
+  the data — `religiousStrength`, the martyr-relic prose — survives).
+  Deleted. Theological combat is now recorded as a B-side gap on BOTH
+  engines rather than as GPU machinery pretending to mirror something.
+
+- **A-47. THE t0 TILE-OWNERSHIP PAIR (`ownerSeatInit` / `ownerInit`),
+  fixture FORMAT 3.** `planes.ts` exported `tileSeat(t) === 0 ? tileCity(t)
+  : -1` — seat 0's half of the pair — and the GPU inferred `tile_seat = 0`
+  wherever it was set, so a civ's or a city-state's t0 ring had no way
+  through the wire. Both halves ship now, one plane each, and `tile_seat`
+  loads straight off `ownerSeatInit` with no per-class arm.
+
+  **THIS ALSO CLOSES A LIVE BREAK.** The per-tile city-state key was
+  renamed `cs` -> `cityState` by the vocabulary purge (6894513) while the
+  GPU still read `t.get("cs", -1)` — so on any re-exported fixture the GPU
+  would have started with NO city-state territory at all, and every
+  CS-territory rule would have diverged from turn 1. Nothing caught it
+  because the freeze has run compile-only since. The key is gone entirely:
+  `ownerSeatInit` carries the city-state rings.
+
+- **A-48. THE REMAINING SEAT-0 DISTINCTIONS, in full.** After A-38..A-47 the
+  list is short and every entry is WIRE or POLICY, never a rule:
+  (1) `step()`'s action interface and the unit-order REPLAY position (row
+  0's triples apply pre-turn, a civ's per-unit rows in-phase) — #108, and
+  TS carries the same fork as `actor.seat !== 0`;
+  (2) WAR_COLUMN_SEAT: the wire carries ONE war axis, so a civ row's war
+  head declares on / sues to that seat while that seat's head names WHICH
+  civ. `seat_masks` forks there and nowhere else;
+  (3) CTX_PAIR_SEAT: the same one-axis limit in the observation, and the
+  reason the DoW sextet is zero on that seat's own row (both engines say so
+  in the same words);
+  (4) `policy/drive.py`'s `_prod_ctx` city CAP — seat 0 expands to the
+  world's physical slot count, a civ stops at the ladder's `maxCities`
+  heuristic. POLICY, not a rule: both engines replay the same recorded
+  decisions, so it moves trajectories and never parity.
+
 ## B. Fidelity vs real Civ 6 — open residuals
 
 - **B-17r. Encampment:** ranged-vs-district strikes are out of scope
@@ -660,6 +762,16 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   ~14× tourism gap (B-20r).
 - **B-26r. Barbarian camp-spawn escalation** beyond the melee ladder
   (cliffs, ranged barbs and naval barbs all landed).
+- **B-27r. THEOLOGICAL COMBAT is absent from BOTH engines.** Real Civ 6
+  resolves religious combat between apostles/missionaries on religious
+  strength, and the loser dies; ours never fights — a religious unit is
+  only ever killed by ordinary combat or by expiry. The data is all
+  present and inert (`religiousStrength` on the roster, the martyr-relic
+  rule in greatPeople.ts, the relic/tourism constants), so this is a
+  missing RESOLVER, not a missing model. Recorded on A-46's deletion of the
+  GPU's caller-less mirror: until TS grows the rule there is nothing for
+  the GPU to mirror.
+
 - **B-D. UNSOURCED DATA VALUES — a residual class, not one item.**
   Mechanics are sourced item by item; the DATA layer largely is not:
   files under cpu/data + cpu/core carry explicit `eyeballed` /
@@ -750,6 +862,24 @@ Landed behind the compile bar only, in dependency order of suspicion:
    (d) **The loyalty pin/flip fixes (A-41)** change who receives a
        defection in a roster with a non-existent civ slot, and stop a
        civ capital pinning in a one-seat world.
+
+11. THE OBSERVATION AND THE WIRE (A-43..A-47) — **FIXTURES MUST
+   REGENERATE FIRST: the format is 3 and the loader refuses a 2.**
+   (a) **The six observation divergences (A-43)** all move what the
+       ladder decides, on whichever seat they touched: a civ seat can
+       now court city-states through the mask, sees its quests and its
+       real settler price, and stops over-counting its unit cap; seat 0
+       and TS agree on oppStr / gang / oppHasCities for the first time.
+   (b) **`seatProximity` (A-44)** was returning 0 for every seat with a
+       city, so the DoW proximity gate was a no-op on the TS side.
+       Expect DIFFERENT wars, not just different numbers.
+   (c) **The Encampment roll key (A-45)** is a LOG tag, so the stream is
+       unmoved — but the GPU dropped from four masked rolls to two, and
+       `_ww_audit` now proves the one-key form against WW_BATTLE_KEYS.
+   (d) **City-state territory at t0 (A-47)** was about to vanish from
+       every GPU world. The first serve run is the first thing that can
+       see it; if CS tiles read empty at t0 on the GPU, the pair is not
+       reaching `tile_seat`.
 
 Hunt discipline: scripted-reachability first (the digest gate names the
 turn), checkpoint-bracket from the nearest earlier checkpoint, full

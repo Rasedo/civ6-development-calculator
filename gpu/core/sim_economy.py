@@ -1193,10 +1193,12 @@ class SimEconomy:
 
     def _rel_combat_planes(self) -> tuple[torch.Tensor, torch.Tensor]:
         """(near3, terr) — [B, O, T] bool planes for the enhancer combat
-        adders. terr[b, g, t] = tile t is OWNED by a city following religion g
-        (seat 0 tiles via the owner slot plane; civ-seat tiles via the id-keyed
-        registry). near3[b, g, t] = some city following g has its CENTER within
-        justWarRange of t. Keyed (turn, _eff_version):
+        adders. terr[b, g, t] = tile t is OWNED by a city following religion g;
+        near3[b, g, t] = some city following g has its CENTER within
+        justWarRange of t. ONE derivation per plane over rows 0..R of the merged
+        city block — `tile_city` holds PERSISTENT ids for every seat (#110), so
+        the id match that used to serve only the civ rows now answers for seat 0
+        too. Keyed (turn, _eff_version):
         followedReligion moves once per turn (_spread_religious_pressure) and
         every city-set/ownership change (founding, capture, transfer, claim,
         compaction) bumps _eff_version — so the keyed cache IS the TS live
@@ -1206,37 +1208,40 @@ class SimEconomy:
             return self._rel_planes_cache[1]
         B, T, O = self.B, self.T, self._O
         dev = self.device
-        # per-tile followed religion of the OWNING city (-1 none)
+        nrow, RC = 1 + self.R, self.RC
+        alive = self.city_alive[:, :nrow]                  # [B, 1+R, RC]
+        fol = self.city_followed[:, :nrow, :RC]            # [B, 1+R, RC]
+        ids = self.city_id[:, :nrow, :RC]                  # [B, 1+R, RC]
+        # per-tile followed religion of the OWNING city (-1 none). `tile_seat`
+        # names the row and `tile_city` the id within it; ids are per-seat
+        # monotonic, so the ALIVE match is unique.
         tfol = torch.full((B, T), -1, dtype=torch.long, device=dev)
-        pf = self.city_followed[:, 0, :self.RC].gather(1, self.owner.clamp(min=0))  # [B, T]
-        tfol = torch.where((self.tile_seat == 0) & self.alive.gather(1, self.owner.clamp(min=0)), pf, tfol)
-        if self.R > 0:
-            for r in range(self.R):
-                for j in range(self.RC):
-                    if not bool(self.civ_city_alive[:, r, j].any()):
-                        continue
-                    ring = (self.civ_at == r) & (self.tile_city == self.civ_city_id[:, r, j].unsqueeze(1)) & self.civ_city_alive[:, r, j].unsqueeze(1)
-                    tfol = torch.where(ring, self.city_followed[:, r + 1, j].unsqueeze(1).expand(B, T), tfol)
+        for row in range(nrow):
+            mine = self.tile_seat == row  # [B, T]
+            if not bool(mine.any()):
+                continue
+            hit = (
+                mine.unsqueeze(2)
+                & (self.tile_city.unsqueeze(2) == ids[:, row].unsqueeze(1))
+                & alive[:, row].unsqueeze(1)
+            )  # [B, T, RC]
+            tfol = torch.where(
+                hit.any(dim=2), fol[:, row].gather(1, hit.long().argmax(dim=2)), tfol
+            )
         terr = tfol.unsqueeze(1) == torch.arange(O, device=dev).reshape(1, O, 1)  # [B, O, T]
         # near3: dilate FOLLOWING city centers by justWarRange (scatter_add
         # then >0 — a masked bool scatter would clobber tile 0 via the clamp)
         near3 = torch.zeros(B, O, T, dtype=torch.bool, device=dev)
         off3 = tiles_within_offsets(self._just_war_range).to(dev)
-        pc_win = tiles_from_offsets(self.site.clamp(min=0).reshape(-1), off3, self.W, self.H).reshape(B, self.RC, -1)  # [B, C, M]
-        civ_city_win = None
-        if self.R > 0:
-            civ_city_win = tiles_from_offsets(self.civ_city_center.clamp(min=0).reshape(-1), off3, self.W, self.H).reshape(B, self.R * self.RC, -1)
+        win = tiles_from_offsets(
+            self.city_center[:, :nrow, :RC].clamp(min=0).reshape(-1), off3, self.W, self.H
+        ).reshape(B, nrow * RC, -1)  # [B, (1+R)·RC, M]
         for g in range(O):
             srci = torch.zeros(B, T, dtype=torch.long, device=dev)
-            fol_c = self.alive & (self.city_followed[:, 0, :self.RC] == g)  # [B, C]
-            if bool(fol_c.any()):
-                w = torch.where(fol_c.unsqueeze(2), pc_win, torch.full_like(pc_win, -1)).reshape(B, -1)
+            fol_g = (alive & (fol == g)).reshape(B, -1)  # [B, (1+R)·RC]
+            if bool(fol_g.any()):
+                w = torch.where(fol_g.unsqueeze(2), win, torch.full_like(win, -1)).reshape(B, -1)
                 srci.scatter_add_(1, w.clamp(min=0), (w >= 0).long())
-            if self.R > 0:
-                fol_rc = self.civ_city_alive & (self.city_followed[:, 1:1 + self.R] == g)  # [B, R, RC]
-                if bool(fol_rc.any()):
-                    wr = torch.where(fol_rc.reshape(B, -1).unsqueeze(2), civ_city_win, torch.full_like(civ_city_win, -1)).reshape(B, -1)
-                    srci.scatter_add_(1, wr.clamp(min=0), (wr >= 0).long())
             near3[:, g] = srci > 0
         out = (near3, terr)
         self._rel_planes_cache = (key, out)
@@ -1374,7 +1379,7 @@ class SimEconomy:
         combat.generalAuraCS.
 
         It joins every unit-vs-unit roll, every unit-vs-CITY roll (rcty/rctyc,
-        csty/cstyc, pcty/pctyc, rngcs, vrngc, attacker side) and every
+        csty/cstyc, rngcs, vrngc, attacker side) and every
         CITY-STRIKE roll (cstk/estk, DEFENDER side). Absent from
         'rngrc' — TS does not add it there."""
         return self._gen_aura_hit(civ_unified, tile, naval).to(self.dtype) * self._gen_aura_cs_val

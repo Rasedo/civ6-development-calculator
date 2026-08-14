@@ -83,7 +83,7 @@ def main() -> None:
     sim2.controlled[0, 0] = True
     g = torch.Generator().manual_seed(7)
     for _ in range(40):
-        m = sim2.seat_masks(0)
+        m = sim2.seat_masks(1)
         pa = torch.full((1, sim2.RC), -1, dtype=torch.long)
         for j in range(sim2.RC):
             row = m["production"][0, j]

@@ -8,10 +8,15 @@ same fitness `cpu/core/score.ts` computes.
 
 Two observation streams feed the policy:
 
-  observe()        [B, obs_size]  — empire + per-city-slot features
-  unit_features()  [B, P, 8]      — per unit slot, for the units head
-                                    (alive, type, hp, position, and the
-                                    bearing to the nearest barbarian camp)
+  observe()        [B, F]    — empire, city-state, opponent, per-city-slot,
+                               escalator, research-cost and ctx blocks, in that
+                               order. `policy/ladder.py`'s block widths (EMP /
+                               PER_CS / PER_CIV / PER_CITY / CTX_FIELDS) are the
+                               ONE layout definition — this file holds no second
+                               copy of the arithmetic.
+  unit_features()  [B, P, 8] — per unit slot, for the units head (alive, type,
+                               hp, position, and the bearing to the nearest
+                               barbarian camp)
 
 reset(scramble=...) re-seeds each game's in-state mulberry32 per episode,
 so consecutive episodes see different barbarian spawns, quests, wars and
@@ -38,10 +43,11 @@ def n_unit_acts(rules: Rules) -> int:
 from .rng import hash_keys
 
 _M32 = (1 << 32) - 1
-_GLOBAL_F = 14
-_PER_CS_F = 3
-_PER_CIV_F = 3
-_PER_CITY_F = 9
+#: The seat the ctx block's PAIRWISE columns are measured against — the
+#: `cpu/core/observe.ts` CTX_PAIR_SEAT twin. The wire carries ONE such axis and
+#: this is the seat on its far side; that seat's own row would be
+#: self-referential, so it renders zero. An unfinished wire, not a rule.
+CTX_PAIR_SEAT = 0
 UNIT_FEATURES = 8
 
 
@@ -62,11 +68,6 @@ class BatchEnv:
         self._ax_q = (col - torch.div(row - (row & 1), 2, rounding_mode="floor")).to(torch.long)
         self._ax_r = row.to(torch.long)
 
-    @property
-    def obs_size(self) -> int:
-        s = self.sim
-        return _GLOBAL_F + _PER_CS_F * s.S + _PER_CIV_F * s.R + _PER_CITY_F * s.RC
-
     def reset(self, scramble: int | None = None) -> torch.Tensor:
         """Restore the initial state (all games, lockstep).
 
@@ -86,39 +87,38 @@ class BatchEnv:
         return self.observe()
 
     def _seat_civ(self, seat: int) -> int:
-        """Seat k>0 -> civ index k-1. Seat 0 has its own tensor family and
-        raises here."""
+        """Seat k>0 -> civ index k-1, for the interfaces that still speak civ
+        indices (apply_seat_actions, civ_score)."""
         r = seat - 1
         if r < 0 or r >= self.sim.R:
             raise ValueError(f"seat {seat} out of range (O = {self.sim.R + 1})")
         return r
 
+    def _row(self, seat: int) -> int:
+        """The seat's ROW in the merged planes — 0 for seat 0, r+1 for civ r,
+        which is also its index in the war matrix. Every mask and observation
+        body below takes this and nothing else."""
+        return 0 if seat == 0 else self._seat_civ(seat) + 1
+
     def masks(self, seat: int = 0) -> dict[str, torch.Tensor]:
         """The seat's decision space: production [B, C, NB+2+NU], tech [B, NT],
         civic [B, NC], units [B, P, n_unit_acts], envoy [B, S], war [B, 2R] —
-        all-False rows mean no decision pends there this turn. Seat k>0 renders
-        the same layouts from the civ tensor family, with envoy all-False (civ
-        seats have no envoys)."""
-        if seat != 0:
-            r = self._seat_civ(seat)
-            s = self.sim
-            m = s.seat_masks(r)
-            return {
-                "war": m["war"],  # [B, 2R]: column 0 declares, column R sues for peace
-                # ONE production body for every seat — same width, no padding.
-                "production": m["production"][:, : s.RC],
-                "tech": m["tech"],
-                "civic": m["civic"],
-                "units": s._seat_unit_mask(r + 1),
-                "envoy": torch.zeros(s.B, s.S, dtype=torch.bool, device=s.device),
-            }
+        all-False rows mean no decision pends there this turn.
+
+        ONE assembly for every seat. `seat_masks` is the engine's one legality
+        body (its war head carries the WAR_COLUMN_SEAT fork, documented there);
+        the unit mask is the same `_seat_unit_mask` at this seat's row.
+        """
+        s = self.sim
+        row = self._row(seat)
+        m = s.seat_masks(row)
         return {
-            "war": self.sim.war_mask(),  # [B, 2R] declare/peace
-            "production": self.sim.production_mask(),
-            "tech": self.sim.tech_mask(),
-            "civic": self.sim.civic_mask(),
-            "units": self.sim._seat_unit_mask(0),
-            "envoy": self.sim.envoy_mask(),
+            "war": m["war"],
+            "production": m["production"][:, : s.RC],
+            "tech": m["tech"],
+            "civic": m["civic"],
+            "units": s._seat_unit_mask(row),
+            "envoy": m["envoy"],
         }
 
     def step(
@@ -155,7 +155,7 @@ class BatchEnv:
         self._last_score = score
         return self.observe(seat), reward, self.sim.turn > self.horizon
 
-    def _escalators(self, seat: int, techs, civics, builders, settler_cost) -> list:
+    def _escalators(self, techs, civics, builders, settler_cost) -> list:
         """The three production costs that ESCALATE with a seat's own state —
         district, settler, builder.
 
@@ -175,84 +175,114 @@ class BatchEnv:
         return [d_cost / 1000.0, settler_cost / 1000.0, s._builder_cost(builders).to(d) / 1000.0]
 
     def observe(self, seat: int = 0) -> torch.Tensor:
-        """[B, obs_size] — empire globals, city-state courtship, opponent
-        posture, and per-city-slot economy/defense, all roughly unit-scaled.
-        The schema is seat-invariant by design: seat k>0 renders the same
-        layout from the civ tensor family."""
-        if seat != 0:
-            return self._observe_civ(self._seat_civ(seat))
+        """[B, F] — empire globals, city-state courtship, opponent posture, and
+        per-city-slot economy/defense, all roughly unit-scaled.
+
+        ONE renderer for every seat, the twin of `cpu/core/observe.ts`'s one
+        `observeSeat`: it takes the seat's ROW in the merged planes and reads
+        nothing that names a particular seat. The two engines must move
+        together here — the gate compares them field for field before every
+        step.
+        """
         s = self.sim
         d = s.dtype
         B, C = s.B, s.RC
         dev = s.device
-        need = s._growth_needed(s.pop).clamp(min=1)
-        denom = s.cur_cost.clamp(min=1)
-        # every major seat shares one unit window, so "this seat's army" is
-        # a SEAT filter, never the whole window
-        _mine0 = s.major_unit_alive & (s.major_unit_seat == 0)
-        owned = (s.owner.unsqueeze(1) == torch.arange(C, device=dev).view(1, C, 1)).sum(dim=2).to(d)
+        row = self._row(seat)
+
+        alive = s.city_alive[:, row]
+        pop = s.city_pop[:, row]
+        cur = s.city_current[:, row]
+        need = s._growth_needed(pop).clamp(min=1)
+        denom = s.city_cost[:, row].clamp(min=1)
+        # OWNED TILES per city: `tile_seat` names the holding row and
+        # `tile_city` the PERSISTENT id within it (#110) — the `ownerSeat` /
+        # `ownerCity` pair TS filters on, one derivation for every seat.
+        owned = (
+            (s.tile_city.unsqueeze(1) == s.city_id[:, row, :C].unsqueeze(2))
+            & (s.tile_seat == row).unsqueeze(1)
+        ).sum(dim=2).to(d)
         per_city = torch.stack(
             [
-                s.alive.to(d),
-                s.pop.to(d) / 10.0,
-                s.food_box / need,
-                torch.where(s.current >= 0, s.progress / denom, torch.zeros_like(s.progress)),
-                s.culture_box / s._border_cost(s.tiles_acquired).clamp(min=1),
+                alive.to(d),
+                pop.to(d) / 10.0,
+                s.city_growth[:, row] / need,
+                torch.where(cur >= 0, s.city_progress[:, row] / denom, torch.zeros_like(denom)),
+                s.city_cbox[:, row] / s._border_cost(s.city_acquired[:, row]).clamp(min=1),
                 owned / 20.0,
-                torch.where(s.alive, s.city_hp[:, 0], torch.zeros_like(s.alive, dtype=s.city_hp.dtype)).to(d) / 200.0,
-                s.loyalty.to(d) / 100.0,
-                (s.current >= 0).to(d),
+                torch.where(alive, s.city_hp[:, row], torch.zeros_like(s.city_hp[:, row])).to(d) / 200.0,
+                s.city_loyalty[:, row].to(d) / 100.0,
+                (cur >= 0).to(d),
                 # The production LADDER branches on isCapital — only the
                 # capital queues a settler.
-                s.is_cap.to(d),
+                s.city_is_cap[:, row].to(d),
             ],
             dim=2,
-        ) * s.alive.unsqueeze(2).to(d)  # [B, C, 10] — dead slots ZERO, the TS zero-fill twin
+        ) * alive.unsqueeze(2).to(d)  # [B, C, 10] — dead slots ZERO, the TS zero-fill twin
         # The city AXIS is LIVING ORDER, not slot order: the TS array shifts
         # down when a city is lost. Compact alive slots to the front, stable in
         # slot (= founding) order.
-        _ord = torch.argsort((~s.alive).long(), dim=1, stable=True)
+        _ord = torch.argsort((~alive).long(), dim=1, stable=True)
         per_city = per_city.gather(1, _ord.unsqueeze(2).expand(-1, -1, per_city.shape[2]))
+
+        mine = s.major_unit_alive & (s.major_unit_seat == row)
         emp = torch.stack(
             [
                 torch.full((B,), float(s.turn) / self.horizon, dtype=d, device=dev),
-                s.techs.sum(dim=1).to(d) / max(s.techs.shape[1], 1),
-                s.civics.sum(dim=1).to(d) / max(s.civics.shape[1], 1),
-                s.tech_prog / 50.0,
-                s.civic_prog / 50.0,
-                s._seat_settlers(0).to(d),  # LIVE settler units
-                # LIVE queued-settler count: current == the settler column NB.
-                # It is the live queue, never a cumulative counter.
-                (s.current == s.rules_dev.b_cost.shape[0]).sum(dim=1).to(d),
-                s.alive.sum(dim=1).to(d) / C,
-                (s.treasury / 200.0).clamp(max=5.0),
-                s.envoys_avail.to(d) / 5.0,
-                s.influence / 100.0,
+                s.civ_techs[:, row].sum(dim=1).to(d) / max(s.civ_techs.shape[2], 1),
+                s.civ_civics[:, row].sum(dim=1).to(d) / max(s.civ_civics.shape[2], 1),
+                s.civ_tech_prog[:, row].to(d) / 50.0,
+                s.civ_civic_prog[:, row].to(d) / 50.0,
+                # LIVE settler units, then LIVE QUEUED ones (current == the
+                # settler column). Both are live reads, never a cumulative
+                # counter, and both gate on a LIVING city as TS's reduce does.
+                s._seat_settlers(row).to(d),
+                (alive & (cur == s.SETTLER)).sum(dim=1).to(d),
+                alive.sum(dim=1).to(d) / C,
+                (s.civ_treasury[:, row] / 200.0).clamp(max=5.0),
+                s.civ_envoys_avail[:, row].to(d) / 5.0,
+                s.civ_influence[:, row].to(d) / 100.0,
                 s.n_camps.to(d) / 5.0,
                 s.barb_unit_alive.sum(dim=1).to(d) / 10.0,
-                _mine0.sum(dim=1).to(d) / 10.0,
+                mine.sum(dim=1).to(d) / 10.0,
                 # Army COMPOSITION: the ladder trains ranged while the army
                 # holds melee, so a bare COUNT cannot express the decision.
-                (_mine0 & (s._type_ranged_strength[s.major_unit_type.clamp(min=0, max=s.NU - 1)] > 0)).sum(dim=1).to(d) / 10.0,
+                (mine & (s._type_ranged_strength[s.major_unit_type.clamp(min=0, max=s.NU - 1)] > 0)).sum(dim=1).to(d) / 10.0,
             ],
             dim=1,
         )  # [B, 15]
+        # THIS SEAT'S OWN courtship view: met, envoys and quest are all
+        # seat-keyed stores, one row per seat, and every seat can hold a quest
+        # (`_seat_quest_phase` runs on every row). Captured city-states ZERO.
         cs = torch.stack(
             [
-                s.citystate_met.to(d),
-                s.citystate_envoys.to(d) / 6.0,
-                (s.citystate_quest > 0).to(d),
+                s.seat_citystate_met[:, row, : s.S].to(d),
+                s.seat_citystate_envoys[:, row, : s.S].to(d) / 6.0,
+                (s.seat_citystate_quest[:, row, : s.S] > 0).to(d),
             ],
             dim=2,
-        ) * s.citystate_alive.unsqueeze(2).to(d)  # [B, S, 3] — captured city-states render ZEROS
-        cv = torch.stack(
-            [
-                (s.civ_only_alive & s.civ_only_atwar).to(d),
-                s.civ_only_warturns.to(d) / 14.0,
-                (s.civ_city_alive.sum(dim=2) * s.civ_only_alive.long()).to(d) / 6.0,
-            ],
-            dim=2,
-        )  # [B, R, 3]
+        ) * s.citystate_alive.unsqueeze(2).to(d)  # [B, S, 3]
+        # OPPONENTS, seat-symmetric: every OTHER major seat in ascending seat
+        # order, and the war field is THIS seat's war with that opponent — read
+        # off the symmetric `war` matrix, so no seat is privileged. A roster slot
+        # with no seat renders zeros (TS walks `state.seats`, which has no such
+        # entry); the width stays R for every asker.
+        opp_cols = []
+        for o in range(1 + s.R):
+            if o == row:
+                continue
+            ex = s.civ_alive[:, o]
+            opp_cols.append(
+                torch.stack(
+                    [
+                        (s.war[:, row, o] & ex).to(d),
+                        s.war_turns[:, o].to(d) / 14.0,
+                        (s.city_alive[:, o].sum(dim=1) * ex.long()).to(d) / 6.0,
+                    ],
+                    dim=1,
+                )
+            )
+        cv = torch.stack(opp_cols, dim=1) if opp_cols else torch.zeros(B, 0, 3, dtype=d, device=dev)
         # EFFECTIVE research cost per option — the quantity the decision
         # actually uses, not the boost flag it derives from. Emitting flags
         # would force the policy to apply `boosted ? base*(1-frac) : base`
@@ -264,207 +294,81 @@ class BatchEnv:
         # away should change which branch a policy walks toward now, and masking
         # to the legal frontier would delete exactly that signal.
         return torch.cat([emp, cs.reshape(B, -1), cv.reshape(B, -1), per_city.reshape(B, -1),
-                          torch.stack(self._escalators(0, s.techs, s.civics, s.builders_trained,
-                                                      # settlerCost counts cities-1 + LIVE + LIVE-QUEUED settlers,
-                                                      # the queued count being (current == the settler column)
-                                                      (s.rules.settler_base + s.rules.settler_per_city
-                                                       * (s.alive.sum(dim=1) - 1 + s._seat_settlers(0)
-                                                          + (s.current == s.rules_dev.b_cost.shape[0]).sum(dim=1)).clamp(min=0).to(d))), dim=1),
-                          s._eff_cost(s.rules_dev.t_cost.unsqueeze(0).expand(B, -1), s.tech_boosted, 0).to(d) / 1000.0,
-                          s._eff_cost(s.rules_dev.c_cost.unsqueeze(0).expand(B, -1), s.civic_boosted, 0, is_civic=True).to(d) / 1000.0,
-                          self._ctx_block(None)], dim=1)
+                          torch.stack(self._escalators(s.civ_techs[:, row], s.civ_civics[:, row],
+                                                       s.civ_builders_trained[:, row],
+                                                       s._seat_settler_cost(row).to(d)), dim=1),
+                          s._eff_cost(s.rules_dev.t_cost.unsqueeze(0).expand(B, -1), s.civ_tech_boosted[:, row], row).to(d) / 1000.0,
+                          s._eff_cost(s.rules_dev.c_cost.unsqueeze(0).expand(B, -1), s.civ_civic_boosted[:, row], row, is_civic=True).to(d) / 1000.0,
+                          self._ctx_block(row)], dim=1)
 
-    def _ctx_block(self, r: int | None) -> torch.Tensor:
+    def _seat_strength(self, row: int) -> torch.Tensor:
+        """[B] long — the `seatStrength` twin: 8 per city plus the combat of
+        every unit this seat owns. Our own heuristic, not a Civ 6 rule, so the
+        only thing that matters is that ONE number answers for everybody: the
+        DoW comparison puts two of them side by side against a 1.3x bar."""
+        s = self.sim
+        ut = s.major_unit_type.clamp(min=0, max=s.NU - 1)
+        mine = s.major_unit_alive & (s.major_unit_seat == row)
+        return s.city_alive[:, row].sum(dim=1) * 8 + (mine.long() * s._type_combat[ut]).sum(dim=1)
+
+    def _ctx_block(self, row: int) -> torch.Tensor:
         """The CTX block (ladder.CTX_FIELDS): the decide-time scalars
         `_prod_ctx`/`_war_ctx` read back out of the observation. RAW and
         unscaled, because the ladder compares them exactly and scaled floats do
         not round-trip bit-stably; the formulas are the scripted sites' own.
-        Seat 0 renders its own family's twins, except the DoW-specific quintet
-        (oppStr/prox/gang/aggression/peaceTurns), which is zero for seat 0 — it
-        runs no scripted DoW policy."""
+
+        The DoW-specific sextet (oppStr / prox / gang / aggression /
+        peaceTurns / oppHasCities) is PAIRWISE, measured against
+        CTX_PAIR_SEAT — the wire carries one such axis. That seat's own row
+        would be self-referential and renders zero, exactly as
+        `cpu/core/observe.ts` does. Read `oppStr`, `gang` and `oppHasCities` as
+        the OPPONENT's (the policy gangs up on their warmongering and compares
+        strength against theirs); `aggression` and `peaceTurns` are this seat's
+        own."""
         s = self.sim
         d = s.dtype
         B = s.B
         dev = s.device
         rng_t = s._type_ranged_strength > 0
-        if r is None:
-            n_cities = s.alive.sum(dim=1)
-            qcur = s.current
-            # seat 0's queue codes are MASK COLUMNS (units at NB+2..NB+1+NU),
-            # not the civ family's 1..NU coding.
-            _nb0 = s.rules_dev.b_cost.shape[0]
-            q_ty = (qcur - (_nb0 + 2)).clamp(min=0, max=s.NU - 1)
-            q_u = (qcur >= _nb0 + 2) & (qcur < _nb0 + 2 + s.NU)
-            q_mil = q_u & (s._type_combat[q_ty] > 0)
-            pt = s.major_unit_type.clamp(min=0, max=s.NU - 1)
-            mine0 = s.major_unit_alive & (s.major_unit_seat == 0)
-            mil = mine0 & (s._type_combat[pt] > 0)
-            n_units = mine0.sum(dim=1) + q_u.sum(dim=1)
-            n_rng = (mil & rng_t[pt]).sum(dim=1) + (q_mil & rng_t[q_ty]).sum(dim=1)
-            n_mel = (mil & ~rng_t[pt]).sum(dim=1) + (q_mil & ~rng_t[q_ty]).sum(dim=1)
-            at_opp = s.civ_only_atwar.any(dim=1) if s.R > 0 else torch.zeros(B, dtype=torch.bool, device=dev)
-            # ONE strength formula for every seat — nCities*8 + own-unit
-            # combat, the `_civ_pair_strengths` text.
-            own_str = n_cities * 8 + (mine0.to(torch.long) * s._type_combat[pt]).sum(dim=1)
-            z = torch.zeros(B, dtype=d, device=dev)
-            return torch.stack([
-                n_cities.to(d), n_units.to(d), n_mel.to(d), n_rng.to(d),
-                (n_cities * 2 + torch.where(at_opp, 3, 1)).to(d),
-                z, own_str.to(d), z, z, z, z,
-                at_opp.to(d), z,
-            ], dim=1)
-        n_cities = s.civ_city_alive[:, r].sum(dim=1)
-        qcur = s.civ_city_current[:, r]
+        alive = s.city_alive[:, row]
+        n_cities = alive.sum(dim=1)
+        # THE ONE production layout: queue codes are mask COLUMNS on every row.
+        qcur = s.city_current[:, row]
         q_ty = (qcur - s.UNIT_BASE).clamp(min=0, max=s.NU - 1)
-        q_u = (qcur >= s.UNIT_BASE) & (qcur < s.UNIT_BASE + s.NU)
+        q_u = alive & (qcur >= s.UNIT_BASE) & (qcur < s.UNIT_BASE + s.NU)
         q_mil = q_u & (s._type_combat[q_ty] > 0)
-        vt = s.major_unit_type.clamp(min=0, max=s.NU - 1)
-        mine = s.major_unit_alive & (s.major_unit_seat == r + 1)
-        mil = mine & (s._type_combat[vt] > 0)
+        ut = s.major_unit_type.clamp(min=0, max=s.NU - 1)
+        mine = s.major_unit_alive & (s.major_unit_seat == row)
+        mil = mine & (s._type_combat[ut] > 0)
         n_units = mine.sum(dim=1) + q_u.sum(dim=1)
-        n_rng = (mil & rng_t[vt]).sum(dim=1) + (q_mil & rng_t[q_ty]).sum(dim=1)
-        n_mel = (mil & ~rng_t[vt]).sum(dim=1) + (q_mil & ~rng_t[q_ty]).sum(dim=1)
-        # The SAME 8-per-city text: this civ seat's view of seat 0, on the one
-        # ruler `civ_only_str` below also uses.
-        _p_mine = s.major_unit_alive & (s.major_unit_seat == 0)
-        p_str = s.alive.sum(dim=1) * 8 + (_p_mine.to(torch.long) * s._type_combat[s.major_unit_type.clamp(min=0, max=s.NU - 1)]).sum(dim=1)
-        own_cs = mine.to(torch.long) * s._type_combat[vt]
-        civ_only_str = torch.floor(n_cities.double() * 8 + own_cs.sum(dim=1).double() + 0.5)
-        d_pr = s.pair_dist[
-            s.site.clamp(min=0).unsqueeze(2), s.civ_city_center[:, r].clamp(min=0).unsqueeze(1)
-        ].to(torch.long)
-        pair_ok = s.alive.unsqueeze(2) & s.civ_city_alive[:, r].unsqueeze(1)
-        prox = torch.where(pair_ok, d_pr, 999).reshape(B, -1).min(dim=1).values
-        gang = s.warmonger >= s._wm_gang
-        atwar_any = s.civ_only_atwar[:, r] | (s.civ_pair_war[:, r].any(dim=1) if s.R > 0 else torch.zeros(B, dtype=torch.bool, device=dev))
+        n_rng = (mil & rng_t[ut]).sum(dim=1) + (q_mil & rng_t[q_ty]).sum(dim=1)
+        n_mel = (mil & ~rng_t[ut]).sum(dim=1) + (q_mil & ~rng_t[q_ty]).sum(dim=1)
+        # atWarWithAny over the majors — this row's own line of the war matrix.
+        # It feeds BOTH the unit cap and the atWarAny column, as TS's one
+        # `atWarWithAny(state, seat)` feeds both.
+        at_war = s.war[:, row, : 1 + s.R].any(dim=1)
+        z = torch.zeros(B, dtype=d, device=dev)
+        if row == CTX_PAIR_SEAT:
+            opp_str = prox = gang = aggr = peace = has_cities = z
+        else:
+            opp_str = self._seat_strength(CTX_PAIR_SEAT).to(d)
+            pair_ok = s.city_alive[:, CTX_PAIR_SEAT].unsqueeze(2) & alive.unsqueeze(1)
+            d_pr = s.pair_dist[
+                s.city_center[:, CTX_PAIR_SEAT].clamp(min=0).unsqueeze(2),
+                s.city_center[:, row].clamp(min=0).unsqueeze(1),
+            ].to(torch.long)
+            prox = torch.where(pair_ok, d_pr, 999).reshape(B, -1).min(dim=1).values.to(d)
+            gang = (s.civ_warmonger[:, CTX_PAIR_SEAT] >= s._wm_gang).to(d)
+            aggr = s.civ_aggression[:, row].to(d)
+            peace = s.peace_turns[:, row].to(d)
+            has_cities = (s.city_alive[:, CTX_PAIR_SEAT].sum(dim=1) > 0).to(d)
         return torch.stack([
             n_cities.to(d), n_units.to(d), n_mel.to(d), n_rng.to(d),
-            (n_cities * 2 + torch.where(s.civ_only_atwar[:, r], 3, 1)).to(d),
-            p_str.to(d), civ_only_str.to(d), prox.to(d),
-            gang.to(d), s.civ_only_aggression[:, r].to(d), s.civ_only_peaceturns[:, r].to(d),
-            atwar_any.to(d), (s.alive.sum(dim=1) > 0).to(d),
+            (n_cities * 2 + torch.where(at_war, 3, 1)).to(d),
+            opp_str, self._seat_strength(row).to(d), prox,
+            gang, aggr, peace,
+            at_war.to(d), has_cities,
         ], dim=1)
-
-    def _observe_civ(self, r: int) -> torch.Tensor:
-        """The seat-invariant obs layout rendered from civ r's tensors: this
-        seat's empire, then an opponent block covering every OTHER civ seat in
-        seat order, each read from THIS seat's point of view.
-        `cpu/core/observe.ts:observeSeat` is the twin."""
-        s = self.sim
-        d = s.dtype
-        B, C = s.B, s.RC
-        dev = s.device
-        # The city AXIS is LIVING ORDER: the TS list shifts down when a city
-        # dies. The step-end reclaim already compacts every row, so this sort is
-        # the belt to that brace — stable, so it is founding order.
-        _ordR = torch.argsort((~s.civ_city_alive[:, r]).long(), dim=1, stable=True)  # [B, RC] slot ids
-        pop = s.civ_city_pop[:, r].gather(1, _ordR).to(d)
-        alive = s.civ_city_alive[:, r].gather(1, _ordR)
-        needs = s._growth_needed(s.civ_city_pop[:, r].gather(1, _ordR)).clamp(min=1)
-        denom = s.civ_city_cost[:, r].gather(1, _ordR).clamp(min=1)
-        _cur = s.civ_city_current[:, r].gather(1, _ordR)
-        per_city = torch.stack(
-            [
-                alive.to(d),
-                pop / 10.0,
-                s.civ_city_growth[:, r].gather(1, _ordR).to(d) / needs.to(d),
-                torch.where(_cur >= 0, s.civ_city_progress[:, r].gather(1, _ordR).to(d) / denom.to(d), torch.zeros_like(pop)),
-                s.civ_city_cbox[:, r].gather(1, _ordR).to(d) / s._border_cost(s.civ_city_acquired[:, r].gather(1, _ordR)).clamp(min=1).to(d),
-                torch.where(
-                    alive,
-                    ((s.tile_city.unsqueeze(1) == s.civ_city_id[:, r].gather(1, _ordR).unsqueeze(2))
-                     & (s.civ_at == r).unsqueeze(1)).sum(dim=2).to(d),  # civ_city_id is PER-CIV — gate by owner plane
-                    torch.zeros(B, C, dtype=d, device=dev),
-                ) / 20.0,
-                torch.where(alive, s.civ_city_hp[:, r].gather(1, _ordR).to(d), torch.zeros_like(pop)) / 200.0,
-                s.civ_city_loyalty[:, r].gather(1, _ordR).to(d) / 100.0,
-                (_cur >= 0).to(d),
-                # The production LADDER branches on isCapital — only the
-                # capital queues a settler.
-                s.civ_city_is_cap[:, r].gather(1, _ordR).to(d),
-            ],
-            dim=2,
-        ) * alive.unsqueeze(2).to(d)  # [B, C, 10] — dead rows ZERO, the TS zero-fill twin
-        n_own_units = (s.major_unit_alive & (s.major_unit_seat == r + 1)).sum(dim=1).to(d)
-        emp = torch.stack(
-            [
-                torch.full((B,), float(s.turn) / self.horizon, dtype=d, device=dev),
-                s.civ_only_techs[:, r].sum(dim=1).to(d) / max(s.civ_only_techs.shape[2], 1),
-                s.civ_only_civics[:, r].sum(dim=1).to(d) / max(s.civ_only_civics.shape[2], 1),
-                s.civ_only_tech_prog[:, r].to(d) / 50.0,
-                s.civ_only_civic_prog[:, r].to(d) / 50.0,
-                # Field 5 is this seat's LIVE settler units and field 6 how
-                # many are QUEUED — the same two meanings seat 0 renders.
-                s._seat_settlers(r + 1).to(d),
-                (s.civ_city_current[:, r] == s.SETTLER).sum(dim=1).to(d),
-                s.civ_city_alive[:, r].sum(dim=1).to(d) / C,
-                (s.civ_only_treasury[:, r] / 200.0).clamp(max=5.0),
-                s.civ_only_envoys_avail[:, r].to(d) / 5.0,
-                s.civ_only_influence[:, r].to(d) / 100.0,
-                s.n_camps.to(d) / 5.0,
-                s.barb_unit_alive.sum(dim=1).to(d) / 10.0,
-                n_own_units / 10.0,
-                # Army COMPOSITION for this seat, the twin of seat 0's — the
-                # ladder trains ranged while the army holds melee, so a bare
-                # unit COUNT cannot express the decision.
-                (s.major_unit_alive & (s.major_unit_seat == r + 1)
-                 & (s._type_ranged_strength[s.major_unit_type.clamp(min=0, max=s.NU - 1)] > 0)).sum(dim=1).to(d) / 10.0,
-            ],
-            dim=1,
-        )  # [B, 15]
-        # THIS SEAT'S OWN courtship view (civ_only_citystate_met / civ_only_citystate_envoys). The quest
-        # column stays zero — quests are a seat-0 mechanic, and TS renders 0
-        # for civ seats too. Captured city-states zero out.
-        cs = torch.stack(
-            [
-                s.civ_only_citystate_met[:, r, : s.S].to(d),
-                s.civ_only_citystate_envoys[:, r, : s.S].to(d) / 6.0,
-                torch.zeros(B, s.S, dtype=d, device=dev),
-            ],
-            dim=2,
-        ) * s.citystate_alive.unsqueeze(2).to(d)
-        # OPPONENTS, seat-symmetric: every OTHER civ seat in ascending seat
-        # order, and the war field is THIS seat's war with that opponent — read
-        # off the symmetric `war` matrix, so no seat is privileged. The twin is
-        # `cpu/core/observe.ts:observeSeat`; the two must move together.
-        me = r + 1  # this seat's index in the seat-ordered walk below
-        opp_cols = []
-        for o in range(1 + s.R):  # every civ seat, in seat order
-            if o == me:
-                continue
-            if o == 0:
-                cities = s.alive.sum(dim=1).to(d)
-            else:
-                cities = (s.civ_city_alive[:, o - 1].sum(dim=1) * s.civ_only_alive[:, o - 1].long()).to(d)
-            opp_cols.append(
-                torch.stack(
-                    [
-                        s.war[:, me, o].to(d),
-                        s.war_turns[:, o].to(d) / 14.0,
-                        cities / 6.0,
-                    ],
-                    dim=1,
-                )
-            )
-        cv = torch.stack(opp_cols, dim=1)  # [B, R, 3]
-        # EFFECTIVE research cost per option — the quantity the decision
-        # actually uses, not the boost flag it derives from. Emitting flags
-        # would force the policy to apply `boosted ? base*(1-frac) : base`
-        # itself, and that formula is a RULE: it must live in the engine, or a
-        # rule leaks into the policy and the two can drift.
-        #
-        # FULL WIDTH on purpose, unmasked. The mask carries legality separately;
-        # what the full vector buys is PLANNING — a boosted tech several prereqs
-        # away should change which branch a policy walks toward now, and masking
-        # to the legal frontier would delete exactly that signal.
-        return torch.cat([emp, cs.reshape(B, -1), cv.reshape(B, -1), per_city.reshape(B, -1),
-                          torch.stack(self._escalators(r + 1, s.civ_only_techs[:, r], s.civ_only_civics[:, r],
-                                                      s.civ_only_builders_trained[:, r] if hasattr(s, "civ_only_builders_trained")
-                                                      else torch.zeros(B, dtype=torch.long, device=dev),
-                                                      torch.zeros(B, dtype=d, device=dev)), dim=1),
-                          s._eff_cost(s.rules_dev.t_cost.unsqueeze(0).expand(B, -1), s.civ_only_tech_boosted[:, r], r + 1).to(d) / 1000.0,
-                          s._eff_cost(s.rules_dev.c_cost.unsqueeze(0).expand(B, -1), s.civ_only_civic_boosted[:, r], r + 1, is_civic=True).to(d) / 1000.0,
-                          self._ctx_block(r)], dim=1)
 
     def unit_features(self, seat: int = 0) -> torch.Tensor:
         """[B, simbase.UNIT_SLOTS, 8] per unit-head-row features for the units
@@ -479,7 +383,7 @@ class BatchEnv:
         s = self.sim
         d = s.dtype
         B = s.B
-        row = 0 if seat == 0 else self._seat_civ(seat) + 1
+        row = self._row(seat)
         smap = s._seat_slot_map(row)
         alive = smap >= 0
         sc = smap.clamp(min=0)

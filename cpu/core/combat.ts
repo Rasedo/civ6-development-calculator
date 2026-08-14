@@ -208,7 +208,7 @@ export function supportCount(state: GameState, defTileIndex: number, defender: U
 // and never trigger this on their own account.
 //
 // widened the SCOPE from unit-vs-unit to every roll where a unit fights
-// a city or a city strikes a unit (pcty/rcty/csty + their counter-rolls, the
+// a city or a city strikes a unit (rcty/csty + their counter-rolls, the
 // ranged-vs-city rolls, and the two city-strike keys cstk/estk).
 // added the movement half (see `generalAuraMP` in aura.ts).
 //
@@ -492,12 +492,12 @@ function attackEncampment(
   state: GameState,
   attacker: Unit,
   tileIndex: number,
-  defCS: number,
-  k: string, seat: number): void {
+  defCS: number, seat: number): void {
   const tile = state.map.tiles[tileIndex];
   const atkCS = assaultAtkCS(state, attacker, tileIndex);
-  const dmgToEncamp = damageRoll(state, atkCS - defCS, k, tileIndex);
-  const dmgToAttacker = damageRoll(state, defCS - atkCS, k + 'c', tileIndex);
+  // ONE roll-key pair whoever owns the district: 'enc' opens, 'encc' counters.
+  const dmgToEncamp = damageRoll(state, atkCS - defCS, 'enc', tileIndex);
+  const dmgToAttacker = damageRoll(state, defCS - atkCS, 'encc', tileIndex);
   gainXp(attacker, XP_ATTACK);
   tile.encampHp = Math.max(0, (tile.encampHp ?? ENCAMPMENT_HP) - dmgToEncamp);
   attacker.hp -= dmgToAttacker;
@@ -518,7 +518,7 @@ export function encampmentDefense(
   state: GameState,
   attacker: Unit,
   tile: Tile,
-): { defCS: number; k: string } | null {
+): { defCS: number } | null {
   if (!encampmentBlocks(state, tile, attacker)) return null;
   // The CIV-level defense floor, deliberately WITHOUT the city-center garrison
   // term: that +5 is "a unit is standing in the city centre", which has nothing
@@ -527,8 +527,7 @@ export function encampmentDefense(
   // district never doubles up with a defender.
   const owner = seatOf(state, tileSeat(tile));
   if (!owner) return null;
-  // The label stays split: it names the damage-roll channel in the logs.
-  return { defCS: Math.max(15, owner.bestMeleeCS ?? 0), k: owner.seat === 0 ? 'penc' : 'renc' };
+  return { defCS: Math.max(15, owner.bestMeleeCS ?? 0) };
 }
 
 /** Melee attack an adjacent enemy unit or city tile. */
@@ -618,7 +617,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     return no('Nothing to attack there.');
   }
   if (encamp && !seatTarget && !cityStateTarget) {
-    attackEncampment(state, attacker, targetIndex, encamp.defCS, encamp.k, seat);
+    attackEncampment(state, attacker, targetIndex, encamp.defCS, seat);
     return ok;
   }
 

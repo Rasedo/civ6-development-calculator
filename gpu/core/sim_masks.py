@@ -20,13 +20,24 @@ class SimMasks:
         legality."""
         return self._seat_production_mask(0)
 
+    def _seat_tech_mask(self, row: int) -> torch.Tensor:
+        """[B, NT] valid research picks for seat row `row`; all-False where that
+        row's research slot is busy. ONE body for every seat."""
+        return (self._available_mask(self.civ_techs[:, row], self._prereq_t)
+                & (self.civ_cur_tech[:, row] == -1).unsqueeze(1))
+
+    def _seat_civic_mask(self, row: int) -> torch.Tensor:
+        """[B, NC] the civic twin of `_seat_tech_mask`."""
+        return (self._available_mask(self.civ_civics[:, row], self._prereq_c)
+                & (self.civ_cur_civic[:, row] == -1).unsqueeze(1))
+
     def tech_mask(self) -> torch.Tensor:
-        """[B, NT] valid research picks; all-False where research is busy."""
-        return self._available_mask(self.techs, self._prereq_t) & (self.cur_tech == -1).unsqueeze(1)
+        """[B, NT] seat 0's row of `_seat_tech_mask` — no mask of its own."""
+        return self._seat_tech_mask(0)
 
     def civic_mask(self) -> torch.Tensor:
-        """[B, NC] valid civic picks; all-False where the slot is busy."""
-        return self._available_mask(self.civics, self._prereq_c) & (self.cur_civic == -1).unsqueeze(1)
+        """[B, NC] seat 0's row of `_seat_civic_mask`."""
+        return self._seat_civic_mask(0)
 
     def _seat_envoy_mask(self, row: int) -> torch.Tensor:
         """[B, S] city-states seat row `row` could back with an available envoy

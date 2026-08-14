@@ -298,7 +298,7 @@ def poke_exclusive_with(rules, rj, path):
     sim.civ_city_bldg[0, r, j, STA] = False
 
     def queue_col(b):
-        return bool(sim.seat_masks(r)["production"][0, j, b])
+        return bool(sim.seat_masks(r + 1)["production"][0, j, b])
 
     assert queue_col(STA), "STABLE must be queueable when neither exclusive is owned"
     assert queue_col(BAR), "BARRACKS must be queueable when neither exclusive is owned"

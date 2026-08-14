@@ -156,12 +156,18 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
     + qMil.filter((q) => isRngType((q as { unit: string }).unit)).length;
   const nMeleeWQ = ownMil.filter((u) => !isRngType(u.type)).length
     + qMil.filter((q) => !isRngType((q as { unit: string }).unit)).length;
-  // The DoW quintet below is PAIRWISE — proximity, gang, aggression and
-  // peaceTurns are all measured against `CTX_PAIR_SEAT`, because the wire
-  // carries one such axis and this is the seat it names. That seat's own row
-  // would be self-referential, so it renders zero. An unfinished wire, not a
-  // rule: nothing in the engine gives that seat any other standing.
-  const civSeat = seat === CTX_PAIR_SEAT ? undefined : seatOf(state, seat);
+  // The DoW quintet below is PAIRWISE — oppStr, proximity, gang, aggression,
+  // peaceTurns and oppHasCities are all measured against `CTX_PAIR_SEAT`,
+  // because the wire carries one such axis and this is the seat it names. That
+  // seat's own row would be self-referential, so it renders zero. An unfinished
+  // wire, not a rule: nothing in the engine gives that seat any other standing.
+  //
+  // Read `opp` for the far side and `me` for this seat, and keep them straight:
+  // oppStr / gang / oppHasCities describe the OPPONENT (the DoW policy compares
+  // own strength against theirs and gangs up on their warmongering), while
+  // aggression and peaceTurns are this seat's own.
+  const me = seatOf(state, seat);
+  const opp = seat === CTX_PAIR_SEAT ? undefined : seatOf(state, CTX_PAIR_SEAT);
   const atOpp = atWarWithAny(state, seat);
   const ctx: number[] = [
     cities.length,
@@ -169,14 +175,14 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
     nMeleeWQ,
     nRangedWQ,
     cities.length * 2 + (atOpp ? 3 : 1),
-    Math.max(0, ...state.seats.filter((o) => o.seat !== seat).map((o) => seatStrength(state, o.seat))),
+    opp ? seatStrength(state, CTX_PAIR_SEAT) : 0,
     seatStrength(state, seat),
-    civSeat ? Math.min(seatProximity(state, civSeat), 999) : 0,
-    civSeat ? (((seatOf(state, seat)!.warmonger ?? 0) >= WARMONGER_GANG) ? 1 : 0) : 0,
-    civSeat ? civSeat.aggression : 0,
-    civSeat ? civSeat.peaceTurns : 0,
-    atWarWithAny(state, seat) ? 1 : 0,
-    civSeat ? (seatOf(state, seat)!.cities.length > 0 ? 1 : 0) : 0,
+    opp ? Math.min(seatProximity(state, CTX_PAIR_SEAT, seat), 999) : 0,
+    opp ? (((opp.warmonger ?? 0) >= WARMONGER_GANG) ? 1 : 0) : 0,
+    opp ? (me?.aggression ?? 0) : 0,
+    opp ? (me?.peaceTurns ?? 0) : 0,
+    atOpp ? 1 : 0,
+    opp ? (opp.cities.length > 0 ? 1 : 0) : 0,
   ];
   return [...emp, ...cityState, ...riv, ...per, ...esc, ...costT, ...costC, ...ctx];
 }

@@ -52,11 +52,14 @@ def _prod_ctx(blocks: dict, sim, seat: int) -> dict:
     # city dies. Until the serve obs dict carries a per-city identity (centre
     # tile) to re-map with, this one flag reads the slot-ordered plane
     # directly; the wire itself stays centre-keyed (the record schema), so
-    # nothing TS-facing leaks. Seat 0 is a seat like any other here, except
-    # that its city cap is the world's physical slot count rather than the
-    # ladder's stop-expanding heuristic.
-    is_cap = sim.is_cap if seat == 0 else sim.civ_city_is_cap[:, seat - 1]
+    # nothing TS-facing leaks. `seat` IS the row of the merged city block, so
+    # this reads one plane for everybody.
+    is_cap = sim.city_is_cap[:, seat]
     n_cities = ctx[:, 0].long()
+    # THE ONE REMAINING SEAT-0 DISTINCTION IN THE DRIVER, and it is POLICY, not
+    # a rule: seat 0 expands to the world's physical slot count while a civ
+    # stops at the ladder's maxCities heuristic. Both engines replay the same
+    # recorded decisions, so it moves trajectories, never parity.
     cap = sim.C if seat == 0 else int(sim.rules.seats.get("maxCities", 6))
     return {
         "settler_queued": emp[:, 6] > 0.5,  # raw queued-settler count
@@ -551,7 +554,7 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
     """The BATCHED decision core — masks, ladder picks, the virtual planner,
     the draw-free applies and the useq stash. Returns the per-verb decision
     tensors; extraction is the caller's per-row problem."""
-    m = sim.seat_masks(r)
+    m = sim.seat_masks(r + 1)
     blocks = _blocks(env, sim, r)
     prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(blocks, sim, r + 1))
     tech = ladder.pick_research(blocks, m["tech"], "tech") if bool(m["tech"].any()) else None
