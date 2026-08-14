@@ -247,7 +247,6 @@ class SimStep:
         the city walks are alive-masked already, so their zero sums need no
         gate."""
         r, B, C, dev = self.rules, self.B, self.RC, self.device
-        rd = self.rules_dev
         active0 = self.alive.any(dim=1)  # actor.cities.length > 0
 
         # --- war weariness: the block-top decay (warWearinessTurn), the same
@@ -471,101 +470,10 @@ class SimStep:
         # frozen-map yields; only the cached totals must not leak past the walk.
         self._eff_version += 1
 
-        # --- research ---------------------------------------------------------------------
-        # The research streams use the same per-city FRESH sums the city loop
-        # accumulated (sciSum/culSum in phase.ts's loop body). An empty
-        # research slot stays empty without a pick — there is no auto-research.
-        turn_science = sci_add
-        turn_culture = cul_add
-        self.tech_prog.add_(turn_science)
-        # LIFETIME science — Seat.scienceTotal's twin, beside the stream add.
-        # Every seat accrues; the civ rows ride seat_science_total rows 1..R.
-        self.science_total.add_(sci_add)
-        self.treasury.add_(gold_add)
-        # Seat 0's per-turn faith income, banked in the same city walk as
-        # gold/science/culture (the civ-seat twin is `civ_only_faith + faith_sum`).
-        self.faith.add_(fth_add)
-        # Unit upkeep + the bankruptcy rule — the ONE pooled body every seat
-        # row calls at this position (right after the gold lands).
-        self._seat_upkeep_and_bankruptcy(0, active0)
-        for _ in range(RESEARCH_LOOPS):
-            active = active0 & (self.cur_tech >= 0)
-            eff = self._eff_cost(
-                rd.t_cost.gather(0, self.cur_tech.clamp(min=0)),
-                self.tech_boosted.gather(1, self.cur_tech.clamp(min=0).unsqueeze(1)).squeeze(1),
-                golden_civ=0,  # seat 0's golden FREE_INQUIRY dedication
-            )
-            fin = active & (self.tech_prog >= eff)
-            if not fin.any():
-                break
-            rows = fin.nonzero(as_tuple=True)[0]
-            self.techs[rows, self.cur_tech[rows]] = True
-            # ANY tech completion bumps — unlocks feed _buildable, and the
-            # mine-boost/Replaceable-Parts techs feed the yield/score caches.
-            # Over-invalidation only costs a recompute of identical values.
-            self._eff_version += 1
-            self.tech_prog.copy_(torch.where(fin, self.tech_prog - eff, self.tech_prog))
-            self.cur_tech.copy_(torch.where(fin, torch.full_like(self.cur_tech, -1), self.cur_tech))
-        # Banked progress only drains once the tree is exhausted (mirrors
-        # advanceResearch; progress banks while the slot is undecided).
-        no_tech = active0 & (self.cur_tech == -1) & ~self._available_mask(self.techs, self._prereq_t).any(dim=1)
-        self.tech_prog.copy_(torch.where(no_tech, torch.minimum(self.tech_prog, torch.zeros_like(self.tech_prog)), self.tech_prog))
-        # TOURISM — once per turn at the seat level, AFTER this turn's TECH
-        # completions (the wonder term reads the seat's era off completed
-        # research) and BEFORE any civic completes — the position the civ
-        # arm proved.
-        self.tourism_total.copy_(self.tourism_total + self._tourism_of(
-            self.gw_writing, self.gw_art, self.gw_music, self.alive, self.tile_seat == 0, self._civ_era(self.techs, self.civics),
-            self.relics,
-            self.techs[:, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,
-            self.artifacts,
-        ))
-        # DIPLOMATIC FAVOR — government TIER + suzerainties, once per turn at
-        # the seat level.
-        _fav0 = self._adopted_gov_tier(self.civics) + self._favor_per_suz * self._suzerain_count(0)
-        self.diplo_favor.add_(torch.where(active0, _fav0, torch.zeros_like(_fav0)))
-        # Seat 0's grievances decay by 1 each turn at peace with EVERY civ seat
-        # (floor 0), immediately after the tourism accumulator. The
-        # +WARMONGER_DOW accrual on declaring has no twin here because no
-        # declare-war grievance path reaches seat 0; the CAPTURE accrual does
-        # mirror, in _transfer_city.
-        self.warmonger.copy_(torch.where(
-            active0 & (self.warmonger > 0) & ~self.civ_only_atwar.any(dim=1),
-            self.warmonger - 1,
-            self.warmonger,
-        ))
-        self.civic_prog.add_(turn_culture)
-        # LIFETIME culture — the cultureTotal twin, beside civicProgress (the
-        # loop position every seat shares).
-        self.culture_total.add_(cul_add)
-        for _ in range(RESEARCH_LOOPS):
-            active = active0 & (self.cur_civic >= 0)
-            eff = self._eff_cost(
-                rd.c_cost.gather(0, self.cur_civic.clamp(min=0)),
-                self.civic_boosted.gather(1, self.cur_civic.clamp(min=0).unsqueeze(1)).squeeze(1),
-                golden_civ=0, is_civic=True,  # seat 0's golden PEN_BRUSH dedication
-            )
-            fin = active & (self.civic_prog >= eff)
-            if not fin.any():
-                break
-            rows = fin.nonzero(as_tuple=True)[0]
-            self.civics[rows, self.cur_civic[rows]] = True
-            # ANY civic completion bumps (Feudalism farm-adjacency +
-            # civic-gated buildings in _buildable).
-            self._eff_version += 1
-            self.civic_prog.copy_(torch.where(fin, self.civic_prog - eff, self.civic_prog))
-            self.cur_civic.copy_(torch.where(fin, torch.full_like(self.cur_civic, -1), self.cur_civic))
-        no_civic = active0 & (self.cur_civic == -1) & ~self._available_mask(self.civics, self._prereq_c).any(dim=1)
-        self.civic_prog.copy_(torch.where(no_civic, torch.minimum(self.civic_prog, torch.zeros_like(self.civic_prog)), self.civic_prog))
-
-        # Great people (advanceGreatPeople) — after the research tail, the
-        # loop position every seat shares, through the ONE row-generic body.
-        self._advance_great_people(0, active0)
-
-        # The BELIEF RACES (pantheon / religion / enhancer) — the row-generic
-        # body the civ rows call at this same position (#73). RNG-neutral
-        # until an open-mask fires.
-        self._seat_belief_claims(0, active0)
+        # --- the seat block's TAIL: banking, upkeep, research, tourism,
+        # favor, grievances, the great-people and belief races. ONE body,
+        # every seat row, on row 0's own city sums. ------------------------
+        self._seat_research_tail(0, active0, sci_add, cul_add, gold_add, fth_add)
 
         # War counters — the loop's war/peace arm, row 0. warTurns counts
         # war-with-WAR_COLUMN_SEAT only and a seat is never at war with

@@ -657,99 +657,13 @@ class SimPhase:
                         self._transfer_city(b, r + 1, j2, int(winner[b]), conquest=False)
 
 
-            # Research: the seat's own boosts drive a cheapest-first pick over
-            # effectiveResearchCostIn, ties by table order (_auto_pick's index
-            # epsilon reproduces the TS stable sort). Progress banks and drains
-            # the same way for every seat. Research picks ride the wire.
-            rdv = self.rules_dev
-            self.civ_only_tech_prog[:, r] = torch.where(active, self.civ_only_tech_prog[:, r] + sci_sum, self.civ_only_tech_prog[:, r])
-            # LIFETIME science — Seat.scienceTotal's twin, beside the stream
-            # add (the same row of seat_science_total seat 0's add writes).
-            self.civ_only_science_total[:, r] = torch.where(active, self.civ_only_science_total[:, r] + sci_sum.to(self.dtype), self.civ_only_science_total[:, r])
-            self.civ_only_treasury[:, r] = torch.where(active, self.civ_only_treasury[:, r] + gold_sum, self.civ_only_treasury[:, r])
-            self.civ_only_faith[:, r] = torch.where(active, self.civ_only_faith[:, r] + faith_sum, self.civ_only_faith[:, r])
-            # Unit upkeep + the bankruptcy rule — the ONE pooled body every
-            # seat row calls at this position (right after the gold lands,
-            # before war marches).
-            self._seat_upkeep_and_bankruptcy(r + 1, active)
-            for _ in range(RESEARCH_LOOPS):
-                curt = self.civ_only_cur_tech[:, r]
-                # boosted techs complete at the discounted cost (_eff_cost —
-                # identical rounding to effectiveResearchCostIn)
-                cost_t = self._eff_cost(
-                    rdv.t_cost.gather(0, curt.clamp(min=0)),
-                    self.civ_only_tech_boosted[:, r].gather(1, curt.clamp(min=0).unsqueeze(1)).squeeze(1),
-                    golden_civ=r + 1,  # golden FREE_INQUIRY, per seat
-                ).double()
-                fin = active & (curt >= 0) & (self.civ_only_tech_prog[:, r] >= cost_t)
-                if not bool(fin.any()):
-                    break
-                rows = fin.nonzero(as_tuple=True)[0]
-                self.civ_only_techs[rows, r, curt[rows]] = True
-                self._eff_version += 1  # the per-r farm-adj/mine planes key on it
-                self.civ_only_tech_prog[:, r] = torch.where(fin, self.civ_only_tech_prog[:, r] - cost_t, self.civ_only_tech_prog[:, r])
-                self.civ_only_cur_tech[:, r] = torch.where(fin, torch.full_like(curt, -1), self.civ_only_cur_tech[:, r])
-            no_t = active & (self.civ_only_cur_tech[:, r] == -1) & ~self._available_mask(self.civ_only_techs[:, r], self._prereq_t).any(dim=1)
-            self.civ_only_tech_prog[:, r] = torch.where(no_t, torch.minimum(self.civ_only_tech_prog[:, r], torch.zeros_like(self.civ_only_tech_prog[:, r])), self.civ_only_tech_prog[:, r])
-            # TOURISM — the `civ.tourism` twin. POSITION IS LOAD-BEARING: the
-            # accrual sits AFTER this turn's TECH completions but BEFORE any
-            # civic completes, and the wonder term reads the seat's ERA off
-            # completed research, so a step either way shifts every wonder's
-            # era term.
-            _tour_r = self._tourism_of(
-                self.civ_city_gw_writing[:, r],
-                self.civ_city_gw_art[:, r],
-                self.civ_city_gw_music[:, r],
-                self.civ_city_alive[:, r],
-                self.civ_at == r,
-                self._civ_era(self.civ_only_techs[:, r], self.civ_only_civics[:, r]),
-                self.civ_city_relics[:, r],
-                self.civ_only_techs[:, r, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,
-                self.civ_city_artifacts[:, r],  # artifactTourism — the seat-0 call's ninth argument
-            )
-            self.civ_only_tourism[:, r] = torch.where(active, self.civ_only_tourism[:, r] + _tour_r, self.civ_only_tourism[:, r])
-            # DIPLOMATIC FAVOR — every seat's twin, at the same position.
-            _fav_r = self._adopted_gov_tier(self.civ_only_civics[:, r]) + self._favor_per_suz * self._suzerain_count(r + 1)
-            self.civ_only_diplo_favor[:, r] = torch.where(active, self.civ_only_diplo_favor[:, r] + _fav_r, self.civ_only_diplo_favor[:, r])
-            # grievances DECAY by 1 per turn at peace, on every axis
-            _at_peace = ~self.civ_only_atwar[:, r] & ~self.civ_pair_war[:, r].any(dim=1)
-            self.civ_only_warmonger[:, r] = torch.where(
-                active & _at_peace & (self.civ_only_warmonger[:, r] > 0),
-                self.civ_only_warmonger[:, r] - 1,
-                self.civ_only_warmonger[:, r],
-            )
-            self.civ_only_civic_prog[:, r] = torch.where(active, self.civ_only_civic_prog[:, r] + cul_sum, self.civ_only_civic_prog[:, r])
-            # LIFETIME culture — the `civ.cultureTotal` twin, immediately after
-            # civicProgress takes the same sum. Draws no RNG.
-            self.civ_only_culture[:, r] = torch.where(active, self.civ_only_culture[:, r] + cul_sum, self.civ_only_culture[:, r])
-            for _ in range(RESEARCH_LOOPS):
-                curc = self.civ_only_cur_civic[:, r]
-                cost_c = self._eff_cost(
-                    rdv.c_cost.gather(0, curc.clamp(min=0)),
-                    self.civ_only_civic_boosted[:, r].gather(1, curc.clamp(min=0).unsqueeze(1)).squeeze(1),
-                    golden_civ=r + 1, is_civic=True,  # golden PEN_BRUSH_AND_VOICE
-                ).double()
-                fin = active & (curc >= 0) & (self.civ_only_civic_prog[:, r] >= cost_c)
-                if not bool(fin.any()):
-                    break
-                rows = fin.nonzero(as_tuple=True)[0]
-                self.civ_only_civics[rows, r, curc[rows]] = True
-                self._eff_version += 1  # Feudalism moves this civ's farm-adj plane
-                self.civ_only_civic_prog[:, r] = torch.where(fin, self.civ_only_civic_prog[:, r] - cost_c, self.civ_only_civic_prog[:, r])
-                self.civ_only_cur_civic[:, r] = torch.where(fin, torch.full_like(curc, -1), self.civ_only_cur_civic[:, r])
-            no_c = active & (self.civ_only_cur_civic[:, r] == -1) & ~self._available_mask(self.civ_only_civics[:, r], self._prereq_c).any(dim=1)
-            self.civ_only_civic_prog[:, r] = torch.where(no_c, torch.minimum(self.civ_only_civic_prog[:, r], torch.zeros_like(self.civ_only_civic_prog[:, r])), self.civ_only_civic_prog[:, r])
+            # The seat block's TAIL — banking, upkeep, research, tourism,
+            # favor, grievances, the great-people and belief races: ONE body,
+            # every seat row, on this row's own city sums.
+            self._seat_research_tail(r + 1, active, sci_sum, cul_sum, gold_sum, faith_sum)
 
             # Builder verbs and missionary SPREAD verbs ride the wire; their
             # phase.ts call positions are here, builders then missionaries.
-
-            # Great-people race (advanceGreatPeople) — ONE row-generic body,
-            # shared with row 0 (which calls it at its own loop position).
-            self._advance_great_people(r + 1, active)
-
-            # The BELIEF RACES (pantheon / religion / enhancer) — one
-            # row-generic body per fact, shared with row 0 (#73).
-            self._seat_belief_claims(r + 1, active)
 
             # Great General moves ride the wire; their phase.ts call position
             # is here, BEFORE the war loop, so the aura reflects the advanced
@@ -820,6 +734,113 @@ class SimPhase:
                 self.civ_only_peaceturns.copy_(torch.where(oh, torch.zeros_like(self.civ_only_peaceturns), self.civ_only_peaceturns))
         if self.R > 0:
             self._geo_make_peace()
+
+    def _seat_research_tail(self, row: int, active: torch.Tensor, sci_sum: torch.Tensor,
+                            cul_sum: torch.Tensor, gold_sum: torch.Tensor,
+                            faith_sum: torch.Tensor) -> None:
+        """The seat block's TAIL, for seat row `row` — ONE body every seat runs.
+
+        In seatPhase order: bank this turn's city sums (science, gold, faith),
+        pay unit upkeep, complete techs, drain a dead tech bank, accrue TOURISM,
+        DIPLOMATIC FAVOR and the grievance decay, bank culture, complete civics,
+        drain a dead civic bank, then the great-people and belief races.
+
+        POSITION IS LOAD-BEARING between tourism and the civics: the wonder
+        term reads the seat's ERA off completed research, so tourism must sit
+        AFTER this turn's tech completions and BEFORE any civic completes.
+
+        The sums arrive from the caller's city walk because that walk is where
+        game.ts computes them, per city, in slot order — the float association
+        is part of the contract."""
+        rdv = self.rules_dev
+
+        def bank(plane: torch.Tensor, add: torch.Tensor) -> None:
+            """`plane[:, row] += add` where the seat is active. Written as ONE
+            expression so no row accumulates at a different precision: the sum
+            adds at ITS dtype and the store casts, on every row alike."""
+            plane[:, row] = plane[:, row] + torch.where(active, add, torch.zeros_like(add))
+
+        bank(self.civ_tech_prog, sci_sum)
+        # LIFETIME science — Seat.scienceTotal's twin, beside the stream add.
+        bank(self.seat_science_total, sci_sum)
+        bank(self.civ_treasury, gold_sum)
+        bank(self.civ_faith, faith_sum)
+        # Unit upkeep + the bankruptcy rule, right after the gold lands and
+        # before any war march.
+        self._seat_upkeep_and_bankruptcy(row, active)
+        for _ in range(RESEARCH_LOOPS):
+            curt = self.civ_cur_tech[:, row]
+            # a boosted tech completes at the discounted cost (_eff_cost —
+            # identical rounding to effectiveResearchCostIn)
+            cost_t = self._eff_cost(
+                rdv.t_cost.gather(0, curt.clamp(min=0)),
+                self.civ_tech_boosted[:, row].gather(1, curt.clamp(min=0).unsqueeze(1)).squeeze(1),
+                golden_civ=row,  # golden FREE_INQUIRY, per seat
+            )
+            fin = active & (curt >= 0) & (self.civ_tech_prog[:, row] >= cost_t)
+            if not bool(fin.any()):
+                break
+            rows = fin.nonzero(as_tuple=True)[0]
+            self.civ_techs[rows, row, curt[rows]] = True
+            # ANY tech completion bumps: unlocks feed _seat_buildable, and the
+            # mine-boost/Replaceable-Parts techs feed the yield/score caches.
+            self._eff_version += 1
+            self.civ_tech_prog[:, row] = torch.where(fin, self.civ_tech_prog[:, row] - cost_t, self.civ_tech_prog[:, row])
+            self.civ_cur_tech[:, row] = torch.where(fin, torch.full_like(curt, -1), self.civ_cur_tech[:, row])
+        # Banked progress only drains once the tree is exhausted (advanceResearch:
+        # progress banks while the slot is undecided).
+        no_t = active & (self.civ_cur_tech[:, row] == -1) & ~self._available_mask(self.civ_techs[:, row], self._prereq_t).any(dim=1)
+        self.civ_tech_prog[:, row] = torch.where(no_t, torch.minimum(self.civ_tech_prog[:, row], torch.zeros_like(self.civ_tech_prog[:, row])), self.civ_tech_prog[:, row])
+        # TOURISM — once per turn at the seat level, in the load-bearing slot.
+        bank(self.civ_tourism, self._tourism_of(
+            self.city_gw_writing[:, row],
+            self.city_gw_art[:, row],
+            self.city_gw_music[:, row],
+            self.city_alive[:, row],
+            self.tile_seat == row,
+            self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]),
+            self.city_relics[:, row],
+            self.civ_techs[:, row, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,
+            self.city_artifacts[:, row],
+        ))
+        # DIPLOMATIC FAVOR — government TIER + suzerainties.
+        bank(self.civ_diplo_favor,
+             self._adopted_gov_tier(self.civ_civics[:, row]) + self._favor_per_suz * self._suzerain_count(row))
+        # grievances DECAY by 1 per turn at peace with every MAJOR — the row's
+        # own line of the war matrix, minus the city-state columns (TS's
+        # atWarWithAny reads Seat.wars, the majors' list).
+        at_peace = ~self.war[:, row, :1 + self.R].any(dim=1)
+        self.civ_warmonger[:, row] = torch.where(
+            active & at_peace & (self.civ_warmonger[:, row] > 0),
+            self.civ_warmonger[:, row] - 1,
+            self.civ_warmonger[:, row],
+        )
+        bank(self.civ_civic_prog, cul_sum)
+        # LIFETIME culture — the cultureTotal twin, immediately after
+        # civicProgress takes the same sum. Draws no RNG.
+        bank(self.civ_culture, cul_sum)
+        for _ in range(RESEARCH_LOOPS):
+            curc = self.civ_cur_civic[:, row]
+            cost_c = self._eff_cost(
+                rdv.c_cost.gather(0, curc.clamp(min=0)),
+                self.civ_civic_boosted[:, row].gather(1, curc.clamp(min=0).unsqueeze(1)).squeeze(1),
+                golden_civ=row, is_civic=True,  # golden PEN_BRUSH_AND_VOICE
+            )
+            fin = active & (curc >= 0) & (self.civ_civic_prog[:, row] >= cost_c)
+            if not bool(fin.any()):
+                break
+            rows = fin.nonzero(as_tuple=True)[0]
+            self.civ_civics[rows, row, curc[rows]] = True
+            self._eff_version += 1  # Feudalism moves this seat's farm-adj plane
+            self.civ_civic_prog[:, row] = torch.where(fin, self.civ_civic_prog[:, row] - cost_c, self.civ_civic_prog[:, row])
+            self.civ_cur_civic[:, row] = torch.where(fin, torch.full_like(curc, -1), self.civ_cur_civic[:, row])
+        no_c = active & (self.civ_cur_civic[:, row] == -1) & ~self._available_mask(self.civ_civics[:, row], self._prereq_c).any(dim=1)
+        self.civ_civic_prog[:, row] = torch.where(no_c, torch.minimum(self.civ_civic_prog[:, row], torch.zeros_like(self.civ_civic_prog[:, row])), self.civ_civic_prog[:, row])
+        # Great-people race (advanceGreatPeople), then the BELIEF RACES
+        # (pantheon / religion / enhancer, #73) — the loop position every seat
+        # shares.
+        self._advance_great_people(row, active)
+        self._seat_belief_claims(row, active)
 
     def _advance_great_people(self, row: int, active: torch.Tensor) -> None:
         """advanceGreatPeople(state, seat) — ONE body for every seat row
