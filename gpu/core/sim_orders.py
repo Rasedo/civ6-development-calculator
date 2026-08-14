@@ -37,7 +37,7 @@ class SimOrders:
             if getattr(self, "_A_FOUND", -1) >= 0 and self._settler_idx >= 0:
                 fnd = act & (a == self._A_FOUND) & (self.civ_unit_type.gather(1, sc.unsqueeze(1)).squeeze(1) == self._settler_idx)
                 if bool(fnd.any()):
-                    made_f = self._found_civ_city_at(r, fnd, here)
+                    made_f = self._found_city_at(r + 1, fnd, here)
                     if bool(made_f.any()):
                         rows_f = made_f.nonzero(as_tuple=True)[0]
                         self.civilian_at[rows_f, here[rows_f]] = -1
@@ -1000,7 +1000,7 @@ class SimOrders:
             if getattr(self, "_A_FOUND", -1) >= 0 and self._settler_idx >= 0:
                 fnd = alive & (a == self._A_FOUND) & (self.seat0_unit_type[:, p] == self._settler_idx)
                 if bool(fnd.any()):
-                    made_f = self._found_seat0_city_at(fnd, here)
+                    made_f = self._found_city_at(0, fnd, here)
                     if bool(made_f.any()):
                         rows_f = made_f.nonzero(as_tuple=True)[0]
                         self.civilian_at[rows_f, self.seat0_unit_tile[rows_f, p]] = -1

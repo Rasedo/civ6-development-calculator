@@ -2469,14 +2469,17 @@ class SimSeats:
             if not bool(claim.any()):
                 return
 
-    def _found_civ_city_at(self, r: int, want: torch.Tensor, tile: torch.Tensor) -> torch.Tensor:
-        """FOUND a city for civ r at `tile` [B] where `want` — the FOUND_CITY
-        verb's mutation. Legality is the site scan's per-candidate gate applied
-        at the settler's tile. The settler unit is consumed by the CALLER.
-        Returns the games that founded."""
-        B = self.B
-        sr = self.rules.seats
+    def _found_city_at(self, row: int, want: torch.Tensor, tile: torch.Tensor) -> torch.Tensor:
+        """FOUND a city for seat row `row` at `tile` [B] where `want` — the
+        FOUND_CITY verb's mutation, ONE body for every seat (row 0 = seat 0,
+        r+1 = civ r; a major's seat IS its block row). canFoundCity is
+        re-checked LIVE at the settler's own tile; the settler unit is
+        consumed by the CALLER. Returns the games that founded."""
+        seat = row
         tc = tile.clamp(min=0)
+        # canFoundCity: static legality (land / passable / no natural wonder /
+        # no oasis = settle_ok), unowned by ANY seat, no district or wonder,
+        # >= CITY_MIN_DIST from EVERY centre, and under the seat city cap.
         unowned = (
             (self.owner.gather(1, tc.unsqueeze(1)).squeeze(1) < 0)
             & (self.citystate_at.gather(1, tc.unsqueeze(1)).squeeze(1) < 0)
@@ -2485,53 +2488,52 @@ class SimSeats:
         okt = (
             (tile >= 0) & unowned
             & self.settle_ok.gather(1, tc.unsqueeze(1)).squeeze(1)
-            & (self.civ_city_at.gather(1, tc.unsqueeze(1)).squeeze(1) < 0)
             & (self.district.gather(1, tc.unsqueeze(1)).squeeze(1) < 0)
             & (self.built_wonder.gather(1, tc.unsqueeze(1)).squeeze(1) < 0)
         )
-        # tooClose (CITY_MIN_DIST = 4) against every centre.
-        d_pl = torch.where(self.alive, self.pair_dist[tc.unsqueeze(1), self.site.clamp(min=0)].to(torch.long), 999)
+        # tooClose (CITY_MIN_DIST = 4) against every MAJOR centre (one flat
+        # scan over the seat axis now that the block is one table) and every
+        # city-state's.
+        nrows = 1 + self.R
+        ctr_all = self.city_center[:, :nrows].reshape(self.B, -1)
+        live_all = self.city_alive[:, :nrows].reshape(self.B, -1)
+        d_all = torch.where(live_all, self.pair_dist[tc.unsqueeze(1), ctr_all.clamp(min=0)].to(torch.long), 999)
         d_cs = torch.where(
             self.citystate_alive, self.pair_dist[tc.unsqueeze(1), self.citystate_center.clamp(min=0)].to(torch.long),
             torch.full_like(self.citystate_center, 999),
         )
-        civ_city_flat = self.civ_city_center.reshape(B, -1)
-        civ_city_live = self.civ_city_alive.reshape(B, -1)
-        d_rc = torch.where(civ_city_live, self.pair_dist[tc.unsqueeze(1), civ_city_flat.clamp(min=0)].to(torch.long), 999)
+        alive_row = self.city_alive[:, row]  # [B, RC]
         found = (
             want & okt
-            & (d_pl.min(dim=1).values >= 4)
+            & (d_all.min(dim=1).values >= 4)
             & (d_cs.min(dim=1).values >= 4)
-            & (d_rc.min(dim=1).values >= 4)
+            & (alive_row.sum(dim=1) < int(self.rules.seats.get("maxCities", 6)))
         )
-        best_site = torch.where(found, tile, torch.full_like(tile, -1))
         if not bool(found.any()):
             return found
         rows = found.nonzero(as_tuple=True)[0]
-        if not bool(found.any()):
-            return
-        rows = found.nonzero(as_tuple=True)[0]
-        # The alive COUNT is NOT a free slot once a capture punches a hole
-        # mid-pool — it would land on a live city and overwrite it. TS appends,
-        # so the mirror is last-alive+1: new cities iterate LAST, matching the
-        # array order, and holes stay holes until reclamation.
+        # Append at last-alive+1 — the TS push mirror. The alive COUNT is not a
+        # free slot while a hole stands (it would land on a live city); the
+        # step-end reclaim compacts, so new cities iterate LAST and slot order
+        # stays array order.
         occ_idx = torch.arange(self.RC, device=self.device).reshape(1, -1)
-        slot = (torch.where(self.civ_city_alive[rows, r], occ_idx, torch.full_like(occ_idx, -1)).max(dim=1).values + 1)
-        assert int(slot.max()) < self.RC, "civ city slots exhausted — raise RC (compaction already ran; this is true living capacity)"
-        self._reveal_around(rows, r + 1, best_site[rows], 3)  # foundCityAt's revealAround(seat, tile, 3)
-        s_idx = best_site[rows]
-        # isCapital = civ.cities.length === 0: a total-collapse refound re-crowns
-        # and updates capitalTiles[r+1]; every other settle founds a
+        slot = (torch.where(alive_row[rows], occ_idx, torch.full_like(occ_idx, -1)).max(dim=1).values + 1)
+        cap_cols = self.C if row == 0 else self.RC
+        assert int(slot.max()) < cap_cols, "city slots exhausted — the step-end reclaim must have compacted"
+        s_idx = tile[rows]
+        self._reveal_around(rows, seat, s_idx, 3)  # foundCityAt's revealAround(seat, tile, 3)
+        # isCapital = seat.cities.length === 0: a total-collapse refound
+        # re-crowns and updates capitalTiles[row]; every other settle founds a
         # non-capital.
-        new_cap = ~self.civ_city_alive[rows, r].any(dim=1)
-        self.civ_city_alive[rows, r, slot] = True
-        self.era_score[rows, r + 1] += self._era_pts["found"]  # the founding moment
-        self.civ_city_is_cap[rows, r, slot] = new_cap
-        self.civ_only_cap_tile[rows, r] = torch.where(new_cap, s_idx, self.civ_only_cap_tile[rows, r])
-        self.civ_city_center[rows, r, slot] = s_idx
-        self.civ_city_pop[rows, r, slot] = 1
-        self.civ_city_growth[rows, r, slot] = 0
-        self.civ_city_cbox[rows, r, slot] = 0
+        new_cap = ~alive_row[rows].any(dim=1)
+        self.city_alive[rows, row, slot] = True
+        self.era_score[rows, row] += self._era_pts["found"]  # the foundCity moment
+        self.city_is_cap[rows, row, slot] = new_cap
+        self.civ_cap_tile[rows, row] = torch.where(new_cap, s_idx, self.civ_cap_tile[rows, row])
+        self.city_center[rows, row, slot] = s_idx
+        self.city_pop[rows, row, slot] = 1
+        self.city_growth[rows, row, slot] = 0
+        self.city_cbox[rows, row, slot] = 0
         # A NEWLY FOUNDED city starts with NO religion. `city_pressure` and
         # `city_followed` are indexed by SLOT and the per-turn block only zeroes
         # slots that are NOT alive, so a slot handed straight from a dead city to
@@ -2541,36 +2543,46 @@ class SimSeats:
         #
         # TRANSFERS deliberately do NOT reset: a transfer moves the existing city
         # and its pressure travels with it.
-        self.city_pressure[rows, r + 1, slot, :] = 0
-        self.city_followed[rows, r + 1, slot] = -1
-        self.civ_city_prod_bank[rows, r, slot] = 0  # same slot-inheritance risk
-        self.civ_city_gw_writing[rows, r, slot] = 0  # a fresh city holds no works
-        self.civ_city_gw_music[rows, r, slot] = 0
-        self.civ_city_loyalty[rows, r, slot] = 100.0
-        self.civ_city_acquired[rows, r, slot] = 0
-        self.civ_city_hp[rows, r, slot] = sr.get("cityMaxHp", 200)
-        self.civ_city_current[rows, r, slot] = -1
-        self.civ_city_progress[rows, r, slot] = 0
-        self.civ_city_cost[rows, r, slot] = 0
-        self.civ_city_qtile[rows, r, slot] = -1
-        self.civ_city_dist_tile[rows, r, slot, :] = -1
-        self.civ_city_wonder[rows, r, slot, :] = -1
-        self.civ_city_bldg[rows, r, slot, :] = False
-        self.civ_city_id[rows, r, slot] = self.civ_only_next_city_id[rows, r]
-        _new_cid = self.civ_only_next_city_id[rows, r].clone()  # this city's persistent id
-        self.civ_only_next_city_id[rows, r] += 1
+        self.city_pressure[rows, row, slot, :] = 0
+        self.city_followed[rows, row, slot] = -1
+        # Full SLOT HYGIENE — the append head is a compacted-away city's old
+        # index, so every per-city fact a fresh City literal zeroes is written
+        # here or the new city inherits the dead one's.
+        self.city_prod_bank[rows, row, slot] = 0
+        self.city_gw_writing[rows, row, slot] = 0  # a fresh city holds no works
+        self.city_gw_art[rows, row, slot] = 0
+        self.city_gw_music[rows, row, slot] = 0
+        self.city_relics[rows, row, slot] = 0
+        self.city_artifacts[rows, row, slot] = 0
+        self.city_loyalty[rows, row, slot] = 100.0
+        self.city_acquired[rows, row, slot] = 0
+        self.city_hp[rows, row, slot] = self.rules.combat.get("cityMaxHp", 200)
+        self.city_outer_hp[rows, row, slot] = 0  # walls come with the building
+        self.city_current[rows, row, slot] = -1
+        self.city_progress[rows, row, slot] = 0
+        self.city_cost[rows, row, slot] = 0
+        self.city_qtile[rows, row, slot] = -1
+        self.city_dist_tile[rows, row, slot, :] = -1
+        self.city_wonder[rows, row, slot, :] = -1
+        self.city_bldg[rows, row, slot, :] = False
+        # Persistent id — foundCityAt's `nextCityId++`; tile_city stores it
+        # (TS ownerCity), the slot stays a storage address only.
+        _new_cid = self.civ_next_city_id[rows, row].clone()
+        self.city_id[rows, row, slot] = _new_cid
+        self.civ_next_city_id[rows, row] += 1
         self.centre_slot_at[rows, s_idx] = slot
-        self.tile_seat[rows, s_idx] = r + 1  # tile ownership lives in tile_seat
-        self._tile_owner_ver += 1  # one storage: nothing else to retag
+        # Claim the centre (unconditionally, as foundCity does); seat + which
+        # city are the two halves TS calls ownerSeat/ownerCity.
+        self.tile_seat[rows, s_idx] = seat
         self.tile_city[rows, s_idx] = _new_cid
+        self._tile_owner_ver += 1
         # Founding strips like foundCity: the removable feature dies (tdef drops
         # to the hills component, feature yields vanish via feat_stripped, the
         # lent district adjacency withdraws) and the improvement dies with it.
         # `fresh_f` guards idempotence — an already-CHOPPED tile has nothing left
-        # to withdraw, and t0 capitals bake the strip into the exported statics.
-        # An UNREMOVABLE feature (oasis/floodplains) SURVIVES the founding, so
-        # both writes gate on feat_removable: a blanket strip would starve
-        # _belief_feat_plane of yields TS still pays.
+        # to withdraw. An UNREMOVABLE feature (oasis/floodplains) SURVIVES the
+        # founding, so both writes gate on feat_removable: a blanket strip would
+        # starve _belief_feat_plane of yields TS still pays.
         frm_f = self.feat_removable[rows, s_idx]
         self.tdef[rows, s_idx] = torch.where(frm_f, self.hills[rows, s_idx].long() * 3, self.tdef[rows, s_idx])
         self.tmove[rows, s_idx] = torch.where(frm_f, self.hills[rows, s_idx].long() * 3, self.tmove[rows, s_idx])  # a stripped feature does not slow movement
@@ -2580,7 +2592,7 @@ class SimSeats:
         # Founding does NOT clear tile.pillaged: a pillaged farm's flag survives
         # the founding — the improvement dies, the flag stays, and later readers
         # see it.
-        contrib = self._feat_adj[rows, s_idx] * fresh_f.unsqueeze(1).to(self._feat_adj.dtype)  # [R, nD]
+        contrib = self._feat_adj[rows, s_idx] * fresh_f.unsqueeze(1).to(self._feat_adj.dtype)  # [n, nD]
         nb = self.neigh[s_idx]
         for d in range(6):
             n_d = nb[:, d]
@@ -2598,10 +2610,49 @@ class SimSeats:
                 & (self.citystate_at[rows, ndc] < 0)
                 & (self.civ_at[rows, ndc] < 0)
             )
-            self.tile_seat[rows[free], n_d[free]] = r + 1  # tile ownership lives in tile_seat
-            self._tile_owner_ver += 1  # one storage: nothing else to retag
+            self.tile_seat[rows[free], n_d[free]] = seat
             self.tile_city[rows[free], n_d[free]] = _new_cid[free]  # ring joins the founder's registry
+            self._tile_owner_ver += 1
+        if row == 0:
+            self._found_seat0_caches(rows, slot, s_idx, new_cap)
         self._eff_version += 1  # feat_stripped / d_static_adj changed
+        return found
+
+    def _found_seat0_caches(self, rows: torch.Tensor, c_new: torch.Tensor, s_idx: torch.Tensor, new_cap: torch.Tensor) -> None:
+        """Row 0's founding-time SITE CACHES — the [B, C] statics the seat-0
+        yield walk reads instead of deriving per tile (centre yields with the
+        floors, pre-clamp raw food, water housing, coastal/river flags, the
+        per-city distance table), plus the centre's `workable` clear, which is
+        how that walk excludes the centre where the civ walk uses a
+        `tiles != centre` predicate. They exist only because the two yield
+        walks are still two; they die with the walk merge."""
+        frm_pre = self.feat_removable[rows, s_idx] | self.feat_stripped[rows, s_idx]
+        cy = self.tile_yields[rows, s_idx].clone()
+        cy = cy - self.feat_yields[rows, s_idx].to(cy.dtype) * frm_pre.unsqueeze(1).to(cy.dtype)
+        raw_food = cy[:, 0].clone()
+        cy[:, 0] = torch.maximum(cy[:, 0], torch.full_like(cy[:, 0], float(self.rules.center_min_food)))
+        cy[:, 1] = torch.maximum(cy[:, 1], torch.full_like(cy[:, 1], float(self.rules.center_min_production)))
+        self.center_yields[rows, c_new] = cy.to(self.center_yields.dtype)
+        self.center_raw_food[rows, c_new] = raw_food.to(self.center_raw_food.dtype)
+        self.base_maintenance[rows, c_new] = torch.where(
+            new_cap,
+            torch.full_like(self.base_maintenance[rows, c_new], float(self.rules.palace_maintenance)),
+            torch.zeros_like(self.base_maintenance[rows, c_new]),
+        )
+        self.water_housing[rows, c_new] = torch.where(
+            self.fresh_water[rows, s_idx],
+            torch.full_like(self.water_housing[rows, c_new], float(self.rules.housing_fresh)),
+            torch.where(
+                self.coastal_land[rows, s_idx],
+                torch.full_like(self.water_housing[rows, c_new], float(self.rules.housing_coastal)),
+                torch.full_like(self.water_housing[rows, c_new], float(self.rules.housing_none)),
+            ),
+        )
+        self.coastal[rows, c_new] = self.coastal_land[rows, s_idx]
+        self.river_center[rows, c_new] = self.tile_river[rows, s_idx]
+        self.dist[rows, c_new] = self.pair_dist[s_idx]
+        self.warrior_trained[rows, c_new] = False
+        self.workable[rows, s_idx] = False
 
     def _hostile_vs_unit(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int) -> None:
         """Shared melee resolution for a hostile attacker (barb slot u of
