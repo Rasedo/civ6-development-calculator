@@ -467,7 +467,7 @@ _MUTABLE = [
     "rng_state", "centre_slot_at", "tdef", "tmove",
     "next_slot", "camp_tile", "n_camps", "game_over",
     "victory_type", "winner", "space_done",  # space-race chain progress
-    "seat0_unit_next", "warrior_trained", "builder_trained",
+    "seat0_unit_next",
     "district_dead",  # captured districts are paved-but-dead
     "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "civ_cap_tile",  # capitalTiles — capital identity + the domination anchor (cap_tile / civ_only_cap_tile are views)

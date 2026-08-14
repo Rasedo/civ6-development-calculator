@@ -1528,14 +1528,6 @@
     "why": "unit-pool allocation cursor (see next_slot)."
    },
    {
-    "plane": "warrior_trained",
-    "why": "a scripted-policy latch. The decision server replaces the policy that reads it; TS has no state twin."
-   },
-   {
-    "plane": "builder_trained",
-    "why": "a scripted-policy latch (see warrior_trained)."
-   },
-   {
     "plane": "district_dead",
     "why": "captured districts are paved but dead. The TS twin is 'the tile carries a district the owning city's registry does not list', and that registry is exactly the object City.districts is excluded for."
    },

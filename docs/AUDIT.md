@@ -158,8 +158,8 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   read the column index or a living-first argsort — `_place_works` and
   `_relocate_palace` LOST their row-0 branches entirely. Row 0's
   [B, C] auxiliaries (center_yields / center_raw_food /
-  base_maintenance / water_housing / coastal / river_center / dist /
-  warrior_trained) ride row 0's permutation. Audit latent (1) (no
+  base_maintenance / water_housing / coastal / river_center / dist)
+  ride row 0's permutation. Audit latent (1) (no
   seat-0 route prune on city death) FIXED in slice 1; latent (2)
   (`centre_slot_at` civ slots stale after a compaction) FIXED here —
   the reclaim re-maps every major centre through its row's inverse

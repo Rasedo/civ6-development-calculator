@@ -2651,7 +2651,6 @@ class SimSeats:
         self.coastal[rows, c_new] = self.coastal_land[rows, s_idx]
         self.river_center[rows, c_new] = self.tile_river[rows, s_idx]
         self.dist[rows, c_new] = self.pair_dist[s_idx]
-        self.warrior_trained[rows, c_new] = False
         self.workable[rows, s_idx] = False
 
     def _hostile_vs_unit(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int) -> None:

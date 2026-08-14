@@ -677,7 +677,6 @@ class SimOrders:
             self.progress[b, c_new] = 0.0
             self.cur_cost[b, c_new] = 0.0
             self.q_dtile[b, c_new] = -1
-            self.warrior_trained[b, c_new] = False
             # Inherit the civ city's buildings — the index spaces match, since
             # civ_city_bldg and buildings both key on the b_cost catalog (PALACE
             # excluded). ANCIENT_WALLS rides along at outer pool 0 and heals
@@ -780,7 +779,6 @@ class SimOrders:
             self.q_dtile[b, c_new] = -1
             self.dist_tile[b, c_new, :] = -1  # row-0 registry hygiene (a CS city carries no districts/wonders)
             self.wonder_reg[b, c_new, :] = -1
-            self.warrior_trained[b, c_new] = False
             self.buildings[b, c_new] = False
             self.outer_hp[b, c_new] = 0  # no walls: the buildings plane was wiped
             self.water_housing[b, c_new] = float(self.tile_wh[b, c_t])

@@ -1786,7 +1786,7 @@ class SimPhase:
     # ride row 0's permutation; the civ rows derive theirs per read.
     _SEAT0_SLOT_FIELDS = (
         "center_yields", "center_raw_food", "base_maintenance", "water_housing",
-        "coastal", "river_center", "dist", "warrior_trained",
+        "coastal", "river_center", "dist",
     )
 
     def _reclaim_cities(self, last_row: int | None = None) -> None:

@@ -1369,8 +1369,6 @@ class SimInit:
         # Seat 0's units: trained via the production head, ordered like
         # state.units (append-only slots preserve spawn order).
         self.seat0_unit_next = torch.zeros(B, dtype=torch.long, device=device)
-        self.warrior_trained = torch.zeros(B, C, dtype=torch.bool, device=device)  # scripted-policy flag
-        self.builder_trained = torch.zeros(B, dtype=torch.bool, device=device)  # scripted-policy flag (capital, once)
         self.tdef = torch.tensor([[t.get("tdef", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # tdef holds the DEFENDER bonus (terrainDefense: hills/woods/rainforest
         # +3, marsh/floodplains −2), read at the def_cs sites. tmove holds the
