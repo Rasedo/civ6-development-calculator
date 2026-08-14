@@ -1995,6 +1995,8 @@ class SimSeats:
             + self._gw_cul_k[1] * self.civ_city_gw_art[:, r, j].double()
             + self._gw_cul_k[2] * self.civ_city_gw_music[:, r, j].double()
         ) * mask.double()
+        # ARTIFACT culture, the batched twin's position.
+        cul = cul + self._artifact_culture * self.civ_city_artifacts[:, r, j].double() * mask.double()
         # RELIC faith, the batched twin's position.
         faith = faith + self._relic_faith * self.civ_city_relics[:, r, j].double() * mask.double()
         # golden PEN, BRUSH AND VOICE, the batched twin's position.

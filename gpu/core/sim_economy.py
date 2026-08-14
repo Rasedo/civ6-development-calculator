@@ -2628,6 +2628,9 @@ class SimEconomy:
             + self._gw_cul_k[1] * self.civ_city_gw_art[:, r].double()
             + self._gw_cul_k[2] * self.civ_city_gw_music[:, r].double()
         ) * alive.double()
+        # ARTIFACTS pay CULTURE beside the works (artifactCulture) — reachable
+        # on a civ row through a captured or defected seat-0 city.
+        cul = cul + self._artifact_culture * self.civ_city_artifacts[:, r].double() * alive.double()
         # RELIC faith, at the same position as the seat-0 term.
         faith = faith + self._relic_faith * self.civ_city_relics[:, r].double() * alive.double()
         # Golden PEN, BRUSH AND VOICE — +1 Culture per COMPLETED SPECIALTY

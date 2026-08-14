@@ -232,6 +232,23 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   TO REOPEN THE MECHANIC: a wire column, beside #83's wonders and
   #97's district placement — not an engine rule.
 
+- **A-29. ARTIFACTS paid seat 0 only — FIXED 2026-08-14.** The same
+  term-by-term read, in the other direction: `artifactCulture` (+3
+  culture per artifact, the buildings bucket) and `artifactTourism`
+  were in seat 0's walk and its `_tourism_of` call, and in NEITHER civ
+  walk nor the civ tourism call — the civ `_tourism_of` simply omitted
+  the ninth argument. Reachable without an archaeologist: a seat-0
+  city holding artifacts becomes a civ city on capture and on a
+  loyalty defection (`sim_phase`'s `civ_city_artifacts[b, w_, slot] =
+  artifacts[b, c]`), and from that turn on its artifacts paid nothing.
+  Both civ walks and the civ tourism call now carry the term at the
+  seat-0 positions. Checked clean in the same pass: housing (the civ
+  batch has every `computeHousing` term; TS's district-housing loop is
+  all-zero in the catalog, and the regional buildings seat 0 masks out
+  of `bf_live` all carry housing 0), maintenance, trade, citizens,
+  city-state envoy/suzerain, government yields and the golden
+  dedication.
+
 ## B. Fidelity vs real Civ 6 — open residuals
 
 - **B-17r. Encampment:** ranged-vs-district strikes are out of scope

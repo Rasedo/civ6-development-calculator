@@ -1077,6 +1077,7 @@ class SimPhase:
                 self._civ_era(self.civ_only_techs[:, r], self.civ_only_civics[:, r]),
                 self.civ_city_relics[:, r],
                 self.civ_only_techs[:, r, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,
+                self.civ_city_artifacts[:, r],  # artifactTourism — the seat-0 call's ninth argument
             )
             self.civ_only_tourism[:, r] = torch.where(active, self.civ_only_tourism[:, r] + _tour_r, self.civ_only_tourism[:, r])
             # DIPLOMATIC FAVOR — every seat's twin, at the same position.
