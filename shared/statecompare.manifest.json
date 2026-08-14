@@ -1532,20 +1532,12 @@
     "why": "captured districts are paved but dead. The TS twin is 'the tile carries a district the owning city's registry does not list', and that registry is exactly the object City.districts is excluded for."
    },
    {
-    "plane": "base_maintenance",
-    "why": "row-0 founding-time site data; TS recomputes it from the map at every read."
-   },
-   {
-    "plane": "water_housing",
-    "why": "founding-time site data (see base_maintenance)."
-   },
-   {
     "plane": "coastal",
-    "why": "founding-time site data (see base_maintenance)."
+    "why": "founding-time site data; TS recomputes it from the map at every read."
    },
    {
     "plane": "river_center",
-    "why": "founding-time site data (see base_maintenance)."
+    "why": "founding-time site data; TS recomputes it from the map at every read."
    },
    {
     "plane": "dist",

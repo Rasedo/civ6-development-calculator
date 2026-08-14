@@ -2162,6 +2162,109 @@ class SimSeats:
         unclaimed id gathers the neutral pad row, adding exact 0)."""
         return self._bel_any and (self._b18_couple or self._seat_has_beliefs(row))
 
+    def _seat_housing(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """THE computeHousing + cityMaintenance body, for every seat row
+        (0 = seat 0, r+1 = civ r). Returns (maintenance, housing), each
+        [B, cols] f64.
+
+        Every term is dyadic (water 2/3/5, building housing integral,
+        improvement housing 0.5), so the f64 sum is exact in any order and the
+        bucket order below — TS's water → districts → buildings → river →
+        improvements → housingAll → conditional — costs nothing to keep.
+        Water access DERIVES from the centre tile on every read
+        (hasFreshWater/isCoastalLand, exported per tile as `wh`); nothing is
+        stored per city, so a captured centre needs no rebuild."""
+        B = self.B
+        cols = self.C if row == 0 else self.RC
+        alive = self.city_alive[:, row, :cols]
+        is_cap_a = (self.city_is_cap[:, row, :cols] & alive).double()
+        ctr = self.city_center[:, row, :cols].clamp(min=0)
+        bldg = self.city_bldg[:, row, :cols]
+        dreg = self.city_dist_tile[:, row, :cols]
+        dflat = dreg.clamp(min=0).reshape(B, -1)
+        dcomp = (dreg >= 0) & self.district_complete.gather(1, dflat).reshape_as(dreg)
+        rd = self.rules_dev
+        # cityMaintenance — per-type district upkeep over COMPLETED districts
+        # (no pillage gate) + buildingMaintenance over EVERY building (no
+        # pillage and no regional skip; cityMaintenance has neither), + the
+        # capital's PALACE, which TS carries as an autoCapital entry in
+        # city.buildings and the GPU carries as an is_cap bonus.
+        maint = (self._d_maint.double().reshape(1, 1, -1) * dcomp.double()).sum(dim=2)
+        maint = maint + torch.einsum("bjn,n->bj", bldg.double(), rd.b_maintenance.double())
+        maint = maint + float(self.rules.palace_maintenance) * is_cap_a
+        # WATER: fresh > coastal > none, then the Aqueduct — a fresh city gains
+        # aqFreshBonus, a dry one is raised to aqNoFreshTotal. A pillaged
+        # Aqueduct gives nothing.
+        wh = self.tile_wh.gather(1, ctr)  # [B, cols] f64
+        if self._aqueduct_idx >= 0:
+            aq_t = dreg[:, :, self._aqueduct_idx]
+            aq_c = aq_t.clamp(min=0)
+            has_aq = (aq_t >= 0) & self.district_complete.gather(1, aq_c) & ~self.district_pillaged.gather(1, aq_c)
+            water = torch.where(
+                has_aq,
+                torch.where(wh == float(self._h_fresh), wh + self._aq_fresh_bonus,
+                            torch.maximum(wh, torch.full_like(wh, self._aq_no_fresh_total))),
+                wh,
+            )
+        else:
+            water = wh
+        # BUILDINGS — housing goes dark in a pillaged district; regional
+        # buildings are NOT skipped here (computeHousing has no regional arm,
+        # and their catalog housing is 0 anyway).
+        selb_h = bldg & ~self._bldg_dark(dreg)
+        housing = water + torch.einsum("bjn,n->bj", selb_h.double(), rd.b_housing.double())
+        housing = housing + self._palace_housing * is_cap_a
+        # NEIGHBORHOOD housing is APPEAL-based, so it cannot ride the flat
+        # district table (its catalog row is housing: 0) and it cannot ride the
+        # one-tile-per-type REGISTRY either — NEIGHBORHOOD is the only
+        # allowMultiple district. Tile scan, keyed to the city that owns the
+        # tile, and skipped entirely while none stands.
+        if self._nbhd_didx >= 0:
+            nb_ok = (self.district == self._nbhd_didx) & self.district_complete & ~self.district_pillaged & (self.tile_seat == row)
+            if bool(nb_ok.any()):
+                ap = self._tile_appeal()
+                hv = torch.full_like(ap, self._appeal_floor)
+                for cut, val in sorted(self._appeal_cuts):  # ascending: higher tiers overwrite
+                    hv = torch.where(ap >= cut, torch.full_like(ap, val), hv)
+                ids = self.city_id[:, row, :cols]  # [B, cols] persistent ids
+                hit = nb_ok.unsqueeze(2) & (self.tile_city.unsqueeze(2) == ids.unsqueeze(1)) & alive.unsqueeze(1)  # [B, T, cols]
+                housing = housing + ((hv * nb_ok).double().unsqueeze(2) * hit.double()).sum(dim=1)
+        if self._follower_live(row):
+            # Religious Community — a FOLLOWER belief: +housing on Shrines /
+            # Temples, keyed per-city on the religion the city FOLLOWS. Dark
+            # buildings excluded, like the flat table above.
+            housing = housing + torch.einsum("bjn,bjn->bj", selb_h.double(), self._fol_tab("bldgH", self._follower_id_for(self._city_rel(row))))
+        if self._seat_has_beliefs(row):
+            # River Goddess' housing half on river CENTERS — a PANTHEON belief,
+            # so it keys on the seat.
+            housing = housing + self._bel_add("river", row)[:, 1].unsqueeze(1) * self.tile_river.gather(1, ctr).double()
+        if self.improvements_on:
+            # +catalog housing per owned improvement within the work radius
+            # (pillaged or not — computeHousing does not gate on pillaged,
+            # unlike yields). The tile must belong to THIS CITY, not merely to
+            # this seat: Civ 6 pays the improvement's housing to the city whose
+            # culture borders contain the tile, and a tile lies inside exactly
+            # one. https://civilization.fandom.com/wiki/Housing_(Civ6)
+            win = tiles_from_offsets(ctr.reshape(-1), self._off3, self.W, self.H).reshape(B, cols, -1)
+            wf = win.clamp(min=0).reshape(B, -1)
+            imp_w = self.improvement.gather(1, wf).reshape_as(win)
+            own = (
+                (win >= 0)
+                & (self.tile_seat.gather(1, wf).reshape_as(win) == row)
+                & (self.tile_city.gather(1, wf).reshape_as(win) == self.city_id[:, row, :cols].unsqueeze(2))
+                & (imp_w >= 0)
+            )
+            housing = housing + (self._imp_housing[imp_w.clamp(min=0)].double() * own.double()).sum(dim=2)
+        # This seat's government/policy housingAll (MONARCHY +1) and BOTH
+        # district-conditional rules (housingIfDistricts / newDeal).
+        if self._gov_has_effects:
+            gm = self._gov_policy_mods_cached("seat0" if row == 0 else row - 1,
+                                              self.civics if row == 0 else self.civ_only_civics[:, row - 1])
+            housing = housing + gm[2].double().unsqueeze(1)
+            all_d, spec_d = self._district_counts(row)
+            housing = housing + self._cond_house_amen(gm[8], gm[9], all_d, spec_d)[0]
+        return maint, torch.where(alive, housing, torch.zeros_like(housing))
+
     def _seat_amenity(self, row: int, lux: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """THE amenity body, for every seat row (0 = seat 0, r+1 = civ r) —
         computeCityStats' amenity half, in f64.
@@ -2644,20 +2747,6 @@ class SimSeats:
         exist only because the two yield walks are still two; they die with
         the walk merge. The centre YIELDS left in slice 7 — they derive from
         eff_y at the site now, like the civ walk's."""
-        self.base_maintenance[rows, c_new] = torch.where(
-            new_cap,
-            torch.full_like(self.base_maintenance[rows, c_new], float(self.rules.palace_maintenance)),
-            torch.zeros_like(self.base_maintenance[rows, c_new]),
-        )
-        self.water_housing[rows, c_new] = torch.where(
-            self.fresh_water[rows, s_idx],
-            torch.full_like(self.water_housing[rows, c_new], float(self.rules.housing_fresh)),
-            torch.where(
-                self.coastal_land[rows, s_idx],
-                torch.full_like(self.water_housing[rows, c_new], float(self.rules.housing_coastal)),
-                torch.full_like(self.water_housing[rows, c_new], float(self.rules.housing_none)),
-            ),
-        )
         self.coastal[rows, c_new] = self.coastal_land[rows, s_idx]
         self.river_center[rows, c_new] = self.tile_river[rows, s_idx]
         self.dist[rows, c_new] = self.pair_dist[s_idx]

@@ -683,11 +683,10 @@ class SimOrders:
             # back, because the heal gate reads the walls bit in this plane.
             self.buildings[b, c_new] = kept_bldg
             self.outer_hp[b, c_new] = 0  # walls (if any) kept at outer pool 0
-            self.water_housing[b, c_new] = float(self.tile_wh[b, c_t])
             self.river_center[b, c_new] = bool(self.tile_river[b, c_t])
             self.dist[b, c_new] = self.pair_dist[c_t].to(self.dist.dtype)
             self.loyalty[b, c_new] = 100.0
-            self._init_center_live(b, c_new, c_t)
+            self._seat0_coastal_at(b, c_new, c_t)
             # The transfer tail: conquest plunders +40 gold, and the war ends
             # if it was the civ's last city. The raze path (`continue` above)
             # mirrors TS's early return — no gold, war state untouched.
@@ -781,11 +780,10 @@ class SimOrders:
             self.wonder_reg[b, c_new, :] = -1
             self.buildings[b, c_new] = False
             self.outer_hp[b, c_new] = 0  # no walls: the buildings plane was wiped
-            self.water_housing[b, c_new] = float(self.tile_wh[b, c_t])
             self.river_center[b, c_new] = bool(self.tile_river[b, c_t])
             self.dist[b, c_new] = self.pair_dist[c_t].to(self.dist.dtype)
             self.loyalty[b, c_new] = 100.0
-            self._init_center_live(b, c_new, c_t)
+            self._seat0_coastal_at(b, c_new, c_t)
         self._eff_version += 1
 
     def _capture_city_state_seat(self, rows: torch.Tensor, citystate_of: torch.Tensor, v: int) -> None:
@@ -848,15 +846,11 @@ class SimOrders:
             self.centre_slot_at[b, c_t] = slot
         self._eff_version += 1
 
-    def _init_center_live(self, b: int, c_new: int, c_t: int) -> None:
-        """Recompute a captured city's center yields from the LIVE tile.
-
-        TS tileYieldsForCenter reads the tile fresh: raw tile yields,
-        strip-adjusted, with food/production min-clamped. Settle sites use the
-        precomputed site_cy instead; a captured centre was never a fixture
-        site, so its slot must be filled here.
-        """
-        self.base_maintenance[b, c_new] = 0.0  # City Center 0 upkeep; no Palace, no buildings
+    def _seat0_coastal_at(self, b: int, c_new: int, c_t: int) -> None:
+        """Row 0's last founding-time site cache: isCoastalLand at a CAPTURED
+        centre, which was never a fixture site. The other four died with the
+        walk merges — maintenance, water housing and the centre yields all
+        derive from the tile at every read now, like TS."""
         nb_c = self.neigh[c_t]
         self.coastal[b, c_new] = bool(self.coastal_water[b, nb_c.clamp(min=0)][nb_c >= 0].any())
 

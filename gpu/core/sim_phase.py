@@ -431,81 +431,9 @@ class SimPhase:
             # the yields cache. Every batched sum is dyadic/int-valued:
             # bit-exact in any shape.
             _gmul_r = self._bel_mul("growth", r + 1) if _rcy_bel else 1.0
-            _riv_h = self._bel_add("river", r + 1)[:, 1] if _rcy_bel else None  # River Goddess: PANTHEON, per-seat
-            _fol_live_r = self._follower_live(r + 1)  # Religious Community: FOLLOWER, per-city
-            _fol_h_rc = self._follower_id_for(self._city_rel(r + 1)) if _fol_live_r else None
-            _ctr_r = self.civ_city_center[:, r].clamp(min=0)  # [B, RC]
 
             def _g5_hm() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-                dt_all = self.civ_city_dist_tile[:, r]  # [B, RC, nD]
-                dd_all = (dt_all >= 0) & self.district_complete.gather(1, dt_all.clamp(min=0).reshape(B, -1)).reshape_as(dt_all)
-                maint = (self._d_maint.reshape(1, 1, -1) * dd_all.to(torch.float64)).sum(dim=2)
-                maint = maint + torch.einsum("bjn,n->bj", self.civ_city_bldg[:, r].to(torch.float64), self.rules_dev.b_maintenance.double())
-                wh = self.tile_wh.gather(1, _ctr_r)  # [B, RC]
-                fresh = wh == float(self._h_fresh)
-                if self._aqueduct_idx >= 0:
-                    aq_t = self.civ_city_dist_tile[:, r, :, self._aqueduct_idx]  # [B, RC]
-                    has_aq = (aq_t >= 0) & self.district_complete.gather(1, aq_t.clamp(min=0)) & ~self.district_pillaged.gather(1, aq_t.clamp(min=0))
-                else:
-                    has_aq = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
-                water = torch.where(
-                    has_aq,
-                    torch.where(fresh, wh + self._aq_fresh_bonus, torch.maximum(wh, torch.full_like(wh, self._aq_no_fresh_total))),
-                    wh,
-                )
-                selb_h = self.civ_city_bldg[:, r] & ~self._bldg_dark(dt_all)  # buildings in a pillaged district give no housing
-                bh = selb_h.double() @ self.rules.b_housing.to(dev).double()  # [B, RC]
-                win3a = tiles_from_offsets(_ctr_r.reshape(-1), self._off3, self.W, self.H).reshape(B, self.RC, -1)
-                w3f = win3a.clamp(min=0).reshape(B, -1)
-                imp_w3 = self.improvement.gather(1, w3f).reshape_as(win3a)
-                # The tile must belong to THIS CITY, not merely to this civ:
-                # Civ 6 pays the improvement's housing to the city whose
-                # CULTURE BORDERS contain the tile, and a tile lies inside
-                # exactly one. Keying on the civ alone would pay one Farm to
-                # every same-civ city holding it in a radius-3 window.
-                # https://civilization.fandom.com/wiki/Housing_(Civ6)
-                _own_rc = self.tile_city.gather(1, w3f).reshape_as(win3a)  # [B, RC, M]
-                imp_own = (
-                    (win3a >= 0)
-                    & (self.civ_at.gather(1, w3f).reshape_as(win3a) == r)
-                    & (_own_rc == self.civ_city_id[:, r].unsqueeze(2))
-                    & (imp_w3 >= 0)
-                )
-                farm = (self._imp_housing[imp_w3.clamp(min=0)].double() * imp_own.double()).sum(dim=2)
-                # PALACE housing on the capital slot (civ_city_bldg holds the
-                # founding PALACE; CITY_CENTER never pillages, so no darkness
-                # gate), plus this seat's GOVERNMENT/POLICY housing — a
-                # government belongs to the seat that ADOPTED it.
-                _gpm = self._gov_policy_mods_cached(r, self.civ_only_civics[:, r])
-                _gp_hous = _gpm[2].double()
-                housing = water + bh + self._palace_housing * (self.civ_city_is_cap[:, r] & self.civ_city_alive[:, r]).double() + farm + _gp_hous.unsqueeze(1)
-                # This civ's housingIfDistricts + newDeal housing, through the
-                # applier every seat shares.
-                _civ_city_all_d = ((self.civ_city_dist_tile[:, r] >= 0) & self.district_complete.gather(
-                    1, self.civ_city_dist_tile[:, r].clamp(min=0).reshape(B, -1)).reshape_as(self.civ_city_dist_tile[:, r])).sum(dim=2)
-                _rh, _ = self._cond_house_amen(_gpm[8], _gpm[9], _civ_city_all_d, self._district_counts(r + 1)[1])
-                housing = housing + _rh
-                # Appeal-based NEIGHBORHOOD housing (the computeHousing twin).
-                # rc tiles are keyed by the per-city registry tile_city, so
-                # sum per rc SLOT over its own tiles.
-                if self._nbhd_didx >= 0:
-                    _ap = self._tile_appeal()
-                    _hv = torch.full_like(_ap, self._appeal_floor)
-                    for _cut, _val in sorted(self._appeal_cuts):
-                        _hv = torch.where(_ap >= _cut, torch.full_like(_ap, _val), _hv)
-                    _nb_ok = (self.district == self._nbhd_didx) & self.district_complete & ~self.district_pillaged
-                    _mine = _nb_ok & (self.civ_at == r)
-                    _srcd = (_hv * _mine.long()).double()
-                    _rid = self.tile_city  # [B, T] persistent rc id, -1 = none
-                    _nbh = torch.zeros_like(housing)
-                    for _j in range(self.RC):
-                        _idj = self.civ_city_id[:, r, _j].unsqueeze(1)  # [B, 1]
-                        _nbh[:, _j] = (_srcd * ((_rid == _idj) & (_idj >= 0)).double()).sum(dim=1)
-                    housing = housing + _nbh
-                if _fol_live_r:
-                    housing = housing + torch.einsum("bjn,bjn->bj", selb_h.double(), self._fol_tab("bldgH", _fol_h_rc))
-                if _rcy_bel:
-                    housing = housing + _riv_h.unsqueeze(1) * self.tile_river.gather(1, _ctr_r).double()
+                maint, housing = self._seat_housing(r + 1)  # THE shared body
                 p64a = self.civ_city_pop[:, r].double()
                 need = torch.floor(15 + 8 * (p64a - 1) + (p64a - 1).clamp(min=0) ** 1.5)
                 return maint, housing, need
@@ -1786,7 +1714,7 @@ class SimPhase:
     # Row-0-only [B, C] planes: founding-derived center stats + flags. They
     # ride row 0's permutation; the civ rows derive theirs per read.
     _SEAT0_SLOT_FIELDS = (
-        "base_maintenance", "water_housing", "coastal", "river_center", "dist",
+        "coastal", "river_center", "dist",
     )
 
     def _reclaim_cities(self, last_row: int | None = None) -> None:

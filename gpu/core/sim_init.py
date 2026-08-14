@@ -141,8 +141,6 @@ class SimInit:
         # --- per-slot city data (dynamic: a slot binds to a tile when a SETTLER
         # founds there; nothing is pre-founded, and every center stat below is
         # derived from the tile planes at founding) --------------------------
-        self.base_maintenance = torch.zeros(B, C, dtype=dtype, device=device)
-        self.water_housing = torch.zeros(B, C, dtype=dtype, device=device)
         self.coastal = torch.zeros(B, C, dtype=torch.bool, device=device)
         self.river_center = torch.zeros(B, C, dtype=torch.bool, device=device)
         self.dist = torch.full((B, C, T), 127, dtype=torch.int16, device=device)
@@ -249,7 +247,6 @@ class SimInit:
         # city exists at t0, so it starts empty.
         self.water = torch.tensor([[t.get("wt", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.nwonder = torch.tensor([[t.get("nw", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
-        self.fresh_water = torch.tensor([[t.get("fw", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.settle_ok = torch.tensor([[t.get("st", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.site_q3 = torch.tensor(
             [[t.get("sq", [0.0, 0.0, 0.0]) for t in f["tiles"]] for f in fixtures], dtype=torch.float64, device=device

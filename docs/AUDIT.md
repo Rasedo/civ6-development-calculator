@@ -337,6 +337,35 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   tests coincide, so this is inert until the flag — but the flag is
   already on.
 
+- **A-33. ONE `_seat_housing(row)` — computeHousing + cityMaintenance
+  (slice 9, 2026-08-14).** The third duplicate pair after the yield
+  walk and the amenity half: seat 0 computed housing and maintenance
+  inline in `_city_totals` while the civ rows used `_g5_hm`, a closure
+  in the economy loop. Every term is dyadic (water 2/3/5, building
+  housing integral, improvement housing 0.5), so the f64 sum the merged
+  body takes IS the number the f32 seat-0 walk used to take — only the
+  cast back to `self.dtype` matters. Bucket order now follows TS: water
+  (+Aqueduct) → buildings (+beliefHousing) → river → improvements →
+  housingAll → housingIfDistricts/newDeal. TWO PLANES DIED with it.
+  `water_housing` [B, C] was written at founding from
+  `fresh_water`/`coastal_land` at the site; `tile_wh` — the exported
+  per-tile `hasFreshWater ? FRESH : isCoastalLand ? COASTAL : NONE`,
+  which is the SAME derivation — is now read at the centre on every
+  call, the civ rows' shape, so a captured centre needs no rebuild.
+  `base_maintenance` [B, C] held `palace_maintenance` on the capital
+  and 0 elsewhere; `BUILDINGS.PALACE` is cost-0 and `buildingMaintenance`
+  returns 0 for cost-0 buildings, so the plane carried a CONSTANT ZERO
+  in every game. The rule it stood for is now an `is_cap` term inside
+  the shared maintenance sum — where TS keeps it, as the autoCapital
+  PALACE entry in `city.buildings` — so it stays correct if the catalog
+  ever gives the Palace a cost. Gone with them: two `_MUTABLE` entries,
+  two `_SEAT0_SLOT_FIELDS` entries, two manifest exclusions (148 → 146
+  planes, 25 → 23 excluded), four founding/capture writes, and the
+  `fresh_water` [B, T] plane, whose only reader was the deleted water
+  cache. `_init_center_live` is now `_seat0_coastal_at` and does one
+  thing. `_found_seat0_caches` is down to `coastal` / `river_center` /
+  `dist` plus the centre `workable` clear.
+
 ## B. Fidelity vs real Civ 6 — open residuals
 
 - **B-17r. Encampment:** ranged-vs-district strikes are out of scope

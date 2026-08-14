@@ -112,7 +112,7 @@ class Rules:
     palace_yields: torch.Tensor  # [6]
     palace_housing: float
     palace_amenities: float
-    palace_maintenance: float  # the capital's base upkeep, derived at founding
+    palace_maintenance: float  # buildingMaintenance('PALACE') — 0 while the Palace is cost-0
     b_cost: torch.Tensor  # [NB]
     b_yields: torch.Tensor  # [NB, 6]
     b_housing: torch.Tensor
@@ -467,7 +467,7 @@ _MUTABLE = [
     "victory_type", "winner", "space_done",  # space-race chain progress
     "seat0_unit_next",
     "district_dead",  # captured districts are paved-but-dead
-    "base_maintenance", "water_housing", "coastal", "river_center", "dist",
+    "coastal", "river_center", "dist",
     "civ_cap_tile",  # capitalTiles — capital identity + the domination anchor (cap_tile / civ_only_cap_tile are views)
     # `tile_seat` is STATE — the city-state part of tile ownership is stored
     # only here (`citystate_at` is a view of it), so it must round-trip.
