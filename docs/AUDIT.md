@@ -458,6 +458,39 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   — two cheap passes, left for #81 rather than a new memo with a new
   staleness surface.
 
+- **A-37. ONE `_seat_border_growth(row, col)` — and row 0's 4-claim cap
+  goes — 2026-08-14.** Cultural border growth was a `_seat_border_growth`
+  for civ rows and an inline block in `step()` for row 0. Merged onto one
+  body that takes a seat ROW and a per-batch COLUMN tensor (row 0 walks
+  its columns in TS array order, a per-batch permutation, so a fixed slot
+  index could not serve it). Three fixes ride along:
+
+  - **`BORDER_LOOPS = 4` DELETED.** TS's claim loop is an unbounded
+    `while`; the civ body loops 64 and row 0 stopped at 4. A city that
+    could afford a 5th claim in one turn got it on a civ row and not on
+    row 0. Every row now runs the civ bound.
+  - **`tileClaimed(t)` is `tileSeat(t) !== NO_SEAT`** — ONE plane, not the
+    three-way `owner < 0 && citystate_at < 0 && civ_at < 0` both bodies
+    spelled out. `_seat_tile_unclaimed` is that one test now, and it also
+    serves the gold tile purchase.
+  - **The adjacency test is `tileBelongsTo(n, city)`** — the same
+    (tileSeat, tileCity) pair the work window uses. Row 0 matched
+    `owner == slot` (its slot plane), the civ matched `civ_at == r &&
+    tile_city == id`; both collapse into `_seat_tile_adj_city(row, ...)`.
+
+  INVALIDATION, unified: a claim bumps `_claim_version` (row 0 used to
+  bump `_eff_version`, the civ bumped `_claim_version` only when the spot
+  landed in a LATER same-row window). `step()`'s row-0 recompute guard now
+  keys on `(_eff_version, _claim_version)`, which is what makes the
+  `_eff_version` bump unnecessary — a claim moves ownership, never a tile
+  yield. The civ's conditional refinement is gone with it: a claim now
+  always invalidates the batched walk for the columns after it, which is
+  correct and slower. Recorded for #81, not re-derived here.
+
+  `_seat_border_key` is row-generic (its dead `_bmul` local went too), so
+  the culture claim, the gold tile purchase and the wire's tile-buy
+  candidate all build ONE pick key from ONE plane composition.
+
 ## B. Fidelity vs real Civ 6 — open residuals
 
 - **B-17r. Encampment:** ranged-vs-district strikes are out of scope

@@ -270,7 +270,6 @@ def load_fixture(path: Path) -> dict:
 # The batched simulation
 # ---------------------------------------------------------------------------
 
-BORDER_LOOPS = 4  # borders expand in a while-loop; 4 covers any realistic culture
 RESEARCH_LOOPS = 40  # > tree size: completes every ready tech/civic in one turn; the early exit keeps it free
 # Slots in the v_/u_ unit pools per game (append-only; runtime-asserted).
 # Dead slots are recycled by `_reclaim_pool`, so the cap bounds LIVE units,

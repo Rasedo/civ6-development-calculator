@@ -315,7 +315,7 @@ class SimPhase:
                     ok_t = want_t & self.civ_city_alive[bidx_t, r, jt5] \
                         & (self.pair_dist[ctr_t, tt5] <= 5) \
                         & self._seat_tile_unclaimed(tt5.unsqueeze(1)).squeeze(1) \
-                        & self._seat_tile_adj_city(r, self.civ_city_id[bidx_t, r, jt5], tt5.unsqueeze(1)).squeeze(1)
+                        & self._seat_tile_adj_city(r + 1, self.civ_city_id[bidx_t, r, jt5], tt5.unsqueeze(1)).squeeze(1)
                     cost_t = self._seat_tile_price(r, ctr_t, tt5)
                     ok_t = ok_t & self._afford(self.civ_only_treasury[:, r], cost_t)
                     if bool(ok_t.any()):
@@ -718,7 +718,7 @@ class SimPhase:
                                         if pi_ in self._space_victory_idx:
                                             self.victory_type.copy_(torch.where(hitp, torch.full_like(self.victory_type, 4), self.victory_type))
                                             self.game_over.logical_or_(hitp)
-                self._seat_border_growth(r, j, cact, cul_c)
+                self._seat_border_growth(r + 1, torch.full((B,), j, dtype=torch.long, device=self.device), cact, cul_c)
                 # City strike: a civ city with ANCIENT_WALLS fires once/turn at
                 # the nearest unit hostile to THIS civ (barbarians always;
                 # at-war seats' units, civilians included), range 2, lowest

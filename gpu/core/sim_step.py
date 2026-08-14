@@ -244,7 +244,7 @@ class SimStep:
         eliminated-actor continue) — active0 gates every seat-level arm;
         the city walks are alive-masked already, so their zero sums need no
         gate."""
-        r, B, C, T, dev = self.rules, self.B, self.C, self.T, self.device
+        r, B, C, dev = self.rules, self.B, self.C, self.device
         rd = self.rules_dev
         active0 = self.alive.any(dim=1)  # actor.cities.length > 0
 
@@ -399,17 +399,20 @@ class SimStep:
         # growth rides the pop dirty flag).
         total, housing, growth_f, tier_idx = self._city_totals()
         lux0 = self._last_lux  # frozen for the whole walk (luxMap semantics)
-        _tot_ver = self._eff_version
+        # The recompute guard: an _eff_version move (completion, purchase,
+        # civic) OR a border CLAIM (_claim_version — a claimed tile widens a
+        # later city's workable window) OR a pop change.
+        _tot_ver = (self._eff_version, self._claim_version)
         # Pop changes ride a dirty FLAG set at the walk's only pop writes
         # (settler completion, growth, starvation). A clamp-at-1 write that
         # leaves pop unchanged forces a spurious recompute of identical values
         # (bit-exact, rare).
         _pop_dirty = False
-        # Seat 0's belief hoists (ids are static inside the walk — claims live
-        # in the phase, not here): Fertility Rites rides the growth chain,
-        # Religious Settlements scales the border cost (js_round(base * mult),
-        # the city.ts form), and the tile-add plane rides the border ySum like
-        # the civ pick key (pickBorderTile's ctx carries the seat's modifiers).
+        # Seat 0's belief hoist (ids are static inside the walk — claims live
+        # in the phase, not here): Fertility Rites rides the growth chain. The
+        # border-claim beliefs (Religious Settlements' cost multiplier, the
+        # tile-add plane in the pick key) live in _seat_border_growth with the
+        # rest of the claim.
         _bel0 = self._seat_has_beliefs(0)
         gmul0 = self._bel_mul("growth", 0).to(self.dtype) if _bel0 else None
         # Hanging Gardens (empireGrowthMult) — seat 0's completed-wonder growth
@@ -418,21 +421,6 @@ class SimStep:
         # of the city walk reads the same state every column would.
         _hg = self._wonder_growth_mult(self._completed_wonders(0))
         hg0 = None if _hg is None else _hg.to(self.dtype)
-        _bmul0 = self._bel_mul("border", 0).to(self.dtype) if _bel0 else None
-        _featsum0 = self._belief_feat_plane(0).sum(dim=2).to(self.dtype) if _bel0 else None
-
-        def _border_ysum() -> torch.Tensor:
-            # The border-pick ranking plane, ONE construct for the walk-entry
-            # compute and both mid-walk refreshes: tileYields carries
-            # FARM-ADJACENCY food (a raze can free farmland onto the frontier)
-            # and the belief tile adds; paved/wondered tiles yield 0
-            # (tileYields, yields.ts).
-            ys = self._eff_yields().sum(dim=2) + self._farmadj_food()
-            if _featsum0 is not None:
-                ys = ys + _featsum0
-            return ys * ((self.district < 0) & (self.built_wonder < 0)).to(self.dtype)
-
-        y_sum = _border_ysum()
         # Loyalty mirrors the loop-top view: city c's tier and pop are captured
         # FRESH at its own iteration (post earlier cities' same-turn mutations,
         # pre its own production/growth) — applyLoyalty runs at the top of the
@@ -443,8 +431,6 @@ class SimStep:
         sci_add = torch.zeros(B, dtype=self.dtype, device=dev)
         cul_add = torch.zeros(B, dtype=self.dtype, device=dev)
         fth_add = torch.zeros(B, dtype=self.dtype, device=dev)
-        neigh_flat = self.neigh.clamp(min=0).reshape(1, -1).expand(B, -1)
-        neigh_valid = (self.neigh >= 0).reshape(1, T, 6)
         # The TS side iterates state.cities in ARRAY order (splice on death,
         # push on found/capture) — which IS slot order under append+reclaim
         # (#110). Every cross-city coupling in this walk — a completion's
@@ -458,11 +444,10 @@ class SimStep:
         bidx = self._bidx
         for s_rank in range(C):
             col = walk_ord[:, s_rank]  # [B] — each game's s_rank-th living city (TS array order)
-            if self._eff_version != _tot_ver or _pop_dirty:
+            if (self._eff_version, self._claim_version) != _tot_ver or _pop_dirty:
                 total, housing, growth_f, tier_idx = self._city_totals(lux=lux0)
-                _tot_ver = self._eff_version
+                _tot_ver = (self._eff_version, self._claim_version)
                 _pop_dirty = False
-                y_sum = _border_ysum()
             tier_fresh[bidx, col] = tier_idx[bidx, col]
             pop_loyal[bidx, col] = self.pop[bidx, col]
             t_c = total[bidx, col]  # [B, 6] this city's FRESH yields
@@ -574,61 +559,12 @@ class SimStep:
             # pickBorderTile reads the LIVE map: refresh the yield ranking if
             # THIS city's own completion/growth just changed it (the box add
             # itself stays the loop-top stats value).
-            if self._eff_version != _tot_ver or _pop_dirty:
+            if (self._eff_version, self._claim_version) != _tot_ver or _pop_dirty:
                 total, housing, growth_f, tier_idx = self._city_totals(lux=lux0)
-                _tot_ver = self._eff_version
+                _tot_ver = (self._eff_version, self._claim_version)
                 _pop_dirty = False
-                y_sum = _border_ysum()
-            self.culture_box[bidx, col] = self.culture_box[bidx, col] + t_c[:, 4]
-            dist_c = self.dist[bidx, col]  # [B, T] — static per city, hoisted out of the claim loop
-            adj_own = None  # dense on the first ready iteration, then incremental
-            for _ in range(BORDER_LOOPS):
-                cost_b = self._border_cost(self.tiles_acquired[bidx, col])
-                if _bmul0 is not None:
-                    cost_b = js_round(cost_b * _bmul0)
-                ready = self.alive[bidx, col] & (self.culture_box[bidx, col] >= cost_b)
-                if not ready.any():
-                    break
-                if adj_own is None:
-                    owner_nb = self.owner.gather(1, neigh_flat).reshape(B, T, 6)
-                    adj_own = ((owner_nb == col.reshape(B, 1, 1)) & neigh_valid).any(dim=2)
-                cand_b = (self.owner == -1) & (self.citystate_at < 0) & (self.civ_at < 0) & (dist_c <= 5) & adj_own
-                # order: dist asc, resource priority desc, yield sum desc, index asc
-                # priority reads LIVE — a paved bonus resource is GONE, and an
-                # orphaned pave is unowned and claimable.
-                key = (
-                    dist_c.to(self.dtype) * 1e12
-                    - (self.res_priority * (~self.res_stripped).long()).to(self.dtype) * 1e9
-                    - torch.round(y_sum * 1000) * 1e4
-                    + self._arangeT.to(self.dtype)
-                )
-                key = torch.where(cand_b, key, self._inf_f)
-                best = key.argmin(dim=1)
-                has_cand = cand_b.any(dim=1)
-                expand = ready & has_cand
-                if expand.any():
-                    rows = expand.nonzero(as_tuple=True)[0]
-                    self.tile_city[rows, best[rows]] = self.city_id[rows, 0, col[rows]]
-                    self.tile_seat[rows, best[rows]] = 0  # seat + which city: the two halves of ownerSeat/ownerCity (persistent id)
-                    self._tile_owner_ver += 1
-                    self._reveal_around(rows, 0, best[rows], 1)  # acquireTile's revealAround(seat, tile, 1)
-                    # Each claim flips ONE tile (-1 → col, per the cand_b
-                    # owner==-1 gate), so adjacency-to-col only GROWS, and only
-                    # at the claimed tile's ≤6 on-map neighbours — the same
-                    # booleans a dense re-derive would produce.
-                    nb_b = self.neigh[best[rows]]  # [n, 6]
-                    ok_b = nb_b >= 0
-                    civ_pair_b = rows.unsqueeze(1).expand_as(nb_b)
-                    adj_own[civ_pair_b[ok_b], nb_b[ok_b]] = True
-                    cb = self.culture_box[bidx, col]
-                    self.culture_box[bidx, col] = torch.where(expand, cb - cost_b, cb)
-                    self.tiles_acquired[bidx, col] = self.tiles_acquired[bidx, col] + expand.long()
-                    self._eff_version += 1  # a claim widens LATER cities' worked candidates
-                capped = ready & ~has_cand
-                cb2 = self.culture_box[bidx, col]
-                self.culture_box[bidx, col] = torch.where(capped, torch.minimum(cb2, cost_b), cb2)
-                if not expand.any():
-                    break
+            # Cultural border growth — THE shared body, row 0's call.
+            self._seat_border_growth(0, col, self.alive[bidx, col], t_c[:, 4])
 
             # --- empire accumulators (FRESH values; the seq-order walk makes
             # each game's float association match game.ts exactly) ------------

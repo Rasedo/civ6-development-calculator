@@ -403,23 +403,22 @@ class SimSeats:
         return mil & afford
 
     def _seat_tile_unclaimed(self, tc: torch.Tensor) -> torch.Tensor:
-        """[B, K] — the tileClaimed twin over the split ownership planes: a tile
-        is claimable only when NO plane family owns it (seat 0's `owner`,
-        `citystate_at`, `civ_at`). tc must be clamped in-range."""
-        return (self.owner.gather(1, tc) < 0) & (self.citystate_at.gather(1, tc) < 0) & (self.civ_at.gather(1, tc) < 0)
+        """[B, K] — `tileClaimed(t)` is `tileSeat(t) !== NO_SEAT`, so ONE plane
+        answers it for every owner class (seat 0, a civ, a city-state).
+        tc must be clamped in-range."""
+        return self.tile_seat.gather(1, tc) < 0
 
-    def _seat_tile_adj_city(self, r: int, cid: torch.Tensor, tc: torch.Tensor,
+    def _seat_tile_adj_city(self, row: int, cid: torch.Tensor, tc: torch.Tensor,
                             nbs: torch.Tensor | None = None) -> torch.Tensor:
         """[B, K] — the borderCandidates adjacency twin: any of the 6
-        neighbours is a tile of THIS city (seat- AND id-matched via the
-        tile_city registry — the n.cityId === city.id check). `cid` is the
-        per-row civ_city_id of the city; `nbs` may be passed to reuse a scan's
-        neighbour tensor."""
+        neighbours `tileBelongsTo` THIS city, the same (tileSeat, tileCity)
+        pair the work window tests. `cid` is the city's persistent id; `nbs`
+        may be passed to reuse a scan's neighbour tensor."""
         if nbs is None:
             nbs = self.neigh[tc.reshape(-1)].reshape(self.B, -1, 6)
         nbf = nbs.clamp(min=0).reshape(self.B, -1)
         return (
-            (self.civ_at.gather(1, nbf).reshape(self.B, -1, 6) == r)
+            (self.tile_seat.gather(1, nbf).reshape(self.B, -1, 6) == row)
             & (self.tile_city.gather(1, nbf).reshape(self.B, -1, 6) == cid.reshape(self.B, 1, 1))
             & (nbs >= 0)
         ).any(dim=2)
@@ -458,11 +457,11 @@ class SimSeats:
             if not bool(live.any()):
                 continue
             ctr = self.civ_city_center[:, r, j]
-            tiles, tc, nbs, key0 = self._seat_border_key(r, j, ctr)
+            tiles, tc, nbs, key0 = self._seat_border_key(r + 1, ctr)
             okt = (
                 (tiles >= 0)
                 & self._seat_tile_unclaimed(tc)
-                & self._seat_tile_adj_city(r, self.civ_city_id[:, r, j], tc, nbs)
+                & self._seat_tile_adj_city(r + 1, self.civ_city_id[:, r, j], tc, nbs)
                 & live.unsqueeze(1)
             )
             has = okt.any(dim=1)
@@ -2041,23 +2040,22 @@ class SimSeats:
         self.centre_slot_at[b, c_t] = slot
         self._eff_version += 1
 
-    def _seat_border_key(self, r: int, j: int, center: torch.Tensor):
-        """The SHARED border-candidate pick key for rc slot j — dist asc, resource
-        priority desc, milli-rounded yield sum desc, global tile index asc (the
-        pickBorderTile twin). Factored out so the CULTURE claim
-        (_seat_border_growth) and the GOLD tile purchase use ONE construction and
-        cannot drift apart. Loop-invariant: claims mutate ownership only, never
-        the key. Returns (tiles, tc, nbs, key0)."""
+    def _seat_border_key(self, row: int, center: torch.Tensor):
+        """The SHARED border-candidate pick key for ONE city of seat row `row` —
+        dist asc, resource priority desc, milli-rounded yield sum desc, global
+        tile index asc (the pickBorderTile twin). Factored out so the CULTURE
+        claim (_seat_border_growth) and the GOLD tile purchase use ONE
+        construction and cannot drift apart. Loop-invariant: claims mutate
+        ownership only, never the key. Returns (tiles, tc, nbs, key0)."""
         B = self.B
-        _bmul = self._bel_mul("border", r + 1) if self._seat_has_beliefs(r + 1) else None
         tiles = tiles_from_offsets(center, self._off5, self.W, self.H)  # [B, M]
         tc = tiles.clamp(min=0)
         nbs = self.neigh[tc.reshape(-1)].reshape(B, -1, 6)  # [B, M, 6]
         g = self._rcy_globals()
-        f_plane = self._rcy_food_plane(r + 1, g)
+        f_plane = self._rcy_food_plane(row, g)
         p_plane = g["p_plane"]
         if self._mine_boost_tech.numel() > 0 and self.MINE >= 0:
-            boost_r = (self.civ_only_techs[:, r][:, self._mine_boost_tech].to(self.dtype) * self._mine_boost_amt).sum(dim=1)
+            boost_r = (self._seat_techs(row)[:, self._mine_boost_tech].to(self.dtype) * self._mine_boost_amt).sum(dim=1)
             p_plane = p_plane + ((self.improvement == self.MINE) & ~self.pillaged).to(self.dtype) * boost_r.unsqueeze(1)
         y_oth = (self.tile_yields[:, :, 2:] - self.feat_yields[:, :, 2:] * g["fs"].unsqueeze(-1)).sum(dim=2)
         # CAMP/PLANTATION catalog gold joins the border ySum: tileYields carries
@@ -2071,10 +2069,10 @@ class SimSeats:
                 y_oth = y_oth + self._tile_appeal().clamp(min=0).to(self.dtype) * (
                     (self.improvement == self.SEASIDE).to(self.dtype) * live_imp
                 )
-        if _bmul is not None or self._seat_has_beliefs(r + 1):
+        if self._seat_has_beliefs(row):
             # belief featureYields ride the pick key too — pickBorderTile's ctx
             # carries the seat's modifiers
-            featP = self._belief_feat_plane(r + 1)
+            featP = self._belief_feat_plane(row)
             f_plane = f_plane + featP[:, :, 0]
             p_plane = p_plane + featP[:, :, 1]
             y_oth = y_oth + featP[:, :, 2:].sum(dim=2)
@@ -2094,54 +2092,51 @@ class SimSeats:
         )
         return tiles, tc, nbs, key0
 
-    def _seat_border_growth(self, r: int, j: int, cact: torch.Tensor, cul_c: torch.Tensor) -> None:
-        """Cultural border growth for rc slot j — box += this city's culture, then
-        consume against _border_cost using the shared pick key (dist asc,
-        resource priority desc, yield-sum desc, index asc; radius 5; fully
-        unowned tiles, with water, impassables and natural wonders all claimable
-        like borderCandidates). The yield sum uses the CIV's planes:
-        strip-adjusted food/prod plus its own farm-adjacency and mine boosts.
-        Adjacency is PER-CITY via the tile_city registry, mirroring
-        borderCandidates' n.cityId === city.id check."""
-        self.civ_city_cbox[:, r, j] = torch.where(cact, self.civ_city_cbox[:, r, j] + cul_c, self.civ_city_cbox[:, r, j])
-        B = self.B
-        center = self.civ_city_center[:, r, j]
+    def _seat_border_growth(self, row: int, col: torch.Tensor, act: torch.Tensor, cul_c: torch.Tensor) -> None:
+        """Cultural border growth for ONE city of seat row `row` — box += this
+        city's culture, then consume against `_border_cost` using the shared
+        pick key (dist asc, resource priority desc, yield-sum desc, index asc;
+        radius 5; unclaimed tiles, with water, impassables and natural wonders
+        all claimable, like borderCandidates). `col` is the city's column, a
+        [B] tensor because row 0 walks its columns in a per-batch order.
+
+        The two predicates are the ones TS names: `tileClaimed(t)` is
+        `tileSeat(t) !== NO_SEAT`, and the adjacency test is `tileBelongsTo(n,
+        city)` — the same (tileSeat, tileCity) pair the work window uses, so a
+        city cannot claim across a sibling's frontier."""
+        bidx = self._bidx
+        box = self.city_cbox[bidx, row, col]
+        self.city_cbox[bidx, row, col] = torch.where(act, box + cul_c.to(box.dtype), box)
+        center = self.city_center[bidx, row, col]
+        cid = self.city_id[bidx, row, col]
         # Religious Settlements — Math.round(base * borderCostMult), the
-        # city.ts:507 form. Without beliefs the mult is 1 and js_round of the
+        # city.ts form. Without beliefs the mult is 1 and js_round of the
         # integral base curve is exact, so the expression is unchanged.
-        _bmul = self._bel_mul("border", r + 1) if self._seat_has_beliefs(r + 1) else None
-        def _civ_city_cost():
-            base = self._border_cost(self.civ_city_acquired[:, r, j])
-            return js_round(base * _bmul) if _bmul is not None else base
+        _bmul = self._bel_mul("border", row) if self._seat_has_beliefs(row) else None
+
+        def _cost() -> torch.Tensor:
+            base = self._border_cost(self.city_acquired[bidx, row, col])
+            # the belief multiplier is f64; the box is the engine dtype, so the
+            # threshold comes back in the box's dtype on every row.
+            return js_round(base * _bmul).to(base.dtype) if _bmul is not None else base
+
         # most calls have no border-ready city — bail before building anything
         # (the loop re-checks per claim).
-        if not bool((cact & (self.civ_city_cbox[:, r, j] >= _civ_city_cost())).any()):
+        if not bool((act & (self.city_cbox[bidx, row, col] >= _cost())).any()):
             return
-        # claims only mutate OWNERSHIP, so the candidate window, the civ ySum
-        # plane and the pick key are loop-invariant and are built ONCE. The
-        # strip-adjusted planes come from the shared cache — the same
-        # construction _seat_city_yields scores worked tiles with, bit-equal to
-        # tileYields under modifiersFromResearch since all shipped yields are
-        # dyadic.
-        tiles, tc, nbs, key0 = self._seat_border_key(r, j, center)
+        # Claims only mutate OWNERSHIP, so the candidate window, the row's ySum
+        # plane and the pick key are loop-invariant and are built ONCE.
+        tiles, tc, nbs, key0 = self._seat_border_key(row, center)
         unowned = None  # window planes dense once, then incremental per claim
         adj_own = None
         for _ in range(64):  # the TS while-loop: multiple claims per turn, escalating cost
-            cost = _civ_city_cost()  # belief border multiplier applied
-            ready = cact & (self.civ_city_cbox[:, r, j] >= cost)
+            cost = _cost()  # belief border multiplier applied
+            ready = act & (self.city_cbox[bidx, row, col] >= cost)
             if not bool(ready.any()):
                 return
             if unowned is None:
-                unowned = (self.owner.gather(1, tc) < 0) & (self.citystate_at.gather(1, tc) < 0) & (self.civ_at.gather(1, tc) < 0)
-                # adjacency is PER-CITY — the neighbor must belong to THIS rc's
-                # registry, as pickBorderTile requires. civ_at alone would let a
-                # city claim across a sibling's frontier.
-                nb_flat = nbs.clamp(min=0).reshape(B, -1)
-                adj_own = (
-                    (self.civ_at.gather(1, nb_flat).reshape(B, -1, 6) == r)
-                    & (self.tile_city.gather(1, nb_flat).reshape(B, -1, 6) == self.civ_city_id[:, r, j].reshape(B, 1, 1))
-                    & (nbs >= 0)
-                ).any(dim=2)
+                unowned = self._seat_tile_unclaimed(tc)
+                adj_own = self._seat_tile_adj_city(row, cid, tc, nbs)
             ok = (tiles >= 0) & unowned & adj_own & ready.unsqueeze(1)
             key = torch.where(ok, key0, self._inf_f)
             best = key.argmin(dim=1)
@@ -2150,25 +2145,19 @@ class SimSeats:
             if bool(claim.any()):
                 rows = claim.nonzero(as_tuple=True)[0]
                 spot = tiles[rows, best[rows]]
-                self.tile_seat[rows, spot] = r + 1  # tile ownership lives in tile_seat
-                self._tile_owner_ver += 1  # one storage: nothing else to retag
-                self.tile_city[rows, spot] = self.civ_city_id[rows, r, j]  # claim registers to THIS city
-                self._reveal_around(rows, r + 1, spot, 1)  # acquireTile's revealAround(seat, tile, 1)
-                # invalidate the batched-yields cache ONLY if this claim
-                # can change a later column — i.e. the spot lands inside a
-                # LATER same-civ city's radius-3 worked window (columns <= j
-                # are already consumed this turn; padding -1 never matches a
-                # real spot >= 0). Cross-civ claims can't flip a valid bit.
-                if j + 1 < self.RC:
-                    _win = self._rcy_globals().get("win_r", {}).get(r)
-                    if _win is None or bool((_win[rows, j + 1 :, :] == spot.reshape(-1, 1, 1)).any()):
-                        self._claim_version += 1
-                self.civ_city_acquired[rows, r, j] += 1
-                self.civ_city_cbox[rows, r, j] -= cost[rows]
-                # only civ_at[spot] changed (-1 → r, per the unowned gate). The
-                # spot leaves the unowned plane and window tiles ADJACENT to it
-                # gain r-adjacency — the same booleans a dense re-derive would
-                # produce, since owner/citystate_at never move in-loop.
+                self.tile_seat[rows, spot] = row  # setTileOwner's two halves:
+                self.tile_city[rows, spot] = cid[rows]  # the seat and the city id
+                self._tile_owner_ver += 1
+                self._reveal_around(rows, row, spot, 1)  # acquireTile's revealAround(seat, tile, 1)
+                # A claim widens a LATER city's workable candidates, so every
+                # walk that already ran this turn is stale.
+                self._claim_version += 1
+                self.city_acquired[rows, row, col[rows]] += 1
+                self.city_cbox[rows, row, col[rows]] -= cost[rows]
+                # Only tile_seat[spot] changed (-1 -> row, per the unclaimed
+                # gate). The spot leaves the unowned plane and window tiles
+                # ADJACENT to it gain this city's adjacency — the same booleans
+                # a dense re-derive would produce, since nothing else moved.
                 unowned[rows, best[rows]] = False
                 nb_s = self.neigh[spot]  # [n, 6]
                 adj_hit = ((tiles[rows].unsqueeze(2) == nb_s.unsqueeze(1)) & (nb_s >= 0).unsqueeze(1)).any(dim=2)  # [n, M]
@@ -2176,7 +2165,8 @@ class SimSeats:
             capped = ready & ~has_cand
             if bool(capped.any()):
                 # Nowhere to grow: cap the box at the current threshold.
-                self.civ_city_cbox[:, r, j] = torch.where(capped, torch.minimum(self.civ_city_cbox[:, r, j], cost), self.civ_city_cbox[:, r, j])
+                cb = self.city_cbox[bidx, row, col]
+                self.city_cbox[bidx, row, col] = torch.where(capped, torch.minimum(cb, cost), cb)
             if not bool(claim.any()):
                 return
 
