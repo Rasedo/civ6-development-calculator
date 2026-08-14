@@ -102,7 +102,7 @@ def _blocks(env, sim, r: int) -> dict:
 #:     }}
 #: plus the optional fields the extractors below document (war, envoys, buy,
 #: buyFaith, levy, and the geo intents). Codes are the MASK layouts
-#: (`seat_masks`, `seat_unit_mask`), one layout for every seat, so the same
+#: (`seat_masks`, `_seat_unit_mask`), one layout for every seat, so the same
 #: file can drive any of them.
 #: The CITY AXIS is keyed by CENTRE TILE, not index: the recorder reads cities
 #: by GPU slot and TS applies by founding-order array position, and the two
@@ -137,17 +137,12 @@ def _policy_rng(sim, seeds: list, turn: int, r: int, salt: int) -> torch.Tensor:
 
 
 def _seat_units(sim, seat: int):
-    """(slot_map, present, tiles, types, charges) for ANY seat — seat 0 reads
-    its own pool directly (identity rows over p_*); seats k >= 1 gather
-    through seat_slot_map."""
-    if seat >= 1:
-        smap = sim.seat_slot_map(seat - 1)
-        sc = smap.clamp(min=0)
-        return (smap, smap >= 0,
-                sim.civ_unit_tile.gather(1, sc), sim.civ_unit_type.gather(1, sc), sim.civ_unit_charges.gather(1, sc))
-    B, N = sim.seat0_unit_tile.shape
-    smap = torch.arange(N, device=sim.device).unsqueeze(0).expand(B, N)
-    return smap, sim.seat0_unit_alive, sim.seat0_unit_tile, sim.seat0_unit_type, sim.seat0_unit_charges
+    """(slot_map, present, tiles, types, charges) for ANY seat — ONE slot
+    map over the ONE shared unit window, ranked by `unit_seat`."""
+    smap = sim._seat_slot_map(seat)
+    sc = smap.clamp(min=0)
+    return (smap, smap >= 0,
+            sim.unit_tile.gather(1, sc), sim.unit_type.gather(1, sc), sim.unit_charges.gather(1, sc))
 
 
 def _builder_jobs(sim, seat: int) -> torch.Tensor:
@@ -240,9 +235,8 @@ def _spread_targets(sim, seat: int) -> torch.Tensor:
 def _seat_unit_orders(sim, seat: int):
     """The RANK-0 unit policy, ONE text for every seat: the ladder's pick over
     the seat's own mask/obs, then the builder-job and spread overrides. Rows
-    ride the seat's slot layout (_seat_units): raw p-pool slots for seat 0
-    (step()'s _apply_unit_actions indexing), the compacted slot map for seats
-    >= 1 (the phase executor's indexing).
+    ride the seat's slot layout (`_seat_units`) — the ONE head layout every
+    applier and every mask indexes by.
 
     The BUILDER verb: a civilian with charges standing ON its job takes the
     job column — REPAIR first (the scripted order), else the lowest legal
@@ -252,8 +246,8 @@ def _seat_unit_orders(sim, seat: int):
     (seats >= 1) or re-planned next turn (seat 0, single-rank like the
     scripted walker's own single-step gait).
     """
-    um = sim.unit_action_mask() if seat == 0 else sim.seat_unit_mask(seat - 1)
-    uo = sim.unit_obs() if seat == 0 else sim.seat_unit_obs(seat - 1)
+    um = sim._seat_unit_mask(seat)
+    uo = sim.seat_unit_obs(seat)
     orders0 = ladder.pick_unit_orders(um, uo)
     job_t = _builder_jobs(sim, seat)
     spread_t = _spread_targets(sim, seat)
@@ -368,7 +362,7 @@ def _buy_ctx(sim, r: int) -> dict:
     n_cities = sim.civ_city_alive[:, r].sum(dim=1)
     _sq = (sim.civ_city_alive[:, r] & (sim.civ_city_current[:, r] == 0)).sum(dim=1)
     sett_cost = (rr.get("settlerBase", 48) + rr.get("settlerPer", 18)
-                 * (n_cities - 1 + sim._civ_only_settlers_of(r) + _sq).clamp(min=0).double()) * sim.rules.gold_purchase_mult
+                 * (n_cities - 1 + sim._seat_settlers(r + 1) + _sq).clamp(min=0).double()) * sim.rules.gold_purchase_mult
     # the buy SPAWNS a unit at the capital (else first city), which must have
     # the pop to pay — the TS driver's tripwire mirrors this exactly.
     _cap_is = sim.civ_city_is_cap[:, r]
@@ -376,8 +370,9 @@ def _buy_ctx(sim, r: int) -> dict:
     _spawn_pop = sim.civ_city_pop[:, r].gather(1, _spawn_slot.unsqueeze(1)).squeeze(1)
     settler_ok = active & (_spawn_pop >= 2) & sim._afford(sim.civ_only_treasury[:, r], sett_cost)
     cand_u = sim._seat_buy_unit_candidates(r, sim._seat_trainable_units(r))
-    vt_all = sim.civ_unit_type.clamp(min=0, max=sim.NU - 1)
-    mil_live = sim.civ_unit_alive & (sim.civ_unit_civ == r) & (sim._type_combat[vt_all] > 0)
+    vt_all = sim.major_unit_type.clamp(min=0, max=sim.NU - 1)
+    mil_live = (sim.major_unit_alive & (sim.major_unit_seat == r + 1)
+                & (sim._type_combat[vt_all] > 0))
     qcur = sim.civ_city_current[:, r]
     q_ty = (qcur - 1).clamp(min=0, max=sim.NU - 1)
     q_mil = (qcur >= 1) & (qcur <= sim.NU) & (sim._type_combat[q_ty] > 0)
@@ -595,8 +590,8 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
     orders0, job_t, spread_t, um, uo = _seat_unit_orders(sim, r + 1)
     B2, N2 = orders0.shape
     ranks = [orders0]
-    smap = sim.seat_slot_map(r)
-    cur = sim.civ_unit_tile.gather(1, smap.clamp(min=0))
+    smap = sim._seat_slot_map(r + 1)
+    cur = sim.unit_tile.gather(1, smap.clamp(min=0))
     # per-row destination: the war target when at war, else the nearest own
     # centre (the same two rules the ladder's own branches follow)
     at_war_rows = uo[:, :, ladder.U_ATWAR] > 0
@@ -620,7 +615,7 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
             for n in range(N2):
                 if not bool((smap[:, n] >= 0).any()):
                     break
-                tgt_n, hi, hpc, hrc = sim._war_march_target(sim.civ_unit_tile.gather(1, smap.clamp(min=0))[:, n].clamp(min=0), ac, hp_r)
+                tgt_n, hi, hpc, hrc = sim._war_march_target(cur[:, n].clamp(min=0), ac, hp_r)
                 has = (hi | hpc | hrc)
                 tgts[:, n] = torch.where(has, tgt_n, tgts[:, n])
             sim._vplan_wt = {"r": r, "tgts": tgts}

@@ -147,7 +147,7 @@ def test_unit_purchase(rules, path):
     twin.treasury[:] = RICH
     twin.step(production=prod(twin, 0, twin.IDLE))
     sim.step(production=prod(sim, 0, pb + sim.NB + 1 + widx))
-    assert int(sim.seat0_unit_alive[0].sum()) == int(twin.seat0_unit_alive[0].sum()) + 1, "purchased unit did not spawn"
+    assert int(sim.major_unit_alive[0].sum()) == int(twin.major_unit_alive[0].sum()) + 1, "purchased unit did not spawn"
     # tech-gated unit not yet researched must be masked off
     hidx = next((i for i, u in enumerate(sim.rules.units) if u["id"] == "HORSEMAN"), None)
     if hidx is not None:

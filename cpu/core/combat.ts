@@ -539,6 +539,23 @@ export function encampmentDefense(
  *  ACTING SEAT — which is what made the city-first divergences of this round
  *  (a barbarian on a foreign centre; the GPU sieging a peaceful city-state) a
  *  state-column hunt instead of one diff. */
+/**
+ * May `seat` attack this city-state's centre? A DECLARED war on the minor
+ * itself, or a war with ANY seat that is its SUZERAIN — contesting the
+ * suzerain drags its minor in, and that is stored as the suzerainty rather
+ * than as a war row, which is why it needs its own term.
+ *
+ * ONE rule, whoever attacks: `meleeAttack`, `rangedAttack` and the
+ * `attackTargets` list all ask this, so an order can never reach a minor the
+ * offered target list refused (the GPU's `_citystate_target` twin).
+ */
+export function cityStateAttackable(state: GameState, cityState: CityState, seat: number): boolean {
+  return (
+    civsAtWar(state, cityState.seat, seat) ||
+    state.seats.some((sx) => isSuzerain(cityState, sx.seat) && civsAtWar(state, sx.seat, seat))
+  );
+}
+
 export function meleeAttack(state: GameState, attackerId: number, targetIndex: number, seat: number): RuleResult {
   const r = meleeAttackInner(state, attackerId, targetIndex, seat);
   if (r.ok) {
@@ -583,17 +600,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   const cityStateTarget = (() => {
     const cityState = cityStateAt(state, targetIndex);
     if (!cityState || cityState.centerIndex !== targetIndex) return undefined;
-    // A city-state is a separate seat 0: war must be DECLARED before its
-    // centre is a target. Both this and `attackTargets` ask `civsAtWar`, so an
-    // order can never reach a city-state the attacker is at peace with.
-    if (attacker.seat === seat) return civsAtWar(state, cityState.seat, seat) ? cityState : undefined;
-    // join-the-suzerain's-war: an AT-WAR seat may siege a CS whose
-    // suzerain is the seat 0 (attackTargets applies the same gate).
-    if (isCiv(attacker.seat)) {
-      const civSeat = seatOf(state, attacker.seat);
-      if (civSeat && civsAtWar(state, civSeat.seat, seat) && isSuzerain(cityState, seat)) return cityState;
-    }
-    return undefined;
+    return cityStateAttackable(state, cityState, unitSeat(attacker)) ? cityState : undefined;
   })();
 
   // A live enemy Encampment is a target in its own right. Checked
@@ -743,31 +750,39 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     // chain as meleeAttack (seat city, then city-state center), one roll,
     // no retaliation. Ranged fire never captures: the city holds at 1 HP
     // until melee takes it.
-    if (attacker.seat === seat) {
-      const civCity = cityAtIndex(state, targetIndex);
-      if (civCity && civsAtWar(state, civCity.holder.seat, seat)) {
-        const defCS = cityDefenseStrength(state, civCity.city);
-        civCity.city.hp = Math.max(1, civCity.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + /* #71: no religion term — this path fires for seat 0 only and the GPU never sets seat 0's holy city */ generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex)); // #70/S2 (B-8)
-        warWearinessBattle(state, attacker.seat, civCity.city.seat, targetIndex, { city: true }); // #51/S7.8f
-        attacker.movesLeft = 0;
-        gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment (city not a unit — no defender xp)
-        return ok;
-      }
-      const cityState = cityStateAt(state, targetIndex);
-      // Bombardment needs a DECLARED war exactly as melee does. The
-      // seat arm one branch up and `meleeAttack`'s cityStateTarget both ask
-      // civsAtWar, but this arm took ANY city-state — so the
-      // two TS paths disagreed with each other about one rule. Real Civ 6
-      // treats a city-state as a separate seat 0 you must declare on, so the
-      // RANGED arm is the wrong one. See [[target-legality-gates]].
-      if (cityState && cityState.centerIndex === targetIndex && civsAtWar(state, cityState.seat, seat)) {
-        const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0);
-        cityState.hp = Math.max(1, (cityState.hp ?? CITY_STATE_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + /* #71: no religion term — this path fires for seat 0 only and the GPU never sets seat 0's holy city */ generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex)); // #70/S2 (B-8)
-        warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), targetIndex, { city: true }); // #51/S7.8f
-        attacker.movesLeft = 0;
-        gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment
-        return ok;
-      }
+    //
+    // WHOEVER fires: the arms key on the ATTACKER's own seat, so an ordered
+    // ranged attack resolves the same way for every seat (the GPU's
+    // `_ranged_attack`, which the applier dispatches by unit type alone).
+    // The enhancer attacker adders key on where the unit STANDS rather than
+    // on what it hits, so they join the city arms behind the same live flag
+    // every other city-attack path asks.
+    const atkSeat = unitSeat(attacker);
+    const relCity = CITY_RELIGION_ADDER_LIVE && isCiv(attacker.seat)
+      ? religionAttackCS(state, attacker, targetIndex)
+      : 0;
+    const civCity = cityAtIndex(state, targetIndex);
+    if (civCity && (capsOf(attacker.seat).alwaysHostile || civsAtWar(state, atkSeat, civCity.holder.seat))) {
+      const defCS = cityDefenseStrength(state, civCity.city);
+      civCity.city.hp = Math.max(1, civCity.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex)); // #70/S2 (B-8)
+      warWearinessBattle(state, attacker.seat, civCity.city.seat, targetIndex, { city: true }); // #51/S7.8f
+      attacker.movesLeft = 0;
+      gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment (city not a unit — no defender xp)
+      return ok;
+    }
+    const cityState = cityStateAt(state, targetIndex);
+    // Bombardment needs a war exactly as melee does, and asks the SAME
+    // question — `cityStateAttackable`, suzerain clause included. This arm
+    // once took ANY city-state, so the two TS paths disagreed with each
+    // other about one rule; real Civ 6 treats a city-state as a separate
+    // seat you must declare on. See [[target-legality-gates]].
+    if (cityState && cityState.centerIndex === targetIndex && cityStateAttackable(state, cityState, atkSeat)) {
+      const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0);
+      cityState.hp = Math.max(1, (cityState.hp ?? CITY_STATE_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex)); // #70/S2 (B-8)
+      warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), targetIndex, { city: true }); // #51/S7.8f
+      attacker.movesLeft = 0;
+      gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment
+      return ok;
     }
   }
   // No city took the shot — fall through to the unit, or bail.
@@ -803,8 +818,13 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   if (!def?.ranged) return;
   const target = state.map.tiles[targetIndex];
   const held = target.district === 'CITY_CENTER' ? cityAtIndex(state, targetIndex) : undefined;
+  // The city arm asks `unitsHostile`'s own question, exactly as
+  // `meleeAttackInner`'s does: BARBARIANS need no war (`caps.alwaysHostile`),
+  // and a barbSeat war row is never set, so gating them on `civsAtWar` alone
+  // left the barbarian raider unable to bombard anything.
   const enemyCity =
-    held && held.holder.seat !== attacker.seat && civsAtWar(state, unitSeat(attacker), held.holder.seat)
+    held && held.holder.seat !== attacker.seat
+    && (capsOf(attacker.seat).alwaysHostile || civsAtWar(state, unitSeat(attacker), held.holder.seat))
       ? held.city
       : undefined;
   if (enemyCity) {
@@ -873,17 +893,12 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
     // (ranged-vs-city-state stays out of scope). The autopilot invariant —
     // "target lists never include PEACEFUL city-states" — holds by
     // construction: nothing but a war offers the tile.
-    //
-    // A city-state is also dragged into its SUZERAIN's wars, so contesting the
-    // suzerain puts the minor's centre in reach. That is stored as the
-    // suzerainty, not as a war row, which is why it needs its own term.
     const cityStateHere = state.cityStates.find((c) => c.centerIndex === t.index);
     const cityStateTarget =
       cityStateHere !== undefined &&
       d === 1 &&
       !def.ranged &&
-      (civsAtWar(state, cityStateHere.seat, unitSeat(unit)) ||
-        state.seats.some((sx) => isSuzerain(cityStateHere, sx.seat) && civsAtWar(state, sx.seat, unitSeat(unit))));
+      cityStateAttackable(state, cityStateHere, unitSeat(unit));
 
     // An adjacent live enemy Encampment is a melee target — the
     // only way to open its tile. Ranged-vs-district stays out of scope.

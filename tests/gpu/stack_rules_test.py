@@ -53,15 +53,15 @@ def test_own_civilian_does_not_block() -> None:
     sim = build()
     t = free_land(sim)
     # a civ-0 civilian sits there
-    slot = int(sim.civ_unit_next[0])
-    sim.civ_unit_alive[0, slot] = True
-    sim.civ_unit_seat[0, slot] = 0 + 1
-    sim.civ_unit_seat[0, slot] = 1
-    sim.civ_unit_type[0, slot] = 0
-    sim.civ_unit_tile[0, slot] = t
-    sim.civ_unit_charges[0, slot] = 3  # civilian
-    sim.civilian_at[0, t] = slot + sim.POOL_LO["civ"]
-    sim.civ_unit_next[0] += 1
+    slot = int(sim.unit_next[0])
+    sim.major_unit_alive[0, slot] = True
+    sim.major_unit_seat[0, slot] = 0 + 1
+    sim.major_unit_seat[0, slot] = 1
+    sim.major_unit_type[0, slot] = 0
+    sim.major_unit_tile[0, slot] = t
+    sim.major_unit_charges[0, slot] = 3  # civilian
+    sim.civilian_at[0, t] = slot + sim.POOL_LO["major"]
+    sim.unit_next[0] += 1
 
     tiles = torch.tensor([[t]])
     own = bool(sim._blocked_for(tiles, 1)[0, 0])          # civ 0's military

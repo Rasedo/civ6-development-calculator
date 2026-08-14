@@ -25,7 +25,7 @@ RULE 3 - no `setattr(self, name, ...)` rebinding (plus 3b: `_alloc_*` helpers,
     rebind a whole pool in one statement — so it is banned outside allocation.
 
 RULE 4 - no rebinding at all of a plane listed in ALIASED, self-referential or
-    not. `self.seat0_unit_aura_mp = (p_hit & p_ok).long() * gm` mentions no seat0_unit_aura_mp,
+    not. `self.major_unit_aura_mp = (p_hit & p_ok).long() * gm` mentions no major_unit_aura_mp,
     passes RULE 1 clean, and still detaches the plane from its pool.
 
 The rules are static and cost milliseconds, which is the point -- they guard
@@ -69,17 +69,17 @@ _CIV_FIELDS = (
     "treasury", "war_weariness", "techs", "civics", "tech_boosted", "civic_boosted",
 )
 ALIASED: frozenset[str] = frozenset(
-    [f"{pre}_unit_{plane}" for pre in ("seat0", "civ", "barb") for plane in _POOL_PLANES]
+    [f"{pre}_unit_{plane}" for pre in ("major", "barb") for plane in _POOL_PLANES]
     + [f for n in _CIV_FIELDS for f in (n, f"civ_only_{n}")]
     # the three legacy war names are SLICES of `war`. A rebind detaches the
     # relation from the matrix every reader consults, and every gate stays
     # green while the two halves drift apart.
     + ["civ_only_atwar", "civ_pair_war", "citystate_atwar"]
-    # the five (civ, city-state) relations — citystate_x is row 0 of seat_citystate_x and civ_only_citystate_x
+    # the five (seat, city-state) relations — citystate_x is row 0 of seat_citystate_x and civ_only_citystate_x
     # is rows 1.., so a rebind detaches one side of the relation from the
     # other and every gate stays green.
     + [f"citystate_{n}" for n in ("met", "envoys", "quest", "quest_camp", "quest_issued")]
-    + [f"citystate_r_{n}" for n in ("met", "envoys", "quest", "quest_camp", "quest_issued")]
+    + [f"civ_only_citystate_{n}" for n in ("met", "envoys", "quest", "quest_camp", "quest_issued")]
     # a minor's city is the city block's minor section, so these four are views
     # like every other city field.
     + ["citystate_alive", "citystate_center", "citystate_pop", "citystate_hp"]
@@ -89,7 +89,7 @@ ALIASED: frozenset[str] = frozenset(
     # the seat-indexed war clocks.
     + ["civ_only_warturns", "civ_only_peaceturns", "citystate_war_turns"]
     # the city block's seat-0 and civ views (the base itself is registered).
-    + ["alive", "site", "pop", "city_hp", "outer_hp", "is_cap", "loyalty",
+    + ["alive", "site", "pop", "outer_hp", "is_cap", "loyalty",
        "tiles_acquired", "food_box", "culture_box", "current", "progress",
        "cur_cost", "q_dtile", "gw_writing", "gw_art", "gw_music", "relics",
        "artifacts", "buildings"]

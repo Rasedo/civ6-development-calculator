@@ -95,11 +95,11 @@ def main() -> None:
     )
     if s2._settler_idx >= 0:
         base5 = float(e2.observe(1)[0, 5])
-        sl = int(s2.civ_unit_next[0])
-        s2.civ_unit_alive[0, sl] = True
-        s2.civ_unit_seat[0, sl] = 1
-        s2.civ_unit_type[0, sl] = s2._settler_idx
-        s2.civ_unit_next[0] += 1
+        sl = int(s2.unit_next[0])
+        s2.major_unit_alive[0, sl] = True
+        s2.major_unit_seat[0, sl] = 1
+        s2.major_unit_type[0, sl] = s2._settler_idx
+        s2.unit_next[0] += 1
         assert abs(float(e2.observe(1)[0, 5]) - base5 - 1.0) < 1e-9, (
             "obs field 5 is the seat's LIVE settler count, derived from the pool"
         )

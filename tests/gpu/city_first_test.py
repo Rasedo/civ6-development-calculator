@@ -25,7 +25,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
 from core import BatchSim, load_rules, load_fixture, FIXTURES
-from core.engine import SEAT0_POOL_MAX
+from core.engine import UNIT_SLOTS
 
 
 def build():
@@ -57,16 +57,16 @@ def civ_centre(sim) -> tuple[int, int]:
 
 
 def put_p_melee(sim, tile: int) -> int:
-    slot = int(sim.seat0_unit_next[0])
-    sim.seat0_unit_alive[0, slot] = True
-    sim.seat0_unit_type[0, slot] = 2  # WARRIOR
-    sim.seat0_unit_tile[0, slot] = tile
-    sim.seat0_unit_hp[0, slot] = 100
-    sim.seat0_unit_seat[0, slot] = 0
-    sim.seat0_unit_mp[0, slot] = 2
-    sim.seat0_unit_mp_full[0, slot] = 2
-    sim.military_at[0, tile] = slot + sim.POOL_LO["seat0"]
-    sim.seat0_unit_next[0] += 1
+    slot = int(sim.unit_next[0])
+    sim.major_unit_alive[0, slot] = True
+    sim.major_unit_type[0, slot] = 2  # WARRIOR
+    sim.major_unit_tile[0, slot] = tile
+    sim.major_unit_hp[0, slot] = 100
+    sim.major_unit_seat[0, slot] = 0
+    sim.major_unit_mp[0, slot] = 2
+    sim.major_unit_mp_full[0, slot] = 2
+    sim.military_at[0, tile] = slot + sim.POOL_LO["major"]
+    sim.unit_next[0] += 1
     return slot
 
 
@@ -76,26 +76,26 @@ def clear_centre(sim, ctr: int) -> None:
     for plane in ("military_at", "civilian_at"):
         occ = int(getattr(sim, plane)[0, ctr])
         if occ >= 0:
-            lo_v = sim.POOL_LO["civ"]
+            lo_v = sim.POOL_LO["major"]
             assert occ >= lo_v, "incumbent should be a civ-pool unit here"
-            sim.civ_unit_alive[0, occ - lo_v] = False
+            sim.major_unit_alive[0, occ - lo_v] = False
             getattr(sim, plane)[0, ctr] = -1
 
 
 def garrison(sim, ctr: int, civilian: bool) -> int:
     """Put a CIV unit on the city centre — military, or a civilian."""
-    slot = int(sim.civ_unit_next[0])
-    sim.civ_unit_alive[0, slot] = True
-    sim.civ_unit_seat[0, slot] = 0 + 1
-    sim.civ_unit_seat[0, slot] = 1
-    sim.civ_unit_type[0, slot] = sim._builder_idx if civilian else 2
-    sim.civ_unit_tile[0, slot] = ctr
-    sim.civ_unit_hp[0, slot] = 100
+    slot = int(sim.unit_next[0])
+    sim.major_unit_alive[0, slot] = True
+    sim.major_unit_seat[0, slot] = 0 + 1
+    sim.major_unit_seat[0, slot] = 1
+    sim.major_unit_type[0, slot] = sim._builder_idx if civilian else 2
+    sim.major_unit_tile[0, slot] = ctr
+    sim.major_unit_hp[0, slot] = 100
     if civilian:
-        sim.civilian_at[0, ctr] = slot + sim.POOL_LO["civ"]
+        sim.civilian_at[0, ctr] = slot + sim.POOL_LO["major"]
     else:
-        sim.military_at[0, ctr] = slot + sim.POOL_LO["civ"]
-    sim.civ_unit_next[0] += 1
+        sim.military_at[0, ctr] = slot + sim.POOL_LO["major"]
+    sim.unit_next[0] += 1
     return slot
 
 
@@ -114,16 +114,18 @@ def run(civilian: bool, military: bool = False) -> tuple[int, int, bool]:
     r, j = next((r, j) for r in range(sim.R) for j in range(sim.RC)
                 if bool(sim.civ_city_alive[0, r, j]) and int(sim.civ_city_center[0, r, j]) == ctr)
     hp0 = int(sim.civ_city_hp[0, r, j])
-    g_hp0 = int(sim.civ_unit_hp[0, g])
+    g_hp0 = int(sim.major_unit_hp[0, g])
 
     # the melee action toward the centre
     d = next(i for i, nb in enumerate(sim.neigh[from_tile].tolist()) if nb == ctr)
-    act = torch.zeros(sim.B, SEAT0_POOL_MAX, dtype=torch.long)
-    act[0, p] = 6 + d
-    sim._apply_unit_actions(act)
+    # the applier indexes HEAD ROWS (this seat's living units in slot
+    # order), so the poke names the rank the merged slot maps to.
+    act = torch.zeros(sim.B, UNIT_SLOTS, dtype=torch.long)
+    act[0, int((sim._seat_slot_map(0)[0] == p).nonzero(as_tuple=True)[0][0])] = 6 + d
+    sim._apply_seat_unit_actions(0, act)
 
-    dead = not bool(sim.civ_unit_alive[0, g])
-    return hp0 - int(sim.civ_city_hp[0, r, j]), (g_hp0 if dead else g_hp0 - int(sim.civ_unit_hp[0, g])), not dead
+    dead = not bool(sim.major_unit_alive[0, g])
+    return hp0 - int(sim.civ_city_hp[0, r, j]), (g_hp0 if dead else g_hp0 - int(sim.major_unit_hp[0, g])), not dead
 
 
 def main() -> None:

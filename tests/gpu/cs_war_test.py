@@ -64,7 +64,7 @@ def main() -> None:
     found = None
     for b in range(s2.B):
         live = s2.citystate_alive[b].nonzero().flatten().tolist()
-        units = s2.seat0_unit_alive[b].nonzero().flatten().tolist()
+        units = (s2.major_unit_alive[b] & (s2.major_unit_seat[b] == 0)).nonzero().flatten().tolist()
         if not live or not units:
             continue
         cs = live[0]
@@ -75,19 +75,21 @@ def main() -> None:
         found = (b, cs, ctr, units[0], nbrs[0])
         break
     assert found is not None, "no fixture has a live city-state and a live seat-0 unit"
-    s2.seat0_unit_type[found[0], found[3]] = fighter
+    s2.major_unit_type[found[0], found[3]] = fighter
     b, cs, ctr, u, spot = found
-    s2.seat0_unit_tile[b, u] = spot
+    s2.major_unit_tile[b, u] = spot
     s2.citystate_atwar[b, cs] = False
     s2.sync_war()  # close the poke under transpose
-    m_peace = s2.unit_action_mask()[b, u, 6:12]
+    # the mask indexes HEAD ROWS — this seat's living units in slot order
+    rw = int((s2._seat_slot_map(0)[b] == u).nonzero(as_tuple=True)[0][0])
+    m_peace = s2._seat_unit_mask(0)[b, rw, 6:12]
     dirs = [i for i, n in enumerate(s2.neigh[spot].tolist()) if n == ctr]
     assert dirs, "the planted tile is not adjacent to the centre"
     d = dirs[0]
     assert not bool(m_peace[d]), "a PEACEFUL city-state must never appear in the attack mask"
     s2.citystate_atwar[b, cs] = True
     s2.sync_war()  # close the poke under transpose
-    m_war = s2.unit_action_mask()[b, u, 6:12]
+    m_war = s2._seat_unit_mask(0)[b, rw, 6:12]
     assert bool(m_war[d]), "after a declaration the city-state centre MUST be attackable"
     print("  a citystate_atwar: peace default, a VIEW of war, snapshot round-trip OK")
     print("  b mask: peaceful hidden, declared war reveals the centre OK")

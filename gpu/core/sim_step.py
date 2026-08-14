@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
 from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star import
-from . import simbase  # the PATCHABLE globals (POOL_MAX/SEAT0_POOL_MAX/_ALIAS_CHECK) must be read live
+from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must be read live
 
 
 class SimStep:
@@ -32,7 +32,7 @@ class SimStep:
         gold).
         tech/civic: [B] long picks applied where the research slot is empty
         (validated against the masks; -1 = no pick).
-        units: [B, simbase.SEAT0_POOL_MAX] long unit orders (0–5 move, 6–11 attack, 12
+        units: [B, simbase.UNIT_SLOTS] long unit orders (0–5 move, 6–11 attack, 12
         hold), executed in slot order before the turn advances.
         envoy: [B] or [B, K] long — back that city-state with one available
         envoy (validated; -1 = none).
@@ -47,7 +47,7 @@ class SimStep:
 
         # --- seat-0 unit orders (before the turn advances) ----------------------
         if units is not None and self.units_mode:
-            self._apply_unit_actions(units)
+            self._apply_seat_unit_actions(0, units)
 
         # --- refreshUnits: heal only units that spent NO MP since their last
         # refresh — +20 in a friendly city (barbs: on their camp), +15 own
@@ -56,8 +56,8 @@ class SimStep:
         # hostile-phase acts from the PREVIOUS step both gate. -------------------
         if self.units_mode:
             cap = self.rules.combat.get("unitHp", 100)
-            # ONE heal rule, three pools. See _seat_heal.
-            for _pre in ("barb", "civ", "seat0"):
+            # ONE heal rule, both windows. See _seat_heal.
+            for _pre in ("barb", "major"):
                 _hp = getattr(self, f"{_pre}_unit_hp")
                 _hp.copy_(torch.where(
                     getattr(self, f"{_pre}_unit_alive") & ~self._spent_mp(_pre),
@@ -67,9 +67,9 @@ class SimStep:
             # gate (movesLeft >= movesFull = spent no MP since the last
             # refresh). A live MILITARY unit that stayed put digs in (+1, cap
             # 2); a move or attack resets it. Civilians and NAVAL units never
-            # fortify. ONE rule, three pools — every pool can hold a hull, so
-            # the naval gate applies to all three.
-            for _pre in ("barb", "civ", "seat0"):
+            # fortify. ONE rule, both windows — either can hold a hull, so the
+            # naval gate applies to both.
+            for _pre in ("barb", "major"):
                 _alive = getattr(self, f"{_pre}_unit_alive")
                 _typ = getattr(self, f"{_pre}_unit_type")
                 _spent = self._spent_mp(_pre)
@@ -84,12 +84,12 @@ class SimStep:
             # refreshUnits mirror, so every later walker reads the snapshot
             # rather than the live (by then possibly moved) generals.
             self._refresh_aura_mp()
-            # The movesLeft/movesFull reset itself, for ALL THREE pools —
-            # refreshUnits loops every unit regardless of seat. The MAJORS'
-            # pools (seat0 + civ) then re-reset at the seatPhase top with the
-            # aura re-frozen there (the TS reset loop covers every isCiv
-            # unit), and the barb pool at the barbarian phase.
-            for _pre in ("seat0", "civ", "barb"):
+            # The movesLeft/movesFull reset itself, for BOTH windows —
+            # refreshUnits loops every unit regardless of seat. The major
+            # window then re-resets at the seatPhase top with the aura
+            # re-frozen there (the TS reset loop covers every isCiv unit, seat
+            # 0 included), and the barb window at the barbarian phase.
+            for _pre in ("major", "barb"):
                 self._reset_mp(_pre)
 
         # --- the hostile world, then the city-states' own turn --------------------
@@ -106,18 +106,15 @@ class SimStep:
 
         # --- Dead-slot reclamation, at the step END and never the top:
         # callers sample slot-keyed unit actions from the PRE-step masks, so
-        # the layout must hold from unit_action_mask() through this step's
+        # the layout must hold from _seat_unit_mask() through this step's
         # applies. Stable compaction is otherwise behavior-invariant (the TS
         # arrays splice; living relative order is the spec). Fires when a
-        # pool's high-water nears its cap, or constantly under
+        # pool's own append head nears its own cap, or constantly under
         # CIV6_RECLAIM_AT.
         if self.units_mode:
-            if int(self.next_slot.max()) >= self._reclaim_at:
-                self._reclaim_pool("barb")
-            if int(self.civ_unit_next.max()) >= self._reclaim_at:
-                self._reclaim_pool("civ")
-            if int(self.seat0_unit_next.max()) >= self._reclaim_at:
-                self._reclaim_pool("seat0")
+            for _pre in ("barb", "major"):
+                if self._reclaim_due(_pre):
+                    self._reclaim_pool(_pre)
         # City-slot compaction, every major row (the TS splice mirror). Row 0
         # compacts whenever it holds a hole (deaths are rare; a dense layout
         # keeps the append head in range); civ rows at their high-water
@@ -337,7 +334,7 @@ class SimStep:
                 base_q = (self.current == self.SETTLER).sum(dim=1, keepdim=True)
                 prefix = is_s.long().cumsum(dim=1) - is_s.long()
                 n_cities = self.alive.sum(dim=1, keepdim=True)
-                s_cost = r.settler_base + r.settler_per_city * (n_cities - 1 + self._seat0_settlers().unsqueeze(1) + base_q + prefix).clamp(min=0).to(self.dtype)
+                s_cost = r.settler_base + r.settler_per_city * (n_cities - 1 + self._seat_settlers(0).unsqueeze(1) + base_q + prefix).clamp(min=0).to(self.dtype)
                 self.progress.copy_(torch.where(is_s, torch.zeros_like(self.progress), self.progress))
                 self.cur_cost.copy_(torch.where(is_s, s_cost, self.cur_cost))
                 self.current.copy_(torch.where(is_s, torch.full_like(self.current, self.SETTLER), self.current))
@@ -464,7 +461,7 @@ class SimStep:
             # adds unmultiplied — that order matters.
             prod_add = t_c[:, 1]
             if self._gov_has_effects and self._encamp_didx >= 0:
-                emult_p = self._gov_policy_mods_cached("seat0", self.civics)[5]
+                emult_p = self._gov_mods(0)[5]
                 en_item = (cur_c >= 0) & (cur_c < self.NB) & (self._b_req_district[cur_c.clamp(min=0, max=self.NB - 1)] == self._encamp_didx)
                 if self._encamp_si >= 0:
                     en_item = en_item | (cur_c == self.UNIT_BASE + self.NU + self._encamp_si)

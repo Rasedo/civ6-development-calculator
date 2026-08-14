@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
 from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star import
-from . import simbase  # the PATCHABLE globals (POOL_MAX/SEAT0_POOL_MAX/_ALIAS_CHECK) must be read live
+from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must be read live
 
 
 class SimPhase:
@@ -35,9 +35,7 @@ class SimPhase:
         # positions.
         if self.units_mode:
             self._refresh_aura_mp()
-            self._reset_mp("seat0")
-        if self.R > 0:
-            self._refresh_aura_mp_civ()
+            self._reset_mp("major")
         # The geopolitics arms run BEFORE the per-seat loop — denounce and
         # alliance first (a fresh grudge blocks a same-turn alliance and
         # starts the formal clock), then the declarations in ACTOR order
@@ -107,8 +105,8 @@ class SimPhase:
             # 0), live + queued, updated through the pick loop like TS's
             # meleeCount/rangedCount; train ranged while the army holds fewer
             # than 1 ranged per 2 melee.
-            vt_all = self.civ_unit_type.clamp(min=0, max=self.NU - 1)
-            mil_live = self.civ_unit_alive & (self.civ_unit_seat == r + 1) & (self._type_combat[vt_all] > 0)
+            vt_all = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+            mil_live = self.major_unit_alive & (self.major_unit_seat == r + 1) & (self._type_combat[vt_all] > 0)
             n_ranged = (mil_live & rng_type[vt_all]).sum(dim=1)
             n_melee = (mil_live & ~rng_type[vt_all]).sum(dim=1)
             qcur = self.civ_city_current[:, r]
@@ -149,7 +147,7 @@ class SimPhase:
             sett_price5 = (
                 rr.get("settlerBase", 48)
                 + rr.get("settlerPer", 18)
-                * (n_cities - 1 + self._civ_only_settlers_of(r) + _sq_r).clamp(min=0).to(self.dtype)
+                * (n_cities - 1 + self._seat_settlers(r + 1) + _sq_r).clamp(min=0).to(self.dtype)
             ) * mult_r5
             dbuy_s = getattr(self, "_driven_buy_settler", None)
             if dbuy_s is not None and r in dbuy_s and self._settler_idx >= 0:
@@ -248,7 +246,7 @@ class SimPhase:
             else:
                 rel_kind, rel_j = None, None
             if rel_kind is not None and rel_j is not None and self._missionary_idx >= 0 and self._shrine_bidx >= 0 and self._hs_idx >= 0:
-                n_live_m5 = (self.civ_unit_alive & (self.civ_unit_seat == r + 1) & (self.civ_unit_type == self._missionary_idx)).sum(dim=1)
+                n_live_m5 = (self.major_unit_alive & (self.major_unit_seat == r + 1) & (self.major_unit_type == self._missionary_idx)).sum(dim=1)
                 mcost5 = self._enh["mcost"][self.civ_only_enhancer[:, r] + 1]  # [B] f64
                 want_m5 = active & self.controlled[:, r] & (rel_kind == 5) & (rel_j >= 0) & self.civ_only_religion_done[:, r] \
                     & (n_live_m5 < self._missionary_cap) & self._afford(self.civ_only_faith[:, r], mcost5)
@@ -269,7 +267,7 @@ class SimPhase:
             # DECISION on the NAMED slot, same SHRINE + complete unpillaged
             # HOLY_SITE gate, same spawn-refund convention.
             if rel_kind is not None and rel_j is not None and self._apostle_idx >= 0 and self._shrine_bidx >= 0 and self._hs_idx >= 0:
-                n_live_a = (self.civ_unit_alive & (self.civ_unit_seat == r + 1) & (self.civ_unit_type == self._apostle_idx)).sum(dim=1)
+                n_live_a = (self.major_unit_alive & (self.major_unit_seat == r + 1) & (self.major_unit_type == self._apostle_idx)).sum(dim=1)
                 # FLAT cost — missionaryCostMult is a MISSIONARY discount and
                 # does not extend to apostles.
                 acost = torch.full((self.B,), float(round(self._apostle_cost)), dtype=torch.float64, device=self.device)
@@ -563,7 +561,7 @@ class SimPhase:
                     # encampmentProdMult, on the queue head only: the
                     # multiplier keys on the ITEM (an Encampment district or
                     # one of its buildings), not on the seat.
-                    _rem = self._gov_policy_mods_cached(r, self.civ_only_civics[:, r])[5] if self._gov_has_effects else None
+                    _rem = self._gov_mods(r + 1)[5] if self._gov_has_effects else None
                     if _rem is not None:
                         # The civ-seat production space has its OWN encoding,
                         # distinct from seat 0's: 0 settler, 1..NU units,
@@ -1073,7 +1071,7 @@ class SimPhase:
                 _rows_w = atw_any & self.controlled[:, r]
                 if bool(_rows_w.any()):
                     _ord_w = torch.where(_rows_w.view(-1, 1, 1), _dsq[r], torch.full_like(_dsq[r], -1))
-                    self.apply_seat_unit_sequence(r, _ord_w)
+                    self.apply_seat_unit_sequence(r + 1, _ord_w)
             # Suing for peace rides the wire's war verb.
             pea = active & ~atw_any  # a seat at ANY war neither patrols nor rolls the seat-0 declaration
             self.civ_only_peaceturns[:, r] = self.civ_only_peaceturns[:, r] + pea.long()
@@ -1081,7 +1079,7 @@ class SimPhase:
                 _rows_p = pea & self.controlled[:, r]
                 if bool(_rows_p.any()):
                     _ord_p = torch.where(_rows_p.view(-1, 1, 1), _dsq[r], torch.full_like(_dsq[r], -1))
-                    self.apply_seat_unit_sequence(r, _ord_p)
+                    self.apply_seat_unit_sequence(r + 1, _ord_p)
             # War declarations arrive on the wire.
 
         # Drop the route-income cache at phase end: its key
@@ -1419,7 +1417,7 @@ class SimPhase:
         # cities are -1 and building/unit codes never write SETTLER)…
         queued_live = (self.current == self.SETTLER).sum(dim=1)
         # …and the settler stock, which purchases grow as the walk proceeds
-        settlers_live = self._seat0_settlers()  # LIVE units, not a bank
+        settlers_live = self._seat_settlers(0)  # LIVE units, not a bank
         # The builder escalator's live count: builders queued in EARLIER turns
         # plus, as the walk proceeds, this turn's queues and purchases (act.p
         # applies sequentially and both move builderCost).
@@ -1476,7 +1474,7 @@ class SimPhase:
                 ) * mult
                 # The settler SPAWNS at the buying city (pop >= 2, and no free
                 # spot = refund — the purchaseSettler rule).
-                found_ps, _ = self._first_free_spot(self.site[:, c], "seat0", torch.ones(self.B, dtype=torch.bool, device=self.device))
+                found_ps, _ = self._first_free_spot(self.site[:, c], 0, torch.ones(self.B, dtype=torch.bool, device=self.device))
                 can = is_ps & (self.pop[:, c] >= 2) & self._afford(self.treasury, s_cost) & found_ps
                 self.treasury.copy_(torch.where(can, self.treasury - s_cost, self.treasury))
                 if bool(can.any()):
@@ -1501,7 +1499,7 @@ class SimPhase:
                     b_now = self._builder_cost(self.builders_trained)  # ALREADY PRODUCED only — a queued item has produced nothing
                     b_now = b_now * mult
                     cost = torch.where(utp == self._builder_idx, b_now, cost)
-                found, _ = self._first_free_spot(self.site[:, c], "seat0", self._type_civilian[utp])
+                found, _ = self._first_free_spot(self.site[:, c], 0, self._type_civilian[utp])
                 can = is_pu & tech_ok & self._afford(self.treasury, cost) & found
                 if bool(can.any()):
                     self.treasury.copy_(torch.where(can, self.treasury - cost, self.treasury))
@@ -1534,6 +1532,16 @@ class SimPhase:
             getattr(self, f"unit_{k}")[rows, dst] = v
         for k, v in self._CAPTURE_RESET.items():
             getattr(self, f"unit_{k}")[rows, dst] = v
+
+    def _reclaim_due(self, pool: str) -> bool:
+        """Has this pool's append head come within `_reclaim_headroom` of its
+        OWN cap? One headroom serves both windows, so the two sizes need no
+        threshold each. CIV6_RECLAIM_AT forces an absolute trigger for the
+        forced-compaction gate."""
+        hw = int(getattr(self, self.POOL_NEXT[pool]).max())
+        if self._reclaim_force_at is not None:
+            return hw >= self._reclaim_force_at
+        return hw >= (self.POOL_HI[pool] - self.POOL_LO[pool]) - self._reclaim_headroom
 
     def _reclaim_pool(self, prefix: str) -> None:
         """Stably compacts a unit pool when its high-water nears the cap.

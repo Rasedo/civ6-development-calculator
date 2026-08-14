@@ -58,20 +58,20 @@ def main() -> None:
     print(f"  30 steps clean with the check on ({len(sim._mut_sig)} _MUTABLE planes tracked)")
 
     # --- 2) the alias check DETECTS a rebind -------------------------------
-    # Stand up the real shape: a unified seat tensor with seat0_unit_hp as a view of it.
-    sim._seat_hp = torch.zeros(sim.B, 2, sim.seat0_unit_hp.shape[1], dtype=sim.seat0_unit_hp.dtype)
-    sim._seat_hp[:, 0] = sim.seat0_unit_hp
-    sim.seat0_unit_hp = sim._seat_hp[:, 0]
-    sim.register_alias("seat0_unit_hp", lambda s: s._seat_hp[:, 0])
+    # Stand up the real shape: a unified seat tensor with major_unit_hp as a view of it.
+    sim._seat_hp = torch.zeros(sim.B, 2, sim.major_unit_hp.shape[1], dtype=sim.major_unit_hp.dtype)
+    sim._seat_hp[:, 0] = sim.major_unit_hp
+    sim.major_unit_hp = sim._seat_hp[:, 0]
+    sim.register_alias("major_unit_hp", lambda s: s._seat_hp[:, 0])
     sim._check_state_discipline()  # intact view must pass
 
     # writing THROUGH the view is fine and must reach the base
-    sim.seat0_unit_hp[:, 0] = 42
+    sim.major_unit_hp[:, 0] = 42
     assert int(sim._seat_hp[0, 0, 0]) == 42, "a write through the view must reach the base"
     sim._check_state_discipline()
 
     # rebinding it is the bug, and must be caught
-    sim.seat0_unit_hp = sim.seat0_unit_hp.clone()
+    sim.major_unit_hp = sim.major_unit_hp.clone()
     try:
         sim._check_state_discipline()
         raise SystemExit("FAIL: a rebound alias was NOT detected — the safety net is inert")

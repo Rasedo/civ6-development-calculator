@@ -115,7 +115,7 @@ def controlled_pair(rules, path, extra_for_a: bool = True):
     civ seat 1's capital (16 v 8: si > sj AND si > sj*1.3, proximity 1)."""
     sim = build(rules, path)
     assert sim.R >= 2, "fixtures must carry two civs"
-    sim.civ_unit_alive[:] = False  # strengths reduce to nCities*8 exactly
+    sim.major_unit_alive[:] = False  # strengths reduce to nCities*8 exactly
     ja = keep_capital_only(sim, 0)
     jb = keep_capital_only(sim, 1)
     if extra_for_a:

@@ -47,80 +47,56 @@ def build(rules, path, steps: int = 20, dtype=torch.float64):
 
 
 def clear_all_units(sim) -> None:
-    sim.seat0_unit_alive[:] = False
-    sim.civ_unit_alive[:] = False
+    sim.major_unit_alive[:] = False
+    sim.major_unit_alive[:] = False
     sim.barb_unit_alive[:] = False
     # the occupancy planes are shared across pools: clear only the id range of
     # the pool being emptied, never the whole plane.
     _pl = sim.military_at
-    _pl[(_pl >= sim.POOL_LO["seat0"]) & (_pl < sim.POOL_HI["seat0"])] = -1
+    _pl[(_pl >= sim.POOL_LO["major"]) & (_pl < sim.POOL_HI["major"])] = -1
     _pl = sim.civilian_at
-    _pl[(_pl >= sim.POOL_LO["seat0"]) & (_pl < sim.POOL_HI["seat0"])] = -1
+    _pl[(_pl >= sim.POOL_LO["major"]) & (_pl < sim.POOL_HI["major"])] = -1
     _pl = sim.military_at
-    _pl[(_pl >= sim.POOL_LO["civ"]) & (_pl < sim.POOL_HI["civ"])] = -1
+    _pl[(_pl >= sim.POOL_LO["major"]) & (_pl < sim.POOL_HI["major"])] = -1
     _pl = sim.civilian_at
-    _pl[(_pl >= sim.POOL_LO["civ"]) & (_pl < sim.POOL_HI["civ"])] = -1
+    _pl[(_pl >= sim.POOL_LO["major"]) & (_pl < sim.POOL_HI["major"])] = -1
     _pl = sim.military_at
     _pl[(_pl >= sim.POOL_LO["barb"]) & (_pl < sim.POOL_HI["barb"])] = -1
     sim._gen_ver += 1
 
 
-def place_pmil(sim, t: int, type_idx: int, hp: int = 100, emb: bool = False) -> int:
-    slot = int(sim.seat0_unit_next[0])
-    sim.seat0_unit_alive[0, slot] = True
-    sim.seat0_unit_type[0, slot] = type_idx
-    sim.seat0_unit_tile[0, slot] = t
-    sim.seat0_unit_hp[0, slot] = hp
-    sim.seat0_unit_charges[0, slot] = 0
-    sim.seat0_unit_fortify[0, slot] = 0
-    sim.seat0_unit_emb[0, slot] = emb
-    sim.military_at[0, t] = slot
-    sim.seat0_unit_next[0] += 1
+def place_mil(sim, seat: int, t: int, type_idx: int, hp: int = 100, emb: bool = False) -> int:
+    """Park `seat`'s MILITARY unit on tile t. ONE window holds every major
+    seat's units, so the seat write is what separates them — a slot left
+    unwritten reads as the dead-slot seed, not as seat 0."""
+    slot = int(sim.unit_next[0])
+    sim.major_unit_alive[0, slot] = True
+    sim.major_unit_seat[0, slot] = seat
+    sim.major_unit_type[0, slot] = type_idx
+    sim.major_unit_tile[0, slot] = t
+    sim.major_unit_hp[0, slot] = hp
+    sim.major_unit_charges[0, slot] = 0
+    sim.major_unit_fortify[0, slot] = 0
+    sim.major_unit_emb[0, slot] = emb
+    sim.military_at[0, t] = slot + sim.POOL_LO["major"]
+    sim.unit_next[0] += 1
     return slot
 
 
-def place_pciv(sim, t: int, type_idx: int, hp: int = 100) -> int:
-    slot = int(sim.seat0_unit_next[0])
-    sim.seat0_unit_alive[0, slot] = True
-    sim.seat0_unit_type[0, slot] = type_idx
-    sim.seat0_unit_tile[0, slot] = t
-    sim.seat0_unit_hp[0, slot] = hp
-    sim.seat0_unit_charges[0, slot] = int(sim._type_charges[type_idx])
-    sim.seat0_unit_fortify[0, slot] = 0
-    sim.seat0_unit_emb[0, slot] = False
-    sim.civilian_at[0, t] = slot
-    sim.seat0_unit_next[0] += 1
-    sim._gen_ver += 1
-    return slot
-
-
-def place_rmil(sim, r: int, t: int, type_idx: int, hp: int = 100, emb: bool = False) -> int:
-    slot = int(sim.civ_unit_next[0])
-    sim.civ_unit_alive[0, slot] = True
-    sim.civ_unit_seat[0, slot] = r + 1
-    sim.civ_unit_type[0, slot] = type_idx
-    sim.civ_unit_tile[0, slot] = t
-    sim.civ_unit_hp[0, slot] = hp
-    sim.civ_unit_charges[0, slot] = 0
-    sim.civ_unit_fortify[0, slot] = 0
-    sim.civ_unit_emb[0, slot] = emb
-    sim.military_at[0, t] = slot + sim.POOL_LO["civ"]
-    sim.civ_unit_next[0] += 1
-    return slot
-
-
-def place_rciv(sim, r: int, t: int, type_idx: int, hp: int = 100) -> int:
-    slot = int(sim.civ_unit_next[0])
-    sim.civ_unit_alive[0, slot] = True
-    sim.civ_unit_seat[0, slot] = r + 1
-    sim.civ_unit_type[0, slot] = type_idx
-    sim.civ_unit_tile[0, slot] = t
-    sim.civ_unit_hp[0, slot] = hp
-    sim.civ_unit_charges[0, slot] = int(sim._type_charges[type_idx])
-    sim.civ_unit_fortify[0, slot] = 0
-    sim.civ_unit_emb[0, slot] = False
-    sim.civilian_at[0, t] = slot + sim.POOL_LO["civ"]
-    sim.civ_unit_next[0] += 1
+def place_civilian(sim, seat: int, t: int, type_idx: int, hp: int = 100) -> int:
+    """Park `seat`'s CIVILIAN unit on tile t — same window, the other
+    occupancy plane, and the roster's charge count."""
+    slot = int(sim.unit_next[0])
+    sim.major_unit_alive[0, slot] = True
+    sim.major_unit_seat[0, slot] = seat
+    sim.major_unit_type[0, slot] = type_idx
+    sim.major_unit_tile[0, slot] = t
+    sim.major_unit_hp[0, slot] = hp
+    sim.major_unit_charges[0, slot] = int(sim._type_charges[type_idx])
+    sim.major_unit_fortify[0, slot] = 0
+    sim.major_unit_emb[0, slot] = False
+    sim.civilian_at[0, t] = slot + sim.POOL_LO["major"]
+    sim.unit_next[0] += 1
     sim._gen_ver += 1
     return slot
 
@@ -137,8 +113,7 @@ def tile_within(sim, ctr: int, dist: int, banned=()) -> int:
             continue
         if not bool(sim.passable[0, t]):
             continue
-        if (int(sim.pmil_at[0, t]) < 0 and int(sim.pciv_at[0, t]) < 0 and int(sim.civ_military_at[0, t]) < 0
-                and int(sim.civ_civilian_at[0, t]) < 0 and int(sim.barb_at[0, t]) < 0):
+        if int(sim.military_at[0, t]) < 0 and int(sim.civilian_at[0, t]) < 0:
             return t
     return -1
 
@@ -153,8 +128,7 @@ def adj_free(sim, t: int, banned=()) -> int:
             continue
         if not bool(sim.passable[0, n]):
             continue
-        if (int(sim.pmil_at[0, n]) < 0 and int(sim.pciv_at[0, n]) < 0 and int(sim.civ_military_at[0, n]) < 0
-                and int(sim.civ_civilian_at[0, n]) < 0 and int(sim.barb_at[0, n]) < 0):
+        if int(sim.military_at[0, n]) < 0 and int(sim.civilian_at[0, n]) < 0:
             return n
     return -1
 
@@ -201,15 +175,15 @@ def poke_seat0_spawn(rules, rj, path):
         # leftover well under gpCost(1), so the claim loop fires exactly once.
         sim.gp_earned[:, cls] = 0
         sim.gp_points[0, cls] = float(sim._gp_costs[0])
-        before = int((sim.seat0_unit_alive[0] & (sim.seat0_unit_type[0] == uidx)).sum())
+        before = int((sim.major_unit_alive[0] & (sim.major_unit_type[0] == uidx)).sum())
         sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
-        after = int((sim.seat0_unit_alive[0] & (sim.seat0_unit_type[0] == uidx)).sum())
+        after = int((sim.major_unit_alive[0] & (sim.major_unit_type[0] == uidx)).sum())
         assert after == before + 1, f"seat-0 {nm} claim did not spawn exactly one unit ({before}->{after})"
         # spawned at/adjacent to the capital, civilian, 1 charge (not military)
-        u = (sim.seat0_unit_alive[0] & (sim.seat0_unit_type[0] == uidx)).nonzero(as_tuple=True)[0][-1].item()
+        u = (sim.major_unit_alive[0] & (sim.major_unit_type[0] == uidx)).nonzero(as_tuple=True)[0][-1].item()
         cap = int(sim.site[0, 0])
-        assert int(sim.pair_dist[cap, int(sim.seat0_unit_tile[0, u])]) <= 1, f"{nm} not spawned at the capital"
-        assert bool(sim._type_civilian[uidx]) and int(sim.seat0_unit_charges[0, u]) >= 1, f"{nm} must be a civilian (charges>=1)"
+        assert int(sim.pair_dist[cap, int(sim.major_unit_tile[0, u])]) <= 1, f"{nm} not spawned at the capital"
+        assert bool(sim._type_civilian[uidx]) and int(sim.major_unit_charges[0, u]) >= 1, f"{nm} must be a civilian (charges>=1)"
     print("  2 seat-0 spawn-at-claim OK — GENERAL + ADMIRAL born at the capital")
 
 
@@ -223,7 +197,7 @@ def poke_aura_helper(rules, rj, path):
     clear_all_units(sim)
     # a seat-0 GENERAL at ctr; probe tiles at distance 2 (in range) and 3 (out).
     ctr = int(sim.site[0, 0])
-    place_pciv(sim, ctr, gi)  # seat-0 general at ctr
+    place_civilian(sim, 0, ctr, gi)  # seat-0 general at ctr
     t1 = tile_within(sim, ctr, 2, banned=[ctr])
     t3 = tile_within(sim, ctr, 3, banned=[ctr, t1])
     assert t1 >= 0 and t3 >= 0
@@ -248,7 +222,7 @@ def poke_aura_helper(rules, rj, path):
     sim2 = build(rules, path)
     clear_all_units(sim2)
     ctr2 = int(sim2.site[0, 0])
-    place_pciv(sim2, ctr2, ai)  # seat-0 admiral
+    place_civilian(sim2, 0, ctr2, ai)  # seat-0 admiral
     tt = tile_within(sim2, ctr2, 2, banned=[ctr2])
     s_nav = float(sim2._gen_aura_cs(civ0, torch.tensor([tt]), torch.ones(B, dtype=torch.bool))[0])
     s_land = float(sim2._gen_aura_cs(civ0, torch.tensor([tt]), torch.zeros(B, dtype=torch.bool))[0])
@@ -276,33 +250,33 @@ def poke_aura_in_combat(rules, rj, path):
         dtile = tile_within(sim, ctr, 4)
         atile = adj_free(sim, dtile, banned=[ctr])
         assert dtile >= 0 and atile >= 0
-        pdef = place_pmil(sim, dtile, WARRIOR, hp=100)
-        ratk = place_rmil(sim, 0, atile, WARRIOR, hp=100)
+        pdef = place_mil(sim, 0, dtile, WARRIOR, hp=100)
+        ratk = place_mil(sim, 1, atile, WARRIOR, hp=100)
         if with_atk_gen:  # a civ general within 2 of the civ attacker
             gt = tile_within(sim, atile, 1, banned=[dtile, atile, ctr])
-            place_rciv(sim, 0, gt, gi)
+            place_civilian(sim, 1, gt, gi)
         if with_def_gen:  # a seat-0 general within 2 of the seat-0 defender
             gt = tile_within(sim, dtile, 1, banned=[dtile, atile, ctr])
-            place_pciv(sim, dtile if False else gt, gi)
+            place_civilian(sim, 0, gt, gi)
         return sim, pdef, ratk, dtile
 
     # --- attacker aura: civ attacker +5 -> more damage to the seat-0 defender
     base, pdef, ratk, dtile = setup(False, False)
-    hp0 = int(base.seat0_unit_hp[0, pdef])
-    base._hostile_vs_unit(torch.tensor([True]), torch.tensor([dtile]), "civ", ratk)
-    dmg_base = hp0 - int(base.seat0_unit_hp[0, pdef])
+    hp0 = int(base.major_unit_hp[0, pdef])
+    base._hostile_vs_unit(torch.tensor([True]), torch.tensor([dtile]), "major", ratk)
+    dmg_base = hp0 - int(base.major_unit_hp[0, pdef])
 
     ga, pdef2, ratk2, dtile2 = setup(True, False)
-    hp0b = int(ga.seat0_unit_hp[0, pdef2])
-    ga._hostile_vs_unit(torch.tensor([True]), torch.tensor([dtile2]), "civ", ratk2)
-    dmg_atkgen = hp0b - int(ga.seat0_unit_hp[0, pdef2])
+    hp0b = int(ga.major_unit_hp[0, pdef2])
+    ga._hostile_vs_unit(torch.tensor([True]), torch.tensor([dtile2]), "major", ratk2)
+    dmg_atkgen = hp0b - int(ga.major_unit_hp[0, pdef2])
     assert dmg_atkgen > dmg_base, f"attacker general aura did not raise damage ({dmg_base} -> {dmg_atkgen})"
 
     # --- defender aura: seat-0 defender +5 -> LESS damage taken
     gd, pdef3, ratk3, dtile3 = setup(False, True)
-    hp0c = int(gd.seat0_unit_hp[0, pdef3])
-    gd._hostile_vs_unit(torch.tensor([True]), torch.tensor([dtile3]), "civ", ratk3)
-    dmg_defgen = hp0c - int(gd.seat0_unit_hp[0, pdef3])
+    hp0c = int(gd.major_unit_hp[0, pdef3])
+    gd._hostile_vs_unit(torch.tensor([True]), torch.tensor([dtile3]), "major", ratk3)
+    dmg_defgen = hp0c - int(gd.major_unit_hp[0, pdef3])
     assert dmg_defgen < dmg_base, f"defender general aura did not lower damage taken ({dmg_base} -> {dmg_defgen})"
     print(f"  4 aura in combat OK — atk+gen {dmg_base}->{dmg_atkgen} dmg dealt, def+gen {dmg_base}->{dmg_defgen} dmg taken")
 
@@ -324,16 +298,16 @@ def poke_capture(rules, rj, path):
     gtile = tile_within(sim, ctr, 4)
     atile = adj_free(sim, gtile, banned=[ctr])
     assert gtile >= 0 and atile >= 0
-    pgen = place_pciv(sim, gtile, gi)  # a lone seat-0 general
-    ratk = place_rmil(sim, 0, atile, WARRIOR)
-    v_before = int(sim.civ_unit_next[0])
-    sim._hostile_vs_unit(torch.tensor([True]), torch.tensor([gtile]), "civ", ratk)
-    assert not bool(sim.seat0_unit_alive[0, pgen]), "captured seat-0 general must leave the seat-0 pool"
-    # POOL-END: appended at the old civ_unit_next slot, type carried, owned by civ 0
+    pgen = place_civilian(sim, 0, gtile, gi)  # a lone seat-0 general
+    ratk = place_mil(sim, 1, atile, WARRIOR)
+    v_before = int(sim.unit_next[0])
+    sim._hostile_vs_unit(torch.tensor([True]), torch.tensor([gtile]), "major", ratk)
+    assert not bool(sim.major_unit_alive[0, pgen]), "captured seat-0 general must leave the seat-0 pool"
+    # POOL-END: appended at the old unit_next slot, type carried, owned by civ 0
     cap = v_before
-    assert bool(sim.civ_unit_alive[0, cap]) and int(sim.civ_unit_type[0, cap]) == gi, "captured general not appended to the civ pool tail as a GENERAL"
-    assert int((sim.civ_unit_seat[0, cap] - 1)) == 0, "captured general not keyed to the captor's civ"
-    assert int(sim.civ_civilian_at[0, gtile]) == cap, "captured general not registered on the civ civilian plane"
+    assert bool(sim.major_unit_alive[0, cap]) and int(sim.major_unit_type[0, cap]) == gi, "captured general not appended to the civ pool tail as a GENERAL"
+    assert int((sim.major_unit_seat[0, cap] - 1)) == 0, "captured general not keyed to the captor's civ"
+    assert int(sim.civilian_at[0, gtile]) == cap, "captured general not registered on the civilian plane"
     print("  6 GENERAL capture OK — B-31 POOL-END transfer, type carried")
 
 

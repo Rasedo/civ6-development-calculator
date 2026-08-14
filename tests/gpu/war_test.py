@@ -184,11 +184,11 @@ def test_capture_plunder(rules, path):
 
 def _melee_slot(sim):
     """First alive MELEE military slot in seat 0's pool."""
-    for p_ in range(int(sim.seat0_unit_next.max())):
+    for p_ in range(int(sim.unit_next.max())):
         if (
-            bool(sim.seat0_unit_alive[0, p_])
-            and float(sim._type_combat[sim.seat0_unit_type[0, p_]]) > 0
-            and float(sim._type_ranged_strength[sim.seat0_unit_type[0, p_]]) == 0
+            bool(sim.major_unit_alive[0, p_])
+            and float(sim._type_combat[sim.major_unit_type[0, p_]]) > 0
+            and float(sim._type_ranged_strength[sim.major_unit_type[0, p_]]) == 0
         ):
             return p_
     return None
@@ -201,12 +201,12 @@ def _place_next_to(sim, p_, ctr):
     nb = sim.neigh[ctr]
     for d in range(6):
         t_ = int(nb[d])
-        if t_ >= 0 and int(sim.pmil_at[0, t_]) < 0 and int(sim.center_at[0, t_]) < 0:
-            old = int(sim.seat0_unit_tile[0, p_])
+        if t_ >= 0 and int(sim.military_at[0, t_]) < 0 and int(sim.center_at[0, t_]) < 0:
+            old = int(sim.major_unit_tile[0, p_])
             sim.military_at[0, old] = -1
-            sim.seat0_unit_tile[0, p_] = t_
+            sim.major_unit_tile[0, p_] = t_
             sim.military_at[0, t_] = p_
-            sim.seat0_unit_hp[0, p_] = 100
+            sim.major_unit_hp[0, p_] = 100
             back = sim.neigh[t_]
             for d2 in range(6):
                 if int(back[d2]) == ctr:
@@ -239,21 +239,21 @@ def test_cs_siege(rules, path):
         # the scripted autopilot trains no military here — spawn a melee unit
         mel = next(i for i in range(len(sim._type_combat)) if float(sim._type_combat[i]) > 0 and float(sim._type_ranged_strength[i]) == 0)
         nb = sim.neigh[ctr]
-        spot = next(int(nb[d]) for d in range(6) if int(nb[d]) >= 0 and int(sim.pmil_at[0, int(nb[d])]) < 0 and int(sim.center_at[0, int(nb[d])]) < 0)
+        spot = next(int(nb[d]) for d in range(6) if int(nb[d]) >= 0 and int(sim.military_at[0, int(nb[d])]) < 0 and int(sim.center_at[0, int(nb[d])]) < 0)
         sim._spawn_unit(0, torch.tensor([True]), torch.tensor([spot]), torch.tensor([mel]))
-        p_ = int(sim.seat0_unit_next[0]) - 1
-        assert bool(sim.seat0_unit_alive[0, p_]), "spawn failed"
+        p_ = int(sim.unit_next[0]) - 1
+        assert bool(sim.major_unit_alive[0, p_]), "spawn failed"
     act = _place_next_to(sim, p_, ctr)
     assert act is not None, "no free tile adjacent to the CS center"
-    ua = torch.full((1, sim.seat0_unit_alive.shape[1]), -1, dtype=torch.long)
+    ua = torch.full((1, sim.major_unit_alive.shape[1]), -1, dtype=torch.long)
     ua[0, p_] = act
-    hp0, tile0 = int(sim.citystate_hp[0, s]), int(sim.seat0_unit_tile[0, p_])
+    hp0, tile0 = int(sim.citystate_hp[0, s]), int(sim.major_unit_tile[0, p_])
     sim.step(units=ua)
     assert int(sim.citystate_hp[0, s]) < hp0, "CS took no siege damage"
     assert bool(sim.citystate_alive[0, s]), "one hit must not kill a full-hp CS"
-    if bool(sim.seat0_unit_alive[0, p_]):
-        assert int(sim.seat0_unit_tile[0, p_]) == tile0, "CS attack must not advance"
-        assert int(sim.seat0_unit_hp[0, p_]) < 100 + 10, "attacker took no counter"  # +heal
+    if bool(sim.major_unit_alive[0, p_]):
+        assert int(sim.major_unit_tile[0, p_]) == tile0, "CS attack must not advance"
+        assert int(sim.major_unit_hp[0, p_]) < 100 + 10, "attacker took no counter"  # +heal
     # capture: grind the hp to the brink, then one more hit
     sim.citystate_hp[0, s] = 1
     # A barbarian parked beside the CS would land the killing blow before this
@@ -265,12 +265,12 @@ def test_cs_siege(rules, path):
         sim.barb_unit_alive[0, u] = False
         if int(sim.barb_at[0, t_]) == u:
             sim.military_at[0, t_] = -1
-    if not bool(sim.seat0_unit_alive[0, p_]):
+    if not bool(sim.major_unit_alive[0, p_]):
         p_ = _melee_slot(sim)
         assert p_ is not None
     act = _place_next_to(sim, p_, ctr)
     assert act is not None
-    ua = torch.full((1, sim.seat0_unit_alive.shape[1]), -1, dtype=torch.long)
+    ua = torch.full((1, sim.major_unit_alive.shape[1]), -1, dtype=torch.long)
     ua[0, p_] = act
     pop_before = int(sim.citystate_pop[0, s])
     ncity0 = int(sim.alive[0].sum())
@@ -285,7 +285,7 @@ def test_cs_siege(rules, path):
     assert int(sim.owner[0, ctr]) == c_new, "center tile must transfer"
     assert int(sim.citystate_at[0, ctr]) == -1, "cityStateId territory must clear"
     assert int(sim.pop[0, c_new]) == max(1, (pop_before * 3) // 4), "pop x0.75 (min 1)"
-    assert int(sim.city_hp[0, c_new]) in (100, 120), "captured city starts at half HP (+20 same-turn heal allowed)"
+    assert int(sim.city_hp[0, 0, c_new]) in (100, 120), "captured city starts at half HP (+20 same-turn heal allowed)"
     assert not bool(sim.envoy_mask()[0, s]), "dead CS must leave the envoy mask"
     print(f"  cs siege OK (hp {hp0} -> {int(sim.citystate_hp[0, s])} on hit; capture: pop {pop_before} -> {int(sim.pop[0, c_new])}, city {c_new})")
 

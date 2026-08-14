@@ -41,7 +41,7 @@ def build():
 def poison_slot(sim, pre: str) -> int:
     """Leave a DROWNED unit's residue in the next slot the pool will hand out:
     dead, but still flagged embarked — exactly what a reclaim leaves behind."""
-    counter = {"barb": "next_slot", "civ": "civ_unit_next"}.get(pre, "seat0_unit_next")
+    counter = sim.POOL_NEXT[pre]
     slot = int(getattr(sim, counter)[0])
     getattr(sim, f"{pre}_unit_alive")[0, slot] = False
     getattr(sim, f"{pre}_unit_emb")[0, slot] = True  # the drowned occupant's flag
@@ -77,26 +77,28 @@ def check(sim, pre: str, slot: int, label: str) -> None:
 
 
 def main() -> None:
-    # --- the civ pool -------------------------------------------------------
+    # --- a CIVILIAN into the reclaimed slot ---------------------------------
     sim = build()
-    slot = poison_slot(sim, "civ")
+    slot = poison_slot(sim, "major")
     tile = free_land(sim)
     mask = torch.zeros(sim.B, dtype=torch.bool)
     mask[0] = True
     at = torch.full((sim.B,), tile, dtype=torch.long)
     sim._spawn_unit(1, mask, at, sim._missionary_idx,
                     charges=torch.full((sim.B,), 3, dtype=torch.long))
-    check(sim, "civ", slot, "civ civilian (missionary)")
+    check(sim, "major", slot, "civilian (missionary), seat 1")
 
-    # --- the seat-0 pool, same ordering rule --------------------------------
+    # --- a MILITARY unit, on a different seat, same ordering rule -----------
+    # One window serves every major seat, so the two cases differ only in the
+    # SEAT that spawns and the unit's class — the reclaim rule is the same one.
     sim2 = build()
-    slot2 = poison_slot(sim2, "seat0")
+    slot2 = poison_slot(sim2, "major")
     tile2 = free_land(sim2)
     m2 = torch.zeros(sim2.B, dtype=torch.bool)
     m2[0] = True
     sim2._spawn_unit(0, m2, torch.full((sim2.B,), tile2, dtype=torch.long),
                      torch.full((sim2.B,), 2, dtype=torch.long))  # WARRIOR
-    check(sim2, "seat0", slot2, "seat-0 military (warrior)")
+    check(sim2, "major", slot2, "military (warrior), seat 0")
 
     print("SPAWN RECLAIM OK — a reclaimed slot hands on no drowned unit's movement pool")
 

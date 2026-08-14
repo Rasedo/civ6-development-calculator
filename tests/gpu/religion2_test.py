@@ -21,7 +21,7 @@ Covered (all gate-unreachable):
      pillaged Holy Site (no buy).
   4. Missionary WALK — driver policy, not engine; only the SPREAD half is poked.
   5. Missionary SPREAD — +10 lump (15 SCRIPTURE) into the target city's
-     accumulator for g, charge −1, and death (civ_unit_alive False, tile cleared) at 0.
+     accumulator for g, charge −1, and death (major_unit_alive False, tile cleared) at 0.
   6. ITINERANT_PREACHERS presR — widens the religion's spread range by exactly 2.
   7. Enhancer COMBAT CS — JUST_WAR near (atk+def +10), CRUSADE onto following
      territory (atk +10), DEFENDER of the faith on following territory (def +5).
@@ -105,34 +105,33 @@ def free_neighbor(sim, ctr: int, banned=()) -> int:
             continue
         if not bool(sim.passable[0, t]):
             continue
-        if (int(sim.civ_civilian_at[0, t]) < 0 and int(sim.civ_military_at[0, t]) < 0
-                and int(sim.pmil_at[0, t]) < 0 and int(sim.pciv_at[0, t]) < 0
+        if (int(sim.civilian_at[0, t]) < 0 and int(sim.military_at[0, t]) < 0
                 and int(sim.barb_at[0, t]) < 0):
             return t
     return -1
 
 
 def clear_missionaries(sim, r: int) -> None:
-    m = sim.civ_unit_alive[0] & ((sim.civ_unit_seat[0] - 1) == r) & (sim.civ_unit_type[0] == sim._missionary_idx)
+    m = sim.major_unit_alive[0] & ((sim.major_unit_seat[0] - 1) == r) & (sim.major_unit_type[0] == sim._missionary_idx)
     for u in m.nonzero(as_tuple=True)[0].tolist():
-        t = int(sim.civ_unit_tile[0, u])
-        sim.civ_unit_alive[0, u] = False
-        if int(sim.civ_civilian_at[0, t]) == u:
+        t = int(sim.major_unit_tile[0, u])
+        sim.major_unit_alive[0, u] = False
+        if int(sim.civilian_at[0, t]) == u:
             sim.civilian_at[0, t] = -1
 
 
 def place_missionary(sim, r: int, t: int, charges: int) -> int:
-    slot = int(sim.civ_unit_next[0])
-    sim.civ_unit_alive[0, slot] = True
-    sim.civ_unit_seat[0, slot] = r + 1
-    sim.civ_unit_type[0, slot] = sim._missionary_idx
-    sim.civ_unit_tile[0, slot] = t
-    sim.civ_unit_hp[0, slot] = 100
-    sim.civ_unit_charges[0, slot] = charges
-    sim.civ_unit_fortify[0, slot] = 0
-    sim.civ_unit_emb[0, slot] = False
-    sim.civilian_at[0, t] = slot + sim.POOL_LO["civ"]
-    sim.civ_unit_next[0] += 1
+    slot = int(sim.unit_next[0])
+    sim.major_unit_alive[0, slot] = True
+    sim.major_unit_seat[0, slot] = r + 1
+    sim.major_unit_type[0, slot] = sim._missionary_idx
+    sim.major_unit_tile[0, slot] = t
+    sim.major_unit_hp[0, slot] = 100
+    sim.major_unit_charges[0, slot] = charges
+    sim.major_unit_fortify[0, slot] = 0
+    sim.major_unit_emb[0, slot] = False
+    sim.civilian_at[0, t] = slot + sim.POOL_LO["major"]
+    sim.unit_next[0] += 1
     return slot
 
 
@@ -169,7 +168,7 @@ def follow_all(sim, g: int) -> None:
 
 
 def live_missionaries(sim, r: int) -> list[int]:
-    m = sim.civ_unit_alive[0] & ((sim.civ_unit_seat[0] - 1) == r) & (sim.civ_unit_type[0] == sim._missionary_idx)
+    m = sim.major_unit_alive[0] & ((sim.major_unit_seat[0] - 1) == r) & (sim.major_unit_type[0] == sim._missionary_idx)
     return m.nonzero(as_tuple=True)[0].tolist()
 
 
@@ -204,8 +203,8 @@ def poke_missionary_buy(rules, rj, path):
     ms = live_missionaries(sim, r)
     assert len(ms) == 1, f"founder did not buy exactly one missionary (got {len(ms)})"
     u = ms[0]
-    assert int(sim.civ_unit_tile[0, u]) == ctr, f"missionary not spawned at the buying city center ({int(sim.civ_unit_tile[0, u])} != {ctr})"
-    assert int(sim.civ_unit_charges[0, u]) == 3, f"base missionary must carry 3 charges, got {int(sim.civ_unit_charges[0, u])}"
+    assert int(sim.major_unit_tile[0, u]) == ctr, f"missionary not spawned at the buying city center ({int(sim.major_unit_tile[0, u])} != {ctr})"
+    assert int(sim.major_unit_charges[0, u]) == 3, f"base missionary must carry 3 charges, got {int(sim.major_unit_charges[0, u])}"
     faith_buy = float(sim.civ_only_faith[0, r])
 
     # control: keep the SHRINE (so its faith income is IDENTICAL) but fill the
@@ -279,7 +278,7 @@ def poke_missionary_pricing(rules, rj, path):
     s2._seat_phase()
     ms2 = live_missionaries(s2, r)
     assert len(ms2) == 1, "SCRIPTURE founder did not buy"
-    assert int(s2.civ_unit_charges[0, ms2[0]]) == 4, f"SCRIPTURE missionary must carry 4 charges, got {int(s2.civ_unit_charges[0, ms2[0]])}"
+    assert int(s2.major_unit_charges[0, ms2[0]]) == 4, f"SCRIPTURE missionary must carry 4 charges, got {int(s2.major_unit_charges[0, ms2[0]])}"
     print("  2 missionary pricing OK (HOLY_ORDER -42 faith; SCRIPTURE 4 charges)")
 
 
@@ -343,9 +342,9 @@ def drive_spread(sim, r: int, u: int, target: int) -> None:
     stream), with the column encoded exactly as the driver encodes it
     (SPREAD_HERE when standing on the target, else + direction + 1)."""
     sim.controlled[:, r] = True
-    smap = sim.seat_slot_map(r)
+    smap = sim._seat_slot_map(r + 1)
     row = int((smap[0] == u).nonzero(as_tuple=True)[0][0])
-    here = int(sim.civ_unit_tile[0, u])
+    here = int(sim.major_unit_tile[0, u])
     if here == target:
         col = int(sim._A_SPREAD)
     else:
@@ -384,12 +383,12 @@ def poke_missionary_spread(rules, rj, path):
 
     # base lump 10, charges 2 -> survives at 1
     sim, u, nb = run(None, 10, charges=2)
-    assert bool(sim.civ_unit_alive[0, u]) and int(sim.civ_unit_charges[0, u]) == 1, "spread must drop a charge and survive at 1"
+    assert bool(sim.major_unit_alive[0, u]) and int(sim.major_unit_charges[0, u]) == 1, "spread must drop a charge and survive at 1"
 
     # SCRIPTURE lump 15, charges 1 -> dies at 0
     sim2, u2, nb2 = run("SCRIPTURE", 15, charges=1)
-    assert not bool(sim2.civ_unit_alive[0, u2]), "missionary must die at 0 charges"
-    assert int(sim2.civ_civilian_at[0, nb2]) < 0, "dead missionary's tile must be cleared"
+    assert not bool(sim2.major_unit_alive[0, u2]), "missionary must die at 0 charges"
+    assert int(sim2.civilian_at[0, nb2]) < 0, "dead missionary's tile must be cleared"
     print("  5 missionary spread OK (+10 base / +15 SCRIPTURE, charge -1, death at 0)")
 
 
@@ -604,16 +603,16 @@ def poke_victor_through_step(rules, rj, path):
         # freeze expansion so no fresh 0-pressure city breaks the majority: kill
         # every unit (settlers can't found) and idle every civ build queue.
         if sim.units_mode:
-            sim.seat0_unit_alive[:] = False
+            sim.major_unit_alive[:] = False
             _pl = sim.military_at  # clear only this pool's entries
-            _pl[(_pl >= sim.POOL_LO["seat0"]) & (_pl < sim.POOL_HI["seat0"])] = -1
+            _pl[(_pl >= sim.POOL_LO["major"]) & (_pl < sim.POOL_HI["major"])] = -1
             _pl = sim.civilian_at  # clear only this pool's entries
-            _pl[(_pl >= sim.POOL_LO["seat0"]) & (_pl < sim.POOL_HI["seat0"])] = -1
-        sim.civ_unit_alive[:] = False
+            _pl[(_pl >= sim.POOL_LO["major"]) & (_pl < sim.POOL_HI["major"])] = -1
+        sim.major_unit_alive[:] = False
         _pl = sim.military_at  # clear only this pool's entries
-        _pl[(_pl >= sim.POOL_LO["civ"]) & (_pl < sim.POOL_HI["civ"])] = -1
+        _pl[(_pl >= sim.POOL_LO["major"]) & (_pl < sim.POOL_HI["major"])] = -1
         _pl = sim.civilian_at  # clear only this pool's entries
-        _pl[(_pl >= sim.POOL_LO["civ"]) & (_pl < sim.POOL_HI["civ"])] = -1
+        _pl[(_pl >= sim.POOL_LO["major"]) & (_pl < sim.POOL_HI["major"])] = -1
         sim.barb_unit_alive[:] = False
         _pl = sim.military_at  # clear only this pool's entries
         _pl[(_pl >= sim.POOL_LO["barb"]) & (_pl < sim.POOL_HI["barb"])] = -1

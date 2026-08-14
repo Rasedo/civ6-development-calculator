@@ -28,9 +28,28 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, FIXTURES
-from core.engine import SEAT0_POOL_MAX, js_round, FLANKING_CS, SUPPORT_CS
+from core.engine import UNIT_SLOTS, js_round, FLANKING_CS, SUPPORT_CS
 
 HOLD = 12
+
+
+def mil_of(sim, t: int, seat: int) -> int:
+    """The MERGED slot of `seat`'s military unit on tile t, else -1 — the
+    shared window makes occupancy a SEAT question."""
+    m = int(sim.military_at[0, t])
+    return m if m >= 0 and int(sim.unit_seat[0, m]) == seat else -1
+
+
+def civ_mil_at(sim, t: int) -> int:
+    """The MERGED slot of ANY CIV seat's military unit on tile t, else -1."""
+    m = int(sim.military_at[0, t])
+    return m if m >= 0 and 0 < int(sim.unit_seat[0, m]) < 100 else -1
+
+
+def rank_of(sim, slot: int, row: int = 0) -> int:
+    """The HEAD ROW merged slot `slot` occupies — what the applier and the
+    mask index by."""
+    return int((sim._seat_slot_map(row)[0] == slot).nonzero(as_tuple=True)[0][0])
 
 
 def cb_events(sim, ua):
@@ -38,7 +57,7 @@ def cb_events(sim, ua):
     parsed CB events [{k, diff, dmg}, ...] for batch row 0."""
     sim._log_combat_b = 0
     sim._combat_events = []
-    sim._apply_unit_actions(ua)
+    sim._apply_seat_unit_actions(0, ua)
     out = []
     for e in sim._combat_events:
         f = dict(tok.split(":", 1) if ":" in tok else (tok, "") for tok in e.split())
@@ -56,13 +75,15 @@ def find_melee(rules, paths):
     for path in paths:
         sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
         for _ in range(120):
-            m = sim.unit_action_mask()[0]  # [P, 16]
-            for p in m[:, 6:12].any(dim=1).nonzero(as_tuple=True)[0].tolist():
-                if float(sim._type_ranged_strength[sim.seat0_unit_type[0, p]]) > 0:
+            smap = sim._seat_slot_map(0)[0]
+            m = sim._seat_unit_mask(0)[0]  # [N, A] — head rows, not slots
+            for n in m[:, 6:12].any(dim=1).nonzero(as_tuple=True)[0].tolist():
+                p = int(smap[n])
+                if p < 0 or float(sim._type_ranged_strength[sim.unit_type[0, p]]) > 0:
                     continue  # want a melee unit
-                for d in m[p, 6:12].nonzero(as_tuple=True)[0].tolist():
-                    tgt = int(sim.neigh[int(sim.seat0_unit_tile[0, p]), d])
-                    if tgt >= 0 and (int(sim.barb_at[0, tgt]) >= 0 or int(sim.civ_military_at[0, tgt]) >= 0):
+                for d in m[n, 6:12].nonzero(as_tuple=True)[0].tolist():
+                    tgt = int(sim.neigh[int(sim.unit_tile[0, p]), d])
+                    if tgt >= 0 and (int(sim.barb_at[0, tgt]) >= 0 or civ_mil_at(sim, tgt) >= 0):
                         return sim, p, 6 + d, path.name
             sim.step()
     raise AssertionError("no adjacent-hostile melee situation found in scripted play")
@@ -130,7 +151,7 @@ def _diff_of(events, k):
 
 
 def test_integrated(sim, p, code, name) -> None:
-    here = int(sim.seat0_unit_tile[0, p])
+    here = int(sim.major_unit_tile[0, p])
     d = code - 6
     tgt = int(sim.neigh[here, d])
     # known wounds: attacker 64 HP, defender 88 HP
@@ -143,15 +164,15 @@ def test_integrated(sim, p, code, name) -> None:
             sim.barb_unit_hp[0, dslot] = v
         def_fort = int(sim.barb_unit_fortify[0, dslot])
     else:
-        dslot = int(sim.civ_military_at[0, tgt])
-        def_combat = int(sim._type_combat[sim.civ_unit_type[0, dslot]])
+        dslot = civ_mil_at(sim, tgt)
+        def_combat = int(sim._type_combat[sim.major_unit_type[0, dslot]])
         def set_def_hp(v):
-            sim.civ_unit_hp[0, dslot] = v
-        def_fort = int(sim.civ_unit_fortify[0, dslot])
-    atk_combat = int(sim._type_combat[sim.seat0_unit_type[0, p]])
+            sim.major_unit_hp[0, dslot] = v
+        def_fort = int(sim.major_unit_fortify[0, dslot])
+    atk_combat = int(sim._type_combat[sim.major_unit_type[0, p]])
     tdef = int(sim.tdef[0, tgt])
-    ua = torch.full((1, SEAT0_POOL_MAX), HOLD, dtype=torch.long)
-    ua[0, p] = code
+    ua = torch.full((1, UNIT_SLOTS), HOLD, dtype=torch.long)
+    ua[0, rank_of(sim, p)] = code
 
     # XP: force known experience so the level term is exercised. Attacker
     # 50 xp -> level 2 (+10 CS); civ defender 20 xp -> level 1 (+5 CS); a
@@ -166,11 +187,11 @@ def test_integrated(sim, p, code, name) -> None:
 
     def run(river_bit):
         snap = sim.snapshot()
-        sim.seat0_unit_hp[0, p] = ATK_HP
+        sim.major_unit_hp[0, p] = ATK_HP
         set_def_hp(DEF_HP)
-        sim.seat0_unit_xp[0, p] = ATK_XP  # attacker veterancy
+        sim.major_unit_xp[0, p] = ATK_XP  # attacker veterancy
         if not is_barb:
-            sim.civ_unit_xp[0, dslot] = DEF_XP  # civ defender veterancy
+            sim.major_unit_xp[0, dslot] = DEF_XP  # civ defender veterancy
         # force the river edge on/off explicitly (river_mask is static; set it
         # each run so restore can't leak the previous state)
         rm = int(sim.river_mask[0, here])
@@ -190,17 +211,17 @@ def test_integrated(sim, p, code, name) -> None:
     # count once.
     def flank_support_ref():
         civ_def = not is_barb
-        dciv = int((sim.civ_unit_seat[0, dslot] - 1)) if civ_def else -1
+        dciv = int((sim.major_unit_seat[0, dslot] - 1)) if civ_def else -1
         flank = support = 0
         for dd in range(6):
             nt = int(sim.neigh[tgt, dd])
             if nt < 0:
                 continue
             has_b = int(sim.barb_at[0, nt]) >= 0
-            has_pm = int(sim.pmil_at[0, nt]) >= 0
-            vms = int(sim.civ_military_at[0, nt])
+            has_pm = mil_of(sim, nt, 0) >= 0
+            vms = civ_mil_at(sim, nt)
             has_vm = vms >= 0
-            vc = int((sim.civ_unit_seat[0, vms] - 1)) if has_vm else -1
+            vc = int((sim.major_unit_seat[0, vms] - 1)) if has_vm else -1
             if civ_def:
                 atwar = bool(sim.civ_only_atwar[0, dciv])
                 hostile = has_b or (has_pm and atwar)
@@ -248,8 +269,8 @@ def test_integrated(sim, p, code, name) -> None:
 
     def run_ranged(river_bit):
         snap = sim.snapshot()
-        sim.seat0_unit_type[0, p] = slinger
-        sim.seat0_unit_hp[0, p] = ATK_HP
+        sim.major_unit_type[0, p] = slinger
+        sim.major_unit_hp[0, p] = ATK_HP
         set_def_hp(DEF_HP)
         rm = int(sim.river_mask[0, here])
         sim.river_mask[0, here] = (rm | (1 << d)) if river_bit else (rm & ~(1 << d))

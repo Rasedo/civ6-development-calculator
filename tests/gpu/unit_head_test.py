@@ -30,19 +30,20 @@ def main() -> None:
     sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
 
     # --- 0) BOTH SEATS' masks are the enum's width -------------------------
-    # A guard on one seat is not a guard: `unit_action_mask` and
-    # `seat_unit_mask` must BOTH match the enum, or a driven civ quietly loses
-    # the tail verbs (REPAIR, resource improvements, FORT, PILLAGE) that the
-    # scripted civ uses.
+    # ONE mask body serves every seat row, so this asserts the SHARED width
+    # against the enum on two different rows — a row-dependent width would
+    # mean a seat quietly loses the tail verbs (REPAIR, resource
+    # improvements, FORT, PILLAGE).
     for _ in range(25):
         sim.step()
-    _pm = sim.unit_action_mask()
-    _rm = sim.seat_unit_mask(0)
+    assert sim.R > 0, "needs a civ row to compare against"
+    _pm = sim._seat_unit_mask(0)
+    _rm = sim._seat_unit_mask(1)
     assert _pm.shape[2] == _rm.shape[2] == len(rj["actions"]["unit"]), (
-        f"unit action width disagrees: seat 0 {_pm.shape[2]}, civ {_rm.shape[2]}, "
+        f"unit action width disagrees: row 0 {_pm.shape[2]}, row 1 {_rm.shape[2]}, "
         f"enum {len(rj['actions']['unit'])}"
     )
-    print(f"  0 both seats' unit masks are {_pm.shape[2]} wide (= the enum) OK")
+    print(f"  0 the unit mask is {_pm.shape[2]} wide on every row (= the enum) OK")
 
     # --- 1) the enum is shipped and matches the improvement roster ----------
     acts = rj["actions"]["unit"]
@@ -67,7 +68,7 @@ def main() -> None:
         assert acts[18 + i] == f"BUILD_{name}", f"resource build col {18+i} is {acts[18+i]}"
 
     # --- 2) the MASK is exactly as wide as the enum ------------------------
-    m = sim.unit_action_mask()
+    m = sim._seat_unit_mask(0)
     assert m.shape[-1] == len(acts), f"mask {m.shape[-1]} wide, enum {len(acts)}"
 
     # --- 3) the engine dispatches by NAME, on the right columns ------------

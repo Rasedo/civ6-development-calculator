@@ -23,7 +23,6 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
 from core import BatchSim, load_rules, load_fixture, FIXTURES
-from core.engine import BARB_SEAT
 
 
 def build():
@@ -35,27 +34,18 @@ def build():
     return sim
 
 
-def place(sim, tile, seat0, hp=100):
-    """Put a MILITARY unit of the given side on `tile`, return its pool slot."""
-    if seat0:
-        slot = int(sim.seat0_unit_next[0])
-        sim.seat0_unit_alive[0, slot] = True
-        sim.seat0_unit_type[0, slot] = 2  # WARRIOR
-        sim.seat0_unit_tile[0, slot] = tile
-        sim.seat0_unit_hp[0, slot] = hp
-        sim.seat0_unit_seat[0, slot] = 0
-        sim.military_at[0, tile] = slot
-        sim.seat0_unit_next[0] += 1
-        return slot
-    slot = int(sim.civ_unit_next[0])
-    sim.civ_unit_alive[0, slot] = True
-    sim.civ_unit_seat[0, slot] = 0 + 1
-    sim.civ_unit_seat[0, slot] = 1  # the absolute seat of civ 0
-    sim.civ_unit_type[0, slot] = 2
-    sim.civ_unit_tile[0, slot] = tile
-    sim.civ_unit_hp[0, slot] = hp
-    sim.military_at[0, tile] = slot + sim.POOL_LO["civ"]
-    sim.civ_unit_next[0] += 1
+def place(sim, tile, seat, hp=100):
+    """Put `seat`'s MILITARY unit on `tile`, return its merged slot. Every
+    major seat spawns into the SAME window, so the seat is the only thing that
+    separates the two sides of this scenario."""
+    slot = int(sim.unit_next[0])
+    sim.major_unit_alive[0, slot] = True
+    sim.major_unit_seat[0, slot] = seat
+    sim.major_unit_type[0, slot] = 2  # WARRIOR
+    sim.major_unit_tile[0, slot] = tile
+    sim.major_unit_hp[0, slot] = hp
+    sim.military_at[0, tile] = slot + sim.POOL_LO["major"]
+    sim.unit_next[0] += 1
     return slot
 
 
@@ -77,9 +67,9 @@ def scenario(sim):
 
 def run(ranged: bool) -> None:
     sim = build()
-    civ_unit_tile, pl_tile = scenario(sim)
-    v = place(sim, civ_unit_tile, seat0=False)
-    p = place(sim, pl_tile, seat0=True)
+    civ_tile, pl_tile = scenario(sim)
+    v = place(sim, civ_tile, seat=1)  # the absolute seat of civ 0
+    p = place(sim, pl_tile, seat=0)
 
     # civ 0 is AT PEACE with seat 0, and AT WAR with civ 1.
     sim.civ_only_atwar[0, 0] = False
@@ -89,15 +79,15 @@ def run(ranged: bool) -> None:
         sim.civ_pair_war[0, 1, 0] = True
         sim.sync_war()  # close the poke under transpose
 
-    before = int(sim.seat0_unit_hp[0, p])
+    before = int(sim.major_unit_hp[0, p])
     att = torch.zeros(sim.B, dtype=torch.bool)
     att[0] = True
     tgt = torch.full((sim.B,), pl_tile, dtype=torch.long)
     if ranged:
-        sim._hostile_ranged_strike(att, tgt, "civ", v)
+        sim._hostile_ranged_strike(att, tgt, "major", v)
     else:
-        sim._hostile_vs_unit(att, tgt, "civ", v)
-    after = int(sim.seat0_unit_hp[0, p])
+        sim._hostile_vs_unit(att, tgt, "major", v)
+    after = int(sim.major_unit_hp[0, p])
     kind = "ranged" if ranged else "melee"
     assert after == before, (
         f"{kind}: a civ AT PEACE with seat 0 damaged a seat-0 unit "
@@ -110,10 +100,10 @@ def run(ranged: bool) -> None:
     sim.civ_only_atwar[0, 0] = True
     sim.sync_war()  # close the poke under transpose
     if ranged:
-        sim._hostile_ranged_strike(att, tgt, "civ", v)
+        sim._hostile_ranged_strike(att, tgt, "major", v)
     else:
-        sim._hostile_vs_unit(att, tgt, "civ", v)
-    at_war = int(sim.seat0_unit_hp[0, p])
+        sim._hostile_vs_unit(att, tgt, "major", v)
+    at_war = int(sim.major_unit_hp[0, p])
     assert at_war < before, (
         f"{kind}: the scenario is inert — the attack did not land even AT WAR "
         f"({before} -> {at_war}); the peace assertion above proves nothing"

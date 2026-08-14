@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
 from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star import
-from . import simbase  # the PATCHABLE globals (POOL_MAX/SEAT0_POOL_MAX/_ALIAS_CHECK) must be read live
+from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must be read live
 
 
 class SimEconomy:
@@ -107,14 +107,10 @@ class SimEconomy:
                            torch.full_like(s, NO_SEAT))
 
     def _atk_seat(self, atk_kind: str, u: int) -> torch.Tensor:
-        """[B] long - the SEAT of the hostile attacker in pool slot `u`.
+        """[B] long - the SEAT of the attacker in pool slot `u`.
         `_hostile_vs_unit` and `_hostile_ranged_strike` are pool-generic over
         atk_kind, so their seat is too."""
-        if atk_kind == "civ":
-            return self.civ_unit_seat[:, u]
-        if atk_kind == "seat0":
-            return self.seat0_unit_seat[:, u]
-        return self.barb_unit_seat[:, u]
+        return getattr(self, f"{atk_kind}_unit_seat")[:, u]
 
     def _row_of(self, seat: torch.Tensor) -> torch.Tensor:
         """[B] long - the war-matrix ROW for each game's absolute seat, with
@@ -323,18 +319,14 @@ class SimEconomy:
         r = self.rules
         return js_round((r.builder_base + r.builder_per * n.to(self.dtype)) * r.game_speed)
 
-    def _seat0_settlers(self) -> torch.Tensor:
-        """[B] seat 0's LIVE settler units — what the settlerCost escalator
-        counts."""
+    def _seat_settlers(self, row: int) -> torch.Tensor:
+        """[B] seat row `row`'s LIVE settler units — what the settlerCost
+        escalator counts. `settlerCount` filters ONE array by seat; so does
+        this, over the ONE shared window."""
         if self._settler_idx < 0:
             return torch.zeros(self.B, dtype=torch.long, device=self.device)
-        return (self.seat0_unit_alive & (self.seat0_unit_type == self._settler_idx)).sum(dim=1)
-
-    def _civ_only_settlers_of(self, r: int) -> torch.Tensor:
-        """[B] civ r's LIVE settler units."""
-        if self._settler_idx < 0:
-            return torch.zeros(self.B, dtype=torch.long, device=self.device)
-        return (self.civ_unit_alive & (self.civ_unit_seat == r + 1) & (self.civ_unit_type == self._settler_idx)).sum(dim=1)
+        return (self.major_unit_alive & (self.major_unit_seat == row)
+                & (self.major_unit_type == self._settler_idx)).sum(dim=1)
 
     def _afford(self, tre: torch.Tensor, cost) -> torch.Tensor:
         """Milli-rounded gold-threshold compare — the `goldAffordable` twin.
@@ -361,9 +353,7 @@ class SimEconomy:
         row's city registry, U = its OWN unlocked specialty types, D ≥ U."""
         if not bool(self._is_specialty[di]):
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        techs2 = self.techs if row == 0 else self.civ_only_techs[:, row - 1]
-        civics2 = self.civics if row == 0 else self.civ_only_civics[:, row - 1]
-        U = self._unlocked_specialty_count(techs2, civics2)
+        U = self._unlocked_specialty_count(self._seat_techs(row), self._seat_civics(row))
         placed = self.city_dist_tile[:, row]  # [B, cols, nD] tile per (city, type)
         n = (placed[:, :, di] >= 0).sum(dim=1)
         tiles_f = placed.clamp(min=0).reshape(self.B, -1)
@@ -905,20 +895,22 @@ class SimEconomy:
             amen = amen + ok.to(self.dtype) * am.unsqueeze(1)
         return house, amen
 
-    def _gov_policy_mods_cached(self, seat_tag, civics2: torch.Tensor):
-        """(seat_tag, _eff_version)-keyed wrapper over _gov_policy_mods. The
-        only mutable input is civics2 (a seat's researched civics) and every
-        civic completion bumps _eff_version, so the eff epoch is a complete
-        key. seat_tag is 'seat0' for seat 0 or the civ index — the tag is the key,
-        the tensor is never hashed. Consumers only READ the returned tuple, so
-        sharing one object across the per-city loop is safe."""
+    def _gov_mods(self, row: int):
+        """getModifiers' government + slotted-policy layer for seat row `row`,
+        cached on (row, _eff_version).
+
+        The only mutable input is the row's researched civics and every civic
+        completion bumps _eff_version, so the eff epoch is a complete key; the
+        ABSOLUTE row is the rest of it, and the tensor is never hashed.
+        Consumers only READ the returned tuple, so sharing one object across
+        the per-city loop is safe."""
         if self._gov_pol_cache is None or self._gov_pol_cache[0] != self._eff_version:
             self._gov_pol_cache = (self._eff_version, {})
         d = self._gov_pol_cache[1]
-        v = d.get(seat_tag)
+        v = d.get(row)
         if v is None:
-            v = self._gov_policy_mods(civics2)
-            d[seat_tag] = v
+            v = self._gov_policy_mods(self._seat_civics(row))
+            d[row] = v
         return v
 
     def _district_adj_raw(self, di: int, adjc: torch.Tensor) -> torch.Tensor:
@@ -1264,30 +1256,28 @@ class SimEconomy:
         of which bump _eff_version, so the cache keys on (turn, _gen_ver, a
         general POSITION fingerprint). The fingerprint is load-bearing: besides
         the _gen_ver-bumped sites (spawn/civ-walk/kill/capture/restore) a
-        general is also moved by the MOVE verb in _apply_unit_actions, which
-        does NOT bump _gen_ver — keying on _gen_ver alone goes stale mid-apply.
-        The weighted tile/pool/type sum changes on ANY general move, kill,
-        capture or spawn, so the cache is exact regardless of the mover.
+        general is also moved by the MOVE verb in _apply_seat_unit_actions,
+        which does NOT bump _gen_ver — keying on _gen_ver alone goes stale
+        mid-apply. The weighted tile/seat/type sum changes on ANY general move,
+        kill, capture or spawn, so the cache is exact regardless of the mover.
 
         Returns None when no General/Admiral is alive anywhere (structural 0;
         call sites skip the gather). Dilation mirrors
         _rel_combat_planes.near3 (scatter_add of longs then >0)."""
         B, T, O, dev = self.B, self.T, self._O, self.device
         gi, ai = self._general_unit_idx, self._admiral_unit_idx
-        p_g = self.seat0_unit_alive & (self.seat0_unit_type == gi) if gi >= 0 else torch.zeros(B, simbase.SEAT0_POOL_MAX, dtype=torch.bool, device=dev)
-        p_a = self.seat0_unit_alive & (self.seat0_unit_type == ai) if ai >= 0 else torch.zeros(B, simbase.SEAT0_POOL_MAX, dtype=torch.bool, device=dev)
-        v_g = self.civ_unit_alive & (self.civ_unit_type == gi) if gi >= 0 else torch.zeros(B, simbase.POOL_MAX, dtype=torch.bool, device=dev)
-        v_a = self.civ_unit_alive & (self.civ_unit_type == ai) if ai >= 0 else torch.zeros(B, simbase.POOL_MAX, dtype=torch.bool, device=dev)
-        present = bool(p_g.any()) or bool(p_a.any()) or bool(v_g.any()) or bool(v_a.any())
+        _z = torch.zeros(B, simbase.MAJOR_POOL_MAX, dtype=torch.bool, device=dev)
+        m_g = self.major_unit_alive & (self.major_unit_type == gi) if gi >= 0 else _z
+        m_a = self.major_unit_alive & (self.major_unit_type == ai) if ai >= 0 else _z
+        live = m_g | m_a
+        present = bool(live.any())
         if present:
-            arp = torch.arange(1, p_g.shape[1] + 1, device=dev)
-            arv = torch.arange(1, v_g.shape[1] + 1, device=dev)
-            # Tile (+1 so tile 0 counts), pool (p vs v via distinct base mults),
-            # type (general vs admiral via ×3) and slot — a swap or a same-tile
-            # pool transfer (capture) still changes the sum.
-            p_fp = int((((self.seat0_unit_tile + 1) * (1 + 2 * p_a.long()) * arp) * (p_g | p_a).long()).sum())
-            v_fp = int((((self.civ_unit_tile + 1) * (1 + 2 * v_a.long()) * arv) * (v_g | v_a).long()).sum())
-            fp = p_fp * 100003 + v_fp + int((p_g | p_a).sum()) * 31 + int((v_g | v_a).sum())
+            ar = torch.arange(1, m_g.shape[1] + 1, device=dev)
+            # Tile (+1 so tile 0 counts), OWNER (+1 so seat 0 counts), type
+            # (general vs admiral via ×3) and slot — a move, a kill, a spawn or
+            # a same-tile ownership flip (capture) all change the sum.
+            fp = int((((self.major_unit_tile + 1) * (1 + 2 * m_a.long()) * ar
+                       * (self.major_unit_seat + 1)) * live.long()).sum()) + int(live.sum()) * 31
         else:
             fp = 0
         key = (self.turn, self._gen_ver, fp)
@@ -1299,8 +1289,7 @@ class SimEconomy:
         off = self._gen_off
         land = torch.zeros(B, O, T, dtype=torch.bool, device=dev)
         sea = torch.zeros(B, O, T, dtype=torch.bool, device=dev)
-        pwin = tiles_from_offsets(self.seat0_unit_tile.clamp(min=0).reshape(-1), off, self.W, self.H).reshape(B, simbase.SEAT0_POOL_MAX, -1)
-        vwin = tiles_from_offsets(self.civ_unit_tile.clamp(min=0).reshape(-1), off, self.W, self.H).reshape(B, simbase.POOL_MAX, -1) if self.R > 0 else None
+        mwin = tiles_from_offsets(self.major_unit_tile.clamp(min=0).reshape(-1), off, self.W, self.H).reshape(B, simbase.MAJOR_POOL_MAX, -1)
 
         def dilate(mask: torch.Tensor, win: torch.Tensor) -> torch.Tensor:
             src = torch.zeros(B, T, dtype=torch.long, device=dev)
@@ -1308,18 +1297,15 @@ class SimEconomy:
             src.scatter_add_(1, w.clamp(min=0), (w >= 0).long())
             return src > 0
 
-        if bool(p_g.any()):
-            land[:, 0] = dilate(p_g, pwin)
-        if bool(p_a.any()):
-            sea[:, 0] = dilate(p_a, pwin)
-        if self.R > 0:
-            for r in range(self.R):
-                rg = v_g & (self.civ_unit_seat == r + 1)
-                ra = v_a & (self.civ_unit_seat == r + 1)
-                if bool(rg.any()):
-                    land[:, r + 1] = dilate(rg, vwin)
-                if bool(ra.any()):
-                    sea[:, r + 1] = dilate(ra, vwin)
+        # ONE loop over the major rows — the pool is shared, so a seat's
+        # generals are the slots its own `unit_seat` names.
+        for _row in range(O):
+            rg = m_g & (self.major_unit_seat == _row)
+            ra = m_a & (self.major_unit_seat == _row)
+            if bool(rg.any()):
+                land[:, _row] = dilate(rg, mwin)
+            if bool(ra.any()):
+                sea[:, _row] = dilate(ra, mwin)
         out = (land, sea)
         self._gen_aura_cache = (key, out)
         return out
@@ -1334,7 +1320,7 @@ class SimEconomy:
         the +MP one, so the two cannot drift apart.
 
         Shape-generic on the trailing dims (leading dim must be B): [B] at the
-        combat call sites, [B, simbase.SEAT0_POOL_MAX] / [B, simbase.POOL_MAX] at the pooled snapshot.
+        combat call sites, [B, MAJOR_POOL_MAX] at the pooled snapshot.
         Does NOT screen civilians — callers own that (the combat sites only ever
         ask about a combatant; the snapshot masks on _type_combat > 0)."""
         planes = self._gen_aura_planes()
@@ -1398,12 +1384,12 @@ class SimEconomy:
 
     def _full_mp(self, pre: str) -> torch.Tensor:
         """[B, U] — refreshUnits' `full + generalAuraMP(state, unit)`, one rule
-        for all three pools: an EMBARKED land unit marches on the flat
+        for both windows: an EMBARKED land unit marches on the flat
         EMBARK_MOVES pool, everything else on its type's `moves`, plus whatever
         the frozen general/admiral aura granted.
 
         Every walker and every afford rule (`mp >= full`) must read this same
-        expression — `stepUnit` is embark-aware for all three pools."""
+        expression — `stepUnit` is embark-aware in both windows."""
         typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         # The golden dedication raises the unit's OWN movement, so it is added
         # to the type pool and then OVERRIDDEN by the embark pool below —
@@ -1436,43 +1422,27 @@ class SimEconomy:
         unit TYPE. The aura is not one — it keys on a GENERAL's POSITION, and
         generals move during the very phase the unit orders execute, so a
         recompute could read a POST-move general where TS read a PRE-move one.
-        Hence the snapshot; the walkers add seat0_unit_aura_mp / civ_unit_aura_mp.
+        Hence the snapshot; the walkers add `major_unit_aura_mp`.
 
-        Barbarians never own a GENERAL/ADMIRAL, so the u_ pool has no plane
-        (mirrors seat0_unit_xp/civ_unit_xp). Civilians are screened here (TS inGeneralAura
-        returns false at combat <= 0), as are dead slots, so a stale reclaimed
-        slot cannot leak a bonus. Zero RNG, integer arithmetic."""
-        gm = self._gen_aura_mp
-        p_ok = self.seat0_unit_alive & (self._type_combat[self.seat0_unit_type] > 0)
-        p_hit = self._gen_aura_hit(
-            torch.zeros_like(self.seat0_unit_tile),  # seat 0 is civ_unified 0
-            self.seat0_unit_tile,
-            self.unit_naval[self.seat0_unit_type] | self.seat0_unit_emb,  # ADMIRAL-keyed when naval OR embarked
+        ONE body, keyed on each slot's OWN seat — refreshUnits loops every
+        unit and asks `generalAuraMP(state, unit)`, which reads that unit's
+        owner. It runs TWICE a turn on the majors, exactly as TS does: once
+        here at the refreshUnits mirror and again at the seatPhase reset that
+        establishes every isCiv seat's real budget (seat 0 included — `isCiv`
+        covers it).
+
+        Barbarians never own a GENERAL/ADMIRAL, so the barb window has no
+        plane (mirrors `unit_xp`). Civilians are screened here (TS
+        inGeneralAura returns false at combat <= 0), as are dead slots, so a
+        stale reclaimed slot cannot leak a bonus. Zero RNG, integer
+        arithmetic."""
+        ok = self.major_unit_alive & (self._type_combat[self.major_unit_type] > 0)
+        hit = self._gen_aura_hit(
+            self.major_unit_seat,  # a major's ABSOLUTE seat IS its block row
+            self.major_unit_tile,
+            self.unit_naval[self.major_unit_type] | self.major_unit_emb,  # ADMIRAL-keyed when naval OR embarked
         )
-        self.seat0_unit_aura_mp.copy_((p_hit & p_ok).long() * gm)
-
-    def _refresh_aura_mp_civ(self) -> None:
-        """The CIV-SEAT pool freezes at a DIFFERENT moment than seat 0's — the
-        top of `_seat_phase`, not the refreshUnits mirror.
-
-        `refreshUnits` does set civ movesLeft at the top of endTurn, but
-        `seatPhase` then RE-RESETS every civ unit's pool before the civ walkers
-        run. That second reset — not the first — establishes a civ seat's real
-        movement budget for the turn, so it is where TS applies the aura and
-        rewrites `movesFull`. Freezing here also lands BEFORE the unit-order
-        phase moves any general, so both engines read the same pre-move
-        positions."""
-        v_ok = self.civ_unit_alive & (self._type_combat[self.civ_unit_type] > 0)
-        v_hit = self._gen_aura_hit(
-            self.civ_unit_seat,  # a civ unit's ABSOLUTE seat IS its block row
-            self.civ_unit_tile,
-            self.unit_naval[self.civ_unit_type] | self.civ_unit_emb,
-        )
-        self.civ_unit_aura_mp.copy_((v_hit & v_ok).long() * self._gen_aura_mp)
-        # seatPhase writes `u.movesLeft = full + generalAuraMP(...)` and
-        # `u.movesFull = u.movesLeft` in this very loop — the reset that
-        # establishes a civ seat's budget for the turn.
-        self._reset_mp("civ")
+        self.major_unit_aura_mp.copy_((hit & ok).long() * self._gen_aura_mp)
 
     def _civ_era(self, techs: torch.Tensor, civics: torch.Tensor) -> torch.Tensor:
         """[B] — the `civEraIndex` twin. The HIGHEST era among a seat's

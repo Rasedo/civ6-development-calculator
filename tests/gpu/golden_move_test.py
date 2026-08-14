@@ -33,17 +33,17 @@ def build() -> BatchSim:
     return BatchSim([load_fixture(p) for p in paths], rules, device="cpu", dtype=torch.float64)
 
 
-def put(sim: BatchSim, pre: str, type_idx: int, seat: int, civ: int = 0) -> int:
-    """Park a unit of `type_idx` in the given pool and return its slot."""
-    counter = {"seat0": "seat0_unit_next", "civ": "civ_unit_next", "barb": "next_slot"}[pre]
+def put(sim: BatchSim, pre: str, type_idx: int, seat: int) -> int:
+    """Park `seat`'s unit of `type_idx` in the pool `pre` names and return its
+    slot. Every MAJOR seat shares one window, so the SEAT is the only thing
+    that separates seat 0's builder from a civ's."""
+    counter = sim.POOL_NEXT[pre]
     slot = int(getattr(sim, counter)[0])
     getattr(sim, f"{pre}_unit_alive")[0, slot] = True
     getattr(sim, f"{pre}_unit_type")[0, slot] = type_idx
     getattr(sim, f"{pre}_unit_seat")[0, slot] = seat
     getattr(sim, f"{pre}_unit_emb")[0, slot] = False
     getattr(sim, f"{pre}_unit_aura_mp")[0, slot] = 0
-    if pre == "civ":
-        sim.civ_unit_seat[0, slot] = civ + 1
     getattr(sim, counter)[0] += 1
     return slot
 
@@ -73,38 +73,38 @@ def main() -> None:
     assert bld >= 0 and mis >= 0 and apo >= 0, "roster indices missing"
 
     # ---- 1. no dedication -> no bonus, for every class ---------------------
-    p_bld = put(sim, "seat0", bld, 0)
-    v_mis = put(sim, "civ", mis, 1, civ=0)
-    put(sim, "civ", apo, 1, civ=0)
-    assert full(sim, "seat0", p_bld) == base(sim, bld), "a Builder with no Golden age gained MP"
-    assert full(sim, "civ", v_mis) == base(sim, mis), "a Missionary with no Golden age gained MP"
-    print(f"  1 no dedication: builder {full(sim, 'seat0', p_bld)}, missionary {full(sim, 'civ', v_mis)} — unchanged")
+    p_bld = put(sim, "major", bld, 0)
+    v_mis = put(sim, "major", mis, 1)
+    put(sim, "major", apo, 1)
+    assert full(sim, "major", p_bld) == base(sim, bld), "a Builder with no Golden age gained MP"
+    assert full(sim, "major", v_mis) == base(sim, mis), "a Missionary with no Golden age gained MP"
+    print(f"  1 no dedication: builder {full(sim, 'major', p_bld)}, missionary {full(sim, 'major', v_mis)} — unchanged")
 
     # ---- 2. MONUMENTALITY lifts BUILDERS, and only builders ---------------
-    v_bld = put(sim, "civ", bld, 1, civ=0)
-    v_war = put(sim, "civ", 2, 1, civ=0)  # WARRIOR — never a dedication class
+    v_bld = put(sim, "major", bld, 1)
+    v_war = put(sim, "major", 2, 1)  # WARRIOR — never a dedication class
     golden(sim, 0, mono)  # seat 0's civ index is 0
     golden(sim, 1, mono)  # civ 0 is unified civ 1
-    assert full(sim, "seat0", p_bld) == base(sim, bld) + bonus, "MONUMENTALITY missed seat 0's Builder"
-    assert full(sim, "civ", v_bld) == base(sim, bld) + bonus, "MONUMENTALITY missed the CIV's Builder"
-    assert full(sim, "civ", v_war) == base(sim, 2), "MONUMENTALITY reached a WARRIOR"
-    assert full(sim, "civ", v_mis) == base(sim, mis), "MONUMENTALITY reached a Missionary"
-    print(f"  2 MONUMENTALITY: builder {base(sim, bld)} -> {full(sim, 'seat0', p_bld)} for seat 0 AND civ; warrior/missionary untouched")
+    assert full(sim, "major", p_bld) == base(sim, bld) + bonus, "MONUMENTALITY missed seat 0's Builder"
+    assert full(sim, "major", v_bld) == base(sim, bld) + bonus, "MONUMENTALITY missed the CIV's Builder"
+    assert full(sim, "major", v_war) == base(sim, 2), "MONUMENTALITY reached a WARRIOR"
+    assert full(sim, "major", v_mis) == base(sim, mis), "MONUMENTALITY reached a Missionary"
+    print(f"  2 MONUMENTALITY: builder {base(sim, bld)} -> {full(sim, 'major', p_bld)} for seat 0 AND civ; warrior/missionary untouched")
 
     # ---- 3. EXODUS lifts MISSIONARY + APOSTLE, and only those -------------
     sim2 = build()
-    p_bld2 = put(sim2, "seat0", bld, 0)
-    v_mis2 = put(sim2, "civ", mis, 1, civ=0)
-    v_apo2 = put(sim2, "civ", apo, 1, civ=0)
+    p_bld2 = put(sim2, "major", bld, 0)
+    v_mis2 = put(sim2, "major", mis, 1)
+    v_apo2 = put(sim2, "major", apo, 1)
     golden(sim2, 1, exo)
-    assert full(sim2, "civ", v_mis2) == base(sim2, mis) + bonus, "EXODUS missed the Missionary"
-    assert full(sim2, "civ", v_apo2) == base(sim2, apo) + bonus, "EXODUS missed the Apostle"
-    assert full(sim2, "seat0", p_bld2) == base(sim2, bld), "EXODUS reached a Builder"
-    print(f"  3 EXODUS: missionary {base(sim2, mis)} -> {full(sim2, 'civ', v_mis2)}, apostle {base(sim2, apo)} -> {full(sim2, 'civ', v_apo2)}; builder untouched")
+    assert full(sim2, "major", v_mis2) == base(sim2, mis) + bonus, "EXODUS missed the Missionary"
+    assert full(sim2, "major", v_apo2) == base(sim2, apo) + bonus, "EXODUS missed the Apostle"
+    assert full(sim2, "major", p_bld2) == base(sim2, bld), "EXODUS reached a Builder"
+    print(f"  3 EXODUS: missionary {base(sim2, mis)} -> {full(sim2, 'major', v_mis2)}, apostle {base(sim2, apo)} -> {full(sim2, 'major', v_apo2)}; builder untouched")
 
     # ---- 4. a DARK/NORMAL age holding the same dedication pays nothing ----
     sim2.civ_age[0, 1] = 1
-    assert full(sim2, "civ", v_mis2) == base(sim2, mis), "a NORMAL age paid the golden bonus"
+    assert full(sim2, "major", v_mis2) == base(sim2, mis), "a NORMAL age paid the golden bonus"
     print("  4 same dedication, NORMAL age — no bonus (a Golden age takes bonuses, a Dark one era score)")
 
     # ---- 5. barbarians hold no dedications -------------------------------
@@ -118,11 +118,11 @@ def main() -> None:
     # ---- 6. an EMBARKED unit keeps the flat pool -------------------------
     if sim3._embark_live:
         sim4 = build()
-        v_b = put(sim4, "civ", bld, 1, civ=0)
+        v_b = put(sim4, "major", bld, 1)
         golden(sim4, 1, mono)
-        assert full(sim4, "civ", v_b) == base(sim4, bld) + bonus
-        sim4.civ_unit_emb[0, v_b] = True
-        assert full(sim4, "civ", v_b) == sim4._embark_moves, (
+        assert full(sim4, "major", v_b) == base(sim4, bld) + bonus
+        sim4.major_unit_emb[0, v_b] = True
+        assert full(sim4, "major", v_b) == sim4._embark_moves, (
             "an EMBARKED builder took the dedication onto the embark pool — "
             "embarkation speed is not a unit's own movement (TS unitFullMoves)"
         )

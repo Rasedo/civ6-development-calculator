@@ -63,10 +63,10 @@ def main() -> None:
     sim.civ_city_current[0, r, j] = w + 1
     sim.civ_city_cost[0, r, j] = float(sim._type_cost[w])
     sim.civ_city_progress[0, r, j] = float(sim._type_cost[w]) - 0.5  # one turn from done
-    units_before = int((sim.civ_unit_alive[0] & ((sim.civ_unit_seat[0] - 1) == r)).sum())
+    units_before = int((sim.major_unit_alive[0] & ((sim.major_unit_seat[0] - 1) == r)).sum())
     sim.step()
     done = int(sim.civ_city_current[0, r, j]) == -1
-    units_after = int((sim.civ_unit_alive[0] & ((sim.civ_unit_seat[0] - 1) == r)).sum())
+    units_after = int((sim.major_unit_alive[0] & ((sim.major_unit_seat[0] - 1) == r)).sum())
     assert done and units_after == units_before + 1, "written queue item must complete and spawn through the ordinary machinery"
 
     # 5. the OTHER civ stays fully scripted (its queue keeps working)

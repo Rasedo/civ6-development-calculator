@@ -63,7 +63,7 @@ def _rollout_loop(sim: BatchSim, turns: int, seed: int) -> None:
         pa = masked_choice(sim.production_mask(), game_seed.view(B, 1), slots, turn, HEAD_PROD)
         ta = masked_choice(sim.tech_mask(), game_seed, turn, HEAD_TECH)
         ca = masked_choice(sim.civic_mask(), game_seed, turn, HEAD_CIVIC)
-        um = sim.unit_action_mask()
+        um = sim._seat_unit_mask(0)
         na = um.shape[2]
         has_attack = um[:, :, 6:12].any(dim=2, keepdim=True)
         um = um & ~(has_attack & (torch.arange(na).view(1, 1, na) < 6))

@@ -17,7 +17,7 @@ import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, layTradeRoad, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit } from './units';
 import { PILLAGE_HEAL_IMPROVEMENTS } from './combat';  // #70: the replay's pillage arm mirrors hostileUnitAct's
 import { UNIT_HP } from '../data/units';
-import { meleeAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, generalAuraCS, cityDefenseStrength } from './combat';
+import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, generalAuraCS, cityDefenseStrength } from './combat';
 import { availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { getModifiers } from './effects';
@@ -37,7 +37,7 @@ import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP, ENCAMPMENT_HP, CITY_MAX_HP } from '../data/units';
 import { generalAuraMP } from './aura'; // #70/S3 (B-8): the aura's +1 MP half
-import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES, SPREAD_PRESSURE } from '../data/religion';
+import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
 import { CITY_WORK_RADIUS, GOLD_PURCHASE_MULT, borderGrowthCost, EMBARKED_DEFENSE_CS } from '../data/constants';
 import { PROJECTS } from '../data/projects';
 import type { CityStats } from './city';
@@ -56,8 +56,11 @@ import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex } from './unit
 const A_FOUND_CITY = unitActionIndex(IMPROVEMENT_IDS).FOUND_CITY;
 import { ALLY_MIN_PEACE, CIV_LEADERS, FORMAL_WAR_MIN_TURNS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION } from '../data/seats';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles, goldenBoostBonus } from './eras';
-import { NO_SEAT, allCities, atWarWithAny, citiesOf, civHasStrategic, civsAtWar, emptySeat, indexOfSeat, isCiv, prophetsOf, seatOf, seatOfCityState, seatOfIndex, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf } from './seats';
+import { NO_SEAT, atWarWithAny, citiesOf, civHasStrategic, civsAtWar, emptySeat, indexOfSeat, isCiv, prophetsOf, seatOf, seatOfCityState, seatOfIndex, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
+// The two verb bodies the SEAT-0 applier and this one share — one SNIPE ring,
+// one SPREAD rule, whichever seat gave the order.
+import { snipeRing, spreadFromUnit } from './unitOrders';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -961,7 +964,12 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         const nb = neighbors(state.map, here);
         const to = nb[a - 6];
         if (to) {
-          if (UNITS[unit.type]?.ranged) hostileRangedStrike(state, unit, to.index);
+          // The ORDERED ranged attack is `rangedAttack`, not the autonomous
+          // strike: same body seat 0's orders take, dispatched by unit TYPE
+          // alone (the GPU applier's arm). `hostileRangedStrike` carries the
+          // major-vs-major scope-out and belongs to the SNIPE column and the
+          // hostile phases.
+          if (UNITS[unit.type]?.ranged) rangedAttack(state, unit.id, to.index, seat);
           else meleeAttack(state, unit.id, to.index, seat);
         }
       } else if (a === 25) {
@@ -1025,39 +1033,13 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           }
         }
       } else if (a >= 38 && a < 45) {
-        // SPREAD — the walker's own body at the replay surface: lump into
-        // the target city's pressure accumulator for g, charge -1, disband
-        // at 0. HERE = column 38; directions 39-44.
-        if ((unit.type === 'MISSIONARY' || unit.type === 'APOSTLE') && (unit.charges ?? 0) > 0 && actor.religion.founded) {
-          const g = actor.seat;
-          const to38 = a === 38 ? here : neighbors(state.map, here)[a - 39];
-          if (to38) {
-            const tcity = allCities(state).find((c) => c.centerIndex === to38.index);
-            if (tcity) {
-              const nRel = state.seats.length - 1 + 1;
-              const eb = actor.religion.enhancer ? ENHANCER_BELIEFS[actor.religion.enhancer]?.effects : undefined;
-              const lump = Math.round(SPREAD_PRESSURE * (eb?.spreadPressureMult ?? 1));
-              let pres = tcity.religionPressure;
-              if (!pres || pres.length !== nRel) {
-                pres = new Array(nRel).fill(0);
-                tcity.religionPressure = pres;
-              }
-              pres[g] += lump;
-              unit.movesLeft = 0;
-              unit.charges = (unit.charges ?? 1) - 1;
-              if (unit.charges <= 0) disbandUnit(state, unit.id);
-            }
-          }
-        }
+        // SPREAD — HERE = column 38; directions 39-44. The SAME body the
+        // triples applier runs, so no seat spreads on a rule of its own.
+        const to38 = a === 38 ? here : neighbors(state.map, here)[a - 39];
+        if (to38) spreadFromUnit(state, unit, actor, to38);
       } else if (a >= 26 && a < 38) {
-        // SNIPE — the ring-2 tile in TILE-INDEX order (the shared #92 layout:
-        // column order IS index order, so both engines enumerate identically).
-        const nb1 = neighbors(state.map, here).filter((t): t is Tile => !!t);
-        const d1 = new Set(nb1.map((t) => t.index));
-        const ring = [...new Set(nb1.flatMap((t) => neighbors(state.map, t)).filter((t): t is Tile => !!t).map((t) => t.index))]
-          .filter((i) => i !== here.index && !d1.has(i))
-          .sort((x, y) => x - y);
-        const rt = ring[a - 26];
+        // SNIPE — the ring-2 tile at this column, shared with every seat.
+        const rt = snipeRing(state, here)[a - 26];
         if (rt !== undefined && UNITS[unit.type]?.ranged) hostileRangedStrike(state, unit, rt);
       }
     });

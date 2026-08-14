@@ -242,14 +242,10 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                 gobs_all = env.observe(seat)
                 gj_all = drive._builder_jobs(sim, seat).tolist()
                 gs_all = drive._spread_targets(sim, seat).tolist()
-                if seat == 0:
-                    # seat-0 rows are RAW pool slots; TS emits per LIVE unit in
-                    # array order — compact by seat0_unit_alive (append-only pool, dead
-                    # slots never reused, so alive-ascending IS array order;
-                    # civ seats get this via seat_slot_map instead).
-                    _pa0 = sim.seat0_unit_alive.tolist()
-                    gj_all = [[jv for jv, av in zip(row, arow) if av] for row, arow in zip(gj_all, _pa0)]
-                    gs_all = [[sv for sv, av in zip(row, arow) if av] for row, arow in zip(gs_all, _pa0)]
+                # Every seat's rows already ride `_seat_slot_map` — this
+                # seat's LIVING units in slot order, which IS the TS array
+                # order it emits per unit. No seat needs a compaction of its
+                # own any more.
                 gb_all = None
                 if seat >= 1:
                     # The BUY-candidate tripwire: _buy_ctx against the TS
@@ -294,15 +290,17 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             tech0 = ladder.pick_research(blocks0, m0["tech"], "tech") if bool(m0["tech"].any()) else _neg0
             civic0 = ladder.pick_research(blocks0, m0["civic"], "civic") if bool(m0["civic"].any()) else _neg0
             # The UNIT verb, seat 0: the same _seat_unit_orders policy as every
-            # seat; rows are RAW pool slots, exactly step()'s indexing. The
-            # record carries [tile, col, civ] triples over PRE-step tiles with
-            # HOLD dropped, and the "units" key is ALWAYS present — its mere
-            # presence is what stands the TS walker down, mirroring units=.
+            # seat, over the ONE head layout — rank n is this seat's n-th
+            # living unit in slot (= TS array) order, exactly step()'s
+            # indexing. The record carries [tile, col, civ] triples over
+            # PRE-step tiles with HOLD dropped, and the "units" key is ALWAYS
+            # present — its mere presence is what stands the TS walker down,
+            # mirroring units=.
             u0, _uj0, _us0, _um0, _uo0 = drive._seat_unit_orders(sim, 0)
             _u0_l = u0.tolist()
-            _pt_l = sim.seat0_unit_tile.tolist()
-            _pc_l = sim._type_civilian[sim.seat0_unit_type].tolist()
-            _pa_l = sim.seat0_unit_alive.tolist()
+            _sm0_l = sim._seat_slot_map(0).tolist()
+            _pt_l = sim.unit_tile.tolist()
+            _pc_l = sim._type_civilian[sim.unit_type].tolist()
             # The ENVOY verb, seat 0: the same greedy sequence as every seat
             # (bank-only — seat 0 converts no influence). ALWAYS a tensor: the
             # envoy= argument stands the GPU's scripted greedy down, and the
@@ -322,9 +320,9 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                                    if int(prod0[b, c]) >= 0 and bool(sim.alive[b, c])],
                     "tech": None if int(tech0[b]) < 0 else int(tech0[b]),
                     "civic": None if int(civic0[b]) < 0 else int(civic0[b]),
-                    "units": [[_pt_l[b][p], v, int(_pc_l[b][p])]
-                              for p, v in enumerate(_u0_l[b])
-                              if _pa_l[b][p] and v >= 0 and v != 12],
+                    "units": [[_pt_l[b][_sm0_l[b][n]], v, int(_pc_l[b][_sm0_l[b][n]])]
+                              for n, v in enumerate(_u0_l[b])
+                              if _sm0_l[b][n] >= 0 and v >= 0 and v != 12],
                     "envoys": [x for x in _e0_l[b] if x >= 0],
                 }
                 ch.stdin.write(json.dumps({"recs": recs}) + "\n")
@@ -497,15 +495,11 @@ def main() -> None:
                 obs_bails += 1
         # Per-unit obs twins: the GPU extractors against the TS arrays, per
         # slot-map row (TS rows = live units in mirrored order; GPU rows beyond
-        # the live count must be -1). Seat 0's raw pool rows are compacted by
-        # seat0_unit_alive, as in the batched path.
+        # the live count must be -1). EVERY seat rides `_seat_slot_map` now,
+        # so no seat needs a compaction of its own.
         for seat in [0] + [r + 1 for r in seats]:
             gj = drive._builder_jobs(sim, seat)[0].tolist()
             gs = drive._spread_targets(sim, seat)[0].tolist()
-            if seat == 0:
-                _pa0 = sim.seat0_unit_alive[0].tolist()
-                gj = [jv for jv, av in zip(gj, _pa0) if av]
-                gs = [sv for sv, av in zip(gs, _pa0) if av]
             tj = msg.get("jobs", {}).get(str(seat), [])
             ts_ = msg.get("spreads", {}).get(str(seat), [])
             if seat >= 1:
@@ -535,11 +529,12 @@ def main() -> None:
                                       f" dpill {bool(sim.district_pillaged[0, _dt])} farm {bool(sim.farm_flat[0, _dt])}"
                                       f" mine {bool(sim.mine_ok[0, _dt])} lumber {bool(sim.lumber_ok[0, _dt])}"
                                       f" res {int(sim.res_imp[0, _dt])}")
-                            for _p in range(int(sim.seat0_unit_next[0])):
-                                if not bool(sim.seat0_unit_alive[0, _p]):
+                            for _p in range(int(sim.unit_next[0])):
+                                if not bool(sim.major_unit_alive[0, _p]):
                                     continue
-                                print(f"  p[{_p}] tile {int(sim.seat0_unit_tile[0, _p])} type {int(sim.seat0_unit_type[0, _p])}"
-                                      f" charges {int(sim.seat0_unit_charges[0, _p])}")
+                                print(f"  u[{_p}] seat {int(sim.major_unit_seat[0, _p])}"
+                                      f" tile {int(sim.major_unit_tile[0, _p])} type {int(sim.major_unit_type[0, _p])}"
+                                      f" charges {int(sim.major_unit_charges[0, _p])}")
                         print(rep)
                         if first_report is None:
                             first_report = rep
@@ -564,9 +559,9 @@ def main() -> None:
         # The UNIT verb, seat 0 — the batched path's twin block.
         u0, _uj0, _us0, _um0, _uo0 = drive._seat_unit_orders(sim, 0)
         _u0_l = u0[0].tolist()
-        _pt_l = sim.seat0_unit_tile[0].tolist()
-        _pc_l = sim._type_civilian[sim.seat0_unit_type][0].tolist()
-        _pa_l = sim.seat0_unit_alive[0].tolist()
+        _sm0_l = sim._seat_slot_map(0)[0].tolist()
+        _pt_l = sim.unit_tile[0].tolist()
+        _pc_l = sim._type_civilian[sim.unit_type][0].tolist()
         env0 = drive._seat_envoys(sim, 0)
         env0_t = env0 if env0 is not None else _neg0.unsqueeze(1)
         # The geopolitics decide ONCE per turn — the batched path's twin.
@@ -579,9 +574,9 @@ def main() -> None:
                            if int(prod0[0, c]) >= 0 and bool(sim.alive[0, c])],
             "tech": None if int(tech0[0]) < 0 else int(tech0[0]),
             "civic": None if int(civic0[0]) < 0 else int(civic0[0]),
-            "units": [[_pt_l[p], v, int(_pc_l[p])]
-                      for p, v in enumerate(_u0_l)
-                      if _pa_l[p] and v >= 0 and v != 12],
+            "units": [[_pt_l[_sm0_l[n]], v, int(_pc_l[_sm0_l[n]])]
+                      for n, v in enumerate(_u0_l)
+                      if _sm0_l[n] >= 0 and v >= 0 and v != 12],
             "envoys": [x for x in env0_t[0].tolist() if x >= 0],
         }
         if os.environ.get("CIV6_SERVE_DEBUG_BUY") and any("buy" in v for v in recs.values()):

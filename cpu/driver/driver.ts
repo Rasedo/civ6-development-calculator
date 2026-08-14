@@ -322,9 +322,8 @@ for (let t = 0; t < N_TURNS; t++) {
     // unifying the unit wire first (#108). Position is load-bearing: the GPU
     // steps seat-0 units at the top of step(), before the production
     // section's district scan reads tile.improvement — a same-turn build
-    // must precede the scan on BOTH engines. rangedActive mirrors
-    // _rl_ranged_active (constant True).
-    applyUnitOrders(state, seat0rec.units, true, o.improvementIds as unknown as string[], 0);
+    // must precede the scan on BOTH engines.
+    applyUnitOrders(state, seat0rec.units, o.improvementIds as unknown as string[], 0);
   }
   // Every OTHER seat-0 verb (production, tech, civic, envoys, buys, geo) is
   // consumed by the seatPhase loop from state.seatActions like every seat's.

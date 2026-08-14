@@ -271,11 +271,20 @@ def load_fixture(path: Path) -> dict:
 # ---------------------------------------------------------------------------
 
 RESEARCH_LOOPS = 40  # > tree size: completes every ready tech/civic in one turn; the early exit keeps it free
-# Slots in the v_/u_ unit pools per game (append-only; runtime-asserted).
-# Dead slots are recycled by `_reclaim_pool`, so the cap bounds LIVE units,
-# not ever-spawned ones.
-POOL_MAX = 256
-SEAT0_POOL_MAX = 256  # slots in the p_ unit pool per game (append-only; runtime-asserted)
+# Slots in the two unit pools per game (append-only; runtime-asserted).
+# Dead slots are recycled by `_reclaim_pool`, so a cap bounds LIVE units, not
+# ever-spawned ones.
+#
+# EVERY MAJOR SEAT SHARES ONE POOL, the twin of TS's single `state.units`
+# array: a unit's owner is `unit_seat`, never the slot range it landed in, so
+# seat 0 has no window of its own to be different in. The barbarians keep a
+# separate one only because nothing indexes them by seat row.
+MAJOR_POOL_MAX = 512
+BARB_POOL_MAX = 256
+#: The per-seat unit HEAD width — the observation/action rows a seat is
+#: decided over, rank-mapped onto its living units in slot order. Unrelated to
+#: pool capacity: it bounds how many units one seat can be ORDERED in a turn.
+UNIT_SLOTS = 256
 
 # The absolute SEAT space, shared with cpu/core/seats.ts.
 # Every damage-roll key that OPENS a battle. The paired counter-roll keys
@@ -286,7 +295,7 @@ SEAT0_POOL_MAX = 256  # slots in the p_ unit pool per game (append-only; runtime
 # enumeration a grep is not: `_ww_audit` makes the engine prove at runtime that
 # the hooks and this set agree.
 WW_BATTLE_KEYS = frozenset({
-    "mel",      # melee vs a unit - p_ pool AND hostile pool
+    "mel",      # melee vs a unit - a MAJOR attacker or a hostile one
     "rng",      # p_ ranged vs a unit or a lone civilian
     "vrng",     # hostile ranged vs a unit
     "csty",     # melee vs a city-state centre - seat 0 AND a civ seat
@@ -318,11 +327,11 @@ SEAT_CAPS = {
     "hostile": {"xp": False, "always_hostile": True},  # barbarians
 }
 
-#: Which class each UNIT POOL belongs to. The pools are already split by class
-#: ("seat0" seat 0, "civ" civ seats, "barb" barbarian), so a pool name answers "what may
-#: this actor do?" without touching the batch. The attack paths' `atk_kind`
-#: tag uses the same letters, so this one table serves both.
-POOL_CLASS = {"seat0": "major", "civ": "major", "barb": "hostile"}
+#: Which class each UNIT POOL belongs to. The pools are split by CLASS and by
+#: nothing else ("major" every major seat, "barb" the barbarians), so a pool
+#: name answers "what may this actor do?" without touching the batch. The
+#: attack paths' `atk_kind` tag uses the same names, so one table serves both.
+POOL_CLASS = {"major": "major", "barb": "hostile"}
 
 
 def seat_class(seat: int) -> str:
@@ -444,14 +453,14 @@ PATROL_DIR_PERM = [3, 4, 2, 5, 1, 0]
 _ALIAS_CHECK = os.environ.get("CIV6_ALIAS_CHECK", "") not in ("", "0")
 
 def pool_view(snap: dict, pre: str, plane: str):
-    """Read a p_/v_/u_ slice out of a snapshot() dict.
+    """Read one pool's slice out of a snapshot() dict.
 
     snapshot() stores the MERGED unit bases, not the per-pool views into them,
     so `snap["mut"]["barb_unit_hp"]` does not exist. This is the supported way to get
     one pool's slice back, and it keeps the slot-range arithmetic in one place.
     """
-    lo = {"seat0": 0, "civ": SEAT0_POOL_MAX, "barb": SEAT0_POOL_MAX + POOL_MAX}[pre]
-    hi = lo + (SEAT0_POOL_MAX if pre == "seat0" else POOL_MAX)
+    lo = {"major": 0, "barb": MAJOR_POOL_MAX}[pre]
+    hi = lo + (MAJOR_POOL_MAX if pre == "major" else BARB_POOL_MAX)
     return snap["mut"][f"unit_{plane}"][:, lo:hi]
 
 
@@ -463,7 +472,6 @@ _MUTABLE = [
     "rng_state", "centre_slot_at", "tdef", "tmove",
     "next_slot", "camp_tile", "n_camps", "game_over",
     "victory_type", "winner", "space_done",  # space-race chain progress
-    "seat0_unit_next",
     "district_dead",  # captured districts are paved-but-dead
     "civ_cap_tile",  # capitalTiles — capital identity + the domination anchor (cap_tile / civ_only_cap_tile are views)
     # `tile_seat` is STATE — the city-state part of tile ownership is stored
@@ -476,7 +484,7 @@ _MUTABLE = [
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dest",  # international dest CENTER TILE (>=0), else -1 (domestic/CS) — SEAT-indexed; civ_only_route_dest is the [:, 1:] view
     "city_id",
-    "civ_unit_next",
+    "unit_next",  # the ONE append cursor every major seat spawns through
     "gp_earned", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
     "pan_claimed", "fol_claimed", "fou_claimed",  # belief-claim masks
     "enh_claimed",  # enhancer-claim mask

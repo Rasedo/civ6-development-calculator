@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
 from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star import
-from . import simbase  # the PATCHABLE globals (POOL_MAX/SEAT0_POOL_MAX/_ALIAS_CHECK) must be read live
+from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must be read live
 
 
 class SimInit:
@@ -35,9 +35,12 @@ class SimInit:
         # C if row == 0 else RC` out of every row-generic body — and left row 0
         # unable to receive the uncapped loyalty flip its own rules allow.
         # Float planes take `dtype`, so this arithmetic is f32 in the f32 lanes.
-        # Two facts carry a seat-0 fill of their own: `city_hp` starts at
-        # cityMaxHp where the civ rows start at 0, and `site` starts at -1
-        # where civ_city_center starts at 0.
+        # Two facts carry a seat-0 fill of their own: hp starts at cityMaxHp
+        # where the civ rows start at 0, and `site` starts at -1 where
+        # civ_city_center starts at 0. A `None` seat-0 name means row 0 has no
+        # view of its own and every reader says `city_x[:, 0]` — the direction
+        # this block is travelling in, since a seat-0 alias is one more name a
+        # row-generic body can be written against by accident.
         # ------------------------------------------------------------------
         self.R = int(f0.get("civMax", 0))
         # City COLUMNS per seat row — ONE width, exported by the TS engine as
@@ -61,7 +64,7 @@ class SimInit:
             ("alive", "alive", "civ_city_alive", torch.bool, False, None, None),
             ("center", "site", "civ_city_center", torch.long, 0, -1, None),
             ("pop", "pop", "civ_city_pop", torch.long, 0, None, None),
-            ("hp", "city_hp", "civ_city_hp", torch.long, 0, int((rules.combat or {}).get("cityMaxHp", 200)), None),
+            ("hp", None, "civ_city_hp", torch.long, 0, int((rules.combat or {}).get("cityMaxHp", 200)), None),
             ("outer_hp", "outer_hp", "civ_city_outer_hp", torch.long, 0, None, None),
             ("is_cap", "is_cap", "civ_city_is_cap", torch.bool, False, None, None),
             ("loyalty", "loyalty", "civ_city_loyalty", dtype, 100.0, None, None),
@@ -81,13 +84,19 @@ class SimInit:
         ):
             _shape = (B, 1 + _rp + _sp, _rcp) + ((_ex,) if _ex else ())
             _base = torch.full(_shape, _rf, dtype=_dt, device=device)
+            # A seat-0 name equal to the base's would SHADOW it: the base is
+            # bound first and the view second, so `city_x` would silently
+            # become row 0 and every `city_x[b, row, col]` in a row-generic
+            # body would index a 2-D tensor. `hp` shipped exactly that.
+            assert _pa != f"city_{_k}", f"city block: seat-0 name {_pa!r} shadows the merged base"
             setattr(self, f"city_{_k}", _base)
             _pv = _base[:, 0]
             if _pf is not None:
                 _pv.fill_(_pf)
-            setattr(self, _pa, _pv)
+            if _pa is not None:
+                setattr(self, _pa, _pv)
+                self.register_alias(_pa, lambda sim, k=_k: getattr(sim, f"city_{k}")[:, 0])
             setattr(self, _ra, _base[:, 1:1 + _rp])
-            self.register_alias(_pa, lambda sim, k=_k: getattr(sim, f"city_{k}")[:, 0])
             self.register_alias(_ra, lambda sim, k=_k, rp=_rp: getattr(sim, f"city_{k}")[:, 1:1 + rp])
 
         def ften(getter, shape_tail=()):
@@ -150,7 +159,14 @@ class SimInit:
         # the Palace or anchor domination, and _reclaim_cities compaction permutes
         # slots underneath. civ_cap_tile is allocated with the civ block below.
         import os as _os
-        self._reclaim_at = int(_os.environ.get("CIV6_RECLAIM_AT", simbase.POOL_MAX - 24))
+        # How close a pool may get to its own cap before `_reclaim_pool`
+        # compacts it — a HEADROOM, applied to whichever pool is asked, so
+        # the two pool sizes need no threshold each.
+        self._reclaim_headroom = int(_os.environ.get("CIV6_RECLAIM_HEADROOM", 24))
+        # ...or an ABSOLUTE high-water trigger, which is what the
+        # forced-compaction gate sets to compact on every step.
+        self._reclaim_force_at = (int(_os.environ["CIV6_RECLAIM_AT"])
+                                  if "CIV6_RECLAIM_AT" in _os.environ else None)
 
         # --- city-states: static, placed at game creation ----------------------
         s_pad = max(self.S, 1)  # self.S is set with the city block
@@ -435,6 +451,11 @@ class SimInit:
         # `seat_ext` is _MUTABLE-registered — registering a view as well would
         # double-restore it (the citystate_atwar contract, asserted in citystate_war_test).
         self.seat_ext = torch.zeros(B, 1 + r_pad + s_pad + 1, dtype=torch.bool, device=device)
+        # Row 0 is driven from outside from the moment the world exists: the
+        # decision server IS seat 0's only driver (#93). Saying so here is what
+        # lets `_apply_seat_unit_actions` gate on `seat_ext[:, row]` for every
+        # seat instead of carrying a "row 0 needs no permission" branch.
+        self.seat_ext[:, 0] = True
         self.controlled = self.seat_ext[:, 1:1 + r_pad]
         self.register_alias("controlled", lambda sim: sim.seat_ext[:, 1:1 + max(sim.R, 1)])
         # Civ-city district registry [.., nD]: the tile of each placed district
@@ -514,27 +535,29 @@ class SimInit:
         # id is tile_city's; center_at / civ_city_at are cached derived views.
         self.centre_slot_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         # ---------------------------------------------------------------------
-        # ONE UNIT POOL. p_*, v_* and u_* are three DISJOINT CONTIGUOUS SLOT
-        # RANGES of one tensor per plane:
+        # ONE UNIT POOL. Two DISJOINT CONTIGUOUS SLOT RANGES of one tensor per
+        # plane:
         #
-        #     [ 0 .. SEAT0_POOL_MAX )  seat 0
-        #     [ SEAT0_POOL_MAX .. SEAT0_POOL_MAX+POOL_MAX )  civ seats
-        #     [ SEAT0_POOL_MAX+POOL_MAX .. SEAT0_POOL_MAX+2·POOL_MAX )  barbarians
+        #     [ 0 .. MAJOR_POOL_MAX )                        EVERY major seat
+        #     [ MAJOR_POOL_MAX .. MAJOR_POOL_MAX+BARB_POOL_MAX )  barbarians
         #
-        # A unit's OWNER is a property of its slot range, so any unit is
-        # addressable by one index across the three ranges.
+        # A unit's OWNER is `unit_seat`, NEVER the range it landed in — seat 0
+        # spawns through the same cursor into the same range as every civ seat,
+        # exactly as TS pushes every seat's unit onto one `state.units`. A
+        # RANGE only says which CLASS of actor lives there, which is what the
+        # barbarian split is for.
         #
-        # The p_/v_/u_ names are VIEWS, so every write must be in place.
-        # tests/gpu/inplace_discipline_test.py enforces that statically and
-        # _check_state_discipline re-checks the data_ptr at runtime under
+        # `major_unit_*` / `barb_unit_*` are VIEWS, so every write must be in
+        # place. tests/gpu/inplace_discipline_test.py enforces that statically
+        # and _check_state_discipline re-checks the data_ptr at runtime under
         # CIV6_ALIAS_CHECK=1.
         # ---------------------------------------------------------------------
-        self.UNIT_MAX = simbase.SEAT0_POOL_MAX + 2 * simbase.POOL_MAX
-        self.POOL_LO = {"seat0": 0, "civ": simbase.SEAT0_POOL_MAX, "barb": simbase.SEAT0_POOL_MAX + simbase.POOL_MAX}
-        self.POOL_HI = {"seat0": simbase.SEAT0_POOL_MAX, "civ": simbase.SEAT0_POOL_MAX + simbase.POOL_MAX, "barb": simbase.SEAT0_POOL_MAX + 2 * simbase.POOL_MAX}
+        self.UNIT_MAX = simbase.MAJOR_POOL_MAX + simbase.BARB_POOL_MAX
+        self.POOL_LO = {"major": 0, "barb": simbase.MAJOR_POOL_MAX}
+        self.POOL_HI = {"major": simbase.MAJOR_POOL_MAX, "barb": self.UNIT_MAX}
         #: The APPEND CURSOR behind each pool, named once. Every spawn, capture
         #: and compaction reads it from here rather than re-deriving the name.
-        self.POOL_NEXT = {"seat0": "seat0_unit_next", "civ": "civ_unit_next", "barb": "next_slot"}
+        self.POOL_NEXT = {"major": "unit_next", "barb": "next_slot"}
         self._UNIT_PLANES: list = []
         for _pl, _dt in (
             ("alive", torch.bool),      # a slot holds a living unit
@@ -563,7 +586,7 @@ class SimInit:
             _base = torch.zeros(B, self.UNIT_MAX, dtype=_dt, device=device)
             setattr(self, f"unit_{_pl}", _base)
             self._UNIT_PLANES.append(_pl)
-            for _pre in ("seat0", "civ", "barb"):
+            for _pre in ("major", "barb"):
                 setattr(self, f"{_pre}_unit_{_pl}", _base[:, self.POOL_LO[_pre]:self.POOL_HI[_pre]])
                 # Assert forever that the view still shares storage with the
                 # merged pool.
@@ -573,14 +596,17 @@ class SimInit:
                         :, sim.POOL_LO[pre]:sim.POOL_HI[pre]
                     ],
                 )
-        # Seat 0's range carries owner 0 (the zero-fill) and the barbarian range
-        # BARB_SEAT. The civ range is SEEDED to seat 1 so a DEAD slot still
-        # names a real seat: `unit_seat` is the ONE owner fact, and readers that
-        # subtract 1 to index a civ plane must not meet a -1 there.
+        # The barbarian range carries BARB_SEAT. The MAJOR range is SEEDED to
+        # seat 1 so a DEAD slot still names a real seat — and deliberately NOT
+        # to 0: `unit_seat == 0` is how every seat-0 read is spelled now, and a
+        # never-spawned slot reading as seat 0 would hand seat 0 the whole
+        # unused pool.
         self.barb_unit_seat.fill_(BARB_SEAT)
-        self.civ_unit_seat.fill_(1)
+        self.major_unit_seat.fill_(1)
 
-        self.civ_unit_next = torch.zeros(B, dtype=torch.long, device=device)
+        #: The ONE major append cursor. `_reclaim_pool` compacts the range and
+        #: rewinds it, so it bounds LIVE units, not ever-spawned ones.
+        self.unit_next = torch.zeros(B, dtype=torch.long, device=device)
         # ONE occupancy map per DOMAIN, holding a MERGED-pool slot: "whose unit
         # is on this tile?" is unit_seat.gather(1, occ_*), with no per-pool
         # plane to pick first.
@@ -744,7 +770,7 @@ class SimInit:
             for cv in f["civs"]:
                 seat = int(cv["seat"])
                 if seat == 0:
-                    continue  # seat 0's units seed the p-pool below, once the roster tables exist
+                    continue  # seat 0's units seed the pool below, once the roster tables exist
                 rid = seat - 1
                 self.civ_only_alive[b, rid] = True
                 self.civ_only_aggression[b, rid] = cv["aggression"]
@@ -759,23 +785,23 @@ class SimInit:
                     self.centre_slot_at[b, rc["center"]] = j
                 self.civ_only_next_city_id[b, rid] = len(cv.get("cities", []))
                 for u_ in cv["units"]:
-                    v = int(self.civ_unit_next[b])
-                    self.civ_unit_alive[b, v] = True
-                    self.civ_unit_seat[b, v] = rid + 1  # seat = civ index + 1
-                    self.civ_unit_type[b, v] = u_["type"]
-                    self.civ_unit_tile[b, v] = u_["tile"]
-                    self.civ_unit_hp[b, v] = rules.combat.get("unitHp", 100)
+                    v = int(self.unit_next[b])
+                    self.major_unit_alive[b, v] = True
+                    self.major_unit_seat[b, v] = seat
+                    self.major_unit_type[b, v] = u_["type"]
+                    self.major_unit_tile[b, v] = u_["tile"]
+                    self.major_unit_hp[b, v] = rules.combat.get("unitHp", 100)
                     # The t0 roster carries a SETTLER (civilian) beside the
                     # warrior — occupancy goes to the CIVILIAN map for it.
                     if bool((rules.units[int(u_["type"])]).get("civilian", 0)):
-                        self.civilian_at[(b, u_['tile'])] = v + simbase.SEAT0_POOL_MAX
+                        self.civilian_at[(b, u_['tile'])] = v
                     else:
-                        self.military_at[(b, u_['tile'])] = v + simbase.SEAT0_POOL_MAX
+                        self.military_at[(b, u_['tile'])] = v
                     # the seeder's spawn reveal — t0 explored derives from the
                     # start units on BOTH engines (the fixture carries none).
                     if self.fog_of_war:
-                        self.seat_explored[b, rid + 1] |= self.pair_dist[int(u_["tile"])] <= 2
-                    self.civ_unit_next[b] += 1
+                        self.seat_explored[b, seat] |= self.pair_dist[int(u_["tile"])] <= 2
+                    self.unit_next[b] += 1
         self._gp_costs = torch.tensor(rr.get("gpCosts", [60 * 2**n for n in range(8)]), dtype=torch.float64, device=device)
         self._gp_roster = torch.tensor(rr.get("gpRoster", [4, 4, 4, 4, 4]), dtype=torch.long, device=device)
         # Great people (advanceGreatPeople): points accrue per class from its
@@ -1057,12 +1083,6 @@ class SimInit:
         # False, war_mask() is all-False and step(war=…) is ignored, so nothing
         # samples or applies it; scripted/parity paths never pass war=.
         self._rl_war_active = True
-        # Ranged units (rangedStrength > 0) execute attack codes 6-11 as a
-        # RANGED strike — one damage roll, no retaliation, no advance, no camp
-        # clear (mirrors rangedAttack; range-1 targets only, legal for both
-        # Slinger rng-1 and Archer rng-2). The replay dispatches by the same
-        # rule via rollout.json's rangedActive flag; False is plain weak melee.
-        self._rl_ranged_active = True
         # Combat log hooks (inert unless rollout --log sets the batch)
         self._log_combat_b: int | None = None
         self._combat_events: list[str] = []
@@ -1203,7 +1223,7 @@ class SimInit:
         #                     that seat.
         #  _rp_kill_version — bumped at the economy-loop strike-kill, the only
         #                     unit-death site inside the loop; it flips
-        #                     barb_unit_alive/seat0_unit_alive (the route raided-mask) with no
+        #                     barb_unit_alive/major_unit_alive (the route raided-mask) with no
         #                     eff bump.
         self._bel_version = 0
         self._rp_kill_version = 0
@@ -1356,7 +1376,7 @@ class SimInit:
         self.n_camps = torch.zeros(B, dtype=torch.long, device=device)
         # Seat 0's units: trained via the production head, ordered like
         # state.units (append-only slots preserve spawn order).
-        self.seat0_unit_next = torch.zeros(B, dtype=torch.long, device=device)
+        self.unit_next = torch.zeros(B, dtype=torch.long, device=device)
         self.tdef = torch.tensor([[t.get("tdef", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # tdef holds the DEFENDER bonus (terrainDefense: hills/woods/rainforest
         # +3, marsh/floodplains −2), read at the def_cs sites. tmove holds the
@@ -1369,7 +1389,7 @@ class SimInit:
         self._dmg_base = torch.tensor(cb.get("dmgBase", [30.0] * 4001), dtype=torch.float64, device=device)  # 0.1-granular exp table over ±200
         # The BARBARIAN ladder maps a ladder POSITION (0..3 melee, 4/5 ranged,
         # 6 scout, 7/8 naval) to a ROSTER index. barb_unit_type holds that roster index,
-        # exactly like seat0_unit_type and civ_unit_type, so combat / moves / ranged strength /
+        # exactly like major_unit_type and major_unit_type, so combat / moves / ranged strength /
         # ranged range / naval all come from the one roster table. The exporter
         # is the source of truth for the ladder's contents.
         _bl = list(cb.get("barbLadder") or [])
@@ -1479,25 +1499,29 @@ class SimInit:
         self._bld_cache = None
         self._arangeNB = torch.arange(NB, device=device)
 
-        # Seat 0's t0 units seed the p-pool HERE — after the roster tables and
-        # the pool planes exist. Slot order is the file's unit order (the wire
-        # contract); charges/MP mirror _spawn_unit's writes, minus the spot
+        # Seat 0's t0 units seed the pool HERE — after the roster tables and
+        # the pool planes exist. They append through the SAME cursor the civ
+        # loop above used, which is why they land after the civs' units rather
+        # than at slot 0: the per-seat unit ORDER is the wire contract, and a
+        # shared pool preserves each seat's own order however the seats
+        # interleave. charges/MP mirror _spawn_unit's writes, minus the spot
         # search (the file tile is the tile).
         for b, f in enumerate(fixtures):
             for cv in f["civs"]:
                 if int(cv["seat"]) != 0:
                     continue
                 for u_ in cv["units"]:
-                    i = int(self.seat0_unit_next[b])
+                    i = int(self.unit_next[b])
                     ti = int(u_["type"])
-                    self.seat0_unit_alive[b, i] = True
-                    self.seat0_unit_type[b, i] = ti
-                    self.seat0_unit_tile[b, i] = int(u_["tile"])
-                    self.seat0_unit_hp[b, i] = rules.combat.get("unitHp", 100)
-                    self.seat0_unit_charges[b, i] = int(self._type_charges[ti])
+                    self.major_unit_alive[b, i] = True
+                    self.major_unit_seat[b, i] = 0
+                    self.major_unit_type[b, i] = ti
+                    self.major_unit_tile[b, i] = int(u_["tile"])
+                    self.major_unit_hp[b, i] = rules.combat.get("unitHp", 100)
+                    self.major_unit_charges[b, i] = int(self._type_charges[ti])
                     _m0u = int(self._type_moves[ti])
-                    self.seat0_unit_mp[b, i] = _m0u
-                    self.seat0_unit_mp_full[b, i] = _m0u
+                    self.major_unit_mp[b, i] = _m0u
+                    self.major_unit_mp_full[b, i] = _m0u
                     if bool(self._type_civilian[ti]):
                         self.civilian_at[(b, int(u_["tile"]))] = i
                     else:
@@ -1505,19 +1529,19 @@ class SimInit:
                     # the seeder's spawn reveal — see the civ loop's twin above.
                     if self.fog_of_war:
                         self.seat_explored[b, 0] |= self.pair_dist[int(u_["tile"])] <= 2
-                    self.seat0_unit_next[b] += 1
+                    self.unit_next[b] += 1
 
         # The FIXTURE-LOADED starting units must seed the best-melee trackers:
         # TS counts them through spawnUnit at placeSeats, so a seat starting
-        # with a WARRIOR has city defense 20, not the floor.
-        vt = self.civ_unit_type.clamp(min=0, max=self.NU - 1)
-        melee_v = self.civ_unit_alive & (self._type_ranged_strength[vt] == 0)
-        citystate_v = torch.where(melee_v, self._type_combat[vt], torch.zeros_like(self.civ_unit_type))
-        for r_ in range(r_pad):
-            self.civ_only_best_melee[:, r_] = torch.where((self.civ_unit_seat == r_ + 1), citystate_v, torch.zeros_like(citystate_v)).max(dim=1).values
-        pt_ = self.seat0_unit_type.clamp(min=0, max=self.NU - 1)
-        melee_p = self.seat0_unit_alive & (self._type_ranged_strength[pt_] == 0)
-        self.best_melee.copy_(torch.where(melee_p, self._type_combat[pt_], torch.zeros_like(self.seat0_unit_type)).max(dim=1).values)
+        # with a WARRIOR has city defense 20, not the floor. ONE scan over the
+        # merged pool, one row per seat.
+        _ut0 = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+        _melee0 = self.major_unit_alive & (self._type_ranged_strength[_ut0] == 0)
+        _mcs0 = torch.where(_melee0, self._type_combat[_ut0], torch.zeros_like(self.major_unit_type))
+        for _row0 in range(1 + r_pad):
+            self.civ_best_melee[:, _row0] = torch.where(
+                self.major_unit_seat == _row0, _mcs0, torch.zeros_like(_mcs0)
+            ).max(dim=1).values
 
         # Pristine copy of the mutable state, for reset().
         self._pristine = {k: getattr(self, k).clone() for k in _MUTABLE}
@@ -1562,23 +1586,19 @@ class SimInit:
     def _check_seat_invariant(self) -> None:
         """unit_seat must agree with the slot range it sits in.
 
-        It is maintained by hand — constant for the seat-0 and barbarian
-        ranges, written at every civ spawn — so it can drift the moment a new
-        spawn path appears. Those two ranges are checked on ALIVE slots only (a
-        dead slot's owner is meaningless); the civ range is checked in full,
-        see below.
+        It is written at every spawn, capture and fixture load, so it can drift
+        the moment a new spawn path appears. Checked on EVERY slot, alive or
+        not: both ranges are seeded to a real seat and a dead slot is reused by
+        the next spawn, so a bogus seat sitting there is a wrong owner waiting
+        to happen — and a stale 0 in the major range would silently enlist the
+        slot for seat 0.
         """
         al = self.unit_alive
         seat = self.unit_seat
-        p, v, u = self.POOL_LO["seat0"], self.POOL_LO["civ"], self.POOL_LO["barb"]
-        pe, ve, ue = self.POOL_HI["seat0"], self.POOL_HI["civ"], self.POOL_HI["barb"]
-        if not bool(((seat[:, p:pe] == 0) | ~al[:, p:pe]).all()):
-            raise AssertionError("SEAT DRIFT: a living p-pool slot does not carry seat 0")
-        # EVERY civ slot, alive or not: the range is seeded to seat 1, so a
-        # dead slot still names a real civ. A bogus seat there is not harmless —
-        # the encampment probe subtracts 1 and indexes civ_only_atwar.
-        if not bool(((seat[:, v:ve] >= 1) & (seat[:, v:ve] <= max(self.R, 1))).all()):
-            raise AssertionError("SEAT DRIFT: a CIV slot's seat is not a civ seat")
+        v, u = self.POOL_LO["major"], self.POOL_LO["barb"]
+        ve, ue = self.POOL_HI["major"], self.POOL_HI["barb"]
+        if not bool(((seat[:, v:ve] >= 0) & (seat[:, v:ve] <= max(self.R, 1))).all()):
+            raise AssertionError("SEAT DRIFT: a MAJOR slot's seat is not a major seat")
         if not bool(((seat[:, u:ue] == BARB_SEAT) | ~al[:, u:ue]).all()):
             raise AssertionError(f"SEAT DRIFT: a living BARB slot does not carry seat {BARB_SEAT}")
         # `caps.xp` is FALSE for the hostile class, and the TS twin enforces it
@@ -1592,7 +1612,7 @@ class SimInit:
 
     #: (name, dtype, fill) for every relation a SEAT holds with a CITY-STATE.
     #: Each is one `seat_citystate_<name> [B, 1+R, S]` plane; `citystate_<name>` is row 0 and
-    #: `citystate_r_<name>` is rows 1.., both views.
+    #: `civ_only_citystate_<name>` is rows 1.., both views.
     _CS_PAIR_FIELDS = (
         ("met", torch.bool, False),
         ("envoys", torch.long, 0),

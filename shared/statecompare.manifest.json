@@ -1323,7 +1323,7 @@
    },
    {
     "path": "GameState.nextUnitId",
-    "why": "TS's unit-id allocator. The GPU allocates slots (`seat0_unit_next`/`civ_unit_next`/`next_slot`) in a different space, and the unit join key is (tile, military/civilian), so no unit id is ever compared."
+    "why": "TS's unit-id allocator. The GPU allocates slots (`unit_next` for the major window, `next_slot` for the barbarian one) in a different space, and the unit join key is (tile, military/civilian), so no unit id is ever compared."
    },
    {
     "path": "GameState.eventLog",
@@ -1516,11 +1516,7 @@
     "why": "unit-pool allocation cursor. Slot bookkeeping that exists because the GPU has slots and TS has arrays."
    },
    {
-    "plane": "seat0_unit_next",
-    "why": "unit-pool allocation cursor (see next_slot)."
-   },
-   {
-    "plane": "civ_unit_next",
+    "plane": "unit_next",
     "why": "unit-pool allocation cursor (see next_slot)."
    },
    {

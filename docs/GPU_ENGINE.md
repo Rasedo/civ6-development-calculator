@@ -12,9 +12,9 @@ Every actor is a seat in one absolute id space (`cpu/core/seats.ts`,
 mirrored in `gpu/core/simbase.py`): seat 0 and the civ seats (civ index
 r = seat r+1) are the same kind of actor ("major"), city-states are
 seats 100+, barbarians seat 200, `NO_SEAT = -1`. Seat capabilities come
-from `SEAT_CAPS` keyed by class. The unit pools and the attack paths'
-`atk_kind` tags share one vocabulary: "seat0", "civ", "barb" — the
-pool range views are `seat0_unit_*` / `civ_unit_*` / `barb_unit_*`.
+from `SEAT_CAPS` keyed by class. The unit WINDOWS and the attack
+paths' `atk_kind` tags share one vocabulary: "major" (every major seat)
+and "barb" — the range views are `major_unit_*` / `barb_unit_*`.
 
 ## Storage geometry
 
@@ -25,8 +25,11 @@ One base tensor per fact, seat-indexed; every legacy name is a view:
 - `city_*  [B, 1+R+S, RC]` — the city block. Row 0 with the `:C` view
   is seat 0, `civ_city_*` views are the civ rows, city-states sit in
   the minor section (`citystate_*` views).
-- `unit_*` — one merged unit pool; seat0_unit_*/civ_unit_*/barb_unit_* are range views,
-  `unit_seat` holds the owner.
+- `unit_*` — one merged unit pool; `major_unit_*` / `barb_unit_*` are
+  range views and `unit_seat` holds the owner. A seat's units are found
+  by SEAT, never by a window of its own; `_seat_slot_map(row)` maps a
+  seat's head rows (what every mask, obs and applier indexes) onto the
+  merged slots behind them.
 - Tile planes: `tile_seat` + `tile_city` (owner seat + city id — TS's
   `ownerSeat`/`ownerCity` pair), `centre_slot_at` (owning seat's city
   slot at a centre). `owner`, `civ_at`, `citystate_at`, `center_at`,
@@ -98,9 +101,12 @@ edit sources while one is in flight.
   false-green caveat. Tag probe output by game id (`state.map.seed`),
   gate tensor prints on the acting mask, never trust a truncated
   window.
-- **Forced compaction** — `CIV6_RECLAIM_AT` (unit pool) and
-  `CIV6_RC_RECLAIM_AT` (civ city slots) force slot reclaim low; run the
-  gate under them to stress slot-layout invariants.
+- **Forced compaction** — `CIV6_RECLAIM_AT` (absolute unit-slot trigger,
+  both windows) and `CIV6_RC_RECLAIM_AT` (city slots) force slot reclaim
+  low; run the gate under them to stress slot-layout invariants. Without
+  the override each unit window fires at its OWN cap minus
+  `CIV6_RECLAIM_HEADROOM` (default 24), so one knob serves the major and
+  barbarian windows whatever their sizes.
 - **Reachability** — a green gate proves the two engines agree, never
   that a mechanic fired. When landing a mechanic, measure which lane
   can REACH it and record that in its AUDIT entry.
