@@ -207,7 +207,7 @@ class SimOrders:
                             if _csr2 is not None:
                                 _rows2, _dead2, _cap2 = _csr2
                                 if bool(_cap2.any()):
-                                    self._capture_city_state(_cap2.nonzero(as_tuple=True)[0], _css, self.civ_unit_civ[:, v] + 1)  # civ v is block row v+1
+                                    self._capture_city_state(_cap2.nonzero(as_tuple=True)[0], _css, self.civ_unit_seat[:, v])  # civ v is block row v+1
                             self.civ_unit_mp[b_, v] = 0
                         elif bool(city_att[b_]):
                             self._hostile_city_attack(one, self.center_at.gather(1, tc.unsqueeze(1)).squeeze(1), "civ", v)
@@ -772,8 +772,8 @@ class SimOrders:
             _tms = torch.where(_tm >= 0, self.unit_seat.gather(1, _tm.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_tm, -1))
             bslot = torch.where(_tms == BARB_SEAT, _tm - self.POOL_LO["barb"], torch.full_like(_tm, -1))
             vslot = torch.where((_tms > 0) & (_tms != BARB_SEAT), _tm - self.POOL_LO["civ"], torch.full_like(_tm, -1))
-            civ_unit_civ = (torch.where(vslot >= 0, _tms - 1, torch.zeros_like(_tms))).clamp(min=0, max=max(self.R - 1, 0))
-            v_ok = (vslot >= 0) & self.civ_only_atwar.gather(1, civ_unit_civ.unsqueeze(1)).squeeze(1)
+            _tgt_civ = (torch.where(vslot >= 0, _tms - 1, torch.zeros_like(_tms))).clamp(min=0, max=max(self.R - 1, 0))
+            v_ok = (vslot >= 0) & self.civ_only_atwar.gather(1, _tgt_civ.unsqueeze(1)).squeeze(1)
             civ_city_civ_t = self.civ_city_at.gather(1, tc.unsqueeze(1)).squeeze(1)
             civ_city_ok = (civ_city_civ_t >= 0) & self.civ_only_atwar.gather(1, civ_city_civ_t.clamp(min=0).clamp(max=max(self.R - 1, 0)).unsqueeze(1)).squeeze(1)
             _tc_ = self.civilian_at.gather(1, tc.unsqueeze(1)).squeeze(1)
@@ -891,22 +891,22 @@ class SimOrders:
                 # (barbarian or at-war civ). Applied once, so both paired rolls
                 # see the same adjusted CS; an embarked defender gets NO
                 # support.
-                _fl, _sp = self._flank_support(tgt, torch.where(is_b, torch.full_like(civ_unit_civ, BARB_SEAT), civ_unit_civ + 1), here)
+                _fl, _sp = self._flank_support(tgt, torch.where(is_b, torch.full_like(_tgt_civ, BARB_SEAT), _tgt_civ + 1), here)
                 atk_e = atk_e + FLANKING_CS * _fl
                 def_e = def_e + SUPPORT_CS * torch.where(v_embd, torch.zeros_like(_sp), _sp)
                 # Religious enhancer defender adders, for CIV defenders only
                 # (barbarians carry none; embarked takes the flat override, no
                 # term; the seat-0 attacker term is structurally 0).
-                def_e = def_e + torch.where(v_embd, torch.zeros_like(def_e), self._rel_def_cs(torch.where(is_b, torch.full_like(civ_unit_civ, -1), civ_unit_civ), tgt).to(def_e.dtype))
+                def_e = def_e + torch.where(v_embd, torch.zeros_like(def_e), self._rel_def_cs(torch.where(is_b, torch.full_like(_tgt_civ, -1), _tgt_civ), tgt).to(def_e.dtype))
                 # Great General/Admiral aura. Seat 0's attacker is keyed on
-                # `here`; a civ defender (civ_unit_civ+1) on `tgt` (barbarian → no
+                # `here`; a civ defender (_tgt_civ+1) on `tgt` (barbarian → no
                 # aura). Embarked/naval select the ADMIRAL plane, added on top
                 # of the embarked defender's flat CS, as generalAuraCS does.
                 atk_naval = self.unit_naval[self.seat0_unit_type[:, p].clamp(min=0, max=self.NU - 1)] | self.seat0_unit_emb[:, p]
-                atk_e = atk_e + self._gen_aura_cs(torch.zeros_like(civ_unit_civ), here, atk_naval).to(atk_e.dtype)
+                atk_e = atk_e + self._gen_aura_cs(torch.zeros_like(_tgt_civ), here, atk_naval).to(atk_e.dtype)
                 _v_def_nav = self.unit_naval[self.civ_unit_type.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)]
                 def_naval = v_embd | torch.where(is_b, torch.zeros_like(v_embd), _v_def_nav)
-                def_civ_u = torch.where(is_b, torch.full_like(civ_unit_civ, -1), civ_unit_civ + 1)
+                def_civ_u = torch.where(is_b, torch.full_like(_tgt_civ, -1), _tgt_civ + 1)
                 def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
                 # Sample the defender BEFORE the rolls: once a death clears
                 # `military_at` the tile reads NO_SEAT, and the war-weariness hook
@@ -965,18 +965,18 @@ class SimOrders:
                 atk_e = atk_rs - self._wound(self.seat0_unit_hp[:, p]) + p_lvl5  # attacker veterancy
                 def_e = def_cs - self._wound(torch.where(is_b, b_hp, v_hpd))
                 # support only (no flanking: a ranged attacker takes no retaliation)
-                _, _sp = self._flank_support(tgt, torch.where(is_b, torch.full_like(civ_unit_civ, BARB_SEAT), civ_unit_civ + 1), torch.full_like(tgt, -1))
+                _, _sp = self._flank_support(tgt, torch.where(is_b, torch.full_like(_tgt_civ, BARB_SEAT), _tgt_civ + 1), torch.full_like(tgt, -1))
                 def_e = def_e + SUPPORT_CS * torch.where(v_embd, torch.zeros_like(_sp), _sp)
                 # civ-defender enhancer adders (embarked = flat, none)
-                def_e = def_e + torch.where(v_embd, torch.zeros_like(def_e), self._rel_def_cs(torch.where(is_b, torch.full_like(civ_unit_civ, -1), civ_unit_civ), tgt).to(def_e.dtype))
+                def_e = def_e + torch.where(v_embd, torch.zeros_like(def_e), self._rel_def_cs(torch.where(is_b, torch.full_like(_tgt_civ, -1), _tgt_civ), tgt).to(def_e.dtype))
                 # Aura: seat 0's attacker keyed on its own tile; a civ defender
-                # (civ_unit_civ+1) on `tgt` (barbarian → none). Naval/embarked take the
+                # (_tgt_civ+1) on `tgt` (barbarian → none). Naval/embarked take the
                 # ADMIRAL plane.
                 atk_naval = self.unit_naval[self.seat0_unit_type[:, p].clamp(min=0, max=self.NU - 1)] | self.seat0_unit_emb[:, p]
-                atk_e = atk_e + self._gen_aura_cs(torch.zeros_like(civ_unit_civ), self.seat0_unit_tile[:, p], atk_naval).to(atk_e.dtype)
+                atk_e = atk_e + self._gen_aura_cs(torch.zeros_like(_tgt_civ), self.seat0_unit_tile[:, p], atk_naval).to(atk_e.dtype)
                 _v_def_nav = self.unit_naval[self.civ_unit_type.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)]
                 def_naval = v_embd | torch.where(is_b, torch.zeros_like(v_embd), _v_def_nav)
-                def_e = def_e + self._gen_aura_cs(torch.where(is_b, torch.full_like(civ_unit_civ, -1), civ_unit_civ + 1), tgt, def_naval).to(def_e.dtype)
+                def_e = def_e + self._gen_aura_cs(torch.where(is_b, torch.full_like(_tgt_civ, -1), _tgt_civ + 1), tgt, def_naval).to(def_e.dtype)
                 _wwr = (self._ww_occ(tgt), self._tile_mil_seat(tgt))
                 d_def = self._damage_roll(civ_only_att, atk_e - def_e, k="rng", tile=tgt)
                 rows = civ_only_att.nonzero(as_tuple=True)[0]
@@ -1967,11 +1967,11 @@ class SimOrders:
         _mfs = torch.where(_mf >= 0, self.unit_seat.gather(1, _mf.clamp(min=0)), torch.full_like(_mf, -1))
         adj_b = (_mfs == BARB_SEAT).reshape(B, self.RC, 6)
         vmn = torch.where((_mfs > 0) & (_mfs != BARB_SEAT), _mf - self.POOL_LO["civ"], torch.full_like(_mf, -1))
-        vm_war = (vmn >= 0) & self.civ_only_atwar.gather(1, self.civ_unit_civ.gather(1, vmn.clamp(min=0)).clamp(max=max(self.R - 1, 0)))
+        vm_war = (vmn >= 0) & self.civ_only_atwar.gather(1, (self.civ_unit_seat.gather(1, vmn.clamp(min=0)) - 1).clamp(max=max(self.R - 1, 0)))
         _cf = self.civilian_at.gather(1, nbf)
         _cfs = torch.where(_cf >= 0, self.unit_seat.gather(1, _cf.clamp(min=0)), torch.full_like(_cf, -1))
         vcn = torch.where((_cfs > 0) & (_cfs != BARB_SEAT), _cf - self.POOL_LO["civ"], torch.full_like(_cf, -1))
-        vc_war = (vcn >= 0) & self.civ_only_atwar.gather(1, self.civ_unit_civ.gather(1, vcn.clamp(min=0)).clamp(max=max(self.R - 1, 0)))
+        vc_war = (vcn >= 0) & self.civ_only_atwar.gather(1, (self.civ_unit_seat.gather(1, vcn.clamp(min=0)) - 1).clamp(max=max(self.R - 1, 0)))
         besieged = ((adj_b | (vm_war | vc_war).reshape(B, self.RC, 6)) & (nb_c >= 0)).any(dim=2)
         healable = self.alive & (self.city_hp < city_max_hp) & ~besieged
         self.city_hp.copy_(torch.where(healable, (self.city_hp + cb.get("cityHealPerTurn", 20)).clamp(max=city_max_hp), self.city_hp))

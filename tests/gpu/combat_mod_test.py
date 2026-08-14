@@ -190,7 +190,7 @@ def test_integrated(sim, p, code, name) -> None:
     # count once.
     def flank_support_ref():
         civ_def = not is_barb
-        dciv = int(sim.civ_unit_civ[0, dslot]) if civ_def else -1
+        dciv = int((sim.civ_unit_seat[0, dslot] - 1)) if civ_def else -1
         flank = support = 0
         for dd in range(6):
             nt = int(sim.neigh[tgt, dd])
@@ -200,7 +200,7 @@ def test_integrated(sim, p, code, name) -> None:
             has_pm = int(sim.pmil_at[0, nt]) >= 0
             vms = int(sim.civ_military_at[0, nt])
             has_vm = vms >= 0
-            vc = int(sim.civ_unit_civ[0, vms]) if has_vm else -1
+            vc = int((sim.civ_unit_seat[0, vms] - 1)) if has_vm else -1
             if civ_def:
                 atwar = bool(sim.civ_only_atwar[0, dciv])
                 hostile = has_b or (has_pm and atwar)

@@ -30,7 +30,7 @@ WARMUP = 10
 def seat_state(sim, r=0):
     return {
         "cities": int(sim.civ_city_alive[0, r].sum()),
-        "units": int((sim.civ_unit_alive[0] & (sim.civ_unit_civ[0] == r)).sum()),
+        "units": int((sim.civ_unit_alive[0] & ((sim.civ_unit_seat[0] - 1) == r)).sum()),
         "techs": int(sim.civ_only_techs[0, r].sum()),
         "civics": int(sim.civ_only_civics[0, r].sum()),
     }

@@ -73,7 +73,7 @@ def place_pmil(sim, t: int, type_idx: int, hp: int = 100, emb: bool = False) -> 
 def place_rmil(sim, r: int, t: int, type_idx: int, hp: int = 100, emb: bool = False) -> int:
     slot = int(sim.civ_unit_next[0])
     sim.civ_unit_alive[0, slot] = True
-    sim.civ_unit_civ[0, slot] = r
+    sim.civ_unit_seat[0, slot] = r + 1
     sim.civ_unit_type[0, slot] = type_idx
     sim.civ_unit_tile[0, slot] = t
     sim.civ_unit_hp[0, slot] = hp
@@ -88,7 +88,7 @@ def place_rmil(sim, r: int, t: int, type_idx: int, hp: int = 100, emb: bool = Fa
 def place_rciv(sim, r: int, t: int, type_idx: int, hp: int = 100, emb: bool = False) -> int:
     slot = int(sim.civ_unit_next[0])
     sim.civ_unit_alive[0, slot] = True
-    sim.civ_unit_civ[0, slot] = r
+    sim.civ_unit_seat[0, slot] = r + 1
     sim.civ_unit_type[0, slot] = type_idx
     sim.civ_unit_tile[0, slot] = t
     sim.civ_unit_hp[0, slot] = hp

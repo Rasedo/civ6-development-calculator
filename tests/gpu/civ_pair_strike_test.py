@@ -63,7 +63,7 @@ def setup(sim, at_war: bool) -> tuple[int, int]:
 
     # EVERY other unit of the striker dies, so only its CITY can reach the
     # victim — otherwise a melee war-act would satisfy the assertion instead.
-    kill = sim.civ_unit_civ[0] == STRIKER
+    kill = (sim.civ_unit_seat[0] - 1) == STRIKER
     sim.civ_unit_alive[0][kill] = False
     for slot in kill.nonzero(as_tuple=True)[0].tolist():
         t_old = int(sim.civ_unit_tile[0, slot])
@@ -75,7 +75,7 @@ def setup(sim, at_war: bool) -> tuple[int, int]:
 
     slot = int(sim.civ_unit_next[0])
     sim.civ_unit_alive[0, slot] = True
-    sim.civ_unit_civ[0, slot] = VICTIM
+    sim.civ_unit_seat[0, slot] = VICTIM + 1
     sim.civ_unit_seat[0, slot] = VICTIM + 1
     sim.civ_unit_type[0, slot] = 2  # WARRIOR
     sim.civ_unit_tile[0, slot] = tile

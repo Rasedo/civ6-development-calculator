@@ -97,7 +97,7 @@ def place_pciv(sim, t: int, type_idx: int, hp: int = 100) -> int:
 def place_rmil(sim, r: int, t: int, type_idx: int, hp: int = 100, emb: bool = False) -> int:
     slot = int(sim.civ_unit_next[0])
     sim.civ_unit_alive[0, slot] = True
-    sim.civ_unit_civ[0, slot] = r
+    sim.civ_unit_seat[0, slot] = r + 1
     sim.civ_unit_type[0, slot] = type_idx
     sim.civ_unit_tile[0, slot] = t
     sim.civ_unit_hp[0, slot] = hp
@@ -112,7 +112,7 @@ def place_rmil(sim, r: int, t: int, type_idx: int, hp: int = 100, emb: bool = Fa
 def place_rciv(sim, r: int, t: int, type_idx: int, hp: int = 100) -> int:
     slot = int(sim.civ_unit_next[0])
     sim.civ_unit_alive[0, slot] = True
-    sim.civ_unit_civ[0, slot] = r
+    sim.civ_unit_seat[0, slot] = r + 1
     sim.civ_unit_type[0, slot] = type_idx
     sim.civ_unit_tile[0, slot] = t
     sim.civ_unit_hp[0, slot] = hp
@@ -332,7 +332,7 @@ def poke_capture(rules, rj, path):
     # POOL-END: appended at the old civ_unit_next slot, type carried, owned by civ 0
     cap = v_before
     assert bool(sim.civ_unit_alive[0, cap]) and int(sim.civ_unit_type[0, cap]) == gi, "captured general not appended to the civ pool tail as a GENERAL"
-    assert int(sim.civ_unit_civ[0, cap]) == 0, "captured general not keyed to the captor's civ"
+    assert int((sim.civ_unit_seat[0, cap] - 1)) == 0, "captured general not keyed to the captor's civ"
     assert int(sim.civ_civilian_at[0, gtile]) == cap, "captured general not registered on the civ civilian plane"
     print("  6 GENERAL capture OK — B-31 POOL-END transfer, type carried")
 

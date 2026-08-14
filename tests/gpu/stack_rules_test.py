@@ -55,7 +55,7 @@ def test_own_civilian_does_not_block() -> None:
     # a civ-0 civilian sits there
     slot = int(sim.civ_unit_next[0])
     sim.civ_unit_alive[0, slot] = True
-    sim.civ_unit_civ[0, slot] = 0
+    sim.civ_unit_seat[0, slot] = 0 + 1
     sim.civ_unit_seat[0, slot] = 1
     sim.civ_unit_type[0, slot] = 0
     sim.civ_unit_tile[0, slot] = t

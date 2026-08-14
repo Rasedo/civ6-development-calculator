@@ -52,7 +52,7 @@ def civ_unit_next(sim) -> int:
 
 def mil_count(sim) -> int:
     t = sim.civ_unit_type[0].clamp(min=0, max=sim.NU - 1)
-    return int((sim.civ_unit_alive[0] & (sim.civ_unit_civ[0] == R) & (sim._type_combat[t] > 0)).sum())
+    return int((sim.civ_unit_alive[0] & ((sim.civ_unit_seat[0] - 1) == R) & (sim._type_combat[t] > 0)).sum())
 
 
 def cap_center(sim) -> int:
@@ -105,7 +105,7 @@ def inject_mil(sim, tiles: list[int], type_idx: int) -> None:
     for t in tiles:
         slot = int(sim.civ_unit_next[0])
         sim.civ_unit_alive[0, slot] = True
-        sim.civ_unit_civ[0, slot] = R
+        sim.civ_unit_seat[0, slot] = R + 1
         sim.civ_unit_type[0, slot] = type_idx
         sim.civ_unit_tile[0, slot] = t
         sim.civ_unit_hp[0, slot] = 100

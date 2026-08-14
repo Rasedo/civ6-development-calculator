@@ -86,7 +86,7 @@ def garrison(sim, ctr: int, civilian: bool) -> int:
     """Put a CIV unit on the city centre — military, or a civilian."""
     slot = int(sim.civ_unit_next[0])
     sim.civ_unit_alive[0, slot] = True
-    sim.civ_unit_civ[0, slot] = 0
+    sim.civ_unit_seat[0, slot] = 0 + 1
     sim.civ_unit_seat[0, slot] = 1
     sim.civ_unit_type[0, slot] = sim._builder_idx if civilian else 2
     sim.civ_unit_tile[0, slot] = ctr

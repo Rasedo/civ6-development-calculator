@@ -43,7 +43,7 @@ def put(sim: BatchSim, pre: str, type_idx: int, seat: int, civ: int = 0) -> int:
     getattr(sim, f"{pre}_unit_emb")[0, slot] = False
     getattr(sim, f"{pre}_unit_aura_mp")[0, slot] = 0
     if pre == "civ":
-        sim.civ_unit_civ[0, slot] = civ
+        sim.civ_unit_seat[0, slot] = civ + 1
     getattr(sim, counter)[0] += 1
     return slot
 

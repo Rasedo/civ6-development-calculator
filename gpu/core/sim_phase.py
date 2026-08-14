@@ -108,7 +108,7 @@ class SimPhase:
             # meleeCount/rangedCount; train ranged while the army holds fewer
             # than 1 ranged per 2 melee.
             vt_all = self.civ_unit_type.clamp(min=0, max=self.NU - 1)
-            mil_live = self.civ_unit_alive & (self.civ_unit_civ == r) & (self._type_combat[vt_all] > 0)
+            mil_live = self.civ_unit_alive & (self.civ_unit_seat == r + 1) & (self._type_combat[vt_all] > 0)
             n_ranged = (mil_live & rng_type[vt_all]).sum(dim=1)
             n_melee = (mil_live & ~rng_type[vt_all]).sum(dim=1)
             qcur = self.civ_city_current[:, r]
@@ -248,7 +248,7 @@ class SimPhase:
             else:
                 rel_kind, rel_j = None, None
             if rel_kind is not None and rel_j is not None and self._missionary_idx >= 0 and self._shrine_bidx >= 0 and self._hs_idx >= 0:
-                n_live_m5 = (self.civ_unit_alive & (self.civ_unit_civ == r) & (self.civ_unit_type == self._missionary_idx)).sum(dim=1)
+                n_live_m5 = (self.civ_unit_alive & (self.civ_unit_seat == r + 1) & (self.civ_unit_type == self._missionary_idx)).sum(dim=1)
                 mcost5 = self._enh["mcost"][self.civ_only_enhancer[:, r] + 1]  # [B] f64
                 want_m5 = active & self.controlled[:, r] & (rel_kind == 5) & (rel_j >= 0) & self.civ_only_religion_done[:, r] \
                     & (n_live_m5 < self._missionary_cap) & self._afford(self.civ_only_faith[:, r], mcost5)
@@ -269,7 +269,7 @@ class SimPhase:
             # DECISION on the NAMED slot, same SHRINE + complete unpillaged
             # HOLY_SITE gate, same spawn-refund convention.
             if rel_kind is not None and rel_j is not None and self._apostle_idx >= 0 and self._shrine_bidx >= 0 and self._hs_idx >= 0:
-                n_live_a = (self.civ_unit_alive & (self.civ_unit_civ == r) & (self.civ_unit_type == self._apostle_idx)).sum(dim=1)
+                n_live_a = (self.civ_unit_alive & (self.civ_unit_seat == r + 1) & (self.civ_unit_type == self._apostle_idx)).sum(dim=1)
                 # FLAT cost — missionaryCostMult is a MISSIONARY discount and
                 # does not extend to apostles.
                 acost = torch.full((self.B,), float(round(self._apostle_cost)), dtype=torch.float64, device=self.device)
@@ -1545,13 +1545,10 @@ class SimPhase:
         CIV6_RECLAIM_AT lowers the trigger for forced-compaction gates."""
         # The field list is DERIVED from the pool's plane list, never
         # transcribed — a hand-written list drifts and silently leaves a plane
-        # behind at the old slot index. `alive` permutes separately, and civ_unit_civ
-        # is the one field that is not a merged plane.
+        # behind at the old slot index. `alive` permutes separately.
         counter = {"barb": "next_slot", "civ": "civ_unit_next"}.get(prefix, "seat0_unit_next")
         maps: list = []
         fields = [f"{prefix}_unit_{pl}" for pl in self._UNIT_PLANES if pl != "alive"]
-        if prefix == "civ":
-            fields.append("civ_unit_civ")
         alive = getattr(self, f"{prefix}_unit_alive")
         B, U = alive.shape
         perm = torch.argsort((~alive).long(), dim=1, stable=True)  # living first, order kept

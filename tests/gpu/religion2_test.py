@@ -113,7 +113,7 @@ def free_neighbor(sim, ctr: int, banned=()) -> int:
 
 
 def clear_missionaries(sim, r: int) -> None:
-    m = sim.civ_unit_alive[0] & (sim.civ_unit_civ[0] == r) & (sim.civ_unit_type[0] == sim._missionary_idx)
+    m = sim.civ_unit_alive[0] & ((sim.civ_unit_seat[0] - 1) == r) & (sim.civ_unit_type[0] == sim._missionary_idx)
     for u in m.nonzero(as_tuple=True)[0].tolist():
         t = int(sim.civ_unit_tile[0, u])
         sim.civ_unit_alive[0, u] = False
@@ -124,7 +124,7 @@ def clear_missionaries(sim, r: int) -> None:
 def place_missionary(sim, r: int, t: int, charges: int) -> int:
     slot = int(sim.civ_unit_next[0])
     sim.civ_unit_alive[0, slot] = True
-    sim.civ_unit_civ[0, slot] = r
+    sim.civ_unit_seat[0, slot] = r + 1
     sim.civ_unit_type[0, slot] = sim._missionary_idx
     sim.civ_unit_tile[0, slot] = t
     sim.civ_unit_hp[0, slot] = 100
@@ -169,7 +169,7 @@ def follow_all(sim, g: int) -> None:
 
 
 def live_missionaries(sim, r: int) -> list[int]:
-    m = sim.civ_unit_alive[0] & (sim.civ_unit_civ[0] == r) & (sim.civ_unit_type[0] == sim._missionary_idx)
+    m = sim.civ_unit_alive[0] & ((sim.civ_unit_seat[0] - 1) == r) & (sim.civ_unit_type[0] == sim._missionary_idx)
     return m.nonzero(as_tuple=True)[0].tolist()
 
 

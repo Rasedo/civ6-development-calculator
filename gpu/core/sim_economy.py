@@ -334,7 +334,7 @@ class SimEconomy:
         """[B] civ r's LIVE settler units."""
         if self._settler_idx < 0:
             return torch.zeros(self.B, dtype=torch.long, device=self.device)
-        return (self.civ_unit_alive & (self.civ_unit_civ == r) & (self.civ_unit_type == self._settler_idx)).sum(dim=1)
+        return (self.civ_unit_alive & (self.civ_unit_seat == r + 1) & (self.civ_unit_type == self._settler_idx)).sum(dim=1)
 
     def _afford(self, tre: torch.Tensor, cost) -> torch.Tensor:
         """Milli-rounded gold-threshold compare — the `goldAffordable` twin.
@@ -1315,8 +1315,8 @@ class SimEconomy:
             sea[:, 0] = dilate(p_a, pwin)
         if self.R > 0:
             for r in range(self.R):
-                rg = v_g & (self.civ_unit_civ == r)
-                ra = v_a & (self.civ_unit_civ == r)
+                rg = v_g & (self.civ_unit_seat == r + 1)
+                ra = v_a & (self.civ_unit_seat == r + 1)
                 if bool(rg.any()):
                     land[:, r + 1] = dilate(rg, vwin)
                 if bool(ra.any()):
@@ -1465,7 +1465,7 @@ class SimEconomy:
         positions."""
         v_ok = self.civ_unit_alive & (self._type_combat[self.civ_unit_type] > 0)
         v_hit = self._gen_aura_hit(
-            self.civ_unit_civ + 1,  # civ index r is civ_unified r+1
+            self.civ_unit_seat,  # a civ unit's ABSOLUTE seat IS its block row
             self.civ_unit_tile,
             self.unit_naval[self.civ_unit_type] | self.civ_unit_emb,
         )

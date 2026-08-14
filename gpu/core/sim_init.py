@@ -571,15 +571,12 @@ class SimInit:
                     ],
                 )
         # Seat 0's range carries owner 0 (the zero-fill) and the barbarian range
-        # BARB_SEAT. The civ range is written wherever civ_unit_civ is, and is SEEDED
-        # to seat 1 so `civ_unit_seat - 1 == civ_unit_civ` holds on DEAD slots too,
-        # exactly as civ_unit_civ's own zero-fill means "civ 0". Without that, seat-1
-        # on an unwritten slot is -1 and indexes out of bounds the moment
-        # anything probes it.
+        # BARB_SEAT. The civ range is SEEDED to seat 1 so a DEAD slot still
+        # names a real seat: `unit_seat` is the ONE owner fact, and readers that
+        # subtract 1 to index a civ plane must not meet a -1 there.
         self.barb_unit_seat.fill_(BARB_SEAT)
         self.civ_unit_seat.fill_(1)
 
-        self.civ_unit_civ = torch.zeros(B, simbase.POOL_MAX, dtype=torch.long, device=device)
         self.civ_unit_next = torch.zeros(B, dtype=torch.long, device=device)
         # ONE occupancy map per DOMAIN, holding a MERGED-pool slot: "whose unit
         # is on this tile?" is unit_seat.gather(1, occ_*), with no per-pool
@@ -761,7 +758,6 @@ class SimInit:
                 for u_ in cv["units"]:
                     v = int(self.civ_unit_next[b])
                     self.civ_unit_alive[b, v] = True
-                    self.civ_unit_civ[b, v] = rid
                     self.civ_unit_seat[b, v] = rid + 1  # seat = civ index + 1
                     self.civ_unit_type[b, v] = u_["type"]
                     self.civ_unit_tile[b, v] = u_["tile"]
@@ -1515,7 +1511,7 @@ class SimInit:
         melee_v = self.civ_unit_alive & (self._type_ranged_strength[vt] == 0)
         citystate_v = torch.where(melee_v, self._type_combat[vt], torch.zeros_like(self.civ_unit_type))
         for r_ in range(r_pad):
-            self.civ_only_best_melee[:, r_] = torch.where(self.civ_unit_civ == r_, citystate_v, torch.zeros_like(citystate_v)).max(dim=1).values
+            self.civ_only_best_melee[:, r_] = torch.where((self.civ_unit_seat == r_ + 1), citystate_v, torch.zeros_like(citystate_v)).max(dim=1).values
         pt_ = self.seat0_unit_type.clamp(min=0, max=self.NU - 1)
         melee_p = self.seat0_unit_alive & (self._type_ranged_strength[pt_] == 0)
         self.best_melee.copy_(torch.where(melee_p, self._type_combat[pt_], torch.zeros_like(self.seat0_unit_type)).max(dim=1).values)
@@ -1564,10 +1560,10 @@ class SimInit:
         """unit_seat must agree with the slot range it sits in.
 
         It is maintained by hand — constant for the seat-0 and barbarian
-        ranges, written beside every civ_unit_civ write for civ units — so it can
-        drift the moment a new spawn path appears. Those two ranges are checked
-        on ALIVE slots only (a dead slot's owner is meaningless, as it is for
-        civ_unit_civ); the civ range is checked in full, see below.
+        ranges, written at every civ spawn — so it can drift the moment a new
+        spawn path appears. Those two ranges are checked on ALIVE slots only (a
+        dead slot's owner is meaningless); the civ range is checked in full,
+        see below.
         """
         al = self.unit_alive
         seat = self.unit_seat
@@ -1575,11 +1571,11 @@ class SimInit:
         pe, ve, ue = self.POOL_HI["seat0"], self.POOL_HI["civ"], self.POOL_HI["barb"]
         if not bool(((seat[:, p:pe] == 0) | ~al[:, p:pe]).all()):
             raise AssertionError("SEAT DRIFT: a living p-pool slot does not carry seat 0")
-        # EVERY civ slot, alive or not: the range is seeded to seat 1
-        # so `civ_unit_seat - 1 == civ_unit_civ` is total. A dead slot with a bogus seat is
-        # not harmless — the encampment probe subtracts 1 and indexes civ_only_atwar.
-        if not bool((seat[:, v:ve] == self.civ_unit_civ + 1).all()):
-            raise AssertionError("SEAT DRIFT: a CIV slot's seat != its civ index + 1")
+        # EVERY civ slot, alive or not: the range is seeded to seat 1, so a
+        # dead slot still names a real civ. A bogus seat there is not harmless —
+        # the encampment probe subtracts 1 and indexes civ_only_atwar.
+        if not bool(((seat[:, v:ve] >= 1) & (seat[:, v:ve] <= max(self.R, 1))).all()):
+            raise AssertionError("SEAT DRIFT: a CIV slot's seat is not a civ seat")
         if not bool(((seat[:, u:ue] == BARB_SEAT) | ~al[:, u:ue]).all()):
             raise AssertionError(f"SEAT DRIFT: a living BARB slot does not carry seat {BARB_SEAT}")
         # `caps.xp` is FALSE for the hostile class, and the TS twin enforces it

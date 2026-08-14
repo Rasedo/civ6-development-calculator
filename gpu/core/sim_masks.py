@@ -768,7 +768,6 @@ class SimMasks:
         getattr(self, f"{pre}_unit_alive")[rows, slot] = True
         if row > 0:
             # a reclaimed civ slot may have held ANOTHER civ's unit
-            self.civ_unit_civ[rows, slot] = row - 1
             self.civ_unit_seat[rows, slot] = row
         getattr(self, f"{pre}_unit_type")[rows, slot] = type_idx[rows]
         getattr(self, f"{pre}_unit_tile")[rows, slot] = spot[rows]
@@ -1203,7 +1202,7 @@ class SimMasks:
         order = spawn order, padded with -1) — every seat's units head rides the
         same simbase.SEAT0_POOL_MAX row layout."""
         B = self.B
-        civ_units = self.civ_unit_alive & (self.civ_unit_civ == r)  # [B, simbase.POOL_MAX]
+        civ_units = self.civ_unit_alive & (self.civ_unit_seat == r + 1)  # [B, simbase.POOL_MAX]
         rank = civ_units.long().cumsum(dim=1) - 1  # rank among the civ's alive slots
         out = torch.full((B, simbase.SEAT0_POOL_MAX), -1, dtype=torch.long, device=self.device)
         take = civ_units & (rank < simbase.SEAT0_POOL_MAX)
@@ -1332,11 +1331,11 @@ class SimMasks:
         #     suzerain's war; d == 1)
         _vt_att = self.civ_unit_type.gather(1, sc).clamp(min=0, max=self.NU - 1)
         _melee_att = (self._type_ranged_strength[_vt_att] <= 0).unsqueeze(2)
-        _vciv_nb = torch.where(vmn >= 0, self.civ_unit_civ.gather(1, vmn.clamp(min=0)), torch.full_like(vmn, -1))
+        _vciv_nb = torch.where(vmn >= 0, self.civ_unit_seat.gather(1, vmn.clamp(min=0)) - 1, torch.full_like(vmn, -1))
         # BOTH halves of the war act's target set (`war_m | war_c`): enemy
         # CIVILIANS are war targets too. rcn (the civilian map's civ slots) was
         # computed above for the stacking terms and is reused here.
-        _rvcivC_nb = torch.where(rcn >= 0, self.civ_unit_civ.gather(1, rcn.clamp(min=0)), torch.full_like(rcn, -1))
+        _rvcivC_nb = torch.where(rcn >= 0, self.civ_unit_seat.gather(1, rcn.clamp(min=0)) - 1, torch.full_like(rcn, -1))
         _civ_pair_u = (
             ((_vciv_nb >= 0) & self.civ_pair_war[:, r].gather(1, _vciv_nb.clamp(min=0)))
             | ((_rvcivC_nb >= 0) & self.civ_pair_war[:, r].gather(1, _rvcivC_nb.clamp(min=0)))

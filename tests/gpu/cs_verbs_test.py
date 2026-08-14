@@ -81,7 +81,7 @@ def empty_land_tiles(sim, k: int) -> list[int]:
 
 def mil_count(sim, r: int) -> int:
     t = sim.civ_unit_type[0].clamp(min=0, max=sim.NU - 1)
-    return int((sim.civ_unit_alive[0] & (sim.civ_unit_civ[0] == r) & (sim._type_combat[t] > 0)).sum())
+    return int((sim.civ_unit_alive[0] & ((sim.civ_unit_seat[0] - 1) == r) & (sim._type_combat[t] > 0)).sum())
 
 
 def meet_quota(sim, r: int) -> None:
@@ -95,7 +95,7 @@ def meet_quota(sim, r: int) -> None:
     for t in empty_land_tiles(sim, need):
         slot = int(sim.civ_unit_next[0])
         sim.civ_unit_alive[0, slot] = True
-        sim.civ_unit_civ[0, slot] = r
+        sim.civ_unit_seat[0, slot] = r + 1
         sim.civ_unit_type[0, slot] = sim._warrior_idx
         sim.civ_unit_tile[0, slot] = t
         sim.civ_unit_hp[0, slot] = 100
@@ -114,7 +114,7 @@ def count_levy(sim, vn0: int, s: int, warr: int) -> int:
     a levy spawn."""
     n = 0
     for slot in range(vn0, int(sim.civ_unit_next[0])):
-        if int(sim.civ_unit_type[0, slot]) == warr and int(sim.civ_unit_civ[0, slot]) == R:
+        if int(sim.civ_unit_type[0, slot]) == warr and int((sim.civ_unit_seat[0, slot] - 1)) == R:
             n += 1
     return n
 

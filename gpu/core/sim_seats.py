@@ -79,14 +79,14 @@ class SimSeats:
             )
             ok_u = tr_u_r & (self._type_combat.unsqueeze(0) > 0) & ~self.unit_naval.unsqueeze(0)
             if self.improvements_on and self._builder_idx >= 0:
-                has_alive = (self.civ_unit_alive & (self.civ_unit_civ == r) & (self.civ_unit_type == self._builder_idx)).any(dim=1)
+                has_alive = (self.civ_unit_alive & (self.civ_unit_seat == r + 1) & (self.civ_unit_type == self._builder_idx)).any(dim=1)
                 has_q = ((self.civ_city_current[:, r] == self._builder_idx + 1) & self.civ_city_alive[:, r]).any(dim=1)  # alive-masked
                 ok_u[:, self._builder_idx] = ~(has_alive | has_q) & self._civ_job_mask(r).any(dim=1)
             # MILITARY ENGINEER: one per civ (live or queued), and only while a
             # FORT job exists. Combat 0 keeps it out of both lanes above, so this
             # column is the only way a net can express one.
             if self._seat_eng_live and self._eng_idx >= 0:
-                has_alive_e = (self.civ_unit_alive & (self.civ_unit_civ == r) & (self.civ_unit_type == self._eng_idx)).any(dim=1)
+                has_alive_e = (self.civ_unit_alive & (self.civ_unit_seat == r + 1) & (self.civ_unit_type == self._eng_idx)).any(dim=1)
                 has_q_e = ((self.civ_city_current[:, r] == self._eng_idx + 1) & self.civ_city_alive[:, r]).any(dim=1)
                 ok_u[:, self._eng_idx] = ~(has_alive_e | has_q_e) & self._seat_fort_job_mask_r(r).any(dim=1)
             # GALLEY: SAILING plus a naval-capable CITY (center adjacent to water
@@ -104,7 +104,7 @@ class SimSeats:
                 else:
                     harbor_jg = torch.zeros(B, dtype=torch.bool, device=dev)
                 vt_allm = self.civ_unit_type.clamp(min=0, max=self.NU - 1)
-                naval_live_g = (self.civ_unit_alive & (self.civ_unit_civ == r) & self.unit_naval[vt_allm]).any(dim=1)
+                naval_live_g = (self.civ_unit_alive & (self.civ_unit_seat == r + 1) & self.unit_naval[vt_allm]).any(dim=1)
                 qcur_g = self.civ_city_current[:, r]
                 q_nav_g = (qcur_g >= 1) & (qcur_g <= self.NU) & self.civ_city_alive[:, r] & self.unit_naval[(qcur_g - 1).clamp(min=0, max=self.NU - 1)]
                 ok_u[:, self._galley_idx] = (
@@ -509,12 +509,12 @@ class SimSeats:
             elig_s = self.civ_city_alive[:, r] & self.civ_city_bldg[:, r, :, self._shrine_bidx] & hs_c
             first_s = elig_s.long().argmax(dim=1)
             if self._missionary_idx >= 0:
-                n_m = (self.civ_unit_alive & (self.civ_unit_civ == r) & (self.civ_unit_type == self._missionary_idx)).sum(dim=1)
+                n_m = (self.civ_unit_alive & (self.civ_unit_seat == r + 1) & (self.civ_unit_type == self._missionary_idx)).sum(dim=1)
                 mcost = self._enh["mcost"][self.civ_only_enhancer[:, r] + 1]
                 m_ok = founded & (n_m < self._missionary_cap) & self._afford(self.civ_only_faith[:, r], mcost) & elig_s.any(dim=1)
                 m_j = torch.where(m_ok, first_s, m_j)
             if self._apostle_idx >= 0:
-                n_a = (self.civ_unit_alive & (self.civ_unit_civ == r) & (self.civ_unit_type == self._apostle_idx)).sum(dim=1)
+                n_a = (self.civ_unit_alive & (self.civ_unit_seat == r + 1) & (self.civ_unit_type == self._apostle_idx)).sum(dim=1)
                 acost = torch.full((B,), float(round(self._apostle_cost)), dtype=torch.float64, device=dev)
                 a_ok = founded & (n_a < self._apostle_cap) & self._afford(self.civ_only_faith[:, r], acost) & elig_s.any(dim=1)
                 a_j = torch.where(a_ok, first_s, a_j)
@@ -995,7 +995,7 @@ class SimSeats:
             # adjacency + different religion + carries religious strength
             d = self.pair_dist[a_tile.unsqueeze(1), self.civ_unit_tile]  # [B, U]
             elig = (
-                self.civ_unit_alive & (d == 1) & (self.civ_unit_civ != r)
+                self.civ_unit_alive & (d == 1) & (self.civ_unit_seat != r + 1)
                 & (rs[self.civ_unit_type.clamp(min=0)] > 0)
             )
             elig = elig & a_on.unsqueeze(1)
@@ -1017,8 +1017,8 @@ class SimSeats:
             def_dead = self.civ_unit_hp[rows, j[rows]] <= 0
             atk_dead = self.civ_unit_hp[rows, u] <= 0
             # pressure swing at the fallen unit's tile
-            win_rel = torch.where(def_dead, torch.full_like(j[rows], r + 1), self.civ_unit_civ[rows, j[rows]] + 1)
-            los_rel = torch.where(def_dead, self.civ_unit_civ[rows, j[rows]] + 1, torch.full_like(j[rows], r + 1))
+            win_rel = torch.where(def_dead, torch.full_like(j[rows], r + 1), self.civ_unit_seat[rows, j[rows]])
+            los_rel = torch.where(def_dead, self.civ_unit_seat[rows, j[rows]], torch.full_like(j[rows], r + 1))
             any_dead = def_dead | atk_dead
             dead_tile = torch.where(def_dead, self.civ_unit_tile[rows, j[rows]], self.civ_unit_tile[rows, u])
             if bool(any_dead.any()):
@@ -1065,7 +1065,7 @@ class SimSeats:
                     _dr = rows[def_dead]
                     _ap = self.civ_unit_type[_dr, j[_dr]] == self._apostle_idx
                     if bool(_ap.any()):
-                        self._grant_relic(_dr[_ap], self.civ_unit_civ[_dr[_ap], j[_dr][_ap]] + 1)
+                        self._grant_relic(_dr[_ap], self.civ_unit_seat[_dr[_ap], j[_dr][_ap]])
                 if bool(atk_dead.any()):
                     _ar = rows[atk_dead]
                     self._grant_relic(_ar, torch.full_like(_ar, r + 1))
@@ -2477,7 +2477,7 @@ class SimSeats:
             # defense terms (embarked = flat, none). Barbs and seat-0 units carry
             # no religion here.
             if atk_kind == "civ":
-                atk_e = atk_e + (self._rel_atk_cs(self.civ_unit_civ[:, u], tgt).to(atk_e.dtype))  # unit-vs-unit: never city-gated
+                atk_e = atk_e + (self._rel_atk_cs((self.civ_unit_seat[:, u] - 1), tgt).to(atk_e.dtype))  # unit-vs-unit: never city-gated
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(def_is_rv, _dciv, torch.full_like(_dciv, -1)), tgt).to(def_e.dtype))
             # Great General / Admiral aura. Attacker keyed on its own tile `here`
             # (a CIV attacker gets its civ's aura; a BARB has none); defender
@@ -2486,7 +2486,7 @@ class SimSeats:
             # gives an embarked defender the admiral aura on top of its flat CS.
             if atk_kind == "civ":
                 atk_naval = self.unit_naval[self.civ_unit_type[:, u].clamp(min=0, max=self.NU - 1)] | self.civ_unit_emb[:, u]
-                atk_e = atk_e + self._gen_aura_cs(self.civ_unit_civ[:, u] + 1, here, atk_naval).to(atk_e.dtype)
+                atk_e = atk_e + self._gen_aura_cs(self.civ_unit_seat[:, u], here, atk_naval).to(atk_e.dtype)
             def_naval = d_emb | (~def_is_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
             def_civ_u = torch.where(def_is_barb, neg, d_seat_m)
             def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
@@ -2516,7 +2516,7 @@ class SimSeats:
             land_ok = self.passable.gather(1, ttc_adv.unsqueeze(1)).squeeze(1)
             if atk_kind == "civ":
                 naval_att = self.unit_naval[self.civ_unit_type[:, u].clamp(min=0, max=self.NU - 1)]
-                civ_u = self.civ_unit_civ[:, u].clamp(min=0)
+                civ_u = (self.civ_unit_seat[:, u] - 1).clamp(min=0)
                 cart_u = (
                     self.civ_only_techs[torch.arange(self.B, device=self.device), civ_u, self._cartography_tech]
                     if self._cartography_tech >= 0 else torch.zeros(self.B, dtype=torch.bool, device=self.device)
@@ -2545,7 +2545,7 @@ class SimSeats:
                 a_tile[vr, u] = ttc[vr]
                 a_occ[vr, ttc[vr]] = u + a_lo
                 if atk_kind == "civ":
-                    self._clear_camp_at(adv, ttc, civ=self.civ_unit_civ[:, u])
+                    self._clear_camp_at(adv, ttc, civ=(self.civ_unit_seat[:, u] - 1))
         if bool(civ_att.any()):
             rows = civ_att.nonzero(as_tuple=True)[0]
             ds = dc_[rows]
@@ -2560,7 +2560,6 @@ class SimSeats:
                 nslot = self.civ_unit_next[rows]
                 assert int(nslot.max()) < simbase.POOL_MAX, "civ slot pool exhausted — raise simbase.POOL_MAX"
                 self.civ_unit_alive[rows, nslot] = True
-                self.civ_unit_civ[rows, nslot] = self.civ_unit_civ[rows, u]
                 self.civ_unit_seat[rows, nslot] = self.civ_unit_seat[rows, u]  # the capture carries the seat
                 self.civ_unit_tile[rows, nslot] = ct
                 self._carry_capture(rows, ds + self.POOL_LO["seat0"], nslot + self.POOL_LO["civ"])
@@ -2583,7 +2582,6 @@ class SimSeats:
                 nslot = self.civ_unit_next[rows]
                 assert int(nslot.max()) < simbase.POOL_MAX, "civ slot pool exhausted — raise simbase.POOL_MAX"
                 self.civ_unit_alive[rows, nslot] = True
-                self.civ_unit_civ[rows, nslot] = self.civ_unit_civ[rows, u]
                 self.civ_unit_seat[rows, nslot] = self.civ_unit_seat[rows, u]  # the capture carries the seat
                 self.civ_unit_tile[rows, nslot] = ct
                 self._carry_capture(rows, ds + self.POOL_LO["civ"], nslot + self.POOL_LO["civ"])
@@ -2621,7 +2619,7 @@ class SimSeats:
                 a_tile[vr, u] = ttc[vr]
                 a_occ[vr, ttc[vr]] = u + a_lo
                 if atk_kind == "civ":
-                    self._clear_camp_at(adv, ttc, civ=self.civ_unit_civ[:, u])
+                    self._clear_camp_at(adv, ttc, civ=(self.civ_unit_seat[:, u] - 1))
 
     def _attack_civ_city(self, att: torch.Tensor, tgt: torch.Tensor, u: int) -> None:
         """A BARBARIAN's melee assault on a civ city — the shared battle in
@@ -2672,7 +2670,7 @@ class SimSeats:
             self.civ_unit_alive[:, u] = self.civ_unit_alive[:, u] & ~died
         captured = rows[self.civ_city_hp[rows, civ[rows], slot[rows]] <= 0]
         if len(captured) > 0:
-            atk_civ = self.civ_unit_civ[:, u]
+            atk_civ = (self.civ_unit_seat[:, u] - 1)
             for b in captured.tolist():
                 # The conqueror is the attacker's civ (civ v is block row v+1).
                 # A civ-vs-civ take is a CONQUEST like any other: it plunders
@@ -3130,8 +3128,8 @@ class SimSeats:
             ).to(atk_e.dtype)
         if atk_kind == "civ":
             atk_naval = self.unit_naval[self.civ_unit_type[:, u].clamp(min=0, max=self.NU - 1)] | self.civ_unit_emb[:, u]
-            atk_e = atk_e + (self._rel_atk_cs(self.civ_unit_civ[:, u], tc).to(atk_e.dtype) if self._city_rel_live else 0)
-            atk_e = atk_e + self._gen_aura_cs(self.civ_unit_civ[:, u] + 1, a_tile[:, u], atk_naval).to(atk_e.dtype)
+            atk_e = atk_e + (self._rel_atk_cs((self.civ_unit_seat[:, u] - 1), tc).to(atk_e.dtype) if self._city_rel_live else 0)
+            atk_e = atk_e + self._gen_aura_cs(self.civ_unit_seat[:, u], a_tile[:, u], atk_naval).to(atk_e.dtype)
         p_att, civ_only_att = att & (civ_only_at < 0), att & (civ_only_at >= 0)
         diff, cdiff = atk_e - def_cs, def_cs - atk_e
         # CAREFUL: _damage_roll returns a value on EVERY row — only the RNG
@@ -3221,7 +3219,7 @@ class SimSeats:
         if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
             atk_e = atk_e + self._xp_lvl_bonus(a_xp[:, u])
         if atk_kind == "civ" and self._city_rel_live:
-            atk_e = atk_e + self._rel_atk_cs(self.civ_unit_civ[:, u], tgt).to(atk_e.dtype)
+            atk_e = atk_e + self._rel_atk_cs((self.civ_unit_seat[:, u] - 1), tgt).to(atk_e.dtype)
         aura_civ = torch.where(a_seat[:, u] == BARB_SEAT,
                                torch.full_like(civ, -1), a_seat[:, u])
         atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
@@ -3286,7 +3284,7 @@ class SimSeats:
         if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
             atk_e = atk_e + self._xp_lvl_bonus(a_xp[:, u])
         if atk_kind == "civ" and self._city_rel_live:
-            atk_e = atk_e + self._rel_atk_cs(self.civ_unit_civ[:, u], tgt).to(atk_e.dtype)
+            atk_e = atk_e + self._rel_atk_cs((self.civ_unit_seat[:, u] - 1), tgt).to(atk_e.dtype)
         # the aura joins attackCityState's atkCS ONCE, so the cstyc counter-roll
         # sees the same atk_e.
         aura_civ = torch.where(a_seat[:, u] == BARB_SEAT,
@@ -3456,8 +3454,8 @@ class SimSeats:
             # the enhancer ATTACKER adders apply to city assaults too —
             # Crusade/Just War key on where the UNIT stands, not on what it hits.
             # Added BEFORE the aura so term order matches the TS assembly.
-            atk_e = atk_e + (self._rel_atk_cs(self.civ_unit_civ[:, u], _ct).to(atk_e.dtype) if self._city_rel_live else 0)
-            atk_e = atk_e + self._gen_aura_cs(self.civ_unit_civ[:, u] + 1, a_tile[:, u], atk_naval).to(atk_e.dtype)
+            atk_e = atk_e + (self._rel_atk_cs((self.civ_unit_seat[:, u] - 1), _ct).to(atk_e.dtype) if self._city_rel_live else 0)
+            atk_e = atk_e + self._gen_aura_cs(self.civ_unit_seat[:, u], a_tile[:, u], atk_naval).to(atk_e.dtype)
         d_city = self._damage_roll(att, atk_e - def_cs, k="pcty", tile=_ct)
         d_self = self._damage_roll(att, def_cs - atk_e, k="pctyc", tile=_ct)
         # the same city combat from the other side of the board.
@@ -3488,7 +3486,7 @@ class SimSeats:
         # a CIV conqueror TAKES the city, reusing the loyalty-flip transfer;
         # barbarians sack.
         if atk_kind == "civ" and len(sacked_rows) > 0:
-            w_civ = self.civ_unit_civ[sacked_rows, u]
+            w_civ = (self.civ_unit_seat[sacked_rows, u] - 1)
             for i in range(len(sacked_rows)):
                 # civ w is block row w+1; the shared transfer pays the +40 on a
                 # REAL transfer only — a raze at the city cap pays nothing.
@@ -3572,8 +3570,8 @@ class SimSeats:
                 # the enhancer ATTACKER adders apply to city assaults too —
                 # Crusade/Just War key on where the UNIT stands, not on what it hits.
                 # Inserted BEFORE the aura add so term order matches the TS assembly.
-                atk_e = atk_e + (self._rel_atk_cs(self.civ_unit_civ[:, u], tgt).to(atk_e.dtype) if self._city_rel_live else 0)
-                atk_e = atk_e + self._gen_aura_cs(self.civ_unit_civ[:, u] + 1, a_tile, a_naval).to(atk_e.dtype)
+                atk_e = atk_e + (self._rel_atk_cs((self.civ_unit_seat[:, u] - 1), tgt).to(atk_e.dtype) if self._city_rel_live else 0)
+                atk_e = atk_e + self._gen_aura_cs(self.civ_unit_seat[:, u], a_tile, a_naval).to(atk_e.dtype)
             d_city = self._damage_roll(city_att, atk_e - def_cs, k="vrngc", tile=tgt)
             self._ww_battle(city_att, self._row_of(self._atk_seat(atk_kind, u)), 0, tgt, city=True)
             rows = city_att.nonzero(as_tuple=True)[0]
@@ -3635,12 +3633,12 @@ class SimSeats:
             # enhancer adders. A CIV attacker gets the attack terms; a
             # BARB carries no faith. A CIV DEFENDER gets the defense terms.
             if not barb:
-                atk_e = atk_e + (self._rel_atk_cs(self.civ_unit_civ[:, u], tgt).to(atk_e.dtype))  # NEVER gated
+                atk_e = atk_e + (self._rel_atk_cs((self.civ_unit_seat[:, u] - 1), tgt).to(atk_e.dtype))  # NEVER gated
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(_dciv, tgt).to(def_e.dtype))
             # attacker aura on its OWN tile (barb: none); a barb or
             # a lone CIVILIAN defender gets none.
             if not barb:
-                atk_e = atk_e + self._gen_aura_cs(self.civ_unit_civ[:, u] + 1, a_tile, a_naval).to(atk_e.dtype)
+                atk_e = atk_e + self._gen_aura_cs(self.civ_unit_seat[:, u], a_tile, a_naval).to(atk_e.dtype)
             def_civ_u = torch.where(d_is_mil & ~d_barb, d_seat, neg)
             def_naval = d_emb | (~d_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
             def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
@@ -4064,7 +4062,7 @@ class SimSeats:
         rstr = torch.zeros(B, self.R, dtype=torch.float64, device=dev)
         vt = self.civ_unit_type.clamp(min=0, max=self.NU - 1)
         for r in range(self.R):
-            combat = ((self.civ_unit_alive & (self.civ_unit_civ == r)).long() * self._type_combat[vt]).sum(dim=1)
+            combat = ((self.civ_unit_alive & (self.civ_unit_seat == r + 1)).long() * self._type_combat[vt]).sum(dim=1)
             rstr[:, r] = js_round(n_c[:, r].double() * 8 + combat.double())
         return rstr
 

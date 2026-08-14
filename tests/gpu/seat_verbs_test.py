@@ -36,7 +36,7 @@ def a_civ_builder(sim, r):
     waiting for the fixture to field one, so the lane does not depend on which
     turn a civ happens to train a builder."""
     for v in range(sim.civ_unit_alive.shape[1]):
-        if bool(sim.civ_unit_alive[0, v]) and int(sim.civ_unit_civ[0, v]) == r:
+        if bool(sim.civ_unit_alive[0, v]) and int((sim.civ_unit_seat[0, v] - 1)) == r:
             sim.civ_unit_type[0, v] = sim._builder_idx
             sim.civ_unit_charges[0, v] = 3
             sim.civ_unit_mp[0, v] = 2
@@ -46,7 +46,7 @@ def a_civ_builder(sim, r):
 
 def a_civ_soldier(sim, r):
     for v in range(sim.civ_unit_alive.shape[1]):
-        if bool(sim.civ_unit_alive[0, v]) and int(sim.civ_unit_civ[0, v]) == r and float(sim._type_combat[int(sim.civ_unit_type[0, v])]) > 0:
+        if bool(sim.civ_unit_alive[0, v]) and int((sim.civ_unit_seat[0, v] - 1)) == r and float(sim._type_combat[int(sim.civ_unit_type[0, v])]) > 0:
             return v, int(sim.civ_unit_tile[0, v])
     return None, None
 
@@ -142,7 +142,7 @@ def main() -> None:
         s2.controlled[0, r] = True
         sl = next(
             v for v in range(s2.civ_unit_alive.shape[1])
-            if bool(s2.civ_unit_alive[0, v]) and int(s2.civ_unit_civ[0, v]) == r
+            if bool(s2.civ_unit_alive[0, v]) and int(s2.civ_unit_seat[0, v]) == r + 1
             and float(s2._type_combat[int(s2.civ_unit_type[0, v])]) > 0
         )
         s2.civ_unit_mp[0, sl] = 4.0

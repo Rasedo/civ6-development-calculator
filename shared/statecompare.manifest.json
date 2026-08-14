@@ -1540,10 +1540,6 @@
     "why": "occupancy index (see military_at)."
    },
    {
-    "plane": "civ_unit_civ",
-    "why": "redundant with unit_seat, which is covered. Slated for deletion by the seat unification."
-   },
-   {
     "plane": "unit_tile",
     "why": "the unit join key itself."
    },

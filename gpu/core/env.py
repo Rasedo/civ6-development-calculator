@@ -319,7 +319,7 @@ class BatchEnv:
         q_u = (qcur >= 1) & (qcur <= s.NU)
         q_mil = q_u & (s._type_combat[q_ty] > 0)
         vt = s.civ_unit_type.clamp(min=0, max=s.NU - 1)
-        mine = s.civ_unit_alive & (s.civ_unit_civ == r)
+        mine = s.civ_unit_alive & (s.civ_unit_seat == r + 1)
         mil = mine & (s._type_combat[vt] > 0)
         n_units = mine.sum(dim=1) + q_u.sum(dim=1)
         n_rng = (mil & rng_t[vt]).sum(dim=1) + (q_mil & rng_t[q_ty]).sum(dim=1)
@@ -410,7 +410,7 @@ class BatchEnv:
             ],
             dim=2,
         ) * alive.unsqueeze(2).to(d)  # [B, C, 10] — dead rows ZERO, the TS zero-fill twin
-        n_own_units = (s.civ_unit_alive & (s.civ_unit_civ == r)).sum(dim=1).to(d)
+        n_own_units = (s.civ_unit_alive & (s.civ_unit_seat == r + 1)).sum(dim=1).to(d)
         emp = torch.stack(
             [
                 torch.full((B,), float(s.turn) / self.horizon, dtype=d, device=dev),
@@ -432,7 +432,7 @@ class BatchEnv:
                 # Army COMPOSITION for this seat, the twin of seat 0's — the
                 # ladder trains ranged while the army holds melee, so a bare
                 # unit COUNT cannot express the decision.
-                (s.civ_unit_alive & (s.civ_unit_civ == r)
+                (s.civ_unit_alive & (s.civ_unit_seat == r + 1)
                  & (s._type_ranged_strength[s.civ_unit_type.clamp(min=0, max=s.NU - 1)] > 0)).sum(dim=1).to(d) / 10.0,
             ],
             dim=1,

@@ -97,7 +97,7 @@ def main() -> None:
         base5 = float(e2.observe(1)[0, 5])
         sl = int(s2.civ_unit_next[0])
         s2.civ_unit_alive[0, sl] = True
-        s2.civ_unit_civ[0, sl] = 0
+        s2.civ_unit_seat[0, sl] = 1
         s2.civ_unit_type[0, sl] = s2._settler_idx
         s2.civ_unit_next[0] += 1
         assert abs(float(e2.observe(1)[0, 5]) - base5 - 1.0) < 1e-9, (

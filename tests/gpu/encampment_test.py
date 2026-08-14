@@ -122,7 +122,7 @@ def build_strike_scene(rules, path):
     sim.civ_unit_alive[0, vslot] = True
     sim.civ_unit_hp[0, vslot] = 100
     sim.civ_unit_type[0, vslot] = strong_ty
-    sim.civ_unit_civ[0, vslot] = 0
+    sim.civ_unit_seat[0, vslot] = 0 + 1
     sim.civ_unit_emb[0, vslot] = False
     sim.civ_only_atwar[0, 0] = True
     sim.sync_war()  # close the war matrix under transpose

@@ -38,7 +38,7 @@ def main() -> None:
     t = int(free[0])
     slot = int(sim.civ_unit_next[0])
     sim.civ_unit_alive[0, slot] = True
-    sim.civ_unit_civ[0, slot] = 0
+    sim.civ_unit_seat[0, slot] = 0 + 1
     sim.civ_unit_type[0, slot] = 0
     sim.civ_unit_tile[0, slot] = t
     sim.civ_unit_hp[0, slot] = 100
@@ -61,7 +61,7 @@ def main() -> None:
     mil = (sim.civ_military_at[0] >= 0).nonzero(as_tuple=True)[0]
     if len(mil):
         mt = int(mil[0])
-        mciv = int(sim.civ_unit_civ[0, int(sim.civ_military_at[0, mt])])
+        mciv = int(sim.civ_unit_seat[0, int(sim.civ_military_at[0, mt])]) - 1
         mtiles = torch.tensor([[mt]])
         assert not bool(sim._blocked_for(mtiles, mciv + 1, is_civilian=True)[0, 0]), "own-civ civilian stacks on own military"
         assert bool(sim._blocked_for(mtiles, mciv + 2, is_civilian=True)[0, 0]), "foreign civilian blocked by civ military"
