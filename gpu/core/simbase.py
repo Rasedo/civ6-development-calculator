@@ -306,10 +306,8 @@ WW_BATTLE_KEYS = frozenset({
     "vrngc",    # hostile ranged vs a seat-0 city
     "rngrc",    # seat-0 ranged vs a civ-seat city
     "rngcs",    # seat-0 ranged vs a city-state centre
-    "pcstk",    # a seat-0 city's walls strike
-    "pestk",    # a seat-0 city's Encampment strike
-    "rcstk",    # a civ-seat city's walls strike
-    "restk",    # a civ-seat city's Encampment strike
+    "cstk",     # ANY seat's city walls strike
+    "estk",     # ANY seat's city Encampment strike
 })
 
 BARB_SEAT = 200  # the barbarians — cpu/core/seats.ts BARB_SEAT

@@ -13,13 +13,14 @@ bar — these pokes are gate-unreachable-surface coverage):
      MILITARY unit inherits the city's best Encampment tier, a civilian stays
      at 0.
   3. The ADDITIONAL Encampment strike: a seat-0 city owning a COMPLETE
-     unpillaged Encampment fires a once/turn ranged strike (k="pestk") at the
+     unpillaged Encampment fires a once/turn ranged strike (k="estk") at the
      nearest hostile unit; removing the Encampment (control) removes the
      strike. A city with BOTH walls and an Encampment rolls TWICE — walls first
-     (k="pcstk"), then Encampment (k="pestk").
+     (k="cstk"), then Encampment (k="estk").
 
 An AT-WAR civ unit is the strike target: civ units do NOT act in
-_barbarian_phase, so the target is stationary and the strike is deterministic.
+the shared per-city body directly, so the target is stationary and the strike
+is deterministic.
 """
 
 from __future__ import annotations
@@ -129,40 +130,47 @@ def build_strike_scene(rules, path):
     return sim, enc_tile, tgt, vslot
 
 
+def fire(sim, row: int = 0, col: int = 0) -> None:
+    """Run ONE city's walls+Encampment strike and heal — the same body every
+    seat row calls from its own per-city block."""
+    c = torch.full((sim.B,), col, dtype=torch.long)
+    sim._seat_city_fire_and_heal(row, c, sim.city_alive[:, row, col])
+
+
 def test_strike(rules, path) -> None:
-    # --- encampment ON: pestk fires, target loses HP
+    # --- encampment ON: estk fires, target loses HP
     sim, enc_tile, tgt, vslot = build_strike_scene(rules, path)
     sim._log_combat_b = 0
     sim._combat_events = []
     hp0 = int(sim.major_unit_hp[0, vslot])
-    sim._barbarian_phase()
-    ev_on = [e for e in sim._combat_events if "k:pestk" in e]
+    fire(sim)
+    ev_on = [e for e in sim._combat_events if "k:estk" in e]
     assert len(ev_on) >= 1, f"Encampment strike did not fire (events: {sim._combat_events})"
     assert int(sim.major_unit_hp[0, vslot]) < hp0, "target took no Encampment-strike damage"
-    print(f"  strike ON OK: pestk fired, target hp {hp0} -> {int(sim.major_unit_hp[0, vslot])}")
+    print(f"  strike ON OK: estk fired, target hp {hp0} -> {int(sim.major_unit_hp[0, vslot])}")
 
-    # --- control: no Encampment -> no pestk, target untouched
+    # --- control: no Encampment -> no estk, target untouched
     sim2, enc2, tgt2, v2 = build_strike_scene(rules, path)
     sim2.district_complete[0, enc2] = False  # incomplete Encampment: no strike
     sim2._log_combat_b = 0
     sim2._combat_events = []
     hp0b = int(sim2.major_unit_hp[0, v2])
-    sim2._barbarian_phase()
-    assert not any("k:pestk" in e for e in sim2._combat_events), "incomplete Encampment still struck"
+    fire(sim2)
+    assert not any("k:estk" in e for e in sim2._combat_events), "incomplete Encampment still struck"
     assert int(sim2.major_unit_hp[0, v2]) == hp0b, "control target lost HP with no complete Encampment"
     print("  strike CONTROL OK: incomplete Encampment fires nothing, target untouched")
 
-    # --- walls + Encampment: rolls TWICE, walls (pcstk) BEFORE Encampment (pestk)
+    # --- walls + Encampment: rolls TWICE, walls (cstk) BEFORE Encampment (estk)
     sim3, enc3, tgt3, v3 = build_strike_scene(rules, path)
     assert sim3._walls_bidx >= 0, "ANCIENT_WALLS not exported"
     sim3.buildings[0, 0, sim3._walls_bidx] = True
     sim3.outer_hp[0, 0] = 0  # let the roll land on the unit, not the wall pool
     sim3._log_combat_b = 0
     sim3._combat_events = []
-    sim3._barbarian_phase()
-    ks = [e.split()[0] for e in sim3._combat_events if ("k:pcstk" in e or "k:pestk" in e)]
-    assert "k:pcstk" in ks and "k:pestk" in ks, f"both strikes must fire, got {ks}"
-    assert ks.index("k:pcstk") < ks.index("k:pestk"), f"walls must roll BEFORE Encampment, got {ks}"
+    fire(sim3)
+    ks = [e.split()[0] for e in sim3._combat_events if ("k:cstk" in e or "k:estk" in e)]
+    assert "k:cstk" in ks and "k:estk" in ks, f"both strikes must fire, got {ks}"
+    assert ks.index("k:cstk") < ks.index("k:estk"), f"walls must roll BEFORE Encampment, got {ks}"
     print(f"  double-roll OK: walls-first order {ks}")
 
 

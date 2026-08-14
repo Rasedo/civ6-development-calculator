@@ -340,8 +340,35 @@ class SimStep:
             pop_loyal[bidx, col] = self.pop[bidx, col]
             t_c = total[bidx, col]  # [B, 6] this city's FRESH yields
             popf_c = self.pop[bidx, col].to(self.dtype)
-            pop_c0 = self.pop[bidx, col].clone()  # loop-top pop: stats.growthNeeded freezes here, and a settler completion can shrink pop mid-block
+            pop_c0 = self.pop[bidx, col].clone()  # loop-top pop — stats.growthNeeded freezes here
 
+            # --- growth: BEFORE the queue, the seatPhase order ------------------
+            # game.ts runs seatGrowth and only THEN the queue block. The order
+            # is observable: a settler completion costs a pop with a floor of 1,
+            # so growing then shrinking is not the same city as shrinking then
+            # growing when the city sits at pop 1.
+            surplus = t_c[:, 0] - popf_c * r.food_per_citizen
+            head = housing[bidx, col] - popf_c
+            hf = torch.where(head >= 2, 1.0, torch.where(head >= 1, 0.5, 0.25).to(self.dtype)).to(self.dtype)
+            _gf_c = surplus * hf * growth_f[bidx, col]
+            if hg0 is not None:
+                _gf_c = _gf_c * hg0  # Hanging Gardens (empireGrowthMult)
+            if gmul0 is not None:
+                # left-to-right like computeCityStats:
+                # ((s×hf)×tier)×empireGrowthMult×growthMult
+                _gf_c = _gf_c * gmul0
+            effective = torch.where(surplus > 0, _gf_c, surplus)
+            self.food_box[bidx, col] = self.food_box[bidx, col] + effective
+            need = self._growth_needed(pop_c0)  # stats.growthNeeded: loop-top pop
+            alive_c = self.alive[bidx, col]
+            grow = alive_c & (self.food_box[bidx, col] >= need)
+            self.pop[bidx, col] = self.pop[bidx, col] + grow.long()
+            fb = self.food_box[bidx, col]
+            self.food_box[bidx, col] = torch.where(grow, fb - need, fb)
+            starve = alive_c & ~grow & (self.food_box[bidx, col] < 0)
+            self.pop[bidx, col] = torch.where(starve, (self.pop[bidx, col] - 1).clamp(min=1), self.pop[bidx, col])
+            fb2 = self.food_box[bidx, col]
+            self.food_box[bidx, col] = torch.where(starve, torch.zeros_like(fb2), fb2)
             # --- production (this city's column) -----------------------------------
             cur_c = self.current[bidx, col]
             has_item = cur_c >= 0
@@ -415,30 +442,6 @@ class SimStep:
             _ovf = (self.progress[bidx, col] - self.cur_cost[bidx, col]).clamp(min=0)
             self.prod_bank[bidx, col] = torch.where(done, self.prod_bank[bidx, col] + _ovf, self.prod_bank[bidx, col])
             self.progress[bidx, col] = torch.where(done, torch.zeros_like(self.progress[bidx, col]), self.progress[bidx, col])
-
-            # --- growth (the pop snapshot re-triggers totals for later cities) ---
-            surplus = t_c[:, 0] - popf_c * r.food_per_citizen
-            head = housing[bidx, col] - popf_c
-            hf = torch.where(head >= 2, 1.0, torch.where(head >= 1, 0.5, 0.25).to(self.dtype)).to(self.dtype)
-            _gf_c = surplus * hf * growth_f[bidx, col]
-            if hg0 is not None:
-                _gf_c = _gf_c * hg0  # Hanging Gardens (empireGrowthMult)
-            if gmul0 is not None:
-                # left-to-right like computeCityStats:
-                # ((s×hf)×tier)×empireGrowthMult×growthMult
-                _gf_c = _gf_c * gmul0
-            effective = torch.where(surplus > 0, _gf_c, surplus)
-            self.food_box[bidx, col] = self.food_box[bidx, col] + effective
-            need = self._growth_needed(pop_c0)  # stats.growthNeeded: loop-top pop
-            alive_c = self.alive[bidx, col]
-            grow = alive_c & (self.food_box[bidx, col] >= need)
-            self.pop[bidx, col] = self.pop[bidx, col] + grow.long()
-            fb = self.food_box[bidx, col]
-            self.food_box[bidx, col] = torch.where(grow, fb - need, fb)
-            starve = alive_c & ~grow & (self.food_box[bidx, col] < 0)
-            self.pop[bidx, col] = torch.where(starve, (self.pop[bidx, col] - 1).clamp(min=1), self.pop[bidx, col])
-            fb2 = self.food_box[bidx, col]
-            self.food_box[bidx, col] = torch.where(starve, torch.zeros_like(fb2), fb2)
             # all three pop-write masks of this rank in one host check
             if bool((made_settler | grow | starve).any()):
                 _pop_dirty = True
@@ -453,6 +456,12 @@ class SimStep:
                 _pop_dirty = False
             # Cultural border growth — THE shared body, row 0's call.
             self._seat_border_growth(0, col, self.alive[bidx, col], t_c[:, 4])
+
+            # THE CITY'S OWN DEFENSE: walls strike, Encampment strike, then the
+            # unbesieged heal — ONE body, every seat row, at this per-city
+            # position. Row 0's copy used to run a phase earlier inside
+            # _barbarian_phase; it is gone from both engines.
+            self._seat_city_fire_and_heal(0, col, self.alive[bidx, col])
 
             # --- empire accumulators (FRESH values; the seq-order walk makes
             # each game's float association match game.ts exactly) ------------

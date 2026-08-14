@@ -14,13 +14,13 @@ import { isWater, isImpassable } from '../../world/query';
 import { civEraIndex } from './city';
 import { logUnitOrder } from './seatTurn';  // #51/S8.1e
 import { MODERN_ERA_INDEX } from '../data/techs';
-import { UNITS, UNIT_HP, CITY_MAX_HP, CITY_HEAL_PER_TURN, WALLS_HP, ENCAMPMENT_HP } from '../data/units';
+import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { CITY_STATE_MAX_HP } from '../data/cityStates';
 import { cityStateAt, isSuzerain } from './cityStates';
 import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER } from '../data/seats';
 import { addEraScore } from './eras';
-import { nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentIntact, encampmentBlocks, crossesRiver, cliffBlocksStep, stepUnit } from './units';
+import { nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, crossesRiver, cliffBlocksStep, stepUnit } from './units';
 import { EMBARKED_DEFENSE_CS, embarkState } from '../data/constants';
 import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, type BeliefEffects } from '../data/religion';
 import { revealAround, unexploredByAll } from './fog';
@@ -163,7 +163,7 @@ function gainXp(unit: Unit, amount: number): void {
 
 /** a surviving MILITARY defender earns +2 (civilians never fight; barbs
  * never accrue — gainXp guards that). Called after the defender's HP is set.
- * Exported for the walls strike (rcstk, phase.ts) — the pcstk mirror. */
+ * Exported for the city walls strike (cstk, phase.ts). */
 export function awardDefenseXp(defender: Unit): void {
   if (defender.hp > 0 && unitDomain(defender.type) === 'military') gainXp(defender, XP_DEFEND);
 }
@@ -185,7 +185,7 @@ function flankCount(state: GameState, defTileIndex: number, attacker: Unit, defe
 
 /** Support count: MILITARY units friendly to the defender (same owner AND
  * civId), adjacent to the defender's tile. Exported for the walls
- * strike (rcstk, phase.ts) — the pcstk mirror. */
+ * strike (cstk, phase.ts). */
 export function supportCount(state: GameState, defTileIndex: number, defender: Unit): number {
   let n = 0;
   for (const t of neighbors(state.map, state.map.tiles[defTileIndex])) {
@@ -209,7 +209,7 @@ export function supportCount(state: GameState, defTileIndex: number, defender: U
 //
 // widened the SCOPE from unit-vs-unit to every roll where a unit fights
 // a city or a city strikes a unit (pcty/rcty/csty + their counter-rolls, the
-// ranged-vs-city rolls, and the four city-strike keys pcstk/pestk/rcstk/restk).
+// ranged-vs-city rolls, and the two city-strike keys cstk/estk).
 // added the movement half (see `generalAuraMP` in aura.ts).
 //
 // The PREDICATE itself lives in aura.ts so this file and units.ts share ONE
@@ -1301,7 +1301,9 @@ function barbScoutType(): string {
   return 'SCOUT';
 }
 
-/** Camps spawn, garrison, raid; cities heal when unbothered. */
+/** Camps spawn, garrison, raid. Nothing city-side runs here: a city fires
+ *  and heals in its OWNER's seatPhase block, through the one body every
+ *  seat shares. */
 export function barbarianPhase(state: GameState, seat: number): void {
   const map = state.map;
   // Barbarians get their movement in their own phase (self-contained for
@@ -1393,122 +1395,10 @@ export function barbarianPhase(state: GameState, seat: number): void {
     if (unit.movesLeft > 0) hostileUnitAct(state, unit);
   }
 
-  // A city WITH ANCIENT_WALLS fires once per turn — range 2, at
-  // the nearest unit hostile to the seat 0 (barbarians always; at-war
-  // units, civilians included — the unitsHostile predicate), ties broken by
-  // lowest tile index (the standard tile-order scan). One roll at the city's
-  // defense strength vs the target's defense, mirroring hostileRangedStrike:
-  // a single roll, no retaliation, civilians take the roll, never captures.
-  // City order — a kill removes the target for later cities and advances the
-  // shared RNG, so this runs immediately BEFORE the heal loop.
-  //
-  // DRAW ORDER: real Civ 6 Encampments strike SEPARATELY from
-  // walls, so a complete unpillaged Encampment fires the same once-per-turn
-  // ranged strike as an ADDITIONAL roll (the second loop below). A city with
-  // BOTH walls and an Encampment rolls twice — WALLS FIRST (this loop, over
-  // all cities), THEN Encampment (the next loop, over all cities). Both loops
-  // scan cities in identical order, so a walls kill in the first loop can
-  // remove a target the Encampment loop would have hit; the GPU mirror runs
-  // the two passes in the same order (k="pcstk" then k="pestk").
-  for (const city of seatOf(state, seat)!.cities) {
-    if (!city.buildings.includes('ANCIENT_WALLS')) continue;
-    const center = map.tiles[city.centerIndex];
-    let bestTile = -1;
-    let bestDist = 99;
-    for (const t of map.tiles) {
-      const d = hexDistance(center.col, center.row, t.col, t.row);
-      if (d < 1 || d > 2) continue;
-      if (!unitsAt(state, t.index).some((u) => unitsHostile(state, u, { seat: seat }))) continue;
-      if (d < bestDist) {
-        bestDist = d;
-        bestTile = t.index;
-      }
-    }
-    if (bestTile < 0) continue;
-    const hostiles = unitsAt(state, bestTile).filter((u) => unitsHostile(state, u, { seat: seat }));
-    const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
-    const tt = map.tiles[bestTile];
-    // support (attacker is the city — not a unit, so no flanking).
-    // An embarked target defends at the flat EMBARKED_DEFENSE_CS.
-    const defCS = defender.embarked
-      ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
-      : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender); // B-4 defender veterancy (embarked → flat, no xp)
-    // A general/admiral shields its units from city fire too —
-    // added OUTSIDE the embarked ternary, mirroring defenderCS (an embarked
-    // defender keeps its flat CS but still gets its ADMIRAL's aura).
-    const defCSa = defCS + generalAuraCS(state, defender, bestTile);
-    const atkCS = cityDefenseStrength(state, city);
-    defender.hp -= damageRoll(state, atkCS - defCSa, 'pcstk', bestTile);
-    awardDefenseXp(defender); // B-4: +2 to a surviving military defender (attacker is the city — no attacker xp)
-    // A city GIVING the attack is city combat too.
-    warWearinessBattle(state, city.seat, defender.seat, bestTile,
-      { dDied: defender.hp <= 0, city: true });
-    if (defender.hp <= 0) killUnit(state, defender, seat);
-  }
-
-  // The ADDITIONAL Encampment strike (walls-first order
-  // documented above). A city with a COMPLETE unpillaged ENCAMPMENT fires the
-  // same pattern — range 2, nearest seat 0-hostile unit, one roll at the
-  // city's defense strength, no retaliation, never captures — under k="pestk".
-  // The strike needs a LIVE garrison: an Encampment beaten to 0 HP is
-  // occupied, and an occupied Encampment fires nothing (real Civ 6).
-  // `encampmentIntact` folds in the complete/unpillaged tests.
-  for (const city of seatOf(state, seat)!.cities) {
-    if (!city.districts.some((dd) => encampmentIntact(map.tiles[dd.tileIndex])))
-      continue;
-    const center = map.tiles[city.centerIndex];
-    let bestTile = -1;
-    let bestDist = 99;
-    for (const t of map.tiles) {
-      const d = hexDistance(center.col, center.row, t.col, t.row);
-      if (d < 1 || d > 2) continue;
-      if (!unitsAt(state, t.index).some((u) => unitsHostile(state, u, { seat: seat }))) continue;
-      if (d < bestDist) {
-        bestDist = d;
-        bestTile = t.index;
-      }
-    }
-    if (bestTile < 0) continue;
-    const hostiles = unitsAt(state, bestTile).filter((u) => unitsHostile(state, u, { seat: seat }));
-    const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
-    const tt = map.tiles[bestTile];
-    const defCS = defender.embarked
-      ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
-      : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender);
-    const defCSa = defCS + generalAuraCS(state, defender, bestTile); // #70/S2 (B-8), the pcstk mirror
-    const atkCS = cityDefenseStrength(state, city);
-    defender.hp -= damageRoll(state, atkCS - defCSa, 'pestk', bestTile);
-    awardDefenseXp(defender);
-    warWearinessBattle(state, city.seat, defender.seat, bestTile,
-      { dDied: defender.hp <= 0, city: true }); // #51/S7.8f, the pcstk rule
-    if (defender.hp <= 0) killUnit(state, defender, seat);
-  }
-
-  // City healing when no hostile is adjacent. The outer wall pool
-  // heals on the same unbesieged gate and rate, capped at WALLS_HP (real
-  // Civ 6 repairs walls too) — full-HP walled cities still heal their wall,
-  // so the early `continue` on full city HP is gone.
-  for (const city of seatOf(state, seat)!.cities) {
-    const hp = city.hp;
-    const center = map.tiles[city.centerIndex];
-    const besieged = neighbors(map, center).some((n) =>
-      unitsAt(state, n.index).some((u) => unitsHostile(state, u, { seat: seat })),
-    );
-    if (besieged) continue;
-    if (hp < CITY_MAX_HP) city.hp = Math.min(CITY_MAX_HP, hp + CITY_HEAL_PER_TURN);
-    if (city.buildings.includes('ANCIENT_WALLS')) {
-      city.outerHp = Math.min(WALLS_HP, (city.outerHp ?? WALLS_HP) + CITY_HEAL_PER_TURN);
-    }
-    // The Encampment garrison repairs on the SAME unbesieged gate
-    // and rate as the walls — real Civ 6 districts heal back, which is what
-    // lets a beaten-down Encampment re-block its tile later. Deliberate
-    // simplification: the gate is the CITY's siege state, not the district's
-    // own adjacency, so it matches the wall pool exactly.
-    for (const d of city.districts) {
-      if (d.type !== 'ENCAMPMENT') continue;
-      const dt = map.tiles[d.tileIndex];
-      if (dt.district !== 'ENCAMPMENT' || !dt.districtComplete || dt.districtPillaged) continue;
-      dt.encampHp = Math.min(ENCAMPMENT_HP, (dt.encampHp ?? ENCAMPMENT_HP) + CITY_HEAL_PER_TURN);
-    }
-  }
+  // A city's WALLS strike, its Encampment strike and its unbesieged heal used
+  // to run HERE for the seat passed in, while every OTHER seat's ran per city
+  // inside its own seatPhase block — so seat 0's cities fired and healed
+  // twice a turn and every other seat's once. Both engines now run one body,
+  // at the per-city seatPhase position, for every seat. Nothing city-side
+  // belongs in the barbarian phase.
 }

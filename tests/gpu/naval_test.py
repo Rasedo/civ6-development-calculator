@@ -7,7 +7,7 @@ The scripted parity rollout reaches almost none of the naval combat surface:
 seat 0 builds no ships and the civ galley policy rarely fights. These pokes pin
 those semantics the same way space_race_test / war_test do: build a BatchSim
 from a fixture, force the state in-memory, then drive the EXACT engine twin
-(_apply_seat_unit_actions, _barbarian_phase pcstk, _seat_phase rcstk, _spawn_unit,
+(_apply_seat_unit_actions, the shared city strike (cstk), _spawn_unit,
 _flank_support) and assert TS-mirroring behaviour.
 
 Covered here (all gate-unreachable):
@@ -21,7 +21,7 @@ Covered here (all gate-unreachable):
   6. OCEAN gate — a naval mover's spawn probe is blocked over OCEAN pre-
      CARTOGRAPHY, allowed post- (and COAST is ungated). (Embarked OCEAN gating
      is the TS twin in tests/cpu/units/naval-embark.test.ts.)
-  7. City walls strike (pcstk / rcstk) — a ship IS struck (tile-agnostic scan)
+  7. City walls strike (cstk) — a ship IS struck (tile-agnostic scan)
      and an EMBARKED target takes the flat-CS override (proven by a two-run
      damage comparison: lower def ⇒ strictly more damage on the same RNG).
   8. Embarked civilian CAPTURE — POOL-END invariant + keeps-embarked.
@@ -425,10 +425,11 @@ def poke_ocean_gate(rules, path, GALLEY):
     print("  6 OCEAN gate OK (pre-CART blocked, post-CART allowed; COAST ungated)")
 
 
-def poke_walls_pcstk(rules, path, GALLEY, WARRIOR):
-    """7a. Seat-0 city ANCIENT_WALLS strike (pcstk, in _barbarian_phase): a
-    naval unit IS struck (tile-agnostic scan), and an EMBARKED target takes the
-    flat-CS override. Override proved by a two-run damage compare on one RNG."""
+def poke_walls_seat0(rules, path, GALLEY, WARRIOR):
+    """7a. A seat-0 city's ANCIENT_WALLS strike (cstk, the shared per-city
+    body): a naval unit IS struck (tile-agnostic scan), and an EMBARKED target
+    takes the flat-CS override. Override proved by a two-run damage compare on
+    one RNG."""
     sim = build(rules, path)
     for _ in range(25):
         sim.step()
@@ -448,7 +449,7 @@ def poke_walls_pcstk(rules, path, GALLEY, WARRIOR):
     gslot = place_mil(sim, r + 1, tt, GALLEY)  # a civ-seat galley in range
     sim.best_melee[0] = 40
     base = sim.snapshot()
-    sim._barbarian_phase()
+    sim._seat_city_fire_and_heal(0, torch.zeros(sim.B, dtype=torch.long), sim.city_alive[:, 0, 0])
     assert int(sim.major_unit_hp[0, gslot]) < 100, "seat-0 city walls did not strike the ship"
 
     # -- embarked override: a civ-seat WARRIOR at the same tile, embarked vs grounded.
@@ -457,21 +458,21 @@ def poke_walls_pcstk(rules, path, GALLEY, WARRIOR):
     wslot = place_mil(sim, r + 1, tt, WARRIOR, emb=True)
     sim.best_melee[0] = 20  # keep the hit sub-lethal so we can read the damage
     snap = sim.snapshot()
-    sim._barbarian_phase()
+    sim._seat_city_fire_and_heal(0, torch.zeros(sim.B, dtype=torch.long), sim.city_alive[:, 0, 0])
     emb_dmg = 100 - int(sim.major_unit_hp[0, wslot])
     sim.restore(snap)
     sim.major_unit_emb[0, wslot] = False  # same warrior, grounded (combat 20 + terrain)
-    sim._barbarian_phase()
+    sim._seat_city_fire_and_heal(0, torch.zeros(sim.B, dtype=torch.long), sim.city_alive[:, 0, 0])
     gnd_dmg = 100 - int(sim.major_unit_hp[0, wslot])
-    assert emb_dmg > gnd_dmg, f"embarked flat-CS override not applied at pcstk (emb {emb_dmg} <= gnd {gnd_dmg})"
-    print(f"  7a pcstk OK (ship struck; embarked override: dmg {emb_dmg} > grounded {gnd_dmg})")
+    assert emb_dmg > gnd_dmg, f"embarked flat-CS override not applied at cstk (emb {emb_dmg} <= gnd {gnd_dmg})"
+    print(f"  7a seat-0 cstk OK (ship struck; embarked override: dmg {emb_dmg} > grounded {gnd_dmg})")
 
 
-def poke_walls_rcstk(rules, path, GALLEY, WARRIOR):
-    """7b. Civ-seat city ANCIENT_WALLS strike (rcstk, in _seat_phase): a seat-0
+def poke_walls_civ(rules, path, GALLEY, WARRIOR):
+    """7b. A civ-seat city's ANCIENT_WALLS strike (cstk, the same body): a seat-0
     ship IS struck and an EMBARKED seat-0 target takes the flat-CS override.
     Isolation: one at-war civ seat with a walled city and ZERO units/queue, all
-    other seats at peace, all barbarians cleared — only rcstk can touch major_unit_hp."""
+    other seats at peace, all barbarians cleared — only the strike can touch major_unit_hp."""
     sim = build(rules, path)
     for _ in range(25):
         sim.step()
@@ -513,8 +514,8 @@ def poke_walls_rcstk(rules, path, GALLEY, WARRIOR):
     sim.major_unit_emb[0, wslot] = False
     sim._seat_phase()
     gnd_dmg = 100 - int(sim.major_unit_hp[0, wslot])
-    assert emb_dmg > gnd_dmg, f"embarked flat-CS override not applied at rcstk (emb {emb_dmg} <= gnd {gnd_dmg})"
-    print(f"  7b rcstk OK (ship struck; embarked override: dmg {emb_dmg} > grounded {gnd_dmg})")
+    assert emb_dmg > gnd_dmg, f"embarked flat-CS override not applied at cstk (emb {emb_dmg} <= gnd {gnd_dmg})"
+    print(f"  7b civ cstk OK (ship struck; embarked override: dmg {emb_dmg} > grounded {gnd_dmg})")
 
 
 def poke_embarked_capture(rules, path, WARRIOR, BUILDER):
@@ -627,8 +628,8 @@ def main() -> None:
     poke_quadrireme_city(rules, path, QUAD)
     poke_seat0_naval(rules, path, GALLEY, WARRIOR)
     poke_ocean_gate(rules, path, GALLEY)
-    poke_walls_pcstk(rules, path, GALLEY, WARRIOR)
-    poke_walls_rcstk(rules, path, GALLEY, WARRIOR)
+    poke_walls_seat0(rules, path, GALLEY, WARRIOR)
+    poke_walls_civ(rules, path, GALLEY, WARRIOR)
     poke_embarked_capture(rules, path, WARRIOR, BUILDER)
     poke_flank_support(rules, path, GALLEY)
     print("NAVAL (B-6) POKES OK")

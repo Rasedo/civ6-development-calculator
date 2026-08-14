@@ -1614,10 +1614,10 @@ export function seatPhase(state: GameState, seat: number): void {
         // fog reveal on the seat, so this stopped needing a hand-copy.
         acquireTile(state, civCity, next);
       }
-      // The mirror of the seat 0 city strike (combat.ts) —
-      // a foreign city WITH ANCIENT_WALLS fires once per turn at the nearest
-      // unit hostile to THIS civ (barbarians always; the seat 0's at-war
-      // units, civilians included), lowest tile index breaking ties. One
+      // THE city strike, for every seat — a city WITH ANCIENT_WALLS fires
+      // once per turn at the nearest unit hostile to THIS seat (barbarians
+      // always; any at-war seat's units, civilians included), lowest tile
+      // index breaking ties. One
       // roll at the foreign city's defense strength vs the target's defense
       // (cityDefenseStrength; single roll, no retaliation, never captures).
       // civCity order, immediately before the heal — a kill shifts the shared RNG.
@@ -1643,28 +1643,28 @@ export function seatPhase(state: GameState, seat: number): void {
           );
           const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
           const tt = state.map.tiles[bestTile];
-          // support (the pcstk mirror; attacker is the city — no flanking).
+          // support (attacker is the city — no flanking).
           // An embarked target defends at the flat EMBARKED_DEFENSE_CS.
           const defCS = defender.embarked
             ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
             : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender); // B-4 defender veterancy (embarked → flat, no xp)
           // The general/admiral aura shields against city fire,
-          // outside the embarked ternary (the combat.ts pcstk mirror).
+          // outside the embarked ternary.
           const defCSa = defCS + generalAuraCS(state, defender, bestTile);
           const atkCS = cityDefenseStrength(state, civCity);
-          defender.hp -= damageRoll(state, atkCS - defCSa, 'rcstk', bestTile);
+          defender.hp -= damageRoll(state, atkCS - defCSa, 'cstk', bestTile);
           awardDefenseXp(defender); // B-4: +2 to a surviving military defender (attacker is the city)
           warWearinessBattle(state, civCity.seat, defender.seat, bestTile,
-            { dDied: defender.hp <= 0, city: true }); // #51/S7.8f, the pcstk twin
+            { dDied: defender.hp <= 0, city: true }); // #51/S7.8f
           if (defender.hp <= 0) killUnit(state, defender, seat);  // #51/S7.12: a dig, like the seat 0's strike
         }
       }
       // The mirror of the ADDITIONAL Encampment strike
-      // (the pestk twin). A seat city with a COMPLETE unpillaged ENCAMPMENT
+      // A city with a COMPLETE unpillaged ENCAMPMENT
       // fires the same once-per-turn ranged strike right AFTER its walls strike
-      // (walls first, then Encampment — per civCity, before the heal), k="restk".
+      // (walls first, then Encampment — per civCity, before the heal), k="estk".
       // A LIVE garrison is now required — an Encampment reduced to
-      // 0 HP is occupied and fires nothing (the pestk twin's rule).
+      // 0 HP is occupied and fires nothing.
       if (civCity.districts.some((dd) => encampmentIntact(state.map.tiles[dd.tileIndex]))) {
         let bestTile = -1;
         let bestDist = 99;
@@ -1689,12 +1689,12 @@ export function seatPhase(state: GameState, seat: number): void {
           const defCS = defender.embarked
             ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
             : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender);
-          const defCSa = defCS + generalAuraCS(state, defender, bestTile); // #70/S2 (B-8), the rcstk mirror
+          const defCSa = defCS + generalAuraCS(state, defender, bestTile); // #70/S2 (B-8), the cstk mirror
           const atkCS = cityDefenseStrength(state, civCity);
-          defender.hp -= damageRoll(state, atkCS - defCSa, 'restk', bestTile);
+          defender.hp -= damageRoll(state, atkCS - defCSa, 'estk', bestTile);
           awardDefenseXp(defender);
           warWearinessBattle(state, civCity.seat, defender.seat, bestTile,
-            { dDied: defender.hp <= 0, city: true }); // #51/S7.8f, the pestk twin
+            { dDied: defender.hp <= 0, city: true }); // #51/S7.8f
           if (defender.hp <= 0) killUnit(state, defender, seat);  // #51/S7.12: a dig, like the seat 0's strike
         }
       }
@@ -1712,8 +1712,7 @@ export function seatPhase(state: GameState, seat: number): void {
         if (civCity.buildings.includes('ANCIENT_WALLS')) {
           civCity.outerHp = Math.min(WALLS_HP, (civCity.outerHp ?? WALLS_HP) + CITY_HEAL_PER_TURN);
         }
-        // The Encampment garrison repairs on the same gate/rate —
-        // the seat 0's barbarianPhase mirror.
+        // The Encampment garrison repairs on the same gate/rate.
         for (const d of civCity.districts) {
           if (d.type !== 'ENCAMPMENT') continue;
           const dt = state.map.tiles[d.tileIndex];

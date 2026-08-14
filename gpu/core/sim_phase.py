@@ -114,9 +114,6 @@ class SimPhase:
             _gr.scatter_(1, _gk.argsort(dim=1, stable=True), torch.arange(self.RC, device=dev).expand(B, self.RC))
             civ_city_gov = (_gr < _titles_r.unsqueeze(1)) & self.civ_city_alive[:, r]  # [B, RC]
             civ_city_flip = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
-            # Unbesieged cities heal the flat rate, war or not (real Civ 6) —
-            # the same cityHealPerTurn rules field _barbarian_phase reads.
-            heal = int(self.rules.combat.get("cityHealPerTurn", 20))
             # The Hanging-Gardens growth product reads the CIV-wide wonder
             # registry — identical for every j, so it is hoisted per r. A
             # wonder COMPLETION mid-loop (the only in-loop write to its inputs:
@@ -425,207 +422,10 @@ class SimPhase:
                                             self.victory_type.copy_(torch.where(hitp, torch.full_like(self.victory_type, 4), self.victory_type))
                                             self.game_over.logical_or_(hitp)
                 self._seat_border_growth(r + 1, torch.full((B,), j, dtype=torch.long, device=self.device), cact, cul_c)
-                # City strike: a civ city with ANCIENT_WALLS fires once/turn at
-                # the nearest unit hostile to THIS civ (barbarians always;
-                # at-war seats' units, civilians included), range 2, lowest
-                # tile index breaking ties. One roll at the city's defense vs
-                # the target's (single roll, no retaliation, never captures).
-                # rc (slot) order, before the heal — a kill advances the RNG.
-                if self._walls_bidx >= 0:
-                    Bn, Tn, dev2 = self.B, self.T, self.device
-                    bidx = torch.arange(Bn, device=dev2)
-                    walled = cact & self.civ_city_bldg[:, r, j, self._walls_bidx]
-                    if bool(walled.any()):
-                        ctr = self.civ_city_center[:, r, j].clamp(min=0)  # [B]
-                        dist = self.pair_dist[ctr].to(torch.long)  # [B, T]
-                        # ANY unit hostile to this civ, read off _seats_hostile
-                        # — the war relation is one symmetric matrix, so
-                        # hostility is looked up rather than transcribed.
-                        _mil, _civ = self.military_at, self.civilian_at
-                        _mseat = torch.where(_mil >= 0, self.unit_seat.gather(1, _mil.clamp(min=0)), torch.full_like(_mil, -1))
-                        _cseat = torch.where(_civ >= 0, self.unit_seat.gather(1, _civ.clamp(min=0)), torch.full_like(_civ, -1))
-                        hm = self._seats_hostile(r + 1, _mseat)
-                        hc = self._seats_hostile(r + 1, _cseat)
-                        hostile = hm | hc  # [B, T]
-                        valid = walled.unsqueeze(1) & hostile & (dist >= 1) & (dist <= 2)
-                        arangeT = torch.arange(Tn, device=dev2)
-                        key = torch.where(valid, dist * (Tn + 1) + arangeT.reshape(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
-                        best_key = key.min(dim=1).values
-                        tt = key.argmin(dim=1)  # [B]
-                        strike = walled & (best_key < 10**9)
-                        if bool(strike.any()):
-                            # ONE defender slot; "military first" is the entire
-                            # priority (one military + one civilian per tile
-                            # makes the rest unreachable).
-                            _okm, _okc = hm[bidx, tt], hc[bidx, tt]
-                            d_slot = torch.where(_okm, _mil[bidx, tt], torch.where(_okc, _civ[bidx, tt], torch.full_like(tt, -1)))
-                            d_seat = torch.where(_okm, _mseat[bidx, tt], torch.where(_okc, _cseat[bidx, tt], torch.full_like(tt, -1)))
-                            ds0 = d_slot.clamp(min=0)
-                            is_barb = d_seat == BARB_SEAT
-                            # A MILITARY target whose seat class earns xp
-                            # (caps.xp) — seat 0 or a civ seat, never a
-                            # barbarian.
-                            is_vet_mil = _okm & ~is_barb
-                            d_type = self.unit_type[bidx, ds0]
-                            # only a target whose class earns xp carries veterancy
-                            def_xp = torch.where(is_vet_mil, self._xp_lvl_bonus(self.unit_xp[bidx, ds0]), torch.zeros_like(tt))
-                            def_cs = self._type_combat[d_type] + self._tdef_i(bidx, tt) + def_xp
-                            # An embarked target (military or civilian; barbs
-                            # never embark) → flat CS, no terrain, no support.
-                            d_emb = self.unit_emb[bidx, ds0] & (d_slot >= 0)
-                            def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
-                            # Garrison bonus: this civ's OWN military standing
-                            # on the city's centre tile.
-                            gslot = self.military_at[bidx, ctr]
-                            gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == r + 1)).long()
-                            atk_cs = torch.maximum(self.civ_only_best_melee[:, r], torch.full_like(self.civ_only_best_melee[:, r], 15)) + gar * 5
-                            # the defending unit is wounded (the attacker is the city)
-                            def_hp = self.unit_hp[bidx, ds0]
-                            def_e = def_cs - self._wound(def_hp)
-                            # The struck unit gains support from adjacent
-                            # same-side military; the attacker is the city, so
-                            # there is no flanking.
-                            # Support keys on the DEFENDER's own seat:
-                            # supportCount counts units with
-                            # `u.seat === defender.seat`, which is what
-                            # `d_seat` holds.
-                            _, _sp = self._flank_support(tt, d_seat, torch.full((Bn,), -1, dtype=torch.long, device=dev2))
-                            def_e = def_e + SUPPORT_CS * torch.where(d_emb, torch.zeros_like(_sp), _sp)  # embarked → no support
-                            # DEFENDER-side general aura (the roll is
-                            # atk_cs - def_e, so the aura REDUCES the damage
-                            # taken), outside the embarked override. The aura
-                            # is the DEFENDER's OWN seat's, which is what
-                            # `d_seat` holds. Barbs own no general (-1) and a
-                            # CIVILIAN is combat-0, so the aura is 0 for both.
-                            _def_civ_u = torch.where(is_vet_mil, d_seat, torch.full_like(tt, -1))
-                            _def_nav = torch.where(is_vet_mil, self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
-                            def_e = def_e + self._gen_aura_cs(_def_civ_u, tt, d_emb | _def_nav).to(def_e.dtype)
-                            self._city_strike_resolve(  # one rule, four callers
-                                strike, tt, d_slot, d_seat, _okm, _okc, is_vet_mil, atk_cs,
-                                def_e, def_hp, r + 1, "rcstk")
-                # The ADDITIONAL Encampment strike (k="restk", the twin of
-                # walls' "rcstk"). City (r, j), if it owns a COMPLETE
-                # unpillaged ENCAMPMENT, fires the same once/turn ranged strike
-                # right AFTER its walls strike — walls first, then Encampment,
-                # per rc, before the heal. civ_city_dist_tile is districts_cat-
-                # indexed, matching self._encamp_didx and self.district.
-                if self._encamp_didx >= 0 and self.districts_on:
-                    Bn, Tn, dev2 = self.B, self.T, self.device
-                    bidx = torch.arange(Bn, device=dev2)
-                    enc_reg = self.civ_city_dist_tile[:, r, j, self._encamp_didx]  # [B]
-                    # `encamp_hp > 0` is part of the gate: a beaten-down
-                    # Encampment is occupied and fires nothing (the pestk twin).
-                    enc_ok = (enc_reg >= 0) & self.district_complete.gather(1, enc_reg.clamp(min=0).unsqueeze(1)).squeeze(1) & ~self.district_pillaged.gather(1, enc_reg.clamp(min=0).unsqueeze(1)).squeeze(1) & (self.encamp_hp.gather(1, enc_reg.clamp(min=0).unsqueeze(1)).squeeze(1) > 0)
-                    has_enc = cact & enc_ok
-                    if bool(has_enc.any()):
-                        ctr = self.civ_city_center[:, r, j].clamp(min=0)  # [B]
-                        dist = self.pair_dist[ctr].to(torch.long)  # [B, T]
-                        # ANY unit hostile to this civ, read off _seats_hostile
-                        # — the war relation is one symmetric matrix, so
-                        # hostility is looked up rather than transcribed.
-                        _mil, _civ = self.military_at, self.civilian_at
-                        _mseat = torch.where(_mil >= 0, self.unit_seat.gather(1, _mil.clamp(min=0)), torch.full_like(_mil, -1))
-                        _cseat = torch.where(_civ >= 0, self.unit_seat.gather(1, _civ.clamp(min=0)), torch.full_like(_civ, -1))
-                        hm = self._seats_hostile(r + 1, _mseat)
-                        hc = self._seats_hostile(r + 1, _cseat)
-                        hostile = hm | hc  # [B, T]
-                        valid = has_enc.unsqueeze(1) & hostile & (dist >= 1) & (dist <= 2)
-                        arangeT = torch.arange(Tn, device=dev2)
-                        key = torch.where(valid, dist * (Tn + 1) + arangeT.reshape(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
-                        best_key = key.min(dim=1).values
-                        tt = key.argmin(dim=1)  # [B]
-                        strike = has_enc & (best_key < 10**9)
-                        if bool(strike.any()):
-                            # ONE defender slot; "military first" is the entire
-                            # priority (one military + one civilian per tile
-                            # makes the rest unreachable).
-                            _okm, _okc = hm[bidx, tt], hc[bidx, tt]
-                            d_slot = torch.where(_okm, _mil[bidx, tt], torch.where(_okc, _civ[bidx, tt], torch.full_like(tt, -1)))
-                            d_seat = torch.where(_okm, _mseat[bidx, tt], torch.where(_okc, _cseat[bidx, tt], torch.full_like(tt, -1)))
-                            ds0 = d_slot.clamp(min=0)
-                            is_barb = d_seat == BARB_SEAT
-                            # A MILITARY target whose seat class earns xp
-                            # (caps.xp) — seat 0 or a civ seat, never a
-                            # barbarian.
-                            is_vet_mil = _okm & ~is_barb
-                            d_type = self.unit_type[bidx, ds0]
-                            def_xp = torch.where(is_vet_mil, self._xp_lvl_bonus(self.unit_xp[bidx, ds0]), torch.zeros_like(tt))
-                            def_cs = self._type_combat[d_type] + self._tdef_i(bidx, tt) + def_xp
-                            d_emb = self.unit_emb[bidx, ds0] & (d_slot >= 0)
-                            def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
-                            # Garrison bonus: this civ's OWN military standing
-                            # on the city's centre tile.
-                            gslot = self.military_at[bidx, ctr]
-                            gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == r + 1)).long()
-                            atk_cs = torch.maximum(self.civ_only_best_melee[:, r], torch.full_like(self.civ_only_best_melee[:, r], 15)) + gar * 5
-                            def_hp = self.unit_hp[bidx, ds0]
-                            def_e = def_cs - self._wound(def_hp)
-                            # Support keys on the DEFENDER's own seat:
-                            # supportCount counts units with
-                            # `u.seat === defender.seat`, which is what
-                            # `d_seat` holds.
-                            _, _sp = self._flank_support(tt, d_seat, torch.full((Bn,), -1, dtype=torch.long, device=dev2))
-                            def_e = def_e + SUPPORT_CS * torch.where(d_emb, torch.zeros_like(_sp), _sp)
-                            # The rcstk mirror: defender-side general aura
-                            # (MILITARY only), outside the embarked override.
-                            _def_civ_u = torch.where(is_vet_mil, d_seat, torch.full_like(tt, -1))  # the DEFENDER's own seat
-                            _def_nav = torch.where(is_vet_mil, self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
-                            def_e = def_e + self._gen_aura_cs(_def_civ_u, tt, d_emb | _def_nav).to(def_e.dtype)
-                            self._city_strike_resolve(  # one rule, four callers
-                                strike, tt, d_slot, d_seat, _okm, _okc, is_vet_mil, atk_cs,
-                                def_e, def_hp, r + 1, "restk")
-                # A siege pins the HP: any adjacent unit hostile to THIS civ —
-                # an at-war seat's units, CIVILIANS included per unitsHostile,
-                # or barbarians — read live at this point in the city loop.
-                nbh = self.neigh[self.civ_city_center[:, r, j].clamp(min=0)]  # [B, 6]
-                nbhc = nbh.clamp(min=0)
-                _ha_m = self.military_at.gather(1, nbhc)
-                _ha_s = torch.where(_ha_m >= 0, self.unit_seat.gather(1, _ha_m.clamp(min=0)), torch.full_like(_ha_m, -1))
-                _ha_c = self.civilian_at.gather(1, nbhc)
-                _ha_cs = torch.where(_ha_c >= 0, self.unit_seat.gather(1, _ha_c.clamp(min=0)), torch.full_like(_ha_c, -1))
-                hostile_adj = (_ha_s == BARB_SEAT) | (
-                    ((_ha_s == 0) | (_ha_cs == 0))
-                    & self.civ_only_atwar[:, r].unsqueeze(1)
-                )
-                # An adjacent AT-WAR civ seat's unit (military or civilian)
-                # besieges this city too — the symmetric unitsHostile. civ_pair_war[:,
-                # r] is gathered by the neighbour's civ index, read straight off
-                # its seat; own-civ units (== r) never besiege.
-                vmn = torch.where((_ha_s > 0) & (_ha_s != BARB_SEAT), _ha_m, torch.full_like(_ha_m, -1))
-                vcn = torch.where((_ha_cs > 0) & (_ha_cs != BARB_SEAT), _ha_c, torch.full_like(_ha_c, -1))
-                vmn_civ = torch.where(vmn >= 0, _ha_s - 1, torch.full_like(vmn, -1))
-                vcn_civ = torch.where(vcn >= 0, _ha_cs - 1, torch.full_like(vcn, -1))
-                war_vmn = (vmn >= 0) & (vmn_civ != r) & self.civ_pair_war[:, r].gather(1, vmn_civ.clamp(min=0))
-                war_vcn = (vcn >= 0) & (vcn_civ != r) & self.civ_pair_war[:, r].gather(1, vcn_civ.clamp(min=0))
-                hostile_adj = hostile_adj | war_vmn | war_vcn
-                besieged_j = ((nbh >= 0) & hostile_adj).any(dim=1)
-                self.civ_city_hp[:, r, j] = torch.where(
-                    cact & ~besieged_j, (self.civ_city_hp[:, r, j] + heal).clamp(max=rr.get("cityMaxHp", 200)), self.civ_city_hp[:, r, j]
-                )
-                # the outer wall pool heals on the same gate
-                if self._walls_bidx >= 0:
-                    heal_oj = cact & ~besieged_j & self.civ_city_bldg[:, r, j, self._walls_bidx]
-                    self.civ_city_outer_hp[:, r, j] = torch.where(
-                        heal_oj, (self.civ_city_outer_hp[:, r, j] + heal).clamp(max=self._walls_hp), self.civ_city_outer_hp[:, r, j]
-                    )
-                # The Encampment garrison repairs on the same gate and rate.
-                # civ_city_dist_tile is districts_cat-indexed, so the Encampment
-                # column holds the tile.
-                if self._encamp_didx >= 0:
-                    _et = self.civ_city_dist_tile[:, r, j, self._encamp_didx]  # [B]
-                    _etc = _et.clamp(min=0)
-                    _live = (
-                        (_et >= 0)
-                        & self.district_complete.gather(1, _etc.unsqueeze(1)).squeeze(1)
-                        & ~self.district_pillaged.gather(1, _etc.unsqueeze(1)).squeeze(1)
-                    )
-                    _ok = cact & ~besieged_j & _live
-                    _cur = self.encamp_hp.gather(1, _etc.unsqueeze(1)).squeeze(1)
-                    self.encamp_hp[:, :] = self.encamp_hp.scatter(
-                        1,
-                        _etc.unsqueeze(1),
-                        torch.where(_ok, (_cur + heal).clamp(max=self._encamp_hp_max), _cur).unsqueeze(1),
-                    )
+                # THE CITY'S OWN DEFENSE: walls strike, Encampment strike,
+                # then the unbesieged heal — ONE body, every seat row, at this
+                # per-city position.
+                self._seat_city_fire_and_heal(r + 1, torch.full((B,), j, dtype=torch.long, device=self.device), cact)
 
             # Loyalty collapses resolve after the city loop, to the
             # max-pressure seat (first_argmax over [seat 0, civ 0, civ 1, ...],
@@ -734,6 +534,133 @@ class SimPhase:
                 self.civ_only_peaceturns.copy_(torch.where(oh, torch.zeros_like(self.civ_only_peaceturns), self.civ_only_peaceturns))
         if self.R > 0:
             self._geo_make_peace()
+
+    def _seat_city_strike(self, row: int, col: torch.Tensor, fire: torch.Tensor, key: str) -> None:
+        """ONE city's once-per-turn RANGED STRIKE — target scan plus the battle.
+
+        `col` [B] is the city slot per batch row, `fire` [B] whether it may
+        shoot at all (walls present / a live Encampment). The target is the
+        NEAREST unit hostile to seat row `row` at range 1-2, ties broken by the
+        lowest tile index; one roll at the city's defense strength against the
+        target's, no retaliation, never captures.
+
+        Hostility is `_seats_hostile` on the row's own line of the war matrix —
+        `unitsHostile` asked of the whole map at once — so barbarians, at-war
+        majors and at-war city-states all answer through one lookup and no seat
+        gets a hand-written hostility set of its own."""
+        Bn, Tn, dev2 = self.B, self.T, self.device
+        if not bool(fire.any()):
+            return
+        bidx = torch.arange(Bn, device=dev2)
+        ctr = self.city_center[bidx, row, col].clamp(min=0)  # [B]
+        dist = self.pair_dist[ctr].to(torch.long)  # [B, T]
+        _mil, _civ = self.military_at, self.civilian_at
+        _mseat = torch.where(_mil >= 0, self.unit_seat.gather(1, _mil.clamp(min=0)), torch.full_like(_mil, -1))
+        _cseat = torch.where(_civ >= 0, self.unit_seat.gather(1, _civ.clamp(min=0)), torch.full_like(_civ, -1))
+        hm = self._seats_hostile(row, _mseat)
+        hc = self._seats_hostile(row, _cseat)
+        valid = fire.unsqueeze(1) & (hm | hc) & (dist >= 1) & (dist <= 2)
+        arangeT = torch.arange(Tn, device=dev2)
+        k = torch.where(valid, dist * (Tn + 1) + arangeT.reshape(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
+        best_key = k.min(dim=1).values
+        tt = k.argmin(dim=1)  # [B] target tile (garbage where no target)
+        strike = fire & (best_key < 10**9)
+        if not bool(strike.any()):
+            return
+        # ONE defender slot; "military first" is the entire priority (one
+        # military and one civilian per tile makes the rest unreachable).
+        _okm, _okc = hm[bidx, tt], hc[bidx, tt]
+        d_slot = torch.where(_okm, _mil[bidx, tt], torch.where(_okc, _civ[bidx, tt], torch.full_like(tt, -1)))
+        d_seat = torch.where(_okm, _mseat[bidx, tt], torch.where(_okc, _cseat[bidx, tt], torch.full_like(tt, -1)))
+        ds0 = d_slot.clamp(min=0)
+        # A MILITARY target whose seat class earns xp — never a barbarian.
+        is_vet_mil = _okm & (d_seat != BARB_SEAT)
+        d_type = self.unit_type[bidx, ds0]
+        def_xp = torch.where(is_vet_mil, self._xp_lvl_bonus(self.unit_xp[bidx, ds0]), torch.zeros_like(tt))
+        def_cs = self._type_combat[d_type] + self._tdef_i(bidx, tt) + def_xp
+        # An embarked target (military or civilian; barbs never embark) → flat
+        # CS, no terrain and no support.
+        d_emb = self.unit_emb[bidx, ds0] & (d_slot >= 0)
+        def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
+        # Garrison bonus: this seat's OWN military standing on the centre tile.
+        gslot = self.military_at[bidx, ctr]
+        gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == row)).long()
+        bm = self.civ_best_melee[:, row]
+        atk_cs = torch.maximum(bm, torch.full_like(bm, 15)) + gar * 5
+        # the defending unit is wounded (the attacker is the city)
+        def_hp = self.unit_hp[bidx, ds0]
+        def_e = def_cs - self._wound(def_hp)
+        # Support keys on the DEFENDER's own seat (supportCount counts units
+        # with `u.seat === defender.seat`); the attacker is a city, so there is
+        # no flanking.
+        _, _sp = self._flank_support(tt, d_seat, torch.full((Bn,), -1, dtype=torch.long, device=dev2))
+        def_e = def_e + SUPPORT_CS * torch.where(d_emb, torch.zeros_like(_sp), _sp)
+        # DEFENDER-side general aura (the roll is atk_cs - def_e, so it REDUCES
+        # the damage taken), outside the embarked override. Barbs own no
+        # general and a civilian is combat-0, so both read 0.
+        _def_seat = torch.where(is_vet_mil, d_seat, torch.full_like(tt, -1))
+        _def_nav = torch.where(is_vet_mil, self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
+        def_e = def_e + self._gen_aura_cs(_def_seat, tt, d_emb | _def_nav).to(def_e.dtype)
+        self._city_strike_resolve(strike, tt, d_slot, d_seat, _okm, _okc, is_vet_mil,
+                                  atk_cs, def_e, def_hp, row, key)
+
+    def _seat_city_fire_and_heal(self, row: int, col: torch.Tensor, act: torch.Tensor) -> None:
+        """A city's WALLS strike, its ADDITIONAL Encampment strike and the
+        unbesieged heal — ONE body, every seat row, at the per-city position
+        game.ts's seatPhase uses (right after border growth, before the next
+        city's block).
+
+        DRAW ORDER: walls first, then Encampment, then the heal, per city. A
+        city holding both rolls twice, and a walls kill removes a target the
+        Encampment roll would have taken.
+
+        There is no second application anywhere: the seat-0 copy that used to
+        run inside barbarianPhase is gone from BOTH engines. Real Civ 6 fires
+        and heals a city in its OWNER's turn, once."""
+        Bn, dev2 = self.B, self.device
+        bidx = torch.arange(Bn, device=dev2)
+        heal = int(self.rules.combat.get("cityHealPerTurn", 20))
+        walled = None
+        if self._walls_bidx >= 0:
+            walled = act & self.city_bldg[bidx, row, col, self._walls_bidx]
+            self._seat_city_strike(row, col, walled, "cstk")
+        enc_reg = e0 = None
+        if self._encamp_didx >= 0 and self.districts_on:
+            # the city's OWN registry, which a capture clears — the districts
+            # walk TS makes.
+            enc_reg = self.city_dist_tile[bidx, row, col, self._encamp_didx]  # [B]
+            e0 = enc_reg.clamp(min=0)
+            enc_live = (enc_reg >= 0) & self.district_complete[bidx, e0] & ~self.district_pillaged[bidx, e0]
+            # `encamp_hp > 0` is part of the FIRING gate but not of the repair
+            # gate: an Encampment beaten to 0 is occupied and shoots nothing,
+            # yet it still heals back.
+            self._seat_city_strike(row, col, act & enc_live & (self.encamp_hp[bidx, e0] > 0), "estk")
+        # A SIEGE pins the HP: any adjacent unit hostile to this seat —
+        # civilians included, per unitsHostile — read live at this point.
+        ctr = self.city_center[bidx, row, col].clamp(min=0)
+        nbh = self.neigh[ctr]  # [B, 6]
+        nbc = nbh.clamp(min=0)
+        _am = self.military_at.gather(1, nbc)
+        _ac = self.civilian_at.gather(1, nbc)
+        _as = torch.where(_am >= 0, self.unit_seat.gather(1, _am.clamp(min=0)), torch.full_like(_am, -1))
+        _acs = torch.where(_ac >= 0, self.unit_seat.gather(1, _ac.clamp(min=0)), torch.full_like(_ac, -1))
+        besieged = ((self._seats_hostile(row, _as) | self._seats_hostile(row, _acs)) & (nbh >= 0)).any(dim=1)
+        ok = act & ~besieged
+        # Unbesieged cities heal the flat rate, war or not (real Civ 6). The
+        # outer wall pool heals on the SAME gate and rate, full-HP or not.
+        hp = self.city_hp[bidx, row, col]
+        self.city_hp[bidx, row, col] = torch.where(
+            ok, (hp + heal).clamp(max=int(self.rules.combat.get("cityMaxHp", 200))), hp)
+        if walled is not None:
+            oh = self.city_outer_hp[bidx, row, col]
+            self.city_outer_hp[bidx, row, col] = torch.where(
+                ok & self.city_bldg[bidx, row, col, self._walls_bidx], (oh + heal).clamp(max=self._walls_hp), oh)
+        if e0 is not None:
+            # The Encampment garrison repairs on the same gate and rate — the
+            # gate is the CITY's siege state, not the district's own adjacency.
+            rep = ok & (enc_reg >= 0) & self.district_complete[bidx, e0] & ~self.district_pillaged[bidx, e0]
+            cur = self.encamp_hp[bidx, e0]
+            self.encamp_hp[bidx, e0] = torch.where(rep, (cur + heal).clamp(max=self._encamp_hp_max), cur)
 
     def _seat_research_tail(self, row: int, active: torch.Tensor, sci_sum: torch.Tensor,
                             cul_sum: torch.Tensor, gold_sum: torch.Tensor,

@@ -1375,7 +1375,7 @@ class SimEconomy:
 
         It joins every unit-vs-unit roll, every unit-vs-CITY roll (rcty/rctyc,
         csty/cstyc, pcty/pctyc, rngcs, vrngc, attacker side) and every
-        CITY-STRIKE roll (pcstk/pestk/rcstk/restk, DEFENDER side). Absent from
+        CITY-STRIKE roll (cstk/estk, DEFENDER side). Absent from
         'rngrc' — TS does not add it there."""
         return self._gen_aura_hit(civ_unified, tile, naval).to(self.dtype) * self._gen_aura_cs_val
 

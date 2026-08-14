@@ -3295,21 +3295,21 @@ class SimSeats:
                              is_mil: torch.Tensor, atk_cs: torch.Tensor,
                              def_e: torch.Tensor, def_hp: torch.Tensor,
                              striker_row, key: str) -> None:
-        """A CITY firing on the best target in range — the resolution half,
-        shared by all four strikes.
+        """A CITY firing on the best target in range — the resolution half of
+        both strikes.
 
-        The four roll keys `pcstk`, `pestk`, `rcstk` and `restk` are the same rule
-        under different striker/target classes — one roll at the city's strength,
-        no retaliation, never captures, the damaged defender's occupancy cleared
-        on death and XP_DEFEND to a MILITARY survivor. Only WHICH city fires
-        (`best_melee` vs `civ_only_best_melee[:, r]`) and hence the roll key differ.
+        `cstk` (walls) and `estk` (Encampment) are the same rule under different
+        FIRING GATES — one roll at the city's strength, no retaliation, never
+        captures, the damaged defender's occupancy cleared on death and
+        XP_DEFEND to a MILITARY survivor. There is no seat in the key: every
+        seat's city fires the same two rolls.
 
-        TARGET SELECTION stays with each caller: a seat-0 city and a civ city
-        scan for hostiles differently, and an Encampment strike needs a live
-        garrison its walls counterpart does not. What is shared is the BATTLE.
+        TARGET SELECTION stays with the caller (`_seat_city_strike`), because an
+        Encampment strike needs a live garrison its walls counterpart does not.
+        What is shared is the BATTLE.
 
-        `striker_row` is the firing seat's war-matrix row — 0 for seat 0, r+1 for
-        civ r — so the war-weariness hook is written once instead of four times.
+        `striker_row` is the firing seat's war-matrix row, so the war-weariness
+        hook is written once instead of once per caller.
         """
         d = self._damage_roll(strike, atk_cs - def_e, k=key, tile=tt)
         # a city GIVING the attack is city combat, so both sides score at the
