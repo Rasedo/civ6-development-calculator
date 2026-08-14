@@ -465,7 +465,6 @@ _MUTABLE = [
     "victory_type", "winner", "space_done",  # space-race chain progress
     "seat0_unit_next",
     "district_dead",  # captured districts are paved-but-dead
-    "coastal", "river_center", "dist",
     "civ_cap_tile",  # capitalTiles — capital identity + the domination anchor (cap_tile / civ_only_cap_tile are views)
     # `tile_seat` is STATE — the city-state part of tile ownership is stored
     # only here (`citystate_at` is a view of it), so it must round-trip.

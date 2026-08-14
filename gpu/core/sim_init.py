@@ -140,9 +140,6 @@ class SimInit:
         # --- per-slot city data (dynamic: a slot binds to a tile when a SETTLER
         # founds there; nothing is pre-founded, and every center stat below is
         # derived from the tile planes at founding) --------------------------
-        self.coastal = torch.zeros(B, C, dtype=torch.bool, device=device)
-        self.river_center = torch.zeros(B, C, dtype=torch.bool, device=device)
-        self.dist = torch.full((B, C, T), 127, dtype=torch.int16, device=device)
         # SLOT ORDER IS TS ARRAY ORDER for every seat row (#110): cities
         # append at last-alive+1 (the push mirror) and the step-end reclaim
         # compacts stably (the splice mirror), so every order-coupled mirror

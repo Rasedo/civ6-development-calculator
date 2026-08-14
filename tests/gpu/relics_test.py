@@ -103,7 +103,7 @@ def main() -> None:
 
     # --- 5) the works SURVIVE a transfer and a slot compaction --------------
     # Real Civ 6: the victor gains the Great Works held in a captured city.
-    #   a. _transfer_rc_to_rc must clear EVERY work plane on the receiving slot
+    #   a. _transfer_city must clear EVERY work plane on the receiving slot
     #      and carry the source's across, or the new city inherits whatever the
     #      REUSED slot index still holds from a dead occupant.
     #   b. _CITY_SLOT_FIELDS must name every work plane, or a compaction leaves
@@ -122,7 +122,7 @@ def main() -> None:
         if dest < s3.RC:
             s3.civ_city_relics[0, 1, dest] = 7
             s3.civ_city_gw_art[0, 1, dest] = 7
-            s3._transfer_rc_to_rc(0, 0, j, 1)
+            s3._transfer_city(0, 1, j, 2, conquest=False)
             assert int(s3.civ_city_relics[0, 1, dest]) == 1, (
                 f"the flipped city must carry its ONE relic, got {int(s3.civ_city_relics[0, 1, dest])} "
                 "(7 means the receiving slot kept a dead city's ghost)"

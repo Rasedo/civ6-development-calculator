@@ -1528,18 +1528,6 @@
     "why": "captured districts are paved but dead. The TS twin is 'the tile carries a district the owning city's registry does not list', and that registry is exactly the object City.districts is excluded for."
    },
    {
-    "plane": "coastal",
-    "why": "founding-time site data; TS recomputes it from the map at every read."
-   },
-   {
-    "plane": "river_center",
-    "why": "founding-time site data; TS recomputes it from the map at every read."
-   },
-   {
-    "plane": "dist",
-    "why": "per-city hex-distance table, a cache of the static map."
-   },
-   {
     "plane": "city_id",
     "why": "persistent city ids on the seat axis (TS City.id); the digest's city join key is the center tile, and the allocator itself is pinned by the nextCityId field."
    },

@@ -155,10 +155,7 @@ def test_capture_plunder(rules, path):
     while bool(sim.civ_city_alive[0, r].any()) and bool((~sim.alive[0]).any()):
         jj = int(sim.civ_city_alive[0, r].nonzero()[0, 0])
         t0 = float(sim.treasury[0])
-        sim._capture_civ_city(
-            torch.tensor([0]), torch.tensor([r]), torch.tensor([jj]),
-            torch.tensor([int(sim.civ_city_center[0, r, jj])]),
-        )
+        sim._transfer_city(0, r + 1, jj, 0, conquest=True)
         caps += 1
         assert float(sim.treasury[0]) == t0 + 40.0, "capture must plunder +40 (TS combat.ts:354)"
         if bool(sim.civ_city_alive[0, r].any()):
@@ -179,10 +176,7 @@ def test_capture_plunder(rules, path):
         sim.war[0, 0, 1 + (r2)] = True
         sim.war[0, 1 + (r2), 0] = True
         t1 = float(sim.treasury[0])
-        sim._capture_civ_city(
-            torch.tensor([0]), torch.tensor([r2]), torch.tensor([j2]),
-            torch.tensor([int(sim.civ_city_center[0, r2, j2])]),
-        )
+        sim._transfer_city(0, r2 + 1, j2, 0, conquest=True)
         assert float(sim.treasury[0]) == t1, "raze must not plunder"
         assert bool(sim.civ_only_atwar[0, r2]), "raze must not end the war (TS early return)"
     print(f"  capture plunder OK ({caps} captures: +40 each, war ends on the last; raze: neither)")

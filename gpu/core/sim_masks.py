@@ -56,11 +56,12 @@ class SimMasks:
                 cc = self._adj_center_count()  # [B,T] adjacent CITY_CENTERs (global) — Aqueduct requires, Encampment forbids
                 for c in range(C if self._rl_any_city else 1):
                     site_c = self.site[:, c].clamp(min=0)
+                    near_c = self.pair_dist[site_c] <= 3  # [B, T] hex distance from THIS city's centre
                     cap_c = torch.div(self.pop[:, c] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(pop_c)
                     under_cap = (spec_tile & (self.owner == c)).sum(dim=1) < cap_c  # only specialty districts count
-                    base = (self.owner == c) & self.d_usable & (self.district < 0) & (self.built_wonder < 0) & (self.improvement < 0) & (self.res_priority <= 1) & (self.dist[:, c] <= 3)
+                    base = (self.owner == c) & self.d_usable & (self.district < 0) & (self.built_wonder < 0) & (self.improvement < 0) & (self.res_priority <= 1) & near_c
                     base[ar, site_c] = False
-                    cbase = (self.owner == c) & self.coastal_water & (self.district < 0) & (self.built_wonder < 0) & (self.improvement < 0) & (self.res_priority <= 1) & (self.dist[:, c] <= 3)
+                    cbase = (self.owner == c) & self.coastal_water & (self.district < 0) & (self.built_wonder < 0) & (self.improvement < 0) & (self.res_priority <= 1) & near_c
                     cbase[ar, site_c] = False
                     has_land = base.any(dim=1)  # [B]
                     has_aq = (base & (cc >= 1) & self.aqsrc).any(dim=1)  # [B] adjacent center + water source
@@ -184,7 +185,9 @@ class SimMasks:
                     pop_sum = (self.pop * self.alive.to(self.pop.dtype)).sum(dim=1)
                 pred = pop_sum >= row["pop"]
             elif kind == "coastalCity":
-                pred = (self.alive & self.coastal).any(dim=1)
+                # isCoastalLand at each live centre, read off the static tile
+                # plane (`site` is -1 on a dead slot, which `alive` masks out).
+                pred = (self.alive & self.coastal_land.gather(1, self.site.clamp(min=0))).any(dim=1)
             elif kind == "cities":
                 pred = self.alive.sum(dim=1) >= row["count"]
             elif kind == "greatPeople":

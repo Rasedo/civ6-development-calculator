@@ -639,7 +639,7 @@ class SimStep:
         # (floor 0), immediately after the tourism accumulator. The
         # +WARMONGER_DOW accrual on declaring has no twin here because no
         # declare-war grievance path reaches seat 0; the CAPTURE accrual does
-        # mirror, in _capture_civ_city.
+        # mirror, in _transfer_city.
         self.warmonger.copy_(torch.where(
             active0 & (self.warmonger > 0) & ~self.civ_only_atwar.any(dim=1),
             self.warmonger - 1,

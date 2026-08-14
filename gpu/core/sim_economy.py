@@ -675,7 +675,10 @@ class SimEconomy:
             torch.ones(B, NB, dtype=torch.bool, device=dev),
         )  # Temple/Amphitheater/… gate on a civic (mirrors availableBuildings' unlocks.buildings)
         unlocked = unlocked & unlocked_civic
-        base = unlocked.unsqueeze(1) & ~self.buildings & (~rd.b_river.reshape(1, 1, -1) | self.river_center.unsqueeze(2))
+        # hasRiver at each centre, read off the static tile plane (a dead
+        # slot's site is -1; its column is masked by `alive` downstream).
+        river_c = self.tile_river.gather(1, self.site.clamp(min=0))  # [B, C]
+        base = unlocked.unsqueeze(1) & ~self.buildings & (~rd.b_river.reshape(1, 1, -1) | river_c.unsqueeze(2))
         if not include_worship:
             # Worship buildings are faith-purchase ONLY: `queueBuilding`
             # refuses them outright, but they ARE legal for
@@ -984,7 +987,7 @@ class SimEconomy:
         B, T, dev = self.B, self.T, self.device
         site_c = self.site[:, c].clamp(min=0)
         surface = self.coastal_water if placement == 2 else self.d_usable  # Harbor sits on coastal water, others on land
-        elig = ((self.owner == c) & surface & (self.district < 0) & (self.built_wonder < 0) & (self.improvement < 0) & (self.res_priority <= 1) & (self.dist[:, c] <= 3))
+        elig = ((self.owner == c) & surface & (self.district < 0) & (self.built_wonder < 0) & (self.improvement < 0) & (self.res_priority <= 1) & (self.pair_dist[site_c] <= 3))
         elig[torch.arange(B, device=dev), site_c] = False
         if placement in (1, 3):  # no-adjacency-yield districts (Aqueduct / Encampment)
             cc = self._adj_center_count()  # [B, T] adjacent CITY_CENTERs (any seat) — the requires/notAdjacentToCityCenter tests

@@ -6,13 +6,13 @@ capital immunity ride inside the loyalty loops).
     $env:PYTHONUTF8='1'; python tests/gpu/governors_test.py
 
 Every poke builds a BatchSim from a fixture, forces state in-memory, then
-drives the exact engine twin (_transfer_rc_to_rc, the step-tail era boundary,
+drives the exact engine twin (_transfer_city, the step-tail era boundary,
 _apply_loyalty_and_flips, _seat_phase). EVERY constant comes from rules.json
 through the engine's own loaders (sim._era_len/_era_dark/_era_gold/_era_pts/
 _gov_per/_gov_max/_gov_loy/_age_factor) — nothing is hardcoded.
 
 Covered:
-  a. Event hooks: _transfer_rc_to_rc bumps the RECEIVER's era_score by the
+  a. Event hooks: _transfer_city bumps the RECEIVER's era_score by the
      conquer const (and nobody else's); _era_pts is exactly rules.json.eras.
      found/wonder/pantheon/religion/gp share the identical `+= const` shape at
      their own sites, and their score→age arithmetic is covered by poke b.
@@ -135,7 +135,7 @@ def two_city_setup(rules, path):
 
 # ------------------------------------------------------------------ pokes -----
 def poke_event_hooks(rules, path):
-    """a. _transfer_rc_to_rc bumps ONLY the receiver's era_score by conquer;
+    """a. _transfer_city bumps ONLY the receiver's era_score by conquer;
     _era_pts is exactly rules.json.eras (found/wonder/pantheon/religion/gp are
     the same shape at their own sites)."""
     er = rules.eras
@@ -148,7 +148,7 @@ def poke_event_hooks(rules, path):
     civ_only_to = next(r for r in range(sim.R) if r != civ_only_from)
     j = int(sim.civ_city_alive[0, civ_only_from].nonzero(as_tuple=True)[0][0])
     before = sim.era_score[0].clone()
-    sim._transfer_rc_to_rc(0, civ_only_from, j, civ_only_to)
+    sim._transfer_city(0, civ_only_from + 1, j, civ_only_to + 1, conquest=False)
     delta = (sim.era_score[0] - before).tolist()
     exp = [0] * (1 + sim.R)
     exp[civ_only_to + 1] = conquer

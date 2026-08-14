@@ -9,7 +9,7 @@ transfer hygiene).
 Every poke builds a BatchSim from a fixture, forces the state in-memory, then
 drives the EXACT engine surface: drive._geo_turn decides (the ported scans) and
 the arms _geo_denounce_and_ally / _geo_declare_wars / _geo_make_peace
-re-validate and execute; plus _seat_phase and _transfer_rc_to_rc. Thresholds
+re-validate and execute; plus _seat_phase and _transfer_city. Thresholds
 come from rules.json (never hardcoded).
 
 Covered:
@@ -29,7 +29,7 @@ Covered:
      war accrues nothing and decays at the at-war rate, full peace decays four
      times faster, the casus belli picks an era COLUMN rather than a
      multiplier, and every seat axis behaves identically.
-  g. _transfer_rc_to_rc: source slot dies with full registry hygiene, receiver
+  g. _transfer_city: source slot dies with full registry hygiene, receiver
      appends at the END of the alive pool, the tile registry re-keys to the
      receiver's fresh rc id, _eff_version bumps, and
      _check_rc_registry_invariant stays green.
@@ -302,7 +302,7 @@ def poke_ww_differential(rules, path):
 
 
 def poke_transfer(rules, path):
-    """g. _transfer_rc_to_rc: loser hygiene, POOL-END append, tile re-key,
+    """g. _transfer_city: loser hygiene, POOL-END append, tile re-key,
     _eff_version bump, _check_rc_registry_invariant green."""
     sim = build(rules, path)
     civ_only_from = next(r for r in range(sim.R) if bool(sim.civ_city_alive[0, r].any()))
@@ -317,7 +317,7 @@ def poke_transfer(rules, path):
     exp_slot = int(occ.max()) + 1 if len(occ) else 0
     ev0 = sim._eff_version
 
-    sim._transfer_rc_to_rc(0, civ_only_from, j, civ_only_to)
+    sim._transfer_city(0, civ_only_from + 1, j, civ_only_to + 1, conquest=False)
 
     assert not bool(sim.civ_city_alive[0, civ_only_from, j]), "the loser slot must die"
     assert int(sim.civ_city_bldg[0, civ_only_from, j].sum()) == 0 and int(sim.civ_city_current[0, civ_only_from, j]) == -1, (

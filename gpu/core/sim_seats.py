@@ -1935,110 +1935,200 @@ class SimSeats:
             tier_idx = torch.where(balance >= self.rules.amenity_tiers[i][0], torch.full_like(tier_idx, i), tier_idx)
         return tier_idx, growth_f.double(), yield_f.double(), lux_add
 
-    def _transfer_rc_to_rc(self, b: int, civ_only_from: int, j: int, civ_only_to: int) -> None:
-        """A loyalty flip between civ seats — pop ×0.75 floor 1, fresh boxes,
-        CITY_CENTER-only registry, half HP, and the city's own tiles re-tag
-        through the tile_city registry. The loser slot dies with full
-        queue/registry hygiene."""
-        # taking a civ's city earns GRIEVANCES.
-        self.civ_only_warmonger[b, civ_only_to] += self._wm_cap
-        c_t = int(self.civ_city_center[b, civ_only_from, j])
-        old_pop = int(self.civ_city_pop[b, civ_only_from, j])
-        old_acq = int(self.civ_city_acquired[b, civ_only_from, j])
-        # conquest keeps infrastructure — snapshot the flipping city's
-        # district/wonder/building registries BEFORE the loser-slot hygiene wipes
-        # them. The tiles do not move, so the registry indices stay valid for the
-        # receiving slot.
-        b30_dist = self.civ_city_dist_tile[b, civ_only_from, j, :].clone()
-        b30_wond = self.civ_city_wonder[b, civ_only_from, j, :].clone()
-        b30_bldg = self.civ_city_bldg[b, civ_only_from, j, :].clone()
-        # GREAT WORKS AND RELICS RIDE WITH THE CITY: the victor gains control of
-        # the Great Works held in a captured city's buildings/districts/wonders,
-        # and those buildings (the Amphitheater / Museum / Temple slots holding
-        # them) are exactly what b30_bldg carries. Snapshot them alongside the
-        # registries above, for the same reason.
-        b20_gww = int(self.civ_city_gw_writing[b, civ_only_from, j])
-        b20_gwa = int(self.civ_city_gw_art[b, civ_only_from, j])
-        b20_gwm = int(self.civ_city_gw_music[b, civ_only_from, j])
-        b20_rel = int(self.civ_city_relics[b, civ_only_from, j])
-        b20_art = int(self.civ_city_artifacts[b, civ_only_from, j])
-        self.civ_city_alive[b, civ_only_from, j] = False
-        # SLOT HYGIENE: the dead slot must not keep a work count. `slot =
-        # occ.max() + 1` REUSES indices and nothing else clears these five, so a
-        # later city landing on this index would inherit a DEAD city's works and
-        # relics.
-        self.civ_city_gw_writing[b, civ_only_from, j] = 0
-        self.civ_city_gw_art[b, civ_only_from, j] = 0
-        self.civ_city_gw_music[b, civ_only_from, j] = 0
-        self.civ_city_relics[b, civ_only_from, j] = 0
-        self.civ_city_artifacts[b, civ_only_from, j] = 0
-        self.civ_city_is_cap[b, civ_only_from, j] = False  # identity dies with the slot
-        self.civ_city_dist_tile[b, civ_only_from, j, :] = -1
-        self.civ_city_wonder[b, civ_only_from, j, :] = -1
-        self.civ_city_bldg[b, civ_only_from, j, :] = False
-        self.civ_city_outer_hp[b, civ_only_from, j] = 0
-        self.civ_city_current[b, civ_only_from, j] = -1
-        self.civ_city_cost[b, civ_only_from, j] = 0
-        self.civ_city_progress[b, civ_only_from, j] = 0
-        self.civ_city_qtile[b, civ_only_from, j] = -1
-        # relocatePalace(from.cities) — the loser re-crowns immediately after its
-        # city list loses the slot, before the route prune and territory re-tag,
-        # matching the TS order.
-        self._relocate_palace(
-            torch.tensor([b], dtype=torch.long, device=self.device),
-            torch.tensor([civ_only_from + 1], dtype=torch.long, device=self.device),
-        )
-        # exactly the flipping city's tiles re-tag (registry scan). civ_city_id is read
-        # before the hygiene writes; the slot's id field is never reset on death.
-        id_from = int(self.civ_city_id[b, civ_only_from, j])
-        own_t = (self.tile_city[b] == id_from) & (self.civ_at[b] == civ_only_from)
-        # the loser's routes die with their endpoint; the receiver starts
-        # route-less (the from.tradeRoutes filter twin).
-        kill = (self.civ_only_routes[b, civ_only_from, :, 0] == id_from) | (self.civ_only_routes[b, civ_only_from, :, 1] == id_from)
-        self.civ_only_routes[b, civ_only_from][kill] = -1
-        self.civ_only_route_dest[b, civ_only_from][kill] = -1
-        self.civ_only_route_exp[b, civ_only_from][kill] = -1
-        self.tile_seat[b] = torch.where(own_t, torch.full_like(self.tile_seat[b], civ_only_to + 1), self.tile_seat[b])  # tile ownership lives in tile_seat
-        self._tile_owner_ver += 1  # one storage: nothing else to retag
-        # re-tagged tiles register to the receiving rc (its id is
-        # assigned below from civ_only_next_city_id — same value, read here first)
-        self.tile_city[b] = torch.where(own_t, torch.full_like(self.tile_city[b], int(self.civ_only_next_city_id[b, civ_only_to])), self.tile_city[b])
-        occ = self.civ_city_alive[b, civ_only_to].nonzero(as_tuple=True)[0]
-        slot = int(occ.max()) + 1 if len(occ) else 0
-        assert slot < self.RC, "civ city slots exhausted - raise RC (compaction already ran; this is true living capacity)"
-        self.civ_city_alive[b, civ_only_to, slot] = True
-        self.era_score[b, civ_only_to + 1] += self._era_pts["conquer"]  # gained a city
-        if self.fog_of_war:  # the captor reveals around the taken city (revealAround r3)
-            self.seat_explored[b, civ_only_to + 1] |= self.pair_dist[c_t] <= 3
-        self.civ_city_is_cap[b, civ_only_to, slot] = False  # a transferred city is never a capital
-        self.civ_city_center[b, civ_only_to, slot] = c_t
-        self.civ_city_pop[b, civ_only_to, slot] = max(1, (old_pop * 3) // 4)
-        self.civ_city_growth[b, civ_only_to, slot] = 0
-        self.civ_city_cbox[b, civ_only_to, slot] = 0
-        self.civ_city_gw_writing[b, civ_only_to, slot] = b20_gww  # works ride with the city
-        self.civ_city_gw_art[b, civ_only_to, slot] = b20_gwa
-        self.civ_city_gw_music[b, civ_only_to, slot] = b20_gwm
-        self.civ_city_relics[b, civ_only_to, slot] = b20_rel
-        self.civ_city_artifacts[b, civ_only_to, slot] = b20_art
-        self.civ_city_loyalty[b, civ_only_to, slot] = 100.0
-        self.civ_city_acquired[b, civ_only_to, slot] = old_acq
-        self.civ_city_hp[b, civ_only_to, slot] = round(self.rules.seats.get("cityMaxHp", 200) / 2)
-        self.civ_city_current[b, civ_only_to, slot] = -1
-        self.civ_city_progress[b, civ_only_to, slot] = 0
-        self.civ_city_cost[b, civ_only_to, slot] = 0
-        self.civ_city_qtile[b, civ_only_to, slot] = -1
-        # adopt the flipping city's districts, wonders and buildings (registry
-        # indices carried verbatim — the tiles stay put). ANCIENT_WALLS rides
-        # along with the outer pool reset to 0; it heals back, since the heal
-        # gate reads civ_city_bldg's walls bit.
-        self.civ_city_dist_tile[b, civ_only_to, slot, :] = b30_dist
-        self.civ_city_wonder[b, civ_only_to, slot, :] = b30_wond
-        self.civ_city_bldg[b, civ_only_to, slot, :] = b30_bldg
-        self.civ_city_outer_hp[b, civ_only_to, slot] = 0  # walls (if any) kept at outer pool 0
-        self.civ_city_id[b, civ_only_to, slot] = int(self.civ_only_next_city_id[b, civ_only_to])
-        self.civ_only_next_city_id[b, civ_only_to] += 1
-        self.centre_slot_at[b, c_t] = slot
+    def _clear_city_slot(self, b: int, row: int, col: int) -> None:
+        """Empty a city slot — the `seat.cities = seat.cities.filter(...)` twin.
+
+        TS DELETES the City object, so nothing of it may survive. A GPU slot is
+        a storage ADDRESS the next occupant reaches through append-at-
+        last-alive+1 or a compaction, and every field left behind is a fact of a
+        city that no longer exists — a queue front, a works count, a walls pool.
+        `center` and `id` are deliberately kept: the caller reads them to re-tag
+        territory after the slot is gone, and every arrival path overwrites both.
+        """
+        self.city_alive[b, row, col] = False
+        self.city_is_cap[b, row, col] = False  # capital identity dies with the city (civ_cap_tile keeps the tile)
+        self.city_pop[b, row, col] = 0
+        self.city_growth[b, row, col] = 0
+        self.city_cbox[b, row, col] = 0
+        self.city_acquired[b, row, col] = 0
+        self.city_loyalty[b, row, col] = 100.0
+        self.city_hp[b, row, col] = int(self.rules.combat.get("cityMaxHp", 200))
+        self.city_outer_hp[b, row, col] = 0
+        # The dead city's QUEUE dies with it: a stale `current` makes the row's
+        # has-queue test see a phantom item.
+        self.city_current[b, row, col] = -1
+        self.city_progress[b, row, col] = 0
+        self.city_cost[b, row, col] = 0
+        self.city_qtile[b, row, col] = -1
+        self.city_prod_bank[b, row, col] = 0
+        self.city_gw_writing[b, row, col] = 0
+        self.city_gw_art[b, row, col] = 0
+        self.city_gw_music[b, row, col] = 0
+        self.city_relics[b, row, col] = 0
+        self.city_artifacts[b, row, col] = 0
+        self.city_dist_tile[b, row, col, :] = -1
+        self.city_wonder[b, row, col, :] = -1
+        self.city_bldg[b, row, col, :] = False
+        self.city_followed[b, row, col] = -1
+        self.city_pressure[b, row, col, :] = 0
+
+    def _seat_city_append(self, b: int, row: int) -> int:
+        """The `seat.cities.push` mirror for ANY seat row: a received city takes
+        last-alive+1, never the alive COUNT — a capture hole would point the
+        count at a live city, and TS appends, so new cities iterate LAST."""
+        cols = self.C if row == 0 else self.RC
+        occ = self.city_alive[b, row, :cols].nonzero(as_tuple=True)[0]
+        col = int(occ.max()) + 1 if len(occ) else 0
+        if col >= cols:
+            # A death earlier this step left a hole under a full head. Row 0's
+            # window is the narrow one, so only it can reach here — and only
+            # after row 0's slot-keyed applies are done, which is what makes
+            # pulling the step-end reclaim forward safe. A mid-phase compaction
+            # of a civ row would permute slots under its own in-flight loop.
+            assert row == 0, "civ city slots exhausted — raise RC (this is true living capacity)"
+            self._reclaim_cities(last_row=0)
+            occ = self.city_alive[b, row, :cols].nonzero(as_tuple=True)[0]
+            col = int(occ.max()) + 1 if len(occ) else 0
+        assert col < cols, "city slots exhausted — the reclaim must have compacted"
+        return col
+
+    def _transfer_city(self, b: int, src_row: int, src_col: int, dst_row: int, *, conquest: bool) -> bool:
+        """ONE `transferCity` for every pair of MAJOR seat rows — conquest and
+        loyalty flip, seat 0 and civ alike. There is no seat-0 transfer and no
+        other-seat transfer: a city leaves one row's list and joins another's.
+
+        The receiver earns GRIEVANCES, the loser re-crowns and loses its routes
+        to the city, the city's OWN tiles (registry scan, never a radius sweep)
+        re-tag to the receiver's next id, pop lands at ×0.75 floor 1, the boxes
+        reset, and the COMPLETE districts, the wonders, the buildings, the great
+        works, the relics and the religion all ride along.
+
+        Returns False when a CONQUEST razes at the receiver's city cap: the city
+        ceases — territory freed, centre unpaved, no plunder. LOYALTY FLIPS ARE
+        UNCAPPED IN EITHER DIRECTION; TS gates that arm on `why === 'conquered'`,
+        never on who is receiving."""
+        dev = self.device
+        cols_s = self.C if src_row == 0 else self.RC
+        cols_d = self.C if dst_row == 0 else self.RC
+        half_hp = (int(self.rules.combat.get("cityMaxHp", 200)) + 1) // 2  # Math.round(CITY_MAX_HP / 2)
+        # Read the identity BEFORE the slot is emptied — a major's block row IS
+        # its tile_seat value, which is how the territory scan finds its tiles.
+        c_t = int(self.city_center[b, src_row, src_col])
+        cid = int(self.city_id[b, src_row, src_col])
+        # Taking a city earns GRIEVANCES — every receiver, accrued at the TOP
+        # like TS's, so a raze at the cap earns them too.
+        self.civ_warmonger[b, dst_row] += self._wm_cap
+        # Conquest keeps infrastructure: snapshot everything that rides with the
+        # city before the loser slot is emptied. `old_bldg` carries the
+        # Amphitheater / Museum / Temple slots that house the great works, which
+        # is why the works ride along with it.
+        old_pop = int(self.city_pop[b, src_row, src_col])
+        old_acq = int(self.city_acquired[b, src_row, src_col])
+        old_gww = int(self.city_gw_writing[b, src_row, src_col])
+        old_gwa = int(self.city_gw_art[b, src_row, src_col])
+        old_gwm = int(self.city_gw_music[b, src_row, src_col])
+        old_rel = int(self.city_relics[b, src_row, src_col])
+        old_art = int(self.city_artifacts[b, src_row, src_col])
+        old_bldg = self.city_bldg[b, src_row, src_col, :].clone()
+        # RELIGION TRAVELS WITH THE CITY (TS copies religionPressure and
+        # followedReligion into the flipped literal). Both planes are slot
+        # indexed, so the fact has to be carried across by hand.
+        old_fol = int(self.city_followed[b, src_row, src_col])
+        old_pres = self.city_pressure[b, src_row, src_col, :].clone()
+        # The city leaves the loser's list...
+        self._clear_city_slot(b, src_row, src_col)
+        self.centre_slot_at[b, c_t] = -1
+        # ...and the loser re-crowns immediately, BEFORE the route prune and
+        # BEFORE the raze early-out — the TS call order.
+        _b1 = torch.tensor([b], dtype=torch.long, device=dev)
+        self._relocate_palace(_b1, torch.tensor([src_row], dtype=torch.long, device=dev))
+        # Routes die with their endpoint. Foreign routes INTO this city heal at
+        # the loop's dead-destination filter — city ids are per-seat, so no
+        # other row's list can name this one.
+        kill = (self.seat_routes[b, src_row, :, 0] == cid) | (self.seat_routes[b, src_row, :, 1] == cid)
+        self.seat_routes[b, src_row][kill] = -1
+        self.seat_route_dest[b, src_row][kill] = -1
+        self.seat_route_exp[b, src_row][kill] = -1
+        # Exactly this city's tiles move, found by registry scan (tileBelongsTo):
+        # a work-radius sweep would leak the outer ring as orphaned territory and
+        # steal a sibling city's frontage.
+        owned = (self.tile_seat[b] == src_row) & (self.tile_city[b] == cid)
+        if conquest and int(self.city_alive[b, dst_row, :cols_d].sum()) >= int(self.rules.seats.get("maxCities", 6)):
+            # The city simply ceases: tiles freed, centre unpaved (centre_slot_at
+            # above — the `district` plane never encodes CITY_CENTER), no plunder.
+            self.tile_seat[b] = torch.where(owned, torch.full_like(self.tile_seat[b], NO_SEAT), self.tile_seat[b])
+            self.tile_city[b] = torch.where(owned, torch.full_like(self.tile_city[b], -1), self.tile_city[b])
+            self._tile_owner_ver += 1
+            self._eff_version += 1
+            return False
+        # The re-tagged tiles register to the RECEIVING city — its id is read
+        # here and assigned to the slot below, the same value.
+        new_id = int(self.civ_next_city_id[b, dst_row])
+        self.tile_seat[b] = torch.where(owned, torch.full_like(self.tile_seat[b], dst_row), self.tile_seat[b])
+        self.tile_city[b] = torch.where(owned, torch.full_like(self.tile_city[b], new_id), self.tile_city[b])
+        self._tile_owner_ver += 1  # seat + which city: the two halves TS calls ownerSeat/ownerCity
+        col = self._seat_city_append(b, dst_row)
+        self.city_alive[b, dst_row, col] = True
+        self.era_score[b, dst_row] += self._era_pts["conquer"]  # gained a city (the raze path returned above)
+        self._reveal_around(_b1, dst_row, torch.tensor([c_t], dtype=torch.long, device=dev), 3)
+        self.city_is_cap[b, dst_row, col] = False  # a received city is never a capital (TS isCapital: false)
+        self.city_center[b, dst_row, col] = c_t
+        self.city_id[b, dst_row, col] = new_id
+        self.civ_next_city_id[b, dst_row] += 1
+        self.centre_slot_at[b, c_t] = col
+        self.city_pop[b, dst_row, col] = max(1, (old_pop * 3) // 4)
+        self.city_growth[b, dst_row, col] = 0  # the transfer resets foodBox...
+        self.city_cbox[b, dst_row, col] = 0  # ...and cultureBox
+        self.city_acquired[b, dst_row, col] = old_acq
+        self.city_loyalty[b, dst_row, col] = 100.0
+        self.city_hp[b, dst_row, col] = half_hp
+        self.city_outer_hp[b, dst_row, col] = 0  # ANCIENT_WALLS rides along at an EMPTY outer pool; it heals back, because the heal gate reads the walls bit in city_bldg
+        self.city_current[b, dst_row, col] = -1  # TS queue: []
+        self.city_progress[b, dst_row, col] = 0
+        self.city_cost[b, dst_row, col] = 0
+        self.city_qtile[b, dst_row, col] = -1
+        self.city_prod_bank[b, dst_row, col] = 0  # TS pushes a FRESH literal, so productionBank is undefined there
+        self.city_gw_writing[b, dst_row, col] = old_gww
+        self.city_gw_art[b, dst_row, col] = old_gwa
+        self.city_gw_music[b, dst_row, col] = old_gwm
+        self.city_relics[b, dst_row, col] = old_rel
+        self.city_artifacts[b, dst_row, col] = old_art
+        self.city_bldg[b, dst_row, col, :] = old_bldg
+        self.city_followed[b, dst_row, col] = old_fol
+        self.city_pressure[b, dst_row, col, :] = old_pres
+        # The receiver's district registry is DERIVED from the tiles that just
+        # re-owned, COMPLETE ones only — never copied from the loser's registry,
+        # which is written at QUEUE time and so lists paves that never finished.
+        # An incomplete captured district stays paved-but-dead: TS drops it from
+        # the new city's array, and `availableBuildings` keys on a district
+        # merely being present.
+        live_ring = owned & (self.district[b] >= 0) & self.district_complete[b]
+        self.city_dist_tile[b, dst_row, col, :] = -1
+        for _t in live_ring.nonzero(as_tuple=True)[0].tolist():
+            self.city_dist_tile[b, dst_row, col, int(self.district[b, _t])] = _t
+        # ...and a tile marked dead at an EARLIER capture-while-incomplete that
+        # has since completed returns to life with the new owner, maintenance
+        # and yields included.
+        dead_ring = owned & (self.district[b] >= 0) & ~self.district_complete[b]
+        self.district_dead[b] = (self.district_dead[b] | dead_ring) & ~live_ring
+        # Wonders are keyed by wonder index -> tile and carry no completeness
+        # test, mirroring the TS `wonders.filter(tileBelongsTo(...))`.
+        self.city_wonder[b, dst_row, col, :] = -1
+        for _t in (owned & (self.built_wonder[b] >= 0)).nonzero(as_tuple=True)[0].tolist():
+            self.city_wonder[b, dst_row, col, int(self.built_wonder[b, _t])] = _t
+        # Real Civ 6 pays the captor gold for taking a city. ONE rate, every
+        # captor — TS's `plunder` defaults to `why === 'conquered'`.
+        if conquest:
+            self.civ_treasury[b, dst_row] += 40.0
+        # Losing the last city ends that war — elimination settles like any peace.
+        if not bool(self.city_alive[b, src_row, :cols_s].any()):
+            _elim = torch.zeros(self.B, dtype=torch.bool, device=dev)
+            _elim[b] = True
+            self._ww_peace(_elim, dst_row, src_row)
+            self.war[b, src_row, dst_row] = False
+            self.war[b, dst_row, src_row] = False
         self._eff_version += 1
+        return True
 
     def _seat_border_key(self, row: int, center: torch.Tensor):
         """The SHARED border-candidate pick key for ONE city of seat row `row` —
@@ -2314,24 +2404,8 @@ class SimSeats:
             self.tile_seat[rows[free], n_d[free]] = seat
             self.tile_city[rows[free], n_d[free]] = _new_cid[free]  # ring joins the founder's registry
             self._tile_owner_ver += 1
-        if row == 0:
-            self._found_seat0_caches(rows, slot, s_idx, new_cap)
         self._eff_version += 1  # feat_stripped / d_static_adj changed
         return found
-
-    def _found_seat0_caches(self, rows: torch.Tensor, c_new: torch.Tensor, s_idx: torch.Tensor, new_cap: torch.Tensor) -> None:
-        """Row 0's three surviving founding-time SITE CACHES — the [B, C]
-        statics the seat-0 walk still reads instead of deriving per tile:
-        `coastal` (isCoastalLand at the centre), `river_center` (hasRiver) and
-        `dist` (the per-city hex-distance table, shared with the district
-        placement scan). They exist only because the two yield walks are still
-        two; they die with the walk merge. The centre YIELDS left in slice 7,
-        palace maintenance and water housing in slice 9, and the centre's
-        `workable` clear with the plane itself — the civ walk's `tiles !=
-        centre` predicate says the same thing without a mutation."""
-        self.coastal[rows, c_new] = self.coastal_land[rows, s_idx]
-        self.river_center[rows, c_new] = self.tile_river[rows, s_idx]
-        self.dist[rows, c_new] = self.pair_dist[s_idx]
 
     def _hostile_vs_unit(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int) -> None:
         """Shared melee resolution for a hostile attacker (barb slot u of
@@ -2610,10 +2684,10 @@ class SimSeats:
         if len(captured) > 0:
             atk_civ = self.civ_unit_civ[:, u]
             for b in captured.tolist():
-                # the conqueror is the attacker's civ; no +40 plunder on a
-                # civ-vs-civ take. The transfer runs per row, reusing the
-                # loyalty-flip machinery.
-                self._transfer_rc_to_rc(b, int(civ[b]), int(slot[b]), int(atk_civ[b]))
+                # The conqueror is the attacker's civ (civ v is block row v+1).
+                # A civ-vs-civ take is a CONQUEST like any other: it plunders
+                # +40 and razes at the winner's city cap.
+                self._transfer_city(b, int(civ[b]) + 1, int(slot[b]), int(atk_civ[b]) + 1, conquest=True)
 
     def _tdef_g(self, tiles: torch.Tensor) -> torch.Tensor:
         """[B] terrain defence at `tiles`, INCLUDING a live FORT (+4).
@@ -3426,10 +3500,9 @@ class SimSeats:
         if atk_kind == "civ" and len(sacked_rows) > 0:
             w_civ = self.civ_unit_civ[sacked_rows, u]
             for i in range(len(sacked_rows)):
-                # the conqueror plunders +40 on a REAL transfer only — a raze at
-                # the city cap pays nothing, as in TS.
-                if self._transfer_city_to_civ(int(sacked_rows[i]), int(slot[sacked_rows[i]]), int(w_civ[i]), conquest=True):
-                    self.civ_only_treasury[int(sacked_rows[i]), int(w_civ[i])] += 40.0
+                # civ w is block row w+1; the shared transfer pays the +40 on a
+                # REAL transfer only — a raze at the city cap pays nothing.
+                self._transfer_city(int(sacked_rows[i]), 0, int(slot[sacked_rows[i]]), int(w_civ[i]) + 1, conquest=True)
             sacked_rows = sacked_rows[:0]  # transferred, not sacked
         if len(sacked_rows) > 0:
             sc = slot[sacked_rows]
