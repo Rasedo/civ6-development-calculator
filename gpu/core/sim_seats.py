@@ -1033,7 +1033,7 @@ class SimSeats:
                     m = near_pc[_k]
                     # ONE seat-wide [NS, RC] mask, written once for all seats.
                     msk = torch.zeros_like(self.city_alive[dr[_k]])
-                    msk[0, : self.C] = m
+                    msk[0, : self.RC] = m
                     drc = self.pair_dist[self.civ_city_center[dr[_k]].clamp(min=0), dt[_k]]  # [R, RC]
                     msk[1:1 + self.R] = (drc <= self._theo_range) & self.civ_city_alive[dr[_k]]
                     if bool(msk.any()):
@@ -1097,7 +1097,7 @@ class SimSeats:
         if bool(pl.any()):
             pr = rows[pl]
             placed = torch.zeros(pr.numel(), dtype=torch.bool, device=self.device)
-            for c in range(self.C):
+            for c in range(self.RC):
                 take = (
                     ~placed
                     & self.alive[pr, c]
@@ -1139,7 +1139,7 @@ class SimSeats:
         winner = torch.full((B,), -1, dtype=torch.long, device=self.device)
         for g in range(O):
             founded_g = self.holy_tile[:, g] >= 0
-            nf = (self.alive & (self.city_followed[:, 0, :self.C] == g)).sum(dim=1)
+            nf = (self.alive & (self.city_followed[:, 0, :self.RC] == g)).sum(dim=1)
             ok = founded_g & any_civ & ((npl == 0) | (2 * nf > npl))
             if self.R > 0:
                 nf_r = (self.civ_city_alive & (self.city_followed[:, 1:1 + self.R] == g)).sum(dim=2)  # [B, R]
@@ -1415,12 +1415,10 @@ class SimSeats:
     def _city_rel(self, row: int) -> torch.Tensor:
         """The religion id each of seat-row `row`'s cities draws its follower
         belief from — followedReligion when the coupling is LIVE, else the
-        row's OWN religion id (which IS the row: seat 0 = 0, civ r = r+1).
-        Row 0 keeps its C-width column contract; civ rows are RC-wide."""
+        row's OWN religion id (which IS the row: seat 0 = 0, civ r = r+1)."""
         if self._b18_couple:
-            return self.city_followed[:, 0, :self.C] if row == 0 else self.city_followed[:, row]
-        ncol = self.C if row == 0 else self.RC
-        return torch.full((self.B, ncol), row, dtype=torch.long, device=self.device)
+            return self.city_followed[:, row]
+        return torch.full((self.B, self.RC), row, dtype=torch.long, device=self.device)
 
     def _belief_feat_plane(self, row: int) -> torch.Tensor:
         """[B, T, 6] belief TILE adds — featureYields at tiles with a LIVE feature
@@ -1527,7 +1525,7 @@ class SimSeats:
             self._seat_route_cache = (key, None)
             return None
         B = self.B
-        cols = self.C if row == 0 else self.RC
+        cols = self.RC
         ids = self.city_id[:, row, :cols]  # [B, cols]
         alive = self.city_alive[:, row, :cols]
         is_cs = rr[:, :, 1] <= -2  # CS dest encoding -(2+cityStateIdx)
@@ -1661,7 +1659,7 @@ class SimSeats:
         cols = C on row 0, RC on a civ row. None when the catalog is empty."""
         if not self._wond_n:
             return None
-        cols = self.C if row == 0 else self.RC
+        cols = self.RC
         reg = self.city_wonder[:, row, :cols]
         return (reg >= 0) & self.built_wonder_complete.gather(1, reg.clamp(min=0).reshape(self.B, -1)).reshape_as(reg)
 
@@ -1711,7 +1709,7 @@ class SimSeats:
         if not self._reg_bidx or not self.districts_on:
             return None
         B = self.B
-        cols = self.C if row == 0 else self.RC
+        cols = self.RC
         alive = self.city_alive[:, row, :cols]
         dt_all = self.city_dist_tile[:, row, :cols]  # [B, cols, nD]
         ctrs = self.city_center[:, row, :cols].clamp(min=0)  # [B, cols] receiver centers
@@ -1740,7 +1738,7 @@ class SimSeats:
         false) and its specialtyOnly twin, off the city district REGISTRY
         (`city.districts`). CITY_CENTER lives outside the placeable catalog, so
         the registry already applies the TS filter's first arm."""
-        cols = self.C if row == 0 else self.RC
+        cols = self.RC
         reg = self.city_dist_tile[:, row, :cols]
         comp = (reg >= 0) & self.district_complete.gather(1, reg.clamp(min=0).reshape(self.B, -1)).reshape_as(reg)
         return comp.sum(dim=2), (comp & self._is_specialty.reshape(1, 1, -1)).sum(dim=2)
@@ -1767,7 +1765,7 @@ class SimSeats:
         (hasFreshWater/isCoastalLand, exported per tile as `wh`); nothing is
         stored per city, so a captured centre needs no rebuild."""
         B = self.B
-        cols = self.C if row == 0 else self.RC
+        cols = self.RC
         alive = self.city_alive[:, row, :cols]
         is_cap_a = (self.city_is_cap[:, row, :cols] & alive).double()
         ctr = self.city_center[:, row, :cols].clamp(min=0)
@@ -1874,7 +1872,7 @@ class SimSeats:
         not re-rank with mid-walk pops. Returns (tier_idx, growth_f, yield_f,
         lux_add), each [B, cols]; the factors are f64 and a caller running
         self.dtype casts them."""
-        cols = self.C if row == 0 else self.RC
+        cols = self.RC
         rd = self.rules_dev
         alive = self.city_alive[:, row, :cols]
         is_cap = self.city_is_cap[:, row, :cols]
@@ -1975,21 +1973,12 @@ class SimSeats:
     def _seat_city_append(self, b: int, row: int) -> int:
         """The `seat.cities.push` mirror for ANY seat row: a received city takes
         last-alive+1, never the alive COUNT — a capture hole would point the
-        count at a live city, and TS appends, so new cities iterate LAST."""
-        cols = self.C if row == 0 else self.RC
-        occ = self.city_alive[b, row, :cols].nonzero(as_tuple=True)[0]
+        count at a live city, and TS appends, so new cities iterate LAST. The
+        step-end reclaim compacts the holes away, which is what keeps the head
+        inside RC while the cap allows only maxCities living."""
+        occ = self.city_alive[b, row].nonzero(as_tuple=True)[0]
         col = int(occ.max()) + 1 if len(occ) else 0
-        if col >= cols:
-            # A death earlier this step left a hole under a full head. Row 0's
-            # window is the narrow one, so only it can reach here — and only
-            # after row 0's slot-keyed applies are done, which is what makes
-            # pulling the step-end reclaim forward safe. A mid-phase compaction
-            # of a civ row would permute slots under its own in-flight loop.
-            assert row == 0, "civ city slots exhausted — raise RC (this is true living capacity)"
-            self._reclaim_cities(last_row=0)
-            occ = self.city_alive[b, row, :cols].nonzero(as_tuple=True)[0]
-            col = int(occ.max()) + 1 if len(occ) else 0
-        assert col < cols, "city slots exhausted — the reclaim must have compacted"
+        assert col < self.RC, "city slots exhausted — raise RC (this is true living capacity)"
         return col
 
     def _transfer_city(self, b: int, src_row: int, src_col: int, dst_row: int, *, conquest: bool) -> bool:
@@ -2008,8 +1997,6 @@ class SimSeats:
         UNCAPPED IN EITHER DIRECTION; TS gates that arm on `why === 'conquered'`,
         never on who is receiving."""
         dev = self.device
-        cols_s = self.C if src_row == 0 else self.RC
-        cols_d = self.C if dst_row == 0 else self.RC
         half_hp = (int(self.rules.combat.get("cityMaxHp", 200)) + 1) // 2  # Math.round(CITY_MAX_HP / 2)
         # Read the identity BEFORE the slot is emptied — a major's block row IS
         # its tile_seat value, which is how the territory scan finds its tiles.
@@ -2053,7 +2040,7 @@ class SimSeats:
         # a work-radius sweep would leak the outer ring as orphaned territory and
         # steal a sibling city's frontage.
         owned = (self.tile_seat[b] == src_row) & (self.tile_city[b] == cid)
-        if conquest and int(self.city_alive[b, dst_row, :cols_d].sum()) >= int(self.rules.seats.get("maxCities", 6)):
+        if conquest and int(self.city_alive[b, dst_row].sum()) >= int(self.rules.seats.get("maxCities", 6)):
             # The city simply ceases: tiles freed, centre unpaved (centre_slot_at
             # above — the `district` plane never encodes CITY_CENTER), no plunder.
             self.tile_seat[b] = torch.where(owned, torch.full_like(self.tile_seat[b], NO_SEAT), self.tile_seat[b])
@@ -2121,7 +2108,7 @@ class SimSeats:
         if conquest:
             self.civ_treasury[b, dst_row] += 40.0
         # Losing the last city ends that war — elimination settles like any peace.
-        if not bool(self.city_alive[b, src_row, :cols_s].any()):
+        if not bool(self.city_alive[b, src_row].any()):
             _elim = torch.zeros(self.B, dtype=torch.bool, device=dev)
             _elim[b] = True
             self._ww_peace(_elim, dst_row, src_row)
@@ -2309,8 +2296,7 @@ class SimSeats:
         # stays array order.
         occ_idx = torch.arange(self.RC, device=self.device).reshape(1, -1)
         slot = (torch.where(alive_row[rows], occ_idx, torch.full_like(occ_idx, -1)).max(dim=1).values + 1)
-        cap_cols = self.C if row == 0 else self.RC
-        assert int(slot.max()) < cap_cols, "city slots exhausted — the step-end reclaim must have compacted"
+        assert int(slot.max()) < self.RC, "city slots exhausted — the step-end reclaim must have compacted"
         s_idx = tile[rows]
         self._reveal_around(rows, seat, s_idx, 3)  # foundCityAt's revealAround(seat, tile, 3)
         # isCapital = seat.cities.length === 0: a total-collapse refound
@@ -2779,7 +2765,7 @@ class SimSeats:
         hold stale ids and the zeros init; ids are per-seat monotonic, so an
         alive match is unique)."""
         if self._owner_ver != self._tile_owner_ver:
-            ids0 = self.city_id[:, 0, : self.C]  # [B, C]
+            ids0 = self.city_id[:, 0, : self.RC]  # [B, C]
             m = (
                 (self.tile_seat == 0).unsqueeze(2)
                 & (self.tile_city.unsqueeze(2) == ids0.unsqueeze(1))
@@ -3063,7 +3049,7 @@ class SimSeats:
         # Seat-0 cities are march targets only at war with seat 0 (hp); a civ
         # ALSO marches to its at-war ENEMY civs' cities (key
         # d*16384 + civIdx*2048 + centerTile), with seat 0 winning ties.
-        ckey = torch.where(self.alive & hpT, dc * 4096 + torch.arange(self.C, device=self.device), 10**9)
+        ckey = torch.where(self.alive & hpT, dc * 4096 + torch.arange(self.RC, device=self.device), 10**9)
         city_min = ckey.min(dim=1).values
         pc_dist = torch.div(city_min, 4096, rounding_mode="floor")  # seat-0 city distance (1e9//4096 stays huge)
         city_tgt = self.site.gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
@@ -3990,7 +3976,7 @@ class SimSeats:
         # then the other civ seats by id). civ↔civ routes exist since the
         # geopolitics verbs did; the old civs-cannot-meet descope is dead.
         intl_want = want & (kmax < 0)
-        C = self.C
+        C = self.RC
         if bool(intl_want.any()) and C > 0:
             dctr_l = [self.site.clamp(min=0)]  # seat 0's centres lead the scan
             dalv_l = [self.alive]
@@ -4059,7 +4045,7 @@ class SimSeats:
         trade-CS suzerainty. ORDER: TS scans actor.cities in ARRAY order —
         column order under append+reclaim (#110), the same tie-break the civ
         arm uses."""
-        B, C, S, dev = self.B, self.C, self.S, self.device
+        B, C, S, dev = self.B, self.RC, self.S, self.device
         want = active0 & (self.alive.sum(dim=1) >= 1)
         rts0 = self.seat_routes[:, 0]  # [B, K, 2]
         if not bool(want.any()):

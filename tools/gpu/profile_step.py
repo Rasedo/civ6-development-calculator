@@ -54,7 +54,7 @@ def _parity_loop(sim: BatchSim, turns: int) -> None:
 def _rollout_loop(sim: BatchSim, turns: int, seed: int) -> None:
     from core.engine import P_MAX
 
-    B, C = sim.B, sim.C
+    B, C = sim.B, sim.RC
     game_seed = torch.tensor([seed * 1_000_003 + i for i in range(B)], dtype=torch.int64)
     slots = torch.arange(C, dtype=torch.int64).view(1, C)
     pslots = torch.arange(P_MAX, dtype=torch.int64).view(1, P_MAX)

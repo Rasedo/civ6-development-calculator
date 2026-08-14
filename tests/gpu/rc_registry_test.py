@@ -250,8 +250,8 @@ def poke_capture_luxury_pool(rules, path):
     sim.civ_at[0, t] = r
     sim.tile_city[0, t] = cid
 
-    have = torch.zeros(sim.B, sim.C, dtype=sim.dtype)
-    need = torch.full((sim.B, sim.C), 10.0, dtype=sim.dtype)
+    have = torch.zeros(sim.B, sim.RC, dtype=sim.dtype)
+    need = torch.full((sim.B, sim.RC), 10.0, dtype=sim.dtype)
     base = float(sim._luxury_amenities(0, have, need).sum())
 
     sim._transfer_city(0, r + 1, j, 0, conquest=True)  # civ r is block row r+1

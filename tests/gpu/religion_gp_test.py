@@ -81,12 +81,12 @@ def main() -> None:
 
     # --- religious pressure spread (accumulate / tie / flip / KILL) --------
     assert sim.holy_tile.shape[1] == sim._O and sim._O == 1 + sim.R
-    assert sim.city_pressure[:, 0, :sim.C].shape == (sim.B, sim.C, sim._O)
-    assert sim.city_followed[:, 0, :sim.C].shape == (sim.B, sim.C)
+    assert sim.city_pressure[:, 0, :sim.RC].shape == (sim.B, sim.RC, sim._O)
+    assert sim.city_followed[:, 0, :sim.RC].shape == (sim.B, sim.RC)
     assert sim.city_pressure[:, 1:1 + sim.R].shape[3] == sim._O and sim.city_followed[:, 1:1 + sim.R].shape == sim.civ_city_alive.shape
     if sim.R >= 2 and sim._O >= 3:
-        sim.city_pressure[:, 0, :sim.C].zero_()
-        sim.city_followed[:, 0, :sim.C].fill_(-1)
+        sim.city_pressure[:, 0, :sim.RC].zero_()
+        sim.city_followed[:, 0, :sim.RC].fill_(-1)
         sim.holy_tile.fill_(-1)
         assert bool(sim.alive[:, 0].all()), "fixture city 0 (capital) must be alive"
         # Religions 1 & 2 both found their holy city AT city 0's center (dist 0,
@@ -122,8 +122,8 @@ def main() -> None:
             assert bool((sim.city_pressure[dead_rc, 0 + 1, 0, :] == 0).all()), "dead rc-slot pressure must reset"
             assert bool((sim.city_followed[dead_rc, 0 + 1, 0] == -1).all()), "dead rc city follows nothing"
         # restore the pressure tensors for the snapshot round-trip below
-        sim.city_pressure[:, 0, :sim.C].zero_()
-        sim.city_followed[:, 0, :sim.C].fill_(-1)
+        sim.city_pressure[:, 0, :sim.RC].zero_()
+        sim.city_followed[:, 0, :sim.RC].fill_(-1)
         sim.holy_tile.fill_(-1)
         sim.city_pressure[:, 1:1 + sim.R].zero_()
         sim.city_followed[:, 1:1 + sim.R].fill_(-1)
@@ -233,7 +233,7 @@ def main() -> None:
         assert bool(((pf + folrow - full).abs().sum() == 0)), "pan+founder + follower must reconstruct the full bldgY"
         # flag routing: LIVE -> followedReligion; INERT -> owner religion.
         if sim._b18_couple:
-            assert bool((sim._city_rel(0) == sim.city_followed[:, 0, :sim.C]).all()), "LIVE: seat 0 draws followedReligion"
+            assert bool((sim._city_rel(0) == sim.city_followed[:, 0, :sim.RC]).all()), "LIVE: seat 0 draws followedReligion"
             assert bool((sim._city_rel(2) == sim.city_followed[:, 1 + 1]).all()), "LIVE: civ draws civ_city_followed"
         else:
             assert bool((sim._city_rel(0) == 0).all()), "INERT: seat 0 draws religion 0"

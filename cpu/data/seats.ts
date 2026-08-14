@@ -121,6 +121,13 @@ export const CIV_LEADERS: { name: string; color: string; cityNames: string[] }[]
 export const TECH_PROD_DIV = 12;
 export const CITY_DEF_PER_TECH = 3;
 export const MAX_CITIES_PER_SEAT = 6;
+/** City COLUMNS a seat is observed and decided over — the same width for every
+ * seat. Larger than MAX_CITIES_PER_SEAT because settling caps at that number
+ * but loyalty flips do NOT: `transferCity` razes at the cap only on conquest,
+ * so a seat can hold more cities than it could ever found, and a narrower
+ * window would hide them from the observation and leave them undecidable. The
+ * GPU's per-seat-row storage width is this same number (rules.seats.citySlots). */
+export const CITY_SLOTS_PER_SEAT = 24;
 /** seat 0's exact settler curve — 48 + 18·(cities−1) at
  * Online speed. Other seats never bank settlers and single-queue them, so
  * seat 0's `cities − 1 + settlers + queued` term reduces to `cities − 1`. */

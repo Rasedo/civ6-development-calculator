@@ -33,10 +33,10 @@ def main() -> None:
     p = sorted(FIXTURES.glob("seed*.json"))[0]
     env = BatchEnv([load_fixture(p)], rules, device="cpu", dtype=torch.float64)
     s = env.sim
-    layout = {"cs": s.S, "civs": s.R, "cities": s.C,
+    layout = {"cs": s.S, "civs": s.R, "cities": s.RC,
               "techs": s.techs.shape[1], "civics": s.civics.shape[1]}
     width = (ladder.EMP + ladder.PER_CS * s.S + ladder.PER_CIV * s.R
-             + ladder.PER_CITY * s.C + ladder.ESCALATORS
+             + ladder.PER_CITY * s.RC + ladder.ESCALATORS
              + s.techs.shape[1] + s.civics.shape[1] + ladder.CTX_SEAT)
 
     shapes = {}
@@ -46,8 +46,8 @@ def main() -> None:
             f"seat {seat} observation is {obs.shape[1]} wide, layout says {width} — "
             "the shared layout and an engine renderer have drifted"
         )
-        blocks = ladder.split(obs, s.S, s.R, s.C, s.techs.shape[1], s.civics.shape[1])
-        assert blocks["city"].shape == (s.B, s.C, ladder.PER_CITY)
+        blocks = ladder.split(obs, s.S, s.R, s.RC, s.techs.shape[1], s.civics.shape[1])
+        assert blocks["city"].shape == (s.B, s.RC, ladder.PER_CITY)
         acts = ladder.decide(obs, env.masks(seat), layout)
         shapes[seat] = {k: tuple(v.shape) for k, v in acts.items()}
     assert shapes[0] == shapes[1], (

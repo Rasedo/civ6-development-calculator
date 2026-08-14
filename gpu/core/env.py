@@ -65,7 +65,7 @@ class BatchEnv:
     @property
     def obs_size(self) -> int:
         s = self.sim
-        return _GLOBAL_F + _PER_CS_F * s.S + _PER_CIV_F * s.R + _PER_CITY_F * s.C
+        return _GLOBAL_F + _PER_CS_F * s.S + _PER_CIV_F * s.R + _PER_CITY_F * s.RC
 
     def reset(self, scramble: int | None = None) -> torch.Tensor:
         """Restore the initial state (all games, lockstep).
@@ -103,7 +103,7 @@ class BatchEnv:
             r = self._seat_civ(seat)
             s = self.sim
             m = s.seat_masks(r)
-            prod = m["production"][:, : s.C]  # city axis mirrors seat 0's width
+            prod = m["production"][:, : s.RC]  # city axis mirrors seat 0's width
             pw = s.production_mask().shape[2]
             if prod.shape[2] < pw:  # purchase block active: pad all-False
                 pad = torch.zeros(s.B, prod.shape[1], pw - prod.shape[2], dtype=torch.bool, device=s.device)
@@ -187,7 +187,7 @@ class BatchEnv:
             return self._observe_civ(self._seat_civ(seat))
         s = self.sim
         d = s.dtype
-        B, C = s.B, s.C
+        B, C = s.B, s.RC
         dev = s.device
         need = s._growth_needed(s.pop).clamp(min=1)
         denom = s.cur_cost.clamp(min=1)
@@ -372,19 +372,17 @@ class BatchEnv:
 
     def _observe_civ(self, r: int) -> torch.Tensor:
         """The seat-invariant obs layout rendered from civ r's tensors: this
-        seat's empire from the rc_*/r_* family (slots beyond C are invisible —
-        RC > C by flips only), then an opponent block covering every OTHER civ
-        seat in seat order, each read from THIS seat's point of view.
+        seat's empire, then an opponent block covering every OTHER civ seat in
+        seat order, each read from THIS seat's point of view.
         `cpu/core/observe.ts:observeSeat` is the twin."""
         s = self.sim
         d = s.dtype
-        B, C = s.B, s.C
+        B, C = s.B, s.RC
         dev = s.device
-        # The city AXIS is LIVING ORDER over the FULL RC width: the TS list
-        # shifts down when a city dies, and a live city can sit in a slot >= C
-        # after flips and captures, so the width cannot be sliced to C before
-        # ordering. Gather the first C living slots (stable = founding order).
-        _ordR = torch.argsort((~s.civ_city_alive[:, r]).long(), dim=1, stable=True)[:, :C]  # [B, C] slot ids
+        # The city AXIS is LIVING ORDER: the TS list shifts down when a city
+        # dies. The step-end reclaim already compacts every row, so this sort is
+        # the belt to that brace — stable, so it is founding order.
+        _ordR = torch.argsort((~s.civ_city_alive[:, r]).long(), dim=1, stable=True)  # [B, RC] slot ids
         pop = s.civ_city_pop[:, r].gather(1, _ordR).to(d)
         alive = s.civ_city_alive[:, r].gather(1, _ordR)
         needs = s._growth_needed(s.civ_city_pop[:, r].gather(1, _ordR)).clamp(min=1)

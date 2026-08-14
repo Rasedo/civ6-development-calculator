@@ -57,7 +57,7 @@ def main() -> None:
     paths = sorted(FIXTURES.glob("seed*.json"))
     assert paths, "no fixtures — run the exporter first"
     sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    B, C, RC = sim.B, sim.C, sim.RC
+    B, C, RC = sim.B, sim.RC, sim.RC
     assert sim._gw_cls == [wc, ac, mc], sim._gw_cls
     assert sim._gw_bidx == [amph, museum, broadcast]
 

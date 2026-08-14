@@ -118,8 +118,7 @@ def _city_rows(sim, b: int) -> list[tuple[int, int]]:
     alive = sim.city_alive[b].tolist()
     rows = []
     for c in _civ_seats(sim):
-        width = sim.C if c == 0 else sim.RC
-        rows += [(c, s) for s in range(width) if alive[c][s]]
+        rows += [(c, s) for s in range(sim.RC) if alive[c][s]]
     return rows
 
 
@@ -297,7 +296,7 @@ SEAT = {
     "techProgress": _civ_scalar("civ_tech_prog"),
     "civicProgress": _civ_scalar("civ_civic_prog"),
     "cityCount": lambda sim, b, rows: [
-        sum(1 for a in sim.city_alive[b, c].tolist()[: (sim.C if c == 0 else sim.RC)] if a) for c in rows
+        sum(1 for a in sim.city_alive[b, c].tolist() if a) for c in rows
     ],
     "wars": lambda sim, b, rows: [_wars_of(sim, b, c) for c in rows],
     "warTurns": lambda sim, b, rows: [int(sim.war_turns[b, _seat_row(sim, c)]) for c in rows],

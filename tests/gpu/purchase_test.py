@@ -44,7 +44,7 @@ def idle_capital(sim, turns=30):
 
 
 def prod(sim, city, code) -> torch.Tensor:
-    p = torch.full((1, sim.C), sim.IDLE, dtype=torch.long)
+    p = torch.full((1, sim.RC), sim.IDLE, dtype=torch.long)
     p[0, city] = code
     return p
 
@@ -178,7 +178,7 @@ def test_settler_sequencing(rules, path):
     r = sim.rules
     c1 = (r.settler_base + r.settler_per_city * max(0, n - 1 + s0 + q)) * r.gold_purchase_mult
     c2 = (r.settler_base + r.settler_per_city * max(0, n - 1 + s0 + 1 + q)) * r.gold_purchase_mult
-    p = torch.full((1, sim.C), sim.IDLE, dtype=torch.long)
+    p = torch.full((1, sim.RC), sim.IDLE, dtype=torch.long)
     p[0, 0] = pbase(sim) + sim.NB
     p[0, 1] = pbase(sim) + sim.NB
     founded_before = int(sim.alive[0].sum())
@@ -194,7 +194,7 @@ def test_settler_sequencing(rules, path):
     sim2.current[:, :2] = -1
     sim2.progress[:, :2] = 0.0
     sim2.treasury[:] = RICH
-    sim2.step(production=torch.full((1, sim2.C), sim2.IDLE, dtype=torch.long))
+    sim2.step(production=torch.full((1, sim2.RC), sim2.IDLE, dtype=torch.long))
     delta = float(sim2.treasury[0]) - float(sim.treasury[0])
     # The bought settlers FOUND during the divergent step (the walker moves
     # after production), and the new borders can re-carve an existing city's
@@ -229,7 +229,7 @@ def test_builder_escalation(rules, path):
     cost = lambda n: round((r.builder_base + r.builder_per * n) * r.game_speed) * r.gold_purchase_mult
     c1 = cost(bt0 + bq)
     c2 = cost(bt0 + bq + 1)
-    p = torch.full((1, sim.C), sim.IDLE, dtype=torch.long)
+    p = torch.full((1, sim.RC), sim.IDLE, dtype=torch.long)
     p[0, 0] = pbase(sim) + sim.NB + 1 + sim._builder_idx
     p[0, 1] = pbase(sim) + sim.NB + 1 + sim._builder_idx
     sim.step(production=p)
@@ -244,7 +244,7 @@ def test_builder_escalation(rules, path):
     sim2.current[:, :2] = -1
     sim2.progress[:, :2] = 0.0
     sim2.treasury[:] = RICH
-    sim2.step(production=torch.full((1, sim2.C), sim2.IDLE, dtype=torch.long))
+    sim2.step(production=torch.full((1, sim2.RC), sim2.IDLE, dtype=torch.long))
     delta = float(sim2.treasury[0]) - float(sim.treasury[0])
     assert abs(delta - (c1 + c2)) < 1e-6, f"sequenced builder prices {delta} != {c1}+{c2}"
     print(f"  builder escalation OK ({c1:.0f} then {c2:.0f} gold in one turn)")

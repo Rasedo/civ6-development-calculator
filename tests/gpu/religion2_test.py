@@ -163,7 +163,7 @@ def make_holy_site(sim, r: int, j: int) -> int:
 def follow_all(sim, g: int) -> None:
     """Force every alive city (seat 0 + the civ seats) to follow religion g, so
     a fresh missionary finds NO target and keeps its full charges."""
-    sim.city_followed[0, 0, :sim.C] = torch.where(sim.alive[0], torch.full_like(sim.city_followed[0, 0, :sim.C], g), sim.city_followed[0, 0, :sim.C])
+    sim.city_followed[0, 0, :sim.RC] = torch.where(sim.alive[0], torch.full_like(sim.city_followed[0, 0, :sim.RC], g), sim.city_followed[0, 0, :sim.RC])
     if sim.R > 0:
         sim.city_followed[0, 1:1 + sim.R, :sim.RC] = torch.where(sim.civ_city_alive[0], torch.full_like(sim.city_followed[0, 1:1 + sim.R, :sim.RC], g), sim.city_followed[0, 1:1 + sim.R, :sim.RC])
 
@@ -549,7 +549,7 @@ def poke_victor_direct(rules, rj, path):
     def set_follow(pg, rg_map):
         """pg = seat 0's religion; rg_map[ri] = each civ seat's religion (None
         leaves that seat cityless)."""
-        sim.city_followed[0, 0, :sim.C] = torch.where(sim.alive[0], torch.full_like(sim.city_followed[0, 0, :sim.C], pg), torch.full_like(sim.city_followed[0, 0, :sim.C], -1))
+        sim.city_followed[0, 0, :sim.RC] = torch.where(sim.alive[0], torch.full_like(sim.city_followed[0, 0, :sim.RC], pg), torch.full_like(sim.city_followed[0, 0, :sim.RC], -1))
         for ri in range(sim.R):
             val = rg_map.get(ri, None)
             if val is None:
@@ -567,7 +567,7 @@ def poke_victor_direct(rules, rj, path):
     sim2 = build(rules, path)
     sim2.holy_tile[0] = -1
     sim2.holy_tile[0, g] = 0
-    sim2.city_followed[0, 0, :sim2.C] = torch.where(sim2.alive[0], torch.full_like(sim2.city_followed[0, 0, :sim2.C], g), torch.full_like(sim2.city_followed[0, 0, :sim2.C], -1))
+    sim2.city_followed[0, 0, :sim2.RC] = torch.where(sim2.alive[0], torch.full_like(sim2.city_followed[0, 0, :sim2.RC], g), torch.full_like(sim2.city_followed[0, 0, :sim2.RC], -1))
     for ri in range(sim2.R):
         sim2.city_followed[0, ri + 1] = torch.where(sim2.civ_city_alive[0, ri], torch.full_like(sim2.city_followed[0, ri + 1], g), torch.full_like(sim2.city_followed[0, ri + 1], -1))
     assert int(sim2._religious_victor()[0]) == g, f"civ religion {g} must win"
@@ -624,8 +624,8 @@ def poke_victor_through_step(rules, rj, path):
         # only religion g founded; preload an overwhelming g-pressure everywhere.
         sim.holy_tile[0] = -1
         sim.holy_tile[0, g] = int(sim.site[0, sim.alive[0].nonzero(as_tuple=True)[0][0]]) if g == 0 else 0
-        sim.city_pressure[0, 0, :sim.C] = 0
-        sim.city_pressure[0, 0, :sim.C, g] = torch.where(sim.alive[0], torch.full((sim.C,), 9000, dtype=sim.city_pressure[:, 0].dtype), torch.zeros(sim.C, dtype=sim.city_pressure[:, 0].dtype))
+        sim.city_pressure[0, 0, :sim.RC] = 0
+        sim.city_pressure[0, 0, :sim.RC, g] = torch.where(sim.alive[0], torch.full((sim.RC,), 9000, dtype=sim.city_pressure[:, 0].dtype), torch.zeros(sim.RC, dtype=sim.city_pressure[:, 0].dtype))
         if sim.R > 0:
             sim.city_pressure[0, 1:1 + sim.R, :sim.RC] = 0
             sim.city_pressure[0, 1:1 + sim.R, :sim.RC, g] = torch.where(sim.civ_city_alive[0], torch.full((sim.R, sim.RC), 9000, dtype=sim.city_pressure.dtype), torch.zeros((sim.R, sim.RC), dtype=sim.city_pressure.dtype))

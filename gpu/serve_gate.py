@@ -264,7 +264,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                     badm[ctx_lo:] = diff[ctx_lo:] != 0
                     if bool(badm.any()):
                         i = int(badm.nonzero(as_tuple=True)[0][0])
-                        flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: OBS [{i}] {_field_name(i, sim.S, sim.R, sim.C, NT, NC)}: GPU {float(gobs[i])!r} vs TS {float(tobs[i])!r}")
+                        flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: OBS [{i}] {_field_name(i, sim.S, sim.R, sim.RC, NT, NC)}: GPU {float(gobs[i])!r} vs TS {float(tobs[i])!r}")
                     for name, ga, ta in (("job", gj_all[b], msg.get("jobs", {}).get(str(seat), [])),
                                          ("spread", gs_all[b], msg.get("spreads", {}).get(str(seat), []))):
                         for i in range(max(len(ga), len(ta))):
@@ -282,7 +282,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             # SEAT 0 runs the same verbs as every seat; production is limited
             # to the base classes.
             m0 = env.masks(0)
-            blocks0 = ladder.split(env.observe(0), sim.S, sim.R, sim.C, NT, NC)
+            blocks0 = ladder.split(env.observe(0), sim.S, sim.R, sim.RC, NT, NC)
             pm0 = m0["production"].clone()
             _base_w0 = NB + 2 + sim.NU + len(sim._scaffold)
             pm0[:, :, _base_w0:] = False
@@ -318,7 +318,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                 recs = {str(r + 1): {**drive._extract_record(sim, r, *per_seat[r], b),
                                      **drive._extract_geo(geo, r, b)} for r in seats}
                 recs["0"] = {
-                    "production": [[int(sim.site[b, c]), int(prod0[b, c])] for c in range(sim.C)
+                    "production": [[int(sim.site[b, c]), int(prod0[b, c])] for c in range(sim.RC)
                                    if int(prod0[b, c]) >= 0 and bool(sim.alive[b, c])],
                     "tech": None if int(tech0[b]) < 0 else int(tech0[b]),
                     "civic": None if int(civic0[b]) < 0 else int(civic0[b]),
@@ -488,7 +488,7 @@ def main() -> None:
             bad[ctx_lo:] = diff[ctx_lo:] != 0
             if bool(bad.any()):
                 i = int(bad.nonzero(as_tuple=True)[0][0])
-                name = _field_name(i, sim.S, sim.R, sim.C, NT, NC)
+                name = _field_name(i, sim.S, sim.R, sim.RC, NT, NC)
                 rep = (f"turn {t + 1} seat {seat}: OBS MISMATCH at [{i}] {name}: "
                        f"GPU {float(gobs[i])!r} vs TS {float(tobs[i])!r}")
                 print(rep)
@@ -550,7 +550,7 @@ def main() -> None:
         # SEAT 0 runs the same verbs as every seat: production limited to the
         # base classes, envoys scripted on BOTH SIDES.
         m0 = env.masks(0)
-        blocks0 = ladder.split(env.observe(0), sim.S, sim.R, sim.C, NT, NC)
+        blocks0 = ladder.split(env.observe(0), sim.S, sim.R, sim.RC, NT, NC)
         pm0 = m0["production"].clone()
         _base_w0 = NB + 2 + sim.NU + len(sim._scaffold)
         pm0[:, :, _base_w0:] = False
@@ -575,7 +575,7 @@ def main() -> None:
         recs = {str(r + 1): {**drive._extract_record(sim, r, *per_seat[r], 0),
                              **drive._extract_geo(geo, r, 0)} for r in seats}
         recs["0"] = {
-            "production": [[int(sim.site[0, c]), int(prod0[0, c])] for c in range(sim.C)
+            "production": [[int(sim.site[0, c]), int(prod0[0, c])] for c in range(sim.RC)
                            if int(prod0[0, c]) >= 0 and bool(sim.alive[0, c])],
             "tech": None if int(tech0[0]) < 0 else int(tech0[0]),
             "civic": None if int(civic0[0]) < 0 else int(civic0[0]),

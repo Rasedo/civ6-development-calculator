@@ -11,7 +11,7 @@ from . import simbase  # the PATCHABLE globals (POOL_MAX/SEAT0_POOL_MAX/_ALIAS_C
 
 
 class SimInit:
-    """B games × C city slots stepping in lockstep. Build from fixtures
+    """B games × RC city slots per seat row, stepping in lockstep. Build from fixtures
     (parity) or by replicating one fixture B times (benchmark/training).
     """
 
@@ -24,25 +24,27 @@ class SimInit:
         self.B, self.W, self.H = B, f0["width"], f0["height"]
         T = self.W * self.H
         self.T = T
-        # Seat 0's column head-room: the TS city cap. Format-2 fixtures carry
-        # no city data (settler starts — nothing is pre-founded), so the slot
-        # count is a rules fact, not a fixture fact.
-        C = int(rules.seats.get("maxCities", 6))
-        self.C = C
         # ------------------------------------------------------------------
         # THE CITY BLOCK. Twenty city facts, one `city_x [B, 1+R+S, RC]` plane
         # each, addressed through per-seat-family VIEWS:
-        #     seat 0:      city_x[:, 0, :C]     (C <= RC, the rest unused)
+        #     seat 0:      city_x[:, 0]
         #     civ seats:   city_x[:, 1:1+R]
         #     city-states: city_x[:, 1+R:, 0]   (carved out further below)
+        # ONE COLUMN WIDTH for every seat row (#68 step 3): row 0 used to hold
+        # `maxCities` columns where the civ rows hold RC, which forked a `cols =
+        # C if row == 0 else RC` out of every row-generic body — and left row 0
+        # unable to receive the uncapped loyalty flip its own rules allow.
         # Float planes take `dtype`, so this arithmetic is f32 in the f32 lanes.
         # Two facts carry a seat-0 fill of their own: `city_hp` starts at
         # cityMaxHp where the civ rows start at 0, and `site` starts at -1
         # where civ_city_center starts at 0.
         # ------------------------------------------------------------------
         self.R = int(f0.get("civMax", 0))
-        self.RC = 24  # city slots per seat row; settling caps at maxCities but
-        # loyalty flips can exceed it. Empty slots are city_alive=False.
+        # City COLUMNS per seat row — ONE width, exported by the TS engine as
+        # rules.seats.citySlots (CITY_SLOTS_PER_SEAT) so the observation head
+        # and this storage cannot drift. Settling caps at maxCities; loyalty
+        # flips exceed it. Empty slots are city_alive=False.
+        self.RC = int(rules.seats.get("citySlots", 24))
         # A city-state's one city is slot 0 of its own seat row, at the row
         # index the war matrix uses, so "which row is this seat" has one answer
         # everywhere; `S` is hoisted here beside `R`.
@@ -80,13 +82,12 @@ class SimInit:
             _shape = (B, 1 + _rp + _sp, _rcp) + ((_ex,) if _ex else ())
             _base = torch.full(_shape, _rf, dtype=_dt, device=device)
             setattr(self, f"city_{_k}", _base)
-            _pv = _base[:, 0, :C] if _ex is None else _base[:, 0, :C, :]
+            _pv = _base[:, 0]
             if _pf is not None:
                 _pv.fill_(_pf)
             setattr(self, _pa, _pv)
             setattr(self, _ra, _base[:, 1:1 + _rp])
-            self.register_alias(_pa, (lambda sim, k=_k, e=_ex: getattr(sim, f"city_{k}")[:, 0, :sim.C]
-                                      if e is None else getattr(sim, f"city_{k}")[:, 0, :sim.C, :]))
+            self.register_alias(_pa, lambda sim, k=_k: getattr(sim, f"city_{k}")[:, 0])
             self.register_alias(_ra, lambda sim, k=_k, rp=_rp: getattr(sim, f"city_{k}")[:, 1:1 + rp])
 
         def ften(getter, shape_tail=()):
@@ -448,9 +449,9 @@ class SimInit:
         # body over city_dist_tile[:, row]. One base, one geometry.
         self.city_dist_tile = torch.full((B, 1 + r_pad, civ_city_pad, nd_b4), -1, dtype=torch.long, device=device)
         self.civ_city_dist_tile = self.city_dist_tile[:, 1:]
-        self.dist_tile = self.city_dist_tile[:, 0, :C]
+        self.dist_tile = self.city_dist_tile[:, 0]
         self.register_alias("civ_city_dist_tile", lambda sim: sim.city_dist_tile[:, 1:])
-        self.register_alias("dist_tile", lambda sim: sim.city_dist_tile[:, 0, :sim.C])
+        self.register_alias("dist_tile", lambda sim: sim.city_dist_tile[:, 0])
         # Districts on CAPTURED territory are DEAD — the tiles stay paved but
         # the conquering city's registry holds only CITY_CENTER (no
         # yields/upkeep/counts; the paving still blocks).
@@ -715,9 +716,9 @@ class SimInit:
         # queue wonders, the #83 action-surface gap).
         self.city_wonder = torch.full((B, 1 + r_pad, civ_city_pad, max(self._wond_n, 1)), -1, dtype=torch.long, device=device)
         self.civ_city_wonder = self.city_wonder[:, 1:]
-        self.wonder_reg = self.city_wonder[:, 0, :C]
+        self.wonder_reg = self.city_wonder[:, 0]
         self.register_alias("civ_city_wonder", lambda sim: sim.city_wonder[:, 1:])
-        self.register_alias("wonder_reg", lambda sim: sim.city_wonder[:, 0, :sim.C])
+        self.register_alias("wonder_reg", lambda sim: sim.city_wonder[:, 0])
         self.res_id = torch.tensor([[t.get("rid", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.desert = torch.tensor([[t.get("des", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.wok = torch.tensor([[t.get("wok", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
@@ -1318,9 +1319,9 @@ class SimInit:
         # for family-shape consistency; every city starts with an empty bank,
         # so unlike the fixture-loaded city_* table it allocates plain).
         self.city_prod_bank = torch.zeros(B, 1 + max(self.R, 1) + max(self.S, 1), self.RC, dtype=dtype, device=device)
-        self.prod_bank = self.city_prod_bank[:, 0, :C]
+        self.prod_bank = self.city_prod_bank[:, 0]
         self.civ_city_prod_bank = self.city_prod_bank[:, 1:1 + max(self.R, 1)]
-        self.register_alias("prod_bank", lambda sim: sim.city_prod_bank[:, 0, :sim.C])
+        self.register_alias("prod_bank", lambda sim: sim.city_prod_bank[:, 0])
         self.register_alias("civ_city_prod_bank", lambda sim: sim.city_prod_bank[:, 1:1 + max(sim.R, 1)])
         # LIFETIME science — Seat.scienceTotal on the seat axis (row 0 =
         # seat 0, rows 1..R the civ seats), accrued beside each row's

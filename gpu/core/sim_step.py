@@ -122,7 +122,7 @@ class SimStep:
         # compacts whenever it holds a hole (deaths are rare; a dense layout
         # keeps the append head in range); civ rows at their high-water
         # threshold. ONE body compacts all rows together.
-        hw0 = (self.alive.long() * (torch.arange(self.C, device=dev).reshape(1, -1) + 1)).amax(dim=1)
+        hw0 = (self.alive.long() * (torch.arange(self.RC, device=dev).reshape(1, -1) + 1)).amax(dim=1)
         need_rc = bool((hw0 > self.alive.sum(dim=1)).any())
         if self.R > 0 and not need_rc:
             # rc high-water = last-alive slot + 1 (what the next append uses)
@@ -244,7 +244,7 @@ class SimStep:
         eliminated-actor continue) — active0 gates every seat-level arm;
         the city walks are alive-masked already, so their zero sums need no
         gate."""
-        r, B, C, dev = self.rules, self.B, self.C, self.device
+        r, B, C, dev = self.rules, self.B, self.RC, self.device
         rd = self.rules_dev
         active0 = self.alive.any(dim=1)  # actor.cities.length > 0
 

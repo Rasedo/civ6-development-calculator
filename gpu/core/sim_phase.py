@@ -1325,7 +1325,7 @@ class SimPhase:
         id)."""
         if self.R == 0:
             return
-        B, C, dev = self.B, self.C, self.device
+        B, C, dev = self.B, self.RC, self.device
         any_rc = (self.civ_city_alive.any(dim=2) & self.civ_only_alive).any(dim=1)
         if not bool(any_rc.any()):
             return
@@ -1411,7 +1411,7 @@ class SimPhase:
         buildings/units land instantly (before _city_totals), so they take
         effect this very turn.
         """
-        r, rd, C = self.rules, self.rules_dev, self.C
+        r, rd, C = self.rules, self.rules_dev, self.RC
         mult = r.gold_purchase_mult
         pbase = self.UNIT_BASE + self.NU + len(self._scaffold)
         n_cities = self.alive.sum(dim=1)
@@ -1591,9 +1591,8 @@ class SimPhase:
         # its neighbour's.
         "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts",
     )
-    def _reclaim_cities(self, last_row: int | None = None) -> None:
-        """Stably compacts city slots per (game, seat row) — rows
-        0..last_row, default every major row.
+    def _reclaim_cities(self) -> None:
+        """Stably compacts city slots per (game, seat row), every major row.
 
         TS SPLICES seat.cities on capture/flip/transfer and pushes on
         settle/receive, so the LIVING's relative order IS the spec — stable
@@ -1604,12 +1603,9 @@ class SimPhase:
         VALUES, so live centres re-map through their row's inverse
         permutation. Runs at the step END like _reclaim_pool: the controlled
         head samples slot-keyed city actions from the PRE-step masks, so the
-        layout must hold through this step's applies. The row-0-only form
-        (last_row=0) is the append sites' overflow backstop — reachable only
-        from a mid-phase civ-block gain, after row 0's slot-keyed applies
-        are all done. CIV6_RC_RECLAIM_AT lowers the civ trigger for
-        forced-compaction gates."""
-        nrows = (1 + self.R) if last_row is None else (last_row + 1)
+        layout must hold through this step's applies.
+        CIV6_RC_RECLAIM_AT lowers the trigger for forced-compaction gates."""
+        nrows = 1 + self.R
         alive = self.city_alive[:, :nrows]  # [B, nrows, RC]
         perm = torch.argsort((~alive).long(), dim=2, stable=True)  # living first, order kept
         # In place, for the same reason as _reclaim_pool: these planes are

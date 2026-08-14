@@ -19,7 +19,7 @@ import type { WorldFile } from '../../world/file';
 import { loadWorld } from '../world/load';
 import { runDriver } from './driver';
 import type { GameState } from '../core/types';
-import { MAX_CITIES_PER_SEAT } from '../data/seats';
+import { CITY_SLOTS_PER_SEAT } from '../data/seats';
 import { IMPROVEMENT_IDS } from '../core/unitActions';
 import { SCAFFOLD_DISTRICTS } from '../data/districts';
 import { TECHS } from '../data/techs';
@@ -60,9 +60,10 @@ await runDriver({
   // #101: N_TURNS is the run's ABSOLUTE horizon; a resumed state has
   // already played state.turn - 1 of them.
   turns: N_TURNS - (state.turn - 1),
-  // The obs layout's per-city slots: the seat city cap (format 1 derived the
-  // same 6 from "capital + 5 planned sites").
-  cityMax: MAX_CITIES_PER_SEAT,
+  // The obs layout's per-city slots — the CITY COLUMN width, not the settle
+  // cap: loyalty flips can carry a seat past maxCities, and those cities have
+  // to be observable and decidable. Matches the GPU's per-seat-row width.
+  cityMax: CITY_SLOTS_PER_SEAT,
   cityStateMax: world.gen.params.cityStateMax,
   civMax: world.gen.params.civMax,
   horizon: HORIZON,

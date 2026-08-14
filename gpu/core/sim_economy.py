@@ -22,7 +22,7 @@ class SimEconomy:
         Runs in the CALLER's dtype: the grants add straight into `amen_have`,
         which is self.dtype on row 0 and f64 on a civ row."""
         B = self.B
-        cols = self.C if row == 0 else self.RC
+        cols = self.RC
         dt = amen_have.dtype
         out = torch.zeros(B, cols, dtype=dt, device=self.device)
         if self._n_lux == 0 or not self.improvements_on:
@@ -663,7 +663,7 @@ class SimEconomy:
         if self._bld_cache is not None and self._bld_cache[0] == self._eff_version:
             return self._bld_cache[1]
         rd = self.rules_dev
-        B, C, NB, dev = self.B, self.C, self.NB, self.device
+        B, C, NB, dev = self.B, self.RC, self.NB, self.device
         unlocked = torch.where(
             rd.b_unlock.unsqueeze(0) >= 0,
             self.techs.gather(1, rd.b_unlock.clamp(min=0).unsqueeze(0).expand(B, -1)),
@@ -1105,7 +1105,7 @@ class SimEconomy:
                 wsl = self._wond_gw[:, kind]  # [nW]
                 live_w = (self.built_wonder >= 0) & self.built_wonder_complete  # [B, T]
                 tile_sl = torch.where(live_w, wsl[self.built_wonder.clamp(min=0)], torch.zeros_like(self.built_wonder))
-                for c in range(self.C):
+                for c in range(self.RC):
                     cap[:, c] = cap[:, c] + (tile_sl * (self.owner == c).long()).sum(dim=1)
             else:
                 wreg = self.civ_city_wonder[:, row - 1]  # [B, RC, nW]
@@ -1184,7 +1184,7 @@ class SimEconomy:
         dev = self.device
         # per-tile followed religion of the OWNING city (-1 none)
         tfol = torch.full((B, T), -1, dtype=torch.long, device=dev)
-        pf = self.city_followed[:, 0, :self.C].gather(1, self.owner.clamp(min=0))  # [B, T]
+        pf = self.city_followed[:, 0, :self.RC].gather(1, self.owner.clamp(min=0))  # [B, T]
         tfol = torch.where((self.tile_seat == 0) & self.alive.gather(1, self.owner.clamp(min=0)), pf, tfol)
         if self.R > 0:
             for r in range(self.R):
@@ -1198,13 +1198,13 @@ class SimEconomy:
         # then >0 — a masked bool scatter would clobber tile 0 via the clamp)
         near3 = torch.zeros(B, O, T, dtype=torch.bool, device=dev)
         off3 = tiles_within_offsets(self._just_war_range).to(dev)
-        pc_win = tiles_from_offsets(self.site.clamp(min=0).reshape(-1), off3, self.W, self.H).reshape(B, self.C, -1)  # [B, C, M]
+        pc_win = tiles_from_offsets(self.site.clamp(min=0).reshape(-1), off3, self.W, self.H).reshape(B, self.RC, -1)  # [B, C, M]
         civ_city_win = None
         if self.R > 0:
             civ_city_win = tiles_from_offsets(self.civ_city_center.clamp(min=0).reshape(-1), off3, self.W, self.H).reshape(B, self.R * self.RC, -1)
         for g in range(O):
             srci = torch.zeros(B, T, dtype=torch.long, device=dev)
-            fol_c = self.alive & (self.city_followed[:, 0, :self.C] == g)  # [B, C]
+            fol_c = self.alive & (self.city_followed[:, 0, :self.RC] == g)  # [B, C]
             if bool(fol_c.any()):
                 w = torch.where(fol_c.unsqueeze(2), pc_win, torch.full_like(pc_win, -1)).reshape(B, -1)
                 srci.scatter_add_(1, w.clamp(min=0), (w >= 0).long())
@@ -1658,7 +1658,7 @@ class SimEconomy:
            that same map to every city's fresh computeCityStats."""
         rd = self.rules_dev
         B, dev, F64 = self.B, self.device, torch.float64
-        cols = self.C if row == 0 else self.RC
+        cols = self.RC
         sl = slice(0, cols) if j is None else slice(j, j + 1)
         n = cols if j is None else 1
         alive = self.city_alive[:, row, sl]  # [B, n]
@@ -2015,7 +2015,7 @@ class SimEconomy:
         ord_ = torch.argsort((~self.alive).long(), dim=1, stable=True)
         bidx = self._bidx
         score = torch.zeros(self.B, dtype=self.dtype, device=self.device)
-        for s in range(self.C):
+        for s in range(self.RC):
             col = ord_[:, s]
             score = score + (self.pop[bidx, col] * self.alive[bidx, col].long()).to(self.dtype) * pw
             t_c = total[bidx, col]

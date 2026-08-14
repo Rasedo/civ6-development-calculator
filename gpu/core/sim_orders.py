@@ -560,7 +560,6 @@ class SimOrders:
         for i in range(len(rows)):
             b = int(rows[i]); s = int(citystate_of[rows[i]])
             row = dst_rows if isinstance(dst_rows, int) else int(dst_rows[b])
-            cols = self.C if row == 0 else self.RC
             c_t = int(self.citystate_center[b, s])
             pop = max(1, (int(self.citystate_pop[b, s]) * 3) // 4)
             self.citystate_alive[b, s] = False
@@ -575,7 +574,7 @@ class SimOrders:
             ring = (self.pair_dist[c_t] <= 2) & (self.tile_seat[b] == 100 + s)
             self.tile_seat[b] = torch.where(ring, torch.full_like(self.tile_seat[b], NO_SEAT), self.tile_seat[b])
             self._tile_owner_ver += 1
-            if int(self.city_alive[b, row, :cols].sum()) >= max_cities:
+            if int(self.city_alive[b, row].sum()) >= max_cities:
                 continue  # razed at the seat city cap — the TS early return, before nextCityId++
             col = self._seat_city_append(b, row)
             new_id = int(self.civ_next_city_id[b, row])
@@ -1754,7 +1753,7 @@ class SimOrders:
             dc = self.pair_dist[here.unsqueeze(1), self.site.clamp(min=0)].to(torch.long)  # [B, C]
             # Distance ties break by TS ARRAY order — column order under
             # append+reclaim (#110).
-            ckey = torch.where(self.alive, dc * 4096 + torch.arange(self.C, device=self.device), 10**9)
+            ckey = torch.where(self.alive, dc * 4096 + torch.arange(self.RC, device=self.device), 10**9)
             city_min = ckey.min(dim=1).values
             city_tgt = self.site.gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
             tgt = torch.where(has_imp, imp_tgt, city_tgt)
@@ -1827,7 +1826,7 @@ class SimOrders:
             bidx = torch.arange(Bn, device=dev2)
             arangeT = torch.arange(Tn, device=dev2)
             walk_ord = torch.argsort((~self.alive).long(), dim=1, stable=True)  # living first = TS array order (#110)
-            for s_rank in range(self.C):
+            for s_rank in range(self.RC):
                 col = walk_ord[:, s_rank]  # [B] — this game's s_rank-th city (TS array order)
                 walled = self.alive[bidx, col] & self.buildings[bidx, col, self._walls_bidx]
                 if not bool(walled.any()):
@@ -1904,9 +1903,9 @@ class SimOrders:
             bidx = torch.arange(Bn, device=dev2)
             arangeT = torch.arange(Tn, device=dev2)
             walk_ord = torch.argsort((~self.alive).long(), dim=1, stable=True)  # living first = TS array order (#110)
-            owner_oh = torch.nn.functional.one_hot(self.owner.clamp(min=0), self.C).bool() & (self.tile_seat == 0).unsqueeze(2)  # [B,T,C]
+            owner_oh = torch.nn.functional.one_hot(self.owner.clamp(min=0), self.RC).bool() & (self.tile_seat == 0).unsqueeze(2)  # [B,T,C]
             has_enc = (((self.district == self._encamp_didx) & self.district_complete & ~self.district_dead & ~self.district_pillaged & (self.encamp_hp > 0)).unsqueeze(2) & owner_oh).any(dim=1)  # [B,C] the city owns a completed LIVE unpillaged Encampment; one beaten to 0 HP is occupied and fires nothing
-            for s_rank in range(self.C):
+            for s_rank in range(self.RC):
                 col = walk_ord[:, s_rank]  # [B] — this game's s_rank-th city (TS array order)
                 enc_city = self.alive[bidx, col] & has_enc[bidx, col]
                 if not bool(enc_city.any()):
@@ -1966,14 +1965,14 @@ class SimOrders:
         nbf = nb_c.clamp(min=0).reshape(B, -1)
         _mf = self.military_at.gather(1, nbf)
         _mfs = torch.where(_mf >= 0, self.unit_seat.gather(1, _mf.clamp(min=0)), torch.full_like(_mf, -1))
-        adj_b = (_mfs == BARB_SEAT).reshape(B, self.C, 6)
+        adj_b = (_mfs == BARB_SEAT).reshape(B, self.RC, 6)
         vmn = torch.where((_mfs > 0) & (_mfs != BARB_SEAT), _mf - self.POOL_LO["civ"], torch.full_like(_mf, -1))
         vm_war = (vmn >= 0) & self.civ_only_atwar.gather(1, self.civ_unit_civ.gather(1, vmn.clamp(min=0)).clamp(max=max(self.R - 1, 0)))
         _cf = self.civilian_at.gather(1, nbf)
         _cfs = torch.where(_cf >= 0, self.unit_seat.gather(1, _cf.clamp(min=0)), torch.full_like(_cf, -1))
         vcn = torch.where((_cfs > 0) & (_cfs != BARB_SEAT), _cf - self.POOL_LO["civ"], torch.full_like(_cf, -1))
         vc_war = (vcn >= 0) & self.civ_only_atwar.gather(1, self.civ_unit_civ.gather(1, vcn.clamp(min=0)).clamp(max=max(self.R - 1, 0)))
-        besieged = ((adj_b | (vm_war | vc_war).reshape(B, self.C, 6)) & (nb_c >= 0)).any(dim=2)
+        besieged = ((adj_b | (vm_war | vc_war).reshape(B, self.RC, 6)) & (nb_c >= 0)).any(dim=2)
         healable = self.alive & (self.city_hp < city_max_hp) & ~besieged
         self.city_hp.copy_(torch.where(healable, (self.city_hp + cb.get("cityHealPerTurn", 20)).clamp(max=city_max_hp), self.city_hp))
         # The outer wall pool heals on the SAME unbesieged gate and rate (cap

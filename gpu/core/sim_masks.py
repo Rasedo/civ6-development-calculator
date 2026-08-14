@@ -21,7 +21,7 @@ class SimMasks:
         NB+1+NU gold-purchase columns (buy building / settler / unit at
         gold_purchase_mult× cost); while off, those columns do not exist and the
         head keeps its narrower width. All-False where no decision pends."""
-        B, C, dev = self.B, self.C, self.device
+        B, C, dev = self.B, self.RC, self.device
         pend = self.alive & (self.current == -1)
         always = torch.ones(B, C, 2, dtype=torch.bool, device=dev)
         cols = [self._buildable(), always]
@@ -1019,7 +1019,7 @@ class SimMasks:
         )  # [B, NU]
         if not per_city:
             return civ_ok
-        C = self.C
+        C = self.RC
         need = self._type_needs_slot.reshape(1, 1, -1)  # [1, 1, NU]
         if self._artifact_bidx < 0:
             room = torch.zeros(B, C, 1, dtype=torch.bool, device=dev)
