@@ -466,7 +466,6 @@ def pool_view(snap: dict, pre: str, plane: str):
 # round-trips.
 _MUTABLE = [
     "seat_science_total",  # science_total / civ_only_science_total are its row views
-    "civic_boosted",
     "rng_state", "centre_slot_at", "tdef", "tmove",
     "next_slot", "camp_tile", "n_camps", "game_over",
     "victory_type", "winner", "space_done",  # space-race chain progress
@@ -476,7 +475,6 @@ _MUTABLE = [
     # only here (`citystate_at` is a view of it), so it must round-trip.
     "tile_seat", "tile_city",
     "citystate_last_levy",  # levy cooldown
-    "influence",
     "civ_pair_warkind", "civ_pair_denounced", "civ_pair_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "seat_ext", "city_prod_bank",
     "city_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)

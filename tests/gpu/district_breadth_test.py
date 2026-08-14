@@ -171,7 +171,7 @@ def _try_encampment_placement(rules, rj, path) -> bool:
             & (sim.built_wonder[0] < 0)
             & (sim.improvement[0] < 0)
             & (sim.res_priority[0] <= 1)
-            & (sim.dist[0, c] <= 3)
+            & (sim.pair_dist[site_c] <= 3)
         )
         base_elig[site_c] = False
         adj_elig = base_elig & (cc[0] >= 1)  # eligible AND adjacent to a center

@@ -238,6 +238,7 @@ def main() -> int:
                 ("unit_head", [py, "tests/gpu/unit_head_test.py"], 4),  # action enum == mask width == RL head width
                 ("state_discipline", [py, "tests/gpu/state_discipline_test.py"], 4),  # alias-rebind + _MUTABLE drift net
                 ("inplace", [py, "tests/gpu/inplace_discipline_test.py"], 1),  # static — no self-rebinds, no stale captures
+                ("seat_symmetry", [py, "tools/gpu/seat_symmetry_check.py"], 1),  # static — dangling attrs, the alias/_MUTABLE contract, the seat-fork allowlist
                 ("fort", [py, "tests/gpu/fort_test.py"], 4),  # Fort +4 defence — the serve gate never reaches it, so this lane is the only proof
                 ("ladder", [py, "tests/gpu/ladder_test.py"], 4),  # the shared decision ladder's own guard
             ],

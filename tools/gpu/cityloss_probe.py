@@ -25,7 +25,7 @@ prev = sim.alive.sum(dim=1).clone()
 for t in range(1, 301):
     sim.step()
     cur = sim.alive.sum(dim=1)
-    atwar = sim.r_atwar.any(dim=1)
+    atwar = sim.war[:, 0, : 1 + sim.R].any(dim=1)
     ever_war |= atwar
     peak = torch.maximum(peak, cur)
     lost = (prev - cur).clamp(min=0)  # cities lost this turn per game

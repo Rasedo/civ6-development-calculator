@@ -56,11 +56,11 @@ def _prod_ctx(blocks: dict, sim, seat: int) -> dict:
     # this reads one plane for everybody.
     is_cap = sim.city_is_cap[:, seat]
     n_cities = ctx[:, 0].long()
-    # THE ONE REMAINING SEAT-0 DISTINCTION IN THE DRIVER, and it is POLICY, not
-    # a rule: seat 0 expands to the world's physical slot count while a civ
-    # stops at the ladder's maxCities heuristic. Both engines replay the same
-    # recorded decisions, so it moves trajectories, never parity.
-    cap = sim.C if seat == 0 else int(sim.rules.seats.get("maxCities", 6))
+    # ONE city cap for every seat — the ladder's maxCities heuristic. (The
+    # seat-0 arm this replaced read a `sim.C` that was itself
+    # `rules.seats.maxCities`, so the fork never carried a difference; the
+    # storage rename left the name dangling and the branch pointless.)
+    cap = int(sim.rules.seats.get("maxCities", 6))
     return {
         "settler_queued": emp[:, 6] > 0.5,  # raw queued-settler count
         "is_capital": is_cap,  # the wonder tier's capital heuristic (city col 9)
@@ -88,7 +88,7 @@ def _blocks(env, sim, r: int) -> dict:
     obs = env.observe(r + 1)  # env._seat_civ's inverse: seat k>0 is civ k-1
     # tech/civic widths come off the live tensors — there is no NT/NC scalar,
     # and hardcoding one here would be the second copy that always drifts.
-    return ladder.split(obs, sim.S, sim.R, sim.C, sim.civ_only_techs.shape[2], sim.civ_only_civics.shape[2])
+    return ladder.split(obs, sim.S, sim.R, sim.RC, sim.civ_only_techs.shape[2], sim.civ_only_civics.shape[2])
 
 
 #: ACTION FILE SCHEMA v2 — THE FILE IS THE INTERFACE.
@@ -165,9 +165,7 @@ def _builder_jobs(sim, seat: int) -> torch.Tensor:
     for n in range(N):
         pres = present[:, n]
         if not bool(pres.any()):
-            if seat >= 1:
-                break  # compacted slot-map rows are contiguous
-            continue  # raw p-pool rows have HOLES (a dead slot before a live one)
+            break  # _seat_slot_map compacts EVERY row — no holes to skip past
         vt = types[:, n].clamp(min=0, max=sim.NU - 1)
         civ_row = (sim._type_charges[vt] > 0) & (charges[:, n] > 0)
         rows = pres & civ_row
@@ -191,22 +189,20 @@ def _spread_targets(sim, seat: int) -> torch.Tensor:
     smap, present, tiles, types, charges = _seat_units(sim, seat)
     B, N = smap.shape
     out = torch.full((B, N), -1, dtype=torch.long, device=sim.device)
-    # seat 0 has no religion-founding plane, so the spread verb is
-    # structurally empty for it.
-    if seat == 0:
-        return out
-    done = sim.civ_only_religion_done[:, seat - 1]
+    done = sim.civ_religion_done[:, seat]
     if not bool(done.any()):
         return out
     g = seat
     T = sim.T
+    # ONE scan over every major row: a spread target is any live city whose
+    # followed religion is not this seat's. `g` IS the row (the religion
+    # plane's own convention), so no arm asks which seat is asking.
+    nrow = 1 + sim.R
     acc = torch.zeros(B, T, dtype=torch.long, device=sim.device)
-    acc.scatter_add_(1, sim.site.clamp(min=0), (sim.alive & (sim.city_followed[:, 0, :sim.C] != g)).long())
-    if sim.R > 0:
-        acc.scatter_add_(
-            1, sim.civ_city_center.clamp(min=0).reshape(B, -1),
-            (sim.civ_city_alive & (sim.city_followed[:, 1:1 + sim.R, :sim.RC] != g)).long().reshape(B, -1),
-        )
+    acc.scatter_add_(
+        1, sim.city_center[:, :nrow].clamp(min=0).reshape(B, -1),
+        (sim.city_alive[:, :nrow] & (sim.city_followed[:, :nrow] != g)).long().reshape(B, -1),
+    )
     tm = acc > 0
     if not bool(tm.any()):
         return out
@@ -214,9 +210,7 @@ def _spread_targets(sim, seat: int) -> torch.Tensor:
     for n in range(N):
         pres = present[:, n]
         if not bool(pres.any()):
-            if seat >= 1:
-                break  # compacted slot-map rows are contiguous
-            continue  # raw p-pool rows have HOLES (the _builder_jobs twin)
+            break  # _seat_slot_map compacts EVERY row (the _builder_jobs twin)
         vt = types[:, n].clamp(min=0, max=sim.NU - 1)
         relig = torch.zeros_like(pres)
         if sim._missionary_idx >= 0:
@@ -306,18 +300,13 @@ def _seat_envoys(sim, seat: int):
     BANK, neediest re-ranked after every pick. Conversion influence->bank is
     an eager RULE at the CS phase for EVERY seat (real Civ 6 grants the envoy
     the moment the meter fills), so this verb is bank-only — ONE text, no
-    influence fork; the pool router below is the only seat-shaped line. Zero
-    draws. Returns [B, K] CS indices (-1 pad) or None."""
+    influence fork and no seat-shaped line: `seat` IS the row of every plane
+    it reads. Zero draws. Returns [B, K] CS indices (-1 pad) or None."""
     if sim.S <= 0:
         return None
-    if seat == 0:
-        avail_e = sim.envoys_avail.clone()
-        met_live_e = sim.citystate_met[:, : sim.S] & sim.citystate_alive[:, : sim.S]
-        mine6_e = sim.citystate_envoys[:, : sim.S].double() / 6.0
-    else:
-        avail_e = sim.civ_only_envoys_avail[:, seat - 1].clone()
-        met_live_e = sim.civ_only_citystate_met[:, seat - 1, : sim.S] & sim.citystate_alive[:, : sim.S]
-        mine6_e = sim.civ_only_citystate_envoys[:, seat - 1, : sim.S].double() / 6.0
+    avail_e = sim.civ_envoys_avail[:, seat].clone()
+    met_live_e = sim.seat_citystate_met[:, seat, : sim.S] & sim.citystate_alive[:, : sim.S]
+    mine6_e = sim.seat_citystate_envoys[:, seat, : sim.S].double() / 6.0
     picks_e = []
     for _ke in range(6):  # bank bound: accrual grants <=1/turn + quest grants
         can_e = met_live_e.any(dim=1) & (avail_e > 0)
@@ -409,9 +398,10 @@ def _buy_ctx(sim, row: int) -> dict:
     # is the policy gate and it joins HERE (the ladder's own condition), not
     # in the engines' re-validation.
     levy_ok, levy_cs = sim._seat_levy_candidate(row, active)
-    # `civ_only_atwar[:, r]` IS the (seat 0, civ r) cell of the single-axis
-    # war matrix, so row 0's "at war with somebody" is its any().
-    levy_ok = levy_ok & (sim.civ_only_atwar[:, row - 1] if row > 0 else sim.civ_only_atwar.any(dim=1))
+    # atWarWithAny, off the war matrix's own row — one expression for every
+    # seat (the seat-0 arm this replaced was already the any(), and the civ
+    # arm counted only the war with seat 0).
+    levy_ok = levy_ok & sim.war[:, row, : 1 + sim.R].any(dim=1)
     return {"jj": jj, "bb": bb, "can_building": can_b, "price": price,
             "settler_ok": settler_ok, "unit_ok": unit_ok,
             "tile_ok": tile_ok, "tile": tile_t, "tile_j": tile_j,
