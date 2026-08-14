@@ -237,13 +237,13 @@ def poke_regional_channel(rules, rj, path):
     sim.civ_city_center[0, r, RECV] = C6
 
     # -- single source, receiver in range 6 -> +3 production
-    reg = sim._seat_regional(r)
+    reg = sim._seat_regional(r + 1)
     assert reg is not None, "regional helper returned None with a live Factory"
     assert abs(float(reg[0][0, RECV, 1]) - fac_prod) < 1e-9, "Factory did not deliver +3 to a range-6 receiver"
 
     # -- receiver at range 7 -> nothing
     sim.civ_city_center[0, r, RECV] = C7
-    reg7 = sim._seat_regional(r)
+    reg7 = sim._seat_regional(r + 1)
     got7 = 0.0 if reg7 is None else float(reg7[0][0, RECV, 1])
     assert got7 == 0.0, f"Factory reached a range-7 receiver ({got7})"
 
@@ -255,19 +255,21 @@ def poke_regional_channel(rules, rj, path):
     sim.civ_city_center[0, r, SRC2] = B
     sim.civ_city_dist_tile[0, r, SRC2, IZ] = B
     sim.civ_city_bldg[0, r, SRC2, FAC] = True
-    reg2 = sim._seat_regional(r)
+    reg2 = sim._seat_regional(r + 1)
     assert abs(float(reg2[0][0, RECV, 1]) - fac_prod) < 1e-9, "two Factories must dedup to +3 (not stack)"
 
     # -- pillaged sources are dark
     sim.district_pillaged[0, A] = True
     sim.district_pillaged[0, B] = True
-    regp = sim._seat_regional(r)
+    regp = sim._seat_regional(r + 1)
     gotp = 0.0 if regp is None else float(regp[0][0, RECV, 1])
     assert gotp == 0.0, f"pillaged source district still delivered ({gotp})"
 
     # -- another seat (no regional buildings) never receives
-    assert sim._seat_regional(1) is None, "a civ with no regional building must get None"
-    print(f"  c regional channel OK (+{fac_prod} at range {RANGE}, dark at {RANGE + 1}, dedup, pillage-dark, civ-isolated)")
+    # the body is ROW-generic now: no OTHER seat row receives, seat 0 included.
+    for _row in (0, 2):
+        assert sim._seat_regional(_row) is None, f"seat row {_row} has no regional building and must get None"
+    print(f"  c regional channel OK (+{fac_prod} at range {RANGE}, dark at {RANGE + 1}, dedup, pillage-dark, seat-isolated)")
 
 
 def poke_exclusive_with(rules, rj, path):
@@ -399,7 +401,7 @@ def poke_civ_palace(rules, rj, path):
     assert diff == [0.0, 2.0, 2.0, 1.0, 5.0, 0.0], f"palace-row contribution wrong: {diff}"
 
     # per-j path == the batched twin, column-for-column, on the poked state
-    af = sim._seat_amenity(r)[2]  # [B, RC]
+    af = sim._seat_amenity(r + 1)[2]  # [B, RC]
     allc = sim._seat_city_yields_all(r, amen_yf=af)  # 6 x [B, RC]
     for jj in sim.civ_city_alive[0, r].nonzero(as_tuple=True)[0].tolist():
         m = sim.civ_city_alive[:, r, jj]
@@ -410,9 +412,9 @@ def poke_civ_palace(rules, rj, path):
 
     # housing / amenity constants wired; the palace amenity never lowers the tier
     assert sim._palace_housing == 1.0 and sim._palace_amenities == 1.0, "palace housing/amenity must be +1/+1"
-    yf_on = float(sim._seat_amenity(r)[2][0, j])
+    yf_on = float(sim._seat_amenity(r + 1)[2][0, j])
     sim.civ_city_is_cap[0, r, j] = False
-    yf_off = float(sim._seat_amenity(r)[2][0, j])
+    yf_off = float(sim._seat_amenity(r + 1)[2][0, j])
     sim.civ_city_is_cap[0, r, j] = True
     assert yf_on >= yf_off, "the palace amenity must not reduce the capital's amenity factor"
     print("  f civ PALACE OK (+2p/+5g/+2s/+1c capital row; per-j==batched twin; housing/amenity wired)")

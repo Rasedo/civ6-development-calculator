@@ -278,6 +278,65 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   manifest exclusions. `_found_seat0_caches` is down to five statics
   plus the `workable` clear.
 
+- **A-31. THE DISTRICT REGISTRY IS THE ONE READ (slice 8, 2026-08-14).**
+  Every TS district consumer walks `city.districts`, a per-city LIST:
+  `pillagedDistrictTypes(map, city.districts)`, `cityDistrictYields`,
+  `cityMaintenance`, `completedDistrictCount`, `computeHousing`'s
+  Aqueduct test, and `regionalEffects`' `citiesOf(state, seat)` →
+  `other.districts`. The civ rows already read the registry
+  (`city_dist_tile[:, row]`); seat 0 alone WINDOW-SCANNED the map —
+  radius-3 tiles whose `district >= 0`, gated on `owner == slot`,
+  `district_complete`, `~district_dead`. That gate is not in TS: a
+  district belongs to the city that built it however the TILE's
+  ownership churns. Seat 0 now reads `dist_tile` for adjacency yields,
+  Holy Site adjacency, the Shipyard's Harbor, districtMaintenance,
+  `completedDistrictCount` (both arms) and the Aqueduct, and
+  `_pillaged_bf_live` is DELETED for `_bldg_dark(dist_tile)` — the
+  shape-generic body the civ rows use, renamed out of civ vocabulary.
+  The `~district_dead` arm is redundant, not wrong: capture rebuilds
+  `dist_tile[b, c_new]` from `live_ring` (COMPLETE tiles only) and
+  clears `district_dead` on exactly that set, so the registry already
+  excludes the paved-but-dead ones. Merged with it, four more bodies
+  collapse to one apiece: `_seat_regional(row)` (seat 0's inline
+  regional-building loop DELETED), `_luxury_amenities(row, have, need)`
+  (the civ's inline grant loop DELETED, ownership now `tile_seat ==
+  row`), `_district_counts(row)` (`_civ_city_spec_count` DELETED), and
+  `_seat_amenity(row, lux)` — THE amenity body, which absorbs the whole
+  seat-0 inline half of `computeCityStats`' amenity walk and takes the
+  frozen-luxMap contract as a parameter. `_city_totals` now calls it
+  and casts the f64 factors back to `self.dtype`; the balance it sums
+  is integer-valued, so the tier an f64 sum picks is the tier an f32
+  sum picked. KNOWN LIMITATION, shared by every row and pre-existing:
+  NEIGHBORHOOD is `allowMultiple: true` but the registry holds one tile
+  per type, so `completedDistrictCount(false)` — the `housingIfDistricts`
+  input — undercounts a second Neighborhood. Unreachable today (no
+  `SCAFFOLD_DISTRICTS` entry, so no picker queues one), and Neighborhood
+  HOUSING itself still rides the multiplicity-safe tile scan on both
+  rows. The remaining seat-0 district window scans are OUTSIDE the yield
+  walk (`sim_masks`' one-per-type and specialty-count legality,
+  `sim_step`'s twin) — their own slice.
+
+- **A-32. FOLLOWER beliefs were gated on the OWNER's claim on civ rows
+  — FIXED 2026-08-14.** `B18_FOLLOWER_COUPLING_LIVE` is `true`, so
+  `followerReligionForCity` returns the city's `followedReligion` and
+  `withFollowerBelief` applies that religion's follower belief with NO
+  test on who owns the city. The GPU's civ bodies gated every follower
+  term on `_seat_has_beliefs(r + 1)` — the OWNER seat's own pantheon or
+  follower claim — so a civ city converted to a religion its owner
+  never founded drew none of it: `bldgY` (Feed the World / Choral
+  Music), Work Ethic's Holy Site production, `faithPerWonder` (Divine
+  Inspiration), `bldgH` (Religious Community) and Zen Meditation's
+  amenities all read zero. Seat 0 had the right gate (`_bel_any`) all
+  along, which is why the split only ever showed up as a CIV shortfall.
+  One predicate now answers it for every row — `_follower_live(row)` =
+  `_bel_any and (coupling or the seat's own claim)` — applied at all
+  five sites in `_seat_city_yields_all`, `_seat_city_yields` and
+  `_g5_hm`, with the PANTHEON/FOUNDER halves (the tile plane, `perF`/
+  `perC`, `bldgY`'s Stewardship term, River Goddess) left on
+  `_seat_has_beliefs`, which is what they key on. Uncoupled the two
+  tests coincide, so this is inert until the flag — but the flag is
+  already on.
+
 ## B. Fidelity vs real Civ 6 — open residuals
 
 - **B-17r. Encampment:** ranged-vs-district strikes are out of scope

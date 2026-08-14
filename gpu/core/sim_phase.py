@@ -391,7 +391,7 @@ class SimPhase:
             faith_sum = torch.zeros(B, dtype=torch.float64, device=dev)
             # The amenity map freezes at the loop top (the luxMap discipline)
             # — loyalty, growth and yields all read it.
-            amen_tidx, amen_gf, amen_yf = self._seat_amenity(r)
+            amen_tidx, amen_gf, amen_yf, _ = self._seat_amenity(r + 1)
             # This civ's governor seats for THIS turn — the loop-top
             # governorPicks mirror (quantized milli loyalty snapshot, ties by
             # slot index == TS array order; alive-masked).
@@ -431,8 +431,9 @@ class SimPhase:
             # the yields cache. Every batched sum is dyadic/int-valued:
             # bit-exact in any shape.
             _gmul_r = self._bel_mul("growth", r + 1) if _rcy_bel else 1.0
-            _riv_h = self._bel_add("river", r + 1)[:, 1] if _rcy_bel else None
-            _fol_h_rc = self._follower_id_for(self._city_rel(r + 1)) if _rcy_bel else None
+            _riv_h = self._bel_add("river", r + 1)[:, 1] if _rcy_bel else None  # River Goddess: PANTHEON, per-seat
+            _fol_live_r = self._follower_live(r + 1)  # Religious Community: FOLLOWER, per-city
+            _fol_h_rc = self._follower_id_for(self._city_rel(r + 1)) if _fol_live_r else None
             _ctr_r = self.civ_city_center[:, r].clamp(min=0)  # [B, RC]
 
             def _g5_hm() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -452,7 +453,7 @@ class SimPhase:
                     torch.where(fresh, wh + self._aq_fresh_bonus, torch.maximum(wh, torch.full_like(wh, self._aq_no_fresh_total))),
                     wh,
                 )
-                selb_h = self.civ_city_bldg[:, r] & ~self._civ_city_bdark(dt_all)  # buildings in a pillaged district give no housing
+                selb_h = self.civ_city_bldg[:, r] & ~self._bldg_dark(dt_all)  # buildings in a pillaged district give no housing
                 bh = selb_h.double() @ self.rules.b_housing.to(dev).double()  # [B, RC]
                 win3a = tiles_from_offsets(_ctr_r.reshape(-1), self._off3, self.W, self.H).reshape(B, self.RC, -1)
                 w3f = win3a.clamp(min=0).reshape(B, -1)
@@ -482,7 +483,7 @@ class SimPhase:
                 # applier every seat shares.
                 _civ_city_all_d = ((self.civ_city_dist_tile[:, r] >= 0) & self.district_complete.gather(
                     1, self.civ_city_dist_tile[:, r].clamp(min=0).reshape(B, -1)).reshape_as(self.civ_city_dist_tile[:, r])).sum(dim=2)
-                _rh, _ = self._cond_house_amen(_gpm[8], _gpm[9], _civ_city_all_d, self._civ_city_spec_count(r))
+                _rh, _ = self._cond_house_amen(_gpm[8], _gpm[9], _civ_city_all_d, self._district_counts(r + 1)[1])
                 housing = housing + _rh
                 # Appeal-based NEIGHBORHOOD housing (the computeHousing twin).
                 # rc tiles are keyed by the per-city registry tile_city, so
@@ -501,8 +502,9 @@ class SimPhase:
                         _idj = self.civ_city_id[:, r, _j].unsqueeze(1)  # [B, 1]
                         _nbh[:, _j] = (_srcd * ((_rid == _idj) & (_idj >= 0)).double()).sum(dim=1)
                     housing = housing + _nbh
-                if _rcy_bel:
+                if _fol_live_r:
                     housing = housing + torch.einsum("bjn,bjn->bj", selb_h.double(), self._fol_tab("bldgH", _fol_h_rc))
+                if _rcy_bel:
                     housing = housing + _riv_h.unsqueeze(1) * self.tile_river.gather(1, _ctr_r).double()
                 p64a = self.civ_city_pop[:, r].double()
                 need = torch.floor(15 + 8 * (p64a - 1) + (p64a - 1).clamp(min=0) ** 1.5)

@@ -252,13 +252,13 @@ def poke_capture_luxury_pool(rules, path):
 
     have = torch.zeros(sim.B, sim.C, dtype=sim.dtype)
     need = torch.full((sim.B, sim.C), 10.0, dtype=sim.dtype)
-    base = float(sim._luxury_amenities(have, need).sum())
+    base = float(sim._luxury_amenities(0, have, need).sum())
 
     sim._capture_civ_city(torch.tensor([0]), torch.tensor([r]), torch.tensor([j]), torch.tensor([c_t]))
     c_new = int(sim.center_at[0, c_t])
     assert c_new >= 0 and bool(sim.alive[0, c_new]), "capture did not land a seat-0 city"
     assert int(sim.owner[0, t]) == c_new, "the luxury tile did not re-own to the captured city (A-17 ring)"
-    after = float(sim._luxury_amenities(have, need).sum())
+    after = float(sim._luxury_amenities(0, have, need).sum())
     assert after >= base + 1.0, f"captured improved luxury did not feed the seat-0 pool ({base} -> {after})"
     sim._check_rc_registry_invariant()  # the handover leaves the registry coherent
     print(f"  d capture-luxury handover OK (lux {lid} req {req}: civ rc {cid} tile {t} -> city {c_new}, grants {base} -> {after})")

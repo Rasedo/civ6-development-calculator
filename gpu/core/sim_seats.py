@@ -1599,11 +1599,13 @@ class SimSeats:
         self._seat_route_cache = (key, inc)
         return inc
 
-    def _civ_city_bdark(self, dt_reg: torch.Tensor) -> torch.Tensor:
-        """Given an rc district-tile registry [..., nD] (tile per district type,
+    def _bldg_dark(self, dt_reg: torch.Tensor) -> torch.Tensor:
+        """Given a city district-tile registry [..., nD] (tile per district type,
         -1 = none), return [..., NB] bool = building b is dark because its
         district is COMPLETE-but-PILLAGED. CITY_CENTER buildings (_b_req_district
-        == -1) never gate. The pillagedDistrictTypes twin over rc buildings."""
+        == -1) never gate. The pillagedDistrictTypes twin, for any seat row —
+        TS reads `city.districts`, a per-city LIST, so the registry (not a tile
+        window) is the faithful input on every row."""
         if not self.districts_on or dt_reg.shape[-1] == 0:
             return torch.zeros(*dt_reg.shape[:-1], self.NB, dtype=torch.bool, device=self.device)
         B0 = dt_reg.shape[0]
@@ -1659,12 +1661,13 @@ class SimSeats:
         # this civ's belief featureYields join every tile column (TS
         # adds them inside tileYields) — worked picks, scores and yields all
         # see them; the score adds stay exact (dyadic ints, f64).
-        _has_bel = self._seat_has_beliefs(r + 1)
-        # this city's FOLLOWER-belief id (from its followed religion when the
-        # coupling is LIVE, else the owner religion r+1, which is byte-identical
-        # to _bel_add's fol term). pan/founder stay per-civ via _bel_add and
-        # _bel_add_pf.
-        _fol_j = self._follower_id_for(self._city_rel(r + 1)[:, j]) if _has_bel else None
+        _has_bel = self._seat_has_beliefs(r + 1)  # PANTHEON + FOUNDER: a seat's own claim
+        # this city's FOLLOWER-belief id, from the religion it FOLLOWS — under
+        # live coupling that need not be one this seat founded, so the follower
+        # half gates on _follower_live (withFollowerBelief has no owner test).
+        # pan/founder stay per-seat via _bel_add and _bel_add_pf.
+        _fol_live = self._follower_live(r + 1)
+        _fol_j = self._follower_id_for(self._city_rel(r + 1)[:, j]) if _fol_live else None
         if _has_bel:
             featP = self._belief_feat_plane(r + 1)
             f_plane = f_plane + featP[:, :, 0]
@@ -1815,7 +1818,7 @@ class SimSeats:
                     add = torch.where(has, adjf, torch.zeros_like(adjf))
                     # Work Ethic: Holy Site adjacency ALSO yields production
                     # (the floored-adjacency twin in phase.ts)
-                    if di == self._hs_idx and _has_bel:
+                    if di == self._hs_idx and _fol_live:
                         prod = prod + add * self._fol_tab("we", _fol_j)  # per-city follower Work Ethic
                     if yc == 3:
                         sci = sci + add
@@ -1832,7 +1835,7 @@ class SimSeats:
         # building yields under empty modifiers (worship never
         # queues, so the plain def.yields sum matches cityBuildingYields).
         if self.districts_on:
-            selb = self.civ_city_bldg[:, r, j] & ~self._civ_city_bdark(self.civ_city_dist_tile[:, r, j]) & ~self._b_regional.reshape(1, -1)  # pillaged-dark; regional buildings are delivered by range
+            selb = self.civ_city_bldg[:, r, j] & ~self._bldg_dark(self.civ_city_dist_tile[:, r, j]) & ~self._b_regional.reshape(1, -1)  # pillaged-dark; regional buildings are delivered by range
             if bool(selb.any()):
                 add6 = selb.double() @ self.rules_dev.b_yields.double()  # [B, 6] (int-valued: dtype roundtrip is exact)
                 food = food + add6[:, 0]
@@ -1843,13 +1846,17 @@ class SimSeats:
                 cul = cul + add6[:, 4]
                 # belief building adds (Feed the World / Choral Music —
                 # the beliefAdd twin, unscaled, pre-tier like TS)
-                if _has_bel:
-                    # founder (Stewardship) bldgY stays per-civ; the follower
-                    # part (Feed the World / Choral Music) keys per-city. The
+                if _has_bel or _fol_live:
+                    # founder (Stewardship) bldgY stays per-SEAT; the follower
+                    # part (Feed the World / Choral Music) keys per-CITY. The
                     # building keys are disjoint and the rows integer, so summing
-                    # the two einsums is bit-identical to one combined pass.
-                    badd = torch.einsum("bn,bnk->bk", selb.double(), self._bel_add_pf("bldgY", r + 1))
-                    badd = badd + torch.einsum("bn,bnk->bk", selb.double(), self._fol_tab("bldgY", _fol_j))
+                    # the two einsums is bit-identical to one combined pass, and
+                    # each half carries its own gate.
+                    badd = torch.zeros(self.B, 6, dtype=torch.float64, device=self.device)
+                    if _has_bel:
+                        badd = badd + torch.einsum("bn,bnk->bk", selb.double(), self._bel_add_pf("bldgY", r + 1))
+                    if _fol_live:
+                        badd = badd + torch.einsum("bn,bnk->bk", selb.double(), self._fol_tab("bldgY", _fol_j))
                     food = food + badd[:, 0]
                     prod = prod + badd[:, 1]
                     gold = gold + badd[:, 2]
@@ -1881,7 +1888,7 @@ class SimSeats:
         # regional-building yields — regionalEffects at the city.ts:445-446
         # position (after the local buildings, before the wonder flat yields),
         # pre-tier. Computed LIVE per j, like TS.
-        _regional_j = self._seat_regional(r)
+        _regional_j = self._seat_regional(r + 1)
         if _regional_j is not None:
             _rj = _regional_j[0][:, j] * mask.double().unsqueeze(1)  # [B, 6]
             food = food + _rj[:, 0]
@@ -1904,7 +1911,7 @@ class SimSeats:
                 sci = sci + wcy[:, 3]
                 cul = cul + wcy[:, 4]
                 faith = faith + wcy[:, 5]
-                if _has_bel:
+                if _fol_live:
                     faith = faith + self._fol_tab("fpw", _fol_j) * compw.sum(dim=1).double()  # per-city follower Divine Inspiration
         # the founder's capital incomes (perFollowers on the civ's LIVE total pop
         # + perCity) land on the capital BEFORE the tier scaling, at
@@ -1945,7 +1952,7 @@ class SimSeats:
             # with pillaged-dark + regional-skip, as in the b_yields sum above.
             _cols6 = None
             if self.districts_on:
-                selb_cs = self.civ_city_bldg[:, r, j] & ~self._civ_city_bdark(self.civ_city_dist_tile[:, r, j]) & ~self._b_regional.reshape(1, -1)  # [B, NB]
+                selb_cs = self.civ_city_bldg[:, r, j] & ~self._bldg_dark(self.civ_city_dist_tile[:, r, j]) & ~self._b_regional.reshape(1, -1)  # [B, NB]
                 if bool(selb_cs.any()):
                     _nBc = selb_cs.shape[1]
                     per3 = (self.civ_only_citystate_envoys[:, r] >= 3).double() * self._citystate_district_bonus * _acs * (self._citystate_b1idx >= 0).double()
@@ -2004,7 +2011,7 @@ class SimSeats:
         # golden PEN, BRUSH AND VOICE, the batched twin's position.
         _pb_j = self._golden_ded(r + 1, self._ded_pen_brush)
         if bool(_pb_j.any()):
-            cul = cul + _pb_j.to(cul.dtype) * self._civ_city_spec_count(r)[:, j].to(cul.dtype) * mask.to(cul.dtype)
+            cul = cul + _pb_j.to(cul.dtype) * self._district_counts(r + 1)[1][:, j].to(cul.dtype) * mask.to(cul.dtype)
         # The amenity tier scales the non-food columns, as at computeCityStats'
         # tail. External callers re-rank FRESH; the phase loop passes its
         # loop-top frozen factors.
@@ -2015,7 +2022,7 @@ class SimSeats:
         _popj = self.civ_city_pop[:, r, j].double()
         sci = sci + self.rules.citizen_science * _popj
         cul = cul + self.rules.citizen_culture * _popj
-        yf = amen_yf if amen_yf is not None else self._seat_amenity(r)[2][:, j]
+        yf = amen_yf if amen_yf is not None else self._seat_amenity(r + 1)[2][:, j]
         prod = prod * yf
         sci = sci * yf
         cul = cul * yf
@@ -2099,121 +2106,141 @@ class SimSeats:
         amt = self._wond_regam.reshape(1, 1, nW).expand(B, cols, nW).reshape(B, cols * nW, 1)
         return (hit.double() * amt).sum(dim=1) * alive.double()
 
-    def _seat_regional(self, r: int) -> tuple[torch.Tensor, torch.Tensor] | None:
-        """The regionalEffects twin for a civ seat: each regional building owned
-        by one of this civ's cities whose source district (civ_city_dist_tile of the
-        building's type) is COMPLETE and unpillaged reaches every ALIVE
-        same-civ city center within regional_range of the source tile; the
-        same building id never stacks (any() over sources). Reads LIVE state
-        at call time (the per-j path sees mid-phase completions, like TS).
-        Returns ([B, RC, 6] yields, [B, RC] amenities) in f64, or None when
-        no city of this civ owns a regional building."""
+    def _seat_regional(self, row: int) -> tuple[torch.Tensor, torch.Tensor] | None:
+        """The regionalEffects twin for seat row `row` (0 = seat 0, r+1 = civ r):
+        each regional building owned by one of this seat's cities whose source
+        district (city_dist_tile of the building's type) is COMPLETE and
+        unpillaged reaches every ALIVE same-seat city center within
+        regional_range of the source tile; the same building id never stacks
+        (any() over sources — TS's `seen` set). Reads LIVE state at call time
+        (the per-j path sees mid-phase completions, like TS). Returns
+        ([B, cols, 6] yields, [B, cols] amenities) in f64, or None when no city
+        of this seat owns a regional building."""
         if not self._reg_bidx or not self.districts_on:
             return None
-        B, RC = self.B, self.RC
-        alive = self.civ_city_alive[:, r]
-        dt_all = self.civ_city_dist_tile[:, r]  # [B, RC, nD]
-        ctrs = self.civ_city_center[:, r].clamp(min=0)  # [B, RC] receiver centers
+        B = self.B
+        cols = self.C if row == 0 else self.RC
+        alive = self.city_alive[:, row, :cols]
+        dt_all = self.city_dist_tile[:, row, :cols]  # [B, cols, nD]
+        ctrs = self.city_center[:, row, :cols].clamp(min=0)  # [B, cols] receiver centers
         y6 = am = None
         for n in self._reg_bidx:
-            own_n = self.civ_city_bldg[:, r, :, n] & alive  # [B, RC] source cities
+            own_n = self.city_bldg[:, row, :cols, n] & alive  # [B, cols] source cities
             if not bool(own_n.any()):
                 continue
-            st = dt_all[:, :, int(self._b_req_district[n])]  # [B, RC] source district tile (-1 none)
+            st = dt_all[:, :, int(self._b_req_district[n])]  # [B, cols] source district tile (-1 none)
             stc = st.clamp(min=0)
             ok = own_n & (st >= 0) & self.district_complete.gather(1, stc) & ~self.district_pillaged.gather(1, stc)  # pillaged source is dark
             if not bool(ok.any()):
                 continue
-            dd = self.pair_dist[stc.unsqueeze(2), ctrs.unsqueeze(1)]  # [B, RCsrc, RCrecv] int16
-            has = (ok.unsqueeze(2) & (dd <= self._regional_range)).any(dim=1) & alive  # [B, RC recv]
+            dd = self.pair_dist[stc.unsqueeze(2), ctrs.unsqueeze(1)]  # [B, src, recv] int16
+            has = (ok.unsqueeze(2) & (dd <= self._regional_range)).any(dim=1) & alive  # [B, cols recv]
             hf = has.double()
             if y6 is None:
-                y6 = torch.zeros(B, RC, 6, dtype=torch.float64, device=self.device)
-                am = torch.zeros(B, RC, dtype=torch.float64, device=self.device)
+                y6 = torch.zeros(B, cols, 6, dtype=torch.float64, device=self.device)
+                am = torch.zeros(B, cols, dtype=torch.float64, device=self.device)
             y6 = y6 + hf.unsqueeze(2) * self.rules_dev.b_yields[n].double().reshape(1, 1, 6)
             am = am + hf * float(self.rules.b_amenities[n])
         return None if y6 is None else (y6, am)
 
-    def _seat_amenity(self, r: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """The luxuryAmenities twin for a civ seat: each UNIQUE improved luxury on
-        THIS civ's territory grants +1 to its luxAmenityCities neediest cities
-        (need desc, slot asc = rc.id acquisition order); tier from have − needed,
-        with have = local building amenities + regional effects + the capital
-        PALACE, and no policy sources. Returns (tier_idx, growth_f, yield_f),
-        each [B, RC]."""
-        B, RC = self.B, self.RC
+    def _district_counts(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """[B, cols] × 2 for seat row `row` — completedDistrictCount(city,
+        false) and its specialtyOnly twin, off the city district REGISTRY
+        (`city.districts`). CITY_CENTER lives outside the placeable catalog, so
+        the registry already applies the TS filter's first arm."""
+        cols = self.C if row == 0 else self.RC
+        reg = self.city_dist_tile[:, row, :cols]
+        comp = (reg >= 0) & self.district_complete.gather(1, reg.clamp(min=0).reshape(self.B, -1)).reshape_as(reg)
+        return comp.sum(dim=2), (comp & self._is_specialty.reshape(1, 1, -1)).sum(dim=2)
+
+    def _follower_live(self, row: int) -> bool:
+        """Can a city of seat row `row` carry a FOLLOWER belief? Follower
+        effects key on the city's FOLLOWED religion, which under live religion
+        coupling can be one this seat never founded — so the seat's own
+        pantheon/follower claim is not the question there. Uncoupled, every
+        city follows its owner's religion and the two tests coincide (an
+        unclaimed id gathers the neutral pad row, adding exact 0)."""
+        return self._bel_any and (self._b18_couple or self._seat_has_beliefs(row))
+
+    def _seat_amenity(self, row: int, lux: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """THE amenity body, for every seat row (0 = seat 0, r+1 = civ r) —
+        computeCityStats' amenity half, in f64.
+
+        baseHave = local (non-regional, unpillaged) building amenities + the
+        capital PALACE + regional BUILDING amenities; luxuryAmenities ranks on
+        THAT and grants +1 to its luxAmenityCities neediest cities. The terms
+        city.ts leaves OUT of the ranking then join the TIER balance only:
+        government/policy amenitiesAll + newDeal, regional WONDER amenities,
+        follower Zen Meditation and pantheon River Goddess. War weariness is
+        subtracted last.
+
+        `lux` FREEZES the luxury map: TS endTurn computes luxuryAmenities ONCE
+        before its city loop and feeds that map to every city's fresh
+        computeCityStats, so a guard-triggered recompute inside the walk must
+        not re-rank with mid-walk pops. Returns (tier_idx, growth_f, yield_f,
+        lux_add), each [B, cols]; the factors are f64 and a caller running
+        self.dtype casts them."""
+        cols = self.C if row == 0 else self.RC
         rd = self.rules_dev
-        selb_a = self.civ_city_bldg[:, r] & ~self._civ_city_bdark(self.civ_city_dist_tile[:, r]) & ~self._b_regional.reshape(1, 1, -1)  # pillaged-dark; regional buildings are delivered by range
-        have = torch.einsum("bjn,n->bj", selb_a.to(torch.float64), rd.b_amenities.double())
-        # PALACE amenity on the capital slot — baseHave sums rc.buildings, which
+        alive = self.city_alive[:, row, :cols]
+        is_cap = self.city_is_cap[:, row, :cols]
+        dreg = self.city_dist_tile[:, row, :cols]
+        # Local building amenities, pillaged-dark. Regional buildings leave the
+        # local sum (localBuildingAmenities' `if (def.regional) continue`) — the
+        # regional channel below delivers them by RANGE.
+        selb = self.city_bldg[:, row, :cols] & ~self._bldg_dark(dreg) & ~self._b_regional.reshape(1, 1, -1)
+        have = torch.einsum("bjn,n->bj", selb.to(torch.float64), rd.b_amenities.double())
+        # PALACE amenity on the capital — baseHave sums city.buildings, which
         # hold the founding PALACE, so it joins BEFORE the luxury ranking.
         # CITY_CENTER never pillages.
-        have = have + self._palace_amenities * (self.civ_city_is_cap[:, r] & self.civ_city_alive[:, r]).double()
-        # regional amenities (Zoo/Stadium) join baseHave BEFORE the luxury
-        # ranking — the city.ts:292 mirror.
-        _regional = self._seat_regional(r)
+        have = have + self._palace_amenities * (is_cap & alive).double()
+        # regional BUILDING amenities (Zoo/Stadium) join baseHave BEFORE the
+        # luxury ranking — the city.ts luxuryAmenities mirror.
+        _regional = self._seat_regional(row)
         if _regional is not None:
             have = have + _regional[1]
-        need = torch.ceil((self.civ_city_pop[:, r].double() - 2) / 2).clamp(min=0)
-        out = torch.zeros(B, RC, dtype=torch.float64, device=self.device)
-        alive = self.civ_city_alive[:, r]
-        if self._n_lux > 0 and self.improvements_on:
-            improved = (self.lux_id >= 0) & (self.civ_at == r) & (self.improvement == self.lux_req)
-            counts = torch.zeros(B, self._n_lux, dtype=torch.long, device=self.device)
-            counts.scatter_add_(1, self.lux_id.clamp(min=0), improved.long())
-            rounds = (counts > 0).long().sum(dim=1)
-            mx = int(rounds.max().item())
-            slot = torch.arange(RC, device=self.device, dtype=torch.float64).reshape(1, RC)
-            k = min(self._lux_k, RC)
-            for rnd in range(mx):
-                act = rounds > rnd
-                needr = need - (have + out)
-                key = torch.where(alive, needr * 64 - slot, torch.full_like(needr, -1e9))
-                top_v, top_i = key.topk(k, dim=1)
-                grant = (top_v > -1e8) & act.unsqueeze(1)
-                out.scatter_add_(1, top_i, grant.to(torch.float64))
-        # this civ's OWN government/policy flat amenities and the newDeal
-        # specialty rule — computeCityStats' two arms, sharing
-        # `_cond_house_amen` with the seat-0 path.
-        _g_amen = _g_nd = None
+        need = torch.ceil((self.city_pop[:, row, :cols].double() - 2) / 2).clamp(min=0)
+        lux_add = self._luxury_amenities(row, have, need) if lux is None else lux.double()
+        # this seat's OWN government/policy flat amenities and the newDeal
+        # specialty rule — computeCityStats' two arms.
         if self._gov_has_effects:
-            _gm = self._gov_policy_mods_cached(r, self.civ_only_civics[:, r])
+            _gm = self._gov_policy_mods_cached("seat0" if row == 0 else row - 1,
+                                               self.civics if row == 0 else self.civ_only_civics[:, row - 1])
             _g_amen, _g_hid, _g_nd = _gm[7], _gm[8], _gm[9]
-            _civ_city_all = ((self.civ_city_dist_tile[:, r] >= 0) & self.district_complete.gather(
-                1, self.civ_city_dist_tile[:, r].clamp(min=0).reshape(B, -1)).reshape_as(self.civ_city_dist_tile[:, r])).sum(dim=2)
-            _, _civ_only_cond_amen = self._cond_house_amen(_g_hid, _g_nd, _civ_city_all, self._civ_city_spec_count(r))
-            have = have + _g_amen.unsqueeze(1) + _civ_only_cond_amen
+            _all_d, _spec_d = self._district_counts(row)
+            _, _cond_amen = self._cond_house_amen(_g_hid, _g_nd, _all_d, _spec_d)
+            have = have + _g_amen.unsqueeze(1) + _cond_amen
         # Regional WONDER amenities (Great Bath / Alhambra / Colosseum) join the
         # TIER balance after the grant — city.ts leaves them out of baseHave.
-        _wregam = self._wonder_regional_amenities(r + 1, self._completed_wonders(r + 1))
+        _wregam = self._wonder_regional_amenities(row, self._completed_wonders(row))
         if _wregam is not None:
             have = have + _wregam
-        if self._seat_has_beliefs(r + 1):
-            # River Goddess (river centers) + Zen Meditation (2+ completed
-            # specialty districts) join the TIER balance ONLY — the luxury-grant
-            # RANKING stays building-amenities-based.
-            ctr = self.civ_city_center[:, r].clamp(min=0)
-            extra = self._bel_add("river", r + 1)[:, 0].unsqueeze(1) * self.tile_river.gather(1, ctr).double()
-            # Zen Meditation keys per-city on the followed religion's follower
-            # belief (the owner religion when uncoupled: byte-identical).
-            zen_rc = self._fol_tab("zen", self._follower_id_for(self._city_rel(r + 1)))  # [B, RC, 2] = min, amenities
-            zmin, zamt = zen_rc[:, :, 0], zen_rc[:, :, 1]  # each [B, RC]
+        extra = None
+        if self._seat_has_beliefs(row):
+            # River Goddess — a PANTHEON belief, so it keys on the SEAT: +amenities
+            # on river CENTERS, tier balance only (the luxury ranking above stays
+            # building-amenities-based).
+            ctr = self.city_center[:, row, :cols].clamp(min=0)
+            extra = self._bel_add("river", row)[:, 0].unsqueeze(1) * self.tile_river.gather(1, ctr).double()
+        if self._follower_live(row) and self.districts_on:
+            # Zen Meditation — a FOLLOWER belief, so it keys per-city on the
+            # religion the city FOLLOWS, which need not be this seat's.
+            zen = self._fol_tab("zen", self._follower_id_for(self._city_rel(row)))  # [B, cols, 2] = min, amenities
+            zmin, zamt = zen[:, :, 0], zen[:, :, 1]
             if bool((zamt != 0).any()):
-                dt_ = self.civ_city_dist_tile[:, r]
-                comp_ = (dt_ >= 0) & self.district_complete.gather(1, dt_.clamp(min=0).reshape(B, -1)).reshape_as(dt_)
-                spec_ = (comp_ & self._is_specialty.reshape(1, 1, -1)).sum(dim=2).double()
-                extra = extra + torch.where(spec_ >= zmin, zamt, torch.zeros_like(spec_))
-            balance = have + out + extra - need
-        else:
-            balance = have + out - need
+                _spec = self._district_counts(row)[1].double()
+                _z = torch.where(_spec >= zmin, zamt, torch.zeros_like(_spec))
+                extra = _z if extra is None else extra + _z
+        balance = have + lux_add - need if extra is None else have + lux_add + extra - need
         # war-weariness drag, subtracted from the tier balance after the luxury
         # grants — the same position every seat uses.
-        balance = balance - self._ww_penalty(r + 1, torch.float64).unsqueeze(1)
+        balance = balance - self._ww_penalty(row, torch.float64).unsqueeze(1)
         growth_f, yield_f = self._amenity_factors(balance)
-        tier_idx = torch.full_like(self.civ_city_pop[:, r], len(self.rules.amenity_tiers) - 1)
+        # Amenity-tier INDEX (0 Ecstatic … 4 Unhappy) — loyalty reads it.
+        tier_idx = torch.full_like(self.city_pop[:, row, :cols], len(self.rules.amenity_tiers) - 1)
         for i in reversed(range(len(self.rules.amenity_tiers))):
             tier_idx = torch.where(balance >= self.rules.amenity_tiers[i][0], torch.full_like(tier_idx, i), tier_idx)
-        return tier_idx, growth_f.double(), yield_f.double()
+        return tier_idx, growth_f.double(), yield_f.double(), lux_add
 
     def _transfer_rc_to_rc(self, b: int, civ_only_from: int, j: int, civ_only_to: int) -> None:
         """A loyalty flip between civ seats — pop ×0.75 floor 1, fresh boxes,
