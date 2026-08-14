@@ -99,7 +99,7 @@ def main() -> None:
             opts = m["civic"][0].nonzero(as_tuple=True)[0]
             ca[0] = opts[torch.randint(len(opts), (1,), generator=g)]
         sim2.apply_seat_actions(0, production=pa, tech=ta, civic=ca)
-        sim2._consume_driven_picks(0)
+        sim2._seat_record_apply(1, torch.ones(sim2.B, dtype=torch.bool))
         sim2.step()
     assert bool(sim2.civ_city_alive[0, 0].any()), "controlled civ must survive random play"
     assert float(sim2.empire_score()[0]) > 0, "world must keep scoring"

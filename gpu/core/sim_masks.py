@@ -28,9 +28,15 @@ class SimMasks:
         """[B, NC] valid civic picks; all-False where the slot is busy."""
         return self._available_mask(self.civics, self._prereq_c) & (self.cur_civic == -1).unsqueeze(1)
 
+    def _seat_envoy_mask(self, row: int) -> torch.Tensor:
+        """[B, S] city-states seat row `row` could back with an available envoy
+        right now — met, alive and a non-empty bank. ONE body for every seat."""
+        return (self.citystate_alive & self.seat_citystate_met[:, row]
+                & (self.civ_envoys_avail[:, row] > 0).unsqueeze(1))
+
     def envoy_mask(self) -> torch.Tensor:
-        """[B, S] city-states an available envoy could back right now."""
-        return self.citystate_alive & self.citystate_met & (self.envoys_avail > 0).unsqueeze(1)
+        """[B, S] seat 0's row of `_seat_envoy_mask` — no mask of its own."""
+        return self._seat_envoy_mask(0)
 
     def war_mask(self) -> torch.Tensor:
         """[B, 2R] seat-0 diplomacy actions: columns 0..R-1 declare war on that

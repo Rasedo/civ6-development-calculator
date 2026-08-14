@@ -11,17 +11,13 @@ from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must
 
 
 class SimPhase:
-    def _seat_phase(
-        self,
-        production: torch.Tensor | None = None,
-        tech: torch.Tensor | None = None,
-        civic: torch.Tensor | None = None,
-        envoy: torch.Tensor | None = None,
-        war: torch.Tensor | None = None,
-    ) -> None:
-        """Runs EVERY seat in id order — the seatPhase twin. Row 0 (seat 0,
-        driven by the wire arguments) takes its turn first through _seat0_row;
-        the civ rows follow through the loop below, one body each.
+    def _seat_phase(self, war: torch.Tensor | None = None) -> None:
+        """Runs EVERY seat in id order — the seatPhase twin. Row 0 takes its
+        turn first through _seat0_row; the civ rows follow through the loop
+        below, one body each. Every row's DECISIONS arrive through the same
+        stash (`_stash_record` / `_stash_buy`, keyed by absolute row), so the
+        only wire argument left here is `war` — seat 0's declare column, which
+        applies at the geo pass below rather than at the record position.
 
         Per seat: ww decay, boosts, CS diplomacy/quests, record picks, the
         buy ladder, trade, per-city economy (yields, growth, queue progress/
@@ -59,14 +55,14 @@ class SimPhase:
             self._geo_declare_wars()
         # ROW 0: seat 0's whole turn, through the same body order as every
         # civ row below (the TS loop iterates state.seats — seat 0 first).
-        self._seat0_row(production=production, tech=tech, civic=civic, envoy=envoy)
+        self._seat0_row()
         for r in range(self.R):
             n_cities = self.civ_city_alive[:, r].sum(dim=1)
             active = self.civ_only_alive[:, r] & (n_cities > 0)
-            # The driven production pick applies HERE — after seat 0's units
-            # have already acted this turn.
-            self._consume_driven_picks(r)
             if not bool(active.any()):
+                # TS's eliminated-actor `continue` — but the record intents are
+                # for THIS turn and must not survive into the next one.
+                self._seat_record_apply(r + 1, active)
                 continue
             # War weariness SETTLES here: accrual happens per BATTLE as the
             # fighting resolves, so what is left for the block top is the
@@ -78,15 +74,16 @@ class SimPhase:
             # same point (the seat's block top).
             self._detect_seat_boosts(r + 1, active)
             # The CS-diplomacy block sits right after boost detection — the
-            # seatPhase position.
-            self._seat_cs_phase(r, active)
+            # seatPhase position. Row addressing: civ r is seat row r+1.
+            self._seat_influence_phase(r + 1, active)
             # CS quests resolve/issue right after the envoy accrual (the
             # seatPhase quest block sits at the tail of the same CS block), so
             # a completed quest's envoy is visible to the levy suzerain test
-            # later this phase. Row addressing: civ r is seat row r+1.
+            # later this phase.
             self._seat_quest_phase(r + 1, active)
-            # Production picks arrive on the wire (_consume_driven_picks
-            # above); a seat with no record queues nothing.
+            # THE RECORD: tech, civic, envoys, production — one body, every seat
+            # row, at applySeatActionRecord's own position.
+            self._seat_record_apply(r + 1, active)
             # THE gold/faith block — one body, every seat row.
             self._seat_buy_ladder(r + 1, active)
             # The trade creation block sits between the buy block and the

@@ -192,12 +192,6 @@ class SimSeats:
         made. With a preference order the CHOICE stays wholly in the policy and
         this function only validates. Near-free for a net, whose logits over the
         columns already ARE a preference order."""
-        if tech is not None:
-            ok = (tech >= 0) & self.controlled[:, r] & (self.civ_only_cur_tech[:, r] == -1)
-            self.civ_only_cur_tech[:, r] = torch.where(ok, tech.clamp(min=0), self.civ_only_cur_tech[:, r])
-        if civic is not None:
-            ok = (civic >= 0) & self.controlled[:, r] & (self.civ_only_cur_civic[:, r] == -1)
-            self.civ_only_cur_civic[:, r] = torch.where(ok, civic.clamp(min=0), self.civ_only_cur_civic[:, r])
         if war is not None:
             Rw = max(self.R, 1)
             w = war.to(torch.long)
@@ -223,30 +217,91 @@ class SimSeats:
                 self.war[:, 1 + r, 0] &= ~peace  # the store IS war[0, 1+r]; this writes the MIRROR cell
                 self.civ_only_warturns[:, r] = torch.where(peace, torch.zeros_like(self.civ_only_warturns[:, r]), self.civ_only_warturns[:, r])
                 self.civ_only_peaceturns[:, r] = torch.where(peace, torch.zeros_like(self.civ_only_peaceturns[:, r]), self.civ_only_peaceturns[:, r])
-        # ENVOY verb: STASHED here, consumed at _seat_cs_phase's own position,
-        # right after the accrual. The totals commute with the accrual, but
-        # SUZERAINTY is a THRESHOLD that seat 0's favor accrual reads, so
-        # applying pre-step would flip suzerainty a turn earlier than TS's
-        # in-block apply. Positions must match, like the unit stash.
-        if envoys is not None and self.S > 0:
-            if not hasattr(self, "_driven_envoys") or self._driven_envoys is None:
-                self._driven_envoys = {}
-            self._driven_envoys[r] = envoys
-        # PRODUCTION stashes like the envoys — consumed at _seat_phase's own pick
-        # position via _consume_driven_picks. Draw-free is not ORDER-free: a
-        # pre-step apply would queue (and district-PAVE) for a city another seat
-        # captures later that same turn, while TS's seatPhase apply runs after
-        # those units act and finds no city at that centre. civ_city_alive gates inside
-        # the appliers make the consume-time refusal exact.
-        if production_pref is not None or production is not None:
-            if not hasattr(self, "_driven_picks") or self._driven_picks is None:
-                self._driven_picks = {}
-            self._driven_picks[r] = (production, production_pref)
-        # the BUY / FAITH / LEVY intents stash like production and are consumed
-        # by _seat_buy_ladder at the gold block's own phase position. Every
-        # stash is keyed by the ABSOLUTE seat row, so seat 0's own intents (set
-        # by step()) share the dicts and the body that drains them.
+        # everything else STASHES and applies at the RECORD POSITION inside the
+        # seat phase. Every stash is keyed by the ABSOLUTE seat row, so seat 0's
+        # own intents (set by step()) share the dicts and the bodies that drain
+        # them.
+        self._stash_record(r + 1, tech=tech, civic=civic, envoys=envoys,
+                           production=production, pref=production_pref)
         self._stash_buy(r + 1, buy=buy, worship=worship, relig=relig, levy=levy)
+
+    def _stash_record(self, row: int, tech=None, civic=None, envoys=None,
+                      production=None, pref=None) -> None:
+        """Park a seat row's applySeatActionRecord intents for
+        `_seat_record_apply` to drain at the record position.
+
+        WHY NOT APPLY NOW. Draw-free is not ORDER-free. TS applies the record
+        inside seatPhase, AFTER the eliminated-actor `continue` and after the
+        CS/quest block: a pre-step apply would set research for a seat TS skips
+        entirely, spend an envoy before the quest that grants one, and queue (or
+        district-PAVE) for a city another seat captures later the same turn. The
+        stash makes the GPU's refusal happen where TS's does."""
+        if tech is not None:
+            self._driven_tech[row] = tech
+        if civic is not None:
+            self._driven_civic[row] = civic
+        if envoys is not None and self.S > 0:
+            self._driven_envoys[row] = envoys
+        if production is not None or pref is not None:
+            self._driven_picks[row] = (production, pref)
+
+    def _seat_record_apply(self, row: int, active: torch.Tensor) -> None:
+        """applySeatActionRecord for seat row `row` — ONE body every seat runs,
+        at the TS record position (after the CS/quest block, before the gold
+        ladder), in the TS arm order: tech, civic, envoys, production.
+
+        `active` is the eliminated-actor `continue`: TS's `continue` precedes
+        the record apply, so a cityless seat applies NOTHING — but the stash is
+        drained either way, because an intent is for THIS turn and a refused one
+        must not survive into the next.
+
+        The WAR arm is deliberately absent and is the LAST split left in the
+        record: seat 0's declare column applies at the geo pass in
+        `_seat_phase`, a civ's in `apply_seat_actions` at decide time — the
+        WAR_COLUMN_SEAT residual, which owns its own task.
+
+        Every arm re-validates against the LIVE state here; nothing chooses."""
+        tech = self._driven_tech.pop(row, None)
+        civic = self._driven_civic.pop(row, None)
+        envoys = self._driven_envoys.pop(row, None)
+        production, pref = self._driven_picks.pop(row, (None, None))
+        if not bool(active.any()):
+            return
+        ext = self.seat_ext[:, row]
+        if tech is not None:
+            t_act = tech.to(torch.long)
+            ok = active & ext & (self.civ_cur_tech[:, row] == -1) & (t_act >= 0) \
+                & self._available_mask(self.civ_techs[:, row], self._prereq_t).gather(1, t_act.clamp(min=0).unsqueeze(1)).squeeze(1)
+            self.civ_cur_tech[:, row] = torch.where(ok, t_act.clamp(min=0), self.civ_cur_tech[:, row])
+        if civic is not None:
+            c_act = civic.to(torch.long)
+            ok = active & ext & (self.civ_cur_civic[:, row] == -1) & (c_act >= 0) \
+                & self._available_mask(self.civ_civics[:, row], self._prereq_c).gather(1, c_act.clamp(min=0).unsqueeze(1)).squeeze(1)
+            self.civ_cur_civic[:, row] = torch.where(ok, c_act.clamp(min=0), self.civ_cur_civic[:, row])
+        if envoys is not None and self.S > 0:
+            # A [B, K] SEQUENCE; a [B] single pick is accepted too. Each pick
+            # re-validates against the LIVE mask, and every increment bumps
+            # _eff_version — an envoy crossing the 1/3/6 thresholds changes the
+            # backed seat's cached yields. BANK ONLY: conversion is an eager
+            # rule in the influence block above, so a decide-time pick can never
+            # exceed the bank.
+            e_seq = envoys.to(torch.long)
+            if e_seq.dim() == 1:
+                e_seq = e_seq.unsqueeze(1)
+            for _ek in range(int(e_seq.shape[1])):
+                e_act = e_seq[:, _ek]
+                ei = e_act.clamp(min=0, max=self.S - 1)
+                ok = active & ext & (e_act >= 0) & (e_act < self.S) \
+                    & self._seat_envoy_mask(row).gather(1, ei.unsqueeze(1)).squeeze(1)
+                if bool(ok.any()):
+                    rows = ok.nonzero(as_tuple=True)[0]
+                    self.seat_citystate_envoys[rows, row, ei[rows]] += 1
+                    self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] - ok.long()
+                    self._eff_version += 1
+        if pref is not None:
+            self._apply_seat_pref(row, pref)
+        elif production is not None:
+            self._apply_seat_production(row, production)
 
     def _stash_buy(self, row: int, buy=None, worship=None, relig=None, levy=None) -> None:
         """Park a seat row's GOLD/FAITH/LEVY intents for `_seat_buy_ladder` to
@@ -669,21 +724,6 @@ class SimSeats:
                     self.civ_treasury[:, row] = torch.where(do_l, self.civ_treasury[:, row] - levy_cost, self.civ_treasury[:, row])
                     rows_l = do_l.nonzero(as_tuple=True)[0]
                     self.citystate_last_levy[rows_l, sl[rows_l]] = self.turn
-
-    def _consume_driven_picks(self, r: int) -> None:
-        """The production half of the stash-and-consume convention:
-        apply_seat_actions stores the driven pick and THIS position — the
-        scripted picker's slot at the top of _seat_phase's r-iteration —
-        executes it, so recorder, GPU replay and TS replay share one within-turn
-        ordering."""
-        dp = getattr(self, "_driven_picks", None)
-        if not dp or r not in dp:
-            return
-        production, pref = dp.pop(r)
-        if pref is not None:
-            self._apply_seat_pref(r + 1, pref)
-        elif production is not None:
-            self._apply_seat_production(r + 1, production)
 
     def _apply_seat_pref(self, row: int, pref: torch.Tensor, max_tries: int = 8) -> None:
         """Apply a PREFERENCE ORDER [B, RC, W] — best legal column wins.
@@ -3708,36 +3748,6 @@ class SimSeats:
                 break
             self.civ_influence[:, row] = torch.where(earn, self.civ_influence[:, row] - cost, self.civ_influence[:, row])
             self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] + earn.long()
-
-    def _seat_cs_phase(self, r: int, active: torch.Tensor) -> None:
-        """CS diplomacy from a civ seat — the seatPhase block after boost
-        detection: the shared meet/influence/conversion body on this row,
-        then the driven envoy picks at the post-accrual position."""
-        if self.S == 0:
-            return
-        S = self.S
-        self._seat_influence_phase(r + 1, active)
-        # the DRIVEN envoy picks consume HERE, at the post-accrual position,
-        # so every threshold reader (suzerainty, and the favor it feeds) sees
-        # the same within-turn sequence on both engines. BANK ONLY:
-        # conversion is an eager rule above, so a decide-time pick can never
-        # exceed the bank.
-        _dse = getattr(self, "_driven_envoys", None)
-        if _dse is not None and r in _dse:
-            _env_s = _dse.pop(r)
-            for _k in range(int(_env_s.shape[1])):
-                e_k = _env_s[:, _k]
-                citystate_i = e_k.clamp(min=0, max=S - 1)
-                ok_e = (
-                    (e_k >= 0) & (e_k < S) & self.controlled[:, r] & self.civ_only_alive[:, r]
-                    & self.citystate_alive[:, :S].gather(1, citystate_i.unsqueeze(1)).squeeze(1)
-                    & self.civ_only_citystate_met[:, r, :S].gather(1, citystate_i.unsqueeze(1)).squeeze(1)
-                )
-                land_e = ok_e & (self.civ_only_envoys_avail[:, r] > 0)
-                if not bool(land_e.any()):
-                    continue
-                self.civ_only_envoys_avail[:, r] = self.civ_only_envoys_avail[:, r] - land_e.long()
-                self.civ_only_citystate_envoys[:, r, :S].scatter_add_(1, citystate_i.unsqueeze(1), land_e.long().unsqueeze(1))
 
     def _quest_owns_dist(self, row: int) -> torch.Tensor:
         """[B, S] — does seat-row `row` own a COMPLETE district of each CS's

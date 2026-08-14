@@ -51,6 +51,7 @@ class SimStep:
         drained by _seat_buy_ladder at the gold block's own phase position.
         """
         dev = self.device
+        self._stash_record(0, tech=tech, civic=civic, envoys=envoy, production=production)
         self._stash_buy(0, buy=buy, worship=worship, relig=relig, levy=levy)
 
         # --- seat-0 unit orders (before the turn advances) ----------------------
@@ -110,7 +111,7 @@ class SimStep:
         if self.disasters:
             self._disaster_phase()
         self._city_state_phase()
-        self._seat_phase(production=production, tech=tech, civic=civic, envoy=envoy, war=war)
+        self._seat_phase(war=war)
 
         # --- Dead-slot reclamation, at the step END and never the top:
         # callers sample slot-keyed unit actions from the PRE-step masks, so
@@ -231,18 +232,14 @@ class SimStep:
         if simbase._ALIAS_CHECK:
             self._check_state_discipline()
 
-    def _seat0_row(
-        self,
-        production: torch.Tensor | None = None,
-        tech: torch.Tensor | None = None,
-        civic: torch.Tensor | None = None,
-        envoy: torch.Tensor | None = None,
-    ) -> None:
+    def _seat0_row(self) -> None:
         """Seat 0's turn — ROW 0 of the seatPhase loop, in the civ arm's
         proven internal order: ww decay -> boosts -> CS diplomacy + quests ->
-        the driven picks (tech/civic/envoys/production incl. purchases) ->
+        the record (tech/civic/envoys/production) -> the buy ladder ->
         trade -> the city econ walk -> loyalty flips -> the research/upkeep/
-        accumulator tail -> great people -> the war counters. The war verb
+        accumulator tail -> great people -> the war counters. Its decisions
+        arrive through the SAME stash every seat uses, so this body takes no
+        wire arguments of its own. The war verb
         does NOT apply here: seat 0 declares and sues at the GEO pass
         positions in _seat_phase, like every seat (the rec.war self-guard's
         twin). An actor with no cities takes no turn (the TS loop's
@@ -266,46 +263,11 @@ class SimStep:
         self._seat_influence_phase(0, active0)
         self._seat_quest_phase(0, active0)
 
-        # --- the driven picks (the applySeatActionRecord position: tech,
-        # civic, envoys, then production; the civ arm applies its picks at the
-        # loop top, a proven-commuting position) -------------------------------
-        # --- research choice (validated; -1 or invalid = keep pending) ---------
-        if tech is not None:
-            t_act = tech.to(torch.long)
-            ok = active0 & (self.cur_tech == -1) & (t_act >= 0) & self._available_mask(self.techs, self._prereq_t).gather(1, t_act.clamp(min=0).unsqueeze(1)).squeeze(1)
-            self.cur_tech.copy_(torch.where(ok, t_act, self.cur_tech))
-        if civic is not None:
-            c_act = civic.to(torch.long)
-            ok = active0 & (self.cur_civic == -1) & (c_act >= 0) & self._available_mask(self.civics, self._prereq_c).gather(1, c_act.clamp(min=0).unsqueeze(1)).squeeze(1)
-            self.cur_civic.copy_(torch.where(ok, c_act, self.cur_civic))
-
-        # --- envoys --------------------------------------------------------------
-        if self.S > 0:
-            if envoy is not None:
-                # A [B, K] SEQUENCE like the civ-seat records; a [B] single
-                # pick is accepted too. Each pick re-validates against the LIVE
-                # mask, and every increment bumps _eff_version — an envoy
-                # crossing the 1/3/6 thresholds changes the capital's cached
-                # yields.
-                e_seq = envoy.to(torch.long)
-                if e_seq.dim() == 1:
-                    e_seq = e_seq.unsqueeze(1)
-                for _ek in range(int(e_seq.shape[1])):
-                    e_act = e_seq[:, _ek]
-                    ok = active0 & (e_act >= 0) & self.envoy_mask().gather(1, e_act.clamp(min=0).unsqueeze(1)).squeeze(1)
-                    if bool(ok.any()):
-                        rows = ok.nonzero(as_tuple=True)[0]
-                        self.citystate_envoys[rows, e_act[rows]] += 1
-                        self.envoys_avail.sub_(ok.long())
-                        self._eff_version += 1
-
-        # --- production choice ---------------------------------------------------
-        # ONE body for every seat row: the queue arms, the districts and the
-        # wonders/projects all live in _apply_seat_production, which walks the
-        # cities in SLOT order because settler prices and the builder escalator
-        # are order-coupled across a seat's cities.
-        if production is not None:
-            self._apply_seat_production(0, production)
+        # --- THE RECORD: tech, civic, envoys, production, at
+        # applySeatActionRecord's own position — one body, every seat row.
+        # step() stashed row 0's intents exactly as apply_seat_actions stashes
+        # a civ's, so this call is byte-for-byte the civ arm's.
+        self._seat_record_apply(0, active0)
 
         # THE gold/faith block — one body, every seat row, at the seatPhase
         # position between the picks and the trade block.

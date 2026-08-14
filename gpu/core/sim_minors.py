@@ -17,7 +17,7 @@ class SimMinors:
         seat's CS DIPLOMACY (meet/influence/quests) runs in the seatPhase
         loop instead — ONE body per fact for every row:
         _seat_influence_phase + _seat_quest_phase (row 0 called from
-        _seat0_row, civ rows via _seat_cs_phase)."""
+        one call per row in the seat phase)."""
         if self.S == 0:
             return
         # The seat-0 <-> city-state war clock ticks FIRST, exactly where

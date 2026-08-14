@@ -805,13 +805,17 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
   const prodPairs = rec.production;
   const techCol = Array.isArray(rec.tech) ? (rec.tech as unknown as number[])[0] : rec.tech;
   const civicCol = Array.isArray(rec.civic) ? (rec.civic as unknown as number[])[0] : rec.civic;
+  // The RESEARCH picks re-validate against AVAILABILITY, not just the empty
+  // slot: real Civ 6 offers no locked tech, the mask never names one, and the
+  // GPU's arm has always checked it — an unchecked arm here would let a stale
+  // record start a tech on ONE engine.
   if (techCol !== null && techCol !== undefined && techCol >= 0 && !actor.research.tech) {
     const t = Object.keys(TECHS)[techCol];
-    if (t) actor.research.tech = t;
+    if (t && availableTechsIn(actor.research).some((d) => d.id === t)) actor.research.tech = t;
   }
   if (civicCol !== null && civicCol !== undefined && civicCol >= 0 && !actor.research.civic) {
     const c = Object.keys(CIVICS)[civicCol];
-    if (c) actor.research.civic = c;
+    if (c && availableCivicsIn(actor.research).some((d) => d.id === c)) actor.research.civic = c;
   }
   // the WAR verb: the recorded declare/peace applies HERE — before the
   // walkers, the exact position the GPU's pre-step war head uses, so a
@@ -820,12 +824,14 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
   // (the scripted roll's own body, minus the roll — that lives in the
   // ladder now, rolled from the DRIVER's policy stream, so neither engine's
   // rule stream moves).
-  // The ENVOY verb: the recorded picks land here, met + availability
+  // The ENVOY verb: the recorded picks land here, ALIVE + met + availability
   // re-validated. BANK ONLY — conversion is an eager RULE at the CS phase for
-  // every seat, so a decide-time pick can never exceed the bank.
+  // every seat, so a decide-time pick can never exceed the bank. A razed
+  // city-state takes no envoy (real Civ 6, and the GPU mask's own term).
   for (const cityStateIdx of rec.envoys ?? []) {
     const cityState = state.cityStates[cityStateIdx];
-    if (!cityState || !hasMet(cityState, actor.seat)) continue;
+    if (!cityState || cityState.cities.length === 0) continue;
+    if (!hasMet(cityState, actor.seat)) continue;
     if ((actor.envoysAvailable ?? 0) <= 0) continue;
     actor.envoysAvailable = (actor.envoysAvailable ?? 0) - 1;
     addEnvoys(cityState, actor.seat, 1);

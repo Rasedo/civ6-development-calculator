@@ -1505,6 +1505,14 @@ class SimInit:
         self._driven_buy_worship: dict = {}
         self._driven_buy_relig: dict = {}
         self._driven_levy: dict = {}
+        # The WIRE's applySeatActionRecord intents, parked the same way and
+        # keyed the same way: decide-time and the RECORD POSITION (after the
+        # CS/quest block, before the gold ladder) are different points in the
+        # turn for every seat, seat 0 included.
+        self._driven_tech: dict = {}
+        self._driven_civic: dict = {}
+        self._driven_envoys: dict = {}
+        self._driven_picks: dict = {}
         self._arangeNB = torch.arange(NB, device=device)
 
         # Seat 0's t0 units seed the pool HERE — after the roster tables and
