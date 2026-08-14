@@ -53,17 +53,18 @@ FORK_ALLOW = {
     ("simbase.py", "seat_of_index"): "the row->seat map itself",
     # --- WIRE LIMITS, named ------------------------------------------------
     ("env.py", "step"): "#108 — row 0's action interface + unit-order replay position",
-    # --- BURN-DOWN (#111). Delete the entry with the stage that closes it. --
+    # --- BURN-DOWN (AUDIT A-32r). Delete the entry that closes the fork. ----
     # The civ-PAIR planes (denounce / ally / warkind / strengths / proximity)
     # have no seat-0 row, so civ<->civ diplomacy is still a space seat 0
-    # cannot enter. `apply_geo` and `_extract_geo` are where the row space and
-    # the civ-pair space meet, and nowhere else.
-    ("sim_seats.py", "_civ_pair_strengths"): "#111 s5 — civ-pair planes have no seat-0 row",
-    ("sim_seats.py", "apply_geo"): "#111 s5 — the ONE row->civ-pair conversion",
-    ("sim_economy.py", "_ww_era_base"): "#111 s5 — civ_pair_warkind has no seat-0 row",
-    ("drive.py", "_geo_turn"): "#111 s5 — civ-pair planes have no seat-0 row",
-    ("drive.py", "geo_decide_and_apply"): "#111 s5 — civ-pair planes have no seat-0 row",
-    ("drive.py", "_extract_geo"): "#111 s5 — the record's civ-pair targets",
+    # cannot enter — and it is a SECOND way to declare war beside the war
+    # head. `apply_geo` and `_extract_geo` are where the row space and the
+    # civ-pair space meet, and nowhere else. Closing A-32r closes all six.
+    ("sim_seats.py", "_civ_pair_strengths"): "A-32r — civ-pair planes have no seat-0 row",
+    ("sim_seats.py", "apply_geo"): "A-32r — the ONE row->civ-pair conversion",
+    ("sim_economy.py", "_ww_era_base"): "A-32r — civ_pair_warkind has no seat-0 row",
+    ("drive.py", "_geo_turn"): "A-32r — civ-pair planes have no seat-0 row",
+    ("drive.py", "geo_decide_and_apply"): "A-32r — civ-pair planes have no seat-0 row",
+    ("drive.py", "_extract_geo"): "A-32r — the record's civ-pair targets",
 }
 
 FORK_PATTERNS = (
