@@ -376,7 +376,7 @@ class SimPhase:
                         self.citystate_last_levy[rows_l, sl5[rows_l]] = self.turn
             # The trade creation block sits between the buy block and the
             # city-loop snapshot — the seatPhase position.
-            self._seat_trade_phase(r, active)
+            self._seat_trade_phase(r + 1, active)
             # The city-loop snapshot is taken AFTER the buy block (the
             # [...civ.cities] discipline): a bought-settler newborn acts this
             # turn (amenity + yields), a queue-completion newborn (founded

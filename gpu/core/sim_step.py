@@ -386,7 +386,7 @@ class SimStep:
 
         # Trade — the route pick + expiry arm at the seatPhase position
         # (between the buy block and the city loop), row 0's body.
-        self._seat0_trade_phase(active0)
+        self._seat_trade_phase(0, active0)
 
         # --- worked tiles + city yields: the PER-CITY interleave ------------------
         # endTurn recomputes computeCityStats FRESH for every city inside its
