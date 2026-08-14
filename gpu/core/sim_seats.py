@@ -1280,7 +1280,9 @@ class SimSeats:
         if self._rcy_cache is not None and self._rcy_cache[0] == self._eff_version:
             return self._rcy_cache[1]
         fs = self.feat_stripped.to(self.dtype)
-        f_base = (self._eff_food() if (self.disasters or self.improvements_on) else self.tile_yields[:, :, 0]) - self.feat_yields[:, :, 0] * fs
+        # _eff_food already subtracts a stripped feature's food, ahead of its
+        # drought floor (the tileYields order) — do NOT strip column 0 again.
+        f_base = self._eff_food()
         p_plane = self._neutral_prod() - self.feat_yields[:, :, 1] * fs
         ty_oth = self.tile_yields - self.feat_yields * fs.unsqueeze(-1)  # strip-adjusted static (cols 2-5)
         # CAMP/PLANTATION catalog gold joins the static columns
@@ -2608,20 +2610,13 @@ class SimSeats:
 
     def _found_seat0_caches(self, rows: torch.Tensor, c_new: torch.Tensor, s_idx: torch.Tensor, new_cap: torch.Tensor) -> None:
         """Row 0's founding-time SITE CACHES — the [B, C] statics the seat-0
-        yield walk reads instead of deriving per tile (centre yields with the
-        floors, pre-clamp raw food, water housing, coastal/river flags, the
-        per-city distance table), plus the centre's `workable` clear, which is
-        how that walk excludes the centre where the civ walk uses a
-        `tiles != centre` predicate. They exist only because the two yield
-        walks are still two; they die with the walk merge."""
-        frm_pre = self.feat_removable[rows, s_idx] | self.feat_stripped[rows, s_idx]
-        cy = self.tile_yields[rows, s_idx].clone()
-        cy = cy - self.feat_yields[rows, s_idx].to(cy.dtype) * frm_pre.unsqueeze(1).to(cy.dtype)
-        raw_food = cy[:, 0].clone()
-        cy[:, 0] = torch.maximum(cy[:, 0], torch.full_like(cy[:, 0], float(self.rules.center_min_food)))
-        cy[:, 1] = torch.maximum(cy[:, 1], torch.full_like(cy[:, 1], float(self.rules.center_min_production)))
-        self.center_yields[rows, c_new] = cy.to(self.center_yields.dtype)
-        self.center_raw_food[rows, c_new] = raw_food.to(self.center_raw_food.dtype)
+        walk still reads instead of deriving per tile (palace maintenance,
+        water housing, coastal/river flags, the per-city distance table), plus
+        the centre's `workable` clear, which is how that walk excludes the
+        centre where the civ walk uses a `tiles != centre` predicate. They
+        exist only because the two yield walks are still two; they die with
+        the walk merge. The centre YIELDS left in slice 7 — they derive from
+        eff_y at the site now, like the civ walk's."""
         self.base_maintenance[rows, c_new] = torch.where(
             new_cap,
             torch.full_like(self.base_maintenance[rows, c_new], float(self.rules.palace_maintenance)),

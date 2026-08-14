@@ -249,6 +249,35 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   city-state envoy/suzerain, government yields and the golden
   dedication.
 
+- **A-30. The feature STRIP sat on the wrong side of the drought floor
+  — FIXED 2026-08-14.** `tileYields` reads `tile.feature` live at the
+  terrain step and applies `max(0, food - 1)` LAST, so a chopped
+  feature is gone BEFORE the floor. `_eff_food` floored first and every
+  caller (`_eff_yields`, `_rcy_globals`) subtracted the stripped
+  feature after, and the two do not commute: a stripped RAINFOREST or
+  MARSH (both +1 food, both removable) on a 0-food terrain under
+  drought floors to 0 and then goes to −1 where TS pays 0. The strip
+  now happens at the top of `_eff_food`, `_eff_yields` strips columns
+  1: only, and `_rcy_globals` takes `_eff_food()` unadjusted. Both
+  walks were affected, so this was never a seat asymmetry — it was a
+  shared construct error. Production and the static columns carry no
+  floor, so subtracting after their overwrites stays exact.
+  RESIDUAL, same family, NOT fixed: seat 0 adds farm-adjacency food
+  post-selection, where `tileYields` adds it before the drought floor.
+  Unreachable as written — the floor only bites at 0 base food and a
+  FARM's own food is ≥ 1 — so it is a construct note, not a bug.
+  **SLICE 7 (the same commit): `center_yields` and `center_raw_food`
+  are DELETED.** With `_eff_food` TS-ordered, the seat-0 centre derives
+  from `eff_y` at the site with the two floors last — the exact shape
+  the civ walk uses, and the exact shape seat 0 already used on its
+  belief branch. The stored pair could not express a belief add (the
+  clamp was baked in at founding), needed a bespoke disaster patch for
+  food, and went stale on anything else the centre tile did. Gone with
+  them: the founding write, the capture-time `_init_center_live`
+  rebuild, two `_MUTABLE` entries, two slot-permutation entries and two
+  manifest exclusions. `_found_seat0_caches` is down to five statics
+  plus the `workable` clear.
+
 ## B. Fidelity vs real Civ 6 — open residuals
 
 - **B-17r. Encampment:** ranged-vs-district strikes are out of scope

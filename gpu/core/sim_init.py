@@ -141,8 +141,6 @@ class SimInit:
         # --- per-slot city data (dynamic: a slot binds to a tile when a SETTLER
         # founds there; nothing is pre-founded, and every center stat below is
         # derived from the tile planes at founding) --------------------------
-        self.center_yields = torch.zeros(B, C, 6, dtype=dtype, device=device)
-        self.center_raw_food = torch.zeros(B, C, dtype=dtype, device=device)
         self.base_maintenance = torch.zeros(B, C, dtype=dtype, device=device)
         self.water_housing = torch.zeros(B, C, dtype=dtype, device=device)
         self.coastal = torch.zeros(B, C, dtype=torch.bool, device=device)

@@ -856,12 +856,6 @@ class SimOrders:
         precomputed site_cy instead; a captured centre was never a fixture
         site, so its slot must be filled here.
         """
-        strip_c = float(self.feat_stripped[b, c_t])
-        cy = (self.tile_yields[b, c_t].to(self.dtype) - self.feat_yields[b, c_t].to(self.dtype) * strip_c).clone()
-        self.center_raw_food[b, c_new] = float(cy[0])  # pre-clamp (fertility/drought redo the clamp live)
-        cy[0] = max(float(cy[0]), float(self.rules.center_min_food))
-        cy[1] = max(float(cy[1]), float(self.rules.center_min_production))
-        self.center_yields[b, c_new] = cy
         self.base_maintenance[b, c_new] = 0.0  # City Center 0 upkeep; no Palace, no buildings
         nb_c = self.neigh[c_t]
         self.coastal[b, c_new] = bool(self.coastal_water[b, nb_c.clamp(min=0)][nb_c >= 0].any())

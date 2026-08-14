@@ -406,10 +406,19 @@ class SimEconomy:
         (+1 each, already capped), drought starves (−1, floored at 0) —
         mirrors the tail of tileYields. Food is the only column disasters
         touch; consumers that don't mix columns read this directly and skip
-        the full [B, T, 6] assembly."""
+        the full [B, T, 6] assembly.
+
+        A CHOPPED or founding-stripped feature is subtracted HERE, at the top,
+        because tileYields reads `tile.feature` live at the terrain step and
+        the drought floor is the LAST thing it does. Subtracting afterwards
+        (as every caller used to) puts the floor on the wrong side: a stripped
+        RAINFOREST/MARSH on a 0-food terrain under drought floors to 0 and
+        then goes to −1. Callers must NOT strip column 0 again."""
         if self._food_cache is not None and self._food_cache[0] == self._eff_version:
             return self._food_cache[1]
         base = self.tile_yields[:, :, 0]
+        if bool(self.feat_stripped.any()):
+            base = base - self.feat_yields[:, :, 0] * self.feat_stripped.to(self.dtype)
         if self.improvements_on:
             # A FARM adds its food to the tile's base yield (part of
             # tileYields, before the fertility/drought tail); a pillaged
@@ -521,12 +530,13 @@ class SimEconomy:
                             self._tile_appeal().clamp(min=0).to(ty.dtype) * sr_live.to(ty.dtype)
                         )
         # A chopped (or founding-stripped) tile loses its feature's own yields
-        # on every column — TS reads tile.feature === null live. The center
-        # path is separate (it reads the neutral planes and applies its own
-        # strip), and _eff_food/_eff_prod rebuild cols 0/1 feature-inclusive,
-        # so the subtraction comes after the overwrites.
+        # on every column — TS reads tile.feature === null live. Columns 1: only:
+        # _eff_food already stripped column 0 BEFORE its drought floor, which is
+        # where tileYields puts it, and the floor is not commutative with the
+        # subtraction. Production and the static columns carry no floor, so
+        # subtracting after their overwrites is exact.
         if bool(self.feat_stripped.any()):
-            ty = ty - self.feat_yields.to(ty.dtype) * self.feat_stripped.unsqueeze(-1).to(ty.dtype)
+            ty[:, :, 1:] = ty[:, :, 1:] - self.feat_yields[:, :, 1:].to(ty.dtype) * self.feat_stripped.unsqueeze(-1).to(ty.dtype)
         self._eff_cache = (self._eff_version, ty)
         return ty
 
@@ -1779,27 +1789,18 @@ class SimEconomy:
             # stays on the unmasked bf (cityMaintenance has no regional skip).
             bf_live = bf_live * self._b_local_f.reshape(1, 1, -1)
             b_y = torch.einsum("bcn,nk->bck", bf_live, rd.b_yields)
-        center_y = self.center_yields
-        if self.disasters:
-            # fertility/drought hit the center's RAW food before the min-clamp
-            sitec = self.site.clamp(min=0)
-            cf = self.center_raw_food + self.fertility.gather(1, sitec).to(self.dtype)
-            cf = torch.where(self.drought.gather(1, sitec) > 0, (cf - 1).clamp(min=0), cf)
-            center_y = self.center_yields.clone()
-            center_y[:, :, 0] = torch.maximum(cf, torch.full_like(cf, float(r.center_min_food)))
-        if featP0 is not None:
-            # Belief adds sit INSIDE tileYields on TS, so the centre's
-            # min-clamps apply AFTER them — the stored (post-clamp)
-            # center_yields cannot express that. Rebuild the centre from the
-            # effective tile plane (featP0 already joined; disasters ride
-            # eff_y), exactly the civ path's max(plane@ctr, min) shape. Only
-            # an UNREMOVABLE feature (floodplains) survives founding to carry
-            # a belief add here.
-            sitec_b = self.site.clamp(min=0)
-            eff_c = eff_y.gather(1, sitec_b.unsqueeze(2).expand(-1, -1, 6))  # [B, C, 6]
-            center_y = eff_c.clone()
-            center_y[:, :, 0] = torch.maximum(eff_c[:, :, 0], torch.full_like(eff_c[:, :, 0], float(r.center_min_food)))
-            center_y[:, :, 1] = torch.maximum(eff_c[:, :, 1], torch.full_like(eff_c[:, :, 1], float(r.center_min_production)))
+        # The CENTRE, derived per read like the civ walk's `max(plane@ctr,
+        # min)` — tileYieldsForCenter reads the tile fresh, so the feature
+        # strip, the disaster tail and this seat's belief adds all ride eff_y
+        # and the two floors land LAST, after them. The centre never carries a
+        # district in the yield sense (TS passes `{...center, district: null}`)
+        # and founding nulls its improvement, so eff_y at the site IS the
+        # unfloored centre.
+        sitec_b = self.site.clamp(min=0)
+        eff_c = eff_y.gather(1, sitec_b.unsqueeze(2).expand(-1, -1, 6))  # [B, C, 6]
+        center_y = eff_c.clone()
+        center_y[:, :, 0] = torch.maximum(eff_c[:, :, 0], torch.full_like(eff_c[:, :, 0], float(r.center_min_food)))
+        center_y[:, :, 1] = torch.maximum(eff_c[:, :, 1], torch.full_like(eff_c[:, :, 1], float(r.center_min_production)))
         total = worked_y + center_y + self.is_cap.unsqueeze(2).to(self.dtype) * self._palace_y.reshape(1, 1, 6) + b_y
         # Per-city FOLLOWER-belief id for seat 0 (from followedReligion when
         # LIVE, else religion 0 = -1 follower = no add). Its building-yield
