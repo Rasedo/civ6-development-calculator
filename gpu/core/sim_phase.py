@@ -52,11 +52,10 @@ class SimPhase:
         if self.R > 0:
             self._geo_declare_wars()
         # THE SEAT LOOP — state.seats in id order, seat 0 first, ONE body per
-        # row. Row 0's war/peace tail is its peace counter alone: warTurns
-        # counts war with WAR_COLUMN_SEAT and a seat is never at war with
-        # itself, and row 0's unit orders replay in the order phase, not here.
-        act0 = self._seat_row(0)
-        self.peace_turns[:, 0] += (act0 & ~self.civ_only_atwar.any(dim=1)).long()
+        # row. All that is left outside _seat_row is the driven unit-sequence
+        # REPLAY: row 0's unit orders ride the triples schema and replay in the
+        # order phase, a civ's ride per-unit rows and replay here (#108).
+        self._seat_row(0)
         for r in range(self.R):
             active = self._seat_row(r + 1)
             if not bool(active.any()):
@@ -70,17 +69,12 @@ class SimPhase:
             # position (a general spawned in the GP claim above walks this turn
             # on full MP).
 
-            # War or peace (branch on the value at entry; a peace made this
-            # turn still runs the war branch, like the TS if/else). A seat at
-            # war with ANYONE takes the WAR branch — its units run the war-act,
-            # which scans every at-war seat's units and cities. civ_only_warturns
-            # tracks the seat-0 war only (atw), while the seat-0 declaration
-            # roll is skipped for a seat already in ANY war via
-            # pea = ~atw_any, so both engines drop the conditional draw in
-            # lockstep.
-            atw = active & self.civ_only_atwar[:, r]
-            atw_any = atw | (active & self.civ_pair_war[:, r, : self.R].any(dim=1))
-            self.civ_only_warturns[:, r] = self.civ_only_warturns[:, r] + atw.long()
+            # The unit REPLAY branches on the war state at entry (a peace made
+            # this turn still runs the war branch, like the TS if/else): a seat
+            # at war with ANYONE takes the WAR branch, whose act scans every
+            # at-war seat's units and cities. The counters this branch used to
+            # carry now ride _seat_war_peace_tail, inside the seat's own block.
+            atw_any = active & self.war[:, r + 1, :1 + self.R].any(dim=1)
             # This seat's live slots, computed once (deaths only shrink
             # mid-loop; neither loop spawns) — the war AND peace walks reuse it.
             # Replayed unit acts fire HERE, at the walkers' own position in the
@@ -96,7 +90,6 @@ class SimPhase:
                     self.apply_seat_unit_sequence(r + 1, _ord_w)
             # Suing for peace rides the wire's war verb.
             pea = active & ~atw_any  # a seat at ANY war neither patrols nor rolls the seat-0 declaration
-            self.civ_only_peaceturns[:, r] = self.civ_only_peaceturns[:, r] + pea.long()
             if _dsq is not None and r in _dsq:
                 _rows_p = pea & self.controlled[:, r]
                 if bool(_rows_p.any()):
@@ -221,9 +214,11 @@ class SimPhase:
         B, dev = self.B, self.device
         active = self.civ_alive[:, row] & self.city_alive[:, row].any(dim=1)
         if not bool(active.any()):
-            # TS's eliminated-actor `continue` — but the record intents are
-            # for THIS turn and must not survive into the next one.
+            # TS's eliminated-actor `continue` — but the stashed intents are for
+            # THIS turn and must not survive into the next one. Both drains pop
+            # unconditionally and apply nothing under an all-False mask.
             self._seat_record_apply(row, active)
+            self._seat_buy_ladder(row, active)
             return active
         # War weariness SETTLES here: accrual happens per BATTLE as the
         # fighting resolves, so what is left for the block top is the
@@ -309,7 +304,31 @@ class SimPhase:
         # favor, grievances, the great-people and belief races: ONE body,
         # every seat row, on this row's own city sums.
         self._seat_research_tail(row, active, sci_sum, cul_sum, gold_sum, faith_sum)
+        # War or peace — the counters are the RULE and they live here for every
+        # row; the UNITS are the wire, and their replay is still the caller's
+        # (row 0's orders ride a different schema, #108).
+        self._seat_war_peace_tail(row, active)
         return active
+
+    def _seat_war_peace_tail(self, row: int, active: torch.Tensor) -> None:
+        """The seat block's war-or-peace COUNTERS — one body, every seat row,
+        at the tail seatPhase gives them.
+
+        `war_turns` measures war with WAR_COLUMN_SEAT, the single pair axis the
+        wire carries (`civsAtWar(state, actor.seat, seat)`); `peace_turns`
+        ticks while the seat is at war with NO major (atWarWithAny reads
+        Seat.wars — the majors' list — so a city-state war does not hold it
+        back). The two are exclusive: war_turns can only move inside a war,
+        which is a war with somebody.
+
+        The war MATRIX makes this row-generic with nothing special-cased. Seat
+        0's column against ITSELF is structurally False, so its war_turns never
+        moves — exactly what `civsAtWar(state, 0, 0)` does on the TS side, and
+        the reason row 0 looked like it needed a counter rule of its own."""
+        atw = active & self.war[:, row, 0]
+        any_war = active & self.war[:, row, :1 + self.R].any(dim=1)
+        self.war_turns[:, row] = self.war_turns[:, row] + atw.long()
+        self.peace_turns[:, row] = self.peace_turns[:, row] + (active & ~any_war).long()
 
     def _seat_governor_seats(self, row: int) -> torch.Tensor:
         """[B, RC] — seat row `row`'s governor-held cities for THIS turn, the
