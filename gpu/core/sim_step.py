@@ -19,6 +19,10 @@ class SimStep:
         units: torch.Tensor | None = None,
         envoy: torch.Tensor | None = None,
         war: torch.Tensor | None = None,
+        buy: tuple | None = None,  # (kind [B], a [B], b [B]) — the GOLD purchase intent (kind 3: a=tile, b=slot)
+        worship: torch.Tensor | None = None,  # kind 4: the city slot to faith-buy the worship building in (-1 = none)
+        relig: tuple | None = None,  # kinds 5/6: (kind [B], slot [B]) — the religious-unit faith buy
+        levy: torch.Tensor | None = None,  # kind 7: the CS index to levy (-1 = none)
     ) -> None:
         """Advance every game one turn, applying seat 0's orders.
 
@@ -42,8 +46,12 @@ class SimStep:
         top, peace at the tail) — seat 0 declares through the geo pass like
         every seat, AFTER this step's unit orders ran, so a same-turn
         declaration legalizes nothing until next turn (the TS schedule).
+        buy/worship/relig/levy: the GOLD and FAITH spending intents, in the
+        same shapes every seat's `apply_seat_actions` takes — stashed here and
+        drained by _seat_buy_ladder at the gold block's own phase position.
         """
         dev = self.device
+        self._stash_buy(0, buy=buy, worship=worship, relig=relig, levy=levy)
 
         # --- seat-0 unit orders (before the turn advances) ----------------------
         if units is not None and self.units_mode:
@@ -299,6 +307,10 @@ class SimStep:
         # order-coupled across a seat's cities.
         if production is not None:
             self._apply_seat_production(0, production)
+
+        # THE gold/faith block — one body, every seat row, at the seatPhase
+        # position between the picks and the trade block.
+        self._seat_buy_ladder(0, active0)
 
         # Trade — the route pick + expiry arm at the seatPhase position
         # (between the buy block and the city loop), row 0's body.

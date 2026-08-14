@@ -190,10 +190,10 @@ def main() -> None:
     # all techs unlocked, no building, settler unaffordable (treasury < its
     # price), military below quota. The bought type tracks the treasury.
     cases = []
-    if sim._civ_only_horseman >= 0 and ho_t >= 0:
-        cases.append((unit_price(sim, sim._civ_only_horseman), sim._civ_only_horseman, "HORSEMAN"))
-    if sim._civ_only_spearman >= 0 and sp_t >= 0:
-        cases.append((unit_price(sim, sim._civ_only_spearman), sim._civ_only_spearman, "SPEARMAN"))
+    if sim._horseman_idx >= 0 and ho_t >= 0:
+        cases.append((unit_price(sim, sim._horseman_idx), sim._horseman_idx, "HORSEMAN"))
+    if sim._spearman_idx >= 0 and sp_t >= 0:
+        cases.append((unit_price(sim, sim._spearman_idx), sim._spearman_idx, "SPEARMAN"))
     cases.append((unit_price(sim, warr), warr, "WARRIOR"))
     for tre, want_idx, label in cases:
         sim.restore(base)

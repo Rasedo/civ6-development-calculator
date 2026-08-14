@@ -135,7 +135,7 @@ def stash_levy(sim, s: int) -> None:
     emit for R (the engine arm re-validates militaristic/suzerain/cooldown/
     afford on its own; at-war is the DRIVER's policy gate)."""
     sim.controlled[0, R] = True
-    sim._driven_levy = {R: torch.full((sim.B,), s, dtype=torch.long, device=sim.device)}
+    sim._stash_buy(R + 1, levy=torch.full((sim.B,), s, dtype=torch.long, device=sim.device))  # civ R is seat row R+1
 
 
 def main() -> None:

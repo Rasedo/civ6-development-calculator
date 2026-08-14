@@ -279,74 +279,40 @@ class SimSeats:
             if not hasattr(self, "_driven_picks") or self._driven_picks is None:
                 self._driven_picks = {}
             self._driven_picks[r] = (production, production_pref)
-        # the BUY intent stashes like production — consumed at the gold block's
-        # own position (_consume_driven_buy).
-        if buy is not None:
-            if not hasattr(self, "_driven_buy") or self._driven_buy is None:
-                self._driven_buy = {}
-            self._driven_buy[r] = buy
-        # the FAITH intents and the LEVY stash like the buy — each is
-        # consumed at its own scripted sub-position in _seat_phase (worship →
-        # missionary/apostle → ... → levy), re-validated there.
-        if worship is not None:
-            if not hasattr(self, "_driven_buy_worship") or self._driven_buy_worship is None:
-                self._driven_buy_worship = {}
-            self._driven_buy_worship[r] = worship
-        if relig is not None:
-            if not hasattr(self, "_driven_buy_relig") or self._driven_buy_relig is None:
-                self._driven_buy_relig = {}
-            self._driven_buy_relig[r] = relig
-        if levy is not None:
-            if not hasattr(self, "_driven_levy") or self._driven_levy is None:
-                self._driven_levy = {}
-            self._driven_levy[r] = levy
+        # the BUY / FAITH / LEVY intents stash like production and are consumed
+        # by _seat_buy_ladder at the gold block's own phase position. Every
+        # stash is keyed by the ABSOLUTE seat row, so seat 0's own intents (set
+        # by step()) share the dicts and the body that drains them.
+        self._stash_buy(r + 1, buy=buy, worship=worship, relig=relig, levy=levy)
 
-    def _seat_buy_candidates(self, r: int, active: torch.Tensor):
-        """The gold-purchase BUILDING candidate — ONE legality body shared by the
-        scripted gold block and the wire driver's _buy_ctx.
+    def _stash_buy(self, row: int, buy=None, worship=None, relig=None, levy=None) -> None:
+        """Park a seat row's GOLD/FAITH/LEVY intents for `_seat_buy_ladder` to
+        drain at the gold block's phase position. One dict per verb, keyed by
+        the ABSOLUTE row — decide-time and apply-time are different points in
+        the turn for every seat, so the stash is not a seat-0 detour."""
+        if buy is not None:
+            self._driven_buy[row] = buy
+        if worship is not None:
+            self._driven_buy_worship[row] = worship
+        if relig is not None:
+            self._driven_buy_relig[row] = relig
+        if levy is not None:
+            self._driven_levy[row] = levy
+
+    def _seat_buy_candidates(self, row: int, active: torch.Tensor):
+        """The gold-purchase BUILDING candidate for seat row `row` — ONE
+        legality body shared by the wire driver's _buy_ctx and the buy ladder.
 
         Returns (jj, bb, can, price, elig): the cheapest completable building
-        anywhere in the civ (argmin of (cost*1024 + bIdx)*32 + citySlot) and
-        whether the treasury clears price + the peace-gold RESERVE. The
-        affordability test is milli-quantised via js_round to match TS exactly."""
+        anywhere in the seat (argmin of (cost*1024 + bIdx)*32 + citySlot) and
+        whether the treasury clears price + the peace-gold RESERVE (a POLICY
+        war chest, not a rule). Legality is `_seat_buildable(row, True)` —
+        purchaseBuilding's own availableBuildings + buildingCompletable pair.
+        The affordability test is milli-quantised via js_round to match TS."""
         B, dev = self.B, self.device
-        rr = self.rules.seats
         rdv6 = self.rules_dev
         NB6 = rdv6.b_cost.shape[0]
-        ones6 = torch.ones(B, NB6, dtype=torch.bool, device=dev)
-        unl6 = torch.where(
-            rdv6.b_unlock.unsqueeze(0) >= 0,
-            self.civ_only_techs[:, r].gather(1, rdv6.b_unlock.clamp(min=0).unsqueeze(0).expand(B, -1)),
-            ones6,
-        ) & torch.where(
-            rdv6.b_unlock_civic.unsqueeze(0) >= 0,
-            self.civ_only_civics[:, r].gather(1, rdv6.b_unlock_civic.clamp(min=0).unsqueeze(0).expand(B, -1)),
-            ones6,
-        )
-        elig6 = torch.zeros(B, self.RC, NB6, dtype=torch.bool, device=dev)
-        for j6 in self.civ_city_alive[:, r].any(dim=0).nonzero(as_tuple=True)[0].tolist():  # only slots alive in some row
-            al6 = active & self.civ_city_alive[:, r, j6]
-            if not bool(al6.any()):
-                continue
-            have6 = self.civ_city_bldg[:, r, j6]
-            ctile6 = self.civ_city_center[:, r, j6].clamp(min=0)
-            riv6 = self.tile_river.gather(1, ctile6.unsqueeze(1)).squeeze(1)
-            ok6 = unl6 & ~have6 & (~rdv6.b_river.reshape(1, -1) | riv6.unsqueeze(1)) & ~self._b_worship.reshape(1, -1)  # worship buildings are faith-only
-            reg6 = self.civ_city_dist_tile[:, r, j6].gather(1, rdv6.b_req_district.clamp(min=0).unsqueeze(0).expand(B, -1))
-            dc6 = (reg6 >= 0) & self.district_complete.gather(1, reg6.clamp(min=0))
-            ok6 = ok6 & torch.where(rdv6.b_req_district.unsqueeze(0) >= 0, dc6, ones6)
-            for bi6, reqs6 in enumerate(self.rules.b_req_buildings):
-                if reqs6:
-                    ok6[:, bi6] &= have6[:, torch.tensor(reqs6, device=dev, dtype=torch.long)].any(dim=1)
-            for bi6, excl6 in enumerate(self.rules.b_excl_buildings):  # exclusiveWith
-                if excl6:
-                    ok6[:, bi6] &= ~have6[:, torch.tensor(excl6, device=dev, dtype=torch.long)].any(dim=1)
-            qb6 = self.civ_city_current[:, r, j6]  # a BUILDING head is its own column, 0..NB-1
-            is_qb = (qb6 >= 0) & (qb6 < NB6)
-            if bool(is_qb.any()):
-                rows_q = is_qb.nonzero(as_tuple=True)[0]
-                ok6[rows_q, qb6[rows_q]] = False
-            elig6[:, j6] = ok6 & al6.unsqueeze(1)
+        elig6 = self._seat_buildable(row, True) & (active.unsqueeze(1) & self.city_alive[:, row]).unsqueeze(2)
         key6 = (rdv6.b_cost.reshape(1, 1, -1) * 1024 + torch.arange(NB6, device=dev, dtype=rdv6.b_cost.dtype).reshape(1, 1, -1)) * 32 \
             + torch.arange(self.RC, device=dev, dtype=rdv6.b_cost.dtype).reshape(1, -1, 1)
         key6 = torch.where(elig6, key6.expand(B, -1, -1), torch.tensor(float("inf"), dtype=rdv6.b_cost.dtype, device=dev))
@@ -356,33 +322,45 @@ class SimSeats:
         jj6 = torch.div(best6, NB6, rounding_mode="floor")
         bb6 = best6 % NB6
         price6 = rdv6.b_cost.gather(0, bb6).double() * self.rules.gold_purchase_mult
-        reserve6 = float(rr.get("peaceGold0", 150))
-        can6 = has6 & (js_round(self.civ_only_treasury[:, r] * 1000) >= js_round((price6 + reserve6) * 1000))
+        reserve6 = float(self.rules.seats.get("peaceGold0", 150))
+        can6 = has6 & (js_round(self.civ_treasury[:, row] * 1000) >= js_round((price6 + reserve6) * 1000))
         return jj6, bb6, can6, price6, elig6
 
-    def _seat_trainable_units(self, r: int) -> torch.Tensor:
-        """[B, NU] the units civ r may train or gold-buy: tech-unlocked
-        (via _type_tech; -1 = ungated) AND strategic-resource access in ITS
-        territory — the ONE formula behind the phase's tr_u_r and the
-        wire driver's _buy_ctx."""
+    def _seat_buy_building(self, row: int, can6: torch.Tensor, jj6: torch.Tensor, bb6: torch.Tensor, price6: torch.Tensor) -> None:
+        """The building-purchase EXECUTOR — the candidates (or the wire's
+        re-validation) decide WHO buys; this only writes."""
+        rows6 = can6.nonzero(as_tuple=True)[0]
+        self.city_bldg[rows6, row, jj6[rows6], bb6[rows6]] = True
+        self._eff_version += 1  # a bought regional building reaches other cities this phase
+        if self._walls_bidx >= 0:
+            wm6 = rows6[bb6[rows6] == self._walls_bidx]
+            if len(wm6) > 0:
+                self.city_outer_hp[wm6, row, jj6[wm6]] = self._walls_hp
+        self.civ_treasury[:, row] = torch.where(can6, self.civ_treasury[:, row] - price6, self.civ_treasury[:, row])
+
+    def _seat_trainable_units(self, row: int) -> torch.Tensor:
+        """[B, NU] the SEAT-level trainable set: tech-unlocked (via _type_tech;
+        -1 = ungated) AND strategic-resource access in ITS territory. The
+        city-free half of `trainableUnits` — the gold UNIT rung spawns at the
+        capital and TS's arm asks no city question either."""
         B = self.B
-        res_ok = self._res_avail_mask(self.civ_at == r)
         return (
             (self._type_tech.unsqueeze(0) < 0)
-            | self.civ_only_techs[:, r].gather(1, self._type_tech.clamp(min=0).unsqueeze(0).expand(B, -1))
-        ) & res_ok
+            | self.civ_techs[:, row].gather(1, self._type_tech.clamp(min=0).unsqueeze(0).expand(B, -1))
+        ) & self._res_avail_mask(self.tile_seat == row)
 
-    def _seat_buy_unit_candidates(self, r: int, tr_u: torch.Tensor) -> torch.Tensor:
-        """Buy-kind 2 [B, NU]: the gold UNIT-purchase candidate set — ONE legality
-        body for the scripted gold rung and the wire's _buy_ctx. Non-naval
-        military among tr_u (SCOUT masked out: affordability can otherwise leave
-        it the only candidate; BUILDER is combat 0), affordable at cost x mult,
-        with NO war-chest reserve. The military-quota gate stays at the call
-        sites — its COUNT is positional, tracking mid-phase spawns and queues."""
+    def _seat_buy_unit_candidates(self, row: int, tr_u: torch.Tensor) -> torch.Tensor:
+        """Buy-kind 2 [B, NU]: the gold UNIT-purchase candidate set — ONE
+        legality body for the wire's _buy_ctx and the ladder's rung. Non-naval
+        military among tr_u (SCOUT masked out: affordability can otherwise
+        leave it the only candidate; BUILDER is combat 0), affordable at cost x
+        mult, with NO war-chest reserve. The military-quota gate stays at the
+        call sites — its COUNT is positional, tracking mid-phase spawns and
+        queues."""
         mil = tr_u & (self._type_combat.unsqueeze(0) > 0) & ~self.unit_naval.unsqueeze(0)
         if self._scout_idx >= 0:
             mil[:, self._scout_idx] = False
-        afford = self._afford(self.civ_only_treasury[:, r].unsqueeze(1), self._type_cost.double().unsqueeze(0) * self.rules.gold_purchase_mult)
+        afford = self._afford(self.civ_treasury[:, row].unsqueeze(1), self._type_cost.double().unsqueeze(0) * self.rules.gold_purchase_mult)
         return mil & afford
 
     def _seat_tile_unclaimed(self, tc: torch.Tensor) -> torch.Tensor:
@@ -406,25 +384,25 @@ class SimSeats:
             & (nbs >= 0)
         ).any(dim=2)
 
-    def _seat_tile_price(self, r: int, ctr: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
-        """[B] f64 — the tilePurchaseCost twin: ring-based base (50 ring ≤2,
-        +25/ring), speed-scaled, ×(1 + 4·max(tech%, civic%)), + 5·speed per
-        tile EVER purchased empire-wide, × this seat's own tilePurchaseMult
+    def _seat_tile_price(self, row: int, ctr: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
+        """[B] f64 — the tilePurchaseCost twin: ring-based base (50 ring <= 2,
+        +25/ring), speed-scaled, x(1 + 4*max(tech%, civic%)), + 5*speed per
+        tile EVER purchased empire-wide, x this seat's own tilePurchaseMult
         (LAND_SURVEYORS is a policy card every seat can slot)."""
         ring = self.pair_dist[ctr, tgt].clamp(min=2)
-        tpct = self.civ_only_techs[:, r].sum(dim=1).double() / max(1, self.civ_only_techs.shape[2])
-        cpct = self.civ_only_civics[:, r].sum(dim=1).double() / max(1, self.civ_only_civics.shape[2])
+        tpct = self.civ_techs[:, row].sum(dim=1).double() / max(1, self.civ_techs.shape[2])
+        cpct = self.civ_civics[:, row].sum(dim=1).double() / max(1, self.civ_civics.shape[2])
         base = js_round(torch.full_like(tpct, 1.0) * (50.0 + 25.0 * (ring - 2).double()) * self.rules.game_speed)
         step = js_round(torch.full_like(tpct, 5.0 * self.rules.game_speed))
-        tpm = self._gov_mods(r + 1)[6].double()
-        return js_round((base * (1.0 + 4.0 * torch.maximum(tpct, cpct)) + step * self.civ_only_tiles_purchased[:, r].double()) * tpm)
+        tpm = self._gov_mods(row)[6].double()
+        return js_round((base * (1.0 + 4.0 * torch.maximum(tpct, cpct)) + step * self.civ_tiles_purchased[:, row].double()) * tpm)
 
-    def _seat_tile_buy_candidate(self, r: int, active: torch.Tensor):
+    def _seat_tile_buy_candidate(self, row: int, active: torch.Tensor):
         """Buy-kind 3: the TILE-BUY candidate — ONE legality body for the wire
-        driver's _buy_ctx and the TS driver's tripwire twin. Walks rc slots in
+        driver's _buy_ctx and the TS driver's tripwire twin. Walks city slots in
         order; the FIRST slot with a border candidate names the pick (best
         _seat_border_key, the same key the culture claim uses), and an
-        UNAFFORDABLE pick ABORTS the civ's tile buy outright rather than trying
+        UNAFFORDABLE pick ABORTS the seat's tile buy outright rather than trying
         the next city — TS breaks out of the walk.
         Returns (slot [B], tile [B], cost [B] f64, ok [B])."""
         B, dev = self.B, self.device
@@ -436,15 +414,15 @@ class SimSeats:
         for j in range(self.RC):
             if not bool(left.any()):
                 break
-            live = left & self.civ_city_alive[:, r, j]
+            live = left & self.city_alive[:, row, j]
             if not bool(live.any()):
                 continue
-            ctr = self.civ_city_center[:, r, j]
-            tiles, tc, nbs, key0 = self._seat_border_key(r + 1, ctr)
+            ctr = self.city_center[:, row, j]
+            tiles, tc, nbs, key0 = self._seat_border_key(row, ctr)
             okt = (
                 (tiles >= 0)
                 & self._seat_tile_unclaimed(tc)
-                & self._seat_tile_adj_city(r + 1, self.civ_city_id[:, r, j], tc, nbs)
+                & self._seat_tile_adj_city(row, self.city_id[:, row, j], tc, nbs)
                 & live.unsqueeze(1)
             )
             has = okt.any(dim=1)
@@ -452,8 +430,8 @@ class SimSeats:
                 continue
             best = torch.where(okt, key0, self._inf_f).argmin(dim=1)
             tgt = tiles.gather(1, best.unsqueeze(1)).squeeze(1)
-            c = self._seat_tile_price(r, ctr.clamp(min=0), tgt.clamp(min=0))
-            buy = has & self._afford(self.civ_only_treasury[:, r], c)
+            c = self._seat_tile_price(row, ctr.clamp(min=0), tgt.clamp(min=0))
+            buy = has & self._afford(self.civ_treasury[:, row], c)
             slot = torch.where(buy, torch.full_like(slot, j), slot)
             tile = torch.where(buy, tgt, tile)
             cost = torch.where(buy, c, cost)
@@ -461,49 +439,53 @@ class SimSeats:
             left = left & ~has  # first slot WITH a candidate ends the walk (buy or abort)
         return slot, tile, cost, ok
 
-    def _seat_faith_buy_candidates(self, r: int, active: torch.Tensor):
+    def _seat_religious_city_ok(self, row: int) -> torch.Tensor:
+        """[B, RC] cities of seat row `row` that can birth a religious unit —
+        purchaseReligiousUnit's city gates: a SHRINE and a COMPLETE unpillaged
+        Holy Site."""
+        if self._shrine_bidx < 0 or self._hs_idx < 0:
+            return torch.zeros(self.B, self.RC, dtype=torch.bool, device=self.device)
+        hs = self.city_dist_tile[:, row, :, self._hs_idx]  # [B, RC]
+        hs_ok = (hs >= 0) & self.district_complete.gather(1, hs.clamp(min=0)) & ~self.district_pillaged.gather(1, hs.clamp(min=0))
+        return self.city_alive[:, row] & self.city_bldg[:, row, :, self._shrine_bidx] & hs_ok
+
+    def _seat_faith_buy_candidates(self, row: int, active: torch.Tensor):
         """Buy-kinds 4-6: the FAITH-purchase candidates — worship building,
-        missionary, apostle — each (ok [B], slot [B]) with the scripted
-        ladder's own gates. Worship: founded religion, afford the flat cost,
-        FIRST alive city in slot order with TEMPLE + a complete unpillaged
-        Holy Site and no worship building yet. Missionary/apostle: founded,
-        live count under the unit's own cap, afford (enhancer-adjusted /
-        flat), FIRST alive city with the SHRINE + complete unpillaged Holy
-        Site. Missionary-before-apostle (one religious unit per turn) is the
-        LADDER's pick, not encoded here."""
+        missionary, apostle — each (ok [B], slot [B]) with the ladder's own
+        gates. Worship: founded religion, afford the flat cost, FIRST alive
+        city in slot order that `_worship_city_ok` admits. Missionary/apostle:
+        founded, live count under the unit's own cap, afford (enhancer-adjusted
+        / flat), FIRST city `_seat_religious_city_ok` admits.
+        Missionary-before-apostle (one religious unit per turn) is the LADDER's
+        pick, not encoded here."""
         B, dev = self.B, self.device
         neg = torch.full((B,), -1, dtype=torch.long, device=dev)
         no = torch.zeros(B, dtype=torch.bool, device=dev)
         w_ok, w_j = no.clone(), neg.clone()
         m_ok, m_j = no.clone(), neg.clone()
         a_ok, a_j = no.clone(), neg.clone()
-        if self._hs_idx < 0 or not bool(self.civ_only_religion_done[:, r].any()):
+        if self._hs_idx < 0 or not bool(self.civ_religion_done[:, row].any()):
             return w_ok, w_j, m_ok, m_j, a_ok, a_j
-        hs_t = self.civ_city_dist_tile[:, r, :, self._hs_idx]  # [B, RC]
-        hs_c = (hs_t >= 0) & self.district_complete.gather(1, hs_t.clamp(min=0)) & ~self.district_pillaged.gather(1, hs_t.clamp(min=0))
-        founded = active & self.civ_only_religion_done[:, r]
-        if self._worship_bidx and self._temple_bidx >= 0:
-            wb = self._worship_bidx[(r + 1) % len(self._worship_bidx)]
-            if wb >= 0:
-                elig_w = self.civ_city_alive[:, r] & ~self.civ_city_bldg[:, r, :, wb] & self.civ_city_bldg[:, r, :, self._temple_bidx] & hs_c
-                w_ok = founded & self._afford(self.civ_only_faith[:, r], self._worship_cost) & elig_w.any(dim=1)
-                w_j = torch.where(w_ok, elig_w.long().argmax(dim=1), w_j)
-        if self._shrine_bidx >= 0:
-            elig_s = self.civ_city_alive[:, r] & self.civ_city_bldg[:, r, :, self._shrine_bidx] & hs_c
-            first_s = elig_s.long().argmax(dim=1)
-            if self._missionary_idx >= 0:
-                n_m = (self.major_unit_alive & (self.major_unit_seat == r + 1) & (self.major_unit_type == self._missionary_idx)).sum(dim=1)
-                mcost = self._enh["mcost"][self.civ_only_enhancer[:, r] + 1]
-                m_ok = founded & (n_m < self._missionary_cap) & self._afford(self.civ_only_faith[:, r], mcost) & elig_s.any(dim=1)
-                m_j = torch.where(m_ok, first_s, m_j)
-            if self._apostle_idx >= 0:
-                n_a = (self.major_unit_alive & (self.major_unit_seat == r + 1) & (self.major_unit_type == self._apostle_idx)).sum(dim=1)
-                acost = torch.full((B,), float(round(self._apostle_cost)), dtype=torch.float64, device=dev)
-                a_ok = founded & (n_a < self._apostle_cap) & self._afford(self.civ_only_faith[:, r], acost) & elig_s.any(dim=1)
-                a_j = torch.where(a_ok, first_s, a_j)
+        founded = active & self.civ_religion_done[:, row]
+        elig_w = self._worship_city_ok(row)
+        if bool(elig_w.any()):
+            w_ok = founded & self._afford(self.civ_faith[:, row], self._worship_cost) & elig_w.any(dim=1)
+            w_j = torch.where(w_ok, elig_w.long().argmax(dim=1), w_j)
+        elig_s = self._seat_religious_city_ok(row)
+        first_s = elig_s.long().argmax(dim=1)
+        if self._missionary_idx >= 0:
+            n_m = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._missionary_idx)).sum(dim=1)
+            mcost = self._enh["mcost"][self.civ_enhancer[:, row] + 1]
+            m_ok = founded & (n_m < self._missionary_cap) & self._afford(self.civ_faith[:, row], mcost) & elig_s.any(dim=1)
+            m_j = torch.where(m_ok, first_s, m_j)
+        if self._apostle_idx >= 0:
+            n_a = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._apostle_idx)).sum(dim=1)
+            acost = torch.full((B,), float(round(self._apostle_cost)), dtype=torch.float64, device=dev)
+            a_ok = founded & (n_a < self._apostle_cap) & self._afford(self.civ_faith[:, row], acost) & elig_s.any(dim=1)
+            a_j = torch.where(a_ok, first_s, a_j)
         return w_ok, w_j, m_ok, m_j, a_ok, a_j
 
-    def _seat_levy_candidate(self, r: int, active: torch.Tensor):
+    def _seat_levy_candidate(self, row: int, active: torch.Tensor):
         """Buy-kind 7: the LEVY candidate — the RULE half only (militaristic
         CS, this seat suzerain, cooldown ready, afford) over the FIRST
         eligible CS in slot order. At-war is the DRIVER's policy gate, not a
@@ -517,81 +499,213 @@ class SimSeats:
         Sl = self.S
         mil_idx = int(self.rules.citystate.get("militaristicIdx", -1))
         levy_cost = float(self.rules.citystate.get("levyGoldCost", 120))
-        suz_min = int(self.rules.citystate.get("suzerainEnvoys", 3))
-        mine = self.civ_only_citystate_envoys[:, r, :Sl]
-        oth = self.civ_only_citystate_envoys[:, :, :Sl].clone()
-        oth[:, r] = -1
-        suz = (
-            (mine >= suz_min)
-            & (mine > self.citystate_envoys[:, :Sl])
-            & (mine > oth.max(dim=1).values)
-            & self.citystate_alive[:, :Sl]
-        )
         ready = (self.turn - self.citystate_last_levy[:, :Sl]) >= self._levy_cooldown
-        elig = active.unsqueeze(1) & (self.citystate_type[:, :Sl] == mil_idx) & suz & ready \
-            & self._afford(self.civ_only_treasury[:, r], levy_cost).unsqueeze(1)
+        elig = active.unsqueeze(1) & (self.citystate_type[:, :Sl] == mil_idx) & self._suzerain_mask(row)[:, :Sl] & ready \
+            & self._afford(self.civ_treasury[:, row], levy_cost).unsqueeze(1)
         ok = elig.any(dim=1)
         cs = torch.where(ok, elig.long().argmax(dim=1), cs)
         return ok, cs
 
-    def _consume_driven_buy(self, r: int, active: torch.Tensor) -> torch.Tensor:
-        """Execute the wire's BUY intent at the gold block's own phase position —
-        draw-free is not order-free. Re-validates the RECORDED (j, b) against the
-        LIVE eligibility scan + affordability, exactly as TS's arm does; a stale
-        intent refuses silently on both engines. Returns the rows that bought
-        (they consume the one-purchase-per-turn slot)."""
-        dbuy = getattr(self, "_driven_buy", None)
-        B, dev = self.B, self.device
-        bought = torch.zeros(B, dtype=torch.bool, device=dev)
-        if not dbuy or r not in dbuy:
-            return bought
-        kind, jjw, bbw = dbuy.pop(r)
-        # kind 1 (SETTLER) executes at the settler SUB-POSITION (after
-        # bank-first, the TS order) — forward it there.
-        if bool((kind == 1).any()):
-            if not hasattr(self, "_driven_buy_settler") or self._driven_buy_settler is None:
-                self._driven_buy_settler = {}
-            self._driven_buy_settler[r] = kind == 1
-        # kind 2 (UNIT) executes at the unit SUB-POSITION (after building and
-        # settler, the TS rung order) — forward it there.
-        if bool((kind == 2).any()):
-            if not hasattr(self, "_driven_buy_unit") or self._driven_buy_unit is None:
-                self._driven_buy_unit = {}
-            self._driven_buy_unit[r] = kind == 2
-        # kind 3 (TILE) executes at the tile SUB-POSITION (the gold ladder's last
-        # rung) — forward (rows, tile, slot) there. For kind 3 the wire's a/b are
-        # (tileIndex, rc slot).
-        if bool((kind == 3).any()):
-            if not hasattr(self, "_driven_buy_tile") or self._driven_buy_tile is None:
-                self._driven_buy_tile = {}
-            self._driven_buy_tile[r] = (kind == 3, jjw, bbw)
-        want = active & self.controlled[:, r] & (kind == 0) & (jjw >= 0) & (bbw >= 0)
-        if not bool(want.any()):
-            return bought
-        _, _, _, _, elig = self._seat_buy_candidates(r, active)
-        jc = jjw.clamp(min=0, max=self.RC - 1)
-        bc = bbw.clamp(min=0, max=self.rules_dev.b_cost.shape[0] - 1)
-        ok = want & elig[torch.arange(B, device=dev), jc, bc]
-        price = self.rules_dev.b_cost.gather(0, bc).double() * self.rules.gold_purchase_mult
-        reserve = float(self.rules.seats.get("peaceGold0", 150))
-        ok = ok & (js_round(self.civ_only_treasury[:, r] * 1000) >= js_round((price + reserve) * 1000))
-        if bool(ok.any()):
-            self._seat_buy_building(r, ok, jc, bc, price)
-            bought = ok
-        return bought
+    def _seat_army_count(self, row: int) -> torch.Tensor:
+        """[B] seat row `row`'s MILITARY strength count — live units plus
+        what its cities have on order (builders are combat 0 and never count).
+        The meleeCount + rangedCount twin TS builds before its buy block, and
+        the input to the gold ladder's unit quota."""
+        vt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+        live = (self.major_unit_alive & (self.major_unit_seat == row) & (self._type_combat[vt] > 0)).sum(dim=1)
+        cur = self.city_current[:, row]
+        q_ty = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
+        q_mil = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU) & (self._type_combat[q_ty] > 0) & self.city_alive[:, row]
+        return live + q_mil.sum(dim=1)
 
-    def _seat_buy_building(self, r: int, can6: torch.Tensor, jj6: torch.Tensor, bb6: torch.Tensor, price6: torch.Tensor) -> None:
-        """The building-purchase EXECUTOR — shared by the scripted gold block and
-        the driven buy arm. The candidates (or the wire's re-validation) decide
-        WHO buys; this only writes."""
-        rows6 = can6.nonzero(as_tuple=True)[0]
-        self.civ_city_bldg[rows6, r, jj6[rows6], bb6[rows6]] = True
-        self._eff_version += 1  # a bought regional building reaches other cities this phase
-        if self._walls_bidx >= 0:
-            wm6 = rows6[bb6[rows6] == self._walls_bidx]
-            if len(wm6) > 0:
-                self.civ_city_outer_hp[wm6, r, jj6[wm6]] = self._walls_hp
-        self.civ_only_treasury[:, r] = torch.where(can6, self.civ_only_treasury[:, r] - price6, self.civ_only_treasury[:, r])
+    def _seat_buy_ladder(self, row: int, active: torch.Tensor) -> None:
+        """THE gold/faith spending block for seat row `row`, at the seatPhase
+        position (after the production picks, before the trade block) — ONE
+        body every seat runs.
+
+        The wire names ONE gold purchase per seat per turn and the rungs fire
+        in the TS order BUILDING > SETTLER > UNIT > TILE, `bought` threading
+        the priority. The FAITH buys ride BESIDE it (their own currency): the
+        worship building, then ONE religious unit, missionary before apostle.
+        The LEVY is gold but a diplomacy action, so it pays its own way outside
+        the one-purchase slot.
+
+        Nothing here CHOOSES: every arm re-validates the named intent against
+        the LIVE state at this position and refuses silently if it no longer
+        holds — the same contract TS's arms keep.
+        """
+        B, dev = self.B, self.device
+        mult = self.rules.gold_purchase_mult
+        ext = self.seat_ext[:, row]
+        alive_row = self.city_alive[:, row]
+        n_cities = alive_row.sum(dim=1)
+        bought = torch.zeros(B, dtype=torch.bool, device=dev)
+        # Kind 0: the BUILDING buy. The wire names (slot, buildingIdx); the
+        # shared candidate body re-validates it against the LIVE state.
+        kind = jjw = bbw = None
+        if row in self._driven_buy:
+            kind, jjw, bbw = self._driven_buy.pop(row)
+        if kind is not None and self.districts_on:
+            want = active & ext & (kind == 0) & (jjw >= 0) & (bbw >= 0)
+            if bool(want.any()):
+                _, _, _, _, elig = self._seat_buy_candidates(row, active)
+                jc = jjw.clamp(min=0, max=self.RC - 1)
+                bc = bbw.clamp(min=0, max=self.rules_dev.b_cost.shape[0] - 1)
+                price = self.rules_dev.b_cost.gather(0, bc).double() * mult
+                reserve = float(self.rules.seats.get("peaceGold0", 150))
+                ok = want & elig[torch.arange(B, device=dev), jc, bc] \
+                    & (js_round(self.civ_treasury[:, row] * 1000) >= js_round((price + reserve) * 1000))
+                if bool(ok.any()):
+                    self._seat_buy_building(row, ok, jc, bc, price)
+                    bought = bought | ok
+        # Kind 1: the SETTLER buy is a UNIT purchase. It spawns at the capital
+        # (else the first alive city), which must have the pop to pay — WHERE
+        # it founds is a later FOUND_CITY order, not part of the purchase.
+        cap_is = self.city_is_cap[:, row]
+        has_cap = cap_is.any(dim=1)
+        spawn_slot = torch.where(has_cap, cap_is.long().argmax(dim=1), alive_row.long().argmax(dim=1))
+        bidx = torch.arange(B, device=dev)
+        if kind is not None and self._settler_idx >= 0:
+            _sq = (alive_row & (self.city_current[:, row] == self.SETTLER)).sum(dim=1)
+            sett_price = (self.rules.settler_base + self.rules.settler_per_city * (
+                n_cities - 1 + self._seat_settlers(row) + _sq
+            ).clamp(min=0).to(self.dtype)) * mult
+            ctr_s = self.city_center[bidx, row, spawn_slot].clamp(min=0)
+            pop_s = self.city_pop[bidx, row, spawn_slot]
+            want_s = (kind == 1) & active & ext & ~bought & (n_cities > 0) \
+                & (pop_s >= self.rules.settler_pop_gate) & self._afford(self.civ_treasury[:, row], sett_price)
+            if bool(want_s.any()):
+                landed_s = self._spawn_unit(row, want_s, ctr_s, self._settler_idx)
+                self.civ_treasury[:, row] = torch.where(landed_s, self.civ_treasury[:, row] - sett_price, self.civ_treasury[:, row])
+                # purchased settlers cost the spawn city a pop (real Civ 6)
+                _pop_col = self.city_pop[bidx, row, spawn_slot]
+                self.city_pop[bidx, row, spawn_slot] = torch.where(landed_s, (_pop_col - 1).clamp(min=1), _pop_col)
+                bought = bought | landed_s
+        # Kind 2: the MILITARY UNIT buy — nothing else bought and the live +
+        # queued military under the quota (2x cities). The STRONGEST affordable
+        # candidate wins (highest combat, ties to the lowest unit index = table
+        # order), spawned at the capital; pay only where it LANDED.
+        if kind is not None:
+            want_u = active & ext & ~bought & (kind == 2) & (self._seat_army_count(row) < 2 * n_cities)
+            if bool(want_u.any()):
+                cand_u = self._seat_buy_unit_candidates(row, self._seat_trainable_units(row))
+                elig_u = want_u & cand_u.any(dim=1)
+                if bool(elig_u.any()):
+                    key_u = self._type_combat.double().unsqueeze(0) * self.NU - torch.arange(self.NU, device=dev, dtype=torch.float64).unsqueeze(0)
+                    key_u = torch.where(cand_u, key_u.expand(B, -1), torch.full((B, self.NU), -1e18, dtype=torch.float64, device=dev))
+                    pick_ty = key_u.argmax(dim=1)
+                    ctr_u = self.city_center[bidx, row, spawn_slot].clamp(min=0)
+                    # a bought military unit inherits the SPAWN city's Encampment training XP
+                    xp_u = (self.city_bldg[bidx, row, spawn_slot].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
+                    landed_u = self._spawn_unit(row, elig_u, ctr_u, pick_ty, init_xp=xp_u)
+                    price_u = self._type_cost.gather(0, pick_ty).double() * mult
+                    self.civ_treasury[:, row] = torch.where(landed_u, self.civ_treasury[:, row] - price_u, self.civ_treasury[:, row])
+                    bought = bought | landed_u
+        # Kinds 4/5/6: the FAITH buys, beside the gold ladder. WORSHIP first
+        # (buyWorshipBuilding: its identity is a RULE — WORSHIP_BUILDINGS[seat
+        # % n] — and the city needs a Temple, a complete unpillaged Holy Site
+        # and no worship building yet), then ONE religious unit.
+        if row in self._driven_buy_worship:
+            wj = self._driven_buy_worship.pop(row)
+            wb = self._worship_bidx_of(row)
+            if wb >= 0:
+                jw = wj.clamp(min=0, max=self.RC - 1)
+                buy_w = active & ext & (wj >= 0) & self.civ_religion_done[:, row] \
+                    & self._afford(self.civ_faith[:, row], self._worship_cost) \
+                    & self._worship_city_ok(row)[bidx, jw]
+                if bool(buy_w.any()):
+                    rows_w = buy_w.nonzero(as_tuple=True)[0]
+                    self.city_bldg[rows_w, row, jw[rows_w], wb] = True
+                    self._eff_version += 1  # invariant: every city_bldg write bumps it
+                    self.civ_faith[:, row] = torch.where(buy_w, self.civ_faith[:, row] - self._worship_cost, self.civ_faith[:, row])
+        rel_kind, rel_j = self._driven_buy_relig.pop(row) if row in self._driven_buy_relig else (None, None)
+        if rel_kind is not None and rel_j is not None:
+            rel_city = self._seat_religious_city_ok(row)
+            jr = rel_j.clamp(min=0, max=self.RC - 1)
+            at_r = self.city_center[bidx, row, jr].clamp(min=0)
+            base_r = active & ext & (rel_j >= 0) & self.civ_religion_done[:, row] & rel_city[bidx, jr]
+            bought_relig = torch.zeros(B, dtype=torch.bool, device=dev)
+            if self._missionary_idx >= 0:
+                n_live_m = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._missionary_idx)).sum(dim=1)
+                mcost = self._enh["mcost"][self.civ_enhancer[:, row] + 1]  # [B] f64
+                buy_m = base_r & (rel_kind == 5) & (n_live_m < self._missionary_cap) & self._afford(self.civ_faith[:, row], mcost)
+                if bool(buy_m.any()):
+                    # SCRIPTURE ships +1 charge, applied at purchase
+                    chg_m = self._type_charges[self._missionary_idx] + self._enh["mchg"][self.civ_enhancer[:, row] + 1]
+                    landed_m = self._spawn_unit(row, buy_m, at_r, self._missionary_idx, charges=chg_m)
+                    self.civ_faith[:, row] = torch.where(landed_m, self.civ_faith[:, row] - mcost, self.civ_faith[:, row])
+                    bought_relig = bought_relig | landed_m
+            if self._apostle_idx >= 0:
+                # the APOSTLE rung runs AFTER the missionary so the cheaper
+                # unit saturates first; ONE religious unit per seat per turn,
+                # whatever the wire asks. FLAT cost — missionaryCostMult is a
+                # MISSIONARY discount and does not extend to apostles.
+                n_live_a = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._apostle_idx)).sum(dim=1)
+                acost = torch.full((B,), float(round(self._apostle_cost)), dtype=torch.float64, device=dev)
+                buy_a = base_r & (rel_kind == 6) & ~bought_relig & (n_live_a < self._apostle_cap) \
+                    & self._afford(self.civ_faith[:, row], acost)
+                if bool(buy_a.any()):
+                    landed_a = self._spawn_unit(row, buy_a, at_r, self._apostle_idx, charges=self._type_charges[self._apostle_idx].expand(B))
+                    self.civ_faith[:, row] = torch.where(landed_a, self.civ_faith[:, row] - acost, self.civ_faith[:, row])
+        # Kind 3: the TILE buy — the LAST rung of the gold ladder. Position
+        # matters: it sits in the gold block, which runs BEFORE the border
+        # walker, and a claim feeds the yields computed in between. The driver
+        # names [tile, slot]; re-validation here is the buyTile twin — the
+        # NAMED tile unclaimed, adjacent to the NAMED city's own territory,
+        # within radius 5, afforded at the LIVE price. The claim does NOT
+        # advance city_cbox (purchases and culture keep separate clocks), but
+        # city_acquired DOES (the next border tile costs more however this one
+        # was gained).
+        if kind is not None:
+            # for kind 3 the wire's a/b ARE (tileIndex, city slot)
+            want_t = (kind == 3) & active & ext & ~bought & (bbw >= 0) & (jjw >= 0)
+            if bool(want_t.any()):
+                jt = bbw.clamp(min=0, max=self.RC - 1)
+                tt = jjw.clamp(min=0, max=self.tile_seat.shape[1] - 1)
+                ctr_t = self.city_center[bidx, row, jt].clamp(min=0)
+                ok_t = want_t & self.city_alive[bidx, row, jt] \
+                    & (self.pair_dist[ctr_t, tt] <= 5) \
+                    & self._seat_tile_unclaimed(tt.unsqueeze(1)).squeeze(1) \
+                    & self._seat_tile_adj_city(row, self.city_id[bidx, row, jt], tt.unsqueeze(1)).squeeze(1)
+                cost_t = self._seat_tile_price(row, ctr_t, tt)
+                ok_t = ok_t & self._afford(self.civ_treasury[:, row], cost_t)
+                if bool(ok_t.any()):
+                    _rows = ok_t.nonzero(as_tuple=True)[0]
+                    self.civ_treasury[_rows, row] -= cost_t[_rows]
+                    self.tile_seat[_rows, tt[_rows]] = row  # ONE storage for tile ownership
+                    self._tile_owner_ver += 1  # nothing else to retag
+                    self._reveal_around(_rows, row, tt[_rows], 1)  # acquireTile's revealAround(seat, tile, 1)
+                    self.tile_city[_rows, tt[_rows]] = self.city_id[_rows, row, jt[_rows]]
+                    self.city_acquired[_rows, row, jt[_rows]] += 1
+                    self.civ_tiles_purchased[_rows, row] += 1
+                    self._eff_version += 1
+                    bought = bought | ok_t
+        # Kind 7: the LEVY — the levyUnits twin, AFTER every purchase (the
+        # gold-block tail, just before the trade block). A wire DECISION: the
+        # driver names the CS (at-war is ITS policy gate, not a rule).
+        # Payment and cooldown are UNCONDITIONAL on a free spawn spot
+        # (levyUnits pays before spawnUnit).
+        if row in self._driven_levy and self.S > 0:
+            lv = self._driven_levy.pop(row)
+            Sl = self.S
+            mil_idx_l = int(self.rules.citystate.get("militaristicIdx", -1))
+            levy_cost = float(self.rules.citystate.get("levyGoldCost", 120))
+            levy_units_n = int(self.rules.citystate.get("levyUnits", 2))
+            want_l = active & ext & (lv >= 0) & (lv < Sl)
+            if bool(want_l.any()):
+                sl = lv.clamp(min=0, max=Sl - 1)
+                ready_l = (self.turn - self.citystate_last_levy[bidx, sl]) >= self._levy_cooldown
+                do_l = want_l & (self.citystate_type[bidx, sl] == mil_idx_l) & self._suzerain_mask(row)[bidx, sl] \
+                    & ready_l & self._afford(self.civ_treasury[:, row], levy_cost)
+                if bool(do_l.any()):
+                    at_l = self.citystate_center[bidx, sl].clamp(min=0)
+                    ltype = self._spearman_idx if self.turn > int(self.rules.combat.get("spearmanAfterTurn", 60)) else self._warrior_idx
+                    ltype_t = torch.full((B,), ltype, dtype=torch.long, device=dev)
+                    for _ in range(levy_units_n):
+                        self._spawn_unit(row, do_l, at_l, ltype_t)  # best-effort; refunds nothing
+                    self.civ_treasury[:, row] = torch.where(do_l, self.civ_treasury[:, row] - levy_cost, self.civ_treasury[:, row])
+                    rows_l = do_l.nonzero(as_tuple=True)[0]
+                    self.citystate_last_levy[rows_l, sl[rows_l]] = self.turn
 
     def _consume_driven_picks(self, r: int) -> None:
         """The production half of the stash-and-consume convention:

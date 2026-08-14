@@ -102,7 +102,7 @@ def _buy_row(sim, seat: int, bc: dict, rk, rj, b: int) -> list:
     drift: [centre, bIdx, settlerOk, unitOk, tileOk, tile, tileCentre,
     worshipCentre, religKind, religCentre, levyIdx]."""
     def ctr(j: int) -> int:
-        return int(sim.civ_city_center[b, seat - 1, j]) if j >= 0 else -1
+        return int(sim.city_center[b, seat, j]) if j >= 0 else -1
     return [
         ctr(int(bc["jj"][b])) if bool(bc["can_building"][b]) else -1,
         int(bc["bb"][b]) if bool(bc["can_building"][b]) else -1,
@@ -120,7 +120,7 @@ def _buy_row(sim, seat: int, bc: dict, rk, rj, b: int) -> list:
 def _buy_rows(sim, seat: int) -> list:
     """The tripwire rows for every batch row of one seat (reads _buy_ctx +
     pick_faith once)."""
-    bc = drive._buy_ctx(sim, seat - 1)
+    bc = drive._buy_ctx(sim, seat)  # ABSOLUTE row — seat 0 has the same buy verbs
     _, rk = ladder.pick_faith(bc["worship_ok"], bc["missionary_ok"], bc["apostle_ok"])
     rj = torch.where(rk == 5, bc["missionary_j"],
                      torch.where(rk == 6, bc["apostle_j"], torch.full_like(rk, -1)))
@@ -246,11 +246,10 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                 # seat's LIVING units in slot order, which IS the TS array
                 # order it emits per unit. No seat needs a compaction of its
                 # own any more.
-                gb_all = None
-                if seat >= 1:
-                    # The BUY-candidate tripwire: _buy_ctx against the TS
-                    # pre-turn twin, in the one row shape both paths share.
-                    gb_all = _buy_rows(sim, seat)
+                # The BUY-candidate tripwire: _buy_ctx against the TS
+                # pre-turn twin, in the one row shape both paths share —
+                # EVERY seat, row 0 included.
+                gb_all = _buy_rows(sim, seat)
                 for b, msg in enumerate(msgs):
                     tobs = torch.tensor(msg["obs"][str(seat)], dtype=torch.float64)
                     gobs = gobs_all[b]
@@ -269,7 +268,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                             if gv != tv:
                                 flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: {name.upper()} row {i}: GPU {gv} vs TS {tv}")
                                 break
-                    if gb_all is not None:
+                    if True:
                         tb = msg.get("buys", {}).get(str(seat), [])
                         if tb and gb_all[b] != tb:
                             flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit,tileOk,tile,tileC,worshipC,religKind,religC,levy]: GPU {gb_all[b]} vs TS {tb}")
@@ -308,6 +307,9 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             env0 = drive._seat_envoys(sim, 0)
             env0_t = env0 if env0 is not None else _neg0.unsqueeze(1)
             _e0_l = env0_t.tolist()
+            # The GOLD/FAITH/LEVY verbs, seat 0: the same decider every seat
+            # runs, over the same shared candidate bodies.
+            buy0, worship0, relig0, levy0 = drive._decide_buys(sim, 0)
             # The geopolitics decide ONCE per turn (the declare scan couples
             # the civ seats), stashed GPU-side and merged into every record.
             geo = drive.geo_decide_and_apply(sim)
@@ -324,10 +326,12 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                               for n, v in enumerate(_u0_l[b])
                               if _sm0_l[b][n] >= 0 and v >= 0 and v != 12],
                     "envoys": [x for x in _e0_l[b] if x >= 0],
+                    **drive._buy_record_fields(sim, 0, b, buy0, worship0, relig0, levy0),
                 }
                 ch.stdin.write(json.dumps({"recs": recs}) + "\n")
                 ch.stdin.flush()
-            sim.step(production=prod0, tech=tech0, civic=civic0, units=u0, envoy=env0_t)
+            sim.step(production=prod0, tech=tech0, civic=civic0, units=u0, envoy=env0_t,
+                     buy=buy0, worship=worship0, relig=relig0, levy=levy0)
             trs = [read_msg(ch) for ch in children]  # barrier: every child's post-step digest
             # THE DIGEST IS THE GATE. On the FIRST disagreement the mismatching
             # groups are dumped keyed from both engines and diffed BY NAME;
@@ -502,8 +506,8 @@ def main() -> None:
             gs = drive._spread_targets(sim, seat)[0].tolist()
             tj = msg.get("jobs", {}).get(str(seat), [])
             ts_ = msg.get("spreads", {}).get(str(seat), [])
-            if seat >= 1:
-                # The same 11-field row as the batched path.
+            if True:
+                # The same 11-field row as the batched path, every seat.
                 gb = _buy_rows(sim, seat)[0]
                 tb = msg.get("buys", {}).get(str(seat), [])
                 if tb and gb != tb:
@@ -564,6 +568,7 @@ def main() -> None:
         _pc_l = sim._type_civilian[sim.unit_type][0].tolist()
         env0 = drive._seat_envoys(sim, 0)
         env0_t = env0 if env0 is not None else _neg0.unsqueeze(1)
+        buy0, worship0, relig0, levy0 = drive._decide_buys(sim, 0)  # seat 0's own gold/faith verbs
         # The geopolitics decide ONCE per turn — the batched path's twin.
         geo = drive.geo_decide_and_apply(sim)
         per_seat = {r: drive._decide_turn(env, sim, r, roster, classes, seeds=[args.seed], turn=t) for r in seats}
@@ -578,12 +583,14 @@ def main() -> None:
                       for n, v in enumerate(_u0_l)
                       if _sm0_l[n] >= 0 and v >= 0 and v != 12],
             "envoys": [x for x in env0_t[0].tolist() if x >= 0],
+            **drive._buy_record_fields(sim, 0, 0, buy0, worship0, relig0, levy0),
         }
         if os.environ.get("CIV6_SERVE_DEBUG_BUY") and any("buy" in v for v in recs.values()):
             print(f"BUYREC turn {t + 1}: " + json.dumps({k: v["buy"] for k, v in recs.items() if "buy" in v}))
         child.stdin.write(json.dumps({"recs": recs}) + "\n")
         child.stdin.flush()
-        sim.step(production=prod0, tech=tech0, civic=civic0, units=u0, envoy=env0_t)
+        sim.step(production=prod0, tech=tech0, civic=civic0, units=u0, envoy=env0_t,
+                 buy=buy0, worship=worship0, relig=relig0, levy=levy0)
         tr = read_msg()
         # THE DIGEST IS THE GATE — the batched path's twin block.
         if True:

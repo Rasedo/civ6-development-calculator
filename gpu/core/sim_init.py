@@ -864,11 +864,11 @@ class SimInit:
         self._off2 = tiles_within_offsets(2).to(device)
         self._off1 = tiles_within_offsets(1).to(device)
         ids = [u["id"] for u in (rules.units or [])]
-        self._civ_only_spearman = ids.index("SPEARMAN") if "SPEARMAN" in ids else 0
-        self._civ_only_horseman = ids.index("HORSEMAN") if "HORSEMAN" in ids else 0
+        self._spearman_idx = ids.index("SPEARMAN") if "SPEARMAN" in ids else 0
+        self._horseman_idx = ids.index("HORSEMAN") if "HORSEMAN" in ids else 0
         # The ranged rung (SLINGER ungated, ARCHER on archerTech)
-        self._civ_only_slinger = ids.index("SLINGER") if "SLINGER" in ids else -1
-        self._civ_only_archer = ids.index("ARCHER") if "ARCHER" in ids else -1
+        self._slinger_idx = ids.index("SLINGER") if "SLINGER" in ids else -1
+        self._archer_idx = ids.index("ARCHER") if "ARCHER" in ids else -1
 
         # --- disasters -----------------------------------------------------------
         self.disasters = bool(f0.get("disasters", 0))
@@ -1498,6 +1498,14 @@ class SimInit:
         self._fadjf_cache = None
         self._rcy_cache = None
         self._bld_cache: dict = {}  # (row, complete) -> (_eff_version, mask); one entry per seat row
+        # The WIRE's spending intents, parked between decide-time and the
+        # gold block's phase position. Keyed by ABSOLUTE seat row — seat 0
+        # stashes through step(), the civ rows through apply_seat_actions,
+        # and _seat_buy_ladder drains whichever row it is running.
+        self._driven_buy: dict = {}
+        self._driven_buy_worship: dict = {}
+        self._driven_buy_relig: dict = {}
+        self._driven_levy: dict = {}
         self._arangeNB = torch.arange(NB, device=device)
 
         # Seat 0's t0 units seed the pool HERE — after the roster tables and

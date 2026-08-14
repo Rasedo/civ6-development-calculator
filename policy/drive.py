@@ -349,47 +349,66 @@ def _war_ctx(blocks: dict) -> dict:
     }
 
 
-def _buy_ctx(sim, r: int) -> dict:
-    """The purchase candidates, read from the engines' ONE legality bodies
-    (sim._seat_buy_candidates for the building, kind 0;
-    sim._seat_buy_unit_candidates for the unit, kind 2 — both the scripted
-    gold rungs' own scans). settler_ok mirrors the settler rung's own gate
-    (city cap + price, no reserve). The unit quota compares decide-time
-    planes: live + queued military < 2x alive cities."""
-    active = sim.civ_only_alive[:, r] & (sim.civ_city_alive[:, r].sum(dim=1) > 0)
-    jj, bb, can_b, price, _ = sim._seat_buy_candidates(r, active)
-    rr = sim.rules.seats
-    n_cities = sim.civ_city_alive[:, r].sum(dim=1)
-    _sq = (sim.civ_city_alive[:, r] & (sim.civ_city_current[:, r] == sim.SETTLER)).sum(dim=1)
-    sett_cost = (rr.get("settlerBase", 48) + rr.get("settlerPer", 18)
-                 * (n_cities - 1 + sim._seat_settlers(r + 1) + _sq).clamp(min=0).double()) * sim.rules.gold_purchase_mult
+def _decide_buys(sim, row: int):
+    """The PURCHASE verbs for seat row `row` — priority over the candidates
+    the engines' one legality bodies produce. ONE decider for every seat: the
+    engine stashes each intent and re-validates it at its own phase
+    sub-position. The gold buy is ONE kind per turn (kind 3's a/b = tile,
+    slot); the faith buys and the levy ride beside it (separate currencies /
+    a diplomacy action). Returns (buy, worship, relig, levy) in the shapes
+    `step` and `apply_seat_actions` take."""
+    bctx = _buy_ctx(sim, row)
+    buy_kind = ladder.pick_purchase(bctx["can_building"], bctx["settler_ok"], bctx["unit_ok"], bctx["tile_ok"])
+    buy_a = torch.where(buy_kind == 3, bctx["tile"], bctx["jj"])
+    buy_b = torch.where(buy_kind == 3, bctx["tile_j"], bctx["bb"])
+    worship_ok, relig_kind = ladder.pick_faith(bctx["worship_ok"], bctx["missionary_ok"], bctx["apostle_ok"])
+    neg_w = torch.full_like(bctx["worship_j"], -1)
+    relig_j = torch.where(relig_kind == 5, bctx["missionary_j"],
+                          torch.where(relig_kind == 6, bctx["apostle_j"], neg_w))
+    return ((buy_kind, buy_a, buy_b),
+            torch.where(worship_ok, bctx["worship_j"], neg_w),
+            (relig_kind, relig_j),
+            torch.where(bctx["levy_ok"], bctx["levy_cs"], torch.full_like(bctx["levy_cs"], -1)))
+
+
+def _buy_ctx(sim, row: int) -> dict:
+    """The purchase candidates for seat row `row`, read from the engines' ONE
+    legality bodies (`_seat_buy_candidates` for the building, kind 0;
+    `_seat_buy_unit_candidates` for the unit, kind 2 — the gold rungs' own
+    scans). settler_ok mirrors the settler rung's own gate (pop + price, no
+    reserve). The unit quota compares decide-time planes: live + queued
+    military < 2x alive cities."""
+    alive_row = sim.city_alive[:, row]
+    n_cities = alive_row.sum(dim=1)
+    active = sim.seat_ext[:, row] & (n_cities > 0)
+    if row > 0:
+        active = active & sim.civ_only_alive[:, row - 1]
+    jj, bb, can_b, price, _ = sim._seat_buy_candidates(row, active)
+    _sq = (alive_row & (sim.city_current[:, row] == sim.SETTLER)).sum(dim=1)
+    sett_cost = (sim.rules.settler_base + sim.rules.settler_per_city
+                 * (n_cities - 1 + sim._seat_settlers(row) + _sq).clamp(min=0).double()) * sim.rules.gold_purchase_mult
     # the buy SPAWNS a unit at the capital (else first city), which must have
     # the pop to pay — the TS driver's tripwire mirrors this exactly.
-    _cap_is = sim.civ_city_is_cap[:, r]
-    _spawn_slot = torch.where(_cap_is.any(dim=1), _cap_is.long().argmax(dim=1), sim.civ_city_alive[:, r].long().argmax(dim=1))
-    _spawn_pop = sim.civ_city_pop[:, r].gather(1, _spawn_slot.unsqueeze(1)).squeeze(1)
-    settler_ok = active & (_spawn_pop >= 2) & sim._afford(sim.civ_only_treasury[:, r], sett_cost)
-    cand_u = sim._seat_buy_unit_candidates(r, sim._seat_trainable_units(r))
-    vt_all = sim.major_unit_type.clamp(min=0, max=sim.NU - 1)
-    mil_live = (sim.major_unit_alive & (sim.major_unit_seat == r + 1)
-                & (sim._type_combat[vt_all] > 0))
-    qcur = sim.civ_city_current[:, r]
-    q_ty = (qcur - sim.UNIT_BASE).clamp(min=0, max=sim.NU - 1)
-    q_mil = (qcur >= sim.UNIT_BASE) & (qcur < sim.UNIT_BASE + sim.NU) & (sim._type_combat[q_ty] > 0)
-    n_mil = mil_live.sum(dim=1) + q_mil.sum(dim=1)
-    unit_ok = active & (n_mil < 2 * n_cities) & cand_u.any(dim=1)
+    _cap_is = sim.city_is_cap[:, row]
+    _spawn_slot = torch.where(_cap_is.any(dim=1), _cap_is.long().argmax(dim=1), alive_row.long().argmax(dim=1))
+    _spawn_pop = sim.city_pop[:, row].gather(1, _spawn_slot.unsqueeze(1)).squeeze(1)
+    settler_ok = active & (_spawn_pop >= sim.rules.settler_pop_gate) & sim._afford(sim.civ_treasury[:, row], sett_cost)
+    cand_u = sim._seat_buy_unit_candidates(row, sim._seat_trainable_units(row))
+    unit_ok = active & (sim._seat_army_count(row) < 2 * n_cities) & cand_u.any(dim=1)
     # kind 3, the TILE candidate — first slot in order with a border
     # candidate, best border key, ABORT on unaffordable (the engines' one
     # legality body _seat_tile_buy_candidate).
-    tile_j, tile_t, _tile_cost, tile_ok = sim._seat_tile_buy_candidate(r, active)
+    tile_j, tile_t, _tile_cost, tile_ok = sim._seat_tile_buy_candidate(row, active)
     # kinds 4-6, the FAITH candidates (worship / missionary / apostle), each
     # with its first-eligible slot from the shared body.
-    w_ok, w_j, m_ok, m_j, a_ok, a_j = sim._seat_faith_buy_candidates(r, active)
+    w_ok, w_j, m_ok, m_j, a_ok, a_j = sim._seat_faith_buy_candidates(row, active)
     # kind 7, the LEVY candidate — the RULE half from the shared body; AT-WAR
-    # is the policy gate and it joins HERE (the scripted block's own
-    # condition), not in the engines' re-validation.
-    levy_ok, levy_cs = sim._seat_levy_candidate(r, active)
-    levy_ok = levy_ok & sim.civ_only_atwar[:, r]
+    # is the policy gate and it joins HERE (the ladder's own condition), not
+    # in the engines' re-validation.
+    levy_ok, levy_cs = sim._seat_levy_candidate(row, active)
+    # `civ_only_atwar[:, r]` IS the (seat 0, civ r) cell of the single-axis
+    # war matrix, so row 0's "at war with somebody" is its any().
+    levy_ok = levy_ok & (sim.civ_only_atwar[:, row - 1] if row > 0 else sim.civ_only_atwar.any(dim=1))
     return {"jj": jj, "bb": bb, "can_building": can_b, "price": price,
             "settler_ok": settler_ok, "unit_ok": unit_ok,
             "tile_ok": tile_ok, "tile": tile_t, "tile_j": tile_j,
@@ -562,18 +581,7 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
     # phase sub-position, re-validating there. The gold buy is ONE kind per
     # turn (kind 3's a/b = tile, slot); the faith buys and the levy ride
     # beside it (separate currencies / the diplomacy action).
-    bctx = _buy_ctx(sim, r)
-    buy_kind = ladder.pick_purchase(bctx["can_building"], bctx["settler_ok"], bctx["unit_ok"], bctx["tile_ok"])
-    buy_a = torch.where(buy_kind == 3, bctx["tile"], bctx["jj"])
-    buy_b = torch.where(buy_kind == 3, bctx["tile_j"], bctx["bb"])
-    buy = (buy_kind, buy_a, buy_b)
-    worship_ok, relig_kind = ladder.pick_faith(bctx["worship_ok"], bctx["missionary_ok"], bctx["apostle_ok"])
-    neg_w = torch.full_like(bctx["worship_j"], -1)
-    worship = torch.where(worship_ok, bctx["worship_j"], neg_w)
-    relig_j = torch.where(relig_kind == 5, bctx["missionary_j"],
-                          torch.where(relig_kind == 6, bctx["apostle_j"], neg_w))
-    relig = (relig_kind, relig_j)
-    levy = torch.where(bctx["levy_ok"], bctx["levy_cs"], torch.full_like(bctx["levy_cs"], -1))
+    buy, worship, relig, levy = _decide_buys(sim, r + 1)
     sim.apply_seat_actions(r, production=prod, tech=tech, civic=civic, war=war, envoys=env_seq,
                            buy=buy, worship=worship, relig=relig, levy=levy)
 
@@ -686,41 +694,55 @@ def _extract_record(sim, r: int, prod, tech, civic, war, env_seq, seq, buy, wors
     # this row's envoy assignment sequence (CS indices), possibly empty.
     _e = [] if env_seq is None else [int(x) for x in env_seq[b].tolist() if int(x) >= 0]
     rec = {"production": prod_pairs, "tech": _t, "civic": _c, "war": _w, "envoys": _e, "units": rows}
-    # the BUY intent, CENTRE-KEYED like production — [0, centreTile,
-    # buildingIdx] for a building purchase. OPTIONAL field: absent = none.
-    if buy is not None and int(buy[0][b]) == 0:
-        _bj = int(buy[1][b])
-        if 0 <= _bj < int(sim.civ_city_center.shape[2]) and bool(sim.civ_city_alive[b, r, _bj]):
-            rec["buy"] = [0, int(sim.civ_city_center[b, r, _bj]), int(buy[2][b])]
-    elif buy is not None and int(buy[0][b]) == 1:
-        rec["buy"] = [1, -1, -1]  # SETTLER: no city key, the site scan decides
-    elif buy is not None and int(buy[0][b]) == 2:
-        rec["buy"] = [2, -1, -1]  # UNIT: the strongest-affordable scan decides
-    elif buy is not None and int(buy[0][b]) == 3:
-        # TILE: [3, tileIndex, centreTile] — the city keyed by CENTRE like
-        # kind 0 (a/b at decide time are tile, slot).
-        _tj = int(buy[2][b])
-        if 0 <= _tj < int(sim.civ_city_center.shape[2]) and bool(sim.civ_city_alive[b, r, _tj]):
-            rec["buy"] = [3, int(buy[1][b]), int(sim.civ_city_center[b, r, _tj])]
+    rec.update(_buy_record_fields(sim, r + 1, b, buy, worship, relig, levy))
+    return rec
+
+
+def _buy_record_fields(sim, row: int, b: int, buy, worship, relig, levy) -> dict:
+    """The GOLD/FAITH/LEVY half of a seat's record, for ANY seat row — every
+    city reference is CENTRE-KEYED like production, because ids are
+    engine-local and centres are the shared vocabulary. Every field is
+    OPTIONAL: absent = no purchase of that kind this turn."""
+    out: dict = {}
+    RCn = int(sim.city_center.shape[2])
+
+    def _centre(j: int) -> int | None:
+        return int(sim.city_center[b, row, j]) if 0 <= j < RCn and bool(sim.city_alive[b, row, j]) else None
+
+    if buy is not None:
+        _k = int(buy[0][b])
+        if _k == 0:
+            _c = _centre(int(buy[1][b]))
+            if _c is not None:
+                out["buy"] = [0, _c, int(buy[2][b])]
+        elif _k == 1:
+            out["buy"] = [1, -1, -1]  # SETTLER: no city key, the spawn scan decides
+        elif _k == 2:
+            out["buy"] = [2, -1, -1]  # UNIT: the strongest-affordable scan decides
+        elif _k == 3:
+            # TILE: [3, tileIndex, centreTile] — the city keyed by CENTRE like
+            # kind 0 (a/b at decide time are tile, slot).
+            _c = _centre(int(buy[2][b]))
+            if _c is not None:
+                out["buy"] = [3, int(buy[1][b]), _c]
     # kinds 4-6, the FAITH purchases — [kind, centreTile] entries in apply
-    # order (worship first, then the one religious unit). OPTIONAL field:
-    # absent = no faith purchase this turn.
+    # order (worship first, then the one religious unit).
     bf = []
     if worship is not None:
-        _wj = int(worship[b])
-        if 0 <= _wj < int(sim.civ_city_center.shape[2]) and bool(sim.civ_city_alive[b, r, _wj]):
-            bf.append([4, int(sim.civ_city_center[b, r, _wj])])
+        _c = _centre(int(worship[b]))
+        if _c is not None:
+            bf.append([4, _c])
     if relig is not None and int(relig[0][b]) in (5, 6):
-        _rj = int(relig[1][b])
-        if 0 <= _rj < int(sim.civ_city_center.shape[2]) and bool(sim.civ_city_alive[b, r, _rj]):
-            bf.append([int(relig[0][b]), int(sim.civ_city_center[b, r, _rj])])
+        _c = _centre(int(relig[1][b]))
+        if _c is not None:
+            bf.append([int(relig[0][b]), _c])
     if bf:
-        rec["buyFaith"] = bf
+        out["buyFaith"] = bf
     # kind 7, the LEVY — the CS index (the shared CS vocabulary, like the
-    # envoy sequence). OPTIONAL field: absent = no levy this turn.
+    # envoy sequence).
     if levy is not None and int(levy[b]) >= 0:
-        rec["levy"] = int(levy[b])
-    return rec
+        out["levy"] = int(levy[b])
+    return out
 
 
 def replay_seat(sim, r: int, rec: dict) -> None:

@@ -269,16 +269,7 @@ class SimEconomy:
         strictly above seat 0, strictly above every other civ."""
         if self.S <= 0 or not bool(peace.any()):
             return
-        suz_min = int(self.rules.citystate.get("suzerainEnvoys", 3))
-        _oth = self.civ_only_citystate_envoys.clone()
-        _oth[:, r] = -1
-        civ_only_suz = (
-            (self.civ_only_citystate_envoys[:, r] >= suz_min)
-            & (self.civ_only_citystate_envoys[:, r] > self.citystate_envoys)
-            & (self.civ_only_citystate_envoys[:, r] > _oth.max(dim=1).values)
-            & self.citystate_alive
-        )
-        rel = civ_only_suz & self.citystate_atwar & peace.unsqueeze(1)
+        rel = self._suzerain_mask(r + 1) & self.citystate_atwar & peace.unsqueeze(1)
         if not bool(rel.any()):
             return
         self.citystate_atwar &= ~rel
@@ -1949,9 +1940,7 @@ class SimEconomy:
             b_cap = b_cap.scatter_add(
                 1, self._citystate_yidx,
                 ((_env >= 1) & _acs).double() * float(self.rules.citystate.get("capitalBonus", 2)))
-            _oth = self.seat_citystate_envoys.clone()
-            _oth[:, row] = -1
-            _suz = (_env >= int(self.rules.citystate.get("suzerainEnvoys", 3))) & (_env > _oth.max(dim=1).values) & _acs
+            _suz = self._suzerain_mask(row)
             b_cap = b_cap.scatter_add(
                 1, self.citystate_suz_key.clamp(min=0),
                 _suz.double() * self._citystate_suz_amt * (self.citystate_suz_key >= 0).double())

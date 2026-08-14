@@ -420,7 +420,7 @@ def main() -> None:
     assert w_ok.tolist() == [True, False, False, False], "worship must pass through untouched"
     # the driver ctx reads the engines' ONE legality bodies, per-row.
     import drive as _drv
-    bctx = _drv._buy_ctx(s, 0)
+    bctx = _drv._buy_ctx(s, 1)  # civ 0 is seat row 1
     assert bctx["can_building"].shape == (s.B,) == bctx["settler_ok"].shape == bctx["unit_ok"].shape, "buy ctx must be per-row"
     assert bctx["tile_ok"].shape == (s.B,) == bctx["worship_ok"].shape == bctx["levy_ok"].shape, "#104 ctx must be per-row"
     assert bctx["missionary_ok"].shape == (s.B,) == bctx["apostle_ok"].shape == bctx["levy_cs"].shape, "#104 ctx must be per-row"

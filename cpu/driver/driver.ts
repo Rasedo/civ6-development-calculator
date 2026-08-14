@@ -15,7 +15,7 @@
  * dev server for the UI later. The record schema is the interface.
  */
 import { appendFileSync, writeFileSync } from 'node:fs';
-import type { DistrictId, GameState, Tile } from '../core/types';
+import type { DistrictId, GameState, Seat, Tile } from '../core/types';
 import { allCities, civHasStrategic, civsAtWar, seatOf, tileOwnedByCiv, tileSeat } from '../core/seats';
 import { hasRiver, isWater } from '../../world/query';
 import { GOLD_PURCHASE_MULT } from '../data/constants';
@@ -58,6 +58,142 @@ export interface DriverOpts {
   civicList: { id: string }[];
   recv: () => Promise<string>;
   send: (msg: unknown) => void;
+}
+
+/** The BUY-candidate tripwire row for ONE seat — the TS pre-turn twin of
+ * drive._buy_ctx, in the 11-field shape the orchestrator compares:
+ * [buildingCentre, buildingIdx, settlerOk, unitOk, tileOk, tile, tileCentre,
+ * worshipCentre, religKind, religCentre, levyIdx]. ATTRIBUTION when a purchase
+ * diverges (which half went wrong, at its causal turn); the digest stays the
+ * gate. Seat-generic: seat 0 is a seat like any other.
+ */
+function buyCandidateRow(state: GameState, actor: Seat): number[] {
+  const unl = computeUnlocksIn(actor.research);
+    let buyC = -1;
+    let buyB = -1;
+    let bd: (typeof BUILDINGS)[string] | null = null;
+    let bc: (typeof actor.cities)[number] | null = null;
+    for (const city of actor.cities) {
+      const have = new Set(city.buildings);
+      const done = new Set(city.districts.filter((d: { tileIndex: number }) => state.map.tiles[d.tileIndex].districtComplete).map((d: { type: string }) => d.type));
+      const center = state.map.tiles[city.centerIndex];
+      for (const def of Object.values(BUILDINGS)) {
+        if (have.has(def.id) || def.worship || SCRIPTED_HELD_BUILDINGS.has(def.id)) continue;
+        if (!done.has(def.district)) continue;
+        if (!unl.buildings.has(def.id)) continue;
+        if (def.requiresAny && !def.requiresAny.some((x) => have.has(x))) continue;
+        if (def.exclusiveWith?.some((x) => have.has(x))) continue;
+        if (def.special === 'WATER_MILL' && !hasRiver(center)) continue;
+        if (city.queue[0]?.kind === 'building' && city.queue[0].building === def.id) continue;
+        if (!bd || def.cost < bd.cost || (def.cost === bd.cost && def.id < bd.id)) {
+          bd = def;
+          bc = city;
+        }
+      }
+    }
+    if (bd && bc && Math.round((actor.treasury ?? 0) * 1000) >= Math.round((bd.cost * GOLD_PURCHASE_MULT + PEACE_GOLD_COST(0)) * 1000)) {
+      buyC = bc.centerIndex;
+      buyB = prodLayout().buildings.indexOf(bd.id);
+    }
+    // The settler is a UNIT purchase now (#71): it spawns at the capital
+    // (else the first city), which must afford the live escalating price
+    // and have the pop to pay (a 1-pop city may not buy one).
+    const settlerSpawnCity = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
+    const settlerOk = settlerSpawnCity !== undefined && settlerSpawnCity.population >= 2
+      && goldAffordable(actor.treasury ?? 0, settlerCost(state, actor.seat) * GOLD_PURCHASE_MULT);
+    let mil = 0;
+    for (const u of state.units) {
+      if (u.seat !== actor.seat) continue;
+      if ((UNITS[u.type]?.combat ?? 0) > 0) mil += 1;
+    }
+    for (const city of actor.cities) {
+      const q = city.queue[0];
+      if (q?.kind === 'unit' && q.unit && (UNITS[q.unit]?.combat ?? 0) > 0) mil += 1;
+    }
+    let anyU = false;
+    for (const cand of BUY_UNITS) {
+      if (cand.tech && !actor.research.techs.includes(cand.tech)) continue;
+      const def = UNITS[cand.id];
+      if (!def) continue;
+      if (def.requiresResource && !civHasStrategic(state, actor.seat, def.requiresResource)) continue;
+      if (!goldAffordable(actor.treasury ?? 0, def.cost * GOLD_PURCHASE_MULT)) continue;
+      anyU = true;
+      break;
+    }
+    const unitOk = actor.cities.length > 0 && mil < actor.cities.length * 2 && anyU;
+    // #104 the TILE candidate twin — the first city in array order with
+    // a border candidate names the pick (pickBorderTile, the culture
+    // claim's own key, with THIS seat's mods); an unaffordable pick
+    // ABORTS the civ's tile buy (the break — it does not try the next
+    // city).
+    let tileOk = 0;
+    let tileT = -1;
+    let tileC = -1;
+    const actorMods = getModifiers(state, actor.seat);
+    for (const city of actor.cities) {
+      const next = pickBorderTile(state, city, { map: state.map, mods: actorMods });
+      if (next === null) continue;
+      if (goldAffordable(actor.treasury ?? 0, tilePurchaseCost(state, city, next))) {
+        tileOk = 1;
+        tileT = next;
+        tileC = city.centerIndex;
+      }
+      break;
+    }
+    // #104 the FAITH candidate twins: worship (independent) + the ONE
+    // religious unit (missionary saturates before apostle) — the
+    // _seat_faith_buy_candidates mirror, first eligible city in order.
+    const hsOk = (city: (typeof actor.cities)[number]): boolean => {
+      const hs = city.districts.find((d) => d.type === 'HOLY_SITE');
+      const ht = hs ? state.map.tiles[hs.tileIndex] : undefined;
+      return !!ht?.districtComplete && !ht.districtPillaged;
+    };
+    let worshipC = -1;
+    let religKind = -1;
+    let religC = -1;
+    if (actor.religion.founded) {
+      const wid = WORSHIP_BUILDINGS[actor.seat % WORSHIP_BUILDINGS.length];
+      if (goldAffordable(actor.faith ?? 0, buildingFaithCost(wid))) {
+        worshipC = actor.cities.find((city) => !city.buildings.includes(wid) && city.buildings.includes('TEMPLE') && hsOk(city))?.centerIndex ?? -1;
+      }
+      const shrineCity = actor.cities.find((city) => city.buildings.includes('SHRINE') && hsOk(city));
+      if (shrineCity) {
+        const eb = actor.religion.enhancer ? ENHANCER_BELIEFS[actor.religion.enhancer]?.effects : undefined;
+        const liveM = state.units.filter((u) => u.seat === actor.seat && u.type === 'MISSIONARY').length;
+        const mCost = Math.round(UNITS.MISSIONARY.cost * (eb?.missionaryCostMult ?? 1));
+        if (liveM < MISSIONARY_CAP && goldAffordable(actor.faith ?? 0, mCost)) {
+          religKind = 5;
+          religC = shrineCity.centerIndex;
+        } else {
+          const liveA = state.units.filter((u) => u.seat === actor.seat && u.type === 'APOSTLE').length;
+          if (liveA < APOSTLE_CAP && goldAffordable(actor.faith ?? 0, Math.round(UNITS.APOSTLE.cost))) {
+            religKind = 6;
+            religC = shrineCity.centerIndex;
+          }
+        }
+      }
+    }
+    // #104 the LEVY candidate twin — at-war (the single war axis, vs
+    // seat 0) is the POLICY gate; the rule body levyUnits has no war
+    // test. First eligible CS in order.
+    let levyIdx = -1;
+    // the WAR AXIS is single (every war pairs a seat with WAR_COLUMN_SEAT),
+    // so "at war" reads the axis from whichever end this seat sits on.
+    const atWarAxis = actor.seat === 0
+      ? state.seats.some((o) => o.seat !== 0 && civsAtWar(state, 0, o.seat))
+      : civsAtWar(state, actor.seat, 0);
+    if (atWarAxis && goldAffordable(actor.treasury ?? 0, LEVY_GOLD_COST)) {
+      for (let ci = 0; ci < state.cityStates.length; ci++) {
+        const csl = state.cityStates[ci];
+        if (csl.type !== 'militaristic') continue;
+        if (!isSuzerain(csl, actor.seat)) continue;
+        if (state.turn - (csl.lastLevyTurn ?? -LEVY_COOLDOWN) < LEVY_COOLDOWN) continue;
+        levyIdx = ci;
+        break;
+      }
+    }
+  return [buyC, buyB, settlerOk ? 1 : 0, unitOk ? 1 : 0,
+    tileOk, tileT, tileC, worshipC, religKind, religC, levyIdx];
 }
 
 /** Play `turns` turns, taking every decision from the server. */
@@ -115,6 +251,8 @@ for (let t = 0; t < N_TURNS; t++) {
       }
       jobsMsg['0'] = jr0;
       spreadsMsg['0'] = sr0;
+      // seat 0's BUY candidates ride the SAME body every seat's do
+      buysMsg['0'] = buyCandidateRow(state, seatOf(state, 0)!);
       if (process.env.CIV6_SERVE_DEBUG_JOB0 && state.turn === Number(process.env.CIV6_SERVE_DEBUG_JOB0)) {
         for (const u of state.units) {
           if (u.seat !== 0) continue;
@@ -173,130 +311,7 @@ for (let t = 0; t < N_TURNS; t++) {
           }
           sr.push(st);
         }
-        // piece 4: the BUY-candidate tripwire — the TS pre-turn twin
-        // of drive._buy_ctx, per seat: [buildingCentre, buildingIdx,
-        // settlerOk, unitOk]. ATTRIBUTION when a purchase diverges (which
-        // half went wrong, at its causal turn); the trace stays the gate.
-        let buyC = -1;
-        let buyB = -1;
-        let bd: (typeof BUILDINGS)[string] | null = null;
-        let bc: (typeof civSeat.cities)[number] | null = null;
-        for (const civCity of civSeat.cities) {
-          const have = new Set(civCity.buildings);
-          const done = new Set(civCity.districts.filter((d) => state.map.tiles[d.tileIndex].districtComplete).map((d) => d.type));
-          const center = state.map.tiles[civCity.centerIndex];
-          for (const def of Object.values(BUILDINGS)) {
-            if (have.has(def.id) || def.worship || SCRIPTED_HELD_BUILDINGS.has(def.id)) continue;
-            if (!done.has(def.district)) continue;
-            if (!unl.buildings.has(def.id)) continue;
-            if (def.requiresAny && !def.requiresAny.some((x) => have.has(x))) continue;
-            if (def.exclusiveWith?.some((x) => have.has(x))) continue;
-            if (def.special === 'WATER_MILL' && !hasRiver(center)) continue;
-            if (civCity.queue[0]?.kind === 'building' && civCity.queue[0].building === def.id) continue;
-            if (!bd || def.cost < bd.cost || (def.cost === bd.cost && def.id < bd.id)) {
-              bd = def;
-              bc = civCity;
-            }
-          }
-        }
-        if (bd && bc && Math.round((civSeat.treasury ?? 0) * 1000) >= Math.round((bd.cost * GOLD_PURCHASE_MULT + PEACE_GOLD_COST(0)) * 1000)) {
-          buyC = bc.centerIndex;
-          buyB = prodLayout().buildings.indexOf(bd.id);
-        }
-        // The settler is a UNIT purchase now (#71): it spawns at the capital
-        // (else the first city), which must afford the live escalating price
-        // and have the pop to pay (a 1-pop city may not buy one).
-        const settlerSpawnCity = civSeat.cities.find((c) => c.isCapital) ?? civSeat.cities[0];
-        const settlerOk = settlerSpawnCity !== undefined && settlerSpawnCity.population >= 2
-          && goldAffordable(civSeat.treasury ?? 0, settlerCost(state, civSeat.seat) * GOLD_PURCHASE_MULT);
-        let mil = 0;
-        for (const u of state.units) {
-          if (u.seat !== civSeat.seat) continue;
-          if ((UNITS[u.type]?.combat ?? 0) > 0) mil += 1;
-        }
-        for (const civCity of civSeat.cities) {
-          const q = civCity.queue[0];
-          if (q?.kind === 'unit' && q.unit && (UNITS[q.unit]?.combat ?? 0) > 0) mil += 1;
-        }
-        let anyU = false;
-        for (const cand of BUY_UNITS) {
-          if (cand.tech && !civSeat.research.techs.includes(cand.tech)) continue;
-          const def = UNITS[cand.id];
-          if (!def) continue;
-          if (def.requiresResource && !civHasStrategic(state, civSeat.seat, def.requiresResource)) continue;
-          if (!goldAffordable(civSeat.treasury ?? 0, def.cost * GOLD_PURCHASE_MULT)) continue;
-          anyU = true;
-          break;
-        }
-        const unitOk = civSeat.cities.length > 0 && mil < civSeat.cities.length * 2 && anyU;
-        // #104 the TILE candidate twin — the first city in array order with
-        // a border candidate names the pick (pickBorderTile, the culture
-        // claim's own key, with THIS seat's mods); an unaffordable pick
-        // ABORTS the civ's tile buy (the break — it does not try the next
-        // city).
-        let tileOk = 0;
-        let tileT = -1;
-        let tileC = -1;
-        const civSeatMods = getModifiers(state, civSeat.seat);
-        for (const civCity of civSeat.cities) {
-          const next = pickBorderTile(state, civCity, { map: state.map, mods: civSeatMods });
-          if (next === null) continue;
-          if (goldAffordable(civSeat.treasury ?? 0, tilePurchaseCost(state, civCity, next))) {
-            tileOk = 1;
-            tileT = next;
-            tileC = civCity.centerIndex;
-          }
-          break;
-        }
-        // #104 the FAITH candidate twins: worship (independent) + the ONE
-        // religious unit (missionary saturates before apostle) — the
-        // _seat_faith_buy_candidates mirror, first eligible city in order.
-        const hsOk = (civCity: (typeof civSeat.cities)[number]): boolean => {
-          const hs = civCity.districts.find((d) => d.type === 'HOLY_SITE');
-          const ht = hs ? state.map.tiles[hs.tileIndex] : undefined;
-          return !!ht?.districtComplete && !ht.districtPillaged;
-        };
-        let worshipC = -1;
-        let religKind = -1;
-        let religC = -1;
-        if (civSeat.religion.founded) {
-          const wid = WORSHIP_BUILDINGS[civSeat.seat % WORSHIP_BUILDINGS.length];
-          if (goldAffordable(civSeat.faith ?? 0, buildingFaithCost(wid))) {
-            worshipC = civSeat.cities.find((civCity) => !civCity.buildings.includes(wid) && civCity.buildings.includes('TEMPLE') && hsOk(civCity))?.centerIndex ?? -1;
-          }
-          const shrineCity = civSeat.cities.find((civCity) => civCity.buildings.includes('SHRINE') && hsOk(civCity));
-          if (shrineCity) {
-            const eb = civSeat.religion.enhancer ? ENHANCER_BELIEFS[civSeat.religion.enhancer]?.effects : undefined;
-            const liveM = state.units.filter((u) => u.seat === civSeat.seat && u.type === 'MISSIONARY').length;
-            const mCost = Math.round(UNITS.MISSIONARY.cost * (eb?.missionaryCostMult ?? 1));
-            if (liveM < MISSIONARY_CAP && goldAffordable(civSeat.faith ?? 0, mCost)) {
-              religKind = 5;
-              religC = shrineCity.centerIndex;
-            } else {
-              const liveA = state.units.filter((u) => u.seat === civSeat.seat && u.type === 'APOSTLE').length;
-              if (liveA < APOSTLE_CAP && goldAffordable(civSeat.faith ?? 0, Math.round(UNITS.APOSTLE.cost))) {
-                religKind = 6;
-                religC = shrineCity.centerIndex;
-              }
-            }
-          }
-        }
-        // #104 the LEVY candidate twin — at-war (the single war axis, vs
-        // seat 0) is the POLICY gate; the rule body levyUnits has no war
-        // test. First eligible CS in order.
-        let levyIdx = -1;
-        if (civsAtWar(state, civSeat.seat, 0) && goldAffordable(civSeat.treasury ?? 0, LEVY_GOLD_COST)) {
-          for (let ci = 0; ci < state.cityStates.length; ci++) {
-            const csl = state.cityStates[ci];
-            if (csl.type !== 'militaristic') continue;
-            if (!isSuzerain(csl, civSeat.seat)) continue;
-            if (state.turn - (csl.lastLevyTurn ?? -LEVY_COOLDOWN) < LEVY_COOLDOWN) continue;
-            levyIdx = ci;
-            break;
-          }
-        }
-        buysMsg[String(r + 1)] = [buyC, buyB, settlerOk ? 1 : 0, unitOk ? 1 : 0,
-          tileOk, tileT, tileC, worshipC, religKind, religC, levyIdx];
+        buysMsg[String(r + 1)] = buyCandidateRow(state, civSeat);
       }
       jobsMsg[String(r + 1)] = jr;   // seat-keyed wire
       spreadsMsg[String(r + 1)] = sr;
