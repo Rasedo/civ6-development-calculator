@@ -645,53 +645,133 @@ class SimEconomy:
             on = valid & self.desert[rowm, af.clamp(min=0)]
             self._fertilize(rowm[on], af[on])  # ...and deposits silt on desert tiles
 
-    def _buildable(self, include_worship: bool = False) -> torch.Tensor:
-        """[B, C, NB] buildings each city could queue now: unlocked (tech), not
-        already built, river gate — and for district buildings, the city owns a
-        completed district of the required type and has a prerequisite building
-        (mirrors availableBuildings)."""
-        if self._bld_cache is not None and self._bld_cache[0] == self._eff_version:
-            return self._bld_cache[1]
+    def _seat_buildable(self, row: int, complete: bool = False) -> torch.Tensor:
+        """[B, RC, NB] buildings seat row `row`'s cities may QUEUE now —
+        `availableBuildings`, which is seat-generic in TS and so has ONE body
+        for every row here.
+
+        The district term walks the city's OWN REGISTRY (`city.districts`),
+        which TS writes at QUEUE: a Library is offered while its Campus is
+        still building, and only `buildingCompletable` — the PURCHASE gate,
+        `complete=True` — demands the district be finished.
+
+        WORSHIP buildings are never offered. `availableBuildings` admits one
+        only when it IS this seat's founded religion's worship building, and
+        nothing in the live engine ever sets `religion.worship` (the founding
+        body claims follower/founder/enhancer and no worship id) — the one
+        live path to a worship building is `buyWorshipBuilding`.
+
+        `queued` is the one-slot twin of TS's queued SET: the production slot
+        holds a BUILDING code exactly when that building is on order, and TS
+        offers neither it nor a prerequisite it would satisfy twice.
+        """
+        key = (row, complete)
+        hit = self._bld_cache.get(key)
+        if hit is not None and hit[0] == self._eff_version:
+            return hit[1]
         rd = self.rules_dev
         B, C, NB, dev = self.B, self.RC, self.NB, self.device
+        ones_nb = torch.ones(B, NB, dtype=torch.bool, device=dev)
+        have = self.city_bldg[:, row]  # [B, C, NB]
         unlocked = torch.where(
             rd.b_unlock.unsqueeze(0) >= 0,
-            self.techs.gather(1, rd.b_unlock.clamp(min=0).unsqueeze(0).expand(B, -1)),
-            torch.ones(B, NB, dtype=torch.bool, device=dev),
-        )
-        unlocked_civic = torch.where(
+            self.civ_techs[:, row].gather(1, rd.b_unlock.clamp(min=0).unsqueeze(0).expand(B, -1)),
+            ones_nb,
+        ) & torch.where(
             rd.b_unlock_civic.unsqueeze(0) >= 0,
-            self.civics.gather(1, rd.b_unlock_civic.clamp(min=0).unsqueeze(0).expand(B, -1)),
-            torch.ones(B, NB, dtype=torch.bool, device=dev),
-        )  # Temple/Amphitheater/… gate on a civic (mirrors availableBuildings' unlocks.buildings)
-        unlocked = unlocked & unlocked_civic
+            self.civ_civics[:, row].gather(1, rd.b_unlock_civic.clamp(min=0).unsqueeze(0).expand(B, -1)),
+            ones_nb,
+        )  # Temple/Amphitheater/... gate on a CIVIC (availableBuildings' unlocks.buildings)
+        cur = self.city_current[:, row]  # [B, C] production layout: [0, NB) IS the building range
+        queued = torch.nn.functional.one_hot(cur.clamp(min=0, max=NB - 1), NB).bool() & ((cur >= 0) & (cur < NB)).unsqueeze(2)
         # hasRiver at each centre, read off the static tile plane (a dead
-        # slot's site is -1; its column is masked by `alive` downstream).
-        river_c = self.tile_river.gather(1, self.site.clamp(min=0))  # [B, C]
-        base = unlocked.unsqueeze(1) & ~self.buildings & (~rd.b_river.reshape(1, 1, -1) | river_c.unsqueeze(2))
-        if not include_worship:
-            # Worship buildings are faith-purchase ONLY: `queueBuilding`
-            # refuses them outright, but they ARE legal for
-            # `purchaseBuilding` — hence the two masks.
-            base = base & ~self._b_worship.reshape(1, 1, -1)
+        # slot's centre is -1; its column is masked by `alive` downstream).
+        river_c = self.tile_river.gather(1, self.city_center[:, row].clamp(min=0))  # [B, C]
+        base = (
+            unlocked.unsqueeze(1) & ~have & ~queued
+            & (~rd.b_river.reshape(1, 1, -1) | river_c.unsqueeze(2))
+            & ~self._b_worship.reshape(1, 1, -1)
+        )
         if self.districts_on and self._b_has_reqs:
-            nD = len(self.districts_cat)
-            valid = (self.district >= 0) & self.district_complete & (self.tile_seat == 0) & ~self.district_dead  # [B, T] (buildingCompletable: district DONE; captured = dead)
-            ow_oh = torch.nn.functional.one_hot(self.owner.clamp(min=0), C).bool() & valid.unsqueeze(2)  # [B, T, C]
-            dt_oh = torch.nn.functional.one_hot(self.district.clamp(min=0), nD).bool()  # [B, T, nD]
-            has_dtype = (ow_oh.unsqueeze(3) & dt_oh.unsqueeze(2)).any(dim=1)  # [B, C, nD] city owns a district of type d
-            rq = self._b_req_district  # [NB]
-            district_ok = (rq < 0).reshape(1, 1, NB) | has_dtype[:, :, rq.clamp(min=0)]  # [B, C, NB]
+            rq = self._b_req_district  # [NB] the district each building needs, -1 = none
+            reg = self.city_dist_tile[:, row][:, :, rq.clamp(min=0)]  # [B, C, NB] registry tile per building
+            has_d = reg >= 0
+            if complete:
+                has_d = has_d & self.district_complete.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape(B, C, NB)
+            district_ok = (rq < 0).reshape(1, 1, NB) | has_d
             prereq_ok = torch.ones(B, C, NB, dtype=torch.bool, device=dev)
+            hq = have | queued  # availableBuildings counts what is ON ORDER too
+            # A PURCHASE must satisfy availableBuildings AND buildingCompletable,
+            # and the latter reads `city.buildings` alone — so the conjunction
+            # wants a BUILT prerequisite, while an exclusion still fires off
+            # either list.
+            req_src = have if complete else hq
             for nb, reqs in enumerate(self._b_req_buildings):
                 if reqs:
-                    prereq_ok[:, :, nb] = self.buildings[:, :, reqs].any(dim=2)
+                    prereq_ok[:, :, nb] = req_src[:, :, reqs].any(dim=2)
             for nb, excl in enumerate(self._b_excl_buildings):  # exclusiveWith
                 if excl:
-                    prereq_ok[:, :, nb] &= ~self.buildings[:, :, excl].any(dim=2)
+                    prereq_ok[:, :, nb] &= ~hq[:, :, excl].any(dim=2)
             base = base & district_ok & prereq_ok
-        self._bld_cache = (self._eff_version, base)
+        self._bld_cache[key] = (self._eff_version, base)
         return base
+
+    def _naval_capable(self, row: int) -> torch.Tensor:
+        """[B, RC] cityNavalCapable: the centre touches ENTERABLE water (the
+        `wpass` plane — a centre facing only ice fields no ships), or the city
+        owns a COMPLETE Harbor."""
+        B, C = self.B, self.RC
+        ctr = self.city_center[:, row].clamp(min=0)  # [B, C]
+        nb = self.neigh[ctr]  # [B, C, 6]
+        out = ((nb >= 0) & self.wpass.gather(1, nb.clamp(min=0).reshape(B, -1)).reshape(B, C, 6)).any(dim=2)
+        if self._harbor_idx >= 0:
+            hb = self.city_dist_tile[:, row, :, self._harbor_idx]  # [B, C]
+            out = out | ((hb >= 0) & self.district_complete.gather(1, hb.clamp(min=0)))
+        return out
+
+    def _trainable_units(self, row: int) -> torch.Tensor:
+        """[B, RC, NU] chassis seat row `row` may TRAIN or BUY in each city —
+        `trainableUnits`, one body for every seat.
+
+        The filters, in TS order: faith-only (MISSIONARY), spawn-only
+        (GENERAL/ADMIRAL), the SETTLER (which trains through its own
+        escalating column), the tech gate, the civic gate, the
+        ARCHAEOLOGIST's free-artifact-slot rule, strategic-resource access,
+        and finally NAVAL hulls, which need a naval-capable city.
+        """
+        B, C, dev = self.B, self.RC, self.device
+        if not self.units_mode:
+            return torch.zeros(B, C, self.NU, dtype=torch.bool, device=dev)
+        ok = (self._type_tech.unsqueeze(0) < 0) | self.civ_techs[:, row].gather(
+            1, self._type_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
+        )
+        ok = ok & self._res_avail_mask(self.tile_seat == row)
+        ok = ok & ~(self._type_faith_only | self._type_spawn_only | self._type_settler).reshape(1, -1)
+        out = ok.unsqueeze(1) & self._type_civic_slot_ok(row, True)
+        if bool(self.unit_naval.any()):
+            out = out & (~self.unit_naval.reshape(1, 1, -1) | self._naval_capable(row).unsqueeze(2))
+        return out
+
+    def _worship_bidx_of(self, row: int) -> int:
+        """The worship building seat row `row`'s religion brings, or -1.
+        `WORSHIP_BUILDINGS[seat % WORSHIP_BUILDINGS.length]` — an identity, not
+        a choice."""
+        if not self._worship_bidx:
+            return -1
+        return int(self._worship_bidx[row % len(self._worship_bidx)])
+
+    def _worship_city_ok(self, row: int) -> torch.Tensor:
+        """[B, RC] cities of seat row `row` that could take its worship
+        building NOW — `buyWorshipBuilding`'s city gates: a TEMPLE, a COMPLETE
+        unpillaged Holy Site, and no worship building yet. The seat-level
+        gates (a founded religion, the faith) sit at the call site."""
+        wb = self._worship_bidx_of(row)
+        if wb < 0 or self._temple_bidx < 0 or self._hs_idx < 0:
+            return torch.zeros(self.B, self.RC, dtype=torch.bool, device=self.device)
+        hs = self.city_dist_tile[:, row, :, self._hs_idx]  # [B, RC]
+        hs_ok = (hs >= 0) & self.district_complete.gather(1, hs.clamp(min=0)) & ~self.district_pillaged.gather(1, hs.clamp(min=0))
+        return (self.city_alive[:, row] & self.city_bldg[:, row, :, self._temple_bidx]
+                & ~self.city_bldg[:, row, :, wb] & hs_ok)
 
     def _adj_district_count(self) -> torch.Tensor:
         """[B, T] number of adjacent COMPLETED districts — the DISTRICT
@@ -962,31 +1042,57 @@ class SimEconomy:
             d[di] = v
         return v
 
-    def _place_district(self, di: int, want: torch.Tensor, c: int, placement: int = 0) -> tuple[torch.Tensor, torch.Tensor]:
-        """QUEUE district-type `di` in seat 0's city slot `c` on its best tile,
-        for batch rows where `want` is set AND an eligible tile exists.
-        Best-tile scan: eligible = owned by city c, district-placeable, empty
-        (no district/improvement), no LUXURY/STRATEGIC resource (bonus tiles
-        ARE pickable and the pave strips the resource), within radius 3, not
-        the center; ranked by floor(static + 0.5·adjacent-completed-districts),
-        ties to lowest tile index. placement=1 (Aqueduct): adjacent-center +
-        water source; placement=3 (Encampment): NOT adjacent-center.
-        queueDistrict semantics — the tile is paved INCOMPLETE and its feature
-        stripped (tile.feature = null); completion arrives via the production
-        loop. Recomputes adjacency each call, so placing city-by-city in slot
-        order reproduces the sequential per-city loop. Returns ([B] placed,
-        [B] tile)."""
+    def _district_elig(self, row: int, j: int, di: int, placement: int = 0):
+        """[B, T] eligible tiles (and the adjacency floor) for placing district
+        `di` in seat row `row`'s city slot j — `canPlaceDistrictIn`, which is
+        seat-generic in TS and so has ONE body here.
+
+        `seat_masks` asks "can this district be placed AT ALL" without placing
+        it, so the mask and `_place_district` MUST share this predicate:
+        anything the mask decides without running the scan can report a
+        district legal where the placer rejects it.
+        """
         B, T, dev = self.B, self.T, self.device
-        site_c = self.site[:, c].clamp(min=0)
+        center = self.city_center[:, row, j].clamp(min=0)
         surface = self.coastal_water if placement == 2 else self.d_usable  # Harbor sits on coastal water, others on land
-        elig = ((self.owner == c) & surface & (self.district < 0) & (self.built_wonder < 0) & (self.improvement < 0) & (self.res_priority <= 1) & (self.pair_dist[site_c] <= 3))
-        elig[torch.arange(B, device=dev), site_c] = False
+        d_center = self.pair_dist[center]  # [B, T]
+        elig = (
+            (self.tile_seat == row)
+            & (self.tile_city == self.city_id[:, row, j].unsqueeze(1))  # ownsTile: THIS city's tiles, not merely the seat's
+            & surface
+            & (self.district < 0)
+            & (self.built_wonder < 0)
+            & (self.improvement < 0)
+            & (self.res_priority <= 1)  # only a BONUS resource may be paved over
+            & (d_center <= 3)           # CITY_WORK_RADIUS
+        )
+        # No clone: the `&` chain above already returns a fresh tensor nothing
+        # else references, and this runs per district type per city per seat
+        # per turn on the hot path.
+        elig[torch.arange(B, device=dev), center] = False  # dist === 0 is the centre
         if placement in (1, 3):  # no-adjacency-yield districts (Aqueduct / Encampment)
-            cc = self._adj_center_count()  # [B, T] adjacent CITY_CENTERs (any seat) — the requires/notAdjacentToCityCenter tests
-            elig = elig & ((cc >= 1) & self.aqsrc if placement == 1 else (cc == 0))  # Aqueduct: adjacent-center+water; Encampment: NOT adjacent-center
-            adjf = torch.zeros(B, T, dtype=self.dtype, device=dev)  # no yield → lowest-index tie-break
+            cc = self._adj_center_count()  # [B, T] adjacent CITY_CENTERs (any seat)
+            elig = elig & ((cc >= 1) & self.aqsrc if placement == 1 else (cc == 0))  # Aqueduct: adjacent-centre + water source; Encampment: NOT adjacent-centre
+            adjf = torch.zeros(B, T, dtype=self.dtype, device=dev)  # no yield -> lowest-index tie-break
         else:  # economic (land) or Harbor (coastal) — full districtAdjacency
             adjf = self._district_adj_floor(di)  # [B, T] (memoised)
+        return elig, adjf
+
+    def _place_district(self, row: int, j: int, di: int, want: torch.Tensor, placement: int = 0) -> torch.Tensor:
+        """QUEUE district-type `di` in seat row `row`'s city slot j on its best
+        tile, for batch rows where `want` is set AND an eligible tile exists.
+
+        Best-tile scan: `_district_elig`, ranked by
+        floor(static + 0.5·adjacent-completed-districts), ties to the lowest
+        tile index. queueDistrict's writes: the tile is paved INCOMPLETE, its
+        improvement and feature die, a BONUS resource is stripped (a fresh sea
+        strip withdraws its lent SEA_RESOURCE adjacency), the city's registry
+        and its completion target remember the tile. Completion arrives via
+        the production loop. Adjacency is recomputed per call, so placing
+        city-by-city in slot order reproduces the sequential per-city loop.
+        Returns the [B] placed mask."""
+        elig, adjf = self._district_elig(row, j, di, placement)
+        T = self.T
         key = torch.where(elig, adjf * T - self._arangeT_f, self._neg_f)
         best = key.argmax(dim=1)  # [B]
         place = want & elig.any(dim=1)
@@ -995,78 +1101,13 @@ class SimEconomy:
             bt = best[rows]
             self.district[rows, bt] = di
             self.district_complete[rows, bt] = False  # queued, not complete
-            self.dist_tile[rows, c, di] = bt  # row-0 registry, written at queue like the civ arm's
-            self._strip_feature_at(rows, bt)  # queueDistrict: tile.feature = null
-            # queueDistrict removes a bonus resource (only priority-1 tiles
-            # carrying a resource are eligible at all); a FRESH sea strip
-            # withdraws its lent SEA_RESOURCE adjacency
+            self.improvement[rows, bt] = -1           # queueDistrict clears it
+            self.city_qtile[rows, row, j] = bt        # the completion target
+            self.city_dist_tile[rows, row, j, di] = bt  # the city registry, written at queue
+            self._strip_feature_at(rows, bt)          # queueDistrict: tile.feature = null
             fresh_rs = (self.res_priority[rows, bt] == 1) & ~self.res_stripped[rows, bt]
             self.res_stripped[rows, bt] = self.res_stripped[rows, bt] | (self.res_priority[rows, bt] == 1)
             self._withdraw_sea_adj(rows[fresh_rs], bt[fresh_rs])
-            self._eff_version += 1
-        return place, best
-
-    def _district_elig_civ(self, r: int, j: int, di: int, placement: int = 0):
-        """[B, T] eligible tiles (and the adjacency floor) for placing district
-        `di` in civ r's city slot j.
-
-        `seat_masks` asks "can this district be placed AT ALL" without placing
-        it, so the mask and `_place_district_civ` MUST share this predicate:
-        anything the mask decides without running the scan can report a
-        district legal where the placer rejects it.
-        """
-        B, T, dev = self.B, self.T, self.device
-        center = self.civ_city_center[:, r, j].clamp(min=0)
-        surface = self.coastal_water if placement == 2 else self.d_usable
-        d_center = self.pair_dist[center]  # [B, T]
-        elig = (
-            (self.civ_at == r)
-            & (self.tile_city == self.civ_city_id[:, r, j].unsqueeze(1))  # THIS city's registry, not merely civ-owned
-            & surface
-            & (self.district < 0)
-            & (self.built_wonder < 0)
-            & (self.civ_city_at < 0)  # sibling centers carry district='CITY_CENTER' in TS
-            & (self.improvement < 0)
-            & (d_center <= 3)
-        )
-        # No clone: the `&` chain above already returns a fresh tensor nothing
-        # else references, and this runs per district type per city per civ
-        # per turn on the scripted hot path.
-        elig[torch.arange(B, device=dev), center] = False
-        if placement in (1, 3):
-            cc = self._adj_center_count()
-            elig = elig & ((cc >= 1) & self.aqsrc if placement == 1 else (cc == 0))
-            adjf = torch.zeros(B, T, dtype=self.dtype, device=dev)
-        else:
-            adjf = self._district_adj_floor(di)  # (memoised)
-        return elig, adjf
-
-    def _place_district_civ(self, r: int, j: int, di: int, want: torch.Tensor, placement: int = 0) -> torch.Tensor:
-        """The civ-seat twin of _place_district — same rank (best
-        floor(static + 0.5·adjacent-completed), ties lowest tile index), civ
-        eligibility (civ-owned via civ_at, district-usable, empty,
-        unimproved, within radius 3 of THIS city's center, not the center) —
-        and it QUEUES rather than completes: tile paved (district set,
-        complete stays False), civ_city_qtile remembers the completion target, the
-        per-city registry gains the type. Returns the placed mask."""
-        elig, adjf = self._district_elig_civ(r, j, di, placement)
-        T = self.T
-        key = torch.where(elig, adjf * T - self._arangeT_f, self._neg_f)
-        best = key.argmax(dim=1)
-        place = want & elig.any(dim=1)
-        if bool(place.any()):
-            rows = place.nonzero(as_tuple=True)[0]
-            self.district[rows, best[rows]] = di
-            self.civ_city_qtile[rows, r, j] = best[rows]
-            self.civ_city_dist_tile[rows, r, j, di] = best[rows]
-            self.improvement[rows, best[rows]] = -1  # queueDistrict clears it
-            # The civ-seat pave strips a bonus resource too (queueDistrict's
-            # rule); fresh sea strips withdraw their lent SEA_RESOURCE
-            # adjacency
-            bt_r = best[rows]
-            fresh_rs = (self.res_priority[rows, bt_r] == 1) & ~self.res_stripped[rows, bt_r]
-            self.res_stripped[rows, bt_r] = self.res_stripped[rows, bt_r] | (self.res_priority[rows, bt_r] == 1)
-            self._withdraw_sea_adj(rows[fresh_rs], bt_r[fresh_rs])
             self._eff_version += 1
         return place
 

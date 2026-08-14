@@ -137,14 +137,13 @@ def adj_free(sim, t: int, banned=()) -> int:
 def poke_exclusion(rules, rj, path):
     """1. Spawn-only GENERAL/ADMIRAL never appear in the production mask's
     unit-train columns (the trainableUnits filter's GPU mirror). The mask is
-    built with the gold-purchase columns switched on, so the widened head is
-    what gets read."""
+    read off the ONE production layout, whose purchase block is always
+    present."""
     sim = build(rules, path)
     gi, ai = sim._general_unit_idx, sim._admiral_unit_idx
     assert gi >= 0 and ai >= 0, "general/admiral roster indices missing from the export"
     assert bool(sim._type_spawn_only[gi]) and bool(sim._type_spawn_only[ai]), "spawn_only flag not set"
     # production_mask: the unit-train columns start at UNIT_BASE.
-    sim._rl_purchase_active = True
     pm = sim.production_mask()  # [B, C, NCODES]
     base = sim.UNIT_BASE
     for uidx, nm in ((gi, "GENERAL"), (ai, "ADMIRAL")):

@@ -178,10 +178,10 @@ def _try_encampment_placement(rules, rj, path) -> bool:
         far_elig = base_elig & (cc[0] == 0)
         if not bool(far_elig.any()):
             continue  # nowhere legal for an encampment here
-        placed_mask, best = sim._place_district(EN, torch.tensor([True]), c, placement=3)
+        placed_mask = sim._place_district(0, c, EN, torch.tensor([True]), placement=3)
         if not bool(placed_mask[0]):
             continue
-        bt = int(best[0])
+        bt = int(sim.city_dist_tile[0, 0, c, EN])   # the registry records the paved tile
         assert int(cc[0, bt]) == 0, f"ENCAMPMENT placed adjacent to a city center (cc={int(cc[0, bt])})"
         assert int(sim.district[0, bt]) == EN, "ENCAMPMENT tile not paved"
         note = "adjacent-center tiles were available but excluded" if bool(adj_elig.any()) else "no adjacent-center tiles here"

@@ -154,7 +154,7 @@ def main() -> None:
     w_lo5 = NB5 + 2 + sim5.NU + nS5 + NB5 + 1 + sim5.NU
     # force a legal (wi, tile) pair deterministically: find a wonder whose wok
     # bit is set on some r0-owned base_ok tile, then grant its unlock tech.
-    base5 = sim5._wonder_base_ok(r5, j5)[0]
+    base5 = sim5._wonder_base_ok(r5 + 1, j5)[0]  # absolute row: civ r is row r+1
     wi5 = None
     for _wi in range(sim5._wond_n):
         _wrow = sim5._wond_rows[_wi]

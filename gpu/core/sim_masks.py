@@ -12,121 +12,85 @@ from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must
 
 class SimMasks:
     def production_mask(self) -> torch.Tensor:
-        """[B, C, NB+2+NU+nScaffold(+NB+1+NU)] valid production actions for idle
-        cities: columns 0..NB-1 = City Center buildings, NB = settler (any city,
-        as queueSettler and seat_masks are), NB+1 = idle, NB+2..NB+1+NU = train
-        that roster unit (tech-gated like trainableUnits), NB+2+NU.. = place
-        that scaffold district (capital-only, off-script; all-False unless
-        _rl_district_active). With _rl_purchase_active the mask WIDENS by
-        NB+1+NU gold-purchase columns (buy building / settler / unit at
-        gold_purchase_mult× cost); while off, those columns do not exist and the
-        head keeps its narrower width. All-False where no decision pends."""
+        """[B, RC, PURCHASE_BASE + NB+1+NU] valid production actions for seat
+        0's idle cities, in the ONE production layout every seat row uses
+        (cpu/core/prodLayout.ts): [0, NB) buildings, SETTLER, IDLE, the roster
+        units, the scaffold districts, then the gold-purchase block (building /
+        settler / unit), which is NOT idle-gated because it buys rather than
+        queues.
+
+        Every column asks a row-generic legality body — `_seat_buildable`,
+        `_trainable_units`, `_district_elig` — the SAME ones the civ mask and
+        the shared apply ask, so no seat sees a different legality and mask and
+        apply cannot drift. The wonder and project columns exist for the civ
+        rows only; seat 0's head is still the narrower one (task #83).
+        """
         B, C, dev = self.B, self.RC, self.device
         pend = self.alive & (self.current == -1)
-        always = torch.ones(B, C, 2, dtype=torch.bool, device=dev)
-        cols = [self._buildable(), always]
-        if self.units_mode:
-            unit_ok = (self._type_tech.unsqueeze(0) < 0) | self.techs.gather(
-                1, self._type_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
-            )
-            unit_ok = unit_ok & self._res_avail_mask(self.tile_seat == 0)  # strategic-resource gate
-            unit_ok = unit_ok & ~self._type_faith_only.reshape(1, -1)  # trainableUnits' faithOnly filter (MISSIONARY never queues)
-            unit_ok = unit_ok & ~self._type_spawn_only.reshape(1, -1)  # spawn-only filter (GENERAL/ADMIRAL never queue)
-            # The Archaeologist's civic + artifact-slot gates. The slot rule is
-            # PER-CITY, so it joins after the [B, NU] -> [B, C, NU] expansion
-            # rather than collapsing unit_ok's rank early.
-            unit_col = unit_ok.unsqueeze(1).expand(-1, C, -1) & self._type_civic_slot_ok(True)
-            if bool(self.unit_naval.any()):
-                # DEBT: this mask withholds every naval column for seat 0, and
-                # the civ mask hand-rolls a single capped galley column — while
-                # TS trainableUnits offers ALL naval hulls to EVERY seat, gated
-                # only on cityNavalCapable (coastal centre or Harbor). The
-                # exclusion lives only in this mask (the decider never sees the
-                # columns), so the gate cannot observe the mismatch.
-                unit_col = unit_col & ~self.unit_naval.reshape(1, 1, -1)
-            cols.append(unit_col)
-        else:
-            cols.append(torch.zeros(B, C, self.NU, dtype=torch.bool, device=dev))
+        # SETTLER: any city over the pop gate, as queueSettler allows. IDLE is
+        # always legal.
+        settler_col = (self.city_pop[:, 0] >= self.rules.settler_pop_gate).unsqueeze(2)
+        idle_col = torch.ones(B, C, 1, dtype=torch.bool, device=dev)
+        bld_q = self._seat_buildable(0)
+        tr_city = self._trainable_units(0)
+        cols = [bld_q, settler_col, idle_col, tr_city]
         nS = len(self._scaffold)
         if nS:
             dcols = torch.zeros(B, C, nS, dtype=torch.bool, device=dev)
-            if self._rl_district_active:  # capital (or any city if _rl_any_city) places districts off-script
-                ar = torch.arange(B, device=dev)
-                spec_tile = (self.district >= 0) & self._is_specialty[self.district.clamp(min=0)] & ~self.district_dead  # [B,T] LIVE specialty district tiles
-                cc = self._adj_center_count()  # [B,T] adjacent CITY_CENTERs (global) — Aqueduct requires, Encampment forbids
-                for c in range(C if self._rl_any_city else 1):
-                    site_c = self.site[:, c].clamp(min=0)
-                    near_c = self.pair_dist[site_c] <= 3  # [B, T] hex distance from THIS city's centre
-                    cap_c = torch.div(self.pop[:, c] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(pop_c)
-                    under_cap = (spec_tile & (self.owner == c)).sum(dim=1) < cap_c  # only specialty districts count
-                    base = (self.owner == c) & self.d_usable & (self.district < 0) & (self.built_wonder < 0) & (self.improvement < 0) & (self.res_priority <= 1) & near_c
-                    base[ar, site_c] = False
-                    cbase = (self.owner == c) & self.coastal_water & (self.district < 0) & (self.built_wonder < 0) & (self.improvement < 0) & (self.res_priority <= 1) & near_c
-                    cbase[ar, site_c] = False
-                    has_land = base.any(dim=1)  # [B]
-                    has_aq = (base & (cc >= 1) & self.aqsrc).any(dim=1)  # [B] adjacent center + water source
-                    has_coastal = cbase.any(dim=1)  # [B] a coastal-water tile (Harbor)
-                    has_enc = (base & (cc == 0)).any(dim=1)  # [B] a land tile NOT adjacent to any center (Encampment)
+            if self.districts_on and self._scaffold:
+                for c in range(C):
+                    reg_c = self.city_dist_tile[:, 0, c]  # [B, nD] THIS city's registry
+                    spec_cnt = ((reg_c >= 0) & self._is_specialty.reshape(1, -1)).sum(dim=1)
+                    cap_c = torch.div(self.city_pop[:, 0, c] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(pop)
                     for si, (di, utech, uciv, plc) in enumerate(self._scaffold):
-                        has_tech = self.techs[:, utech] if utech >= 0 else (self.civics[:, uciv] if uciv >= 0 else torch.ones(B, dtype=torch.bool, device=dev))  # kind-aware
-                        not_owned = ~((self.district == di) & (self.owner == c) & ~self.district_dead).any(dim=1)  # one-per-type (LIVE)
-                        if plc == 1:  # Aqueduct: non-specialty (no cap), aqueduct-eligible tile
-                            dcols[:, c, si] = has_tech & has_aq & not_owned
-                        elif plc == 2:  # Harbor: specialty (cap), coastal-water tile
-                            dcols[:, c, si] = has_tech & under_cap & has_coastal & not_owned
-                        elif plc == 3:  # Encampment: specialty (cap), not adjacent to the center
-                            dcols[:, c, si] = has_tech & under_cap & has_enc & not_owned
-                        else:
-                            dcols[:, c, si] = has_tech & under_cap & has_land & not_owned
+                        has_tech = (self.techs[:, utech] if utech >= 0
+                                    else (self.civics[:, uciv] if uciv >= 0
+                                          else torch.ones(B, dtype=torch.bool, device=dev)))  # kind-aware
+                        under_cap = (spec_cnt < cap_c) if bool(self._is_specialty[di]) else torch.ones(B, dtype=torch.bool, device=dev)
+                        # The PLACEMENT SCAN runs HERE, not lazily at apply
+                        # time: without it the mask is optimistic, calling a
+                        # district legal on the gate tests alone while the apply
+                        # also demands a tile that can take it.
+                        can_place = self._district_elig(0, c, di, plc)[0].any(dim=1)
+                        dcols[:, c, si] = has_tech & (reg_c[:, di] < 0) & under_cap & can_place
             cols.append(dcols)
-        if self._rl_purchase_active:
-            # Purchases. Eligibility mirrors the TS functions at a pending
-            # decision (queue empty, so availableBuildings ∧ buildingCompletable
-            # collapses to _buildable): building = _buildable & gold; settler =
-            # gold at the live settlerCost; unit = trainableUnits & gold. Gold is
-            # OPTIMISTIC here and RE-validated at apply in slot order (earlier
-            # slots' purchases drain the shared treasury and a bought settler
-            # raises the next slot's price); a unit also needs a free spawn tile
-            # there — TS refunds when spawnUnit finds none.
-            mult = self.rules.gold_purchase_mult
-            tre = self.treasury
-            # Worship buildings are admitted and priced in FAITH at the flat
-            # worship cost — `purchaseBuilding` splits on
-            # `BUILDINGS[id].worship`, gold otherwise.
-            _pbuy = self._buildable(include_worship=True)
-            _w = self._b_worship.reshape(1, 1, -1)
-            _gold_ok = self._afford(tre.reshape(B, 1, 1), self.rules_dev.b_cost.reshape(1, 1, -1) * mult)
-            _faith_ok = self._afford(self.faith.reshape(B, 1, 1),
-                                     torch.full((1, 1, self.NB), self._worship_cost,
-                                                dtype=self.dtype, device=dev))
-            pb = _pbuy & torch.where(_w, _faith_ok, _gold_ok)
-            n_cities = self.alive.sum(dim=1, keepdim=True)
-            queued_s = (self.current == self.SETTLER).sum(dim=1, keepdim=True)
-            s_cost = self.rules.settler_base + self.rules.settler_per_city * (
-                n_cities - 1 + self._seat_settlers(0).unsqueeze(1) + queued_s
-            ).clamp(min=0).to(self.dtype)
-            ps = self._afford(tre.unsqueeze(1), s_cost * mult).unsqueeze(2).expand(B, C, 1)
-            if self.units_mode:
-                u_ok = (self._type_tech.unsqueeze(0) < 0) | self.techs.gather(
-                    1, self._type_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
-                )
-                u_ok = u_ok & self._type_civic_slot_ok(False)  # civic gate
-                u_ok = u_ok & self._res_avail_mask(self.tile_seat == 0)  # strategic-resource gate (purchase)
-                u_ok = u_ok & ~self._type_faith_only.reshape(1, -1)  # faith-only never gold-buys (trainableUnits mirror)
-                u_ok = u_ok & ~self._type_spawn_only.reshape(1, -1)  # spawn-only never gold-buys (trainableUnits mirror)
-                u_cost = self._type_cost.unsqueeze(0).expand(B, -1)
-                if self._builder_idx >= 0:
-                    # the builder column prices off the live escalator, like TS
-                    # unitPurchaseCost at mask time.
-                    u_cost = u_cost.clone()
-                    u_cost[:, self._builder_idx] = self._builder_cost(self.builders_trained)  # ALREADY PRODUCED only — a queued item has produced nothing
-                pu = (u_ok & self._afford(tre.unsqueeze(1), u_cost * mult)).unsqueeze(1).expand(-1, C, -1)
-                if bool(self.unit_naval.any()):
-                    pu = pu & ~self.unit_naval.reshape(1, 1, -1)  # DEBT: mask-only naval ban; TS purchaseUnit is capability-gated for every seat
-            else:
-                pu = torch.zeros(B, C, self.NU, dtype=torch.bool, device=dev)
-            cols.append(torch.cat([pb, ps, pu], dim=2))
-        return torch.cat(cols, dim=2) & pend.unsqueeze(2)
+        # Purchases. Gold is OPTIMISTIC here and RE-validated at apply in slot
+        # order (earlier slots drain the shared treasury and a bought settler
+        # raises the next slot's price); a unit also needs a free spawn tile
+        # there — TS refunds when spawnUnit finds none.
+        mult = self.rules.gold_purchase_mult
+        tre = self.treasury
+        # purchaseBuilding wants buildingCompletable (the district FINISHED) and
+        # gold; the seat's own WORSHIP building is the one faith column, priced
+        # flat and gated by buyWorshipBuilding's city rules.
+        pb = self._seat_buildable(0, True) & self._afford(tre.reshape(B, 1, 1), self.rules_dev.b_cost.reshape(1, 1, -1) * mult)
+        wb0 = self._worship_bidx_of(0)
+        if wb0 >= 0:
+            pb[:, :, wb0] = (
+                self.religion_done.unsqueeze(1) & self._worship_city_ok(0)
+                & self._afford(self.faith, self._worship_cost).unsqueeze(1)
+            )
+        n_cities = self.alive.sum(dim=1, keepdim=True)
+        queued_s = (self.current == self.SETTLER).sum(dim=1, keepdim=True)
+        s_cost = self.rules.settler_base + self.rules.settler_per_city * (
+            n_cities - 1 + self._seat_settlers(0).unsqueeze(1) + queued_s
+        ).clamp(min=0).to(self.dtype)
+        ps = (self._afford(tre.unsqueeze(1), s_cost * mult).unsqueeze(2)
+              & (self.city_pop[:, 0] >= self.rules.settler_pop_gate).unsqueeze(2))
+        u_cost = self._type_cost.unsqueeze(0).expand(B, -1)
+        if self._builder_idx >= 0:
+            # the builder column prices off the live escalator, like TS
+            # unitPurchaseCost at mask time.
+            u_cost = u_cost.clone()
+            u_cost[:, self._builder_idx] = self._builder_cost(self.builders_trained)  # ALREADY PRODUCED only — a queued item has produced nothing
+        pu = tr_city & self._afford(tre.unsqueeze(1), u_cost * mult).unsqueeze(1)
+        cols.append(torch.cat([pb, ps, pu], dim=2))
+        # the base columns are idle-gated; the purchase block is not.
+        base_w = self.PURCHASE_BASE
+        out = torch.cat(cols, dim=2)
+        out[:, :, :base_w] &= pend.unsqueeze(2)
+        out[:, :, base_w:] &= self.alive.unsqueeze(2)
+        return out
 
     def tech_mask(self) -> torch.Tensor:
         """[B, NT] valid research picks; all-False where research is busy."""
@@ -969,13 +933,13 @@ class SimMasks:
             self.civ_treasury[b, 0 if seat is None else int(seat[b])] += float(reward)
 
 
-    def _type_civic_slot_ok(self, per_city: bool) -> torch.Tensor:
-        """The Archaeologist's two extra trainableUnits gates — the CIVIC unlock
-        (Natural History) and the ARTIFACT-SLOT rule (its city must hold an
-        ARCHAEOLOGICAL MUSEUM with a free slot). Returns [B, NU] when per_city
-        is False, else [B, C, NU]."""
+    def _type_civic_slot_ok(self, row: int, per_city: bool) -> torch.Tensor:
+        """The Archaeologist's two extra trainableUnits gates for seat row
+        `row` — the CIVIC unlock (Natural History) and the ARTIFACT-SLOT rule
+        (its city must hold an ARCHAEOLOGICAL MUSEUM with a free slot).
+        Returns [B, NU] when per_city is False, else [B, RC, NU]."""
         B, dev = self.B, self.device
-        civ_ok = (self._type_civic.unsqueeze(0) < 0) | self.civics.gather(
+        civ_ok = (self._type_civic.unsqueeze(0) < 0) | self.civ_civics[:, row].gather(
             1, self._type_civic.clamp(min=0).unsqueeze(0).expand(B, -1)
         )  # [B, NU]
         if not per_city:
@@ -986,8 +950,8 @@ class SimMasks:
             room = torch.zeros(B, C, 1, dtype=torch.bool, device=dev)
         else:
             room = (
-                self.buildings[:, :, self._artifact_bidx] & (self.artifacts < self._artifact_slots)
-            ).unsqueeze(2)  # [B, C, 1]
+                self.city_bldg[:, row, :, self._artifact_bidx] & (self.city_artifacts[:, row] < self._artifact_slots)
+            ).unsqueeze(2)  # [B, RC, 1]
         return civ_ok.unsqueeze(1) & (~need | room)
 
     def _seat_slot_map(self, row: int) -> torch.Tensor:

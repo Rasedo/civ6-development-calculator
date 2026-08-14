@@ -25,11 +25,11 @@ class SimStep:
         Every argument is optional and None means "seat 0 decides nothing" —
         no queue, no pick, no order. Invalid entries are masked to no-ops.
 
-        production: [B, C] long — per-city action (0..NB-1 building, NB
-        settler, NB+1 idle, NB+2..NB+1+NU train that roster unit,
-        NB+2+NU.. place that scaffold district; with _rl_purchase_active,
-        NB+2+NU+nScaffold.. buy that building / a settler / that unit with
-        gold).
+        production: [B, RC] long — per-city action in the ONE production
+        layout every seat row uses (cpu/core/prodLayout.ts): [0, NB)
+        buildings, SETTLER, IDLE, the roster units, the scaffold districts,
+        then the purchase block (buy that building / a settler / that unit
+        with gold).
         tech/civic: [B] long picks applied where the research slot is empty
         (validated against the masks; -1 = no pick).
         units: [B, simbase.UNIT_SLOTS] long unit orders (0–5 move, 6–11 attack, 12
@@ -292,94 +292,13 @@ class SimStep:
                         self._eff_version += 1
 
         # --- production choice ---------------------------------------------------
+        # ONE body for every seat row: the queue arms, the districts, the
+        # wonders/projects and the purchase block all live in
+        # _apply_seat_production, which walks the cities in SLOT order because
+        # settler prices, the builder escalator and the treasury are all
+        # order-coupled across a seat's cities.
         if production is not None:
-            act = torch.where(self.alive & (self.current == -1), production.to(torch.long), torch.full_like(production.to(torch.long), -1))
-            buildable = self._buildable()
-            is_b = (act >= 0) & (act < self.NB)
-            valid_b = is_b & buildable.gather(2, act.clamp(min=0, max=self.NB - 1).unsqueeze(2)).squeeze(2)
-            is_s = act == self.SETTLER
-            is_u = (act >= self.UNIT_BASE) & (act < self.UNIT_BASE + self.NU)
-            ut = (act - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
-            trainable = (self._type_tech.unsqueeze(0) < 0) | self.techs.gather(
-                1, self._type_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
-            )  # [B, NU]
-            trainable = trainable & self._res_avail_mask(self.tile_seat == 0)  # re-validate strategic-resource access
-            trainable = trainable & ~self._type_faith_only.reshape(1, -1)  # faith-only never queues (trainableUnits mirror)
-            valid_u = is_u & trainable.gather(1, ut)
-            if self._rl_purchase_active and self._builder_idx >= 0:
-                # With purchases live, builder queues are order-coupled with
-                # builder PURCHASES in the same turn (both move the escalator)
-                # — the sequential walk below handles them instead.
-                valid_u = valid_u & (ut != self._builder_idx)
-            self.progress.copy_(torch.where(valid_b | valid_u, torch.zeros_like(self.progress), self.progress))
-            self.cur_cost.copy_(torch.where(valid_b, rd.b_cost[act.clamp(min=0, max=self.NB - 1)], self.cur_cost))
-            self.cur_cost.copy_(torch.where(valid_u, self._type_cost[ut], self.cur_cost))
-            if self._builder_idx >= 0:
-                # Builder queues escalate like the settler prefix-sum — earlier
-                # slots' queues raise later slots' price (current is
-                # pre-decision here, exactly like base_q). This is the only
-                # line that overrides the static roster price with the
-                # escalator.
-                is_bu = valid_u & (ut == self._builder_idx)
-                if bool(is_bu.any()):
-                    bq_n = self.builders_trained.unsqueeze(1)
-                    self.cur_cost.copy_(torch.where(is_bu, self._builder_cost(bq_n), self.cur_cost))
-            self.current.copy_(torch.where(valid_b | valid_u, act, self.current))
-            if not self._rl_purchase_active:
-                # Queues resolve city-by-city in slot order, and each queued
-                # settler raises the next one's price — an exclusive prefix sum
-                # reproduces that sequential cost exactly. (Building/unit codes
-                # above never write SETTLER, so counting current==SETTLER after
-                # them sees exactly the pre-decision queue.)
-                base_q = (self.current == self.SETTLER).sum(dim=1, keepdim=True)
-                prefix = is_s.long().cumsum(dim=1) - is_s.long()
-                n_cities = self.alive.sum(dim=1, keepdim=True)
-                s_cost = r.settler_base + r.settler_per_city * (n_cities - 1 + self._seat_settlers(0).unsqueeze(1) + base_q + prefix).clamp(min=0).to(self.dtype)
-                self.progress.copy_(torch.where(is_s, torch.zeros_like(self.progress), self.progress))
-                self.cur_cost.copy_(torch.where(is_s, s_cost, self.cur_cost))
-                self.current.copy_(torch.where(is_s, torch.full_like(self.current, self.SETTLER), self.current))
-            else:
-                # With purchases live, settler prices and the treasury are
-                # order-coupled across slots (a queued OR bought settler raises
-                # the next slot's price; every purchase drains shared gold), so
-                # walk slots sequentially. The mask here is the PURCHASE-eligible
-                # one (worship included), not the production one the queue
-                # decision uses.
-                self._apply_settlers_and_purchases(act, self._buildable(include_worship=True))
-
-            # District placement: the production decision QUEUES a scaffold
-            # district — the tile is paved + feature-stripped at once
-            # (queueDistrict semantics, districtComplete = false) and the build
-            # slot works it off at districtCost(state), exactly like the civ
-            # path. The district codes double as CURRENT codes (above the unit
-            # range at NB+2+NU+si). Cities in slot order, adjacency recomputed
-            # at each placement.
-            if self.districts_on and self._scaffold and self._rl_district_active:
-                dbase = self.DISTRICT_BASE
-                dcp = self.rules.district_cost
-                # floor(base·(1 + scale·max(tech%, civic%)))
-                t_pct = self.techs.sum(dim=1).double() / float(rd.t_cost.shape[0])
-                c_pct = self.civics.sum(dim=1).double() / float(rd.c_cost.shape[0])
-                d_cost = torch.floor(dcp.get("base", 32) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct))).to(self.dtype)
-                for c in range(C if self._rl_any_city else 1):
-                    ac = act[:, c]  # city c's chosen action (-1 where not idle/alive)
-                    cap_c = torch.div(self.pop[:, c] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(pop_c)
-                    for si, (di, utech, uciv, plc) in enumerate(self._scaffold):
-                        has_tech = self.techs[:, utech] if utech >= 0 else (self.civics[:, uciv] if uciv >= 0 else torch.ones(B, dtype=torch.bool, device=dev))  # tech- or civic-gated
-                        spec_count = ((self.district >= 0) & self._is_specialty[self.district.clamp(min=0)] & (self.owner == c) & ~self.district_dead).sum(dim=1)  # LIVE specialty only (recomputed)
-                        not_owned = ~((self.district == di) & (self.owner == c) & ~self.district_dead).any(dim=1)  # one-per-type (LIVE)
-                        under_cap = (plc == 1) | (spec_count < cap_c)  # Aqueduct is non-specialty → no cap
-                        want = (ac == dbase + si) & has_tech & under_cap & not_owned
-                        if bool(want.any()):
-                            # the discount reads BEFORE the placement registers
-                            disc = self._district_discounted(0, di)
-                            d_cost_si = torch.where(disc, torch.floor(d_cost * 0.6), d_cost)
-                            placed, best = self._place_district(di, want, c, plc)
-                            if bool(placed.any()):
-                                self.current[:, c] = torch.where(placed, torch.full_like(self.current[:, c], dbase + si), self.current[:, c])
-                                self.cur_cost[:, c] = torch.where(placed, d_cost_si, self.cur_cost[:, c])
-                                self.progress[:, c] = torch.where(placed, torch.zeros_like(self.progress[:, c]), self.progress[:, c])
-                                self.q_dtile[:, c] = torch.where(placed, best, self.q_dtile[:, c])
+            self._apply_seat_production(0, production)
 
         # Trade — the route pick + expiry arm at the seatPhase position
         # (between the buy block and the city loop), row 0's body.

@@ -6,12 +6,12 @@
 A civ district (and wonder) may only be placed on a tile whose registry entry
 (tile_city) is THIS city (civ_city_id) — not merely a tile owned by the civ. A
 sibling's registered tile is NOT a valid site. These pokes drive the engine
-twin (_place_district_civ) and the env-gated consistency scan
+twin (_place_district) and the env-gated consistency scan
 (_check_rc_registry_invariant) that the forced-compaction gate also exercises.
 
 Covered:
   a. PLACEMENT RULE: with the whole work radius owned by the civ but registered
-     to a SIBLING, _place_district_civ REFUSES; flip the one candidate's
+     to a SIBLING, _place_district REFUSES; flip the one candidate's
      registry to THIS city and it places, and the paved tile registers back to
      this rc (civ_city_dist_tile <-> tile_city).
   b. NEVER PICKS A SIBLING TILE: with a sibling-registered tile of MAXIMAL
@@ -54,7 +54,7 @@ def scaffold_p0(sim):
 
 
 def radius3_usable(sim, center, exclude=()):
-    """On-map tiles within radius 3 of center that _place_district_civ's elig
+    """On-map tiles within radius 3 of center that _place_district's elig
     would accept BUT for ownership: d_usable, empty (district/wonder/civ centre/
     improvement all clear), not the center."""
     ds = sim.pair_dist[center]
@@ -76,7 +76,7 @@ def radius3_usable(sim, center, exclude=()):
 
 def poke_placement_rule(rules, path):
     """a. The whole work radius is civ-owned but registered to a SIBLING ->
-    _place_district_civ must place NOTHING. Flip the one candidate's registry
+    _place_district must place NOTHING. Flip the one candidate's registry
     to THIS city -> it places, and the paved tile registers back
     (civ_city_dist_tile == tile, tile_city[tile] == civ_city_id)."""
     sim = build(rules, path)
@@ -99,14 +99,14 @@ def poke_placement_rule(rules, path):
     sim.civ_at[0, T] = r
     sim.tile_city[0, T] = sib_id
 
-    placed = sim._place_district_civ(r, j, di, torch.tensor([True]), 0)
+    placed = sim._place_district(r + 1, j, di, torch.tensor([True]), 0)
     assert not bool(placed[0]), "district placed on a SIBLING-registered tile (A-24 bug)"
     assert int(sim.district[0, T]) < 0, "sibling tile was paved despite the refusal"
     assert int(sim.civ_city_dist_tile[0, r, j, di]) < 0, "registry gained a sibling tile"
 
     # Now register the same tile to THIS city -> placement succeeds and is coherent.
     sim.tile_city[0, T] = own_id
-    placed2 = sim._place_district_civ(r, j, di, torch.tensor([True]), 0)
+    placed2 = sim._place_district(r + 1, j, di, torch.tensor([True]), 0)
     assert bool(placed2[0]), "district refused its OWN registered tile"
     assert int(sim.district[0, T]) == di, "own tile not paved"
     assert int(sim.civ_city_dist_tile[0, r, j, di]) == T, "registry did not record the paved tile"
@@ -141,7 +141,7 @@ def poke_never_picks_sibling(rules, path):
     assert float(adjf[0, T_own]) <= float(adjf[0, T_sib]) + 1e6  # sanity: values are finite
     # (adjacency is derived from the map; we cannot cheaply inflate it, so we
     # rely on elig excluding the sibling tile — assert the CHOSEN tile is own.)
-    placed = sim._place_district_civ(r, j, di, torch.tensor([True]), 0)
+    placed = sim._place_district(r + 1, j, di, torch.tensor([True]), 0)
     assert bool(placed[0]), "no placement with an own-registered tile available"
     chosen = int(sim.civ_city_dist_tile[0, r, j, di])
     assert chosen == T_own, f"picker chose a non-own tile {chosen} (own was {T_own})"

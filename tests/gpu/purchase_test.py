@@ -3,14 +3,13 @@
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/purchase_test.py
 
-Purchases ship ACTIVE (`_rl_purchase_active` True → 46-column production
-head). The gated-OFF path stays available for benchmarking 26-column
-checkpoints: test 1 flips the flag off and proves the mask narrows back to
-NB+2+NU+nScaffold and a purchase-range code is a bit-exact no-op. The rest
-pin the semantics the TS engine mirrors: buy = production cost ×
-goldPurchaseMult, buildings need `_buildable`, units need tech + a free spawn
-tile, settler prices ride the live `cities-1 + settlers + queued` counter and
-are order-coupled across slots in the same turn (slot walk, like the replay).
+The purchase block is part of the ONE production layout every seat row uses,
+so these pin the semantics the TS engine mirrors on every row: buy =
+production cost x goldPurchaseMult, buildings need `_seat_buildable` with the
+district FINISHED (buildingCompletable), units need `_trainable_units` plus a
+free spawn tile, and settler prices ride the live `cities-1 + settlers +
+queued` counter, order-coupled across slots in the same turn (the slot walk,
+like the replay).
 """
 
 from __future__ import annotations
@@ -49,28 +48,9 @@ def prod(sim, city, code) -> torch.Tensor:
     return p
 
 
-def test_inert_when_off(rules, path):
-    sim = build(rules, path)
-    idle_capital(sim)
-    assert sim._rl_purchase_active, "flag ships ON since V-P2"
-    sim._rl_purchase_active = False  # the narrow-head benchmarking path
-    w = sim.production_mask().shape[2]
-    assert w == pbase(sim), f"gated-off mask width {w} != {pbase(sim)}"
-    # a purchase-range code behaves exactly like IDLE (invalid = no-op)
-    snap = sim.snapshot()
-    sim.step(production=prod(sim, 0, pbase(sim) + 1))
-    after_code = {k: getattr(sim, k).clone() for k in _MUTABLE}
-    sim.restore(snap)
-    sim.step(production=prod(sim, 0, sim.IDLE))
-    drift = [k for k in _MUTABLE if not torch.equal(getattr(sim, k), after_code[k])]
-    assert not drift, f"purchase code perturbed gated-off state: {drift}"
-    print("  inert-when-off OK (width", w, "+ bit-exact no-op)")
-
-
 def test_width_and_mask_when_on(rules, path):
     sim = build(rules, path)
     idle_capital(sim)
-    sim._rl_purchase_active = True
     w = sim.production_mask().shape[2]
     want = pbase(sim) + sim.NB + 1 + sim.NU
     assert w == want, f"active mask width {w} != {want}"
@@ -101,7 +81,6 @@ def scan_to_purchasable(sim) -> list[int]:
 
 def test_building_purchase(rules, path):
     sim = build(rules, path)
-    sim._rl_purchase_active = True
     pb = pbase(sim)
     js = scan_to_purchasable(sim)
     assert js, "no purchasable building within 80 turns (fixture drift?)"
@@ -117,7 +96,6 @@ def test_building_purchase(rules, path):
     # bought building's own upkeep, which it pays this same turn (it exists
     # before the maintenance charge, exactly like a TS purchase before endTurn)
     sim2 = build(rules, path)
-    sim2._rl_purchase_active = True
     scan_to_purchasable(sim2)  # identical deterministic scan -> same pre-step state
     sim2.step(production=prod(sim2, 0, sim2.IDLE))
     base_spent = RICH - float(sim2.treasury[0])
@@ -131,7 +109,6 @@ def test_building_purchase(rules, path):
 def test_unit_purchase(rules, path):
     sim = build(rules, path)
     idle_capital(sim)
-    sim._rl_purchase_active = True
     sim.treasury[:] = RICH
     pb = pbase(sim)
     # warrior: no tech gate
@@ -143,7 +120,6 @@ def test_unit_purchase(rules, path):
     # isolates it: same seed, same step, only the production differs.
     twin = build(rules, path)
     idle_capital(twin)
-    twin._rl_purchase_active = True
     twin.treasury[:] = RICH
     twin.step(production=prod(twin, 0, twin.IDLE))
     sim.step(production=prod(sim, 0, pb + sim.NB + 1 + widx))
@@ -168,7 +144,6 @@ def test_settler_sequencing(rules, path):
         if bool(sim.alive[0, 1]):
             break
     assert bool(sim.alive[0, 1]), "no second city within 120 scripted turns"
-    sim._rl_purchase_active = True
     sim.current[:, :2] = -1
     sim.progress[:, :2] = 0.0
     sim.treasury[:] = RICH
@@ -190,7 +165,6 @@ def test_settler_sequencing(rules, path):
         sim2.step()
         if bool(sim2.alive[0, 1]):
             break
-    sim2._rl_purchase_active = True
     sim2.current[:, :2] = -1
     sim2.progress[:, :2] = 0.0
     sim2.treasury[:] = RICH
@@ -219,7 +193,6 @@ def test_builder_escalation(rules, path):
     if sim._builder_idx < 0:
         print("  builder escalation SKIPPED (no builder in roster)")
         return
-    sim._rl_purchase_active = True
     sim.current[:, :2] = -1
     sim.progress[:, :2] = 0.0
     sim.treasury[:] = RICH
@@ -240,7 +213,6 @@ def test_builder_escalation(rules, path):
         sim2.step()
         if bool(sim2.alive[0, 1]):
             break
-    sim2._rl_purchase_active = True
     sim2.current[:, :2] = -1
     sim2.progress[:, :2] = 0.0
     sim2.treasury[:] = RICH
@@ -253,10 +225,12 @@ def test_builder_escalation(rules, path):
 def test_worship_faith_purchase(rules, path):
     """A WORSHIP building is faith-purchase ONLY, on every seat.
 
-    `game.ts:queueBuilding` refuses worship outright ("purchased with faith, not
-    built") while `purchaseBuilding` prices it in faith, so the GPU's single
-    `_buildable` mask filters worship out and re-admits it only under
-    `include_worship`.
+    `availableBuildings` offers a worship building only when it IS this seat's
+    religion's — and nothing in the live engine ever sets `religion.worship` —
+    so `_seat_buildable` filters worship out of BOTH the queue and the gold
+    columns on every row. The one path is `buyWorshipBuilding`'s rule, whose
+    identity is `WORSHIP_BUILDINGS[seat % n]` and whose city gates are a
+    TEMPLE, a COMPLETE unpillaged Holy Site and no worship building yet.
 
     Neither gate reaches this verb, so this poke is its only coverage.
     """
@@ -264,13 +238,15 @@ def test_worship_faith_purchase(rules, path):
     if not sim._worship_bidx or sim._temple_bidx < 0 or sim._hs_idx < 0:
         print("  worship faith-purchase SKIPPED (no worship catalog)")
         return
-    wj = int(sim._worship_bidx[0])
-    sim._rl_purchase_active = True
+    wj = sim._worship_bidx_of(0)
+    assert wj >= 0, "seat 0 has no worship building"
     pb = pbase(sim)
-    # the PRODUCTION mask must still refuse it (queueBuilding's rule)
-    assert not bool(sim._buildable()[0, 0, wj]), "worship must never be queueable"
-    # buildingCompletable: a worship building needs a COMPLETED HOLY_SITE in the
-    # city AND the Temple prerequisite. Plant both, plus the faith to pay with.
+    # neither production column offers it — queue OR gold
+    assert not bool(sim._seat_buildable(0)[0, 0, wj]), "worship must never be queueable"
+    assert not bool(sim._seat_buildable(0, True)[0, 0, wj]), "worship must never gold-buy"
+    # buyWorshipBuilding: a COMPLETED HOLY_SITE in the city's REGISTRY, the
+    # Temple prerequisite and a founded religion. Plant all three, plus the
+    # faith to pay with.
     def _endow(s):
         owned = ((s.owner[0] == 0) & (s.district[0] < 0) & (s.center_at[0] < 0)
                  & (s.built_wonder[0] < 0)).nonzero(as_tuple=True)[0]
@@ -278,13 +254,15 @@ def test_worship_faith_purchase(rules, path):
         t = int(owned[0])
         s.district[0, t] = s._hs_idx
         s.district_complete[0, t] = True
+        s.city_dist_tile[0, 0, 0, s._hs_idx] = t   # the city registry TS walks
         s.buildings[0, 0, s._temple_bidx] = True
+        s.religion_done[0] = True
         s.faith.fill_(10_000.0)
         s._eff_version += 1
         return t
     _endow(sim)
-    assert bool(sim._buildable(include_worship=True)[0, 0, wj]), (
-        "worship must be PURCHASE-eligible once its Temple stands"
+    assert bool(sim._worship_city_ok(0)[0, 0]), (
+        "worship must be BUYABLE once its Temple and Holy Site stand"
     )
     f0, g0 = float(sim.faith[0]), float(sim.treasury[0])
     sim.step(production=prod(sim, 0, pb + wj))
@@ -297,7 +275,6 @@ def test_worship_faith_purchase(rules, path):
     # therefore holds the building too, granted free — then the only difference
     # between the two deltas is the price itself.
     sim2 = build(rules, path)
-    sim2._rl_purchase_active = True
     _endow(sim2)
     sim2.buildings[0, 0, wj] = True   # granted FREE: same yields, same upkeep
     sim2._eff_version += 1
@@ -321,7 +298,6 @@ def main() -> None:
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
     path = paths[0]
     print(f"purchase_test on {path.name}")
-    test_inert_when_off(rules, path)
     test_width_and_mask_when_on(rules, path)
     test_building_purchase(rules, path)
     test_worship_faith_purchase(rules, path)

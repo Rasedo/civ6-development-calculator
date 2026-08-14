@@ -31,23 +31,22 @@ class SimMinors:
 
     # civ-seat unit SPAWNS ride _spawn_unit(row, ...) — one body, every major row.
 
-    def _wonder_base_ok(self, r: int, j: int) -> torch.Tensor:
-        """[B, T] wonder-tile base predicate for city (r, j) — ONE body shared
-        by the scripted pick, seat_masks and the driven apply, because
+    def _wonder_base_ok(self, row: int, j: int) -> torch.Tensor:
+        """[B, T] wonder-tile base predicate for seat row `row`'s city slot j —
+        ONE body shared by every seat, the mask and the driven apply, because
         placement legality that exists twice drifts twice."""
-        d_ctr = self.pair_dist[self.civ_city_center[:, r, j].clamp(min=0)]  # [B, T]
+        d_ctr = self.pair_dist[self.city_center[:, row, j].clamp(min=0)]  # [B, T]
         return (
-            (self.civ_at == r)
-            & (self.tile_city == self.civ_city_id[:, r, j].unsqueeze(1))  # THIS city's registry
+            (self.tile_seat == row)
+            & (self.tile_city == self.city_id[:, row, j].unsqueeze(1))  # THIS city's registry
             & (d_ctr <= 3)
             & (self.district < 0)
             & (self.built_wonder < 0)
-            & (self.civ_city_at < 0)
-            & (self.center_at < 0)
+            & (self.centre_slot_at < 0)  # no seat's centre, sibling or foreign
             & (self.res_priority <= 1)
         )
 
-    def _wonder_unlock_ok(self, r: int, wi: int) -> torch.Tensor | None:
+    def _wonder_unlock_ok(self, row: int, wi: int) -> torch.Tensor | None:
         """[B] unlock for wonder wi, or None when its unlock or adjacency
         requirement sits outside the compact tree (-3: the TS includes() never
         matches, so the wonder is unbuildable for every seat)."""
@@ -58,13 +57,13 @@ class SimMinors:
             return None
         ok = torch.ones(self.B, dtype=torch.bool, device=self.device)
         if int(wrow.get("ut", -1)) >= 0:
-            ok = ok & self.civ_only_techs[:, r, int(wrow["ut"])]
+            ok = ok & self.civ_techs[:, row, int(wrow["ut"])]
         if int(wrow.get("uc", -1)) >= 0:
-            ok = ok & self.civ_only_civics[:, r, int(wrow["uc"])]
+            ok = ok & self.civ_civics[:, row, int(wrow["uc"])]
         return ok
 
-    def _wonder_cand(self, r: int, j: int, wi: int, base_ok: torch.Tensor) -> torch.Tensor:
-        """[B, T] candidate tiles for wonder wi at city (r, j) — the wok
+    def _wonder_cand(self, row: int, j: int, wi: int, base_ok: torch.Tensor) -> torch.Tensor:
+        """[B, T] candidate tiles for wonder wi at (row, j) — the wok
         bitplane plus the adjacency arms, exactly the scripted pick's terms."""
         wrow = self._wond_rows[wi]
         cand_w = base_ok & ((self.wok >> wi) & 1).bool()
@@ -77,7 +76,7 @@ class SimMinors:
             cand_w = cand_w & self._adj_res_live(int(wrow["adjR"]))
         return cand_w
 
-    def _queue_civ_wonder_at(self, r: int, j: int, wi: int, has_w: torch.Tensor, cand_w: torch.Tensor) -> None:
+    def _queue_wonder_at(self, row: int, j: int, wi: int, has_w: torch.Tensor, cand_w: torch.Tensor) -> None:
         """queueWonder's writes for rows `has_w` (each has a candidate in
         cand_w): pave the LOWEST-index tile, improvement dies, feature dies
         except floodplains, a bonus resource is stripped, registry + queue
@@ -96,19 +95,19 @@ class SimMinors:
         fresh_rs = (self.res_priority[rows_w, bwt] == 1) & ~self.res_stripped[rows_w, bwt]
         self.res_stripped[rows_w, bwt] = self.res_stripped[rows_w, bwt] | (self.res_priority[rows_w, bwt] == 1)
         self._withdraw_sea_adj(rows_w[fresh_rs], bwt[fresh_rs])
-        self.civ_city_wonder[rows_w, r, j, wi] = bwt
+        self.city_wonder[rows_w, row, j, wi] = bwt
         code_w = self.WONDER_BASE + wi
-        self.civ_city_current[:, r, j] = torch.where(has_w, torch.full_like(self.civ_city_current[:, r, j], code_w), self.civ_city_current[:, r, j])
-        self.civ_city_cost[:, r, j] = torch.where(has_w, torch.full_like(self.civ_city_cost[:, r, j], float(wrow["cost"])), self.civ_city_cost[:, r, j])
-        self.civ_city_progress[:, r, j] = torch.where(has_w, torch.zeros_like(self.civ_city_progress[:, r, j]), self.civ_city_progress[:, r, j])
+        self.city_current[:, row, j] = torch.where(has_w, torch.full_like(self.city_current[:, row, j], code_w), self.city_current[:, row, j])
+        self.city_cost[:, row, j] = torch.where(has_w, torch.full_like(self.city_cost[:, row, j], float(wrow["cost"])), self.city_cost[:, row, j])
+        self.city_progress[:, row, j] = torch.where(has_w, torch.zeros_like(self.city_progress[:, row, j]), self.city_progress[:, row, j])
         self._eff_version += 1  # a pave: features/improvements changed under the caches
 
-    def _seat_proj_cost(self, r: int) -> torch.Tensor:
+    def _seat_proj_cost(self, row: int) -> torch.Tensor:
         """The project cost — max(round(15·speed), round(dCost·0.5)) on THIS
-        civ's research; the districtCostIn twin the phase hoists."""
+        seat's research; the districtCostIn twin the phase hoists."""
         dcp = self.rules.district_cost
-        t_pct_r = self.civ_only_techs[:, r].to(torch.float64).mean(dim=1)
-        c_pct_r = self.civ_only_civics[:, r].to(torch.float64).mean(dim=1)
+        t_pct_r = self.civ_techs[:, row].to(torch.float64).mean(dim=1)
+        c_pct_r = self.civ_civics[:, row].to(torch.float64).mean(dim=1)
         d_cost = torch.floor(dcp.get("base", 32) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct_r, c_pct_r)))
         p_floor = float(round(15 * self.rules.game_speed))
         return torch.maximum(torch.full_like(d_cost, p_floor), js_round(d_cost * 0.5))

@@ -465,7 +465,7 @@ class SimInit:
         # The district-tile registry on the city-block seat axis (row 0 =
         # seat 0, rows 1.. = the civ seats; city-states pave no districts, so
         # no CS rows). EVERY row is live: writes at queue (_place_district /
-        # _place_district_civ), the capture rebuilds, and clears at every
+        # _place_district), the capture rebuilds, and clears at every
         # city-exit path; _district_discounted and _quest_owns_dist read one
         # body over city_dist_tile[:, row]. One base, one geometry.
         self.city_dist_tile = torch.full((B, 1 + r_pad, civ_city_pad, nd_b4), -1, dtype=torch.long, device=device)
@@ -1071,14 +1071,6 @@ class SimInit:
         self._appeal_floor = 2
         self._encamp_si = next((si for si, (di, _ut, _uc, _plc) in enumerate(self._scaffold) if di == self._encamp_didx), -1)
         self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
-        self._rl_district_active = True  # the RL production head may place districts — mask columns NB+2+NU+si
-        self._rl_any_city = True  # True lets non-capital cities place districts too
-        # Gold purchases (buy a building / settler / unit outright at
-        # gold_purchase_mult× production cost, mirroring purchaseBuilding /
-        # purchaseSettler / purchaseUnit). While True the production mask
-        # carries NB+1+NU extra purchase columns, so a checkpoint trained
-        # against the narrower head does not match.
-        self._rl_purchase_active = True
         # The seat-0 diplomacy head (declareWar / sueForPeace on a civ). While
         # False, war_mask() is all-False and step(war=…) is ignored, so nothing
         # samples or applies it; scripted/parity paths never pass war=.
@@ -1505,7 +1497,7 @@ class SimInit:
         self._appeal_cache = None  # _tile_appeal, _eff_version-keyed
         self._fadjf_cache = None
         self._rcy_cache = None
-        self._bld_cache = None
+        self._bld_cache: dict = {}  # (row, complete) -> (_eff_version, mask); one entry per seat row
         self._arangeNB = torch.arange(NB, device=device)
 
         # Seat 0's t0 units seed the pool HERE — after the roster tables and
@@ -1566,7 +1558,8 @@ class SimInit:
         self._nprod_cache = None
         self._adjd_cache = self._adjc_cache = self._adjh_cache = None
         self._dadj_cache = None
-        self._fadjq_cache = self._fadjf_cache = self._rcy_cache = self._bld_cache = None
+        self._fadjq_cache = self._fadjf_cache = self._rcy_cache = None
+        self._bld_cache = {}
         # Beliefs/units are back to pristine — bump the counters and drop the
         # civ-phase caches (the bel_add memo is keyed on _bel_version alone).
         self._bel_version += 1
@@ -1810,7 +1803,8 @@ class SimInit:
         self._nprod_cache = None
         self._adjd_cache = self._adjc_cache = self._adjh_cache = None
         self._dadj_cache = None
-        self._fadjq_cache = self._fadjf_cache = self._rcy_cache = self._bld_cache = None
+        self._fadjq_cache = self._fadjf_cache = self._rcy_cache = None
+        self._bld_cache = {}
         # The restored snapshot may carry different beliefs/units — bump the
         # counters and drop the civ-phase caches.
         self._bel_version += 1
