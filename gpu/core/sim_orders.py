@@ -93,7 +93,6 @@ class SimOrders:
                     self._step_verb(  # the shared step contract
                         ok, sc + simbase.SEAT0_POOL_MAX, here, tgt, a.clamp(min=0, max=5),
                         r + 1, is_civ,
-                        camp_civ=torch.full((B,), r, dtype=torch.long, device=dev),
                     )
             # --- attacks 6-11 (military only; the shared resolution handles
             # barbarian and seat-0 defenders, lone civilians and city
@@ -897,7 +896,7 @@ class SimOrders:
                 # Religious enhancer defender adders, for CIV defenders only
                 # (barbarians carry none; embarked takes the flat override, no
                 # term; the seat-0 attacker term is structurally 0).
-                def_e = def_e + torch.where(v_embd, torch.zeros_like(def_e), self._rel_def_cs(torch.where(is_b, torch.full_like(_tgt_civ, -1), _tgt_civ), tgt).to(def_e.dtype))
+                def_e = def_e + torch.where(v_embd, torch.zeros_like(def_e), self._rel_def_cs(torch.where(is_b, torch.full_like(_tgt_civ, -1), _tgt_civ + 1), tgt).to(def_e.dtype))
                 # Great General/Admiral aura. Seat 0's attacker is keyed on
                 # `here`; a civ defender (_tgt_civ+1) on `tgt` (barbarian → no
                 # aura). Embarked/naval select the ADMIRAL plane, added on top
@@ -968,7 +967,7 @@ class SimOrders:
                 _, _sp = self._flank_support(tgt, torch.where(is_b, torch.full_like(_tgt_civ, BARB_SEAT), _tgt_civ + 1), torch.full_like(tgt, -1))
                 def_e = def_e + SUPPORT_CS * torch.where(v_embd, torch.zeros_like(_sp), _sp)
                 # civ-defender enhancer adders (embarked = flat, none)
-                def_e = def_e + torch.where(v_embd, torch.zeros_like(def_e), self._rel_def_cs(torch.where(is_b, torch.full_like(_tgt_civ, -1), _tgt_civ), tgt).to(def_e.dtype))
+                def_e = def_e + torch.where(v_embd, torch.zeros_like(def_e), self._rel_def_cs(torch.where(is_b, torch.full_like(_tgt_civ, -1), _tgt_civ + 1), tgt).to(def_e.dtype))
                 # Aura: seat 0's attacker keyed on its own tile; a civ defender
                 # (_tgt_civ+1) on `tgt` (barbarian → none). Naval/embarked take the
                 # ADMIRAL plane.
@@ -1029,7 +1028,7 @@ class SimOrders:
                 def_e = def_e + SUPPORT_CS * torch.where(civ_embd, torch.zeros_like(_sp), _sp)
                 # A civilian defender takes the enhancer defender adders too
                 # (TS defenderCS applies to any unit).
-                def_e = def_e + torch.where(civ_embd, torch.zeros_like(def_e), self._rel_def_cs(vc_civ_t, tgt).to(def_e.dtype))
+                def_e = def_e + torch.where(civ_embd, torch.zeros_like(def_e), self._rel_def_cs(vc_civ_t + 1, tgt).to(def_e.dtype))
                 # Attacker aura only: the defender is a CIVILIAN (combat 0) and
                 # generalAuraCS returns 0 for civilians.
                 atk_naval = self.unit_naval[self.seat0_unit_type[:, p].clamp(min=0, max=self.NU - 1)] | self.seat0_unit_emb[:, p]

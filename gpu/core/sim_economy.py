@@ -1218,43 +1218,42 @@ class SimEconomy:
         self._rel_planes_cache = (key, out)
         return out
 
-    def _rel_atk_cs(self, civ_r: torch.Tensor, battle_tile: torch.Tensor) -> torch.Tensor:
-        """Enhancer ATTACKER adders (Just War near + Crusade onto
-        following-city territory) for units of civ index civ_r ([B], -1 =
-        barbarian/none). Seat 0's units carry no religion — holy_tile[:, 0] is
-        never set — so the seat-0 term is structurally 0 and omitted at the
-        call sites. Returns f64 [B]."""
-        if not self._enh_combat_any or self.R == 0 or not bool((self.civ_only_enhancer >= 0).any()):
-            return torch.zeros(self.B, dtype=torch.float64, device=self.device)
-        cr = civ_r.clamp(min=0, max=self.R - 1)
-        has = (civ_r >= 0) & self.civ_only_religion_done.gather(1, cr.unsqueeze(1)).squeeze(1)
-        eidx = self.civ_only_enhancer.gather(1, cr.unsqueeze(1)).squeeze(1) + 1  # [B] 0 = pad
-        eidx = torch.where(has, eidx, torch.zeros_like(eidx))
-        g = (cr + 1).unsqueeze(1)  # religion id [B, 1]
-        near3, terr = self._rel_combat_planes()
-        bt = battle_tile.clamp(min=0).unsqueeze(1)
-        nr = near3.gather(1, g.unsqueeze(2).expand(-1, -1, self.T)).squeeze(1).gather(1, bt).squeeze(1)
-        tr = terr.gather(1, g.unsqueeze(2).expand(-1, -1, self.T)).squeeze(1).gather(1, bt).squeeze(1)
-        add = self._enh["cnear"][eidx] * nr.double() + self._enh["cvs"][eidx] * tr.double()
-        return torch.where(has & (battle_tile >= 0), add, torch.zeros_like(add))
+    def _rel_combat_adder(self, seat: torch.Tensor, tile: torch.Tensor, terr_key: str) -> torch.Tensor:
+        """The shared body of the two enhancer combat adders — `terr_key`
+        picks the TERRITORY clause ("cvs" Crusade for an attacker, "cdef"
+        Defender of the Faith for a defender); the Just War proximity clause
+        ("cnear") is common to both.
 
-    def _rel_def_cs(self, civ_r: torch.Tensor, def_tile: torch.Tensor) -> torch.Tensor:
-        """Enhancer DEFENDER adders (Just War near + Defender of the Faith on
-        following-city territory) for unit defenders of civ index civ_r ([B],
-        -1 = barbarian/seat 0/none). f64 [B]."""
-        if not self._enh_combat_any or self.R == 0 or not bool((self.civ_only_enhancer >= 0).any()):
+        `seat` is an ABSOLUTE seat per game ([B] long). A religion's id IS its
+        founder's seat, so seats 0..R index the belief planes directly and one
+        gather serves every seat; anything else — a barbarian, a city-state,
+        NO_SEAT — falls outside that range and contributes 0. Returns f64 [B].
+        """
+        if not self._enh_combat_any or not bool((self.civ_enhancer >= 0).any()):
             return torch.zeros(self.B, dtype=torch.float64, device=self.device)
-        cr = civ_r.clamp(min=0, max=self.R - 1)
-        has = (civ_r >= 0) & self.civ_only_religion_done.gather(1, cr.unsqueeze(1)).squeeze(1)
-        eidx = self.civ_only_enhancer.gather(1, cr.unsqueeze(1)).squeeze(1) + 1
+        g = seat.clamp(min=0, max=self._O - 1)
+        has = (seat >= 0) & (seat < self._O) & self.civ_religion_done.gather(1, g.unsqueeze(1)).squeeze(1)
+        eidx = self.civ_enhancer.gather(1, g.unsqueeze(1)).squeeze(1) + 1  # [B] 0 = pad
         eidx = torch.where(has, eidx, torch.zeros_like(eidx))
-        g = (cr + 1).unsqueeze(1)
+        gi = g.unsqueeze(1)  # religion id [B, 1]
         near3, terr = self._rel_combat_planes()
-        bt = def_tile.clamp(min=0).unsqueeze(1)
-        nr = near3.gather(1, g.unsqueeze(2).expand(-1, -1, self.T)).squeeze(1).gather(1, bt).squeeze(1)
-        tr = terr.gather(1, g.unsqueeze(2).expand(-1, -1, self.T)).squeeze(1).gather(1, bt).squeeze(1)
-        add = self._enh["cnear"][eidx] * nr.double() + self._enh["cdef"][eidx] * tr.double()
-        return torch.where(has & (def_tile >= 0), add, torch.zeros_like(add))
+        bt = tile.clamp(min=0).unsqueeze(1)
+        nr = near3.gather(1, gi.unsqueeze(2).expand(-1, -1, self.T)).squeeze(1).gather(1, bt).squeeze(1)
+        tr = terr.gather(1, gi.unsqueeze(2).expand(-1, -1, self.T)).squeeze(1).gather(1, bt).squeeze(1)
+        add = self._enh["cnear"][eidx] * nr.double() + self._enh[terr_key][eidx] * tr.double()
+        return torch.where(has & (tile >= 0), add, torch.zeros_like(add))
+
+    def _rel_atk_cs(self, seat: torch.Tensor, battle_tile: torch.Tensor) -> torch.Tensor:
+        """`religionAttackCS` — the enhancer ATTACKER adders (Just War near +
+        Crusade onto following-city territory) for the units of ABSOLUTE seat
+        `seat` ([B] long). f64 [B]."""
+        return self._rel_combat_adder(seat, battle_tile, "cvs")
+
+    def _rel_def_cs(self, seat: torch.Tensor, def_tile: torch.Tensor) -> torch.Tensor:
+        """`religionDefenseCS` — the enhancer DEFENDER adders (Just War near +
+        Defender of the Faith on following-city territory) for the units of
+        ABSOLUTE seat `seat` ([B] long). f64 [B]."""
+        return self._rel_combat_adder(seat, def_tile, "cdef")
 
     def _gen_aura_planes(self):
         """Per (batch, unified-civ g, tile) booleans — land[b, g, t] = tile t

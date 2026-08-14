@@ -532,6 +532,9 @@ class SimInit:
         self.UNIT_MAX = simbase.SEAT0_POOL_MAX + 2 * simbase.POOL_MAX
         self.POOL_LO = {"seat0": 0, "civ": simbase.SEAT0_POOL_MAX, "barb": simbase.SEAT0_POOL_MAX + simbase.POOL_MAX}
         self.POOL_HI = {"seat0": simbase.SEAT0_POOL_MAX, "civ": simbase.SEAT0_POOL_MAX + simbase.POOL_MAX, "barb": simbase.SEAT0_POOL_MAX + 2 * simbase.POOL_MAX}
+        #: The APPEND CURSOR behind each pool, named once. Every spawn, capture
+        #: and compaction reads it from here rather than re-deriving the name.
+        self.POOL_NEXT = {"seat0": "seat0_unit_next", "civ": "civ_unit_next", "barb": "next_slot"}
         self._UNIT_PLANES: list = []
         for _pl, _dt in (
             ("alive", torch.bool),      # a slot holds a living unit

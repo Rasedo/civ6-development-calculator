@@ -462,30 +462,33 @@ def poke_combat_cs(rules, rj, path):
     sim.city_followed[0, 0, c] = g
     sim.owner[0, ctr] = c  # the center tile is seat-0-owned -> terr[g, ctr] true
     sim._rel_planes_cache = None
-    civ = torch.tensor([r])
+    seat = torch.tensor([g])  # a religion's id IS its founder's seat
     bt = torch.tensor([ctr])
 
     sim.civ_only_enhancer[:, r] = E["JUST_WAR"]
-    atk = float(sim._rel_atk_cs(civ, bt)[0])
-    dfn = float(sim._rel_def_cs(civ, bt)[0])
+    atk = float(sim._rel_atk_cs(seat, bt)[0])
+    dfn = float(sim._rel_def_cs(seat, bt)[0])
     assert atk == 10.0 and dfn == 10.0, f"JUST_WAR near adder wrong (atk {atk}, def {dfn})"
 
     sim.civ_only_enhancer[:, r] = E["CRUSADE"]
-    atk_c = float(sim._rel_atk_cs(civ, bt)[0])
+    atk_c = float(sim._rel_atk_cs(seat, bt)[0])
     assert atk_c == 10.0, f"CRUSADE attack-on-territory adder wrong ({atk_c})"
 
     sim.civ_only_enhancer[:, r] = E["DEFENDER"]
-    dfn_d = float(sim._rel_def_cs(civ, bt)[0])
+    dfn_d = float(sim._rel_def_cs(seat, bt)[0])
     assert dfn_d == 5.0, f"DEFENDER defend-on-territory adder wrong ({dfn_d})"
 
-    # a religion-less participant (barbarian / seat 0, civ_r = -1) gets nothing.
+    # a seat outside the religion id space (a barbarian, a city-state, nobody)
+    # gets nothing.
     z = float(sim._rel_atk_cs(torch.tensor([-1]), bt)[0])
-    assert z == 0.0, f"barb/seat 0 must get no religious combat bonus ({z})"
+    assert z == 0.0, f"a seat with no religion must get no combat bonus ({z})"
+    zb = float(sim._rel_atk_cs(torch.tensor([200]), bt)[0])
+    assert zb == 0.0, f"a barbarian must get no religious combat bonus ({zb})"
 
     # no founded religion -> no adder either.
     sim.civ_only_religion_done[:, r] = False
     sim.civ_only_enhancer[:, r] = E["JUST_WAR"]
-    z2 = float(sim._rel_atk_cs(civ, bt)[0])
+    z2 = float(sim._rel_atk_cs(seat, bt)[0])
     assert z2 == 0.0, f"unfounded religion must give no combat bonus ({z2})"
     print("  7 enhancer combat CS OK (JUST_WAR +10 atk/def, CRUSADE +10 atk, DEFENDER +5 def)")
 

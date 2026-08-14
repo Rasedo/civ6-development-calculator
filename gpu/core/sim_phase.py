@@ -1546,7 +1546,7 @@ class SimPhase:
         # The field list is DERIVED from the pool's plane list, never
         # transcribed — a hand-written list drifts and silently leaves a plane
         # behind at the old slot index. `alive` permutes separately.
-        counter = {"barb": "next_slot", "civ": "civ_unit_next"}.get(prefix, "seat0_unit_next")
+        counter = self.POOL_NEXT[prefix]
         maps: list = []
         fields = [f"{prefix}_unit_{pl}" for pl in self._UNIT_PLANES if pl != "alive"]
         alive = getattr(self, f"{prefix}_unit_alive")

@@ -651,12 +651,38 @@ class SimMasks:
         spot = cand7.gather(1, first.clamp(max=6).unsqueeze(1)).squeeze(1)
         return first < 7, spot
 
-    def _barb_water_ok(self, tiles: torch.Tensor) -> torch.Tensor:
-        """The water plane a BARBARIAN hull may enter — wpass minus
-        OCEAN. Barbarians own no tech, so TS's waterEnterable (which gates
-        OCEAN on the owner's CARTOGRAPHY) always refuses ocean for them."""
-        tc = tiles.clamp(min=0).unsqueeze(1)
-        return (self.wpass.gather(1, tc) & ~self.ocean_tile.gather(1, tc)).squeeze(1)
+    def _seat_tech(self, seat: torch.Tensor, tech: int) -> torch.Tensor:
+        """[B] bool — does the seat named per game in `seat` hold tech `tech`?
+
+        `seat` is an ABSOLUTE seat; anything outside 0..R (a barbarian, a
+        city-state, NO_SEAT) holds no tech, and a `tech` the rules table does
+        not define is False everywhere. The research planes are the merged
+        `civ_techs[:, row]` block, so seat 0 needs no arm of its own."""
+        if tech < 0:
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        rows = seat.clamp(min=0, max=self.R)
+        bidx = torch.arange(self.B, device=self.device)
+        return (seat >= 0) & (seat <= self.R) & self.civ_techs[bidx, rows, tech]
+
+    def _advance_terrain(self, u_type: torch.Tensor, u_seat: torch.Tensor,
+                         dest: torch.Tensor) -> torch.Tensor:
+        """`tileFreeForUnit`'s TERRAIN half for a post-battle ADVANCE — the
+        check `_blocked_for` (occupancy only) omits, without which an attacker
+        would advance onto the water tile of a just-killed embarked enemy.
+
+        meleeAttack passes allowEmbark FALSE, so a LAND unit takes the land
+        plane and never crosses to water; a NAVAL hull takes enterable water,
+        OCEAN behind its OWN seat's CARTOGRAPHY, and never comes ashore.
+        Barbarians raid by sea too (the GALLEY / QUADRIREME) and hold no tech,
+        so their water plane is wpass minus OCEAN — exactly what
+        waterEnterable allows them, with no arm of its own."""
+        dc = dest.clamp(min=0).unsqueeze(1)
+        land_ok = self.passable.gather(1, dc).squeeze(1)
+        water_ok = self.wpass.gather(1, dc).squeeze(1) & (
+            ~self.ocean_tile.gather(1, dc).squeeze(1)
+            | self._seat_tech(u_seat, self._cartography_tech)
+        )
+        return torch.where(self.unit_naval[u_type.clamp(min=0, max=self.NU - 1)], water_ok, land_ok)
 
     def _spawn_barb(self, mask: torch.Tensor, at_tile: torch.Tensor, unit_type: int, naval: bool = False) -> None:
         """Barbarians are military; appends to the slot list, which is what
@@ -982,10 +1008,10 @@ class SimMasks:
             free = free | (harbor & own.gather(1, land.unsqueeze(1)).squeeze(1))
         return trans & bit & ~free
 
-    def _clear_camp_at(self, mask: torch.Tensor, tile: torch.Tensor, civ: torch.Tensor | None = None) -> None:
+    def _clear_camp_at(self, mask: torch.Tensor, tile: torch.Tensor, seat: torch.Tensor | None = None) -> None:
         """A non-barbarian unit entering a camp tile clears it: +50 gold to
-        ITS seat (pass civ=[B] civ ids; None banks it to seat 0) and the camp
-        list splices left (order matters for later garrison loops)."""
+        ITS seat (`seat` is a [B] ABSOLUTE seat; None means seat 0) and the
+        camp list splices left (order matters for later garrison loops)."""
         if not bool(mask.any()):
             return
         hit = mask & (self.camp_tile == tile.unsqueeze(1)).any(dim=1)
@@ -999,12 +1025,7 @@ class SimMasks:
             row[k:-1] = row[k + 1 :].clone()
             row[-1] = -1
             self.n_camps[b] -= 1
-            if civ is None:
-                self.treasury[b] += reward
-            else:
-                self.civ_only_treasury[b, int(civ[b])] += float(reward)
-
-    # --- seat-0 unit actions (phase 4b) ---------------------------------------
+            self.civ_treasury[b, 0 if seat is None else int(seat[b])] += float(reward)
 
 
     def _type_civic_slot_ok(self, per_city: bool) -> torch.Tensor:
