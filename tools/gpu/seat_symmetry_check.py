@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """STATIC seat-symmetry + attribute-resolution check for the GPU engine.
 
-Three things the compile bar cannot see, because `BatchSim`'s namespace is
+Four things the compile bar cannot see, because `BatchSim`'s namespace is
 built by `setattr` in a loop and there is no `__getattr__` fallback:
 
 1. A DANGLING ATTRIBUTE. `self.C` was deleted when every seat row got one
@@ -13,7 +13,13 @@ built by `setattr` in a loop and there is no `__getattr__` fallback:
    restore must round-trip its BASE and never the view (a view restored
    beside its base is copied twice, and a rebind would orphan it).
 
-3. THE SEAT-0 FORK CENSUS. Every `row == 0` / `seat == 0` / `row - 1` style
+3. A SHADOWED METHOD. `self.x = <tensor>` in the constructor and `def x` on a
+   mixin are the same attribute; the instance binding wins, so every
+   `self.x(...)` call is a TypeError and every `self.x[...]` read on the
+   method is one too. Two mixin files never mention each other, so nothing
+   short of running the engine notices.
+
+4. THE SEAT-0 FORK CENSUS. Every `row == 0` / `seat == 0` / `row - 1` style
    branch in the engine is either a WIRE limit with a name, or work that has
    not been done. The allowlist below names every survivor; anything else
    fails, so a new fork cannot arrive quietly.
@@ -44,21 +50,20 @@ READERS = ("gpu", "policy", "tests/gpu", "tools/gpu")
 # ---------------------------------------------------------------------------
 FORK_ALLOW = {
     # --- PERMANENT: the two index spaces have to meet somewhere ------------
-    ("env.py", "_row"): "the seat->row map itself",
     ("simbase.py", "seat_of_index"): "the row->seat map itself",
-    ("sim_phase.py", "_seat_row"): "the row->seat map's engine-side twin",
     # --- WIRE LIMITS, named ------------------------------------------------
     ("env.py", "step"): "#108 — row 0's action interface + unit-order replay position",
     # --- BURN-DOWN (#111). Delete the entry with the stage that closes it. --
+    # The civ-PAIR planes (denounce / ally / warkind / strengths / proximity)
+    # have no seat-0 row, so civ<->civ diplomacy is still a space seat 0
+    # cannot enter. `apply_geo` and `_extract_geo` are where the row space and
+    # the civ-pair space meet, and nowhere else.
     ("sim_seats.py", "_civ_pair_strengths"): "#111 s5 — civ-pair planes have no seat-0 row",
-    ("sim_seats.py", "_civ_pair_proximity"): "#111 s5 — civ-pair planes have no seat-0 row",
-    ("drive.py", "_geo_turn"): "#111 s5 — civ-pair planes have no seat-0 row",
     ("sim_seats.py", "apply_geo"): "#111 s5 — the ONE row->civ-pair conversion",
+    ("sim_economy.py", "_ww_era_base"): "#111 s5 — civ_pair_warkind has no seat-0 row",
+    ("drive.py", "_geo_turn"): "#111 s5 — civ-pair planes have no seat-0 row",
     ("drive.py", "geo_decide_and_apply"): "#111 s5 — civ-pair planes have no seat-0 row",
     ("drive.py", "_extract_geo"): "#111 s5 — the record's civ-pair targets",
-    ("sim_economy.py", "_ww_era_base"): "#111 s5 — civ_pair_warkind has no seat-0 row",
-    ("sim_phase.py", "_seat_city_produce"): "#111 s4 — victory_type is scored vs seat 0",
-    ("sim_seats.py", "seat_masks"): "#111 s5 — the WAR_COLUMN_SEAT head fork",
 }
 
 FORK_PATTERNS = (
@@ -431,7 +436,42 @@ def mutable_names() -> set[str]:
 
 
 # ---------------------------------------------------------------------------
-# 3. the fork census
+# 3. the shadowed-method check
+# ---------------------------------------------------------------------------
+def shadowed_methods() -> list[tuple[str, str, str, int]]:
+    """Names bound as DATA on `self` that are also a `def` in gpu/core.
+
+    The instance binding wins over the class attribute, so the method is
+    unreachable from that point on and every call site raises. This is how
+    `self._seat_row = <seat->row tensor>` silently killed `_seat_row(row)`,
+    the seat-loop body, in the same round that unified it.
+
+    Returns (name, the file that defines it, the file that binds it, line)."""
+    defs: dict[str, str] = {}
+    binds: dict[str, tuple[str, int]] = {}
+    for path in sorted(CORE.glob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        rel = path.name
+        for cls in [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]:
+            for st in cls.body:
+                if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    defs.setdefault(st.name, rel)
+        for node in ast.walk(tree):
+            targets: list[ast.expr] = []
+            if isinstance(node, ast.Assign):
+                targets = list(node.targets)
+            elif isinstance(node, ast.AnnAssign):
+                targets = [node.target]
+            for t in targets:
+                for sub in ([t] if not isinstance(t, (ast.Tuple, ast.List)) else t.elts):
+                    if (isinstance(sub, ast.Attribute) and isinstance(sub.value, ast.Name)
+                            and sub.value.id == "self"):
+                        binds.setdefault(sub.attr, (rel, sub.lineno))
+    return sorted((n, defs[n], binds[n][0], binds[n][1]) for n in set(defs) & set(binds))
+
+
+# ---------------------------------------------------------------------------
+# 4. the fork census
 # ---------------------------------------------------------------------------
 def _code_lines(src: str) -> dict[int, str]:
     """line -> its CODE text, strings and comments blanked out.
@@ -501,15 +541,32 @@ def main(census_only: bool = False) -> int:
         for d_ in dupes:
             print(f"  {d_}")
 
-    stray = [h for h in fork_census() if (h[0], h[1]) not in FORK_ALLOW]
+    shadowed = shadowed_methods()
+    if shadowed:
+        fails += 1
+        print("SHADOWED METHOD — a data attribute buries a def of the same name:")
+        for nm, dfile, bfile, bline in shadowed:
+            print(f"  {nm}  (def in {dfile}, bound at {bfile}:{bline})")
+
+    census = fork_census()
+    stray = [h for h in census if (h[0], h[1]) not in FORK_ALLOW]
     if stray:
         fails += 1
         print("UNALLOWED SEAT FORK — every survivor must be named in FORK_ALLOW:")
         for f, fn, label, ln, code in stray:
             print(f"  {f}:{ln} [{fn}] {label}  {code[:80]}")
+    # A STALE allowlist entry is a fork someone closed without saying so — and
+    # the next one to arrive in that function would land pre-forgiven.
+    live = {(h[0], h[1]) for h in census}
+    rot = sorted(k for k in FORK_ALLOW if k not in live)
+    if rot:
+        fails += 1
+        print("STALE FORK_ALLOW ENTRY — the fork is gone; delete the line:")
+        for f, fn in rot:
+            print(f"  {f} [{fn}] — {FORK_ALLOW[(f, fn)]}")
 
     if fails:
-        print(f"\nseat-symmetry check FAILED ({fails} of 3)")
+        print(f"\nseat-symmetry check FAILED ({fails} of 4)")
         return 1
     print(f"seat-symmetry check OK — {len(known)} bound attributes, "
           f"{len(aliases)} aliases, {len(FORK_ALLOW)} allowed forks")

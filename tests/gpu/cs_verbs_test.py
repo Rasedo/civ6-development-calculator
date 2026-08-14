@@ -122,9 +122,8 @@ def prep_levy(sim, s: int, envoys: int = 5) -> None:
     """Isolate the levy: R at war + suzerain of a militaristic CS, the OTHER
     civ inert (peace, no gold), queues cleared, R's unit quota met."""
     clear_queues(sim)
-    sim.civ_only_atwar[0, R] = True
-    sim.civ_only_atwar[0, OTHER] = False
-    sim.sync_war()  # a poke must write the legacy stores too
+    sim.war[0, 0, 1 + R] = sim.war[0, 1 + R, 0] = True
+    sim.war[0, 0, 1 + OTHER] = sim.war[0, 1 + OTHER, 0] = False
     sim.civ_treasury[0, OTHER + 1] = 0.0  # the shared unit_next pool must not grow from OTHER's buys
     make_suzerain_mil(sim, s, envoys)
     meet_quota(sim, R)
@@ -180,8 +179,7 @@ def main() -> None:
     # both engines (refusal parity); the driver simply never emits one.
     sim.restore(base)
     prep_levy(sim, S0)
-    sim.civ_only_atwar[0, R] = False
-    sim.sync_war()  # a poke must write the legacy stores too
+    sim.war[0, 0, 1 + R] = sim.war[0, 1 + R, 0] = False
     stash_levy(sim, S0)
     sim.civ_treasury[0, R + 1] = cost
     sim._seat_phase()

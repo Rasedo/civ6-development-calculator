@@ -241,7 +241,7 @@ def poke_aura_in_combat(rules, rj, path):
         nonlocal gi
         gi = sim._general_unit_idx
         clear_all_units(sim)
-        sim.civ_only_atwar[:, 0] = True
+        sim.war[:, 0, 1 + 0] = sim.war[:, 1 + 0, 0] = True
         sim.sync_war()  # a poked war write lands in one cell; mirror the pair
         ctr = int(sim.city_center[0, 0, 0])
         # the seat-0 defender at a free tile; a civ attacker adjacent to it
@@ -290,7 +290,7 @@ def poke_capture(rules, rj, path):
     sim = build(rules, path)
     gi = sim._general_unit_idx
     clear_all_units(sim)
-    sim.civ_only_atwar[:, 0] = True
+    sim.war[:, 0, 1 + 0] = sim.war[:, 1 + 0, 0] = True
     sim.sync_war()  # a poked war write lands in one cell; mirror the pair
     ctr = int(sim.city_center[0, 0, 0])
     gtile = tile_within(sim, ctr, 4)

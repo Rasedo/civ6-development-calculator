@@ -15,7 +15,7 @@ import { envoysOf, setMet } from '../../cpu/core/cityStates';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import { seatPhase } from '../../cpu/core/phase';
 import { prodLayout } from '../../cpu/core/prodLayout';
-import { cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOfIndex, setTileOwner, setWar, tileSeat } from '../../cpu/core/seats';
+import { cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOfIndex, setTileOwner, setWar, setWarTurnsWith, tileSeat } from '../../cpu/core/seats';
 import { tilesWithin, neighbors } from '../../world/hex';
 import { spawnUnit } from '../../cpu/core/units';
 import { isWater, isImpassable } from '../../world/query';
@@ -31,7 +31,7 @@ function addCiv(state: GameState, col: number, row: number): Seat {
     ww: {}, wwTurn: {}, diplomaticFavor: 0, diplomaticPoints: 0, influencePoints: 0,
     envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0,
     tourism: 0, government: { current: null, policies: [] }, cities: [], nextCityId: 0,
-    warTurns: 0, peaceTurns: 0,
+    peaceTurns: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     gpp: {}, gpEarned: [], buildersTrained: 0, bestMeleeCS: 0,
     tilesPurchased: 0, spaceProjects: [],
@@ -239,7 +239,7 @@ describe('#70 the action FILE drives the TS civ', () => {
       const state = makeState(makeMap(14, 14, 'GRASSLAND'));
       const civ = addCiv(state, 6, 6);
       setWar(state, civ.seat, 0, true);
-      civ.warTurns = warTurns;
+      setWarTurnsWith(state, civ.seat, 0, warTurns);
       civ.treasury = treasury;
       const R = 1; // one civ in this fixture — peace col = R
       state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [], tech: null, civic: null, war: R, units: [] } } };

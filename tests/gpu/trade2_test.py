@@ -64,7 +64,7 @@ def main() -> None:
     sim.seat_routes[0, 1, 0, 1] = -1                        # intl: dest carried below
     sim.seat_route_dest[0, 1, 0] = dest_tile
     sim.seat_route_exp[0, 1, 0] = int(sim.turn) + sim._trade_duration
-    sim.civ_only_atwar[0, 0] = False
+    sim.war[0, 0, 1 + 0] = sim.war[0, 1 + 0, 0] = False
     sim.sync_war()  # close the poke under transpose
     sim._seat_route_cache = None
     inc = sim._seat_route_income(1)
@@ -76,12 +76,12 @@ def main() -> None:
         assert abs(float(inc[0, 0, col])) < 1e-9, f"intl route must not pay {name}"
 
     # destination interdiction: war with the destination seat suspends income
-    sim.civ_only_atwar[0, 0] = True
+    sim.war[0, 0, 1 + 0] = sim.war[0, 1 + 0, 0] = True
     sim.sync_war()  # close the poke under transpose
     sim._seat_route_cache = None
     inc = sim._seat_route_income(1)
     assert inc is None or abs(float(inc[0, 0, 2])) < 1e-9, "intl income must be suspended at war"
-    sim.civ_only_atwar[0, 0] = False
+    sim.war[0, 0, 1 + 0] = sim.war[0, 1 + 0, 0] = False
     sim.sync_war()  # close the poke under transpose
 
     # a completed specialty district at the destination adds 1 gold each

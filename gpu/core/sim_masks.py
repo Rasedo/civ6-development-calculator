@@ -49,24 +49,41 @@ class SimMasks:
         """[B, S] seat 0's row of `_seat_envoy_mask` — no mask of its own."""
         return self._seat_envoy_mask(0)
 
-    def war_mask(self) -> torch.Tensor:
-        """[B, 2R] seat-0 diplomacy actions: columns 0..R-1 declare war on that
-        civ (declareWar: alive & not already at war — free, no RNG), R..2R-1
-        sue for peace (sueForPeace: at war for >= warMinTurns and treasury
-        covers peaceGold0 + peaceGoldSlope·warTurns). All-False while
+    def war_targets(self, row: int) -> list[int]:
+        """The seat rows this row's war head addresses, in ascending seat
+        order — every OTHER major, so the head is R wide for every row and
+        column k means the same KIND of thing whoever asks.
+
+        For row 0 that is [1 .. R], the layout the wire has always carried; for
+        a civ row column 0 is seat 0 and the rest are the other civs, which is
+        what the single-axis head used to leave dead."""
+        return [k if k < row else k + 1 for k in range(self.R)]
+
+    def _seat_war_mask(self, row: int) -> torch.Tensor:
+        """[B, 2R] seat row `row`'s diplomacy actions over `war_targets(row)`:
+        columns 0..R-1 declare war on that seat (declareWar: both alive & not
+        already at war — free, no RNG), R..2R-1 sue it for peace (sueForPeace:
+        at war for >= warMinTurns of THAT war and the treasury covers
+        peaceGold0 + peaceGoldSlope·warTurns of THAT war). All-False while
         _rl_war_active is off — the head exists but nothing samples it."""
         B, dev = self.B, self.device
-        R = max(self.R, 1)
+        Rw = max(self.R, 1)
         if self.R == 0 or not self._rl_war_active:
-            return torch.zeros(B, 2 * R, dtype=torch.bool, device=dev)
+            return torch.zeros(B, 2 * Rw, dtype=torch.bool, device=dev)
         rr = self.rules.seats
-        declare = self.civ_alive[:, 1:] & ~self.civ_only_atwar
-        cost = rr.get("peaceGold0", 150) + rr.get("peaceGoldSlope", 10) * self.civ_only_warturns.to(self.dtype)
+        idx = torch.tensor(self.war_targets(row), dtype=torch.long, device=dev)
+        # BOTH sides have to be alive. Row 0's arm used to test only the
+        # target (its own liveness is a given) and a civ's only itself (its
+        # target was seat 0); the conjunction is each of those on its own row.
+        live = self.civ_alive[:, row].unsqueeze(1) & self.civ_alive[:, idx]
+        at_war = self.war[:, row, idx]                      # [B, R]
+        wt = self.war_turns[:, row, idx]                    # [B, R] THIS war's clock
+        cost = rr.get("peaceGold0", 150) + rr.get("peaceGoldSlope", 10) * wt.to(torch.float64)
+        declare = live & ~at_war
         peace = (
-            self.civ_alive[:, 1:]
-            & self.civ_only_atwar
-            & (self.civ_only_warturns >= rr.get("warMinTurns", 14))  # ONE min-war-turns rule, every seat
-            & self._afford(self.civ_treasury[:, 0].unsqueeze(1), cost)
+            live & at_war
+            & (wt >= rr.get("warMinTurns", 14))  # ONE min-war-turns rule, every seat
+            & self._afford(self.civ_treasury[:, row].unsqueeze(1), cost)
         )
         return torch.cat([declare, peace], dim=1)
 

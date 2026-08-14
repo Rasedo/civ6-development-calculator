@@ -501,7 +501,7 @@ def poke_messenger_route(rules, rj, path):
     g = r + 1
     E = enh_rows(sim)
     sim.civ_religion_done[:, r + 1] = True
-    sim.civ_only_atwar[:, r] = False
+    sim.war[:, 0, 1 + r] = sim.war[:, 1 + r, 0] = False
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     sim.barb_unit_alive[:] = False
     sim.military_at[:] = -1  # no raiders left to suspend the route

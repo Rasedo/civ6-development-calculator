@@ -836,7 +836,7 @@ export function endTurn(state: GameState, seat: number): void {
     barbarianPhase(state, seat);
   }
   if (state.disasters) disasterPhase(state);
-  cityStatePhase(state, seat);
+  cityStatePhase(state);
   seatPhase(state, seat);
 
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { civsAtWar, seatOfIndex, setWar } from '../../../cpu/core/seats';
+import { civsAtWar, seatOfIndex, setWar, setWarTurnsWith, warTurnsWith } from '../../../cpu/core/seats';
 import { makeState, tileAtCoords } from '../helpers';
 import { declareWarOnCityState, sueForPeaceWithCityState } from '../../../cpu/core/cityStates';
 import { cityStatePhase } from '../../../cpu/core/cityStates';
@@ -51,7 +51,6 @@ function addCiv(state: GameState, id: number, atWar: boolean): Seat {
     cities: [],
     nextCityId: 0,
     wars: [], formalWars: [], denounced: {}, allies: [],
-    warTurns: atWar ? 20 : 0,
     peaceTurns: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     gpp: {},
@@ -64,6 +63,7 @@ function addCiv(state: GameState, id: number, atWar: boolean): Seat {
   } as unknown as Seat;
   state.seats.push(civ);
   setWar(state, civ.seat, 0, atWar);
+  if (atWar) setWarTurnsWith(state, civ.seat, 0, 20);
   return civ;
 }
 
@@ -75,13 +75,13 @@ describe('#50: seat 0 <-> city-state peace', () => {
     expect(civsAtWar(state, cityState.seat, 0)).toBe(true);
 
     expect(sueForPeaceWithCityState(state, cityState.id, 0).ok).toBe(false); // 0 turns waited
-    for (let i = 0; i < WAR_MIN_TURNS - 1; i++) cityStatePhase(state, 0);
+    for (let i = 0; i < WAR_MIN_TURNS - 1; i++) cityStatePhase(state);
     expect(sueForPeaceWithCityState(state, cityState.id, 0).ok).toBe(false); // one short
-    cityStatePhase(state, 0);
+    cityStatePhase(state);
     // ... and at the floor it is accepted unconditionally (no gold, no roll)
     expect(sueForPeaceWithCityState(state, cityState.id, 0).ok).toBe(true);
     expect(civsAtWar(state, cityState.seat, 0)).toBe(false);
-    expect(cityState.cityStateWarTurns).toBe(0); // a re-declaration waits the floor out again
+    expect(warTurnsWith(state, cityState.seat, 0)).toBe(0); // a re-declaration waits the floor out again
   });
 
   it('a city-state will NOT make separate peace while its suzerain is at war', () => {
@@ -90,7 +90,7 @@ describe('#50: seat 0 <-> city-state peace', () => {
     const rome = addCiv(state, 0, true);
     cityState.envoys = { [seatOfIndex(0)]: SUZERAIN_ENVOYS }; // Rome is suzerain
     expect(declareWarOnCityState(state, cityState.id, 0).ok).toBe(true);
-    for (let i = 0; i < WAR_MIN_TURNS + 2; i++) cityStatePhase(state, 0);
+    for (let i = 0; i < WAR_MIN_TURNS + 2; i++) cityStatePhase(state);
 
     const r = sueForPeaceWithCityState(state, cityState.id, 0);
     expect(r.ok).toBe(false);

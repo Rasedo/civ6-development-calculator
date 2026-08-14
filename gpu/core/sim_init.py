@@ -196,22 +196,16 @@ class SimInit:
         # written once here rather than teaching the block a third fill.
         self.citystate_hp.fill_(int(rules.citystate.get("maxHp", 150)))
         self.register_alias("citystate_hp", lambda sim: sim.city_hp[:, sim._CITY_MINOR0:sim._CITY_MINOR0 + max(sim.S, 1), 0])
-        # Seat 0 <-> city-state war state (the CityState.atWar twin), a SLICE of
-        # the war matrix carved out after `_alloc_war` runs above. Peace is the
-        # default; the attack mask and the resolver both read it.
-        self.citystate_atwar = self.war[:, 0, 1 + max(self.R, 1):1 + max(self.R, 1) + s_pad]
-        self.register_alias("citystate_atwar", lambda sim: sim.war[:, 0, 1 + max(sim.R, 1):1 + max(sim.R, 1) + max(sim.S, 1)])
-        # The two war CLOCKS are seat-indexed like the matrix they count.
-        # `war_turns[b, row]` is how long that seat has been at war with seat 0
-        # (the cityStateWarTurns twin, gating PEACE_MIN_WAR_TURNS); `civ_only_warturns` and
-        # `citystate_war_turns` are its civ and minor slices, at the same `_seat_row`
-        # index `war` uses. `peace_turns` has the same shape, but only its civ
-        # slice is written — there is no city-state peace clock.
-        self.war_turns = torch.zeros(B, self.NS, dtype=torch.long, device=device)
+        # `war_turns[b, i, j]` is how long i and j have been at war — one cell
+        # per WAR, symmetric like the matrix it counts, because that is what
+        # the rule it gates is: peace cannot be offered until warMinTurns of
+        # THAT war have passed, and its price is that war's own length.
+        #
+        # `peace_turns[b, row]` is per SEAT and stays that way: it counts turns
+        # at war with NOBODY, which is the driver's peacefulness heuristic
+        # rather than a Civ 6 rule.
+        self.war_turns = torch.zeros(B, self.NS, self.NS, dtype=torch.long, device=device)
         self.peace_turns = torch.zeros(B, self.NS, dtype=torch.long, device=device)
-        _cs0 = 1 + max(self.R, 1)
-        self.citystate_war_turns = self.war_turns[:, _cs0:_cs0 + s_pad]
-        self.register_alias("citystate_war_turns", lambda sim: sim.war_turns[:, 1 + max(sim.R, 1):1 + max(sim.R, 1) + max(sim.S, 1)])
         citystate_yidx = rules.citystate.get("typeYieldIdx", [3, 4, 2, 1, 1, 5])
         self._citystate_yidx = torch.tensor(citystate_yidx, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S]
         citystate_didx = rules.citystate.get("typeDistrictIdx", [0, 2, 3, 5, 6, 1])  # CS type -> district idx (Campus/Theater/CommHub/IZ/Encampment/HolySite)
@@ -284,13 +278,6 @@ class SimInit:
         # disks exactly as the seeder's spawn reveals did.
         self.seat_explored = torch.zeros(B, 1 + r_pad, self.T, dtype=torch.bool, device=device)
         self.civ_aggression = torch.zeros(B, 1 + r_pad, dtype=torch.float64, device=device)
-        # The seat-0/civ vector and the civ/civ block are SLICES of the war
-        # matrix (allocated in `_alloc_war` above), not tensors of their own:
-        # `civ_only_atwar[b, r]` and `civ_pair_war[b, i, j]` address the matrix's own memory.
-        self.civ_only_atwar = self.war[:, 0, 1:1 + r_pad]
-        self.register_alias("civ_only_atwar", lambda sim: sim.war[:, 0, 1:1 + max(sim.R, 1)])
-        self.civ_pair_war = self.war[:, 1:1 + r_pad, 1:1 + r_pad]
-        self.register_alias("civ_pair_war", lambda sim: sim.war[:, 1:1 + max(sim.R, 1), 1:1 + max(sim.R, 1)])
 
         # ------------------------------------------------------------------
         # PER-SEAT SCALARS. One `civ_x [B, 1+R]` plane per fact, addressed by
@@ -325,7 +312,7 @@ class SimInit:
                     self.civ_treasury[_b, _s] = float(_cv.get("treasury", 0.0))
         # Per-PAIR casus belli. civ_pair_warkind[b, i, j] = the (i, j) civ/civ war is
         # FORMAL (denounced >= formalWarMinTurns earlier); False = SURPRISE
-        # (default). Symmetric, only meaningful where civ_pair_war. civ_pair_denounced[b, i,
+        # (default). Symmetric, only meaningful where war[b, i+1, j+1]. civ_pair_denounced[b, i,
         # j] = the turn i denounced j (a directed grudge, -1 = none, never
         # reset). Both start empty (no civ/civ war exists at t0), so there is no
         # exporter load. _MUTABLE for snapshot/restore.
@@ -397,11 +384,6 @@ class SimInit:
         self._ded_faith = int(_er.get("dedicationFaith", 2))
         self._ded_era = int(_er.get("dedicationEraScore", 1))
         self._gov_loy = float(_er.get("governorLoyalty", 8))
-        # The civ slices of the two clocks (integer turn counters).
-        self.civ_only_warturns = self.war_turns[:, 1:1 + r_pad]
-        self.register_alias("civ_only_warturns", lambda sim: sim.war_turns[:, 1:1 + max(sim.R, 1)])
-        self.civ_only_peaceturns = self.peace_turns[:, 1:1 + r_pad]
-        self.register_alias("civ_only_peaceturns", lambda sim: sim.peace_turns[:, 1:1 + max(sim.R, 1)])
         # Per-city production queue head. civ_city_current: -1 idle, 0 settler,
         # 1+u trains roster unit u.
         nt_b3, nc_b3 = len(rules.t_cost), len(rules.c_cost)
@@ -1525,6 +1507,15 @@ class SimInit:
         """Declare `self.<name>` to be a VIEW of `recompute(self)`, forever."""
         self._aliases[name] = recompute
 
+    def row_of(self, seat: int) -> int:
+        """Absolute seat id -> its row in the war matrix and the seat planes.
+
+        The scalar spelling of the `_seat_row` gather, for the Python-level
+        callers (pokes, the digest) that hold one seat rather than a tensor of
+        them. Majors are their own row, so this only earns its keep from 100
+        (city-states) and 200 (barbarians) up."""
+        return int(self._seat_row[seat])
+
     def _check_seat_invariant(self) -> None:
         """unit_seat must agree with the slot range it sits in.
 
@@ -1602,8 +1593,8 @@ class SimInit:
         The absolute space is sparse — a dense 201x201 per game would be 40KB —
         so `_seat_row` maps absolute seat -> row in one gather.
 
-        Allocated BEFORE `civ_only_atwar` / `civ_pair_war` / `citystate_atwar`, which are slices of
-        it rather than tensors beside it."""
+        `war` is the ONLY store: no seat family carries a view of its own
+        slice, so a declaration is written where it is read."""
         self.NS = 1 + r_pad + s_pad + 1
         self.BARB_ROW = 1 + r_pad + s_pad
         _row = torch.zeros(BARB_SEAT + 1, dtype=torch.long, device=device)
@@ -1643,14 +1634,15 @@ class SimInit:
     def sync_war(self) -> None:
         """Close the war matrix under TRANSPOSE.
 
-        A write through `civ_only_atwar` / `civ_pair_war` / `citystate_atwar` lands in one cell of
-        the matrix; the mirror cell of the pair still has to be written.
+        A poke that writes one cell of a pair leaves the mirror stale. The
+        engine's own arms write both sides (`_apply_war_column`, the geo arms,
+        `_reset_war_clock`); this is for a test that pokes the upper triangle
+        and wants the relation closed.
 
         The UPPER triangle is authoritative and is mirrored down. Deliberately
         NOT an OR: a write that makes PEACE clears one cell, and ORing the
-        transpose back in would hand the war straight over again. All three
-        names live in the upper triangle — row 0 for civ_only_atwar/citystate_atwar, the a<b
-        half for civ_pair_war. Idempotent; call it as often as you like."""
+        transpose back in would hand the war straight over again. Idempotent;
+        call it as often as you like."""
         w = self.war
         keep = torch.triu(
             torch.ones(self.NS, self.NS, dtype=torch.bool, device=w.device), diagonal=1
@@ -1662,10 +1654,10 @@ class SimInit:
 
         Checked every step under CIV6_ALIAS_CHECK=1."""
         w = self.war
-        # civ_only_atwar / civ_pair_war / citystate_atwar ARE the matrix, so there is no separate
-        # store to cross-check against. SYMMETRY is the property code can
-        # break: every write through one of those names touches one cell of a
-        # pair, and the mirror has to be written too.
+        # The matrix is the only store, so there is no second copy to
+        # cross-check against. SYMMETRY is the property code can break: a
+        # declaration writes one cell of a pair, and the mirror has to be
+        # written too.
         if not bool((w == w.transpose(1, 2)).all()):
             bad = (w != w.transpose(1, 2)).nonzero()[0].tolist()
             raise AssertionError(

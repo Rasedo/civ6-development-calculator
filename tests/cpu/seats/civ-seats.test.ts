@@ -3,7 +3,7 @@ import { greatPeopleEarned } from '../../../cpu/core/greatPeople';
 import { computeCityStats } from '../../../cpu/core/city';
 import { setMet } from '../../../cpu/core/cityStates';
 import { CITY_MAX_HP } from '../../../cpu/data/units';
-import { BARB_SEAT, cityStateOfSeat, civsAtWar, emptySeat, indexOfSeat, isBarbSeat, isCityStateSeat, isCiv, seatOf, seatOfCityState, seatOfIndex, setTileOwner, setWar, tileCity, tileSeat, unitsOf } from '../../../cpu/core/seats';
+import { BARB_SEAT, cityStateOfSeat, civsAtWar, emptySeat, indexOfSeat, isBarbSeat, isCityStateSeat, isCiv, seatOf, seatOfCityState, seatOfIndex, setTileOwner, setWar, setWarTurnsWith, tileCity, tileSeat, unitsOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { createGame, foundCity, endTurn, serialize, deserialize, choosePantheon } from '../../../cpu/core/game';
 import { canFoundCity } from '../../../cpu/core/rules';
@@ -41,7 +41,6 @@ function addCiv(
     government: { current: null, policies: [] },
     cities: [],
     nextCityId: 0,
-    warTurns: 0,
     peaceTurns: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     gpp: {},
@@ -240,10 +239,10 @@ describe('war and peace', () => {
   it('peace needs time and gold; capture converts the city', () => {
     const state = makeState();
     state.unitsMode = true;
-    const civ = addCiv(state, 8, 8, { warTurns: 0 });
+    const civ = addCiv(state, 8, 8);
     setWar(state, civ.seat, 0, true);
     expect(sueForPeace(state, indexOfSeat(civ.seat), 0).ok).toBe(false); // too soon
-    civ.warTurns = 10;
+    setWarTurnsWith(state, civ.seat, 0, 10);
     seatOf(state, 0)!.treasury = 0;
     expect(sueForPeace(state, indexOfSeat(civ.seat), 0).ok).toBe(false); // too broke
 
@@ -287,8 +286,9 @@ describe('AUDIT B-30: conquest keeps infrastructure', () => {
   it('capture carries districts + buildings + wonders MINUS PALACE, walls at outerHp 0', () => {
     const state = makeState();
     state.unitsMode = true;
-    const civ = addCiv(state, 8, 8, { warTurns: 10 });
+    const civ = addCiv(state, 8, 8);
     setWar(state, civ.seat, 0, true);
+    setWarTurnsWith(state, civ.seat, 0, 10);
     const civCity = civ.cities[0];
     const center = state.map.tiles[civCity.centerIndex];
     const ring = tilesWithin(state.map, center.col, center.row, 1).filter((t) => t.index !== center.index);
@@ -362,8 +362,9 @@ describe('AUDIT B-30: conquest keeps infrastructure', () => {
         hp: CITY_MAX_HP,
       });
     }
-    const civ = addCiv(state, 8, 8, { warTurns: 10 });
+    const civ = addCiv(state, 8, 8);
     setWar(state, civ.seat, 0, true);
+    setWarTurnsWith(state, civ.seat, 0, 10);
     const civCity = civ.cities[0];
     const center = state.map.tiles[civCity.centerIndex];
     const ring = tilesWithin(state.map, center.col, center.row, 1).filter((t) => t.index !== center.index);

@@ -178,7 +178,7 @@ def poke_galley_city(rules, path, GALLEY):
     for _ in range(25):
         sim.step()
     r, j, ctr = first_civ_city(sim)
-    sim.civ_only_atwar[0, r] = True
+    sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     # the center must hold no unit (else the melee hits the occupant / civilian)
     clear_tile(sim, ctr)
@@ -220,10 +220,10 @@ def poke_galley_cs(rules, path, GALLEY):
     assert len(live), "no city-state on this seed"
     s = int(live[0])
     # a city-state is a separate seat you must DECLARE on, and the GPU enforces
-    # it (`citystate_here` carries `citystate_atwar`, mirroring TS's cityStateTarget). This poke
+    # it (`citystate_here` carries war[seat, cs], mirroring TS's cityStateTarget). This poke
     # sieges, so it must be at war first; there is no declare VERB on the GPU,
     # so set the plane directly.
-    sim.citystate_atwar[0, s] = True
+    sim.war[0, 0, sim.row_of(100 + s)] = sim.war[0, sim.row_of(100 + s), 0] = True
     ctr = int(sim.citystate_center[0, s])
     clear_tile(sim, ctr)
     wt = empty_neighbor(sim, ctr)
@@ -260,7 +260,7 @@ def poke_quadrireme_unit(rules, path, QUAD, WARRIOR):
         sim.step()
     assert float(sim._type_ranged_strength[QUAD]) > 0 and bool(sim.unit_naval[QUAD]), "quadrireme must be a naval ranged unit"
     r, j, ctr = first_civ_city(sim)
-    sim.civ_only_atwar[0, r] = True
+    sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     # a defender tile + an adjacent water tile for the ship (both cleared/empty)
     dt = empty_neighbor(sim, ctr)
@@ -288,7 +288,7 @@ def poke_quadrireme_city(rules, path, QUAD):
     for _ in range(25):
         sim.step()
     r, j, ctr = first_civ_city(sim)
-    sim.civ_only_atwar[0, r] = True
+    sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     clear_tile(sim, ctr)
     wt = empty_neighbor(sim, ctr)
@@ -320,7 +320,7 @@ def poke_seat0_naval(rules, path, GALLEY, WARRIOR):
     for _ in range(25):
         sim.step()
     r, j, ctr = first_civ_city(sim)
-    sim.civ_only_atwar[0, r] = True
+    sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     # spawn: an anchor land tile with exactly one free WATER neighbour -> the
     # naval probe skips the (land) anchor and lands the ship on the water tile.
@@ -438,7 +438,7 @@ def poke_walls_seat0(rules, path, GALLEY, WARRIOR):
     c, ctr = 0, int(sim.city_center[0, 0, 0])
     sim.city_bldg[0, 0, c, sim._walls_bidx] = True
     r = 0
-    sim.civ_only_atwar[0, r] = True
+    sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
 
     # -- ship struck: isolate the wall strike (no barbarian / other-seat confounds).
@@ -478,8 +478,8 @@ def poke_walls_civ(rules, path, GALLEY, WARRIOR):
         sim.step()
     r, j, ctr = first_civ_city(sim)
     # make civ seat r the ONLY aggressor; strip its army/economy so nothing else fires
-    sim.civ_only_atwar[:] = False
-    sim.civ_only_atwar[0, r] = True
+    sim.war[:, 0, 1:1 + sim.R] = sim.war[:, 1:1 + sim.R, 0] = False
+    sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     clear_all_major_units(sim)
     sim.barb_unit_alive[:] = False
@@ -526,7 +526,7 @@ def poke_embarked_capture(rules, path, WARRIOR, BUILDER):
     for _ in range(25):
         sim.step()
     r = 0
-    sim.civ_only_atwar[0, r] = True
+    sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     # a land tile for the seat-0 warrior + an adjacent (water) tile for the
     # embarked civ-seat builder.
@@ -570,7 +570,7 @@ def poke_flank_support(rules, path, GALLEY):
     for _ in range(25):
         sim.step()
     r = 0
-    sim.civ_only_atwar[0, r] = True
+    sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     # an isolated defender tile whose six neighbours are on-map and empty.
     dt = -1

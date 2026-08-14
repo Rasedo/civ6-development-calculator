@@ -45,12 +45,12 @@ class SimStep:
         hold), executed in slot order before the turn advances.
         envoy: [B] or [B, K] long — back that city-state with one available
         envoy (validated; -1 = none).
-        war: [B] long (ignored while _rl_war_active is off) — 0..R-1 declare
-        war on that civ seat, R..2R-1 sue for peace with it, -1 none. Applied
-        at the GEO pass positions inside _seat_phase (declare at the phase
-        top, peace at the tail) — seat 0 declares through the geo pass like
-        every seat, AFTER this step's unit orders ran, so a same-turn
-        declaration legalizes nothing until next turn (the TS schedule).
+        war: [B] long (ignored while _rl_war_active is off) — a column of
+        row 0's own war head over `war_targets(0)`: 0..R-1 declare war on that
+        seat, R..2R-1 sue it for peace, -1 none. Applied through
+        `_apply_war_column`, the ONE applier, at the record position every
+        other row's column is applied at — so a same-turn declaration
+        legalizes this turn's own unit orders, exactly as it does for a civ.
         buy/worship/relig/levy: the GOLD and FAITH spending intents, in the
         same shapes every seat's `apply_seat_actions` takes — stashed here and
         drained by _seat_buy_ladder at the gold block's own phase position.
@@ -58,6 +58,8 @@ class SimStep:
         dev = self.device
         self._stash_record(0, tech=tech, civic=civic, envoys=envoy, production=production)
         self._stash_buy(0, buy=buy, worship=worship, relig=relig, levy=levy)
+        if war is not None:
+            self._apply_war_column(0, war)
 
         # --- seat-0 unit orders (before the turn advances) ----------------------
         if units is not None and self.units_mode:
@@ -117,7 +119,7 @@ class SimStep:
         if self.disasters:
             self._disaster_phase()
         self._city_state_phase()
-        self._seat_phase(war=war)
+        self._seat_phase()
 
         # --- Dead-slot reclamation, at the step END and never the top:
         # callers sample slot-keyed unit actions from the PRE-step masks, so

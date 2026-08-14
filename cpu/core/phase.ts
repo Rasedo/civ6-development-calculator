@@ -56,7 +56,7 @@ import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex } from './unit
 const A_FOUND_CITY = unitActionIndex(IMPROVEMENT_IDS).FOUND_CITY;
 import { ALLY_MIN_PEACE, CIV_LEADERS, FORMAL_WAR_MIN_TURNS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION } from '../data/seats';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles, goldenBoostBonus } from './eras';
-import { NO_SEAT, atWarWithAny, citiesOf, civHasStrategic, civsAtWar, emptySeat, indexOfSeat, isCiv, prophetsOf, seatOf, seatOfCityState, seatOfIndex, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf } from './seats';
+import { NO_SEAT, atWarWithAny, citiesOf, civHasStrategic, civsAtWar, emptySeat, indexOfSeat, isCiv, prophetsOf, seatOf, seatOfCityState, seatOfIndex, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, warTurnsWith, warsOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 // The two verb bodies the SEAT-0 applier and this one share — one SNIPE ring,
 // one SPREAD rule, whichever seat gave the order.
@@ -94,11 +94,13 @@ export const BUY_UNITS: { id: string; tech?: string }[] = [
 
 
 /**
- * The counterparty the WIRE's war column names. The decision record carries a
- * single war axis and it is measured against this seat; nothing in the engine
- * gives that seat any other standing.
+ * The seats a row's WAR HEAD addresses, in ascending seat order — every OTHER
+ * major, so the head is Rw wide for every seat and column k means the same
+ * kind of thing whoever asks. The GPU's `war_targets(row)` twin.
  */
-const WAR_COLUMN_SEAT = 0;
+export function warTargets(state: GameState, seat: number): number[] {
+  return state.seats.map((s) => s.seat).filter((s) => s !== seat);
+}
 
 /** How good a city site this tile is: fresh water, then the yields and hills
  *  in its work radius. Negative = not settleable. World generation only. */
@@ -164,7 +166,6 @@ export function placeSeats(state: GameState, count?: number): void {
       aggression: 0.3 + nextRandom(state) * 0.6,
       cities: [],
       nextCityId: 0,
-      warTurns: 0,
       peaceTurns: 0,
       // The SEAT block — identical on the seat 0's seat 0.
       seat: i + 1,
@@ -267,7 +268,7 @@ export function declareWar(state: GameState, seatIndex: number, seat: number): R
   if (!actor) return no('No such civilization.');
   if (civsAtWar(state, actor.seat, seat)) return no('Already at war.');
   setWar(state, actor.seat, seat, true);
-  actor.warTurns = 0;
+  setWarTurnsWith(state, actor.seat, seat, 0);
   // The seat 0 earns GRIEVANCES for declaring, exactly as a seat
   // does (WARMONGER_DOW at the civ↔civ DoW site).
   seatOf(state, seat)!.warmonger = (seatOf(state, seat)!.warmonger ?? 0) + WARMONGER_DOW;
@@ -279,27 +280,30 @@ export function sueForPeace(state: GameState, seatIndex: number, seat: number): 
   const actor = seatOf(state, seatOfIndex(seatIndex));
   if (!actor) return no('No such civilization.');
   if (!civsAtWar(state, actor.seat, seat)) return no('Not at war.');
-  if (actor.warTurns < WAR_MIN_TURNS) {  // #96: one min-war-turns constant, the actor's
-    return no(`Too soon — they will not talk for another ${WAR_MIN_TURNS - actor.warTurns} turns.`);
+  const waited = warTurnsWith(state, actor.seat, seat);
+  if (waited < WAR_MIN_TURNS) {  // #96: one min-war-turns constant, THIS war's
+    return no(`Too soon — they will not talk for another ${WAR_MIN_TURNS - waited} turns.`);
   }
-  const cost = PEACE_GOLD_COST(actor.warTurns);
+  const cost = PEACE_GOLD_COST(waited);
   if (!state.sandbox) {
     if (!goldAffordable(seatOf(state, seat)!.treasury, cost)) return no(`Peace costs ${cost} gold right now.`);
     seatOf(state, seat)!.treasury -= cost;
   }
-  makePeace(state, actor);
+  makePeace(state, actor, seat);
   return ok;
 }
 
-function makePeace(state: GameState, actor: Seat): void {
-  setWar(state, actor.seat, WAR_COLUMN_SEAT, false);
+function makePeace(state: GameState, actor: Seat, foe: number): void {
+  setWar(state, actor.seat, foe, false);
   // A peace treaty sheds 2000 WWP from THAT war, on both sides.
   // Deliberately larger than any plausible accumulation — it is how the source
   // stops a settled war haunting a civ forever, since the residual of a war you
   // are no longer in has no decay rule of its own.
-  warWearinessPeace(state, WAR_COLUMN_SEAT, actor.seat);
-  actor.warTurns = 0;
+  warWearinessPeace(state, foe, actor.seat);
+  setWarTurnsWith(state, actor.seat, foe, 0);
   actor.peaceTurns = 0;
+  const foeSeat = seatOf(state, foe);
+  if (foeSeat && 'peaceTurns' in foeSeat) (foeSeat as Seat).peaceTurns = 0;
   // SOURCED: "making peace with a civ always forces peace with all
   // city-states they are suzerain of", and a city-state "automatically gets
   // peace when you stop being at war with their suzerain". A city-state is
@@ -307,12 +311,15 @@ function makePeace(state: GameState, actor: Seat): void {
   // this is the ONLY way out of a suzerain-driven war — see
   // sueForPeaceWithCityState, which refuses while the suzerain is still hostile.
   // Placed in makePeace, not sueForPeace, so the AI peace path gets it too.
+  // BOTH sides shed the city-states the other dragged in.
   for (const cityState of state.cityStates ?? []) {
-    if (civsAtWar(state, cityState.seat, WAR_COLUMN_SEAT) && isSuzerain(cityState, actor.seat)) {
-      setWar(state, cityState.seat, WAR_COLUMN_SEAT, false);
-      cityState.cityStateWarTurns = 0;
-      warWearinessPeace(state, WAR_COLUMN_SEAT, seatOfCityState(cityState.id)); // #51/S7.8f
-      state.eventLog.push(`${cityState.name} makes peace alongside its suzerain.`);
+    for (const [patron, opponent] of [[actor.seat, foe], [foe, actor.seat]] as const) {
+      if (civsAtWar(state, cityState.seat, opponent) && isSuzerain(cityState, patron)) {
+        setWar(state, cityState.seat, opponent, false);
+        setWarTurnsWith(state, cityState.seat, opponent, 0);
+        warWearinessPeace(state, opponent, seatOfCityState(cityState.id)); // #51/S7.8f
+        state.eventLog.push(`${cityState.name} makes peace alongside its suzerain.`);
+      }
     }
   }
   state.eventLog.push(`Peace with ${actor.name}.`);
@@ -839,20 +846,26 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
     addEnvoys(cityState, actor.seat, 1);
   }
   const warCol = rec.war;
-  // Self-guard: the war column's target IS seat 0 (the single-axis residual
-  // WAR_COLUMN_SEAT documents), so seat 0's own record can never mean it —
-  // seat 0 declares on civs through the geoWar arm like every seat.
-  if (warCol !== null && warCol !== undefined && warCol >= 0 && actor.seat !== WAR_COLUMN_SEAT) {
+  // The war head addresses the OTHER MAJORS in ascending seat order: column k
+  // declares on `warTargets(state, actor.seat)[k]`, column Rw + k sues it. For
+  // seat 0 that is [1 .. Rw], the layout the wire has always carried; for a
+  // civ, column 0 is seat 0 and the rest used to be dead.
+  if (warCol !== null && warCol !== undefined && warCol >= 0) {
     const Rw = state.seats.length - 1;
-    if (warCol === 0 && !civsAtWar(state, actor.seat, WAR_COLUMN_SEAT)) {
-      setWar(state, actor.seat, WAR_COLUMN_SEAT, true);
-      actor.warTurns = 0;
-      state.eventLog.push(`${actor.name} declares war on you!`);
-    } else if (warCol === Rw && civsAtWar(state, actor.seat, WAR_COLUMN_SEAT) && actor.warTurns >= WAR_MIN_TURNS) {
-      const cost = PEACE_GOLD_COST(actor.warTurns);
-      if (goldAffordable(actor.treasury ?? 0, cost)) {
-        actor.treasury = (actor.treasury ?? 0) - cost;
-        makePeace(state, actor);
+    const targets = warTargets(state, actor.seat);
+    const foe = targets[warCol < Rw ? warCol : warCol - Rw];
+    if (foe !== undefined && actor.seat !== foe) {
+      if (warCol < Rw && !civsAtWar(state, actor.seat, foe)) {
+        setWar(state, actor.seat, foe, true);
+        setWarTurnsWith(state, actor.seat, foe, 0);
+        state.eventLog.push(`${actor.name} declares war on ${seatOf(state, foe)?.name ?? 'you'}!`);
+      } else if (warCol >= Rw && civsAtWar(state, actor.seat, foe)) {
+        const waited = warTurnsWith(state, actor.seat, foe);
+        const cost = PEACE_GOLD_COST(waited);
+        if (waited >= WAR_MIN_TURNS && goldAffordable(actor.treasury ?? 0, cost)) {
+          actor.treasury = (actor.treasury ?? 0) - cost;
+          makePeace(state, actor, foe);
+        }
       }
     }
   }
@@ -1874,12 +1887,14 @@ export function seatPhase(state: GameState, seat: number): void {
     // War and peace. The two counters are the RULE; the units are the WIRE.
     // A seat's unit orders are replayed here, at the position the turn gives
     // them, so a recorded trajectory reproduces exactly.
+    // Every war this seat is in ticks, each in its own cell — one clock per
+    // WAR, so a seat fighting two opponents can sue either on that war's own
+    // terms. `peaceTurns` stays per SEAT: it counts turns at war with nobody.
     const anyWar = atWarWithAny(state, actor.seat);
-    if (anyWar) {
-      if (civsAtWar(state, actor.seat, seat)) actor.warTurns += 1;
-    } else {
-      actor.peaceTurns += 1;
+    for (const foe of warsOf(state, actor.seat)) {
+      setWarTurnsWith(state, actor.seat, foe, warTurnsWith(state, actor.seat, foe) + 1);
     }
+    if (!anyWar) actor.peaceTurns += 1;
     // Seat 0's units ride the TRIPLES schema and are applied by the driver
     // pre-endTurn (the GPU steps them at the top of step() the same way);
     // reading triples as per-unit rows here would dispatch garbage. The one

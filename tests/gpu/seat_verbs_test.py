@@ -109,7 +109,7 @@ def main() -> None:
     sim = fresh(rules, path)
     slot, tile = a_civ_soldier(sim, r)
     assert slot is not None, "no civ military unit by t30"
-    sim.civ_only_atwar[0, r] = True
+    sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
     sim.tile_seat[0, tile] = 0        # seat-0 land (the enemy plane)
     sim.civ_at[0, tile] = -1
     sim.improvement[0, tile] = 0
@@ -123,7 +123,7 @@ def main() -> None:
     # The gate must be enemy-ownership, not merely "an improvement is here".
     sim = fresh(rules, path)
     slot, tile = a_civ_soldier(sim, r)
-    sim.civ_only_atwar[0, r] = True
+    sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
     sim.tile_seat[0, tile] = -1
     sim.citystate_at[0, tile] = -1
     sim.civ_at[0, tile] = r          # OWN land
@@ -209,7 +209,7 @@ def main() -> None:
     sim6 = fresh(rules, path)
     sim6.seat_ext[0, r + 1] = True
     sl6, t6 = a_civ_soldier(sim6, r)
-    sim6.civ_only_atwar[0, r] = True
+    sim6.war[0, 0, 1 + r] = sim6.war[0, 1 + r, 0] = True
     sim6.tile_seat[0, t6] = 0
     sim6.civ_at[0, t6] = -1
     sim6.improvement[0, t6] = 0

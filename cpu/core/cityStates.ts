@@ -7,7 +7,7 @@
  */
 
 import type { City, CityState, CityStateQuest, CityStateType, GameState, Tile, Yields } from './types';
-import { NO_SEAT, citiesOf, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setWar, tileSeat } from './seats';
+import { NO_SEAT, citiesOf, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setWar, setWarTurnsWith, tileSeat, warTurnsWith, warsOf } from './seats';
 import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from '../../world/hex';
 import { isWater, isImpassable, hasFreshWater } from '../../world/query';
@@ -378,12 +378,12 @@ export function sueForPeaceWithCityState(state: GameState, cityStateId: number, 
   if (suz) {
     return { ok: false, reason: `${cityState.name} will not talk while you are at war with its suzerain, ${suz.name}.` };
   }
-  const waited = cityState.cityStateWarTurns ?? 0;
+  const waited = warTurnsWith(state, cityState.seat, seat);
   if (waited < WAR_MIN_TURNS) {  // #51: ONE min-war-turns rule, every seat
     return { ok: false, reason: `Too soon — they will not talk for another ${WAR_MIN_TURNS - waited} turns.` };
   }
   setWar(state, cityState.seat, seat, false);
-  cityState.cityStateWarTurns = 0;
+  setWarTurnsWith(state, cityState.seat, seat, 0);
   warWearinessPeace(state, seat, seatOfCityState(cityState.id)); // #51/S7.8f
   state.eventLog.push(`You have made peace with ${cityState.name}.`);
   return { ok: true };
@@ -400,15 +400,17 @@ export function questLabel(quest: CityStateQuest): string {
   }
 }
 
-export function cityStatePhase(state: GameState, seat: number): void {
+export function cityStatePhase(state: GameState): void {
   if (state.cityStates.length === 0) return;
 
-  // Tick the seat 0 <-> city-state war clock — the Seat.warTurns
-  // twin. Peace unlocks at WAR_MIN_TURNS (one constant, every seat).
-  // (The single-axis residual: like Seat.warTurns this clock only measures
-  // war against WAR_COLUMN_SEAT; civ <-> CS wars ride the suzerain drag.)
+  // Tick each city-state's OWN LINE of the pair clock, exactly where
+  // cityStatePhase does; a major's line ticks in its own seat block, so every
+  // war's two ends each move once a turn. Peace unlocks at WAR_MIN_TURNS (one
+  // constant, every seat).
   for (const cityState of state.cityStates) {
-    if (civsAtWar(state, cityState.seat, seat)) cityState.cityStateWarTurns = (cityState.cityStateWarTurns ?? 0) + 1;
+    for (const foe of warsOf(state, cityState.seat)) {
+      setWarTurnsWith(state, cityState.seat, foe, warTurnsWith(state, cityState.seat, foe) + 1);
+    }
   }
 
   // Seat diplomacy — meets, influence -> envoys, quests — happens in the

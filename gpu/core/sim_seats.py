@@ -141,35 +141,19 @@ class SimSeats:
         (`_seat_influence_phase` banks the influence, `_seat_record_apply`
         spends it on any row), so no seat's envoy head is structurally empty.
 
-        THE WAR HEAD is the one place a row still forks, and the fork is
-        WAR_COLUMN_SEAT's, not seat 0's standing: the wire carries ONE war
-        axis, so a civ row's [B, 2R] head declares on / sues to that seat
-        (column 0 / column R) while that seat's own head names WHICH civ.
-        Closing it is wire work, not a rule difference.
+        THE WAR HEAD is `war_targets(row)`: column k addresses the k-th OTHER
+        major in ascending seat order, so every row's head is the same width
+        and means the same kind of thing. It used to carry ONE axis — a civ's
+        head had two live columns, both pointing at seat 0 — which is why the
+        head, and only the head, needed to know which row was asking.
 
         Masks read the CURRENT state — call before step(); apply_seat_actions()
         writes the choices the seat phase honors."""
-        B, dev = self.B, self.device
-        production = self._seat_production_mask(row)
-        tech = self._seat_tech_mask(row)
-        civic = self._seat_civic_mask(row)
-        envoy = self._seat_envoy_mask(row)
-        if row == 0:
-            war = self.war_mask()
-        else:
-            sr = self.rules.seats
-            Rw = max(self.R, 1)
-            war = torch.zeros(B, 2 * Rw, dtype=torch.bool, device=dev)
-            atw = self.war[:, row, 0]
-            war[:, 0] = self.civ_alive[:, row] & ~atw
-            pcost_m = sr.get("peaceGold0", 150) + sr.get("peaceGoldSlope", 10) * self.war_turns[:, row].to(torch.float64)
-            war[:, Rw] = (
-                self.civ_alive[:, row] & atw
-                & (self.war_turns[:, row] >= sr.get("warMinTurns", 14))
-                & self._afford(self.civ_treasury[:, row], pcost_m)
-            )
-        return {"production": production, "tech": tech, "civic": civic,
-                "envoy": envoy, "war": war}
+        return {"production": self._seat_production_mask(row),
+                "tech": self._seat_tech_mask(row),
+                "civic": self._seat_civic_mask(row),
+                "envoy": self._seat_envoy_mask(row),
+                "war": self._seat_war_mask(row)}
 
     def apply_seat_actions(
         self,
@@ -203,33 +187,7 @@ class SimSeats:
         this function only validates. Near-free for a net, whose logits over the
         columns already ARE a preference order."""
         if war is not None:
-            Rw = max(self.R, 1)
-            w = war.to(torch.long)
-            # WAR_COLUMN_SEAT: this row's head declares on / sues to seat 0,
-            # so its war cell is war[0, row] and its clocks are indexed by row.
-            atw = self.war[:, 0, row]
-            declare = (w == 0) & self.seat_ext[:, row] & self.civ_alive[:, row] & ~atw
-            if bool(declare.any()):
-                self.war[:, 0, row] |= declare
-                self.war[:, row, 0] |= declare  # the MIRROR cell
-                self.war_turns[:, row] = torch.where(declare, torch.zeros_like(self.war_turns[:, row]), self.war_turns[:, row])
-            # peace costs this row the same schedule every seat pays, out of its
-            # own treasury (the mask prices it; the apply re-validates it).
-            sr = self.rules.seats
-            pcost_c = sr.get("peaceGold0", 150) + sr.get("peaceGoldSlope", 10) * self.war_turns[:, row].to(torch.float64)
-            peace = (
-                (w == Rw) & self.seat_ext[:, row] & self.war[:, 0, row]
-                & (self.war_turns[:, row] >= sr.get("warMinTurns", 14))
-                & self._afford(self.civ_treasury[:, row], pcost_c)
-            )
-            if bool(peace.any()):
-                self.civ_treasury[:, row] = torch.where(peace, self.civ_treasury[:, row] - pcost_c, self.civ_treasury[:, row])
-                self.war[:, 0, row] &= ~peace
-                self._ww_peace(peace, 0, row)  # -2000 on the treaty (the makePeace twin)
-                self._citystate_suzerain_release(row, peace)
-                self.war[:, row, 0] &= ~peace  # the MIRROR cell
-                self.war_turns[:, row] = torch.where(peace, torch.zeros_like(self.war_turns[:, row]), self.war_turns[:, row])
-                self.peace_turns[:, row] = torch.where(peace, torch.zeros_like(self.peace_turns[:, row]), self.peace_turns[:, row])
+            self._apply_war_column(row, war)
         # everything else STASHES and applies at the RECORD POSITION inside the
         # seat phase. Every stash is keyed by the seat row, so seat 0's own
         # intents (set by step()) share the dicts and the bodies that drain
@@ -237,6 +195,57 @@ class SimSeats:
         self._stash_record(row, tech=tech, civic=civic, envoys=envoys,
                            production=production, pref=production_pref)
         self._stash_buy(row, buy=buy, worship=worship, relig=relig, levy=levy)
+
+    def _reset_war_clock(self, i: int, j: int, mask: torch.Tensor) -> None:
+        """Zero the (i, j) war clock and its mirror where `mask` — every
+        declaration and every peace restarts THAT war's clock and no other."""
+        self.war_turns[:, i, j] = torch.where(mask, torch.zeros_like(self.war_turns[:, i, j]), self.war_turns[:, i, j])
+        self.war_turns[:, j, i] = self.war_turns[:, i, j]
+
+    def _apply_war_column(self, row: int, war: torch.Tensor) -> None:
+        """The WAR verb for ANY row: `war` [B] long is a column of that row's
+        own head (-1 = stand down), addressed through `war_targets(row)`.
+
+        Re-validated against the live state, per target, because the mask was
+        taken before this turn's other seats moved. Every write lands in the
+        war matrix and its mirror; the clock is the PAIR's.
+        """
+        if self.R == 0:
+            return
+        Rw = max(self.R, 1)
+        w = war.to(torch.long)
+        sr = self.rules.seats
+        ext = self.seat_ext[:, row]
+        mine = self.civ_alive[:, row]
+        for k, tgt in enumerate(self.war_targets(row)):
+            live = mine & self.civ_alive[:, tgt]
+            at_war = self.war[:, row, tgt]
+            declare = (w == k) & ext & live & ~at_war
+            if bool(declare.any()):
+                self.war[:, row, tgt] |= declare
+                self.war[:, tgt, row] |= declare  # the MIRROR cell
+                self._reset_war_clock(row, tgt, declare)
+            # peace costs the asking row the same schedule every seat pays,
+            # out of its own treasury (the mask prices it; the apply
+            # re-validates it) — priced on THIS war's clock.
+            wt = self.war_turns[:, row, tgt]
+            pcost = sr.get("peaceGold0", 150) + sr.get("peaceGoldSlope", 10) * wt.to(torch.float64)
+            peace = (
+                (w == Rw + k) & ext & self.war[:, row, tgt]
+                & (wt >= sr.get("warMinTurns", 14))
+                & self._afford(self.civ_treasury[:, row], pcost)
+            )
+            if bool(peace.any()):
+                self.civ_treasury[:, row] = torch.where(peace, self.civ_treasury[:, row] - pcost, self.civ_treasury[:, row])
+                self.war[:, row, tgt] &= ~peace
+                self.war[:, tgt, row] &= ~peace  # the MIRROR cell
+                self._ww_peace(peace, row, tgt)  # -2000 on the treaty (the makePeace twin)
+                # both sides shed the city-states the other dragged in
+                self._citystate_suzerain_release(row, tgt, peace)
+                self._citystate_suzerain_release(tgt, row, peace)
+                self._reset_war_clock(row, tgt, peace)
+                for _pr in (row, tgt):
+                    self.peace_turns[:, _pr] = torch.where(peace, torch.zeros_like(self.peace_turns[:, _pr]), self.peace_turns[:, _pr])
 
     def _stash_record(self, row: int, tech=None, civic=None, envoys=None,
                       production=None, pref=None) -> None:
@@ -268,10 +277,10 @@ class SimSeats:
         drained either way, because an intent is for THIS turn and a refused one
         must not survive into the next.
 
-        The WAR arm is deliberately absent and is the LAST split left in the
-        record: seat 0's declare column applies at the geo pass in
-        `_seat_phase`, a civ's in `apply_seat_actions` at decide time — the
-        WAR_COLUMN_SEAT residual, which owns its own task.
+        The WAR arm is absent because it applies EARLIER, at decide time, for
+        every row alike: `_apply_war_column` runs from `apply_seat_actions` (a
+        civ) or from `step()` (row 0), both ahead of the phase, so a same-turn
+        declaration legalizes this turn's own unit orders.
 
         Every arm re-validates against the LIVE state here; nothing chooses."""
         tech = self._driven_tech.pop(row, None)
@@ -4084,15 +4093,15 @@ class SimSeats:
 
     def apply_geo(self, row: int, denounce: torch.Tensor | None = None,
                   ally: torch.Tensor | None = None,
-                  civ_pair_war: torch.Tensor | None = None,
-                  civ_pair_peace: torch.Tensor | None = None) -> None:
+                  geo_war: torch.Tensor | None = None,
+                  geo_peace: torch.Tensor | None = None) -> None:
         """Stash seat `row`'s GEOPOLITICS intents for this turn, consumed at
         the phase's own pass positions (_geo_denounce_and_ally and
         _geo_declare_wars at the phase top, _geo_make_peace at the tail) and
-        re-validated there. denounce/ally/civ_pair_peace are [B, R] bool target
-        masks; civ_pair_war is [B] long (the one target civ, -1 = none). ally and
-        civ_pair_peace name a PAIR — the driver emits them on the LOWER civ
-        index's record; the arm writes both sides either way.
+        re-validated there. denounce/ally/geo_peace are [B, R] bool target
+        masks; geo_war is [B] long (the one target civ, -1 = none). ally and
+        geo_peace name a PAIR — the driver emits them on the LOWER civ index's
+        record; the arm writes both sides either way.
 
         Callers speak rows; the CIV-PAIR conversion is this one line, because
         `civ_pair_denounced` / `civ_pair_allied` / `civ_pair_warkind` are
@@ -4110,14 +4119,14 @@ class SimSeats:
             if getattr(self, "_driven_ally", None) is None:
                 self._driven_ally = {}
             self._driven_ally[r] = ally
-        if civ_pair_war is not None:
+        if geo_war is not None:
             if getattr(self, "_driven_geo_war", None) is None:
                 self._driven_geo_war = {}
-            self._driven_geo_war[r] = civ_pair_war
-        if civ_pair_peace is not None:
+            self._driven_geo_war[r] = geo_war
+        if geo_peace is not None:
             if getattr(self, "_driven_geo_peace", None) is None:
                 self._driven_geo_peace = {}
-            self._driven_geo_peace[r] = civ_pair_peace
+            self._driven_geo_peace[r] = geo_peace
 
     def _geo_denounce_and_ally(self) -> None:
         """The DENOUNCE and ALLIANCE arms — wire DECISIONS at the pass's
@@ -4143,7 +4152,7 @@ class SimSeats:
                         continue
                     den = (
                         want[:, b] & alive_civ[:, a] & alive_civ[:, b]
-                        & (self.civ_pair_denounced[:, a, b] < 0) & ~self.civ_pair_war[:, a, b]
+                        & (self.civ_pair_denounced[:, a, b] < 0) & ~self.war[:, a + 1, b + 1]
                     )
                     if bool(den.any()):
                         self.civ_pair_denounced[:, a, b] = torch.where(
@@ -4162,7 +4171,7 @@ class SimSeats:
                         continue
                     form = (
                         want[:, b] & alive_civ[:, a] & alive_civ[:, b]
-                        & ~self.civ_pair_war[:, a, b] & ~self.civ_pair_allied[:, a, b]
+                        & ~self.war[:, a + 1, b + 1] & ~self.civ_pair_allied[:, a, b]
                         & (self.civ_pair_denounced[:, a, b] < 0) & (self.civ_pair_denounced[:, b, a] < 0)
                         & (self.civ_warmonger[:, a + 1] <= 0) & (self.civ_warmonger[:, b + 1] <= 0)
                     )
@@ -4193,11 +4202,12 @@ class SimSeats:
                     continue
                 declare = (
                     (want == b) & alive_civ[:, a] & alive_civ[:, b]
-                    & ~self.civ_pair_war[:, a, b] & ~self.civ_pair_allied[:, a, b]
+                    & ~self.war[:, a + 1, b + 1] & ~self.civ_pair_allied[:, a, b]
                 )
                 if bool(declare.any()):
-                    self.civ_pair_war[:, a, b] = self.civ_pair_war[:, a, b] | declare
-                    self.civ_pair_war[:, b, a] = self.civ_pair_war[:, b, a] | declare
+                    self.war[:, a + 1, b + 1] = self.war[:, a + 1, b + 1] | declare
+                    self.war[:, b + 1, a + 1] = self.war[:, b + 1, a + 1] | declare
+                    self._reset_war_clock(a + 1, b + 1, declare)
                     self.civ_warmonger[:, a + 1] = self.civ_warmonger[:, a + 1] + declare.long() * self._wm_dow
                     dt = self.civ_pair_denounced[:, a, b]
                     formal = declare & (dt >= 0) & ((int(self.turn) - dt) >= formal_min)
@@ -4219,10 +4229,13 @@ class SimSeats:
             for b in range(self.R):
                 if b == a or not bool(want[:, b].any()):
                     continue
-                peace = want[:, b] & self.civ_pair_war[:, a, b]
+                peace = want[:, b] & self.war[:, a + 1, b + 1]
                 if bool(peace.any()):
-                    self.civ_pair_war[:, a, b] = self.civ_pair_war[:, a, b] & ~peace
-                    self.civ_pair_war[:, b, a] = self.civ_pair_war[:, b, a] & ~peace
+                    self.war[:, a + 1, b + 1] = self.war[:, a + 1, b + 1] & ~peace
+                    self.war[:, b + 1, a + 1] = self.war[:, b + 1, a + 1] & ~peace
                     self.civ_pair_warkind[:, a, b] = self.civ_pair_warkind[:, a, b] & ~peace
                     self.civ_pair_warkind[:, b, a] = self.civ_pair_warkind[:, b, a] & ~peace
+                    self._reset_war_clock(a + 1, b + 1, peace)
                     self._ww_peace(peace, a + 1, b + 1)
+                    self._citystate_suzerain_release(a + 1, b + 1, peace)
+                    self._citystate_suzerain_release(b + 1, a + 1, peace)

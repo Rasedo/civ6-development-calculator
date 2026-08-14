@@ -50,7 +50,7 @@ def civ_centre(sim) -> tuple[int, int]:
                     continue
                 if int(sim.military_at[0, nb]) >= 0 or int(sim.civilian_at[0, nb]) >= 0:
                     continue
-                sim.civ_only_atwar[0, r] = True
+                sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
                 sim.sync_war()
                 return ctr, nb
     raise AssertionError("no alive civ centre with a free neighbour")

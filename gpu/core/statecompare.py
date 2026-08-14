@@ -187,6 +187,19 @@ def _wars_of(sim, b: int, seat: int) -> list[int]:
     return sorted(int(sim._ROW_SEAT[j]) for j, on in enumerate(row) if on)
 
 
+def _war_clock_line(sim, b: int, seat: int) -> list[list[int]]:
+    """[[opponentSeat, turnsAtWar], ...] for every LIVE war of `seat`, in
+    ascending opponent-seat order.
+
+    One clock per WAR, so the pair is the key. Only live wars are emitted: a
+    settled war's cell is reset by both engines, but comparing a value nothing
+    reads would make the digest fail on bookkeeping rather than on rules."""
+    row = _seat_row(sim, seat)
+    on = sim.war[b, row].tolist()
+    wt = sim.war_turns[b, row].tolist()
+    return sorted([int(sim._ROW_SEAT[j]), int(wt[j])] for j, w in enumerate(on) if w)
+
+
 GAME = {
     "turn": lambda sim, b, rows: [sim.turn],
     "rng": lambda sim, b, rows: [int(sim.rng_state[b])],
@@ -300,7 +313,7 @@ SEAT = {
         sum(1 for a in sim.city_alive[b, c].tolist() if a) for c in rows
     ],
     "wars": lambda sim, b, rows: [_wars_of(sim, b, c) for c in rows],
-    "warTurns": lambda sim, b, rows: [int(sim.war_turns[b, _seat_row(sim, c)]) for c in rows],
+    "warTurns": lambda sim, b, rows: [_war_clock_line(sim, b, c) for c in rows],
     "peaceTurns": lambda sim, b, rows: [int(sim.peace_turns[b, _seat_row(sim, c)]) for c in rows],
     "warWeariness": _ww_pairs("ww", lambda v: v != 0),
     "warWearinessTurn": _ww_pairs("ww_turn", lambda v: v >= 0),
@@ -373,9 +386,7 @@ CITY_STATE = {
         [int(sim._citystate_didx[b, s]) if int(sim.seat_citystate_quest[b, c, s]) == 3 else -1
          for c in _civ_seats(sim)] for s in rows],
     "lastLevyTurn": lambda sim, b, rows: [int(sim.citystate_last_levy[b, s]) for s in rows],
-    "warTurns": lambda sim, b, rows: [
-        int(sim.war_turns[b, _seat_row(sim, 100 + s)]) for s in rows
-    ],
+    "warTurns": lambda sim, b, rows: [_war_clock_line(sim, b, 100 + s) for s in rows],
 }
 
 

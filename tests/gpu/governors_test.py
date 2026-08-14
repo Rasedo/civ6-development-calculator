@@ -106,7 +106,7 @@ def apply_loyalty_row(sim, tier, row: int = 0) -> None:
     """The seat block's loyalty pass for one seat row, with an explicit amenity
     TIER map: the loop-top governor seats, then applyLoyalty per living column
     in array order (pops read live, the engine's own order), then the flips.
-    Exactly what _seat_row does around _seat_city_loyalty."""
+    Exactly what _seat_turn does around _seat_city_loyalty."""
     gov = sim._seat_governor_seats(row)
     flip = torch.zeros(sim.B, sim.RC, dtype=torch.bool)
     for j in range(sim.RC):

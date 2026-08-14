@@ -101,8 +101,9 @@ class BatchEnv:
         all-False rows mean no decision pends there this turn.
 
         ONE assembly for every seat. `seat_masks` is the engine's one legality
-        body (its war head carries the WAR_COLUMN_SEAT fork, documented there);
-        the unit mask is the same `_seat_unit_mask` at this seat's row.
+        body — its war head addresses `war_targets(row)`, the other majors in
+        ascending seat order — and the unit mask is the same `_seat_unit_mask`
+        at this seat's row.
         """
         s = self.sim
         row = self._row(seat)
@@ -273,7 +274,7 @@ class BatchEnv:
                 torch.stack(
                     [
                         (s.war[:, row, o] & ex).to(d),
-                        s.war_turns[:, o].to(d) / 14.0,
+                        s.war_turns[:, row, o].to(d) / 14.0,
                         (s.city_alive[:, o].sum(dim=1) * ex.long()).to(d) / 6.0,
                     ],
                     dim=1,

@@ -236,12 +236,17 @@ def pick_faith(worship_ok: torch.Tensor, missionary_ok: torch.Tensor, apostle_ok
 
 
 def pick_war(mask: torch.Tensor, ctx: dict, rng: dict) -> torch.Tensor:
-    """[B] long — the WAR verb: a civ seat declares on seat 0, or sues for
-    peace. Seat 0 is a civ seat's only opponent under the war rules.
+    """[B] long — the WAR verb: declare on an opponent, or sue it for peace.
 
-    `mask` is seat_masks['war'] [B, 2R]: col 0 = DECLARE legal (alive, at
-    peace), col R = SUE legal (at war, warTurns >= min, peace gold
-    affordable) — LEGALITY, engine-owned. Everything else here is POLICY:
+    `mask` is seat_masks['war'] [B, 2R] over `war_targets(row)` — the other
+    majors in ascending seat order, the same layout for every seat. This
+    picker still reads only column 0 and column R, the FIRST such opponent,
+    because `ctx` describes ONE opponent; the per-opponent observation that
+    would let it compare them is #111 s6.
+
+    Col 0 = DECLARE legal (both alive, at peace), col R = SUE legal (at war,
+    THAT war's clock >= min, peace gold affordable) — LEGALITY, engine-owned.
+    Everything else here is POLICY:
     the sue chance (0.25), the DoW conditions (the opponent has cities,
     peaceTurns > 20, proximity <= 9, warmonger-gang OR a 1.3x strength edge)
     and the DoW chance (0.08 · (0.5 + aggression)).
@@ -252,7 +257,8 @@ def pick_war(mask: torch.Tensor, ctx: dict, rng: dict) -> torch.Tensor:
     and both engines' scripted rolls stand down for driven seats, so
     draw-count parity is untouched by construction.
 
-    Returns the war-head column (0 = declare, R = peace) or -1.
+    Returns the war-head column (0 = declare on the first opponent,
+    R = sue that opponent) or -1.
     """
     B, W2 = mask.shape
     R = max(W2 // 2, 1)

@@ -40,7 +40,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import type { City, CityState, GameState, Seat, Tile, Unit } from './types';
-import { prophetsOf } from './seats';
+import { prophetsOf, warsOf, warTurnsWith } from './seats';
 import { questFor } from './observe';
 import { envoysOf } from './cityStates';
 import { prodLayout } from './prodLayout';
@@ -245,6 +245,20 @@ const overTiles = (fn: (t: Tile) => Val): Extractor => (_state, rows) => (rows a
 const overCityStates = (fn: (cityState: CityState, state: GameState) => Val): Extractor =>
   (state, rows) => (rows as CityState[]).map((cityState) => fn(cityState, state));
 
+/**
+ * [[opponentSeat, turnsAtWar], ...] for every LIVE war of `seat`, in ascending
+ * opponent-seat order — one clock per WAR, so the pair is the key.
+ *
+ * Only live wars are emitted: a settled war's clock is reset on both engines,
+ * but comparing a value nothing reads would make the digest fail on
+ * bookkeeping rather than on rules.
+ */
+const warClockLine = (state: GameState, seat: number): Val =>
+  warsOf(state, seat)
+    .slice()
+    .sort((a, b) => a - b)
+    .map((foe) => [foe, warTurnsWith(state, seat, foe)]) as unknown as Val;
+
 const GAME: Record<string, Extractor> = {
   turn: (s) => [s.turn],
   rng: (s) => [s.rngState >>> 0],
@@ -321,7 +335,7 @@ const SEAT: Record<string, Extractor> = {
   civicProgress: overSeats((s) => s.research.civicProgress),
   cityCount: overSeats((s) => s.cities.length),
   wars: overSeats((s) => [...s.wars].sort((a, b) => a - b)),
-  warTurns: overSeats((s) => s.warTurns),
+  warTurns: overSeats((s, state) => warClockLine(state, s.seat)),
   peaceTurns: overSeats((s) => s.peaceTurns),
   warWeariness: overSeats((s) => wwPairs(s.ww, (v) => v !== 0)),
   warWearinessTurn: overSeats((s) => wwPairs(s.wwTurn, (v) => v >= 0)),
@@ -383,7 +397,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
     }),
   ),
   lastLevyTurn: overCityStates((cityState) => cityState.lastLevyTurn ?? -LEVY_COOLDOWN),
-  warTurns: overCityStates((cityState) => cityState.cityStateWarTurns ?? 0),
+  warTurns: overCityStates((cityState, state) => warClockLine(state, cityState.seat)),
 };
 
 const CITY: Record<string, Extractor> = {

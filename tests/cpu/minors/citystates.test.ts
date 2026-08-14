@@ -156,7 +156,7 @@ describe('envoys', () => {
     const state = makeState();
     addCs(state, 9, 9);
     seatOf(state, 0)!.influencePoints = ENVOY_COST - 2;
-    cityStatePhase(state, 0);
+    cityStatePhase(state);
     expect(seatOf(state, 0)!.envoysAvailable).toBe(1);
     expect(seatOf(state, 0)!.influencePoints).toBeLessThan(ENVOY_COST);
   });

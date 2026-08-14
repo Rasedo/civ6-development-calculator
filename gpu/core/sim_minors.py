@@ -20,9 +20,12 @@ class SimMinors:
         one call per row in the seat phase)."""
         if self.S == 0:
             return
-        # The seat-0 <-> city-state war clock ticks FIRST, exactly where
-        # cityStatePhase does.
-        self.citystate_war_turns.add_(self.citystate_atwar.long())
+        # The city-states' own LINES of the pair clock tick FIRST, exactly
+        # where cityStatePhase does. A major's line ticks in its own seat
+        # block, so every war's two cells each move once a turn.
+        _cs0 = 1 + max(self.R, 1)
+        _cs = slice(_cs0, _cs0 + max(self.S, 1))
+        self.war_turns[:, _cs] += self.war[:, _cs].long()
         if self.turn % 12 == 0:
             self.citystate_pop.copy_(torch.where(self.citystate_alive, (self.citystate_pop + 1).clamp(max=10), self.citystate_pop))
         # siege recovery — +10/turn toward maxHp (cityStatePhase tail).

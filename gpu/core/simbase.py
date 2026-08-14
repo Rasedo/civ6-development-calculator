@@ -510,7 +510,7 @@ _MUTABLE = [
     # single family view reaches both — registering the base is the only
     # spelling that stays complete when the block grows a section.
     "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_is_cap", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts", "city_bldg",
-    # the two seat-indexed war clocks (civ_only_warturns / citystate_war_turns /
-    # civ_only_peaceturns are VIEWS of these).
+    # the PAIR war clock and the per-seat peace clock. `war` itself is
+    # allocated beside them and registered above.
     "war_turns", "peace_turns",
 ]

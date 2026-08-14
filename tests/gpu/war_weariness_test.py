@@ -35,8 +35,8 @@ def build():
     assert sim.R >= 2, "needs two civs to poke simultaneous wars"
     for _ in range(20):
         sim.step()
-    sim.civ_only_atwar[:] = False
-    sim.civ_pair_war[:] = False
+    sim.war[:, 0, 1:1 + sim.R] = sim.war[:, 1:1 + sim.R, 0] = False
+    sim.war[:, 1:1 + sim.R, 1:1 + sim.R] = False
     sim.sync_war()  # close the pokes under transpose
     sim.ww[:] = 0
     sim.ww_turn[:] = -1
@@ -137,13 +137,13 @@ def main() -> None:
     sim.ww[:, 0, 1] = 1000
     sim.ww[:, 0, 2] = 1000
     sim.ww_turn[:, 0, 1] = int(sim.turn)  # blood was spilled against civ 0
-    sim.civ_only_atwar[:, 0] = True
+    sim.war[:, 0, 1 + 0] = sim.war[:, 1 + 0, 0] = True
     sim.sync_war()
     sim._ww_decay(0)
     assert int(sim.ww[0, 0, 1]) == 1000, "a war fought THIS turn does not decay"
     assert int(sim.ww[0, 0, 2]) == 1000 - int(rww["decayAtWar"]), int(sim.ww[0, 0, 2])
     sim.turn += 1
-    sim.civ_only_atwar[:, 0] = False
+    sim.war[:, 0, 1 + 0] = sim.war[:, 1 + 0, 0] = False
     sim.sync_war()
     sim._ww_decay(0)
     assert int(sim.ww[0, 0, 1]) == 1000 - int(rww["decayAtPeace"]), int(sim.ww[0, 0, 1])
@@ -181,7 +181,7 @@ def main() -> None:
 
     # --- a war DECLARED but never fought costs nothing -------------------
     sim = build()
-    sim.civ_only_atwar[:, 0] = True
+    sim.war[:, 0, 1 + 0] = sim.war[:, 1 + 0, 0] = True
     sim.sync_war()
     for _ in range(30):
         sim.step()

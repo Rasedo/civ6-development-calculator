@@ -32,24 +32,25 @@ def main() -> None:
 
     # --- 1) the plane exists, is peace-by-default and survives a round trip --
     sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    # `citystate_atwar` is a SLICE of the war matrix, so what has to be registered —
-    # and what actually carries the state through a round trip — is `war`.
-    # Registering the view instead would restore into a fresh tensor and
-    # silently orphan the matrix.
+    # A (seat, city-state) war is a cell of the war matrix and has no second
+    # name (#111): what is registered and what carries the state through a
+    # round trip are the same tensor, so the pair cannot drift.
     assert "war" in _MUTABLE, "the war matrix must be registered in _MUTABLE"
-    assert "citystate_atwar" not in _MUTABLE, "citystate_atwar is a VIEW of war — registering it too would double-restore"
-    assert sim.citystate_atwar.data_ptr() == sim.war[:, 0, 1 + max(sim.R, 1):].data_ptr(), (
-        "citystate_atwar must share storage with war[seat 0, city-state]"
+    assert not hasattr(sim, "citystate_atwar"), (
+        "the seat-0/city-state war VIEW must stay deleted — one name per fact (#111)"
     )
-    assert sim.citystate_atwar.shape == (sim.B, sim.S), f"citystate_atwar shape {tuple(sim.citystate_atwar.shape)}"
-    assert not bool(sim.citystate_atwar.any()), "peace is the default — no city-state starts at war"
-    sim.citystate_atwar[0, 0] = True
+    assert sim.war.shape == (sim.B, sim.NS, sim.NS), f"war shape {tuple(sim.war.shape)}"
+    cs_lo = sim.row_of(100 + 0)
+    assert not bool(sim.war[:, :, cs_lo:cs_lo + sim.S].any()), (
+        "peace is the default — no city-state starts at war"
+    )
+    sim.war[0, 0, sim.row_of(100 + 0)] = sim.war[0, sim.row_of(100 + 0), 0] = True
     sim.sync_war()  # close the poke under transpose
     snap = sim.snapshot()
-    sim.citystate_atwar[0, 0] = False
+    sim.war[0, 0, sim.row_of(100 + 0)] = sim.war[0, sim.row_of(100 + 0), 0] = False
     sim.sync_war()  # close the poke under transpose
     sim.restore(snap)
-    assert bool(sim.citystate_atwar[0, 0]), "citystate_atwar must survive snapshot/restore"
+    assert bool(sim.war[0, 0, sim.row_of(100 + 0)]), "a city-state war must survive snapshot/restore"
 
     # --- 2) peace hides the centre; a declaration reveals it -----------------
     # Walk a few turns so a seat-0 unit exists, then plant one adjacent to a
@@ -78,7 +79,7 @@ def main() -> None:
     s2.major_unit_type[found[0], found[3]] = fighter
     b, cs, ctr, u, spot = found
     s2.major_unit_tile[b, u] = spot
-    s2.citystate_atwar[b, cs] = False
+    s2.war[b, 0, s2.row_of(100 + cs)] = s2.war[b, s2.row_of(100 + cs), 0] = False
     s2.sync_war()  # close the poke under transpose
     # the mask indexes HEAD ROWS — this seat's living units in slot order
     rw = int((s2._seat_slot_map(0)[b] == u).nonzero(as_tuple=True)[0][0])
@@ -87,11 +88,11 @@ def main() -> None:
     assert dirs, "the planted tile is not adjacent to the centre"
     d = dirs[0]
     assert not bool(m_peace[d]), "a PEACEFUL city-state must never appear in the attack mask"
-    s2.citystate_atwar[b, cs] = True
+    s2.war[b, 0, s2.row_of(100 + cs)] = s2.war[b, s2.row_of(100 + cs), 0] = True
     s2.sync_war()  # close the poke under transpose
     m_war = s2._seat_unit_mask(0)[b, rw, 6:12]
     assert bool(m_war[d]), "after a declaration the city-state centre MUST be attackable"
-    print("  a citystate_atwar: peace default, a VIEW of war, snapshot round-trip OK")
+    print("  a city-state war: peace default, one store, snapshot round-trip OK")
     print("  b mask: peaceful hidden, declared war reveals the centre OK")
 
     # --- c: the SUZERAIN RELEASE --------------------------------------------
@@ -100,8 +101,10 @@ def main() -> None:
     # city-state in the gate, so this poke is the only coverage it has.
     suz_min = int(s2.rules.citystate.get("suzerainEnvoys", 3))
     r = 0
-    s2.citystate_atwar[b, cs] = True
-    s2.citystate_war_turns[b, cs] = 7
+    s2.war[b, 0, s2.row_of(100 + cs)] = s2.war[b, s2.row_of(100 + cs), 0] = True
+    _citystate_row0 = 1 + max(s2.R, 1) + cs
+    s2.war_turns[b, 0, _citystate_row0] = 7
+    s2.war_turns[b, _citystate_row0, 0] = 7
     s2.seat_citystate_envoys[b, r + 1, cs] = suz_min + 2   # this civ is the strict suzerain
     s2.seat_citystate_envoys[b, 0, cs] = 0
     if s2.R > 1:
@@ -113,19 +116,20 @@ def main() -> None:
 
     _peace = torch.zeros(s2.B, dtype=torch.bool)
     _peace[b] = True
-    s2._citystate_suzerain_release(r + 1, _peace)
-    assert not bool(s2.citystate_atwar[b, cs]), "the suzerain's peace must end the city-state's war"
-    assert int(s2.citystate_war_turns[b, cs]) == 0, "the war clock must reset"
+    # the PATRON is the suzerain civ; seat 0 is the foe whose war ends.
+    s2._citystate_suzerain_release(r + 1, 0, _peace)
+    assert not bool(s2.war[b, 0, s2.row_of(100 + cs)]), "the suzerain's peace must end the city-state's war"
     assert float(s2.ww[b, 0, _citystate_row]) == max(0.0, 900.0 - shed), "seat 0 must shed the treaty amount"
-    assert int(s2.war_turns[b, _citystate_row]) == 0, "citystate_war_turns is a VIEW — war_turns must see the reset"
+    assert int(s2.war_turns[b, 0, _citystate_row]) == 0, "the (seat 0, city-state) clock must reset"
+    assert int(s2.war_turns[b, _citystate_row, 0]) == 0, "...and its mirror cell with it"
 
     # a civ that is NOT the suzerain releases nothing
-    s2.citystate_atwar[b, cs] = True
+    s2.war[b, 0, s2.row_of(100 + cs)] = s2.war[b, s2.row_of(100 + cs), 0] = True
     s2.seat_citystate_envoys[b, r + 1, cs] = 0
     s2.sync_war()
-    s2._citystate_suzerain_release(r + 1, _peace)
-    assert bool(s2.citystate_atwar[b, cs]), "a non-suzerain's peace must NOT free the city-state"
-    print("  c suzerain release: war ends, clock resets through the view, -%d ww OK" % shed)
+    s2._citystate_suzerain_release(r + 1, 0, _peace)
+    assert bool(s2.war[b, 0, s2.row_of(100 + cs)]), "a non-suzerain's peace must NOT free the city-state"
+    print("  c suzerain release: war ends, BOTH clock cells reset, -%d ww OK" % shed)
 
     print("citystate_war_test OK — A-18 seat 0 <-> city-state war gates the attack mask")
 

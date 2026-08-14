@@ -403,7 +403,7 @@
      "name": "warTurns",
      "compare": "exact",
      "covers": [
-      "Seat.warTurns"
+      "GameState.warTurns"
      ],
      "planes": [
       "war_turns"
@@ -794,7 +794,7 @@
      "name": "warTurns",
      "compare": "exact",
      "covers": [
-      "CityState.cityStateWarTurns"
+      "GameState.warTurns"
      ],
      "planes": []
     }

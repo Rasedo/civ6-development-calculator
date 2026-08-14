@@ -193,6 +193,11 @@ export interface GameState {
   roadBridges?: boolean;
   /** World Congress sessions held so far. */
   congressSessions?: number;
+  /** How long each live WAR has run, keyed by the unordered seat pair
+   *  ("a,b" with a < b). One clock per war — peace cannot be offered until
+   *  WAR_MIN_TURNS of THAT war have passed and its price is that war's own
+   *  length, so a seat fighting two opponents holds two clocks. */
+  warTurns?: Record<string, number>;
   map: GameMap;
   turn: number;
   /** Recorded decisions. A seat listed here does not decide: its codes are
@@ -400,7 +405,7 @@ export interface Seat {
   color: string;
   /** 0..1 — settling pace and war likelihood. */
   aggression: number;
-  warTurns: number;
+  /** Removed: the war clock is per-PAIR and lives on GameState.warTurns. */
   peaceTurns: number;
   /**
    * WAR. Every seat this one is fighting, as ABSOLUTE SEAT IDS — the single
@@ -504,7 +509,7 @@ export interface CityState extends Seat {
   met: number[];
   /** Turns elapsed since seat 0 declared on this city-state; gates when
    *  peace may be offered. */
-  cityStateWarTurns?: number;
+  /** Removed: a city-state's war clocks live on GameState.warTurns too. */
   /** Siege hit points; absent = full (CITY_STATE_MAX_HP). */
   hp?: number;
   /** Turn of seat 0's last militaristic levy here (cooldown). */

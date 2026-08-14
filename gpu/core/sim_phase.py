@@ -11,18 +11,18 @@ from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must
 
 
 class SimPhase:
-    def _seat_phase(self, war: torch.Tensor | None = None) -> None:
+    def _seat_phase(self) -> None:
         """Runs EVERY seat in id order — the seatPhase twin. This function holds
         the schedule AROUND the seat loop (the MP reset, the geopolitics arms,
-        the peace pass); every row's turn itself is ONE call to _seat_row.
-        Decisions arrive through the same stash for every row (`_stash_record`
-        / `_stash_buy`, keyed by absolute row), so the only wire argument left
-        here is `war` — seat 0's declare column, which applies at the geo pass
-        below rather than at the record position.
+        the peace pass); every row's turn itself is ONE call to _seat_turn.
 
-        What remains per-row in this file is the war-or-peace tail: the civ
-        counters and the driven unit-sequence replay (WAR_COLUMN_SEAT)."""
-        rr = self.rules.seats
+        NO WIRE ARGUMENT reaches here any more. Every row's decisions arrive
+        through the same stash (`_stash_record` / `_stash_buy`, keyed by the
+        absolute row) and its war column through `_apply_war_column`, so the
+        schedule holds no seat's intents of its own.
+
+        What remains per-row in this file is the war-or-peace tail and the
+        driven unit-sequence replay (#108)."""
         # Freeze the MAJORS' aura MP here: the seatPhase movesLeft reset
         # covers every isCiv unit — seat 0's pool included — ahead of any
         # general war-walk, so both engines read the same pre-move general
@@ -37,28 +37,15 @@ class SimPhase:
         # live for both sides' war-acts this turn); peace at the tail.
         if self.R > 0:
             self._geo_denounce_and_ally()
-        # Seat 0 declares through the geo pass like every seat (the rec.war
-        # self-guard's twin: its own war column can never mean itself). The
-        # arm re-validates against the LIVE mask at this position.
-        if war is not None and self._rl_war_active and self.R > 0:
-            w0 = war.to(torch.long)
-            ok0 = self.city_alive[:, 0].any(dim=1) & (w0 >= 0) & self.war_mask().gather(1, w0.clamp(min=0).unsqueeze(1)).squeeze(1)
-            decl = ok0 & (w0 < self.R)
-            if bool(decl.any()):
-                oh = torch.nn.functional.one_hot(w0.clamp(min=0, max=self.R - 1), self.R).bool() & decl.unsqueeze(1)
-                self.civ_only_atwar.logical_or_(oh)
-                self.war[:, 1:1 + self.civ_only_atwar.shape[1], 0] |= oh
-                self.civ_only_warturns.copy_(torch.where(oh, torch.zeros_like(self.civ_only_warturns), self.civ_only_warturns))
-        if self.R > 0:
             self._geo_declare_wars()
         # THE SEAT LOOP — state.seats in id order, seat 0 first, ONE body per
-        # row. All that is left outside _seat_row is the driven unit-sequence
+        # row. All that is left outside _seat_turn is the driven unit-sequence
         # REPLAY: row 0's unit orders ride the triples schema and replay in the
         # order phase, a civ's ride per-unit rows and replay here (#108) — so
         # row 0 simply never has a `_driven_useq` entry and the block below is
         # a no-op on it. No branch encodes that; the stash key does.
         for row in range(1 + self.R):
-            active = self._seat_row(row)
+            active = self._seat_turn(row)
             if not bool(active.any()):
                 continue
 
@@ -106,26 +93,10 @@ class SimPhase:
         # load-bearing for R=1 configs.
         self._seat_route_cache = None
 
-        # The PEACE pass runs AFTER every seat acted, in actor order — seat
-        # 0's sue-for-peace arm leads (the geoPeace pass position), then the
-        # civ↔civ pairs. Re-validated against the LIVE mask; the gold
-        # schedule is the seat-0 war verb's own rule (the TS geoPeace arm
-        # carries no terms — a WAR_COLUMN_SEAT-family residual).
-        if war is not None and self._rl_war_active and self.R > 0:
-            w0p = war.to(torch.long)
-            okp = self.city_alive[:, 0].any(dim=1) & (w0p >= 0) & self.war_mask().gather(1, w0p.clamp(min=0).unsqueeze(1)).squeeze(1)
-            pea = okp & (w0p >= self.R)
-            if bool(pea.any()):
-                ri = (w0p - self.R).clamp(min=0, max=self.R - 1)
-                cost = rr.get("peaceGold0", 150) + rr.get("peaceGoldSlope", 10) * self.civ_only_warturns.gather(
-                    1, ri.unsqueeze(1)
-                ).squeeze(1).to(self.dtype)
-                oh = torch.nn.functional.one_hot(ri, self.R).bool() & pea.unsqueeze(1)
-                self.civ_treasury[:, 0].copy_(torch.where(pea, self.civ_treasury[:, 0] - cost, self.civ_treasury[:, 0]))
-                self.civ_only_atwar.logical_and_(~oh)
-                self.war[:, 1:1 + self.civ_only_atwar.shape[1], 0] &= ~oh
-                self.civ_only_warturns.copy_(torch.where(oh, torch.zeros_like(self.civ_only_warturns), self.civ_only_warturns))
-                self.civ_only_peaceturns.copy_(torch.where(oh, torch.zeros_like(self.civ_only_peaceturns), self.civ_only_peaceturns))
+        # The civ↔civ PEACE pass runs AFTER every seat acted, at the geoPeace
+        # position. Row 0's own sue-for-peace no longer has an arm here: its
+        # war column rides `_apply_war_column` at the record position, the
+        # same one every other row's does.
         if self.R > 0:
             self._geo_make_peace()
 
@@ -198,10 +169,14 @@ class SimPhase:
         self._city_strike_resolve(strike, tt, d_slot, d_seat, _okm, _okc, is_vet_mil,
                                   atk_cs, def_e, def_hp, row, key)
 
-    def _seat_row(self, row: int) -> torch.Tensor:
+    def _seat_turn(self, row: int) -> torch.Tensor:
         """ONE seat's turn — the seatPhase loop body, for ANY major seat row
         (0 = seat 0, r+1 = civ r). Returns the row's `active` mask so the
         caller can drive its war-or-peace tail.
+
+        NOT `_seat_row`: that name is the seat->row lookup TENSOR, and binding
+        both on `self` buries whichever loses. The seat-symmetry check now
+        fails on the collision.
 
         In seatPhase order: the war-weariness decay, boost detection,
         city-state diplomacy and quests, the recorded picks, the gold/faith
@@ -209,9 +184,10 @@ class SimPhase:
         the queue, border growth, the city's own defense), the loyalty
         collapses, then the research/upkeep/tourism/great-people tail.
 
-        What the CALLER still owns is the war-or-peace tail: its counters and
-        its driven unit-sequence replay still differ between row 0 and a civ
-        row (the WAR_COLUMN_SEAT residual)."""
+        What the CALLER still owns is the driven unit-sequence REPLAY, whose
+        position in the phase differs between row 0 and a civ row (#108). The
+        counters are not a caller concern any more — `_seat_war_peace_tail`
+        runs from here, one body for every row."""
         B, dev = self.B, self.device
         active = self.civ_alive[:, row] & self.city_alive[:, row].any(dim=1)
         if not bool(active.any()):
@@ -224,8 +200,8 @@ class SimPhase:
         # War weariness SETTLES here: accrual happens per BATTLE as the
         # fighting resolves, so what is left for the block top is the
         # decay. The same function every seat calls, on its own row.
-        # civ_pair_war is fixed for the turn by the phase-top declaration pass,
-        # so the "at war with somebody" test inside is stable.
+        # The civ block of `war` is fixed for the turn by the phase-top
+        # declaration pass, so the "at war with somebody" test inside is stable.
         self._ww_decay(row, active)
         # Eurekas/inspirations from this seat — the TS twin runs at the
         # same point (the seat's block top).
@@ -315,20 +291,20 @@ class SimPhase:
         """The seat block's war-or-peace COUNTERS — one body, every seat row,
         at the tail seatPhase gives them.
 
-        `war_turns` measures war with WAR_COLUMN_SEAT, the single pair axis the
-        wire carries (`civsAtWar(state, actor.seat, seat)`); `peace_turns`
+        `war_turns[row]` is this row's LINE of the pair clock: every war it is
+        in ticks, each in its own cell, so a seat fighting two opponents has
+        two clocks and can sue either on that war's own terms. `peace_turns`
         ticks while the seat is at war with NO major (atWarWithAny reads
         Seat.wars — the majors' list — so a city-state war does not hold it
-        back). The two are exclusive: war_turns can only move inside a war,
+        back). The two are exclusive: a war clock only moves inside a war,
         which is a war with somebody.
 
-        The war MATRIX makes this row-generic with nothing special-cased. Seat
-        0's column against ITSELF is structurally False, so its war_turns never
-        moves — exactly what `civsAtWar(state, 0, 0)` does on the TS side, and
-        the reason row 0 looked like it needed a counter rule of its own."""
-        atw = active & self.war[:, row, 0]
+        The war MATRIX makes this row-generic with nothing special-cased. A
+        row's cell against ITSELF is structurally False, so it never counts a
+        war with itself — exactly what `civsAtWar(state, s, s)` does on the TS
+        side, and the reason row 0 looked like it needed a rule of its own."""
         any_war = active & self.war[:, row, :1 + self.R].any(dim=1)
-        self.war_turns[:, row] = self.war_turns[:, row] + atw.long()
+        self.war_turns[:, row] += (active.unsqueeze(1) & self.war[:, row]).long()
         self.peace_turns[:, row] = self.peace_turns[:, row] + (active & ~any_war).long()
 
     def _seat_governor_seats(self, row: int) -> torch.Tensor:

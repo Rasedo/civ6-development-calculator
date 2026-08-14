@@ -85,8 +85,8 @@ def setup(sim, at_war: bool) -> tuple[int, int]:
     sim.military_at[0, tile] = slot + sim.POOL_LO["major"]
     sim.unit_next[0] += 1
 
-    sim.civ_pair_war[0, STRIKER, VICTIM] = at_war
-    sim.civ_pair_war[0, VICTIM, STRIKER] = at_war
+    sim.war[0, 1 + STRIKER, 1 + VICTIM] = at_war
+    sim.war[0, 1 + VICTIM, 1 + STRIKER] = at_war
     sim.sync_war()
     return slot, tile
 

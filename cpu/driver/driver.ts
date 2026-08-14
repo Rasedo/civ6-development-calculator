@@ -173,16 +173,15 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
         }
       }
     }
-    // #104 the LEVY candidate twin — at-war (the single war axis, vs
-    // seat 0) is the POLICY gate; the rule body levyUnits has no war
-    // test. First eligible CS in order.
+    // #104 the LEVY candidate twin — being at war is the POLICY gate; the
+    // rule body levyUnits has no war test. First eligible CS in order.
     let levyIdx = -1;
-    // the WAR AXIS is single (every war pairs a seat with WAR_COLUMN_SEAT),
-    // so "at war" reads the axis from whichever end this seat sits on.
-    const atWarAxis = actor.seat === 0
-      ? state.seats.some((o) => o.seat !== 0 && civsAtWar(state, 0, o.seat))
-      : civsAtWar(state, actor.seat, 0);
-    if (atWarAxis && goldAffordable(actor.treasury ?? 0, LEVY_GOLD_COST)) {
+    // At war with ANY other major, read off this seat's own row — the GPU's
+    // `war[row, :1+R].any()` twin. It used to read a single war axis from
+    // whichever end the seat sat on, so a civ fighting only another civ read
+    // FALSE here and never levied.
+    const atWar = state.seats.some((o) => o.seat !== actor.seat && civsAtWar(state, actor.seat, o.seat));
+    if (atWar && goldAffordable(actor.treasury ?? 0, LEVY_GOLD_COST)) {
       for (let ci = 0; ci < state.cityStates.length; ci++) {
         const csl = state.cityStates[ci];
         if (csl.type !== 'militaristic') continue;

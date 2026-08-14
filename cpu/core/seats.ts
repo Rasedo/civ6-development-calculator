@@ -141,7 +141,7 @@ export function emptySeat(seat: number): Seat {
     warmonger: 0, ww: {}, wwTurn: {}, diplomaticFavor: 0, diplomaticPoints: 0,
     wars: [], formalWars: [], denounced: {}, allies: [],
     influencePoints: 0, envoysAvailable: 0,
-    warTurns: 0, peaceTurns: 0,
+    peaceTurns: 0,
     treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     government: { current: null, policies: [] },
@@ -268,6 +268,27 @@ export function setWar(state: GameState, a: number, b: number, on: boolean): voi
   };
   put(sa, b);
   put(sb, a);
+}
+
+/**
+ * How long have `a` and `b` been at war? ONE clock per WAR, keyed by the
+ * unordered pair, because that is what the rule it gates is: peace cannot be
+ * offered until WAR_MIN_TURNS of THAT war have passed and its price is that
+ * war's own length. A seat fighting two opponents holds two clocks.
+ */
+export function warClockKey(a: number, b: number): string {
+  return a < b ? `${a},${b}` : `${b},${a}`;
+}
+
+export function warTurnsWith(state: GameState, a: number, b: number): number {
+  if (a === b) return 0;
+  return state.warTurns?.[warClockKey(a, b)] ?? 0;
+}
+
+export function setWarTurnsWith(state: GameState, a: number, b: number, v: number): void {
+  if (a === b) return;
+  if (!state.warTurns) state.warTurns = {};
+  state.warTurns[warClockKey(a, b)] = v;
 }
 
 /** Is this war FORMAL (denounced first) rather than a surprise attack? */

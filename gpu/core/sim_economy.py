@@ -260,27 +260,29 @@ class SimEconomy:
                 continue
             self.ww[:, i, j] = torch.where(mask, (self.ww[:, i, j] - shed).clamp(min=0), self.ww[:, i, j])
 
-    def _citystate_suzerain_release(self, row: int, peace: torch.Tensor) -> None:
-        """Making peace with seat row `row` ALSO ends the wars its city-states
-        were dragged into — the `makePeace` loop that walks `state.cityStates`
-        and clears every `cs.atWar` whose suzerain is that seat.
+    def _citystate_suzerain_release(self, patron: int, foe: int, peace: torch.Tensor) -> None:
+        """Making peace with `patron` ALSO ends `foe`'s wars against the
+        city-states `patron` is suzerain of — the `makePeace` loop that walks
+        `state.cityStates` and clears every `cs.atWar` whose suzerain is the
+        seat being made peace with.
 
         The suzerain test is `isSuzerain`'s: at least `suzerainEnvoys`,
-        strictly above seat 0, strictly above every other civ."""
+        strictly above every other seat."""
         if self.S <= 0 or not bool(peace.any()):
             return
         _cs0 = 1 + max(self.R, 1)
         cs = slice(_cs0, _cs0 + max(self.S, 1))
-        rel = self._suzerain_mask(row) & self.war[:, 0, cs] & peace.unsqueeze(1)
+        rel = self._suzerain_mask(patron) & self.war[:, foe, cs] & peace.unsqueeze(1)
         if not bool(rel.any()):
             return
         # The war matrix is the store; write the cell and its mirror, and the
         # clock IN PLACE (a rebind would orphan every other view of it).
-        self.war[:, 0, cs] &= ~rel
-        self.war[:, cs, 0] &= ~rel
-        self.war_turns[:, cs].masked_fill_(rel, 0)
+        self.war[:, foe, cs] &= ~rel
+        self.war[:, cs, foe] &= ~rel
+        self.war_turns[:, foe, cs].masked_fill_(rel, 0)
+        self.war_turns[:, cs, foe].masked_fill_(rel, 0)
         for _s in range(self.S):
-            self._ww_peace(rel[:, _s], 0, _cs0 + _s)
+            self._ww_peace(rel[:, _s], foe, _cs0 + _s)
 
     def _ww_penalty(self, row: int, dtype=None) -> torch.Tensor:
         """[B] a seat row's war-weariness amenity penalty (integer floor, then

@@ -11,7 +11,7 @@
  * every seat.
  */
 import type { City, CityState, CityStateQuest, GameState, QueueItem } from './types';
-import { atWarWithAny, citiesOf, civsAtWar, isBarbSeat, seatOf, tileCity, tileSeat } from './seats';
+import { atWarWithAny, citiesOf, civsAtWar, isBarbSeat, seatOf, tileCity, tileSeat, warTurnsWith } from './seats';
 import { seatStrength, seatProximity } from './phase';
 import { WARMONGER_GANG } from '../data/seats';
 import { envoysOf, hasMet } from './cityStates';
@@ -91,7 +91,7 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
     if (o.seat === seat) continue;
     riv.push(
       civsAtWar(state, o.seat, seat) ? 1 : 0,
-      (o.warTurns ?? 0) / 14.0,
+      warTurnsWith(state, seat, o.seat) / 14.0,
       o.cities.length / 6.0,
     );
   }

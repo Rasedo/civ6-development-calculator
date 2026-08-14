@@ -417,7 +417,7 @@ def _geo_turn(sim):
     deterministic; everything here is POLICY — proximity and strength
     thresholds, the gang bypass, war-weariness pacing, id-order scanning —
     and the engine arms re-validate only the RULES. Returns (denounce
-    [B,R,R] bool, ally [B,R,R] bool from the lower index, civ_pair_war [B,R] long
+    [B,R,R] bool, ally [B,R,R] bool from the lower index, war [B,R] long
     target, peace [B,R,R] bool from the lower index)."""
     B, R, dev = sim.B, sim.R, sim.device
     den = torch.zeros(B, R, R, dtype=torch.bool, device=dev)
@@ -445,7 +445,7 @@ def _geo_turn(sim):
                 continue
             den[:, a, b] = (
                 alive_civ[:, a] & alive_civ[:, b]
-                & (sim.civ_pair_denounced[:, a, b] < 0) & ~sim.civ_pair_war[:, a, b]
+                & (sim.civ_pair_denounced[:, a, b] < 0) & ~sim.war[:, a + 1, b + 1]
                 & (prox[a, b] <= prox_max) & (rstr[:, a] > rstr[:, b])
             )
     # ALLIANCE (lower-index proposal): peace-era pairs with no grudge — the
@@ -455,7 +455,7 @@ def _geo_turn(sim):
             for b in range(a + 1, R):
                 ally[:, a, b] = (
                     alive_civ[:, a] & alive_civ[:, b]
-                    & ~sim.civ_pair_war[:, a, b] & ~sim.civ_pair_allied[:, a, b]
+                    & ~sim.war[:, a + 1, b + 1] & ~sim.civ_pair_allied[:, a, b]
                     & (sim.civ_pair_denounced[:, a, b] < 0) & (sim.civ_pair_denounced[:, b, a] < 0)
                     & ~den[:, a, b] & ~den[:, b, a]
                     & (sim.civ_warmonger[:, a + 1] <= 0) & (sim.civ_warmonger[:, b + 1] <= 0)
@@ -482,7 +482,7 @@ def _geo_turn(sim):
                 continue
             declare = (
                 aggr_ok & alive_civ[:, b] & ~used[:, b]
-                & ~sim.civ_pair_war[:, a, b] & (prox[a, b] <= prox_max)
+                & ~sim.war[:, a + 1, b + 1] & (prox[a, b] <= prox_max)
                 & ((rstr[:, a] > rstr[:, b] * ratio) | (sim.civ_warmonger[:, b + 1] >= sim._wm_gang))
                 & (ww[:, b] <= peace_ww)
                 & ~allied_eff[:, a, b]
@@ -497,7 +497,7 @@ def _geo_turn(sim):
     # like the sue verb: a decision decides from its observation.
     for a in range(R):
         for b in range(a + 1, R):
-            peace[:, a, b] = sim.civ_pair_war[:, a, b] & ((ww[:, a] > peace_ww) | (ww[:, b] > peace_ww))
+            peace[:, a, b] = sim.war[:, a + 1, b + 1] & ((ww[:, a] > peace_ww) | (ww[:, b] > peace_ww))
     return den, ally, war, peace
 
 
@@ -507,7 +507,7 @@ def geo_decide_and_apply(sim):
     return the tensors for wire extraction (_extract_geo per seat row)."""
     den, ally, war, peace = _geo_turn(sim)
     for r in range(sim.R):
-        sim.apply_geo(r + 1, denounce=den[:, r], ally=ally[:, r], civ_pair_war=war[:, r], civ_pair_peace=peace[:, r])
+        sim.apply_geo(r + 1, denounce=den[:, r], ally=ally[:, r], geo_war=war[:, r], geo_peace=peace[:, r])
     return den, ally, war, peace
 
 
@@ -817,9 +817,9 @@ def replay_seat(sim, row: int, rec: dict) -> None:
     if rec.get("ally"):
         geo_kwargs["ally"] = _geo_mask(rec["ally"])
     if rec.get("geoWar") is not None:
-        geo_kwargs["civ_pair_war"] = torch.full((sim.B,), int(rec["geoWar"]), dtype=torch.long, device=dev)
+        geo_kwargs["geo_war"] = torch.full((sim.B,), int(rec["geoWar"]), dtype=torch.long, device=dev)
     if rec.get("geoPeace"):
-        geo_kwargs["civ_pair_peace"] = _geo_mask(rec["geoPeace"])
+        geo_kwargs["geo_peace"] = _geo_mask(rec["geoPeace"])
     if geo_kwargs:
         sim.apply_geo(row, **geo_kwargs)
     # draw order: replay stashes exactly as the driver does; the PHASE
