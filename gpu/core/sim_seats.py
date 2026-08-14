@@ -3259,7 +3259,7 @@ class SimSeats:
         # Seat-0 cities are march targets only at war with seat 0 (hp); a civ
         # ALSO marches to its at-war ENEMY civs' cities (key
         # d*16384 + civIdx*2048 + centerTile), with seat 0 winning ties.
-        ckey = torch.where(self.alive & hpT, dc * 4096 + self.city_seq, 10**9)
+        ckey = torch.where(self.alive & hpT, dc * 4096 + torch.arange(self.C, device=self.device), 10**9)
         city_min = ckey.min(dim=1).values
         pc_dist = torch.div(city_min, 4096, rounding_mode="floor")  # seat-0 city distance (1e9//4096 stays huge)
         city_tgt = self.site.gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
@@ -4051,7 +4051,7 @@ class SimSeats:
         destCompletedSpecialty/2) — with strictly-greater-beats semantics, so
         ties keep the FIRST pair in (from asc, to asc) slot order. rc slot order
         IS TS array order: founding/capture/transfer all append at last-alive+1
-        and _reclaim_civ_cities is stable."""
+        and _reclaim_cities is stable."""
         B, RC, dev = self.B, self.RC, self.device
         alive = self.civ_city_alive[:, r]  # [B, RC]
         # ONE city suffices — a met CS is a routable dest, and the TS gate is
@@ -4253,10 +4253,9 @@ class SimSeats:
         city ids like the civ rows, CS dest -(2+s), intl dest -1 + centre
         tile in seat_route_dest). Capacity mirrors tradeCapacity: FOREIGN_TRADE +
         Market-or-Lighthouse per living city + completed Colossus/GZ +
-        trade-CS suzerainty. ORDER: TS scans actor.cities in ARRAY order,
-        which for seat 0 is city_seq order, NOT column order (foundings
-        reuse holes) — so ties break on an explicit seq-rank key, unlike the
-        civ arm whose slots are append-only."""
+        trade-CS suzerainty. ORDER: TS scans actor.cities in ARRAY order —
+        column order under append+reclaim (#110), the same tie-break the civ
+        arm uses."""
         B, C, S, dev = self.B, self.C, self.S, self.device
         want = active0 & (self.alive.sum(dim=1) >= 1)
         rts0 = self.seat_routes[:, 0]  # [B, K, 2]
@@ -4305,11 +4304,9 @@ class SimSeats:
             self.alive.unsqueeze(2) & self.alive.unsqueeze(1) & ~eye0
             & (d00 <= self._trade_range) & ~exists0 & want.reshape(B, 1, 1)
         )
-        # seq-rank tie-break: rank[c] = this column's position in city_seq
-        # order among LIVE cities (dead columns sort last, masked anyway).
-        seq_key = torch.where(self.alive, self.city_seq, self.city_seq + 10**6)
-        rank = torch.empty(B, C, dtype=torch.long, device=dev)
-        rank.scatter_(1, seq_key.argsort(dim=1, stable=True), cols.expand(B, C))
+        # Array-position tie-break = the column index (dead columns are
+        # masked by every valid* above).
+        rank = cols.reshape(1, C).expand(B, C)
         W2 = C + max(S, 0)
         # key = score·BIG − scan position (from-rank major, then dests: own
         # cities by rank, then CS by index) → argmax = strictly-greater-wins,

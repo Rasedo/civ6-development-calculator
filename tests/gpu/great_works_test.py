@@ -15,7 +15,7 @@ WRITER inside 250t is uncommon; MUSEUM even rarer):
     linearly per work);
   * WRITER/MUSICIAN earned through _advance_great_people apply NO instant
     civic lump when a slot exists;
-  * _reclaim_civ_cities carries a city's works with it through slot compaction.
+  * _reclaim_cities carries a city's works with it through slot compaction.
 
 Follows the religion_gp_test pattern: load rules + a fixture, drive the GPU
 BatchSim, assert on its internal tensors.
@@ -95,13 +95,12 @@ def main() -> None:
         sim.gw_writing.zero_()
         sim.buildings[:, 0, amph] = True
         sim.buildings[:, 1, amph] = True
-        # First Writer -> all 2 into the LOWER city_seq (capital = seq 0).
-        cap = int(sim.city_seq[0, 0]); nxt = int(sim.city_seq[0, 1])
-        lo, hi = (0, 1) if cap < nxt else (1, 0)
+        # First Writer -> all 2 into the LOWER column (array order, #110).
+        lo, hi = 0, 1
         sim._place_works(0, torch.ones(B, dtype=torch.bool), cval, 0)
-        assert bool((sim.gw_writing[:, lo] == 2).all()), "the lowest-seq city fills first"
-        assert bool((sim.gw_writing[:, hi] == 0).all()), "the higher-seq city stays empty"
-        # Second Writer -> spills into the higher-seq city.
+        assert bool((sim.gw_writing[:, lo] == 2).all()), "the lowest-column city fills first"
+        assert bool((sim.gw_writing[:, hi] == 0).all()), "the higher-column city stays empty"
+        # Second Writer -> spills into the higher column.
         sim._place_works(0, torch.ones(B, dtype=torch.bool), cval, 0)
         assert bool((sim.gw_writing[:, hi] == 2).all()), "overflow spills to the next city"
         sim.buildings[:, 1, amph] = False
@@ -206,7 +205,7 @@ def main() -> None:
     if sim.R > 0:
         assert int(sim.civ_city_gw_music[0, 0, 0]) == 1, "civ_city_gw_music not preserved across snapshot"
 
-    # --- _reclaim_civ_cities carries a city's works with its slot -------------------
+    # --- _reclaim_cities carries a city's works with its slot -------------------
     if sim.R > 0 and RC >= 2:
         # Make slot 1 the only live city (slot 0 dead) with a known work count,
         # then compact: the living city must move to slot 0 carrying its works.
@@ -215,7 +214,7 @@ def main() -> None:
         sim.civ_city_alive[0, 0, 1] = True
         sim.civ_city_gw_writing[0, 0, 1] = 2
         sim.civ_city_gw_music[0, 0, 1] = 1
-        sim._reclaim_civ_cities()
+        sim._reclaim_cities()
         assert int(sim.civ_city_gw_writing[0, 0, 0]) == 2, "works must ride the slot permutation (writing)"
         assert int(sim.civ_city_gw_music[0, 0, 0]) == 1, "works must ride the slot permutation (music)"
 

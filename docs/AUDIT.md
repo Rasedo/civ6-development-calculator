@@ -55,7 +55,7 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   engines. (The other old A-9 residual, palace relocation on capital
   loss, has since landed: `_relocate_palace` (one body, every seat row).)
 - **A-11r. Trade-route tails.** (1) ~~seat-0 machinery~~ LIVE: seat 0
-  picks (`_seat0_trade_phase`, city_seq-rank scan order), earns
+  picks (`_seat0_trade_phase`, array-order scan), earns
   (`_seat0_route_income` at the cityTradeYields position in
   `_city_totals`) and expires row 0 — measure REACH at the freeze-lift
   hunt. (2) ~~civ↔civ descope~~ DEAD: the intl arm routes to ANY other
@@ -143,13 +143,29 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   `tileBelongsTo(t, 0, id)` match. The `tile.ownerCity` digest is now
   a REAL byte-exact id proof (was append-counter coincidence), and
   `nextCityId` lost its manifest gap — the whole pair row joins the
-  fatal digest. Audit latent (1) (no seat-0 route prune on city
-  death) FIXED in slice 1; latent (2) (**`centre_slot_at`'s civ slot
-  values go stale after every `_reclaim_civ_cities`** — unread today
-  only because `civ_city_at` tests `>= 0`) still stands, slice 3's
-  business. REMAINING: slice 3 = the row-0 reclaim + delete
-  `city_seq`/`city_seq_next`/`walk_ord`; then the founding bodies and
-  the two yield walks merge. BONUS CATCH (freeze-backlog break): the
+  fatal digest.
+  **SLICE 3 SHIPPED 2026-08-10 — THE REGIME IS ONE.** Every seat row
+  now APPENDS at last-alive+1 (the TS `push` mirror; the seat-0
+  hole-reuse pick is deleted) and compacts stably at step end (the TS
+  `splice` mirror) through ONE `_reclaim_cities(last_row=None)` over
+  rows 0..R — so SLOT ORDER *IS* TS ARRAY ORDER for every seat, and
+  `city_seq`/`city_seq_next`/`founded_n` are DELETED along with every
+  `walk_ord` argsort that existed to translate between the two. The
+  eight order-coupled mirrors that keyed on `city_seq` (the city walk,
+  empire_score, luxury-grant ties, loyalty pop-mix, governor picks,
+  defection order, `_place_works` row 0, the trade-pick rank, the two
+  barb walks, both march ckeys, `_relocate_palace`'s row-0 branch) now
+  read the column index or a living-first argsort — `_place_works` and
+  `_relocate_palace` LOST their row-0 branches entirely. Row 0's
+  [B, C] auxiliaries (center_yields / center_raw_food /
+  base_maintenance / water_housing / coastal / river_center / dist /
+  warrior_trained) ride row 0's permutation. Audit latent (1) (no
+  seat-0 route prune on city death) FIXED in slice 1; latent (2)
+  (`centre_slot_at` civ slots stale after a compaction) FIXED here —
+  the reclaim re-maps every major centre through its row's inverse
+  permutation, so `center_at`'s value-readers are always fresh.
+  REMAINING: the founding bodies and the two yield walks now merge
+  with nothing structural in the way. BONUS CATCH (freeze-backlog break): the
   format-2 exporter ships no `cities` key, but `sim_init` still
   derived `C` from it and PRE-FOUNDED a ghost capital at column 0
   (`alive[:, 0] = True`) — the first regenerated fixture would have
@@ -294,6 +310,22 @@ Landed behind the compile bar only, in dependency order of suspicion:
    no tiles — a format-1 remnant that would have crashed the format-2
    load at `C = len(f["cities"]) = 0`) is DELETED; t0 starts cityless
    on both engines.
+9. THE SLOT REGIME (#110 slice 3) — append+stable-compact for every
+   seat row, `city_seq`/`founded_n` deleted, ten order-coupled
+   mirrors re-keyed to the column index. BEHAVIOUR-CHANGING in three
+   places, each argued but unproven: (a) seat 0 no longer REUSES a
+   hole on founding — a post-death founding lands at the append head,
+   which is the TS push; (b) compaction now fires whenever ANY major
+   row holds a hole (was: civ high-water threshold only), so civ slot
+   indices move earlier than before — stable, so relative order is
+   untouched, but any latent slot-keyed staleness surfaces here; (c)
+   `centre_slot_at` re-maps on every compaction (the A-27(2) fix), so
+   `center_at`'s two value-readers (`_seat_route_income`'s dest_slot
+   gather, `_hostile_city_attack`'s slot arg) change answers wherever
+   they were reading stale slots. The two capture sites carry a
+   splice-now backstop and the founding path asserts its dense-layout
+   precondition — a red assert there names the schedule position that
+   broke it.
 
 Hunt discipline: scripted-reachability first (the digest gate names the
 turn), checkpoint-bracket from the nearest earlier checkpoint, full

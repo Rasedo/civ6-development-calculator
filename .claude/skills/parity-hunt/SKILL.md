@@ -84,12 +84,14 @@ python gpu/tools/logdiff.py          # prints the FIRST divergent line
 
 ## Known divergence classes (check these FIRST — all were paid for)
 
-1. **city_seq / array-vs-column order**: TS iterates and tie-breaks by
-   array/id order (acquisition order); GPU columns stop matching it once
-   a hole-reuse founding lands a new city in a low column. Any
-   order-coupled mirror or id-ascending tie-break must compare
-   `city_seq`. Three shipped instances: loyalty pop-mix, luxury-grant
-   ties, trace cityIds.
+1. **array-vs-column order**: TS iterates and tie-breaks by array
+   position; GPU rows append at last-alive+1 and compact stably
+   (#110), so SLOT order is array order — but only while every
+   creation site appends and the reclaim stays stable. An
+   order-coupled mirror that sorts by anything else (or a creation
+   path that fills a hole directly) re-opens the class. Three
+   historically-paid instances: loyalty pop-mix, luxury-grant ties,
+   trace cityIds.
 2. **Slot hygiene**: a dead pooled entity's queue/registries leak into
    civ-wide readers (has_q phantom builder; reused-slot progress). Clear
    on kill AND alive-mask readers.

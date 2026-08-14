@@ -59,13 +59,13 @@ def q(x: float) -> int:
     return math.floor(x * 1000 + 0.5)
 
 
-def add_seat0_city(sim, col: int, tile: int, pop: int, loy: float, seq: int) -> None:
+def add_seat0_city(sim, col: int, tile: int, pop: int, loy: float) -> None:
+    # Array position IS the column under append+reclaim (#110).
     sim.alive[0, col] = True
     sim.is_cap[0, col] = False
     sim.site[0, col] = tile
     sim.pop[0, col] = pop
     sim.loyalty[0, col] = loy
-    sim.city_seq[0, col] = seq
 
 
 def recon_seat0_next(sim, c: int, tier_idx_c: int, picked: bool) -> float:
@@ -111,8 +111,8 @@ def two_city_setup(rules, path):
     nb = [int(x) for x in sim.neigh[int(sim.site[0, cap])].tolist() if x >= 0]
     free = (~sim.alive[0]).nonzero(as_tuple=True)[0].tolist()
     cols = free[:2]
-    add_seat0_city(sim, cols[0], nb[0], 4, 55.0, 10)
-    add_seat0_city(sim, cols[1], nb[1], 4, 59.0, 11)
+    add_seat0_city(sim, cols[0], nb[0], 4, 55.0)
+    add_seat0_city(sim, cols[1], nb[1], 4, 59.0)
     # GUARANTEE FOREIGN PRESSURE. Loyalty pressure is a RATIO —
     # `scale * (own - foreign) / (own + foreign)` — so with foreign == 0 it is
     # `own/own` and the SOURCE-seat age factor CANCELS ALGEBRAICALLY, leaving
@@ -268,7 +268,7 @@ def poke_governor_seat0(rules, path):
     tier = torch.zeros(sim.B, sim.C, dtype=torch.long)
     pop_before = sim.pop.clone()
     gov = sim._gov_loy
-    weakest = min(cols, key=lambda c: (q(float(sim.loyalty[0, c])), int(sim.city_seq[0, c])))
+    weakest = min(cols, key=lambda c: (q(float(sim.loyalty[0, c])), c))  # ties by array position = column (#110)
     sim.civics[0, : sim._gov_per] = True  # titles 1
     snap = sim.snapshot()
     sim._apply_loyalty_and_flips(tier, pop_before)

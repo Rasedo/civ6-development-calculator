@@ -1568,18 +1568,6 @@
     "why": "per-city hex-distance table, a cache of the static map."
    },
    {
-    "plane": "founded_n",
-    "why": "monotonic founding counter; slot bookkeeping."
-   },
-   {
-    "plane": "city_seq",
-    "why": "the TS-array-order rank of each city column. It exists to make GPU column order reproduce TS array order, so comparing it would be comparing the adapter to itself."
-   },
-   {
-    "plane": "city_seq_next",
-    "why": "the city_seq allocator (see city_seq)."
-   },
-   {
     "plane": "city_id",
     "why": "persistent city ids on the seat axis (TS City.id); the digest's city join key is the center tile, and the allocator itself is pinned by the nextCityId field."
    },

@@ -16,9 +16,9 @@ class SimEconomy:
         seat 0's borders — tile.improvement equals the resource's OWN
         improvement, and pillage does NOT suspend it — grants +1 amenity to
         the luxAmenityCities NEEDIEST cities. Grants feed back into the
-        ranking (need desc, ties by CITY ID asc = the ACQUISITION order,
-        city_seq), and rounds are homogeneous, so only the per-game COUNT of
-        active luxuries matters."""
+        ranking (need desc, ties by array position asc = column order under
+        append+reclaim), and rounds are homogeneous, so only the per-game
+        COUNT of active luxuries matters."""
         B, C = self.B, self.C
         out = torch.zeros(B, C, dtype=self.dtype, device=self.device)
         if self._n_lux == 0 or not self.improvements_on:
@@ -30,7 +30,7 @@ class SimEconomy:
         mx = int(rounds.max().item())
         if mx == 0:
             return out
-        seq = self.city_seq.to(self.dtype)  # tie: lower city id (acquisition order)
+        seq = torch.arange(C, device=self.device, dtype=self.dtype)  # tie: earlier array position = lower column
         k = min(self._lux_k, C)
         for rnd in range(mx):
             act = rounds > rnd
@@ -1062,10 +1062,10 @@ class SimEconomy:
 
     def _place_works(self, row: int, hit: torch.Tensor, culture_val: torch.Tensor, kind: int) -> None:
         """placeGreatWorks for seat row `row`: distribute gwWorks works per
-        earning game across the row's cities in ITS cities-array order — row 0
-        visits by acquisition rank (city_seq, the state.cities order), a civ
-        row visits in slot order (its cities array) — lowest slot first, into
-        the kind's building column at that kind's slot count. Charges with no
+        earning game across the row's cities in ITS cities-array order —
+        slot order for every row under append+reclaim (#110), dead slots
+        holding zero open slots — into the kind's building column at that
+        kind's slot count. Charges with no
         open slot anywhere overflow to the seat's instant culture lump on its
         current civic. Every slot write bumps _eff_version (yield-bearing).
 
@@ -1098,20 +1098,9 @@ class SimEconomy:
         alive = self.city_alive[:, row]  # [B, RC]
         openc = (cap - used).clamp(min=0) * alive.long()  # [B, RC] open slots per live city
         W = nworks * hit.long()  # [B] works to place this earn
-        if row == 0:
-            # state.cities array order = city_seq rank (acquisition order).
-            seq = torch.full_like(openc, 10**9)
-            seq[:, : self.C] = torch.where(alive[:, : self.C], self.city_seq, self.city_seq + 10**6)
-            ordv = torch.argsort(seq, dim=1, stable=True)
-            open_ord = openc.gather(1, ordv)  # open slots in visit order
-            prefix = open_ord.cumsum(dim=1) - open_ord  # exclusive: filled before this city
-            alloc_ord = (W.unsqueeze(1) - prefix).clamp(min=0).minimum(open_ord)  # greedy lowest-first
-            alloc = torch.zeros_like(openc).scatter(1, ordv, alloc_ord)  # back to slot index
-            placed = alloc_ord.sum(dim=1)
-        else:
-            prefix = openc.cumsum(dim=1) - openc  # exclusive prefix in slot order
-            alloc = (W.unsqueeze(1) - prefix).clamp(min=0).minimum(openc)
-            placed = alloc.sum(dim=1)
+        prefix = openc.cumsum(dim=1) - openc  # exclusive prefix in slot order
+        alloc = (W.unsqueeze(1) - prefix).clamp(min=0).minimum(openc)
+        placed = alloc.sum(dim=1)
         overflow = (W - placed).clamp(min=0)  # [B] charges with no slot
         gw_base[:, row] = gw_base[:, row] + alloc
         civic[:, row] = civic[:, row] + overflow.to(dt) * culture_val
@@ -1129,7 +1118,7 @@ class SimEconomy:
         KILL hygiene: dead/absent slots are zeroed each turn (torch.where on the
         alive mask), so a razed-then-reused slot starts fresh — the TS mirror is
         the fresh City object a founded/flipped city gets. city_pressure/city_followed
-        permute with their city in _reclaim_civ_cities, so pressure tracks the CITY, not
+        permute with their city in _reclaim_cities, so pressure tracks the CITY, not
         the slot, through compaction."""
         B, O = self.B, self._O
         # Itinerant Preachers: per-religion range — base + the religion's
@@ -2160,15 +2149,15 @@ class SimEconomy:
         ASSOCIATION — per city: pop×popWeight, then each yield×weight in key
         order. Science rides non-dyadic 0.7s, so the sum ORDER is worth a real
         ±1 ulp, enough to flip the leader. TS iterates state.cities in ARRAY
-        order (splice on death, push on found = acquisition order), so the sum
-        walks city_seq rank; column order stops matching it after a hole-reuse
-        founding. Dead columns sort last and add exact 0.0
+        order (splice on death, push on found) — slot order under
+        append+reclaim (#110), so the sum walks living columns first, in
+        column order. Dead columns sort last and add exact 0.0
         (association-neutral)."""
         total, _, _, _ = self._city_totals()
         rd = self.rules_dev
         w = rd.score_yield_weights
         pw = float(self.rules.score_pop_weight)
-        ord_ = torch.argsort(torch.where(self.alive, self.city_seq, self.city_seq + 10**6), dim=1, stable=True)
+        ord_ = torch.argsort((~self.alive).long(), dim=1, stable=True)
         bidx = self._bidx
         score = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for s in range(self.C):

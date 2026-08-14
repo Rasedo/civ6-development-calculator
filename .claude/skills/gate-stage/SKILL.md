@@ -67,8 +67,9 @@ the spec; the GPU engine mirrors it turn-exactly. Never widen tolerances.
   with the commit message crediting each hunted catch.
 - New pooled state needs KILL hygiene: when an entity dies, clear every
   field a civ-wide reader could later see (queues, registries), or
-  alive-mask the readers. New order/tie logic must follow `city_seq`
-  (acquisition order), never column index.
+  alive-mask the readers. New order/tie logic follows SLOT order
+  living-first (#110: slot order IS TS array order under
+  append+reclaim); a creation path must APPEND, never fill a hole.
 - Commit messages via `git commit -F <message-file>` (Write the file
   first) — PowerShell/Bash quoting mangles multi-line -m.
 - `PYTHONUTF8=1` on every piped python run (cp1251 consoles kill

@@ -106,7 +106,7 @@ def main() -> None:
     #   a. _transfer_rc_to_rc must clear EVERY work plane on the receiving slot
     #      and carry the source's across, or the new city inherits whatever the
     #      REUSED slot index still holds from a dead occupant.
-    #   b. _RC_SLOT_FIELDS must name every work plane, or a compaction leaves
+    #   b. _CITY_SLOT_FIELDS must name every work plane, or a compaction leaves
     #      one behind at the old index.
     s3 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     if s3.R >= 2 and int(s3.civ_city_alive[0, 0].sum()) >= 1:
@@ -136,8 +136,8 @@ def main() -> None:
 
     # b. compaction must permute ALL FOUR planes with their city.
     s4 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    for nm in ("civ_city_gw_writing", "civ_city_gw_art", "civ_city_gw_music", "civ_city_relics", "civ_city_artifacts"):
-        assert nm in s4._RC_SLOT_FIELDS, f"{nm} missing from _RC_SLOT_FIELDS — compaction drops it"
+    for nm in ("city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts"):
+        assert nm in s4._CITY_SLOT_FIELDS, f"{nm} missing from _CITY_SLOT_FIELDS — compaction drops it"
     # SCAN for a civ holding two cities rather than assuming fixture 0 does —
     # a poke that silently skips proves nothing. Civs start on a single
     # capital, so STEP until one has settled a second city; checking at t0
@@ -163,7 +163,7 @@ def main() -> None:
         s4.civ_city_gw_art[0, civ_only_pick, hi] = 4
         keep_id = int(s4.civ_city_id[0, civ_only_pick, hi])
         s4.civ_city_alive[0, civ_only_pick, lo] = False  # kill the lower slot -> `hi` compacts down
-        s4._reclaim_civ_cities()
+        s4._reclaim_cities()
         where = (s4.civ_city_alive[0, civ_only_pick] & (s4.civ_city_id[0, civ_only_pick] == keep_id)).nonzero().flatten()
         assert len(where) == 1, "the surviving city vanished from the registry"
         k = int(where[0])

@@ -520,11 +520,9 @@ class SimOrders:
         loyalty defection or raze) — TS calls relocatePalace right there.
         No-op when the seat is gone (no live city) or still holds a capital;
         otherwise the surviving city with the HIGHEST population is
-        re-crowned, ties to the EARLIEST acquisition (TS scans the array with
-        a strict `>`). The scan order is the seat's cities-ARRAY order: row
-        0's array order is the city_seq rank (its columns hole-reuse), while
-        a civ row's slot order IS acquisition rank (append-only, stable
-        reclaim) — that per-row key is the one branch below.
+        re-crowned, ties to the EARLIEST array position (TS scans the array
+        with a strict `>`). The scan order is the seat's cities-ARRAY order —
+        slot order for EVERY row under append+reclaim (#110).
 
         The PALACE BUILDING needs no write: both engines model it as a
         capital TERM (city_is_cap × the palace yield/housing/amenity terms),
@@ -537,12 +535,7 @@ class SimOrders:
         need = alive.any(dim=1) & ~(self.city_is_cap[rows, seat_row] & alive).any(dim=1)  # [n]
         if not bool(need.any()):
             return
-        seq = torch.arange(self.RC, device=self.device).reshape(1, -1).expand_as(alive).clone()
-        r0 = seat_row == 0
-        if bool(r0.any()):
-            # dead columns beyond C never matter (alive is False there), so
-            # the pad value only has to keep the tensor rectangular.
-            seq[r0, : self.C] = self.city_seq[rows[r0]]
+        seq = torch.arange(self.RC, device=self.device).reshape(1, -1).expand_as(alive)
         key = torch.where(alive, self.city_pop[rows, seat_row] * (1 << 20) - seq, torch.full_like(seq, -(1 << 60)))
         pick = key.max(dim=1).indices  # [n] (garbage where ~need, masked below)
         self.city_is_cap[rows[need], seat_row[need], pick[need]] = True
@@ -605,28 +598,24 @@ class SimOrders:
             self.tile_seat[b] = torch.where(ring, torch.full_like(self.tile_seat[b], NO_SEAT), self.tile_seat[b])  # civ tile ownership lives in tile_seat
             self._tile_owner_ver += 1
             self.tile_city[b] = torch.where(ring, torch.full_like(self.tile_city[b], -1), self.tile_city[b])
-            # TS APPENDS the captured city, so the slot is the founding
-            # HIGH-WATER mark (founded_n) — last-alive+1 would land in the
-            # newest hole when the most recent city was the one that died.
-            # Raze at TS's count cap; the hole-reuse fallback only fires when
-            # the column space is exhausted below the cap, and behaviour rides
-            # city_seq rather than the column index, so reuse stays order-safe.
+            # Raze at TS's count cap; otherwise append at last-alive+1 — the
+            # TS push mirror. The step-end reclaim keeps the layout dense at
+            # creation time, so the slot is in range whenever the cap allows.
             if int(self.alive[b].sum()) >= 6:
                 continue  # razed at the seat city cap
-            c_new = int(self.founded_n[b])
+            alive_0 = self.alive[b].nonzero(as_tuple=True)[0]
+            c_new = int(alive_0.max()) + 1 if len(alive_0) else 0
             if c_new >= self.C:
-                free = (~self.alive[b]).nonzero(as_tuple=True)[0]
-                if len(free) == 0:
-                    continue  # razed: no slot at all
-                c_new = int(free[0])
-            else:
-                self.founded_n[b] += 1
+                # A death earlier this step left a hole under a full head — the
+                # splice-now backstop (row 0 only; every path that reaches
+                # here runs after row 0's slot-keyed applies).
+                self._reclaim_cities(last_row=0)
+                alive_0 = self.alive[b].nonzero(as_tuple=True)[0]
+                c_new = int(alive_0.max()) + 1 if len(alive_0) else 0
             self.alive[b, c_new] = True
             self.era_score[b, 0] += self._era_pts["conquer"]  # gained a city (the raze paths continue above)
             if self.fog_of_war:  # the captor reveals around the taken city (revealAround r3)
                 self.seat_explored[b, 0] |= self.pair_dist[c_t] <= 3
-            self.city_seq[b, c_new] = int(self.city_seq_next[b])
-            self.city_seq_next[b] += 1
             # Persistent id — the receiver's `nextCityId++` (transferCity /
             # the CS annex); tile_city stores the id (TS ownerCity).
             new_id0 = int(self.next_city_id[b])
@@ -743,21 +732,17 @@ class SimOrders:
             # NO city is founded (TS early-returns before nextCityId++).
             if int(self.alive[b].sum()) >= 6:
                 continue
-            # Append at the founding HIGH-WATER mark, as in _capture_civ_city.
-            c_new = int(self.founded_n[b])
+            # Append at last-alive+1 — the TS push mirror, as in _capture_civ_city.
+            alive_0 = self.alive[b].nonzero(as_tuple=True)[0]
+            c_new = int(alive_0.max()) + 1 if len(alive_0) else 0
             if c_new >= self.C:
-                free = (~self.alive[b]).nonzero(as_tuple=True)[0]
-                if len(free) == 0:
-                    continue  # no slot: the CS still dies (see docstring)
-                c_new = int(free[0])
-            else:
-                self.founded_n[b] += 1
+                self._reclaim_cities(last_row=0)  # the splice-now backstop (see _capture_civ_city)
+                alive_0 = self.alive[b].nonzero(as_tuple=True)[0]
+                c_new = int(alive_0.max()) + 1 if len(alive_0) else 0
             self.alive[b, c_new] = True
             self.era_score[b, 0] += self._era_pts["conquer"]  # gained a city (the raze paths continue above)
             if self.fog_of_war:  # the captor reveals around the taken city (revealAround r3)
                 self.seat_explored[b, 0] |= self.pair_dist[c_t] <= 3
-            self.city_seq[b, c_new] = int(self.city_seq_next[b])
-            self.city_seq_next[b] += 1
             # Persistent id — the receiver's `nextCityId++` (transferCity /
             # the CS annex); tile_city stores the id (TS ownerCity).
             new_id0 = int(self.next_city_id[b])
@@ -2010,10 +1995,9 @@ class SimOrders:
                 has_imp = torch.zeros_like(act)
                 imp_tgt = here.clamp(min=0)
             dc = self.pair_dist[here.unsqueeze(1), self.site.clamp(min=0)].to(torch.long)  # [B, C]
-            # Distance ties break by TS ARRAY order, which is the FOUNDING
-            # sequence and diverges from the slot index once a capture reuses a
-            # hole. city_seq IS that sequence, so rank on it.
-            ckey = torch.where(self.alive, dc * 4096 + self.city_seq, 10**9)
+            # Distance ties break by TS ARRAY order — column order under
+            # append+reclaim (#110).
+            ckey = torch.where(self.alive, dc * 4096 + torch.arange(self.C, device=self.device), 10**9)
             city_min = ckey.min(dim=1).values
             city_tgt = self.site.gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
             tgt = torch.where(has_imp, imp_tgt, city_tgt)
@@ -2085,7 +2069,7 @@ class SimOrders:
             Bn, Tn, dev2 = self.B, self.T, self.device
             bidx = torch.arange(Bn, device=dev2)
             arangeT = torch.arange(Tn, device=dev2)
-            walk_ord = torch.argsort(torch.where(self.alive, self.city_seq, self.city_seq + 10**6), dim=1, stable=True)
+            walk_ord = torch.argsort((~self.alive).long(), dim=1, stable=True)  # living first = TS array order (#110)
             for s_rank in range(self.C):
                 col = walk_ord[:, s_rank]  # [B] — this game's s_rank-th city (TS array order)
                 walled = self.alive[bidx, col] & self.buildings[bidx, col, self._walls_bidx]
@@ -2162,7 +2146,7 @@ class SimOrders:
             Bn, Tn, dev2 = self.B, self.T, self.device
             bidx = torch.arange(Bn, device=dev2)
             arangeT = torch.arange(Tn, device=dev2)
-            walk_ord = torch.argsort(torch.where(self.alive, self.city_seq, self.city_seq + 10**6), dim=1, stable=True)
+            walk_ord = torch.argsort((~self.alive).long(), dim=1, stable=True)  # living first = TS array order (#110)
             owner_oh = torch.nn.functional.one_hot(self.owner.clamp(min=0), self.C).bool() & (self.tile_seat == 0).unsqueeze(2)  # [B,T,C]
             has_enc = (((self.district == self._encamp_didx) & self.district_complete & ~self.district_dead & ~self.district_pillaged & (self.encamp_hp > 0)).unsqueeze(2) & owner_oh).any(dim=1)  # [B,C] the city owns a completed LIVE unpillaged Encampment; one beaten to 0 HP is occupied and fires nothing
             for s_rank in range(self.C):

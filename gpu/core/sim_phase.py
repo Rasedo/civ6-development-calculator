@@ -1414,12 +1414,10 @@ class SimPhase:
         d_cc = self.pair_dist[sitec.unsqueeze(2), sitec.unsqueeze(1)].to(self.dtype)
         # d_cc[b, c, c'] = dist(site[c], site[c']) — weight by source c'
         w = (rng + 1 - d_cc).clamp(min=0)
-        # "Earlier in the loop" is ARRAY order (acquisition order, city_seq),
-        # NOT column order: a hole-reuse founding puts the NEWEST city in a LOW
-        # column, so column order would drop same-turn growth from the
-        # own-pressure sum of every array-earlier, column-later city.
-        seq = self.city_seq
-        earlier = seq.unsqueeze(1) < seq.unsqueeze(2)  # [B, c, c'] → seq[c'] < seq[c]
+        # "Earlier in the loop" is ARRAY order — column order under
+        # append+reclaim (#110): an earlier column is an array-earlier city.
+        cols_e = torch.arange(C, device=dev)
+        earlier = (cols_e.reshape(1, C, 1) > cols_e.reshape(1, 1, C)).expand(B, C, C)  # [B, c, c'] → c' earlier than c
         pop_mix = torch.where(earlier, self.pop.unsqueeze(1).to(self.dtype), pop_before.unsqueeze(1).to(self.dtype))
         # Contributions scale by the SOURCE seat's age factor (the loyaltyDelta
         # mirror: per-seat subtotal × factor — halves-exact in this dtype, so
@@ -1441,11 +1439,11 @@ class SimPhase:
         pressure = torch.where(tot > 0, scale * (own - foreign) / tot.clamp(min=1e-9), torch.zeros_like(tot))
         # Seat 0's governor seats — the endTurn governorPicks mirror. Rank
         # alive cities on QUANTIZED milli loyalty (raw-f64 ranking is
-        # float-association-fragile), ties by city_seq (TS array position).
-        # Pick from the PRE-update snapshot.
+        # float-association-fragile), ties by TS array position = column
+        # order (#110). Pick from the PRE-update snapshot.
         titles_p = (self.civics.sum(dim=1) // self._gov_per).clamp(max=self._gov_max)  # [B]
         q_loy = js_round(self.loyalty * 1000).long()
-        gov_key = torch.where(self.alive, q_loy * 256 + self.city_seq, torch.full_like(q_loy, 1 << 40))
+        gov_key = torch.where(self.alive, q_loy * 256 + cols_e, torch.full_like(q_loy, 1 << 40))
         gov_rank = torch.empty_like(gov_key)
         gov_rank.scatter_(1, gov_key.argsort(dim=1, stable=True), torch.arange(C, device=dev).expand(B, C))
         gov_b = (gov_rank < titles_p.unsqueeze(1)) & self.alive
@@ -1464,11 +1462,11 @@ class SimPhase:
         # Defectors resolve in ACQUISITION order (the TS array-order loop) with
         # pressures read LIVE per defection — an earlier transfer moves pops
         # that later defections must see.
-        pairs: list[tuple[int, int, int]] = []
+        pairs: list[tuple[int, int]] = []
         for c in range(C):
             for b in flip[:, c].nonzero(as_tuple=True)[0].tolist():
-                pairs.append((b, int(self.city_seq[b, c]), c))
-        for b, _, c in sorted(pairs):
+                pairs.append((b, c))
+        for b, c in sorted(pairs):
             site_c = int(self.site[b, c])
             d_rc1 = self.pair_dist[site_c, civ_city_flat[b].clamp(min=0)].to(self.dtype)
             wr = (rng + 1 - d_rc1).clamp(min=0) * self.civ_city_pop[b].reshape(-1).to(self.dtype) * civ_city_live[b].to(self.dtype)
@@ -1610,8 +1608,15 @@ class SimPhase:
         civ_city_flat = self.civ_city_center.reshape(B, -1).clamp(min=0)
         drc = torch.where(self.civ_city_alive.reshape(B, -1), self.pair_dist[sc.unsqueeze(1), civ_city_flat].to(torch.long), 999)
         cap_ok = self.alive.sum(dim=1) < 6
-        hole = first_argmax((~self.alive).long())
-        slot_new = torch.where(self.founded_n < C, self.founded_n, hole)
+        # Append at last-alive+1 — the TS push mirror. Foundings resolve at
+        # step TOP (the unit-triples apply) while every seat-0 city death
+        # comes later in the schedule, so the layout here is the one the
+        # step-end reclaim left DENSE — with the cap gate, slot < C. The two
+        # CAPTURE sites run after deaths and carry their own backstop.
+        slot_new = (self.alive.long() * (torch.arange(C, device=self.device) + 1)).amax(dim=1)
+        assert not bool((cap_ok & (slot_new >= C)).any()), (
+            "seat-0 append head past C with the cap open — a death reached the founding path"
+        )
         no_district = self.district.gather(1, sc.unsqueeze(1)).squeeze(1) < 0
         citystate_ctr = self.citystate_center[:, : max(self.S, 1)].clamp(min=0)
         dcs = torch.where(
@@ -1685,12 +1690,7 @@ class SimPhase:
         self.q_dtile[rows, c_new] = -1
         self.dist_tile[rows, c_new, :] = -1  # row-0 registry hygiene
         self.wonder_reg[rows, c_new, :] = -1
-        # founded_n bumps only for append slots — a hole-fallback founding
-        # reuses a dead column.
-        self.founded_n[rows] += (c_new == self.founded_n[rows]).long()
         self.era_score[rows, 0] += self._era_pts["found"]  # the foundCity moment
-        self.city_seq[rows, c_new] = self.city_seq_next[rows]
-        self.city_seq_next[rows] += 1
         # Persistent id — foundCityAt's `nextCityId++`; tile_city stores it
         # (TS ownerCity), the column stays a storage address only.
         new_id0 = self.next_city_id[rows].clone()
@@ -1920,53 +1920,84 @@ class SimPhase:
             # from another pool is out of range by construction.
             at.copy_(torch.where(mine, inv.gather(1, (at - lo).clamp(min=0, max=inv.shape[1] - 1)) + lo, at))
 
-    _RC_SLOT_FIELDS = (
-        "civ_city_alive", "civ_city_center", "civ_city_pop", "civ_city_growth", "civ_city_cbox", "civ_city_loyalty",
-        "civ_city_acquired", "civ_city_hp", "civ_city_outer_hp", "civ_city_id", "civ_city_is_cap", "civ_city_current", "civ_city_progress",
-        "civ_city_prod_bank",  # banked overflow: it rides the permutation with
-                         # civ_city_progress or a compaction hands one city's bank
+    _CITY_SLOT_FIELDS = (
+        "city_alive", "city_center", "city_pop", "city_growth", "city_cbox", "city_loyalty",
+        "city_acquired", "city_hp", "city_outer_hp", "city_id", "city_is_cap", "city_current", "city_progress",
+        "city_prod_bank",  # banked overflow: it rides the permutation with
+                         # city_progress or a compaction hands one city's bank
                          # to its neighbour
-        "civ_city_cost", "civ_city_qtile",
+        "city_cost", "city_qtile",
         # ALL work counts must ride the compaction permutation; one left out
         # stays at the old slot index, so the city loses its works or inherits
         # its neighbour's.
-        "civ_city_gw_writing", "civ_city_gw_art", "civ_city_gw_music", "civ_city_relics", "civ_city_artifacts",
+        "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts",
+    )
+    # Row-0-only [B, C] planes: founding-derived center stats + flags. They
+    # ride row 0's permutation; the civ rows derive theirs per read.
+    _SEAT0_SLOT_FIELDS = (
+        "center_yields", "center_raw_food", "base_maintenance", "water_housing",
+        "coastal", "river_center", "dist", "warrior_trained",
     )
 
-    def _reclaim_civ_cities(self) -> None:
-        """Stably compacts the rc city slots, per (game, civ).
+    def _reclaim_cities(self, last_row: int | None = None) -> None:
+        """Stably compacts city slots per (game, seat row) — rows
+        0..last_row, default every major row.
 
-        TS SPLICES civ.cities on capture/flip/transfer and pushes on
+        TS SPLICES seat.cities on capture/flip/transfer and pushes on
         settle/receive, so the LIVING's relative order IS the spec — stable
         compaction preserves it exactly (the per-slot loops, the arange
-        tie-breaks and civ_empire_score's sequential association all see the
-        same cities in the same order). No tile map keys on the SLOT
-        (civ_city_at/civ_at are civ-keyed; civ_city_center carries tile VALUES and permutes
-        with its row), so no inverse-map rebuild is needed — but the capital is
-        an identity, not a slot, so civ_city_is_cap permutes along. Runs at the step
-        END like _reclaim_pool: the controlled head samples slot-keyed city
-        actions from the PRE-step masks, so the layout must hold through this
-        step's applies. CIV6_RC_RECLAIM_AT lowers the trigger for
+        tie-breaks and empire-score's sequential association all see the
+        same cities in the same order). tile_city needs no rebuild — it is
+        id-keyed for every seat (#110) — but centre_slot_at carries SLOT
+        VALUES, so live centres re-map through their row's inverse
+        permutation. Runs at the step END like _reclaim_pool: the controlled
+        head samples slot-keyed city actions from the PRE-step masks, so the
+        layout must hold through this step's applies. The row-0-only form
+        (last_row=0) is the append sites' overflow backstop — reachable only
+        from a mid-phase civ-block gain, after row 0's slot-keyed applies
+        are all done. CIV6_RC_RECLAIM_AT lowers the civ trigger for
         forced-compaction gates."""
-        alive = self.civ_city_alive  # [B, R, RC]
+        nrows = (1 + self.R) if last_row is None else (last_row + 1)
+        alive = self.city_alive[:, :nrows]  # [B, nrows, RC]
         perm = torch.argsort((~alive).long(), dim=2, stable=True)  # living first, order kept
-        # In place, for the same reason as _reclaim_pool: these rc_* planes are
+        # In place, for the same reason as _reclaim_pool: these planes are
         # views of one merged city tensor, and a setattr rebind here would
         # orphan every alias at the first compaction.
-        for name in self._RC_SLOT_FIELDS:
-            t = getattr(self, name)
+        for name in self._CITY_SLOT_FIELDS:
+            t = getattr(self, name)[:, :nrows]
             t.copy_(t.gather(2, perm))
-        for name in ("civ_city_dist_tile", "civ_city_bldg", "civ_city_wonder"):
-            t = getattr(self, name)
+        for name in ("city_dist_tile", "city_bldg", "city_wonder"):
+            t = getattr(self, name)[:, :nrows]
             t.copy_(t.gather(2, perm.unsqueeze(3).expand(-1, -1, -1, t.shape[3])))
-        # The religion pair lives on ONE seat-indexed plane, so its civ rows
-        # are permuted by slice rather than by name. Both MUST ride the
+        # The religion pair lives on the same seat axis. Both MUST ride the
         # permutation or a compaction hands one city's faith to its neighbour.
-        _fol = self.city_followed[:, 1:1 + self.R]
+        _fol = self.city_followed[:, :nrows]
         _fol.copy_(_fol.gather(2, perm))
-        _pre = self.city_pressure[:, 1:1 + self.R]
+        _pre = self.city_pressure[:, :nrows]
         _pre.copy_(_pre.gather(2, perm.unsqueeze(3).expand(-1, -1, -1, _pre.shape[3])))
-        self._eff_version += 1  # no (r, j)-keyed cache may survive the permutation
+        # Row 0's [B, C] auxiliaries ride its permutation. perm[:, 0, :C] IS
+        # a permutation of 0..C-1: row 0 lives only in :C, and the stable
+        # sort keeps the dead :C columns ahead of the dead RC tail.
+        perm0 = perm[:, 0, : self.C]
+        for name in self._SEAT0_SLOT_FIELDS:
+            t = getattr(self, name)
+            if t.dim() == 2:
+                t.copy_(t.gather(1, perm0))
+            else:  # [B, C, K]
+                t.copy_(t.gather(1, perm0.unsqueeze(2).expand(-1, -1, t.shape[2])))
+        # centre_slot_at: the owning row's slot at each live centre, re-mapped
+        # through the inverse permutation. This also ends the civ-row
+        # staleness latent (AUDIT A-27(2)) — center_at's value-readers see
+        # fresh slots after every compaction.
+        inv = torch.argsort(perm, dim=2)  # [B, nrows, RC] slot -> new slot
+        seat_t = self.tile_seat
+        is_major_ctr = (seat_t >= 0) & (seat_t < nrows) & (self.centre_slot_at >= 0)
+        rowt = seat_t.clamp(min=0, max=nrows - 1)  # a major's seat IS its block row
+        inv_flat = inv.reshape(self.B, -1)
+        idx = (rowt * self.RC + self.centre_slot_at.clamp(min=0)).clamp(max=inv_flat.shape[1] - 1)
+        self.centre_slot_at.copy_(torch.where(is_major_ctr, inv_flat.gather(1, idx), self.centre_slot_at))
+        self._eff_version += 1  # no (row, j)-keyed cache may survive the permutation
+        self._tile_owner_ver += 1  # owner / center_at derive slots from permuted state
 
     def _check_rc_registry_invariant(self) -> None:
         """Machine-checks district/wonder <-> tile-registry coherence for every alive civ city.

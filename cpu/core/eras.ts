@@ -184,8 +184,9 @@ export function governorTitles(nCivics: number): number {
 /** The STATELESS greedy pick — the `titles` LOWEST-loyalty cities.
  *  `qLoys` are QUANTIZED milli loyalties (Math.round(loy·1000) — ranking on
  *  raw f64 would be float-association-fragile across engines; the
- *  quantization lesson), ties broken by ARRAY position (acquisition order —
- *  the GPU mirrors with slot index / city_seq). Returns picked indices. */
+ *  quantization lesson), ties broken by ARRAY position (the GPU mirrors
+ *  with the slot index — slot order IS array order, #110). Returns picked
+ *  indices. */
 export function governorPicks(qLoys: number[], titles: number): Set<number> {
   const idx = qLoys.map((q, i) => [q, i] as const);
   idx.sort((a, b) => a[0] - b[0] || a[1] - b[1]);

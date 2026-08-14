@@ -118,15 +118,22 @@ class SimStep:
                 self._reclaim_pool("civ")
             if int(self.seat0_unit_next.max()) >= self._reclaim_at:
                 self._reclaim_pool("seat0")
-        if self.R > 0:
+        # City-slot compaction, every major row (the TS splice mirror). Row 0
+        # compacts whenever it holds a hole (deaths are rare; a dense layout
+        # keeps the append head in range); civ rows at their high-water
+        # threshold. ONE body compacts all rows together.
+        hw0 = (self.alive.long() * (torch.arange(self.C, device=dev).reshape(1, -1) + 1)).amax(dim=1)
+        need_rc = bool((hw0 > self.alive.sum(dim=1)).any())
+        if self.R > 0 and not need_rc:
             # rc high-water = last-alive slot + 1 (what the next append uses)
             civ_city_hw = (self.civ_city_alive.long() * (torch.arange(self.RC, device=dev).reshape(1, 1, -1) + 1)).amax(dim=2)
-            if int(civ_city_hw.max()) >= self._civ_city_reclaim_at:
-                self._reclaim_civ_cities()
+            need_rc = int(civ_city_hw.max()) >= self._civ_city_reclaim_at
+        if need_rc:
+            self._reclaim_cities()
+        if self.R > 0 and self._civ_city_reg_check:
             # After compaction (the riskiest registry reshuffle) and all of
             # this step's placements/captures — env-gated, so free when off.
-            if self._civ_city_reg_check:
-                self._check_rc_registry_invariant()
+            self._check_rc_registry_invariant()
 
         # Religious pressure spread — after all foundings/settles/flips and the
         # rc compaction, mirroring endTurn's tail.
@@ -433,18 +440,18 @@ class SimStep:
         neigh_flat = self.neigh.clamp(min=0).reshape(1, -1).expand(B, -1)
         neigh_valid = (self.neigh >= 0).reshape(1, T, 6)
         # The TS side iterates state.cities in ARRAY order (splice on death,
-        # push on found/capture = acquisition order), which column order stops
-        # matching once a founding reuses a hole. Every cross-city coupling in
-        # this walk — a completion's _eff_version bump feeding a later city's
-        # totals, a border claim consuming a shared candidate tile, spawn-spot
-        # contention, the accumulators' float association — depends on that
-        # order, so walk the columns by city_seq rank (per-batch gathers).
+        # push on found/capture) — which IS slot order under append+reclaim
+        # (#110). Every cross-city coupling in this walk — a completion's
+        # _eff_version bump feeding a later city's totals, a border claim
+        # consuming a shared candidate tile, spawn-spot contention, the
+        # accumulators' float association — depends on that order, so walk
+        # living columns first, in column order (per-batch gathers).
         # Dead/unfounded columns sort last and stay masked no-ops. Cities
         # cannot be founded or die inside the walk, so the order is fixed here.
-        walk_ord = torch.argsort(torch.where(self.alive, self.city_seq, self.city_seq + 10**6), dim=1, stable=True)
+        walk_ord = torch.argsort((~self.alive).long(), dim=1, stable=True)
         bidx = self._bidx
         for s_rank in range(C):
-            col = walk_ord[:, s_rank]  # [B] — each game's s_rank-th city by acquisition
+            col = walk_ord[:, s_rank]  # [B] — each game's s_rank-th living city (TS array order)
             if self._eff_version != _tot_ver or _pop_dirty:
                 total, housing, growth_f, tier_idx = self._city_totals(lux=lux0)
                 _tot_ver = self._eff_version

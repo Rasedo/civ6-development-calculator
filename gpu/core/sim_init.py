@@ -148,17 +148,13 @@ class SimInit:
         self.coastal = torch.zeros(B, C, dtype=torch.bool, device=device)
         self.river_center = torch.zeros(B, C, dtype=torch.bool, device=device)
         self.dist = torch.full((B, C, T), 127, dtype=torch.int16, device=device)
-        self.founded_n = torch.zeros(B, dtype=torch.long, device=device)  # monotonic: flips never free a slot; nothing is pre-founded
-        # TS iterates state.cities in ARRAY (acquisition) order, which stops
-        # matching column order once a hole-reusing founding lands a new city in
-        # a low column. city_seq[b, c] ranks column c by acquisition; every
-        # order-coupled mirror of the TS city loop — the city WALK, empire_score
-        # and loyalty's grown/not-grown pop mix — compares seq, not column index.
-        self.city_seq = torch.zeros(B, C, dtype=torch.long, device=device)
-        self.city_seq_next = torch.zeros(B, dtype=torch.long, device=device)  # no city exists yet
+        # SLOT ORDER IS TS ARRAY ORDER for every seat row (#110): cities
+        # append at last-alive+1 (the push mirror) and the step-end reclaim
+        # compacts stably (the splice mirror), so every order-coupled mirror
+        # of the TS city loop walks columns living-first, in column order.
         # The capital is an IDENTITY (is_cap plus civ_cap_tile), not column 0:
         # a captured capital's hole-reused column must not pin loyalty, carry
-        # the Palace or anchor domination, and _reclaim_civ_cities compaction permutes
+        # the Palace or anchor domination, and _reclaim_cities compaction permutes
         # slots underneath. civ_cap_tile is allocated with the civ block below.
         import os as _os
         self._reclaim_at = int(_os.environ.get("CIV6_RECLAIM_AT", simbase.POOL_MAX - 24))
@@ -251,7 +247,7 @@ class SimInit:
         r_pad, civ_city_pad = max(self.R, 1), self.RC
         # Per-tile registry of the owning civ CITY as its persistent civ_city_id
         # (per-civ ids, meaningful only where civ_at >= 0). Keyed on the ID, not
-        # the slot, so _reclaim_civ_cities compaction needs no tile-plane remap. No civ
+        # the slot, so _reclaim_cities compaction needs no tile-plane remap. No civ
         # city exists at t0, so it starts empty.
         self.water = torch.tensor([[t.get("wt", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.nwonder = torch.tensor([[t.get("nw", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
@@ -478,7 +474,7 @@ class SimInit:
         self.register_alias("civ_city_id", lambda sim: sim.city_id[:, 1:])
         # capitalTiles, seat-indexed: only an isCapital founding (t0 or a
         # total-collapse refound) writes a row. The capital is an identity
-        # (city_is_cap), not a slot — _reclaim_civ_cities compaction permutes slots
+        # (city_is_cap), not a slot — _reclaim_cities compaction permutes slots
         # underneath. Row 0 starts -1 (no capital until the first FOUND crowns
         # it); cap_tile / civ_only_cap_tile are the row views.
         self.civ_cap_tile = torch.zeros(B, 1 + r_pad, dtype=torch.long, device=device)
@@ -486,7 +482,7 @@ class SimInit:
         self.cap_tile = self.civ_cap_tile[:, 0]
         self.civ_only_cap_tile = self.civ_cap_tile[:, 1:]
         # Trade routes — (from_id, to_id) rc-id pairs, -1 = empty column.
-        # Id-keyed like tile_city, so _reclaim_civ_cities slot permutations never touch
+        # Id-keyed like tile_city, so _reclaim_cities slot permutations never touch
         # it. K must cover the real capacity bound (tradeCapacity):
         # FOREIGN_TRADE 1 + maxCities MARKET/LIGHTHOUSE + 2 wonders (COLOSSUS,
         # GREAT_ZIMBABWE) + one per suzerained TRADE city-state, plus slack.
@@ -1007,7 +1003,7 @@ class SimInit:
         # adjacency/buildings/housing/amenities/GPP/CS-envoy channels stop until
         # a builder repairs it (static counts stay: still owned). A tile plane,
         # not slot-keyed, so snapshot/restore covers it and
-        # _reclaim_civ_cities/_reclaim_pool leave it intact.
+        # _reclaim_cities/_reclaim_pool leave it intact.
         self.district_pillaged = torch.zeros(B, T, dtype=torch.bool, device=device)
         nD = len(self.districts_cat)
         self.d_static_adj = torch.tensor(
@@ -1366,7 +1362,7 @@ class SimInit:
         # 0 = seat 0, 1..R = civ i). Bool [B, 1+R, n_space]. Bookkeeping only —
         # the science victory fires on the victory STEP directly — and
         # _MUTABLE-registered for snapshot/restore. Keyed per seat, not per city
-        # slot, so _reclaim_civ_cities leaves it intact and it needs no kill hygiene.
+        # slot, so _reclaim_cities leaves it intact and it needs no kill hygiene.
         self.space_done = torch.zeros(B, 1 + self.R, max(self._n_space, 1), dtype=torch.bool, device=device)
         self.camp_tile = torch.full((B, max(self.K, 1)), -1, dtype=torch.long, device=device)
         self.n_camps = torch.zeros(B, dtype=torch.long, device=device)
