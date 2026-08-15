@@ -27,6 +27,10 @@ FORK_PATTERNS = (
     (re.compile(r"\br\s*\+\s*1\b"), "r + 1"),
     (re.compile(r"\b" + _SEAT_PLANE + r"\[:,\s*0\s*[,\]]"), "plane[:, 0] — literal row 0"),
     (re.compile(r"\b" + _SEAT_PLANE + r"\[:,\s*1\s*:"), "plane[:, 1:] — the civ rows alone"),
+    # The same two forks with a ROW-SELECTING index in front (`plane[wr, 0]`),
+    # which the `[:,` patterns above read straight past.
+    (re.compile(r"\b" + _SEAT_PLANE + r"\[[a-z_][a-z_0-9]*,\s*0\s*[,\]]"), "plane[rows, 0] — literal row 0"),
+    (re.compile(r"\b" + _SEAT_PLANE + r"\[[a-z_][a-z_0-9]*,\s*1\s*:"), "plane[rows, 1:] — the civ rows alone"),
     (re.compile(r"\b\w*_seat\b[^\n&|]{0,80}?[=!]=\s*0\b"), "seat expression == 0"),
     (re.compile(r"\.civ_at\b"), "civ-family tile view"),
     (re.compile(r"\brecs\[\s*\]"), 'recs["0"] — the wire\'s hand-rolled seat-0 record'),
@@ -428,6 +432,22 @@ def external_binds() -> set[str]:
     return out
 
 
+def _scope_receivers(fn: ast.AST, in_core: bool) -> set[str]:
+    """The local names that hold a sim in this scope — `self` inside the
+    engine, `sim`, anything assigned from a sim constructor or a `.sim`."""
+    recv = _sim_bound_locals(fn)
+    if in_core:
+        recv.add("self")
+    recv.add("sim")
+    recv |= {n.targets[0].id for n in ast.walk(fn)
+             if isinstance(n, ast.Assign) and len(n.targets) == 1
+             and isinstance(n.targets[0], ast.Name)
+             and SIM_RX.match(n.targets[0].id)
+             and isinstance(n.value, ast.Call)
+             and _SIM_CTOR.match(_callee(n.value))}
+    return recv
+
+
 def unresolved_reads(known: set[str], shapes: list[str]) -> list[tuple[str, int, str]]:
     shape_res = [re.compile("^" + re.escape(sh).replace(r"\{\}", r"[A-Za-z_0-9]+") + "$")
                  for sh in shapes]
@@ -441,16 +461,7 @@ def unresolved_reads(known: set[str], shapes: list[str]) -> list[tuple[str, int,
         scopes: list[ast.AST] = [n for n in ast.walk(tree)
                                  if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))] + [tree]
         for fn in scopes:
-            recv = _sim_bound_locals(fn)
-            if in_core:
-                recv.add("self")
-            recv.add("sim")
-            recv |= {n.targets[0].id for n in ast.walk(fn)
-                     if isinstance(n, ast.Assign) and len(n.targets) == 1
-                     and isinstance(n.targets[0], ast.Name)
-                     and SIM_RX.match(n.targets[0].id)
-                     and isinstance(n.value, ast.Call)
-                     and _SIM_CTOR.match(_callee(n.value))}
+            recv = _scope_receivers(fn, in_core)
             body = fn.body if isinstance(fn, ast.Module) else fn.body
             for node in [x for b in body for x in ast.walk(b)]:
                 if not (isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)):
@@ -487,6 +498,133 @@ def unresolved_reads(known: set[str], shapes: list[str]) -> list[tuple[str, int,
                     hit = (str(path.relative_to(ROOT)), node.lineno, f"getattr(…, {a!r})")
                     if hit not in bad:
                         bad.append(hit)
+    return sorted(set(bad))
+
+
+# ---------------------------------------------------------------------------
+# A CALL IS A CONTRACT, AND THE MIXINS HIDE IT.
+#
+# `BatchSim` is composed from mixin classes that do not declare one another, so
+# `self._ranged_attack(...)` in one file resolves to a `def` in another that no
+# type checker joins up — pyright sees an attribute it cannot type and says
+# nothing, and the attribute census above only asks whether the NAME exists.
+# Adding a parameter therefore breaks every cross-file caller silently, at
+# runtime, on the first turn that reaches one. Two shapes are checked: the
+# ARITY of a `self.<method>(…)` call, and the FIELDS of the `Rules` dataclass,
+# which is likewise the only declaration of its surface.
+# ---------------------------------------------------------------------------
+
+class _Sig:
+    __slots__ = ("pos", "req", "vararg", "kwonly", "kwreq", "kwargs")
+
+    def __init__(self, fn: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+        a = fn.args
+        pos = [p.arg for p in list(a.posonlyargs) + list(a.args)]
+        if pos and pos[0] in ("self", "cls"):
+            pos = pos[1:]
+        self.pos = pos
+        self.req = pos[:len(pos) - len(a.defaults)] if a.defaults else list(pos)
+        self.vararg = a.vararg is not None
+        self.kwonly = [p.arg for p in a.kwonlyargs]
+        self.kwreq = [p.arg for p, d in zip(a.kwonlyargs, a.kw_defaults) if d is None]
+        self.kwargs = a.kwarg is not None
+
+    def key(self) -> tuple:
+        return (tuple(self.pos), tuple(self.req), self.vararg,
+                tuple(self.kwonly), tuple(self.kwreq), self.kwargs)
+
+
+_SIG_SKIP_DECOS = {"property", "staticmethod", "classmethod", "cached_property"}
+
+
+def method_sigs() -> dict[str, _Sig | None]:
+    """method name -> its signature, or None where two defs disagree (an
+    ambiguous name is skipped rather than guessed at)."""
+    out: dict[str, _Sig | None] = {}
+    for path in sorted(CORE.glob("*.py")):
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:
+            continue
+        for cls in [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]:
+            for fn in cls.body:
+                if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                if any(isinstance(d, ast.Name) and d.id in _SIG_SKIP_DECOS for d in fn.decorator_list):
+                    continue
+                sig = _Sig(fn)
+                if fn.name in out:
+                    prev = out[fn.name]
+                    if prev is None or prev.key() != sig.key():
+                        out[fn.name] = None
+                else:
+                    out[fn.name] = sig
+    return out
+
+
+def bad_arity(sigs: dict[str, _Sig | None]) -> list[tuple[str, int, str]]:
+    bad: list[tuple[str, int, str]] = []
+    for path in _reader_files():
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:
+            continue
+        in_core = path.parent == CORE
+        scopes: list[ast.AST] = [n for n in ast.walk(tree)
+                                 if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))] + [tree]
+        for fn in scopes:
+            recv = _scope_receivers(fn, in_core)
+            for node in [x for b in fn.body for x in ast.walk(b)]:
+                if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                        and isinstance(node.func.value, ast.Name) and node.func.value.id in recv):
+                    continue
+                sig = sigs.get(node.func.attr)
+                if sig is None:  # unknown or ambiguous — the census owns the name check
+                    continue
+                if any(isinstance(x, ast.Starred) for x in node.args) or any(k.arg is None for k in node.keywords):
+                    continue  # *args / **kwargs at the call site: arity is not statically known
+                n_pos, kw = len(node.args), {k.arg for k in node.keywords if k.arg}
+                why = ""
+                if not sig.vararg and n_pos > len(sig.pos):
+                    why = f"{n_pos} positional for {len(sig.pos)} parameter(s)"
+                else:
+                    bound = set(sig.pos[:n_pos]) | kw
+                    miss = [p for p in sig.req if p not in bound] + [p for p in sig.kwreq if p not in kw]
+                    extra = [] if sig.kwargs else sorted(kw - set(sig.pos) - set(sig.kwonly))
+                    if miss:
+                        why = "missing " + ", ".join(miss)
+                    elif extra:
+                        why = "no such parameter: " + ", ".join(extra)
+                if why:
+                    bad.append((str(path.relative_to(ROOT)), node.lineno,
+                                f"{node.func.value.id}.{node.func.attr}(…) — {why}"))
+    return sorted(set(bad))
+
+
+def rules_fields() -> set[str]:
+    tree = ast.parse((CORE / "simbase.py").read_text(encoding="utf-8"))
+    for cls in [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef) and n.name == "Rules"]:
+        return {st.target.id for st in cls.body
+                if isinstance(st, ast.AnnAssign) and isinstance(st.target, ast.Name)}
+    return set()
+
+
+def bad_rules_reads(fields: set[str]) -> list[tuple[str, int, str]]:
+    bad: list[tuple[str, int, str]] = []
+    for path in _reader_files():
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Attribute):
+                continue
+            base = node.value
+            named = (isinstance(base, ast.Name) and base.id == "rules") or \
+                    (isinstance(base, ast.Attribute) and base.attr == "rules")
+            if not named or node.attr in fields or node.attr.startswith("__"):
+                continue
+            bad.append((str(path.relative_to(ROOT)), node.lineno, f"rules.{node.attr}"))
     return sorted(set(bad))
 
 
@@ -737,6 +875,22 @@ def main(census_only: bool = False) -> int:
         for f, ln, what in bad:
             print(f"  {f}:{ln}  {what}")
 
+    sigs = method_sigs()
+    arity = bad_arity(sigs)
+    if arity:
+        fails += 1
+        print("CALL ARITY — a method is called with arguments its def does not take:")
+        for f, ln, what in arity:
+            print(f"  {f}:{ln}  {what}")
+
+    fields = rules_fields()
+    rbad = bad_rules_reads(fields)
+    if rbad:
+        fails += 1
+        print("DANGLING RULES FIELD — read but not declared on the Rules dataclass:")
+        for f, ln, what in rbad:
+            print(f"  {f}:{ln}  {what}")
+
     dupes = sorted(aliases & mutable_names())
     if dupes:
         fails += 1
@@ -764,7 +918,9 @@ def main(census_only: bool = False) -> int:
     if fails:
         print(f"\nseat-symmetry check FAILED ({fails} fault classes)")
         return 1
-    print(f"seat-symmetry check OK — {len(known)} bound attributes, {len(aliases)} aliases, "
+    print(f"seat-symmetry check OK — {len(known)} bound attributes, "
+          f"{sum(1 for s in sigs.values() if s is not None)} method signatures, "
+          f"{len(fields)} rules fields, {len(aliases)} aliases, "
           f"{len(FORK_ALLOW)} allowed GPU forks, {len(TS_FORK_ALLOW)} allowed TS forks, "
           f"{_checked_refs} comment refs resolve")
     return 0

@@ -28,16 +28,15 @@ HOLD = 12
 def _parity_loop(sim: BatchSim, turns: int) -> None:
     for _ in range(turns):
         sim.step()
-        pass
 
 
 def _rollout_loop(sim: BatchSim, turns: int, seed: int) -> None:
-    from core.engine import P_MAX
-
     B, C = sim.B, sim.RC
     game_seed = torch.tensor([seed * 1_000_003 + i for i in range(B)], dtype=torch.int64)
     slots = torch.arange(C, dtype=torch.int64).view(1, C)
-    pslots = torch.arange(P_MAX, dtype=torch.int64).view(1, P_MAX)
+    # The unit head is as wide as `_seat_slot_map` compacts to, which the mask
+    # itself reports — a pool constant here would rot the moment it moved.
+    pslots = torch.arange(sim._seat_unit_mask(0).shape[1], dtype=torch.int64).view(1, -1)
     for _ in range(turns):
         turn = sim.turn
         pa = masked_choice(sim.production_mask(), game_seed.view(B, 1), slots, turn, HEAD_PROD)
@@ -53,7 +52,6 @@ def _rollout_loop(sim: BatchSim, turns: int, seed: int) -> None:
         sim.apply_seat_actions(0, production=pa, tech=ta, civic=ca, envoys=ea)
         sim._apply_seat_unit_actions(0, ua)
         sim.step()
-        pass
 
 
 def _report(part: str, pr: cProfile.Profile, wall: float, turns: int, dump: str | None) -> None:
@@ -79,10 +77,13 @@ def main() -> int:
     ap.add_argument("--turns", type=int, default=250)
     ap.add_argument("--seed", type=int, default=2026, help="rollout action-stream seed (the profiled game")
     ap.add_argument("--dump", default=None, help="dump raw .prof stats (suffix _parity/_rollout added)")
+    ap.add_argument("--worlds", default=None, help="fixture directory (default: the exported seeder/worlds)")
     args = ap.parse_args()
 
-    rules = load_rules()
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    where = Path(args.worlds) if args.worlds else FIXTURES
+    rules = load_rules(where / "rules.json")
+    # `seed*.json` also matches the Layer A `seed*.world.json` beside it.
+    paths = [p for p in sorted(where.glob("seed*.json")) if not p.name.endswith(".world.json")]
     if not paths:
         print("no fixtures — run `npm run seed && npm run export` first")
         return 1

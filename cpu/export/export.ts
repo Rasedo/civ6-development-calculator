@@ -53,9 +53,8 @@ for (const f of worldFiles) {
   fixture.srcStamp = srcStamp;
   writeFileSync(`${DIR}/seed${world.gen.seed}.json`, JSON.stringify(fixture));
   console.log(
-    `seed${world.gen.seed}.json: format 2 — ${world.civs.length} civs (settler starts), ` +
+    `seed${world.gen.seed}.json: format ${fixture.format} — ${world.civs.length} civs (settler starts), ` +
       `${world.cityStates.length} CS, ${state.map.tiles.length} tiles`,
   );
 }
-console.log(`\nCompiled ${worldFiles.length} fixtures in ${DIR}/ — ` +
-  'NOTE: format 2 (no pre-founded capitals); the GPU engine refuses these.');
+console.log(`\nCompiled ${worldFiles.length} fixtures in ${DIR}/`);

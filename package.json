@@ -6,8 +6,8 @@
   "scripts": {
     "test": "vitest run",
     "lint": "oxlint cpu seeder tools tests",
-    "seed": "vite-node seeder/seeder.ts",
-    "seed:check": "vite-node seeder/stamp.ts --check",
+    "seed": "vite-node seeder/world.ts",
+    "seed:check": "vite-node seeder/world.ts --check",
     "export": "vite-node cpu/export/export.ts"
   },
   "devDependencies": {

@@ -92,7 +92,7 @@ class Rules:
     boosts: list  # [{target, idx, kind, ...}] — eureka/inspiration conditions
     combat: dict  # barbarian constants + the JS-computed damage-base table
     units: list  # trainable roster [{id, cost, combat, maintenance, civilian, requiresTech}]
-    cs: dict  # city-state constants (envoy cost, influence rate, quest pacing, type→yield)
+    citystate: dict  # city-state constants (envoy cost, influence rate, quest pacing, type→yield)
     seats: dict  # seat pacing, loyalty, GP costs, belief-pool sizes (cpu/data/seats.ts)
     beliefs: dict  # dense pantheon/follower/founder effect tables (data-file key order = claim-draw order)
     projects: dict  # {rows: [{d, y, g}], yieldFraction, gppFraction} in data order
@@ -170,7 +170,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         boosts=r.get("boosts", []),
         combat=r.get("combat", {}),
         units=r.get("units", []),
-        cs=r.get("cs", {}),
+        citystate=r["cityState"],
         seats=r["seats"],  # the seat bag (cpu/data/seats.ts)
         beliefs=r.get("beliefs", {}),
         projects=r.get("projects", {}),

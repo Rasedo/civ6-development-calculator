@@ -30,8 +30,50 @@ class SimSeats:
         # which is what these columns offer.
         bld_q = self._seat_buildable(row)  # [B, RC, NB]
         tr_city = self._trainable_units(row)  # [B, RC, NU]
+        ones_b = torch.ones(B, dtype=torch.bool, device=dev)
+        nW_m = self._wond_n if self.districts_on else 0
+        nP_m = len(self._proj_rows) if self.districts_on else 0
+        W = bld_q.shape[2] + 2 + tr_city.shape[2] + nS + nW_m + nP_m
+        # EVERY column below is `& idle_j`, so a column no game can queue in
+        # contributes an all-False row whatever the legality bodies answer —
+        # and the district/wonder bodies are the two most expensive in a step.
+        dead_col = torch.zeros(B, W, dtype=torch.bool, device=dev)
+        # The unit-column overrides and the wonder unlock/built tests ask about
+        # the SEAT, not the city: hoisted, they run once instead of RC times.
+        ovr: list[tuple[int, torch.Tensor]] = []
+        if self.improvements_on and self._builder_idx >= 0:
+            has_alive = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._builder_idx)).any(dim=1)
+            has_q = ((self.city_current[:, row] == self.UNIT_BASE + self._builder_idx) & alive).any(dim=1)
+            ovr.append((self._builder_idx, ~(has_alive | has_q) & self._seat_job_mask(row).any(dim=1)))
+        if self._seat_eng_live and self._eng_idx >= 0:
+            has_alive_e = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._eng_idx)).any(dim=1)
+            has_q_e = ((self.city_current[:, row] == self.UNIT_BASE + self._eng_idx) & alive).any(dim=1)
+            ovr.append((self._eng_idx, ~(has_alive_e | has_q_e) & self._seat_fort_job_mask(row).any(dim=1)))
+        if self._galley_idx >= 0 and self._sailing_tech >= 0:
+            has_sail_g = self.civ_techs[:, row, self._sailing_tech]
+            vt_allm = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+            naval_live_g = (self.major_unit_alive & (self.major_unit_seat == row) & self.unit_naval[vt_allm]).any(dim=1)
+            qcur_g = self.city_current[:, row]
+            q_nav_g = (qcur_g >= self.UNIT_BASE) & (qcur_g < self.UNIT_BASE + self.NU) & alive \
+                & self.unit_naval[(qcur_g - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)]
+            ovr.append((self._galley_idx, has_sail_g & ~(naval_live_g | q_nav_g.any(dim=1))))
+        # A district's unlock and a wonder's unlock/already-built pair are per
+        # SEAT too, so both tables are built once for the whole column sweep.
+        d_tech = [
+            (self.civ_techs[:, row, utech] if utech >= 0
+             else (self.civ_civics[:, row, uciv] if uciv >= 0 else ones_b))
+            for (_di, utech, uciv, _plc) in self._scaffold
+        ] if (self.districts_on and self._scaffold) else []
+        w_okc: list[torch.Tensor | None] = []
+        for wi in range(nW_m):
+            unl_w = self._wonder_unlock_ok(row, wi)
+            okc_m = None if unl_w is None else unl_w & ~(self.built_wonder == wi).any(dim=1)
+            w_okc.append(okc_m if okc_m is not None and bool(okc_m.any()) else None)
         prod_cols = []
         for j in range(self.RC):
+            if not bool(idle[:, j].any()):
+                prod_cols.append(dead_col)
+                continue
             ok_b = bld_q[:, j]
             ok_s = (self.city_pop[:, row, j] >= self.rules.settler_pop_gate).unsqueeze(1)
             # units: `trainableUnits` for this row and city — the SAME body the
@@ -42,51 +84,30 @@ class SimSeats:
             # smuggle an untrainable chassis past the legality body.
             tr_j = tr_city[:, j]  # [B, NU]
             ok_u = tr_j & (self._type_combat.unsqueeze(0) > 0) & ~self.unit_naval.unsqueeze(0)
-            if self.improvements_on and self._builder_idx >= 0:
-                has_alive = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._builder_idx)).any(dim=1)
-                has_q = ((self.city_current[:, row] == self.UNIT_BASE + self._builder_idx) & alive).any(dim=1)
-                ok_u[:, self._builder_idx] = tr_j[:, self._builder_idx] & ~(has_alive | has_q) & self._seat_job_mask(row).any(dim=1)
-            if self._seat_eng_live and self._eng_idx >= 0:
-                has_alive_e = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._eng_idx)).any(dim=1)
-                has_q_e = ((self.city_current[:, row] == self.UNIT_BASE + self._eng_idx) & alive).any(dim=1)
-                ok_u[:, self._eng_idx] = tr_j[:, self._eng_idx] & ~(has_alive_e | has_q_e) & self._seat_fort_job_mask(row).any(dim=1)
-            if self._galley_idx >= 0 and self._sailing_tech >= 0:
-                has_sail_g = self.civ_techs[:, row, self._sailing_tech]
-                vt_allm = self.major_unit_type.clamp(min=0, max=self.NU - 1)
-                naval_live_g = (self.major_unit_alive & (self.major_unit_seat == row) & self.unit_naval[vt_allm]).any(dim=1)
-                qcur_g = self.city_current[:, row]
-                q_nav_g = (qcur_g >= self.UNIT_BASE) & (qcur_g < self.UNIT_BASE + self.NU) & alive \
-                    & self.unit_naval[(qcur_g - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)]
-                ok_u[:, self._galley_idx] = (
-                    tr_j[:, self._galley_idx] & has_sail_g & ~(naval_live_g | q_nav_g.any(dim=1))
-                )
+            for _ui, _gate in ovr:
+                ok_u[:, _ui] = tr_j[:, _ui] & _gate
             ok_d = torch.zeros(B, nS, dtype=torch.bool, device=dev)
             if self.districts_on and self._scaffold:
                 cap_max = torch.div(self.city_pop[:, row, j] - 1, 3, rounding_mode="floor") + 1
                 spec_cnt = ((self.city_dist_tile[:, row, j] >= 0) & self._is_specialty).sum(dim=1)
-                for si, (di, utech, uciv, plc) in enumerate(self._scaffold):
-                    has_tech = self.civ_techs[:, row, utech] if utech >= 0 else (self.civ_civics[:, row, uciv] if uciv >= 0 else torch.ones(B, dtype=torch.bool, device=dev))
+                site = self._district_elig_site(row, j)  # every type in this city shares it
+                for si, (di, _ut, _uc, plc) in enumerate(self._scaffold):
                     not_owned = self._district_slot_free(row, j, di)
-                    under_cap = (spec_cnt < cap_max) if bool(self._is_specialty[di]) else torch.ones(B, dtype=torch.bool, device=dev)
-                    can_place = self._district_elig(row, j, di, plc).any(dim=1)
-                    ok_d[:, si] = has_tech & not_owned & under_cap & can_place
-            base_j = torch.cat([ok_b, ok_s, torch.ones(B, 1, dtype=torch.bool, device=dev), ok_u, ok_d], dim=1)
-            nW_m = self._wond_n if self.districts_on else 0
+                    under_cap = (spec_cnt < cap_max) if bool(self._is_specialty[di]) else ones_b
+                    can_place = self._district_elig(row, j, di, plc, base=site).any(dim=1)
+                    ok_d[:, si] = d_tech[si] & not_owned & under_cap & can_place
+            base_j = torch.cat([ok_b, ok_s, ones_b.unsqueeze(1), ok_u, ok_d], dim=1)
             ok_w = torch.zeros(B, max(nW_m, 0), dtype=torch.bool, device=dev)
             if nW_m > 0:
                 base_okm = self._wonder_base_ok(row, j)
                 for wi in range(nW_m):
-                    unl_w = self._wonder_unlock_ok(row, wi)
-                    if unl_w is None or not bool(unl_w.any()):
-                        continue
-                    okc_m = unl_w & ~(self.built_wonder == wi).any(dim=1)
-                    if not bool(okc_m.any()):
+                    okc_m = w_okc[wi]
+                    if okc_m is None:
                         continue
                     ok_w[:, wi] = okc_m & self._wonder_cand(row, j, wi, base_okm).any(dim=1)
             # PROJECT columns [nP], the `availableProjects` predicate: the row's
             # district must be COMPLETE on this city, and a SPACE row must also
             # be un-done, tech-unlocked, and preceded by its finished step.
-            nP_m = len(self._proj_rows) if self.districts_on else 0
             ok_p = torch.zeros(B, max(nP_m, 0), dtype=torch.bool, device=dev)
             for pi_m, prow_m in enumerate(self._proj_rows if self.districts_on else []):
                 d_im = int(prow_m.get("d", -1))
@@ -951,11 +972,15 @@ class SimSeats:
         """
         if self._apostle_idx < 0 or not self.units_mode:
             return
-        U = self.major_unit_alive.shape[1]
         rs = self._rel_strength
         nrow = self.n_majors
         sw = int(self._theo_swing)
-        for u in range(U):
+        # Only slots that hold a live APOSTLE somewhere in the batch can open a
+        # fight, and nothing spawns one mid-pass — so this set is a superset of
+        # the actors and the pool's other five hundred slots cost nothing. A
+        # slot whose apostle DIES mid-pass still falls out on `att` below.
+        _open = (self.major_unit_alive & (self.major_unit_type == self._apostle_idx)).any(dim=0)
+        for u in _open.nonzero(as_tuple=True)[0].tolist():
             att = self.major_unit_alive[:, u] & (self.major_unit_type[:, u] == self._apostle_idx)
             if not bool(att.any()):
                 continue
@@ -2365,6 +2390,14 @@ class SimSeats:
         mseat = torch.where(mil >= 0, self.unit_seat.gather(1, mil.clamp(min=0)), torch.full_like(mil, -1))
         return ((mil >= 0) & (mseat != BARB_SEAT)) | (self.civilian_at >= 0)
 
+    def _nonbarb_unit_at(self, tiles: torch.Tensor) -> torch.Tensor:
+        """[B, N] — `_nonbarb_unit_plane` evaluated AT `tiles`. A prober asking
+        about one tile per game has no business building the whole map."""
+        t = tiles.clamp(min=0)
+        mil = self.military_at.gather(1, t)
+        mseat = torch.where(mil >= 0, self.unit_seat.gather(1, mil.clamp(min=0)), torch.full_like(mil, -1))
+        return ((mil >= 0) & (mseat != BARB_SEAT)) | (self.civilian_at.gather(1, t) >= 0)
+
     def _nonbarb_mil_plane(self) -> torch.Tensor:
         mil = self.military_at
         mseat = torch.where(mil >= 0, self.unit_seat.gather(1, mil.clamp(min=0)), torch.full_like(mil, -1))
@@ -2438,21 +2471,29 @@ class SimSeats:
 
 
     def _seats_hostile(self, a_seat, b_plane: torch.Tensor) -> torch.Tensor:
+        # A seat is never hostile to ITSELF, stated explicitly below: leaving it
+        # to the war matrix's unwritten diagonal would make the answer depend on
+        # a value nothing maintains.
         B = self.B
-        a = a_seat if torch.is_tensor(a_seat) else torch.full(
-            (B, 1), a_seat, dtype=torch.long, device=self.device
-        )
-        a = a.reshape(B, 1)
         valid = b_plane >= 0
-        a_barb, b_barb = a == BARB_SEAT, b_plane == BARB_SEAT
-        bidx = torch.arange(B, device=self.device).unsqueeze(1)
-        ra = self._seat_row[a.clamp(min=0)]
+        b_barb = b_plane == BARB_SEAT
         rb = self._seat_row[b_plane.clamp(min=0)]
-        at_war = self.war[bidx, ra, rb]
-        # A seat is never hostile to ITSELF, stated explicitly: leaving it to the
-        # war matrix's unwritten diagonal would make the answer depend on a value
-        # nothing maintains.
-        return valid & (a != b_plane) & ((a_barb ^ b_barb) | (~a_barb & ~b_barb & at_war))
+        if torch.is_tensor(a_seat):
+            a = a_seat.reshape(B, 1)
+            ra = self._seat_row[a.clamp(min=0)]
+            at_war = self.war[self._bidx1, ra, rb]
+            a_barb = a == BARB_SEAT
+            return valid & (a != b_plane) & ((a_barb ^ b_barb) | (~a_barb & ~b_barb & at_war))
+        # An INT acting seat is the common case (the walkers probe on behalf of
+        # one seat): one row of the war matrix gathered by the other side's row,
+        # with no [B, 1] fill and no advanced index. The two arms below are the
+        # tensor formula above with `a_barb` folded out.
+        not_same = b_plane != a_seat
+        if a_seat == BARB_SEAT:  # a barbarian is hostile to every non-barbarian
+            return valid & not_same & ~b_barb
+        at_war = self.war[:, int(self._seat_row[max(int(a_seat), 0)])].gather(
+            1, rb.reshape(B, -1)).reshape(rb.shape)
+        return valid & not_same & (b_barb | at_war)
 
     def _step_verb(
         self,
@@ -2622,21 +2663,17 @@ class SimSeats:
         # THE CITY SCAN — one total order over every major this seat is at
         # war with, on the TS key: distance, then the seat id, then the centre
         # tile. No seat is a separate arm and none wins a tie by being row 0.
-        ckey_min = torch.full((B,), 10**18, dtype=torch.long, device=dev)
-        city_tgt = hc.clone()
-        for row2 in range(self.n_majors):
-            war2 = self.war[:, row, row2]
-            if not bool(war2.any()):
-                continue
-            for j in range(self.RC):
-                ct2 = self.city_center[:, row2, j].clamp(min=0)
-                alive2 = self.city_alive[:, row2, j] & war2
-                d2 = self.pair_dist[hc, ct2].to(torch.long)
-                key2 = torch.where(alive2, d2 * (2048 * 8) + row2 * 2048 + ct2, torch.full_like(d2, 10**18))
-                upd = key2 < ckey_min
-                ckey_min = torch.where(upd, key2, ckey_min)
-                city_tgt = torch.where(upd, ct2, city_tgt)
+        # ONE argmin over the whole city block: the key is unique per live
+        # city, so the winner is the one a slot-by-slot scan would have kept.
+        _cc = self.city_center[:, :self.n_majors].reshape(B, -1).clamp(min=0)  # [B, M]
+        _ca = (self.city_alive[:, :self.n_majors].reshape(B, -1)
+               & self.war[:, row, :self.n_majors].repeat_interleave(self.RC, dim=1))
+        _d2 = self.pair_dist[hc.unsqueeze(1), _cc].to(torch.long)
+        _key = torch.where(_ca, _d2 * (2048 * 8) + self._march_seatkey + _cc,
+                           torch.full_like(_d2, 10**18))
+        ckey_min, _cwin = _key.min(dim=1)
         has_city = ckey_min < 10**18
+        city_tgt = torch.where(has_city, _cc.gather(1, _cwin.unsqueeze(1)).squeeze(1), hc)
         tgt = torch.where(has_imp, imp_tgt, city_tgt)
         return tgt, has_imp, has_city
 

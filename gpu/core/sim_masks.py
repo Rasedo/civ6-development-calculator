@@ -357,11 +357,24 @@ class SimMasks:
         return live & self._seats_hostile(seat, owner_seat)
 
     def _encamp_block(self, tiles: torch.Tensor, seat) -> torch.Tensor:
-        """[B, N] — `_encamp_block_plane` sampled at `tiles` (one source of
-        truth for the predicate; the walkers probe a handful of tiles)."""
+        """[B, N] — the same predicate as `_encamp_block_plane`, but evaluated
+        AT `tiles` instead of over the whole map. A gather commutes with the
+        elementwise chain, and the walkers probe six or twelve tiles where the
+        plane is thousands, so this is the form every prober wants."""
         if self._encamp_didx < 0:
             return torch.zeros_like(tiles, dtype=torch.bool)
-        return self._encamp_block_plane(seat).gather(1, tiles.clamp(min=0))
+        t = tiles.clamp(min=0)
+        live = (
+            (self.district.gather(1, t) == self._encamp_didx)
+            & self.district_complete.gather(1, t)
+            & ~self.district_pillaged.gather(1, t)
+            & (self.encamp_hp.gather(1, t) > 0)
+        )
+        if not torch.is_tensor(seat) and seat == BARB_SEAT:
+            return live
+        ow = self.tile_seat.gather(1, t)
+        owner_seat = torch.where((ow >= 0) & (ow < self.n_majors), ow, torch.full_like(ow, -1))
+        return live & self._seats_hostile(seat, owner_seat)
 
     def _blocked_for(
         self,

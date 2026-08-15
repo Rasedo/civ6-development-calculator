@@ -558,6 +558,44 @@ placement. Numbering restarts here — "watch first" below means THIS list.
    improvement on a natural-wonder tile — the other side the old order got
    wrong.
 
+26. THE GPU ENGINE COULD NOT CONSTRUCT, AND NOTHING SAID SO. `Rules` declared
+   the city-state bag as `cs` while all 33 readers ask for `rules.citystate`,
+   and `load_rules` filled it from a `"cs"` key the exporter has never
+   written — so `BatchSim.__init__` raised `AttributeError` on its FIRST
+   city-state read. Every GPU lane, the serve gate and the whole poke set have
+   been dead since that rename; the freeze is the only reason it went
+   unnoticed. Fixed by naming the field for what its readers call it and
+   loading `r["cityState"]` — a KeyError if the exporter ever drops it, never
+   a silent `{}`. CONSEQUENCE TO READ: seven city-state constants now reach
+   the engine for the first time — `envoyCost` 100, `influencePerTurn` 3,
+   `meetRange` 3, `questCooldown` 12, `questEnvoys` 1, `militaristicIdx` 4,
+   `tradeIdx` 2, and the two envoy-building tables `typeB1Idx`/`typeB2Idx`
+   (which the fallbacks left at all -1, i.e. NO envoy building at all).
+   A second runtime-only break sat behind it: `_apply_seat_unit_actions`
+   called `_ranged_attack` without the acting `row`, so an ORDERED ranged
+   attack raised on the first turn a seat fired one.
+   Both are now held statically — `seat_symmetry_check` gained a CALL ARITY
+   census over the mixin methods and a `Rules`-field census, and each was
+   verified to fail on the bug it was written for.
+
+27. THE ENGINE IS 2.4x FASTER AND ITS STATE IS BYTE-IDENTICAL. A 250-turn
+   driven rollout at B=9 went 126.2s -> 53.1s and an undriven parity loop at
+   B=6 went 3.6s -> 1.2s, with the profiled call count down from 9.6M to
+   5.0M. Every change was A/B'd against a SHA-256 of all 141 `_MUTABLE`
+   planes after 120 driven turns over 9 games; the digest never moved.
+   What changed: `canPlaceDistrictIn`'s city-only part is computed once per
+   city instead of once per district type (`_district_elig_site`); the
+   production mask skips columns no game can queue in and hoists the
+   seat-level unit/wonder/district-unlock tests out of its column sweep;
+   `_encamp_block` and the new `_nonbarb_unit_at` evaluate at the probed
+   TILES instead of building a map-wide plane to sample six of them;
+   `_seats_hostile` has an int fast path; the barbarian march and
+   `_war_march_target` replaced a 72-trip Python scan of the city block with
+   one argmin; and `_theological_combat_phase` walks only the pool slots that
+   hold an apostle instead of all 512. THIS IS NOT A PARITY CLAIM — the
+   digest proves the GPU agrees with ITSELF, and only over the one driver and
+   the one regime it ran.
+
 STILL UNVERIFIED, and NOT changed on a guess: our feature-removal techs are
 Woods -> Mining and Marsh -> Irrigation. Rainforest -> Bronze Working checks
 out against a real source; the other two could not be confirmed either way,

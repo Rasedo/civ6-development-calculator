@@ -937,6 +937,7 @@ class SimInit:
         self._claim_version = 0
         self._gen_ver = 0
         self._gen_aura_cache = None
+        self._bidx1 = torch.arange(B, device=device).unsqueeze(1)  # [B, 1] batch index, for advanced indexing
         self._fbase_cache: tuple[int, torch.Tensor] | None = None
         self._food_cache: tuple[int, torch.Tensor] | None = None
         self._nprod_cache: tuple[int, torch.Tensor] | None = None
@@ -1131,6 +1132,17 @@ class SimInit:
         self._prereq_c = self._prereq_matrix(rules.c_prereqs, NC).to(device)
         self._arangeT = torch.arange(T, device=device)
         self._arangeT_f = self._arangeT.to(dtype)
+        # The two halves of a TILE-ORDER argmin key, [B, T]: the tile index
+        # where the scan hits and an out-of-range sentinel where it does not.
+        # Both are read-only constants a per-unit scan would otherwise re-fill.
+        self._arange_bt = self._arangeT.unsqueeze(0).expand(B, T)
+        self._tile_miss = torch.full((B, T), T + 1, dtype=torch.long, device=device)
+        self._march_miss = torch.full((B, T), 10**9, dtype=torch.long, device=device)
+        # The barbarian march key's SEAT term, one entry per city-block cell in
+        # `city_center[:, :n_majors].reshape(B, -1)` order (row-major, so the
+        # column index runs fastest).
+        self._march_seatkey = (torch.arange(self.n_majors * self.RC, device=device)
+                               // self.RC) * 2048
         self._bidx = torch.arange(B, device=device)
         self._inf_f = torch.tensor(float("inf"), dtype=dtype, device=device)
         self._adjd_cache = None

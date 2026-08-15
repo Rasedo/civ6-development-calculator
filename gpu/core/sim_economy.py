@@ -844,7 +844,36 @@ class SimEconomy:
             d[di] = v
         return v
 
-    def _district_elig(self, row: int, j: int, di: int, placement: int = 0) -> torch.Tensor:
+    def _district_elig_site(self, row: int, j: int) -> torch.Tensor:
+        """[B, T] the part of `canPlaceDistrictIn` that depends only on the CITY
+        — everything but the surface and the two placement clauses. Every
+        district type in one city shares it, so a caller looping the catalog
+        computes it ONCE and hands it back through `_district_elig(base=…)`."""
+        B, dev = self.B, self.device
+        center = self.city_center[:, row, j].clamp(min=0)
+        elig = (
+            (self.tile_seat == row)
+            & (self.tile_city == self.city_id[:, row, j].unsqueeze(1))
+            & (self.district < 0)
+            & (self.built_wonder < 0)
+            & (self.improvement < 0)
+            & (self.res_priority <= 1)  # only a BONUS resource may be paved over
+            & (self.pair_dist[center] <= 3)  # CITY_WORK_RADIUS
+        )
+        # A district PAVES the tile, so a removable feature still standing on it
+        # must be one this seat could clear — `tile_ftu` is that feature's
+        # removal tech, -1 where there is nothing to clear.
+        need_clear = (self.tile_ftu >= 0) & ~self.feat_stripped
+        if bool(need_clear.any()):
+            have = self.civ_techs[:, row].gather(1, self.tile_ftu.clamp(min=0))
+            elig = elig & (~need_clear | have)
+        # No clone: the `&` chain above already returns a fresh tensor nothing
+        # else references. Callers must not write into what they get back.
+        elig[torch.arange(B, device=dev), center] = False  # dist === 0 is the centre
+        return elig
+
+    def _district_elig(self, row: int, j: int, di: int, placement: int = 0,
+                       base: torch.Tensor | None = None) -> torch.Tensor:
         """[B, T] the tiles that may take district `di` in seat row `row`'s city
         slot j — `canPlaceDistrictIn`, which is seat-generic in TS and so has
         ONE body here.
@@ -855,31 +884,8 @@ class SimEconomy:
         legal where the placer rejects it. It answers LEGALITY only — ranking
         the legal tiles is the policy's job (`district_rank_adj`).
         """
-        B, dev = self.B, self.device
-        center = self.city_center[:, row, j].clamp(min=0)
         surface = self.coastal_water if placement == 2 else self.d_usable  # Harbor sits on coastal water, others on land
-        d_center = self.pair_dist[center]  # [B, T]
-        elig = (
-            (self.tile_seat == row)
-            & (self.tile_city == self.city_id[:, row, j].unsqueeze(1))
-            & surface
-            & (self.district < 0)
-            & (self.built_wonder < 0)
-            & (self.improvement < 0)
-            & (self.res_priority <= 1)  # only a BONUS resource may be paved over
-            & (d_center <= 3)           # CITY_WORK_RADIUS
-        )
-        # A district PAVES the tile, so a removable feature still standing on it
-        # must be one this seat could clear — `tile_ftu` is that feature's
-        # removal tech, -1 where there is nothing to clear.
-        need_clear = (self.tile_ftu >= 0) & ~self.feat_stripped
-        if bool(need_clear.any()):
-            have = self.civ_techs[:, row].gather(1, self.tile_ftu.clamp(min=0))
-            elig = elig & (~need_clear | have)
-        # No clone: the `&` chain above already returns a fresh tensor nothing
-        # else references, and this runs per district type per city per seat
-        # per turn on the hot path.
-        elig[torch.arange(B, device=dev), center] = False  # dist === 0 is the centre
+        elig = (self._district_elig_site(row, j) if base is None else base) & surface
         if placement in (1, 3):  # Aqueduct: adjacent-centre + water source; Encampment: NOT adjacent-centre
             cc = self._adj_center_count()  # [B, T] adjacent CITY_CENTERs (any seat)
             elig = elig & ((cc >= 1) & self.aqsrc if placement == 1 else (cc == 0))

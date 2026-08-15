@@ -12,10 +12,22 @@ class SimOrders:
         ctl = self.seat_ext[:, row]
         techs, civics = self.civ_techs[:, row], self.civ_civics[:, row]
         own_tile = self.tile_seat == row
-        for n in range(simbase.UNIT_SLOTS):
-            slot = smap[:, n]
-            if not bool((slot >= 0).any()):
+        # Which RANKS are worth opening at all, decided once over the whole
+        # [B, UNIT_SLOTS] block: the slot map and the action block are both
+        # fixed for the call, so a rank no game commands can be skipped without
+        # touching the sim. Liveness is NOT folded in — a unit can die to an
+        # earlier rank's retaliation, so `present` below still reads it fresh.
+        _n = min(smap.shape[1], actions.shape[1], simbase.UNIT_SLOTS)
+        _held = smap[:, :_n] >= 0
+        _cmd = _held & (actions[:, :_n] >= 0) & (actions[:, :_n] != 12) & ctl.unsqueeze(1)
+        _rank_held = _held.any(dim=0).tolist()
+        _rank_cmd = _cmd.any(dim=0).tolist()
+        for n in range(_n):
+            if not _rank_held[n]:
                 break
+            if not _rank_cmd[n]:
+                continue
+            slot = smap[:, n]
             sc = slot.clamp(min=0)
             present = (slot >= 0) & ctl & self.unit_alive.gather(1, sc.unsqueeze(1)).squeeze(1)
             a = actions[:, n].to(torch.long)
@@ -139,7 +151,7 @@ class SimOrders:
                             # advance. It re-derives its own target and returns
                             # the rows that actually fired — its refusals are
                             # TS's early returns, which leave movesLeft alone.
-                            if bool(self._ranged_attack(one, tgt, "major", v)[b_]):
+                            if bool(self._ranged_attack(one, tgt, "major", v, row)[b_]):
                                 self.unit_mp[b_, v] = 0
 
             if getattr(self, "_snipe_on", False):
@@ -609,15 +621,15 @@ class SimOrders:
         want = can_roll & (r1 < cb.get("campSpawnChance", 0.08))
         if bool(want.any()):
             wr = want.nonzero(as_tuple=True)[0]
-            near_city_w = ((self.pair_dist[self.city_center[wr, 0].clamp(min=0)] < 5) & self.city_alive[wr, 0].unsqueeze(2)).any(dim=1)  # [n, T]
             # campCandidates excludes t.district LIVE: camp_ok is static, but
             # paves are not, and an orphaned pave left over from a razed city
-            # would pad the set and shift the draw-indexed camp spot.
-            # Camps rise away from EVERY seat, so live CIV city centres repel
-            # candidates too.
-            rcc_w = self.city_center[wr, 1:self.n_majors].reshape(len(wr), -1)
-            near_rc_w = ((self.pair_dist[rcc_w.clamp(min=0)] < 5) & self.city_alive[wr, 1:self.n_majors].reshape(len(wr), -1).unsqueeze(2)).any(dim=1)
-            cand_w = self.camp_ok[wr] & (self.tile_seat[wr] < 0) & ~near_city_w & ~near_rc_w & (self.district[wr] < 0) & (self.built_wonder[wr] < 0)
+            # would pad the set and shift the draw-indexed camp spot. Camps rise
+            # away from EVERY major's live centre — ONE scan over the whole city
+            # block, which is also one gather instead of two.
+            cc_w = self.city_center[wr, :self.n_majors].reshape(len(wr), -1)
+            alive_w = self.city_alive[wr, :self.n_majors].reshape(len(wr), -1)
+            near_city_w = ((self.pair_dist[cc_w.clamp(min=0)] < 5) & alive_w.unsqueeze(2)).any(dim=1)  # [n, T]
+            cand_w = self.camp_ok[wr] & (self.tile_seat[wr] < 0) & ~near_city_w & (self.district[wr] < 0) & (self.built_wonder[wr] < 0)
             if self.fog_of_war:
                 # camps rise IN THE FOG — only on tiles dark to EVERY major
                 # seat (unexploredByAll; combat.ts's preferFog term).
@@ -767,12 +779,12 @@ class SimOrders:
                         | (self.centre_slot_at >= 0)
                     )
                 )
-                rng_key = torch.where(rng_valid, self._arangeT.unsqueeze(0).expand(B, T), torch.full((B, T), T + 1, dtype=torch.long, device=dev))
+                rng_key = torch.where(rng_valid, self._arange_bt, self._tile_miss)
                 target_tile = torch.where(rngd, rng_key.min(dim=1).values, target_tile)
             attack = act & (target_tile <= T)
             ttc = target_tile.clamp(max=T - 1)
             ctr_here = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0
-            has_u = self._nonbarb_unit_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
+            has_u = self._nonbarb_unit_at(ttc.unsqueeze(1)).squeeze(1)
             city_att = attack & ~rngd & ctr_here
             unit_att = attack & ~rngd & has_u & ~ctr_here
             enc_att = (
@@ -842,7 +854,7 @@ class SimOrders:
             march = act & ~attack & ~pillage & ~dist_pillage
             if not bool(march.any()):
                 continue
-            arangeT = torch.arange(T, device=dev)
+            arangeT = self._arangeT
             if self.improvements_on or self.districts_on:
                 # `isCiv(tileSeat(t))` — owned by ANY major. A barbarian is
                 # hostile to all of them, so no war term joins it.
@@ -850,8 +862,8 @@ class SimOrders:
                 imp_job = (self.improvement >= 0) & ~self.pillaged & _owned  # [B, T]
                 if self.districts_on:  # pillageable districts join the union
                     imp_job = imp_job | ((self.district >= 0) & self.district_complete & ~self.district_pillaged & _owned)
-                d_imp = self.pair_dist[here.unsqueeze(1), arangeT.unsqueeze(0)].to(torch.long)
-                ikey = torch.where(imp_job & (d_imp < 13), d_imp * (T + 1) + arangeT, torch.full_like(d_imp, 10**9))
+                d_imp = self.pair_dist[here].to(torch.long)
+                ikey = torch.where(imp_job & (d_imp < 13), d_imp * (T + 1) + arangeT, self._march_miss)
                 imp_min, imp_tgt = ikey.min(dim=1)
                 has_imp = imp_min < 10**9
             else:
@@ -859,20 +871,18 @@ class SimOrders:
                 imp_tgt = here.clamp(min=0)
             # BARBARIANS MARCH ON ANYONE — every major's cities, on the TS
             # key: distance, then the seat id, then the centre tile
-            # (`caps.alwaysHostile`, so no war term). Scanning row 0 alone left
-            # a civ city un-besieged however close it stood.
-            ckey_min = torch.full((B,), 10**18, dtype=torch.long, device=dev)
-            city_tgt = here.clamp(min=0)
-            for row2 in range(self.n_majors):
-                for j in range(self.RC):
-                    ct2 = self.city_center[:, row2, j].clamp(min=0)
-                    d2 = self.pair_dist[here.clamp(min=0), ct2].to(torch.long)
-                    key2 = torch.where(self.city_alive[:, row2, j],
-                                       d2 * (2048 * 8) + row2 * 2048 + ct2,
-                                       torch.full_like(d2, 10**18))
-                    upd = key2 < ckey_min
-                    ckey_min = torch.where(upd, key2, ckey_min)
-                    city_tgt = torch.where(upd, ct2, city_tgt)
+            # (`caps.alwaysHostile`, so no war term). ONE argmin over the whole
+            # city block: the key is unique per live city, so the winner is the
+            # same one a slot-by-slot scan would have kept.
+            _cc = self.city_center[:, :self.n_majors].reshape(B, -1).clamp(min=0)  # [B, M]
+            _ca = self.city_alive[:, :self.n_majors].reshape(B, -1)                # [B, M]
+            _d2 = self.pair_dist[here.clamp(min=0).unsqueeze(1), _cc].to(torch.long)
+            _key = torch.where(_ca, _d2 * (2048 * 8) + self._march_seatkey + _cc,
+                               torch.full_like(_d2, 10**18))
+            ckey_min, _cwin = _key.min(dim=1)
+            city_tgt = torch.where(ckey_min < 10**18,
+                                   _cc.gather(1, _cwin.unsqueeze(1)).squeeze(1),
+                                   here.clamp(min=0))
             tgt = torch.where(has_imp, imp_tgt, city_tgt)
             has_tgt = has_imp | (ckey_min < 10**18)
             d_here = self.pair_dist[here, tgt].to(torch.long)
