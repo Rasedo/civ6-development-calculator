@@ -42,9 +42,6 @@ export interface DriverOpts {
   turns: number;
   cityMax: number;
   cityStateMax: number;
-  /** The world file's `civMax` — the count of a seat's OPPONENTS, so the
-   *  major roster is `civMax + 1` seats wide (ids 0..civMax). */
-  civMax: number;
   horizon: number;
   improvementIds: string[];
   scaffoldDistricts: { id: DistrictId }[];
@@ -192,12 +189,12 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
 /** Play `turns` turns, taking every decision from the server. */
 
 export async function runDriver(o: DriverOpts): Promise<void> {
-  const { state, seed, turns: N_TURNS, cityMax: CITY_MAX, cityStateMax: CITY_STATE_MAX, civMax: CIV_MAX } = o;
-  // The MAJOR ROSTER WIDTH. `civMax` counts a seat's opponents, so the seats
-  // it describes are 0..civMax — one more than the number it names. Deriving
-  // the width once is what keeps `<= CIV_MAX` from appearing beside
-  // `< CIV_MAX` in the same file.
-  const N_MAJORS = CIV_MAX + 1;
+  const { state, seed, turns: N_TURNS, cityMax: CITY_MAX, cityStateMax: CITY_STATE_MAX } = o;
+  // THE MAJOR ROSTER WIDTH, read off THE ROSTER. It arrived as a `civMax`
+  // option until #115 — a count of the seats BESIDES seat 0, which had to be
+  // +1'd here and could disagree with the roster it was describing. The
+  // GPU reads its own width the same way, off the fixture's `civs[]`.
+  const N_MAJORS = state.seats.length;
 for (let t = 0; t < N_TURNS; t++) {
   {
     // S1(b): the handshake — obs out (one per seat, the seat-invariant

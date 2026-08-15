@@ -65,7 +65,6 @@ await runDriver({
   // to be observable and decidable. Matches the GPU's per-seat-row width.
   cityMax: CITY_SLOTS_PER_SEAT,
   cityStateMax: world.gen.params.cityStateMax,
-  civMax: world.gen.params.civMax,
   horizon: HORIZON,
   improvementIds: IMPROVEMENT_IDS as unknown as string[],
   scaffoldDistricts: SCAFFOLD_DISTRICTS,

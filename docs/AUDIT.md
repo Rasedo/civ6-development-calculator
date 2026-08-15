@@ -383,9 +383,18 @@ item here CHANGES BEHAVIOUR on both engines together; none of it has run.
    `builderImprove`'s legality also stopped reading a literal seat 0.
 9. THE `R = 0` PHANTOM ROW IS GONE. Major-axis widths were `1 + max(R, 1)`,
    which reserved a second row for a solo game and marked it wire-driven.
-   No configuration in `seeder/` produces R = 0 (`civMax` defaults to 2), so
-   this is unreachable today and cannot be validated by the gate — it is
-   named here so nobody hunts for it.
+   No configuration in `seeder/` produces a one-major world (`civCount`
+   defaults to 3), so this is unreachable today and cannot be validated by
+   the gate — it is named here so nobody hunts for it.
+9b. THE ROSTER WIDTH IS READ OFF THE ROSTER. The `civMax` wire key is
+   DELETED from the world params and the fixture; `n_majors` is
+   `len(f0["civs"])` and the driver's is `state.seats.length`. The seeder's
+   third CLI argument changed MEANING (rivals → majors) and its default
+   with it (2 → 3), so `npm run seed -- 12 3 2` now asks for two majors
+   where it used to ask for three. The generated worlds are otherwise
+   byte-identical: `placeCivs` receives the same number and draws from the
+   same per-civ streams. **The genStamp moves** (it hashes `params`), which
+   is the loud failure that forces the regeneration.
 10. `PILLAGE` ON SEAT 0'S PATH now gates on `combat > 0` rather than "carries
    no charges". The GPU has always used the former; the deleted
    `seatPillage` let a Great General pillage where the GPU refused.

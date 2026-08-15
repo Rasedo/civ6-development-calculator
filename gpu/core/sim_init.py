@@ -40,16 +40,18 @@ class SimInit:
         # other rows start at 0, and `center` starts at -1 where they start at
         # 0 — which is a FILL, not a fork: every reader is the same expression.
         # ------------------------------------------------------------------
-        # THE MAJOR ROSTER WIDTH. The world file's `civMax` is a WIRE key and
-        # counts a seat's OPPONENTS, so the seats it describes are 0..civMax —
-        # one more than the number it names. Everything downstream wants the
-        # WIDTH; an opponent count, where one is genuinely meant (the war
-        # head's columns, the observation's per-opponent block), is
-        # `n_majors - 1` written at the site that means it. The engine carried
-        # the opponent count as `self.R` until #115 and spelled the width
-        # `1 + self.R` at 180-odd sites, none of which could be checked by
-        # reading it.
-        self.n_majors = 1 + int(f0.get("civMax", 0))
+        # THE MAJOR ROSTER WIDTH, read off THE ROSTER: `civs[]` is seat-keyed
+        # and holds one entry per major, seat 0 among them. It used to be
+        # `1 + civMax`, a separate scalar wire key that counted the seats
+        # BESIDES seat 0 — the last place the player-and-rivals model was
+        # still writing itself down, and a second source of truth that could
+        # disagree with the array right beside it. An opponent count, where
+        # one is genuinely meant (the war head's columns, the observation's
+        # per-opponent block), is `n_majors - 1` written at the site that
+        # means it. The engine carried that count as `self.R` until #115 and
+        # spelled the width `1 + self.R` at 180-odd sites, none of which could
+        # be checked by reading it.
+        self.n_majors = len(f0["civs"])
         # City COLUMNS per seat row — ONE width, exported by the TS engine as
         # rules.seats.citySlots (CITY_SLOTS_PER_SEAT) so the observation head
         # and this storage cannot drift. Settling caps at maxCities; loyalty
@@ -325,7 +327,7 @@ class SimInit:
         for _b, _f in enumerate(fixtures):
             for _cv in _f["civs"]:
                 _s = int(_cv["seat"])
-                if 0 <= _s <= self.n_majors:
+                if 0 <= _s < self.n_majors:
                     self.civ_treasury[_b, _s] = float(_cv.get("treasury", 0.0))
         # THE DIPLOMATIC PAIR PLANES, on the WAR MATRIX'S OWN ROWS — same
         # geometry as `war`, so every seat has a row and `war[b, i, j]` and

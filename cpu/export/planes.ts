@@ -382,8 +382,12 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     volcanoes,
     maxCamps,
     rngInit: world.rngInit >>> 0,
+    // `cityStateMax` is a genuine MAX — placement drops a city-state it
+    // cannot space, so it sizes the minor rows and the roster may be
+    // shorter. The majors have no such key: `civs[]` below IS the roster,
+    // exact (placeCivs throws rather than drop a seat), and the GPU reads
+    // its width off it. The old `civMax` counted the seats besides seat 0.
     cityStateMax: world.gen.params.cityStateMax,
-    civMax: world.gen.params.civMax,
     cityStates: cityStateAtStart,
     // ONE civ array, seat order, civ 0 not special: aggression + the t0
     // units (settler first, warrior second — file order is the contract).

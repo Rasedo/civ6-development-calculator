@@ -70,7 +70,11 @@ export interface WorldFile {
     /** The placement policy version — bump it whenever a placement rule
      *  changes, so worlds.lock says WHY every hash moved. */
     placement: string;
-    params: { width: number; height: number; cityStateMax: number; civMax: number };
+    /** What the generator was ASKED for. `cityStateMax` is a max — placement
+     *  drops a city-state it cannot space — while `civCount` is exact, since
+     *  `placeCivs` throws rather than seat fewer. Either way `civs[]` /
+     *  `cityStates[]` below are the rosters; these are provenance. */
+    params: { width: number; height: number; cityStateMax: number; civCount: number };
     /** Hash of the seeder+world sources that generated this file. */
     genStamp: string;
   };
