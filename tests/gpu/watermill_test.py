@@ -26,11 +26,14 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from warmup import plant_city, settle_all
 
 
 def build(rules, path, steps=40):
+    """Two live cities on row 0 through the engine's own FOUND verb, then
+    `steps` turns of growth (food and pop accrue without decisions)."""
     sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+    plant_city(sim, 0)
     for _ in range(steps):
         sim.step()
     return sim
@@ -46,16 +49,8 @@ def main() -> None:
     if not paths:
         print("no fixtures — run `npm run seed && npm run export` first")
         raise SystemExit(1)
-    # SCAN for a fixture that still has two live cities at t40 rather than
-    # pinning paths[0]: the control comparison needs a second city, and which
-    # seeds still hold one moves with any trajectory change.
-    sim = None
-    for p in paths:
-        cand = build(rules, str(p))
-        if int(cand.city_alive[0, 0].sum()) >= 2:
-            sim = cand
-            break
-    assert sim is not None, "no fixture has two live cities at t40 — cannot run the control comparison"
+    sim = build(rules, str(paths[0]))
+    assert int(sim.city_alive[0, 0].sum()) >= 2, "build() must leave row 0 with two live cities"
 
     wm_cols = sim.rules_dev.b_farmbonus.nonzero().flatten().tolist()
     assert len(wm_cols) == 1, f"expected exactly one farm-bonus building (the Water Mill), got {wm_cols}"

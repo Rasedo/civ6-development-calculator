@@ -181,14 +181,76 @@ def _spread_targets(sim, seat: int) -> torch.Tensor:
     return out
 
 
+def _settle_targets(sim, seat: int):
+    """([B, N] nearest-foundable tile per SETTLER row, [B, T] foundable plane)
+    — canFoundCity's own terms over the whole map: unowned, settle_ok, bare of
+    district and wonder, >= 4 from every live city (majors and city-states),
+    and under the city cap. The plane feeds the FOUND override (found only
+    where the apply would accept) and the target feeds the walk."""
+    smap, present, tiles, types, charges = _seat_units(sim, seat)
+    B, N = smap.shape
+    dev = sim.device
+    T = sim.T
+    out = torch.full((B, N), -1, dtype=torch.long, device=dev)
+    ok = torch.zeros(B, T, dtype=torch.bool, device=dev)
+    if getattr(sim, "_settler_idx", -1) < 0 or getattr(sim, "_A_FOUND", -1) < 0:
+        return out, ok
+    is_settler = present & (types == sim._settler_idx)
+    under_cap = sim.city_alive[:, seat].sum(dim=1) < int(sim.rules.seats.get("maxCities", 6))
+    if not bool(is_settler.any()) or not bool(under_cap.any()):
+        return out, ok
+    nrow = sim.n_majors
+    ctr = torch.cat((sim.city_center[:, :nrow].reshape(B, -1), sim.citystate_center), dim=1)
+    live = torch.cat((sim.city_alive[:, :nrow].reshape(B, -1), sim.citystate_alive), dim=1)
+    for b in range(B):
+        if not bool(under_cap[b]):
+            continue
+        cb = ctr[b][live[b]]
+        dmin = (sim.pair_dist[:, cb.clamp(min=0)].min(dim=1).values.to(torch.long)
+                if int(live[b].sum()) else torch.full((T,), 999, dtype=torch.long, device=dev))
+        ok[b] = (
+            (sim.tile_seat[b] < 0) & sim.settle_ok[b]
+            & (sim.district[b] < 0) & (sim.built_wonder[b] < 0) & (dmin >= 4)
+        )
+    if not bool(ok.any()):
+        return out, ok
+    arangeT = torch.arange(T, device=dev)
+    for n in range(N):
+        if not bool(present[:, n].any()):
+            break
+        rows = is_settler[:, n]
+        if not bool(rows.any()):
+            continue
+        d = sim.pair_dist[tiles[:, n].clamp(min=0)].to(torch.long)
+        key = torch.where(ok, d * T + arangeT, torch.full_like(d, 2 ** 40))
+        best = key.argmin(dim=1)
+        has = rows & ok.gather(1, best.unsqueeze(1)).squeeze(1)
+        out[:, n] = torch.where(has, best, out[:, n])
+    return out, ok
+
+
 def _seat_unit_orders(sim, seat: int):
     um = sim._seat_unit_mask(seat)
     uo = sim.seat_unit_obs(seat)
     orders0 = ladder.pick_unit_orders(um, uo)
     job_t = _builder_jobs(sim, seat)
     spread_t = _spread_targets(sim, seat)
+    settle_t, found_ok = _settle_targets(sim, seat)
     _smap, present, tiles, _types, _charges = _seat_units(sim, seat)
     on_job = (job_t >= 0) & (tiles == job_t) & present
+    # Rank-0 WALK toward a civilian destination (job, spread or settle
+    # target): the virtual planner extends MOVE rows only, so rank 0 must
+    # itself step or the unit never leaves the city it spawned in.
+    tgt = torch.where(job_t >= 0, job_t, torch.where(spread_t >= 0, spread_t, settle_t))
+    walkers = present & (tgt >= 0) & (tiles != tgt)
+    if bool(walkers.any()):
+        nbr = sim.neigh[tiles.clamp(min=0)]  # [B, N, 6]
+        d_cur = sim.pair_dist[tiles.clamp(min=0), tgt.clamp(min=0)].to(torch.long)
+        d_nb = sim.pair_dist[nbr.clamp(min=0), tgt.clamp(min=0).unsqueeze(2)].to(torch.long)
+        closer = um[:, :, 0:6] & (nbr >= 0) & (d_nb < d_cur.unsqueeze(2))
+        w_key = torch.where(closer, d_nb * 8 + torch.arange(6, device=um.device), torch.full_like(d_nb, 2 ** 30))
+        has_w = walkers & closer.any(dim=2)
+        orders0 = torch.where(has_w, w_key.argmin(dim=2), orders0)
     A_SP = getattr(sim, "_A_SPREAD", -1)
     if A_SP >= 0 and bool((spread_t >= 0).any()):
         d_sp = sim.pair_dist[tiles.clamp(min=0), spread_t.clamp(min=0)].to(torch.long)
@@ -208,7 +270,11 @@ def _seat_unit_orders(sim, seat: int):
     if A_F >= 0 and getattr(sim, "_settler_idx", -1) >= 0:
         is_settler = present & (_types == sim._settler_idx)
         if bool(is_settler.any()) and um.shape[2] > A_F:
-            take_f = is_settler & um[:, :, A_F]
+            # FOUND only where canFoundCity's own terms say yes: the mask
+            # column is type-only and the APPLY validates the spot, so an
+            # unconditional FOUND pins a settler on illegal ground to a
+            # refused verb forever.
+            take_f = is_settler & um[:, :, A_F] & found_ok.gather(1, tiles.clamp(min=0))
             orders0 = torch.where(take_f, torch.full_like(orders0, A_F), orders0)
     if bool(on_job.any()):
         W_u = um.shape[2]
@@ -224,7 +290,7 @@ def _seat_unit_orders(sim, seat: int):
         chosen = torch.where(rep_ok, torch.full_like(orders0, 17), pick_b)
         take_b = on_job & (chosen >= 0)
         orders0 = torch.where(take_b, chosen, orders0)
-    return orders0, job_t, spread_t, um, uo
+    return orders0, job_t, spread_t, settle_t, um, uo
 
 
 def _seat_envoys(sim, seat: int):
@@ -419,8 +485,11 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     if seeds is not None and turn is not None and sim.S > 0:
         env_seq = _seat_envoys(sim, row)
     buy, worship, relig, levy = _decide_buys(sim, row)
-    sim.apply_seat_actions(row, production=prod, tech=tech, civic=civic, war=war, envoys=env_seq,
-                           buy=buy, worship=worship, relig=relig, levy=levy)
+    # production_tile rides along or the drive and its own record diverge: a
+    # district column without its tile is refused at the apply, while the
+    # replay side passes the recorded tile and places it.
+    sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic,
+                           war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy)
 
     # units, and the draw order: the driver PLANS, the PHASE executes.
     # Applying steps pre-step to re-observe would consume combat draws at a
@@ -432,7 +501,7 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     # exactly like the scripted walkers. The phase executes the stash at the
     # walkers' position and RE-VALIDATES every rank: an illegal later step
     # refuses, never substitutes.
-    orders0, job_t, spread_t, um, uo = _seat_unit_orders(sim, row)
+    orders0, job_t, spread_t, settle_t, um, uo = _seat_unit_orders(sim, row)
     B2, N2 = orders0.shape
     ranks = [orders0]
     smap = sim._seat_slot_map(row)
@@ -456,8 +525,8 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
             for n in range(N2):
                 if not bool((smap[:, n] >= 0).any()):
                     break
-                tgt_n, hi, hpc, hrc = sim._war_march_target(cur[:, n].clamp(min=0), row)
-                has = (hi | hpc | hrc)
+                tgt_n, hi, hcty = sim._war_march_target(cur[:, n].clamp(min=0), row)
+                has = hi | hcty
                 tgts[:, n] = torch.where(has, tgt_n, tgts[:, n])
             sim._vplan_wt = {"row": row, "tgts": tgts}
         tgts = sim._vplan_wt["tgts"]
@@ -468,6 +537,7 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
             dest = torch.where(at_war_rows[:, n] & (tgts[:, n] >= 0), tgts[:, n], torch.full_like(tgts[:, n], -1))
             dest = torch.where((dest < 0) & (job_t[:, n] >= 0), job_t[:, n], dest)
             dest = torch.where((dest < 0) & (spread_t[:, n] >= 0), spread_t[:, n], dest)
+            dest = torch.where((dest < 0) & (settle_t[:, n] >= 0), settle_t[:, n], dest)
             ok_rows = rows_mv & (dest >= 0)
             if not bool(ok_rows.any()):
                 continue
@@ -580,8 +650,10 @@ def replay_seat(sim, row: int, rec: dict) -> None:
             # a district column carries its TILE as the pair's third element
             t = int(ent[2]) if len(ent) > 2 else -1
             dtile[:, :, si] = torch.where(hit, torch.full_like(dtile[:, :, si], t), dtile[:, :, si])
-    tech = None if rec["tech"] is None else torch.tensor(rec["tech"], dtype=torch.long, device=dev)
-    civic = None if rec["civic"] is None else torch.tensor(rec["civic"], dtype=torch.long, device=dev)
+    # [B] like the war arm below — a bare torch.tensor(int) is 0-dim and the
+    # record apply gathers on dim 1.
+    tech = None if rec["tech"] is None else torch.full((sim.B,), int(rec["tech"]), dtype=torch.long, device=dev)
+    civic = None if rec["civic"] is None else torch.full((sim.B,), int(rec["civic"]), dtype=torch.long, device=dev)
     _wv = rec.get("war")
     war = None if _wv is None else torch.full((sim.B,), int(_wv), dtype=torch.long, device=dev)
     _ev = rec.get("envoys") or []

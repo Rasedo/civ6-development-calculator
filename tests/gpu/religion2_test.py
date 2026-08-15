@@ -173,6 +173,16 @@ def live_missionaries(sim, r: int) -> list[int]:
     return m.nonzero(as_tuple=True)[0].tolist()
 
 
+def order_relig_buy(sim, r: int, j: int, kind: int = 5) -> None:
+    """Stash the religious-unit faith-buy INTENT on the wire (kind 5 =
+    missionary, 6 = apostle). The engines are decision-free: the buy is an
+    ORDER `_seat_buy_ladder` re-validates, never a choice the phase makes —
+    so every gating poke stashes the intent and asserts the REFUSAL."""
+    sim.seat_ext[0, r + 1] = True
+    sim.apply_seat_actions(r + 1, relig=(torch.full((1,), kind, dtype=torch.long),
+                                         torch.full((1,), j, dtype=torch.long)))
+
+
 # ------------------------------------------------------------------ pokes -----
 def poke_missionary_buy(rules, rj, path):
     """1. A founder with the SHRINE + a complete unpillaged Holy Site + 60 faith
@@ -200,6 +210,7 @@ def poke_missionary_buy(rules, rj, path):
     sim.civilian_at[0, ctr] = -1
 
     base = sim.snapshot()
+    order_relig_buy(sim, r, j)
     sim._seat_phase()
     ms = live_missionaries(sim, r)
     assert len(ms) == 1, f"founder did not buy exactly one missionary (got {len(ms)})"
@@ -214,6 +225,7 @@ def poke_missionary_buy(rules, rj, path):
     sim.restore(base)
     for t in free_tiles(sim, 2):
         place_missionary(sim, r, t, charges=0)
+    order_relig_buy(sim, r, j)  # the same intent, refused at the cap
     sim._seat_phase()
     assert len(live_missionaries(sim, r)) == 2, "cap control must not buy a 3rd missionary"
     faith_nobuy = float(sim.civ_faith[0, r + 1])
@@ -247,6 +259,7 @@ def poke_missionary_pricing(rules, rj, path):
         make_holy_site(s, r, j)
         follow_all(s, r + 1)
         base = s.snapshot()
+        order_relig_buy(s, r, j)
         s._seat_phase()
         ms = live_missionaries(s, r)
         # debit diff vs a cap-filled control (Shrine kept -> identical income)
@@ -254,6 +267,7 @@ def poke_missionary_pricing(rules, rj, path):
         s.restore(base)
         for t in free_tiles(s, 2):
             place_missionary(s, r, t, charges=0)
+        order_relig_buy(s, r, j)
         s._seat_phase()
         debit = float(s.civ_faith[0, r + 1]) - faith_buy
         return ms, debit
@@ -276,6 +290,7 @@ def poke_missionary_pricing(rules, rj, path):
         s2.city_bldg[:, r + 1, :, TEMPLE] = False
     make_holy_site(s2, r, j)
     follow_all(s2, r + 1)
+    order_relig_buy(s2, r, j)
     s2._seat_phase()
     ms2 = live_missionaries(s2, r)
     assert len(ms2) == 1, "SCRIPTURE founder did not buy"
@@ -312,21 +327,25 @@ def poke_missionary_gating(rules, rj, path):
     # cap: two live missionaries -> no third
     s = setup(prefill=2)
     assert len(live_missionaries(s, r)) == 2
+    order_relig_buy(s, r, j)
     s._seat_phase()
     assert len(live_missionaries(s, r)) == 2, "cap breached: a 3rd missionary was bought at cap 2"
 
     # no shrine
     s = setup(with_shrine=False)
+    order_relig_buy(s, r, j)
     s._seat_phase()
     assert len(live_missionaries(s, r)) == 0, "bought a missionary WITHOUT the Shrine"
 
     # incomplete holy site
     s = setup(hs_complete=False)
+    order_relig_buy(s, r, j)
     s._seat_phase()
     assert len(live_missionaries(s, r)) == 0, "bought a missionary on an INCOMPLETE Holy Site"
 
     # pillaged holy site
     s = setup(hs_pillaged=True)
+    order_relig_buy(s, r, j)
     s._seat_phase()
     assert len(live_missionaries(s, r)) == 0, "bought a missionary on a PILLAGED Holy Site"
     print("  3 missionary gating OK (cap 2, no-Shrine, incomplete-HS, pillaged-HS all block)")
@@ -352,7 +371,7 @@ def drive_spread(sim, r: int, u: int, target: int) -> None:
         col = int(sim._A_SPREAD) + 1 + [int(x) for x in sim.neigh[here].tolist()].index(target)
     seq = torch.full((sim.B, int(smap.shape[1]), 1), -1, dtype=torch.long)
     seq[0, row, 0] = col
-    sim.apply_seat_unit_sequence(r, seq)
+    sim.apply_seat_unit_sequence(r + 1, seq)  # the applier takes the ROW
 
 
 def poke_missionary_spread(rules, rj, path):
@@ -365,6 +384,7 @@ def poke_missionary_spread(rules, rj, path):
         r = 0
         g = r + 1
         clear_missionaries(sim, r)
+        sim.civ_religion_done[:, r + 1] = True  # the SPREAD arm's own gate
         if enh_idx is not None:
             sim.civ_enhancer[:, r + 1] = E[enh_idx]
         c = 0

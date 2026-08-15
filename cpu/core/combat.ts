@@ -531,7 +531,11 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   // CIV 6: the CITY defends its own tile, so a lone civilian standing on it
   // never draws the blow.
   if (seatTarget) {
-    if (attacker.seat === seat && !civsAtWar(state, seatTarget.holder.seat, seat)) {
+    // The refusal mirrors seatTarget's own predicate: an alwaysHostile
+    // attacker (barbarians) has no peace to respect, so only a seat that
+    // NEEDS a war to target the city can be refused for lacking one.
+    if (attacker.seat === seat && !capsOf(attacker.seat).alwaysHostile
+        && !civsAtWar(state, seatTarget.holder.seat, seat)) {
       return no(`You are at peace with ${seatTarget.holder.name} — declare war first.`);
     }
     attackCity(state, attacker, seatTarget.holder, seatTarget.city, seat);

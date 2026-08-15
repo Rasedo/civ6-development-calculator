@@ -305,6 +305,9 @@ def poke_exclusive_with(rules, rj, path):
     sim.city_bldg[0, r + 1, j, STA] = False
 
     def queue_col(b):
+        # every engine write to city_bldg bumps _eff_version; a poke must too,
+        # or the buildable cache serves the pre-poke mask
+        sim._eff_version += 1
         return bool(sim.seat_masks(r + 1)["production"][0, j, b])
 
     assert queue_col(STA), "STABLE must be queueable when neither exclusive is owned"
@@ -355,7 +358,14 @@ def poke_worship_buy(rules, rj, path):
 
     base = sim.snapshot()
 
+    def order_worship(s):
+        # the buy is a WIRE intent the ladder re-validates, never a choice the
+        # phase makes — so every branch stashes it and the gates decide
+        s.seat_ext[0, r + 1] = True
+        s.apply_seat_actions(r + 1, worship=torch.full((1,), j, dtype=torch.long))
+
     # run BUY: the worship building is purchased this phase
+    order_worship(sim)
     sim._seat_phase()
     faith_buy = float(sim.civ_faith[0, r + 1])
     bought = bool(sim.city_bldg[0, r + 1, j, wb])
@@ -366,6 +376,7 @@ def poke_worship_buy(rules, rj, path):
     # isolates the flat 114 debit.
     sim.restore(base)
     sim.city_bldg[0, r + 1, j, wb] = True
+    order_worship(sim)
     sim._seat_phase()
     faith_own = float(sim.civ_faith[0, r + 1])
     assert abs((faith_own - faith_buy) - cost) < 1e-6, (
@@ -375,6 +386,7 @@ def poke_worship_buy(rules, rj, path):
     # no Temple -> no buy at all
     sim.restore(base)
     sim.city_bldg[0, r + 1, j, TEMPLE] = False
+    order_worship(sim)
     sim._seat_phase()
     assert not bool(sim.city_bldg[0, r + 1, j, wb]), "a founder WITHOUT the Temple must not buy a worship building"
     print(f"  e worship faith-buy OK (row {wb}=WORSHIP[(r+1)%5], -{cost} faith exact; no-Temple no-buy)")

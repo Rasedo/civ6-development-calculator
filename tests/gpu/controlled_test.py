@@ -70,11 +70,12 @@ def main() -> None:
     units_after = int((sim.major_unit_alive[0] & ((sim.major_unit_seat[0] - 1) == r)).sum())
     assert done and units_after == units_before + 1, "written queue item must complete and spawn through the ordinary machinery"
 
-    # 5. the OTHER civ stays fully scripted (its queue keeps working)
+    # 5. an UNDRIVEN civ stays inert — the engine is decision-free, so a seat
+    #    with no record on the wire never starts a queue of its own.
     other = 1 if sim.n_majors > 2 else 0
     if other != r:
         busy = int((sim.city_current[0, other + 1] >= 0).sum())
-        assert busy > 0, "the scripted civ must keep queueing"
+        assert busy == 0, "an undriven civ queued something — the engine took a decision on its own"
 
     # 6. mask-driven random control runs indefinitely and legally — every
     # sampled action comes from seat_masks and must be honored

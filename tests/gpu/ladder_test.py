@@ -26,6 +26,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent.parent / "
 from core import load_rules, load_fixture, fixture_paths  # noqa: E402
 from core.env import BatchEnv  # noqa: E402
 import ladder  # noqa: E402
+from warmup import settle_all  # noqa: E402
 
 
 def main() -> None:
@@ -33,6 +34,7 @@ def main() -> None:
     p = fixture_paths()[0]
     env = BatchEnv([load_fixture(p)], rules, device="cpu", dtype=torch.float64)
     s = env.sim
+    settle_all(s)  # decide() plays no unit verbs, so the capitals must exist first
     layout = {"cs": s.S, "civs": s.n_majors - 1, "cities": s.RC,
               "techs": s.civ_techs.shape[2], "civics": s.civ_civics.shape[2]}
     # techs/civics appear TWICE: the effective cost per option, then the

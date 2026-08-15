@@ -85,7 +85,16 @@ def main() -> None:
     assert float(sim2.civ_tech_retain[0, other, t_b]) == 0.0, "one seat's parked science must not appear on another's row"
 
     # --- 6) civics run the same body ---------------------------------------
+    # OPEN THE TREE first: a fresh seat has one legal civic (the root), and
+    # nothing completes on its own — completing civics is what widens the mask
+    # to the two picks the switch needs.
     cf = sim2._seat_civic_mask(row)[0].nonzero(as_tuple=True)[0].tolist()
+    for _ in range(4):
+        if len(cf) >= 2:
+            break
+        sim2.civ_civics[0, row, cf[0]] = True
+        cf = sim2._seat_civic_mask(row)[0].nonzero(as_tuple=True)[0].tolist()
+    assert len(cf) >= 2, "the civic tree never offered two picks"
     c_a, c_b = cf[0], cf[1]
     sim2._select_research(row, torch.full((sim2.B,), c_a, dtype=torch.long), ok, is_civic=True)
     sim2.civ_civic_prog[:, row] = 7.0

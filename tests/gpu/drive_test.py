@@ -24,7 +24,6 @@ import drive
 
 
 TURNS = 120
-WARMUP = 10
 
 
 def seat_state(sim, row=1):
@@ -40,58 +39,39 @@ def main() -> None:
     rules = load_rules()
     path = fixture_paths()[0]
 
-    # the scripted transcription, for reference
-    a = BatchEnv([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
-    for _ in range(WARMUP + TURNS):
-        a.sim.step()
-    ref = seat_state(a.sim)
-
-    # the same seat, driven by the ladder from WARMUP onward
+    # Driven from t0: the seat starts as a settler and a warrior, and the
+    # engine takes no decision of its own — every city, tech and unit below is
+    # the driver's doing, so the floors are ABSOLUTE (there is no scripted
+    # reference to compare against; an undriven seat stays at 0/2/0/0 forever).
     b = BatchEnv([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
-    for _ in range(WARMUP):
-        b.sim.step()
     log = drive.drive(b, TURNS, seats=[1])
     got = seat_state(b.sim)
 
     assert len(log) == TURNS, f"driver logged {len(log)} turns, expected {TURNS}"
     assert bool(b.sim.seat_ext[0, 1]), "the driven seat must be marked controlled"
-    print(f"  scripted: {ref}")
     print(f"  ladder  : {got}")
 
-    # 1. the seat SURVIVED and kept its cities — a driver that holds every turn
-    #    still passes a smoke test, so assert the civ is actually alive.
-    assert got["cities"] >= 1, "the ladder-driven civ lost every city"
+    # 1. it FOUNDED — the driver must play the settler's one verb, over the
+    #    real order path, or the seat never enters the game at all.
+    assert got["cities"] >= 1, "the driver never founded a city from the starting settler"
 
-    # 2. it RESEARCHED. The research verb is mask-gated and ported; a driven seat
-    #    that never picks would sit at its warm-up tech count forever.
-    assert got["techs"] >= ref["techs"] - 2, (
-        f"driven seat fell behind on tech ({got['techs']} vs scripted {ref['techs']}) "
-        "— the research verb is not being applied"
-    )
+    # 2. it RESEARCHED. The research verb is mask-gated and ported; a driven
+    #    seat that never picks holds 0 techs forever.
+    assert got["techs"] >= 8, f"only {got['techs']} techs in {TURNS} turns — the research verb is not being applied"
+    assert got["civics"] >= 6, f"only {got['civics']} civics in {TURNS} turns — the civic verb is not being applied"
 
-    # 3. it BUILT things. Production carries the most machinery of any verb; if
-    #    the driven seat fields no units at all, the preference apply or the
-    #    mask is refusing everything.
-    assert got["units"] >= 1, "the driven seat fielded no units at all"
+    # 3. it BUILT things. Production carries the most machinery of any verb; a
+    #    driven seat still holding only its two starting units means the
+    #    preference apply or the mask is refusing everything.
+    assert got["units"] >= 3, f"the driven seat fielded no units beyond its start ({got['units']})"
+    print(f"  {TURNS} turns driven by policy/ladder.py from the settler start OK")
 
-    # 4. it is COMPETITIVE with the scripted picker. Not identical — the two
-    #    disagree on a few production decisions, so the trajectories legitimately
-    #    diverge — but a driven civ that ends with a third of the scripted one's
-    #    cities means a verb is silently refusing.
-    assert got["cities"] >= max(1, ref["cities"] - 2), (
-        f"driven civ has {got['cities']} cities against the scripted {ref['cities']} "
-        "— check the settler column and #87's preference apply"
-    )
-    print(f"  {TURNS} turns driven by policy/ladder.py, seat competitive with the script OK")
-
-    # 5. THE FILE IS THE INTERFACE. Replaying the recorded actions — with no
+    # 4. THE FILE IS THE INTERFACE. Replaying the recorded actions — with no
     #    ladder and no picker — must reproduce the run EXACTLY, which is what
     #    makes the log a COMPLETE record of the decisions: if a replay had to ask
     #    the ladder anything, no other engine could reproduce the trajectory
     #    from the file.
     c = BatchEnv([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
-    for _ in range(WARMUP):
-        c.sim.step()
     drive.replay(c, log, seats=[1])
     rep = seat_state(c.sim)
     assert rep == got, f"replay diverged from the driven run: {rep} vs {got}"

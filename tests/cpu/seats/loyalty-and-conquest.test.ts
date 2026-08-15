@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeCityStats } from '../../../cpu/core/city';
-import { BARB_SEAT, cityStateOfSeat, emptySeat, isCityStateSeat, isCiv, seatOf, seatOfCityState, setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
+import { BARB_SEAT, cityStateOfSeat, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
 import { makeState, makeMap, tileAtCoords } from '../helpers';
 import { foundCity, endTurn } from '../../../cpu/core/game';
 import { tilesWithin } from '../../../world/hex';
@@ -113,27 +113,12 @@ describe('civ tile economies', () => {
       seatPhase(rich);
       seatPhase(poor);
     }
-    // A productive civ converts POPULATION into CITIES, and each settler costs
-    // its city a pop — so one city's count is NOT a growth proxy. Sum the
-    // empire, which is what "grows faster" means.
+    // GROWTH is the decision-free half of the economy: food banks into the
+    // box and pops arrive with no record on the wire. Queues, settlers and
+    // districts are ORDERS, so an undriven empire fields none — pop is the
+    // observable that separates the two sites.
     const totalPop = (r: Seat) => r.cities.reduce((n, civCity) => n + civCity.population, 0);
-    expect(a.cities.length).toBeGreaterThan(b.cities.length);
     expect(totalPop(a)).toBeGreaterThan(totalPop(b));
-    // Production output is queue COMPLETIONS — richer land fields
-    // more (units + cities + in-flight progress), not a bigger stock.
-    // Districts/buildings are completions too (rough catalog costs).
-    const output = (st: GameState, r: Seat) =>
-      st.units.filter((u) => isCiv(u.seat) && u.seat === r.seat).length * 40 +
-      (r.cities.length - 1) * 90 +
-      r.cities.reduce(
-        (n, civCity) =>
-          n +
-          (civCity.queue[0]?.progress ?? 0) +
-          civCity.districts.filter((d) => d.type !== 'CITY_CENTER').length * 54 +
-          civCity.buildings.length * 60,
-        0,
-      );
-    expect(output(rich, a)).toBeGreaterThan(output(poor, b));
   });
 });
 
@@ -160,14 +145,16 @@ describe('barbarians vs the other civs', () => {
     expect(defender.hp < 100 || !state.units.includes(defender)).toBe(true);
   });
 
-  it('civ units strike back at adjacent barbarians in peacetime', () => {
+  it('civ units can strike adjacent barbarians in peacetime', () => {
     const state = makeState();
     state.unitsMode = true;
     const civ = addCiv(state, 8, 8);
     const guard = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 4, 4).index, civ.seat)!;
     const barb = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 4, 5).index, BARB_SEAT)!;
+    // the mask offers the barb in peacetime; the STRIKE is an order — the
+    // engine takes no decision of its own, so the test issues it
     expect(attackTargets(state, guard)).toContain(barb.tileIndex);
-    seatPhase(state);
+    expect(meleeAttack(state, guard.id, barb.tileIndex, civ.seat).ok).toBe(true);
     expect(barb.hp < 100 || !state.units.includes(barb)).toBe(true);
   });
 });

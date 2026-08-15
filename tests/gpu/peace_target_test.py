@@ -70,6 +70,11 @@ def run(ranged: bool) -> None:
     sim = build()
     civ_tile, pl_tile = scenario(sim)
     v = place(sim, civ_tile, seat=1)  # the absolute seat of civ 0
+    if ranged:
+        # the resolver refuses a 0-ranged-strength attacker, so the ranged leg
+        # needs a real ranged type
+        sim.major_unit_type[0, v] = next(
+            i for i in range(sim.NU) if float(sim._type_ranged_strength[i]) > 0)
     p = place(sim, pl_tile, seat=0)
 
     # civ 0 is AT PEACE with seat 0, and AT WAR with civ 1.
@@ -85,7 +90,9 @@ def run(ranged: bool) -> None:
     att[0] = True
     tgt = torch.full((sim.B,), pl_tile, dtype=torch.long)
     if ranged:
-        sim._hostile_ranged_strike(att, tgt, "major", v)
+        # rangedAttack is the major-vs-major resolver; hostileRangedStrike
+        # scopes majors' units out entirely (its barb/CS arm)
+        sim._ranged_attack(att, tgt, "major", v, 1)
     else:
         sim._hostile_vs_unit(att, tgt, "major", v)
     after = int(sim.major_unit_hp[0, p])
@@ -101,7 +108,7 @@ def run(ranged: bool) -> None:
     sim.war[0, 0, 1 + 0] = sim.war[0, 1 + 0, 0] = True
     sim.sync_war()  # close the poke under transpose
     if ranged:
-        sim._hostile_ranged_strike(att, tgt, "major", v)
+        sim._ranged_attack(att, tgt, "major", v, 1)
     else:
         sim._hostile_vs_unit(att, tgt, "major", v)
     at_war = int(sim.major_unit_hp[0, p])

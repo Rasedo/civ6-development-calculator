@@ -16,7 +16,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
 from core.engine import BARB_SEAT  # seat-keyed occupancy
-from warmup import settle_all
+from warmup import developed, settle_all
 
 
 def main() -> None:
@@ -75,15 +75,12 @@ def main() -> None:
     assert int(sim.civilian_at[0, t]) == slot + sim.POOL_LO["major"], "civilian_at not in snapshot"
     assert int(sim.major_unit_charges[0, slot]) == 3, "major_unit_charges not in snapshot"
 
-    # builders arise organically — the plane must be POPULATED somewhere in a
-    # 70-turn run, and every alive civilian slot must be indexed by it
-    # (plane/slot coherence).
-    sim2 = settle_all(BatchSim([load_fixture(paths[1])], rules, device="cpu", dtype=torch.float64))
-    seen = False
-    for _ in range(70):
-        sim2.step()
-        seen = seen or bool((sim2.civilian_at >= 0).any())
-    assert seen, "no civ builder ever existed in 70 turns (B5b broken?)"
+    # builders arise organically from DRIVEN production (bare steps queue
+    # nothing) — the plane must be POPULATED, and every alive civilian slot
+    # must be indexed by it (plane/slot coherence).
+    sim2 = developed(rules, paths[1], turns=40)
+    seen = bool((sim2.civilian_at >= 0).any())
+    assert seen, "no civ builder exists after a 40-turn driven run (B5b broken?)"
     b2 = sim2._builder_idx
     for u in range(int(sim2.unit_next[0])):
         if bool(sim2.major_unit_alive[0, u]) and int(sim2.major_unit_type[0, u]) == b2:

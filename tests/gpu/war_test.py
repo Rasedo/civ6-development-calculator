@@ -81,6 +81,7 @@ def test_declare(rules, path):
     sim.restore(snap)
     sim.war[:, 0, 1 + 0] = sim.war[:, 1 + 0, 0] = True
     sim._reset_war_clock(0, 1, torch.ones(sim.B, dtype=torch.bool))
+    sim.civ_warmonger[:, 0] += sim._wm_dow  # declareWar's grievance stamp on the declarer
     sim.step()
     d = drift(sim, after)
     assert not d, f"declare != poked declareWar + plain step: {d}"
@@ -95,7 +96,7 @@ def test_peace(rules, path):
     sim._apply_war_column(0, war_vec(sim, 0))  # declare on civ 0
     sim.step()
     rr = sim.rules.seats
-    need = int(rr.get("peaceMinWarTurns", 8))
+    need = int(rr.get("warMinTurns", 10))  # sueForPeace's own gate key
     for _ in range(need):
         sim.civ_treasury[:, 0] = 0.0  # isolate the warTurns gate (a rich-enough world opens the gold gate mid-wait)
         assert not bool(sim._seat_war_mask(0)[0, sim.n_majors - 1]), "peace column open too soon"
@@ -116,6 +117,7 @@ def test_peace(rules, path):
     sim.civ_treasury[:, 0] -= cost  # IN PLACE — treasury is a view of civ_treasury
     sim.war[:, 0, 1 + 0] = sim.war[:, 1 + 0, 0] = False
     sim._reset_war_clock(0, 1, torch.ones(sim.B, dtype=torch.bool))
+    sim.peace_turns[:, 0] = 0  # the treaty restarts BOTH parties' peace clocks
     sim.peace_turns[:, 1 + 0] = 0
     sim.step()
     d = drift(sim, after)
@@ -174,6 +176,7 @@ def _melee_slot(sim):
     for p_ in range(int(sim.unit_next.max())):
         if (
             bool(sim.major_unit_alive[0, p_])
+            and int(sim.major_unit_seat[0, p_]) == 0  # the pool holds EVERY major's units
             and float(sim._type_combat[sim.major_unit_type[0, p_]]) > 0
             and float(sim._type_ranged_strength[sim.major_unit_type[0, p_]]) == 0
         ):
@@ -234,8 +237,11 @@ def test_cs_siege(rules, path):
         assert bool(sim.major_unit_alive[0, p_]), "spawn failed"
     act = _place_next_to(sim, p_, ctr)
     assert act is not None, "no free tile adjacent to the CS center"
-    ua = torch.full((1, sim.major_unit_alive.shape[1]), -1, dtype=torch.long)
-    ua[0, p_] = act
+    # orders are RANKED over the seat's slot map, not raw pool slots
+    sim.seat_ext[0, 0] = True
+    smap = sim._seat_slot_map(0)[0]
+    ua = torch.full((1, smap.shape[0]), -1, dtype=torch.long)
+    ua[0, int((smap == p_).nonzero(as_tuple=True)[0][0])] = act
     hp0, tile0 = int(sim.citystate_hp[0, s]), int(sim.major_unit_tile[0, p_])
     sim._apply_seat_unit_actions(0, ua)
     sim.step()
@@ -260,8 +266,9 @@ def test_cs_siege(rules, path):
         assert p_ is not None
     act = _place_next_to(sim, p_, ctr)
     assert act is not None
-    ua = torch.full((1, sim.major_unit_alive.shape[1]), -1, dtype=torch.long)
-    ua[0, p_] = act
+    smap = sim._seat_slot_map(0)[0]
+    ua = torch.full((1, smap.shape[0]), -1, dtype=torch.long)
+    ua[0, int((smap == p_).nonzero(as_tuple=True)[0][0])] = act
     pop_before = int(sim.citystate_pop[0, s])
     ncity0 = int(sim.city_alive[0, 0].sum())
     sim._apply_seat_unit_actions(0, ua)

@@ -4,7 +4,8 @@
     python gpu/battery.py --no-bail    # keep every lane running past a failure
 
 Stage 0 is serial because everything below depends on it: the TS and Python
-static gates, then the world seed, the fixture export and its staleness lock.
+static gates, the seeder-drift check against the committed worlds.lock, then
+the world seed and the fixture export.
 Two lanes then run concurrently:
 
     vitest + serve : the TS suite, then the decision-server gate
@@ -146,9 +147,14 @@ def main() -> int:
         # or hang deep inside a lane instead of an import error.
         ("f821", [str(ruff), "check", "--select", "F821", "gpu", "policy", "tools"]),
         ("pyright", [npx, "pyright"]),
+        # The lock check runs BEFORE seed: `seed` rewrites worlds.lock, so a
+        # check placed after it diffs a generation against itself and can
+        # never fail. Checked first, it diffs against the COMMITTED baseline —
+        # seeder drift fails here, and re-baselining is an explicit
+        # `npm run seed` + commit, never a battery side effect.
+        ("lock", [npm, "run", "seed:check"]),
         ("seed", [npm, "run", "seed"]),
         ("export", [npm, "run", "export"]),
-        ("lock", [npm, "run", "seed:check"]),
     ):
         run(name, cmd, threads=24)
         if failed.is_set():

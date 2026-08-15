@@ -499,8 +499,7 @@ def main() -> None:
     print("seat-0 grievances OK — _MUTABLE, decay, floor")
 
     # --- DIPLOMATIC FAVOR ----------------------------------------------------
-    for _f in ("diplo_favor", "civ_only_diplo_favor"):
-        assert _round_trips(_f, _MUT2), f"{_f} must round-trip through _MUTABLE"
+    assert _round_trips("civ_diplo_favor", _MUT2), "civ_diplo_favor must round-trip through _MUTABLE"
     s4 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     assert s4._favor_per_suz == 1, f"GS pays 1 favor per suzerainty, got {s4._favor_per_suz}"
     # the suzerain tests: >= suzerainEnvoys AND strictly more than every civ seat
@@ -531,7 +530,7 @@ def main() -> None:
     print("diplomatic favor OK — suzerain contest, tie rule, tier+suz accrual, _MUTABLE")
 
     # --- the WORLD CONGRESS + the DIPLOMATIC victory -------------------------
-    for _f in ("congress_sessions", "diplo_points", "civ_only_diplo_points"):
+    for _f in ("congress_sessions", "civ_diplo_points"):
         assert _round_trips(_f, _MUT2), f"{_f} must round-trip through _MUTABLE"
     s6 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     assert s6._congress_interval == 30, f"GS convenes every 30 turns, got {s6._congress_interval}"

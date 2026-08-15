@@ -100,6 +100,9 @@ def main() -> None:
         t = int(cand[0])
         sim.district[0, t] = spec_idx
         sim.district_complete[0, t] = True
+        # specialtyDistricts is a REGISTRY read (`city_dist_tile`), never a
+        # tile scan — the poke must write both, as a real placement does.
+        sim.city_dist_tile[0, 0, 0, spec_idx] = t
         sim._eff_version += 1
         sim._seat_route_cache = None
         inc = sim._seat_route_income(1)

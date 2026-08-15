@@ -655,10 +655,9 @@ per fix.
 
 ## The battery's open reds
 
-The first full battery since the freeze left 22 lanes red out of 56. They
-are three families, and only the first is a parity question.
+ONE lane is red, and it is chapter A's one member.
 
-**1. THE SERVE GATE, turn 1, every seed.** Two digest groups split:
+**THE SERVE GATE, turn 1, every seed** (A-34r). Two digest groups split:
 `seat.milli` and `tile.exact`. Turn 1 means the divergence is in the
 OPENING, which is exactly the regime the settler-start fix just made
 reachable for the first time; read it before assuming any older backlog
@@ -673,51 +672,36 @@ seed and read it field by field; no bisect is needed. `tile.exact` differs
 per seed, so that half carries real per-world data and needs the gate to
 name a tile.
 
-**2. THE WORLD NO LONGER DEVELOPS ON ITS OWN, and ~12 pokes assume it does.**
-Both engines are decision-free without a record, so `sim.step()` founds
-nothing, queues nothing and researches nothing; `settle_all` gives each seat
-its capital and no more. Every lane below builds a world by stepping and then
-looks for something only a DECIDING seat produces:
+**HOW TO READ A POKE RED, from the two rounds that cleared the other 21.**
+Of 21 lanes, NONE was a mechanic bug on a live path. The recurring shapes,
+each of which reads exactly like an engine red until checked:
 
-  - `relics` — "no fixture reaches a civ with two cities"
-  - `occupancy` — "no civ builder ever existed in 70 turns"
-  - `controlled` — "the scripted civ must keep queueing"
-  - `culture_victory`, `encampment` (the strike), `district_wire`,
-    `geopolitics`, `religion2`, `war`, `research_switch`, `peace_target`,
-    `districts`, `ladder`, `drive`
+  - **The auto-decision premise.** The engines are decision-free: a buy, a
+    strike, a queue pick or a spread is an ORDER the applier re-validates,
+    never something `_seat_phase` chooses. A lane that steps and waits is
+    waiting for nothing — stash the intent (`apply_seat_actions`, the
+    order helpers in `tests/gpu/warmup.py`) and assert the validation.
+  - **The registry confound.** Districts are read off the city REGISTRY
+    (`city_dist_tile`), never the tile plane; a scene must write both, as a
+    real completion does. Third and fourth instances: `trade2`'s specialty
+    count, `encampment`'s strike.
+  - **The stale index space.** Appliers take the ROW and RANKED orders over
+    `_seat_slot_map`; a test speaking the dead civ-index or raw pool-slot
+    convention lands its orders on the wrong seat or the wrong unit and
+    no-ops (`seat_verbs`, `religion2`'s spread, `war`'s CS siege).
+  - **The wrong resolver.** `_hostile_ranged_strike` scopes out
+    major-vs-major by design; that pairing is `_ranged_attack`'s.
+  - **A stale cache under a poke.** Writes that the engine always pairs
+    with `_eff_version += 1` must be paired in a poke too, or the mask
+    serves the pre-poke world (`districts`' exclusiveWith).
 
-The TS suite has the same family, and it is NOT new — `vitest`'s
-`tests/cpu/seats/loyalty-and-conquest.test.ts` fails three cases ("good land
-grows the other civs faster than tundra", "barbarians attack civ units and
-sack civ cities", "civ units strike back at adjacent barbarians in
-peacetime") at the round's BASE commit too. They were only ever hidden
-behind two other red files in the battery's 15-line tail: fix the first
-failing vitest file and the next one appears. Read that as a warning about
-the tail, not just about these lanes.
-
-`drive_test` is the clearest statement of the problem: it compares a driven
-seat against a "scripted transcription, for reference" that is now a seat
-which does nothing at all, so its competitiveness assertions compare against
-zero. Each of these lanes needs a DRIVEN warm-up (the ladder, as `drive_test`
-already does) rather than a bare step loop — or an explicit poke that puts
-the state it needs on the planes. That is a per-lane decision about what the
-lane is actually for, not a codemod.
-
-**3. MECHANIC REDS the empty world was hiding.** These only became visible
-once the pokes had a city to poke:
-
-  - `trade2` — a route to a destination with one specialty district pays 3
-    gold where the rule is 3+1.
-  - `seat_verbs` — resource improvement column 18 dispatches to nothing
-    (`improvement` stays -1). A whole build verb is dead.
-
-**A NOTE ON FAMILY 2 AND 3, learned while triaging them.** Three of the reds
-above were NOT the engine. `cs_bonus` reported the 3-envoy building bonus
-firing without the building, and the pillaged Campus still paying — both were
-its own controls, which stepped 1 -> 3 envoys and so crossed the SUZERAIN
-threshold at the same time, whose flat capital yield pays into the same
-channel and answers to no building. Its pillage lane also wrote the district
-onto the TILE plane only, where the yield walk reads the city REGISTRY, so it
-built a Campus no city owned and nothing could go dark. A control that moves
-two things at once measures neither; read every remaining lane above for the
-same shape before believing it names a mechanic.
+The round's REAL finds, all off the driven path the warm-up opened:
+`replay_seat` shipped 0-dim tech/civic tensors, `_decide_turn` dropped the
+district tile from its own apply (drive and its own record diverged), the
+virtual planner unpacked a signature `_war_march_target` no longer has, the
+driver ordered FOUND unconditionally so a settler off legal ground burned
+every turn on a refused verb (no settle targets existed at all), an f32 sim
+crashed on three f64 tensor-index writes, and TS's `meleeAttackInner`
+refused a barbarian at a city for "peace" its own targeting predicate had
+already waived — the GPU sacks, so the two engines answered differently
+until the TS fix.

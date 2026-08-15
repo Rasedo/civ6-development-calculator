@@ -13,6 +13,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "policy"))
 from core import BatchEnv, load_rules, load_fixture, fixture_paths
+from warmup import settle_all
 
 
 def main() -> None:
@@ -69,6 +70,7 @@ def main() -> None:
     from core.env import BatchEnv as _BE
     e2 = _BE([load_fixture(fixture_paths()[0])], rules, device="cpu", dtype=torch.float64)
     s2 = e2.sim
+    settle_all(s2)  # the city block renders LIVING cities — an unsettled world has none
     for _ in range(60):
         s2.step()
     # read the block widths from the ONE layout definition — a literal here

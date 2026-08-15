@@ -23,7 +23,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
 from core.engine import _MUTABLE
-from warmup import settle_all
+from warmup import plant_city, settle_all
 
 
 def main() -> None:
@@ -139,41 +139,27 @@ def main() -> None:
     s4 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     for nm in ("city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts"):
         assert nm in s4._CITY_SLOT_FIELDS, f"{nm} missing from _CITY_SLOT_FIELDS — compaction drops it"
-    # SCAN for a civ holding two cities rather than assuming fixture 0 does —
-    # a poke that silently skips proves nothing. Civs start on a single
-    # capital, so STEP until one has settled a second city; checking at t0
-    # finds nothing and would skip the case entirely.
-    civ_only_pick = -1
-    for p in paths[:4]:
-        s4 = settle_all(BatchSim([load_fixture(p)], rules, device="cpu", dtype=torch.float64))
-        for _ in range(60):
-            s4.step()
-            for r in range(s4.n_majors - 1):
-                if int(s4.city_alive[0, r + 1].sum()) >= 2:
-                    civ_only_pick = r
-                    break
-            if civ_only_pick >= 0:
-                break
-        if civ_only_pick >= 0:
-            break
-    assert civ_only_pick >= 0, "no fixture reaches a civ with two cities — cannot exercise compaction"
-    if True:
-        live = s4.city_alive[0, civ_only_pick + 1].nonzero().flatten().tolist()
-        lo, hi = live[0], live[1]
-        s4.city_relics[0, civ_only_pick + 1, hi] = 5
-        s4.city_gw_art[0, civ_only_pick + 1, hi] = 4
-        keep_id = int(s4.city_id[0, civ_only_pick + 1, hi])
-        s4.city_alive[0, civ_only_pick + 1, lo] = False  # kill the lower slot -> `hi` compacts down
-        s4._reclaim_cities()
-        where = (s4.city_alive[0, civ_only_pick + 1] & (s4.city_id[0, civ_only_pick + 1] == keep_id)).nonzero().flatten()
-        assert len(where) == 1, "the surviving city vanished from the registry"
-        k = int(where[0])
-        assert int(s4.city_relics[0, civ_only_pick + 1, k]) == 5, (
-            f"the relic must follow its city through compaction (slot {hi}->{k}), "
-            f"got {int(s4.city_relics[0, civ_only_pick + 1, k])}"
-        )
-        assert int(s4.city_gw_art[0, civ_only_pick + 1, k]) == 4, "art must follow its city through compaction"
-        print("  #79b all four work planes ride the slot compaction OK")
+    # A civ holding two cities, through the engine's own FOUND verb — no seed
+    # gamble, no bare stepping (a stepped world never develops on its own).
+    row = 1
+    plant_city(s4, row)
+    live = s4.city_alive[0, row].nonzero().flatten().tolist()
+    assert len(live) >= 2, "plant_city must leave the row with two cities"
+    lo, hi = live[0], live[1]
+    s4.city_relics[0, row, hi] = 5
+    s4.city_gw_art[0, row, hi] = 4
+    keep_id = int(s4.city_id[0, row, hi])
+    s4.city_alive[0, row, lo] = False  # kill the lower slot -> `hi` compacts down
+    s4._reclaim_cities()
+    where = (s4.city_alive[0, row] & (s4.city_id[0, row] == keep_id)).nonzero().flatten()
+    assert len(where) == 1, "the surviving city vanished from the registry"
+    k = int(where[0])
+    assert int(s4.city_relics[0, row, k]) == 5, (
+        f"the relic must follow its city through compaction (slot {hi}->{k}), "
+        f"got {int(s4.city_relics[0, row, k])}"
+    )
+    assert int(s4.city_gw_art[0, row, k]) == 4, "art must follow its city through compaction"
+    print("  #79b all four work planes ride the slot compaction OK")
 
     print("relics OK — constants, placement, dead-city masking, tourism term, _MUTABLE, #79 transfer+compaction")
 

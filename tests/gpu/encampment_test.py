@@ -105,6 +105,9 @@ def build_strike_scene(rules, path):
     enc_tile = int(owned[0])
     sim.district[0, enc_tile] = sim._encamp_didx
     sim.district_complete[0, enc_tile] = True
+    # the strike walks the city's own REGISTRY (`city_dist_tile`), not the
+    # tile plane — a hand-built scene must write both, like a real completion
+    sim.city_dist_tile[0, 0, 0, sim._encamp_didx] = enc_tile
     # A completed Encampment musters its garrison, and the strike requires a
     # LIVE one (an Encampment at 0 HP is occupied and fires nothing). The
     # engine writes this at every completion site; a hand-built scene has to

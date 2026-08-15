@@ -61,8 +61,8 @@ def main() -> None:
         """Drive _culture_victor directly on planted totals. tour/cul are
         per-unified-civ lists (index 0 = seat 0)."""
         s = _sim(1)
-        s.tourism_total = torch.tensor([tour[0]], dtype=s.civ_tourism[:, 0].dtype)
-        s.culture_total = torch.tensor([cul[0]], dtype=s.civ_culture[:, 0].dtype)
+        s.civ_tourism[:, 0] = tour[0]
+        s.civ_culture[:, 0] = cul[0]
         for row in range(1, s.n_majors):
             s.civ_tourism[:, row] = tour[row]
             s.civ_culture[:, row] = cul[row]

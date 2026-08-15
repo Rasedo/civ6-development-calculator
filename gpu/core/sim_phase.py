@@ -238,7 +238,10 @@ class SimPhase:
         upd = act & others
         nxt = torch.where(upd, (loy + delta).clamp(min=0, max=lmax), loy)
         cap = self.city_is_cap[bidx, row, col]
-        self.city_loyalty[bidx, row, col] = torch.where(upd & cap, torch.full_like(nxt, lmax), nxt)
+        # f64 intermediates, stored at the PLANE's dtype (an f32 sim keeps an
+        # f32 loyalty plane).
+        self.city_loyalty[bidx, row, col] = torch.where(
+            upd & cap, torch.full_like(nxt, lmax), nxt).to(self.city_loyalty.dtype)
         return upd & ~cap & (self.city_loyalty[bidx, row, col] <= 0)
 
     def _seat_loyalty_flips(self, row: int, flip: torch.Tensor) -> None:
@@ -282,7 +285,8 @@ class SimPhase:
         grow = act & (box >= need)
         starve = act & ~grow & (box < 0)
         nxt = torch.where(grow, box - need, torch.where(starve, torch.zeros_like(box), box))
-        self.city_growth[bidx, row, col] = torch.where(act, nxt, old)
+        # f64 intermediates, stored at the PLANE's dtype (see _seat_city_loyalty)
+        self.city_growth[bidx, row, col] = torch.where(act, nxt, old).to(old.dtype)
         pop = self.city_pop[bidx, row, col] + grow.long()
         self.city_pop[bidx, row, col] = torch.where(starve, (pop - 1).clamp(min=1), pop)
 
@@ -318,7 +322,8 @@ class SimPhase:
         # phase.ts spends the bank right after the production add.
         prog = self.city_progress[bidx, row, col]
         bank = self.city_prod_bank[bidx, row, col]
-        self.city_progress[bidx, row, col] = torch.where(has_q, prog + prod + bank, prog)
+        # f64 intermediates, stored at the PLANE's dtype (see _seat_city_loyalty)
+        self.city_progress[bidx, row, col] = torch.where(has_q, prog + prod + bank, prog).to(prog.dtype)
         self.city_prod_bank[bidx, row, col] = torch.where(has_q, torch.zeros_like(bank), bank)
         cost = self.city_cost[bidx, row, col].clone()
         done = has_q & (self.city_progress[bidx, row, col] >= cost)

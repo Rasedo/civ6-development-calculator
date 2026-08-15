@@ -38,6 +38,14 @@ import ladder  # noqa: E402
 
 def build(rules, path, turns=25):
     sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+    # Unlock the scaffold for every row: districts gate on techs/civics and an
+    # undriven world researches nothing — the TILE WIRE, not the unlock, is
+    # what this lane proves.
+    for _di, ut, uc, _plc in sim._scaffold:
+        if ut >= 0:
+            sim.civ_techs[:, :, ut] = True
+        if uc >= 0:
+            sim.civ_civics[:, :, uc] = True
     for _ in range(turns):
         sim.step()
     return sim
