@@ -363,20 +363,16 @@ XP_DEFEND = 2
 XP_LEVEL_CS = 5
 XP_LEVELS = (15, 45, 90)
 
-# --- one civ-id space --------------------------------------------------------
-# Seat 0 is civ 0; the civ at fixture array index r (== the TS civ.id, asserted
-# at export) is civ r+1. City-states and barbarians stay outside the numbering.
-# The plane families still carry the split: the [B, C] city tensors ARE civ 0's
-# seat, and a civ plane's dim-1 index r means civ r+1. NB: the `_type_civilian` unit
-# tensor means "unit type is CIVILIAN" and is unrelated.
+# --- ONE INDEX SPACE ---------------------------------------------------------
+# A fixture's `civs[]` is SEAT-KEYED — the exporter writes `state.seats` in seat
+# order, seat 0 among them, each entry carrying its own absolute `seat` — and
+# that id IS the entry's row in every merged plane. City-states (100+) and
+# barbarians (200) stay outside the major numbering. There is no second index
+# space: the `r + 1` / `c - 1` conversion helpers that used to live here had no
+# caller left once every signature took the row, and went with it.
+# NB: the `_type_civilian` unit tensor means "unit type is CIVILIAN" and is
+# unrelated to any of this.
 
-
-def seat_of_index(r: int) -> int:
-    return r + 1
-
-
-def index_of_seat(c: int) -> int:
-    return c - 1
 M32 = 0xFFFFFFFF
 
 _PAIR_DIST_CACHE: dict[tuple[int, int], torch.Tensor] = {}

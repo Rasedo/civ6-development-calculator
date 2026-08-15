@@ -49,8 +49,10 @@ READERS = ("gpu", "policy", "tests/gpu", "tools/gpu")
 # exists, and the only acceptable reasons are the wire's own limits.
 # ---------------------------------------------------------------------------
 FORK_ALLOW = {
-    # --- PERMANENT: the two index spaces have to meet somewhere ------------
-    ("simbase.py", "seat_of_index"): "the row->seat map itself",
+    # No PERMANENT entry any more. The row->seat map used to sit here on the
+    # grounds that two index spaces have to meet somewhere; they do not, and
+    # its two helpers had no caller at all — an exemption that would have
+    # pre-forgiven every future fork landing in a dead function.
     # --- WIRE LIMITS, named ------------------------------------------------
     ("serve_gate.py", "run_batched"): "#108 — the wire's seat-0 RECORD SCHEMA (production pairs, unit triples)",
     ("serve_gate.py", "main"): "#108 — the wire's seat-0 RECORD SCHEMA, the single-seed twin",
