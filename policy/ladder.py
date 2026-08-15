@@ -239,6 +239,25 @@ def _best_in_lane(cand: torch.Tensor, strength: torch.Tensor) -> torch.Tensor:
     return torch.where(cand, key, torch.full_like(key, -(10 ** 9))).argmax(dim=1)
 
 
+def pick_district_tile(elig: torch.Tensor, adj: torch.Tensor) -> torch.Tensor:
+    """[B] WHERE to put a district: the eligible tile with the highest
+    adjacency, ties to the LOWEST tile index. -1 where nothing is eligible.
+
+    This is the placement CHOICE, and it lives here rather than in either
+    engine: both used to run a scan of their own and had to agree forever.
+    Now the policy picks, the record carries the tile, and the engines only
+    re-validate it.
+
+    `key = adj*T - idx` then argmax reproduces the TS scan's strict `>` (first
+    wins over tile order) without depending on argmax's undefined tie-break.
+    """
+    T = elig.shape[1]
+    ar = torch.arange(T, device=elig.device, dtype=adj.dtype)
+    key = torch.where(elig, adj * T - ar, torch.full_like(adj, -1e18))
+    best = key.argmax(dim=1)
+    return torch.where(elig.any(dim=1), best, torch.full_like(best, -1))
+
+
 def prod_classes(NB: int, NU: int, n_scaffold: int, n_wonder: int = 0, n_project: int = 0) -> dict:
     ub = NB + 2
     w_lo = ub + NU + n_scaffold

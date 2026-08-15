@@ -51,8 +51,8 @@ describe('world wonders', () => {
     const after = computeCityStats(state, city).breakdown.buildings.culture;
     expect(after - before).toBe(2);
 
-    // theater square next to the wonder gets +1 culture adjacency
-    expect(districtAdjacency(state.map, tileAtCoords(state.map, 10, 8), 'THEATER_SQUARE')).toBe(1);
+    // theater square next to the wonder gets +2 culture adjacency (GS)
+    expect(districtAdjacency(state.map, tileAtCoords(state.map, 10, 8), 'THEATER_SQUARE')).toBe(2);
   });
 
   it('Petra boosts this city’s worked desert tiles', () => {

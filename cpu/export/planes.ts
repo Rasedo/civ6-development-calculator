@@ -119,9 +119,12 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // it live — the seed 9235/9144 founding-site divergence (G-6). Keep `st`
       // purely static: water / impassable / natural wonder / OASIS.
       st: !isWater(t) && !isImpassable(t) && !t.wonder && t.feature !== 'OASIS' ? 1 : 0,
+      // canPlaceDistrictIn's STATIC half. GS allows districts on floodplains,
+      // so only the Oasis is refused by feature; the removable-feature TECH
+      // gate is dynamic and lives on `ftu` (the engine reads it per seat).
       du:
         !isWater(t) && !isImpassable(t) && !t.wonder && !t.builtWonder &&
-        t.feature !== 'OASIS' && t.feature !== 'FLOODPLAINS' && !t.district &&
+        t.feature !== 'OASIS' && !t.district &&
         !(t.resource && RESOURCES[t.resource].category !== 'bonus') ? 1 : 0,
       dadj: PLACEABLE_DISTRICTS.map((id) => {
         const raw = staticAdjRaw(map, t, id);
@@ -263,7 +266,9 @@ export function buildFixture(state: GameState, world: WorldFile): object {
   const ownerInit = map.tiles.map((t) => tileCity(t));
 
   return {
-    format: 3, // #71 settler starts; #51 the ownerSeatInit/ownerInit pair
+    // 4: `du` no longer refuses floodplains (GS builds districts on them), so
+    // a format-3 fixture would silently hold a narrower placement surface.
+    format: 4,
     seed: world.gen.seed,
     width: map.width,
     height: map.height,

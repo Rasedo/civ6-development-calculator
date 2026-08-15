@@ -104,9 +104,10 @@ describe('#70 the action FILE drives the TS civ', () => {
     expect(civ.cities[0].queue.length).toBe(0);
   });
 
-  it('applies a recorded DISTRICT column, running the placement scan', () => {
-    // The file names the TYPE; the engine still finds the tile. A tile index in
-    // the record would be DERIVED state, and the schema carries decisions only.
+  it('applies a recorded DISTRICT column ON THE RECORDED TILE, and nothing without one', () => {
+    // WHERE a district goes is a DECISION, so the file names the tile and this
+    // engine only re-validates it. No scan here means no scan to disagree with
+    // the other engine's.
     const state = makeState(makeMap(14, 14, 'GRASSLAND'));
     const civ = addCiv(state, 6, 6);
     civ.research.techs.push('BRONZE_WORKING', 'MINING', 'ASTROLOGY', 'WRITING', 'POTTERY');
@@ -114,11 +115,23 @@ describe('#70 the action FILE drives the TS civ', () => {
     const L = prodLayout();
     const si = SCAFFOLD_DISTRICTS.findIndex((d) => d.id === 'CAMPUS');
     expect(si).toBeGreaterThanOrEqual(0);
-    state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [[civ.cities[0].centerIndex, L.districtLo + si]], tech: null, civic: null, units: [] } } };
+    const centre = civ.cities[0].centerIndex;
+    const col = L.districtLo + si;
+    const spot = neighbors(state.map, state.map.tiles[centre]).find((t) => tileSeat(t) === civ.seat);
+    expect(spot).toBeTruthy();
+
+    // a district column with no tile builds NOTHING — the engine never picks a plot
+    state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [[centre, col]], tech: null, civic: null, units: [] } } };
+    seatPhase(state);
+    expect(civ.cities[0].queue.length).toBe(0);
+
+    state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [[centre, col, spot!.index]], tech: null, civic: null, units: [] } } };
     seatPhase(state);
     const q = civ.cities[0].queue[0];
     expect(q?.kind).toBe('district');
     expect(q?.kind === 'district' && q.district).toBe('CAMPUS');
+    expect(q?.kind === 'district' && q.tileIndex).toBe(spot!.index);
+    expect(state.map.tiles[spot!.index].district).toBe('CAMPUS');
   });
 
   it('replays recorded UNIT MOVE orders, one entry per step', () => {

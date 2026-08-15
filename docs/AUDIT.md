@@ -101,7 +101,7 @@ not add a "done" column back.
   `{}` in every simulated game; the GPU's greedy assignment was deleted
   rather than mirrored, because assigning a citizen is a CHOICE and neither
   engine takes a choice without a wire record. TO REOPEN THE MECHANIC: a
-  wire column, beside #83's wonders and #97's district placement — not an
+  wire column, the way district placement now records its TILE — not an
   engine rule.
 - **A-29r. `cityYieldMult` cannot express BUILD order.** TS applies it in
   `city.wonders` build order; the GPU registry is keyed by wonder id and
@@ -446,6 +446,41 @@ item here CHANGES BEHAVIOUR on both engines together; none of it has run.
    `victory_row` whenever the outcome has one, falling back to the leader for
    the turn-limit score result. GPU-only plane, absent from the digest, and
    its one reader is `protagonist()` — no trajectory rides on it.
+17. THE DISTRICT TILE RIDES THE WIRE. Both engines scanned every owned tile
+   for the best adjacency; the choice is the policy's now
+   (`ladder.pick_district_tile`), the record's production entry carries it as
+   a third element, and the engines only re-validate. The KEY is unchanged
+   (highest adjacency floor, ties to the lowest tile index), so a scripted
+   game should place identically — with one deliberate difference: the pick
+   is made at DECIDE time and validated a phase later, so a tile that stops
+   being eligible in between is REFUSED rather than slid to the next best.
+   The visible case is two cities of one seat wanting the same plot: the
+   second now idles (or falls to its next ranked column) where the old scan
+   quietly moved it. **A district column with no recorded tile builds
+   nothing** — that is the contract, not a bug.
+18. DISTRICT PLACEMENT LEGALITY MOVED, twice, both sourced to GS. (a)
+   FLOODPLAINS are district-usable now (GS builds on all of them), which
+   widens `du` — hence fixture format 4, and expect districts on tiles the
+   old set refused. (b) A tile whose REMOVABLE feature is still standing
+   needs the seat to hold that feature's removal tech, which NARROWS early
+   placement sharply: Woods and Rainforest plots are shut until Mining /
+   Bronze Working. Net direction per seat is not predictable — read the
+   first serve run, do not assume.
+19. THREE ADJACENCY AMOUNTS WERE WRONG against the GS Civilopedia, all of
+   them too low: Campus/REEF 1 -> 2, Harbor/CITY_CENTER 1 -> 2,
+   Theater Square/BUILT_WONDER 1 -> 2. Every coastal capital's Harbor gains
+   gold from turn one, so this moves the economy from very early, and it
+   also changes which tile the placement key picks.
+20. `placeSeatDistrict` NEVER CLEARED THE FEATURE. `queueDistrict` and the
+   GPU's `_place_district` both null the feature the district paves; the
+   WIRE applier — the only one the gate uses — did not. A district built on
+   Woods left the Woods standing on TS, lending adjacency to neighbours the
+   GPU had already withdrawn. Fixed with the placement rewrite.
+
+STILL UNVERIFIED, and NOT changed on a guess: our feature-removal techs are
+Woods -> Mining and Marsh -> Irrigation. Rainforest -> Bronze Working checks
+out against a real source; the other two could not be confirmed either way,
+and item 18(b) now makes them load-bearing for district placement.
 
 WATCH FIRST when the run goes red: (1) and (2) together mean seat 0's whole
 trajectory changed. Bracket from a checkpoint and read the SEAT the
@@ -456,6 +491,9 @@ divergence names before reading the mechanic.
   religions. A gate that never puts two apostles side by side proves
   nothing about it.
 - Row 0's wonder/project completions need the driver to pick those columns.
+- District placement IS reachable in-gate, unlike most of this list — every
+  seed queues districts from the early game, so items 17-20 should show up
+  in the very first serve run rather than hiding.
 - No seat fields a second ship, and seat 0 lays no international trade leg,
   under the current masks (B-28r, A-11r) — re-measure both.
 - The war head's newly-live columns need a game with THREE majors in reach

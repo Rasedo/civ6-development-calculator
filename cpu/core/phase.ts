@@ -40,7 +40,6 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { disbandUnit, builderCost, builderRemoveFeature } from './units';
 import { killUnit } from './combat';  // #51/S7.12
 import { availableProjects, buyTile, buyWorshipBuilding, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampmentItem, purchaseReligiousUnit, purchaseSettler, queueProject, settlerCost } from './game';
-import { districtAdjacency } from './yields';
 import { SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex } from './unitActions';
 
@@ -363,42 +362,36 @@ export function relocatePalace(
 
 
 
-/** Place ONE named district, so a caller can queue the district the record
- * names rather than "the first placeable one". Shared, so a wire pick and a
- * replay cannot place differently: that split is precisely how the GPU mask and
- * picker drifted apart in #86. Returns false when no owned tile can take it. */
+/** Queue the district the record names, ON THE TILE THE RECORD NAMES.
+ *
+ * This engine does NOT choose the plot: WHERE a district goes is a decision,
+ * it rides the wire, and this body only re-validates it. Two scans that had to
+ * agree forever are one recorded number now. Returns false when the named tile
+ * cannot take it. */
 export function placeSeatDistrict(
   state: GameState,
   actor: Seat,
   civCity: City,
   id: DistrictId,
   unlocks: Unlocks,
+  tileIndex: number,
 ): boolean {
+  const tile = state.map.tiles[tileIndex];
+  if (!tile) return false;
   const owns = (t: Tile) => tileBelongsTo(t, civCity);
-  let best = -1;
-  let bestAdj = -1;
-  for (const t of state.map.tiles) {
-    if (!owns(t) || t.improvement) continue;
-    if (!canPlaceDistrictIn(state, civCity, id, t.index, { unlocks, ownsTile: owns }).ok) continue;
-    const adj = Math.floor(districtAdjacency(state.map, t, id));
-    if (adj > bestAdj) {
-      bestAdj = adj;
-      best = t.index;
-    }
-  }
-  if (best < 0) return false;
-  const tile = state.map.tiles[best];
+  if (tile.improvement) return false;
+  if (!canPlaceDistrictIn(state, civCity, id, tileIndex, { unlocks, ownsTile: owns }).ok) return false;
   const base = districtCostIn(actor.research);
-  const cost = districtDiscounted(state, actor.seat, id, { unlocks, cities: actor.cities }) ? Math.floor(base * 0.6) : base;  // #96: one discount rule, every seat
+  const cost = districtDiscounted(state, actor.seat, id, { unlocks, cities: actor.cities }) ? Math.floor(base * 0.6) : base;
   tile.district = id;
   tile.districtComplete = false;
   tile.improvement = null;
-  // Placement removes a bonus resource, exactly like the
-  // seat 0's queueDistrict (real Civ 6 rule; canPlaceDistrictIn already
-  // refused luxury/strategic).
+  tile.feature = null;              // the district PAVES the tile, as queueDistrict does
+  // Placement removes a bonus resource (real Civ 6 rule; canPlaceDistrictIn
+  // already refused luxury/strategic).
   if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
-  civCity.districts.push({ type: id, tileIndex: best });
-  commitProduction(state, civCity.seat, civCity, { kind: 'district', district: id, tileIndex: best, progress: 0, cost });
+  civCity.districts.push({ type: id, tileIndex });
+  commitProduction(state, civCity.seat, civCity, { kind: 'district', district: id, tileIndex, progress: 0, cost });
   return true;
 }
 
@@ -707,7 +700,7 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
       }
     }
   }
-  for (const [centre, aCol] of prodPairs) {
+  for (const [centre, aCol, aTile] of prodPairs) {
     const civCity = actor.cities.find((c) => c.centerIndex === centre);
     if (!civCity) continue;                          // centre not this engine's city (drifted state)
     const a = aCol;
@@ -735,12 +728,12 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
     } else if (a >= projectLo && a < projectLo + projects.length) {
       queueSeatProject(state, civCity, projects[a - projectLo]);
     } else if (a >= NB + 2 + NU) {
-      // DISTRICT: the file names the TYPE, the engine still runs the placement
-      // scan — a tile index in the record would be derived state, and the whole
-      // point of the schema is that it carries DECISIONS only.
+      // DISTRICT: the file names the TYPE **and the TILE**. Which plot a
+      // district takes is a decision, not derived state, so it is recorded and
+      // re-validated rather than re-derived by a scan each engine owns.
       const si = a - (NB + 2 + NU);
       const d = SCAFFOLD_DISTRICTS[si];
-      if (d) placeSeatDistrict(state, actor, civCity, d.id, computeUnlocksIn(actor.research));
+      if (d) placeSeatDistrict(state, actor, civCity, d.id, computeUnlocksIn(actor.research), aTile ?? -1);
     }
   }
 }

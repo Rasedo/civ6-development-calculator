@@ -53,13 +53,17 @@ def _blocks(env, sim, row: int) -> dict:
     return ladder.split(obs, sim.S, sim.n_majors - 1, sim.RC, sim.civ_techs.shape[2], sim.civ_civics.shape[2])
 
 
-#: ACTION FILE SCHEMA v2 — THE FILE IS THE INTERFACE.
+#: ACTION FILE SCHEMA v3 — THE FILE IS THE INTERFACE.
 #:
 #: Both engines parse this, so it records DECISIONS, never derived state: a
 #: replay must be able to reproduce the run without re-deriving anything the
 #: policy knew. Per turn, per driven seat:
 #:     {"turn": t, "s<seatRow>": {
-#:         "production": [[centreTile, col], ...]  one pair per city that acts
+#:         "production": [[centreTile, col], ...]  one entry per city that acts;
+#:                                  a DISTRICT column carries a third element,
+#:                                  the TILE to build it on, because WHERE a
+#:                                  district goes is a decision and neither
+#:                                  engine may pick it (v3)
 #:         "tech": col | None       None = no pick
 #:         "civic": col | None
 #:         "units": [[N], ...]      one entry per unit STEP this turn, since a
@@ -75,7 +79,7 @@ def _blocks(env, sim, row: int) -> dict:
 #: centre, never by slot. The UNITS axis stays positional: the engines
 #: deliberately mirror unit order (TS splices captured units to the END because
 #: the GPU appends; deaths drop identically from both).
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 _M32 = 0xFFFFFFFF
@@ -368,14 +372,40 @@ def _extract_geo(geo, row: int, b: int) -> dict:
 
 
 def decide_and_apply(env, sim, row: int, roster: dict, classes: dict, max_steps: int = 4) -> dict:
-    prod, tech, civic, war, env_seq, seq, buy, worship, relig, levy = _decide_turn(env, sim, row, roster, classes, max_steps)
-    return _extract_record(sim, row, prod, tech, civic, war, env_seq, seq, buy, worship, relig, levy, 0)
+    return _extract_record(sim, row, *_decide_turn(env, sim, row, roster, classes, max_steps), 0)
+
+
+def _district_tiles(sim, row: int, prod: torch.Tensor):
+    """[B, RC, nS] the tile each city would put each district column on, or
+    None when this world has no district columns.
+
+    The placement CHOICE, which is policy and belongs here: the engines used to
+    run a scan apiece and had to agree forever. Only the column a city actually
+    picked is filled — every other entry stays -1, and the apply refuses a
+    district column whose tile is -1. A net driving `production_pref` must fill
+    every column it wants reachable, through this same body.
+    """
+    nS = len(sim._scaffold) if sim.districts_on else 0
+    if nS == 0:
+        return None
+    out = torch.full((sim.B, sim.RC, nS), -1, dtype=torch.long, device=sim.device)
+    for j in range(min(int(prod.shape[1]), sim.RC)):
+        a = prod[:, j]
+        for si, (di, _ut, _uc, plc) in enumerate(sim._scaffold):
+            want = a == sim.DISTRICT_BASE + si
+            if not bool(want.any()):
+                continue
+            t = ladder.pick_district_tile(sim._district_elig(row, j, di, plc),
+                                          sim.district_rank_adj(di, plc))
+            out[:, j, si] = torch.where(want, t, out[:, j, si])
+    return out
 
 
 def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int = 4, seeds=None, turn=None):
     m = sim.seat_masks(row)
     blocks = _blocks(env, sim, row)
     prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(blocks, sim, row))
+    dtile = _district_tiles(sim, row, prod)
     tech = ladder.pick_research(blocks, m["tech"], "tech") if bool(m["tech"].any()) else None
     civic = ladder.pick_research(blocks, m["civic"], "civic") if bool(m["civic"].any()) else None
     war = None
@@ -458,18 +488,24 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
         sim._driven_useq = {}
     sim._driven_useq[row] = seq
-    return prod, tech, civic, war, env_seq, seq, buy, worship, relig, levy
+    return prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy
 
 
-def _extract_record(sim, row: int, prod, tech, civic, war, env_seq, seq, buy, worship, relig, levy, b: int) -> dict:
+def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, b: int) -> dict:
     _pr = prod[b]
     _ctr = sim.city_center[b, row]
     _alive_c = sim.city_alive[b, row]
-    prod_pairs = [
-        [int(_ctr[j]), int(_pr[j])]
-        for j in range(min(int(_pr.shape[0]), int(_ctr.shape[0])))
-        if int(_pr[j]) >= 0 and bool(_alive_c[j])
-    ]
+    nS = 0 if dtile is None else int(dtile.shape[2])
+    prod_pairs = []
+    for j in range(min(int(_pr.shape[0]), int(_ctr.shape[0]))):
+        col = int(_pr[j])
+        if col < 0 or not bool(_alive_c[j]):
+            continue
+        pair = [int(_ctr[j]), col]
+        si = col - sim.DISTRICT_BASE
+        if 0 <= si < nS:
+            pair.append(int(dtile[b, j, si]))  # a DISTRICT column names its tile
+        prod_pairs.append(pair)
     _t = None if tech is None or int(tech[b]) < 0 else int(tech[b])
     _c = None if civic is None or int(civic[b]) < 0 else int(civic[b])
     rows = [seq[b, :, k].tolist() for k in range(int(seq.shape[2]))]
@@ -533,9 +569,17 @@ def replay_seat(sim, row: int, rec: dict) -> None:
     """
     dev = sim.device
     prod = torch.full((sim.B, sim.RC), -1, dtype=torch.long, device=dev)
-    for centre, col in rec["production"]:
-        hit = (sim.city_center[:, row] == int(centre)) & sim.city_alive[:, row]
-        prod = torch.where(hit, torch.full_like(prod, int(col)), prod)
+    nS = len(sim._scaffold) if sim.districts_on else 0
+    dtile = torch.full((sim.B, sim.RC, nS), -1, dtype=torch.long, device=dev) if nS else None
+    for ent in rec["production"]:
+        centre, col = int(ent[0]), int(ent[1])
+        hit = (sim.city_center[:, row] == centre) & sim.city_alive[:, row]
+        prod = torch.where(hit, torch.full_like(prod, col), prod)
+        si = col - sim.DISTRICT_BASE
+        if dtile is not None and 0 <= si < nS:
+            # a district column carries its TILE as the pair's third element
+            t = int(ent[2]) if len(ent) > 2 else -1
+            dtile[:, :, si] = torch.where(hit, torch.full_like(dtile[:, :, si], t), dtile[:, :, si])
     tech = None if rec["tech"] is None else torch.tensor(rec["tech"], dtype=torch.long, device=dev)
     civic = None if rec["civic"] is None else torch.tensor(rec["civic"], dtype=torch.long, device=dev)
     _wv = rec.get("war")
@@ -586,8 +630,8 @@ def replay_seat(sim, row: int, rec: dict) -> None:
             relig = (torch.where(_rjt >= 0, torch.full_like(_rjt, _fk), torch.full_like(_rjt, -1)), _rjt)
     _lv = rec.get("levy")
     levy = None if _lv is None else torch.full((sim.B,), int(_lv), dtype=torch.long, device=dev)
-    sim.apply_seat_actions(row, production=prod, tech=tech, civic=civic, war=war, envoys=env_seq,
-                           buy=buy, worship=worship, relig=relig, levy=levy)
+    sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic,
+                           war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy)
     def _geo_mask(seats) -> torch.Tensor:
         m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=dev)
         for j in seats:

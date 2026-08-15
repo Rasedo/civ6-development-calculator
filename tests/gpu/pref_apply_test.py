@@ -10,7 +10,8 @@ absent from the game.
 chain back inside the engine: the policy supplies a ranking, apply walks it
 best-first and takes the first column that actually lands. The engine never
 chooses — it only discovers which of the policy's own preferences the live state
-accepts.
+accepts. A district column carries its TILE the same way, in
+`production_tile`, and is refused when that tile stopped being eligible.
 
 Nothing else in the battery passes `production_pref`, so these pokes are its
 only coverage.
@@ -93,7 +94,11 @@ def main() -> None:
     legal_b2 = [c for c in range(NB) if bool(m2[c])]
     assert legal_b2, "no legal building for the fallback rank"
     d_col = D0                              # rank it FIRST even though it cannot land
-    sim2.apply_seat_actions(r + 1, production_pref=pref([d_col, legal_b2[0]]))
+    # Name a tile that WAS eligible and no longer is, so the fallthrough is
+    # proven to come from the LEGALITY re-check and not from a missing tile.
+    dt2 = torch.full((1, sim2.RC, len(sim2._scaffold)), -1, dtype=torch.long)
+    dt2[0, j, 0] = next(t for t in own.tolist() if t != ctr)
+    sim2.apply_seat_actions(r + 1, production_pref=pref([d_col, legal_b2[0]]), production_tile=dt2)
     sim2._seat_record_apply(r + 1, ACTIVE)
     got2 = int(sim2.city_current[0, r + 1, j])
     assert got2 != -1, "#87 REGRESSION: an unplaceable top pick left the city IDLE"

@@ -68,7 +68,7 @@ class SimSeats:
                     has_tech = self.civ_techs[:, row, utech] if utech >= 0 else (self.civ_civics[:, row, uciv] if uciv >= 0 else torch.ones(B, dtype=torch.bool, device=dev))
                     not_owned = self.city_dist_tile[:, row, j, di] < 0
                     under_cap = (spec_cnt < cap_max) if bool(self._is_specialty[di]) else torch.ones(B, dtype=torch.bool, device=dev)
-                    can_place = self._district_elig(row, j, di, plc)[0].any(dim=1)
+                    can_place = self._district_elig(row, j, di, plc).any(dim=1)
                     ok_d[:, si] = has_tech & not_owned & under_cap & can_place
             base_j = torch.cat([ok_b, ok_s, torch.ones(B, 1, dtype=torch.bool, device=dev), ok_u, ok_d], dim=1)
             nW_m = self._wond_n if self.districts_on else 0
@@ -116,6 +116,7 @@ class SimSeats:
         civic: torch.Tensor | None = None,
         war: torch.Tensor | None = None,
         production_pref: torch.Tensor | None = None,
+        production_tile: torch.Tensor | None = None,
         envoys: torch.Tensor | None = None,
         buy: tuple | None = None,  # (kind [B], a [B], b [B]) — the wire's GOLD purchase intent (kind 3: a=tile, b=slot)
         worship: torch.Tensor | None = None,  # kind 4: rc slot to faith-buy the worship building in (-1 = none)
@@ -138,11 +139,17 @@ class SimSeats:
         ladder into the engine and credit the policy for a decision it never
         made. With a preference order the CHOICE stays wholly in the policy and
         this function only validates. Near-free for a net, whose logits over the
-        columns already ARE a preference order."""
+        columns already ARE a preference order.
+
+        `production_tile` [B, RC, nS] is the TILE each city would put each
+        district column on — the placement choice, which is the policy's too. A
+        district column whose tile is -1 (or absent) is REFUSED: this function
+        re-validates a plot, it never picks one. `policy/ladder.py`'s
+        `pick_district_tile` is the body that chooses."""
         if war is not None:
             self._apply_war_column(row, war)
         self._stash_record(row, tech=tech, civic=civic, envoys=envoys,
-                           production=production, pref=production_pref)
+                           production=production, pref=production_pref, dtile=production_tile)
         self._stash_buy(row, buy=buy, worship=worship, relig=relig, levy=levy)
 
     def _reset_war_clock(self, i: int, j: int, mask: torch.Tensor) -> None:
@@ -193,7 +200,7 @@ class SimSeats:
                     self.peace_turns[:, _pr] = torch.where(peace, torch.zeros_like(self.peace_turns[:, _pr]), self.peace_turns[:, _pr])
 
     def _stash_record(self, row: int, tech=None, civic=None, envoys=None,
-                      production=None, pref=None) -> None:
+                      production=None, pref=None, dtile=None) -> None:
         """Park a seat row's applySeatActionRecord intents for
         `_seat_record_apply` to drain at the record position.
 
@@ -210,7 +217,7 @@ class SimSeats:
         if envoys is not None and self.S > 0:
             self._driven_envoys[row] = envoys
         if production is not None or pref is not None:
-            self._driven_picks[row] = (production, pref)
+            self._driven_picks[row] = (production, pref, dtile)
 
     def _seat_record_apply(self, row: int, active: torch.Tensor) -> None:
         """applySeatActionRecord for seat row `row` — ONE body every seat runs,
@@ -231,7 +238,7 @@ class SimSeats:
         tech = self._driven_tech.pop(row, None)
         civic = self._driven_civic.pop(row, None)
         envoys = self._driven_envoys.pop(row, None)
-        production, pref = self._driven_picks.pop(row, (None, None))
+        production, pref, dtile = self._driven_picks.pop(row, (None, None, None))
         if not bool(active.any()):
             return
         ext = self.seat_ext[:, row]
@@ -260,9 +267,9 @@ class SimSeats:
                     self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] - ok.long()
                     self._eff_version += 1
         if pref is not None:
-            self._apply_seat_pref(row, pref)
+            self._apply_seat_pref(row, pref, dtile)
         elif production is not None:
-            self._apply_seat_production(row, production)
+            self._apply_seat_production(row, production, dtile)
 
     def _stash_buy(self, row: int, buy=None, worship=None, relig=None, levy=None) -> None:
         if buy is not None:
@@ -648,7 +655,8 @@ class SimSeats:
                     rows_l = do_l.nonzero(as_tuple=True)[0]
                     self.citystate_last_levy[rows_l, sl[rows_l]] = self.turn
 
-    def _apply_seat_pref(self, row: int, pref: torch.Tensor, max_tries: int = 8) -> None:
+    def _apply_seat_pref(self, row: int, pref: torch.Tensor, dtile: torch.Tensor | None = None,
+                         max_tries: int = 8) -> None:
         if pref.dim() != 3:
             raise AssertionError(f"production_pref must be [B, RC, W], got {tuple(pref.shape)}")
         RCj = min(int(pref.shape[1]), self.RC)
@@ -665,12 +673,16 @@ class SimSeats:
                 code = torch.where(idle, code, torch.full_like(code, -1))
             if not bool((code >= 0).any()):
                 return
-            self._apply_seat_production(row, code)
+            self._apply_seat_production(row, code, dtile)
 
-    def _apply_seat_production(self, row: int, production: torch.Tensor) -> None:
-        """THE production apply, for seat row `row` (0 = seat 0, r+1 = civ r):
-        one pass over that seat's cities in SLOT order, each taking the code it
-        was given.
+    def _apply_seat_production(self, row: int, production: torch.Tensor,
+                               dtile: torch.Tensor | None = None) -> None:
+        """THE production apply for seat row `row`: one pass over that seat's
+        cities in SLOT order, each taking the code it was given.
+
+        `dtile` [B, RC, nS] is the record's district TILE per city per district
+        column; without it no district column can land, because choosing a plot
+        is the policy's job and this body only re-validates one.
 
         The walk is SEQUENTIAL because the decisions are order-coupled: a
         queued settler raises the next slot's settlerCost and a queued builder
@@ -697,6 +709,8 @@ class SimSeats:
         settlers_live = self._seat_settlers(row)
         nW_a = self._wond_n if self.districts_on else 0
         nP_a = len(self._proj_rows) if self.districts_on else 0
+        if dtile is not None and (dtile.dim() != 3 or int(dtile.shape[2]) != nS):
+            raise AssertionError(f"production_tile must be [B, RC, {nS}], got {tuple(dtile.shape)}")
         for j in range(min(int(production.shape[1]), self.RC)):
             a = production[:, j].to(torch.long)
             alive_j = self.city_alive[:, row, j]
@@ -731,7 +745,8 @@ class SimSeats:
                 self.city_cost[:, row, j] = torch.where(is_u, cost_q, self.city_cost[:, row, j])
                 self.city_progress[:, row, j] = torch.where(is_u, torch.zeros_like(self.city_progress[:, row, j]), self.city_progress[:, row, j])
             is_d = act & (a >= self.DISTRICT_BASE) & (a < self.DISTRICT_BASE + nS)
-            if bool(is_d.any()) and self.districts_on and self._scaffold:
+            if bool(is_d.any()) and self.districts_on and self._scaffold \
+                    and dtile is not None and j < int(dtile.shape[1]):
                 dcp = rls.district_cost
                 t_pct = self.civ_techs[:, row].sum(dim=1).double() / float(rdv.t_cost.shape[0])
                 c_pct = self.civ_civics[:, row].sum(dim=1).double() / float(rdv.c_cost.shape[0])
@@ -753,7 +768,7 @@ class SimSeats:
                         continue
                     disc = self._district_discounted(row, di)
                     d_cost_si = torch.where(disc, torch.floor(d_cost * 0.6), d_cost)
-                    placed = self._place_district(row, j, di, want_d, plc)
+                    placed = self._place_district(row, j, di, want_d, plc, dtile[:, j, si])
                     if bool(placed.any()):
                         self.city_current[:, row, j] = torch.where(placed, torch.full_like(cur_j, self.DISTRICT_BASE + si), self.city_current[:, row, j])
                         self.city_cost[:, row, j] = torch.where(placed, d_cost_si, self.city_cost[:, row, j])

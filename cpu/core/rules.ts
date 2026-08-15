@@ -190,8 +190,16 @@ export function canPlaceDistrictIn(
   if (tile.builtWonder) return no('A wonder occupies this tile.');
   if (tile.wonder) return no('Cannot build on a natural wonder.');
   if (isImpassable(tile)) return no('Impassable terrain.');
-  if (tile.feature === 'FLOODPLAINS') return no('Districts cannot be built on floodplains.');
   if (tile.feature === 'OASIS') return no('Districts cannot be built on an oasis.');
+  // GS lets districts be built on every kind of Floodplains (they flood
+  // instead of being refused), so there is no floodplain test here.
+  //
+  // A district PAVES the tile, so a removable feature standing on it must be
+  // one this seat could clear — real Civ 6 refuses the plot until the removal
+  // tech is in. `unlocks === null` is the sandbox, which gates nothing.
+  if (tile.feature && FEATURES[tile.feature].removable && unlocks && !unlocks.featureRemovals.has(tile.feature)) {
+    return no(`Clearing ${FEATURES[tile.feature].name} requires further research.`);
+  }
 
   if (def.placement.onCoastalWater) {
     if (!isCoastalWater(map, tile)) return no('Must be on coast/lake water adjacent to land.');

@@ -1128,7 +1128,6 @@ class SimInit:
         self._arangeT_f = self._arangeT.to(dtype)
         self._bidx = torch.arange(B, device=device)
         self._inf_f = torch.tensor(float("inf"), dtype=dtype, device=device)
-        self._neg_f = torch.tensor(-1e18, dtype=dtype, device=device)
         self._adjd_cache = None
         self._adjc_cache = None
         self._adjh_cache = None

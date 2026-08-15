@@ -830,17 +830,18 @@ class SimEconomy:
             d[di] = v
         return v
 
-    def _district_elig(self, row: int, j: int, di: int, placement: int = 0):
-        """[B, T] eligible tiles (and the adjacency floor) for placing district
-        `di` in seat row `row`'s city slot j — `canPlaceDistrictIn`, which is
-        seat-generic in TS and so has ONE body here.
+    def _district_elig(self, row: int, j: int, di: int, placement: int = 0) -> torch.Tensor:
+        """[B, T] the tiles that may take district `di` in seat row `row`'s city
+        slot j — `canPlaceDistrictIn`, which is seat-generic in TS and so has
+        ONE body here.
 
         `seat_masks` asks "can this district be placed AT ALL" without placing
         it, so the mask and `_place_district` MUST share this predicate:
-        anything the mask decides without running the scan can report a
-        district legal where the placer rejects it.
+        anything the mask decides without running this can report a district
+        legal where the placer rejects it. It answers LEGALITY only — ranking
+        the legal tiles is the policy's job (`district_rank_adj`).
         """
-        B, T, dev = self.B, self.T, self.device
+        B, dev = self.B, self.device
         center = self.city_center[:, row, j].clamp(min=0)
         surface = self.coastal_water if placement == 2 else self.d_usable  # Harbor sits on coastal water, others on land
         d_center = self.pair_dist[center]  # [B, T]
@@ -854,27 +855,44 @@ class SimEconomy:
             & (self.res_priority <= 1)  # only a BONUS resource may be paved over
             & (d_center <= 3)           # CITY_WORK_RADIUS
         )
+        # A district PAVES the tile, so a removable feature still standing on it
+        # must be one this seat could clear — `tile_ftu` is that feature's
+        # removal tech, -1 where there is nothing to clear.
+        need_clear = (self.tile_ftu >= 0) & ~self.feat_stripped
+        if bool(need_clear.any()):
+            have = self.civ_techs[:, row].gather(1, self.tile_ftu.clamp(min=0))
+            elig = elig & (~need_clear | have)
         # No clone: the `&` chain above already returns a fresh tensor nothing
         # else references, and this runs per district type per city per seat
         # per turn on the hot path.
         elig[torch.arange(B, device=dev), center] = False  # dist === 0 is the centre
-        if placement in (1, 3):  # no-adjacency-yield districts (Aqueduct / Encampment)
+        if placement in (1, 3):  # Aqueduct: adjacent-centre + water source; Encampment: NOT adjacent-centre
             cc = self._adj_center_count()  # [B, T] adjacent CITY_CENTERs (any seat)
-            elig = elig & ((cc >= 1) & self.aqsrc if placement == 1 else (cc == 0))  # Aqueduct: adjacent-centre + water source; Encampment: NOT adjacent-centre
-            adjf = torch.zeros(B, T, dtype=self.dtype, device=dev)  # no yield -> lowest-index tie-break
-        else:
-            adjf = self._district_adj_floor(di)
-        return elig, adjf
+            elig = elig & ((cc >= 1) & self.aqsrc if placement == 1 else (cc == 0))
+        return elig
 
-    def _place_district(self, row: int, j: int, di: int, want: torch.Tensor, placement: int = 0) -> torch.Tensor:
-        elig, adjf = self._district_elig(row, j, di, placement)
-        T = self.T
-        key = torch.where(elig, adjf * T - self._arangeT_f, self._neg_f)
-        best = key.argmax(dim=1)
-        place = want & elig.any(dim=1)
+    def district_rank_adj(self, di: int, placement: int = 0) -> torch.Tensor:
+        """[B, T] the adjacency a district of type `di` WOULD earn on each tile
+        — what a placement policy ranks its legal tiles by. The Aqueduct and
+        the Encampment have no adjacency yield at all, so they rank flat and
+        fall to the lowest tile index."""
+        if placement in (1, 3):
+            return torch.zeros(self.B, self.T, dtype=self.dtype, device=self.device)
+        return self._district_adj_floor(di)
+
+    def _place_district(self, row: int, j: int, di: int, want: torch.Tensor,
+                        placement: int, tile: torch.Tensor) -> torch.Tensor:
+        """Queue district `di` in row `row`'s city slot j ON THE TILE THE RECORD
+        NAMES. The engine does not choose the plot: `tile` [B] is the policy's
+        pick and this body only re-validates it, so a tile that stopped being
+        eligible since the mask REFUSES rather than sliding to a neighbour the
+        policy never asked for."""
+        elig = self._district_elig(row, j, di, placement)
+        bt_all = tile.clamp(min=0, max=self.T - 1)
+        place = want & (tile >= 0) & (tile < self.T) & elig.gather(1, bt_all.unsqueeze(1)).squeeze(1)
         if bool(place.any()):
             rows = place.nonzero(as_tuple=True)[0]
-            bt = best[rows]
+            bt = bt_all[rows]
             self.district[rows, bt] = di
             self.district_complete[rows, bt] = False  # queued, not complete
             self.improvement[rows, bt] = -1           # queueDistrict clears it

@@ -4,6 +4,8 @@ import { makeMap, makeState, tileAtCoords, grantTechs, expandBorders } from './h
 import { growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, maxSpecialtyDistricts } from '../../cpu/data/constants';
 import { foundCity, queueDistrict, queueBuilding, endTurn, toggleLockedTile, itemCost } from '../../cpu/core/game';
 import { canFoundCity, canPlaceDistrict } from '../../cpu/core/rules';
+import { placeSeatDistrict } from '../../cpu/core/phase';
+import { computeUnlocksIn } from '../../cpu/core/effects';
 import { computeCityStats, assignWorkedTiles, luxuryAmenities } from '../../cpu/core/city';
 
 describe('rule formulas', () => {
@@ -179,6 +181,44 @@ describe('districts and buildings', () => {
     expandBorders(state, city, 2);
     expect(canPlaceDistrict(state, city, 'ENCAMPMENT', tileAtCoords(state.map, 9, 8).index).ok).toBe(false);
     expect(canPlaceDistrict(state, city, 'ENCAMPMENT', tileAtCoords(state.map, 10, 8).index).ok).toBe(true);
+  });
+
+  it('GS: a district may sit on floodplains, never on an oasis', () => {
+    const { state, city } = settled();
+    state.sandbox = true;
+    const spot = tileAtCoords(state.map, 9, 8);
+    spot.terrain = 'DESERT';
+    spot.feature = 'FLOODPLAINS';
+    expect(canPlaceDistrict(state, city, 'CAMPUS', spot.index).ok).toBe(true);
+    spot.feature = 'OASIS';
+    expect(canPlaceDistrict(state, city, 'CAMPUS', spot.index).ok).toBe(false);
+  });
+
+  it('a district needs the tech that CLEARS the feature on its tile', () => {
+    const { state, city } = settled();
+    grantTechs(state, 'WRITING');
+    const spot = tileAtCoords(state.map, 9, 8);
+    spot.terrain = 'PLAINS';
+    spot.feature = 'RAINFOREST'; // cleared by BRONZE_WORKING
+    expect(canPlaceDistrict(state, city, 'CAMPUS', spot.index).ok).toBe(false);
+    grantTechs(state, 'MINING', 'BRONZE_WORKING');
+    expect(canPlaceDistrict(state, city, 'CAMPUS', spot.index).ok).toBe(true);
+  });
+
+  it('the wire names the district TILE: an illegal one is refused, the named one is paved', () => {
+    const { state, city } = settled();
+    grantTechs(state, 'WRITING', 'MINING', 'BRONZE_WORKING');
+    const seat = seatOf(state, 0)!;
+    const unlocks = computeUnlocksIn(seat.research);
+    const off = tileAtCoords(state.map, 0, 0); // not this city's tile
+    expect(placeSeatDistrict(state, seat, city, 'CAMPUS', unlocks, off.index)).toBe(false);
+    expect(off.district).toBe(null);
+    const spot = tileAtCoords(state.map, 9, 8);
+    spot.terrain = 'PLAINS';
+    spot.feature = 'WOODS'; // the pave clears it
+    expect(placeSeatDistrict(state, seat, city, 'CAMPUS', unlocks, spot.index)).toBe(true);
+    expect(spot.district).toBe('CAMPUS');
+    expect(spot.feature).toBe(null);
   });
 
   it('buildings require their chain and a completed district', () => {

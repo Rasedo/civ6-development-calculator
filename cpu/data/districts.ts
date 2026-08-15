@@ -1,8 +1,17 @@
 /**
- * Districts (base game, common to all civs). Adjacency rules follow base
- * Civ 6. Production cost scales with overall tech/civic progress and locks
- * in at queue time (districtCost in core/game.ts); the `cost` field below is
- * only a fallback for queue items without a locked cost.
+ * Districts, common to all civs. Adjacency amounts are the GATHERING STORM
+ * Civilopedia's, which is the ruleset this repo models: a "+1 for every two
+ * adjacent X" reads as 0.5 here and the TOTAL truncates once, in
+ * `districtAdjacency` — never per source. Production cost scales with overall
+ * tech/civic progress and locks in at queue time (districtCost in
+ * core/game.ts); the `cost` field below is only a fallback for queue items
+ * without a locked cost.
+ *
+ * Sources the real game has and this map cannot express are simply absent:
+ * Government Plaza, Ley Line, Geothermal Fissure, Dam/Canal/Bath (the
+ * Industrial Zone's +2 reads off the Aqueduct alone), Lumber Mill and
+ * strategic resources for the Industrial Zone, Entertainment Complex and
+ * Water Park for the Theater Square.
  */
 
 import type { DistrictId, YieldKey } from '../core/types';
@@ -74,10 +83,13 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     countsTowardLimit: true,
     allowMultiple: false,
     adjacencyYield: 'science',
+    // GS Civilopedia: +1 per adjacent Mountain, +2 per adjacent Reef (and
+    // Geothermal Fissure, which this map has no feature for), +1 per TWO
+    // adjacent Rainforest tiles, +1 per TWO adjacent districts.
     adjacency: [
       { source: 'MOUNTAIN', amount: 1 },
       { source: 'RAINFOREST', amount: 0.5 },
-      { source: 'REEF', amount: 1 },
+      { source: 'REEF', amount: 2 },
       { source: 'DISTRICT', amount: 0.5 },
     ],
     housing: 0,
@@ -112,8 +124,10 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     countsTowardLimit: true,
     allowMultiple: false,
     adjacencyYield: 'culture',
+    // GS Civilopedia: +2 Culture from EACH adjacent wonder tile (a major
+    // bonus, not a standard one), +1 per two adjacent districts.
     adjacency: [
-      { source: 'BUILT_WONDER', amount: 1 },
+      { source: 'BUILT_WONDER', amount: 2 },
       { source: 'DISTRICT', amount: 0.5 },
     ],
     housing: 0,
@@ -147,8 +161,10 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     countsTowardLimit: true,
     allowMultiple: false,
     adjacencyYield: 'gold',
+    // GS Civilopedia: +2 Gold from each adjacent City Center, +1 per adjacent
+    // coastal resource, +1 per two adjacent districts.
     adjacency: [
-      { source: 'CITY_CENTER', amount: 1 },
+      { source: 'CITY_CENTER', amount: 2 },
       { source: 'SEA_RESOURCE', amount: 1 },
       { source: 'DISTRICT', amount: 0.5 },
     ],
@@ -243,23 +259,14 @@ export const PLACEABLE_DISTRICTS: DistrictId[] = [
 ];
 
 /**
- * The districts scripted policies place, in priority order — shared by the
- * GPU fixture exporter's scaffold, the GPU engine, and the seat district
- * picker. The full specialty catalog is scaffolded
- * now — the original five keep their order (first-placeable-wins semantics),
- * the append runs yields-first with Encampment last (its scaffold
- * hold-out is lifted; cap competition is intended, real AIs build early
- * Encampments). `unlockKind: 'civic'` marks civic-tree unlocks (the default
- * is a tech id). NEIGHBORHOOD's appeal-housing MACHINERY is in on
- * both engines (computeHousing reads appealTier(tileAppeal), the GPU mirrors
- * via _tile_appeal over the exported ap/apf contributions),
- * but the scaffold entry stays OUT for now: with it in, the two engines queued
- * DIFFERENT districts t189, rQCost0 1895 vs 1988), a placement/cost
- * divergence needing its own hunt. Re-adding the row below is the remaining
- * step. It is placed
- * LAST so the specialty scaffold keeps first-placeable-wins priority, and it
- * carries countsTowardLimit:false + allowMultiple:true, so it neither eats a
- * specialty slot nor trips the "build any specialty district" boost.
+ * THE district columns of the production mask, in column order — shared by
+ * the fixture exporter, the GPU engine and the wire applier, so the order IS
+ * the wire's meaning and must never be re-sorted. `unlockKind: 'civic'` marks
+ * a civic-tree unlock; the default is a tech id.
+ *
+ * NEIGHBORHOOD is deliberately absent: its appeal-housing machinery is live on
+ * both engines, but with the column in, the two queued different districts —
+ * a placement/cost divergence that needs its own hunt before the row goes back.
  */
 export const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; unlockKind?: 'civic'; placement?: 'aqueduct' | 'coastal' | 'encampment' }[] = [
   { id: 'CAMPUS', unlockId: 'WRITING' },

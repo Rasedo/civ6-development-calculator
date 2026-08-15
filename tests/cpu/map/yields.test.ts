@@ -125,7 +125,7 @@ describe('shipyard special', () => {
     const harborTile = tileAtCoords(state.map, 8, 7);
     expect(queueDistrict(state, city.id, 'HARBOR', harborTile.index, 0).ok).toBe(true);
     const adjacency = districtAdjacency(state.map, harborTile, 'HARBOR');
-    expect(adjacency).toBeGreaterThanOrEqual(1); // GS: city center +1
+    expect(adjacency).toBeGreaterThanOrEqual(2); // GS: adjacent City Center is +2
 
     expect(queueBuilding(state, city.id, 'LIGHTHOUSE', 0).ok).toBe(true);
     const before = computeCityStats(state, city).breakdown.buildings.production;

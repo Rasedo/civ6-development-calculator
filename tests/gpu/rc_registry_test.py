@@ -100,14 +100,14 @@ def poke_placement_rule(rules, path):
     sim.tile_seat[0, T] = r + 1
     sim.tile_city[0, T] = sib_id
 
-    placed = sim._place_district(r + 1, j, di, torch.tensor([True]), 0)
+    placed = sim._place_district(r + 1, j, di, torch.tensor([True]), 0, torch.tensor([T]))
     assert not bool(placed[0]), "district placed on a SIBLING-registered tile (A-24 bug)"
     assert int(sim.district[0, T]) < 0, "sibling tile was paved despite the refusal"
     assert int(sim.city_dist_tile[0, r + 1, j, di]) < 0, "registry gained a sibling tile"
 
     # Now register the same tile to THIS city -> placement succeeds and is coherent.
     sim.tile_city[0, T] = own_id
-    placed2 = sim._place_district(r + 1, j, di, torch.tensor([True]), 0)
+    placed2 = sim._place_district(r + 1, j, di, torch.tensor([True]), 0, torch.tensor([T]))
     assert bool(placed2[0]), "district refused its OWN registered tile"
     assert int(sim.district[0, T]) == di, "own tile not paved"
     assert int(sim.city_dist_tile[0, r + 1, j, di]) == T, "registry did not record the paved tile"
@@ -116,9 +116,9 @@ def poke_placement_rule(rules, path):
 
 
 def poke_never_picks_sibling(rules, path):
-    """b. A sibling-registered tile of MAXIMAL adjacency next to an
-    own-registered tile of lower adjacency: the picker still chooses the OWN
-    tile (the sibling tile never enters elig, so its adjacency cannot win)."""
+    """b. A sibling-registered tile beside an own-registered one: the sibling
+    never enters ELIG, so no adjacency it carries can win it — and naming it on
+    the wire is refused outright."""
     sim = build(rules, path)
     r, j = 0, 0
     di = scaffold_p0(sim)
@@ -137,18 +137,17 @@ def poke_never_picks_sibling(rules, path):
     sim.tile_city[0, T_sib] = sib_id
     sim.tile_city[0, T_own] = own_id
 
-    # Give the sibling tile a huge adjacency edge; if it were eligible it would
-    # win the argmax. The own tile must still be the one paved.
-    adjf = sim._district_adj_floor(di)
-    assert float(adjf[0, T_own]) <= float(adjf[0, T_sib]) + 1e6  # sanity: values are finite
-    # (adjacency is derived from the map; we cannot cheaply inflate it, so we
-    # rely on elig excluding the sibling tile — assert the CHOSEN tile is own.)
-    placed = sim._place_district(r + 1, j, di, torch.tensor([True]), 0)
-    assert bool(placed[0]), "no placement with an own-registered tile available"
+    elig = sim._district_elig(r + 1, j, di, 0)[0]
+    assert not bool(elig[T_sib]), "a sibling-registered tile is ELIGIBLE — adjacency could win it"
+    assert bool(elig[T_own]), "the own-registered tile must be eligible"
+    refused = sim._place_district(r + 1, j, di, torch.tensor([True]), 0, torch.tensor([T_sib]))
+    assert not bool(refused[0]), "the wire named a sibling tile and the engine took it"
+    placed = sim._place_district(r + 1, j, di, torch.tensor([True]), 0, torch.tensor([T_own]))
+    assert bool(placed[0]), "the engine refused its OWN registered tile"
     chosen = int(sim.city_dist_tile[0, r + 1, j, di])
-    assert chosen == T_own, f"picker chose a non-own tile {chosen} (own was {T_own})"
+    assert chosen == T_own, f"registry recorded {chosen}, not the named tile {T_own}"
     assert int(sim.tile_city[0, chosen]) == own_id, "chosen tile registers to a sibling"
-    print(f"  b never-picks-sibling OK (chose own tile {T_own}, not sibling {T_sib})")
+    print(f"  b never-picks-sibling OK (sibling {T_sib} ineligible and refused; own {T_own} paved)")
 
 
 def poke_invariant_scan(rules, path):

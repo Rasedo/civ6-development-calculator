@@ -93,10 +93,13 @@ export interface GovernmentState {
 }
 
 export interface SeatActionRecord {
-  /** [centerTile, maskColumn] pairs. The city axis is keyed by CENTER TILE
+  /** [centerTile, maskColumn] pairs, plus a third element on a DISTRICT
+   * column: the tile index to build it on. WHERE a district goes is a
+   * decision, so it rides the wire — neither engine scans for a plot, both
+   * only re-validate the one named. The city axis is keyed by CENTER TILE
    * because slot order and founding order diverge under compaction and
    * capture. A missing center = that engine has no such city. */
-  production: [number, number][];
+  production: [number, number, number?][];
   war?: number | null;
   envoys?: number[];
   tech: number | null;

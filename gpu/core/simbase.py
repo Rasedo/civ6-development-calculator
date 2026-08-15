@@ -235,10 +235,11 @@ def load_fixture(path: Path) -> dict:
     """Load one seed fixture — THE chokepoint every fixture-consuming lane
     shares, so staleness is checked exactly once, here:
 
-    - anything but `format` 3 (settler starts: no pre-founded majors, one
+    - anything but `format` 4 (settler starts: no pre-founded majors, one
       `civs[]` array carrying each seat's t0 units; tile ownership as the
-      `ownerSeatInit`/`ownerInit` pair) is REFUSED loudly rather than half-read
-      into a world this engine cannot represent;
+      `ownerSeatInit`/`ownerInit` pair; `du` counting floodplains as
+      district-usable) is REFUSED loudly rather than half-read into a world
+      this engine cannot represent;
     - a fixture whose `srcStamp` disagrees with the rules.json beside it is a
       MIXED SET (half re-exported), which reads exactly like an engine
       divergence.
@@ -246,12 +247,12 @@ def load_fixture(path: Path) -> dict:
     p = Path(path)
     f = json.loads(p.read_text())
     fmt = f.get("format", 1)
-    if fmt != 3:
+    if fmt != 4:
         raise RuntimeError(
-            f"{p.name}: fixture format {fmt} — this engine runs FORMAT 3 (settler starts, #71/#106: "
-            "no pre-founded majors, one `civs[]` array carrying each seat's t0 units; #51: tile "
-            "ownership as the seat-generic `ownerSeatInit`/`ownerInit` pair, replacing the per-tile "
-            "city-state key). Regenerate with `npm run seed && npm run export`."
+            f"{p.name}: fixture format {fmt} — this engine runs FORMAT 4 (settler starts: no "
+            "pre-founded majors, one `civs[]` array carrying each seat's t0 units; tile ownership "
+            "as the seat-generic `ownerSeatInit`/`ownerInit` pair; floodplains district-usable). "
+            "Regenerate with `npm run seed && npm run export`."
         )
     fx_stamp = f.get("srcStamp")
     rules_stamp = _rules_stamp_for(p.parent)

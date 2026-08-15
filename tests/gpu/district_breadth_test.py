@@ -178,10 +178,16 @@ def _try_encampment_placement(rules, rj, path) -> bool:
         far_elig = base_elig & (cc[0] == 0)
         if not bool(far_elig.any()):
             continue  # nowhere legal for an encampment here
-        placed_mask = sim._place_district(0, c, EN, torch.tensor([True]), placement=3)
-        if not bool(placed_mask[0]):
+        # The RULE lives in the eligibility set, which is what the mask and the
+        # policy both read; the engine then only validates the tile it is told.
+        elig = sim._district_elig(0, c, EN, 3)[0]
+        if not bool(elig.any()):
             continue
-        bt = int(sim.city_dist_tile[0, 0, c, EN])   # the registry records the paved tile
+        assert not bool((elig & (cc[0] >= 1)).any()), "an ENCAMPMENT tile adjacent to a city center is eligible"
+        bt = int(elig.nonzero(as_tuple=True)[0][0])
+        placed_mask = sim._place_district(0, c, EN, torch.tensor([True]), 3, torch.tensor([bt]))
+        assert bool(placed_mask[0]), f"the engine refused an ELIGIBLE encampment tile {bt}"
+        assert int(sim.city_dist_tile[0, 0, c, EN]) == bt, "the registry records another tile"
         assert int(cc[0, bt]) == 0, f"ENCAMPMENT placed adjacent to a city center (cc={int(cc[0, bt])})"
         assert int(sim.district[0, bt]) == EN, "ENCAMPMENT tile not paved"
         note = "adjacent-center tiles were available but excluded" if bool(adj_elig.any()) else "no adjacent-center tiles here"
