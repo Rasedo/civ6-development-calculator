@@ -687,13 +687,21 @@ already does) rather than a bare step loop — or an explicit poke that puts
 the state it needs on the planes. That is a per-lane decision about what the
 lane is actually for, not a codemod.
 
-**3. THREE MECHANIC REDS the empty world was hiding.** These only became
-visible once the pokes had a city to poke:
+**3. MECHANIC REDS the empty world was hiding.** These only became visible
+once the pokes had a city to poke:
 
-  - `cs_bonus` — the 3-envoy tier-1 building bonus fires for a city with NO
-    tier-1 building (4.725 -> 7.875). The lane's own negative control caught
-    it; the positive case passes, so the gate is on the wrong predicate.
   - `trade2` — a route to a destination with one specialty district pays 3
     gold where the rule is 3+1.
   - `seat_verbs` — resource improvement column 18 dispatches to nothing
     (`improvement` stays -1). A whole build verb is dead.
+
+**A NOTE ON FAMILY 2 AND 3, learned while triaging them.** Three of the reds
+above were NOT the engine. `cs_bonus` reported the 3-envoy building bonus
+firing without the building, and the pillaged Campus still paying — both were
+its own controls, which stepped 1 -> 3 envoys and so crossed the SUZERAIN
+threshold at the same time, whose flat capital yield pays into the same
+channel and answers to no building. Its pillage lane also wrote the district
+onto the TILE plane only, where the yield walk reads the city REGISTRY, so it
+built a Campus no city owned and nothing could go dark. A control that moves
+two things at once measures neither; read every remaining lane above for the
+same shape before believing it names a mechanic.

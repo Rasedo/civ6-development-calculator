@@ -110,13 +110,22 @@ def test_building_bonus(rules, path) -> None:
     assert abs(f3 - f1) < 1e-9 and abs(f6 - f1) < 1e-9, "food changed — bonus landed in the wrong channel"
     print(f"  seat-0 building bonus OK: science {s1:.2f}(1e) -> {s3:.2f}(3e) -> {s6:.2f}(6e), food flat")
 
-    # control: no LIBRARY -> the 3-envoy tier-1 bonus vanishes
+    # CONTROL: the 1->3 envoy step also crosses the SUZERAIN threshold, whose
+    # flat capital yield pays into the same channel — so "no bonus without the
+    # building" cannot be read off that step alone. Take the step TWICE, with
+    # and without the LIBRARY: the suzerain half is identical in both, and the
+    # difference of the deltas is the building bonus by itself.
     sim.city_bldg[0, 0, 0, li] = False
     sim.city_bldg[0, 0, 0, ui] = False
     s1b, _ = sci0(1)
     s3b, _ = sci0(3)
-    assert abs(s3b - s1b) < 1e-9, f"3-envoy bonus fired with NO tier-1 building ({s1b}->{s3b})"
-    print("  seat-0 building CONTROL OK: no tier-1 building -> no 3-envoy bonus")
+    assert abs((s3b - s1b) - (s3 - s1)) > 1e-9, (
+        f"the 1->3 envoy step paid the same with and without the LIBRARY "
+        f"({s1}->{s3} vs {s1b}->{s3b}) — the tier-1 building is not gating it"
+    )
+    assert (s3 - s1) > (s3b - s1b), "dropping the tier-1 building must SHRINK the 3-envoy step"
+    print(f"  seat-0 building CONTROL OK: the 3-envoy step is {s3 - s1:.2f} with the LIBRARY "
+          f"and {s3b - s1b:.2f} without (the remainder is the suzerain yield)")
 
 
 def test_building_pillage(rules, path) -> None:
@@ -146,6 +155,10 @@ def test_building_pillage(rules, path) -> None:
     sim.district_complete[0, ct] = True
     sim.district_pillaged[0, ct] = False
     sim.district_dead[0, ct] = False
+    # THE REGISTRY is what the yield walk reads (`_bldg_dark` takes the city's
+    # district-tile row, TS's `city.districts` twin) — a poke that writes only
+    # the tile plane builds a Campus no city owns, and nothing can go dark.
+    sim.city_dist_tile[0, 0, 0, campus_idx] = ct
     li = bidx("LIBRARY")
     sim.city_bldg[0, 0, 0, li] = True
 
@@ -165,8 +178,16 @@ def test_building_pillage(rules, path) -> None:
     s3_dark = sci0(3)
     s1_dark = sci0(1)
     dark_delta = s3_dark - s1_dark
-    assert abs(dark_delta) < 1e-9, f"pillaged-Campus LIBRARY still paid the CS bonus ({dark_delta})"
-    print(f"  pillage-dark OK: live delta {live_delta:.2f} -> pillaged delta {dark_delta:.2f}")
+    # The 1->3 step also crosses the SUZERAIN threshold, whose flat capital
+    # yield pays into this same channel and is unaffected by any pillage — so
+    # the pillaged step is not expected to reach zero, only to LOSE the
+    # building's share of it.
+    assert dark_delta < live_delta - 1e-9, (
+        f"pillaging the Campus did not darken its LIBRARY: the 1->3 envoy step still pays "
+        f"{dark_delta} against {live_delta} live"
+    )
+    print(f"  pillage-dark OK: 1->3 envoy step {live_delta:.2f} live -> {dark_delta:.2f} pillaged "
+          "(the remainder is the suzerain yield)")
 
 
 def test_suzerain(rules, path) -> None:

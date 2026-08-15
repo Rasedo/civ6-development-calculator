@@ -7,8 +7,11 @@ import { DIR_E } from '../../../world/hex';
 
 function unitsState() {
   const state = makeState(makeMap(16, 16));
-  state.unitsMode = true;
+  // The capital is placed BEFORE units mode goes live: with it on, `foundCity`
+  // demands a settler standing on the tile, which is the real opening and not
+  // what these lanes are about.
   const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
+  state.unitsMode = true;
   return { state, city };
 }
 
