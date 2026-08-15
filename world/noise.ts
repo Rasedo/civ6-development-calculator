@@ -1,4 +1,3 @@
-/** Seeded 2D value noise with fractal Brownian motion, used by map generation. */
 
 import { mulberry32, deriveSeed } from './rng';
 
@@ -10,9 +9,7 @@ export interface Noise2D {
   (x: number, y: number): number; // -> [0, 1)
 }
 
-/** Lattice value noise: random value per integer lattice point, smooth interpolation between. */
 export function valueNoise(seed: number): Noise2D {
-  // Hash lattice coordinates to a deterministic pseudo-random value.
   const base = seed >>> 0;
   function lattice(ix: number, iy: number): number {
     let h = base;
@@ -38,7 +35,6 @@ export function valueNoise(seed: number): Noise2D {
   };
 }
 
-/** Fractal sum of value-noise octaves, normalized back to roughly [0, 1]. */
 export function fbm(seed: number, octaves = 4, lacunarity = 2, gain = 0.5): Noise2D {
   const layers: Noise2D[] = [];
   for (let i = 0; i < octaves; i++) {
@@ -59,7 +55,6 @@ export function fbm(seed: number, octaves = 4, lacunarity = 2, gain = 0.5): Nois
   };
 }
 
-/** Tiny per-tile jitter stream (e.g. to break ties in river descent). */
 export function jitter(seed: number): (i: number) => number {
   const rng = mulberry32(seed);
   const cache: number[] = [];

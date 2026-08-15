@@ -1,11 +1,3 @@
-/**
- * Natural disasters (stage 11d, eyeballed Gathering Storm): river floods,
- * volcanic eruptions, droughts and storms. Destruction pillages
- * improvements; several events leave permanent fertility (+1 food, capped)
- * behind — the classic risk/reward of settling floodplains and volcano
- * slopes. All rolls go through the in-state RNG. Sea-level rise is
- * deliberately not modeled yet.
- */
 
 import type { GameState, Tile } from './types';
 import { neighbors, tilesWithin } from '../../world/hex';
@@ -39,16 +31,13 @@ function fertilize(tile: Tile): void {
   }
 }
 
-/** One turn of weather. Call only when state.disasters is on. */
 export function disasterPhase(state: GameState): void {
   const map = state.map;
 
-  // Drought clocks tick down first.
   for (const t of map.tiles) {
     if (t.droughtTurns > 0) t.droughtTurns -= 1;
   }
 
-  // --- river flood: a floodplain drowns, then blooms -------------------------
   if (nextRandom(state) < FLOOD_CHANCE) {
     const target = pick(state, map.tiles.filter((t) => t.feature === 'FLOODPLAINS'));
     if (target) {
@@ -58,7 +47,6 @@ export function disasterPhase(state: GameState): void {
     }
   }
 
-  // --- volcanic eruptions ------------------------------------------------------
   for (const volcano of map.tiles) {
     if (!volcano.volcano) continue;
     if (nextRandom(state) >= ERUPTION_CHANCE_PER_VOLCANO) continue;
@@ -69,7 +57,6 @@ export function disasterPhase(state: GameState): void {
     log(state, `Volcanic eruption at (${volcano.col}, ${volcano.row}) — slopes scorched, soil enriched.`);
   }
 
-  // --- drought -------------------------------------------------------------------
   if (nextRandom(state) < DROUGHT_CHANCE) {
     const center = pick(
       state,
@@ -85,7 +72,6 @@ export function disasterPhase(state: GameState): void {
     }
   }
 
-  // --- storm (hurricane over water edges, sandstorm over desert, blizzard) ------
   if (nextRandom(state) < STORM_CHANCE) {
     const center = pick(state, map.tiles.filter((t) => !isWater(t)));
     if (center) {

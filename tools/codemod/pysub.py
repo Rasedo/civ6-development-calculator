@@ -55,11 +55,11 @@ import time
 
 REPO = os.environ.get("CODEMOD_ROOT") or os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 APPLY = "--apply" in sys.argv
-CHECK = "--check" in sys.argv          # py_compile + ruff F-rules on touched files
+CHECK = "--check" in sys.argv
 SHOW_DIFF = "--no-diff" not in sys.argv
 
 
-for _stream in (sys.stdout, sys.stderr):  # the miss report prints codepoints
+for _stream in (sys.stdout, sys.stderr):
     try:
         _stream.reconfigure(encoding="utf-8")
     except AttributeError:
@@ -71,7 +71,6 @@ class CodemodError(Exception):
 
 
 def _nearest_miss(hay: str, needle: str) -> str:
-    """Why an exact anchor did not match, at CODEPOINT resolution."""
     first = needle.strip().splitlines()[0].strip() if needle.strip() else ""
     if not first:
         return "    (empty anchor)"
@@ -103,7 +102,6 @@ def _nearest_miss(hay: str, needle: str) -> str:
 
 
 class Src:
-    """One file under edit. Text is staged in memory; nothing reaches disk."""
 
     def __init__(self, mod: "Mod", rel: str) -> None:
         self.mod = mod
@@ -121,7 +119,6 @@ class Src:
         print(f"  PLAN x{n}  {self.rel}  {what}")
 
     def sub(self, old: str, new: str, want: int = 1) -> "Src":
-        """Literal replacement, count-asserted. Raises before any write."""
         got = self.text.count(old)
         if got != want:
             head = old.strip().splitlines()[0][:70] if old.strip() else "<empty>"
@@ -132,8 +129,6 @@ class Src:
         return self
 
     def sub_re(self, pattern: str, repl: str, want: int) -> "Src":
-        """Regex replacement, count-asserted. `want` is mandatory: a regex with
-        an unstated site count is how a codemod edits a place nobody read."""
         got = len(re.findall(pattern, self.text))
         if got != want:
             raise CodemodError(f"{self.rel}: /{pattern}/\n    expected {want} site(s), found {got}")
@@ -153,7 +148,6 @@ class Src:
 
 
 class Mod:
-    """Stage every edit, then commit ALL files or NONE."""
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -242,7 +236,6 @@ class Mod:
         except OSError as e:
             restore(f"WRITE FAILED after {wrote}/{len(pending)} file(s): {e}")
 
-        # The step that makes "applied" mean applied.
         for s in pending:
             with open(s.abs, "rb") as fh:
                 on_disk = fh.read()
@@ -289,9 +282,6 @@ class Mod:
         if not os.path.exists(ruff):
             raise CodemodError("--check asked for ruff and it is not in .venv. NOTHING WRITTEN.")
         r = subprocess.run(
-            # Syntax is py_compile's job above; these are the NAME errors a text
-            # codemod actually introduces (a symbol it forgot to define/import,
-            # a def it duplicated, an import whose last use it just deleted).
             [ruff, "check", "--isolated", "--select", "F821,F811,F401", "--no-cache", *[p for _, p in staged]],
             capture_output=True,
             text=True,

@@ -1,12 +1,3 @@
-"""THE BATCHED SIM — BatchSim, assembled from its region mixins.
-
-The module floor (Rules, load_rules/load_fixture, FIXTURES, UNIT_SLOTS, the
-_MUTABLE plane registry, hex/pool helpers) lives in `simbase.py`; the class
-body is divided by region across the `sim_*.py` mixins. This module
-re-exports the whole public surface, so `from core.engine import ...` reaches
-every name — but module-global PATCHING (e.g. a probe setting MAJOR_POOL_MAX)
-must target `core.simbase`, where the globals actually live.
-"""
 from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — the public module surface

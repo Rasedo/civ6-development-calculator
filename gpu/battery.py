@@ -30,16 +30,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 FULL = "--full" in sys.argv
-NO_BAIL = "--no-bail" in sys.argv  # keep every lane running past a failure
+NO_BAIL = "--no-bail" in sys.argv
 
 # Poke pool: 4 workers x OMP 2 = 8 threads. Deliberately small — the box is 24
 # cores and the serve lane's twelve TS children already claim most of them.
 POKE_WORKERS = 4
 POKE_OMP = 2
 
-# Measured poke-lane wall times (seconds), used ONLY to order the poke group
-# cheapest-first so bail-fast surfaces a red sooner. A stale entry costs
-# ordering quality, never correctness.
 POKE_COST = {
     "great_works": 2.7, "religion_gp": 3.2, "government": 3.3,
     "relics": 3.4, "trade2": 3.5, "bankruptcy": 3.7, "domination": 3.8,
@@ -66,11 +63,6 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True) -> None:
     env["OMP_NUM_THREADS"] = str(threads)
     env["MKL_NUM_THREADS"] = str(threads)
     t0 = time.time()
-    # BAIL-FAST: the standing process is to fix and RE-RUN the whole battery,
-    # so once any lane fails every other lane is wasted wall-clock — the
-    # expensive ones most of all. Poll instead of blocking so a failure
-    # elsewhere can kill this lane now. `--no-bail` runs everything anyway,
-    # for counting how many lanes a change breaks.
     p = subprocess.Popen(
         cmd, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         text=True, encoding="utf-8", errors="replace",
@@ -95,7 +87,6 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True) -> None:
         status = "ok" if p.returncode == 0 else f"FAIL rc={p.returncode}"
         print(f"  {name:<14} {dt:6.1f}s  {status}", flush=True)
         if p.returncode == 0 and name.startswith("eval"):
-            # baselines are results, not just gates — always surface them
             for ln in p.stdout.strip().splitlines()[-1:]:
                 print(f"    | {ln}", flush=True)
         if p.returncode != 0:
@@ -105,15 +96,6 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True) -> None:
 
 
 def lane_parallel(steps: list[tuple[str, list[str], int]], workers: int, threads: int) -> None:
-    """Run one lane's steps CONCURRENTLY through a bounded pool.
-
-    Poke tests are independent processes over read-only fixtures — none writes
-    a file — so they parallelise freely. BOUNDED is the point: the whole group
-    at OMP 4 would be well over a hundred threads on 24 cores, and
-    oversubscription starves the lanes that set the critical path. A small pool
-    at a lower OMP spends the same core-seconds in a shorter window, and every
-    poke red surfaces in ONE pass.
-    """
     pos = [0]
     lk = threading.Lock()
 
@@ -151,32 +133,19 @@ def main() -> int:
     npx = "npx.cmd" if os.name == "nt" else "npx"
     npm = "npm.cmd" if os.name == "nt" else "npm"
     py = sys.executable
-    # ruff ships in the venv beside the interpreter.
     ruff = Path(py).with_name("ruff.exe" if os.name == "nt" else "ruff")
     t0 = time.time()
 
     print("stage 0 (serial): tsc, export", flush=True)
     for name, cmd in (
-        # No lane consumes a vite build artifact — export and vitest both run
-        # from source — so the type check IS the gate here, and vitest runs in
-        # a lane below.
         ("tsc", [npx, "tsc", "--noEmit"]),
-        # Parse-check + module boundary in one ~300ms pass: it catches a
-        # mangled file that tsc reports with an empty error message, and it
-        # enforces the world/seeder import boundary.
         ("parse", ["node", "tools/parse-check.mjs"]),
         ("lint", [npx, "oxlint", "cpu", "seeder", "world", "tools", "tests"]),  # no-constant-binary-expression et al
         # F821 = UNDEFINED NAME on the Python side, ~0.3s. Without it an
         # undefined name in a rarely-reached engine branch presents as a crash
         # or hang deep inside a lane instead of an import error.
         ("f821", [str(ruff), "check", "--select", "F821", "gpu", "policy", "tools"]),
-        # pyright, basic mode; suppressions are documented in pyrightconfig.json.
         ("pyright", [npx, "pyright"]),
-        # Worlds (the engine-free seeder layer) then the compiled planes. The
-        # lock check is the staleness guard: every lane below COMPARES the two
-        # engines, and a stale world set reads exactly like an engine
-        # divergence. The fixtures' own srcStamp is additionally enforced
-        # inside gpu load_fixture.
         ("seed", [npm, "run", "seed"]),
         ("export", [npm, "run", "export"]),
         ("lock", [npm, "run", "seed:check"]),
@@ -195,10 +164,10 @@ def main() -> int:
                 ("serve", [py, "gpu/serve_gate.py", "--batched", "--turns", "250"], 6),
             ],
             [
-                ("buy_wire", [py, "tests/gpu/buy_wire_test.py"], 4),  # kinds 0-7, every seat row
+                ("buy_wire", [py, "tests/gpu/buy_wire_test.py"], 4),
                 ("war", [py, "tests/gpu/war_test.py"], 4),
                 ("ranged", [py, "tests/gpu/ranged_test.py"], 4),
-                ("combat_mod", [py, "tests/gpu/combat_mod_test.py"], 4),  # wounded + river
+                ("combat_mod", [py, "tests/gpu/combat_mod_test.py"], 4),
                 ("occupancy", [py, "tests/gpu/occupancy_test.py"], 4),
                 ("domination", [py, "tests/gpu/domination_test.py"], 4),
                 ("peace_target", [py, "tests/gpu/peace_target_test.py"], 2),  # no attack without a war
@@ -243,21 +212,10 @@ def main() -> int:
                 ("ladder", [py, "tests/gpu/ladder_test.py"], 4),  # the shared decision ladder's own guard
             ],
         ]
-        # BAIL-FAST ORDERING. The poke group is ONE lane on purpose: it is
-        # nowhere near the critical path (the serve lane sets that), so
-        # splitting it could not shorten the wall — only steal cores from the
-        # lanes that do set it. What list order DOES decide is
-        # time-to-first-failure, so the cheap pokes run first and surface most
-        # reds in seconds at zero CPU cost. Times are measured medians;
-        # unknown lanes default mid-pack, neither starved nor promoted. Pokes
-        # are independent processes over read-only fixtures, so order carries
-        # no semantics.
         for L in lanes:
-            if len(L) > 5:  # only the poke group is this long
+            if len(L) > 5:
                 L.sort(key=lambda s: POKE_COST.get(s[0], 30.0))
 
-        # The poke group runs through the bounded pool; every other lane is
-        # serial (1-3 steps each, and on the critical path).
         threads = [
             threading.Thread(target=lane_parallel, args=(l, POKE_WORKERS, POKE_OMP))
             if len(l) > 5

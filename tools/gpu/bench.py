@@ -1,11 +1,3 @@
-"""Throughput benchmark for the vectorized engine.
-
-    python tools/gpu/bench.py                # CPU, and CUDA if available
-    python tools/gpu/bench.py --turns 100 --batches 1,256,4096
-
-Reports game-turns/second (one 'turn' = one full simulated turn of ONE
-game — all its cities; a batch of 4096 stepping once = 4096 turns).
-"""
 
 from __future__ import annotations
 
@@ -22,7 +14,6 @@ from core import BatchSim, load_rules, load_fixture, FIXTURES
 
 def bench(device: str, dtype, batch: int, turns: int, fixture: dict, rules) -> float:
     sim = BatchSim([fixture] * batch, rules, device=device, dtype=dtype)
-    # warmup (JIT-ish caches, CUDA context)
     for _ in range(3):
         sim.step()
     if device == "cuda":
@@ -62,8 +53,6 @@ def main() -> None:
             except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
                 if "out of memory" not in str(e).lower():
                     raise
-                # A too-large batch shouldn't abort the sweep — report and
-                # move on, freeing the partial allocation first.
                 print(f"{device:8} {b:>6}  OOM")
                 if device == "cuda":
                     torch.cuda.empty_cache()

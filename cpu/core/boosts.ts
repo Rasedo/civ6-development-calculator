@@ -1,4 +1,3 @@
-/** Evaluation of eureka/inspiration conditions against the game state. */
 
 import { dedicationEvent } from './eras';
 import { seatOf, citiesOf, tileOwnedByCiv } from './seats';
@@ -13,8 +12,6 @@ import { isCoastalLand } from '../../world/query';
 
 export { BOOST_FRACTION };
 
-/** the eureka/inspiration discount, scoped to any civ's
- * research state (seat 0's effectiveResearchCost delegates here). */
 export function effectiveResearchCostIn(
   rsr: ResearchState,
   id: string,
@@ -79,8 +76,6 @@ function checkSatisfied(state: GameState, seat: number, check: BoostCheck): bool
           (t.wonder !== null || neighbors(state.map, t).some((n) => n.wonder !== null)),
       );
     case 'policies':
-      // A seat with no policy machinery has an empty slot list, so this reads
-      // 0 — and goes live by itself the day that seat gets cards.
       return (
         (seatOf(state, seat)?.government.policies.filter((p) => p !== null).length ?? 0) >=
         check.count
@@ -94,8 +89,6 @@ export function isBoosted(state: GameState, id: string, seat: number): boolean {
   return seatOf(state, seat)!.research.boosted.includes(id);
 }
 
-/** Auto-detect one seat's satisfied eureka/inspiration conditions (idempotent).
- *  Returns the ids newly flagged by this call. */
 export function detectBoosts(state: GameState, seat: number): string[] {
   const research = seatOf(state, seat)?.research;
   if (!research) return [];
@@ -106,9 +99,6 @@ export function detectBoosts(state: GameState, seat: number): string[] {
     if (research.techs.includes(id) || research.civics.includes(id)) continue;
     if (checkSatisfied(state, seat, def.check)) {
       research.boosted.push(id);
-      // FREE INQUIRY pays era score per EUREKA, PEN BRUSH AND
-      // VOICE per INSPIRATION — a tech boost is a eureka, a civic boost an
-      // inspiration.
       dedicationEvent(state, seat, TECHS[id] ? DED_FREE_INQUIRY : DED_PEN_BRUSH_AND_VOICE);
       newly.push(id);
     }
@@ -116,7 +106,6 @@ export function detectBoosts(state: GameState, seat: number): string[] {
   return newly;
 }
 
-/** Manually toggle a boost (for conditions the calculator can't observe). */
 export function toggleBoost(state: GameState, id: string, seat: number): void {
   const i = seatOf(state, seat)!.research.boosted.indexOf(id);
   if (i >= 0) seatOf(state, seat)!.research.boosted.splice(i, 1);

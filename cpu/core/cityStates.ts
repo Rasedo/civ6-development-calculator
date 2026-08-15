@@ -1,10 +1,3 @@
-/**
- * City-states: independent one-city minors placed at game creation. Their
- * territory blocks settling and border growth; envoys (earned from
- * influence and quests) buy yield bonuses keyed to their type, with a
- * suzerain perk at 3+. Peaceful in this stage — conquest arrives with the
- * seat-civ war framework.
- */
 
 import type { City, CityState, CityStateQuest, CityStateType, GameState, Tile, Yields } from './types';
 import { NO_SEAT, citiesOf, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setWar, setWarTurnsWith, tileSeat, warTurnsWith, warsOf } from './seats';
@@ -23,12 +16,8 @@ import { warWearinessPeace } from './weariness';
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
-/** Minimum spacing between city-states (and, at placement, map fairness). */
 const CITY_STATE_SPACING = 8;
 
-// ---------------------------------------------------------------------------
-// Placement
-// ---------------------------------------------------------------------------
 
 function siteQuality(state: GameState, tile: Tile): number {
   if (isWater(tile) || isImpassable(tile)) return -1;
@@ -47,7 +36,6 @@ function siteQuality(state: GameState, tile: Tile): number {
   return q;
 }
 
-/** Place `count` city-states on good, mutually distant sites (seeded). */
 export function placeCityStates(state: GameState, count?: number): void {
   const land = state.map.tiles.filter((t) => !isWater(t) && !isImpassable(t)).length;
   const target = count ?? Math.max(2, Math.min(6, Math.round(land / 200)));
@@ -75,11 +63,6 @@ export function placeCityStates(state: GameState, count?: number): void {
   });
 }
 
-/**
- * FOUND one city-state at a known tile — the ONE constructor, shared by the
- * scored placement above and the world-file loader. Claims the centre plus
- * any unowned first-ring tile.
- */
 export function placeCityStateAt(
   state: GameState,
   id: number,
@@ -89,8 +72,6 @@ export function placeCityStateAt(
 ): CityState {
   const tile = state.map.tiles[centerIndex];
   const cityState: CityState = {
-    // A minor is a Seat — the civ-level fields at zero, which is
-    // the RULE (it banks and researches nothing), not a placeholder.
     ...emptySeat(seatOfCityState(id)),
     id,
     name,
@@ -108,9 +89,6 @@ export function placeCityStateAt(
   return cityState;
 }
 
-// ---------------------------------------------------------------------------
-// Queries
-// ---------------------------------------------------------------------------
 
 export function cityStateAt(state: GameState, tileIndex: number): CityState | undefined {
   const _s = tileSeat(state.map.tiles[tileIndex]);
@@ -126,17 +104,14 @@ export function envoysOf(cityState: CityState, seat: number): number {
   return cityState.envoys[seat] ?? 0;
 }
 
-/** Has `seat` met this city-state? */
 export function hasMet(cityState: CityState, seat: number): boolean {
   return cityState.met.includes(seat);
 }
 
-/** Record contact between `seat` and this city-state. Idempotent. */
 export function setMet(cityState: CityState, seat: number): void {
   if (!cityState.met.includes(seat)) cityState.met.push(seat);
 }
 
-/** Bank `n` more envoys for `seat` here. The ONE writer. */
 export function addEnvoys(cityState: CityState, seat: number, n = 1): void {
   cityState.envoys[seat] = (cityState.envoys[seat] ?? 0) + n;
 }
@@ -153,7 +128,6 @@ export function isSuzerain(cityState: CityState, seat: number): boolean {
   return Object.entries(cityState.envoys).every(([k, e]) => Number(k) === seat || mine > (e ?? 0));
 }
 
-/** Extra trade-route capacity from being suzerain of trade city-states. */
 export function cityStateTradeCapacityBonus(state: GameState, seat: number): number {
   return state.cityStates.filter((cityState) => cityState.type === 'trade' && isSuzerain(cityState, seat)).length;
 }
@@ -168,7 +142,6 @@ export interface CsBonuses {
   buildingAdd: Partial<Record<string, Partial<Yields>>>;
 }
 
-/** the tier-1 (3-envoy) and tier-2 (6-envoy) building ids per CS type. */
 function cityStateTierBuildings(type: GameState['cityStates'][number]['type']): {
   tier1?: string;
   tier2?: string;
@@ -177,10 +150,6 @@ function cityStateTierBuildings(type: GameState['cityStates'][number]['type']): 
   return { tier1: list[0], tier2: list[1] };
 }
 
-/**
- * The 1/3/6 envoy-count bonuses this seat draws from every city-state, folded
- * into its modifiers. `envoysOf` is the one place "my envoy count" comes from.
- */
 export function cityStateEnvoyBonuses(state: GameState, seat: number): CsBonuses {
   const capital: Partial<Yields> = {};
   const buildingAdd: CsBonuses['buildingAdd'] = {};
@@ -201,11 +170,6 @@ export function cityStateEnvoyBonuses(state: GameState, seat: number): CsBonuses
   return { capital, buildingAdd };
 }
 
-/**
- * The suzerain's per-CS unique bonus, as a flat capital-yield add for
- * whichever seat holds suzerainty. The two twins differed only in the
- * seat handed to `isSuzerain`.
- */
 export function cityStateSuzerainCapitalBonus(state: GameState, seat: number): Partial<Yields> {
   const out: Partial<Yields> = {};
   for (const cityState of state.cityStates) {
@@ -217,14 +181,11 @@ export function cityStateSuzerainCapitalBonus(state: GameState, seat: number): P
   return out;
 }
 
-/** Per-turn yield gain of assigning one more envoy to `cityState` (for advisors/RL). */
 export function envoyBonusDelta(state: GameState, cityState: CityState, seat: number): Yields {
   const delta = emptyYields();
   const key = CITY_STATE_TYPE_YIELD[cityState.type];
   const next = envoysOf(cityState, seat) + 1;
   if (next === 1) delta[key] += CITY_STATE_CAPITAL_BONUS;
-  // The 3/6 tiers now land on cities holding the type's tier-1/tier-2
-  // BUILDING (not the bare district) — count matching held buildings.
   if (next === 3 || next === 6) {
     const { tier1, tier2 } = cityStateTierBuildings(cityState.type);
     const bld = next === 3 ? tier1 : tier2;
@@ -237,9 +198,6 @@ export function envoyBonusDelta(state: GameState, cityState: CityState, seat: nu
   return delta;
 }
 
-// ---------------------------------------------------------------------------
-// Actions
-// ---------------------------------------------------------------------------
 
 export function assignEnvoy(state: GameState, cityStateId: number, seat: number): RuleResult {
   const cityState = state.cityStates.find((c) => c.id === cityStateId);
@@ -252,17 +210,7 @@ export function assignEnvoy(state: GameState, cityStateId: number, seat: number)
   return ok;
 }
 
-// ---------------------------------------------------------------------------
-// Per-turn phase
-// ---------------------------------------------------------------------------
 
-/**
- * ONE "is this quest done?" rule for every seat. Camps are global; the
- * route and district tests read the SEAT's own lists, which `owner` supplies
- * (omitted = seat 0, what every seat-0 call site meant). Note the quest
- * ISSUERS are deliberately NOT merged: seat 0's draws RNG and that seat's
- * is zero-draw by design (B8), and choosing a quest is policy, not a rule.
- */
 export function questSatisfied(
   state: GameState,
   cityState: CityState,
@@ -304,8 +252,6 @@ export function issueQuest(
   const center = state.map.tiles[cityState.centerIndex];
   const cities = owner?.cities ?? seatOf(state, seat)!.cities;
   const routes = owner?.tradeRoutes ?? seatOf(state, seat)?.tradeRoutes ?? [];
-  // clearCamp — the NEAREST camp within range 6, ties to the LOWEST tile
-  // index (the deterministic key hexDist*(nTiles+1)+tile).
   let campIndex: number | undefined;
   let campKey = Infinity;
   const span = state.map.tiles.length + 1;
@@ -320,14 +266,11 @@ export function issueQuest(
     }
   }
   if (campIndex !== undefined) return { kind: 'clearCamp', campIndex };
-  // buildDistrict — the CS type's own district, unless this seat already
-  // holds one completed.
   const district = CITY_STATE_TYPE_DISTRICT[cityState.type];
   const alreadyBuilt = cities.some((c) =>
     c.districts.some((d) => d.type === district && state.map.tiles[d.tileIndex].districtComplete),
   );
   if (!alreadyBuilt) return { kind: 'buildDistrict', district };
-  // sendTradeRoute — unless this seat already routes to this CS.
   if (!routes.some((r) => r.toCs === cityState.id)) return { kind: 'sendTradeRoute' };
   return null;
 }
@@ -368,12 +311,6 @@ export function sueForPeaceWithCityState(state: GameState, cityStateId: number, 
   const cityState = (state.cityStates ?? []).find((c) => c.id === cityStateId);
   if (!cityState) return { ok: false, reason: 'No such city-state.' };
   if (!civsAtWar(state, cityState.seat, seat)) return { ok: false, reason: 'Not at war.' };
-  // SOURCED: a city-state is dragged into its SUZERAIN's wars and
-  // cannot make separate peace while that war runs — "city states automatically
-  // get peace when you either stop being at war with their suzerain or them
-  // switching". So refuse here; the way out is peace with the suzerain (which
-  // makePeace then forces onto every city-state it is suzerain of) or the
-  // suzerainty changing hands.
   const suz = state.seats.find((civSeat) => civsAtWar(state, civSeat.seat, seat) && isSuzerain(cityState, civSeat.seat));
   if (suz) {
     return { ok: false, reason: `${cityState.name} will not talk while you are at war with its suzerain, ${suz.name}.` };
@@ -403,21 +340,13 @@ export function questLabel(quest: CityStateQuest): string {
 export function cityStatePhase(state: GameState): void {
   if (state.cityStates.length === 0) return;
 
-  // Tick each city-state's OWN LINE of the pair clock, exactly where
-  // cityStatePhase does; a major's line ticks in its own seat block, so every
-  // war's two ends each move once a turn. Peace unlocks at WAR_MIN_TURNS (one
-  // constant, every seat).
   for (const cityState of state.cityStates) {
     for (const foe of warsOf(state, cityState.seat)) {
       setWarTurnsWith(state, cityState.seat, foe, warTurnsWith(state, cityState.seat, foe) + 1);
     }
   }
 
-  // Seat diplomacy — meets, influence -> envoys, quests — happens in the
-  // seatPhase loop, ONE body for every seat (seat 0 included). This phase
-  // is the city-states' OWN turn only.
 
-  // Cosmetic slow growth + siege recovery.
   if (state.turn % 12 === 0) {
     for (const cityState of state.cityStates) cityState.population = Math.min(10, cityState.population + 1);
   }

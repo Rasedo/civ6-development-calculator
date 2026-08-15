@@ -27,15 +27,11 @@ import { UNITS } from '../data/units';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { PROJECTS } from '../data/projects';
 
-/** Districts whose buildings sit in the production table. */
 export const BUILDING_DISTRICTS: Set<string> = new Set<string>([
   'CITY_CENTER',
   ...SCAFFOLD_DISTRICTS.map((d) => d.id),
 ]);
 
-/** The building rows, in table order. PALACE stays out — both engines model it
- * as a capital term, not a row. Worship buildings JOIN the table (the other seats
- * faith-buy them; the pickers mask them via the `worship` flag). */
 export function centerBuildingIds(): string[] {
   return Object.values(BUILDINGS)
     .filter((b) => BUILDING_DISTRICTS.has(b.district) && b.id !== 'PALACE' && !SCRIPTED_HELD_BUILDINGS.has(b.id))
@@ -49,15 +45,10 @@ export function rosterUnitIds(): string[] {
   return Object.values(UNITS).map((u) => u.id);
 }
 
-/** wonder rows in EXPORT order — `Object.values(BUILT_WONDERS)`, the
- * exact order `rules.json`'s wonders.rows ships in. Column index = data
- * index, both engines. */
 export function wonderIds(): string[] {
   return Object.values(BUILT_WONDERS).map((w) => w.id);
 }
 
-/** project rows in EXPORT order — `Object.values(PROJECTS)`, matching
- * rules.json's projects.rows (base rows first, space rows last). */
 export function projectIds(): string[] {
   return Object.values(PROJECTS).map((p) => p.id);
 }

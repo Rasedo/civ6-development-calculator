@@ -24,8 +24,6 @@ import { TECHS } from '../data/techs';
 import { UNITS } from '../data/units';
 import { CIVICS } from '../data/civics';
 
-/** This seat's live quest at a city-state, if any — one seat-keyed store,
- *  whatever the seat. */
 export function questFor(cityState: CityState, seat: number): CityStateQuest | null {
   return cityState.seatQuest?.[seat] ?? null;
 }
@@ -54,10 +52,6 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
     // army holds melee, so a bare unit COUNT cannot express the decision.
     state.units.filter((u) => u.seat === seat && (UNITS[u.type]?.ranged?.strength ?? 0) > 0).length / 10.0,
   ];
-  // S1(c): FIXED S slots by t0 id, ZEROS when captured (the trace
-  // tables' own convention — iterating the live array narrowed the vector
-  // after a CS capture). Each slot renders THE SEAT'S OWN view: met,
-  // envoys and quest are all seat-keyed stores, one row per seat.
   const cityState: number[] = [];
   const nCs = cityStateMax ?? (state.cityStates ?? []).length;
   for (let i = 0; i < nCs; i++) {
@@ -110,9 +104,6 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
       c.hp / 200.0,
       (c.loyalty ?? 100) / 100.0,
       head ? 1 : 0,
-      // The production LADDER branches on isCapital (only
-      // the capital queues a settler) — nine floats could not say which
-      // city it was talking to.
       c.isCapital ? 1 : 0,
     );
   }

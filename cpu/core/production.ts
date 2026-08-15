@@ -1,11 +1,3 @@
-/**
- * PRODUCTION PAYOUT — what a finished queue item does.
- *
- * One implementation for every seat: the city carries its owner in `city.seat`,
- * so nothing here asks which seat is building. Kept in its own module because
- * both the turn loop and the scripted phase complete items, and neither should
- * have to import the other.
- */
 import type { City, GameState, QueueItem } from './types';
 import { seatOf } from './seats';
 import { UNITS, ENCAMPMENT_HP, WALLS_HP } from '../data/units';
@@ -16,21 +8,12 @@ import { spawnUnit } from './units';
 import { encampmentTrainXp } from './combat';
 import { applyLumpYield } from './economy';
 
-/**
- * A finished PROJECT pays out, for whichever seat owns the city.
- *
- * `victoryType` names the CONDITION (3 = science) and `victoryRow` the seat
- * that met it. They used to be one field reported from seat 0's point of view,
- * which made the end of the game a property of one seat rather than of the
- * game.
- */
 export function completeProject(state: GameState, city: City, projectId: string, cost: number): void {
   const def = PROJECTS[projectId];
   if (!def) return;
   const owner = seatOf(state, city.seat);
   if (!owner) return;
 
-  // Space-race step: record chain progress; the final step ends the game.
   if (def.space) {
     if (!owner.spaceProjects.includes(projectId)) owner.spaceProjects.push(projectId);
     state.eventLog.push(`${city.name} completed ${def.name}.`);
@@ -47,8 +30,6 @@ export function completeProject(state: GameState, city: City, projectId: string,
     applyLumpYield(state, city.centerIndex, { key: def.yield, amount }, city.seat);
     state.eventLog.push(`${city.name} completed ${def.name}: +${amount} ${def.yield}.`);
   }
-  // Pay EVERY class the project lists (the Festival pays three), each at the
-  // project's own rate.
   const classes = gpClassesOf(def);
   if (classes.length) {
     const pts = Math.round(cost * gppFractionOf(def));
@@ -59,13 +40,6 @@ export function completeProject(state: GameState, city: City, projectId: string,
   }
 }
 
-/**
- * A finished queue item takes effect, for whichever seat owns the city.
- *
- * `cost` is the item's paid cost — projects scale their payout by it. Founding
- * is NOT done here: completion spawns the SETTLER unit, and a FOUND order
- * decides where it goes.
- */
 export function completeQueueItem(
   state: GameState,
   city: City,
@@ -78,9 +52,7 @@ export function completeQueueItem(
     case 'district': {
       const dt = state.map.tiles[item.tileIndex];
       dt.districtComplete = true;
-      // MONUMENTALITY pays era score per SPECIALTY district (the centre is not one).
       if (dt.district !== 'CITY_CENTER') dedicationEvent(state, city.seat, DED_MONUMENTALITY);
-      // A completed ENCAMPMENT musters its garrison.
       if (dt.district === 'ENCAMPMENT') dt.encampHp = ENCAMPMENT_HP;
       break;
     }
@@ -96,7 +68,6 @@ export function completeQueueItem(
       break;
     case 'unit': {
       const trained = spawnUnit(state, item.unit, city.centerIndex, city.seat);
-      // A trained MILITARY unit inherits the city's Encampment training XP.
       if (trained && (UNITS[item.unit]?.combat ?? 0) > 0) {
         const xp = encampmentTrainXp(city.buildings);
         if (xp > 0) trained.xp = xp;
@@ -109,7 +80,6 @@ export function completeQueueItem(
       break;
     case 'building':
       city.buildings.push(item.building);
-      // Completing the walls fills the outer-defense pool.
       if (item.building === 'ANCIENT_WALLS') city.outerHp = WALLS_HP;
       break;
   }

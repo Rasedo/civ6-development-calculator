@@ -39,7 +39,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_PATH = ROOT / "shared" / "statecompare.manifest.json"
-ENGINE_PATH = Path(__file__).resolve().parent / "simbase.py"  # where _MUTABLE is declared
+ENGINE_PATH = Path(__file__).resolve().parent / "simbase.py"
 
 _MASK = 0xFFFFFFFF
 _2_32 = 1 << 32
@@ -49,8 +49,6 @@ def load_manifest(path: Path = MANIFEST_PATH) -> dict:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-# ---------------------------------------------------------------------------
-# the hash
 
 
 def _mix32(h: int) -> int:
@@ -102,19 +100,13 @@ class _Acc:
         return f"{self.b:08x}{self.a:08x}"
 
 
-# ---------------------------------------------------------------------------
-# row sets — what a group's rows ARE, and how each is keyed
 
 
 def _civ_seats(sim) -> list[int]:
-    """The civ seats, in seat order. Seat 0 is one of them, not a case."""
     return list(range(sim.n_majors))
 
 
 def _city_rows(sim, b: int) -> list[tuple[int, int]]:
-    """(seat, slot) for every LIVING city of a civ seat. Dead slots keep stale
-    values — capture clears `city_alive` and the queue planes but not pop/hp/
-    loyalty — so the alive mask is load-bearing, not cosmetic."""
     alive = sim.city_alive[b].tolist()
     rows = []
     for c in _civ_seats(sim):
@@ -178,7 +170,6 @@ def group_keys(sim, b: int, group: str, rows: list) -> list[int]:
 
 
 def _seat_row(sim, seat: int) -> int:
-    """Absolute seat id -> the war matrix's compact row."""
     return int(sim._seat_row[seat])
 
 
@@ -263,9 +254,6 @@ def _capital_tile(sim, b, rows):
 
 
 def _civ_only(plane: str, absent):
-    """A fact the GPU stores for seats above 0 only. `absent` is what seat 0
-    reads back; every such field carries `gap` in the manifest and the default
-    digest skips it."""
     def get(sim, b, rows):
         t = getattr(sim, plane)[b].tolist()
         return [absent if c == 0 else t[c - 1] for c in rows]
@@ -326,31 +314,21 @@ SEAT = {
     "routeCount": lambda sim, b, rows: [
         sum(1 for r in sim.seat_routes[b, _seat_row(sim, c)].tolist() if r[0] >= 0) for c in rows
     ],
-    # Belief facts — row-addressed pair planes, seat 0 included (#73: every
-    # seat claims through the one belief-race body).
     "prophets": _civ_scalar("civ_prophets"),
     "beliefPantheon": _civ_scalar("civ_pantheon"),
     "beliefFollower": _civ_scalar("civ_follower"),
     "beliefFounder": _civ_scalar("civ_founder"),
     "beliefEnhancer": _civ_scalar("civ_enhancer"),
-    # The per-seat city-id allocator — row 0 allocates like every civ row
-    # (#110: tile_city stores the ids), so the whole pair row is pinned.
     "nextCityId": _civ_scalar("civ_next_city_id"),
     "scienceTotal": lambda sim, b, rows: [float(sim.seat_science_total[b, _seat_row(sim, c)]) for c in rows],
-    # The three seat-PAIR relations, read over EVERY major row — seat 0 is a
-    # row of these planes like any other, so all three are fatal digest fields.
     "formalWars": _seat_pair_relation("seat_warkind", lambda v: bool(v)),
     "denounced": _seat_pair_relation("seat_denounced", lambda v: v >= 0),
     "allies": _seat_pair_relation("seat_allied", lambda v: bool(v)),
-    # --- the declared gaps (extracted, census-covered, skipped by default) ---
     "tilesPurchased": _civ_only("civ_only_tiles_purchased", 0),
 }
 
 
 def _citystate_plane(plane: str, minor: bool):
-    """A city-state fact. `minor` planes live in the CITY block's minor section
-    (row _CITY_MINOR0 + s, slot 0) — a city-state's one city is a city like any
-    other; the rest are [B, S] planes of their own."""
     def get(sim, b, rows):
         t = getattr(sim, plane)[b].tolist()
         if minor:
@@ -361,7 +339,6 @@ def _citystate_plane(plane: str, minor: bool):
 
 
 def _csr(plane: str):
-    """A (civ, city-state) relation, read as a vector over civ seats."""
     def get(sim, b, rows):
         m = getattr(sim, plane)[b].tolist()
         return [[m[c][s] for c in _civ_seats(sim)] for s in rows]
@@ -378,8 +355,6 @@ CITY_STATE = {
     "questKind": _csr("seat_citystate_quest"),
     "questIssued": _csr("seat_citystate_quest_issued"),
     "questCamp": _csr("seat_citystate_quest_camp"),
-    # The asked district is DERIVED, not stored: a kind-3 quest always asks
-    # the CS type's own district (_citystate_didx), for every seat row.
     "questDistrict": lambda sim, b, rows: [
         [int(sim._citystate_didx[b, s]) if int(sim.seat_citystate_quest[b, c, s]) == 3 else -1
          for c in _civ_seats(sim)] for s in rows],
@@ -449,8 +424,6 @@ UNIT = {
 
 
 def _tile(plane: str):
-    # The tile group's rows ARE 0..T-1 in order, so a whole-plane tolist() is
-    # already in row order — one host copy per field instead of T of them.
     def get(sim, b, rows):
         return getattr(sim, plane)[b].tolist()
     return get
@@ -490,8 +463,6 @@ TILE = {
 EXTRACTORS = {"game": GAME, "seat": SEAT, "cityState": CITY_STATE, "city": CITY, "unit": UNIT, "tile": TILE}
 
 
-# ---------------------------------------------------------------------------
-# the digest
 
 
 def check_extractors(manifest: dict | None = None) -> None:
@@ -552,8 +523,6 @@ def state_digest(sim, b: int, manifest: dict | None = None, include_gaps: bool =
 
 
 def group_dump(sim, b: int, group: str, manifest: dict | None = None, include_gaps: bool = False) -> dict:
-    """The keyed rows behind one group's digest, `{key: {field: value}}` — what
-    a by-name diff reads once a digest says which group moved."""
     man = manifest or load_manifest()
     g = next(x for x in man["groups"] if x["name"] == group)
     rows = group_rows(sim, b, group)
@@ -563,8 +532,6 @@ def group_dump(sim, b: int, group: str, manifest: dict | None = None, include_ga
     return {keys[r]: {n: v[r] for n, v in cols.items()} for r in range(len(rows))}
 
 
-# ---------------------------------------------------------------------------
-# the census
 
 
 def engine_mutable(path: Path = ENGINE_PATH) -> list[str]:
@@ -579,11 +546,6 @@ def engine_mutable(path: Path = ENGINE_PATH) -> list[str]:
 
 
 def census(manifest: dict | None = None) -> list[str]:
-    """Every `_MUTABLE` plane is covered by a manifest field or is on the
-    exclusion list with a reason. Returns the complaints; empty means clean.
-
-    Adding a tensor to `_MUTABLE` without deciding what compares it fails here.
-    """
     man = manifest or load_manifest()
     covered: set[str] = set()
     for g in man["groups"]:

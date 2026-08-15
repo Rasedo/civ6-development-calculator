@@ -1,33 +1,4 @@
 # -*- coding: utf-8 -*-
-"""STATIC seat-symmetry + attribute-resolution check for the GPU engine.
-
-Four things the compile bar cannot see, because `BatchSim`'s namespace is
-built by `setattr` in a loop and there is no `__getattr__` fallback:
-
-1. A DANGLING ATTRIBUTE. `self.C` was deleted when every seat row got one
-   city-column width; three `sim.C` reads survived in the driver and would
-   have raised AttributeError on the serve gate's first turn. pyright cannot
-   resolve a setattr-built namespace and ruff only sees locals.
-
-2. THE ALIAS/_MUTABLE CONTRACT. A registered alias is a VIEW; snapshot and
-   restore must round-trip its BASE and never the view (a view restored
-   beside its base is copied twice, and a rebind would orphan it).
-
-3. A SHADOWED METHOD. `self.x = <tensor>` in the constructor and `def x` on a
-   mixin are the same attribute; the instance binding wins, so every
-   `self.x(...)` call is a TypeError and every `self.x[...]` read on the
-   method is one too. Two mixin files never mention each other, so nothing
-   short of running the engine notices.
-
-4. THE SEAT-0 FORK CENSUS. Every `row == 0` / `seat == 0` / `row - 1` style
-   branch in the engine is either a WIRE limit with a name, or work that has
-   not been done. The allowlist below names every survivor; anything else
-   fails, so a new fork cannot arrive quietly.
-
-Read-only, imports nothing from the engine. Run it in the compile bar:
-
-    python tools/gpu/seat_symmetry_check.py
-"""
 from __future__ import annotations
 
 import ast
@@ -41,32 +12,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 CORE = ROOT / "gpu" / "core"
 READERS = ("gpu", "policy", "tests/gpu", "tools/gpu")
 
-# ---------------------------------------------------------------------------
-# THE FORK ALLOWLIST — (module, enclosing function, why).
-#
-# Anything matching the fork patterns outside this list is a failure. Shrink
-# the list, never grow it: an entry here is a seat-0 distinction that still
-# exists, and the only acceptable reasons are the wire's own limits.
-# ---------------------------------------------------------------------------
 FORK_ALLOW: dict[tuple[str, str], str] = {
-    # EMPTY, on both engines, since #115 — which is what #68 said done would
-    # look like. Two kinds of entry have lived here and neither should return:
-    #
-    #   a PERMANENT one ("two index spaces have to meet somewhere"), which was
-    #   false and which would have pre-forgiven every future fork that happened
-    #   to land in the exempted function — the one it named turned out to have
-    #   no caller at all;
-    #
-    #   a WIRE-LIMIT one (#108, the seat-0 record schema), which was true when
-    #   written and stopped being true the moment the wire carried one shape.
-    #
-    # An entry is a seat-0 distinction that still exists. Write the reason, and
-    # write what would end it.
 }
 
-#: The merged seat planes, by the naming convention that IS the storage
-#: contract (#111): `civ_x[:, row]`, `city_x[:, row, slot]`,
-#: `seat_x[:, row, ...]`, plus the three that predate the prefixes.
 _SEAT_PLANE = r"(?:(?:civ|city|seat)_[a-z_0-9]+|war|war_turns|peace_turns)"
 
 FORK_PATTERNS = (
@@ -77,38 +25,10 @@ FORK_PATTERNS = (
     (re.compile(r"\brow\s*-\s*1\b"), "row - 1"),
     (re.compile(r"\bseat\s*-\s*1\b"), "seat - 1"),
     (re.compile(r"\br\s*\+\s*1\b"), "r + 1"),
-    # A fork does not have to name `row`. These three spellings are how every
-    # one that survived #111 was written, and the token patterns above are
-    # blind to all of them: they match ADJACENT tokens, and a fork hidden
-    # inside an expression has none.
-    #
-    # `civ_techs[:, 0]` — seat 0's research standing in for the asking seat's
-    # (`_farmadj_food`, `_mark_antiquity`); `city_center[:, 0]` — seat 0's
-    # cities standing in for every major's (the barbarian march).
     (re.compile(r"\b" + _SEAT_PLANE + r"\[:,\s*0\s*[,\]]"), "plane[:, 0] — literal row 0"),
-    # …and its other half. `city_dist_tile[:, 1:]` is "the CIV rows", which
-    # only makes sense if row 0's copy of the fact lives somewhere else — the
-    # exact split #109/#111 spent two rounds deleting.
     (re.compile(r"\b" + _SEAT_PLANE + r"\[:,\s*1\s*:"), "plane[:, 1:] — the civ rows alone"),
-    # `tile_seat.gather(...) == 0` — a seat-VALUED expression tested against
-    # seat 0 (the barbarian melee priority, the pillage-job owner test). The
-    # `&`/`|` exclusion keeps the comparison in ONE conjunct, so an unrelated
-    # `x == 0` further along a boolean chain is not a hit.
     (re.compile(r"\b\w*_seat\b[^\n&|]{0,80}?[=!]=\s*0\b"), "seat expression == 0"),
-    # `civ_at` — `tile_seat` mapped into the CIV index space, so every reader
-    # spelled "a civ, not seat 0" and needed a seat-0 arm beside it. DELETED in
-    # #115; the pattern stays because a re-introduction is exactly the mistake
-    # worth failing on, and it costs one regex.
-    # (`citystate_at` is NOT here: a city-state's index is a genuinely
-    # different space, the same exemption the four surviving aliases carry.)
     (re.compile(r"\.civ_at\b"), "civ-family tile view"),
-    # The WIRE's own spelling: `recs["0"] = {...}`, the hand-rolled seat-0
-    # record — the last seat-0 distinction either engine has, and one no
-    # pattern above can see, because a schema fork is a literal dict rather
-    # than a comparison. Written as an EMPTY subscript because `_code_lines`
-    # blanks string tokens whole, quotes included: the census reads the literal
-    # key as `recs[   ]`, while the generic `recs[str(row)]` beside it survives
-    # intact and does not match.
     (re.compile(r"\brecs\[\s*\]"), 'recs["0"] — the wire\'s hand-rolled seat-0 record'),
 )
 
@@ -153,9 +73,6 @@ TS_FORK_PATTERNS = (
     (re.compile(r"\(\s*state\s*,\s*0\s*[,)]"), "a SEAT argument hardcoded to 0"),
     (re.compile(r"\bseat\s*[-+]\s*1\b"), "seat ± 1 — the civ index space"),
     (re.compile(r"seatOf\(\s*state\s*,\s*[A-Za-z_][A-Za-z_0-9]*\s*\+\s*1\s*\)"), "civ index + 1 -> seat"),
-    # The named conversions. Matching only `seat ± 1` would catch the two
-    # DEFINITIONS and none of the callers — the caller is where the second
-    # index space actually costs something, so name the call.
     (re.compile(r"\b(?:seatOfIndex|indexOfSeat)\s*\("), "the civ index space, by name"),
 )
 
@@ -171,7 +88,7 @@ def _ts_code_lines(src: str) -> dict[int, str]:
     remove. Regex literals and JSX are not handled; neither appears in `cpu/`."""
     out: list[list[str]] = [list(ln) for ln in src.splitlines()]
     row = col = 0
-    stack: list[str] = []  # nesting of "//" | "/*" | a quote char | "${"
+    stack: list[str] = []
     i = 0
     n = len(src)
 
@@ -196,9 +113,9 @@ def _ts_code_lines(src: str) -> dict[int, str]:
                 stack.append("/*")
                 blank = True
             elif ch in "\"'`":
-                stack.append(ch)  # the quote itself stays, its body goes
+                stack.append(ch)
             elif ch == "}" and m == "${":
-                stack.pop()       # back into the template literal
+                stack.pop()
         elif m == "/*":
             if ch == "*" and nxt == "/":
                 for c2 in (col, col + 1):
@@ -215,7 +132,7 @@ def _ts_code_lines(src: str) -> dict[int, str]:
                 col, i = col + 2, i + 2
                 continue
             if m == "`" and ch == "$" and nxt == "{":
-                stack.append("${")  # an interpolation is code again
+                stack.append("${")
                 blank = False
                 col, i = col + 2, i + 2
                 continue
@@ -269,7 +186,6 @@ def ts_fork_census() -> list[tuple[str, str, str, int, str]]:
 
 
 def _funcs_by_line(tree: ast.AST) -> dict[int, str]:
-    """line -> innermost enclosing def name."""
     out: dict[int, str] = {}
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -281,15 +197,11 @@ def _funcs_by_line(tree: ast.AST) -> dict[int, str]:
     return out
 
 
-# ---------------------------------------------------------------------------
-# 1. attribute resolution
-# ---------------------------------------------------------------------------
 def _string_literals(tree: ast.AST) -> set[str]:
     return {n.value for n in ast.walk(tree) if isinstance(n, ast.Constant) and isinstance(n.value, str)}
 
 
 def _fstring_shapes(node: ast.JoinedStr) -> str | None:
-    """`f"civ_{k}"` -> "civ_{}"; None when a literal part is missing."""
     parts = []
     for v in node.values:
         if isinstance(v, ast.Constant) and isinstance(v.value, str):
@@ -302,12 +214,6 @@ def _fstring_shapes(node: ast.JoinedStr) -> str | None:
 
 
 def _soft_literal(node: ast.AST):
-    """literal_eval that tolerates non-literal cells.
-
-    The seat-plane tables mix names with dtypes (`("alive", "alive",
-    "civ_city_alive", torch.bool, ...)`), so a strict literal_eval refuses the
-    whole table and the names it holds go unresolved. Non-literal cells become
-    None; the string cells — the only ones that name an attribute — survive."""
     if isinstance(node, ast.Constant):
         return node.value
     if isinstance(node, (ast.Tuple, ast.List)):
@@ -319,8 +225,6 @@ def _soft_literal(node: ast.AST):
 
 
 def _class_tables(tree: ast.AST) -> dict[str, object]:
-    """Class- and module-level literal tables, by name — the seat-plane
-    tables (`_CIV_PAIR_FIELDS`, `_CS_PAIR_FIELDS`, …) a `for` unpacks."""
     out: dict[str, object] = {}
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign) and len(node.targets) == 1:
@@ -335,11 +239,8 @@ def _class_tables(tree: ast.AST) -> dict[str, object]:
 
 
 def _loop_bound_strings(var: str, loops: list[ast.For], tables: dict[str, object]) -> set[str]:
-    """Every string `var` can take, over the enclosing `for` statements whose
-    iterable is a literal table. Empty when nothing resolves."""
     got: set[str] = set()
     for lp in loops:
-        # which position in the loop target is `var`?
         tgt = lp.target
         names = [e.id for e in tgt.elts if isinstance(e, ast.Name)] if isinstance(tgt, ast.Tuple) else (
             [tgt.id] if isinstance(tgt, ast.Name) else [])
@@ -367,7 +268,6 @@ def _loop_bound_strings(var: str, loops: list[ast.For], tables: dict[str, object
 
 
 def enclosing_for(scope: ast.AST, node: ast.AST) -> list[ast.For]:
-    """The `for` statements wrapping `node` inside `scope`, innermost first."""
     parent: dict[int, ast.AST] = {}
     for p in ast.walk(scope):
         for c in ast.iter_child_nodes(p):
@@ -381,7 +281,6 @@ def enclosing_for(scope: ast.AST, node: ast.AST) -> list[ast.For]:
 
 
 def defined_attrs() -> tuple[set[str], list[str], set[str]]:
-    """(exact names, f-string shapes, alias names) BatchSim binds on `self`."""
     names: set[str] = set()
     shapes: list[str] = []
     aliases: set[str] = set()
@@ -403,7 +302,6 @@ def defined_attrs() -> tuple[set[str], list[str], set[str]]:
             return out
 
         def bind(a: ast.expr, at: ast.AST, into: set[str] | None = None) -> None:
-            """Record whatever attribute name(s) `a` can be."""
             sink = names if into is None else into
             if isinstance(a, ast.Constant) and isinstance(a.value, str):
                 sink.add(a.value)
@@ -412,7 +310,7 @@ def defined_attrs() -> tuple[set[str], list[str], set[str]]:
                 got = _loop_bound_strings(a.id, enclosing_loops(at), tables)
                 if got:
                     sink.update(got)
-                else:  # unresolvable — accept everything rather than lie
+                else:
                     shapes.append("{}")
                 return
             if isinstance(a, ast.JoinedStr):
@@ -429,14 +327,13 @@ def defined_attrs() -> tuple[set[str], list[str], set[str]]:
                     shapes.append(sh)  # multi-slot: only the regex, never a guess
                 elif got:
                     sink.update(f"{pre}{g}{suf}" for g in got)
-                else:  # unresolved single slot — the shape plus identifier-ish literals
+                else:
                     shapes.append(sh)
                     sink.update(f"{pre}{lit}{suf}" for lit in lits if _IDENT.match(lit))
                 return
             shapes.append("{}")
 
         for node in ast.walk(tree):
-            # self.x = ... / self.x: T = ... / self.x, self.y = ...
             targets: list[ast.expr] = []
             if isinstance(node, ast.Assign):
                 targets = list(node.targets)
@@ -447,17 +344,14 @@ def defined_attrs() -> tuple[set[str], list[str], set[str]]:
                     if (isinstance(sub, ast.Attribute) and isinstance(sub.value, ast.Name)
                             and sub.value.id == "self"):
                         names.add(sub.attr)
-            # setattr(self, <name>, ...)
             if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
                     and node.func.id == "setattr" and len(node.args) >= 2
                     and isinstance(node.args[0], ast.Name) and node.args[0].id == "self"):
                 bind(node.args[1], node)
-            # register_alias("x", ...) / register_alias(f"civ_only_{k}", ...)
             if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
                     and node.func.attr == "register_alias" and node.args):
                 bind(node.args[0], node, into=aliases)
                 bind(node.args[0], node)
-            # properties and plain methods are attributes too
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 names.add(node.name)
             if isinstance(node, ast.ClassDef):
@@ -471,8 +365,6 @@ def defined_attrs() -> tuple[set[str], list[str], set[str]]:
     return names, shapes, aliases
 
 
-#: receivers that ARE the sim in this codebase. `self` inside gpu/core is the
-#: sim; the pokes build several at once and name them `sim`, `s`, `s2`, `sim3`.
 SIM_RX = re.compile(r"^(?:self|sim[a-z_0-9]*|s[0-9]*)$")
 SIM_RECEIVERS = ("sim", "s", "self")
 #: what a call has to be NAMED to count as building a sim.
@@ -502,10 +394,6 @@ def _reader_files() -> list[pathlib.Path]:
 
 
 def _sim_bound_locals(fn: ast.AST) -> set[str]:
-    """Locals in `fn` bound from a sim — `s = self.sim`, `sim = env.sim`.
-
-    Without this, `s.clamp()` on a local TENSOR called `s` reads as a sim
-    attribute and every tensor method looks dangling."""
     out: set[str] = set()
     for n in ast.walk(fn):
         if isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name):
@@ -522,10 +410,6 @@ def _sim_bound_locals(fn: ast.AST) -> set[str]:
 
 
 def external_binds() -> set[str]:
-    """Attributes bound on the sim from OUTSIDE gpu/core — the driver's
-    per-turn scratch (`sim._vplan_wt`, `sim._driven_useq`) and the discipline
-    test's synthetic base. They are real attributes; they just are not
-    allocated in the constructor."""
     out: set[str] = set()
     for path in _reader_files():
         try:
@@ -563,9 +447,6 @@ def unresolved_reads(known: set[str], shapes: list[str]) -> list[tuple[str, int,
             if in_core:
                 recv.add("self")
             recv.add("sim")
-            # the pokes build several sims at once (`s2`, `sim3`, `simr`);
-            # only a CONSTRUCTOR call binds one, or `s = x.clamp(...)` would
-            # make every tensor method look like a dangling sim attribute.
             recv |= {n.targets[0].id for n in ast.walk(fn)
                      if isinstance(n, ast.Assign) and len(n.targets) == 1
                      and isinstance(n.targets[0], ast.Name)
@@ -595,7 +476,7 @@ def unresolved_reads(known: set[str], shapes: list[str]) -> list[tuple[str, int,
                 if not (node.args and isinstance(node.args[0], ast.Name) and node.args[0].id in recv):
                     continue
                 if len(node.args) > 2:
-                    continue  # a default makes the read total
+                    continue
                 names: set[str] = set()
                 key = node.args[1] if len(node.args) > 1 else None
                 if isinstance(key, ast.Constant) and isinstance(key.value, str):
@@ -611,9 +492,6 @@ def unresolved_reads(known: set[str], shapes: list[str]) -> list[tuple[str, int,
     return sorted(set(bad))
 
 
-# ---------------------------------------------------------------------------
-# 2. the alias / _MUTABLE contract
-# ---------------------------------------------------------------------------
 def mutable_names() -> set[str]:
     src = (CORE / "simbase.py").read_text(encoding="utf-8")
     tree = ast.parse(src)
@@ -626,18 +504,7 @@ def mutable_names() -> set[str]:
     return set()
 
 
-# ---------------------------------------------------------------------------
-# 3. the shadowed-method check
-# ---------------------------------------------------------------------------
 def shadowed_methods() -> list[tuple[str, str, str, int]]:
-    """Names bound as DATA on `self` that are also a `def` in gpu/core.
-
-    The instance binding wins over the class attribute, so the method is
-    unreachable from that point on and every call site raises. This is how
-    `self._seat_row = <seat->row tensor>` silently killed `_seat_row(row)`,
-    the seat-loop body, in the same round that unified it.
-
-    Returns (name, the file that defines it, the file that binds it, line)."""
     defs: dict[str, str] = {}
     binds: dict[str, tuple[str, int]] = {}
     for path in sorted(CORE.glob("*.py")):
@@ -661,15 +528,7 @@ def shadowed_methods() -> list[tuple[str, str, str, int]]:
     return sorted((n, defs[n], binds[n][0], binds[n][1]) for n in set(defs) & set(binds))
 
 
-# ---------------------------------------------------------------------------
-# 4. the fork census
-# ---------------------------------------------------------------------------
 def _code_lines(src: str) -> dict[int, str]:
-    """line -> its CODE text, strings and comments blanked out.
-
-    Comments and docstrings are prose about seats and are full of `r+1 = civ
-    r`; scanning them turns the census into noise. tokenize is exact where a
-    `#`-split is not."""
     import io
     import tokenize
 
@@ -695,10 +554,6 @@ def _code_lines(src: str) -> dict[int, str]:
 
 def fork_census() -> list[tuple[str, str, str, int, str]]:
     hits: list[tuple[str, str, str, int, str]] = []
-    # `gpu/serve_gate.py` is in the census, not just the engine and the policy:
-    # it is where the WIRE is spelled, and the wire is where the last seat-0
-    # distinction lives. Leaving the driver out would let the one surviving
-    # fork sit in the one file nobody measures.
     for d in (CORE, ROOT / "policy", ROOT / "gpu"):
         for path in sorted(d.glob("*.py")):
             src = path.read_text(encoding="utf-8")
@@ -713,11 +568,6 @@ def fork_census() -> list[tuple[str, str, str, int, str]]:
 
 
 def census_faults(engine: str, census, allow: dict) -> int:
-    """The STRAY/STALE pair, for EITHER engine's census — the two halves are
-    the same check and share this body so neither can drift ahead of the
-    other. A stray fork is one nobody named; a stale entry is a fork someone
-    closed without saying so, and the next one to arrive in that function
-    would land pre-forgiven."""
     fails = 0
     stray = [h for h in census if (h[0], h[1]) not in allow]
     if stray:

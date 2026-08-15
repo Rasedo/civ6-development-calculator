@@ -9,26 +9,15 @@ import { GAME_SPEED } from './constants';
 export interface UnitDef {
   id: string;
   name: string;
-  /** Letter drawn on the map badge. */
   code: string;
   cost: number;
-  /** Gold upkeep per turn (empire-level). */
   maintenance: number;
   moves: number;
-  /** Melee combat strength (0 = civilian). */
   combat: number;
-  /** Ranged attack strength + range (attacks without retaliation). */
   ranged?: { strength: number; range: number };
-  /** Builder charges (improvements/chops); undefined for non-builders. */
   charges?: number;
   requiresTech?: string;
-  /** CIVIC gate — the Archaeologist unlocks on Natural History, not
-   *  on a tech. Same shape as requiresTech; trainableUnits checks both. */
   requiresCivic?: string;
-  /** strategic-resource ACCESS gate — a resource id (data/resources)
-   * this unit needs to BUILD or PURCHASE. Access = an owned territory tile with
-   * the resource AND its completed, unpillaged matching improvement
-   * (civHasStrategic). No stockpile / per-unit count / maintenance draw. */
   requiresResource?: string;
   /** a NAVAL unit lives on water natively (never `embarked`). No naval
    * units exist yet (N2 adds GALLEY/QUADRIREME) — the field is plumbed now so
@@ -50,11 +39,6 @@ export interface UnitDef {
    * Great-General/Admiral claim (applyGreatPersonEffect + the mirror).
    * trainableUnits filters it out on every seat, exactly like faithOnly. */
   spawnOnly?: boolean;
-  /** the SETTLER chassis. Trained through the production layout's DEDICATED
-   * settler column (its cost escalates per settler, so the generic unit
-   * columns cannot price it) — trainableUnits filters it out exactly like
-   * faithOnly/spawnOnly, and queueSettler/purchaseSettler are its only
-   * build paths. */
   settler?: boolean;
   description: string;
 }
@@ -140,10 +124,6 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       requiresResource: 'HORSES', // AUDIT B-9: retroactive — its own description flagged this gap
       description: 'Fast shock cavalry (needs Horses access).',
     }),
-    // The medieval/renaissance melee & ranged roster. Costs are
-    // pre-GAME_SPEED like the rest of UNITS; tech ids verified in data/techs.ts.
-    // SWORDSMAN/KNIGHT gate on IRON access. No naval hulls / upgrades this
-    // round (recorded residuals); MUSKETMAN's niter is unmodeled on maps.
     U({
       id: 'SWORDSMAN',
       name: 'Swordsman',

@@ -10,7 +10,6 @@ import { computeCityStats } from './city';
 
 export type ScoreObjective = 'science' | 'culture' | 'gold' | 'production' | 'food' | 'balanced';
 
-/** The balanced yield mix. Mirrored into rules.score.yieldWeights. */
 export const BALANCED_WEIGHTS: Partial<Record<YieldKey, number>> = {
   food: 1,
   production: 2,
@@ -20,7 +19,6 @@ export const BALANCED_WEIGHTS: Partial<Record<YieldKey, number>> = {
   faith: 0.75,
 };
 
-/** Σ over the seat's cities: pop × weight + yields · weights. */
 export function empireScore(state: GameState, seat: number, objective: ScoreObjective): number {
   let score = 0;
   for (const city of seatOf(state, seat)!.cities) {

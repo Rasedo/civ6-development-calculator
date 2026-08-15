@@ -48,7 +48,6 @@ def hex_distance_from(width: int, height: int, center: int) -> torch.Tensor:
 
 
 def neighbor_table(width: int, height: int) -> torch.Tensor:
-    """[T, 6] neighbor indices (-1 off-map), odd-r offsets."""
     even = [(1, 0), (0, -1), (-1, -1), (-1, 0), (-1, 1), (0, 1)]
     odd = [(1, 0), (1, -1), (0, -1), (-1, 0), (0, 1), (1, 1)]
     out = torch.full((width * height, 6), -1, dtype=torch.long)
@@ -62,14 +61,11 @@ def neighbor_table(width: int, height: int) -> torch.Tensor:
     return out
 
 
-# ---------------------------------------------------------------------------
-# Rules & fixtures
-# ---------------------------------------------------------------------------
 
 
 @dataclass
 class Rules:
-    focus_base: torch.Tensor  # [6]
+    focus_base: torch.Tensor
     citizen_science: float
     citizen_culture: float
     food_per_citizen: float
@@ -81,11 +77,11 @@ class Rules:
     housing_aq_no_fresh: float  # Aqueduct: raise a non-fresh city's water housing to this
     amenity_tiers: list  # [(min, growth, yield)]
     center_min_food: float
-    center_min_production: float  # city-centre production floor
+    center_min_production: float
     settler_base: float
     settler_per_city: float
     settler_pop_gate: int
-    builder_base: float  # builderCost = round((base + per·n)·speed)
+    builder_base: float
     builder_per: float
     game_speed: float
     gold_purchase_mult: float  # gold price = production cost × this (GOLD_PURCHASE_MULT)
@@ -167,7 +163,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         builder_per=r["scenario"].get("builderPer", 4),
         game_speed=r["scenario"].get("gameSpeed", 0.6),
         gold_purchase_mult=r["scenario"].get("goldPurchaseMult", 4),
-        turn_limit=r["scenario"].get("turnLimit", 250),  # TURN_LIMIT
+        turn_limit=r["scenario"].get("turnLimit", 250),
         district_cost=r.get("districtCost", {"base": 54, "scale": 8}),
         score_pop_weight=r["score"]["popWeight"],
         score_yield_weights=torch.tensor(r["score"]["yieldWeights"], dtype=torch.float64),
@@ -226,7 +222,6 @@ _RULES_STAMP_CACHE: dict = {}
 
 
 def _rules_stamp_for(dirpath: Path) -> str:
-    """srcStamp of the rules.json SITTING BESIDE the fixture (cached per dir)."""
     key = str(dirpath)
     if key not in _RULES_STAMP_CACHE:
         rp = dirpath / "rules.json"
@@ -268,9 +263,6 @@ def load_fixture(path: Path) -> dict:
     return f
 
 
-# ---------------------------------------------------------------------------
-# The batched simulation
-# ---------------------------------------------------------------------------
 
 RESEARCH_LOOPS = 40  # > tree size: completes every ready tech/civic in one turn; the early exit keeps it free
 # Slots in the two unit pools per game (append-only; runtime-asserted).
@@ -283,9 +275,6 @@ RESEARCH_LOOPS = 40  # > tree size: completes every ready tech/civic in one turn
 # separate one only because nothing indexes them by seat row.
 MAJOR_POOL_MAX = 512
 BARB_POOL_MAX = 256
-#: The per-seat unit HEAD width — the observation/action rows a seat is
-#: decided over, rank-mapped onto its living units in slot order. Unrelated to
-#: pool capacity: it bounds how many units one seat can be ORDERED in a turn.
 UNIT_SLOTS = 256
 
 # The absolute SEAT space, shared with cpu/core/seats.ts.
@@ -325,10 +314,6 @@ SEAT_CAPS = {
     "hostile": {"xp": False, "always_hostile": True},  # barbarians
 }
 
-#: Which class each UNIT POOL belongs to. The pools are split by CLASS and by
-#: nothing else ("major" every major seat, "barb" the barbarians), so a pool
-#: name answers "what may this actor do?" without touching the batch. The
-#: attack paths' `atk_kind` tag uses the same names, so one table serves both.
 POOL_CLASS = {"major": "major", "barb": "hostile"}
 
 
@@ -379,7 +364,6 @@ _PAIR_DIST_CACHE: dict[tuple[int, int], torch.Tensor] = {}
 
 
 def pair_distances(width: int, height: int) -> torch.Tensor:
-    """[T, T] int16 hex distance between every pair of tiles (per map shape)."""
     key = (width, height)
     if key not in _PAIR_DIST_CACHE:
         rows = [hex_distance_from(width, height, i) for i in range(width * height)]
@@ -388,7 +372,6 @@ def pair_distances(width: int, height: int) -> torch.Tensor:
 
 
 def js_round(x: torch.Tensor) -> torch.Tensor:
-    """JS Math.round: half-up toward +∞ (torch.round is half-to-even)."""
     return torch.floor(x + 0.5)
 
 
@@ -422,8 +405,6 @@ def tiles_within_offsets(radius: int) -> torch.Tensor:
 
 
 def tiles_from_offsets(centers: torch.Tensor, offsets: torch.Tensor, width: int, height: int) -> torch.Tensor:
-    """[N, M] tile indices reached from centers [N] by axial offsets [M, 2]
-    (-1 off-map). Mirrors offsetToAxial/axialToOffset arithmetic."""
     col = centers % width
     row = torch.div(centers, width, rounding_mode="floor")
     q = col - ((row - (row & 1)) >> 1)
@@ -435,9 +416,6 @@ def tiles_from_offsets(centers: torch.Tensor, offsets: torch.Tensor, width: int,
     return torch.where(ok, idx, torch.full_like(idx, -1))
 
 
-# tilesWithin(radius 1) enumerates neighbors in W, SW, NW, SE, NE, E order —
-# NOT the riverMask direction order neighbors() uses. Patrol tie-breaks
-# follow the former; this permutation maps neigh's columns onto it.
 PATROL_DIR_PERM = [3, 4, 2, 5, 1, 0]
 
 # CIV6_ALIAS_CHECK=1 turns on the per-step state-discipline assertions (alias
@@ -447,19 +425,11 @@ PATROL_DIR_PERM = [3, 4, 2, 5, 1, 0]
 _ALIAS_CHECK = os.environ.get("CIV6_ALIAS_CHECK", "") not in ("", "0")
 
 def pool_view(snap: dict, pre: str, plane: str):
-    """Read one pool's slice out of a snapshot() dict.
-
-    snapshot() stores the MERGED unit bases, not the per-pool views into them,
-    so `snap["mut"]["barb_unit_hp"]` does not exist. This is the supported way to get
-    one pool's slice back, and it keeps the slot-range arithmetic in one place.
-    """
     lo = {"major": 0, "barb": MAJOR_POOL_MAX}[pre]
     hi = lo + (MAJOR_POOL_MAX if pre == "major" else BARB_POOL_MAX)
     return snap["mut"][f"unit_{plane}"][:, lo:hi]
 
 
-# The mutable state tensors — everything reset() restores and snapshot()
-# round-trips.
 _MUTABLE = [
     "seat_science_total",
     "rng_state", "centre_slot_at", "tdef", "tmove",
@@ -470,13 +440,13 @@ _MUTABLE = [
     # `tile_seat` is STATE — the city-state part of tile ownership is stored
     # only here (`citystate_at` is a view of it), so it must round-trip.
     "tile_seat", "tile_city",
-    "citystate_last_levy",  # levy cooldown
+    "citystate_last_levy",
     "seat_warkind", "seat_denounced", "seat_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "seat_ext", "city_prod_bank",
     "city_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dest",  # international dest CENTER TILE (>=0), else -1 (domestic/CS), by seat row
     "city_id",
-    "unit_next",  # the ONE append cursor every major seat spawns through
+    "unit_next",
     "gp_earned", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
     "pan_claimed", "fol_claimed", "fou_claimed",  # belief-claim masks
     "enh_claimed",  # enhancer-claim mask
@@ -490,21 +460,12 @@ _MUTABLE = [
     # RANGE VIEWS into them — snapshot/restore round-trips one tensor per plane
     # instead of three, and a view can never be half-restored.
     "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_emb", "unit_seat", "military_at", "civilian_at", "war", "ww", "ww_turn",
-    # per-seat scalar bases, addressed `civ_x[:, row]` — no views live on these
     "civ_best_melee", "civ_builders_trained", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted",
     "civ_enhancer", "civ_enhancer_done", "civ_follower", "civ_founder", "civ_next_city_id",
     "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_tiles_purchased",
-    # the (seat, city-state) relation bases, addressed `seat_citystate_x[:, row, s]`
     "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_camp", "seat_citystate_quest_issued",
-    # per-seat FOG — Seat.explored's twin, [B, n_majors, T]
     "seat_explored",
-    # more seat-indexed scalar bases, same convention.
     "civ_culture", "civ_faith", "civ_tourism", "civ_warmonger", "civ_gpp",
-    # the CITY BLOCK bases. The block has a MAJOR and a MINOR section, and no
-    # single family view reaches both — registering the base is the only
-    # spelling that stays complete when the block grows a section.
     "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_is_cap", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts", "city_bldg",
-    # the PAIR war clock and the per-seat peace clock. `war` itself is
-    # allocated beside them and registered above.
     "war_turns", "peace_turns",
 ]

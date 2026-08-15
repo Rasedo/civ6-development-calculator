@@ -29,7 +29,6 @@ export const CITY_STATE_TYPES: CityStateType[] = [
   'religious',
 ];
 
-/** Yield each type grants through envoys. */
 export const CITY_STATE_TYPE_YIELD: Record<CityStateType, YieldKey> = {
   scientific: 'science',
   cultural: 'culture',
@@ -39,7 +38,6 @@ export const CITY_STATE_TYPE_YIELD: Record<CityStateType, YieldKey> = {
   religious: 'faith',
 };
 
-/** District whose presence carries the 3- and 6-envoy bonuses. */
 export const CITY_STATE_TYPE_DISTRICT: Record<CityStateType, DistrictId> = {
   scientific: 'CAMPUS',
   cultural: 'THEATER_SQUARE',
@@ -67,14 +65,6 @@ export const CITY_STATE_TYPE_BUILDINGS: Record<CityStateType, string[]> = {
   religious: ['SHRINE', 'TEMPLE'],
 };
 
-// Per-CS UNIQUE suzerain bonus table (real GS bonuses, degraded to a
-// description + the closest expressible channel). The suzerain PERK logic stays
-// type-generic (isSuzerain / cityStateTradeCapacityBonus / the militaristic levy) per
-// out of scope, so this table is catalog DATA — it documents each named
-// city-state's real bonus for a future per-CS wiring round. Names mirror
-// CITY_STATE_NAMES (type × 4). `channel` names the existing yield/effect surface a
-// future wiring would use; `note` records what the real bonus needs that this
-// model lacks (tourism, spies, naval, era score, combat) → degraded/inert.
 export interface SuzerainBonusDef {
   name: string;
   type: CityStateType;
@@ -83,51 +73,32 @@ export interface SuzerainBonusDef {
   note?: string;
 }
 export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
-  // scientific
   Geneva: { name: 'Geneva', type: 'scientific', bonus: '+15% science while not at war with any civ.', channel: 'science' },
   Stockholm: { name: 'Stockholm', type: 'scientific', bonus: '+2 science per specialty district building tier.', channel: 'science' },
   Seoul: { name: 'Seoul', type: 'scientific', bonus: '+science per turn per Campus adjacency.', channel: 'science' },
   Anshan: { name: 'Anshan', type: 'scientific', bonus: '+1 science & +1 culture from Great Works / relics.', channel: 'science', note: 'Great-Work slots are Slice Q' },
-  // cultural
   Vilnius: { name: 'Vilnius', type: 'cultural', bonus: '+2 culture per specialty district building tier.', channel: 'culture' },
   Antioch: { name: 'Antioch', type: 'cultural', bonus: 'Extra trade-route yields / market access.', channel: 'gold', note: 'trade routes are B-23 (deferred)' },
   Kumasi: { name: 'Kumasi', type: 'cultural', bonus: '+2 culture & +1 faith from trade routes to city-states.', channel: 'culture', note: 'trade routes are B-23' },
   Caguana: { name: 'Caguana', type: 'cultural', bonus: '+1 culture from plantations / +appeal.', channel: 'culture', note: 'appeal partly modeled' },
-  // trade
   Amsterdam: { name: 'Amsterdam', type: 'trade', bonus: '+gold from trade routes / luxuries.', channel: 'gold', note: 'trade routes are B-23' },
   Zanzibar: { name: 'Zanzibar', type: 'trade', bonus: 'Monopoly luxuries: +amenities & +gold.', channel: 'gold' },
   'Bandar Brunei': { name: 'Bandar Brunei', type: 'trade', bonus: '+gold from sea resources.', channel: 'gold', note: 'naval yields degraded' },
   Hunza: { name: 'Hunza', type: 'trade', bonus: '+gold on trade routes per resource passed.', channel: 'gold', note: 'trade routes are B-23' },
-  // industrial
   Toronto: { name: 'Toronto', type: 'industrial', bonus: '+production toward wonders/buildings when powered.', channel: 'production', note: 'power system not modeled' },
   'Buenos Aires': { name: 'Buenos Aires', type: 'industrial', bonus: 'Bonus resources also give +amenities.', channel: 'amenities' },
   Cardiff: { name: 'Cardiff', type: 'industrial', bonus: '+production & +gold from Harbor power.', channel: 'production', note: 'power system not modeled' },
   'Mexico City': { name: 'Mexico City', type: 'industrial', bonus: '+15% production toward Projects.', channel: 'production' },
-  // militaristic
   Kabul: { name: 'Kabul', type: 'militaristic', bonus: 'Units earn +XP from combat.', channel: 'none', note: 'unit XP not modeled' },
   Carthage: { name: 'Carthage', type: 'militaristic', bonus: '+Encampment building production; free maintenance for melee.', channel: 'production' },
   Preslav: { name: 'Preslav', type: 'militaristic', bonus: 'Heavy/light cavalry +combat & +movement in enemy land.', channel: 'none', note: 'unit roster is B-10' },
   Valletta: { name: 'Valletta', type: 'militaristic', bonus: 'Gold-purchase Renaissance/ancient walls & buildings in cities with a wall.', channel: 'production' },
-  // religious
   Jerusalem: { name: 'Jerusalem', type: 'religious', bonus: 'Your religion counts as majority for envoy effects; +faith.', channel: 'faith', note: 'religion depth is Slice Q' },
   'La Venta': { name: 'La Venta', type: 'religious', bonus: 'Builders can build a special improvement for faith.', channel: 'faith' },
   Yerevan: { name: 'Yerevan', type: 'religious', bonus: 'Apostles gain a promotion of choice.', channel: 'none', note: 'apostles/theological combat not modeled' },
   Armagh: { name: 'Armagh', type: 'religious', bonus: 'Builders can build a Monastery for faith/production.', channel: 'faith' },
 };
 
-// The LIVE per-CS suzerain effect — a flat
-// +CITY_STATE_SUZERAIN_YIELD/turn to the suzerain's CAPITAL in the named yield channel
-// (whichever seat, either seat, holds suzerainty). This is the machine-
-// readable subset of CITY_STATE_SUZERAIN_BONUS above; the 14 rows here degrade their
-// real %-scaling/conditional bonus to a flat channel yield (documented per
-// row in CITY_STATE_SUZERAIN_BONUS.bonus). Rows NOT listed are DESCOPED, each for a
-// modeled-system gap:
-//   - channel 'none': Kabul (combat XP), Preslav (cavalry combat/movement),
-//     Yerevan (apostle promotions) — no yield channel to degrade to.
-//   - trade routes: Antioch, Kumasi, Amsterdam, Hunza.
-//   - power system (not modeled): Toronto, Cardiff.
-//   - amenities channel: Buenos Aires — the capital-yield vehicle carries the
-//     six yields only, not the amenity tier.
 export const CITY_STATE_SUZERAIN_YIELD = 3;
 export const CITY_STATE_SUZERAIN_LIVE: Record<string, YieldKey> = {
   Geneva: 'science',
@@ -164,32 +135,20 @@ export const CITY_STATE_NAMES: Record<CityStateType, string[]> = {
   religious: ['Jerusalem', 'La Venta', 'Yerevan', 'Armagh'],
 };
 
-/** Influence points needed per envoy. */
 export const ENVOY_COST = 100;
-/** Base influence per turn; +1 per government tier above Chiefdom. */
 export const INFLUENCE_PER_TURN = 3;
-/** Envoy thresholds and per-threshold district yield amount. */
 export const ENVOY_THRESHOLDS = [1, 3, 6] as const;
 export const CITY_STATE_CAPITAL_BONUS = 2;
 export const CITY_STATE_DISTRICT_BONUS = 2;
-/** Envoys needed to be suzerain (strictly most among all civs). */
 export const SUZERAIN_ENVOYS = 3;
-/** a seat meets a CS once one of its cities or units sits within
- * this range of the CS center — the explore-to-meet mirror (the other seats have
- * no fog; seat 0 meets via isExplored). */
 export const CITY_STATE_MEET_RANGE = 3;
-/** New quests are issued this many turns after the last one resolved. */
 export const QUEST_COOLDOWN = 12;
-/** Quest reward. */
 export const QUEST_ENVOYS = 1;
-/** Siege hit points of a city-state. */
 export const CITY_STATE_MAX_HP = 150;
-/** Suzerain levy from militaristic city-states: units granted, gold, cooldown. */
 export const LEVY_UNITS = 2;
 export const LEVY_GOLD_COST = 120;
 export const LEVY_COOLDOWN = 20;
 
-/** Government tier for influence accrual (matches data/policies tiers). */
 export const GOV_INFLUENCE_TIER: Record<string, number> = {
   CHIEFDOM: 0,
   AUTOCRACY: 1,

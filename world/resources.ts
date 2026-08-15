@@ -25,13 +25,9 @@ export interface ResourceDef {
   category: ResourceCategory;
   yields: Partial<Yields>;
   improvement: ImprovementId;
-  /** Valid base terrains. */
   terrains: TerrainId[];
-  /** Valid elevations (FLAT/HILLS). */
   elevations: Elevation[];
-  /** If set, resource only spawns on one of these features. */
   requiresFeature?: string[];
-  /** Features the resource may additionally coexist with. */
   okFeatures?: string[];
   /** If set, resource never spawns on a feature. */
   noFeature?: boolean;
@@ -47,7 +43,6 @@ const HILLS: Elevation[] = ['HILLS'];
 const ANY: Elevation[] = ['FLAT', 'HILLS'];
 
 export const RESOURCES: Record<string, ResourceDef> = {
-  // --- Bonus ---------------------------------------------------------------
   WHEAT: { id: 'WHEAT', name: 'Wheat', category: 'bonus', yields: { food: 1 }, improvement: 'FARM', terrains: ['PLAINS'], elevations: FLAT, okFeatures: ['FLOODPLAINS'], harvestYield: 'food' },
   RICE: { id: 'RICE', name: 'Rice', category: 'bonus', yields: { food: 1 }, improvement: 'FARM', terrains: ['GRASSLAND'], elevations: FLAT, okFeatures: ['MARSH'], harvestYield: 'food' },
   CATTLE: { id: 'CATTLE', name: 'Cattle', category: 'bonus', yields: { food: 1 }, improvement: 'PASTURE', terrains: ['GRASSLAND'], elevations: FLAT, noFeature: true },
@@ -59,7 +54,6 @@ export const RESOURCES: Record<string, ResourceDef> = {
   CRABS: { id: 'CRABS', name: 'Crabs', category: 'bonus', yields: { gold: 2 }, improvement: 'FISHING_BOATS', terrains: ['COAST'], elevations: FLAT, harvestYield: 'gold' },
   COPPER: { id: 'COPPER', name: 'Copper', category: 'bonus', yields: { gold: 2 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA'], elevations: HILLS, noFeature: true, harvestYield: 'gold' },
 
-  // --- Strategic -----------------------------------------------------------
   HORSES: { id: 'HORSES', name: 'Horses', category: 'strategic', yields: { food: 1, production: 1 }, improvement: 'PASTURE', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, noFeature: true },
   IRON: { id: 'IRON', name: 'Iron', category: 'strategic', yields: { science: 1 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA', 'SNOW'], elevations: HILLS, noFeature: true },
   NITER: { id: 'NITER', name: 'Niter', category: 'strategic', yields: { food: 1, production: 1 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'TUNDRA'], elevations: FLAT, noFeature: true },
@@ -68,7 +62,6 @@ export const RESOURCES: Record<string, ResourceDef> = {
   ALUMINUM: { id: 'ALUMINUM', name: 'Aluminum', category: 'strategic', yields: { science: 1 }, improvement: 'MINE', terrains: ['DESERT', 'PLAINS'], elevations: HILLS, noFeature: true },
   URANIUM: { id: 'URANIUM', name: 'Uranium', category: 'strategic', yields: { production: 2 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA', 'SNOW'], elevations: ANY, noFeature: true },
 
-  // --- Luxury --------------------------------------------------------------
   WINE: { id: 'WINE', name: 'Wine', category: 'luxury', yields: { food: 1, gold: 1 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, noFeature: true },
   COTTON: { id: 'COTTON', name: 'Cotton', category: 'luxury', yields: { gold: 3 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, noFeature: true },
   SILK: { id: 'SILK', name: 'Silk', category: 'luxury', yields: { gold: 1 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, requiresFeature: ['WOODS'] },

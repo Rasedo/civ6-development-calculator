@@ -12,11 +12,9 @@ import type { ImprovementId, Yields } from '../core/types';
 export interface ImprovementDef {
   id: ImprovementId;
   name: string;
-  /** Two-letter code drawn on the map. */
   code: string;
   yields: Partial<Yields>;
   housing: number;
-  /** Only buildable on a resource that lists this improvement. */
   resourceOnly: boolean;
   description: string;
 }
@@ -75,16 +73,6 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     id: 'CAMP',
     name: 'Camp',
     code: 'Ca',
-    // SOURCING SWEEP, CORRECTED TWICE. This value was
-    // ORIGINALLY 2 with an "approximate" marker. Slice 1 changed it to 1 on
-    // the strength of a web-SEARCH SUMMARY — and that was WRONG. The
-    // Gathering Storm CIVILOPEDIA entry for the Camp reads "+2 Gold" and
-    // "+0.5 Housing", so the original 2 was right all along and is restored.
-    // The marker is cleared because the value is now sourced from the
-    // Civilopedia itself rather than from a summary of search results.
-    // NOT MODELED (recorded): the Camp also gains +1 Food and +1 Production
-    // with the MERCANTILISM civic, and a further +2 Gold with SYNTHETIC
-    // MATERIALS. This model pays the base yield only.
     yields: { gold: 2 },
     housing: 0.5,
     resourceOnly: true,
@@ -133,16 +121,6 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     resourceOnly: false,
     description: 'Flat coastal grassland/plains/desert with Breathtaking appeal. Gold equal to the tile appeal.',
   },
-  // The FORT, sourced from the Gathering Storm Civilopedia —
-  // "Occupying unit receives +4 Defense Strength, and automatically gains 2
-  // turns of fortification." Built by a MILITARY ENGINEER (never a Builder),
-  // prerequisite tech Siege Tactics. It carries NO yields: its whole effect is
-  // defensive, which is why it is the first improvement here whose value never
-  // shows up in a city's yield sum.
-  // NOT MODELLED, recorded rather than folded in: the "deals minor damage to
-  // and depletes the movement of hostile units walking onto this tile" half —
-  // neither engine has a tile-enters-damage hook, and inventing a number for it
-  // would be exactly the guessed-constant failure this sweep exists to catch.
   FORT: {
     id: 'FORT',
     name: 'Fort',

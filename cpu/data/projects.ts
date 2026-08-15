@@ -26,9 +26,7 @@ import type { DistrictId, GreatPersonClass, YieldKey } from '../core/types';
 export interface ProjectDef {
   id: string;
   name: string;
-  /** Requires a completed district of this type in the city. */
   district: DistrictId;
-  /** Yield granted on completion (fraction of production cost). */
   yield: YieldKey | null;
   /** Great-person class receiving points on completion. Kept as the PRIMARY
    *  class (and the GPU export's single `g` column) for index stability; read
@@ -38,16 +36,12 @@ export interface ProjectDef {
    *  points to Great Writer, Great Artist AND Great Musician; every other
    *  district project pays a single class. Omitted = [gpClass]. */
   gpClasses?: GreatPersonClass[];
-  /** per-class GPP fraction of the production invested. Omitted =
-   *  PROJECT_GPP_FRACTION. */
   gppFraction?: number;
   description: string;
-  // --- space race (science victory) -----------------------------------------
   /** Gating tech that must be researched before this project is available. */
   requiresTech?: string;
   /** Previous space-race project that must be completed first (the chain). */
   requiresProject?: string;
-  /** Completing this project wins the science victory. */
   victory?: boolean;
   /** Marks a space-race project: filtered out of the GPU projects table (the
    *  GPU space-race SIMULATION is deferred), and placed
@@ -73,12 +67,6 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       district: 'THEATER_SQUARE',
       yield: 'culture',
       gpClass: 'ARTIST',
-      // The Festival is the ONE multi-class project. Its D_TYPE is 5 where
-      // every other district project's is 10, which is exactly why each of its
-      // three classes gets ~11% where a single-class project's one class gets
-      // ~22%. Sourced from the Civilopedia entry ("a small amount of Great
-      // Writer, Great Artist, and Great Musician points") and the wiki's
-      // per-project rates.
       gpClasses: ['WRITER', 'ARTIST', 'MUSICIAN'],
       gppFraction: 0.11,
       description: 'Convert production into culture and Great Writer/Artist/Musician points.',
@@ -116,16 +104,6 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       description: 'Convert production into Great General points.',
     }),
 
-    // ========================================================================
-    // space race — the sequential science-victory chain. Gated on
-    // Information/Future-era techs (structurally unreachable in the 100-turn
-    // scripted parity gate — proven inert) and on each other (the sequence).
-    // DEGRADE: no Spaceport district exists, so the science district (CAMPUS)
-    // is the Spaceport proxy; these grant no yield/GPP (pure victory steps).
-    // They sit LAST so the seat greedy `.find` (first-complete-district
-    // project) always resolves to a base project — the other seats never run the race
-    // under the scripted policy. Completing EXOPLANET_EXPEDITION wins.
-    // ========================================================================
     P({ id: 'LAUNCH_EARTH_SATELLITE', name: 'Launch Earth Satellite', district: 'CAMPUS', yield: null, gpClass: null, space: true, requiresTech: 'ROCKETRY', description: 'Space race step 1 of 6. (Spaceport degraded to Campus.)' }),
     P({ id: 'LAUNCH_MOON_LANDING', name: 'Launch Moon Landing', district: 'CAMPUS', yield: null, gpClass: null, space: true, requiresTech: 'SATELLITES', requiresProject: 'LAUNCH_EARTH_SATELLITE', description: 'Space race step 2 of 6.' }),
     P({ id: 'MARS_REACTOR', name: 'Launch Mars Reactor', district: 'CAMPUS', yield: null, gpClass: null, space: true, requiresTech: 'NANOTECHNOLOGY', requiresProject: 'LAUNCH_MOON_LANDING', description: 'Space race step 3 of 6 (Mars component).' }),
@@ -135,7 +113,6 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
   ].map((p) => [p.id, p]),
 );
 
-/** Space-race projects in chain order. */
 export const SPACE_PROJECTS: ProjectDef[] = Object.values(PROJECTS).filter((p) => p.space);
 
 /** Yield granted on completion = production cost × this.
@@ -146,13 +123,8 @@ export const SPACE_PROJECTS: ProjectDef[] = Object.values(PROJECTS).filter((p) =
  *  table. We grant the equivalent lump on completion; total production invested
  *  equals the cost, so the totals agree. Was 0.75, which was five times real. */
 export const PROJECT_YIELD_FRACTION = 0.15;
-/** Great-person points granted on completion = production cost × this, PER
- *  CLASS. #79, SOURCED: a standard district project (D_TYPE 10) pays ~22% to
- *  its single class. The Festival (D_TYPE 5) overrides this with 0.11 paid to
- *  EACH of its three classes. Was 0.3. */
 export const PROJECT_GPP_FRACTION = 0.22;
 
-/** the classes a completed project pays, and the per-class rate. */
 export function gpClassesOf(p: ProjectDef): GreatPersonClass[] {
   if (p.gpClasses) return p.gpClasses;
   return p.gpClass ? [p.gpClass] : [];

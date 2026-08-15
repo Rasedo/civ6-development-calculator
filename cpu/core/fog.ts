@@ -1,13 +1,3 @@
-/**
- * Fog of war and tribal villages. One-level fog: a tile is unexplored (hidden,
- * unusable) or explored (fully informative). Reveals happen on founding, border
- * growth, unit movement and spawning.
- *
- * Fog is PER SEAT — `Seat.explored` is that seat's own map knowledge, parallel
- * to `map.tiles`, and an empty array means "everything explored". Every reveal
- * and every query names the seat it belongs to, so one seat's scouting never
- * lifts another's fog.
- */
 
 import type { GameState, Unit } from './types';
 import { citiesOf, isCiv, seatOf, tileSeat, unitsOf } from './seats';
@@ -22,14 +12,12 @@ export function fogActive(state: GameState): boolean {
   return state.unitsMode && state.fogOfWar;
 }
 
-/** Has `seat` explored this tile? Fog off, or an empty record, means yes. */
 export function isExplored(state: GameState, seat: number, tileIndex: number): boolean {
   if (!fogActive(state)) return true;
   const ex = seatOf(state, seat)?.explored;
   return !ex || ex.length === 0 || ex[tileIndex] === 1;
 }
 
-/** Reveal `radius` tiles around `tileIndex` for `seat`. */
 export function revealAround(
   state: GameState,
   seat: number,
@@ -49,12 +37,10 @@ export function revealAround(
   }
 }
 
-/** Is this tile dark to EVERY civ? Barbarian camps rise where nobody is looking. */
 export function unexploredByAll(state: GameState, tileIndex: number): boolean {
   return state.seats.every((s) => s.explored.length === 0 || s.explored[tileIndex] !== 1);
 }
 
-/** Turn fog on mid-game: reveal what each seat plausibly knows. */
 export function initFog(state: GameState): void {
   for (const s of state.seats) {
     s.explored = new Array(state.map.tiles.length).fill(0);
@@ -66,9 +52,6 @@ export function initFog(state: GameState): void {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Tribal villages
-// ---------------------------------------------------------------------------
 
 /**
  * Claim a village with a unit standing on it (seeded reward).
@@ -119,7 +102,6 @@ export function claimGoodyHut(state: GameState, unit: Unit): void {
       break;
     }
     case 3: {
-      // Eureka for a random unboosted, unresearched tech.
       const candidates = Object.keys(TECHS).filter(
         (id) => !owner.research.techs.includes(id) && !owner.research.boosted.includes(id),
       );
@@ -146,11 +128,7 @@ export function claimGoodyHut(state: GameState, unit: Unit): void {
   if (state.eventLog.length > 20) state.eventLog.shift();
 }
 
-// ---------------------------------------------------------------------------
-// Scout auto-explore
-// ---------------------------------------------------------------------------
 
-/** Nearest reachable tile this unit's seat has not explored, or null. */
 export function nearestUnexplored(state: GameState, unit: Unit): number | null {
   const ex = seatOf(state, unit.seat)?.explored;
   if (!fogActive(state) || !ex || ex.length === 0) return null;

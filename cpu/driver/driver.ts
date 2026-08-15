@@ -51,13 +51,6 @@ export interface DriverOpts {
   send: (msg: unknown) => void;
 }
 
-/** The BUY-candidate tripwire row for ONE seat — the TS pre-turn twin of
- * drive._buy_ctx, in the 11-field shape the orchestrator compares:
- * [buildingCentre, buildingIdx, settlerOk, unitOk, tileOk, tile, tileCentre,
- * worshipCentre, religKind, religCentre, levyIdx]. ATTRIBUTION when a purchase
- * diverges (which half went wrong, at its causal turn); the digest stays the
- * gate. Seat-generic: seat 0 is a seat like any other.
- */
 function buyCandidateRow(state: GameState, actor: Seat): number[] {
   const unl = computeUnlocksIn(actor.research);
     let buyC = -1;
@@ -86,9 +79,6 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
       buyC = bc.centerIndex;
       buyB = prodLayout().buildings.indexOf(bd.id);
     }
-    // The settler is a UNIT purchase now (#71): it spawns at the capital
-    // (else the first city), which must afford the live escalating price
-    // and have the pop to pay (a 1-pop city may not buy one).
     const settlerSpawnCity = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
     const settlerOk = settlerSpawnCity !== undefined && settlerSpawnCity.population >= 2
       && goldAffordable(actor.treasury ?? 0, settlerCost(state, actor.seat) * GOLD_PURCHASE_MULT);
@@ -112,11 +102,6 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
       break;
     }
     const unitOk = actor.cities.length > 0 && mil < actor.cities.length * 2 && anyU;
-    // #104 the TILE candidate twin — the first city in array order with
-    // a border candidate names the pick (pickBorderTile, the culture
-    // claim's own key, with THIS seat's mods); an unaffordable pick
-    // ABORTS the civ's tile buy (the break — it does not try the next
-    // city).
     let tileOk = 0;
     let tileT = -1;
     let tileC = -1;
@@ -131,9 +116,6 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
       }
       break;
     }
-    // #104 the FAITH candidate twins: worship (independent) + the ONE
-    // religious unit (missionary saturates before apostle) — the
-    // _seat_faith_buy_candidates mirror, first eligible city in order.
     const hsOk = (city: (typeof actor.cities)[number]): boolean => {
       const hs = city.districts.find((d) => d.type === 'HOLY_SITE');
       const ht = hs ? state.map.tiles[hs.tileIndex] : undefined;
@@ -164,8 +146,6 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
         }
       }
     }
-    // #104 the LEVY candidate twin — being at war is the POLICY gate; the
-    // rule body levyUnits has no war test. First eligible CS in order.
     let levyIdx = -1;
     // At war with ANY other major, read off this seat's own row — the GPU's
     // `war[row, :1+R].any()` twin. It used to read a single war axis from
@@ -186,7 +166,6 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
     tileOk, tileT, tileC, worshipC, religKind, religC, levyIdx];
 }
 
-/** Play `turns` turns, taking every decision from the server. */
 
 export async function runDriver(o: DriverOpts): Promise<void> {
   const { state, seed, turns: N_TURNS, cityMax: CITY_MAX, cityStateMax: CITY_STATE_MAX } = o;
@@ -226,7 +205,6 @@ for (let t = 0; t < N_TURNS; t++) {
           owns(t) && !isWater(t)
           && (t.pillaged || t.districtPillaged
             || (!t.improvement && validImprovementsIn(t, { unlocks: unl, ownsTile: owns, map: state.map }).length > 0)));
-        // The religion GROUP id IS the seat id, on both engines.
         const spreadTargets = actor.religion.founded
           ? allCities(state).filter((c) => c.followedReligion !== seat)
           : [];
@@ -262,12 +240,6 @@ for (let t = 0; t < N_TURNS; t++) {
     o.send({ t: state.turn, obs, jobs: jobsMsg, spreads: spreadsMsg, buys: buysMsg });
     const msg = JSON.parse(await o.recv()) as { recs?: Record<string, unknown> };
     if (msg.recs && Object.keys(msg.recs).length) {
-      // The rec keys are SEAT ids and storage is seat-keyed too — the
-      // seatPhase loop reads state.seatActions[turn][actor.seat] for EVERY
-      // seat, 0 included, and EVERY verb in the record (production, tech,
-      // civic, war, envoys, buys, geo and the unit ranks) is consumed there.
-      // Nothing is applied off-loop any more: #108 retired the seat-0 TRIPLES
-      // schema, so one record shape reaches one applier at one position.
       const bySeat: Record<number, unknown> = {};
       for (const [sid, rec] of Object.entries(msg.recs)) {
         bySeat[Number(sid)] = rec;
@@ -288,8 +260,6 @@ for (let t = 0; t < N_TURNS; t++) {
       console.log(`t${state.turn - 1} seat ${s} cities=${sx.cities.length} pop=${sx.cities.map((c) => c.population).join(',')}`);
     }
   }
-  // #105 (owner override): the TRACE is DELETED — the state-compare digest
-  // IS the per-turn comparison, always on.
   o.send({ digest: stateDigest(state) });
   // Post-trace control: the orchestrator may request keyed dumps of the
   // groups whose digests disagreed — the state has not moved yet, so the
@@ -310,9 +280,4 @@ for (let t = 0; t < N_TURNS; t++) {
     o.send({ dumps });
   }
 }
-  // A dead seat 0 is a LEGITIMATE outcome — conquest and loyalty flips are
-// the hostile world working. The gate compares every seat every turn
-// regardless of who survives, and a finished game reads post-hoc from
-// whichever seat earned the horizon (the `protagonist()` pick), so no
-// single seat's fate invalidates a seed.
 }

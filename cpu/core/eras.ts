@@ -2,14 +2,7 @@ import type { GameState } from './types';
 import { seatOf, isBarbSeat } from './seats';
 import { DEDICATIONS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_FAITH, DEDICATION_ERA_SCORE, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/seats';
 
-// ---------------------------------------------------------------------------
-// Era score / Ages.
-// Unified civ ids: 0 = seat 0, r+1 = seat r (the civsAtWar convention).
-// Every hook is a plain `+= const` (zero-draw). Ages: 0 Dark / 1 Normal /
-// 2 Golden, assigned at each era boundary from the just-ended window's score.
-// ---------------------------------------------------------------------------
 
-/** Accrue era score for `seat`. Absent reads 0, so no save migration. */
 export function addEraScore(state: GameState, seat: number, pts: number): void {
   const s = seatOf(state, seat);
   if (s) s.eraScore = (s.eraScore ?? 0) + pts;
@@ -76,8 +69,6 @@ export function dedicationEvent(state: GameState, civ: number, kind: number): vo
   if (n > 0) addEraScore(state, civ, n * DED_EVENT_SCORE[kind]);
 }
 
-/** true when this civ's CURRENT age is a HEROIC age — it entered
- *  a Golden age directly from a Dark one. */
 export function isHeroicAge(state: GameState, civ: number): boolean {
   return ((seatOf(state, civ)?.prevAge ?? 1)) === 0 && ((seatOf(state, civ)?.age ?? 1)) === 2;
 }
@@ -95,8 +86,6 @@ export function dedicationFaith(state: GameState, civ: number): number {
   return DEDICATION_FAITH * ((seatOf(state, civ)?.dedications ?? 1));
 }
 
-/** extra era score per turn while DARK or NORMAL — the
- *  climb-out dedication (the Golden-age twin of dedicationFaith). */
 export function dedicationEraScore(state: GameState, civ: number): number {
   const age = (seatOf(state, civ)?.age ?? 1);
   if (age === 2) return 0;
@@ -154,29 +143,22 @@ export function goldenMoveBonus(state: GameState, unit: { type: string; seat: nu
   return 0;
 }
 
-/** EXODUS golden — +4 Great Prophet points per turn. */
 export function goldenProphetPoints(state: GameState, civ: number): number {
   return goldenDedication(state, civ, DED_EXODUS) ? 4 : 0;
 }
 
-/** a Eureka (FREE_INQUIRY) or Inspiration (PEN_BRUSH_AND_VOICE)
- *  refunds an EXTRA 10% on top of BOOST_FRACTION. Techs read the first. */
 export function goldenBoostBonus(state: GameState, civ: number, civic: boolean): number {
   return goldenDedication(state, civ, civic ? DED_PEN_BRUSH_AND_VOICE : DED_FREE_INQUIRY) ? 0.1 : 0;
 }
 
-/** PEN_BRUSH_AND_VOICE golden — +1 Culture per SPECIALTY district. */
 export function goldenCulturePerDistrict(state: GameState, civ: number): number {
   return goldenDedication(state, civ, DED_PEN_BRUSH_AND_VOICE) ? 1 : 0;
 }
 
-/** The loyalty-pressure factor the SOURCE civ's age grants its pop-pressure
- *  contributions. Missing entries (era 0, fresh saves) read Normal. */
 export function agePressureFactor(state: GameState, civ: number): number {
   return AGE_PRESSURE[(seatOf(state, civ)?.age ?? 1)];
 }
 
-/** Governor titles a civ holds for `nCivics` completed civics. */
 export function governorTitles(nCivics: number): number {
   return Math.min(GOV_MAX_TITLES, Math.floor(nCivics / GOV_CIVICS_PER_TITLE));
 }

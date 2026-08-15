@@ -33,29 +33,17 @@ export type SlotKind = 'military' | 'economic' | 'diplomatic' | 'wildcard';
 export const GOVERNMENTS_ADOPTION_LIVE = true;
 
 export interface PolicyEffects {
-  /** Flat yields added to every city. */
   cityYields?: Partial<Yields>;
-  /** Flat yields added to the capital only. */
   capitalYields?: Partial<Yields>;
-  /** Multiplies the adjacency bonus of these districts (e.g. 2 = +100%). */
   adjacencyMult?: Partial<Record<DistrictId, number>>;
-  /** Multiplies building yields belonging to these districts (e.g. 1.5). */
   buildingYieldMult?: Partial<Record<DistrictId, number>>;
-  /** Housing in cities with at least N districts (city center included). */
   housingIfDistricts?: { min: number; housing: number };
-  /** Amenities in cities with at least N specialty districts. */
   amenitiesIfSpecialty?: { min: number; amenities: number };
-  /** Housing+amenities in cities with at least N specialty districts. */
   newDeal?: { min: number; housing: number; amenities: number };
-  /** Multiplier on tile purchase gold cost (0.8 = 20% cheaper). */
   tilePurchaseMult?: number;
-  /** Multiplier on production put toward Encampment district/buildings. */
   encampmentProdMult?: number;
-  /** Percentage multipliers applied to final city yields. */
   yieldMult?: Partial<Yields>;
-  /** Flat amenities in every city. */
   amenitiesAll?: number;
-  /** Flat housing in every city. */
   housingAll?: number;
 }
 
@@ -140,7 +128,6 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     // Cards whose real effect maps to an existing channel carry
     // it. Diplomatic cards exist now so diplomatic slots stop sitting idle.
 
-    // --- Military (combat / unit-production — inert) ---------------------------
     P('DISCIPLINE', 'Discipline', 'military', '+combat strength vs barbarians (combat not modeled).', {}),
     P('SURVEY', 'Survey', 'military', 'Faster tribal-village/goody rewards (not modeled).', {}),
     P('MANEUVER', 'Maneuver', 'military', '+production toward heavy/light cavalry (not modeled).', {}),
@@ -155,7 +142,6 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     P('REDOUBT', 'Redoubt', 'military', 'Anti-cavalry/support strength (not modeled).', {}),
     P('TOTAL_WAR', 'Total War', 'military', '+combat strength attacking, faster support (not modeled).', {}),
 
-    // --- Economic (production/trade/wonder/GP multipliers — mostly inert) ------
     P('GOD_OF_THE_OPEN_SKY', 'God of the Open Sky', 'economic', '+culture from pastures (feature-yield not modeled here).', {}),
     P('COLONIZATION', 'Colonization', 'economic', '+50% production toward Settlers (settler-production multiplier not modeled).', {}),
     P('ILKUM', 'Ilkum', 'economic', '+30% production toward Builders (builder-production multiplier not modeled).', {}),
@@ -170,7 +156,6 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     P('GRAND_MASTERS_CHAPEL', 'Grand Master’s Chapel', 'economic', 'Faith may buy land military units (faith-purchase of units not modeled).', {}),
     P('FREE_TRADE', 'Free Trade', 'economic', '+1 trade-route capacity (trade routes not modeled).', {}),
 
-    // --- Diplomatic (envoys/grievances/spies/tourism — inert fillers) ---------
     P('DIPLOMATIC_LEAGUE', 'Diplomatic League', 'diplomatic', 'First envoy to a city-state counts double (envoys not policy-driven here).', {}),
     P('CHARISMATIC_LEADER', 'Charismatic Leader', 'diplomatic', '+influence-point generation (influence-per-turn not policy-driven here).', {}),
     P('CONTAINMENT', 'Containment', 'diplomatic', 'Suzerain influence against other civs (not modeled).', {}),
@@ -178,7 +163,6 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     P('ONLINE_COMMUNITIES', 'Online Communities', 'diplomatic', '+tourism per government (tourism not modeled).', {}),
     P('MARTYRDOM', 'Martyrdom', 'diplomatic', 'Great-Prophet/faith diplomacy (not modeled).', {}),
 
-    // --- Wildcard (great-people / faith / tourism — inert) --------------------
     P('STRATEGOS', 'Strategos', 'wildcard', '+Great General points (GP points not modeled).', {}),
     P('INSPIRATION', 'Inspiration', 'wildcard', '+Great Scientist points (GP points not modeled).', {}),
     P('REVELATION', 'Revelation', 'wildcard', '+Great Prophet points (GP points not modeled).', {}),
@@ -187,26 +171,7 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
   ].map((p) => [p.id, p]),
 );
 
-// ---------------------------------------------------------------------------
 
-/**
- * SOURCING SWEEP, by direct GS Civilopedia fetch.
- *
- * VERIFIED: MONARCHY is tier 2 and its entry reads "2 Diplomatic Favor per
- * turn" — which validates the whole favor chain end to end, since that
- * mechanic pays favor equal to the government TIER. Chiefdom at tier 0 paying
- * nothing is consistent with the same rule.
- *
- * MONARCHY's slots are CORRECTED here to the Civilopedia's 2 Military /
- * 1 Economic / 1 Diplomatic / 2 Wildcard (they were 3M/1E/1D/1W — same total
- * of six, but one extra military card and one fewer wildcard, which gates what
- * can be slotted). The OTHER NINE governments' slot lists are NOT yet fetched
- * and remain a recorded residual.
- *
- * POLICY CARDS, spot-checked: URBAN_PLANNING is "+1 Production in all cities"
- * in an ECONOMIC slot — this model's text, effect AND slot type all match.
- * The remaining card effects are NOT individually fetched; NARROWED marker.
- */
 export interface GovernmentDef {
   id: string;
   name: string;
@@ -239,22 +204,12 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
     // of 4, which is why no gate ever caught the wrong composition.
     G('AUTOCRACY', 'Autocracy', 1, [M, E, D, W], { capitalYields: { food: 1, production: 1, gold: 1, science: 1, culture: 1, faith: 1 } },
       '+1 to all yields in the capital.'),
-    // Civilopedia: 2 Military, 1 Economic, 1 Wildcard and NO Diplomatic
-    // slot. Was [M, E, D, W] — same total of 4, wrong composition.
-    // Its inherent "+4 Combat Strength to land melee, anti-cavalry and naval
-    // melee" stays unmodeled and is recorded in AUDIT.
     G('OLIGARCHY', 'Oligarchy', 1, [M, M, E, W], {},
       'Combat bonuses (not modeled in this calculator).'),
     G('CLASSICAL_REPUBLIC', 'Classical Republic', 1, [E, E, D, W], { amenitiesAll: 1 },
       '+1 amenity in all cities.'),
-    // The GS Civilopedia's Monarchy entry lists 2 Military, 1 Economic,
-    // 1 Diplomatic and 2 Wildcard. The SPLIT gates what can be slotted, so the
-    // total of six is not enough on its own.
     G('MONARCHY', 'Monarchy', 2, [M, M, E, D, W, W], { housingAll: 1 },
       '+1 housing in all cities.'),
-    // Civilopedia: 1 Military, 2 Economic, 2 Diplomatic, 1 Wildcard.
-    // Was [M, E, E, D, W, W] — same total of 6, a Wildcard standing in for a
-    // Diplomatic slot.
     G('MERCHANT_REPUBLIC', 'Merchant Republic', 2, [M, E, E, D, D, W], { yieldMult: { gold: 1.1 } },
       '+10% gold in all cities.'),
     G('THEOCRACY', 'Theocracy', 2, [M, M, E, E, D, W], { yieldMult: { faith: 1.1 } },
@@ -268,7 +223,6 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
   ].map((g) => [g.id, g]),
 );
 
-/** Can `card` sit in a slot of `slot` kind? */
 export function cardFitsSlot(card: PolicyDef, slot: SlotKind): boolean {
   return slot === 'wildcard' || card.kind === slot;
 }

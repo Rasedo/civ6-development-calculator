@@ -1,8 +1,3 @@
-/**
- * City mechanics: housing, amenities, citizen tile assignment, growth math,
- * cultural border expansion. `computeCityStats` is the single entry point
- * used by the UI and turn loop.
- */
 
 import { addYields, emptyYields, type City, type GameState, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
 import { tilesWithin, hexDistance } from '../../world/hex';
@@ -39,34 +34,24 @@ export interface CityStats {
     districts: Yields;
     buildings: Yields;
     citizens: Yields;
-    /** Flat bonuses from government/policies/religion. */
     bonuses: Yields;
-    /** Income from this city's outgoing trade routes. */
     trade: Yields;
   };
-  /** Final per-turn yields (amenity + government modifiers applied). */
   total: Yields;
   foodSurplus: number;
-  /** Surplus after growth modifiers (what actually enters the food box). */
   effectiveFoodSurplus: number;
   growthNeeded: number;
-  /** Turns until next citizen; null if not growing. */
   turnsToGrow: number | null;
   border: {
     cost: number;
     progress: number;
-    /** Turns until the next culture expansion; null if no culture/candidates. */
     turns: number | null;
     nextTile: number | null;
   };
-  /** Citizens working as specialists (already clamped to slots/population). */
   specialistTotal: number;
-  /** Gold upkeep of districts + buildings (already subtracted from total.gold). */
   maintenance: number;
 }
 
-/** Gold upkeep: commercial money-makers are free, everything else scales with
- * tier. Exported so both engines read one source of truth. */
 export function buildingMaintenance(id: string): number {
   const def = BUILDINGS[id];
   if (!def || def.cost === 0) return 0;
@@ -97,7 +82,6 @@ export function cityMaintenance(state: GameState, city: City): number {
   return total;
 }
 
-/** Tiles a city could work: owned, in range, passable, not district/wonder tiles. */
 export function workableTiles(state: GameState, city: City): Tile[] {
   const center = state.map.tiles[city.centerIndex];
   return tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS).filter(
@@ -110,11 +94,7 @@ export function workableTiles(state: GameState, city: City): Tile[] {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Specialists
-// ---------------------------------------------------------------------------
 
-/** Specialist capacity per district tile (one slot per building in it). */
 export function citySpecialistSlots(state: GameState, city: City): Map<number, number> {
   const out = new Map<number, number>();
   for (const d of city.districts) {
@@ -127,7 +107,6 @@ export function citySpecialistSlots(state: GameState, city: City): Map<number, n
   return out;
 }
 
-/** Assigned specialists clamped to slots (and, in aggregate, to population). */
 export function effectiveSpecialists(state: GameState, city: City): Map<number, number> {
   const slots = citySpecialistSlots(state, city);
   const out = new Map<number, number>();
@@ -162,7 +141,6 @@ export function tileScore(y: Yields, focus: FocusId): number {
   return score;
 }
 
-/** Pick which tiles the city's citizens work: locked tiles first, then best score. */
 export function assignWorkedTiles(
   state: GameState,
   city: City,
@@ -192,7 +170,6 @@ export function tileYieldsForCenter(ctx: YieldCtx, center: Tile): Yields {
   return y;
 }
 
-/** Completed districts, excluding the city center. */
 function completedDistrictCount(state: GameState, city: City, specialtyOnly: boolean): number {
   return city.districts.filter((d) => {
     if (d.type === 'CITY_CENTER') return false;
@@ -201,7 +178,6 @@ function completedDistrictCount(state: GameState, city: City, specialtyOnly: boo
   }).length;
 }
 
-/** Housing from water access, districts, buildings, improvements and policies. */
 export function computeHousing(state: GameState, city: City, mods?: Modifiers): number {
   const m = mods ?? getModifiers(state, city.seat);
   const map = state.map;
@@ -259,15 +235,12 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
   return total;
 }
 
-/** Each unique improved luxury grants +1 amenity to the neediest cities. */
 export function luxuryAmenities(state: GameState, seat: number): Map<number, number> {
   const cities = citiesOf(state, seat);
   const result = new Map<number, number>();
   for (const c of cities) result.set(c.id, 0);
   if (cities.length === 0) return result;
 
-  // Each DISTINCT improved luxury this seat owns grants one amenity to each of
-  // its LUXURY_AMENITY_CITIES neediest cities.
   const luxuries = new Set<string>();
   for (const t of state.map.tiles) {
     if (!t.resource || tileSeat(t) !== seat) continue;
@@ -275,7 +248,6 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
     if (def.category === 'luxury' && t.improvement === def.improvement) luxuries.add(t.resource);
   }
 
-  // Need = amenities required minus what buildings already provide.
   const baseHave = new Map<number, number>();
   for (const c of cities) {
     baseHave.set(c.id, localBuildingAmenities(state, c) + regionalEffects(state, c).amenities);
@@ -294,17 +266,11 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
   return result;
 }
 
-// ---------------------------------------------------------------------------
-// Cultural border expansion
-// ---------------------------------------------------------------------------
 
-/** Unowned tiles this city could claim next (adjacent to its territory, within 5 rings). */
 export function borderCandidates(state: GameState, city: City): number[] {
   const center = state.map.tiles[city.centerIndex];
   const out: number[] = [];
   for (const t of tilesWithin(state.map, center.col, center.row, BORDER_MAX_RADIUS)) {
-    // "own OR foreign" IS "claimed by anyone" — the twin wrote
-    // exactly that as `tileOwned(t)`, an alias for `tileClaimed`.
     if (tileClaimed(t)) continue;
     const adjOwn = tilesWithin(state.map, t.col, t.row, 1).some(
       (n) => n.index !== t.index && tileBelongsTo(n, city),
@@ -321,11 +287,6 @@ export function resourcePriority(tile: Tile): number {
 }
 
 /** The tile culture growth would claim next (Civ 6-ish priorities). */
-/**
- * The tile culture growth claims next: nearest, then resource priority, then
- * total yield, then index.
- *
- */
 export function pickBorderTile(state: GameState, city: City, ctx?: YieldCtx): number | null {
   const yctx = ctx ?? makeYieldCtx(state, city.seat);
   const center = state.map.tiles[city.centerIndex];
@@ -347,20 +308,13 @@ export function pickBorderTile(state: GameState, city: City, ctx?: YieldCtx): nu
     .sort((a, b) => a.dist - b.dist || b.res - a.res || b.ySum - a.ySum || a.i - b.i)[0].i;
 }
 
-/** Claim a tile for the city (culture growth or purchase). */
 export function acquireTile(state: GameState, city: City, tileIndex: number): void {
   setTileOwner(state.map.tiles[tileIndex], city.seat, city.id);
   city.tilesAcquired += 1;
-  // Fog is per seat — the reveal names the claiming seat, so any seat can
-  // claim a tile through this same function instead of hand-copying
-  // setTileOwner + tilesAcquired at its own call site, which is how the
-  // two once drifted.
   revealAround(state, city.seat, tileIndex, 1);
 }
 
-// ---------------------------------------------------------------------------
 
-/** Completed world-wonder defs owned by a city. */
 function completedWonders(state: GameState, city: City) {
   return city.wonders
     .filter((w) => state.map.tiles[w.tileIndex].builtWonderComplete)
@@ -368,9 +322,6 @@ function completedWonders(state: GameState, city: City) {
     .filter((w) => w.def);
 }
 
-/**
- * Empire-wide growth multiplier from a SEAT's wonders (Hanging Gardens).
- */
 export function empireGrowthMult(state: GameState, seat: number): number {
   let mult = 1;
   for (const c of citiesOf(state, seat)) {
@@ -381,7 +332,6 @@ export function empireGrowthMult(state: GameState, seat: number): number {
   return mult;
 }
 
-/** Amenities reaching `city` from regional wonders (Great Bath, Alhambra, Colosseum). */
 function wonderRegionalAmenities(state: GameState, city: City): number {
   const center = state.map.tiles[city.centerIndex];
   let n = 0;
@@ -399,18 +349,6 @@ function wonderRegionalAmenities(state: GameState, city: City): number {
   return n;
 }
 
-/**
- * A civ's per-turn TOURISM. Great Works pay the Gathering Storm
- * values that pair tourism with culture (writing 2, music 4); a SEASIDE RESORT
- * pays the APPEAL of its tile — the same number as its gold, per the
- * Civilopedia. Attributed by tile OWNERSHIP rather than by worked-tile
- * assignment, so the two seats cannot drift on citizen placement.
- *
- * RECORDED RESIDUALS: wonders (2 + 1 per era advanced past the
- * wonder's own era — needs a wonder->era mapping, derivable from
- * requiresTech's era), relics, artifacts and National Parks; none of those
- * systems exist here yet. The Culture VICTORY itself is scored elsewhere.
- */
 /**
  * A civ's ERA INDEX — the highest era among its completed techs
  * and civics (real Civ 6 advances a civ's era with its research). Used only
@@ -431,8 +369,6 @@ export function civEraIndex(techIds: readonly string[], civicIds: readonly strin
   return e;
 }
 
-/** the era a built wonder FIRST became available — the era of its
- *  unlock (tech or civic). Ancient when it has neither. */
 export function wonderEraIndex(id: string): number {
   const def = BUILT_WONDERS[id];
   if (!def) return 0;
@@ -464,11 +400,6 @@ function resortTourism(state: GameState, owns: (t: Tile) => boolean): number {
   return t;
 }
 
-/**
- * Cumulative tourism for ANY seat: great works (PRINTING doubles Writing —
- * relics, artifacts, seaside resorts and wonders.
- *
- */
 export function seatTourism(state: GameState, seat: number): number {
   const s = seatOf(state, seat);
   if (!s) return 0;
@@ -486,9 +417,6 @@ export function computeCityStats(
   luxMap?: Map<number, number>,
   mods?: Modifiers,
 ): CityStats {
-  // Layer this city's followed religion's FOLLOWER belief onto its owner's
-  // per-seat modifiers. A religion is keyed by the seat that founded it, so
-  // the owner's id is the id to compare the followed religion against.
   const base = mods ?? getModifiers(state, city.seat);
   const m = withFollowerBelief(state, base, followerReligionForCity(city.followedReligion, city.seat));
   const ctx: YieldCtx = { map: state.map, mods: m };
@@ -497,30 +425,18 @@ export function computeCityStats(
   const wonders = completedWonders(state, city);
   const hasPetra = wonders.some((w) => w.def.effects?.petraDesert);
 
-  // --- specialists ------------------------------------------------------------
   const specialists = effectiveSpecialists(state, city);
   let specialistTotal = 0;
   for (const n of specialists.values()) specialistTotal += n;
 
-  // --- worked tiles ---------------------------------------------------------
   const worked = assignWorkedTiles(state, city, ctx, city.population - specialistTotal);
   const tiles = emptyYields();
-  // The city-center tile is worked for free.
   addYields(tiles, tileYieldsForCenter(ctx, center));
   const petraBonus = (t: Tile) => {
     if (hasPetra && t.terrain === 'DESERT' && t.feature !== 'FLOODPLAINS' && !t.district) {
       addYields(tiles, { food: 2, gold: 2, production: 1 });
     }
   };
-  // WATER MILL, sourced from the Gathering Storm Civilopedia:
-  // "Bonus resources improved by Farms gain +1 Food each." Modelled in its
-  // GENERAL form, not as a named rice/wheat pair: the queued brief said
-  // "rice/wheat", which happens to be the same set today only because
-  // resources.ts carries no Maize, and would silently drift the moment a third
-  // farm bonus resource is added.
-  // Per-CITY, so it cannot ride ctx.mods like farmAdjTier (a research-wide
-  // modifier) — tileYields has no idea which city works the tile. Applied over
-  // the worked set exactly like petraBonus above.
   const hasWaterMill = city.buildings.includes('WATER_MILL');
   const waterMillBonus = (t: Tile) => {
     if (!hasWaterMill || t.improvement !== 'FARM' || !t.resource) return;
@@ -535,7 +451,6 @@ export function computeCityStats(
     waterMillBonus(map.tiles[i]);
   }
 
-  // --- districts & buildings -------------------------------------------------
   const districts = cityDistrictYields(ctx, city);
   for (const [tileIndex, n] of specialists) {
     const inst = city.districts.find((d) => d.tileIndex === tileIndex);
@@ -549,19 +464,12 @@ export function computeCityStats(
     if (w.def.cityYields) addYields(buildings, w.def.cityYields);
   }
   if (m.faithPerWonder > 0) buildings.faith += m.faithPerWonder * wonders.length;
-  // Slotted Great Works — culture/turn per work BY KIND (writing
-  // 2, music 4 — the real GS values; tourism unmodeled), in the buildings
-  // bucket so it scales with the amenity tier + government yieldMult (like
-  // every building yield), but NOT the district buildingYieldMult (which
-  // cityBuildingYields already applied to the building's own yields).
   buildings.culture += greatWorkCulture(city);
   buildings.culture += artifactCulture(city); // B-20 (#79): +3 culture per artifact
   // Golden PEN_BRUSH_AND_VOICE — +1 Culture per SPECIALTY district, from
   // THIS CITY'S OWNER's dedication. It read seat 0's for every city until
   // #113; the GPU has always read the city's own row.
   buildings.culture += goldenCulturePerDistrict(state, city.seat) * completedDistrictCount(state, city, true);
-  // RELICS pay FAITH (4 each), in the same buildings bucket and at
-  // the same position — a relic is a Great Work held in the Temple's slot.
   buildings.faith += relicFaith(city);
 
   const trade = cityTradeYields(state, city);
@@ -574,7 +482,6 @@ export function computeCityStats(
   addYields(bonuses, m.cityYields);
   if (city.isCapital) addYields(bonuses, m.capitalYields);
 
-  // --- housing & amenities -----------------------------------------------------
   const housing = computeHousing(state, city, m);
   let have =
     localBuildingAmenities(state, city) +
@@ -583,9 +490,6 @@ export function computeCityStats(
     m.amenitiesAll +
     (m.riverCity && hasRiver(center) ? m.riverCity.amenities : 0) +
     ((luxMap ?? luxuryAmenities(state, city.seat)).get(city.id) ?? 0);
-  // War weariness is a flat empire-wide amenity drag, applied AFTER the
-  // luxury grant (whose ranking stays building-amenities-based) so it shifts the
-  // balance/tier without touching the relative luxury distribution.
   have -= warWearinessPenalty(wwMax(seatOf(state, city.seat)));
   const specialtyCount = completedDistrictCount(state, city, true);
   for (const rule of m.amenitiesIfSpecialty) {
@@ -598,7 +502,6 @@ export function computeCityStats(
   const balance = have - needed;
   const tier = amenityTier(balance);
 
-  // --- totals -------------------------------------------------------------------
   const total = emptyYields();
   addYields(total, tiles);
   addYields(total, districts);
@@ -635,7 +538,6 @@ export function computeCityStats(
   const growthNeeded = growthFoodNeeded(city.population);
   const turnsToGrow = effective > 0 ? Math.ceil((growthNeeded - city.foodBox) / effective) : null;
 
-  // --- border growth ---------------------------------------------------------
   const borderCost = Math.round(borderGrowthCost(city.tilesAcquired) * m.borderCostMult);
   const nextTile = pickBorderTile(state, city, ctx);
   const borderTurns =

@@ -16,20 +16,13 @@
  */
 
 export interface WorldUnit {
-  /** Unit type id (a string — the engine validates it against its roster). */
   type: string;
   tile: number;
 }
 
 export interface WorldCiv {
-  /** Leader index — the engine resolves identity (name, color, city names)
-   *  from its own leader table. Civ 0 is not special; the array is the
-   *  seat order. */
   leader: number;
-  /** 0..1 — war likelihood; drawn from this civ's placement stream. */
   aggression: number;
-  /** Starting units, in array order (the order is part of the contract:
-   *  the serve gate compares per-unit rows in array order). */
   units: WorldUnit[];
 }
 
@@ -39,8 +32,6 @@ export interface WorldCityState {
   center: number;
 }
 
-/** Per-tile layers, parallel arrays over tile index. Coded layers index into
- *  `catalogs`; -1 = none. */
 export interface WorldMapLayers {
   width: number;
   height: number;
@@ -67,23 +58,14 @@ export interface WorldFile {
   format: 'world@1';
   gen: {
     seed: number;
-    /** The placement policy version — bump it whenever a placement rule
-     *  changes, so worlds.lock says WHY every hash moved. */
     placement: string;
-    /** What the generator was ASKED for. `cityStateMax` is a max — placement
-     *  drops a city-state it cannot space — while `civCount` is exact, since
-     *  `placeCivs` throws rather than seat fewer. Either way `civs[]` /
-     *  `cityStates[]` below are the rosters; these are provenance. */
     params: { width: number; height: number; cityStateMax: number; civCount: number };
-    /** Hash of the seeder+world sources that generated this file. */
     genStamp: string;
   };
   catalogs: WorldCatalogs;
   map: WorldMapLayers;
   civs: WorldCiv[];
   cityStates: WorldCityState[];
-  /** The play stream's declared start: (seed ^ 0x9e3779b9) >>> 0. */
   rngInit: number;
-  /** sha256 of this file without the hash itself — the worlds.lock entry. */
   worldHash?: string;
 }

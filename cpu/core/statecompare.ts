@@ -86,7 +86,6 @@ export function loadManifest(): Manifest {
   return cached;
 }
 
-// --- the hash -------------------------------------------------------------
 
 function mix32(h: number): number {
   h = h >>> 0;
@@ -223,9 +222,6 @@ function queueItemCost(q: City['queue'][number] | undefined): number {
 
 const QUEST_KIND: Record<string, number> = { clearCamp: 1, sendTradeRoute: 2, buildDistrict: 3 };
 
-// --- extractors -----------------------------------------------------------
-// One per manifest field name. Each takes the state and the group's ROWS and
-// returns one value per row, in row order.
 
 type Extractor = (state: GameState, rows: readonly unknown[]) => Val[];
 
@@ -245,14 +241,6 @@ const overTiles = (fn: (t: Tile) => Val): Extractor => (_state, rows) => (rows a
 const overCityStates = (fn: (cityState: CityState, state: GameState) => Val): Extractor =>
   (state, rows) => (rows as CityState[]).map((cityState) => fn(cityState, state));
 
-/**
- * [[opponentSeat, turnsAtWar], ...] for every LIVE war of `seat`, in ascending
- * opponent-seat order — one clock per WAR, so the pair is the key.
- *
- * Only live wars are emitted: a settled war's clock is reset on both engines,
- * but comparing a value nothing reads would make the digest fail on
- * bookkeeping rather than on rules.
- */
 const warClockLine = (state: GameState, seat: number): Val =>
   warsOf(state, seat)
     .slice()
@@ -283,10 +271,6 @@ const GAME: Record<string, Extractor> = {
   unitCount: (s) => [s.units.length],
 };
 
-/** War weariness and its battle stamps are keyed by the OPPONENT's absolute
- *  seat on both engines. Emitted as (opponent, value) pairs sorted by opponent:
- *  a sum or a max cancels a pair of opposite errors, which is the failure the
- *  trace's `wwSum` column was invented after. */
 const wwPairs = (rec: Record<number, number>, live: (v: number) => boolean): number[] => {
   const out: number[] = [];
   for (const k of Object.keys(rec).map(Number).sort((a, b) => a - b)) {
@@ -350,8 +334,6 @@ const SEAT: Record<string, Extractor> = {
   gpPoints: overSeats((s) => GP_CLASSES.map((c) => s.gpp[c] ?? 0)),
   spaceProjects: overSeats((s) => s.spaceProjects.length),
   routeCount: overSeats((s) => (s.tradeRoutes ?? []).length),
-  // Belief facts — every seat row, seat 0 included (#73: one belief-race
-  // body for all seats).
   prophets: overSeats((s) => prophetsOf(s)),
   beliefPantheon: overSeats((s) => idx(PANTHEON_IDX, s.religion.pantheon)),
   beliefFollower: overSeats((s) => idx(FOLLOWER_IDX, s.religion.follower)),
@@ -359,8 +341,6 @@ const SEAT: Record<string, Extractor> = {
   beliefEnhancer: overSeats((s) => idx(ENHANCER_IDX, s.religion.enhancer)),
   scienceTotal: overSeats((s) => s.scienceTotal),
   nextCityId: overSeats((s) => s.nextCityId),
-  // The three seat-PAIR relations, over EVERY seat — seat 0 included, which
-  // is why all three are fatal digest fields rather than declared gaps.
   formalWars: overSeats((s) => [...s.formalWars].sort((a, b) => a - b)),
   denounced: overSeats((s) =>
     Object.keys(s.denounced)
@@ -368,7 +348,6 @@ const SEAT: Record<string, Extractor> = {
       .sort((a, b) => a - b),
   ),
   allies: overSeats((s) => [...s.allies].sort((a, b) => a - b)),
-  // --- the declared gaps (extracted, census-covered, skipped by default) ---
   tilesPurchased: overSeats((s) => s.tilesPurchased),
 };
 
@@ -480,7 +459,6 @@ const EXTRACTORS: Record<string, Record<string, Extractor>> = {
   tile: TILE,
 };
 
-// --- rows and keys --------------------------------------------------------
 
 /** Is this unit type a CIVILIAN? Spelled the way the seeder ships it into
  *  rules.units (`civilian: u.charges !== undefined`), because the GPU's
@@ -525,7 +503,6 @@ export function groupKeys(group: string, rows: readonly unknown[]): number[] {
   }
 }
 
-// --- the digest -----------------------------------------------------------
 
 export interface GroupDigest {
   exact: string;
@@ -597,8 +574,6 @@ export function stateDigest(state: GameState, opts: { includeGaps?: boolean } = 
   return out;
 }
 
-/** The keyed rows behind one group's digest, `{key: {field: value}}` — what a
- *  by-name diff reads once a digest says which group moved. */
 export function groupDump(
   state: GameState,
   group: string,
@@ -620,12 +595,7 @@ export function groupDump(
   return out;
 }
 
-// --- the census -----------------------------------------------------------
 
-/** The field names an `export interface` declares, read out of the SOURCE — a
- *  TypeScript interface has no runtime existence, so the only surface to walk
- *  is the text that declares it. Comments are stripped first, and only
- *  top-level lines count, so a nested object literal's keys are not fields. */
 export function interfaceFields(name: string, source: string): string[] {
   const head = new RegExp(`export interface ${name}\\b[^{]*\\{`).exec(source);
   if (!head) throw new Error(`no 'export interface ${name}' in cpu/core/types.ts`);
@@ -657,14 +627,6 @@ export function interfaceFields(name: string, source: string): string[] {
   return out;
 }
 
-/**
- * Every field of every type in `censusTypes` is either covered by a manifest
- * field or on the exclusion list with a reason. Returns the complaints; empty
- * means clean.
- *
- * This is the answer to "coverage is whatever somebody remembered to add":
- * adding a field to `GameState` without deciding what compares it fails here.
- */
 export function census(man: Manifest = loadManifest()): string[] {
   const source = readFileSync(fileURLToPath(TYPES_URL), 'utf-8');
   const covered = new Set<string>();

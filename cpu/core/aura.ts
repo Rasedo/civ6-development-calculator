@@ -17,14 +17,8 @@ import type { GameState, Unit } from './types';
 
 export const GENERAL_AURA_CS = 5;
 export const GENERAL_AURA_RANGE = 2;
-/** the movement half of the same aura. */
 export const GENERAL_AURA_MP = 1;
 
-/**
- * Is `unit` (evaluated as standing on `tileIndex`) inside an own general's or
- * admiral's aura? THE single predicate behind both halves — keeping the +CS and
- * +MP effects from ever drifting apart.
- */
 export function inGeneralAura(state: GameState, unit: Unit, tileIndex: number): boolean {
   if ((UNITS[unit.type]?.combat ?? 0) <= 0) return false; // civilians are never affected
   const auraType = unit.embarked || UNITS[unit.type]?.naval ? 'ADMIRAL' : 'GENERAL';
@@ -37,12 +31,6 @@ export function inGeneralAura(state: GameState, unit: Unit, tileIndex: number): 
   return false;
 }
 
-/**
- * The aura's movement bonus for this unit on its CURRENT tile, applied
- * at the `refreshUnits` movement reset. Because the granted pool now varies per
- * turn, `refreshUnits` records it as `Unit.movesFull` so the heal / fortify
- * "spent no MP" gates keep measuring against what was actually granted.
- */
 export function generalAuraMP(state: GameState, unit: Unit): number {
   return inGeneralAura(state, unit, unit.tileIndex) ? GENERAL_AURA_MP : 0;
 }

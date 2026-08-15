@@ -1,4 +1,3 @@
-/** Deterministic seeded RNG (mulberry32) so the same seed always yields the same map. */
 
 export type Rng = () => number;
 
@@ -13,17 +12,14 @@ export function mulberry32(seed: number): Rng {
   };
 }
 
-/** Integer in [0, n). */
 export function randInt(rng: Rng, n: number): number {
   return Math.floor(rng() * n);
 }
 
-/** Random element, or undefined for an empty array. */
 export function pick<T>(rng: Rng, arr: T[]): T {
   return arr[randInt(rng, arr.length)];
 }
 
-/** In-place Fisher–Yates shuffle. */
 export function shuffle<T>(rng: Rng, arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = randInt(rng, i + 1);
@@ -32,7 +28,6 @@ export function shuffle<T>(rng: Rng, arr: T[]): T[] {
   return arr;
 }
 
-/** Derive an independent stream from a base seed and a label. */
 export function deriveSeed(seed: number, label: string): number {
   let h = seed >>> 0;
   for (let i = 0; i < label.length; i++) {

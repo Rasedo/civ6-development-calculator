@@ -30,7 +30,6 @@ import type { WorldCiv, WorldCityState } from '../world/file';
 
 export const PLACEMENT_VERSION = 'spaced-balanced@1';
 
-/** Owner rule (2026-08-09): each major civ at least ten tiles from the rest. */
 export const MAJOR_START_DIST = 10;
 export const CITY_STATE_START_DIST = 6;
 export const START_RESOURCE_RADIUS = 3;
@@ -38,7 +37,6 @@ export const START_RESOURCE_MIN = 2;
 export const START_RESOURCE_SPREAD = 3;
 const MIN_LAND_NEARBY = 8;
 
-/** The deterministic relaxation ladder: [civ spacing, resource spread]. */
 const RELAX: [number, number][] = [
   [MAJOR_START_DIST, START_RESOURCE_SPREAD],
   [MAJOR_START_DIST, 99],
@@ -46,8 +44,6 @@ const RELAX: [number, number][] = [
   [6, 99],
 ];
 
-/** City-state types and name pools, keyed by type. Strings only — validated
- *  by the loader against the engine's own catalog. */
 const CITY_STATE_TYPES = ['scientific', 'cultural', 'trade', 'industrial', 'militaristic', 'religious'] as const;
 const CITY_STATE_NAMES: Record<(typeof CITY_STATE_TYPES)[number], string[]> = {
   scientific: ['Geneva', 'Stockholm', 'Bologna'],
@@ -80,10 +76,6 @@ function landNear(map: GameMap, t: Tile): number {
 
 const far = (a: Tile, b: Tile, d: number): boolean => hexDistance(a.col, a.row, b.col, b.row) >= d;
 
-/**
- * The civ starts: one tile per major seat, in seat order, each with its
- * settler+warrior pair and an aggression draw from the same stream.
- */
 export function placeCivs(map: GameMap, seed: number, nCivs: number): { starts: Tile[]; civs: WorldCiv[] } {
   const legal = map.tiles.filter((t) => startLegal(t) && landNear(map, t) >= MIN_LAND_NEARBY);
   const res = new Map(legal.map((t) => [t.index, resourcesNear(map, t)]));
@@ -109,8 +101,6 @@ export function placeCivs(map: GameMap, seed: number, nCivs: number): { starts: 
     civs.push({
       leader: i,
       aggression: 0.3 + rng() * 0.6,
-      // Settler first, warrior second — array order is the wire contract.
-      // Both on the start tile (one civilian + one military stack legally).
       units: [
         { type: 'SETTLER', tile: pick.index },
         { type: 'WARRIOR', tile: pick.index },
@@ -120,9 +110,6 @@ export function placeCivs(map: GameMap, seed: number, nCivs: number): { starts: 
   return { starts, civs };
 }
 
-/** The city-states: legality + spacing from every start and each other; the
- *  type is a draw from the same per-CS stream, the name the type pool's first
- *  unused entry. */
 export function placeCityStates(map: GameMap, seed: number, nCs: number, civStarts: Tile[]): WorldCityState[] {
   const legal = map.tiles.filter((t) => startLegal(t) && landNear(map, t) >= MIN_LAND_NEARBY);
   const placed: Tile[] = [];

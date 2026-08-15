@@ -1,7 +1,3 @@
-/**
- * Research/government effects engine: computes what is unlocked and a single
- * `Modifiers` object that the yield/housing/amenity code consumes.
- */
 
 import type { DistrictId, GameState, GreatPersonClass, ImprovementId, ResearchState, ResourceCategory, Yields } from './types';
 import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
@@ -11,9 +7,6 @@ import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOL
 import { seatOf, citiesOf } from './seats';
 import { cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus } from './cityStates';
 
-// ---------------------------------------------------------------------------
-// Unlocks
-// ---------------------------------------------------------------------------
 
 export interface Unlocks {
   improvements: Set<string>;
@@ -25,7 +18,6 @@ export interface Unlocks {
   hillFarms: boolean;
 }
 
-/** Content available with zero research. */
 const BASELINE = {
   improvements: ['FARM'],
   buildings: ['MONUMENT'],
@@ -42,8 +34,6 @@ function* completedEffectsIn(research: ResearchState): Generator<ResearchEffect>
   }
 }
 
-/** Unlocks from an arbitrary research state (seat districts/
- * buildings gate on the SEAT's own trees). Seat-0 wrapper below. */
 export function computeUnlocksIn(research: ResearchState): Unlocks {
   const u: Unlocks = {
     improvements: new Set(BASELINE.improvements),
@@ -97,11 +87,6 @@ export function isCivicComplete(state: GameState, id: string, seat: number): boo
   return seatOf(state, seat)!.research.civics.includes(id);
 }
 
-/**
- * Techs researchable from an arbitrary research state (the other seats run the
- * SAME trees through their own ResearchState; the seat-0 wrappers below keep
- * their exact signatures and behavior).
- */
 export function availableTechsIn(research: ResearchState): TechDef[] {
   return Object.values(TECHS).filter(
     (t) => !research.techs.includes(t.id) && t.prereqs.every((p) => research.techs.includes(p)),
@@ -122,14 +107,9 @@ export function availableCivics(state: GameState, seat: number): CivicDef[] {
   return availableCivicsIn(seatOf(state, seat)!.research);
 }
 
-// ---------------------------------------------------------------------------
-// Modifiers
-// ---------------------------------------------------------------------------
 
 export interface Modifiers {
-  /** Extra yields per improvement instance (tech boosts). */
   improvementYields: Partial<Record<ImprovementId, Partial<Yields>>>;
-  /** Farms: +1 food per tier when adjacent to 2+ farms (Feudalism, Replaceable Parts). */
   farmAdjTier: number;
   hillFarms: boolean;
   adjacencyMult: Partial<Record<DistrictId, number>>;
@@ -144,7 +124,6 @@ export interface Modifiers {
   tilePurchaseMult: number;
   encampmentProdMult: number;
   yieldMult: Partial<Yields>;
-  // --- religion-driven -------------------------------------------------------
   featureYields: Partial<Record<string, Partial<Yields>>>;
   improvementOnResource: { category: ResourceCategory; yields: Partial<Yields> }[];
   borderCostMult: number;
@@ -155,7 +134,6 @@ export interface Modifiers {
   buildingHousingAdd: Partial<Record<string, number>>;
   riverCity: { amenities: number; housing: number } | null;
   faithPerWonder: number;
-  /** Flat yields per completed district instance (city-state envoys). */
   districtYieldAdd: Partial<Record<DistrictId, Partial<Yields>>>;
 }
 
@@ -221,12 +199,6 @@ function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.housingAll) mods.housingAll += fx.housingAll;
 }
 
-/**
- * The research-driven modifier head only (foreign cities apply THEIR
- * OWN tech boosts — mine yields, farm adjacency, hill farms; government/
- * religion/CS blocks are seat-0 machinery and stay out). Seat 0's
- * getModifiers builds on top of this.
- */
 export function modifiersFromResearch(research: ResearchState): Modifiers {
   const mods = defaultModifiers();
   for (const fx of completedEffectsIn(research)) {
@@ -242,43 +214,7 @@ export function modifiersFromResearch(research: ResearchState): Modifiers {
   return mods;
 }
 
-// T1 PERF: self-validating value-key cache for the modifier head. The key
-// projects every input the returned Modifiers depends on, so a call-site-free
-// invalidation (combat captures/transfers, tech/civic completion, growth) is
-// captured automatically:
-//   - research.techs.length / research.civics.length: the research arrays are
-//     APPEND-ONLY (only .push at game.ts / phase.ts; no splice/pop/shift/
-//     filter/reassign on any seat's research across the repo), so per-seat the
-//     length is a monotonic version counter that uniquely identifies the
-//     completed-effects set feeding both modifiersFromResearch and
-//     computeAdoption (government + slotted policies).
-//   - pantheon / founded / founder / enhancer: belief ids fully determine the
-//     static belief-effect tables applied.
-//   - Sum(pop) + cities.length: the ONLY fields the belief seat reads
-//     (perFollowers = floor(Sum(pop)/per); perCity = cities.length).
-// `state` is NOT an input: every seat now passes an explicit belief seat, so
-// applyBeliefEffects never falls back to reading seatOf(state, seat)!.cities. WeakMap keys on
-// the seat object, stable within a state and fresh across deserialize/clone.
-//
-// SEAT 0 is deliberately excluded: its mods also depend on stored policy
-// slots and the live city-state channel, neither of which is in this key.
 
-/**
- * ONE modifier head, for any seat.
- *
- * Nothing here branches on WHICH seat is asking. Research, government,
- * beliefs and the city-state channel are each read from the seat's own state,
- * so a seat with none of a thing contributes nothing from it.
- *
- * The government is DERIVED from research rather than read from the stored
- * slots: the two are the same value (endTurn recomputes the store with the
- * same `computeAdoption`), and one derivation cannot drift from itself.
- *
- * Not memoised. A cache here needs a key covering research, beliefs, the
- * stored slots, every city-state envoy count and the buildings the envoy
- * tiers land on; a key that misses one serves a stale modifier set, which
- * surfaces as a yield divergence far from its cause.
- */
 export function getModifiers(state: GameState, seat: number): Modifiers {
   const s = seatOf(state, seat);
   if (!s) return defaultModifiers(); // no such seat — unreachable from real callers
@@ -289,28 +225,18 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
 
   const mods = modifiersFromResearch(s.research);
 
-  // Government + slotted policies, derived from this seat's own research.
   if (GOVERNMENTS_ADOPTION_LIVE) applyGovernment(mods, s.research);
 
-  // Religion: pantheon always; founder belief once founded. The FOLLOWER
-  // belief is per-CITY, keyed on that city's followedReligion
-  // (withFollowerBelief in computeCityStats). Pantheon, founder and enhancer
-  // are per-civ and belong here.
   const beliefSeat = { followers: pop, cities: cities.length };
   applyBeliefEffects(mods, rel?.pantheon ? PANTHEONS[rel.pantheon] : undefined, beliefSeat);
   if (rel?.founded) {
     applyBeliefEffects(mods, rel.founder ? FOUNDER_BELIEFS[rel.founder] : undefined, beliefSeat);
-    // Enhancer belief (inert effects this round; wired for symmetry).
     applyBeliefEffects(mods, rel.enhancer ? ENHANCER_BELIEFS[rel.enhancer] : undefined, beliefSeat);
   }
 
-  // The city-state channel: envoy tier bonuses and the suzerain capital perk,
-  // for whichever seat is asking. A seat holding no envoys reads zero.
   if (state.cityStates?.length) {
     const cityState = cityStateEnvoyBonuses(state, seat);
     addPartial(mods.capitalYields, cityState.capital);
-    // The 3/6 tiers land on BUILDINGS (buildingYieldAdd, applied in
-    // cityBuildingYields — inheriting its pillaged-dark + regional-skip).
     for (const [building, y] of Object.entries(cityState.buildingAdd)) {
       const cur = (mods.buildingYieldAdd[building] ??= {});
       addPartial(cur, y);
@@ -354,7 +280,6 @@ function applyBeliefEffects(
   if (fx.riverCity) mods.riverCity = fx.riverCity;
   if (fx.faithPerWonder) mods.faithPerWonder += fx.faithPerWonder;
 
-  // Founder incomes land in the capital; followers = the seat's own population.
   if (fx.perFollowers) {
     const followers = seat ? seat.followers : 0;
     const times = Math.floor(followers / fx.perFollowers.per);
@@ -394,7 +319,6 @@ export function computeAdoption(research: ResearchState): {
   let chosen: GovernmentDef | null = null;
   for (const g of Object.values(GOVERNMENTS)) {
     if (!u.governments.has(g.id)) continue;
-    // Strict `>` keeps the first table-order government among equal tiers.
     if (!chosen || g.tier > chosen.tier) chosen = g;
   }
   if (!chosen) return { government: null, policies: [] };
@@ -408,8 +332,6 @@ export function computeAdoption(research: ResearchState): {
   return { government: chosen.id, policies };
 }
 
-/** Layer a seat's adopted government + slotted policies onto `mods`, exactly
- * as getModifiers does for seat 0's seatOf(state, seat)!.government. */
 function applyGovernment(mods: Modifiers, research: ResearchState): void {
   const { government, policies } = computeAdoption(research);
   const gov = government ? GOVERNMENTS[government] : null;
@@ -422,37 +344,13 @@ function applyGovernment(mods: Modifiers, research: ResearchState): void {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Per-city FOLLOWER-belief coupling
-// ---------------------------------------------------------------------------
 
-/**
- * The FOLLOWER belief of religion `g` — the unified civ id (0 = seat
- * 0's religion, i+1 = seat i's). Returns undefined for an unfounded /
- * absent religion (g < 0, or the founding civ has not founded / claimed no
- * follower). Follower beliefs carry ONLY the per-city channels workEthic,
- * buildingYields, buildingHousing, amenitiesIfSpecialty and faithPerWonder
- * (verified over FOLLOWER_BELIEFS), so they can be layered onto a base
- * Modifiers per city without disturbing pantheon/founder/government channels.
- */
-/** A religion is keyed by the SEAT that founded it, so `g` is that seat. */
 export function followerBeliefForReligion(state: GameState, g: number): BeliefDef | undefined {
   if (g < 0) return undefined;
   const rel = seatOf(state, g)?.religion;
   return rel?.founded && rel.follower ? FOLLOWER_BELIEFS[rel.follower] : undefined;
 }
 
-/**
- * Layer a city's followed religion's FOLLOWER belief onto a base
- * (per-civ) Modifiers, returning a per-city Modifiers. `followed` is the
- * religion id the city follows (null/-1 = none → base returned unchanged).
- * Only the follower-belief channels are cloned+mutated (buildingYieldAdd,
- * buildingHousingAdd, amenitiesIfSpecialty, workEthic, faithPerWonder); every
- * other channel is shared with `base` by reference, so the numeric result is
- * bit-identical to having applied that belief through the per-civ path. When
- * the coupling switch is INERT the caller passes the OWNER civ's religion id,
- * which reproduces the pre-coupling per-civ application exactly.
- */
 export function withFollowerBelief(
   state: GameState,
   base: Modifiers,
@@ -484,9 +382,6 @@ export function withFollowerBelief(
   return m;
 }
 
-/** the religion id a city draws its FOLLOWER belief from, honoring the
- * coupling switch: LIVE → the city's followedReligion; INERT → the owner civ's
- * religion id, which is the seat id. */
 export function followerReligionForCity(
   followedReligion: number | null | undefined,
   ownerReligionId: number,
@@ -495,18 +390,11 @@ export function followerReligionForCity(
   return ownerReligionId;
 }
 
-/** Convenience bundle used by yield computations. */
 export interface YieldCtx {
   map: GameState['map'];
   mods: Modifiers;
 }
 
-/** A SEAT's yield context: the map, plus that seat's own modifiers. Two tiles
- *  side by side yield different numbers to different seats — techs, policies,
- *  pantheon and envoy tiers all land in `mods` — so every caller names whose
- *  view it wants. It read seat 0's modifiers whoever asked until #114, which
- *  meant a civ's border pick and worked-tile scoring were scored with the
- *  wrong seat's bonuses. */
 export function makeYieldCtx(state: GameState, seat: number): YieldCtx {
   return { map: state.map, mods: getModifiers(state, seat) };
 }
@@ -519,13 +407,11 @@ export function baseYieldCtx(state: GameState): YieldCtx {
   return { map: state.map, mods: defaultModifiers() };
 }
 
-/** Current government's policy slots, including wonder-granted extras. */
 export function governmentSlots(state: GameState, seat: number): import('../data/policies').SlotKind[] {
   const govId = seatOf(state, seat)!.government.current;
   const gov = govId ? GOVERNMENTS[govId] : null;
   if (!gov) return [];
   const slots = [...gov.slots];
-  // Forbidden City grants an extra wildcard slot.
   const hasFC = seatOf(state, seat)!.cities.some((c) =>
     c.wonders?.some(
       (w) => w.id === 'FORBIDDEN_CITY' && state.map.tiles[w.tileIndex].builtWonderComplete,

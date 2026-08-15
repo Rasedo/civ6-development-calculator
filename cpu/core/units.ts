@@ -28,9 +28,6 @@ const no = (reason: string): RuleResult => ({ ok: false, reason });
 
 export { nextRandom } from './rand';
 
-// ---------------------------------------------------------------------------
-// Movement
-// ---------------------------------------------------------------------------
 
 /**
  * The unit-aware TERRAIN passability plane. A NAVAL unit stands on
@@ -47,13 +44,10 @@ export function unitPassable(tile: Tile, unit?: { type: string }): boolean {
   return naval ? isWater(tile) : !isWater(tile);
 }
 
-/** The owner's completed techs. Barbarians and city-states answer with their
- *  own empty research, which is the right answer and needs no special case. */
 function ownerTechs(state: GameState, unit: { seat: number }): string[] {
   return seatOf(state, unit.seat)?.research.techs ?? [];
 }
 
-/** does a unit's OWNER have a tech (the embark/ocean gate reads this). */
 export function ownerHasTech(
   state: GameState,
   unit: { seat: number },
@@ -119,10 +113,6 @@ export function moveCostInto(from: Tile, tile: Tile): number {
   return cost;
 }
 
-/**
- * The river charge a step pays — 0 on water, 0 for a road-to-road
- * step once bridges exist, else RIVER_CROSS_MP when the edge carries a river.
- */
 export function riverCharge(state: GameState, from: Tile, to: Tile): number {
   if (isWater(to)) return 0;
   if (roadStep(from, to) && roadBridges(state)) return 0;
@@ -178,7 +168,6 @@ export const TRADE_ROAD_MAX_STEPS = 32;
  *  a flat 3 — the pre-existing convention, now named). */
 export const RIVER_CROSS_MP = 3;
 
-/** Does stepping from `from` toward `to` cross a river edge? */
 export function crossesRiver(from: Tile, to: Tile): boolean {
   if (from.riverMask === 0) return false;
   const [fq, fr] = offsetToAxial(from.col, from.row);
@@ -203,18 +192,6 @@ export function unitDomain(type: string): 'civilian' | 'military' {
   return UNITS[type]?.charges !== undefined ? 'civilian' : 'military';
 }
 
-/**
- * Side key: one string per side, so "same side" is a string compare.
- *
- * A CITY-STATE gets its own key rather than falling off the end of the chain
- * as `'barbarian'`. Nothing exercises it yet (neither engine gives a
- * city-state units) and it would
- * have fired the moment Round 6 did, in the worst possible way: a minor's unit
- * would have stacked freely with barbarians (`tileFreeForUnit` compares side
-/**
- * Are two units enemies right now? Barbarians fight everyone; seat civs
- * fight the seat 0 only while at war; seat civs never fight each other.
- */
 export function unitsHostile(
   state: GameState,
   a: { seat: number },
@@ -227,11 +204,6 @@ export function unitsHostile(
   return civsAtWar(state, a.seat, b.seat);
 }
 
-/**
- * Is this tile a LIVE Encampment garrison? Complete, unpillaged
- * and still holding HP. `districtPillaged` already means "the district
- * is down", so a pillaged Encampment blocks nothing.
- */
 export function encampmentIntact(tile: Tile): boolean {
   return (
     tile.district === 'ENCAMPMENT' &&
@@ -246,11 +218,6 @@ export function encampmentIntact(tile: Tile): boolean {
   );
 }
 
-/**
- * The OWNER of a district tile, as a hostility probe. Seat
- * territory carries `seatIndex`; otherwise an owned tile belongs to the seat 0.
- * (City-states never build Encampments in this model, so `cityStateId` needs no arm.)
- */
 export function tileOwnerSide(tile: Tile): { seat: number } | null {
   const s = tileSeat(tile);
   return s === NO_SEAT ? null : { seat: s };
@@ -273,12 +240,6 @@ export function encampmentBlocks(
   return side !== null && unitsHostile(state, unit, side);
 }
 
-/**
- * ZONE OF CONTROL (deliberate simplification): a MILITARY unit hostile
- * to `mover` standing ADJACENT to `tileIndex` exerts a zone of control —
- * entering that tile ends the mover's movement this turn. Civilians exert
- * none; hostility is tested LIVE via unitsHostile; city centers are deferred.
- */
 export function inEnemyZoc(
   state: GameState,
   tileIndex: number,
@@ -302,22 +263,8 @@ export function fortifyBonus(unit: { fortifyTurns?: number }): number {
   return Math.min(2, unit.fortifyTurns ?? 0) * 3;
 }
 
-/** Stacking: 1 military + 1 civilian per side; other sides block entirely.
- * Passability is composed here (it needs the owner's tech). A NAVAL
- * unit needs an enterable water tile; a LAND unit needs land, OR — when
- * `allowEmbark` (the war-march v1 surface) and its owner can embark — an
- * enterable water tile. Every non-war-march caller leaves `allowEmbark` false,
- * so land units stay land-only there (inert). */
 
-/**
- * Is the land/water edge between `a` and `b` closed by a CLIFF?
- * The mask lives on the LAND tile (elevated coastline), so read it from
- * whichever side is land and test the bit pointing at the other.
- * Exceptions are the sourced ones: a city centre, or a Harbor on the land tile.
- */
 
-/** Does this tile belong to the unit's own seat? (the owner-only Harbor cliff
- *  exception). Barbarians own no tiles, so they answer false from the data. */
 function tileOwnedByUnitOwner(t: Tile, unit: { seat: number }): boolean {
   return tileSeat(t) === unit.seat;
 }
@@ -328,9 +275,6 @@ export function cliffBlocks(state: GameState, a: Tile, b: Tile, unit?: { seat: n
   if (isWater(land) || !isWater(water)) return false; // not a land/water edge
   if (!land.cliffMask) return false;
   if (land.district === 'CITY_CENTER') return false; // cities ignore cliffs
-  // SOURCED: "A Harbor may still be built next to Cliffs. When your units use
-  // it, they will be able to pass the Cliffs to embark or disembark. ENEMY
-  // units won't." So the Harbor exception is OWNER-ONLY, not a hole in the wall.
   if (land.district === 'HARBOR' && unit && tileOwnedByUnitOwner(land, unit)) return false;
   for (let d = 0; d < 6; d++) {
     if (neighborTile(state.map, land, d)?.index === water.index) {
@@ -376,7 +320,6 @@ export function tileFreeForUnit(
   if (isImpassable(tile)) return false;
   const naval = unit ? !!UNITS[unit.type]?.naval : false;
   if (isWater(tile)) {
-    // Water tile: a naval unit (native) or an embark-capable land unit only.
     if (naval) {
       if (!unit || !waterEnterable(state, tile, unit)) return false;
     } else {
@@ -393,26 +336,15 @@ export function tileFreeForUnit(
   const domain = unit ? unitDomain(unit.type) : 'civilian';
   for (const u of unitsAt(state, tileIndex)) {
     if (u.id === unit?.id) continue;
-    // Every seat is its own side, so a civ's tile is foreign to every other
-    // civ, not just to the barbarians.
     if (u.seat !== side) return false; // foreign occupied
     if (unitDomain(u.type) === domain) return false; // same-slot ally
   }
   return true;
 }
 
-/**
- * A* path (tile indexes, excluding the start). Ignores MP — the walker
- * spends MP turn by turn. Occupied intermediate tiles are allowed (units
- * pass through); only the destination must be free.
- */
 export function findPath(state: GameState, unit: Unit, targetIndex: number): number[] | null {
   const map = state.map;
   const target = map.tiles[targetIndex];
-  // A NAVAL unit routes over enterable water only (OCEAN needs the
-  // owner's CARTOGRAPHY); a LAND unit keeps the land plane (no seat 0-ordered
-  // embark routing in v1 — that rides #50). The scripted walkers never use
-  // findPath, so this only serves seat 0-ordered ship moves / auto-explore.
   const naval = !!UNITS[unit.type]?.naval;
   const passOk = (t: Tile): boolean =>
     // Routing never plans THROUGH a live enemy Encampment.
@@ -463,21 +395,10 @@ export function findPath(state: GameState, unit: Unit, targetIndex: number): num
   return null;
 }
 
-/** Walk a unit along its stored path while its MP cover each step.
- * Embark/disembark (a land unit stepping between land and water) sets/
- * clears `unit.embarked` and costs ALL remaining MP; embarked movement uses the
- * flat EMBARK_MOVES pool. In N1 findPath never routes a LAND unit through water
- * (unitPassable is land-only for them) so this is inert here and exercised only
- * by the war-march; it is left correct for naval/embark movers that N2 adds. */
-/** What the movement-point contract did with one step. */
 export type StepOutcome =
-  /** Took the step and has MP left. */
   | 'moved'
-  /** Took the step; MP is now spent (ZOC halt or the pool ran out). */
   | 'halted'
-  /** Did not move — not enough MP. The step is still legal next turn. */
   | 'cantAfford'
-  /** Did not move — a cliff closes this edge. */
   | 'blocked';
 
 /**
@@ -543,11 +464,6 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   if (unit.movesLeft < cost && unit.movesLeft < full) return 'cantAfford';
   if (transition) unit.embarked = isWater(to);
   unit.tileIndex = to.index;
-  // THE move commit, for every seat. `walkPath` is the SEAT 0's
-  // walker; the other seats have their own chassis functions that transcribe its rules
-  // by hand ("walkPath's exact charge", three separate copies) — so seaming
-  // walkPath logged 642 seat 0 moves and ZERO seat ones. Every seat's step
-  // lands here instead: this is the ONLY tile write in core.
   logUnitOrder(state, unit.seat, unit.id, 'move', to.index);
   unit.movesLeft = Math.max(0, unit.movesLeft - cost);
   if (unit.seat === seat) {
@@ -567,7 +483,6 @@ export function walkPath(state: GameState, unit: Unit): void {
   while (unit.path && unit.path.length > 0 && unit.movesLeft > 0) {
     const nextIndex = unit.path[0];
     const to = state.map.tiles[nextIndex];
-    // Enemy-occupied tiles block; the final step also needs a free slot.
     const blockedByEnemy =
       unitsAt(state, nextIndex).some((u) => u.seat !== unit.seat) ||
       encampmentBlocks(state, to, unit); // B-17 (#71)
@@ -586,7 +501,6 @@ export function walkPath(state: GameState, unit: Unit): void {
   if (unit.path && unit.path.length === 0) unit.path = null;
 }
 
-/** Order a move: computes a path and walks as far as this turn's MP allow. */
 export function orderMove(state: GameState, unitId: number, targetIndex: number): RuleResult {
   const unit = state.units.find((u) => u.id === unitId);
   if (!unit) return no('No such unit.');
@@ -599,9 +513,6 @@ export function orderMove(state: GameState, unitId: number, targetIndex: number)
   return ok;
 }
 
-// ---------------------------------------------------------------------------
-// Training & upkeep
-// ---------------------------------------------------------------------------
 
 /**
  * The builder price escalator — 50 + 4 (pre-speed) per
@@ -646,10 +557,6 @@ export function cityNavalCapable(
   );
 }
 
-/** Unit types a city can train right now. NAVAL units are offered ONLY
- * when a naval-capable `city` is supplied (center-coastal or a completed
- * Harbor) — callers without a city (RL candidate scan) never see naval, which
- * keeps seat 0 naval to poke tests until #50 gives the RL verbs. */
 export function trainableUnits(
   state: GameState,
   seat: number,
@@ -667,8 +574,6 @@ export function trainableUnits(
     // (queueSettler/purchaseSettler), never the generic unit columns.
     if (d.settler) return false;
     if (d.requiresTech && !state.sandbox && !isTechComplete(state, d.requiresTech, seat)) return false;
-    // The CIVIC gate (Archaeologist / Natural History), the exact
-    // twin of the tech gate above and equally sandbox-exempt.
     if (d.requiresCivic && !state.sandbox && !isCivicComplete(state, d.requiresCivic, seat)) return false;
     // An ARCHAEOLOGIST may only be trained where its city's
     // ARCHAEOLOGICAL MUSEUM still has a FREE artifact slot — the real Civ 6
@@ -680,9 +585,6 @@ export function trainableUnits(
       const has = (held?.buildings ?? []).includes(ARTIFACT_BUILDING);
       if (!has || (held?.artifacts ?? 0) >= ARTIFACT_SLOTS) return false;
     }
-    // Strategic-resource access gates build AND purchase (purchaseUnit
-    // funnels through here). Data-driven off UnitDef.requiresResource; the seat 0
-    // is civ 0. Sandbox ignores the gate, like the tech gate above.
     if (d.requiresResource && !state.sandbox && !civHasStrategic(state, seat, d.requiresResource)) return false;
     if (d.naval) return !!city && cityNavalCapable(state, city);
     return true;
@@ -730,8 +632,6 @@ export function queueUnit(state: GameState, cityId: number, unitType: string, se
     spawnUnit(state, unitType, city.centerIndex, seat);
     return ok;
   }
-  // Builders lock their escalated price at queue time (the counter
-  // may grow before completion; settlers/districts already work this way).
   if (unitType === 'BUILDER') {
     city.queue.push({ kind: 'unit', unit: unitType, progress: 0, cost: builderCost(state, seat) });
   } else {
@@ -740,7 +640,6 @@ export function queueUnit(state: GameState, cityId: number, unitType: string, se
   return ok;
 }
 
-/** Place a new unit on/near a tile (first free slot by distance). */
 export function spawnUnit(
   state: GameState,
   unitType: string,
@@ -767,9 +666,6 @@ export function spawnUnit(
   };
   // FORTIFY: military units carry a fortify counter (civilians never do).
   if (def.charges === undefined) unit.fortifyTurns = 0;
-  // XP: a unit carries an experience counter iff its seat's class
-  // can earn any (#51/S6.11 `caps.xp`). Leaving the field ABSENT for a seat
-  // that cannot is what keeps `xp = 0` from reading as "a veteran-in-waiting".
   if (capsOf(seat).xp) unit.xp = 0;
   state.units.push(unit);
   revealAround(state, seat, unit.tileIndex);
@@ -783,7 +679,6 @@ export function spawnUnit(
   return unit;
 }
 
-/** The city centered on this tile, with the seat that holds it, if any. */
 export function cityAtIndex(
   state: GameState,
   tileIndex: number,
@@ -799,12 +694,10 @@ export function disbandUnit(state: GameState, unitId: number): void {
   state.units = state.units.filter((u) => u.id !== unitId);
 }
 
-/** This seat's LIVE settler units — the escalator settlerCost() reads. */
 export function settlerCount(state: GameState, seat: number): number {
   return state.units.reduce((n, u) => n + (u.seat === seat && u.type === 'SETTLER' ? 1 : 0), 0);
 }
 
-/** Gold upkeep of this seat's units. */
 export function unitMaintenance(state: GameState, seat: number): number {
   return state.units.reduce(
     (s, u) => s + (u.seat === seat ? UNITS[u.type]?.maintenance ?? 0 : 0),
@@ -812,13 +705,9 @@ export function unitMaintenance(state: GameState, seat: number): number {
   );
 }
 
-/** Start-of-turn refresh: heal, MP back to full, multi-turn moves continue. */
 export function refreshUnits(state: GameState): void {
   for (const unit of state.units) {
     const tile = state.map.tiles[unit.tileIndex];
-    // An EMBARKED land unit refreshes to the flat EMBARK_MOVES pool
-    // (naval units keep their own moves). The heal/fortify "spent no MP" gate
-    // below reads this same `full`.
     const naval = !!UNITS[unit.type]?.naval;
     const full = unitFullMoves(state, unit);
     // Real Civ 6: a unit heals only if it
@@ -832,9 +721,6 @@ export function refreshUnits(state: GameState): void {
     // units that have never been refreshed.
     const grantedLast = unit.movesFull ?? full;
     if (unit.movesLeft >= grantedLast) {
-      // ONE heal rule for every seat. Each term is simply EMPTY for the
-      // classes it does not apply to: a major holds no camps, the barbarians
-      // hold no land.
       const home = tileSeat(tile) === unit.seat;
       const onCamp = seatOf(state, unit.seat)?.camps.includes(unit.tileIndex) ?? false;
       const heal = home && tile.district === 'CITY_CENTER' ? 20
@@ -861,7 +747,6 @@ export function refreshUnits(state: GameState): void {
     unit.movesFull = granted;
     unit.movesLeft = granted;
     if (unit.path) walkPath(state, unit);
-    // Auto-explore: keep chasing the fog until there is none in reach.
     if (unit.mission === 'explore' && !unit.path && unit.movesLeft > 0) {
       const target = nearestUnexplored(state, unit);
       if (target === null) {
@@ -879,7 +764,6 @@ export function refreshUnits(state: GameState): void {
   }
 }
 
-/** Toggle a unit's auto-explore standing order. */
 export function setExploreMission(state: GameState, unitId: number, on: boolean): RuleResult {
   const unit = state.units.find((u) => u.id === unitId);
   if (!unit) return no('No such unit.');
@@ -888,9 +772,6 @@ export function setExploreMission(state: GameState, unitId: number, on: boolean)
   return ok;
 }
 
-// ---------------------------------------------------------------------------
-// Builder actions
-// ---------------------------------------------------------------------------
 
 function builderOn(state: GameState, unitId: number): { unit?: Unit; err?: RuleResult } {
   const unit = state.units.find((u) => u.id === unitId);
@@ -906,9 +787,6 @@ function spendCharge(state: GameState, unit: Unit): void {
   if (unit.charges <= 0) disbandUnit(state, unit.id);
 }
 
-/** Build an improvement with the builder standing on the tile (instant, 1
- *  charge). Legality is the ASKING SEAT's — techs, civics and borders all
- *  differ per seat, and this read a literal 0 until #115. */
 export function builderImprove(state: GameState, unitId: number, imp: ImprovementId, seat: number): RuleResult {
   const { unit, err } = builderOn(state, unitId);
   if (err) return err;
@@ -928,8 +806,6 @@ export function builderImprove(state: GameState, unitId: number, imp: Improvemen
  * no charges" instead, which let a Great General pillage on one engine and not
  * the other. It went with the triples schema in #108. */
 
-/** Repair a pillaged improvement or district (no charge, ends the builder's
- * turn). Districts join the same repair, mirroring improvement repair. */
 export function builderRepair(state: GameState, unitId: number): RuleResult {
   const { unit, err } = builderOn(state, unitId);
   if (err) return err;
@@ -958,9 +834,6 @@ export function builderRemoveFeature(state: GameState, unitId: number, seat: num
   if (tile.improvement === 'LUMBER_MILL' && tile.feature === 'WOODS') tile.improvement = null;
   tile.feature = null;
   if (grant) {
-    // The lump pays the CHOPPING seat. `chopGrant` already refused unless the
-    // tile is in that seat's borders, so the literal 0 this passed until #115
-    // could only ever have credited the wrong pocket.
     applyLumpYield(state, tile.index, grant, seat);
     state.eventLog.push(`Chopped ${featureName}: +${grant.amount} ${grant.key}.`);
   }
@@ -968,7 +841,6 @@ export function builderRemoveFeature(state: GameState, unitId: number, seat: num
   return ok;
 }
 
-/** Harvest a bonus resource (1 charge): removes it for an era-scaled yield lump. */
 export function builderHarvest(state: GameState, unitId: number): RuleResult {
   const { unit, err } = builderOn(state, unitId);
   if (err) return err;
@@ -990,29 +862,10 @@ export function builderHarvest(state: GameState, unitId: number): RuleResult {
   return ok;
 }
 
-/** Neighboring tile of a unit in direction d, if any (UI helper). */
 export function unitNeighbor(state: GameState, unit: Unit, d: number): Tile | null {
   return neighborTile(state.map, state.map.tiles[unit.tileIndex], d);
 }
 
-/**
- * GREEDY WALK TOWARD A TILE, for any seat.
- *
- * `walkPath` follows a QUEUED path; this is the other walker — step to the free
- * neighbour strictly closer, first-found wins ties (direction order), stop when
- * within `stopWithin`. It was transcribed by hand three times inside
- * `phase.ts`, each copy annotated with what it was copying ("pays walkPath's
- * charge", "walkPath's charge (tile cost + 3 per river)", "the missionary
- * chassis verbatim: ... walkPath's EXACT CHARGE, ZOC halt, camp clear").
- *
- * `stepUnit` already held the charge, the ZOC halt and the camp clear, so those
- * were genuinely shared; what was triplicated is the PATHING around it — which
- * is where task #46 came from (a rule inside the seat 0's walker that the hand
- * copies did not carry).
- *
- * Takes a UNIT, not a seat index: nothing here is seat-specific, and the
- * Python ladder will call it for whichever seat it is driving.
- */
 export function walkToward(state: GameState, unit: Unit, target: Tile, stopWithin = 0): void {
   for (;;) {
     const at = state.map.tiles[unit.tileIndex];

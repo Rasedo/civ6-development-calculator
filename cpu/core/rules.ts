@@ -1,8 +1,3 @@
-/**
- * Placement validation: city sites, improvements, features, districts,
- * buildings — including tech/civic gating (bypassed in sandbox mode).
- * Every rule returns a reason so the UI can explain refusals.
- */
 
 import type { City, DistrictId, GameMap, GameState, ImprovementId, Tile } from './types';
 import { hexDistance, neighbors } from '../../world/hex';
@@ -28,12 +23,10 @@ export interface RuleResult {
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
-/** Sandbox ignores research gating entirely. */
 function gates(state: GameState, seat: number): Unlocks | null {
   return state.sandbox ? null : computeUnlocks(state, seat);
 }
 
-// ---------------------------------------------------------------------------
 
 /**
  * May `seat` found a city on this tile? ONE rule, asked per seat.
@@ -68,25 +61,13 @@ export function canFoundCity(state: GameState, tileIndex: number, seat: number):
   return ok;
 }
 
-// ---------------------------------------------------------------------------
 
-/** Improvements that may be built on this tile right now (research-gated). */
-/**
- * Owner-qualified improvement rules: the same body over an
- * arbitrary unlock set and ownership test so seat builders place under
- * THEIR research. The seat-0 wrapper below keeps the exact old behavior.
- */
 export function validImprovementsIn(
   tile: Tile,
   opts: {
     unlocks: Unlocks | null;
     ownsTile: (t: Tile) => boolean;
     map?: GameMap;
-    /**
-     * The unit TYPE proposing the improvement. Only the FORT is type-gated
-     * (Military Engineer only); every other improvement is any Builder's. A
-     * caller that passes nothing is never offered the FORT.
-     */
     builder?: string;
   },
 ): ImprovementId[] {
@@ -115,7 +96,6 @@ export function validImprovementsIn(
     return tile.improvement ? [] : ['FORT'];
   }
   if (tile.resource) {
-    // A tile with a resource only accepts the improvement that works it.
     const imp = RESOURCES[tile.resource].improvement;
     return unlocked(imp) ? [imp] : [];
   }
@@ -184,13 +164,7 @@ export function canRemoveFeature(state: GameState, tile: Tile, seat: number): Ru
   return ok;
 }
 
-// ---------------------------------------------------------------------------
 
-/**
- * Owner-qualified placement: the same rule body over an arbitrary
- * unlock set and tile-ownership test, so foreign cities place districts under
- * THEIR research. The seat-0 wrapper below keeps the exact old behavior.
- */
 export function canPlaceDistrictIn(
   state: GameState,
   city: City,
@@ -260,7 +234,6 @@ export function canPlaceDistrictIn(
   return ok;
 }
 
-/** All tiles where the district could go (for map highlighting). */
 export function canPlaceDistrict(
   state: GameState,
   city: City,
@@ -284,7 +257,6 @@ export function districtPlacementTiles(state: GameState, city: City, type: Distr
   return out;
 }
 
-// ---------------------------------------------------------------------------
 
 /**
  * Buildings the city could queue right now (research-gated). Districts under
@@ -306,7 +278,6 @@ export function availableBuildings(state: GameState, city: City): BuildingDef[] 
   for (const type of placed) {
     for (const def of buildingsForDistrict(type)) {
       if (have.has(def.id) || queued.has(def.id)) continue;
-      // Worship buildings are outside research: they come from your religion.
       if (def.worship) {
         if (seatOf(state, city.seat)?.religion.worship !== def.id) continue;
       } else if (unlocks && !unlocks.buildings.has(def.id)) {
@@ -321,7 +292,6 @@ export function availableBuildings(state: GameState, city: City): BuildingDef[] 
   return out;
 }
 
-/** Can this building actually finish right now (district done, prereqs owned)? */
 export function buildingCompletable(state: GameState, city: City, buildingId: string): boolean {
   const def = BUILDINGS[buildingId];
   if (!def) return false;
@@ -337,11 +307,7 @@ export function buildingDef(id: string): BuildingDef {
   return BUILDINGS[id];
 }
 
-// ---------------------------------------------------------------------------
-// World wonders
-// ---------------------------------------------------------------------------
 
-/** Has this wonder been placed (building or built) anywhere in the world? */
 export function wonderExists(state: GameState, wonderId: string): boolean {
   return state.map.tiles.some((t) => t.builtWonder === wonderId);
 }
@@ -419,7 +385,6 @@ export function wonderPlacementTiles(state: GameState, city: City, wonderId: str
   return out;
 }
 
-/** Wonders this city could start right now (unlocked, unbuilt, with a legal tile). */
 export function availableWonders(state: GameState, city: City, seat: number): BuiltWonderDef[] {
   return Object.values(BUILT_WONDERS).filter((def) => {
     if (wonderExists(state, def.id)) return false;

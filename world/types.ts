@@ -1,11 +1,3 @@
-/**
- * THE WORLD'S TYPES — the map half of the old shared type file, engine-free.
- *
- * `world/` may be imported by anything (the seeder, both engine sides, tests)
- * and imports NOTHING outside itself. If a symbol needs to know what a tile
- * is WORTH, what a building COSTS, or what a rule DOES, it does not belong
- * here.
- */
 
 /**
  * The six yields, and the ONLY place their order is written.
@@ -91,14 +83,7 @@ export const NO_SEAT = -1;
 export const CITY_MIN_DIST = 4;
 
 export interface Tile {
-  /**
-   * WHO owns this tile — one seat id from the absolute space in
-   * cpu/core/seats.ts (NO_SEAT = nobody). Read it through
-   * `tileSeat`/`tileCity`/`tileBelongsTo` and write it through `setTileOwner`;
-   * nothing else should touch it.
-   */
   ownerSeat: number;
-  /** WHICH CITY of that seat works the tile (-1 = none / a city-state). */
   ownerCity: number;
   index: number;
   col: number;
@@ -107,15 +92,11 @@ export interface Tile {
   elevation: Elevation;
   feature: FeatureId | null;
   resource: string | null; // resource id from world/resources
-  /** Natural wonder id occupying this tile, or null. */
   wonder: string | null;
-  /** 6-bit mask; bit d set = river runs along the edge toward neighbor direction d. */
   riverMask: number;
   improvement: string | null; // ImprovementId
-  /** District type occupying this tile; possibly still under construction. */
   district: DistrictId | null;
   districtComplete: boolean;
-  /** World wonder occupying this tile; possibly still under construction. */
   builtWonder: string | null;
   builtWonderComplete: boolean;
   /** CLIFFS as a six-bit EDGE mask, exactly like `riverMask` — bit
@@ -128,11 +109,7 @@ export interface Tile {
    *  an Artifact. Real Civ 6 creates these from pre-Modern events (a razed
    *  barbarian outpost, a unit dying) and reveals them with Natural History. */
   antiquity?: boolean;
-  /** Pillaged improvement (yields nothing until a builder repairs it). */
   pillaged: boolean;
-  /** pillaged district (a complete, non-CITY_CENTER district whose
-   * yields/buildings/housing/amenities/GPP go dark until a builder repairs it;
-   * static counts — cost/limit/maintenance — stay, since it is still owned). */
   districtPillaged?: boolean;
   /** the ENCAMPMENT garrison pool (max ENCAMPMENT_HP = 100), set
    *  when the district COMPLETES. While positive the tile blocks hostile
@@ -147,13 +124,9 @@ export interface Tile {
    *  also ignores the river crossing charge (Civ 6's Classical road brings
    *  bridges). Absent = no road. */
   road?: boolean;
-  /** Tribal village (goody hut) waiting for a unit to claim it. */
   goodyHut: boolean;
-  /** Volcano (a mountain that occasionally erupts when disasters are on). */
   volcano: boolean;
-  /** Permanent bonus food from floods/eruptions/storm silt (capped). */
   fertility: number;
-  /** Turns of drought left (-1 food while active). */
   droughtTurns: number;
 }
 
@@ -168,7 +141,6 @@ export interface MapGenOptions {
   width: number;
   height: number;
   seed: number;
-  /** Approximate fraction of land tiles. */
   landFraction?: number;
   withResources?: boolean;
   withWonders?: boolean;

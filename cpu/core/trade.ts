@@ -16,18 +16,8 @@ import type { RuleResult } from './rules';
 
 export const TRADE_ROUTE_RANGE = 15;
 
-/** every trade route (domestic, city-state, international) expires this
- * many turns after it starts; the owner re-picks next turn via the existing
- * deterministic pickers (real-ish 21-turn land route trimmed to the model's
- * online pace). Expiry is arithmetic — zero RNG draws. */
 export const TRADE_ROUTE_DURATION = 20;
 
-/**
- * Total route capacity for ANY seat: the Foreign Trade civic, Markets and
- * Lighthouses (non-cumulative per city), Colossus/Great Zimbabwe, plus
- * +1 per trade city-state this seat is suzerain of.
- *
- */
 export function tradeCapacity(state: GameState, seat: number): number {
   const s = seatOf(state, seat);
   let cap = 0;
@@ -42,16 +32,12 @@ export function tradeCapacity(state: GameState, seat: number): number {
   return cap + cityStateTradeCapacityBonus(state, seat);
 }
 
-/** Count of completed, limit-counting (specialty) districts in a city — the
- * shared basis for domestic and international route yields. Exported so the
- * scripted/seat pickers score international destinations off the same count. */
 export function specialtyDistricts(state: GameState, city: City): number {
   return city.districts.filter(
     (d) => DISTRICTS[d.type].countsTowardLimit && state.map.tiles[d.tileIndex].districtComplete,
   ).length;
 }
 
-/** Yields the origin receives from one route to `dest`. */
 export function routeYields(state: GameState, dest: City): Yields {
   const out = emptyYields();
   addYields(out, { food: 1, production: 1 }); // city center
@@ -70,15 +56,12 @@ export const CITY_STATE_ROUTE_SPEC = 1;
  * domestic-only channel). Exported for the GPU rules dump. */
 export const INTL_ROUTE_GOLD = 3;
 
-/** Yields the origin receives from one INTERNATIONAL route to `dest` (a met
- * seat's city, or — from a seat's seat — a seat-0 city). Gold only. */
 export function routeYieldsInternational(state: GameState, dest: City): Yields {
   const out = emptyYields();
   out.gold += INTL_ROUTE_GOLD + specialtyDistricts(state, dest);
   return out;
 }
 
-/** Yields from one route to a city-state: gold-forward plus its specialty. */
 export function cityStateRouteYields(cityState: CityState): Yields {
   const out = emptyYields();
   out.gold += CITY_STATE_ROUTE_GOLD;
@@ -115,9 +98,6 @@ export function routeRaided(state: GameState, from: City, to: City, seat: number
   return routeRaidedAt(state, [from.centerIndex, to.centerIndex], seat);
 }
 
-/** All trade income for a city (sum of its outgoing, unraided routes).
- *  Routes live on the OWNING seat (`Seat.tradeRoutes`) — city ids are
- *  per-seat, so reading any other seat's list would collide. */
 export function cityTradeYields(state: GameState, city: City): Yields {
   const seat = city.seat;
   const out = emptyYields();
@@ -131,10 +111,6 @@ export function cityTradeYields(state: GameState, city: City): Yields {
       continue;
     }
     if (route.toSeat !== undefined) {
-      // international: a route to another major seat's city — gold only.
-      // Suspended while at war with that seat (destination-civ interdiction)
-      // or while hostiles prowl either endpoint. `toSeat` is the ABSOLUTE
-      // seat id, the one encoding every store uses.
       const civSeat = seatOf(state, route.toSeat);
       const civCity = civSeat?.cities.find((c) => c.id === route.toSeatCity);
       if (civSeat && civCity && !civsAtWar(state, civSeat.seat, seat) && !routeRaidedAt(state, [city.centerIndex, civCity.centerIndex], seat)) {
@@ -145,8 +121,6 @@ export function cityTradeYields(state: GameState, city: City): Yields {
     const dest = seatOf(state, seat)!.cities.find((c) => c.id === route.to);
     if (dest && !routeRaided(state, city, dest, seat)) {
       addYields(out, routeYields(state, dest));
-      // Extra yields when the destination city follows the OWNER's
-      // religion (religion ids are seat ids) — the enhancer belief's rule.
       const relT = seatOf(state, seat)!.religion;
       if (relT?.founded && relT.enhancer && dest.followedReligion === seat) {
         const tr = ENHANCER_BELIEFS[relT.enhancer]?.effects.tradeReligionYields;
@@ -181,14 +155,10 @@ export function addTradeRoute(state: GameState, from: number, to: number, seat: 
   const check = canAddTradeRoute(state, from, to, seat);
   if (!check.ok) return check;
   (seatOf(state, seat)!.tradeRoutes ??= []).push({ from, to, expiresTurn: state.turn + TRADE_ROUTE_DURATION });
-  // The route's Trader lays road along its land path.
   layRouteRoad(state, from, seatOf(state, seat)!.cities.find((c) => c.id === to)?.centerIndex ?? -1, seat);
   return { ok: true };
 }
 
-/** lay the route's road between two CENTER tiles (either endpoint
- *  missing = nothing to walk). Kept here so all four creation sites — the three
- *  seat-0 verbs and the seat pick — call ONE thing. */
 export function layRouteRoad(state: GameState, fromCityId: number, toCenterIndex: number, seat: number): void {
   const a = seatOf(state, seat)!.cities.find((c) => c.id === fromCityId);
   if (!a || toCenterIndex < 0) return;
@@ -223,9 +193,6 @@ export function addCsTradeRoute(state: GameState, from: number, cityStateId: num
   return { ok: true };
 }
 
-/** International: can `seat` route from its own city `from` to major
- * `toSeat`'s city `seatCity`? Both ends are ABSOLUTE seats — the `toSeat`
- * field this writes has always stored one. */
 export function canAddIntlTradeRoute(state: GameState, from: number, toSeat: number, seatCity: number, seat: number): RuleResult {
   const a = seatOf(state, seat)!.cities.find((c) => c.id === from);
   const civSeat = seatOf(state, toSeat);

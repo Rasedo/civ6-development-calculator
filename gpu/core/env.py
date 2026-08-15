@@ -56,7 +56,6 @@ class BatchEnv:
         self._episode = 0
         self._score_prev: dict[int, torch.Tensor] = {}
         s = self.sim
-        # odd-r offset → axial, for hex distances in unit features
         t = torch.arange(s.T, device=s.device)
         row = torch.div(t, s.W, rounding_mode="floor")
         col = t % s.W
@@ -64,14 +63,6 @@ class BatchEnv:
         self._ax_r = row.to(torch.long)
 
     def reset(self, scramble: int | None = None) -> torch.Tensor:
-        """Restore the initial state (all games, lockstep).
-
-        scramble=None replays the fixture's recorded RNG stream — identical
-        worlds every episode, and what the gates compare against. Passing an
-        int re-seeds each game's mulberry32 from (scramble, game index, episode
-        counter): same maps, fresh barbarians/quests/wars/disasters each
-        episode — the training setting.
-        """
         self.sim.reset()
         if scramble is not None:
             s = self.sim
@@ -82,23 +73,11 @@ class BatchEnv:
         return self.observe()
 
     def _row(self, seat: int) -> int:
-        """A major's SEAT ID IS ITS ROW in every merged plane, and that row is
-        also its index in the war matrix. All this does is bounds-check; the
-        engine speaks rows and nothing below converts."""
         if not 0 <= seat < self.sim.n_majors:
             raise ValueError(f"seat {seat} is not a major row (0..{self.sim.n_majors - 1})")
         return seat
 
     def masks(self, seat: int = 0) -> dict[str, torch.Tensor]:
-        """The seat's decision space: production [B, C, NB+2+NU], tech [B, NT],
-        civic [B, NC], units [B, P, n_unit_acts], envoy [B, S], war [B, 2*n_opponents] —
-        all-False rows mean no decision pends there this turn.
-
-        ONE assembly for every seat. `seat_masks` is the engine's one legality
-        body — its war head addresses `war_targets(row)`, the other majors in
-        ascending seat order — and the unit mask is the same `_seat_unit_mask`
-        at this seat's row.
-        """
         s = self.sim
         row = self._row(seat)
         m = s.seat_masks(row)
@@ -121,21 +100,6 @@ class BatchEnv:
         war: torch.Tensor | None = None,
         seat: int = 0,
     ) -> tuple[torch.Tensor, torch.Tensor, bool]:
-        """Returns (obs [B, F], reward [B], done). done is batch-wide —
-        lockstep fixed-horizon episodes; the caller resets. The reward is THIS
-        seat's `seat_score` delta, one body for every row.
-
-        ONE ACTION INTERFACE, every row: the draw-free verbs go through
-        `apply_seat_actions`, the orders through `_apply_seat_unit_actions`,
-        and `step()` — which takes no seat arguments at all — advances the
-        world.
-
-        This RL entry applies its orders PRE-TURN, which is a property of the
-        entry, not of a row: it hands the env one rank and steps. The gate's
-        driver stashes a per-unit SEQUENCE instead, and every major row's
-        replays at the walkers' position inside the phase. No row has a
-        position of its own on either path.
-        """
         row = self._row(seat)
         prev = self._score_prev.get(row)
         if prev is None:
@@ -150,16 +114,6 @@ class BatchEnv:
         return self.observe(seat), score - prev, self.sim.turn > self.horizon
 
     def _escalators(self, techs, civics, builders, settler_cost) -> list:
-        """The three production costs that ESCALATE with a seat's own state —
-        district, settler, builder.
-
-        Every other production price is static rules data, which the ladder
-        already loads from `rules.json`. Static data is NOT state and does not
-        belong in an observation; carrying the whole price table to express
-        three moving numbers would be noise a policy has to learn to ignore.
-        Computed HERE, with the engine's own helpers, so the escalation rule
-        stays in the engine — the same reason research emits effective cost
-        rather than a boost flag."""
         s = self.sim
         d = s.dtype
         dcp = s.rules.district_cost
@@ -207,8 +161,6 @@ class BatchEnv:
                 torch.where(alive, s.city_hp[:, row], torch.zeros_like(s.city_hp[:, row])).to(d) / 200.0,
                 s.city_loyalty[:, row].to(d) / 100.0,
                 (cur >= 0).to(d),
-                # The production LADDER branches on isCapital — only the
-                # capital queues a settler.
                 s.city_is_cap[:, row].to(d),
             ],
             dim=2,
@@ -295,17 +247,7 @@ class BatchEnv:
                 )
             )
         cv = (torch.stack(opp_cols, dim=1) if opp_cols
-              else torch.zeros(B, 0, 7, dtype=d, device=dev))  # ladder.PER_CIV
-        # EFFECTIVE research cost per option — the quantity the decision
-        # actually uses, not the boost flag it derives from. Emitting flags
-        # would force the policy to apply `boosted ? base*(1-frac) : base`
-        # itself, and that formula is a RULE: it must live in the engine, or a
-        # rule leaks into the policy and the two can drift.
-        #
-        # FULL WIDTH on purpose, unmasked. The mask carries legality separately;
-        # what the full vector buys is PLANNING — a boosted tech several prereqs
-        # away should change which branch a policy walks toward now, and masking
-        # to the legal frontier would delete exactly that signal.
+              else torch.zeros(B, 0, 7, dtype=d, device=dev))
         return torch.cat([emp, cs.reshape(B, -1), cv.reshape(B, -1), per_city.reshape(B, -1),
                           torch.stack(self._escalators(s.civ_techs[:, row], s.civ_civics[:, row],
                                                        s.civ_builders_trained[:, row],
@@ -325,23 +267,11 @@ class BatchEnv:
         return s.city_alive[:, row].sum(dim=1) * 8 + (mine.long() * s._type_combat[ut]).sum(dim=1)
 
     def _ctx_block(self, row: int) -> torch.Tensor:
-        """The CTX block (ladder.CTX_FIELDS): the decide-time scalars
-        `_prod_ctx`/`_war_ctx` read back out of the observation. RAW and
-        unscaled, because the ladder compares them exactly and scaled floats do
-        not round-trip bit-stably; the formulas are the scripted sites' own.
-
-        Everything here is the ASKER'S OWN, for every row alike. What is
-        measured against an opponent (their strength, the closest city pair,
-        their warmonger gang, whether they hold a city) lives in the OPPONENT
-        block, one column per opponent, so the policy can compare them; those
-        four used to sit here as a single pairwise reading against one fixed
-        seat, which rendered zeros on that seat's own row."""
         s = self.sim
         d = s.dtype
         rng_t = s._type_ranged_strength > 0
         alive = s.city_alive[:, row]
         n_cities = alive.sum(dim=1)
-        # THE ONE production layout: queue codes are mask COLUMNS on every row.
         qcur = s.city_current[:, row]
         q_ty = (qcur - s.UNIT_BASE).clamp(min=0, max=s.NU - 1)
         q_u = alive & (qcur >= s.UNIT_BASE) & (qcur < s.UNIT_BASE + s.NU)
@@ -366,15 +296,6 @@ class BatchEnv:
         ], dim=1)
 
     def unit_features(self, seat: int = 0) -> torch.Tensor:
-        """[B, simbase.UNIT_SLOTS, 8] per unit-head-row features for the units
-        head: alive, type, hp, map position, and range/bearing to the nearest
-        barbarian camp (zeros when no camp stands — the head then has nothing
-        to hunt).
-
-        ONE layout over ONE slot map, so a policy reads any seat's units the
-        same way. The camp columns are not a seat-0 feature: a camp is hostile
-        to every seat and every seat's units can clear one.
-        """
         s = self.sim
         d = s.dtype
         B = s.B
@@ -411,4 +332,4 @@ class BatchEnv:
                 torch.where(keep, (ndr.to(d) / 10.0).clamp(min=-1.0, max=1.0), z),
             ],
             dim=2,
-        )  # [B, N, 8]
+        )

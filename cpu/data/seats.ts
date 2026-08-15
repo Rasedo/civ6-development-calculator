@@ -1,57 +1,6 @@
 import { GAME_SPEED } from './constants';
 
-/**
- * WHAT A SEAT MAY DO.
- *
- * Every actor in the game is a seat (`core/seats.ts`): seat 0, the opponents,
- * the city-states, the barbarians. They differ, and this is the ONE table that
- * says how. Code that reads a seat asks the table; it never branches on the
- * seat id, which is what let "is this a barbarian?" get spelled four different
- * ways across combat.ts, units.ts and eras.ts.
- *
- * THE ADMISSIBILITY RULE (UNIFY_SEATS_PLAN §3): a capability bit is admissible
- * only where the EMPTY / ZERO DATA VALUE WOULD BE WRONG. A bit that merely
- * restates what a seat's data already says is a second source of truth for one
- * fact, and the two will drift.
- *
- * The plan proposed twelve bits. The rule admits TWO. The other ten are listed
- * below with the datum that makes each unnecessary — recorded rather than
- * carried, because a dead flag reads like a rule and is not one:
- *
- *   research      a seat with `research.techs = []` never unlocks anything.
- *   found         a seat with `settlers = 0` and no build queue never settles.
- *   produce       an empty queue produces nothing.
- *   expandBorders border growth is paid for out of culture; zero culture, no
- *                 growth. (A city-state's fixed ring is its FOUNDING ring.)
- *   greatPeople   zero `gpp` never crosses a threshold.
- *   trade         an empty `tradeRoutes` list routes nothing.
- *   diplomacy     zero favour and zero points win no diplomatic victory.
- *   envoys        `envoysAvailable = 0` assigns none. (Being a suzerain
- *                 TARGET is the minor's own `type` datum, not a capability of
- *                 the sender.)
- *   suzerainable  as above — it is data on the minor.
- *   victory       every victory check is a threshold on a stored total, and a
- *                 seat that accrues none never crosses one. Domination reads
- *                 `isCapital`, which a minor's one city does not set.
- *
- * `alwaysHostile` and `xp` survive because in both cases the empty value is a
- * LIE: an all-false war row reads as PEACE, and `xp = 0` accumulates.
- *
- * NOT STORED ON THE SEAT. The plan's target shape had `Seat { caps, ... }`.
- * The class is already a function of the absolute seat id (`seatClass`), so a
- * stored copy would be a second source of truth for a fact the id carries —
- * the exact hazard the admissibility rule exists to prevent, one level up.
- * The trigger that would flip this: a per-CIV trait that varies a capability
- * WITHIN a class (a civ whose barbarians promote). Nothing does today.
- */
 
-/**
- * The three kinds of actor.
- *
- *   major    seat 0 and the opponents — full civs
- *   minor    city-states
- *   hostile  barbarians
- */
 export type SeatClass = 'major' | 'minor' | 'hostile';
 
 export interface SeatCaps {
@@ -63,14 +12,6 @@ export interface SeatCaps {
    * promotions at all.
    */
   xp: boolean;
-  /**
-   * This seat is at war with every other seat, permanently, with no war state
-   * declared or stored.
-   *
-   * Zero would be wrong: the war relation is one symmetric matrix
-   * and an all-false row means PEACE. Barbarians never declare and never make
-   * peace, so their hostility cannot be expressed as war data.
-   */
   alwaysHostile: boolean;
 }
 
@@ -133,21 +74,15 @@ export const CITY_SLOTS_PER_SEAT = 24;
  * seat 0's `cities − 1 + settlers + queued` term reduces to `cities − 1`. */
 export const SETTLER_COST = (cities: number) =>
   Math.round(80 * GAME_SPEED) + Math.round(30 * GAME_SPEED) * Math.max(0, cities - 1);
-/** Auto-peace becomes possible after this many war turns. */
 export const WAR_MIN_TURNS = 14;
-/** Seat 0 may sue for peace after this many war turns. */
 // SOURCED: real Civ 6 allows peace only once **10** turns have passed
 // since the war began (the leaders action panel unlocks the offer then). Was 8.
 // The same floor governs the seat 0 <-> city-state peace added in #50, so both
 // pairings read this one constant.
 export const PEACE_GOLD_COST = (warTurns: number) => 150 + 10 * warTurns;
-// One city HP cap, for every seat: CITY_MAX_HP in data/units.ts.
 
-// --- deeper-opponent pacing ---------------------------------------------------
 
-// --- loyalty -------------------------------------------------------------------
 export const LOYALTY_MAX = 100;
-/** City centers exert population pressure out to this many tiles. */
 export const LOYALTY_RANGE = 9;
 /** Max per-turn swing from population pressure. Real Civ 6 ±20. */
 export const LOYALTY_PRESSURE_SCALE = 20;
@@ -208,25 +143,15 @@ export const LOYALTY_AMENITY: Record<string, number> = {
 // UNITS ARE NOW REAL WWP. The accumulator stays an INTEGER, so the derived
 // amenity penalty is integer too and there is no float-association risk.
 
-/** Per-battle base, at home, by era index `min(era - 1, 4)` — FORMAL war. */
 export const WW_ERA_BASE_FORMAL = [16, 22, 28, 34, 40] as const;
 /** The same table for a SURPRISE war (no casus belli). The premium runs 1.00
  *  at Ancient to 1.30 at Industrial+ — never the flat 2 that S7.8r deleted. */
 export const WW_ERA_BASE_SURPRISE = [16, 25, 34, 43, 52] as const;
-/** Fighting outside your own borders doubles the base. */
 export const WW_ABROAD_MULT = 2;
-/** A unit of yours dying in the battle adds this many bases, to YOUR side. */
 export const WW_DEATH_MULT = 3;
-/** Shed per turn in a war in which no battle was fought this turn. */
 export const WW_DECAY_AT_WAR = 50;
-/** Shed per turn by a seat that is at war with nobody. */
 export const WW_DECAY_AT_PEACE = 200;
-/** Shed by both sides of a pair the turn they sign peace. */
 export const WW_PEACE_TREATY = 2000;
-/** Accumulator points per −1 amenity: "for every 400 WWP you currently have
- *  you gain -1 war weariness". The remainder buys nothing — that is the floor
- *  in `warWearinessPenalty`, not a per-turn reset (the decay rules above only
- *  make sense on an accumulator that PERSISTS). */
 export const WAR_WEARINESS_PER_AMENITY = 400;
 /* THERE IS NO SURPRISE-VS-FORMAL WEARINESS MULTIPLIER, and weariness is not
  * seat-dependent.
@@ -253,11 +178,6 @@ export const WAR_WEARINESS_PER_AMENITY = 400;
  * CivFanatics thread, with the caveat above. The GlobalParameters rows have
  * NOT been read directly — a claim about shipped game data must name a source
  * that was actually fetched. */
-/** Era score and Ages. The game is
- *  divided into fixed ERA_LENGTH-turn eras (no per-civ tech-era drift —
- *  recorded residual). Each civ accrues an INTEGER era score from zero-draw
- *  "historic moment" events; the accumulator resets at every era boundary
- *  (S2 reads the just-ended era's score to set the civ's Age). */
 export const ERA_LENGTH = 50;
 export const ERA_SCORE_FOUND = 2; // founded a city
 export const ERA_SCORE_CONQUER = 3; // gained a city by capture/flip/transfer
@@ -265,22 +185,9 @@ export const ERA_SCORE_WONDER = 3; // completed a world wonder
 export const ERA_SCORE_PANTHEON = 1;
 export const ERA_SCORE_RELIGION = 2;
 export const ERA_SCORE_GP = 1; // earned a Great Person
-/** Age thresholds on the just-ended era window's score — Dark below
- *  DARK_T, Golden at/above GOLDEN_T, Normal between. PINNED FROM S1 EVIDENCE
- *  (24 scripted seeds × 5 eras × 3 civs, pooled q25 1 / med 6 / q75 9):
- *  Dark 31% / Normal 47% / Golden 22% of in-gate windows — all three ages
- *  occur robustly. Era 0 is Normal for everyone (createGame default). */
 export const ERA_DARK_T = 3;
 export const ERA_GOLDEN_T = 10;
-/** Loyalty-pressure factor by the SOURCE civ's age (Dark/Normal/
- *  Golden). Halves are exact in f32 AND f64 (dyadic), so the modulated
- *  pressure sums stay association-free like the integer sums they replace. */
 export const AGE_PRESSURE = [0.5, 1.0, 1.5];
-/** Governors as STATELESS loyalty anchors. A civ holds
- *  min(GOV_MAX_TITLES, floor(civics / GOV_CIVICS_PER_TITLE)) governors; each
- *  turn they sit in its LOWEST-loyalty cities (quantized milli, ties by
- *  acquisition order) and add GOVERNOR_LOYALTY to that city's delta.
- *  RESIDUALS: establishment turns, promotions, non-loyalty abilities. */
 export const GOV_CIVICS_PER_TITLE = 10;
 export const GOV_MAX_TITLES = 5;
 /**
@@ -330,9 +237,7 @@ export const DIPLO_FAVOR_PER_SUZERAIN = 1;
  *     overstating the rate. Recorded, not hidden.
  */
 export const CONGRESS_INTERVAL = 30;
-/** Index into data/techs ERAS — 2 = Medieval, when the Congress first meets. */
 export const CONGRESS_MIN_ERA = 2;
-/** Diplomatic Victory Points awarded to the winner of a session's resolution. */
 export const DVP_PER_RESOLUTION = 1;
 /** Diplomatic Victory threshold (real Civ 6 GS: 20 points). */
 export const DIPLO_VICTORY_POINTS = 20;
@@ -342,16 +247,8 @@ export const CULTURE_PER_DOMESTIC_TOURIST = 100;
 
 /** dedications granted on a HEROIC age (Dark -> Golden). Real
  * Civ 6 grants three; every other transition grants one. */
-/** the seat ADMIRAL war-march switch, landed INERT — a marching
- * admiral is a CIVILIAN and capturable where a parked one is not, and
- * the engines diverged on it t235). Flip when its hunt lands. */
 export const ADMIRAL_MARCH_LIVE = true;
 
-/** the dedication PAYOUT switch, landed INERT. The substrate —
- * prevAges (the Heroic-age test) and the dedication COUNT — is live and
- * parity-exact; only the per-turn faith / era-score payouts are gated, because
- * they feed seat faith and therefore purchases, and the engines diverged on a
- * downstream seat unit t235). Flip when its hunt lands. */
 /**
  * The NAMED DEDICATION CATALOG. #71 landed dedications as a COUNT
  * with a flat payout; real Civ 6 has each civ commit to a NAMED dedication per
@@ -380,7 +277,6 @@ export const DED_MONUMENTALITY = 0;
 export const DED_FREE_INQUIRY = 1;
 export const DED_PEN_BRUSH_AND_VOICE = 2;
 export const DED_EXODUS = 3;
-/** Era score each dedication's DARK/NORMAL face pays per triggering event. */
 export const DED_EVENT_SCORE = [1, 1, 1, 2] as const;
 
 export const DEDICATION_PAYOUTS_LIVE = true;
@@ -397,8 +293,6 @@ export const DEDICATION_PAYOUTS_LIVE = true;
 export const ENGINEER_LIVE = true;
 
 export const HEROIC_DEDICATIONS = 3;
-/** Faith per turn per dedication while in a GOLDEN/HEROIC age (the
- * Monumentality flavour — a Golden age dedicates to a BONUS). */
 export const DEDICATION_FAITH = 2;
 /** MONUMENTALITY / EXODUS OF THE EVANGELISTS grant +2 Movement to
  *  Builders and to Missionaries/Apostles/Inquisitors respectively, for the
@@ -437,23 +331,10 @@ export const ALLY_MIN_PEACE = 30;
 export const WARMONGER_DOW = 4;
 export const WARMONGER_CAPTURE = 3;
 export const WARMONGER_GANG = 6;
-/** Amenity penalty (>=0) a city takes for a weariness accumulator value.
- *  NO CEILING: "-1 Amenity per 400 WWP you currently have" is the whole
- *  conversion and nothing in the source caps it. What bounds a long war is
- *  the decay, and PEACE_WW. */
 export function warWearinessPenalty(weariness: number): number {
   return Math.floor(Math.max(0, weariness) / WAR_WEARINESS_PER_AMENITY);
 }
 
-// --- civ↔civ war ----------------------------------------------------------
-// The pairwise auto-DoW re-derives the seat-0 auto-DoW's DETERMINISTIC gates
-// (proximity + strength ratio) and DROPS its RNG probability gate → ZERO-DRAW
-// (documented deviation; the seat-0 pair keeps its RNG). Anti-thrash is the
-// aggressor's own war-weariness: a war-weary civ (ww ≥ DOW_WW_MAX) never
-// opens a NEW front, and a pair sues out once EITHER side's ww exceeds
-// PEACE_WW — so after a ww-triggered peace the aggressor's ww (> PEACE_WW
-// > DOW_WW_MAX) blocks an immediate re-declaration until it decays at peace.
-/** Max distance (closest city pair) for a pairwise DoW — the seat-0 gate. */
 export const DOW_PROXIMITY = 9;
 /** Aggressor strength must exceed target × this — the seat-0 gate (1.3). */
 export const DOW_STRENGTH_RATIO = 1.3;
@@ -464,5 +345,4 @@ export const DOW_STRENGTH_RATIO = 1.3;
  *  IN AMENITY TERMS is exactly x50. Both still sit below/above each other the
  *  same way, so the anti-thrash argument above is unchanged. */
 export const DOW_WW_MAX = 300;
-/** A warring pair sues out once EITHER side's war-weariness exceeds this. */
 export const PEACE_WW = 500;

@@ -16,10 +16,8 @@ export type MapSizeId = keyof typeof MAP_SIZES;
 /** Minimum distance between city centers.
  * Real Civ 6 blocks settling within 3 tiles of any center. */
 
-/** Tiles a city can work / place districts in (rings from the center). */
 export const CITY_WORK_RADIUS = 3;
 
-/** Borders can grow culturally out to this many rings. */
 export const BORDER_MAX_RADIUS = 5;
 
 /** Culture needed for a city's next border expansion (n = tiles acquired so
@@ -31,14 +29,9 @@ export function borderGrowthCost(n: number): number {
 
 
 /** Gold price of buying a building/unit = production cost × this (Civ 6). */
-/** Game-speed cost multiplier (GS-1): Online-ish pace. All production AND
- * research costs scale by this so the whole game accelerates uniformly
- * (~1/0.6 = 1.67x faster), pulling the plateau earlier. Purchases (x4 the
- * production cost) inherit it automatically. */
 export const GAME_SPEED = 0.6;
 
 export const GOLD_PURCHASE_MULT = 4;
-/** Faith price of buying a worship building = production cost × this. */
 export const FAITH_PURCHASE_MULT = 2;
 
 export const FOOD_PER_CITIZEN = 2;
@@ -73,7 +66,6 @@ export function setEmbarkLive(v: boolean): void {
 export const CITIZEN_SCIENCE = 0.5;
 export const CITIZEN_CULTURE = 0.3;
 
-/** Worked city-center tile is floored to these yields. */
 export const CITY_CENTER_MIN_FOOD = 2;
 export const CITY_CENTER_MIN_PRODUCTION = 1;
 
@@ -82,14 +74,12 @@ export function growthFoodNeeded(pop: number): number {
   return Math.floor(15 + 8 * (pop - 1) + Math.pow(pop - 1, 1.5));
 }
 
-/** Growth multiplier from spare housing (housing - population). */
 export function housingGrowthFactor(remaining: number): number {
   if (remaining >= 2) return 1;
   if (remaining >= 1) return 0.5;
   return 0.25;
 }
 
-/** Amenities a city needs (none for the first 2 citizens, then 1 per 2). */
 export function amenitiesNeeded(pop: number): number {
   return Math.max(0, Math.ceil((pop - 2) / 2));
 }
@@ -97,7 +87,6 @@ export function amenitiesNeeded(pop: number): number {
 export interface AmenityTier {
   name: string;
   growthFactor: number;
-  /** Multiplier on non-food yields. */
   yieldFactor: number;
 }
 
@@ -129,15 +118,10 @@ export const HOUSING_NO_WATER = 2;
 export const AQUEDUCT_FRESH_BONUS = 2;
 export const AQUEDUCT_NO_FRESH_TOTAL = 6;
 
-/** Each unique improved luxury gives +1 amenity to this many neediest cities.
- *  SOURCING SWEEP: VERIFIED CORRECT — the GS Civilopedia's
- *  luxury entries read "+4 Amenities (1 per city)", so 4 is the real spread. */
 export const LUXURY_AMENITY_CITIES = 4;
 
-/** Range (tiles from the district) of regional building effects. */
 export const REGIONAL_RANGE = 6;
 
-/** One specialty district allowed at pop 1, +1 per 3 population. */
 export function maxSpecialtyDistricts(pop: number): number {
   return Math.floor((pop - 1) / 3) + 1;
 }

@@ -44,8 +44,6 @@ if (process.env.CIV6_SERVE_LOAD) {
   state = JSON.parse(readFileSync(process.env.CIV6_SERVE_LOAD, 'utf-8')) as GameState;
 } else {
   state = loadWorld(world);
-  // Serve knobs: decisions arrive on the wire turn by turn; the engine's
-  // auto-research stands down like every other scripted fallback.
   state.seatActions = {} as GameState['seatActions'];
   state.autoResearch = false;
 }
@@ -57,8 +55,6 @@ const civicList = Object.values(CIVICS);
 await runDriver({
   state,
   seed: SEED,
-  // #101: N_TURNS is the run's ABSOLUTE horizon; a resumed state has
-  // already played state.turn - 1 of them.
   turns: N_TURNS - (state.turn - 1),
   // The obs layout's per-city slots — the CITY COLUMN width, not the settle
   // cap: loyalty flips can carry a seat past maxCities, and those cities have

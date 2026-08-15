@@ -15,7 +15,6 @@ import type { GameMap, Tile } from './types';
 
 export const SQRT3 = Math.sqrt(3);
 
-/** Axial direction vectors, index-aligned with riverMask bits. */
 export const AXIAL_DIRS: ReadonlyArray<readonly [number, number]> = [
   [1, 0], // 0 E
   [1, -1], // 1 NE
@@ -44,7 +43,6 @@ export function axialToOffset(q: number, r: number): [number, number] {
   return [q + ((r - (r & 1)) >> 1), r];
 }
 
-/** Offset coords of the neighbor in direction d (may be off-map). */
 export function neighborOffset(col: number, row: number, d: number): [number, number] {
   const [q, r] = offsetToAxial(col, row);
   const [dq, dr] = AXIAL_DIRS[d];
@@ -72,13 +70,11 @@ export function tileAt(map: GameMap, col: number, row: number): Tile | null {
   return map.tiles[tileIndex(map, col, row)];
 }
 
-/** On-map neighbor in direction d, or null. */
 export function neighborTile(map: GameMap, tile: Tile, d: number): Tile | null {
   const [c, r] = neighborOffset(tile.col, tile.row, d);
   return tileAt(map, c, r);
 }
 
-/** All on-map neighbors. */
 export function neighbors(map: GameMap, tile: Tile): Tile[] {
   const out: Tile[] = [];
   for (let d = 0; d < 6; d++) {
@@ -88,7 +84,6 @@ export function neighbors(map: GameMap, tile: Tile): Tile[] {
   return out;
 }
 
-/** All on-map tiles within `radius` of the tile at (col,row), including itself. */
 export function tilesWithin(map: GameMap, col: number, row: number, radius: number): Tile[] {
   const [cq, cr] = offsetToAxial(col, row);
   const out: Tile[] = [];
@@ -104,18 +99,11 @@ export function tilesWithin(map: GameMap, col: number, row: number, radius: numb
   return out;
 }
 
-// ---------------------------------------------------------------------------
-// Pixel geometry (pointy-top). size = hex circumradius.
-// ---------------------------------------------------------------------------
 
 export function hexCenter(col: number, row: number, size: number): { x: number; y: number } {
   return { x: SQRT3 * size * (col + 0.5 * (row & 1)), y: 1.5 * size * row };
 }
 
-/**
- * Corner offsets from the center, ordered:
- *   0=NE(+w/2,-s/2) 1=N(0,-s) 2=NW(-w/2,-s/2) 3=SW(-w/2,+s/2) 4=S(0,+s) 5=SE(+w/2,+s/2)
- */
 export function cornerOffsets(size: number): { x: number; y: number }[] {
   const w2 = (SQRT3 / 2) * size;
   const s2 = size / 2;
@@ -129,7 +117,6 @@ export function cornerOffsets(size: number): { x: number; y: number }[] {
   ];
 }
 
-/** For each direction d, the two corner indexes of the edge facing d. */
 export const EDGE_CORNERS: ReadonlyArray<readonly [number, number]> = [
   [5, 0], // E
   [0, 1], // NE
@@ -139,11 +126,9 @@ export const EDGE_CORNERS: ReadonlyArray<readonly [number, number]> = [
   [4, 5], // SE
 ];
 
-/** Pixel position -> offset coords of containing hex (cube rounding). */
 export function pixelToHex(x: number, y: number, size: number): [number, number] {
   const q = ((SQRT3 / 3) * x - (1 / 3) * y) / size;
   const r = ((2 / 3) * y) / size;
-  // cube round
   const s = -q - r;
   let rq = Math.round(q);
   let rr = Math.round(r);
@@ -156,13 +141,6 @@ export function pixelToHex(x: number, y: number, size: number): [number, number]
   return axialToOffset(rq, rr);
 }
 
-// ---------------------------------------------------------------------------
-// Corner (vertex) graph for rivers.
-//
-// Every lattice vertex is the N corner of exactly one hex or the S corner of
-// exactly one hex, so {col,row,side} is a canonical name. Each vertex meets
-// exactly 3 tiles and 3 edges. Each edge separates exactly 2 tiles.
-// ---------------------------------------------------------------------------
 
 export interface Vertex {
   col: number;
@@ -174,7 +152,6 @@ export function vertexKey(v: Vertex): string {
   return `${v.col},${v.row},${v.side}`;
 }
 
-/** The (up to 3, possibly off-map) tiles sharing this vertex. */
 export function vertexTouchingTiles(v: Vertex): [number, number][] {
   const { col, row } = v;
   if (v.side === 'N') {
@@ -185,11 +162,9 @@ export function vertexTouchingTiles(v: Vertex): [number, number][] {
 
 export interface VertexEdge {
   to: Vertex;
-  /** The two tiles flanking the traversed edge, with the riverMask bit each receives. */
   flanks: { col: number; row: number; dir: number }[];
 }
 
-/** The 3 edges leaving a vertex (endpoints may be off-map). */
 export function vertexNeighbors(v: Vertex): VertexEdge[] {
   const { col, row } = v;
   if (v.side === 'N') {
@@ -211,7 +186,6 @@ export function vertexNeighbors(v: Vertex): VertexEdge[] {
         ],
       },
       {
-        // Straight up: the edge between our NE and NW neighbors.
         to: { col, row: row - 2, side: 'S' },
         flanks: [
           { col: ne[0], row: ne[1], dir: DIR_W },
@@ -238,7 +212,6 @@ export function vertexNeighbors(v: Vertex): VertexEdge[] {
       ],
     },
     {
-      // Straight down: the edge between our SE and SW neighbors.
       to: { col, row: row + 2, side: 'N' },
       flanks: [
         { col: se[0], row: se[1], dir: DIR_W },

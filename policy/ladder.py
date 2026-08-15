@@ -1,21 +1,3 @@
-"""THE LADDER: one seat-generic policy, outside both engines.
-
-THE LINE. Anything that must be identical BETWEEN THE ENGINES is a RULE and
-belongs in them; anything that need only be identical BETWEEN RUNS is a POLICY
-and belongs once, here. So legality is theirs — the masks and the observation
-come from the engine — and CHOICE is this module's: given a seat's observation
-and its legality masks, each verb returns the action that seat takes.
-
-THE FILE IS THE INTERFACE. The chosen actions are recorded and both engines
-replay them, so neither carries its own copy of the policy. `seat_ext[B, NS]`
-says who drives each seat — False = this ladder, True = actions supplied from
-outside (a net) — and seat 0 has a column like every other seat, so a net can
-attach there too.
-
-Contents: the observation layout constants and `split`; the per-verb picks
-(envoy, research, production, gold purchase, faith, war); and
-`pick_unit_orders`, one order per unit.
-"""
 from __future__ import annotations
 
 import torch
@@ -65,12 +47,7 @@ CTX_FIELDS = (
     "peaceTurns",     # turns this seat has been at war with nobody
     "atWarAny",       # 0/1: at war with ANYONE (the embark/cap arm's term)
 )
-PER_CITY = 10  # alive, pop/10, foodBox/need, progress/cost, cultureBox/cost,
-              # ownedTiles/20, hp/200, loyalty/100, hasQueue, isCapital
-# The trailing RESEARCH-COST blocks — EFFECTIVE cost per tech, then per civic,
-# in catalog order (`Object.values(TECHS)` / `Object.values(CIVICS)`, what both
-# engines' planes use). The pick is lowest effective cost, so the observation
-# carries the price itself rather than a boost flag — see `pick_research`.
+PER_CITY = 10
 
 
 def split(obs: torch.Tensor, n_cs: int, n_opponents: int, n_cities: int,
@@ -105,7 +82,7 @@ def split(obs: torch.Tensor, n_cs: int, n_opponents: int, n_cities: int,
     i += n_t
     boost_c = obs[:, i:i + n_c]
     i += n_c
-    ctx = obs[:, i:i + CTX_SEAT]  # raw decide-time scalars
+    ctx = obs[:, i:i + CTX_SEAT]
     i += CTX_SEAT
     assert i == obs.shape[1], f"observation width {obs.shape[1]} != layout {i}"
     return {"empire": emp, "cs": cs, "civ": cv, "city": city,
@@ -114,24 +91,12 @@ def split(obs: torch.Tensor, n_cs: int, n_opponents: int, n_cities: int,
 
 
 def first_legal(mask: torch.Tensor) -> torch.Tensor:
-    """[..., K] bool -> [...] long: the lowest legal index, -1 if none.
-
-    Both engines' scripted picks break ties LOWEST-INDEX-WINS and this must
-    match: a policy that breaks ties differently produces a different game,
-    not a wrong one, but the recorded action file would stop replaying."""
     any_legal = mask.any(dim=-1)
     idx = mask.float().argmax(dim=-1)
     return torch.where(any_legal, idx, torch.full_like(idx, -1))
 
 
 def decide(obs: torch.Tensor, masks: dict[str, torch.Tensor], layout: dict[str, int]) -> dict[str, torch.Tensor]:
-    """(observation, legality masks) -> actions, for ONE seat, batched.
-
-    The minimal surface: production and units take the lowest legal option,
-    research and envoys go through their own verbs. What matters structurally
-    is that a policy READS AN OBSERVATION and RETURNS ACTIONS, so this ladder
-    and a net are interchangeable at one seam.
-    """
     blocks = split(obs, layout["cs"], layout["civs"], layout["cities"],
                    layout["techs"], layout["civics"])
     out: dict[str, torch.Tensor] = {}
@@ -149,25 +114,10 @@ def decide(obs: torch.Tensor, masks: dict[str, torch.Tensor], layout: dict[str, 
 
 
 def pick_envoy(blocks: dict, mask: torch.Tensor) -> torch.Tensor:
-    """[B] long — the ENVOY verb.
-
-    Greedy assignment: the neediest met city-state by OWN envoys — fewest
-    envoys this seat has already placed — ties to the lowest city-state index,
-    the lowest-index-wins convention every scripted picker uses and the one
-    the recorded action file depends on. It reads only `met` and this seat's
-    own envoy count, both already in the city-state block.
-
-    NOT CARRIED, deliberately: how many envoys OTHER seats hold at each
-    city-state. No verb consults it, so carrying it would be speculative — but
-    a policy that wanted to CONTEST a suzerainty would need it, and it is
-    engine-computed, not derivable from the catalog. Record it when a verb
-    actually reads it; do not widen on a guess.
-    """
-    cs = blocks["cs"]                    # [B, S, 3] = met, envoys/6, hasQuest
+    cs = blocks["cs"]
     met = cs[:, :, 0] > 0.5
-    mine = cs[:, :, 1]                   # own envoys, /6
+    mine = cs[:, :, 1]
     legal = mask & met
-    # neediest first: lowest own-envoy count among legal, ties to lowest index
     big = torch.full_like(mine, float("inf"))
     score = torch.where(legal, mine, big)
     any_legal = legal.any(dim=-1)
@@ -204,20 +154,8 @@ def pick_research(blocks: dict, mask: torch.Tensor, kind: str) -> torch.Tensor:
     return torch.where(any_legal, idx, torch.full_like(idx, -1))
 
 
-#: Production action classes, in the ladder's priority order. The engine
-#: encoding is: buildings [0, NB), SETTLER = NB, IDLE = NB+1,
-#: units [NB+2, NB+2+NU), then the districts, the wonders and the projects.
-#:
-#: MILITARY_ENGINEER and the GALLEY are single-column tiers like the builder:
-#: combat 0 or naval, so neither can ever win an army lane and without its own
-#: tier neither is ever picked at all. The GALLEY sits BELOW the army and is
-#: deliberately NOT cap-gated — it is queued only when the army branch missed
-#: because the cap was full, and counted afterwards. WONDER sits between
-#: building and builder; PROJECT is LAST, the army-capped fallback that fires
-#: only when every other class missed.
 PROD_PRIORITY = ("settler", "district", "building", "wonder", "builder", "engineer", "unit", "galley", "project")
 
-#: single-column tiers -> (roster key, is it gated by the unit cap)
 SOLO_TIERS = {"builder": ("builder_idx", True),
               "engineer": ("engineer_idx", True),
               "galley": ("galley_idx", False)}
@@ -225,13 +163,6 @@ SOLO_TIERS = {"builder": ("builder_idx", True),
 
 def pick_purchase(can_building: torch.Tensor, settler_ok: torch.Tensor, unit_ok: torch.Tensor,
                   tile_ok: torch.Tensor) -> torch.Tensor:
-    """The GOLD-PURCHASE priority — ONE purchase per seat per turn,
-    BUILDING > SETTLER > UNIT > TILE, no rng (the scripted gold block's own
-    rung order). Inputs are the per-row candidate flags from the driver's
-    _buy_ctx (which reads the engines' shared legality bodies); the return
-    is the KIND [B] long: 0 building, 1 settler, 2 unit, 3 tile, -1 nothing.
-    The engines' driven arms re-validate at their own phase position — a
-    kind is an INTENT, not a write."""
     kind = torch.full(can_building.shape, -1, dtype=torch.long, device=can_building.device)
     kind = torch.where(tile_ok, torch.full_like(kind, 3), kind)
     kind = torch.where(unit_ok, torch.full_like(kind, 2), kind)
@@ -241,12 +172,6 @@ def pick_purchase(can_building: torch.Tensor, settler_ok: torch.Tensor, unit_ok:
 
 
 def pick_faith(worship_ok: torch.Tensor, missionary_ok: torch.Tensor, apostle_ok: torch.Tensor):
-    """The FAITH-purchase policy. WORSHIP is independent (its own building,
-    its own gates); the RELIGIOUS UNIT is one per seat per turn, MISSIONARY
-    saturating before APOSTLE. Returns (worship [B] bool, relig_kind [B]
-    long: 5 missionary, 6 apostle, -1 neither). Candidates come from the
-    engines' one legality body (_seat_faith_buy_candidates); the arms
-    re-validate."""
     relig = torch.full(worship_ok.shape, -1, dtype=torch.long, device=worship_ok.device)
     relig = torch.where(apostle_ok, torch.full_like(relig, 6), relig)
     relig = torch.where(missionary_ok, torch.full_like(relig, 5), relig)
@@ -254,42 +179,11 @@ def pick_faith(worship_ok: torch.Tensor, missionary_ok: torch.Tensor, apostle_ok
 
 
 def pick_war(mask: torch.Tensor, ctx: dict, rng: dict) -> torch.Tensor:
-    """[B] long — the WAR verb: declare on an opponent, or sue it for peace.
-
-    `mask` is seat_masks['war'] [B, 2*n_opponents] over `war_targets(row)` — the other
-    majors in ascending seat order, the same layout for every seat. Column k
-    DECLARES on the k-th such opponent (both alive, at peace); column n_opponents+k SUES
-    that same one (at war, THAT war's clock >= min, peace gold affordable).
-    Legality is the engine's. Everything else here is POLICY: the sue chance
-    (0.25), the DoW conditions (that opponent has cities, this seat has been
-    at peace > 20 turns, proximity <= 9, their warmonger-gang OR a 1.3x
-    strength edge over THEM) and the DoW chance (0.08 · (0.5 + aggression)).
-
-    `ctx` mixes two shapes and the distinction is the point: the opponent
-    terms (`opp_str`, `prox`, `gang`, `has_cities`) are [B, n_opponents], one column per
-    opponent, so this compares them; the asker's own (`own_str`,
-    `peace_turns`, `aggression`) are [B].
-
-    ONE ROLL each, whatever the field: a seat gets one sue chance and one DoW
-    chance per turn, and the chosen target is the lowest-index opponent that
-    passes. Rolling per opponent would make a seat with four neighbours four
-    times as belligerent as one with a single neighbour.
-
-    `rng` carries {'dow': [B], 'peace': [B]} floats from the DRIVER's own
-    policy stream. THE ENGINES' SHARED STREAM IS NEVER TOUCHED: a driven
-    seat's war choice is a recorded FACT by the time either engine sees it,
-    and both engines' scripted rolls stand down for driven seats, so
-    draw-count parity is untouched by construction.
-
-    Returns the war-head column, or -1.
-    """
     B, W2 = mask.shape
     n_opp = W2 // 2
     out = torch.full((B,), -1, dtype=torch.long, device=mask.device)
     if n_opp == 0:
-        return out  # a lone major has nobody to declare on
-    # the scripted order: the war branch's sue roll runs before the peace
-    # branch's DoW roll, and a seat is only ever in one branch
+        return out
     sue_k = first_legal(mask[:, n_opp:] & (rng["peace"] < 0.25).unsqueeze(1))
     out = torch.where(sue_k >= 0, n_opp + sue_k, out)
     dow_k = first_legal(
@@ -340,14 +234,6 @@ def _best_in_lane(cand: torch.Tensor, strength: torch.Tensor) -> torch.Tensor:
 
 
 def prod_classes(NB: int, NU: int, n_scaffold: int, n_wonder: int = 0, n_project: int = 0) -> dict:
-    """Index ranges per production class, from the engine's own constants.
-
-    Passed IN rather than hardcoded: the ladder must not carry a second copy of
-    the action encoding, or it drifts from the engine the way every other
-    duplicated definition in this codebase has.
-
-    Zero widths (the defaults) make the wonder and project tiers vanish.
-    """
     ub = NB + 2
     w_lo = ub + NU + n_scaffold
     return {
@@ -429,20 +315,10 @@ def pick_production(
         under_cap = n_units < cap
         for name in PROD_PRIORITY:
             if name in SOLO_TIERS:
-                # single-column tiers. The MASK carries each one's own gates
-                # (builder: one-per-civ + a job exists; engineer: one-per-civ +
-                # a fort job; galley: SAILING + naval-capable city + zero naval
-                # owned) — the ladder only supplies the cap, which no mask has.
                 key, capped = SOLO_TIERS[name]
                 idx = roster[key] if roster else -1
                 if idx < 0 or u_lo + idx >= W:
                     continue
-                # every one of these is ONE PER SEAT and the engine's gate reads
-                # civ_city_current LIVE, so it retires the moment any city queues one.
-                # The mask is a snapshot taken before the walk and keeps saying
-                # "legal" for the rest of them, so without this the ladder
-                # queues a builder, an engineer or a galley in every idle city
-                # at once.
                 hit = mask[:, j, u_lo + idx] & ~solo_taken[name]
                 if capped:
                     hit = hit & under_cap
@@ -502,12 +378,8 @@ def pick_production(
     return out
 
 
-#: the scripted patrol's direction tie-break (engine `PATROL_DIR_PERM`). POLICY,
-#: not a rule — it decides WHICH of several equally-legal steps is taken, so it
-#: belongs here rather than in either engine.
 PATROL_DIR_PERM = (3, 4, 2, 5, 1, 0)
 
-#: per-unit observation offsets — mirrors BatchSim.UNIT_OBS.
 U_DHOME, U_DNB, U_NBTILE, U_MP, U_CHARGES, U_CIVILIAN = 0, 1, 7, 13, 14, 15
 U_ATWAR, U_DWAR, U_DWARNB = 16, 17, 18   # the war half
 U_RINGTILE = 24                          # the 12 ring-2 tile ids
@@ -516,46 +388,16 @@ U_RINGTILE = 24                          # the 12 ring-2 tile ids
 A_PILLAGE = 25
 A_SNIPE = 26
 
-#: how close to home the patrol stops drifting (engine's `d_home > 3`).
 PATROL_HOME_RADIUS = 3
 
 
 def pick_unit_orders(mask: torch.Tensor, obs: torch.Tensor, home_radius: int = PATROL_HOME_RADIUS) -> torch.Tensor:
-    """[B, N] long — ONE order per unit.
-
-    At peace the rule is three lines:
-        1. attack a hostile in reach, target = LOWEST TILE INDEX
-        2. else drift home when further than `home_radius`
-        3. else hold
-    At war a unit marches on its war target, fights, pillages or holds; it
-    never drifts home.
-
-    Legality comes from `mask` [B, N, W]; the distances and neighbour tile ids
-    come from `obs` [B, N, 36] — the masks say which orders are LEGAL and never
-    which one the verb wants, which is why the observation carries a per-unit
-    block at all.
-
-    ONE STEP PER CALL, deliberately. A unit walks REAL MP and the action space
-    is a direction SEQUENCE, so several steps per turn are expressible. But
-    choosing step 2 needs to know where step 1 lands, and the observation is
-    1-HOP: it carries each neighbour's distance to home and nothing beyond. So
-    the DRIVER plans the later ranks itself rather than this verb guessing a
-    path it cannot see. A net, which may commit several steps at once, can fill
-    the sequence directly — the action space supports both.
-
-    Returns 12 (HOLD) where nothing better is legal, never -1: holding is a real
-    order and the engine treats -1 as "no instruction".
-    """
     B, N, W = mask.shape
     dev = mask.device
     atk = mask[:, :, 6:12]
     nb_tile = obs[:, :, U_NBTILE:U_NBTILE + 6]
     BIG = float(10 ** 9)
 
-    # 1. ATTACK — lowest target TILE INDEX across the unit's whole range: the
-    #    engine scans ALL tiles in index order, so adjacent (d=1) and ring
-    #    (d=2, SNIPE) targets INTERLEAVE by index. Compare both against one
-    #    key and pick whichever holds the lower tile id.
     a_key = torch.where(atk, nb_tile, torch.full_like(nb_tile, BIG))
     adj_min = a_key.min(dim=2).values
     adj_dir = a_key.argmin(dim=2)
@@ -572,33 +414,20 @@ def pick_unit_orders(mask: torch.Tensor, obs: torch.Tensor, home_radius: int = P
     use_ring = sn_min < adj_min
     atk_col = torch.where(use_ring, sn_col, adj_dir + 6)
 
-    # 2a. WAR MARCH — while at war with a live target, step to the neighbour
-    #     STRICTLY CLOSER to the war target; ties in DIRECTION ORDER (the
-    #     engine's war march scans `arange6`, unlike the patrol's
-    #     PATROL_DIR_PERM — two different tie-breaks, deliberately preserved).
-    #     PILLAGE-underfoot outranks the march: the scripted rule pillages
-    #     before marching, and the mask's PILLAGE column carries legality.
     at_war = obs[:, :, U_ATWAR] > 0
     d_war = obs[:, :, U_DWAR]
     d_war_nb = obs[:, :, U_DWARNB:U_DWARNB + 6]
     legal_mv = mask[:, :, 0:6]
     w_closer = legal_mv & (d_war_nb < d_war.unsqueeze(2))
-    # the ENGINE's march key is `d_nb * 8 + dir` — MIN DISTANCE first, then
-    # direction order. Ranking closer neighbours by direction alone would pick
-    # a legal, closer, but not CLOSEST step whenever two directions both
-    # approach the target.
     w_key = torch.where(w_closer,
                         d_war_nb * 8 + torch.arange(6, device=dev).view(1, 1, 6).to(d_war_nb.dtype),
                         torch.full((B, N, 6), 1e9, dtype=d_war_nb.dtype, device=dev))
     has_wmv = w_closer.any(dim=2)
     w_dir = w_key.argmin(dim=2)
     has_target = d_war < 1e6
-    pillage_col = A_PILLAGE                   # NOT W-1 — SNIPE sits after it
+    pillage_col = A_PILLAGE
     can_pillage = mask[:, :, pillage_col] if W > A_PILLAGE else torch.zeros(B, N, dtype=torch.bool, device=dev)
 
-    # 2b. PEACE PATROL — only while further than the stop radius, and only to a
-    #     neighbour that is strictly CLOSER to home. Ties break in
-    #     PATROL_DIR_PERM order, so score by that rank, not by direction index.
     d_home = obs[:, :, U_DHOME]
     d_nb = obs[:, :, U_DNB:U_DNB + 6]
     rank = torch.empty(6, dtype=torch.long, device=dev)
@@ -616,7 +445,7 @@ def pick_unit_orders(mask: torch.Tensor, obs: torch.Tensor, home_radius: int = P
     # A unit at war either marches on a target, fights, pillages, or HOLDS.
     out = torch.where(roam & ~at_war, mv_dir, out)               # peace drift only at peace
     war_march = at_war & has_target & has_wmv
-    out = torch.where(war_march, w_dir, out)                     # the war march
+    out = torch.where(war_march, w_dir, out)
     out = torch.where(at_war & can_pillage, torch.full_like(out, pillage_col), out)
     out = torch.where(has_atk, atk_col, out)                     # attack outranks all
     # a unit with no legal order at all gets no instruction

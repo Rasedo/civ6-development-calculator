@@ -1,8 +1,3 @@
-"""Legality masks, boosts, the RNG, damage, spawning, unit observations.
-
-One mixin of BatchSim (assembled in engine.py); state and helpers live on
-self / gpu/core/simbase.py.
-"""
 from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers
@@ -21,60 +16,36 @@ class SimMasks:
         return self._seat_production_mask(0)
 
     def _seat_tech_mask(self, row: int) -> torch.Tensor:
-        """[B, NT] valid research picks for seat row `row`; all-False where that
-        row's research slot is busy. ONE body for every seat."""
         return (self._available_mask(self.civ_techs[:, row], self._prereq_t)
                 & (self.civ_cur_tech[:, row] == -1).unsqueeze(1))
 
     def _seat_civic_mask(self, row: int) -> torch.Tensor:
-        """[B, NC] the civic twin of `_seat_tech_mask`."""
         return (self._available_mask(self.civ_civics[:, row], self._prereq_c)
                 & (self.civ_cur_civic[:, row] == -1).unsqueeze(1))
 
     def tech_mask(self) -> torch.Tensor:
-        """[B, NT] seat 0's row of `_seat_tech_mask` — no mask of its own."""
         return self._seat_tech_mask(0)
 
     def civic_mask(self) -> torch.Tensor:
-        """[B, NC] seat 0's row of `_seat_civic_mask`."""
         return self._seat_civic_mask(0)
 
     def _seat_envoy_mask(self, row: int) -> torch.Tensor:
-        """[B, S] city-states seat row `row` could back with an available envoy
-        right now — met, alive and a non-empty bank. ONE body for every seat."""
         return (self.citystate_alive & self.seat_citystate_met[:, row]
                 & (self.civ_envoys_avail[:, row] > 0).unsqueeze(1))
 
     def envoy_mask(self) -> torch.Tensor:
-        """[B, S] seat 0's row of `_seat_envoy_mask` — no mask of its own."""
         return self._seat_envoy_mask(0)
 
     def war_targets(self, row: int) -> list[int]:
-        """The seat rows this row's war head addresses, in ascending seat
-        order — every OTHER major, so the head is n_opponents wide for every row and
-        column k means the same KIND of thing whoever asks.
-
-        For row 0 that is [1 .. n_majors-1], the layout the wire has always carried; for
-        a civ row column 0 is seat 0 and the rest are the other civs, which is
-        what the single-axis head used to leave dead."""
         return [k if k < row else k + 1 for k in range(self.n_majors - 1)]
 
     def _seat_war_mask(self, row: int) -> torch.Tensor:
-        """[B, 2*n_opponents] seat row `row`'s diplomacy actions over `war_targets(row)`:
-        columns 0..n_opponents-1 declare war on that seat (declareWar: both alive & not
-        already at war — free, no RNG), n_opponents..2*n_opponents-1 sue it for peace (sueForPeace:
-        at war for >= warMinTurns of THAT war and the treasury covers
-        peaceGold0 + peaceGoldSlope·warTurns of THAT war). All-False while
-        _rl_war_active is off — the head exists but nothing samples it."""
         B, dev = self.B, self.device
         n_opp = self.n_majors - 1
         if n_opp == 0 or not self._rl_war_active:
             return torch.zeros(B, 2 * n_opp, dtype=torch.bool, device=dev)
         rr = self.rules.seats
         idx = torch.tensor(self.war_targets(row), dtype=torch.long, device=dev)
-        # BOTH sides have to be alive. Row 0's arm used to test only the
-        # target (its own liveness is a given) and a civ's only itself (its
-        # target was seat 0); the conjunction is each of those on its own row.
         live = self.civ_alive[:, row].unsqueeze(1) & self.civ_alive[:, idx]
         at_war = self.war[:, row, idx]                      # [B, n_opponents]
         wt = self.war_turns[:, row, idx]                    # [B, n_opponents] THIS war's clock
@@ -82,12 +53,11 @@ class SimMasks:
         declare = live & ~at_war
         peace = (
             live & at_war
-            & (wt >= rr.get("warMinTurns", 14))  # ONE min-war-turns rule, every seat
+            & (wt >= rr.get("warMinTurns", 14))
             & self._afford(self.civ_treasury[:, row].unsqueeze(1), cost)
         )
         return torch.cat([declare, peace], dim=1)
 
-    # --- eureka detection --------------------------------------------------------
 
     def _detect_seat_boosts(self, row: int, active: torch.Tensor) -> None:
         """detectBoosts for seat row `row` (0 = seat 0, r+1 = civ r) — ONE
@@ -104,10 +74,6 @@ class SimMasks:
         for brow in self.rules.boosts:
             kind = brow["kind"]
             if kind == "building":
-                # checkSatisfied counts buildings in LIVE cities only (it
-                # iterates citiesOf). A razed/lost city leaves a dead slot
-                # whose stale buildings must NOT count — a leftover Market
-                # would inflate the GUILDS "build 2 Markets" inspiration.
                 pred = (self.city_bldg[:, row, :, brow["b"]] & alive).sum(dim=1) >= brow["count"]
             elif kind == "cityPop":
                 pred = ((pop >= brow["pop"]) & alive).any(dim=1)
@@ -122,13 +88,11 @@ class SimMasks:
             elif kind == "cities":
                 pred = alive.sum(dim=1) >= brow["count"]
             elif kind == "greatPeople":
-                # state.claimedGreatPeople is GLOBAL — the same pool answers
-                # for every seat.
                 pred = (self.gp_earned.sum(dim=1) if brow["cls"] < 0 else self.gp_earned[:, brow["cls"]]) >= brow["count"]
             elif kind == "tech":
                 pred = self.civ_techs[:, row, brow["t"]]
             elif kind == "anyWonderBuilt":
-                pred = self.built_wonder_complete.any(dim=1)  # global scan, every seat
+                pred = self.built_wonder_complete.any(dim=1)
             elif kind == "nearNaturalWonder":
                 pred = ((self.tile_seat == row) & self.wonder_near).any(dim=1)
             elif kind == "improvement":
@@ -145,7 +109,7 @@ class SimMasks:
                 # captured district leaves the registry with its city, so the
                 # registry needs no liveness term of its own.
                 dtype = brow.get("dtype", -1)
-                dt = self.city_dist_tile[:, row]  # [B, RC, nD] registry tiles
+                dt = self.city_dist_tile[:, row]
                 comp = self.district_complete.gather(1, dt.clamp(min=0).reshape(self.B, -1)).reshape_as(dt)
                 on = (dt >= 0) & comp & alive.unsqueeze(2)
                 if dtype < 0:
@@ -153,17 +117,12 @@ class SimMasks:
                     # TOWARD THE LIMIT qualify (specialty) — aqueducts and the
                     # other support districts are excluded.
                     if brow.get("distinct"):
-                        # CIVIL_ENGINEERING: distinct specialty TYPES across cities.
                         pred = (on.any(dim=1) & self._is_specialty.reshape(1, -1)).sum(dim=1) >= brow["count"]
                     else:
                         pred = (on & self._is_specialty.reshape(1, 1, -1)).sum(dim=(1, 2)) >= brow["count"]
                 else:
                     pred = on[:, :, dtype].sum(dim=1) >= brow["count"]
             elif kind == "policies":
-                # "run N policy cards" (MEDIEVAL_FAIRES, count 4).
-                # checkSatisfied counts this SEAT's non-null government.policies
-                # entries. A seat with no policy machinery reads 0 and the row
-                # goes live by itself the day that seat gets cards.
                 if self._gov_has_effects and self._npol:
                     pred = self._gov_mods(row)[4].sum(dim=1) >= brow["count"]
                 else:
@@ -183,19 +142,13 @@ class SimMasks:
                 self.civ_tech_boosted[:, row, idx] |= hit & ~done
                 self._dedication_event(row, 1, newly)
             else:
-                # PEN BRUSH AND VOICE pays era score per INSPIRATION.
                 done = self.civ_civics[:, row, idx]
                 newly = hit & ~done & ~self.civ_civic_boosted[:, row, idx]
                 self.civ_civic_boosted[:, row, idx] |= hit & ~done
                 self._dedication_event(row, 2, newly)
 
-    # --- barbarians (phase 4a) ----------------------------------------------------
 
     def _next_random(self, mask: torch.Tensor) -> torch.Tensor:
-        """Mirrors nextRandom (mulberry32 on state.rngState): advances the
-        u32 state ONLY where mask, returns [B] float64 draws (garbage
-        elsewhere). All arithmetic runs on u32-in-int64; int64 wrap-around
-        preserves values mod 2^32, so masking after each op is exact."""
         a = (self.rng_state + 0x6D2B79F5) & M32
         t = ((a ^ (a >> 15)) * (1 | a)) & M32
         t = (((t + (((t ^ (t >> 7)) * (61 | t)) & M32)) & M32) ^ t) & M32
@@ -204,12 +157,7 @@ class SimMasks:
         return out
 
     def _damage_roll(self, mask: torch.Tensor, diff: torch.Tensor, k: str = "?", tile: torch.Tensor | None = None) -> torch.Tensor:
-        """Mirrors damageRoll: 30·e^(0.04·Δ)·rand(0.8–1.2) — equal-strength
-        hits land 24–36 — JS-rounded, min 1. The exponential comes from the
-        fixture's JS-computed table (libm exp() can differ by an ulp between
-        runtimes and the result rounds to an integer); Δ may be fractional,
-        so the table is keyed on the 0.1-quantised difference."""
-        if k in WW_BATTLE_KEYS:  # this roll OPENS a battle
+        if k in WW_BATTLE_KEYS:
             self._ww_opened += mask.long()
         # Combat log: every roll of the logged game becomes a keyed CB<seq>
         # line — TS damageRoll is the twin. k = the TS call-site tag (one tag
@@ -221,10 +169,6 @@ class SimMasks:
         log_hit = b is not None and bool(mask[b])
         c0 = int(self.rng_state[b]) if log_hit else 0
         r = self._next_random(mask)
-        # diff may be fractional (wounded units subtract hp/10, a river melee
-        # subtracts 5). Quantize to 0.1 (q = round(diff·10)) and look up
-        # 30·e^(0.04·q/10) — the fixture table (indexed i = q+2000) holds the
-        # EXACT JS double damageRoll computes, so parity survives the ulp.
         q = js_round(diff * 10).to(torch.long)
         # The table spans q in [-2000, 2000] (diff +-200), so XP level bonuses
         # (up to +15 CS) cannot push |diff| past it. TS damageRoll has no clamp;
@@ -256,14 +200,8 @@ class SimMasks:
         return XP_LEVEL_CS * level
 
     def _river_cross(self, frm: torch.Tensor, to: torch.Tensor) -> torch.Tensor:
-        """Mirrors crossesRiver: returns 1 where the melee edge
-        frm->to (an adjacent tile pair) crosses a river, else 0. neigh column
-        d IS riverMask bit d — the movement walkers read the same bit for the
-        +3 crossing charge — so find the neighbour direction of frm that lands
-        on `to` and return that river bit (at most one direction matches; a
-        non-adjacent or off-map `to` yields 0, exactly like crossesRiver)."""
         arange6 = torch.arange(6, device=self.device)
-        nb = self.neigh[frm.clamp(min=0)]  # [B, 6]
+        nb = self.neigh[frm.clamp(min=0)]
         match = (nb == to.unsqueeze(1)) & (to.unsqueeze(1) >= 0) & (frm.unsqueeze(1) >= 0)
         rm = self.river_mask.gather(1, frm.clamp(min=0).unsqueeze(1)).squeeze(1)  # [B]
         bits = (rm.unsqueeze(1) >> arange6) & 1  # [B, 6]
@@ -287,7 +225,7 @@ class SimMasks:
         Stacking blocks foreign units, so each tile holds at most ONE military
         unit — each of the 6 neighbours contributes 0 or 1. Returns
         (flank [B] long, support [B] long)."""
-        nb = self.neigh[def_tile.clamp(min=0)]  # [B, 6]
+        nb = self.neigh[def_tile.clamp(min=0)]
         nbc = nb.clamp(min=0)
         on = nb >= 0
         # TWO gathers: the defender's SEAT and each neighbour's, in the one
@@ -301,15 +239,11 @@ class SimMasks:
         d_seat = def_seat.reshape(self.B, 1)
         n_seat = torch.where(
             present, self.unit_seat.gather(1, mslot.clamp(min=0)), torch.full_like(nbc, -1)
-        )  # [B, 6], -1 = no (unembarked) military neighbour
+        )
 
-        # The same question ZOC and the Encampment probe ask. `_seats_hostile`
-        # treats -1 as nobody, so `present` is only needed for the FRIENDLY side.
         hostile = self._seats_hostile(d_seat, n_seat)
-        # exclude the attacker's own unit (the military at attacker_tile)
         is_atk = (nb == attacker_tile.unsqueeze(1)) & (attacker_tile.unsqueeze(1) >= 0)
         hostile = hostile & ~is_atk
-        # friendly = same seat, military
         friendly = present & (n_seat == d_seat)
         return hostile.long().sum(dim=1), friendly.long().sum(dim=1)
 
@@ -340,7 +274,7 @@ class SimMasks:
             walking = alive & ~arrived
             if not bool(walking.any()):
                 break
-            nb = self.neigh[cur.clamp(min=0)]  # [n, 6]
+            nb = self.neigh[cur.clamp(min=0)]
             nbc = nb.clamp(min=0)
             okn = (nb >= 0) & self.passable[rows2, nbc]
             d_nb = self.pair_dist[dest.clamp(min=0).unsqueeze(1), nbc].to(torch.long)
@@ -351,7 +285,6 @@ class SimMasks:
             nxt = nb.gather(1, (best % 8).clamp(max=5).unsqueeze(1)).squeeze(1)
             cur = torch.where(step_ok, nxt, cur)
             path.append(torch.where(step_ok, cur, torch.full_like(cur, -1)))
-            # a walking row that could not step is a SEA route — it dies here
             alive = alive & (arrived | step_ok)
             arrived = arrived | (alive & (cur == dest))
         commit = alive & arrived
@@ -409,12 +342,9 @@ class SimMasks:
         yourself" arm the seat-0 fast path here used to state a second time.
         `seat` may be an int or a [B, 1] tensor (the war-march probes per
         slot)."""
-        live = self._encamp_live()  # [B, T]
+        live = self._encamp_live()
         if not torch.is_tensor(seat) and seat == BARB_SEAT:
-            return live  # barbarians are hostile to every owner
-        # The Encampment OWNER's seat per tile. Only a MAJOR ever paves one, so
-        # the major rows ARE the domain and a city-state / unowned tile reads
-        # -1 (nobody), which `_seats_hostile` refuses.
+            return live
         owner_seat = torch.where(
             (self.tile_seat >= 0) & (self.tile_seat < self.n_majors),
             self.tile_seat, torch.full_like(self.tile_seat, -1),
@@ -434,9 +364,6 @@ class SimMasks:
         seat,
         is_civilian=False,
     ) -> torch.Tensor:
-        """tileFreeForUnit: STACKING plus the Encampment wall — a live enemy
-        Encampment bars entry. `_stack_blocked` is the stacking half alone.
-        """
         return self._stack_blocked(tiles, seat, is_civilian) | self._encamp_block(tiles, seat)
 
     def _stack_blocked(
@@ -455,15 +382,10 @@ class SimMasks:
         `seat` may be an int or a [B, 1] tensor (the war-march probes per slot).
         """
         tc = tiles.clamp(min=0)
-        # military_at/civilian_at hold a MERGED-pool slot, so the occupant's owner is
-        # one more gather into unit_seat.
         mil_slot = self.military_at.gather(1, tc)
         civ_slot = self.civilian_at.gather(1, tc)
 
         if True:
-            # Whose unit occupies this tile, per DOMAIN, in the absolute seat
-            # space (-1 = nobody). At most one military and one civilian can
-            # stand here, so each domain has a single owner.
             neg = torch.full_like(tc, -1)
             mil_seat = torch.where(
                 mil_slot >= 0, self.unit_seat.gather(1, mil_slot.clamp(min=0)), neg
@@ -471,9 +393,6 @@ class SimMasks:
             civ_seat = torch.where(
                 civ_slot >= 0, self.unit_seat.gather(1, civ_slot.clamp(min=0)), neg
             )
-            # `is_civilian` may be a per-row [B] tensor — the spawn probe
-            # decides per GAME whether it is placing a civilian. Normalise to a
-            # broadcastable bool tensor so one expression covers both.
             civ_b = (
                 is_civilian.unsqueeze(1)
                 if torch.is_tensor(is_civilian)
@@ -494,7 +413,7 @@ class SimMasks:
         enterable WATER (wpass; OCEAN needs the owner's CARTOGRAPHY, passed as
         cart [B]) instead of the land plane, so ships land on water.
         Returns (found [B], spot [B])."""
-        cand7 = torch.cat([at_tile.unsqueeze(1), self.neigh[at_tile.clamp(min=0)]], dim=1)  # [B, 7]
+        cand7 = torch.cat([at_tile.unsqueeze(1), self.neigh[at_tile.clamp(min=0)]], dim=1)
         okc = cand7.clamp(min=0)
         # The SAME stacking rule the movement probe uses, keyed on the spawning
         # seat; the barbarian seat needs no special case, because "hostile to
@@ -506,8 +425,6 @@ class SimMasks:
         blocked = self._blocked_for(cand7, seat, is_civilian=False if civ_mask is None else civ_mask)
         terr = self.passable.gather(1, okc)
         if naval_mask is not None and bool(naval_mask.any()):
-            # naval rows use the water plane — wpass, OCEAN gated on the
-            # owner's CARTOGRAPHY (else all-false → coast/lake only).
             ocean_ok = ~self.ocean_tile.gather(1, okc)
             if cart is not None:
                 ocean_ok = ocean_ok | cart.unsqueeze(1)
@@ -552,8 +469,6 @@ class SimMasks:
         return torch.where(self.unit_naval[u_type.clamp(min=0, max=self.NU - 1)], water_ok, land_ok)
 
     def _spawn_barb(self, mask: torch.Tensor, at_tile: torch.Tensor, unit_type: int, naval: bool = False) -> None:
-        """Barbarians are military; appends to the slot list, which is what
-        keeps GPU unit order identical to state.units array order."""
         if not bool(mask.any()):
             return
         # a NAVAL barb probes the WATER plane (its hull cannot stand ashore),
@@ -567,8 +482,6 @@ class SimMasks:
         slot = self.next_slot[rows]
         assert int(slot.max()) < simbase.BARB_POOL_MAX, "barbarian slot pool exhausted — raise simbase.BARB_POOL_MAX"
         self.barb_unit_alive[rows, slot] = True
-        # callers pass a ladder POSITION; barb_unit_type stores the ROSTER index it
-        # names, so every downstream read uses the roster tables.
         self.barb_unit_type[rows, slot] = int(self._barb_ladder[unit_type])
         self.barb_unit_tile[rows, slot] = spot[rows]
         self.barb_unit_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
@@ -578,10 +491,6 @@ class SimMasks:
         # CAN move before its first refresh, and a reclaimed slot must not
         # inherit the dead unit's remainder.
         self.barb_unit_emb[rows, slot] = False
-        # BEFORE _full_mp, which READS `emb`: a reclaimed slot carries the dead
-        # occupant's flag, and _full_mp overrides an embarked unit's pool to the
-        # flat EMBARK_MOVES. Only reachable once a slot is REUSED, i.e. after a
-        # compaction.
         _m = self._full_mp("barb")[rows, slot]
         self.barb_unit_mp[rows, slot] = _m
         self.barb_unit_mp_full[rows, slot] = _m
@@ -610,30 +519,16 @@ class SimMasks:
         one)."""
         if not self.fog_of_war or rows.numel() == 0:
             return
-        disk = self.pair_dist[tiles.clamp(min=0)] <= radius  # [K, T]
+        disk = self.pair_dist[tiles.clamp(min=0)] <= radius
         self.seat_explored[rows, seat_row] |= disk
 
     def _explored_at(self, seat_row, tiles: torch.Tensor) -> torch.Tensor:
-        """isExplored's twin over a tile tensor: True wherever `seat_row` has
-        lifted the fog (fog off = everything explored). tiles [...]-shaped
-        long; returns a same-shaped bool."""
         if not self.fog_of_war:
             return torch.ones_like(tiles, dtype=torch.bool)
         ex = self.seat_explored[:, seat_row] if isinstance(seat_row, int) else self.seat_explored[torch.arange(self.B, device=self.device), seat_row]
         return ex.gather(1, tiles.clamp(min=0).reshape(self.B, -1)).reshape(tiles.shape)
 
     def _spawn_unit(self, row: int, mask: torch.Tensor, at_tile: torch.Tensor, type_idx, init_xp: torch.Tensor | None = None, charges: torch.Tensor | None = None) -> torch.Tensor:
-        """spawnUnit for any major seat row (0 = seat 0, r+1 = civ r): the
-        unit appears at/near `at_tile` (the first free spot in direction
-        order) in the ONE major pool, owned by `unit_seat`; the
-        roster's civilian bit picks the occupancy plane (and zeroes the
-        military-only fields), and naval types probe water with OCEAN gated
-        on this row's own CARTOGRAPHY. type_idx: int or [B] long. init_xp
-        ([B] long) seeds a MILITARY unit's starting XP from its city's
-        Encampment training buildings — civilians stay 0. charges ([B]
-        long) overrides the roster charge count (the MISSIONARY buy's
-        SCRIPTURE +1). Returns the LANDED mask — a caller that paid refunds
-        where no spot was free."""
         if not bool(mask.any()):
             return torch.zeros_like(mask)
         if isinstance(type_idx, int):
@@ -642,7 +537,6 @@ class SimMasks:
             type_idx = type_idx.expand(self.B)
         pre = "major"
         is_civ_u = self._type_civilian[type_idx.clamp(min=0)]
-        # clamp max too: unmasked rows may hold district queue codes.
         ti_n = type_idx.clamp(min=0, max=self.NU - 1)
         naval_m = self.unit_naval[ti_n] & mask
         techs2 = self.civ_techs[:, row]
@@ -656,17 +550,15 @@ class SimMasks:
         slot = nxt[rows]
         assert int(slot.max()) < simbase.MAJOR_POOL_MAX, "major slot pool exhausted — raise simbase.MAJOR_POOL_MAX"
         getattr(self, f"{pre}_unit_alive")[rows, slot] = True
-        # a reclaimed slot may have held ANOTHER seat's unit
         self.major_unit_seat[rows, slot] = row
         getattr(self, f"{pre}_unit_type")[rows, slot] = type_idx[rows]
         getattr(self, f"{pre}_unit_tile")[rows, slot] = spot[rows]
-        self._reveal_around(rows, row, spot[rows], 2)  # spawnUnit's revealAround (SIGHT_RANGE)
+        self._reveal_around(rows, row, spot[rows], 2)
         getattr(self, f"{pre}_unit_hp")[rows, slot] = self.rules.combat.get("unitHp", 100)
-        getattr(self, f"{pre}_unit_fortify")[rows, slot] = 0  # a fresh (possibly reclaimed) slot starts undug
+        getattr(self, f"{pre}_unit_fortify")[rows, slot] = 0
         if init_xp is None:
-            getattr(self, f"{pre}_unit_xp")[rows, slot] = 0  # a fresh (possibly reclaimed) slot starts at 0 xp
+            getattr(self, f"{pre}_unit_xp")[rows, slot] = 0
         else:
-            # MILITARY rows inherit the training city's Encampment XP; civilians stay 0.
             getattr(self, f"{pre}_unit_xp")[rows, slot] = torch.where(is_civ_u[rows], torch.zeros_like(slot), init_xp[rows])
         # a unit spawned MID-turn has no frozen grant yet — TS leaves movesFull
         # undefined until its first refreshUnits and the `?? full` fallback
@@ -682,7 +574,7 @@ class SimMasks:
         getattr(self, f"{pre}_unit_mp")[rows, slot] = _m
         getattr(self, f"{pre}_unit_mp_full")[rows, slot] = _m
         getattr(self, f"{pre}_unit_charges")[rows, slot] = self._type_charges[type_idx[rows]] if charges is None else charges[rows]
-        off = self.POOL_LO[pre]  # merged-pool index of this pool's slot 0
+        off = self.POOL_LO[pre]
         cu_rows = is_civ_u[rows]
         mil_rows = rows[~cu_rows]
         if len(mil_rows) > 0:
@@ -737,7 +629,7 @@ class SimMasks:
         if not bool(mask.any()):
             return
         t = tile.clamp(min=0)
-        era = self._row_era(row)  # [B] the acting seat's era
+        era = self._row_era(row)
         okr = (
             mask
             & (tile >= 0)
@@ -813,13 +705,6 @@ class SimMasks:
         return tab[:, civ]
 
     def _cliff_block_dirs(self, cur: torch.Tensor, nb6: torch.Tensor, own: torch.Tensor | None = None) -> torch.Tensor:
-        """[B, 6]: per-direction, is the step cur->neighbour a
-        land/water crossing closed by a CLIFF? Applied at STEP-legality level so
-        a walker routes AROUND a cliff instead of halting at it.
-        The mask lives on the LAND tile, so read it there and test the bit
-        pointing at the water side — from the water side that is the opposite
-        direction ((d + 3) % 6). Sourced exceptions: a city centre, and a HARBOR
-        belonging to the mover's OWN civ ("enemy units won't" pass it)."""
         B, dev = self.B, self.device
         if not bool(self.cliff_mask.any()):
             return torch.zeros(B, 6, dtype=torch.bool, device=dev)
@@ -887,7 +772,7 @@ class SimMasks:
         hit = mask & (self.camp_tile == tile.unsqueeze(1)).any(dim=1)
         if not bool(hit.any()):
             return
-        self._mark_antiquity(hit, tile, row)  # a razed outpost leaves a dig
+        self._mark_antiquity(hit, tile, row)
         reward = self.rules.combat.get("campClearReward", 50)
         for b in hit.nonzero(as_tuple=True)[0].tolist():
             camps = self.camp_tile[b]
@@ -901,38 +786,26 @@ class SimMasks:
 
 
     def _type_civic_slot_ok(self, row: int, per_city: bool) -> torch.Tensor:
-        """The Archaeologist's two extra trainableUnits gates for seat row
-        `row` — the CIVIC unlock (Natural History) and the ARTIFACT-SLOT rule
-        (its city must hold an ARCHAEOLOGICAL MUSEUM with a free slot).
-        Returns [B, NU] when per_city is False, else [B, RC, NU]."""
         B, dev = self.B, self.device
         civ_ok = (self._type_civic.unsqueeze(0) < 0) | self.civ_civics[:, row].gather(
             1, self._type_civic.clamp(min=0).unsqueeze(0).expand(B, -1)
-        )  # [B, NU]
+        )
         if not per_city:
             return civ_ok
         C = self.RC
-        need = self._type_needs_slot.reshape(1, 1, -1)  # [1, 1, NU]
+        need = self._type_needs_slot.reshape(1, 1, -1)
         if self._artifact_bidx < 0:
             room = torch.zeros(B, C, 1, dtype=torch.bool, device=dev)
         else:
             room = (
                 self.city_bldg[:, row, :, self._artifact_bidx] & (self.city_artifacts[:, row] < self._artifact_slots)
-            ).unsqueeze(2)  # [B, RC, 1]
+            ).unsqueeze(2)
         return civ_ok.unsqueeze(1) & (~need | room)
 
     def _seat_slot_map(self, row: int) -> torch.Tensor:
-        """[B, simbase.UNIT_SLOTS] — the MERGED-POOL slot behind each of seat
-        row `row`'s unit head rows, in slot (= spawn) order, padded with -1.
-
-        The pool is shared by every major seat, so a seat's units are the slots
-        `unit_seat == row` and its ARRAY ORDER is their slot order — the twin of
-        `state.units.filter(u => u.seat === row)`, whose relative order the
-        stable compaction preserves. Every seat reads the same head layout, so
-        one policy and one applier serve all of them."""
         B = self.B
         mine = self.major_unit_alive & (self.major_unit_seat == row)
-        rank = mine.long().cumsum(dim=1) - 1  # rank among this seat's living slots
+        rank = mine.long().cumsum(dim=1) - 1
         out = torch.full((B, simbase.UNIT_SLOTS), -1, dtype=torch.long, device=self.device)
         take = mine & (rank < simbase.UNIT_SLOTS)
         bs, slots = take.nonzero(as_tuple=True)
@@ -972,48 +845,31 @@ class SimMasks:
         return out
 
     def _seat_unit_mask(self, row: int) -> torch.Tensor:
-        """[B, simbase.UNIT_SLOTS, A] valid orders per unit of seat row `row`,
-        A = len(_act_names) — ONE body for every seat.
-
-        0-5 step to that neighbour (seat-aware stacking, the Encampment wall,
-        cliffs, the naval/embark terrain planes), 6-11 attack there (a hostile
-        unit, an at-war centre, a city-state centre, a live enemy Encampment),
-        12 hold, 13/14/15 build FARM/MINE/LUMBER under this seat's own
-        unlocks, then chop, repair, the resource improvements, pillage, the
-        SNIPE ring, SPREAD and FOUND_CITY.
-
-        The mask is OPTIMISTIC: orders are RE-validated at execution (both
-        engines identically), because an earlier unit's move can invalidate a
-        later unit's order. What it must NOT do is offer a column no applier
-        arm executes — a legal column that silently no-ops teaches a policy
-        that the verb is worthless."""
         B, dev = self.B, self.device
         N = simbase.UNIT_SLOTS
         smap = self._seat_slot_map(row)
         present = smap >= 0
         sc = smap.clamp(min=0)
         alive = present.unsqueeze(2)
-        tile = self.unit_tile.gather(1, sc)                      # [B, N]
+        tile = self.unit_tile.gather(1, sc)
         tc = tile.clamp(min=0)
         utype = self.unit_type.gather(1, sc)
         ut = utype.clamp(min=0, max=self.NU - 1)
         u_emb = self.unit_emb.gather(1, sc)
         u_charges = self.unit_charges.gather(1, sc)
-        techs = self.civ_techs[:, row]                            # [B, nTech]
+        techs = self.civ_techs[:, row]
         civics = self.civ_civics[:, row]
-        own_tile = self.tile_seat == row                          # [B, T]
+        own_tile = self.tile_seat == row
         nb = self.neigh[tc.reshape(-1)].reshape(B, N, 6)
-        nbc = nb.clamp(min=0).reshape(B, -1)                      # [B, N*6]
+        nbc = nb.clamp(min=0).reshape(B, -1)
         on_map = nb >= 0
 
-        # ---- who stands on each neighbour, by SEAT ---------------------------
         _ms = self.military_at.gather(1, nbc)
         _cs = self.civilian_at.gather(1, nbc)
         neg = torch.full_like(_ms, -1)
         m_seat = torch.where(_ms >= 0, self.unit_seat.gather(1, _ms.clamp(min=0)), neg)
         c_seat = torch.where(_cs >= 0, self.unit_seat.gather(1, _cs.clamp(min=0)), neg)
 
-        # ---- MOVE 0-5 --------------------------------------------------------
         is_civ = (self._type_civilian[utype.clamp(min=0)]).unsqueeze(2)
         passable = self.passable.gather(1, nbc).reshape(B, N, 6)
         is_nav = self.unit_naval[ut].unsqueeze(2)
@@ -1026,20 +882,11 @@ class SimMasks:
                 self.wpass.gather(1, nbc).reshape(B, N, 6)
                 & (~self.ocean_tile.gather(1, nbc).reshape(B, N, 6) | cart)
             )
-            # AT WAR WITH ANYONE: a grounded land unit stays land-only at
-            # peace. Military embark needs SHIPBUILDING; CARTOGRAPHY only opens
-            # OCEAN, so both techs are terms. Row 0 runs the same gate every
-            # civ row does (#68 step 4) — the seat-0 order path used to have no
-            # embark arm at all.
             any_war = self.war[:, row].any(dim=1).view(B, 1, 1)
             embark = water & ship & ~is_nav & any_war
             terr = torch.where(is_nav, water, passable | embark)
         else:
             terr = passable
-        # the step-scan gate is `_blocked_for`, the same body the appliers and
-        # the march call: STACKING plus the ENCAMPMENT WALL (a live enemy
-        # Encampment bars entry; it is a DISTRICT, so an occupancy probe reads
-        # its tile as empty). One legality rule, every surface.
         _blk = torch.where(
             is_civ,
             self._blocked_for(nbc, row, is_civilian=True).reshape(B, N, 6),
@@ -1047,9 +894,6 @@ class SimMasks:
         )
         has_mp = (self.unit_mp.gather(1, sc) > 0).unsqueeze(2)
         move = on_map & terr & ~_blk & alive & has_mp
-        # CLIFF EDGES, applied at step level exactly as the march applies
-        # _cliff_block_dirs. Per-row loop bounded by the LIVE head — rows empty
-        # across the whole batch break out.
         if self._embark_live:
             for _n in range(N):
                 if not bool(present[:, _n].any()):
@@ -1064,8 +908,6 @@ class SimMasks:
         ).reshape(B, N, 6)
         ctr_seat = self._centre_seat_plane()
         ctr_nb = ctr_seat.gather(1, nbc)
-        # a MAJOR centre is a target when its holder is hostile; the minors go
-        # through _citystate_target, which carries the suzerain clause.
         ctr_major = (ctr_nb >= 0) & (ctr_nb < 100)
         city_t = (self._seats_hostile(row, torch.where(ctr_major, ctr_nb, neg))).reshape(B, N, 6)
         cs_t = torch.zeros(B, N, 6, dtype=torch.bool, device=dev)
@@ -1086,9 +928,6 @@ class SimMasks:
 
         hold = alive
 
-        # ---- BUILDER VERBS ---------------------------------------------------
-        # `here_ok` is validImprovements' shared half: a builder with charges on
-        # an OWN, empty, non-centre tile.
         if self.improvements_on and self._builder_idx >= 0:
             hf = (civics[:, self._hillfarms_civic] if self._hillfarms_civic >= 0
                   else torch.zeros(B, dtype=torch.bool, device=dev)).unsqueeze(1)
@@ -1113,9 +952,6 @@ class SimMasks:
         else:
             here_ok = torch.zeros(B, N, dtype=torch.bool, device=dev)
             build_f = build_m = build_l = torch.zeros(B, N, 1, dtype=torch.bool, device=dev)
-        # CHOP: canRemoveFeature has NO ownership test — the grant checks the
-        # owner itself — so this is builder + charges + a removable feature
-        # whose tech is in and which is not already stripped.
         ftr_t = self.tile_ftr.gather(1, tc)
         ftu_t = self.tile_ftu.gather(1, tc)
         chop = (
@@ -1134,10 +970,9 @@ class SimMasks:
             & own_tile.gather(1, tc)
             & (self.pillaged.gather(1, tc) | self.district_pillaged.gather(1, tc))
         ).unsqueeze(2)
-        # the RESOURCE improvements + SEASIDE_RESORT, on this seat's own techs.
         _res_cols: list[torch.Tensor] = []
         if self.improvements_on and self._builder_idx >= 0:
-            _rq = self.res_imp.gather(1, tc)  # required improvement idx, -1 = none
+            _rq = self.res_imp.gather(1, tc)
             for _k in range(3, self._imp_unlock.numel()):
                 _ut = int(self._imp_unlock[_k])
                 _unl = (techs[:, _ut].unsqueeze(1) if _ut >= 0
@@ -1147,10 +982,6 @@ class SimMasks:
                 else:
                     _ok = here_ok & (_rq == _k) & _unl
                 _res_cols.append(_ok.unsqueeze(2))
-        # PILLAGE: a MILITARY unit standing on an ENEMY tile with a live
-        # improvement, or a complete non-centre unpillaged district. `seatPillage`'s
-        # own enemy test — an AT-WAR major's land, or ANY city-state's (a minor's
-        # territory needs no declaration to wreck).
         _ts = self.tile_seat
         _enemy = (
             ((_ts >= 0) & (_ts < 100) & self.war[:, row].gather(1, _ts.clamp(min=0, max=self.NS - 1)))
@@ -1165,14 +996,10 @@ class SimMasks:
         )
         pillage = (present & (self._type_combat[utype] > 0) & _enemy & (_has_imp | _has_dis)).unsqueeze(2)
 
-        # ---- SNIPE (the distance-2 ring) -------------------------------------
-        # Legal iff this unit is ranged with range >= 2, not embarked, and the
-        # k-th ring tile holds a target `_hostile_ranged_strike` would resolve:
-        # a hostile unit inside the strike's own scope-out, or a hostile CENTRE.
         _sn: list[torch.Tensor] = []
         if getattr(self, "_snipe_on", False):
             rngd = (self._type_ranged_strength[ut] > 0) & (self._type_ranged_range[ut] >= 2)
-            ring = self.ring2[tc]                     # [B, N, 12]
+            ring = self.ring2[tc]
             ringc = ring.clamp(min=0).reshape(B, -1)
             _rm = self.military_at.gather(1, ringc)
             _rc = self.civilian_at.gather(1, ringc)
@@ -1189,7 +1016,6 @@ class SimMasks:
                 & (ring >= 0) & (_ring_u | _ring_c)
             ]
 
-        # ---- SPREAD (religious pressure onto self/neighbour) ------------------
         _sp: list[torch.Tensor] = []
         if getattr(self, "_A_SPREAD", -1) >= 0:
             _relig = torch.zeros_like(present)
@@ -1200,7 +1026,6 @@ class SimMasks:
             _sp_ok = present & _relig & (u_charges > 0) & self.civ_religion_done[:, row].unsqueeze(1)
             _sp = [_sp_ok.unsqueeze(2).expand(-1, -1, 7)]
 
-        # ---- FOUND_CITY ------------------------------------------------------
         _fd: list[torch.Tensor] = []
         if getattr(self, "_A_FOUND", -1) >= 0:
             _fd = [(present & (utype == self._settler_idx)).unsqueeze(2)
@@ -1212,16 +1037,12 @@ class SimMasks:
             + _res_cols + [pillage] + _sn + _sp + _fd,
             dim=2,
         )
-        # the mask's width IS the enum's length, or a dispatch is reading the
-        # wrong column. `_res_cols` is empty when improvements are off, which
-        # legitimately shortens the row — only assert when they are on.
         if self._act_names and self.improvements_on and self._builder_idx >= 0:
             assert out.shape[-1] == len(self._act_names), (
                 f"_seat_unit_mask is {out.shape[-1]} wide but the enum has {len(self._act_names)} entries"
             )
         return out
 
-    #: per-unit observation layout. Keep in step with `_unit_obs`.
     UNIT_OBS = (
         "d_home",           # 0    distance to this seat's nearest live city
         *(f"d_home_n{i}" for i in range(6)),   # 1-6  same, per neighbour
@@ -1243,22 +1064,11 @@ class SimMasks:
 
     def _unit_obs(self, tile, present, centers, calive, mp, charges, utype,
                   at_war=None, war_tgt=None):
-        """[B, N, 36] the per-unit half of the observation, seat-generic.
-
-        The masks say WHICH ORDERS ARE LEGAL, never which one the verb wants.
-        "How far is home, and which neighbour is closer" is what a policy needs
-        and nothing in the empire/city/civ scalars carries it. Distances are
-        what the OBSERVATION owes the verb; the direction tie-break and the stop
-        radius stay POLICY and live in gpu/ladder.py.
-
-        One body for every seat: seat 0 passes `site`/`major_unit_tile`, a civ passes
-        `civ_city_center[:, r]`/its slot-mapped tiles.
-        """
         B, N = tile.shape
         dev, dt = self.device, self.dtype
         BIG = float(self.T)
         tc = tile.clamp(min=0)
-        nb = self.neigh[tc]                                   # [B, N, 6]
+        nb = self.neigh[tc]
         nbc = nb.clamp(min=0).reshape(B, N * 6)
 
         d_home = torch.full((B, N), BIG, dtype=dt, device=dev)
@@ -1268,16 +1078,9 @@ class SimMasks:
             ctr = centers[:, c].clamp(min=0).unsqueeze(1)
             d_home = torch.where(ok, torch.minimum(d_home, self.pair_dist[tc, ctr].to(dt)), d_home)
             d_nb = torch.where(ok, torch.minimum(d_nb, self.pair_dist[nbc, ctr].to(dt)), d_nb)
-        # a missing neighbour is unreachable, not adjacent to home
         d_nb = torch.where(nb.reshape(B, N * 6) >= 0, d_nb, torch.full_like(d_nb, BIG)).reshape(B, N, 6)
 
         civ = (self._type_combat[utype.clamp(min=0, max=self.NU - 1)] <= 0)
-        # the WAR half. `war_tgt` [B, N] is PER UNIT — the march destination
-        # is the nearest enemy improvement within 13 OF THAT UNIT (else nearest
-        # enemy city), so a per-seat target would misdirect every unit but one.
-        # It comes from `_war_march_target`, the SAME implementation the march
-        # itself calls, so the observation cannot drift from the rule it feeds.
-        # -1 rows mean no target; their distances read BIG.
         if at_war is None:
             at_war = torch.zeros(B, dtype=torch.bool, device=dev)
         if war_tgt is None:
@@ -1303,21 +1106,13 @@ class SimMasks:
                 at_war.to(dt).unsqueeze(1).expand(B, N).unsqueeze(2),
                 d_war.unsqueeze(2),
                 d_war_nb,
-                self.ring2[tc].to(dt),   # [B, N, 12] ring tile ids, -1 pad
+                self.ring2[tc].to(dt),
             ],
             dim=2,
         )
         return torch.where(present.unsqueeze(2), out, torch.zeros_like(out))
 
     def seat_unit_obs(self, row: int) -> torch.Tensor:
-        """[B, simbase.UNIT_SLOTS, 36] seat row `row`'s per-unit observation —
-        ONE layout, so one policy reads any seat.
-
-        The WAR columns: at_war = hostile to ANY other major seat. The march
-        target is PER UNIT (`_war_march_target` takes the unit's own tile —
-        nearest enemy improvement within 13 OF IT), so the shared method runs
-        once per occupied row; a seat fields a handful of units, and rows empty
-        across the whole batch are skipped."""
         B, dev = self.B, self.device
         smap = self._seat_slot_map(row)
         sc = smap.clamp(min=0)
@@ -1341,31 +1136,11 @@ class SimMasks:
         )
 
     def apply_seat_unit_sequence(self, row: int, seq: torch.Tensor) -> None:
-        """Apply a unit's order as a SHORT DIRECTION SEQUENCE [B, simbase.UNIT_SLOTS, K].
-
-        A unit walks REAL MP and covers several tiles in a turn, so one order
-        per unit-turn cannot express a full move; the sequence is what lets the
-        ACTION SPACE reach the mobility the engine allows.
-
-        Column k is applied in order. Only MOVE columns (0-5) continue a
-        sequence: any other verb ends the unit's turn, so k>0 entries are
-        blanked for units that did something else.
-
-        NO NEW MP BOOKKEEPING. `_step_verb` owns the contract ("movesLeft <
-        cost && movesLeft < full refuses, so a unit at FULL MP always gets its
-        first step"), so a unit out of movement simply has its next step refused
-        and later columns are no-ops.
-
-        The ENGINE NEVER EXTENDS A MOVE. Every step it walks was named by the
-        policy; "repeat the chosen direction until MP is spent" would put a
-        movement policy back inside the engine.
-        """
         if seq.dim() != 3:
             raise AssertionError(f"unit sequence must be [B, simbase.UNIT_SLOTS, K], got {tuple(seq.shape)}")
         for k in range(int(seq.shape[2])):
             a_k = seq[:, :, k].to(torch.long)
             if k > 0:
-                # a non-move verb consumed the turn at an earlier rank
                 a_k = torch.where(a_k < 6, a_k, torch.full_like(a_k, -1))
             if not bool((a_k >= 0).any()):
                 return

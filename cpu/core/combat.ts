@@ -1,12 +1,3 @@
-/**
- * Combat and barbarians. #78 sourced the DAMAGE FORMULA (base and exponent
- * verified exact; the random range is contested — see damageRoll). Damage uses the classic
- * 30·e^(0.04·Δstrength)·rand(0.8–1.2) curve, with +3 defense on
- * hills/woods/rainforest/marsh. Barbarian camps spawn in the wilds, garrison
- * themselves, and send raiders that pillage improvements and batter cities;
- * cities at 0 HP are sacked (population/gold loss, nearby pillaging), not
- * captured. All randomness flows through the in-state RNG.
- */
 
 import type { City, CityState, GameState, ImprovementId, Seat, Tile, Unit } from './types';
 import { neighbors, hexDistance, tilesWithin } from '../../world/hex';
@@ -41,8 +32,6 @@ const no = (reason: string): RuleResult => ({ ok: false, reason });
 export const CAMP_CLEAR_REWARD = 50;
 export const MAX_BARB_PER_CAMP = 3;
 
-/** any non-barbarian unit entering a camp tile clears it —
- * +50 to ITS civ's treasury (the other seats bank it like the seat 0). */
 export function clearCampFor(state: GameState, unit: Unit, tileIndex: number, seat: number): void {
   // You do not clear your OWN camps. This was `isBarbSeat(...)` —
   // an identity test standing in for that rule, which only became sayable once
@@ -67,9 +56,6 @@ export const PILLAGE_HEAL_IMPROVEMENTS: ReadonlySet<string> = new Set<Improvemen
   'FISHING_BOATS',
 ]);
 
-// ---------------------------------------------------------------------------
-// Combat math
-// ---------------------------------------------------------------------------
 
 export function terrainDefense(tile: Tile): number {
   let d = 0;
@@ -79,17 +65,6 @@ export function terrainDefense(tile: Tile): number {
   // they don't shelter like woods/rainforest. Marsh stays SLOW to enter
   // (moveCostInto, deliberately unchanged); only its DEFENSE value flips here.
   if (tile.feature === 'MARSH' || tile.feature === 'FLOODPLAINS') d -= 2;
-  // FORT, sourced: "Occupying unit receives +4 Defense Strength".
-  // Added HERE because terrainDefense is the single chokepoint every defender
-  // path already routes through, so the bonus reaches melee, ranged and city
-  // defence without touching three call sites.
-  // The entry's other two halves are NOT modelled and are recorded rather than
-  // approximated: the automatic 2 turns of fortification (would need a hook on
-  // every tile-entry site, and fortifyBonus is a separate accumulator), and the
-  // "minor damage + movement depletion to hostile units walking onto this tile"
-  // (neither engine has a tile-enters-damage hook, and the damage number is not
-  // stated, so inventing one is the guessed-constant failure this sweep exists
-  // to catch).
   if (tile.improvement === 'FORT') d += 4;
   return d;
 }
@@ -126,7 +101,6 @@ export const XP_DEFEND = 2;
 export const XP_LEVEL_CS = 5;
 export const XP_LEVELS: readonly number[] = [15, 45, 90];
 
-/** 0..3 — the number of XP_LEVELS thresholds this unit's xp has crossed. */
 export function unitLevel(unit: { xp?: number }): number {
   const xp = unit.xp ?? 0;
   let level = 0;
@@ -134,17 +108,10 @@ export function unitLevel(unit: { xp?: number }): number {
   return level;
 }
 
-/** the flat CS bonus a unit's veterancy grants at every roll it fights. */
 export function xpLevelBonus(unit: { xp?: number }): number {
   return XP_LEVEL_CS * unitLevel(unit);
 }
 
-/** the flat XP a unit TRAINED or PURCHASED in a city starts
- * with — the BEST tier over the city's Encampment military buildings (not the
- * sum): BARRACKS/STABLE 5, ARMORY 10, MILITARY_ACADEMY 15 (data-driven off
- * BuildingDef.trainXp). Keys purely off building presence — a military
- * building cannot exist without a complete Encampment; district-pillage state
- * is NOT consulted (recorded residual). Applies to military units only. */
 export function encampmentTrainXp(buildings: readonly string[]): number {
   let best = 0;
   for (const b of buildings) {
@@ -168,8 +135,6 @@ export function awardDefenseXp(defender: Unit): void {
   if (defender.hp > 0 && unitDomain(defender.type) === 'military') gainXp(defender, XP_DEFEND);
 }
 
-/** Flanking count: MILITARY units u ≠ attacker, adjacent to the defender's
- * tile, that are hostile to the defender. */
 function flankCount(state: GameState, defTileIndex: number, attacker: Unit, defender: Unit): number {
   let n = 0;
   for (const t of neighbors(state.map, state.map.tiles[defTileIndex])) {
@@ -183,9 +148,6 @@ function flankCount(state: GameState, defTileIndex: number, attacker: Unit, defe
   return n;
 }
 
-/** Support count: MILITARY units friendly to the defender (same owner AND
- * civId), adjacent to the defender's tile. Exported for the walls
- * strike (cstk, phase.ts). */
 export function supportCount(state: GameState, defTileIndex: number, defender: Unit): number {
   let n = 0;
   for (const t of neighbors(state.map, state.map.tiles[defTileIndex])) {
@@ -221,29 +183,19 @@ export function generalAuraCS(state: GameState, unit: Unit, tileIndex: number): 
   return inGeneralAura(state, unit, tileIndex) ? GENERAL_AURA_CS : 0;
 }
 
-/** the enhancer belief of a UNIT's civ religion (religion id = unified
- * Undefined for a seat with no founded religion and for an unenhanced one —
- * which is how barbarians and city-states answer, from their own empty data. */
 function unitEnhancer(state: GameState, unit: Unit): BeliefEffects | undefined {
   const rel = seatOf(state, unit.seat)?.religion;
   return rel?.founded && rel.enhancer ? ENHANCER_BELIEFS[rel.enhancer]?.effects : undefined;
 }
 
-/** The religion id of a unit's owner, or -1 when it founded none. A religion
- * is keyed by the seat that founded it, so the id IS the owner's seat. */
 function unitReligion(state: GameState, unit: Unit): number {
   return seatOf(state, unit.seat)?.religion.founded ? unit.seat : -1;
 }
 
-/** The followed religion of the city OWNING this tile (-1 = unowned, or owned
- *  by a city following nothing). Resolved through the per-city tile registry,
- *  `tileCity(tile)`. */
 function tileFollowedReligion(state: GameState, tile: Tile): number {
   return cityAtTile(state, tile)?.followedReligion ?? -1;
 }
 
-/** is ANY city following religion g within JUST_WAR_RANGE of this tile?
- *  Whose city it is does not enter the rule. */
 function nearFollowingCity(state: GameState, tile: Tile, g: number): boolean {
   for (const c of allCities(state)) {
     if (c.followedReligion !== g) continue;
@@ -253,10 +205,6 @@ function nearFollowingCity(state: GameState, tile: Tile, g: number): boolean {
   return false;
 }
 
-/** enhancer combat adders for the ATTACKER in a unit-vs-unit roll
- * (Just War near a following city + Crusade attacking onto following-city
- * territory). The battle tile is the DEFENDER's tile. City/CS targets get
- * nothing (unit-vs-unit scope). */
 export function religionAttackCS(state: GameState, attacker: Unit, battleTileIndex: number): number {
   const g = unitReligion(state, attacker);
   if (g < 0) return 0;
@@ -269,9 +217,6 @@ export function religionAttackCS(state: GameState, attacker: Unit, battleTileInd
   return bonus;
 }
 
-/** enhancer combat adders for a UNIT DEFENDER (Just War near a
- * following city + Defender of the Faith on following-city territory). The
- * battle tile is the defender's own tile. */
 export function religionDefenseCS(state: GameState, defender: Unit, defTileIndex: number): number {
   const g = unitReligion(state, defender);
   if (g < 0) return 0;
@@ -291,8 +236,6 @@ export function religionDefenseCS(state: GameState, defender: Unit, defTileIndex
  * soft targets). Used by every melee/ranged/walls site so the override is
  * applied identically. Flanking (the attacker's term) is added separately. */
 export function defenderCS(state: GameState, defender: Unit, defTileIndex: number): number {
-  // The general/admiral aura joins the defender's assembly at every
-  // unit-vs-unit defenderCS caller (embarked → ADMIRAL branch of generalAuraCS).
   if (defender.embarked) return EMBARKED_DEFENSE_CS - woundPenalty(defender) + generalAuraCS(state, defender, defTileIndex);
   const tile = state.map.tiles[defTileIndex];
   return (
@@ -343,14 +286,6 @@ export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = 
   return dmg;
 }
 
-// City defense = the strongest MELEE unit the owner
-// has ever fielded (floor 15), +5 when the owner's own military garrisons
-// the center. No population term; walls stay out of scope.
-/**
- * A city's defence: its OWNER's strongest melee ever fielded (floor 15,
- * plus 5 for that owner's military garrisoning the centre.
- *
- */
 export function cityDefenseStrength(state: GameState, city: City): number {
   const garrison = unitsAt(state, city.centerIndex).find(
     (u) => u.seat === city.seat && unitDomain(u.type) === 'military',
@@ -358,9 +293,6 @@ export function cityDefenseStrength(state: GameState, city: City): number {
   return Math.max(15, seatOf(state, city.seat)?.bestMeleeCS ?? 0) + (garrison ? 5 : 0);
 }
 
-/** The ONE combat death path: a unit dying in battle leaves an antiquity site.
- *  Every killer routes through here — including the city strikes in
- *  `phase.ts` — so the site appears whoever landed the blow. */
 export function killUnit(state: GameState, unit: Unit, seat: number): void {
   markAntiquitySite(state, unit.tileIndex, seat); // B-20 (#79): a death leaves a dig
   disbandUnit(state, unit.id);
@@ -467,10 +399,6 @@ function cityAssault(
   city.hp -= dmgToCity - absorbed;
   attacker.hp -= dmgToAttacker;
   attacker.movesLeft = 0;
-  // A CITY is receiving the attack, so both sides score at the
-  // abroad column whoever's borders it stands in. Scored BEFORE killUnit and
-  // before the caller's capture branch — the location multiplier is the one
-  // that applied while the battle was fought, not after the tile changes hands.
   warWearinessBattle(state, attacker.seat, city.seat, city.centerIndex,
     { aDied: attacker.hp <= 0, city: true });
   if (attacker.hp <= 0) killUnit(state, attacker, seat);
@@ -495,42 +423,28 @@ function attackEncampment(
   defCS: number, seat: number): void {
   const tile = state.map.tiles[tileIndex];
   const atkCS = assaultAtkCS(state, attacker, tileIndex);
-  // ONE roll-key pair whoever owns the district: 'enc' opens, 'encc' counters.
   const dmgToEncamp = damageRoll(state, atkCS - defCS, 'enc', tileIndex);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, 'encc', tileIndex);
   gainXp(attacker, XP_ATTACK);
   tile.encampHp = Math.max(0, (tile.encampHp ?? ENCAMPMENT_HP) - dmgToEncamp);
   attacker.hp -= dmgToAttacker;
   attacker.movesLeft = 0;
-  // An Encampment is part of its city's defenses and fights
-  // at that city's strength, so it scores as city combat for both sides.
   warWearinessBattle(state, attacker.seat, tileSeat(tile), tileIndex,
     { aDied: attacker.hp <= 0, city: true });
   if (attacker.hp <= 0) killUnit(state, attacker, seat);
 }
 
-/**
- * The defense strength an Encampment on `tile` fights at — its
- * OWNING city's, since the district is part of that city's defenses. Returns
- * null when the tile is not a live enemy Encampment for this attacker.
- */
 export function encampmentDefense(
   state: GameState,
   attacker: Unit,
   tile: Tile,
 ): { defCS: number } | null {
   if (!encampmentBlocks(state, tile, attacker)) return null;
-  // The CIV-level defense floor, deliberately WITHOUT the city-center garrison
-  // term: that +5 is "a unit is standing in the city centre", which has nothing
-  // to do with this district. A unit standing on the ENCAMPMENT is fought as a
-  // unit instead (the `enemies.length === 0` precedence in meleeAttack), so the
-  // district never doubles up with a defender.
   const owner = seatOf(state, tileSeat(tile));
   if (!owner) return null;
   return { defCS: Math.max(15, owner.bestMeleeCS ?? 0) };
 }
 
-/** Melee attack an adjacent enemy unit or city tile. */
 
 /** the COMMIT seam for meleeAttack. The resolver returns early on a
  *  dozen refusals; logging inside it would record ATTEMPTS, and an attempt is
@@ -577,17 +491,6 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   }
 
   const enemies = unitsAt(state, targetIndex).filter((u) => unitsHostile(state, attacker, u));
-  // A city is a TARGET only if the attacker is AT WAR with the seat
-  // that holds it. One rule, whoever attacks and whoever holds.
-  //
-  // `civsAtWar` is false for a seat against itself, so this also refuses an
-  // attack on one's OWN centre without a separate term. BARBARIANS need no
-  // war — `caps.alwaysHostile` is the whole point of the capability table,
-  // and gating them on `civsAtWar` leaves them unable to sack anything.
-  //
-  // Being at PEACE with a city's owner is no reason to be unable to hit a
-  // barbarian standing on it, so this falls through to the unit target
-  // instead of diverting to the city and then refusing the whole action.
   const seatTarget = (() => {
     const civCity = cityAtIndex(state, targetIndex);
     if (!civCity) return undefined;
@@ -607,9 +510,6 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   // standing on the district is fought first (real Civ 6 hits the unit).
   const encamp = enemies.length === 0 ? encampmentDefense(state, attacker, target) : null;
   if (enemies.length === 0 && !seatTarget && !cityStateTarget && !encamp) {
-    // A seat CITY may sit here and simply not be a legal target
-    // (at peace). `seatTarget` is undefined in that case now, so name the
-    // REAL reason rather than claiming the tile is empty.
     const civCityHere = cityAtIndex(state, targetIndex);
     if (civCityHere && !civsAtWar(state, unitSeat(attacker), civCityHere.holder.seat)) {
       return no(`You are at peace with ${civCityHere.holder.name} — declare war first.`);
@@ -647,18 +547,9 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   const defender =
     enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
   const defDef = UNITS[defender.type];
-  // Fortify and WOUNDS: both attacker and defender fight at their
-  // HP-reduced strength (up to −10 at 0 HP). River: a melee attacker
-  // crossing a river edge into the defender's tile takes −5.
   const atkCS = def.combat - woundPenalty(attacker) - (crossesRiver(from, target) ? RIVER_ATTACK_PENALTY : 0);
 
   if ((defDef?.combat ?? 0) <= 0) {
-    // A melee attack on a lone civilian CAPTURES it — no combat
-    // roll (draw-count neutral). Seat 0 and seat attackers flip the
-    // defender to their side in place (movesLeft=0, hp and charges kept,
-    // unit stays on its tile); the attacker spends its attack but does NOT
-    // advance (single-occupancy model). Barbarians still merely kill — no
-    // prisoner/camp system is modeled (recorded simplification).
     if (isBarbSeat(attacker.seat)) {
       killUnit(state, defender, seat);
     } else {
@@ -678,19 +569,12 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
       return ok;
     }
   } else {
-    // Flanking helps the attacker, support helps the defender. Applied
-    // ONCE so both paired rolls see the same adjusted CS. DefenderCS
-    // folds in support AND the embarked-defender override (flat CS, no terms).
-    // Attacker veterancy joins the flank term; defenderCS folds in the
-    // defender's own level bonus. Applied once so both paired rolls agree.
     const atkCSf = atkCS + FLANKING_CS * flankCount(state, targetIndex, attacker, defender) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex); // B6-S1 + B7-G (B-8): aura keyed on the ATTACKER's own tile
     const defCSf = defenderCS(state, defender, targetIndex);
     defender.hp -= damageRoll(state, atkCSf - defCSf, 'mel', targetIndex);
     attacker.hp -= damageRoll(state, defCSf - atkCSf, 'melc', targetIndex);
     gainXp(attacker, XP_ATTACK); // B-4: +5 for the attack executed
     awardDefenseXp(defender); // B-4: +2 to a surviving military defender
-    // Scored on the TARGET's tile, before either death is applied —
-    // both sides pay, and the loser pays 3 bases more.
     warWearinessBattle(state, attacker.seat, defender.seat, targetIndex,
       { aDied: attacker.hp <= 0 && defender.hp > 0, dDied: defender.hp <= 0 });
     if (defender.hp <= 0) {
@@ -703,7 +587,6 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     }
   }
   attacker.movesLeft = 0;
-  // Advance into the tile if it's now free for us.
   if (state.units.includes(attacker) && tileFreeForUnit(state, targetIndex, 0, attacker)) {
     attacker.tileIndex = targetIndex;
     clearCampFor(state, attacker, targetIndex, seat); // P5/S7 (C-3): every seat clears it
@@ -711,7 +594,6 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   return ok;
 }
 
-/** Ranged attack within the unit's range (no retaliation taken). */
 
 /** the COMMIT seam for rangedAttack. The resolver returns early on a
  *  dozen refusals; logging inside it would record ATTEMPTS, and an attempt is
@@ -740,8 +622,6 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     return no('Out of range.');
   }
   const enemies = unitsAt(state, targetIndex).filter((u) => unitsHostile(state, attacker, u));
-  // City-first over a MILITARY garrison; a lone civilian still
-  // takes the shot (see meleeAttack for the rule and its seed-9053 precedent).
   if (enemies.length === 0 || enemies.some((u) => unitDomain(u.type) === 'military')) {
     // Ranged units CAN bombard cities — same fallback
     // chain as meleeAttack (seat city, then city-state center), one roll,
@@ -782,33 +662,18 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
       return ok;
     }
   }
-  // No city took the shot — fall through to the unit, or bail.
   if (enemies.length === 0) return no('Nothing to attack there.');
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
-  // support (no flanking: a ranged attacker takes no
-  // retaliation). DefenderCS applies the embarked-defender override.
   const defCS = defenderCS(state, defender, targetIndex);
   defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rng', targetIndex); // B6-S1 + B7-G (B-8)
   gainXp(attacker, XP_ATTACK); // B-4: +5 for the ranged attack executed
   awardDefenseXp(defender); // B-4: +2 to a surviving military defender (civilians excluded)
-  // "the target location is always the location, including for
-  // ranged units" — a ranged attacker takes no retaliation but wearies all the
-  // same, at the multiplier of the tile it FIRED ON, not the one it stands on.
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
   if (defender.hp <= 0) killUnit(state, defender, seat);
   attacker.movesLeft = 0;
   return ok;
 }
 
-/**
- * A hostile RANGED unit strikes — one roll, no retaliation, no
- * advance (rangedAttack's shape from the attacker's seat). A SEAT 0 city
- * takes the hit first even with a garrison (meleeAttack's city precedence)
- * and holds at 1 HP — ranged fire never captures; else the units on the
- * tile (military first; civilians take the roll too, rangedAttack's
- * convention, not the melee roll-free kill). Any other civ's center tile
- * is the same no-op quirk as the melee scan: nothing happens, no MP spent.
- */
 export function hostileRangedStrike(state: GameState, attacker: Unit, targetIndex: number): void {
   const seat = attacker.seat;
   const def = UNITS[attacker.type];
@@ -844,8 +709,6 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   );
   if (enemies.length === 0) return; // the CITY_CENTER quirk: a no-op, like meleeAttack's `no(...)`
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
-  // support (no flanking: a ranged strike takes no
-  // retaliation). DefenderCS applies the embarked-defender override.
   const defCS = defenderCS(state, defender, targetIndex);
   defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'vrng', targetIndex); // B6-S1 + B7-G (B-8)
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 }); // #51/S7.8f
@@ -855,7 +718,6 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   attacker.movesLeft = 0;
 }
 
-/** Tiles this unit can attack right now (UI helper). */
 export function attackTargets(state: GameState, unit: Unit): number[] {
   const def = UNITS[unit.type];
   if (!def || def.combat <= 0 || unit.movesLeft <= 0) return [];
@@ -866,18 +728,9 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
   for (const t of state.map.tiles) {
     const d = hexDistance(from.col, from.row, t.col, t.row);
     if (d < 1 || d > range) continue;
-    // A seat's RANGED unit does NOT engage enemy units
-    // (ranged-vs-seat scope-out — melee the other seats fight the other seats; own/barb
-    // targets unchanged). def.ranged marks a ranged attacker.
     const hasEnemy = unitsAt(state, t.index).some(
       (u) => unitsHostile(state, unit, u) && !(def.ranged && isCiv(unit.seat) && isCiv(u.seat)),
     );
-    // A CITY CENTRE is a target when the seat HOLDING it is at war with this
-    // unit. One rule, whoever attacks and whoever holds — a unit never targets
-    // its own centre, because a seat is never at war with itself.
-    //
-    // Ranged bombards at its full range; melee must be
-    // adjacent. BARBARIANS need no war (`caps.alwaysHostile`) and always melee.
     const holder = cityAtIndex(state, t.index);
     const cityTarget =
       holder !== undefined &&
@@ -897,17 +750,12 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
       !def.ranged &&
       cityStateAttackable(state, cityStateHere, unitSeat(unit));
 
-    // An adjacent live enemy Encampment is a melee target — the
-    // only way to open its tile. Ranged-vs-district stays out of scope.
     const encampTarget = d === 1 && !def.ranged && encampmentBlocks(state, t, unit);
     if (hasEnemy || cityTarget || cityStateTarget || encampTarget) out.push(t.index);
   }
   return out;
 }
 
-// ---------------------------------------------------------------------------
-// Seat cities: siege and capture
-// ---------------------------------------------------------------------------
 
 function attackCity(state: GameState, attacker: Unit, holder: Seat, city: City, seat: number): void {
   cityAssault(state, attacker, city, 'rcty', 'rctyc', seat);
@@ -919,35 +767,26 @@ function attackCity(state: GameState, attacker: Unit, holder: Seat, city: City, 
   if (unitsAt(state, city.centerIndex).some((u) => unitsHostile(state, attacker, u))) return;
   const captor = seatOf(state, attacker.seat);
   if (captor && !isBarbSeat(attacker.seat)) {
-    // The conqueror plunders 40 gold, but only on a REAL
-    // transfer — the raze at the city cap returns false and pays nothing.
     if (transferCity(state, holder.seat, captor, city, 'conquered')) {
       captor.treasury = (captor.treasury ?? 0) + 40;
     }
   } else {
-    // A sack is a gold loss (milli-rounded 20%, cap 100) and the pillage ring,
-    // not just the pop hit.
     sackCity(state, city, holder.seat);
     state.eventLog.push(`Barbarians sacked ${city.name} (${holder.name}).`);
   }
 }
 
-/** Seat 0 siege of a city-state (attacking it IS the declaration of war). */
 function attackCityState(state: GameState, attacker: Unit, cityState: CityState, seat: number): void {
   const atkCS = assaultAtkCS(state, attacker, cityState.centerIndex);
   const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0);
   cityState.hp = (cityState.hp ?? CITY_STATE_MAX_HP) - damageRoll(state, atkCS - defCS, 'csty', cityState.centerIndex);
   attacker.hp -= damageRoll(state, defCS - atkCS, 'cstyc', cityState.centerIndex);
-  // Warring a city-state wearies you exactly as warring a major
-  // does. The minor keeps no accumulator of its own (no amenities, no research
-  // to date an era from) — see holdsWeariness.
   warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), cityState.centerIndex,
     { aDied: attacker.hp <= 0, city: true });
   attacker.movesLeft = 0;
   gainXp(attacker, XP_ATTACK); // B-4: +5 for the attack executed
   if (attacker.hp <= 0) killUnit(state, attacker, seat);
   if ((cityState.hp ?? 0) <= 0) {
-    // A seat conqueror lands the CS as its own city.
     if (isCiv(attacker.seat)) {
       const civSeat = seatOf(state, attacker.seat);
       if (civSeat) captureCityStateFor(state, civSeat, cityState);
@@ -957,16 +796,12 @@ function attackCityState(state: GameState, attacker: Unit, cityState: CityState,
   }
 }
 
-/** Conquest of a city-state: it joins your empire; its envoys die with it. */
 export function captureCityState(state: GameState, cityState: CityState, seat: number): void {
   state.cityStates = state.cityStates.filter((c) => c.id !== cityState.id);
-  // A route dies with its endpoint, for whichever seat holds it.
   for (const sx of state.seats) {
     sx.tradeRoutes = sx.tradeRoutes?.filter((x) => x.toCs !== cityState.id);
   }
   const center = state.map.tiles[cityState.centerIndex];
-  // The slot cap applies here too: a full empire RAZES the city-state instead
-  // of annexing it, the capture path's exact rule.
   if (seatOf(state, seat)!.cities.length >= 6) {
     for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
       if (tileSeat(t) === seatOfCityState(cityState.id)) setTileOwner(t, NO_SEAT);
@@ -979,7 +814,6 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
   const id = captor.nextCityId++;
   for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
     if (tileSeat(t) === seatOfCityState(cityState.id)) {
-      // keep an existing claim where there is one, else take the tile
       setTileOwner(t, seat, tileSeat(t) === seat ? tileCity(t) : id);
     }
   }
@@ -1014,10 +848,6 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
   state.eventLog.push(`${cityState.name} conquered — the city-state joins your empire.`);
 }
 
-/** seat conquest of a city-state — the captureCityState twin on the
- * seat seat (join-the-suzerain's-war). Pop ×0.75 floor 1, the ring-2 cityStateId
- * territory re-tags to the new civCity, envoys die with the CS, the
- * MAX_CITIES_PER_SEAT raze rule, routes pruned with the endpoint. */
 export function captureCityStateFor(state: GameState, actor: Seat, cityState: CityState): void {
   state.cityStates = state.cityStates.filter((c) => c.id !== cityState.id);
   for (const sx of state.seats) {
@@ -1037,7 +867,6 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
       setTileOwner(t, actor.seat, id); // A-17: the claim registers to the new civCity
     }
   }
-  // Every captor reveals around the taken city (the seat-0 arm's rule).
   revealAround(state, actor.seat, cityState.centerIndex, 3);
   center.district = 'CITY_CENTER'; // #70 HUNT: the captureCityState twin — see the note there
   actor.cities.push({
@@ -1065,22 +894,13 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
 }
 
 
-// ---------------------------------------------------------------------------
-// Barbarians
-// ---------------------------------------------------------------------------
 
 function campCandidates(state: GameState): Tile[] {
   const preferFog = state.fogOfWar;
   return state.map.tiles.filter((t) => {
     if (isWater(t) || isImpassable(t) || t.wonder || t.district || t.builtWonder) return false;
-    // CLAIMED ground is out, whoever claimed it. The majors half used to be
-    // spelled `isCiv(tileSeat(t))` and the city-state half `tileForeignTo(t,
-    // seat)` with a seat nobody chose — the same predicate wearing a seat
-    // argument, since a minor's tile is foreign to every major alike.
     if (tileClaimed(t) || t.goodyHut) return false;
     if (preferFog && !unexploredByAll(state, t.index)) return false; // camps rise in the fog
-    // Camps rise away from EVERY civilization's cities. Whose
-    // city it is does not enter the spacing rule.
     for (const c of allCities(state)) {
       const ct = state.map.tiles[c.centerIndex];
       if (hexDistance(ct.col, ct.row, t.col, t.row) < 5) return false;
@@ -1097,18 +917,11 @@ function barbUnits(state: GameState): Unit[] {
   return state.units.filter((u) => isBarbSeat(u.seat));
 }
 
-/**
- * One hostile unit's turn against the seat 0: attack > pillage > advance.
- * Shared by barbarian raiders and at-war units.
- */
 export function hostileUnitAct(state: GameState, unit: Unit): void {
   const seat = unit.seat;
   const map = state.map;
   const tile = () => map.tiles[unit.tileIndex];
 
-  // 1. Attack anything hostile in reach (seat 0 or, for barbarians, the other seats too).
-  // Ranged units strike (one roll, no retaliation) instead of
-  // meleeing — attackTargets already scanned at their full range.
   const targets = attackTargets(state, unit);
   if (targets.length > 0) {
     if (UNITS[unit.type]?.ranged) hostileRangedStrike(state, unit, targets[0]);
@@ -1122,12 +935,6 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   // BARBARIANS raid foreign improvements too; raiders keep pillaging
   // the seat 0 only (they never war the other seats).
   const here = tile();
-  // A seat pillages/raids SEAT 0 tiles only while at war with
-  // the seat 0 (barbarians always); a seat-only-war seat leaves the neutral
-  // seat 0's improvements alone. Seat-foreign improvements pillage is out of
-  // scope (residual) — enemy TILES are never a pillage/march target here.
-  // Pillage any CIV's improvement this unit is at war with. Barbarians are
-  // hostile to everyone, so they need no war state.
   const hereOwned = isCiv(tileSeat(here))
     && (isBarbSeat(unit.seat) || civsAtWar(state, unitSeat(unit), tileSeat(here)));
   if (here.improvement && !here.pillaged && hereOwned) {
@@ -1138,10 +945,6 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     unit.movesLeft = 0;
     return;
   }
-  // Else pillage the district underfoot — a COMPLETE, non-
-  // CITY_CENTER, unpillaged enemy district (seat 0 districts for any raider,
-  // seat districts for barbarians too). No heal, no loot
-  // (v1 — matches yield-type pillages bank nothing).
   if (
     here.district !== null &&
     here.district !== 'CITY_CENTER' &&
@@ -1154,8 +957,6 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     return;
   }
 
-  // 3. March toward the nearest unpillaged improvement OR district (the
-  // union), else nearest city.
   let target: Tile | null = null;
   let bestDist = 13;
   for (const t of map.tiles) {
@@ -1180,13 +981,6 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   // (real Civ 6), and a unit standing on one could never attack it (d>=1).
   const marchOnto = target !== null;
   if (!target) {
-    // The nearest city this unit is HOSTILE TO, over every
-    // civ seat. Barbarians march on anyone (`caps.alwaysHostile`); everyone
-    // else needs a declared war, which also excludes their own cities.
-    //
-    // Ordering is distance-major, then the LOWEST seat id, then the centre
-    // tile index — one total order, so the pick never depends on which seat
-    // is asking.
     let best: Tile | null = null;
     let bestKey = Infinity;
     for (const other of state.seats) {
@@ -1206,18 +1000,6 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     target = best;
   }
   if (!target) return;
-  // CIV SEAT and BARBARIAN units both walk the march on REAL
-  // MP — each step re-picks the passable free neighbor closest to the (fixed)
-  // target, moves only if strictly closer, and pays walkPath's exact charge
-  // (tile cost + 3 per river crossing; a full-MP unit always affords its first
-  // step). Any step spends MP (movesLeft < full blocks the heal).
-  // EMBARK: the war-march is the ONLY v1 surface where a scripted mover
-  // may take WATER steps. tileFreeForUnit(..., allowEmbark, 0) composes the embark
-  // gate (an at-war seat MILITARY unit whose owner has SHIPBUILDING — canEmbark)
-  // and the ocean gate (CARTOGRAPHY). Barbarians own no tech, so canEmbark is
-  // false for them and the shared walker stays land-only. `embarkState.live` is
-  // the N1 master switch (default false → land-only, gates byte-identical); N2
-  // flips it true with the embarked-combat + peace-act package.
   const allowEmbark = embarkState.live;
   for (;;) {
     const at = tile();
@@ -1301,15 +1083,8 @@ function barbScoutType(): string {
   return 'SCOUT';
 }
 
-/** Camps spawn, garrison, raid. Nothing city-side runs here: a city fires
- *  and heals in its OWNER's seatPhase block, through the one body every
- *  seat shares. */
 export function barbarianPhase(state: GameState): void {
   const map = state.map;
-  // Barbarians get their movement in their own phase (self-contained for
-  // tests/RL). Through the SAME contract every other seat uses.
-  // Through `unitFullMoves` like every other seat, so a rule that ever gives
-  // the hostile class a dedication or an embark pool reaches it too.
   for (const u of state.units) {
     if (!isBarbSeat(u.seat)) continue;
     u.movesLeft = unitFullMoves(state, u) + generalAuraMP(state, u);
@@ -1317,25 +1092,16 @@ export function barbarianPhase(state: GameState): void {
   }
   const maxCamps = Math.max(1, Math.floor(map.tiles.filter((t) => !isWater(t)).length / 120));
 
-  // New camp? ANY live civilization sustains the barb world —
-  // the other seats count, not just the seat 0 (the roll-gate short-circuit is part
-  // of the draw-count contract; both engines change together).
   const anyCivCity = state.seats.some((sx) => sx.cities.length > 0);
   if (anyCivCity && state.barbSeat.camps.length < maxCamps && nextRandom(state) < 0.08) {
     const candidates = campCandidates(state);
     if (candidates.length > 0) {
       const spot = candidates[Math.floor(nextRandom(state) * candidates.length)];
       state.barbSeat.camps.push(spot.index);
-      // The SCOUT opener is INERT behind BARB_SCOUT_OPENER_LIVE. Everything it
-      // needs is in — barbScoutType, the barb u_type column, the type-aware
-      // barb march — but flipping it splits the two engines' barb counts late
-      // in a game, a death/gate difference that needs its own diagnosis.
-      // Flipping it means dropping the guard, nothing else.
       spawnUnit(state, BARB_SCOUT_OPENER_LIVE ? barbScoutType() : barbMeleeType(state.turn), spot.index, BARB_SEAT);
     }
   }
 
-  // Garrisons + raiders.
   const barbs = barbUnits(state);
   // Indexed loop (identical iteration ORDER, so no draw-order change)
   // because the ranged ladder keys off the camp's INDEX, not its tile.
@@ -1352,12 +1118,6 @@ export function barbarianPhase(state: GameState): void {
       barbUnits(state).length < state.barbSeat.camps.length * MAX_BARB_PER_CAMP &&
       nextRandom(state) < 0.1
     ) {
-      // Every third camp raids RANGED, the rest melee.
-      // NAVAL barbarians — every FOURTH camp (a different
-      // residue, so it never collides with the ranged rule) puts out a hull
-      // instead, when it is COASTAL and has a free adjacent water tile. The
-      // spot is the LOWEST-index free water neighbour, so this is zero-draw:
-      // the 0.1 roll above already fired and nothing else is consulted.
       const water = neighbors(map, map.tiles[campIdx])
         // A tech-less barbarian cannot enter OCEAN (waterEnterable gates it on
         // CARTOGRAPHY), so only COAST/LAKE count — otherwise spawnUnit's own
@@ -1379,7 +1139,6 @@ export function barbarianPhase(state: GameState): void {
     }
   }
 
-  // Raider actions: everyone but one guard per camp marches.
   const guards = new Set<number>();
   for (const campIdx of state.barbSeat.camps) {
     const camp = map.tiles[campIdx];
@@ -1395,10 +1154,4 @@ export function barbarianPhase(state: GameState): void {
     if (unit.movesLeft > 0) hostileUnitAct(state, unit);
   }
 
-  // A city's WALLS strike, its Encampment strike and its unbesieged heal used
-  // to run HERE for the seat passed in, while every OTHER seat's ran per city
-  // inside its own seatPhase block — so seat 0's cities fired and healed
-  // twice a turn and every other seat's once. Both engines now run one body,
-  // at the per-city seatPhase position, for every seat. Nothing city-side
-  // belongs in the barbarian phase.
 }

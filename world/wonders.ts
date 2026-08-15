@@ -1,43 +1,16 @@
-/**
- * Natural wonders (a recognizable base-game subset). Wonder tiles can never be
- * improved, districted or settled;
- * passable ones are workable with the yields below. Holy Sites get +2 faith
- * adjacency from any adjacent natural wonder (see districts.ts).
- *
- * SOURCING SWEEP, all against the GS CIVILOPEDIA directly:
- *   CRATER_LAKE  corrected faith 4 -> 5 ("+5 Faith, +1 Science") — CONFIRMED
- *   DEAD_SEA     +2 Faith / +2 Culture — correct as written
- *   PANTANAL     +2 Food / +2 Culture — correct as written
- *
- * YOSEMITE is `impassable: true` with
- * `adjacentYields: { gold: 1, food: 1, science: 1 }` and no own-tile yield,
- * matching the Civilopedia.
- * Its "+2 Appeal to neighbouring tiles" is NOT modelled: appeal credits any
- * adjacent natural wonder +2 generically (core/appeal.ts), so Yosemite already
- * gets the right appeal by the general rule and needs no per-wonder term.
- *
- * The remaining eight wonders are NOT yet sourced individually; NARROWED marker.
- */
 
 import type { TerrainId, Yields } from './types';
 
 export interface NaturalWonderDef {
   id: string;
   name: string;
-  /** Short code drawn on the map. */
   code: string;
-  /** Number of contiguous tiles. */
   size: number;
   impassable: boolean;
-  /** Terrain the wonder tiles are converted to (e.g. lakes). */
   becomesTerrain?: TerrainId;
-  /** Yields of each wonder tile (workable only if passable). */
   tileYields: Partial<Yields>;
-  /** Bonus yields granted to all adjacent (non-wonder) tiles. */
   adjacentYields?: Partial<Yields>;
-  /** Adjacent tiles get their base terrain yields doubled (Torres del Paine). */
   doublesAdjacentTerrain?: boolean;
-  /** Placement requirements for the anchor tile. */
   spawn: {
     water?: boolean; // must be coast water
     terrains?: TerrainId[]; // for land wonders
@@ -149,13 +122,6 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
     name: 'Yosemite',
     code: 'YO',
     size: 2,
-    // Sourced from the Civilopedia
-    // (features/feature_yosemite) — "+1 Gold, +1 Food, and +1 Science to
-    // adjacent tiles" and "impassable — units cannot enter this two-tile
-    // natural wonder". Was `impassable: false` paying { gold, science } on its
-    // OWN tile: wrong on passability, wrong channel, and missing the Food.
-    // The recorded note claimed this needed a NEW adjacency channel; it did
-    // not — `adjacentYields` already exists and five other wonders use it.
     impassable: true,
     tileYields: {},
     adjacentYields: { gold: 1, food: 1, science: 1 },
@@ -196,7 +162,6 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
   },
 };
 
-/** How many wonders to place per map size (scaled by tile count). */
 export function wonderQuota(width: number, height: number): number {
   return Math.max(2, Math.round((width * height) / 1000));
 }

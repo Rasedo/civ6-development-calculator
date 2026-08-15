@@ -1,8 +1,3 @@
-/**
- * One-time yield lumps: chop (feature removal) and harvest (bonus resource
- * removal) values, and the routing of lump yields into the right sinks.
- * Lives outside game.ts so units.ts can use it without an import cycle.
- */
 
 import { seatOf, tileSeat, cityAtTile } from './seats';
 
@@ -26,17 +21,14 @@ export interface LumpGrant {
   amount: number;
 }
 
-/** What chopping this tile's feature would grant (null = nothing). */
 export function chopGrant(state: GameState, tile: Tile, seat: number): LumpGrant | null {
   if (!tile.feature) return null;
   const key = FEATURES[tile.feature]?.chopYield;
   if (!key) return null;
-  // A chop only pays the seat whose borders the tile is in.
   if (tileSeat(tile) !== seat) return null;
   return { key, amount: chopValue(state, seat) };
 }
 
-/** What harvesting this tile's bonus resource would grant (null = not harvestable). */
 export function harvestGrant(state: GameState, tile: Tile, seat: number): LumpGrant | null {
   if (!tile.resource) return null;
   const res = RESOURCES[tile.resource];
@@ -50,11 +42,6 @@ export function harvestGrant(state: GameState, tile: Tile, seat: number): LumpGr
   return { key: res.harvestYield, amount: chopValue(state, seat) };
 }
 
-/**
- * Route a lump yield into the empire: food/production stay local to the
- * owning city (production banks if the queue is empty), the rest go to
- * empire pools. `tileIndex` locates the owning city.
- */
 export function applyLumpYield(
   state: GameState,
   tileIndex: number,
@@ -62,8 +49,6 @@ export function applyLumpYield(
   seat: number,
 ): void {
   const { key, amount } = grant;
-  // The four EMPIRE sinks are the seat's own. `City = City`, so
-  // the city sinks below already take either without a branch.
   const s = seatOf(state, seat);
   if (!s) return;
   if (key === 'gold') {
@@ -90,7 +75,6 @@ export function applyLumpYield(
     city.foodBox += amount;
     return;
   }
-  // production: into the current build, else banked until something is queued
   if (city.queue.length > 0) {
     city.queue[0].progress += amount;
   } else {

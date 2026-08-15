@@ -39,9 +39,6 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def _q_eq(a, b, scale: int) -> bool:
-    """Quantised equality, elementwise over nested lists — the same
-    quantisation the digests fold, so a dump diff and a digest mismatch always
-    agree about whether two values differ."""
     if isinstance(a, list) or isinstance(b, list):
         if not (isinstance(a, list) and isinstance(b, list)) or len(a) != len(b):
             return False
@@ -50,9 +47,6 @@ def _q_eq(a, b, scale: int) -> bool:
 
 
 def digest_diff(man: dict, gdig: dict, tdig: dict | None) -> tuple[list[str], list[str]]:
-    """Compare the two engines' per-group digests. Returns (bad group names,
-    report lines). Row-count disagreement is reported as itself: a missing row
-    and a drifted field are different findings."""
     bad: list[str] = []
     reps: list[str] = []
     for g in man["groups"]:
@@ -118,9 +112,7 @@ def _buy_row(sim, seat: int, bc: dict, rk, rj, b: int) -> list:
 
 
 def _buy_rows(sim, seat: int) -> list:
-    """The tripwire rows for every batch row of one seat (reads _buy_ctx +
-    pick_faith once)."""
-    bc = drive._buy_ctx(sim, seat)  # ABSOLUTE row — seat 0 has the same buy verbs
+    bc = drive._buy_ctx(sim, seat)
     _, rk = ladder.pick_faith(bc["worship_ok"], bc["missionary_ok"], bc["apostle_ok"])
     rj = torch.where(rk == 5, bc["missionary_j"],
                      torch.where(rk == 6, bc["apostle_j"], torch.full_like(rk, -1)))
@@ -128,7 +120,6 @@ def _buy_rows(sim, seat: int) -> list:
 
 
 def _field_name(i: int, S: int, n_opponents: int, C: int, NT: int, NC: int) -> str:
-    """Index -> block.field, from the ladder layout (the ONE derivation)."""
     if i < ladder.EMP:
         return f"empire.{ladder.EMP_FIELDS[i]}"
     i -= ladder.EMP
@@ -180,7 +171,6 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     classes = ladder.prod_classes(NB, sim.NU, len(sim._scaffold), sim._wond_n if sim.districts_on else 0, len(sim._proj_rows) if sim.districts_on else 0)
     rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
     roster = ladder.unit_roster(rj["units"])
-    # The extractor sets are checked against the manifest before a turn runs.
     sc_man = statecompare.load_manifest()
     statecompare.check_extractors(sc_man)
     dig_dumped = False
@@ -189,8 +179,6 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     NT, NC = sim.civ_techs.shape[2], sim.civ_civics.shape[2]
     ctx_lo = env.observe(1).shape[1] - ladder.CTX_SEAT
 
-    # Resume restores the GPU from its turn-T snapshot BEFORE the children
-    # spawn; each child gets its own dumped GameState to reload.
     t0 = 0
     if ckpt_every or resume:
         assert ckpt_dir is not None
@@ -239,7 +227,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
 
     try:
         for t in range(t0, turns):
-            msgs = [read_msg(ch) for ch in children]  # barrier
+            msgs = [read_msg(ch) for ch in children]
             for seat in seats:
                 gobs_all = env.observe(seat)
                 gj_all = drive._builder_jobs(sim, seat).tolist()
@@ -276,8 +264,6 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                             flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit,tileOk,tile,tileC,worshipC,religKind,religC,levy]: GPU {gb_all[b]} vs TS {tb}")
             if bad:
                 break
-            # The geopolitics decide ONCE per turn (the declare scan couples
-            # the seats), stashed GPU-side and merged into every record.
             geo = drive.geo_decide_and_apply(sim)
             # ONE decide body, ONE record shape, every major row, seat 0 first.
             # Seat 0 rides `_decide_turn` like the rest, which also hands it the
@@ -315,13 +301,11 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                                                       statecompare.group_dump(sim, b, gname, sc_man),
                                                       dmp["dumps"][gname]):
                                     print(line)
-                # The state has not moved since the digest, so a dump here IS
-                # the state the digest hashed — that is the resume point.
                 if ckpt_every and (t + 1) % ckpt_every == 0:
                     assert ckpt_dir is not None
                     ch.stdin.write(json.dumps({"ckpt": str(ckpt_dir / f"b_seed{seeds[b]}_t{t + 1}.json")}) + "\n")
                     ch.stdin.flush()
-                    read_msg(ch)  # the write ack — the child holds the turn until acked
+                    read_msg(ch)
                 ch.stdin.write(json.dumps({"go": 1}) + "\n")
                 ch.stdin.flush()
             if ckpt_every and (t + 1) % ckpt_every == 0:
@@ -384,7 +368,7 @@ def main() -> None:
     fx = load_fixture(FIXTURES / f"seed{args.seed}.json")
     env = BatchEnv([fx], rules, device="cpu", dtype=torch.float64)
     sim = env.sim
-    seats = list(range(sim.n_majors))  # every major row, seat 0 first
+    seats = list(range(sim.n_majors))
     NB = sim.rules_dev.b_cost.shape[0]
     classes = ladder.prod_classes(NB, sim.NU, len(sim._scaffold), sim._wond_n if sim.districts_on else 0, len(sim._proj_rows) if sim.districts_on else 0)
     rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
@@ -444,7 +428,6 @@ def main() -> None:
                 child.kill()
                 sys.exit(1)
             diff = (gobs - tobs).abs()
-            # the raw ctx block is exact; the scaled blocks get eps
             bad = torch.zeros_like(diff, dtype=torch.bool)
             bad[:ctx_lo] = diff[:ctx_lo] > args.eps
             bad[ctx_lo:] = diff[ctx_lo:] != 0
@@ -467,7 +450,6 @@ def main() -> None:
             tj = msg.get("jobs", {}).get(str(seat), [])
             ts_ = msg.get("spreads", {}).get(str(seat), [])
             if True:
-                # The same 11-field row as the batched path, every seat.
                 gb = _buy_rows(sim, seat)[0]
                 tb = msg.get("buys", {}).get(str(seat), [])
                 if tb and gb != tb:
@@ -506,8 +488,6 @@ def main() -> None:
                         break
         if obs_bails:
             break
-        # The batched path's twin: geo once, then ONE decide body per major
-        # row in seat order.
         geo = drive.geo_decide_and_apply(sim)
         per_seat = {row: drive._decide_turn(env, sim, row, roster, classes, seeds=[args.seed], turn=t) for row in seats}
         recs = {str(row): {**drive._extract_record(sim, row, *per_seat[row], 0),
@@ -518,7 +498,6 @@ def main() -> None:
         child.stdin.flush()
         sim.step()
         tr = read_msg()
-        # THE DIGEST IS THE GATE — the batched path's twin block.
         if True:
             gdig = statecompare.state_digest(sim, 0, sc_man)
             bad_groups, reps = digest_diff(sc_man, gdig, tr.get("digest"))
@@ -539,11 +518,10 @@ def main() -> None:
                                               statecompare.group_dump(sim, 0, gname, sc_man),
                                               dmp["dumps"][gname]):
                             print(line)
-        # Checkpoint at the same post-digest point as the batched path.
         if args.ckpt_every and (t + 1) % args.ckpt_every == 0:
             child.stdin.write(json.dumps({"ckpt": str(ckpt_dir / f"s{args.seed}_t{t + 1}.json")}) + "\n")
             child.stdin.flush()
-            read_msg()  # the write ack
+            read_msg()
             torch.save({"seed": args.seed, "turn": t + 1, "snap": sim.snapshot()},
                        ckpt_dir / f"s{args.seed}_t{t + 1}.pt")
         child.stdin.write(json.dumps({"go": 1}) + "\n")

@@ -19,55 +19,27 @@
 import type { GreatPersonClass, ResourceCategory, Yields } from '../core/types';
 
 export interface BeliefEffects {
-  /** Extra yields per improvement instance. */
   improvementYields?: Partial<Record<string, Partial<Yields>>>;
-  /** Extra yields on tiles with these features. */
   featureYields?: Partial<Record<string, Partial<Yields>>>;
-  /** Extra yields for improvements sitting on a resource of this category. */
   improvementOnResource?: { category: ResourceCategory; yields: Partial<Yields> };
-  /** Border expansion cost multiplier (0.85 = 15% cheaper). */
   borderCostMult?: number;
-  /** Growth multiplier for all cities. */
   growthMult?: number;
-  /** +GPP per city that has the class's district. */
   gppFlat?: Partial<Record<GreatPersonClass, number>>;
-  /** Holy Site adjacency bonus also yields production (Work Ethic). */
   workEthic?: boolean;
-  /** Extra yields on specific buildings. */
   buildingYields?: Partial<Record<string, Partial<Yields>>>;
-  /** Extra housing on specific buildings. */
   buildingHousing?: Partial<Record<string, number>>;
-  /** +1 amenity in cities with N+ specialty districts (Zen Meditation). */
   amenitiesIfSpecialty?: { min: number; amenities: number };
-  /** Amenity/housing for cities whose center touches a river (River Goddess). */
   riverCity?: { amenities: number; housing: number };
-  /** Faith per completed world wonder in the city (Divine Inspiration). */
   faithPerWonder?: number;
-  /** Founder income per N followers (followers = your total population). */
   perFollowers?: { per: number; yields: Partial<Yields> };
-  /** Founder income per city. */
   perCity?: Partial<Yields>;
-  /** extra holy-center pressure range (Itinerant Preachers). */
   pressureRangeBonus?: number;
-  /** extra yields on each trade route whose DESTINATION city follows
-   * this religion (Messenger of the Gods). */
   tradeReligionYields?: Partial<Yields>;
-  /** +CS in unit-vs-unit combat within JUST_WAR_RANGE tiles of a city
-   * following this religion (Just War). Applies attacking and defending. */
   combatNearFollowing?: number;
-  /** +CS DEFENDING (unit-vs-unit) on a tile owned by a city following
-   * this religion (Defender of the Faith). */
   combatDefendFollowing?: number;
-  /** +CS ATTACKING a unit standing on a tile owned by a city following
-   * this religion (Crusade). */
   combatVsUnitInFollowing?: number;
-  /** extra missionary spread charges (Scripture +1). */
   missionaryChargeBonus?: number;
-  /** multiplier on the SPREAD_PRESSURE lump (Scripture ×1.5 → 15,
-   * integer-exact after Math.round). */
   spreadPressureMult?: number;
-  /** multiplier on the missionary faith price (Holy Order ×0.7 →
-   * round(60·0.7) = 42). */
   missionaryCostMult?: number;
 }
 
@@ -116,18 +88,10 @@ export const PANTHEONS: Record<string, BeliefDef> = Object.fromEntries(
     B('RIVER_GODDESS', 'River Goddess', '+1 amenity and +1 housing in cities whose center is on a river.', {
       riverCity: { amenities: 1, housing: 1 },
     }),
-    // Catalog expansion to the real GS pantheon roster (25 total).
-    // Two land on the improvementOnResource channel; the rest need absent
-    // systems (Holy-Site adjacency, tile appeal, combat, production-toward-X)
-    // and land INERT (empty effects).
     B('GODDESS_OF_FESTIVALS', 'Goddess of Festivals', '+1 culture from improved luxury resources.', {
-      // GS: +1 culture from Plantation/Vineyard luxuries. Degrade: any
-      // improvement on a luxury resource (channel is improvement-agnostic).
       improvementOnResource: { category: 'luxury', yields: { culture: 1 } },
     }),
     B('RELIGIOUS_IDOLS', 'Religious Idols', '+2 faith from improved bonus resources.', {
-      // GS: +2 faith from Mines/Quarries over bonus & luxury resources.
-      // Degrade: bonus category only, improvement-agnostic.
       improvementOnResource: { category: 'bonus', yields: { faith: 2 } },
     }),
     B('CITY_PATRON_GODDESS', 'City Patron Goddess', '+25% production toward districts in cities without one.', {}),
@@ -165,9 +129,6 @@ export const FOLLOWER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
     B('DIVINE_INSPIRATION', 'Divine Inspiration', '+2 faith from each world wonder in the city.', {
       faithPerWonder: 2,
     }),
-    // Real GS follower beliefs whose effects need absent systems
-    // (faith-purchase of non-worship buildings, relics/tourism, unique units)
-    // — land INERT.
     B('JESUIT_EDUCATION', 'Jesuit Education', 'May purchase Campus and Theater Square buildings with faith.', {}),
     B('RELIQUARIES', 'Reliquaries', 'Triple faith and tourism from relics.', {}),
     B('WARRIOR_MONKS', 'Warrior Monks', 'May train Warrior Monks (a religious melee unit).', {}),
@@ -188,17 +149,10 @@ export const FOUNDER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
     B('CHURCH_PROPERTY', 'Church Property', '+2 gold for each city following your religion.', {
       perCity: { gold: 2 },
     }),
-    // Real GS founder beliefs to 8 total. Two land on existing
-    // channels (perCity, buildingYields); two need absent systems (city-state
-    // envoy influence, allied bonuses) and land INERT. Recorded in the log.
     B('PILGRIMAGE', 'Pilgrimage', '+2 faith for each city following your religion.', {
-      // GS: +2 faith per FOREIGN city following. Degrade: perCity applies to
-      // all cities following (the engine has no foreign-follower split yet).
       perCity: { faith: 2 },
     }),
     B('STEWARDSHIP', 'Stewardship', '+1 science from Libraries/Universities and +1 gold from Markets/Banks.', {
-      // GS: gated on a Governor + religion-following. Degrade: applies to the
-      // founder civ's cities unconditionally via the buildingYields channel.
       buildingYields: {
         LIBRARY: { science: 1 }, UNIVERSITY: { science: 1 },
         MARKET: { gold: 1 }, BANK: { gold: 1 },
@@ -245,7 +199,6 @@ export const ENHANCER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
   ].map((b) => [b.id, b]),
 );
 
-/** Worship buildings: exactly one is unlocked by founding (seat 0's pick). */
 export const WORSHIP_BUILDINGS = ['CATHEDRAL', 'GURDWARA', 'MEETING_HOUSE', 'PAGODA', 'STUPA'];
 
 export const RELIGION_NAMES = [
@@ -260,22 +213,14 @@ export const PANTHEON_FAITH_COST = 25;
  * Itinerant Preachers adds its pressureRangeBonus to THIS religion's
  * radius (per-religion range in spreadReligiousPressure). */
 export const RELIGION_PRESSURE_RANGE = 10;
-/** Just War's "near" radius — unit-vs-unit combat within this many
- * tiles (hex distance from the BATTLE tile = the defender's tile) of a city
- * following the participant's religion. */
 export const JUST_WAR_RANGE = 3;
-/** integer pressure added per in-range turn (integer keeps the flip
- * comparison exact — no float association across the batch). */
 export const RELIGION_PRESSURE_PER_TURN = 1;
 /** the lump a missionary SPREAD adds to the target city's accumulator
  * for its owner religion — a decade of ambient (+1/turn), so a spread flips
  * decisively but ambient can re-erode. Real Civ 6 spreads ~200 vs ~30/turn
  * ambient; same ratio class. SCRIPTURE multiplies ×1.5 → 15 (integer). */
 export const SPREAD_PRESSURE = 10;
-/** max LIVE missionaries per civ (the seat buy gate). */
 export const MISSIONARY_CAP = 2;
-/** live APOSTLE cap per civ — apostles are the expensive combat
- * arm, so one at a time keeps the faith ladder from starving worship buys. */
 export const APOSTLE_CAP = 1;
 /**
  * THE APOSTLE HUNT RECORD (#71; the buy is a wire decision since #104 —
@@ -330,13 +275,8 @@ export const APOSTLE_CAP = 1;
 export const CITY_RELIGION_ADDER_LIVE = true;
 
 export const THEO_DAMAGE = 2;
-/** Flat damage both sides take before the strength difference is applied. */
 export const THEO_BASE_DAMAGE = 30;
-/** Cities within this range of the fallen unit feel the pressure swing. */
 export const THEO_PRESSURE_RANGE = 6;
-/** Pressure the winner's religion gains (and the loser's sheds) in cities
- * within SPREAD/PRESSURE range when a religious unit dies in theological
- * combat. */
 export const THEO_PRESSURE_SWING = 15;
 
 /**

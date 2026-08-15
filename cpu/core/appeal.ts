@@ -26,19 +26,9 @@ import { neighbors } from '../../world/hex';
 import { isMountain } from '../../world/query';
 
 export function tileAppeal(map: GameMap, tile: Tile): number {
-  // A NATURAL WONDER tile is a fixed 5 and a MOUNTAIN tile a fixed
-  // 4, and NEITHER is affected by its neighbours — adjacency does not reach
-  // them at all. (The Civilopedia's terser "+4 if the tile is on a Mountain"
-  // reads as additive; that is the wrong reading. Only BLANKET AURAS —
-  // Eiffel Tower, Golden Gate Bridge, Alvar Aalto, Charles Correa — modify
-  // these, because they overwrite the tile's own property rather than sending
-  // an adjacency signal. None of those are modelled here, so the values are
-  // final; when one is added it must apply ON TOP of these, not through the
-  // neighbour loop.)
   if (tile.wonder) return 5;
   if (isMountain(tile)) return 4;
   let appeal = 0;
-  // "+1 if the tile is on a River or Lake" — ON-TILE, not adjacent.
   if (tile.riverMask !== 0 || tile.terrain === 'LAKE') appeal += 1;
   for (const n of neighbors(map, tile)) {
     if (n.wonder) appeal += 2;
@@ -58,7 +48,6 @@ export function tileAppeal(map: GameMap, tile: Tile): number {
 
 export interface AppealTier {
   name: string;
-  /** Housing a Neighborhood provides at this appeal. */
   housing: number;
 }
 

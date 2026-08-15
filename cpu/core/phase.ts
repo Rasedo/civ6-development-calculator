@@ -1,10 +1,3 @@
-/**
- * Scripted seat civilizations: real cities, territory and units on the map,
- * with real production queues, research, maintenance, housing and border
- * culture underneath. They settle, grow, expand borders, race you for great
- * people, pantheons and beliefs, and can declare (or receive) war — at-war
- * units raid like barbarians, and cities can be conquered.
- */
 
 import type { City, DistrictId, GameState, ImprovementId, SeatActionRecord, Seat, Tile, Unit } from './types';
 import { advanceGreatPeople } from './greatPeople';
@@ -21,7 +14,6 @@ import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefe
 import { availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { getModifiers } from './effects';
- // Seat specialist yields
 import { routeYields, cityStateRouteYields, TRADE_ROUTE_RANGE, TRADE_ROUTE_DURATION, tradeCapacity } from './trade';
 import { addEnvoys, hasMet, isSuzerain, issueQuest, questSatisfied, setMet } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS } from '../data/cityStates';
@@ -52,14 +44,11 @@ import { districtAdjacency } from './yields';
 import { SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex } from './unitActions';
 
-/** The FOUND_CITY column, resolved by NAME from the shared enum. */
 const A_FOUND_CITY = unitActionIndex(IMPROVEMENT_IDS).FOUND_CITY;
 import { ALLY_MIN_PEACE, CIV_LEADERS, FORMAL_WAR_MIN_TURNS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION } from '../data/seats';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles, goldenBoostBonus } from './eras';
 import { NO_SEAT, atWarWithAny, citiesOf, civHasStrategic, civsAtWar, emptySeat, isCiv, prophetsOf, seatOf, seatOfCityState, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, warTurnsWith, warsOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
-// The two verb bodies the SEAT-0 applier and this one share — one SNIPE ring,
-// one SPREAD rule, whichever seat gave the order.
 import { snipeRing, spreadFromUnit } from './unitOrders';
 
 const ok: RuleResult = { ok: true };
@@ -87,9 +76,6 @@ export const BUY_UNITS: { id: string; tech?: string }[] = [
   { id: 'MUSKETMAN', tech: 'GUNPOWDER' },
 ];
 
-// ---------------------------------------------------------------------------
-// Placement
-// ---------------------------------------------------------------------------
 
 
 
@@ -103,8 +89,6 @@ export function warTargets(state: GameState, seat: number): number[] {
   return state.seats.map((s) => s.seat).filter((s) => s !== seat);
 }
 
-/** How good a city site this tile is: fresh water, then the yields and hills
- *  in its work radius. Negative = not settleable. World generation only. */
 function siteQuality(state: GameState, tile: Tile): number {
   if (isWater(tile) || isImpassable(tile)) return -1;
   if (tile.wonder || tile.feature === 'OASIS' || tile.district) return -1;
@@ -130,7 +114,6 @@ export function nextCityName(actor: Seat): string {
   return n < names.length ? names[n] : `${names[0]} ${n + 1}`;
 }
 
-/** Place `count` seat civs on distant good sites (seeded, deterministic). */
 export function placeSeats(state: GameState, count?: number): void {
   const land = state.map.tiles.filter((t) => !isWater(t) && !isImpassable(t)).length;
   const target = Math.min(
@@ -160,12 +143,6 @@ export function placeSeats(state: GameState, count?: number): void {
 
   picked.forEach((tile, i) => {
     const leader = CIV_LEADERS[i % CIV_LEADERS.length];
-    // THE SEAT ID IS THE APPEND POSITION — `state.seats` IS the storage, so a
-    // new major's id is simply where it lands, the same idiom `loadWorld`
-    // uses. No civ index, and nothing to convert. `emptySeat` supplies every
-    // other field; only the three a leader carries differ, and the twenty
-    // this literal used to restate were `emptySeat`'s own values written
-    // twice.
     const actor: Seat = {
       ...emptySeat(state.seats.length),
       name: leader.name,
@@ -182,9 +159,6 @@ export function placeSeats(state: GameState, count?: number): void {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Queries
-// ---------------------------------------------------------------------------
 
 
 /**
@@ -213,11 +187,6 @@ function nearestDistance(state: GameState, a: number, bs: number[]): number {
   return best;
 }
 
-/**
- * Distance between the closest city pair of TWO seats — Infinity when either
- * holds none. A PAIR question, so it takes both sides: it used to read `actor`
- * for both and answer 0 for anybody holding a city.
- */
 export function seatProximity(state: GameState, a: number, b: number): number {
   const ca = citiesOf(state, a);
   const cb = citiesOf(state, b);
@@ -229,28 +198,18 @@ export function seatProximity(state: GameState, a: number, b: number): number {
   return best;
 }
 
-// ---------------------------------------------------------------------------
-// DIPLOMACY, for any seat against any seat. Per-pair war state over the seat
-// space: `setWar` writes both seats' `wars` lists, so the store is symmetric
-// by construction.
-// ---------------------------------------------------------------------------
 
-/** `actor` declares war on `seat`. Both are ABSOLUTE seats. */
 export function declareWar(state: GameState, actorSeat: number, seat: number): RuleResult {
   const actor = seatOf(state, actorSeat);
   if (!actor) return no('No such civilization.');
   if (civsAtWar(state, actor.seat, seat)) return no('Already at war.');
   setWar(state, actor.seat, seat, true);
   setWarTurnsWith(state, actor.seat, seat, 0);
-  // Declaring earns GRIEVANCES — the same WARMONGER_DOW every declaration
-  // pays, wherever it is entered from.
   seatOf(state, seat)!.warmonger = (seatOf(state, seat)!.warmonger ?? 0) + WARMONGER_DOW;
   state.eventLog.push(`War declared on ${actor.name}!`);
   return ok;
 }
 
-/** `seat` sues `actorSeat` for peace, on THIS war's clock and price. Both are
- *  ABSOLUTE seats. */
 export function sueForPeace(state: GameState, actorSeat: number, seat: number): RuleResult {
   const actor = seatOf(state, actorSeat);
   if (!actor) return no('No such civilization.');
@@ -270,26 +229,12 @@ export function sueForPeace(state: GameState, actorSeat: number, seat: number): 
 
 function makePeace(state: GameState, actor: Seat, foe: number): void {
   setWar(state, actor.seat, foe, false);
-  // the ended war's KIND clears; the grudge stamp is permanent. Here rather
-  // than at one caller, so every peace path sheds it.
   setWarFormal(state, actor.seat, foe, false);
-  // A peace treaty sheds 2000 WWP from THAT war, on both sides.
-  // Deliberately larger than any plausible accumulation — it is how the source
-  // stops a settled war haunting a civ forever, since the residual of a war you
-  // are no longer in has no decay rule of its own.
   warWearinessPeace(state, foe, actor.seat);
   setWarTurnsWith(state, actor.seat, foe, 0);
   actor.peaceTurns = 0;
   const foeSeat = seatOf(state, foe);
   if (foeSeat && 'peaceTurns' in foeSeat) (foeSeat as Seat).peaceTurns = 0;
-  // SOURCED: "making peace with a civ always forces peace with all
-  // city-states they are suzerain of", and a city-state "automatically gets
-  // peace when you stop being at war with their suzerain". A city-state is
-  // dragged into its suzerain's wars and cannot leave one on its own terms, so
-  // this is the ONLY way out of a suzerain-driven war — see
-  // sueForPeaceWithCityState, which refuses while the suzerain is still hostile.
-  // Placed in makePeace, not sueForPeace, so the AI peace path gets it too.
-  // BOTH sides shed the city-states the other dragged in.
   for (const cityState of state.cityStates ?? []) {
     for (const [patron, opponent] of [[actor.seat, foe], [foe, actor.seat]] as const) {
       if (civsAtWar(state, cityState.seat, opponent) && isSuzerain(cityState, patron)) {
@@ -303,7 +248,6 @@ function makePeace(state: GameState, actor: Seat, foe: number): void {
   state.eventLog.push(`Peace with ${actor.name}.`);
 }
 
-/** Levy a militaristic city-state's troops (suzerain only, gold, cooldown). */
 export function levyUnits(state: GameState, cityStateId: number, seat: number): RuleResult {
   const cityState = state.cityStates.find((c) => c.id === cityStateId);
   if (!cityState) return no('No such city-state.');
@@ -326,23 +270,7 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
   return ok;
 }
 
-// ---------------------------------------------------------------------------
-// Loyalty (only in motion while seat civs exist; capitals are immune)
-// ---------------------------------------------------------------------------
 
-/** Per-turn loyalty change for a seat 0 city under seat pressure.
- *  Every pop-pressure contribution scales by the SOURCE civ's age
- *  factor (Dark ×0.5 / Normal ×1 / Golden ×1.5) — factors are halves, so the
- *  sums stay exact in both engines' dtypes. The flip-WINNER pick
- *  (`flipCity`) deliberately stays on RAW pressure (both engines). */
-/**
- * This turn's loyalty change for `city`: nearby population pressure, scaled by
- * each SOURCE seat's age factor, plus the amenity term.
- *
- * OWN pressure is the city's own seat; FOREIGN is every other civ. Each seat's
- * subtotal is scaled by its own age factor before summing, so the halves stay
- * exact.
- */
 export function loyaltyDelta(state: GameState, city: City, amenityTierName: string): number {
   const here = state.map.tiles[city.centerIndex];
   const pressureFrom = (cities: City[]): number => {
@@ -371,22 +299,16 @@ export function loyaltyDelta(state: GameState, city: City, amenityTierName: stri
  * already computed). Returns true when the city has hit 0 and must flip.
  */
 export function applyLoyalty(state: GameState, city: City, amenityTierName: string, govBonus = 0): boolean {
-  // Loyalty only moves while somebody ELSE holds a city to exert pressure.
   if (!state.seats.some((s) => s.seat !== city.seat && s.cities.length > 0)) return false;
   if (city.isCapital) {
     city.loyalty = LOYALTY_MAX;
     return false;
   }
-  // S3: govBonus = GOVERNOR_LOYALTY when this city holds a governor
-  // (the stateless per-turn pick endTurn computes before the city loop).
   const next = (city.loyalty ?? LOYALTY_MAX) + loyaltyDelta(state, city, amenityTierName) + govBonus;
   city.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));
   return city.loyalty <= 0;
 }
 
-/** A city at 0 loyalty defects to the seat exerting the most pressure. */
-/** A city at 0 loyalty defects to the SEAT exerting the most pressure on it —
- *  its own owner excluded, since a city does not defect to itself. */
 export function flipCity(state: GameState, city: City): void {
   const here = state.map.tiles[city.centerIndex];
   let winner: Seat | null = null;
@@ -408,8 +330,6 @@ export function flipCity(state: GameState, city: City): void {
   transferCity(state, city.seat, winner, city, 'loyalty collapsed');
 }
 
-/** The seat 0-city → seat-city transfer (shared by loyalty flips and
- * 's reverse capture — a seat melee finishing a seat 0 city). */
 /**
  * PALACE RELOCATION. Real Civ 6 does not leave a civ
  * capital-less when its capital falls — the Palace is rebuilt in the surviving
@@ -436,17 +356,7 @@ export function relocatePalace(
 }
 
 
-// ---------------------------------------------------------------------------
-// Per-turn phase
-// ---------------------------------------------------------------------------
 
-/** the tile this seat city's culture growth claims next —
- * the seat 0's pickBorderTile policy verbatim (radius 5, fully unowned
- * tiles, dist asc → resource priority desc → yield sum desc → index asc)
- * under that seat's OWN research modifiers (the seatCityYields ctx).
- * Water, impassables and natural wonders are all claimable, exactly like
- * borderCandidates. Adjacency is PER-CITY via the `Tile.ownerCity` registry,
- * so a city never claims across a sibling's frontier. */
 
 
 
@@ -478,8 +388,6 @@ export function placeSeatDistrict(
   }
   if (best < 0) return false;
   const tile = state.map.tiles[best];
-  // The seat's own discount, priced BEFORE registering the
-  // placement (symmetric with the seat 0's queueDistrict).
   const base = districtCostIn(actor.research);
   const cost = districtDiscounted(state, actor.seat, id, { unlocks, cities: actor.cities }) ? Math.floor(base * 0.6) : base;  // #96: one discount rule, every seat
   tile.district = id;
@@ -513,9 +421,6 @@ export function placeSeatWonder(state: GameState, actor: Seat, civCity: City, de
     const p = def.placement;
     const cands = tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS)
       .filter((t) => {
-        // Per-city ownership, mirroring canPlaceWonder's `tileCity(tile) ===
-        // city.id` — the wonder tile registers to THIS civCity (`Tile.ownerCity`), not
-        // merely the civ. Same coherence fix as tryQueueDistrict.
         if (!tileOwnedByCiv(t, civ) || !tileBelongsTo(t, civCity) || t.index === civCity.centerIndex) return false;
         if (t.district || t.builtWonder || t.wonder) return false;
         if (isImpassable(t)) return false;
@@ -550,12 +455,6 @@ export function placeSeatWonder(state: GameState, actor: Seat, civCity: City, de
   }
 }
 
-/** Run ONE named district project — the queue for a single
- * id, shared by the scripted chain and the driven replay. BASE projects only:
- * the space-race rows ride their own chain (requiresTech/requiresProject and
- * the one-shot spaceProjects ledger), which no mask offers yet. Re-validates
- * the district on THIS city. */
-/** Queue a non-space project, judged by the shared `availableProjects` gate. */
 export function queueSeatProject(state: GameState, civCity: City, projId: string): boolean {
   const proj = PROJECTS[projId];
   if (!proj || proj.space || proj.victory) return false;
@@ -572,14 +471,6 @@ export function queueSeatProject(state: GameState, civCity: City, projId: string
 
 
 
-/**
- * The DIPLOMATIC FAVOR a civ earns this turn — its GOVERNMENT TIER
- * plus DIPLO_FAVOR_PER_SUZERAIN for every city-state it is Suzerain of. Both
- * seats share this shape; `gov` is the civ's adopted government id (null =
- * none, which pays nothing — Chiefdom is tier 0 anyway) and `suzerains` the
- * count from that seat's suzerain test. Zero-draw, integer-only.
- */
-/** city-states the SEAT 0 is Suzerain of. */
 /**
  * The WORLD CONGRESS session. Convenes at every CONGRESS_INTERVAL
  * turn once ANY civ has reached CONGRESS_MIN_ERA (Medieval), and runs one
@@ -598,14 +489,12 @@ export function worldCongress(state: GameState): void {
   if (state.turn % CONGRESS_INTERVAL !== 0) return;
   if (!state.seats.some((sx) => civEraIndex(sx.research.techs, sx.research.civics) >= CONGRESS_MIN_ERA)) return;
   state.congressSessions = (state.congressSessions ?? 0) + 1;
-  // every civ commits ALL its favor; the largest commitment wins
   const votes = state.seats.map((sx) => sx.diplomaticFavor ?? 0);
   let win = -1;
   for (let c = 0; c < votes.length; c++) {
     if (votes[c] <= 0) continue; // no favor, no vote
     if (win < 0 || votes[c] > votes[win]) win = c; // ties keep the LOWER seat
   }
-  // the commitments are spent whether or not they won
   for (const sx of state.seats) sx.diplomaticFavor = 0;
   if (win < 0) return; // nobody could vote
   const winner = state.seats[win];
@@ -618,17 +507,6 @@ export function worldCongress(state: GameState): void {
 
 
 
-/** The civCity → civCity transfer (loyalty flips between opponents): pop ×0.75 floor 1,
- * fresh boxes, CITY_CENTER-only registry, half HP, territory re-tags —
- * the shared transferCity shape. */
-/**
- * ONE transfer for every seat. There is no seat 0 transfer and no other seat
- * transfer — a city leaves one seat's city list and joins another's. The two
- * `from` is the losing
- * seat (null when a city-state or an unowned city changes hands is not
- * modelled — callers always have a seat). Returns false when the city was
- * RAZED instead of transferred.
- */
 export function transferCity(
   state: GameState,
   fromSeat: number,
@@ -637,22 +515,14 @@ export function transferCity(
   why: string,
   plunder = why === 'conquered',
 ): boolean {
-  // Taking a city earns GRIEVANCES — every seat, not just seat-on-seat.
   to.warmonger = (to.warmonger ?? 0) + WARMONGER_CAPTURE;
   // The losing seat's city list — one lookup, because every seat holds its own.
   const loser = seatOf(state, fromSeat);
   if (loser) {
     loser.cities = loser.cities.filter((c) => c.id !== civCity.id);
     relocatePalace(loser.cities);
-    // Routes die with their endpoint (the receiver starts route-less).
-    // Foreign routes INTO this city self-heal at the loop's dead-destination
-    // filter — city ids are per-seat, so no other list can name this one.
     if (loser.tradeRoutes) loser.tradeRoutes = loser.tradeRoutes.filter((x) => x.from !== civCity.id && x.to !== civCity.id);
   }
-  // CONQUEST razes at the winner's city cap — the city simply
-  // ceases (tiles freed, centre unpaved, no plunder). Loyalty flips stay
-  // uncapped. This arm lived only on the seat 0 path; a seat taking a seat
-  // city past its cap silently exceeded it.
   if (why === 'conquered' && to.cities.length >= MAX_CITIES_PER_SEAT) {
     for (const t of state.map.tiles) {
       if (tileBelongsTo(t, civCity)) setTileOwner(t, NO_SEAT);
@@ -663,8 +533,6 @@ export function transferCity(
     state.eventLog.push(`${civCity.name} razed — ${to.name} cannot govern more cities.`);
     return false;
   }
-  // Exactly the flipping city's tiles re-tag, found by registry scan: a
-  // work-radius sweep would leak the outer ring and steal sibling frontage.
   for (const t of state.map.tiles) {
     if (tileBelongsTo(t, civCity)) {
       setTileOwner(t, to.seat, to.nextCityId); // the civCity pushed below
@@ -730,7 +598,6 @@ export function transferCity(
   // Real Civ 6 pays the captor gold for taking a city. One rate, every captor.
   if (plunder) to.treasury += 40;
   state.eventLog.push(`${civCity.name} defected to ${to.name}! (${why})`);
-  // Losing the last city ends that war — elimination settles like any peace.
   if (loser && loser.cities.length === 0) {
     setWar(state, loser.seat, to.seat, false);
     warWearinessPeace(state, to.seat, loser.seat);
@@ -767,12 +634,7 @@ export function assertCityRegistryCoherent(state: GameState): void {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Seat city-state quests — deterministic, zero-draw
-// ---------------------------------------------------------------------------
 
-/** Has this seat satisfied its `cityState` quest? The seat-seat twin of
- *  questSatisfied (cityStates.ts), now the shared seat-generic rule. */
 
 
 /** apply ONE recorded turn for a driven seat. Touches no policy — if this
@@ -824,21 +686,11 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
     addEnvoys(cityState, actor.seat, 1);
   }
   const warCol = rec.war;
-  // The war head addresses the OTHER MAJORS in ascending seat order: column k
-  // declares on `warTargets(state, actor.seat)[k]`, column nOpp + k sues it.
-  // For seat 0 that is every other seat in id order, the layout the wire has
-  // always carried; for a
-  // civ, column 0 is seat 0 and the rest used to be dead.
   if (warCol !== null && warCol !== undefined && warCol >= 0) {
     const nOpp = state.seats.length - 1;  // the head is one column per OPPONENT
     const targets = warTargets(state, actor.seat);
     const foe = targets[warCol < nOpp ? warCol : warCol - nOpp];
     if (foe !== undefined && actor.seat !== foe) {
-      // ALLIES NEVER DECLARE ON EACH OTHER, declaring earns GRIEVANCES, and
-      // the war takes its KIND here: FORMAL iff this seat's grudge on the
-      // target is at least FORMAL_WAR_MIN_TURNS old (a same-turn stamp is 0
-      // old — a surprise). All three live here because the head is the ONLY
-      // entry: nothing else declares, so nothing else can carry them.
       if (warCol < nOpp && !civsAtWar(state, actor.seat, foe) && !seatsAllied(state, actor.seat, foe)) {
         setWar(state, actor.seat, foe, true);
         setWarTurnsWith(state, actor.seat, foe, 0);
@@ -880,14 +732,9 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
       else if (id && UNITS[id]) commitProduction(state, civCity.seat, civCity, { kind: 'unit', unit: id, progress: 0 });
     }
     else if (a >= wonderLo && a < wonderLo + wonders.length) {
-      // WONDER: the file names WHICH wonder; the engine re-runs the whole
-      // placement scan and the one-per-world check (cross-seat — another civ
-      // may have claimed it since recording; the replay refuses, never
-      // double-builds).
       const wd = BUILT_WONDERS[wonders[a - wonderLo]];
       if (wd) placeSeatWonder(state, actor, civCity, wd);
     } else if (a >= projectLo && a < projectLo + projects.length) {
-      // PROJECT: base rows only; queueSeatProject re-validates.
       queueSeatProject(state, civCity, projects[a - projectLo]);
     } else if (a >= NB + 2 + NU) {
       // DISTRICT: the file names the TYPE, the engine still runs the placement
@@ -898,10 +745,6 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
       if (d) placeSeatDistrict(state, actor, civCity, d.id, computeUnlocksIn(actor.research));
     }
   }
-  // unit orders are NOT applied here. This function runs at the PICK position;
-  // the unit walkers run LATER in the phase, and a replay that acts units
-  // early reorders combat against production within the turn. The unit half
-  // executes in the war/peace section below, exactly where the walkers would.
 }
 
 /** replay this seat's recorded UNIT orders.
@@ -934,9 +777,6 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
       if (!state.units.includes(unit) || unit.movesLeft <= 0) return;  // died or spent
       const here = state.map.tiles[unit.tileIndex];
       if (a === A_FOUND_CITY) {
-        // FOUND where the settler stands (#71). foundCity re-validates
-        // legality and consumes the unit; a refusal soft-fails like every
-        // other re-validated verb.
         if (unit.type !== 'SETTLER') return;
         const res = foundCity(state, unit.tileIndex, actor.seat);
         if (res.ok && res.city) state.eventLog.push(`${actor.name} founded ${res.city.name}.`);
@@ -1012,12 +852,6 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           unit.movesLeft = 0;
         }
       } else if ((a >= 13 && a < 18) || (a >= 18 && a < 18 + IMPROVEMENT_IDS.length - DEDICATED_IMPROVEMENTS)) {
-        // BUILDER verbs — the seat walker's OWN bodies (builderActions),
-        // re-validated: REPAIR/CHOP-equivalents clear flags without a charge;
-        // a BUILD writes the improvement, spends a charge and disbands at 0.
-        // validImprovementsIn under the CIV SEAT's unlocks is the legality body
-        // (builderImprove's seat 0-facing validImprovements would gate on the
-        // wrong civ's techs).
         if ((unit.charges ?? 0) <= 0 && a !== 17) return;
         if (a === 16) {
           // CHOP: `builderRemoveFeature`, the ONE remove body — removability,
@@ -1050,12 +884,9 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           }
         }
       } else if (a >= 38 && a < 45) {
-        // SPREAD — HERE = column 38; directions 39-44. The SAME body the
-        // triples applier runs, so no seat spreads on a rule of its own.
         const to38 = a === 38 ? here : neighbors(state.map, here)[a - 39];
         if (to38) spreadFromUnit(state, unit, actor, to38);
       } else if (a >= 26 && a < 38) {
-        // SNIPE — the ring-2 tile at this column, shared with every seat.
         const rt = snipeRing(state, here)[a - 26];
         if (rt !== undefined && UNITS[unit.type]?.ranged) hostileRangedStrike(state, unit, rt);
       }
@@ -1064,8 +895,6 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
 }
 
 export function seatPhase(state: GameState): void {
-  // No early-out on a civ-less roster: seat 0's OWN turn (economy, upkeep,
-  // diplomacy, quests) runs through the loop below like every seat's.
 
   // Seat units get their movement in this phase (like barbarians).
   // An EMBARKED land unit moves on the flat EMBARK_MOVES pool (not its
@@ -1089,16 +918,6 @@ export function seatPhase(state: GameState): void {
     u.movesFull = u.movesLeft;
   }
 
-  // #107: the DENOUNCE and ALLIANCE verbs — wire DECISIONS at their own
-  // position, BEFORE the seat loop, so a fresh grudge blocks a same-turn
-  // alliance and starts the formal clock before any declaration reads
-  // either. Targets are ABSOLUTE SEATS. Each arm re-validates its
-  // RULES on the named pair; the choosing thresholds (proximity, strength
-  // edges) are the driver's policy and never re-checked here.
-  //
-  // DECLARING AND SUING ARE NOT HERE. They ride each seat's own war head at
-  // its record position — the one entry, with the alliance gate, the
-  // grievance and the war's kind on it.
   for (const actor of state.seats) {
     if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
     const recG = state.seatActions?.[state.turn - 1]?.[actor.seat];
@@ -1126,33 +945,14 @@ export function seatPhase(state: GameState): void {
       state.eventLog.push(`${actor.name} and ${target.name} form an alliance.`);
     }
   }
-  // EVERY seat takes its turn through this one body, in seat order. There is
-  // no seat 0 loop and no seat loop.
   for (const actor of state.seats) {
-    // ONE record lookup for the whole seat's turn.
     const recU = state.seatActions?.[state.turn - 1]?.[actor.seat];
     if (actor.cities.length === 0) continue; // eliminated
 
-    // War weariness settles at this seat's block top, before
-    // seatAmenityTiers uses it — the same call the seat 0's endTurn makes, in
-    // the same relative position. The pairwise war state is fixed for this turn
-    // by the phase-top DoW pass, so the "at war with somebody" test inside is
-    // stable through this block (peace resolves after the loop).
     warWearinessTurn(state, actor.seat);
 
-    // Eurekas/inspirations fire from the CIV SEAT's seat too — the
-    // mirror of the seat 0's endTurn-top detectBoosts (same conditions,
-    // this civ's cities/research/territory; the discounts apply in the
-    // research loops below).
     detectBoosts(state, actor.seat);
 
-    // City-state diplomacy — meet, influence→envoy accrual (flat rate +
-    // the adopted government's tier), quests. ONE body for every seat.
-    // T1 PERF: this seat's units are invariant from here through the
-    // composition count below — no unit spawns/disbands occur in the CS-meet
-    // block or the pre-turn count loop (the buy/war/peace loops that DO mutate
-    // the list come later), so one filtered list is shared across the
-    // uses (unitCount, melee/ranged tally).
     const seatUnitList = unitsOf(state, actor.seat);
     {
       // Meet by EXPLORATION — a city-state is met the moment its centre is
@@ -1210,15 +1010,6 @@ export function seatPhase(state: GameState): void {
       }
     }
 
-    // Per-city REAL production queues (settler + units at real
-    // costs) replace the pooled prodstock/milstock, their pace/split
-    // constants and the random home-city draw. Each city queues ONE item —
-    // the capital prefers the settler (one in flight per civ), everyone
-    // else trains units up to the cap — funds it with its OWN production,
-    // and resolves it on completion at that city. Unit TYPE gates on the
-    // seat's REAL techs; buildings arrive with B4. Picks
-    // happen for the PRE-TURN city set, in founding order, before any
-    // same-turn completion can found a new city.
     let unitCount = seatUnitList.length;
     // Army composition (military only — builders don't count),
     // live + queued, updated through this pick loop so same-turn picks see
@@ -1243,16 +1034,6 @@ export function seatPhase(state: GameState): void {
       }
     }
     const seatUnlocks = computeUnlocksIn(actor.research);
-    // THE FILE IS THE INTERFACE. A seat with a recorded action for this turn
-    // does NOT decide — it applies what the ladder already chose. This is the
-    // branch that makes the transcription below deletable: while both exist the
-    // file path is verified against it, and once verified the ladder path is the
-    // only one left.
-    // state.turn is 1-BASED at seatPhase time (createGame starts at 1;
-    // endTurn increments after the phases), while the recorder keys 0-based
-    // drive-loop turns. Reading [state.turn] skipped record t0 — the only
-    // turn that queued anything, since picks are one-shot and every later
-    // turn records -1 while the queue is busy. Driven-parity layer 3.
     const rec = state.seatActions?.[state.turn - 1]?.[actor.seat];
     if (rec) applySeatActionRecord(state, actor, rec);
     // The record replaces the PICKS and nothing else. Bookkeeping — yields,
@@ -1270,16 +1051,9 @@ export function seatPhase(state: GameState): void {
     {
       let bought = false;
       if (rec) {
-        // The BUILDING buy: the wire's centre-keyed intent [0, centreTile,
-        // buildingIdx], re-validated here. The index is the SHIPPED catalog
-        // order.
         const bv = rec.buy;
         if (bv && bv[0] === 0) {
           const civCity = actor.cities.find((c) => c.centerIndex === bv[1]);
-          // the SHIPPED catalog order (prodLayout, the one derivation) — NOT
-          // Object.values(BUILDINGS): the exporter filters rows, so raw
-          // enumeration is offset (9040 t178: idx 5 resolved ANCIENT_WALLS
-          // where the wire meant LIBRARY; both buys refused silently).
           const bid = prodLayout().buildings[bv[2]];
           const def = bid ? BUILDINGS[bid] : undefined;
           if (civCity && def && !def.worship && !SCRIPTED_HELD_BUILDINGS.has(def.id)) {
@@ -1307,23 +1081,11 @@ export function seatPhase(state: GameState): void {
           }
         }
       }
-      // Kind 1, the SETTLER buy — a UNIT purchase now (#71): the settler
-      // spawns at the capital (else the first city), which pays the pop; the
-      // afford/pop gates and the no-spot refund all live in purchaseSettler.
-      // WHERE it founds is a later unit ORDER, not part of the purchase.
       const wantSettler = rec?.buy?.[0] === 1;
       if (wantSettler && !bought && actor.cities.length > 0) {
         const spawnCity = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
         bought = purchaseSettler(state, spawnCity.id, actor.seat).ok;
       }
-      // MILITARY UNIT — when nothing else was bought and the
-      // civ's live+queued military is under the #56 H1 quota (2× cities,
-      // seat-side), buy the STRONGEST affordable trainable military unit
-      // (highest combat, ties to table order) at cost × mult. It spawns via
-      // the shared seat machinery at the capital (else the first city), and
-      // pays only where it LANDED (no free spot = refund).
-      // Kind 2, the MILITARY UNIT buy — the quota and candidate scan below
-      // re-validate the intent.
       const wantUnit = rec?.buy?.[0] === 2;
       if (wantUnit && !bought && meleeCount + rangedCount < actor.cities.length * 2) {
         let pickId: string | null = null;
@@ -1332,8 +1094,6 @@ export function seatPhase(state: GameState): void {
           if (cand.tech && !actor.research.techs.includes(cand.tech)) continue;
           const def = UNITS[cand.id];
           if (!def) continue;
-          // Strategic-resource access gates the gold buy too (HORSEMAN
-          // needs HORSES) — data-driven off requiresResource, mirroring the ladder.
           if (def.requiresResource && !civHasStrategic(state, actor.seat, def.requiresResource)) continue;
           if (!goldAffordable(actor.treasury ?? 0, def.cost * GOLD_PURCHASE_MULT)) continue;
           if (def.combat > pickCombat) {
@@ -1348,8 +1108,6 @@ export function seatPhase(state: GameState): void {
           if (u) {
             actor.treasury = (actor.treasury ?? 0) - price;
             bought = true;
-            // A purchased military unit inherits the spawn
-            // city's Encampment training XP (best military-building tier).
             if ((UNITS[pickId]?.combat ?? 0) > 0) {
               const xp = encampmentTrainXp(spawnCity.buildings);
               if (xp > 0) u.xp = xp;
@@ -1357,12 +1115,6 @@ export function seatPhase(state: GameState): void {
           }
         }
       }
-      // #104 kind 3, the TILE buy: [3, tileIndex, centreTile] — the CENTRE-
-      // keyed city (the v2 convention: ids are engine-local, centres are the
-      // shared vocabulary) buys the named tile at the seat's own live price.
-      // buyTile is the ONE legality body (adjacency to that city's territory,
-      // unowned, afford, the escalator and tilePurchaseMult all live inside
-      // it), so this arm is pure re-validated dispatch, exactly like kind 0.
       const bv3 = rec?.buy;
       if (bv3 && bv3[0] === 3 && !bought) {
         const rc3 = actor.cities.find((c) => c.centerIndex === bv3[2]);
@@ -1390,11 +1142,6 @@ export function seatPhase(state: GameState): void {
       }
     }
 
-    // #104 kind 7, the CITY-STATE LEVY — gold, but a diplomacy action, not
-    // the one-gold-purchase slot (levyUnits pays its own way). The wire
-    // names the CS by index; levyUnits is the ONE legality body
-    // (militaristic, suzerain, cooldown, afford — at-war is the DRIVER's
-    // policy gate, not a rule, so a mid-turn peace does not refuse here).
     {
       const lvi = rec?.levy;
       if (lvi !== undefined && lvi !== null && lvi >= 0) {
@@ -1435,12 +1182,6 @@ export function seatPhase(state: GameState): void {
             if (!best || ySum > best.ySum) best = { from: from.id, toCs: cityState.id, ySum };
           }
         }
-        // international: considered AFTER domestic + CS (only when no
-        // domestic/CS candidate exists) — a route to ANY OTHER major seat's
-        // city whose centre this seat has EXPLORED (fog is the meeting rule
-        // here, as for city-states), gold-heavy and picked by NEAREST-city
-        // preference (min hex distance; ties keep the first in from-asc,
-        // target-seat-asc, city-asc order).
         if (!best) {
           let bestIntl: { from: number; toSeat: number; toSeatCity: number; d: number } | null = null;
           for (const from of actor.cities) {
@@ -1466,8 +1207,6 @@ export function seatPhase(state: GameState): void {
           else if (best.toSeatCity !== undefined) { route.toSeat = best.toSeat; route.toSeatCity = best.toSeatCity; }
           else route.to = best.to!;
           routes.push(route);
-          // The seat route's Trader lays road along its land path.
-          // Destination centre: an own city, a met city-state, or a seat 0 city.
           const fromRc = actor.cities.find((c) => c.id === route.from);
           const destIdx =
             route.toCs !== undefined
@@ -1478,9 +1217,6 @@ export function seatPhase(state: GameState): void {
           if (fromRc && destIdx >= 0) layTradeRoad(state, fromRc.centerIndex, destIdx);
         }
       }
-      // duration: after the pick, drop routes whose expiresTurn has
-      // arrived — the freed capacity re-picks NEXT turn (zero draws). Also
-      // drop international routes whose destination city no longer exists.
       actor.tradeRoutes = routes.filter(
         (x) =>
           (x.expiresTurn === undefined || x.expiresTurn > state.turn) &&
@@ -1496,9 +1232,6 @@ export function seatPhase(state: GameState): void {
     let culSum = 0;
     let goldSum = 0;
     let faithSum = 0;
-    // The luxury map and modifiers FREEZE at the loop top: loyalty, growth
-    // and yields all read this turn's snapshot, and defections resolve after
-    // the loop. Exactly the discipline endTurn uses.
     const luxMap = luxuryAmenities(state, actor.seat);
     const seatMods = getModifiers(state, actor.seat);
     const cityStats = new Map<number, CityStats>();
@@ -1515,10 +1248,6 @@ export function seatPhase(state: GameState): void {
     for (const civCity of [...actor.cities]) {
       const stats = cityStats.get(civCity.id) ?? computeCityStats(state, civCity, luxMap, seatMods);
       const tier = stats.amenities.tier;
-      // Seat city loyalty at the loop top (the seat 0's
-      // applyLoyalty position) — own = THIS civ's cities, foreign = the
-      // seat 0's + every other seat's; capitals are immune; live pops
-      // (earlier cities in this loop already grew — the seat 0's mix).
       if (applyLoyalty(state, civCity, tier.name, rGovIds.has(civCity.id) ? GOVERNOR_LOYALTY : 0)) {
         civCityDefectors.push(civCity);
       }
@@ -1528,19 +1257,11 @@ export function seatPhase(state: GameState): void {
       goldSum += y.gold;
       faithSum += y.faith; // P5/S5 (C-17): the faith yield gains its consumer
       const production = y.production;
-      // Seat science/culture streams. The citizens' term
-      // is already inside `y` — and now inside the amenity tier with it, which
-      // is where the seat 0's has always been.
       sciSum += y.science;
       const culC = y.culture;
       culSum += culC;
 
-      // ONE growth rule for every seat: the surplus arrives pre-folded (the
-      // housing, amenity, belief and wonder factors all live in
-      // computeCityStats) and seatGrowth banks, grows or starves.
       seatGrowth(civCity, stats.effectiveFoodSurplus, stats.growthNeeded);
-      // Queue progress + completion (settler founds via the site scan; a
-      // unit spawns at THIS city — no home-city RNG draw anymore).
       const q = civCity.queue[0];
       if (q && (q.kind === 'settler' || q.kind === 'unit' || q.kind === 'district' || q.kind === 'building' || q.kind === 'project' || q.kind === 'wonder')) {
         // The seat's GOVERNMENT/POLICY encampmentProdMult, which
@@ -1589,33 +1310,18 @@ export function seatPhase(state: GameState): void {
           civCity.productionBank = (civCity.productionBank ?? 0) + (q.progress - cost);
         }
       }
-      // Cultural border growth: this city's culture (the culSum term,
-      // pre-growth pop) fills its own box and consumes against the escalating
-      // curve.
       civCity.cultureBox += culC;
-      // Religious Settlements — the belief border-cost multiplier,
-      // the seat 0's Math.round(base * borderCostMult) form (city.ts:507).
       const civCityBorderCost = () =>
         Math.round(borderGrowthCost(civCity.tilesAcquired) * getModifiers(state, actor.seat).borderCostMult);
       while (civCity.cultureBox >= civCityBorderCost()) {
         const next = pickBorderTile(state, civCity, { map: state.map, mods: getModifiers(state, actor.seat) });
         if (next === null) {
-          // Nowhere to grow: cap the box at the current threshold.
           civCity.cultureBox = Math.min(civCity.cultureBox, civCityBorderCost());
           break;
         }
         civCity.cultureBox -= civCityBorderCost();
-        // The same claim the seat 0 uses. `acquireTile` now gates its
-        // fog reveal on the seat, so this stopped needing a hand-copy.
         acquireTile(state, civCity, next);
       }
-      // THE city strike, for every seat — a city WITH ANCIENT_WALLS fires
-      // once per turn at the nearest unit hostile to THIS seat (barbarians
-      // always; any at-war seat's units, civilians included), lowest tile
-      // index breaking ties. One
-      // roll at the foreign city's defense strength vs the target's defense
-      // (cityDefenseStrength; single roll, no retaliation, never captures).
-      // civCity order, immediately before the heal — a kill shifts the shared RNG.
       const civCityCenter = state.map.tiles[civCity.centerIndex];
       if (civCity.buildings.includes('ANCIENT_WALLS')) {
         let bestTile = -1;
@@ -1638,13 +1344,9 @@ export function seatPhase(state: GameState): void {
           );
           const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
           const tt = state.map.tiles[bestTile];
-          // support (attacker is the city — no flanking).
-          // An embarked target defends at the flat EMBARKED_DEFENSE_CS.
           const defCS = defender.embarked
             ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
             : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender); // B-4 defender veterancy (embarked → flat, no xp)
-          // The general/admiral aura shields against city fire,
-          // outside the embarked ternary.
           const defCSa = defCS + generalAuraCS(state, defender, bestTile);
           const atkCS = cityDefenseStrength(state, civCity);
           defender.hp -= damageRoll(state, atkCS - defCSa, 'cstk', bestTile);
@@ -1656,12 +1358,6 @@ export function seatPhase(state: GameState): void {
           if (defender.hp <= 0) killUnit(state, defender, civCity.seat);
         }
       }
-      // The mirror of the ADDITIONAL Encampment strike
-      // A city with a COMPLETE unpillaged ENCAMPMENT
-      // fires the same once-per-turn ranged strike right AFTER its walls strike
-      // (walls first, then Encampment — per civCity, before the heal), k="estk".
-      // A LIVE garrison is now required — an Encampment reduced to
-      // 0 HP is occupied and fires nothing.
       if (civCity.districts.some((dd) => encampmentIntact(state.map.tiles[dd.tileIndex]))) {
         let bestTile = -1;
         let bestDist = 99;
@@ -1697,9 +1393,6 @@ export function seatPhase(state: GameState): void {
           if (defender.hp <= 0) killUnit(state, defender, civCity.seat);
         }
       }
-      // A siege pins the HP: any adjacent unit hostile to THIS civ counts,
-      // CIVILIANS included, per `unitsHostile` — the same predicate the rest
-      // of the heal gate uses.
       const besieged = neighbors(state.map, civCityCenter).some((n) =>
         unitsAt(state, n.index).some((u) => unitsHostile(state, u, { seat: actor.seat })),
       );
@@ -1711,7 +1404,6 @@ export function seatPhase(state: GameState): void {
         if (civCity.buildings.includes('ANCIENT_WALLS')) {
           civCity.outerHp = Math.min(WALLS_HP, (civCity.outerHp ?? WALLS_HP) + CITY_HEAL_PER_TURN);
         }
-        // The Encampment garrison repairs on the same gate/rate.
         for (const d of civCity.districts) {
           if (d.type !== 'ENCAMPMENT') continue;
           const dt = state.map.tiles[d.tileIndex];
@@ -1721,21 +1413,9 @@ export function seatPhase(state: GameState): void {
       }
     }
 
-    // Loyalty collapses resolve after the city loop (they
-    // mutate the list) — to the max-pressure civ; the SEAT 0 can win one.
     for (const civCity of civCityDefectors) flipCity(state, civCity);
 
-    // REAL research — cheapest-first auto-pick at RAW cost (no
-    // eurekas for opponents until B6; ties keep the tech-table order via the
-    // stable sort, mirroring the seat 0's autoPickResearch), progress
-    // banks and drains exactly like advanceResearch.
     const rsr = actor.research;
-    // Cheapest-first by EFFECTIVE cost, like the seat 0's auto-pick
-    // (boosts discount the pick key; stable sort keeps table-order ties).
-    // The golden FREE_INQUIRY / PEN_BRUSH_AND_VOICE extra
-    // 10% belongs to THIS seat, not to civ 0. It is in the pick KEY as well
-    // as the completion test because the discount changes which item is
-    // cheapest — that is exactly what #79's hunt found on the seat 0 side.
     const gTech = goldenBoostBonus(state, actor.seat, false);
     const gCivic = goldenBoostBonus(state, actor.seat, true);
     const pickNext = () => {
@@ -1749,8 +1429,6 @@ export function seatPhase(state: GameState): void {
     // Every seat accrues (the GPU twin is seat_science_total rows 0..R);
     // lump grants (applyLumpGrant, goody maps) add to the same field.
     actor.scienceTotal = (actor.scienceTotal ?? 0) + sciSum;
-    // Boosted techs complete at the discounted cost, like the seat 0's
-    // advanceResearch (effectiveResearchCostIn — same rounding).
     while (rsr.tech && rsr.techProgress >= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech)) {
       rsr.techProgress -= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech);
       rsr.techs.push(rsr.tech);
@@ -1764,14 +1442,8 @@ export function seatPhase(state: GameState): void {
     // scores DOMESTIC TOURISTS off lifetime culture, so this is the substrate
     // the Culture victory reads. Zero-draw; the GPU mirrors at this position.
     actor.cultureTotal = (actor.cultureTotal ?? 0) + culSum;
-    // Net gold — city upkeep already netted per city; unit
-    // upkeep and the bankruptcy rule are the same for every seat
-    // (milli-rounded test; disband the priciest-upkeep unit, tie → lowest
-    // id; no refund).
     actor.treasury = (actor.treasury ?? 0) + goldSum;
     actor.faith = (actor.faith ?? 0) + faithSum; // P5/S5 (C-17)
-    // Tourism, diplomatic favor and grievance decay — the shared
-    // per-seat accumulators, at the position they have always held.
     seatAccumulators(state, actor.seat);
     actor.treasury -= state.units.reduce(
       (s, u) => s + (u.seat === actor.seat ? UNITS[u.type]?.maintenance ?? 0 : 0),
@@ -1801,7 +1473,6 @@ export function seatPhase(state: GameState): void {
     // controlled seats ("controlled opponents' builders answer to the units
     // head", `active & ~controlled`); this call was ungated, TS builders kept
 
-    // Races: great people, then pantheons and beliefs.
     advanceGreatPeople(state, actor.seat);
 
     // The BELIEF RACES — eager rules for EVERY seat row, seat 0 included
@@ -1844,8 +1515,6 @@ export function seatPhase(state: GameState): void {
         addEraScore(state, actor.seat, ERA_SCORE_RELIGION);
         actor.religion.follower = fPick;
         actor.religion.founder = oPick;
-        // Freeze the holy tile (the LIVE capital's center at founding, else
-        // the first live city) — the source of this religion's pressure.
         actor.religion.holyTile = (actor.cities.find((c) => c.isCapital) ?? actor.cities[0])?.centerIndex ?? null;
         const name = RELIGION_NAMES[actor.seat % RELIGION_NAMES.length];
         state.eventLog.push(`${actor.name} founded ${name} — two beliefs left the pool.`);
@@ -1864,25 +1533,12 @@ export function seatPhase(state: GameState): void {
       }
     }
 
-    // The Great General marches with the war effort (spawned above
-    // in advanceGreatPeople — a fresh one walks this turn on its full MP). Runs
-    // BEFORE the war loop so the aura reflects the general's advanced position.
 
-    // War and peace. The two counters are the RULE; the units are the WIRE.
-    // A seat's unit orders are replayed here, at the position the turn gives
-    // them, so a recorded trajectory reproduces exactly.
-    // Every war this seat is in ticks, each in its own cell — one clock per
-    // WAR, so a seat fighting two opponents can sue either on that war's own
-    // terms. `peaceTurns` stays per SEAT: it counts turns at war with nobody.
     const anyWar = atWarWithAny(state, actor.seat);
     for (const foe of warsOf(state, actor.seat)) {
       setWarTurnsWith(state, actor.seat, foe, warTurnsWith(state, actor.seat, foe) + 1);
     }
     if (!anyWar) actor.peaceTurns += 1;
-    // EVERY seat's unit orders replay here, at the walkers' own position —
-    // one schema (per-unit rank rows), one applier, one position. Seat 0 used
-    // to ride a TRIPLES record applied pre-turn by the driver; #108 retired
-    // it, so no seat's combat draws land at a stream position of their own.
     if (recU) applySeatUnitOrders(state, actor, recU.units);
   }
 

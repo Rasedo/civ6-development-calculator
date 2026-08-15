@@ -1,10 +1,3 @@
-/**
- * Great people (simplified): each class accumulates points from its district
- * (+1/turn), that district's buildings (+1 each/turn) and specialists
- * (+1 each/turn). Individuals are claimed automatically in order, with
- * instant effects only (tile-activation abilities aren't modeled).
- * Writers/artists/musicians are condensed into one Artist class.
- */
 
 import type { DistrictId, GreatPersonClass } from '../core/types';
 
@@ -59,7 +52,6 @@ export interface GreatPersonDef {
     culture?: number; // added to current civic progress
     faith?: number;
     gold?: number;
-    /** Production added to the capital's current queue head. */
     productionToCapital?: number;
   };
   effectText: string;
@@ -116,12 +108,6 @@ export const GREAT_PEOPLE: Record<GreatPersonClass, GreatPersonDef[]> = {
     P('GENERAL', 'GP_HANNIBAL', 'Hannibal Barca', { productionToCapital: 280 }, '+280 production in the capital'),
     P('GENERAL', 'GP_EL_CID', 'El Cid', { productionToCapital: 600 }, '+600 production in the capital'),
   ],
-  // Per-era Writer/Musician rosters (4 each, one per era tier — keeps
-  // the gpEffects tensor rectangular). Their real output is a Great Work of
-  // Writing / Music, which ROUND B7 landed (slots + per-turn yield); the
-  // per-person `culture` value below is now only the OVERFLOW lump a charge
-  // falls back to when no slot is open anywhere. Tourism stays absent.
-  // Slot model in the Great Works block below.
   WRITER: [
     P('WRITER', 'GP_LI_BAI', 'Li Bai', { culture: 45 }, '+45 culture toward the current civic'),
     P('WRITER', 'GP_CHAUCER', 'Geoffrey Chaucer', { culture: 110 }, '+110 culture toward the current civic'),
@@ -160,33 +146,12 @@ export const GP_CLASSES = Object.keys(GP_CLASS_DISTRICT) as GreatPersonClass[];
  *
  * NO Great Work pays gold.
  */
-/** The three slotted Great Work kinds, in the order both engines index them. */
 export const GW_WRITING = 0;
 export const GW_ART = 1;
 export const GW_MUSIC = 2;
 
-/** Per-kind building, slot count, works per Great Person, culture and tourism. */
 export const GW_BUILDINGS = ['AMPHITHEATER', 'MUSEUM', 'BROADCAST_CENTER'] as const;
 
-/**
- * ARTIFACTS — the fifth Great Work kind, sourced from the
- * Civilization wiki (Archaeologist / Archaeological Museum / Antiquity Site
- * pages):
- *   - an ARTIFACT pays +3 Culture and +3 Tourism;
- *   - an ARCHAEOLOGICAL MUSEUM holds 3 artifact slots;
- *   - the ARCHAEOLOGIST is unlocked by the NATURAL HISTORY civic, carries 3
- *     charges, and may only be trained in a city whose Archaeological Museum
- *     still has a free slot;
- *   - ANTIQUITY SITES appear once Natural History is in, and are created by
- *     events before the Modern era — razing a barbarian outpost, or a unit
- *     dying — both of which this engine already raises.
- * MEASURED reachable: NATURAL_HISTORY is researched by 21 of 24 seat civs and
- * 1 of 12 seat-0 seeds by t250, so this is exercised in-gate (mostly seat-side)
- * rather than sitting past the horizon like the space race.
- * NOT MODELLED, recorded: THEMING bonuses (three same-era artifacts by
- * different civs double the building's tourism) and Shipwrecks (no water
- * excavation), and trading works between civs.
- */
 export const ARTIFACT_BUILDING = 'ARCHAEOLOGICAL_MUSEUM';
 export const ARTIFACT_SLOTS = 3;
 export const ARTIFACT_CULTURE = 3;
@@ -194,21 +159,13 @@ export const ARTIFACT_TOURISM = 3;
 export const ARCHAEOLOGIST_CHARGES = 3;
 export const ARCHAEOLOGIST_CIVIC = 'NATURAL_HISTORY';
 
-/** culture from a city's artifacts. */
 export function artifactCulture(city: { artifacts?: number }): number {
   return (city.artifacts ?? 0) * ARTIFACT_CULTURE;
 }
-/** tourism from a city's artifacts. */
 export function artifactTourism(city: { artifacts?: number }): number {
   return (city.artifacts ?? 0) * ARTIFACT_TOURISM;
 }
 export const GW_SLOTS = [2, 3, 1] as const;
-/**
- * Great Work slots granted by a completed WONDER, in kind order
- * [writing, art, music]. Sourced by direct Civilopedia fetch — the Great
- * Library reads "+2 Great Works of Writing slots" on top of its yields.
- * Additive with GW_SLOTS, so a wonder contributes capacity of its own.
- */
 export const GW_WONDER_SLOTS: Record<string, readonly [number, number, number]> = {
   GREAT_LIBRARY: [2, 0, 0],
 };
@@ -216,24 +173,20 @@ export const GW_WORKS_PER_PERSON = [2, 3, 2] as const;
 export const GW_CULTURE = [2, 2, 4] as const;
 export const GW_TOURISM = [2, 2, 4] as const;
 
-/** The Great Person class that produces each kind (the work-carrying classes). */
 export const GW_CLASS_KIND: Partial<Record<GreatPersonClass, number>> = {
   WRITER: GW_WRITING,
   ARTIST: GW_ART,
   MUSICIAN: GW_MUSIC,
 };
-/** Classes whose people carry Great Works (vs. the instant-lump classes). */
 export const GW_WORK_CLASSES = new Set<GreatPersonClass>(['WRITER', 'ARTIST', 'MUSICIAN']);
 
 type GwCity = {
   greatWorksWriting?: number;
   greatWorksArt?: number;
   greatWorksMusic?: number;
-  /** read only by the caller-supplied wonder-slot resolver. */
   wonders?: { id: string; tileIndex: number }[];
 };
 
-/** The per-kind slotted count of a city, in kind order. */
 export function gwCount(city: GwCity, kind: number): number {
   return (kind === GW_WRITING ? city.greatWorksWriting : kind === GW_ART ? city.greatWorksArt : city.greatWorksMusic) ?? 0;
 }
@@ -253,7 +206,6 @@ function gwSet(city: GwCity, kind: number, n: number): void {
 export const GW_PRINTING_TECH = 'PRINTING';
 export const GW_PRINTING_WRITING_MULT = 2;
 
-/** the per-turn TOURISM a city's Great Works generate. */
 export function greatWorkTourism(city: GwCity, printing = false): number {
   const writing = GW_TOURISM[GW_WRITING] * (printing ? GW_PRINTING_WRITING_MULT : 1) * gwCount(city, GW_WRITING);
   return writing + GW_TOURISM[GW_ART] * gwCount(city, GW_ART) + GW_TOURISM[GW_MUSIC] * gwCount(city, GW_MUSIC);
@@ -280,12 +232,10 @@ export const RELIC_SLOTS_PER_BUILDING = 1;
 export const RELIC_FAITH = 4;
 export const RELIC_TOURISM = 8;
 
-/** the per-turn FAITH a city's relics pay. */
 export function relicFaith(city: { relics?: number }): number {
   return RELIC_FAITH * (city.relics ?? 0);
 }
 
-/** the per-turn TOURISM a city's relics pay. */
 export function relicTourism(city: { relics?: number }): number {
   return RELIC_TOURISM * (city.relics ?? 0);
 }
@@ -308,36 +258,17 @@ export function placeRelic(cities: { buildings: string[]; relics?: number }[]): 
   return false;
 }
 
-/** Great works stored in a city (all kinds) — the total slotted count. */
 export function cityGreatWorks(city: GwCity): number {
   return gwCount(city, GW_WRITING) + gwCount(city, GW_ART) + gwCount(city, GW_MUSIC);
 }
 
-/**
- * The building-tier CULTURE a city's slotted works pay, by kind.
- * Both engines add this single sum at the buildings-bucket position in this
- * association — culture += (writingTerm + artTerm + musicTerm).
- */
 export function greatWorkCulture(city: GwCity): number {
   return GW_CULTURE[GW_WRITING] * gwCount(city, GW_WRITING) + GW_CULTURE[GW_ART] * gwCount(city, GW_ART) + GW_CULTURE[GW_MUSIC] * gwCount(city, GW_MUSIC);
 }
 
-/**
- * Place a Great Person's GW_WORKS_PER_PERSON[kind] works into `cities`
- * (visited in array order — the acquisition/slot order both engines share).
- * Each work fills the LOWEST city with an open slot of the matching building,
- * lowest slot first; the per-city count is bumped. Returns the count of works
- * that found NO slot (the overflow charges that fall back to a lump).
- */
 export function placeGreatWorks(
   cities: (GwCity & { buildings: string[] })[],
   kind: number,
-  /**
-   * Extra slots this city gets from completed WONDERS, per kind.
-   * Supplied by the caller rather than derived here on purpose — this module
-   * is map-free, and wonder COMPLETENESS lives on the tile
-   * (`builtWonderComplete`), so only a caller holding the map can resolve it.
-   */
   extra?: (city: GwCity & { buildings: string[] }) => number,
 ): number {
   const building = GW_BUILDINGS[kind];

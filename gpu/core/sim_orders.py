@@ -1,8 +1,3 @@
-"""Unit-order application (every seat), captures, founding mutations, the barbarian phase.
-
-One mixin of BatchSim (assembled in engine.py); state and helpers live on
-self / gpu/core/simbase.py.
-"""
 from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
@@ -12,24 +7,6 @@ from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must
 
 class SimOrders:
     def _apply_seat_unit_actions(self, row: int, actions: torch.Tensor) -> None:
-        """Execute seat row `row`'s unit orders — THE applier, for every seat.
-
-        `actions` is [B, simbase.UNIT_SLOTS]: head row n carries the order for
-        the n-th of this seat's living units in slot (= spawn) order, the
-        layout `_seat_slot_map` and `_seat_unit_mask` both speak. -1 and 12 are
-        HOLD.
-
-        That head order IS `state.units.filter(u => u.seat === row)`: every
-        major seat appends at the one shared cursor and the step-end compaction
-        is stable, so a seat's slots keep their relative order forever.
-
-        Orders are RE-VALIDATED here (an earlier unit's move can invalidate a
-        later one's) and combat draws from the shared RNG stream, so this walk
-        order is part of the parity contract.
-
-        The combat arms dispatch one GAME at a time, because a head row maps to
-        a different merged slot per game; every other verb stays batched.
-        """
         B, dev = self.B, self.device
         smap = self._seat_slot_map(row)
         ctl = self.seat_ext[:, row]
@@ -38,10 +15,8 @@ class SimOrders:
         for n in range(simbase.UNIT_SLOTS):
             slot = smap[:, n]
             if not bool((slot >= 0).any()):
-                break  # the head is dense: an empty row in every game ends it
+                break
             sc = slot.clamp(min=0)
-            # LIVE, not merely mapped: `smap` is a loop-top snapshot and an
-            # earlier order can disband its own unit or lose it to a counter.
             present = (slot >= 0) & ctl & self.unit_alive.gather(1, sc.unsqueeze(1)).squeeze(1)
             a = actions[:, n].to(torch.long)
             act = present & (a >= 0) & (a != 12)
@@ -54,9 +29,8 @@ class SimOrders:
             is_civ = self._type_civilian[utp.clamp(min=0)]
             u_emb = self.unit_emb.gather(1, sc.unsqueeze(1)).squeeze(1)
             u_charges = self.unit_charges.gather(1, sc.unsqueeze(1)).squeeze(1)
-            nb = self.neigh[hc]  # [B, 6]
+            nb = self.neigh[hc]
 
-            # --- FOUND_CITY: a settler founds where it stands, consumed ------
             if getattr(self, "_A_FOUND", -1) >= 0 and self._settler_idx >= 0:
                 fnd = act & (a == self._A_FOUND) & (utp == self._settler_idx)
                 if bool(fnd.any()):
@@ -66,7 +40,6 @@ class SimOrders:
                         self.civilian_at[fr, here[fr]] = -1
                         self.unit_alive[fr, sc[fr]] = False
 
-            # --- MOVE 0-5 ---------------------------------------------------
             mv = act & (a < 6)
             if bool(mv.any()):
                 dirs = a.clamp(min=0, max=5)
@@ -77,10 +50,6 @@ class SimOrders:
                     self._blocked_for(tgt.unsqueeze(1), row, is_civilian=True).squeeze(1),
                     self._blocked_for(tgt.unsqueeze(1), row).squeeze(1),
                 )
-                # The MASK's three-way terrain body, at the apply surface: one
-                # legality rule, both surfaces. A naval hull takes the water
-                # plane (OCEAN behind CARTOGRAPHY); a land unit takes the land
-                # plane, or the EMBARK gate (SHIPBUILDING, at war with anyone).
                 terr = self.passable.gather(1, tc.unsqueeze(1)).squeeze(1)
                 is_nav = self.unit_naval[ut]
                 if self._embark_live:
@@ -93,17 +62,12 @@ class SimOrders:
                     )
                     any_war = self.war[:, row].any(dim=1)
                     terr = torch.where(is_nav, water, terr | (water & ship & ~is_nav & any_war))
-                # stepUnit refuses a cliff edge internally and `_step_verb` does
-                # not, so the refusal is spelled out here; walkPath's
-                # movesLeft > 0 loop gate likewise (the DISEMBARK arm costs "all
-                # remaining", which the afford test alone reads as free at 0).
                 clf = self._cliff_block_dirs(hc, nb, own_tile).gather(1, dirs.unsqueeze(1)).squeeze(1)
                 mp = self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1)
                 ok = mv & (tgt >= 0) & terr & ~blocked & ~clf & (mp > 0)
                 if bool(ok.any()):
-                    self._step_verb(ok, sc, here, tgt, dirs, row, is_civ)  # the shared step contract
+                    self._step_verb(ok, sc, here, tgt, dirs, row, is_civ)
 
-            # --- ATTACK 6-11 ------------------------------------------------
             atk = (
                 act & (a >= 6) & (a < 12)
                 & (self._type_combat[utp.clamp(min=0)] > 0)  # civilians cannot attack
@@ -125,8 +89,6 @@ class SimOrders:
                     c_seat = torch.where(_cs >= 0, self.unit_seat.gather(1, _cs.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
                     host_m = self._seats_hostile(row, m_seat.unsqueeze(1)).squeeze(1)
                     host_c = self._seats_hostile(row, c_seat.unsqueeze(1)).squeeze(1)
-                    # No cityFirst term: a centre is attacked as the CITY
-                    # whoever stands on it.
                     ctr = self._centre_seat_plane().gather(1, tc.unsqueeze(1)).squeeze(1)
                     city_t = self._seats_hostile(
                         row, torch.where((ctr >= 0) & (ctr < 100), ctr, neg).unsqueeze(1)).squeeze(1)
@@ -180,7 +142,6 @@ class SimOrders:
                             if bool(self._ranged_attack(one, tgt, "major", v)[b_]):
                                 self.unit_mp[b_, v] = 0
 
-            # --- SNIPE (the distance-2 ring) --------------------------------
             if getattr(self, "_snipe_on", False):
                 snp = act & (a >= self._A_SNIPE) & (a < self._A_SNIPE + 12) & ~is_civ
                 if bool(snp.any()):
@@ -200,11 +161,6 @@ class SimOrders:
                         if bool(self._hostile_ranged_strike(one, tgt_s, "major", v)[b_]):
                             self.unit_mp[b_, v] = 0
 
-            # --- CHOP (builderRemoveFeature) --------------------------------
-            # canRemoveFeature has NO ownership test — the GRANT checks the
-            # owner itself — so the lump lands only inside this seat's borders,
-            # in the city that owns the tile: food -> its growth box,
-            # production -> its head progress, banked when the queue is idle.
             if self._builder_idx >= 0:
                 ftr = self.tile_ftr.gather(1, hc.unsqueeze(1)).squeeze(1)
                 ftu = self.tile_ftu.gather(1, hc.unsqueeze(1)).squeeze(1)
@@ -231,7 +187,7 @@ class SimOrders:
                     for i2 in range(len(cr)):
                         b2, j2 = int(cr[i2]), int(col_c[i2])
                         if j2 < 0:
-                            continue  # outside this seat's borders: chopped, no lump
+                            continue
                         amt = float(amount[b2])
                         if int(ftr[cr[i2]]) == 1:
                             self.city_growth[b2, row, j2] += amt
@@ -246,7 +202,6 @@ class SimOrders:
                         self.unit_alive[dr, sc[dr]] = False
                         self.civilian_at[(dr, hc[dr])] = -1
 
-            # --- BUILD / REPAIR / RESOURCE IMPROVEMENTS ---------------------
             if self.improvements_on and self._builder_idx >= 0:
                 hf = (civics[:, self._hillfarms_civic] if self._hillfarms_civic >= 0
                       else torch.zeros(B, dtype=torch.bool, device=dev))
@@ -254,15 +209,13 @@ class SimOrders:
                           else torch.zeros(B, dtype=torch.bool, device=dev))
                 constr = (techs[:, self._lumber_unlock_tech] if self._lumber_unlock_tech >= 0
                           else torch.zeros(B, dtype=torch.bool, device=dev))
-                # validImprovements' shared half: a builder with charges on an
-                # OWN, empty, non-centre tile.
                 here_ok = (
                     act & (utp == self._builder_idx) & (u_charges > 0)
                     & own_tile.gather(1, hc.unsqueeze(1)).squeeze(1)
                     & (self.centre_slot_at.gather(1, hc.unsqueeze(1)).squeeze(1) < 0)
                     & (self.improvement.gather(1, hc.unsqueeze(1)).squeeze(1) < 0)
                     & (self.district.gather(1, hc.unsqueeze(1)).squeeze(1) < 0)
-                    & (self.built_wonder.gather(1, hc.unsqueeze(1)).squeeze(1) < 0)  # an in-flight wonder pave refuses improvements
+                    & (self.built_wonder.gather(1, hc.unsqueeze(1)).squeeze(1) < 0)
                 )
                 _rq = self.res_imp.gather(1, hc.unsqueeze(1)).squeeze(1)
                 did = torch.zeros(B, dtype=torch.bool, device=dev)
@@ -277,7 +230,7 @@ class SimOrders:
                         _valid = self.mine_ok.gather(1, hc.unsqueeze(1)).squeeze(1) & mining
                     elif _k == self.LUMBER:
                         _valid = (self.lumber_ok.gather(1, hc.unsqueeze(1)).squeeze(1)
-                                  & ~self.feat_stripped.gather(1, hc.unsqueeze(1)).squeeze(1) & constr)  # a chopped tile has no woods left to mill
+                                  & ~self.feat_stripped.gather(1, hc.unsqueeze(1)).squeeze(1) & constr)
                     else:
                         _ut = int(self._imp_unlock[_k])
                         _unl = (techs[:, _ut] if _ut >= 0
@@ -320,10 +273,6 @@ class SimOrders:
                     self.unit_mp[_r, sc[_r]] = 0
                     self._eff_version += 1
 
-            # --- PILLAGE (`seatPillage`) ------------------------------------
-            # A MILITARY unit on an ENEMY tile wrecks the improvement, else a
-            # complete non-centre district. Enemy = an AT-WAR major's land, or
-            # ANY city-state's (a minor's territory needs no declaration).
             if self._act_names and self._A_PILLAGE > 0:
                 _ts = self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1)
                 _en = (
@@ -344,8 +293,6 @@ class SimOrders:
                     _tt = hc[_r]
                     _pi = _hi[_r]
                     self.pillaged[_r[_pi], _tt[_pi]] = True
-                    # FOOD improvements (PILLAGE_HEAL) heal their pillager +25,
-                    # capped at full HP — every pillage arm carries it.
                     _impv = self.improvement[_r[_pi], _tt[_pi]]
                     _hl = self._imp_heals[_impv.clamp(min=0)] & (_impv >= 0)
                     _hr = _r[_pi][_hl]
@@ -357,9 +304,6 @@ class SimOrders:
                     self.unit_mp[_r, sc[_r]] = 0
                     self._eff_version += 1
 
-            # --- SPREAD (religious pressure) --------------------------------
-            # The lump into the target city's accumulator for religion `row` —
-            # a religion's id IS its founder's seat. Charge -1, disband at 0.
             if getattr(self, "_A_SPREAD", -1) >= 0:
                 spx = act & (a >= self._A_SPREAD) & (a < self._A_SPREAD + 7)
                 if bool(spx.any()):
@@ -426,9 +370,9 @@ class SimOrders:
             return
         seq = torch.arange(self.RC, device=self.device).reshape(1, -1).expand_as(alive)
         key = torch.where(alive, self.city_pop[rows, seat_row] * (1 << 20) - seq, torch.full_like(seq, -(1 << 60)))
-        pick = key.max(dim=1).indices  # [n] (garbage where ~need, masked below)
+        pick = key.max(dim=1).indices
         self.city_is_cap[rows[need], seat_row[need], pick[need]] = True
-        self._eff_version += 1  # yield-bearing: the palace term just moved
+        self._eff_version += 1
 
     def _capture_city_state(self, rows: torch.Tensor, citystate_of: torch.Tensor, dst_rows) -> None:
         """Annex a city-state into ANY seat row — the `captureCityState` twin.
@@ -444,7 +388,7 @@ class SimOrders:
         `dst_rows` is the receiving block row: an int, or a [B] tensor when the
         row is the conquering unit's and so is read per game."""
         dev = self.device
-        half_hp = (int(self.rules.combat.get("cityMaxHp", 200)) + 1) // 2  # Math.round(CITY_MAX_HP / 2)
+        half_hp = (int(self.rules.combat.get("cityMaxHp", 200)) + 1) // 2
         max_cities = int(self.rules.seats.get("maxCities", 6))
         for i in range(len(rows)):
             b = int(rows[i]); s = int(citystate_of[rows[i]])
@@ -458,8 +402,6 @@ class SimOrders:
             self.seat_routes[b] = torch.where(dead_cs.unsqueeze(2), torch.full_like(self.seat_routes[b], -1), self.seat_routes[b])
             self.seat_route_dest[b] = torch.where(dead_cs, torch.full_like(self.seat_route_dest[b], -1), self.seat_route_dest[b])
             self.seat_route_exp[b] = torch.where(dead_cs, torch.full_like(self.seat_route_exp[b], -1), self.seat_route_exp[b])
-            # tilesWithin(centre, 2) that this minor owns — a city-state's tile
-            # ownership lives in tile_seat as 100+s.
             ring = (self.pair_dist[c_t] <= 2) & (self.tile_seat[b] == 100 + s)
             self.tile_seat[b] = torch.where(ring, torch.full_like(self.tile_seat[b], NO_SEAT), self.tile_seat[b])
             self._tile_owner_ver += 1
@@ -468,15 +410,13 @@ class SimOrders:
             col = self._seat_city_append(b, row)
             new_id = int(self.civ_next_city_id[b, row])
             self.civ_next_city_id[b, row] += 1
-            # setTileOwner's two halves — the seat and the city id — over the
-            # ring and, unconditionally, over the centre.
             self.tile_seat[b] = torch.where(ring, torch.full_like(self.tile_seat[b], row), self.tile_seat[b])
             self.tile_city[b] = torch.where(ring, torch.full_like(self.tile_city[b], new_id), self.tile_city[b])
             self.tile_seat[b, c_t] = row
             self.tile_city[b, c_t] = new_id
             self._tile_owner_ver += 1
             self.city_alive[b, row, col] = True
-            self.era_score[b, row] += self._era_pts["conquer"]  # gained a city (the raze path continued above)
+            self.era_score[b, row] += self._era_pts["conquer"]
             self._reveal_around(torch.tensor([b], dtype=torch.long, device=dev), row,
                                 torch.tensor([c_t], dtype=torch.long, device=dev), 3)
             self.city_id[b, row, col] = new_id
@@ -603,25 +543,25 @@ class SimOrders:
         that seat's own spawn order even though every major seat interleaves
         into it). Only upkeep>0 units are candidates, and there is no refund.
         `active` is the TS loop's eliminated-actor continue."""
-        insolvent = js_round(self.civ_treasury[:, row] * 1000) < 0  # [B]
+        insolvent = js_round(self.civ_treasury[:, row] * 1000) < 0
         if active is not None:
             insolvent = insolvent & active
         if not bool(insolvent.any()):
             return
-        maint = self._type_maintenance[self.unit_type.clamp(min=0, max=self.NU - 1)]  # [B, W]
+        maint = self._type_maintenance[self.unit_type.clamp(min=0, max=self.NU - 1)]
         cand = self.unit_alive & (self.unit_seat == row) & (maint > 0)
         W = cand.shape[1]
         slots = torch.arange(W, device=self.device, dtype=maint.dtype).unsqueeze(0)  # [1, W]
         # maximize (upkeep, -slot): upkeep*(W+1) - slot lets upkeep dominate, tie -> lowest slot
         score = torch.where(cand, maint * float(W + 1) - slots, torch.full_like(maint, -1e30))
-        victim = score.argmax(dim=1)  # [B]
+        victim = score.argmax(dim=1)
         do_kill = insolvent & cand.any(dim=1)
         if not bool(do_kill.any()):
             return
         rows = do_kill.nonzero(as_tuple=True)[0]
         vslot = victim[rows]
         vtile = self.unit_tile[rows, vslot]
-        vciv = self._type_civilian[self.unit_type[rows, vslot].clamp(min=0, max=self.NU - 1)]  # clear military vs civilian occupancy
+        vciv = self._type_civilian[self.unit_type[rows, vslot].clamp(min=0, max=self.NU - 1)]
         mil = ~vciv
         if bool(mil.any()):
             self.military_at[(rows[mil], vtile[mil])] = -1
@@ -640,11 +580,6 @@ class SimOrders:
         self.barb_unit_mp.copy_(self._type_moves[self.barb_unit_type.clamp(min=0, max=self.NU - 1)])
 
     def _barbarian_phase(self) -> None:
-        """Run the barbarian phase, turn for turn and draw for draw.
-
-        Camp roll → camp placement → per-camp garrison rolls → raider actions
-        (attack else march) in unit order. NOTHING city-side runs here: a city
-        fires and heals in its OWNER's block, through the one shared body."""
         cb, B, T, dev = self.rules.combat, self.B, self.T, self.device
         self._barb_reset_mp()  # barbarianPhase's own movesLeft reset
         # The shared barbarian MELEE era-ladder type index (barb_unit_type 0/1/2/3 =
@@ -660,32 +595,18 @@ class SimOrders:
             else 1 if self.turn > cb.get("spearmanAfterTurn", 60)
             else 0
         )
-        # The RANGED barbarian ladder (barbRangedType): barb_unit_type 4 = ARCHER,
-        # 5 = CROSSBOWMAN after turn 120. Used at the RAID spawn site only, and
-        # only for every THIRD camp by its INDEX in the camp list
-        # (campNo % 3 === 0). Spawn TYPE only, so the 0.1 raid roll is
-        # untouched and this stays draw-count neutral.
         ranged_type = 5 if self.turn > cb.get("crossbowmanAfterTurn", 120) else 4
-        # The barbarian NAVAL ladder: GALLEY, then QUADRIREME past the same era
-        # turn the crossbow ladder uses.
         self._barb_naval_type = (
             self._barb_quad_idx
             if self.turn > cb.get("crossbowmanAfterTurn", 120)
             else self._barb_galley_idx
         )
 
-        # New camp? One draw whenever below the cap AND any seat still holds a
-        # city (seat 0 or a civ seat), so only a fully citiless world skips the
-        # roll. The short-circuit is part of the draw-count contract. A second
-        # draw picks the spot, and only if any candidate exists.
         any_city = self.city_alive[:, :self.n_majors].reshape(B, -1).any(dim=1)
         can_roll = any_city & (self.n_camps < self.max_camps)
         r1 = self._next_random(can_roll)
         want = can_roll & (r1 < cb.get("campSpawnChance", 0.08))
         if bool(want.any()):
-            # Only the `want` rows consume the candidate planes, so build them
-            # on the want sub-batch (boolean/integer ops row-restrict exactly;
-            # the RNG calls keep their full-B masks unchanged).
             wr = want.nonzero(as_tuple=True)[0]
             near_city_w = ((self.pair_dist[self.city_center[wr, 0].clamp(min=0)] < 5) & self.city_alive[wr, 0].unsqueeze(2)).any(dim=1)  # [n, T]
             # campCandidates excludes t.district LIVE: camp_ok is static, but
@@ -695,17 +616,17 @@ class SimOrders:
             # candidates too.
             rcc_w = self.city_center[wr, 1:self.n_majors].reshape(len(wr), -1)
             near_rc_w = ((self.pair_dist[rcc_w.clamp(min=0)] < 5) & self.city_alive[wr, 1:self.n_majors].reshape(len(wr), -1).unsqueeze(2)).any(dim=1)
-            cand_w = self.camp_ok[wr] & (self.tile_seat[wr] < 0) & ~near_city_w & ~near_rc_w & (self.district[wr] < 0) & (self.built_wonder[wr] < 0)  # a live builtWonder excludes the tile too
+            cand_w = self.camp_ok[wr] & (self.tile_seat[wr] < 0) & ~near_city_w & ~near_rc_w & (self.district[wr] < 0) & (self.built_wonder[wr] < 0)
             if self.fog_of_war:
                 # camps rise IN THE FOG — only on tiles dark to EVERY major
                 # seat (unexploredByAll; combat.ts's preferFog term).
                 cand_w = cand_w & ~self.seat_explored[wr].any(dim=1)
             if self.K > 0:
-                camp_d_w = self.pair_dist[self.camp_tile[wr].clamp(min=0)].to(torch.long)  # [n, K, T]
+                camp_d_w = self.pair_dist[self.camp_tile[wr].clamp(min=0)].to(torch.long)
                 near_camp_w = ((camp_d_w < 5) & (self.camp_tile[wr] >= 0).unsqueeze(2)).any(dim=1)
                 cand_w = cand_w & ~near_camp_w
             has = torch.zeros_like(want)
-            has[wr] = cand_w.any(dim=1)  # want[wr] is all-True, so has == want & cand.any
+            has[wr] = cand_w.any(dim=1)
             r2 = self._next_random(has)
             if bool(has.any()):
                 k_w = torch.floor(r2[wr] * cand_w.sum(dim=1).to(torch.float64)).to(torch.long)
@@ -738,7 +659,7 @@ class SimOrders:
             if not bool(active.any()):
                 continue
             near_any = near_any_all[:, k]
-            self._spawn_barb(active & ~near_any, camp, melee_type)  # era ladder (empty camp regarrisons)
+            self._spawn_barb(active & ~near_any, camp, melee_type)
             can_grow = active & near_any & (self.barb_unit_alive.sum(dim=1) < self.n_camps * cb.get("maxBarbPerCamp", 3))
             r = self._next_random(can_grow)
             # Every THIRD camp raids RANGED, the rest melee. `k` IS the TS
@@ -753,7 +674,7 @@ class SimOrders:
             # already fired and nothing else is consulted.
             _nav_done = torch.zeros_like(_raid)
             if k % 4 == 1 and self._barb_naval_type >= 0:
-                _nb = self.neigh[camp.clamp(min=0)]  # [B, 6]
+                _nb = self.neigh[camp.clamp(min=0)]
                 _nbc = _nb.clamp(min=0)
                 _free = (
                     (_nb >= 0)
@@ -776,7 +697,7 @@ class SimOrders:
         # (fresh — garrison spawns just added units).
         guard = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=dev)
         if any_camp:
-            du_g = self.pair_dist[self.camp_tile.clamp(min=0).unsqueeze(2), self.barb_unit_tile.unsqueeze(1)].to(torch.long)  # [B, K, U]
+            du_g = self.pair_dist[self.camp_tile.clamp(min=0).unsqueeze(2), self.barb_unit_tile.unsqueeze(1)].to(torch.long)
         for k in range(self.K if any_camp else 0):
             camp = self.camp_tile[:, k]
             active = camp >= 0
@@ -799,10 +720,6 @@ class SimOrders:
         # mid-loop and nothing spawns barbarians here, so the snapshot is a
         # superset; ascending order (and thus the TS unit order) is unchanged.
         u_live = self.barb_unit_alive[:, :u_high].any(dim=0).nonzero(as_tuple=True)[0].tolist() if u_high else []
-        # Which barbarian slots are RANGED (ARCHER/CROSSBOWMAN). Hoisted:
-        # nothing spawns barbarians inside the raider loop, so barb_unit_type is fixed
-        # here, and the batch-wide flag costs ONE host sync per turn instead of
-        # one per slot.
         u_rngd_all = self.barb_unit_alive & (self._type_ranged_strength[self.barb_unit_type.clamp(min=0, max=self.NU - 1)] > 0)
         any_rngd = bool(u_rngd_all.any())
         for u in u_live:
@@ -810,7 +727,7 @@ class SimOrders:
             if not bool(act.any()):
                 continue
             here = self.barb_unit_tile[:, u]
-            nb = self.neigh[here]  # [B, 6]
+            nb = self.neigh[here]
             nbc = nb.clamp(min=0)
             # A MAJOR's centre is a melee target whoever holds it —
             # `caps.alwaysHostile` needs no war and `cityAtIndex` names no
@@ -823,8 +740,6 @@ class SimOrders:
             _mn = self.military_at.gather(1, nbc)
             _mn_seat = torch.where(_mn >= 0, self.unit_seat.gather(1, _mn.clamp(min=0)), torch.full_like(_mn, -1))
             has_unit = ((_mn >= 0) & (_mn_seat != BARB_SEAT)) | (self.civilian_at.gather(1, nbc) >= 0)
-            # An adjacent LIVE Encampment is a melee target for a barbarian too
-            # (hostile to every owner) — attackTargets' encampTarget.
             enc_nb = self._encamp_block(nb, BARB_SEAT) if self._encamp_didx >= 0 else None
             valid = (nb >= 0) & (ctr | has_unit | (enc_nb if enc_nb is not None else False))
             tkey = torch.where(valid, nb, T + 1)
@@ -842,7 +757,7 @@ class SimOrders:
             rngd = u_rngd_all[:, u]
             if any_rngd and bool((act & rngd).any()):
                 rng_u = self._type_ranged_range[self.barb_unit_type[:, u].clamp(min=0, max=self.NU - 1)]
-                d_all = self.pair_dist[here.clamp(min=0)].to(torch.long)  # [B, T]
+                d_all = self.pair_dist[here.clamp(min=0)].to(torch.long)
                 rng_valid = (
                     (d_all >= 1)
                     & (d_all <= rng_u.unsqueeze(1))
@@ -855,11 +770,7 @@ class SimOrders:
                 target_tile = torch.where(rngd, rng_key.min(dim=1).values, target_tile)
             attack = act & (target_tile <= T)
             ttc = target_tile.clamp(max=T - 1)
-            # meleeAttackInner's precedence, ONE set of arms for every
-            # centre: a city is attacked as the CITY whoever stands on it —
-            # through a garrison, and through a lone civilian too.
             ctr_here = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0
-            # a NON-BARBARIAN unit stands on the target tile
             has_u = self._nonbarb_unit_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
             city_att = attack & ~rngd & ctr_here
             unit_att = attack & ~rngd & has_u & ~ctr_here
@@ -895,17 +806,10 @@ class SimOrders:
                 acted_att = acted_att | self._hostile_ranged_strike(rng_att, ttc, "barb", u)
             self.barb_unit_mp[:, u] = torch.where(acted_att, torch.zeros_like(self.barb_unit_mp[:, u]), self.barb_unit_mp[:, u])  # the turn is spent (TS movesLeft = 0)
 
-            # Pillage: a raider that did not attack, standing on an owned,
-            # improved, unpillaged tile, pillages it and holds (no march this
-            # turn) — hostileUnitAct's pillage branch. Only FOOD improvements
-            # heal the pillager (+25).
             pillage = torch.zeros_like(act)
             if self.improvements_on:
                 h_imp = self.improvement.gather(1, here.unsqueeze(1)).squeeze(1) >= 0
                 h_unpil = ~self.pillaged.gather(1, here.unsqueeze(1)).squeeze(1)
-                # barbarians raid CIV improvements too
-                # barbarians raid any MAJOR's improvements; a city-state's
-                # are not in hostileUnitAct's set.
                 _h_seat = self.tile_seat.gather(1, here.unsqueeze(1)).squeeze(1)
                 h_owned = (_h_seat >= 0) & (_h_seat < self.n_majors)
                 pillage = act & ~attack & h_imp & h_unpil & h_owned
@@ -920,10 +824,6 @@ class SimOrders:
                         heal_r, (self.barb_unit_hp[rows, u] + 25).clamp(max=hp_cap), self.barb_unit_hp[rows, u]
                     )
 
-            # Else pillage the DISTRICT underfoot — a COMPLETE, unpillaged
-            # enemy district (self.district excludes centres by construction).
-            # No heal, no loot. Barbarians raid CIV districts too; this is
-            # hostileUnitAct's district branch.
             dist_pillage = torch.zeros_like(act)
             if self.districts_on:
                 h_dist = self.district.gather(1, here.unsqueeze(1)).squeeze(1)
@@ -938,10 +838,6 @@ class SimOrders:
                     self.barb_unit_mp[rows, u] = 0  # the turn is spent (TS movesLeft = 0)
                     self._eff_version += 1  # district yields just dropped
 
-            # March target: the nearest unpillaged owned improvement OR
-            # district within dist < 13 (ties → lowest tile index), else the
-            # nearest alive city (ties → founding order) — hostileUnitAct's
-            # target scan.
             march = act & ~attack & ~pillage & ~dist_pillage
             if not bool(march.any()):
                 continue
@@ -979,18 +875,6 @@ class SimOrders:
             tgt = torch.where(has_imp, imp_tgt, city_tgt)
             has_tgt = has_imp | (ckey_min < 10**18)
             d_here = self.pair_dist[here, tgt].to(torch.long)
-            # The raider walks REAL MP toward the (fixed) target, exactly as
-            # the civ march does. Per step: the passable free neighbour closest
-            # to it (ties → direction order), move only if strictly closer,
-            # walkPath's charge (1 + tmove//3, live/strip-adjusted, +3 per
-            # river-edge crossing); a full-MP unit always affords its first
-            # step. An improvement target is walked ONTO; a CITY target stops
-            # the march ADJACENT (dir >= 1 — enemy centres cannot be entered,
-            # and the start-of-phase attack scan already met any adjacent
-            # target). Any step spends MP, which blocks the heal. MP comes from
-            # the unit's own type — barbarian types do not all share one value
-            # (the SCOUT opener has 3 where the melee ladder has 2). Camps are
-            # a barbarian no-op (clearCampFor skips barbarians).
             cur = here.clone()
             d_cur = d_here.clone()
             gslot = torch.full_like(cur, u + self.POOL_LO["barb"])
@@ -1005,19 +889,15 @@ class SimOrders:
                 _navm = self.unit_naval[self.barb_unit_type[:, u].clamp(min=0)].unsqueeze(1)
                 _plane = torch.where(
                     _navm,
-                    self.wpass.gather(1, nb2c) & ~self.ocean_tile.gather(1, nb2c),  # no CARTOGRAPHY
+                    self.wpass.gather(1, nb2c) & ~self.ocean_tile.gather(1, nb2c),
                     self.passable.gather(1, nb2c),
                 )
                 step_ok = (nb2 >= 0) & _plane & ~self._blocked_for(nb2, BARB_SEAT)
-                d_nb = self.pair_dist[tgt.unsqueeze(1), nb2c].to(torch.long)  # dist(neighbor, target); symmetric
+                d_nb = self.pair_dist[tgt.unsqueeze(1), nb2c].to(torch.long)
                 skey = torch.where(step_ok, d_nb * 8 + arange6, 10**9)
                 best = skey.min(dim=1).values
                 dir_i = (best % 8).clamp(max=5)
                 dest = nb2.gather(1, dir_i.unsqueeze(1)).squeeze(1)
-                # An improvement target is walked ONTO; a CITY target stops the
-                # march adjacent. Everything past the destination — cost,
-                # afford, the occupancy pair, the tile, the MP spend, the ZOC
-                # halt — is the shared step contract.
                 mv = self._step_verb(
                     moving
                     & (best < 10**9)
@@ -1033,11 +913,4 @@ class SimOrders:
                 cur = torch.where(mv, dest, cur)
                 moving = mv & (mp > 0)
 
-        # A seat-0 city's WALLS strike, its Encampment strike and its heal used
-        # to run HERE, a phase early and in three all-cities passes, while every
-        # other seat's ran per city inside its own seat block. Both engines now
-        # run one body — `_seat_city_fire_and_heal` — at the per-city seatPhase
-        # position, for every seat row. Nothing city-side belongs in the
-        # barbarian phase.
 
-    # --- city-states (phase 4c) ---------------------------------------------------

@@ -32,18 +32,12 @@ const args = process.argv.slice(2).filter((a) => a !== '--check');
 const CHECK = process.argv.includes('--check');
 const N_SEEDS = Number(args[0] ?? 12);
 const CITY_STATE_MAX = Number(args[1] ?? 3);
-// HOW MANY MAJORS, seat 0 included. It was `civMax = 2` — the count of the
-// seats BESIDES seat 0 — until #115: the last written-down trace of the
-// player-and-rivals model, and a number every reader had to +1 before use.
 const CIV_COUNT = Number(args[2] ?? 3);
 const OUT = args[3] ?? 'seeder/worlds';
 const WIDTH = 44;
 const HEIGHT = 26;
 const LOCK_PATH = 'seeder/worlds.lock';
 
-/** The seed list: plain arithmetic. The old survivability SEED_OVERRIDES died
- *  with the scripted reference game — a bad seed is now a coverage question
- *  answered at the level of the SEED SET, never by hand-picking survivors. */
 const seeds = Array.from({ length: N_SEEDS }, (_, s) => 9001 + s * 13);
 
 const params = { width: WIDTH, height: HEIGHT, cityStateMax: CITY_STATE_MAX, civCount: CIV_COUNT };
@@ -52,7 +46,6 @@ const stamp = genStamp({ ...params, seeds, placement: PLACEMENT_VERSION });
 const ELEVATIONS = ['FLAT', 'HILLS', 'MOUNTAIN'];
 
 function buildWorld(seed: number): WorldFile {
-  // withVillages: false — goody-hut claiming is outside the ported scope.
   const map = generateMap({ width: WIDTH, height: HEIGHT, seed, withResources: true, withWonders: true, withVillages: false });
   const catalogs = {
     terrains: Object.keys(TERRAINS),
@@ -128,8 +121,6 @@ if (CHECK) {
     );
   }
   writeFileSync(LOCK_PATH, JSON.stringify(lock, null, 1) + '\n');
-  // Sweep orphans: the emit set is the single source of truth — a stale
-  // world poisons the serve gate, which globs this directory.
   const emitted = new Set(worlds.map((w) => `seed${w.gen.seed}.world.json`));
   for (const f of readdirSync(OUT)) {
     if (/^seed\d+\.world\.json$/.test(f) && !emitted.has(f)) {

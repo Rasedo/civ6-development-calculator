@@ -1,20 +1,3 @@
-/**
- * LOAD A WORLD FILE (Layer A) into a live `GameState` — the TS engine's side
- * of the seeder cut: the seeder no longer imports the engine, and the engine
- * no longer re-runs placement; both meet at the file.
- *
- * The loader must reproduce INCIDENTAL ordering exactly (unit array order,
- * unit ids, first-ring city-state ownership): the serve gate compares
- * per-unit rows in array order, so a "semantically correct" loader that
- * reorders units fails the gate for a non-engine reason. Everything here is
- * therefore a straight walk of the file, in file order, through the same
- * engine constructors the old in-engine placement used.
- *
- * Validation is loud and total: every catalog string must exist in the
- * engine's own tables (a renumbered or renamed catalog is a startup failure,
- * not a silent permutation), every unit type must be in the roster, and every
- * spawn must land exactly on its file tile.
- */
 import type { WorldFile } from '../../world/file';
 import type { CityStateType, Elevation, FeatureId, GameMap, GameState, TerrainId, Tile } from '../core/types';
 import { NO_SEAT } from '../core/types';
@@ -83,7 +66,6 @@ export function loadWorld(world: WorldFile): GameState {
   state.disasters = true;
   state.rngState = world.rngInit >>> 0;
 
-  // City-states first (file order = id order), through the one constructor.
   world.cityStates.forEach((cityState, i) => {
     if (!CITY_STATE_TYPES.includes(cityState.type as CityStateType)) {
       throw new Error(`world file names city-state type '${cityState.type}' the engine does not know`);
@@ -91,14 +73,8 @@ export function loadWorld(world: WorldFile): GameState {
     placeCityStateAt(state, i, cityState.name, cityState.type as CityStateType, cityState.center);
   });
 
-  // The civs, in seat order — civ 0 included, one constructor for all. NO
-  // capitals: each civ's file units (settler + warrior) ARE its start.
   world.civs.forEach((civ, i) => {
     const leader = CIV_LEADERS[civ.leader % CIV_LEADERS.length];
-    // ONE constructor, every seat. `createGameFromMap` pre-seeds row 0's
-    // record for the map path, so take the record when it is already there and
-    // build it when it is not — there is no `i === 0` arm, and seat 0 draws its
-    // leader, its colour and its aggression exactly where every other seat does.
     const seat = state.seats[i] ?? (state.seats[i] = emptySeat(i));
     seat.name = leader.name;
     seat.color = leader.color;

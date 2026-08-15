@@ -1,11 +1,3 @@
-/**
- * GREAT PEOPLE — accrual, recruitment and payout, for every seat.
- *
- * Great people are unique individuals drawn from one global pool: whoever
- * reaches a class's next cost first takes that person, and nobody else can.
- * `state.claimedGreatPeople` is that pool's claim order; each seat records its
- * own recruits in `Seat.gpEarned`.
- */
 
 import type { GameState, GreatPersonClass } from './types';
 import { citiesOf, seatOf } from './seats';
@@ -16,19 +8,10 @@ import { addEraScore, goldenProphetPoints } from './eras';
 import { getModifiers } from './effects';
 import { spawnUnit } from './units';
 
-/** How many people of this class ANYONE has already recruited. */
 export function greatPeopleEarned(state: GameState, cls: GreatPersonClass): number {
   return state.claimedGreatPeople.filter((id) => GREAT_PEOPLE[cls].some((p) => p.id === id)).length;
 }
 
-/**
- * This seat's great-person points per turn, by class.
- *
- * A city earns for a class when it holds that class's district, COMPLETE and
- * unpillaged: 1 point, plus the belief's flat bonus, plus one per building of
- * that district. The golden-age EXODUS prophet grant is civ-wide and
- * district-free, so it lands outside the per-city loop.
- */
 export function greatPersonPointsPerTurn(
   state: GameState,
   seat: number,
@@ -53,7 +36,6 @@ export function greatPersonPointsPerTurn(
   return out;
 }
 
-/** Recruit the next person of `cls` for `seat` and apply what they do. */
 function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
   const owner = seatOf(state, seat);
   const person = GREAT_PEOPLE[cls][greatPeopleEarned(state, cls)];
@@ -62,9 +44,6 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
   const fx = person.effect;
 
   if (fx.science) owner.research.techProgress += fx.science;
-  // WRITER/MUSICIAN/ARTIST slot a Great Work (deferred culture per turn); a
-  // charge with no open slot falls back to the instant culture lump, one per
-  // overflow charge. Every other class applies its culture instantly.
   if (GW_WORK_CLASSES.has(cls)) {
     const kind = GW_CLASS_KIND[cls]!;
     // Wonder-granted slots (Great Library +2 writing) resolve HERE because
@@ -89,8 +68,6 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
     if (capital && capital.queue.length > 0) capital.queue[0].progress += fx.productionToCapital;
     else if (capital) capital.productionBank = (capital.productionBank ?? 0) + fx.productionToCapital;
   }
-  // A GENERAL/ADMIRAL claim also spawns its support unit at the capital, on top
-  // of the roster's instant effect (which models the retire ability).
   if (cls === 'GENERAL' || cls === 'ADMIRAL') {
     const capital = cities.find((c) => c.isCapital);
     if (capital) spawnUnit(state, cls, capital.centerIndex, seat);
@@ -102,11 +79,6 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
   state.eventLog.push(`${owner.name} claimed ${person.name}.`);
 }
 
-/**
- * Bank this turn's points for `seat` and recruit everyone they can afford.
- * Cost rises with how many of the class ANYONE has taken, and the remainder
- * carries — points are never zeroed on a recruit.
- */
 export function advanceGreatPeople(state: GameState, seat: number): void {
   const owner = seatOf(state, seat);
   if (!owner) return;

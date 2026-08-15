@@ -1,23 +1,3 @@
-"""Perf driver: attributable cProfile baselines for `step()`.
-
-    python tools/gpu/profile_step.py                    # both parts, 250 turns
-    python tools/gpu/profile_step.py --part parity
-    python tools/gpu/profile_step.py --part rollout
-    python tools/gpu/profile_step.py --dump out.prof    # keep the raw stats
-
-Two mirrors of the battery's hot paths, run under cProfile with OMP/MKL
-pinned to 4 threads so numbers are comparable across sessions:
-
-  parity  — scripted/f64 mirror: first 6 seed fixtures, B=6, bare step().
-  rollout — off-script core: first 3 seed fixtures × 3 replicas, B=9, the
-            masked-choice sampling + attack-preferring order transform, then
-            step(...).
-
-Output per part: wall seconds, turns/sec, top-40 by cumtime, top-15 by
-tottime, and the `Tensor.any` guard-storm counter (call count + tottime).
-Numbers are only comparable when the box is QUIET (never read perf off a
-contended machine).
-"""
 
 from __future__ import annotations
 
@@ -48,7 +28,7 @@ HOLD = 12
 def _parity_loop(sim: BatchSim, turns: int) -> None:
     for _ in range(turns):
         sim.step()
-        pass  # step cost only
+        pass
 
 
 def _rollout_loop(sim: BatchSim, turns: int, seed: int) -> None:
@@ -73,7 +53,7 @@ def _rollout_loop(sim: BatchSim, turns: int, seed: int) -> None:
         sim.apply_seat_actions(0, production=pa, tech=ta, civic=ca, envoys=ea)
         sim._apply_seat_unit_actions(0, ua)
         sim.step()
-        pass  # step cost only
+        pass
 
 
 def _report(part: str, pr: cProfile.Profile, wall: float, turns: int, dump: str | None) -> None:

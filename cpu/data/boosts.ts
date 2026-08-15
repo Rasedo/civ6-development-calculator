@@ -33,7 +33,6 @@ export type BoostCheck =
 
 export interface BoostDef {
   desc: string;
-  /** Auto-detected condition; absent = manual toggle only. */
   check?: BoostCheck;
 }
 
@@ -41,7 +40,6 @@ export const BOOST_FRACTION = 0.4;
 
 /** Keyed by tech/civic id (ids never collide between the two trees). */
 export const BOOSTS: Record<string, BoostDef> = {
-  // --- tech eurekas ----------------------------------------------------------
   IRRIGATION: { desc: 'Farm a resource.', check: { kind: 'improvement', id: 'FARM', count: 1, onResource: true } },
   WRITING: { desc: 'Meet another civilization. (manual)' },
   ASTROLOGY: { desc: 'Own a tile adjacent to a natural wonder.', check: { kind: 'nearNaturalWonder' } },
@@ -82,7 +80,6 @@ export const BOOSTS: Record<string, BoostDef> = {
   STEAM_POWER: { desc: 'Build 2 Shipyards.', check: { kind: 'building', id: 'SHIPYARD', count: 2 } },
   REFINING: { desc: 'Build 2 Oil Wells.', check: { kind: 'improvement', id: 'OIL_WELL', count: 2 } },
 
-  // --- civic inspirations -------------------------------------------------------
   CRAFTSMANSHIP: { desc: 'Improve 3 tiles.', check: { kind: 'improvement', id: 'FARM', count: 3 } },
   FOREIGN_TRADE: { desc: 'Discover a second continent. (manual)' },
   MILITARY_TRADITION: { desc: 'Clear a barbarian outpost. (manual)' },
@@ -114,9 +111,5 @@ export const BOOSTS: Record<string, BoostDef> = {
   CLASS_STRUGGLE: { desc: 'Build 3 Factories.', check: { kind: 'building', id: 'FACTORY', count: 3 } },
   TOTALITARIANISM: { desc: 'Build 3 Military Academies.', check: { kind: 'building', id: 'MILITARY_ACADEMY', count: 3 } },
 
-  // new-civic inspirations — only NUCLEAR_PROGRAM has an expressible,
-  // exported target (Research Lab, a Campus tier). Every other appended civic's
-  // real inspiration needs an absent system (trade routes, alliances, luxuries,
-  // multi-city population, wonder counts) and is uninspirable (recorded).
   NUCLEAR_PROGRAM: { desc: 'Build a Research Lab.', check: { kind: 'building', id: 'RESEARCH_LAB', count: 1 } },
 };

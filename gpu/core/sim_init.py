@@ -1,8 +1,3 @@
-"""Construction: fixture loading, plane allocation, aliases, snapshot/restore, invariants.
-
-One mixin of BatchSim (assembled in engine.py); state and helpers live on
-self / gpu/core/simbase.py.
-"""
 from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
@@ -11,9 +6,6 @@ from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must
 
 
 class SimInit:
-    """B games × RC city slots per seat row, stepping in lockstep. Build from fixtures
-    (parity) or by replicating one fixture B times (benchmark/training).
-    """
 
     def __init__(self, fixtures: list[dict], rules: Rules, device: str = "cpu", dtype=torch.float64):
         self.rules = rules
@@ -57,9 +49,6 @@ class SimInit:
         # and this storage cannot drift. Settling caps at maxCities; loyalty
         # flips exceed it. Empty slots are city_alive=False.
         self.RC = int(rules.seats.get("citySlots", 24))
-        # A city-state's one city is slot 0 of its own seat row, at the row
-        # index the war matrix uses, so "which row is this seat" has one answer
-        # everywhere; `S` is hoisted here beside `n_majors`.
         self.S = int(f0.get("cityStateMax", 0))
         # FOG IS LIVE in units mode (fogOfWar rides the fixture; older
         # fixtures predate the key and fall back to unitsMode — the creation
@@ -94,28 +83,22 @@ class SimInit:
             _shape = (B, self.n_majors + _sp, _rcp) + ((_ex,) if _ex else ())
             _base = torch.full(_shape, _rf, dtype=_dt, device=device)
             setattr(self, f"city_{_k}", _base)
-            if _pf is not None:  # two facts open row 0 differently (hp, centre)
+            if _pf is not None:
                 _base[:, 0].fill_(_pf)
 
         def ften(getter, shape_tail=()):
             return torch.tensor([getter(f) for f in fixtures], dtype=dtype, device=device).reshape(B, *shape_tail)
 
-        # --- static map -------------------------------------------------------
         self.tile_yields = ften(lambda f: [t["y"] for t in f["tiles"]], (T, 6))
         self.res_priority = torch.tensor([[t["res"] for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.wonder_near = torch.tensor([[t.get("wnear", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
-        self.coastal_land = torch.tensor([[t.get("cl", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)  # isCoastalLand (coastalCity eurekas)
+        self.coastal_land = torch.tensor([[t.get("cl", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.passable = torch.tensor([[t["pass"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
-        # WATER passability (a water tile that is not impassable). Static
-        # terrain layer — tech gating (embark capability, OCEAN needing
-        # CARTOGRAPHY) is composed at the war-march gather site.
         self.wpass = torch.tensor([[t.get("wpass", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         # OCEAN tiles need CARTOGRAPHY to enter (COAST/LAKE do not); the gate is
         # applied per-mover.
         self.ocean_tile = torch.tensor([[t.get("ocean", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
 
-        # Citizen-workability (= !isImpassable — water IS workable, unlike unit
-        # passability).
         self.work_ok = torch.tensor([[t.get("work", t["pass"]) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         # Luxury amenity source (mirrors luxuryAmenities): per tile, the
         # luxury's catalog index (-1 none) and the improvement index that
@@ -156,12 +139,7 @@ class SimInit:
         # the Palace or anchor domination, and _reclaim_cities compaction permutes
         # slots underneath. civ_cap_tile is allocated with the civ block below.
         import os as _os
-        # How close a pool may get to its own cap before `_reclaim_pool`
-        # compacts it — a HEADROOM, applied to whichever pool is asked, so
-        # the two pool sizes need no threshold each.
         self._reclaim_headroom = int(_os.environ.get("CIV6_RECLAIM_HEADROOM", 24))
-        # ...or an ABSOLUTE high-water trigger, which is what the
-        # forced-compaction gate sets to compact on every step.
         self._reclaim_force_at = (int(_os.environ["CIV6_RECLAIM_AT"])
                                   if "CIV6_RECLAIM_AT" in _os.environ else None)
 
@@ -188,8 +166,6 @@ class SimInit:
         self.register_alias("citystate_center", lambda sim: sim.city_center[:, sim._CITY_MINOR0:sim._CITY_MINOR0 + max(sim.S, 1), 0])
         self.citystate_pop = self.city_pop[:, _m0:_m0 + s_pad, 0]
         self.register_alias("citystate_pop", lambda sim: sim.city_pop[:, sim._CITY_MINOR0:sim._CITY_MINOR0 + max(sim.S, 1), 0])
-        # Per-CS suzerain unique-perk yield column (-1 = none). Name-keyed in
-        # the exporter, constant thereafter.
         self.citystate_suz_key = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         for b, f in enumerate(fixtures):
             for s, cs in enumerate(f.get("cityStates", [])):
@@ -213,8 +189,6 @@ class SimInit:
         self._alloc_war(B, self.n_majors, s_pad, device)
         # Siege hit points (attackCityState) — the TS `cs.hp` twin.
         self.citystate_hp = self.city_hp[:, _m0:_m0 + s_pad, 0]
-        # The block fills every non-seat-0 row with 0; a minor's own maximum is
-        # written once here rather than teaching the block a third fill.
         self.citystate_hp.fill_(int(rules.citystate.get("maxHp", 150)))
         self.register_alias("citystate_hp", lambda sim: sim.city_hp[:, sim._CITY_MINOR0:sim._CITY_MINOR0 + max(sim.S, 1), 0])
         # `war_turns[b, i, j]` is how long i and j have been at war — one cell
@@ -241,9 +215,8 @@ class SimInit:
         self._citystate_b2idx = torch.tensor(citystate_b2, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S]
         self._citystate_suz_amt = float(rules.citystate.get("suzerainYield", 3))  # flat suzerain capital-yield amount
 
-        # --- civ seats ---------------------------------------------------------
         rr = rules.seats
-        n_gp = len(rr.get("gpClassDistrict", [])) or 5  # GP class count (Scientist..General)
+        n_gp = len(rr.get("gpClassDistrict", [])) or 5
 
         # City slots append at last-alive+1 (order-preserving) and compact at
         # the step end whenever any major row holds a hole, so the layout is
@@ -252,23 +225,14 @@ class SimInit:
         # CIV6_RC_REGISTRY_CHECK. No hot-path cost otherwise.
         self._civ_city_reg_check = bool(_os.environ.get("CIV6_RC_REGISTRY_CHECK"))
         civ_city_pad = self.RC
-        # Per-tile registry of the owning CITY as its persistent city id
-        # (meaningful only where a major owns the tile). Keyed on the ID, not
-        # the slot, so _reclaim_cities compaction needs no tile-plane remap. No civ
-        # city exists at t0, so it starts empty.
         self.water = torch.tensor([[t.get("wt", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.nwonder = torch.tensor([[t.get("nw", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.settle_ok = torch.tensor([[t.get("st", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.site_q3 = torch.tensor(
             [[t.get("sq", [0.0, 0.0, 0.0]) for t in f["tiles"]] for f in fixtures], dtype=torch.float64, device=device
-        )  # [B, T, 3] per-source contributions, added separately like siteQuality
+        )
         self.hills = torch.tensor([[t.get("hl", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
-        # River-edge crossing bits, riverMask verbatim — the neigh columns
-        # enumerate AXIAL_DIRS order (E NE NW W SW SE), the same order the
-        # mask's bits use: bit d = crossing toward neigh column d.
         self.river_mask = torch.tensor([[int(t.get("rm", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
-        # CLIFF edge mask — the riverMask twin. Blocks EMBARK and DISEMBARK
-        # across that land/water edge (cities and Harbors excepted).
         self.cliff_mask = torch.tensor([[int(t.get("cm", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # Per-tile APPEAL contribution (cpu/core/appeal.ts tileAppeal sums what
         # each NEIGHBOUR contributes). `ap` = static part + the t0 feature term;
@@ -276,33 +240,15 @@ class SimInit:
         # exactly it. Dynamic terms are applied in _tile_appeal.
         self.appeal_base = torch.tensor([[int(t.get("ap", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.appeal_feat = torch.tensor([[int(t.get("apf", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
-        # The ON-TILE appeal terms (mountain +4, river/lake +1). NOT neighbour
-        # contributions, so they are added to the tile's OWN appeal after the
-        # neighbour gather rather than folded into appeal_base.
         self.appeal_self = torch.tensor([[int(t.get("aps", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # Appeal OVERRIDE — natural wonder 5, mountain 4, neither touched by
         # adjacency; -999 = compute normally. Mirrors the two early returns in
         # cpu/core/appeal.ts tileAppeal.
         self.appeal_over = torch.tensor([[int(t.get("apo", -999)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
-        # Existence + temperament on the seat axis (row 0 = seat 0). Static:
-        # placed at creation, never mutated, so the base is not snapshot-
-        # registered.
-        # Life comes from the fixture's seat-keyed `civs[]` below, for every
-        # row alike — a seat the world does not contain is not alive (#75).
         self.civ_alive = torch.zeros(B, self.n_majors, dtype=torch.bool, device=device)
-        # Per-seat FOG — Seat.explored's twin. Row 0 = seat 0, r+1 = civ r;
-        # a tile is dark until a reveal (spawn/walk/found/growth/capture)
-        # lifts it for THAT seat. Accrues only with fog_of_war (the
-        # revealAround gate), and the t0 unit loads below seed the start
-        # disks exactly as the seeder's spawn reveals did.
         self.seat_explored = torch.zeros(B, self.n_majors, self.T, dtype=torch.bool, device=device)
         self.civ_aggression = torch.zeros(B, self.n_majors, dtype=torch.float64, device=device)
 
-        # ------------------------------------------------------------------
-        # PER-SEAT SCALARS. One `civ_x [B, n_majors]` plane per fact, addressed by
-        # ROW and by nothing else (#111): `civ_x[:, 0]` is seat 0, `civ_x[:, 1:]`
-        # the civ seats, `civ_x[:, row]` whichever seat is asking.
-        # ------------------------------------------------------------------
         _civ_scalars = (
             ("best_melee", torch.long, 0), ("builders_trained", torch.long, 0),
             ("civic_prog", dtype, 0), ("cur_civic", torch.long, -1),
@@ -310,10 +256,6 @@ class SimInit:
             ("diplo_points", torch.long, 0), ("envoys_avail", torch.long, 0),
             ("influence", dtype, 0), ("tech_prog", dtype, 0),
             ("treasury", dtype, 0),
-            # The belief/religion identity row, the city-id allocator and the
-            # tile-purchase escalator ride the same seat axis. Seat 0's rows
-            # exist from here on; the mechanics that write them arrive with
-            # the seat-0 religion work and the seat-0 purchase wire.
             ("enhancer", torch.long, -1), ("enhancer_done", torch.bool, 0),
             ("follower", torch.long, -1), ("founder", torch.long, -1),
             ("next_city_id", torch.long, 0), ("pantheon", torch.long, -1),
@@ -322,32 +264,15 @@ class SimInit:
         )
         for _nm, _dt, _fill in _civ_scalars:
             setattr(self, f"civ_{_nm}", torch.full((B, self.n_majors), _fill, dtype=_dt, device=device))
-        # The opening balance, addressed by the seat the fixture names — no
-        # arm assumes where in `civs[]` a given seat sits.
         for _b, _f in enumerate(fixtures):
             for _cv in _f["civs"]:
                 _s = int(_cv["seat"])
                 if 0 <= _s < self.n_majors:
                     self.civ_treasury[_b, _s] = float(_cv.get("treasury", 0.0))
-        # THE DIPLOMATIC PAIR PLANES, on the WAR MATRIX'S OWN ROWS — same
-        # geometry as `war`, so every seat has a row and `war[b, i, j]` and
-        # `seat_warkind[b, i, j]` name the same pair. They were [B, n_opponents, n_opponents] over
-        # civ indices until #113, which is why seat 0 could neither denounce,
-        # ally, nor hold a casus belli.
-        #   seat_warkind[b, i, j]   the (i, j) war is FORMAL (denounced at least
-        #                           formalWarMinTurns earlier); False = SURPRISE.
-        #                           Symmetric, meaningful only where war[b, i, j].
-        #   seat_denounced[b, i, j] the turn i denounced j — a DIRECTED grudge,
-        #                           -1 = none, never reset.
-        #   seat_allied[b, i, j]    symmetric alliance. Allies never declare war
-        #                           on each other; a denouncement or a war breaks it.
-        # All three start empty (no war exists at t0), so there is no exporter
-        # load. _MUTABLE for snapshot/restore.
         _pw = self.n_majors
         self.seat_warkind = torch.zeros(B, _pw, _pw, dtype=torch.bool, device=device)
         self.seat_denounced = torch.full((B, _pw, _pw), -1, dtype=torch.long, device=device)
         self.seat_allied = torch.zeros_like(self.seat_denounced, dtype=torch.bool)
-        # World Congress sessions held.
         self.congress_sessions = torch.zeros(B, dtype=torch.long, device=device)
         # Per-seat era-score accumulator on unified civ ids (col 0 = seat 0,
         # r+1 = civ r) — the TS `state.eraScore` mirror. Integer, zero-draw;
@@ -355,8 +280,6 @@ class SimInit:
         # endTurn eraBoundary mirror). Loaded from the fixture's t0 snapshot.
         # _MUTABLE for snapshot/restore.
         self.era_score = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
-        # The NAMED dedications each seat committed this era — catalog indices,
-        # HEROIC_DEDICATIONS wide; -1 = slot unused.
         self.ded_picks = torch.full((B, self.n_majors, max(int(rules.eras.get("heroicDedications", 3)), 1)), -1, dtype=torch.long, device=device)
         for b, f in enumerate(fixtures):
             esi = f.get("eraScoreInit", [])
@@ -364,16 +287,12 @@ class SimInit:
                 self.era_score[b, c] = int(v)
         _er = rules.eras
         self._ally_min_peace = int((rules.seats.get("eras") or {}).get("allyMinPeace", 30))
-        # A war is FORMAL iff the aggressor's grudge on this target is at least
-        # this old; a same-turn stamp is 0 old, so a fresh denouncement buys a
-        # SURPRISE war, not a formal one.
         self._formal_war_min = int(rules.seats.get("formalWarMinTurns", 5))
         _er2 = rules.seats.get("eras") or {}
         self._wm_dow = int(_er2.get("warmongerDow", 4))
         self._wm_cap = int(_er2.get("warmongerCapture", 3))
         self._wm_gang = int(_er2.get("warmongerGang", 6))
         self._favor_per_suz = int(_er2.get("diplomaticFavorPerSuzerain", 1))
-        # The WORLD CONGRESS schedule + victory threshold.
         self._congress_interval = int(_er2.get("congressInterval", 30))
         self._congress_min_era = int(_er2.get("congressMinEra", 2))
         self._dvp_per_res = int(_er2.get("dvpPerResolution", 1))
@@ -386,19 +305,14 @@ class SimInit:
         # the SOURCE seat's loyalty-pressure multiplier (halves — exact in f32
         # AND f64, so modulated sums stay association-free).
         self.civ_age = torch.ones(B, self.n_majors, dtype=torch.long, device=device)
-        # Dedication substrate — the PREVIOUS age (the Heroic test) and how many
-        # dedications each seat committed this era.
         self.prev_age = torch.ones_like(self.civ_age)
         self.dedications = torch.ones_like(self.civ_age)
         self._era_dark = int(_er.get("darkT", 3))
         self._era_gold = int(_er.get("goldenT", 10))
         self._age_factor = torch.tensor(_er.get("agePressure", [0.5, 1.0, 1.5]), dtype=torch.float64, device=device)
-        # Governors — STATELESS greedy loyalty anchors, recomputed every turn
-        # from civics + the quantized loyalty snapshot.
         self._gov_per = int(_er.get("govCivicsPerTitle", 10))
         self._gov_max = int(_er.get("govMaxTitles", 5))
         self._ded_payouts_live = bool(_er.get("dedicationPayoutsLive", False))
-        # Catalog indices for the golden-age dedications.
         self._ded_monumentality = int(_er.get("dedMonumentality", 0))
         self._ded_free_inquiry = int(_er.get("dedFreeInquiry", 1))
         self._ded_pen_brush = int(_er.get("dedPenBrush", 2))
@@ -408,46 +322,24 @@ class SimInit:
         self._golden_move = int(_er.get("goldenMoveBonus", 0))
         self._ded_exodus = int(_er.get("dedExodus", 3))
         self._heroic_ded = int(_er.get("heroicDedications", 3))
-        # The NAMED dedication catalog — per-kind event era score.
         self._ded_event_score = [int(x) for x in _er.get("dedEventScore", [1, 1, 1, 2])]
         self._n_ded = len(self._ded_event_score)
         self._ded_faith = int(_er.get("dedicationFaith", 2))
         self._ded_era = int(_er.get("dedicationEraScore", 1))
         self._gov_loy = float(_er.get("governorLoyalty", 8))
-        # Per-city production queue head. civ_city_current: -1 idle, 0 settler,
-        # 1+u trains roster unit u.
         nt_b3, nc_b3 = len(rules.t_cost), len(rules.c_cost)
         # The per-seat RESEARCH vectors, merged like the scalars. Placed here
         # because their width is only known once the rules tables are read.
         for _nm, _w in (("techs", nt_b3), ("civics", nc_b3),
                         ("tech_boosted", nt_b3), ("civic_boosted", nc_b3)):
             setattr(self, f"civ_{_nm}", torch.zeros(B, self.n_majors, _w, dtype=torch.bool, device=device))
-        # WHO DRIVES EACH SEAT — one column per seat row, True = actions
-        # supplied from outside. The wire-driven arms (`_seat_record_apply`,
-        # `_seat_buy_ladder`, `_apply_seat_unit_actions`, the useq replay) all
-        # gate on this column, so it is what lets them stay row-generic.
         self.seat_ext = torch.zeros(B, self.n_majors + s_pad + 1, dtype=torch.bool, device=device)
-        # EVERY MAJOR is driven from outside from the moment the world exists.
-        # Not a seat-0 fact: the decision server is the only driver either
-        # engine has (#93/#102 deleted both scripted ladders), so a major row
-        # that no wire drives simply has no intents to gate. The minor rows —
-        # city-states and the barbarian class — stay False; they are ruled, not
-        # decided.
         self.seat_ext[:, :self.n_majors] = True
         # Civ-city district registry [.., nD]: the tile of each placed district
         # type, -1 = none. A queued district already occupies its column, so it
         # counts toward the cap and the one-per-type rule (city.districts in TS).
         nd_b4 = max(len(rules.districts or []), 1)
-        # The district-tile registry on the city-block seat axis (row 0 =
-        # seat 0, rows 1.. = the civ seats; city-states pave no districts, so
-        # no CS rows). EVERY row is live: writes at queue (_place_district /
-        # _place_district), the capture rebuilds, and clears at every
-        # city-exit path; _district_discounted and _quest_owns_dist read one
-        # body over city_dist_tile[:, row]. One base, one geometry.
         self.city_dist_tile = torch.full((B, self.n_majors, civ_city_pad, nd_b4), -1, dtype=torch.long, device=device)
-        # Districts on CAPTURED territory are DEAD — the tiles stay paved but
-        # the conquering city's registry holds only CITY_CENTER (no
-        # yields/upkeep/counts; the paving still blocks).
         self.district_dead = torch.zeros(B, T, dtype=torch.bool, device=device)
         # Persistent city ids on the seat axis (row 0 = seat 0, rows 1.. =
         # the civ seats) — the TS City.id, allocated per seat from
@@ -462,39 +354,12 @@ class SimInit:
         # which is the `capitalTile ?? -1` the digest compares against and the
         # missing capital `dominationWinner` refuses to name a winner over.
         self.civ_cap_tile = torch.full((B, self.n_majors), -1, dtype=torch.long, device=device)
-        # Trade routes — (from_id, to_id) rc-id pairs, -1 = empty column.
-        # Id-keyed like tile_city, so _reclaim_cities slot permutations never touch
-        # it. K must cover the real capacity bound (tradeCapacity):
-        # FOREIGN_TRADE 1 + maxCities MARKET/LIGHTHOUSE + 2 wonders (COLOSSUS,
-        # GREAT_ZIMBABWE) + one per suzerained TRADE city-state, plus slack.
-        # No route exists at t0.
         k_routes = 1 + int(self.rules.seats.get("maxCities", 6)) + 2 + max(int(self.S), 0) + 2
-        # ROUTES ARE A SEAT PLANE: one `seat_routes` over every seat row, with
-        # `civ_only_routes` as the [:, 1:] VIEW onto it, exactly like seat_ext ->
-        # controlled and civ_* -> r_*. Seat 0 having a slice is what lets a
-        # seat-generic rule (the shared CS-quest issuer) ask "do I already route
-        # to this city-state?" without caring which seat is asking.
         self.seat_routes = torch.full((B, self.n_majors + s_pad + 1, k_routes, 2), -1, dtype=torch.long, device=device)
-        # Parallel per-route metadata (same slot layout as civ_only_routes[..., :]).
-        # civ_only_route_dest holds an international route's destination city CENTER
-        # TILE (>=0); -1 marks domestic/CS (dest decoded from civ_only_routes[..., 1]).
-        # civ_only_route_exp is the route's expiry turn (start + trade.duration); -1 on
-        # a free slot.
         self.seat_route_dest = torch.full((B, self.n_majors + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
         self.seat_route_exp = torch.full((B, self.n_majors + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
-        # Seat <-> city-state diplomacy: the envoys/met planes plus the
-        # influence/envoy-bank accumulators. Nothing at t0 (every seat starts
-        # unmet, zero everywhere).
         self._alloc_cs_pairs(B, self.n_majors, s_pad, device)
-        # City-state quests — ONE per (seat, CS). kind 0 none / 1 clearCamp /
-        # 2 trade / 3 district; the buildDistrict target is deterministic (the
-        # CS type's district, from _citystate_didx), so no per-quest district plane is
-        # needed. civ_only_citystate_quest_issued starts at 0, so the first issue is at
-        # turn >= questCooldown.
 
-        # THE CENTRE REGISTRY, seat-generic: the owning seat's city SLOT at
-        # any major centre tile, -1 elsewhere. The seat is tile_seat's and the
-        # id is tile_city's — three planes, no per-seat-family view over them.
         self.centre_slot_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         # ---------------------------------------------------------------------
         # ONE UNIT POOL. Two DISJOINT CONTIGUOUS SLOT RANGES of one tensor per
@@ -517,8 +382,6 @@ class SimInit:
         self.UNIT_MAX = simbase.MAJOR_POOL_MAX + simbase.BARB_POOL_MAX
         self.POOL_LO = {"major": 0, "barb": simbase.MAJOR_POOL_MAX}
         self.POOL_HI = {"major": simbase.MAJOR_POOL_MAX, "barb": self.UNIT_MAX}
-        #: The APPEND CURSOR behind each pool, named once. Every spawn, capture
-        #: and compaction reads it from here rather than re-deriving the name.
         self.POOL_NEXT = {"major": "unit_next", "barb": "next_slot"}
         self._UNIT_PLANES: list = []
         for _pl, _dt in (
@@ -535,8 +398,6 @@ class SimInit:
             # general that walks later in the same step cannot retro-change a
             # pool TS already granted.
             ("aura_mp", torch.long),
-            # MOVEMENT POINTS as state: what the unit has left this turn, and
-            # its full per-turn pool.
             ("mp", torch.long),
             ("mp_full", torch.long),
             # The OWNER of whatever sits in this slot, in the absolute seat
@@ -550,28 +411,16 @@ class SimInit:
             self._UNIT_PLANES.append(_pl)
             for _pre in ("major", "barb"):
                 setattr(self, f"{_pre}_unit_{_pl}", _base[:, self.POOL_LO[_pre]:self.POOL_HI[_pre]])
-                # Assert forever that the view still shares storage with the
-                # merged pool.
                 self.register_alias(
                     f"{_pre}_unit_{_pl}",
                     lambda sim, pl=_pl, pre=_pre: getattr(sim, f"unit_{pl}")[
                         :, sim.POOL_LO[pre]:sim.POOL_HI[pre]
                     ],
                 )
-        # The barbarian range carries BARB_SEAT. The MAJOR range is SEEDED to
-        # seat 1 so a DEAD slot still names a real seat — and deliberately NOT
-        # to 0: `unit_seat == 0` is how every seat-0 read is spelled now, and a
-        # never-spawned slot reading as seat 0 would hand seat 0 the whole
-        # unused pool.
         self.barb_unit_seat.fill_(BARB_SEAT)
         self.major_unit_seat.fill_(1)
 
-        #: The ONE major append cursor. `_reclaim_pool` compacts the range and
-        #: rewinds it, so it bounds LIVE units, not ever-spawned ones.
         self.unit_next = torch.zeros(B, dtype=torch.long, device=device)
-        # ONE occupancy map per DOMAIN, holding a MERGED-pool slot: "whose unit
-        # is on this tile?" is unit_seat.gather(1, occ_*), with no per-pool
-        # plane to pick first.
         self.military_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.civilian_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.gp_earned = torch.zeros(B, n_gp, dtype=torch.long, device=device)
@@ -587,10 +436,6 @@ class SimInit:
         self.pan_claimed = torch.zeros(B, max(len(_bl.get("pantheons", [])), 1), dtype=torch.bool, device=device)
         self.fol_claimed = torch.zeros(B, max(len(_bl.get("followers", [])), 1), dtype=torch.bool, device=device)
         self.fou_claimed = torch.zeros(B, max(len(_bl.get("founders", [])), 1), dtype=torch.bool, device=device)
-        # Enhancer pool mask + per-seat claimed identity + a done flag, in the
-        # fol_claimed / civ_only_follower / civ_only_religion_done shape. Enhancers carry none
-        # of the generic beliefRow fields, so they have no `_bel` table; their
-        # channels are the separate `_enh` table below.
         self.enh_claimed = torch.zeros(B, max(len(_bl.get("enhancers", [])), 1), dtype=torch.bool, device=device)
         self._enh_any = len(_bl.get("enhancers", [])) > 0
         # Religious pressure spread. A religion is indexed by the MAJOR SEAT
@@ -631,16 +476,12 @@ class SimInit:
                 "perC": torch.tensor([[0.0] * 6] + [x["perC"] for x in _rows], dtype=torch.float64, device=device),
                 "impRes": torch.tensor([[[0.0] * 6] * 4] + [x.get("impRes", [[0.0] * 6] * 4) for x in _rows], dtype=torch.float64, device=device),
                 "fpw": torch.tensor([0.0] + [float(x.get("fpw", 0)) for x in _rows], dtype=torch.float64, device=device),
-                # improvementYields [nBel+1, nImp, 6], row 0 = the unclaimed
-                # pad.
                 "impY": torch.tensor(
                     [[[0.0] * 6] * _ni] + [x.get("impY", [[0.0] * 6] * _ni) for x in _rows],
                     dtype=torch.float64, device=device,
                 ),
             }
         self._bel_any = any(len(_bl.get(k, [])) > 0 for k in ("pantheons", "followers", "founders"))
-        # Enhancer effect channels (row 0 = the unclaimed pad; index =
-        # civ_only_enhancer + 1).
         _erows = _bl.get("enhancers", [])
         # The missionary chassis anchors + per-enhancer channels. The exporter
         # pre-rounds mcost/mlump to INTEGERS (Math.round on the TS side), so
@@ -651,13 +492,12 @@ class SimInit:
         _mlump0 = int(_bl.get("spreadPressure", 10))
         self._missionary_idx = int(_bl.get("missionaryIdx", -1))
         self._missionary_cap = int(_bl.get("missionaryCap", 2))
-        # APOSTLE + theological combat.
         self._apostle_idx = int(_bl.get("apostleIdx", -1))
         self._apostle_cost = float(_bl.get("apostleCost", 200))
         self._apostle_cap = int(_bl.get("apostleCap", 1))
         _rs = _bl.get("relStrength") or []
         self._rel_strength = torch.tensor(list(_rs) + [0] * 64, dtype=torch.long, device=device)
-        self._city_rel_live = bool(_bl.get("cityReligionAdderLive", False))  # gates _rel_atk_cs on city attacks
+        self._city_rel_live = bool(_bl.get("cityReligionAdderLive", False))
         self._theo_dmg = int(_bl.get("theoDamage", 2))
         self._theo_base = int(_bl.get("theoBaseDamage", 30))
         self._theo_swing = float(_bl.get("theoPressureSwing", 15))
@@ -690,19 +530,12 @@ class SimInit:
         self._n_space = len(self._space_proj_idx)
         self._space_step = {pi: k for k, pi in enumerate(self._space_proj_idx)}
         self._space_victory_idx = {i for i in self._space_proj_idx if int(self._proj_rows[i].get("vic", 0))}
-        # World wonders — the tile planes (built_wonder id at a paved tile, its
-        # completion flag), the per-rc registry, the static placement bitmask +
-        # rid/des planes, and the effect tables.
         _wd = rules.wonders or {}
         self._wond_rows = list(_wd.get("rows", []))
         self._wond_n = len(self._wond_rows)
         self._fp_fid = int(_wd.get("fpFid", -1))
         self.built_wonder = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.built_wonder_complete = torch.zeros(B, T, dtype=torch.bool, device=device)
-        # The wonder-tile registry, same seat-axis shape and row liveness as
-        # city_dist_tile above. EVERY row fills it: the wonder column is on the
-        # production mask for every seat and `_queue_wonder_at` writes the
-        # queueing row, whichever it is.
         self.city_wonder = torch.full((B, self.n_majors, civ_city_pad, max(self._wond_n, 1)), -1, dtype=torch.long, device=device)
         self.res_id = torch.tensor([[t.get("rid", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.desert = torch.tensor([[t.get("des", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
@@ -721,13 +554,7 @@ class SimInit:
             # music), additive with the GW_BUILDINGS slots.
             self._wond_gw = torch.tensor([list(w.get("gwslots", [0, 0, 0])) for w in self._wond_rows], dtype=torch.long, device=device)
         self.feat_id = torch.tensor([[t.get("fid", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
-        # foundCity strips ONLY a REMOVABLE feature — an OASIS/FLOODPLAINS
-        # center keeps its feature LIVE (belief featureYields still apply
-        # there). Founding paths gate their feat_stripped/tdef writes on this.
         self.feat_removable = torch.tensor([[bool(t.get("frm", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
-        # The fixture's `civs[]` is SEAT-KEYED and seat 0 is one of its entries.
-        # Units seed further down, once the roster tables exist — nothing here
-        # forks on which seat it is reading.
         for b, f in enumerate(fixtures):
             for cv in f["civs"]:
                 row = int(cv["seat"])
@@ -745,12 +572,8 @@ class SimInit:
                 self.civ_next_city_id[b, row] = len(cv.get("cities", []))
         self._gp_costs = torch.tensor(rr.get("gpCosts", [60 * 2**n for n in range(8)]), dtype=torch.float64, device=device)
         self._gp_roster = torch.tensor(rr.get("gpRoster", [4, 4, 4, 4, 4]), dtype=torch.long, device=device)
-        # Great people (advanceGreatPeople): points accrue per class from its
-        # district + that district's buildings; earning the n-th person costs
-        # gp_costs[n] and applies gp_effects[cls, n]. Every seat draws from the
-        # SAME gp_earned pool, the civ seats claiming first each turn.
         gp_cd = rr.get("gpClassDistrict", [])
-        self._gp_class_district = torch.tensor(gp_cd if gp_cd else [-1] * n_gp, dtype=torch.long, device=device)  # [n_gp] every class
+        self._gp_class_district = torch.tensor(gp_cd if gp_cd else [-1] * n_gp, dtype=torch.long, device=device)
         gp_fx = rr.get("gpEffects", [])
         self._gp_effects = torch.tensor(gp_fx if gp_fx else [[[0, 0, 0, 0, 0]] * 4] * n_gp, dtype=dtype, device=device)  # [n_gp, maxN, 5] (col 4 = faith)
         self._prophet_cls = int(rr.get("prophetCls", 3))  # PROPHET's class index
@@ -767,7 +590,6 @@ class SimInit:
         self._gw_bidx = [int(x) for x in rr.get("gwBidxByKind", [-1, -1, -1])]
         self._gw_slots_k = [int(x) for x in rr.get("gwSlotsByKind", [2, 3, 1])]
         self._gw_works_k = [int(x) for x in rr.get("gwWorksByKind", [2, 3, 2])]
-        # RELICS (the TEMPLE's slot) and ARTIFACTS — the same plumbing shape.
         self._modern_era_index = int(rr.get("modernEraIndex", 5))
         self._artifact_bidx = int(rr.get("artifactBidx", -1))
         self._artifact_slots = int(rr.get("artifactSlots", 3))
@@ -778,40 +600,29 @@ class SimInit:
         self._relic_faith = int(rr.get("relicFaith", 4))
         self._relic_tour = int(rr.get("relicTourism", 8))
         self._gw_cul_k = [float(x) for x in rr.get("gwCultureByKind", [2, 2, 4])]
-        # TOURISM per Great Work, paired with the culture above.
         self._gw_tour_k = [int(x) for x in rr.get("gwTourismByKind", [2, 2, 4])]
-        # PRINTING doubles Great Work of WRITING tourism.
         self._gw_printing_tech = int(rr.get("gwPrintingTech", -1))
         self._gw_printing_mult = int(rr.get("gwPrintingWritingMult", 2))
-        # WONDER tourism — base + 1 per era advanced PAST the wonder's own era.
-        # Wonder era comes from its unlock; a seat's era is the highest era
-        # among its completed techs/civics (the same scale).
         self._wonder_tour_base = int(rr.get("wonderTourismBase", 2))
-        # CULTURE VICTORY thresholds.
         self._tourism_per_visitor = int(rr.get("tourismPerVisitorPerCiv", 200))
         self._culture_per_tourist = int(rr.get("culturePerDomesticTourist", 100))
         self._tech_era = torch.tensor(rr.get("techEra", []) or [0], dtype=torch.long, device=device)
         self._civic_era = torch.tensor(rr.get("civicEra", []) or [0], dtype=torch.long, device=device)
         _wera = (rules.wonders or {}).get("eras", []) or [0]
         self._wonder_era = torch.tensor(list(_wera), dtype=torch.long, device=device)
-        # ANTIQUITY SITES — the markAntiquitySite twin. Created by PRE-MODERN
-        # events (a razed camp, a unit death) and excavated into Artifacts by an
-        # Archaeologist.
         self.antiquity = torch.zeros(B, self.T, dtype=torch.bool, device=device)
         self._loyalty_amenity = torch.tensor(rr.get("loyaltyAmenity", [6, 3, 0, -3, -6]), dtype=dtype, device=device)
         self._off3 = tiles_within_offsets(int(rr.get("workRadius", 3))).to(device)
-        self._off5 = tiles_within_offsets(5).to(device)  # border growth radius (BORDER_MAX_RADIUS)
+        self._off5 = tiles_within_offsets(5).to(device)
         self._off7 = tiles_within_offsets(7).to(device)
         self._off2 = tiles_within_offsets(2).to(device)
         self._off1 = tiles_within_offsets(1).to(device)
         ids = [u["id"] for u in (rules.units or [])]
         self._spearman_idx = ids.index("SPEARMAN") if "SPEARMAN" in ids else 0
         self._horseman_idx = ids.index("HORSEMAN") if "HORSEMAN" in ids else 0
-        # The ranged rung (SLINGER ungated, ARCHER on archerTech)
         self._slinger_idx = ids.index("SLINGER") if "SLINGER" in ids else -1
         self._archer_idx = ids.index("ARCHER") if "ARCHER" in ids else -1
 
-        # --- disasters -----------------------------------------------------------
         self.disasters = bool(f0.get("disasters", 0))
         self.floodplain = torch.tensor([[t.get("fp", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.drought_cand = torch.tensor([[t.get("dc", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
@@ -825,7 +636,6 @@ class SimInit:
         self.fertility = torch.zeros(B, T, dtype=torch.long, device=device)
         self.drought = torch.zeros(B, T, dtype=torch.long, device=device)
 
-        # --- improvements ---------------------------------------------------------
         imp = rules.improvements or {}
         ids = imp.get("ids", [])
         self.improvements_on = bool(ids)
@@ -836,9 +646,6 @@ class SimInit:
         self._act_names = list((rules.actions or {}).get("unit", []))
         self._act = {n: i for i, n in enumerate(self._act_names)}
         if self._act_names:
-            # The expected width VERSIONS ON THE ENUM'S OWN CONTENT: each
-            # optional block (SNIPE, SPREAD, FOUND) is all-or-nothing, so a
-            # PARTIAL enum fails loudly whichever blocks an export carries.
             self._snipe_on = "SNIPE_0" in self._act
             self._A_SPREAD = self._act.get("SPREAD_HERE", -1)  # religious spread head
             self._A_FOUND = self._act.get("FOUND_CITY", -1)  # the settler's verb
@@ -849,12 +656,8 @@ class SimInit:
             self._A_REPAIR = self._act["REPAIR"]
             self._A_PILLAGE = self._act["PILLAGE"]
             self._A_SNIPE = self._act.get("SNIPE_0", self._A_PILLAGE + 1)
-            # column for BUILD_<improvement>, indexed by improvement roster index
             self._A_IMP = [self._act.get(f"BUILD_{n}", -1) for n in ids]
         else:
-            # No enum shipped (a stale rules.json): fall back to hardcoded
-            # column numbers so nothing crashes. These numbers can collide —
-            # re-export rather than rely on them.
             self._A_CHOP, self._A_REPAIR = 16, 17
             self._A_PILLAGE = 13 + len(ids) + 2
             self._A_SNIPE = self._A_PILLAGE + 1
@@ -880,7 +683,6 @@ class SimInit:
         self._mine_prod = float(imp.get("mineProd", 1))       # base MINE production
         self._lumber_prod = float(imp.get("lumberProd", 1))   # LUMBER_MILL production (no tech boost)
         self._builder_idx = int(imp.get("builderIdx", -1))
-        # The Military Engineer roster index + its live flag.
         self._eng_idx = int(imp.get("engineerIdx", -1))
         self._seat_eng_live = bool(imp.get("engineerLive", False))
         self._hillfarms_civic = int(imp.get("hillFarmsCivic", -1))
@@ -894,11 +696,6 @@ class SimInit:
         mbt = imp.get("mineBoostTechs", [])  # [[techIdx, prodAmount], ...]
         self._mine_boost_tech = torch.tensor([x[0] for x in mbt], dtype=torch.long, device=device)
         self._mine_boost_amt = torch.tensor([float(x[1]) for x in mbt], dtype=dtype, device=device)
-        # The dense per-improvement catalog (base yields [nI, 6], housing [nI],
-        # unlockImprovement tech idx [nI]; -1 = baseline FARM) and the per-tile
-        # resource-improvement plane rq: a resource tile accepts exactly this
-        # roster index (-1 no resource, -9 out of roster = FISHING_BOATS on sea
-        # resources, unreachable in both engines).
         irows = imp.get("rows", [])
         nI = max(len(ids), 1)
         self._imp_yields = torch.zeros(nI, 6, dtype=dtype, device=device)
@@ -929,13 +726,9 @@ class SimInit:
         # dynamic and runs off _tile_appeal().
         self._sr_c = torch.tensor([[t.get("sr_c", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self._sr_nf = torch.tensor([[t.get("sr_nf", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
-        self.improvement = torch.full((B, T), -1, dtype=torch.long, device=device)  # -1 none, else improvement idx
+        self.improvement = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.pillaged = torch.zeros(B, T, dtype=torch.bool, device=device)
 
-        # --- districts ------------------------------------------------------------
-        # The catalog plus a [B, T] district-type-index tensor (-1 = none).
-        # Writers: the scripted scaffold, civ queues and the RL district head —
-        # see _place_district.
         self.districts_cat = list(rules.districts or [])
         self.districts_on = bool(self.districts_cat)
         self.district = torch.full((B, T), -1, dtype=torch.long, device=device)  # -1 none, else PLACEABLE_DISTRICTS idx
@@ -956,17 +749,12 @@ class SimInit:
             [[bool(t.get("rd", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
         )
         self.road_bridged = False
-        # A COMPLETE, non-CITY_CENTER district raided into darkness — its
-        # adjacency/buildings/housing/amenities/GPP/CS-envoy channels stop until
-        # a builder repairs it (static counts stay: still owned). A tile plane,
-        # not slot-keyed, so snapshot/restore covers it and
-        # _reclaim_cities/_reclaim_pool leave it intact.
         self.district_pillaged = torch.zeros(B, T, dtype=torch.bool, device=device)
         nD = len(self.districts_cat)
         self.d_static_adj = torch.tensor(
             [[t.get("dadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],
             dtype=dtype, device=device,
-        )  # [B, T, nD] raw static-source adjacency; mutated when an in-game founding clears a center feature
+        )
         self.feat_yields = torch.tensor(
             [[t.get("fy", [0.0] * 6) for t in f["tiles"]] for f in fixtures],
             dtype=dtype, device=device,
@@ -984,11 +772,11 @@ class SimInit:
         self._feat_adj = torch.tensor(
             [[t.get("fadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],
             dtype=dtype, device=device,
-        )  # [B, T, nD] adjacency a tile's removable feature lends to neighbours (dropped on founding here)
+        )
         self._nfeat_adj = torch.tensor(
             [[t.get("nfadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],
             dtype=dtype, device=device,
-        )  # [B, T, nD] the NON-removable feature's lent adjacency (GS REEF -> Campus): queueDistrict paves null ANY feature, foundCity only removable
+        )
         sc = rules.district_scaffold or {}
         self.CAMPUS = int(sc.get("campusIdx", 0))
         self.campus_unlock_tech = int(sc.get("campusUnlockTech", -1))  # WRITING
@@ -1005,9 +793,6 @@ class SimInit:
             if d.get("id") in ("INDUSTRIAL_ZONE", "ENCAMPMENT")
         ]
         self._nbhd_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "NEIGHBORHOOD"), -1)
-        # appealTier thresholds -> Neighborhood housing: >=4 Breathtaking 6,
-        # 2..3 Charming 5, -1..1 Average 4, -3..-2 Uninviting 3, <=-4
-        # Disgusting 2.
         self._appeal_cuts = [(4, 6), (2, 5), (-1, 4), (-3, 3)]
         self._appeal_floor = 2
         self._encamp_si = next((si for si, (di, _ut, _uc, _plc) in enumerate(self._scaffold) if di == self._encamp_didx), -1)
@@ -1016,17 +801,14 @@ class SimInit:
         # False, war_mask() is all-False and step(war=…) is ignored, so nothing
         # samples or applies it; scripted/parity paths never pass war=.
         self._rl_war_active = True
-        # Combat log hooks (inert unless rollout --log sets the batch)
         self._log_combat_b: int | None = None
         self._combat_events: list[str] = []
-        # (the CS-quest "askable" list is no longer consumed: the asked
-        # district is always the CS type's own, _citystate_didx)
         self.d_usable = torch.tensor(
             [[t.get("du", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
-        )  # [B, T] district-placeable land — static part of canPlaceDistrict
+        )
         self.aqsrc = torch.tensor(
             [[t.get("aqsrc", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
-        )  # [B, T] Aqueduct water source (river / adjacent lake·oasis·mountain), static
+        )
         self.coastal_water = torch.tensor(
             [[t.get("cw", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
         )  # [B, T] Harbor surface: coastal/lake water adjacent to land, static
@@ -1047,11 +829,6 @@ class SimInit:
         self._dyn_aqueduct = torch.tensor([_src_amt(d, 13) for d in self.districts_cat], dtype=dtype, device=device)  # [nD]
         self._mine_iidx = 1   # IMPROVEMENT_IDS: FARM=0, MINE=1, LUMBER_MILL=2, QUARRY=3, ...
         self._quarry_iidx = 3
-        # Government + policy modifier tables. Per seat, per turn the engine
-        # adopts the newest unlocked government (highest tier, ties to table
-        # order) and greedily fills its BASE slots in policy-table order among
-        # unlocked cards of matching kind — the computeAdoption twin. See
-        # _gov_policy_mods for how the channels below are applied.
         _govs = rules.governments or []
         _pols = rules.policies or []
         self._ngov = len(_govs)
@@ -1085,9 +862,9 @@ class SimInit:
             self._gov_nd_amen = torch.tensor([float(x[2]) for x in _gnd], dtype=dtype, device=device)
             self._gov_arange = torch.arange(self._ngov, dtype=torch.long, device=device)
         if self._npol:
-            self._pol_kind = torch.tensor([int(p["kind"]) for p in _pols], dtype=torch.long, device=device)  # [nPol]
+            self._pol_kind = torch.tensor([int(p["kind"]) for p in _pols], dtype=torch.long, device=device)
             self._pol_unlock_civic = torch.tensor([int(p["unlockCivic"]) for p in _pols], dtype=torch.long, device=device)
-            self._pol_city_y = torch.tensor([[float(x) for x in p["cityYields"]] for p in _pols], dtype=dtype, device=device)  # [nPol,6]
+            self._pol_city_y = torch.tensor([[float(x) for x in p["cityYields"]] for p in _pols], dtype=dtype, device=device)
             self._pol_cap_y = torch.tensor([[float(x) for x in p["capitalYields"]] for p in _pols], dtype=dtype, device=device)
             self._pol_housing = torch.tensor([float(p.get("housingAll", 0)) for p in _pols], dtype=dtype, device=device)  # [nPol]
             # housingIfDistricts (INSULAE {min 2, +1}): +housing to a city with
@@ -1114,11 +891,9 @@ class SimInit:
             or (self._npol and float(self._pol_city_y.abs().sum() + self._pol_cap_y.abs().sum() + self._pol_housing.abs().sum() + self._pol_hid_house.abs().sum() + (self._pol_encamp - 1).abs().sum() + (self._pol_tpmult - 1).abs().sum()) > 0)
         )
         self._harbor_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HARBOR"), -1)
-        self._hs_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HOLY_SITE"), -1)  # Work Ethic
+        self._hs_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HOLY_SITE"), -1)
         self._shipyard_bidx = int(rules.shipyard_bidx)
         self._walls_bidx = int(rules.ancient_walls_bidx)
-        # Trade anchors: id-anchored capacity sources + route constants (the
-        # tradeCapacity / routeYields mirror).
         _tr = rules.trade or {}
         self._trade_mkt = int(_tr.get("marketBidx", -1))
         self._trade_lgh = int(_tr.get("lighthouseBidx", -1))
@@ -1134,43 +909,21 @@ class SimInit:
         # do NOT). Aqueduct also carries housing, not an adjacency yield.
         self._is_specialty = torch.tensor([bool(d.get("countsTowardLimit", True)) for d in self.districts_cat], dtype=torch.bool, device=device)  # [nD]
         self._aqueduct_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "AQUEDUCT"), -1)
-        # Per-type unlock indices (-1 = no unlockDistrict effect in the compact
-        # tree — NOT unlocked, mirroring computeUnlocks).
         self._d_unlock_t = torch.tensor([int(d.get("unlockTech", -1)) for d in self.districts_cat], dtype=torch.long, device=device)
         self._d_unlock_c = torch.tensor([int(d.get("unlockCivic", -1)) for d in self.districts_cat], dtype=torch.long, device=device)
-        self._d_maint = torch.tensor([float(d.get("maintenance", 1)) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] gold upkeep per district type
+        self._d_maint = torch.tensor([float(d.get("maintenance", 1)) for d in self.districts_cat], dtype=dtype, device=device)
         self._h_fresh = float(rules.housing_fresh)
         self._aq_fresh_bonus = float(rules.housing_aq_fresh_bonus)
         self._aq_no_fresh_total = float(rules.housing_aq_no_fresh)
 
-        # The _MUTABLE shape/dtype baseline, captured lazily on the first check
-        # so every plane exists by then. (_aliases is initialised earlier — the
-        # merged unit pool is the first thing to register into it.)
         self._mut_sig: dict = {}
 
         self._eff_version = 0
-        # Two extra invalidation counters the _eff_version epoch misses.
-        #  _bel_version     — bumped at the belief-claim sites (+restore/reset);
-        #                     civ_only_pantheon/civ_only_follower/civ_only_founder change there only,
-        #                     with no eff bump, yet the same-turn trace re-reads
-        #                     that seat.
-        #  _rp_kill_version — bumped at the economy-loop strike-kill, the only
-        #                     unit-death site inside the loop; it flips
-        #                     barb_unit_alive/major_unit_alive (the route raided-mask) with no
-        #                     eff bump.
         self._bel_version = 0
         self._rp_kill_version = 0
-        # Bumped when a border-growth claim lands INSIDE a later same-seat
-        # city's worked-tile window (tile ownership is the valid-mask input the
-        # eff epoch misses); claims elsewhere leave the yields cache intact.
         self._claim_version = 0
-        # The Great General/Admiral aura plane cache is keyed on general
-        # POSITIONS, which move mid-turn and change on spawn/kill/capture —
-        # none of which bump _eff_version. This counter bumps at every such site
-        # (+restore), so the (turn, _gen_ver) keyed cache stays exact within and
-        # across turns.
         self._gen_ver = 0
-        self._gen_aura_cache = None  # ((turn,_gen_ver), (land [B,O,T], sea [B,O,T]) | None)
+        self._gen_aura_cache = None
         self._food_cache: tuple[int, torch.Tensor] | None = None
         self._nprod_cache: tuple[int, torch.Tensor] | None = None
         # Civ-phase caches, same single-slot-by-key shape as _rcy_globals.
@@ -1214,7 +967,6 @@ class SimInit:
             }
         )
 
-        # --- dynamic state ------------------------------------------------------
         self.turn = 1
         # THE t0 TILE-OWNERSHIP PAIR, seat-generic and shipped as a pair:
         # `ownerSeatInit` is TS's `ownerSeat` per tile (NO_SEAT for nobody,
@@ -1231,14 +983,9 @@ class SimInit:
         self._citystate_at_ver = -1
         self._citystate_at_cache: torch.Tensor | None = None
         self._civ_at_cache: torch.Tensor | None = None
-        # `city_slot_at(row)`, per row — the only derived view that still
-        # needs a slot rather than a seat.
         self._city_slot_cache: dict[int, tuple[int, torch.Tensor]] = {}
-        # `tile_seat` is STATE, not a cache: `citystate_at` is a VIEW of it.
-        # It loads straight off the wire's own seat plane — ONE composition, no
-        # per-class arm to forget.
         self.tile_seat = torch.tensor(
-            [f["ownerSeatInit"] for f in fixtures], dtype=torch.long, device=device)  # [B, T]
+            [f["ownerSeatInit"] for f in fixtures], dtype=torch.long, device=device)
         self._b_req_district = rules.b_req_district.to(device)  # [NB] required district idx (-1 none)
         self._b_req_buildings = rules.b_req_buildings  # list of prereq-building-index lists
         self._b_excl_buildings = rules.b_excl_buildings  # exclusive-sibling index lists
@@ -1262,18 +1009,13 @@ class SimInit:
         # for family-shape consistency; every city starts with an empty bank,
         # so unlike the fixture-loaded city_* table it allocates plain).
         self.city_prod_bank = torch.zeros(B, self.n_majors + max(self.S, 1), self.RC, dtype=dtype, device=device)
-        # LIFETIME science — Seat.scienceTotal on the seat axis (row 0 =
-        # seat 0, rows 1..n_majors-1 the other majors), accrued beside each row's
-        # techProgress stream add in the seatPhase loop.
         self.seat_science_total = torch.zeros(B, self.n_majors, dtype=dtype, device=device)
 
-        # --- the hostile world: barbarians ----------------------------------------
         self.units_mode = bool(f0.get("unitsMode", 0))
         assert all(bool(f.get("unitsMode", 0)) == self.units_mode for f in fixtures)
         cb = rules.combat
         self.max_camps = torch.tensor([f.get("maxCamps", 0) for f in fixtures], dtype=torch.long, device=device)
         self.K = int(self.max_camps.max().item()) if self.units_mode else 0
-        # The in-state mulberry32, one u32 per game, mirrored draw for draw.
         self.rng_state = torch.tensor([f.get("rngInit", 0) for f in fixtures], dtype=torch.int64, device=device)
         # Tile -> unit-slot occupancy stacking mirrors tileFreeForUnit: a
         # foreign unit blocks a tile entirely; among one seat's own units, one
@@ -1287,23 +1029,11 @@ class SimInit:
         self.victory_type = torch.zeros(B, dtype=torch.long, device=device)
         self.victory_row = torch.full((B,), -1, dtype=torch.long, device=device)
         self.winner = torch.full((B,), -1, dtype=torch.long, device=device)
-        # Per-seat space-race chain progress in the unified civ space (index
-        # the row IS the major's seat id). Bool [B, n_majors, n_space]. Bookkeeping only —
-        # the science victory fires on the victory STEP directly — and
-        # _MUTABLE-registered for snapshot/restore. Keyed per seat, not per city
-        # slot, so _reclaim_cities leaves it intact and it needs no kill hygiene.
         self.space_done = torch.zeros(B, self.n_majors, max(self._n_space, 1), dtype=torch.bool, device=device)
         self.camp_tile = torch.full((B, max(self.K, 1)), -1, dtype=torch.long, device=device)
         self.n_camps = torch.zeros(B, dtype=torch.long, device=device)
-        # Seat 0's units: trained via the production head, ordered like
-        # state.units (append-only slots preserve spawn order).
         self.unit_next = torch.zeros(B, dtype=torch.long, device=device)
         self.tdef = torch.tensor([[t.get("tdef", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
-        # tdef holds the DEFENDER bonus (terrainDefense: hills/woods/rainforest
-        # +3, marsh/floodplains −2), read at the def_cs sites. tmove holds the
-        # movement-slow encoding (hills, woods, rainforest and marsh +3;
-        # floodplains flat) — enter cost is 1 + tmove//3, so marsh stays SLOW
-        # while its defense is negative.
         self.tmove = torch.tensor([[t.get("tmove", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # Damage table stays float64 regardless of sim dtype: the RNG factor
         # is float64 and damage rounds to integers the TS engine must match.
@@ -1315,9 +1045,6 @@ class SimInit:
         # is the source of truth for the ladder's contents.
         _bl = list(cb.get("barbLadder") or [])
         if not _bl:
-            # A rules.json without barbLadder is a STALE EXPORT; falling back to
-            # a one-entry ladder would only move the failure somewhere confusing
-            # ("index 4 out of bounds" deep inside _spawn_barb).
             raise ValueError(
                 "rules.json has no combat.barbLadder — this is a pre-#51/S3.2 export. "
                 "Re-run the exporter for this fixture set (`npm run seed && npm run export`)."
@@ -1336,7 +1063,6 @@ class SimInit:
         self._sailing_tech = int(cb.get("sailingTech", -1))
         self._shipbuilding_tech = int(cb.get("shipbuildingTech", -1))
         self._cartography_tech = int(cb.get("cartographyTech", -1))
-        # Trainable roster tables (index = position in rules.units).
         ru = rules.units or [{"id": "WARRIOR", "cost": 40, "combat": 20, "maintenance": 0, "civilian": 0, "requiresTech": -1}]
         self.NU = len(ru)
         # THE PRODUCTION LAYOUT (cpu/core/prodLayout.ts), named once. It is the
@@ -1360,27 +1086,14 @@ class SimInit:
         # Read at the war-march passability composition.
         self.unit_naval = torch.tensor([bool(u.get("naval", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_tech = torch.tensor([u["requiresTech"] for u in ru], dtype=torch.long, device=device)
-        # The Archaeologist's CIVIC gate + its ARTIFACT-slot rule.
         self._type_civic = torch.tensor([u.get("requiresCivic", -1) for u in ru], dtype=torch.long, device=device)
         self._type_needs_slot = torch.tensor([bool(u.get("needsArtifactSlot", 0)) for u in ru], dtype=torch.bool, device=device)
-        # Per-roster strategic-resource requirement (index into the resource
-        # list the tile res_id plane uses; -1 = ungated). _res_unit_pairs caches
-        # (unit_idx, res_idx) for the access scan — empty when the roster
-        # requires nothing, so _res_avail_mask short-circuits to all-True.
         self._type_resource = torch.tensor([int(u.get("requiresResource", -1)) for u in ru], dtype=torch.long, device=device)
         self._res_unit_pairs = [(i, int(u.get("requiresResource", -1))) for i, u in enumerate(ru) if int(u.get("requiresResource", -1)) >= 0]
         self._type_charges = torch.tensor([u.get("charges", 0) for u in ru], dtype=torch.long, device=device)
-        # Faith-purchase-only roster flag (MISSIONARY) — the trainableUnits
-        # filter's mirror; masks the type out of the gold purchase path.
         self._type_faith_only = torch.tensor([bool(u.get("fo", 0)) for u in ru], dtype=torch.bool, device=device)
-        # Spawn-only roster flag (GENERAL/ADMIRAL) — the trainableUnits filter's
-        # mirror; masks the type out of production_mask AND the purchase path.
-        # Birthed only by the Great-Person claim.
         self._type_spawn_only = torch.tensor([bool(u.get("so", 0)) for u in ru], dtype=torch.bool, device=device)
         self._warrior_idx = next((i for i, u in enumerate(ru) if u["id"] == "WARRIOR"), 0)
-        # The SETTLER chassis is a real roster unit. `settler: 1` masks it out
-        # of the generic unit columns; training goes through the dedicated
-        # escalating settler column, founding through FOUND_CITY.
         self._settler_idx = next((i for i, u in enumerate(ru) if bool(u.get("settler", 0))), -1)
         self._type_settler = torch.tensor([bool(u.get("settler", 0)) for u in ru], dtype=torch.bool, device=device)
         # SCOUT is a military explorer (combat 10) but never in the civ roster
@@ -1389,16 +1102,10 @@ class SimInit:
         # leave SCOUT the only affordable candidate, so it is masked out of the
         # buy set to mirror TS.
         self._scout_idx = next((i for i, u in enumerate(ru) if u["id"] == "SCOUT"), -1)
-        # The scripted galley-policy build target (the naval MELEE unit,
-        # requiresTech SAILING). -1 if the roster has no galley.
         self._galley_idx = next((i for i, u in enumerate(ru) if u["id"] == "GALLEY"), -1)
-        # The Great General / Great Admiral chassis. unit_idx = the roster index
-        # of the spawned combat-0 civilian; cls = the GP class index whose claim
-        # spawns it (-1 = absent). The aura amount and range come from the
-        # exporter.
         self._general_unit_idx = int(rr.get("generalUnitIdx", -1))
         self._admiral_unit_idx = int(rr.get("admiralUnitIdx", -1))
-        self._admiral_march_live = bool(rr.get("admiralMarchLive", False))  # gates the admiral march
+        self._admiral_march_live = bool(rr.get("admiralMarchLive", False))
         self._general_cls = int(rr.get("generalClassIdx", -1))
         self._admiral_cls = int(rr.get("admiralClassIdx", -1))
         self._gen_aura_cs_val = float(rr.get("generalAuraCs", 5))
@@ -1406,23 +1113,18 @@ class SimInit:
         self._gen_aura_mp = int(rr.get("generalAuraMp", 1))  # the aura's movement half
         self._gen_off = tiles_within_offsets(self._gen_aura_range).to(device)  # aura disk (hexDistance ≤ range)
 
-        # Precomputed static prereq masks would race with completion inside a
-        # turn; availability is recomputed per loop (cheap: NT ≤ 32).
         self._prereq_t = self._prereq_matrix(rules.t_prereqs, NT).to(device)
         self._prereq_c = self._prereq_matrix(rules.c_prereqs, NC).to(device)
         self._arangeT = torch.arange(T, device=device)
-        # Hoisted per-call allocations (index buffers + scalar consts)
         self._arangeT_f = self._arangeT.to(dtype)
         self._bidx = torch.arange(B, device=device)
         self._inf_f = torch.tensor(float("inf"), dtype=dtype, device=device)
         self._neg_f = torch.tensor(-1e18, dtype=dtype, device=device)
-        # Derived caches, all keyed on _eff_version — every dependency's
-        # mutation site bumps it.
         self._adjd_cache = None
         self._adjc_cache = None
         self._adjh_cache = None
         self._fadjq_cache = None
-        self._appeal_cache = None  # _tile_appeal, _eff_version-keyed
+        self._appeal_cache = None
         self._rcy_cache = None
         self._bld_cache: dict = {}  # (row, complete) -> (_eff_version, mask); one entry per seat row
         # The WIRE's spending intents, parked between decide-time and the
@@ -1433,10 +1135,6 @@ class SimInit:
         self._driven_buy_worship: dict = {}
         self._driven_buy_relig: dict = {}
         self._driven_levy: dict = {}
-        # The WIRE's applySeatActionRecord intents, parked the same way and
-        # keyed the same way: decide-time and the RECORD POSITION (after the
-        # CS/quest block, before the gold ladder) are different points in the
-        # turn for every seat, seat 0 included.
         self._driven_tech: dict = {}
         self._driven_civic: dict = {}
         self._driven_envoys: dict = {}
@@ -1468,14 +1166,10 @@ class SimInit:
                     _m0u = int(self._type_moves[ti])
                     self.major_unit_mp[b, i] = _m0u
                     self.major_unit_mp_full[b, i] = _m0u
-                    # The t0 roster carries a SETTLER (civilian) beside the
-                    # warrior — occupancy goes to the CIVILIAN map for it.
                     if bool(self._type_civilian[ti]):
                         self.civilian_at[(b, int(u_["tile"]))] = i
                     else:
                         self.military_at[(b, int(u_["tile"]))] = i
-                    # the seeder's spawn reveal — t0 explored derives from the
-                    # start units on BOTH engines (the fixture carries none).
                     if self.fog_of_war:
                         self.seat_explored[b, seat] |= self.pair_dist[int(u_["tile"])] <= 2
                     self.unit_next[b] += 1
@@ -1492,64 +1186,32 @@ class SimInit:
                 self.major_unit_seat == _row0, _mcs0, torch.zeros_like(_mcs0)
             ).max(dim=1).values
 
-        # Pristine copy of the mutable state, for reset().
         self._pristine = {k: getattr(self, k).clone() for k in _MUTABLE}
 
     def reset(self) -> None:
-        """Restore the initial state (all games, lockstep)."""
         for k, v in self._pristine.items():
             getattr(self, k).copy_(v)
         self.turn = 1
-        self._eff_version += 1  # fertility/drought just changed under the cache
+        self._eff_version += 1
         self._food_cache = None
         self._nprod_cache = None
         self._adjd_cache = self._adjc_cache = self._adjh_cache = None
         self._dadj_cache = None
         self._fadjq_cache = self._rcy_cache = None
         self._bld_cache = {}
-        # Beliefs/units are back to pristine — bump the counters and drop the
-        # civ-phase caches (the bel_add memo is keyed on _bel_version alone).
         self._bel_version += 1
         self._rp_kill_version += 1
         self._claim_version += 1
         self._seat_route_cache = self._belief_feat_cache = None
         self._bel_add_memo = self._gov_pol_cache = None
 
-    # ---- state discipline: the aliasing safety net ---------------------------
-    #
-    # The per-seat names (`p_*`, `v_*`, `civ_only_*`, `citystate_*`, ...) are VIEWS of one
-    # merged tensor. A view survives `x[...] = v` and `x.copy_(v)` but is
-    # silently destroyed by `self.x = torch.where(...)`, which REBINDS the name
-    # to a fresh dense tensor; writes through it then never reach the base, with
-    # no exception until some downstream sum disagrees many turns later.
-    #
-    # So: any name registered as an alias must keep its storage across a step.
-    # Plenty of `_MUTABLE` tensors are legitimately rebound every step, so a
-    # blanket "no _MUTABLE data_ptr may change" rule would fail on turn 1; what
-    # is pinned for them is shape and dtype.
     def register_alias(self, name: str, recompute) -> None:
-        """Declare `self.<name>` to be a VIEW of `recompute(self)`, forever."""
         self._aliases[name] = recompute
 
     def row_of(self, seat: int) -> int:
-        """Absolute seat id -> its row in the war matrix and the seat planes.
-
-        The scalar spelling of the `_seat_row` gather, for the Python-level
-        callers (pokes, the digest) that hold one seat rather than a tensor of
-        them. Majors are their own row, so this only earns its keep from 100
-        (city-states) and 200 (barbarians) up."""
         return int(self._seat_row[seat])
 
     def _check_seat_invariant(self) -> None:
-        """unit_seat must agree with the slot range it sits in.
-
-        It is written at every spawn, capture and fixture load, so it can drift
-        the moment a new spawn path appears. Checked on EVERY slot, alive or
-        not: both ranges are seeded to a real seat and a dead slot is reused by
-        the next spawn, so a bogus seat sitting there is a wrong owner waiting
-        to happen — and a stale 0 in the major range would silently enlist the
-        slot for seat 0.
-        """
         al = self.unit_alive
         seat = self.unit_seat
         v, u = self.POOL_LO["major"], self.POOL_LO["barb"]
@@ -1567,20 +1229,14 @@ class SimInit:
         if not SEAT_CAPS[POOL_CLASS["barb"]]["xp"] and not bool((self.unit_xp[:, u:ue] == 0).all()):
             raise AssertionError("CAP VIOLATION: a BARB slot carries xp, but caps.xp is False for the hostile class")
 
-    #: (name, dtype, fill) for every relation a SEAT holds with a CITY-STATE.
-    #: Each is one `seat_citystate_<name> [B, n_majors, S]` plane; `citystate_<name>` is row 0 and
-    #: `civ_only_citystate_<name>` is rows 1.., both views.
     _CS_PAIR_FIELDS = (
         ("met", torch.bool, False),
         ("envoys", torch.long, 0),
-        ("quest", torch.long, 0),        # 0 none / 1 clearCamp / 2 trade / 3 district
+        ("quest", torch.long, 0),
         ("quest_camp", torch.long, -1),
         ("quest_issued", torch.long, 0),
     )
 
-    #: (key, dtype, trailing-dim attribute) for the per-seat scalars whose
-    #: width is only known after the rules load. `dtype=None` takes the
-    #: engine's dtype.
     _CIV_PAIR_FIELDS = (
         ("culture", None, None),
         ("faith", None, None),
@@ -1590,34 +1246,17 @@ class SimInit:
     )
 
     def _alloc_civ_pairs(self, B: int, n_majors: int, dtype, device) -> None:
-        """Allocate one plane per fact, one row per MAJOR seat.
-
-        `dtype=None` means the merged plane takes the engine's dtype."""
         for _k, _dt, _ex in self._CIV_PAIR_FIELDS:
             _w = getattr(self, _ex) if _ex else None
             _shape = (B, n_majors) + ((_w,) if _w else ())
             setattr(self, f"civ_{_k}", torch.zeros(_shape, dtype=_dt or dtype, device=device))
 
     def _alloc_cs_pairs(self, B: int, n_majors: int, s_pad: int, device) -> None:
-        """Allocate one plane per (seat, city-state) relation, [B, n_majors, S].
-
-        The row IS the major's seat id — no view either side."""
         for _nm, _dt, _fill in self._CS_PAIR_FIELDS:
             setattr(self, f"seat_citystate_{_nm}",
                     torch.full((B, n_majors, s_pad), _fill, dtype=_dt, device=device))
 
     def _alloc_war(self, B: int, n_majors: int, s_pad: int, device) -> None:
-        """ONE war relation: `war[b, i, j]`, symmetric, covering every pair.
-
-        Rows are a COMPACT seat index:
-          0 .. n_majors-1        the majors, row = absolute seat id
-          n_majors .. +S         city-states  (absolute seat 100+s)
-          n_majors+S             barbarians   (absolute seat 200)
-        The absolute space is sparse — a dense 201x201 per game would be 40KB —
-        so `_seat_row` maps absolute seat -> row in one gather.
-
-        `war` is the ONLY store: no seat family carries a view of its own
-        slice, so a declaration is written where it is read."""
         self.NS = n_majors + s_pad + 1
         self.BARB_ROW = n_majors + s_pad
         _row = torch.zeros(BARB_SEAT + 1, dtype=torch.long, device=device)
@@ -1627,10 +1266,6 @@ class SimInit:
             _row[100 + _c] = n_majors + _c
         _row[BARB_SEAT] = self.BARB_ROW
         self._seat_row = _row
-        # The INVERSE. `_seat_row` answers "which row is this seat"; the
-        # weariness rules ask the other way round ("is the tile owned by the
-        # seat sitting in this row"), and a row-indexed lookup keeps that a
-        # gather rather than a Python branch per seat class.
         _rs = torch.full((self.NS,), NO_SEAT, dtype=torch.long, device=device)
         for _r in range(n_majors):
             _rs[_r] = _r
@@ -1639,32 +1274,12 @@ class SimInit:
         _rs[self.BARB_ROW] = BARB_SEAT
         self._ROW_SEAT = _rs
         self.war = torch.zeros(B, self.NS, self.NS, dtype=torch.bool, device=device)
-        # WAR WEARINESS is keyed exactly like WAR, because every rule that
-        # touches it is per-war — a battle scores against one enemy, the decay
-        # applies to a war nobody fought, and a treaty settles ONE war.
-        # `ww[b, i, j]` is row i's points from its war with row j (NOT
-        # symmetric: each side accrues its own). `ww_turn` stamps the last turn
-        # a battle was fought there, which tells a war being fought from a
-        # phoney one. The barbarian row exists and is never written.
         self.ww = torch.zeros(B, self.NS, self.NS, dtype=torch.long, device=device)
-        # The per-step battle-site audit. Not game state — a tripwire, reset
-        # every step, asserted at the turn boundary.
         self._ww_opened = torch.zeros(B, dtype=torch.long, device=device)
         self._ww_hooked = torch.zeros(B, dtype=torch.long, device=device)
         self.ww_turn = torch.full((B, self.NS, self.NS), -1, dtype=torch.long, device=device)
 
     def sync_war(self) -> None:
-        """Close the war matrix under TRANSPOSE.
-
-        A poke that writes one cell of a pair leaves the mirror stale. The
-        engine's own arms write both sides (`_apply_war_column`, the geo arms,
-        `_reset_war_clock`); this is for a test that pokes the upper triangle
-        and wants the relation closed.
-
-        The UPPER triangle is authoritative and is mirrored down. Deliberately
-        NOT an OR: a write that makes PEACE clears one cell, and ORing the
-        transpose back in would hand the war straight over again. Idempotent;
-        call it as often as you like."""
         w = self.war
         keep = torch.triu(
             torch.ones(self.NS, self.NS, dtype=torch.bool, device=w.device), diagonal=1
@@ -1726,12 +1341,10 @@ class SimInit:
         return {
             "mut": {k: getattr(self, k).clone() for k in _MUTABLE},
             "turn": self.turn,
-            "road_bridged": self.road_bridged,  # a scalar latch, not a plane
+            "road_bridged": self.road_bridged,
         }
 
     def restore(self, snap: dict) -> None:
-        """Restore a snapshot() in place. Bumps _eff_version + clears the derived
-        caches so a later compute recomputes against the restored state."""
         for k, v in snap["mut"].items():
             getattr(self, k).copy_(v)
         # restore rewrites tile ownership in place, which is a
@@ -1748,10 +1361,8 @@ class SimInit:
         self._dadj_cache = None
         self._fadjq_cache = self._rcy_cache = None
         self._bld_cache = {}
-        # The restored snapshot may carry different beliefs/units — bump the
-        # counters and drop the civ-phase caches.
         self._bel_version += 1
-        self._gen_ver += 1  # restored unit pools may hold different generals
+        self._gen_ver += 1
         self._rp_kill_version += 1
         self._claim_version += 1
         self._seat_route_cache = self._belief_feat_cache = None
@@ -1765,4 +1376,3 @@ class SimInit:
                 m[i, p] = True
         return m
 
-    # --- helpers ---------------------------------------------------------------

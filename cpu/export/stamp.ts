@@ -1,17 +1,3 @@
-/**
- * THE EXPORT STAMP — which engine source compiled rules.json + the planes.
- *
- * Hashes every `.ts` under `cpu/` and `world/` (rules.json's content is
- * determined overwhelmingly by `cpu/data/**`, which the old seeder-only stamp
- * missed by an order of magnitude) plus the run's params. The world files
- * carry their own `genStamp` (seeder/stamp.ts); a fixture records BOTH —
- * srcStamp for the compiler, worldHash for the world — so any half going
- * stale is visible.
- *
- * Self-contained on purpose: `seeder/` may not import `cpu/`, so a shared
- * walker would have to live in `world/`, which imports nothing at all. Two
- * copies of a 20-line walk is the cheaper contract.
- */
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join as pathJoin, relative, sep } from 'node:path';
@@ -28,7 +14,6 @@ function walk(dir: string, out: string[]): void {
   }
 }
 
-/** sha256 over (relative path, bytes) of cpu/ + world/ sources plus params. */
 export function exportStamp(params: unknown): string {
   const files: string[] = [];
   for (const r of ['cpu', 'world']) walk(pathJoin(ROOT, r), files);

@@ -1,15 +1,7 @@
-"""Why do seat 0's cities decline in the long game — loyalty flips (peace) or
-civ conquest (war)?
-
-Per game over 300 turns: track peak seat-0 cities, the final count, and whether
-seat 0 was EVER at war with any civ. Cities lost in games that never went to war
-point at loyalty flips; losses concentrated in at-war games point at conquest.
-Also splits the empire-wide city-loss count by war state at the turn of loss.
-"""
 import sys, torch
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-import core.simbase as _eng  # the globals live on the module floor
+import core.simbase as _eng
 _eng.U_MAX = 512; _eng.P_MAX = 512
 from core import BatchSim, load_rules, load_fixture, FIXTURES
 
@@ -28,7 +20,7 @@ for t in range(1, 301):
     atwar = sim.war[:, 0, : sim.n_majors].any(dim=1)
     ever_war |= atwar
     peak = torch.maximum(peak, cur)
-    lost = (prev - cur).clamp(min=0)  # cities lost this turn per game
+    lost = (prev - cur).clamp(min=0)
     loss_at_war += int((lost * atwar).sum())
     loss_at_peace += int((lost * ~atwar).sum())
     prev = cur.clone()

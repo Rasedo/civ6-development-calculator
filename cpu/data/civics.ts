@@ -1,16 +1,3 @@
-/**
- * Civics tree — the full GS ~50-node tree.
- *
- * THE ORDER IS A WIRE CONTRACT: both engines index civics by position, so this
- * list is APPEND-ONLY. Inserting a node renumbers every one after it.
- * Costs are real-anchored culture.
- *
- * The appended nodes are PURE TREE NODES: their real unlocks are policy cards
- * and tier-3 governments — the POLICIES/GOVERNMENTS surface owned by Slice P
- * — so they carry NO unlock effects here,
- * keeping the merge clean. Inspirations attach only where expressible against
- * an exported target; the rest are uninspirable (recorded).
- */
 
 import type { Era, ResearchEffect } from './techs';
 import { GAME_SPEED } from './constants';
@@ -35,7 +22,6 @@ const C = (
 
 export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
   [
-    // --- Ancient -------------------------------------------------------------
     C('CODE_OF_LAWS', 'Code of Laws', 'Ancient', 20, [], [
       { kind: 'unlockGovernment', government: 'CHIEFDOM' },
       { kind: 'unlockPolicy', policy: 'URBAN_PLANNING' },
@@ -75,7 +61,6 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockPolicy', policy: 'GOD_OF_THE_OPEN_SKY' },
     ]),
 
-    // --- Classical ------------------------------------------------------------
     C('GAMES_AND_RECREATION', 'Games and Recreation', 'Classical', 110, ['STATE_WORKFORCE'], [
       { kind: 'unlockDistrict', district: 'ENTERTAINMENT_COMPLEX' },
       { kind: 'unlockBuilding', building: 'ARENA' },
@@ -84,7 +69,6 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockGovernment', government: 'AUTOCRACY' },
       { kind: 'unlockGovernment', government: 'OLIGARCHY' },
       { kind: 'unlockGovernment', government: 'CLASSICAL_REPUBLIC' },
-      // Political Philosophy grants the first diplomatic cards.
       { kind: 'unlockPolicy', policy: 'DIPLOMATIC_LEAGUE' },
       { kind: 'unlockPolicy', policy: 'CHARISMATIC_LEADER' },
     ]),
@@ -107,7 +91,6 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockPolicy', policy: 'NAVAL_INFRASTRUCTURE' },
     ]),
 
-    // --- Medieval --------------------------------------------------------------
     C('FEUDALISM', 'Feudalism', 'Medieval', 275, ['THEOLOGY'], [
       { kind: 'farmAdjacency' },
       { kind: 'unlockPolicy', policy: 'FEUDAL_CONTRACT' },
@@ -128,7 +111,6 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockPolicy', policy: 'GOTHIC_ARCHITECTURE' },
     ]),
 
-    // --- Renaissance ------------------------------------------------------------
     C('EXPLORATION', 'Exploration', 'Renaissance', 400, ['MEDIEVAL_FAIRES'], [
       { kind: 'unlockGovernment', government: 'MERCHANT_REPUBLIC' },
     ]),
@@ -158,7 +140,6 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockPolicy', policy: 'LIBERALISM' },
     ]),
 
-    // --- Industrial --------------------------------------------------------------
     C('CIVIL_ENGINEERING', 'Civil Engineering', 'Industrial', 920, ['ENLIGHTENMENT'], [
       { kind: 'hillFarms' },
       { kind: 'unlockPolicy', policy: 'PUBLIC_WORKS' },
@@ -176,7 +157,6 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockDistrict', district: 'NEIGHBORHOOD' },
     ]),
 
-    // --- Modern -------------------------------------------------------------------
     C('MASS_MEDIA', 'Mass Media', 'Modern', 1410, ['URBANIZATION']),
     C('PROFESSIONAL_SPORTS', 'Professional Sports', 'Modern', 1480, ['URBANIZATION'], [
       { kind: 'unlockBuilding', building: 'STADIUM' },
@@ -190,46 +170,28 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockGovernment', government: 'COMMUNISM' },
       { kind: 'unlockPolicy', policy: 'FIVE_YEAR_PLAN' },
     ]),
-    // TOTAL_WAR: SUBSTITUTION — real granting civic (Scorched Earth, Atomic) is
-    // absent; placed on Totalitarianism, the closest present modern-military civic.
     C('TOTALITARIANISM', 'Totalitarianism', 'Modern', 1715, ['MASS_MEDIA'], [
       { kind: 'unlockGovernment', government: 'FASCISM' },
       { kind: 'unlockPolicy', policy: 'TOTAL_WAR' },
     ]),
 
-    // ========================================================================
-    // Full-tree expansion (index 30+). Pure tree nodes — real policy /
-    // government unlocks belong to Slice P's POLICIES/GOVERNMENTS surface, so
-    // no unlock effects here. NUCLEAR_PROGRAM carries the one expressible
-    // inspiration (Research Lab, an exported Campus building).
-    // ========================================================================
 
-    // --- Classical (fill) ----------------------------------------------------
     C('MILITARY_TRAINING', 'Military Training', 'Classical', 120, ['MILITARY_TRADITION', 'GAMES_AND_RECREATION']),
     C('DEFENSIVE_TACTICS', 'Defensive Tactics', 'Classical', 175, ['GAMES_AND_RECREATION'], [
       { kind: 'unlockPolicy', policy: 'BASTIONS' },
     ]),
 
-    // --- Medieval (fill) -----------------------------------------------------
     C('MERCENARIES', 'Mercenaries', 'Medieval', 385, ['FEUDALISM']),
 
-    // --- Renaissance (fill) --------------------------------------------------
-    // FREE_TRADE: SUBSTITUTION — real "Free Market" already sits on The
-    // Enlightenment (FREE_MARKETS); this extra trade card has no distinct real
-    // civic. Placed on Mercantilism, a Renaissance economic/trade civic.
     C('MERCANTILISM', 'Mercantilism', 'Renaissance', 655, ['HUMANISM'], [
       { kind: 'unlockPolicy', policy: 'FREE_TRADE' },
     ]),
     C('DIPLOMATIC_SERVICE', 'Diplomatic Service', 'Renaissance', 655, ['EXPLORATION']),
 
-    // --- Industrial (fill) ---------------------------------------------------
     C('OPERA_AND_BALLET', 'Opera and Ballet', 'Industrial', 870, ['HUMANISM']),
     C('COLONIALISM', 'Colonialism', 'Industrial', 920, ['MERCANTILISM']),
     C('CONSERVATION', 'Conservation', 'Industrial', 1060, ['NATURAL_HISTORY']),
 
-    // --- Modern (fill) -------------------------------------------------------
-    // REDOUBT: best-known real unlock is a modern military civic; placed on
-    // Mobilization alongside Levee en Masse (its real granting civic).
     C('MOBILIZATION', 'Mobilization', 'Modern', 1410, ['NATIONALISM'], [
       { kind: 'unlockPolicy', policy: 'LEVEE_EN_MASSE' },
       { kind: 'unlockPolicy', policy: 'REDOUBT' },
@@ -243,7 +205,6 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('CAPITALISM', 'Capitalism', 'Modern', 1620, ['MASS_MEDIA']),
     C('CULTURAL_HERITAGE', 'Cultural Heritage', 'Modern', 1500, ['CONSERVATION']),
 
-    // --- Atomic (new era) ----------------------------------------------------
     C('COLD_WAR', 'Cold War', 'Atomic', 2200, ['MOBILIZATION'], [
       { kind: 'unlockPolicy', policy: 'CONTAINMENT' },
     ]),
@@ -253,7 +214,6 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     ]),
     C('ENVIRONMENTALISM', 'Environmentalism', 'Atomic', 2340, ['CULTURAL_HERITAGE']),
 
-    // --- Information (new era) ------------------------------------------------
     C('GLOBALIZATION', 'Globalization', 'Information', 2500, ['SPACE_RACE', 'CAPITALISM']),
     C('SOCIAL_MEDIA', 'Social Media', 'Information', 2500, ['GLOBALIZATION'], [
       { kind: 'unlockPolicy', policy: 'COLLECTIVE_ACTIVISM' },

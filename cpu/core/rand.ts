@@ -1,8 +1,6 @@
-/** In-state seeded RNG: serialized with the game, so runs are replayable. */
 
 import type { GameState } from './types';
 
-/** Advance the game's RNG and return a float in [0, 1). */
 export function nextRandom(state: GameState): number {
   let a = state.rngState | 0;
   a = (a + 0x6d2b79f5) | 0;

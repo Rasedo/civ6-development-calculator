@@ -27,7 +27,6 @@ export interface BuiltWonderDef {
   requiresTech?: string;
   requiresCivic?: string;
   placement: {
-    /** Allowed base terrains (land wonders). */
     terrains?: TerrainId[];
     flatOnly?: boolean;
     hillsOnly?: boolean;
@@ -36,28 +35,20 @@ export interface BuiltWonderDef {
     adjacentDistrict?: DistrictId;
     /** Must neighbor a tile with this resource. */
     adjacentResource?: string;
-    /** Placed on coastal water adjacent to land (Colossus). */
     onCoastalWater?: boolean;
     allowFloodplains?: boolean;
   };
-  /** Flat yields for the owning city. */
   cityYields?: Partial<Yields>;
   effects?: {
-    /** Growth multiplier for every city in the empire (Hanging Gardens). */
     growthAllMult?: number;
-    /** Amenities to cities within 6 tiles (Colosseum). */
     regionalAmenities?: number;
-    /** +2 food +2 gold +1 production on this city's non-floodplain desert tiles. */
     petraDesert?: boolean;
-    /** Multipliers on the owning city's final yields (Ruhr, Oxford, Big Ben). */
     cityYieldMult?: Partial<Yields>;
-    /** Adds a wildcard policy slot (Forbidden City). */
     extraWildcardSlot?: boolean;
   };
   description: string;
 }
 
-// Wonder costs speed-scale like every other production cost.
 const W = (def: BuiltWonderDef): BuiltWonderDef => ({ ...def, cost: Math.round(def.cost * GAME_SPEED) });
 
 export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
@@ -197,18 +188,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       description: '+6 gold and +10% gold in this city. River tile adjacent to a Commercial Hub.',
     }),
 
-    // ========================================================================
-    // World wonders 13 → 30 (index 13-29; stays within the 32-bit `wok`
-    // tile-bitmask ceiling). Effects use ONLY the supported wonder channels
-    // (cityYields / growthAllMult / regionalAmenities / cityYieldMult); every
-    // real effect needing an absent system (tourism/appeal, naval, Great-Work
-    // slots, envoys, era score, relic/martyr, policy slots, per-improvement
-    // amenities, tile-terrain bonuses) is DEGRADED to flat cityYields or
-    // dropped. Placement predicates are drawn
-    // only from the combos the existing 13 already exercise.
-    // ========================================================================
 
-    // --- Ancient / Classical -------------------------------------------------
     W({
       id: 'TEMPLE_OF_ARTEMIS', name: 'Temple of Artemis', code: 'TA', cost: 180,
       requiresTech: 'ARCHERY', placement: { flatOnly: true },
@@ -240,7 +220,6 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       description: '+1 science/faith/culture. (Free Great Engineer/Admiral charges dropped.)',
     }),
 
-    // --- Medieval / Renaissance ----------------------------------------------
     W({
       id: 'ALHAMBRA', name: 'Alhambra', code: 'AL', cost: 710,
       requiresTech: 'CASTLES', placement: { hillsOnly: true, adjacentDistrict: 'ENCAMPMENT' },
@@ -290,7 +269,6 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       description: '+2 science, +1 faith. (Diplomatic policy slot dropped.)',
     }),
 
-    // --- Industrial / Modern -------------------------------------------------
     W({
       id: 'HERMITAGE', name: 'Hermitage', code: 'HM', cost: 1200,
       requiresCivic: 'NATURAL_HISTORY', placement: { flatOnly: true, adjacentDistrict: 'THEATER_SQUARE' },

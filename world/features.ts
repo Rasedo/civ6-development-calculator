@@ -11,16 +11,11 @@ export interface FeatureDef {
   id: string;
   name: string;
   yields: Partial<Yields>;
-  /** Terrains the feature can sit on (for generation + validation). */
   terrains: TerrainId[];
-  /** Allowed on hills? (always allowed on flat unless flatOnly is false). */
   allowHills: boolean;
   impassable?: boolean;
-  /** Can a builder remove it (chop)? */
   removable: boolean;
-  /** Counts as fresh water for adjacent tiles / cities. */
   freshWater?: boolean;
-  /** Yield granted (era-scaled lump) when a builder chops it in units mode. */
   chopYield?: YieldKey;
 }
 

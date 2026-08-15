@@ -1,8 +1,3 @@
-"""The seat phase: EVERY seat's turn (yields, growth, borders, completion, loyalty, transfers).
-
-One mixin of BatchSim (assembled in engine.py); state and helpers live on
-self / gpu/core/simbase.py.
-"""
 from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
@@ -12,38 +7,11 @@ from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must
 
 class SimPhase:
     def _seat_phase(self) -> None:
-        """Runs EVERY seat in id order — the seatPhase twin. This function holds
-        the schedule AROUND the seat loop (the MP reset, the geopolitics arms,
-        the peace pass); every row's turn itself is ONE call to _seat_turn.
-
-        NO WIRE ARGUMENT reaches here any more. Every row's decisions arrive
-        through the same stash (`_stash_record` / `_stash_buy`, keyed by the
-        absolute row) and its war column through `_apply_war_column`, so the
-        schedule holds no seat's intents of its own.
-
-        What remains per-row in this file is the war-or-peace tail and the
-        driven unit-sequence replay — both ONE body, every major row."""
-        # Freeze the MAJORS' aura MP here: the seatPhase movesLeft reset
-        # covers every isCiv unit — seat 0's pool included — ahead of any
-        # general war-walk, so both engines read the same pre-move general
-        # positions.
         if self.units_mode:
             self._refresh_aura_mp()
             self._reset_mp("major")
-        # DENOUNCE and ALLY run before the per-seat loop: a fresh grudge has
-        # to break a standing alliance and start the formal clock before any
-        # declaration reads either. Declaring and suing are NOT here — they
-        # ride each seat's own war head at its record position, which
-        # is why nothing follows this call.
         if self.n_majors > 1:
             self._geo_denounce_and_ally()
-        # THE SEAT LOOP — state.seats in id order, seat 0 first, ONE body per
-        # row. All that is left outside _seat_turn is the driven unit-sequence
-        # REPLAY below, and since #108 that is one schema at one position for
-        # every major row: rank rows over `_seat_slot_map`, drained HERE, where
-        # the walkers stand. Row 0's orders used to ride a `[tile, col, civ]`
-        # triples record executed before step() — a whole turn earlier in the
-        # combat draw stream than any other seat's.
         for row in range(self.n_majors):
             active = self._seat_turn(row)
             if not bool(active.any()):
@@ -83,14 +51,7 @@ class SimPhase:
                 if bool(_rows_p.any()):
                     _ord_p = torch.where(_rows_p.view(-1, 1, 1), _dsq[row], torch.full_like(_dsq[row], -1))
                     self.apply_seat_unit_sequence(row, _ord_p)
-            # War declarations arrive on the wire.
 
-        # Drop the route-income cache at phase end: its key
-        # (turn, r, eff, _rp_kill_version) does not cover unit deaths in the
-        # war/peace acts above, so post-phase callers (leader/domination/
-        # trace) must recompute against post-war state. With two or more opponents the single
-        # slot is overwritten before any same-r re-read, but that must not be
-        # load-bearing for a single-opponent config.
         self._seat_route_cache = None
 
 
@@ -122,12 +83,10 @@ class SimPhase:
         arangeT = torch.arange(Tn, device=dev2)
         k = torch.where(valid, dist * (Tn + 1) + arangeT.reshape(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
         best_key = k.min(dim=1).values
-        tt = k.argmin(dim=1)  # [B] target tile (garbage where no target)
+        tt = k.argmin(dim=1)
         strike = fire & (best_key < 10**9)
         if not bool(strike.any()):
             return
-        # ONE defender slot; "military first" is the entire priority (one
-        # military and one civilian per tile makes the rest unreachable).
         _okm, _okc = hm[bidx, tt], hc[bidx, tt]
         d_slot = torch.where(_okm, _mil[bidx, tt], torch.where(_okc, _civ[bidx, tt], torch.full_like(tt, -1)))
         d_seat = torch.where(_okm, _mseat[bidx, tt], torch.where(_okc, _cseat[bidx, tt], torch.full_like(tt, -1)))
@@ -141,22 +100,14 @@ class SimPhase:
         # CS, no terrain and no support.
         d_emb = self.unit_emb[bidx, ds0] & (d_slot >= 0)
         def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
-        # Garrison bonus: this seat's OWN military standing on the centre tile.
         gslot = self.military_at[bidx, ctr]
         gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == row)).long()
         bm = self.civ_best_melee[:, row]
         atk_cs = torch.maximum(bm, torch.full_like(bm, 15)) + gar * 5
-        # the defending unit is wounded (the attacker is the city)
         def_hp = self.unit_hp[bidx, ds0]
         def_e = def_cs - self._wound(def_hp)
-        # Support keys on the DEFENDER's own seat (supportCount counts units
-        # with `u.seat === defender.seat`); the attacker is a city, so there is
-        # no flanking.
         _, _sp = self._flank_support(tt, d_seat, torch.full((Bn,), -1, dtype=torch.long, device=dev2))
         def_e = def_e + SUPPORT_CS * torch.where(d_emb, torch.zeros_like(_sp), _sp)
-        # DEFENDER-side general aura (the roll is atk_cs - def_e, so it REDUCES
-        # the damage taken), outside the embarked override. Barbs own no
-        # general and a civilian is combat-0, so both read 0.
         _def_seat = torch.where(is_vet_mil, d_seat, torch.full_like(tt, -1))
         _def_nav = torch.where(is_vet_mil, self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
         def_e = def_e + self._gen_aura_cs(_def_seat, tt, d_emb | _def_nav).to(def_e.dtype)
@@ -164,23 +115,6 @@ class SimPhase:
                                   atk_cs, def_e, def_hp, row, key)
 
     def _seat_turn(self, row: int) -> torch.Tensor:
-        """ONE seat's turn — the seatPhase loop body, for ANY major seat row
-        (0 = seat 0, r+1 = civ r). Returns the row's `active` mask so the
-        caller can drive its war-or-peace tail.
-
-        NOT `_seat_row`: that name is the seat->row lookup TENSOR, and binding
-        both on `self` buries whichever loses. The seat-symmetry check now
-        fails on the collision.
-
-        In seatPhase order: the war-weariness decay, boost detection,
-        city-state diplomacy and quests, the recorded picks, the gold/faith
-        ladder, trade, the per-city block (loyalty, the empire streams, growth,
-        the queue, border growth, the city's own defense), the loyalty
-        collapses, then the research/upkeep/tourism/great-people tail.
-
-        What the CALLER still owns is the driven unit-sequence REPLAY, at one
-        position for every major row. The counters are not a caller concern any
-        more — `_seat_war_peace_tail` runs from here, one body for every row."""
         B, dev = self.B, self.device
         active = self.civ_alive[:, row] & self.city_alive[:, row].any(dim=1)
         if not bool(active.any()):
@@ -190,47 +124,23 @@ class SimPhase:
             self._seat_record_apply(row, active)
             self._seat_buy_ladder(row, active)
             return active
-        # War weariness SETTLES here: accrual happens per BATTLE as the
-        # fighting resolves, so what is left for the block top is the
-        # decay. The same function every seat calls, on its own row.
-        # The civ block of `war` is fixed for the turn by the phase-top
-        # declaration pass, so the "at war with somebody" test inside is stable.
         self._ww_decay(row, active)
         # Eurekas/inspirations from this seat — the TS twin runs at the
         # same point (the seat's block top).
         self._detect_seat_boosts(row, active)
-        # The CS-diplomacy block sits right after boost detection — the
-        # seatPhase position.
         self._seat_influence_phase(row, active)
-        # CS quests resolve/issue right after the envoy accrual (the
-        # seatPhase quest block sits at the tail of the same CS block), so
-        # a completed quest's envoy is visible to the levy suzerain test
-        # later this phase.
         self._seat_quest_phase(row, active)
-        # THE RECORD: tech, civic, envoys, production — one body, every seat
-        # row, at applySeatActionRecord's own position.
         self._seat_record_apply(row, active)
-        # THE gold/faith block — one body, every seat row.
         self._seat_buy_ladder(row, active)
-        # The trade creation block sits between the buy block and the
-        # city-loop snapshot — the seatPhase position.
         self._seat_trade_phase(row, active)
-        # The city-loop snapshot is taken AFTER the buy block (the
-        # [...actor.cities] discipline): a bought-settler newborn acts this
-        # turn (amenity + yields), a queue-completion newborn (founded
-        # inside the loop, later) does not.
         alive_c = self.city_alive[:, row].clone()
 
         sci_sum = torch.zeros(B, dtype=torch.float64, device=dev)
         cul_sum = torch.zeros(B, dtype=torch.float64, device=dev)
         gold_sum = torch.zeros(B, dtype=torch.float64, device=dev)
         faith_sum = torch.zeros(B, dtype=torch.float64, device=dev)
-        # THE loop-top stats snapshot — one body, every seat row. Every
-        # column below reads THIS map: yields, amenity tier, effective food
-        # surplus and growth need all freeze here, and nothing inside the
-        # loop refreshes them.
         total, eff, need, tier_idx = self._seat_city_stats(row)
-        gov = self._seat_governor_seats(row)  # [B, RC]
+        gov = self._seat_governor_seats(row)
         flip = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
         # One guard sync for the whole economy loop: alive_c is a pre-loop
         # CLONE (a queue-completion newborn founded inside the loop does not
@@ -241,9 +151,8 @@ class SimPhase:
         for j in range(self.RC):
             if not cact_any_l[j]:
                 continue
-            cact = cact_all[:, j]  # post-buy snapshot (a bought settler's city acts this turn)
+            cact = cact_all[:, j]
             jc = torch.full((B,), j, dtype=torch.long, device=dev)
-            # City loyalty at its loop-top position — one body, every seat row.
             flip[:, j] = self._seat_city_loyalty(row, jc, cact, tier_idx[:, j], gov[:, j])
             # The empire streams, in seatPhase's own order. ASSOCIATION
             # MATTERS: TS `sciSum += y.science + 0.7*pop` desugars to
@@ -260,23 +169,13 @@ class SimPhase:
             sci_sum = torch.where(cact, sci_sum + total[:, j, 3], sci_sum)
             cul_c = torch.where(cact, total[:, j, 4], torch.zeros_like(total[:, j, 4]))
             cul_sum = torch.where(cact, cul_sum + cul_c, cul_sum)
-            # seatGrowth, then the queue, then borders, then the city's own
-            # defense — four shared bodies, one call each, every seat row.
             self._seat_city_growth(row, jc, cact, eff[:, j], need[:, j])
             self._seat_city_produce(row, jc, cact, total[:, j, 1])
             self._seat_border_growth(row, jc, cact, cul_c)
             self._seat_city_fire_and_heal(row, jc, cact)
 
-        # Loyalty collapses resolve after the city loop — one body, every
-        # seat row.
         self._seat_loyalty_flips(row, flip)
-        # The seat block's TAIL — banking, upkeep, research, tourism,
-        # favor, grievances, the great-people and belief races: ONE body,
-        # every seat row, on this row's own city sums.
         self._seat_research_tail(row, active, sci_sum, cul_sum, gold_sum, faith_sum)
-        # War or peace — the counters are the RULE and they live here for every
-        # row; the UNITS are the wire, and their replay is the loop's, at one
-        # position for every row.
         self._seat_war_peace_tail(row, active)
         return active
 
@@ -308,7 +207,7 @@ class SimPhase:
         governorTitles(civics) of them. Read once per seat block, before any
         loyalty moves."""
         dev, B, RC = self.device, self.B, self.RC
-        titles = (self.civ_civics[:, row].sum(dim=1) // self._gov_per).clamp(max=self._gov_max)  # [B]
+        titles = (self.civ_civics[:, row].sum(dim=1) // self._gov_per).clamp(max=self._gov_max)
         alive = self.city_alive[:, row]
         q = js_round(self.city_loyalty[:, row] * 1000).long()
         key = torch.where(alive, q * 256 + torch.arange(RC, device=dev).reshape(1, -1), torch.full_like(q, 1 << 40))
@@ -318,20 +217,6 @@ class SimPhase:
 
     def _seat_city_loyalty(self, row: int, col: torch.Tensor, act: torch.Tensor,
                            tier: torch.Tensor, gov: torch.Tensor) -> torch.Tensor:
-        """applyLoyalty for ONE column of seat row `row`; returns the FLIP mask.
-
-        Loyalty only moves while SOMEBODY ELSE holds a city. A capital pins to
-        loyaltyMax — and only past that guard, which is where applyLoyalty puts
-        it. Everything else takes nearby population pressure scaled per SOURCE
-        seat by that seat's own age factor, plus the amenity term and the
-        governor bonus.
-
-        Pops are read LIVE, which is why this is a per-city body and not a
-        batched pass: cities EARLIER in this seat's loop have already grown,
-        later ones have not, and seats later in the seat loop have not taken
-        their turn at all. Every pressure term is pop x an integer weight and
-        every age factor is a half, so the subtotals are exact and their sum
-        order does not matter."""
         B, dev, F = self.B, self.device, torch.float64
         bidx, nrow = self._bidx, self.n_majors
         rr = self.rules.seats
@@ -343,16 +228,16 @@ class SimPhase:
         held = self.city_alive[:, :nrow].any(dim=2) & self.civ_alive[:, :nrow]  # [B, n_majors]
         others = torch.cat((held[:, :row], held[:, row + 1:]), dim=1)
         others = others.any(dim=1) if others.shape[1] else torch.zeros(B, dtype=torch.bool, device=dev)
-        here = self.city_center[bidx, row, col].clamp(min=0)  # [B]
+        here = self.city_center[bidx, row, col].clamp(min=0)
         ctr = self.city_center[:, :nrow].reshape(B, -1).clamp(min=0)
         d = self.pair_dist[here.unsqueeze(1), ctr].to(F)
         w = ((rng + 1 - d).clamp(min=0)
              * self.city_pop[:, :nrow].reshape(B, -1).double()
              * self.city_alive[:, :nrow].reshape(B, -1).double())
-        sub = w.reshape(B, nrow, self.RC).sum(dim=2) * self._age_factor[self.civ_age[:, :nrow]]  # [B, n_majors]
+        sub = w.reshape(B, nrow, self.RC).sum(dim=2) * self._age_factor[self.civ_age[:, :nrow]]
         own = sub[:, row]
         keep = torch.ones(nrow, dtype=F, device=dev)
-        keep[row] = 0.0  # own is not foreign; a 0.0 term leaves the sum exact
+        keep[row] = 0.0
         foreign = (sub * keep.reshape(1, -1)).sum(dim=1)
         tot = own + foreign
         press = torch.where(tot > 0, scale * (own - foreign) / tot.clamp(min=1e-9), torch.zeros_like(tot))
@@ -401,18 +286,6 @@ class SimPhase:
 
     def _seat_city_growth(self, row: int, col: torch.Tensor, act: torch.Tensor,
                           eff: torch.Tensor, need: torch.Tensor) -> None:
-        """seatGrowth — bank the effective surplus, then grow OR starve. ONE
-        body, every seat row, at the per-city seatPhase position (after this
-        city's yields, before its queue).
-
-        `eff` and `need` are THIS column's snapshot effectiveFoodSurplus and
-        growthNeeded (_seat_city_stats): the housing, amenity-tier, wonder and
-        belief factors are already folded into `eff`, and `need` reads the pop
-        the turn opened with.
-
-        The two arms are EXCLUSIVE (seatGrowth's `else if`): a city that grows
-        never starves the same turn. Starvation floors the pop at 1 and empties
-        the box."""
         bidx = self._bidx
         old = self.city_growth[bidx, row, col]
         box = old + eff
@@ -444,10 +317,6 @@ class SimPhase:
         has_q = act & (cur >= 0)
         if not bool(has_q.any()):
             return
-        # The seat's own encampmentProdMult, on the queue head only: the
-        # multiplier keys on the ITEM (an Encampment district or one of its
-        # buildings), not on the seat. A building head is its own production
-        # column (0..NB-1) on every row, so one decode serves every seat.
         if self._gov_has_effects and self._encamp_didx >= 0:
             em = self._gov_mods(row)[5]
             enc_i = (cur >= 0) & (cur < self.NB) & (
@@ -461,7 +330,7 @@ class SimPhase:
         bank = self.city_prod_bank[bidx, row, col]
         self.city_progress[bidx, row, col] = torch.where(has_q, prog + prod + bank, prog)
         self.city_prod_bank[bidx, row, col] = torch.where(has_q, torch.zeros_like(bank), bank)
-        cost = self.city_cost[bidx, row, col].clone()  # the project lump reads the LOCKED cost
+        cost = self.city_cost[bidx, row, col].clone()
         done = has_q & (self.city_progress[bidx, row, col] >= cost)
         if not bool(done.any()):
             return
@@ -474,8 +343,6 @@ class SimPhase:
         self.city_cost[bidx, row, col] = torch.where(done, torch.zeros_like(cost), cost)
         ctr = self.city_center[bidx, row, col]
 
-        # --- SETTLER: a unit like any other. It spawns at the city and the city
-        # pays 1 pop (floored at 1); WHERE it founds is a later FOUND_CITY order.
         made_s = done & (cur == self.SETTLER)
         if bool(made_s.any()):
             pop = self.city_pop[bidx, row, col]
@@ -483,22 +350,15 @@ class SimPhase:
             if self._settler_idx >= 0:
                 self._spawn_unit(row, made_s, ctr, self._settler_idx)
 
-        # --- UNITS. _spawn_unit reads the roster's civilian bit itself, so the
-        # Builder and the Military Engineer arrive with their charges and a
-        # civilian's 0 xp through this one call; a military unit inherits the
-        # city's best Encampment training tier.
         made_u = done & (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU)
         if bool(made_u.any()):
             ui = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
             xp = (self.city_bldg[bidx, row, col, :].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
             self._spawn_unit(row, made_u, ctr, ui, init_xp=xp)
             if self._builder_idx >= 0:
-                # a completed builder moves this seat's cost escalator
                 made_b = made_u & (ui == self._builder_idx)
                 self.civ_builders_trained[:, row] = self.civ_builders_trained[:, row] + made_b.long()
 
-        # --- DISTRICT: the paved tile completes (reserved at queue time in
-        # city_qtile) and an Encampment musters its garrison.
         made_d = done & (cur >= self.DISTRICT_BASE) & (cur < self.WONDER_BASE)
         if bool(made_d.any()):
             dr = made_d.nonzero(as_tuple=True)[0]
@@ -514,8 +374,6 @@ class SimPhase:
             self.city_qtile[bidx, row, col] = torch.where(made_d, torch.full_like(cur, -1), self.city_qtile[bidx, row, col])
             self._eff_version += 1
 
-        # --- BUILDING: it joins the registry (bounded above — district,
-        # wonder and project codes all sit past NB).
         made_b2 = done & (cur >= 0) & (cur < self.NB)
         if bool(made_b2.any()):
             br = made_b2.nonzero(as_tuple=True)[0]
@@ -526,13 +384,10 @@ class SimPhase:
             # reads the loop-top snapshot.
             self._eff_version += 1
             if self._walls_bidx >= 0:
-                # ANCIENT_WALLS fills the outer pool
                 wm = br[bi[br] == self._walls_bidx]
                 if len(wm) > 0:
                     self.city_outer_hp[wm, row, col[wm]] = self._walls_hp
 
-        # --- WONDER: the tile completes (effects read built_wonder_complete
-        # live off the registry) and the seat banks the era score.
         if self._wond_n:
             made_w = done & (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + self._wond_n)
             if bool(made_w.any()):
@@ -543,8 +398,6 @@ class SimPhase:
                 self.era_score[wr, row] += self._era_pts["wonder"]
                 self._eff_version += 1
 
-        # --- PROJECT: js_round(cost × frac) into the seat's own streams plus
-        # the great-person points (the completeProject twin).
         if self._proj_rows:
             made_p = done & (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
             if bool(made_p.any()):
@@ -563,10 +416,6 @@ class SimPhase:
                         self.civ_treasury[:, row] = torch.where(hit, self.civ_treasury[:, row] + amt_y, self.civ_treasury[:, row])
                     elif y_i == 5:
                         self.civ_faith[:, row] = torch.where(hit, self.civ_faith[:, row] + amt_y, self.civ_faith[:, row])
-                    # Pay EVERY listed class at THIS row's rate — the Festival
-                    # pays Writer/Artist/Musician at 0.11 each, every other
-                    # project one class at 0.22. `gs`/`gf` fall back to a
-                    # single `g` + the global fraction when the row omits them.
                     amt_g = js_round(cost * float(prow.get("gf", self._proj_gf)))
                     g_list = prow.get("gs")
                     if not g_list:
@@ -575,10 +424,6 @@ class SimPhase:
                     for g_i in (int(x) for x in g_list):
                         if 0 <= g_i < self.civ_gpp.shape[2]:
                             self.civ_gpp[:, row, g_i] = torch.where(hit, self.civ_gpp[:, row, g_i] + amt_g, self.civ_gpp[:, row, g_i])
-                    # A space-race step records chain progress; completing
-                    # the VICTORY step ends the game — for whichever seat flew
-                    # it. Space rows carry y=g=-1, so the yield/GPP blocks
-                    # above are no-ops for them.
                     if int(prow.get("sp", 0)):
                         self.space_done[hit, row, self._space_step[pidx]] = True
                         if pidx in self._space_victory_idx:
@@ -613,14 +458,9 @@ class SimPhase:
             enc_reg = self.city_dist_tile[bidx, row, col, self._encamp_didx]  # [B]
             e0 = enc_reg.clamp(min=0)
             enc_live = (enc_reg >= 0) & self.district_complete[bidx, e0] & ~self.district_pillaged[bidx, e0]
-            # `encamp_hp > 0` is part of the FIRING gate but not of the repair
-            # gate: an Encampment beaten to 0 is occupied and shoots nothing,
-            # yet it still heals back.
             self._seat_city_strike(row, col, act & enc_live & (self.encamp_hp[bidx, e0] > 0), "estk")
-        # A SIEGE pins the HP: any adjacent unit hostile to this seat —
-        # civilians included, per unitsHostile — read live at this point.
         ctr = self.city_center[bidx, row, col].clamp(min=0)
-        nbh = self.neigh[ctr]  # [B, 6]
+        nbh = self.neigh[ctr]
         nbc = nbh.clamp(min=0)
         _am = self.military_at.gather(1, nbc)
         _ac = self.civilian_at.gather(1, nbc)
@@ -638,8 +478,6 @@ class SimPhase:
             self.city_outer_hp[bidx, row, col] = torch.where(
                 ok & self.city_bldg[bidx, row, col, self._walls_bidx], (oh + heal).clamp(max=self._walls_hp), oh)
         if e0 is not None:
-            # The Encampment garrison repairs on the same gate and rate — the
-            # gate is the CITY's siege state, not the district's own adjacency.
             rep = ok & (enc_reg >= 0) & self.district_complete[bidx, e0] & ~self.district_pillaged[bidx, e0]
             cur = self.encamp_hp[bidx, e0]
             self.encamp_hp[bidx, e0] = torch.where(rep, (cur + heal).clamp(max=self._encamp_hp_max), cur)
@@ -664,43 +502,30 @@ class SimPhase:
         rdv = self.rules_dev
 
         def bank(plane: torch.Tensor, add: torch.Tensor) -> None:
-            """`plane[:, row] += add` where the seat is active. Written as ONE
-            expression so no row accumulates at a different precision: the sum
-            adds at ITS dtype and the store casts, on every row alike."""
             plane[:, row] = plane[:, row] + torch.where(active, add, torch.zeros_like(add))
 
         bank(self.civ_tech_prog, sci_sum)
-        # LIFETIME science — Seat.scienceTotal's twin, beside the stream add.
         bank(self.seat_science_total, sci_sum)
         bank(self.civ_treasury, gold_sum)
         bank(self.civ_faith, faith_sum)
-        # Unit upkeep + the bankruptcy rule, right after the gold lands and
-        # before any war march.
         self._seat_upkeep_and_bankruptcy(row, active)
         for _ in range(RESEARCH_LOOPS):
             curt = self.civ_cur_tech[:, row]
-            # a boosted tech completes at the discounted cost (_eff_cost —
-            # identical rounding to effectiveResearchCostIn)
             cost_t = self._eff_cost(
                 rdv.t_cost.gather(0, curt.clamp(min=0)),
                 self.civ_tech_boosted[:, row].gather(1, curt.clamp(min=0).unsqueeze(1)).squeeze(1),
-                golden_civ=row,  # golden FREE_INQUIRY, per seat
+                golden_civ=row,
             )
             fin = active & (curt >= 0) & (self.civ_tech_prog[:, row] >= cost_t)
             if not bool(fin.any()):
                 break
             rows = fin.nonzero(as_tuple=True)[0]
             self.civ_techs[rows, row, curt[rows]] = True
-            # ANY tech completion bumps: unlocks feed _seat_buildable, and the
-            # mine-boost/Replaceable-Parts techs feed the yield/score caches.
             self._eff_version += 1
             self.civ_tech_prog[:, row] = torch.where(fin, self.civ_tech_prog[:, row] - cost_t, self.civ_tech_prog[:, row])
             self.civ_cur_tech[:, row] = torch.where(fin, torch.full_like(curt, -1), self.civ_cur_tech[:, row])
-        # Banked progress only drains once the tree is exhausted (advanceResearch:
-        # progress banks while the slot is undecided).
         no_t = active & (self.civ_cur_tech[:, row] == -1) & ~self._available_mask(self.civ_techs[:, row], self._prereq_t).any(dim=1)
         self.civ_tech_prog[:, row] = torch.where(no_t, torch.minimum(self.civ_tech_prog[:, row], torch.zeros_like(self.civ_tech_prog[:, row])), self.civ_tech_prog[:, row])
-        # TOURISM — once per turn at the seat level, in the load-bearing slot.
         bank(self.civ_tourism, self._tourism_of(
             self.city_gw_writing[:, row],
             self.city_gw_art[:, row],
@@ -712,7 +537,6 @@ class SimPhase:
             self.civ_techs[:, row, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,
             self.city_artifacts[:, row],
         ))
-        # DIPLOMATIC FAVOR — government TIER + suzerainties.
         bank(self.civ_diplo_favor,
              self._adopted_gov_tier(self.civ_civics[:, row]) + self._favor_per_suz * self._suzerain_count(row))
         # grievances DECAY by 1 per turn at peace with every MAJOR — the row's
@@ -725,52 +549,32 @@ class SimPhase:
             self.civ_warmonger[:, row],
         )
         bank(self.civ_civic_prog, cul_sum)
-        # LIFETIME culture — the cultureTotal twin, immediately after
-        # civicProgress takes the same sum. Draws no RNG.
         bank(self.civ_culture, cul_sum)
         for _ in range(RESEARCH_LOOPS):
             curc = self.civ_cur_civic[:, row]
             cost_c = self._eff_cost(
                 rdv.c_cost.gather(0, curc.clamp(min=0)),
                 self.civ_civic_boosted[:, row].gather(1, curc.clamp(min=0).unsqueeze(1)).squeeze(1),
-                golden_civ=row, is_civic=True,  # golden PEN_BRUSH_AND_VOICE
+                golden_civ=row, is_civic=True,
             )
             fin = active & (curc >= 0) & (self.civ_civic_prog[:, row] >= cost_c)
             if not bool(fin.any()):
                 break
             rows = fin.nonzero(as_tuple=True)[0]
             self.civ_civics[rows, row, curc[rows]] = True
-            self._eff_version += 1  # Feudalism moves this seat's farm-adj plane
+            self._eff_version += 1
             self.civ_civic_prog[:, row] = torch.where(fin, self.civ_civic_prog[:, row] - cost_c, self.civ_civic_prog[:, row])
             self.civ_cur_civic[:, row] = torch.where(fin, torch.full_like(curc, -1), self.civ_cur_civic[:, row])
         no_c = active & (self.civ_cur_civic[:, row] == -1) & ~self._available_mask(self.civ_civics[:, row], self._prereq_c).any(dim=1)
         self.civ_civic_prog[:, row] = torch.where(no_c, torch.minimum(self.civ_civic_prog[:, row], torch.zeros_like(self.civ_civic_prog[:, row])), self.civ_civic_prog[:, row])
-        # Great-people race (advanceGreatPeople), then the BELIEF RACES
-        # (pantheon / religion / enhancer, #73) — the loop position every seat
-        # shares.
         self._advance_great_people(row, active)
         self._seat_belief_claims(row, active)
 
     def _advance_great_people(self, row: int, active: torch.Tensor) -> None:
-        """advanceGreatPeople(state, seat) — ONE body for every seat row
-        (0 = seat 0, r+1 = civ r), at the shared loop position after the
-        research tail. Accrual per class: 1 + beliefGppFlat + (that
-        district's built buildings) per city owning a COMPLETED unpillaged
-        district of the class, read through the seat-axis registry
-        (captured districts never ENTER a registry, so the tile plane's
-        district_dead needs no gate here). Claims come from the SHARED
-        earned pool at gpCost(earned), overflow kept; effects land in this
-        row's own streams (tech/civic progress, treasury, faith, the
-        capital's build head); WRITER/ARTIST/MUSICIAN culture slots Great
-        Works; GENERAL/ADMIRAL spawn at the capital; a PROPHET banks for
-        the belief races. No RNG draws."""
         if self._gp_nc == 0:
             return
         B, dev = self.B, self.device
-        for cls in range(self._gp_nc):  # all GP classes (incl Admiral/General)
-            # Accrual = 1 + (that district's buildings) per city owning a
-            # COMPLETED district of the class, so a seat accrues nothing
-            # until its first Campus/Holy Site/Commercial Hub completes.
+        for cls in range(self._gp_nc):
             d_cls = int(self._gp_class_district[cls]) if cls < self._gp_nc else -1
             if d_cls >= 0 and self.districts_on:
                 reg_c = self.city_dist_tile[:, row, :, d_cls]  # [B, cols]
@@ -781,24 +585,17 @@ class SimPhase:
                 # term (1 + gppFlat + buildings), the
                 # greatPersonPointsPerTurn form.
                 if self._bel_any and cls < self._bel["pan"]["gpp"].shape[1]:
-                    gflat = self._bel_add("gpp", row)[:, cls].double().unsqueeze(1)  # [B, 1]
+                    gflat = self._bel_add("gpp", row)[:, cls].double().unsqueeze(1)
                 else:
                     gflat = torch.zeros(B, 1, dtype=torch.float64, device=dev)
                 pts = (comp_c.double() * (1.0 + gflat + nb_of.double())).sum(dim=1)
             else:
                 pts = torch.zeros(B, dtype=torch.float64, device=dev)
-            # Golden EXODUS pays +4 PROPHET points a turn, seat-wide and
-            # district-free — greatPersonPointsPerTurn adds it OUTSIDE its
-            # per-city loop, so it joins `pts` before the `pts > 0` guard,
-            # not after.
             if cls == self._prophet_cls:
                 pts = pts + self._golden_ded(row, self._ded_exodus).double() * 4.0
             self.civ_gpp[:, row, cls] = torch.where(
                 active & (pts > 0), self.civ_gpp[:, row, cls] + pts, self.civ_gpp[:, row, cls]
             )
-            # Claim loop: overflow is KEPT (gpp −= cost, not zeroed) and
-            # the person's effect lands in this seat's own streams,
-            # mirroring applyGreatPersonEffect. PROPHETs gate the religion.
             maxN = self._gp_effects.shape[1]
             for _ in range(maxN):
                 earned_c = self.gp_earned[:, cls]
@@ -808,12 +605,8 @@ class SimPhase:
                 if not bool(hit.any()):
                     break
                 hf = hit.to(torch.float64)
-                eff = self._gp_effects[cls, earned_c.clamp(max=maxN - 1)]  # [B, 5]
+                eff = self._gp_effects[cls, earned_c.clamp(max=maxN - 1)]
                 self.civ_tech_prog[:, row] = self.civ_tech_prog[:, row] + eff[:, 0].double() * hf
-                # WRITER/ARTIST/MUSICIAN culture is slotted as Great Works
-                # into this seat's cities (deferred per-kind culture);
-                # overflow charges fall back to the instant lump inside
-                # _place_works.
                 _kind = self._gw_cls.index(cls) if cls in self._gw_cls else -1
                 if _kind >= 0:
                     self._place_works(row, hit, eff[:, 1].double(), _kind)
@@ -822,11 +615,6 @@ class SimPhase:
                 self.civ_treasury[:, row] = self.civ_treasury[:, row] + eff[:, 2].double() * hf
                 prod_fx = eff[:, 3].double() * hf
                 if bool((prod_fx != 0).any()):
-                    # The capital's build head (cities.find(isCapital),
-                    # queue non-empty). city_is_cap identifies it because
-                    # compaction can move the capital off slot 0; at most
-                    # one flag per (b, row), so the masked add lands on
-                    # exactly the capital's head or nowhere.
                     _capa = self.city_is_cap[:, row] & self.city_alive[:, row]
                     capm = _capa & (self.city_current[:, row] >= 0)
                     self.city_progress[:, row] = self.city_progress[:, row] + torch.where(capm, prod_fx.unsqueeze(1), torch.zeros_like(self.city_progress[:, row]))
@@ -878,14 +666,14 @@ class SimPhase:
             prow = popen.nonzero(as_tuple=True)[0]
             self.pan_claimed[prow, pid[prow]] = True
             self.civ_pantheon[prow, row] = pid[prow]
-            self._bel_version += 1  # belief change -> _bel_add / _belief_feat_plane invalidate
+            self._bel_version += 1
         self.civ_faith[:, row] = torch.where(popen, self.civ_faith[:, row] - pfc, self.civ_faith[:, row])
         self.pantheon_claimed_n.add_(popen.long())
         self.civ_pantheon_done[:, row] = self.civ_pantheon_done[:, row] | popen
         self.era_score[:, row] += popen.long() * self._era_pts["pantheon"]
         d_hs = int(self._gp_class_district[self._prophet_cls]) if self._prophet_cls < self._gp_nc else -1
         if d_hs >= 0 and self.districts_on:
-            reg_hs = self.city_dist_tile[:, row, :, d_hs]  # [B, cols]
+            reg_hs = self.city_dist_tile[:, row, :, d_hs]
             has_hs = ((reg_hs >= 0) & self.district_complete.gather(1, reg_hs.clamp(min=0))).any(dim=1)
         else:
             has_hs = torch.zeros(B, dtype=torch.bool, device=dev)
@@ -903,36 +691,22 @@ class SimPhase:
                 bid = sel.long().argmax(dim=1)
                 claimed_m[orow, bid[orow]] = True
                 ids_t[orow, row] = bid[orow]
-            self._bel_version += 1  # follower/founder change -> _bel_add / _belief_feat_plane invalidate
+            self._bel_version += 1
         self.claimed_f_n.add_(ropen.long())
         self.claimed_o_n.add_(ropen.long())
         self.civ_religion_done[:, row] = self.civ_religion_done[:, row] | ropen
         self.era_score[:, row] += ropen.long() * self._era_pts["religion"]
-        # Freeze this religion's holy tile at founding — it is the pressure
-        # source. civ_religion_done latches, so ropen fires once and the tile
-        # never re-writes. The tile is the LIVE capital at founding time,
-        # else the FIRST LIVE CITY (`cities.find(isCapital) ?? cities[0]`);
-        # a static capital tile would go stale when the capital fell before
-        # founding.
         _alv = self.city_alive[:, row]
         _cap = self.city_is_cap[:, row] & _alv
         _ctr = self.city_center[:, row]
         _h_slot = torch.where(_cap.any(dim=1), _cap.long().argmax(dim=1), _alv.long().argmax(dim=1))
         _holy = _ctr.gather(1, _h_slot.unsqueeze(1)).squeeze(1)
-        _holy = torch.where(_alv.any(dim=1), _holy, torch.full_like(_holy, -1))  # ?? null
+        _holy = torch.where(_alv.any(dim=1), _holy, torch.full_like(_holy, -1))
         self.holy_tile[:, row] = torch.where(ropen, _holy, self.holy_tile[:, row])
 
-        # Enhance the founded religion: a SECOND earned Prophet claims an
-        # enhancer belief, denying it from the shared pool (the mirror of
-        # the follower/founder claim). The draw sits AFTER the founder
-        # draw, gated on religionFounded && !enhancerClaimed &&
-        # prophets >= 2 && pool-open, and advances only where eopen, so it
-        # is RNG-neutral when it never fires. The effects are live: presR
-        # (pressure range), tradeRel (route income), cnear/cdef/cvs
-        # (combat CS) read civ_enhancer through the _enh tables.
         edue = active & self.civ_religion_done[:, row] & ~self.civ_enhancer_done[:, row] & (self.civ_prophets[:, row] >= 2)
         eopen = edue & (self.claimed_e_n < rr.get("enhancerPool", 0))
-        re_ = self._next_random(eopen)  # third belief draw — after follower/founder
+        re_ = self._next_random(eopen)
         if bool(eopen.any()) and self._enh_any:
             erow = eopen.nonzero(as_tuple=True)[0]
             n_open = (~self.enh_claimed).sum(dim=1)
@@ -942,7 +716,7 @@ class SimPhase:
             eid = sel.long().argmax(dim=1)
             self.enh_claimed[erow, eid[erow]] = True
             self.civ_enhancer[erow, row] = eid[erow]
-            self._bel_version += 1  # an enhancer claim moves the belief epoch too
+            self._bel_version += 1
         self.claimed_e_n.add_(eopen.long())
         self.civ_enhancer_done[:, row] = self.civ_enhancer_done[:, row] | eopen
 
@@ -955,12 +729,6 @@ class SimPhase:
     _CAPTURE_RESET = {"fortify": 0, "aura_mp": 0, "mp": 0}
 
     def _carry_capture(self, rows: torch.Tensor, src: torch.Tensor, dst: torch.Tensor) -> None:
-        """Move a unit's per-slot state from MERGED slot `src` to `dst`.
-
-        One loop over _CAPTURE_CARRY instead of a hand-written block per
-        capture path. Reads are taken BEFORE any write, so src and dst may be
-        in the same pool.
-        """
         vals = {k: getattr(self, f"unit_{k}")[rows, src].clone() for k in self._CAPTURE_CARRY}
         for k, v in vals.items():
             getattr(self, f"unit_{k}")[rows, dst] = v
@@ -993,7 +761,7 @@ class SimPhase:
         fields = [f"{prefix}_unit_{pl}" for pl in self._UNIT_PLANES if pl != "alive"]
         alive = getattr(self, f"{prefix}_unit_alive")
         B, U = alive.shape
-        perm = torch.argsort((~alive).long(), dim=1, stable=True)  # living first, order kept
+        perm = torch.argsort((~alive).long(), dim=1, stable=True)
         inv = torch.empty_like(perm)
         inv.scatter_(1, perm, torch.arange(U, device=alive.device).unsqueeze(0).expand(B, -1))
         # Write the permutation IN PLACE: p_/v_/u_ are VIEWS of one merged pool
@@ -1007,8 +775,6 @@ class SimPhase:
         for m in maps:
             at = getattr(self, m)
             at.copy_(torch.where(at >= 0, inv.gather(1, at.clamp(min=0)), at))
-        # The merged maps hold MERGED slots, so the inverse permutation applies
-        # only to entries inside THIS pool's range.
         lo, hi = self.POOL_LO[prefix], self.POOL_HI[prefix]
         for m in ("military_at", "civilian_at"):
             at = getattr(self, m)
@@ -1021,13 +787,8 @@ class SimPhase:
     _CITY_SLOT_FIELDS = (
         "city_alive", "city_center", "city_pop", "city_growth", "city_cbox", "city_loyalty",
         "city_acquired", "city_hp", "city_outer_hp", "city_id", "city_is_cap", "city_current", "city_progress",
-        "city_prod_bank",  # banked overflow: it rides the permutation with
-                         # city_progress or a compaction hands one city's bank
-                         # to its neighbour
+        "city_prod_bank",
         "city_cost", "city_qtile",
-        # ALL work counts must ride the compaction permutation; one left out
-        # stays at the old slot index, so the city loses its works or inherits
-        # its neighbour's.
         "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts",
     )
     def _reclaim_cities(self) -> None:
@@ -1070,7 +831,7 @@ class SimPhase:
         inv = torch.argsort(perm, dim=2)  # [B, nrows, RC] slot -> new slot
         seat_t = self.tile_seat
         is_major_ctr = (seat_t >= 0) & (seat_t < nrows) & (self.centre_slot_at >= 0)
-        rowt = seat_t.clamp(min=0, max=nrows - 1)  # a major's seat IS its block row
+        rowt = seat_t.clamp(min=0, max=nrows - 1)
         inv_flat = inv.reshape(self.B, -1)
         idx = (rowt * self.RC + self.centre_slot_at.clamp(min=0)).clamp(max=inv_flat.shape[1] - 1)
         self.centre_slot_at.copy_(torch.where(is_major_ctr, inv_flat.gather(1, idx), self.centre_slot_at))
@@ -1078,27 +839,12 @@ class SimPhase:
         self._tile_owner_ver += 1  # owner / center_at derive slots from permuted state
 
     def _check_rc_registry_invariant(self) -> None:
-        """Machine-checks district/wonder <-> tile-registry coherence for every alive civ city.
-
-        Env-gated via self._civ_city_reg_check, so it costs nothing on the hot path
-        when off. Two directions of the tile_city contract:
-
-          (1) FORWARD: every district tile (city_dist_tile) and wonder tile
-              (city_wonder) a city lists registers BACK to that city — its
-              tile_city equals city_id (a district/wonder sits on a tile owned
-              by THAT city). A tile registered to a SIBLING fails here.
-          (2) BACKWARD: every populated registry cell points at a tile this row
-              still owns (no dangling index into re-owned/razed land). The
-              registry never lists a tile it does not own.
-
-        Raises AssertionError naming (game, seat, slot, kind, di/wi, tile,
-        expected id, actual tile_city) on the first violation."""
         B = self.B
         for row in range(self.n_majors):
             expect = self.city_id[:, row].unsqueeze(2)  # [B, RC, 1] this city's id
             alive = self.city_alive[:, row].unsqueeze(2)  # [B, RC, 1]
             for name in ("city_dist_tile", "city_wonder"):
-                reg = getattr(self, name)[:, row]  # [B, RC, K] tile per (city, type/slot)
+                reg = getattr(self, name)[:, row]
                 has = (reg >= 0) & alive
                 if not bool(has.any()):
                     continue

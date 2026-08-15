@@ -1,8 +1,3 @@
-/**
- * Yield computations: per-tile yields (terrain/feature/resource/improvement,
- * natural-wonder effects, tech boosts), district adjacency bonuses (with
- * policy multipliers) and building yields (regional + special cases).
- */
 
 import { addYields, emptyYields, type GameState, type City, type Tile, type Yields, type DistrictId, type ImprovementId } from './types';
 import { citiesOf } from './seats';
@@ -19,7 +14,6 @@ import { DISTRICTS, type AdjacencyRule } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { REGIONAL_RANGE } from '../data/constants';
 
-/** Base terrain yields incl. hills (used for Torres del Paine doubling). */
 function terrainYields(tile: Tile): Yields {
   const out = emptyYields();
   addYields(out, TERRAINS[tile.terrain].yields);
@@ -27,7 +21,6 @@ function terrainYields(tile: Tile): Yields {
   return out;
 }
 
-/** Raw yields of a tile in context (terrain + feature + resource + improvement + wonders + boosts). */
 export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
   const out = emptyYields();
 
@@ -68,7 +61,6 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
     }
   }
 
-  // Natural wonder adjacency bonuses
   for (const n of neighbors(ctx.map, tile)) {
     if (!n.wonder) continue;
     const w = WONDERS[n.wonder];
@@ -77,7 +69,6 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
     if (w.doublesAdjacentTerrain) addYields(out, terrainYields(tile));
   }
 
-  // Disaster legacy: fertility feeds, drought starves.
   if (tile.fertility > 0) out.food += tile.fertility;
   if (tile.droughtTurns > 0) out.food = Math.max(0, out.food - 1);
   return out;
@@ -138,7 +129,6 @@ export function districtAdjacency(map: GameState['map'], tile: Tile, type: Distr
   return Math.floor(sum);
 }
 
-/** Adjacency bonus including policy multipliers (Natural Philosophy etc.). */
 export function effectiveAdjacency(ctx: YieldCtx, tile: Tile, type: DistrictId): number {
   return districtAdjacency(ctx.map, tile, type) * (ctx.mods.adjacencyMult[type] ?? 1);
 }
@@ -160,7 +150,6 @@ export function pillagedDistrictTypes(
   return out;
 }
 
-/** Sum of adjacency yields over a city's completed districts. */
 export function cityDistrictYields(ctx: YieldCtx, city: City): Yields {
   const out = emptyYields();
   for (const d of city.districts) {
@@ -172,18 +161,12 @@ export function cityDistrictYields(ctx: YieldCtx, city: City): Yields {
     if (def.adjacencyYield) {
       const adj = effectiveAdjacency(ctx, tile, d.type);
       out[def.adjacencyYield] += adj;
-      // Work Ethic: Holy Site adjacency also provides production.
       if (d.type === 'HOLY_SITE' && ctx.mods.workEthic) out.production += adj;
     }
   }
   return out;
 }
 
-/**
- * Yields from the city's own (non-regional) buildings, including the
- * Shipyard special (production = Harbor gold adjacency) and policy
- * building-yield multipliers (Rationalism etc.).
- */
 export function cityBuildingYields(ctx: YieldCtx, city: City): Yields {
   const out = emptyYields();
   const pillaged = pillagedDistrictTypes(ctx.map, city.districts); // B-32
@@ -211,16 +194,6 @@ export interface RegionalEffects {
   amenities: number;
 }
 
-/**
- * Regional building effects reaching `city` from every city's districts
- * within REGIONAL_RANGE of the city center (including its own). The same
- * building type never stacks. (Policy building multipliers deliberately not
- * applied here — no card in the current catalogue targets regional buildings.)
- */
-/**
- * Regional building effects reaching this city from its OWNER's other cities.
- *
- */
 export function regionalEffects(state: GameState, city: City): RegionalEffects {
   const center = state.map.tiles[city.centerIndex];
   const seen = new Set<string>();
@@ -243,7 +216,6 @@ export function regionalEffects(state: GameState, city: City): RegionalEffects {
   return out;
 }
 
-/** Local (non-regional) building amenities, e.g. Arena, Palace. */
 export function localBuildingAmenities(state: GameState, city: City): number {
   const pillaged = pillagedDistrictTypes(state.map, city.districts); // B-32
   let n = 0;

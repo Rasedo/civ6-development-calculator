@@ -69,7 +69,6 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
     : [0, 0, 0, 0, 0, 0, 0],
   perC: YIELD_KEYS.map((k) => def.effects.perCity?.[k] ?? 0),
   fpw: def.effects.faithPerWonder ?? 0,  // A-4 activates this (Divine Inspiration)
-  // B6-S1 enhancer channels (zeros on non-enhancer rows):
   presR: def.effects.pressureRangeBonus ?? 0,  // Itinerant Preachers
   tradeRel: YIELD_KEYS.map((k) => def.effects.tradeReligionYields?.[k] ?? 0),  // Messenger of the Gods [6]
   cnear: def.effects.combatNearFollowing ?? 0,  // Just War (within justWarRange, unit-vs-unit)
@@ -80,17 +79,7 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
   mchg: def.effects.missionaryChargeBonus ?? 0,  // Scripture +1 charge
   mlump: Math.round(SPREAD_PRESSURE * (def.effects.spreadPressureMult ?? 1)),  // Scripture 15, base 10
   mcost: Math.round((UNITS.MISSIONARY?.cost ?? 0) * (def.effects.missionaryCostMult ?? 1)),  // Holy Order 42, base 60
-  // A-13 activates improvementYields (omitted while the targets were
-  // unbuildable): extra yields per improvement instance, [nImp, 6] in
-  // IMPROVEMENT_IDS order. The FISHING_BOATS row (God of the Sea) simply
-  // never exports — out of roster — so that belief stays inert, as in TS
-  // scope (the improvement is unreachable in both engines).
   impY: IMPROVEMENT_IDS.map((id) => YIELD_KEYS.map((k) => def.effects.improvementYields?.[id]?.[k] ?? 0)),
-  // improvements on a resource of a category (God of Craftsmen): rows by
-  // category code 0 none / 1 bonus / 2 strategic / 3 luxury — the same
-  // codes as the tile `res` priority plane. NOT unreachable: IRON/NITER/
-  // COAL's own improvement is MINE, so strategic mines exist today (the
-  // A-7 hunt's catch — rng 2026006082 t127, two worked strategic mines).
   impRes: (() => {
     const rows = [0, 1, 2, 3].map(() => YIELD_KEYS.map(() => 0 as number));
     const rule = def.effects.improvementOnResource;
@@ -103,10 +92,6 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
 });
 
 
-// Boost conditions the covered scope can actually trigger. Still skipped
-// (structurally unreachable for BOTH engines, so parity holds):
-// FISHING_BOATS improvement rows (out of roster, water-unreachable).
-// B9-R1: distinctTypes district rows export now (see the district branch).
 const boostRows: object[] = [];
 for (const [id, def] of Object.entries(BOOSTS)) {
   if (!def.check) continue;
@@ -138,9 +123,6 @@ for (const [id, def] of Object.entries(BOOSTS)) {
     const imp = IMPROVEMENT_IDS.indexOf(c.id);
     if (imp >= 0) row = { kind: 'improvement', imp, count: c.count, onResource: c.onResource ? 1 : 0 };
   } else if (c.kind === 'anyWonderBuilt') {
-    // A-4: civ-seat wonders make this REACHABLE (it was filtered as
-    // structurally-unreachable before) — both civs' detection reads the
-    // same global builtWonderComplete scan.
     row = { kind: 'anyWonderBuilt' };
   } else if (c.kind === 'district') {
     // District eurekas/inspirations (STATE_WORKFORCE: any specialty district;
@@ -170,36 +152,16 @@ for (const [id, def] of Object.entries(BOOSTS)) {
 }
 
 
-// Adjacency-source order shared with the engine (indices into this list are
-// what `districts[].adjacency[].src` refers to). Static sources (known at t=0)
-// come first conceptually but the order here is just the stable wire encoding.
 const ADJ_SRC: AdjacencySource[] = [
   'MOUNTAIN', 'RAINFOREST', 'WOODS', 'REEF', 'NATURAL_WONDER', 'BUILT_WONDER',
   'RIVER', 'DISTRICT', 'CITY_CENTER', 'HARBOR_DISTRICT', 'SEA_RESOURCE',
-  // B-16 (GS Industrial Zone): dynamic improvement/district sources, indices 11-13.
   'MINE', 'QUARRY', 'AQUEDUCT',
 ];
 
-// Terrain-permanent adjacency sources (known at t=0). The dynamic ones
-// (adjacent district/center/harbor/mine, built wonder) are added live by the
-// engine before the floor.
-// D2b-activate off-switch: the scripted Campus placement + its parity are
-// correct for maintenance/adjacency/eurekas, but building a district flips the
-// city-state buildDistrict quest's `!already` check, which changes the quest
-// RNG stream (envoy/quest cascade). Kept OFF until that CS-quest interaction is
-// mirrored (D2b-activate round 2). Flip to true to re-activate; the engine
-// reads the same flag via districtScaffold.active.
 const SCRIPTED_CAMPUS = true;
 
-// Districts the scripted policy places, in order (each once, when its unlock
-// tech is in and the per-pop specialty cap allows). The engine mirrors this.
-// placement 'aqueduct' = the non-specialty housing district (adjacent to the
-// city center + a river/lake/oasis/mountain; no adjacency yield → lowest tile).
-// SCAFFOLD_DISTRICTS moved to data/districts.ts (C1-B4: the civ-seat picker
-// shares it). ENCAMPMENT stays held out — see the note there.
 const PLACEMENT_CODE = { aqueduct: 1, coastal: 2, encampment: 3 } as const;
 
-// A-7r: policy/government slot-kind wire encoding.
 const SLOT_KIND_IDX: Record<SlotKind, number> = { military: 0, economic: 1, diplomatic: 2, wildcard: 3 };
 
 
@@ -223,40 +185,16 @@ export function buildRules() {
       { min: -2, growth: 0.85, yield: 0.95 },
       { min: -999, growth: 0.7, yield: 0.9 },
     ],
-    // Mirrors settlerCost(0): 80 + 30 × (cities − 1 + settlers banked + settlers queued).
-    // goldPurchaseMult mirrors GOLD_PURCHASE_MULT (V-P1: buy = production cost × 4).
-    // P4/D-10: builderBase/builderPer/gameSpeed mirror builderCost() —
-    // round((50 + 4·n) × GAME_SPEED), n = builders ever trained + queued.
-    // P4/D-15: settler 80/30 speed-scales like unit costs (mirrors settlerCost).
     scenario: { settlerBase: Math.round(80 * GAME_SPEED), settlerPerCity: Math.round(30 * GAME_SPEED), settlerPopGate: SETTLER_POP_GATE, goldPurchaseMult: GOLD_PURCHASE_MULT, turnLimit: TURN_LIMIT, builderBase: 50, builderPer: 4, gameSpeed: GAME_SPEED },
-      // #51/S0.3: the UNIT ACTION enum (index = position). Both engines dispatch by
-    // NAME off this list instead of hardcoded column numbers — the collision that
-    // bound PILLAGE to the FORT column and left the real pillage column dead.
     actions: { unit: unitActionNames(IMPROVEMENT_IDS) },
-    // Mirrors districtCostIn() — opponents pay it from THEIR research counts
-    // (C1-B4). P4/D-8: floor(base·(1+scale·max(tech%, civic%)));
-    // P4/D-15: the 54 base speed-scales like every production cost.
     districtCost: { base: Math.round(54 * GAME_SPEED), scale: 9 },
-    // Mirrors empireScore(state, 'balanced'): Σ cities (pop × popWeight + yields · weights).
     score: { popWeight: 3, yieldWeights: YIELD_KEYS.map((k) => BALANCED_WEIGHTS[k] ?? 0) },
-    // SHIPYARD special (yields.ts:171): a city with this building adds its completed Harbor's
-    // districtAdjacency as PRODUCTION. Index into the exported building roster, -1 if absent.
     shipyardBidx: buildingIdx.get('SHIPYARD') ?? -1,
-    // AUDIT B-1: the ANCIENT_WALLS building row — the engine watches its
-    // completion to fill the outer-defense pool, and B-2's city ranged strike
-    // fires only from cities holding it. -1 if absent from the exported set.
     ancientWallsBidx: buildingIdx.get('ANCIENT_WALLS') ?? -1,
-    // B9-R3: worship faith-buy anchors — the 5 worship rows in WORSHIP_BUILDINGS
-    // order (the deterministic pick indexes THIS list by religion id % 5, not
-    // the cost-sorted table), the Temple prerequisite row, and the flat
-    // buildingFaithCost for worship (game.ts:443).
     worshipBidx: WORSHIP_BUILDINGS.map((id) => buildingIdx.get(id) ?? -1),
     templeBidx: buildingIdx.get('TEMPLE') ?? -1,
     worshipFaithCost: Math.round(190 * GAME_SPEED),
-    // B6-S2: the missionary buy's Shrine gate (phase.ts missionary branch).
     shrineBidx: buildingIdx.get('SHRINE') ?? -1,
-    // AUDIT A-11: civ-seat trade — id-anchored capacity sources + route constants
-    // (the tradeCapacity/routeYields mirror; no CS term until A-12).
     trade: {
       marketBidx: buildingIdx.get('MARKET') ?? -1,
       lighthouseBidx: buildingIdx.get('LIGHTHOUSE') ?? -1,
@@ -265,19 +203,12 @@ export function buildRules() {
         .map((id) => BUILT_WONDER_LIST.findIndex((w) => w.id === id))
         .filter((i) => i >= 0),
       range: TRADE_ROUTE_RANGE,
-      // A-12b: civ-seat CS-route income constants (cityStateRouteYields mirror).
       cityStateRouteGold: CITY_STATE_ROUTE_GOLD,
       cityStateRouteSpec: CITY_STATE_ROUTE_SPEC,
-      // B-23: international-route gold base (routeYieldsInternational: +intlGold
-      // +1 gold per destination completed specialty district) + route duration.
       intlGold: INTL_ROUTE_GOLD,
       duration: TRADE_ROUTE_DURATION,
     },
-    // B-15 war weariness (mirrors data/opponents.ts): integer accumulator → flat
-    // empire-wide amenity penalty for seat 0 AND each civ seat.
     warWeariness: {
-      // #51/S7.8f: the per-BATTLE model. `perTurn`/`cap` are gone — there is no
-      // per-turn accrual and no ceiling.
       eraFormal: [...WW_ERA_BASE_FORMAL],
       eraSurprise: [...WW_ERA_BASE_SURPRISE],
       abroad: WW_ABROAD_MULT,
@@ -286,10 +217,7 @@ export function buildRules() {
       decayAtPeace: WW_DECAY_AT_PEACE,
       peaceTreaty: WW_PEACE_TREATY,
       perAmenity: WAR_WEARINESS_PER_AMENITY,
-      // B-22 (S3): casus-belli accrual multipliers (SURPRISE ×2, FORMAL ×1).
     },
-    // B-24 (task #68): era score / Ages (mirrors data/opponents.ts; S1 = the
-    // accumulator constants; age thresholds + governor constants land S2/S3).
     eras: {
       length: ERA_LENGTH,
       found: ERA_SCORE_FOUND,
@@ -298,19 +226,14 @@ export function buildRules() {
       pantheon: ERA_SCORE_PANTHEON,
       religion: ERA_SCORE_RELIGION,
       gp: ERA_SCORE_GP,
-      // S2: age thresholds (S1-evidence-pinned) + the source-civ pressure factors.
       darkT: ERA_DARK_T,
       goldenT: ERA_GOLDEN_T,
       agePressure: AGE_PRESSURE,
-      // S3: governors — stateless greedy loyalty anchors.
       govCivicsPerTitle: GOV_CIVICS_PER_TITLE,
       govMaxTitles: GOV_MAX_TITLES,
       allyMinPeace: ALLY_MIN_PEACE, warmongerDow: WARMONGER_DOW, warmongerCapture: WARMONGER_CAPTURE, warmongerGang: WARMONGER_GANG, diplomaticFavorPerSuzerain: DIPLO_FAVOR_PER_SUZERAIN, congressInterval: CONGRESS_INTERVAL, congressMinEra: CONGRESS_MIN_ERA, dvpPerResolution: DVP_PER_RESOLUTION, diploVictoryPoints: DIPLO_VICTORY_POINTS, dedicationPayoutsLive: DEDICATION_PAYOUTS_LIVE, dedMonumentality: DED_MONUMENTALITY, dedFreeInquiry: DED_FREE_INQUIRY, dedPenBrush: DED_PEN_BRUSH_AND_VOICE, dedExodus: DED_EXODUS, heroicDedications: HEROIC_DEDICATIONS, dedEventScore: [...DED_EVENT_SCORE], dedicationFaith: DEDICATION_FAITH, goldenMoveBonus: GOLDEN_MOVE_BONUS, dedicationEraScore: DEDICATION_ERA_SCORE, governorLoyalty: GOVERNOR_LOYALTY,
     },
     boosts: boostRows,
-    // City-state rules (mirrors data/cityStates.ts; covered scope only — the
-    // 3/6-envoy district tiers are inert without districts, and the CHIEFDOM
-    // influence tier is 0, so influence accrues at the flat base rate).
     cityState: {
       envoyCost: ENVOY_COST,
       influencePerTurn: INFLUENCE_PER_TURN,
@@ -318,28 +241,15 @@ export function buildRules() {
       meetRange: CITY_STATE_MEET_RANGE, // A-12: civ-seat proximity-meet radius
       questCooldown: QUEST_COOLDOWN,
       questEnvoys: QUEST_ENVOYS,
-      // V-CS: attackCityState/captureCityState (siege hp + the militaristic +6)
       maxHp: CITY_STATE_MAX_HP,
       militaristicIdx: CITY_STATE_TYPES.indexOf('militaristic'),
       tradeIdx: CITY_STATE_TYPES.indexOf('trade'), // A-12b: suzerain trade capacity
       suzerainEnvoys: SUZERAIN_ENVOYS, // A-12b: the strict-contest minimum
-      // per CS type (by index): which yield column its envoys boost
       typeYieldIdx: CITY_STATE_TYPES.map((t) => YIELD_KEYS.indexOf(CITY_STATE_TYPE_YIELD[t])),
-      // per CS type: the district whose count carries the 3-/6-envoy bonus, and
-      // the per-district amount (cityStateEnvoyBonuses: +CITY_STATE_DISTRICT_BONUS at >=3, again
-      // at >=6, added to each owned completed district of that type).
       typeDistrictIdx: CITY_STATE_TYPES.map((t) => PLACEABLE_DISTRICTS.indexOf(CITY_STATE_TYPE_DISTRICT[t])),
       districtBonus: CITY_STATE_DISTRICT_BONUS,
-      // B-21: the 3/6-envoy bonus now lands on the type's tier-1 (>=3) and
-      // tier-2 (>=6) BUILDING (CITY_STATE_TYPE_BUILDINGS[t][0]/[1]) — the catalog index
-      // into centerBuildings, -1 if the building is absent from the roster.
-      // Regional tier-2 buildings (FACTORY/POWER_PLANT) are excluded by the
-      // building-yield loop in BOTH engines (parity-safe; industrial 6-tier inert).
       typeB1Idx: CITY_STATE_TYPES.map((t) => buildingIdx.get(CITY_STATE_TYPE_BUILDINGS[t][0]) ?? -1),
       typeB2Idx: CITY_STATE_TYPES.map((t) => buildingIdx.get(CITY_STATE_TYPE_BUILDINGS[t][1]) ?? -1),
-      // B-21: the suzerain's per-CS unique perk — a flat capital yield of this
-      // amount in the CS's live channel (CITY_STATE_SUZERAIN_LIVE). The channel is
-      // shipped per-CS-instance on cityStateAtStart (name-keyed), -1 = descoped.
       suzerainYield: CITY_STATE_SUZERAIN_YIELD,
       // A-12 (B8-L): CIV-SEAT levy — a militaristic CS's suzerain (a civ seat) at war
       // spawns levyUnits units at levyGoldCost off its treasury, levyCooldown
@@ -349,10 +259,6 @@ export function buildRules() {
       levyGoldCost: LEVY_GOLD_COST,
       levyCooldown: LEVY_COOLDOWN,
     },
-    // Civ-seat pacing (mirrors data/opponents.ts). loyaltyAmenity is keyed by
-    // amenity-tier INDEX in the same order as amenityTiers above. The
-    // pantheon/belief pools matter only as SIZES: a civ seat's pick consumes a
-    // draw and shrinks the pool, but the identity is inert in covered scope.
     seats: {
       maxCities: MAX_CITIES_PER_SEAT,
       // The per-seat CITY COLUMN width — one number for the GPU's storage rows
@@ -360,9 +266,6 @@ export function buildRules() {
       citySlots: CITY_SLOTS_PER_SEAT,
       settlerBase: Math.round(80 * GAME_SPEED), // P5/S3: SETTLER_COST(c) = seat 0's 48 + 18·max(0, c − 1)
       settlerPer: Math.round(30 * GAME_SPEED),
-      // (P5/S4: borderPeriod died — civ-seat borders grow on culture.)
-      // P5/S5: the timed claims died — the pantheon costs faith, religion
-      // gates on pantheon + Holy Site + an earned PROPHET-class person.
       pantheonFaithCost: PANTHEON_FAITH_COST,
       prophetCls: GP_CLASSES.indexOf('PROPHET'),
       // B-20 (Round B7): Great Works. WRITER/MUSICIAN class indices, the building
@@ -384,11 +287,6 @@ export function buildRules() {
       // the tourism, not the slot count). Index into the exported tech list.
       gwPrintingTech: techIdx.get(GW_PRINTING_TECH) ?? -1,
       gwPrintingWritingMult: GW_PRINTING_WRITING_MULT,
-      // B-20 (#73): RELICS — held in a TEMPLE's single slot, paying 4 faith and
-      // 8 tourism each (GS values). Created when an APOSTLE dies in theological
-      // combat; see the RELIC_* comment in cpu/data/greatPeople.ts for the
-      // Martyr-promotion deviation and the reachability measurement.
-      // B-20 (#79): artifacts — the relic plumbing's twin.
       artifactBidx: buildingIdx.get(ARTIFACT_BUILDING) ?? -1,
       artifactSlots: ARTIFACT_SLOTS,
       artifactCulture: ARTIFACT_CULTURE,
@@ -398,39 +296,24 @@ export function buildRules() {
       relicSlots: RELIC_SLOTS_PER_BUILDING,
       relicFaith: RELIC_FAITH,
       relicTourism: RELIC_TOURISM,
-      // B-20 (#71): WONDER tourism = base + 1 per era advanced PAST the wonder's
-      // own era. Wonder era = the era of its unlock (tech or civic); a civ's era
-      // = the highest era among its completed techs/civics — the SAME scale.
       wonderTourismBase: WONDER_TOURISM_BASE,
-      // B-25 (#72): the CULTURE VICTORY thresholds (GS values — see the
-      // constants' comment in cpu/data/opponents.ts for the source).
       tourismPerVisitorPerCiv: TOURISM_PER_VISITOR_PER_CIV,
       culturePerDomesticTourist: CULTURE_PER_DOMESTIC_TOURIST,
       techEra: techList.map((t) => Math.max(0, ERAS.indexOf(t.era))),
       civicEra: civicList.map((c) => Math.max(0, ERAS.indexOf(c.era))),
       warMinTurns: WAR_MIN_TURNS,
-      // A-19/B-33 (S2): pairwise civ-seat↔civ-seat DoW/peace gates (zero-draw).
       dowProximity: DOW_PROXIMITY,
       dowStrengthRatio: DOW_STRENGTH_RATIO,
       dowWwMax: DOW_WW_MAX,
       peaceWw: PEACE_WW,
       formalWarMinTurns: FORMAL_WAR_MIN_TURNS, // B-22 (S3)
-      // Diplomacy (V-W1): sueForPeace gates on warTurns >= warMinTurns — ONE
-      // and costs PEACE_GOLD_COST(warTurns) — exported as its linear params.
-      // C1-B3b: research consumers — the production divisor, defense per
-      // tech, and the real unit-type gates.
       research: {
         prodDiv: TECH_PROD_DIV,
         defPerTech: CITY_DEF_PER_TECH,
         spearTech: techIdx.get('BRONZE_WORKING') ?? -1,
         horseTech: techIdx.get('HORSEBACK_RIDING') ?? -1,
-        // AUDIT A-6: the ranged rung — SLINGER is ungated, ARCHER needs this.
         archerTech: techIdx.get('ARCHERY') ?? -1,
       },
-      // C1-B5b: civ-seat builder gates — improvement unlock indices in the tech
-      // table (FARM is baseline; hillFarms rides the civic the engine already
-      // indexes) and the balanced-weight gain per option for the Δ-tileScore
-      // pick (flat catalog yields ⇒ the Δ is a constant per improvement).
       builder: {
         mineTech: Object.values(TECHS).findIndex((td) => td.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === 'MINE')),
         lumberTech: Object.values(TECHS).findIndex((td) => td.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === 'LUMBER_MILL')),
@@ -448,20 +331,10 @@ export function buildRules() {
       loyaltyAmenity: ['Ecstatic', 'Happy', 'Content', 'Displeased', 'Unhappy'].map((n) => LOYALTY_AMENITY[n] ?? 0),
       gpCosts: Array.from({ length: 8 }, (_, n) => gpCost(n)),
       gpRoster: GP_CLASSES.map((c) => GREAT_PEOPLE[c].length),
-      // Seat-0 great-people (advanceGreatPeople): per class, the PLACEABLE_DISTRICTS
-      // idx that accrues its points, and each person's instant effect
-      // [science→tech, culture→civic, gold→treasury, production→capital]. Every
-      // seat draws from the SAME gp_earned pool at its own loop position
-      // (rows in seat order), so only classDistrict + effects are new.
       gpClassDistrict: GP_CLASSES.map((c) => PLACEABLE_DISTRICTS.indexOf(GP_CLASS_DISTRICT[c])),
       gpEffects: GP_CLASSES.map((c) =>
-        // col 4 = faith (Prophets) — pantheon/worship funding for EVERY seat
-        // row (#73: seat 0 banks it and claims through the same belief races).
         GREAT_PEOPLE[c].map((p) => [p.effect.science ?? 0, p.effect.culture ?? 0, p.effect.gold ?? 0, p.effect.productionToCapital ?? 0, p.effect.faith ?? 0]),
       ),
-      // B7-G (B-8): Great General / Great Admiral spawn-at-claim + aura anchors.
-      // classIdx = the GP_CLASSES index whose claim spawns the unit; unitIdx =
-      // the roster (UNITS) index of the spawned combat-0 civilian (-1 = absent).
       generalClassIdx: GP_CLASSES.indexOf('GENERAL'),
       admiralClassIdx: GP_CLASSES.indexOf('ADMIRAL'),
       generalUnitIdx: Object.values(UNITS).findIndex((u) => u.id === 'GENERAL'),
@@ -477,23 +350,10 @@ export function buildRules() {
       // enhancer claiming + the mirrored draw are a deferred follow-up); this
       // documents the slot for that work.
       enhancerPool: Object.keys(ENHANCER_BELIEFS).length,
-      // B-18: religious pressure spread radius (holy city -> cities within N tiles).
       pressureRange: RELIGION_PRESSURE_RANGE,
-      // B6-S1: Just War's "near a following city" radius (unit-vs-unit combat).
       justWarRange: JUST_WAR_RANGE,
-      // B-18 (slice U): pressure->yields coupling master switch. When true a
-      // city's FOLLOWER-belief yields key on its followedReligion; when false the
-      // owner civ's religion (byte-identical to the pre-coupling per-civ apply).
       followerCoupling: B18_FOLLOWER_COUPLING_LIVE,
     },
-    // AUDIT A-7: dense belief-effect tables — identity-claimed pantheons/
-    // beliefs now APPLY to civ seats. Row order = the data-file key order;
-    // the claim draw picks the k-th OPEN id in this same order in both
-    // engines. faithPerWonder shipped by A-4 (fpw); improvementYields shipped
-    // by A-13 (impY) now that PASTURE/CAMP/QUARRY/PLANTATION are buildable —
-    // only the FISHING_BOATS row stays out (water-unreachable in both
-    // engines). improvementOnResource shipped since A-7 (impRes): mines on
-    // IRON/NITER/COAL exist today.
     beliefs: {
       // B6-S2: the missionary chassis anchors (read via rules.beliefs, like the
       // enhancer rows). Base values double as the GPU pad row (unenhanced civ):
@@ -502,8 +362,6 @@ export function buildRules() {
       missionaryCost: UNITS.MISSIONARY.cost,
       spreadPressure: SPREAD_PRESSURE,
       missionaryCap: MISSIONARY_CAP,
-      // B-18 (#71): the APOSTLE — faith-buy twin of the missionary, plus the
-      // theological-combat constants. Religious strengths ride the roster.
       apostleIdx: Object.values(UNITS).findIndex((u) => u.id === 'APOSTLE'),
       apostleCost: UNITS.APOSTLE.cost,
       apostleCap: APOSTLE_CAP,
@@ -521,15 +379,6 @@ export function buildRules() {
       // builds only pan/fol/fou tables and ignores this key.
       enhancers: Object.values(ENHANCER_BELIEFS).map(beliefRow),
     },
-    // AUDIT A-4: civ-seat wonders (data order). Static placement lives in the
-    // per-tile `wok` bitmask below; LIVE terms (ownership, occupancy,
-    // radius, non-bonus resource, adjacent completed district, adjacent
-    // un-stripped resource, world uniqueness) are the engine's job.
-    // extraWildcardSlot (Forbidden City) is skipped — no civ-seat government.
-    // regionalAmenities is LIVE on both engines: the Colosseum's Entertainment
-    // Complex is out of the placeable set, but the Great Bath (river) and the
-    // Alhambra (hills + Encampment) both reach. Costs are already speed-scaled
-    // in the data file.
     wonders: {
       // B-20 (#71): the era each wonder first became available (its unlock's
       // era), parallel to `rows` — the GPU indexes it by wonder index.
@@ -551,8 +400,6 @@ export function buildRules() {
         cy: YIELD_KEYS.map((k) => w.cityYields?.[k] ?? 0),
         growAll: w.effects?.growthAllMult ?? 1,
         petra: w.effects?.petraDesert ? 1 : 0,
-        // AUDIT #78: Great Work slots this wonder grants, per kind
-        // [writing, art, music] — additive with the GW_BUILDINGS slots.
         gwslots: GW_WONDER_SLOTS[w.id] ?? [0, 0, 0],
         mult: YIELD_KEYS.map((k) => w.effects?.cityYieldMult?.[k] ?? 1),
         // adjacency requirement: -1 none, -2 CITY_CENTER, -3 required but
@@ -598,14 +445,6 @@ export function buildRules() {
       yieldFraction: PROJECT_YIELD_FRACTION,
       gppFraction: PROJECT_GPP_FRACTION,
     },
-    // Barbarian rules (mirrors combat.ts). B-29: strengthDiff is now a multiple
-    // of 0.1 (wounded units subtract hp/10, a river melee subtracts 5), so the
-    // table is indexed by q = round(diff·10) at 0.1 granularity — entry i holds
-    // 30·e^(0.04·(i−2000)/10), the EXACT expression damageRoll evaluates for
-    // q = i−2000. Computed HERE so both engines share the same doubles: libm
-    // exp() may differ by an ulp between runtimes, and damage rounds to integers.
-    // B-4: widened from 1201 (±60) to 4001 (±200) — XP level bonuses (up to +15 CS)
-    // can grow |diff| past ±60 where B-29's wounds/river only shrank it.
     combat: {
       unitHp: UNIT_HP,
       cityMaxHp: CITY_MAX_HP,
@@ -626,18 +465,6 @@ export function buildRules() {
       wallsHp: WALLS_HP, // AUDIT B-1: the ANCIENT_WALLS outer-defense pool cap
       encampHp: ENCAMPMENT_HP, // B-17 (#71): the ENCAMPMENT garrison pool cap
       unitHealPerTurn: 10,
-      // #51/S3.2: the barb era ladder is now a list of ROSTER INDICES, not a
-      // second index space. Ladder POSITION is structural in the engine —
-      // 0/1/2/3 melee (WARRIOR/SPEARMAN/PIKEMAN/MUSKETMAN), 4/5 ranged
-      // (ARCHER/CROSSBOWMAN), 6 SCOUT, 7/8 naval (GALLEY/QUADRIREME) — and each
-      // entry says which roster unit that position IS. u_type is therefore a
-      // roster index like p_type and v_type, so combat/moves/ranged/naval all
-      // read the one roster table.
-      //
-      // This replaces unitCombat / unitMoves / unitRangedStrength /
-      // unitRangedRange / unitNaval, five parallel arrays that restated roster
-      // values under a different numbering. Appending a barb type is still an
-      // append: the position is the index into THIS array.
       barbScoutOpenerLive: BARB_SCOUT_OPENER_LIVE, // B-26 (#71): inert pending its hunt
       barbLadder: [
         'WARRIOR',
@@ -687,38 +514,18 @@ export function buildRules() {
       // same order the tile `rid` plane uses), or -1 = ungated. The GPU joins it
       // with the per-tile `rq`/res_imp plane to gate build+purchase per civ.
       requiresResource: u.requiresResource ? RESOURCE_IDS.indexOf(u.requiresResource) : -1,
-      // V-R: ranged strike stats (Slinger 15/1, Archer 25/2); 0 = melee-only.
       rangedStrength: u.ranged?.strength ?? 0,
       rangedRange: u.ranged?.range ?? 0,
-      // AUDIT A-8: full MP per turn — the civ-seat walkers' budget.
       moves: u.moves,
-      // #45/B-6: NAVAL unit (lives on water, never embarks). All-false for the
-      // current land-only roster — N2 adds GALLEY/QUADRIREME.
       naval: u.naval ? 1 : 0,
       // B6-S2: faith-purchase-only (MISSIONARY) — the trainableUnits filter's
       // mirror; masks the type out of the GPU purchase path.
       fo: u.faithOnly ? 1 : 0,
-      // B7-G (B-8): spawn-only (GENERAL/ADMIRAL) — the trainableUnits filter's
-      // mirror; masks the type out of production_mask AND the purchase path.
       so: u.spawnOnly ? 1 : 0,
-      // #71: the SETTLER chassis — trains through the dedicated escalating
-      // settler column only; masked out of the generic unit columns.
       settler: u.settler ? 1 : 0,
     })),
-    // Tile improvements (6a: FARM; 6b: MINE, LUMBER_MILL). `ids` are the
-    // engine's improvement index (0 = FARM, 1 = MINE, 2 = LUMBER_MILL); a
-    // tile's improvement state is -1 = none. FARM is ungated (+1 food, +0.5
-    // housing); the hill-farm sub-case needs the hillFarms civic. MINE (+1⚙,
-    // MINING) and LUMBER_MILL (+1⚙, CONSTRUCTION) are tech-gated. A MINE is
-    // also tech-BOOSTED: Apprenticeship and Industrialization each add +1⚙ to
-    // every mine (improvementYields effects), so mineBoostTechs ships the
-    // [techIdx, prodAmount] pairs the engine sums over researched techs.
-    // builderIdx is BUILDER's roster position.
     improvements: {
       ids: IMPROVEMENT_IDS,
-      // AUDIT A-13: the dense per-improvement catalog — base yields (6 cols),
-      // housing, and the unlockImprovement tech index (-1 = baseline: FARM).
-      // The legacy scalar keys below stay (engine defaults ride them).
       rows: IMPROVEMENT_IDS.map((id) => {
         const def = IMPROVEMENTS[id as keyof typeof IMPROVEMENTS];
         return {
@@ -730,8 +537,6 @@ export function buildRules() {
           ),
         };
       }),
-      // C1-B1 gate catch: an improved luxury (its OWN improvement, e.g. a mine
-      // on Diamonds) grants +1 amenity to this many neediest cities.
       luxAmenityCities: LUXURY_AMENITY_CITIES,
       farmFood: IMPROVEMENTS.FARM.yields.food ?? 1,
       farmHousing: IMPROVEMENTS.FARM.housing,
@@ -748,7 +553,6 @@ export function buildRules() {
       mineUnlockTech: techList.findIndex((t) =>
         t.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === 'MINE'),
       ),
-      // B-27 (#71): RADIO unlocks SEASIDE_RESORT.
       seasideUnlockTech: techList.findIndex((t) =>
         t.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === 'SEASIDE_RESORT'),
       ),
@@ -766,29 +570,17 @@ export function buildRules() {
         })
         .filter(([, boost]) => boost > 0),
     },
-    // District catalog (D1 plumbing; inert until D2 places one). idx = engine
-    // district index; adjYield = the YIELD_KEYS column its adjacency feeds
-    // (-1 = none); adjacency `src` indexes ADJ_SRC (static: mountain/rainforest/
-    // woods/reef/naturalWonder/river/seaResource; dynamic: builtWonder/district/
-    // cityCenter/harbor/mineOrQuarry). Cost is flat in this model.
-    // Specialist yields do NOT ship: assigning a citizen to a district slot is
-    // a manual verb (setSpecialists), nothing in the turn loop writes
-    // city.specialists, so every citizen works a tile on both engines.
     districts: PLACEABLE_DISTRICTS.map((id, idx) => {
       const d = DISTRICTS[id];
       return {
         id,
         idx,
-        // P4/D-8: the unlockDistrict effect's tech/civic index (-1 = none in
-        // the compact tree) — the discount's U counts types with a satisfied
-        // unlock, exactly mirroring computeUnlocks().districts.
         unlockTech: techList.findIndex((t) => t.effects.some((e) => e.kind === 'unlockDistrict' && e.district === id)),
         unlockCivic: civicList.findIndex((c) => c.effects.some((e) => e.kind === 'unlockDistrict' && e.district === id)),
         cost: d.cost,
         adjYield: d.adjacencyYield ? YIELD_KEYS.indexOf(d.adjacencyYield) : -1,
         adjacency: d.adjacency.map((a) => ({ src: ADJ_SRC.indexOf(a.source), amount: a.amount })),
         housing: d.housing,
-        // districtMaintenance: 0 for City Center / Neighborhood / Aqueduct, else 1.
         maintenance: ['CITY_CENTER', 'NEIGHBORHOOD', 'AQUEDUCT', 'COMMERCIAL_HUB', 'HARBOR'].includes(id) ? 0 : 1, // P4/D-14: CH+Harbor exempt (real Civ 6)
         countsTowardLimit: d.countsTowardLimit ? 1 : 0,
         allowMultiple: d.allowMultiple ? 1 : 0,
@@ -798,27 +590,18 @@ export function buildRules() {
         notAdjCenter: d.placement.notAdjacentToCityCenter ? 1 : 0,
       };
     }),
-    // D2b scaffold: which district the scripted policy places (Campus) and the
-    // tech that unlocks it (WRITING).
     districtScaffold: {
       campusIdx: PLACEABLE_DISTRICTS.indexOf('CAMPUS'),
       campusUnlockTech: techList.findIndex((t) =>
         t.effects.some((e) => e.kind === 'unlockDistrict' && e.district === 'CAMPUS'),
       ),
       active: SCRIPTED_CAMPUS ? 1 : 0,
-      // Districts the scripted policy places, IN ORDER (engine mirrors this list).
-      // placement 0=land (best floor(static+0.5·adj) tile), 1=aqueduct (adjacent to
-      // center + water source, lowest tile, non-specialty + housing), 2=coastal,
-      // 3=encampment (NOT adjacent-center). B9-R1: civic-unlocked entries ship
-      // unlockCivic instead of unlockTech (exactly one of the two is >= 0).
       place: SCAFFOLD_DISTRICTS.map(({ id, unlockId, unlockKind, placement }) => ({
         idx: PLACEABLE_DISTRICTS.indexOf(id),
         unlockTech: unlockKind === 'civic' ? -1 : techIdx.get(unlockId) ?? -1,
         unlockCivic: unlockKind === 'civic' ? civicIdx.get(unlockId) ?? -1 : -1,
         placement: placement ? PLACEMENT_CODE[placement] : 0,
       })),
-      // CS buildDistrict askable list → engine district-type indices, so the
-      // `already`/satisfied checks generalize past CAMPUS.
       askable: (['CAMPUS', 'HOLY_SITE', 'COMMERCIAL_HUB', 'THEATER_SQUARE'] as const).map((id) =>
         PLACEABLE_DISTRICTS.indexOf(id),
       ),
@@ -835,31 +618,17 @@ export function buildRules() {
       yields: YIELD_KEYS.map((k) => b.yields?.[k] ?? 0),
       housing: b.housing ?? 0,
       amenities: b.amenities ?? 0,
-      // Mirrors city.ts buildingMaintenance (derived, not stored): Commercial Hub
-      // buildings (Market/Bank/Stock Exchange) are upkeep-free, like cost-0 ones.
       maintenance: b.cost === 0 ? 0 : b.maintenance !== undefined ? b.maintenance : b.worship || b.district === 'COMMERCIAL_HUB' ? 0 : b.cost >= 500 ? 3 : b.cost >= 190 ? 2 : 1, // P4/D-13 mirror
       river: b.special === 'WATER_MILL',
-      // AUDIT #78: the Water Mill's "Bonus resources improved by Farms gain +1
-      // Food each". Deliberately NOT reusing `river` above, which happens to
-      // select the same building today but means "requires a river city" — the
-      // two would diverge the moment another river-gated building is added.
       farmBonusFood: b.special === 'WATER_MILL',
       unlockTech: buildingUnlockTech.get(b.id) ?? -1,
       unlockCivic: buildingUnlockCivic.get(b.id) ?? -1,
-      // District buildings are gated (mirrors availableBuildings) on the city
-      // owning a completed district of this type and having a prerequisite.
       reqDistrict: b.district === 'CITY_CENTER' ? -1 : PLACEABLE_DISTRICTS.indexOf(b.district),
       reqBuildings: (b.requiresAny ?? []).map((id) => buildingIdx.get(id) ?? -1).filter((i) => i >= 0),
-      // B9-R1: exclusiveWith (Barracks/Stable) — pickers refuse a building whose
-      // exclusive sibling is already owned (availableBuildings' rule).
       exclBuildings: (b.exclusiveWith ?? []).map((id) => buildingIdx.get(id) ?? -1).filter((i) => i >= 0),
-      // B9-R2: regional buildings leave the local yield/amenity sums — the
-      // regional channel (regionalEffects semantics) delivers them by range.
       regional: b.regional ? 1 : 0,
       // B9-R3: worship = faith-purchase-only (never queued, never gold-bought).
       worship: b.worship ? 1 : 0,
-      // B-17 (ROUND B7): flat training XP granted to units trained/purchased in
-      // a city holding this Encampment military building (best tier counts).
       trainXp: b.trainXp ?? 0,
     })),
     techs: techList.map((t) => ({

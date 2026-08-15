@@ -25,7 +25,6 @@ export type AdjacencySource =
 
 export interface AdjacencyRule {
   source: AdjacencySource;
-  /** Yield gained per matching neighbor (0.5 = "+1 per 2"). */
   amount: number;
 }
 
@@ -35,7 +34,6 @@ export interface DistrictDef {
   code: string;
   color: string;
   cost: number;
-  /** Counts against the population district limit (specialty districts do). */
   countsTowardLimit: boolean;
   allowMultiple: boolean;
   adjacencyYield?: YieldKey;
@@ -45,7 +43,6 @@ export interface DistrictDef {
     /** Must be placed on coast/lake water adjacent to land (Harbor). */
     onCoastalWater?: boolean;
     requiresAdjacentCityCenter?: boolean;
-    /** Aqueduct: needs adjacent river/lake/oasis/mountain as a water source. */
     requiresWaterSourceOrMountain?: boolean;
     notAdjacentToCityCenter?: boolean;
   };
@@ -232,7 +229,6 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
 };
 
-/** Order shown in UI menus. */
 export const PLACEABLE_DISTRICTS: DistrictId[] = [
   'CAMPUS',
   'HOLY_SITE',

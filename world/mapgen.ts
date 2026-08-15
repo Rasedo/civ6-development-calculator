@@ -65,7 +65,6 @@ export function generateMap(opts: MapGenOptions): GameMap {
     }
   }
 
-  // --- 1. Elevation ---------------------------------------------------------
   const elevNoise = fbm(deriveSeed(seed, 'elev'), 5);
   const FREQ = 0.085;
   const elev = new Float64Array(width * height);
@@ -73,7 +72,6 @@ export function generateMap(opts: MapGenOptions): GameMap {
     const distToEdge = Math.min(t.col, t.row, width - 1 - t.col, height - 1 - t.row);
     const falloff = Math.min(1, distToEdge / 4);
     const x = t.col / (width - 1);
-    // Carve an oceanic channel in the middle to suggest two continents.
     const split = 1 - 0.42 * Math.exp(-Math.pow((x - 0.5) / 0.07, 2));
     elev[t.index] = elevNoise(t.col * FREQ, t.row * FREQ) * falloff * split;
   }
@@ -83,7 +81,6 @@ export function generateMap(opts: MapGenOptions): GameMap {
   const seaLevel = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * (1 - landFraction)))];
   const isLandIdx = (i: number) => elev[i] >= seaLevel;
 
-  // --- 2. Mountains & hills ---------------------------------------------------
   const ridgeNoise = fbm(deriveSeed(seed, 'ridge'), 4);
   const landTiles = map.tiles.filter((t) => isLandIdx(t.index));
   const maxElev = Math.max(...landTiles.map((t) => elev[t.index]), seaLevel + 1e-9);
@@ -101,7 +98,6 @@ export function generateMap(opts: MapGenOptions): GameMap {
     else if (i < nMountain + nHills) t.elevation = 'HILLS';
   });
 
-  // --- 3. Climate bands -> base terrain ---------------------------------------
   const moistNoise = fbm(deriveSeed(seed, 'moist'), 4);
   const tempNoise = fbm(deriveSeed(seed, 'temp'), 3);
   const half = (height - 1) / 2;
@@ -110,8 +106,6 @@ export function generateMap(opts: MapGenOptions): GameMap {
   for (const t of map.tiles) {
     latJ[t.index] = latOf(t.row) + (tempNoise(t.col * FREQ * 2, t.row * FREQ * 2) - 0.5) * 0.12;
   }
-  // Raw fBm clusters tightly around 0.5; rank-normalize over land so
-  // moisture thresholds behave like real percentiles.
   const moisture = new Float64Array(width * height);
   {
     const raw = new Float64Array(width * height);
@@ -133,7 +127,6 @@ export function generateMap(opts: MapGenOptions): GameMap {
     t.terrain = terrain;
   }
 
-  // --- 4. Water classification: lakes, coast, ocean -----------------------------
   const waterTiles = map.tiles.filter((t) => !isLandIdx(t.index));
   const compId = new Map<number, number>();
   const compSize = new Map<number, number>();
@@ -164,10 +157,8 @@ export function generateMap(opts: MapGenOptions): GameMap {
     t.terrain = neighbors(map, t).some((n) => isLandIdx(n.index)) ? 'COAST' : 'OCEAN';
   }
 
-  // --- 5. Rivers along hex edges -------------------------------------------------
   generateRivers(map, elev, seaLevel, deriveSeed(seed, 'rivers'));
 
-  // --- 6. Features ------------------------------------------------------------
   const rngF = mulberry32(deriveSeed(seed, 'features'));
   for (const t of map.tiles) {
     const lat = latJ[t.index];
@@ -214,17 +205,14 @@ export function generateMap(opts: MapGenOptions): GameMap {
     }
   }
 
-  // --- 7. Natural wonders ----------------------------------------------------------
   if (opts.withWonders ?? true) {
     placeWonders(map, deriveSeed(seed, 'wonders'));
   }
 
-  // --- 8. Resources --------------------------------------------------------------
   if (withResources) {
     placeResources(map, deriveSeed(seed, 'resources'));
   }
 
-  // --- 8b. Volcanoes (a few mountains that can erupt) --------------------------------
   {
     const rngVo = mulberry32(deriveSeed(seed, 'volcanoes'));
     const mountains = shuffle(rngVo, map.tiles.filter((t) => t.elevation === 'MOUNTAIN' && !t.wonder));
@@ -234,7 +222,6 @@ export function generateMap(opts: MapGenOptions): GameMap {
     }
   }
 
-  // --- 9. Tribal villages -----------------------------------------------------------
   if (opts.withVillages ?? true) {
     const rngV = mulberry32(deriveSeed(seed, 'villages'));
     let quota = Math.round(
@@ -262,8 +249,6 @@ export function generateMap(opts: MapGenOptions): GameMap {
   for (const t of map.tiles) {
     if (TERRAINS[t.terrain].water) continue;
     if (t.elevation !== 'HILLS' && t.elevation !== 'MOUNTAIN') continue;
-    // direction-indexed: `neighbors()` DROPS off-map entries, so its array
-    // index is not the direction at a map edge — walk d explicitly.
     for (let d = 0; d < 6; d++) {
       const n = neighborTile(map, t, d);
       if (n && TERRAINS[n.terrain as TerrainId].water) t.cliffMask |= 1 << d;
@@ -273,7 +258,6 @@ export function generateMap(opts: MapGenOptions): GameMap {
   return map;
 }
 
-// ---------------------------------------------------------------------------
 
 function wonderTileValid(
   map: GameMap,
@@ -348,7 +332,6 @@ function placeWonders(map: GameMap, seed: number): void {
   }
 }
 
-// ---------------------------------------------------------------------------
 
 function touchesWater(map: GameMap, v: Vertex, isLandIdx: (i: number) => boolean): boolean {
   for (const [c, r] of vertexTouchingTiles(v)) {
@@ -388,7 +371,6 @@ function generateRivers(map: GameMap, elev: Float64Array, seaLevel: number, seed
 
   const riverCount = Math.max(2, Math.round(landTiles.length / 55));
 
-  // Sources: high-elevation land, spaced out, not right at the water.
   const topLand = [...landTiles]
     .sort((a, b) => elev[b.index] - elev[a.index])
     .slice(0, Math.max(10, Math.floor(landTiles.length * 0.3)));
@@ -433,14 +415,12 @@ function generateRivers(map: GameMap, elev: Float64Array, seaLevel: number, seed
       visited.add(vertexKey(best.to));
       v = best.to;
       if (!inBounds(map, v.col, v.row) && !touchesWater(map, v, isLandIdx)) {
-        // walked off the map without reaching water; stop here
         break;
       }
     }
   }
 }
 
-// ---------------------------------------------------------------------------
 
 function resourceValidOnTile(tile: Tile, def: ResourceDef): boolean {
   if (tile.elevation === 'MOUNTAIN') return false;

@@ -33,23 +33,12 @@ import { civEraIndex } from './city';
  *  for the same reason — there is no barbarian *war* to be weary of. */
 const scores = (seat: number): boolean => !isBarbSeat(seat) && seat >= 0;
 
-/** Only MAJOR civs hold weariness: they are the seats with amenities to lose
- *  and research to date their era from. A city-state is a valid OPPONENT (a
- *  war against one wears you down normally) but keeps no accumulator. */
 const holdsWeariness = (seat: number): boolean => isCiv(seat);
 
-/** This seat's WWP against `other`. Absent = 0. */
 export function wwGet(seat: Seat, other: number): number {
   return seat.ww?.[other] ?? 0;
 }
 
-/**
- * The weariness this seat actually FEELS: the worst of its wars.
- *
- * "Multiple simultaneous wars score separately; only the highest counts."
- * Summing them would punish a civ for the number of its enemies rather than
- * for the blood spilled, which is the opposite of what the source describes.
- */
 export function wwMax(seat: Seat | undefined): number {
   if (!seat?.ww) return 0;
   let m = 0;
@@ -60,14 +49,6 @@ export function wwMax(seat: Seat | undefined): number {
   return m;
 }
 
-/**
- * Every war's points added together — NOT a game rule, a GATE column.
- *
- * `wwMax` is what the game feels, and two engines can agree on a maximum while
- * disagreeing about which war holds it or how many wars there are. The sum
- * moves whenever any single war does, so tracing max AND sum pins the whole
- * per-war multiset against a scalar comparison. [[measure-every-path]].
- */
 export function wwSum(seat: Seat | undefined): number {
   if (!seat?.ww) return 0;
   let n = 0;
@@ -75,17 +56,6 @@ export function wwSum(seat: Seat | undefined): number {
   return n;
 }
 
-/** Is the war between `a` and `b` a FORMAL one (a casus belli was used)?
- *
- *  Only the civ↔civ axis can answer yes, because DENOUNCING is the only
-/**
- * The per-battle base for `seat` fighting `other`: its own era's row of the
- * formal or surprise column, era index clamped at Industrial (4) and beyond.
- *
- * The era is the SEAT's own (`civEraIndex` — the highest era among its
- * completed techs and civics), not the world's: an Ancient-era civ dragged
- * into an Industrial war wearies at Ancient rates.
- */
 export function wwEraBase(state: GameState, seat: number, other: number): number {
   const s = seatOf(state, seat);
   // A seat with no research record has completed nothing, so it fights at
@@ -97,17 +67,6 @@ export function wwEraBase(state: GameState, seat: number, other: number): number
   return row[Math.min(Math.max(era, 0), row.length - 1)];
 }
 
-/**
- * Is `tileOwner` land this seat fights on at the HOME rate?
- *
- * The shipped GlobalParameters carry two rows and only two:
- * `WAR_WEARINESS_PER_COMBAT_IN_ALLIED_LANDS = 1` and
- * `..._IN_FOREIGN_LANDS = 2`. So an ALLY's territory is home ground — not just
- * your own — and everything else, unowned ground included, is foreign.
- *
- * Only CIVS ally, so a city-state's or a barbarian's territory is never
- * friendly by this route.
- */
 function friendlyLand(state: GameState, seat: number, tileOwner: number): boolean {
   if (tileOwner < 0) return false; // nobody's land is foreign land
   if (tileOwner === seat) return true;
@@ -124,18 +83,6 @@ function addWw(state: GameState, seat: number, other: number, amount: number): v
   s.wwTurn[other] = state.turn;
 }
 
-/**
- * One BATTLE, scored for both sides.
- *
- * `tileIndex` is the tile the battle is decided on — the TARGET's tile, "always
- * the location, including for ranged units". `city` says a city (or its
- * district) is giving or receiving the attack, which forces the abroad column
- * for both sides regardless of whose borders it stands in.
- *
- * Call it AFTER the damage rolls and after the deaths are known, but BEFORE any
- * capture — a captured tile changes hands, and the location multiplier is the
- * one that applied while the battle was fought.
- */
 export function warWearinessBattle(
   state: GameState,
   aSeat: number,
@@ -156,14 +103,6 @@ export function warWearinessBattle(
   score(dSeat, aSeat, opts.dDied ?? false);
 }
 
-/**
- * The end-of-turn decay for ONE seat, called from that seat's own block top,
- * so "weariness settles" always precedes "amenities are read".
- *
- *   * a war in which a battle was fought THIS turn does not decay
- *   * any other war decays 50 while this seat is at war with somebody
- *   * a seat at war with nobody sheds 200 from every war it remembers
- */
 export function warWearinessTurn(state: GameState, seat: number): void {
   const s = seatOf(state, seat);
   if (!s?.ww) return;
@@ -176,20 +115,10 @@ export function warWearinessTurn(state: GameState, seat: number): void {
   }
 }
 
-/** Is this seat at war with ANY live opponent? Drives which decay rate applies
- *  ("during war" vs "at peace with all"). Barbarian hostility is not a war —
- *  see `scores`. */
 export function anyWar(state: GameState, seat: number): boolean {
   return atWarWithAny(state, seat);
 }
 
-/**
- * A peace treaty between `a` and `b`: both sides shed 2000 from THAT war.
- *
- * It is deliberately larger than any plausible accumulation, which is how the
- * source keeps a settled war from haunting a civ forever — the residual of a
- * war you are no longer in has no decay rule of its own.
- */
 export function warWearinessPeace(state: GameState, a: number, b: number): void {
   const shed = (self: number, foe: number): void => {
     const s = seatOf(state, self);

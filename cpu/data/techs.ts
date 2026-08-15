@@ -1,17 +1,3 @@
-/**
- * Technology tree — the full GS ~68-node tree.
- *
- * THE ORDER IS A WIRE CONTRACT: both engines index techs by position, so this
- * list is APPEND-ONLY. Inserting a node renumbers every one after it.
- * Costs are real-anchored base science.
- *
- * Nodes past the modeled roster are PURE TREE NODES: their real unlocks are
- * military units, naval hulls, or absent systems
- * (aircraft, nukes), so they unlock nothing yet.
- * Eurekas are attached only where the boost condition is expressible in
- * data/boosts.ts terms AND the target is exported (Campus/Harbor tiers,
- * districts, roster improvements); everything else is unboostable (recorded).
- */
 
 import type { DistrictId, ImprovementId, Yields } from '../core/types';
 import { GAME_SPEED } from './constants';
@@ -27,8 +13,6 @@ export type Era =
   | 'Information'
   | 'Future';
 
-// The full GS era ladder. Atomic/Information/Future are display-only
-// groupings (no core logic reads `.era`); adding them is purely additive.
 /** ERAS index of 'Modern' — antiquity sites stop being created
  *  once the world reaches it (real Civ 6). Derived below, not hardcoded. */
 export const MODERN_ERA_INDEX = 5;
@@ -50,11 +34,8 @@ export type ResearchEffect =
   | { kind: 'unlockDistrict'; district: DistrictId }
   | { kind: 'unlockBuilding'; building: string }
   | { kind: 'unlockFeatureRemoval'; feature: string }
-  /** Permanent yield bonus for every instance of an improvement. */
   | { kind: 'improvementYields'; improvement: ImprovementId; yields: Partial<Yields> }
-  /** Farms gain +1 food when adjacent to 2+ farms (stacks per tier). */
   | { kind: 'farmAdjacency' }
-  /** Farms become buildable on grassland/plains hills. */
   | { kind: 'hillFarms' }
   | { kind: 'unlockGovernment'; government: string }
   | { kind: 'unlockPolicy'; policy: string };
@@ -79,7 +60,6 @@ const T = (
 
 export const TECHS: Record<string, TechDef> = Object.fromEntries(
   [
-    // --- Ancient -------------------------------------------------------------
     T('POTTERY', 'Pottery', 'Ancient', 25, [], [{ kind: 'unlockBuilding', building: 'GRANARY' }]),
     T('ANIMAL_HUSBANDRY', 'Animal Husbandry', 'Ancient', 25, [], [
       { kind: 'unlockImprovement', improvement: 'PASTURE' },
@@ -118,7 +98,6 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'unlockBuilding', building: 'WATER_MILL' },
     ]),
 
-    // --- Classical ------------------------------------------------------------
     T('CELESTIAL_NAVIGATION', 'Celestial Navigation', 'Classical', 120, ['SAILING', 'ASTROLOGY'], [
       { kind: 'unlockDistrict', district: 'HARBOR' },
       { kind: 'unlockBuilding', building: 'LIGHTHOUSE' },
@@ -138,7 +117,6 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'unlockDistrict', district: 'AQUEDUCT' },
     ]),
 
-    // --- Medieval --------------------------------------------------------------
     T('APPRENTICESHIP', 'Apprenticeship', 'Medieval', 275, ['CURRENCY', 'HORSEBACK_RIDING'], [
       { kind: 'unlockDistrict', district: 'INDUSTRIAL_ZONE' },
       { kind: 'unlockBuilding', building: 'WORKSHOP' },
@@ -165,13 +143,11 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'unlockBuilding', building: 'BANK' },
     ]),
 
-    // --- Renaissance ------------------------------------------------------------
     T('MASS_PRODUCTION', 'Mass Production', 'Renaissance', 580, ['EDUCATION', 'CONSTRUCTION'], [
       { kind: 'unlockBuilding', building: 'SHIPYARD' },
     ]),
     T('ASTRONOMY', 'Astronomy', 'Renaissance', 580, ['EDUCATION']),
 
-    // --- Industrial --------------------------------------------------------------
     T('INDUSTRIALIZATION', 'Industrialization', 'Industrial', 930, ['MASS_PRODUCTION'], [
       { kind: 'unlockBuilding', building: 'FACTORY' },
       { kind: 'improvementYields', improvement: 'MINE', yields: { production: 1 } },
@@ -186,7 +162,6 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'unlockBuilding', building: 'MILITARY_ACADEMY' },
     ]),
 
-    // --- Modern -------------------------------------------------------------------
     T('ELECTRICITY', 'Electricity', 'Modern', 1250, ['INDUSTRIALIZATION'], [
       { kind: 'unlockBuilding', building: 'POWER_PLANT' },
       { kind: 'unlockBuilding', building: 'SEAPORT' },
@@ -205,23 +180,15 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'farmAdjacency' },
     ]),
 
-    // ========================================================================
-    // Full-tree expansion (index 32+). All rows below unlock nothing in
-    // the modeled roster (military/naval/absent systems); they exist as tree
-    // topology + gating for late wonders/projects and the science victory.
-    // ========================================================================
 
-    // --- Classical (fill) ----------------------------------------------------
     T('IRON_WORKING', 'Iron Working', 'Classical', 120, ['BRONZE_WORKING']),
     T('SHIPBUILDING', 'Shipbuilding', 'Classical', 200, ['SAILING']),
 
-    // --- Medieval (fill) -----------------------------------------------------
     T('MACHINERY', 'Machinery', 'Medieval', 275, ['IRON_WORKING']),
     T('MILITARY_TACTICS', 'Military Tactics', 'Medieval', 275, ['MATHEMATICS']),
     T('STIRRUPS', 'Stirrups', 'Medieval', 390, ['HORSEBACK_RIDING']),
     T('CASTLES', 'Castles', 'Medieval', 390, ['CONSTRUCTION']),
 
-    // --- Renaissance (fill) --------------------------------------------------
     T('GUNPOWDER', 'Gunpowder', 'Renaissance', 490, ['MILITARY_ENGINEERING', 'STIRRUPS']),
     T('METAL_CASTING', 'Metal Casting', 'Renaissance', 500, ['GUNPOWDER']),
     T('CARTOGRAPHY', 'Cartography', 'Renaissance', 490, ['SHIPBUILDING']),
@@ -229,19 +196,16 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('SQUARE_RIGGING', 'Square Rigging', 'Renaissance', 580, ['CARTOGRAPHY']),
     T('SIEGE_TACTICS', 'Siege Tactics', 'Renaissance', 580, ['CASTLES']),
 
-    // --- Industrial (fill) ---------------------------------------------------
     T('STEAM_POWER', 'Steam Power', 'Industrial', 930, ['INDUSTRIALIZATION', 'SQUARE_RIGGING']),
     T('BALLISTICS', 'Ballistics', 'Industrial', 1070, ['METAL_CASTING']),
     T('RIFLING', 'Rifling', 'Industrial', 1250, ['BALLISTICS', 'STEEL']),
 
-    // --- Modern (fill) -------------------------------------------------------
     T('FLIGHT', 'Flight', 'Modern', 1250, ['RADIO', 'STEEL']),
     T('COMBUSTION', 'Combustion', 'Modern', 1250, ['STEAM_POWER', 'RIFLING']),
     T('REFINING', 'Refining', 'Modern', 1250, ['STEEL']),
     T('PLASTICS', 'Plastics', 'Modern', 1560, ['COMBUSTION', 'REFINING']),
     T('ELECTRONICS', 'Electronics', 'Modern', 1560, ['ELECTRICITY', 'RADIO']),
 
-    // --- Atomic (new era) ----------------------------------------------------
     T('COMPUTERS', 'Computers', 'Atomic', 1800, ['ELECTRONICS']),
     T('NUCLEAR_FISSION', 'Nuclear Fission', 'Atomic', 1800, ['COMBUSTION', 'PLASTICS']),
     T('ROCKETRY', 'Rocketry', 'Atomic', 1900, ['FLIGHT', 'RADIO']),
@@ -249,7 +213,6 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('COMBINED_ARMS', 'Combined Arms', 'Atomic', 2000, ['STEEL', 'FLIGHT']),
     T('SYNTHETIC_MATERIALS', 'Synthetic Materials', 'Atomic', 2200, ['PLASTICS']),
 
-    // --- Information (new era) ------------------------------------------------
     T('SATELLITES', 'Satellites', 'Information', 2470, ['ROCKETRY', 'COMPUTERS']),
     T('GUIDANCE_SYSTEMS', 'Guidance Systems', 'Information', 2470, ['ROCKETRY', 'ADVANCED_FLIGHT']),
     T('LASERS', 'Lasers', 'Information', 2600, ['NUCLEAR_FISSION']),
@@ -258,7 +221,6 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('ROBOTICS', 'Robotics', 'Information', 2470, ['COMPUTERS']),
     T('TELECOMMUNICATIONS', 'Telecommunications', 'Information', 2600, ['SATELLITES', 'COMPUTERS']),
 
-    // --- Future (new era) -----------------------------------------------------
     T('OFFWORLD_MISSION', 'Offworld Mission', 'Future', 3200, ['TELECOMMUNICATIONS', 'NUCLEAR_FUSION']),
     T('SMART_MATERIALS', 'Smart Materials', 'Future', 3200, ['NANOTECHNOLOGY', 'ROBOTICS']),
     T('ADVANCED_POWER_CELLS', 'Advanced Power Cells', 'Future', 3400, ['NUCLEAR_FUSION']),

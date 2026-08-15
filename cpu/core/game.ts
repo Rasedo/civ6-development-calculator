@@ -1,8 +1,3 @@
-/**
- * Game state lifecycle: creation, seat 0 actions (found city, improve,
- * place districts/buildings, buy tiles, pick research, run government),
- * the end-of-turn loop, and serialization.
- */
 
 import type { City, DistrictId, GameState, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, Seat, Unit } from './types';
 import { greatPeopleEarned } from './greatPeople';
@@ -37,11 +32,8 @@ import { PROJECTS, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { BARB_SEAT, allCities, allSeats, citiesOf, emptySeat, seatOf, seatOfCityState, setTileOwner, tileClaimed, unitSeat } from './seats';
 
-/** the game is over once this many turns are played (score victory at
- * the limit; domination can end it earlier). Config for the horizon. */
 export const TURN_LIMIT = 250;
 
-/** Eureka/inspiration discount applied to a research cost. */
 export function effectiveResearchCost(state: GameState, seat: number, id: string, baseCost: number): number {
   // A GOLDEN Free Inquiry / Pen-Brush-and-Voice deepens the boost — the
   // RESEARCHING seat's dedication, which is the `seat` this function already
@@ -63,14 +55,6 @@ export function districtCostIn(research: ResearchState): number {
   return Math.floor(Math.round(54 * GAME_SPEED) * (1 + 9 * Math.max(tPct, cPct)));
 }
 
-/** the GS district discount — 40% off a specialty type while the civ
- * has PLACED fewer of it than its per-unlocked-type average of COMPLETED
- * specialty districts: n < ceil(D/U), gated on D ≥ U (civfanatics 27783). */
-/**
- * ONE discount rule for every seat — n < ceil(D/U) with D >= U, over the
- * seat's OWN unlocked-district set and its OWN cities. `owner` supplies both;
- * omitted means seat 0, which is what every seat 0 call site meant.
- */
 export function districtDiscounted(
   state: GameState,
   seat: number,
@@ -132,16 +116,9 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     gameOver: false, // GV-2
     victoryType: 0, // GV-4/GV-3
     victoryRow: -1,
-    // FOG IS LIVE in units mode, for every seat: reveals accrue from the
-    // first spawn (placement happens after creation, so starts are seen),
-    // meets/settling/camp-rise all gate on the explored planes. The classic
-    // calculator (no units) has nothing to scout with — fog stays off.
     fogOfWar: unitsMode,
     eventLog: [],
     cityStates: [],
-    // The seat 0 is seat 0 and holds the SAME shape a seat does.
-    // Seat seats are appended by the seat factory (they are the same objects
-    // as `the other seats[]` while the field-by-field migration proceeds).
     seats: [emptySeat(0)],
     claimedPantheons: [],
     claimedBeliefs: [],
@@ -179,18 +156,6 @@ function cityName(id: number): string {
   return round === 0 ? base : `${base} ${round + 1}`;
 }
 
-/**
- * THE founding mutation, for every seat.
- *
- * `revealAround` lifts the FOUNDER's fog only — fog is per-seat, and one
- * seat's founding never scouts for another.
- *
- * The OWNER is PASSED, never re-derived from the seat. An earlier attempt
- * resolved it via `citiesOf(state, seat)`, whose `seatOf(...)?.cities ??
- * []` returns a FRESH ARRAY when the lookup misses — the push then succeeds
- * silently and the city is lost. 16 tests caught it. Passing the owner makes
- * that unrepresentable.
- */
 export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: Seat | null): City {
   const list: City[] = owner ? owner.cities : seatOf(state, seat)!.cities;
   const id = owner ? owner.nextCityId++ : seatOf(state, seat)!.nextCityId++;
@@ -262,13 +227,6 @@ export function foundCity(
   return { ok: true, city };
 }
 
-/**
- * domination: the civ that holds EVERY original capital (its own plus
- * every seat's, by capture), else -1. Capitals are loyalty-immune, so a
- * capital tile only changes hands by capture — each seat's `capitalTile` is
- * static and we read who currently has a city centered on each. A razed
- * capital (no city there) makes domination impossible, so we return -1.
- */
 export function dominationWinner(state: GameState): number {
   const expected = state.seats.length;
   if (expected <= 1) return -1; // nothing to conquer — a solo game never dominates
@@ -318,7 +276,6 @@ export function removeFeature(state: GameState, tileIndex: number, seat: number)
   const tile = state.map.tiles[tileIndex];
   const check = canRemoveFeature(state, tile, seat);
   if (!check.ok) return check;
-  // Improvements that depended on the feature disappear with it.
   if (tile.improvement === 'LUMBER_MILL' && tile.feature === 'WOODS') tile.improvement = null;
   tile.feature = null;
   return { ok: true };
@@ -339,14 +296,11 @@ export function queueDistrict(
   const tile = state.map.tiles[tileIndex];
   tile.district = type;
   tile.districtComplete = state.sandbox;
-  // Sandbox completes instantly, so the garrison musters here too.
   if (state.sandbox && type === 'ENCAMPMENT') tile.encampHp = ENCAMPMENT_HP;
   tile.improvement = null;
   tile.feature = null;
   if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
 
-  // Price BEFORE registering the placement (the discount reads the
-  // pre-placement counts — "value C changes the moment you place").
   const cost = districtCost(state, seat, type);
   city.districts.push({ type, tileIndex });
   if (!state.sandbox) {
@@ -375,7 +329,6 @@ export function queueBuilding(state: GameState, cityId: number, buildingId: stri
   return { ok: true };
 }
 
-/** Queue a world wonder on a tile. */
 export function queueWonder(
   state: GameState,
   cityId: number,
@@ -402,19 +355,11 @@ export function queueWonder(
   return { ok: true };
 }
 
-// ---------------------------------------------------------------------------
-// Projects & purchases
-// ---------------------------------------------------------------------------
 
-/** Project production cost, scaling with research progress like districts.
- * The floor speed-scales with everything else (15 → 9). */
 export function projectCost(state: GameState, seat: number): number {
   return Math.max(Math.round(15 * GAME_SPEED), Math.round(districtCost(state, seat) * 0.5));
 }
 
-/** Projects this city can run (needs the matching completed district).
- * space-race projects additionally require their gating tech, the previous
- * chain step already completed by this empire, and are one-time (not repeated). */
 export function availableProjects(state: GameState, city: City): ProjectDef[] {
   const owner = seatOf(state, city.seat);
   const done = owner?.spaceProjects ?? [];
@@ -455,17 +400,11 @@ export function buildingFaithCost(buildingId: string): number {
   return (BUILDINGS[buildingId]?.cost ?? 0) * FAITH_PURCHASE_MULT;
 }
 
-/** GS: gold/faith thresholds compare at MILLI precision — the treasury
- * accumulates non-dyadic 0.05-unit gold whose sub-milli drift differs
- * between the engines (BLAS association), so a raw `treasury < cost` splits
- * at invisible knife-edges (P5-S7 hunt: t228 — a 72.000-milli
- * treasury vs a 72-gold scout purchase went opposite ways). */
 export function goldAffordable(treasury: number, cost: number): boolean {
   return Math.round(treasury * 1000) >= Math.round(cost * 1000);
 }
 
 export function unitPurchaseCost(state: GameState, unitType: string, seat: number): number {
-  // Builders price off the live escalator, like the settler pair.
   const base = unitType === 'BUILDER' ? builderCost(state, seat) : UNITS[unitType]?.cost ?? 0;
   return base * GOLD_PURCHASE_MULT;
 }
@@ -502,12 +441,9 @@ export function purchaseBuilding(state: GameState, cityId: number, buildingId: s
   return { ok: true };
 }
 
-/** Buy a unit with gold; it appears at the city center immediately. */
 export function purchaseUnit(state: GameState, cityId: number, unitType: string, seat: number): RuleResult {
   const city = citiesOf(state, seat).find((c) => c.id === cityId);
   if (!city) return { ok: false, reason: 'No such city.' };
-  // TrainableUnits(state, seat, city) offers naval units ONLY when the city
-  // is naval-capable (coastal center or completed Harbor) — the buy gate.
   if (!trainableUnits(state, seat, city).some((d) => d.id === unitType)) {
     return { ok: false, reason: 'Unit not available (enable units mode / research).' };
   }
@@ -556,11 +492,6 @@ export function purchaseSettler(state: GameState, cityId: number, seat: number):
   return { ok: true };
 }
 
-/** Faith-buy this seat's WORSHIP building in the named city (#104 kind 4).
- * The building's identity is a RULE, not a choice: religion id == seat (the
- * B-18 convention), and each religion's worship building is fixed. City
- * gates: TEMPLE built, HOLY_SITE complete and unpillaged, building not
- * already present. Flat faith price (buildingFaithCost). */
 export function buyWorshipBuilding(state: GameState, cityId: number, seat: number): RuleResult {
   const buyer = seatOf(state, seat);
   if (!buyer) return { ok: false, reason: 'No such seat.' };
@@ -583,14 +514,6 @@ export function buyWorshipBuilding(state: GameState, cityId: number, seat: numbe
   return { ok: true };
 }
 
-/** Faith-buy a MISSIONARY or APOSTLE at the named city (#104 kinds 5/6).
- * Gates: founded religion; live count under the unit's own cap; SHRINE
- * built and HOLY_SITE complete + unpillaged in that city. Missionaries
- * price at cost × the enhancer's missionaryCostMult (HOLY_ORDER ×0.7 → 42)
- * and SCRIPTURE ships +1 charge; apostles are flat (the mult is a
- * missionary discount — both engines agree, so a belief can never desync
- * the two prices). Spawn-refund: no free spot near the centre = no pay.
- * ONE religious unit per seat per turn is the CALLER's short-circuit. */
 export function purchaseReligiousUnit(
   state: GameState,
   cityId: number,
@@ -659,7 +582,6 @@ export function itemLabel(item: QueueItem): string {
   return BUILDINGS[item.building].name;
 }
 
-/** Manually assign specialists to a district tile (clamped to slots & population). */
 export function setSpecialists(
   state: GameState,
   cityId: number,
@@ -678,39 +600,24 @@ export function setSpecialists(
   return { ok: true };
 }
 
-// Exported — the CIV SEAT production add needs the same test, and a
-// second copy of it in phase.ts is exactly how the two drift apart.
 export function isEncampmentItem(item: QueueItem): boolean {
   if (item.kind === 'district') return item.district === 'ENCAMPMENT';
   if (item.kind !== 'building') return false;
   return BUILDINGS[item.building]?.district === 'ENCAMPMENT';
 }
 
-// ---------------------------------------------------------------------------
-// Tiles, research, government actions
-// ---------------------------------------------------------------------------
 
 /** Gold price of a tile. Real Civ 6: ring-based base (50 for ring
  * ≤2, 75 for ring 3, +25/ring beyond as a scope extension), speed-scaled,
  * × (1 + 4·research progress), +5 (scaled) per tile EVER purchased
  * empire-wide — fully decoupled from the culture-growth counter. Without a
  * target tile (UI headline price) the ring-2 base is shown. */
-/**
- * ONE tile-price text for every seat. The seat 0's and that seat's were
- * character-identical formulas over different planes — the seat's own
- * research fraction, its own purchase count, its own tilePurchaseMult
- * (LAND_SURVEYORS is a policy card, not the seat 0's alone). `owner` supplies
- * those three; callers that pass nothing get seat 0, which is what every
- * existing seat 0 call site meant.
- */
 export function tilePurchaseCost(
   state: GameState,
   city: City | City,
   tileIndex?: number,
   owner?: { research: ResearchState; tilesPurchased?: number; mods: Modifiers },
 ): number {
-  // The city's OWNER sets the price: its research, its purchase escalator,
-  // its modifiers. `owner` is an override for callers that already have it.
   const os = seatOf(state, city.seat);
   const src = owner ?? {
     research: os!.research,
@@ -784,7 +691,6 @@ export function setGovernment(state: GameState, governmentId: string, seat: numb
   seatOf(state, seat)!.government.current = governmentId;
   const slots = governmentSlots(state, seat); // includes wonder-granted extras
   seatOf(state, seat)!.government.policies = slots.map(() => null);
-  // Re-seat old cards into compatible slots where possible.
   for (const cardId of oldCards) {
     const card = POLICIES[cardId];
     if (!card) continue;
@@ -822,17 +728,10 @@ export function setPolicy(state: GameState, slotIndex: number, policyId: string 
   return { ok: true };
 }
 
-// ---------------------------------------------------------------------------
-// Turn loop
-// ---------------------------------------------------------------------------
 
 
 
 export function endTurn(state: GameState): void {
-  // Every seat's turn — boosts, upkeep, bankruptcy, economy, verbs — runs
-  // through ONE body: `phase.ts:seatPhase` loops the seat roster, seat 0
-  // included. Nothing here belongs to one seat; this function only holds
-  // the GLOBAL schedule around that loop.
   if (state.unitsMode) {
     refreshUnits(state);
     barbarianPhase(state);
@@ -842,17 +741,11 @@ export function endTurn(state: GameState): void {
   seatPhase(state);
 
 
-  // THEOLOGICAL COMBAT, then the religious pressure spread — the fight first,
-  // so the turn's spread reads the swing the fallen unit caused. Both run
-  // after all foundings/settles/flips, so both engines scan the same final
-  // city + holy-tile set.
   theologicalCombatPhase(state);
   spreadReligiousPressure(state);
 
   state.turn += 1;
   eraBoundary(state);
-  // The WORLD CONGRESS convenes on the same post-increment turn
-  // number the era boundary uses, so both engines fire it at one position.
   worldCongress(state); // B-24: era-score window reset at ERA_LENGTH multiples (GPU mirrors at its turn increment)
   // DEDICATION payouts — a Golden/Heroic age pays faith, a Dark or
   // Normal age pays era score (the climb-out dedication), both scaled by the
@@ -866,24 +759,14 @@ export function endTurn(state: GameState): void {
   // otherwise the score victory fires at TURN_LIMIT. Detection only — no freeze
   // Detection is indicator-only, so with no domination this stays inert.
   const dom = dominationWinner(state);
-  // A SCIENCE victory set during this turn's project completions takes
-  // precedence over the domination/score recompute, winner and all.
   const spaceWon = state.victoryType === 3;
-  // Religious victory — checked on the follow set the spread above just
-  // flipped (real-time predominance, the domination pattern: live recompute,
-  // no freeze). Precedence space > domination > religion > score.
   const rel = religiousVictor(state);
-  // CULTURE victory, checked after religion —
-  // precedence space > domination > religion > culture > score.
   const cul = rel >= 0 ? -1 : cultureVictor(state);
   // DIPLOMATIC victory — 20 Diplomatic Victory Points, real
   // Civ 6's threshold. Checked LAST of the real conditions: precedence is
   // space > domination > religion > culture > DIPLOMATIC > score.
   const dip = rel >= 0 || cul >= 0 ? -1 : diplomaticVictor(state);
   state.gameOver = spaceWon || dom >= 0 || rel >= 0 || cul >= 0 || dip >= 0 || state.turn > TURN_LIMIT;
-  // The KIND and the WINNER are two facts and travel separately. Every victor
-  // above already returns the winning seat; the odd/even code pairs this
-  // replaces threw that away and kept only "was it seat 0".
   state.victoryType = spaceWon
     ? state.victoryType
     : dom >= 0
@@ -1000,9 +883,6 @@ function religiousVictor(state: GameState): number {
   return -1;
 }
 
-// ---------------------------------------------------------------------------
-// Great people
-// ---------------------------------------------------------------------------
 
 
 
@@ -1057,8 +937,6 @@ function religiousVictor(state: GameState): number {
 function theologicalCombatPhase(state: GameState): void {
   const nRel = state.seats.length;
   const relStr = (u: Unit): number => UNITS[u.type]?.religiousStrength ?? 0;
-  // The attacker walk snapshots the array: a death splices `state.units`, and
-  // a live iteration would skip the unit that slid into the gap.
   for (const att of [...state.units]) {
     if (att.type !== 'APOSTLE' || att.hp <= 0) continue;
     if (!state.units.includes(att)) continue; // already fell this pass
@@ -1109,18 +987,13 @@ function theologicalCombatPhase(state: GameState): void {
 }
 
 function spreadReligiousPressure(state: GameState): void {
-  // One religion per MAJOR — the roster's own length.
   const nRel = state.seats.length;
   const holy: number[] = new Array(nRel).fill(-1);
-  // A religion is keyed by the seat that founded it, so its holy tile sits at
-  // that seat's own index.
   for (const sx of state.seats) {
     const r = sx.religion;
     if (r.founded && r.holyTile != null && r.holyTile >= 0) holy[sx.seat] = r.holyTile;
   }
   if (!holy.some((h) => h >= 0)) return; // no religion exists yet — nothing to spread
-  // Per-religion range — the base radius plus the
-  // religion's enhancer pressureRangeBonus (0 when unenhanced).
   const range: number[] = new Array(nRel).fill(RELIGION_PRESSURE_RANGE);
   for (const sx of state.seats) {
     const eb = sx.religion.enhancer;
@@ -1143,8 +1016,6 @@ function spreadReligiousPressure(state: GameState): void {
         pres[g] += RELIGION_PRESSURE_PER_TURN;
       }
     }
-    // Flip: the religion with the most pressure (>0); strict `>` iterating g
-    // ascending keeps the LOWEST id on a tie.
     let best = -1;
     let bestP = 0;
     for (let g = 0; g < nRel; g++) {
@@ -1153,8 +1024,6 @@ function spreadReligiousPressure(state: GameState): void {
         best = g;
       }
     }
-    // EXODUS OF THE EVANGELISTS pays era score each time a city
-    // CONVERTS to a civ's religion — the religion's OWNER earns it.
     const wasFollowed = city.followedReligion ?? -1;
     city.followedReligion = best >= 0 ? best : null;
     if (best >= 0 && best !== wasFollowed) dedicationEvent(state, best, DED_EXODUS);
@@ -1170,19 +1039,15 @@ export function toggleLockedTile(state: GameState, cityId: number, tileIndex: nu
   else city.lockedTiles.push(tileIndex);
 }
 
-// ---------------------------------------------------------------------------
 
 export function serialize(state: GameState): string {
   return JSON.stringify(state);
 }
 
-/** Parse a save, filling in fields that older saves lack. */
 export function deserialize(json: string): GameState {
   const state = JSON.parse(json) as GameState;
   state.seats ??= [];
   if (state.seats.length === 0) state.seats.push(emptySeat(0));
-  // Every seat gets its defaults; an older save is missing them everywhere,
-  // not just on the seat that happened to be the seat 0.
   for (const sx of state.seats) {
     sx.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
     sx.research.boosted ??= [];
@@ -1191,7 +1056,6 @@ export function deserialize(json: string): GameState {
     sx.religion.enhancer ??= null;
     sx.buildersTrained ??= 0;
     sx.tilesPurchased ??= 0;
-    // Seed the melee tracker from the standing army an older save carries.
     sx.bestMeleeCS ??= Math.max(
       0,
       ...state.units
@@ -1209,26 +1073,16 @@ export function deserialize(json: string): GameState {
   state.units ??= [];
   state.nextUnitId ??= 0;
   state.rngState ??= (state.map.seed ^ 0x9e3779b9) >>> 0;
-  // Saves written before the minor/hostile seats existed carry
-  // neither, and `seatOf` is TOTAL now — an older save must not make it lie.
-  // Such a save keeps its camps too — they were `state.barbCamps`,
-  // which is the barbarian seat's `camps` now. Read the legacy field BEFORE
-  // building the seat: `emptySeat` already puts an EMPTY ARRAY there, and `[]`
-  // is not nullish, so a `??=` afterwards would silently drop every camp.
   const legacyCamps = (state as unknown as { barbCamps?: number[] }).barbCamps;
   state.barbSeat ??= { ...emptySeat(BARB_SEAT), camps: legacyCamps ?? [] };
   state.barbSeat.camps ??= legacyCamps ?? [];
   for (const cityState of state.cityStates ?? []) Object.assign(cityState, { ...emptySeat(seatOfCityState(cityState.id)), ...cityState });
-  // Per-pair diplomacy is ONE store per seat; every reader indexes these
-  // without a guard, so a hand-built state gets empty defaults. (The
-  // pre-seat legacy translation is gone — nothing can write that format.)
   for (const s of allSeats(state)) {
     s.wars ??= [];
     s.formalWars ??= [];
     s.allies ??= [];
     s.denounced ??= {};
   }
-  // The war store is symmetric; repair one-sided entries.
   for (const s of allSeats(state)) {
     for (const other of s.wars) {
       const os = seatOf(state, other);
@@ -1299,9 +1153,6 @@ export function deserialize(json: string): GameState {
   return state;
 }
 
-// ---------------------------------------------------------------------------
-// Religion
-// ---------------------------------------------------------------------------
 
 export function canChoosePantheon(state: GameState, seat: number): RuleResult {
   if (seatOf(state, seat)!.religion.pantheon) return { ok: false, reason: 'Pantheon already chosen.' };
@@ -1358,7 +1209,6 @@ export function foundReligion(
   seatOf(state, seat)!.religion.founder = choice.founder;
   state.claimedBeliefs.push(choice.follower, choice.founder); // pushed like the eager race's picks
   seatOf(state, seat)!.religion.worship = choice.worship;
-  // Freeze the holy tile (the capital's center) — the pressure source.
   seatOf(state, seat)!.religion.holyTile = (seatOf(state, seat)!.cities.find((c) => c.isCapital) ?? seatOf(state, seat)!.cities[0])?.centerIndex ?? null;
   return { ok: true };
 }
