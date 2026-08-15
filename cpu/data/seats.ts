@@ -46,10 +46,8 @@ export const SEAT_CAPS: Record<SeatClass, SeatCaps> = {
 // measured distribution), the war/denounce/warmonger magnitudes, and the
 // governor constants.
 //
-// SHIPPED-ONLY. DOW_PROXIMITY, DOW_STRENGTH_RATIO, DOW_WW_MAX, PEACE_WW,
-// ALLY_MIN_PEACE, TECH_PROD_DIV and CITY_DEF_PER_TECH are read by NO TypeScript
-// code. They exist to be shipped into rules.json for the GPU's scripted ladder,
-// and they die with it (task #102).
+// SHIPPED-ONLY: DOW_PROXIMITY has no TypeScript reader. It exists to reach
+// rules.json, where the denounce decider reads it.
 // ---------------------------------------------------------------------------
 
 export const CIV_LEADERS: { name: string; color: string; cityNames: string[] }[] = [
@@ -59,8 +57,6 @@ export const CIV_LEADERS: { name: string; color: string; cityNames: string[] }[]
   { name: 'Sumeria', color: '#b8823d', cityNames: ['Uruk', 'Ur', 'Eridu', 'Lagash', 'Nippur', 'Kish'] },
 ];
 
-export const TECH_PROD_DIV = 12;
-export const CITY_DEF_PER_TECH = 3;
 export const MAX_CITIES_PER_SEAT = 6;
 /** City COLUMNS a seat is observed and decided over — the same width for every
  * seat. Larger than MAX_CITIES_PER_SEAT because settling caps at that number
@@ -336,13 +332,3 @@ export function warWearinessPenalty(weariness: number): number {
 }
 
 export const DOW_PROXIMITY = 9;
-/** Aggressor strength must exceed target × this — the seat-0 gate (1.3). */
-export const DOW_STRENGTH_RATIO = 1.3;
-/** An aggressor at or above this war-weariness will not open a new war.
- *  6 -> 300. These two are ENGINE AI heuristics, not Civ 6 rules,
- *  and they are denominated in accumulator units. The accumulator's amenity
- *  conversion moved 8 -> 400 WWP per amenity, so preserving the AI's behaviour
- *  IN AMENITY TERMS is exactly x50. Both still sit below/above each other the
- *  same way, so the anti-thrash argument above is unchanged. */
-export const DOW_WW_MAX = 300;
-export const PEACE_WW = 500;

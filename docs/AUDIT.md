@@ -50,11 +50,10 @@ nothing carries forward.
 |---|---|---|
 | A-9r Neighborhood | 4 | one district, both engines, plus the registry's `allowMultiple` |
 | A-11r trade-route tails | 8 | a Trader UNIT, a route wire verb, and a route-store schema change |
-| A-27r seat-0 district scans | 3 | two scan sites folded into the row-generic walk |
 | A-28r specialists | 6 | a mechanic neither engine has: wire column, assignment, yields |
 | A-29r cityYieldMult order | 2 | registry ordering; no colliding pair exists in the catalog today |
 | A-30r farm-adjacency order | 1 | construct note, unreachable as written |
-| **A. Seat symmetry** | **24** | |
+| **A. Seat symmetry** | **21** | |
 | B-17r Encampment strikes | 1 | scoped out with ranged-vs-city; the rest of the district is done |
 | B-18r religion tails | 2 | complete on every seat; one latent lifecycle drift to hunt |
 | B-20r tourism tails | 7 | national parks, civ Archaeologists, theming, shipwrecks, digs |
@@ -68,7 +67,7 @@ nothing carries forward.
 | B-29r peace-treaty cooldown | 1 | a per-pair clock and its gate, both engines |
 | B-D unsourced data values | 5 | a residual CLASS: every invented magnitude, re-sourced |
 | **B. Fidelity vs real Civ 6** | **39** | |
-| **OPEN, TOTAL** | **63** | |
+| **OPEN, TOTAL** | **60** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -92,10 +91,6 @@ not add a "done" column back.
   be plundered en route. (4) GPU intl dests are stored as TILES, so a dest
   captured by another major keeps paying until expiry where TS's
   (toSeat, toSeatCity) filter drops it. Route-store schema change.
-- **A-27r. Seat-0 district window scans OUTSIDE the yield walk.**
-  `sim_masks`' one-per-type and specialty-count legality and `sim_step`'s
-  twin still scan seat-0 district windows in their own shapes. Their own
-  slice.
 - **A-28r. SPECIALISTS are not a mechanic on either engine.** TS only ever
   writes `city.specialists` from `setSpecialists`, a UI verb, so it is
   `{}` in every simulated game; the GPU's greedy assignment was deleted
@@ -131,17 +126,22 @@ not add a "done" column back.
 - **B-20r. Tourism tails.** Tourism, Great Works of writing/music/ART,
   relics, artifacts + archaeology (Archaeologist, antiquity sites,
   museum slots) and the wonder-era term all exist and are digest-
-  compared. Open: NATIONAL PARKS (no concept); civ seats never PRODUCE
-  an Archaeologist (seat-0-only so far — the production-wiring tail);
-  recorded-not-modeled: theming bonuses, shipwreck excavation, trading
-  works between civs, open-borders digs. The martyr-relic overstatement
-  (~7x) is B-27r(3). MEASURED consequence: visiting tourists peak ~7 vs
-  ~97 domestic at t250, so the culture victory is live-but-unreachable by
-  ~14x until these close.
-- **B-21r. City-state suzerain rows:** 14 shipped / 10 descoped
-  (unit-XP, cavalry, apostle-promotion, trade-route, power and
-  amenities channels — each documented at `CITY_STATE_SUZERAIN_LIVE`); shipped
-  rows degrade %-scaling and conditionals to a flat channel yield.
+  compared. Open: NATIONAL PARKS (no concept); recorded-not-modeled:
+  theming bonuses, shipwreck excavation, trading works between civs,
+  open-borders digs. The martyr-relic overstatement (~7x) is B-27r(3).
+  NOT a gap: the Archaeologist trains on every row — `trainableUnits` /
+  `_trainable_units` gate it on the museum's free artifact slot through
+  `_type_civic_slot_ok`, one body per engine. What no seat does is PICK
+  the column, which is a ladder question, not a wiring one.
+  MEASURED BEFORE THE FREEZE, and stale by construction: visiting
+  tourists peaked ~7 against ~97 domestic at t250, putting the culture
+  victory ~14x out of reach. Re-measure at the first serve run before
+  quoting it — every round since has moved the economy.
+- **B-21r. City-state suzerain rows:** 14 shipped (`CITY_STATE_SUZERAIN_LIVE`)
+  / 10 descoped, each carrying its reason in its `CITY_STATES` catalog entry's
+  `note` — unit-XP, cavalry, apostle-promotion, trade-route, power and
+  amenities channels. Shipped rows degrade %-scaling and conditionals to a
+  flat channel yield.
 - **B-22r. World Congress tails:** one resolution type only (real GS
   rotates many); Emergencies and Scored Competitions — the main real
   DVP sources — are unmodeled (awarding via the resolution winner is
@@ -157,14 +157,15 @@ not add a "done" column back.
   ESTABLISHMENT and promotions (governors are a stateless greedy
   ranking today); per-civ tech-era drift (eras are global 50-turn
   blocks).
-- **B-25r. Victory tails:** every named Civ 6 victory exists on both
-  engines and every one is now REACHABLE — the space-race mask gate closed
-  the last hole (#83). Open: the culture win's ~14× tourism gap (B-20r), and
-  ONE deliberate deviation in the space race — real Civ 6 runs every step in
-  a SPACEPORT, this repo has no Spaceport district and runs them in a Campus,
-  which makes them cheaper and removes a district decision from the path.
-  The Lagrange/Terrestrial Laser Stations (repeatable boosters that shorten
-  the Exoplanet flight) are unmodelled, so arrival is not accelerable.
+- **B-25r. Victory tails:** every named Civ 6 victory exists on both engines
+  and every one is REACHABLE — a seat can queue every space step and the
+  wire applier takes it on both sides. Open: the culture win's tourism gap
+  (B-20r), and the science victory's own fidelity tail, which is large
+  enough to be its own work item rather than a line here — the Spaceport
+  district, the real per-project costs, the light-year FLIGHT (we award the
+  win the instant `EXOPLANET_EXPEDITION` completes; real GS launches a craft
+  that must arrive, and the laser-station boosters that shorten the trip are
+  unmodelled because there is no trip), and the three projects' side effects.
 - **B-26r. Barbarian camp-spawn escalation** beyond the melee ladder
   (cliffs, ranged barbs and naval barbs all landed).
 - **B-27r. Theological-combat simplifications.** The resolver runs on both
@@ -198,21 +199,28 @@ not add a "done" column back.
   clock to gate on already exists per-pair (#111 s5's `war_turns`); what is
   missing is a per-pair PEACE stamp beside it.
 - **B-D. UNSOURCED DATA VALUES — a residual class, not one item.**
-  Mechanics are sourced item by item; the DATA layer largely is not:
-  files under cpu/data + cpu/core carry explicit `eyeballed` /
-  `approximate` / `stand-in` markers on magnitudes (builtWonders,
-  policies, improvements, wonders, units, resources, religion,
-  projects, constants, cityStates, buildings, boosts, appeal, combat).
-  A wrong CONSTANT passes every gate — both engines agree on the wrong
-  number. Closing this is a sourcing sweep round: verify each marked
-  magnitude against Civ 6 data, or record it as a deliberate
-  stylization where the model genuinely diverges.
+  Mechanics are sourced item by item; the DATA layer largely is not, and a
+  wrong CONSTANT passes every gate because both engines agree on the wrong
+  number. **The marker grep no longer finds this class.** It used to: a
+  sweep for `eyeballed` / `approximate` / `stand-in` named a dozen files.
+  The comment purge deleted most of those markers along with the prose
+  around them, so what survives is 11 occurrences over 7 files
+  (`builtWonders` costs plus three stand-in unlock techs, `units` costs,
+  `policies` numbers and its stand-in card effects, `economy`'s harvest
+  gating, and two RECORDED-not-approximated notes in `cityStates` /
+  `units` that are deliberate omissions, not unsourced magnitudes).
+  `improvements` now states the opposite — every yield sourced to the GS
+  Civilopedia, no markers left — and `projects` was sourced with #83.
+  So the sweep cannot be scoped by grepping; it has to walk cpu/data file
+  by file, checking each magnitude against a real Civ 6 source and either
+  correcting it or recording it as a deliberate stylization. Re-marking as
+  it goes is what makes the class shrinkable again.
 
 ## The freeze backlog — what the first serve run must validate
 
 Nothing below this line has run against the gate. **Regenerate first:
-`npm run seed && npm run export` — the fixture format is 3 and the loader
-refuses a 2.** In dependency order of suspicion; git log carries what each
+`npm run seed && npm run export` — the fixture format is 4 and the loader
+refuses a 3.** In dependency order of suspicion; git log carries what each
 change was, this is only what to CHECK.
 
 **Behaviour-preserving by intent, proven only by digests:**
@@ -239,9 +247,10 @@ calling it a bug:**
    FIRST divergence here if any creation path misses an allocation —
    `tile.ownerCity` and `nextCityId` are byte-exact digest fields now.
 8. #110 THE SLOT REGIME, three unproven changes: (a) seat 0 no longer reuses
-   a hole on founding; (b) compaction covers every major row in ONE body —
-   and as of #112 fires on ONE trigger too, so civ slot indices move
-   earlier than before; stable, so relative order is untouched, but latent
+   a hole on founding; (b) compaction is ONE body on ONE trigger for every
+   major row — it fires whenever ANY row holds a hole, TS's dense spliced
+   array, so `CIV6_RC_RECLAIM_AT` is gone and civ slot indices move earlier
+   than before; stable, so relative order is untouched, but latent
    slot-keyed staleness surfaces here;
    (c) `centre_slot_at` re-maps on every compaction, so `center_at`'s two
    value-readers change answers wherever they read stale slots. A red
@@ -305,11 +314,8 @@ calling it a bug:**
    0 — that was a DIGEST divergence against `capitalTile ?? -1` for any
    seat before its first founding, and `_domination` now refuses a winner
    while any capital is missing, as `dominationWinner` does.
-   Storage-only, but read it if the layout looks odd: city-slot compaction
-   now fires whenever ANY major row holds a hole (one trigger, TS's dense
-   spliced array), so `CIV6_RC_RECLAIM_AT` is gone and civ slot indices
-   move earlier than before. This SUPERSEDES 8(b), which described the
-   compaction BODY covering every row while the TRIGGER stayed forked.
+   The compaction trigger changed with it — see 8(b), which carries the
+   whole of that story.
 
 17. #113, THE WAR AXIS AND THE ACTION INTERFACE. (a) SEAT 0 CAN NOW
    DECLARE WAR AND SUE FOR PEACE. The gate's hand-rolled seat-0 block never
@@ -326,11 +332,15 @@ calling it a bug:**
    wars run longer and cost gold to end. (d) THE HEAD GAINED THE ALLIANCE
    GATE, the warmonger grievance and the war's KIND — a war declared
    through the head used to have none of the three. (e) THE PACING TERMS
-   ARE GONE: `_geo_turn`'s `dowWwMax` / `peaceWw` gates left with its
-   declare half and `ladder.pick_war` cannot express them, because
-   war-weariness is not in the observation. Expect more thrash between war
-   and peace until a ww field lands — #108-adjacent policy work, not an
-   engine rule. (f) The geo RECORD's targets are ABSOLUTE SEATS and its
+   ARE GONE: the war-weariness ceilings that used to gate a declaration and
+   a peace went with the old declare path, and `ladder.pick_war` cannot
+   express them, because war-weariness is not in the observation. Expect
+   more thrash between war and peace until a ww field lands — policy work,
+   not an engine rule. (`_geo_turn` itself survives, deciding denounce and
+   ally only off `dowProximity`. The ceilings, and the equally unread
+   `dowStrengthRatio` / research `prodDiv` / `defPerTech`, are no longer
+   exported at all — an export key no rule reads is a false affordance.)
+   (f) The geo RECORD's targets are ABSOLUTE SEATS and its
    `geoWar`/`geoPeace` keys are gone. (g) Three TS point fixes ride along:
    `goldenCulturePerDistrict`, `goldenBoostBonus` and `addEraScore` were
    each passing a literal seat 0 where the acting seat belongs, so
@@ -342,8 +352,11 @@ calling it a bug:**
    already walked. Both engines document the position as matched — read the
    first divergence here before assuming it is elsewhere.
 
-**#115 — the wire's last seat-0 shape, and the rivals arithmetic.** Every
-item here CHANGES BEHAVIOUR on both engines together; none of it has run.
+**THE SECOND LIST — behaviour changes since the wire's last seat-0 shape.**
+Every item here CHANGES BEHAVIOUR on both engines together; none of it has
+run. Items 1-10 are the seat-0 wire shape and the rivals arithmetic; 11-16
+the action-space holes (the space race, research switching); 17-20 district
+placement. Numbering restarts here — "watch first" below means THIS list.
 
 1. SEAT 0'S UNIT ORDERS MOVED IN THE TURN. They rode a `[tile, col, civ]`
    TRIPLES record applied before the step (GPU) / before `endTurn` (TS);
@@ -482,9 +495,9 @@ Woods -> Mining and Marsh -> Irrigation. Rainforest -> Bronze Working checks
 out against a real source; the other two could not be confirmed either way,
 and item 18(b) now makes them load-bearing for district placement.
 
-WATCH FIRST when the run goes red: (1) and (2) together mean seat 0's whole
-trajectory changed. Bracket from a checkpoint and read the SEAT the
-divergence names before reading the mechanic.
+WATCH FIRST when the run goes red: this list's (1) and (2) together mean
+seat 0's whole trajectory changed. Bracket from a checkpoint and read the
+SEAT the divergence names before reading the mechanic.
 
 **Reachability, before believing any green run:**
 - Theological combat needs two ADJACENT religious units of different
