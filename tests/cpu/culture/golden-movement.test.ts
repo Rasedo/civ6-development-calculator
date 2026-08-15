@@ -143,7 +143,7 @@ describe('B-24 golden dedications reach the civ that committed them', () => {
     if (kind !== null) golden(state, 1, kind);
     for (let t = 0; t < turns; t++) {
       if (kind !== null) golden(state, 1, kind); // survive era boundaries
-      endTurn(state, 0);
+      endTurn(state);
     }
     return state;
   }

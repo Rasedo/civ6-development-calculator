@@ -111,14 +111,14 @@ describe('citizens and growth', () => {
     const stats = computeCityStats(state, city);
     expect(stats.foodSurplus).toBeGreaterThan(0);
     let guard = 0;
-    while (city.population === 1 && guard++ < 50) endTurn(state, 0);
+    while (city.population === 1 && guard++ < 50) endTurn(state);
     expect(city.population).toBe(2);
   });
 
   it('treasury and science accumulate over turns', () => {
     const state = makeState(makeMap(16, 16));
     foundCity(state, tileAtCoords(state.map, 8, 8).index, 0);
-    endTurn(state, 0);
+    endTurn(state);
     expect(seatOf(state, 0)!.treasury).toBeGreaterThan(0); // palace gold
     expect(seatOf(state, 0)!.scienceTotal).toBeGreaterThan(0);
     expect(state.turn).toBe(2);
@@ -150,7 +150,7 @@ describe('districts and buildings', () => {
     expect(spot.districtComplete).toBe(false);
     const prod = computeCityStats(state, city).total.production;
     const turns = Math.ceil(itemCost(city.queue[0]) / prod);
-    for (let i = 0; i < turns; i++) endTurn(state, 0);
+    for (let i = 0; i < turns; i++) endTurn(state);
     expect(spot.districtComplete).toBe(true);
   });
 

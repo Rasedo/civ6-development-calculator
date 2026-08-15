@@ -166,7 +166,7 @@ def main() -> None:
     prow7 = sim7._proj_rows[0]
     d_i7 = int(prow7["d"])
     ctr7 = int(sim7.city_center[0, r5 + 1, j5])
-    dt7 = next(int(t) for t in range(sim7.T) if int(sim7.civ_at[0, t]) == r5 and int(sim7.district[0, t]) < 0 and t != ctr7 and int(sim7.built_wonder[0, t]) < 0)
+    dt7 = next(int(t) for t in range(sim7.T) if (int(sim7.tile_seat[0, t]) - 1) == r5 and int(sim7.district[0, t]) < 0 and t != ctr7 and int(sim7.built_wonder[0, t]) < 0)
     sim7.district[0, dt7] = d_i7
     sim7.district_complete[0, dt7] = True
     sim7.city_dist_tile[0, r5 + 1, j5, d_i7] = dt7

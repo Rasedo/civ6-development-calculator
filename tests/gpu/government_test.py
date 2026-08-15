@@ -193,7 +193,7 @@ def main() -> None:
     assert not bool(simn.civ_civic_boosted[0, 0, mf_idx]), "MEDIEVAL_FAIRES does NOT fire below 4 slotted policies"
     # ...and the same row on a CIV seat: the policies condition is keyed on
     # that seat's own civics, not on seat 0's.
-    if simp.R > 0:
+    if simp.n_majors > 1:
         simr = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
         simr.civ_civics[:, 1].copy_(civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "MILITARY_TRADITION", "POLITICAL_PHILOSOPHY", "STATE_WORKFORCE", "EARLY_EMPIRE", "CIVIL_SERVICE", "DIVINE_RIGHT"]))
         simr.civ_civic_boosted[:, 1:] = False

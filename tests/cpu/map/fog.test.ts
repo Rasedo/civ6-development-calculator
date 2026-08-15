@@ -31,7 +31,7 @@ describe('fog of war', () => {
 
     const scout = spawnUnit(state, 'SCOUT', tileAtCoords(state.map, 9, 9).index, 0)!;
     orderMove(state, scout.id, tileAtCoords(state.map, 14, 9).index);
-    for (let i = 0; i < 6; i++) endTurn(state, 0);
+    for (let i = 0; i < 6; i++) endTurn(state);
     expect(isExplored(state, 0, tileAtCoords(state.map, 14, 9).index)).toBe(true);
     // dark tile is now within the scout's revealed trail or still dark:
     if (isExplored(state, 0, dark.index)) {
@@ -44,7 +44,7 @@ describe('fog of war', () => {
     const scout = spawnUnit(state, 'SCOUT', tileAtCoords(state.map, 9, 9).index, 0)!;
     setExploreMission(state, scout.id, true);
     const before = seatOf(state, 0)!.explored.filter((e) => e === 1).length;
-    for (let i = 0; i < 30; i++) endTurn(state, 0);
+    for (let i = 0; i < 30; i++) endTurn(state);
     const after = seatOf(state, 0)!.explored.filter((e) => e === 1).length;
     expect(after).toBeGreaterThan(before);
   });
@@ -88,7 +88,7 @@ describe('tribal villages', () => {
     hut.goodyHut = true;
     const scout = spawnUnit(state, 'SCOUT', tileAtCoords(state.map, 9, 9).index, 0)!;
     orderMove(state, scout.id, hut.index);
-    for (let i = 0; i < 4 && hut.goodyHut; i++) endTurn(state, 0);
+    for (let i = 0; i < 4 && hut.goodyHut; i++) endTurn(state);
     expect(hut.goodyHut).toBe(false);
     expect(state.eventLog.some((e) => e.startsWith('Tribal village'))).toBe(true);
   });

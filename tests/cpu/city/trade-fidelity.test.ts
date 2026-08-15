@@ -145,11 +145,11 @@ describe('B-23 route duration', () => {
     expect(state.seats[0].tradeRoutes!.length).toBe(1);
 
     state.turn = TRADE_ROUTE_DURATION; // still one turn short of expiry
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(state.seats[0].tradeRoutes!.length).toBe(1);
 
     state.turn = 1 + TRADE_ROUTE_DURATION; // expiry turn reached
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(state.seats[0].tradeRoutes!.length).toBe(0);
   });
 });
@@ -167,7 +167,7 @@ describe('B-23 civ international pick + income', () => {
     const civ = addCiv(state, 13, 10);
     expect(tradeCapacity(state, civ.seat)).toBeGreaterThanOrEqual(1);
 
-    seatPhase(state, 0);
+    seatPhase(state);
 
     const routes = civ.tradeRoutes ?? [];
     const intl = routes.find((r) => r.toSeatCity !== undefined);

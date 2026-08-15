@@ -94,9 +94,10 @@ def poke_placement_rule(rules, path):
     # eligible tile owned by the civ but registered to a sibling.
     ds = sim.pair_dist[center]
     in_radius = (ds <= 3)
-    sim.civ_at[0, in_radius] = -1
+    sim.tile_seat[0, in_radius] = -1
+    sim._tile_owner_ver += 1
     T = cands[0]
-    sim.civ_at[0, T] = r
+    sim.tile_seat[0, T] = r + 1
     sim.tile_city[0, T] = sib_id
 
     placed = sim._place_district(r + 1, j, di, torch.tensor([True]), 0)
@@ -128,10 +129,11 @@ def poke_never_picks_sibling(rules, path):
     cands = radius3_usable(sim, center)
     assert len(cands) >= 2, "need two usable radius-3 tiles"
     ds = sim.pair_dist[center]
-    sim.civ_at[0, ds <= 3] = -1
+    sim.tile_seat[0, ds <= 3] = -1
+    sim._tile_owner_ver += 1
     T_sib, T_own = cands[0], cands[1]
     for t in (T_sib, T_own):
-        sim.civ_at[0, t] = r
+        sim.tile_seat[0, t] = r + 1
     sim.tile_city[0, T_sib] = sib_id
     sim.tile_city[0, T_own] = own_id
 
@@ -162,9 +164,9 @@ def poke_invariant_scan(rules, path):
     # none yet, plant ONE coherent reference (own-registered) and confirm the
     # scan still passes before corrupting it.
     r = j = di = None
-    for rr in range(sim.R):
-        for jj in sim.city_alive[0, rr + 1].nonzero(as_tuple=True)[0].tolist():
-            row = sim.city_dist_tile[0, rr + 1, jj]
+    for rr in range(1, sim.n_majors):
+        for jj in sim.city_alive[0, rr].nonzero(as_tuple=True)[0].tolist():
+            row = sim.city_dist_tile[0, rr, jj]
             hit = (row >= 0).nonzero(as_tuple=True)[0]
             if len(hit):
                 r, j, di = rr, jj, int(hit[0])
@@ -177,7 +179,7 @@ def poke_invariant_scan(rules, path):
         di = scaffold_p0(sim)
         center = int(sim.city_center[0, r + 1, j])
         T = radius3_usable(sim, center)[0]
-        sim.civ_at[0, T] = r
+        sim.tile_seat[0, T] = r + 1
         sim.tile_city[0, T] = int(sim.city_id[0, r + 1, j])
         sim.district[0, T] = di
         sim.city_dist_tile[0, r + 1, j, di] = T
@@ -197,15 +199,15 @@ def poke_invariant_scan(rules, path):
     sim._check_rc_registry_invariant()  # repaired
 
     # backward violation: the tile is no longer owned by any civ
-    good_at = int(sim.civ_at[0, tile])
-    sim.civ_at[0, tile] = -1
+    good_at = (int(sim.tile_seat[0, tile]) - 1)
+    sim.tile_seat[0, tile] = -1
     raised = False
     try:
         sim._check_rc_registry_invariant()
     except AssertionError:
         raised = True
     assert raised, "scan missed a backward (un-owned) incoherence"
-    sim.civ_at[0, tile] = good_at
+    sim.tile_seat[0, tile] = good_at + 1
     sim._check_rc_registry_invariant()  # repaired
     print(f"  c invariant scan OK (positive pass; forward+backward raise; repair passes; rc {r},{j} di {di})")
 
@@ -218,7 +220,7 @@ def poke_capture_luxury_pool(rules, path):
     FISHING_BOATS improvement is absent from the GPU catalog) is inert in BOTH
     engines, so the poke picks an in-roster spec."""
     sim = build(rules, path)
-    r = next(rr for rr in range(sim.R) if bool(sim.city_alive[0, rr + 1].any()))
+    r = next(rr for rr in range(sim.n_majors - 1) if bool(sim.city_alive[0, rr + 1].any()))
     j = int(sim.city_alive[0, r + 1].nonzero(as_tuple=True)[0][0])
     c_t = int(sim.city_center[0, r + 1, j])
     cid = int(sim.city_id[0, r + 1, j])
@@ -247,7 +249,7 @@ def poke_capture_luxury_pool(rules, path):
     sim.lux_req[0, t] = req
     sim.improvement[0, t] = req
     sim.pillaged[0, t] = False
-    sim.civ_at[0, t] = r
+    sim.tile_seat[0, t] = r + 1
     sim.tile_city[0, t] = cid
 
     have = torch.zeros(sim.B, sim.RC, dtype=sim.dtype)

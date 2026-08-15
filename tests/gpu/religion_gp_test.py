@@ -80,11 +80,11 @@ def main() -> None:
     assert int(sel.long().argmax(dim=1)[0]) == 3, "enhancer k-th-open pick wrong"
 
     # --- religious pressure spread (accumulate / tie / flip / KILL) --------
-    assert sim.holy_tile.shape[1] == sim._O and sim._O == 1 + sim.R
-    assert sim.city_pressure[:, 0, :sim.RC].shape == (sim.B, sim.RC, sim._O)
+    assert sim.holy_tile.shape[1] == sim.n_majors and sim.n_majors == sim.n_majors
+    assert sim.city_pressure[:, 0, :sim.RC].shape == (sim.B, sim.RC, sim.n_majors)
     assert sim.city_followed[:, 0, :sim.RC].shape == (sim.B, sim.RC)
-    assert sim.city_pressure[:, 1:1 + sim.R].shape[3] == sim._O and sim.city_followed[:, 1:1 + sim.R].shape == sim.city_alive[:, 1:1 + max(sim.R, 1)].shape
-    if sim.R >= 2 and sim._O >= 3:
+    assert sim.city_pressure[:, 1:sim.n_majors].shape[3] == sim.n_majors and sim.city_followed[:, 1:sim.n_majors].shape == sim.city_alive[:, 1:sim.n_majors].shape
+    if sim.n_majors >= 3 and sim.n_majors >= 3:
         sim.city_pressure[:, 0, :sim.RC].zero_()
         sim.city_followed[:, 0, :sim.RC].fill_(-1)
         sim.holy_tile.fill_(-1)
@@ -113,8 +113,8 @@ def main() -> None:
         assert bool((sim.city_followed[:, 0, 0] == -1).all()), "dead city follows nothing"
         sim.city_alive[:, 0, 0] = True
         # rc side: a dead civ-city slot is likewise zeroed and follows nothing.
-        sim.city_pressure[:, 1:1 + sim.R].zero_()
-        sim.city_followed[:, 1:1 + sim.R].fill_(-1)
+        sim.city_pressure[:, 1:sim.n_majors].zero_()
+        sim.city_followed[:, 1:sim.n_majors].fill_(-1)
         sim.city_pressure[:, 0 + 1, 0, 1] = 7  # stale pressure on a (possibly dead) slot
         sim._spread_religious_pressure()
         dead_rc = ~sim.city_alive[:, 1, 0]
@@ -125,8 +125,8 @@ def main() -> None:
         sim.city_pressure[:, 0, :sim.RC].zero_()
         sim.city_followed[:, 0, :sim.RC].fill_(-1)
         sim.holy_tile.fill_(-1)
-        sim.city_pressure[:, 1:1 + sim.R].zero_()
-        sim.city_followed[:, 1:1 + sim.R].fill_(-1)
+        sim.city_pressure[:, 1:sim.n_majors].zero_()
+        sim.city_followed[:, 1:sim.n_majors].fill_(-1)
 
     # --- ladder-boundary clamp (past the roster the top era holds) ---------
     top = sim._gp_costs.shape[0] - 1
@@ -197,7 +197,7 @@ def main() -> None:
     # A city draws the follower belief of the religion it FOLLOWS, not its
     # owner's — proven bit-exactly via the coupling mechanism (_follower_by_rel
     # / _follower_id_for / _fol_tab) plus the flag routing.
-    if sim.R >= 2:
+    if sim.n_majors >= 3:
         import json as _json
         _braw = _json.loads((FIXTURES / "rules.json").read_text())["buildings"]
         _bid = [b["id"] for b in _braw]

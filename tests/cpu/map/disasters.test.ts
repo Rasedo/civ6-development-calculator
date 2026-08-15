@@ -64,14 +64,14 @@ describe('disasters', () => {
     const a = mk();
     const b = deserialize(serialize(mk()));
     for (let i = 0; i < 30; i++) {
-      endTurn(a, 0);
-      endTurn(b, 0);
+      endTurn(a);
+      endTurn(b);
     }
     expect(serialize(a)).toBe(serialize(b));
 
     const calm = makeState(makeMap(18, 18));
     foundCity(calm, tileAtCoords(calm.map, 9, 9).index, 0);
-    for (let i = 0; i < 30; i++) endTurn(calm, 0);
+    for (let i = 0; i < 30; i++) endTurn(calm);
     expect(calm.eventLog.length).toBe(0);
     expect(calm.map.tiles.every((t) => t.fertility === 0 && t.droughtTurns === 0)).toBe(true);
   });

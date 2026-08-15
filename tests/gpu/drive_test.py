@@ -96,7 +96,7 @@ def main() -> None:
     rep = seat_state(c.sim)
     assert rep == got, f"replay diverged from the driven run: {rep} vs {got}"
     assert bool((b.sim.major_unit_tile == c.sim.major_unit_tile).all()), "replay put units on different tiles"
-    assert bool((b.sim.city_current[:, 1:1 + max(b.sim.R, 1)] == c.sim.city_current[:, 1:1 + max(c.sim.R, 1)]).all()), "replay left different city queues"
+    assert bool((b.sim.city_current[:, 1:b.sim.n_majors] == c.sim.city_current[:, 1:c.sim.n_majors]).all()), "replay left different city queues"
     assert bool((b.sim.civ_treasury[:, 1:] == c.sim.civ_treasury[:, 1:]).all()), "replay diverged on treasury"
     print("  action file replays to IDENTICAL state (no ladder, no picker) OK")
     print("DRIVE OK")

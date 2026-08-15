@@ -134,11 +134,11 @@ class SimEconomy:
                 | ((self.civilian_at.gather(1, t).squeeze(1) >= 0).long() << 1))
 
     def _ww_holds(self, row: int) -> bool:
-        """Only MAJOR civs keep an accumulator: rows 0..R. A city-state is a
+        """Only MAJOR civs keep an accumulator: rows 0..n_majors-1. A city-state is a
         real OPPONENT - warring one wears you down normally - but has no
         amenities to lose and no research to date its era from. The barbarian
         row is never a war at all."""
-        return 0 <= row <= self.R
+        return 0 <= row < self.n_majors
 
     def _ww_era_base(self, row: torch.Tensor, foe_row: torch.Tensor) -> torch.Tensor:
         """[B] long - each game's per-battle base for the seat in `row` fighting
@@ -157,12 +157,12 @@ class SimEconomy:
         rww = self.rules.war_weariness
         formal = torch.tensor(rww.get("eraFormal", [16, 22, 28, 34, 40]), dtype=torch.long, device=self.device)
         surprise = torch.tensor(rww.get("eraSurprise", [16, 25, 34, 43, 52]), dtype=torch.long, device=self.device)
-        civ = row.clamp(0, self.R)  # civ_techs/civ_civics cover rows 0..R only
+        civ = row.clamp(0, self.n_majors - 1)  # civ_techs/civ_civics cover rows 0..n_majors-1 only
         T, C = self.civ_techs.shape[2], self.civ_civics.shape[2]
         techs = self.civ_techs.gather(1, civ.view(-1, 1, 1).expand(-1, 1, T)).squeeze(1)
         civics = self.civ_civics.gather(1, civ.view(-1, 1, 1).expand(-1, 1, C)).squeeze(1)
         era = self._civ_era(techs, civics).clamp(0, formal.numel() - 1)
-        rr = (row >= 0) & (row <= self.R) & (foe_row >= 0) & (foe_row <= self.R)
+        rr = (row >= 0) & (row < self.n_majors) & (foe_row >= 0) & (foe_row < self.n_majors)
         n = self.seat_warkind.shape[1]
         flat = row.clamp(0, n - 1) * n + foe_row.clamp(0, n - 1)
         kind = self.seat_warkind.reshape(self.B, -1).gather(1, flat.unsqueeze(1)).squeeze(1) & rr
@@ -204,10 +204,10 @@ class SimEconomy:
         flat_ww = self.ww.view(self.B, NS * NS)
         flat_turn = self.ww_turn.view(self.B, NS * NS)
         for self_row, foe_row, died in ((a_row, d_row, a_died), (d_row, a_row, d_died)):
-            # Only MAJOR civs (rows 0..R) keep an accumulator - a city-state is
+            # Only MAJOR civs (rows 0..n_majors-1) keep an accumulator - a city-state is
             # a real opponent but has no amenities to lose and no research to
             # date its era from.
-            score = live & (self_row >= 0) & (self_row <= self.R)
+            score = live & (self_row >= 0) & (self_row < self.n_majors)
             if not bool(score.any()):
                 continue
             base = self._ww_era_base(self_row, foe_row)
@@ -216,7 +216,7 @@ class SimEconomy:
             # ..._IN_FOREIGN_LANDS 2 - so an ALLY's territory is home ground
             # too, and unowned ground is foreign. `friendlyLand`'s twin.
             _own = owner == self._ROW_SEAT.gather(0, self_row.clamp(min=0))
-            _rr = (self_row >= 0) & (self_row <= self.R) & (owner >= 0) & (owner <= self.R)
+            _rr = (self_row >= 0) & (self_row < self.n_majors) & (owner >= 0) & (owner < self.n_majors)
             _n = self.seat_allied.shape[1]
             _fl = self_row.clamp(0, _n - 1) * _n + owner.clamp(0, _n - 1)
             _ally = self.seat_allied.reshape(self.B, -1).gather(1, _fl.unsqueeze(1)).squeeze(1) & _rr
@@ -270,7 +270,7 @@ class SimEconomy:
         strictly above every other seat."""
         if self.S <= 0 or not bool(peace.any()):
             return
-        _cs0 = 1 + max(self.R, 1)
+        _cs0 = self.n_majors
         cs = slice(_cs0, _cs0 + max(self.S, 1))
         rel = self._suzerain_mask(patron) & self.war[:, foe, cs] & peace.unsqueeze(1)
         if not bool(rel.any()):
@@ -531,7 +531,7 @@ class SimEconomy:
                 er_volc.append(volc[rows])
         if er_rows:
             rows = torch.cat(er_rows)
-            nb = self.neigh[torch.cat(er_volc)]  # [R, 6]
+            nb = self.neigh[torch.cat(er_volc)]  # [n, 6]
             row6 = rows.unsqueeze(1).expand(-1, 6).reshape(-1)
             nbf = nb.reshape(-1)
             on = nbf >= 0
@@ -542,7 +542,7 @@ class SimEconomy:
         hit, tile = self._pick_static(r < 0.02, self._droughtc_list)
         if bool(hit.any()):
             rows = hit.nonzero(as_tuple=True)[0]
-            area = tiles_from_offsets(tile[rows], self._off2, self.W, self.H)  # [R, 19]
+            area = tiles_from_offsets(tile[rows], self._off2, self.W, self.H)  # [n, 19]
             M = area.shape[1]
             rowm = rows.unsqueeze(1).expand(-1, M).reshape(-1)
             af = area.reshape(-1)
@@ -555,7 +555,7 @@ class SimEconomy:
         hit, tile = self._pick_static(r < 0.04, self._land_list)
         if bool(hit.any()):
             rows = hit.nonzero(as_tuple=True)[0]
-            area = tiles_from_offsets(tile[rows], self._off1, self.W, self.H)  # [R, 7]
+            area = tiles_from_offsets(tile[rows], self._off1, self.W, self.H)  # [n, 7]
             M = area.shape[1]
             rowm = rows.unsqueeze(1).expand(-1, M).reshape(-1)
             af = area.reshape(-1)
@@ -1088,7 +1088,7 @@ class SimEconomy:
         the fresh City object a founded/flipped city gets. city_pressure/city_followed
         permute with their city in _reclaim_cities, so pressure tracks the CITY, not
         the slot, through compaction."""
-        B, O = self.B, self._O
+        B, O = self.B, self.n_majors
         # Itinerant Preachers: per-religion range — base + the religion's
         # claimed enhancer's presR. A religion is keyed by its FOUNDER's row
         # and every row can claim an enhancer (#73), which is what TS walks:
@@ -1099,7 +1099,7 @@ class SimEconomy:
         founded = self.holy_tile >= 0  # [B, O]
         ht = self.holy_tile.clamp(min=0)  # [B, O] valid tile idx (masked where unfounded)
         # ONE flip for every seat.
-        NSC = 1 + max(self.R, 0)
+        NSC = self.n_majors
         cen = self.city_center[:, :NSC].clamp(min=0)                     # [B, NSC, RC]
         d_all = self.pair_dist[cen.unsqueeze(3), ht.reshape(B, 1, 1, O)].to(torch.long)
         liv = self.city_alive[:, :NSC]                                    # [B, NSC, RC]
@@ -1113,7 +1113,7 @@ class SimEconomy:
         # PRE-flip follow set, exactly like `wasFollowed`.
         was = self.city_followed[:, :NSC].clone()
         self.city_followed[:, :NSC].copy_(torch.where(liv & (tot > 0), best, torch.full_like(best, -1)))
-        for _g in range(self._O):
+        for _g in range(self.n_majors):
             _conv = (self.city_followed[:, :NSC] == _g) & (was != _g) & liv
             if bool(_conv.any()):
                 self._dedication_event(_g, 3, _conv.reshape(B, -1).sum(dim=1))  # per CITY
@@ -1122,7 +1122,7 @@ class SimEconomy:
         """(near3, terr) — [B, O, T] bool planes for the enhancer combat
         adders. terr[b, g, t] = tile t is OWNED by a city following religion g;
         near3[b, g, t] = some city following g has its CENTER within
-        justWarRange of t. ONE derivation per plane over rows 0..R of the merged
+        justWarRange of t. ONE derivation per plane over rows 0..n_majors-1 of the merged
         city block — `tile_city` holds PERSISTENT ids for every seat (#110), so
         the id match that used to serve only the civ rows now answers for seat 0
         too. Keyed (turn, _eff_version):
@@ -1133,12 +1133,12 @@ class SimEconomy:
         key = (self.turn, self._eff_version)
         if self._rel_planes_cache is not None and self._rel_planes_cache[0] == key:
             return self._rel_planes_cache[1]
-        B, T, O = self.B, self.T, self._O
+        B, T, O = self.B, self.T, self.n_majors
         dev = self.device
-        nrow, RC = 1 + self.R, self.RC
-        alive = self.city_alive[:, :nrow]                  # [B, 1+R, RC]
-        fol = self.city_followed[:, :nrow, :RC]            # [B, 1+R, RC]
-        ids = self.city_id[:, :nrow, :RC]                  # [B, 1+R, RC]
+        nrow, RC = self.n_majors, self.RC
+        alive = self.city_alive[:, :nrow]                  # [B, n_majors, RC]
+        fol = self.city_followed[:, :nrow, :RC]            # [B, n_majors, RC]
+        ids = self.city_id[:, :nrow, :RC]                  # [B, n_majors, RC]
         # per-tile followed religion of the OWNING city (-1 none). `tile_seat`
         # names the row and `tile_city` the id within it; ids are per-seat
         # monotonic, so the ALIVE match is unique.
@@ -1162,10 +1162,10 @@ class SimEconomy:
         off3 = tiles_within_offsets(self._just_war_range).to(dev)
         win = tiles_from_offsets(
             self.city_center[:, :nrow, :RC].clamp(min=0).reshape(-1), off3, self.W, self.H
-        ).reshape(B, nrow * RC, -1)  # [B, (1+R)·RC, M]
+        ).reshape(B, nrow * RC, -1)  # [B, n_majors·RC, M]
         for g in range(O):
             srci = torch.zeros(B, T, dtype=torch.long, device=dev)
-            fol_g = (alive & (fol == g)).reshape(B, -1)  # [B, (1+R)·RC]
+            fol_g = (alive & (fol == g)).reshape(B, -1)  # [B, n_majors·RC]
             if bool(fol_g.any()):
                 w = torch.where(fol_g.unsqueeze(2), win, torch.full_like(win, -1)).reshape(B, -1)
                 srci.scatter_add_(1, w.clamp(min=0), (w >= 0).long())
@@ -1181,14 +1181,14 @@ class SimEconomy:
         ("cnear") is common to both.
 
         `seat` is an ABSOLUTE seat per game ([B] long). A religion's id IS its
-        founder's seat, so seats 0..R index the belief planes directly and one
+        founder's seat, so seats 0..n_majors-1 index the belief planes directly and one
         gather serves every seat; anything else — a barbarian, a city-state,
         NO_SEAT — falls outside that range and contributes 0. Returns f64 [B].
         """
         if not self._enh_combat_any or not bool((self.civ_enhancer >= 0).any()):
             return torch.zeros(self.B, dtype=torch.float64, device=self.device)
-        g = seat.clamp(min=0, max=self._O - 1)
-        has = (seat >= 0) & (seat < self._O) & self.civ_religion_done.gather(1, g.unsqueeze(1)).squeeze(1)
+        g = seat.clamp(min=0, max=self.n_majors - 1)
+        has = (seat >= 0) & (seat < self.n_majors) & self.civ_religion_done.gather(1, g.unsqueeze(1)).squeeze(1)
         eidx = self.civ_enhancer.gather(1, g.unsqueeze(1)).squeeze(1) + 1  # [B] 0 = pad
         eidx = torch.where(has, eidx, torch.zeros_like(eidx))
         gi = g.unsqueeze(1)  # religion id [B, 1]
@@ -1228,7 +1228,7 @@ class SimEconomy:
         Returns None when no General/Admiral is alive anywhere (structural 0;
         call sites skip the gather). Dilation mirrors
         _rel_combat_planes.near3 (scatter_add of longs then >0)."""
-        B, T, O, dev = self.B, self.T, self._O, self.device
+        B, T, O, dev = self.B, self.T, self.n_majors, self.device
         gi, ai = self._general_unit_idx, self._admiral_unit_idx
         _z = torch.zeros(B, simbase.MAJOR_POOL_MAX, dtype=torch.bool, device=dev)
         m_g = self.major_unit_alive & (self.major_unit_type == gi) if gi >= 0 else _z
@@ -1292,7 +1292,7 @@ class SimEconomy:
             return torch.zeros_like(tile, dtype=torch.bool)
         land, sea = planes
         valid = (civ_unified >= 0) & (tile >= 0)
-        g = civ_unified.clamp(min=0, max=self._O - 1)
+        g = civ_unified.clamp(min=0, max=self.n_majors - 1)
         idx = (g * self.T + tile.clamp(min=0)).reshape(self.B, -1)
         land_hit = land.reshape(self.B, -1).gather(1, idx).reshape(tile.shape)
         sea_hit = sea.reshape(self.B, -1).gather(1, idx).reshape(tile.shape)
@@ -1428,10 +1428,10 @@ class SimEconomy:
         answers for them and `seats.ts` builds both with empty `techs`/`civics`,
         so `civEraIndex` returns 0 there."""
         if isinstance(row, int):
-            if 0 <= row <= self.R:
+            if 0 <= row < self.n_majors:
                 return self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row])
             return torch.zeros(self.B, dtype=torch.long, device=self.device)
-        major = (row >= 0) & (row <= self.R)
+        major = (row >= 0) & (row < self.n_majors)
         idx = torch.where(major, row, torch.zeros_like(row))
         b = torch.arange(self.B, device=self.device)
         era = self._civ_era(self.civ_techs[b, idx], self.civ_civics[b, idx])
@@ -2013,7 +2013,7 @@ class SimEconomy:
         r+1 = civ index r. Ties → lowest id (seat 0 first, then the lowest
         civ index), matching TS's strict-`>` scan — via first_argmax
         (torch.argmax's tie pick is unspecified)."""
-        cols = [self.seat_score(row) for row in range(1 + self.R)]
+        cols = [self.seat_score(row) for row in range(self.n_majors)]
         return first_argmax(torch.stack(cols, dim=1))
 
     def protagonist(self) -> torch.Tensor:
@@ -2024,9 +2024,9 @@ class SimEconomy:
         horizon, so no single seat's fate invalidates a seed. Read-side
         only: nothing in the simulation consults it, and the wire records
         every seat, so any pick has a complete trajectory to read."""
-        cols = [self.seat_score(row) for row in range(1 + self.R)]
-        scores = torch.stack(cols, dim=1)  # [B, 1+R]
-        has_city = self.city_alive[:, : 1 + self.R].any(dim=2)  # [B, 1+R]
+        cols = [self.seat_score(row) for row in range(self.n_majors)]
+        scores = torch.stack(cols, dim=1)  # [B, n_majors]
+        has_city = self.city_alive[:, : self.n_majors].any(dim=2)  # [B, n_majors]
         fenced = torch.where(has_city, scores, torch.full_like(scores, float("-inf")))
         pick = torch.where(has_city.any(dim=1), first_argmax(fenced), first_argmax(scores))
         return torch.where(self.winner >= 0, self.winner, pick)
@@ -2035,12 +2035,12 @@ class SimEconomy:
         """[B] the seat holding EVERY original capital (civ_cap_tile), else -1.
         A capital tile counts as HELD when a centre stands there, and
         `tile_seat` names its holder (a centre tile belongs to its own city).
-        Mirrors dominationWinner: a solo game (R==0) never dominates; any
+        Mirrors dominationWinner: a solo game (n_majors == 1) never dominates; any
         capital not yet founded, unowned, or split -> -1."""
         B, dev = self.B, self.device
-        if self.R == 0:
+        if self.n_majors == 1:
             return torch.full((B,), -1, dtype=torch.long, device=dev)
-        caps = self.civ_cap_tile[:, : 1 + self.R]  # [B, 1+R] capitalTiles — survives rc compaction
+        caps = self.civ_cap_tile[:, : self.n_majors]  # [B, n_majors] capitalTiles — survives rc compaction
         # A seat with NO capitalTile yet drops out of `caps` on TS and takes
         # the `caps.length < expected` early return with it. Here it is a -1,
         # which also may not reach `gather` — clamp for the read, refuse on the

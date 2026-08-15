@@ -210,9 +210,9 @@ class SimSeats:
         taken before this turn's other seats moved. Every write lands in the
         war matrix and its mirror; the clock is the PAIR's.
         """
-        if self.R == 0:
+        if self.n_majors == 1:
             return
-        Rw = max(self.R, 1)
+        n_opp = self.n_majors - 1
         w = war.to(torch.long)
         sr = self.rules.seats
         ext = self.seat_ext[:, row]
@@ -242,7 +242,7 @@ class SimSeats:
             wt = self.war_turns[:, row, tgt]
             pcost = sr.get("peaceGold0", 150) + sr.get("peaceGoldSlope", 10) * wt.to(torch.float64)
             peace = (
-                (w == Rw + k) & ext & self.war[:, row, tgt]
+                (w == n_opp + k) & ext & self.war[:, row, tgt]
                 & (wt >= sr.get("warMinTurns", 14))
                 & self._afford(self.civ_treasury[:, row], pcost)
             )
@@ -977,9 +977,9 @@ class SimSeats:
         seat's own unlocks.
 
         Reads LIVE research: both engines decide pre-turn, so no mid-phase
-        snapshot exists to pass. The OWNERSHIP term is what used to fork —
-        `owner >= 0` for row 0 against `civ_at == r` for a civ — and both are
-        `tile_seat == row`."""
+        snapshot exists to pass. The OWNERSHIP term is what used to fork — one
+        predicate for row 0 and another in the civ index space for a civ — and
+        both are `tile_seat == row`."""
         return self._job_mask_core(self.civ_techs[:, row], self.civ_civics[:, row], self.tile_seat == row)
 
     def _job_mask_core(self, tk: torch.Tensor, cv: torch.Tensor, owned: torch.Tensor) -> torch.Tensor:
@@ -1049,7 +1049,7 @@ class SimSeats:
         # with (the civsAtWar test, applied per tile owner). Compact war row ==
         # absolute seat for the majors, so one loop covers seat 0 and the civs.
         host = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
-        for other in range(1 + self.R):
+        for other in range(self.n_majors):
             if other == row:
                 continue
             host = host | ((self.tile_seat == other) & self.war[:, row, other].unsqueeze(1))
@@ -1083,7 +1083,7 @@ class SimSeats:
             return
         U = self.major_unit_alive.shape[1]
         rs = self._rel_strength
-        nrow = 1 + self.R
+        nrow = self.n_majors
         sw = int(self._theo_swing)
         for u in range(U):
             att = self.major_unit_alive[:, u] & (self.major_unit_type[:, u] == self._apostle_idx)
@@ -1126,7 +1126,7 @@ class SimSeats:
                 dr, dt = rows[any_dead], dead_tile[any_dead]
                 wr, lr = win[any_dead], los[any_dead]
                 n = dr.numel()
-                ctr = self.city_center[dr][:, :nrow]  # [n, 1+R, RC]
+                ctr = self.city_center[dr][:, :nrow]  # [n, n_majors, RC]
                 near = (
                     self.pair_dist[ctr.clamp(min=0).reshape(n, -1), dt.unsqueeze(1)]
                     .reshape(n, nrow, self.RC) <= self._theo_range
@@ -1198,7 +1198,7 @@ class SimSeats:
         r+1 = civ r), so one walk places every seat's relic."""
         if rows.numel() == 0 or self._relic_bidx < 0:
             return
-        row = civ.clamp(min=0, max=self.R)
+        row = civ.clamp(min=0, max=self.n_majors - 1)
         placed = torch.zeros(rows.numel(), dtype=torch.bool, device=self.device)
         for j in range(self.RC):
             take = (
@@ -1218,17 +1218,17 @@ class SimSeats:
         following g; -1 none. Requires g founded (holy_tile set) and at least one
         living seat. At most one g can predominate within a seat, so the
         ascending scan needs no tie-break."""
-        B, O, nrow = self.B, self._O, 1 + self.R
-        # ONE walk over the majors — rows 0..R of the merged city block, seat 0
+        B, O, nrow = self.B, self.n_majors, self.n_majors
+        # ONE walk over the majors — rows 0..n_majors-1 of the merged city block, seat 0
         # among them. `n` is each seat's city count; a seat holding none is
         # vacuously converted, which is what `cities.length === 0` gives TS.
-        alive = self.city_alive[:, :nrow]                # [B, 1+R, RC]
-        fol = self.city_followed[:, :nrow, : self.RC]    # [B, 1+R, RC]
-        n = alive.sum(dim=2)                             # [B, 1+R]
+        alive = self.city_alive[:, :nrow]                # [B, n_majors, RC]
+        fol = self.city_followed[:, :nrow, : self.RC]    # [B, n_majors, RC]
+        n = alive.sum(dim=2)                             # [B, n_majors]
         any_seat = (n > 0).any(dim=1)
         winner = torch.full((B,), -1, dtype=torch.long, device=self.device)
         for g in range(O):
-            nf = (alive & (fol == g)).sum(dim=2)         # [B, 1+R]
+            nf = (alive & (fol == g)).sum(dim=2)         # [B, n_majors]
             ok = (self.holy_tile[:, g] >= 0) & any_seat & ((n == 0) | (2 * nf > n)).all(dim=1)
             winner = torch.where((winner < 0) & ok, torch.full_like(winner, g), winner)
         return winner
@@ -1238,10 +1238,10 @@ class SimSeats:
         twin: >= suzerainEnvoys, alive, and STRICTLY more envoys than every
         other seat row (a tie leaves no suzerain)."""
         suz_min = int(self.rules.citystate.get("suzerainEnvoys", 3))
-        env = self.seat_citystate_envoys  # [B, 1+R, S]
+        env = self.seat_citystate_envoys  # [B, n_majors, S]
         mine = env[:, row]
         m = (mine >= suz_min) & self.citystate_alive
-        for o in range(1 + self.R):
+        for o in range(self.n_majors):
             if o != row:
                 m = m & (mine > env[:, o])
         return m
@@ -1264,7 +1264,7 @@ class SimSeats:
         if not fires:
             return
         era_ok = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        for row in range(1 + self.R):
+        for row in range(self.n_majors):
             era_ok = era_ok | (self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]) >= self._congress_min_era)
         if not bool(era_ok.any()):
             return
@@ -1274,14 +1274,14 @@ class SimSeats:
         # than being the candidate the others are compared against.
         best = torch.zeros(self.B, dtype=self.civ_diplo_favor.dtype, device=self.device)
         win = torch.full_like(best, -1)
-        for row in range(1 + self.R):
+        for row in range(self.n_majors):
             v = self.civ_diplo_favor[:, row]
             take = (v > 0) & (v > best)
             win = torch.where(take, torch.full_like(win, row), win)
             best = torch.where(take, v, best)
         # commitments are spent whether or not they won (only where the
         # session actually convened)
-        for row in range(1 + self.R):
+        for row in range(self.n_majors):
             self.civ_diplo_favor[:, row] = torch.where(era_ok, torch.zeros_like(self.civ_diplo_favor[:, row]), self.civ_diplo_favor[:, row])
             self.civ_diplo_points[:, row] = self.civ_diplo_points[:, row] + (era_ok & (win == row)).long() * self._dvp_per_res
 
@@ -1290,7 +1290,7 @@ class SimSeats:
         >= diploVictoryPoints Diplomatic Victory Points and still holding a
         city; -1 none."""
         winner = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
-        for row in range(1 + self.R):
+        for row in range(self.n_majors):
             okr = self.city_alive[:, row].any(dim=1) & (self.civ_diplo_points[:, row] >= self._dvp_win)
             winner = torch.where((winner < 0) & okr, torch.full_like(winner, row), winner)
         return winner
@@ -1330,9 +1330,9 @@ class SimSeats:
         convention) so a sub-milli float drift cannot move a tourist count.
         A cityless seat cannot win."""
         B, dev = self.B, self.device
-        n_civs = 1 + self.R
+        n_civs = self.n_majors
         vis_div = n_civs * self._tourism_per_visitor
-        nrow = 1 + self.R
+        nrow = self.n_majors
         alive = [self.city_alive[:, row].any(dim=1) for row in range(nrow)]
         tour = [self.civ_tourism[:, row] for row in range(nrow)]
         cul = [self.civ_culture[:, row] for row in range(nrow)]
@@ -1473,8 +1473,8 @@ class SimSeats:
         by seat row g (0 = seat 0, i+1 = civ i), so the map IS the
         civ_follower base. Pad id -1 gathers the neutral row 0 in the
         follower tables."""
-        fbr = torch.full((self.B, self._O), -1, dtype=torch.long, device=self.device)
-        n = min(self._O, self.civ_follower.shape[1])
+        fbr = torch.full((self.B, self.n_majors), -1, dtype=torch.long, device=self.device)
+        n = min(self.n_majors, self.civ_follower.shape[1])
         fbr[:, :n] = self.civ_follower[:, :n]
         return fbr
 
@@ -1682,9 +1682,9 @@ class SimSeats:
             # specialtyDistricts on the DEST — the same DISTRICT REGISTRY read
             # this row takes for its own cities, indexed at the dest's (row,
             # column) instead of a map-wide district-tile scan.
-            _reg = self.city_dist_tile  # [B, 1+R, RC, nD]
+            _reg = self.city_dist_tile  # [B, n_majors, RC, nD]
             _comp = (_reg >= 0) & self.district_complete.gather(1, _reg.clamp(min=0).reshape(B, -1)).reshape_as(_reg)
-            _spec_all = (_comp & self._is_specialty.reshape(1, 1, 1, -1)).sum(dim=3)  # [B, 1+R, RC]
+            _spec_all = (_comp & self._is_specialty.reshape(1, 1, 1, -1)).sum(dim=3)  # [B, n_majors, RC]
             spec_dest = _spec_all.gather(1, _rx).gather(2, hit.long().argmax(dim=2).unsqueeze(2)).squeeze(2)  # [B, K]
             gold_i = (self._trade_intl_gold + spec_dest).double()
             raided_i = near.gather(1, from_j) | self._route_raided_near(row, dest_tile)
@@ -2360,7 +2360,7 @@ class SimSeats:
         # tooClose (CITY_MIN_DIST = 4) against every MAJOR centre (one flat
         # scan over the seat axis now that the block is one table) and every
         # city-state's.
-        nrows = 1 + self.R
+        nrows = self.n_majors
         ctr_all = self.city_center[:, :nrows].reshape(self.B, -1)
         live_all = self.city_alive[:, :nrows].reshape(self.B, -1)
         d_all = torch.where(live_all, self.pair_dist[tc.unsqueeze(1), ctr_all.clamp(min=0)].to(torch.long), 999)
@@ -2742,29 +2742,15 @@ class SimSeats:
         return hit[1]
 
     @property
-    def civ_at(self) -> torch.Tensor:
-        """[B, T] — which civ owns each tile, -1 for nobody.
-
-        A VIEW of `tile_seat` in the CIV index space (seat r+1 reads as r),
-        cached on `_tile_owner_ver`. NO ENGINE BODY READS IT: every rule asks
-        `tile_seat == row` in the one index space the planes use. It survives
-        for the tests that WRITE it, and converting those to a `tile_seat`
-        write plus a `_tile_owner_ver` bump needs a test run to land."""
-        if self._civ_at_ver != self._tile_owner_ver:
-            s = self.tile_seat
-            self._civ_at_cache = torch.where(
-                (s >= 1) & (s < 100), s - 1, torch.full_like(s, -1)
-            )
-            self._civ_at_ver = self._tile_owner_ver
-        return self._civ_at_cache
-
-    @property
     def citystate_at(self) -> torch.Tensor:
         """[B, T] — which city-state owns each tile, -1 for nobody.
 
-        A VIEW of `tile_seat`, not a plane. Cached on `_tile_owner_ver` for the
-        same reason as `civ_at`: dozens of call sites each recomputing a `where`
-        would be dozens more kernel launches in a dispatch-bound step."""
+        A VIEW of `tile_seat`, not a plane, and the ONLY one left: `civ_at`,
+        which mapped a major's seat into the civ index space, went with that
+        space in #115. Cached on `_tile_owner_ver` because dozens of call sites
+        each recomputing a `where` would be dozens more kernel launches in a
+        dispatch-bound step. A city-state's index IS a different space (seat
+        100+s), so this one is a conversion, not a second numbering."""
         if self._citystate_at_ver != self._tile_owner_ver:
             self._citystate_at_cache = torch.where(
                 self.tile_seat >= 100, self.tile_seat - 100,
@@ -2878,7 +2864,7 @@ class SimSeats:
         # Major seats only — revealAround gates to isCiv on TS the same way,
         # so barbarian/city-state movers accrue nothing on either engine.
         srow = self.unit_seat[rows, gs]
-        major = srow <= self.R
+        major = srow < self.n_majors
         if bool(major.any()):
             self._reveal_around(rows[major], srow[major], dest[rows][major], 2)
         if clear_camp:
@@ -2957,7 +2943,7 @@ class SimSeats:
         # one gather; a city-state or barbarian tile is masked out by `major`
         # before it can index the row.
         _ts = self.tile_seat
-        major = (_ts >= 0) & (_ts <= self.R)
+        major = (_ts >= 0) & (_ts < self.n_majors)
         at_war_t = major & self.war[:, row].gather(1, torch.where(major, _ts, torch.zeros_like(_ts)))
         if self.improvements_on or self.districts_on:
             imp_job = (self.improvement >= 0) & ~self.pillaged & at_war_t
@@ -2975,7 +2961,7 @@ class SimSeats:
         # tile. No seat is a separate arm and none wins a tie by being row 0.
         ckey_min = torch.full((B,), 10**18, dtype=torch.long, device=dev)
         city_tgt = hc.clone()
-        for row2 in range(1 + self.R):
+        for row2 in range(self.n_majors):
             war2 = self.war[:, row, row2]  # [B]; the diagonal is false, so row2 == row is safe
             if not bool(war2.any()):
                 continue
@@ -3012,7 +2998,7 @@ class SimSeats:
         # is — ONE row-generic read of the merged best-melee block. Only a
         # MAJOR ever paves an Encampment, so the row clamp is exact.
         hseat = self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1)
-        hrow = hseat.clamp(min=0, max=self.R)
+        hrow = hseat.clamp(min=0, max=self.n_majors - 1)
         bidx = torch.arange(self.B, device=self.device)
         def_cs = torch.maximum(self.civ_best_melee[bidx, hrow], torch.full_like(hrow, 15))
         # Attacker CS assembled exactly as `_assault_city` assembles it.
@@ -3118,7 +3104,7 @@ class SimSeats:
         bidx = torch.arange(B, device=dev)
         a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
         ttc = tgt.clamp(min=0)
-        hrow = self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.R)
+        hrow = self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.n_majors - 1)
         slot = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
         # the city fights at its holder's best-melee-ever, floored at 15, +5 for
         # a garrison of ITS OWN seat standing on the centre.
@@ -3422,7 +3408,7 @@ class SimSeats:
         if bool(city_att.any()):
             # cityDefenseStrength: max(15, the holder's strongest melee ever),
             # +5 when the holder's OWN military stands on the centre.
-            hrow = ctr.clamp(min=0, max=self.R)
+            hrow = ctr.clamp(min=0, max=self.n_majors - 1)
             hcol = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
             _gm = self.military_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
             gar = ((_gm >= 0) & (self.unit_seat[_bidx, _gm.clamp(min=0)] == hrow)).long()
@@ -3611,7 +3597,7 @@ class SimSeats:
         if bool(city_att.any()):
             # cityDefenseStrength: max(15, the holder's strongest melee ever),
             # +5 when the holder's OWN military stands on the centre.
-            hrow = self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.R)
+            hrow = self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.n_majors - 1)
             slot = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
             gar = ((mslot >= 0) & (m_seat == hrow)).long()
             def_cs = torch.maximum(self.civ_best_melee[bidx, hrow], torch.full_like(hrow, 15)) + gar * 5
@@ -3969,7 +3955,7 @@ class SimSeats:
         # order, which IS TS's `state.seats` order).
         intl_want = want & (kmax < 0)
         dctr_l, dalv_l = [], []
-        for r2 in range(1 + self.R):
+        for r2 in range(self.n_majors):
             if r2 == row:
                 continue
             dctr_l.append(self.city_center[:, r2].clamp(min=0))
@@ -4044,12 +4030,12 @@ class SimSeats:
             self.seat_route_exp[:, row][drop] = -1
 
     def _seat_strengths(self) -> torch.Tensor:
-        """[B, 1+R] seatStrength = js_round(nCities*8 + Σ own-unit combat) for
+        """[B, n_majors] seatStrength = js_round(nCities*8 + Σ own-unit combat) for
         every major ROW (civilians carry combat 0). Feeds the diplomacy arms;
         computed pre-phase, before this turn's spawns and combat."""
         B, dev = self.B, self.device
-        nrow = 1 + self.R
-        n_c = self.city_alive[:, :nrow].sum(dim=2)  # [B, 1+R]
+        nrow = self.n_majors
+        n_c = self.city_alive[:, :nrow].sum(dim=2)  # [B, n_majors]
         rstr = torch.zeros(B, nrow, dtype=torch.float64, device=dev)
         vt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
         for row in range(nrow):
@@ -4071,7 +4057,7 @@ class SimSeats:
                   ally: torch.Tensor | None = None) -> None:
         """Stash seat `row`'s DENOUNCE and ALLY intents for this turn,
         consumed by `_geo_denounce_and_ally` at the phase top and re-validated
-        there. Both are [B, 1+R] bool target masks over seat ROWS. `ally` names
+        there. Both are [B, n_majors] bool target masks over seat ROWS. `ally` names
         a PAIR — the driver emits it on the LOWER row's record; the arm writes
         both sides either way.
 
@@ -4102,12 +4088,12 @@ class SimSeats:
         astash = getattr(self, "_driven_ally", None)
         if not dstash and not astash:
             return
-        nrow = 1 + self.R
+        nrow = self.n_majors
         n_c = self.city_alive[:, :nrow].sum(dim=2)
-        alive_row = self.civ_alive[:, :nrow] & (n_c > 0)  # [B, 1+R]
+        alive_row = self.civ_alive[:, :nrow] & (n_c > 0)  # [B, n_majors]
         if dstash:
             for a in sorted(dstash.keys()):
-                want = dstash.pop(a)  # [B, 1+R]
+                want = dstash.pop(a)  # [B, n_majors]
                 for b in range(nrow):
                     if b == a or not bool(want[:, b].any()):
                         continue
@@ -4124,7 +4110,7 @@ class SimSeats:
         if astash:
             era_open = int(self.turn) >= self._ally_min_peace
             for a in sorted(astash.keys()):
-                want = astash.pop(a)  # [B, 1+R]
+                want = astash.pop(a)  # [B, n_majors]
                 if not era_open:
                     continue  # popped either way — a stale intent never lingers
                 for b in range(nrow):

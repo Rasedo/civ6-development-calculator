@@ -109,7 +109,7 @@ def main() -> None:
     #   b. _CITY_SLOT_FIELDS must name every work plane, or a compaction leaves
     #      one behind at the old index.
     s3 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    if s3.R >= 2 and int(s3.city_alive[0, 1].sum()) >= 1:
+    if s3.n_majors >= 3 and int(s3.city_alive[0, 1].sum()) >= 1:
         j = int(s3.city_alive[0, 1].nonzero()[0])
         s3.city_relics[0, 1, j] = 1
         s3.city_gw_art[0, 1, j] = 2
@@ -147,7 +147,7 @@ def main() -> None:
         s4 = BatchSim([load_fixture(p)], rules, device="cpu", dtype=torch.float64)
         for _ in range(60):
             s4.step()
-            for r in range(s4.R):
+            for r in range(s4.n_majors - 1):
                 if int(s4.city_alive[0, r + 1].sum()) >= 2:
                     civ_only_pick = r
                     break

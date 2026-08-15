@@ -32,45 +32,47 @@ B18_FOLLOWER_COUPLING, CITY_RELIGION_ADDER, ADMIRAL_MARCH,
 DEDICATION_PAYOUTS, ENGINEER, BARB_SCOUT_OPENER); no mechanic is inert
 behind a flag.
 
-## Completion estimate (owner-requested; guesstimates)
+## What is left (owner-requested; guesstimates)
 
-Hand-weighted 1–8 by implementation size; partial items carry
-fractional credit. Chapters C/D/E/G closed in full and dropped.
+THE PERCENTAGE IS GONE, and it is not coming back. A "% complete" needs a
+denominator — the weight of everything ALREADY closed — and nobody could
+recompute that number from this file, because closed entries are deleted
+here by design. So it was only ever maintained by a running delta chain,
+and a delta chain that is never re-derived drifts: it did, five times, the
+last one arithmetically impossible (41.55 + 1 done against a weight of 42).
 
-| Chapter | Weight | Done | % |
-|---|---|---|---|
-| A symmetry | 42 | 41.55 | **99%** |
-| B fidelity | 91 | 88.44 | **97%** |
-| Closed chapters (C/D/E/G) | 62 | 62 | 100% |
-| **Overall** | **195** | **191.99** | **98%** |
+What replaces it is a number every future round can recompute from the list
+it is already reading: the OPEN weight, hand-weighted 1–8 by implementation
+size, itemised so the arithmetic is visible. It cannot drift, because
+nothing carries forward.
 
-DELTA LEDGER — apply every change to the table in the same commit that
-makes it, or the table drifts from the entries it counts (it has, four
-times). #111: A-26 (weight 2, 1.33 done) LEFT chapter A for chapter B as
-B-28r, since what survives of it is shared rather than seat-shaped;
-A-31r closed 3 of its 4 sub-items (+0.75 A); A-32r and A-33r are new and
-open (+2 A weight, +0 done); B-29r is new and open (+1 B weight). The
-percentages FELL: this round closed less than it found, which is the
-number doing its job. #112: A-33r's SEAT half closed — the two arms are
-one — leaving only its fidelity question (+0.5 A done). Nothing else moved
-weight: the four live divergences #112 found had never been entries,
-because nothing had ever looked for them. #113: A-32r CLOSED (+1 A done);
-A-33r CLOSED — its fidelity question was verified against a real Civ 6
-source and fixed on both engines (+0.5 A done); A-31r lost its ACTION
-INTERFACE half (+0.13 A done), leaving the wire's record SCHEMA; A-34r is
-new and open (+1 A weight, +0 done). #114: A-34r CLOSED in the round after
-it opened — `placeSeats` takes the append position, `seatOfIndex` and
-`indexOfSeat` are deleted, and no `cpu/` body converts between numberings
-any more; `makeYieldCtx` takes the asking seat (+1 A done).
+| Open item | Weight | What the weight is for |
+|---|---|---|
+| A-9r Neighborhood | 4 | one district, both engines, plus the registry's `allowMultiple` |
+| A-11r trade-route tails | 8 | a Trader UNIT, a route wire verb, and a route-store schema change |
+| A-27r seat-0 district scans | 3 | two scan sites folded into the row-generic walk |
+| A-28r specialists | 6 | a mechanic neither engine has: wire column, assignment, yields |
+| A-29r cityYieldMult order | 2 | registry ordering; no colliding pair exists in the catalog today |
+| A-30r farm-adjacency order | 1 | construct note, unreachable as written |
+| **A. Seat symmetry** | **24** | |
+| B-17r Encampment strikes | 1 | scoped out with ranged-vs-city; the rest of the district is done |
+| B-18r religion tails | 2 | complete on every seat; one latent lifecycle drift to hunt |
+| B-20r tourism tails | 7 | national parks, civ Archaeologists, theming, shipwrecks, digs |
+| B-21r suzerain rows | 3 | 10 descoped channels, each needing its own mechanic |
+| B-22r World Congress | 6 | one resolution type of many; emergencies and competitions absent |
+| B-24r Ages/governors | 4 | Monumentality purchases, the governor tails |
+| B-25r victory tails | 3 | every victory exists; the tails are rate and term work |
+| B-26r barb escalation | 2 | camp-spawn ladder beyond melee |
+| B-27r theological combat | 2 | resolver simplifications, incl. the ~7x martyr-relic overstatement |
+| B-28r naval production | 3 | one heuristic column where `trainableUnits` belongs |
+| B-29r peace-treaty cooldown | 1 | a per-pair clock and its gate, both engines |
+| B-D unsourced data values | 5 | a residual CLASS: every invented magnitude, re-sourced |
+| **B. Fidelity vs real Civ 6** | **39** | |
+| **OPEN, TOTAL** | **63** | |
 
-THE TABLE ABOVE IS NOW WRONG, and by construction: 41.55 + 1 = 42.55
-against a chapter weight of 42. The delta chain overshot its own ceiling —
-the fifth drift, and this time the arithmetic says so out loud rather than
-hiding behind a fresh entry's weight. DO NOT patch it with another delta.
-The next round to touch chapter A must RECOMPUTE the row from the open list
-(A-9r, A-11r, A-27r, A-28r, A-29r, A-30r, A-31r — seven items), re-weight
-those seven 1-8 by implementation size, and set done = weight - open. A
-running ledger that can exceed 100% is not measuring anything.
+RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
+SAME commit. When one opens, add a row with its weight and its reason. Do
+not add a "done" column back.
 
 ## A. Seat symmetry — open
 
@@ -111,32 +113,6 @@ running ledger that can exceed 100% is not measuring anything.
   `tileYields` adds it BEFORE the drought floor. Unreachable as written
   (the floor only bites at 0 base food and a FARM's own food is >= 1), so
   it is a construct note, not a live bug.
-- **A-31r. THE SEAT-0 RECORD SCHEMA.** What is left is the WIRE's own
-  shape, in `serve_gate`'s hand-rolled `recs["0"]` and TS's matching
-  `actor.seat !== 0` in `seatPhase`: seat 0's production rides
-  `[centreTile, code]` pairs and its units `[tile, verb, isCivilian]`
-  triples, where every civ row sends per-unit ranks. The schema decides
-  WHERE the orders execute — row 0's pre-turn, a civ's at the walkers'
-  position in the phase — so the two cannot be merged without moving the
-  combat DRAW positions. Task #108, and after #114 the checker's allowlists
-  hold NOTHING ELSE: four sites, two per engine, all four this same fact —
-  `serve_gate`'s two `recs["0"]` blocks, `seatPhase`'s `actor.seat !== 0`,
-  and the serve client's seat-0 candidate rows in `driver.ts`.
-  The ACTION INTERFACE half closed in #113: `step()` takes no seat
-  arguments at all now, every row's choices arrive through
-  `apply_seat_actions` + `_apply_seat_unit_actions`, and `seat_ext` is set
-  for every major row rather than row 0 alone.
-  A CAUTION THAT HAS EARNED ITS PLACE. This entry has twice claimed the
-  distinction was down to one thing, and twice been wrong — because the
-  instrument only matched what it was taught. #111's checker matched
-  ADJACENT TOKENS (`row == 0`) and missed every fork written as an
-  EXPRESSION (`civ_techs[:, 0]`, `city_center[:, 0]`); #112 taught it those
-  and closed four live rule divergences, then claimed the class closed on
-  the strength of a GPU-only census; #113 taught it TypeScript and found
-  three more in `cpu/`, plus a `[0] + [r + 1 for r in seats]` in the gate's
-  own single-seed path that skipped seat 1 and asked for a seat that does
-  not exist. Claim only what the instrument measures, and measure both
-  engines.
 
 ## B. Fidelity vs real Civ 6 — open residuals
 
@@ -362,6 +338,61 @@ calling it a bug:**
    coincide; for a civ row TS's declaration lands after earlier seats have
    already walked. Both engines document the position as matched — read the
    first divergence here before assuming it is elsewhere.
+
+**#115 — the wire's last seat-0 shape, and the rivals arithmetic.** Every
+item here CHANGES BEHAVIOUR on both engines together; none of it has run.
+
+1. SEAT 0'S UNIT ORDERS MOVED IN THE TURN. They rode a `[tile, col, civ]`
+   TRIPLES record applied before the step (GPU) / before `endTurn` (TS);
+   they now ride the same per-unit RANK rows every other seat sends and
+   replay at the walkers' position inside the phase. Seat 0's combat draws
+   therefore consume the shared RNG stream at a different POSITION than
+   before. Expect every seed's trajectory to differ from any pre-#115
+   checkpoint — that is the change, not a bug. What must still hold is that
+   the two engines move together.
+2. SEAT 0 GAINED MULTI-RANK MOVEMENT. Its old block emitted rank 0 only, so
+   it walked one tile a turn while every civ walked up to four. It now goes
+   through `_decide_turn`'s virtual planner like the rest. This widens what
+   seat 0 does far more than the position change does.
+3. SEAT 0'S RECORD GAINED `denounce` / `ally`. `geo_decide_and_apply` has
+   always computed and APPLIED row 0's intents GPU-side; the hand-rolled
+   `recs["0"]` never carried them, so the TS child was never told. A LIVE
+   divergence, latent only while row 0's terms happened not to fire.
+4. SEAT 0'S SPREAD ROWS ARE REAL. `driver.ts` hardcoded `sr0.push(-1)`
+   under "seat-0 religion founding has no GPU twin yet", which stopped
+   being true in #111. The GPU has been emitting real targets against a
+   column of -1s.
+5. SEAT 0'S MOVE REFUSALS TIGHTENED. It used `walkPath` (allowEmbark false,
+   no stacking or encampment gate); it now uses `tileFreeForUnit` +
+   `stepUnit`, the same body the civ rows and the GPU's `_blocked_for`
+   share. Seat 0 can now embark at war with SHIPBUILDING, which the GPU's
+   row-generic `any_war` arm already allowed it.
+6. THE ANTIQUITY-SITE ERA GATE TAKES THE ACTING SEAT on TS. #112 fixed the
+   GPU (`_dig_at(..., row)`) and left `applySeatUnitOrders` and the two city
+   STRIKE bodies passing the phase's ambient 0, so a civ's death left (or
+   did not leave) a dig by SEAT 0's era. Needs a dig by a seat whose era
+   differs from seat 0's — no early-game lane reaches it.
+7. THE DECIDE ORDER PUT SEAT 0 FIRST. It used to decide last, so its war
+   column applied after every civ row had taken its mask. Row order now
+   matches `_seat_phase`'s and TS's `seatPhase`'s.
+8. CHOP PAYS ITS LUMP ON THE REPLAY PATH. `applySeatUnitOrders`' inline arm
+   cleared the feature and paid nothing where the GPU grants
+   `20 + 2.5*(techs+civics)`. LATENT: `_seat_unit_orders`' builder ladder
+   offers columns 13-15/18-24 and REPAIR, never 16 — so nothing reaches it
+   until the ladder does. `builderRemoveFeature`'s lump and
+   `builderImprove`'s legality also stopped reading a literal seat 0.
+9. THE `R = 0` PHANTOM ROW IS GONE. Major-axis widths were `1 + max(R, 1)`,
+   which reserved a second row for a solo game and marked it wire-driven.
+   No configuration in `seeder/` produces R = 0 (`civMax` defaults to 2), so
+   this is unreachable today and cannot be validated by the gate — it is
+   named here so nobody hunts for it.
+10. `PILLAGE` ON SEAT 0'S PATH now gates on `combat > 0` rather than "carries
+   no charges". The GPU has always used the former; the deleted
+   `seatPillage` let a Great General pillage where the GPU refused.
+
+WATCH FIRST when the run goes red: (1) and (2) together mean seat 0's whole
+trajectory changed. Bracket from a checkpoint and read the SEAT the
+divergence names before reading the mechanic.
 
 **Reachability, before believing any green run:**
 - Theological combat needs two ADJACENT religious units of different

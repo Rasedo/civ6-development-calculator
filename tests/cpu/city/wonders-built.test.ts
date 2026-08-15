@@ -140,7 +140,7 @@ describe('great people', () => {
 
     const before = seatOf(state, 0)!.research.techProgress;
     const turns = Math.ceil(gpCost(0) / 2);
-    for (let i = 0; i < turns; i++) endTurn(state, 0);
+    for (let i = 0; i < turns; i++) endTurn(state);
     expect(greatPeopleEarned(state, 'SCIENTIST')).toBe(1);
     expect(state.claimedGreatPeople[0]).toBe('GP_ARYABHATA');
     // +50 science landed somewhere in tech progress (research also ticked normally)
@@ -152,7 +152,7 @@ describe('great people', () => {
     queueDistrict(state, city.id, 'COMMERCIAL_HUB', tileAtCoords(state.map, 9, 8).index, 0);
     queueBuilding(state, city.id, 'MARKET', 0);
     const before = seatOf(state, 0)!.treasury;
-    for (let i = 0; i < 30; i++) endTurn(state, 0);
+    for (let i = 0; i < 30; i++) endTurn(state);
     expect(greatPeopleEarned(state, 'MERCHANT')).toBeGreaterThanOrEqual(1);
     expect(seatOf(state, 0)!.treasury).toBeGreaterThan(before + 100); // Colaeus +100 plus income
   });

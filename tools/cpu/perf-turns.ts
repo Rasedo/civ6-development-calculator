@@ -48,7 +48,7 @@ for (const seed of SEEDS) {
   if (state.unitsMode) spawnUnit(state, 'SETTLER', site, 0);
   foundCity(state, site, 0);
   const t0 = performance.now();
-  for (let t = 0; t < TURNS; t++) endTurn(state, 0);
+  for (let t = 0; t < TURNS; t++) endTurn(state);
   const ms = performance.now() - t0;
   total += TURNS;
   totalMs += ms;

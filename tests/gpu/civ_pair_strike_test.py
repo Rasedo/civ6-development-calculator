@@ -42,7 +42,7 @@ def build():
     sim = BatchSim([load_fixture(p) for p in paths], rules, device="cpu", dtype=torch.float64)
     for _ in range(40):  # far enough in that both civs hold a city
         sim.step()
-    assert sim.R > 1, "this lane needs two civs"
+    assert sim.n_majors > 2, "this lane needs two civs"
     return sim
 
 

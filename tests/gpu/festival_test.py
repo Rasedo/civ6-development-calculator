@@ -53,7 +53,7 @@ def main() -> None:
     #   seat phase — the space_race_test pattern. Civs can select a Festival in
     #   principle but never do in-gate, so plant it.
     sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    assert sim.R >= 1, "need a civ"
+    assert sim.n_majors >= 2, "need a civ"
     r, j = 0, 0
     assert bool(sim.civ_alive[0, r + 1]) and bool(sim.city_alive[0, r + 1, j]), "civ capital must be alive"
     code = sim.PROJECT_BASE + pi_fest

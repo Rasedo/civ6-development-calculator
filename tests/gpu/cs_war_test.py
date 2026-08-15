@@ -102,14 +102,14 @@ def main() -> None:
     suz_min = int(s2.rules.citystate.get("suzerainEnvoys", 3))
     r = 0
     s2.war[b, 0, s2.row_of(100 + cs)] = s2.war[b, s2.row_of(100 + cs), 0] = True
-    _citystate_row0 = 1 + max(s2.R, 1) + cs
+    _citystate_row0 = s2.n_majors + cs
     s2.war_turns[b, 0, _citystate_row0] = 7
     s2.war_turns[b, _citystate_row0, 0] = 7
     s2.seat_citystate_envoys[b, r + 1, cs] = suz_min + 2   # this civ is the strict suzerain
     s2.seat_citystate_envoys[b, 0, cs] = 0
-    if s2.R > 1:
+    if s2.n_majors > 2:
         s2.seat_citystate_envoys[b, 2:, cs] = 0
-    _citystate_row = 1 + max(s2.R, 1) + cs
+    _citystate_row = s2.n_majors + cs
     s2.ww[b, 0, _citystate_row] = 900.0
     s2.sync_war()
     shed = int(s2.rules.war_weariness.get("peaceTreaty", 2000))

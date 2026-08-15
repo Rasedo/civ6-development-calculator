@@ -73,7 +73,7 @@ describe('movement', () => {
     expect(orderMove(state, unit.id, far.index).ok).toBe(true);
     expect(unit.tileIndex).not.toBe(far.index); // 2 MP can't get there
     let guard = 0;
-    while (unit.tileIndex !== far.index && guard++ < 10) endTurn(state, 0);
+    while (unit.tileIndex !== far.index && guard++ < 10) endTurn(state);
     expect(unit.tileIndex).toBe(far.index);
     expect(unit.path).toBeNull();
   });
@@ -133,15 +133,15 @@ describe('builders', () => {
 
     expect(queueUnit(state, city.id, 'BUILDER', 0).ok).toBe(true);
     let guard = 0;
-    while (state.units.length === 0 && guard++ < 40) endTurn(state, 0);
+    while (state.units.length === 0 && guard++ < 40) endTurn(state);
     const builder = state.units[0];
     expect(builder).toBeDefined();
 
     // walk to the farm tile, then build
     orderMove(state, builder.id, farmTile.index);
     let g2 = 0;
-    while (builder.tileIndex !== farmTile.index && g2++ < 5) endTurn(state, 0);
-    expect(builderImprove(state, builder.id, 'FARM').ok).toBe(true);
+    while (builder.tileIndex !== farmTile.index && g2++ < 5) endTurn(state);
+    expect(builderImprove(state, builder.id, 'FARM', 0).ok).toBe(true);
     expect(farmTile.improvement).toBe('FARM');
     expect(builder.charges).toBe(2);
   });

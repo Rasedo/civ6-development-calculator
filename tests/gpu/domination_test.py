@@ -37,12 +37,12 @@ def main() -> int:
         return 1
     path = paths[6] if len(paths) > 6 else paths[0]
     sim = build(rules, path)
-    if sim.R < 2:
-        print(f"SKIP domination — fixture has {sim.R} civs, need >=2")
+    if sim.n_majors < 3:
+        print(f"SKIP domination — fixture has {sim.n_majors} majors, need >= 3")
         return 0
 
     pcap = int(sim.city_center[0, 0, 0])
-    rcaps = [int(sim.city_center[0, r + 1, 0]) for r in range(sim.R)]
+    rcaps = [int(sim.city_center[0, row, 0]) for row in range(1, sim.n_majors)]
 
     # 1. Split at founding — seat 0 holds its own, each civ holds theirs -> -1.
     assert dom(sim) == -1, f"split capitals should be -1, got {dom(sim)}"
@@ -59,7 +59,7 @@ def main() -> int:
     s = build(rules, path)
     s.centre_slot_at[0, pcap] = 0
     s.tile_seat[0, pcap] = 1  # civ index 0 took seat 0's capital
-    for r in range(1, sim.R):
+    for r in range(1, sim.n_majors - 1):
         s.centre_slot_at[0, rcaps[r]] = 0
         s.tile_seat[0, rcaps[r]] = 1  # ...and every other civ capital
     s._tile_owner_ver += 1

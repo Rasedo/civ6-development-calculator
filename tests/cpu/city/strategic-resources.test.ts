@@ -100,7 +100,7 @@ describe('B-9/B-10 new-unit build path', () => {
     // force the queue to completion and run a turn
     city.queue[0].progress = 10_000;
     const before = seatOf(state, 0)!.bestMeleeCS;
-    endTurn(state, 0);
+    endTurn(state);
     const swords = state.units.filter((u) => u.type === 'SWORDSMAN' && (u.seat) === 0);
     expect(swords.length).toBe(1);
     // Strongest melee ever fielded now reflects the Swordsman (combat 36)

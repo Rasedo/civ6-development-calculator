@@ -146,7 +146,7 @@ def force_water(sim, t: int, ocean: bool = False) -> None:
 
 
 def first_civ_city(sim):
-    idxs = sim.city_alive[0, 1:1 + max(sim.R, 1)].nonzero()
+    idxs = sim.city_alive[0, 1:sim.n_majors].nonzero()
     assert len(idxs), "no civ city on this seed/turn"
     r, j = int(idxs[0, 0]), int(idxs[0, 1])
     return r, j, int(sim.city_center[0, r + 1, j])
@@ -478,7 +478,7 @@ def poke_walls_civ(rules, path, GALLEY, WARRIOR):
         sim.step()
     r, j, ctr = first_civ_city(sim)
     # make civ seat r the ONLY aggressor; strip its army/economy so nothing else fires
-    sim.war[:, 0, 1:1 + sim.R] = sim.war[:, 1:1 + sim.R, 0] = False
+    sim.war[:, 0, 1:sim.n_majors] = sim.war[:, 1:sim.n_majors, 0] = False
     sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     clear_all_major_units(sim)

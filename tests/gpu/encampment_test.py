@@ -188,7 +188,7 @@ def test_civ_encamp_prod_mult(rules, path) -> None:
             s.step()
         return s
     sim = _prep()
-    if not sim._gov_has_effects or sim._encamp_si < 0 or sim.R < 1:
+    if not sim._gov_has_effects or sim._encamp_si < 0 or sim.n_majors < 2:
         print("  civ encampmentProdMult SKIPPED (no gov effects / no Encampment scaffold)")
         return
     r = 0

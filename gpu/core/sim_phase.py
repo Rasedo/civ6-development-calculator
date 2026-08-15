@@ -22,7 +22,7 @@ class SimPhase:
         schedule holds no seat's intents of its own.
 
         What remains per-row in this file is the war-or-peace tail and the
-        driven unit-sequence replay (#108)."""
+        driven unit-sequence replay — both ONE body, every major row."""
         # Freeze the MAJORS' aura MP here: the seatPhase movesLeft reset
         # covers every isCiv unit — seat 0's pool included — ahead of any
         # general war-walk, so both engines read the same pre-move general
@@ -35,15 +35,16 @@ class SimPhase:
         # declaration reads either. Declaring and suing are NOT here — they
         # ride each seat's own war head at its record position, which
         # is why nothing follows this call.
-        if self.R > 0:
+        if self.n_majors > 1:
             self._geo_denounce_and_ally()
         # THE SEAT LOOP — state.seats in id order, seat 0 first, ONE body per
         # row. All that is left outside _seat_turn is the driven unit-sequence
-        # REPLAY: row 0's unit orders ride the triples schema and replay in the
-        # order phase, a civ's ride per-unit rows and replay here (#108) — so
-        # row 0 simply never has a `_driven_useq` entry and the block below is
-        # a no-op on it. No branch encodes that; the stash key does.
-        for row in range(1 + self.R):
+        # REPLAY below, and since #108 that is one schema at one position for
+        # every major row: rank rows over `_seat_slot_map`, drained HERE, where
+        # the walkers stand. Row 0's orders used to ride a `[tile, col, civ]`
+        # triples record executed before step() — a whole turn earlier in the
+        # combat draw stream than any other seat's.
+        for row in range(self.n_majors):
             active = self._seat_turn(row)
             if not bool(active.any()):
                 continue
@@ -61,7 +62,7 @@ class SimPhase:
             # at war with ANYONE takes the WAR branch, whose act scans every
             # at-war seat's units and cities. The counters this branch used to
             # carry now ride _seat_war_peace_tail, inside the seat's own block.
-            atw_any = active & self.war[:, row, :1 + self.R].any(dim=1)
+            atw_any = active & self.war[:, row, :self.n_majors].any(dim=1)
             # This seat's live slots, computed once (deaths only shrink
             # mid-loop; neither loop spawns) — the war AND peace walks reuse it.
             # Replayed unit acts fire HERE, at the walkers' own position in the
@@ -87,9 +88,9 @@ class SimPhase:
         # Drop the route-income cache at phase end: its key
         # (turn, r, eff, _rp_kill_version) does not cover unit deaths in the
         # war/peace acts above, so post-phase callers (leader/domination/
-        # trace) must recompute against post-war state. With R>=2 the single
+        # trace) must recompute against post-war state. With two or more opponents the single
         # slot is overwritten before any same-r re-read, but that must not be
-        # load-bearing for R=1 configs.
+        # load-bearing for a single-opponent config.
         self._seat_route_cache = None
 
 
@@ -177,10 +178,9 @@ class SimPhase:
         the queue, border growth, the city's own defense), the loyalty
         collapses, then the research/upkeep/tourism/great-people tail.
 
-        What the CALLER still owns is the driven unit-sequence REPLAY, whose
-        position in the phase differs between row 0 and a civ row (#108). The
-        counters are not a caller concern any more — `_seat_war_peace_tail`
-        runs from here, one body for every row."""
+        What the CALLER still owns is the driven unit-sequence REPLAY, at one
+        position for every major row. The counters are not a caller concern any
+        more — `_seat_war_peace_tail` runs from here, one body for every row."""
         B, dev = self.B, self.device
         active = self.civ_alive[:, row] & self.city_alive[:, row].any(dim=1)
         if not bool(active.any()):
@@ -275,8 +275,8 @@ class SimPhase:
         # every seat row, on this row's own city sums.
         self._seat_research_tail(row, active, sci_sum, cul_sum, gold_sum, faith_sum)
         # War or peace — the counters are the RULE and they live here for every
-        # row; the UNITS are the wire, and their replay is still the caller's
-        # (row 0's orders ride a different schema, #108).
+        # row; the UNITS are the wire, and their replay is the loop's, at one
+        # position for every row.
         self._seat_war_peace_tail(row, active)
         return active
 
@@ -296,7 +296,7 @@ class SimPhase:
         row's cell against ITSELF is structurally False, so it never counts a
         war with itself — exactly what `civsAtWar(state, s, s)` does on the TS
         side, and the reason row 0 looked like it needed a rule of its own."""
-        any_war = active & self.war[:, row, :1 + self.R].any(dim=1)
+        any_war = active & self.war[:, row, :self.n_majors].any(dim=1)
         self.war_turns[:, row] += (active.unsqueeze(1) & self.war[:, row]).long()
         self.peace_turns[:, row] = self.peace_turns[:, row] + (active & ~any_war).long()
 
@@ -333,14 +333,14 @@ class SimPhase:
         every age factor is a half, so the subtotals are exact and their sum
         order does not matter."""
         B, dev, F = self.B, self.device, torch.float64
-        bidx, nrow = self._bidx, 1 + self.R
+        bidx, nrow = self._bidx, self.n_majors
         rr = self.rules.seats
         rng = int(rr.get("loyaltyRange", 9))
         scale = float(rr.get("loyaltyScale", 20))
         lmax = float(rr.get("loyaltyMax", 100))
         # "somebody else holds a city": the majors that EXIST and hold one,
         # this row excluded.
-        held = self.city_alive[:, :nrow].any(dim=2) & self.civ_alive[:, :nrow]  # [B, 1+R]
+        held = self.city_alive[:, :nrow].any(dim=2) & self.civ_alive[:, :nrow]  # [B, n_majors]
         others = torch.cat((held[:, :row], held[:, row + 1:]), dim=1)
         others = others.any(dim=1) if others.shape[1] else torch.zeros(B, dtype=torch.bool, device=dev)
         here = self.city_center[bidx, row, col].clamp(min=0)  # [B]
@@ -349,7 +349,7 @@ class SimPhase:
         w = ((rng + 1 - d).clamp(min=0)
              * self.city_pop[:, :nrow].reshape(B, -1).double()
              * self.city_alive[:, :nrow].reshape(B, -1).double())
-        sub = w.reshape(B, nrow, self.RC).sum(dim=2) * self._age_factor[self.civ_age[:, :nrow]]  # [B, 1+R]
+        sub = w.reshape(B, nrow, self.RC).sum(dim=2) * self._age_factor[self.civ_age[:, :nrow]]  # [B, n_majors]
         own = sub[:, row]
         keep = torch.ones(nrow, dtype=F, device=dev)
         keep[row] = 0.0  # own is not foreign; a 0.0 term leaves the sum exact
@@ -380,7 +380,7 @@ class SimPhase:
 
         Defections resolve in ARRAY order with pressures read LIVE: an earlier
         transfer moves pops a later one must see."""
-        nrow = 1 + self.R
+        nrow = self.n_majors
         rng = int(self.rules.seats.get("loyaltyRange", 9))
         for j in range(self.RC):
             fl = flip[:, j] & self.city_alive[:, row, j]
@@ -718,7 +718,7 @@ class SimPhase:
         # grievances DECAY by 1 per turn at peace with every MAJOR — the row's
         # own line of the war matrix, minus the city-state columns (TS's
         # atWarWithAny reads Seat.wars, the majors' list).
-        at_peace = ~self.war[:, row, :1 + self.R].any(dim=1)
+        at_peace = ~self.war[:, row, :self.n_majors].any(dim=1)
         self.civ_warmonger[:, row] = torch.where(
             active & at_peace & (self.civ_warmonger[:, row] > 0),
             self.civ_warmonger[:, row] - 1,
@@ -1045,7 +1045,7 @@ class SimPhase:
         layout must hold through this step's applies. The trigger is the
         step's own hole test, so every death compacts and the layout is never
         seen with a hole in it."""
-        nrows = 1 + self.R
+        nrows = self.n_majors
         alive = self.city_alive[:, :nrows]  # [B, nrows, RC]
         perm = torch.argsort((~alive).long(), dim=2, stable=True)  # living first, order kept
         # In place, for the same reason as _reclaim_pool: these planes are
@@ -1094,7 +1094,7 @@ class SimPhase:
         Raises AssertionError naming (game, seat, slot, kind, di/wi, tile,
         expected id, actual tile_city) on the first violation."""
         B = self.B
-        for row in range(1 + self.R):
+        for row in range(self.n_majors):
             expect = self.city_id[:, row].unsqueeze(2)  # [B, RC, 1] this city's id
             alive = self.city_alive[:, row].unsqueeze(2)  # [B, RC, 1]
             for name in ("city_dist_tile", "city_wonder"):

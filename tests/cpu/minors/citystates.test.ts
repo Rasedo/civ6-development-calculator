@@ -179,13 +179,13 @@ describe('quests and trade', () => {
     const city = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;
     const cityState = addCs(state, 9, 9);
     cityState.seatQuest = [{ kind: 'buildDistrict', district: 'CAMPUS' }];
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(envoysOf(cityState, 0)).toBe(0); // not built yet
     const campus = tileAtCoords(state.map, 6, 5);
     campus.district = 'CAMPUS';
     campus.districtComplete = true;
     city.districts.push({ type: 'CAMPUS', tileIndex: campus.index });
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(envoysOf(cityState, 0)).toBe(1);
     expect(cityState.seatQuest[0]).toBeNull();
   });
@@ -217,11 +217,11 @@ describe('determinism', () => {
     const a = createGame({ width: 30, height: 20, seed: 9, withResources: true, withWonders: true, cityStates: true });
     const sites = a.map.tiles.filter((t) => canFoundCity(a, t.index, 0).ok);
     foundCity(a, sites[Math.floor(sites.length / 2)].index, 0);
-    for (let i = 0; i < 5; i++) endTurn(a, 0);
+    for (let i = 0; i < 5; i++) endTurn(a);
     const b = deserialize(serialize(a));
     for (let i = 0; i < 10; i++) {
-      endTurn(a, 0);
-      endTurn(b, 0);
+      endTurn(a);
+      endTurn(b);
     }
     expect(serialize(a)).toBe(serialize(b));
   });

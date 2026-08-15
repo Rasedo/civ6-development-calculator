@@ -62,7 +62,7 @@ export function seatGovernmentId(state: GameState, seat: number): string | null 
  * once for every seat. City-state wars are excluded.
  */
 export function atPeaceWithAllCivs(state: GameState, seat: number): boolean {
-  for (let other = 0; other <= state.seats.length - 1; other++) {
+  for (let other = 0; other < state.seats.length; other++) {
     if (other !== seat && civsAtWar(state, seat, other)) return false;
   }
   return true;

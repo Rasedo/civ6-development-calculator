@@ -90,7 +90,7 @@ def _blocks(env, sim, row: int) -> dict:
     obs = env.observe(row)
     # tech/civic widths come off the live tensors — there is no NT/NC scalar,
     # and hardcoding one here would be the second copy that always drifts.
-    return ladder.split(obs, sim.S, sim.R, sim.RC, sim.civ_techs.shape[2], sim.civ_civics.shape[2])
+    return ladder.split(obs, sim.S, sim.n_majors - 1, sim.RC, sim.civ_techs.shape[2], sim.civ_civics.shape[2])
 
 
 #: ACTION FILE SCHEMA v2 — THE FILE IS THE INTERFACE.
@@ -199,7 +199,7 @@ def _spread_targets(sim, seat: int) -> torch.Tensor:
     # ONE scan over every major row: a spread target is any live city whose
     # followed religion is not this seat's. `g` IS the row (the religion
     # plane's own convention), so no arm asks which seat is asking.
-    nrow = 1 + sim.R
+    nrow = sim.n_majors
     acc = torch.zeros(B, T, dtype=torch.long, device=sim.device)
     acc.scatter_add_(
         1, sim.city_center[:, :nrow].clamp(min=0).reshape(B, -1),
@@ -332,7 +332,7 @@ def _war_ctx(blocks: dict) -> dict:
     pair, the warmonger-gang term, aggression), so the policy consumes only
     what a client observation carries.
 
-    Two blocks, two shapes. The OPPONENT block is [B, R, PER_CIV], one column
+    Two blocks, two shapes. The OPPONENT block is [B, n_opponents, PER_CIV], one column
     per other major in ascending seat order — the same order the war head
     uses, so column k here and column k of the mask name the same seat. The
     CTX block is the asker's own."""
@@ -406,7 +406,7 @@ def _buy_ctx(sim, row: int) -> dict:
     # atWarWithAny, off the war matrix's own row — one expression for every
     # seat (the seat-0 arm this replaced was already the any(), and the civ
     # arm counted only the war with seat 0).
-    levy_ok = levy_ok & sim.war[:, row, : 1 + sim.R].any(dim=1)
+    levy_ok = levy_ok & sim.war[:, row, : sim.n_majors].any(dim=1)
     return {"jj": jj, "bb": bb, "can_building": can_b, "price": price,
             "settler_ok": settler_ok, "unit_ok": unit_ok,
             "tile_ok": tile_ok, "tile": tile_t, "tile_j": tile_j,
@@ -421,20 +421,20 @@ def _geo_turn(sim):
     ROWS. Computed once because the alliance scan reads this turn's fresh
     grudges. Zero-draw and deterministic; everything here is POLICY —
     proximity and strength thresholds, row-order scanning — and the engine
-    arm re-validates only the RULES. Returns (denounce [B,1+R,1+R] bool,
-    ally [B,1+R,1+R] bool from the lower row).
+    arm re-validates only the RULES. Returns (denounce [B, n_majors, n_majors] bool,
+    ally [B, n_majors, n_majors] bool from the lower row).
 
     Declaring and suing are NOT here: they ride each seat's own war head
     through `ladder.pick_war`, the one entry."""
     B, dev = sim.B, sim.device
-    nrow = 1 + sim.R
+    nrow = sim.n_majors
     den = torch.zeros(B, nrow, nrow, dtype=torch.bool, device=dev)
     ally = torch.zeros_like(den)
-    if sim.R < 1:
+    if sim.n_majors < 2:
         return den, ally
     rr = sim.rules.seats
     n_c = sim.city_alive[:, :nrow].sum(dim=2)
-    alive_row = sim.civ_alive[:, :nrow] & (n_c > 0)  # [B, 1+R]
+    alive_row = sim.civ_alive[:, :nrow] & (n_c > 0)  # [B, n_majors]
     rstr = sim._seat_strengths()
     prox_max = int(rr.get("dowProximity", 9))
     prox = {}
@@ -474,7 +474,7 @@ def geo_decide_and_apply(sim):
     sim (the engine arm consumes them at the phase top), and return the
     tensors for wire extraction (_extract_geo per seat row)."""
     den, ally = _geo_turn(sim)
-    for row in range(1 + sim.R):
+    for row in range(sim.n_majors):
         sim.apply_geo(row, denounce=den[:, row], ally=ally[:, row])
     return den, ally
 
@@ -638,7 +638,7 @@ def _extract_record(sim, row: int, prod, tech, civic, war, env_seq, seq, buy, wo
     while len(rows) > 1 and all(x < 0 for x in rows[-1]):
         rows.pop()
     # the war-head column over `war_targets(row)` — the other majors in
-    # ascending seat order: k declares on the k-th, R+k sues it. Or None;
+    # ascending seat order: k declares on the k-th, n_opponents+k sues it. Or None;
     # OPTIONAL field, a missing key reads as None.
     _w = None if war is None or int(war[b]) < 0 else int(war[b])
     # this row's envoy assignment sequence (CS indices), possibly empty.
@@ -769,9 +769,9 @@ def replay_seat(sim, row: int, rec: dict) -> None:
     # ABSOLUTE SEATS, which for a major is its row; declaring and
     # suing rode `war` above, on the head.
     def _geo_mask(seats) -> torch.Tensor:
-        m = torch.zeros(sim.B, 1 + sim.R, dtype=torch.bool, device=dev)
+        m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=dev)
         for j in seats:
-            if 0 <= int(j) <= sim.R:
+            if 0 <= int(j) < sim.n_majors:
                 m[:, int(j)] = True
         return m
 
@@ -800,7 +800,7 @@ def replay_seat(sim, row: int, rec: dict) -> None:
 def replay(env, log: list, seats=None) -> None:
     """Re-run a recorded game from the action file alone. No ladder, no picker."""
     sim = env.sim
-    seats = list(range(1, 1 + sim.R)) if seats is None else list(seats)
+    seats = list(range(1, sim.n_majors)) if seats is None else list(seats)
     for row in seats:
         take_seat(sim, row)
     for turn_rec in log:
@@ -835,7 +835,7 @@ def drive_batched(env, turns: int, seats=None, seeds=None) -> list:
     """
     sim = env.sim
     B = sim.B
-    seats = list(range(1, 1 + sim.R)) if seats is None else list(seats)
+    seats = list(range(1, sim.n_majors)) if seats is None else list(seats)
     NB = sim.rules_dev.b_cost.shape[0]
     classes = ladder.prod_classes(NB, sim.NU, len(sim._scaffold), sim._wond_n if sim.districts_on else 0, len(sim._proj_rows) if sim.districts_on else 0)
     rj = json.loads((Path(__file__).resolve().parent.parent / "seeder" / "worlds" / "rules.json").read_text(encoding="utf-8"))

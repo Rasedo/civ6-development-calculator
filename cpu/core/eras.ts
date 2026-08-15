@@ -26,7 +26,7 @@ export function eraBoundary(state: GameState): void {
   // cleared. Set here (rather than off a raw turn comparison) because this site
   // is already proven to fire at the same moment in both engines.
   state.roadBridges = true;
-  for (let c = 0; c < 1 + state.seats.length - 1; c++) {
+  for (let c = 0; c < state.seats.length; c++) {
     const seat = seatOf(state, c);
     if (!seat) continue;
     const s = seat.eraScore ?? 0;
@@ -49,7 +49,7 @@ export function eraBoundary(state: GameState): void {
     const era = Math.floor(state.turn / ERA_LENGTH);
     seat.dedicationPicks = Array.from({ length: seat.dedications }, (_, k) => (era + c + k) % DEDICATIONS.length);
   }
-  for (let c = 0; c < 1 + state.seats.length - 1; c++) {
+  for (let c = 0; c < state.seats.length; c++) {
     const seat = seatOf(state, c);
     if (seat) seat.eraScore = 0;  // the window resets for the new era
   }
@@ -205,7 +205,7 @@ export function governorPicks(qLoys: number[], titles: number): Set<number> {
  */
 export function applyDedications(state: GameState, addFaith: (civ: number, amount: number) => void): void {
   if (!DEDICATION_PAYOUTS_LIVE) return; // B-24 (#71): substrate live, payouts inert
-  for (let c = 0; c < 1 + state.seats.length - 1; c++) {
+  for (let c = 0; c < state.seats.length; c++) {
     const f = dedicationFaith(state, c);
     if (f > 0) addFaith(c, f);
     const es = dedicationEraScore(state, c);

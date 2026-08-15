@@ -13,7 +13,6 @@ import { isTechComplete, isCivicComplete } from './effects';
 import { ARTIFACT_BUILDING, ARTIFACT_SLOTS } from '../data/greatPeople';
 import { clearCampFor } from './combat';
 import { UNITS, UNIT_HP, ENCAMPMENT_HP, type UnitDef } from '../data/units';
-import { PILLAGE_HEAL_IMPROVEMENTS } from './combat'; // A-21 (#50): the shared heal set
 import { generalAuraMP } from './aura'; // #70/S3 (B-8): the aura's +1 MP half
 import { goldenMoveBonus } from './eras'; // B-24: MONUMENTALITY / EXODUS +2 MP
 import { GAME_SPEED, EMBARK_MOVES } from '../data/constants';
@@ -21,7 +20,7 @@ import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { NO_SEAT, capsOf, civHasStrategic, civsAtWar, isCityStateSeat, isCiv, seatOf, tileClaimed, tileSeat } from './seats';
+import { NO_SEAT, capsOf, civHasStrategic, civsAtWar, seatOf, tileClaimed, tileSeat } from './seats';
 import type { ImprovementId } from './types';
 
 const ok: RuleResult = { ok: true };
@@ -907,12 +906,14 @@ function spendCharge(state: GameState, unit: Unit): void {
   if (unit.charges <= 0) disbandUnit(state, unit.id);
 }
 
-/** Build an improvement with the builder standing on the tile (instant, 1 charge). */
-export function builderImprove(state: GameState, unitId: number, imp: ImprovementId): RuleResult {
+/** Build an improvement with the builder standing on the tile (instant, 1
+ *  charge). Legality is the ASKING SEAT's — techs, civics and borders all
+ *  differ per seat, and this read a literal 0 until #115. */
+export function builderImprove(state: GameState, unitId: number, imp: ImprovementId, seat: number): RuleResult {
   const { unit, err } = builderOn(state, unitId);
   if (err) return err;
   const tile = state.map.tiles[unit!.tileIndex];
-  if (!validImprovements(state, tile, 0).includes(imp)) {
+  if (!validImprovements(state, tile, seat).includes(imp)) {
     return no('Not a valid improvement for this tile.');
   }
   tile.improvement = imp;
@@ -920,44 +921,15 @@ export function builderImprove(state: GameState, unitId: number, imp: Improvemen
   return ok;
 }
 
+/* The PILLAGE verb has ONE body, and it is `applySeatUnitOrders`' PILLAGE arm
+ * in phase.ts — the same improvement-then-district order, the same +25 heal,
+ * gated on `combat > 0` the way `hostileUnitAct` and the GPU's apply both are.
+ * A second `seatPillage` used to sit here for seat 0 alone, gated on "carries
+ * no charges" instead, which let a Great General pillage on one engine and not
+ * the other. It went with the triples schema in #108. */
+
 /** Repair a pillaged improvement or district (no charge, ends the builder's
  * turn). Districts join the same repair, mirroring improvement repair. */
-/**
- * The SEAT 0 PILLAGE verb. Pillaging existed only on
- * the hostile side (`hostileUnitAct` step 2 for barbarians and at-war the other seats),
- * so the other seats wrecked seat 0 improvements while the seat 0 could only answer by
- * killing units or taking cities.
- *
- * Mirrors the hostile rule exactly: a MILITARY unit standing on an ENEMY tile
- * pillages the improvement first, else a COMPLETE non-CITY_CENTER unpillaged
- * district, in that order; a PILLAGE_HEAL_IMPROVEMENTS target heals +25
- * (capped at UNIT_HP); the turn is spent. Enemy = an at-war seat's tile or a
- * city-state's; the seat 0 never pillages its own.
- */
-export function seatPillage(state: GameState, unitId: number, seat: number): RuleResult {
-  const unit = state.units.find((u) => u.id === unitId);
-  if (!unit || unit.seat !== seat) return no('No such unit.');
-  if (unitDomain(unit.type) !== 'military') return no('Only military units pillage.');
-  if (unit.movesLeft <= 0) return no('No movement left.');
-  const tile = state.map.tiles[unit.tileIndex];
-  const enemy =
-    (isCiv(tileSeat(tile)) && civsAtWar(state, tileSeat(tile), seat)) ||
-    isCityStateSeat(tileSeat(tile));
-  if (!enemy) return no('Not an enemy tile.');
-  if (tile.improvement && !tile.pillaged) {
-    tile.pillaged = true;
-    if (PILLAGE_HEAL_IMPROVEMENTS.has(tile.improvement)) unit.hp = Math.min(UNIT_HP, unit.hp + 25);
-    unit.movesLeft = 0;
-    return ok;
-  }
-  if (tile.district && tile.district !== 'CITY_CENTER' && tile.districtComplete && !tile.districtPillaged) {
-    tile.districtPillaged = true; // B-32
-    unit.movesLeft = 0;
-    return ok;
-  }
-  return no('Nothing to pillage here.');
-}
-
 export function builderRepair(state: GameState, unitId: number): RuleResult {
   const { unit, err } = builderOn(state, unitId);
   if (err) return err;
@@ -986,7 +958,10 @@ export function builderRemoveFeature(state: GameState, unitId: number, seat: num
   if (tile.improvement === 'LUMBER_MILL' && tile.feature === 'WOODS') tile.improvement = null;
   tile.feature = null;
   if (grant) {
-    applyLumpYield(state, tile.index, grant, 0);
+    // The lump pays the CHOPPING seat. `chopGrant` already refused unless the
+    // tile is in that seat's borders, so the literal 0 this passed until #115
+    // could only ever have credited the wrong pocket.
+    applyLumpYield(state, tile.index, grant, seat);
     state.eventLog.push(`Chopped ${featureName}: +${grant.amount} ${grant.key}.`);
   }
   spendCharge(state, unit!);

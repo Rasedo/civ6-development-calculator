@@ -132,7 +132,7 @@ def main() -> None:
     # The research discount / prophet points / culture answer for the civ that
     # committed the dedication, never a hardcoded civ 0.
     sim5 = build()
-    if sim5.R > 0:
+    if sim5.n_majors > 1:
         fi, pb = sim5._ded_free_inquiry, sim5._ded_pen_brush
         cost = torch.full((sim5.B,), 200.0, dtype=sim5.dtype)
         boosted = torch.ones(sim5.B, dtype=torch.bool)

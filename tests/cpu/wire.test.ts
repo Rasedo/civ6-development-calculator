@@ -63,7 +63,7 @@ describe('#70 the action FILE drives the TS civ', () => {
     const civ = addCiv(state, 6, 6);
     const L = prodLayout();
     state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [[civ.cities[0].centerIndex, L.settlerCol]], tech: null, civic: null, units: [] } } };
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(civ.cities[0].queue[0]?.kind).toBe('settler');
   });
 
@@ -73,7 +73,7 @@ describe('#70 the action FILE drives the TS civ', () => {
     const L = prodLayout();
     const col = 0;
     state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [[civ.cities[0].centerIndex, col]], tech: null, civic: null, units: [] } } };
-    seatPhase(state, 0);
+    seatPhase(state);
     const q = civ.cities[0].queue[0];
     expect(q?.kind).toBe('building');
     expect(q?.kind === 'building' && q.building).toBe(L.buildings[col]);
@@ -86,7 +86,7 @@ describe('#70 the action FILE drives the TS civ', () => {
     const L = prodLayout();
     const ui = L.units.indexOf('WARRIOR');
     state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [[civ.cities[0].centerIndex, L.unitLo + ui]], tech: null, civic: null, units: [] } } };
-    seatPhase(state, 0);
+    seatPhase(state);
     const q = civ.cities[0].queue[0];
     expect(q?.kind).toBe('unit');
     expect(q?.kind === 'unit' && q.unit).toBe('WARRIOR');
@@ -100,7 +100,7 @@ describe('#70 the action FILE drives the TS civ', () => {
     const civ = addCiv(state, 6, 6);
     const L = prodLayout();
     state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [[civ.cities[0].centerIndex, L.idleCol]], tech: null, civic: null, units: [] } } };
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(civ.cities[0].queue.length).toBe(0);
   });
 
@@ -115,7 +115,7 @@ describe('#70 the action FILE drives the TS civ', () => {
     const si = SCAFFOLD_DISTRICTS.findIndex((d) => d.id === 'CAMPUS');
     expect(si).toBeGreaterThanOrEqual(0);
     state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [[civ.cities[0].centerIndex, L.districtLo + si]], tech: null, civic: null, units: [] } } };
-    seatPhase(state, 0);
+    seatPhase(state);
     const q = civ.cities[0].queue[0];
     expect(q?.kind).toBe('district');
     expect(q?.kind === 'district' && q.district).toBe('CAMPUS');
@@ -137,7 +137,7 @@ describe('#70 the action FILE drives the TS civ', () => {
     const dir = nb.findIndex((t) => t && !isImpassable(t) && !isWater(t));
     expect(dir).toBeGreaterThanOrEqual(0);
     state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [], tech: null, civic: null, units: [[dir]] } } };
-    seatPhase(state, 0);
+    seatPhase(state);
     const after = state.units.find((u) => u.id === spawned!.id);
     expect(after).toBeTruthy();
     expect(after!.tileIndex).not.toBe(before);
@@ -161,7 +161,7 @@ describe('#70 the action FILE drives the TS civ', () => {
       nb[dir]!.terrain = 'COAST';
       state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [], tech: null, civic: null, units: [[dir]] } } };
       const before = u.tileIndex;
-      seatPhase(state, 0);
+      seatPhase(state);
       return { moved: state.units.find((x) => x.id === u.id)!.tileIndex !== before };
     };
     expect(mk(false).moved).toBe(false); // no Shipbuilding: REFUSED
@@ -182,7 +182,7 @@ describe('#70 the action FILE drives the TS civ', () => {
     const dir = nb.findIndex((t) => t && !isWater(t) && !isImpassable(t));
     expect(dir).toBeGreaterThanOrEqual(0);
     state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [], tech: null, civic: null, units: [[dir]] } } };
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(state.units.find((x) => x.id === u.id)!.tileIndex).toBe(home.index);
   });
 
@@ -200,7 +200,7 @@ describe('#70 the action FILE drives the TS civ', () => {
         tileAtCoords(state.map, 12, 12).builtWonder = 'ORACLE';
       }
       state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [[civ.cities[0].centerIndex, oracleCol]], tech: null, civic: null, units: [] } } };
-      seatPhase(state, 0);
+      seatPhase(state);
       return civ.cities[0];
     };
     const civCity = mk(false);
@@ -221,7 +221,7 @@ describe('#70 the action FILE drives the TS civ', () => {
     dt.districtComplete = true;
     civCity.districts.push({ type: 'CAMPUS', tileIndex: dt.index });
     state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [[civCity.centerIndex, col]], tech: null, civic: null, units: [] } } };
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(civCity.queue[0]?.kind).toBe('project');
   });
 
@@ -230,7 +230,7 @@ describe('#70 the action FILE drives the TS civ', () => {
       const state = makeState(makeMap(14, 14, 'GRASSLAND'));
       const civ = addCiv(state, 6, 6);
       state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [], tech: null, civic: null, war: 0, units: [] } } };
-      seatPhase(state, 0);
+      seatPhase(state);
       return { state, civ };
     };
     const dec = declare();
@@ -243,7 +243,7 @@ describe('#70 the action FILE drives the TS civ', () => {
       civ.treasury = treasury;
       const R = 1; // one civ in this fixture — peace col = R
       state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [], tech: null, civic: null, war: R, units: [] } } };
-      seatPhase(state, 0);
+      seatPhase(state);
       return { state, civ };
     };
     // funded + warTurns past the minimum: peace lands (and pays)
@@ -267,7 +267,7 @@ describe('#70 the action FILE drives the TS civ', () => {
     civ.envoysAvailable = 1;
     civ.influencePoints = 100;
     state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [], tech: null, civic: null, envoys: [0, 0, 0], units: [] } } };
-    seatPhase(state, 0);
+    seatPhase(state);
     // pick 1 spends the bank, pick 2 spends 100 influence, pick 3 REFUSES (broke)
     expect(envoysOf(cityState, civ.seat)).toBe(2);
     expect(civ.envoysAvailable).toBe(0);
@@ -281,7 +281,7 @@ describe('#70 the action FILE drives the TS civ', () => {
     const unit = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 8, 8).index, civ.seat)!;
     const where = unit.tileIndex;
     state.seatActions = { [state.turn - 1]: {} };   // record present, this seat absent
-    seatPhase(state, 0);
+    seatPhase(state);
     // Nothing discretionary happened: no production picked, no research
     // picked, no unit moved. The rules still ran — that is what the rest of
     // this suite covers.

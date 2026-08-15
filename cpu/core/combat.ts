@@ -26,7 +26,7 @@ import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, type Belief
 import { revealAround, unexploredByAll } from './fog';
 import { transferCity } from './phase';
 import type { RuleResult } from './rules';
-import { BARB_SEAT, NO_SEAT, allCities, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCiv, seatOf, seatOfCityState, setTileOwner, tileCity, tileForeignTo, tileSeat, unitSeat } from './seats';
+import { BARB_SEAT, NO_SEAT, allCities, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCiv, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE, generalAuraMP } from './aura'; // #70/S2/S3 (B-8): the shared aura predicate
 // The ONE full-MP contract, so the barbarian phase's reset cannot
 // drift from every other seat's. units.ts already imports from here, so this
@@ -1069,12 +1069,15 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
 // Barbarians
 // ---------------------------------------------------------------------------
 
-function campCandidates(state: GameState, seat: number): Tile[] {
+function campCandidates(state: GameState): Tile[] {
   const preferFog = state.fogOfWar;
   return state.map.tiles.filter((t) => {
     if (isWater(t) || isImpassable(t) || t.wonder || t.district || t.builtWonder) return false;
-    if (isCiv(tileSeat(t)) || t.goodyHut) return false;
-    if (tileForeignTo(t, seat)) return false;
+    // CLAIMED ground is out, whoever claimed it. The majors half used to be
+    // spelled `isCiv(tileSeat(t))` and the city-state half `tileForeignTo(t,
+    // seat)` with a seat nobody chose — the same predicate wearing a seat
+    // argument, since a minor's tile is foreign to every major alike.
+    if (tileClaimed(t) || t.goodyHut) return false;
     if (preferFog && !unexploredByAll(state, t.index)) return false; // camps rise in the fog
     // Camps rise away from EVERY civilization's cities. Whose
     // city it is does not enter the spacing rule.
@@ -1301,7 +1304,7 @@ function barbScoutType(): string {
 /** Camps spawn, garrison, raid. Nothing city-side runs here: a city fires
  *  and heals in its OWNER's seatPhase block, through the one body every
  *  seat shares. */
-export function barbarianPhase(state: GameState, seat: number): void {
+export function barbarianPhase(state: GameState): void {
   const map = state.map;
   // Barbarians get their movement in their own phase (self-contained for
   // tests/RL). Through the SAME contract every other seat uses.
@@ -1319,7 +1322,7 @@ export function barbarianPhase(state: GameState, seat: number): void {
   // of the draw-count contract; both engines change together).
   const anyCivCity = state.seats.some((sx) => sx.cities.length > 0);
   if (anyCivCity && state.barbSeat.camps.length < maxCamps && nextRandom(state) < 0.08) {
-    const candidates = campCandidates(state, seat);
+    const candidates = campCandidates(state);
     if (candidates.length > 0) {
       const spot = candidates[Math.floor(nextRandom(state) * candidates.length)];
       state.barbSeat.camps.push(spot.index);

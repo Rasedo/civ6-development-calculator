@@ -18,13 +18,21 @@ and "barb" — the range views are `major_unit_*` / `barb_unit_*`.
 
 ## Storage geometry
 
-One base tensor per fact, seat-indexed; every legacy name is a view:
+ONE base tensor per fact, seat-indexed, and ONE NAME for it. The family
+views (`civ_only_*`, `civ_city_*`, the bare row-0 names) were deleted in
+#111: every reader addresses the base BY ROW, because a second name for a
+row is a second way to write a body that serves one seat.
 
-- `civ_*  [B, 1+R]` — per-seat scalars (treasury, techs, faith, gpp,
-  cap_tile, …). Bare names are row 0, `civ_only_*` names are rows 1+.
-- `city_*  [B, 1+R+S, RC]` — the city block. Row 0 with the `:C` view
-  is seat 0, `civ_city_*` views are the civ rows, city-states sit in
-  the minor section (`citystate_*` views).
+`sim.n_majors` is the major roster width — seat ids 0..n_majors-1, one row
+each, no padding. An OPPONENT count, where one is meant (the war head's
+columns, the observation's per-opponent block), is `n_majors - 1` written
+at the site that means it. There is no `R`.
+
+- `civ_*  [B, n_majors]` — per-seat scalars (treasury, techs, faith, gpp,
+  cap_tile, …), addressed `civ_x[:, row]`.
+- `city_*  [B, n_majors+S, RC]` — the city block. Majors occupy rows
+  0..n_majors-1 at full RC width; a city-state's one city is slot 0 of its
+  own row in the minor section.
 - `unit_*` — one merged unit pool; `major_unit_*` / `barb_unit_*` are
   range views and `unit_seat` holds the owner. A seat's units are found
   by SEAT, never by a window of its own; `_seat_slot_map(row)` maps a
@@ -33,13 +41,14 @@ One base tensor per fact, seat-indexed; every legacy name is a view:
 - Tile planes: `tile_seat` + `tile_city` (owner seat + city id — TS's
   `ownerSeat`/`ownerCity` pair), `centre_slot_at` (owning seat's city
   slot at a centre), `city_slot_at(row)` (that row's owning city slot).
-  `civ_at` and `citystate_at` are cached DERIVED properties keyed on
-  `_tile_owner_ver` — never write them; write the stored planes and
-  bump the version. Ask `tile_seat == row`: `civ_at` speaks the CIV
-  index space (seat r+1 reads as r) and no engine body reads it.
-- Relations: `war/ww/ww_turns` over the compact seat-row space,
-  `civ_pair_*` civ↔civ matrices, `seat_citystate_*` (seat, city-state)
-  pairs.
+  `citystate_at` is a cached DERIVED property keyed on `_tile_owner_ver` —
+  never write it; write `tile_seat` and bump the version. Ownership is
+  `tile_seat == row`, always.
+- Relations: `war/ww/ww_turns` and `seat_warkind/denounced/allied` over
+  the compact seat-row space, `seat_citystate_*` (seat, city-state) pairs.
+
+The four surviving `register_alias` entries are all one geometry the row
+index cannot reach: a city-state's city at `[:, n_majors+s, 0]`.
 
 `_MUTABLE` in `simbase.py` registers BASES only; `snapshot()`/`restore()`
 round-trip them and `restore()` copies in place so views never dangle.

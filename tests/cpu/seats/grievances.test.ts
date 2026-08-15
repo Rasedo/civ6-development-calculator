@@ -56,7 +56,7 @@ describe('B-22 diplomatic favor', () => {
     const state = newGame(1);
     seatOf(state, 0)!.diplomaticFavor = 0;
     seatOf(state, 0)!.government.current = 'MONARCHY';
-    endTurn(state, 0);
+    endTurn(state);
     // no suzerainties in a fresh game -> exactly the tier
     expect(seatOf(state, 0)!.diplomaticFavor).toBe(GOVERNMENTS.MONARCHY.tier);
   });
@@ -74,7 +74,7 @@ describe('B-22 seat-0 grievances', () => {
     const state = newGame(1);
     declareWar(state, (state.seats[1] as Seat).seat, 0);
     const before = seatOf(state, 0)!.warmonger!;
-    endTurn(state, 0);
+    endTurn(state);
     expect(seatOf(state, 0)!.warmonger).toBe(before); // still at war -> no decay
   });
 
@@ -83,16 +83,16 @@ describe('B-22 seat-0 grievances', () => {
     declareWar(state, (state.seats[1] as Seat).seat, 0);
     setWar(state, (state.seats[(0) + 1] as Seat).seat, 0, false); // peace on every axis
     const before = seatOf(state, 0)!.warmonger!;
-    endTurn(state, 0);
+    endTurn(state);
     expect(seatOf(state, 0)!.warmonger).toBe(before - 1);
   });
 
   it('decay floors at zero and never goes negative', () => {
     const state = newGame(1);
     seatOf(state, 0)!.warmonger = 1;
-    endTurn(state, 0);
+    endTurn(state);
     expect(seatOf(state, 0)!.warmonger).toBe(0);
-    endTurn(state, 0);
+    endTurn(state);
     expect(seatOf(state, 0)!.warmonger).toBe(0); // stays put, never negative
   });
 

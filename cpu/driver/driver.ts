@@ -14,9 +14,9 @@
  * Transport is injected (`recv`/`send`): stdio lines for the gate today, a
  * dev server for the UI later. The record schema is the interface.
  */
-import { appendFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import type { DistrictId, GameState, Seat, Tile } from '../core/types';
-import { allCities, civHasStrategic, civsAtWar, seatOf, tileOwnedByCiv, tileSeat } from '../core/seats';
+import { allCities, civHasStrategic, civsAtWar, seatOf, tileOwnedByCiv } from '../core/seats';
 import { hasRiver, isWater } from '../../world/query';
 import { GOLD_PURCHASE_MULT } from '../data/constants';
 import { PEACE_GOLD_COST } from '../data/seats';
@@ -27,7 +27,6 @@ import { isSuzerain } from '../core/cityStates';
 import { pickBorderTile } from '../core/city';
 import { WORSHIP_BUILDINGS, MISSIONARY_CAP, APOSTLE_CAP, ENHANCER_BELIEFS } from '../data/religion';
 import { LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
-import { applyUnitOrders } from '../core/unitOrders';
 import { observeSeat } from '../core/observe';
 import { stateDigest, groupDump } from '../core/statecompare';
 import { validImprovementsIn } from '../core/rules';
@@ -37,19 +36,14 @@ import { prodLayout } from '../core/prodLayout';
 import { UNITS } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 
-/** The slice of seat 0's record the driver still applies itself: unit
- *  orders in the TRIPLES schema (see the apply site). Every other verb in
- *  the record routes through the seatPhase loop via state.seatActions. */
-interface Seat0Rec {
-  units?: [number, number, number][];
-}
-
 export interface DriverOpts {
   state: GameState;
   seed: number;
   turns: number;
   cityMax: number;
   cityStateMax: number;
+  /** The world file's `civMax` — the count of a seat's OPPONENTS, so the
+   *  major roster is `civMax + 1` seats wide (ids 0..civMax). */
   civMax: number;
   horizon: number;
   improvementIds: string[];
@@ -199,7 +193,11 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
 
 export async function runDriver(o: DriverOpts): Promise<void> {
   const { state, seed, turns: N_TURNS, cityMax: CITY_MAX, cityStateMax: CITY_STATE_MAX, civMax: CIV_MAX } = o;
-  let seat0rec: Seat0Rec | null = null;
+  // The MAJOR ROSTER WIDTH. `civMax` counts a seat's opponents, so the seats
+  // it describes are 0..civMax — one more than the number it names. Deriving
+  // the width once is what keeps `<= CIV_MAX` from appearing beside
+  // `< CIV_MAX` in the same file.
+  const N_MAJORS = CIV_MAX + 1;
 for (let t = 0; t < N_TURNS; t++) {
   {
     // S1(b): the handshake — obs out (one per seat, the seat-invariant
@@ -210,7 +208,7 @@ for (let t = 0; t < N_TURNS; t++) {
     // The wire is SEAT-keyed: every key is a seat id, and "0" is a seat like
     // any other.
     const obs: Record<string, number[]> = {};
-    for (let seat = 0; seat <= CIV_MAX; seat++) obs[String(seat)] = observeSeat(state, seat, CITY_MAX, o.horizon, CITY_STATE_MAX);
+    for (let seat = 0; seat < N_MAJORS; seat++) obs[String(seat)] = observeSeat(state, seat, CITY_MAX, o.horizon, CITY_STATE_MAX);
     // per-unit obs twins — the drive.py extractors' TS mirrors, per
     // seat unit IN UNIT-ARRAY ORDER (the proven slot-map mirror):
     // job = nearest hasJob tile (d*T + index key, ties lowest);
@@ -219,75 +217,24 @@ for (let t = 0; t < N_TURNS; t++) {
     const jobsMsg: Record<string, number[]> = {};
     const spreadsMsg: Record<string, number[]> = {};
     const buysMsg: Record<string, number[]> = {};
-        const nT = state.map.tiles.length;
-    {
-      // Seat 0's job rows — the SAME job predicate over its own planes
-      // (_seat_job_mask's TS mirror), rows per LIVE seat-0 unit in array
-      // order (the GPU compacts its raw p-pool rows by p_alive to match).
-      // SPREAD stays EMPTY: seat-0 religion founding has no GPU twin yet
-      // — the gate compares the shared gate, not TS's richer plane.
-      const jr0: number[] = [];
-      const sr0: number[] = [];
-      const owns0 = (t: Tile) => tileSeat(t) === 0;
-      const unl0 = computeUnlocksIn(seatOf(state, 0)!.research);
-      const jobTiles0 = state.map.tiles.filter((t) =>
-        owns0(t) && !isWater(t)
-        && (t.pillaged || t.districtPillaged
-          || (!t.improvement && validImprovementsIn(t, { unlocks: unl0, ownsTile: owns0, map: state.map }).length > 0)));
-      for (const u of state.units) {
-        if (u.seat !== 0) continue;
-        let jt = -1;
-        if (UNITS[u.type]?.charges !== undefined && (u.charges ?? 0) > 0) {
-          const ut = state.map.tiles[u.tileIndex];
-          let bk = Infinity;
-          for (const t of jobTiles0) {
-            const k = hexDistance(ut.col, ut.row, t.col, t.row) * nT + t.index;
-            if (k < bk) { bk = k; jt = t.index; }
-          }
-        }
-        jr0.push(jt);
-        sr0.push(-1);
-      }
-      jobsMsg['0'] = jr0;
-      spreadsMsg['0'] = sr0;
-      // seat 0's BUY candidates ride the SAME body every seat's do
-      buysMsg['0'] = buyCandidateRow(state, seatOf(state, 0)!);
-      if (process.env.CIV6_SERVE_DEBUG_JOB0 && state.turn === Number(process.env.CIV6_SERVE_DEBUG_JOB0)) {
-        for (const u of state.units) {
-          if (u.seat !== 0) continue;
-          appendFileSync('.claude/scratchpad/job0_ts.txt', JSON.stringify({
-            unit: u.type, tile: u.tileIndex, charges: u.charges ?? null, moves: u.movesLeft,
-          }) + String.fromCharCode(10));
-        }
-        for (const ti of (process.env.CIV6_SERVE_DEBUG_TILES ?? '').split(',').filter(Boolean).map(Number)) {
-          const t0d = state.map.tiles[ti];
-          appendFileSync('.claude/scratchpad/job0_ts.txt', JSON.stringify({
-            ti, terrain: t0d.terrain, elev: t0d.elevation, feature: t0d.feature,
-            res: t0d.resource, district: t0d.district, wonder: t0d.wonder,
-            builtWonder: t0d.builtWonder, imp: t0d.improvement, pill: t0d.pillaged,
-            owns: tileSeat(t0d) === 0,
-            valid: validImprovementsIn(t0d, { unlocks: unl0, ownsTile: owns0, map: state.map }),
-          }) + String.fromCharCode(10));
-        }
-      }
-    }
-    for (let r = 0; r < CIV_MAX; r++) {
-      const civSeat = state.seats[r + 1];
+    const nT = state.map.tiles.length;
+    for (let seat = 0; seat < N_MAJORS; seat++) {
+      const actor = seatOf(state, seat);
       const jr: number[] = [];
       const sr: number[] = [];
-      if (civSeat) {
-        const owns = (t: Tile) => tileOwnedByCiv(t, civSeat.seat);
-        const unl = computeUnlocksIn(civSeat.research);
+      if (actor) {
+        const owns = (t: Tile) => tileOwnedByCiv(t, seat);
+        const unl = computeUnlocksIn(actor.research);
         const jobTiles = state.map.tiles.filter((t) =>
           owns(t) && !isWater(t)
           && (t.pillaged || t.districtPillaged
             || (!t.improvement && validImprovementsIn(t, { unlocks: unl, ownsTile: owns, map: state.map }).length > 0)));
-        const g = r + 1;
-        const spreadTargets = civSeat.religion.founded
-          ? allCities(state).filter((c) => c.followedReligion !== g)
+        // The religion GROUP id IS the seat id, on both engines.
+        const spreadTargets = actor.religion.founded
+          ? allCities(state).filter((c) => c.followedReligion !== seat)
           : [];
         for (const u of state.units) {
-          if (u.seat !== civSeat.seat) continue;
+          if (u.seat !== seat) continue;
           let jt = -1;
           if (UNITS[u.type]?.charges !== undefined && (u.charges ?? 0) > 0) {
             const ut = state.map.tiles[u.tileIndex];
@@ -310,43 +257,39 @@ for (let t = 0; t < N_TURNS; t++) {
           }
           sr.push(st);
         }
-        buysMsg[String(r + 1)] = buyCandidateRow(state, civSeat);
+        buysMsg[String(seat)] = buyCandidateRow(state, actor);
       }
-      jobsMsg[String(r + 1)] = jr;   // seat-keyed wire
-      spreadsMsg[String(r + 1)] = sr;
+      jobsMsg[String(seat)] = jr;   // seat-keyed wire
+      spreadsMsg[String(seat)] = sr;
     }
     o.send({ t: state.turn, obs, jobs: jobsMsg, spreads: spreadsMsg, buys: buysMsg });
     const msg = JSON.parse(await o.recv()) as { recs?: Record<string, unknown> };
     if (msg.recs && Object.keys(msg.recs).length) {
       // The rec keys are SEAT ids and storage is seat-keyed too — the
       // seatPhase loop reads state.seatActions[turn][actor.seat] for EVERY
-      // seat, 0 included. Only seat 0's unit triples are applied off-loop.
+      // seat, 0 included, and EVERY verb in the record (production, tech,
+      // civic, war, envoys, buys, geo and the unit ranks) is consumed there.
+      // Nothing is applied off-loop any more: #108 retired the seat-0 TRIPLES
+      // schema, so one record shape reaches one applier at one position.
       const bySeat: Record<number, unknown> = {};
       for (const [sid, rec] of Object.entries(msg.recs)) {
         bySeat[Number(sid)] = rec;
       }
       (state.seatActions as unknown as Record<number, unknown>)[state.turn - 1] = bySeat;
-      seat0rec = (msg.recs as Record<string, Seat0Rec | undefined>)['0'] ?? null;
     }
   }
-  if (seat0rec?.units) {
-    // UNITS only — the ONE seat-0 verb still applied off-loop. Seat 0's unit
-    // orders ride the TRIPLES schema ([tile, action, civilianFlag]); the
-    // seatPhase walkers read per-unit ROWS, so routing them there means
-    // unifying the unit wire first (#108). Position is load-bearing: the GPU
-    // steps seat-0 units at the top of step(), before the production
-    // section's district scan reads tile.improvement — a same-turn build
-    // must precede the scan on BOTH engines.
-    applyUnitOrders(state, seat0rec.units, o.improvementIds as unknown as string[], 0);
-  }
-  // Every OTHER seat-0 verb (production, tech, civic, envoys, buys, geo) is
-  // consumed by the seatPhase loop from state.seatActions like every seat's.
   // CIV6_EXPORT_DEBUG=<seed>: narrate that seed's turn events for diagnosis.
   const evBefore = state.eventLog.length;
-  endTurn(state, 0);
+  endTurn(state);
   if (process.env.CIV6_EXPORT_DEBUG === String(seed)) {
     for (const line of state.eventLog.slice(evBefore)) console.log(`t${state.turn - 1} ${line}`);
-    console.log(`t${state.turn - 1} cities=${seatOf(state, 0)!.cities.length} pop=${seatOf(state, 0)!.cities.map((c) => c.population).join(',')}`);
+    // EVERY major, not just seat 0 — a divergence rarely announces which seat
+    // it belongs to, and a probe that only watches one seat cannot say.
+    for (let s = 0; s < N_MAJORS; s++) {
+      const sx = state.seats[s];
+      if (!sx) continue;
+      console.log(`t${state.turn - 1} seat ${s} cities=${sx.cities.length} pop=${sx.cities.map((c) => c.population).join(',')}`);
+    }
   }
   // #105 (owner override): the TRACE is DELETED — the state-compare digest
   // IS the per-turn comparison, always on.

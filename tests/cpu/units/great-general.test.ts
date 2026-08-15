@@ -136,7 +136,7 @@ describe('B7-G (B-8) spawn-at-claim & capture', () => {
     // fund exactly one GENERAL; advanceGreatPeople (in endTurn) claims + spawns.
     seatOf(state, 0)!.gpp.GENERAL = gpCost(0);
     const before = state.units.filter((u) => (u.seat) === 0 && u.type === 'GENERAL').length;
-    endTurn(state, 0);
+    endTurn(state);
     const after = state.units.filter((u) => (u.seat) === 0 && u.type === 'GENERAL');
     expect(after.length).toBe(before + 1);
     // spawned at/adjacent to the capital, a civilian with 1 charge

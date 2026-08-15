@@ -122,7 +122,7 @@ describe('civ placement and expansion', () => {
     civ.cities[0].queue.push({ kind: 'settler', progress: 500, cost: 90 });
     const claimedBefore = state.map.tiles.filter((t) => tileClaimed(t)).length;
     state.turn = 9; // border-expansion tick for city id 0
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(civ.cities.length).toBe(2);
     const claimedAfter = state.map.tiles.filter((t) => tileClaimed(t)).length;
     expect(claimedAfter).toBeGreaterThan(claimedBefore);
@@ -146,7 +146,7 @@ describe('A-24 civ district/tile registry coherence', () => {
     // must never fire — placements/captures keep .districts and Tile.ownerCity
     // mutually consistent. Also assert directly each turn for tight failure.
     for (let i = 0; i < 80; i++) {
-      endTurn(state, 0);
+      endTurn(state);
       assertCityRegistryCoherent(state);
     }
     // sanity: the other civs actually placed some districts to make the check meaningful
@@ -180,7 +180,7 @@ describe('races', () => {
     const civ = addCiv(state, 6, 6);
     civ.gpp.SCIENTIST = gpCost(0); // about to claim
     const before = greatPeopleEarned(state, 'SCIENTIST');
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(greatPeopleEarned(state, 'SCIENTIST')).toBe(before + 1);
     expect(state.eventLog.some((e) => e.includes('claimed'))).toBe(true);
   });
@@ -189,7 +189,7 @@ describe('races', () => {
     // The pantheon costs the civ 25 of its OWN faith.
     const state = makeState();
     const civ = addCiv(state, 6, 6, { religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, faith: 25 });
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(state.claimedPantheons.length).toBe(1);
     expect(civ.faith ?? 0).toBeLessThan(25); // the claim spent it
     const taken = state.claimedPantheons[0];
@@ -201,7 +201,7 @@ describe('races', () => {
     const state = makeState();
     addCiv(state, 6, 6, { religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, faith: 0 });
     state.turn = 30;
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(state.claimedPantheons.length).toBe(0);
   });
 });
@@ -232,7 +232,7 @@ describe('war and peace', () => {
     farm.improvement = 'FARM';
     const raider = spawnUnit(state, 'WARRIOR', farm.index, civ.seat)!;
     raider.tileIndex = farm.index;
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(farm.pillaged).toBe(true);
   });
 
@@ -396,11 +396,11 @@ describe('determinism', () => {
     });
     const sites = a.map.tiles.filter((t) => canFoundCity(a, t.index, 0).ok);
     foundCity(a, sites[Math.floor(sites.length / 2)].index, 0);
-    for (let i = 0; i < 5; i++) endTurn(a, 0);
+    for (let i = 0; i < 5; i++) endTurn(a);
     const b = deserialize(serialize(a));
     for (let i = 0; i < 12; i++) {
-      endTurn(a, 0);
-      endTurn(b, 0);
+      endTurn(a);
+      endTurn(b);
     }
     expect(serialize(a)).toBe(serialize(b));
   });
@@ -453,13 +453,13 @@ describe('civ trade routes (A-11)', () => {
     const civ = addCiv(state, 8, 8);
     const second = addSecondCity(state, civ, 11, 8);
     civ.research.civics.push('FOREIGN_TRADE');
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(civ.tradeRoutes?.length).toBe(1);
     const r0 = civ.tradeRoutes![0];
     expect([civ.cities[0].id, second.id]).toContain(r0.from);
     expect([civ.cities[0].id, second.id]).toContain(r0.to);
     expect(r0.from).not.toBe(r0.to);
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(civ.tradeRoutes?.length).toBe(1); // capacity 1: no second route
     // endpoint death prunes
     civ.tradeRoutes = civ.tradeRoutes!.filter(() => true);
@@ -539,7 +539,7 @@ describe('civ CS trade routes (A-12b)', () => {
     setMet(cityState, civ.seat);
     const civCity = civ.cities[0];
     const y0 = computeCityStats(state, civCity).total;
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(civ.tradeRoutes?.length).toBe(1);
     expect(civ.tradeRoutes![0]).toEqual({ from: civCity.id, toCs: cityState.id, expiresTurn: state.turn + 20 }); // B-23 duration
     const y1 = computeCityStats(state, civCity).total;

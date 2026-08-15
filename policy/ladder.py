@@ -73,20 +73,25 @@ PER_CITY = 10  # alive, pop/10, foodBox/need, progress/cost, cultureBox/cost,
 # carries the price itself rather than a boost flag — see `pick_research`.
 
 
-def split(obs: torch.Tensor, n_cs: int, n_civs: int, n_cities: int,
+def split(obs: torch.Tensor, n_cs: int, n_opponents: int, n_cities: int,
           n_techs: int, n_civics: int) -> dict[str, torch.Tensor]:
     """Slice a [B, F] observation into its blocks.
 
     The layout is positional and shared with TS; anything reading an
     observation goes through here rather than hardcoding offsets a second
-    time — the second copy is how the schema drifts."""
+    time — the second copy is how the schema drifts.
+
+    `n_opponents` is the `cv` block's row count: an observation renders the
+    OTHER majors, never the asker, so it is one short of the roster. It was
+    called `n_civs` and fed `sim.R` until #115, which read like the roster
+    size and was not."""
     b = obs.shape[0]
     i = EMP
     emp = obs[:, :i]
     cs = obs[:, i:i + PER_CS * n_cs].reshape(b, n_cs, PER_CS)
     i += PER_CS * n_cs
-    cv = obs[:, i:i + PER_CIV * n_civs].reshape(b, n_civs, PER_CIV)
-    i += PER_CIV * n_civs
+    cv = obs[:, i:i + PER_CIV * n_opponents].reshape(b, n_opponents, PER_CIV)
+    i += PER_CIV * n_opponents
     city = obs[:, i:i + PER_CITY * n_cities].reshape(b, n_cities, PER_CITY)
     i += PER_CITY * n_cities
     # the three ESCALATING production costs — district, settler, builder.
@@ -251,9 +256,9 @@ def pick_faith(worship_ok: torch.Tensor, missionary_ok: torch.Tensor, apostle_ok
 def pick_war(mask: torch.Tensor, ctx: dict, rng: dict) -> torch.Tensor:
     """[B] long — the WAR verb: declare on an opponent, or sue it for peace.
 
-    `mask` is seat_masks['war'] [B, 2R] over `war_targets(row)` — the other
+    `mask` is seat_masks['war'] [B, 2*n_opponents] over `war_targets(row)` — the other
     majors in ascending seat order, the same layout for every seat. Column k
-    DECLARES on the k-th such opponent (both alive, at peace); column R+k SUES
+    DECLARES on the k-th such opponent (both alive, at peace); column n_opponents+k SUES
     that same one (at war, THAT war's clock >= min, peace gold affordable).
     Legality is the engine's. Everything else here is POLICY: the sue chance
     (0.25), the DoW conditions (that opponent has cities, this seat has been
@@ -261,7 +266,7 @@ def pick_war(mask: torch.Tensor, ctx: dict, rng: dict) -> torch.Tensor:
     strength edge over THEM) and the DoW chance (0.08 · (0.5 + aggression)).
 
     `ctx` mixes two shapes and the distinction is the point: the opponent
-    terms (`opp_str`, `prox`, `gang`, `has_cities`) are [B, R], one column per
+    terms (`opp_str`, `prox`, `gang`, `has_cities`) are [B, n_opponents], one column per
     opponent, so this compares them; the asker's own (`own_str`,
     `peace_turns`, `aggression`) are [B].
 
@@ -279,16 +284,16 @@ def pick_war(mask: torch.Tensor, ctx: dict, rng: dict) -> torch.Tensor:
     Returns the war-head column, or -1.
     """
     B, W2 = mask.shape
-    R = W2 // 2
+    n_opp = W2 // 2
     out = torch.full((B,), -1, dtype=torch.long, device=mask.device)
-    if R == 0:
+    if n_opp == 0:
         return out  # a lone major has nobody to declare on
     # the scripted order: the war branch's sue roll runs before the peace
     # branch's DoW roll, and a seat is only ever in one branch
-    sue_k = first_legal(mask[:, R:] & (rng["peace"] < 0.25).unsqueeze(1))
-    out = torch.where(sue_k >= 0, R + sue_k, out)
+    sue_k = first_legal(mask[:, n_opp:] & (rng["peace"] < 0.25).unsqueeze(1))
+    out = torch.where(sue_k >= 0, n_opp + sue_k, out)
     dow_k = first_legal(
-        mask[:, :R]
+        mask[:, :n_opp]
         & ctx["has_cities"]
         & (ctx["prox"] <= 9)
         & (ctx["gang"] | (ctx["own_str"].unsqueeze(1) > ctx["opp_str"] * 1.3))

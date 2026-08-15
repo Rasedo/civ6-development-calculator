@@ -58,7 +58,7 @@ describe('B-25 science victory', () => {
     for (const id of CHAIN) {
       // Drive completion through the real endTurn queue path (progress pre-filled).
       city.queue = [{ kind: 'project', project: id, progress: 100000, cost: 1 }];
-      endTurn(state, 0);
+      endTurn(state);
       expect(seatOf(state, 0)!.spaceProjects).toContain(id);
     }
     expect(state.victoryType).toBe(3);
@@ -70,7 +70,7 @@ describe('B-25 science victory', () => {
     const { state } = newGameWithCampus(1);
     const civCity = (state.seats[(0) + 1] as Seat).cities[0];
     civCity.queue = [{ kind: 'project', project: 'EXOPLANET_EXPEDITION', progress: 100000, cost: 1 }];
-    endTurn(state, 0);
+    endTurn(state);
     expect(state.victoryType).toBe(3);
     expect(state.victoryRow).toBe(1);
     expect(state.gameOver).toBe(true);

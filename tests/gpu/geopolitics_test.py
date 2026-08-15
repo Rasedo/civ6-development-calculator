@@ -75,7 +75,7 @@ def geo_denounce(sim) -> None:
 # has one, seat 0 included, and `_apply_war_column` is the only entry.
 def war_column(sim, row: int, tgt: int, sue: bool = False) -> torch.Tensor:
     k = sim.war_targets(row).index(tgt)
-    col = (max(sim.R, 1) + k) if sue else k
+    col = (sim.n_majors - 1 + k) if sue else k
     return torch.full((sim.B,), col, dtype=torch.long, device=sim.device)
 
 
@@ -96,7 +96,7 @@ def clear_pairs(sim):
     """Wipe every pair-war artifact so a poke starts from a clean matrix. ONE
     block over the major rows — row 0's relations live in the same planes as
     every other row's, so there is nothing to clear separately."""
-    nrow = 1 + sim.R
+    nrow = sim.n_majors
     sim.war[:, :nrow, :nrow] = False
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     sim.war_turns[:, :nrow, :nrow] = 0
@@ -122,7 +122,7 @@ def controlled_pair(rules, path, extra_for_a: bool = True):
     8 v 8) — plus, when extra_for_a, a spare city for row 1 ADJACENT to row
     2's capital (16 v 8: si > sj AND si > sj*1.3, proximity 1)."""
     sim = build(rules, path)
-    assert sim.R >= 2, "fixtures must carry two civs"
+    assert sim.n_majors >= 3, "fixtures must carry two civs"
     sim.major_unit_alive[:] = False  # strengths reduce to nCities*8 exactly
     ja = keep_capital_only(sim, 1)
     jb = keep_capital_only(sim, 2)
@@ -145,7 +145,7 @@ def poke_substrate(rules, path):
     block under test spans EVERY major row, seat 0 included — the round that
     made the head the one war entry made row 0 a row of these planes."""
     sim = build(rules, path)
-    nrow = 1 + sim.R
+    nrow = sim.n_majors
     assert sim.war.dtype == torch.bool and sim.seat_warkind.dtype == torch.bool
     assert sim.seat_denounced.dtype == torch.long and sim.war_turns.dtype == torch.long
     for _p in ("seat_warkind", "seat_denounced", "seat_allied"):
@@ -390,13 +390,13 @@ def poke_transfer(rules, path):
     """g. _transfer_city: loser hygiene, POOL-END append, tile re-key,
     _eff_version bump, _check_rc_registry_invariant green."""
     sim = build(rules, path)
-    civ_only_from = next(r for r in range(sim.R) if bool(sim.city_alive[0, r + 1].any()))
-    civ_only_to = next(r for r in range(sim.R) if r != civ_only_from)
+    civ_only_from = next(r for r in range(sim.n_majors - 1) if bool(sim.city_alive[0, r + 1].any()))
+    civ_only_to = next(r for r in range(sim.n_majors - 1) if r != civ_only_from)
     j = int(sim.city_alive[0, civ_only_from + 1].nonzero(as_tuple=True)[0][0])
     c_t = int(sim.city_center[0, civ_only_from + 1, j])
     id_from = int(sim.city_id[0, civ_only_from + 1, j])
     id_next = int(sim.civ_next_city_id[0, civ_only_to + 1])
-    own = (sim.tile_city[0] == id_from) & (sim.civ_at[0] == civ_only_from)
+    own = (sim.tile_city[0] == id_from) & (sim.tile_seat[0] == civ_only_from + 1)
     n_own = int(own.sum())
     occ = sim.city_alive[0, civ_only_to + 1].nonzero(as_tuple=True)[0]
     exp_slot = int(occ.max()) + 1 if len(occ) else 0
@@ -414,7 +414,7 @@ def poke_transfer(rules, path):
     assert int(sim.city_id[0, civ_only_to + 1, exp_slot]) == id_next and int(sim.civ_next_city_id[0, civ_only_to + 1]) == id_next + 1
     assert int(sim.centre_slot_at[0, c_t]) >= 0 and int(sim.tile_seat[0, c_t]) == civ_only_to + 1, (
         "the center tile must re-seat to the receiver")
-    rekeyed = (sim.tile_city[0] == id_next) & (sim.civ_at[0] == civ_only_to)
+    rekeyed = (sim.tile_city[0] == id_next) & (sim.tile_seat[0] == civ_only_to + 1)
     assert int(rekeyed.sum()) == n_own, (
         f"A-17: exactly the flipping city's {n_own} tiles must re-key to the receiver ({int(rekeyed.sum())})"
     )
@@ -488,7 +488,7 @@ def main() -> None:
     s3.restore(_snap)
     assert int(s3.civ_warmonger[0, 0]) == 7, "warmonger must survive snapshot/restore"
     # decay only at peace on EVERY axis, floored at 0
-    s3.war[:, 0, 1:1 + s3.R] = s3.war[:, 1:1 + s3.R, 0] = False
+    s3.war[:, 0, 1:s3.n_majors] = s3.war[:, 1:s3.n_majors, 0] = False
     s3.sync_war()  # a poke writes one cell; close the war matrix under transpose
     s3.civ_warmonger[:, 0] = 2
     s3.step()
@@ -511,7 +511,7 @@ def main() -> None:
     assert int(s4._suzerain_count(0)[0]) == 0, "below the envoy minimum is not suzerainty"
     s4.seat_citystate_envoys[:, 0, 0] = suz_min
     assert int(s4._suzerain_count(0)[0]) == 1, "at the minimum with no civ contest -> suzerain"
-    if s4.R > 0:
+    if s4.n_majors > 1:
         s4.seat_citystate_envoys[:, 1, 0] = suz_min  # a TIE leaves no suzerain (real Civ 6)
         assert int(s4._suzerain_count(0)[0]) == 0, "a tie must leave NO suzerain"
         s4.seat_citystate_envoys[:, 1, 0] = suz_min + 1
@@ -559,12 +559,12 @@ def main() -> None:
             _era_ok = _t
             break
     assert _era_ok is not None, "no tech reaches the Medieval era — check the era table"
-    if s6.R > 0:
+    if s6.n_majors > 1:
         s6.civ_diplo_favor[:, 1] = 90  # the civ seat outspends seat 0, 90 vs 50
     s6._world_congress()
     assert int(s6.congress_sessions[0]) == 1, "the session must convene"
     assert int(s6.civ_diplo_favor[0, 0]) == 0, "every commitment is spent"
-    if s6.R > 0:
+    if s6.n_majors > 1:
         assert int(s6.civ_diplo_favor[0, 1]) == 0, "the winner's favor is spent too"
         assert int(s6.civ_diplo_points[0, 1]) == s6._dvp_per_res, "the largest commitment takes the point"
         assert int(s6.civ_diplo_points[0, 0]) == 0, "the loser takes nothing"
@@ -574,11 +574,11 @@ def main() -> None:
     s7.turn = s7._congress_interval
     s7.civ_techs[:, 0].zero_(); s7.civ_techs[:, 0, _era_ok] = True
     s7.civ_diplo_favor[:, 0] = 25
-    if s7.R > 0:
+    if s7.n_majors > 1:
         s7.civ_diplo_favor[:, 1] = 25
     s7._world_congress()
     assert int(s7.civ_diplo_points[0, 0]) == s7._dvp_per_res, "a tie must go to the lower civ id"
-    if s7.R > 0:
+    if s7.n_majors > 1:
         assert int(s7.civ_diplo_points[0, 1]) == 0
 
     # zero favor everywhere: the session counts but awards nothing
@@ -595,7 +595,7 @@ def main() -> None:
     assert int(s9._diplomatic_victor()[0]) == -1, "one point short is not a win"
     s9.civ_diplo_points[:, 0] = s9._dvp_win
     assert int(s9._diplomatic_victor()[0]) == 0, "seat 0 wins at the threshold"
-    if s9.R > 0:
+    if s9.n_majors > 1:
         s9.civ_diplo_points[:, 0].zero_()
         s9.civ_diplo_points[:, 1] = s9._dvp_win
         assert int(s9._diplomatic_victor()[0]) == 1, "a civ wins at the threshold"

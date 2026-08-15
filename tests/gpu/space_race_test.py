@@ -66,7 +66,7 @@ def main() -> None:
     assert sim._space_step == {i: k for k, (i, _) in enumerate(space)}, "chain-step map mismatch"
     assert sim._space_victory_idx == {space[-1][0]}, "victory step index mismatch"
     assert "space_done" in _MUTABLE, "space_done must be registered in _MUTABLE"
-    assert sim.space_done.shape == (sim.B, 1 + sim.R, 6), f"space_done shape {tuple(sim.space_done.shape)}"
+    assert sim.space_done.shape == (sim.B, sim.n_majors, 6), f"space_done shape {tuple(sim.space_done.shape)}"
 
     # --- 3) a CIV completes the victory step -> victoryType 4 (DEFEAT) ---
     #   Force a live civ capital to hold the EXOPLANET_EXPEDITION project at
@@ -74,7 +74,7 @@ def main() -> None:
     #   space_done (civ r+1, last step), victoryType 4, and game_over. This is
     #   the production.ts completeProject twin (rc.queue = [EXOPLANET...] in
     #   the TS poke). Civs never SELECT a space row, so plant it directly.
-    assert sim.R >= 1, "need at least one civ for the defeat path"
+    assert sim.n_majors >= 2, "need at least one civ for the defeat path"
     sim2 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     r, j = 0, 0
     assert bool(sim2.civ_alive[0, r + 1]) and bool(sim2.city_alive[0, r + 1, j]), "civ capital must be alive at turn 0"

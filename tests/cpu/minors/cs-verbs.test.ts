@@ -133,7 +133,7 @@ describe('A-12 (B8-L): civ levy', () => {
     setWar(state, civ.seat, 0, true);
     civ.treasury = LEVY_GOLD_COST; // exactly the price — nothing else spends gold without a record
     stashLevy(state, civ.seat, state.cityStates.indexOf(cityState));
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(cityState.lastLevyTurn).toBe(state.turn);
     expect(levyUnitsNear(state, civ, cityState)).toBe(LEVY_UNITS);
   });
@@ -142,7 +142,7 @@ describe('A-12 (B8-L): civ levy', () => {
     const { state, civ, cityState } = scenario();
     setWar(state, civ.seat, 0, true);
     civ.treasury = LEVY_GOLD_COST;
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(cityState.lastLevyTurn).toBeUndefined();
   });
 
@@ -151,7 +151,7 @@ describe('A-12 (B8-L): civ levy', () => {
     setWar(state, civ.seat, 0, false);
     civ.treasury = LEVY_GOLD_COST;
     stashLevy(state, civ.seat, state.cityStates.indexOf(cityState));
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(cityState.lastLevyTurn).toBe(state.turn);
   });
 
@@ -161,7 +161,7 @@ describe('A-12 (B8-L): civ levy', () => {
     setWar(state, civ.seat, 0, true);
     civ.treasury = LEVY_GOLD_COST;
     stashLevy(state, civ.seat, state.cityStates.indexOf(cityState));
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(cityState.lastLevyTurn).toBeUndefined();
   });
 
@@ -170,7 +170,7 @@ describe('A-12 (B8-L): civ levy', () => {
     setWar(state, civ.seat, 0, true);
     civ.treasury = LEVY_GOLD_COST - 1;
     stashLevy(state, civ.seat, state.cityStates.indexOf(cityState));
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(cityState.lastLevyTurn).toBeUndefined();
   });
 
@@ -181,7 +181,7 @@ describe('A-12 (B8-L): civ levy', () => {
     cityState.lastLevyTurn = state.turn - (LEVY_COOLDOWN - 1); // still cooling down
     const before = levyUnitsNear(state, civ, cityState);
     stashLevy(state, civ.seat, state.cityStates.indexOf(cityState));
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(cityState.lastLevyTurn).toBe(state.turn - (LEVY_COOLDOWN - 1)); // unchanged
     expect(levyUnitsNear(state, civ, cityState)).toBe(before);
   });
@@ -204,7 +204,7 @@ describe('A-12 (B8-L): civ quests (deterministic, zero-draw)', () => {
   it('issues buildDistrict when no camp is near and the district is unbuilt (zero-draw)', () => {
     const { state, civ, cityState } = scenario('scientific');
     const rng0 = state.rngState;
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(cityState.seatQuest?.[civ.seat]?.kind).toBe('buildDistrict');
     expect(cityState.seatQuest?.[civ.seat]?.district).toBe(CITY_STATE_TYPE_DISTRICT['scientific']);
     expect(state.rngState).toBe(rng0); // NO nextRandom consumed by the civ-quest path
@@ -218,7 +218,7 @@ describe('A-12 (B8-L): civ quests (deterministic, zero-draw)', () => {
     const close = near[0].index;
     state.barbSeat.camps = [far, close]; // out of array order — nearest must still win
     const rng0 = state.rngState;
-    seatPhase(state, 0);
+    seatPhase(state);
     const q = cityState.seatQuest?.[civ.seat];
     expect(q?.kind).toBe('clearCamp');
     // nearest to the CS center
@@ -238,7 +238,7 @@ describe('A-12 (B8-L): civ quests (deterministic, zero-draw)', () => {
     state.barbSeat.camps = []; // camp 999 gone
     const env0 = envoysOf(cityState, civ.seat);
     const rng0 = state.rngState;
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(cityState.seatQuest?.[civ.seat]).toBeNull();
     expect(envoysOf(cityState, civ.seat)).toBe(env0 + QUEST_ENVOYS);
     expect(state.rngState).toBe(rng0);
@@ -247,7 +247,7 @@ describe('A-12 (B8-L): civ quests (deterministic, zero-draw)', () => {
   it('does not issue a quest for an UNMET city-state', () => {
     const { state, civ, cityState } = scenario('scientific');
     cityState.met = cityState.met.filter((x) => x !== civ.seat);
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(cityState.seatQuest?.[civ.seat] ?? null).toBeNull();
   });
 });
@@ -278,7 +278,7 @@ describe('A-12 (B8-L): SEAT-0 quest draw-count neutrality', () => {
     cs2.envoys[civ.seat] = 3;
     state.barbSeat.camps = [];
     const rng0 = state.rngState;
-    seatPhase(state, 0);
+    seatPhase(state);
     // both a resolve and an issue happened, drawing nothing
     expect(cityState.seatQuest?.[civ.seat]).toBeNull();
     expect(cs2.seatQuest?.[civ.seat]?.kind).toBe('buildDistrict');
@@ -295,7 +295,7 @@ describe('A-12 (B8-L): SEAT-0 quest draw-count neutrality', () => {
     cityState.seatQuestIssuedTurn = [state.turn - QUEST_COOLDOWN]; // due to issue
     state.barbSeat.camps = [];
     const rng0 = state.rngState;
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(cityState.seatQuest?.[0]).not.toBeNull();
     // scientific -> the type's own district, not a draw from a flat list
     expect(cityState.seatQuest?.[0]?.kind).toBe('buildDistrict');

@@ -81,7 +81,8 @@ def test_spawn_probe_obeys_encampments() -> None:
         return
     t = free_land(sim)
     # make `t` a live civ-0 Encampment tile at war with seat 0
-    sim.civ_at[0, t] = 0
+    sim.tile_seat[0, t] = 1      # seat 1's land
+    sim._tile_owner_ver += 1
     sim.district[0, t] = sim._encamp_didx
     sim.district_complete[0, t] = True
     sim.district_pillaged[0, t] = False

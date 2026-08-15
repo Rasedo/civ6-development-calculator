@@ -132,7 +132,7 @@ describe('chops and harvests', () => {
     const banked = city.productionBank ?? 0;
     expect(banked).toBeGreaterThan(0);
     queueBuilding(state, city.id, 'MONUMENT', 0);
-    endTurn(state, 0);
+    endTurn(state);
     const head = city.queue[0];
     if (head) {
       expect(head.progress).toBeGreaterThanOrEqual(banked);
@@ -200,7 +200,7 @@ describe('district projects', () => {
 
     city.queue[0].progress = cost; // about to finish
     const sciBefore = seatOf(state, 0)!.scienceTotal;
-    endTurn(state, 0);
+    endTurn(state);
     const lump = Math.round(cost * PROJECT_YIELD_FRACTION);
     const gpp = Math.round(cost * PROJECT_GPP_FRACTION);
     expect(city.queue.length).toBe(0);
@@ -220,7 +220,7 @@ describe('district projects', () => {
     queueProject(state, city.id, 'TRAINING', 0);
     const cost = itemCost(city.queue[0]);
     city.queue[0].progress = cost;
-    endTurn(state, 0);
+    endTurn(state);
     expect(seatOf(state, 0)!.gpp.GENERAL ?? 0).toBeGreaterThanOrEqual(
       Math.round(cost * PROJECT_GPP_FRACTION),
     );
@@ -247,7 +247,7 @@ describe('district projects', () => {
     const control = makeState();
     const cc = foundAt(control, 5, 5);
     addDistrict(control, cc, 'THEATER_SQUARE', 6, 5);
-    endTurn(control, 0);
+    endTurn(control);
     const base = seatOf(control, 0)!.gpp.WRITER ?? 0;
 
     const state = makeState();
@@ -257,7 +257,7 @@ describe('district projects', () => {
     expect(r.ok).toBe(true);
     const cost = itemCost(city.queue[0]);
     city.queue[0].progress = cost;
-    endTurn(state, 0);
+    endTurn(state);
 
     const each = Math.round(cost * 0.11);
     expect(each).toBeGreaterThan(0);

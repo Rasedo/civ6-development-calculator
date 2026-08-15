@@ -177,7 +177,7 @@ def test_suzerain(rules, path) -> None:
         sim.citystate_alive[0, 1:] = False
     # seat 0 STRICTLY suzerain of CS0: 4 envoys, civ seats at 0
     sim.seat_citystate_envoys[0, 0, 0] = 4
-    if sim.R > 0:
+    if sim.n_majors > 1:
         sim.seat_citystate_envoys[0, 1:, 0] = 0
     suz_amt = float(sim._citystate_suz_amt)
 
@@ -193,7 +193,7 @@ def test_suzerain(rules, path) -> None:
     print(f"  seat-0 suzerain OK: capital science shipped {ship:.2f} vs descoped {desc:.2f} (+{suz_amt} pre-amenity)")
 
     # contest lost: a civ seat out-envoys seat 0 -> no perk
-    if sim.R > 0:
+    if sim.n_majors > 1:
         sim.citystate_suz_key[0, 0] = SCIENCE
         sim.seat_citystate_envoys[0, 1, 0] = 9  # civ 0 dominates
         sim._eff_version += 1
@@ -207,7 +207,7 @@ def test_civ_bonus(rules, path) -> None:
     sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
     for _ in range(20):
         sim.step()
-    if sim.R == 0:
+    if sim.n_majors == 1:
         print("  civ test SKIPPED (no civs)")
         return
     r = 0

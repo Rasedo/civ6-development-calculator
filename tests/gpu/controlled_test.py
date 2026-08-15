@@ -70,7 +70,7 @@ def main() -> None:
     assert done and units_after == units_before + 1, "written queue item must complete and spawn through the ordinary machinery"
 
     # 5. the OTHER civ stays fully scripted (its queue keeps working)
-    other = 1 if sim.R > 1 else 0
+    other = 1 if sim.n_majors > 2 else 0
     if other != r:
         busy = int((sim.city_current[0, other + 1] >= 0).sum())
         assert busy > 0, "the scripted civ must keep queueing"
@@ -111,12 +111,12 @@ def main() -> None:
     assert sim2.seat_ext.shape == (sim2.B, sim2.NS), (
         f"seat_ext must span the absolute seat space, got {tuple(sim2.seat_ext.shape)}"
     )
-    assert sim2.seat_ext[:, 1:1 + max(sim2.R, 1)].data_ptr() == sim2.seat_ext[:, 1:].data_ptr(), (
+    assert sim2.seat_ext[:, 1:sim2.n_majors].data_ptr() == sim2.seat_ext[:, 1:].data_ptr(), (
         "controlled must be the CIV SLICE of seat_ext, not a second tensor"
     )
     sim2.seat_ext.zero_()                          # this sim already drives a civ
     sim2.seat_ext[0, 0] = True                     # seat 0 is externally driven
-    assert not bool(sim2.seat_ext[0, 1:1 + max(sim2.R, 1)].any()), "seat 0 must not leak into the civ slice"
+    assert not bool(sim2.seat_ext[0, 1:sim2.n_majors].any()), "seat 0 must not leak into the civ slice"
     sim2.seat_ext[0, 1] = True
     assert bool(sim2.seat_ext[0, 1]), "civ 0 IS seat_ext column 1"
     _snap = sim2.snapshot()

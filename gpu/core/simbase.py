@@ -461,12 +461,12 @@ def pool_view(snap: dict, pre: str, plane: str):
 # The mutable state tensors — everything reset() restores and snapshot()
 # round-trips.
 _MUTABLE = [
-    "seat_science_total",  # science_total / civ_only_science_total are its row views
+    "seat_science_total",
     "rng_state", "centre_slot_at", "tdef", "tmove",
     "next_slot", "camp_tile", "n_camps", "game_over",
     "victory_type", "victory_row", "winner", "space_done",  # space-race chain progress
     "district_dead",  # captured districts are paved-but-dead
-    "civ_cap_tile",  # capitalTiles — capital identity + the domination anchor (cap_tile / civ_only_cap_tile are views)
+    "civ_cap_tile",  # capitalTiles — capital identity + the domination anchor
     # `tile_seat` is STATE — the city-state part of tile ownership is stored
     # only here (`citystate_at` is a view of it), so it must round-trip.
     "tile_seat", "tile_city",
@@ -474,7 +474,7 @@ _MUTABLE = [
     "seat_warkind", "seat_denounced", "seat_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "seat_ext", "city_prod_bank",
     "city_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
-    "seat_route_dest",  # international dest CENTER TILE (>=0), else -1 (domestic/CS) — SEAT-indexed; civ_only_route_dest is the [:, 1:] view
+    "seat_route_dest",  # international dest CENTER TILE (>=0), else -1 (domestic/CS), by seat row
     "city_id",
     "unit_next",  # the ONE append cursor every major seat spawns through
     "gp_earned", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
@@ -486,21 +486,19 @@ _MUTABLE = [
     "fertility", "drought", "improvement", "pillaged", "district", "dscaffold_placed",
     "district_pillaged",  # raided-dark districts (tile plane, reclaim-safe)
     "d_static_adj",  # mutated when an in-game founding clears the center tile's removable feature
-    # The merged unit pool. The BASES are registered, never the p_/v_/u_ VIEWS
-    # into them — snapshot/restore round-trips one tensor per plane instead of
-    # three, and a view can never be half-restored.
+    # The merged unit pool. The BASES are registered, never the `major_`/`barb_`
+    # RANGE VIEWS into them — snapshot/restore round-trips one tensor per plane
+    # instead of three, and a view can never be half-restored.
     "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_emb", "unit_seat", "military_at", "civilian_at", "war", "ww", "ww_turn",
-    # per-seat scalar bases (the x / civ_only_x views live on these)
+    # per-seat scalar bases, addressed `civ_x[:, row]` — no views live on these
     "civ_best_melee", "civ_builders_trained", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted",
     "civ_enhancer", "civ_enhancer_done", "civ_follower", "civ_founder", "civ_next_city_id",
     "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_tiles_purchased",
-    # the (civ, city-state) relation bases — citystate_x is row 0 and civ_only_citystate_x rows 1..,
-    # both VIEWS, so only the base may be registered.
+    # the (seat, city-state) relation bases, addressed `seat_citystate_x[:, row, s]`
     "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_camp", "seat_citystate_quest_issued",
-    # per-seat FOG — Seat.explored's twin, [B, 1+R, T] (explored / civ_only_explored are views)
+    # per-seat FOG — Seat.explored's twin, [B, n_majors, T]
     "seat_explored",
-    # more seat-indexed scalar bases; the per-family names are VIEWS of these,
-    # so only the base may be registered.
+    # more seat-indexed scalar bases, same convention.
     "civ_culture", "civ_faith", "civ_tourism", "civ_warmonger", "civ_gpp",
     # the CITY BLOCK bases. The block has a MAJOR and a MINOR section, and no
     # single family view reaches both — registering the base is the only

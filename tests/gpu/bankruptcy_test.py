@@ -62,7 +62,7 @@ def main() -> int:
     # ONE body serves every seat row, so every case runs on seat 0 AND on a civ
     # seat: a rule that only fired for row 0 would be a merge that never landed.
     sim = build(rules, path)
-    seats = [0, 1] if sim.R > 0 else [0]
+    seats = [0, 1] if sim.n_majors > 1 else [0]
     for seat in seats:
         # 1. Priciest + tie -> lowest slot: two HORSEMEN (slots 0,2) + a SPEARMAN;
         #    slot 0 (oldest horseman) goes, and ONLY one this turn.
@@ -87,7 +87,7 @@ def main() -> int:
 
         # 4. ...and a unit of ANOTHER seat is never the victim, however pricey:
         #    one window holds them all, so the seat filter is the whole guard.
-        other = 1 - seat if sim.R > 0 else None
+        other = 1 - seat if sim.n_majors > 1 else None
         if other is not None:
             sim = build(rules, path)
             setup(sim, [S], [101], -4.0, seat)

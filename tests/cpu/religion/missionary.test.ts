@@ -33,7 +33,7 @@ describe('B6-S2 civ missionary chassis', () => {
       const u = spawnUnit(state, 'MISSIONARY', target.centerIndex, civSeat.seat)!;
       u.charges = 2;
       const uid = u.id;
-      endTurn(state, 0);
+      endTurn(state);
       expect((target.religionPressure ?? [])[1]).toBe(10);
       const still = state.units.find((x) => x.id === uid);
       expect(still?.charges).toBe(1);
@@ -49,7 +49,7 @@ describe('B6-S2 civ missionary chassis', () => {
       const u = spawnUnit(state, 'MISSIONARY', target.centerIndex, civSeat.seat)!;
       u.charges = 1;
       const uid = u.id;
-      endTurn(state, 0);
+      endTurn(state);
       expect((target.religionPressure ?? [])[1]).toBe(15);
       expect(state.units.find((x) => x.id === uid)).toBeUndefined();
     }

@@ -194,7 +194,7 @@ describe('B9-R3 PALACE grant on founding and on capture', () => {
     const civ = addCiv(state, 6, 6);
     civ.cities[0].queue.push({ kind: 'settler', progress: 500, cost: 90 });
     state.turn = 9; // border/settle tick for city id 0
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(civ.cities.length).toBe(2);
     const second = civ.cities[1];
     expect(second.isCapital).toBe(false);

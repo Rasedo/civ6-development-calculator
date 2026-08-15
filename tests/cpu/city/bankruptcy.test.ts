@@ -16,7 +16,7 @@ describe('GV-5 bankruptcy', () => {
     const h2 = spawnUnit(state, 'HORSEMAN', tileAtCoords(state.map, 11, 5).index, 0); // maint 2
     // upkeep = 2 + 1 + 2 = 5; treasury 1 -> -4 after settle -> bankruptcy.
     seatOf(state, 0)!.treasury = 1;
-    endTurn(state, 0);
+    endTurn(state);
 
     const seat0Units = state.units.filter((u) => (u.seat) === 0);
     expect(seat0Units.length).toBe(2); // exactly one disbanded, not the whole army
@@ -29,7 +29,7 @@ describe('GV-5 bankruptcy', () => {
     state.unitsMode = true;
     spawnUnit(state, 'HORSEMAN', tileAtCoords(state.map, 5, 5).index, 0);
     seatOf(state, 0)!.treasury = 100; // 100 - 2 upkeep = 98 >= 0
-    endTurn(state, 0);
+    endTurn(state);
     expect(state.units.filter((u) => (u.seat) === 0).length).toBe(1);
   });
 
@@ -38,7 +38,7 @@ describe('GV-5 bankruptcy', () => {
     state.unitsMode = true;
     spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 5).index, 0); // maint 0
     seatOf(state, 0)!.treasury = -50; // already deep in the red, but nothing costs upkeep
-    endTurn(state, 0);
+    endTurn(state);
     expect(state.units.filter((u) => (u.seat) === 0).length).toBe(1); // WARRIOR kept
   });
 });

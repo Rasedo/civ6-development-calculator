@@ -110,8 +110,8 @@ describe('civ tile economies', () => {
     expect(ya.production).toBeGreaterThan(yb.production);
     for (let i = 0; i < 30; i++) {
       rich.turn = poor.turn = i + 1;
-      seatPhase(rich, 0);
-      seatPhase(poor, 0);
+      seatPhase(rich);
+      seatPhase(poor);
     }
     // A productive civ converts POPULATION into CITIES, and each settler costs
     // its city a pop — so one city's count is NOT a growth proxy. Sum the
@@ -151,7 +151,7 @@ describe('barbarians vs the other civs', () => {
     sieger.tileIndex = adj.index;
 
     const popBefore = civCity.population;
-    barbarianPhase(state, 0);
+    barbarianPhase(state);
     // Civ city sacked, not captured — it still belongs to Rome.
     expect(civ.cities.length).toBe(1);
     expect(civCity.population).toBeLessThanOrEqual(popBefore);
@@ -167,7 +167,7 @@ describe('barbarians vs the other civs', () => {
     const guard = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 4, 4).index, civ.seat)!;
     const barb = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 4, 5).index, BARB_SEAT)!;
     expect(attackTargets(state, guard)).toContain(barb.tileIndex);
-    seatPhase(state, 0);
+    seatPhase(state);
     expect(barb.hp < 100 || !state.units.includes(barb)).toBe(true);
   });
 });
@@ -234,7 +234,7 @@ describe('city-state conquest and levies', () => {
     const state = makeState();
     const cityState = addCs(state, 8, 8, 'trade', 0);
     cityState.hp = 50;
-    endTurn(state, 0);
+    endTurn(state);
     expect(cityState.hp).toBeGreaterThan(50);
     expect(cityState.hp).toBeLessThanOrEqual(CITY_STATE_MAX_HP);
   });
@@ -253,7 +253,7 @@ describe('loyalty', () => {
       loyaltyDelta(state, border, 'Content'),
     );
 
-    endTurn(state, 0);
+    endTurn(state);
     expect(border.loyalty ?? 100).toBeLessThan(100);
     expect(capital.loyalty ?? 100).toBe(100); // capitals are immune
 

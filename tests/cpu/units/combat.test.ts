@@ -85,7 +85,7 @@ describe('combat', () => {
 
     let galley: ReturnType<typeof spawnUnit> = null;
     for (let i = 0; i < 400 && !galley; i++) {
-      barbarianPhase(state, 0);
+      barbarianPhase(state);
       galley = state.units.find((u) => isBarbSeat(u.seat) && u.type === 'GALLEY') ?? null;
     }
     expect(galley).not.toBeNull();
@@ -132,9 +132,9 @@ describe('barbarians', () => {
     const { state } = battlefield();
     const farm = tileAtCoords(state.map, 10, 9);
     farm.improvement = 'FARM';
-    for (let i = 0; i < 60 && state.barbSeat.camps.length === 0; i++) barbarianPhase(state, 0);
+    for (let i = 0; i < 60 && state.barbSeat.camps.length === 0; i++) barbarianPhase(state);
     expect(state.barbSeat.camps.length).toBeGreaterThan(0);
-    for (let i = 0; i < 120 && !farm.pillaged; i++) barbarianPhase(state, 0);
+    for (let i = 0; i < 120 && !farm.pillaged; i++) barbarianPhase(state);
     expect(farm.pillaged).toBe(true);
 
     // pillaged improvements are dead weight until repaired
@@ -161,7 +161,7 @@ describe('barbarians', () => {
     expect(city.hp).toBe(CITY_MAX_HP / 2);
 
     state.units = []; // barbarians gone
-    barbarianPhase(state, 0);
+    barbarianPhase(state);
     expect(city.hp).toBe(CITY_MAX_HP / 2 + 20);
   });
 
@@ -176,11 +176,11 @@ describe('barbarians', () => {
 
   it('the barbarian phase runs inside endTurn without disturbing peace-mode saves', () => {
     const { state } = battlefield();
-    for (let i = 0; i < 5; i++) endTurn(state, 0);
+    for (let i = 0; i < 5; i++) endTurn(state);
     expect(state.turn).toBe(6);
     const calm = makeState(makeMap(16, 16));
     foundCity(calm, tileAtCoords(calm.map, 8, 8).index, 0);
-    for (let i = 0; i < 5; i++) endTurn(calm, 0);
+    for (let i = 0; i < 5; i++) endTurn(calm);
     expect(calm.units.length).toBe(0); // units mode off => no barbarians
   });
 });
@@ -425,7 +425,7 @@ describe('B-4 XP & levels', () => {
     civSeat.tileIndex = near.index;
     civSeat.hp = 100; // survives the strike (defense 25 vs city ~15)
     expect(civSeat.xp).toBe(0);
-    barbarianPhase(state, 0);
+    barbarianPhase(state);
     expect(civSeat.hp).toBeLessThan(100); // the walls strike landed
     expect(civSeat.xp).toBe(2); // survived → +2 (attacker is the city, no attacker xp)
   });

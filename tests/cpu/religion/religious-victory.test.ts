@@ -39,7 +39,7 @@ describe('B6-S3 religious victory', () => {
     civSeat.religion.founded = true;
     civSeat.religion.holyTile = civSeat.cities[0].centerIndex;
     pressAll(state, 1);
-    endTurn(state, 0);
+    endTurn(state);
     expect(state.victoryType).toBe(4);
     expect(state.victoryRow).toBe(1);
     expect(state.gameOver).toBe(true);
@@ -50,7 +50,7 @@ describe('B6-S3 religious victory', () => {
     seatOf(state, 0)!.religion.founded = true;
     seatOf(state, 0)!.religion.holyTile = seatOf(state, 0)!.cities[0].centerIndex;
     pressAll(state, 0);
-    endTurn(state, 0);
+    endTurn(state);
     expect(state.victoryType).toBe(4);
     expect(state.victoryRow).toBe(0);
     expect(state.gameOver).toBe(true);
@@ -65,7 +65,7 @@ describe('B6-S3 religious victory', () => {
     // Seat 0's single city resists: a dominant religion-0 accumulator
     // outweighs any ambient +1 religion-1 pressure this turn's spread adds.
     seatOf(state, 0)!.cities[0].religionPressure = [500, 0];
-    endTurn(state, 0);
+    endTurn(state);
     // 0 of 1 seat-0 cities follow religion 1 -> 0*2 <= 1 blocks the win.
     expect(state.victoryType).toBe(0);
     expect(state.gameOver).toBe(false);
@@ -80,7 +80,7 @@ describe('B6-S3 religious victory', () => {
     civSeat.religion.founded = true;
     civSeat.religion.holyTile = civSeat.cities[0].centerIndex;
     pressAll(state, 1);
-    endTurn(state, 0);
+    endTurn(state);
     expect(state.victoryType).toBe(4);
     expect(state.victoryRow).toBe(1);
     expect(state.gameOver).toBe(true);

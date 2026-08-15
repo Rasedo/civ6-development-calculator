@@ -21,7 +21,7 @@ describe('cultural border growth', () => {
     expect(before).toBe(7);
 
     let guard = 0;
-    while (city.tilesAcquired === 0 && guard++ < 60) endTurn(state, 0);
+    while (city.tilesAcquired === 0 && guard++ < 60) endTurn(state);
     expect(city.tilesAcquired).toBeGreaterThanOrEqual(1);
 
     const owned = state.map.tiles.filter((t) => tileCity(t) === city.id);

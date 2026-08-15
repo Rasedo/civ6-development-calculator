@@ -36,7 +36,7 @@ def main() -> None:
     # improvements, FORT, PILLAGE).
     for _ in range(25):
         sim.step()
-    assert sim.R > 0, "needs a civ row to compare against"
+    assert sim.n_majors > 1, "needs a civ row to compare against"
     _pm = sim._seat_unit_mask(0)
     _rm = sim._seat_unit_mask(1)
     assert _pm.shape[2] == _rm.shape[2] == len(rj["actions"]["unit"]), (

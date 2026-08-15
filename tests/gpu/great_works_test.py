@@ -63,10 +63,10 @@ def main() -> None:
 
     # --- tensor shapes -----------------------------------------------------
     assert sim.city_gw_writing[:, 0].shape == (B, C) and sim.city_gw_art[:, 0].shape == (B, C) and sim.city_gw_music[:, 0].shape == (B, C)
-    assert sim.city_gw_writing[:, 1:1 + max(sim.R, 1)].shape == sim.city_alive[:, 1:1 + max(sim.R, 1)].shape
-    assert sim.city_gw_music[:, 1:1 + max(sim.R, 1)].shape == sim.city_alive[:, 1:1 + max(sim.R, 1)].shape
-    assert sim.city_gw_art[:, 1:1 + max(sim.R, 1)].shape == sim.city_alive[:, 1:1 + max(sim.R, 1)].shape
-    assert bool((sim.city_gw_writing[:, 0] == 0).all()) and bool((sim.city_gw_writing[:, 1:1 + max(sim.R, 1)] == 0).all()), "fresh: no works"
+    assert sim.city_gw_writing[:, 1:sim.n_majors].shape == sim.city_alive[:, 1:sim.n_majors].shape
+    assert sim.city_gw_music[:, 1:sim.n_majors].shape == sim.city_alive[:, 1:sim.n_majors].shape
+    assert sim.city_gw_art[:, 1:sim.n_majors].shape == sim.city_alive[:, 1:sim.n_majors].shape
+    assert bool((sim.city_gw_writing[:, 0] == 0).all()) and bool((sim.city_gw_writing[:, 1:sim.n_majors] == 0).all()), "fresh: no works"
 
     if not sim.districts_on:
         print("GREAT-WORKS OK (districts off — placement paths skipped)")
@@ -181,10 +181,10 @@ def main() -> None:
     assert bool((sim.civ_civic_prog[:, 0] == civicE).all()), "a slotted earned Writer applies NO instant culture lump"
 
     # --- civ-seat placement: _place_civ_works fills rc slots + overflows ---
-    if sim.R > 0 and bool(sim.city_alive[:, 1, 0].any()):
+    if sim.n_majors > 1 and bool(sim.city_alive[:, 1, 0].any()):
         r = 0
         live = sim.city_alive[:, r + 1, 0]
-        sim.city_gw_writing[:, 1:1 + max(sim.R, 1)].zero_(); sim.city_gw_art[:, 1:1 + max(sim.R, 1)].zero_(); sim.city_gw_music[:, 1:1 + max(sim.R, 1)].zero_()
+        sim.city_gw_writing[:, 1:sim.n_majors].zero_(); sim.city_gw_art[:, 1:sim.n_majors].zero_(); sim.city_gw_music[:, 1:sim.n_majors].zero_()
         sim.city_bldg[:, r + 1, 0, amph] = True
         rc0 = sim.civ_civic_prog[:, r + 1].clone()
         sim._place_works(r + 1, torch.ones(B, dtype=torch.bool), torch.full((B,), 45.0, dtype=torch.float64), 0)
@@ -196,20 +196,20 @@ def main() -> None:
 
     # --- snapshot / restore round-trips the Great-Works tensors (_MUTABLE) --
     sim.city_gw_writing[0, 0, 0] = 2
-    sim.city_gw_music[0, 1, 0] = 1 if sim.R > 0 else 0
+    sim.city_gw_music[0, 1, 0] = 1 if sim.n_majors > 1 else 0
     snap = sim.snapshot()
     sim.city_gw_writing[0, 0, 0] = 0
     sim.city_gw_music[0, 1, 0] = 0
     sim.restore(snap)
     assert int(sim.city_gw_writing[0, 0, 0]) == 2, "gw_writing not preserved across snapshot"
-    if sim.R > 0:
+    if sim.n_majors > 1:
         assert int(sim.city_gw_music[0, 1, 0]) == 1, "civ_city_gw_music not preserved across snapshot"
 
     # --- _reclaim_cities carries a city's works with its slot -------------------
-    if sim.R > 0 and RC >= 2:
+    if sim.n_majors > 1 and RC >= 2:
         # Make slot 1 the only live city (slot 0 dead) with a known work count,
         # then compact: the living city must move to slot 0 carrying its works.
-        sim.city_gw_writing[:, 1:1 + max(sim.R, 1)].zero_(); sim.city_gw_art[:, 1:1 + max(sim.R, 1)].zero_(); sim.city_gw_music[:, 1:1 + max(sim.R, 1)].zero_()
+        sim.city_gw_writing[:, 1:sim.n_majors].zero_(); sim.city_gw_art[:, 1:sim.n_majors].zero_(); sim.city_gw_music[:, 1:sim.n_majors].zero_()
         sim.city_alive[0, 1, :] = False
         sim.city_alive[0, 1, 1] = True
         sim.city_gw_writing[0, 1, 1] = 2

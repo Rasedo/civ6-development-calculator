@@ -108,7 +108,7 @@ class _Acc:
 
 def _civ_seats(sim) -> list[int]:
     """The civ seats, in seat order. Seat 0 is one of them, not a case."""
-    return list(range(1 + sim.R))
+    return list(range(sim.n_majors))
 
 
 def _city_rows(sim, b: int) -> list[tuple[int, int]]:
@@ -273,7 +273,7 @@ def _civ_only(plane: str, absent):
 
 
 def _seat_pair_relation(plane: str, live):
-    """A seat<->seat [1+R, 1+R] relation read as a per-seat set of ABSOLUTE
+    """A seat<->seat [n_majors, n_majors] relation read as a per-seat set of ABSOLUTE
     opponent seats. One index space: the row IS the seat, so seat 0 answers
     like any other and the TS side's `overSeats` walker lines up with it
     without a hole."""
@@ -284,7 +284,7 @@ def _seat_pair_relation(plane: str, live):
 
 
 SEAT = {
-    # Fog — the seat_explored [1+R, T] row per seat, dense 0/1 (the TS
+    # Fog — the seat_explored [n_majors, T] row per seat, dense 0/1 (the TS
     # extractor renders its empty-array state dense the same way).
     "explored": _civ_scalar("seat_explored"),
     "treasury": _civ_scalar("civ_treasury"),

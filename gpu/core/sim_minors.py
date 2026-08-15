@@ -23,7 +23,7 @@ class SimMinors:
         # The city-states' own LINES of the pair clock tick FIRST, exactly
         # where cityStatePhase does. A major's line ticks in its own seat
         # block, so every war's two cells each move once a turn.
-        _cs0 = 1 + max(self.R, 1)
+        _cs0 = self.n_majors
         _cs = slice(_cs0, _cs0 + max(self.S, 1))
         self.war_turns[:, _cs] += self.war[:, _cs].long()
         if self.turn % 12 == 0:

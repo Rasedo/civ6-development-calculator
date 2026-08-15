@@ -48,14 +48,20 @@ READERS = ("gpu", "policy", "tests/gpu", "tools/gpu")
 # the list, never grow it: an entry here is a seat-0 distinction that still
 # exists, and the only acceptable reasons are the wire's own limits.
 # ---------------------------------------------------------------------------
-FORK_ALLOW = {
-    # No PERMANENT entry any more. The row->seat map used to sit here on the
-    # grounds that two index spaces have to meet somewhere; they do not, and
-    # its two helpers had no caller at all — an exemption that would have
-    # pre-forgiven every future fork landing in a dead function.
-    # --- WIRE LIMITS, named ------------------------------------------------
-    ("serve_gate.py", "run_batched"): "#108 — the wire's seat-0 RECORD SCHEMA (production pairs, unit triples)",
-    ("serve_gate.py", "main"): "#108 — the wire's seat-0 RECORD SCHEMA, the single-seed twin",
+FORK_ALLOW: dict[tuple[str, str], str] = {
+    # EMPTY, on both engines, since #115 — which is what #68 said done would
+    # look like. Two kinds of entry have lived here and neither should return:
+    #
+    #   a PERMANENT one ("two index spaces have to meet somewhere"), which was
+    #   false and which would have pre-forgiven every future fork that happened
+    #   to land in the exempted function — the one it named turned out to have
+    #   no caller at all;
+    #
+    #   a WIRE-LIMIT one (#108, the seat-0 record schema), which was true when
+    #   written and stopped being true the moment the wire carried one shape.
+    #
+    # An entry is a seat-0 distinction that still exists. Write the reason, and
+    # write what would end it.
 }
 
 #: The merged seat planes, by the naming convention that IS the storage
@@ -89,8 +95,10 @@ FORK_PATTERNS = (
     # `&`/`|` exclusion keeps the comparison in ONE conjunct, so an unrelated
     # `x == 0` further along a boolean chain is not a hit.
     (re.compile(r"\b\w*_seat\b[^\n&|]{0,80}?[=!]=\s*0\b"), "seat expression == 0"),
-    # `civ_at` is `tile_seat` mapped into the CIV index space, so every reader
-    # spells "a civ, not seat 0" and needs a seat-0 arm beside it.
+    # `civ_at` — `tile_seat` mapped into the CIV index space, so every reader
+    # spelled "a civ, not seat 0" and needed a seat-0 arm beside it. DELETED in
+    # #115; the pattern stays because a re-introduction is exactly the mistake
+    # worth failing on, and it costs one regex.
     # (`citystate_at` is NOT here: a city-state's index is a genuinely
     # different space, the same exemption the four surviving aliases carry.)
     (re.compile(r"\.civ_at\b"), "civ-family tile view"),
@@ -120,13 +128,18 @@ FORK_PATTERNS = (
 # a seat that starts the game as a different kind of thing.
 TS_ROOTS = ("cpu/core", "cpu/driver", "cpu/export", "cpu/world")
 
-TS_FORK_ALLOW = {
-    # No PERMANENT entry, and no index-space entry at all: `seatOfIndex` and
-    # `indexOfSeat` are gone from `cpu/` entirely (#114), so there is nothing
-    # left that has to convert between two numberings.
-    # --- WIRE LIMITS, named ------------------------------------------------
-    ("phase.ts", "seatPhase"): "#108 — `actor.seat !== 0` is the unit-order SCHEMA fork (triples vs per-unit ranks)",
-    ("driver.ts", "runDriver"): "#108 — the serve client's own seat-0 candidate rows, and endTurn's ambient seat argument",
+TS_FORK_ALLOW: dict[tuple[str, str], str] = {
+    # EMPTY since #115. `seatOfIndex`/`indexOfSeat` left `cpu/` in #114; the
+    # unit-order schema fork, the driver's own seat-0 candidate rows and
+    # `endTurn`/`seatPhase`/`barbarianPhase`'s ambient seat argument all left
+    # in #115. No entry point in the TS engine takes a seat any more, which is
+    # exactly the shape `step()` has had on the GPU since #113.
+    #
+    # READ THE CAUTION IN A-31r BEFORE ADDING ONE BACK: this class has been
+    # declared closed three times on the strength of an instrument that only
+    # matched what it had been taught, and each time the next pattern found
+    # live divergences. An empty allowlist is a statement about these
+    # PATTERNS, not about the codebase.
 }
 
 TS_FORK_PATTERNS = (

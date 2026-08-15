@@ -32,11 +32,11 @@ def build():
     paths = sorted(FIXTURES.glob("seed*.json"))
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
     sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    assert sim.R >= 2, "needs two civs to poke simultaneous wars"
+    assert sim.n_majors >= 3, "needs two civs to poke simultaneous wars"
     for _ in range(20):
         sim.step()
-    sim.war[:, 0, 1:1 + sim.R] = sim.war[:, 1:1 + sim.R, 0] = False
-    sim.war[:, 1:1 + sim.R, 1:1 + sim.R] = False
+    sim.war[:, 0, 1:sim.n_majors] = sim.war[:, 1:sim.n_majors, 0] = False
+    sim.war[:, 1:sim.n_majors, 1:sim.n_majors] = False
     sim.sync_war()  # close the pokes under transpose
     sim.ww[:] = 0
     sim.ww_turn[:] = -1
@@ -115,7 +115,7 @@ def main() -> None:
 
     # --- a CITY-STATE is a real opponent but holds no accumulator ---------
     sim.ww[:] = 0
-    citystate_row = 1 + sim.R
+    citystate_row = sim.n_majors
     sim._ww_battle(one(sim), 0, citystate_row, away, city=True)
     assert int(sim.ww[0, 0, citystate_row]) > 0, "warring a minor wears you down normally"
     assert int(sim.ww[0, citystate_row, :].sum()) == 0, "a minor keeps no accumulator"

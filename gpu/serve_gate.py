@@ -127,7 +127,7 @@ def _buy_rows(sim, seat: int) -> list:
     return [_buy_row(sim, seat, bc, rk, rj, b) for b in range(sim.B)]
 
 
-def _field_name(i: int, S: int, R: int, C: int, NT: int, NC: int) -> str:
+def _field_name(i: int, S: int, n_opponents: int, C: int, NT: int, NC: int) -> str:
     """Index -> block.field, from the ladder layout (the ONE derivation)."""
     if i < ladder.EMP:
         return f"empire.{ladder.EMP_FIELDS[i]}"
@@ -135,9 +135,9 @@ def _field_name(i: int, S: int, R: int, C: int, NT: int, NC: int) -> str:
     if i < ladder.PER_CS * S:
         return f"citystate[{i // ladder.PER_CS}].{i % ladder.PER_CS}"
     i -= ladder.PER_CS * S
-    if i < ladder.PER_CIV * R:
+    if i < ladder.PER_CIV * n_opponents:
         return f"civ[{i // ladder.PER_CIV}].{ladder.PER_CIV_FIELDS[i % ladder.PER_CIV]}"
-    i -= ladder.PER_CIV * R
+    i -= ladder.PER_CIV * n_opponents
     if i < ladder.PER_CITY * C:
         return f"city[{i // ladder.PER_CITY}].{i % ladder.PER_CITY}"
     i -= ladder.PER_CITY * C
@@ -172,7 +172,10 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     seeds = [int(fx["seed"]) for fx in fixtures]
     env = BatchEnv(fixtures, rules, device="cpu", dtype=torch.float64)
     sim = env.sim
-    seats = list(range(1, 1 + sim.R))
+    # EVERY major row, seat 0 first — the order `_seat_phase` walks and the
+    # order TS's seatPhase applies records in. Seat 0 used to be decided by a
+    # hand-rolled block AFTER this list and applied last; #108 retired it.
+    seats = list(range(sim.n_majors))
     NB = sim.rules_dev.b_cost.shape[0]
     classes = ladder.prod_classes(NB, sim.NU, len(sim._scaffold), sim._wond_n if sim.districts_on else 0, len(sim._proj_rows) if sim.districts_on else 0)
     rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
@@ -237,7 +240,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     try:
         for t in range(t0, turns):
             msgs = [read_msg(ch) for ch in children]  # barrier
-            for seat in [0] + seats:
+            for seat in seats:
                 gobs_all = env.observe(seat)
                 gj_all = drive._builder_jobs(sim, seat).tolist()
                 gs_all = drive._spread_targets(sim, seat).tolist()
@@ -258,7 +261,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                     badm[ctx_lo:] = diff[ctx_lo:] != 0
                     if bool(badm.any()):
                         i = int(badm.nonzero(as_tuple=True)[0][0])
-                        flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: OBS [{i}] {_field_name(i, sim.S, sim.R, sim.RC, NT, NC)}: GPU {float(gobs[i])!r} vs TS {float(tobs[i])!r}")
+                        flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: OBS [{i}] {_field_name(i, sim.S, sim.n_majors - 1, sim.RC, NT, NC)}: GPU {float(gobs[i])!r} vs TS {float(tobs[i])!r}")
                     for name, ga, ta in (("job", gj_all[b], msg.get("jobs", {}).get(str(seat), [])),
                                          ("spread", gs_all[b], msg.get("spreads", {}).get(str(seat), []))):
                         for i in range(max(len(ga), len(ta))):
@@ -273,74 +276,21 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                             flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit,tileOk,tile,tileC,worshipC,religKind,religC,levy]: GPU {gb_all[b]} vs TS {tb}")
             if bad:
                 break
-            # SEAT 0 runs the same verbs as every seat, over the same mask —
-            # wonder and project columns included, which TS applies through the
-            # same seat-generic applySeatActionRecord arms.
-            m0 = env.masks(0)
-            blocks0 = ladder.split(env.observe(0), sim.S, sim.R, sim.RC, NT, NC)
-            prod0 = ladder.pick_production(m0["production"], classes, roster, drive._prod_ctx(blocks0, sim, 0))
-            # ALWAYS tensors, -1 where no pick: None would mean "not driven" to
-            # the step, and the GPU's auto-research would fire while the TS
-            # child accrued against a null.
-            _neg0 = torch.full((sim.B,), -1, dtype=torch.long)
-            tech0 = ladder.pick_research(blocks0, m0["tech"], "tech") if bool(m0["tech"].any()) else _neg0
-            civic0 = ladder.pick_research(blocks0, m0["civic"], "civic") if bool(m0["civic"].any()) else _neg0
-            # The UNIT verb, seat 0: the same _seat_unit_orders policy as every
-            # seat, over the ONE head layout — rank n is this seat's n-th
-            # living unit in slot (= TS array) order, exactly step()'s
-            # indexing. The record carries [tile, col, civ] triples over
-            # PRE-step tiles with HOLD dropped, and the "units" key is ALWAYS
-            # present — its mere presence is what stands the TS walker down,
-            # mirroring units=.
-            u0, _uj0, _us0, _um0, _uo0 = drive._seat_unit_orders(sim, 0)
-            _u0_l = u0.tolist()
-            _sm0_l = sim._seat_slot_map(0).tolist()
-            _pt_l = sim.unit_tile.tolist()
-            _pc_l = sim._type_civilian[sim.unit_type].tolist()
-            # The ENVOY verb, seat 0: the same greedy sequence as every seat
-            # (bank-only — seat 0 converts no influence). ALWAYS a tensor: the
-            # envoy= argument stands the GPU's scripted greedy down, and the
-            # record's "envoys" key stands the TS loop down.
-            env0 = drive._seat_envoys(sim, 0)
-            env0_t = env0 if env0 is not None else _neg0.unsqueeze(1)
-            _e0_l = env0_t.tolist()
-            # The WAR verb, seat 0: the same `pick_war`, over the same head, off
-            # the same policy stream every civ row uses. Seat 0 had NO war
-            # decider at all until A-31r — the hand-rolled block below simply
-            # never picked a column — so it could neither declare nor sue while
-            # every other seat could.
-            war0 = ladder.pick_war(m0["war"], drive._war_ctx(blocks0), {
-                "dow": drive._policy_rng(sim, seeds, t, 0, 1),
-                "peace": drive._policy_rng(sim, seeds, t, 0, 2),
-            })
-            # The GOLD/FAITH/LEVY verbs, seat 0: the same decider every seat
-            # runs, over the same shared candidate bodies.
-            buy0, worship0, relig0, levy0 = drive._decide_buys(sim, 0)
             # The geopolitics decide ONCE per turn (the declare scan couples
-            # the civ seats), stashed GPU-side and merged into every record.
+            # the seats), stashed GPU-side and merged into every record.
             geo = drive.geo_decide_and_apply(sim)
+            # ONE decide body, ONE record shape, every major row, seat 0 first.
+            # Seat 0 rides `_decide_turn` like the rest, which also hands it the
+            # MULTI-RANK unit plan every other row already had (its own block
+            # only ever emitted rank 0) and the `denounce`/`ally` record fields
+            # its block never carried at all — the GPU has been applying row 0's
+            # geo intents while the wire told the TS child nothing about them.
             per_seat = {row: drive._decide_turn(env, sim, row, roster, classes, seeds=seeds, turn=t) for row in seats}
             for b, ch in enumerate(children):
                 recs = {str(row): {**drive._extract_record(sim, row, *per_seat[row], b),
                                    **drive._extract_geo(geo, row, b)} for row in seats}
-                recs["0"] = {
-                    "production": [[int(sim.city_center[b, 0, c]), int(prod0[b, c])] for c in range(sim.RC)
-                                   if int(prod0[b, c]) >= 0 and bool(sim.city_alive[b, 0, c])],
-                    "tech": None if int(tech0[b]) < 0 else int(tech0[b]),
-                    "civic": None if int(civic0[b]) < 0 else int(civic0[b]),
-                    "war": None if int(war0[b]) < 0 else int(war0[b]),
-                    "units": [[_pt_l[b][_sm0_l[b][n]], v, int(_pc_l[b][_sm0_l[b][n]])]
-                              for n, v in enumerate(_u0_l[b])
-                              if _sm0_l[b][n] >= 0 and v >= 0 and v != 12],
-                    "envoys": [x for x in _e0_l[b] if x >= 0],
-                    **drive._buy_record_fields(sim, 0, b, buy0, worship0, relig0, levy0),
-                }
                 ch.stdin.write(json.dumps({"recs": recs}) + "\n")
                 ch.stdin.flush()
-            sim.apply_seat_actions(0, production=prod0, tech=tech0, civic=civic0, war=war0,
-                                   envoys=env0_t, buy=buy0, worship=worship0, relig=relig0, levy=levy0)
-            if sim.units_mode:
-                sim._apply_seat_unit_actions(0, u0)
             sim.step()
             trs = [read_msg(ch) for ch in children]  # barrier: every child's post-step digest
             # THE DIGEST IS THE GATE. On the FIRST disagreement the mismatching
@@ -434,7 +384,7 @@ def main() -> None:
     fx = load_fixture(FIXTURES / f"seed{args.seed}.json")
     env = BatchEnv([fx], rules, device="cpu", dtype=torch.float64)
     sim = env.sim
-    seats = list(range(1, 1 + sim.R))
+    seats = list(range(sim.n_majors))  # every major row, seat 0 first
     NB = sim.rules_dev.b_cost.shape[0]
     classes = ladder.prod_classes(NB, sim.NU, len(sim._scaffold), sim._wond_n if sim.districts_on else 0, len(sim._proj_rows) if sim.districts_on else 0)
     rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
@@ -486,10 +436,7 @@ def main() -> None:
     for t in range(t0, args.turns):
         msg = read_msg()
         assert msg.get("t") == t + 1, f"turn frame skew: TS says {msg.get('t')}, orchestrator at {t + 1}"
-        # `seats` is already ROWS (= absolute seat ids for majors). The `r + 1`
-        # this line used to carry was left over from the civ-index space and
-        # skipped seat 1 while asking for a seat R+1 that does not exist.
-        for seat in [0] + seats:
+        for seat in seats:
             gobs = env.observe(seat)[0]
             tobs = torch.tensor(msg["obs"][str(seat)], dtype=torch.float64)
             if gobs.shape[0] != tobs.shape[0]:
@@ -503,7 +450,7 @@ def main() -> None:
             bad[ctx_lo:] = diff[ctx_lo:] != 0
             if bool(bad.any()):
                 i = int(bad.nonzero(as_tuple=True)[0][0])
-                name = _field_name(i, sim.S, sim.R, sim.RC, NT, NC)
+                name = _field_name(i, sim.S, sim.n_majors - 1, sim.RC, NT, NC)
                 rep = (f"turn {t + 1} seat {seat}: OBS MISMATCH at [{i}] {name}: "
                        f"GPU {float(gobs[i])!r} vs TS {float(tobs[i])!r}")
                 print(rep)
@@ -514,7 +461,7 @@ def main() -> None:
         # slot-map row (TS rows = live units in mirrored order; GPU rows beyond
         # the live count must be -1). EVERY seat rides `_seat_slot_map` now,
         # so no seat needs a compaction of its own.
-        for seat in [0] + seats:
+        for seat in seats:
             gj = drive._builder_jobs(sim, seat)[0].tolist()
             gs = drive._spread_targets(sim, seat)[0].tolist()
             tj = msg.get("jobs", {}).get(str(seat), [])
@@ -535,11 +482,11 @@ def main() -> None:
                     tv = ta[i] if i < len(ta) else -1
                     if gv != tv:
                         rep = f"turn {t + 1} seat {seat}: {name.upper()} TARGET row {i}: GPU {gv} vs TS {tv}"
-                        if os.environ.get("CIV6_SERVE_DEBUG_JOB0") and name == "job":
+                        if os.environ.get("CIV6_SERVE_DEBUG_JOB") and name == "job":
                             for _dt in (gv, tv):
                                 if _dt < 0:
                                     continue
-                                print(f"  tile {_dt}: city_slot {int(sim.city_slot_at(0)[0, _dt])} tile_seat {int(sim.tile_seat[0, _dt])}"
+                                print(f"  tile {_dt}: city_slot {int(sim.city_slot_at(seat)[0, _dt])} tile_seat {int(sim.tile_seat[0, _dt])}"
                                       f" water {bool(sim.water[0, _dt])} imp {int(sim.improvement[0, _dt])}"
                                       f" dist {int(sim.district[0, _dt])} wond {int(sim.built_wonder[0, _dt])}"
                                       f" ctr {int(sim.centre_slot_at[0, _dt])} pill {bool(sim.pillaged[0, _dt])}"
@@ -559,60 +506,16 @@ def main() -> None:
                         break
         if obs_bails:
             break
-        # SEAT 0 runs the same verbs as every seat, over the same mask — the
-        # batched path's twin block.
-        m0 = env.masks(0)
-        blocks0 = ladder.split(env.observe(0), sim.S, sim.R, sim.RC, NT, NC)
-        prod0 = ladder.pick_production(m0["production"], classes, roster, drive._prod_ctx(blocks0, sim, 0))
-        # ALWAYS tensors, -1 where no pick: None would mean "not driven" to the
-        # step, and the GPU's auto-research would fire while the TS child
-        # accrued against a null.
-        _neg0 = torch.full((sim.B,), -1, dtype=torch.long)
-        tech0 = ladder.pick_research(blocks0, m0["tech"], "tech") if bool(m0["tech"].any()) else _neg0
-        civic0 = ladder.pick_research(blocks0, m0["civic"], "civic") if bool(m0["civic"].any()) else _neg0
-        # The UNIT verb, seat 0 — the batched path's twin block.
-        u0, _uj0, _us0, _um0, _uo0 = drive._seat_unit_orders(sim, 0)
-        _u0_l = u0[0].tolist()
-        _sm0_l = sim._seat_slot_map(0)[0].tolist()
-        _pt_l = sim.unit_tile[0].tolist()
-        _pc_l = sim._type_civilian[sim.unit_type][0].tolist()
-        env0 = drive._seat_envoys(sim, 0)
-        env0_t = env0 if env0 is not None else _neg0.unsqueeze(1)
-            # The WAR verb, seat 0: the same `pick_war`, over the same head, off
-        # the same policy stream every civ row uses. Seat 0 had NO war
-        # decider at all until A-31r — the hand-rolled block below simply
-        # never picked a column — so it could neither declare nor sue while
-        # every other seat could.
-        war0 = ladder.pick_war(m0["war"], drive._war_ctx(blocks0), {
-            "dow": drive._policy_rng(sim, [args.seed], t, 0, 1),
-            "peace": drive._policy_rng(sim, [args.seed], t, 0, 2),
-        })
-        buy0, worship0, relig0, levy0 = drive._decide_buys(sim, 0)  # seat 0's own gold/faith verbs
-        # The geopolitics decide ONCE per turn — the batched path's twin.
+        # The batched path's twin: geo once, then ONE decide body per major
+        # row in seat order.
         geo = drive.geo_decide_and_apply(sim)
         per_seat = {row: drive._decide_turn(env, sim, row, roster, classes, seeds=[args.seed], turn=t) for row in seats}
         recs = {str(row): {**drive._extract_record(sim, row, *per_seat[row], 0),
                            **drive._extract_geo(geo, row, 0)} for row in seats}
-        recs["0"] = {
-            "production": [[int(sim.city_center[0, 0, c]), int(prod0[0, c])] for c in range(sim.RC)
-                           if int(prod0[0, c]) >= 0 and bool(sim.city_alive[0, 0, c])],
-            "tech": None if int(tech0[0]) < 0 else int(tech0[0]),
-            "civic": None if int(civic0[0]) < 0 else int(civic0[0]),
-            "war": None if int(war0[0]) < 0 else int(war0[0]),
-            "units": [[_pt_l[_sm0_l[n]], v, int(_pc_l[_sm0_l[n]])]
-                      for n, v in enumerate(_u0_l)
-                      if _sm0_l[n] >= 0 and v >= 0 and v != 12],
-            "envoys": [x for x in env0_t[0].tolist() if x >= 0],
-            **drive._buy_record_fields(sim, 0, 0, buy0, worship0, relig0, levy0),
-        }
         if os.environ.get("CIV6_SERVE_DEBUG_BUY") and any("buy" in v for v in recs.values()):
             print(f"BUYREC turn {t + 1}: " + json.dumps({k: v["buy"] for k, v in recs.items() if "buy" in v}))
         child.stdin.write(json.dumps({"recs": recs}) + "\n")
         child.stdin.flush()
-        sim.apply_seat_actions(0, production=prod0, tech=tech0, civic=civic0, war=war0,
-                               envoys=env0_t, buy=buy0, worship=worship0, relig=relig0, levy=levy0)
-        if sim.units_mode:
-            sim._apply_seat_unit_actions(0, u0)
         sim.step()
         tr = read_msg()
         # THE DIGEST IS THE GATE — the batched path's twin block.

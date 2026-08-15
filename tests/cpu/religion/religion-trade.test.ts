@@ -203,14 +203,14 @@ describe('religious pressure spread (B-18)', () => {
     seatOf(state, 0)!.religion.founded = true;
     seatOf(state, 0)!.religion.holyTile = cap.centerIndex;
 
-    endTurn(state, 0);
+    endTurn(state);
     expect(cap.followedReligion).toBe(0);
     expect(near.followedReligion).toBe(0); // within RELIGION_PRESSURE_RANGE
     expect(far.followedReligion ?? null).toBeNull(); // out of range — no pressure
 
     // Integer pressure accrues +1 per in-range turn.
     const p = cap.religionPressure![0];
-    endTurn(state, 0);
+    endTurn(state);
     expect(cap.religionPressure![0]).toBe(p + 1);
     expect(far.religionPressure?.[0] ?? 0).toBe(0);
     // The majority-pressure flip and the cross-civ tie -> lowest-id case are

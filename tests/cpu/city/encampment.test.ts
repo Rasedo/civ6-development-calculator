@@ -73,7 +73,7 @@ describe('B-17 Encampment', () => {
     const near = tileAtCoords(state.map, center.col - 1, center.row); // adjacent -> in range
     const civSeat = spawnUnit(state, 'SPEARMAN', near.index, 1)!;
     civSeat.hp = 100;
-    barbarianPhase(state, 0);
+    barbarianPhase(state);
     expect(civSeat.hp).toBeLessThan(100); // the Encampment strike landed
     expect(civSeat.xp).toBe(2); // survived -> +2 (attacker is the city)
   });
@@ -87,7 +87,7 @@ describe('B-17 Encampment', () => {
     const near = tileAtCoords(state.map, center.col - 1, center.row);
     const civSeat = spawnUnit(state, 'SPEARMAN', near.index, 1)!;
     civSeat.hp = 100;
-    barbarianPhase(state, 0);
+    barbarianPhase(state);
     expect(civSeat.hp).toBe(100);
   });
 
@@ -103,7 +103,7 @@ describe('B-17 Encampment', () => {
     const log: string[] = [];
     (globalThis as any).__cbLog = log;
     try {
-      barbarianPhase(state, 0);
+      barbarianPhase(state);
     } finally {
       delete (globalThis as any).__cbLog;
     }

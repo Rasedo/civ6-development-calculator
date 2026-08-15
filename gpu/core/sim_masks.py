@@ -51,33 +51,33 @@ class SimMasks:
 
     def war_targets(self, row: int) -> list[int]:
         """The seat rows this row's war head addresses, in ascending seat
-        order — every OTHER major, so the head is R wide for every row and
+        order — every OTHER major, so the head is n_opponents wide for every row and
         column k means the same KIND of thing whoever asks.
 
-        For row 0 that is [1 .. R], the layout the wire has always carried; for
+        For row 0 that is [1 .. n_majors-1], the layout the wire has always carried; for
         a civ row column 0 is seat 0 and the rest are the other civs, which is
         what the single-axis head used to leave dead."""
-        return [k if k < row else k + 1 for k in range(self.R)]
+        return [k if k < row else k + 1 for k in range(self.n_majors - 1)]
 
     def _seat_war_mask(self, row: int) -> torch.Tensor:
-        """[B, 2R] seat row `row`'s diplomacy actions over `war_targets(row)`:
-        columns 0..R-1 declare war on that seat (declareWar: both alive & not
-        already at war — free, no RNG), R..2R-1 sue it for peace (sueForPeace:
+        """[B, 2*n_opponents] seat row `row`'s diplomacy actions over `war_targets(row)`:
+        columns 0..n_opponents-1 declare war on that seat (declareWar: both alive & not
+        already at war — free, no RNG), n_opponents..2*n_opponents-1 sue it for peace (sueForPeace:
         at war for >= warMinTurns of THAT war and the treasury covers
         peaceGold0 + peaceGoldSlope·warTurns of THAT war). All-False while
         _rl_war_active is off — the head exists but nothing samples it."""
         B, dev = self.B, self.device
-        Rw = max(self.R, 1)
-        if self.R == 0 or not self._rl_war_active:
-            return torch.zeros(B, 2 * Rw, dtype=torch.bool, device=dev)
+        n_opp = self.n_majors - 1
+        if n_opp == 0 or not self._rl_war_active:
+            return torch.zeros(B, 2 * n_opp, dtype=torch.bool, device=dev)
         rr = self.rules.seats
         idx = torch.tensor(self.war_targets(row), dtype=torch.long, device=dev)
         # BOTH sides have to be alive. Row 0's arm used to test only the
         # target (its own liveness is a given) and a civ's only itself (its
         # target was seat 0); the conjunction is each of those on its own row.
         live = self.civ_alive[:, row].unsqueeze(1) & self.civ_alive[:, idx]
-        at_war = self.war[:, row, idx]                      # [B, R]
-        wt = self.war_turns[:, row, idx]                    # [B, R] THIS war's clock
+        at_war = self.war[:, row, idx]                      # [B, n_opponents]
+        wt = self.war_turns[:, row, idx]                    # [B, n_opponents] THIS war's clock
         cost = rr.get("peaceGold0", 150) + rr.get("peaceGoldSlope", 10) * wt.to(torch.float64)
         declare = live & ~at_war
         peace = (
@@ -279,7 +279,7 @@ class SimMasks:
         def_tile [B], count the MILITARY units on the 6 adjacent tiles that
         are hostile to (flanking) or friendly to (support) the defender.
 
-        def_seat [B] long: the defender's seat (0, 1..R civs, BARB_SEAT
+        def_seat [B] long: the defender's seat (0..n_majors-1 for the majors, BARB_SEAT
         barbarians). attacker_tile [B]: the tile of the melee attacker to
         EXCLUDE from flanking (u != attacker); pass all -1 for a ranged/city
         attacker (support-only sites — the returned flank is then unused).
@@ -416,7 +416,7 @@ class SimMasks:
         # the major rows ARE the domain and a city-state / unowned tile reads
         # -1 (nobody), which `_seats_hostile` refuses.
         owner_seat = torch.where(
-            (self.tile_seat >= 0) & (self.tile_seat <= self.R),
+            (self.tile_seat >= 0) & (self.tile_seat < self.n_majors),
             self.tile_seat, torch.full_like(self.tile_seat, -1),
         )
         return live & self._seats_hostile(seat, owner_seat)
@@ -521,15 +521,15 @@ class SimMasks:
     def _seat_tech(self, seat: torch.Tensor, tech: int) -> torch.Tensor:
         """[B] bool — does the seat named per game in `seat` hold tech `tech`?
 
-        `seat` is an ABSOLUTE seat; anything outside 0..R (a barbarian, a
+        `seat` is an ABSOLUTE seat; anything outside the major rows (a barbarian, a
         city-state, NO_SEAT) holds no tech, and a `tech` the rules table does
         not define is False everywhere. The research planes are the merged
         `civ_techs[:, row]` block, so seat 0 needs no arm of its own."""
         if tech < 0:
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        rows = seat.clamp(min=0, max=self.R)
+        rows = seat.clamp(min=0, max=self.n_majors - 1)
         bidx = torch.arange(self.B, device=self.device)
-        return (seat >= 0) & (seat <= self.R) & self.civ_techs[bidx, rows, tech]
+        return (seat >= 0) & (seat < self.n_majors) & self.civ_techs[bidx, rows, tech]
 
     def _advance_terrain(self, u_type: torch.Tensor, u_seat: torch.Tensor,
                          dest: torch.Tensor) -> torch.Tensor:
@@ -768,7 +768,7 @@ class SimMasks:
 
 
     def _golden_ded_table(self, kind: int) -> torch.Tensor:
-        """[B, 1+R] bool — which civs are in a GOLDEN age holding `kind`."""
+        """[B, n_majors] bool — which civs are in a GOLDEN age holding `kind`."""
         return (self.civ_age == 2) & (self.ded_picks == kind).any(dim=2)
 
     def _golden_move_mp(self, pre: str) -> torch.Tensor:
@@ -896,7 +896,7 @@ class SimMasks:
             camps[-1] = -1
             self.n_camps[b] -= 1
             _s = int(seat[b])
-            if 0 <= _s <= self.R:
+            if 0 <= _s < self.n_majors:
                 self.civ_treasury[b, _s] += float(reward)
 
 
@@ -962,10 +962,10 @@ class SimMasks:
         drags its minor in). Row-generic — the suzerain clause loops the major
         rows rather than naming seat 0."""
         S = max(self.S, 1)
-        cs_row0 = 1 + max(self.R, 1)
+        cs_row0 = self.n_majors
         out = self.war[:, row, cs_row0:cs_row0 + S][:, :self.S] if self.S > 0 else torch.zeros(self.B, 0, dtype=torch.bool, device=self.device)
         out = out.clone()
-        for sx in range(1 + self.R):
+        for sx in range(self.n_majors):
             if sx == row:
                 continue
             out = out | (self._suzerain_mask(sx)[:, :self.S] & self.war[:, row, sx].unsqueeze(1))

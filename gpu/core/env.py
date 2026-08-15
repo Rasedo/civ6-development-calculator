@@ -82,17 +82,16 @@ class BatchEnv:
         return self.observe()
 
     def _row(self, seat: int) -> int:
-        """A major's SEAT ID IS ITS ROW in every merged plane — seat 0 is row 0
-        and civ r is seat r+1 is row r+1 — which is also its index in the war
-        matrix. All this does is bounds-check; the engine speaks rows and
-        nothing below converts."""
-        if not 0 <= seat <= self.sim.R:
-            raise ValueError(f"seat {seat} out of range (O = {self.sim.R + 1})")
+        """A major's SEAT ID IS ITS ROW in every merged plane, and that row is
+        also its index in the war matrix. All this does is bounds-check; the
+        engine speaks rows and nothing below converts."""
+        if not 0 <= seat < self.sim.n_majors:
+            raise ValueError(f"seat {seat} is not a major row (0..{self.sim.n_majors - 1})")
         return seat
 
     def masks(self, seat: int = 0) -> dict[str, torch.Tensor]:
         """The seat's decision space: production [B, C, NB+2+NU], tech [B, NT],
-        civic [B, NC], units [B, P, n_unit_acts], envoy [B, S], war [B, 2R] —
+        civic [B, NC], units [B, P, n_unit_acts], envoy [B, S], war [B, 2*n_opponents] —
         all-False rows mean no decision pends there this turn.
 
         ONE assembly for every seat. `seat_masks` is the engine's one legality
@@ -126,13 +125,16 @@ class BatchEnv:
         lockstep fixed-horizon episodes; the caller resets. The reward is THIS
         seat's `seat_score` delta, one body for every row.
 
-        ONE ACTION INTERFACE, every row (A-31r): the draw-free verbs go through
+        ONE ACTION INTERFACE, every row: the draw-free verbs go through
         `apply_seat_actions`, the orders through `_apply_seat_unit_actions`,
         and `step()` — which takes no seat arguments at all — advances the
-        world. What is still row-0-shaped is where those orders EXECUTE: they
-        run pre-turn here, while the driver's civ rows stash a per-unit
-        sequence the phase replays at the walkers' position (#108). That is the
-        wire's unit SCHEMA, not this interface.
+        world.
+
+        This RL entry applies its orders PRE-TURN, which is a property of the
+        entry, not of a row: it hands the env one rank and steps. The gate's
+        driver stashes a per-unit SEQUENCE instead, and every major row's
+        replays at the walkers' position inside the phase. No row has a
+        position of its own on either path.
         """
         row = self._row(seat)
         prev = self._score_prev.get(row)
@@ -259,7 +261,7 @@ class BatchEnv:
         # here and column k of the head name the same seat. Everything is read
         # from THIS seat's point of view off symmetric stores, so no seat is
         # privileged. A roster slot with no seat renders zeros (TS walks
-        # `state.seats`, which has no such entry); the width stays R for every
+        # `state.seats`, which has no such entry); the width stays n_opponents for every
         # asker.
         #
         # The last four are the DoW terms. They were a single pairwise sextet
@@ -267,7 +269,7 @@ class BatchEnv:
         # policy could not choose WHICH opponent to declare on (#111 s6). RAW
         # and unscaled, like the ctx block and for the same reason.
         opp_cols = []
-        for o in range(1 + s.R):
+        for o in range(s.n_majors):
             if o == row:
                 continue
             ex = s.civ_alive[:, o]
@@ -353,7 +355,7 @@ class BatchEnv:
         # atWarWithAny over the majors — this row's own line of the war matrix.
         # It feeds BOTH the unit cap and the atWarAny column, as TS's one
         # `atWarWithAny(state, seat)` feeds both.
-        at_war = s.war[:, row, : 1 + s.R].any(dim=1)
+        at_war = s.war[:, row, : s.n_majors].any(dim=1)
         return torch.stack([
             n_cities.to(d), n_units.to(d), n_mel.to(d), n_rng.to(d),
             (n_cities * 2 + torch.where(at_war, 3, 1)).to(d),

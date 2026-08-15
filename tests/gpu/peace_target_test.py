@@ -74,7 +74,7 @@ def run(ranged: bool) -> None:
     # civ 0 is AT PEACE with seat 0, and AT WAR with civ 1.
     sim.war[0, 0, 1 + 0] = sim.war[0, 1 + 0, 0] = False
     sim.sync_war()  # close the poke under transpose
-    if sim.R > 1:
+    if sim.n_majors > 2:
         sim.war[0, 1 + 0, 1 + 1] = True
         sim.war[0, 1 + 1, 1 + 0] = True
         sim.sync_war()  # close the poke under transpose

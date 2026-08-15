@@ -44,7 +44,7 @@ def _sim(n: int = 1) -> BatchSim:
 
 def main() -> None:
     sim = _sim(1)
-    n_civs = 1 + sim.R
+    n_civs = sim.n_majors
     per_visitor = sim._tourism_per_visitor
     per_domestic = sim._culture_per_tourist
     assert per_visitor == 200, f"GS value is 200 per civ, got {per_visitor}"
@@ -62,32 +62,32 @@ def main() -> None:
         s = _sim(1)
         s.tourism_total = torch.tensor([tour[0]], dtype=s.civ_tourism[:, 0].dtype)
         s.culture_total = torch.tensor([cul[0]], dtype=s.civ_culture[:, 0].dtype)
-        for r in range(s.R):
-            s.civ_tourism[:, r + 1] = tour[r + 1]
-            s.civ_culture[:, r + 1] = cul[r + 1]
-            if alive_civs is not None and not alive_civs[r]:
-                s.city_alive[:, r + 1] = False
+        for row in range(1, s.n_majors):
+            s.civ_tourism[:, row] = tour[row]
+            s.civ_culture[:, row] = cul[row]
+            if alive_civs is not None and not alive_civs[row - 1]:
+                s.city_alive[:, row] = False
         return int(s._culture_victor()[0]), s
 
     # --- 1) seat 0 out-touring every civ WINS ------------------------------
-    w, _ = victor([tourism_for(5)] + [0] * sim.R, [culture_for(1)] + [culture_for(4)] * sim.R)
+    w, _ = victor([tourism_for(5)] + [0] * (sim.n_majors - 1), [culture_for(1)] + [culture_for(4)] * (sim.n_majors - 1))
     assert w == 0, f"seat 0 should win the culture victory, got civ {w}"
 
     # --- 2) a civ out-touring everyone is the DEFEAT direction -----------
-    tour = [0] * (1 + sim.R)
+    tour = [0] * (sim.n_majors)
     tour[1] = tourism_for(9)
-    cul = [culture_for(3)] + [culture_for(1)] * sim.R
+    cul = [culture_for(3)] + [culture_for(1)] * (sim.n_majors - 1)
     w, _ = victor(tour, cul)
     assert w == 1, f"civ 0 should win, got civ {w}"
 
     # --- 3) EQUAL counts do not win (strictly greater) ---------------------
-    w, _ = victor([tourism_for(4)] + [0] * sim.R, [culture_for(1)] + [culture_for(4)] * sim.R)
+    w, _ = victor([tourism_for(4)] + [0] * (sim.n_majors - 1), [culture_for(1)] + [culture_for(4)] * (sim.n_majors - 1))
     assert w == -1, f"equal visiting/domestic must NOT win, got civ {w}"
 
     # --- 4) it must beat EVERY other civ ----------------------------------
-    if sim.R >= 2:
-        cul = [culture_for(1)] + [culture_for(2), culture_for(9)] + [0.0] * (sim.R - 2)
-        w, _ = victor([tourism_for(6)] + [0] * sim.R, cul)
+    if sim.n_majors >= 3:
+        cul = [culture_for(1)] + [culture_for(2), culture_for(9)] + [0.0] * (sim.n_majors - 3)
+        w, _ = victor([tourism_for(6)] + [0] * (sim.n_majors - 1), cul)
         assert w == -1, f"beating only one civ must NOT win, got civ {w}"
 
     # --- 5) the divisor scales with the number of civs ---------------------
@@ -98,10 +98,10 @@ def main() -> None:
     assert raw // (3 * per_visitor) == 4, "a 3-civ game must dilute the same tourism to 4"
 
     # --- 6) a CITYLESS civ cannot win -------------------------------------
-    tour = [0] * (1 + sim.R)
+    tour = [0] * (sim.n_majors)
     tour[1] = tourism_for(9)
-    cul = [culture_for(3)] + [culture_for(1)] * sim.R
-    w, _ = victor(tour, cul, alive_civs=[False] + [True] * (sim.R - 1))
+    cul = [culture_for(3)] + [culture_for(1)] * (sim.n_majors - 1)
+    w, _ = victor(tour, cul, alive_civs=[False] + [True] * (sim.n_majors - 2))
     assert w != 1, "a civ with no cities must not win on banked tourism"
 
     # --- 7) RELIGION outranks CULTURE on the same turn --------------------

@@ -26,7 +26,7 @@ describe('research progression', () => {
     const state = makeState(makeMap(16, 16));
     foundCity(state, tileAtCoords(state.map, 8, 8).index, 0);
     let guard = 0;
-    while (seatOf(state, 0)!.research.techs.length === 0 && guard++ < 30) endTurn(state, 0);
+    while (seatOf(state, 0)!.research.techs.length === 0 && guard++ < 30) endTurn(state);
     expect(seatOf(state, 0)!.research.techs.length).toBe(1);
     expect(TECHS[seatOf(state, 0)!.research.techs[0]].cost).toBe(Math.min(...Object.values(TECHS).map((t) => t.cost))); // cheapest tier first
     // a fresh current tech was auto-picked
@@ -37,7 +37,7 @@ describe('research progression', () => {
     const state = makeState(makeMap(16, 16));
     foundCity(state, tileAtCoords(state.map, 8, 8).index, 0);
     let guard = 0;
-    while (seatOf(state, 0)!.research.civics.length === 0 && guard++ < 40) endTurn(state, 0);
+    while (seatOf(state, 0)!.research.civics.length === 0 && guard++ < 40) endTurn(state);
     expect(seatOf(state, 0)!.research.civics).toContain('CODE_OF_LAWS');
     expect(seatOf(state, 0)!.government.current).toBe('CHIEFDOM');
     expect(seatOf(state, 0)!.government.policies.length).toBe(2); // 1 military + 1 economic

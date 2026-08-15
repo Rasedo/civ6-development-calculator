@@ -197,7 +197,7 @@ describe('governors / era score (#68 B-24)', () => {
       addCity(state, r0, 3, 5, 40); // weakest non-capital
       addCity(state, r0, 7, 5, 60); // stronger non-capital
       addCiv(state, 10, 10); // a second civ so r0's cities feel foreign pressure (loyalty runs)
-      seatPhase(state, 0);
+      seatPhase(state);
       return { weak: r0.cities[1].loyalty!, strong: r0.cities[2].loyalty! };
     }
     const control = scenario(0); // titles 0

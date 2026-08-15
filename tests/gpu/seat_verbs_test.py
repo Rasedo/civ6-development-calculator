@@ -74,7 +74,7 @@ def main() -> None:
     assert slot is not None, "civ 0 has no live unit at t30"
     # make the builder's own tile demand a resource improvement it can unlock
     k = 3  # first resource improvement in the roster
-    sim.civ_at[0, tile] = r
+    sim.tile_seat[0, tile] = r + 1
     sim.res_imp[0, tile] = k
     sim.improvement[0, tile] = -1
     sim.district[0, tile] = -1
@@ -97,9 +97,10 @@ def main() -> None:
     sim = fresh(rules, path)
     slot, tile = a_civ_builder(sim, r)
     assert slot is not None
-    sim.civ_at[0, tile] = r
+    sim.tile_seat[0, tile] = r + 1
     sim.improvement[0, tile] = 0
     sim.pillaged[0, tile] = True
+    sim._tile_owner_ver += 1
     order(sim, r, slot, A_REP)
     assert not bool(sim.pillaged[0, tile]), "#89 DISPATCH DEAD: REPAIR left the tile pillaged"
     print("  2 REPAIR clears a pillaged civ tile OK")
@@ -110,11 +111,11 @@ def main() -> None:
     slot, tile = a_civ_soldier(sim, r)
     assert slot is not None, "no civ military unit by t30"
     sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
-    sim.tile_seat[0, tile] = 0        # seat-0 land (the enemy plane)
-    sim.civ_at[0, tile] = -1
+    sim.tile_seat[0, tile] = 0        # seat-0 land — the enemy this civ is at war with
     sim.improvement[0, tile] = 0
     sim.pillaged[0, tile] = False
     sim.district[0, tile] = -1
+    sim._tile_owner_ver += 1
     order(sim, r, slot, A_PIL)
     assert bool(sim.pillaged[0, tile]), "#89 DISPATCH DEAD: PILLAGE did not wreck the improvement"
     print("  3 PILLAGE wrecks an enemy improvement OK")
@@ -124,11 +125,10 @@ def main() -> None:
     sim = fresh(rules, path)
     slot, tile = a_civ_soldier(sim, r)
     sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
-    sim.tile_seat[0, tile] = -1
-    sim.citystate_at[0, tile] = -1
-    sim.civ_at[0, tile] = r          # OWN land
+    sim.tile_seat[0, tile] = r + 1    # OWN land
     sim.improvement[0, tile] = 0
     sim.pillaged[0, tile] = False
+    sim._tile_owner_ver += 1
     order(sim, r, slot, A_PIL)
     assert not bool(sim.pillaged[0, tile]), "a civ pillaged its OWN improvement"
     print("  4 PILLAGE refused on own land OK")
@@ -210,11 +210,11 @@ def main() -> None:
     sim6.seat_ext[0, r + 1] = True
     sl6, t6 = a_civ_soldier(sim6, r)
     sim6.war[0, 0, 1 + r] = sim6.war[0, 1 + r, 0] = True
-    sim6.tile_seat[0, t6] = 0
-    sim6.civ_at[0, t6] = -1
+    sim6.tile_seat[0, t6] = 0         # seat-0 land, the pillage target
     sim6.improvement[0, t6] = 0
     sim6.pillaged[0, t6] = False
     sim6.district[0, t6] = -1
+    sim6._tile_owner_ver += 1
     sm6 = sim6._seat_slot_map(r + 1)[0]
     rw6 = int((sm6 == sl6).nonzero(as_tuple=True)[0][0])
     sq6 = torch.full((1, sm6.shape[0], 2), -1, dtype=torch.long)

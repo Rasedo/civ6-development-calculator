@@ -46,7 +46,7 @@ describe('B-25 culture victory', () => {
     seatOf(state, 0)!.cultureTotal = cultureFor(1);
     civSeat.cultureTotal = cultureFor(4); // 5 visiting > 4 domestic
     civSeat.tourism = 0;
-    endTurn(state, 0);
+    endTurn(state);
     expect(state.victoryType).toBe(5);
     expect(state.victoryRow).toBe(0);
     expect(state.gameOver).toBe(true);
@@ -59,7 +59,7 @@ describe('B-25 culture victory', () => {
     civSeat.cultureTotal = cultureFor(1);
     seatOf(state, 0)!.cultureTotal = cultureFor(3); // civ 9 visiting > seat-0 3 domestic
     seatOf(state, 0)!.tourism = 0;
-    endTurn(state, 0);
+    endTurn(state);
     expect(state.victoryType).toBe(5);
     expect(state.victoryRow).toBe(1);
     expect(state.gameOver).toBe(true);
@@ -72,7 +72,7 @@ describe('B-25 culture victory', () => {
     seatOf(state, 0)!.cultureTotal = cultureFor(1);
     civSeat.cultureTotal = cultureFor(4); // 4 visiting vs 4 domestic — not a win
     civSeat.tourism = 0;
-    endTurn(state, 0);
+    endTurn(state);
     expect(state.victoryType).not.toBe(5);
     expect(state.gameOver).toBe(false);
   });
@@ -84,7 +84,7 @@ describe('B-25 culture victory', () => {
     (state.seats[(0) + 1] as Seat).cultureTotal = cultureFor(2); // beaten
     (state.seats[(1) + 1] as Seat).cultureTotal = cultureFor(9); // NOT beaten
     for (const civSeat of state.seats.slice(1)) civSeat.tourism = 0;
-    endTurn(state, 0);
+    endTurn(state);
     expect(state.victoryType).not.toBe(5);
     expect(state.gameOver).toBe(false);
   });
@@ -97,7 +97,7 @@ describe('B-25 culture victory', () => {
     seatOf(two, 0)!.cultureTotal = cultureFor(1);
     (two.seats[(0) + 1] as Seat).cultureTotal = cultureFor(5);
     (two.seats[(0) + 1] as Seat).tourism = 0;
-    endTurn(two, 0);
+    endTurn(two);
     expect(two.victoryType).toBe(5); // 6 > 5
 
     const three = newGame(2);
@@ -107,7 +107,7 @@ describe('B-25 culture victory', () => {
       civSeat.cultureTotal = cultureFor(5);
       civSeat.tourism = 0;
     }
-    endTurn(three, 0);
+    endTurn(three);
     expect(three.victoryType).not.toBe(5); // only 4 visiting now — 4 < 5
   });
 
@@ -119,7 +119,7 @@ describe('B-25 culture victory', () => {
     civSeat.cities = []; // wiped off the map, but its lifetime totals remain
     seatOf(state, 0)!.cultureTotal = cultureFor(3);
     seatOf(state, 0)!.tourism = 0;
-    endTurn(state, 0);
+    endTurn(state);
     expect(state.victoryType).not.toBe(5);
   });
 
@@ -140,7 +140,7 @@ describe('B-25 culture victory', () => {
     seatOf(state, 0)!.cultureTotal = cultureFor(1);
     civSeat.cultureTotal = cultureFor(4);
     civSeat.tourism = 0;
-    endTurn(state, 0);
+    endTurn(state);
     expect(state.victoryType).toBe(4);
   });
 });

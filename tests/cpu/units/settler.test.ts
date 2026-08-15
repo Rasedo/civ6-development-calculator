@@ -26,7 +26,7 @@ describe('settlers', () => {
     expect(settlerCost(state, 0)).toBe(66); // queued settler raises the next price (+18)
     const prod = computeCityStats(state, a).total.production;
     const turns = Math.ceil(48 / prod);
-    for (let i = 0; i < turns; i++) endTurn(state, 0);
+    for (let i = 0; i < turns; i++) endTurn(state);
     expect(settlerCount(state, 0)).toBe(1); // completion SPAWNED the unit at the city
 
     // walked to the site, FOUND consumes it

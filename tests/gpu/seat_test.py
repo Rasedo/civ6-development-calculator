@@ -76,7 +76,7 @@ def main() -> None:
     # read the block widths from the ONE layout definition — a literal here
     # would silently point at the wrong field whenever a block grows.
     import ladder as _lay
-    _base = _lay.EMP + _lay.PER_CS * s2.S + _lay.PER_CIV * s2.R
+    _base = _lay.EMP + _lay.PER_CS * s2.S + _lay.PER_CIV * (s2.n_majors - 1)
     for name, plane, col, scale in (
         ("treasury", s2.civ_treasury[:, 1:], 8, 200.0),
         ("influence", s2.civ_influence[:, 1:], 10, 100.0),
@@ -118,7 +118,7 @@ def main() -> None:
     # (b) with no winner and NOBODY holding a city (a t0 world), the pick
     # falls back to the plain score leader — the same deterministic
     # first_argmax tie-break, so the two reads must agree exactly
-    assert not bool(s3.city_alive[0, 0].any()) and not bool(s3.city_alive[0, 1:1 + max(s3.R, 1)].any()), (
+    assert not bool(s3.city_alive[0, 0].any()) and not bool(s3.city_alive[0, 1:s3.n_majors].any()), (
         "t0 fixture grew cities — re-derive this scenario"
     )
     assert int(s3.protagonist()[0]) == int(s3.leader()[0]), (

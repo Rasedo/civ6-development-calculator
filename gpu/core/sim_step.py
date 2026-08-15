@@ -6,10 +6,10 @@ NO SEAT IS SHAPED INTO THIS FILE. Every seat's decisions arrive the same way —
 seat arguments at all: it advances the world. Row 0's turn is `_seat_phase`'s
 row-0 call, the same body every seat takes.
 
-The one distinction left anywhere near here is the unit-order REPLAY POSITION
-(#108): row 0's orders ride the triples schema and execute pre-turn, where a
-civ row's per-unit ranks are stashed and replayed at the walkers' own position
-in the phase. That is a WIRE SCHEMA fork, and it lives in the record, not here.
+There is no distinction left near here either. Every major row's unit orders
+ride ONE schema — per-unit rank rows over `_seat_slot_map` — and drain at ONE
+position, the walkers' own, inside `_seat_phase`. Row 0's triples record and
+its pre-turn execution went in #108.
 
 One mixin of BatchSim (assembled in engine.py); state and helpers live on
 self / gpu/core/simbase.py.
@@ -28,8 +28,8 @@ class SimStep:
         NO ACTIONS ARRIVE HERE. A seat's draw-free choices are written by
         `apply_seat_actions(row, ...)` and its unit orders by
         `_apply_seat_unit_actions(row, ...)` — both before this call, both
-        identical for every row, and row 0 has no interface of its own
-        (A-31r). Whatever was stashed drains at its own position in the phase.
+        identical for every row, and no row has an interface of its own.
+        Whatever was stashed drains at its own position in the phase.
         """
         dev = self.device
 
@@ -107,11 +107,11 @@ class SimStep:
         # trigger, ONE body, every row — the seat whose deaths compact
         # EAGERLY and the seat that waits for a threshold were the same rule
         # written twice, and only the eager one is TS's.
-        _alive_m = self.city_alive[:, :1 + self.R]
+        _alive_m = self.city_alive[:, :self.n_majors]
         _hw = (_alive_m.long() * (torch.arange(self.RC, device=dev).reshape(1, 1, -1) + 1)).amax(dim=2)
         if bool((_hw > _alive_m.sum(dim=2)).any()):
             self._reclaim_cities()
-        if self.R > 0 and self._civ_city_reg_check:
+        if self.n_majors > 1 and self._civ_city_reg_check:
             # After compaction (the riskiest registry reshuffle) and all of
             # this step's placements/captures — env-gated, so free when off.
             self._check_rc_registry_invariant()
@@ -162,7 +162,7 @@ class SimStep:
             # entries (three on a Heroic age).
             _era_i = int(self.turn // self._era_len)
             self.ded_picks[:] = -1
-            for _c in range(1 + self.R):
+            for _c in range(self.n_majors):
                 for _k in range(self.ded_picks.shape[2]):
                     _take = self.dedications[:, _c] > _k
                     self.ded_picks[:, _c, _k] = torch.where(
@@ -183,7 +183,7 @@ class SimStep:
             _fa = torch.where(_gold, self.dedications * self._ded_faith, torch.zeros_like(self.dedications))
             _es = torch.where(_gold, torch.zeros_like(self.dedications), self.dedications * self._ded_era)
             self.era_score.add_(_es)
-            _fw = 1 + self.R
+            _fw = self.n_majors
             self.civ_faith[:, :_fw].copy_(self.civ_faith[:, :_fw] + _fa[:, :_fw].to(self.civ_faith.dtype))
         dom = self._domination()
         # A SCIENCE victory set during this turn's project completions takes

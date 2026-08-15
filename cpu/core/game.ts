@@ -828,18 +828,18 @@ export function setPolicy(state: GameState, slotIndex: number, policyId: string 
 
 
 
-export function endTurn(state: GameState, seat: number): void {
+export function endTurn(state: GameState): void {
   // Every seat's turn — boosts, upkeep, bankruptcy, economy, verbs — runs
   // through ONE body: `phase.ts:seatPhase` loops the seat roster, seat 0
   // included. Nothing here belongs to one seat; this function only holds
   // the GLOBAL schedule around that loop.
   if (state.unitsMode) {
     refreshUnits(state);
-    barbarianPhase(state, seat);
+    barbarianPhase(state);
   }
   if (state.disasters) disasterPhase(state);
   cityStatePhase(state);
-  seatPhase(state, seat);
+  seatPhase(state);
 
 
   // THEOLOGICAL COMBAT, then the religious pressure spread — the fight first,
@@ -945,7 +945,7 @@ function diplomaticVictor(state: GameState): number {
  * never both qualify against each other.
  */
 function cultureVictor(state: GameState): number {
-  const nCivs = 1 + state.seats.length - 1;
+  const nCivs = state.seats.length;
   const visitDiv = nCivs * TOURISM_PER_VISITOR_PER_CIV;
   const alive = state.seats.map((sx) => sx.cities.length > 0);
   const tourism = state.seats.map((sx) => sx.tourism ?? 0);
@@ -1109,8 +1109,8 @@ function theologicalCombatPhase(state: GameState): void {
 }
 
 function spreadReligiousPressure(state: GameState): void {
-  const R = state.seats.length - 1;
-  const nRel = 1 + R;
+  // One religion per MAJOR — the roster's own length.
+  const nRel = state.seats.length;
   const holy: number[] = new Array(nRel).fill(-1);
   // A religion is keyed by the seat that founded it, so its holy tile sits at
   // that seat's own index.

@@ -26,9 +26,9 @@ describe('eurekas & inspirations', () => {
   it('boosts fire during normal turns and never re-fire', () => {
     const state = makeState(makeMap(16, 16));
     foundCity(state, tileAtCoords(state.map, 8, 8).index, 0); // grassland interior -> no coast
-    endTurn(state, 0);
+    endTurn(state);
     const count = seatOf(state, 0)!.research.boosted.length;
-    endTurn(state, 0);
+    endTurn(state);
     expect(seatOf(state, 0)!.research.boosted.length).toBe(count); // idempotent
   });
 

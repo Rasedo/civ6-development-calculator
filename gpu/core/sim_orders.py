@@ -378,7 +378,7 @@ class SimOrders:
                         & self.civ_religion_done[:, row]
                     )
                     if bool(ok_sp.any()):
-                        nrows = 1 + self.R
+                        nrows = self.n_majors
                         tc_sp = tgt_sp.clamp(min=0)
                         lump = self._enh["mlump"][self.civ_enhancer[:, row] + 1]
                         pm = (
@@ -678,7 +678,7 @@ class SimOrders:
         # city (seat 0 or a civ seat), so only a fully citiless world skips the
         # roll. The short-circuit is part of the draw-count contract. A second
         # draw picks the spot, and only if any candidate exists.
-        any_city = self.city_alive[:, :1 + self.R].reshape(B, -1).any(dim=1)
+        any_city = self.city_alive[:, :self.n_majors].reshape(B, -1).any(dim=1)
         can_roll = any_city & (self.n_camps < self.max_camps)
         r1 = self._next_random(can_roll)
         want = can_roll & (r1 < cb.get("campSpawnChance", 0.08))
@@ -693,8 +693,8 @@ class SimOrders:
             # would pad the set and shift the draw-indexed camp spot.
             # Camps rise away from EVERY seat, so live CIV city centres repel
             # candidates too.
-            rcc_w = self.city_center[wr, 1:1 + max(self.R, 1)].reshape(len(wr), -1)
-            near_rc_w = ((self.pair_dist[rcc_w.clamp(min=0)] < 5) & self.city_alive[wr, 1:1 + max(self.R, 1)].reshape(len(wr), -1).unsqueeze(2)).any(dim=1)
+            rcc_w = self.city_center[wr, 1:self.n_majors].reshape(len(wr), -1)
+            near_rc_w = ((self.pair_dist[rcc_w.clamp(min=0)] < 5) & self.city_alive[wr, 1:self.n_majors].reshape(len(wr), -1).unsqueeze(2)).any(dim=1)
             cand_w = self.camp_ok[wr] & (self.tile_seat[wr] < 0) & ~near_city_w & ~near_rc_w & (self.district[wr] < 0) & (self.built_wonder[wr] < 0)  # a live builtWonder excludes the tile too
             if self.fog_of_war:
                 # camps rise IN THE FOG — only on tiles dark to EVERY major
@@ -907,7 +907,7 @@ class SimOrders:
                 # barbarians raid any MAJOR's improvements; a city-state's
                 # are not in hostileUnitAct's set.
                 _h_seat = self.tile_seat.gather(1, here.unsqueeze(1)).squeeze(1)
-                h_owned = (_h_seat >= 0) & (_h_seat <= self.R)
+                h_owned = (_h_seat >= 0) & (_h_seat < self.n_majors)
                 pillage = act & ~attack & h_imp & h_unpil & h_owned
                 if bool(pillage.any()):
                     rows = pillage.nonzero(as_tuple=True)[0]
@@ -930,7 +930,7 @@ class SimOrders:
                 h_dcomp = self.district_complete.gather(1, here.unsqueeze(1)).squeeze(1)
                 h_dunpil = ~self.district_pillaged.gather(1, here.unsqueeze(1)).squeeze(1)
                 _hd_seat = self.tile_seat.gather(1, here.unsqueeze(1)).squeeze(1)
-                h_downed = (_hd_seat >= 0) & (_hd_seat <= self.R)
+                h_downed = (_hd_seat >= 0) & (_hd_seat < self.n_majors)
                 dist_pillage = act & ~attack & ~pillage & (h_dist >= 0) & h_dcomp & h_dunpil & h_downed
                 if bool(dist_pillage.any()):
                     rows = dist_pillage.nonzero(as_tuple=True)[0]
@@ -949,7 +949,7 @@ class SimOrders:
             if self.improvements_on or self.districts_on:
                 # `isCiv(tileSeat(t))` — owned by ANY major. A barbarian is
                 # hostile to all of them, so no war term joins it.
-                _owned = (self.tile_seat >= 0) & (self.tile_seat <= self.R)  # [B, T]
+                _owned = (self.tile_seat >= 0) & (self.tile_seat < self.n_majors)  # [B, T]
                 imp_job = (self.improvement >= 0) & ~self.pillaged & _owned  # [B, T]
                 if self.districts_on:  # pillageable districts join the union
                     imp_job = imp_job | ((self.district >= 0) & self.district_complete & ~self.district_pillaged & _owned)
@@ -966,7 +966,7 @@ class SimOrders:
             # a civ city un-besieged however close it stood.
             ckey_min = torch.full((B,), 10**18, dtype=torch.long, device=dev)
             city_tgt = here.clamp(min=0)
-            for row2 in range(1 + self.R):
+            for row2 in range(self.n_majors):
                 for j in range(self.RC):
                     ct2 = self.city_center[:, row2, j].clamp(min=0)
                     d2 = self.pair_dist[here.clamp(min=0), ct2].to(torch.long)

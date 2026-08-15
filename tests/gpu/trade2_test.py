@@ -49,15 +49,15 @@ def main() -> None:
     assert "seat_route_dest" in _MUTABLE and "seat_route_exp" in _MUTABLE, "route tensors must be _MUTABLE (#51: SEAT-indexed bases; civ_only_route_* are views)"
     B = sim.B
     K = sim.seat_routes.shape[2]
-    assert sim.seat_route_dest[:, 1:1 + max(sim.R, 1)].shape == (B, max(sim.R, 1), K), "civ_only_route_dest shape"
-    assert sim.seat_route_exp[:, 1:1 + max(sim.R, 1)].shape == (B, max(sim.R, 1), K), "civ_only_route_exp shape"
-    assert sim.seat_route_dest[:, 1:1 + max(sim.R, 1)].dtype == torch.long and sim.seat_route_exp[:, 1:1 + max(sim.R, 1)].dtype == torch.long, "route metadata dtype"
-    assert sim.seat_route_dest[:, 1:1 + max(sim.R, 1)].dtype == sim.seat_routes[:, 1:1 + max(sim.R, 1)].dtype, "civ_only_route_dest dtype must match civ_only_routes"
+    assert sim.seat_route_dest[:, 1:sim.n_majors].shape == (B, sim.n_majors - 1, K), "route_dest civ-row shape"
+    assert sim.seat_route_exp[:, 1:sim.n_majors].shape == (B, sim.n_majors - 1, K), "route_exp civ-row shape"
+    assert sim.seat_route_dest[:, 1:sim.n_majors].dtype == torch.long and sim.seat_route_exp[:, 1:sim.n_majors].dtype == torch.long, "route metadata dtype"
+    assert sim.seat_route_dest[:, 1:sim.n_majors].dtype == sim.seat_routes[:, 1:sim.n_majors].dtype, "civ_only_route_dest dtype must match civ_only_routes"
 
     # --- 2) international income: intlGold + dest specialty, gold only -----
     #   Plant a civ-capital route to seat 0's capital centre tile. At t0 that
     #   capital holds no specialty district, so gold = intlGold(3).
-    assert sim.R >= 1 and bool(sim.city_alive[0, 1, 0]), "need a live civ capital"
+    assert sim.n_majors >= 2 and bool(sim.city_alive[0, 1, 0]), "need a live civ capital"
     dest_tile = int(sim.city_center[0, 0, 0])  # seat 0's capital centre tile
     assert int(sim.centre_slot_at[0, dest_tile]) == 0 and int(sim.tile_seat[0, dest_tile]) == 0 and bool(sim.city_alive[0, 0, 0]), "seat-0 capital must own its center"
     sim.seat_routes[0, 1, 0, 0] = int(sim.city_id[0, 1, 0])  # origin = civ capital

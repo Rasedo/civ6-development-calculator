@@ -45,7 +45,7 @@ import { civEraIndex, computeCityStats, luxuryAmenities, pickBorderTile, acquire
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { hasRiver, hasFreshWater, isCoastalWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
-import { disbandUnit, builderCost } from './units';
+import { disbandUnit, builderCost, builderRemoveFeature } from './units';
 import { killUnit } from './combat';  // #51/S7.12
 import { availableProjects, buyTile, buyWorshipBuilding, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampmentItem, purchaseReligiousUnit, purchaseSettler, queueProject, settlerCost } from './game';
 import { districtAdjacency } from './yields';
@@ -95,8 +95,9 @@ export const BUY_UNITS: { id: string; tech?: string }[] = [
 
 /**
  * The seats a row's WAR HEAD addresses, in ascending seat order — every OTHER
- * major, so the head is Rw wide for every seat and column k means the same
- * kind of thing whoever asks. The GPU's `war_targets(row)` twin.
+ * major, so the head is one column per OPPONENT for every seat and column k
+ * means the same kind of thing whoever asks. The GPU's `war_targets(row)`
+ * twin.
  */
 export function warTargets(state: GameState, seat: number): number[] {
   return state.seats.map((s) => s.seat).filter((s) => s !== seat);
@@ -824,20 +825,21 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
   }
   const warCol = rec.war;
   // The war head addresses the OTHER MAJORS in ascending seat order: column k
-  // declares on `warTargets(state, actor.seat)[k]`, column Rw + k sues it. For
-  // seat 0 that is [1 .. Rw], the layout the wire has always carried; for a
+  // declares on `warTargets(state, actor.seat)[k]`, column nOpp + k sues it.
+  // For seat 0 that is every other seat in id order, the layout the wire has
+  // always carried; for a
   // civ, column 0 is seat 0 and the rest used to be dead.
   if (warCol !== null && warCol !== undefined && warCol >= 0) {
-    const Rw = state.seats.length - 1;
+    const nOpp = state.seats.length - 1;  // the head is one column per OPPONENT
     const targets = warTargets(state, actor.seat);
-    const foe = targets[warCol < Rw ? warCol : warCol - Rw];
+    const foe = targets[warCol < nOpp ? warCol : warCol - nOpp];
     if (foe !== undefined && actor.seat !== foe) {
       // ALLIES NEVER DECLARE ON EACH OTHER, declaring earns GRIEVANCES, and
       // the war takes its KIND here: FORMAL iff this seat's grudge on the
       // target is at least FORMAL_WAR_MIN_TURNS old (a same-turn stamp is 0
       // old — a surprise). All three live here because the head is the ONLY
       // entry: nothing else declares, so nothing else can carry them.
-      if (warCol < Rw && !civsAtWar(state, actor.seat, foe) && !seatsAllied(state, actor.seat, foe)) {
+      if (warCol < nOpp && !civsAtWar(state, actor.seat, foe) && !seatsAllied(state, actor.seat, foe)) {
         setWar(state, actor.seat, foe, true);
         setWarTurnsWith(state, actor.seat, foe, 0);
         actor.warmonger = (actor.warmonger ?? 0) + WARMONGER_DOW;
@@ -845,7 +847,7 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
         const formal = dt !== undefined && state.turn - dt >= FORMAL_WAR_MIN_TURNS;
         setWarFormal(state, actor.seat, foe, formal);
         state.eventLog.push(`${actor.name} declares ${formal ? 'a formal' : 'a surprise'} war on ${seatOf(state, foe)?.name ?? 'you'}!`);
-      } else if (warCol >= Rw && civsAtWar(state, actor.seat, foe)) {
+      } else if (warCol >= nOpp && civsAtWar(state, actor.seat, foe)) {
         const waited = warTurnsWith(state, actor.seat, foe);
         const cost = PEACE_GOLD_COST(waited);
         if (waited >= WAR_MIN_TURNS && goldAffordable(actor.treasury ?? 0, cost)) {
@@ -921,7 +923,7 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
  * are NOT replayed here yet — the ladder's peace verb never emits them, so
  * recording one would mean the policy changed and this needs extending with it.
  */
-export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number[][], seat: number): void {
+export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number[][]): void {
   if (!steps || steps.length === 0) return;
   for (const step of steps) {
     const row = Array.isArray(step[0]) ? (step[0] as unknown as number[]) : step;
@@ -962,7 +964,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         if (to) {
           const anyWarU = atWarWithAny(state, actor.seat);
           const allowEmb = anyWarU && ownerHasTech(state, unit, 'SHIPBUILDING');
-          if (tileFreeForUnit(state, to.index, seat, unit, allowEmb)) stepUnit(state, unit, to);
+          if (tileFreeForUnit(state, to.index, actor.seat, unit, allowEmb)) stepUnit(state, unit, to);
         }
       } else if (a >= 6 && a < 12) {
         // ATTACK — safe to replay now BECAUSE the walkers stand down for
@@ -972,12 +974,16 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         const to = nb[a - 6];
         if (to) {
           // The ORDERED ranged attack is `rangedAttack`, not the autonomous
-          // strike: same body seat 0's orders take, dispatched by unit TYPE
-          // alone (the GPU applier's arm). `hostileRangedStrike` carries the
-          // major-vs-major scope-out and belongs to the SNIPE column and the
-          // hostile phases.
-          if (UNITS[unit.type]?.ranged) rangedAttack(state, unit.id, to.index, seat);
-          else meleeAttack(state, unit.id, to.index, seat);
+          // strike, dispatched by unit TYPE alone (the GPU applier's arm).
+          // `hostileRangedStrike` carries the major-vs-major scope-out and
+          // belongs to the SNIPE column and the hostile phases.
+          //
+          // The ACTING seat, not the phase's ambient 0: both bodies thread it
+          // to `killUnit` -> `markAntiquitySite`, whose ERA gate reads that
+          // seat's own research. A civ's unit dying used to leave (or not
+          // leave) a dig according to SEAT 0's era.
+          if (UNITS[unit.type]?.ranged) rangedAttack(state, unit.id, to.index, actor.seat);
+          else meleeAttack(state, unit.id, to.index, actor.seat);
         }
       } else if (a === 25) {
         // PILLAGE underfoot — hostileUnitAct's own block, faithfully: an
@@ -1014,11 +1020,15 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         // wrong civ's techs).
         if ((unit.charges ?? 0) <= 0 && a !== 17) return;
         if (a === 16) {
-          // CHOP: remove the feature underfoot (the walker's own remove body)
-          if (here.feature && here.feature !== 'FLOODPLAINS' && tileBelongsTo(here, actor.cities.find((c) => tileBelongsTo(here, c)) ?? actor.cities[0])) {
-            here.feature = null;
-            unit.movesLeft = 0;
-          }
+          // CHOP: `builderRemoveFeature`, the ONE remove body — removability,
+          // the resource dependency, the feature-removal TECH, the LUMBER_MILL
+          // that goes with the woods, the charge, and the YIELD LUMP into the
+          // owning city. The inline arm that used to stand here cleared the
+          // feature and paid NOTHING, so every seat driving this column banked
+          // a chop the GPU paid out (its own `_A_CHOP` arm grants
+          // `20 + 2.5*(techs+civics)`). Latent rather than live: the driver's
+          // builder ladder offers 13-15/18-24 and REPAIR, never column 16.
+          builderRemoveFeature(state, unit.id, actor.seat);
         } else if (a === 17) {
           if (here.pillaged && tileOwnedByCiv(here, actor.seat)) {
             here.pillaged = false;
@@ -1053,7 +1063,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
   }
 }
 
-export function seatPhase(state: GameState, seat: number): void {
+export function seatPhase(state: GameState): void {
   // No early-out on a civ-less roster: seat 0's OWN turn (economy, upkeep,
   // diplomacy, quests) runs through the loop below like every seat's.
 
@@ -1641,7 +1651,9 @@ export function seatPhase(state: GameState, seat: number): void {
           awardDefenseXp(defender); // B-4: +2 to a surviving military defender (attacker is the city)
           warWearinessBattle(state, civCity.seat, defender.seat, bestTile,
             { dDied: defender.hp <= 0, city: true }); // #51/S7.8f
-          if (defender.hp <= 0) killUnit(state, defender, seat);  // #51/S7.12: a dig, like the seat 0's strike
+          // The STRIKER is the city, so the dig's era gate is its owner's —
+          // the GPU passes `striker_row` at the same site.
+          if (defender.hp <= 0) killUnit(state, defender, civCity.seat);
         }
       }
       // The mirror of the ADDITIONAL Encampment strike
@@ -1680,7 +1692,9 @@ export function seatPhase(state: GameState, seat: number): void {
           awardDefenseXp(defender);
           warWearinessBattle(state, civCity.seat, defender.seat, bestTile,
             { dDied: defender.hp <= 0, city: true }); // #51/S7.8f
-          if (defender.hp <= 0) killUnit(state, defender, seat);  // #51/S7.12: a dig, like the seat 0's strike
+          // The STRIKER is the city, so the dig's era gate is its owner's —
+          // the GPU passes `striker_row` at the same site.
+          if (defender.hp <= 0) killUnit(state, defender, civCity.seat);
         }
       }
       // A siege pins the HP: any adjacent unit hostile to THIS civ counts,
@@ -1865,11 +1879,11 @@ export function seatPhase(state: GameState, seat: number): void {
       setWarTurnsWith(state, actor.seat, foe, warTurnsWith(state, actor.seat, foe) + 1);
     }
     if (!anyWar) actor.peaceTurns += 1;
-    // Seat 0's units ride the TRIPLES schema and are applied by the driver
-    // pre-endTurn (the GPU steps them at the top of step() the same way);
-    // reading triples as per-unit rows here would dispatch garbage. The one
-    // unit-wire fork left — unify the schema to route it too (#108).
-    if (recU && actor.seat !== 0) applySeatUnitOrders(state, actor, recU.units, seat);
+    // EVERY seat's unit orders replay here, at the walkers' own position —
+    // one schema (per-unit rank rows), one applier, one position. Seat 0 used
+    // to ride a TRIPLES record applied pre-turn by the driver; #108 retired
+    // it, so no seat's combat draws land at a stream position of their own.
+    if (recU) applySeatUnitOrders(state, actor, recU.units);
   }
 
   // Env-gated registry coherence check at the phase tail (after every

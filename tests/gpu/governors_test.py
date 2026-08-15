@@ -85,14 +85,14 @@ def recon_seat0_next(sim, c: int, tier_idx_c: int, picked: bool) -> float:
         own += float(sim.city_pop[0, 0, cp]) * w
     own_eff = own * af[int(sim.civ_age[0, 0])]
     for_eff = 0.0
-    for r in range(sim.R):
+    for row in range(1, sim.n_majors):
         sub = 0.0
         for j in range(sim.RC):
-            if not bool(sim.city_alive[0, r + 1, j]):
+            if not bool(sim.city_alive[0, row, j]):
                 continue
-            w = max(0.0, rng + 1 - float(sim.pair_dist[sc, int(sim.city_center[0, r + 1, j])]))
-            sub += float(sim.city_pop[0, r + 1, j]) * w
-        for_eff += sub * af[int(sim.civ_age[0, r + 1])]
+            w = max(0.0, rng + 1 - float(sim.pair_dist[sc, int(sim.city_center[0, row, j])]))
+            sub += float(sim.city_pop[0, row, j]) * w
+        for_eff += sub * af[int(sim.civ_age[0, row])]
     tot = own_eff + for_eff
     press = scale * (own_eff - for_eff) / tot if tot > 0 else 0.0
     amen = float(sim._loyalty_amenity[tier_idx_c])
@@ -134,7 +134,7 @@ def two_city_setup(rules, path):
     # `own/own` and the SOURCE-seat age factor CANCELS ALGEBRAICALLY, leaving
     # the Golden x1.5 assertion unable to fire whatever the starting loyalty.
     # Plant a civ city in range rather than hoping a fixture parks one there.
-    if sim.R > 0:
+    if sim.n_majors > 1:
         cap_tile = int(sim.city_center[0, 0, cap])
         near = next(
             (t for t in range(sim.T)
@@ -160,13 +160,13 @@ def poke_event_hooks(rules, path):
         assert sim._era_pts[k] == int(er.get(k, d)), f"_era_pts[{k}] must mirror rules.json"
 
     conquer = sim._era_pts["conquer"]
-    civ_only_from = next(r for r in range(sim.R) if bool(sim.city_alive[0, r + 1].any()))
-    civ_only_to = next(r for r in range(sim.R) if r != civ_only_from)
+    civ_only_from = next(r for r in range(sim.n_majors - 1) if bool(sim.city_alive[0, r + 1].any()))
+    civ_only_to = next(r for r in range(sim.n_majors - 1) if r != civ_only_from)
     j = int(sim.city_alive[0, civ_only_from + 1].nonzero(as_tuple=True)[0][0])
     before = sim.era_score[0].clone()
     sim._transfer_city(0, civ_only_from + 1, j, civ_only_to + 1, conquest=False)
     delta = (sim.era_score[0] - before).tolist()
-    exp = [0] * (1 + sim.R)
+    exp = [0] * (sim.n_majors)
     exp[civ_only_to + 1] = conquer
     assert delta == exp, f"conquer must accrue +{conquer} to the receiver only (got {delta})"
     print(f"  a event hooks OK (_era_pts == rules.eras; rc→rc transfer += {conquer} to receiver civ {civ_only_to + 1} only)")
@@ -217,7 +217,7 @@ def poke_age_pressure(rules, path):
     combos = [(1, 1, 1), (0, 1, 1), (2, 1, 1), (1, 0, 0), (1, 2, 2)]
     for combo in combos:
         sim.restore(snap)
-        for i in range(1 + sim.R):
+        for i in range(sim.n_majors):
             sim.civ_age[0, i] = combo[i] if i < len(combo) else 1
         exp = {c: recon_seat0_next(sim, c, 0, False) for c in range(sim.RC) if bool(sim.city_alive[0, 0, c])}
         apply_loyalty_row(sim, tier)
