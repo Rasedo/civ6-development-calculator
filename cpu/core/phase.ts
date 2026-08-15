@@ -755,7 +755,7 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
  * in the same order.
  *
  * Row j addresses the seat's j-th unit in SPAWN order, which is what
- * `seat_slot_map` ranks by on the GPU side. the seat's unit list filters `state.units`,
+ * `_seat_slot_map` ranks by on the GPU side. The seat's unit list filters `state.units`,
  * which preserves spawn order, so the two agree — but this is an ASSUMPTION the
  * gate has to hold, not a guarantee this function can enforce: if it ever breaks,
  * every seat's orders land on the wrong units and the failure looks like chaos

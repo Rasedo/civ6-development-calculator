@@ -276,8 +276,8 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     // `cityStateMax` is a genuine MAX — placement drops a city-state it
     // cannot space, so it sizes the minor rows and the roster may be
     // shorter. The majors have no such key: `civs[]` below IS the roster,
-    // exact (placeCivs throws rather than drop a seat), and the GPU reads
-    // its width off it. The old `civMax` counted the seats besides seat 0.
+    // exact (`placeCivs` throws rather than drop a seat), and the GPU reads
+    // its width off it.
     cityStateMax: world.gen.params.cityStateMax,
     cityStates: cityStateAtStart,
     civs: state.seats.map((s) => ({

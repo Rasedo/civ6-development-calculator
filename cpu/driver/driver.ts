@@ -169,10 +169,10 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
 
 export async function runDriver(o: DriverOpts): Promise<void> {
   const { state, seed, turns: N_TURNS, cityMax: CITY_MAX, cityStateMax: CITY_STATE_MAX } = o;
-  // THE MAJOR ROSTER WIDTH, read off THE ROSTER. It arrived as a `civMax`
-  // option until #115 — a count of the seats BESIDES seat 0, which had to be
-  // +1'd here and could disagree with the roster it was describing. The
-  // GPU reads its own width the same way, off the fixture's `civs[]`.
+  // THE MAJOR ROSTER WIDTH, read off THE ROSTER — never a scalar option
+  // beside it, which is a second source of truth that can disagree with the
+  // array it describes. The GPU reads its own width the same way, off the
+  // fixture's `civs[]`.
   const N_MAJORS = state.seats.length;
 for (let t = 0; t < N_TURNS; t++) {
   {

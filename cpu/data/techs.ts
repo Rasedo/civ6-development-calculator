@@ -130,8 +130,8 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       // `unlocks.improvements` never contained it and `unlocked('FORT')` was
       // true only in sandbox. Neither seat could build one. MEASURED: across
       // the 12-seed gate the seat production arm was reached 526 times (325 of
-      // them at war) and `fortUnlocked` was false on EVERY one. This — not the
-      // absent production policy — is why the FORT was never reachable.
+      // them at war) and the FORT was never once unlocked. This — not the
+      // absent production policy — is why it was never reachable.
       // Real Civ 6 unlocks the Fort with Military Engineering, the same tech
       // that trains the Military Engineer.
       { kind: 'unlockImprovement', improvement: 'FORT' },

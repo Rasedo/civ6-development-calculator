@@ -220,7 +220,7 @@ export function greatWorkTourism(city: GwCity, printing = false): number {
  *
  * SOURCE, and the one deliberate deviation: real Civ 6 creates a relic when an
  * Apostle carrying the MARTYR promotion is killed in theological combat.
- * Promotions are not modeled, and `theologicalCombat` is deliberately ZERO-DRAW
+ * Promotions are not modeled, and `theologicalCombatPhase` is deliberately ZERO-DRAW
  * (a conditional RNG draw there would have to be mirrored draw-for-draw across
  * both engines), so rolling for Martyr is not available. Every APOSTLE killed
  * in theological combat martyrs instead. That OVERSTATES relic frequency by

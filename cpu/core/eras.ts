@@ -127,10 +127,11 @@ export function goldenDedication(state: GameState, civ: number, kind: number): b
  *
  * These two were implemented for #79, hunted, and reverted: scripted parity
  * went green but the off-script gate diverged on the `rng` DRAW COUNT at seed
- * 9015 t199, because TS kept movement points as STATE while the GPU kept none
- * and rebuilt `full_mp` inside every walker. #51/S5.1–S5.3 closed that split —
- * one resident MP pool, one reset rule, one step contract — so the bonus now
- * has exactly one place to live on each engine.
+ * 9015 t199, because TS kept movement points as STATE while the GPU kept
+ * none and rebuilt the pool inside every walker. Both engines hold ONE
+ * resident MP pool now (`unit_mp` against its `unit_mp_full` ceiling), with
+ * one reset rule and one step contract, so the bonus has exactly one place to
+ * live on each side.
  */
 export function goldenMoveBonus(state: GameState, unit: { type: string; seat: number }): number {
   const civ = isBarbSeat(unit.seat) ? -1 : unit.seat; // barbarians hold no dedications

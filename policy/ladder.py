@@ -264,7 +264,7 @@ def pick_production(
     the single shared rule, which is also Civ 6's.
 
     CITIES ARE WALKED IN ORDER, not scored independently, because the rules
-    carry state ACROSS them: `settlerQueued`, `unitCount` and the
+    carry state ACROSS them: the settler latch, the unit count and the
     `meleeCount`/`rangedCount` army composition are all updated inside the TS
     city loop and the engine mirrors each one. A snapshot mask cannot say "city
     0 just took the settler", so a stateless pass queues one per city.

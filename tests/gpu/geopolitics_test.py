@@ -470,10 +470,9 @@ def main() -> None:
 
     # --- seat 0's grievance twin ---------------------------------------------
     from core.engine import _MUTABLE as _MUT2
-    # `warmonger` and `civ_only_warmonger` are the two halves of ONE
-    # `civ_warmonger [B, 1+R]` plane, so the BASE is what carries the state
-    # through a snapshot. Registering a view beside its base would restore into
-    # fresh storage and orphan the other half.
+    # `civ_warmonger [B, n_majors]` is ONE plane and the BASE is what carries
+    # the state through a snapshot. Registering a view beside its base would
+    # restore into fresh storage and orphan the other half.
     assert "civ_warmonger" in _MUT2, "civ_warmonger must be registered in _MUTABLE"
     assert "warmonger" not in _MUT2, "warmonger is a VIEW of civ_warmonger"
     s3 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)

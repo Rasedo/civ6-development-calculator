@@ -215,7 +215,9 @@ def test_cs_siege(rules, path):
         return
     s = int(live[0])
     # A city-state is a separate seat you must DECLARE on, and the GPU enforces
-    # that (`citystate_here` carries war[seat, cs], mirroring TS's cityStateTarget). This poke
+    # that
+    # that (the pair cell `war[b, row, cs_row]` is the whole fact, mirroring
+    # TS's `cityStateTarget`). This poke
     # sieges, so it must be at war first; there is no declare VERB on the GPU,
     # so poke the plane directly.
     sim.war[0, 0, sim.row_of(100 + s)] = sim.war[0, sim.row_of(100 + s), 0] = True

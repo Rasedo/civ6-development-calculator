@@ -49,11 +49,9 @@ FORK_PATTERNS = (
 TS_ROOTS = ("cpu/core", "cpu/driver", "cpu/export", "cpu/world")
 
 TS_FORK_ALLOW: dict[tuple[str, str], str] = {
-    # EMPTY since #115. `seatOfIndex`/`indexOfSeat` left `cpu/` in #114; the
-    # unit-order schema fork, the driver's own seat-0 candidate rows and
-    # `endTurn`/`seatPhase`/`barbarianPhase`'s ambient seat argument all left
-    # in #115. No entry point in the TS engine takes a seat any more, which is
-    # exactly the shape `step()` has had on the GPU since #113.
+    # EMPTY. No entry point in the TS engine takes a seat: `endTurn`,
+    # `seatPhase` and `barbarianPhase` all read the roster, and the unit wire
+    # has one schema for every row — the same shape `step()` has on the GPU.
     #
     # READ THE CAUTION IN A-31r BEFORE ADDING ONE BACK: this class has been
     # declared closed three times on the strength of an instrument that only
@@ -492,6 +490,142 @@ def unresolved_reads(known: set[str], shapes: list[str]) -> list[tuple[str, int,
     return sorted(set(bad))
 
 
+# ---------------------------------------------------------------------------
+# COMMENTS NAME SYMBOLS, AND A NAME IS A CLAIM.
+#
+# A comment is the only assertion in this repo with no instrument behind it,
+# which is why the purge (#116) took two thirds of them. What survives has to
+# earn it, and the cheapest possible bar is that the symbols it NAMES exist:
+# `stale-transcription-of-a-dead-oracle` is a class this codebase has already
+# been bitten by — a body's comment citing a function deleted with its host —
+# and it costs one scan to make impossible.
+#
+# Only BACKTICKED, name-shaped tokens are checked: a name in backticks is a
+# deliberate reference, while prose is prose. Resolution is deliberately broad
+# (every def, class, assignment, parameter and loop variable in either tree,
+# plus the sim's loop-bound planes from `defined_attrs`) — the bar is "this
+# name exists SOMEWHERE", not "it is in scope here", because the alternative
+# is a checker that cries wolf and gets switched off.
+# ---------------------------------------------------------------------------
+_TS_DECL_PATS = (
+    r"\b(?:function|const|let|var|class|interface|type|enum)\s+(\w{3,})",
+    r"^\s+(\w{3,})\??\s*:",
+    r"^\s+(?:async\s+)?(\w{3,})\s*\(",
+    r"(?:const|let|var)\s*\{([^}]*)\}",
+    r"function\s+\w+\(([^)]*)\)",
+    # METHOD parameters, including the multi-line signatures the harness uses —
+    # a docstring naming its own argument is not a dead reference.
+    r"^\s+(?:async\s+)?\w+\(([^)]*)\)",
+    r"^\s+(\w{3,})\??\s*[:,]\s*\w",
+    r"=\s*\(([^)]*)\)\s*(?::[^=]*?)?=>",  # arrow-function parameters
+    r"[{;]\s*(\w{3,})\??\s*:",            # inline object-type members
+    r"process\.env\.(\w{3,})",            # env vars are declared by being read
+)
+# A name can also exist only as a STRING: wire keys (`apf`), ctx keys
+# (`unit_cap`), the plane names `setattr` composes. Quoting one in a comment is
+# a real reference to a real thing, so the string tables count as declarations.
+_STRING_NAME = re.compile(r"['\"]([A-Za-z_]\w{2,})['\"]")
+_PY_DECL_PATS = (
+    r"^\s*(?:def|class)\s+(\w{3,})",
+    r"self\.(\w{3,})\s*=",
+    r"^\s*(\w{3,})\s*(?:[:,)\w\s]*)?=[^=]",
+    r"\bfor\s+(\w{3,})\b",
+    r"\bdef\s+\w+\(([^)]*)\)",
+)
+# Backticked tokens that are NOT symbol claims: shapes, flags, dtypes, prose.
+_NAMEISH = re.compile(r"^(?:[a-z][a-z0-9]*(?:_[a-z0-9]+)+|[a-z]+[A-Z]\w*|[A-Z][A-Z0-9_]{3,})(?:\(\))?$")
+# Names that are real but not OURS: torch/node/ts-morph API, and the game's own
+# data ids. `EFFECT_ADJUST_WAR_WEARINESS` is a Civ 6 modifier id cited as a
+# SOURCE — the most valuable kind of reference in this repo, and it would be
+# perverse for the checker to demand we delete it because our tree has no such
+# symbol.
+_FOREIGN_RE = re.compile(r"^(?:EFFECT|MODIFIER|TRAIT|ABILITY|GLOBAL|COLLECTION|REQUIREMENT)_")
+_FOREIGN = {"full_like", "zeros_like", "ones_like", "index_put_", "scatter_add_",
+            "index_select", "masked_fill", "argsort", "readFileSync", "writeFileSync",
+            "addImportDeclaration", "addNamedImports", "getImportDeclarations",
+            "noUnusedLocals", "noEmit", "skipLibCheck"}
+
+
+# The SOURCE trees. `.venv` and `.claude/scratchpad` are not ours: a vendored
+# package's docstrings would flood this check with names from code nobody here
+# maintains, and a spent codemod script quotes the very symbols it deleted.
+SRC_ROOTS = ("gpu", "policy", "tools", "cpu", "world", "seeder", "tests", "shared")
+
+
+def _src_files(suffix: str):
+    for base in SRC_ROOTS:
+        d = ROOT / base
+        if not d.exists():
+            continue
+        for p in sorted(d.rglob(f"*{suffix}")):
+            if not {"node_modules", "__pycache__", ".git", "worlds", "dist"} & set(p.parts):
+                yield p
+
+
+def _declared_everywhere() -> set[str]:
+    out: set[str] = set()
+    for suffix, pats in ((".py", _PY_DECL_PATS), (".ts", _TS_DECL_PATS)):
+        for p in _src_files(suffix):
+            try:
+                src = p.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            for pat in pats:
+                for m in re.finditer(pat, src, re.M):
+                    out |= set(re.findall(r"\w{3,}", m.group(1)))
+            out |= {m.group(1) for m in _STRING_NAME.finditer(src)}
+    return out
+
+
+def _comment_texts() -> list[tuple[str, int, str]]:
+    """(file, line, text) for every comment and docstring in both trees."""
+    out: list[tuple[str, int, str]] = []
+    for p in _src_files(".py"):
+        rel = str(p.relative_to(ROOT)).replace("\\", "/")
+        try:
+            src = p.read_text(encoding="utf-8")
+            tree = ast.parse(src)
+        except (SyntaxError, OSError, UnicodeDecodeError):
+            continue
+        for i, line in enumerate(src.splitlines(), 1):
+            if "#" in line:
+                out.append((rel, i, line[line.index("#"):]))
+        for node in ast.walk(tree):
+            doc = ast.get_docstring(node) if isinstance(
+                node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) else None
+            if doc:
+                out.append((rel, getattr(node, "lineno", 1), doc))
+    for p in _src_files(".ts"):
+        rel = str(p.relative_to(ROOT)).replace("\\", "/")
+        try:
+            src = p.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for i, line in enumerate(src.splitlines(), 1):
+            if "//" in line or "*" in line:
+                out.append((rel, i, line))
+    return out
+
+
+_checked_refs = 0
+
+
+def dead_comment_refs(known: set[str]) -> list[tuple[str, int, str]]:
+    global _checked_refs
+    universe = known | _declared_everywhere() | _FOREIGN
+    bad: list[tuple[str, int, str]] = []
+    for rel, line, text in _comment_texts():
+        for tok in re.findall(r"`([^`\n]+)`", text):
+            name = tok.strip().rstrip("()").split(".")[-1].split("[")[0]
+            if not _NAMEISH.match(name) or _FOREIGN_RE.match(name):
+                continue
+            if name in universe:
+                _checked_refs += 1
+            else:
+                bad.append((rel, line, name))
+    return bad
+
+
 def mutable_names() -> set[str]:
     src = (CORE / "simbase.py").read_text(encoding="utf-8")
     tree = ast.parse(src)
@@ -610,6 +744,13 @@ def main(census_only: bool = False) -> int:
         for d_ in dupes:
             print(f"  {d_}")
 
+    stale = dead_comment_refs(known)
+    if stale:
+        fails += 1
+        print("DEAD COMMENT REFERENCE — a comment names a symbol that exists nowhere:")
+        for f, ln, what in stale:
+            print(f"  {f}:{ln}  `{what}`")
+
     shadowed = shadowed_methods()
     if shadowed:
         fails += 1
@@ -624,7 +765,8 @@ def main(census_only: bool = False) -> int:
         print(f"\nseat-symmetry check FAILED ({fails} fault classes)")
         return 1
     print(f"seat-symmetry check OK — {len(known)} bound attributes, {len(aliases)} aliases, "
-          f"{len(FORK_ALLOW)} allowed GPU forks, {len(TS_FORK_ALLOW)} allowed TS forks")
+          f"{len(FORK_ALLOW)} allowed GPU forks, {len(TS_FORK_ALLOW)} allowed TS forks, "
+          f"{_checked_refs} comment refs resolve")
     return 0
 
 

@@ -220,7 +220,9 @@ def poke_galley_cs(rules, path, GALLEY):
     assert len(live), "no city-state on this seed"
     s = int(live[0])
     # a city-state is a separate seat you must DECLARE on, and the GPU enforces
-    # it (`citystate_here` carries war[seat, cs], mirroring TS's cityStateTarget). This poke
+    # it
+    # that (the pair cell `war[b, row, cs_row]` is the whole fact, mirroring
+    # TS's `cityStateTarget`). This poke
     # sieges, so it must be at war first; there is no declare VERB on the GPU,
     # so set the plane directly.
     sim.war[0, 0, sim.row_of(100 + s)] = sim.war[0, sim.row_of(100 + s), 0] = True

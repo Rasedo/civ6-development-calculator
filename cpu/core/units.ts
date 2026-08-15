@@ -802,9 +802,8 @@ export function builderImprove(state: GameState, unitId: number, imp: Improvemen
 /* The PILLAGE verb has ONE body, and it is `applySeatUnitOrders`' PILLAGE arm
  * in phase.ts — the same improvement-then-district order, the same +25 heal,
  * gated on `combat > 0` the way `hostileUnitAct` and the GPU's apply both are.
- * A second `seatPillage` used to sit here for seat 0 alone, gated on "carries
- * no charges" instead, which let a Great General pillage on one engine and not
- * the other. It went with the triples schema in #108. */
+ * A charge test here instead of that combat test is what lets a Great General
+ * pillage on one engine and not the other. */
 
 export function builderRepair(state: GameState, unitId: number): RuleResult {
   const { unit, err } = builderOn(state, unitId);

@@ -76,7 +76,7 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
 }
 
 /** A bare non-capital source city holding one regional building on a complete
- * Industrial Zone at `izTile`. */
+ * Industrial Zone at `izTileIndex`. */
 function makeSourceCity(civ: Seat, centerIndex: number, izTileIndex: number): City {
   return {
     id: civ.nextCityId++,

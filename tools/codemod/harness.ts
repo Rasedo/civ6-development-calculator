@@ -489,10 +489,10 @@ export class Mod {
   /**
    * PROJECT-WIDE symbol rename via the TypeScript language service.
    *
-   * This is the op regex codemods cannot do at all: `.civId` -> `.seat` was
-   * nine regexes over src+tests+scripts, each one guessing at the shape of the
-   * expression around it. Here it is one call, it follows the SYMBOL, and it
-   * cannot touch a same-named property on an unrelated type.
+   * This is the op regex codemods cannot do at all. Renaming one property
+   * across src, tests and scripts takes a fistful of regexes, each guessing at
+   * the shape of the expression around it. Here it is one call, it follows the
+   * SYMBOL, and it cannot touch a same-named property on an unrelated type.
    */
   renameProperty(rel: string, interfaceName: string, from: string, to: string): void {
     const it = this.file(rel).iface(interfaceName);

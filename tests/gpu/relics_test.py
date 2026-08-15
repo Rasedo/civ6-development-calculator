@@ -3,7 +3,7 @@
 Real Civ 6 counts a Relic as a Great Work held in a TEMPLE's single slot,
 paying +4 Faith and +8 Tourism (the densest tourism source in the game). A
 relic is created when an Apostle killed in theological combat carried the
-MARTYR promotion; promotions are unmodeled and `theologicalCombat` is
+MARTYR promotion; promotions are unmodeled and `theologicalCombatPhase` is
 deliberately zero-draw, so every APOSTLE killed there martyrs — a recorded
 overstatement (see the RELIC_* comment in cpu/data/greatPeople.ts).
 

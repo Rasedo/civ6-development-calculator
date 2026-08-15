@@ -322,8 +322,9 @@ class SimEconomy:
     def _auto_pick(self, cur, done, boosted, cost, prereq, golden_civ=None, is_civic: bool = False):
         """Cheapest-available (effective cost, tie = table order), where cur == -1.
         The key is the DISCOUNTED cost, so a golden Free Inquiry /
-        Pen-Brush-and-Voice changes which item is picked — `autoPickResearch`
-        sorts by `effectiveResearchCost`, which carries the same bonus."""
+        Pen-Brush-and-Voice changes which item is picked, and the cost it
+        sorts on is `effectiveResearchCostIn`'s, which carries the same
+        bonus."""
         avail = self._available_mask(done, prereq)
         eff = self._eff_cost(cost.unsqueeze(0).expand_as(avail), boosted, golden_civ, is_civic)
         key = torch.where(avail, eff, torch.tensor(float("inf"), dtype=self.dtype, device=self.device)).double()
@@ -1197,7 +1198,7 @@ class SimEconomy:
         moment. TS computes `granted = full + generalAuraMP(state, unit)`
         inside refreshUnits — the TOP of endTurn, before anything moves — and
         spends movesLeft down from that frozen pool all turn. The GPU keeps no
-        persistent movesLeft: every walker recomputes `full_mp` from
+        persistent movesLeft: every walker recomputes the full pool from
         `_type_moves[type]` MID-turn, which is safe only for terms that depend on
         unit TYPE. The aura is not one — it keys on a GENERAL's POSITION, and
         generals move during the very phase the unit orders execute, so a

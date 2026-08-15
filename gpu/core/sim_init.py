@@ -176,9 +176,9 @@ class SimInit:
                 self.citystate_suz_key[b, s] = cs.get("suzKey", -1)
         # A city-state's tile ownership lives in `tile_seat` (seeded below off
         # the wire's `ownerSeatInit` plane); `citystate_at` is a derived view.
-        # The (seat, city-state) relations live on `seat_citystate_*` [B, n_majors, S] planes
-        # allocated below, once self.n_majors is known — `citystate_met` is `[:, 0]` and
-        # `civ_only_citystate_met` is `[:, 1:]` of ONE tensor, and so on.
+        # The (seat, city-state) relations live on `seat_citystate_*`
+        # [B, n_majors, S] planes allocated below, once self.n_majors is known;
+        # every reader addresses one by row, `seat_citystate_met[:, row, s]`.
         # (the asked-for district is never stored: it is always the CS type's
         # own — _citystate_didx — so quest resolve/digest both re-derive it)
         # LEVY cooldown — per CS, SHARED across seats (the TS cs.lastLevyTurn
@@ -236,7 +236,7 @@ class SimInit:
         self.cliff_mask = torch.tensor([[int(t.get("cm", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # Per-tile APPEAL contribution (cpu/core/appeal.ts tileAppeal sums what
         # each NEIGHBOUR contributes). `ap` = static part + the t0 feature term;
-        # `ap_feat` isolates that feature term so a chopped tile subtracts
+        # `apf` isolates that feature term so a chopped tile subtracts
         # exactly it. Dynamic terms are applied in _tile_appeal.
         self.appeal_base = torch.tensor([[int(t.get("ap", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.appeal_feat = torch.tensor([[int(t.get("apf", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
