@@ -1,9 +1,9 @@
-import { seatOf } from '../../../cpu/core/seats';
+import { seatOf, unitsOf } from '../../../cpu/core/seats';
 import { computeCityStats } from '../../../cpu/core/city';
 import { describe, it, expect } from 'vitest';
 import { tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, emptySeat } from '../../../cpu/core/seats';
 import { makeState, tileAtCoords } from '../helpers';
-import { createGame } from '../../../cpu/core/game';
+import { createGame, foundCity } from '../../../cpu/core/game';
 import { seatPhase, transferCity } from '../../../cpu/core/phase';
 import { hexDistance, tilesWithin } from '../../../world/hex';
 import type { GameState, City, Seat, Tile } from '../../../cpu/core/types';
@@ -16,7 +16,6 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,
-    seat: 1,
     warmonger: 0,
     ww: {}, wwTurn: {},
     diplomaticFavor: 0,
@@ -55,7 +54,9 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
     focus: 'balanced',
     queue: [],
     isCapital: true,
-    buildings: [],
+    // the PALACE every real capital carries — its amenity keeps the city
+    // Content, so yield DELTAS are not damped by the displeasure multiplier
+    buildings: ['PALACE'],
     districts: [{ type: 'CITY_CENTER', tileIndex: tile.index }],
     wonders: [],
     specialists: {},
@@ -191,10 +192,14 @@ describe('PALACE grant on founding and on capture', () => {
 
   it('a SECOND city founded by a settler does not', () => {
     const state = makeState();
+    state.unitsMode = true;
     const civ = addCiv(state, 6, 6);
     civ.cities[0].queue.push({ kind: 'settler', progress: 500, cost: 90 });
-    state.turn = 9; // border/settle tick for city id 0
-    seatPhase(state);
+    seatPhase(state); // completes the settler: a UNIT spawns, founding is an order
+    const settler = unitsOf(state, civ.seat).find((u) => u.type === 'SETTLER')!;
+    expect(settler).toBeDefined();
+    settler.tileIndex = tileAtCoords(state.map, 12, 6).index; // legal ground, ≥4 from the capital
+    expect(foundCity(state, settler.tileIndex, civ.seat).ok).toBe(true);
     expect(civ.cities.length).toBe(2);
     const second = civ.cities[1];
     expect(second.isCapital).toBe(false);

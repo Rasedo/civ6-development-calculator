@@ -6,7 +6,7 @@ import { canFoundCity } from '../../../cpu/core/rules';
 import { seatPhase } from '../../../cpu/core/phase';
 import { borderCandidates, computeCityStats } from '../../../cpu/core/city';
 import { tilesWithin, hexDistance } from '../../../world/hex';
-import { assignEnvoy, cityStatePhase, cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus, envoyBonusDelta, envoysOf, isSuzerain } from '../../../cpu/core/cityStates';
+import { assignEnvoy, cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus, envoyBonusDelta, envoysOf, isSuzerain } from '../../../cpu/core/cityStates';
 import { tradeCapacity, addCsTradeRoute, cityTradeYields } from '../../../cpu/core/trade';
 import { ENVOY_COST, CITY_STATE_SUZERAIN_YIELD } from '../../../cpu/data/cityStates';
 import type { CityState, CityStateType, GameState } from '../../../cpu/core/types';
@@ -154,9 +154,10 @@ describe('envoys', () => {
 
   it('influence accrues into envoys once someone is met', () => {
     const state = makeState();
+    foundCity(state, tileAtCoords(state.map, 4, 4).index, 0); // the seat loop skips cityless seats
     addCs(state, 9, 9);
     seatOf(state, 0)!.influencePoints = ENVOY_COST - 2;
-    cityStatePhase(state);
+    seatPhase(state); // influence accrues in the SEAT phase, per actor
     expect(seatOf(state, 0)!.envoysAvailable).toBe(1);
     expect(seatOf(state, 0)!.influencePoints).toBeLessThan(ENVOY_COST);
   });
@@ -232,12 +233,15 @@ describe('civ envoys and the suzerain contest', () => {
     const state = makeState();
     const cityState = addCs(state, 8, 8, { type: 'trade', envoys: { [0]: 3 } });
     expect(isSuzerain(cityState, 0)).toBe(true); // uncontested
-    cityState.envoys = { [1]: 3 };
-    expect(isSuzerain(cityState, 0)).toBe(false); // tied: nobody rules
-    expect(isSuzerain(cityState, 1)).toBe(false);
-    cityState.envoys = { [1]: 4 };
+    cityState.envoys = { [0]: 3, [1]: 3 }; // ONE envoy map for every seat: a tie rules nobody
     expect(isSuzerain(cityState, 0)).toBe(false);
-    expect(isSuzerain(cityState, 1)).toBe(true);
+    expect(isSuzerain(cityState, 1)).toBe(false);
+    cityState.envoys = { [1]: 3 };
+    expect(isSuzerain(cityState, 0)).toBe(false);
+    expect(isSuzerain(cityState, 1)).toBe(true); // any seat rules uncontested at the minimum
+    cityState.envoys = { [0]: 3, [1]: 4 };
+    expect(isSuzerain(cityState, 0)).toBe(false);
+    expect(isSuzerain(cityState, 1)).toBe(true); // strictly more
     cityState.envoys = { [0]: 5 };
     expect(isSuzerain(cityState, 0)).toBe(true);
     expect(isSuzerain(cityState, 1)).toBe(false);

@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { BARB_SEAT, isBarbSeat, seatOf } from '../../../cpu/core/seats';
-import { makeMap, makeState, tileAtCoords } from '../helpers';
-import { foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
+import { BARB_SEAT, emptySeat, isBarbSeat, seatOf, setWar } from '../../../cpu/core/seats';
+import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
+import { endTurn, foundCity, serialize, deserialize } from '../../../cpu/core/game';
+import { seatPhase } from '../../../cpu/core/phase';
 import { spawnUnit, builderRepair } from '../../../cpu/core/units';
 import { meleeAttack, rangedAttack, attackTargets, terrainDefense, barbarianPhase, FLANKING_CS, SUPPORT_CS, XP_ATTACK, XP_DEFEND, XP_LEVELS, xpLevelBonus, unitLevel, awardDefenseXp } from '../../../cpu/core/combat';
 import { routeRaided } from '../../../cpu/core/trade';
@@ -13,7 +14,7 @@ import { unitPassable } from '../../../cpu/core/units';
 function battlefield() {
   const state = makeState(makeMap(20, 20));
   state.unitsMode = true;
-  const city = foundCity(state, tileAtCoords(state.map, 9, 9).index, 0).city!;
+  const city = settleAt(state, tileAtCoords(state.map, 9, 9).index);
   return { state, city };
 }
 
@@ -76,7 +77,7 @@ describe('combat', () => {
   it('a coastal camp fields a barbarian hull, on water', () => {
     const state = makeState(makeMap(20, 20));
     state.unitsMode = true;
-    foundCity(state, tileAtCoords(state.map, 9, 9).index, 0);
+    settleAt(state, tileAtCoords(state.map, 9, 9).index);
     // campNo % 4 === 1 is the naval camp, so camp 0 is a landlocked decoy.
     state.barbSeat.camps.push(tileAtCoords(state.map, 3, 3).index);
     const camp1 = tileAtCoords(state.map, 15, 15);
@@ -161,13 +162,13 @@ describe('barbarians', () => {
     expect(city.hp).toBe(CITY_MAX_HP / 2);
 
     state.units = []; // barbarians gone
-    barbarianPhase(state);
+    seatPhase(state); // unbesieged cities heal in the SEAT phase
     expect(city.hp).toBe(CITY_MAX_HP / 2 + 20);
   });
 
   it('barbarians near a trade endpoint suspend the route', () => {
     const { state, city } = battlefield();
-    const b = foundCity(state, tileAtCoords(state.map, 14, 9).index, 0).city!;
+    const b = settleAt(state, tileAtCoords(state.map, 14, 9).index);
     expect(routeRaided(state, city, b, 0)).toBe(false);
     const barb = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 15, 9).index, BARB_SEAT)!;
     barb.tileIndex = tileAtCoords(state.map, 15, 9).index;
@@ -179,7 +180,7 @@ describe('barbarians', () => {
     for (let i = 0; i < 5; i++) endTurn(state);
     expect(state.turn).toBe(6);
     const calm = makeState(makeMap(16, 16));
-    foundCity(calm, tileAtCoords(calm.map, 8, 8).index, 0);
+    foundCity(calm, tileAtCoords(calm.map, 8, 8).index, 0); // units mode off: no settler needed
     for (let i = 0; i < 5; i++) endTurn(calm);
     expect(calm.units.length).toBe(0); // units mode off => no barbarians
   });
@@ -418,15 +419,18 @@ describe('XP & levels', () => {
   it('a city walls strike grants a surviving civ defender +2', () => {
     const { state, city } = battlefield();
     city.buildings.push('ANCIENT_WALLS');
-    state.seats.push({ id: 0, atWar: true, cities: [] } as any);
+    // a CITYLESS civ at war: the seat loop skips it, so its spearman holds
+    // still while seat 0's walls strike (seatPhase, 'cstk') targets it
+    state.seats.push(emptySeat(1));
+    setWar(state, 0, 1, true);
     const center = state.map.tiles[city.centerIndex];
     const near = tileAtCoords(state.map, center.col + 1, center.row); // adjacent → in range 1..2
-    const civSeat = spawnUnit(state, 'SPEARMAN', near.index, 1)!;
-    civSeat.tileIndex = near.index;
-    civSeat.hp = 100; // survives the strike (defense 25 vs city ~15)
-    expect(civSeat.xp).toBe(0);
-    barbarianPhase(state);
-    expect(civSeat.hp).toBeLessThan(100); // the walls strike landed
-    expect(civSeat.xp).toBe(2); // survived → +2 (attacker is the city, no attacker xp)
+    const defender = spawnUnit(state, 'SPEARMAN', near.index, 1)!;
+    defender.tileIndex = near.index;
+    defender.hp = 100; // survives the strike (defense 25 vs city ~15)
+    expect(defender.xp ?? 0).toBe(0);
+    seatPhase(state);
+    expect(defender.hp).toBeLessThan(100); // the walls strike landed
+    expect(defender.xp).toBe(2); // survived → +2 (attacker is the city, no attacker xp)
   });
 });

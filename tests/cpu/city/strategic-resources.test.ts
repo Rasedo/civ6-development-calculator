@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { UNITS } from '../../../cpu/data/units';
-import { makeMap, makeState, tileAtCoords, grantTechs } from '../helpers';
-import { foundCity, endTurn } from '../../../cpu/core/game';
+import { makeMap, makeState, tileAtCoords, grantTechs, settleAt } from '../helpers';
+import { endTurn } from '../../../cpu/core/game';
 import { trainableUnits, queueUnit } from '../../../cpu/core/units';
 import { NO_SEAT, civHasStrategic, seatOf, setTileOwner, tileCity } from '../../../cpu/core/seats';
 
@@ -10,7 +10,7 @@ import { NO_SEAT, civHasStrategic, seatOf, setTileOwner, tileCity } from '../../
 function resState(resource: string, improvement: string | null, ...techs: string[]) {
   const state = makeState(makeMap(16, 16));
   state.unitsMode = true;
-  const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
+  const city = settleAt(state, tileAtCoords(state.map, 8, 8).index); // spawns the settler founding consumes
   grantTechs(state, ...techs);
   const tile = tileAtCoords(state.map, 8, 9);
   setTileOwner(tile, city.seat, city.id); // owned by the seat-0 capital

@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { cityStateOfSeat, emptySeat, isCityStateSeat, seatOfCityState, setTileOwner, setWar, tileSeat, unitsOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
+import { foundCity } from '../../../cpu/core/game';
+import { initFog } from '../../../cpu/core/fog';
 import { seatPhase } from '../../../cpu/core/phase';
 import { envoysOf, isSuzerain, setMet } from '../../../cpu/core/cityStates';
 import { hexDistance, tilesWithin } from '../../../world/hex';
@@ -247,6 +249,12 @@ describe('civ quests (deterministic, zero-draw)', () => {
   it('does not issue a quest for an UNMET city-state', () => {
     const { state, civ, cityState } = scenario('scientific');
     cityState.met = cityState.met.filter((x) => x !== civ.seat);
+    // fog ON (unitsMode is half of fogActive): meeting is by exploration, so
+    // unmet survives only while the centre is dark — a fogless world meets
+    // every CS at the phase top
+    state.unitsMode = true;
+    state.fogOfWar = true;
+    initFog(state);
     seatPhase(state);
     expect(cityState.seatQuest?.[civ.seat] ?? null).toBeNull();
   });
@@ -291,6 +299,7 @@ describe('SEAT-0 quest draw-count neutrality', () => {
     // the shared PRNG, so quest issuance can never shift a draw count.
     const state = makeState(makeMap(24, 24));
     state.turn = 20;
+    foundCity(state, tileAtCoords(state.map, 5, 5).index, 0); // the seat loop skips cityless seats
     const cityState = addCs(state, 16, 10, { type: 'scientific', met: [0] });
     cityState.seatQuestIssuedTurn = [state.turn - QUEST_COOLDOWN]; // due to issue
     state.barbSeat.camps = [];

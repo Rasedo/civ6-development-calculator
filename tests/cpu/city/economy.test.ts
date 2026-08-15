@@ -1,16 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { seatOf, setTileOwner } from '../../../cpu/core/seats';
-import { makeMap, makeState, tileAtCoords, grantTechs } from '../helpers';
-import { foundCity, queueBuilding, purchaseBuilding, purchaseUnit, purchaseSettler, queueProject, availableProjects, projectCost, buildingPurchaseCost, buildingFaithCost, unitPurchaseCost, settlerCost, endTurn, itemCost } from '../../../cpu/core/game';
+import { makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
+import { queueBuilding, purchaseBuilding, purchaseUnit, purchaseSettler, queueProject, availableProjects, projectCost, buildingPurchaseCost, buildingFaithCost, unitPurchaseCost, settlerCost, endTurn, itemCost } from '../../../cpu/core/game';
 import { spawnUnit, builderRemoveFeature, builderHarvest, settlerCount } from '../../../cpu/core/units';
 import { chopValue, chopGrant, harvestGrant } from '../../../cpu/core/economy';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../../../cpu/data/projects';
 import type { City, DistrictId, GameState } from '../../../cpu/core/types';
 
 function foundAt(state: GameState, col: number, row: number): City {
-  const r = foundCity(state, tileAtCoords(state.map, col, row).index, 0);
-  expect(r.ok).toBe(true);
-  return r.city!;
+  // settleAt spawns the settler that founding consumes under unitsMode
+  return settleAt(state, tileAtCoords(state.map, col, row).index);
 }
 
 function addDistrict(state: GameState, city: City, type: DistrictId, col: number, row: number): void {
@@ -74,6 +73,7 @@ describe('gold & faith purchases', () => {
 
     const sCost = settlerCost(state, 0) * 4;
     seatOf(state, 0)!.treasury = sCost;
+    city.population = 2; // a 1-pop city may not buy a settler (real Civ 6)
     expect(purchaseSettler(state, city.id, 0).ok).toBe(true);
     expect(settlerCount(state, 0)).toBe(1); // a real UNIT spawns at the city
     expect(seatOf(state, 0)!.treasury).toBe(0);

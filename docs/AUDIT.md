@@ -705,3 +705,35 @@ crashed on three f64 tensor-index writes, and TS's `meleeAttackInner`
 refused a barbarian at a city for "peace" its own targeting predicate had
 already waived — the GPU sacks, so the two engines answered differently
 until the TS fix.
+
+**THE TS SUITE'S OWN ICEBERG, same triage.** The battery tail only ever
+shows the last failing file; running vitest directly found 65 red tests in
+20 files, all pre-existing. The TS-specific shapes, beyond the GPU list
+above:
+
+  - **Founding under `unitsMode` needs a settler on the tile** — the FOUND
+    rule re-validates for every seat now. Nine files called `foundCity`
+    bare and dereferenced `.city!`; `settleAt` (tests/cpu/helpers.ts) is
+    the scene helper.
+  - **The actor loop skips a CITYLESS seat** (`seatPhase`) — influence,
+    diplomatic favor, unit upkeep/bankruptcy and quest issuance all
+    live inside it; a scene that never founds measures none of them.
+  - **Rules that moved INTO the seat phase**: city strikes (`cstk`/`estk`),
+    city healing, influence-to-envoy conversion — lanes still calling
+    `barbarianPhase`/`cityStatePhase` waited on the old home.
+  - **The scripted adoption** (`computeAdoption`): modifiers read the
+    adoption, a pure function of civics — `setPolicy`/`setGovernment`
+    write a store nothing reads in a driven game.
+  - **One seat model**: `isCiv(0)` is true; a fake seat `{ id, atWar }` or
+    a duplicated hardcoded seat id builds a scene the war axis cannot see;
+    a CityState without `emptySeat(seatOfCityState(id))` has no seat id.
+  - **Meeting is by EXPLORATION** — in a fogless world every seat meets
+    every city-state at the phase top; "unmet" scenes need fog live.
+
+TWO real engine-side finds in the TS tranche: the `'policies'` BOOST CHECK
+(`checkSatisfied`) counted the vestigial stored government — always zero in
+a driven game — while the GPU counts the scripted adoption's slotted mask,
+so MEDIEVAL_FAIRES's boost fired on one engine only (TS fixed to the
+adoption count); and the statecompare CENSUS had silently lost `Tile` +
+`GameMap` when they moved to `world/types.ts` (it read one file as text),
+alongside a manifest entry for the deleted `GameState.plannedSettles`.

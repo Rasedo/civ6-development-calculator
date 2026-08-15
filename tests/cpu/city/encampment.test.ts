@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { seatOf } from '../../../cpu/core/seats';
-import { makeMap, makeState, tileAtCoords } from '../helpers';
-import { foundCity, purchaseUnit } from '../../../cpu/core/game';
+import { BARB_SEAT, seatOf } from '../../../cpu/core/seats';
+import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
+import { purchaseUnit } from '../../../cpu/core/game';
+import { seatPhase } from '../../../cpu/core/phase';
 import { spawnUnit } from '../../../cpu/core/units';
-import { barbarianPhase, encampmentTrainXp } from '../../../cpu/core/combat';
+import { encampmentTrainXp } from '../../../cpu/core/combat';
 import { citySpecialistSlots } from '../../../cpu/core/city';
 import { SPECIALIST_YIELDS } from '../../../cpu/data/greatPeople';
 
@@ -14,7 +15,7 @@ import { SPECIALIST_YIELDS } from '../../../cpu/data/greatPeople';
 function battlefield() {
   const state = makeState(makeMap(20, 20));
   state.unitsMode = true;
-  const city = foundCity(state, tileAtCoords(state.map, 9, 9).index, 0).city!;
+  const city = settleAt(state, tileAtCoords(state.map, 9, 9).index);
   return { state, city };
 }
 
@@ -68,48 +69,47 @@ describe('Encampment', () => {
   it('the ADDITIONAL Encampment strike fires (and only when complete)', () => {
     const { state, city } = battlefield();
     addEncampment(state, city, 10, 9);
-    state.seats.push({ id: 0, atWar: true, cities: [] } as any);
     const center = state.map.tiles[city.centerIndex];
     const near = tileAtCoords(state.map, center.col - 1, center.row); // adjacent -> in range
-    const civSeat = spawnUnit(state, 'SPEARMAN', near.index, 1)!;
-    civSeat.hp = 100;
-    barbarianPhase(state);
-    expect(civSeat.hp).toBeLessThan(100); // the Encampment strike landed
-    expect(civSeat.xp).toBe(2); // survived -> +2 (attacker is the city)
+    // a barbarian is hostile with no war bookkeeping and holds still through
+    // seatPhase (barbarians act in barbarianPhase, which never runs here)
+    const raider = spawnUnit(state, 'SPEARMAN', near.index, BARB_SEAT)!;
+    raider.hp = 100;
+    seatPhase(state);
+    expect(raider.hp).toBeLessThan(100); // the Encampment strike landed
+    expect(raider.xp).toBeUndefined(); // barbarians never accrue XP (capsOf)
   });
 
   it('control: an incomplete Encampment strikes nothing', () => {
     const { state, city } = battlefield();
     const enc = addEncampment(state, city, 10, 9);
     enc.districtComplete = false; // not yet built
-    state.seats.push({ id: 0, atWar: true, cities: [] } as any);
     const center = state.map.tiles[city.centerIndex];
     const near = tileAtCoords(state.map, center.col - 1, center.row);
-    const civSeat = spawnUnit(state, 'SPEARMAN', near.index, 1)!;
-    civSeat.hp = 100;
-    barbarianPhase(state);
-    expect(civSeat.hp).toBe(100);
+    const raider = spawnUnit(state, 'SPEARMAN', near.index, BARB_SEAT)!;
+    raider.hp = 100;
+    seatPhase(state);
+    expect(raider.hp).toBe(100);
   });
 
   it('walls + Encampment rolls twice, walls first', () => {
     const { state, city } = battlefield();
     city.buildings.push('ANCIENT_WALLS');
     addEncampment(state, city, 10, 9);
-    state.seats.push({ id: 0, atWar: true, cities: [] } as any);
     const center = state.map.tiles[city.centerIndex];
     const near = tileAtCoords(state.map, center.col - 1, center.row);
-    const civSeat = spawnUnit(state, 'SPEARMAN', near.index, 1)!;
-    civSeat.hp = 100;
+    const raider = spawnUnit(state, 'SPEARMAN', near.index, BARB_SEAT)!;
+    raider.hp = 100;
     const log: string[] = [];
     (globalThis as any).__cbLog = log;
     try {
-      barbarianPhase(state);
+      seatPhase(state);
     } finally {
       delete (globalThis as any).__cbLog;
     }
-    const ks = log.map((e) => e.split(' ')[0]).filter((k) => k === 'k:pcstk' || k === 'k:pestk');
-    expect(ks).toContain('k:pcstk');
-    expect(ks).toContain('k:pestk');
-    expect(ks.indexOf('k:pcstk')).toBeLessThan(ks.indexOf('k:pestk')); // walls before Encampment
+    const ks = log.map((e) => e.split(' ')[0]).filter((k) => k === 'k:cstk' || k === 'k:estk');
+    expect(ks).toContain('k:cstk');
+    expect(ks).toContain('k:estk');
+    expect(ks.indexOf('k:cstk')).toBeLessThan(ks.indexOf('k:estk')); // walls before Encampment
   });
 });

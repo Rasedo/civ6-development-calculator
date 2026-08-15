@@ -3,12 +3,12 @@ import { greatPeopleEarned } from '../../../cpu/core/greatPeople';
 import { computeCityStats } from '../../../cpu/core/city';
 import { setMet } from '../../../cpu/core/cityStates';
 import { CITY_MAX_HP } from '../../../cpu/data/units';
-import { BARB_SEAT, cityStateOfSeat, civsAtWar, emptySeat, isBarbSeat, isCityStateSeat, isCiv, seatOf, seatOfCityState, setTileOwner, setWar, setWarTurnsWith, tileCity, tileClaimed, tileSeat, unitsOf } from '../../../cpu/core/seats';
-import { makeMap, makeState, tileAtCoords } from '../helpers';
+import { BARB_SEAT, cityStateOfSeat, civsAtWar, emptySeat, isBarbSeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setWar, setWarTurnsWith, tileCity, tileClaimed, tileSeat, unitsOf } from '../../../cpu/core/seats';
+import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { createGame, foundCity, endTurn, serialize, deserialize, choosePantheon } from '../../../cpu/core/game';
 import { canFoundCity } from '../../../cpu/core/rules';
 import { tilesWithin, hexDistance } from '../../../world/hex';
-import { assertCityRegistryCoherent, declareWar, seatPhase, sueForPeace, transferCity } from '../../../cpu/core/phase';
+import { applySeatUnitOrders, assertCityRegistryCoherent, declareWar, seatPhase, sueForPeace, transferCity } from '../../../cpu/core/phase';
 import { meleeAttack, attackTargets, captureCityState } from '../../../cpu/core/combat';
 import { routeRaidedAt, tradeCapacity } from '../../../cpu/core/trade';
 import { spawnUnit, unitsHostile } from '../../../cpu/core/units';
@@ -26,7 +26,6 @@ function addCiv(
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,
-    seat: 1,
     warmonger: 0,
     ww: {}, wwTurn: {},
     diplomaticFavor: 0,
@@ -115,15 +114,17 @@ describe('civ placement and expansion', () => {
     }
   });
 
-  it('the other civs grow, expand borders and found further cities', () => {
+  it('the other civs grow, expand borders; a finished settler spawns as a UNIT', () => {
     const state = makeState();
     const civ = addCiv(state, 6, 6);
     // Settlers are per-city queue items — queue one about to finish
     civ.cities[0].queue.push({ kind: 'settler', progress: 500, cost: 90 });
     const claimedBefore = state.map.tiles.filter((t) => tileClaimed(t)).length;
-    state.turn = 9; // border-expansion tick for city id 0
+    civ.cities[0].cultureBox = 200; // above borderGrowthCost: the phase claims frontier tiles
     seatPhase(state);
-    expect(civ.cities.length).toBe(2);
+    // founding is a wire ORDER: the completed settler spawns and waits for one
+    expect(civ.cities.length).toBe(1);
+    expect(unitsOf(state, civ.seat).some((u) => u.type === 'SETTLER')).toBe(true);
     const claimedAfter = state.map.tiles.filter((t) => tileClaimed(t)).length;
     expect(claimedAfter).toBeGreaterThan(claimedBefore);
     // growth box fills toward pop 4
@@ -149,12 +150,13 @@ describe('civ district/tile registry coherence', () => {
       endTurn(state);
       assertCityRegistryCoherent(state);
     }
-    // sanity: the other civs actually placed some districts to make the check meaningful
-    const placed = state.seats.slice(1).reduce(
-      (n, r) => n + r.cities.reduce((m, c) => m + c.districts.length + (c.wonders?.length ?? 0), 0),
-      0,
-    );
-    expect(placed).toBeGreaterThan(state.seats.length - 1); // more than just the CITY_CENTERs
+    // sanity: the scan still has teeth in this full-grown state — forge one
+    // incoherent registration and it must throw. (Undriven seats place no
+    // districts on their own, so counting placements would prove nothing.)
+    const civ = state.seats.slice(1).find((r) => r.cities.length > 0)!;
+    const civCity = civ.cities[0];
+    setTileOwner(state.map.tiles[civCity.centerIndex], civ.seat, civCity.id + 999);
+    expect(() => assertCityRegistryCoherent(state)).toThrow(/registry incoherence/);
   });
 
   it('the scan catches a district tile registered to a SIBLING civCity', () => {
@@ -170,7 +172,7 @@ describe('civ district/tile registry coherence', () => {
     sibling.districts.push({ type: 'HOLY_SITE', tileIndex: stolen.index });
     expect(() => assertCityRegistryCoherent(state)).not.toThrow(); // still coherent (tile registers to this civCity)
     setTileOwner(stolen, tileSeat(stolen), sibling.id + 999); // now it belongs to a sibling
-    expect(() => assertCityRegistryCoherent(state)).toThrow(/A-24 registry incoherence/);
+    expect(() => assertCityRegistryCoherent(state)).toThrow(/registry incoherence/);
   });
 });
 
@@ -220,19 +222,21 @@ describe('war and peace', () => {
     expect(attackTargets(state, mine)).toContain(theirs.tileIndex);
   });
 
-  it('at-war civ units pillage your improvements', () => {
+  it('the PILLAGE verb wrecks an enemy improvement underfoot (war re-validated)', () => {
     const state = makeState();
     state.unitsMode = true;
     const civ = addCiv(state, 10, 10);
-    setWar(state, civ.seat, 0, true);
-    const city = foundCity(state, tileAtCoords(state.map, 4, 4).index, 0).city!;
-    // A farm outside attack range of anything (raiders attack before pillaging).
+    const city = settleAt(state, tileAtCoords(state.map, 4, 4).index);
     const farm = tileAtCoords(state.map, 6, 4);
     setTileOwner(farm, city.seat, city.id);
     farm.improvement = 'FARM';
     const raider = spawnUnit(state, 'WARRIOR', farm.index, civ.seat)!;
     raider.tileIndex = farm.index;
-    seatPhase(state);
+    // pillage is a wire VERB (column 25), not an autonomous act
+    applySeatUnitOrders(state, civ, [[25]]);
+    expect(farm.pillaged).toBe(false); // at peace: the apply re-validates and refuses
+    setWar(state, civ.seat, 0, true);
+    applySeatUnitOrders(state, civ, [[25]]);
     expect(farm.pillaged).toBe(true);
   });
 
@@ -263,7 +267,8 @@ describe('war and peace', () => {
     const converted = seatOf(state, 0)!.cities.find((c) => c.name === 'Roma')!;
     expect(converted.population).toBeGreaterThanOrEqual(1);
     expect(tileCity(state.map.tiles[civCity.centerIndex])).toBe(converted.id);
-    expect(isCiv(tileSeat(state.map.tiles[civCity.centerIndex]))).toBe(false);
+    expect(tileSeat(state.map.tiles[civCity.centerIndex])).toBe(0); // the captor owns the center
+
     expect(civsAtWar(state, civ.seat, 0)).toBe(false); // last city gone: war over
   });
 
@@ -590,7 +595,7 @@ describe('civilian capture', () => {
   it('a seat-0 melee captures a lone at-war civ civilian (charges kept, no advance)', () => {
     const state = makeState(makeMap(20, 20));
     state.unitsMode = true;
-    foundCity(state, tileAtCoords(state.map, 9, 9).index, 0);
+    settleAt(state, tileAtCoords(state.map, 9, 9).index);
     const civ = addCiv(state, 16, 16);
     setWar(state, civ.seat, 0, true);
     const atkTile = tileAtCoords(state.map, 11, 9);
@@ -621,7 +626,7 @@ describe('civilian capture', () => {
   it('a barbarian still KILLS a lone civilian (no prisoner system)', () => {
     const state = makeState(makeMap(20, 20));
     state.unitsMode = true;
-    foundCity(state, tileAtCoords(state.map, 9, 9).index, 0);
+    settleAt(state, tileAtCoords(state.map, 9, 9).index);
     const atkTile = tileAtCoords(state.map, 11, 9);
     const defTile = tileAtCoords(state.map, 12, 9);
     const barb = spawnUnit(state, 'WARRIOR', atkTile.index, BARB_SEAT)!;

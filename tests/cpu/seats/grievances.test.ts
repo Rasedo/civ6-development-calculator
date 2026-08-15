@@ -3,7 +3,7 @@ import type { Seat } from '../../../cpu/core/types';
 import { seatOf, setWar } from '../../../cpu/core/seats';
 import { createGame, endTurn } from '../../../cpu/core/game';
 import { declareWar } from '../../../cpu/core/phase';
-import { settleFirstCity } from '../helpers';
+import { grantCivics, settleFirstCity } from '../helpers';
 import { WARMONGER_DOW, WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN } from '../../../cpu/data/seats';
 import { diplomaticFavorPerTurn } from '../../../cpu/core/seatTurn';
 import { GOVERNMENTS } from '../../../cpu/data/policies';
@@ -54,7 +54,8 @@ describe('diplomatic favor', () => {
   it('accrues on seat 0 each turn', () => {
     const state = newGame(1);
     seatOf(state, 0)!.diplomaticFavor = 0;
-    seatOf(state, 0)!.government.current = 'MONARCHY';
+    // the LIVE government is the scripted adoption — a pure function of civics
+    grantCivics(state, 'CODE_OF_LAWS', 'DIVINE_RIGHT'); // adopts MONARCHY
     endTurn(state);
     // no suzerainties in a fresh game -> exactly the tier
     expect(seatOf(state, 0)!.diplomaticFavor).toBe(GOVERNMENTS.MONARCHY.tier);

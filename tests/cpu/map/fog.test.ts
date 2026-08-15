@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { seatOf } from '../../../cpu/core/seats';
-import { makeMap, makeState, tileAtCoords } from '../helpers';
-import { foundCity, endTurn } from '../../../cpu/core/game';
+import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
+import { endTurn } from '../../../cpu/core/game';
 import { canFoundCity } from '../../../cpu/core/rules';
 import { spawnUnit, orderMove, setExploreMission } from '../../../cpu/core/units';
 import { fogActive, isExplored, initFog, claimGoodyHut } from '../../../cpu/core/fog';
@@ -11,7 +11,7 @@ function foggyState() {
   const state = makeState(makeMap(20, 20));
   state.unitsMode = true;
   state.fogOfWar = true;
-  const city = foundCity(state, tileAtCoords(state.map, 9, 9).index, 0).city!;
+  const city = settleAt(state, tileAtCoords(state.map, 9, 9).index);
   return { state, city };
 }
 
@@ -52,8 +52,7 @@ describe('fog of war', () => {
   it('initFog reveals owned land and unit surroundings when toggled mid-game', () => {
     const state = makeState(makeMap(20, 20));
     state.unitsMode = true;
-    const city = foundCity(state, tileAtCoords(state.map, 9, 9).index, 0).city!;
-    void city;
+    settleAt(state, tileAtCoords(state.map, 9, 9).index);
     state.fogOfWar = true;
     initFog(state);
     expect(isExplored(state, 0, tileAtCoords(state.map, 9, 9).index)).toBe(true);

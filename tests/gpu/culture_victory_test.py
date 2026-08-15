@@ -115,21 +115,13 @@ def main() -> None:
     assert int(gated[0]) == -1, "a religious win must suppress the culture check"
 
     # --- 8) the culture plane round-trips (snapshot/restore) ---------------
-    # `culture_total` and `civ_only_culture` are the two halves of ONE
-    # `civ_culture [B, 1+R]` plane, so the BASE is what carries the state.
-    # Registering a view beside its base would restore into fresh storage and
-    # orphan the other half.
     assert "civ_culture" in _MUTABLE, "civ_culture must be registered in _MUTABLE"
-    assert "civ_only_culture" not in _MUTABLE, "civ_only_culture is a VIEW of civ_culture"
     s = _sim(1)
-    assert s.civ_culture[:, 1:].data_ptr() == s.civ_culture[:, 1:].data_ptr(), (
-        "civ_only_culture must share storage with civ_culture[:, 1:]"
-    )
     s.civ_culture[:, 1] = 1234.5
     snap = s.snapshot()
     s.civ_culture[:, 1] = 0.0
     s.restore(snap)
-    assert float(s.civ_culture[0, 1]) == 1234.5, "civ_only_culture must survive snapshot/restore"
+    assert float(s.civ_culture[0, 1]) == 1234.5, "civ_culture must survive snapshot/restore"
 
     print("culture victory OK — kind 5 + a named victor + _MUTABLE round-trip")
 

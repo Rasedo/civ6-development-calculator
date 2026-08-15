@@ -18,7 +18,6 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,
-    seat: 1,
     warmonger: 0,
     ww: {}, wwTurn: {},
     diplomaticFavor: 0,
@@ -157,26 +156,31 @@ describe('governors / era score', () => {
     expect([0, 1].map((i) => seatOf(state, i)?.eraScore)).toEqual([7, 7]); // window untouched
   });
 
-  // ---- addEraScore: lazy accrual ----------------------------------------------
-  it('addEraScore lazily accrues on unified civ ids (absent entries read 0)', () => {
+  // ---- addEraScore: accrues on the SEAT ----------------------------------------
+  it('addEraScore accrues on the seat from 0; a missing seat takes nothing', () => {
     const state = makeState();
-    expect(seatOf(state, 0)?.eraScore).toBeUndefined();
-    addEraScore(state, 2, 3); // civ 2, no prior array
+    addCiv(state, 5, 5);   // seat 1
+    addCiv(state, 10, 10); // seat 2
+    expect(seatOf(state, 2)?.eraScore).toBeUndefined();
+    addEraScore(state, 2, 3);
     expect(seatOf(state, 2)?.eraScore).toBe(3);
     addEraScore(state, 2, 5);
     expect(seatOf(state, 2)?.eraScore).toBe(8); // 3 + 5
-    addEraScore(state, 0, 2); // a different civ starts fresh from 0
+    addEraScore(state, 0, 2); // a different seat starts fresh from 0
     expect(seatOf(state, 0)?.eraScore).toBe(2);
+    addEraScore(state, 7, 4); // no seat 7 — the write lands nowhere
+    expect(seatOf(state, 7)?.eraScore).toBeUndefined();
   });
 
   // ---- agePressureFactor: defaults + values -----------------------------------
   it('agePressureFactor reads Normal when the age is absent, else the age factor', () => {
     const state = makeState();
-    expect(agePressureFactor(state, 0)).toBe(AGE_PRESSURE[1]); // no civAges → Normal
+    addCiv(state, 5, 5); // seat 1
+    expect(agePressureFactor(state, 0)).toBe(AGE_PRESSURE[1]); // no age set → Normal
     [0, 2].forEach((v, i) => { const s = seatOf(state, i); if (s) s.age = v; });
     expect(agePressureFactor(state, 0)).toBe(AGE_PRESSURE[0]); // Dark
     expect(agePressureFactor(state, 1)).toBe(AGE_PRESSURE[2]); // Golden
-    expect(agePressureFactor(state, 5)).toBe(AGE_PRESSURE[1]); // absent civ → Normal
+    expect(agePressureFactor(state, 5)).toBe(AGE_PRESSURE[1]); // absent seat → Normal
   });
 
   // ---- seatPhase-driven: the weakest city gets +GOVERNOR_LOYALTY -------------
@@ -217,11 +221,14 @@ describe('named dedications', () => {
   // MEASURED live: 199 payouts fire across the 24 scripted seeds
   // (123 Monumentality, 50 Exodus, 24 inspirations, 2 eurekas), and the Age
   // distribution is byte-identical to before, so no civ crossed a threshold.
-  const base = () => ({
-    civAges: [1, 1],
-    dedicationPicks: [[DED_MONUMENTALITY], [DED_EXODUS]],
-    opponents: [{}],
-  }) as unknown as GameState;
+  const base = () => {
+    const st = makeState();
+    addCiv(st, 5, 5); // seat 1
+    for (const i of [0, 1]) seatOf(st, i)!.age = 1;
+    seatOf(st, 0)!.dedicationPicks = [DED_MONUMENTALITY];
+    seatOf(st, 1)!.dedicationPicks = [DED_EXODUS];
+    return st;
+  };
 
   it('pays the committed dedication on its own event only', () => {
     const st = base();

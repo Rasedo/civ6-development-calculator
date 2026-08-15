@@ -1,12 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { seatOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs, grantCivics } from '../helpers';
-import { foundCity, endTurn, setTechResearch, setGovernment, setPolicy, removeFeature, queueDistrict, queueBuilding } from '../../../cpu/core/game';
+import { foundCity, endTurn, setTechResearch, setCivicResearch, setGovernment, setPolicy, removeFeature, queueDistrict, queueBuilding } from '../../../cpu/core/game';
 import { validImprovements } from '../../../cpu/core/rules';
 import { computeCityStats } from '../../../cpu/core/city';
 import { tileYields, effectiveAdjacency } from '../../../cpu/core/yields';
-import { availableTechs, computeUnlocks, makeYieldCtx } from '../../../cpu/core/effects';
-import { TECHS } from '../../../cpu/data/techs';
+import { availableTechs, computeAdoption, computeUnlocks, makeYieldCtx } from '../../../cpu/core/effects';
 
 describe('research progression', () => {
   it('starts with only no-prereq techs available', () => {
@@ -22,25 +21,33 @@ describe('research progression', () => {
     expect(setTechResearch(state, 'WRITING', 0).ok).toBe(true);
   });
 
-  it('auto-picks and completes research over turns', () => {
+  it('a picked tech completes over turns; nothing is picked FOR a seat', () => {
     const state = makeState(makeMap(16, 16));
     foundCity(state, tileAtCoords(state.map, 8, 8).index, 0);
+    // research is a wire ORDER: turns alone start nothing, science banks
+    for (let i = 0; i < 5; i++) endTurn(state);
+    expect(seatOf(state, 0)!.research.tech).toBeNull();
+    expect(seatOf(state, 0)!.research.techs.length).toBe(0);
+    expect(setTechResearch(state, 'POTTERY', 0).ok).toBe(true);
     let guard = 0;
     while (seatOf(state, 0)!.research.techs.length === 0 && guard++ < 30) endTurn(state);
-    expect(seatOf(state, 0)!.research.techs.length).toBe(1);
-    expect(TECHS[seatOf(state, 0)!.research.techs[0]].cost).toBe(Math.min(...Object.values(TECHS).map((t) => t.cost))); // cheapest tier first
-    // a fresh current tech was auto-picked
-    expect(seatOf(state, 0)!.research.tech).not.toBeNull();
+    expect(seatOf(state, 0)!.research.techs).toEqual(['POTTERY']);
+    // completion picks no successor either
+    expect(seatOf(state, 0)!.research.tech).toBeNull();
   });
 
-  it('completing Code of Laws installs Chiefdom automatically', () => {
+  it('completing Code of Laws adopts Chiefdom with both slots filled', () => {
     const state = makeState(makeMap(16, 16));
     foundCity(state, tileAtCoords(state.map, 8, 8).index, 0);
+    expect(setCivicResearch(state, 'CODE_OF_LAWS', 0).ok).toBe(true);
     let guard = 0;
     while (seatOf(state, 0)!.research.civics.length === 0 && guard++ < 40) endTurn(state);
     expect(seatOf(state, 0)!.research.civics).toContain('CODE_OF_LAWS');
-    expect(seatOf(state, 0)!.government.current).toBe('CHIEFDOM');
-    expect(seatOf(state, 0)!.government.policies.length).toBe(2); // 1 military + 1 economic
+    expect(seatOf(state, 0)!.research.civic).toBeNull();
+    // the LIVE government is computeAdoption's, a pure function of civics
+    const adopted = computeAdoption(seatOf(state, 0)!.research);
+    expect(adopted.government).toBe('CHIEFDOM');
+    expect(adopted.policies.filter((p) => p !== null).length).toBe(2); // 1 military + 1 economic
   });
 });
 
@@ -136,44 +143,55 @@ describe('governments and policies', () => {
     expect(setPolicy(state, 0, 'URBAN_PLANNING', 0).ok).toBe(false);
   });
 
-  it('Urban Planning adds +1 production through city stats', () => {
-    const { state, city } = withGovernment('CHIEFDOM');
+  it('Urban Planning adds +1 production through the adopted government', () => {
+    const state = makeState(makeMap(16, 16));
+    const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
     const before = computeCityStats(state, city).breakdown.bonuses.production;
-    expect(setPolicy(state, 1, 'URBAN_PLANNING', 0).ok).toBe(true);
+    grantCivics(state, 'CODE_OF_LAWS'); // CHIEFDOM's economic slot takes URBAN_PLANNING
     const after = computeCityStats(state, city).breakdown.bonuses.production;
     expect(after - before).toBe(1);
   });
 
   it('Natural Philosophy doubles campus adjacency', () => {
-    const { state, city } = withGovernment('CLASSICAL_REPUBLIC'); // slots: [E, E, D, W]
-    grantCivics(state, 'RECORDED_HISTORY');
+    const state = makeState(makeMap(16, 16));
+    const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
     state.sandbox = true;
     const spot = tileAtCoords(state.map, 9, 8);
     tileAtCoords(state.map, 10, 8).elevation = 'MOUNTAIN';
     tileAtCoords(state.map, 9, 7).elevation = 'MOUNTAIN';
     expect(queueDistrict(state, city.id, 'CAMPUS', spot.index, 0).ok).toBe(true);
 
+    grantCivics(state, 'CODE_OF_LAWS'); // a government, but no NATURAL_PHILOSOPHY yet
     expect(effectiveAdjacency(makeYieldCtx(state, 0), spot, 'CAMPUS')).toBe(2);
-    expect(setPolicy(state, 0, 'NATURAL_PHILOSOPHY', 0).ok).toBe(true);
+    // MONARCHY's second wildcard reaches NATURAL_PHILOSOPHY in the greedy fill
+    grantCivics(state, 'DIVINE_RIGHT', 'RECORDED_HISTORY');
     expect(effectiveAdjacency(makeYieldCtx(state, 0), spot, 'CAMPUS')).toBe(4);
     expect(computeCityStats(state, city).breakdown.districts.science).toBe(4);
   });
 
   it('Rationalism boosts campus building yields by 50%', () => {
-    const { state, city } = withGovernment('CLASSICAL_REPUBLIC');
-    grantCivics(state, 'ENLIGHTENMENT');
+    const state = makeState(makeMap(16, 16));
+    const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
     state.sandbox = true;
     expect(queueDistrict(state, city.id, 'CAMPUS', tileAtCoords(state.map, 9, 8).index, 0).ok).toBe(true);
     expect(queueBuilding(state, city.id, 'LIBRARY', 0).ok).toBe(true);
-    const before = computeCityStats(state, city).breakdown.buildings.science; // palace 2 + library 2
-    expect(before).toBe(4);
-    expect(setPolicy(state, 0, 'RATIONALISM', 0).ok).toBe(true);
+    // DEMOCRACY carries three economic slots — enough for the greedy fill to
+    // reach RATIONALISM once The Enlightenment unlocks it
+    grantCivics(state, 'CODE_OF_LAWS', 'SUFFRAGE');
+    expect(computeCityStats(state, city).breakdown.buildings.science).toBe(4); // palace 2 + library 2
+    grantCivics(state, 'ENLIGHTENMENT');
     expect(computeCityStats(state, city).breakdown.buildings.science).toBe(5); // library 2 -> 3
   });
 
-  it('Classical Republic grants +1 amenity in all cities', () => {
-    const { state, city } = withGovernment('CLASSICAL_REPUBLIC');
-    expect(computeCityStats(state, city).amenities.have).toBe(2); // palace 1 + government 1
+  it('the tier tie-break adopts AUTOCRACY, first tier-1 in table order', () => {
+    const state = makeState(makeMap(16, 16));
+    const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
+    grantCivics(state, 'CODE_OF_LAWS', 'POLITICAL_PHILOSOPHY');
+    // all three tier-1 governments unlock together; adoption is deterministic
+    expect(computeUnlocks(state, 0).governments.has('CLASSICAL_REPUBLIC')).toBe(true);
+    expect(computeAdoption(seatOf(state, 0)!.research).government).toBe('AUTOCRACY');
+    // AUTOCRACY's +1-all-yields capital bonus joins URBAN_PLANNING's +1
+    expect(computeCityStats(state, city).breakdown.bonuses.production).toBe(2);
   });
 
   it('switching governments re-seats compatible policies', () => {

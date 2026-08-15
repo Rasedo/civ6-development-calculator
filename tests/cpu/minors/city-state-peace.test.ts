@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { civsAtWar, setWar, setWarTurnsWith, warTurnsWith } from '../../../cpu/core/seats';
+import { civsAtWar, emptySeat, seatOfCityState, setWar, setWarTurnsWith, warTurnsWith } from '../../../cpu/core/seats';
 import { makeState, tileAtCoords } from '../helpers';
 import { declareWarOnCityState, sueForPeaceWithCityState } from '../../../cpu/core/cityStates';
 import { cityStatePhase } from '../../../cpu/core/cityStates';
@@ -17,6 +17,7 @@ import type { CityState, GameState, Seat } from '../../../cpu/core/types';
 function addCs(state: GameState, id: number): CityState {
   const t = tileAtCoords(state.map, 8, 8);
   const cityState: CityState = {
+    ...emptySeat(seatOfCityState(id)), // the war axis keys on the CS's SEAT id
     id,
     name: 'Kandy',
     type: 'scientific',

@@ -1357,10 +1357,6 @@
     "why": "a human-readable log; no rule reads it."
    },
    {
-    "path": "GameState.plannedSettles",
-    "why": "TS's queued auto-found tiles. The GPU expresses the same intent as a static candidate-site table plus `next_site_ptr`. The FOUNDINGS the two produce are compared (the `city` group); the plan behind them is not the same object."
-   },
-   {
     "path": "GameMap.width",
     "why": "world geometry, fixed at build and identical by construction (both engines read one fixture)."
    },

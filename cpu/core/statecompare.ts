@@ -56,13 +56,17 @@ import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, LEVY_COOLDOWN } from '../data/city
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS } from '../data/religion';
 
 const MANIFEST_URL = new URL('../../shared/statecompare.manifest.json', import.meta.url);
-const TYPES_URL = new URL('./types.ts', import.meta.url);
+// `cpu/core/types.ts` re-exports `world/types.ts` (Tile, GameMap live there),
+// so the census text surface is the concatenation of both files.
+const TYPES_URLS = [new URL('./types.ts', import.meta.url), new URL('../../world/types.ts', import.meta.url)];
 
 export interface ManifestField {
   name: string;
   compare: 'exact' | 'milli';
   covers: string[];
   planes: string[];
+  /** a computed guard (e.g. game.cityCount) — no stored field or plane behind it */
+  derived?: boolean;
   note?: string;
   gap?: string;
 }
@@ -602,7 +606,7 @@ export function groupDump(
 
 export function interfaceFields(name: string, source: string): string[] {
   const head = new RegExp(`export interface ${name}\\b[^{]*\\{`).exec(source);
-  if (!head) throw new Error(`no 'export interface ${name}' in cpu/core/types.ts`);
+  if (!head) throw new Error(`no 'export interface ${name}' in cpu/core/types.ts + world/types.ts`);
   let i = head.index + head[0].length;
   const start = i;
   let depth = 1;
@@ -632,7 +636,7 @@ export function interfaceFields(name: string, source: string): string[] {
 }
 
 export function census(man: Manifest = loadManifest()): string[] {
-  const source = readFileSync(fileURLToPath(TYPES_URL), 'utf-8');
+  const source = TYPES_URLS.map((u) => readFileSync(fileURLToPath(u), 'utf-8')).join('\n');
   const covered = new Set<string>();
   for (const g of man.groups) {
     for (const p of g.covers) covered.add(p);

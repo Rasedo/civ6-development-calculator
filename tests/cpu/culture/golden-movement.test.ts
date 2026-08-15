@@ -97,7 +97,7 @@ describe('golden movement dedications', () => {
 
   it('barbarians hold no dedications', () => {
     const state = newGame();
-    for (let c = 0; c < 4; c++) golden(state, c, DED_MONUMENTALITY);
+    for (const s of state.seats) golden(state, s.seat, DED_MONUMENTALITY); // every MAJOR golden
     const b = place(state, 'BUILDER', BARB_SEAT);
     expect(unitFullMoves(state, b)).toBe(UNITS.BUILDER.moves);
   });

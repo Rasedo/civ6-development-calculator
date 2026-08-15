@@ -53,7 +53,7 @@ describe('cultural border growth', () => {
     expect(buyTile(state, city.id, target.index, 0).ok).toBe(true);
     expect(tileCity(target)).toBe(city.id);
     expect(seatOf(state, 0)!.treasury).toBe(1000 - cost);
-    expect(city.tilesAcquired).toBe(0); // purchases don't advance the culture counter
+    expect(city.tilesAcquired).toBe(1); // purchases skip the culture BOX but advance the acquired count
     expect(seatOf(state, 0)!.tilesPurchased).toBe(1);
     expect(tilePurchaseCost(state, city)).toBe(33); // +5 (speed-scaled → 3) per purchase
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { emptySeat, isCiv, seatOf, setTileOwner, setWar, tileCity } from '../../../cpu/core/seats';
-import { makeMap, makeState, tileAtCoords, grantTechs } from '../helpers';
-import { foundCity, purchaseUnit } from '../../../cpu/core/game';
+import { makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
+import { purchaseUnit } from '../../../cpu/core/game';
 import { moveCostInto, unitPassable, canEmbark, waterEnterable, ownerHasTech, inEnemyZoc, spawnUnit, tileFreeForUnit, cityNavalCapable, trainableUnits, queueUnit, orderMove, walkPath } from '../../../cpu/core/units';
 import { hostileUnitAct, meleeAttack, defenderCS } from '../../../cpu/core/combat';
 import { neighbors } from '../../../world/hex';
@@ -140,9 +140,9 @@ describe('war-march water steps (behind the inert live switch)', () => {
     start.terrain = 'GRASSLAND';
     const cityTile = tileAtCoords(state.map, 10, 5);
     cityTile.terrain = 'GRASSLAND';
-    foundCity(state, cityTile.index, 0);
+    settleAt(state, cityTile.index); // the march target; founding consumes the spawned settler
     addCivAtWar(state, 3, 5, techs);
-    const unit = state.units.find((u) => isCiv(u.seat))!;
+    const unit = state.units.find((u) => u.seat === 1)!;
     return { state, unit };
   }
 
@@ -242,16 +242,14 @@ describe('N2 production gating', () => {
     // coastal city: a water tile adjacent to the center
     const coastCenter = tileAtCoords(state.map, 4, 5);
     tileAtCoords(state.map, 5, 5).terrain = 'COAST';
-    foundCity(state, coastCenter.index, 0);
-    const coastCity = seatOf(state, 0)!.cities[0];
+    const coastCity = settleAt(state, coastCenter.index);
     expect(cityNavalCapable(state, coastCity)).toBe(true);
     expect(trainableUnits(state, 0, coastCity).some((d) => d.id === 'GALLEY')).toBe(true);
     expect(queueUnit(state, coastCity.id, 'GALLEY', 0).ok).toBe(true);
 
     // inland city: no water neighbor, no completed Harbor
     const inlandCenter = tileAtCoords(state.map, 11, 5);
-    foundCity(state, inlandCenter.index, 0);
-    const inlandCity = seatOf(state, 0)!.cities[1];
+    const inlandCity = settleAt(state, inlandCenter.index);
     expect(cityNavalCapable(state, inlandCity)).toBe(false);
     expect(trainableUnits(state, 0, inlandCity).some((d) => d.id === 'GALLEY')).toBe(false);
     expect(queueUnit(state, inlandCity.id, 'GALLEY', 0).ok).toBe(false);
@@ -266,8 +264,7 @@ describe('N2 production gating', () => {
     state.unitsMode = true;
     grantTechs(state, 'SAILING');
     const center = tileAtCoords(state.map, 6, 5);
-    foundCity(state, center.index, 0);
-    const city = seatOf(state, 0)!.cities[0];
+    const city = settleAt(state, center.index);
     expect(cityNavalCapable(state, city)).toBe(false);
     // a completed Harbor district (its tile stays land here — the capability
     // gate reads the district, not the tile's water)

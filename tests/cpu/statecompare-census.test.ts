@@ -28,7 +28,9 @@ describe('statecompare census', () => {
     for (const g of loadManifest().groups) {
       for (const f of g.fields) {
         expect(['exact', 'milli']).toContain(f.compare);
-        expect(f.covers.length + f.planes.length).toBeGreaterThan(0);
+        // a `derived` field is a computed guard (game.cityCount) — the one
+        // shape with no stored field or plane behind it
+        if (!f.derived) expect(f.covers.length + f.planes.length).toBeGreaterThan(0);
       }
     }
   });

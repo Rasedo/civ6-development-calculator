@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { seatOf, setTileOwner } from '../../../cpu/core/seats';
-import { makeState, tileAtCoords, grantTechs } from '../helpers';
-import { foundCity } from '../../../cpu/core/game';
+import { makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
 import { spawnUnit, archaeologistExcavate, trainableUnits } from '../../../cpu/core/units';
 import { markAntiquitySite } from '../../../cpu/core/combat';
 import { ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_CULTURE, ARTIFACT_TOURISM, ARCHAEOLOGIST_CHARGES, artifactCulture, artifactTourism } from '../../../cpu/data/greatPeople';
@@ -14,9 +13,8 @@ import type { City, GameState } from '../../../cpu/core/types';
 // pre-Modern events create.
 
 function found(state: GameState, col: number, row: number): City {
-  const r = foundCity(state, tileAtCoords(state.map, col, row).index, 0);
-  expect(r.ok).toBe(true);
-  return r.city!;
+  // settleAt spawns the settler that founding consumes under unitsMode
+  return settleAt(state, tileAtCoords(state.map, col, row).index);
 }
 
 describe('artifacts and archaeology', () => {
