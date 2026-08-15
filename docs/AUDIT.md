@@ -686,6 +686,15 @@ looks for something only a DECIDING seat produces:
     `geopolitics`, `religion2`, `war`, `research_switch`, `peace_target`,
     `districts`, `ladder`, `drive`
 
+The TS suite has the same family, and it is NOT new — `vitest`'s
+`tests/cpu/seats/loyalty-and-conquest.test.ts` fails three cases ("good land
+grows the other civs faster than tundra", "barbarians attack civ units and
+sack civ cities", "civ units strike back at adjacent barbarians in
+peacetime") at the round's BASE commit too. They were only ever hidden
+behind two other red files in the battery's 15-line tail: fix the first
+failing vitest file and the next one appears. Read that as a warning about
+the tail, not just about these lanes.
+
 `drive_test` is the clearest statement of the problem: it compares a driven
 seat against a "scripted transcription, for reference" that is now a seat
 which does nothing at all, so its competitiveness assertions compare against
