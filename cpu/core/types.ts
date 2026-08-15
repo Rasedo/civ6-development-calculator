@@ -71,12 +71,20 @@ export interface City {
 /** Empire research progress (one tech + one civic at a time, like Civ 6). */
 export interface ResearchState {
   tech: string | null;
+  /** Science banked toward `tech`. Switching PARKS this in `techRetained`
+   *  under the old tech and loads the new one's — real Civ 6 keeps the
+   *  progress on a tech you abandon and hands it back when you return. */
   techProgress: number;
   civic: string | null;
   civicProgress: number;
   techs: string[];
   civics: string[];
   boosted: string[];
+  /** Progress PARKED on techs that are not currently being researched. The
+   *  tech being researched is never in here — its progress lives in
+   *  `techProgress` — so the two are a partition, never a sum. */
+  techRetained: Record<string, number>;
+  civicRetained: Record<string, number>;
 }
 
 export interface GovernmentState {

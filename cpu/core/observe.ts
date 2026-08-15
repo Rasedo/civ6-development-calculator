@@ -133,6 +133,13 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
     (rs ? effectiveResearchCostIn(rs, t.id, t.cost, gT) : t.cost) / 1000);
   const costC = Object.values(CIVICS).map((c) =>
     (rs ? effectiveResearchCostIn(rs, c.id, c.cost, gC) : c.cost) / 1000);
+  // PARKED progress per option, on the cost blocks' scale so the two read as a
+  // ratio. Switching research is a legal move and cannot be decided from the
+  // cost alone: the science already sunk into an abandoned item is the other
+  // half of the comparison. The CURRENT item reads 0 — its progress is the
+  // pool, in the empire block — so the two never double-count.
+  const progT = Object.values(TECHS).map((t) => (rs?.techRetained[t.id] ?? 0) / 1000);
+  const progC = Object.values(CIVICS).map((c) => (rs?.civicRetained[c.id] ?? 0) / 1000);
   // S1(a): the CTX block — ladder.CTX_FIELDS, RAW and unscaled (the
   // ladder compares these exactly; a /10 scale does not round-trip
   // bit-stably in f64). Formulas are the SCRIPTED SITES' own — the GPU twin
@@ -160,5 +167,5 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
     me?.peaceTurns ?? 0,
     atAny ? 1 : 0,
   ];
-  return [...emp, ...cityState, ...riv, ...per, ...esc, ...costT, ...costC, ...ctx];
+  return [...emp, ...cityState, ...riv, ...per, ...esc, ...costT, ...costC, ...progT, ...progC, ...ctx];
 }

@@ -104,12 +104,22 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       description: 'Convert production into Great General points.',
     }),
 
-    P({ id: 'LAUNCH_EARTH_SATELLITE', name: 'Launch Earth Satellite', district: 'CAMPUS', yield: null, gpClass: null, space: true, requiresTech: 'ROCKETRY', description: 'Space race step 1 of 6. (Spaceport degraded to Campus.)' }),
-    P({ id: 'LAUNCH_MOON_LANDING', name: 'Launch Moon Landing', district: 'CAMPUS', yield: null, gpClass: null, space: true, requiresTech: 'SATELLITES', requiresProject: 'LAUNCH_EARTH_SATELLITE', description: 'Space race step 2 of 6.' }),
-    P({ id: 'MARS_REACTOR', name: 'Launch Mars Reactor', district: 'CAMPUS', yield: null, gpClass: null, space: true, requiresTech: 'NANOTECHNOLOGY', requiresProject: 'LAUNCH_MOON_LANDING', description: 'Space race step 3 of 6 (Mars component).' }),
-    P({ id: 'MARS_HABITATION', name: 'Launch Mars Habitation', district: 'CAMPUS', yield: null, gpClass: null, space: true, requiresTech: 'NUCLEAR_FUSION', requiresProject: 'MARS_REACTOR', description: 'Space race step 4 of 6 (Mars component).' }),
-    P({ id: 'MARS_HYDROPONICS', name: 'Launch Mars Hydroponics', district: 'CAMPUS', yield: null, gpClass: null, space: true, requiresTech: 'ROBOTICS', requiresProject: 'MARS_HABITATION', description: 'Space race step 5 of 6 (Mars component).' }),
-    P({ id: 'EXOPLANET_EXPEDITION', name: 'Exoplanet Expedition', district: 'CAMPUS', yield: null, gpClass: null, space: true, victory: true, requiresTech: 'OFFWORLD_MISSION', requiresProject: 'MARS_HYDROPONICS', description: 'Space race step 6 of 6 — completing it wins the Science Victory.' }),
+    // THE SPACE RACE, four steps, each needing the previous one COMPLETE.
+    // SOURCED against the Gathering Storm Civilopedia entries (this repo models
+    // GS — see cpu/data/boosts.ts): Launch Earth Satellite needs Rocketry;
+    // Launch Moon Landing needs Satellites; Launch Mars Colony needs
+    // Nanotechnology; Exoplanet Expedition needs Smart Materials, and winning
+    // is its arrival. GS REPLACES the base game's three separate Mars
+    // components (Reactor/Habitation/Hydroponics, which were parallel off the
+    // Moon Landing, not a chain) with the single Mars Colony project.
+    //
+    // ONE DELIBERATE DEVIATION: real Civ 6 runs every one of these in a
+    // SPACEPORT. This repo has no Spaceport district, so they run in a Campus.
+    // That makes them cheaper and removes a district decision from the path.
+    P({ id: 'LAUNCH_EARTH_SATELLITE', name: 'Launch Earth Satellite', district: 'CAMPUS', yield: null, gpClass: null, space: true, requiresTech: 'ROCKETRY', description: 'Space race step 1 of 4.' }),
+    P({ id: 'LAUNCH_MOON_LANDING', name: 'Launch Moon Landing', district: 'CAMPUS', yield: null, gpClass: null, space: true, requiresTech: 'SATELLITES', requiresProject: 'LAUNCH_EARTH_SATELLITE', description: 'Space race step 2 of 4.' }),
+    P({ id: 'LAUNCH_MARS_COLONY', name: 'Launch Mars Colony', district: 'CAMPUS', yield: null, gpClass: null, space: true, requiresTech: 'NANOTECHNOLOGY', requiresProject: 'LAUNCH_MOON_LANDING', description: 'Space race step 3 of 4 — a human base on Mars.' }),
+    P({ id: 'EXOPLANET_EXPEDITION', name: 'Exoplanet Expedition', district: 'CAMPUS', yield: null, gpClass: null, space: true, victory: true, requiresTech: 'SMART_MATERIALS', requiresProject: 'LAUNCH_MARS_COLONY', description: 'Space race step 4 of 4 — completing it wins the Science Victory.' }),
   ].map((p) => [p.id, p]),
 );
 

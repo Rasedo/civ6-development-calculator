@@ -293,6 +293,8 @@ SEAT = {
     "currentCivic": _civ_scalar("civ_cur_civic"),
     "techProgress": _civ_scalar("civ_tech_prog"),
     "civicProgress": _civ_scalar("civ_civic_prog"),
+    "techRetained": lambda sim, b, rows: [x for c in rows for x in sim.civ_tech_retain[b, c].tolist()],
+    "civicRetained": lambda sim, b, rows: [x for c in rows for x in sim.civ_civic_retain[b, c].tolist()],
     "cityCount": lambda sim, b, rows: [
         sum(1 for a in sim.city_alive[b, c].tolist() if a) for c in rows
     ],

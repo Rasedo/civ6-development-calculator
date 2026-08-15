@@ -13,6 +13,7 @@ import { UNIT_HP } from '../data/units';
 import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, generalAuraCS, cityDefenseStrength } from './combat';
 import { availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
+import { selectResearch } from './economy';
 import { getModifiers } from './effects';
 import { routeYields, cityStateRouteYields, TRADE_ROUTE_RANGE, TRADE_ROUTE_DURATION, tradeCapacity } from './trade';
 import { addEnvoys, hasMet, isSuzerain, issueQuest, questSatisfied, setMet } from './cityStates';
@@ -660,7 +661,7 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
   // record start a tech on ONE engine.
   if (techCol !== null && techCol !== undefined && techCol >= 0 && !actor.research.tech) {
     const t = Object.keys(TECHS)[techCol];
-    if (t && availableTechsIn(actor.research).some((d) => d.id === t)) actor.research.tech = t;
+    if (t && availableTechsIn(actor.research).some((d) => d.id === t)) selectResearch(actor.research, t);
   }
   if (civicCol !== null && civicCol !== undefined && civicCol >= 0 && !actor.research.civic) {
     const c = Object.keys(CIVICS)[civicCol];
@@ -1432,6 +1433,7 @@ export function seatPhase(state: GameState): void {
     while (rsr.tech && rsr.techProgress >= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech)) {
       rsr.techProgress -= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech);
       rsr.techs.push(rsr.tech);
+      delete rsr.techRetained[rsr.tech];
       rsr.tech = null;
       pickNext();
     }
@@ -1463,6 +1465,7 @@ export function seatPhase(state: GameState): void {
     while (rsr.civic && rsr.civicProgress >= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic)) {
       rsr.civicProgress -= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic);  // A-3
       rsr.civics.push(rsr.civic);
+      delete rsr.civicRetained[rsr.civic];
       rsr.civic = null;
       pickNext();
     }

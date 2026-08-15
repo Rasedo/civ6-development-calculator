@@ -82,12 +82,18 @@ def split(obs: torch.Tensor, n_cs: int, n_opponents: int, n_cities: int,
     i += n_t
     boost_c = obs[:, i:i + n_c]
     i += n_c
+    # PARKED progress per option, same widths and same scale as the costs —
+    # what a seat already sank into an item it is not currently researching.
+    prog_t = obs[:, i:i + n_t]
+    i += n_t
+    prog_c = obs[:, i:i + n_c]
+    i += n_c
     ctx = obs[:, i:i + CTX_SEAT]
     i += CTX_SEAT
     assert i == obs.shape[1], f"observation width {obs.shape[1]} != layout {i}"
     return {"empire": emp, "cs": cs, "civ": cv, "city": city,
             "escalators": esc, "costTech": boost_t, "costCivic": boost_c,
-            "ctx": ctx}
+            "progTech": prog_t, "progCivic": prog_c, "ctx": ctx}
 
 
 def first_legal(mask: torch.Tensor) -> torch.Tensor:

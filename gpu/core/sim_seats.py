@@ -83,20 +83,20 @@ class SimSeats:
                     if not bool(okc_m.any()):
                         continue
                     ok_w[:, wi] = okc_m & self._wonder_cand(row, j, wi, base_okm).any(dim=1)
-            # PROJECT columns [nP]: BASE rows only (district complete on THIS
-            # city). Space/victory rows keep their column for layout stability
-            # but never read True — their chain (requiresTech, requiresProject,
-            # the one-shot spaceProjects ledger) is a separate queue path.
+            # PROJECT columns [nP], the `availableProjects` predicate: the row's
+            # district must be COMPLETE on this city, and a SPACE row must also
+            # be un-done, tech-unlocked, and preceded by its finished step.
             nP_m = len(self._proj_rows) if self.districts_on else 0
             ok_p = torch.zeros(B, max(nP_m, 0), dtype=torch.bool, device=dev)
             for pi_m, prow_m in enumerate(self._proj_rows if self.districts_on else []):
-                if int(prow_m.get("sp", 0)) or int(prow_m.get("vic", 0)):
-                    continue
                 d_im = int(prow_m.get("d", -1))
                 if d_im < 0 or d_im >= self.city_dist_tile.shape[3]:
                     continue
                 regp_m = self.city_dist_tile[:, row, j, d_im]
-                ok_p[:, pi_m] = (regp_m >= 0) & self.district_complete.gather(1, regp_m.clamp(min=0).unsqueeze(1)).squeeze(1)
+                okp_m = (regp_m >= 0) & self.district_complete.gather(1, regp_m.clamp(min=0).unsqueeze(1)).squeeze(1)
+                if int(prow_m.get("sp", 0)):
+                    okp_m = okp_m & self._space_step_ok(row, pi_m)
+                ok_p[:, pi_m] = okp_m
             idle_j = idle[:, j].unsqueeze(1)
             prod_cols.append(torch.cat([base_j & idle_j, ok_w & idle_j, ok_p & idle_j], dim=1))
         return torch.stack(prod_cols, dim=1)
@@ -237,14 +237,14 @@ class SimSeats:
         ext = self.seat_ext[:, row]
         if tech is not None:
             t_act = tech.to(torch.long)
-            ok = active & ext & (self.civ_cur_tech[:, row] == -1) & (t_act >= 0) \
+            ok = active & ext & (t_act >= 0) \
                 & self._available_mask(self.civ_techs[:, row], self._prereq_t).gather(1, t_act.clamp(min=0).unsqueeze(1)).squeeze(1)
-            self.civ_cur_tech[:, row] = torch.where(ok, t_act.clamp(min=0), self.civ_cur_tech[:, row])
+            self._select_research(row, t_act, ok)
         if civic is not None:
             c_act = civic.to(torch.long)
-            ok = active & ext & (self.civ_cur_civic[:, row] == -1) & (c_act >= 0) \
+            ok = active & ext & (c_act >= 0) \
                 & self._available_mask(self.civ_civics[:, row], self._prereq_c).gather(1, c_act.clamp(min=0).unsqueeze(1)).squeeze(1)
-            self.civ_cur_civic[:, row] = torch.where(ok, c_act.clamp(min=0), self.civ_cur_civic[:, row])
+            self._select_research(row, c_act, ok, is_civic=True)
         if envoys is not None and self.S > 0:
             e_seq = envoys.to(torch.long)
             if e_seq.dim() == 1:
@@ -781,19 +781,73 @@ class SimSeats:
                 for pcode in sorted(set(a[is_p].tolist())):
                     pi_a = int(pcode) - self.PROJECT_BASE
                     prow_a = self._proj_rows[pi_a]
-                    if int(prow_a.get("sp", 0)) or int(prow_a.get("vic", 0)):
-                        continue  # base rows only — the mask never offers these
                     d_ia = int(prow_a.get("d", -1))
                     if d_ia < 0 or d_ia >= self.city_dist_tile.shape[3]:
                         continue
                     regp_a = self.city_dist_tile[:, row, j, d_ia]
                     has_pa = (regp_a >= 0) & self.district_complete.gather(1, regp_a.clamp(min=0).unsqueeze(1)).squeeze(1)
+                    # RE-VALIDATE the chain at apply, not just at mask: a record
+                    # is replayed a phase after the mask that justified it, and
+                    # the step in front of it may have completed since.
+                    if int(prow_a.get("sp", 0)):
+                        has_pa = has_pa & self._space_step_ok(row, pi_a)
                     rows_p = is_p & (a == pcode) & has_pa
                     if not bool(rows_p.any()):
                         continue
                     self.city_current[:, row, j] = torch.where(rows_p, torch.full_like(cur_j, self.PROJECT_BASE + pi_a), self.city_current[:, row, j])
                     self.city_cost[:, row, j] = torch.where(rows_p, pc_a, self.city_cost[:, row, j])
                     self.city_progress[:, row, j] = torch.where(rows_p, torch.zeros_like(self.city_progress[:, row, j]), self.city_progress[:, row, j])
+
+    def _select_research(self, row: int, want: torch.Tensor, ok: torch.Tensor, is_civic: bool = False) -> None:
+        """The `selectResearch` twin: switch item, keeping the old one's science.
+
+        `ok` is the per-batch legality already computed by the caller; where it
+        is False nothing moves. Where it is True and the pick DIFFERS from what
+        the seat is researching, the progress pool is parked under the outgoing
+        item and the incoming item's parked value replaces it — a re-statement
+        of the current pick is a no-op, so a record that repeats itself cannot
+        round-trip the pool through the map and lose it to a rounding step.
+        """
+        cur = self.civ_cur_civic[:, row] if is_civic else self.civ_cur_tech[:, row]
+        pool = self.civ_civic_prog[:, row] if is_civic else self.civ_tech_prog[:, row]
+        park = self.civ_civic_retain[:, row] if is_civic else self.civ_tech_retain[:, row]
+        move = ok & (want != cur)
+        if not bool(move.any()):
+            return
+        had = move & (cur >= 0)
+        # park the outgoing item's pool
+        park.scatter_(1, cur.clamp(min=0).unsqueeze(1), torch.where(had, pool, park.gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1)).unsqueeze(1))
+        # load the incoming item's parked value, and empty its slot
+        want_c = want.clamp(min=0).unsqueeze(1)
+        loaded = park.gather(1, want_c).squeeze(1)
+        park.scatter_(1, want_c, torch.where(move, torch.zeros_like(loaded), loaded).unsqueeze(1))
+        new_pool = torch.where(move, loaded, pool)
+        new_cur = torch.where(move, want.clamp(min=0), cur)
+        if is_civic:
+            self.civ_civic_prog[:, row] = new_pool
+            self.civ_cur_civic[:, row] = new_cur
+        else:
+            self.civ_tech_prog[:, row] = new_pool
+            self.civ_cur_tech[:, row] = new_cur
+
+    def _space_step_ok(self, row: int, pi: int) -> torch.Tensor:
+        """[B] — may this seat START space-race step `pi` right now?
+
+        The `availableProjects` space arm, term for term: not already in the
+        seat's ledger (these are ONE-TIME), its `requiresTech` researched, and
+        its `requiresProject` already in the ledger. `rp` indexes the whole
+        projects table, so it maps through the same chain-step table the
+        completion write uses — the ledger is keyed by STEP, not by row.
+        """
+        ok = ~self.space_done[:, row, self._space_step[pi]]
+        prow = self._proj_rows[pi]
+        rt = int(prow.get("rt", -1))
+        if rt >= 0:
+            ok = ok & self.civ_techs[:, row, rt]
+        rp = int(prow.get("rp", -1))
+        if rp >= 0:
+            ok = ok & self.space_done[:, row, self._space_step[rp]]
+        return ok
 
     def _seat_job_mask(self, row: int) -> torch.Tensor:
         return self._job_mask_core(self.civ_techs[:, row], self.civ_civics[:, row], self.tile_seat == row)

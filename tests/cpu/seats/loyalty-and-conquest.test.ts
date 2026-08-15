@@ -34,7 +34,7 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
     cities: [],
     nextCityId: 0,
     peaceTurns: 0,
-    research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
+    research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} },
     gpp: {},
     gpEarned: [],
     buildersTrained: 0,

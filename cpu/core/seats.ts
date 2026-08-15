@@ -84,7 +84,7 @@ export function emptySeat(seat: number): Seat {
     influencePoints: 0, envoysAvailable: 0,
     peaceTurns: 0,
     treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0,
-    research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
+    research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} },
     government: { current: null, policies: [] },
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     gpp: {}, gpEarned: [],

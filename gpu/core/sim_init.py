@@ -333,6 +333,15 @@ class SimInit:
         for _nm, _w in (("techs", nt_b3), ("civics", nc_b3),
                         ("tech_boosted", nt_b3), ("civic_boosted", nc_b3)):
             setattr(self, f"civ_{_nm}", torch.zeros(B, self.n_majors, _w, dtype=torch.bool, device=device))
+        # PARKED research progress, per item. A seat may switch research at any
+        # time (real Civ 6 does, and hands the abandoned item's science back on
+        # return), so the progress POOL — `civ_tech_prog`, which belongs to
+        # whatever is current — is parked here under the outgoing item and the
+        # incoming item's parked value is loaded into it. The item being
+        # researched is never in here: the two stores PARTITION a seat's
+        # science and no body may add them.
+        for _nm, _w in (("tech_retain", nt_b3), ("civic_retain", nc_b3)):
+            setattr(self, f"civ_{_nm}", torch.zeros(B, self.n_majors, _w, dtype=dtype, device=device))
         self.seat_ext = torch.zeros(B, self.n_majors + s_pad + 1, dtype=torch.bool, device=device)
         self.seat_ext[:, :self.n_majors] = True
         # Civ-city district registry [.., nD]: the tile of each placed district

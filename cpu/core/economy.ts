@@ -1,10 +1,41 @@
 
 import { seatOf, tileSeat, cityAtTile } from './seats';
 
-import type { City, GameState, Tile, YieldKey } from './types';
+import type { City, GameState, ResearchState, Tile, YieldKey } from './types';
 import { computeUnlocksIn } from './effects';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
+
+/**
+ * SELECT a tech or civic, keeping the progress on the one being left.
+ *
+ * Real Civ 6 lets a seat switch research at any moment and hands the
+ * abandoned item's science back when it returns to it. The progress POOL
+ * (`techProgress`) belongs to whatever is current, so a switch parks the pool
+ * under the outgoing id and loads the incoming id's parked value — the two
+ * stores partition the seat's science, and no path may add them.
+ *
+ * Selecting the SAME id is a no-op rather than a park-and-reload, so a record
+ * that re-states the current pick cannot round-trip the pool through the map.
+ * Selecting `null` parks and leaves the pool holding whatever a completion's
+ * overflow left, which is the value the next pick inherits.
+ */
+export function selectResearch(rsr: ResearchState, id: string | null, isCivic = false): void {
+  const cur = isCivic ? rsr.civic : rsr.tech;
+  if (cur === id) return;
+  const retained = isCivic ? rsr.civicRetained : rsr.techRetained;
+  const pool = isCivic ? rsr.civicProgress : rsr.techProgress;
+  if (cur) retained[cur] = pool;
+  const next = id ? retained[id] ?? 0 : pool;
+  if (id) delete retained[id];
+  if (isCivic) {
+    rsr.civic = id;
+    rsr.civicProgress = next;
+  } else {
+    rsr.tech = id;
+    rsr.techProgress = next;
+  }
+}
 
 /**
  * Era-scaled value of a chop/harvest (Civ 6 scales with game progress;
@@ -64,6 +95,7 @@ export function applyLumpYield(
     s.scienceTotal += amount;
     return;
   }
+  // (selectResearch, below, is the only other writer of the progress pool.)
   if (key === 'culture') {
     s.research.civicProgress += amount;
     s.cultureTotal += amount;

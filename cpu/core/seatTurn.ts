@@ -4,6 +4,7 @@ import { seatOf, civsAtWar } from './seats';
 import { isSuzerain } from './cityStates';
 import { seatTourism } from './city';
 import { computeAdoption } from './effects';
+import { selectResearch } from './economy';
 import { GOVERNMENTS, GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import { DIPLO_FAVOR_PER_SUZERAIN } from '../data/seats';
 
@@ -68,7 +69,7 @@ export function commitProduction(state: GameState, seat: number, city: City, ite
 export function commitResearch(state: GameState, seat: number, kind: 'tech' | 'civic', id: string | null): void {
   const s = seatOf(state, seat);
   if (!s) return;
-  if (kind === 'tech') s.research.tech = id;
+  if (kind === 'tech') selectResearch(s.research, id);
   else s.research.civic = id;
   if (process.env.CIV6_ALOG && id !== null) {
     console.error(`ALOG t${state.turn} s${seat} ${kind} ${id}`);

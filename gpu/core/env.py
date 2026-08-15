@@ -254,6 +254,16 @@ class BatchEnv:
                                                        s._seat_settler_cost(row).to(d)), dim=1),
                           s._eff_cost(s.rules_dev.t_cost.unsqueeze(0).expand(B, -1), s.civ_tech_boosted[:, row], row).to(d) / 1000.0,
                           s._eff_cost(s.rules_dev.c_cost.unsqueeze(0).expand(B, -1), s.civ_civic_boosted[:, row], row, is_civic=True).to(d) / 1000.0,
+                          # PARKED progress per option, on the cost blocks'
+                          # scale so the two read as a ratio. Switching is a
+                          # legal move (#72), and it cannot be decided from the
+                          # cost alone: what a seat has already sunk into an
+                          # abandoned tech is the other half of the comparison.
+                          # The CURRENT item reads 0 here — its progress is the
+                          # pool, in the empire block — so the two never
+                          # double-count.
+                          s.civ_tech_retain[:, row].to(d) / 1000.0,
+                          s.civ_civic_retain[:, row].to(d) / 1000.0,
                           self._ctx_block(row)], dim=1)
 
     def _seat_strength(self, row: int) -> torch.Tensor:

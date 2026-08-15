@@ -1049,7 +1049,7 @@ export function deserialize(json: string): GameState {
   state.seats ??= [];
   if (state.seats.length === 0) state.seats.push(emptySeat(0));
   for (const sx of state.seats) {
-    sx.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
+    sx.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} };
     sx.research.boosted ??= [];
     sx.government ??= { current: null, policies: [] };
     sx.religion ??= { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null };
@@ -1107,7 +1107,7 @@ export function deserialize(json: string): GameState {
   // fields in place — a current-shape save must round-trip byte-identically
   // (the seat determinism test serializes and compares).
   for (const r of state.seats) {
-    r.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
+    r.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} };
     r.treasury ??= 0; // VP-G1
     for (const civCity of r.cities as (City & { growthBox?: number })[]) {
       civCity.seat ??= r.seat;

@@ -317,6 +317,10 @@ const SEAT: Record<string, Extractor> = {
   currentCivic: overSeats((s) => idx(CIVIC_IDX, s.research.civic)),
   techProgress: overSeats((s) => s.research.techProgress),
   civicProgress: overSeats((s) => s.research.civicProgress),
+  // PARKED progress, in table order — the GPU side is a plane of the same
+  // width, so order is where the two representations meet.
+  techRetained: overSeats((s) => [...TECH_IDX.keys()].map((id) => s.research.techRetained[id] ?? 0)),
+  civicRetained: overSeats((s) => [...CIVIC_IDX.keys()].map((id) => s.research.civicRetained[id] ?? 0)),
   cityCount: overSeats((s) => s.cities.length),
   wars: overSeats((s) => [...s.wars].sort((a, b) => a - b)),
   warTurns: overSeats((s, state) => warClockLine(state, s.seat)),

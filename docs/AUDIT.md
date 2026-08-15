@@ -158,10 +158,13 @@ not add a "done" column back.
   ranking today); per-civ tech-era drift (eras are global 50-turn
   blocks).
 - **B-25r. Victory tails:** every named Civ 6 victory exists on both
-  engines; open is the seat-0 PROJECT-PRODUCTION path on the GPU
-  (victoryType 3 can be preserved but not produced — the wire has no
-  project/wonder columns for any seat, task #83), and the culture win's
-  ~14× tourism gap (B-20r).
+  engines and every one is now REACHABLE — the space-race mask gate closed
+  the last hole (#83). Open: the culture win's ~14× tourism gap (B-20r), and
+  ONE deliberate deviation in the space race — real Civ 6 runs every step in
+  a SPACEPORT, this repo has no Spaceport district and runs them in a Campus,
+  which makes them cheaper and removes a district decision from the path.
+  The Lagrange/Terrestrial Laser Stations (repeatable boosters that shorten
+  the Exoplanet flight) are unmodelled, so arrival is not accelerable.
 - **B-26r. Barbarian camp-spawn escalation** beyond the melee ladder
   (cliffs, ranged barbs and naval barbs all landed).
 - **B-27r. Theological-combat simplifications.** The resolver runs on both
@@ -398,6 +401,39 @@ item here CHANGES BEHAVIOUR on both engines together; none of it has run.
 10. `PILLAGE` ON SEAT 0'S PATH now gates on `combat > 0` rather than "carries
    no charges". The GPU has always used the former; the deleted
    `seatPillage` let a Great General pillage where the GPU refused.
+11. THE SPACE RACE IS A DIFFERENT SHAPE (#83). The project roster lost two
+   rows — the base game's three separate Mars components collapse to
+   Gathering Storm's single `LAUNCH_MARS_COLONY`, which is what this repo
+   models — so **every project column index after the Mars rows SHIFTS**, and
+   with it the production mask's width. Nothing derived from that layout may
+   be read from an old fixture. Sourced against the GS Civilopedia: the old
+   rows also had their techs rotated by one (Reactor was gated on
+   Nanotechnology where the real Reactor wants Nuclear Fusion) and were
+   chained to each other where the real three hung in PARALLEL off the Moon
+   Landing; `EXOPLANET_EXPEDITION` was gated on `OFFWORLD_MISSION` where the
+   Civilopedia says Smart Materials.
+12. THE SPACE MASK GATE IS LIVE (#83). Space rows were skipped by
+   `_seat_production_mask` and by the apply, so the columns read False for
+   every seat and the chain was unreachable on the GPU while TS could walk
+   it. Both skips are gone, replaced by `_space_step_ok`. Behaviour change on
+   the GPU only, and only in games that reach Information-era techs — which
+   no gate lane does, so a green run says NOTHING about this. The poke lane
+   is the proof.
+13. THE RESEARCH HEAD NO LONGER CLOSES (#72). `_seat_tech_mask` and
+   `_seat_civic_mask` dropped their `cur_tech == -1` term, and so did the
+   apply. **Expect a different research order on the GPU from the first turn
+   a policy prefers a switch** — the whole head is legal every turn now,
+   where it used to be entirely illegal whenever anything was underway
+   (0 of 68 at t60 of seed 9002). This is the biggest trajectory change in
+   the backlog after the seat loop.
+14. RESEARCH PROGRESS IS PARTITIONED (#72). `civ_tech_retain` /
+   `civ_civic_retain` (TS: `techRetained` / `civicRetained`) hold the science
+   parked on items not currently being researched; the pool holds the current
+   item's. Both are in the FATAL digest, and the pool's arithmetic is
+   unchanged, so a no-switch game must digest exactly as before — **if
+   `techProgress` moves without a switch having happened, the swap is
+   leaking.** The observation grew two blocks of tech/civic width, so its
+   dims changed again (#77 licenses it).
 
 WATCH FIRST when the run goes red: (1) and (2) together mean seat 0's whole
 trajectory changed. Bracket from a checkpoint and read the SEAT the

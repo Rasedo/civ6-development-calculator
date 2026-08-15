@@ -76,7 +76,7 @@ export function computeUnlocksIn(research: ResearchState): Unlocks {
 
 export function computeUnlocks(state: GameState, seat: number): Unlocks {
   const s = seatOf(state, seat);
-  return computeUnlocksIn(s ? s.research : { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] });
+  return computeUnlocksIn(s ? s.research : { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} });
 }
 
 export function isTechComplete(state: GameState, id: string, seat: number): boolean {

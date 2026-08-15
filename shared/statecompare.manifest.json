@@ -379,6 +379,26 @@
      ]
     },
     {
+     "name": "techRetained",
+     "compare": "milli",
+     "covers": [
+      "ResearchState.techRetained"
+     ],
+     "planes": [
+      "civ_tech_retain"
+     ]
+    },
+    {
+     "name": "civicRetained",
+     "compare": "milli",
+     "covers": [
+      "ResearchState.civicRetained"
+     ],
+     "planes": [
+      "civ_civic_retain"
+     ]
+    },
+    {
      "name": "cityCount",
      "compare": "exact",
      "covers": [

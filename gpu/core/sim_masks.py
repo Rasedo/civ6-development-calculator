@@ -16,12 +16,17 @@ class SimMasks:
         return self._seat_production_mask(0)
 
     def _seat_tech_mask(self, row: int) -> torch.Tensor:
-        return (self._available_mask(self.civ_techs[:, row], self._prereq_t)
-                & (self.civ_cur_tech[:, row] == -1).unsqueeze(1))
+        # EVERY available tech, whether or not one is already underway: real
+        # Civ 6 lets a seat switch research at any moment, and `availableTechsIn`
+        # never consulted the current selection either. The old
+        # `cur_tech == -1` term made the whole tech head illegal for as long as
+        # anything was being researched — measured at t60 of seed 9002, a seat
+        # with 9 techs had 0 of 68 legal — so "switch research" was a move no
+        # policy could express and none could learn.
+        return self._available_mask(self.civ_techs[:, row], self._prereq_t)
 
     def _seat_civic_mask(self, row: int) -> torch.Tensor:
-        return (self._available_mask(self.civ_civics[:, row], self._prereq_c)
-                & (self.civ_cur_civic[:, row] == -1).unsqueeze(1))
+        return self._available_mask(self.civ_civics[:, row], self._prereq_c)
 
     def tech_mask(self) -> torch.Tensor:
         return self._seat_tech_mask(0)

@@ -27,11 +27,11 @@ function newGameWithCampus(opponents = 0) {
 }
 
 const CHAIN = SPACE_PROJECTS.map((p) => p.id);
-const GATING_TECHS = ['ROCKETRY', 'SATELLITES', 'NANOTECHNOLOGY', 'NUCLEAR_FUSION', 'ROBOTICS', 'OFFWORLD_MISSION'];
+const GATING_TECHS = ['ROCKETRY', 'SATELLITES', 'NANOTECHNOLOGY', 'SMART_MATERIALS'];
 
 describe('B-25 science victory', () => {
   it('space projects are catalog-complete and end in a victory step', () => {
-    expect(CHAIN.length).toBe(6);
+    expect(CHAIN.length).toBe(4);
     expect(CHAIN[CHAIN.length - 1]).toBe('EXOPLANET_EXPEDITION');
     expect(SPACE_PROJECTS[SPACE_PROJECTS.length - 1].victory).toBe(true);
   });

@@ -523,6 +523,11 @@ class SimPhase:
             self.civ_techs[rows, row, curt[rows]] = True
             self._eff_version += 1
             self.civ_tech_prog[:, row] = torch.where(fin, self.civ_tech_prog[:, row] - cost_t, self.civ_tech_prog[:, row])
+            # A finished tech holds no parked science — its slot was emptied
+            # when it became current — but clear it anyway, so the partition
+            # cannot be broken by a future writer. The overflow stays in the
+            # pool and belongs to whatever the next record picks.
+            self.civ_tech_retain[rows, row, curt[rows]] = 0
             self.civ_cur_tech[:, row] = torch.where(fin, torch.full_like(curt, -1), self.civ_cur_tech[:, row])
         no_t = active & (self.civ_cur_tech[:, row] == -1) & ~self._available_mask(self.civ_techs[:, row], self._prereq_t).any(dim=1)
         self.civ_tech_prog[:, row] = torch.where(no_t, torch.minimum(self.civ_tech_prog[:, row], torch.zeros_like(self.civ_tech_prog[:, row])), self.civ_tech_prog[:, row])
@@ -564,6 +569,7 @@ class SimPhase:
             self.civ_civics[rows, row, curc[rows]] = True
             self._eff_version += 1
             self.civ_civic_prog[:, row] = torch.where(fin, self.civ_civic_prog[:, row] - cost_c, self.civ_civic_prog[:, row])
+            self.civ_civic_retain[rows, row, curc[rows]] = 0
             self.civ_cur_civic[:, row] = torch.where(fin, torch.full_like(curc, -1), self.civ_cur_civic[:, row])
         no_c = active & (self.civ_cur_civic[:, row] == -1) & ~self._available_mask(self.civ_civics[:, row], self._prereq_c).any(dim=1)
         self.civ_civic_prog[:, row] = torch.where(no_c, torch.minimum(self.civ_civic_prog[:, row], torch.zeros_like(self.civ_civic_prog[:, row])), self.civ_civic_prog[:, row])

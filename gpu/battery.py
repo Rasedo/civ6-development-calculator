@@ -186,6 +186,7 @@ def main() -> int:
                 ("religion_gp", [py, "tests/gpu/religion_gp_test.py"], 4),
                 ("war_weariness", [py, "tests/gpu/war_weariness_test.py"], 4),
                 ("space_race", [py, "tests/gpu/space_race_test.py"], 4),
+                ("research_switch", [py, "tests/gpu/research_switch_test.py"], 4),  # switching research keeps the abandoned item's science
                 ("culture_victory", [py, "tests/gpu/culture_victory_test.py"], 4),  # the culture win, which the serve gate never reaches
                 ("relics", [py, "tests/gpu/relics_test.py"], 4),  # martyr relics — temple slots, faith + tourism
                 ("festival", [py, "tests/gpu/festival_test.py"], 4),  # Festival pays THREE GP classes at 0.11 (serve gate never reaches it)
