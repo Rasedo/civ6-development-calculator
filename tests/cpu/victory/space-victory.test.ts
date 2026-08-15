@@ -2,13 +2,13 @@ import { describe, it, expect } from 'vitest';
 import type { Seat } from '../../../cpu/core/types';
 import { seatOf } from '../../../cpu/core/seats';
 import { createGame, endTurn, availableProjects } from '../../../cpu/core/game';
+import { queueSeatProject } from '../../../cpu/core/phase';
 import { settleFirstCity } from '../helpers';
 import { SPACE_PROJECTS } from '../../../cpu/data/projects';
 
-// space race / science victory. Structurally unreachable in the 100-turn
-// scripted parity gate (gated on Information/Future techs), so these focused
-// pokes pin the semantics the rollout can't reach. The GPU space-race
-// SIMULATION is deferred — the chain lives in TS.
+// space race / science victory. Gated on Information/Future techs, so no gate
+// lane reaches it and these pokes are the only proof of the semantics. The GPU
+// twin is tests/gpu/space_race_test.py.
 
 function newGameWithCampus(opponents = 0) {
   const state = createGame({
@@ -29,7 +29,7 @@ function newGameWithCampus(opponents = 0) {
 const CHAIN = SPACE_PROJECTS.map((p) => p.id);
 const GATING_TECHS = ['ROCKETRY', 'SATELLITES', 'NANOTECHNOLOGY', 'SMART_MATERIALS'];
 
-describe('B-25 science victory', () => {
+describe('science victory', () => {
   it('space projects are catalog-complete and end in a victory step', () => {
     expect(CHAIN.length).toBe(4);
     expect(CHAIN[CHAIN.length - 1]).toBe('EXOPLANET_EXPEDITION');
@@ -50,6 +50,17 @@ describe('B-25 science victory', () => {
     seatOf(state, 0)!.spaceProjects = ['LAUNCH_EARTH_SATELLITE'];
     avail = availableProjects(state, city).filter((p) => p.space).map((p) => p.id);
     expect(avail).toEqual(['LAUNCH_MOON_LANDING']);
+  });
+
+  it('the WIRE applier queues a space step — a recorded column must not be dropped', () => {
+    const { state, city } = newGameWithCampus();
+    seatOf(state, 0)!.research.techs.push(...GATING_TECHS);
+    expect(queueSeatProject(state, city, 'LAUNCH_EARTH_SATELLITE')).toBe(true);
+    expect(city.queue[0]).toMatchObject({ kind: 'project', project: 'LAUNCH_EARTH_SATELLITE' });
+    // and the chain still gates it: step 2 is refused until step 1 is DONE.
+    const later = newGameWithCampus();
+    seatOf(later.state, 0)!.research.techs.push(...GATING_TECHS);
+    expect(queueSeatProject(later.state, later.city, 'LAUNCH_MOON_LANDING')).toBe(false);
   });
 
   it('completing the whole chain sets victoryType 3, won by the launching seat', () => {

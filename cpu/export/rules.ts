@@ -417,18 +417,16 @@ export function buildRules() {
       })),
       fpFid: FEAT_IDS.indexOf('FLOODPLAINS'),
     },
-    // AUDIT A-14: civ-seat projects (data order; d = PLACEABLE_DISTRICTS idx,
-    // y = YIELD_KEYS idx or -1, g = GP_CLASSES idx or -1). Out-of-scaffold
-    // districts export d=-1 and never fire — table-driven for A-9's future.
+    // Projects in data order; d = PLACEABLE_DISTRICTS idx, y = YIELD_KEYS idx
+    // or -1, g = GP_CLASSES idx or -1. A project on an out-of-scaffold district
+    // exports d=-1 and never fires.
+    //
+    // Space rows carry sp (space flag) / vic (victory step) plus the tech gate
+    // (rt = techs-table idx) and previous-step link (rp = projects-table idx),
+    // which is what `_space_step_ok` reads. They sit LAST, in chain order: the
+    // scripted greedy takes the lowest legal index, so a base project always
+    // shadows them.
     projects: {
-      // B-25 (Round B3, Slice W): the space-race chain now SHIPS to the GPU.
-      // Every row carries sp (space flag) / vic (victory step) plus the tech
-      // gate (rt = techs-table idx) and previous-step link (rp = projects-table
-      // idx) so the GPU mirrors the sequence + the science victoryType 3.
-      // Space rows sit LAST (chain order): the civ-seat greedy pick resolves to a
-      // base project first, and the scripted seat 0 never queues projects, so
-      // the chain is inert in-gate (gate-unreachable at 250t) — proven by the
-      // parity gate + gpu/space_race_test.py.
       rows: Object.values(PROJECTS).map((p, _i, all) => ({
         d: PLACEABLE_DISTRICTS.indexOf(p.district),
         y: p.yield ? YIELD_KEYS.indexOf(p.yield) : -1,

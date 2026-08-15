@@ -1738,10 +1738,9 @@ class SimEconomy:
         return t[:, :, 0], t[:, :, 1], t[:, :, 3], t[:, :, 4], t[:, :, 2], t[:, :, 5]
 
     def leader(self) -> torch.Tensor:
-        """[B] the current score-leader as a unified civ id — 0 = seat 0,
-        r+1 = civ index r. Ties → lowest id (seat 0 first, then the lowest
-        civ index), matching TS's strict-`>` scan — via first_argmax
-        (torch.argmax's tie pick is unspecified)."""
+        """[B] the current score leader's ROW. Ties → the lowest row, matching
+        TS's strict-`>` scan — via first_argmax (torch.argmax's tie pick is
+        unspecified)."""
         cols = [self.seat_score(row) for row in range(self.n_majors)]
         return first_argmax(torch.stack(cols, dim=1))
 

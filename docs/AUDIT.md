@@ -434,6 +434,18 @@ item here CHANGES BEHAVIOUR on both engines together; none of it has run.
    `techProgress` moves without a switch having happened, the swap is
    leaking.** The observation grew two blocks of tech/civic width, so its
    dims changed again (#77 licenses it).
+15. THE TS WIRE APPLIER ACCEPTS SPACE COLUMNS. `queueSeatProject` opened with
+   `proj.space || proj.victory` -> refuse, and it is the only path the record
+   replay uses — so the GPU queued a space step and TS silently dropped the
+   same record. #83 opened the GPU mask and missed this half. Both sides now
+   gate on `availableProjects` alone. Unreachable in-gate like the rest of
+   the chain, so nothing green proves it; the new wire poke is the tripwire.
+16. `winner` NAMES THE VICTOR, not the score leader. It was
+   `dom >= 0 ? dom : leader()`, so a science, religious, cultural or
+   diplomatic victory credited whoever had the highest score. It now reads
+   `victory_row` whenever the outcome has one, falling back to the leader for
+   the turn-limit score result. GPU-only plane, absent from the digest, and
+   its one reader is `protagonist()` — no trajectory rides on it.
 
 WATCH FIRST when the run goes red: (1) and (2) together mean seat 0's whole
 trajectory changed. Bracket from a checkpoint and read the SEAT the

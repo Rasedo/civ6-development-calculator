@@ -32,7 +32,6 @@ import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP, ENCAMPMENT_HP, CITY_MAX_HP } from 
 import { generalAuraMP } from './aura'; // #70/S3 (B-8): the aura's +1 MP half
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
 import { CITY_WORK_RADIUS, GOLD_PURCHASE_MULT, borderGrowthCost, EMBARKED_DEFENSE_CS } from '../data/constants';
-import { PROJECTS } from '../data/projects';
 import type { CityStats } from './city';
 import { civEraIndex, computeCityStats, luxuryAmenities, pickBorderTile, acquireTile } from './city';
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
@@ -457,8 +456,6 @@ export function placeSeatWonder(state: GameState, actor: Seat, civCity: City, de
 }
 
 export function queueSeatProject(state: GameState, civCity: City, projId: string): boolean {
-  const proj = PROJECTS[projId];
-  if (!proj || proj.space || proj.victory) return false;
   if (!availableProjects(state, civCity).some((p) => p.id === projId)) return false;
   return queueProject(state, civCity.id, projId, civCity.seat).ok;
 }

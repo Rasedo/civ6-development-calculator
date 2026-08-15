@@ -2,9 +2,7 @@
  *
  * The wire records mask COLUMNS, and both engines must agree on what column 7
  * means, forever. One derivation, imported by everything that needs it — a
- * second copy would rot the file format silently, which is the
- * same disease as #85 (the seat mask five units behind the picker) one level
- * up. So the derivation lives here and both sides import it.
+ * second copy would rot the file format silently.
  *
  * Layout, shared by `production_mask` and `seat_masks`:
  *     [0, NB)            queue that City Center building
@@ -12,14 +10,13 @@
  *     NB + 1             IDLE (queue nothing)
  *     [NB+2, NB+2+NU)    train that roster unit
  *     [NB+2+NU, +nS)     place that scaffold district
- *     [wonderLo, +nW)    queue that world wonder (#88; placement re-scanned)
- *     [projectLo, +nP)   run that district project (#88; BASE rows only —
- *                        space-race rows keep their column for layout
- *                        stability but no mask ever offers them; the space
- *                        chain is its own queue path with its own gate)
- * There is no PURCHASE block: gold and faith spending is the BUY WIRE (#103,
- * #104 — kinds 0-7, one purchase per seat per turn), which every seat records
- * and both engines re-validate at the gold block's own phase position.
+ *     [wonderLo, +nW)    queue that world wonder (placement re-scanned)
+ *     [projectLo, +nP)   run that district project — base rows and the four
+ *                        space-race steps alike; a space row is legal only
+ *                        with its tech and its predecessor step complete
+ * There is no PURCHASE block: gold and faith spending is the BUY WIRE (kinds
+ * 0-7, one purchase per seat per turn), which every seat records and both
+ * engines re-validate at the gold block's own phase position.
  */
 import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
 import { SCAFFOLD_DISTRICTS } from '../data/districts';

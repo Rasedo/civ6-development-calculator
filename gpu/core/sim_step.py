@@ -121,8 +121,12 @@ class SimStep:
         self.game_over = space_won | (dom >= 0) | (rel >= 0) | (cul >= 0) | (dip >= 0) | (self.turn > self.rules.turn_limit)
         self.victory_type.copy_(torch.where(space_won, self.victory_type, torch.where(dom >= 0, torch.full_like(dom, 2), torch.where(rel >= 0, torch.full_like(rel, 4), torch.where(cul >= 0, torch.full_like(cul, 5), torch.where(dip >= 0, torch.full_like(dip, 6), torch.where(self.game_over, torch.ones_like(dom), torch.zeros_like(dom))))))))
         self.victory_row.copy_(torch.where(space_won, self.victory_row, torch.where(dom >= 0, dom, torch.where(rel >= 0, rel, torch.where(cul >= 0, cul, torch.where(dip >= 0, dip, torch.full_like(dom, -1)))))))
+        # The WINNER is whoever the outcome names — `victory_row` for every
+        # condition that has a victor. Only the turn-limit score result has
+        # none, and there the score leader is the winner.
         lead = self.leader() if bool(self.game_over.any()) else torch.full_like(dom, -1)
-        self.winner = torch.where(dom >= 0, dom, torch.where(self.game_over, lead, torch.full_like(dom, -1)))
+        self.winner = torch.where(self.victory_row >= 0, self.victory_row,
+                                  torch.where(self.game_over, lead, torch.full_like(dom, -1)))
 
         if simbase._ALIAS_CHECK:
             self._check_state_discipline()

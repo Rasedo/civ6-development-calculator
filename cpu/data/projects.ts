@@ -43,9 +43,9 @@ export interface ProjectDef {
   /** Previous space-race project that must be completed first (the chain). */
   requiresProject?: string;
   victory?: boolean;
-  /** Marks a space-race project: filtered out of the GPU projects table (the
-   *  GPU space-race SIMULATION is deferred), and placed
-   *  AFTER the base projects so the seat greedy `.find` never selects it. */
+  /** Marks a space-race project: one-time, gated on `requiresTech` and
+   *  `requiresProject`, and placed AFTER the base rows so a greedy
+   *  lowest-index pick resolves to a base project first. */
   space?: boolean;
 }
 
