@@ -19,7 +19,7 @@ function addCs(
 ): CityState {
   const center = tileAtCoords(state.map, col, row);
   const cityState: CityState = {
-    ...emptySeat(seatOfCityState(state.cityStates.length)), // #51/S6.12
+    ...emptySeat(seatOfCityState(state.cityStates.length)),
     id: state.cityStates.length,
     name: `Testopolis ${state.cityStates.length}`,
     type: 'scientific',
@@ -60,7 +60,7 @@ describe('city-state placement', () => {
     const ring2 = tilesWithin(state.map, 6, 6, 2).find(
       (t) => hexDistance(t.col, t.row, 6, 6) === 2,
     )!;
-    expect(canFoundCity(state, ring2.index, 0).ok).toBe(false); // min city distance 4 (P4/D-5)
+    expect(canFoundCity(state, ring2.index, 0).ok).toBe(false); // min city distance 4
     const ring3 = tilesWithin(state.map, 6, 6, 3).find(
       (t) => hexDistance(t.col, t.row, 6, 6) === 3,
     )!;
@@ -72,7 +72,7 @@ describe('city-state placement', () => {
   it('border growth never claims city-state territory', () => {
     const state = makeState();
     addCs(state, 8, 5);
-    const city = foundCity(state, tileAtCoords(state.map, 4, 5).index, 0).city!; // dist 4 from the CS (P4/D-5)
+    const city = foundCity(state, tileAtCoords(state.map, 4, 5).index, 0).city!; // dist 4 from the CS
     const candidates = borderCandidates(state, city);
     for (const i of candidates) {
       expect((isCityStateSeat(tileSeat(state.map.tiles[i])) ? cityStateOfSeat(tileSeat(state.map.tiles[i])) : -1)).toBe(-1);

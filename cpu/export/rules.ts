@@ -10,10 +10,10 @@
 
 
 import { TURN_LIMIT } from '../core/game';
-import { IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements'; // B-27 (#71)
+import { IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
 import type { ImprovementId } from '../core/types';
 import { GENERAL_AURA_CS, GENERAL_AURA_RANGE, BARB_SCOUT_OPENER_LIVE } from '../core/combat';
-import { GENERAL_AURA_MP } from '../core/aura'; // #70/S3 (B-8)
+import { GENERAL_AURA_MP } from '../core/aura';
 import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_BUILDINGS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_YIELD, CITY_STATE_MAX_HP, CITY_STATE_MEET_RANGE, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_CULTURE, ARTIFACT_TOURISM } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, type BeliefEffects } from '../data/religion';
@@ -30,20 +30,20 @@ import { UNITS, UNIT_HP, CITY_MAX_HP, WALLS_HP, ENCAMPMENT_HP } from '../data/un
 import { YIELD_KEYS } from '../core/types';
 import { BUILDINGS } from '../data/buildings';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencySource } from '../data/districts';
-import { TECHS, ERAS, MODERN_ERA_INDEX } from '../data/techs'; // B-20 (#71): era scale
+import { TECHS, ERAS, MODERN_ERA_INDEX } from '../data/techs'; // era scale
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, GOVERNMENTS_ADOPTION_LIVE, type SlotKind } from '../data/policies';
 import { BOOSTS, BOOST_FRACTION } from '../data/boosts';
 import { CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, FOOD_PER_CITIZEN, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, GOLD_PURCHASE_MULT, LUXURY_AMENITY_CITIES, GAME_SPEED, REGIONAL_RANGE, EMBARK_MOVES, EMBARKED_DEFENSE_CS, embarkState } from '../data/constants';
 
 // The GPU improvement index space (tile.improvement values, build codes 13-15).
-// AUDIT A-13: the roster grew — indices 0-2 stay stable (every existing
+// the roster grew — indices 0-2 stay stable (every existing
 // plane/consumer keys on them); the resource-only improvements append.
 // FISHING_BOATS stays OUT: water-only, and a land builder can never stand
 // on the tile (unreachable in both engines).
-// B-27 (#71): SEASIDE_RESORT appended LAST — this array's order IS the GPU's
+// SEASIDE_RESORT appended LAST — this array's order IS the GPU's
 // improvement index, so anything but an append renumbers every other row.
-import { IMPROVEMENT_IDS } from '../core/unitActions'; // #93: ONE roster, core-owned (order is the column index; FORT appended LAST)
+import { IMPROVEMENT_IDS } from '../core/unitActions'; // ONE roster, core-owned (order is the column index; FORT appended LAST)
 
  
 import { techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, RESOURCE_IDS, BUILT_WONDER_LIST } from './catalog';
@@ -68,7 +68,7 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
     ? [def.effects.perFollowers.per, ...YIELD_KEYS.map((k) => def.effects.perFollowers!.yields[k] ?? 0)]
     : [0, 0, 0, 0, 0, 0, 0],
   perC: YIELD_KEYS.map((k) => def.effects.perCity?.[k] ?? 0),
-  fpw: def.effects.faithPerWonder ?? 0,  // A-4 activates this (Divine Inspiration)
+  fpw: def.effects.faithPerWonder ?? 0,  // Divine Inspiration
   presR: def.effects.pressureRangeBonus ?? 0,  // Itinerant Preachers
   tradeRel: YIELD_KEYS.map((k) => def.effects.tradeReligionYields?.[k] ?? 0),  // Messenger of the Gods [6]
   cnear: def.effects.combatNearFollowing ?? 0,  // Just War (within justWarRange, unit-vs-unit)
@@ -112,8 +112,8 @@ for (const [id, def] of Object.entries(BOOSTS)) {
     if (t !== undefined) row = { kind: 'tech', t };
   } else if (c.kind === 'nearNaturalWonder') row = { kind: 'nearNaturalWonder' };
   else if (c.kind === 'improvement') {
-    // Improvement eurekas for every improvement in the grown roster (A-13
-    // gate-catch, seed 9066 t57 rTechProg1: civ seat 1's first QUARRY at t48
+    // Improvement eurekas for every improvement in the grown roster (a
+    // gate catch, seed 9066 t57 rTechProg1: seat 1's first QUARRY at t48
     // fired MASONRY's eureka in TS only — the old FARM/MINE/LUMBER
     // hardcode left quarry/pasture rows unexported, so the GPU's research
     // stream forked on the boosted cost). MASONRY (quarry) and
@@ -141,7 +141,7 @@ for (const [id, def] of Object.entries(BOOSTS)) {
     if (!c.class) row = { kind: 'greatPeople', cls: -1, count: c.count };
     else if (cls >= 0 && cls < 5) row = { kind: 'greatPeople', cls, count: c.count };
   } else if (c.kind === 'policies') {
-    // B-13 (Slice V): the "run N policy cards" inspiration (MEDIEVAL_FAIRES,
+    // the "run N policy cards" inspiration (MEDIEVAL_FAIRES,
     // count 4). Dormant until the new-card unlockPolicy wiring let the scripted
     // seat 0 fill 4+ slots in-gate; the GPU counts SEAT 0's slotted-policy
     // mask (`_gov_policy_mods`). Seat-0 only: the civ-seat boost detector has
@@ -174,10 +174,10 @@ export function buildRules() {
     centerMinFood: CITY_CENTER_MIN_FOOD,
     centerMinProduction: CITY_CENTER_MIN_PRODUCTION,
     housing: { fresh: HOUSING_FRESH_WATER, coastal: HOUSING_COASTAL, none: HOUSING_NO_WATER, aqFreshBonus: AQUEDUCT_FRESH_BONUS, aqNoFreshTotal: AQUEDUCT_NO_FRESH_TOTAL },
-    regionalRange: REGIONAL_RANGE, // B9-R2: regional-building reach (hex distance, city centers)
+    regionalRange: REGIONAL_RANGE, // regional-building reach (hex distance, city centers)
     boostFraction: BOOST_FRACTION,
     // amenityTier(balance) thresholds, highest first (see data/constants.ts).
-    // P4/D-12: real Civ 6 bands — Content exactly 0, Displeased -1..-2.
+    // real Civ 6 bands — Content exactly 0, Displeased -1..-2.
     amenityTiers: [
       { min: 3, growth: 1.2, yield: 1.1 },
       { min: 1, growth: 1.1, yield: 1.05 },
@@ -238,20 +238,20 @@ export function buildRules() {
       envoyCost: ENVOY_COST,
       influencePerTurn: INFLUENCE_PER_TURN,
       capitalBonus: CITY_STATE_CAPITAL_BONUS,
-      meetRange: CITY_STATE_MEET_RANGE, // A-12: civ-seat proximity-meet radius
+      meetRange: CITY_STATE_MEET_RANGE, // civ-seat proximity-meet radius
       questCooldown: QUEST_COOLDOWN,
       questEnvoys: QUEST_ENVOYS,
       maxHp: CITY_STATE_MAX_HP,
       militaristicIdx: CITY_STATE_TYPES.indexOf('militaristic'),
-      tradeIdx: CITY_STATE_TYPES.indexOf('trade'), // A-12b: suzerain trade capacity
-      suzerainEnvoys: SUZERAIN_ENVOYS, // A-12b: the strict-contest minimum
+      tradeIdx: CITY_STATE_TYPES.indexOf('trade'), // suzerain trade capacity
+      suzerainEnvoys: SUZERAIN_ENVOYS, // the strict-contest minimum
       typeYieldIdx: CITY_STATE_TYPES.map((t) => YIELD_KEYS.indexOf(CITY_STATE_TYPE_YIELD[t])),
       typeDistrictIdx: CITY_STATE_TYPES.map((t) => PLACEABLE_DISTRICTS.indexOf(CITY_STATE_TYPE_DISTRICT[t])),
       districtBonus: CITY_STATE_DISTRICT_BONUS,
       typeB1Idx: CITY_STATE_TYPES.map((t) => buildingIdx.get(CITY_STATE_TYPE_BUILDINGS[t][0]) ?? -1),
       typeB2Idx: CITY_STATE_TYPES.map((t) => buildingIdx.get(CITY_STATE_TYPE_BUILDINGS[t][1]) ?? -1),
       suzerainYield: CITY_STATE_SUZERAIN_YIELD,
-      // A-12 (B8-L): CIV-SEAT levy — a militaristic CS's suzerain (a civ seat) at war
+      // CIV-SEAT levy — a militaristic CS's suzerain (a civ seat) at war
       // spawns levyUnits units at levyGoldCost off its treasury, levyCooldown
       // per CS shared across seats. (Seat-0 levy is UI-only, absent from the
       // scripted reference, so the GPU only mirrors the civ-seat path.)
@@ -264,17 +264,17 @@ export function buildRules() {
       // The per-seat CITY COLUMN width — one number for the GPU's storage rows
       // and for both engines' observation/decision head (see CITY_SLOTS_PER_SEAT).
       citySlots: CITY_SLOTS_PER_SEAT,
-      settlerBase: Math.round(80 * GAME_SPEED), // P5/S3: SETTLER_COST(c) = seat 0's 48 + 18·max(0, c − 1)
+      settlerBase: Math.round(80 * GAME_SPEED), // SETTLER_COST(c) = seat 0's 48 + 18·max(0, c − 1)
       settlerPer: Math.round(30 * GAME_SPEED),
       pantheonFaithCost: PANTHEON_FAITH_COST,
       prophetCls: GP_CLASSES.indexOf('PROPHET'),
-      // B-20 (Round B7): Great Works. WRITER/MUSICIAN class indices, the building
+      // Great Works. WRITER/MUSICIAN class indices, the building
       // columns (b_cost catalog order) that hold writing/music works, the slots
       // per building, the works per person and the per-work culture yield BY KIND
-      // (#70/S1: writing 2, music 4 — the real GS values; NO Great Work pays
+      // (writing 2, music 4 — the real GS values; NO Great Work pays
       // gold, and tourism is unmodeled). The GPU slots works into these building
       // columns and adds the matching culture at the buildings-bucket position.
-      // #73: the three slotted Great Work kinds, in kind order
+      // the three slotted Great Work kinds, in kind order
       // (0 WRITING / 1 ART / 2 MUSIC) — the REAL Civ 6 mapping:
       // Amphitheater 2 slots, Art Museum 3, Broadcast Center 1.
       gwClsByKind: [GP_CLASSES.indexOf('WRITER'), GP_CLASSES.indexOf('ARTIST'), GP_CLASSES.indexOf('MUSICIAN')],
@@ -282,8 +282,8 @@ export function buildRules() {
       gwSlotsByKind: [...GW_SLOTS],
       gwWorksByKind: [...GW_WORKS_PER_PERSON],
       gwCultureByKind: [...GW_CULTURE],
-      gwTourismByKind: [...GW_TOURISM], // B-20 (#71): tourism per Great Work
-      // B-20 (#74): PRINTING doubles Great Work of WRITING tourism (real Civ 6 —
+      gwTourismByKind: [...GW_TOURISM], // tourism per Great Work
+      // PRINTING doubles Great Work of WRITING tourism (real Civ 6 —
       // the tourism, not the slot count). Index into the exported tech list.
       gwPrintingTech: techIdx.get(GW_PRINTING_TECH) ?? -1,
       gwPrintingWritingMult: GW_PRINTING_WRITING_MULT,
@@ -337,11 +337,11 @@ export function buildRules() {
       generalAuraCs: GENERAL_AURA_CS,
       generalAuraRange: GENERAL_AURA_RANGE,
       generalAuraMp: GENERAL_AURA_MP,
-      admiralMarchLive: ADMIRAL_MARCH_LIVE, // B-8 (#71): inert pending its hunt // #70/S3 (B-8): the aura's movement half
+      admiralMarchLive: ADMIRAL_MARCH_LIVE, // inert pending its hunt // the aura's movement half
       pantheonPool: Object.keys(PANTHEONS).length,
       followerPool: Object.keys(FOLLOWER_BELIEFS).length,
       founderPool: Object.keys(FOUNDER_BELIEFS).length,
-      // B-18: Enhancer pool size. The GPU does not yet race enhancers (civ-seat
+      // Enhancer pool size. The GPU does not yet race enhancers (civ-seat
       // enhancer claiming + the mirrored draw are a deferred follow-up); this
       // documents the slot for that work.
       enhancerPool: Object.keys(ENHANCER_BELIEFS).length,
@@ -350,7 +350,7 @@ export function buildRules() {
       followerCoupling: B18_FOLLOWER_COUPLING_LIVE,
     },
     beliefs: {
-      // B6-S2: the missionary chassis anchors (read via rules.beliefs, like the
+      // the missionary chassis anchors (read via rules.beliefs, like the
       // enhancer rows). Base values double as the GPU pad row (unenhanced civ):
       // cost round(100·GAME_SPEED)=60 faith, lump SPREAD_PRESSURE=10, cap 2.
       missionaryIdx: Object.values(UNITS).findIndex((u) => u.id === 'MISSIONARY'),
@@ -369,13 +369,13 @@ export function buildRules() {
       pantheons: Object.values(PANTHEONS).map(beliefRow),
       followers: Object.values(FOLLOWER_BELIEFS).map(beliefRow),
       founders: Object.values(FOUNDER_BELIEFS).map(beliefRow),
-      // B-18: Enhancer effect rows (all inert this round). Exported so the
+      // Enhancer effect rows (all inert this round). Exported so the
       // deferred GPU enhancer race has the table ready; the engine currently
       // builds only pan/fol/fou tables and ignores this key.
       enhancers: Object.values(ENHANCER_BELIEFS).map(beliefRow),
     },
     wonders: {
-      // B-20 (#71): the era each wonder first became available (its unlock's
+      // the era each wonder first became available (its unlock's
       // era), parallel to `rows` — the GPU indexes it by wonder index.
       eras: Object.values(BUILT_WONDERS).map((w) =>
         w.requiresTech
@@ -388,7 +388,7 @@ export function buildRules() {
         cost: w.cost,
         // -1 = no requirement; -3 = requires a tech/civic ABSENT from the
         // compact tree — unreachable, exactly like TS's includes() never
-        // matching (the A-4 hunt's catch: Oracle's MYSTICISM exported -1 and
+        // matching (a hunt's catch: Oracle's MYSTICISM exported -1 and
         // the GPU read that as unlocked, building wonders TS never could)
         ut: w.requiresTech ? techIdx.get(w.requiresTech) ?? -3 : -1,
         uc: w.requiresCivic ? civicIdx.get(w.requiresCivic) ?? -3 : -1,
@@ -426,7 +426,7 @@ export function buildRules() {
         d: PLACEABLE_DISTRICTS.indexOf(p.district),
         y: p.yield ? YIELD_KEYS.indexOf(p.yield) : -1,
         g: p.gpClass ? GP_CLASSES.indexOf(p.gpClass) : -1,
-        // #79: the FULL class list + this project's own per-class rate. `g` stays
+        // the FULL class list + this project's own per-class rate. `g` stays
         // for index stability; the GPU reads `gs`/`gf` and falls back to `g`.
         gs: gpClassesOf(p).map((c) => GP_CLASSES.indexOf(c)),
         gf: gppFractionOf(p),
@@ -445,20 +445,20 @@ export function buildRules() {
       campSpawnChance: 0.08,
       garrisonGrowChance: 0.1,
       spearmanAfterTurn: 60,
-      // AUDIT B-26 (ROUND B10): the shared barb MELEE era ladder thresholds
+      // the shared barb MELEE era ladder thresholds
       // (WARRIOR → SPEARMAN t>60 → PIKEMAN t>120 → MUSKETMAN t>180). The GPU
       // reads these; the TS barbMeleeType hard-codes the same thresholds.
       pikemanAfterTurn: 120,
       musketmanAfterTurn: 180,
-      // #70/S5 (B-26): the RANGED barb ladder threshold (barbRangedType —
+      // the RANGED barb ladder threshold (barbRangedType —
       // ARCHER, then CROSSBOWMAN after turn 120). The GPU reads this; the TS
       // barbRangedType hard-codes the same number.
       crossbowmanAfterTurn: 120,
       cityHealPerTurn: 20,
-      wallsHp: WALLS_HP, // AUDIT B-1: the ANCIENT_WALLS outer-defense pool cap
-      encampHp: ENCAMPMENT_HP, // B-17 (#71): the ENCAMPMENT garrison pool cap
+      wallsHp: WALLS_HP, // the ANCIENT_WALLS outer-defense pool cap
+      encampHp: ENCAMPMENT_HP, // the ENCAMPMENT garrison pool cap
       unitHealPerTurn: 10,
-      barbScoutOpenerLive: BARB_SCOUT_OPENER_LIVE, // B-26 (#71): inert pending its hunt
+      barbScoutOpenerLive: BARB_SCOUT_OPENER_LIVE, // inert pending its hunt
       barbLadder: [
         'WARRIOR',
         'SPEARMAN',
@@ -477,12 +477,12 @@ export function buildRules() {
       barbNavalTypes: [7, 8], // ladder POSITIONS: GALLEY, then QUADRIREME past crossbowmanAfterTurn
       campClearReward: 50,
       dmgBase: Array.from({ length: 4001 }, (_, i) => 30 * Math.exp((0.04 * (i - 2000)) / 10)),
-      // #45/B-6 EMBARK: flat embarked MP, the LIVE water-step master switch (N1
+      // EMBARK: flat embarked MP, the LIVE water-step master switch (N1
       // ships it INERT), and the embark/ocean tech gates (index into rules techs;
       // military embarks on SHIPBUILDING, civilians on SAILING, OCEAN needs
       // CARTOGRAPHY). The GPU mirrors these exactly.
       embarkMoves: EMBARK_MOVES,
-      embarkedDefenseCs: EMBARKED_DEFENSE_CS, // #45/B-6: flat embarked-defender CS
+      embarkedDefenseCs: EMBARKED_DEFENSE_CS, // flat embarked-defender CS
       embarkLive: embarkState.live ? 1 : 0,
       sailingTech: techIdx.get('SAILING') ?? -1,
       shipbuildingTech: techIdx.get('SHIPBUILDING') ?? -1,
@@ -499,11 +499,11 @@ export function buildRules() {
       civilian: u.charges !== undefined ? 1 : 0,
       charges: u.charges ?? 0,
       requiresTech: u.requiresTech ? techIdx.get(u.requiresTech) ?? -1 : -1,
-      // B-20 (#79): the CIVIC gate (Archaeologist / Natural History) and the
+      // the CIVIC gate (Archaeologist / Natural History) and the
       // ARTIFACT-slot rule, so the GPU can refuse what trainableUnits refuses.
       requiresCivic: u.requiresCivic ? civicIdx.get(u.requiresCivic) ?? -1 : -1,
       needsArtifactSlot: u.id === 'ARCHAEOLOGIST' ? 1 : 0,
-      // AUDIT B-9: strategic-resource ACCESS gate — index into RESOURCE_IDS (the
+      // strategic-resource ACCESS gate — index into RESOURCE_IDS (the
       // same order the tile `rid` plane uses), or -1 = ungated. The GPU joins it
       // with the per-tile `rq`/res_imp plane to gate build+purchase per civ.
       requiresResource: u.requiresResource ? RESOURCE_IDS.indexOf(u.requiresResource) : -1,
@@ -511,7 +511,7 @@ export function buildRules() {
       rangedRange: u.ranged?.range ?? 0,
       moves: u.moves,
       naval: u.naval ? 1 : 0,
-      // B6-S2: faith-purchase-only (MISSIONARY) — the trainableUnits filter's
+      // faith-purchase-only (MISSIONARY) — the trainableUnits filter's
       // mirror; masks the type out of the GPU purchase path.
       fo: u.faithOnly ? 1 : 0,
       so: u.spawnOnly ? 1 : 0,
@@ -536,7 +536,7 @@ export function buildRules() {
       mineProd: IMPROVEMENTS.MINE.yields.production ?? 1,
       lumberProd: IMPROVEMENTS.LUMBER_MILL.yields.production ?? 1,
       builderIdx: Object.values(UNITS).findIndex((u) => u.id === 'BUILDER'),
-      // B-27 (#79): the Military Engineer's roster index + the border/war flag,
+      // the Military Engineer's roster index + the border/war flag,
       // so the GPU can mirror hasFortJob / the engineer job set.
       engineerIdx: Object.values(UNITS).findIndex((u) => u.id === 'MILITARY_ENGINEER'),
       engineerLive: ENGINEER_LIVE,
@@ -574,7 +574,7 @@ export function buildRules() {
         adjYield: d.adjacencyYield ? YIELD_KEYS.indexOf(d.adjacencyYield) : -1,
         adjacency: d.adjacency.map((a) => ({ src: ADJ_SRC.indexOf(a.source), amount: a.amount })),
         housing: d.housing,
-        maintenance: ['CITY_CENTER', 'NEIGHBORHOOD', 'AQUEDUCT', 'COMMERCIAL_HUB', 'HARBOR'].includes(id) ? 0 : 1, // P4/D-14: CH+Harbor exempt (real Civ 6)
+        maintenance: ['CITY_CENTER', 'NEIGHBORHOOD', 'AQUEDUCT', 'COMMERCIAL_HUB', 'HARBOR'].includes(id) ? 0 : 1, // CH+Harbor exempt (real Civ 6)
         countsTowardLimit: d.countsTowardLimit ? 1 : 0,
         allowMultiple: d.allowMultiple ? 1 : 0,
         onCoastalWater: d.placement.onCoastalWater ? 1 : 0,
@@ -611,7 +611,7 @@ export function buildRules() {
       yields: YIELD_KEYS.map((k) => b.yields?.[k] ?? 0),
       housing: b.housing ?? 0,
       amenities: b.amenities ?? 0,
-      maintenance: b.cost === 0 ? 0 : b.maintenance !== undefined ? b.maintenance : b.worship || b.district === 'COMMERCIAL_HUB' ? 0 : b.cost >= 500 ? 3 : b.cost >= 190 ? 2 : 1, // P4/D-13 mirror
+      maintenance: b.cost === 0 ? 0 : b.maintenance !== undefined ? b.maintenance : b.worship || b.district === 'COMMERCIAL_HUB' ? 0 : b.cost >= 500 ? 3 : b.cost >= 190 ? 2 : 1, // the buildingMaintenance mirror
       river: b.special === 'WATER_MILL',
       farmBonusFood: b.special === 'WATER_MILL',
       unlockTech: buildingUnlockTech.get(b.id) ?? -1,
@@ -620,7 +620,7 @@ export function buildRules() {
       reqBuildings: (b.requiresAny ?? []).map((id) => buildingIdx.get(id) ?? -1).filter((i) => i >= 0),
       exclBuildings: (b.exclusiveWith ?? []).map((id) => buildingIdx.get(id) ?? -1).filter((i) => i >= 0),
       regional: b.regional ? 1 : 0,
-      // B9-R3: worship = faith-purchase-only (never queued, never gold-bought).
+      // worship = faith-purchase-only (never queued, never gold-bought).
       worship: b.worship ? 1 : 0,
       trainXp: b.trainXp ?? 0,
     })),
@@ -634,10 +634,10 @@ export function buildRules() {
       cost: c.cost,
       prereqs: (c.prereqs ?? []).map((p) => civicIdx.get(p)!),
     })),
-    // A-7r behavioral master switch (mirrored to the GPU so both engines gate
-    // adoption identically). Landed inert; see GOVERNMENTS_ADOPTION_LIVE.
+    // The adoption master switch, mirrored to the GPU so both engines gate
+    // adoption identically — see GOVERNMENTS_ADOPTION_LIVE.
     governmentsLive: GOVERNMENTS_ADOPTION_LIVE,
-    // A-7r: government + policy modifier tables (the A-7 belief-table shape).
+    // government + policy modifier tables (the belief-table shape).
     // Slot kinds: military=0, economic=1, diplomatic=2, wildcard=3. Only the
     // cityYields/capitalYields channels are exported (the GPU-implemented gov/
     // policy effects); other PolicyEffects channels (adjacencyMult,
@@ -669,7 +669,7 @@ export function buildRules() {
       adjacencyMult: PLACEABLE_DISTRICTS.map((d) => g.effects.adjacencyMult?.[d] ?? 1),
       buildingYieldMult: PLACEABLE_DISTRICTS.map((d) => g.effects.buildingYieldMult?.[d] ?? 1),
       tilePurchaseMult: g.effects.tilePurchaseMult ?? 1,
-      encampmentProdMult: g.effects.encampmentProdMult ?? 1, // B9-R1: VETERANCY went live with the Encampment scaffold
+      encampmentProdMult: g.effects.encampmentProdMult ?? 1, // VETERANCY went live with the Encampment scaffold
       housingIfDistricts: g.effects.housingIfDistricts ? [g.effects.housingIfDistricts.min, g.effects.housingIfDistricts.housing] : [-1, 0],
       amenitiesIfSpecialty: g.effects.amenitiesIfSpecialty ? [g.effects.amenitiesIfSpecialty.min, g.effects.amenitiesIfSpecialty.amenities] : [-1, 0],
       newDeal: g.effects.newDeal ? [g.effects.newDeal.min, g.effects.newDeal.housing, g.effects.newDeal.amenities] : [-1, 0, 0],
@@ -688,7 +688,7 @@ export function buildRules() {
       adjacencyMult: PLACEABLE_DISTRICTS.map((d) => p.effects.adjacencyMult?.[d] ?? 1),
       buildingYieldMult: PLACEABLE_DISTRICTS.map((d) => p.effects.buildingYieldMult?.[d] ?? 1),
       tilePurchaseMult: p.effects.tilePurchaseMult ?? 1,
-      encampmentProdMult: p.effects.encampmentProdMult ?? 1, // B9-R1: VETERANCY went live with the Encampment scaffold
+      encampmentProdMult: p.effects.encampmentProdMult ?? 1, // VETERANCY went live with the Encampment scaffold
       housingIfDistricts: p.effects.housingIfDistricts ? [p.effects.housingIfDistricts.min, p.effects.housingIfDistricts.housing] : [-1, 0],
       amenitiesIfSpecialty: p.effects.amenitiesIfSpecialty ? [p.effects.amenitiesIfSpecialty.min, p.effects.amenitiesIfSpecialty.amenities] : [-1, 0],
       newDeal: p.effects.newDeal ? [p.effects.newDeal.min, p.effects.newDeal.housing, p.effects.newDeal.amenities] : [-1, 0, 0],

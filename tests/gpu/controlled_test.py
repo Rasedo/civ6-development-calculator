@@ -126,7 +126,7 @@ def main() -> None:
         "the driver plane must round-trip through snapshot/restore"
     )
     sim2.seat_ext.zero_()
-    print("  #51/S8.0 driver plane OK (seat 0 has a slot; controlled is its civ slice)")
+    print("  driver plane OK (seat 0 has a slot; controlled is its civ slice)")
 
     print("C2b CONTROLLED-CIV OK")
 

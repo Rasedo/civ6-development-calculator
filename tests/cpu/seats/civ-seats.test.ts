@@ -22,7 +22,7 @@ function addCiv(
   opts: Partial<Seat> = {},
 ): Seat {
   const civ: Seat = {
-    ...emptySeat(state.seats.length), // #51/S6.12
+    ...emptySeat(state.seats.length),
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,
@@ -85,7 +85,7 @@ function addCivCity(state: GameState, civ: Seat, col: number, row: number): City
   };
   tile.district = 'CITY_CENTER';
   tile.districtComplete = true;
-  setTileOwner(tile, civ.seat, city.id); // A-17: per-city registry
+  setTileOwner(tile, civ.seat, city.id); // per-city registry
   for (const t of tilesWithin(state.map, col, row, 1)) {
     if (tileSeat(t) !== 0 && (isCityStateSeat(tileSeat(t)) ? cityStateOfSeat(tileSeat(t)) : -1) === -1) {
       setTileOwner(t, civ.seat, city.id);
@@ -344,7 +344,7 @@ describe('AUDIT B-30: conquest keeps infrastructure', () => {
       seatOf(state, 0)!.cities.push({
         id: seatOf(state, 0)!.nextCityId++,
         seat: 0,
-        foundedTurn: state.turn,  // #51/S4.1r
+        foundedTurn: state.turn,
         name: `P${i}`,
         centerIndex: 20 + i,
         population: 1,
@@ -503,7 +503,7 @@ describe('civ CS trade routes (A-12b)', () => {
   function addCs(state: GameState, col: number, row: number, opts: Partial<CityState> = {}): CityState {
     const center = tileAtCoords(state.map, col, row);
     const cityState: CityState = {
-      ...emptySeat(seatOfCityState(state.cityStates.length)), // #51/S6.12
+      ...emptySeat(seatOfCityState(state.cityStates.length)),
     id: state.cityStates.length,
       name: `Testopolis ${state.cityStates.length}`,
       type: 'scientific',
@@ -541,7 +541,7 @@ describe('civ CS trade routes (A-12b)', () => {
     const y0 = computeCityStats(state, civCity).total;
     seatPhase(state);
     expect(civ.tradeRoutes?.length).toBe(1);
-    expect(civ.tradeRoutes![0]).toEqual({ from: civCity.id, toCs: cityState.id, expiresTurn: state.turn + 20 }); // B-23 duration
+    expect(civ.tradeRoutes![0]).toEqual({ from: civCity.id, toCs: cityState.id, expiresTurn: state.turn + 20 }); // route duration
     const y1 = computeCityStats(state, civCity).total;
     // cityStateRouteYields: +3 gold, +1 science (both tier-scaled; band like the
     // envoy tests — the phase also grew the city, so compare channels the

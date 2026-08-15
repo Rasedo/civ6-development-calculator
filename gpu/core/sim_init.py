@@ -274,8 +274,8 @@ class SimInit:
         self.seat_denounced = torch.full((B, _pw, _pw), -1, dtype=torch.long, device=device)
         self.seat_allied = torch.zeros_like(self.seat_denounced, dtype=torch.bool)
         self.congress_sessions = torch.zeros(B, dtype=torch.long, device=device)
-        # Per-seat era-score accumulator on unified civ ids (col 0 = seat 0,
-        # r+1 = civ r) — the TS `state.eraScore` mirror. Integer, zero-draw;
+        # Per-seat era-score accumulator, one column per seat row — the TS
+        # `state.eraScore` mirror. Integer, zero-draw;
         # resets at every eraLength boundary (right after `self.turn += 1`, the
         # endTurn eraBoundary mirror). Loaded from the fixture's t0 snapshot.
         # _MUTABLE for snapshot/restore.
@@ -1055,7 +1055,7 @@ class SimInit:
         _bl = list(cb.get("barbLadder") or [])
         if not _bl:
             raise ValueError(
-                "rules.json has no combat.barbLadder — this is a pre-#51/S3.2 export. "
+                "rules.json has no combat.barbLadder — this export predates the ladder. "
                 "Re-run the exporter for this fixture set (`npm run seed && npm run export`)."
             )
         self._barb_ladder = torch.tensor(_bl, dtype=torch.long, device=device)

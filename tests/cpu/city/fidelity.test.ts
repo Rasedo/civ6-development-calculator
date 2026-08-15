@@ -45,7 +45,7 @@ describe('district cost scaling', () => {
   it('rises with research and locks at queue time', () => {
     const state = makeState(makeMap(16, 16));
     const base = districtCost(state, 0);
-    expect(base).toBe(32); // D-15: round(54 × GAME_SPEED)
+    expect(base).toBe(32); // round(54 × GAME_SPEED)
 
     const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
     grantTechs(state, 'WRITING');
@@ -130,9 +130,9 @@ describe('maintenance', () => {
 
     queueDistrict(state, city.id, 'COMMERCIAL_HUB', tileAtCoords(state.map, 7, 8).index, 0);
     queueBuilding(state, city.id, 'MARKET', 0);
-    expect(cityMaintenance(state, city)).toBe(2); // hub free (P4/D-14, real Civ 6), market free
+    expect(cityMaintenance(state, city)).toBe(2); // hub free (real Civ 6), market free
 
     const stats = computeCityStats(state, city);
-    expect(stats.maintenance).toBe(2); // hub exempt (P4/D-14)
+    expect(stats.maintenance).toBe(2); // hub exempt
   });
 });

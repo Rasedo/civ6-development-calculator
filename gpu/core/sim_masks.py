@@ -65,7 +65,7 @@ class SimMasks:
 
 
     def _detect_seat_boosts(self, row: int, active: torch.Tensor) -> None:
-        """detectBoosts for seat row `row` (0 = seat 0, r+1 = civ r) — ONE
+        """detectBoosts for seat row `row` — ONE
         body, because `checkSatisfied` is seat-generic in TS: every condition
         reads either THIS seat's cities/research/territory or a map-global
         fact, and no arm asks which seat is asking.
@@ -505,8 +505,8 @@ class SimMasks:
     def _reveal_around(self, rows: torch.Tensor, seat_row, tiles: torch.Tensor, radius: int) -> None:
         """revealAround's twin: lift `seat_row`'s fog within `radius` of
         `tiles`. rows [K] batch indices (UNIQUE per call — advanced-index
-        assignment is last-write-wins), seat_row an int or [K] long (0 =
-        seat 0, r+1 = civ r), tiles [K] long. No-op with fog off — TS's
+        assignment is last-write-wins), seat_row an int or [K] long, tiles
+        [K] long. No-op with fog off — TS's
         revealAround gates on state.fogOfWar the same way, so a fog-off
         world accrues NO explored state on either engine.
 

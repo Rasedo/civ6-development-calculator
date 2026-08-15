@@ -12,7 +12,7 @@ import type { GameState, City, Seat, Tile } from '../../../cpu/core/types';
 function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> = {}): Seat {
   const tile = tileAtCoords(state.map, col, row);
   const civ: Seat = {
-    ...emptySeat(state.seats.length), // #51/S6.12
+    ...emptySeat(state.seats.length),
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,

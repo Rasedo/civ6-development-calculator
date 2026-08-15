@@ -8,7 +8,7 @@ import { isWater, isImpassable } from '../../world/query';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, layTradeRoad, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit } from './units';
-import { PILLAGE_HEAL_IMPROVEMENTS } from './combat';  // #70: the replay's pillage arm mirrors hostileUnitAct's
+import { PILLAGE_HEAL_IMPROVEMENTS } from './combat';  // the replay's pillage arm mirrors hostileUnitAct's
 import { UNIT_HP } from '../data/units';
 import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, generalAuraCS, cityDefenseStrength } from './combat';
 import { availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
@@ -24,12 +24,12 @@ import type { RuleResult } from './rules';
 import { TERRAINS } from '../../world/terrains';
 import { TECHS } from '../data/techs';
 import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
-import { prodLayout } from './prodLayout';   // #70: ONE column layout, shared with the exporter
+import { prodLayout } from './prodLayout';   // ONE column layout, shared with the exporter
 import { CIVICS } from '../data/civics';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP, ENCAMPMENT_HP, CITY_MAX_HP } from '../data/units';
-import { generalAuraMP } from './aura'; // #70/S3 (B-8): the aura's +1 MP half
+import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
 import { CITY_WORK_RADIUS, GOLD_PURCHASE_MULT, borderGrowthCost, EMBARKED_DEFENSE_CS } from '../data/constants';
 import type { CityStats } from './city';
@@ -38,7 +38,7 @@ import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { hasRiver, hasFreshWater, isCoastalWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { disbandUnit, builderCost, builderRemoveFeature } from './units';
-import { killUnit } from './combat';  // #51/S7.12
+import { killUnit } from './combat';
 import { availableProjects, buyTile, buyWorshipBuilding, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampmentItem, purchaseReligiousUnit, purchaseSettler, queueProject, settlerCost } from './game';
 import { SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex } from './unitActions';
@@ -148,7 +148,7 @@ export function placeSeats(state: GameState, count?: number): void {
       color: leader.color,
       aggression: 0.3 + nextRandom(state) * 0.6,
     };
-    foundCityAt(state, actor.seat, tile, actor);  // #96: one founding mutation, every seat
+    foundCityAt(state, actor.seat, tile, actor);  // one founding mutation, every seat
     // Push BEFORE the starting warrior spawns, so spawnUnit's bestMeleeCS
     // chokepoint can find the seat — "strongest melee ever FIELDED" includes
     // the starting army (defense 20 from turn 0; the GPU seeds
@@ -214,7 +214,7 @@ export function sueForPeace(state: GameState, actorSeat: number, seat: number): 
   if (!actor) return no('No such civilization.');
   if (!civsAtWar(state, actor.seat, seat)) return no('Not at war.');
   const waited = warTurnsWith(state, actor.seat, seat);
-  if (waited < WAR_MIN_TURNS) {  // #96: one min-war-turns constant, THIS war's
+  if (waited < WAR_MIN_TURNS) {  // one min-war-turns constant, THIS war's
     return no(`Too soon — they will not talk for another ${WAR_MIN_TURNS - waited} turns.`);
   }
   const cost = PEACE_GOLD_COST(waited);
@@ -239,7 +239,7 @@ function makePeace(state: GameState, actor: Seat, foe: number): void {
       if (civsAtWar(state, cityState.seat, opponent) && isSuzerain(cityState, patron)) {
         setWar(state, cityState.seat, opponent, false);
         setWarTurnsWith(state, cityState.seat, opponent, 0);
-        warWearinessPeace(state, opponent, seatOfCityState(cityState.id)); // #51/S7.8f
+        warWearinessPeace(state, opponent, seatOfCityState(cityState.id));
         state.eventLog.push(`${cityState.name} makes peace alongside its suzerain.`);
       }
     }
@@ -578,11 +578,11 @@ export function transferCity(
     greatWorksArt: civCity.greatWorksArt,
     greatWorksMusic: civCity.greatWorksMusic,
     relics: civCity.relics,
-    artifacts: civCity.artifacts, // B-20 (#79): artifacts ride the flip too
+    artifacts: civCity.artifacts, // artifacts ride the flip too
     hp: Math.round(CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   };
-  if (keptBuildings.includes('ANCIENT_WALLS')) flipped.outerHp = 0; // B-30: walls kept, outer pool 0
+  if (keptBuildings.includes('ANCIENT_WALLS')) flipped.outerHp = 0; // walls kept, outer pool 0
   to.cities.push(flipped);
   addEraScore(state, to.seat, ERA_SCORE_CONQUER);
   revealAround(state, to.seat, civCity.centerIndex, 3);
@@ -992,7 +992,7 @@ export function seatPhase(state: GameState): void {
             state.eventLog.push(`${cityState.name} quest complete for ${actor.name}: +${QUEST_ENVOYS} envoy.`);
           }
         } else if (state.turn - (rqi[actor.seat] ?? 0) >= QUEST_COOLDOWN) {
-          const q = issueQuest(state, cityState, actor.seat, { tradeRoutes: actor.tradeRoutes, cities: actor.cities });  // #96: one issuer, every seat
+          const q = issueQuest(state, cityState, actor.seat, { tradeRoutes: actor.tradeRoutes, cities: actor.cities });  // one issuer, every seat
           if (q) {
             rq[actor.seat] = q;
             rqi[actor.seat] = state.turn;
@@ -1065,7 +1065,7 @@ export function seatPhase(state: GameState): void {
               if (Math.round((actor.treasury ?? 0) * 1000) >= Math.round((price + reserve) * 1000)) {
                 actor.treasury = (actor.treasury ?? 0) - price;
                 civCity.buildings.push(def.id);
-                if (def.id === 'ANCIENT_WALLS') civCity.outerHp = WALLS_HP; // AUDIT B-1
+                if (def.id === 'ANCIENT_WALLS') civCity.outerHp = WALLS_HP;
                 bought = true;
               }
             }
@@ -1227,7 +1227,7 @@ export function seatPhase(state: GameState): void {
     const seatMods = getModifiers(state, actor.seat);
     const cityStats = new Map<number, CityStats>();
     for (const civCity of actor.cities) cityStats.set(civCity.id, computeCityStats(state, civCity, luxMap, seatMods));
-    // S3: this seat's governor seats for THIS turn — same stateless
+    // this seat's governor seats for THIS turn — same stateless
     // greedy as the seat 0 (quantized milli loyalty snapshot at the loop top,
     // ties by array position == the GPU's civCity slot order).
     const rGovPicks = governorPicks(
@@ -1246,7 +1246,7 @@ export function seatPhase(state: GameState): void {
       // `total.gold` is already NET of district+building upkeep — computeCityStats
       // subtracts it — so this must not charge it a second time.
       goldSum += y.gold;
-      faithSum += y.faith; // P5/S5 (C-17): the faith yield gains its consumer
+      faithSum += y.faith; // the faith yield gains its consumer
       const production = y.production;
       sciSum += y.science;
       const culC = y.culture;
@@ -1270,19 +1270,19 @@ export function seatPhase(state: GameState): void {
         }
         const cost =
           q.kind === 'unit'
-            ? q.cost ?? UNITS[q.unit]?.cost ?? 54 // P4/D-10: builders lock at queue
+            ? q.cost ?? UNITS[q.unit]?.cost ?? 54 // builders lock at queue
             : q.kind === 'building'
               ? BUILDINGS[q.building]?.cost ?? 54
               : q.kind === 'wonder'
-                ? BUILT_WONDERS[q.wonder]?.cost ?? 54 // A-4: catalog cost (already speed-scaled)
+                ? BUILT_WONDERS[q.wonder]?.cost ?? 54 // catalog cost (already speed-scaled)
                 : q.cost ?? 54; // settler / district / project carry their own cost
         if (q.progress >= cost) {
           civCity.queue.shift();
           completeQueueItem(state, civCity, q, cost);
           // A completion's OVERFLOW carries to the next item, for every seat.
           // this is the largest single production leak in the model.
-          // `City = City`, so the bank field the seat 0 has
-          // used since V-H1 is already here — nothing new to store.
+          // Every seat's city is the same record, so the bank field is
+          // already here — nothing new to store.
           //
           // IT ALWAYS BANKS — it does NOT carry into `civCity.queue[0]` even when a
           // next item is waiting. Real Civ 6 (and this file's own queue) would
@@ -1331,19 +1331,19 @@ export function seatPhase(state: GameState): void {
         }
         if (bestTile >= 0) {
           const hostiles = unitsAt(state, bestTile).filter(
-            (u) => unitsHostile(state, u, { seat: actor.seat }), // #51/S7.1 (#59)
+            (u) => unitsHostile(state, u, { seat: actor.seat }),
           );
           const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
           const tt = state.map.tiles[bestTile];
           const defCS = defender.embarked
             ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
-            : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender); // B-4 defender veterancy (embarked → flat, no xp)
+            : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender); // defender veterancy (embarked → flat, no xp)
           const defCSa = defCS + generalAuraCS(state, defender, bestTile);
           const atkCS = cityDefenseStrength(state, civCity);
           defender.hp -= damageRoll(state, atkCS - defCSa, 'cstk', bestTile);
-          awardDefenseXp(defender); // B-4: +2 to a surviving military defender (attacker is the city)
+          awardDefenseXp(defender); // +2 to a surviving military defender (attacker is the city)
           warWearinessBattle(state, civCity.seat, defender.seat, bestTile,
-            { dDied: defender.hp <= 0, city: true }); // #51/S7.8f
+            { dDied: defender.hp <= 0, city: true });
           // The STRIKER is the city, so the dig's era gate is its owner's —
           // the GPU passes `striker_row` at the same site.
           if (defender.hp <= 0) killUnit(state, defender, civCity.seat);
@@ -1366,19 +1366,19 @@ export function seatPhase(state: GameState): void {
         }
         if (bestTile >= 0) {
           const hostiles = unitsAt(state, bestTile).filter(
-            (u) => unitsHostile(state, u, { seat: actor.seat }), // #51/S7.1 (#59)
+            (u) => unitsHostile(state, u, { seat: actor.seat }),
           );
           const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
           const tt = state.map.tiles[bestTile];
           const defCS = defender.embarked
             ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
             : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender);
-          const defCSa = defCS + generalAuraCS(state, defender, bestTile); // #70/S2 (B-8), the cstk mirror
+          const defCSa = defCS + generalAuraCS(state, defender, bestTile); // the cstk mirror
           const atkCS = cityDefenseStrength(state, civCity);
           defender.hp -= damageRoll(state, atkCS - defCSa, 'estk', bestTile);
           awardDefenseXp(defender);
           warWearinessBattle(state, civCity.seat, defender.seat, bestTile,
-            { dDied: defender.hp <= 0, city: true }); // #51/S7.8f
+            { dDied: defender.hp <= 0, city: true });
           // The STRIKER is the city, so the dig's era gate is its owner's —
           // the GPU passes `striker_row` at the same site.
           if (defender.hp <= 0) killUnit(state, defender, civCity.seat);
@@ -1435,7 +1435,7 @@ export function seatPhase(state: GameState): void {
     // the Culture victory reads. Zero-draw; the GPU mirrors at this position.
     actor.cultureTotal = (actor.cultureTotal ?? 0) + culSum;
     actor.treasury = (actor.treasury ?? 0) + goldSum;
-    actor.faith = (actor.faith ?? 0) + faithSum; // P5/S5 (C-17)
+    actor.faith = (actor.faith ?? 0) + faithSum;
     seatAccumulators(state, actor.seat);
     actor.treasury -= state.units.reduce(
       (s, u) => s + (u.seat === actor.seat ? UNITS[u.type]?.maintenance ?? 0 : 0),
@@ -1453,7 +1453,7 @@ export function seatPhase(state: GameState): void {
       if (victim) disbandUnit(state, victim.id);
     }
     while (rsr.civic && rsr.civicProgress >= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic)) {
-      rsr.civicProgress -= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic);  // A-3
+      rsr.civicProgress -= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic);
       rsr.civics.push(rsr.civic);
       delete rsr.civicRetained[rsr.civic];
       rsr.civic = null;

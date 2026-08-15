@@ -31,7 +31,7 @@ function addCompletedCampus(state: GameState, city: City, col: number, row: numb
 function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> = {}): Seat {
   const tile = tileAtCoords(state.map, col, row);
   const civ: Seat = {
-    ...emptySeat(state.seats.length), // #51/S6.12
+    ...emptySeat(state.seats.length),
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,

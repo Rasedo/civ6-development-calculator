@@ -380,7 +380,7 @@ def poke_ww_differential(rules, path):
     sim._seat_phase()
     assert int(sim.ww[0, 1, 0]) == 11, (
         "a war seat 0 is in decays at the same rate as a civ<->civ war — "
-        "weariness is not seat-dependent (#51/S7.8r, S7.8f)"
+        "weariness is not seat-dependent (one rule for every seat)"
     )
 
     print(f"  f ww PER-BATTLE OK (declared-but-unfought = 0, decay -{at_war} at war / -{at_peace} at peace)")

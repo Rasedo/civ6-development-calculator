@@ -16,7 +16,7 @@ export function effectiveResearchCostIn(
   rsr: ResearchState,
   id: string,
   baseCost: number,
-  goldenExtra = 0, // B-24 (#79): FREE_INQUIRY (techs) / PEN_BRUSH_AND_VOICE (civics)
+  goldenExtra = 0, // FREE_INQUIRY (techs) / PEN_BRUSH_AND_VOICE (civics)
 ): number {
   return rsr.boosted.includes(id)
     ? Math.round(baseCost * (1 - BOOST_FRACTION - goldenExtra))

@@ -9,7 +9,7 @@ import { isWater } from '../../../world/query';
 import { EMBARKED_DEFENSE_CS, setEmbarkLive } from '../../../cpu/data/constants';
 import type { GameState, City, Seat, Unit } from '../../../cpu/core/types';
 
-// N1: the MOVEMENT + EMBARKATION model. The scripted civ war-march is
+// the MOVEMENT + EMBARKATION model. The scripted civ war-march is
 // the only v1 surface that may take water steps, and it is behind the inert
 // `embarkState.live` master switch (default OFF → gates byte-identical). These
 // tests poke the switch ON to exercise the water-step path directly.
@@ -18,7 +18,7 @@ afterEach(() => setEmbarkLive(false)); // never leak the switch into other suite
 
 function addCivAtWar(state: GameState, col: number, row: number, techs: string[]): Seat {
   const civ: Seat = {
-    ...emptySeat(state.seats.length), // #51/S6.12
+    ...emptySeat(state.seats.length),
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,
@@ -56,7 +56,7 @@ function addCivAtWar(state: GameState, col: number, row: number, techs: string[]
   return civ;
 }
 
-describe('#45/B-6 movement primitives', () => {
+describe('movement primitives', () => {
   it('water tiles enter at cost 1; land units are land-only, terrain-passable', () => {
     const map = makeMap(12, 12, 'GRASSLAND');
     const land = tileAtCoords(map, 5, 5);
@@ -117,7 +117,7 @@ describe('#45/B-6 movement primitives', () => {
   });
 });
 
-describe('#45/B-6 spawn stays ashore', () => {
+describe('spawn stays ashore', () => {
   it('a land unit never spawns on water', () => {
     const state = makeState(makeMap(12, 12, 'COAST'));
     // island: one land tile surrounded by water
@@ -130,7 +130,7 @@ describe('#45/B-6 spawn stays ashore', () => {
   });
 });
 
-describe('#45/B-6 war-march water steps (behind the inert live switch)', () => {
+describe('war-march water steps (behind the inert live switch)', () => {
   function marchScenario(techs: string[]): { state: GameState; unit: Unit } {
     // Almost-all-water map: unit start + seat-0 city are the only land, so the
     // strictly-closer march step is always a water tile (forces an embark).
@@ -200,7 +200,7 @@ describe('#45/B-6 war-march water steps (behind the inert live switch)', () => {
 
 function bareCiv(state: GameState, atWar = true): Seat {
   const civ: Seat = {
-    ...emptySeat(state.seats.length), // #51/S6.12
+    ...emptySeat(state.seats.length),
     name: 'Carthage',
     color: '#2d8',
     aggression: 0.5,
@@ -234,7 +234,7 @@ function bareCiv(state: GameState, atWar = true): Seat {
   return civ;
 }
 
-describe('#45/B-6 N2 production gating', () => {
+describe('N2 production gating', () => {
   it('naval units build ONLY in a naval-capable city (coastal center or Harbor)', () => {
     const state = makeState(makeMap(16, 12, 'GRASSLAND'));
     state.unitsMode = true;
@@ -279,7 +279,7 @@ describe('#45/B-6 N2 production gating', () => {
   });
 });
 
-describe('#45/B-6 N2 naval spawn + combat', () => {
+describe('N2 naval spawn + combat', () => {
   it('a naval unit spawns on the nearest free WATER tile', () => {
     const state = makeState(makeMap(12, 12, 'GRASSLAND'));
     state.unitsMode = true;

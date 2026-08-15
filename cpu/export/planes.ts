@@ -34,9 +34,7 @@ import { LUXURY_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, featIdx, wonderStaticOk, s
 export function buildFixture(state: GameState, world: WorldFile): object {
   const map = state.map;
   // NOBODY's modifiers: the fixture's tile plane is what a tile yields before
-  // any seat's research, and the GPU applies each row's own on top. (This read
-  // seat 0's modifiers before #114 — numerically the same at t0, since no seat
-  // has researched anything yet, but it said the wrong thing.)
+  // any seat's research, and the GPU applies each row's own on top.
   const ctx = baseYieldCtx(state);
 
   const cityStateAtStart = state.cityStates.map((cityState) => ({
@@ -54,7 +52,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
   }
 
   const tiles = map.tiles.map((t) => {
-    // C1-B1: the static plane ships UNPAVED yields — what the tile would
+    // the static plane ships UNPAVED yields — what the tile would
     // yield without its district — because paving is a runtime mask in every
     // GPU consumer, and civ-seat centers need their real (district-nulled)
     // yields live (tileYieldsForCenter). Only t=0 district tiles (capitals)
@@ -66,7 +64,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       wnear: t.wonder !== null || neighbors(map, t).some((n) => n.wonder !== null) ? 1 : 0,
       cl: isCoastalLand(map, t) ? 1 : 0,
       fid: t.feature ? featIdx.get(t.feature) ?? -1 : -1,
-      // A-13 off-script gate catch (rng 2026006108 t81): foundCity strips
+      // off-script gate catch (rng 2026006108 t81): foundCity strips
       // ONLY a REMOVABLE feature (game.ts:209 / phase.ts:144) — an OASIS/
       // FLOODPLAINS center keeps its feature LIVE, and belief featureYields
       // (Lady of the Reeds) apply to it. The GPU founding paths gate their
@@ -78,13 +76,13 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       pass: unitPassable(t) ? 1 : 0,
       wpass: isWater(t) && !isImpassable(t) ? 1 : 0,
       ocean: t.terrain === 'OCEAN' ? 1 : 0,
-      work: isImpassable(t) ? 0 : 1, // C1-B1: citizen-workable (water IS workable; ice/mountains are not)
+      work: isImpassable(t) ? 0 : 1, // citizen-workable (water IS workable; ice/mountains are not)
       // Luxury amenity source (mirrors luxuryAmenities): the luxury's catalog
       // index + the improvement index that activates it. -9 = its improvement
       // is outside the GPU roster (PEARLS/WHALES -> FISHING_BOATS), so it can
       // never activate in the GPU — currently true in TS too (no scripted
       // builder path builds FISHING_BOATS), but #50's RL improvement verbs
-      // would make it a LIVE asymmetry: revisit with A-18 (AUDIT note).
+      // would make it a LIVE asymmetry: revisit when those verbs land.
       lux: t.resource && RESOURCES[t.resource].category === 'luxury' ? LUXURY_IDS.indexOf(t.resource) : -1,
       luxreq: (() => {
         if (!t.resource || RESOURCES[t.resource].category !== 'luxury') return -9;
@@ -93,7 +91,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       })(),
       tdef: terrainDefense(t),
       tmove: (moveCostInto(t, t) - 1) * 3,
-      rd: t.road ? 1 : 0, // B-23 (#71): the ROAD plane (false at t0)
+      rd: t.road ? 1 : 0, // the ROAD plane (false at t0)
       camp: !isWater(t) && !isImpassable(t) && !t.wonder && !t.district && !t.builtWonder && !t.goodyHut ? 1 : 0,
       riv: hasRiver(t) ? 1 : 0,
       wh: hasFreshWater(map, t) ? HOUSING_FRESH_WATER : isCoastalLand(map, t) ? HOUSING_COASTAL : HOUSING_NO_WATER,
@@ -116,7 +114,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // gates on `self.district < 0` at the candidate site. Baking the t0
       // district froze a tile that later loses its district (a razed city's
       // freed center) as permanently unsettleable in the GPU while TS re-opens
-      // it live — the seed 9235/9144 founding-site divergence (G-6). Keep `st`
+      // it live — the seed 9235/9144 founding-site divergence. Keep `st`
       // purely static: water / impassable / natural wonder / OASIS.
       st: !isWater(t) && !isImpassable(t) && !t.wonder && t.feature !== 'OASIS' ? 1 : 0,
       // canPlaceDistrictIn's STATIC half. GS allows districts on floodplains,
@@ -135,15 +133,14 @@ export function buildFixture(state: GameState, world: WorldFile): object {
         return raw;
       }),
       fadj: PLACEABLE_DISTRICTS.map((id) => featureAdjContribution(t, id)),
-      // P4: the NON-removable feature's lent adjacency (today: the GS REEF's
-      // Campus bonus). queueDistrict nulls ANY feature when it paves the tile
-      // (P2), so the engine must withdraw this too — foundCity does NOT
+      // the NON-removable feature's lent adjacency (today: the GS REEF's
+      // Campus bonus). queueDistrict nulls ANY feature when it paves the tile,
+      // so the engine must withdraw this too — foundCity does NOT
       // (it only clears removable features).
       nfadj: PLACEABLE_DISTRICTS.map((id) => featureAdjContribution(t, id, false)),
-      // The removable feature's OWN yields (C1-B3 gate catch): SEAT-0 founding
-      // strips the feature, so a later loyalty-flip must read this center
-      // stripped — civ-seat founding does NOT strip, and the t=0 capitals were
-      // exported already-stripped.
+      // The removable feature's OWN yields. `foundCityAt` strips a removable
+      // feature on EVERY seat, so a later loyalty-flip must read that centre
+      // stripped; the t0 capitals were exported already-stripped.
       fy: t.feature && FEATURES[t.feature].removable ? YIELD_KEYS.map((k) => FEATURES[t.feature!].yields?.[k] ?? 0) : [0, 0, 0, 0, 0, 0],
       aqsrc:
         hasRiver(t) ||
@@ -161,7 +158,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
         return (s.food ?? 0) * 1.2 + (s.production ?? 0) + (s.gold ?? 0) * 0.5;
       }),
       hl: t.elevation === 'HILLS' ? 1 : 0,
-      // A-9 (#71): tile APPEAL contributions. `tileAppeal` (core/appeal.ts)
+      // tile APPEAL contributions. `tileAppeal` (core/appeal.ts)
       // sums what each NEIGHBOUR contributes, so ship the per-tile
       // contribution and let the GPU gather it over `neigh`. `ap` is the
       // STATIC part (natural wonder +2, mountain +1, coast/lake +1) PLUS this
@@ -188,13 +185,13 @@ export function buildFixture(state: GameState, world: WorldFile): object {
             : 0,
       aps: (t.riverMask ?? 0) !== 0 || t.terrain === 'LAKE' ? 1 : 0,
       apo: t.wonder ? 5 : isMountain(t) ? 4 : -999,
-      // AUDIT A-8: river-edge crossing bits for the civ-seat MP walkers. The
+      // river-edge crossing bits for the civ-seat MP walkers. The
       // GPU's neigh columns enumerate AXIAL_DIRS order (E NE NW W SW SE) —
       // the same order riverMask bits use — so bit d = crossing toward
       // neighbor column d, both engines.
       rm: t.riverMask ?? 0,
-      cm: t.cliffMask ?? 0, // B-26 (#79): CLIFF edge mask — blocks embark/disembark
-      // AUDIT A-13: the resource's own-improvement roster index — resource
+      cm: t.cliffMask ?? 0, // CLIFF edge mask — blocks embark/disembark
+      // the resource's own-improvement roster index — resource
       // tiles accept exactly this improvement (validImprovements' resource
       // branch). -1 = no resource; -9 = out of roster (FISHING_BOATS on sea
       // resources: water tiles a land builder can never reach, both engines).

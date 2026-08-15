@@ -103,7 +103,7 @@ def main() -> None:
         assert abs(float(e2.observe(1)[0, 5]) - base5 - 1.0) < 1e-9, (
             "obs field 5 is the seat's LIVE settler count, derived from the pool"
         )
-    print("  #51/S8.1c civ observation reads live state (treasury/influence/"
+    print("  civ observation reads live state (treasury/influence/"
           "envoys/loyalty/settlers) OK")
 
     # The POST-HOC PROTAGONIST pick — a finished game reads from whichever

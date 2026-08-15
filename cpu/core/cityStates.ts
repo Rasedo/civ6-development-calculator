@@ -316,12 +316,12 @@ export function sueForPeaceWithCityState(state: GameState, cityStateId: number, 
     return { ok: false, reason: `${cityState.name} will not talk while you are at war with its suzerain, ${suz.name}.` };
   }
   const waited = warTurnsWith(state, cityState.seat, seat);
-  if (waited < WAR_MIN_TURNS) {  // #51: ONE min-war-turns rule, every seat
+  if (waited < WAR_MIN_TURNS) {  // ONE min-war-turns rule, every seat
     return { ok: false, reason: `Too soon — they will not talk for another ${WAR_MIN_TURNS - waited} turns.` };
   }
   setWar(state, cityState.seat, seat, false);
   setWarTurnsWith(state, cityState.seat, seat, 0);
-  warWearinessPeace(state, seat, seatOfCityState(cityState.id)); // #51/S7.8f
+  warWearinessPeace(state, seat, seatOfCityState(cityState.id));
   state.eventLog.push(`You have made peace with ${cityState.name}.`);
   return { ok: true };
 }

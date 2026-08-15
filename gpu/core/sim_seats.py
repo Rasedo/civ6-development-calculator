@@ -1056,17 +1056,17 @@ class SimSeats:
         if bool(mil.any()):
             self.military_at[(rows[mil], t[mil])] = -1
 
-    def _grant_relic(self, rows: torch.Tensor, civ: torch.Tensor) -> None:
+    def _grant_relic(self, rows: torch.Tensor, seat: torch.Tensor) -> None:
         """The `placeRelic` mirror: hand each row's seat ONE relic, placed in the
         LOWEST city holding a TEMPLE with a free relic slot — city ARRAY order,
         which the dense city/rc slot order mirrors. A relic that finds no slot is
         LOST, as TS discards the return value the same way.
 
-        `civ` [n] IS the seat's ROW in the merged city block (0 = seat 0,
-        r+1 = civ r), so one walk places every seat's relic."""
+        `seat` [n] IS the row in the merged city block, so one walk places
+        every seat's relic."""
         if rows.numel() == 0 or self._relic_bidx < 0:
             return
-        row = civ.clamp(min=0, max=self.n_majors - 1)
+        row = seat.clamp(min=0, max=self.n_majors - 1)
         placed = torch.zeros(rows.numel(), dtype=torch.bool, device=self.device)
         for j in range(self.RC):
             take = (
@@ -1175,9 +1175,8 @@ class SimSeats:
             self.era_score[:, civ] = self.era_score[:, civ] + pay.long() * cnt * n * self._ded_event_score[kind]
 
     def _culture_victor(self) -> torch.Tensor:
-        """The `cultureVictor` mirror: [B] the lowest seat id (0 = seat 0,
-        r+1 = civ r) whose VISITING tourists exceed EVERY other seat's DOMESTIC
-        tourists; -1 none.
+        """The `cultureVictor` mirror: [B] the lowest seat id whose VISITING
+        tourists exceed EVERY other seat's DOMESTIC tourists; -1 none.
 
         visiting = lifetime tourism // (nCivs * TOURISM_PER_VISITOR_PER_CIV)
         domestic = lifetime culture // CULTURE_PER_DOMESTIC_TOURIST
@@ -1319,7 +1318,7 @@ class SimSeats:
         improvements on a LIVE resource (category = the res priority code), plus
         improvementYields at unpillaged improvements. TS adds all three inside
         tileYields, so they ride every consumer: worked-tile picks and yields,
-        scores, the border ySum. Row-keyed (0 = seat 0, r+1 = civ r).
+        scores, the border ySum. Row-keyed.
 
         Cached single-slot on (row, _eff_version, _bel_version). Belief inputs
         bump _bel_version at claims/restore; tile inputs (feat_id/feat_stripped/
@@ -1566,7 +1565,7 @@ class SimSeats:
         return (hit.double() * amt).sum(dim=1) * alive.double()
 
     def _seat_regional(self, row: int) -> tuple[torch.Tensor, torch.Tensor] | None:
-        """The regionalEffects twin for seat row `row` (0 = seat 0, r+1 = civ r):
+        """The regionalEffects twin for seat row `row`:
         each regional building owned by one of this seat's cities whose source
         district (city_dist_tile of the building's type) is COMPLETE and
         unpillaged reaches every ALIVE same-seat city center within
@@ -1703,8 +1702,8 @@ class SimSeats:
         return maint, torch.where(alive, housing, torch.zeros_like(housing))
 
     def _seat_amenity(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        """THE amenity body, for every seat row (0 = seat 0, r+1 = civ r) —
-        computeCityStats' amenity half, in f64.
+        """THE amenity body, for every seat row — computeCityStats' amenity
+        half, in f64.
 
         baseHave = local (non-regional, unpillaged) building amenities + the
         capital PALACE + regional BUILDING amenities; luxuryAmenities ranks on
@@ -2055,8 +2054,8 @@ class SimSeats:
 
     def _found_city_at(self, row: int, want: torch.Tensor, tile: torch.Tensor) -> torch.Tensor:
         """FOUND a city for seat row `row` at `tile` [B] where `want` — the
-        FOUND_CITY verb's mutation, ONE body for every seat (row 0 = seat 0,
-        r+1 = civ r; a major's seat IS its block row). canFoundCity is
+        FOUND_CITY verb's mutation, ONE body for every seat (a major's seat
+        IS its block row). canFoundCity is
         re-checked LIVE at the settler's own tile; the settler unit is
         consumed by the CALLER. Returns the games that founded."""
         seat = row
@@ -3211,8 +3210,8 @@ class SimSeats:
         return fired
 
     def _seat_influence_phase(self, row: int, active: torch.Tensor) -> None:
-        """Meet + influence → envoy conversion for ONE seat row (0 = seat 0,
-        r+1 = civ r) — the seatPhase CS-diplomacy accrual, one body for every
+        """Meet + influence → envoy conversion for ONE seat row — the
+        seatPhase CS-diplomacy accrual, one body for every
         seat. Meet is by EXPLORATION (isExplored at the CS centre — fog is
         live; the proximity surrogate is deleted, scouting is what meets, the
         real Civ 6 rule). The accrual is influencePerTurn + this seat's own

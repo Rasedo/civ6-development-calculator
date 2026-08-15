@@ -305,9 +305,8 @@ export const SPECIALIST_YIELDS: Partial<Record<DistrictId, Partial<Record<'food'
   // THIS WHOLE TABLE IS UI-ONLY. setSpecialists is a manual verb and nothing
   // in the turn loop writes city.specialists, so effectiveSpecialists is empty
   // in every simulated game and every citizen works a tile. The table is NOT
-  // exported to the GPU: it once was, and the GPU auto-assigned slots off it
-  // by a greedy that TS has no counterpart for — a decision no seat made
-  // (deleted 2026-08-14, AUDIT A-28). Turning specialists into a real choice
-  // means a WIRE column, not an engine rule.
+  // exported to the GPU, because assigning a citizen is a DECISION and the
+  // wire has no column for it. Turning specialists into a real choice means
+  // adding that column, not an engine rule.
   ENCAMPMENT: { production: 1, gold: 1 },
 };

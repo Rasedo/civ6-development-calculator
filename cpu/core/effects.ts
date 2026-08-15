@@ -249,7 +249,7 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
 function applyBeliefEffects(
   mods: Modifiers,
   belief?: { effects: BeliefEffects },
-  seat?: { followers: number; cities: number },  // A-7: actor seats pass their own counts
+  seat?: { followers: number; cities: number },  // actor seats pass their own counts
 ): void {
   if (!belief) return;
   const fx = belief.effects;

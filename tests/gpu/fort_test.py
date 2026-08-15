@@ -70,7 +70,7 @@ def main() -> None:
     assert int(sim._tdef_i(b, idx)[0]) == 0, "removing the fort must remove the bonus"
     print("  c live read OK (static tdef untouched; removing the fort removes the bonus)")
 
-    print("fort_test OK — #78 B-27: fort +4 defence, stacking, live off `improvement`")
+    print("fort_test OK — fort +4 defence, stacking, live off `improvement`")
 
 
 if __name__ == "__main__":

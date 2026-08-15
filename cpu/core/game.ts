@@ -37,7 +37,7 @@ export const TURN_LIMIT = 250;
 export function effectiveResearchCost(state: GameState, seat: number, id: string, baseCost: number): number {
   // A GOLDEN Free Inquiry / Pen-Brush-and-Voice deepens the boost — the
   // RESEARCHING seat's dedication, which is the `seat` this function already
-  // takes. It read seat 0's until #113; the GPU passes the row.
+  // takes; the GPU passes the row.
   return effectiveResearchCostIn(seatOf(state, seat)!.research, id, baseCost, goldenBoostBonus(state, seat, !TECHS[id]));
 }
 
@@ -111,10 +111,10 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     units: [],
     nextUnitId: 0,
     rngState: (map.seed ^ 0x9e3779b9) >>> 0,
-    barbSeat: emptySeat(BARB_SEAT), // #51/S6.12: the hostile class has a seat too
+    barbSeat: emptySeat(BARB_SEAT), // the hostile class has a seat too
     disasters: false,
-    gameOver: false, // GV-2
-    victoryType: 0, // GV-4/GV-3
+    gameOver: false,
+    victoryType: 0,
     victoryRow: -1,
     fogOfWar: unitsMode,
     eventLog: [],
@@ -189,10 +189,10 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     if (!tileClaimed(t)) setTileOwner(t, seat, id);
   }
   list.push(city);
-  addEraScore(state, seat, ERA_SCORE_FOUND); // B-24
+  addEraScore(state, seat, ERA_SCORE_FOUND);
   if (city.isCapital) {
     const owner = seatOf(state, seat);
-    if (owner) owner.capitalTile = tile.index;  // GV-3: static once founded
+    if (owner) owner.capitalTile = tile.index;  // static once founded
   }
   revealAround(state, seat, tile.index, 3);
   return city;
@@ -322,7 +322,7 @@ export function queueBuilding(state: GameState, cityId: number, buildingId: stri
   }
   if (state.sandbox) {
     city.buildings.push(buildingId);
-    if (buildingId === 'ANCIENT_WALLS') city.outerHp = WALLS_HP; // AUDIT B-1
+    if (buildingId === 'ANCIENT_WALLS') city.outerHp = WALLS_HP;
   } else {
     commitProduction(state, city.seat, city, { kind: 'building', building: buildingId, progress: 0 });
   }
@@ -437,7 +437,7 @@ export function purchaseBuilding(state: GameState, cityId: number, buildingId: s
     }
   }
   city.buildings.push(buildingId);
-  if (buildingId === 'ANCIENT_WALLS') city.outerHp = WALLS_HP; // AUDIT B-1
+  if (buildingId === 'ANCIENT_WALLS') city.outerHp = WALLS_HP;
   return { ok: true };
 }
 
@@ -568,7 +568,7 @@ export function itemCost(item: QueueItem): number {
   if (item.kind === 'district') return item.cost ?? DISTRICTS[item.district].cost;
   if (item.kind === 'wonder') return BUILT_WONDERS[item.wonder].cost;
   if (item.kind === 'settler') return item.cost;
-  if (item.kind === 'unit') return item.cost ?? UNITS[item.unit]?.cost ?? 54; // P4/D-10: builders lock at queue
+  if (item.kind === 'unit') return item.cost ?? UNITS[item.unit]?.cost ?? 54; // builders lock at queue
   if (item.kind === 'project') return item.cost;
   return BUILDINGS[item.building].cost;
 }
@@ -746,7 +746,7 @@ export function endTurn(state: GameState): void {
 
   state.turn += 1;
   eraBoundary(state);
-  worldCongress(state); // B-24: era-score window reset at ERA_LENGTH multiples (GPU mirrors at its turn increment)
+  worldCongress(state); // era-score window reset at ERA_LENGTH multiples (GPU mirrors at its turn increment)
   // DEDICATION payouts — a Golden/Heroic age pays faith, a Dark or
   // Normal age pays era score (the climb-out dedication), both scaled by the
   // dedication COUNT so a Heroic age pays triple. Immediately after the
@@ -822,7 +822,7 @@ function diplomaticVictor(state: GameState): number {
  * civ, so the per-civ divisor is applied to the total instead — the same
  * threshold, without per-pair bookkeeping the engines do not have.
  *
- * Returns the winning unified civ id (0 seat 0, r+1 seat r), or -1. A civ
+ * Returns the winning SEAT id, or -1. A civ
  * with NO cities cannot win (a dead civ attracts nobody); the ascending scan
  * breaks ties toward the lowest id, and the > comparison means two civs can
  * never both qualify against each other.
@@ -1101,14 +1101,14 @@ export function deserialize(json: string): GameState {
     sx.influencePoints ??= 0;
     sx.envoysAvailable ??= 0;
   }
-  state.seats ??= []; // #51/S1.3j: seats IS the actor storage now
+  state.seats ??= []; // seats IS the actor storage now
   // Foreign cities became full City objects; older saves carry the
   // scalar shape (growthBox, no queue/districts/…). Fill ONLY the missing
   // fields in place — a current-shape save must round-trip byte-identically
   // (the seat determinism test serializes and compares).
   for (const r of state.seats) {
     r.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} };
-    r.treasury ??= 0; // VP-G1
+    r.treasury ??= 0;
     for (const civCity of r.cities as (City & { growthBox?: number })[]) {
       civCity.seat ??= r.seat;
       civCity.foodBox ??= civCity.growthBox ?? 0;
@@ -1126,7 +1126,7 @@ export function deserialize(json: string): GameState {
   }
   state.claimedPantheons ??= [];
   state.claimedBeliefs ??= [];
-  state.claimedEnhancers ??= []; // B-18
+  state.claimedEnhancers ??= [];
   for (const u of state.units) {
     u.seat ??= 0; // old saves predate the seat field
     u.hp ??= 100;
@@ -1172,7 +1172,7 @@ export function choosePantheon(state: GameState, beliefId: string, seat: number)
   if (!state.sandbox) seatOf(state, seat)!.faith -= PANTHEON_FAITH_COST;
   seatOf(state, seat)!.religion.pantheon = beliefId;
   state.claimedPantheons.push(beliefId); // every claim path pushes what it takes — the pool IS the exclusion
-  addEraScore(state, seat, ERA_SCORE_PANTHEON); // B-24: seat 0 verb — gate-unreachable, TS-only (actor hook mirrors)
+  addEraScore(state, seat, ERA_SCORE_PANTHEON); // seat 0 verb — gate-unreachable, TS-only (actor hook mirrors)
   return { ok: true };
 }
 

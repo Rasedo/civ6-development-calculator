@@ -108,7 +108,7 @@ export function dedicationEraScore(state: GameState, civ: number): number {
  *                        ones: NOT modelled.)
  */
 export function goldenDedication(state: GameState, civ: number, kind: number): boolean {
-  if (civ < 0) return false; // B-24 (#79): BARBARIANS hold no dedications
+  if (civ < 0) return false; // BARBARIANS hold no dedications
   if (((seatOf(state, civ)?.age ?? 1)) !== 2) return false;
   const picks = seatOf(state, civ)?.dedicationPicks;
   return !!picks && picks.includes(kind);
@@ -187,7 +187,7 @@ export function governorPicks(qLoys: number[], titles: number): Set<number> {
  * each seat keeps its own — the caller knows which accumulator to touch.
  */
 export function applyDedications(state: GameState, addFaith: (civ: number, amount: number) => void): void {
-  if (!DEDICATION_PAYOUTS_LIVE) return; // B-24 (#71): substrate live, payouts inert
+  if (!DEDICATION_PAYOUTS_LIVE) return; // substrate live, payouts inert
   for (let c = 0; c < state.seats.length; c++) {
     const f = dedicationFaith(state, c);
     if (f > 0) addFaith(c, f);

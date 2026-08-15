@@ -303,8 +303,7 @@ export interface CityState extends Seat {
   met: number[];
   hp?: number;
   lastLevyTurn?: number;
-  /** The per-seat quest, keyed by ABSOLUTE SEAT (index 0 = seat 0, r+1 =
-   *  civ r — the GPU's seat-row geometry). The kind is the first
+  /** The per-seat quest, keyed by ABSOLUTE SEAT. The kind is the first
    *  satisfiable option in a fixed order, no RNG. */
   seatQuest?: (CityStateQuest | null)[];
   seatQuestIssuedTurn?: number[];

@@ -12,7 +12,7 @@ import type { CityState, CityStateType, GameState, Seat, City } from '../../../c
 function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> = {}): Seat {
   const tile = tileAtCoords(state.map, col, row);
   const civ: Seat = {
-    ...emptySeat(state.seats.length), // #51/S6.12
+    ...emptySeat(state.seats.length),
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,
@@ -78,7 +78,7 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
 function addCs(state: GameState, col: number, row: number, opts: Partial<CityState> & { type?: CityStateType } = {}): CityState {
   const center = tileAtCoords(state.map, col, row);
   const cityState: CityState = {
-    ...emptySeat(seatOfCityState(state.cityStates.length)), // #51/S6.12
+    ...emptySeat(seatOfCityState(state.cityStates.length)),
     id: state.cityStates.length,
     name: `CS${state.cityStates.length}`,
     type: 'scientific',

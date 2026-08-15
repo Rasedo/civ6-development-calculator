@@ -47,7 +47,7 @@ export function makeMap(width = 12, height = 12, terrain: TerrainId = 'GRASSLAND
 export function makeState(map: GameMap = makeMap()): GameState {
   return {
     map,
-    barbSeat: emptySeat(BARB_SEAT), // #51/S6.12
+    barbSeat: emptySeat(BARB_SEAT),
     turn: 1,
     sandbox: false,
     claimedGreatPeople: [],

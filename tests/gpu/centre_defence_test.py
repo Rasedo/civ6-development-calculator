@@ -136,7 +136,7 @@ def main() -> None:
     print(f"  MILITARY garrison: city -{city_d} hp, garrison -{garr_d} hp")
     assert city_d > 0, (
         "a MILITARY garrison still shields its city — the attack hit the unit "
-        "instead of the city (#51/S7.10a: a garrison adds to CITY strength, it "
+        "instead of the city (a garrison adds to CITY strength, it "
         "is not a separate defender)"
     )
     assert garr_d == 0, (

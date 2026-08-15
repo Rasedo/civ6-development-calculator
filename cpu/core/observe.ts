@@ -92,7 +92,7 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
   const per: number[] = [];
   for (let i = 0; i < cityMax; i++) {
     const c = cities[i];
-    if (!c) { per.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0); continue; }  // #51/S8.4c: 10 per slot
+    if (!c) { per.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0); continue; }  // 10 per slot
     const head = c.queue[0];
     per.push(
       1,

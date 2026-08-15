@@ -7,7 +7,7 @@
 import { addYields, emptyYields, type City, type CityState, type GameState, type Yields } from './types';
 import { isBarbSeat, seatOf, citiesOf, civsAtWar } from './seats';
 import { hexDistance } from '../../world/hex';
-import { layTradeRoad } from './units'; // B-23 (#71): Traders lay road
+import { layTradeRoad } from './units'; // Traders lay road
 import { DISTRICTS } from '../data/districts';
 import { cityStateTradeCapacityBonus, hasMet } from './cityStates';
 import { CITY_STATE_TYPE_YIELD } from '../data/cityStates';
@@ -73,9 +73,6 @@ export function cityStateRouteYields(cityState: CityState): Yields {
  * A route is suspended while units HOSTILE TO ITS OWNER prowl within 3 of
  * either endpoint.
  *
- * merged the both seats twins behind a flag, because neither
- * covered CIV-SEAT-vs-CIV-SEAT and turning it on is a behaviour change that Round 2
- * was forbidden to make. #51/S7.1 is Round 7, and turns it on: the flag
  * ONE predicate — "is this unit hostile to the route's owner" — answers for
  * every seat pair. A seat at war with another interdicts its trade, which is
  * how war works in Civ 6.
@@ -189,7 +186,7 @@ export function addCsTradeRoute(state: GameState, from: number, cityStateId: num
   const check = canAddCsTradeRoute(state, from, cityStateId, seat);
   if (!check.ok) return check;
   (seatOf(state, seat)!.tradeRoutes ??= []).push({ from, to: -1, toCs: cityStateId, expiresTurn: state.turn + TRADE_ROUTE_DURATION });
-  layRouteRoad(state, from, state.cityStates.find((c) => c.id === cityStateId)?.centerIndex ?? -1, seat); // B-23 (#71)
+  layRouteRoad(state, from, state.cityStates.find((c) => c.id === cityStateId)?.centerIndex ?? -1, seat);
   return { ok: true };
 }
 

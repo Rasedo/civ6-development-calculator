@@ -51,7 +51,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'BUILDER',
       name: 'Builder',
       code: 'B',
-      cost: 50, // P4/D-10: real Civ 6 base (the +4-per-builder escalation stays unmodeled - AUDIT)
+      cost: 50, // real Civ 6 base (the +4-per-builder escalation stays unmodeled - AUDIT)
       maintenance: 0,
       moves: 2,
       combat: 0,
@@ -119,9 +119,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       cost: 80,
       maintenance: 2,
       moves: 4,
-      combat: 36, // P4/D-9: real Civ 6 Horseman
+      combat: 36, // real Civ 6 Horseman
       requiresTech: 'HORSEBACK_RIDING',
-      requiresResource: 'HORSES', // AUDIT B-9: retroactive — its own description flagged this gap
+      requiresResource: 'HORSES', // retroactive — its own description flagged this gap
       description: 'Fast shock cavalry (needs Horses access).',
     }),
     U({
@@ -221,7 +221,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       combat: 0,
       charges: 3,
       faithOnly: true,
-      religiousStrength: 25, // B-18 (#71): defends theological combat, never initiates
+      religiousStrength: 25, // defends theological combat, never initiates
       description: 'Spreads its religion to nearby cities (3 charges, faith purchase only).',
     }),
     // The Great General / Great Admiral support chassis (appended

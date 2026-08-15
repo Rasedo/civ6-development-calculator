@@ -8,16 +8,16 @@ import { BUILDINGS } from '../data/buildings';
 import { centerBuildingIds } from '../core/prodLayout';
 import { DISTRICTS, type AdjacencySource } from '../data/districts';
 import { FEATURES } from '../../world/features';
-import { TECHS } from '../data/techs'; // B-20 (#71): era scale
+import { TECHS } from '../data/techs'; // era scale
 import { CIVICS } from '../data/civics';
 import { RESOURCES } from '../../world/resources';
 
 // The GPU improvement index space (tile.improvement values, build codes 13-15).
-// AUDIT A-13: the roster grew — indices 0-2 stay stable (every existing
+// the roster grew — indices 0-2 stay stable (every existing
 // plane/consumer keys on them); the resource-only improvements append.
 // FISHING_BOATS stays OUT: water-only, and a land builder can never stand
 // on the tile (unreachable in both engines).
-// B-27 (#71): SEASIDE_RESORT appended LAST — this array's order IS the GPU's
+// SEASIDE_RESORT appended LAST — this array's order IS the GPU's
 // improvement index, so anything but an append renumbers every other row.
 
  

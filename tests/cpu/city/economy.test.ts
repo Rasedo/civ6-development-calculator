@@ -68,7 +68,7 @@ describe('gold & faith purchases', () => {
     expect(purchaseUnit(state, city.id, 'BUILDER', 0).ok).toBe(true);
     expect(state.units.length).toBe(1);
     expect(seatOf(state, 0)!.treasury).toBe(0);
-    expect(seatOf(state, 0)!.buildersTrained).toBe(1); // P4/D-10
+    expect(seatOf(state, 0)!.buildersTrained).toBe(1);
     expect(unitPurchaseCost(state, 'BUILDER', 0)).toBeGreaterThan(120); // escalated
     expect(purchaseUnit(state, city.id, 'BUILDER', 0).ok).toBe(false); // broke
 

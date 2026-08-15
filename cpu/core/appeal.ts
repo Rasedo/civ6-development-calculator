@@ -36,10 +36,10 @@ export function tileAppeal(map: GameMap, tile: Tile): number {
     if (n.feature === 'WOODS') appeal += 1;
     if (isMountain(n) && !n.wonder) appeal += 1;
     if (n.terrain === 'COAST' || n.terrain === 'LAKE') appeal += 1;
-    if (n.feature === 'OASIS') appeal += 1; // #78: sourced, was missing
+    if (n.feature === 'OASIS') appeal += 1; // sourced, was missing
     if (n.feature === 'RAINFOREST' || n.feature === 'MARSH') appeal -= 1;
-    if (n.feature === 'FLOODPLAINS') appeal -= 1; // #78: sourced, was missing
-    if (n.pillaged) appeal -= 1; // #78: "-1 each adjacent pillaged tile"
+    if (n.feature === 'FLOODPLAINS') appeal -= 1; // sourced, was missing
+    if (n.pillaged) appeal -= 1; // "-1 each adjacent pillaged tile"
     if (n.improvement === 'MINE' || n.improvement === 'QUARRY' || n.improvement === 'OIL_WELL') appeal -= 1;
     if (n.district === 'INDUSTRIAL_ZONE' || n.district === 'ENCAMPMENT') appeal -= 1;
   }

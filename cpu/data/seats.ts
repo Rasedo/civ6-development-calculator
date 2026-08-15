@@ -70,11 +70,11 @@ export const CITY_SLOTS_PER_SEAT = 24;
  * seat 0's `cities − 1 + settlers + queued` term reduces to `cities − 1`. */
 export const SETTLER_COST = (cities: number) =>
   Math.round(80 * GAME_SPEED) + Math.round(30 * GAME_SPEED) * Math.max(0, cities - 1);
+/** Turns a war must run before either side may sue for peace — one floor for
+ *  every pairing, majors and city-states alike. CIV 6: the leaders' action
+ *  panel unlocks the offer at **10**; this model uses 14 and the gap is
+ *  unreconciled (AUDIT B-D). */
 export const WAR_MIN_TURNS = 14;
-// SOURCED: real Civ 6 allows peace only once **10** turns have passed
-// since the war began (the leaders action panel unlocks the offer then). Was 8.
-// The same floor governs the seat 0 <-> city-state peace added in #50, so both
-// pairings read this one constant.
 export const PEACE_GOLD_COST = (warTurns: number) => 150 + 10 * warTurns;
 
 

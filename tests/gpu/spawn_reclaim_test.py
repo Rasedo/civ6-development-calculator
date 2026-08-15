@@ -71,7 +71,7 @@ def check(sim, pre: str, slot: int, label: str) -> None:
     assert full >= want, (
         f"{label}: mp_full={full} is BELOW the type's own moves ({want}) — the "
         f"unit inherited the flat EMBARK_MOVES of the drowned unit whose slot "
-        f"it took (#51/S7.2: clear `emb` BEFORE _full_mp reads it)"
+        f"it took (clear `emb` BEFORE _full_mp reads it)"
     )
     assert mp == full, f"{label}: a fresh unit starts on a full pool ({mp} != {full})"
 

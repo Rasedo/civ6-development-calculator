@@ -36,7 +36,7 @@ function tiles(state: GameState, seat: number): { home: number; away: number } {
   return { home: home.index, away: away.index };
 }
 
-describe('#51/S7.8f war weariness — the per-battle model', () => {
+describe('war weariness — the per-battle model', () => {
   it('scores BOTH sides, at the base for the era, with no discount for the aggressor', () => {
     const state = newGame();
     const { away } = tiles(state, 0);

@@ -648,7 +648,7 @@ class SimPhase:
                         self._gen_ver += 1
 
     def _seat_belief_claims(self, row: int, active: torch.Tensor) -> None:
-        """The BELIEF RACES for ONE seat row (0 = seat 0, r+1 = civ r), at the
+        """The BELIEF RACES for ONE seat row, at the
         loop position right after the GP race. The picks' IDENTITIES matter:
         the effects apply to this seat. The draw takes the k-th OPEN id in
         data order — open[floor(rand * open.length)], the open list filtering
@@ -832,7 +832,7 @@ class SimPhase:
         _pre.copy_(_pre.gather(2, perm.unsqueeze(3).expand(-1, -1, -1, _pre.shape[3])))
         # centre_slot_at: the owning row's slot at each live centre, re-mapped
         # through the inverse permutation. This also ends the civ-row
-        # staleness latent (AUDIT A-27(2)) — center_at's value-readers see
+        # staleness latent — center_at's value-readers see
         # fresh slots after every compaction.
         inv = torch.argsort(perm, dim=2)  # [B, nrows, RC] slot -> new slot
         seat_t = self.tile_seat

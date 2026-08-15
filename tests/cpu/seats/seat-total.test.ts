@@ -24,7 +24,7 @@ function newGame(): GameState {
   return state;
 }
 
-describe('#51/S6.12 seatOf is total', () => {
+describe('seatOf is total', () => {
   it('answers for all four classes — and with a DIFFERENT object each time', () => {
     const state = newGame();
     const ids = [0, 1, 2, seatOfCityState(0), seatOfCityState(2), BARB_SEAT];
@@ -67,7 +67,7 @@ describe('#51/S6.12 seatOf is total', () => {
   });
 });
 
-describe('#51/S6.13 the camps belong to the barbarian seat', () => {
+describe('the camps belong to the barbarian seat', () => {
   it('a fresh game puts them on the seat and nowhere else', () => {
     const state = newGame();
     expect(Array.isArray(state.barbSeat.camps)).toBe(true);

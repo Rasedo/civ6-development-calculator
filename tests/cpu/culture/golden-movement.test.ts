@@ -20,11 +20,10 @@ import type { GameState, Unit } from '../../../cpu/core/types';
 //     Movement for all Missionaries, Apostles, and Inquisitors." (no
 //     INQUISITOR in this roster).
 //
-// shipped both, hunted them, and reverted: the off-script gate diverged on
-// the rng DRAW COUNT because the two engines modelled movement points
-// differently. #51/S5.1–S5.3 made MP one resident pool with one reset rule and
-// one step contract on both engines, so the bonus now has exactly one home
-// each side. The GPU twin is gpu/golden_move_test.py.
+// MP is one resident pool with one reset rule and one step contract on both
+// engines, so the bonus has exactly one home each side. Model it twice and the
+// off-script gate diverges on the rng DRAW COUNT, not on a yield.
+// The GPU twin is gpu/golden_move_test.py.
 //
 // Every case has its negative twin, so the suite cannot pass by granting
 // everyone +2.

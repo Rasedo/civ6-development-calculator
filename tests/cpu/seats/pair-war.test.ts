@@ -50,7 +50,7 @@ function tilesNear(state: GameState, centre: number): { near: number; far: numbe
   return { near: near.index, far: far.index };
 }
 
-describe('#51/S7.1 (#59) civ↔civ trade raiding', () => {
+describe('civ↔civ trade raiding', () => {
   it('an at-war CIV SEAT suspends another civ\'s route, exactly as seat 0 does', () => {
     const state = newGame();
     const centre = seatOf(state, 0)!.cities[0].centerIndex;

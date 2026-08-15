@@ -48,12 +48,11 @@ nothing carries forward.
 
 | Open item | Weight | What the weight is for |
 |---|---|---|
-| A-9r Neighborhood | 4 | one district, both engines, plus the registry's `allowMultiple` |
-| A-11r trade-route tails | 8 | a Trader UNIT, a route wire verb, and a route-store schema change |
-| A-28r specialists | 6 | a mechanic neither engine has: wire column, assignment, yields |
+| A-9r Neighborhood column | 4 | find the divergence that pulled it, then put the column back |
 | A-29r cityYieldMult order | 2 | registry ordering; no colliding pair exists in the catalog today |
 | A-30r farm-adjacency order | 1 | construct note, unreachable as written |
-| **A. Seat symmetry** | **21** | |
+| A-31r intl route destination | 2 | the GPU route store is keyed by TILE where TS keys by (seat, city) |
+| **A. Engine vs engine** | **9** | |
 | B-17r Encampment strikes | 1 | scoped out with ranged-vs-city; the rest of the district is done |
 | B-18r religion tails | 2 | complete on every seat; one latent lifecycle drift to hunt |
 | B-20r tourism tails | 7 | national parks, civ Archaeologists, theming, shipwrecks, digs |
@@ -65,51 +64,63 @@ nothing carries forward.
 | B-27r theological combat | 2 | resolver simplifications, incl. the ~7x martyr-relic overstatement |
 | B-28r naval production | 3 | one heuristic column where `trainableUnits` belongs |
 | B-29r peace-treaty cooldown | 1 | a per-pair clock and its gate, both engines |
+| B-30r specialists | 6 | a mechanic neither engine has: wire column, assignment, yields |
+| B-31r trade-route tails | 6 | a Trader UNIT and a route wire verb |
 | B-D unsourced data values | 5 | a residual CLASS: every invented magnitude, re-sourced |
-| **B. Fidelity vs real Civ 6** | **39** | |
+| **B. Fidelity vs real Civ 6** | **51** | |
 | **OPEN, TOTAL** | **60** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
 not add a "done" column back.
 
-## A. Seat symmetry — open
+## A. Engine vs engine — where the two implementations can answer differently
 
-- **A-9r. NEIGHBORHOOD district.** The one district the 9-wide scaffold
-  still lacks (URBANIZATION civic unlock, appeal-tier housing). Ordinary
-  district plumbing on both engines — the appeal plane exists.
-  Related, and blocked on the same work: the district registry holds ONE
-  tile per type, so `completedDistrictCount(false)` undercounts a second
-  Neighborhood (`allowMultiple: true`). Unreachable while no
-  `SCAFFOLD_DISTRICTS` entry exists to queue one.
-- **A-11r. Trade-route tails.** (1) The international leg was
-  gate-unreachable under the old decisions — re-measure at the hunt, the
-  exploration gating changed the candidate set. (2) No seat's wire carries
-  a trade-route DECISION: route creation is an eager rule, and a route verb
-  is P8-surface work. (3) No physical Trader unit — routes lay roads
-  (`layTradeRoad` / `_lay_trade_road`) but nothing walks, so a route cannot
-  be plundered en route. (4) GPU intl dests are stored as TILES, so a dest
-  captured by another major keeps paying until expiry where TS's
-  (toSeat, toSeatCity) filter drops it. Route-store schema change.
-- **A-28r. SPECIALISTS are not a mechanic on either engine.** TS only ever
-  writes `city.specialists` from `setSpecialists`, a UI verb, so it is
-  `{}` in every simulated game; the GPU's greedy assignment was deleted
-  rather than mirrored, because assigning a citizen is a CHOICE and neither
-  engine takes a choice without a wire record. TO REOPEN THE MECHANIC: a
-  wire column, the way district placement now records its TILE — not an
-  engine rule.
+THE DIGEST IS THE ONLY INSTRUMENT FOR THIS CLASS. Both engines can be
+equally faithful to Civ 6 and still disagree with each other; a gate red is
+the only thing that would say so. None of these is a SEAT asymmetry —
+seat 0 rides the same machinery as every other row, and
+`tools/gpu/seat_symmetry_check.py` holds that with both allowlists empty.
+Each entry names its own reachability, because not one of the four is known
+to fire in a driven game today, which is exactly why they are still here.
+
+- **A-9r. The NEIGHBORHOOD column is pulled over a divergence nobody
+  found.** The district itself is complete on both engines — catalog entry,
+  URBANIZATION unlock, appeal-tier housing (`_nbhd_didx` against
+  `_appeal_cuts`, `computeHousing`'s twin) — but it is deliberately absent
+  from `SCAFFOLD_DISTRICTS`, because with the column in, the two engines
+  queued DIFFERENT districts. That placement/cost divergence was worked
+  around, not diagnosed. Two consequences: no seat can build a Neighborhood
+  at all, and the second one `allowMultiple` promises has nowhere to go on
+  the GPU — `city_dist_tile` is one slot per (city, district type), so
+  `_district_counts` would undercount where TS's `completedDistrictCount`
+  walks the `city.districts` ARRAY and counts both. REACHABILITY: zero.
+  Nothing can queue one, so neither half is inside the digest's reach until
+  the column goes back in — and putting it back is what re-opens the hunt.
 - **A-29r. `cityYieldMult` cannot express BUILD order.** TS applies it in
   `city.wonders` build order; the GPU registry is keyed by wonder id and
   cannot, so two multipliers on the SAME channel in one city could
-  associate differently. No such pair exists in the catalog today (Ruhr is
-  production, Big Ben gold) — a third would make it live.
+  associate differently. REACHABILITY: no such pair exists in the catalog
+  today (Ruhr is production, Big Ben gold) — a third would make it live.
 - **A-30r. Farm-adjacency food is added post-selection** (every row —
   `_rcy_food_plane` takes the row's own civics/techs), where
-  `tileYields` adds it BEFORE the drought floor. Unreachable as written
-  (the floor only bites at 0 base food and a FARM's own food is >= 1), so
-  it is a construct note, not a live bug.
+  `tileYields` adds it BEFORE the drought floor. REACHABILITY: none as
+  written — the floor only bites at 0 base food and a FARM's own food is
+  >= 1 — so it is a construct note, not a live bug.
+- **A-31r. The international route destination is stored differently.**
+  The GPU keeps a TILE (`route_dest`); TS keys the route by
+  `(toSeat, toSeatCity)`. When another major CAPTURES the destination city,
+  TS's expiry filter drops the route and the GPU keeps paying it to the end
+  of its term. Route-store schema change on the GPU side. REACHABILITY:
+  unmeasured — the international leg was gate-unreachable under the old
+  decisions, and the exploration gating has moved the candidate set since,
+  so measure it at the hunt before assuming it is dead.
 
-## B. Fidelity vs real Civ 6 — open residuals
+## B. Fidelity vs real Civ 6 — where both engines agree on the wrong answer
+
+NO GATE CAN CATCH THIS CLASS. Parity proves the two engines match, never
+that either matches the real game, so every entry here closes against a
+Civ 6 source or is recorded as unverifiable.
 
 - **B-17r. Encampment:** ranged-vs-district strikes are out of scope,
   matching the ranged-vs-city scope-out. The rest of the district
@@ -178,17 +189,14 @@ not add a "done" column back.
   apostle martyrs into a relic where real Civ 6 needs the MARTYR promotion,
   an OVERSTATEMENT of relic frequency (see the RELIC_* comment in
   data/greatPeople).
-- **B-28r. THE NAVAL PRODUCTION SURFACE is one heuristic column.** Not a
-  seat asymmetry any more — `_seat_production_mask` runs for every row, and
-  the naval BAN it used to carry on row 0 is gone. What is left is shared
-  and unfaithful: `ok_u` masks out every hull (`~unit_naval`) and a single
-  hand-rolled GALLEY column (`_galley_idx`, sim_seats.py) is added back,
-  legal only while the seat owns zero naval units live or queued. Real Civ
-  6 offers whatever `trainableUnits` allows in a naval-capable city, with
-  no one-ship cap. The fix is to drop `~unit_naval` and let the capability
-  gate that already rides in `tr_j` answer, deleting the galley column —
-  a behaviour round that needs the serve gate live. Same family as #83
-  (projects/wonders): a SHARED action-surface gap, not a seat one.
+- **B-28r. THE NAVAL PRODUCTION SURFACE is one heuristic column.** `ok_u`
+  masks out every hull (`~unit_naval`) and a single hand-rolled GALLEY
+  column (`_galley_idx`, sim_seats.py) is added back, legal only while the
+  seat owns zero naval units live or queued. Real Civ 6 offers whatever
+  `trainableUnits` allows in a naval-capable city, with no one-ship cap.
+  The fix is to drop `~unit_naval` and let the capability gate that already
+  rides in `tr_j` answer, deleting the galley column — a behaviour round
+  that needs the serve gate live.
   REACHABILITY: no seat fields a second ship in driven games, so every
   naval rule past the first hull is poke-covered only.
 - **B-29r. No peace-treaty cooldown.** Real Civ 6 binds a peace treaty for
@@ -198,6 +206,21 @@ not add a "done" column back.
   next turn, so a rich seat can thrash war→peace→war on one opponent. The
   clock to gate on already exists per-pair (#111 s5's `war_turns`); what is
   missing is a per-pair PEACE stamp beside it.
+- **B-30r. SPECIALISTS are not a mechanic on either engine.** Real Civ 6
+  lets a city work a district slot instead of a tile; here TS only ever
+  writes `city.specialists` from `setSpecialists`, a UI verb, so it is `{}`
+  in every simulated game, and the GPU's greedy assignment was deleted
+  rather than mirrored — assigning a citizen is a CHOICE, and neither
+  engine takes a choice without a wire record. REOPENING IT is a wire
+  column, the way district placement records its TILE, plus the assignment
+  rule and the yields; it is not an engine-rule fix.
+- **B-31r. Trade-route tails.** (1) No physical Trader UNIT — routes lay
+  roads (`layTradeRoad` / `_lay_trade_road`) but nothing walks the path, so
+  a route cannot be plundered en route and its range is not a journey.
+  (2) No seat's wire carries a trade-route DECISION: route creation is an
+  eager rule on both engines, where a real player spends a Trader on a
+  chosen pair. A route verb is P8-surface work. The destination-STORAGE
+  divergence between the engines is A-31r, not this entry.
 - **B-D. UNSOURCED DATA VALUES — a residual class, not one item.**
   Mechanics are sourced item by item; the DATA layer largely is not, and a
   wrong CONSTANT passes every gate because both engines agree on the wrong
@@ -215,6 +238,12 @@ not add a "done" column back.
   by file, checking each magnitude against a real Civ 6 source and either
   correcting it or recording it as a deliberate stylization. Re-marking as
   it goes is what makes the class shrinkable again.
+  ONE MEMBER IS ALREADY NAMED AND CONTRADICTS ITS OWN SOURCE:
+  `WAR_MIN_TURNS` is 14, while the sourcing note beside it — and the
+  SOURCED list at the head of `cpu/data/seats.ts` — says real Civ 6 unlocks
+  the peace offer at **10**. Both engines read the 14, so no gate can see
+  it. Deciding it is a behaviour round: the floor gates every `sueForPeace`
+  and the war head's peace columns on both sides.
 
 ## The freeze backlog — what the first serve run must validate
 
@@ -503,12 +532,14 @@ SEAT the divergence names before reading the mechanic.
 - Theological combat needs two ADJACENT religious units of different
   religions. A gate that never puts two apostles side by side proves
   nothing about it.
-- Row 0's wonder/project completions need the driver to pick those columns.
+- Wonder and project completions need the driver to pick those columns on
+  some row; no rule reaches them otherwise.
 - District placement IS reachable in-gate, unlike most of this list — every
   seed queues districts from the early game, so items 17-20 should show up
   in the very first serve run rather than hiding.
-- No seat fields a second ship, and seat 0 lays no international trade leg,
-  under the current masks (B-28r, A-11r) — re-measure both.
+- No seat fields a second ship under the current masks (B-28r), and the
+  international trade leg went unreached under the old decisions (A-31r) —
+  re-measure both.
 - The war head's newly-live columns need a game with THREE majors in reach
   of each other; a two-major seed exercises nothing the old single axis did
   not already reach.

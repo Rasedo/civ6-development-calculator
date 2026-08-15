@@ -27,7 +27,7 @@ function newGame(): GameState {
   return state;
 }
 
-describe('#51/S6.11 seat classes', () => {
+describe('seat classes', () => {
   it('the absolute seat space IS the class — nothing stores a duplicate', () => {
     expect(seatClass(0)).toBe('major');
     expect(seatClass(1)).toBe('major');
@@ -48,7 +48,7 @@ describe('#51/S6.11 seat classes', () => {
   });
 });
 
-describe('#51/S6.11 caps.xp', () => {
+describe('caps.xp', () => {
   it('a barbarian gets NO xp field; seat 0 and a civ each get one', () => {
     const state = newGame();
     const land = state.map.tiles.findIndex((t) => t.terrain !== 'OCEAN' && t.terrain !== 'COAST');
@@ -64,7 +64,7 @@ describe('#51/S6.11 caps.xp', () => {
   });
 });
 
-describe('#51/S6.11 caps.alwaysHostile', () => {
+describe('caps.alwaysHostile', () => {
   it('a barbarian is hostile to everyone with NO war state stored', () => {
     const state = newGame();
     const barb = { seat: BARB_SEAT };

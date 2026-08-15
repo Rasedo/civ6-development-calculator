@@ -1111,11 +1111,12 @@ class SimEconomy:
         self._gen_aura_cache = (key, out)
         return out
 
-    def _gen_aura_hit(self, civ_unified: torch.Tensor, tile: torch.Tensor, naval: torch.Tensor) -> torch.Tensor:
+    def _gen_aura_hit(self, seat: torch.Tensor, tile: torch.Tensor, naval: torch.Tensor) -> torch.Tensor:
         """The RAW aura predicate — bool, shaped like `tile` — for a unit of
-        seat `civ_unified` standing on `tile`, ADMIRAL-keyed when `naval`
-        (naval|embarked) else GENERAL-keyed. civ_unified: 0 = seat 0, r+1 =
-        civ index r, -1 = none/barbarian. THE single predicate behind both
+        `seat` standing on `tile`, ADMIRAL-keyed when `naval`
+        (naval|embarked) else GENERAL-keyed. Only a MAJOR owns an aura, so
+        callers pass -1 for anyone else and the predicate is False there.
+        THE single predicate behind both
         halves of the aura, mirroring `aura.inGeneralAura` — `_gen_aura_cs`
         scales it to the +CS adder and the refresh-site snapshot scales it to
         the +MP one, so the two cannot drift apart.
@@ -1128,17 +1129,17 @@ class SimEconomy:
         if planes is None:
             return torch.zeros_like(tile, dtype=torch.bool)
         land, sea = planes
-        valid = (civ_unified >= 0) & (tile >= 0)
-        g = civ_unified.clamp(min=0, max=self.n_majors - 1)
+        valid = (seat >= 0) & (tile >= 0)
+        g = seat.clamp(min=0, max=self.n_majors - 1)
         idx = (g * self.T + tile.clamp(min=0)).reshape(self.B, -1)
         land_hit = land.reshape(self.B, -1).gather(1, idx).reshape(tile.shape)
         sea_hit = sea.reshape(self.B, -1).gather(1, idx).reshape(tile.shape)
         return torch.where(naval, sea_hit, land_hit) & valid
 
-    def _gen_aura_cs(self, civ_unified: torch.Tensor, tile: torch.Tensor, naval: torch.Tensor) -> torch.Tensor:
+    def _gen_aura_cs(self, seat: torch.Tensor, tile: torch.Tensor, naval: torch.Tensor) -> torch.Tensor:
         """The +generalAuraCs adder [B] (dtype) for own military near an own
-        GENERAL (land) / ADMIRAL (naval|embarked). civ_unified: 0 = seat 0,
-        r+1 = civ index r, -1 = none/barbarian. An INTEGER add joining the
+        GENERAL (land) / ADMIRAL (naval|embarked); `seat` < 0 scores nothing.
+        An INTEGER add joining the
         quantized assembly (the JUST_WAR/CRUSADE pattern) — mirrors
         combat.generalAuraCS.
 
@@ -1146,7 +1147,7 @@ class SimEconomy:
         csty/cstyc, rngcs, vrngc, attacker side) and every
         CITY-STRIKE roll (cstk/estk, DEFENDER side). Absent from
         'rngrc' — TS does not add it there."""
-        return self._gen_aura_hit(civ_unified, tile, naval).to(self.dtype) * self._gen_aura_cs_val
+        return self._gen_aura_hit(seat, tile, naval).to(self.dtype) * self._gen_aura_cs_val
 
     def _seat_heal(self, pre: str) -> torch.Tensor:
         """What this pool's units heal — the refreshUnits rule.
@@ -1663,7 +1664,7 @@ class SimEconomy:
             # of the three scalings, as an EXPLICIT wonder-id-order product. TS
             # walks city.wonders in BUILD order; the registry is keyed by wonder
             # id and cannot express that, so two multipliers on the SAME channel
-            # in one city can associate differently (AUDIT A-27 residual).
+            # in one city can associate differently.
             ones6 = torch.ones(1, 1, 6, dtype=F64, device=dev)
             wmm = torch.ones(B, n, 6, dtype=F64, device=dev)
             for wi in range(compw.shape[2]):

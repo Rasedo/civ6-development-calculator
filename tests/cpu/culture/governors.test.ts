@@ -14,7 +14,7 @@ import type { GameState, City, Seat } from '../../../cpu/core/types';
 function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> = {}): Seat {
   const tile = tileAtCoords(state.map, col, row);
   const civ: Seat = {
-    ...emptySeat(state.seats.length), // #51/S6.12
+    ...emptySeat(state.seats.length),
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,
@@ -108,7 +108,7 @@ function addCity(state: GameState, civ: Seat, col: number, row: number, loyalty:
   return city;
 }
 
-describe('governors / era score (#68 B-24)', () => {
+describe('governors / era score', () => {
   // ---- governorTitles: floor division + cap -----------------------------------
   it('governorTitles floors civics / perTitle and caps at govMax', () => {
     expect(governorTitles(0)).toBe(0);

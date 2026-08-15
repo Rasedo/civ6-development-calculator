@@ -175,26 +175,26 @@ export const FOUNDER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
 export const ENHANCER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
   [
     B('ITINERANT_PREACHERS', 'Itinerant Preachers', 'Religious pressure spreads two tiles further.', {
-      pressureRangeBonus: 2, // B6-S1
+      pressureRangeBonus: 2,
     }),
     B('SCRIPTURE', 'Scripture', 'Missionaries and Apostles gain +1 spread charge and stronger pressure.', {
-      missionaryChargeBonus: 1, // B6-S2
-      spreadPressureMult: 1.5, // B6-S2: lump 10 → 15
+      missionaryChargeBonus: 1,
+      spreadPressureMult: 1.5, // lump 10 → 15
     }),
     B('JUST_WAR', 'Just War', '+10 combat strength near cities following your religion.', {
-      combatNearFollowing: 10, // B6-S1: within JUST_WAR_RANGE, unit-vs-unit
+      combatNearFollowing: 10, // within JUST_WAR_RANGE, unit-vs-unit
     }),
     B('DEFENDER_OF_THE_FAITH', 'Defender of the Faith', '+5 combat strength when defending in friendly-religion territory.', {
-      combatDefendFollowing: 5, // B6-S1
+      combatDefendFollowing: 5,
     }),
     B('CRUSADE', 'Crusade', '+10 combat strength against units in cities following your religion.', {
-      combatVsUnitInFollowing: 10, // B6-S1
+      combatVsUnitInFollowing: 10,
     }),
     B('HOLY_ORDER', 'Holy Order', 'Missionaries and Apostles are 30% cheaper to purchase.', {
-      missionaryCostMult: 0.7, // B6-S2: 60 → 42 faith
+      missionaryCostMult: 0.7, // 60 → 42 faith
     }),
     B('MESSENGER_OF_THE_GODS', 'Messenger of the Gods', '+2 gold and +2 faith from trade routes to cities of your religion.', {
-      tradeReligionYields: { gold: 2, faith: 2 }, // B6-S1
+      tradeReligionYields: { gold: 2, faith: 2 },
     }),
   ].map((b) => [b.id, b]),
 );

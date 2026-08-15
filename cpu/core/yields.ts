@@ -8,7 +8,7 @@ import { TERRAINS, HILLS_YIELDS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { IMPROVEMENTS } from '../data/improvements';
-import { tileAppeal } from './appeal'; // B-27 (#71): the Seaside Resort's dynamic gold
+import { tileAppeal } from './appeal'; // the Seaside Resort's dynamic gold
 import { WONDERS } from '../../world/wonders';
 import { DISTRICTS, type AdjacencyRule } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
@@ -154,7 +154,7 @@ export function cityDistrictYields(ctx: YieldCtx, city: City): Yields {
   const out = emptyYields();
   for (const d of city.districts) {
     const tile = ctx.map.tiles[d.tileIndex];
-    if (!tile.districtComplete || tile.districtPillaged) continue; // B-32: pillaged = dark
+    if (!tile.districtComplete || tile.districtPillaged) continue; // pillaged = dark
     const def = DISTRICTS[d.type];
     const cityStateAdd = ctx.mods.districtYieldAdd[d.type];
     if (cityStateAdd) addYields(out, cityStateAdd);
@@ -169,12 +169,12 @@ export function cityDistrictYields(ctx: YieldCtx, city: City): Yields {
 
 export function cityBuildingYields(ctx: YieldCtx, city: City): Yields {
   const out = emptyYields();
-  const pillaged = pillagedDistrictTypes(ctx.map, city.districts); // B-32
+  const pillaged = pillagedDistrictTypes(ctx.map, city.districts);
   for (const id of city.buildings) {
     const def = BUILDINGS[id];
     if (!def) continue;
     if (def.regional) continue; // handled by regional scan (affects own city too)
-    if (pillaged.has(def.district)) continue; // B-32: buildings in a pillaged district are dark
+    if (pillaged.has(def.district)) continue; // buildings in a pillaged district are dark
     const mult = ctx.mods.buildingYieldMult[def.district] ?? 1;
     if (def.yields) addYields(out, def.yields, mult);
     const beliefAdd = ctx.mods.buildingYieldAdd[id];
@@ -201,7 +201,7 @@ export function regionalEffects(state: GameState, city: City): RegionalEffects {
   for (const other of citiesOf(state, city.seat)) {
     for (const inst of other.districts) {
       const tile = state.map.tiles[inst.tileIndex];
-      if (!tile.districtComplete || tile.districtPillaged) continue; // B-32: pillaged source is dark
+      if (!tile.districtComplete || tile.districtPillaged) continue; // pillaged source is dark
       for (const id of other.buildings) {
         const def = BUILDINGS[id];
         if (!def || !def.regional || def.district !== inst.type) continue;
@@ -217,12 +217,12 @@ export function regionalEffects(state: GameState, city: City): RegionalEffects {
 }
 
 export function localBuildingAmenities(state: GameState, city: City): number {
-  const pillaged = pillagedDistrictTypes(state.map, city.districts); // B-32
+  const pillaged = pillagedDistrictTypes(state.map, city.districts);
   let n = 0;
   for (const id of city.buildings) {
     const def = BUILDINGS[id];
     if (!def || def.regional || !def.amenities) continue;
-    if (pillaged.has(def.district)) continue; // B-32: pillaged district's amenities go dark
+    if (pillaged.has(def.district)) continue; // pillaged district's amenities go dark
     n += def.amenities;
   }
   return n;

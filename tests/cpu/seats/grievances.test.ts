@@ -8,13 +8,12 @@ import { WARMONGER_DOW, WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN } from '../../.
 import { diplomaticFavorPerTurn } from '../../../cpu/core/seatTurn';
 import { GOVERNMENTS } from '../../../cpu/data/policies';
 
-// SEAT 0's WARMONGER score (grievances) — the exact twin of
-// Seat.warmonger, which #55/S3 landed for opponents only. Real Civ 6 prices
-// aggression in grievances: declaring war and taking cities make a civ shunned
-// and ganged up on. Grows on declaring (+4) and on taking a foreign city (+3),
-// decays 1/turn while at peace with EVERY civ, floor 0. Past
-// WARMONGER_GANG a civ may declare on seat 0 WITHOUT the usual
-// strength advantage.
+// THE WARMONGER score (grievances), one `Seat.warmonger` per seat. Real Civ 6
+// prices aggression in grievances: declaring war and taking cities make a civ
+// shunned and ganged up on. Grows on declaring (+4) and on taking a foreign
+// city (+3), decays 1/turn while at peace with EVERY civ, floor 0. Past
+// WARMONGER_GANG a seat may be declared on WITHOUT the usual strength
+// advantage.
 //
 // MEASURED live in the gate: seat 0's score peaks at exactly the gang
 // threshold (6) with 192 civ-turns at or over it across the 24 scripted seeds,

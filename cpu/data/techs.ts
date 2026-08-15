@@ -87,7 +87,7 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'unlockBuilding', building: 'LIBRARY' },
     ]),
     T('MASONRY', 'Masonry', 'Ancient', 80, ['MINING'], [
-      { kind: 'unlockBuilding', building: 'ANCIENT_WALLS' }, // AUDIT B-1
+      { kind: 'unlockBuilding', building: 'ANCIENT_WALLS' },
     ]),
     T('BRONZE_WORKING', 'Bronze Working', 'Ancient', 80, ['MINING'], [
       { kind: 'unlockDistrict', district: 'ENCAMPMENT' },
@@ -168,7 +168,7 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     ]),
     T('RADIO', 'Radio', 'Modern', 1250, ['INDUSTRIALIZATION'], [
       { kind: 'unlockBuilding', building: 'BROADCAST_CENTER' },
-      { kind: 'unlockImprovement', improvement: 'SEASIDE_RESORT' }, // B-27 (#71)
+      { kind: 'unlockImprovement', improvement: 'SEASIDE_RESORT' },
     ]),
     T('CHEMISTRY', 'Chemistry', 'Modern', 1250, ['SANITATION'], [
       { kind: 'unlockBuilding', building: 'RESEARCH_LAB' },

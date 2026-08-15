@@ -3,7 +3,7 @@ import type { City, CityState, GameState, ImprovementId, Seat, Tile, Unit } from
 import { neighbors, hexDistance, tilesWithin } from '../../world/hex';
 import { isWater, isImpassable } from '../../world/query';
 import { civEraIndex } from './city';
-import { logUnitOrder } from './seatTurn';  // #51/S8.1e
+import { logUnitOrder } from './seatTurn';
 import { MODERN_ERA_INDEX } from '../data/techs';
 import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
@@ -18,7 +18,7 @@ import { revealAround, unexploredByAll } from './fog';
 import { transferCity } from './phase';
 import type { RuleResult } from './rules';
 import { BARB_SEAT, NO_SEAT, allCities, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCiv, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat } from './seats';
-import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE, generalAuraMP } from './aura'; // #70/S2/S3 (B-8): the shared aura predicate
+import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE, generalAuraMP } from './aura'; // the shared aura predicate
 // The ONE full-MP contract, so the barbarian phase's reset cannot
 // drift from every other seat's. units.ts already imports from here, so this
 // closes a cycle — both directions are called at RUN time, never at module
@@ -40,7 +40,7 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number, se
   const camp = state.barbSeat.camps.indexOf(tileIndex);
   if (camp < 0) return;
   state.barbSeat.camps.splice(camp, 1);
-  markAntiquitySite(state, tileIndex, seat); // B-20 (#79): a razed outpost leaves a dig
+  markAntiquitySite(state, tileIndex, seat); // a razed outpost leaves a dig
   const clearer = seatOf(state, unit.seat);
   if (clearer) clearer.treasury += CAMP_CLEAR_REWARD;
 }
@@ -74,7 +74,7 @@ export function terrainDefense(tile: Tile): number {
 // the strengthDiff it feeds into is quantized to 0.1 inside damageRoll so the
 // GPU's exp table can reproduce the exact JS double. Cities / city-states /
 // walls are NOT units — they never call this.
-export const RIVER_ATTACK_PENALTY = 5; // B-29: melee across a river, attacker CS −5
+export const RIVER_ATTACK_PENALTY = 5; // melee across a river, attacker CS −5
 export function woundPenalty(unit: { hp: number }): number {
   return 10 * ((UNIT_HP - unit.hp) / 100);
 }
@@ -121,8 +121,8 @@ export function encampmentTrainXp(buildings: readonly string[]): number {
   return best;
 }
 
-/** award XP to a unit — only where the seat's class allows it (#51/S6.11
- *  `caps.xp`; false for barbarians, who have no promotions in Civ 6). */
+/** award XP to a unit — only where the seat's class allows it
+ *  (`caps.xp`; false for barbarians, who have no promotions in Civ 6). */
 function gainXp(unit: Unit, amount: number): void {
   if (!capsOf(unit.seat).xp) return;
   unit.xp = (unit.xp ?? 0) + amount;
@@ -141,7 +141,7 @@ function flankCount(state: GameState, defTileIndex: number, attacker: Unit, defe
     for (const u of unitsAt(state, t.index)) {
       if (u.id === attacker.id) continue;
       if (unitDomain(u.type) !== 'military') continue;
-      if (u.embarked) continue; // #45/B-6: embarked units flank for nobody
+      if (u.embarked) continue; // embarked units flank for nobody
       if (unitsHostile(state, u, defender)) n++;
     }
   }
@@ -153,7 +153,7 @@ export function supportCount(state: GameState, defTileIndex: number, defender: U
   for (const t of neighbors(state.map, state.map.tiles[defTileIndex])) {
     for (const u of unitsAt(state, t.index)) {
       if (unitDomain(u.type) !== 'military') continue;
-      if (u.embarked) continue; // #45/B-6: embarked units support nobody
+      if (u.embarked) continue; // embarked units support nobody
       if (u.seat === defender.seat) n++;
     }
   }
@@ -244,9 +244,9 @@ export function defenderCS(state: GameState, defender: Unit, defTileIndex: numbe
     fortifyBonus(defender) -
     woundPenalty(defender) +
     SUPPORT_CS * supportCount(state, defTileIndex, defender) +
-    xpLevelBonus(defender) + // B-4: veterancy — an embarked defender got the flat override above (no xp)
-    religionDefenseCS(state, defender, defTileIndex) + // B6-S1: enhancer adders (unit-vs-unit — every defenderCS caller is one; city strikes assemble inline without them)
-    generalAuraCS(state, defender, defTileIndex) // B7-G (B-8): Great General/Admiral aura
+    xpLevelBonus(defender) + // veterancy — an embarked defender got the flat override above (no xp)
+    religionDefenseCS(state, defender, defTileIndex) + // enhancer adders (unit-vs-unit — every defenderCS caller is one; city strikes assemble inline without them)
+    generalAuraCS(state, defender, defTileIndex) // Great General/Admiral aura
   );
 }
 
@@ -294,7 +294,7 @@ export function cityDefenseStrength(state: GameState, city: City): number {
 }
 
 export function killUnit(state: GameState, unit: Unit, seat: number): void {
-  markAntiquitySite(state, unit.tileIndex, seat); // B-20 (#79): a death leaves a dig
+  markAntiquitySite(state, unit.tileIndex, seat); // a death leaves a dig
   disbandUnit(state, unit.id);
 }
 
@@ -392,7 +392,7 @@ function cityAssault(
   }
   const dmgToCity = damageRoll(state, atkCS - defCS, kCity, city.centerIndex);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, kAttacker, city.centerIndex);
-  gainXp(attacker, XP_ATTACK); // B-4: +5 for the attack executed
+  gainXp(attacker, XP_ATTACK); // +5 for the attack executed
   const outer = city.outerHp ?? 0;
   const absorbed = Math.min(outer, dmgToCity);
   if (absorbed > 0) city.outerHp = outer - absorbed;
@@ -483,7 +483,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   const def = UNITS[attacker.type];
   if (!def || def.combat <= 0) return no('Civilians cannot attack.');
   if (attacker.movesLeft <= 0) return no('No movement left.');
-  if (attacker.embarked) return no('Embarked units cannot attack.'); // #45/B-6
+  if (attacker.embarked) return no('Embarked units cannot attack.');
   const from = state.map.tiles[attacker.tileIndex];
   const target = state.map.tiles[targetIndex];
   if (hexDistance(from.col, from.row, target.col, target.row) !== 1) {
@@ -553,7 +553,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     if (isBarbSeat(attacker.seat)) {
       killUnit(state, defender, seat);
     } else {
-      defender.seat = attacker.seat; // #51/S1.3b: one field carries the whole ownership change
+      defender.seat = attacker.seat; // one field carries the whole ownership change
       defender.movesLeft = 0;
       attacker.movesLeft = 0;
       // GPU parity: the batch engine transfers the captured unit to the END
@@ -569,12 +569,12 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
       return ok;
     }
   } else {
-    const atkCSf = atkCS + FLANKING_CS * flankCount(state, targetIndex, attacker, defender) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex); // B6-S1 + B7-G (B-8): aura keyed on the ATTACKER's own tile
+    const atkCSf = atkCS + FLANKING_CS * flankCount(state, targetIndex, attacker, defender) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex); // aura keyed on the ATTACKER's own tile
     const defCSf = defenderCS(state, defender, targetIndex);
     defender.hp -= damageRoll(state, atkCSf - defCSf, 'mel', targetIndex);
     attacker.hp -= damageRoll(state, defCSf - atkCSf, 'melc', targetIndex);
-    gainXp(attacker, XP_ATTACK); // B-4: +5 for the attack executed
-    awardDefenseXp(defender); // B-4: +2 to a surviving military defender
+    gainXp(attacker, XP_ATTACK); // +5 for the attack executed
+    awardDefenseXp(defender); // +2 to a surviving military defender
     warWearinessBattle(state, attacker.seat, defender.seat, targetIndex,
       { aDied: attacker.hp <= 0 && defender.hp > 0, dDied: defender.hp <= 0 });
     if (defender.hp <= 0) {
@@ -589,7 +589,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   attacker.movesLeft = 0;
   if (state.units.includes(attacker) && tileFreeForUnit(state, targetIndex, 0, attacker)) {
     attacker.tileIndex = targetIndex;
-    clearCampFor(state, attacker, targetIndex, seat); // P5/S7 (C-3): every seat clears it
+    clearCampFor(state, attacker, targetIndex, seat); // every seat clears it
   }
   return ok;
 }
@@ -615,7 +615,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   const def = UNITS[attacker.type];
   if (!def?.ranged) return no('Not a ranged unit.');
   if (attacker.movesLeft <= 0) return no('No movement left.');
-  if (attacker.embarked) return no('Embarked units cannot attack.'); // #45/B-6
+  if (attacker.embarked) return no('Embarked units cannot attack.');
   const from = state.map.tiles[attacker.tileIndex];
   const target = state.map.tiles[targetIndex];
   if (hexDistance(from.col, from.row, target.col, target.row) > def.ranged.range) {
@@ -641,10 +641,10 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     const civCity = cityAtIndex(state, targetIndex);
     if (civCity && (capsOf(attacker.seat).alwaysHostile || civsAtWar(state, atkSeat, civCity.holder.seat))) {
       const defCS = cityDefenseStrength(state, civCity.city);
-      civCity.city.hp = Math.max(1, civCity.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex)); // #70/S2 (B-8)
-      warWearinessBattle(state, attacker.seat, civCity.city.seat, targetIndex, { city: true }); // #51/S7.8f
+      civCity.city.hp = Math.max(1, civCity.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex));
+      warWearinessBattle(state, attacker.seat, civCity.city.seat, targetIndex, { city: true });
       attacker.movesLeft = 0;
-      gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment (city not a unit — no defender xp)
+      gainXp(attacker, XP_ATTACK); // +5 for the bombardment (city not a unit — no defender xp)
       return ok;
     }
     const cityState = cityStateAt(state, targetIndex);
@@ -655,19 +655,19 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     // seat you must declare on. See [[target-legality-gates]].
     if (cityState && cityState.centerIndex === targetIndex && cityStateAttackable(state, cityState, atkSeat)) {
       const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0);
-      cityState.hp = Math.max(1, (cityState.hp ?? CITY_STATE_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex)); // #70/S2 (B-8)
-      warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), targetIndex, { city: true }); // #51/S7.8f
+      cityState.hp = Math.max(1, (cityState.hp ?? CITY_STATE_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex));
+      warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), targetIndex, { city: true });
       attacker.movesLeft = 0;
-      gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment
+      gainXp(attacker, XP_ATTACK); // +5 for the bombardment
       return ok;
     }
   }
   if (enemies.length === 0) return no('Nothing to attack there.');
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
   const defCS = defenderCS(state, defender, targetIndex);
-  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rng', targetIndex); // B6-S1 + B7-G (B-8)
-  gainXp(attacker, XP_ATTACK); // B-4: +5 for the ranged attack executed
-  awardDefenseXp(defender); // B-4: +2 to a surviving military defender (civilians excluded)
+  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rng', targetIndex);
+  gainXp(attacker, XP_ATTACK); // +5 for the ranged attack executed
+  awardDefenseXp(defender); // +2 to a surviving military defender (civilians excluded)
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
   if (defender.hp <= 0) killUnit(state, defender, seat);
   attacker.movesLeft = 0;
@@ -693,11 +693,11 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
     const defCS = cityDefenseStrength(state, enemyCity);
     enemyCity.hp = Math.max(
       1,
-      enemyCity.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'vrngc', targetIndex), // #70/S2 (B-8)
+      enemyCity.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'vrngc', targetIndex),
     );
-    warWearinessBattle(state, attacker.seat, enemyCity.seat, targetIndex, { city: true }); // #51/S7.8f
+    warWearinessBattle(state, attacker.seat, enemyCity.seat, targetIndex, { city: true });
     attacker.movesLeft = 0;
-    gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment (city not a unit)
+    gainXp(attacker, XP_ATTACK); // +5 for the bombardment (city not a unit)
     return;
   }
   // A RANGED unit does not engage another civ's units — the ranged-vs-civ
@@ -710,10 +710,10 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   if (enemies.length === 0) return; // the CITY_CENTER quirk: a no-op, like meleeAttack's `no(...)`
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
   const defCS = defenderCS(state, defender, targetIndex);
-  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'vrng', targetIndex); // B6-S1 + B7-G (B-8)
-  warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 }); // #51/S7.8f
-  gainXp(attacker, XP_ATTACK); // B-4: +5 for the ranged strike executed
-  awardDefenseXp(defender); // B-4: +2 to a surviving military defender
+  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'vrng', targetIndex);
+  warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
+  gainXp(attacker, XP_ATTACK); // +5 for the ranged strike executed
+  awardDefenseXp(defender); // +2 to a surviving military defender
   if (defender.hp <= 0) killUnit(state, defender, seat);
   attacker.movesLeft = 0;
 }
@@ -721,7 +721,7 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
 export function attackTargets(state: GameState, unit: Unit): number[] {
   const def = UNITS[unit.type];
   if (!def || def.combat <= 0 || unit.movesLeft <= 0) return [];
-  if (unit.embarked) return []; // #45/B-6: embarked units cannot attack
+  if (unit.embarked) return []; // embarked units cannot attack
   const from = state.map.tiles[unit.tileIndex];
   const range = def.ranged?.range ?? 1;
   const out: number[] = [];
@@ -784,7 +784,7 @@ function attackCityState(state: GameState, attacker: Unit, cityState: CityState,
   warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), cityState.centerIndex,
     { aDied: attacker.hp <= 0, city: true });
   attacker.movesLeft = 0;
-  gainXp(attacker, XP_ATTACK); // B-4: +5 for the attack executed
+  gainXp(attacker, XP_ATTACK); // +5 for the attack executed
   if (attacker.hp <= 0) killUnit(state, attacker, seat);
   if ((cityState.hp ?? 0) <= 0) {
     if (isCiv(attacker.seat)) {
@@ -826,7 +826,7 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
   seatOf(state, seat)!.cities.push({
     id,
     seat: seat, // a conquered city-state joins its CONQUEROR's roster
-    foundedTurn: state.turn,  // #51/S4.1r
+    foundedTurn: state.turn,
     name: cityState.name,
     centerIndex: cityState.centerIndex,
     population: Math.max(1, Math.floor(cityState.population * 0.75)),
@@ -841,10 +841,10 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
     districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }],
     wonders: [],
     specialists: {},
-    hp: Math.round(CITY_MAX_HP / 2), // a conquered CS joins at half HP (S1.3)
+    hp: Math.round(CITY_MAX_HP / 2), // a conquered CS joins at half HP
   });
   revealAround(state, seat, cityState.centerIndex, 3);
-  addEraScore(state, seat, ERA_SCORE_CONQUER); // B-24: the CONQUEROR gained a city
+  addEraScore(state, seat, ERA_SCORE_CONQUER); // the CONQUEROR gained a city
   state.eventLog.push(`${cityState.name} conquered — the city-state joins your empire.`);
 }
 
@@ -864,7 +864,7 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
   const id = actor.nextCityId++;
   for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
     if (tileSeat(t) === seatOfCityState(cityState.id)) {
-      setTileOwner(t, actor.seat, id); // A-17: the claim registers to the new civCity
+      setTileOwner(t, actor.seat, id); // the claim registers to the new civCity
     }
   }
   revealAround(state, actor.seat, cityState.centerIndex, 3);
@@ -889,7 +889,7 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
     hp: Math.round(CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   });
-  addEraScore(state, actor.seat, ERA_SCORE_CONQUER); // B-24: gained a city (actor CS conquest)
+  addEraScore(state, actor.seat, ERA_SCORE_CONQUER); // gained a city (actor CS conquest)
   state.eventLog.push(`${cityState.name} has been conquered by ${actor.name}!`);
 }
 
@@ -968,7 +968,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
       t.district !== null &&
       t.district !== 'CITY_CENTER' &&
       t.districtComplete &&
-      !t.districtPillaged; // B-32
+      !t.districtPillaged;
     if (!impJob && !distJob) continue;
     const d = hexDistance(here.col, here.row, t.col, t.row);
     if (d < bestDist) {
@@ -1113,7 +1113,7 @@ export function barbarianPhase(state: GameState): void {
         hexDistance(map.tiles[u.tileIndex].col, map.tiles[u.tileIndex].row, camp.col, camp.row) <= 1,
     );
     if (nearCamp.length === 0) {
-      spawnUnit(state, barbMeleeType(state.turn), campIdx, BARB_SEAT); // B-26 era ladder
+      spawnUnit(state, barbMeleeType(state.turn), campIdx, BARB_SEAT); // the melee era ladder
     } else if (
       barbUnits(state).length < state.barbSeat.camps.length * MAX_BARB_PER_CAMP &&
       nextRandom(state) < 0.1

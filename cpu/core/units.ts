@@ -5,7 +5,7 @@
  */
 
 import type { GameState, City, Seat, Tile, Unit } from './types';
-import { logUnitOrder } from './seatTurn';  // #51/S8.1e
+import { logUnitOrder } from './seatTurn';
 import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial } from '../../world/hex';
 import { isWater, isImpassable } from '../../world/query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
@@ -13,8 +13,8 @@ import { isTechComplete, isCivicComplete } from './effects';
 import { ARTIFACT_BUILDING, ARTIFACT_SLOTS } from '../data/greatPeople';
 import { clearCampFor } from './combat';
 import { UNITS, UNIT_HP, ENCAMPMENT_HP, type UnitDef } from '../data/units';
-import { generalAuraMP } from './aura'; // #70/S3 (B-8): the aura's +1 MP half
-import { goldenMoveBonus } from './eras'; // B-24: MONUMENTALITY / EXODUS +2 MP
+import { generalAuraMP } from './aura'; // the aura's +1 MP half
+import { goldenMoveBonus } from './eras'; // MONUMENTALITY / EXODUS +2 MP
 import { GAME_SPEED, EMBARK_MOVES } from '../data/constants';
 import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
@@ -384,7 +384,7 @@ export function findPath(state: GameState, unit: Unit, targetIndex: number): num
       if (closed.has(n.index) || !passOk(n)) continue;
       // Rivers cost +3 to cross — the same charge the walker pays (water steps
       // never pay a river charge, so naval routing skips it).
-      const g = cur.g + moveCostInto(curTile, n) + (naval ? 0 : riverCharge(state, curTile, n)); // B-23 (#71): roads
+      const g = cur.g + moveCostInto(curTile, n) + (naval ? 0 : riverCharge(state, curTile, n)); // roads
       const existing = open.get(n.index);
       if (!existing || g < existing.g) {
         open.set(n.index, { g, f: g + hexDistance(n.col, n.row, target.col, target.row), from: bestIdx });
@@ -460,7 +460,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   if (cliffBlocksStep(state, from, to, unit)) return 'blocked';
   const cost = transition
     ? unit.movesLeft
-    : moveCostInto(from, to) + riverCharge(state, from, to); // B-23 (#71): roads
+    : moveCostInto(from, to) + riverCharge(state, from, to); // roads
   if (unit.movesLeft < cost && unit.movesLeft < full) return 'cantAfford';
   if (transition) unit.embarked = isWater(to);
   unit.tileIndex = to.index;
@@ -485,7 +485,7 @@ export function walkPath(state: GameState, unit: Unit): void {
     const to = state.map.tiles[nextIndex];
     const blockedByEnemy =
       unitsAt(state, nextIndex).some((u) => u.seat !== unit.seat) ||
-      encampmentBlocks(state, to, unit); // B-17 (#71)
+      encampmentBlocks(state, to, unit);
     if (blockedByEnemy || (unit.path.length === 1 && !tileFreeForUnit(state, nextIndex, unit.seat, unit))) {
       unit.path = null;
       return;
@@ -810,7 +810,7 @@ export function builderRepair(state: GameState, unitId: number): RuleResult {
   if (err) return err;
   const tile = state.map.tiles[unit!.tileIndex];
   if (tile.pillaged) tile.pillaged = false;
-  else if (tile.districtPillaged) tile.districtPillaged = false; // B-32
+  else if (tile.districtPillaged) tile.districtPillaged = false;
   else return no('Nothing pillaged here.');
   unit!.movesLeft = 0;
   return ok;

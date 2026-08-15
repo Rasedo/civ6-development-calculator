@@ -521,8 +521,8 @@ class SimOrders:
         self._eff_version += 1
 
     def _seat_upkeep_and_bankruptcy(self, row: int, active: torch.Tensor) -> None:
-        """Unit upkeep + the bankruptcy rule for ONE seat row (0 = seat 0,
-        r+1 = civ r), at the loop position right after the seat's gold lands:
+        """Unit upkeep + the bankruptcy rule for ONE seat row, at the loop
+        position right after the seat's gold lands:
         charge maintenance for every living unit of this seat off the POOLED
         planes, then disband while insolvent. An eliminated actor charges
         nothing (the TS loop's eliminated-actor continue)."""

@@ -4,7 +4,7 @@ import { hexDistance, neighbors } from '../../world/hex';
 import { isWater, isImpassable, isMountain, isCoastalWater, hasRiver } from '../../world/query';
 import { computeUnlocks, isTechComplete, isCivicComplete, type Unlocks } from './effects';
 import { isExplored } from './fog';
-import { tileAppeal } from './appeal'; // B-27 (#71): SEASIDE_RESORT gates on appeal
+import { tileAppeal } from './appeal'; // SEASIDE_RESORT gates on appeal
 import { SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
@@ -143,7 +143,7 @@ export function validImprovements(state: GameState, tile: Tile, seat: number): I
   return validImprovementsIn(tile, {
     unlocks: gates(state, seat),
     ownsTile: (t) => tileSeat(t) === seat,
-    map: state.map, // B-27 (#71): SEASIDE_RESORT needs coast adjacency + appeal
+    map: state.map, // SEASIDE_RESORT needs coast adjacency + appeal
   });
 }
 

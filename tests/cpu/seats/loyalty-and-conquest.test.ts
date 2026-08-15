@@ -14,7 +14,7 @@ import type { CityState, CityStateType, GameState, City, Seat } from '../../../c
 function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> = {}): Seat {
   const tile = tileAtCoords(state.map, col, row);
   const civ: Seat = {
-    ...emptySeat(state.seats.length), // #51/S6.12
+    ...emptySeat(state.seats.length),
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,
@@ -66,7 +66,7 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
   };
   tile.district = 'CITY_CENTER';
   tile.districtComplete = true;
-  setTileOwner(tile, civ.seat, city.id); // A-17: per-city registry
+  setTileOwner(tile, civ.seat, city.id); // per-city registry
   for (const t of tilesWithin(state.map, col, row, 1)) {
     if (tileSeat(t) !== 0 && (isCityStateSeat(tileSeat(t)) ? cityStateOfSeat(tileSeat(t)) : -1) === -1) {
       setTileOwner(t, civ.seat, city.id);
@@ -80,7 +80,7 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
 function addCs(state: GameState, col: number, row: number, type: CityStateType, envoys = 0): CityState {
   const center = tileAtCoords(state.map, col, row);
   const cityState: CityState = {
-    ...emptySeat(seatOfCityState(state.cityStates.length)), // #51/S6.12
+    ...emptySeat(seatOfCityState(state.cityStates.length)),
     id: state.cityStates.length,
     name: 'Valletta',
     type,

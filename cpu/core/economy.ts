@@ -64,7 +64,7 @@ export function harvestGrant(state: GameState, tile: Tile, seat: number): LumpGr
   if (!tile.resource) return null;
   const res = RESOURCES[tile.resource];
   if (!res?.harvestYield) return null;
-  if (tileSeat(tile) !== seat) return null;  // #51/S7.9
+  if (tileSeat(tile) !== seat) return null;
   // Harvesting needs the tech that works the resource (eyeballed Civ 6
   // gating) — THIS seat's tech.
   const rs = seatOf(state, seat)?.research;

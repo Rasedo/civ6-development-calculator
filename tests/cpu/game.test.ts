@@ -30,9 +30,9 @@ describe('rule formulas', () => {
     expect(amenityTier(0).name).toBe('Content');
     expect(amenityTier(1).name).toBe('Happy');
     expect(amenityTier(3).name).toBe('Ecstatic');
-    expect(amenityTier(-1).name).toBe('Displeased'); // D-12: Content is 0 only
+    expect(amenityTier(-1).name).toBe('Displeased'); // Content is 0 only
     expect(amenityTier(-2).name).toBe('Displeased');
-    expect(amenityTier(-3).name).toBe('Unhappy'); // D-12: Unhappy from -3
+    expect(amenityTier(-3).name).toBe('Unhappy'); // Unhappy from -3
     expect(amenityTier(-5).name).toBe('Unhappy');
   });
 
@@ -64,7 +64,7 @@ describe('founding cities', () => {
     const a = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
     expandBorders(state, a, 4);
     expect(canFoundCity(state, tileAtCoords(state.map, 10, 8).index, 0).ok).toBe(false); // dist 2
-    expect(canFoundCity(state, tileAtCoords(state.map, 11, 8).index, 0).ok).toBe(false); // dist 3 — real Civ 6 blocks it (P4/D-5)
+    expect(canFoundCity(state, tileAtCoords(state.map, 11, 8).index, 0).ok).toBe(false); // dist 3 — real Civ 6 blocks it
     expect(canFoundCity(state, tileAtCoords(state.map, 12, 8).index, 0).ok).toBe(true); // dist 4, owned by first city
   });
 

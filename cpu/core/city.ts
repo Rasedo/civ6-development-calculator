@@ -5,7 +5,7 @@ import { hasFreshWater, isCoastalLand, isImpassable } from '../../world/query';
 import { tileYields, cityDistrictYields, cityBuildingYields, regionalEffects, localBuildingAmenities, pillagedDistrictTypes } from './yields';
 import { getModifiers, makeYieldCtx, withFollowerBelief, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier } from './appeal';
-import { TECHS, ERAS } from '../data/techs'; // B-20 (#71): wonder/civ era scale
+import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
 import { CIVICS } from '../data/civics';
 /** base tourism every completed wonder pays (real Civ 6). */
 export const WONDER_TOURISM_BASE = 2;
@@ -100,7 +100,7 @@ export function citySpecialistSlots(state: GameState, city: City): Map<number, n
   for (const d of city.districts) {
     if (!SPECIALIST_YIELDS[d.type]) continue;
     const dt = state.map.tiles[d.tileIndex];
-    if (!dt.districtComplete || dt.districtPillaged) continue; // B-32: pillaged district has no working specialists
+    if (!dt.districtComplete || dt.districtPillaged) continue; // pillaged district has no working specialists
     const slots = city.buildings.filter((b) => BUILDINGS[b]?.district === d.type).length;
     if (slots > 0) out.set(d.tileIndex, slots);
   }
@@ -193,17 +193,17 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
     (d) =>
       d.type === 'AQUEDUCT' &&
       map.tiles[d.tileIndex].districtComplete &&
-      !map.tiles[d.tileIndex].districtPillaged, // B-32: a pillaged Aqueduct gives no housing
+      !map.tiles[d.tileIndex].districtPillaged, // a pillaged Aqueduct gives no housing
   );
   if (hasAqueduct) {
     water = fresh ? water + AQUEDUCT_FRESH_BONUS : Math.max(water, AQUEDUCT_NO_FRESH_TOTAL);
   }
 
-  const pillaged = pillagedDistrictTypes(map, city.districts); // B-32
+  const pillaged = pillagedDistrictTypes(map, city.districts);
   let total = water;
   for (const d of city.districts) {
     const dt = map.tiles[d.tileIndex];
-    if (!dt.districtComplete || dt.districtPillaged) continue; // B-32: pillaged district's housing is dark
+    if (!dt.districtComplete || dt.districtPillaged) continue; // a pillaged district's housing is dark
     if (d.type === 'NEIGHBORHOOD') {
       total += appealTier(tileAppeal(map, dt)).housing;
     } else {
@@ -212,7 +212,7 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
   }
   for (const id of city.buildings) {
     const def = BUILDINGS[id];
-    if (def && pillaged.has(def.district)) continue; // B-32: buildings in a pillaged district are dark
+    if (def && pillaged.has(def.district)) continue; // buildings in a pillaged district are dark
     if (def?.housing) total += def.housing;
     const beliefHousing = m.buildingHousingAdd[id];
     if (beliefHousing) total += beliefHousing;
@@ -465,10 +465,9 @@ export function computeCityStats(
   }
   if (m.faithPerWonder > 0) buildings.faith += m.faithPerWonder * wonders.length;
   buildings.culture += greatWorkCulture(city);
-  buildings.culture += artifactCulture(city); // B-20 (#79): +3 culture per artifact
+  buildings.culture += artifactCulture(city); // +3 culture per artifact
   // Golden PEN_BRUSH_AND_VOICE — +1 Culture per SPECIALTY district, from
-  // THIS CITY'S OWNER's dedication. It read seat 0's for every city until
-  // #113; the GPU has always read the city's own row.
+  // THIS CITY'S OWNER's dedication, which is the row the GPU reads.
   buildings.culture += goldenCulturePerDistrict(state, city.seat) * completedDistrictCount(state, city, true);
   buildings.faith += relicFaith(city);
 
