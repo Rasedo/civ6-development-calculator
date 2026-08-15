@@ -272,18 +272,14 @@ def _civ_only(plane: str, absent):
     return get
 
 
-def _civ_pair_relation(plane: str, live):
-    """A civ<->civ [R, R] relation read as a per-seat set of ABSOLUTE
-    opponent seats. Seat 0 has no row at all, which is the gap."""
+def _seat_pair_relation(plane: str, live):
+    """A seat<->seat [1+R, 1+R] relation read as a per-seat set of ABSOLUTE
+    opponent seats. One index space: the row IS the seat, so seat 0 answers
+    like any other and the TS side's `overSeats` walker lines up with it
+    without a hole."""
     def get(sim, b, rows):
         m = getattr(sim, plane)[b].tolist()
-        out = []
-        for c in rows:
-            if c == 0:
-                out.append([])
-                continue
-            out.append(sorted(j + 1 for j, v in enumerate(m[c - 1]) if live(v)))
-        return out
+        return [sorted(j for j, v in enumerate(m[c]) if live(v)) for c in rows]
     return get
 
 
@@ -340,12 +336,14 @@ SEAT = {
     # The per-seat city-id allocator — row 0 allocates like every civ row
     # (#110: tile_city stores the ids), so the whole pair row is pinned.
     "nextCityId": _civ_scalar("civ_next_city_id"),
-    # --- the declared gaps (extracted, census-covered, skipped by default) ---
     "scienceTotal": lambda sim, b, rows: [float(sim.seat_science_total[b, _seat_row(sim, c)]) for c in rows],
+    # The three seat-PAIR relations, read over EVERY major row — seat 0 is a
+    # row of these planes like any other, so all three are fatal digest fields.
+    "formalWars": _seat_pair_relation("seat_warkind", lambda v: bool(v)),
+    "denounced": _seat_pair_relation("seat_denounced", lambda v: v >= 0),
+    "allies": _seat_pair_relation("seat_allied", lambda v: bool(v)),
+    # --- the declared gaps (extracted, census-covered, skipped by default) ---
     "tilesPurchased": _civ_only("civ_only_tiles_purchased", 0),
-    "formalWars": _civ_pair_relation("civ_pair_warkind", lambda v: bool(v)),
-    "denounced": _civ_pair_relation("civ_pair_denounced", lambda v: v >= 0),
-    "allies": _civ_pair_relation("civ_pair_allied", lambda v: bool(v)),
 }
 
 

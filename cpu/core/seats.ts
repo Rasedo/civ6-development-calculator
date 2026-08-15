@@ -40,11 +40,13 @@ export const cityStateOfSeat = (seat: number): number => seat - CITY_STATE_SEAT_
 /**
  * Converts a 0-based civ index to a seat id, and back.
  *
- * A second numbering survives alongside the seat space: the per-civ PARALLEL
- * ARRAYS (`CityState.seatEnvoys`, `seatMet`, `seatQuest`) and the trace's
- * per-seat blocks are indexed 0-based, excluding seat 0. These two functions
- * are the only sanctioned crossing between the numberings — a bare `+1`/`-1`
- * on a seat id is a bug.
+ * These two are the only sanctioned crossing between the numberings — a bare
+ * `+1`/`-1` on a seat id is a bug.
+ *
+ * The second numbering has nearly gone. `CityState.seatEnvoys` / `seatMet` /
+ * `seatQuest` are ABSOLUTE-seat-keyed (index 0 IS seat 0), `seatOfIndex`
+ * survives in the roster builder, and after #113 no `cpu/` body calls
+ * `indexOfSeat` at all — the remaining callers are tests.
  */
 export const seatOfIndex = (index: number): number => index + 1;
 export const indexOfSeat = (seat: number): number => seat - 1;

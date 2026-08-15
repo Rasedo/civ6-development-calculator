@@ -621,19 +621,17 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     return ok;
   }
 
-  // CITY-FIRST over a MILITARY garrison. In Civ 6 a garrisoned
-  // unit adds its strength to the CITY's defence; it is not a separate
-  // defender standing in front of it.
-  // https://forums.civfanatics.com/threads/669378/
+  // CITY-FIRST, unconditionally. In Civ 6 a garrisoned unit adds its strength
+  // to the CITY's defence; it is not a separate defender standing in front of
+  // it (https://forums.civfanatics.com/threads/669378/). And a CIVILIAN on a
+  // city tile is not a defender either: it cannot be captured separately at
+  // all — a city is taken by bringing its centre to 0 HP with a melee unit,
+  // and civilians sheltering inside a city that falls simply vanish.
   //
-  // A LONE CIVILIAN still wins, and that is not an oversight: capture kills it
-  // ROLL-FREE and advances, and P2's reshuffle pinned that against TS at seed
-  // 9053 t204 (a seat builder on an at-war seat centre — besieging the city
-  // there cost 2 extra draws). Civilians cannot defend, so they cannot be the
-  // thing a city is attacked "through".
-  const garrisoned = enemies.some((u) => unitDomain(u.type) === 'military');
-  const cityFirst = enemies.length === 0 || garrisoned;
-  if (seatTarget && cityFirst) {
+  // A LONE CIVILIAN used to draw the blow here, pinned to a hunted parity case
+  // (seed 9053 t204) rather than to a source. #113 checked the source: it is
+  // the city that defends its own tile.
+  if (seatTarget) {
     if (attacker.seat === seat && !civsAtWar(state, seatTarget.holder.seat, seat)) {
       return no(`You are at peace with ${seatTarget.holder.name} — declare war first.`);
     }
@@ -641,7 +639,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     return ok;
   }
 
-  if (cityStateTarget && cityFirst) {
+  if (cityStateTarget) {
     attackCityState(state, attacker, cityStateTarget, seat);
     return ok;
   }
@@ -993,7 +991,7 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
   setTileOwner(center, seat, id);
   seatOf(state, seat)!.cities.push({
     id,
-    seat: seat, // #51/S1.3d: a conquered city-state joins the SEAT 0's seat
+    seat: seat, // a conquered city-state joins its CONQUEROR's roster
     foundedTurn: state.turn,  // #51/S4.1r
     name: cityState.name,
     centerIndex: cityState.centerIndex,
@@ -1012,7 +1010,7 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
     hp: Math.round(CITY_MAX_HP / 2), // a conquered CS joins at half HP (S1.3)
   });
   revealAround(state, seat, cityState.centerIndex, 3);
-  addEraScore(state, 0, ERA_SCORE_CONQUER); // B-24: gained a city (CS conquest)
+  addEraScore(state, seat, ERA_SCORE_CONQUER); // B-24: the CONQUEROR gained a city
   state.eventLog.push(`${cityState.name} conquered — the city-state joins your empire.`);
 }
 

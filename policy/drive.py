@@ -6,9 +6,11 @@ The engine hands out an OBSERVATION and a set of legality MASKS,
 on the engine side of that line.
 
 WHAT DRIVING A SEAT MEANS, concretely:
-  * `take_seat` sets `controlled[:, r]`, which makes the engine's scripted
-    picker skip civ r entirely — research auto-pick, the production ladder and
-    the unit AI all stand down.
+  * `take_seat` sets `seat_ext[:, row]`, the column every wire-driven arm
+    gates on. Every major row carries it from world construction — the
+    decision server is the only driver either engine has — so this is a
+    statement of intent for a seat taken mid-run, not a switch that turns
+    some built-in AI off. There is no built-in AI left to turn off.
   * every turn, for each driven seat: read masks + observation, call the ladder,
     write the actions back through the ordinary apply paths —
     `apply_seat_actions` for production/tech/civic/war/purchases (with a
@@ -415,125 +417,80 @@ def _buy_ctx(sim, row: int) -> dict:
 
 
 def _geo_turn(sim):
-    """The GEOPOLITICS decisions for the WHOLE turn — the three scans
-    (denounce, then alliance, then the civ↔civ declarations, plus the peace
-    pairs), computed ONCE per turn because the declare scan couples civs
-    (one new war per civ per turn, both sides). Zero-draw and
-    deterministic; everything here is POLICY — proximity and strength
-    thresholds, the gang bypass, war-weariness pacing, id-order scanning —
-    and the engine arms re-validate only the RULES. Returns (denounce
-    [B,R,R] bool, ally [B,R,R] bool from the lower index, war [B,R] long
-    target, peace [B,R,R] bool from the lower index)."""
-    B, R, dev = sim.B, sim.R, sim.device
-    den = torch.zeros(B, R, R, dtype=torch.bool, device=dev)
+    """The DENOUNCE and ALLIANCE decisions for the whole turn, over seat
+    ROWS. Computed once because the alliance scan reads this turn's fresh
+    grudges. Zero-draw and deterministic; everything here is POLICY —
+    proximity and strength thresholds, row-order scanning — and the engine
+    arm re-validates only the RULES. Returns (denounce [B,1+R,1+R] bool,
+    ally [B,1+R,1+R] bool from the lower row).
+
+    Declaring and suing are NOT here: they ride each seat's own war head
+    through `ladder.pick_war`, the one entry."""
+    B, dev = sim.B, sim.device
+    nrow = 1 + sim.R
+    den = torch.zeros(B, nrow, nrow, dtype=torch.bool, device=dev)
     ally = torch.zeros_like(den)
-    peace = torch.zeros_like(den)
-    war = torch.full((B, R), -1, dtype=torch.long, device=dev)
-    if R < 2:
-        return den, ally, war, peace
+    if sim.R < 1:
+        return den, ally
     rr = sim.rules.seats
-    n_c = sim.city_alive[:, 1:1 + max(sim.R, 1)].sum(dim=2)
-    alive_civ = sim.civ_alive[:, 1:R + 1] & (n_c > 0)  # [B, R]
-    rstr = sim._civ_pair_strengths()
+    n_c = sim.city_alive[:, :nrow].sum(dim=2)
+    alive_row = sim.civ_alive[:, :nrow] & (n_c > 0)  # [B, 1+R]
+    rstr = sim._seat_strengths()
     prox_max = int(rr.get("dowProximity", 9))
     prox = {}
-    for a in range(R):
-        for b in range(R):
+    for a in range(nrow):
+        for b in range(nrow):
             if a != b:
-                prox[a, b] = sim._civ_pair_proximity(a, b)
-    # DENOUNCE: every eligible directed pair — a nearer, weaker-scoring civ
+                prox[a, b] = sim._seat_proximity(a, b)
+    # DENOUNCE: every eligible directed pair — a nearer, weaker-scoring seat
     # not yet at war (the declare family's gates at the WEAKER strength bar,
     # so the stamp reliably precedes the war).
-    for a in range(R):
-        for b in range(R):
+    for a in range(nrow):
+        for b in range(nrow):
             if a == b:
                 continue
             den[:, a, b] = (
-                alive_civ[:, a] & alive_civ[:, b]
-                & (sim.civ_pair_denounced[:, a, b] < 0) & ~sim.war[:, a + 1, b + 1]
+                alive_row[:, a] & alive_row[:, b]
+                & (sim.seat_denounced[:, a, b] < 0) & ~sim.war[:, a, b]
                 & (prox[a, b] <= prox_max) & (rstr[:, a] > rstr[:, b])
             )
-    # ALLIANCE (lower-index proposal): peace-era pairs with no grudge — the
+    # ALLIANCE (lower-row proposal): peace-era pairs with no grudge — the
     # stored stamps AND this turn's fresh denouncements — and no grievances.
-    if int(sim.turn) >= sim._civ_pair_ally_min_peace:
-        for a in range(R):
-            for b in range(a + 1, R):
+    if int(sim.turn) >= sim._ally_min_peace:
+        for a in range(nrow):
+            for b in range(a + 1, nrow):
                 ally[:, a, b] = (
-                    alive_civ[:, a] & alive_civ[:, b]
-                    & ~sim.war[:, a + 1, b + 1] & ~sim.civ_pair_allied[:, a, b]
-                    & (sim.civ_pair_denounced[:, a, b] < 0) & (sim.civ_pair_denounced[:, b, a] < 0)
+                    alive_row[:, a] & alive_row[:, b]
+                    & ~sim.war[:, a, b] & ~sim.seat_allied[:, a, b]
+                    & (sim.seat_denounced[:, a, b] < 0) & (sim.seat_denounced[:, b, a] < 0)
                     & ~den[:, a, b] & ~den[:, b, a]
-                    & (sim.civ_warmonger[:, a + 1] <= 0) & (sim.civ_warmonger[:, b + 1] <= 0)
+                    & (sim.civ_warmonger[:, a] <= 0) & (sim.civ_warmonger[:, b] <= 0)
                 )
-    # DECLARE: aggressor index asc, first eligible target asc, ONE new war
-    # per civ per turn (both sides); the gang bypass (a warmonger target
-    # needs no strength edge); the target's anti-thrash war-weariness gate;
-    # the alliance state as the arms will see it (fresh grudges break, fresh
-    # alliances form, before the declare arm runs).
-    ww = torch.stack([sim._ww_max(r + 1) for r in range(R)], dim=1)
-    ratio = float(rr.get("dowStrengthRatio", 1.3))
-    ww_cap = int(rr.get("dowWwMax", 6))
-    peace_ww = int(rr.get("peaceWw", 10))
-    allied_eff = sim.civ_pair_allied[:, :R, :R].clone()
-    brk = den | den.transpose(1, 2)
-    allied_eff = (allied_eff & ~brk) | ally | ally.transpose(1, 2)
-    used = torch.zeros(B, R, dtype=torch.bool, device=dev)
-    for a in range(R):
-        aggr_ok = alive_civ[:, a] & (ww[:, a] < ww_cap) & ~used[:, a]
-        if not bool(aggr_ok.any()):
-            continue
-        for b in range(R):
-            if a == b:
-                continue
-            declare = (
-                aggr_ok & alive_civ[:, b] & ~used[:, b]
-                & ~sim.war[:, a + 1, b + 1] & (prox[a, b] <= prox_max)
-                & ((rstr[:, a] > rstr[:, b] * ratio) | (sim.civ_warmonger[:, b + 1] >= sim._wm_gang))
-                & (ww[:, b] <= peace_ww)
-                & ~allied_eff[:, a, b]
-            )
-            if bool(declare.any()):
-                war[:, a] = torch.where(declare, torch.full_like(war[:, a], b), war[:, a])
-                used[:, a] = used[:, a] | declare
-                used[:, b] = used[:, b] | declare
-                aggr_ok = aggr_ok & ~declare
-    # PEACE (lower-index pair): a warring pair sues out once EITHER side's
-    # war-weariness is past the threshold — read from the PRE-TURN state,
-    # like the sue verb: a decision decides from its observation.
-    for a in range(R):
-        for b in range(a + 1, R):
-            peace[:, a, b] = sim.war[:, a + 1, b + 1] & ((ww[:, a] > peace_ww) | (ww[:, b] > peace_ww))
-    return den, ally, war, peace
+    return den, ally
 
 
 def geo_decide_and_apply(sim):
-    """Decide the turn's geopolitics once, stash every civ's intents on
-    the sim (the engine arms consume them at their pass positions), and
-    return the tensors for wire extraction (_extract_geo per seat row)."""
-    den, ally, war, peace = _geo_turn(sim)
-    for r in range(sim.R):
-        sim.apply_geo(r + 1, denounce=den[:, r], ally=ally[:, r], geo_war=war[:, r], geo_peace=peace[:, r])
-    return den, ally, war, peace
+    """Decide the turn's denounce/ally once, stash every row's intents on the
+    sim (the engine arm consumes them at the phase top), and return the
+    tensors for wire extraction (_extract_geo per seat row)."""
+    den, ally = _geo_turn(sim)
+    for row in range(1 + sim.R):
+        sim.apply_geo(row, denounce=den[:, row], ally=ally[:, row])
+    return den, ally
 
 
 def _extract_geo(geo, row: int, b: int) -> dict:
-    """Seat `row`'s geo record fields for batch row b — the TARGETS are still
-    civ indices, since the civ-pair planes have no seat-0 row (#111 s5); absent
-    keys = no intent (the wire's optional-field convention)."""
-    den, ally, war, peace = geo
-    r = row - 1
+    """Seat `row`'s geo record fields for batch row b. The TARGETS are
+    ABSOLUTE SEATS — the planes are the war matrix's own rows.
+    Absent keys = no intent (the wire's optional-field convention)."""
+    den, ally = geo
     out = {}
-    dl = den[b, r].nonzero(as_tuple=True)[0].tolist()
+    dl = den[b, row].nonzero(as_tuple=True)[0].tolist()
     if dl:
         out["denounce"] = dl
-    al = ally[b, r].nonzero(as_tuple=True)[0].tolist()
+    al = ally[b, row].nonzero(as_tuple=True)[0].tolist()
     if al:
         out["ally"] = al
-    if int(war[b, r]) >= 0:
-        out["geoWar"] = int(war[b, r])
-    pl = peace[b, r].nonzero(as_tuple=True)[0].tolist()
-    if pl:
-        out["geoPeace"] = pl
     return out
 
 
@@ -680,8 +637,9 @@ def _extract_record(sim, row: int, prod, tech, civic, war, env_seq, seq, buy, wo
     rows = [seq[b, :, k].tolist() for k in range(int(seq.shape[2]))]
     while len(rows) > 1 and all(x < 0 for x in rows[-1]):
         rows.pop()
-    # the war-head column (0 = declare on seat 0, R = sue for peace), or
-    # None. OPTIONAL field: a missing key reads as None.
+    # the war-head column over `war_targets(row)` — the other majors in
+    # ascending seat order: k declares on the k-th, R+k sues it. Or None;
+    # OPTIONAL field, a missing key reads as None.
     _w = None if war is None or int(war[b]) < 0 else int(war[b])
     # this row's envoy assignment sequence (CS indices), possibly empty.
     _e = [] if env_seq is None else [int(x) for x in env_seq[b].tolist() if int(x) >= 0]
@@ -807,12 +765,13 @@ def replay_seat(sim, row: int, rec: dict) -> None:
     levy = None if _lv is None else torch.full((sim.B,), int(_lv), dtype=torch.long, device=dev)
     sim.apply_seat_actions(row, production=prod, tech=tech, civic=civic, war=war, envoys=env_seq,
                            buy=buy, worship=worship, relig=relig, levy=levy)
-    # the GEOPOLITICS intents (civ-index targets) stash for the phase's own
-    # pass positions.
-    def _geo_mask(idxs) -> torch.Tensor:
-        m = torch.zeros(sim.B, sim.R, dtype=torch.bool, device=dev)
-        for j in idxs:
-            if 0 <= int(j) < sim.R:
+    # the DENOUNCE/ALLY intents stash for the phase-top arm. Targets are
+    # ABSOLUTE SEATS, which for a major is its row; declaring and
+    # suing rode `war` above, on the head.
+    def _geo_mask(seats) -> torch.Tensor:
+        m = torch.zeros(sim.B, 1 + sim.R, dtype=torch.bool, device=dev)
+        for j in seats:
+            if 0 <= int(j) <= sim.R:
                 m[:, int(j)] = True
         return m
 
@@ -821,10 +780,6 @@ def replay_seat(sim, row: int, rec: dict) -> None:
         geo_kwargs["denounce"] = _geo_mask(rec["denounce"])
     if rec.get("ally"):
         geo_kwargs["ally"] = _geo_mask(rec["ally"])
-    if rec.get("geoWar") is not None:
-        geo_kwargs["geo_war"] = torch.full((sim.B,), int(rec["geoWar"]), dtype=torch.long, device=dev)
-    if rec.get("geoPeace"):
-        geo_kwargs["geo_peace"] = _geo_mask(rec["geoPeace"])
     if geo_kwargs:
         sim.apply_geo(row, **geo_kwargs)
     # draw order: replay stashes exactly as the driver does; the PHASE

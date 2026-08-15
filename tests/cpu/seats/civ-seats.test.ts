@@ -215,7 +215,7 @@ describe('war and peace', () => {
     const theirs = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 4, 5).index, civ.seat)!;
     expect(unitsHostile(state, mine, theirs)).toBe(false);
     expect(attackTargets(state, mine)).not.toContain(theirs.tileIndex);
-    expect(declareWar(state, indexOfSeat(civ.seat), 0).ok).toBe(true);
+    expect(declareWar(state, civ.seat, 0).ok).toBe(true);
     expect(unitsHostile(state, mine, theirs)).toBe(true);
     expect(attackTargets(state, mine)).toContain(theirs.tileIndex);
   });
@@ -241,10 +241,10 @@ describe('war and peace', () => {
     state.unitsMode = true;
     const civ = addCiv(state, 8, 8);
     setWar(state, civ.seat, 0, true);
-    expect(sueForPeace(state, indexOfSeat(civ.seat), 0).ok).toBe(false); // too soon
+    expect(sueForPeace(state, civ.seat, 0).ok).toBe(false); // too soon
     setWarTurnsWith(state, civ.seat, 0, 10);
     seatOf(state, 0)!.treasury = 0;
-    expect(sueForPeace(state, indexOfSeat(civ.seat), 0).ok).toBe(false); // too broke
+    expect(sueForPeace(state, civ.seat, 0).ok).toBe(false); // too broke
 
     // Conquest path instead: batter the city down and take it.
     const civCity = civ.cities[0];

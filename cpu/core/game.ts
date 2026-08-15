@@ -43,8 +43,10 @@ export const TURN_LIMIT = 250;
 
 /** Eureka/inspiration discount applied to a research cost. */
 export function effectiveResearchCost(state: GameState, seat: number, id: string, baseCost: number): number {
-  // A GOLDEN Free Inquiry / Pen-Brush-and-Voice deepens the boost.
-  return effectiveResearchCostIn(seatOf(state, seat)!.research, id, baseCost, goldenBoostBonus(state, 0, !TECHS[id]));
+  // A GOLDEN Free Inquiry / Pen-Brush-and-Voice deepens the boost — the
+  // RESEARCHING seat's dedication, which is the `seat` this function already
+  // takes. It read seat 0's until #113; the GPU passes the row.
+  return effectiveResearchCostIn(seatOf(state, seat)!.research, id, baseCost, goldenBoostBonus(state, seat, !TECHS[id]));
 }
 
 /**
@@ -1203,13 +1205,6 @@ export function deserialize(json: string): GameState {
     t.builtWonder ??= null;
     t.builtWonderComplete ??= false;
   }
-  // Routes live on the owning seat now; a legacy save kept seat 0's on the
-  // GameState — fold them in (and drop the dead key so serialize round-trips).
-  const legacyRoutes = (state as unknown as { tradeRoutes?: Seat['tradeRoutes'] }).tradeRoutes;
-  if (legacyRoutes?.length && !state.seats[0]?.tradeRoutes?.length && state.seats[0]) {
-    state.seats[0].tradeRoutes = legacyRoutes;
-  }
-  delete (state as unknown as { tradeRoutes?: unknown }).tradeRoutes;
   state.unitsMode ??= false;
   state.units ??= [];
   state.nextUnitId ??= 0;

@@ -162,10 +162,10 @@ class SimEconomy:
         techs = self.civ_techs.gather(1, civ.view(-1, 1, 1).expand(-1, 1, T)).squeeze(1)
         civics = self.civ_civics.gather(1, civ.view(-1, 1, 1).expand(-1, 1, C)).squeeze(1)
         era = self._civ_era(techs, civics).clamp(0, formal.numel() - 1)
-        rr = (row >= 1) & (row <= self.R) & (foe_row >= 1) & (foe_row <= self.R)
-        n = self.civ_pair_warkind.shape[1]
-        flat = (row.clamp(1, max(n, 1)) - 1) * n + (foe_row.clamp(1, max(n, 1)) - 1)
-        kind = self.civ_pair_warkind.reshape(self.B, -1).gather(1, flat.unsqueeze(1)).squeeze(1) & rr
+        rr = (row >= 0) & (row <= self.R) & (foe_row >= 0) & (foe_row <= self.R)
+        n = self.seat_warkind.shape[1]
+        flat = row.clamp(0, n - 1) * n + foe_row.clamp(0, n - 1)
+        kind = self.seat_warkind.reshape(self.B, -1).gather(1, flat.unsqueeze(1)).squeeze(1) & rr
         return torch.where(kind, formal[era], surprise[era])
 
     def _ww_battle(self, hit: torch.Tensor, a_row, d_row, tile: torch.Tensor,
@@ -216,10 +216,10 @@ class SimEconomy:
             # ..._IN_FOREIGN_LANDS 2 - so an ALLY's territory is home ground
             # too, and unowned ground is foreign. `friendlyLand`'s twin.
             _own = owner == self._ROW_SEAT.gather(0, self_row.clamp(min=0))
-            _rr = (self_row >= 1) & (self_row <= self.R) & (owner >= 1) & (owner <= self.R)
-            _n = self.civ_pair_allied.shape[1]
-            _fl = (self_row.clamp(1, max(_n, 1)) - 1) * _n + (owner.clamp(1, max(_n, 1)) - 1)
-            _ally = self.civ_pair_allied.reshape(self.B, -1).gather(1, _fl.unsqueeze(1)).squeeze(1) & _rr
+            _rr = (self_row >= 0) & (self_row <= self.R) & (owner >= 0) & (owner <= self.R)
+            _n = self.seat_allied.shape[1]
+            _fl = self_row.clamp(0, _n - 1) * _n + owner.clamp(0, _n - 1)
+            _ally = self.seat_allied.reshape(self.B, -1).gather(1, _fl.unsqueeze(1)).squeeze(1) & _rr
             at_home = (_own | _ally) & (not city)
             gain = base * torch.where(at_home, 1, abroad)
             if died is not None:

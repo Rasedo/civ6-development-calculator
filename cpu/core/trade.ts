@@ -5,7 +5,7 @@
  */
 
 import { addYields, emptyYields, type City, type CityState, type GameState, type Yields } from './types';
-import { isBarbSeat, seatOfIndex, seatOf, citiesOf, civsAtWar } from './seats';
+import { isBarbSeat, seatOf, citiesOf, civsAtWar } from './seats';
 import { hexDistance } from '../../world/hex';
 import { layTradeRoad } from './units'; // B-23 (#71): Traders lay road
 import { DISTRICTS } from '../data/districts';
@@ -223,18 +223,19 @@ export function addCsTradeRoute(state: GameState, from: number, cityStateId: num
   return { ok: true };
 }
 
-/** International: can seat 0 route from own city `from` to met seat
- * civ `seatCiv`'s city `seatCity`? */
-export function canAddIntlTradeRoute(state: GameState, from: number, seatCiv: number, seatCity: number, seat: number): RuleResult {
+/** International: can `seat` route from its own city `from` to major
+ * `toSeat`'s city `seatCity`? Both ends are ABSOLUTE seats — the `toSeat`
+ * field this writes has always stored one. */
+export function canAddIntlTradeRoute(state: GameState, from: number, toSeat: number, seatCity: number, seat: number): RuleResult {
   const a = seatOf(state, seat)!.cities.find((c) => c.id === from);
-  const civSeat = seatOf(state, seatOfIndex(seatCiv));
+  const civSeat = seatOf(state, toSeat);
   const civCity = civSeat?.cities.find((c) => c.id === seatCity);
   if (!a || !civSeat || !civCity) return { ok: false, reason: 'No such city / actor city.' };
   const routes = seatOf(state, seat)!.tradeRoutes ?? [];
   if (routes.length >= tradeCapacity(state, seat)) {
     return { ok: false, reason: `No spare trading capacity (${tradeCapacity(state, seat)} in use).` };
   }
-  if (routes.some((r) => r.from === from && r.toSeat === seatOfIndex(seatCiv) && r.toSeatCity === seatCity)) {
+  if (routes.some((r) => r.from === from && r.toSeat === toSeat && r.toSeatCity === seatCity)) {
     return { ok: false, reason: 'That route already runs.' };
   }
   const ta = state.map.tiles[a.centerIndex];
@@ -245,14 +246,14 @@ export function canAddIntlTradeRoute(state: GameState, from: number, seatCiv: nu
   return { ok: true };
 }
 
-export function addIntlTradeRoute(state: GameState, from: number, seatCiv: number, seatCity: number, seat: number): RuleResult {
-  const check = canAddIntlTradeRoute(state, from, seatCiv, seatCity, seat);
+export function addIntlTradeRoute(state: GameState, from: number, toSeat: number, seatCity: number, seat: number): RuleResult {
+  const check = canAddIntlTradeRoute(state, from, toSeat, seatCity, seat);
   if (!check.ok) return check;
-  (seatOf(state, seat)!.tradeRoutes ??= []).push({ from, to: -1, toSeat: seatOfIndex(seatCiv), toSeatCity: seatCity, expiresTurn: state.turn + TRADE_ROUTE_DURATION });
+  (seatOf(state, seat)!.tradeRoutes ??= []).push({ from, to: -1, toSeat, toSeatCity: seatCity, expiresTurn: state.turn + TRADE_ROUTE_DURATION });
   layRouteRoad(
     state,
     from,
-    seatOf(state, seatOfIndex(seatCiv))?.cities.find((c) => c.id === seatCity)?.centerIndex ?? -1,
+    seatOf(state, toSeat)?.cities.find((c) => c.id === seatCity)?.centerIndex ?? -1,
     seat,
   );
   return { ok: true };

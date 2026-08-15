@@ -357,10 +357,10 @@ const SEAT: Record<string, Extractor> = {
   beliefFollower: overSeats((s) => idx(FOLLOWER_IDX, s.religion.follower)),
   beliefFounder: overSeats((s) => idx(FOUNDER_IDX, s.religion.founder)),
   beliefEnhancer: overSeats((s) => idx(ENHANCER_IDX, s.religion.enhancer)),
-  // --- the declared gaps (extracted, census-covered, skipped by default) ---
   scienceTotal: overSeats((s) => s.scienceTotal),
-  tilesPurchased: overSeats((s) => s.tilesPurchased),
   nextCityId: overSeats((s) => s.nextCityId),
+  // The three seat-PAIR relations, over EVERY seat — seat 0 included, which
+  // is why all three are fatal digest fields rather than declared gaps.
   formalWars: overSeats((s) => [...s.formalWars].sort((a, b) => a - b)),
   denounced: overSeats((s) =>
     Object.keys(s.denounced)
@@ -368,6 +368,8 @@ const SEAT: Record<string, Extractor> = {
       .sort((a, b) => a - b),
   ),
   allies: overSeats((s) => [...s.allies].sort((a, b) => a - b)),
+  // --- the declared gaps (extracted, census-covered, skipped by default) ---
+  tilesPurchased: overSeats((s) => s.tilesPurchased),
 };
 
 const perCiv = (state: GameState, fn: (seat: number) => number): number[] =>

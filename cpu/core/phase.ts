@@ -56,7 +56,7 @@ import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex } from './unit
 const A_FOUND_CITY = unitActionIndex(IMPROVEMENT_IDS).FOUND_CITY;
 import { ALLY_MIN_PEACE, CIV_LEADERS, FORMAL_WAR_MIN_TURNS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION } from '../data/seats';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles, goldenBoostBonus } from './eras';
-import { NO_SEAT, atWarWithAny, citiesOf, civHasStrategic, civsAtWar, emptySeat, indexOfSeat, isCiv, prophetsOf, seatOf, seatOfCityState, seatOfIndex, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, warTurnsWith, warsOf } from './seats';
+import { NO_SEAT, atWarWithAny, citiesOf, civHasStrategic, civsAtWar, emptySeat, isCiv, prophetsOf, seatOf, seatOfCityState, seatOfIndex, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, warTurnsWith, warsOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 // The two verb bodies the SEAT-0 applier and this one share — one SNIPE ring,
 // one SPREAD rule, whichever seat gave the order.
@@ -248,36 +248,29 @@ export function seatProximity(state: GameState, a: number, b: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Seat 0 diplomacy actions
+// DIPLOMACY, for any seat against any seat. Per-pair war state over the seat
+// space: `setWar` writes both seats' `wars` lists, so the store is symmetric
+// by construction.
 // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// Per-pair war state on UNIFIED civ ids (0 = seat 0,
-// r+1 = seat r). The (0, r+1) seat 0 pair reads/writes the EXISTING `atWar`
-// one store: `setWar` writes both seats' `wars` lists
-// (symmetric by construction). S1 ships these INERT (nothing reads them yet).
-// ---------------------------------------------------------------------------
-
-
-
-
-
-
-export function declareWar(state: GameState, seatIndex: number, seat: number): RuleResult {
-  const actor = seatOf(state, seatOfIndex(seatIndex));
+/** `actor` declares war on `seat`. Both are ABSOLUTE seats. */
+export function declareWar(state: GameState, actorSeat: number, seat: number): RuleResult {
+  const actor = seatOf(state, actorSeat);
   if (!actor) return no('No such civilization.');
   if (civsAtWar(state, actor.seat, seat)) return no('Already at war.');
   setWar(state, actor.seat, seat, true);
   setWarTurnsWith(state, actor.seat, seat, 0);
-  // The seat 0 earns GRIEVANCES for declaring, exactly as a seat
-  // does (WARMONGER_DOW at the civ↔civ DoW site).
+  // Declaring earns GRIEVANCES — the same WARMONGER_DOW every declaration
+  // pays, wherever it is entered from.
   seatOf(state, seat)!.warmonger = (seatOf(state, seat)!.warmonger ?? 0) + WARMONGER_DOW;
   state.eventLog.push(`War declared on ${actor.name}!`);
   return ok;
 }
 
-export function sueForPeace(state: GameState, seatIndex: number, seat: number): RuleResult {
-  const actor = seatOf(state, seatOfIndex(seatIndex));
+/** `seat` sues `actorSeat` for peace, on THIS war's clock and price. Both are
+ *  ABSOLUTE seats. */
+export function sueForPeace(state: GameState, actorSeat: number, seat: number): RuleResult {
+  const actor = seatOf(state, actorSeat);
   if (!actor) return no('No such civilization.');
   if (!civsAtWar(state, actor.seat, seat)) return no('Not at war.');
   const waited = warTurnsWith(state, actor.seat, seat);
@@ -295,6 +288,9 @@ export function sueForPeace(state: GameState, seatIndex: number, seat: number): 
 
 function makePeace(state: GameState, actor: Seat, foe: number): void {
   setWar(state, actor.seat, foe, false);
+  // the ended war's KIND clears; the grudge stamp is permanent. Here rather
+  // than at one caller, so every peace path sheds it.
+  setWarFormal(state, actor.seat, foe, false);
   // A peace treaty sheds 2000 WWP from THAT war, on both sides.
   // Deliberately larger than any plausible accumulation — it is how the source
   // stops a settled war haunting a civ forever, since the residual of a war you
@@ -778,7 +774,7 @@ export function assertCityRegistryCoherent(state: GameState): void {
         const t = state.map.tiles[tileIndex];
         if (!tileBelongsTo(t, civCity) || !tileOwnedByCiv(t, civ)) {
           throw new Error(
-            `A-24 registry incoherence: actor=${indexOfSeat(actor.seat)} civCity.id=${civCity.id} ${kind}=${type} ` +
+            `A-24 registry incoherence: seat=${actor.seat} civCity.id=${civCity.id} ${kind}=${type} ` +
               `tile=${tileIndex} ownerSeat=${tileSeat(t)} ownerCity=${tileCity(t)} turn=${state.turn}`,
           );
         }
@@ -855,10 +851,19 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
     const targets = warTargets(state, actor.seat);
     const foe = targets[warCol < Rw ? warCol : warCol - Rw];
     if (foe !== undefined && actor.seat !== foe) {
-      if (warCol < Rw && !civsAtWar(state, actor.seat, foe)) {
+      // ALLIES NEVER DECLARE ON EACH OTHER, declaring earns GRIEVANCES, and
+      // the war takes its KIND here: FORMAL iff this seat's grudge on the
+      // target is at least FORMAL_WAR_MIN_TURNS old (a same-turn stamp is 0
+      // old — a surprise). All three live here because the head is the ONLY
+      // entry: nothing else declares, so nothing else can carry them.
+      if (warCol < Rw && !civsAtWar(state, actor.seat, foe) && !seatsAllied(state, actor.seat, foe)) {
         setWar(state, actor.seat, foe, true);
         setWarTurnsWith(state, actor.seat, foe, 0);
-        state.eventLog.push(`${actor.name} declares war on ${seatOf(state, foe)?.name ?? 'you'}!`);
+        actor.warmonger = (actor.warmonger ?? 0) + WARMONGER_DOW;
+        const dt = actor.denounced[foe];
+        const formal = dt !== undefined && state.turn - dt >= FORMAL_WAR_MIN_TURNS;
+        setWarFormal(state, actor.seat, foe, formal);
+        state.eventLog.push(`${actor.name} declares ${formal ? 'a formal' : 'a surprise'} war on ${seatOf(state, foe)?.name ?? 'you'}!`);
       } else if (warCol >= Rw && civsAtWar(state, actor.seat, foe)) {
         const waited = warTurnsWith(state, actor.seat, foe);
         const cost = PEACE_GOLD_COST(waited);
@@ -1093,19 +1098,21 @@ export function seatPhase(state: GameState, seat: number): void {
     u.movesFull = u.movesLeft;
   }
 
-  // #107: the GEOPOLITICS verbs — wire DECISIONS at their own positions:
-  // denounce + alliance, then the civ↔civ declarations, BEFORE the seat
-  // loop (a declared war is live for both civs' war-acts this turn; a
-  // fresh grudge blocks a same-turn alliance and starts the formal
-  // clock); peace lands after the loop. Targets are CIV indices (seat =
-  // index + 1). Each arm re-validates its RULES on the named pair; the
-  // choosing thresholds (proximity, strength edges, war-weariness pacing)
-  // are the driver's policy and never re-checked here.
+  // #107: the DENOUNCE and ALLIANCE verbs — wire DECISIONS at their own
+  // position, BEFORE the seat loop, so a fresh grudge blocks a same-turn
+  // alliance and starts the formal clock before any declaration reads
+  // either. Targets are ABSOLUTE SEATS. Each arm re-validates its
+  // RULES on the named pair; the choosing thresholds (proximity, strength
+  // edges) are the driver's policy and never re-checked here.
+  //
+  // DECLARING AND SUING ARE NOT HERE. They ride each seat's own war head at
+  // its record position — the one entry, with the alliance gate, the
+  // grievance and the war's kind on it.
   for (const actor of state.seats) {
     if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
     const recG = state.seatActions?.[state.turn - 1]?.[actor.seat];
     for (const tj of recG?.denounce ?? []) {
-      const target = seatOf(state, tj + 1);
+      const target = seatOf(state, tj);
       if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
       if (actor.denounced[target.seat] !== undefined) continue; // the grudge is permanent
       if (civsAtWar(state, actor.seat, target.seat)) continue;
@@ -1118,7 +1125,7 @@ export function seatPhase(state: GameState, seat: number): void {
     if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
     const recG = state.seatActions?.[state.turn - 1]?.[actor.seat];
     for (const tj of recG?.ally ?? []) {
-      const target = seatOf(state, tj + 1);
+      const target = seatOf(state, tj);
       if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
       if (state.turn < ALLY_MIN_PEACE) continue; // the alliance era has not opened
       if (civsAtWar(state, actor.seat, target.seat) || seatsAllied(state, actor.seat, target.seat)) continue;
@@ -1128,24 +1135,6 @@ export function seatPhase(state: GameState, seat: number): void {
       state.eventLog.push(`${actor.name} and ${target.name} form an alliance.`);
     }
   }
-  for (const actor of state.seats) {
-    if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
-    const recG = state.seatActions?.[state.turn - 1]?.[actor.seat];
-    const tj = recG?.geoWar;
-    if (tj === undefined || tj === null || tj < 0) continue;
-    const target = seatOf(state, tj + 1);
-    if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
-    if (civsAtWar(state, actor.seat, target.seat) || seatsAllied(state, actor.seat, target.seat)) continue;
-    setWar(state, actor.seat, target.seat, true);
-    actor.warmonger = (actor.warmonger ?? 0) + WARMONGER_DOW; // declaring earns grievances
-    // FORMAL iff the aggressor's grudge on this target is old enough; a
-    // same-turn stamp is 0 old — a surprise.
-    const dt = actor.denounced[target.seat];
-    const formal = dt !== undefined && state.turn - dt >= FORMAL_WAR_MIN_TURNS;
-    setWarFormal(state, actor.seat, target.seat, formal);
-    state.eventLog.push(`${actor.name} declares ${formal ? 'a formal' : 'a surprise'} war on ${target.name}!`);
-  }
-
   // EVERY seat takes its turn through this one body, in seat order. There is
   // no seat 0 loop and no seat loop.
   for (const actor of state.seats) {
@@ -1900,24 +1889,6 @@ export function seatPhase(state: GameState, seat: number): void {
     // reading triples as per-unit rows here would dispatch garbage. The one
     // unit-wire fork left — unify the schema to route it too (#108).
     if (recU && actor.seat !== 0) applySeatUnitOrders(state, actor, recU.units, seat);
-  }
-
-  // #107: the civ↔civ PEACE arm — after every seat acted, the pair named
-  // on the LOWER civ index's record. The rule is only "at war"; the
-  // war-weariness threshold that CHOOSES to sue is the driver's, read
-  // from the pre-turn observation like the seat-0 sue verb.
-  for (const actor of state.seats) {
-    if (!isCiv(actor.seat)) continue;
-    const recG = state.seatActions?.[state.turn - 1]?.[actor.seat];
-    for (const tj of recG?.geoPeace ?? []) {
-      const target = seatOf(state, tj + 1);
-      if (!target || !isCiv(target.seat)) continue;
-      if (!civsAtWar(state, actor.seat, target.seat)) continue;
-      setWar(state, actor.seat, target.seat, false);
-      warWearinessPeace(state, actor.seat, target.seat);
-      setWarFormal(state, actor.seat, target.seat, false); // the ended war's kind clears (the grudge stays)
-      state.eventLog.push(`${actor.name} and ${target.name} make peace.`);
-    }
   }
 
   // Env-gated registry coherence check at the phase tail (after every

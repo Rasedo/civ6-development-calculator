@@ -70,7 +70,9 @@ def _rollout_loop(sim: BatchSim, turns: int, seed: int) -> None:
         um[:, :, 12:13] = um[:, :, 12:13] & ~has_attack
         ua = masked_choice(um, game_seed.view(B, 1), pslots, turn, HEAD_UNIT)
         ea = masked_choice(sim.envoy_mask(), game_seed, turn, HEAD_ENVOY)
-        sim.step(production=pa, tech=ta, civic=ca, units=ua, envoy=ea)
+        sim.apply_seat_actions(0, production=pa, tech=ta, civic=ca, envoys=ea)
+        sim._apply_seat_unit_actions(0, ua)
+        sim.step()
         pass  # step cost only
 
 

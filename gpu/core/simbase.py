@@ -475,7 +475,7 @@ _MUTABLE = [
     # only here (`citystate_at` is a view of it), so it must round-trip.
     "tile_seat", "tile_city",
     "citystate_last_levy",  # levy cooldown
-    "civ_pair_warkind", "civ_pair_denounced", "civ_pair_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "seat_ext", "city_prod_bank",
+    "seat_warkind", "seat_denounced", "seat_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "seat_ext", "city_prod_bank",
     "city_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dest",  # international dest CENTER TILE (>=0), else -1 (domestic/CS) — SEAT-indexed; civ_only_route_dest is the [:, 1:] view

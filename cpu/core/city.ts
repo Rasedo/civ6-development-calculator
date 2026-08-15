@@ -556,8 +556,10 @@ export function computeCityStats(
   // cityBuildingYields already applied to the building's own yields).
   buildings.culture += greatWorkCulture(city);
   buildings.culture += artifactCulture(city); // B-20 (#79): +3 culture per artifact
-  // Golden PEN_BRUSH_AND_VOICE — +1 Culture per SPECIALTY district.
-  buildings.culture += goldenCulturePerDistrict(state, 0) * completedDistrictCount(state, city, true);
+  // Golden PEN_BRUSH_AND_VOICE — +1 Culture per SPECIALTY district, from
+  // THIS CITY'S OWNER's dedication. It read seat 0's for every city until
+  // #113; the GPU has always read the city's own row.
+  buildings.culture += goldenCulturePerDistrict(state, city.seat) * completedDistrictCount(state, city, true);
   // RELICS pay FAITH (4 each), in the same buildings bucket and at
   // the same position — a relic is a Great Work held in the Temple's slot.
   buildings.faith += relicFaith(city);

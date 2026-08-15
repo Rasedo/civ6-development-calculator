@@ -95,13 +95,11 @@ export function loadWorld(world: WorldFile): GameState {
   // capitals: each civ's file units (settler + warrior) ARE its start.
   world.civs.forEach((civ, i) => {
     const leader = CIV_LEADERS[civ.leader % CIV_LEADERS.length];
-    const seat = i === 0
-      ? state.seats[0]
-      : (() => {
-          const s = emptySeat(i);
-          state.seats.push(s);
-          return s;
-        })();
+    // ONE constructor, every seat. `createGameFromMap` pre-seeds row 0's
+    // record for the map path, so take the record when it is already there and
+    // build it when it is not — there is no `i === 0` arm, and seat 0 draws its
+    // leader, its colour and its aggression exactly where every other seat does.
+    const seat = state.seats[i] ?? (state.seats[i] = emptySeat(i));
     seat.name = leader.name;
     seat.color = leader.color;
     seat.aggression = civ.aggression;

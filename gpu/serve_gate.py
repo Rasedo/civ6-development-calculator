@@ -304,6 +304,15 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             env0 = drive._seat_envoys(sim, 0)
             env0_t = env0 if env0 is not None else _neg0.unsqueeze(1)
             _e0_l = env0_t.tolist()
+            # The WAR verb, seat 0: the same `pick_war`, over the same head, off
+            # the same policy stream every civ row uses. Seat 0 had NO war
+            # decider at all until A-31r — the hand-rolled block below simply
+            # never picked a column — so it could neither declare nor sue while
+            # every other seat could.
+            war0 = ladder.pick_war(m0["war"], drive._war_ctx(blocks0), {
+                "dow": drive._policy_rng(sim, seeds, t, 0, 1),
+                "peace": drive._policy_rng(sim, seeds, t, 0, 2),
+            })
             # The GOLD/FAITH/LEVY verbs, seat 0: the same decider every seat
             # runs, over the same shared candidate bodies.
             buy0, worship0, relig0, levy0 = drive._decide_buys(sim, 0)
@@ -319,6 +328,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                                    if int(prod0[b, c]) >= 0 and bool(sim.city_alive[b, 0, c])],
                     "tech": None if int(tech0[b]) < 0 else int(tech0[b]),
                     "civic": None if int(civic0[b]) < 0 else int(civic0[b]),
+                    "war": None if int(war0[b]) < 0 else int(war0[b]),
                     "units": [[_pt_l[b][_sm0_l[b][n]], v, int(_pc_l[b][_sm0_l[b][n]])]
                               for n, v in enumerate(_u0_l[b])
                               if _sm0_l[b][n] >= 0 and v >= 0 and v != 12],
@@ -327,8 +337,11 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                 }
                 ch.stdin.write(json.dumps({"recs": recs}) + "\n")
                 ch.stdin.flush()
-            sim.step(production=prod0, tech=tech0, civic=civic0, units=u0, envoy=env0_t,
-                     buy=buy0, worship=worship0, relig=relig0, levy=levy0)
+            sim.apply_seat_actions(0, production=prod0, tech=tech0, civic=civic0, war=war0,
+                                   envoys=env0_t, buy=buy0, worship=worship0, relig=relig0, levy=levy0)
+            if sim.units_mode:
+                sim._apply_seat_unit_actions(0, u0)
+            sim.step()
             trs = [read_msg(ch) for ch in children]  # barrier: every child's post-step digest
             # THE DIGEST IS THE GATE. On the FIRST disagreement the mismatching
             # groups are dumped keyed from both engines and diffed BY NAME;
@@ -473,7 +486,10 @@ def main() -> None:
     for t in range(t0, args.turns):
         msg = read_msg()
         assert msg.get("t") == t + 1, f"turn frame skew: TS says {msg.get('t')}, orchestrator at {t + 1}"
-        for seat in [0] + [r + 1 for r in seats]:
+        # `seats` is already ROWS (= absolute seat ids for majors). The `r + 1`
+        # this line used to carry was left over from the civ-index space and
+        # skipped seat 1 while asking for a seat R+1 that does not exist.
+        for seat in [0] + seats:
             gobs = env.observe(seat)[0]
             tobs = torch.tensor(msg["obs"][str(seat)], dtype=torch.float64)
             if gobs.shape[0] != tobs.shape[0]:
@@ -562,6 +578,15 @@ def main() -> None:
         _pc_l = sim._type_civilian[sim.unit_type][0].tolist()
         env0 = drive._seat_envoys(sim, 0)
         env0_t = env0 if env0 is not None else _neg0.unsqueeze(1)
+            # The WAR verb, seat 0: the same `pick_war`, over the same head, off
+        # the same policy stream every civ row uses. Seat 0 had NO war
+        # decider at all until A-31r — the hand-rolled block below simply
+        # never picked a column — so it could neither declare nor sue while
+        # every other seat could.
+        war0 = ladder.pick_war(m0["war"], drive._war_ctx(blocks0), {
+            "dow": drive._policy_rng(sim, [args.seed], t, 0, 1),
+            "peace": drive._policy_rng(sim, [args.seed], t, 0, 2),
+        })
         buy0, worship0, relig0, levy0 = drive._decide_buys(sim, 0)  # seat 0's own gold/faith verbs
         # The geopolitics decide ONCE per turn — the batched path's twin.
         geo = drive.geo_decide_and_apply(sim)
@@ -573,6 +598,7 @@ def main() -> None:
                            if int(prod0[0, c]) >= 0 and bool(sim.city_alive[0, 0, c])],
             "tech": None if int(tech0[0]) < 0 else int(tech0[0]),
             "civic": None if int(civic0[0]) < 0 else int(civic0[0]),
+            "war": None if int(war0[0]) < 0 else int(war0[0]),
             "units": [[_pt_l[_sm0_l[n]], v, int(_pc_l[_sm0_l[n]])]
                       for n, v in enumerate(_u0_l)
                       if _sm0_l[n] >= 0 and v >= 0 and v != 12],
@@ -583,8 +609,11 @@ def main() -> None:
             print(f"BUYREC turn {t + 1}: " + json.dumps({k: v["buy"] for k, v in recs.items() if "buy" in v}))
         child.stdin.write(json.dumps({"recs": recs}) + "\n")
         child.stdin.flush()
-        sim.step(production=prod0, tech=tech0, civic=civic0, units=u0, envoy=env0_t,
-                 buy=buy0, worship=worship0, relig=relig0, levy=levy0)
+        sim.apply_seat_actions(0, production=prod0, tech=tech0, civic=civic0, war=war0,
+                               envoys=env0_t, buy=buy0, worship=worship0, relig=relig0, levy=levy0)
+        if sim.units_mode:
+            sim._apply_seat_unit_actions(0, u0)
+        sim.step()
         tr = read_msg()
         # THE DIGEST IS THE GATE — the batched path's twin block.
         if True:

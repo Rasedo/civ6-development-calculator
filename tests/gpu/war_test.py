@@ -3,13 +3,14 @@
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/war_test.py
 
-The head ships ACTIVE (`_rl_war_active`). Test 1 pins the gate-safety
-property: the SCRIPTED path (war=None) is bit-identical to a sim with the head
-forced off, so the gates — which never pass war= — cannot see it. The rest
-prove the applied action is EXACTLY the TS state transition: step(war=a) must
-equal hand-poking the declareWar / sueForPeace effect into the state and then
-stepping plain (bit-identical across every _MUTABLE tensor), which sidesteps
-every same-turn world confound (civ phase RNG, raids, income).
+The head ships ACTIVE (`_rl_war_active`) and EVERY row drives it, seat 0
+included. Test 1 pins the no-column property: a turn nobody hands a war
+column to is bit-identical to a sim with the head forced off, so the flag
+cannot leak into an undriven turn. The rest prove the applied action is
+EXACTLY the TS state transition: `_apply_war_column` must equal hand-poking
+the declareWar / sueForPeace effect into the state and then stepping plain
+(bit-identical across every _MUTABLE tensor), which sidesteps every same-turn
+world confound (seat phase RNG, raids, income).
 """
 
 from __future__ import annotations
@@ -43,9 +44,10 @@ def war_vec(sim, code) -> torch.Tensor:
 
 
 def test_inert_when_off(rules, path):
-    """The flag ships ON, so the gate-safety property is about the SCRIPTED
-    path: war=None must be bit-identical to a sim with the head forced off.
-    The gates never pass war=, so parity cannot depend on the flag."""
+    """The flag ships ON, so what is under test is the NO-COLUMN path: a turn
+    with no war column must be bit-identical to a sim with the head forced
+    off. The gate does drive the column now — for seat 0 as for every row — so
+    this pins the floor, not the gate."""
     sim = build(rules, path)
     assert sim._rl_war_active, "V-W1 ships ACTIVE now"
     ref = build(rules, path)
@@ -70,7 +72,8 @@ def test_declare(rules, path):
     assert bool(m[0]), "declare-war column should be open (civ 0 alive, at peace)"
     assert not bool(m[sim.R]), "peace column must be closed while not at war"
     snap = sim.snapshot()
-    sim.step(war=war_vec(sim, 0))
+    sim._apply_war_column(0, war_vec(sim, 0))  # the head, the one entry — same call every row makes
+    sim.step()
     assert bool(sim.war[0, 0, 1 + 0]), "declare did not set war[seat 0, civ 0]"
     after = snap_all(sim)
     # equivalence: poke declareWar's exact effect, then step plain
@@ -88,7 +91,8 @@ def test_peace(rules, path):
     for _ in range(20):
         sim.step()
     sim._rl_war_active = True
-    sim.step(war=war_vec(sim, 0))  # declare on civ 0
+    sim._apply_war_column(0, war_vec(sim, 0))  # declare on civ 0
+    sim.step()
     rr = sim.rules.seats
     need = int(rr.get("peaceMinWarTurns", 8))
     for _ in range(need):
@@ -102,7 +106,8 @@ def test_peace(rules, path):
     wt = int(sim.war_turns[0, 0, 1])
     cost = float(rr.get("peaceGold0", 150) + rr.get("peaceGoldSlope", 10) * wt)
     snap = sim.snapshot()
-    sim.step(war=war_vec(sim, sim.R))  # sue for peace with civ 0
+    sim._apply_war_column(0, war_vec(sim, sim.R))  # sue for peace with civ 0
+    sim.step()
     assert not bool(sim.war[0, 0, 1 + 0]), "peace did not clear war[seat 0, civ 0]"
     after = snap_all(sim)
     # equivalence: poke sueForPeace's exact effect, then step plain
@@ -229,7 +234,8 @@ def test_cs_siege(rules, path):
     ua = torch.full((1, sim.major_unit_alive.shape[1]), -1, dtype=torch.long)
     ua[0, p_] = act
     hp0, tile0 = int(sim.citystate_hp[0, s]), int(sim.major_unit_tile[0, p_])
-    sim.step(units=ua)
+    sim._apply_seat_unit_actions(0, ua)
+    sim.step()
     assert int(sim.citystate_hp[0, s]) < hp0, "CS took no siege damage"
     assert bool(sim.citystate_alive[0, s]), "one hit must not kill a full-hp CS"
     if bool(sim.major_unit_alive[0, p_]):
@@ -255,7 +261,8 @@ def test_cs_siege(rules, path):
     ua[0, p_] = act
     pop_before = int(sim.citystate_pop[0, s])
     ncity0 = int(sim.city_alive[0, 0].sum())
-    sim.step(units=ua)
+    sim._apply_seat_unit_actions(0, ua)
+    sim.step()
     assert not bool(sim.citystate_alive[0, s]), "CS at 1 hp must fall to the next hit"
     # >= not ==: an organic settler founding can land in the same step as the
     # capture (+2 total); the capture itself is pinned by the

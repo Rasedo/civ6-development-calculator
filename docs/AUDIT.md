@@ -39,10 +39,10 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 41 | 39.92 | **97%** |
+| A symmetry | 42 | 41.55 | **99%** |
 | B fidelity | 91 | 88.44 | **97%** |
 | Closed chapters (C/D/E/G) | 62 | 62 | 100% |
-| **Overall** | **194** | **190.36** | **98%** |
+| **Overall** | **195** | **191.99** | **98%** |
 
 DELTA LEDGER — apply every change to the table in the same commit that
 makes it, or the table drifts from the entries it counts (it has, four
@@ -54,7 +54,11 @@ percentages FELL: this round closed less than it found, which is the
 number doing its job. #112: A-33r's SEAT half closed — the two arms are
 one — leaving only its fidelity question (+0.5 A done). Nothing else moved
 weight: the four live divergences #112 found had never been entries,
-because nothing had ever looked for them.
+because nothing had ever looked for them. #113: A-32r CLOSED (+1 A done);
+A-33r CLOSED — its fidelity question was verified against a real Civ 6
+source and fixed on both engines (+0.5 A done); A-31r lost its ACTION
+INTERFACE half (+0.13 A done), leaving the wire's record SCHEMA; A-34r is
+new and open (+1 A weight, +0 done).
 
 ## A. Seat symmetry — open
 
@@ -95,50 +99,41 @@ because nothing had ever looked for them.
   `tileYields` adds it BEFORE the drought floor. Unreachable as written
   (the floor only bites at 0 base food and a FARM's own food is >= 1), so
   it is a construct note, not a live bug.
-- **A-31r. THE REMAINING SEAT-0 DISTINCTION.** ONE, and it is WIRE, not a
-  rule: `step()`'s action interface and the unit-order REPLAY position —
-  row 0's triples apply pre-turn, a civ's per-unit rows in-phase. Task
-  #108, and TS carries the same fork as `actor.seat !== 0`. `seat_ext[:, 0]`
-  is the same fork at the other end.
-  (#111 closed three more: the war axis is symmetric and its clocks are
-  per-pair, the observation's DoW terms are per-opponent, and the
-  `_prod_ctx` city cap was a branch on a dangling name that never carried
-  a difference.)
-  THIS SENTENCE WAS FALSE WHEN #111 WROTE IT, and the correction is the
-  point: the checker it rested on matched ADJACENT TOKENS (`row == 0`),
-  and every fork that survived #111 was written as an EXPRESSION —
-  `civ_techs[:, 0]`, `city_center[:, 0]`, `city_dist_tile[:, 1:]`. #112
-  gave the checker four expression-level patterns, censused the 36 hits
-  they found, and closed four LIVE rule divergences the token patterns
-  could not see: the barbarian march scanned row 0's cities alone, the
-  seat war-march kept a row-0 arm keyed on the SLOT where TS keys on the
-  centre tile, the barbarian melee priority exempted a row-0 centre from
-  the lone-civilian rule, and every antiquity dig in the game read row 0's
-  ERA. Claim only what the instrument measures.
-- **A-32r. TWO WAYS TO DECLARE WAR.** A major's war head (`war_targets`,
-  #111 s5) and the geo wire's `geoWar` column (`_geo_declare_wars` /
-  `apply_geo`) both start a civ↔civ war, at different phase positions and
-  under different re-validation. The geo path also carries the casus belli
-  (`civ_pair_warkind`) and the alliance/denouncement gates, which the head
-  does not, so the two are not interchangeable: a war declared through the
-  head has no KIND. Merge target: one applier over seat-PAIR planes, with
-  the head as the only entry. The civ-pair planes still have no seat-0 row,
-  which is what keeps `apply_geo`'s row→civ-pair conversion alive (the last
-  entries in the seat-symmetry checker's allowlist).
-- **A-33r. A LONE CIVILIAN on a city centre draws the blow.**
-  `meleeAttackInner` computes `cityFirst = enemies.length === 0 ||
-  garrisoned`, so a centre holding one civilian and no military is
-  attacked as the CIVILIAN — captured roll-free — instead of as the city.
-  Its comment defends this ("civilians cannot defend, so they cannot be
-  the thing a city is attacked through") and pins it to a hunted parity
-  case, seed 9053 t204. Real Civ 6 has no capture-inside-a-city move: the
-  city is the defender on its own tile. Both engines now agree, so no gate
-  can see it, and the fix is one predicate on each side — but it is a
-  FIDELITY change, unverified against a real Civ 6 source, and
-  behaviour-changing on both engines. A hunt of its own.
-  (The SEAT half is closed: #112 deleted the row-0 arm that skipped the
-  test entirely. My #111 note named the CIV arm as the divergent one; it
-  was the row-0 arm — read `meleeAttackInner` before believing either.)
+- **A-31r. THE SEAT-0 RECORD SCHEMA.** What is left is the WIRE's own
+  shape, in `serve_gate`'s hand-rolled `recs["0"]` and TS's matching
+  `actor.seat !== 0` in `seatPhase`: seat 0's production rides
+  `[centreTile, code]` pairs and its units `[tile, verb, isCivilian]`
+  triples, where every civ row sends per-unit ranks. The schema decides
+  WHERE the orders execute — row 0's pre-turn, a civ's at the walkers'
+  position in the phase — so the two cannot be merged without moving the
+  combat DRAW positions. Task #108, and the checker's remaining allowlist
+  entries are exactly these three sites.
+  The ACTION INTERFACE half closed in #113: `step()` takes no seat
+  arguments at all now, every row's choices arrive through
+  `apply_seat_actions` + `_apply_seat_unit_actions`, and `seat_ext` is set
+  for every major row rather than row 0 alone.
+  A CAUTION THAT HAS EARNED ITS PLACE. This entry has twice claimed the
+  distinction was down to one thing, and twice been wrong — because the
+  instrument only matched what it was taught. #111's checker matched
+  ADJACENT TOKENS (`row == 0`) and missed every fork written as an
+  EXPRESSION (`civ_techs[:, 0]`, `city_center[:, 0]`); #112 taught it those
+  and closed four live rule divergences, then claimed the class closed on
+  the strength of a GPU-only census; #113 taught it TypeScript and found
+  three more in `cpu/`, plus a `[0] + [r + 1 for r in seats]` in the gate's
+  own single-seed path that skipped seat 1 and asked for a seat that does
+  not exist. Claim only what the instrument measures, and measure both
+  engines.
+- **A-34r. WORLD CONSTRUCTION is not seat-generic.** `placeSeats` builds
+  opponents from a CIV index at seats 1.., leaving `createGameFromMap`'s
+  pre-seeded record at seat 0 as the human — the classic calculator's
+  world, where seat 0 is a different KIND of seat (no leader, no colour,
+  `aggression: 0`, which is a live term in the DoW gate). Only `createGame`
+  calls it, and the live path no longer does: serve and export both build
+  through `cpu/world/load.ts`, which since #113 gives every seat its
+  leader, colour and aggression draw through one index-generic loop. What
+  keeps `placeSeats` alive is ~15 test files under `tests/cpu/`. Not a live
+  divergence — a test-only world constructor that would become one the
+  moment anything else called it.
 
 ## B. Fidelity vs real Civ 6 — open residuals
 
@@ -316,7 +311,10 @@ calling it a bug:**
    stands; (b) both march scans use TS's one key (distance, then seat id,
    then centre TILE), so a target that used to be picked by SLOT can
    change; (c) a barbarian melee on ANY centre now goes through the
-   lone-civilian test (see A-33r); (d) an antiquity dig reads the ACTING
+   lone-civilian test — and as of #113 that test is gone from both
+   engines, because real Civ 6 has no capture-inside-a-city move: a
+   centre is attacked as the CITY whoever stands on it; (d) an antiquity
+   dig reads the ACTING
    seat's era, so a modern row 0 no longer suppresses everyone's digs and
    an ancient one no longer keeps stamping past the deadline; (e) the
    Itinerant Preachers range bonus reaches row 0's religion (#73 gave it
@@ -330,6 +328,37 @@ calling it a bug:**
    spliced array), so `CIV6_RC_RECLAIM_AT` is gone and civ slot indices
    move earlier than before. This SUPERSEDES 8(b), which described the
    compaction BODY covering every row while the TRIGGER stayed forked.
+
+17. #113, THE WAR AXIS AND THE ACTION INTERFACE. (a) SEAT 0 CAN NOW
+   DECLARE WAR AND SUE FOR PEACE. The gate's hand-rolled seat-0 block never
+   picked a war column, so seat 0 was the one seat that could do neither;
+   it now runs the same `pick_war` off the same policy stream, which means
+   new wars in the rollout and a policy RNG stream drawn at a row it was
+   never drawn at before. (b) DECLARING AND SUING MOVED. The `geoWar` and
+   `geoPeace` loops are deleted on both engines; every declaration and
+   every treaty rides the seat's own war head at its RECORD position, so a
+   civ↔civ war now starts at the declaring seat's phase position instead
+   of the phase top. (c) PEACE IS PRICED FOR EVERYONE. The civ↔civ arm
+   ended wars on a weariness threshold alone; the head charges
+   `peaceGold0 + slope*clock` and refuses under `warMinTurns`, so civ↔civ
+   wars run longer and cost gold to end. (d) THE HEAD GAINED THE ALLIANCE
+   GATE, the warmonger grievance and the war's KIND — a war declared
+   through the head used to have none of the three. (e) THE PACING TERMS
+   ARE GONE: `_geo_turn`'s `dowWwMax` / `peaceWw` gates left with its
+   declare half and `ladder.pick_war` cannot express them, because
+   war-weariness is not in the observation. Expect more thrash between war
+   and peace until a ww field lands — #108-adjacent policy work, not an
+   engine rule. (f) The geo RECORD's targets are ABSOLUTE SEATS and its
+   `geoWar`/`geoPeace` keys are gone. (g) Three TS point fixes ride along:
+   `goldenCulturePerDistrict`, `goldenBoostBonus` and `addEraScore` were
+   each passing a literal seat 0 where the acting seat belongs, so
+   golden-age culture, boost bonuses and conquest era score were credited
+   to seat 0 no matter who earned them (the GPU was right in all three).
+   WATCH FIRST: the GPU applies every row's war column pre-step while TS
+   applies each at its own seat's record position. For seat 0 those
+   coincide; for a civ row TS's declaration lands after earlier seats have
+   already walked. Both engines document the position as matched — read the
+   first divergence here before assuming it is elsewhere.
 
 **Reachability, before believing any green run:**
 - Theological combat needs two ADJACENT religious units of different

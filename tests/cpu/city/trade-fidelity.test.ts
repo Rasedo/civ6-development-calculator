@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cityStateOfSeat, emptySeat, indexOfSeat, isCityStateSeat, seatOfIndex, setTileOwner, setWar, tileSeat } from '../../../cpu/core/seats';
+import { cityStateOfSeat, emptySeat, isCityStateSeat, seatOfIndex, setTileOwner, setWar, tileSeat } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { tilesWithin } from '../../../world/hex';
@@ -116,8 +116,8 @@ describe('B-23 international route yields', () => {
     addCompletedCampus(state, civ.cities[0], 12, 7);
 
     expect(tradeCapacity(state, 0)).toBeGreaterThanOrEqual(1);
-    expect(canAddIntlTradeRoute(state, origin.id, indexOfSeat(civ.seat), civ.cities[0].id, 0).ok).toBe(true);
-    expect(addIntlTradeRoute(state, origin.id, indexOfSeat(civ.seat), civ.cities[0].id, 0).ok).toBe(true);
+    expect(canAddIntlTradeRoute(state, origin.id, civ.seat, civ.cities[0].id, 0).ok).toBe(true);
+    expect(addIntlTradeRoute(state, origin.id, civ.seat, civ.cities[0].id, 0).ok).toBe(true);
 
     const peaceYields = cityTradeYields(state, origin);
     expect(peaceYields.gold).toBe(INTL_ROUTE_GOLD + 1); // 3 base + 1 specialty

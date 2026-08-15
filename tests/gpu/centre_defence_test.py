@@ -1,18 +1,21 @@
-"""A garrison does not shield its city.
+"""A CITY CENTRE is attacked as the CITY, whoever stands on it.
 
-    python tests/gpu/city_first_test.py
+    python tests/gpu/centre_defence_test.py
 
 In Civ 6 a garrisoned unit adds its strength to the CITY's defence; it is not a
 separate defender standing in front of it, so an attack aimed at an at-war
-civ's centre lands on the CITY even when a military unit stands there.
+seat's centre lands on the CITY even when a military unit stands there.
   https://forums.civfanatics.com/threads/669378/
 
-A LONE CIVILIAN is the exception: it is captured ROLL-FREE and the attacker
-advances. Civilians cannot defend, so a city is never attacked "through" one.
+THERE IS NO EXCEPTION FOR A CIVILIAN. A settler or builder occupying a city
+tile cannot be captured separately — the attack is on the city, and the
+civilian is only lost if the city itself falls. The engines carried a
+`cityFirst = enemies.length === 0 || garrisoned` term that made a lone
+civilian the defender and handed it over roll-free; it is gone from both.
 
 The scripted parity gate barely reaches this — it never issues a seat-0 attack —
-so without this lane the precedence would rest on the rollout alone. Both cases
-below are asserted, and the negative twin is the civilian.
+so without this lane the precedence would rest on the rollout alone. All three
+occupancy cases below are asserted: military, lone civilian, and both.
 """
 
 from __future__ import annotations
@@ -142,16 +145,18 @@ def main() -> None:
     )
 
     city_c, _, civ_alive = run(civilian=True)
-    print(f"  LONE CIVILIAN    : city -{city_c} hp, captured {not civ_alive}")
-    assert city_c == 0, (
-        "the city took damage through a LONE CIVILIAN — B-31 kills it roll-free "
-        "and P2's reshuffle pinned that against TS at seed 9053 t204"
+    print(f"  LONE CIVILIAN    : city -{city_c} hp, civilian alive {civ_alive}")
+    assert city_c > 0, (
+        "a LONE CIVILIAN on the centre still drew the blow — the deleted "
+        "cityFirst term is back. A city tile is attacked as the CITY."
     )
-    assert not civ_alive, "B-31: the lone civilian must be captured roll-free"
+    assert civ_alive, (
+        "the civilian was captured off a city tile — real Civ 6 has no "
+        "capture-inside-a-city move; it is lost only if the city falls"
+    )
 
-    # garrison AND civilian on the centre: the military puts the CITY first
-    # (TS cityFirst = enemies==0 || garrisoned); the civilian shields nothing
-    # and survives.
+    # garrison AND civilian on the centre: the same answer again — the centre
+    # is the city, and neither occupant is a separate defender.
     city_b, _, civ_alive_b = run(civilian=True, military=True)
     print(f"  GARRISON+CIVILIAN: city -{city_b} hp, civilian alive {civ_alive_b}")
     assert city_b > 0, (
@@ -159,7 +164,8 @@ def main() -> None:
     )
     assert civ_alive_b, "the civilian is not a combatant — it survives the siege"
 
-    print("CITY-FIRST OK — a garrison shields nothing, a lone civilian does, both together siege")
+    print("CENTRE DEFENCE OK — the city takes the blow through a garrison, "
+          "a lone civilian and both together")
 
 
 if __name__ == "__main__":

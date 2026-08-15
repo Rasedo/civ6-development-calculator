@@ -272,7 +272,7 @@ def main() -> None:
     sim8.major_unit_type[0, sl8] = ni
     sim8.major_unit_mp[0, sl8] = 3.0
     # park it on coastal water with a free water neighbour (occ bookkeeping
-    # by hand, the city_first_test idiom)
+    # by hand, the centre_defence_test idiom)
     w8 = None
     for cand in (sim8.wpass[0] & ~sim8.ocean_tile[0]).nonzero(as_tuple=True)[0].tolist():
         if int(sim8.military_at[0, cand]) >= 0:

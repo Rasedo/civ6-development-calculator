@@ -220,11 +220,22 @@ class SimSeats:
         for k, tgt in enumerate(self.war_targets(row)):
             live = mine & self.civ_alive[:, tgt]
             at_war = self.war[:, row, tgt]
-            declare = (w == k) & ext & live & ~at_war
+            # ALLIES NEVER DECLARE ON EACH OTHER — the gate the civ-pair arm
+            # carried and the head did not, until the head became the only
+            # entry.
+            declare = (w == k) & ext & live & ~at_war & ~self.seat_allied[:, row, tgt]
             if bool(declare.any()):
                 self.war[:, row, tgt] |= declare
                 self.war[:, tgt, row] |= declare  # the MIRROR cell
                 self._reset_war_clock(row, tgt, declare)
+                # Declaring earns GRIEVANCES, and the war takes its KIND here:
+                # FORMAL iff this row's grudge on the target is old enough. A
+                # same-turn stamp is 0 old — a surprise.
+                self.civ_warmonger[:, row] = self.civ_warmonger[:, row] + declare.long() * self._wm_dow
+                _dt = self.seat_denounced[:, row, tgt]
+                _formal = declare & (_dt >= 0) & ((int(self.turn) - _dt) >= self._formal_war_min)
+                self.seat_warkind[:, row, tgt] = torch.where(declare, _formal, self.seat_warkind[:, row, tgt])
+                self.seat_warkind[:, tgt, row] = torch.where(declare, _formal, self.seat_warkind[:, tgt, row])
             # peace costs the asking row the same schedule every seat pays,
             # out of its own treasury (the mask prices it; the apply
             # re-validates it) — priced on THIS war's clock.
@@ -239,6 +250,9 @@ class SimSeats:
                 self.civ_treasury[:, row] = torch.where(peace, self.civ_treasury[:, row] - pcost, self.civ_treasury[:, row])
                 self.war[:, row, tgt] &= ~peace
                 self.war[:, tgt, row] &= ~peace  # the MIRROR cell
+                # the ended war's KIND clears; the grudge stamp is permanent
+                self.seat_warkind[:, row, tgt] &= ~peace
+                self.seat_warkind[:, tgt, row] &= ~peace
                 self._ww_peace(peace, row, tgt)  # -2000 on the treaty (the makePeace twin)
                 # both sides shed the city-states the other dragged in
                 self._citystate_suzerain_release(row, tgt, peace)
@@ -3575,7 +3589,8 @@ class SimSeats:
         c_seat = torch.where(cslot >= 0, self.unit_seat.gather(1, cslot.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
         ok_m = self._seats_hostile(aseat.unsqueeze(1), m_seat.unsqueeze(1)).squeeze(1)
         ok_c = self._seats_hostile(aseat.unsqueeze(1), c_seat.unsqueeze(1)).squeeze(1)
-        city_first = ~(ok_c & ~ok_m)  # a LONE hostile civilian shields the centre
+        # No cityFirst term: a centre is attacked as the CITY whoever stands
+        # on it, garrison and lone civilian alike.
         ctr = self._centre_seat_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
         city_t = self._seats_hostile(
             aseat.unsqueeze(1), torch.where((ctr >= 0) & (ctr < 100), ctr, neg).unsqueeze(1)).squeeze(1)
@@ -3584,8 +3599,8 @@ class SimSeats:
             _cst = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
             _cst.scatter_(1, self.citystate_center[:, :self.S].clamp(min=0), self._citystate_target(row))
             cs_t = _cst.gather(1, ttc.unsqueeze(1)).squeeze(1) & (ctr >= 100)
-        city_att = att & city_first & city_t
-        cs_att = att & city_first & ~city_t & cs_t
+        city_att = att & city_t
+        cs_att = att & ~city_t & cs_t
         # the enhancer ATTACKER adders (Just War near + Crusade onto following
         # territory) key on where the UNIT stands, not on what it hits, so they
         # join the city arms too — behind the same live flag every other
@@ -4028,65 +4043,50 @@ class SimSeats:
             self.seat_route_dest[:, row][drop] = -1
             self.seat_route_exp[:, row][drop] = -1
 
-    def _civ_pair_strengths(self) -> torch.Tensor:
-        """[B, R] seatStrength = js_round(nCities*8 + Σ own-unit combat) for every
-        civ seat (civilians carry combat 0). Feeds the DoW/peace arms; computed
-        pre-phase, before this turn's spawns and combat."""
+    def _seat_strengths(self) -> torch.Tensor:
+        """[B, 1+R] seatStrength = js_round(nCities*8 + Σ own-unit combat) for
+        every major ROW (civilians carry combat 0). Feeds the diplomacy arms;
+        computed pre-phase, before this turn's spawns and combat."""
         B, dev = self.B, self.device
-        n_c = self.city_alive[:, 1:1 + max(self.R, 1)].sum(dim=2)  # [B, R]
-        rstr = torch.zeros(B, self.R, dtype=torch.float64, device=dev)
+        nrow = 1 + self.R
+        n_c = self.city_alive[:, :nrow].sum(dim=2)  # [B, 1+R]
+        rstr = torch.zeros(B, nrow, dtype=torch.float64, device=dev)
         vt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
-        for r in range(self.R):
-            combat = ((self.major_unit_alive & (self.major_unit_seat == r + 1)).long() * self._type_combat[vt]).sum(dim=1)
-            rstr[:, r] = js_round(n_c[:, r].double() * 8 + combat.double())
+        for row in range(nrow):
+            combat = ((self.major_unit_alive & (self.major_unit_seat == row)).long() * self._type_combat[vt]).sum(dim=1)
+            rstr[:, row] = js_round(n_c[:, row].double() * 8 + combat.double())
         return rstr
 
-    def _civ_pair_proximity(self, a: int, b: int) -> torch.Tensor:
-        """[B] closest city-pair distance between civs a and b (999 if either
-        cityless) — the seatPairProximity twin."""
+    def _seat_proximity(self, a: int, b: int) -> torch.Tensor:
+        """[B] closest city-pair distance between major ROWS a and b (999 if
+        either is cityless) — the seatPairProximity twin."""
         B = self.B
         d_ab = self.pair_dist[
-            self.city_center[:, a + 1].clamp(min=0).unsqueeze(2), self.city_center[:, b + 1].clamp(min=0).unsqueeze(1)
+            self.city_center[:, a].clamp(min=0).unsqueeze(2), self.city_center[:, b].clamp(min=0).unsqueeze(1)
         ].to(torch.long)  # [B, RC, RC]
-        pair_ok = self.city_alive[:, a + 1].unsqueeze(2) & self.city_alive[:, b + 1].unsqueeze(1)
+        pair_ok = self.city_alive[:, a].unsqueeze(2) & self.city_alive[:, b].unsqueeze(1)
         return torch.where(pair_ok, d_ab, 999).reshape(B, -1).min(dim=1).values
 
     def apply_geo(self, row: int, denounce: torch.Tensor | None = None,
-                  ally: torch.Tensor | None = None,
-                  geo_war: torch.Tensor | None = None,
-                  geo_peace: torch.Tensor | None = None) -> None:
-        """Stash seat `row`'s GEOPOLITICS intents for this turn, consumed at
-        the phase's own pass positions (_geo_denounce_and_ally and
-        _geo_declare_wars at the phase top, _geo_make_peace at the tail) and
-        re-validated there. denounce/ally/geo_peace are [B, R] bool target
-        masks; geo_war is [B] long (the one target civ, -1 = none). ally and
-        geo_peace name a PAIR — the driver emits them on the LOWER civ index's
-        record; the arm writes both sides either way.
+                  ally: torch.Tensor | None = None) -> None:
+        """Stash seat `row`'s DENOUNCE and ALLY intents for this turn,
+        consumed by `_geo_denounce_and_ally` at the phase top and re-validated
+        there. Both are [B, 1+R] bool target masks over seat ROWS. `ally` names
+        a PAIR — the driver emits it on the LOWER row's record; the arm writes
+        both sides either way.
 
-        Callers speak rows; the CIV-PAIR conversion is this one line, because
-        `civ_pair_denounced` / `civ_pair_allied` / `civ_pair_warkind` are
-        [B, R, R] planes with NO seat-0 row — civ<->civ diplomacy is a space
-        seat 0 cannot enter. The fix is seat-PAIR planes over the whole war
-        matrix, with the war head (#111 s5); until then this is where the two
-        index spaces meet, and nowhere else.
+        There is no war intent here any more: declaring and suing ride the
+        seat's own WAR HEAD, the one entry. Rows all the way down —
+        the planes these write are the war matrix's own geometry.
         """
-        r = row - 1
         if denounce is not None:
             if getattr(self, "_driven_denounce", None) is None:
                 self._driven_denounce = {}
-            self._driven_denounce[r] = denounce
+            self._driven_denounce[row] = denounce
         if ally is not None:
             if getattr(self, "_driven_ally", None) is None:
                 self._driven_ally = {}
-            self._driven_ally[r] = ally
-        if geo_war is not None:
-            if getattr(self, "_driven_geo_war", None) is None:
-                self._driven_geo_war = {}
-            self._driven_geo_war[r] = geo_war
-        if geo_peace is not None:
-            if getattr(self, "_driven_geo_peace", None) is None:
-                self._driven_geo_peace = {}
-            self._driven_geo_peace[r] = geo_peace
+            self._driven_ally[row] = ally
 
     def _geo_denounce_and_ally(self) -> None:
         """The DENOUNCE and ALLIANCE arms — wire DECISIONS at the pass's
@@ -4102,100 +4102,41 @@ class SimSeats:
         astash = getattr(self, "_driven_ally", None)
         if not dstash and not astash:
             return
-        n_c = self.city_alive[:, 1:1 + max(self.R, 1)].sum(dim=2)
-        alive_civ = self.civ_alive[:, 1:self.R + 1] & (n_c > 0)  # [B, R]
+        nrow = 1 + self.R
+        n_c = self.city_alive[:, :nrow].sum(dim=2)
+        alive_row = self.civ_alive[:, :nrow] & (n_c > 0)  # [B, 1+R]
         if dstash:
             for a in sorted(dstash.keys()):
-                want = dstash.pop(a)  # [B, R]
-                for b in range(self.R):
+                want = dstash.pop(a)  # [B, 1+R]
+                for b in range(nrow):
                     if b == a or not bool(want[:, b].any()):
                         continue
                     den = (
-                        want[:, b] & alive_civ[:, a] & alive_civ[:, b]
-                        & (self.civ_pair_denounced[:, a, b] < 0) & ~self.war[:, a + 1, b + 1]
+                        want[:, b] & alive_row[:, a] & alive_row[:, b]
+                        & (self.seat_denounced[:, a, b] < 0) & ~self.war[:, a, b]
                     )
                     if bool(den.any()):
-                        self.civ_pair_denounced[:, a, b] = torch.where(
-                            den, torch.full_like(self.civ_pair_denounced[:, a, b], int(self.turn)), self.civ_pair_denounced[:, a, b]
+                        self.seat_denounced[:, a, b] = torch.where(
+                            den, torch.full_like(self.seat_denounced[:, a, b], int(self.turn)), self.seat_denounced[:, a, b]
                         )
-                        self.civ_pair_allied[:, a, b] = self.civ_pair_allied[:, a, b] & ~den
-                        self.civ_pair_allied[:, b, a] = self.civ_pair_allied[:, b, a] & ~den
+                        self.seat_allied[:, a, b] = self.seat_allied[:, a, b] & ~den
+                        self.seat_allied[:, b, a] = self.seat_allied[:, b, a] & ~den
         if astash:
-            era_open = int(self.turn) >= self._civ_pair_ally_min_peace
+            era_open = int(self.turn) >= self._ally_min_peace
             for a in sorted(astash.keys()):
-                want = astash.pop(a)  # [B, R]
+                want = astash.pop(a)  # [B, 1+R]
                 if not era_open:
                     continue  # popped either way — a stale intent never lingers
-                for b in range(self.R):
+                for b in range(nrow):
                     if b == a or not bool(want[:, b].any()):
                         continue
                     form = (
-                        want[:, b] & alive_civ[:, a] & alive_civ[:, b]
-                        & ~self.war[:, a + 1, b + 1] & ~self.civ_pair_allied[:, a, b]
-                        & (self.civ_pair_denounced[:, a, b] < 0) & (self.civ_pair_denounced[:, b, a] < 0)
-                        & (self.civ_warmonger[:, a + 1] <= 0) & (self.civ_warmonger[:, b + 1] <= 0)
+                        want[:, b] & alive_row[:, a] & alive_row[:, b]
+                        & ~self.war[:, a, b] & ~self.seat_allied[:, a, b]
+                        & (self.seat_denounced[:, a, b] < 0) & (self.seat_denounced[:, b, a] < 0)
+                        & (self.civ_warmonger[:, a] <= 0) & (self.civ_warmonger[:, b] <= 0)
                     )
                     if bool(form.any()):
-                        self.civ_pair_allied[:, a, b] = self.civ_pair_allied[:, a, b] | form
-                        self.civ_pair_allied[:, b, a] = self.civ_pair_allied[:, b, a] | form
+                        self.seat_allied[:, a, b] = self.seat_allied[:, a, b] | form
+                        self.seat_allied[:, b, a] = self.seat_allied[:, b, a] | form
 
-    def _geo_declare_wars(self) -> None:
-        """The civ↔civ DECLARE arm — a wire DECISION at the pass's own
-        position (phase top, after denounce/ally, so the war is live for
-        both civs' war-acts this turn). Rules re-validated: both alive with
-        cities, at peace, not allied (LIVE — this turn's grudge already
-        broke, this turn's alliance already formed). Effects: war both ways,
-        the aggressor's grievances, and the war's KIND — FORMAL iff the
-        aggressor's stamp on the target is at least formalWarMinTurns old (a
-        same-turn stamp is 0 old: a surprise). Pacing — one new war per civ
-        per turn, the war-weariness gates — is the driver's policy."""
-        stash = getattr(self, "_driven_geo_war", None)
-        if not stash:
-            return
-        formal_min = int(self.rules.seats.get("formalWarMinTurns", 5))
-        n_c = self.city_alive[:, 1:1 + max(self.R, 1)].sum(dim=2)
-        alive_civ = self.civ_alive[:, 1:self.R + 1] & (n_c > 0)
-        for a in sorted(stash.keys()):
-            want = stash.pop(a)  # [B] long target
-            for b in range(self.R):
-                if b == a:
-                    continue
-                declare = (
-                    (want == b) & alive_civ[:, a] & alive_civ[:, b]
-                    & ~self.war[:, a + 1, b + 1] & ~self.civ_pair_allied[:, a, b]
-                )
-                if bool(declare.any()):
-                    self.war[:, a + 1, b + 1] = self.war[:, a + 1, b + 1] | declare
-                    self.war[:, b + 1, a + 1] = self.war[:, b + 1, a + 1] | declare
-                    self._reset_war_clock(a + 1, b + 1, declare)
-                    self.civ_warmonger[:, a + 1] = self.civ_warmonger[:, a + 1] + declare.long() * self._wm_dow
-                    dt = self.civ_pair_denounced[:, a, b]
-                    formal = declare & (dt >= 0) & ((int(self.turn) - dt) >= formal_min)
-                    self.civ_pair_warkind[:, a, b] = torch.where(declare, formal, self.civ_pair_warkind[:, a, b])
-                    self.civ_pair_warkind[:, b, a] = torch.where(declare, formal, self.civ_pair_warkind[:, b, a])
-
-    def _geo_make_peace(self) -> None:
-        """The civ↔civ PEACE arm — a wire DECISION at the pass's own
-        position (the phase tail, after every civ acted). The rule is only
-        "at war"; the war-weariness threshold that CHOOSES to sue is the
-        driver's, read from the pre-turn observation like the seat-0 sue
-        verb. Effects: peace both ways, the treaty's war-weariness relief,
-        the war's kind cleared (the grudge stamp stays)."""
-        stash = getattr(self, "_driven_geo_peace", None)
-        if not stash:
-            return
-        for a in sorted(stash.keys()):
-            want = stash.pop(a)  # [B, R]
-            for b in range(self.R):
-                if b == a or not bool(want[:, b].any()):
-                    continue
-                peace = want[:, b] & self.war[:, a + 1, b + 1]
-                if bool(peace.any()):
-                    self.war[:, a + 1, b + 1] = self.war[:, a + 1, b + 1] & ~peace
-                    self.war[:, b + 1, a + 1] = self.war[:, b + 1, a + 1] & ~peace
-                    self.civ_pair_warkind[:, a, b] = self.civ_pair_warkind[:, a, b] & ~peace
-                    self.civ_pair_warkind[:, b, a] = self.civ_pair_warkind[:, b, a] & ~peace
-                    self._reset_war_clock(a + 1, b + 1, peace)
-                    self._ww_peace(peace, a + 1, b + 1)
-                    self._citystate_suzerain_release(a + 1, b + 1, peace)
-                    self._citystate_suzerain_release(b + 1, a + 1, peace)

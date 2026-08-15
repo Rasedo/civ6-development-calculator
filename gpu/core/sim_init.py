@@ -308,17 +308,24 @@ class SimInit:
                 _s = int(_cv["seat"])
                 if 0 <= _s <= r_pad:
                     self.civ_treasury[_b, _s] = float(_cv.get("treasury", 0.0))
-        # Per-PAIR casus belli. civ_pair_warkind[b, i, j] = the (i, j) civ/civ war is
-        # FORMAL (denounced >= formalWarMinTurns earlier); False = SURPRISE
-        # (default). Symmetric, only meaningful where war[b, i+1, j+1]. civ_pair_denounced[b, i,
-        # j] = the turn i denounced j (a directed grudge, -1 = none, never
-        # reset). Both start empty (no civ/civ war exists at t0), so there is no
-        # exporter load. _MUTABLE for snapshot/restore.
-        self.civ_pair_warkind = torch.zeros(B, r_pad, r_pad, dtype=torch.bool, device=device)
-        self.civ_pair_denounced = torch.full((B, r_pad, r_pad), -1, dtype=torch.long, device=device)
-        # civ/civ ALLIANCES, symmetric. Allies never declare war on each other;
-        # a denouncement or a war breaks it.
-        self.civ_pair_allied = torch.zeros_like(self.civ_pair_denounced, dtype=torch.bool)
+        # THE DIPLOMATIC PAIR PLANES, on the WAR MATRIX'S OWN ROWS — same
+        # geometry as `war`, so every seat has a row and `war[b, i, j]` and
+        # `seat_warkind[b, i, j]` name the same pair. They were [B, R, R] over
+        # civ indices until #113, which is why seat 0 could neither denounce,
+        # ally, nor hold a casus belli.
+        #   seat_warkind[b, i, j]   the (i, j) war is FORMAL (denounced at least
+        #                           formalWarMinTurns earlier); False = SURPRISE.
+        #                           Symmetric, meaningful only where war[b, i, j].
+        #   seat_denounced[b, i, j] the turn i denounced j — a DIRECTED grudge,
+        #                           -1 = none, never reset.
+        #   seat_allied[b, i, j]    symmetric alliance. Allies never declare war
+        #                           on each other; a denouncement or a war breaks it.
+        # All three start empty (no war exists at t0), so there is no exporter
+        # load. _MUTABLE for snapshot/restore.
+        _pw = 1 + r_pad
+        self.seat_warkind = torch.zeros(B, _pw, _pw, dtype=torch.bool, device=device)
+        self.seat_denounced = torch.full((B, _pw, _pw), -1, dtype=torch.long, device=device)
+        self.seat_allied = torch.zeros_like(self.seat_denounced, dtype=torch.bool)
         # World Congress sessions held.
         self.congress_sessions = torch.zeros(B, dtype=torch.long, device=device)
         # Per-seat era-score accumulator on unified civ ids (col 0 = seat 0,
@@ -335,7 +342,11 @@ class SimInit:
             for c, v in enumerate(esi[: 1 + r_pad]):
                 self.era_score[b, c] = int(v)
         _er = rules.eras
-        self._civ_pair_ally_min_peace = int((rules.seats.get("eras") or {}).get("allyMinPeace", 30))
+        self._ally_min_peace = int((rules.seats.get("eras") or {}).get("allyMinPeace", 30))
+        # A war is FORMAL iff the aggressor's grudge on this target is at least
+        # this old; a same-turn stamp is 0 old, so a fresh denouncement buys a
+        # SURPRISE war, not a formal one.
+        self._formal_war_min = int(rules.seats.get("formalWarMinTurns", 5))
         _er2 = rules.seats.get("eras") or {}
         self._wm_dow = int(_er2.get("warmongerDow", 4))
         self._wm_cap = int(_er2.get("warmongerCapture", 3))
@@ -390,18 +401,18 @@ class SimInit:
         for _nm, _w in (("techs", nt_b3), ("civics", nc_b3),
                         ("tech_boosted", nt_b3), ("civic_boosted", nc_b3)):
             setattr(self, f"civ_{_nm}", torch.zeros(B, 1 + r_pad, _w, dtype=torch.bool, device=device))
-        # WHO DRIVES EACH SEAT — one column per seat row, False = the built-in
-        # AI, True = actions supplied from outside. The scripted picker,
-        # research auto-pick and unit AI skip an externally driven seat;
-        # externally written choices (city_current, civ_cur_*) are honored by
-        # the existing mechanics. Row 0 is `seat_ext[:, 0]` and a civ is
-        # `seat_ext[:, r + 1]` — one plane, no view.
+        # WHO DRIVES EACH SEAT — one column per seat row, True = actions
+        # supplied from outside. The wire-driven arms (`_seat_record_apply`,
+        # `_seat_buy_ladder`, `_apply_seat_unit_actions`, the useq replay) all
+        # gate on this column, so it is what lets them stay row-generic.
         self.seat_ext = torch.zeros(B, 1 + r_pad + s_pad + 1, dtype=torch.bool, device=device)
-        # Row 0 is driven from outside from the moment the world exists: the
-        # decision server IS seat 0's only driver (#93). Saying so here is what
-        # lets `_apply_seat_unit_actions` gate on `seat_ext[:, row]` for every
-        # seat instead of carrying a "row 0 needs no permission" branch.
-        self.seat_ext[:, 0] = True
+        # EVERY MAJOR is driven from outside from the moment the world exists.
+        # Not a seat-0 fact: the decision server is the only driver either
+        # engine has (#93/#102 deleted both scripted ladders), so a major row
+        # that no wire drives simply has no intents to gate. The minor rows —
+        # city-states and the barbarian class — stay False; they are ruled, not
+        # decided.
+        self.seat_ext[:, :1 + r_pad] = True
         # Civ-city district registry [.., nD]: the tile of each placed district
         # type, -1 = none. A queued district already occupies its column, so it
         # counts toward the cap and the one-per-type rule (city.districts in TS).

@@ -1,9 +1,15 @@
-"""step(): the global turn schedule, and the WIRE seat 0's decisions arrive on.
+"""step(): the global turn schedule.
 
-Seat 0's TURN is not here — it is `_seat_phase`'s row-0 call, the same body
-every seat takes. What is seat-0-shaped in this file is the action interface
-(the step() arguments) and the unit-order replay position, which rides the
-triples schema rather than the per-unit rows a civ uses (#108).
+NO SEAT IS SHAPED INTO THIS FILE. Every seat's decisions arrive the same way —
+`apply_seat_actions(row, ...)` for the draw-free verbs and
+`_apply_seat_unit_actions(row, ...)` for the orders — and `step()` takes no
+seat arguments at all: it advances the world. Row 0's turn is `_seat_phase`'s
+row-0 call, the same body every seat takes.
+
+The one distinction left anywhere near here is the unit-order REPLAY POSITION
+(#108): row 0's orders ride the triples schema and execute pre-turn, where a
+civ row's per-unit ranks are stashed and replayed at the walkers' own position
+in the phase. That is a WIRE SCHEMA fork, and it lives in the record, not here.
 
 One mixin of BatchSim (assembled in engine.py); state and helpers live on
 self / gpu/core/simbase.py.
@@ -16,60 +22,22 @@ from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must
 
 
 class SimStep:
-    def step(
-        self,
-        production: torch.Tensor | None = None,
-        tech: torch.Tensor | None = None,
-        civic: torch.Tensor | None = None,
-        units: torch.Tensor | None = None,
-        envoy: torch.Tensor | None = None,
-        war: torch.Tensor | None = None,
-        buy: tuple | None = None,  # (kind [B], a [B], b [B]) — the GOLD purchase intent (kind 3: a=tile, b=slot)
-        worship: torch.Tensor | None = None,  # kind 4: the city slot to faith-buy the worship building in (-1 = none)
-        relig: tuple | None = None,  # kinds 5/6: (kind [B], slot [B]) — the religious-unit faith buy
-        levy: torch.Tensor | None = None,  # kind 7: the CS index to levy (-1 = none)
-    ) -> None:
-        """Advance every game one turn, applying seat 0's orders.
+    def step(self) -> None:
+        """Advance every game one turn.
 
-        Every argument is optional and None means "seat 0 decides nothing" —
-        no queue, no pick, no order. Invalid entries are masked to no-ops.
-
-        production: [B, RC] long — per-city action in the ONE production
-        layout every seat row uses (cpu/core/prodLayout.ts): [0, NB)
-        buildings, SETTLER, IDLE, the roster units, the scaffold districts,
-        the world wonders and the district projects. Spending is not here — it
-        rides `buy`/`worship`/`relig`/`levy` below.
-        tech/civic: [B] long picks applied where the research slot is empty
-        (validated against the masks; -1 = no pick).
-        units: [B, simbase.UNIT_SLOTS] long unit orders (0–5 move, 6–11 attack, 12
-        hold), executed in slot order before the turn advances.
-        envoy: [B] or [B, K] long — back that city-state with one available
-        envoy (validated; -1 = none).
-        war: [B] long (ignored while _rl_war_active is off) — a column of
-        row 0's own war head over `war_targets(0)`: 0..R-1 declare war on that
-        seat, R..2R-1 sue it for peace, -1 none. Applied through
-        `_apply_war_column`, the ONE applier, at the record position every
-        other row's column is applied at — so a same-turn declaration
-        legalizes this turn's own unit orders, exactly as it does for a civ.
-        buy/worship/relig/levy: the GOLD and FAITH spending intents, in the
-        same shapes every seat's `apply_seat_actions` takes — stashed here and
-        drained by _seat_buy_ladder at the gold block's own phase position.
+        NO ACTIONS ARRIVE HERE. A seat's draw-free choices are written by
+        `apply_seat_actions(row, ...)` and its unit orders by
+        `_apply_seat_unit_actions(row, ...)` — both before this call, both
+        identical for every row, and row 0 has no interface of its own
+        (A-31r). Whatever was stashed drains at its own position in the phase.
         """
         dev = self.device
-        self._stash_record(0, tech=tech, civic=civic, envoys=envoy, production=production)
-        self._stash_buy(0, buy=buy, worship=worship, relig=relig, levy=levy)
-        if war is not None:
-            self._apply_war_column(0, war)
-
-        # --- seat-0 unit orders (before the turn advances) ----------------------
-        if units is not None and self.units_mode:
-            self._apply_seat_unit_actions(0, units)
 
         # --- refreshUnits: heal only units that spent NO MP since their last
         # refresh — +20 in a friendly city (barbs: on their camp), +15 own
         # territory, +10 neutral ground, +5 foreign-owned land. The heal
-        # precedes the MP reset, so seat-0 orders from THIS step and
-        # hostile-phase acts from the PREVIOUS step both gate. -------------------
+        # precedes the MP reset, so pre-turn orders applied AHEAD of this call
+        # and hostile-phase acts from the PREVIOUS step both gate. -------------
         if self.units_mode:
             cap = self.rules.combat.get("unitHp", 100)
             # ONE heal rule, both windows. See _seat_heal.

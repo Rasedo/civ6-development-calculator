@@ -52,22 +52,8 @@ FORK_ALLOW = {
     # --- PERMANENT: the two index spaces have to meet somewhere ------------
     ("simbase.py", "seat_of_index"): "the row->seat map itself",
     # --- WIRE LIMITS, named ------------------------------------------------
-    ("env.py", "step"): "#108 — row 0's action interface + unit-order replay position",
-    ("sim_init.py", "__init__"): "#108 — seat_ext[:, 0] is the wire fork env.step_seat spells as `row != 0`",
-    # --- BURN-DOWN (AUDIT A-32r). Delete the entry that closes the fork. ----
-    # The civ-PAIR planes (denounce / ally / warkind / strengths / proximity)
-    # have no seat-0 row, so civ<->civ diplomacy is still a space seat 0
-    # cannot enter — and it is a SECOND way to declare war beside the war
-    # head. `apply_geo` and `_extract_geo` are where the row space and the
-    # civ-pair space meet, and nowhere else. Closing A-32r closes all six.
-    ("sim_seats.py", "_civ_pair_strengths"): "A-32r — civ-pair planes have no seat-0 row",
-    ("sim_seats.py", "apply_geo"): "A-32r — the ONE row->civ-pair conversion",
-    ("sim_seats.py", "_geo_denounce_and_ally"): "A-32r — the civ-pair candidate set has no seat-0 row",
-    ("sim_seats.py", "_geo_declare_wars"): "A-32r — the civ-pair candidate set has no seat-0 row",
-    ("sim_economy.py", "_ww_era_base"): "A-32r — civ_pair_warkind has no seat-0 row",
-    ("drive.py", "_geo_turn"): "A-32r — civ-pair planes have no seat-0 row",
-    ("drive.py", "geo_decide_and_apply"): "A-32r — civ-pair planes have no seat-0 row",
-    ("drive.py", "_extract_geo"): "A-32r — the record's civ-pair targets",
+    ("serve_gate.py", "run_batched"): "#108 — the wire's seat-0 RECORD SCHEMA (production pairs, unit triples)",
+    ("serve_gate.py", "main"): "#108 — the wire's seat-0 RECORD SCHEMA, the single-seed twin",
 }
 
 #: The merged seat planes, by the naming convention that IS the storage
@@ -106,7 +92,174 @@ FORK_PATTERNS = (
     # (`citystate_at` is NOT here: a city-state's index is a genuinely
     # different space, the same exemption the four surviving aliases carry.)
     (re.compile(r"\.civ_at\b"), "civ-family tile view"),
+    # The WIRE's own spelling: `recs["0"] = {...}`, the hand-rolled seat-0
+    # record — the last seat-0 distinction either engine has, and one no
+    # pattern above can see, because a schema fork is a literal dict rather
+    # than a comparison. Written as an EMPTY subscript because `_code_lines`
+    # blanks string tokens whole, quotes included: the census reads the literal
+    # key as `recs[   ]`, while the generic `recs[str(row)]` beside it survives
+    # intact and does not match.
+    (re.compile(r"\brecs\[\s*\]"), 'recs["0"] — the wire\'s hand-rolled seat-0 record'),
 )
+
+# ---------------------------------------------------------------------------
+# THE SAME CENSUS, ON THE TS ORACLE.
+#
+# Checking one engine and reporting "the class is closed" is the mistake #112
+# was: a clean run is evidence about the instrument, not the codebase. The GPU
+# half of that round found four live divergences; the FIRST run of the census
+# below found three more in `cpu/`, all of the same shape — a rule body passing
+# a literal 0 where the acting seat belongs — and all of them ones the GPU
+# already got right. There is no reason the oracle should be less measured than
+# the twin.
+# ---------------------------------------------------------------------------
+# `cpu/world` belongs here as much as the rest: WORLD CONSTRUCTION is where a
+# seat gets its leader, its colour and its aggression draw, and a fork there is
+# a seat that starts the game as a different kind of thing.
+TS_ROOTS = ("cpu/core", "cpu/driver", "cpu/export", "cpu/world")
+
+TS_FORK_ALLOW = {
+    # --- PERMANENT: the two index spaces have to meet somewhere ------------
+    ("seats.ts", "indexOfSeat"): "the seat->civ index map itself",
+    # --- WIRE LIMITS, named ------------------------------------------------
+    ("phase.ts", "seatPhase"): "#108 — `actor.seat !== 0` is the unit-order SCHEMA fork (triples vs per-unit ranks)",
+    ("driver.ts", "runDriver"): "#108 — the serve client's own seat-0 candidate rows, and endTurn's ambient seat argument",
+    # --- NOT RULES ---------------------------------------------------------
+    ("effects.ts", "makeYieldCtx"): "the EXPORTER's yield context; its only live caller is cpu/export/planes.ts",
+    # --- BURN-DOWN (AUDIT A-34r). Delete the entry that closes the fork. ----
+    # `placeSeats` builds opponents from a CIV index at seats 1.., leaving the
+    # `createGameFromMap` record at seat 0 as the human — the classic
+    # calculator's world, where seat 0 is a different KIND of seat. Its only
+    # caller is `createGame`, which the live path no longer uses (serve and
+    # export both go through cpu/world/load.ts); what keeps it alive is ~15
+    # test files. Not a live divergence, and not a fork to forgive silently.
+    ("phase.ts", "placeSeats"): "A-34r — the map path's civ-index seat constructor (createGame, test-only)",
+}
+
+TS_FORK_PATTERNS = (
+    (re.compile(r"\bseat\s*[=!]==\s*0\b"), "seat === 0"),
+    (re.compile(r"\bseats\[0\]"), "state.seats[0] — literal seat 0"),
+    # THE ONE THAT FOUND ALL THREE. `goldenCulturePerDistrict(state, 0)` in a
+    # per-CITY yield body, `goldenBoostBonus(state, 0)` inside a function whose
+    # own parameter is the seat, `addEraScore(state, 0)` on the path where
+    # `seat` is the conqueror: a seat argument written as a literal reads like
+    # a constant and is a fork.
+    (re.compile(r"\(\s*state\s*,\s*0\s*[,)]"), "a SEAT argument hardcoded to 0"),
+    (re.compile(r"\bseat\s*[-+]\s*1\b"), "seat ± 1 — the civ index space"),
+    (re.compile(r"seatOf\(\s*state\s*,\s*[A-Za-z_][A-Za-z_0-9]*\s*\+\s*1\s*\)"), "civ index + 1 -> seat"),
+    # The named conversions. Matching only `seat ± 1` would catch the two
+    # DEFINITIONS and none of the callers — the caller is where the second
+    # index space actually costs something, so name the call.
+    (re.compile(r"\b(?:seatOfIndex|indexOfSeat)\s*\("), "the civ index space, by name"),
+)
+
+
+def _ts_code_lines(src: str) -> dict[int, str]:
+    """line -> its CODE text, comments and string bodies blanked.
+
+    The GPU half uses `tokenize`; there is no TS tokenizer here, so this is a
+    character scan over the things that can hide or fake a hit: `//` to end of
+    line, `/* */`, and quoted strings. A template literal's `${...}` is CODE
+    and stays — blanking it would have hidden `seatOf(state, 0)` inside an
+    interpolation, which is the same blindness this whole check exists to
+    remove. Regex literals and JSX are not handled; neither appears in `cpu/`."""
+    out: list[list[str]] = [list(ln) for ln in src.splitlines()]
+    row = col = 0
+    stack: list[str] = []  # nesting of "//" | "/*" | a quote char | "${"
+    i = 0
+    n = len(src)
+
+    def mode() -> str:
+        return stack[-1] if stack else ""
+
+    while i < n:
+        ch = src[i]
+        nxt = src[i + 1] if i + 1 < n else ""
+        if ch == "\n":
+            if mode() == "//":
+                stack.pop()
+            row, col, i = row + 1, 0, i + 1
+            continue
+        m = mode()
+        blank = m in ("//", "/*") or m in ("\"", "'", "`")
+        if m in ("", "${"):
+            if ch == "/" and nxt == "/":
+                stack.append("//")
+                blank = True
+            elif ch == "/" and nxt == "*":
+                stack.append("/*")
+                blank = True
+            elif ch in "\"'`":
+                stack.append(ch)  # the quote itself stays, its body goes
+            elif ch == "}" and m == "${":
+                stack.pop()       # back into the template literal
+        elif m == "/*":
+            if ch == "*" and nxt == "/":
+                for c2 in (col, col + 1):
+                    if c2 < len(out[row]):
+                        out[row][c2] = " "
+                stack.pop()
+                col, i = col + 2, i + 2
+                continue
+        elif m in ("\"", "'", "`"):
+            if ch == "\\":
+                for c2 in (col, col + 1):
+                    if c2 < len(out[row]):
+                        out[row][c2] = " "
+                col, i = col + 2, i + 2
+                continue
+            if m == "`" and ch == "$" and nxt == "{":
+                stack.append("${")  # an interpolation is code again
+                blank = False
+                col, i = col + 2, i + 2
+                continue
+            if ch == m:
+                stack.pop()
+                blank = False
+        if blank and col < len(out[row]):
+            out[row][col] = " "
+        col, i = col + 1, i + 1
+    return {k + 1: "".join(v) for k, v in enumerate(out)}
+
+
+_TS_DECL = re.compile(
+    r"^(?:export\s+)?(?:async\s+)?(?:function\s+(?P<f>[A-Za-z_$][\w$]*)"
+    r"|const\s+(?P<c>[A-Za-z_$][\w$]*)\s*[:=][^=]*?(?:=>|function))"
+)
+
+
+def _ts_funcs_by_line(code: dict[int, str]) -> dict[int, str]:
+    """line -> the last TOP-LEVEL function declaration at or above it.
+
+    A brace-matching parser would be exact; this is not, and does not need to
+    be. `cpu/` declares its functions at column 0, so "the last unindented
+    declaration above this line" names the enclosing one — and anchoring at
+    column 0 is what keeps a nested arrow-function const from stealing the
+    attribution, which would make an allowlist key change under an unrelated
+    refactor. The file:line in the report locates the hit either way."""
+    out: dict[int, str] = {}
+    cur = "<module>"
+    for ln in sorted(code):
+        m = _TS_DECL.match(code[ln])
+        if m:
+            cur = m.group("f") or m.group("c") or cur
+        out[ln] = cur
+    return out
+
+
+def ts_fork_census() -> list[tuple[str, str, str, int, str]]:
+    hits: list[tuple[str, str, str, int, str]] = []
+    for rel in TS_ROOTS:
+        for path in sorted((ROOT / rel).glob("*.ts")):
+            code = _ts_code_lines(path.read_text(encoding="utf-8"))
+            fmap = _ts_funcs_by_line(code)
+            for i, line in code.items():
+                if not line.strip():
+                    continue
+                for rx, label in TS_FORK_PATTERNS:
+                    if rx.search(line):
+                        hits.append((path.name, fmap.get(i, "<module>"), label, i, line.strip()))
+    return hits
 
 
 def _funcs_by_line(tree: ast.AST) -> dict[int, str]:
@@ -536,7 +689,11 @@ def _code_lines(src: str) -> dict[int, str]:
 
 def fork_census() -> list[tuple[str, str, str, int, str]]:
     hits: list[tuple[str, str, str, int, str]] = []
-    for d in (CORE, ROOT / "policy"):
+    # `gpu/serve_gate.py` is in the census, not just the engine and the policy:
+    # it is where the WIRE is spelled, and the wire is where the last seat-0
+    # distinction lives. Leaving the driver out would let the one surviving
+    # fork sit in the one file nobody measures.
+    for d in (CORE, ROOT / "policy", ROOT / "gpu"):
         for path in sorted(d.glob("*.py")):
             src = path.read_text(encoding="utf-8")
             fmap = _funcs_by_line(ast.parse(src))
@@ -549,14 +706,38 @@ def fork_census() -> list[tuple[str, str, str, int, str]]:
     return hits
 
 
+def census_faults(engine: str, census, allow: dict) -> int:
+    """The STRAY/STALE pair, for EITHER engine's census — the two halves are
+    the same check and share this body so neither can drift ahead of the
+    other. A stray fork is one nobody named; a stale entry is a fork someone
+    closed without saying so, and the next one to arrive in that function
+    would land pre-forgiven."""
+    fails = 0
+    stray = [h for h in census if (h[0], h[1]) not in allow]
+    if stray:
+        fails += 1
+        print(f"UNALLOWED SEAT FORK ({engine}) — every survivor must be named in the allowlist:")
+        for f, fn, label, ln, code in stray:
+            print(f"  {f}:{ln} [{fn}] {label}  {code[:80]}")
+    live = {(h[0], h[1]) for h in census}
+    rot = sorted(k for k in allow if k not in live)
+    if rot:
+        fails += 1
+        print(f"STALE ALLOWLIST ENTRY ({engine}) — the fork is gone; delete the line:")
+        for f, fn in rot:
+            print(f"  {f} [{fn}] — {allow[(f, fn)]}")
+    return fails
+
+
 def main(census_only: bool = False) -> int:
     known, shapes, aliases = defined_attrs()
     known |= external_binds()
     fails = 0
 
     if census_only:
-        for f, fn, label, ln, code in fork_census():
-            print(f"{f}:{ln} [{fn}] {label}  {code[:90]}")
+        for tag, hits in (("gpu", fork_census()), ("ts", ts_fork_census())):
+            for f, fn, label, ln, code in hits:
+                print(f"{tag} {f}:{ln} [{fn}] {label}  {code[:90]}")
         return 0
 
     bad = unresolved_reads(known, shapes)
@@ -580,28 +761,14 @@ def main(census_only: bool = False) -> int:
         for nm, dfile, bfile, bline in shadowed:
             print(f"  {nm}  (def in {dfile}, bound at {bfile}:{bline})")
 
-    census = fork_census()
-    stray = [h for h in census if (h[0], h[1]) not in FORK_ALLOW]
-    if stray:
-        fails += 1
-        print("UNALLOWED SEAT FORK — every survivor must be named in FORK_ALLOW:")
-        for f, fn, label, ln, code in stray:
-            print(f"  {f}:{ln} [{fn}] {label}  {code[:80]}")
-    # A STALE allowlist entry is a fork someone closed without saying so — and
-    # the next one to arrive in that function would land pre-forgiven.
-    live = {(h[0], h[1]) for h in census}
-    rot = sorted(k for k in FORK_ALLOW if k not in live)
-    if rot:
-        fails += 1
-        print("STALE FORK_ALLOW ENTRY — the fork is gone; delete the line:")
-        for f, fn in rot:
-            print(f"  {f} [{fn}] — {FORK_ALLOW[(f, fn)]}")
+    fails += census_faults("gpu", fork_census(), FORK_ALLOW)
+    fails += census_faults("ts", ts_fork_census(), TS_FORK_ALLOW)
 
     if fails:
-        print(f"\nseat-symmetry check FAILED ({fails} of 4)")
+        print(f"\nseat-symmetry check FAILED ({fails} fault classes)")
         return 1
-    print(f"seat-symmetry check OK — {len(known)} bound attributes, "
-          f"{len(aliases)} aliases, {len(FORK_ALLOW)} allowed forks")
+    print(f"seat-symmetry check OK — {len(known)} bound attributes, {len(aliases)} aliases, "
+          f"{len(FORK_ALLOW)} allowed GPU forks, {len(TS_FORK_ALLOW)} allowed TS forks")
     return 0
 
 

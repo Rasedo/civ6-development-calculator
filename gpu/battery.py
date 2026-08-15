@@ -52,7 +52,7 @@ POKE_COST = {
     "festival": 4.0, "citystate_war": 6.0, "snapshot": 30.0, "golden_move": 3.0, "pref_apply": 8.0, "seat_verbs": 10.0, "drive": 60.0,
     "civ_pair_strike": 12.0,
     "spawn_reclaim": 6.0,
-    "city_first": 14.0,
+    "centre_defence": 14.0,
 }
 
 results: list[tuple[str, float, int]] = []
@@ -204,7 +204,7 @@ def main() -> int:
                 ("peace_target", [py, "tests/gpu/peace_target_test.py"], 2),  # no attack without a war
                 ("civ_pair_strike", [py, "tests/gpu/civ_pair_strike_test.py"], 2),  # a civ city fires on an enemy civ
                 ("spawn_reclaim", [py, "tests/gpu/spawn_reclaim_test.py"], 2),  # a reclaimed slot hands on no drowned unit's MP
-                ("city_first", [py, "tests/gpu/city_first_test.py"], 2),  # a garrison shields no city
+                ("centre_defence", [py, "tests/gpu/centre_defence_test.py"], 2),  # a centre is attacked as the CITY
                 ("stack_rules", [py, "tests/gpu/stack_rules_test.py"], 2),  # cross-domain stacking + Encampment spawn wall
                 ("golden_move", [py, "tests/gpu/golden_move_test.py"], 2),  # MONUMENTALITY / EXODUS +2 MP, per seat
                 ("bankruptcy", [py, "tests/gpu/bankruptcy_test.py"], 4),

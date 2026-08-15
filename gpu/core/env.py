@@ -126,24 +126,23 @@ class BatchEnv:
         lockstep fixed-horizon episodes; the caller resets. The reward is THIS
         seat's `seat_score` delta, one body for every row.
 
-        The one seat-0 distinction left in this file is the ACTION INTERFACE
-        (#108): row 0's triples ride `step()` and apply pre-turn, a civ's rows
-        apply in-phase. TS carries the same fork, and closing it is wire work.
+        ONE ACTION INTERFACE, every row (A-31r): the draw-free verbs go through
+        `apply_seat_actions`, the orders through `_apply_seat_unit_actions`,
+        and `step()` — which takes no seat arguments at all — advances the
+        world. What is still row-0-shaped is where those orders EXECUTE: they
+        run pre-turn here, while the driver's civ rows stash a per-unit
+        sequence the phase replays at the walkers' position (#108). That is the
+        wire's unit SCHEMA, not this interface.
         """
         row = self._row(seat)
         prev = self._score_prev.get(row)
         if prev is None:
             prev = self.sim.seat_score(row)
-        if row != 0:
-            self.sim.seat_ext[:, row] = True
-            self.sim.apply_seat_actions(row, production=production, tech=tech,
-                                        civic=civic, war=war, envoys=envoy)
-            if units is not None:
-                self.sim._apply_seat_unit_actions(row, units)
-            self.sim.step()
-        else:
-            self.sim.step(production=production, tech=tech, civic=civic,
-                          units=units, envoy=envoy, war=war)
+        self.sim.apply_seat_actions(row, production=production, tech=tech,
+                                    civic=civic, war=war, envoys=envoy)
+        if units is not None and self.sim.units_mode:
+            self.sim._apply_seat_unit_actions(row, units)
+        self.sim.step()
         score = self.sim.seat_score(row)
         self._score_prev[row] = score
         return self.observe(seat), score - prev, self.sim.turn > self.horizon

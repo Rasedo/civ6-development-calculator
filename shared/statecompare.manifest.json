@@ -643,9 +643,8 @@
       "Seat.formalWars"
      ],
      "planes": [
-      "civ_pair_warkind"
-     ],
-     "gap": "casus belli is stored as an [R, R] civ<->civ matrix; there is no seat-0 row, so seat 0's formal wars read empty. The fix is widening it to the war matrix's seat space, the way `war` itself already is."
+      "seat_warkind"
+     ]
     },
     {
      "name": "denounced",
@@ -654,9 +653,8 @@
       "Seat.denounced"
      ],
      "planes": [
-      "civ_pair_denounced"
-     ],
-     "gap": "[R, R] civ<->civ only, no seat-0 row (see formalWars)."
+      "seat_denounced"
+     ]
     },
     {
      "name": "allies",
@@ -665,9 +663,8 @@
       "Seat.allies"
      ],
      "planes": [
-      "civ_pair_allied"
-     ],
-     "gap": "[R, R] civ<->civ only, no seat-0 row (see formalWars)."
+      "seat_allied"
+     ]
     }
    ]
   },

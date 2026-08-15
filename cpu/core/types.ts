@@ -161,16 +161,15 @@ export interface SeatActionRecord {
    * Gold, but NOT the one-gold-purchase slot — a levy is a diplomacy
    * action and rides beside `buy`, like real Civ 6. */
   levy?: number | null;
-  /** #107 GEOPOLITICS — targets are CIV indices, 0-based (seat = index+1),
-   * the same index space as the observation's civ block. `denounce`:
-   * grudge stamps this turn. `ally` / `geoPeace` name a PAIR and ride the
-   * LOWER civ index's record (the applying arm writes both sides).
-   * `geoWar`: the one civ↔civ declaration. Every arm re-validates its
-   * rules; the choosing thresholds are the driver's policy. */
+  /** #107 GEOPOLITICS — targets are ABSOLUTE SEATS, so seat 0 is nameable
+   * like any other.
+   * `denounce`: grudge stamps this turn. `ally` names a PAIR and rides the
+   * LOWER seat's record (the applying arm writes both sides). Declaring and
+   * suing are NOT here — they ride `war`, the seat's own head, the one
+   * entry. Every arm re-validates its rules; the choosing thresholds are the
+   * driver's policy. */
   denounce?: number[];
   ally?: number[];
-  geoWar?: number | null;
-  geoPeace?: number[];
 }
 
 /** turn -> SEAT id -> that seat's record. Seat 0 is a key like any other. */
@@ -412,10 +411,10 @@ export interface Seat {
    * storage, whatever the pair. Symmetric by construction: write it only
    * through `setWar`, ask it only through `civsAtWar`.
    *
-   * The GPU's twin is one symmetric `war[b, i, j]` matrix over its own compact
-   * seat index. Neither engine reads the other; both flatten their storage
-   * into the `geoWarMask` trace column (bit i = the i-th civ above seat 0) and
-   * the gate compares those numbers, so the BIT ORDER is what has to agree.
+   * The GPU's twin is one symmetric `war[b, i, j]` matrix over the same seat
+   * space. Neither engine reads the other; the gate compares the `wars` digest
+   * field — each seat's opponents as a SORTED list of absolute seat ids — so
+   * what has to agree is the SET, not any packing of it.
    */
   wars: number[];
   /** Of those wars, the ones that are FORMAL — a denouncement at least

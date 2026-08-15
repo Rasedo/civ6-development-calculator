@@ -125,10 +125,8 @@ class SimOrders:
                     c_seat = torch.where(_cs >= 0, self.unit_seat.gather(1, _cs.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
                     host_m = self._seats_hostile(row, m_seat.unsqueeze(1)).squeeze(1)
                     host_c = self._seats_hostile(row, c_seat.unsqueeze(1)).squeeze(1)
-                    # cityFirst = no hostile occupant, or a hostile MILITARY
-                    # among them. A LONE hostile civilian shields the centre —
-                    # it is captured (or shot) instead.
-                    city_first = ~(host_c & ~host_m)
+                    # No cityFirst term: a centre is attacked as the CITY
+                    # whoever stands on it.
                     ctr = self._centre_seat_plane().gather(1, tc.unsqueeze(1)).squeeze(1)
                     city_t = self._seats_hostile(
                         row, torch.where((ctr >= 0) & (ctr < 100), ctr, neg).unsqueeze(1)).squeeze(1)
@@ -151,8 +149,8 @@ class SimOrders:
                         & melee & ~host_m & ~host_c & ~city_t & ~cs_t
                         if self._encamp_didx >= 0 else torch.zeros_like(valid)
                     )
-                    city_hit = city_t & city_first
-                    cs_hit = cs_t & ~city_t & city_first
+                    city_hit = city_t
+                    cs_hit = cs_t & ~city_t
                     unit_hit = (host_m | host_c) & ~city_hit & ~cs_hit
                     _css = self.citystate_at.gather(1, tc.unsqueeze(1)).squeeze(1).clamp(min=0)
                     for b_ in valid.nonzero(as_tuple=True)[0].tolist():
@@ -858,17 +856,13 @@ class SimOrders:
             attack = act & (target_tile <= T)
             ttc = target_tile.clamp(max=T - 1)
             # meleeAttackInner's precedence, ONE set of arms for every
-            # centre: a city is attacked THROUGH a MILITARY garrison, but a
-            # LONE CIVILIAN draws the blow itself — it is captured roll-free,
-            # so it cannot be the thing a city is attacked through. Seat 0's
-            # centre used to skip that test; TS never did.
+            # centre: a city is attacked as the CITY whoever stands on it —
+            # through a garrison, and through a lone civilian too.
             ctr_here = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0
             # a NON-BARBARIAN unit stands on the target tile
             has_u = self._nonbarb_unit_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
-            has_mil = self._nonbarb_mil_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
-            city_hit = ctr_here & (~has_u | has_mil)
-            city_att = attack & ~rngd & city_hit
-            unit_att = attack & ~rngd & has_u & ~city_hit
+            city_att = attack & ~rngd & ctr_here
+            unit_att = attack & ~rngd & has_u & ~ctr_here
             enc_att = (
                 attack
                 & ~rngd

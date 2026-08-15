@@ -30,14 +30,13 @@ class SimPhase:
         if self.units_mode:
             self._refresh_aura_mp()
             self._reset_mp("major")
-        # The geopolitics arms run BEFORE the per-seat loop — denounce and
-        # alliance first (a fresh grudge blocks a same-turn alliance and
-        # starts the formal clock), then the declarations in ACTOR order
-        # (seat 0's declare arm leads, then the civ↔civ pass — the war is
-        # live for both sides' war-acts this turn); peace at the tail.
+        # DENOUNCE and ALLY run before the per-seat loop: a fresh grudge has
+        # to break a standing alliance and start the formal clock before any
+        # declaration reads either. Declaring and suing are NOT here — they
+        # ride each seat's own war head at its record position, which
+        # is why nothing follows this call.
         if self.R > 0:
             self._geo_denounce_and_ally()
-            self._geo_declare_wars()
         # THE SEAT LOOP — state.seats in id order, seat 0 first, ONE body per
         # row. All that is left outside _seat_turn is the driven unit-sequence
         # REPLAY: row 0's unit orders ride the triples schema and replay in the
@@ -93,12 +92,6 @@ class SimPhase:
         # load-bearing for R=1 configs.
         self._seat_route_cache = None
 
-        # The civ↔civ PEACE pass runs AFTER every seat acted, at the geoPeace
-        # position. Row 0's own sue-for-peace no longer has an arm here: its
-        # war column rides `_apply_war_column` at the record position, the
-        # same one every other row's does.
-        if self.R > 0:
-            self._geo_make_peace()
 
     def _seat_city_strike(self, row: int, col: torch.Tensor, fire: torch.Tensor, key: str) -> None:
         """ONE city's once-per-turn RANGED STRIKE — target scan plus the battle.

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Seat } from '../../../cpu/core/types';
-import { indexOfSeat, seatOf, setWar } from '../../../cpu/core/seats';
+import { seatOf, setWar } from '../../../cpu/core/seats';
 import { createGame, endTurn } from '../../../cpu/core/game';
 import { declareWar } from '../../../cpu/core/phase';
 import { settleFirstCity } from '../helpers';
@@ -66,13 +66,13 @@ describe('B-22 seat-0 grievances', () => {
   it('declaring war earns grievances', () => {
     const state = newGame(1);
     expect(seatOf(state, 0)!.warmonger ?? 0).toBe(0);
-    expect(declareWar(state, indexOfSeat((state.seats[(0) + 1] as Seat).seat), 0).ok).toBe(true);
+    expect(declareWar(state, (state.seats[1] as Seat).seat, 0).ok).toBe(true);
     expect(seatOf(state, 0)!.warmonger).toBe(WARMONGER_DOW);
   });
 
   it('grievances do NOT decay while a war is still running', () => {
     const state = newGame(1);
-    declareWar(state, indexOfSeat((state.seats[(0) + 1] as Seat).seat), 0);
+    declareWar(state, (state.seats[1] as Seat).seat, 0);
     const before = seatOf(state, 0)!.warmonger!;
     endTurn(state, 0);
     expect(seatOf(state, 0)!.warmonger).toBe(before); // still at war -> no decay
@@ -80,7 +80,7 @@ describe('B-22 seat-0 grievances', () => {
 
   it('grievances decay by 1 per turn once at peace with every civ', () => {
     const state = newGame(1);
-    declareWar(state, indexOfSeat((state.seats[(0) + 1] as Seat).seat), 0);
+    declareWar(state, (state.seats[1] as Seat).seat, 0);
     setWar(state, (state.seats[(0) + 1] as Seat).seat, 0, false); // peace on every axis
     const before = seatOf(state, 0)!.warmonger!;
     endTurn(state, 0);
@@ -100,8 +100,8 @@ describe('B-22 seat-0 grievances', () => {
     // Two declarations put seat 0 at 8, past the gang threshold of 6 —
     // the point at which opponents stop needing a strength advantage.
     const state = newGame(2);
-    declareWar(state, indexOfSeat((state.seats[(0) + 1] as Seat).seat), 0);
-    declareWar(state, indexOfSeat((state.seats[(1) + 1] as Seat).seat), 0);
+    declareWar(state, (state.seats[1] as Seat).seat, 0);
+    declareWar(state, (state.seats[2] as Seat).seat, 0);
     expect(seatOf(state, 0)!.warmonger).toBe(2 * WARMONGER_DOW);
     expect(seatOf(state, 0)!.warmonger!).toBeGreaterThanOrEqual(WARMONGER_GANG);
   });
