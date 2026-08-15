@@ -15,7 +15,7 @@ import type { GameState } from '../core/types';
 import { YIELD_KEYS } from '../core/types';
 import type { WorldFile } from '../../world/file';
 import { tileCity, tileSeat } from '../core/seats';
-import { makeYieldCtx } from '../core/effects';
+import { baseYieldCtx } from '../core/effects';
 import { tileYields, districtAdjacency } from '../core/yields';
 import { terrainDefense } from '../core/combat';
 import { moveCostInto, unitPassable } from '../core/units';
@@ -34,7 +34,11 @@ import { LUXURY_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, featIdx, wonderStaticOk, s
 /** Layer B for one loaded world. `srcStamp` is stamped by the CLI. */
 export function buildFixture(state: GameState, world: WorldFile): object {
   const map = state.map;
-  const ctx = makeYieldCtx(state);
+  // NOBODY's modifiers: the fixture's tile plane is what a tile yields before
+  // any seat's research, and the GPU applies each row's own on top. (This read
+  // seat 0's modifiers before #114 — numerically the same at t0, since no seat
+  // has researched anything yet, but it said the wrong thing.)
+  const ctx = baseYieldCtx(state);
 
   const cityStateAtStart = state.cityStates.map((cityState) => ({
     id: cityState.id,

@@ -15,7 +15,7 @@ import { envoysOf, setMet } from '../../cpu/core/cityStates';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import { seatPhase } from '../../cpu/core/phase';
 import { prodLayout } from '../../cpu/core/prodLayout';
-import { cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOfIndex, setTileOwner, setWar, setWarTurnsWith, tileSeat } from '../../cpu/core/seats';
+import { cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, setTileOwner, setWar, setWarTurnsWith, tileSeat } from '../../cpu/core/seats';
 import { tilesWithin, neighbors } from '../../world/hex';
 import { spawnUnit } from '../../cpu/core/units';
 import { isWater, isImpassable } from '../../world/query';
@@ -26,7 +26,7 @@ import type { GameState, City, Seat } from '../../cpu/core/types';
 function addCiv(state: GameState, col: number, row: number): Seat {
   const tile = tileAtCoords(state.map, col, row);
   const civ: Seat = {
-    ...emptySeat(seatOfIndex(state.seats.length - 1)),
+    ...emptySeat(state.seats.length),
     name: 'Rome', color: '#8e3db8', aggression: 0.5, seat: 1, warmonger: 0,
     ww: {}, wwTurn: {}, diplomaticFavor: 0, diplomaticPoints: 0, influencePoints: 0,
     envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0,

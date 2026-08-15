@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { civsAtWar, seatOfIndex, setWar, setWarTurnsWith, warTurnsWith } from '../../../cpu/core/seats';
+import { civsAtWar, setWar, setWarTurnsWith, warTurnsWith } from '../../../cpu/core/seats';
 import { makeState, tileAtCoords } from '../helpers';
 import { declareWarOnCityState, sueForPeaceWithCityState } from '../../../cpu/core/cityStates';
 import { cityStatePhase } from '../../../cpu/core/cityStates';
@@ -88,7 +88,7 @@ describe('#50: seat 0 <-> city-state peace', () => {
     const state = makeState();
     const cityState = addCs(state, 1);
     const rome = addCiv(state, 0, true);
-    cityState.envoys = { [seatOfIndex(0)]: SUZERAIN_ENVOYS }; // Rome is suzerain
+    cityState.envoys = { [1]: SUZERAIN_ENVOYS }; // Rome is suzerain
     expect(declareWarOnCityState(state, cityState.id, 0).ok).toBe(true);
     for (let i = 0; i < WAR_MIN_TURNS + 2; i++) cityStatePhase(state);
 

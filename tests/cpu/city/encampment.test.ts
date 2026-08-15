@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { seatOf, seatOfIndex } from '../../../cpu/core/seats';
+import { seatOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { foundCity, purchaseUnit } from '../../../cpu/core/game';
 import { spawnUnit } from '../../../cpu/core/units';
@@ -71,7 +71,7 @@ describe('B-17 Encampment', () => {
     state.seats.push({ id: 0, atWar: true, cities: [] } as any);
     const center = state.map.tiles[city.centerIndex];
     const near = tileAtCoords(state.map, center.col - 1, center.row); // adjacent -> in range
-    const civSeat = spawnUnit(state, 'SPEARMAN', near.index, seatOfIndex(0))!;
+    const civSeat = spawnUnit(state, 'SPEARMAN', near.index, 1)!;
     civSeat.hp = 100;
     barbarianPhase(state, 0);
     expect(civSeat.hp).toBeLessThan(100); // the Encampment strike landed
@@ -85,7 +85,7 @@ describe('B-17 Encampment', () => {
     state.seats.push({ id: 0, atWar: true, cities: [] } as any);
     const center = state.map.tiles[city.centerIndex];
     const near = tileAtCoords(state.map, center.col - 1, center.row);
-    const civSeat = spawnUnit(state, 'SPEARMAN', near.index, seatOfIndex(0))!;
+    const civSeat = spawnUnit(state, 'SPEARMAN', near.index, 1)!;
     civSeat.hp = 100;
     barbarianPhase(state, 0);
     expect(civSeat.hp).toBe(100);
@@ -98,7 +98,7 @@ describe('B-17 Encampment', () => {
     state.seats.push({ id: 0, atWar: true, cities: [] } as any);
     const center = state.map.tiles[city.centerIndex];
     const near = tileAtCoords(state.map, center.col - 1, center.row);
-    const civSeat = spawnUnit(state, 'SPEARMAN', near.index, seatOfIndex(0))!;
+    const civSeat = spawnUnit(state, 'SPEARMAN', near.index, 1)!;
     civSeat.hp = 100;
     const log: string[] = [];
     (globalThis as any).__cbLog = log;

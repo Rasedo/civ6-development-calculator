@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cityStateOfSeat, emptySeat, indexOfSeat, isCityStateSeat, seatOfCityState, seatOfIndex, setTileOwner, setWar, tileSeat, unitsOf } from '../../../cpu/core/seats';
+import { cityStateOfSeat, emptySeat, isCityStateSeat, seatOfCityState, setTileOwner, setWar, tileSeat, unitsOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
 import { envoysOf, isSuzerain, setMet } from '../../../cpu/core/cityStates';
@@ -12,7 +12,7 @@ import type { CityState, CityStateType, GameState, Seat, City } from '../../../c
 function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> = {}): Seat {
   const tile = tileAtCoords(state.map, col, row);
   const civ: Seat = {
-    ...emptySeat(seatOfIndex(state.seats.length - 1)), // #51/S6.12
+    ...emptySeat(state.seats.length), // #51/S6.12
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,
@@ -205,8 +205,8 @@ describe('A-12 (B8-L): civ quests (deterministic, zero-draw)', () => {
     const { state, civ, cityState } = scenario('scientific');
     const rng0 = state.rngState;
     seatPhase(state, 0);
-    expect(cityState.seatQuest?.[indexOfSeat(civ.seat)]?.kind).toBe('buildDistrict');
-    expect(cityState.seatQuest?.[indexOfSeat(civ.seat)]?.district).toBe(CITY_STATE_TYPE_DISTRICT['scientific']);
+    expect(cityState.seatQuest?.[civ.seat]?.kind).toBe('buildDistrict');
+    expect(cityState.seatQuest?.[civ.seat]?.district).toBe(CITY_STATE_TYPE_DISTRICT['scientific']);
     expect(state.rngState).toBe(rng0); // NO nextRandom consumed by the civ-quest path
   });
 
@@ -219,7 +219,7 @@ describe('A-12 (B8-L): civ quests (deterministic, zero-draw)', () => {
     state.barbSeat.camps = [far, close]; // out of array order — nearest must still win
     const rng0 = state.rngState;
     seatPhase(state, 0);
-    const q = cityState.seatQuest?.[indexOfSeat(civ.seat)];
+    const q = cityState.seatQuest?.[civ.seat];
     expect(q?.kind).toBe('clearCamp');
     // nearest to the CS center
     const dc = hexDistance(state.map.tiles[close].col, state.map.tiles[close].row, ct.col, ct.row);
@@ -232,14 +232,14 @@ describe('A-12 (B8-L): civ quests (deterministic, zero-draw)', () => {
     const { state, civ, cityState } = scenario('scientific');
     // pre-seed a clearCamp quest whose camp is already gone → satisfied
     cityState.seatQuest = [];
-    cityState.seatQuest[indexOfSeat(civ.seat)] = { kind: 'clearCamp', campIndex: 999 };
+    cityState.seatQuest[civ.seat] = { kind: 'clearCamp', campIndex: 999 };
     cityState.seatQuestIssuedTurn = [];
-    cityState.seatQuestIssuedTurn[indexOfSeat(civ.seat)] = state.turn;
+    cityState.seatQuestIssuedTurn[civ.seat] = state.turn;
     state.barbSeat.camps = []; // camp 999 gone
     const env0 = envoysOf(cityState, civ.seat);
     const rng0 = state.rngState;
     seatPhase(state, 0);
-    expect(cityState.seatQuest?.[indexOfSeat(civ.seat)]).toBeNull();
+    expect(cityState.seatQuest?.[civ.seat]).toBeNull();
     expect(envoysOf(cityState, civ.seat)).toBe(env0 + QUEST_ENVOYS);
     expect(state.rngState).toBe(rng0);
   });
@@ -248,7 +248,7 @@ describe('A-12 (B8-L): civ quests (deterministic, zero-draw)', () => {
     const { state, civ, cityState } = scenario('scientific');
     cityState.met = cityState.met.filter((x) => x !== civ.seat);
     seatPhase(state, 0);
-    expect(cityState.seatQuest?.[indexOfSeat(civ.seat)] ?? null).toBeNull();
+    expect(cityState.seatQuest?.[civ.seat] ?? null).toBeNull();
   });
 });
 
@@ -268,9 +268,9 @@ describe('A-12 (B8-L): SEAT-0 quest draw-count neutrality', () => {
     cityState.envoys[civ.seat] = 3;
     // a satisfied quest to resolve + an issue on the same phase (second CS)
     cityState.seatQuest = [];
-    cityState.seatQuest[indexOfSeat(civ.seat)] = { kind: 'clearCamp', campIndex: 999 };
+    cityState.seatQuest[civ.seat] = { kind: 'clearCamp', campIndex: 999 };
     cityState.seatQuestIssuedTurn = [];
-    cityState.seatQuestIssuedTurn[indexOfSeat(civ.seat)] = state.turn;
+    cityState.seatQuestIssuedTurn[civ.seat] = state.turn;
     const cs2 = addCs(state, 10, 16, { type: 'cultural' });
     cs2.met = [];
     setMet(cs2, civ.seat);
@@ -280,8 +280,8 @@ describe('A-12 (B8-L): SEAT-0 quest draw-count neutrality', () => {
     const rng0 = state.rngState;
     seatPhase(state, 0);
     // both a resolve and an issue happened, drawing nothing
-    expect(cityState.seatQuest?.[indexOfSeat(civ.seat)]).toBeNull();
-    expect(cs2.seatQuest?.[indexOfSeat(civ.seat)]?.kind).toBe('buildDistrict');
+    expect(cityState.seatQuest?.[civ.seat]).toBeNull();
+    expect(cs2.seatQuest?.[civ.seat]?.kind).toBe('buildDistrict');
     expect(state.rngState).toBe(rng0);
   });
 

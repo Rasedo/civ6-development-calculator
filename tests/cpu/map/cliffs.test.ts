@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { seatOfIndex, setTileOwner } from '../../../cpu/core/seats';
+import { setTileOwner } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { cliffBlocks, cliffBlocksStep } from '../../../cpu/core/units';
 import { neighborTile } from '../../../world/hex';
@@ -63,7 +63,7 @@ describe('B-26: cliffs block embark and disembark', () => {
     setTileOwner(land, 0, 1); // seat 0's territory
     expect(cliffBlocks(state, land, sea, { seat: 0 })).toBe(false);
     // an enemy using the same Harbor tile is still walled out
-    expect(cliffBlocks(state, land, sea, { seat: seatOfIndex(0) })).toBe(true);
+    expect(cliffBlocks(state, land, sea, { seat: 1 })).toBe(true);
   });
 
   it('an edge with no cliff bit is free', () => {
@@ -78,7 +78,7 @@ describe('B-26: cliffs block embark and disembark', () => {
   describe('cliffBlocksStep: the step-level rule every mover shares', () => {
     it('blocks a land unit crossing a cliff edge, both directions', () => {
       const { state, land, sea } = setup();
-      const u = { type: 'MUSKETMAN', seat: seatOfIndex(0) };
+      const u = { type: 'MUSKETMAN', seat: 1 };
       expect(cliffBlocksStep(state, land, sea, u)).toBe(true); // embark
       expect(cliffBlocksStep(state, sea, land, u)).toBe(true); // disembark
     });

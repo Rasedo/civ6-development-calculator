@@ -1,6 +1,6 @@
 import { seatOf } from '../../../cpu/core/seats';
 import { describe, it, expect } from 'vitest';
-import { BARB_SEAT, seatOfIndex } from '../../../cpu/core/seats';
+import { BARB_SEAT } from '../../../cpu/core/seats';
 import { createGame, endTurn } from '../../../cpu/core/game';
 import { settleFirstCity } from '../helpers';
 import { spawnUnit, refreshUnits, unitFullMoves } from '../../../cpu/core/units';
@@ -57,7 +57,7 @@ describe('B-24 golden movement dedications', () => {
   it('grants nothing outside a Golden age', () => {
     const state = newGame();
     const b = place(state, 'BUILDER', 0);
-    const m = place(state, 'MISSIONARY', seatOfIndex(0));
+    const m = place(state, 'MISSIONARY', 1);
     expect(unitFullMoves(state, b)).toBe(UNITS.BUILDER.moves);
     expect(unitFullMoves(state, m)).toBe(UNITS.MISSIONARY.moves);
   });
@@ -65,11 +65,11 @@ describe('B-24 golden movement dedications', () => {
   it('MONUMENTALITY lifts Builders — for a civ seat exactly as for seat 0', () => {
     const state = newGame();
     golden(state, 0, DED_MONUMENTALITY);
-    golden(state, seatOfIndex(0), DED_MONUMENTALITY);
+    golden(state, 1, DED_MONUMENTALITY);
     const pb = place(state, 'BUILDER', 0);
-    const rb = place(state, 'BUILDER', seatOfIndex(0));
-    const rw = place(state, 'WARRIOR', seatOfIndex(0));
-    const rm = place(state, 'MISSIONARY', seatOfIndex(0));
+    const rb = place(state, 'BUILDER', 1);
+    const rw = place(state, 'WARRIOR', 1);
+    const rm = place(state, 'MISSIONARY', 1);
     expect(unitFullMoves(state, pb)).toBe(UNITS.BUILDER.moves + GOLDEN_MOVE_BONUS);
     expect(unitFullMoves(state, rb)).toBe(UNITS.BUILDER.moves + GOLDEN_MOVE_BONUS);
     expect(unitFullMoves(state, rw)).toBe(UNITS.WARRIOR.moves);
@@ -78,10 +78,10 @@ describe('B-24 golden movement dedications', () => {
 
   it('EXODUS lifts Missionaries and Apostles, not Builders', () => {
     const state = newGame();
-    golden(state, seatOfIndex(0), DED_EXODUS);
-    const m = place(state, 'MISSIONARY', seatOfIndex(0));
-    const a = place(state, 'APOSTLE', seatOfIndex(0));
-    const b = place(state, 'BUILDER', seatOfIndex(0));
+    golden(state, 1, DED_EXODUS);
+    const m = place(state, 'MISSIONARY', 1);
+    const a = place(state, 'APOSTLE', 1);
+    const b = place(state, 'BUILDER', 1);
     expect(unitFullMoves(state, m)).toBe(UNITS.MISSIONARY.moves + GOLDEN_MOVE_BONUS);
     expect(unitFullMoves(state, a)).toBe(UNITS.APOSTLE.moves + GOLDEN_MOVE_BONUS);
     expect(unitFullMoves(state, b)).toBe(UNITS.BUILDER.moves);
@@ -89,10 +89,10 @@ describe('B-24 golden movement dedications', () => {
 
   it('a NORMAL age holding the same dedication pays nothing', () => {
     const state = newGame();
-    golden(state, seatOfIndex(0), DED_EXODUS);
-    const m = place(state, 'MISSIONARY', seatOfIndex(0));
+    golden(state, 1, DED_EXODUS);
+    const m = place(state, 'MISSIONARY', 1);
     expect(unitFullMoves(state, m)).toBe(UNITS.MISSIONARY.moves + GOLDEN_MOVE_BONUS);
-    seatOf(state, seatOfIndex(0))!.age = 1;
+    seatOf(state, 1)!.age = 1;
     expect(unitFullMoves(state, m)).toBe(UNITS.MISSIONARY.moves);
   });
 
@@ -105,8 +105,8 @@ describe('B-24 golden movement dedications', () => {
 
   it('an embarked unit keeps the flat embark pool', () => {
     const state = newGame();
-    golden(state, seatOfIndex(0), DED_MONUMENTALITY);
-    const b = place(state, 'BUILDER', seatOfIndex(0));
+    golden(state, 1, DED_MONUMENTALITY);
+    const b = place(state, 'BUILDER', 1);
     expect(unitFullMoves(state, b)).toBe(UNITS.BUILDER.moves + GOLDEN_MOVE_BONUS);
     b.embarked = true;
     // embarkation speed is not a unit's own movement, so the dedication drops
@@ -140,9 +140,9 @@ describe('B-24 golden movement dedications', () => {
 describe('B-24 golden dedications reach the civ that committed them', () => {
   function civRun(kind: number | null, turns: number): GameState {
     const state = newGame();
-    if (kind !== null) golden(state, seatOfIndex(0), kind);
+    if (kind !== null) golden(state, 1, kind);
     for (let t = 0; t < turns; t++) {
-      if (kind !== null) golden(state, seatOfIndex(0), kind); // survive era boundaries
+      if (kind !== null) golden(state, 1, kind); // survive era boundaries
       endTurn(state, 0);
     }
     return state;
@@ -165,13 +165,13 @@ describe('B-24 golden dedications reach the civ that committed them', () => {
     civ.research.boosted.push(id!);
     const base = TECHS[id!].cost;
     const plain = effectiveResearchCostIn(civ.research, id!, base);
-    golden(state, seatOfIndex(0), DED_FREE_INQUIRY);
-    const g = goldenBoostBonus(state, seatOfIndex(0), false);
+    golden(state, 1, DED_FREE_INQUIRY);
+    const g = goldenBoostBonus(state, 1, false);
     expect(g).toBeGreaterThan(0);
     expect(effectiveResearchCostIn(civ.research, id!, base, g)).toBeLessThan(plain);
     // ...and SEAT 0's Golden age does not pay for the civ
     const other = newGame();
     golden(other, 0, DED_FREE_INQUIRY);
-    expect(goldenBoostBonus(other, seatOfIndex(0), false)).toBe(0);
+    expect(goldenBoostBonus(other, 1, false)).toBe(0);
   });
 });

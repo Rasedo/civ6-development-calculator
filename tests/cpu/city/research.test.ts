@@ -81,9 +81,9 @@ describe('tech gating and boosts', () => {
     const hills = tileAtCoords(state.map, 9, 8);
     hills.elevation = 'HILLS';
     hills.improvement = 'MINE';
-    expect(tileYields(makeYieldCtx(state), hills).production).toBe(2); // hills 1 + mine 1
+    expect(tileYields(makeYieldCtx(state, 0), hills).production).toBe(2); // hills 1 + mine 1
     grantTechs(state, 'APPRENTICESHIP');
-    expect(tileYields(makeYieldCtx(state), hills).production).toBe(3);
+    expect(tileYields(makeYieldCtx(state, 0), hills).production).toBe(3);
   });
 
   it('Feudalism farm adjacency: +1 food with 2+ adjacent farms', () => {
@@ -93,11 +93,11 @@ describe('tech gating and boosts', () => {
     const b = tileAtCoords(state.map, 9, 7); // NE of (9,8) on even row? both adjacent to a
     const c = tileAtCoords(state.map, 8, 7);
     for (const t of [a, b, c]) t.improvement = 'FARM';
-    const before = tileYields(makeYieldCtx(state), a).food; // grass 2 + farm 1
+    const before = tileYields(makeYieldCtx(state, 0), a).food; // grass 2 + farm 1
     expect(before).toBe(3);
     grantCivics(state, 'FEUDALISM');
     // b and c are both adjacent to a (and to each other)
-    expect(tileYields(makeYieldCtx(state), a).food).toBe(4);
+    expect(tileYields(makeYieldCtx(state, 0), a).food).toBe(4);
   });
 
   it('sandbox ignores research gating', () => {
@@ -153,9 +153,9 @@ describe('governments and policies', () => {
     tileAtCoords(state.map, 9, 7).elevation = 'MOUNTAIN';
     expect(queueDistrict(state, city.id, 'CAMPUS', spot.index, 0).ok).toBe(true);
 
-    expect(effectiveAdjacency(makeYieldCtx(state), spot, 'CAMPUS')).toBe(2);
+    expect(effectiveAdjacency(makeYieldCtx(state, 0), spot, 'CAMPUS')).toBe(2);
     expect(setPolicy(state, 0, 'NATURAL_PHILOSOPHY', 0).ok).toBe(true);
-    expect(effectiveAdjacency(makeYieldCtx(state), spot, 'CAMPUS')).toBe(4);
+    expect(effectiveAdjacency(makeYieldCtx(state, 0), spot, 'CAMPUS')).toBe(4);
     expect(computeCityStats(state, city).breakdown.districts.science).toBe(4);
   });
 

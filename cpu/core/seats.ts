@@ -37,19 +37,15 @@ export const BARB_SEAT = 200;
 export const seatOfCityState = (cityStateId: number): number => CITY_STATE_SEAT_BASE + cityStateId;
 export const cityStateOfSeat = (seat: number): number => seat - CITY_STATE_SEAT_BASE;
 
-/**
- * Converts a 0-based civ index to a seat id, and back.
- *
- * These two are the only sanctioned crossing between the numberings — a bare
- * `+1`/`-1` on a seat id is a bug.
- *
- * The second numbering has nearly gone. `CityState.seatEnvoys` / `seatMet` /
- * `seatQuest` are ABSOLUTE-seat-keyed (index 0 IS seat 0), `seatOfIndex`
- * survives in the roster builder, and after #113 no `cpu/` body calls
- * `indexOfSeat` at all — the remaining callers are tests.
+/*
+ * THERE IS NO SECOND NUMBERING. Seat ids are absolute everywhere: majors are
+ * 0..R, city-states 100+, barbarians 200, and `CityState.seatEnvoys` /
+ * `seatMet` / `seatQuest` are keyed by that id (index 0 IS seat 0). The
+ * `seatOfIndex` / `indexOfSeat` pair that used to convert to a 0-based civ
+ * index was deleted once `placeSeats` — its last caller — took the append
+ * position instead. A bare `+1` / `-1` on a seat id is a bug with nothing to
+ * excuse it now.
  */
-export const seatOfIndex = (index: number): number => index + 1;
-export const indexOfSeat = (seat: number): number => seat - 1;
 
 /** The seat that owns this tile, or NO_SEAT. */
 export function tileSeat(t: Tile): number {

@@ -3,7 +3,7 @@ import { warWearinessBattle, warWearinessTurn, warWearinessPeace, wwGet, wwMax, 
 import { WW_ERA_BASE_FORMAL, WW_ERA_BASE_SURPRISE, WW_ABROAD_MULT, WW_DEATH_MULT, WW_DECAY_AT_WAR, WW_DECAY_AT_PEACE, WW_PEACE_TREATY, WAR_WEARINESS_PER_AMENITY, warWearinessPenalty } from '../../../cpu/data/seats';
 import { createGame } from '../../../cpu/core/game';
 import { settleFirstCity } from '../helpers';
-import { seatOf, setTileOwner, setWar, BARB_SEAT, seatOfIndex, seatOfCityState } from '../../../cpu/core/seats';
+import { seatOf, setTileOwner, setWar, BARB_SEAT, seatOfCityState } from '../../../cpu/core/seats';
 import type { GameState, Seat } from '../../../cpu/core/types';
 
 // War weariness is scored PER BATTLE.
@@ -40,7 +40,7 @@ describe('#51/S7.8f war weariness — the per-battle model', () => {
   it('scores BOTH sides, at the base for the era, with no discount for the aggressor', () => {
     const state = newGame();
     const { away } = tiles(state, 0);
-    const civ = seatOfIndex(0);
+    const civ = 1;
     warWearinessBattle(state, 0, civ, away);
     // Ancient, no casus belli anywhere: 16, doubled for fighting off both
     // civs' land. "Accumulated by both the attacker and the defender, without
@@ -53,7 +53,7 @@ describe('#51/S7.8f war weariness — the per-battle model', () => {
   it('fighting at HOME is half what fighting abroad is — per side, on the same battle', () => {
     const state = newGame();
     const { home } = tiles(state, 0); // SEAT 0's borders
-    const civ = seatOfIndex(0);
+    const civ = 1;
     warWearinessBattle(state, 0, civ, home);
     const base = WW_ERA_BASE_SURPRISE[0];
     // the defender is at home, the invader is not — one battle, two multipliers
@@ -64,7 +64,7 @@ describe('#51/S7.8f war weariness — the per-battle model', () => {
   it('a CITY giving or receiving the attack forces the abroad column for both', () => {
     const state = newGame();
     const { home } = tiles(state, 0);
-    const civ = seatOfIndex(0);
+    const civ = 1;
     warWearinessBattle(state, 0, civ, home, { city: true });
     // same tile as the test above, where seat 0 scored a single base
     expect(wwGet(seatOf(state, 0)!, civ)).toBe(WW_ERA_BASE_SURPRISE[0] * WW_ABROAD_MULT);
@@ -73,7 +73,7 @@ describe('#51/S7.8f war weariness — the per-battle model', () => {
   it('a death costs the side that LOST the unit three more bases, and only that side', () => {
     const state = newGame();
     const { away } = tiles(state, 0);
-    const civ = seatOfIndex(0);
+    const civ = 1;
     warWearinessBattle(state, 0, civ, away, { dDied: true });
     const base = WW_ERA_BASE_SURPRISE[0];
     expect(wwGet(seatOf(state, 0)!, civ)).toBe(base * WW_ABROAD_MULT);
@@ -83,7 +83,7 @@ describe('#51/S7.8f war weariness — the per-battle model', () => {
   it('the era table is the sourced one, and the surprise premium opens at Classical', () => {
     const state = newGame();
     const p = seatOf(state, 0)!;
-    expect(wwEraBase(state, 0, seatOfIndex(0))).toBe(WW_ERA_BASE_SURPRISE[0]);
+    expect(wwEraBase(state, 0, 1)).toBe(WW_ERA_BASE_SURPRISE[0]);
     // Ancient is the one row where a casus belli buys nothing — 16 either way.
     expect(WW_ERA_BASE_FORMAL[0]).toBe(WW_ERA_BASE_SURPRISE[0]);
     for (let e = 1; e < WW_ERA_BASE_FORMAL.length; e++) {
@@ -91,7 +91,7 @@ describe('#51/S7.8f war weariness — the per-battle model', () => {
     }
     // the seat's OWN era drives it: a Classical civ wearies at the Classical row
     p.research.techs = ['MINING', 'BRONZE_WORKING', 'CURRENCY', 'WRITING', 'ASTROLOGY', 'HORSEBACK_RIDING', 'IRON_WORKING'];
-    const era = wwEraBase(state, 0, seatOfIndex(0));
+    const era = wwEraBase(state, 0, 1);
     expect(WW_ERA_BASE_SURPRISE as readonly number[]).toContain(era);
   });
 
@@ -118,8 +118,8 @@ describe('#51/S7.8f war weariness — the per-battle model', () => {
   it('wars score SEPARATELY and only the worst is felt', () => {
     const state = newGame(2);
     const { away } = tiles(state, 0);
-    const a = seatOfIndex(0);
-    const b = seatOfIndex(1);
+    const a = 1;
+    const b = 2;
     warWearinessBattle(state, 0, a, away);
     warWearinessBattle(state, 0, a, away);
     warWearinessBattle(state, 0, b, away);
@@ -133,8 +133,8 @@ describe('#51/S7.8f war weariness — the per-battle model', () => {
   it('a war fought this turn does not decay; a phoney war sheds 50 and peace sheds 200', () => {
     const state = newGame(2);
     const { away } = tiles(state, 0);
-    const a = seatOfIndex(0);
-    const b = seatOfIndex(1);
+    const a = 1;
+    const b = 2;
     const p = seatOf(state, 0)!;
     p.ww = { [a]: 1000, [b]: 1000 };
     p.wwTurn = { [a]: state.turn }; // blood was spilled against `a` this turn
@@ -156,8 +156,8 @@ describe('#51/S7.8f war weariness — the per-battle model', () => {
 
   it('a peace treaty sheds 2000 from THAT war only, and never below zero', () => {
     const state = newGame(2);
-    const a = seatOfIndex(0);
-    const b = seatOfIndex(1);
+    const a = 1;
+    const b = 2;
     const p = seatOf(state, 0)!;
     p.ww = { [a]: 900, [b]: 900 };
     warWearinessPeace(state, 0, a);
@@ -177,7 +177,7 @@ describe('#51/S7.8f war weariness — the per-battle model', () => {
 
   it('a war DECLARED but not fought costs nothing', () => {
     const state = newGame();
-    const civ = seatOfIndex(0);
+    const civ = 1;
     setWar(state, 0, civ, true);
     for (let i = 0; i < 30; i++) {
       state.turn += 1;

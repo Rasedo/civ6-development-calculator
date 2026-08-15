@@ -121,21 +121,12 @@ FORK_PATTERNS = (
 TS_ROOTS = ("cpu/core", "cpu/driver", "cpu/export", "cpu/world")
 
 TS_FORK_ALLOW = {
-    # --- PERMANENT: the two index spaces have to meet somewhere ------------
-    ("seats.ts", "indexOfSeat"): "the seat->civ index map itself",
+    # No PERMANENT entry, and no index-space entry at all: `seatOfIndex` and
+    # `indexOfSeat` are gone from `cpu/` entirely (#114), so there is nothing
+    # left that has to convert between two numberings.
     # --- WIRE LIMITS, named ------------------------------------------------
     ("phase.ts", "seatPhase"): "#108 — `actor.seat !== 0` is the unit-order SCHEMA fork (triples vs per-unit ranks)",
     ("driver.ts", "runDriver"): "#108 — the serve client's own seat-0 candidate rows, and endTurn's ambient seat argument",
-    # --- NOT RULES ---------------------------------------------------------
-    ("effects.ts", "makeYieldCtx"): "the EXPORTER's yield context; its only live caller is cpu/export/planes.ts",
-    # --- BURN-DOWN (AUDIT A-34r). Delete the entry that closes the fork. ----
-    # `placeSeats` builds opponents from a CIV index at seats 1.., leaving the
-    # `createGameFromMap` record at seat 0 as the human — the classic
-    # calculator's world, where seat 0 is a different KIND of seat. Its only
-    # caller is `createGame`, which the live path no longer uses (serve and
-    # export both go through cpu/world/load.ts); what keeps it alive is ~15
-    # test files. Not a live divergence, and not a fork to forgive silently.
-    ("phase.ts", "placeSeats"): "A-34r — the map path's civ-index seat constructor (createGame, test-only)",
 }
 
 TS_FORK_PATTERNS = (

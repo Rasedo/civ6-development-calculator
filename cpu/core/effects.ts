@@ -501,8 +501,22 @@ export interface YieldCtx {
   mods: Modifiers;
 }
 
-export function makeYieldCtx(state: GameState): YieldCtx {
-  return { map: state.map, mods: getModifiers(state, 0) };
+/** A SEAT's yield context: the map, plus that seat's own modifiers. Two tiles
+ *  side by side yield different numbers to different seats — techs, policies,
+ *  pantheon and envoy tiers all land in `mods` — so every caller names whose
+ *  view it wants. It read seat 0's modifiers whoever asked until #114, which
+ *  meant a civ's border pick and worked-tile scoring were scored with the
+ *  wrong seat's bonuses. */
+export function makeYieldCtx(state: GameState, seat: number): YieldCtx {
+  return { map: state.map, mods: getModifiers(state, seat) };
+}
+
+/** The BASE yield context: the map with NOBODY's modifiers. What a tile is
+ *  worth before any seat's research touches it — which is exactly what the
+ *  GPU fixture's static tile plane stores, because the GPU applies each row's
+ *  own techs/civics/beliefs at runtime. */
+export function baseYieldCtx(state: GameState): YieldCtx {
+  return { map: state.map, mods: defaultModifiers() };
 }
 
 /** Current government's policy slots, including wonder-granted extras. */

@@ -56,7 +56,7 @@ import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex } from './unit
 const A_FOUND_CITY = unitActionIndex(IMPROVEMENT_IDS).FOUND_CITY;
 import { ALLY_MIN_PEACE, CIV_LEADERS, FORMAL_WAR_MIN_TURNS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION } from '../data/seats';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles, goldenBoostBonus } from './eras';
-import { NO_SEAT, atWarWithAny, citiesOf, civHasStrategic, civsAtWar, emptySeat, isCiv, prophetsOf, seatOf, seatOfCityState, seatOfIndex, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, warTurnsWith, warsOf } from './seats';
+import { NO_SEAT, atWarWithAny, citiesOf, civHasStrategic, civsAtWar, emptySeat, isCiv, prophetsOf, seatOf, seatOfCityState, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, warTurnsWith, warsOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 // The two verb bodies the SEAT-0 applier and this one share — one SNIPE ring,
 // one SPREAD rule, whichever seat gave the order.
@@ -159,43 +159,24 @@ export function placeSeats(state: GameState, count?: number): void {
 
   picked.forEach((tile, i) => {
     const leader = CIV_LEADERS[i % CIV_LEADERS.length];
+    // THE SEAT ID IS THE APPEND POSITION — `state.seats` IS the storage, so a
+    // new major's id is simply where it lands, the same idiom `loadWorld`
+    // uses. No civ index, and nothing to convert. `emptySeat` supplies every
+    // other field; only the three a leader carries differ, and the twenty
+    // this literal used to restate were `emptySeat`'s own values written
+    // twice.
     const actor: Seat = {
-      ...emptySeat(seatOfIndex(i)), // #51/S6.12: one Seat constructor, every seat
+      ...emptySeat(state.seats.length),
       name: leader.name,
       color: leader.color,
       aggression: 0.3 + nextRandom(state) * 0.6,
-      cities: [],
-      nextCityId: 0,
-      peaceTurns: 0,
-      // The SEAT block — identical on the seat 0's seat 0.
-      seat: i + 1,
-      warmonger: 0,
-      ww: {}, wwTurn: {}, // B-15 / #51/S7.8f: per-WAR points, keyed by opponent seat
-      diplomaticFavor: 0,
-      diplomaticPoints: 0,
-      influencePoints: 0,
-      envoysAvailable: 0,
-      treasury: 0,
-      scienceTotal: 0,
-      cultureTotal: 0,
-      faith: 0,
-      tourism: 0,
-      government: { current: null, policies: [] },
-      research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
-      gpp: {},
-      gpEarned: [],
-      buildersTrained: 0,
-      bestMeleeCS: 0,
-      tilesPurchased: 0,
-      spaceProjects: [],
-      religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     };
     foundCityAt(state, actor.seat, tile, actor);  // #96: one founding mutation, every seat
-    // Push BEFORE the starting warrior
-    // spawns so spawnUnit's bestMeleeCS chokepoint can find the seat —
-    // "strongest melee ever FIELDED" includes the starting army (defense
-    // 20 from turn 0; the GPU seeds civ_only_best_melee from the fixture pools).
-    state.seats.push(actor); // #51/S1.3j: seats IS the storage — seats[r+1] is actor r
+    // Push BEFORE the starting warrior spawns, so spawnUnit's bestMeleeCS
+    // chokepoint can find the seat — "strongest melee ever FIELDED" includes
+    // the starting army (defense 20 from turn 0; the GPU seeds
+    // civ_best_melee from the fixture pools).
+    state.seats.push(actor);
     spawnUnit(state, 'WARRIOR', tile.index, actor.seat);
   });
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { seatOfIndex, tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, emptySeat } from '../../../cpu/core/seats';
+import { tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, emptySeat } from '../../../cpu/core/seats';
 import { makeState, tileAtCoords } from '../helpers';
 import { transferCity } from '../../../cpu/core/phase';
 import { tilesWithin } from '../../../world/hex';
@@ -19,7 +19,7 @@ import type { GameState, City, Seat } from '../../../cpu/core/types';
 function addCiv(state: GameState, col: number, row: number, name: string): Seat {
   const tile = tileAtCoords(state.map, col, row);
   const civ: Seat = {
-    ...emptySeat(seatOfIndex(state.seats.length - 1)), // #51/S6.12
+    ...emptySeat(state.seats.length), // #51/S6.12
     name,
     color: '#8e3db8',
     aggression: 0.5,

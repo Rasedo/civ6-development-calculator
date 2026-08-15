@@ -3,7 +3,7 @@ import { greatPeopleEarned } from '../../../cpu/core/greatPeople';
 import { computeCityStats } from '../../../cpu/core/city';
 import { setMet } from '../../../cpu/core/cityStates';
 import { CITY_MAX_HP } from '../../../cpu/data/units';
-import { BARB_SEAT, cityStateOfSeat, civsAtWar, emptySeat, indexOfSeat, isBarbSeat, isCityStateSeat, isCiv, seatOf, seatOfCityState, seatOfIndex, setTileOwner, setWar, setWarTurnsWith, tileCity, tileSeat, unitsOf } from '../../../cpu/core/seats';
+import { BARB_SEAT, cityStateOfSeat, civsAtWar, emptySeat, isBarbSeat, isCityStateSeat, isCiv, seatOf, seatOfCityState, setTileOwner, setWar, setWarTurnsWith, tileCity, tileClaimed, tileSeat, unitsOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { createGame, foundCity, endTurn, serialize, deserialize, choosePantheon } from '../../../cpu/core/game';
 import { canFoundCity } from '../../../cpu/core/rules';
@@ -22,7 +22,7 @@ function addCiv(
   opts: Partial<Seat> = {},
 ): Seat {
   const civ: Seat = {
-    ...emptySeat(seatOfIndex(state.seats.length - 1)), // #51/S6.12
+    ...emptySeat(state.seats.length), // #51/S6.12
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,
@@ -104,11 +104,11 @@ describe('civ placement and expansion', () => {
     for (const r of a.seats.slice(1)) {
       expect(r.cities.length).toBe(1);
       const center = a.map.tiles[r.cities[0].centerIndex];
-      expect(indexOfSeat(tileSeat(center))).toBe(indexOfSeat(r.seat));
+      expect(tileSeat(center)).toBe(r.seat);
       expect(center.district).toBe('CITY_CENTER');
       expect(unitsOf(a, r.seat).length).toBeGreaterThanOrEqual(1);
       for (const other of a.seats.slice(1)) {
-        if (indexOfSeat(other.seat) === indexOfSeat(r.seat)) continue;
+        if (other.seat === r.seat) continue;
         const oc = a.map.tiles[other.cities[0].centerIndex];
         expect(hexDistance(center.col, center.row, oc.col, oc.row)).toBeGreaterThanOrEqual(10);
       }
@@ -120,11 +120,11 @@ describe('civ placement and expansion', () => {
     const civ = addCiv(state, 6, 6);
     // Settlers are per-city queue items — queue one about to finish
     civ.cities[0].queue.push({ kind: 'settler', progress: 500, cost: 90 });
-    const claimedBefore = state.map.tiles.filter((t) => indexOfSeat(tileSeat(t)) !== -1).length;
+    const claimedBefore = state.map.tiles.filter((t) => tileClaimed(t)).length;
     state.turn = 9; // border-expansion tick for city id 0
     seatPhase(state, 0);
     expect(civ.cities.length).toBe(2);
-    const claimedAfter = state.map.tiles.filter((t) => indexOfSeat(tileSeat(t)) !== -1).length;
+    const claimedAfter = state.map.tiles.filter((t) => tileClaimed(t)).length;
     expect(claimedAfter).toBeGreaterThan(claimedBefore);
     // growth box fills toward pop 4
     expect(civ.cities[0].foodBox).toBeGreaterThan(0);
@@ -263,7 +263,7 @@ describe('war and peace', () => {
     const converted = seatOf(state, 0)!.cities.find((c) => c.name === 'Roma')!;
     expect(converted.population).toBeGreaterThanOrEqual(1);
     expect(tileCity(state.map.tiles[civCity.centerIndex])).toBe(converted.id);
-    expect((isCiv(tileSeat(state.map.tiles[civCity.centerIndex])) ? indexOfSeat(tileSeat(state.map.tiles[civCity.centerIndex])) : -1)).toBe(-1);
+    expect(isCiv(tileSeat(state.map.tiles[civCity.centerIndex]))).toBe(false);
     expect(civsAtWar(state, civ.seat, 0)).toBe(false); // last city gone: war over
   });
 
@@ -581,7 +581,7 @@ describe('civ CS trade routes (A-12b)', () => {
     const civCity = civ.cities[civ.cities.length - 1];
     expect(civCity.centerIndex).toBe(cityState.centerIndex);
     expect(civCity.population).toBe(2); // 3 × 0.75 floored
-    expect((isCiv(tileSeat(state.map.tiles[cityState.centerIndex])) ? indexOfSeat(tileSeat(state.map.tiles[cityState.centerIndex])) : -1)).toBe(indexOfSeat(civ.seat));
+    expect(tileSeat(state.map.tiles[cityState.centerIndex])).toBe(civ.seat);
     expect(tileCity(state.map.tiles[cityState.centerIndex])).toBe(civCity.id);
   });
 });

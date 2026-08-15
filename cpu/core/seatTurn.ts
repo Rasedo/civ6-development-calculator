@@ -15,7 +15,7 @@
  */
 
 import type { City, GameState, QueueItem } from './types';
-import { seatOf, civsAtWar, seatOfIndex } from './seats';
+import { seatOf, civsAtWar } from './seats';
 // S1(a): the ctx block reads the scripted DoW site's own helpers. phase.ts
 // already imports from THIS module — the cycle is function-level and resolves
 // at call time (observeSeat runs long after module init).
@@ -86,10 +86,6 @@ export function seatAccumulators(state: GameState, seat: number): void {
     s.warmonger = (s.warmonger ?? 0) - 1;
   }
 }
-
-/** The seat id for seat `seatIndex` — re-exported so turn-body callers need
- *  only this module. */
-export { seatOfIndex };
 
 /**
  * CITY GROWTH, for any seat's city.

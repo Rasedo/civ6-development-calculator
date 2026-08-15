@@ -1,6 +1,6 @@
 import { civsAtWar, seatOf } from '../../../cpu/core/seats';
 import { describe, it, expect } from 'vitest';
-import { seatOfIndex, setWar, BARB_SEAT } from '../../../cpu/core/seats';
+import { setWar, BARB_SEAT } from '../../../cpu/core/seats';
 import { createGame } from '../../../cpu/core/game';
 import { settleFirstCity } from '../helpers';
 import { spawnUnit, unitsHostile } from '../../../cpu/core/units';
@@ -55,8 +55,8 @@ describe('#51/S7.1 (#59) civ↔civ trade raiding', () => {
     const state = newGame();
     const centre = seatOf(state, 0)!.cities[0].centerIndex;
     const { near, far } = tilesNear(state, centre);
-    const owner = seatOfIndex(0);
-    const raider = seatOfIndex(1);
+    const owner = 1;
+    const raider = 2;
 
     const u = spawnUnit(state, 'WARRIOR', far, raider)!;
     expect(routeRaidedAt(state, [centre], owner)).toBe(false); // out of range
@@ -75,9 +75,9 @@ describe('#51/S7.1 (#59) civ↔civ trade raiding', () => {
     const state = newGame();
     const centre = seatOf(state, 0)!.cities[0].centerIndex;
     const { near, far } = tilesNear(state, centre);
-    const owner = seatOfIndex(0);
+    const owner = 1;
 
-    const neutral = spawnUnit(state, 'WARRIOR', near, seatOfIndex(2))!;
+    const neutral = spawnUnit(state, 'WARRIOR', near, 3)!;
     expect(routeRaidedAt(state, [centre], owner)).toBe(false);
 
     // ...and the barbarian standing on the same tile does raid it (caps.alwaysHostile)
@@ -90,7 +90,7 @@ describe('#51/S7.1 (#59) civ↔civ trade raiding', () => {
     const state = newGame();
     const centre = seatOf(state, 0)!.cities[0].centerIndex;
     const { near } = tilesNear(state, centre);
-    const owner = seatOfIndex(0);
+    const owner = 1;
     spawnUnit(state, 'WARRIOR', near, owner);
     expect(routeRaidedAt(state, [centre], owner)).toBe(false);
   });
@@ -99,7 +99,7 @@ describe('#51/S7.1 (#59) civ↔civ trade raiding', () => {
     const state = newGame();
     const centre = seatOf(state, 0)!.cities[0].centerIndex;
     const { near } = tilesNear(state, centre);
-    const raider = seatOfIndex(0);
+    const raider = 1;
     spawnUnit(state, 'WARRIOR', near, raider);
     expect(routeRaidedAt(state, [centre], 0)).toBe(false);
     setWar(state, 0, raider, true);
@@ -110,8 +110,8 @@ describe('#51/S7.1 (#59) civ↔civ trade raiding', () => {
 describe('war is a property of a PAIR of seats', () => {
   it('setWar writes both sides, and either orientation clears both', () => {
     const state = newGame();
-    const a = seatOfIndex(0);
-    const b = seatOfIndex(1);
+    const a = 1;
+    const b = 2;
     expect(civsAtWar(state, a, b)).toBe(false);
     setWar(state, a, b, true);
     expect(civsAtWar(state, a, b)).toBe(true);
@@ -126,8 +126,8 @@ describe('war is a property of a PAIR of seats', () => {
 
   it('unitsHostile between two civs keys on that pair, not on which seat asks', () => {
     const state = newGame();
-    const a = { seat: seatOfIndex(0) };
-    const b = { seat: seatOfIndex(1) };
+    const a = { seat: 1 };
+    const b = { seat: 2 };
     expect(unitsHostile(state, a, b)).toBe(false);
     setWar(state, a.seat, b.seat, true);
     expect(unitsHostile(state, a, b)).toBe(true);
@@ -137,12 +137,12 @@ describe('war is a property of a PAIR of seats', () => {
 
   it('a RANGED unit never strikes another civ unit — melee still lists it', () => {
     const state = newGame();
-    setWar(state, seatOfIndex(0), seatOfIndex(1), true);
+    setWar(state, 1, 2, true);
     const land = state.map.tiles.filter((t) => t.terrain !== 'OCEAN' && t.terrain !== 'COAST');
     const atkTile = land[0];
     const defTile = neighbors(state.map, atkTile).find((n) => n.terrain !== 'OCEAN' && n.terrain !== 'COAST')!;
-    const atk = spawnUnit(state, 'ARCHER', atkTile.index, seatOfIndex(0))!;
-    const def = spawnUnit(state, 'WARRIOR', defTile.index, seatOfIndex(1))!;
+    const atk = spawnUnit(state, 'ARCHER', atkTile.index, 1)!;
+    const def = spawnUnit(state, 'WARRIOR', defTile.index, 2)!;
     expect(unitsHostile(state, atk, def)).toBe(true);
     const hp0 = def.hp;
     const mp0 = atk.movesLeft;
@@ -150,7 +150,7 @@ describe('war is a property of a PAIR of seats', () => {
     expect(def.hp).toBe(hp0);        // the ranged arm is a no-op against a civ
     expect(atk.movesLeft).toBe(mp0); // and costs nothing
     expect(attackTargets(state, atk)).not.toContain(def.tileIndex);
-    const melee = spawnUnit(state, 'WARRIOR', atkTile.index, seatOfIndex(0))!;
+    const melee = spawnUnit(state, 'WARRIOR', atkTile.index, 1)!;
     expect(attackTargets(state, melee)).toContain(def.tileIndex);
   });
 });

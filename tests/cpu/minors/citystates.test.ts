@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cityStateOfSeat, emptySeat, isCityStateSeat, seatOf, seatOfCityState, seatOfIndex, setTileOwner, tileSeat } from '../../../cpu/core/seats';
+import { cityStateOfSeat, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, tileSeat } from '../../../cpu/core/seats';
 import { makeState, tileAtCoords } from '../helpers';
 import { createGame, foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
 import { canFoundCity } from '../../../cpu/core/rules';
@@ -232,28 +232,28 @@ describe('civ envoys and the suzerain contest (A-12)', () => {
     const state = makeState();
     const cityState = addCs(state, 8, 8, { type: 'trade', envoys: { [0]: 3 } });
     expect(isSuzerain(cityState, 0)).toBe(true); // uncontested
-    cityState.envoys = { [seatOfIndex(0)]: 3 };
+    cityState.envoys = { [1]: 3 };
     expect(isSuzerain(cityState, 0)).toBe(false); // tied: nobody rules
-    expect(isSuzerain(cityState, seatOfIndex(0))).toBe(false);
-    cityState.envoys = { [seatOfIndex(0)]: 4 };
+    expect(isSuzerain(cityState, 1)).toBe(false);
+    cityState.envoys = { [1]: 4 };
     expect(isSuzerain(cityState, 0)).toBe(false);
-    expect(isSuzerain(cityState, seatOfIndex(0))).toBe(true);
+    expect(isSuzerain(cityState, 1)).toBe(true);
     cityState.envoys = { [0]: 5 };
     expect(isSuzerain(cityState, 0)).toBe(true);
-    expect(isSuzerain(cityState, seatOfIndex(0))).toBe(false);
+    expect(isSuzerain(cityState, 1)).toBe(false);
   });
 
   it('the envoy bonuses apply the 1/3/6 thresholds off that civ only', () => {
     const state = makeState();
     const cityState = addCs(state, 8, 8, { type: 'scientific' });
-    cityState.envoys = { [seatOfIndex(0)]: 6, [seatOfIndex(1)]: 1 };
-    const b0 = cityStateEnvoyBonuses(state, seatOfIndex(0));
+    cityState.envoys = { [1]: 6, [2]: 1 };
+    const b0 = cityStateEnvoyBonuses(state, 1);
     expect(b0.capital.science).toBe(2);
     // At 6 envoys the 3-tier lands on the tier-1 building (LIBRARY) and
     // the 6-tier on the tier-2 building (UNIVERSITY) — +2 each, separate keys.
     expect(b0.buildingAdd.LIBRARY?.science).toBe(2);
     expect(b0.buildingAdd.UNIVERSITY?.science).toBe(2);
-    const b1 = cityStateEnvoyBonuses(state, seatOfIndex(1));
+    const b1 = cityStateEnvoyBonuses(state, 2);
     expect(b1.capital.science).toBe(2);
     expect(b1.buildingAdd.LIBRARY).toBeUndefined(); // 1 envoy: capital only
   });
@@ -283,7 +283,7 @@ describe('B-21 suzerain unique perk (CITY_STATE_SUZERAIN_LIVE)', () => {
   it('loses the perk when a civ wins the strict contest', () => {
     const state = makeState();
     const cityState = addCs(state, 8, 8, { type: 'scientific', name: 'Geneva', envoys: { [0]: 3 } });
-    cityState.envoys = { [seatOfIndex(0)]: 4 }; // civ 0 out-envoys seat 0
+    cityState.envoys = { [1]: 4 }; // civ 0 out-envoys seat 0
     expect(isSuzerain(cityState, 0)).toBe(false);
     expect(cityStateSuzerainCapitalBonus(state, 0)).toEqual({});
   });
@@ -292,10 +292,10 @@ describe('B-21 suzerain unique perk (CITY_STATE_SUZERAIN_LIVE)', () => {
     const state = makeState();
     // Vilnius (cultural) is SHIPPED -> culture channel.
     const cityState = addCs(state, 8, 8, { type: 'cultural', name: 'Vilnius', envoys: { [0]: 0 } });
-    cityState.envoys = { [seatOfIndex(0)]: 3 };
-    expect(isSuzerain(cityState, seatOfIndex(0))).toBe(true);
-    expect(cityStateSuzerainCapitalBonus(state, seatOfIndex(0)).culture).toBe(CITY_STATE_SUZERAIN_YIELD);
+    cityState.envoys = { [1]: 3 };
+    expect(isSuzerain(cityState, 1)).toBe(true);
+    expect(cityStateSuzerainCapitalBonus(state, 1).culture).toBe(CITY_STATE_SUZERAIN_YIELD);
     // no perk for a civ that is not the suzerain
-    expect(cityStateSuzerainCapitalBonus(state, seatOfIndex(1))).toEqual({});
+    expect(cityStateSuzerainCapitalBonus(state, 2)).toEqual({});
   });
 });

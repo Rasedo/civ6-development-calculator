@@ -169,7 +169,7 @@ export function assignWorkedTiles(
   ctx?: YieldCtx,
   workers = city.population,
 ): number[] {
-  const yctx = ctx ?? makeYieldCtx(state);
+  const yctx = ctx ?? makeYieldCtx(state, city.seat);
   const candidates = workableTiles(state, city);
   const scored = candidates
     .map((t) => ({ index: t.index, score: tileScore(tileYields(yctx, t), city.focus) }))
@@ -327,7 +327,7 @@ export function resourcePriority(tile: Tile): number {
  *
  */
 export function pickBorderTile(state: GameState, city: City, ctx?: YieldCtx): number | null {
-  const yctx = ctx ?? makeYieldCtx(state);
+  const yctx = ctx ?? makeYieldCtx(state, city.seat);
   const center = state.map.tiles[city.centerIndex];
   const candidates = borderCandidates(state, city);
   if (candidates.length === 0) return null;

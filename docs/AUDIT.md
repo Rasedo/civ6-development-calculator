@@ -58,7 +58,19 @@ because nothing had ever looked for them. #113: A-32r CLOSED (+1 A done);
 A-33r CLOSED — its fidelity question was verified against a real Civ 6
 source and fixed on both engines (+0.5 A done); A-31r lost its ACTION
 INTERFACE half (+0.13 A done), leaving the wire's record SCHEMA; A-34r is
-new and open (+1 A weight, +0 done).
+new and open (+1 A weight, +0 done). #114: A-34r CLOSED in the round after
+it opened — `placeSeats` takes the append position, `seatOfIndex` and
+`indexOfSeat` are deleted, and no `cpu/` body converts between numberings
+any more; `makeYieldCtx` takes the asking seat (+1 A done).
+
+THE TABLE ABOVE IS NOW WRONG, and by construction: 41.55 + 1 = 42.55
+against a chapter weight of 42. The delta chain overshot its own ceiling —
+the fifth drift, and this time the arithmetic says so out loud rather than
+hiding behind a fresh entry's weight. DO NOT patch it with another delta.
+The next round to touch chapter A must RECOMPUTE the row from the open list
+(A-9r, A-11r, A-27r, A-28r, A-29r, A-30r, A-31r — seven items), re-weight
+those seven 1-8 by implementation size, and set done = weight - open. A
+running ledger that can exceed 100% is not measuring anything.
 
 ## A. Seat symmetry — open
 
@@ -106,8 +118,10 @@ new and open (+1 A weight, +0 done).
   triples, where every civ row sends per-unit ranks. The schema decides
   WHERE the orders execute — row 0's pre-turn, a civ's at the walkers'
   position in the phase — so the two cannot be merged without moving the
-  combat DRAW positions. Task #108, and the checker's remaining allowlist
-  entries are exactly these three sites.
+  combat DRAW positions. Task #108, and after #114 the checker's allowlists
+  hold NOTHING ELSE: four sites, two per engine, all four this same fact —
+  `serve_gate`'s two `recs["0"]` blocks, `seatPhase`'s `actor.seat !== 0`,
+  and the serve client's seat-0 candidate rows in `driver.ts`.
   The ACTION INTERFACE half closed in #113: `step()` takes no seat
   arguments at all now, every row's choices arrive through
   `apply_seat_actions` + `_apply_seat_unit_actions`, and `seat_ext` is set
@@ -123,17 +137,6 @@ new and open (+1 A weight, +0 done).
   own single-seed path that skipped seat 1 and asked for a seat that does
   not exist. Claim only what the instrument measures, and measure both
   engines.
-- **A-34r. WORLD CONSTRUCTION is not seat-generic.** `placeSeats` builds
-  opponents from a CIV index at seats 1.., leaving `createGameFromMap`'s
-  pre-seeded record at seat 0 as the human — the classic calculator's
-  world, where seat 0 is a different KIND of seat (no leader, no colour,
-  `aggression: 0`, which is a live term in the DoW gate). Only `createGame`
-  calls it, and the live path no longer does: serve and export both build
-  through `cpu/world/load.ts`, which since #113 gives every seat its
-  leader, colour and aggression draw through one index-generic loop. What
-  keeps `placeSeats` alive is ~15 test files under `tests/cpu/`. Not a live
-  divergence — a test-only world constructor that would become one the
-  moment anything else called it.
 
 ## B. Fidelity vs real Civ 6 — open residuals
 

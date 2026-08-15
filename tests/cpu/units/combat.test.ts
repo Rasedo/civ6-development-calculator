@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BARB_SEAT, isBarbSeat, seatOf, seatOfIndex } from '../../../cpu/core/seats';
+import { BARB_SEAT, isBarbSeat, seatOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
 import { spawnUnit, builderRepair } from '../../../cpu/core/units';
@@ -421,7 +421,7 @@ describe('B-4 XP & levels', () => {
     state.seats.push({ id: 0, atWar: true, cities: [] } as any);
     const center = state.map.tiles[city.centerIndex];
     const near = tileAtCoords(state.map, center.col + 1, center.row); // adjacent → in range 1..2
-    const civSeat = spawnUnit(state, 'SPEARMAN', near.index, seatOfIndex(0))!;
+    const civSeat = spawnUnit(state, 'SPEARMAN', near.index, 1)!;
     civSeat.tileIndex = near.index;
     civSeat.hp = 100; // survives the strike (defense 25 vs city ~15)
     expect(civSeat.xp).toBe(0);

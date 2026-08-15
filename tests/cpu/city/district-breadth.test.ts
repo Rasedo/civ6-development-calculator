@@ -1,7 +1,7 @@
 import { seatOf } from '../../../cpu/core/seats';
 import { computeCityStats } from '../../../cpu/core/city';
 import { describe, it, expect } from 'vitest';
-import { seatOfIndex, tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, emptySeat } from '../../../cpu/core/seats';
+import { tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, emptySeat } from '../../../cpu/core/seats';
 import { makeState, tileAtCoords } from '../helpers';
 import { createGame } from '../../../cpu/core/game';
 import { seatPhase, transferCity } from '../../../cpu/core/phase';
@@ -12,7 +12,7 @@ import type { GameState, City, Seat, Tile } from '../../../cpu/core/types';
 function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> = {}): Seat {
   const tile = tileAtCoords(state.map, col, row);
   const civ: Seat = {
-    ...emptySeat(seatOfIndex(state.seats.length - 1)), // #51/S6.12
+    ...emptySeat(state.seats.length), // #51/S6.12
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,

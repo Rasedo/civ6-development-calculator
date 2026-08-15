@@ -3,7 +3,7 @@ import { UNITS } from '../../../cpu/data/units';
 import { makeMap, makeState, tileAtCoords, grantTechs } from '../helpers';
 import { foundCity, endTurn } from '../../../cpu/core/game';
 import { trainableUnits, queueUnit } from '../../../cpu/core/units';
-import { NO_SEAT, civHasStrategic, seatOf, seatOfIndex, setTileOwner, tileCity } from '../../../cpu/core/seats';
+import { NO_SEAT, civHasStrategic, seatOf, setTileOwner, tileCity } from '../../../cpu/core/seats';
 
 /** Units-mode game with the capital at (8,8), and a resource tile inside
  * borders that the caller can configure. Returns the state, city and the tile. */
@@ -51,7 +51,7 @@ describe('B-9 civHasStrategic access', () => {
     // ownership loss (capture / border loss): cityId cleared, civ takes it
     setTileOwner(tile, NO_SEAT);
     expect(has(state, 'IRON')).toBe(false);
-    setTileOwner(tile, seatOfIndex(0), tileCity(tile)); // now owned by civ 0 (civ 1), not seat 0
+    setTileOwner(tile, 1, tileCity(tile)); // now owned by civ 0 (civ 1), not seat 0
     expect(civHasStrategic(state, 0, 'IRON')).toBe(false);
     expect(civHasStrategic(state, 1, 'IRON')).toBe(true); // the civ now has access
   });

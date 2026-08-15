@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../cpu/core/game';
 import { settleFirstCity } from '../helpers';
-import { civsAtWar, setWar, seatOfIndex, seatOfCityState, BARB_SEAT } from '../../../cpu/core/seats';
+import { civsAtWar, setWar, seatOfCityState, BARB_SEAT } from '../../../cpu/core/seats';
 import { unitsHostile } from '../../../cpu/core/units';
 import type { GameState } from '../../../cpu/core/types';
 
@@ -63,9 +63,9 @@ describe('the war relation covers every seat pair', () => {
   it('civ against civ reads the same store', () => {
     const state = newGame();
     const r0 = state.seats.slice(1)[0];
-    expect(civsAtWar(state, 0, seatOfIndex(0))).toBe(false);
+    expect(civsAtWar(state, 0, 1)).toBe(false);
     setWar(state, r0.seat, 0, true);
-    expect(civsAtWar(state, 0, seatOfIndex(0))).toBe(true);
-    expect(civsAtWar(state, seatOfIndex(0), seatOfIndex(1))).toBe(false);
+    expect(civsAtWar(state, 0, 1)).toBe(true);
+    expect(civsAtWar(state, 1, 2)).toBe(false);
   });
 });

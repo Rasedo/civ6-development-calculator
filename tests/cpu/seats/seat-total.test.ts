@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BARB_SEAT, seatOfIndex, seatOfCityState, seatOf, allSeats, emptySeat } from '../../../cpu/core/seats';
+import { BARB_SEAT, seatOfCityState, seatOf, allSeats, emptySeat } from '../../../cpu/core/seats';
 import { createGame, serialize, deserialize } from '../../../cpu/core/game';
 import { settleFirstCity } from '../helpers';
 import type { GameState } from '../../../cpu/core/types';
@@ -27,7 +27,7 @@ function newGame(): GameState {
 describe('#51/S6.12 seatOf is total', () => {
   it('answers for all four classes — and with a DIFFERENT object each time', () => {
     const state = newGame();
-    const ids = [0, seatOfIndex(0), seatOfIndex(1), seatOfCityState(0), seatOfCityState(2), BARB_SEAT];
+    const ids = [0, 1, 2, seatOfCityState(0), seatOfCityState(2), BARB_SEAT];
     const got = ids.map((id) => seatOf(state, id));
     expect(got.every((s) => s !== undefined)).toBe(true);
     expect(got.map((s) => s!.seat)).toEqual(ids); // each knows its own id
@@ -43,7 +43,7 @@ describe('#51/S6.12 seatOf is total', () => {
 
   it('a seat id nobody holds still answers undefined — total is not "always yes"', () => {
     const state = newGame();
-    expect(seatOf(state, seatOfIndex(50))).toBeUndefined(); // no such civ
+    expect(seatOf(state, 51)).toBeUndefined(); // no such civ
     expect(seatOf(state, seatOfCityState(50))).toBeUndefined(); // no such minor
   });
 

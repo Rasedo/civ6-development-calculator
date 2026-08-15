@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BARB_SEAT, seatOfIndex, seatOfCityState, seatClass, capsOf } from '../../../cpu/core/seats';
+import { BARB_SEAT, seatOfCityState, seatClass, capsOf } from '../../../cpu/core/seats';
 import { SEAT_CAPS } from '../../../cpu/data/seats';
 import { createGame } from '../../../cpu/core/game';
 import { settleFirstCity } from '../helpers';
@@ -30,8 +30,8 @@ function newGame(): GameState {
 describe('#51/S6.11 seat classes', () => {
   it('the absolute seat space IS the class — nothing stores a duplicate', () => {
     expect(seatClass(0)).toBe('major');
-    expect(seatClass(seatOfIndex(0))).toBe('major');
-    expect(seatClass(seatOfIndex(7))).toBe('major');
+    expect(seatClass(1)).toBe('major');
+    expect(seatClass(8)).toBe('major');
     expect(seatClass(seatOfCityState(0))).toBe('minor');
     expect(seatClass(seatOfCityState(5))).toBe('minor');
     expect(seatClass(BARB_SEAT)).toBe('hostile');
@@ -54,7 +54,7 @@ describe('#51/S6.11 caps.xp', () => {
     const land = state.map.tiles.findIndex((t) => t.terrain !== 'OCEAN' && t.terrain !== 'COAST');
     const barb = spawnUnit(state, 'WARRIOR', land, BARB_SEAT)!;
     const mine = spawnUnit(state, 'WARRIOR', land, 0)!;
-    const theirs = spawnUnit(state, 'WARRIOR', land, seatOfIndex(0))!;
+    const theirs = spawnUnit(state, 'WARRIOR', land, 1)!;
     expect(capsOf(BARB_SEAT).xp).toBe(false);
     expect(barb.xp).toBeUndefined();
     // the negative twin: an absent field must mean "cannot earn", not "new"
@@ -70,8 +70,8 @@ describe('#51/S6.11 caps.alwaysHostile', () => {
     const barb = { seat: BARB_SEAT };
     expect(capsOf(BARB_SEAT).alwaysHostile).toBe(true);
     expect(unitsHostile(state, barb, { seat: 0 })).toBe(true);
-    expect(unitsHostile(state, barb, { seat: seatOfIndex(0) })).toBe(true);
-    expect(unitsHostile(state, { seat: seatOfIndex(1) }, barb)).toBe(true);
+    expect(unitsHostile(state, barb, { seat: 1 })).toBe(true);
+    expect(unitsHostile(state, { seat: 2 }, barb)).toBe(true);
     // and to a MINOR, which has no war row with the barbarians at all
     expect(unitsHostile(state, barb, { seat: seatOfCityState(0) })).toBe(true);
   });
@@ -83,13 +83,13 @@ describe('#51/S6.11 caps.alwaysHostile', () => {
 
   it('a major seat is hostile only where WAR says so — the negative twin', () => {
     const state = newGame();
-    const a = { seat: seatOfIndex(0) };
-    const b = { seat: seatOfIndex(1) };
-    expect(capsOf(seatOfIndex(0)).alwaysHostile).toBe(false);
+    const a = { seat: 1 };
+    const b = { seat: 2 };
+    expect(capsOf(1).alwaysHostile).toBe(false);
     expect(unitsHostile(state, a, b)).toBe(false); // at peace
-    setWar(state, seatOfIndex(0), seatOfIndex(1), true);
+    setWar(state, 1, 2, true);
     expect(unitsHostile(state, a, b)).toBe(true); // and now at war
-    setWar(state, seatOfIndex(0), seatOfIndex(1), false);
+    setWar(state, 1, 2, false);
     expect(unitsHostile(state, a, b)).toBe(false); // peace again — not sticky
   });
 });

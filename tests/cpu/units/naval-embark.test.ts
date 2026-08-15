@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { emptySeat, isCiv, seatOf, seatOfIndex, setTileOwner, setWar, tileCity } from '../../../cpu/core/seats';
+import { emptySeat, isCiv, seatOf, setTileOwner, setWar, tileCity } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs } from '../helpers';
 import { foundCity, purchaseUnit } from '../../../cpu/core/game';
 import { moveCostInto, unitPassable, canEmbark, waterEnterable, ownerHasTech, inEnemyZoc, spawnUnit, tileFreeForUnit, cityNavalCapable, trainableUnits, queueUnit, orderMove, walkPath } from '../../../cpu/core/units';
@@ -18,7 +18,7 @@ afterEach(() => setEmbarkLive(false)); // never leak the switch into other suite
 
 function addCivAtWar(state: GameState, col: number, row: number, techs: string[]): Seat {
   const civ: Seat = {
-    ...emptySeat(seatOfIndex(state.seats.length - 1)), // #51/S6.12
+    ...emptySeat(state.seats.length), // #51/S6.12
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,
@@ -200,7 +200,7 @@ describe('#45/B-6 war-march water steps (behind the inert live switch)', () => {
 
 function bareCiv(state: GameState, atWar = true): Seat {
   const civ: Seat = {
-    ...emptySeat(seatOfIndex(state.seats.length - 1)), // #51/S6.12
+    ...emptySeat(state.seats.length), // #51/S6.12
     name: 'Carthage',
     color: '#2d8',
     aggression: 0.5,
@@ -349,7 +349,7 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
     const civCity: City = {
       id: 0,
       name: 'Utica',
-      seat: seatOfIndex(1),
+      seat: 2,
       centerIndex: civCityCenter.index,
       population: 5,
       foodBox: 0,
@@ -390,7 +390,7 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
     const civCity: City = {
       id: 0,
       name: 'Kart-Hadasht',
-      seat: seatOfIndex(1),
+      seat: 2,
       centerIndex: civCityCenter.index,
       population: 5,
       foodBox: 0,

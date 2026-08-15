@@ -28,7 +28,7 @@ describe('pantheons', () => {
     const pasture = tileAtCoords(state.map, 9, 8);
     pasture.resource = 'CATTLE';
     pasture.improvement = 'PASTURE';
-    expect(tileYields(makeYieldCtx(state), pasture).culture).toBe(1);
+    expect(tileYields(makeYieldCtx(state, 0), pasture).culture).toBe(1);
   });
 
   it('Fertility Rites boosts growth; Religious Settlements cheapens borders', () => {
