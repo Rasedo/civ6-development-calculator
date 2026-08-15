@@ -125,7 +125,6 @@ class SimInit:
                           _n1[_n1.clamp(min=0)], torch.full((self.T, 6, 6), -1, dtype=_n1.dtype, device=device))
         _n2 = _n2.reshape(self.T, 36)
         _ring = torch.full((self.T, 12), -1, dtype=torch.long, device=device)
-        _selfT = torch.arange(self.T, device=device)
         for t in range(self.T):
             d1 = set(int(x) for x in _n1[t].tolist() if int(x) >= 0)
             cand = sorted(set(int(x) for x in _n2[t].tolist() if int(x) >= 0) - d1 - {t})
@@ -225,17 +224,15 @@ class SimInit:
         n_gp = len(rr.get("gpClassDistrict", [])) or 5  # GP class count (Scientist..General)
         # The unified civ index space: 0 = seat 0, r+1 = civ index r.
         self.O = 1 + self.R
-        # rc slots append at last-alive+1 (order-preserving), so churn can
-        # exhaust the space while holes sit below — compact at the step end once
-        # the high-water nears the cap (forced low via CIV6_RC_RECLAIM_AT).
-        self._civ_city_reclaim_at = int(_os.environ.get("CIV6_RC_RECLAIM_AT", self.RC - 8))
-        # Env-gated machine-checked registry invariant. Auto-ON whenever forced
-        # compaction runs (CIV6_RC_RECLAIM_AT set), also standalone via
+        # City slots append at last-alive+1 (order-preserving) and compact at
+        # the step end whenever any major row holds a hole, so the layout is
+        # always the dense array TS splices.
+        # Env-gated machine-checked registry invariant, via
         # CIV6_RC_REGISTRY_CHECK. No hot-path cost otherwise.
-        self._civ_city_reg_check = bool(_os.environ.get("CIV6_RC_REGISTRY_CHECK")) or ("CIV6_RC_RECLAIM_AT" in _os.environ)
+        self._civ_city_reg_check = bool(_os.environ.get("CIV6_RC_REGISTRY_CHECK"))
         r_pad, civ_city_pad = max(self.R, 1), self.RC
-        # Per-tile registry of the owning civ CITY as its persistent civ_city_id
-        # (per-civ ids, meaningful only where civ_at >= 0). Keyed on the ID, not
+        # Per-tile registry of the owning CITY as its persistent city id
+        # (meaningful only where a major owns the tile). Keyed on the ID, not
         # the slot, so _reclaim_cities compaction needs no tile-plane remap. No civ
         # city exists at t0, so it starts empty.
         self.water = torch.tensor([[t.get("wt", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
@@ -269,8 +266,9 @@ class SimInit:
         # Existence + temperament on the seat axis (row 0 = seat 0). Static:
         # placed at creation, never mutated, so the base is not snapshot-
         # registered.
+        # Life comes from the fixture's seat-keyed `civs[]` below, for every
+        # row alike — a seat the world does not contain is not alive (#75).
         self.civ_alive = torch.zeros(B, 1 + r_pad, dtype=torch.bool, device=device)
-        self.civ_alive[:, 0] = True
         # Per-seat FOG — Seat.explored's twin. Row 0 = seat 0, r+1 = civ r;
         # a tile is dark until a reveal (spawn/walk/found/growth/capture)
         # lifts it for THAT seat. Accrues only with fog_of_war (the
@@ -428,10 +426,10 @@ class SimInit:
         # capitalTiles, seat-indexed: only an isCapital founding (t0 or a
         # total-collapse refound) writes a row. The capital is an identity
         # (city_is_cap), not a slot — _reclaim_cities compaction permutes slots
-        # underneath. Row 0 starts -1 (no capital until the first FOUND crowns
-        # it); cap_tile / civ_only_cap_tile are the row views.
-        self.civ_cap_tile = torch.zeros(B, 1 + r_pad, dtype=torch.long, device=device)
-        self.civ_cap_tile[:, 0] = -1
+        # underneath. EVERY row starts -1: no capital until a FOUND crowns one,
+        # which is the `capitalTile ?? -1` the digest compares against and the
+        # missing capital `dominationWinner` refuses to name a winner over.
+        self.civ_cap_tile = torch.full((B, 1 + r_pad), -1, dtype=torch.long, device=device)
         # Trade routes — (from_id, to_id) rc-id pairs, -1 = empty column.
         # Id-keyed like tile_city, so _reclaim_cities slot permutations never touch
         # it. K must cover the real capacity bound (tradeCapacity):
@@ -463,8 +461,8 @@ class SimInit:
         # turn >= questCooldown.
 
         # THE CENTRE REGISTRY, seat-generic: the owning seat's city SLOT at
-        # any major centre tile, -1 elsewhere. The seat is tile_seat's, the
-        # id is tile_city's; center_at / civ_city_at are cached derived views.
+        # any major centre tile, -1 elsewhere. The seat is tile_seat's and the
+        # id is tile_city's — three planes, no per-seat-family view over them.
         self.centre_slot_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         # ---------------------------------------------------------------------
         # ONE UNIT POOL. Two DISJOINT CONTIGUOUS SLOT RANGES of one tensor per
@@ -1141,7 +1139,6 @@ class SimInit:
         # across turns.
         self._gen_ver = 0
         self._gen_aura_cache = None  # ((turn,_gen_ver), (land [B,O,T], sea [B,O,T]) | None)
-        self._eff_cache: tuple[int, torch.Tensor] | None = None
         self._food_cache: tuple[int, torch.Tensor] | None = None
         self._nprod_cache: tuple[int, torch.Tensor] | None = None
         # Civ-phase caches, same single-slot-by-key shape as _rcy_globals.
@@ -1203,13 +1200,11 @@ class SimInit:
         self._citystate_at_cache: torch.Tensor | None = None
         self._civ_at_ver = -1
         self._civ_at_cache: torch.Tensor | None = None
-        self._civ_city_at_ver = -1
-        self._civ_city_at_cache: torch.Tensor | None = None
         # `city_slot_at(row)`, per row — the only derived view that still
         # needs a slot rather than a seat.
         self._city_slot_cache: dict[int, tuple[int, torch.Tensor]] = {}
-        # `tile_seat` is STATE, not a cache: `owner` / `civ_at` / `citystate_at`
-        # are all VIEWS of it. It loads straight off the wire's own seat plane —
+        # `tile_seat` is STATE, not a cache: `civ_at` / `citystate_at` are
+        # VIEWS of it. It loads straight off the wire's own seat plane —
         # ONE composition, no per-class arm to forget.
         self.tile_seat = torch.tensor(
             [f["ownerSeatInit"] for f in fixtures], dtype=torch.long, device=device)  # [B, T]
@@ -1390,14 +1385,13 @@ class SimInit:
         self._bidx = torch.arange(B, device=device)
         self._inf_f = torch.tensor(float("inf"), dtype=dtype, device=device)
         self._neg_f = torch.tensor(-1e18, dtype=dtype, device=device)
-        # Derived caches, all keyed on _eff_version like _eff_cache — every
-        # dependency's mutation site bumps it.
+        # Derived caches, all keyed on _eff_version — every dependency's
+        # mutation site bumps it.
         self._adjd_cache = None
         self._adjc_cache = None
         self._adjh_cache = None
         self._fadjq_cache = None
         self._appeal_cache = None  # _tile_appeal, _eff_version-keyed
-        self._fadjf_cache = None
         self._rcy_cache = None
         self._bld_cache: dict = {}  # (row, complete) -> (_eff_version, mask); one entry per seat row
         # The WIRE's spending intents, parked between decide-time and the
@@ -1476,12 +1470,11 @@ class SimInit:
             getattr(self, k).copy_(v)
         self.turn = 1
         self._eff_version += 1  # fertility/drought just changed under the cache
-        self._eff_cache = None
         self._food_cache = None
         self._nprod_cache = None
         self._adjd_cache = self._adjc_cache = self._adjh_cache = None
         self._dadj_cache = None
-        self._fadjq_cache = self._fadjf_cache = self._rcy_cache = None
+        self._fadjq_cache = self._rcy_cache = None
         self._bld_cache = {}
         # Beliefs/units are back to pristine — bump the counters and drop the
         # civ-phase caches (the bel_add memo is keyed on _bel_version alone).
@@ -1670,7 +1663,6 @@ class SimInit:
     def _check_state_discipline(self) -> None:
         self._check_seat_invariant()
         self._check_war_invariant()
-        self._check_tile_owner_invariant()
         for name, fn in self._aliases.items():
             cur = getattr(self, name)
             want = fn(self)
@@ -1721,12 +1713,11 @@ class SimInit:
         self.turn = snap["turn"]
         self.road_bridged = snap.get("road_bridged", False)
         self._eff_version += 1
-        self._eff_cache = None
         self._food_cache = None
         self._nprod_cache = None
         self._adjd_cache = self._adjc_cache = self._adjh_cache = None
         self._dadj_cache = None
-        self._fadjq_cache = self._fadjf_cache = self._rcy_cache = None
+        self._fadjq_cache = self._rcy_cache = None
         self._bld_cache = {}
         # The restored snapshot may carry different beliefs/units — bump the
         # counters and drop the civ-phase caches.

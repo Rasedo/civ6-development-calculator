@@ -328,7 +328,8 @@ def poke_transfer(rules, path):
     assert bool(sim.city_alive[0, civ_only_to + 1, exp_slot]), "the receiver must append at the END of the alive pool"
     assert int(sim.city_center[0, civ_only_to + 1, exp_slot]) == c_t and not bool(sim.city_is_cap[0, civ_only_to + 1, exp_slot])
     assert int(sim.city_id[0, civ_only_to + 1, exp_slot]) == id_next and int(sim.civ_next_city_id[0, civ_only_to + 1]) == id_next + 1
-    assert int(sim.civ_city_at[0, c_t]) == civ_only_to, "the center tile must re-seat to the receiver"
+    assert int(sim.centre_slot_at[0, c_t]) >= 0 and int(sim.tile_seat[0, c_t]) == civ_only_to + 1, (
+        "the center tile must re-seat to the receiver")
     rekeyed = (sim.tile_city[0] == id_next) & (sim.civ_at[0] == civ_only_to)
     assert int(rekeyed.sum()) == n_own, (
         f"A-17: exactly the flipping city's {n_own} tiles must re-key to the receiver ({int(rekeyed.sum())})"

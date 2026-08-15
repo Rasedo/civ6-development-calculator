@@ -68,7 +68,7 @@ def radius3_usable(sim, center, exclude=()):
             continue
         if int(sim.district[0, t]) >= 0 or int(sim.built_wonder[0, t]) >= 0:
             continue
-        if int(sim.civ_city_at[0, t]) >= 0 or int(sim.improvement[0, t]) >= 0:
+        if int(sim.centre_slot_at[0, t]) >= 0 or int(sim.improvement[0, t]) >= 0:
             continue
         out.append(t)
     return out

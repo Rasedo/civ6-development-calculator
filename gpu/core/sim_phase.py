@@ -1049,8 +1049,9 @@ class SimPhase:
         VALUES, so live centres re-map through their row's inverse
         permutation. Runs at the step END like _reclaim_pool: the controlled
         head samples slot-keyed city actions from the PRE-step masks, so the
-        layout must hold through this step's applies.
-        CIV6_RC_RECLAIM_AT lowers the trigger for forced-compaction gates."""
+        layout must hold through this step's applies. The trigger is the
+        step's own hole test, so every death compacts and the layout is never
+        seen with a hole in it."""
         nrows = 1 + self.R
         alive = self.city_alive[:, :nrows]  # [B, nrows, RC]
         perm = torch.argsort((~alive).long(), dim=2, stable=True)  # living first, order kept

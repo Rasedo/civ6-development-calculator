@@ -39,10 +39,10 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 41 | 39.42 | **96%** |
+| A symmetry | 41 | 39.92 | **97%** |
 | B fidelity | 91 | 88.44 | **97%** |
 | Closed chapters (C/D/E/G) | 62 | 62 | 100% |
-| **Overall** | **194** | **189.86** | **98%** |
+| **Overall** | **194** | **190.36** | **98%** |
 
 DELTA LEDGER — apply every change to the table in the same commit that
 makes it, or the table drifts from the entries it counts (it has, four
@@ -51,7 +51,10 @@ B-28r, since what survives of it is shared rather than seat-shaped;
 A-31r closed 3 of its 4 sub-items (+0.75 A); A-32r and A-33r are new and
 open (+2 A weight, +0 done); B-29r is new and open (+1 B weight). The
 percentages FELL: this round closed less than it found, which is the
-number doing its job.
+number doing its job. #112: A-33r's SEAT half closed — the two arms are
+one — leaving only its fidelity question (+0.5 A done). Nothing else moved
+weight: the four live divergences #112 found had never been entries,
+because nothing had ever looked for them.
 
 ## A. Seat symmetry — open
 
@@ -87,18 +90,31 @@ number doing its job.
   cannot, so two multipliers on the SAME channel in one city could
   associate differently. No such pair exists in the catalog today (Ruhr is
   production, Big Ben gold) — a third would make it live.
-- **A-30r. Farm-adjacency food is added post-selection on row 0**, where
+- **A-30r. Farm-adjacency food is added post-selection** (every row —
+  `_rcy_food_plane` takes the row's own civics/techs), where
   `tileYields` adds it BEFORE the drought floor. Unreachable as written
   (the floor only bites at 0 base food and a FARM's own food is >= 1), so
   it is a construct note, not a live bug.
 - **A-31r. THE REMAINING SEAT-0 DISTINCTION.** ONE, and it is WIRE, not a
   rule: `step()`'s action interface and the unit-order REPLAY position —
   row 0's triples apply pre-turn, a civ's per-unit rows in-phase. Task
-  #108, and TS carries the same fork as `actor.seat !== 0`.
-  (#111 closed the other three: the war axis is symmetric and its clocks
-  are per-pair, the observation's DoW terms are per-opponent, and the
+  #108, and TS carries the same fork as `actor.seat !== 0`. `seat_ext[:, 0]`
+  is the same fork at the other end.
+  (#111 closed three more: the war axis is symmetric and its clocks are
+  per-pair, the observation's DoW terms are per-opponent, and the
   `_prod_ctx` city cap was a branch on a dangling name that never carried
   a difference.)
+  THIS SENTENCE WAS FALSE WHEN #111 WROTE IT, and the correction is the
+  point: the checker it rested on matched ADJACENT TOKENS (`row == 0`),
+  and every fork that survived #111 was written as an EXPRESSION —
+  `civ_techs[:, 0]`, `city_center[:, 0]`, `city_dist_tile[:, 1:]`. #112
+  gave the checker four expression-level patterns, censused the 36 hits
+  they found, and closed four LIVE rule divergences the token patterns
+  could not see: the barbarian march scanned row 0's cities alone, the
+  seat war-march kept a row-0 arm keyed on the SLOT where TS keys on the
+  centre tile, the barbarian melee priority exempted a row-0 centre from
+  the lone-civilian rule, and every antiquity dig in the game read row 0's
+  ERA. Claim only what the instrument measures.
 - **A-32r. TWO WAYS TO DECLARE WAR.** A major's war head (`war_targets`,
   #111 s5) and the geo wire's `geoWar` column (`_geo_declare_wars` /
   `apply_geo`) both start a civ↔civ war, at different phase positions and
@@ -109,15 +125,20 @@ number doing its job.
   the head as the only entry. The civ-pair planes still have no seat-0 row,
   which is what keeps `apply_geo`'s row→civ-pair conversion alive (the last
   entries in the seat-symmetry checker's allowlist).
-- **A-33r. Barbarian melee priority splits on the centre's owner.** A
-  seat-0 centre is attacked as the CITY whatever stands on it (`tgt_city`
-  → `_melee_city`); a civ centre is attacked through its occupant unless
-  that occupant is military (`_city_wins = _rvc_here & ~_civ_only`), so a
-  lone civilian on a civ centre draws the blow instead of the city. Both
-  engines agree (it mirrors TS `meleeAttack`), so no gate can see it. Real
-  Civ 6 resolves an attack on a city tile against the CITY, so the CIV arm
-  is the divergent one and the fix is to delete `_civ_only` from
-  `_city_wins`. Behaviour-changing on both engines — a hunt of its own.
+- **A-33r. A LONE CIVILIAN on a city centre draws the blow.**
+  `meleeAttackInner` computes `cityFirst = enemies.length === 0 ||
+  garrisoned`, so a centre holding one civilian and no military is
+  attacked as the CIVILIAN — captured roll-free — instead of as the city.
+  Its comment defends this ("civilians cannot defend, so they cannot be
+  the thing a city is attacked through") and pins it to a hunted parity
+  case, seed 9053 t204. Real Civ 6 has no capture-inside-a-city move: the
+  city is the defender on its own tile. Both engines now agree, so no gate
+  can see it, and the fix is one predicate on each side — but it is a
+  FIDELITY change, unverified against a real Civ 6 source, and
+  behaviour-changing on both engines. A hunt of its own.
+  (The SEAT half is closed: #112 deleted the row-0 arm that skipped the
+  test entirely. My #111 note named the CIV arm as the divergent one; it
+  was the row-0 arm — read `meleeAttackInner` before believing either.)
 
 ## B. Fidelity vs real Civ 6 — open residuals
 
@@ -241,9 +262,10 @@ calling it a bug:**
    FIRST divergence here if any creation path misses an allocation —
    `tile.ownerCity` and `nextCityId` are byte-exact digest fields now.
 8. #110 THE SLOT REGIME, three unproven changes: (a) seat 0 no longer reuses
-   a hole on founding; (b) compaction fires whenever ANY major row holds a
-   hole, so civ slot indices move earlier than before — stable, so relative
-   order is untouched, but latent slot-keyed staleness surfaces here;
+   a hole on founding; (b) compaction covers every major row in ONE body —
+   and as of #112 fires on ONE trigger too, so civ slot indices move
+   earlier than before; stable, so relative order is untouched, but latent
+   slot-keyed staleness surfaces here;
    (c) `centre_slot_at` re-maps on every compaction, so `center_at`'s two
    value-readers change answers wherever they read stale slots. A red
    dense-layout assert on the founding path names the schedule position that
@@ -288,6 +310,27 @@ calling it a bug:**
    none); and the job mask's ownership term is `tile_seat == row` on every
    row.
 
+16. #112, THE RULE-BODY CENSUS. Six behaviour changes, all GPU-side, all
+   toward what TS already does: (a) a barbarian marches on EVERY major's
+   cities, not row 0's — a civ city can now be besieged however close it
+   stands; (b) both march scans use TS's one key (distance, then seat id,
+   then centre TILE), so a target that used to be picked by SLOT can
+   change; (c) a barbarian melee on ANY centre now goes through the
+   lone-civilian test (see A-33r); (d) an antiquity dig reads the ACTING
+   seat's era, so a modern row 0 no longer suppresses everyone's digs and
+   an ancient one no longer keeps stamping past the deadline; (e) the
+   Itinerant Preachers range bonus reaches row 0's religion (#73 gave it
+   an enhancer; the code still said no founding path could); (f)
+   `civ_cap_tile` starts -1 on EVERY row, where the civ rows used to start
+   0 — that was a DIGEST divergence against `capitalTile ?? -1` for any
+   seat before its first founding, and `_domination` now refuses a winner
+   while any capital is missing, as `dominationWinner` does.
+   Storage-only, but read it if the layout looks odd: city-slot compaction
+   now fires whenever ANY major row holds a hole (one trigger, TS's dense
+   spliced array), so `CIV6_RC_RECLAIM_AT` is gone and civ slot indices
+   move earlier than before. This SUPERSEDES 8(b), which described the
+   compaction BODY covering every row while the TRIGGER stayed forked.
+
 **Reachability, before believing any green run:**
 - Theological combat needs two ADJACENT religious units of different
   religions. A gate that never puts two apostles side by side proves
@@ -298,6 +341,11 @@ calling it a bug:**
 - The war head's newly-live columns need a game with THREE majors in reach
   of each other; a two-major seed exercises nothing the old single axis did
   not already reach.
+- #112's march changes need a barbarian within reach of a CIV city while a
+  row-0 city stands closer, and the antiquity fix needs a dig by a seat
+  whose era differs from row 0's — early-game lanes reach neither.
+- The `civ_cap_tile` default only shows before a seat's first FOUND. A gate
+  that starts every seat with a capital reads identically either way.
 
 Hunt discipline: scripted-reachability first (the digest gate names the
 turn), checkpoint-bracket from the nearest earlier checkpoint, full fresh

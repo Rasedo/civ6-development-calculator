@@ -32,10 +32,11 @@ One base tensor per fact, seat-indexed; every legacy name is a view:
   merged slots behind them.
 - Tile planes: `tile_seat` + `tile_city` (owner seat + city id — TS's
   `ownerSeat`/`ownerCity` pair), `centre_slot_at` (owning seat's city
-  slot at a centre). `owner`, `civ_at`, `citystate_at`, `center_at`,
-  `civ_city_at` are cached DERIVED properties keyed on
+  slot at a centre), `city_slot_at(row)` (that row's owning city slot).
+  `civ_at` and `citystate_at` are cached DERIVED properties keyed on
   `_tile_owner_ver` — never write them; write the stored planes and
-  bump the version.
+  bump the version. Ask `tile_seat == row`: `civ_at` speaks the CIV
+  index space (seat r+1 reads as r) and no engine body reads it.
 - Relations: `war/ww/ww_turns` over the compact seat-row space,
   `civ_pair_*` civ↔civ matrices, `seat_citystate_*` (seat, city-state)
   pairs.
@@ -102,11 +103,12 @@ edit sources while one is in flight.
   gate tensor prints on the acting mask, never trust a truncated
   window.
 - **Forced compaction** — `CIV6_RECLAIM_AT` (absolute unit-slot trigger,
-  both windows) and `CIV6_RC_RECLAIM_AT` (city slots) force slot reclaim
-  low; run the gate under them to stress slot-layout invariants. Without
-  the override each unit window fires at its OWN cap minus
-  `CIV6_RECLAIM_HEADROOM` (default 24), so one knob serves the major and
-  barbarian windows whatever their sizes.
+  both windows) forces unit-slot reclaim low; run the gate under it to
+  stress slot-layout invariants. Without the override each unit window
+  fires at its OWN cap minus `CIV6_RECLAIM_HEADROOM` (default 24), so one
+  knob serves the major and barbarian windows whatever their sizes. CITY
+  slots need no knob: they compact whenever any major row holds a hole.
+  `CIV6_RC_REGISTRY_CHECK` machine-checks the city registry per step.
 - **Reachability** — a green gate proves the two engines agree, never
   that a mechanic fired. When landing a mechanic, measure which lane
   can REACH it and record that in its AUDIT entry.

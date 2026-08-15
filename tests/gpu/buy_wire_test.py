@@ -200,7 +200,6 @@ def empty_land(sim, k: int) -> list[int]:
         & (sim.military_at[0] < 0)
         & (sim.civilian_at[0] < 0)
         & (sim.barb_at[0] < 0)
-        & (sim.civ_city_at[0] < 0)
         & (sim.centre_slot_at[0] < 0)
         & (sim.tile_seat[0] < 0)
     ).nonzero(as_tuple=True)[0].tolist()

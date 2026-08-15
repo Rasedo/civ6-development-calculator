@@ -53,6 +53,7 @@ FORK_ALLOW = {
     ("simbase.py", "seat_of_index"): "the row->seat map itself",
     # --- WIRE LIMITS, named ------------------------------------------------
     ("env.py", "step"): "#108 — row 0's action interface + unit-order replay position",
+    ("sim_init.py", "__init__"): "#108 — seat_ext[:, 0] is the wire fork env.step_seat spells as `row != 0`",
     # --- BURN-DOWN (AUDIT A-32r). Delete the entry that closes the fork. ----
     # The civ-PAIR planes (denounce / ally / warkind / strengths / proximity)
     # have no seat-0 row, so civ<->civ diplomacy is still a space seat 0
@@ -61,11 +62,18 @@ FORK_ALLOW = {
     # civ-pair space meet, and nowhere else. Closing A-32r closes all six.
     ("sim_seats.py", "_civ_pair_strengths"): "A-32r — civ-pair planes have no seat-0 row",
     ("sim_seats.py", "apply_geo"): "A-32r — the ONE row->civ-pair conversion",
+    ("sim_seats.py", "_geo_denounce_and_ally"): "A-32r — the civ-pair candidate set has no seat-0 row",
+    ("sim_seats.py", "_geo_declare_wars"): "A-32r — the civ-pair candidate set has no seat-0 row",
     ("sim_economy.py", "_ww_era_base"): "A-32r — civ_pair_warkind has no seat-0 row",
     ("drive.py", "_geo_turn"): "A-32r — civ-pair planes have no seat-0 row",
     ("drive.py", "geo_decide_and_apply"): "A-32r — civ-pair planes have no seat-0 row",
     ("drive.py", "_extract_geo"): "A-32r — the record's civ-pair targets",
 }
+
+#: The merged seat planes, by the naming convention that IS the storage
+#: contract (#111): `civ_x[:, row]`, `city_x[:, row, slot]`,
+#: `seat_x[:, row, ...]`, plus the three that predate the prefixes.
+_SEAT_PLANE = r"(?:(?:civ|city|seat)_[a-z_0-9]+|war|war_turns|peace_turns)"
 
 FORK_PATTERNS = (
     (re.compile(r"\brow\s*[=!]=\s*0\b"), "row == 0"),
@@ -75,6 +83,29 @@ FORK_PATTERNS = (
     (re.compile(r"\brow\s*-\s*1\b"), "row - 1"),
     (re.compile(r"\bseat\s*-\s*1\b"), "seat - 1"),
     (re.compile(r"\br\s*\+\s*1\b"), "r + 1"),
+    # A fork does not have to name `row`. These three spellings are how every
+    # one that survived #111 was written, and the token patterns above are
+    # blind to all of them: they match ADJACENT tokens, and a fork hidden
+    # inside an expression has none.
+    #
+    # `civ_techs[:, 0]` — seat 0's research standing in for the asking seat's
+    # (`_farmadj_food`, `_mark_antiquity`); `city_center[:, 0]` — seat 0's
+    # cities standing in for every major's (the barbarian march).
+    (re.compile(r"\b" + _SEAT_PLANE + r"\[:,\s*0\s*[,\]]"), "plane[:, 0] — literal row 0"),
+    # …and its other half. `city_dist_tile[:, 1:]` is "the CIV rows", which
+    # only makes sense if row 0's copy of the fact lives somewhere else — the
+    # exact split #109/#111 spent two rounds deleting.
+    (re.compile(r"\b" + _SEAT_PLANE + r"\[:,\s*1\s*:"), "plane[:, 1:] — the civ rows alone"),
+    # `tile_seat.gather(...) == 0` — a seat-VALUED expression tested against
+    # seat 0 (the barbarian melee priority, the pillage-job owner test). The
+    # `&`/`|` exclusion keeps the comparison in ONE conjunct, so an unrelated
+    # `x == 0` further along a boolean chain is not a hit.
+    (re.compile(r"\b\w*_seat\b[^\n&|]{0,80}?[=!]=\s*0\b"), "seat expression == 0"),
+    # `civ_at` is `tile_seat` mapped into the CIV index space, so every reader
+    # spells "a civ, not seat 0" and needs a seat-0 arm beside it.
+    # (`citystate_at` is NOT here: a city-state's index is a genuinely
+    # different space, the same exemption the four surviving aliases carry.)
+    (re.compile(r"\.civ_at\b"), "civ-family tile view"),
 )
 
 

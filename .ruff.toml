@@ -1,0 +1,12 @@
+# Ruff defaults, with ONE change: a leading underscore stops excusing a dead
+# local. Ruff's default dummy-variable-rgx forgives every `_name`, and this
+# codebase names most of its scratch tensors that way — so F841 was blind to
+# exactly the locals it exists to find. `_citystate_ctr` sat in
+# `_mark_antiquity` computing two gathers per dig that nothing read, through
+# every green compile bar. `_` alone still means "deliberately discarded".
+#
+# Everything else is ruff's default on purpose: the bar runs
+# `ruff check --select F821,F841`, and a wider select belongs in the command,
+# not here.
+[lint]
+dummy-variable-rgx = "^_$"

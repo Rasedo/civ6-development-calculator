@@ -132,17 +132,16 @@ class SimStep:
             for _pre in ("barb", "major"):
                 if self._reclaim_due(_pre):
                     self._reclaim_pool(_pre)
-        # City-slot compaction, every major row (the TS splice mirror). Row 0
-        # compacts whenever it holds a hole (deaths are rare; a dense layout
-        # keeps the append head in range); civ rows at their high-water
-        # threshold. ONE body compacts all rows together.
-        hw0 = (self.city_alive[:, 0].long() * (torch.arange(self.RC, device=dev).reshape(1, -1) + 1)).amax(dim=1)
-        need_rc = bool((hw0 > self.city_alive[:, 0].sum(dim=1)).any())
-        if self.R > 0 and not need_rc:
-            # rc high-water = last-alive slot + 1 (what the next append uses)
-            civ_city_hw = (self.city_alive[:, 1:1 + max(self.R, 1)].long() * (torch.arange(self.RC, device=dev).reshape(1, 1, -1) + 1)).amax(dim=2)
-            need_rc = int(civ_city_hw.max()) >= self._civ_city_reclaim_at
-        if need_rc:
+        # City-slot compaction, every major row (the TS splice mirror): a row
+        # compacts whenever it holds a HOLE, so the layout stays the dense
+        # array TS keeps by splicing `seat.cities` on every death. High-water
+        # = last-alive slot + 1, which is where the next append lands. ONE
+        # trigger, ONE body, every row — the seat whose deaths compact
+        # EAGERLY and the seat that waits for a threshold were the same rule
+        # written twice, and only the eager one is TS's.
+        _alive_m = self.city_alive[:, :1 + self.R]
+        _hw = (_alive_m.long() * (torch.arange(self.RC, device=dev).reshape(1, 1, -1) + 1)).amax(dim=2)
+        if bool((_hw > _alive_m.sum(dim=2)).any()):
             self._reclaim_cities()
         if self.R > 0 and self._civ_city_reg_check:
             # After compaction (the riskiest registry reshuffle) and all of
@@ -216,9 +215,8 @@ class SimStep:
             _fa = torch.where(_gold, self.dedications * self._ded_faith, torch.zeros_like(self.dedications))
             _es = torch.where(_gold, torch.zeros_like(self.dedications), self.dedications * self._ded_era)
             self.era_score.add_(_es)
-            self.civ_faith[:, 0].copy_(self.civ_faith[:, 0] + _fa[:, 0].to(self.civ_faith[:, 0].dtype))
-            if self.R > 0:
-                self.civ_faith[:, 1:].copy_(self.civ_faith[:, 1:] + _fa[:, 1 : 1 + self.R].to(self.civ_faith[:, 1:].dtype))
+            _fw = 1 + self.R
+            self.civ_faith[:, :_fw].copy_(self.civ_faith[:, :_fw] + _fa[:, :_fw].to(self.civ_faith.dtype))
         dom = self._domination()
         # A SCIENCE victory set during this turn's project completions takes
         # precedence over the domination/score recompute and is preserved,

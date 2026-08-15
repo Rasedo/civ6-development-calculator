@@ -1255,10 +1255,12 @@ class SimSeats:
         if not bool(era_ok.any()):
             return
         self.congress_sessions.add_(era_ok.long())
-        # the ascending scan: strictly-greater keeps the LOWER id on a tie
-        best = self.civ_diplo_favor[:, 0].clone()
-        win = torch.where(best > 0, torch.zeros_like(best), torch.full_like(best, -1))
-        for row in range(1, 1 + self.R):
+        # the ascending scan: strictly-greater keeps the LOWER id on a tie.
+        # Zero seeds it, so row 0 enters the loop like every other row rather
+        # than being the candidate the others are compared against.
+        best = torch.zeros(self.B, dtype=self.civ_diplo_favor.dtype, device=self.device)
+        win = torch.full_like(best, -1)
+        for row in range(1 + self.R):
             v = self.civ_diplo_favor[:, row]
             take = (v > 0) & (v > best)
             win = torch.where(take, torch.full_like(win, row), win)
@@ -1360,7 +1362,7 @@ class SimSeats:
             live_imp = ((self.improvement >= 0) & ~self.pillaged).to(self.dtype)
             ty_oth[:, :, 2:] = ty_oth[:, :, 2:] + self._imp_yields[self.improvement.clamp(min=0), 2:] * live_imp.unsqueeze(-1)
             # the SEASIDE RESORT's gold is the tile's APPEAL, not a catalog
-            # constant — the same term _eff_yields applies, or a resort would pay
+            # constant (tileYields reads it live), or a resort would pay
             # nothing on this path.
             if self.SEASIDE >= 0:
                 sr_live = (self.improvement == self.SEASIDE).to(self.dtype) * live_imp
@@ -2555,7 +2557,8 @@ class SimSeats:
             if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
                 a_xp[:, u] = torch.where(mil_att, a_xp[:, u] + XP_ATTACK, a_xp[:, u])
             rows, def_dead, atk_dead = self._melee_exchange(
-                mil_att, tgt, ttc, d_slot, ~def_is_barb, a_hp, u, atk_e, def_e)
+                mil_att, tgt, ttc, d_slot, ~def_is_barb, a_hp, u, atk_e, def_e,
+                self._row_of(a_seat[:, u]))
             # the same battle rule every seat scores, on whichever seat is
             # attacking here. Runs BEFORE the advance.
             self._ww_battle(mil_att, self._row_of(self._atk_seat(atk_kind, u)),
@@ -2563,7 +2566,7 @@ class SimSeats:
                             a_died=atk_dead, d_died=(_wwh & ~self._ww_occ(tgt)) != 0)
             if bool(atk_dead.any()):
                 ar = atk_dead.nonzero(as_tuple=True)[0]
-                self._dig_at(ar, here[ar])  # killUnit's dig
+                self._dig_at(ar, here[ar], self._row_of(a_seat[ar, u]))  # killUnit's dig
                 a_occ[ar, here[ar]] = -1
                 a_alive[:, u] = a_alive[:, u] & ~atk_dead
             # tileFreeForUnit's TERRAIN check, which _blocked_for (occupancy
@@ -2581,7 +2584,7 @@ class SimSeats:
                 a_tile[vr, u] = ttc[vr]
                 a_occ[vr, ttc[vr]] = u + a_lo
                 if major:
-                    self._clear_camp_at(adv, ttc, seat=a_seat[:, u])
+                    self._clear_camp_at(adv, ttc, a_seat[:, u], self._row_of(a_seat[:, u]))
         if bool(civ_att.any()):
             # A melee on a LONE hostile civilian is roll-free either way, and
             # only WHO is attacking decides which: a MAJOR captures it (the
@@ -2591,7 +2594,7 @@ class SimSeats:
             if major:
                 self._capture_unit(rows, cslot_raw[rows], atk_kind, a_seat[rows, u], ttc[rows])
             else:
-                self._dig_at(rows, ttc[rows])  # a barb KILL leaves a dig
+                self._dig_at(rows, ttc[rows], self._row_of(a_seat[rows, u]))  # a barb KILL leaves a dig
                 self.civilian_at[(rows, ttc[rows])] = -1
                 self.unit_alive[rows, cslot_raw[rows]] = False
                 self._gen_ver += 1  # the killed civilian may be a general → invalidate the aura plane
@@ -2728,9 +2731,11 @@ class SimSeats:
     def civ_at(self) -> torch.Tensor:
         """[B, T] — which civ owns each tile, -1 for nobody.
 
-        A VIEW of `tile_seat`, cached on `_tile_owner_ver`: dozens of call sites
-        each recomputing a `where` would be dozens more kernel launches in a
-        dispatch-bound step."""
+        A VIEW of `tile_seat` in the CIV index space (seat r+1 reads as r),
+        cached on `_tile_owner_ver`. NO ENGINE BODY READS IT: every rule asks
+        `tile_seat == row` in the one index space the planes use. It survives
+        for the tests that WRITE it, and converting those to a `tile_seat`
+        write plus a `_tile_owner_ver` bump needs a test run to land."""
         if self._civ_at_ver != self._tile_owner_ver:
             s = self.tile_seat
             self._civ_at_cache = torch.where(
@@ -2738,23 +2743,6 @@ class SimSeats:
             )
             self._civ_at_ver = self._tile_owner_ver
         return self._civ_at_cache
-
-    @property
-    def civ_city_at(self) -> torch.Tensor:
-        """[B, T] — the civ INDEX at a civ centre, -1 elsewhere: the centre
-        registry joined with civ_at (a centre tile is owned by its city, so
-        the tile's seat names the civ). Cached on _tile_owner_ver.
-
-        `centre_slot_at >= 0` is the seat-generic "a major's centre stands
-        here" and answers most of what this used to be asked; what is left is
-        the barbarian target scan, whose civ-vs-seat-0 split is a TS rule
-        difference (#111 s4 note in AUDIT)."""
-        if self._civ_city_at_ver != self._tile_owner_ver:
-            self._civ_city_at_cache = torch.where(
-                self.centre_slot_at >= 0, self.civ_at,
-                torch.full_like(self.centre_slot_at, -1))
-            self._civ_city_at_ver = self._tile_owner_ver
-        return self._civ_city_at_cache
 
     @property
     def citystate_at(self) -> torch.Tensor:
@@ -2771,24 +2759,6 @@ class SimSeats:
             self._citystate_at_ver = self._tile_owner_ver
         return self._citystate_at_cache
 
-
-    def _check_tile_owner_invariant(self) -> None:
-        """A tile has at most ONE owner.
-
-        Two consumers reading different ownership answers would each pick a
-        different winner, so this runs every step under CIV6_ALIAS_CHECK."""
-        # `civ_at` and `citystate_at` are views of `tile_seat`, so one-owner is
-        # a property of the ENCODING rather than an agreement between planes.
-        # The count below can only be 0 or 1 by construction; it stays as a
-        # cheap tripwire against a future write reintroducing a second store.
-        n = (self.tile_seat == 0).long() + (self.civ_at >= 0).long() + (self.citystate_at >= 0).long()
-        if not bool((n <= 1).all()):
-            b, t = [int(x[0]) for x in (n > 1).nonzero(as_tuple=True)]
-            raise AssertionError(
-                f"TILE OWNER DRIFT: game {b} tile {t} is claimed by "
-                f"{int(n[b, t])} seats at once — tile_seat={int(self.tile_seat[b, t])}, "
-                f"civ_at={int(self.civ_at[b, t])}, citystate_at={int(self.citystate_at[b, t])}"
-            )
 
     def _seats_hostile(self, a_seat, b_plane: torch.Tensor) -> torch.Tensor:
         """unitsHostile over a PLANE of seats — [B, T] bool.
@@ -2900,7 +2870,7 @@ class SimSeats:
         if clear_camp:
             # the camp reward banks to the MOVER's own seat, read off the
             # merged pool rather than passed down by each caller.
-            self._clear_camp_at(moved, dest, seat=self.unit_seat.gather(1, gs1).squeeze(1))
+            self._clear_camp_at(moved, dest, self.unit_seat.gather(1, gs1).squeeze(1), seat)
         if self._embark_live:
             self.unit_emb[rows, gs] = (to_water & ~naval)[rows]
         spent = (mp - cost).clamp(min=0)
@@ -2954,30 +2924,31 @@ class SimSeats:
     def _war_march_target(self, hc: torch.Tensor, row: int):
         """The war-march DESTINATION for seat `row`'s units standing at `hc` —
         the nearest unpillaged enemy improvement or complete district within 13,
-        else the nearest enemy city, with seat 0 winning ties and distance ties
-        breaking on the founding sequence.
+        else the nearest enemy city on `hostileUnitAct`'s key: distance, then
+        the owner's SEAT id, then the centre TILE. No owner is a separate arm
+        and none wins a tie by being row 0.
 
-        The row indexes the war matrix directly, so who this seat fights is read
-        here rather than passed in: `hp` (at war with seat 0) is one cell of the
-        row, and the enemy-city walk reads the rest of it. Row 0 finds `hp`
-        false on its own diagonal and marches to at-war civs' cities alone,
-        which is what "seat 0 owns the improvements" means.
+        The row indexes the war matrix directly, so who this seat fights is
+        read here rather than passed in — every cell of the row, including
+        the diagonal, which is false against itself.
 
         ONE implementation shared by the per-unit OBSERVATION and the driver;
         separate copies would drift.
-        Returns (tgt, has_imp, has_pc, has_rc).
+        Returns (tgt, has_imp, has_city).
         """
         B, T, dev = self.B, self.T, self.device
-        hp = self.war[:, row, 0]
         arangeT = torch.arange(T, device=dev)
-        # the improvement/district march targets SEAT-0 tiles only while at war
-        # with seat 0 (hp) — a civ at war only with other civs heads for their
-        # cities, not neutral seat-0 improvements.
-        hpT = hp.unsqueeze(1)
+        # AT WAR WITH THIS TILE'S OWNER — the TS `tOwned` term, for every major
+        # owner alike. A major's absolute seat IS its row, so the war lookup is
+        # one gather; a city-state or barbarian tile is masked out by `major`
+        # before it can index the row.
+        _ts = self.tile_seat
+        major = (_ts >= 0) & (_ts <= self.R)
+        at_war_t = major & self.war[:, row].gather(1, torch.where(major, _ts, torch.zeros_like(_ts)))
         if self.improvements_on or self.districts_on:
-            imp_job = (self.improvement >= 0) & ~self.pillaged & (self.tile_seat == 0) & hpT
-            if self.districts_on:  # pillageable seat-0 districts join the union
-                imp_job = imp_job | ((self.district >= 0) & self.district_complete & ~self.district_pillaged & (self.tile_seat == 0) & hpT)
+            imp_job = (self.improvement >= 0) & ~self.pillaged & at_war_t
+            if self.districts_on:  # pillageable enemy districts join the union
+                imp_job = imp_job | ((self.district >= 0) & self.district_complete & ~self.district_pillaged & at_war_t)
             d_imp = self.pair_dist[hc.unsqueeze(1), arangeT.unsqueeze(0)].to(torch.long)
             ikey = torch.where(imp_job & (d_imp < 13), d_imp * (T + 1) + arangeT, torch.full_like(d_imp, 10**9))
             imp_min, imp_tgt = ikey.min(dim=1)
@@ -2985,20 +2956,12 @@ class SimSeats:
         else:
             has_imp = torch.zeros(B, dtype=torch.bool, device=dev)
             imp_tgt = hc
-        dc = self.pair_dist[hc.unsqueeze(1), self.city_center[:, 0].clamp(min=0)].to(torch.long)
-        # Distance ties break by the FOUNDING sequence (TS array order), NOT the
-        # slot index — the same rule the barbarian twin uses.
-        # Seat-0 cities are march targets only at war with seat 0 (hp); a seat
-        # ALSO marches to its at-war ENEMY civs' cities (key
-        # d*32768 + seatRow*2048 + centerTile — the ordering TS walks, distance
-        # then seat then centre), with seat 0 winning ties.
-        ckey = torch.where(self.city_alive[:, 0] & hpT, dc * 4096 + torch.arange(self.RC, device=self.device), 10**9)
-        city_min = ckey.min(dim=1).values
-        pc_dist = torch.div(city_min, 4096, rounding_mode="floor")  # seat-0 city distance (1e9//4096 stays huge)
-        city_tgt = self.city_center[:, 0].gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
-        civ_city_key_min = torch.full((B,), 10**18, dtype=torch.long, device=dev)
-        civ_city_tgt = hc.clone()
-        for row2 in range(1, 1 + self.R):
+        # THE CITY SCAN — one total order over every major this seat is at
+        # war with, on the TS key: distance, then the seat id, then the centre
+        # tile. No seat is a separate arm and none wins a tie by being row 0.
+        ckey_min = torch.full((B,), 10**18, dtype=torch.long, device=dev)
+        city_tgt = hc.clone()
+        for row2 in range(1 + self.R):
             war2 = self.war[:, row, row2]  # [B]; the diagonal is false, so row2 == row is safe
             if not bool(war2.any()):
                 continue
@@ -3006,17 +2969,13 @@ class SimSeats:
                 ct2 = self.city_center[:, row2, j].clamp(min=0)
                 alive2 = self.city_alive[:, row2, j] & war2
                 d2 = self.pair_dist[hc, ct2].to(torch.long)
-                key2 = torch.where(alive2, d2 * (2048 * 16) + row2 * 2048 + ct2, torch.full_like(d2, 10**18))
-                upd = key2 < civ_city_key_min
-                civ_city_key_min = torch.where(upd, key2, civ_city_key_min)
-                civ_city_tgt = torch.where(upd, ct2, civ_city_tgt)
-        has_pc = city_min < 10**9
-        has_rc = civ_city_key_min < 10**18
-        civ_city_dist = torch.div(civ_city_key_min, 2048 * 16, rounding_mode="floor")
-        # seat 0 wins ties (pc_dist <= civ_city_dist); else the nearest enemy civ city
-        city_target = torch.where(has_pc & (~has_rc | (pc_dist <= civ_city_dist)), city_tgt, civ_city_tgt)
-        tgt = torch.where(has_imp, imp_tgt, city_target)
-        return tgt, has_imp, has_pc, has_rc
+                key2 = torch.where(alive2, d2 * (2048 * 8) + row2 * 2048 + ct2, torch.full_like(d2, 10**18))
+                upd = key2 < ckey_min
+                ckey_min = torch.where(upd, key2, ckey_min)
+                city_tgt = torch.where(upd, ct2, city_tgt)
+        has_city = ckey_min < 10**18
+        tgt = torch.where(has_imp, imp_tgt, city_tgt)
+        return tgt, has_imp, has_city
 
     def _attack_encampment(self, att: torch.Tensor, tile: torch.Tensor, atk_kind: str, u: int) -> None:
         """The `attackEncampment` twin — a melee assault ON an Encampment tile.
@@ -3073,7 +3032,7 @@ class SimSeats:
                         tc, a_died=_ww_ad, city=True)
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
-            self._dig_at(dr, a_tile[dr, u])  # killUnit's dig
+            self._dig_at(dr, a_tile[dr, u], self._row_of(self._atk_seat(atk_kind, u)[dr]))  # killUnit's dig
             a_occ[dr, a_tile[dr, u]] = -1
             a_alive[:, u] = a_alive[:, u] & ~died
 
@@ -3190,7 +3149,7 @@ class SimSeats:
         self._ww_battle(att, self._row_of(a_seat[:, u]), hrow, tgt, a_died=died, city=True)
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
-            self._dig_at(dr, a_tile[dr, u])  # killUnit's dig
+            self._dig_at(dr, a_tile[dr, u], self._row_of(a_seat[dr, u]))  # killUnit's dig
             self.military_at[(dr, a_tile[dr, u])] = -1
             a_alive[:, u] = a_alive[:, u] & ~died
         return rows, hrow, slot, died, ttc
@@ -3288,7 +3247,7 @@ class SimSeats:
         atk_dead = att & (a_hp[:, u] <= 0)
         if bool(atk_dead.any()):
             ar = atk_dead.nonzero(as_tuple=True)[0]
-            self._dig_at(ar, here[ar])  # killUnit's dig
+            self._dig_at(ar, here[ar], self._row_of(a_seat[ar, u]))  # killUnit's dig
             self.military_at[(ar, here[ar])] = -1
             a_alive[:, u] = a_alive[:, u] & ~atk_dead
         # warring a city-state wearies you exactly as warring a major does; the
@@ -3344,7 +3303,7 @@ class SimSeats:
             self.unit_alive[gd, ds[dead]] = False
             # a combat death leaves a DIG on the tile the dead unit stood on —
             # `combat.ts:killUnit`, not only at a razed outpost.
-            self._dig_at(gd, td)
+            self._dig_at(gd, td, striker_row)
             if bool(dead.any()):
                 # A death changes `_seat_route_income`'s raided mask, and that
                 # cache is keyed on `_rp_kill_version`. A strike firing
@@ -3365,7 +3324,8 @@ class SimSeats:
     def _melee_exchange(self, att: torch.Tensor, tgt: torch.Tensor, tile_c: torch.Tensor,
                         d_slot: torch.Tensor, def_can_xp: torch.Tensor,
                         a_hp: torch.Tensor, u: int,
-                        atk_e: torch.Tensor, def_e: torch.Tensor):
+                        atk_e: torch.Tensor, def_e: torch.Tensor,
+                        atk_row: torch.Tensor):
         """ONE melee exchange between two units — the `meleeAttack` core.
 
         The paired rolls, the defender-death write, XP_DEFEND to a survivor that
@@ -3394,7 +3354,7 @@ class SimSeats:
             gd, td = rows[dead], tile_c[rows[dead]]
             self.unit_alive[gd, ds[dead]] = False
             self.military_at[gd, td] = -1
-            self._dig_at(gd, td)  # killUnit's dig
+            self._dig_at(gd, td, atk_row[gd])  # killUnit's dig
         # +2 to a surviving MILITARY defender that can earn it.
         surv = (att & def_can_xp & ~def_dead).nonzero(as_tuple=True)[0]
         if len(surv) > 0:
@@ -3543,7 +3503,7 @@ class SimSeats:
             dead = self.unit_hp[g, ds] <= 0
             gd, td = g[dead], ttc[g[dead]]
             self.unit_alive[gd, ds[dead]] = False
-            self._dig_at(gd, td)  # killUnit's dig
+            self._dig_at(gd, td, self._row_of(self._atk_seat(atk_kind, u)[gd]))  # killUnit's dig
             # Clearing both maps is branch-free and exact: only one of them is
             # set on that tile.
             md = d_is_mil[gd]
@@ -3701,7 +3661,7 @@ class SimSeats:
             dead = self.unit_hp[g, ds] <= 0
             gd, td = g[dead], ttc[g[dead]]
             self.unit_alive[gd, ds[dead]] = False
-            self._dig_at(gd, td)  # killUnit's dig
+            self._dig_at(gd, td, self._row_of(self._atk_seat(atk_kind, u)[gd]))  # killUnit's dig
             # Clearing both maps is branch-free and exact: only one of them is
             # set on that tile.
             md = ok_m[gd]
@@ -4049,8 +4009,8 @@ class SimSeats:
     def _expire_seat_routes(self, row: int) -> None:
         """Drop seat row `row`'s routes whose expiresTurn has arrived, plus any
         international route whose destination is no longer a live MAJOR city
-        centre (the tradeRoutes filter twin — seat-0 centres via center_at, civ
-        centres via civ_city_at). Consumers gate on active
+        centre (the tradeRoutes filter twin — every seat's centres through the
+        one `centre_slot_at` registry). Consumers gate on active
         (seat_routes[..., 0] >= 0), so this is idempotent per turn.
         KNOWN CORNER vs TS: the dest is stored as a TILE, not (seat, city), so a
         dest CAPTURED by another major still reads as a live centre here while

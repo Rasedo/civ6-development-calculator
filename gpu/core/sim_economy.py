@@ -424,47 +424,16 @@ class SimEconomy:
         self._food_cache = (self._eff_version, food)
         return food
 
-    def _eff_prod(self) -> torch.Tensor:
-        """[B, T] tile PRODUCTION with improvement yields applied: a MINE or
-        LUMBER_MILL adds its production to the tile's base (mirrors the
-        improvement branch of tileYields), a pillaged improvement adds
-        nothing. MINE production is tech-boosted — each of Apprenticeship /
-        Industrialization adds +1⚙ to EVERY mine — so an existing mine's
-        yield RISES when a boost tech completes; _eff_version bumps there so
-        the eff/score caches follow. Production has no fertility/drought or
-        natural-wonder tail (those touch food only), so base + improvement
-        is the whole story."""
-        base = self.tile_yields[:, :, 1]
-        if not self.improvements_on:
-            return base
-        live = ~self.pillaged
-        out = base
-        if self.MINE >= 0:
-            if self._mine_boost_tech.numel() > 0:
-                researched = self.civ_techs[:, 0, self._mine_boost_tech].to(self.dtype)  # [B, K]
-                boost = (researched * self._mine_boost_amt).sum(dim=1)            # [B]
-            else:
-                boost = torch.zeros(self.B, dtype=self.dtype, device=self.device)
-            mine_prod = (self._mine_prod + boost).unsqueeze(1)                    # [B, 1]
-            out = out + ((self.improvement == self.MINE) & live).to(self.dtype) * mine_prod
-        if self.LUMBER >= 0:
-            out = out + ((self.improvement == self.LUMBER) & live).to(self.dtype) * self._lumber_prod
-        # The rest of the roster (QUARRY/PASTURE/CAMP/PLANTATION/OIL_WELL,
-        # idx >= 3) adds its catalog production via the dense table;
-        # FARM/MINE/LUMBER keep their bespoke terms above.
-        new_imp = self.improvement >= 3
-        if bool(new_imp.any()):
-            out = out + (new_imp & live).to(self.dtype) * self._imp_yields[self.improvement.clamp(min=0), 1]
-        return out
-
     def _neutral_prod(self) -> torch.Tensor:
-        """[B, T] tile PRODUCTION as a CIV SEAT works it. That path calls
-        tileYields with defaultModifiers(): the improvement's BASE production
-        applies (the mine/lumber mill is physically on the tile; pillage
-        suspends it) but seat 0's mine-boost techs do NOT — those ride
-        ctx.mods, which defaultModifiers zeroes. Distinct from _eff_prod(),
-        the seat-0-context plane that adds the boosts. Cached per _eff_version
-        (improvement/pillage changes bump it)."""
+        """[B, T] tile PRODUCTION with NO seat's research in it — the base
+        every seat shares: the improvement is physically on the tile and
+        pillage suspends it, whoever is looking.
+
+        The tech-boosted part is NOT missing, it is per SEAT and cannot live
+        in a [B, T] plane: `_seat_city_yields` adds `_mine_boost_amt` from
+        THAT row's own techs, which is what TS does when it builds the yield
+        context from `getModifiers(state, city.seat)`. Cached per
+        _eff_version (improvement/pillage changes bump it)."""
         base = self.tile_yields[:, :, 1]
         if not self.improvements_on:
             return base
@@ -484,51 +453,6 @@ class SimEconomy:
             out = out + (new_imp & live).to(self.dtype) * self._imp_yields[self.improvement.clamp(min=0), 1]
         self._nprod_cache = (self._eff_version, out)
         return out
-
-    def _eff_yields(self) -> torch.Tensor:
-        """[B, T, 6] tile yields with disaster food AND improvement production
-        — for consumers whose cross-column float sums must keep the assembled
-        row order.
-
-        Cached per disaster version: fertility/drought mutate ONLY inside
-        _disaster_phase, improvement/pillaged state inside the builder/raider
-        paths, and mine-boost techs inside research — each bumps the version.
-        The cache returns the identical tensor, so downstream float behavior
-        is unchanged."""
-        if not self.disasters and not self.improvements_on and not bool(self.feat_stripped.any()):
-            return self.tile_yields
-        if self._eff_cache is not None and self._eff_cache[0] == self._eff_version:
-            return self._eff_cache[1]
-        ty = self.tile_yields.clone()
-        ty[:, :, 0] = self._eff_food()
-        if self.improvements_on:
-            ty[:, :, 1] = self._eff_prod()
-            # gold+ columns — CAMP/PLANTATION add catalog gold. Generic over
-            # the whole roster (cols 2-5 are zero for the rest),
-            # pillage-suspended like every improvement yield.
-            live_imp = (self.improvement >= 0) & ~self.pillaged
-            if bool(live_imp.any()):
-                ty[:, :, 2:] = ty[:, :, 2:] + self._imp_yields[self.improvement.clamp(min=0), 2:] * live_imp.unsqueeze(-1).to(ty.dtype)
-                # The SEASIDE RESORT's gold IS the tile's appeal, so it cannot
-                # come from the static catalog row. Floored at 0 like the TS
-                # twin. Cached with the rest on _eff_version — _tile_appeal()
-                # is keyed the same way.
-                if self.SEASIDE >= 0:
-                    sr_live = live_imp & (self.improvement == self.SEASIDE)
-                    if bool(sr_live.any()):
-                        ty[:, :, 2] = ty[:, :, 2] + (
-                            self._tile_appeal().clamp(min=0).to(ty.dtype) * sr_live.to(ty.dtype)
-                        )
-        # A chopped (or founding-stripped) tile loses its feature's own yields
-        # on every column — TS reads tile.feature === null live. Columns 1: only:
-        # _eff_food already stripped column 0 BEFORE its drought floor, which is
-        # where tileYields puts it, and the floor is not commutative with the
-        # subtraction. Production and the static columns carry no floor, so
-        # subtracting after their overwrites is exact.
-        if bool(self.feat_stripped.any()):
-            ty[:, :, 1:] = ty[:, :, 1:] - self.feat_yields[:, :, 1:].to(ty.dtype) * self.feat_stripped.unsqueeze(-1).to(ty.dtype)
-        self._eff_cache = (self._eff_version, ty)
-        return ty
 
     def _fertilize(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
         """+1 fertility (capped) on land, non-mountain tiles. (row, tile)
@@ -770,9 +694,9 @@ class SimEconomy:
 
     def _adj_district_count(self) -> torch.Tensor:
         """[B, T] number of adjacent COMPLETED districts — the DISTRICT
-        adjacency source. Counts seat 0 city centers (center_at), specialty
-        districts (self.district) and MAJOR city centres (centre_slot_at, which
-        carry tile.district='CITY_CENTER' in TS). No owner filter, mirroring
+        adjacency source. Counts every MAJOR city centre (centre_slot_at —
+        those carry tile.district='CITY_CENTER' in TS) and every completed
+        specialty district (self.district). No owner filter, mirroring
         matchesAdjacency('DISTRICT')."""
         if self._adjd_cache is not None and self._adjd_cache[0] == self._eff_version:
             return self._adjd_cache[1]
@@ -1166,11 +1090,12 @@ class SimEconomy:
         the slot, through compaction."""
         B, O = self.B, self._O
         # Itinerant Preachers: per-religion range — base + the religion's
-        # claimed enhancer's presR. Religion 0 (seat 0) keeps the base: no
-        # founding path assigns it an enhancer.
+        # claimed enhancer's presR. A religion is keyed by its FOUNDER's row
+        # and every row can claim an enhancer (#73), which is what TS walks:
+        # `for (const sx of state.seats) range[sx.seat] += presR`.
         RANGE = torch.full((B, O), int(self._pressure_range), dtype=torch.long, device=self.device)
-        if self.R > 0 and self._enh_any:
-            RANGE[:, 1 : 1 + self.R] += self._enh["presR"][self.civ_enhancer[:, 1:] + 1].long()
+        if self._enh_any:
+            RANGE += self._enh["presR"][self.civ_enhancer[:, :O] + 1].long()
         founded = self.holy_tile >= 0  # [B, O]
         ht = self.holy_tile.clamp(min=0)  # [B, O] valid tile idx (masked where unfounded)
         # ONE flip for every seat.
@@ -1495,6 +1420,23 @@ class SimEconomy:
             e = torch.maximum(e, (civics[:, :nc].long() * self._civic_era[:nc]).max(dim=1).values)
         return e
 
+    def _row_era(self, row) -> torch.Tensor:
+        """[B] — `civEraIndex(seatOf(state, seat).research)` for an arbitrary
+        seat ROW: an int, or a [B] tensor of rows (-1 = nobody).
+
+        A CITY-STATE or BARBARIAN row reads ANCIENT, not an error: `seatOf`
+        answers for them and `seats.ts` builds both with empty `techs`/`civics`,
+        so `civEraIndex` returns 0 there."""
+        if isinstance(row, int):
+            if 0 <= row <= self.R:
+                return self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row])
+            return torch.zeros(self.B, dtype=torch.long, device=self.device)
+        major = (row >= 0) & (row <= self.R)
+        idx = torch.where(major, row, torch.zeros_like(row))
+        b = torch.arange(self.B, device=self.device)
+        era = self._civ_era(self.civ_techs[b, idx], self.civ_civics[b, idx])
+        return torch.where(major, era, torch.zeros_like(era))
+
     def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, relics: torch.Tensor | None = None, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None) -> torch.Tensor:
         """[B] — a seat's per-turn TOURISM, the `seatTourism` twin. Great Works
         pay the values that pair tourism with culture; every OWNED unpillaged
@@ -1618,25 +1560,6 @@ class SimEconomy:
         if self._farmadj_tech >= 0:
             tier = tier + techs[:, self._farmadj_tech].long()
         return tier
-
-    def _farmadj_food(self) -> torch.Tensor:
-        """[B, T] seat 0's farm-adjacency food bonus = qual × seat 0's tier —
-        the border-pick ranking plane's copy. The city walk takes the same
-        term for EVERY row through _rcy_food_plane, which folds it into the
-        food plane where tileYields carries it."""
-        if self._fadjf_cache is not None and self._fadjf_cache[0] == self._eff_version:
-            return self._fadjf_cache[1]
-        z = torch.zeros(self.B, self.T, dtype=self.dtype, device=self.device)
-        if not self.improvements_on:
-            out = z
-        else:
-            tier = self._farmadj_tier(self.civ_civics[:, 0], self.civ_techs[:, 0])
-            if not bool((tier > 0).any()):
-                out = z
-            else:
-                out = self._farmadj_qual().to(self.dtype) * tier.unsqueeze(1).to(self.dtype)
-        self._fadjf_cache = (self._eff_version, out)
-        return out
 
     def _seat_city_walk(self, row: int, j: int | None = None, *, amen_yf: torch.Tensor) -> torch.Tensor:
         """THE computeCityStats twin — [B, n, 6] f64 per-city totals in engine
@@ -2109,19 +2032,25 @@ class SimEconomy:
         return torch.where(self.winner >= 0, self.winner, pick)
 
     def _domination(self) -> torch.Tensor:
-        """[B] the unified civ id holding EVERY original capital (civ_cap_tile),
-        else -1. Owner of a capital tile: 0 if a seat-0 city is centered there
-        a centre stands there, and `tile_seat` names its holder (a centre tile
-        belongs to its own city). Mirrors dominationWinner: a solo game (R==0)
-        never dominates; any unowned or split capital -> -1."""
+        """[B] the seat holding EVERY original capital (civ_cap_tile), else -1.
+        A capital tile counts as HELD when a centre stands there, and
+        `tile_seat` names its holder (a centre tile belongs to its own city).
+        Mirrors dominationWinner: a solo game (R==0) never dominates; any
+        capital not yet founded, unowned, or split -> -1."""
         B, dev = self.B, self.device
         if self.R == 0:
             return torch.full((B,), -1, dtype=torch.long, device=dev)
         caps = self.civ_cap_tile[:, : 1 + self.R]  # [B, 1+R] capitalTiles — survives rc compaction
-        held = self.centre_slot_at.gather(1, caps) >= 0
-        seat_at = self.tile_seat.gather(1, caps)
+        # A seat with NO capitalTile yet drops out of `caps` on TS and takes
+        # the `caps.length < expected` early return with it. Here it is a -1,
+        # which also may not reach `gather` — clamp for the read, refuse on the
+        # flag.
+        none_yet = (caps < 0).any(dim=1)
+        capsc = caps.clamp(min=0)
+        held = self.centre_slot_at.gather(1, capsc) >= 0
+        seat_at = self.tile_seat.gather(1, capsc)
         owner = torch.where(held, seat_at, torch.full_like(seat_at, -1))
-        bad = (owner < 0).any(dim=1) | (owner != owner[:, :1]).any(dim=1)
+        bad = none_yet | (owner < 0).any(dim=1) | (owner != owner[:, :1]).any(dim=1)
         return torch.where(bad, torch.full((B,), -1, dtype=torch.long, device=dev), owner[:, 0])
 
     # --- action masks (the macro-action surface) --------------------------------

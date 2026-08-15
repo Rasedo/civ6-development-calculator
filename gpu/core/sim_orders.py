@@ -680,7 +680,7 @@ class SimOrders:
         # city (seat 0 or a civ seat), so only a fully citiless world skips the
         # roll. The short-circuit is part of the draw-count contract. A second
         # draw picks the spot, and only if any candidate exists.
-        any_city = self.city_alive[:, 0].any(dim=1) | self.city_alive[:, 1:1 + max(self.R, 1)].reshape(B, -1).any(dim=1)
+        any_city = self.city_alive[:, :1 + self.R].reshape(B, -1).any(dim=1)
         can_roll = any_city & (self.n_camps < self.max_camps)
         r1 = self._next_random(can_roll)
         want = can_roll & (r1 < cb.get("campSpawnChance", 0.08))
@@ -814,24 +814,21 @@ class SimOrders:
             here = self.barb_unit_tile[:, u]
             nb = self.neigh[here]  # [B, 6]
             nbc = nb.clamp(min=0)
-            # A seat-0 centre and a civ centre are BOTH melee targets, but
-            # they enter the priority differently below — a lone civilian
-            # defends a civ centre and does not defend a seat-0 one. That is a
-            # TS rule difference (`meleeAttack`), not a storage one, so the two
-            # predicates stay separate until the fidelity call is made.
-            _nb_ctr = self.centre_slot_at.gather(1, nbc) >= 0
-            ctr = _nb_ctr & (self.tile_seat.gather(1, nbc) == 0)
+            # A MAJOR's centre is a melee target whoever holds it —
+            # `caps.alwaysHostile` needs no war and `cityAtIndex` names no
+            # seat. `centre_slot_at` carries only major centres, so this one
+            # predicate is the whole test.
+            ctr = self.centre_slot_at.gather(1, nbc) >= 0
             # A NON-BARBARIAN unit is adjacent (a barbarian is not a target for
             # a barbarian). Civilians are never barbarian, so only the military
             # plane needs the seat test.
             _mn = self.military_at.gather(1, nbc)
             _mn_seat = torch.where(_mn >= 0, self.unit_seat.gather(1, _mn.clamp(min=0)), torch.full_like(_mn, -1))
             has_unit = ((_mn >= 0) & (_mn_seat != BARB_SEAT)) | (self.civilian_at.gather(1, nbc) >= 0)
-            vc = self.civ_city_at.gather(1, nbc) >= 0
             # An adjacent LIVE Encampment is a melee target for a barbarian too
             # (hostile to every owner) — attackTargets' encampTarget.
             enc_nb = self._encamp_block(nb, BARB_SEAT) if self._encamp_didx >= 0 else None
-            valid = (nb >= 0) & (ctr | has_unit | vc | (enc_nb if enc_nb is not None else False))
+            valid = (nb >= 0) & (ctr | has_unit | (enc_nb if enc_nb is not None else False))
             tkey = torch.where(valid, nb, T + 1)
             target_tile = tkey.min(dim=1).values
             # A RANGED raider (ARCHER/CROSSBOWMAN) scans its FULL range
@@ -848,7 +845,7 @@ class SimOrders:
             if any_rngd and bool((act & rngd).any()):
                 rng_u = self._type_ranged_range[self.barb_unit_type[:, u].clamp(min=0, max=self.NU - 1)]
                 d_all = self.pair_dist[here.clamp(min=0)].to(torch.long)  # [B, T]
-                civ_only_valid = (
+                rng_valid = (
                     (d_all >= 1)
                     & (d_all <= rng_u.unsqueeze(1))
                     & (
@@ -856,33 +853,27 @@ class SimOrders:
                         | (self.centre_slot_at >= 0)
                     )
                 )
-                civ_only_key = torch.where(civ_only_valid, self._arangeT.unsqueeze(0).expand(B, T), torch.full((B, T), T + 1, dtype=torch.long, device=dev))
-                target_tile = torch.where(rngd, civ_only_key.min(dim=1).values, target_tile)
+                rng_key = torch.where(rng_valid, self._arangeT.unsqueeze(0).expand(B, T), torch.full((B, T), T + 1, dtype=torch.long, device=dev))
+                target_tile = torch.where(rngd, rng_key.min(dim=1).values, target_tile)
             attack = act & (target_tile <= T)
             ttc = target_tile.clamp(max=T - 1)
-            # meleeAttack routes seat-0 centre tiles to the city even with a
-            # garrison; units defend everywhere else.
-            tgt_city = (self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0) & (
-                self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1) == 0)
+            # meleeAttackInner's precedence, ONE set of arms for every
+            # centre: a city is attacked THROUGH a MILITARY garrison, but a
+            # LONE CIVILIAN draws the blow itself — it is captured roll-free,
+            # so it cannot be the thing a city is attacked through. Seat 0's
+            # centre used to skip that test; TS never did.
+            ctr_here = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0
             # a NON-BARBARIAN unit stands on the target tile
             has_u = self._nonbarb_unit_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
-            # A CIV centre is attacked THROUGH its garrison, exactly as a
-            # seat-0 centre is (`city_att` never tests `has_u`). A LONE
-            # CIVILIAN still wins — it is killed roll-free — so the city only
-            # beats a MILITARY occupant.
-            _has_mil = self._nonbarb_mil_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
-            _civ_only = has_u & ~_has_mil
-            _rvc_here = self.civ_city_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0
-            _city_wins = _rvc_here & ~_civ_only
-            city_att = attack & ~rngd & tgt_city
-            unit_att = attack & ~rngd & ~tgt_city & has_u & ~_city_wins
-            vc_att = attack & ~rngd & ~tgt_city & _city_wins
+            has_mil = self._nonbarb_mil_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
+            city_hit = ctr_here & (~has_u | has_mil)
+            city_att = attack & ~rngd & city_hit
+            unit_att = attack & ~rngd & has_u & ~city_hit
             enc_att = (
                 attack
                 & ~rngd
-                & ~tgt_city
+                & ~ctr_here
                 & ~has_u
-                & ~_rvc_here
                 & self._encamp_block(ttc.unsqueeze(1), BARB_SEAT).squeeze(1)
                 if self._encamp_didx >= 0
                 else None
@@ -892,11 +883,9 @@ class SimOrders:
                 self._melee_city(city_att, ttc, "barb", u)
             if bool(unit_att.any()):
                 self._hostile_vs_unit(unit_att, ttc, "barb", u)
-            if bool(vc_att.any()):
-                self._melee_city(vc_att, ttc, "barb", u)
             if enc_att is not None and bool(enc_att.any()):
                 self._attack_encampment(enc_att, ttc, "barb", u)
-            acted_att = city_att | unit_att | vc_att
+            acted_att = city_att | unit_att
             if enc_att is not None:
                 acted_att = acted_att | enc_att
             # A RANGED raider strikes instead: hostileUnitAct routes any
@@ -907,9 +896,9 @@ class SimOrders:
             # ungarrisoned CIV centre (TS `enemyCity` resolves to seat-0 cities
             # only) spends nothing, but `attack` still HOLDS the unit, because
             # TS returns from hostileUnitAct before the pillage/march branches.
-            civ_only_att = attack & rngd
-            if any_rngd and bool(civ_only_att.any()):
-                acted_att = acted_att | self._hostile_ranged_strike(civ_only_att, ttc, "barb", u)
+            rng_att = attack & rngd
+            if any_rngd and bool(rng_att.any()):
+                acted_att = acted_att | self._hostile_ranged_strike(rng_att, ttc, "barb", u)
             self.barb_unit_mp[:, u] = torch.where(acted_att, torch.zeros_like(self.barb_unit_mp[:, u]), self.barb_unit_mp[:, u])  # the turn is spent (TS movesLeft = 0)
 
             # Pillage: a raider that did not attack, standing on an owned,
@@ -964,7 +953,9 @@ class SimOrders:
                 continue
             arangeT = torch.arange(T, device=dev)
             if self.improvements_on or self.districts_on:
-                _owned = (self.tile_seat == 0) | (self.civ_at >= 0)  # [B, T] — civ tiles tempt barbarians too
+                # `isCiv(tileSeat(t))` — owned by ANY major. A barbarian is
+                # hostile to all of them, so no war term joins it.
+                _owned = (self.tile_seat >= 0) & (self.tile_seat <= self.R)  # [B, T]
                 imp_job = (self.improvement >= 0) & ~self.pillaged & _owned  # [B, T]
                 if self.districts_on:  # pillageable districts join the union
                     imp_job = imp_job | ((self.district >= 0) & self.district_complete & ~self.district_pillaged & _owned)
@@ -975,14 +966,24 @@ class SimOrders:
             else:
                 has_imp = torch.zeros_like(act)
                 imp_tgt = here.clamp(min=0)
-            dc = self.pair_dist[here.unsqueeze(1), self.city_center[:, 0].clamp(min=0)].to(torch.long)  # [B, C]
-            # Distance ties break by TS ARRAY order — column order under
-            # append+reclaim (#110).
-            ckey = torch.where(self.city_alive[:, 0], dc * 4096 + torch.arange(self.RC, device=self.device), 10**9)
-            city_min = ckey.min(dim=1).values
-            city_tgt = self.city_center[:, 0].gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
+            # BARBARIANS MARCH ON ANYONE — every major's cities, on the TS
+            # key: distance, then the seat id, then the centre tile
+            # (`caps.alwaysHostile`, so no war term). Scanning row 0 alone left
+            # a civ city un-besieged however close it stood.
+            ckey_min = torch.full((B,), 10**18, dtype=torch.long, device=dev)
+            city_tgt = here.clamp(min=0)
+            for row2 in range(1 + self.R):
+                for j in range(self.RC):
+                    ct2 = self.city_center[:, row2, j].clamp(min=0)
+                    d2 = self.pair_dist[here.clamp(min=0), ct2].to(torch.long)
+                    key2 = torch.where(self.city_alive[:, row2, j],
+                                       d2 * (2048 * 8) + row2 * 2048 + ct2,
+                                       torch.full_like(d2, 10**18))
+                    upd = key2 < ckey_min
+                    ckey_min = torch.where(upd, key2, ckey_min)
+                    city_tgt = torch.where(upd, ct2, city_tgt)
             tgt = torch.where(has_imp, imp_tgt, city_tgt)
-            has_tgt = has_imp | (city_min < 10**9)
+            has_tgt = has_imp | (ckey_min < 10**18)
             d_here = self.pair_dist[here, tgt].to(torch.long)
             # The raider walks REAL MP toward the (fixed) target, exactly as
             # the civ march does. Per step: the passable free neighbour closest

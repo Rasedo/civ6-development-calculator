@@ -703,46 +703,49 @@ class SimMasks:
         return can
 
 
-    def _dig_at(self, gd: torch.Tensor, td: torch.Tensor) -> None:
+    def _dig_at(self, gd: torch.Tensor, td: torch.Tensor, row) -> None:
         """Mark a DIG for the games in `gd` on the tiles in `td` — the
         row-index form of `_mark_antiquity`, which takes a [B] mask.
         Every COMBAT death goes through here, exactly as every TS combat death
         goes through `combat.ts:killUnit`. Maintenance disbands and builder
-        charge-exhaustion are NOT deaths and must not call it."""
+        charge-exhaustion are NOT deaths and must not call it.
+
+        `row` is the ACTING seat's row — `killUnit(state, unit, seat)` passes
+        the seat whose ORDER this is, and the era gate reads that seat. An int
+        or a tensor ALIGNED WITH `gd`, like `td`."""
         if len(gd) == 0:
             return
         m = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         m[gd] = True
         t = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
         t[gd] = td
-        self._mark_antiquity(m, t)
+        if not isinstance(row, int):
+            r = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+            r[gd] = row
+            row = r
+        self._mark_antiquity(m, t, row)
 
-    def _mark_antiquity(self, mask: torch.Tensor, tile: torch.Tensor) -> None:
+    def _mark_antiquity(self, mask: torch.Tensor, tile: torch.Tensor, row) -> None:
         """The markAntiquitySite twin — stamp an ANTIQUITY SITE on
         `tile` for the rows in `mask`. Real Civ 6 creates these from PRE-MODERN
         events (a razed barbarian outpost, a unit dying), so the era gate is the
         sourced part; a tile already carrying a dig does not stack, and water,
-        districts and wonder tiles are refused exactly as TS refuses them."""
+        districts and wonder tiles are refused exactly as TS refuses them.
+
+        The era is the ACTING seat's, never one fixed seat's:
+        `markAntiquitySite` takes the seat and reads ITS research."""
         if not bool(mask.any()):
             return
         t = tile.clamp(min=0)
-        era = self._civ_era(self.civ_techs[:, 0], self.civ_civics[:, 0])  # [B] seat 0's era
-        if self.S > 0:
-            _citystate_s = self.citystate_at.gather(1, t.unsqueeze(1)).squeeze(1)
-            _citystate_ctr = (_citystate_s >= 0) & (
-                self.citystate_center.gather(1, _citystate_s.clamp(min=0).unsqueeze(1)).squeeze(1) == t)
-        else:
-            _citystate_ctr = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        # TS keeps ONE tile map, so `t.district` is set for EVERY seat's
-        # district and `markAntiquitySite` refuses them all. The GPU splits the
-        # fact: `self.district` is seat 0's, while a civ's live in the
-        # `civ_city_dist_tile` registry — both must be refused.
-        _rv_dist = (self.city_dist_tile[:, 1:] == t.view(self.B, 1, 1, 1)).any(3).any(2).any(1)
+        era = self._row_era(row)  # [B] the acting seat's era
         okr = (
             mask
             & (tile >= 0)
             & (era < self._modern_era_index)
             & ~self.water.gather(1, t.unsqueeze(1)).squeeze(1)
+            # TS keeps ONE tile map, so `t.district` refuses EVERY seat's
+            # district — and so does this plane: `_place_district` writes it
+            # under whichever ROW queued the district, and nothing clears it.
             & (self.district.gather(1, t.unsqueeze(1)).squeeze(1) < 0)
             & (self.built_wonder.gather(1, t.unsqueeze(1)).squeeze(1) < 0)
             # TS refuses a dig on ANY tile carrying a district, and `foundCity`
@@ -750,11 +753,11 @@ class SimMasks:
             # The GPU's `district` plane does NOT encode centres — they live in
             # the seat-generic centre registry, so it is named here too.
             & (self.centre_slot_at.gather(1, t.unsqueeze(1)).squeeze(1) < 0)  # any major's centre
-            # NOTE: a CITY-STATE centre is deliberately NOT excluded. TS sets
-            # `tile.district = 'CITY_CENTER'` on seat-0 founding, on both
-            # capture paths and on CIV founding, but NOT for a city-state,
-            # so `markAntiquitySite` accepts a death on a minor's centre.
-            & ~_rv_dist  # a CIV's district tile
+            # NOTE: a CITY-STATE centre is deliberately NOT excluded, and no
+            # term for it is computed. TS sets `tile.district = 'CITY_CENTER'`
+            # on any MAJOR's founding and on both capture paths, but never for
+            # a city-state, so `markAntiquitySite` accepts a death on a
+            # minor's centre.
         )
         if not bool(okr.any()):
             return
@@ -866,24 +869,35 @@ class SimMasks:
             free = free | (harbor & own.gather(1, land.unsqueeze(1)).squeeze(1))
         return trans & bit & ~free
 
-    def _clear_camp_at(self, mask: torch.Tensor, tile: torch.Tensor, seat: torch.Tensor | None = None) -> None:
+    def _clear_camp_at(self, mask: torch.Tensor, tile: torch.Tensor, seat: torch.Tensor, row) -> None:
         """A non-barbarian unit entering a camp tile clears it: +50 gold to
-        ITS seat (`seat` is a [B] ABSOLUTE seat; None means seat 0) and the
-        camp list splices left (order matters for later garrison loops)."""
+        ITS seat (`seat` is a [B] ABSOLUTE seat — `clearCampFor` banks to
+        `seatOf(unit.seat)`) and the camp list splices left (order matters for
+        later garrison loops).
+
+        `row` is the ACTING seat's row, which is a DIFFERENT seat from the
+        mover when a suzerain walks a levied unit: `clearCampFor` banks the
+        gold to the unit's seat and stamps the dig with the order's seat.
+
+        KNOWN CORNER vs TS: a LEVIED city-state unit banks nothing here. TS
+        credits `seatOf(unit.seat)` whoever that is and a city-state carries a
+        treasury; the GPU's treasury plane has major rows only."""
         if not bool(mask.any()):
             return
         hit = mask & (self.camp_tile == tile.unsqueeze(1)).any(dim=1)
         if not bool(hit.any()):
             return
-        self._mark_antiquity(hit, tile)  # a razed outpost leaves a dig
+        self._mark_antiquity(hit, tile, row)  # a razed outpost leaves a dig
         reward = self.rules.combat.get("campClearReward", 50)
         for b in hit.nonzero(as_tuple=True)[0].tolist():
-            row = self.camp_tile[b]
-            k = int((row == tile[b]).nonzero(as_tuple=True)[0][0])
-            row[k:-1] = row[k + 1 :].clone()
-            row[-1] = -1
+            camps = self.camp_tile[b]
+            k = int((camps == tile[b]).nonzero(as_tuple=True)[0][0])
+            camps[k:-1] = camps[k + 1 :].clone()
+            camps[-1] = -1
             self.n_camps[b] -= 1
-            self.civ_treasury[b, 0 if seat is None else int(seat[b])] += float(reward)
+            _s = int(seat[b])
+            if 0 <= _s <= self.R:
+                self.civ_treasury[b, _s] += float(reward)
 
 
     def _type_civic_slot_ok(self, row: int, per_city: bool) -> torch.Tensor:
@@ -1315,8 +1329,8 @@ class SimMasks:
             for n in range(int(present.any(dim=0).sum())):
                 if not bool(present[:, n].any()):
                     break
-                tgt_n, hi, hpc, hrc = self._war_march_target(tiles[:, n].clamp(min=0), row)
-                has = (hi | hpc | hrc) & present[:, n] & at_war
+                tgt_n, hi, hc_n = self._war_march_target(tiles[:, n].clamp(min=0), row)
+                has = (hi | hc_n) & present[:, n] & at_war
                 war_tgt[:, n] = torch.where(has, tgt_n, war_tgt[:, n])
         return self._unit_obs(
             tiles, present,
