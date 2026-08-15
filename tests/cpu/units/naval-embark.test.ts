@@ -379,7 +379,7 @@ describe('N2 naval spawn + combat', () => {
 
   it('a SEAT-0 galley MOVES across water (findPath naval) then attacks a coastal city', () => {
     // The GPU RL/controlled head cannot order a ship's water move yet (that is
-    // the #50 residual — its move-apply reads the land plane); TS findPath/
+    // a residual — its move-apply reads the land plane); TS findPath/
     // walkPath ARE naval-aware, so the seat-0 naval MOVE end-to-end lives here.
     const state = makeState(makeMap(14, 12, 'COAST')); // all-water map
     state.unitsMode = true;

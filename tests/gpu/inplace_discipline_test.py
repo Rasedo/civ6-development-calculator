@@ -62,7 +62,7 @@ _POOL_PLANES = (
     "alive", "acted", "type", "tile", "hp",
     "fortify", "xp", "charges", "aura_mp", "emb", "seat",
 )
-# The per-seat, per-family VIEWS are gone (#111): every seat fact has ONE
+# The per-seat, per-family VIEWS are gone: every seat fact has ONE
 # name and is addressed by row, so there is nothing left to orphan. What
 # survives is the merged unit pool's two halves and the city block's MINOR
 # section — the one geometry no row view reaches.

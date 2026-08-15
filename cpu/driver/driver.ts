@@ -264,7 +264,7 @@ for (let t = 0; t < N_TURNS; t++) {
   // Post-trace control: the orchestrator may request keyed dumps of the
   // groups whose digests disagreed — the state has not moved yet, so the
   // dump is exactly the state the digest hashed. It may also request a
-  // CHECKPOINT (#101): GameState is plain JSON-able data, so the dump a
+  // CHECKPOINT: GameState is plain JSON-able data, so the dump a
   // fresh child reloads via CIV6_SERVE_LOAD is bit-faithful, rngState and
   // seatActions included. `go` releases the turn.
   for (;;) {

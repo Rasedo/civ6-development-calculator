@@ -52,7 +52,7 @@ function place(state: GameState, type: string, seat: number): Unit {
   return u!;
 }
 
-describe('B-24 golden movement dedications', () => {
+describe('golden movement dedications', () => {
   it('grants nothing outside a Golden age', () => {
     const state = newGame();
     const b = place(state, 'BUILDER', 0);
@@ -136,7 +136,7 @@ describe('B-24 golden movement dedications', () => {
 // civ's research discount, prophet points and culture to another.
 // ---------------------------------------------------------------------------
 
-describe('B-24 golden dedications reach the civ that committed them', () => {
+describe('golden dedications reach the civ that committed them', () => {
   function civRun(kind: number | null, turns: number): GameState {
     const state = newGame();
     if (kind !== null) golden(state, 1, kind);

@@ -21,7 +21,7 @@ function newGame(opponents = 1): GameState {
   return state;
 }
 
-describe('B6-S2 civ missionary chassis', () => {
+describe('civ missionary chassis', () => {
   it('a missionary within 1 of a differing city spreads +10 (15 SCRIPTURE), loses a charge, dies at 0', () => {
     // base lump 10, charges 2 -> survives at 1.
     {

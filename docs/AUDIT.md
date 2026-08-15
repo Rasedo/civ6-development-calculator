@@ -48,11 +48,10 @@ nothing carries forward.
 
 | Open item | Weight | What the weight is for |
 |---|---|---|
-| A-9r Neighborhood column | 4 | find the divergence that pulled it, then put the column back |
 | A-29r cityYieldMult order | 2 | registry ordering; no colliding pair exists in the catalog today |
 | A-30r farm-adjacency order | 1 | construct note, unreachable as written |
 | A-31r intl route destination | 2 | the GPU route store is keyed by TILE where TS keys by (seat, city) |
-| **A. Engine vs engine** | **9** | |
+| **A. Engine vs engine** | **5** | |
 | B-17r Encampment strikes | 1 | scoped out with ranged-vs-city; the rest of the district is done |
 | B-18r religion tails | 2 | complete on every seat; one latent lifecycle drift to hunt |
 | B-20r tourism tails | 7 | national parks, civ Archaeologists, theming, shipwrecks, digs |
@@ -66,9 +65,10 @@ nothing carries forward.
 | B-29r peace-treaty cooldown | 1 | a per-pair clock and its gate, both engines |
 | B-30r specialists | 6 | a mechanic neither engine has: wire column, assignment, yields |
 | B-31r trade-route tails | 6 | a Trader UNIT and a route wire verb |
+| B-32r one district per type | 3 | the registry's last dim becomes a SLOT space on both engines |
 | B-D unsourced data values | 5 | a residual CLASS: every invented magnitude, re-sourced |
-| **B. Fidelity vs real Civ 6** | **51** | |
-| **OPEN, TOTAL** | **60** | |
+| **B. Fidelity vs real Civ 6** | **54** | |
+| **OPEN, TOTAL** | **59** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -84,19 +84,6 @@ seat 0 rides the same machinery as every other row, and
 Each entry names its own reachability, because not one of the four is known
 to fire in a driven game today, which is exactly why they are still here.
 
-- **A-9r. The NEIGHBORHOOD column is pulled over a divergence nobody
-  found.** The district itself is complete on both engines — catalog entry,
-  URBANIZATION unlock, appeal-tier housing (`_nbhd_didx` against
-  `_appeal_cuts`, `computeHousing`'s twin) — but it is deliberately absent
-  from `SCAFFOLD_DISTRICTS`, because with the column in, the two engines
-  queued DIFFERENT districts. That placement/cost divergence was worked
-  around, not diagnosed. Two consequences: no seat can build a Neighborhood
-  at all, and the second one `allowMultiple` promises has nowhere to go on
-  the GPU — `city_dist_tile` is one slot per (city, district type), so
-  `_district_counts` would undercount where TS's `completedDistrictCount`
-  walks the `city.districts` ARRAY and counts both. REACHABILITY: zero.
-  Nothing can queue one, so neither half is inside the digest's reach until
-  the column goes back in — and putting it back is what re-opens the hunt.
 - **A-29r. `cityYieldMult` cannot express BUILD order.** TS applies it in
   `city.wonders` build order; the GPU registry is keyed by wonder id and
   cannot, so two multipliers on the SAME channel in one city could
@@ -221,6 +208,18 @@ Civ 6 source or is recorded as unverifiable.
   eager rule on both engines, where a real player spends a Trader on a
   chosen pair. A route verb is P8-surface work. The destination-STORAGE
   divergence between the engines is A-31r, not this entry.
+- **B-32r. ONE district per (city, type), where Civ 6 allows several.** Real
+  Civ 6 lets a city build as many NEIGHBORHOODS as it has tiles for — they do
+  not count toward the population cap, which is the whole point of them. Both
+  engines refuse the second: the district REGISTRY's last dimension IS the
+  district catalog index (`city_dist_tile[b, row, j, di]`, `city.districts`
+  gated by `canPlaceDistrictIn`), so a second tile of the same type has
+  nowhere to go. Closing it means making that dimension a SLOT space — extra
+  slots for the types that repeat, with the per-slot tables (`_is_specialty`
+  and friends) widened to match, and `_transfer_city`'s registry rebuild made
+  slot-aware rather than keyed by `self.district[b, t]`. Roughly 35 GPU read
+  sites, all of the form `[..., di]`. Neighborhood is the only repeating type
+  in the catalog today, so the gap is exactly one district wide.
 - **B-D. UNSOURCED DATA VALUES — a residual class, not one item.**
   Mechanics are sourced item by item; the DATA layer largely is not, and a
   wrong CONSTANT passes every gate because both engines agree on the wrong
@@ -238,12 +237,6 @@ Civ 6 source or is recorded as unverifiable.
   by file, checking each magnitude against a real Civ 6 source and either
   correcting it or recording it as a deliberate stylization. Re-marking as
   it goes is what makes the class shrinkable again.
-  ONE MEMBER IS ALREADY NAMED AND CONTRADICTS ITS OWN SOURCE:
-  `WAR_MIN_TURNS` is 14, while the sourcing note beside it — and the
-  SOURCED list at the head of `cpu/data/seats.ts` — says real Civ 6 unlocks
-  the peace offer at **10**. Both engines read the 14, so no gate can see
-  it. Deciding it is a behaviour round: the floor gates every `sueForPeace`
-  and the war head's peace columns on both sides.
 
 ## The freeze backlog — what the first serve run must validate
 
@@ -519,6 +512,40 @@ placement. Numbering restarts here — "watch first" below means THIS list.
    Woods left the Woods standing on TS, lending adjacency to neighbours the
    GPU had already withdrawn. Fixed with the placement rewrite.
 
+21. THE NEIGHBORHOOD COLUMN IS BACK, and it is the 10th `SCAFFOLD_DISTRICTS`
+   entry — APPENDED, so the nine existing district columns keep their
+   indices and only `wonderLo` / `projectLo` shift by one. Both engines
+   derive those bases from the scaffold LENGTH (`prodLayout`,
+   `WONDER_BASE = DISTRICT_BASE + len(_scaffold)`), so nothing is hardcoded,
+   but every checkpoint and net head is invalidated and the fixtures must be
+   re-exported before anything runs. The column was pulled because the two
+   engines queued different districts with it in; the cause found by reading
+   was the `allowMultiple` gate — TS offered a SECOND Neighborhood where the
+   GPU's registry could not hold one. Both refuse it now (item 22). What was
+   checked and already agrees: the cost curve (`district_cost.base` 32 =
+   `round(54 × GAME_SPEED)`), the discount (all-False for a non-specialty
+   type on both), the specialty CAP (`floor((pop-1)/3)+1` both), the appeal
+   housing bands (`appealTier` vs `_appeal_cuts`, identical including the
+   floor of 2), zero maintenance, no buildings in the district, and empty
+   adjacency so every eligible tile ties and the lowest index wins on both.
+   READ THIS FIRST if districts diverge late: URBANIZATION is an Industrial
+   civic, so nothing reaches the column before then and an early-turn
+   district red is NOT this.
+
+22. NO SEAT MAY BUILD A SECOND DISTRICT OF ONE TYPE — a deliberate
+   deviation, now shared. `canPlaceDistrictIn` dropped its `!allowMultiple`
+   guard and refuses unconditionally, matching the GPU's registry, and the
+   dead `allowMultiple` export key is gone. In real Civ 6 this only binds
+   the Neighborhood; recorded as B-32r.
+
+23. `WAR_MIN_TURNS` 14 -> 10, the sourced Civ 6 value. Both engines read it
+   from rules.json, so they move together, but every war in every seed now
+   ends up to 4 turns earlier and `PEACE_GOLD_COST(warTurns)` is charged off
+   a smaller clock. Expect the whole war chapter of every trajectory to
+   shift; a divergence here is far more likely to be a second-order effect
+   of the new cadence than a rule break. The `/14.0` in `observe` and
+   `env.observe` is an observation SCALE, not this floor, and stays.
+
 STILL UNVERIFIED, and NOT changed on a guess: our feature-removal techs are
 Woods -> Mining and Marsh -> Irrigation. Rainforest -> Bronze Working checks
 out against a real source; the other two could not be confirmed either way,
@@ -537,6 +564,10 @@ SEAT the divergence names before reading the mechanic.
 - District placement IS reachable in-gate, unlike most of this list — every
   seed queues districts from the early game, so items 17-20 should show up
   in the very first serve run rather than hiding.
+- The NEIGHBORHOOD column is the exception: URBANIZATION is an Industrial
+  civic (cost 1060, after CIVIL_ENGINEERING and NATIONALISM), so MEASURE
+  whether any seed reaches it inside 250 turns before reading a green run as
+  evidence about item 21. If none does, the column is poke-covered only.
 - No seat fields a second ship under the current masks (B-28r), and the
   international trade leg went unreached under the old decisions (A-31r) —
   re-measure both.

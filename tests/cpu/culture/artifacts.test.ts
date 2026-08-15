@@ -19,7 +19,7 @@ function found(state: GameState, col: number, row: number): City {
   return r.city!;
 }
 
-describe('B-20 (#79): artifacts and archaeology', () => {
+describe('artifacts and archaeology', () => {
   it('the sourced constants and the museum choice', () => {
     expect(ARTIFACT_CULTURE).toBe(3);
     expect(ARTIFACT_TOURISM).toBe(3);

@@ -38,7 +38,7 @@ function cultureFor(n: number) {
   return n * CULTURE_PER_DOMESTIC_TOURIST;
 }
 
-describe('B-25 culture victory', () => {
+describe('culture victory', () => {
   it('seat 0 out-touring every civ wins the culture victory', () => {
     const state = newGame(1);
     const civSeat = (state.seats[(0) + 1] as Seat);

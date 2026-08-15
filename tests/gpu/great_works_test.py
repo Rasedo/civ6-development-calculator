@@ -95,7 +95,7 @@ def main() -> None:
         sim.city_gw_writing[:, 0].zero_()
         sim.city_bldg[:, 0, 0, amph] = True
         sim.city_bldg[:, 0, 1, amph] = True
-        # First Writer -> all 2 into the LOWER column (array order, #110).
+        # First Writer -> all 2 into the LOWER column (array order).
         lo, hi = 0, 1
         sim._place_works(0, torch.ones(B, dtype=torch.bool), cval, 0)
         assert bool((sim.city_gw_writing[:, 0, lo] == 2).all()), "the lowest-column city fills first"

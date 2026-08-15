@@ -9,8 +9,8 @@
  * trace + digest per turn, all over stdio lines prefixed "@@" (ordinary
  * logging cannot corrupt the stream; the orchestrator filters on the
  * sentinel). A serve run is a gate, not an export — nothing is written,
- * except a checkpoint dump when the orchestrator asks for one (#101:
- * {ckpt: path} writes the GameState JSON that CIV6_SERVE_LOAD reloads).
+ * except a checkpoint dump when the orchestrator asks for one ({ckpt: path}
+ * writes the GameState JSON that CIV6_SERVE_LOAD reloads).
  */
 import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
@@ -35,7 +35,7 @@ const DIR = process.argv[3] ?? 'seeder/worlds';
 const HORIZON = Number(process.env.CIV6_SERVE_HORIZON ?? N_TURNS);
 
 const world = JSON.parse(readFileSync(`${DIR}/seed${SEED}.world.json`, 'utf-8')) as WorldFile;
-// #101 resume: CIV6_SERVE_LOAD names a checkpoint dump (the {ckpt} control
+// resume: CIV6_SERVE_LOAD names a checkpoint dump (the {ckpt} control
 // message's JSON of a live GameState) — reload it instead of rebuilding from
 // the world file; the serve knobs ride in the dump. The world file is still
 // read for the obs-layout params either way.

@@ -454,7 +454,7 @@ _MUTABLE = [
     "holy_tile", "city_pressure", "city_followed",  # ONE seat-indexed pressure+followed plane pair
     "antiquity",  # ANTIQUITY SITES (bool tile plane)
     "built_wonder", "built_wonder_complete", "city_wonder",  # world wonders + the per-city registry
-    "fertility", "drought", "improvement", "pillaged", "district", "dscaffold_placed",
+    "fertility", "drought", "improvement", "pillaged", "district",
     "district_pillaged",  # raided-dark districts (tile plane, reclaim-safe)
     "d_static_adj",  # mutated when an in-game founding clears the center tile's removable feature
     # The merged unit pool. The BASES are registered, never the `major_`/`barb_`

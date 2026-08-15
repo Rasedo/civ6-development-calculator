@@ -44,7 +44,6 @@ export interface DistrictDef {
   color: string;
   cost: number;
   countsTowardLimit: boolean;
-  allowMultiple: boolean;
   adjacencyYield?: YieldKey;
   adjacency: AdjacencyRule[];
   housing: number;
@@ -68,7 +67,6 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     color: '#d8b54a',
     cost: 0,
     countsTowardLimit: false,
-    allowMultiple: false,
     adjacency: [],
     housing: 0,
     placement: {},
@@ -81,7 +79,6 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     color: '#3f8fce',
     cost: 54,
     countsTowardLimit: true,
-    allowMultiple: false,
     adjacencyYield: 'science',
     // GS Civilopedia: +1 per adjacent Mountain, +2 per adjacent Reef (and
     // Geothermal Fissure, which this map has no feature for), +1 per TWO
@@ -103,7 +100,6 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     color: '#cfd4dc',
     cost: 54,
     countsTowardLimit: true,
-    allowMultiple: false,
     adjacencyYield: 'faith',
     adjacency: [
       { source: 'NATURAL_WONDER', amount: 2 },
@@ -122,7 +118,6 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     color: '#b75fb3',
     cost: 54,
     countsTowardLimit: true,
-    allowMultiple: false,
     adjacencyYield: 'culture',
     // GS Civilopedia: +2 Culture from EACH adjacent wonder tile (a major
     // bonus, not a standard one), +1 per two adjacent districts.
@@ -141,7 +136,6 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     color: '#e0b62e',
     cost: 54,
     countsTowardLimit: true,
-    allowMultiple: false,
     adjacencyYield: 'gold',
     adjacency: [
       { source: 'RIVER', amount: 2 },
@@ -159,7 +153,6 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     color: '#3fa7a0',
     cost: 54,
     countsTowardLimit: true,
-    allowMultiple: false,
     adjacencyYield: 'gold',
     // GS Civilopedia: +2 Gold from each adjacent City Center, +1 per adjacent
     // coastal resource, +1 per two adjacent districts.
@@ -179,7 +172,6 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     color: '#c0622b',
     cost: 54,
     countsTowardLimit: true,
-    allowMultiple: false,
     adjacencyYield: 'production',
     adjacency: [
       { source: 'MINE', amount: 0.5 },
@@ -198,7 +190,6 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     color: '#9c3c3c',
     cost: 54,
     countsTowardLimit: true,
-    allowMultiple: false,
     adjacency: [],
     housing: 0,
     placement: { notAdjacentToCityCenter: true },
@@ -211,7 +202,6 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     color: '#6fb8d8',
     cost: 54,
     countsTowardLimit: false,
-    allowMultiple: false,
     adjacency: [],
     housing: 0, // housing handled specially (depends on existing fresh water)
     placement: { requiresAdjacentCityCenter: true, requiresWaterSourceOrMountain: true },
@@ -224,7 +214,6 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     color: '#d86fa0',
     cost: 54,
     countsTowardLimit: true,
-    allowMultiple: false,
     adjacency: [],
     housing: 0,
     placement: {},
@@ -237,7 +226,6 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     color: '#7c8b4f',
     cost: 54,
     countsTowardLimit: false,
-    allowMultiple: true,
     adjacency: [],
     housing: 0, // appeal-based (2-6), computed from the tile it sits on
     placement: {},
@@ -263,10 +251,6 @@ export const PLACEABLE_DISTRICTS: DistrictId[] = [
  * the fixture exporter, the GPU engine and the wire applier, so the order IS
  * the wire's meaning and must never be re-sorted. `unlockKind: 'civic'` marks
  * a civic-tree unlock; the default is a tech id.
- *
- * NEIGHBORHOOD is deliberately absent: its appeal-housing machinery is live on
- * both engines, but with the column in, the two queued different districts —
- * a placement/cost divergence that needs its own hunt before the row goes back.
  */
 export const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; unlockKind?: 'civic'; placement?: 'aqueduct' | 'coastal' | 'encampment' }[] = [
   { id: 'CAMPUS', unlockId: 'WRITING' },
@@ -278,4 +262,5 @@ export const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; unlockKind?
   { id: 'THEATER_SQUARE', unlockId: 'DRAMA_AND_POETRY', unlockKind: 'civic' },
   { id: 'ENTERTAINMENT_COMPLEX', unlockId: 'GAMES_AND_RECREATION', unlockKind: 'civic' },
   { id: 'ENCAMPMENT', unlockId: 'BRONZE_WORKING', placement: 'encampment' },
+  { id: 'NEIGHBORHOOD', unlockId: 'URBANIZATION', unlockKind: 'civic' },
 ];

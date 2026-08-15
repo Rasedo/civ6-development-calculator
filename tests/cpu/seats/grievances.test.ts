@@ -31,7 +31,7 @@ function newGame(opponents = 1) {
   return state;
 }
 
-describe('B-22 diplomatic favor', () => {
+describe('diplomatic favor', () => {
   // Real Civ 6 (GS): a civ earns favor per turn equal to its GOVERNMENT TIER,
   // plus +1 per city-state it is Suzerain of. Chiefdom is tier 0 and pays
   // nothing, which is why an early game accrues favor only through envoys.
@@ -61,7 +61,7 @@ describe('B-22 diplomatic favor', () => {
   });
 });
 
-describe('B-22 seat-0 grievances', () => {
+describe('seat-0 grievances', () => {
   it('declaring war earns grievances', () => {
     const state = newGame(1);
     expect(seatOf(state, 0)!.warmonger ?? 0).toBe(0);

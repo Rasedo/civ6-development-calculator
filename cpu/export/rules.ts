@@ -48,7 +48,7 @@ import { IMPROVEMENT_IDS } from '../core/unitActions'; // ONE roster, core-owned
  
 import { techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, RESOURCE_IDS, BUILT_WONDER_LIST } from './catalog';
 
-/** The REAL settler rule now (#71): a 1-pop city may not train or buy one.
+/** The REAL settler rule now: a 1-pop city may not train or buy one.
  *  Exported to the GPU as scenario.settlerPopGate. */
 const SETTLER_POP_GATE = 2;
 
@@ -74,7 +74,7 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
   cnear: def.effects.combatNearFollowing ?? 0,  // Just War (within justWarRange, unit-vs-unit)
   cdef: def.effects.combatDefendFollowing ?? 0,  // Defender of the Faith
   cvs: def.effects.combatVsUnitInFollowing ?? 0,  // Crusade
-  // B6-S2 missionary channels — pre-rounded INTEGERS so both engines read the
+  // Missionary channels — pre-rounded INTEGERS so both engines read the
   // identical value (the GPU indexes these by civ_only_enhancer + a base-value pad):
   mchg: def.effects.missionaryChargeBonus ?? 0,  // Scripture +1 charge
   mlump: Math.round(SPREAD_PRESSURE * (def.effects.spreadPressureMult ?? 1)),  // Scripture 15, base 10
@@ -126,7 +126,7 @@ for (const [id, def] of Object.entries(BOOSTS)) {
     row = { kind: 'anyWonderBuilt' };
   } else if (c.kind === 'district') {
     // District eurekas/inspirations (STATE_WORKFORCE: any specialty district;
-    // MATHEMATICS: 3; per-type ones). B9-R1: distinctTypes conditions
+    // MATHEMATICS: 3; per-type ones). distinctTypes conditions
     // (CIVIL_ENGINEERING: 7 different specialty districts) export now — the
     // full specialty catalog is scaffold-placeable, so both civs can satisfy
     // them (the old "wait for D3" skip made the GPU miss a live inspiration:
@@ -264,7 +264,7 @@ export function buildRules() {
       // The per-seat CITY COLUMN width — one number for the GPU's storage rows
       // and for both engines' observation/decision head (see CITY_SLOTS_PER_SEAT).
       citySlots: CITY_SLOTS_PER_SEAT,
-      settlerBase: Math.round(80 * GAME_SPEED), // SETTLER_COST(c) = seat 0's 48 + 18·max(0, c − 1)
+      settlerBase: Math.round(80 * GAME_SPEED), // 48 + 18·max(0, cities − 1 + live + queued)
       settlerPer: Math.round(30 * GAME_SPEED),
       pantheonFaithCost: PANTHEON_FAITH_COST,
       prophetCls: GP_CLASSES.indexOf('PROPHET'),
@@ -361,7 +361,7 @@ export function buildRules() {
       apostleCost: UNITS.APOSTLE.cost,
       apostleCap: APOSTLE_CAP,
       relStrength: Object.values(UNITS).map((u) => u.religiousStrength ?? 0),
-      cityReligionAdderLive: CITY_RELIGION_ADDER_LIVE, // #71 DEBT-2: inert pending its hunt
+      cityReligionAdderLive: CITY_RELIGION_ADDER_LIVE, // DEBT-2: inert pending its hunt
       theoDamage: THEO_DAMAGE,
       theoBaseDamage: THEO_BASE_DAMAGE,
       theoPressureSwing: THEO_PRESSURE_SWING,
@@ -576,7 +576,6 @@ export function buildRules() {
         housing: d.housing,
         maintenance: ['CITY_CENTER', 'NEIGHBORHOOD', 'AQUEDUCT', 'COMMERCIAL_HUB', 'HARBOR'].includes(id) ? 0 : 1, // CH+Harbor exempt (real Civ 6)
         countsTowardLimit: d.countsTowardLimit ? 1 : 0,
-        allowMultiple: d.allowMultiple ? 1 : 0,
         onCoastalWater: d.placement.onCoastalWater ? 1 : 0,
         reqAdjCenter: d.placement.requiresAdjacentCityCenter ? 1 : 0,
         reqWaterOrMountain: d.placement.requiresWaterSourceOrMountain ? 1 : 0,
@@ -660,7 +659,7 @@ export function buildRules() {
       ],
       cityYields: YIELD_KEYS.map((k) => g.effects.cityYields?.[k] ?? 0),
       capitalYields: YIELD_KEYS.map((k) => g.effects.capitalYields?.[k] ?? 0),
-      // #46r full channel matrix: off-script research paths can adopt ANY
+      // The full channel matrix: off-script research paths can adopt ANY
       // government (the Merchant-Republic catch), so every effect channel a
       // government or WIRED card carries is reachable and must export.
       housingAll: g.effects.housingAll ?? 0,

@@ -17,7 +17,7 @@ import type { Tile } from '../../../cpu/core/types';
 // sourced rule that they block naval attacks on a city — community reports say
 // naval melee can attack through cliffs, so nothing is implemented for it.
 
-describe('B-26: cliffs block embark and disembark', () => {
+describe('cliffs block embark and disembark', () => {
   function setup() {
     const state = makeState(makeMap(12, 12, 'GRASSLAND'));
     const land = tileAtCoords(state.map, 5, 5);

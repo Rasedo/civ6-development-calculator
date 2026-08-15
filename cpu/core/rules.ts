@@ -212,7 +212,10 @@ export function canPlaceDistrictIn(
     if (cat !== 'bonus') return no(`Cannot build over a ${cat} resource.`);
   }
 
-  if (!def.allowMultiple && city.districts.some((d) => d.type === type)) {
+  // ONE tile per (city, district type), every type. CIV 6 lets a city build
+  // several Neighborhoods; the district REGISTRY here is keyed by type on both
+  // engines (`city_dist_tile[..., di]`) and has nowhere to put a second.
+  if (city.districts.some((d) => d.type === type)) {
     return no(`${def.name} already exists in this city.`);
   }
   if (def.countsTowardLimit) {

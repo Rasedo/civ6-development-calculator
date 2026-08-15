@@ -39,7 +39,7 @@ function tileAt(state: GameState, ctr: number, dist: number, banned: number[] = 
   return -1;
 }
 
-describe('B7-G (B-8) Great General / Admiral catalog', () => {
+describe('Great General / Admiral catalog', () => {
   it('GENERAL & ADMIRAL are combat-0, single-charge, spawn-only civilians', () => {
     for (const id of ['GENERAL', 'ADMIRAL']) {
       const def = UNITS[id];
@@ -59,7 +59,7 @@ describe('B7-G (B-8) Great General / Admiral catalog', () => {
   });
 });
 
-describe('B7-G (B-8) aura', () => {
+describe('aura', () => {
   it('+5 to own LAND military within 2 of an own GENERAL; 0 at range 3 / wrong civ / naval', () => {
     const state = newGame();
     const cap = seatOf(state, 0)!.cities[0].centerIndex;
@@ -130,7 +130,7 @@ describe('B7-G (B-8) aura', () => {
   });
 });
 
-describe('B7-G (B-8) spawn-at-claim & capture', () => {
+describe('spawn-at-claim & capture', () => {
   it('a seat-0 GENERAL claim spawns a general civilian at the capital', () => {
     const state = newGame();
     // fund exactly one GENERAL; advanceGreatPeople (in endTurn) claims + spawns.
@@ -147,7 +147,7 @@ describe('B7-G (B-8) spawn-at-claim & capture', () => {
     expect(g.charges).toBe(1);
   });
 
-  it('B-31: an at-war civ melee on a lone seat-0 GENERAL captures it', () => {
+  it('an at-war civ melee on a lone seat-0 GENERAL captures it', () => {
     const state = newGame();
     setWar(state, (state.seats[(0) + 1] as Seat).seat, 0, true);
     const cap = seatOf(state, 0)!.cities[0].centerIndex;

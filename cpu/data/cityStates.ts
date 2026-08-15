@@ -95,7 +95,7 @@ export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   Valletta: { name: 'Valletta', type: 'militaristic', bonus: 'Gold-purchase Renaissance/ancient walls & buildings in cities with a wall.', channel: 'production' },
   Jerusalem: { name: 'Jerusalem', type: 'religious', bonus: 'Your religion counts as majority for envoy effects; +faith.', channel: 'faith', note: 'the +faith half ships; the majority-override clause is a conditional the channel cannot carry' },
   'La Venta': { name: 'La Venta', type: 'religious', bonus: 'Builders can build a special improvement for faith.', channel: 'faith' },
-  Yerevan: { name: 'Yerevan', type: 'religious', bonus: 'Apostles gain a promotion of choice.', channel: 'none', note: 'apostles and theological combat ship; unit PROMOTIONS do not (B-27r)' },
+  Yerevan: { name: 'Yerevan', type: 'religious', bonus: 'Apostles gain a promotion of choice.', channel: 'none', note: 'apostles and theological combat ship; unit PROMOTIONS do not' },
   Armagh: { name: 'Armagh', type: 'religious', bonus: 'Builders can build a Monastery for faith/production.', channel: 'faith' },
 };
 

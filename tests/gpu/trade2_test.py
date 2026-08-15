@@ -46,7 +46,7 @@ def main() -> None:
 
     sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     assert sim._trade_intl_gold == 3 and sim._trade_duration == 20, "engine trade consts mismatch"
-    assert "seat_route_dest" in _MUTABLE and "seat_route_exp" in _MUTABLE, "route tensors must be _MUTABLE (#51: SEAT-indexed bases; civ_only_route_* are views)"
+    assert "seat_route_dest" in _MUTABLE and "seat_route_exp" in _MUTABLE, "route tensors must be _MUTABLE (SEAT-indexed bases; civ_only_route_* are views)"
     B = sim.B
     K = sim.seat_routes.shape[2]
     assert sim.seat_route_dest[:, 1:sim.n_majors].shape == (B, sim.n_majors - 1, K), "route_dest civ-row shape"

@@ -27,7 +27,7 @@ const tile = (over: Partial<Tile> = {}): Tile =>
     ...over,
   }) as Tile;
 
-describe('B-27 fort', () => {
+describe('fort', () => {
   it('grants the occupying unit +4 defense strength', () => {
     const bare = terrainDefense(tile());
     const fort = terrainDefense(tile({ improvement: 'FORT' }));

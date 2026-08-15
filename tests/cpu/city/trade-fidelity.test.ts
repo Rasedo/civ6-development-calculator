@@ -94,7 +94,7 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
   return civ;
 }
 
-describe('B-23 international route yields', () => {
+describe('international route yields', () => {
   it('routeYieldsInternational pays INTL_ROUTE_GOLD + 1 gold per completed specialty district, gold only', () => {
     const { state, dest } = twoCitySandbox();
     expect(specialtyDistricts(state, dest)).toBe(0);
@@ -130,7 +130,7 @@ describe('B-23 international route yields', () => {
   });
 });
 
-describe('B-23 route duration', () => {
+describe('route duration', () => {
   it('addTradeRoute / addCsTradeRoute stamp expiresTurn = turn + TRADE_ROUTE_DURATION', () => {
     const { state, origin, dest } = twoCitySandbox();
     state.turn = 7;
@@ -154,7 +154,7 @@ describe('B-23 route duration', () => {
   });
 });
 
-describe('B-23 civ international pick + income', () => {
+describe('civ international pick + income', () => {
   it('a civ with spare capacity and no domestic/CS destination routes to the nearest seat-0 city', () => {
     const state = makeState(makeMap(24, 24));
     state.sandbox = true;

@@ -93,7 +93,7 @@ function addCs(state: GameState, col: number, row: number, opts: Partial<CitySta
   return cityState;
 }
 
-// (#104: the old meetQuota guard is gone — every gold rung is record-driven
+// (the old meetQuota guard is gone — every gold rung is record-driven
 // now, so nothing can drain a levy-priced treasury without a record.)
 
 function levyUnitsNear(state: GameState, civ: Seat, cityState: CityState): number {
@@ -105,7 +105,7 @@ function levyUnitsNear(state: GameState, civ: Seat, cityState: CityState): numbe
 }
 
 // ---------------------------------------------------------------------------
-describe('A-12 (B8-L): civ levy', () => {
+describe('civ levy', () => {
   function scenario(): { state: GameState; civ: Seat; cityState: CityState } {
     const state = makeState(makeMap(24, 24));
     state.turn = 20; // > QUEST_COOLDOWN, ≤ 60 → WARRIOR ladder rung
@@ -118,7 +118,7 @@ describe('A-12 (B8-L): civ levy', () => {
     return { state, civ, cityState };
   }
 
-  /** #104: the levy is a wire DECISION — store the kind-7 record the driver
+  /** The levy is a wire DECISION — store the kind-7 record the driver
    * would emit; seatPhase's arm re-validates the rule half (militaristic,
    * suzerain, cooldown, afford) through levyUnits itself. */
   function stashLevy(state: GameState, seat: number, cityStateIndex: number): void {
@@ -188,7 +188,7 @@ describe('A-12 (B8-L): civ levy', () => {
 });
 
 // ---------------------------------------------------------------------------
-describe('A-12 (B8-L): civ quests (deterministic, zero-draw)', () => {
+describe('civ quests (deterministic, zero-draw)', () => {
   function scenario(cityStateType: CityStateType = 'scientific'): { state: GameState; civ: Seat; cityState: CityState } {
     const state = makeState(makeMap(24, 24));
     state.turn = 20;
@@ -253,7 +253,7 @@ describe('A-12 (B8-L): civ quests (deterministic, zero-draw)', () => {
 });
 
 // ---------------------------------------------------------------------------
-describe('A-12 (B8-L): SEAT-0 quest draw-count neutrality', () => {
+describe('SEAT-0 quest draw-count neutrality', () => {
   it('the civ-quest path consumes ZERO rng, so the shared PRNG (and the seat-0 path) is untouched', () => {
     // A civ that would issue AND resolve a quest, at peace (no combat/war
     // draws), belief-opted-out: seatPhase must leave rngState untouched by

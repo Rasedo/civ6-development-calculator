@@ -128,9 +128,8 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       // the Archaeological Museum are the same choice point. A building with
       // no unlock at all is worse than wrong: TS omits it from
       // `unlocks.buildings` while the GPU reads unlockTech -1 as "always
-      // available", so the two engines
-      // in #41, and it showed up as a treasury/culture divergence at
-      // t193 rather than as anything mentioning museums.
+      // available", so the two engines disagreed — and it surfaced as a
+      // treasury/culture divergence at t193, mentioning no museum anywhere.
       { kind: 'unlockBuilding', building: 'ARCHAEOLOGICAL_MUSEUM' },
       { kind: 'unlockPolicy', policy: 'GRAND_OPERA' },
     ]),

@@ -1,4 +1,3 @@
-import { GAME_SPEED } from './constants';
 
 
 export type SeatClass = 'major' | 'minor' | 'hostile';
@@ -26,8 +25,8 @@ export const SEAT_CAPS: Record<SeatClass, SeatCaps> = {
  * city-state units yet, so no unit carries a minor seat and this cell is never
  * read. It holds `true` because that is what the code did before the table
  * existed — `gainXp` refused barbarians and nobody else — so the table changes
- * no behaviour. When Round 6 gives minors units, this cell needs a Civ 6
- * source before it is trusted; it is called out here rather than left to be
+ * no behaviour. The day minors get units, this cell needs a Civ 6 source
+ * before it is trusted; it is called out here rather than left to be
  * discovered as a silent default.
  */
 
@@ -65,16 +64,10 @@ export const MAX_CITIES_PER_SEAT = 6;
  * window would hide them from the observation and leave them undecidable. The
  * GPU's per-seat-row storage width is this same number (rules.seats.citySlots). */
 export const CITY_SLOTS_PER_SEAT = 24;
-/** seat 0's exact settler curve — 48 + 18·(cities−1) at
- * Online speed. Other seats never bank settlers and single-queue them, so
- * seat 0's `cities − 1 + settlers + queued` term reduces to `cities − 1`. */
-export const SETTLER_COST = (cities: number) =>
-  Math.round(80 * GAME_SPEED) + Math.round(30 * GAME_SPEED) * Math.max(0, cities - 1);
-/** Turns a war must run before either side may sue for peace — one floor for
- *  every pairing, majors and city-states alike. CIV 6: the leaders' action
- *  panel unlocks the offer at **10**; this model uses 14 and the gap is
- *  unreconciled (AUDIT B-D). */
-export const WAR_MIN_TURNS = 14;
+/** CIV 6: a war must run **10** turns before either side may negotiate peace
+ *  (the leaders' action panel unlocks the offer then). One floor for every
+ *  pairing here, majors and city-states alike. */
+export const WAR_MIN_TURNS = 10;
 export const PEACE_GOLD_COST = (warTurns: number) => 150 + 10 * warTurns;
 
 
@@ -141,7 +134,7 @@ export const LOYALTY_AMENITY: Record<string, number> = {
 
 export const WW_ERA_BASE_FORMAL = [16, 22, 28, 34, 40] as const;
 /** The same table for a SURPRISE war (no casus belli). The premium runs 1.00
- *  at Ancient to 1.30 at Industrial+ — never the flat 2 that S7.8r deleted. */
+ *  at Ancient to 1.30 at Industrial+, never a flat 2. */
 export const WW_ERA_BASE_SURPRISE = [16, 25, 34, 43, 52] as const;
 export const WW_ABROAD_MULT = 2;
 export const WW_DEATH_MULT = 3;
@@ -246,8 +239,8 @@ export const CULTURE_PER_DOMESTIC_TOURIST = 100;
 export const ADMIRAL_MARCH_LIVE = true;
 
 /**
- * The NAMED DEDICATION CATALOG. #71 landed dedications as a COUNT
- * with a flat payout; real Civ 6 has each civ commit to a NAMED dedication per
+ * The NAMED DEDICATION CATALOG. Real Civ 6 has each civ commit to a NAMED
+ * dedication per
  * era, and every dedication has TWO faces — a DARK/NORMAL face that pays ERA
  * SCORE off specific EVENTS (the climb-out) and a GOLDEN face that pays a
  * standing bonus instead.
@@ -263,7 +256,7 @@ export const ADMIRAL_MARCH_LIVE = true;
  *   2 PEN_BRUSH_AND_VOICE +1 era score per INSPIRATION (civic boost) triggered
  *   3 EXODUS_OF_THE_EVANGELISTS  +2 era score per city converted to your religion
  *
- * The GOLDEN face keeps #71's flat faith for now — the named Golden bonuses
+ * The GOLDEN face keeps a flat faith payout for now — the named Golden bonuses
  * (Monumentality's faith purchases, Free Inquiry's eureka overflow, ...) need
  * machinery this round does not build, and inventing substitutes would be the
  * fabrication the verify-before-implement rule exists to prevent. Recorded.

@@ -60,7 +60,7 @@ def q(x: float) -> int:
 
 
 def add_seat0_city(sim, col: int, tile: int, pop: int, loy: float) -> None:
-    # Array position IS the column under append+reclaim (#110).
+    # Array position IS the column under append+reclaim.
     sim.city_alive[0, 0, col] = True
     sim.city_is_cap[0, 0, col] = False
     sim.city_center[0, 0, col] = tile
@@ -282,7 +282,7 @@ def poke_governor_seat0(rules, path):
     sim, cols = two_city_setup(rules, path)  # loyalties 55, 59; capital 100
     tier = torch.zeros(sim.B, sim.RC, dtype=torch.long)
     gov = sim._gov_loy
-    weakest = min(cols, key=lambda c: (q(float(sim.city_loyalty[0, 0, c])), c))  # ties by array position = column (#110)
+    weakest = min(cols, key=lambda c: (q(float(sim.city_loyalty[0, 0, c])), c))  # ties by array position = column
     sim.civ_civics[0, 0, : sim._gov_per] = True  # titles 1
     snap = sim.snapshot()
     apply_loyalty_row(sim, tier)
@@ -384,7 +384,7 @@ def main() -> None:
     poke_governor_seat0(rules, path)
     poke_seat0_golden(rules, path)
     poke_capital_immunity(rules, path)
-    print("GOVERNORS (B-24) POKES OK")
+    print("GOVERNORS POKES OK")
 
 
 if __name__ == "__main__":

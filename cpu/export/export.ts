@@ -9,7 +9,7 @@
  * plus one `rules.json` for the set. Each artifact carries `srcStamp` (the
  * cpu/+world/ source hash) and each fixture its world's `worldHash`, and the
  * fixtures must match `seeder/worlds.lock` — the whole staleness chain is
- * checkable end to end (#78).
+ * checkable end to end.
  */
 import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 
@@ -58,4 +58,4 @@ for (const f of worldFiles) {
   );
 }
 console.log(`\nCompiled ${worldFiles.length} fixtures in ${DIR}/ — ` +
-  'NOTE: format 2 (no pre-founded capitals); the GPU engine refuses these until its #71/#102 catch-up.');
+  'NOTE: format 2 (no pre-founded capitals); the GPU engine refuses these.');

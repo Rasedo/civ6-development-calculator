@@ -16,7 +16,7 @@ import { placeRelic, relicFaith, relicTourism, RELIC_BUILDING, RELIC_SLOTS_PER_B
 
 const city = (buildings: string[], relics?: number) => ({ buildings, relics });
 
-describe('B-20 relics', () => {
+describe('relics', () => {
   it('sourced constants: a TEMPLE holds ONE relic worth 4 faith and 8 tourism', () => {
     expect(RELIC_BUILDING).toBe('TEMPLE');
     expect(RELIC_SLOTS_PER_BUILDING).toBe(1);

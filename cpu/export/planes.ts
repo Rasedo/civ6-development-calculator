@@ -6,7 +6,7 @@
  * that is the oracle. Never authoritative: regenerate at will, compare via
  * the srcStamp/worldHash pair.
  *
- * FORMAT 2 (#71): there are NO pre-founded major cities and NO planned
+ * FORMAT 2: there are NO pre-founded major cities and NO planned
  * sites — every civ starts as its file units (settler + warrior), carried in
  * `civs[]` (one array; civ 0 is not special). load_fixture refuses any other
  * format.
@@ -81,7 +81,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // index + the improvement index that activates it. -9 = its improvement
       // is outside the GPU roster (PEARLS/WHALES -> FISHING_BOATS), so it can
       // never activate in the GPU — currently true in TS too (no scripted
-      // builder path builds FISHING_BOATS), but #50's RL improvement verbs
+      // builder path builds FISHING_BOATS), but the RL improvement verbs
       // would make it a LIVE asymmetry: revisit when those verbs land.
       lux: t.resource && RESOURCES[t.resource].category === 'luxury' ? LUXURY_IDS.indexOf(t.resource) : -1,
       luxreq: (() => {
@@ -95,7 +95,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       camp: !isWater(t) && !isImpassable(t) && !t.wonder && !t.district && !t.builtWonder && !t.goodyHut ? 1 : 0,
       riv: hasRiver(t) ? 1 : 0,
       wh: hasFreshWater(map, t) ? HOUSING_FRESH_WATER : isCoastalLand(map, t) ? HOUSING_COASTAL : HOUSING_NO_WATER,
-      // V-H1 chop planes: ftr = the chop grant key when this tile's feature
+      // Chop planes: ftr = the chop grant key when this tile's feature
       // is removable AND carries a chopYield AND no resource depends on it
       // (0 none, 1 food, 2 production); ftu = the tech whose effect unlocks
       // that feature's removal (-1 = never removable).
@@ -108,7 +108,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       fw: hasFreshWater(map, t) ? 1 : 0,
       nw: t.wonder ? 1 : 0,
       // statically settleable for civ-seat expansion (mirrors siteQuality's -1s;
-      // ownership and dynamic districts are the engine's job). GEO-H (#55):
+      // ownership and dynamic districts are the engine's job). GEO-H:
       // `st` must NOT bake `!t.district` — the district is a LIVE property
       // (siteQuality reads tile.district each call), and the engine already
       // gates on `self.district < 0` at the candidate site. Baking the t0

@@ -17,7 +17,7 @@ const mk = (capitalTiles: number[], seat0Centers: number[], civCenters: number[]
     ],
   }) as unknown as GameState;
 
-describe('GV-3 dominationWinner', () => {
+describe('dominationWinner', () => {
   const caps = [10, 20, 30]; // seat 0 cap 10, seat 1 cap 20, seat 2 cap 30
 
   it('is -1 while capitals are split among civs', () => {

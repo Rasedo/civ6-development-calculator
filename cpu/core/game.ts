@@ -655,7 +655,7 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number, sea
   // Purchases claim the tile but do NOT advance the culture-growth BOX
   // (real Civ 6 keeps the two schedules separate). They DO advance the
   // acquired COUNT — the next border tile costs more however this one was
-  // gained — which is why the claim goes through acquireTile (#104: this
+  // gained — which is why the claim goes through acquireTile (this
   // body used to hand-copy setTileOwner and silently skip tilesAcquired,
   // the exact drift acquireTile exists to prevent).
   acquireTile(state, city, tileIndex);
@@ -922,7 +922,7 @@ function religiousVictor(state: GameState): number {
  * ORDER is `state.units` ARRAY order for both the attacker walk and the
  * defender pick — this codebase's shared convention, which the GPU mirrors
  * with slot order (capture moves a unit to the END of both). An id tie-break
- * was the B-18 parity bug: after a capture an id no longer reflects array
+ * was a parity bug: after a capture an id no longer reflects array
  * position.
  *
  * WHY IT IS A PHASE AND NOT A VERB: the fight was never a choice — an apostle

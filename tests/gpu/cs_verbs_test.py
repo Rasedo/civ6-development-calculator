@@ -310,7 +310,7 @@ def main() -> None:
     assert int(sim.seat_citystate_quest[0, R + 1, s1]) == 0, "Q5: an unmet CS issued a civ quest"
     print("  Q5 unmet-CS gate OK (no quest without contact)")
 
-    print("CS VERBS (A-12 civ levy + quests) OK")
+    print("CS VERBS (civ levy + quests) OK")
 
 
 if __name__ == "__main__":

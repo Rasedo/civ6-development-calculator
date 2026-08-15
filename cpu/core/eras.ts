@@ -125,11 +125,8 @@ export function goldenDedication(state: GameState, civ: number, kind: number): b
  *     Movement for all Missionaries, Apostles, and Inquisitors." This roster
  *     has no INQUISITOR, so the pair below is the whole class.
  *
- * These two were implemented for #79, hunted, and reverted: scripted parity
- * went green but the off-script gate diverged on the `rng` DRAW COUNT at seed
- * 9015 t199, because TS kept movement points as STATE while the GPU kept
- * none and rebuilt the pool inside every walker. Both engines hold ONE
- * resident MP pool now (`unit_mp` against its `unit_mp_full` ceiling), with
+ * Model movement points twice and the off-script gate diverges on the `rng`
+ * DRAW COUNT, not on a yield. Both engines hold ONE resident MP pool (`unit_mp` against its `unit_mp_full` ceiling), with
  * one reset rule and one step contract, so the bonus has exactly one place to
  * live on each side.
  */
@@ -168,7 +165,7 @@ export function governorTitles(nCivics: number): number {
  *  `qLoys` are QUANTIZED milli loyalties (Math.round(loy·1000) — ranking on
  *  raw f64 would be float-association-fragile across engines; the
  *  quantization lesson), ties broken by ARRAY position (the GPU mirrors
- *  with the slot index — slot order IS array order, #110). Returns picked
+ *  with the slot index — slot order IS array order). Returns picked
  *  indices. */
 export function governorPicks(qLoys: number[], titles: number): Set<number> {
   const idx = qLoys.map((q, i) => [q, i] as const);

@@ -210,12 +210,11 @@ describe('governors / era score', () => {
   });
 });
 
-describe('B-24 named dedications (#77)', () => {
+describe('named dedications', () => {
   // Real Civ 6: each civ commits to a NAMED dedication per era, and every
   // dedication has TWO faces — a DARK/NORMAL face paying ERA SCORE off a
-  // specific EVENT, and a GOLDEN face paying a standing bonus instead. #71
-  // modeled only a COUNT with a flat payout; #77 adds the catalog and the
-  // event faces. MEASURED live: 199 payouts fire across the 24 scripted seeds
+  // specific EVENT, and a GOLDEN face paying a standing bonus instead.
+  // MEASURED live: 199 payouts fire across the 24 scripted seeds
   // (123 Monumentality, 50 Exodus, 24 inspirations, 2 eurekas), and the Age
   // distribution is byte-identical to before, so no civ crossed a threshold.
   const base = () => ({

@@ -306,7 +306,7 @@ def poke_capture(rules, rj, path):
     assert bool(sim.major_unit_alive[0, cap]) and int(sim.major_unit_type[0, cap]) == gi, "captured general not appended to the civ pool tail as a GENERAL"
     assert int((sim.major_unit_seat[0, cap] - 1)) == 0, "captured general not keyed to the captor's civ"
     assert int(sim.civilian_at[0, gtile]) == cap, "captured general not registered on the civilian plane"
-    print("  6 GENERAL capture OK — B-31 POOL-END transfer, type carried")
+    print("  6 GENERAL capture OK — POOL-END transfer, type carried")
 
 
 sim0 = None  # module-level handle for poke_seat0_spawn's roster indices
@@ -327,7 +327,7 @@ def main() -> None:
     poke_aura_helper(rules, rj, path)
     poke_aura_in_combat(rules, rj, path)
     poke_capture(rules, rj, path)
-    print("GP_AURA (B-8) POKES OK")
+    print("GP_AURA POKES OK")
 
 
 if __name__ == "__main__":

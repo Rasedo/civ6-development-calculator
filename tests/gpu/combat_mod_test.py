@@ -258,7 +258,7 @@ def test_integrated(sim, p, code, name) -> None:
     assert _diff_of(ev1, "mel") == _diff_of(ev0, "mel") - 50, "river did not cut the melee diff by 50"
     assert _diff_of(ev1, "melc") == _diff_of(ev0, "melc") + 50, "river did not lift the counter diff by 50"
     print(
-        f"  D. melee on {name} slot {p}: wounded+B-4 xp assembly exact "
+        f"  D. melee on {name} slot {p}: wounded+xp assembly exact "
         f"(atk +{atk_xp_cs}, def +{def_xp_cs} CS); "
         f"river mel {q_mel0}->{q_mel1} (-50), melc {q_melc0}->{q_melc1} (+50)"
     )

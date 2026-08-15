@@ -36,7 +36,7 @@ function cityWithAmphitheater() {
   return { state, city };
 }
 
-describe('B-20 Great Works', () => {
+describe('Great Works', () => {
   it('slots a writing person into Amphitheater slots and yields +2 culture/work', () => {
     const { state, city } = cityWithAmphitheater();
     const before = computeCityStats(state, city).breakdown.buildings.culture;

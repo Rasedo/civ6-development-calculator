@@ -40,7 +40,7 @@ describe('cultural border growth', () => {
     expect(pickBorderTile(state, city)).toBe(luxTile.index);
   });
 
-  it('buying tiles costs ring-priced gold on its own schedule (D-17)', () => {
+  it('buying tiles costs ring-priced gold on its own schedule', () => {
     const state = makeState(makeMap(18, 18));
     const city = foundCity(state, tileAtCoords(state.map, 9, 9).index, 0).city!;
     seatOf(state, 0)!.treasury = 1000;

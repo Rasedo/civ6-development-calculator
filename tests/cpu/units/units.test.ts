@@ -78,7 +78,7 @@ describe('movement', () => {
     expect(unit.path).toBeNull();
   });
 
-  it('steps need the full MP cost, except one step from full MP (D-3/D-4)', () => {
+  it('steps need the full MP cost, except one step from full MP', () => {
     const { state } = unitsState();
     const start = tileAtCoords(state.map, 8, 10);
     const mid = tileAtCoords(state.map, 9, 10);

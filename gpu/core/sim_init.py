@@ -18,8 +18,8 @@ class SimInit:
         self.T = T
         # ------------------------------------------------------------------
         # THE CITY BLOCK. Twenty city facts, one `city_x [B, n_majors+S, RC]` plane
-        # each. There are NO family views: every reader indexes the base by ROW
-        # (#111), because a second name for a row is a second way to write a
+        # each. There are NO family views: every reader indexes the base by
+        # ROW, because a second name for a row is a second way to write a
         # body that only serves one seat.
         #     seat 0:      city_x[:, 0]
         #     civ seats:   city_x[:, 1:n_majors]
@@ -40,9 +40,6 @@ class SimInit:
         # disagree with the array right beside it. An opponent count, where
         # one is genuinely meant (the war head's columns, the observation's
         # per-opponent block), is `n_majors - 1` written at the site that
-        # means it. The engine carried that count as `self.R` until #115 and
-        # spelled the width `1 + self.R` at 180-odd sites, none of which could
-        # be checked by reading it.
         self.n_majors = len(f0["civs"])
         # City COLUMNS per seat row — ONE width, exported by the TS engine as
         # rules.seats.citySlots (CITY_SLOTS_PER_SEAT) so the observation head
@@ -130,7 +127,7 @@ class SimInit:
         # --- per-slot city data (dynamic: a slot binds to a tile when a SETTLER
         # founds there; nothing is pre-founded, and every center stat below is
         # derived from the tile planes at founding) --------------------------
-        # SLOT ORDER IS TS ARRAY ORDER for every seat row (#110): cities
+        # SLOT ORDER IS TS ARRAY ORDER for every seat row: cities
         # append at last-alive+1 (the push mirror) and the step-end reclaim
         # compacts stably (the splice mirror), so every order-coupled mirror
         # of the TS city loop walks columns living-first, in column order.
@@ -144,12 +141,8 @@ class SimInit:
                                   if "CIV6_RECLAIM_AT" in _os.environ else None)
 
         # --- city-states: static, placed at game creation ----------------------
-        # THE ONE SURVIVING PAD, and it is not the major axis's. The majors had
-        # `max(R, 1)` too until #115, which reserved a PHANTOM row for a solo
-        # game and (worse) made the storage width and the loop bound two
-        # different numbers that agree for every configuration anyone runs.
-        # Seat 0 always exists, so dropping that one floors the width at 1 and
-        # can never make a zero-width dim. `S == 0` genuinely means NO
+        # THE ONE SURVIVING PAD, and it is not the major axis's: seat 0 always
+        # exists, so the major width needs no floor and can never come out zero. `S == 0` genuinely means NO
         # city-state rows, so dropping THIS one would: `seat_citystate_*`
         # becomes `[B, n_majors, 0]`, and a reduction over an empty dim raises
         # where a reduction over a dead row returns the identity. The guards
@@ -350,11 +343,10 @@ class SimInit:
         nd_b4 = max(len(rules.districts or []), 1)
         self.city_dist_tile = torch.full((B, self.n_majors, civ_city_pad, nd_b4), -1, dtype=torch.long, device=device)
         self.district_dead = torch.zeros(B, T, dtype=torch.bool, device=device)
-        # Persistent city ids on the seat axis (row 0 = seat 0, rows 1.. =
-        # the civ seats) — the TS City.id, allocated per seat from
-        # civ_next_city_id. tile_city stores THESE ids for every seat
-        # (#110 slice 2); consumers that speak seat-0 column space resolve
-        # through the `owner` cache's id→slot match.
+        # Persistent city ids on the seat axis — the TS City.id, allocated per
+        # seat from civ_next_city_id. tile_city stores THESE ids for every seat;
+        # consumers that speak column space resolve through the `owner` cache's
+        # id→slot match.
         self.city_id = torch.zeros(B, self.n_majors, civ_city_pad, dtype=torch.long, device=device)
         # capitalTiles, seat-indexed: only an isCapital founding (t0 or a
         # total-collapse refound) writes a row. The capital is an identity
@@ -790,7 +782,6 @@ class SimInit:
         self.CAMPUS = int(sc.get("campusIdx", 0))
         self.campus_unlock_tech = int(sc.get("campusUnlockTech", -1))  # WRITING
         self._scaffold = [(int(p["idx"]), int(p["unlockTech"]), int(p.get("unlockCivic", -1)), int(p.get("placement", 0))) for p in sc.get("place", [])]  # (district idx, unlock tech idx, unlock CIVIC idx — at most one of the two >= 0, placement: 0 land / 1 aqueduct / 2 coastal / 3 encampment)
-        self.dscaffold_placed = torch.zeros(B, max(len(self._scaffold), 1), dtype=torch.bool, device=device)  # per-scaffold-district placed flag
         # VETERANCY's encampmentProdMult needs the ENCAMPMENT district idx and
         # its scaffold slot (the queue head codes for the district and its
         # buildings — cpu/core/game.ts isEncampmentItem).

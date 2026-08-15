@@ -124,7 +124,7 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     ]),
     T('MILITARY_ENGINEERING', 'Military Engineering', 'Medieval', 335, ['CONSTRUCTION'], [
       { kind: 'unlockBuilding', building: 'ARMORY' },
-      // The FORT was added in #78 with its improvement def, its
+      // The FORT ships with its improvement def, its
       // Military-Engineer-only placement rule, its +4 terrain defence and two
       // constructed test lanes — but NO tech ever unlocked it, so
       // `unlocks.improvements` never contained it and `unlocked('FORT')` was

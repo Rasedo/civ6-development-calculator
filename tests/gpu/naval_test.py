@@ -609,7 +609,7 @@ def poke_flank_support(rules, path, GALLEY):
     flank1, sup1 = sim._flank_support(dtile, dseat, noatk)
     assert int(sup0) - int(sup1) == 1, "the naval ally embarked must drop support by exactly 1"
     assert int(flank0) - int(flank1) == 1, "the naval unit embarked must drop flanking by exactly 1"
-    print(f"  9 B-7 flank/support OK (naval counts flank {int(flank0)}/support {int(sup0)}; embarked -> {int(flank1)}/{int(sup1)})")
+    print(f"  9 flank/support OK (naval counts flank {int(flank0)}/support {int(sup0)}; embarked -> {int(flank1)}/{int(sup1)})")
 
 
 def main() -> None:
@@ -634,7 +634,7 @@ def main() -> None:
     poke_walls_civ(rules, path, GALLEY, WARRIOR)
     poke_embarked_capture(rules, path, WARRIOR, BUILDER)
     poke_flank_support(rules, path, GALLEY)
-    print("NAVAL (B-6) POKES OK")
+    print("NAVAL POKES OK")
 
 
 if __name__ == "__main__":

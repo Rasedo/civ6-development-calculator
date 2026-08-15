@@ -36,7 +36,7 @@ def main() -> None:
     layout = {"cs": s.S, "civs": s.n_majors - 1, "cities": s.RC,
               "techs": s.civ_techs.shape[2], "civics": s.civ_civics.shape[2]}
     # techs/civics appear TWICE: the effective cost per option, then the
-    # progress parked on it (#72).
+    # progress parked on it.
     width = (ladder.EMP + ladder.PER_CS * s.S + ladder.PER_CIV * (s.n_majors - 1)
              + ladder.PER_CITY * s.RC + ladder.ESCALATORS
              + 2 * (s.civ_techs.shape[2] + s.civ_civics.shape[2]) + ladder.CTX_SEAT)
@@ -246,7 +246,7 @@ def main() -> None:
     assert [int(sgal[0, 0]), int(sgal[0, 1])] == [gal, -1]
 
     print("  f production verb OK (class priority, no capital gate, "
-          "lowest-index within class, B-10 army lanes, counters threaded, "
+          "lowest-index within class, army lanes, counters threaded, "
           "engineer/galley tiers)")
 
     # ---- g) the UNIT-ORDERS verb --------------------------------------------

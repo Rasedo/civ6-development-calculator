@@ -355,7 +355,7 @@ class SimOrders:
         otherwise the surviving city with the HIGHEST population is
         re-crowned, ties to the EARLIEST array position (TS scans the array
         with a strict `>`). The scan order is the seat's cities-ARRAY order —
-        slot order for EVERY row under append+reclaim (#110).
+        slot order for EVERY row under append+reclaim.
 
         The PALACE BUILDING needs no write: both engines model it as a
         capital TERM (city_is_cap × the palace yield/housing/amenity terms),

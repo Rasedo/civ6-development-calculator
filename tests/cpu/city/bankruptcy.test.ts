@@ -7,7 +7,7 @@ import { spawnUnit } from '../../../cpu/core/units';
 // An insolvent treasury (after unit upkeep) disbands ONE unit per turn —
 // the priciest seat-0 unit, tie -> lowest id (oldest spawn). Inert at the gate
 // (play stays gold-positive), so these focused cases pin the semantics.
-describe('GV-5 bankruptcy', () => {
+describe('bankruptcy', () => {
   it('disbands one unit per turn: the priciest, tie -> lowest id', () => {
     const state = makeState();
     state.unitsMode = true;

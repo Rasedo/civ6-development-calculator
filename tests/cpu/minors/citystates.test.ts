@@ -227,7 +227,7 @@ describe('determinism', () => {
   });
 });
 
-describe('civ envoys and the suzerain contest (A-12)', () => {
+describe('civ envoys and the suzerain contest', () => {
   it('suzerainty needs strictly more envoys than every civ', () => {
     const state = makeState();
     const cityState = addCs(state, 8, 8, { type: 'trade', envoys: { [0]: 3 } });
@@ -259,7 +259,7 @@ describe('civ envoys and the suzerain contest (A-12)', () => {
   });
 });
 
-describe('B-21 suzerain unique perk (CITY_STATE_SUZERAIN_LIVE)', () => {
+describe('suzerain unique perk (CITY_STATE_SUZERAIN_LIVE)', () => {
   it('grants the shipped channel yield to a strict seat-0 suzerain', () => {
     const state = makeState();
     // Geneva (scientific) is a SHIPPED row -> science channel.

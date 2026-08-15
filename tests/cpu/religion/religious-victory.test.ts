@@ -32,7 +32,7 @@ function pressAll(state: ReturnType<typeof newGame>, g: number, amount = 500) {
   }
 }
 
-describe('B6-S3 religious victory', () => {
+describe('religious victory', () => {
   it('a civ religion predominant in every civ wins for THAT civ', () => {
     const state = newGame(1);
     const civSeat = (state.seats[(0) + 1] as Seat);

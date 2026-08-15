@@ -159,7 +159,7 @@ def main() -> None:
         assert not bool(sim7._golden_ded(0, pb)[0]), "PEN_BRUSH leaked to seat 0"
         print("  8 per-seat table: a dedication answers for the civ that committed it, and only that civ")
 
-    print("GOLDEN MOVE (B-24) OK — +2 MP for the seat that holds the dedication")
+    print("GOLDEN MOVE OK — +2 MP for the seat that holds the dedication")
 
 
 if __name__ == "__main__":

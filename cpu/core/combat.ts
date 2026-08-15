@@ -337,7 +337,7 @@ function sackCity(state: GameState, city: City | City, seat: number): void {
  * place so the assault kinds cannot drift:
  *
  * the wound penalty, the −5 river crossing, attacker veterancy
- * (a city is not a unit, so no defender xp), the #71 enhancer adder, and the
+ * (a city is not a unit, so no defender xp), the enhancer adder, and the
  * great-general aura.
  *
  * The enhancer adders apply to city assaults too — Crusade/Just
@@ -528,9 +528,8 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   // all — a city is taken by bringing its centre to 0 HP with a melee unit,
   // and civilians sheltering inside a city that falls simply vanish.
   //
-  // A LONE CIVILIAN used to draw the blow here, pinned to a hunted parity case
-  // (seed 9053 t204) rather than to a source. #113 checked the source: it is
-  // the city that defends its own tile.
+  // CIV 6: the CITY defends its own tile, so a lone civilian standing on it
+  // never draws the blow.
   if (seatTarget) {
     if (attacker.seat === seat && !civsAtWar(state, seatTarget.holder.seat, seat)) {
       return no(`You are at peace with ${seatTarget.holder.name} — declare war first.`);
@@ -868,7 +867,7 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
     }
   }
   revealAround(state, actor.seat, cityState.centerIndex, 3);
-  center.district = 'CITY_CENTER'; // #70 HUNT: the captureCityState twin — see the note there
+  center.district = 'CITY_CENTER'; // HUNT: the captureCityState twin — see the note there
   actor.cities.push({
     id,
     name: cityState.name,

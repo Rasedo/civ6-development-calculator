@@ -23,7 +23,7 @@ function resState(resource: string, improvement: string | null, ...techs: string
 const has = (state: ReturnType<typeof resState>['state'], r: string) =>
   civHasStrategic(state, 0, r);
 
-describe('B-9 civHasStrategic access', () => {
+describe('civHasStrategic access', () => {
   it('needs owned + resource + matching improvement + unpillaged', () => {
     const { state, tile } = resState('HORSES', 'PASTURE');
     expect(has(state, 'HORSES')).toBe(true);
@@ -57,7 +57,7 @@ describe('B-9 civHasStrategic access', () => {
   });
 });
 
-describe('B-9 build/purchase gating', () => {
+describe('build/purchase gating', () => {
   const ids = (tiles: ReturnType<typeof trainableUnits>) => tiles.map((d) => d.id);
 
   it('HORSEMAN retro-gate: tech alone is not enough without HORSES access', () => {
@@ -93,7 +93,7 @@ describe('B-9 build/purchase gating', () => {
   });
 });
 
-describe('B-9/B-10 new-unit build path', () => {
+describe('new-unit build path', () => {
   it('a gated SWORDSMAN builds and updates city-defense best-melee', () => {
     const { state, city } = resState('IRON', 'MINE', 'IRON_WORKING');
     expect(queueUnit(state, city.id, 'SWORDSMAN', 0).ok).toBe(true);

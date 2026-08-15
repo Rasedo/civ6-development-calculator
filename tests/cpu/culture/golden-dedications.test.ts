@@ -10,9 +10,8 @@ import type { GameState } from '../../../cpu/core/types';
 // bonus, so each fires ONLY at civAges === 2 and only for a committed pick.
 //
 // The two MOVEMENT halves (Monumentality's +2 Builders, Exodus's +2 religious
-// units) are DEFERRED to the seat unification (task #51, Round 5) — they need
-// ONE movement-point model to be expressible on both engines at all. See the
-// note above goldenDedication in src/core/eras.ts.
+// units) ride `goldenMoveBonus` off the one resident MP pool — see the note
+// above it in cpu/core/eras.ts.
 
 function golden(kind: number): GameState {
   const state = makeState();
@@ -21,7 +20,7 @@ function golden(kind: number): GameState {
   return state;
 }
 
-describe('B-24: golden-age dedication bonuses', () => {
+describe('golden-age dedication bonuses', () => {
   it('FREE_INQUIRY deepens TECH boosts, PEN_BRUSH deepens CIVIC boosts', () => {
     const fi = golden(DED_FREE_INQUIRY);
     expect(goldenBoostBonus(fi, 0, false)).toBeCloseTo(0.1); // techs

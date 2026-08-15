@@ -82,7 +82,7 @@ function addCiv(state: GameState, col: number, row: number, name: string): Seat 
   return civ;
 }
 
-describe('B-20 (#79): great works and relics ride a city transfer', () => {
+describe('great works and relics ride a city transfer', () => {
   it('a flipped civ city carries its relic and great works to the new owner', () => {
     const state = makeState();
     const from = addCiv(state, 4, 4, 'Rome');

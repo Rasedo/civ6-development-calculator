@@ -144,7 +144,7 @@ class BatchEnv:
         need = s._growth_needed(pop).clamp(min=1)
         denom = s.city_cost[:, row].clamp(min=1)
         # OWNED TILES per city: `tile_seat` names the holding row and
-        # `tile_city` the PERSISTENT id within it (#110) — the `ownerSeat` /
+        # `tile_city` the PERSISTENT id within it — the `ownerSeat` /
         # `ownerCity` pair TS filters on, one derivation for every seat.
         owned = (
             (s.tile_city.unsqueeze(1) == s.city_id[:, row, :C].unsqueeze(2))
@@ -218,7 +218,7 @@ class BatchEnv:
         #
         # The last four are the DoW terms. They were a single pairwise sextet
         # in the ctx block, measured against one fixed seat, which is why a
-        # policy could not choose WHICH opponent to declare on (#111 s6). RAW
+        # policy could not choose WHICH opponent to declare on. RAW
         # and unscaled, like the ctx block and for the same reason.
         opp_cols = []
         for o in range(s.n_majors):
@@ -256,7 +256,7 @@ class BatchEnv:
                           s._eff_cost(s.rules_dev.c_cost.unsqueeze(0).expand(B, -1), s.civ_civic_boosted[:, row], row, is_civic=True).to(d) / 1000.0,
                           # PARKED progress per option, on the cost blocks'
                           # scale so the two read as a ratio. Switching is a
-                          # legal move (#72), and it cannot be decided from the
+                          # legal move, and it cannot be decided from the
                           # cost alone: what a seat has already sunk into an
                           # abandoned tech is the other half of the comparison.
                           # The CURRENT item reads 0 here — its progress is the

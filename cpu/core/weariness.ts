@@ -19,9 +19,8 @@ import { civEraIndex } from './city';
  * 50 a turn. A phoney war is free and a bloody one is ruinous, and the
  * old model had exactly no way to tell them apart.
  *
- * Everything here takes a SEAT. There is no seat-0 function and no other seat
- * function — seat 0's endTurn and each seat's block call the same three
- * entry points, which is the whole point of #51.
+ * Everything here takes a SEAT: one set of three entry points, called from
+ * every seat's block.
  */
 
 /** Barbarians neither accrue weariness nor inflict it.

@@ -91,7 +91,7 @@ export function grantCivics(state: GameState, ...ids: string[]): void {
 
 /**
  * Found a test city at a tile: in units mode a SETTLER is spawned on the tile
- * first (founding consumes it — the #71 rule); outside units mode founding is
+ * first (founding consumes it); outside units mode founding is
  * free. Throws on refusal so a bad setup fails loudly, not three asserts later.
  */
 export function settleAt(state: GameState, tileIndex: number, seat = 0): City {
@@ -103,7 +103,7 @@ export function settleAt(state: GameState, tileIndex: number, seat = 0): City {
 
 /**
  * Found the seat's first city at the LEGAL tile closest to the map centre
- * (ties by index) — the advisor's scored pick is gone (#100); a test setup
+ * (ties by index) — the advisor's scored pick is gone; a test setup
  * needs a decent deterministic capital, not a good one.
  */
 export function settleFirstCity(state: GameState, seat = 0): City {

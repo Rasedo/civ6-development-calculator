@@ -296,7 +296,6 @@ export function cliffBlocks(state: GameState, a: Tile, b: Tile, unit?: { seat: n
  *
  * Callers must filter this at CANDIDATE level, not use it as a halt: a walker
  * routes AROUND a cliff to its next-best neighbour (the GPU's step_ok mask).
- * (#51 still owes us ONE mover; this at least makes the RULE single-sourced.)
  */
 export function cliffBlocksStep(
   state: GameState,
@@ -442,8 +441,7 @@ export type StepOutcome =
  *
  * FOUR sites computed this expression — stepUnit, refreshUnits,
  * seatPhase and spawnUnit — and a bonus added to one of them is a bonus the
- * other three silently disagree about. That is exactly how the #79 attempt
- * failed. The GPU's twin is `_full_mp`.
+ * other three silently disagree about. The GPU's twin is `_full_mp`.
  */
 export function unitFullMoves(state: GameState, unit: { type: string; seat: number; embarked?: boolean }): number {
   const def = UNITS[unit.type];

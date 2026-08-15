@@ -1,6 +1,6 @@
 /**
  * THE EMPIRE SCORE — the RL reward, and the one thing that outlived the
- * UI-era advisor family (#100): `rules.score` ships these weights to the GPU,
+ * UI-era advisor family: `rules.score` ships these weights to the GPU,
  * every consumer reads `empireScore`, and the
  * two engines must agree on it bit for bit.
  */

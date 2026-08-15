@@ -33,11 +33,11 @@ def main() -> None:
     # --- 1) the plane exists, is peace-by-default and survives a round trip --
     sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     # A (seat, city-state) war is a cell of the war matrix and has no second
-    # name (#111): what is registered and what carries the state through a
+    # name: what is registered and what carries the state through a
     # round trip are the same tensor, so the pair cannot drift.
     assert "war" in _MUTABLE, "the war matrix must be registered in _MUTABLE"
     assert not hasattr(sim, "citystate_atwar"), (
-        "the seat-0/city-state war VIEW must stay deleted — one name per fact (#111)"
+        "the seat-0/city-state war VIEW must stay deleted — one name per fact"
     )
     assert sim.war.shape == (sim.B, sim.NS, sim.NS), f"war shape {tuple(sim.war.shape)}"
     cs_lo = sim.row_of(100 + 0)
@@ -131,7 +131,7 @@ def main() -> None:
     assert bool(s2.war[b, 0, s2.row_of(100 + cs)]), "a non-suzerain's peace must NOT free the city-state"
     print("  c suzerain release: war ends, BOTH clock cells reset, -%d ww OK" % shed)
 
-    print("citystate_war_test OK — A-18 seat 0 <-> city-state war gates the attack mask")
+    print("citystate_war_test OK — a major<->city-state war gates the attack mask")
 
 
 if __name__ == "__main__":

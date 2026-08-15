@@ -416,7 +416,7 @@ def poke_transfer(rules, path):
         "the center tile must re-seat to the receiver")
     rekeyed = (sim.tile_city[0] == id_next) & (sim.tile_seat[0] == civ_only_to + 1)
     assert int(rekeyed.sum()) == n_own, (
-        f"A-17: exactly the flipping city's {n_own} tiles must re-key to the receiver ({int(rekeyed.sum())})"
+        f"exactly the flipping city's {n_own} tiles must re-key to the receiver ({int(rekeyed.sum())})"
     )
     # the transfer bumps once for itself, and AGAIN when the city that left was
     # the losing seat's capital and the Palace relocates to its highest-
@@ -465,7 +465,7 @@ def main() -> None:
     poke_ww_differential(rules, path)
     poke_transfer(rules, path)
     poke_float32(rules, path)
-    print("GEOPOLITICS (A-19/B-33/B-22) POKES OK")
+    print("GEOPOLITICS POKES OK")
 
 
     # --- seat 0's grievance twin ---------------------------------------------

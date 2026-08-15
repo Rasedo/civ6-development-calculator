@@ -178,7 +178,7 @@ describe('regional yield channel, via seatCityYields', () => {
     expect(prodPillaged).toBe(prodOut);
   });
 });
-describe('B9-R3 PALACE grant on founding and on capture', () => {
+describe('PALACE grant on founding and on capture', () => {
   it("a civ's FIRST city carries the PALACE", () => {
     const game = createGame({ width: 44, height: 26, seed: 3, withResources: true, withWonders: true, opponents: true });
     expect((game.seats.length - 1)).toBeGreaterThanOrEqual(1);
@@ -201,7 +201,7 @@ describe('B9-R3 PALACE grant on founding and on capture', () => {
     expect(second.buildings).not.toContain('PALACE');
   });
 
-  it('capture strips the PALACE but keeps other buildings (B-30)', () => {
+  it('capture strips the PALACE but keeps other buildings', () => {
     const state = makeState();
     const civ = addCiv(state, 6, 6);
     civ.cities[0].buildings = ['PALACE', 'TEMPLE'];

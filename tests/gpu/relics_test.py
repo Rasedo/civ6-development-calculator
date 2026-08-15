@@ -42,7 +42,7 @@ def main() -> None:
 
     # --- 2) _MUTABLE registration + snapshot/restore ------------------------
     # ONE `city_relics` plane, addressed by row. The seat-0 and civ family
-    # views are gone (#111): a second name for a fact is what let a fork look
+    # views are gone: a second name for a fact is what let a fork look
     # like two different expressions, so their absence is the assertion.
     assert "city_relics" in _MUTABLE, "city_relics must be registered in _MUTABLE"
     for f in ("relics", "civ_city_relics"):

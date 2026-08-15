@@ -107,7 +107,7 @@ export interface SeatActionRecord {
   units: number[][];
   buy?: [number, number, number] | null;
   buyFaith?: [number, number][];
-  /** The city-state LEVY (#104): the CS index to levy, or null/absent.
+  /** The city-state LEVY: the CS index to levy, or null/absent.
    * Gold, but NOT the one-gold-purchase slot — a levy is a diplomacy
    * action and rides beside `buy`, like real Civ 6. */
   levy?: number | null;

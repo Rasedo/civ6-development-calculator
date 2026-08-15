@@ -32,7 +32,7 @@ function addEncampment(state: any, city: any, col: number, row: number) {
   return t;
 }
 
-describe('B-17 Encampment', () => {
+describe('Encampment', () => {
   it('specialist slot: SPECIALIST_YIELDS.ENCAMPMENT and citySpecialistSlots', () => {
     expect(SPECIALIST_YIELDS.ENCAMPMENT).toEqual({ production: 1, gold: 1 });
     const { state, city } = battlefield();

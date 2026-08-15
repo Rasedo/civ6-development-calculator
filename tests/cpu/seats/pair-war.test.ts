@@ -9,7 +9,7 @@ import { hostileRangedStrike, attackTargets } from '../../../cpu/core/combat';
 import { neighbors } from '../../../world/hex';
 import type { GameState } from '../../../cpu/core/types';
 
-// (task #59) — a civ's war with another civ is a real war.
+// — a civ's war with another civ is a real war.
 //
 // Two mechanics ignored it, both written before made civ↔civ war
 // exist, and both saying so in their own comments:

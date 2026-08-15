@@ -58,7 +58,7 @@ function addCiv(
 }
 
 /** The city half of addCiv, on its own so a test can give a civ a SECOND
- * city. #82 made that necessary: with no capital gate, the first idle city
+ * city. With no capital gate, the first idle city
  * always takes the settler, so exercising any later branch of the pick loop
  * needs a settler parked elsewhere. */
 function addCivCity(state: GameState, civ: Seat, col: number, row: number): City {
@@ -139,7 +139,7 @@ describe('civ placement and expansion', () => {
   });
 });
 
-describe('A-24 civ district/tile registry coherence', () => {
+describe('civ district/tile registry coherence', () => {
   it('stays coherent across a full game (every district/wonder tile registers to its civCity)', () => {
     const state = createGame({ width: 44, height: 26, seed: 7, withResources: true, withWonders: true, opponents: true });
     // Run many turns; the scan (called from seatPhase under the env flag)
@@ -282,7 +282,7 @@ describe('war and peace', () => {
   });
 });
 
-describe('AUDIT B-30: conquest keeps infrastructure', () => {
+describe('conquest keeps infrastructure', () => {
   it('capture carries districts + buildings + wonders MINUS PALACE, walls at outerHp 0', () => {
     const state = makeState();
     state.unitsMode = true;
@@ -406,7 +406,7 @@ describe('determinism', () => {
   });
 });
 
-describe('civ trade routes (A-11)', () => {
+describe('civ trade routes', () => {
   function addSecondCity(state: GameState, civ: Seat, col: number, row: number): City {
     const tile = tileAtCoords(state.map, col, row);
     const city: City = {
@@ -499,7 +499,7 @@ describe('civ trade routes (A-11)', () => {
   });
 });
 
-describe('civ CS trade routes (A-12b)', () => {
+describe('civ CS trade routes', () => {
   function addCs(state: GameState, col: number, row: number, opts: Partial<CityState> = {}): CityState {
     const center = tileAtCoords(state.map, col, row);
     const cityState: CityState = {
@@ -586,7 +586,7 @@ describe('civ CS trade routes (A-12b)', () => {
   });
 });
 
-describe('B-31 civilian capture', () => {
+describe('civilian capture', () => {
   it('a seat-0 melee captures a lone at-war civ civilian (charges kept, no advance)', () => {
     const state = makeState(makeMap(20, 20));
     state.unitsMode = true;

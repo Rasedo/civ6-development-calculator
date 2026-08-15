@@ -26,7 +26,7 @@ def main() -> None:
     civ_idx = {c["id"]: i for i, c in enumerate(rj["civics"])}
     gov_idx = {g["id"]: i for i, g in enumerate(rj["governments"])}
 
-    assert rj["governments"], "rules.json carries no governments table (A-7r exporter rows missing)"
+    assert rj["governments"], "rules.json carries no governments table (exporter rows missing)"
     assert len(rj["policies"]) >= 50, f"expected the full ~50+ policy catalog, got {len(rj['policies'])}"
     # URBAN_PLANNING must remain the first economic card (greedy slotting relies on it).
     econ = [p["id"] for p in rj["policies"] if p["kind"] == 1]
@@ -130,7 +130,7 @@ def main() -> None:
     # 5) The master switch ships LIVE — a real sim computes the mods; forcing
     #    the switch off in-memory silences them.
     sim2 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    assert sim2._gov_live is True, "A-7r ships LIVE (rules.governmentsLive True since #46r)"
+    assert sim2._gov_live is True, "governments ship LIVE (rules.governmentsLive True)"
     sim2._gov_has_effects = False  # force-off in memory
     cy, cpy, ch, cym, _s2, _e2, _tp2, *_ = sim2._gov_policy_mods(civics_with(["CODE_OF_LAWS"]))
     assert float(cy.abs().sum()) == 0.0 and float(cpy.abs().sum()) == 0.0 and float(ch.abs().sum()) == 0.0, "switch off => no mods"
@@ -204,7 +204,7 @@ def main() -> None:
         )
         assert not bool(simr.civ_civic_boosted[0, 0, mf_idx]), "a civ's inspiration landed on seat 0's row"
 
-    print("government_test OK — adoption, slot fill incl. wildcard overflow, housingAll, influence tier, B-13 new-card slotting + inert-channel proof + MEDIEVAL_FAIRES policies inspiration")
+    print("government_test OK — adoption, slot fill incl. wildcard overflow, housingAll, influence tier, new-card slotting + inert-channel proof + MEDIEVAL_FAIRES policies inspiration")
 
 
 if __name__ == "__main__":

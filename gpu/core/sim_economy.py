@@ -949,7 +949,7 @@ class SimEconomy:
         B, O = self.B, self.n_majors
         # Itinerant Preachers: per-religion range — base + the religion's
         # claimed enhancer's presR. A religion is keyed by its FOUNDER's row
-        # and every row can claim an enhancer (#73), which is what TS walks:
+        # and every row can claim an enhancer, which is what TS walks:
         # `for (const sx of state.seats) range[sx.seat] += presR`.
         RANGE = torch.full((B, O), int(self._pressure_range), dtype=torch.long, device=self.device)
         if self._enh_any:
@@ -981,7 +981,7 @@ class SimEconomy:
         adders. terr[b, g, t] = tile t is OWNED by a city following religion g;
         near3[b, g, t] = some city following g has its CENTER within
         justWarRange of t. ONE derivation per plane over rows 0..n_majors-1 of the merged
-        city block — `tile_city` holds PERSISTENT ids for every seat (#110), so
+        city block — `tile_city` holds PERSISTENT ids for every seat, so
         the id match that used to serve only the civ rows now answers for seat 0
         too. Keyed (turn, _eff_version):
         followedReligion moves once per turn (_spread_religious_pressure) and

@@ -1,7 +1,7 @@
 /**
- * Core rule constants and formulas (base Civ 6). #78 sourced the WATER-HOUSING
- * block against the wiki and found all five values already correct; the rest of
- * this file has NOT been swept yet.
+ * Core rule constants and formulas (base Civ 6). The WATER-HOUSING block is
+ * sourced against the wiki, all five values confirmed; the rest of this file
+ * has NOT been swept (AUDIT B-D).
  */
 
 export const MAP_SIZES = {

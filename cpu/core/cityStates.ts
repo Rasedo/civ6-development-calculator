@@ -302,10 +302,6 @@ export function declareWarOnCityState(state: GameState, cityStateId: number, sea
  * "will always accept an offer of peace without preconditions" — so there is no
  * acceptance roll here, only the cooldown. Peace resets the counter, so a
  * re-declaration must wait out the floor again.
- *
- * This is the return path `declareWarOnCityState` deliberately lacked when #45
- * landed the war state; the AUDIT entry there recorded "any peace-making path
- * back" as not modelled, and this closes it.
  */
 export function sueForPeaceWithCityState(state: GameState, cityStateId: number, seat: number): RuleResult {
   const cityState = (state.cityStates ?? []).find((c) => c.id === cityStateId);

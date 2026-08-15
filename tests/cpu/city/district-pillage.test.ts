@@ -28,7 +28,7 @@ function cityWithCampus(campusCol = 9) {
   return { state, city, campus };
 }
 
-describe('B-32 district pillage', () => {
+describe('district pillage', () => {
   it('darkens a pillaged district (adjacency + building yields) and repair restores it', () => {
     const { state, city, campus } = cityWithCampus();
     const adjacency = districtAdjacency(state.map, campus, 'CAMPUS');

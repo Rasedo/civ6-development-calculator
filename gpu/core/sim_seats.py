@@ -1807,8 +1807,8 @@ class SimSeats:
         city owning each (rows[i], tiles[i]) pair, -1 where the tile is not
         this row's.
 
-        `tile_city` stores the owning city's PERSISTENT id for every seat
-        (#110), so the column is that id's position in this row's ALIVE
+        `tile_city` stores the owning city's PERSISTENT id for every seat,
+        so the column is that id's position in this row's ALIVE
         registry; ids are per-seat monotonic, so an alive match is unique."""
         ids = self.city_id[rows, row]
         m = (
@@ -2375,7 +2375,7 @@ class SimSeats:
 
         Not a plain view of `tile_seat`: it answers a different question, not
         "whose tile" but "whose CITY", TS's `ownerCity` beside its `ownerSeat`.
-        `tile_city` stores the PERSISTENT city id for every seat (#110), while
+        `tile_city` stores the PERSISTENT city id for every seat, while
         the consumers speak column space — so the derivation matches the row's
         own id registry, ALIVE columns only (dead and never-founded columns
         hold stale ids and the zeros init; ids are per-seat monotonic, so an

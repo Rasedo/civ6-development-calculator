@@ -510,7 +510,7 @@ def main() -> None:
     poke_civ_palace(rules, rj, path)
     poke_gp_district_accrual(rules, rj, path)
     poke_float32_dtype(rules, path)
-    print("DISTRICT BREADTH (A-9) POKES OK")
+    print("DISTRICT BREADTH POKES OK")
 
 
 if __name__ == "__main__":

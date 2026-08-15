@@ -192,7 +192,7 @@ describe('trade routes', () => {
   });
 });
 
-describe('religious pressure spread (B-18)', () => {
+describe('religious pressure spread', () => {
   it("a holy city converts cities within range each turn; distant cities stay unconverted", () => {
     const state = makeState(makeMap(40, 20));
     state.sandbox = true;

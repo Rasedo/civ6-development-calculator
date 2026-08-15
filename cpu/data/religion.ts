@@ -13,7 +13,7 @@
  *
  * Per-city pressure, missionaries, apostles and theological combat are all
  * modelled on both
- * engines, and #76 made religious predominance a victory condition.
+ * engines, and religious predominance is a victory condition.
  */
 
 import type { GreatPersonClass, ResourceCategory, Yields } from '../core/types';
@@ -223,7 +223,7 @@ export const SPREAD_PRESSURE = 10;
 export const MISSIONARY_CAP = 2;
 export const APOSTLE_CAP = 1;
 /**
- * THE APOSTLE HUNT RECORD (#71; the buy is a wire decision since #104 —
+ * THE APOSTLE HUNT RECORD (the buy is a wire decision —
  * its old master switch is gone).
  *
  * The apostle unit, its religious strength, theological combat and the

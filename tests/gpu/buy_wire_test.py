@@ -3,7 +3,7 @@
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/buy_wire_test.py
 
-Spending is not a production column: it is the BUY WIRE (#103, #104) — kinds
+Spending is not a production column: it is the BUY WIRE — kinds
 0-7 on the seat action record, applied by ONE body, `_seat_buy_ladder(row,
 active)`, at the seatPhase position every seat shares. Nothing in it CHOOSES:
 each arm re-validates the intent the wire named against the LIVE state and

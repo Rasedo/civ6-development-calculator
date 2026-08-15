@@ -101,7 +101,7 @@ def poke_placement_rule(rules, path):
     sim.tile_city[0, T] = sib_id
 
     placed = sim._place_district(r + 1, j, di, torch.tensor([True]), 0, torch.tensor([T]))
-    assert not bool(placed[0]), "district placed on a SIBLING-registered tile (A-24 bug)"
+    assert not bool(placed[0]), "district placed on a SIBLING-registered tile"
     assert int(sim.district[0, T]) < 0, "sibling tile was paved despite the refusal"
     assert int(sim.city_dist_tile[0, r + 1, j, di]) < 0, "registry gained a sibling tile"
 
@@ -258,7 +258,7 @@ def poke_capture_luxury_pool(rules, path):
     sim._transfer_city(0, r + 1, j, 0, conquest=True)  # civ r is block row r+1
     c_new = int(sim.centre_slot_at[0, c_t])
     assert c_new >= 0 and bool(sim.city_alive[0, 0, c_new]), "capture did not land a seat-0 city"
-    assert int(sim.city_slot_at(0)[0, t]) == c_new, "the luxury tile did not re-own to the captured city (A-17 ring)"
+    assert int(sim.city_slot_at(0)[0, t]) == c_new, "the luxury tile did not re-own to the captured city (the ring)"
     after = float(sim._luxury_amenities(0, have, need).sum())
     assert after >= base + 1.0, f"captured improved luxury did not feed the seat-0 pool ({base} -> {after})"
     sim._check_rc_registry_invariant()  # the handover leaves the registry coherent
@@ -270,12 +270,12 @@ def main() -> None:
     paths = sorted(FIXTURES.glob("seed*.json"))
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
     path = paths[0]
-    print(f"civ_city_registry_test (A-24) on {path.name}")
+    print(f"civ_city_registry_test on {path.name}")
     poke_placement_rule(rules, path)
     poke_never_picks_sibling(rules, path)
     poke_invariant_scan(rules, path)
     poke_capture_luxury_pool(rules, path)
-    print("RC REGISTRY (A-24) POKES OK")
+    print("RC REGISTRY POKES OK")
 
 
 if __name__ == "__main__":

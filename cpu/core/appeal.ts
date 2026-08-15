@@ -1,6 +1,6 @@
 /**
  * Tile appeal: natural wonders and greenery raise it, heavy industry and
- * jungle/marsh lower it. Drives Neighborhood housing, and (since #71/#73) the
+ * jungle/marsh lower it. Drives Neighborhood housing, and the
  * Seaside Resort's gold and tourism.
  *
  * SOURCING SWEEP, verified against the Civilization wiki's

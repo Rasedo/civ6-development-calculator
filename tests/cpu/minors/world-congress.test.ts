@@ -34,7 +34,7 @@ function medieval(state: ReturnType<typeof newGame>) {
   for (const civSeat of state.seats.slice(1)) civSeat.research.techs.push('APPRENTICESHIP');
 }
 
-describe('B-22 world congress', () => {
+describe('world congress', () => {
   it('does not convene before the MEDIEVAL era', () => {
     const state = newGame(1);
     state.turn = CONGRESS_INTERVAL; // a session turn ...
@@ -102,7 +102,7 @@ describe('B-22 world congress', () => {
   });
 });
 
-describe('B-22/B-25 diplomatic victory', () => {
+describe('diplomatic victory', () => {
   it('20 points wins, for whichever seat holds them', () => {
     const state = newGame(1);
     seatOf(state, 0)!.diplomaticPoints = DIPLO_VICTORY_POINTS;

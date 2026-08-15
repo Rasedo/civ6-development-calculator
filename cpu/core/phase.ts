@@ -402,7 +402,7 @@ export function placeSeatDistrict(
  * EVERYTHING (unlock, one-per-world, placement): one-per-world is CROSS-SEAT,
  * so a column legal at record time can have been claimed by any civ by apply
  * time — the replay refuses rather than double-building. The capital gate
- * stays OUT: it is the scripted picker's heuristic (the #82 settler lesson),
+ * stays OUT: it is the scripted picker's heuristic,
  * and real Civ 6 lets any city raise any unlocked wonder. */
 export function placeSeatWonder(state: GameState, actor: Seat, civCity: City, def: BuiltWonderDef): boolean {
   const civ = actor.seat;
@@ -639,7 +639,7 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
   // apply_turn needed on the GPU side, and the second driven-parity red: every
   // comparison against a LIST is false, so nothing ever queued and the TS
   // queues flatlined while the economies agreed.
-  // v2 (#70 signature A): production is [[centreTile, col], ...] — the city
+  // v2: production is [[centreTile, col], ...] — the city
   // axis keyed by CENTRE TILE, because slot order and founding order diverge
   // under compaction/capture. Each engine resolves the centre to ITS city.
   const prodPairs = rec.production;
@@ -740,7 +740,7 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
 
 /** replay this seat's recorded UNIT orders.
  *
- * `rec.units` is one entry per STEP, because #90 made a unit's order a direction
+ * `rec.units` is one entry per STEP, because a unit's order is a direction
  * SEQUENCE — the GPU driver re-observes between steps (the observation is 1-hop)
  * and records what it chose each time, so a faithful replay walks the same steps
  * in the same order.
@@ -1113,7 +1113,7 @@ export function seatPhase(state: GameState): void {
       }
     }
 
-    // #104 kinds 4-6, the FAITH purchases — faith is its own currency, so
+    // kinds 4-6, the FAITH purchases — faith is its own currency, so
     // these ride BESIDE the gold buy, in the scripted ladder's own order
     // (worship saturates first, then ONE religious unit — missionary before
     // apostle). Each entry names its city by centre; the legality bodies
@@ -1468,8 +1468,8 @@ export function seatPhase(state: GameState): void {
 
     advanceGreatPeople(state, actor.seat);
 
-    // The BELIEF RACES — eager rules for EVERY seat row, seat 0 included
-    // (#73). Identities are POLICY draws from the open pools; every gate and
+    // The BELIEF RACES — eager rules for EVERY seat row. Identities are
+    // POLICY draws from the open pools; every gate and
     // draw mirrors the GPU's row-generic _seat_belief_claims (the
     // popen/ropen/eopen shapes), so the streams stay aligned. The open pools
     // are purely the claimed lists — every claim path (this block AND the

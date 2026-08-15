@@ -1581,10 +1581,6 @@
     "why": "the seat-axis per-city wonder registry (see city_dist_tile)."
    },
    {
-    "plane": "dscaffold_placed",
-    "why": "a per-scaffold-district placed latch; the placements themselves are on the tile plane and are covered."
-   },
-   {
     "plane": "d_static_adj",
     "why": "static per-tile district adjacency, mutated only when a founding clears a feature — derived from the map plus feat_stripped, both covered."
    }

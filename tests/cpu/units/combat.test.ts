@@ -73,7 +73,7 @@ describe('combat', () => {
   // wrong until t34 caught it — a hull spawns on WATER, and killing
   // an adjacent LAND unit never walks it ashore (tileFreeForUnit refuses land
   // to a naval unit, so meleeAttack's advance is skipped).
-  it('B-26: a coastal camp fields a barbarian hull, on water', () => {
+  it('a coastal camp fields a barbarian hull, on water', () => {
     const state = makeState(makeMap(20, 20));
     state.unitsMode = true;
     foundCity(state, tileAtCoords(state.map, 9, 9).index, 0);
@@ -92,7 +92,7 @@ describe('combat', () => {
     expect(isWater(state.map.tiles[galley!.tileIndex])).toBe(true);
   });
 
-  it('B-26: a barbarian hull kills ashore but never advances onto land', () => {
+  it('a barbarian hull kills ashore but never advances onto land', () => {
     const { state } = battlefield();
     const water = tileAtCoords(state.map, 11, 9);
     water.terrain = 'COAST';
@@ -190,7 +190,7 @@ describe('barbarians', () => {
 // clean way to test the CS terms is to read `diff` off the combat log with and
 // without an adjacent unit. FLANKING_CS·1 = +2 attacker CS = +20 on the mel
 // diff; SUPPORT_CS·1 = +2 defender CS = −20 on the mel/rng diff.
-describe('B-7 flanking & support', () => {
+describe('flanking & support', () => {
   const rollDiff = (tag: string, fn: () => void): number => {
     const log: string[] = [];
     (globalThis as any).__cbLog = log;
@@ -292,7 +292,7 @@ describe('B-7 flanking & support', () => {
   });
 });
 
-describe('B-4 XP & levels', () => {
+describe('XP & levels', () => {
   const rollDiff = (tag: string, fn: () => void): number => {
     const log: string[] = [];
     (globalThis as any).__cbLog = log;

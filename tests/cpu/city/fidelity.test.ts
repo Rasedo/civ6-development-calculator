@@ -60,7 +60,7 @@ describe('district cost scaling', () => {
     expect(itemCost(city.queue[0])).toBe(locked); // still the price it was queued at
   });
 
-  it('D-8: under-represented specialty types cost 40% less', () => {
+  it('under-represented specialty types cost 40% less', () => {
     const state = makeState(makeMap(16, 16));
     const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
     grantTechs(state, 'WRITING', 'ASTROLOGY'); // Campus + Holy Site unlocked → U = 2

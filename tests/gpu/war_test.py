@@ -49,7 +49,7 @@ def test_inert_when_off(rules, path):
     off. The gate does drive the column now — for seat 0 as for every row — so
     this pins the floor, not the gate."""
     sim = build(rules, path)
-    assert sim._rl_war_active, "V-W1 ships ACTIVE now"
+    assert sim._rl_war_active, "the war head ships ACTIVE"
     ref = build(rules, path)
     ref._rl_war_active = False
     for _ in range(30):

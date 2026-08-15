@@ -203,7 +203,7 @@ class SimPhase:
         """[B, RC] — seat row `row`'s governor-held cities for THIS turn, the
         loop-top governorPicks mirror. Rank the row's ALIVE cities on QUANTIZED
         milli loyalty (a raw-f64 ranking is float-association fragile), ties by
-        column index == TS array order (#110), and seat the top
+        column index == TS array order, and seat the top
         governorTitles(civics) of them. Read once per seat block, before any
         loyalty moves."""
         dev, B, RC = self.device, self.B, self.RC
@@ -805,7 +805,7 @@ class SimPhase:
         compaction preserves it exactly (the per-slot loops, the arange
         tie-breaks and empire-score's sequential association all see the
         same cities in the same order). tile_city needs no rebuild — it is
-        id-keyed for every seat (#110) — but centre_slot_at carries SLOT
+        id-keyed for every seat — but centre_slot_at carries SLOT
         VALUES, so live centres re-map through their row's inverse
         permutation. Runs at the step END like _reclaim_pool: the controlled
         head samples slot-keyed city actions from the PRE-step masks, so the
@@ -865,7 +865,7 @@ class SimPhase:
                     b, j, k = int(idx[0]), int(idx[1]), int(idx[2])
                     tile = int(reg[b, j, k])
                     raise AssertionError(
-                        f"A-24 registry incoherence: game={b} seat={row} slot={j} "
+                        f"registry incoherence: game={b} seat={row} slot={j} "
                         f"{name}[{k}] tile={tile} expected_id={int(self.city_id[b, row, j])} "
                         f"actual_city_tile_id={int(self.tile_city[b, tile])} "
                         f"tile_seat={int(self.tile_seat[b, tile])} turn={self.turn}"
