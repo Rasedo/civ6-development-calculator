@@ -614,7 +614,7 @@ export function assertCityRegistryCoherent(state: GameState): void {
         const t = state.map.tiles[tileIndex];
         if (!tileBelongsTo(t, civCity) || !tileOwnedByCiv(t, civ)) {
           throw new Error(
-            `A-24 registry incoherence: seat=${actor.seat} civCity.id=${civCity.id} ${kind}=${type} ` +
+            `registry incoherence: seat=${actor.seat} civCity.id=${civCity.id} ${kind}=${type} ` +
               `tile=${tileIndex} ownerSeat=${tileSeat(t)} ownerCity=${tileCity(t)} turn=${state.turn}`,
           );
         }

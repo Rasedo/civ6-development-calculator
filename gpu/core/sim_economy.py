@@ -897,7 +897,15 @@ class SimEconomy:
             self.district_complete[rows, bt] = False  # queued, not complete
             self.improvement[rows, bt] = -1           # queueDistrict clears it
             self.city_qtile[rows, row, j] = bt        # the completion target
-            self.city_dist_tile[rows, row, j, di] = bt  # the city registry, written at queue
+            # The city registry, written at queue. A REPEATABLE type keeps its
+            # FIRST tile: nothing reads the entry for its own sake (no
+            # buildings, no projects, no adjacency of its own), and
+            # `_district_counts` reads the tile plane for it.
+            if bool(self._is_repeatable[di]):
+                _held = self.city_dist_tile[rows, row, j, di]
+                self.city_dist_tile[rows, row, j, di] = torch.where(_held < 0, bt, _held)
+            else:
+                self.city_dist_tile[rows, row, j, di] = bt
             self._strip_feature_at(rows, bt)          # queueDistrict: tile.feature = null
             fresh_rs = (self.res_priority[rows, bt] == 1) & ~self.res_stripped[rows, bt]
             self.res_stripped[rows, bt] = self.res_stripped[rows, bt] | (self.res_priority[rows, bt] == 1)

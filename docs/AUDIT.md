@@ -65,10 +65,9 @@ nothing carries forward.
 | B-29r peace-treaty cooldown | 1 | a per-pair clock and its gate, both engines |
 | B-30r specialists | 6 | a mechanic neither engine has: wire column, assignment, yields |
 | B-31r trade-route tails | 6 | a Trader UNIT and a route wire verb |
-| B-32r one district per type | 3 | the registry's last dim becomes a SLOT space on both engines |
 | B-D unsourced data values | 5 | a residual CLASS: every invented magnitude, re-sourced |
-| **B. Fidelity vs real Civ 6** | **54** | |
-| **OPEN, TOTAL** | **59** | |
+| **B. Fidelity vs real Civ 6** | **51** | |
+| **OPEN, TOTAL** | **56** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -208,18 +207,6 @@ Civ 6 source or is recorded as unverifiable.
   eager rule on both engines, where a real player spends a Trader on a
   chosen pair. A route verb is P8-surface work. The destination-STORAGE
   divergence between the engines is A-31r, not this entry.
-- **B-32r. ONE district per (city, type), where Civ 6 allows several.** Real
-  Civ 6 lets a city build as many NEIGHBORHOODS as it has tiles for — they do
-  not count toward the population cap, which is the whole point of them. Both
-  engines refuse the second: the district REGISTRY's last dimension IS the
-  district catalog index (`city_dist_tile[b, row, j, di]`, `city.districts`
-  gated by `canPlaceDistrictIn`), so a second tile of the same type has
-  nowhere to go. Closing it means making that dimension a SLOT space — extra
-  slots for the types that repeat, with the per-slot tables (`_is_specialty`
-  and friends) widened to match, and `_transfer_city`'s registry rebuild made
-  slot-aware rather than keyed by `self.district[b, t]`. Roughly 35 GPU read
-  sites, all of the form `[..., di]`. Neighborhood is the only repeating type
-  in the catalog today, so the gap is exactly one district wide.
 - **B-D. UNSOURCED DATA VALUES — a residual class, not one item.**
   Mechanics are sourced item by item; the DATA layer largely is not, and a
   wrong CONSTANT passes every gate because both engines agree on the wrong
@@ -521,7 +508,7 @@ placement. Numbering restarts here — "watch first" below means THIS list.
    re-exported before anything runs. The column was pulled because the two
    engines queued different districts with it in; the cause found by reading
    was the `allowMultiple` gate — TS offered a SECOND Neighborhood where the
-   GPU's registry could not hold one. Both refuse it now (item 22). What was
+   GPU's registry could not hold one. Both ALLOW it now (item 22). What was
    checked and already agrees: the cost curve (`district_cost.base` 32 =
    `round(54 × GAME_SPEED)`), the discount (all-False for a non-specialty
    type on both), the specialty CAP (`floor((pop-1)/3)+1` both), the appeal
@@ -532,11 +519,23 @@ placement. Numbering restarts here — "watch first" below means THIS list.
    civic, so nothing reaches the column before then and an early-turn
    district red is NOT this.
 
-22. NO SEAT MAY BUILD A SECOND DISTRICT OF ONE TYPE — a deliberate
-   deviation, now shared. `canPlaceDistrictIn` dropped its `!allowMultiple`
-   guard and refuses unconditionally, matching the GPU's registry, and the
-   dead `allowMultiple` export key is gone. In real Civ 6 this only binds
-   the Neighborhood; recorded as B-32r.
+22. A CITY MAY HOLD SEVERAL NEIGHBORHOODS, on both engines. `allowMultiple`
+   is a live rule now rather than an exported flag nobody read: TS gates
+   `canPlaceDistrictIn` on it and the GPU reads it into `_is_repeatable`,
+   which feeds `_district_slot_free` at both the mask and the applier. THE
+   REGISTRY DID NOT GROW. `city_dist_tile[..., di]` still holds ONE tile per
+   type and now means "the FIRST of them" — nothing reads a Neighborhood's
+   entry for its own sake (it has no buildings, no projects, no adjacency and
+   zero maintenance), and the registry is a digest EXCLUSION on both sides, so
+   the two engines need not agree on which tile it names. What had to move is
+   `_district_counts`: the ALL count adds the tile-plane total for repeatable
+   types and subtracts the one registry entry back out, so it matches TS
+   walking `city.districts`. The specialty twin stays a registry read, held by
+   a load-time refusal of any repeatable type that counts toward the cap.
+   WATCH: housing and the amenity/housing "if N districts" thresholds are the
+   consumers of that count, so a second Neighborhood shows up there first.
+   The queue-time write and `_transfer_city`'s rebuild both keep the FIRST
+   tile; last-wins would have been equivalent for every non-repeating type.
 
 23. `WAR_MIN_TURNS` 14 -> 10, the sourced Civ 6 value. Both engines read it
    from rules.json, so they move together, but every war in every seed now

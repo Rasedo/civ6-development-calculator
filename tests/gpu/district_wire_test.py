@@ -15,7 +15,9 @@ What this lane holds:
   * the removable-feature TECH gate: a district paves its tile, so a feature
     still standing on it must be one this seat could clear;
   * the record round-trips — `_extract_record` writes the tile as the pair's
-    third element and `replay_seat` puts it back on the plane.
+    third element and `replay_seat` puts it back on the plane;
+  * a REPEATABLE district (`allowMultiple`) goes down twice in one city and
+    both are counted, where a plain one is refused the second time.
 """
 
 from __future__ import annotations
@@ -174,9 +176,65 @@ def main() -> None:
     assert int(back.city_dist_tile[0, row, j, di]) == t6, \
         "the replay put the district somewhere other than the recorded tile"
 
+    # --- 7) a REPEATABLE district goes down twice; a plain one does not -----
+    #   CIV 6 lets a city hold several Neighborhoods. The registry keeps ONE
+    #   tile per type, so the second is carried by the tile plane and counted
+    #   there — and the non-repeatable control is what proves the gate is the
+    #   `allowMultiple` flag rather than a hole in the harness.
+    rep = next(((k, d) for k, (d, _u, _c, _p) in enumerate(sim._scaffold)
+                if bool(sim._is_repeatable[d])), None)
+    assert rep is not None, "no repeatable district in the scaffold — this section proves nothing"
+    si_r, di_r = rep
+
+    def place_twice(s, si_x: int, di_x: int, complete_first: bool):
+        """Queue that column twice on one city, each on its own tile. Returns
+        (first tile, second tile or -1 if the engine refused)."""
+        _di, ut, uc, plc_x = s._scaffold[si_x]
+        if ut >= 0:
+            s.civ_techs[0, row, ut] = True
+        if uc >= 0:
+            s.civ_civics[0, row, uc] = True
+        s.seat_ext[0, row] = True
+        out = []
+        for _ in range(2):
+            e = s._district_elig(row, j, di_x, plc_x)
+            t = int(ladder.pick_district_tile(e, s.district_rank_adj(di_x, plc_x))[0])
+            if t < 0:
+                out.append(-1)
+                break
+            dt = torch.full((1, s.RC, len(s._scaffold)), -1, dtype=torch.long)
+            dt[0, j, si_x] = t
+            pr = torch.full((1, s.RC), -1, dtype=torch.long)
+            pr[0, j] = s.DISTRICT_BASE + si_x
+            s.city_current[0, row, j] = -1
+            s.apply_seat_actions(row, production=pr, production_tile=dt)
+            s._seat_record_apply(row, torch.ones(1, dtype=torch.bool))
+            took = int(s.city_current[0, row, j]) == s.DISTRICT_BASE + si_x
+            out.append(t if took else -1)
+            if took and complete_first:
+                s.district_complete[0, t] = True
+        return out
+
+    two = build(rules, path)
+    base_all = int(two._district_counts(row)[0][0, j])
+    a, b = place_twice(two, si_r, di_r, complete_first=True)
+    assert a >= 0 and b >= 0 and a != b, f"the repeatable district did not go down twice: {a}, {b}"
+    assert int(two.district[0, a]) == di_r and int(two.district[0, b]) == di_r, "a tile was not paved"
+    assert int(two.city_dist_tile[0, row, j, di_r]) == a, "the registry did not keep its FIRST tile"
+    assert int(two._district_counts(row)[0][0, j]) == base_all + 2, \
+        "completedDistrictCount missed the second one — the tile-plane term is not counting"
+
+    one = build(rules, path)
+    si_p, di_p = next((k, d) for k, (d, _u, _c, p) in enumerate(one._scaffold)
+                      if p == 0 and not bool(one._is_repeatable[d]))
+    c, d2 = place_twice(one, si_p, di_p, complete_first=True)
+    assert c >= 0, "the control district did not go down even once"
+    assert d2 < 0, f"a NON-repeatable district went down twice (tiles {c}, {d2})"
+
     print("district_wire_test OK — ladder key == the old engine key, no tile places nothing, "
           "an ineligible tile is refused, a suboptimal one is honoured, the feature-tech gate "
-          "holds, and the tile round-trips through the record")
+          "holds, the tile round-trips through the record, and a repeatable district goes down "
+          "twice where a plain one is refused")
 
 
 if __name__ == "__main__":

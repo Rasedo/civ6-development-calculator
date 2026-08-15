@@ -66,7 +66,7 @@ class SimSeats:
                 spec_cnt = ((self.city_dist_tile[:, row, j] >= 0) & self._is_specialty).sum(dim=1)
                 for si, (di, utech, uciv, plc) in enumerate(self._scaffold):
                     has_tech = self.civ_techs[:, row, utech] if utech >= 0 else (self.civ_civics[:, row, uciv] if uciv >= 0 else torch.ones(B, dtype=torch.bool, device=dev))
-                    not_owned = self.city_dist_tile[:, row, j, di] < 0
+                    not_owned = self._district_slot_free(row, j, di)
                     under_cap = (spec_cnt < cap_max) if bool(self._is_specialty[di]) else torch.ones(B, dtype=torch.bool, device=dev)
                     can_place = self._district_elig(row, j, di, plc).any(dim=1)
                     ok_d[:, si] = has_tech & not_owned & under_cap & can_place
@@ -763,7 +763,7 @@ class SimSeats:
                                       else torch.ones(self.B, dtype=torch.bool, device=self.device)))
                     spec_si = bool(self._is_specialty[di])
                     under_cap = (spec_cnt < cap_j) if spec_si else torch.ones_like(want_d)
-                    want_d = want_d & has_tech & (reg_j[:, di] < 0) & under_cap
+                    want_d = want_d & has_tech & self._district_slot_free(row, j, di) & under_cap
                     if not bool(want_d.any()):
                         continue
                     disc = self._district_discounted(row, di)
@@ -1601,15 +1601,39 @@ class SimSeats:
             am = am + hf * float(self.rules.b_amenities[n])
         return None if y6 is None else (y6, am)
 
+    def _district_slot_free(self, row: int, j: int, di: int) -> torch.Tensor:
+        """canPlaceDistrictIn's one-per-city arm, [B]. A REPEATABLE type is
+        never blocked by an existing one — CIV 6 lets a city hold several
+        Neighborhoods, which is why they sit outside the population cap."""
+        if bool(self._is_repeatable[di]):
+            return torch.ones(self.B, dtype=torch.bool, device=self.device)
+        return self.city_dist_tile[:, row, j, di] < 0
+
     def _district_counts(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         """[B, cols] × 2 for seat row `row` — completedDistrictCount(city,
-        false) and its specialtyOnly twin, off the city district REGISTRY
-        (`city.districts`). CITY_CENTER lives outside the placeable catalog, so
-        the registry already applies the TS filter's first arm."""
+        false) and its specialtyOnly twin. CITY_CENTER lives outside the
+        placeable catalog, so the registry already applies the TS filter's
+        first arm.
+
+        The registry holds ONE tile per type, so a REPEATABLE type is counted
+        off the TILE PLANE and its single registry entry subtracted back out;
+        TS walks `city.districts`, which lists every one. A repeatable type is
+        never specialty (asserted at load), so the specialty twin stays a
+        registry read."""
         cols = self.RC
         reg = self.city_dist_tile[:, row, :cols]
         comp = (reg >= 0) & self.district_complete.gather(1, reg.clamp(min=0).reshape(self.B, -1)).reshape_as(reg)
-        return comp.sum(dim=2), (comp & self._is_specialty.reshape(1, 1, -1)).sum(dim=2)
+        all_n = comp.sum(dim=2)
+        spec_n = (comp & self._is_specialty.reshape(1, 1, -1)).sum(dim=2)
+        if self._rep_any:
+            rep_t = (self.district >= 0) & self.district_complete \
+                & self._is_repeatable[self.district.clamp(min=0)]  # [B, T]
+            if bool(rep_t.any()):
+                ids = self.city_id[:, row, :cols]
+                alive = self.city_alive[:, row, :cols]
+                hit = rep_t.unsqueeze(2) & (self.tile_city.unsqueeze(2) == ids.unsqueeze(1)) & alive.unsqueeze(1)
+                all_n = all_n + hit.sum(dim=1) - (comp & self._is_repeatable.reshape(1, 1, -1)).sum(dim=2)
+        return all_n, spec_n
 
     def _follower_live(self, row: int) -> bool:
         return self._bel_any and (self._b18_couple or self._seat_has_beliefs(row))
@@ -1927,7 +1951,9 @@ class SimSeats:
         live_ring = owned & (self.district[b] >= 0) & self.district_complete[b]
         self.city_dist_tile[b, dst_row, col, :] = -1
         for _t in live_ring.nonzero(as_tuple=True)[0].tolist():
-            self.city_dist_tile[b, dst_row, col, int(self.district[b, _t])] = _t
+            _di = int(self.district[b, _t])
+            if int(self.city_dist_tile[b, dst_row, col, _di]) < 0:  # a repeatable type keeps its first
+                self.city_dist_tile[b, dst_row, col, _di] = _t
         dead_ring = owned & (self.district[b] >= 0) & ~self.district_complete[b]
         self.district_dead[b] = (self.district_dead[b] | dead_ring) & ~live_ring
         # Wonders are keyed by wonder index -> tile and carry no completeness

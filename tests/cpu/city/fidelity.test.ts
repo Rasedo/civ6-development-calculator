@@ -113,6 +113,29 @@ describe('appeal & neighborhoods', () => {
     // placing the district may not change the tile's own appeal inputs
     expect(computeHousing(state, city) - before).toBe(expected);
   });
+
+  it('a city may hold SEVERAL neighborhoods, and each pays its own appeal', () => {
+    const state = makeState(makeMap(16, 16));
+    state.sandbox = true;
+    const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
+    expandBorders(state, city, 2);
+    city.population = 7; // specialty cap 3, so the CAMPUS control below is refused
+                         // by the one-per-city rule and not by the cap
+    const first = tileAtCoords(state.map, 10, 8);
+    const second = tileAtCoords(state.map, 8, 10);
+    const before = computeHousing(state, city);
+    const want = appealTier(tileAppeal(state.map, first)).housing
+      + appealTier(tileAppeal(state.map, second)).housing;
+
+    expect(queueDistrict(state, city.id, 'NEIGHBORHOOD', first.index, 0).ok).toBe(true);
+    expect(queueDistrict(state, city.id, 'NEIGHBORHOOD', second.index, 0).ok).toBe(true);
+    expect(city.districts.filter((d) => d.type === 'NEIGHBORHOOD').length).toBe(2);
+    expect(computeHousing(state, city) - before).toBe(want);
+
+    // the control: a one-per-city type is still refused the second time
+    expect(queueDistrict(state, city.id, 'CAMPUS', tileAtCoords(state.map, 7, 8).index, 0).ok).toBe(true);
+    expect(queueDistrict(state, city.id, 'CAMPUS', tileAtCoords(state.map, 8, 7).index, 0).ok).toBe(false);
+  });
 });
 
 describe('maintenance', () => {

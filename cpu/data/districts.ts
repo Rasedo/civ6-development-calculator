@@ -44,6 +44,9 @@ export interface DistrictDef {
   color: string;
   cost: number;
   countsTowardLimit: boolean;
+  /** A city may hold SEVERAL of this type (CIV 6: the Neighborhood, which is
+   *  why it does not count toward the population cap). Absent means one. */
+  allowMultiple?: boolean;
   adjacencyYield?: YieldKey;
   adjacency: AdjacencyRule[];
   housing: number;
@@ -226,6 +229,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     color: '#7c8b4f',
     cost: 54,
     countsTowardLimit: false,
+    allowMultiple: true,
     adjacency: [],
     housing: 0, // appeal-based (2-6), computed from the tile it sits on
     placement: {},

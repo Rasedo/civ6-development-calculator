@@ -908,6 +908,14 @@ class SimInit:
         # Which district types count toward the specialty cap (Aqueduct/Neighborhood
         # do NOT). Aqueduct also carries housing, not an adjacency yield.
         self._is_specialty = torch.tensor([bool(d.get("countsTowardLimit", True)) for d in self.districts_cat], dtype=torch.bool, device=device)  # [nD]
+        # Types a city may hold SEVERAL of (CIV 6: the Neighborhood). The
+        # registry keeps ONE tile per type, so these are counted off the tile
+        # plane in `_district_counts`; the registry entry is the first of them.
+        self._is_repeatable = torch.tensor([bool(d.get("allowMultiple", 0)) for d in self.districts_cat], dtype=torch.bool, device=device)  # [nD]
+        self._rep_any = bool(self._is_repeatable.any())
+        if self._rep_any and bool((self._is_repeatable & self._is_specialty).any()):
+            raise ValueError("a repeatable district that counts toward the specialty cap: "
+                             "the cap and the discount both read the registry, which holds one tile per type")
         self._aqueduct_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "AQUEDUCT"), -1)
         self._d_unlock_t = torch.tensor([int(d.get("unlockTech", -1)) for d in self.districts_cat], dtype=torch.long, device=device)
         self._d_unlock_c = torch.tensor([int(d.get("unlockCivic", -1)) for d in self.districts_cat], dtype=torch.long, device=device)

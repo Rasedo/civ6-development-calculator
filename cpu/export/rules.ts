@@ -576,6 +576,7 @@ export function buildRules() {
         housing: d.housing,
         maintenance: ['CITY_CENTER', 'NEIGHBORHOOD', 'AQUEDUCT', 'COMMERCIAL_HUB', 'HARBOR'].includes(id) ? 0 : 1, // CH+Harbor exempt (real Civ 6)
         countsTowardLimit: d.countsTowardLimit ? 1 : 0,
+        allowMultiple: d.allowMultiple ? 1 : 0,
         onCoastalWater: d.placement.onCoastalWater ? 1 : 0,
         reqAdjCenter: d.placement.requiresAdjacentCityCenter ? 1 : 0,
         reqWaterOrMountain: d.placement.requiresWaterSourceOrMountain ? 1 : 0,
