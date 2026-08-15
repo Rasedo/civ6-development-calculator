@@ -78,9 +78,10 @@ can be equally faithful to Civ 6 and still disagree with each other, and a
 gate red is the only thing that would say so.
 
 - **A-34r. The serve gate splits at TURN 1**, on `seat.milli` and
-  `tile.exact`, on every seed. Detail, and the one anomaly to explain
-  first, are under "The battery's open reds" at the bottom; the freeze
-  backlog above it is the list of places to look after that.
+  `tile.exact`, on every seed. The seat half is seed-constant on BOTH
+  engines, so it is one fixed difference readable off a single seed's seat
+  block; the tile half is per-world. Detail under "The battery's open reds"
+  at the bottom; the freeze backlog above it is where to look after that.
 
 Chapter A being SHORT still means only that this is what an instrument has
 found, never that the rest agrees.
@@ -658,13 +659,19 @@ The first full battery since the freeze left 22 lanes red out of 56. They
 are three families, and only the first is a parity question.
 
 **1. THE SERVE GATE, turn 1, every seed.** Two digest groups split:
-`seat.milli` and `tile.exact`. The GPU's `seat.milli` hash is IDENTICAL
-across all twelve seeds, which is itself a fact to explain before reading
-the divergence — twelve different worlds should not agree. `tile.exact`
-differs per seed, so that one carries real per-world data. Turn 1 means the
-divergence is in the OPENING, which is exactly the regime the settler-start
-fix just made reachable for the first time; read it before assuming any
-older backlog item.
+`seat.milli` and `tile.exact`. Turn 1 means the divergence is in the
+OPENING, which is exactly the regime the settler-start fix just made
+reachable for the first time; read it before assuming any older backlog
+item.
+
+The two halves want different tools. `seat.milli` is SEED-CONSTANT on both
+engines — every world hashes to GPU `038c8d3e532e1432` against TS
+`b6d5f4ac9e5ed653` — which is what per-seat scalars should look like before
+anything map-dependent has happened, and it means the divergence is ONE
+fixed difference the map cannot touch. Dump the seat block for a single
+seed and read it field by field; no bisect is needed. `tile.exact` differs
+per seed, so that half carries real per-world data and needs the gate to
+name a tile.
 
 **2. THE WORLD NO LONGER DEVELOPS ON ITS OWN, and ~12 pokes assume it does.**
 Both engines are decision-free without a record, so `sim.step()` founds
