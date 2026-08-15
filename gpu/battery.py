@@ -191,17 +191,17 @@ def main() -> int:
                 ("culture_victory", [py, "tests/gpu/culture_victory_test.py"], 4),  # the culture win, which the serve gate never reaches
                 ("relics", [py, "tests/gpu/relics_test.py"], 4),  # martyr relics — temple slots, faith + tourism
                 ("festival", [py, "tests/gpu/festival_test.py"], 4),  # Festival pays THREE GP classes at 0.11 (serve gate never reaches it)
-                ("citystate_war", [py, "tests/gpu/citystate_war_test.py"], 4),  # seat-0 <-> city-state war gates the attack mask
+                ("citystate_war", [py, "tests/gpu/cs_war_test.py"], 4),  # war with a city-state gates the attack mask
                 ("snapshot", [py, "tests/gpu/snapshot_restore_test.py"], 4),  # _MUTABLE round-trip + step determinism (the ONLY lane that restores)
                 ("naval", [py, "tests/gpu/naval_test.py"], 4),  # naval surfaces the serve gate never reaches
                 ("districts", [py, "tests/gpu/district_breadth_test.py"], 4),  # district catalog breadth
-                ("civ_city_registry", [py, "tests/gpu/civ_city_registry_test.py"], 4),  # civ district/tile registry consistency
+                ("city_registry", [py, "tests/gpu/rc_registry_test.py"], 4),  # district/tile registry consistency, every seat row
                 ("religion2", [py, "tests/gpu/religion2_test.py"], 4),  # missionary / enhancer / religious-victory surfaces
                 ("encampment", [py, "tests/gpu/encampment_test.py"], 4),  # Encampment strike + training XP + specialist surfaces
                 ("great_works", [py, "tests/gpu/great_works_test.py"], 4),  # Writer/Musician Great-Work slots + yield
                 ("gp_aura", [py, "tests/gpu/gp_aura_test.py"], 4),  # Great General/Admiral spawn/walk/aura/capture (GENERAL unreachable in the gate)
-                ("citystate_bonus", [py, "tests/gpu/citystate_bonus_test.py"], 4),  # CS envoy building re-key + suzerain perk (6-envoy tier unreachable in the gate)
-                ("citystate_verbs", [py, "tests/gpu/citystate_verbs_test.py"], 4),  # civ levy + civ city-state quests
+                ("citystate_bonus", [py, "tests/gpu/cs_bonus_test.py"], 4),  # CS envoy building re-key + suzerain perk (6-envoy tier unreachable in the gate)
+                ("citystate_verbs", [py, "tests/gpu/cs_verbs_test.py"], 4),  # levy + city-state quests
                 ("trade2", [py, "tests/gpu/trade2_test.py"], 4),  # international routes + route duration surfaces
                 ("geopolitics", [py, "tests/gpu/geopolitics_test.py"], 4),  # per-pair wars + casus belli + civ-to-civ city transfer
                 ("governors", [py, "tests/gpu/governors_test.py"], 4),  # era-score hooks + Ages loyalty modulation + governor anchors
@@ -212,8 +212,21 @@ def main() -> int:
                 ("seat_symmetry", [py, "tools/gpu/seat_symmetry_check.py"], 1),  # static — dangling attrs, the alias/_MUTABLE contract, the seat-fork allowlist
                 ("fort", [py, "tests/gpu/fort_test.py"], 4),  # Fort +4 defence — the serve gate never reaches it, so this lane is the only proof
                 ("ladder", [py, "tests/gpu/ladder_test.py"], 4),  # the shared decision ladder's own guard
+                ("food_order", [py, "tests/gpu/food_order_test.py"], 1),  # the farm-adjacency tier sits before the drought floor
+                ("sc_census", [py, "tests/gpu/statecompare_census_test.py"], 1),  # static — every _MUTABLE plane is compared or excused
             ],
         ]
+        # A lane that names a path nothing writes, or a test file no lane
+        # names, must be LOUD: a green battery over a shrunken lane list reads
+        # exactly like a green battery over all of them. Both directions.
+        _named = {a for L in lanes for s in L for a in s[1] if isinstance(a, str) and a.endswith(".py")}
+        _missing = sorted(p for p in _named if not (ROOT / p).exists())
+        _loose = sorted(str(p.relative_to(ROOT)).replace("\\", "/")
+                        for p in (ROOT / "tests" / "gpu").glob("*_test.py")
+                        if str(p.relative_to(ROOT)).replace("\\", "/") not in _named)
+        if _missing or _loose:
+            print(f"BATTERY LANE DRIFT — missing: {_missing or 'none'}; unregistered: {_loose or 'none'}")
+            return 1
         for L in lanes:
             if len(L) > 5:
                 L.sort(key=lambda s: POKE_COST.get(s[0], 30.0))

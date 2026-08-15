@@ -400,7 +400,8 @@ class SimOrders:
             # minor is encoded -(2+s) in every row's dest column, seat 0's too.
             dead_cs = self.seat_routes[b, :, :, 1] == -(2 + s)  # [NS, K]
             self.seat_routes[b] = torch.where(dead_cs.unsqueeze(2), torch.full_like(self.seat_routes[b], -1), self.seat_routes[b])
-            self.seat_route_dest[b] = torch.where(dead_cs, torch.full_like(self.seat_route_dest[b], -1), self.seat_route_dest[b])
+            self.seat_route_dseat[b] = torch.where(dead_cs, torch.full_like(self.seat_route_dseat[b], -1), self.seat_route_dseat[b])
+            self.seat_route_dcity[b] = torch.where(dead_cs, torch.full_like(self.seat_route_dcity[b], -1), self.seat_route_dcity[b])
             self.seat_route_exp[b] = torch.where(dead_cs, torch.full_like(self.seat_route_exp[b], -1), self.seat_route_exp[b])
             ring = (self.pair_dist[c_t] <= 2) & (self.tile_seat[b] == 100 + s)
             self.tile_seat[b] = torch.where(ring, torch.full_like(self.tile_seat[b], NO_SEAT), self.tile_seat[b])

@@ -1,7 +1,7 @@
 """City-state envoy/suzerain bonus self-test.
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
-    python tests/gpu/citystate_bonus_test.py
+    python tests/gpu/cs_bonus_test.py
 
 Scripted parity is the primary correctness bar; these pokes cover the part of
 the surface the gate reaches only partially (seat 0 rarely passes ~5 envoys
@@ -255,7 +255,7 @@ def main() -> None:
     paths = sorted(FIXTURES.glob("seed*.json"))
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
     p = paths[0]
-    print(f"citystate_bonus_test on {p.name}:")
+    print(f"cs_bonus_test on {p.name}:")
     test_catalog(rules, p)
     test_building_bonus(rules, p)
     test_building_pillage(rules, p)

@@ -48,10 +48,7 @@ nothing carries forward.
 
 | Open item | Weight | What the weight is for |
 |---|---|---|
-| A-29r cityYieldMult order | 2 | registry ordering; no colliding pair exists in the catalog today |
-| A-30r farm-adjacency order | 1 | construct note, unreachable as written |
-| A-31r intl route destination | 2 | the GPU route store is keyed by TILE where TS keys by (seat, city) |
-| **A. Engine vs engine** | **5** | |
+| **A. Engine vs engine** | **0** | no known member — see the chapter |
 | B-17r Encampment strikes | 1 | scoped out with ranged-vs-city; the rest of the district is done |
 | B-18r religion tails | 2 | complete on every seat; one latent lifecycle drift to hunt |
 | B-20r tourism tails | 7 | national parks, civ Archaeologists, theming, shipwrecks, digs |
@@ -67,7 +64,7 @@ nothing carries forward.
 | B-31r trade-route tails | 6 | a Trader UNIT and a route wire verb |
 | B-D unsourced data values | 5 | a residual CLASS: every invented magnitude, re-sourced |
 | **B. Fidelity vs real Civ 6** | **51** | |
-| **OPEN, TOTAL** | **56** | |
+| **OPEN, TOTAL** | **51** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -75,32 +72,18 @@ not add a "done" column back.
 
 ## A. Engine vs engine — where the two implementations can answer differently
 
-THE DIGEST IS THE ONLY INSTRUMENT FOR THIS CLASS. Both engines can be
-equally faithful to Civ 6 and still disagree with each other; a gate red is
-the only thing that would say so. None of these is a SEAT asymmetry —
-seat 0 rides the same machinery as every other row, and
-`tools/gpu/seat_symmetry_check.py` holds that with both allowlists empty.
-Each entry names its own reachability, because not one of the four is known
-to fire in a driven game today, which is exactly why they are still here.
+THE CHAPTER HAS NO KNOWN MEMBER, AND THAT IS A WEAK CLAIM. The digest is
+the only instrument for this class — both engines can be equally faithful to
+Civ 6 and still disagree with each other, and a gate red is the only thing
+that would say so. **No gate has run since the restructure.** So "empty"
+means every divergence anyone has yet FOUND by reading is closed; it does
+not mean the two engines agree. The first
+`python gpu/serve_gate.py --batched` run is what re-populates this chapter,
+and the freeze backlog below is the list of places to look first.
 
-- **A-29r. `cityYieldMult` cannot express BUILD order.** TS applies it in
-  `city.wonders` build order; the GPU registry is keyed by wonder id and
-  cannot, so two multipliers on the SAME channel in one city could
-  associate differently. REACHABILITY: no such pair exists in the catalog
-  today (Ruhr is production, Big Ben gold) — a third would make it live.
-- **A-30r. Farm-adjacency food is added post-selection** (every row —
-  `_rcy_food_plane` takes the row's own civics/techs), where
-  `tileYields` adds it BEFORE the drought floor. REACHABILITY: none as
-  written — the floor only bites at 0 base food and a FARM's own food is
-  >= 1 — so it is a construct note, not a live bug.
-- **A-31r. The international route destination is stored differently.**
-  The GPU keeps a TILE (`route_dest`); TS keys the route by
-  `(toSeat, toSeatCity)`. When another major CAPTURES the destination city,
-  TS's expiry filter drops the route and the GPU keeps paying it to the end
-  of its term. Route-store schema change on the GPU side. REACHABILITY:
-  unmeasured — the international leg was gate-unreachable under the old
-  decisions, and the exploration gating has moved the candidate set since,
-  so measure it at the hunt before assuming it is dead.
+What is NOT a source of new members: a seat asymmetry. Seat 0 rides the same
+machinery as every other row, and `tools/gpu/seat_symmetry_check.py` holds
+that with both allowlists empty.
 
 ## B. Fidelity vs real Civ 6 — where both engines agree on the wrong answer
 
@@ -544,6 +527,36 @@ placement. Numbering restarts here — "watch first" below means THIS list.
    shift; a divergence here is far more likely to be a second-order effect
    of the new cadence than a rule break. The `/14.0` in `observe` and
    `env.observe` is an observation SCALE, not this floor, and stays.
+
+24. AN INTERNATIONAL ROUTE IS KEYED BY (SEAT, CITY ID) ON BOTH ENGINES.
+   The GPU stored the destination CENTRE TILE, so a destination CAPTURED by
+   another major still read as a live centre and kept paying to the end of
+   its term; TS's `toSeatCity` lookup dropped it. The store is now
+   `seat_route_dseat` + `seat_route_dcity`, and every consumer —
+   the pick's already-connected test, `_seat_route_income`, and
+   `_expire_seat_routes` via the new `_route_dest_alive` — resolves the pair
+   among that seat's LIVING cities the way `cityTradeYields` does. The dest
+   CENTRE for the raid check now follows the lookup instead of a tile frozen
+   at creation. THIS ONE CHANGES BEHAVIOUR and the digest can see it:
+   `routeCount` moves the turn a destination flips, and the origin's gold
+   with it. Reachability is UNMEASURED — the international leg only fires
+   when a seat exhausts domestic + city-state destinations — so read the
+   route count before concluding the lane is dead.
+
+25. TWO ASSOCIATION FIXES WITH NO REACHABLE DELTA TODAY, listed so a future
+   catalog edit does not resurrect them silently.
+   (a) `completedWonders` now returns CATALOG order, not build order, so the
+   float products over it (`cityYieldMult`, `growthAllMult`) fold the way the
+   GPU's ascending wonder-index product does. Inert while each channel has at
+   most one multiplier — today Ruhr is production, Big Ben gold, the Campus
+   wonder science, and exactly one wonder carries `growthAllMult`. A SECOND
+   multiplier on any one channel makes the order load-bearing.
+   (b) The farm-adjacency tier is added BEFORE the fertility/drought tail
+   (`_food_base` + `_food_tail`, the tileYields order) instead of after
+   `_eff_food`. Inert because the drought floor only bites at 0 food and a
+   FARM's own food is 1, and because `validImprovementsIn` refuses every
+   improvement on a natural-wonder tile — the other side the old order got
+   wrong.
 
 STILL UNVERIFIED, and NOT changed on a guess: our feature-removal techs are
 Woods -> Mining and Marsh -> Irrigation. Rainforest -> Bronze Working checks

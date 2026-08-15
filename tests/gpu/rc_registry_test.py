@@ -1,7 +1,7 @@
 """Civ district/wonder placement rule + the machine-checked registry invariant.
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
-    $env:PYTHONUTF8='1'; python tests/gpu/civ_city_registry_test.py
+    $env:PYTHONUTF8='1'; python tests/gpu/rc_registry_test.py
 
 A civ district (and wonder) may only be placed on a tile whose registry entry
 (tile_city) is THIS city (civ_city_id) — not merely a tile owned by the civ. A
@@ -270,7 +270,7 @@ def main() -> None:
     paths = sorted(FIXTURES.glob("seed*.json"))
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
     path = paths[0]
-    print(f"civ_city_registry_test on {path.name}")
+    print(f"rc_registry_test on {path.name}")
     poke_placement_rule(rules, path)
     poke_never_picks_sibling(rules, path)
     poke_invariant_scan(rules, path)

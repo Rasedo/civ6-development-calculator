@@ -315,11 +315,22 @@ export function acquireTile(state: GameState, city: City, tileIndex: number): vo
 }
 
 
+/** Catalog position per wonder id — the index the exported `wonders.rows`
+ *  table is in, which is the order the GPU folds its per-wonder products in. */
+const WONDER_CATALOG_ORDER = new Map(Object.keys(BUILT_WONDERS).map((id, i) => [id, i]));
+
 function completedWonders(state: GameState, city: City) {
+  // CATALOG order, not build order. Two callers fold a FLOAT product over this
+  // list — `empireGrowthMult` over growthAllMult and `computeCityStats` over
+  // cityYieldMult — and the GPU's registry is keyed by wonder index and can
+  // only fold ascending, so two multipliers on one channel would otherwise
+  // associate differently on the two engines. Build order is not a Civ 6 fact;
+  // nothing in the game reads it.
   return city.wonders
     .filter((w) => state.map.tiles[w.tileIndex].builtWonderComplete)
-    .map((w) => ({ def: BUILT_WONDERS[w.id], tileIndex: w.tileIndex }))
-    .filter((w) => w.def);
+    .map((w) => ({ def: BUILT_WONDERS[w.id], tileIndex: w.tileIndex, idx: WONDER_CATALOG_ORDER.get(w.id) ?? 0 }))
+    .filter((w) => w.def)
+    .sort((a, b) => a.idx - b.idx);
 }
 
 export function empireGrowthMult(state: GameState, seat: number): number {

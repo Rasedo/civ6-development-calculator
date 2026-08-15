@@ -357,7 +357,12 @@ class SimInit:
         self.civ_cap_tile = torch.full((B, self.n_majors), -1, dtype=torch.long, device=device)
         k_routes = 1 + int(self.rules.seats.get("maxCities", 6)) + 2 + max(int(self.S), 0) + 2
         self.seat_routes = torch.full((B, self.n_majors + s_pad + 1, k_routes, 2), -1, dtype=torch.long, device=device)
-        self.seat_route_dest = torch.full((B, self.n_majors + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
+        # An INTERNATIONAL leg's destination, keyed the way TS keys it: the
+        # (seat, city id) pair, not a tile. A city id is only unique WITHIN a
+        # seat (`civ_next_city_id` counts per row) and a capture mints a NEW
+        # one, so the pair is what makes a captured destination stop resolving.
+        self.seat_route_dseat = torch.full((B, self.n_majors + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
+        self.seat_route_dcity = torch.full((B, self.n_majors + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
         self.seat_route_exp = torch.full((B, self.n_majors + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
         self._alloc_cs_pairs(B, self.n_majors, s_pad, device)
 
@@ -932,6 +937,7 @@ class SimInit:
         self._claim_version = 0
         self._gen_ver = 0
         self._gen_aura_cache = None
+        self._fbase_cache: tuple[int, torch.Tensor] | None = None
         self._food_cache: tuple[int, torch.Tensor] | None = None
         self._nprod_cache: tuple[int, torch.Tensor] | None = None
         # Civ-phase caches, same single-slot-by-key shape as _rcy_globals.
@@ -1200,6 +1206,7 @@ class SimInit:
             getattr(self, k).copy_(v)
         self.turn = 1
         self._eff_version += 1
+        self._fbase_cache = None
         self._food_cache = None
         self._nprod_cache = None
         self._adjd_cache = self._adjc_cache = self._adjh_cache = None
@@ -1362,6 +1369,7 @@ class SimInit:
         self.turn = snap["turn"]
         self.road_bridged = snap.get("road_bridged", False)
         self._eff_version += 1
+        self._fbase_cache = None
         self._food_cache = None
         self._nprod_cache = None
         self._adjd_cache = self._adjc_cache = self._adjh_cache = None

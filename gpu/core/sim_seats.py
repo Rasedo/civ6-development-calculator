@@ -1234,13 +1234,18 @@ class SimSeats:
         return g
 
     def _rcy_food_plane(self, row: int, g: dict) -> torch.Tensor:
+        """[B, T] tile food for seat row `row`. The farm-adjacency tier is the
+        row's own (its civics/techs), and tileYields adds it INSIDE the
+        improvement block — ahead of fertility and the drought floor — so the
+        tier goes onto the pre-tail base and the tail is taken again."""
         if row in g["f_r"]:
             return g["f_r"][row]
         f_plane = g["f_base"]
         if self.improvements_on:
             tier = self._farmadj_tier(self._seat_civics(row), self._seat_techs(row))
             if bool((tier > 0).any()):
-                f_plane = f_plane + self._farmadj_qual().to(self.dtype) * tier.unsqueeze(1).to(self.dtype)
+                adj = self._farmadj_qual().to(self.dtype) * tier.unsqueeze(1).to(self.dtype)
+                f_plane = self._food_tail(self._food_base() + adj)
         g["f_r"][row] = f_plane
         return f_plane
 
@@ -1381,19 +1386,14 @@ class SimSeats:
         cityStateRouteSpec to the CS type's specialty column (_citystate_yidx),
         gated on citystate_alive — TS removes a captured CS and prunes its
         routes at capture, and this gate is the mirror for the same-turn read.
-        An INTERNATIONAL leg (seat_route_dest >= 0 holds the dest CENTRE TILE)
-        pays intlGold + the dest city's completed specialty count to GOLD only,
-        refused while at war with the dest's seat.
+        An INTERNATIONAL leg (seat_route_dcity >= 0, paired with
+        seat_route_dseat) pays intlGold + the dest city's completed specialty
+        count to GOLD only, refused while at war with the dest's seat.
 
         Every specialty count is a DISTRICT REGISTRY read, for this row's own
         cities and for a foreign destination alike — specialtyDistricts walks
         `city.districts`, so a tile scan is the wrong input on any row.
         Endpoints resolve by PERSISTENT id among LIVING cities.
-
-        KNOWN CORNER vs TS (unchanged in kind, now uniform across rows): the
-        intl dest is stored as a TILE, so a dest CAPTURED by another major
-        resolves to the CAPTOR's city here where TS's (toSeat, toSeatCity)
-        lookup drops the route. Closing it needs a route-store schema change.
 
         Cached single-slot on (turn, row, _eff_version, _rp_kill_version,
         _bel_version): trade and war run outside the walk that consumes this,
@@ -1461,35 +1461,34 @@ class SimSeats:
             ycol = self._citystate_yidx[:, :S].gather(1, css)
             inc.scatter_add_(1, from_j * 6 + ycol, citystate_spec * pc)
         # INTERNATIONAL legs: a route to ANY OTHER MAJOR's city
-        # (seat_route_dest = the dest CENTRE TILE, >=0) pays intlGold + the dest
-        # city's completed specialty count to GOLD only. Suspended while at war
-        # with the DEST's seat or while a hostile prowls within 3 of either
-        # endpoint.
-        rd_i = self.seat_route_dest[:, row]  # [B, K] dest centre tile (>=0 = intl)
-        intl = act & (rd_i >= 0)
+        # (seat_route_dcity >= 0) pays intlGold + the dest city's completed
+        # specialty count to GOLD only. Suspended while at war with the DEST's
+        # seat or while a hostile prowls within 3 of either endpoint.
+        rd_c = self.seat_route_dcity[:, row]  # [B, K] dest city id (>=0 = intl)
+        intl = act & (rd_c >= 0)
         if bool(intl.any()):
-            K_i = rd_i.shape[1]
-            dest_tile = rd_i.clamp(min=0)  # [B, K]
-            # The dest CITY, resolved the way tileBelongsTo names it: a centre
-            # tile carries its own city's (seat, id), and a major's seat IS its
-            # city-block row. A CS- or barbarian-held tile is not a major's city
-            # and falls out on the row test.
-            nrow, RCw = self.city_id.shape[1], self.city_id.shape[2]
-            d_row = self.tile_seat.gather(1, dest_tile)  # [B, K] absolute seat
-            d_id = self.tile_city.gather(1, dest_tile)  # [B, K] its persistent city id
-            d_major = (d_row >= 0) & (d_row < nrow) & (d_row != row)
-            dr = torch.where(d_major, d_row, torch.zeros_like(d_row))
+            K_i = rd_c.shape[1]
+            RCw = self.city_id.shape[2]
+            # The dest CITY is the STORED (seat, id) pair looked up among that
+            # seat's LIVING cities — `seatOf(toSeat).cities.find(c => c.id ===
+            # toSeatCity)`. A capture re-mints the flipped city's id under the
+            # captor, so the pair stops resolving and the leg pays nothing.
+            dr = self.seat_route_dseat[:, row].clamp(min=0)  # [B, K]
             _rx = dr.unsqueeze(2).expand(B, K_i, RCw)
-            hit = (self.city_id.gather(1, _rx) == d_id.unsqueeze(2)) & self.city_alive.gather(1, _rx)
-            valid_dest = d_major & hit.any(dim=2)
+            hit = (self.city_id.gather(1, _rx) == rd_c.unsqueeze(2)) & self.city_alive.gather(1, _rx)
+            valid_dest = intl & hit.any(dim=2)
+            _col = hit.long().argmax(dim=2).unsqueeze(2)  # [B, K, 1] the dest's column
             # specialtyDistricts on the DEST — the same DISTRICT REGISTRY read
             # this row takes for its own cities, indexed at the dest's (row,
             # column) instead of a map-wide district-tile scan.
             _reg = self.city_dist_tile  # [B, n_majors, RC, nD]
             _comp = (_reg >= 0) & self.district_complete.gather(1, _reg.clamp(min=0).reshape(B, -1)).reshape_as(_reg)
             _spec_all = (_comp & self._is_specialty.reshape(1, 1, 1, -1)).sum(dim=3)  # [B, n_majors, RC]
-            spec_dest = _spec_all.gather(1, _rx).gather(2, hit.long().argmax(dim=2).unsqueeze(2)).squeeze(2)  # [B, K]
+            spec_dest = _spec_all.gather(1, _rx).gather(2, _col).squeeze(2)  # [B, K]
             gold_i = (self._trade_intl_gold + spec_dest).double()
+            # routeRaidedAt reads the RESOLVED city's centerIndex, so the
+            # endpoint follows the lookup rather than a tile stored at creation.
+            dest_tile = self.city_center.gather(1, _rx).gather(2, _col).squeeze(2).clamp(min=0)  # [B, K]
             raided_i = near.gather(1, from_j) | self._route_raided_near(row, dest_tile)
             pays_i = intl & has_from & valid_dest & ~self.war[:, row, :].gather(1, dr) & ~raided_i
             inc.scatter_add_(1, from_j * 6 + 2, gold_i * pays_i.double())
@@ -1898,7 +1897,8 @@ class SimSeats:
         self._relocate_palace(_b1, torch.tensor([src_row], dtype=torch.long, device=dev))
         kill = (self.seat_routes[b, src_row, :, 0] == cid) | (self.seat_routes[b, src_row, :, 1] == cid)
         self.seat_routes[b, src_row][kill] = -1
-        self.seat_route_dest[b, src_row][kill] = -1
+        self.seat_route_dseat[b, src_row][kill] = -1
+        self.seat_route_dcity[b, src_row][kill] = -1
         self.seat_route_exp[b, src_row][kill] = -1
         owned = (self.tile_seat[b] == src_row) & (self.tile_city[b] == cid)
         if conquest and int(self.city_alive[b, dst_row].sum()) >= int(self.rules.seats.get("maxCities", 6)):
@@ -3472,7 +3472,8 @@ class SimSeats:
             slot = _free_slot(rows)
             self.seat_routes[rows, row, slot, 0] = ids[rows, i_pick]
             self.seat_routes[rows, row, slot, 1] = to_id
-            self.seat_route_dest[rows, row, slot] = -1
+            self.seat_route_dseat[rows, row, slot] = -1
+            self.seat_route_dcity[rows, row, slot] = -1
             self.seat_route_exp[rows, row, slot] = exp_val
             _o = centers[rows, i_pick]
             _d = torch.where(
@@ -3487,25 +3488,33 @@ class SimSeats:
         # EXPLORED, NEAREST first (ties keep from-asc, then the block-row scan
         # order, which IS TS's `state.seats` order).
         intl_want = want & (kmax < 0)
-        dctr_l, dalv_l = [], []
+        dctr_l, dalv_l, did_l, drow_l = [], [], [], []
         for r2 in range(self.n_majors):
             if r2 == row:
                 continue
             dctr_l.append(self.city_center[:, r2].clamp(min=0))
             dalv_l.append(self.city_alive[:, r2])
+            did_l.append(self.city_id[:, r2])
+            drow_l.append(torch.full_like(self.city_id[:, r2], r2))
         if bool(intl_want.any()) and dctr_l:
             dctr = torch.cat(dctr_l, dim=1)  # [B, D] dest centre tiles
             dalv = torch.cat(dalv_l, dim=1)  # [B, D]
+            did = torch.cat(did_l, dim=1)    # [B, D] dest city id
+            drow = torch.cat(drow_l, dim=1)  # [B, D] dest seat row
             D = dctr.shape[1]
             d_ip = self.pair_dist[centers.unsqueeze(2), dctr.unsqueeze(1)]  # [B, RC, D]
-            rdst = self.seat_route_dest[:, row]  # [B, K]
+            rds = self.seat_route_dseat[:, row]  # [B, K]
+            rdc = self.seat_route_dcity[:, row]  # [B, K]
             act2 = rr[:, :, 0] >= 0  # [B, K]
-            # already-connected: an ACTIVE intl route from slot i to dest tile d
+            # already-connected: an ACTIVE intl route from slot i to that
+            # (seat, city) — TS's `x.toSeat === other.seat && x.toSeatCity === pc.id`.
             exists_ip = (
                 (rr[:, :, 0].reshape(B, 1, 1, -1) == ids.reshape(B, RC, 1, 1))
-                & (rdst.reshape(B, 1, 1, -1) == dctr.reshape(B, 1, D, 1))
+                & (rdc.reshape(B, 1, 1, -1) >= 0)
+                & (rdc.reshape(B, 1, 1, -1) == did.reshape(B, 1, D, 1))
+                & (rds.reshape(B, 1, 1, -1) == drow.reshape(B, 1, D, 1))
                 & act2.reshape(B, 1, 1, -1)
-            ).any(dim=3)  # [B, RC, D] (rdst is -1 for domestic/CS -> never == dctr>=0)
+            ).any(dim=3)  # [B, RC, D]
             valid_ip = (
                 alive.unsqueeze(2)
                 & dalv.unsqueeze(1)
@@ -3528,7 +3537,8 @@ class SimSeats:
                 slot = _free_slot(rows)
                 self.seat_routes[rows, row, slot, 0] = ids[rows, i_pick]
                 self.seat_routes[rows, row, slot, 1] = -1
-                self.seat_route_dest[rows, row, slot] = dest_tile
+                self.seat_route_dseat[rows, row, slot] = drow[rows, c_pick]
+                self.seat_route_dcity[rows, row, slot] = did[rows, c_pick]
                 self.seat_route_exp[rows, row, slot] = exp_val
                 self._lay_trade_road(rows, centers[rows, i_pick], dest_tile)
 
@@ -3540,25 +3550,35 @@ class SimSeats:
 
     def _expire_seat_routes(self, row: int) -> None:
         """Drop seat row `row`'s routes whose expiresTurn has arrived, plus any
-        international route whose destination is no longer a live MAJOR city
-        centre (the tradeRoutes filter twin — every seat's centres through the
-        one `centre_slot_at` registry). Consumers gate on active
-        (seat_routes[..., 0] >= 0), so this is idempotent per turn.
-        KNOWN CORNER vs TS: the dest is stored as a TILE, not (seat, city), so a
-        dest CAPTURED by another major still reads as a live centre here while
-        TS's (toSeat, toSeatCity) filter drops the route — closing it needs a
-        route-store schema change."""
+        international route whose (seat, city id) destination no longer names a
+        living city — the tradeRoutes filter's second arm,
+        `seatOf(toSeat).cities.some(c => c.id === toSeatCity)`. A CAPTURE mints
+        the flipped city a fresh id under the CAPTOR's seat, so both halves of
+        the pair stop matching and the route dies. Consumers gate on active
+        (seat_routes[..., 0] >= 0), so this is idempotent per turn."""
         act = self.seat_routes[:, row, :, 0] >= 0
         exp = self.seat_route_exp[:, row]
         expired = act & (exp >= 0) & (exp <= int(self.turn))
-        rd = self.seat_route_dest[:, row]
-        rdc = rd.clamp(min=0)
-        dest_gone = act & (rd >= 0) & (self.centre_slot_at.gather(1, rdc) < 0)
+        dst, dc = self._route_dest_alive(row)
+        dest_gone = act & (dc >= 0) & ~dst
         drop = expired | dest_gone
         if bool(drop.any()):
             self.seat_routes[:, row][drop] = -1
-            self.seat_route_dest[:, row][drop] = -1
+            self.seat_route_dseat[:, row][drop] = -1
+            self.seat_route_dcity[:, row][drop] = -1
             self.seat_route_exp[:, row][drop] = -1
+
+    def _route_dest_alive(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """For each of seat row `row`'s route slots: does its INTERNATIONAL
+        destination still exist? Returns (alive [B, K], dest city id [B, K],
+        -1 where the leg is domestic or city-state). The `.cities.find(c => c.id
+        === toSeatCity)` twin — the id is matched inside the STORED seat's own
+        block, because ids are only unique within a seat."""
+        dc = self.seat_route_dcity[:, row]  # [B, K]
+        ds = self.seat_route_dseat[:, row].clamp(min=0)
+        _rx = ds.unsqueeze(2).expand(self.B, dc.shape[1], self.city_id.shape[2])
+        hit = (self.city_id.gather(1, _rx) == dc.unsqueeze(2)) & self.city_alive.gather(1, _rx)
+        return hit.any(dim=2) & (dc >= 0), dc
 
     def _seat_strengths(self) -> torch.Tensor:
         B, dev = self.B, self.device

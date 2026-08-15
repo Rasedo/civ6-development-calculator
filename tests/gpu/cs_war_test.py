@@ -1,6 +1,6 @@
 """SEAT 0 <-> CITY-STATE WAR — the CS-attack mask column.
 
-    python tests/gpu/citystate_war_test.py
+    python tests/gpu/cs_war_test.py
 
 Real Civ 6 treats a city-state as a separate seat: peace is the default and war
 must be DECLARED before its centre can be attacked. Offering a PEACEFUL
@@ -131,7 +131,7 @@ def main() -> None:
     assert bool(s2.war[b, 0, s2.row_of(100 + cs)]), "a non-suzerain's peace must NOT free the city-state"
     print("  c suzerain release: war ends, BOTH clock cells reset, -%d ww OK" % shed)
 
-    print("citystate_war_test OK — a major<->city-state war gates the attack mask")
+    print("cs_war_test OK — a major<->city-state war gates the attack mask")
 
 
 if __name__ == "__main__":

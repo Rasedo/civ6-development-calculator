@@ -568,7 +568,8 @@
      ],
      "planes": [
       "seat_routes",
-      "seat_route_dest",
+      "seat_route_dseat",
+      "seat_route_dcity",
       "seat_route_exp"
      ]
     },

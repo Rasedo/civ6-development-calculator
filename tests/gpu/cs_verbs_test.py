@@ -1,7 +1,7 @@
 """Civ-seat city-state verbs — levy + quests.
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
-    python tests/gpu/citystate_verbs_test.py
+    python tests/gpu/cs_verbs_test.py
 
 Both mechanics run from the civ phase (the `_seat_phase` levy block +
 `_seat_quest_phase`, TS twins `seatPhase`'s levy branch + `issueQuest` /
@@ -142,7 +142,7 @@ def main() -> None:
     paths = sorted(FIXTURES.glob("seed*.json"))
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
     path = paths[0]
-    print(f"citystate_verbs_test on {path.name}")
+    print(f"cs_verbs_test on {path.name}")
 
     sim = build(rules, path)
     for _ in range(25):

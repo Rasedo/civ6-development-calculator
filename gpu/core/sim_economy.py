@@ -333,33 +333,47 @@ class SimEconomy:
         has = avail.any(dim=1)
         return torch.where((cur == -1) & has, best, cur)
 
-    def _eff_food(self) -> torch.Tensor:
-        """[B, T] tile FOOD with the disaster terms applied: fertility feeds
-        (+1 each, already capped), drought starves (−1, floored at 0) —
-        mirrors the tail of tileYields. Food is the only column disasters
-        touch; consumers that don't mix columns read this directly and skip
-        the full [B, T, 6] assembly.
+    def _food_base(self) -> torch.Tensor:
+        """[B, T] tile FOOD as tileYields has it at the END of the improvement
+        block — terrain + feature + resource, less a CHOPPED or
+        founding-stripped feature, plus the FARM's own food. Everything a SEAT
+        adds (the farm-adjacency tier) belongs on top of THIS, before the tail.
 
-        A CHOPPED or founding-stripped feature is subtracted HERE, at the top,
-        because tileYields reads `tile.feature` live at the terrain step and
-        the drought floor is the LAST thing it does. Subtracting afterwards
-        (as every caller used to) puts the floor on the wrong side: a stripped
-        RAINFOREST/MARSH on a 0-food terrain under drought floors to 0 and
-        then goes to −1. Callers must NOT strip column 0 again."""
-        if self._food_cache is not None and self._food_cache[0] == self._eff_version:
-            return self._food_cache[1]
+        The stripped feature is subtracted HERE, at the top, because tileYields
+        reads `tile.feature` live at the terrain step and the drought floor is
+        the LAST thing it does. Subtracting afterwards puts the floor on the
+        wrong side: a stripped RAINFOREST/MARSH on a 0-food terrain under
+        drought floors to 0 and then goes to −1. Callers must NOT strip
+        column 0 again."""
+        if self._fbase_cache is not None and self._fbase_cache[0] == self._eff_version:
+            return self._fbase_cache[1]
         base = self.tile_yields[:, :, 0]
         if bool(self.feat_stripped.any()):
             base = base - self.feat_yields[:, :, 0] * self.feat_stripped.to(self.dtype)
         if self.improvements_on:
             farm = (self.improvement == self.FARM) & ~self.pillaged
             base = base + farm.to(self.dtype) * self._farm_food
+        self._fbase_cache = (self._eff_version, base)
+        return base
+
+    def _food_tail(self, base: torch.Tensor) -> torch.Tensor:
+        """tileYields' last three lines over a food plane: fertility feeds
+        (+1 each, already capped), drought starves (−1, floored at 0), and a
+        natural-wonder tile keeps the wonder's fixed food because it
+        EARLY-RETURNS above all of it — the disaster STATE still lands on it
+        (the trace counts it), but its food never moves."""
         food = base + self.fertility.to(self.dtype)
         food = torch.where(self.drought > 0, (food - 1).clamp(min=0), food)
-        # Natural-wonder tiles EARLY-RETURN in tileYields with the wonder's
-        # fixed yields, BEFORE the fertility/drought tail — the disaster STATE
-        # still lands on them (the trace counts it), but their food never moves.
-        food = torch.where(self.nwonder, self.tile_yields[:, :, 0], food)
+        return torch.where(self.nwonder, self.tile_yields[:, :, 0], food)
+
+    def _eff_food(self) -> torch.Tensor:
+        """[B, T] tile FOOD with the disaster terms applied — the whole of
+        tileYields' food column for a seat with no farm-adjacency tier. Food is
+        the only column disasters touch; consumers that don't mix columns read
+        this directly and skip the full [B, T, 6] assembly."""
+        if self._food_cache is not None and self._food_cache[0] == self._eff_version:
+            return self._food_cache[1]
+        food = self._food_tail(self._food_base())
         self._food_cache = (self._eff_version, food)
         return food
 
@@ -1669,10 +1683,10 @@ class SimEconomy:
             total = total * gym.double().unsqueeze(1)
         if compw is not None and bool(compw.any()):
             # Each wonder's cityYieldMult (Ruhr production, Big Ben gold) LAST
-            # of the three scalings, as an EXPLICIT wonder-id-order product. TS
-            # walks city.wonders in BUILD order; the registry is keyed by wonder
-            # id and cannot express that, so two multipliers on the SAME channel
-            # in one city can associate differently.
+            # of the three scalings, as an EXPLICIT ascending wonder-index
+            # product — the association `completedWonders` sorts its list into,
+            # so two multipliers on the SAME channel fold the same way on both
+            # engines.
             ones6 = torch.ones(1, 1, 6, dtype=F64, device=dev)
             wmm = torch.ones(B, n, 6, dtype=F64, device=dev)
             for wi in range(compw.shape[2]):
