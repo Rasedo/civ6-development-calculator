@@ -30,7 +30,15 @@ def main() -> None:
     for g in man["groups"]:
         for f in g["fields"]:
             assert f["compare"] in ("exact", "milli"), f"{g['name']}.{f['name']}: compare {f['compare']!r}"
-            assert f.get("covers") or f.get("planes"), f"{g['name']}.{f['name']} names no surface on either engine"
+            # A field either names the surface it reads on one engine, or is
+            # DERIVED — computed from surfaces another field already covers,
+            # and carried only so a collision between them is loud. Silence is
+            # the third case, and the one this rejects.
+            assert f.get("covers") or f.get("planes") or f.get("derived"), (
+                f"{g['name']}.{f['name']} names no surface on either engine and is not marked derived"
+            )
+            if f.get("derived"):
+                assert f.get("note"), f"{g['name']}.{f['name']} is derived but says nothing about what it guards"
 
     # --- the digest algebra (the TS test's vectors, mirrored) ---
     keys = [3, 7, 11]

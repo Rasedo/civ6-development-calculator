@@ -32,14 +32,15 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
 from core.engine import _MUTABLE
+from warmup import settle_all
 
 
 def main() -> None:
     rules = load_rules()
     rj = json.loads((FIXTURES / "rules.json").read_text())
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
 
     # --- 1) the exported chain: catalog + gating + sequence ----------------
@@ -62,7 +63,7 @@ def main() -> None:
             assert int(row.get("rp", -1)) == space[k - 1][0], f"space step {k} must require the previous step"
 
     # --- 2) engine metadata mirrors the exported chain ---------------------
-    sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     assert sim._n_space == 4, f"_n_space should be 4, got {sim._n_space}"
     assert sim._space_proj_idx == [i for i, _ in space], "_space_proj_idx must match the exported space rows"
     assert sim._space_step == {i: k for k, (i, _) in enumerate(space)}, "chain-step map mismatch"
@@ -73,7 +74,7 @@ def main() -> None:
     # --- 2b) _space_step_ok — the `availableProjects` space arm, term by term
     #   Step 2 (Moon Landing) is the useful probe: it has both a tech gate and
     #   a predecessor, so all four states of the truth table are reachable.
-    gk = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    gk = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     pi_1, row_1 = space[1][0], 1
     rt_1, step_0, step_1 = int(space[1][1]["rt"]), gk._space_step[space[0][0]], gk._space_step[space[1][0]]
     gk.civ_techs[:, row_1, rt_1] = False
@@ -99,7 +100,7 @@ def main() -> None:
     #   The whole mechanic hung on this: every other piece was live, but the
     #   mask skipped space rows, so the column was never legal and nothing
     #   could reach the completion path.
-    mk = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    mk = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     mrow, mj = 1, 0
     assert bool(mk.city_alive[0, mrow, mj]), "need a live city to hold the project"
     di_camp = int(space[0][1]["d"])
@@ -125,7 +126,7 @@ def main() -> None:
     #   `completeProject` twin, and the outcome code names the WINNER whoever
     #   it is — no seat has an outcome of its own.
     assert sim.n_majors >= 2, "need a second major to prove the outcome is not seat 0's"
-    sim2 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    sim2 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     r, j = 0, 0
     assert bool(sim2.civ_alive[0, r + 1]) and bool(sim2.city_alive[0, r + 1, j]), "civ capital must be alive at turn 0"
     pi_exo = space[-1][0]
@@ -145,19 +146,19 @@ def main() -> None:
     #   domination/score recompute, winner and all. A game NOT in a space
     #   victory recomputes normally (running game -> 0 at an early turn).
     for wrow in (0, 1):
-        s = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+        s = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
         s.victory_type[:] = 3
         s.victory_row[:] = wrow
         s.step()
         assert int(s.victory_type[0]) == 3, f"recompute must PRESERVE victoryType 3, got {int(s.victory_type[0])}"
         assert int(s.victory_row[0]) == wrow, f"recompute must PRESERVE the victor row {wrow}, got {int(s.victory_row[0])}"
         assert bool(s.game_over[0]), "a science victory ends the game"
-    s0 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s0 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     s0.step()  # early turn, no dom, below the turn limit
     assert int(s0.victory_type[0]) == 0 and not bool(s0.game_over[0]), "a running game recomputes to victoryType 0 / not over"
 
     # --- 5) space_done rides snapshot/restore (the _MUTABLE contract) ------
-    s = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     snap = s.snapshot()
     s.space_done[0, 1, 0] = True
     assert bool(s.space_done[0, 1, 0]), "mutation applied"

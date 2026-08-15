@@ -22,12 +22,13 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
+from warmup import settle_all
 
 
 def main() -> None:
     rules = load_rules()
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
     rows = (rules.projects or {}).get("rows", [])
     assert rows, "no exported project rows"
@@ -52,7 +53,7 @@ def main() -> None:
     #   Plant the project at full progress in a live civ capital and run the
     #   seat phase — the space_race_test pattern. Civs can select a Festival in
     #   principle but never do in-gate, so plant it.
-    sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     assert sim.n_majors >= 2, "need a civ"
     r, j = 0, 0
     assert bool(sim.civ_alive[0, r + 1]) and bool(sim.city_alive[0, r + 1, j]), "civ capital must be alive"

@@ -20,12 +20,11 @@ freeze backlog the first serve run must validate.
 - Every landed mechanic records WHICH lane can reach it. A green gate
   over an unreached mechanic proves nothing.
 
-**State:** P8 training PARKED until this file is clean. A TEST FREEZE
-is in force — everything since the restructure sits behind the compile
-bar only, and the first `npm run seed && npm run export` +
-`python gpu/serve_gate.py --batched` run opens the hunt (see the freeze
-backlog at the bottom). Restore the seed set to 24 before the final
-hunt — the 12-seed set is a temporary dev-speed cut.
+**State:** P8 training PARKED until this file is clean. The freeze is
+over: the battery has run, the serve gate reaches turn 1 and is RED
+there, and "The battery's open reds" at the bottom is where the hunt
+starts. Restore the seed set to 24 before the final hunt — the 12-seed
+set is a temporary dev-speed cut.
 
 All surviving `_LIVE` master switches are ON (GOVERNMENTS_ADOPTION,
 B18_FOLLOWER_COUPLING, CITY_RELIGION_ADDER, ADMIRAL_MARCH,
@@ -48,7 +47,8 @@ nothing carries forward.
 
 | Open item | Weight | What the weight is for |
 |---|---|---|
-| **A. Engine vs engine** | **0** | no known member — see the chapter |
+| A-34r serve gate red at turn 1 | 3 | two digest groups, every seed; size unknown until the first site is named |
+| **A. Engine vs engine** | **3** | |
 | B-17r Encampment strikes | 1 | scoped out with ranged-vs-city; the rest of the district is done |
 | B-18r religion tails | 2 | complete on every seat; one latent lifecycle drift to hunt |
 | B-20r tourism tails | 7 | national parks, civ Archaeologists, theming, shipwrecks, digs |
@@ -64,7 +64,7 @@ nothing carries forward.
 | B-31r trade-route tails | 6 | a Trader UNIT and a route wire verb |
 | B-D unsourced data values | 5 | a residual CLASS: every invented magnitude, re-sourced |
 | **B. Fidelity vs real Civ 6** | **51** | |
-| **OPEN, TOTAL** | **51** | |
+| **OPEN, TOTAL** | **54** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -72,18 +72,28 @@ not add a "done" column back.
 
 ## A. Engine vs engine — where the two implementations can answer differently
 
-THE CHAPTER HAS NO KNOWN MEMBER, AND THAT IS A WEAK CLAIM. The digest is
-the only instrument for this class — both engines can be equally faithful to
-Civ 6 and still disagree with each other, and a gate red is the only thing
-that would say so. **No gate has run since the restructure.** So "empty"
-means every divergence anyone has yet FOUND by reading is closed; it does
-not mean the two engines agree. The first
-`python gpu/serve_gate.py --batched` run is what re-populates this chapter,
-and the freeze backlog below is the list of places to look first.
+THE CHAPTER HAS ONE MEMBER AGAIN, and it arrived the moment an instrument
+could speak. The digest is the only instrument for this class — both engines
+can be equally faithful to Civ 6 and still disagree with each other, and a
+gate red is the only thing that would say so.
+
+- **A-34r. The serve gate splits at TURN 1**, on `seat.milli` and
+  `tile.exact`, on every seed. Detail, and the one anomaly to explain
+  first, are under "The battery's open reds" at the bottom; the freeze
+  backlog above it is the list of places to look after that.
+
+Chapter A being SHORT still means only that this is what an instrument has
+found, never that the rest agrees.
 
 What is NOT a source of new members: a seat asymmetry. Seat 0 rides the same
 machinery as every other row, and `tools/gpu/seat_symmetry_check.py` holds
 that with both allowlists empty.
+
+REMOVED FROM THIS CHAPTER'S REACH, and worth stating because it silently
+covered everything: until this round a seat with no city never took its turn
+on either engine, so under format 4's settler starts the gate compared two
+games in which nobody ever founded, built or researched anything. A green
+digest over that world would have meant nothing at all.
 
 ## B. Fidelity vs real Civ 6 — where both engines agree on the wrong answer
 
@@ -210,10 +220,17 @@ Civ 6 source or is recorded as unverifiable.
 
 ## The freeze backlog — what the first serve run must validate
 
-Nothing below this line has run against the gate. **Regenerate first:
-`npm run seed && npm run export` — the fixture format is 4 and the loader
-refuses a 3.** In dependency order of suspicion; git log carries what each
-change was, this is only what to CHECK.
+The first battery since the freeze has now RUN, and the serve gate reaches
+turn 1 and goes red there — see "The battery's open reds" below, which is
+where diagnosis starts. This list is still the read-this-before-calling-it-a-
+bug list for whatever the gate names, in dependency order of suspicion; git
+log carries what each change was, this is only what to CHECK.
+
+One correction it already forced: every item below was written expecting a
+world with capitals on the map. Format 4 starts each major with a SETTLER,
+and until the fix in this round a city-less seat never took its turn at all —
+so anything phrased as "the seat's first N turns" describes a regime the
+engines have not actually been in since the format changed.
 
 **Behaviour-preserving by intent, proven only by digests:**
 1. The #104 wire verbs (tile buy kind 3, faith kinds 4/5/6, levy) and their
@@ -634,3 +651,49 @@ Hunt discipline: scripted-reachability first (the digest gate names the
 turn), checkpoint-bracket from the nearest earlier checkpoint, full fresh
 gate for any behaviour-changing fix. One battery at the round's end, never
 per fix.
+
+## The battery's open reds
+
+The first full battery since the freeze left 22 lanes red out of 56. They
+are three families, and only the first is a parity question.
+
+**1. THE SERVE GATE, turn 1, every seed.** Two digest groups split:
+`seat.milli` and `tile.exact`. The GPU's `seat.milli` hash is IDENTICAL
+across all twelve seeds, which is itself a fact to explain before reading
+the divergence — twelve different worlds should not agree. `tile.exact`
+differs per seed, so that one carries real per-world data. Turn 1 means the
+divergence is in the OPENING, which is exactly the regime the settler-start
+fix just made reachable for the first time; read it before assuming any
+older backlog item.
+
+**2. THE WORLD NO LONGER DEVELOPS ON ITS OWN, and ~12 pokes assume it does.**
+Both engines are decision-free without a record, so `sim.step()` founds
+nothing, queues nothing and researches nothing; `settle_all` gives each seat
+its capital and no more. Every lane below builds a world by stepping and then
+looks for something only a DECIDING seat produces:
+
+  - `relics` — "no fixture reaches a civ with two cities"
+  - `occupancy` — "no civ builder ever existed in 70 turns"
+  - `controlled` — "the scripted civ must keep queueing"
+  - `culture_victory`, `encampment` (the strike), `district_wire`,
+    `geopolitics`, `religion2`, `war`, `research_switch`, `peace_target`,
+    `districts`, `ladder`, `drive`
+
+`drive_test` is the clearest statement of the problem: it compares a driven
+seat against a "scripted transcription, for reference" that is now a seat
+which does nothing at all, so its competitiveness assertions compare against
+zero. Each of these lanes needs a DRIVEN warm-up (the ladder, as `drive_test`
+already does) rather than a bare step loop — or an explicit poke that puts
+the state it needs on the planes. That is a per-lane decision about what the
+lane is actually for, not a codemod.
+
+**3. THREE MECHANIC REDS the empty world was hiding.** These only became
+visible once the pokes had a city to poke:
+
+  - `cs_bonus` — the 3-envoy tier-1 building bonus fires for a city with NO
+    tier-1 building (4.725 -> 7.875). The lane's own negative control caught
+    it; the positive case passes, so the gate is on the wrong predicate.
+  - `trade2` — a route to a destination with one specialty district pays 3
+    gold where the rule is 3+1.
+  - `seat_verbs` — resource improvement column 18 dispatches to nothing
+    (`improvement` stays -1). A whole build verb is dead.

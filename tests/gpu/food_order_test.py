@@ -22,14 +22,15 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
+from warmup import settle_all
 
 
 def main() -> None:
     rules = load_rules()
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
-    sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     assert sim.improvements_on, "improvements must be on or the farm-adjacency term never fires"
     assert sim.FARM >= 0, "no FARM in the improvement roster"
     assert sim._farmadj_civic >= 0 or sim._farmadj_tech >= 0, \

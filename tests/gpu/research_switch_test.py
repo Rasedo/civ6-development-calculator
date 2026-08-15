@@ -25,18 +25,19 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
 from core.engine import _MUTABLE
+from warmup import settle_all
 
 
 def main() -> None:
     rules = load_rules()
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
     row = 1
 
     # --- 1) the mask offers every available tech, underway or not ----------
-    sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     free = sim._seat_tech_mask(row)
     n_free = int(free[0].sum())
     assert n_free > 0, "a fresh seat must have techs to research"
@@ -51,7 +52,7 @@ def main() -> None:
     assert bool(busy[0, t_b]), "the seat must be able to switch to another available tech"
 
     # --- 2) switch away, switch back, science survives ---------------------
-    sim2 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    sim2 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     ok = torch.ones(sim2.B, dtype=torch.bool, device=sim2.device)
     sim2._select_research(row, torch.full((sim2.B,), t_a, dtype=torch.long), ok)
     assert int(sim2.civ_cur_tech[0, row]) == t_a
@@ -95,7 +96,7 @@ def main() -> None:
     # --- 7) both maps ride snapshot/restore --------------------------------
     for name in ("civ_tech_retain", "civ_civic_retain"):
         assert name in _MUTABLE, f"{name} must be registered in _MUTABLE"
-    s = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     snap = s.snapshot()
     s.civ_tech_retain[0, row, t_a] = 99.0
     s.restore(snap)

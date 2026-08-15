@@ -14,15 +14,16 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
 from core.engine import BARB_SEAT  # seat-keyed occupancy
+from warmup import settle_all
 
 
 def main() -> None:
     rules = load_rules()
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
-    sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     for _ in range(20):
         sim.step()
 
@@ -77,7 +78,7 @@ def main() -> None:
     # builders arise organically — the plane must be POPULATED somewhere in a
     # 70-turn run, and every alive civilian slot must be indexed by it
     # (plane/slot coherence).
-    sim2 = BatchSim([load_fixture(paths[1])], rules, device="cpu", dtype=torch.float64)
+    sim2 = settle_all(BatchSim([load_fixture(paths[1])], rules, device="cpu", dtype=torch.float64))
     seen = False
     for _ in range(70):
         sim2.step()

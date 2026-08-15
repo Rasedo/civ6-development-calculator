@@ -23,14 +23,14 @@ import torch
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent.parent / "policy"))
-from core import load_rules, load_fixture, FIXTURES  # noqa: E402
+from core import load_rules, load_fixture, fixture_paths  # noqa: E402
 from core.env import BatchEnv  # noqa: E402
 import ladder  # noqa: E402
 
 
 def main() -> None:
     rules = load_rules()
-    p = sorted(FIXTURES.glob("seed*.json"))[0]
+    p = fixture_paths()[0]
     env = BatchEnv([load_fixture(p)], rules, device="cpu", dtype=torch.float64)
     s = env.sim
     layout = {"cs": s.S, "civs": s.n_majors - 1, "cities": s.RC,

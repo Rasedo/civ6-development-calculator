@@ -25,13 +25,14 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
+from warmup import settle_all
 
 ACTIVE = torch.ones(1, dtype=torch.bool)  # the eliminated-actor gate: these seats hold cities
 
 
 def fresh(rules, path, turns=25):
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
     for _ in range(turns):
         sim.step()
     return sim
@@ -39,7 +40,7 @@ def fresh(rules, path, turns=25):
 
 def main() -> None:
     rules = load_rules()
-    path = sorted(FIXTURES.glob("seed*.json"))[0]
+    path = fixture_paths()[0]
     sim = fresh(rules, path)
     r, j = 0, 0
     assert bool(sim.city_alive[0, r + 1, j]), "civ 0 capital must exist by t25"

@@ -32,7 +32,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
+from warmup import settle_all
 
 BUILDING_IDS = [b["id"] for b in json.loads((FIXTURES / "rules.json").read_text())["buildings"]]
 
@@ -54,7 +55,7 @@ def test_catalog(sim) -> None:
 
 
 def test_training_xp_wiring(rules, path) -> None:
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
     # a military unit type and the builder (civilian) type
     mil_ty = int(torch.tensor([c if not bool(sim._type_civilian[i]) else -1 for i, c in enumerate(sim._type_combat.tolist())]).argmax())
     assert not bool(sim._type_civilian[mil_ty]) and float(sim._type_combat[mil_ty]) > 0, "no military unit type found"
@@ -86,7 +87,7 @@ def test_training_xp_wiring(rules, path) -> None:
 def build_strike_scene(rules, path):
     """A seat-0 city (slot 0) owning a COMPLETE Encampment, one AT-WAR civ
     warrior adjacent, no barbs. Returns (sim, enc_tile, tgt_tile, vslot)."""
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
     assert sim.districts_on and sim._encamp_didx >= 0, "encampment district not exported"
     # advance a little so the seat-0 city has borders/tiles
     for _ in range(6):
@@ -183,7 +184,7 @@ def test_civ_encamp_prod_mult(rules, path) -> None:
     so the gate cannot reach the channel at all. Both inputs are poked
     directly."""
     def _prep():
-        s = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+        s = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
         for _ in range(80):          # civs need civics before they adopt a government
             s.step()
         return s
@@ -224,9 +225,9 @@ def test_civ_encamp_prod_mult(rules, path) -> None:
 
 def main() -> None:
     rules = load_rules()
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
-    sim0 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    sim0 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     print(f"encampment_test on {paths[0].name}:")
     test_catalog(sim0)
     test_training_xp_wiring(rules, paths[0])

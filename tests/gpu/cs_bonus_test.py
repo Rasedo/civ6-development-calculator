@@ -37,7 +37,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
+from warmup import settle_all
 
 RULES_J = json.loads((FIXTURES / "rules.json").read_text())
 BUILDING_IDS = [b["id"] for b in RULES_J["buildings"]]
@@ -61,7 +62,7 @@ def _force_scientific_cs0(sim) -> None:
 
 
 def test_catalog(rules, path) -> None:
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
     cs = rules.citystate
     # per-type tier indices match the rules export
     for t in range(len(cs["typeB1Idx"])):
@@ -84,7 +85,7 @@ def test_catalog(rules, path) -> None:
 
 
 def test_building_bonus(rules, path) -> None:
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
     for _ in range(6):
         sim.step()
     _force_scientific_cs0(sim)
@@ -119,7 +120,7 @@ def test_building_bonus(rules, path) -> None:
 
 
 def test_building_pillage(rules, path) -> None:
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
     for _ in range(6):
         sim.step()
     _force_scientific_cs0(sim)
@@ -169,7 +170,7 @@ def test_building_pillage(rules, path) -> None:
 
 
 def test_suzerain(rules, path) -> None:
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
     for _ in range(6):
         sim.step()
     _force_scientific_cs0(sim)
@@ -204,7 +205,7 @@ def test_suzerain(rules, path) -> None:
 
 
 def test_civ_bonus(rules, path) -> None:
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
     for _ in range(20):
         sim.step()
     if sim.n_majors == 1:
@@ -252,7 +253,7 @@ def test_civ_bonus(rules, path) -> None:
 
 def main() -> None:
     rules = load_rules()
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
     p = paths[0]
     print(f"cs_bonus_test on {p.name}:")

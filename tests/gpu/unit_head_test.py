@@ -19,15 +19,16 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
+from warmup import settle_all
 
 
 def main() -> None:
     rules = load_rules()
     rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
-    sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
 
     # --- 0) BOTH SEATS' masks are the enum's width -------------------------
     # ONE mask body serves every seat row, so this asserts the SHARED width
@@ -49,10 +50,11 @@ def main() -> None:
     acts = rj["actions"]["unit"]
     imp_ids = rj["improvements"]["ids"]
     assert acts, "rules.actions.unit missing — the exporter must ship the enum"
-    assert len(acts) == 13 + len(imp_ids) + 3 + 12 + 7, (  # +12 SNIPE, +7 SPREAD
+    assert len(acts) == 13 + len(imp_ids) + 3 + 12 + 7 + 1, (  # +12 SNIPE, +7 SPREAD, +1 FOUND_CITY
         f"enum is {len(acts)} wide for {len(imp_ids)} improvements"
     )
-    assert acts[-7] == "SPREAD_HERE" and acts[-1] == "SPREAD_5", "#93: SPREAD tail misplaced"
+    assert acts[-8] == "SPREAD_HERE" and acts[-2] == "SPREAD_5", "SPREAD tail misplaced"
+    assert acts[-1] == "FOUND_CITY", "FOUND_CITY must stay the enum's last column"
 
     # PILLAGE is NOT the last column — the SNIPE ring and the SPREAD tail sit
     # after it — so PILLAGE and the ring must hold their exact seats and every
@@ -75,6 +77,7 @@ def main() -> None:
     assert sim._A_PILLAGE == acts.index("PILLAGE"), "PILLAGE dispatch column"
     assert sim._A_CHOP == acts.index("CHOP"), "CHOP dispatch column"
     assert sim._A_REPAIR == acts.index("REPAIR"), "REPAIR dispatch column"
+    assert sim._A_FOUND == acts.index("FOUND_CITY"), "FOUND_CITY dispatch column"
     # pillage must NOT share a column with any build verb
     assert sim._A_PILLAGE not in sim._A_IMP, (
         f"PILLAGE column {sim._A_PILLAGE} collides with a BUILD column {sim._A_IMP} "

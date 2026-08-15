@@ -17,7 +17,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
+from warmup import settle_all
 
 
 def main() -> None:
@@ -32,9 +33,9 @@ def main() -> None:
     econ = [p["id"] for p in rj["policies"] if p["kind"] == 1]
     assert econ[0] == "URBAN_PLANNING", f"URBAN_PLANNING must be the first economic policy, got {econ[0]}"
 
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
-    sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
 
     # Force the master switch on in-memory so the pokes are export-independent.
     sim._gov_live = True
@@ -129,7 +130,7 @@ def main() -> None:
 
     # 5) The master switch ships LIVE — a real sim computes the mods; forcing
     #    the switch off in-memory silences them.
-    sim2 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    sim2 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     assert sim2._gov_live is True, "governments ship LIVE (rules.governmentsLive True)"
     sim2._gov_has_effects = False  # force-off in memory
     cy, cpy, ch, cym, _s2, _e2, _tp2, *_ = sim2._gov_policy_mods(civics_with(["CODE_OF_LAWS"]))
@@ -177,14 +178,14 @@ def main() -> None:
     #    below. ONE detector serves every row, so the lane also proves a CIV
     #    row reads its OWN slotted-policy count.
     mf_idx = civ_idx["MEDIEVAL_FAIRES"]
-    simp = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    simp = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     simp.civ_civics[:, 0].copy_(civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "MILITARY_TRADITION", "POLITICAL_PHILOSOPHY", "STATE_WORKFORCE", "EARLY_EMPIRE", "CIVIL_SERVICE", "DIVINE_RIGHT"]))
     _, _, _, _, slp, *_ = simp._gov_policy_mods(simp.civ_civics[:, 0])
     assert int(slp[0].sum()) >= 4, "MONARCHY config must slot >=4 policies to arm the inspiration"
     simp.civ_civic_boosted[:, 0] = False
     simp._detect_seat_boosts(0, torch.ones(simp.B, dtype=torch.bool))
     assert bool(simp.civ_civic_boosted[0, 0, mf_idx]), "MEDIEVAL_FAIRES inspiration fires at 4+ slotted policies"
-    simn = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    simn = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     simn.civ_civics[:, 0].copy_(civics_with(["CODE_OF_LAWS"]))
     _, _, _, _, sln, *_ = simn._gov_policy_mods(simn.civ_civics[:, 0])
     assert int(sln[0].sum()) < 4, "CHIEFDOM+CODE_OF_LAWS slots <4 policies"
@@ -194,7 +195,7 @@ def main() -> None:
     # ...and the same row on a CIV seat: the policies condition is keyed on
     # that seat's own civics, not on seat 0's.
     if simp.n_majors > 1:
-        simr = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+        simr = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
         simr.civ_civics[:, 1].copy_(civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "MILITARY_TRADITION", "POLITICAL_PHILOSOPHY", "STATE_WORKFORCE", "EARLY_EMPIRE", "CIVIL_SERVICE", "DIVINE_RIGHT"]))
         simr.civ_civic_boosted[:, 1:] = False
         simr._detect_seat_boosts(1, torch.ones(simr.B, dtype=torch.bool))

@@ -18,7 +18,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "policy"))
-from core import load_rules, load_fixture, FIXTURES
+from core import load_rules, load_fixture, fixture_paths
 from core.env import BatchEnv
 import drive
 
@@ -38,7 +38,7 @@ def seat_state(sim, row=1):
 
 def main() -> None:
     rules = load_rules()
-    path = sorted(FIXTURES.glob("seed*.json"))[0]
+    path = fixture_paths()[0]
 
     # the scripted transcription, for reference
     a = BatchEnv([load_fixture(path)], rules, device="cpu", dtype=torch.float64)

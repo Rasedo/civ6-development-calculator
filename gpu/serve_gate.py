@@ -29,7 +29,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "policy"))  # drive + ladder
-from core import load_rules, load_fixture, FIXTURES  # noqa: E402
+from core import load_rules, load_fixture, fixture_paths, FIXTURES  # noqa: E402
 from core import statecompare  # noqa: E402
 from core.env import BatchEnv  # noqa: E402
 import drive  # noqa: E402
@@ -158,7 +158,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     data; the child reloads it via CIV6_SERVE_LOAD). --resume T restores both
     sides from the turn-T checkpoint and continues."""
     rules = load_rules()
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     fixtures = [load_fixture(p) for p in paths]
     seeds = [int(fx["seed"]) for fx in fixtures]
     env = BatchEnv(fixtures, rules, device="cpu", dtype=torch.float64)
@@ -349,7 +349,7 @@ def main() -> None:
 
     if args.seeds:
         if args.seeds == "all":
-            seeds = sorted(int(p.stem[4:]) for p in FIXTURES.glob("seed*.json"))
+            seeds = sorted(int(p.stem[4:]) for p in fixture_paths())
         else:
             seeds = [int(x) for x in args.seeds.split(",")]
         bad = 0

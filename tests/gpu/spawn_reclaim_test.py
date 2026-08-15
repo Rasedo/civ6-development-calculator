@@ -26,13 +26,14 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
+from warmup import settle_all
 
 
 def build():
     rules = load_rules()
-    sim = BatchSim([load_fixture(sorted(FIXTURES.glob("seed*.json"))[0])], rules,
-                   device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(fixture_paths()[0])], rules,
+                   device="cpu", dtype=torch.float64))
     for _ in range(20):
         sim.step()
     return sim

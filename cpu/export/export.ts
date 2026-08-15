@@ -11,7 +11,7 @@
  * fixtures must match `seeder/worlds.lock` — the whole staleness chain is
  * checkable end to end.
  */
-import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 
 import type { WorldFile } from '../../world/file';
 import { loadWorld } from '../world/load';
@@ -56,5 +56,15 @@ for (const f of worldFiles) {
     `seed${world.gen.seed}.json: format ${fixture.format} — ${world.civs.length} civs (settler starts), ` +
       `${world.cityStates.length} CS, ${state.map.tiles.length} tiles`,
   );
+}
+// A fixture whose world is gone is an ORPHAN of an older seed formula, and it
+// still answers a `seed*.json` glob. The seeder prunes its own layer; this
+// prunes ours, so the directory holds exactly the current set.
+const emitted = new Set(worldFiles.map((f) => f.replace('.world.json', '.json')));
+for (const f of readdirSync(DIR)) {
+  if (/^seed\d+\.json$/.test(f) && !emitted.has(f)) {
+    rmSync(`${DIR}/${f}`);
+    console.log(`orphaned fixture removed: ${f}`);
+  }
 }
 console.log(`\nCompiled ${worldFiles.length} fixtures in ${DIR}/`);

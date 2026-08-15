@@ -26,16 +26,17 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
+from warmup import settle_all
 
 
 def main() -> None:
     rules = load_rules()
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     if not paths:
         print("no fixtures — run `npm run seed && npm run export` first")
         raise SystemExit(1)
-    sim = BatchSim([load_fixture(str(paths[0]))], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(str(paths[0]))], rules, device="cpu", dtype=torch.float64))
     assert sim.FORT >= 0, "FORT must be in the exported improvement roster"
 
     # a flat tile with no feature, so base terrain defence is 0, and a hills one

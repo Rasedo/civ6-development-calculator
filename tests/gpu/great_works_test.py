@@ -29,7 +29,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
+from warmup import settle_all
 
 
 def main() -> None:
@@ -54,9 +55,9 @@ def main() -> None:
     assert not any("gold" in k.lower() for k in rr if k.startswith("gw")), \
         "no Great Work pays gold — a gw*Gold key would be a fidelity regression"
 
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run the exporter first"
-    sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     B, C, RC = sim.B, sim.RC, sim.RC
     assert sim._gw_cls == [wc, ac, mc], sim._gw_cls
     assert sim._gw_bidx == [amph, museum, broadcast]

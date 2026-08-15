@@ -20,7 +20,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
+from warmup import settle_all
 
 
 def main() -> None:
@@ -52,9 +53,9 @@ def main() -> None:
     assert len(bl.get("enhancers", [])) == 7, "enhancer effect rows missing from export"
 
     # --- GPU side: tensors auto-extend to n_gp = 9 -------------------------
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run the exporter first"
-    sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     assert sim._gp_nc == 9, f"engine n_gp must be 9, got {sim._gp_nc}"
     assert sim.gp_earned.shape[1] == 9 and sim.civ_gpp.shape[2] == 9
     assert sim.civ_gpp.shape[2] == 9, "civ gpp tensor must be n_gp wide"

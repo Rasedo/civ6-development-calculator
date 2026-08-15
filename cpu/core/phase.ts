@@ -938,7 +938,14 @@ export function seatPhase(state: GameState): void {
   }
   for (const actor of state.seats) {
     const recU = state.seatActions?.[state.turn - 1]?.[actor.seat];
-    if (actor.cities.length === 0) continue; // eliminated
+    if (actor.cities.length === 0) {
+      // No city means no economy — but the UNITS still walk. A settler start
+      // owns nothing but units, so skipping the whole block here locks the
+      // seat out of the FOUND verb, the one verb that would give it a city.
+      // CIV6: a civ is eliminated when it holds neither a city nor a settler.
+      if (recU) applySeatUnitOrders(state, actor, recU.units);
+      continue;
+    }
 
     warWearinessTurn(state, actor.seat);
 

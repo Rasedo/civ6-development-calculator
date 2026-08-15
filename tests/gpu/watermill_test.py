@@ -25,11 +25,12 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
+from warmup import settle_all
 
 
 def build(rules, path, steps=40):
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
     for _ in range(steps):
         sim.step()
     return sim
@@ -41,7 +42,7 @@ def food_of(sim, c):
 
 def main() -> None:
     rules = load_rules()
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     if not paths:
         print("no fixtures — run `npm run seed && npm run export` first")
         raise SystemExit(1)
@@ -51,7 +52,7 @@ def main() -> None:
     sim = None
     for p in paths:
         cand = build(rules, str(p))
-        if int(cand.alive[0].sum()) >= 2:
+        if int(cand.city_alive[0, 0].sum()) >= 2:
             sim = cand
             break
     assert sim is not None, "no fixture has two live cities at t40 — cannot run the control comparison"

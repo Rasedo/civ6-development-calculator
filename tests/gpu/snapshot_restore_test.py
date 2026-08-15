@@ -22,16 +22,17 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
 from core.engine import _MUTABLE
+from warmup import settle_all
 
 
 def main() -> None:
     rules = load_rules()
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
 
-    sim = BatchSim([load_fixture(p) for p in paths[:4]], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(p) for p in paths[:4]], rules, device="cpu", dtype=torch.float64))
     for _ in range(30):
         sim.step()
     snap = sim.snapshot()
@@ -60,7 +61,7 @@ def main() -> None:
     # a plane that a step mutates but nobody registered is invisible to it. So
     # assert the real property: EVERY tensor attribute a step changes must be
     # registered, or snapshot/restore silently leaks it across a search.
-    s2 = BatchSim([load_fixture(p) for p in paths[:4]], rules, device="cpu", dtype=torch.float64)
+    s2 = settle_all(BatchSim([load_fixture(p) for p in paths[:4]], rules, device="cpu", dtype=torch.float64))
     for _ in range(20):
         s2.step()
     watched = {

@@ -231,6 +231,35 @@ def _rules_stamp_for(dirpath: Path) -> str:
     return _RULES_STAMP_CACHE[key]
 
 
+def fixture_paths(dirpath: Path = FIXTURES) -> list[Path]:
+    """Every EXPORTED fixture in `dirpath`, sorted — and nothing else.
+
+    Two other things live in the same directory and match a `seed*.json`
+    glob, so no caller may write one:
+
+    - the seeder's own `seed*.world.json` inputs, which `load_fixture`
+      refuses as a foreign format;
+    - ORPHANS from an older generation, left behind because seeding a
+      different seed count or formula writes the new set without removing
+      the old. An orphan makes the set MIXED, and a caller that takes
+      `paths[0]` reads clean while its neighbour walking the whole list
+      dies — so it is raised HERE, naming every one, instead of surfacing
+      one lane at a time as a format refusal.
+    """
+    out, orphans = [], []
+    for p in sorted(dirpath.glob("seed*.json")):
+        if p.name.endswith(".world.json"):
+            continue
+        (out if json.loads(p.read_text()).get("format") == 4 else orphans).append(p)
+    if orphans:
+        raise RuntimeError(
+            f"{dirpath}: {len(orphans)} orphaned fixture(s) from an older generation "
+            f"beside {len(out)} current — {', '.join(p.name for p in orphans)}. "
+            "Delete them and re-run `npm run seed && npm run export`."
+        )
+    return out
+
+
 def load_fixture(path: Path) -> dict:
     """Load one seed fixture — THE chokepoint every fixture-consuming lane
     shares, so staleness is checked exactly once, here:

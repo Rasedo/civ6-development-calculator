@@ -30,13 +30,14 @@ import torch
 _ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_ROOT / "gpu"))
 sys.path.insert(0, str(_ROOT / "policy"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES  # noqa: E402
+from core import BatchSim, load_rules, load_fixture, fixture_paths  # noqa: E402
+from warmup import settle_all
 import drive  # noqa: E402
 import ladder  # noqa: E402
 
 
 def build(rules, path, turns=25):
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
     for _ in range(turns):
         sim.step()
     return sim
@@ -69,7 +70,7 @@ def _live_city(sim):
 
 def main() -> None:
     rules = load_rules()
-    path = sorted(FIXTURES.glob("seed*.json"))[0]
+    path = fixture_paths()[0]
     sim = build(rules, path)
     row, j, si, di, plc = _live_city(sim)
     sim.seat_ext[0, row] = True

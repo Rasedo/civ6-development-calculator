@@ -18,7 +18,7 @@ import torch
 torch.set_num_threads(4)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
 from core.rng import masked_choice
 
 HEAD_PROD, HEAD_TECH, HEAD_CIVIC, HEAD_UNIT, HEAD_ENVOY = 101, 202, 303, 404, 505
@@ -82,8 +82,7 @@ def main() -> int:
 
     where = Path(args.worlds) if args.worlds else FIXTURES
     rules = load_rules(where / "rules.json")
-    # `seed*.json` also matches the Layer A `seed*.world.json` beside it.
-    paths = [p for p in sorted(where.glob("seed*.json")) if not p.name.endswith(".world.json")]
+    paths = fixture_paths(where)
     if not paths:
         print("no fixtures — run `npm run seed && npm run export` first")
         return 1

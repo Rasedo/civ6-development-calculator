@@ -35,12 +35,13 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
+from warmup import settle_all
 
 
 # ------------------------------------------------------------------ helpers ---
 def build(rules, path, steps: int = 20, dtype=torch.float64):
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=dtype)
+    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=dtype))
     for _ in range(steps):
         sim.step()
     return sim
@@ -316,7 +317,7 @@ def main() -> None:
     global sim0
     rules = load_rules()
     rj = json.loads((FIXTURES / "rules.json").read_text())
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
     path = paths[0]
     print(f"gp_aura_test on {path.name}")

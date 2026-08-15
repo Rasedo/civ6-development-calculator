@@ -60,7 +60,8 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "policy"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
+from warmup import settle_all
 import drive
 
 
@@ -86,7 +87,7 @@ def head_war(sim, row: int, tgt: int, sue: bool = False) -> None:
 
 # ------------------------------------------------------------------ helpers ---
 def build(rules, path, steps: int = 18, dtype=torch.float64):
-    sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=dtype)
+    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=dtype))
     for _ in range(steps):
         sim.step()
     return sim
@@ -452,7 +453,7 @@ def _round_trips(name: str, mut) -> bool:
 
 def main() -> None:
     rules = load_rules()
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
     path = paths[0]
     print(f"geopolitics_test on {path.name}")
@@ -475,7 +476,7 @@ def main() -> None:
     # restore into fresh storage and orphan the other half.
     assert "civ_warmonger" in _MUT2, "civ_warmonger must be registered in _MUTABLE"
     assert "warmonger" not in _MUT2, "warmonger is a VIEW of civ_warmonger"
-    s3 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s3 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     assert s3.civ_warmonger[:, 0].shape == (1,), s3.civ_warmonger[:, 0].shape
     assert s3.civ_warmonger[:, 0].data_ptr() == s3.civ_warmonger.data_ptr(), (
         "warmonger must share storage with civ_warmonger[:, 0]"
@@ -500,7 +501,7 @@ def main() -> None:
     # --- DIPLOMATIC FAVOR ----------------------------------------------------
     for _f in ("diplo_favor", "civ_only_diplo_favor"):
         assert _round_trips(_f, _MUT2), f"{_f} must round-trip through _MUTABLE"
-    s4 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s4 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     assert s4._favor_per_suz == 1, f"GS pays 1 favor per suzerainty, got {s4._favor_per_suz}"
     # the suzerain tests: >= suzerainEnvoys AND strictly more than every civ seat
     suz_min = int(s4.rules.citystate.get("suzerainEnvoys", 3))
@@ -517,7 +518,7 @@ def main() -> None:
         assert int(s4._suzerain_count(1)[0]) == 1, "the strictly-higher civ is suzerain"
         assert int(s4._suzerain_count(0)[0]) == 0, "... and seat 0 is not"
     # the accrual itself: tier + suzerainties, and it is CUMULATIVE
-    s5 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s5 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     f0 = int(s5.civ_diplo_favor[0, 0])
     s5.step()
     f1 = int(s5.civ_diplo_favor[0, 0])
@@ -532,7 +533,7 @@ def main() -> None:
     # --- the WORLD CONGRESS + the DIPLOMATIC victory -------------------------
     for _f in ("congress_sessions", "diplo_points", "civ_only_diplo_points"):
         assert _round_trips(_f, _MUT2), f"{_f} must round-trip through _MUTABLE"
-    s6 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s6 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     assert s6._congress_interval == 30, f"GS convenes every 30 turns, got {s6._congress_interval}"
     assert s6._congress_min_era == 2, f"GS starts at the MEDIEVAL era (index 2), got {s6._congress_min_era}"
     assert s6._dvp_win == 20, f"GS diplomatic victory is 20 points, got {s6._dvp_win}"
@@ -569,7 +570,7 @@ def main() -> None:
         assert int(s6.civ_diplo_points[0, 0]) == 0, "the loser takes nothing"
 
     # a TIE keeps the LOWER seat id (seat 0)
-    s7 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s7 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     s7.turn = s7._congress_interval
     s7.civ_techs[:, 0].zero_(); s7.civ_techs[:, 0, _era_ok] = True
     s7.civ_diplo_favor[:, 0] = 25
@@ -581,7 +582,7 @@ def main() -> None:
         assert int(s7.civ_diplo_points[0, 1]) == 0
 
     # zero favor everywhere: the session counts but awards nothing
-    s8 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s8 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     s8.turn = s8._congress_interval
     s8.civ_techs[:, 0].zero_(); s8.civ_techs[:, 0, _era_ok] = True
     s8.civ_diplo_favor[:, 0].zero_(); s8.civ_diplo_favor[:, 1:].zero_()
@@ -589,7 +590,7 @@ def main() -> None:
     assert int(s8.congress_sessions[0]) == 1 and int(s8.civ_diplo_points[0, 0]) == 0, "no favor -> no award"
 
     # the victory check itself
-    s9 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s9 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     s9.civ_diplo_points[:, 0] = s9._dvp_win - 1
     assert int(s9._diplomatic_victor()[0]) == -1, "one point short is not a win"
     s9.civ_diplo_points[:, 0] = s9._dvp_win

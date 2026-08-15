@@ -13,44 +13,34 @@ class SimPhase:
         if self.n_majors > 1:
             self._geo_denounce_and_ally()
         for row in range(self.n_majors):
-            active = self._seat_turn(row)
-            if not bool(active.any()):
+            self._seat_turn(row)
+
+            # THE UNIT WALK IS NOT THE ECONOMY TURN. `_seat_turn` answers for a
+            # seat that owns a CITY; this walk answers for a seat that owns a
+            # UNIT, and a settler start owns nothing else. Gating it on the
+            # economy's mask locks a city-less seat out of the FOUND verb —
+            # the one verb that would give it a city — for the whole game.
+            # CIV6: a civ is eliminated when it holds neither a city nor a
+            # settler, and until then it takes its turn.
+            _dsq = getattr(self, "_driven_useq", None)
+            if _dsq is None or row not in _dsq:
                 continue
-
-            # Builder verbs and missionary SPREAD verbs ride the wire; their
-            # phase.ts call positions are here, builders then missionaries.
-
-            # Great General moves ride the wire; their phase.ts call position
-            # is here, BEFORE the war loop, so the aura reflects the advanced
-            # position (a general spawned in the GP claim above walks this turn
-            # on full MP).
-
-            # The unit REPLAY branches on the war state at entry (a peace made
-            # this turn still runs the war branch, like the TS if/else): a seat
-            # at war with ANYONE takes the WAR branch, whose act scans every
-            # at-war seat's units and cities. The counters this branch used to
-            # carry now ride _seat_war_peace_tail, inside the seat's own block.
-            atw_any = active & self.war[:, row, :self.n_majors].any(dim=1)
-            # This seat's live slots, computed once (deaths only shrink
-            # mid-loop; neither loop spawns) — the war AND peace walks reuse it.
+            walk = self.civ_alive[:, row] & self.seat_ext[:, row]
+            if not bool(walk.any()):
+                continue
             # Replayed unit acts fire HERE, at the walkers' own position in the
             # phase, never before step(): battles DRAW, so they must consume
             # their combat draws at the same position in the stream as the TS
             # in-phase replay. Draw-free actions (production/tech/civic) stay
-            # pre-step. War rows here, peace rows at the peace loop below.
-            _dsq = getattr(self, "_driven_useq", None)
-            if _dsq is not None and row in _dsq:
-                _rows_w = atw_any & self.seat_ext[:, row]
-                if bool(_rows_w.any()):
-                    _ord_w = torch.where(_rows_w.view(-1, 1, 1), _dsq[row], torch.full_like(_dsq[row], -1))
-                    self.apply_seat_unit_sequence(row, _ord_w)
-            # Suing for peace rides the wire's war verb.
-            pea = active & ~atw_any  # a seat at ANY war neither patrols nor rolls the seat-0 declaration
-            if _dsq is not None and row in _dsq:
-                _rows_p = pea & self.seat_ext[:, row]
-                if bool(_rows_p.any()):
-                    _ord_p = torch.where(_rows_p.view(-1, 1, 1), _dsq[row], torch.full_like(_dsq[row], -1))
-                    self.apply_seat_unit_sequence(row, _ord_p)
+            # pre-step. The walk branches on the war state at entry (a peace
+            # made this turn still runs the war branch, like the TS if/else):
+            # a seat at war with ANYONE takes the WAR branch, whose act scans
+            # every at-war seat's units and cities.
+            atw = walk & self.war[:, row, :self.n_majors].any(dim=1)
+            for _rows in (atw, walk & ~atw):
+                if bool(_rows.any()):
+                    self.apply_seat_unit_sequence(row, torch.where(
+                        _rows.view(-1, 1, 1), _dsq[row], torch.full_like(_dsq[row], -1)))
 
         self._seat_route_cache = None
 

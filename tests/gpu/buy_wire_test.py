@@ -32,7 +32,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
+from warmup import settle_all
 
 ROWS = (0, 1)  # seat 0 and civ 0 — the SAME ladder must serve both
 ACTIVE = torch.ones(1, dtype=torch.bool)
@@ -40,7 +41,7 @@ RICH = 10_000.0
 
 
 def build(rules, path):
-    return BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+    return settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
 
 
 def t1(v: int) -> torch.Tensor:
@@ -429,7 +430,7 @@ def case_levy(sim, base, row: int) -> None:
 
 def main() -> None:
     rules = load_rules()
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
     path = paths[0]
     print(f"buy_wire_test on {path.name}")

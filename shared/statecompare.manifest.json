@@ -165,6 +165,7 @@
      "compare": "exact",
      "covers": [],
      "planes": [],
+     "derived": true,
      "note": "guards the per-city key: two cities colliding on one center tile would merge in the city digest and change nothing else."
     },
     {

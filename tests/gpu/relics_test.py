@@ -21,16 +21,17 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
 from core.engine import _MUTABLE
+from warmup import settle_all
 
 
 def main() -> None:
     rules = load_rules()
     rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
-    sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
 
     # --- 1) sourced constants, and the building really is the TEMPLE --------
     assert sim._relic_slots == 1, f"a Temple holds ONE relic, got {sim._relic_slots}"
@@ -86,7 +87,7 @@ def main() -> None:
     assert int(sim.city_relics[0, 0, 2]) == 1, "placement falls through to the next live temple city"
 
     # --- 4) the tourism term actually counts relics ------------------------
-    s2 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s2 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     era = s2._civ_era(s2.civ_techs[:, 0], s2.civ_civics[:, 0])
     base = s2._tourism_of(s2.city_gw_writing[:, 0], s2.city_gw_art[:, 0], s2.city_gw_music[:, 0], s2.city_alive[:, 0], s2.tile_seat == 0, era)
     s2.city_alive[:, 0, 0] = True
@@ -108,7 +109,7 @@ def main() -> None:
     #      REUSED slot index still holds from a dead occupant.
     #   b. _CITY_SLOT_FIELDS must name every work plane, or a compaction leaves
     #      one behind at the old index.
-    s3 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s3 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     if s3.n_majors >= 3 and int(s3.city_alive[0, 1].sum()) >= 1:
         j = int(s3.city_alive[0, 1].nonzero()[0])
         s3.city_relics[0, 1, j] = 1
@@ -135,7 +136,7 @@ def main() -> None:
             print("  #79a works+relics ride the rc->rc transfer, source slot cleared OK")
 
     # b. compaction must permute ALL FOUR planes with their city.
-    s4 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s4 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     for nm in ("city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts"):
         assert nm in s4._CITY_SLOT_FIELDS, f"{nm} missing from _CITY_SLOT_FIELDS — compaction drops it"
     # SCAN for a civ holding two cities rather than assuming fixture 0 does —
@@ -144,7 +145,7 @@ def main() -> None:
     # finds nothing and would skip the case entirely.
     civ_only_pick = -1
     for p in paths[:4]:
-        s4 = BatchSim([load_fixture(p)], rules, device="cpu", dtype=torch.float64)
+        s4 = settle_all(BatchSim([load_fixture(p)], rules, device="cpu", dtype=torch.float64))
         for _ in range(60):
             s4.step()
             for r in range(s4.n_majors - 1):

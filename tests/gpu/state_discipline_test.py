@@ -33,21 +33,22 @@ os.environ.setdefault("CIV6_ALIAS_CHECK", "1")
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
 from core.engine import _MUTABLE
+from warmup import settle_all
 
 
 def build(paths, rules):
-    return BatchSim([load_fixture(p) for p in paths[:2]], rules, device="cpu", dtype=torch.float64)
+    return settle_all(BatchSim([load_fixture(p) for p in paths[:2]], rules, device="cpu", dtype=torch.float64))
 
 
 def main() -> None:
-    from core.engine import _ALIAS_CHECK
+    from core import simbase
 
-    assert _ALIAS_CHECK, "the engine flag is off — CIV6_ALIAS_CHECK must be set BEFORE importing core"
+    assert simbase._ALIAS_CHECK, "the engine flag is off — CIV6_ALIAS_CHECK must be set BEFORE importing core"
 
     rules = load_rules()
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
 
     # --- 1) the check runs clean on the real engine ------------------------

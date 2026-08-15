@@ -21,17 +21,18 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
 from core.engine import _MUTABLE
+from warmup import settle_all
 
 
 def main() -> None:
     rules = load_rules()
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
 
     # --- 1) the plane exists, is peace-by-default and survives a round trip --
-    sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     # A (seat, city-state) war is a cell of the war matrix and has no second
     # name: what is registered and what carries the state through a
     # round trip are the same tensor, so the pair cannot drift.
@@ -55,7 +56,7 @@ def main() -> None:
     # --- 2) peace hides the centre; a declaration reveals it -----------------
     # Walk a few turns so a seat-0 unit exists, then plant one adjacent to a
     # live city-state centre and read the mask with war off, then on.
-    s2 = BatchSim([load_fixture(p) for p in paths], rules, device="cpu", dtype=torch.float64)
+    s2 = settle_all(BatchSim([load_fixture(p) for p in paths], rules, device="cpu", dtype=torch.float64))
     for _ in range(30):
         s2.step()
     # CONSTRUCT the configuration rather than hunt for it: take any live seat-0

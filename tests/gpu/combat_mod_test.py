@@ -27,8 +27,9 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
 from core.engine import UNIT_SLOTS, js_round, FLANKING_CS, SUPPORT_CS
+from warmup import settle_all
 
 HOLD = 12
 
@@ -73,7 +74,7 @@ def find_melee(rules, paths):
     """Scripted-advance until a seat-0 MELEE unit can strike an adjacent
     barb/civ unit (not a city) — returns (sim, p, code, name)."""
     for path in paths:
-        sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
         for _ in range(120):
             smap = sim._seat_slot_map(0)[0]
             m = sim._seat_unit_mask(0)[0]  # [N, A] — head rows, not slots
@@ -286,7 +287,7 @@ def test_integrated(sim, p, code, name) -> None:
 
 def main() -> None:
     rules = load_rules()
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
     sim, p, code, name = find_melee(rules, paths)
     print(f"combat_mod_test on {name}: melee slot {p}, code {code}, turn {sim.turn}")

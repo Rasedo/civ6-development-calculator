@@ -439,10 +439,12 @@ def _scope_receivers(fn: ast.AST, in_core: bool) -> set[str]:
     if in_core:
         recv.add("self")
     recv.add("sim")
+    # A CONSTRUCTOR call settles it whatever the local is called: requiring the
+    # name to look like a sim as well is what let a dead alias survive on one
+    # spelled `cand`.
     recv |= {n.targets[0].id for n in ast.walk(fn)
              if isinstance(n, ast.Assign) and len(n.targets) == 1
              and isinstance(n.targets[0], ast.Name)
-             and SIM_RX.match(n.targets[0].id)
              and isinstance(n.value, ast.Call)
              and _SIM_CTOR.match(_callee(n.value))}
     return recv

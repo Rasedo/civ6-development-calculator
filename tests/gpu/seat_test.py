@@ -12,12 +12,12 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "policy"))
-from core import BatchEnv, load_rules, load_fixture, FIXTURES
+from core import BatchEnv, load_rules, load_fixture, fixture_paths
 
 
 def main() -> None:
     rules = load_rules()
-    paths = sorted(FIXTURES.glob("seed*.json"))[:4]
+    paths = fixture_paths()[:4]
     fixtures = [load_fixture(p) for p in paths]
     a = BatchEnv(fixtures, rules, device="cpu", dtype=torch.float64)
     b = BatchEnv(fixtures, rules, device="cpu", dtype=torch.float64)
@@ -66,10 +66,8 @@ def main() -> None:
     # compares trace columns and an observation is not one. This lane is the
     # only thing standing between that renderer and silent drift.
     # `observeSeat` in cpu/core/observe.ts is the reference layout.
-    import pathlib as _pl
     from core.env import BatchEnv as _BE
-    _p = sorted(_pl.Path("seeder/worlds").glob("seed*.json"))[0]
-    e2 = _BE([load_fixture(_p)], rules, device="cpu", dtype=torch.float64)
+    e2 = _BE([load_fixture(fixture_paths()[0])], rules, device="cpu", dtype=torch.float64)
     s2 = e2.sim
     for _ in range(60):
         s2.step()
@@ -108,7 +106,7 @@ def main() -> None:
 
     # The POST-HOC PROTAGONIST pick — a finished game reads from whichever
     # seat earned the horizon, so no single seat's fate invalidates a seed.
-    e3 = BatchEnv([load_fixture(sorted(FIXTURES.glob("seed*.json"))[0])], rules,
+    e3 = BatchEnv([load_fixture(fixture_paths()[0])], rules,
                   device="cpu", dtype=torch.float64)
     s3 = e3.sim
     # (a) an explicit winner overrides every other consideration

@@ -41,7 +41,7 @@ POKE_COST = {
     "great_works": 2.7, "religion_gp": 3.2, "government": 3.3,
     "relics": 3.4, "trade2": 3.5, "bankruptcy": 3.7, "domination": 3.8,
     "culture_victory": 4.3, "space_race": 4.8, "encampment": 4.9, "citystate_verbs": 6.6,
-    "citystate_bonus": 7.9, "buy_wire": 9.2, "civ_city_registry": 12.4, "controlled": 13.8,
+    "citystate_bonus": 7.9, "buy_wire": 9.2, "city_registry": 12.4, "controlled": 13.8,
     "combat_mod": 17.1, "ranged": 18.5, "occupancy": 21.0,
     "governors": 22.2, "war_weariness": 23.2, "geopolitics": 23.8, "seat": 29.0,
     "gp_aura": 31.6, "war": 32.5, "religion2": 51.7,
@@ -121,7 +121,7 @@ def lane_parallel(steps: list[tuple[str, list[str], int]], workers: int, threads
 
 def lane(steps: list[tuple[str, list[str], int]]) -> None:
     for name, cmd, threads in steps:
-        if failed.is_set():
+        if failed.is_set() and not NO_BAIL:
             with lock:
                 results.append((name, 0.0, -1))
                 print(f"  {name:<14}   skip  (earlier failure)", flush=True)

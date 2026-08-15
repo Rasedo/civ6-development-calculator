@@ -21,8 +21,9 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
 from core.engine import UNIT_SLOTS, MAJOR_POOL_MAX, pool_view
+from warmup import settle_all
 
 HOLD = 12
 
@@ -49,7 +50,7 @@ def find_fight(rules, paths):
     UNIT (barb or another major's) — the mask also offers at-war CITY sieges,
     which this test's defender probe doesn't model."""
     for path in paths:
-        sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+        sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
         for _ in range(90):
             smap = sim._seat_slot_map(0)[0]
             m = sim._seat_unit_mask(0)[0]  # [N, A] — head rows, not slots
@@ -81,7 +82,7 @@ def defender_state(sim, tile, pre=None):
 
 def main() -> None:
     rules = load_rules()
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
     sim, p, code, name = find_fight(rules, paths)
     print(f"ranged_test on {name}: unit slot {p}, attack code {code}, turn {sim.turn}")

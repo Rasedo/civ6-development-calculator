@@ -23,16 +23,17 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
 from core.engine import BARB_SEAT
+from warmup import settle_all
 
 
 def build(turns: int = 10):
     rules = load_rules()
-    sim = BatchSim(
-        [load_fixture(p) for p in sorted(FIXTURES.glob("seed*.json"))[:1]],
+    sim = settle_all(BatchSim(
+        [load_fixture(p) for p in fixture_paths()[:1]],
         rules, device="cpu", dtype=torch.float64,
-    )
+    ))
     for _ in range(turns):
         sim.step()
     return sim
@@ -98,7 +99,7 @@ def test_spawn_probe_obeys_encampments() -> None:
         "a live enemy Encampment must bar the tile for seat 0"
     )
     found, spot = sim._first_free_spot(
-        torch.tensor([t]), "seat0",
+        torch.tensor([t]), 0,
         civ_mask=torch.zeros(sim.B, dtype=torch.bool),
     )
     assert int(spot[0]) != t, (

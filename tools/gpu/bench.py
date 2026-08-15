@@ -9,7 +9,7 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
 
 
 def bench(device: str, dtype, batch: int, turns: int, fixture: dict, rules) -> float:
@@ -34,7 +34,7 @@ def main() -> None:
     args = p.parse_args()
 
     rules = load_rules()
-    fixture = load_fixture(sorted(FIXTURES.glob("seed*.json"))[0])
+    fixture = load_fixture(fixture_paths()[0])
     batches = [int(b) for b in args.batches.split(",")]
 
     devices = [("cpu", torch.float64)]

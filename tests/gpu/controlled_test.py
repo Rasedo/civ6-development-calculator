@@ -16,13 +16,14 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
+from warmup import settle_all
 
 
 def main() -> None:
     rules = load_rules()
-    paths = sorted(FIXTURES.glob("seed*.json"))
-    sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    paths = fixture_paths()
+    sim = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     for _ in range(25):
         sim.step()
 
@@ -77,7 +78,7 @@ def main() -> None:
 
     # 6. mask-driven random control runs indefinitely and legally — every
     # sampled action comes from seat_masks and must be honored
-    sim2 = BatchSim([load_fixture(paths[1])], rules, device="cpu", dtype=torch.float64)
+    sim2 = settle_all(BatchSim([load_fixture(paths[1])], rules, device="cpu", dtype=torch.float64))
     for _ in range(30):
         sim2.step()
     sim2.seat_ext[0, 1] = True

@@ -16,11 +16,12 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
+from warmup import settle_all
 
 
 def build(rules, path):
-    return BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+    return settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
 
 
 def dom(sim) -> int:
@@ -31,7 +32,7 @@ def main() -> int:
     rules = load_rules()
     # resolve the fixture by POSITION: the lane only needs "some 2-civ
     # fixture", so a seed-set change cannot break it.
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     if not paths:
         print("no fixtures — run `npm run seed && npm run export` first")
         return 1

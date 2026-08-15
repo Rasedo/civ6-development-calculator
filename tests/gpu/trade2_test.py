@@ -32,14 +32,15 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
 from core.engine import _MUTABLE
+from warmup import settle_all
 
 
 def main() -> None:
     rules = load_rules()
     rj = json.loads((FIXTURES / "rules.json").read_text())
-    paths = sorted(FIXTURES.glob("seed*.json"))
+    paths = fixture_paths()
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
 
     # --- 1) exported constants mirror cpu/core/trade.ts --------------------
@@ -47,7 +48,7 @@ def main() -> None:
     assert int(tr["intlGold"]) == 3, f"intlGold should be 3, got {tr['intlGold']}"
     assert int(tr["duration"]) == 20, f"duration should be 20, got {tr['duration']}"
 
-    sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    sim = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     assert sim._trade_intl_gold == 3 and sim._trade_duration == 20, "engine trade consts mismatch"
     for _p in ("seat_route_dseat", "seat_route_dcity", "seat_route_exp"):
         assert _p in _MUTABLE, f"{_p} must be _MUTABLE — the route store rides snapshot/restore"
@@ -105,7 +106,7 @@ def main() -> None:
         assert abs(float(inc[0, 0, 2]) - 4.0) < 1e-9, f"one dest specialty → 3+1 gold, got {float(inc[0, 0, 2])}"
 
     # --- 3) duration expiry: due route dropped, future route kept ----------
-    s = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     fid = int(s.city_id[0, 1, 0])
     s.seat_routes[0, 1, 0, 0] = fid
     s.seat_routes[0, 1, 0, 1] = int(s.city_id[0, 1, 0])  # (any active dest; expiry keys on exp only)
@@ -119,7 +120,7 @@ def main() -> None:
     assert int(s.seat_routes[0, 1, 1, 0]) == fid, "a future route must survive expiry"
 
     # --- 4) dest-gone: the (seat, city id) pair must still resolve ---------
-    s2 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s2 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     live_cid = int(s2.city_id[0, 0, 0])
     dead_cid = int(s2.city_id[0, 0].max()) + 1000  # an id row 0 has never minted
     for slot, cid in ((0, dead_cid), (1, live_cid)):
@@ -137,7 +138,7 @@ def main() -> None:
     #   city under the captor (`civ_next_city_id[dst_row]++`) and re-crowns the
     #   same centre tile, so the tile stays a live centre while TS's
     #   (toSeat, toSeatCity) lookup stops resolving.
-    s4 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s4 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     cap_tile = int(s4.city_center[0, 0, 0])
     cap_cid = int(s4.city_id[0, 0, 0])
     s4.seat_routes[0, 1, 0, 0] = int(s4.city_id[0, 1, 0])
@@ -156,7 +157,7 @@ def main() -> None:
     assert int(s4.seat_route_dcity[0, 1, 0]) == -1 and int(s4.seat_route_dseat[0, 1, 0]) == -1, "dropped slot's dest must reset"
 
     # --- 6) the route tensors ride snapshot/restore ------------------------
-    s3 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s3 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     snap = s3.snapshot()
     s3.seat_route_dseat[0, 1, 0] = 0
     s3.seat_route_dcity[0, 1, 0] = 123

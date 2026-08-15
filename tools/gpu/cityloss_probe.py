@@ -3,9 +3,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 import core.simbase as _eng
 _eng.U_MAX = 512; _eng.P_MAX = 512
-from core import BatchSim, load_rules, load_fixture, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
 
-pool = [load_fixture(p) for p in sorted(FIXTURES.glob("seed*.json"))[:24]]
+pool = [load_fixture(p) for p in fixture_paths()[:24]]
 sim = BatchSim(pool, load_rules(), device="cpu", dtype=torch.float64)
 B = sim.B
 peak = sim.city_alive[:, 0].sum(dim=1).clone()
