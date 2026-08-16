@@ -41,7 +41,7 @@ def build(rules, path, turns=25):
     # Unlock the scaffold for every row: districts gate on techs/civics and an
     # undriven world researches nothing — the TILE WIRE, not the unlock, is
     # what this lane proves.
-    for _di, ut, uc, _plc in sim._scaffold:
+    for _di, ut, uc, _plc, _fc in sim._scaffold:
         if ut >= 0:
             sim.civ_techs[:, :, ut] = True
         if uc >= 0:
@@ -62,7 +62,7 @@ def _live_city(sim):
             reg = sim.city_dist_tile[0, row, j]
             spec = int(((reg >= 0) & sim._is_specialty.reshape(-1)).sum())
             cap = (int(sim.city_pop[0, row, j]) - 1) // 3 + 1
-            for si, (di, ut, uc, plc) in enumerate(sim._scaffold):
+            for si, (di, ut, uc, plc, _fc) in enumerate(sim._scaffold):
                 if plc != 0:
                     continue  # the plain surface: no aqueduct/encampment/coast rule
                 unlocked = (bool(sim.civ_techs[0, row, ut]) if ut >= 0
@@ -190,7 +190,7 @@ def main() -> None:
     #   tile per type, so the second is carried by the tile plane and counted
     #   there — and the non-repeatable control is what proves the gate is the
     #   `allowMultiple` flag rather than a hole in the harness.
-    rep = next(((k, d) for k, (d, _u, _c, _p) in enumerate(sim._scaffold)
+    rep = next(((k, d) for k, (d, _u, _c, _p, _f) in enumerate(sim._scaffold)
                 if bool(sim._is_repeatable[d])), None)
     assert rep is not None, "no repeatable district in the scaffold — this section proves nothing"
     si_r, di_r = rep
@@ -198,7 +198,7 @@ def main() -> None:
     def place_twice(s, si_x: int, di_x: int, complete_first: bool):
         """Queue that column twice on one city, each on its own tile. Returns
         (first tile, second tile or -1 if the engine refused)."""
-        _di, ut, uc, plc_x = s._scaffold[si_x]
+        _di, ut, uc, plc_x, _fc = s._scaffold[si_x]
         if ut >= 0:
             s.civ_techs[0, row, ut] = True
         if uc >= 0:
@@ -234,7 +234,7 @@ def main() -> None:
         "completedDistrictCount missed the second one — the tile-plane term is not counting"
 
     one = build(rules, path)
-    si_p, di_p = next((k, d) for k, (d, _u, _c, p) in enumerate(one._scaffold)
+    si_p, di_p = next((k, d) for k, (d, _u, _c, p, _f) in enumerate(one._scaffold)
                       if p == 0 and not bool(one._is_repeatable[d]))
     c, d2 = place_twice(one, si_p, di_p, complete_first=True)
     assert c >= 0, "the control district did not go down even once"

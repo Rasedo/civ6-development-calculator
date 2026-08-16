@@ -62,7 +62,7 @@ class SimSeats:
         d_tech = [
             (self.civ_techs[:, row, utech] if utech >= 0
              else (self.civ_civics[:, row, uciv] if uciv >= 0 else ones_b))
-            for (_di, utech, uciv, _plc) in self._scaffold
+            for (_di, utech, uciv, _plc, _fc) in self._scaffold
         ] if (self.districts_on and self._scaffold) else []
         w_okc: list[torch.Tensor | None] = []
         for wi in range(nW_m):
@@ -91,7 +91,7 @@ class SimSeats:
                 cap_max = torch.div(self.city_pop[:, row, j] - 1, 3, rounding_mode="floor") + 1
                 spec_cnt = ((self.city_dist_tile[:, row, j] >= 0) & self._is_specialty).sum(dim=1)
                 site = self._district_elig_site(row, j)  # every type in this city shares it
-                for si, (di, _ut, _uc, plc) in enumerate(self._scaffold):
+                for si, (di, _ut, _uc, plc, _fc) in enumerate(self._scaffold):
                     not_owned = self._district_slot_free(row, j, di)
                     under_cap = (spec_cnt < cap_max) if bool(self._is_specialty[di]) else ones_b
                     can_place = self._district_elig(row, j, di, plc, base=site).any(dim=1)
@@ -106,8 +106,9 @@ class SimSeats:
                         continue
                     ok_w[:, wi] = okc_m & self._wonder_cand(row, j, wi, base_okm).any(dim=1)
             # PROJECT columns [nP], the `availableProjects` predicate: the row's
-            # district must be COMPLETE on this city, and a SPACE row must also
-            # be un-done, tech-unlocked, and preceded by its finished step.
+            # district must be COMPLETE on this city; a SPACE row must also be
+            # un-done, tech-unlocked, and preceded by its finished step; a
+            # LASER row is repeatable and tech-gated only.
             ok_p = torch.zeros(B, max(nP_m, 0), dtype=torch.bool, device=dev)
             for pi_m, prow_m in enumerate(self._proj_rows if self.districts_on else []):
                 d_im = int(prow_m.get("d", -1))
@@ -117,6 +118,10 @@ class SimSeats:
                 okp_m = (regp_m >= 0) & self.district_complete.gather(1, regp_m.clamp(min=0).unsqueeze(1)).squeeze(1)
                 if int(prow_m.get("sp", 0)):
                     okp_m = okp_m & self._space_step_ok(row, pi_m)
+                elif int(prow_m.get("ls", 0)):
+                    rt_m = int(prow_m.get("rt", -1))
+                    if rt_m >= 0:
+                        okp_m = okp_m & self.civ_techs[:, row, rt_m]
                 ok_p[:, pi_m] = okp_m
             idle_j = idle[:, j].unsqueeze(1)
             prod_cols.append(torch.cat([base_j & idle_j, ok_w & idle_j, ok_p & idle_j], dim=1))
@@ -817,7 +822,7 @@ class SimSeats:
                 reg_j = self.city_dist_tile[:, row, j]  # [B, nD] THIS city's registry — the list TS counts
                 spec_cnt = ((reg_j >= 0) & self._is_specialty.reshape(1, -1)).sum(dim=1)
                 cap_j = torch.div(self.city_pop[:, row, j] - 1, 3, rounding_mode="floor") + 1
-                for si, (di, utech, uciv, plc) in enumerate(self._scaffold):
+                for si, (di, utech, uciv, plc, fc) in enumerate(self._scaffold):
                     want_d = is_d & (a == self.DISTRICT_BASE + si)
                     if not bool(want_d.any()):
                         continue
@@ -829,8 +834,13 @@ class SimSeats:
                     want_d = want_d & has_tech & self._district_slot_free(row, j, di) & under_cap
                     if not bool(want_d.any()):
                         continue
-                    disc = self._district_discounted(row, di)
-                    d_cost_si = torch.where(disc, torch.floor(d_cost * 0.6), d_cost)
+                    if fc >= 0:
+                        # A FLAT-priced district (the Spaceport): no research
+                        # scaling, no under-represented discount.
+                        d_cost_si = torch.full_like(d_cost, float(fc))
+                    else:
+                        disc = self._district_discounted(row, di)
+                        d_cost_si = torch.where(disc, torch.floor(d_cost * 0.6), d_cost)
                     placed = self._place_district(row, j, di, want_d, plc, dtile[:, j, si])
                     if bool(placed.any()):
                         self.city_current[:, row, j] = torch.where(placed, torch.full_like(cur_j, self.DISTRICT_BASE + si), self.city_current[:, row, j])
@@ -869,11 +879,19 @@ class SimSeats:
                     # the step in front of it may have completed since.
                     if int(prow_a.get("sp", 0)):
                         has_pa = has_pa & self._space_step_ok(row, pi_a)
+                    elif int(prow_a.get("ls", 0)):
+                        rt_a = int(prow_a.get("rt", -1))
+                        if rt_a >= 0:
+                            has_pa = has_pa & self.civ_techs[:, row, rt_a]
                     rows_p = is_p & (a == pcode) & has_pa
                     if not bool(rows_p.any()):
                         continue
+                    # Space steps and laser stations carry their REAL fixed
+                    # price (`pc`); everything else takes the generic curve.
+                    pc_fixed = int(prow_a.get("pc", -1))
+                    price_a = torch.full_like(pc_a, float(pc_fixed)) if pc_fixed >= 0 else pc_a
                     self.city_current[:, row, j] = torch.where(rows_p, torch.full_like(cur_j, self.PROJECT_BASE + pi_a), self.city_current[:, row, j])
-                    self.city_cost[:, row, j] = torch.where(rows_p, pc_a, self.city_cost[:, row, j])
+                    self.city_cost[:, row, j] = torch.where(rows_p, price_a, self.city_cost[:, row, j])
                     self.city_progress[:, row, j] = torch.where(rows_p, torch.zeros_like(self.city_progress[:, row, j]), self.city_progress[:, row, j])
 
     def _select_research(self, row: int, want: torch.Tensor, ok: torch.Tensor, is_civic: bool = False) -> None:

@@ -562,6 +562,26 @@
      ]
     },
     {
+     "name": "spaceLy",
+     "compare": "exact",
+     "covers": [
+      "Seat.spaceLy"
+     ],
+     "planes": [
+      "space_ly"
+     ]
+    },
+    {
+     "name": "spaceLasers",
+     "compare": "exact",
+     "covers": [
+      "Seat.spaceLasers"
+     ],
+     "planes": [
+      "space_lasers"
+     ]
+    },
+    {
      "name": "routeCount",
      "compare": "exact",
      "covers": [

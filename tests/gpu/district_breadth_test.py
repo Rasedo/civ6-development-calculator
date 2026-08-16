@@ -156,7 +156,7 @@ def _try_encampment_placement(rules, rj, path) -> bool:
     sim = build(rules, path)
     EN = didx(rj, "ENCAMPMENT")
     # scaffold spec carries placement 3 for the encampment district
-    plc = next((p for (di, ut, uc, p) in sim._scaffold if di == EN), None)
+    plc = next((p for (di, ut, uc, p, _fc) in sim._scaffold if di == EN), None)
     assert plc == 3, f"ENCAMPMENT scaffold placement must be 3 (notAdjacentToCityCenter), got {plc}"
 
     cc = sim._adj_center_count()  # [B, T]

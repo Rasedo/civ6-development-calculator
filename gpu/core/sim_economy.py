@@ -892,7 +892,11 @@ class SimEconomy:
         legal where the placer rejects it. It answers LEGALITY only — ranking
         the legal tiles is the policy's job (`district_rank_adj`).
         """
-        surface = self.coastal_water if placement == 2 else self.d_usable  # Harbor sits on coastal water, others on land
+        # Harbor sits on coastal water, the Spaceport on FLAT land (no Hills),
+        # everything else on any usable land.
+        surface = (self.coastal_water if placement == 2
+                   else self.d_usable & ~self.hills if placement == 4
+                   else self.d_usable)
         elig = (self._district_elig_site(row, j) if base is None else base) & surface
         if placement in (1, 3):  # Aqueduct: adjacent-centre + water source; Encampment: NOT adjacent-centre
             cc = self._adj_center_count()  # [B, T] adjacent CITY_CENTERs (any seat)
@@ -901,10 +905,10 @@ class SimEconomy:
 
     def district_rank_adj(self, di: int, placement: int = 0) -> torch.Tensor:
         """[B, T] the adjacency a district of type `di` WOULD earn on each tile
-        — what a placement policy ranks its legal tiles by. The Aqueduct and
-        the Encampment have no adjacency yield at all, so they rank flat and
-        fall to the lowest tile index."""
-        if placement in (1, 3):
+        — what a placement policy ranks its legal tiles by. The Aqueduct, the
+        Encampment and the Spaceport have no adjacency yield at all, so they
+        rank flat and fall to the lowest tile index."""
+        if placement in (1, 3, 4):
             return torch.zeros(self.B, self.T, dtype=self.dtype, device=self.device)
         return self._district_adj_floor(di)
 

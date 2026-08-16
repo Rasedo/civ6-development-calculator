@@ -534,6 +534,9 @@ class SimInit:
         self._n_space = len(self._space_proj_idx)
         self._space_step = {pi: k for k, pi in enumerate(self._space_proj_idx)}
         self._space_victory_idx = {i for i in self._space_proj_idx if int(self._proj_rows[i].get("vic", 0))}
+        # Laser-station rows: repeatable, tech-gated only, each completion
+        # speeds the Exoplanet craft (+1 LY/turn) — cpu/data/projects.ts `laser`.
+        self._laser_proj_idx = {i for i, row in enumerate(self._proj_rows) if int(row.get("ls", 0))}
         _wd = rules.wonders or {}
         self._wond_rows = list(_wd.get("rows", []))
         self._wond_n = len(self._wond_rows)
@@ -784,7 +787,7 @@ class SimInit:
         sc = rules.district_scaffold or {}
         self.CAMPUS = int(sc.get("campusIdx", 0))
         self.campus_unlock_tech = int(sc.get("campusUnlockTech", -1))  # WRITING
-        self._scaffold = [(int(p["idx"]), int(p["unlockTech"]), int(p.get("unlockCivic", -1)), int(p.get("placement", 0))) for p in sc.get("place", [])]  # (district idx, unlock tech idx, unlock CIVIC idx — at most one of the two >= 0, placement: 0 land / 1 aqueduct / 2 coastal / 3 encampment)
+        self._scaffold = [(int(p["idx"]), int(p["unlockTech"]), int(p.get("unlockCivic", -1)), int(p.get("placement", 0)), int(p.get("fixedCost", -1))) for p in sc.get("place", [])]  # (district idx, unlock tech idx, unlock CIVIC idx — at most one of the two >= 0, placement: 0 land / 1 aqueduct / 2 coastal / 3 encampment / 4 flat, fixed cost or -1 = the research curve)
         # VETERANCY's encampmentProdMult needs the ENCAMPMENT district idx and
         # its scaffold slot (the queue head codes for the district and its
         # buildings — cpu/core/game.ts isEncampmentItem).
@@ -793,12 +796,12 @@ class SimInit:
         # NEIGHBORHOOD column whose housing reads the appeal tier.
         self._appeal_bad_dist = [
             i for i, d in enumerate(self.districts_cat)
-            if d.get("id") in ("INDUSTRIAL_ZONE", "ENCAMPMENT")
+            if d.get("id") in ("INDUSTRIAL_ZONE", "ENCAMPMENT", "SPACEPORT")
         ]
         self._nbhd_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "NEIGHBORHOOD"), -1)
         self._appeal_cuts = [(4, 6), (2, 5), (-1, 4), (-3, 3)]
         self._appeal_floor = 2
-        self._encamp_si = next((si for si, (di, _ut, _uc, _plc) in enumerate(self._scaffold) if di == self._encamp_didx), -1)
+        self._encamp_si = next((si for si, (di, _ut, _uc, _plc, _fc) in enumerate(self._scaffold) if di == self._encamp_didx), -1)
         self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
         # The seat-0 diplomacy head (declareWar / sueForPeace on a civ). While
         # False, war_mask() is all-False and step(war=…) is ignored, so nothing
@@ -1044,6 +1047,10 @@ class SimInit:
         self.victory_row = torch.full((B,), -1, dtype=torch.long, device=device)
         self.winner = torch.full((B,), -1, dtype=torch.long, device=device)
         self.space_done = torch.zeros(B, self.n_majors, max(self._n_space, 1), dtype=torch.bool, device=device)
+        # The Exoplanet flight: LY travelled (-1 = no craft in flight) and the
+        # completed laser stations that speed it. Win on ARRIVAL, in step().
+        self.space_ly = torch.full((B, self.n_majors), -1, dtype=torch.long, device=device)
+        self.space_lasers = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self.camp_tile = torch.full((B, max(self.K, 1)), -1, dtype=torch.long, device=device)
         self.n_camps = torch.zeros(B, dtype=torch.long, device=device)
         self.unit_next = torch.zeros(B, dtype=torch.long, device=device)

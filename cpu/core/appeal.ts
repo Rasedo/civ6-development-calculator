@@ -6,8 +6,8 @@
  * SOURCING SWEEP, verified against the Civilization wiki's
  * Appeal page. Every term below is CORRECT as written: an adjacent NATURAL
  * WONDER is +2, an adjacent MOUNTAIN / WOODS / COAST or LAKE is +1, and an
- * adjacent RAINFOREST, MARSH, MINE, QUARRY, OIL WELL, INDUSTRIAL ZONE or
- * ENCAMPMENT is -1. The modifiers are cumulative, as here.
+ * adjacent RAINFOREST, MARSH, MINE, QUARRY, OIL WELL, INDUSTRIAL ZONE,
+ * ENCAMPMENT or SPACEPORT is -1. The modifiers are cumulative, as here.
  *
  * TWO SOURCED GAPS, recorded not fixed (each is an appeal change that moves
  * Neighborhood housing AND Seaside Resort yields, so it needs its own gated
@@ -41,7 +41,7 @@ export function tileAppeal(map: GameMap, tile: Tile): number {
     if (n.feature === 'FLOODPLAINS') appeal -= 1; // sourced, was missing
     if (n.pillaged) appeal -= 1; // "-1 each adjacent pillaged tile"
     if (n.improvement === 'MINE' || n.improvement === 'QUARRY' || n.improvement === 'OIL_WELL') appeal -= 1;
-    if (n.district === 'INDUSTRIAL_ZONE' || n.district === 'ENCAMPMENT') appeal -= 1;
+    if (n.district === 'INDUSTRIAL_ZONE' || n.district === 'ENCAMPMENT' || n.district === 'SPACEPORT') appeal -= 1;
   }
   return appeal;
 }

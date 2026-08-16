@@ -89,7 +89,7 @@ export function emptySeat(seat: number): Seat {
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     gpp: {}, gpEarned: [],
     buildersTrained: 0, bestMeleeCS: 0, tilesPurchased: 0,
-    spaceProjects: [], camps: [], explored: [],
+    spaceProjects: [], spaceLy: -1, spaceLasers: 0, camps: [], explored: [],
   };
 }
 

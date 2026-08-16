@@ -324,6 +324,8 @@ SEAT = {
     "religionFounded": lambda sim, b, rows: [1 if int(sim.holy_tile[b, c]) >= 0 else 0 for c in rows],
     "gpPoints": lambda sim, b, rows: [[float(x) for x in sim.civ_gpp[b, c].tolist()] for c in rows],
     "spaceProjects": lambda sim, b, rows: [sum(1 for x in sim.space_done[b, c].tolist() if x) for c in rows],
+    "spaceLy": _civ_scalar("space_ly"),
+    "spaceLasers": _civ_scalar("space_lasers"),
     "routeCount": lambda sim, b, rows: [
         sum(1 for r in sim.seat_routes[b, _seat_row(sim, c)].tolist() if r[0] >= 0) for c in rows
     ],

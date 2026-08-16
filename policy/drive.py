@@ -483,7 +483,7 @@ def _district_tiles(sim, row: int, prod: torch.Tensor):
     out = torch.full((sim.B, sim.RC, nS), -1, dtype=torch.long, device=sim.device)
     for j in range(min(int(prod.shape[1]), sim.RC)):
         a = prod[:, j]
-        for si, (di, _ut, _uc, plc) in enumerate(sim._scaffold):
+        for si, (di, _ut, _uc, plc, _fc) in enumerate(sim._scaffold):
             want = a == sim.DISTRICT_BASE + si
             if not bool(want.any()):
                 continue

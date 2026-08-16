@@ -217,6 +217,11 @@ export interface Seat {
   bestMeleeCS: number;
   tilesPurchased: number;
   spaceProjects: string[];
+  /** Light-years the Exoplanet craft has travelled; -1 = no craft in flight.
+   *  The win fires on ARRIVAL (spaceLy >= SPACE_FLIGHT_LY), not on launch. */
+  spaceLy?: number;
+  /** Completed laser-station projects — each adds +1 LY/turn to the craft. */
+  spaceLasers?: number;
   camps: number[];
   gpEarned: string[];
   eraScore?: number;

@@ -302,6 +302,8 @@ const SEAT: Record<string, Extractor> = {
   envoysAvailable: overSeats((s) => s.envoysAvailable),
   buildersTrained: overSeats((s) => s.buildersTrained),
   bestMeleeCS: overSeats((s) => s.bestMeleeCS),
+  spaceLy: overSeats((s) => s.spaceLy ?? -1),
+  spaceLasers: overSeats((s) => s.spaceLasers ?? 0),
   techs: overSeats((s) => s.research.techs.map((t) => idx(TECH_IDX, t)).sort((a, b) => a - b)),
   civics: overSeats((s) => s.research.civics.map((c) => idx(CIVIC_IDX, c)).sort((a, b) => a - b)),
   // TS keeps ONE `boosted` list mixing tech and civic ids; the GPU keeps two

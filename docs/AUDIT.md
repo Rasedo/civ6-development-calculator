@@ -55,7 +55,7 @@ nothing carries forward.
 | B-21r suzerain rows | 3 | 10 descoped channels, each needing its own mechanic |
 | B-22r World Congress | 6 | one resolution type of many; emergencies and competitions absent |
 | B-24r Ages/governors | 2 | eight dedication catalog entries, dark-age policies, governor promotions, per-civ era drift |
-| B-25r victory tails | 3 | every victory exists; the tails are rate and term work |
+| B-25r victory tails | 1 | science victory fully sourced; residual = B-20r cross-ref + three recorded deviations |
 | B-26r barb escalation | 2 | camp-spawn ladder beyond melee |
 | B-27r theological combat | 2 | resolver simplifications, incl. the ~7x martyr-relic overstatement |
 | B-28r naval production | 3 | one heuristic column where `trainableUnits` belongs |
@@ -65,8 +65,8 @@ nothing carries forward.
 | B-33r floods vs districts | 1 | GS floods damage districts/buildings on floodplains (the Dam's reason to exist); both engines only pillage improvements and fertilize |
 | B-31r trade-route tails | 6 | a Trader UNIT and a route wire verb |
 | B-D unsourced data values | 5 | a residual CLASS: every invented magnitude, re-sourced |
-| **B. Fidelity vs real Civ 6** | **51** | |
-| **OPEN, TOTAL** | **51** | |
+| **B. Fidelity vs real Civ 6** | **49** | |
+| **OPEN, TOTAL** | **49** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -141,14 +141,25 @@ Civ 6 source or is recorded as unverifiable.
   governor channel modeled); per-civ tech-era drift (eras are global
   50-turn blocks).
 - **B-25r. Victory tails:** every named Civ 6 victory exists on both engines
-  and every one is REACHABLE — a seat can queue every space step and the
-  wire applier takes it on both sides. Open: the culture win's tourism gap
-  (B-20r), and the science victory's own fidelity tail, which is large
-  enough to be its own work item rather than a line here — the Spaceport
-  district, the real per-project costs, the light-year FLIGHT (we award the
-  win the instant `EXOPLANET_EXPEDITION` completes; real GS launches a craft
-  that must arrive, and the laser-station boosters that shorten the trip are
-  unmodelled because there is no trip), and the three projects' side effects.
+  and every one is REACHABLE. The science victory is now the sourced GS
+  shape end to end: the SPACEPORT district (Rocketry, flat 1080, flat land,
+  outside the specialty cap, -1 adjacent appeal), real per-step prices
+  (540/900/1080/1260 speed-scaled; the Mars Colony's 1800 is the one figure
+  without a direct quote — wiki GS data module confirms 900/1500/2100 and
+  1800 completes that ladder), the three side effects (full-map reveal /
+  10x-science Culture lump / nothing), and the light-year FLIGHT — the
+  Exoplanet craft flies 30 LY at 1 LY/turn plus one per completed laser
+  station (`TERRESTRIAL_LASER_STATION` / `LAGRANGE_LASER_STATION`,
+  repeatable, Offworld Mission, 360 each) and the win fires on ARRIVAL.
+  Only the two poke lanes reach any of it (`space_race_test` /
+  `space-victory.test`): Smart Materials sits far past TURN_LIMIT, which is
+  also the RECORDED reason the flight state is not rendered into the
+  observation and the win pays no terminal reward — nothing reachable this
+  phase could learn from it. Open: the culture win's tourism gap (B-20r),
+  and three small sourced deviations — the Terrestrial station's
+  powered-city condition (no power system), the Lagrange station's
+  30 Aluminum (no strategic-resource stockpiles), and the Spaceport's
+  upkeep left at the generic 1 gold (unsourced, the B-D class).
 - **B-26r. Barbarian camp-spawn escalation** beyond the melee ladder
   (cliffs, ranged barbs and naval barbs all landed).
 - **B-27r. Theological-combat simplifications.** The resolver runs on both

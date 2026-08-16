@@ -22,6 +22,7 @@
  */
 
 import type { DistrictId, GreatPersonClass, YieldKey } from '../core/types';
+import { GAME_SPEED } from './constants';
 
 export interface ProjectDef {
   id: string;
@@ -47,6 +48,12 @@ export interface ProjectDef {
    *  `requiresProject`, and placed AFTER the base rows so a greedy
    *  lowest-index pick resolves to a base project first. */
   space?: boolean;
+  /** Marks a laser-station project: repeatable, `requiresTech`-gated, each
+   *  completion adds +1 light-year/turn to this seat's Exoplanet craft. */
+  laser?: boolean;
+  /** FIXED production cost (real Civ 6 value; the table mapper applies the
+   *  game-speed coefficient). Absent = the generic district-project price. */
+  cost?: number;
 }
 
 const P = (def: ProjectDef) => def;
@@ -104,24 +111,43 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       description: 'Convert production into Great General points.',
     }),
 
-    // THE SPACE RACE, four steps, each needing the previous one COMPLETE.
-    // SOURCED against the Gathering Storm Civilopedia entries (this repo models
-    // GS — see cpu/data/boosts.ts): Launch Earth Satellite needs Rocketry;
-    // Launch Moon Landing needs Satellites; Launch Mars Colony needs
-    // Nanotechnology; Exoplanet Expedition needs Smart Materials, and winning
-    // is its arrival. GS REPLACES the base game's three separate Mars
+    // THE LASER STATIONS (before the space rows so those stay LAST, in chain
+    // order). CIV6 (GS, Arioch + wiki): both unlock with Offworld Mission,
+    // cost 600 production each, are REPEATABLE across cities, and each
+    // completion speeds the Exoplanet craft by +1 light-year/turn. Deviations,
+    // recorded in docs/AUDIT.md: the Terrestrial station's powered-city
+    // condition (no power system here) and the Lagrange station's 30 Aluminum
+    // (no strategic-resource stockpiles) are unmodelled, so the two rows are
+    // effectively twins.
+    P({ id: 'TERRESTRIAL_LASER_STATION', name: 'Terrestrial Laser Station', district: 'SPACEPORT', yield: null, gpClass: null, laser: true, cost: 600, requiresTech: 'OFFWORLD_MISSION', description: 'Repeatable: +1 light-year/turn for the Exoplanet craft.' }),
+    P({ id: 'LAGRANGE_LASER_STATION', name: 'Lagrange Laser Station', district: 'SPACEPORT', yield: null, gpClass: null, laser: true, cost: 600, requiresTech: 'OFFWORLD_MISSION', description: 'Repeatable: +1 light-year/turn for the Exoplanet craft.' }),
+
+    // THE SPACE RACE, four steps, each needing the previous one COMPLETE, all
+    // run in a SPACEPORT. SOURCED against the Gathering Storm Civilopedia
+    // entries (this repo models GS — see cpu/data/boosts.ts): Launch Earth
+    // Satellite needs Rocketry and reveals the whole map; Launch Moon Landing
+    // needs Satellites and pays a one-time Culture lump of 10x the seat's
+    // science/turn; Launch Mars Colony needs Nanotechnology and has NO yield
+    // effect (it exists to open the expedition); Exoplanet Expedition needs
+    // Smart Materials and LAUNCHES a craft — the win fires when it ARRIVES
+    // (see SPACE_FLIGHT_LY). GS REPLACES the base game's three separate Mars
     // components (Reactor/Habitation/Hydroponics, which were parallel off the
     // Moon Landing, not a chain) with the single Mars Colony project.
     //
-    // ONE DELIBERATE DEVIATION: real Civ 6 runs every one of these in a
-    // SPACEPORT. This repo has no Spaceport district, so they run in a Campus.
-    // That makes them cheaper and removes a district decision from the path.
-    P({ id: 'LAUNCH_EARTH_SATELLITE', name: 'Launch Earth Satellite', district: 'CAMPUS', yield: null, gpClass: null, space: true, requiresTech: 'ROCKETRY', description: 'Space race step 1 of 4.' }),
-    P({ id: 'LAUNCH_MOON_LANDING', name: 'Launch Moon Landing', district: 'CAMPUS', yield: null, gpClass: null, space: true, requiresTech: 'SATELLITES', requiresProject: 'LAUNCH_EARTH_SATELLITE', description: 'Space race step 2 of 4.' }),
-    P({ id: 'LAUNCH_MARS_COLONY', name: 'Launch Mars Colony', district: 'CAMPUS', yield: null, gpClass: null, space: true, requiresTech: 'NANOTECHNOLOGY', requiresProject: 'LAUNCH_MOON_LANDING', description: 'Space race step 3 of 4 — a human base on Mars.' }),
-    P({ id: 'EXOPLANET_EXPEDITION', name: 'Exoplanet Expedition', district: 'CAMPUS', yield: null, gpClass: null, space: true, victory: true, requiresTech: 'SMART_MATERIALS', requiresProject: 'LAUNCH_MARS_COLONY', description: 'Space race step 4 of 4 — completing it wins the Science Victory.' }),
-  ].map((p) => [p.id, p]),
+    // COSTS (GS, Standard speed): 900 / 1500 / 1800 / 2100 — 900, 1500 and
+    // 2100 quoted directly (wiki GS data module, Arioch); 1800 is the GS data
+    // value consistent with that ladder, the one figure without a direct quote.
+    P({ id: 'LAUNCH_EARTH_SATELLITE', name: 'Launch Earth Satellite', district: 'SPACEPORT', yield: null, gpClass: null, space: true, cost: 900, requiresTech: 'ROCKETRY', description: 'Space race step 1 of 4 — reveals the entire map.' }),
+    P({ id: 'LAUNCH_MOON_LANDING', name: 'Launch Moon Landing', district: 'SPACEPORT', yield: null, gpClass: null, space: true, cost: 1500, requiresTech: 'SATELLITES', requiresProject: 'LAUNCH_EARTH_SATELLITE', description: 'Space race step 2 of 4 — one-time Culture of 10x science/turn.' }),
+    P({ id: 'LAUNCH_MARS_COLONY', name: 'Launch Mars Colony', district: 'SPACEPORT', yield: null, gpClass: null, space: true, cost: 1800, requiresTech: 'NANOTECHNOLOGY', requiresProject: 'LAUNCH_MOON_LANDING', description: 'Space race step 3 of 4 — a human base on Mars.' }),
+    P({ id: 'EXOPLANET_EXPEDITION', name: 'Exoplanet Expedition', district: 'SPACEPORT', yield: null, gpClass: null, space: true, victory: true, cost: 2100, requiresTech: 'SMART_MATERIALS', requiresProject: 'LAUNCH_MARS_COLONY', description: 'Space race step 4 of 4 — launches the craft; winning is its arrival.' }),
+  ].map((p) => [p.id, p.cost !== undefined ? { ...p, cost: Math.round(p.cost * GAME_SPEED) } : p]),
 );
+
+/** CIV6 (GS): the Exoplanet craft's journey — 50 light-years on Standard
+ *  speed at a base 1 LY/turn, +1 LY/turn per completed laser station; the
+ *  distance takes the game-speed coefficient like every other magnitude. */
+export const SPACE_FLIGHT_LY = Math.round(50 * GAME_SPEED);
 
 export const SPACE_PROJECTS: ProjectDef[] = Object.values(PROJECTS).filter((p) => p.space);
 

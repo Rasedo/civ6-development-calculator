@@ -105,6 +105,19 @@ class SimStep:
                     )
             self.era_score[:] = 0
         self._world_congress()
+        # THE EXOPLANET FLIGHT — CIV6: 1 light-year/turn plus one per laser
+        # station, and the win fires on ARRIVAL, not launch. Ties in one turn
+        # go to the lowest row (argmax takes the FIRST True), and the
+        # victory_type guard keeps an already-won space game's victor.
+        fly = self.space_ly >= 0  # [B, n_majors]
+        if bool(fly.any()):
+            self.space_ly.copy_(torch.where(fly, self.space_ly + 1 + self.space_lasers, self.space_ly))
+            arrive = fly & (self.space_ly >= int(self.rules.space_ly_target))
+            landed = arrive.any(dim=1) & (self.victory_type != 3)
+            if bool(landed.any()):
+                first = torch.argmax(arrive.long(), dim=1)
+                self.victory_type.copy_(torch.where(landed, torch.full_like(self.victory_type, 3), self.victory_type))
+                self.victory_row.copy_(torch.where(landed, first, self.victory_row))
         dom = self._domination()
         space_won = self.victory_type == 3
         rel = self._religious_victor()  # on the follow set the spread just flipped

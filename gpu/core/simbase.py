@@ -87,6 +87,7 @@ class Rules:
     gold_purchase_mult: float  # gold price = production cost × this (GOLD_PURCHASE_MULT)
     faith_purchase_mult: float  # faith price = production cost × this (FAITH_PURCHASE_MULT)
     turn_limit: int  # game over once turn > this
+    space_ly_target: int  # the Exoplanet craft's distance (light-years, speed-scaled)
     district_cost: dict  # districtCost params {base, scale} — each seat pays it from ITS OWN research
     score_pop_weight: float
     score_yield_weights: torch.Tensor  # [6]
@@ -166,6 +167,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         gold_purchase_mult=r["scenario"].get("goldPurchaseMult", 4),
         faith_purchase_mult=r["scenario"].get("faithPurchaseMult", 2),
         turn_limit=r["scenario"].get("turnLimit", 250),
+        space_ly_target=r["scenario"].get("spaceLyTarget", 30),
         district_cost=r.get("districtCost", {"base": 54, "scale": 8}),
         score_pop_weight=r["score"]["popWeight"],
         score_yield_weights=torch.tensor(r["score"]["yieldWeights"], dtype=torch.float64),
@@ -467,6 +469,7 @@ _MUTABLE = [
     "rng_state", "centre_slot_at", "tdef", "tmove",
     "next_slot", "camp_tile", "n_camps", "game_over",
     "victory_type", "victory_row", "winner", "space_done",  # space-race chain progress
+    "space_ly", "space_lasers",  # the Exoplanet flight (LY travelled, laser stations)
     "district_dead",  # captured districts are paved-but-dead
     "civ_cap_tile",  # capitalTiles — capital identity + the domination anchor
     # `tile_seat` is STATE — the city-state part of tile ownership is stored

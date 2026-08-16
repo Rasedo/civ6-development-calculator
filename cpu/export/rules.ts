@@ -17,7 +17,7 @@ import { GENERAL_AURA_MP } from '../core/aura';
 import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_BUILDINGS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_YIELD, CITY_STATE_MAX_HP, CITY_STATE_MEET_RANGE, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_CULTURE, ARTIFACT_TOURISM } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, type BeliefEffects } from '../data/religion';
-import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, gpClassesOf, gppFractionOf } from '../data/projects';
+import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { TRADE_ROUTE_RANGE, CITY_STATE_ROUTE_GOLD, CITY_STATE_ROUTE_SPEC, INTL_ROUTE_GOLD, TRADE_ROUTE_DURATION } from '../core/trade';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
@@ -160,7 +160,7 @@ const ADJ_SRC: AdjacencySource[] = [
 
 const SCRIPTED_CAMPUS = true;
 
-const PLACEMENT_CODE = { aqueduct: 1, coastal: 2, encampment: 3 } as const;
+const PLACEMENT_CODE = { aqueduct: 1, coastal: 2, encampment: 3, flat: 4 } as const;
 
 const SLOT_KIND_IDX: Record<SlotKind, number> = { military: 0, economic: 1, diplomatic: 2, wildcard: 3 };
 
@@ -185,7 +185,7 @@ export function buildRules() {
       { min: -2, growth: 0.85, yield: 0.95 },
       { min: -999, growth: 0.7, yield: 0.9 },
     ],
-    scenario: { settlerBase: Math.round(80 * GAME_SPEED), settlerPerCity: Math.round(30 * GAME_SPEED), settlerPopGate: SETTLER_POP_GATE, goldPurchaseMult: GOLD_PURCHASE_MULT, faithPurchaseMult: FAITH_PURCHASE_MULT, turnLimit: TURN_LIMIT, builderBase: 50, builderPer: 4, gameSpeed: GAME_SPEED },
+    scenario: { settlerBase: Math.round(80 * GAME_SPEED), settlerPerCity: Math.round(30 * GAME_SPEED), settlerPopGate: SETTLER_POP_GATE, goldPurchaseMult: GOLD_PURCHASE_MULT, faithPurchaseMult: FAITH_PURCHASE_MULT, turnLimit: TURN_LIMIT, builderBase: 50, builderPer: 4, gameSpeed: GAME_SPEED, spaceLyTarget: SPACE_FLIGHT_LY },
     actions: { unit: unitActionNames(IMPROVEMENT_IDS) },
     districtCost: { base: Math.round(54 * GAME_SPEED), scale: 9 },
     score: { popWeight: 3, yieldWeights: YIELD_KEYS.map((k) => BALANCED_WEIGHTS[k] ?? 0) },
@@ -420,7 +420,9 @@ export function buildRules() {
     // (rt = techs-table idx) and previous-step link (rp = projects-table idx),
     // which is what `_space_step_ok` reads. They sit LAST, in chain order: the
     // scripted greedy takes the lowest legal index, so a base project always
-    // shadows them.
+    // shadows them. Laser rows (`ls`, repeatable, tech-gated only) sit between
+    // the base rows and the chain; `pc` is a FIXED price (already speed-scaled)
+    // where >= 0, else the generic curve applies.
     projects: {
       rows: Object.values(PROJECTS).map((p, _i, all) => ({
         d: PLACEABLE_DISTRICTS.indexOf(p.district),
@@ -431,7 +433,9 @@ export function buildRules() {
         gs: gpClassesOf(p).map((c) => GP_CLASSES.indexOf(c)),
         gf: gppFractionOf(p),
         sp: p.space ? 1 : 0,
+        ls: p.laser ? 1 : 0,
         vic: p.victory ? 1 : 0,
+        pc: p.cost ?? -1,
         rt: p.requiresTech ? (techIdx.get(p.requiresTech) ?? -1) : -1,
         rp: p.requiresProject ? all.findIndex((q) => q.id === p.requiresProject) : -1,
       })),
@@ -594,6 +598,8 @@ export function buildRules() {
         unlockTech: unlockKind === 'civic' ? -1 : techIdx.get(unlockId) ?? -1,
         unlockCivic: unlockKind === 'civic' ? civicIdx.get(unlockId) ?? -1 : -1,
         placement: placement ? PLACEMENT_CODE[placement] : 0,
+        // FLAT price (the Spaceport): speed-scaled here, -1 = the generic curve.
+        fixedCost: DISTRICTS[id].fixedCost ? Math.round(DISTRICTS[id].cost * GAME_SPEED) : -1,
       })),
       askable: (['CAMPUS', 'HOLY_SITE', 'COMMERCIAL_HUB', 'THEATER_SQUARE'] as const).map((id) =>
         PLACEABLE_DISTRICTS.indexOf(id),

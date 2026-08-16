@@ -138,6 +138,13 @@ class SimPhase:
         # is a loop-invariant local.
         cact_all = active.unsqueeze(1) & alive_c  # [B, RC]
         cact_any_l = cact_all.any(dim=0).tolist()
+        # The seat's science/turn off the SAME loop-top snapshot, folded in
+        # slot order — the Moon Landing lump reads it. TS folds the identical
+        # city-stats values in array order, so the f64 association agrees.
+        sci_turn = torch.zeros(B, dtype=torch.float64, device=dev)
+        for j in range(self.RC):
+            if cact_any_l[j]:
+                sci_turn = torch.where(cact_all[:, j], sci_turn + total[:, j, 3], sci_turn)
         for j in range(self.RC):
             if not cact_any_l[j]:
                 continue
@@ -160,7 +167,7 @@ class SimPhase:
             cul_c = torch.where(cact, total[:, j, 4], torch.zeros_like(total[:, j, 4]))
             cul_sum = torch.where(cact, cul_sum + cul_c, cul_sum)
             self._seat_city_growth(row, jc, cact, eff[:, j], need[:, j])
-            self._seat_city_produce(row, jc, cact, total[:, j, 1])
+            self._seat_city_produce(row, jc, cact, total[:, j, 1], sci_turn)
             self._seat_border_growth(row, jc, cact, cul_c)
             self._seat_city_fire_and_heal(row, jc, cact)
 
@@ -297,7 +304,7 @@ class SimPhase:
         self.city_pop[bidx, row, col] = torch.where(starve, (pop - 1).clamp(min=1), pop)
 
     def _seat_city_produce(self, row: int, col: torch.Tensor, act: torch.Tensor,
-                           prod: torch.Tensor) -> None:
+                           prod: torch.Tensor, sci_turn: torch.Tensor | None = None) -> None:
         """The queue head's turn — the production add, the banked chop, the
         completion and every completion's payout. ONE body, every seat row, at
         the per-city seatPhase position (after growth, before border growth).
@@ -429,12 +436,28 @@ class SimPhase:
                     for g_i in (int(x) for x in g_list):
                         if 0 <= g_i < self.civ_gpp.shape[2]:
                             self.civ_gpp[:, row, g_i] = torch.where(hit, self.civ_gpp[:, row, g_i] + amt_g, self.civ_gpp[:, row, g_i])
+                    if int(prow.get("ls", 0)):
+                        # A laser station: repeatable, +1 LY/turn for the craft.
+                        self.space_lasers[:, row] += hit.long()
                     if int(prow.get("sp", 0)):
-                        self.space_done[hit, row, self._space_step[pidx]] = True
+                        step_k = self._space_step[pidx]
+                        self.space_done[hit, row, step_k] = True
+                        # The sourced per-step side effects (`completeProject`'s
+                        # space arm; step 2, Mars Colony, has none).
+                        if step_k == 0 and self.fog_of_war:
+                            # CIV6: Launch Earth Satellite reveals the entire
+                            # map — the same fog gate as every reveal site.
+                            self.seat_explored[hit, row] = True
+                        if step_k == 1 and sci_turn is not None:
+                            # CIV6: one-time Culture of 10x science/turn, the
+                            # applyLumpYield culture arm (pool + lifetime bank).
+                            amt_c = js_round(10.0 * sci_turn)
+                            self.civ_civic_prog[:, row] = torch.where(hit, self.civ_civic_prog[:, row] + amt_c, self.civ_civic_prog[:, row])
+                            self.civ_culture[:, row] = torch.where(hit, self.civ_culture[:, row] + amt_c, self.civ_culture[:, row])
                         if pidx in self._space_victory_idx:
-                            self.victory_type.copy_(torch.where(hit, torch.full_like(self.victory_type, 3), self.victory_type))
-                            self.victory_row.copy_(torch.where(hit, torch.full_like(self.victory_row, row), self.victory_row))
-                            self.game_over.logical_or_(hit)
+                            # CIV6: completing the Exoplanet Expedition LAUNCHES
+                            # the craft; the win fires on ARRIVAL, in step().
+                            self.space_ly[hit, row] = 0
 
     def _seat_city_fire_and_heal(self, row: int, col: torch.Tensor, act: torch.Tensor) -> None:
         """A city's WALLS strike, its ADDITIONAL Encampment strike and the

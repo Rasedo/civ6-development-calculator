@@ -31,7 +31,7 @@ import { RESOURCES } from '../../world/resources';
 import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP, ENCAMPMENT_HP, CITY_MAX_HP } from '../data/units';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
-import { CITY_WORK_RADIUS, GOLD_PURCHASE_MULT, borderGrowthCost, EMBARKED_DEFENSE_CS } from '../data/constants';
+import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, borderGrowthCost, EMBARKED_DEFENSE_CS } from '../data/constants';
 import type { CityStats } from './city';
 import { civEraIndex, computeCityStats, luxuryAmenities, pickBorderTile, acquireTile } from './city';
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
@@ -40,7 +40,7 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { disbandUnit, builderCost, builderRemoveFeature, trainableUnits } from './units';
 import { killUnit } from './combat';
 import { availableProjects, buyTile, buyWorshipBuilding, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampmentItem, purchaseCivilianWithFaith, purchaseReligiousUnit, purchaseSettler, queueProject, settlerCost } from './game';
-import { SCAFFOLD_DISTRICTS } from '../data/districts';
+import { DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex } from './unitActions';
 
 const A_FOUND_CITY = unitActionIndex(IMPROVEMENT_IDS).FOUND_CITY;
@@ -381,8 +381,13 @@ export function placeSeatDistrict(
   const owns = (t: Tile) => tileBelongsTo(t, civCity);
   if (tile.improvement) return false;
   if (!canPlaceDistrictIn(state, civCity, id, tileIndex, { unlocks, ownsTile: owns }).ok) return false;
+  // CIV6: the Spaceport's cost is FLAT — no research scaling, no discount.
   const base = districtCostIn(actor.research);
-  const cost = districtDiscounted(state, actor.seat, id, { unlocks, cities: actor.cities }) ? Math.floor(base * 0.6) : base;
+  const cost = DISTRICTS[id]?.fixedCost
+    ? Math.round(DISTRICTS[id].cost * GAME_SPEED)
+    : districtDiscounted(state, actor.seat, id, { unlocks, cities: actor.cities })
+      ? Math.floor(base * 0.6)
+      : base;
   tile.district = id;
   tile.districtComplete = false;
   tile.improvement = null;
@@ -1252,6 +1257,11 @@ export function seatPhase(state: GameState): void {
     const seatMods = getModifiers(state, actor.seat);
     const cityStats = new Map<number, CityStats>();
     for (const civCity of actor.cities) cityStats.set(civCity.id, computeCityStats(state, civCity, luxMap, seatMods));
+    // The seat's science/turn off the SAME loop-top snapshot, folded in city
+    // order — the Moon Landing lump reads it, and the GPU folds the identical
+    // walk columns in slot order, so the f64 association agrees.
+    let sciPerTurnSeat = 0;
+    for (const civCity of actor.cities) sciPerTurnSeat += cityStats.get(civCity.id)!.total.science;
     // this seat's governor seats for THIS turn — same stateless
     // greedy as the seat 0 (quantized milli loyalty snapshot at the loop top,
     // ties by array position == the GPU's civCity slot order).
@@ -1303,7 +1313,7 @@ export function seatPhase(state: GameState): void {
                 : q.cost ?? 54; // settler / district / project carry their own cost
         if (q.progress >= cost) {
           civCity.queue.shift();
-          completeQueueItem(state, civCity, q, cost);
+          completeQueueItem(state, civCity, q, cost, sciPerTurnSeat);
           // A completion's OVERFLOW carries to the next item, for every seat.
           // this is the largest single production leak in the model.
           // Every seat's city is the same record, so the bank field is

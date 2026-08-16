@@ -210,6 +210,9 @@ export function canPlaceDistrictIn(
   } else if (isWater(tile)) {
     return no('Must be on land.');
   }
+  if (def.placement.flatLand && tile.elevation === 'HILLS') {
+    return no('Must be on flat land.');
+  }
 
   if (tile.resource) {
     const cat = RESOURCES[tile.resource].category;

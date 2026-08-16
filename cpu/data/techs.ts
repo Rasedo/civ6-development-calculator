@@ -208,7 +208,9 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
 
     T('COMPUTERS', 'Computers', 'Atomic', 1800, ['ELECTRONICS']),
     T('NUCLEAR_FISSION', 'Nuclear Fission', 'Atomic', 1800, ['COMBUSTION', 'PLASTICS']),
-    T('ROCKETRY', 'Rocketry', 'Atomic', 1900, ['FLIGHT', 'RADIO']),
+    T('ROCKETRY', 'Rocketry', 'Atomic', 1900, ['FLIGHT', 'RADIO'], [
+      { kind: 'unlockDistrict', district: 'SPACEPORT' },
+    ]),
     T('ADVANCED_FLIGHT', 'Advanced Flight', 'Atomic', 1900, ['FLIGHT']),
     T('COMBINED_ARMS', 'Combined Arms', 'Atomic', 2000, ['STEEL', 'FLIGHT']),
     T('SYNTHETIC_MATERIALS', 'Synthetic Materials', 'Atomic', 2200, ['PLASTICS']),

@@ -28,7 +28,7 @@ import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, MISSIONARY_CAP, APOSTLE_CAP, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE } from '../data/religion';
-import { PROJECTS, type ProjectDef } from '../data/projects';
+import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { BARB_SEAT, allCities, allSeats, citiesOf, emptySeat, seatOf, seatOfCityState, setTileOwner, tileClaimed, unitSeat } from './seats';
 
@@ -78,6 +78,8 @@ export function districtDiscounted(
 }
 
 export function districtCost(state: GameState, seat: number, type?: DistrictId): number {
+  // CIV6: the Spaceport's cost is FLAT — it never scales and takes no discount.
+  if (type !== undefined && DISTRICTS[type]?.fixedCost) return Math.round(DISTRICTS[type].cost * GAME_SPEED);
   const base = districtCostIn(seatOf(state, seat)!.research);
   return type !== undefined && districtDiscounted(state, seat, type) ? Math.floor(base * 0.6) : base;
 }
@@ -358,7 +360,11 @@ export function queueWonder(
 }
 
 
-export function projectCost(state: GameState, seat: number): number {
+export function projectCost(state: GameState, seat: number, projectId?: string): number {
+  // Space steps and laser stations carry their REAL fixed price (already
+  // speed-scaled in the table); everything else takes the generic curve.
+  const fixed = projectId !== undefined ? PROJECTS[projectId]?.cost : undefined;
+  if (fixed !== undefined) return fixed;
   return Math.max(Math.round(15 * GAME_SPEED), Math.round(districtCost(state, seat) * 0.5));
 }
 
@@ -368,6 +374,10 @@ export function availableProjects(state: GameState, city: City): ProjectDef[] {
   return Object.values(PROJECTS).filter((p) => {
     if (!city.districts.some((d) => d.type === p.district && state.map.tiles[d.tileIndex].districtComplete)) {
       return false;
+    }
+    if (p.laser) {
+      // Repeatable — tech-gated only, never in the one-time ledger.
+      return !p.requiresTech || (owner?.research.techs.includes(p.requiresTech) ?? false);
     }
     if (!p.space) return true;
     if (done.includes(p.id)) return false; // one-time
@@ -384,7 +394,7 @@ export function queueProject(state: GameState, cityId: number, projectId: string
   if (!availableProjects(state, city).some((p) => p.id === projectId)) {
     return { ok: false, reason: 'Project needs its completed district in this city.' };
   }
-  commitProduction(state, city.seat, city, { kind: 'project', project: projectId, progress: 0, cost: projectCost(state, seat) });
+  commitProduction(state, city.seat, city, { kind: 'project', project: projectId, progress: 0, cost: projectCost(state, seat, projectId) });
   return { ok: true };
 }
 
@@ -787,6 +797,19 @@ export function endTurn(state: GameState): void {
   state.turn += 1;
   eraBoundary(state);
   worldCongress(state); // era-score window reset at ERA_LENGTH multiples (GPU mirrors at its turn increment)
+  // THE EXOPLANET FLIGHT — CIV6: the craft covers 1 light-year/turn plus one
+  // per completed laser station, and the win fires on ARRIVAL, not launch.
+  // Ascending seat order + the victoryType guard: a same-turn tie goes to the
+  // lowest row, and an already-won space game keeps its victor.
+  for (const s of state.seats) {
+    if ((s.spaceLy ?? -1) < 0) continue;
+    s.spaceLy = (s.spaceLy ?? 0) + 1 + (s.spaceLasers ?? 0);
+    if (s.spaceLy >= SPACE_FLIGHT_LY && state.victoryType !== 3) {
+      state.victoryType = 3;
+      state.victoryRow = s.seat;
+      state.eventLog.push('Science Victory! The Exoplanet Expedition has arrived.');
+    }
+  }
   // Domination ends the game the instant a civ holds every capital;
   // otherwise the score victory fires at TURN_LIMIT. Detection only — no freeze
   // Detection is indicator-only, so with no domination this stays inert.

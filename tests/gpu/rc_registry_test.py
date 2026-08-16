@@ -48,7 +48,7 @@ def build(rules, path, steps: int = 18, dtype=torch.float64):
 def scaffold_p0(sim):
     """First scaffold district with placement code 0 (plain best-adjacency) that
     the live capital does NOT already own — so a place can be observed."""
-    for (di, _ut, _uc, plc) in sim._scaffold:
+    for (di, _ut, _uc, plc, _fc) in sim._scaffold:
         if plc == 0 and int(sim.city_dist_tile[0, 1, 0, di]) < 0:
             return di
     raise AssertionError("no placement-0 scaffold district free on the capital")

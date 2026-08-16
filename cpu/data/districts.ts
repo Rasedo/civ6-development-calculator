@@ -43,6 +43,9 @@ export interface DistrictDef {
   code: string;
   color: string;
   cost: number;
+  /** CIV6: this district's cost is FLAT (`cost` × game speed) — it never
+   *  scales with research progress and takes no discount. The Spaceport. */
+  fixedCost?: boolean;
   countsTowardLimit: boolean;
   /** A city may hold SEVERAL of this type (CIV 6: the Neighborhood, which is
    *  why it does not count toward the population cap). Absent means one. */
@@ -56,6 +59,8 @@ export interface DistrictDef {
     requiresAdjacentCityCenter?: boolean;
     requiresWaterSourceOrMountain?: boolean;
     notAdjacentToCityCenter?: boolean;
+    /** Refuses Hills (Spaceport: flat land only). */
+    flatLand?: boolean;
   };
   description: string;
 }
@@ -235,6 +240,23 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     placement: {},
     description: 'Housing based on tile appeal (2-6).',
   }),
+  // CIV6 (GS Civilopedia + wiki): unlocked by Rocketry, FLAT 1800 production
+  // (never scales with research, no discount), flat land only (no Hills),
+  // does NOT count toward the population district limit, no adjacency, -1
+  // appeal to adjacent tiles, and it hosts all four Science Victory projects.
+  SPACEPORT: D({
+    id: 'SPACEPORT',
+    name: 'Spaceport',
+    code: 'SPT',
+    color: '#8d97ad',
+    cost: 1800,
+    fixedCost: true,
+    countsTowardLimit: false,
+    adjacency: [],
+    housing: 0,
+    placement: { flatLand: true },
+    description: 'Launch site for the Science Victory projects. Flat land only.',
+  }),
 };
 
 export const PLACEABLE_DISTRICTS: DistrictId[] = [
@@ -248,6 +270,7 @@ export const PLACEABLE_DISTRICTS: DistrictId[] = [
   'AQUEDUCT',
   'ENTERTAINMENT_COMPLEX',
   'NEIGHBORHOOD',
+  'SPACEPORT', // appended LAST — earlier indices are wire meaning
 ];
 
 /**
@@ -256,7 +279,7 @@ export const PLACEABLE_DISTRICTS: DistrictId[] = [
  * the wire's meaning and must never be re-sorted. `unlockKind: 'civic'` marks
  * a civic-tree unlock; the default is a tech id.
  */
-export const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; unlockKind?: 'civic'; placement?: 'aqueduct' | 'coastal' | 'encampment' }[] = [
+export const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; unlockKind?: 'civic'; placement?: 'aqueduct' | 'coastal' | 'encampment' | 'flat' }[] = [
   { id: 'CAMPUS', unlockId: 'WRITING' },
   { id: 'HOLY_SITE', unlockId: 'ASTROLOGY' },
   { id: 'COMMERCIAL_HUB', unlockId: 'CURRENCY' },
@@ -267,4 +290,5 @@ export const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; unlockKind?
   { id: 'ENTERTAINMENT_COMPLEX', unlockId: 'GAMES_AND_RECREATION', unlockKind: 'civic' },
   { id: 'ENCAMPMENT', unlockId: 'BRONZE_WORKING', placement: 'encampment' },
   { id: 'NEIGHBORHOOD', unlockId: 'URBANIZATION', unlockKind: 'civic' },
+  { id: 'SPACEPORT', unlockId: 'ROCKETRY', placement: 'flat' },
 ];
