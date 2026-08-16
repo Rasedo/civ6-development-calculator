@@ -658,10 +658,18 @@ class SimEconomy:
         return out
 
     def _adj_dtype_complete(self, di: int) -> torch.Tensor:
-        nb = self.neigh
-        nbc = nb.clamp(min=0)
-        hit = (self.district[:, nbc] == di) & self.district_complete[:, nbc] & (nb >= 0).unsqueeze(0)
-        return hit.any(dim=2)
+        # memoised on _eff_version like its count siblings above — it reads the
+        # same district/district_complete planes, whose every writer bumps the key
+        if self._adjt_cache is None or self._adjt_cache[0] != self._eff_version:
+            self._adjt_cache = (self._eff_version, {})
+        d = self._adjt_cache[1]
+        v = d.get(di)
+        if v is None:
+            nb = self.neigh
+            nbc = nb.clamp(min=0)
+            v = ((self.district[:, nbc] == di) & self.district_complete[:, nbc] & (nb >= 0).unsqueeze(0)).any(dim=2)
+            d[di] = v
+        return v
 
     def _adj_res_live(self, ri: int) -> torch.Tensor:
         nb = self.neigh

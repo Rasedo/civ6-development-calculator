@@ -1147,6 +1147,7 @@ class SimInit:
         self._adjd_cache = None
         self._adjc_cache = None
         self._adjh_cache = None
+        self._adjt_cache = None
         self._fadjq_cache = None
         self._appeal_cache = None
         self._rcy_cache = None
@@ -1222,7 +1223,7 @@ class SimInit:
         self._fbase_cache = None
         self._food_cache = None
         self._nprod_cache = None
-        self._adjd_cache = self._adjc_cache = self._adjh_cache = None
+        self._adjd_cache = self._adjc_cache = self._adjh_cache = self._adjt_cache = None
         self._dadj_cache = None
         self._fadjq_cache = self._rcy_cache = None
         self._bld_cache = {}
@@ -1385,7 +1386,7 @@ class SimInit:
         self._fbase_cache = None
         self._food_cache = None
         self._nprod_cache = None
-        self._adjd_cache = self._adjc_cache = self._adjh_cache = None
+        self._adjd_cache = self._adjc_cache = self._adjh_cache = self._adjt_cache = None
         self._dadj_cache = None
         self._fadjq_cache = self._rcy_cache = None
         self._bld_cache = {}

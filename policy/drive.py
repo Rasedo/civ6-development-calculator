@@ -46,8 +46,9 @@ def take_seat(sim, row: int) -> None:
     sim.seat_ext[:, row] = True
 
 
-def _blocks(env, sim, row: int) -> dict:
-    obs = env.observe(row)
+def _blocks(env, sim, row: int, obs: torch.Tensor | None = None) -> dict:
+    if obs is None:
+        obs = env.observe(row)
     # tech/civic widths come off the live tensors — there is no NT/NC scalar,
     # and hardcoding one here would be the second copy that always drifts.
     return ladder.split(obs, sim.S, sim.n_majors - 1, sim.RC, sim.civ_techs.shape[2], sim.civ_civics.shape[2])
@@ -231,12 +232,16 @@ def _settle_targets(sim, seat: int):
     return out, ok
 
 
-def _seat_unit_orders(sim, seat: int):
+def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
     um = sim._seat_unit_mask(seat)
     uo = sim.seat_unit_obs(seat)
     orders0 = ladder.pick_unit_orders(um, uo)
-    job_t = _builder_jobs(sim, seat)
-    spread_t = _spread_targets(sim, seat)
+    # the serve tripwire computes both target tables pre-decide at the same
+    # state; passing them here skips the recomputation (pure reads either way)
+    if job_t is None:
+        job_t = _builder_jobs(sim, seat)
+    if spread_t is None:
+        spread_t = _spread_targets(sim, seat)
     settle_t, found_ok = _settle_targets(sim, seat)
     _smap, present, tiles, _types, _charges = _seat_units(sim, seat)
     on_job = (job_t >= 0) & (tiles == job_t) & present
@@ -337,8 +342,9 @@ def _war_ctx(blocks: dict) -> dict:
     }
 
 
-def _decide_buys(sim, row: int):
-    bctx = _buy_ctx(sim, row)
+def _decide_buys(sim, row: int, bctx: dict | None = None):
+    if bctx is None:
+        bctx = _buy_ctx(sim, row)
     buy_kind = ladder.pick_purchase(bctx["can_building"], bctx["settler_ok"], bctx["unit_ok"], bctx["tile_ok"])
     buy_a = torch.where(buy_kind == 3, bctx["tile"], bctx["jj"])
     buy_b = torch.where(buy_kind == 3, bctx["tile_j"], bctx["bb"])
@@ -487,9 +493,9 @@ def _district_tiles(sim, row: int, prod: torch.Tensor):
     return out
 
 
-def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int = 4, seeds=None, turn=None):
+def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int = 4, seeds=None, turn=None, pre: dict | None = None):
     m = sim.seat_masks(row)
-    blocks = _blocks(env, sim, row)
+    blocks = _blocks(env, sim, row, obs=None if pre is None else pre.get("obs"))
     prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(blocks, sim, row))
     dtile = _district_tiles(sim, row, prod)
     tech = ladder.pick_research(blocks, m["tech"], "tech") if bool(m["tech"].any()) else None
@@ -504,7 +510,7 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     env_seq = None
     if seeds is not None and turn is not None and sim.S > 0:
         env_seq = _seat_envoys(sim, row)
-    buy, worship, relig, levy, monu = _decide_buys(sim, row)
+    buy, worship, relig, levy, monu = _decide_buys(sim, row, bctx=None if pre is None else pre.get("bctx"))
     # production_tile rides along or the drive and its own record diverge: a
     # district column without its tile is refused at the apply, while the
     # replay side passes the recorded tile and places it.
@@ -522,7 +528,10 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     # exactly like the scripted walkers. The phase executes the stash at the
     # walkers' position and RE-VALIDATES every rank: an illegal later step
     # refuses, never substitutes.
-    orders0, job_t, spread_t, settle_t, um, uo = _seat_unit_orders(sim, row)
+    orders0, job_t, spread_t, settle_t, um, uo = _seat_unit_orders(
+        sim, row,
+        job_t=None if pre is None else pre.get("jobs"),
+        spread_t=None if pre is None else pre.get("spreads"))
     B2, N2 = orders0.shape
     ranks = [orders0]
     smap = sim._seat_slot_map(row)
