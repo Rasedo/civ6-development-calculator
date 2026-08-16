@@ -124,7 +124,12 @@ class SimStep:
         # The WINNER is whoever the outcome names — `victory_row` for every
         # condition that has a victor. Only the turn-limit score result has
         # none, and there the score leader is the winner.
-        lead = self.leader() if bool(self.game_over.any()) else torch.full_like(dom, -1)
+        # `lead` is read ONLY where the game is over with no named victor —
+        # the turn-limit score finish. Gating on those exact rows (not
+        # game_over.any()) keeps three full seat_score city walks out of
+        # every turn that follows the batch's first finished game.
+        need_lead = self.game_over & (self.victory_row < 0)
+        lead = self.leader() if bool(need_lead.any()) else torch.full_like(dom, -1)
         self.winner = torch.where(self.victory_row >= 0, self.victory_row,
                                   torch.where(self.game_over, lead, torch.full_like(dom, -1)))
 

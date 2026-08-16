@@ -426,7 +426,9 @@ CITY = {
 
 def _unit(plane: str):
     def get(sim, b, rows):
-        t = getattr(sim, plane)[b].tolist()
+        if _np is not None:
+            return getattr(sim, plane)[b].numpy()[_np.asarray(rows, dtype=_np.int64)]
+        t = getattr(sim, plane)[b].tolist()  # pragma: no cover — numpy rides with torch
         return [t[i] for i in rows]
     return get
 
@@ -445,12 +447,20 @@ UNIT = {
 
 
 def _tile(plane: str):
+    # A zero-copy numpy VIEW of the live row — the fold consumes it before
+    # the sim mutates again, and it skips boxing 1144 values per field per
+    # game per turn into a Python list only to array them right back.
     def get(sim, b, rows):
-        return getattr(sim, plane)[b].tolist()
+        if _np is not None:
+            return getattr(sim, plane)[b].numpy()
+        return getattr(sim, plane)[b].tolist()  # pragma: no cover
     return get
 
 
 def _owner_city(sim, b, rows):
+    if _np is not None:
+        seat = sim.tile_seat[b].numpy()
+        return _np.where((seat >= 0) & (seat < 100), sim.tile_city[b].numpy(), -1)
     seat = sim.tile_seat[b].tolist()
     city = sim.tile_city[b].tolist()
     return [city[t] if 0 <= seat[t] < 100 else -1 for t in rows]
@@ -471,14 +481,8 @@ TILE = {
     "road": _tile("road"),
     "fertility": _tile("fertility"),
     "droughtTurns": _tile("drought"),
-    "hasFeature": lambda sim, b, rows: [
-        1 if (fid >= 0 and not st) else 0
-        for fid, st in zip(sim.feat_id[b].tolist(), sim.feat_stripped[b].tolist())
-    ],
-    "hasResource": lambda sim, b, rows: [
-        1 if (cat != 0 and not st) else 0
-        for cat, st in zip(sim.res_cat[b].tolist(), sim.res_stripped[b].tolist())
-    ],
+    "hasFeature": lambda sim, b, rows: ((sim.feat_id[b] >= 0) & ~sim.feat_stripped[b]).long().numpy(),
+    "hasResource": lambda sim, b, rows: ((sim.res_cat[b] != 0) & ~sim.res_stripped[b]).long().numpy(),
 }
 
 EXTRACTORS = {"game": GAME, "seat": SEAT, "cityState": CITY_STATE, "city": CITY, "unit": UNIT, "tile": TILE}

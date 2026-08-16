@@ -335,6 +335,12 @@ def pick_production(
 
     solo_taken = {nm: torch.zeros(B, dtype=torch.bool, device=dev) for nm in SOLO_TIERS}
     out = torch.full((B, C), -1, dtype=torch.long, device=dev)
+    # roster lanes are city-invariant — slice once, not per j
+    if roster is not None and u_lo < W:
+        nu0 = min(u_hi, W) - u_lo
+        rng_t0, nav0 = roster["is_ranged"][:nu0], roster["naval"][:nu0]
+        comb0, rstr0 = roster["combat"][:nu0], roster["ranged_str"][:nu0]
+        mel_lane0, rng_lane0 = ~rng_t0 & ~nav0 & (comb0 > 0), rng_t0 & ~nav0
     for j in range(C):
         best = torch.full((B,), -1, dtype=torch.long, device=dev)
         under_cap = n_units < cap
@@ -354,13 +360,10 @@ def pick_production(
                 if roster is None or u_lo >= W:
                     continue
                 legal = mask[:, j, u_lo:min(u_hi, W)]
-                nu = legal.shape[1]
-                rng_t = roster["is_ranged"][:nu]
-                nav = roster["naval"][:nu]
-                mel_ok = legal & ~rng_t & ~nav & (roster["combat"][:nu] > 0)
-                rng_ok = legal & rng_t & ~nav
-                pick_m = u_lo + _best_in_lane(mel_ok, roster["combat"][:nu])
-                pick_r = u_lo + _best_in_lane(rng_ok, roster["ranged_str"][:nu])
+                mel_ok = legal & mel_lane0
+                rng_ok = legal & rng_lane0
+                pick_m = u_lo + _best_in_lane(mel_ok, comb0)
+                pick_r = u_lo + _best_in_lane(rng_ok, rstr0)
                 want_r = ranged * 2 < melee
                 use_r = want_r & rng_ok.any(dim=1)
                 use_m = ~use_r & mel_ok.any(dim=1)
