@@ -23,6 +23,8 @@ import json
 import os
 import subprocess
 import sys
+import time
+from collections import defaultdict
 from pathlib import Path
 
 import torch
@@ -145,7 +147,8 @@ def _field_name(i: int, S: int, n_opponents: int, C: int, NT: int, NC: int) -> s
 
 
 def run_batched(turns: int, eps: float, ckpt_every: int = 0,
-                ckpt_dir: Path | None = None, resume: int = 0) -> None:
+                ckpt_dir: Path | None = None, resume: int = 0,
+                profile: bool = False, cprofile: str = "") -> None:
     """The battery-lane shape: ONE B=12 GPU sim, one TS child per seed in
     PARALLEL, a per-turn barrier. Children run concurrently between barriers
     (independent processes); the GPU pays batched dispatch once per step
@@ -225,9 +228,32 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             first = rep
         bad += 1
 
+    # --profile: wall-time split of the turn loop. `wait_*` buckets are time
+    # BLOCKED on the TS children (the decision-server share); the rest is this
+    # process — GPU or orchestration.
+    prof: dict[str, float] = defaultdict(float)
+    _pc = time.perf_counter
+    # --cprofile T0-T1: function-level attribution over that turn window, in
+    # situ — a bare sim outside the serve loop is decision-free and EMPTY
+    # (settler starts, nothing founds), so only the live loop measures truth.
+    cp = cp_lo = cp_hi = None
+    if cprofile:
+        import cProfile
+        lo, _, hi = cprofile.partition("-")
+        cp_lo, cp_hi = int(lo), int(hi)
+        cp = cProfile.Profile()
+
     try:
         for t in range(t0, turns):
+            if cp is not None:
+                if t == cp_lo:
+                    cp.enable()
+                elif t == cp_hi:
+                    cp.disable()
+            _t = _pc()
             msgs = [read_msg(ch) for ch in children]
+            prof["wait_obs (TS children)"] += _pc() - _t
+            _t = _pc()
             for seat in seats:
                 gobs_all = env.observe(seat)
                 gj_all = drive._builder_jobs(sim, seat).tolist()
@@ -262,8 +288,10 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                         tb = msg.get("buys", {}).get(str(seat), [])
                         if tb and gb_all[b] != tb:
                             flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit,tileOk,tile,tileC,worshipC,religKind,religC,levy]: GPU {gb_all[b]} vs TS {tb}")
+            prof["obs+targets compare (GPU obs, buys, jobs)"] += _pc() - _t
             if bad:
                 break
+            _t = _pc()
             geo = drive.geo_decide_and_apply(sim)
             # ONE decide body, ONE record shape, every major row, seat 0 first.
             # Seat 0 rides `_decide_turn` like the rest, which also hands it the
@@ -272,21 +300,32 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             # its block never carried at all — the GPU has been applying row 0's
             # geo intents while the wire told the TS child nothing about them.
             per_seat = {row: drive._decide_turn(env, sim, row, roster, classes, seeds=seeds, turn=t) for row in seats}
+            prof["decide (policy on GPU)"] += _pc() - _t
+            _t = _pc()
             for b, ch in enumerate(children):
                 recs = {str(row): {**drive._extract_record(sim, row, *per_seat[row], b),
                                    **drive._extract_geo(geo, row, b)} for row in seats}
                 ch.stdin.write(json.dumps({"recs": recs}) + "\n")
                 ch.stdin.flush()
+            prof["extract+send records"] += _pc() - _t
+            _t = _pc()
             sim.step()
+            prof["sim.step (GPU engine)"] += _pc() - _t
+            _t = _pc()
             trs = [read_msg(ch) for ch in children]  # barrier: every child's post-step digest
+            prof["wait_digest (TS children)"] += _pc() - _t
             # THE DIGEST IS THE GATE. On the FIRST disagreement the mismatching
             # groups are dumped keyed from both engines and diffed BY NAME;
             # later ones get one line each, capped so a persistent drift cannot
             # flood the output.
             for b, ch in enumerate(children):
                 if True:
+                    _t = _pc()
                     gdig = statecompare.state_digest(sim, b, sc_man)
+                    prof["state_digest (GPU extract)"] += _pc() - _t
+                    _t = _pc()
                     bad_groups, reps = digest_diff(sc_man, gdig, trs[b].get("digest"))
+                    prof["digest_diff (compare)"] += _pc() - _t
                     if bad_groups:
                         for rep in reps:
                             flag(f"seed {seeds[b]} turn {t + 1}: {rep}")
@@ -321,6 +360,22 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             except OSError:
                 pass
             ch.kill()
+    if profile:
+        total = sum(prof.values())
+        print(f"PROFILE — turn-loop wall {total:.1f}s over {turns - t0} turns "
+              f"({len(seeds)} seeds); buckets, largest first:")
+        for k, v in sorted(prof.items(), key=lambda kv: -kv[1]):
+            print(f"  {k:<42} {v:8.1f}s  {100 * v / total:5.1f}%")
+        ts_wait = sum(v for k, v in prof.items() if k.startswith("wait_"))
+        print(f"  blocked on TS children: {ts_wait:.1f}s ({100 * ts_wait / total:.1f}%) — "
+              "the rest is this process (GPU + orchestration)")
+    if cp is not None:
+        import pstats
+        cp.create_stats()
+        print(f"\nCPROFILE — turns {cp_lo}..{cp_hi}, full loop body:")
+        st = pstats.Stats(cp)
+        st.sort_stats("cumulative").print_stats(30)
+        st.sort_stats("tottime").print_stats(20)
     if bad:
         print(f"SERVE GATE (BATCHED) RED — first: {first}")
         sys.exit(1)
@@ -340,11 +395,14 @@ def main() -> None:
     ap.add_argument("--ckpt-every", type=int, default=0, help="checkpoint both engines every K completed turns (0 = off)")
     ap.add_argument("--ckpt-dir", default=".claude/scratchpad/serve_ckpt", help="where checkpoints live (GPU .pt + per-seed TS .json)")
     ap.add_argument("--resume", type=int, default=0, help="resume from the checkpoint taken at this turn (a prior --ckpt-every run, same seeds)")
+    ap.add_argument("--profile", action="store_true", help="batched only: print the turn-loop wall-time split (TS-children wait vs GPU vs digest)")
+    ap.add_argument("--cprofile", default="", help="batched only: 'T0-T1' — cProfile the loop body over that turn window, in situ")
     args = ap.parse_args()
     ckpt_dir = Path(args.ckpt_dir)
 
     if args.batched:
-        run_batched(args.turns, args.eps, args.ckpt_every, ckpt_dir, args.resume)
+        run_batched(args.turns, args.eps, args.ckpt_every, ckpt_dir, args.resume,
+                    profile=args.profile, cprofile=args.cprofile)
         return
 
     if args.seeds:

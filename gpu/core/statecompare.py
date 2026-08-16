@@ -37,12 +37,18 @@ import json
 import math
 from pathlib import Path
 
+try:  # the census must stay importable with no numpy on the path
+    import numpy as _np
+except ImportError:  # pragma: no cover
+    _np = None
+
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_PATH = ROOT / "shared" / "statecompare.manifest.json"
 ENGINE_PATH = Path(__file__).resolve().parent / "simbase.py"
 
 _MASK = 0xFFFFFFFF
 _2_32 = 1 << 32
+_VEC_MIN_ROWS = 64
 
 
 def load_manifest(path: Path = MANIFEST_PATH) -> dict:
@@ -498,6 +504,87 @@ def check_extractors(manifest: dict | None = None) -> None:
             )
 
 
+def _mix32_np(h):
+    h = h & _MASK
+    h = ((h ^ (h >> 16)) * 0x85EBCA6B) & _MASK
+    h = ((h ^ (h >> 13)) * 0xC2B2AE35) & _MASK
+    return (h ^ (h >> 16)) & _MASK
+
+
+def _step_np(h, x):
+    return _mix32_np(((h & _MASK) ^ (x & _MASK)) + 0x9E3779B9)
+
+
+def _q_np(arr, scale: int):
+    if arr.dtype.kind == "f":
+        return _np.floor(arr * scale + 0.5).astype(_np.int64)
+    q = arr.astype(_np.int64)
+    return q * scale if scale != 1 else q
+
+
+def _fold_rows_np(keys, cols) -> dict | None:
+    """`fold_rows` with the rows in PARALLEL — the identical arithmetic on
+    int64 vectors (multiplication wraps mod 2^64; `& _MASK` right after makes
+    that exactly mod-2^32, which is all `_mix32` ever keeps).
+
+    Scalar columns fold as one vector; a UNIFORM-length list column folds as
+    `len` plus one vector per element position (every row's chain has the
+    same shape, so the rows stay parallel); a RAGGED column drops to a
+    per-row loop for that column alone. Returns None only on value types
+    none of those paths handle — the digest VALUE is the seam and must not
+    depend on which path ran.
+    """
+    if _np is None:
+        return None
+    # Below ~64 rows the per-op numpy overhead LOSES to the scalar loop —
+    # the seat/city/game groups are 1-15 rows and vectorising them QUADRUPLED
+    # digest time. The vector path exists for the tile group's 1144 rows and
+    # the unit group's mid-game hundreds.
+    if len(keys) < _VEC_MIN_ROWS:
+        return None
+    qs = []
+    for cmp, vals in cols:
+        scale = 1000 if cmp == "milli" else 1
+        try:
+            arr = _np.asarray(vals)
+        except ValueError:
+            arr = _np.empty(0, dtype=object)  # ragged — take the per-row path
+        if arr.dtype.kind in "ifb" and arr.ndim in (1, 2):
+            qs.append((cmp, "vec", _q_np(arr, scale)))
+        elif len(vals) and all(isinstance(v, (list, tuple)) for v in vals):
+            qs.append((cmp, "ragged", [[_quantise(x, scale) for x in v] for v in vals]))
+        else:
+            return None
+    k = _np.asarray(keys, dtype=_np.int64)
+    seed = _step_np(_np.int64(0x811C9DC5), k % _2_32)
+    h = {"exact": seed.copy(), "milli": seed.copy()}
+    for i, (cmp, kind, q) in enumerate(qs):
+        t = _step_np(h[cmp], _np.int64(i))
+        if kind == "vec":
+            cols2d = q.reshape(len(k), -1) if q.ndim == 2 else q.reshape(len(k), 1)
+            t = _step_np(t, _np.int64(cols2d.shape[1]))  # _fold's len(seq)
+            for j in range(cols2d.shape[1]):
+                qj = cols2d[:, j]
+                t = _step_np(t, qj % _2_32)
+                t = _step_np(t, (qj // _2_32) & _MASK)
+        else:  # ragged: chain LENGTH differs per row — scalar per row
+            t = t.copy()
+            for r, seq in enumerate(q):
+                hr = int(t[r])
+                hr = _step(hr, len(seq))
+                for v in seq:
+                    hr = _step(hr, v % _2_32)
+                    hr = _step(hr, (v // _2_32) & _MASK)
+                t[r] = hr
+        h[cmp] = t
+    out = {}
+    for cmp in ("exact", "milli"):
+        a = int(h[cmp].sum()) & _MASK
+        b = int(_mix32_np(h[cmp] ^ 0x5BF03635).sum()) & _MASK
+        out[cmp] = f"{b:08x}{a:08x}"
+    return out
+
+
 def fold_rows(keys, cols) -> dict:
     """The digest arithmetic itself, over already-extracted columns. THE seam
     the two engines must agree on bit for bit — `cpu/core/statecompare.ts`'s
@@ -507,7 +594,14 @@ def fold_rows(keys, cols) -> dict:
     `cols[i]` is `(compare, vals)` and `vals[r]` is field i's value for row r.
     Column ORDER is folded in, so two fields swapping places changes the digest;
     ROW order is not, because the per-row hashes are summed.
+
+    Scalar-only groups take `_fold_rows_np` (the tile group is 1144 rows x 16
+    fields, every turn, every game — the scalar loop was half the serve lane's
+    wall); list-valued groups keep the loop below. Same bits either way.
     """
+    vec = _fold_rows_np(keys, cols)
+    if vec is not None:
+        return vec
     accs = {"exact": _Acc(), "milli": _Acc()}
     for r in range(len(keys)):
         seed = _step(0x811C9DC5, keys[r] % _2_32)
@@ -582,9 +676,61 @@ def census(manifest: dict | None = None) -> list[str]:
     return bad
 
 
+def _fold_ab_check() -> list[str]:
+    """The vectorised fold against the scalar fold, on adversarial columns —
+    negatives, floats on both scales, bools, empty row sets, values above
+    2^32. One digest arithmetic, two implementations; any split is a bug in
+    the numpy path, never a manifest problem."""
+    if _np is None:
+        return []
+    cases = [
+        ([0], [("exact", [0])]),
+        ([3, 7, 11], [("exact", [-1, 0, 2]), ("milli", [0.05, -2.5, 1e6]),
+                      ("exact", [True, False, True]), ("exact", [2**33 + 5, -(2**33), 7])]),
+        ([2288], [("exact", [123456.789]), ("milli", [-0.0005])]),
+        ([], [("exact", []), ("milli", [])]),
+        (list(range(1144)), [("exact", list(range(-500, 644))),
+                             ("milli", [i * 0.001 for i in range(1144)])]),
+        # list-valued columns: uniform (vectorised), empty, and ragged
+        # (per-row path) — plus a scalar column beside them in one group
+        ([5, 6], [("exact", [[1, 2], [3, 4]]), ("exact", [[], []]), ("exact", [7, -8])]),
+        ([5, 6, 9], [("milli", [[0.5], [1.5, -2.5], []]), ("exact", [[2**33], [0], [1, 2, 3]])]),
+    ]
+    out = []
+    global _VEC_MIN_ROWS
+    keep_min = _VEC_MIN_ROWS
+    _VEC_MIN_ROWS = 0  # the check exercises the ARITHMETIC on small rows too
+    try:
+        # A column no path handles must DECLINE, so fold_rows keeps the loop.
+        if _fold_rows_np([5, 6], [("exact", [[1], "x"])]) is not None:
+            out.append("fold A/B: np path accepted a mixed-type column")
+        return out + _fold_ab_cases(cases)
+    finally:
+        _VEC_MIN_ROWS = keep_min
+
+
+def _fold_ab_cases(cases) -> list[str]:
+    out = []
+    for keys, cols in cases:
+        vec = _fold_rows_np(keys, cols)
+        ref = {"exact": _Acc(), "milli": _Acc()}
+        for r in range(len(keys)):
+            seed = _step(0x811C9DC5, keys[r] % _2_32)
+            h = {"exact": seed, "milli": seed}
+            for i, (cmp, vals) in enumerate(cols):
+                h[cmp] = _fold(_step(h[cmp], i), vals[r], 1000 if cmp == "milli" else 1)
+            ref["exact"].add(h["exact"])
+            ref["milli"].add(h["milli"])
+        want = {"exact": ref["exact"].hex(), "milli": ref["milli"].hex()}
+        if vec != want:
+            out.append(f"fold A/B split on keys[:3]={keys[:3]}: np {vec} vs scalar {want}")
+    return out
+
+
 def _main() -> int:
     man = load_manifest()
     bad = census(man)
+    bad += _fold_ab_check()
     try:
         check_extractors(man)
     except AssertionError as exc:

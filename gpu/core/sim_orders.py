@@ -57,11 +57,16 @@ class SimOrders:
                 dirs = a.clamp(min=0, max=5)
                 tgt = nb.gather(1, dirs.unsqueeze(1)).squeeze(1)
                 tc = tgt.clamp(min=0)
-                blocked = torch.where(
-                    is_civ,
-                    self._blocked_for(tgt.unsqueeze(1), row, is_civilian=True).squeeze(1),
-                    self._blocked_for(tgt.unsqueeze(1), row).squeeze(1),
-                )
+                # Both arms are pure reads; build the civilian plane only when
+                # a civilian is actually moving this rank — most ranks are
+                # military-only and the second _blocked_for was half the cost.
+                blocked = self._blocked_for(tgt.unsqueeze(1), row).squeeze(1)
+                if bool((mv & is_civ).any()):
+                    blocked = torch.where(
+                        is_civ,
+                        self._blocked_for(tgt.unsqueeze(1), row, is_civilian=True).squeeze(1),
+                        blocked,
+                    )
                 terr = self.passable.gather(1, tc.unsqueeze(1)).squeeze(1)
                 is_nav = self.unit_naval[ut]
                 if self._embark_live:
