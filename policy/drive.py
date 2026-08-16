@@ -127,7 +127,9 @@ def _builder_jobs(sim, seat: int) -> torch.Tensor:
         if not bool(pres.any()):
             break
         vt = types[:, n].clamp(min=0, max=sim.NU - 1)
-        civ_row = (sim._type_charges[vt] > 0) & (charges[:, n] > 0)
+        # BUILDERS only — a missionary's charge is a spread, not a build, and
+        # the engines' improvement arms refuse every other type anyway.
+        civ_row = (vt == sim._builder_idx) & (charges[:, n] > 0)
         rows = pres & civ_row
         if not bool(rows.any()):
             continue
@@ -344,10 +346,13 @@ def _decide_buys(sim, row: int):
     neg_w = torch.full_like(bctx["worship_j"], -1)
     relig_j = torch.where(relig_kind == 5, bctx["missionary_j"],
                           torch.where(relig_kind == 6, bctx["apostle_j"], neg_w))
+    monu_kind = ladder.pick_monu(bctx["monu_builder_ok"], bctx["monu_settler_ok"])
+    monu_j = torch.where(monu_kind >= 0, bctx["spawn_slot"], torch.full_like(bctx["spawn_slot"], -1))
     return ((buy_kind, buy_a, buy_b),
             torch.where(worship_ok, bctx["worship_j"], neg_w),
             (relig_kind, relig_j),
-            torch.where(bctx["levy_ok"], bctx["levy_cs"], torch.full_like(bctx["levy_cs"], -1)))
+            torch.where(bctx["levy_ok"], bctx["levy_cs"], torch.full_like(bctx["levy_cs"], -1)),
+            (monu_kind, monu_j))
 
 
 def _buy_ctx(sim, row: int) -> dict:
@@ -356,8 +361,11 @@ def _buy_ctx(sim, row: int) -> dict:
     active = sim.seat_ext[:, row] & (n_cities > 0) & sim.civ_alive[:, row]
     jj, bb, can_b, price, _ = sim._seat_buy_candidates(row, active)
     _sq = (alive_row & (sim.city_current[:, row] == sim.SETTLER)).sum(dim=1)
-    sett_cost = (sim.rules.settler_base + sim.rules.settler_per_city
-                 * (n_cities - 1 + sim._seat_settlers(row) + _sq).clamp(min=0).double()) * sim.rules.gold_purchase_mult
+    sett_base = (sim.rules.settler_base + sim.rules.settler_per_city
+                 * (n_cities - 1 + sim._seat_settlers(row) + _sq).clamp(min=0).double())
+    mon_g = sim._golden_ded(row, sim._ded_monumentality)
+    sett_cost = sett_base * sim.rules.gold_purchase_mult
+    sett_cost = torch.where(mon_g, sett_cost * 0.7, sett_cost)
     # the buy SPAWNS a unit at the capital (else first city), which must have
     # the pop to pay — the TS driver's tripwire mirrors this exactly.
     _cap_is = sim.city_is_cap[:, row]
@@ -368,11 +376,23 @@ def _buy_ctx(sim, row: int) -> dict:
     unit_ok = active & (sim._seat_army_count(row) < 2 * n_cities) & cand_u.any(dim=1)
     tile_j, tile_t, _tile_cost, tile_ok = sim._seat_tile_buy_candidate(row, active)
     w_ok, w_j, m_ok, m_j, a_ok, a_j = sim._seat_faith_buy_candidates(row, active)
+    # CIV6 (GS Civilopedia, Monumentality, Golden face): "May purchase civilian
+    # units with Faith. Builders and Settlers are 30% cheaper to purchase with
+    # Faith and Gold." FAITH_PURCHASE_MULT with the literal 0.7 LAST; the
+    # POLICY gate (at most one live builder) is here, the rule is the applier's.
+    monu_b_ok = torch.zeros_like(mon_g)
+    if sim._builder_idx >= 0:
+        n_bl = (sim.major_unit_alive & (sim.major_unit_seat == row) & (sim.major_unit_type == sim._builder_idx)).sum(dim=1)
+        bl_cost = sim._builder_cost(sim.civ_builders_trained[:, row]).double() * sim.rules.faith_purchase_mult * 0.7
+        monu_b_ok = active & mon_g & (n_bl < 1) & sim._afford(sim.civ_faith[:, row], bl_cost)
+    monu_s_ok = active & mon_g & (_spawn_pop >= sim.rules.settler_pop_gate) \
+        & sim._afford(sim.civ_faith[:, row], sett_base * sim.rules.faith_purchase_mult * 0.7)
     levy_ok, levy_cs = sim._seat_levy_candidate(row, active)
     levy_ok = levy_ok & sim.war[:, row, : sim.n_majors].any(dim=1)
     return {"jj": jj, "bb": bb, "can_building": can_b, "price": price,
             "settler_ok": settler_ok, "unit_ok": unit_ok,
             "tile_ok": tile_ok, "tile": tile_t, "tile_j": tile_j,
+            "monu_builder_ok": monu_b_ok, "monu_settler_ok": monu_s_ok, "spawn_slot": _spawn_slot,
             "worship_ok": w_ok, "worship_j": w_j,
             "missionary_ok": m_ok, "missionary_j": m_j,
             "apostle_ok": a_ok, "apostle_j": a_j,
@@ -484,12 +504,13 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     env_seq = None
     if seeds is not None and turn is not None and sim.S > 0:
         env_seq = _seat_envoys(sim, row)
-    buy, worship, relig, levy = _decide_buys(sim, row)
+    buy, worship, relig, levy, monu = _decide_buys(sim, row)
     # production_tile rides along or the drive and its own record diverge: a
     # district column without its tile is refused at the apply, while the
     # replay side passes the recorded tile and places it.
     sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic,
-                           war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy)
+                           war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
+                           monu=monu)
 
     # units, and the draw order: the driver PLANS, the PHASE executes.
     # Applying steps pre-step to re-observe would consume combat draws at a
@@ -558,10 +579,10 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
         sim._driven_useq = {}
     sim._driven_useq[row] = seq
-    return prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy
+    return prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu
 
 
-def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, b: int) -> dict:
+def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, b: int) -> dict:
     _pr = prod[b]
     _ctr = sim.city_center[b, row]
     _alive_c = sim.city_alive[b, row]
@@ -584,11 +605,11 @@ def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, 
     _w = None if war is None or int(war[b]) < 0 else int(war[b])
     _e = [] if env_seq is None else [int(x) for x in env_seq[b].tolist() if int(x) >= 0]
     rec = {"production": prod_pairs, "tech": _t, "civic": _c, "war": _w, "envoys": _e, "units": rows}
-    rec.update(_buy_record_fields(sim, row, b, buy, worship, relig, levy))
+    rec.update(_buy_record_fields(sim, row, b, buy, worship, relig, levy, monu))
     return rec
 
 
-def _buy_record_fields(sim, row: int, b: int, buy, worship, relig, levy) -> dict:
+def _buy_record_fields(sim, row: int, b: int, buy, worship, relig, levy, monu=None) -> dict:
     """The GOLD/FAITH/LEVY half of a seat's record, for ANY seat row — every
     city reference is CENTRE-KEYED like production, because ids are
     engine-local and centres are the shared vocabulary. Every field is
@@ -622,6 +643,10 @@ def _buy_record_fields(sim, row: int, b: int, buy, worship, relig, levy) -> dict
         _c = _centre(int(relig[1][b]))
         if _c is not None:
             bf.append([int(relig[0][b]), _c])
+    if monu is not None and int(monu[0][b]) in (8, 9):
+        _c = _centre(int(monu[1][b]))
+        if _c is not None:
+            bf.append([int(monu[0][b]), _c])
     if bf:
         out["buyFaith"] = bf
     if levy is not None and int(levy[b]) >= 0:
@@ -692,7 +717,7 @@ def replay_seat(sim, row: int, rec: dict) -> None:
             hj = torch.where(mm, torch.full_like(hj, j), hj)
         return hj
 
-    worship = relig = None
+    worship = relig = monu = None
     for _ent in rec.get("buyFaith") or []:
         _fk, _fc = int(_ent[0]), int(_ent[1])
         if _fk == 4:
@@ -700,10 +725,14 @@ def replay_seat(sim, row: int, rec: dict) -> None:
         elif _fk in (5, 6):
             _rjt = _centre_slot(_fc)
             relig = (torch.where(_rjt >= 0, torch.full_like(_rjt, _fk), torch.full_like(_rjt, -1)), _rjt)
+        elif _fk in (8, 9):
+            _mjt = _centre_slot(_fc)
+            monu = (torch.where(_mjt >= 0, torch.full_like(_mjt, _fk), torch.full_like(_mjt, -1)), _mjt)
     _lv = rec.get("levy")
     levy = None if _lv is None else torch.full((sim.B,), int(_lv), dtype=torch.long, device=dev)
     sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic,
-                           war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy)
+                           war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
+                           monu=monu)
     def _geo_mask(seats) -> torch.Tensor:
         m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=dev)
         for j in seats:

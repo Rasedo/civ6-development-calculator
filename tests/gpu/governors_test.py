@@ -194,15 +194,11 @@ def poke_boundary(rules, path):
         assert int(sim.turn) % elen == 0, "the step must land on the boundary"
         got = int(sim.civ_age[0, 0])
         assert got == exp_age, f"score {score} must map to age {exp_age} (got {got})"
-        # The window RESETS at the boundary, but the dedication payout runs
-        # IMMEDIATELY after it (endTurn order: eraBoundary -> applyDedications),
-        # so a DARK or NORMAL seat has already banked one turn of climb-out
-        # score into the FRESH window. A GOLDEN seat is paid in faith instead
-        # and stays at 0.
-        want_es = 0 if exp_age == 2 else sim._ded_era * int(sim.dedications[0, 0])
-        assert int(sim.era_score[0, 0]) == want_es, (
-            f"fresh window must hold exactly this turn's dedication payout "
-            f"({want_es}), got {int(sim.era_score[0, 0])}"
+        # The window RESETS at the boundary, and NO flat payout follows it:
+        # dedications pay era score off EVENTS (dedicationEvent) or a golden
+        # standing bonus — never per turn. The fresh window must read 0.
+        assert int(sim.era_score[0, 0]) == 0, (
+            f"fresh window must be empty, got {int(sim.era_score[0, 0])}"
         )
     print(f"  b boundary OK (darkT {dark}, goldenT {gold}: {dark-1}→Dark, {dark}→Normal, {gold-1}→Normal, {gold}→Golden; window reset)")
 

@@ -2,7 +2,7 @@
 import { addYields, emptyYields, type City, type GameState, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
 import { tilesWithin, hexDistance } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable } from '../../world/query';
-import { tileYields, cityDistrictYields, cityBuildingYields, regionalEffects, localBuildingAmenities, pillagedDistrictTypes } from './yields';
+import { tileYields, cityDistrictYields, cityBuildingYields, regionalEffects, localBuildingAmenities, pillagedDistrictTypes, effectiveAdjacency } from './yields';
 import { getModifiers, makeYieldCtx, withFollowerBelief, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
@@ -16,9 +16,9 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { goldenCulturePerDistrict } from './eras';
+import { goldenCulturePerDistrict, goldenDedication } from './eras';
 import { SPECIALIST_YIELDS, greatWorkCulture, greatWorkTourism, relicFaith, relicTourism, artifactCulture, artifactTourism, GW_PRINTING_TECH } from '../data/greatPeople';
-import { warWearinessPenalty } from '../data/seats';
+import { warWearinessPenalty, DED_FREE_INQUIRY } from '../data/seats';
 import { RESOURCES } from '../../world/resources';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, REGIONAL_RANGE, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, type AmenityTier } from '../data/constants';
 import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf, tileClaimed } from './seats';
@@ -463,6 +463,16 @@ export function computeCityStats(
   }
 
   const districts = cityDistrictYields(ctx, city);
+  // CIV6 (GS Civilopedia, Free Inquiry, Golden face): "Commercial Hub and
+  // Harbor district's Gold adjacency bonus provides Science as well."
+  if (goldenDedication(state, city.seat, DED_FREE_INQUIRY)) {
+    for (const d of city.districts) {
+      if (d.type !== 'COMMERCIAL_HUB' && d.type !== 'HARBOR') continue;
+      const t = map.tiles[d.tileIndex];
+      if (!t.districtComplete || t.districtPillaged) continue;
+      districts.science += effectiveAdjacency(ctx, t, d.type);
+    }
+  }
   for (const [tileIndex, n] of specialists) {
     const inst = city.districts.find((d) => d.tileIndex === tileIndex);
     const y = inst ? SPECIALIST_YIELDS[inst.type] : undefined;

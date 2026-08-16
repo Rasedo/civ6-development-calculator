@@ -256,10 +256,10 @@ export const ADMIRAL_MARCH_LIVE = true;
  *   2 PEN_BRUSH_AND_VOICE +1 era score per INSPIRATION (civic boost) triggered
  *   3 EXODUS_OF_THE_EVANGELISTS  +2 era score per city converted to your religion
  *
- * The GOLDEN face keeps a flat faith payout for now — the named Golden bonuses
- * (Monumentality's faith purchases, Free Inquiry's eureka overflow, ...) need
- * machinery this round does not build, and inventing substitutes would be the
- * fabrication the verify-before-implement rule exists to prevent. Recorded.
+ * The GOLDEN face of each pays its sourced standing bonuses (movement,
+ * boost overflow, culture per district, prophet points, charges, the
+ * Monumentality faith purchases + 30% discount) — see `eras.goldenDedication`'s
+ * callers. There is NO flat per-turn payout on either face in real Civ 6.
  */
 export const DEDICATIONS = ['MONUMENTALITY', 'FREE_INQUIRY', 'PEN_BRUSH_AND_VOICE', 'EXODUS_OF_THE_EVANGELISTS'] as const;
 export const DED_MONUMENTALITY = 0;
@@ -282,15 +282,11 @@ export const DEDICATION_PAYOUTS_LIVE = true;
 export const ENGINEER_LIVE = true;
 
 export const HEROIC_DEDICATIONS = 3;
-export const DEDICATION_FAITH = 2;
 /** MONUMENTALITY / EXODUS OF THE EVANGELISTS grant +2 Movement to
  *  Builders and to Missionaries/Apostles/Inquisitors respectively, for the
  *  duration of the GOLDEN age that committed them (Civilopedia, Gathering
  *  Storm). Exported to the GPU as `eras.goldenMoveBonus`. */
 export const GOLDEN_MOVE_BONUS = 2;
-/** Era score per turn per dedication while DARK or NORMAL — real Civ 6's
- * climb-out dedications pay in era score, not yields. */
-export const DEDICATION_ERA_SCORE = 1;
 
 export const GOVERNOR_LOYALTY = 8;
 /** A civ↔civ war is FORMAL iff the aggressor denounced

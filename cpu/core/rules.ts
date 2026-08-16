@@ -95,6 +95,10 @@ export function validImprovementsIn(
     if (isWater(tile) || !unlocked('FORT')) return [];
     return tile.improvement ? [] : ['FORT'];
   }
+  // CIV6: every other improvement is the BUILDER's alone. A charge-carrying
+  // Missionary/Apostle must refuse here exactly as the GPU improvement arm
+  // does with its builder-type gate — a wire order for any other unit no-ops.
+  if (opts.builder !== undefined && opts.builder !== 'BUILDER') return [];
   if (tile.resource) {
     const imp = RESOURCES[tile.resource].improvement;
     return unlocked(imp) ? [imp] : [];

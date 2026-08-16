@@ -54,7 +54,7 @@ nothing carries forward.
 | B-20r tourism tails | 7 | national parks, civ Archaeologists, theming, shipwrecks, digs |
 | B-21r suzerain rows | 3 | 10 descoped channels, each needing its own mechanic |
 | B-22r World Congress | 6 | one resolution type of many; emergencies and competitions absent |
-| B-24r Ages/governors | 4 | Monumentality purchases, the governor tails |
+| B-24r Ages/governors | 2 | eight dedication catalog entries, dark-age policies, governor promotions, per-civ era drift |
 | B-25r victory tails | 3 | every victory exists; the tails are rate and term work |
 | B-26r barb escalation | 2 | camp-spawn ladder beyond melee |
 | B-27r theological combat | 2 | resolver simplifications, incl. the ~7x martyr-relic overstatement |
@@ -65,8 +65,8 @@ nothing carries forward.
 | B-33r floods vs districts | 1 | GS floods damage districts/buildings on floodplains (the Dam's reason to exist); both engines only pillage improvements and fertilize |
 | B-31r trade-route tails | 6 | a Trader UNIT and a route wire verb |
 | B-D unsourced data values | 5 | a residual CLASS: every invented magnitude, re-sourced |
-| **B. Fidelity vs real Civ 6** | **53** | |
-| **OPEN, TOTAL** | **53** | |
+| **B. Fidelity vs real Civ 6** | **51** | |
+| **OPEN, TOTAL** | **51** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -130,14 +130,16 @@ Civ 6 source or is recorded as unverifiable.
   (no vote-size chooser on any seat); peace deals carry no terms; the
   favor PENALTIES (CO2, global grievances, occupied capitals) are
   named by sources without rates — recorded, not invented.
-- **B-24r. Ages/governors tails:** Monumentality's faith-purchase of
-  civilians + 30% discount, Exodus's +2 charges on new religious
-  units, Free Inquiry's commercial-adjacency-gives-Science clause; the
-  eight unmodeled dedication catalog entries (four need spies / air
-  units / artifact systems / GDRs); dark-age policies; governor
-  ESTABLISHMENT and promotions (governors are a stateless greedy
-  ranking today); per-civ tech-era drift (eras are global 50-turn
-  blocks).
+- **B-24r. Ages/governors tails:** the eight unmodeled dedication
+  catalog entries (To Arms!, Hic Sunt Dracones, Reform the Coinage,
+  Heartbeat of Steam, plus four needing spies / air units / artifact
+  systems / GDRs — each needs BOTH faces sourced and hooked, and any
+  catalog growth reshuffles every round-robin pick); dark-age
+  policies; governor PROMOTIONS (the 5-turn establishment clock gates
+  only promotions — the +8 loyalty is by-assignment in real R&F,
+  sourced, so the stateless greedy ranking is faithful for the one
+  governor channel modeled); per-civ tech-era drift (eras are global
+  50-turn blocks).
 - **B-25r. Victory tails:** every named Civ 6 victory exists on both engines
   and every one is REACHABLE — a seat can queue every space step and the
   wire applier takes it on both sides. Open: the culture win's tourism gap

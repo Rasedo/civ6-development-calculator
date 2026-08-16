@@ -105,13 +105,6 @@ class SimStep:
                     )
             self.era_score[:] = 0
         self._world_congress()
-        if self._ded_payouts_live and (self._ded_faith > 0 or self._ded_era > 0):
-            _gold = self.civ_age == 2
-            _fa = torch.where(_gold, self.dedications * self._ded_faith, torch.zeros_like(self.dedications))
-            _es = torch.where(_gold, torch.zeros_like(self.dedications), self.dedications * self._ded_era)
-            self.era_score.add_(_es)
-            _fw = self.n_majors
-            self.civ_faith[:, :_fw].copy_(self.civ_faith[:, :_fw] + _fa[:, :_fw].to(self.civ_faith.dtype))
         dom = self._domination()
         space_won = self.victory_type == 3
         rel = self._religious_victor()  # on the follow set the spread just flipped

@@ -1580,6 +1580,7 @@ class SimEconomy:
         dcomp = (dreg >= 0) & self.district_complete.gather(1, dflat).reshape_as(dreg)
         dlive = dcomp & ~self.district_pillaged.gather(1, dflat).reshape_as(dreg)
         hs_adj = None
+        fi_adj = None
         for di, dd in enumerate(self.districts_cat):
             yc = int(dd.get("adjYield", -1))
             if yc < 0:
@@ -1590,8 +1591,16 @@ class SimEconomy:
             dist_y[:, :, yc] = dist_y[:, :, yc] + add
             if di == self._hs_idx:
                 hs_adj = add
+            elif di == self._commhub_idx or di == self._harbor_idx:
+                fi_adj = add if fi_adj is None else fi_adj + add
         if fol_live and hs_adj is not None:
             dist_y[:, :, 1] = dist_y[:, :, 1] + hs_adj * self._fol_tab("we", fol_id)
+        # CIV6 (GS Civilopedia, Free Inquiry, Golden face): "Commercial Hub and
+        # Harbor district's Gold adjacency bonus provides Science as well."
+        if fi_adj is not None:
+            _fi = self._golden_ded(row, self._ded_free_inquiry)
+            if bool(_fi.any()):
+                dist_y[:, :, 3] = dist_y[:, :, 3] + fi_adj * _fi.double().unsqueeze(1)
 
         bld_y = self._palace_y.double().reshape(1, 1, 6) * is_cap.unsqueeze(2)
         selb = bldg & ~self._bldg_dark(dreg) & ~self._b_regional.reshape(1, 1, -1)

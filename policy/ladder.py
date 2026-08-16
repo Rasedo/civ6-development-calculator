@@ -184,6 +184,15 @@ def pick_faith(worship_ok: torch.Tensor, missionary_ok: torch.Tensor, apostle_ok
     return worship_ok, relig
 
 
+def pick_monu(builder_ok: torch.Tensor, settler_ok: torch.Tensor) -> torch.Tensor:
+    """The Monumentality faith-civilian pick — kind 8 BUILDER, 9 SETTLER,
+    settler preferred (expansion first, like the gold ladder)."""
+    kind = torch.full(builder_ok.shape, -1, dtype=torch.long, device=builder_ok.device)
+    kind = torch.where(builder_ok, torch.full_like(kind, 8), kind)
+    kind = torch.where(settler_ok, torch.full_like(kind, 9), kind)
+    return kind
+
+
 def pick_war(mask: torch.Tensor, ctx: dict, rng: dict) -> torch.Tensor:
     B, W2 = mask.shape
     n_opp = W2 // 2

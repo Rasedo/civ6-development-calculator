@@ -317,8 +317,6 @@ class SimInit:
         self._heroic_ded = int(_er.get("heroicDedications", 3))
         self._ded_event_score = [int(x) for x in _er.get("dedEventScore", [1, 1, 1, 2])]
         self._n_ded = len(self._ded_event_score)
-        self._ded_faith = int(_er.get("dedicationFaith", 2))
-        self._ded_era = int(_er.get("dedicationEraScore", 1))
         self._gov_loy = float(_er.get("governorLoyalty", 8))
         nt_b3, nc_b3 = len(rules.t_cost), len(rules.c_cost)
         # The per-seat RESEARCH vectors, merged like the scalars. Placed here
@@ -897,6 +895,7 @@ class SimInit:
         )
         self._harbor_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HARBOR"), -1)
         self._hs_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HOLY_SITE"), -1)
+        self._commhub_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "COMMERCIAL_HUB"), -1)
         self._shipyard_bidx = int(rules.shipyard_bidx)
         self._walls_bidx = int(rules.ancient_walls_bidx)
         _tr = rules.trade or {}
@@ -1159,6 +1158,7 @@ class SimInit:
         self._driven_buy: dict = {}
         self._driven_buy_worship: dict = {}
         self._driven_buy_relig: dict = {}
+        self._driven_buy_monu: dict = {}
         self._driven_levy: dict = {}
         self._driven_tech: dict = {}
         self._driven_civic: dict = {}

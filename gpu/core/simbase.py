@@ -85,6 +85,7 @@ class Rules:
     builder_per: float
     game_speed: float
     gold_purchase_mult: float  # gold price = production cost × this (GOLD_PURCHASE_MULT)
+    faith_purchase_mult: float  # faith price = production cost × this (FAITH_PURCHASE_MULT)
     turn_limit: int  # game over once turn > this
     district_cost: dict  # districtCost params {base, scale} — each seat pays it from ITS OWN research
     score_pop_weight: float
@@ -163,6 +164,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         builder_per=r["scenario"].get("builderPer", 4),
         game_speed=r["scenario"].get("gameSpeed", 0.6),
         gold_purchase_mult=r["scenario"].get("goldPurchaseMult", 4),
+        faith_purchase_mult=r["scenario"].get("faithPurchaseMult", 2),
         turn_limit=r["scenario"].get("turnLimit", 250),
         district_cost=r.get("districtCost", {"base": 54, "scale": 8}),
         score_pop_weight=r["score"]["popWeight"],

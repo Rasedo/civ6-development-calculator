@@ -635,6 +635,20 @@ def state_digest(sim, b: int, manifest: dict | None = None, include_gaps: bool =
     return out
 
 
+def _py(v):
+    """Plain-Python view of an extractor value — the extractors return numpy
+    scalars/arrays (the fold path's zero-copy contract) and this dump path is
+    the one consumer that must json-serialize them."""
+    if _np is not None:
+        if isinstance(v, _np.ndarray):
+            return v.tolist()
+        if isinstance(v, _np.generic):
+            return v.item()
+    if isinstance(v, (list, tuple)):
+        return [_py(x) for x in v]
+    return v
+
+
 def group_dump(sim, b: int, group: str, manifest: dict | None = None, include_gaps: bool = False) -> dict:
     man = manifest or load_manifest()
     g = next(x for x in man["groups"] if x["name"] == group)
@@ -642,7 +656,7 @@ def group_dump(sim, b: int, group: str, manifest: dict | None = None, include_ga
     keys = group_keys(sim, b, group, rows)
     fields = [f for f in g["fields"] if include_gaps or "gap" not in f]
     cols = {f["name"]: EXTRACTORS[group][f["name"]](sim, b, rows) for f in fields}
-    return {keys[r]: {n: v[r] for n, v in cols.items()} for r in range(len(rows))}
+    return {_py(keys[r]): {n: _py(v[r]) for n, v in cols.items()} for r in range(len(rows))}
 
 
 

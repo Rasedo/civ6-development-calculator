@@ -92,11 +92,11 @@ def dump_diff(man: dict, group: str, gdump: dict, tdump: dict, cap: int = 12) ->
     return reps
 
 
-def _buy_row(sim, seat: int, bc: dict, rk, rj, b: int) -> list:
+def _buy_row(sim, seat: int, bc: dict, rk, rj, mk, b: int) -> list:
     """One row of the BUY-candidate tripwire, in the TS driver twin's exact
     shape — shared by the batched and single-seed paths so the two cannot
     drift: [centre, bIdx, settlerOk, unitOk, tileOk, tile, tileCentre,
-    worshipCentre, religKind, religCentre, levyIdx]."""
+    worshipCentre, religKind, religCentre, levyIdx, monuKind, monuCentre]."""
     def ctr(j: int) -> int:
         return int(sim.city_center[b, seat, j]) if j >= 0 else -1
     return [
@@ -110,6 +110,8 @@ def _buy_row(sim, seat: int, bc: dict, rk, rj, b: int) -> list:
         int(rk[b]),
         ctr(int(rj[b])),
         int(bc["levy_cs"][b]) if bool(bc["levy_ok"][b]) else -1,
+        int(mk[b]),
+        ctr(int(bc["spawn_slot"][b])) if int(mk[b]) >= 0 else -1,
     ]
 
 
@@ -118,7 +120,8 @@ def _buy_rows(sim, seat: int) -> list:
     _, rk = ladder.pick_faith(bc["worship_ok"], bc["missionary_ok"], bc["apostle_ok"])
     rj = torch.where(rk == 5, bc["missionary_j"],
                      torch.where(rk == 6, bc["apostle_j"], torch.full_like(rk, -1)))
-    return [_buy_row(sim, seat, bc, rk, rj, b) for b in range(sim.B)]
+    mk = ladder.pick_monu(bc["monu_builder_ok"], bc["monu_settler_ok"])
+    return [_buy_row(sim, seat, bc, rk, rj, mk, b) for b in range(sim.B)]
 
 
 def _field_name(i: int, S: int, n_opponents: int, C: int, NT: int, NC: int) -> str:
@@ -287,7 +290,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                     if True:
                         tb = msg.get("buys", {}).get(str(seat), [])
                         if tb and gb_all[b] != tb:
-                            flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit,tileOk,tile,tileC,worshipC,religKind,religC,levy]: GPU {gb_all[b]} vs TS {tb}")
+                            flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit,tileOk,tile,tileC,worshipC,religKind,religC,levy,monuKind,monuC]: GPU {gb_all[b]} vs TS {tb}")
             prof["obs+targets compare (GPU obs, buys, jobs)"] += _pc() - _t
             if bad:
                 break
@@ -511,7 +514,7 @@ def main() -> None:
                 gb = _buy_rows(sim, seat)[0]
                 tb = msg.get("buys", {}).get(str(seat), [])
                 if tb and gb != tb:
-                    rep = f"turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit,tileOk,tile,tileC,worshipC,religKind,religC,levy]: GPU {gb} vs TS {tb}"
+                    rep = f"turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit,tileOk,tile,tileC,worshipC,religKind,religC,levy,monuKind,monuC]: GPU {gb} vs TS {tb}"
                     print(rep)
                     if first_report is None:
                         first_report = rep

@@ -39,7 +39,7 @@ import { hasRiver, hasFreshWater, isCoastalWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { disbandUnit, builderCost, builderRemoveFeature, trainableUnits } from './units';
 import { killUnit } from './combat';
-import { availableProjects, buyTile, buyWorshipBuilding, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampmentItem, purchaseReligiousUnit, purchaseSettler, queueProject, settlerCost } from './game';
+import { availableProjects, buyTile, buyWorshipBuilding, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampmentItem, purchaseCivilianWithFaith, purchaseReligiousUnit, purchaseSettler, queueProject, settlerCost } from './game';
 import { SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex } from './unitActions';
 
@@ -868,6 +868,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           // builder ladder offers 13-15/18-24 and REPAIR, never column 16.
           builderRemoveFeature(state, unit.id, actor.seat);
         } else if (a === 17) {
+          if (unit.type !== 'BUILDER') return; // the GPU repair arm's builder gate
           if (here.pillaged && tileOwnedByCiv(here, actor.seat)) {
             here.pillaged = false;
             unit.movesLeft = 0;
@@ -1143,12 +1144,16 @@ export function seatPhase(state: GameState): void {
     // automatic in Civ 6 and stayed a rule; a purchase is a choice.
     {
       let boughtRelig = false;
+      let boughtCivilian = false;
       for (const [fk, centre] of rec?.buyFaith ?? []) {
         const civCityF = actor.cities.find((c) => c.centerIndex === centre);
         if (!civCityF) continue;
         if (fk === 4) buyWorshipBuilding(state, civCityF.id, actor.seat);
         else if ((fk === 5 || fk === 6) && !boughtRelig) {
           boughtRelig = purchaseReligiousUnit(state, civCityF.id, fk === 5 ? 'MISSIONARY' : 'APOSTLE', actor.seat).ok;
+        } else if ((fk === 8 || fk === 9) && !boughtCivilian) {
+          // kinds 8/9 — the Monumentality faith-civilian (8 builder, 9 settler)
+          boughtCivilian = purchaseCivilianWithFaith(state, civCityF.id, fk === 8 ? 'BUILDER' : 'SETTLER', actor.seat).ok;
         }
       }
     }

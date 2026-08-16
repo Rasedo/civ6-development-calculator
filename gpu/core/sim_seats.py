@@ -143,6 +143,7 @@ class SimSeats:
         worship: torch.Tensor | None = None,  # kind 4: rc slot to faith-buy the worship building in (-1 = none)
         relig: tuple | None = None,  # kinds 5/6: (kind [B], slot [B]) — the religious-unit faith buy
         levy: torch.Tensor | None = None,  # kind 7: CS index to levy (-1 = none)
+        monu: tuple | None = None,  # kinds 8/9: (kind [B], slot [B]) — the Monumentality faith-civilian buy (8 builder, 9 settler)
     ) -> None:
         """Write seat ROW `row`'s choices BEFORE step(). Codes use the
         seat_masks layout; -1 = no action. Queue writes mirror the picker's exact
@@ -169,7 +170,7 @@ class SimSeats:
         `pick_district_tile` is the body that chooses."""
         self._stash_record(row, tech=tech, civic=civic, envoys=envoys, war=war,
                            production=production, pref=production_pref, dtile=production_tile)
-        self._stash_buy(row, buy=buy, worship=worship, relig=relig, levy=levy)
+        self._stash_buy(row, buy=buy, worship=worship, relig=relig, levy=levy, monu=monu)
 
     def _reset_war_clock(self, i: int, j: int, mask: torch.Tensor) -> None:
         self.war_turns[:, i, j] = torch.where(mask, torch.zeros_like(self.war_turns[:, i, j]), self.war_turns[:, i, j])
@@ -296,7 +297,7 @@ class SimSeats:
         elif production is not None:
             self._apply_seat_production(row, production, dtile)
 
-    def _stash_buy(self, row: int, buy=None, worship=None, relig=None, levy=None) -> None:
+    def _stash_buy(self, row: int, buy=None, worship=None, relig=None, levy=None, monu=None) -> None:
         if buy is not None:
             self._driven_buy[row] = buy
         if worship is not None:
@@ -305,6 +306,8 @@ class SimSeats:
             self._driven_buy_relig[row] = relig
         if levy is not None:
             self._driven_levy[row] = levy
+        if monu is not None:
+            self._driven_buy_monu[row] = monu
 
     def _seat_buy_candidates(self, row: int, active: torch.Tensor):
         """The gold-purchase BUILDING candidate for seat row `row` — ONE
@@ -571,7 +574,12 @@ class SimSeats:
         spawn_slot = torch.where(has_cap, cap_is.long().argmax(dim=1), alive_row.long().argmax(dim=1))
         bidx = torch.arange(B, device=dev)
         if kind is not None and self._settler_idx >= 0:
+            # CIV6 (GS Civilopedia, Monumentality, Golden face): "Builders and
+            # Settlers are 30% cheaper to purchase with Faith and Gold."
+            # Literal 0.7 applied LAST, like the TS twin (1.0 - 0.3 != 0.7 in f64).
             sett_price = self._seat_settler_cost(row) * mult
+            mon = self._golden_ded(row, self._ded_monumentality)
+            sett_price = torch.where(mon, sett_price * 0.7, sett_price)
             ctr_s = self.city_center[bidx, row, spawn_slot].clamp(min=0)
             pop_s = self.city_pop[bidx, row, spawn_slot]
             want_s = (kind == 1) & active & ext & ~bought & (n_cities > 0) \
@@ -618,12 +626,15 @@ class SimSeats:
             at_r = self.city_center[bidx, row, jr].clamp(min=0)
             base_r = active & ext & (rel_j >= 0) & self.civ_religion_done[:, row] & rel_city[bidx, jr]
             bought_relig = torch.zeros(B, dtype=torch.bool, device=dev)
+            # CIV6 (GS Civilopedia, Exodus of the Evangelists, Golden face):
+            # "newly trained ones get +2 Charges" — Missionaries and Apostles.
+            exo_chg = self._golden_ded_table(self._ded_exodus)[:, row].long() * 2
             if self._missionary_idx >= 0:
                 n_live_m = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._missionary_idx)).sum(dim=1)
                 mcost = self._enh["mcost"][self.civ_enhancer[:, row] + 1]
                 buy_m = base_r & (rel_kind == 5) & (n_live_m < self._missionary_cap) & self._afford(self.civ_faith[:, row], mcost)
                 if bool(buy_m.any()):
-                    chg_m = self._type_charges[self._missionary_idx] + self._enh["mchg"][self.civ_enhancer[:, row] + 1]
+                    chg_m = self._type_charges[self._missionary_idx] + self._enh["mchg"][self.civ_enhancer[:, row] + 1] + exo_chg
                     landed_m = self._spawn_unit(row, buy_m, at_r, self._missionary_idx, charges=chg_m)
                     self.civ_faith[:, row] = torch.where(landed_m, self.civ_faith[:, row] - mcost, self.civ_faith[:, row])
                     bought_relig = bought_relig | landed_m
@@ -633,8 +644,35 @@ class SimSeats:
                 buy_a = base_r & (rel_kind == 6) & ~bought_relig & (n_live_a < self._apostle_cap) \
                     & self._afford(self.civ_faith[:, row], acost)
                 if bool(buy_a.any()):
-                    landed_a = self._spawn_unit(row, buy_a, at_r, self._apostle_idx, charges=self._type_charges[self._apostle_idx].expand(B))
+                    landed_a = self._spawn_unit(row, buy_a, at_r, self._apostle_idx, charges=self._type_charges[self._apostle_idx].expand(B) + exo_chg)
                     self.civ_faith[:, row] = torch.where(landed_a, self.civ_faith[:, row] - acost, self.civ_faith[:, row])
+        m_kind, m_j = self._driven_buy_monu.pop(row) if row in self._driven_buy_monu else (None, None)
+        if m_kind is not None and m_j is not None:
+            # CIV6 (GS Civilopedia, Monumentality, Golden face): "May purchase
+            # civilian units with Faith. Builders and Settlers are 30% cheaper
+            # to purchase with Faith and Gold." Literal 0.7 LAST, the TS twin's
+            # association (1.0 - 0.3 != 0.7 in f64).
+            mon_g = self._golden_ded(row, self._ded_monumentality)
+            jm = m_j.clamp(min=0, max=self.RC - 1)
+            at_m = self.city_center[bidx, row, jm].clamp(min=0)
+            base_m = active & ext & (m_j >= 0) & mon_g & self.city_alive[bidx, row, jm]
+            if self._builder_idx >= 0:
+                bl_price = self._builder_cost(self.civ_builders_trained[:, row]).double() * self.rules.faith_purchase_mult * 0.7
+                buy_bl = base_m & (m_kind == 8) & self._afford(self.civ_faith[:, row], bl_price)
+                if bool(buy_bl.any()):
+                    landed_bl = self._spawn_unit(row, buy_bl, at_m, self._builder_idx)
+                    self.civ_faith[:, row] = torch.where(landed_bl, self.civ_faith[:, row] - bl_price, self.civ_faith[:, row])
+                    # a purchased builder escalates builderCost like a trained one
+                    self.civ_builders_trained[:, row] = self.civ_builders_trained[:, row] + landed_bl.long()
+            if self._settler_idx >= 0:
+                s_price = self._seat_settler_cost(row) * self.rules.faith_purchase_mult * 0.7
+                pop_m = self.city_pop[bidx, row, jm]
+                buy_sl = base_m & (m_kind == 9) & (pop_m >= self.rules.settler_pop_gate) & self._afford(self.civ_faith[:, row], s_price)
+                if bool(buy_sl.any()):
+                    landed_sl = self._spawn_unit(row, buy_sl, at_m, self._settler_idx)
+                    self.civ_faith[:, row] = torch.where(landed_sl, self.civ_faith[:, row] - s_price, self.civ_faith[:, row])
+                    _pop_m = self.city_pop[bidx, row, jm]
+                    self.city_pop[bidx, row, jm] = torch.where(landed_sl, (_pop_m - 1).clamp(min=1), _pop_m)
         if kind is not None:
             want_t = (kind == 3) & active & ext & ~bought & (bbw >= 0) & (jjw >= 0)
             if bool(want_t.any()):

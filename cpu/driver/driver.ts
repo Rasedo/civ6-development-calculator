@@ -18,11 +18,13 @@ import { writeFileSync } from 'node:fs';
 import type { DistrictId, GameState, Seat, Tile } from '../core/types';
 import { allCities, civHasStrategic, civsAtWar, seatOf, tileOwnedByCiv } from '../core/seats';
 import { hasRiver, isWater } from '../../world/query';
-import { GOLD_PURCHASE_MULT } from '../data/constants';
-import { PEACE_GOLD_COST } from '../data/seats';
+import { GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT } from '../data/constants';
+import { PEACE_GOLD_COST, DED_MONUMENTALITY } from '../data/seats';
 import { SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
 import { BUY_UNITS } from '../core/phase';
 import { buildingFaithCost, endTurn, goldAffordable, settlerCost, tilePurchaseCost } from '../core/game';
+import { goldenDedication, monumentalityBuyMult } from '../core/eras';
+import { builderCost } from '../core/units';
 import { isSuzerain } from '../core/cityStates';
 import { pickBorderTile } from '../core/city';
 import { WORSHIP_BUILDINGS, MISSIONARY_CAP, APOSTLE_CAP, ENHANCER_BELIEFS } from '../data/religion';
@@ -81,7 +83,7 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
     }
     const settlerSpawnCity = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
     const settlerOk = settlerSpawnCity !== undefined && settlerSpawnCity.population >= 2
-      && goldAffordable(actor.treasury ?? 0, settlerCost(state, actor.seat) * GOLD_PURCHASE_MULT);
+      && goldAffordable(actor.treasury ?? 0, settlerCost(state, actor.seat) * GOLD_PURCHASE_MULT * monumentalityBuyMult(state, actor.seat));
     let mil = 0;
     for (const u of state.units) {
       if (u.seat !== actor.seat) continue;
@@ -146,6 +148,27 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
         }
       }
     }
+    // The Monumentality faith-civilian pick (kind 8 builder, 9 settler,
+    // settler preferred) — the pick_monu twin, spawn at the capital (else
+    // first city) like the gold settler buy.
+    let monuKind = -1;
+    let monuC = -1;
+    if (goldenDedication(state, actor.seat, DED_MONUMENTALITY)) {
+      const monuSpawn = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
+      if (monuSpawn) {
+        const liveBuilders = state.units.filter((u) => u.seat === actor.seat && u.type === 'BUILDER').length;
+        if (liveBuilders < 1
+          && goldAffordable(actor.faith ?? 0, builderCost(state, actor.seat) * FAITH_PURCHASE_MULT * monumentalityBuyMult(state, actor.seat))) {
+          monuKind = 8;
+          monuC = monuSpawn.centerIndex;
+        }
+        if (monuSpawn.population >= 2
+          && goldAffordable(actor.faith ?? 0, settlerCost(state, actor.seat) * FAITH_PURCHASE_MULT * monumentalityBuyMult(state, actor.seat))) {
+          monuKind = 9;
+          monuC = monuSpawn.centerIndex;
+        }
+      }
+    }
     let levyIdx = -1;
     // At war with ANY other major, read off this seat's own row — the GPU's
     // `war[row, :1+R].any()` twin. It used to read a single war axis from
@@ -163,7 +186,7 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
       }
     }
   return [buyC, buyB, settlerOk ? 1 : 0, unitOk ? 1 : 0,
-    tileOk, tileT, tileC, worshipC, religKind, religC, levyIdx];
+    tileOk, tileT, tileC, worshipC, religKind, religC, levyIdx, monuKind, monuC];
 }
 
 
@@ -211,7 +234,7 @@ for (let t = 0; t < N_TURNS; t++) {
         for (const u of state.units) {
           if (u.seat !== seat) continue;
           let jt = -1;
-          if (UNITS[u.type]?.charges !== undefined && (u.charges ?? 0) > 0) {
+          if (u.type === 'BUILDER' && (u.charges ?? 0) > 0) {
             const ut = state.map.tiles[u.tileIndex];
             let bk = Infinity;
             for (const t of jobTiles) {

@@ -774,7 +774,10 @@ export function setExploreMission(state: GameState, unitId: number, on: boolean)
 function builderOn(state: GameState, unitId: number): { unit?: Unit; err?: RuleResult } {
   const unit = state.units.find((u) => u.id === unitId);
   if (!unit) return { err: no('No such unit.') };
-  if (UNITS[unit.type]?.charges === undefined) return { err: no('Not a builder.') };
+  // CIV6: only the BUILDER spends charges on build verbs — a Missionary or
+  // Apostle charge is a SPREAD, not a build (the GPU arms gate on the builder
+  // type; carrying charges is not enough).
+  if (unit.type !== 'BUILDER') return { err: no('Not a builder.') };
   if ((unit.charges ?? 0) <= 0) return { err: no('No charges left.') };
   return { unit };
 }

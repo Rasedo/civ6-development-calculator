@@ -1,6 +1,6 @@
 import type { GameState } from './types';
 import { seatOf, isBarbSeat } from './seats';
-import { DEDICATIONS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_FAITH, DEDICATION_ERA_SCORE, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/seats';
+import { DEDICATIONS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/seats';
 
 
 export function addEraScore(state: GameState, seat: number, pts: number): void {
@@ -74,38 +74,20 @@ export function isHeroicAge(state: GameState, civ: number): boolean {
 }
 
 /**
- * The per-turn DEDICATION yield a civ's commitments pay.
- * A GOLDEN (or HEROIC) age dedicates to a bonus — modeled as flat faith, the
- * Monumentality flavour — while a DARK or NORMAL age dedicates to CLIMBING,
- * which real Civ 6 pays in extra era score. Both scale with the dedication
- * COUNT, so a Heroic age is literally three times the commitment.
- */
-export function dedicationFaith(state: GameState, civ: number): number {
-  const age = (seatOf(state, civ)?.age ?? 1);
-  if (age !== 2) return 0;
-  return DEDICATION_FAITH * ((seatOf(state, civ)?.dedications ?? 1));
-}
-
-export function dedicationEraScore(state: GameState, civ: number): number {
-  const age = (seatOf(state, civ)?.age ?? 1);
-  if (age === 2) return 0;
-  return DEDICATION_ERA_SCORE * ((seatOf(state, civ)?.dedications ?? 1));
-}
-
-/**
  * The GOLDEN-AGE face of a dedication — the standing bonus that
  * replaces the Dark/Normal era-score payout. SOURCED from the Civ 6 dedication
  * catalog:
- *   MONUMENTALITY        +2 Movement for all BUILDERS. (Faith-purchase of
- *                        civilians and the 30% purchase discount: NOT modelled.)
- *   FREE_INQUIRY         Eurekas provide an ADDITIONAL 10% of technology cost.
- *                        (Commercial Hub/Harbor gold adjacency also giving
- *                        Science: NOT modelled.)
+ *   MONUMENTALITY        +2 Movement for all BUILDERS; Builders and Settlers
+ *                        may be faith-purchased and are 30% cheaper to
+ *                        purchase with Faith and Gold.
+ *   FREE_INQUIRY         Eurekas provide an ADDITIONAL 10% of technology cost,
+ *                        and Commercial Hub/Harbor GOLD adjacency also pays
+ *                        Science.
  *   PEN_BRUSH_AND_VOICE  Inspirations provide an ADDITIONAL 10% of civic cost,
  *                        and each city gains +1 Culture per SPECIALTY district.
- *   EXODUS               +2 Movement for MISSIONARIES/APOSTLES and +4 Great
- *                        Prophet points per turn. (+2 charges on newly trained
- *                        ones: NOT modelled.)
+ *   EXODUS               +2 Movement for MISSIONARIES/APOSTLES, +4 Great
+ *                        Prophet points per turn, and newly trained ones get
+ *                        +2 Charges.
  */
 export function goldenDedication(state: GameState, civ: number, kind: number): boolean {
   if (civ < 0) return false; // BARBARIANS hold no dedications
@@ -145,6 +127,15 @@ export function goldenProphetPoints(state: GameState, civ: number): number {
   return goldenDedication(state, civ, DED_EXODUS) ? 4 : 0;
 }
 
+/** CIV6 (GS Civilopedia, Monumentality, Golden face): "Builders and Settlers
+ *  are 30% cheaper to purchase with Faith and Gold." A PURCHASE price rule
+ *  only — production-queue costs are untouched. Callers multiply LAST
+ *  (`base * GOLD_PURCHASE_MULT * this`) so both engines share one
+ *  association. */
+export function monumentalityBuyMult(state: GameState, civ: number): number {
+  return goldenDedication(state, civ, DED_MONUMENTALITY) ? 0.7 : 1;
+}
+
 export function goldenBoostBonus(state: GameState, civ: number, civic: boolean): number {
   return goldenDedication(state, civ, civic ? DED_PEN_BRUSH_AND_VOICE : DED_FREE_INQUIRY) ? 0.1 : 0;
 }
@@ -162,6 +153,11 @@ export function governorTitles(nCivics: number): number {
 }
 
 /** The STATELESS greedy pick — the `titles` LOWEST-loyalty cities.
+ *  CIV6 (R&F, sourced): a governor's +8 Loyalty applies the moment they are
+ *  ASSIGNED — the 5-turn establishment clock gates only their PROMOTIONS,
+ *  which this model does not carry. A per-turn reassignment therefore moves
+ *  the loyalty bonus instantly, exactly as reassignment does in the real
+ *  game; no establishment state is needed until promotions exist.
  *  `qLoys` are QUANTIZED milli loyalties (Math.round(loy·1000) — ranking on
  *  raw f64 would be float-association-fragile across engines; the
  *  quantization lesson), ties broken by ARRAY position (the GPU mirrors
@@ -173,22 +169,3 @@ export function governorPicks(qLoys: number[], titles: number): Set<number> {
   return new Set(idx.slice(0, titles).map(([, i]) => i));
 }
 
-/**
- * Apply this turn's DEDICATION payouts for every civ. Called once
- * per turn from endTurn, right beside eraBoundary, so the GPU can mirror it at
- * the same position. A GOLDEN/HEROIC age pays faith; a DARK or NORMAL age pays
- * era score (the climb-out dedication). Both scale with the dedication COUNT,
- * so a Heroic age pays triple. Zero-draw, integer-only.
- *
- * `addFaith` is injected because seat 0's faith lives on GameState while
- * each seat keeps its own — the caller knows which accumulator to touch.
- */
-export function applyDedications(state: GameState, addFaith: (civ: number, amount: number) => void): void {
-  if (!DEDICATION_PAYOUTS_LIVE) return; // substrate live, payouts inert
-  for (let c = 0; c < state.seats.length; c++) {
-    const f = dedicationFaith(state, c);
-    if (f > 0) addFaith(c, f);
-    const es = dedicationEraScore(state, c);
-    if (es > 0) addEraScore(state, c, es);
-  }
-}

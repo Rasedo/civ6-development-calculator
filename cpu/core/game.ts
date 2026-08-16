@@ -16,8 +16,8 @@ import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
 import { placeSeats, seatPhase, worldCongress, nextCityName } from './phase';
 import { commitProduction, commitResearch } from './seatTurn';
-import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS } from '../data/seats';
-import { addEraScore, eraBoundary, applyDedications, dedicationEvent, goldenBoostBonus } from './eras';
+import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY } from '../data/seats';
+import { addEraScore, eraBoundary, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
 import { UNITS, WALLS_HP, ENCAMPMENT_HP, CITY_MAX_HP } from '../data/units';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
@@ -408,7 +408,8 @@ export function goldAffordable(treasury: number, cost: number): boolean {
 
 export function unitPurchaseCost(state: GameState, unitType: string, seat: number): number {
   const base = unitType === 'BUILDER' ? builderCost(state, seat) : UNITS[unitType]?.cost ?? 0;
-  return base * GOLD_PURCHASE_MULT;
+  const m = unitType === 'BUILDER' ? monumentalityBuyMult(state, seat) : 1;
+  return base * GOLD_PURCHASE_MULT * m;
 }
 
 /**
@@ -479,7 +480,7 @@ export function purchaseSettler(state: GameState, cityId: number, seat: number):
   if (!state.sandbox && city.population < 2) return { ok: false, reason: 'A city of 1 population cannot buy a settler.' };
   const buyer = seatOf(state, seat);
   if (!buyer) return { ok: false, reason: 'No such seat.' };
-  const cost = settlerCost(state, seat) * GOLD_PURCHASE_MULT;
+  const cost = settlerCost(state, seat) * GOLD_PURCHASE_MULT * monumentalityBuyMult(state, seat);
   if (!state.sandbox) {
     if (!goldAffordable(buyer.treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
     buyer.treasury -= cost;
@@ -545,6 +546,43 @@ export function purchaseReligiousUnit(
   if (!u) return { ok: false, reason: 'No free tile near the city center.' };
   buyer.faith = (buyer.faith ?? 0) - cost;
   if (unitType === 'MISSIONARY' && eb?.missionaryChargeBonus) u.charges = (u.charges ?? 0) + eb.missionaryChargeBonus;
+  // CIV6 (GS Civilopedia, Exodus of the Evangelists, Golden face): "newly
+  // trained ones get +2 Charges" — Missionaries and Apostles alike.
+  if (goldenDedication(state, seat, DED_EXODUS)) u.charges = (u.charges ?? 0) + 2;
+  return { ok: true };
+}
+
+/** CIV6 (GS Civilopedia, Monumentality, Golden face): "May purchase civilian
+ *  units with Faith. Builders and Settlers are 30% cheaper to purchase with
+ *  Faith and Gold." Faith prices at FAITH_PURCHASE_MULT (1 faith = 0.5
+ *  production = 2 gold), and the 30% multiplies LAST so both engines share
+ *  one association. */
+export function purchaseCivilianWithFaith(
+  state: GameState,
+  cityId: number,
+  unitType: 'BUILDER' | 'SETTLER',
+  seat: number,
+): RuleResult {
+  const buyer = seatOf(state, seat);
+  if (!buyer) return { ok: false, reason: 'No such seat.' };
+  if (!goldenDedication(state, seat, DED_MONUMENTALITY)) {
+    return { ok: false, reason: 'Needs the Monumentality dedication in a Golden Age.' };
+  }
+  const city = citiesOf(state, seat).find((c) => c.id === cityId);
+  if (!city) return { ok: false, reason: 'No such city.' };
+  if (unitType === 'SETTLER' && city.population < 2) {
+    return { ok: false, reason: 'A city of 1 population cannot buy a settler.' };
+  }
+  const base = unitType === 'SETTLER' ? settlerCost(state, seat) : builderCost(state, seat);
+  const cost = base * FAITH_PURCHASE_MULT * monumentalityBuyMult(state, seat);
+  if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
+  const u = spawnUnit(state, unitType, city.centerIndex, seat);
+  if (!u) return { ok: false, reason: 'No free tile near the city center.' };
+  buyer.faith = (buyer.faith ?? 0) - cost;
+  // Purchased settlers cost the pop too (real Civ 6); a purchased builder
+  // escalates builderCost like a trained one.
+  if (unitType === 'SETTLER') city.population = Math.max(1, city.population - 1);
+  else buyer.buildersTrained += 1;
   return { ok: true };
 }
 
@@ -749,14 +787,6 @@ export function endTurn(state: GameState): void {
   state.turn += 1;
   eraBoundary(state);
   worldCongress(state); // era-score window reset at ERA_LENGTH multiples (GPU mirrors at its turn increment)
-  // DEDICATION payouts — a Golden/Heroic age pays faith, a Dark or
-  // Normal age pays era score (the climb-out dedication), both scaled by the
-  // dedication COUNT so a Heroic age pays triple. Immediately after the
-  // boundary so the GPU mirrors at the same position.
-  applyDedications(state, (civ, amt) => {
-    const sx = state.seats[civ];
-    if (sx) sx.faith = (sx.faith ?? 0) + amt;
-  });
   // Domination ends the game the instant a civ holds every capital;
   // otherwise the score victory fires at TURN_LIMIT. Detection only — no freeze
   // Detection is indicator-only, so with no domination this stays inert.
