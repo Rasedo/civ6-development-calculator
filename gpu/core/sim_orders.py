@@ -20,8 +20,34 @@ class SimOrders:
         _n = min(smap.shape[1], actions.shape[1], simbase.UNIT_SLOTS)
         _held = smap[:, :_n] >= 0
         _cmd = _held & (actions[:, :_n] >= 0) & (actions[:, :_n] != 12) & ctl.unsqueeze(1)
-        _rank_held = _held.any(dim=0).tolist()
-        _rank_cmd = _cmd.any(dim=0).tolist()
+        # Which ARMS can fire at each rank, decided from the action block alone
+        # (fixed for the call, like the rank tables). Each arm's exact mask
+        # still runs where its bit is set — the table only skips arms that are
+        # PROVABLY empty, which is most of them on most ranks (a k>0 sequence
+        # pass is moves-only by construction) and collapses the per-rank
+        # guard-sync storm into this ONE sync.
+        _ab = torch.where(_cmd, actions[:, :_n], torch.full_like(actions[:, :_n], -1))
+        _no = torch.zeros_like(_cmd)
+        _fc = getattr(self, "_A_FOUND", -1)
+        _sn = getattr(self, "_A_SNIPE", -1) if getattr(self, "_snipe_on", False) else -1
+        _sp = getattr(self, "_A_SPREAD", -1)
+        _ic = [c for c in getattr(self, "_A_IMP", []) if c >= 0]
+        if getattr(self, "_A_REPAIR", -1) >= 0:
+            _ic.append(self._A_REPAIR)
+        _tab = torch.stack([
+            _held.any(dim=0),
+            _cmd.any(dim=0),
+            ((_ab >= 0) & (_ab < 6)).any(dim=0),                                # move
+            ((_ab >= 6) & (_ab < 12)).any(dim=0),                               # attack
+            ((_ab == _fc) if _fc >= 0 else _no).any(dim=0),                     # found
+            (((_ab >= _sn) & (_ab < _sn + 12)) if _sn >= 0 else _no).any(dim=0),  # snipe
+            ((_ab == getattr(self, "_A_CHOP", -1)) if getattr(self, "_A_CHOP", -1) >= 0 else _no).any(dim=0),
+            (torch.isin(_ab, torch.tensor(_ic, dtype=_ab.dtype, device=dev)) if _ic else _no).any(dim=0),
+            ((_ab == self._A_PILLAGE) if self._act_names and self._A_PILLAGE > 0 else _no).any(dim=0),
+            (((_ab >= _sp) & (_ab < _sp + 7)) if _sp >= 0 else _no).any(dim=0),  # spread
+        ]).tolist()
+        (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
+         _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -43,7 +69,7 @@ class SimOrders:
             u_charges = self.unit_charges.gather(1, sc.unsqueeze(1)).squeeze(1)
             nb = self.neigh[hc]
 
-            if getattr(self, "_A_FOUND", -1) >= 0 and self._settler_idx >= 0:
+            if _rk_found[n] and self._settler_idx >= 0:
                 fnd = act & (a == self._A_FOUND) & (utp == self._settler_idx)
                 if bool(fnd.any()):
                     made = self._found_city_at(row, fnd, here)
@@ -52,8 +78,8 @@ class SimOrders:
                         self.civilian_at[fr, here[fr]] = -1
                         self.unit_alive[fr, sc[fr]] = False
 
-            mv = act & (a < 6)
-            if bool(mv.any()):
+            mv = act & (a < 6) if _rk_move[n] else None
+            if mv is not None and bool(mv.any()):
                 dirs = a.clamp(min=0, max=5)
                 tgt = nb.gather(1, dirs.unsqueeze(1)).squeeze(1)
                 tc = tgt.clamp(min=0)
@@ -89,8 +115,8 @@ class SimOrders:
                 act & (a >= 6) & (a < 12)
                 & (self._type_combat[utp.clamp(min=0)] > 0)  # civilians cannot attack
                 & ~u_emb                                     # nor can an embarked unit
-            )
-            if bool(atk.any()):
+            ) if _rk_atk[n] else None
+            if atk is not None and bool(atk.any()):
                 dirs = (a - 6).clamp(min=0, max=5)
                 tgt = nb.gather(1, dirs.unsqueeze(1)).squeeze(1)
                 tc = tgt.clamp(min=0)
@@ -159,7 +185,7 @@ class SimOrders:
                             if bool(self._ranged_attack(one, tgt, "major", v, row)[b_]):
                                 self.unit_mp[b_, v] = 0
 
-            if getattr(self, "_snipe_on", False):
+            if _rk_snipe[n]:
                 snp = act & (a >= self._A_SNIPE) & (a < self._A_SNIPE + 12) & ~is_civ
                 if bool(snp.any()):
                     tgt_s = self.ring2[hc].gather(1, (a - self._A_SNIPE).clamp(min=0, max=11).unsqueeze(1)).squeeze(1)
@@ -178,7 +204,7 @@ class SimOrders:
                         if bool(self._hostile_ranged_strike(one, tgt_s, "major", v)[b_]):
                             self.unit_mp[b_, v] = 0
 
-            if self._builder_idx >= 0:
+            if _rk_chop[n] and self._builder_idx >= 0:
                 ftr = self.tile_ftr.gather(1, hc.unsqueeze(1)).squeeze(1)
                 ftu = self.tile_ftu.gather(1, hc.unsqueeze(1)).squeeze(1)
                 chp = (
@@ -219,7 +245,7 @@ class SimOrders:
                         self.unit_alive[dr, sc[dr]] = False
                         self.civilian_at[(dr, hc[dr])] = -1
 
-            if self.improvements_on and self._builder_idx >= 0:
+            if _rk_imp[n] and self.improvements_on and self._builder_idx >= 0:
                 hf = (civics[:, self._hillfarms_civic] if self._hillfarms_civic >= 0
                       else torch.zeros(B, dtype=torch.bool, device=dev))
                 mining = (techs[:, self._mine_unlock_tech] if self._mine_unlock_tech >= 0
@@ -290,7 +316,7 @@ class SimOrders:
                     self.unit_mp[_r, sc[_r]] = 0
                     self._eff_version += 1
 
-            if self._act_names and self._A_PILLAGE > 0:
+            if _rk_pillage[n]:
                 _ts = self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1)
                 _en = (
                     ((_ts >= 0) & (_ts < 100)
@@ -321,7 +347,7 @@ class SimOrders:
                     self.unit_mp[_r, sc[_r]] = 0
                     self._eff_version += 1
 
-            if getattr(self, "_A_SPREAD", -1) >= 0:
+            if _rk_spread[n]:
                 spx = act & (a >= self._A_SPREAD) & (a < self._A_SPREAD + 7)
                 if bool(spx.any()):
                     _relig = torch.zeros_like(spx)
