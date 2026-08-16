@@ -298,7 +298,9 @@ export function queueDistrict(
   tile.districtComplete = state.sandbox;
   if (state.sandbox && type === 'ENCAMPMENT') tile.encampHp = ENCAMPMENT_HP;
   tile.improvement = null;
-  tile.feature = null;
+  // CIV6: a district paves every feature EXCEPT floodplains — the feature
+  // stays under the district (GS floods damage districts built on them).
+  tile.feature = tile.feature === 'FLOODPLAINS' ? tile.feature : null;
   if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
 
   const cost = districtCost(state, seat, type);

@@ -1,6 +1,6 @@
 
 import type { City, CityState, CityStateQuest, CityStateType, GameState, Tile, Yields } from './types';
-import { NO_SEAT, citiesOf, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setWar, setWarTurnsWith, tileSeat, warTurnsWith, warsOf } from './seats';
+import { NO_SEAT, citiesOf, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setWar, setWarTurnsWith, tileSeat, warTurnsWith } from './seats';
 import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from '../../world/hex';
 import { isWater, isImpassable, hasFreshWater } from '../../world/query';
@@ -335,13 +335,6 @@ export function questLabel(quest: CityStateQuest): string {
 
 export function cityStatePhase(state: GameState): void {
   if (state.cityStates.length === 0) return;
-
-  for (const cityState of state.cityStates) {
-    for (const foe of warsOf(state, cityState.seat)) {
-      setWarTurnsWith(state, cityState.seat, foe, warTurnsWith(state, cityState.seat, foe) + 1);
-    }
-  }
-
 
   if (state.turn % 12 === 0) {
     for (const cityState of state.cityStates) cityState.population = Math.min(10, cityState.population + 1);

@@ -37,7 +37,7 @@ import { civEraIndex, computeCityStats, luxuryAmenities, pickBorderTile, acquire
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { hasRiver, hasFreshWater, isCoastalWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
-import { disbandUnit, builderCost, builderRemoveFeature } from './units';
+import { disbandUnit, builderCost, builderRemoveFeature, trainableUnits } from './units';
 import { killUnit } from './combat';
 import { availableProjects, buyTile, buyWorshipBuilding, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampmentItem, purchaseReligiousUnit, purchaseSettler, queueProject, settlerCost } from './game';
 import { SCAFFOLD_DISTRICTS } from '../data/districts';
@@ -386,7 +386,10 @@ export function placeSeatDistrict(
   tile.district = id;
   tile.districtComplete = false;
   tile.improvement = null;
-  tile.feature = null;              // the district PAVES the tile, as queueDistrict does
+  // CIV6: a district paves every feature EXCEPT floodplains — the feature
+  // stays under the district (GS floods damage districts built on them; the
+  // Dam exists for exactly that), and the flood-target pick draws from it.
+  tile.feature = tile.feature === 'FLOODPLAINS' ? tile.feature : null;
   // Placement removes a bonus resource (real Civ 6 rule; canPlaceDistrictIn
   // already refused luxury/strategic).
   if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
@@ -645,17 +648,18 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
   const prodPairs = rec.production;
   const techCol = Array.isArray(rec.tech) ? (rec.tech as unknown as number[])[0] : rec.tech;
   const civicCol = Array.isArray(rec.civic) ? (rec.civic as unknown as number[])[0] : rec.civic;
-  // The RESEARCH picks re-validate against AVAILABILITY, not just the empty
-  // slot: real Civ 6 offers no locked tech, the mask never names one, and the
-  // GPU's arm has always checked it — an unchecked arm here would let a stale
-  // record start a tech on ONE engine.
-  if (techCol !== null && techCol !== undefined && techCol >= 0 && !actor.research.tech) {
+  // The RESEARCH picks re-validate against AVAILABILITY: real Civ 6 offers no
+  // locked tech, the mask never names one, and an unchecked arm here would let
+  // a stale record start a tech on ONE engine. A pick may SWITCH the seat off
+  // an item mid-research — selectResearch parks the pool — and a re-stated
+  // pick is its no-op.
+  if (techCol !== null && techCol !== undefined && techCol >= 0) {
     const t = Object.keys(TECHS)[techCol];
     if (t && availableTechsIn(actor.research).some((d) => d.id === t)) selectResearch(actor.research, t);
   }
-  if (civicCol !== null && civicCol !== undefined && civicCol >= 0 && !actor.research.civic) {
+  if (civicCol !== null && civicCol !== undefined && civicCol >= 0) {
     const c = Object.keys(CIVICS)[civicCol];
-    if (c && availableCivicsIn(actor.research).some((d) => d.id === c)) actor.research.civic = c;
+    if (c && availableCivicsIn(actor.research).some((d) => d.id === c)) selectResearch(actor.research, c, true);
   }
   // the WAR verb: the recorded declare/peace applies HERE — before the
   // walkers, the exact position the GPU's pre-step war head uses, so a
@@ -669,8 +673,11 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
   // every seat, so a decide-time pick can never exceed the bank. A razed
   // city-state takes no envoy (real Civ 6, and the GPU mask's own term).
   for (const cityStateIdx of rec.envoys ?? []) {
+    // a razed/captured city-state leaves the array entirely, so existence IS
+    // the alive test — its city lives in the CityState's own flat fields,
+    // never in the seat-idiom `cities` list, which stays empty for a minor.
     const cityState = state.cityStates[cityStateIdx];
-    if (!cityState || cityState.cities.length === 0) continue;
+    if (!cityState) continue;
     if (!hasMet(cityState, actor.seat)) continue;
     if ((actor.envoysAvailable ?? 0) <= 0) continue;
     actor.envoysAvailable = (actor.envoysAvailable ?? 0) - 1;
@@ -715,12 +722,18 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
       }
     } else if (a >= NB + 2 && a < NB + 2 + NU) {
       const id = units[a - NB - 2];
-      // The BUILDER prices off the ONE escalator, exactly as
-      // the scripted branch and the GPU's queue arm both do — omitting the
-      // cost here fell back to the base price and locked r1c1's builder at 30
-      // where the GPU locked 32 t61, the qCost family).
-      if (id === 'BUILDER') commitProduction(state, civCity.seat, civCity, { kind: 'unit', unit: id, progress: 0, cost: builderCost(state, actor.seat) });
-      else if (id && UNITS[id]) commitProduction(state, civCity.seat, civCity, { kind: 'unit', unit: id, progress: 0 });
+      // Re-validate TRAINABILITY at apply, not just at mask: the record is
+      // replayed a phase after the mask that justified it, and the strategic
+      // resource (a pastured HORSE, pillaged since) or slot rule may have
+      // moved — the GPU applier refuses what trainableUnits refuses.
+      if (id && UNITS[id] && trainableUnits(state, actor.seat, civCity).some((d) => d.id === id)) {
+        // The BUILDER prices off the ONE escalator, exactly as
+        // the scripted branch and the GPU's queue arm both do — omitting the
+        // cost here fell back to the base price and locked r1c1's builder at 30
+        // where the GPU locked 32 t61, the qCost family).
+        if (id === 'BUILDER') commitProduction(state, civCity.seat, civCity, { kind: 'unit', unit: id, progress: 0, cost: builderCost(state, actor.seat) });
+        else commitProduction(state, civCity.seat, civCity, { kind: 'unit', unit: id, progress: 0 });
+      }
     }
     else if (a >= wonderLo && a < wonderLo + wonders.length) {
       const wd = BUILT_WONDERS[wonders[a - wonderLo]];
@@ -1536,7 +1549,9 @@ export function seatPhase(state: GameState): void {
 
     const anyWar = atWarWithAny(state, actor.seat);
     for (const foe of warsOf(state, actor.seat)) {
-      setWarTurnsWith(state, actor.seat, foe, warTurnsWith(state, actor.seat, foe) + 1);
+      // ONE tick per pair per turn, at the pair's LOWER seat's tail — a major
+      // always outranks its city-state foes (their seat ids sit at 100+).
+      if (actor.seat < foe) setWarTurnsWith(state, actor.seat, foe, warTurnsWith(state, actor.seat, foe) + 1);
     }
     if (!anyWar) actor.peaceTurns += 1;
     if (recU) applySeatUnitOrders(state, actor, recU.units);

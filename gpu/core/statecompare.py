@@ -178,8 +178,9 @@ def _wars_of(sim, b: int, seat: int) -> list[int]:
     return sorted(int(sim._ROW_SEAT[j]) for j, on in enumerate(row) if on)
 
 
-def _war_clock_line(sim, b: int, seat: int) -> list[list[int]]:
-    """[[opponentSeat, turnsAtWar], ...] for every LIVE war of `seat`, in
+def _war_clock_line(sim, b: int, seat: int) -> list[int]:
+    """[opponentSeat, turnsAtWar, ...] — FLATTENED pairs (the wwPairs shape,
+    because the digest fold is flat) for every LIVE war of `seat`, in
     ascending opponent-seat order.
 
     One clock per WAR, so the pair is the key. Only live wars are emitted: a
@@ -188,7 +189,8 @@ def _war_clock_line(sim, b: int, seat: int) -> list[list[int]]:
     row = _seat_row(sim, seat)
     on = sim.war[b, row].tolist()
     wt = sim.war_turns[b, row].tolist()
-    return sorted([int(sim._ROW_SEAT[j]), int(wt[j])] for j, w in enumerate(on) if w)
+    pairs = sorted((int(sim._ROW_SEAT[j]), int(wt[j])) for j, w in enumerate(on) if w)
+    return [x for p in pairs for x in p]
 
 
 GAME = {
@@ -293,8 +295,11 @@ SEAT = {
     "currentCivic": _civ_scalar("civ_cur_civic"),
     "techProgress": _civ_scalar("civ_tech_prog"),
     "civicProgress": _civ_scalar("civ_civic_prog"),
-    "techRetained": lambda sim, b, rows: [x for c in rows for x in sim.civ_tech_retain[b, c].tolist()],
-    "civicRetained": lambda sim, b, rows: [x for c in rows for x in sim.civ_civic_retain[b, c].tolist()],
+    # one LIST per row (the `wars` shape) — flattening across rows would hand
+    # row k a single element while the TS side folds the whole table-order
+    # vector under that key
+    "techRetained": lambda sim, b, rows: [sim.civ_tech_retain[b, c].tolist() for c in rows],
+    "civicRetained": lambda sim, b, rows: [sim.civ_civic_retain[b, c].tolist() for c in rows],
     "cityCount": lambda sim, b, rows: [
         sum(1 for a in sim.city_alive[b, c].tolist() if a) for c in rows
     ],
@@ -372,6 +377,16 @@ def _cty(plane: str):
     return get
 
 
+def _qfront(sim, b, c, s):
+    # ORACLE: TS's queueTile reads the queue item's own tileIndex for both
+    # district and wonder kinds. Here the district pick is city_qtile; a
+    # WONDER's completion target lives in the city_wonder registry.
+    cur = int(sim.city_current[b, c, s])
+    if sim.WONDER_BASE <= cur < sim.PROJECT_BASE:
+        return [cur, int(sim.city_wonder[b, c, s, cur - sim.WONDER_BASE])]
+    return [cur, int(sim.city_qtile[b, c, s])]
+
+
 CITY = {
     "seat": lambda sim, b, rows: [c for c, _ in rows],
     "population": _cty("city_pop"),
@@ -388,9 +403,7 @@ CITY = {
     "productionBank": lambda sim, b, rows: [
         float(sim.city_prod_bank[b, c, s]) for c, s in rows
     ],
-    "queueFront": lambda sim, b, rows: [
-        [int(sim.city_current[b, c, s]), int(sim.city_qtile[b, c, s])] for c, s in rows
-    ],
+    "queueFront": lambda sim, b, rows: [_qfront(sim, b, c, s) for c, s in rows],
     "queueProgress": _cty("city_progress"),
     "queueCost": _cty("city_cost"),
     "followedReligion": _cty("city_followed"),

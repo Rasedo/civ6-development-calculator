@@ -758,15 +758,15 @@ class SimOrders:
             tkey = torch.where(valid, nb, T + 1)
             target_tile = tkey.min(dim=1).values
             # A RANGED raider (ARCHER/CROSSBOWMAN) scans its FULL range
-            # instead: attackTargets over the whole map in TILE ORDER, d in
-            # [1, range]. Target classes are attackTargets' for a barbarian —
-            # `hasEnemy` (any hostile unit, military or civilian; a barbarian
-            # is never hostile to a barbarian) and `cityTarget`, which
-            # barbarians hold against every seat, so EVERY city-centre tile is
-            # in reach at d <= range. City-state centres carry no district in
-            # TS, so they are NOT targets, same as the melee scan. Gated on
-            # `.any()` so a batch with no ranged barbarian pays nothing for the
-            # [B, T] scan.
+            # instead: attackTargets over the whole map in TILE ORDER. Target
+            # classes are attackTargets' for a barbarian — `hasEnemy` (any
+            # hostile unit, military or civilian; a barbarian is never hostile
+            # to a barbarian) at d in [1, range], and `cityTarget`, which for
+            # an alwaysHostile seat is ADJACENT ONLY (`d === 1`) whatever the
+            # weapon — a barbarian never shoots a city from range. City-state
+            # centres carry no district in TS, so they are NOT targets, same
+            # as the melee scan. Gated on `.any()` so a batch with no ranged
+            # barbarian pays nothing for the [B, T] scan.
             rngd = u_rngd_all[:, u]
             if any_rngd and bool((act & rngd).any()):
                 rng_u = self._type_ranged_range[self.barb_unit_type[:, u].clamp(min=0, max=self.NU - 1)]
@@ -774,11 +774,8 @@ class SimOrders:
                 rng_valid = (
                     (d_all >= 1)
                     & (d_all <= rng_u.unsqueeze(1))
-                    & (
-                        self._nonbarb_unit_plane()
-                        | (self.centre_slot_at >= 0)
-                    )
-                )
+                    & self._nonbarb_unit_plane()
+                ) | ((d_all == 1) & (self.centre_slot_at >= 0))
                 rng_key = torch.where(rng_valid, self._arange_bt, self._tile_miss)
                 target_tile = torch.where(rngd, rng_key.min(dim=1).values, target_tile)
             attack = act & (target_tile <= T)

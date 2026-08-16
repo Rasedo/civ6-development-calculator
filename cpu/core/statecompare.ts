@@ -245,11 +245,13 @@ const overTiles = (fn: (t: Tile) => Val): Extractor => (_state, rows) => (rows a
 const overCityStates = (fn: (cityState: CityState, state: GameState) => Val): Extractor =>
   (state, rows) => (rows as CityState[]).map((cityState) => fn(cityState, state));
 
-const warClockLine = (state: GameState, seat: number): Val =>
-  warsOf(state, seat)
-    .slice()
-    .sort((a, b) => a - b)
-    .map((foe) => [foe, warTurnsWith(state, seat, foe)]) as unknown as Val;
+// FLATTENED pairs (the wwPairs shape): the digest fold is FLAT, so a nested
+// [foe, clock] pair would quantise to NaN and every clock would hash alike.
+const warClockLine = (state: GameState, seat: number): Val => {
+  const out: number[] = [];
+  for (const foe of [...warsOf(state, seat)].sort((a, b) => a - b)) out.push(foe, warTurnsWith(state, seat, foe));
+  return out;
+};
 
 const GAME: Record<string, Extractor> = {
   turn: (s) => [s.turn],
@@ -445,7 +447,11 @@ const TILE: Record<string, Extractor> = {
   improvement: overTiles((t) => (t.improvement === null ? -1 : IMPROVEMENT_IDS.indexOf(t.improvement))),
   pillaged: overTiles((t) => (t.pillaged ? 1 : 0)),
   district: overTiles((t) => (t.district === null ? -1 : PLACEABLE_DISTRICTS.indexOf(t.district))),
-  districtComplete: overTiles((t) => (t.districtComplete ? 1 : 0)),
+  // PLACEABLE districts only, matching `district`'s own encoding: a founded
+  // centre carries districtComplete on TS while the GPU has no CITY_CENTER
+  // district row at all — centre-ness is compared through ownerCity and the
+  // city group, not here.
+  districtComplete: overTiles((t) => (t.district !== null && t.district !== 'CITY_CENTER' && t.districtComplete ? 1 : 0)),
   districtPillaged: overTiles((t) => (t.districtPillaged ? 1 : 0)),
   builtWonder: overTiles((t) => idx(WONDER_IDX, t.builtWonder)),
   builtWonderComplete: overTiles((t) => (t.builtWonderComplete ? 1 : 0)),

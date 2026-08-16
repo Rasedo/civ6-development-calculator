@@ -167,9 +167,7 @@ class SimSeats:
         district column whose tile is -1 (or absent) is REFUSED: this function
         re-validates a plot, it never picks one. `policy/ladder.py`'s
         `pick_district_tile` is the body that chooses."""
-        if war is not None:
-            self._apply_war_column(row, war)
-        self._stash_record(row, tech=tech, civic=civic, envoys=envoys,
+        self._stash_record(row, tech=tech, civic=civic, envoys=envoys, war=war,
                            production=production, pref=production_pref, dtile=production_tile)
         self._stash_buy(row, buy=buy, worship=worship, relig=relig, levy=levy)
 
@@ -220,7 +218,7 @@ class SimSeats:
                 for _pr in (row, tgt):
                     self.peace_turns[:, _pr] = torch.where(peace, torch.zeros_like(self.peace_turns[:, _pr]), self.peace_turns[:, _pr])
 
-    def _stash_record(self, row: int, tech=None, civic=None, envoys=None,
+    def _stash_record(self, row: int, tech=None, civic=None, envoys=None, war=None,
                       production=None, pref=None, dtile=None) -> None:
         """Park a seat row's applySeatActionRecord intents for
         `_seat_record_apply` to drain at the record position.
@@ -237,28 +235,31 @@ class SimSeats:
             self._driven_civic[row] = civic
         if envoys is not None and self.S > 0:
             self._driven_envoys[row] = envoys
+        if war is not None:
+            self._driven_war[row] = war
         if production is not None or pref is not None:
             self._driven_picks[row] = (production, pref, dtile)
 
     def _seat_record_apply(self, row: int, active: torch.Tensor) -> None:
         """applySeatActionRecord for seat row `row` — ONE body every seat runs,
         at the TS record position (after the CS/quest block, before the gold
-        ladder), in the TS arm order: tech, civic, envoys, production.
+        ladder), in the TS arm order: tech, civic, envoys, war, production.
 
         `active` is the eliminated-actor `continue`: TS's `continue` precedes
         the record apply, so a cityless seat applies NOTHING — but the stash is
         drained either way, because an intent is for THIS turn and a refused one
         must not survive into the next.
 
-        The WAR arm is absent because it applies EARLIER, at decide time, for
-        every row alike: `_apply_war_column` runs from `apply_seat_actions` (a
-        civ) or from `step()` (row 0), both ahead of the phase, so a same-turn
-        declaration legalizes this turn's own unit orders.
+        The WAR arm drains here and not at decide time: the walkers drain later
+        in the phase, so a same-turn declaration still legalizes this turn's
+        own unit orders — and the phase-top geo denounce has already landed, so
+        the declare's alliance gate reads the post-denounce axis, as TS's does.
 
         Every arm re-validates against the LIVE state here; nothing chooses."""
         tech = self._driven_tech.pop(row, None)
         civic = self._driven_civic.pop(row, None)
         envoys = self._driven_envoys.pop(row, None)
+        war = self._driven_war.pop(row, None)
         production, pref, dtile = self._driven_picks.pop(row, (None, None, None))
         if not bool(active.any()):
             return
@@ -287,6 +288,9 @@ class SimSeats:
                     self.seat_citystate_envoys[rows, row, ei[rows]] += 1
                     self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] - ok.long()
                     self._eff_version += 1
+        if war is not None:
+            w_act = war.to(torch.long)
+            self._apply_war_column(row, torch.where(active, w_act, torch.full_like(w_act, -1)))
         if pref is not None:
             self._apply_seat_pref(row, pref, dtile)
         elif production is not None:
@@ -840,9 +844,12 @@ class SimSeats:
         `ok` is the per-batch legality already computed by the caller; where it
         is False nothing moves. Where it is True and the pick DIFFERS from what
         the seat is researching, the progress pool is parked under the outgoing
-        item and the incoming item's parked value replaces it — a re-statement
-        of the current pick is a no-op, so a record that repeats itself cannot
-        round-trip the pool through the map and lose it to a rounding step.
+        item and the incoming item's parked value replaces it. With NOTHING
+        current the pool is a completion's unowned overflow and the pick adds
+        it to the loaded value — CIV6 carries overflow into the next research.
+        A re-statement of the current pick is a no-op, so a record that repeats
+        itself cannot round-trip the pool through the map and lose it to a
+        rounding step.
         """
         cur = self.civ_cur_civic[:, row] if is_civic else self.civ_cur_tech[:, row]
         pool = self.civ_civic_prog[:, row] if is_civic else self.civ_tech_prog[:, row]
@@ -857,7 +864,8 @@ class SimSeats:
         want_c = want.clamp(min=0).unsqueeze(1)
         loaded = park.gather(1, want_c).squeeze(1)
         park.scatter_(1, want_c, torch.where(move, torch.zeros_like(loaded), loaded).unsqueeze(1))
-        new_pool = torch.where(move, loaded, pool)
+        keep = torch.where(had, torch.zeros_like(pool), pool)
+        new_pool = torch.where(move, loaded + keep, pool)
         new_cur = torch.where(move, want.clamp(min=0), cur)
         if is_civic:
             self.civ_civic_prog[:, row] = new_pool
@@ -3364,6 +3372,10 @@ class SimSeats:
         resolved = res_camp | res_trade | res_dist
         if bool(resolved.any()):
             self.seat_citystate_quest[:, row, :S] = torch.where(resolved, torch.zeros_like(cur), cur)
+            # No quest, no target — TS reads campIndex off the LIVE quest
+            # object, so a resolved quest must not leave a stale camp here.
+            self.seat_citystate_quest_camp[:, row, :S] = torch.where(
+                resolved, torch.full_like(cur, -1), self.seat_citystate_quest_camp[:, row, :S])
             self.seat_citystate_quest_issued[:, row, :S] = torch.where(resolved, torch.full_like(cur, self.turn), self.seat_citystate_quest_issued[:, row, :S])
             self.seat_citystate_envoys[:, row, :S] = self.seat_citystate_envoys[:, row, :S] + resolved.long() * q_env
             self._eff_version += 1
@@ -3379,7 +3391,9 @@ class SimSeats:
             issued = new_kind > 0
             self.seat_citystate_quest[:, row, :S] = torch.where(issued, new_kind, cur2)
             self.seat_citystate_quest_issued[:, row, :S] = torch.where(issued, torch.full_like(cur2, self.turn), self.seat_citystate_quest_issued[:, row, :S])
-            self.seat_citystate_quest_camp[:, row, :S] = torch.where(want_camp, camp_nearest, self.seat_citystate_quest_camp[:, row, :S])
+            self.seat_citystate_quest_camp[:, row, :S] = torch.where(
+                want_camp, camp_nearest,
+                torch.where(issued, torch.full_like(cur2, -1), self.seat_citystate_quest_camp[:, row, :S]))
 
     def _seat_trade_phase(self, row: int, active: torch.Tensor) -> None:
         """ONE new route per seat per turn while under capacity, then expiry —

@@ -9,9 +9,6 @@ class SimMinors:
     def _city_state_phase(self) -> None:
         if self.S == 0:
             return
-        _cs0 = self.n_majors
-        _cs = slice(_cs0, _cs0 + max(self.S, 1))
-        self.war_turns[:, _cs] += self.war[:, _cs].long()
         if self.turn % 12 == 0:
             self.citystate_pop.copy_(torch.where(self.citystate_alive, (self.citystate_pop + 1).clamp(max=10), self.citystate_pop))
         citystate_max = int(self.rules.citystate.get("maxHp", 150))

@@ -1164,6 +1164,7 @@ class SimInit:
         self._driven_civic: dict = {}
         self._driven_envoys: dict = {}
         self._driven_picks: dict = {}
+        self._driven_war: dict = {}
         self._arangeNB = torch.arange(NB, device=device)
 
         # EVERY seat's t0 units seed the pool HERE, through ONE body — after

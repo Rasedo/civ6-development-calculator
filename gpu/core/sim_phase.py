@@ -173,9 +173,12 @@ class SimPhase:
         """The seat block's war-or-peace COUNTERS — one body, every seat row,
         at the tail seatPhase gives them.
 
-        `war_turns[row]` is this row's LINE of the pair clock: every war it is
-        in ticks, each in its own cell, so a seat fighting two opponents has
-        two clocks and can sue either on that war's own terms. `peace_turns`
+        `war_turns` is the pair clock: each war has ONE clock, ticked once per
+        turn at the pair's LOWER row's tail — every column above `row` (higher
+        majors, every city-state) is exactly the set this row is the lower
+        member of, and the mirror write keeps the matrix symmetric. A seat
+        fighting two opponents has two clocks and can sue either on that war's
+        own terms. `peace_turns`
         ticks while the seat is at war with NO major (atWarWithAny reads
         Seat.wars — the majors' list — so a city-state war does not hold it
         back). The two are exclusive: a war clock only moves inside a war,
@@ -186,7 +189,10 @@ class SimPhase:
         war with itself — exactly what `civsAtWar(state, s, s)` does on the TS
         side, and the reason row 0 looked like it needed a rule of its own."""
         any_war = active & self.war[:, row, :self.n_majors].any(dim=1)
-        self.war_turns[:, row] += (active.unsqueeze(1) & self.war[:, row]).long()
+        pair = active.unsqueeze(1) & self.war[:, row]
+        pair[:, :row + 1] = False
+        self.war_turns[:, row] += pair.long()
+        self.war_turns[:, :, row] += pair.long()
         self.peace_turns[:, row] = self.peace_turns[:, row] + (active & ~any_war).long()
 
     def _seat_governor_seats(self, row: int) -> torch.Tensor:
@@ -403,10 +409,14 @@ class SimPhase:
                     if not bool(hit.any()):
                         continue
                     y_i = int(prow.get("y", -1))
+                    # ORACLE: applyLumpYield's science/culture arms feed the
+                    # LIFETIME banks alongside the pools.
                     if y_i == 3:
                         self.civ_tech_prog[:, row] = torch.where(hit, self.civ_tech_prog[:, row] + amt_y, self.civ_tech_prog[:, row])
+                        self.seat_science_total[:, row] = torch.where(hit, self.seat_science_total[:, row] + amt_y, self.seat_science_total[:, row])
                     elif y_i == 4:
                         self.civ_civic_prog[:, row] = torch.where(hit, self.civ_civic_prog[:, row] + amt_y, self.civ_civic_prog[:, row])
+                        self.civ_culture[:, row] = torch.where(hit, self.civ_culture[:, row] + amt_y, self.civ_culture[:, row])
                     elif y_i == 2:
                         self.civ_treasury[:, row] = torch.where(hit, self.civ_treasury[:, row] + amt_y, self.civ_treasury[:, row])
                     elif y_i == 5:

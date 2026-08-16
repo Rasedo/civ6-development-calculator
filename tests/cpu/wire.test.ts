@@ -82,6 +82,7 @@ describe('#70 the action FILE drives the TS civ', () => {
 
   it('applies a recorded UNIT column', () => {
     const state = makeState(makeMap(14, 14, 'GRASSLAND'));
+    state.unitsMode = true; // the replay arm re-validates trainableUnits, which is empty with units off
     const civ = addCiv(state, 6, 6);
     const L = prodLayout();
     const ui = L.units.indexOf('WARRIOR');

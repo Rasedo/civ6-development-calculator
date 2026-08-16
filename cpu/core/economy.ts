@@ -9,16 +9,15 @@ import { RESOURCES } from '../../world/resources';
 /**
  * SELECT a tech or civic, keeping the progress on the one being left.
  *
- * Real Civ 6 lets a seat switch research at any moment and hands the
- * abandoned item's science back when it returns to it. The progress POOL
- * (`techProgress`) belongs to whatever is current, so a switch parks the pool
- * under the outgoing id and loads the incoming id's parked value — the two
- * stores partition the seat's science, and no path may add them.
+ * CIV6: research switches freely — a switched-away item retains its
+ * progress and hands it back when re-picked, and the overflow a completion
+ * leaves carries into whatever is picked next. The pool belongs to the
+ * current item; with nothing current it holds unowned completion overflow.
+ * So a switch parks the WHOLE pool under the outgoing id, and a pick loads
+ * the incoming id's parked value plus any unowned overflow.
  *
  * Selecting the SAME id is a no-op rather than a park-and-reload, so a record
  * that re-states the current pick cannot round-trip the pool through the map.
- * Selecting `null` parks and leaves the pool holding whatever a completion's
- * overflow left, which is the value the next pick inherits.
  */
 export function selectResearch(rsr: ResearchState, id: string | null, isCivic = false): void {
   const cur = isCivic ? rsr.civic : rsr.tech;
@@ -26,7 +25,7 @@ export function selectResearch(rsr: ResearchState, id: string | null, isCivic = 
   const retained = isCivic ? rsr.civicRetained : rsr.techRetained;
   const pool = isCivic ? rsr.civicProgress : rsr.techProgress;
   if (cur) retained[cur] = pool;
-  const next = id ? retained[id] ?? 0 : pool;
+  const next = (cur ? 0 : pool) + (id ? retained[id] ?? 0 : 0);
   if (id) delete retained[id];
   if (isCivic) {
     rsr.civic = id;

@@ -625,45 +625,47 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     return no('Out of range.');
   }
   const enemies = unitsAt(state, targetIndex).filter((u) => unitsHostile(state, attacker, u));
-  if (enemies.length === 0 || enemies.some((u) => unitDomain(u.type) === 'military')) {
-    // Ranged units CAN bombard cities — same fallback
-    // chain as meleeAttack (seat city, then city-state center), one roll,
-    // no retaliation. Ranged fire never captures: the city holds at 1 HP
-    // until melee takes it.
-    //
-    // WHOEVER fires: the arms key on the ATTACKER's own seat, so an ordered
-    // ranged attack resolves the same way for every seat (the GPU's
-    // `_ranged_attack`, which the applier dispatches by unit type alone).
-    // The enhancer attacker adders key on where the unit STANDS rather than
-    // on what it hits, so they join the city arms behind the same live flag
-    // every other city-attack path asks.
-    const atkSeat = unitSeat(attacker);
-    const relCity = CITY_RELIGION_ADDER_LIVE && isCiv(attacker.seat)
-      ? religionAttackCS(state, attacker, targetIndex)
-      : 0;
-    const civCity = cityAtIndex(state, targetIndex);
-    if (civCity && (capsOf(attacker.seat).alwaysHostile || civsAtWar(state, atkSeat, civCity.holder.seat))) {
-      const defCS = cityDefenseStrength(state, civCity.city);
-      civCity.city.hp = Math.max(1, civCity.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex));
-      warWearinessBattle(state, attacker.seat, civCity.city.seat, targetIndex, { city: true });
-      attacker.movesLeft = 0;
-      gainXp(attacker, XP_ATTACK); // +5 for the bombardment (city not a unit — no defender xp)
-      return ok;
-    }
-    const cityState = cityStateAt(state, targetIndex);
-    // Bombardment needs a war exactly as melee does, and asks the SAME
-    // question — `cityStateAttackable`, suzerain clause included. This arm
-    // once took ANY city-state, so the two TS paths disagreed with each
-    // other about one rule; real Civ 6 treats a city-state as a separate
-    // seat you must declare on. See [[target-legality-gates]].
-    if (cityState && cityState.centerIndex === targetIndex && cityStateAttackable(state, cityState, atkSeat)) {
-      const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0);
-      cityState.hp = Math.max(1, (cityState.hp ?? CITY_STATE_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex));
-      warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), targetIndex, { city: true });
-      attacker.movesLeft = 0;
-      gainXp(attacker, XP_ATTACK); // +5 for the bombardment
-      return ok;
-    }
+  // Ranged units CAN bombard cities — same fallback
+  // chain as meleeAttack (seat city, then city-state center), one roll,
+  // no retaliation. Ranged fire never captures: the city holds at 1 HP
+  // until melee takes it.
+  //
+  // CITY-FIRST, unconditionally, like meleeAttack: the CITY defends its own
+  // tile WHOEVER stands on it — a garrison adds strength and a lone civilian
+  // never draws the blow — so the city arms run before any unit resolution.
+  //
+  // WHOEVER fires: the arms key on the ATTACKER's own seat, so an ordered
+  // ranged attack resolves the same way for every seat (the GPU's
+  // `_ranged_attack`, which the applier dispatches by unit type alone).
+  // The enhancer attacker adders key on where the unit STANDS rather than
+  // on what it hits, so they join the city arms behind the same live flag
+  // every other city-attack path asks.
+  const atkSeat = unitSeat(attacker);
+  const relCity = CITY_RELIGION_ADDER_LIVE && isCiv(attacker.seat)
+    ? religionAttackCS(state, attacker, targetIndex)
+    : 0;
+  const civCity = cityAtIndex(state, targetIndex);
+  if (civCity && (capsOf(attacker.seat).alwaysHostile || civsAtWar(state, atkSeat, civCity.holder.seat))) {
+    const defCS = cityDefenseStrength(state, civCity.city);
+    civCity.city.hp = Math.max(1, civCity.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex));
+    warWearinessBattle(state, attacker.seat, civCity.city.seat, targetIndex, { city: true });
+    attacker.movesLeft = 0;
+    gainXp(attacker, XP_ATTACK); // +5 for the bombardment (city not a unit — no defender xp)
+    return ok;
+  }
+  const cityState = cityStateAt(state, targetIndex);
+  // Bombardment needs a war exactly as melee does, and asks the SAME
+  // question — `cityStateAttackable`, suzerain clause included. This arm
+  // once took ANY city-state, so the two TS paths disagreed with each
+  // other about one rule; real Civ 6 treats a city-state as a separate
+  // seat you must declare on. See [[target-legality-gates]].
+  if (cityState && cityState.centerIndex === targetIndex && cityStateAttackable(state, cityState, atkSeat)) {
+    const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0);
+    cityState.hp = Math.max(1, (cityState.hp ?? CITY_STATE_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex));
+    warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), targetIndex, { city: true });
+    attacker.movesLeft = 0;
+    gainXp(attacker, XP_ATTACK); // +5 for the bombardment
+    return ok;
   }
   if (enemies.length === 0) return no('Nothing to attack there.');
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
@@ -763,16 +765,12 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
 function attackCity(state: GameState, attacker: Unit, holder: Seat, city: City, seat: number): void {
   cityAssault(state, attacker, city, 'rcty', 'rctyc', seat);
   if (city.hp > 0) return;
-  // DAMAGE goes through a garrison, CAPTURE does not. Civ 6 takes a
-  // city by MOVING INTO the centre, which a surviving defender forbids — so a
-  // city battered to 0 HP with a garrison still standing holds at 0 until the
-  // garrison dies.
-  if (unitsAt(state, city.centerIndex).some((u) => unitsHostile(state, attacker, u))) return;
+  // CIV6: a garrison never HOLDS a fallen city — units on the centre do not
+  // block capture (the real game destroys them with the city; both engines
+  // leave them standing, recorded as B-32r).
   const captor = seatOf(state, attacker.seat);
   if (captor && !isBarbSeat(attacker.seat)) {
-    if (transferCity(state, holder.seat, captor, city, 'conquered')) {
-      captor.treasury = (captor.treasury ?? 0) + 40;
-    }
+    transferCity(state, holder.seat, captor, city, 'conquered');  // pays the plunder itself
   } else {
     sackCity(state, city, holder.seat);
     state.eventLog.push(`Barbarians sacked ${city.name} (${holder.name}).`);

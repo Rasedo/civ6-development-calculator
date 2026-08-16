@@ -69,8 +69,7 @@ export function commitProduction(state: GameState, seat: number, city: City, ite
 export function commitResearch(state: GameState, seat: number, kind: 'tech' | 'civic', id: string | null): void {
   const s = seatOf(state, seat);
   if (!s) return;
-  if (kind === 'tech') selectResearch(s.research, id);
-  else s.research.civic = id;
+  selectResearch(s.research, id, kind === 'civic');
   if (process.env.CIV6_ALOG && id !== null) {
     console.error(`ALOG t${state.turn} s${seat} ${kind} ${id}`);
   }

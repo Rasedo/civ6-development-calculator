@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { civsAtWar, emptySeat, seatOfCityState, setWar, setWarTurnsWith, warTurnsWith } from '../../../cpu/core/seats';
 import { makeState, tileAtCoords } from '../helpers';
 import { declareWarOnCityState, sueForPeaceWithCityState } from '../../../cpu/core/cityStates';
-import { cityStatePhase } from '../../../cpu/core/cityStates';
 import { SUZERAIN_ENVOYS } from '../../../cpu/data/cityStates';
 import { WAR_MIN_TURNS } from '../../../cpu/data/seats';
 import type { CityState, GameState, Seat } from '../../../cpu/core/types';
@@ -76,9 +75,11 @@ describe('#50: seat 0 <-> city-state peace', () => {
     expect(civsAtWar(state, cityState.seat, 0)).toBe(true);
 
     expect(sueForPeaceWithCityState(state, cityState.id, 0).ok).toBe(false); // 0 turns waited
-    for (let i = 0; i < WAR_MIN_TURNS - 1; i++) cityStatePhase(state);
+    // the pair clock ticks at the LOWER seat's phase tail (the major's), and
+    // this scene runs no seat-0 economy — write the clock it would have built
+    setWarTurnsWith(state, cityState.seat, 0, WAR_MIN_TURNS - 1);
     expect(sueForPeaceWithCityState(state, cityState.id, 0).ok).toBe(false); // one short
-    cityStatePhase(state);
+    setWarTurnsWith(state, cityState.seat, 0, WAR_MIN_TURNS);
     // ... and at the floor it is accepted unconditionally (no gold, no roll)
     expect(sueForPeaceWithCityState(state, cityState.id, 0).ok).toBe(true);
     expect(civsAtWar(state, cityState.seat, 0)).toBe(false);
@@ -91,7 +92,7 @@ describe('#50: seat 0 <-> city-state peace', () => {
     const rome = addCiv(state, 0, true);
     cityState.envoys = { [1]: SUZERAIN_ENVOYS }; // Rome is suzerain
     expect(declareWarOnCityState(state, cityState.id, 0).ok).toBe(true);
-    for (let i = 0; i < WAR_MIN_TURNS + 2; i++) cityStatePhase(state);
+    setWarTurnsWith(state, cityState.seat, 0, WAR_MIN_TURNS + 2);
 
     const r = sueForPeaceWithCityState(state, cityState.id, 0);
     expect(r.ok).toBe(false);

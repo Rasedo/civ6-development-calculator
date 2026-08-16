@@ -926,7 +926,12 @@ class SimEconomy:
                 self.city_dist_tile[rows, row, j, di] = torch.where(_held < 0, bt, _held)
             else:
                 self.city_dist_tile[rows, row, j, di] = bt
-            self._strip_feature_at(rows, bt)          # queueDistrict: tile.feature = null
+            # CIV6: a district paves every feature EXCEPT floodplains — the
+            # feature stays under the district and keeps feeding the flood
+            # pick (queueDistrict and _queue_wonder_at share this gate).
+            nofp = self.feat_id[rows, bt] != self._fp_fid
+            if bool(nofp.any()):
+                self._strip_feature_at(rows[nofp], bt[nofp])
             fresh_rs = (self.res_priority[rows, bt] == 1) & ~self.res_stripped[rows, bt]
             self.res_stripped[rows, bt] = self.res_stripped[rows, bt] | (self.res_priority[rows, bt] == 1)
             self._withdraw_sea_adj(rows[fresh_rs], bt[fresh_rs])
