@@ -345,6 +345,9 @@ class SimSeats:
     def _seat_buy_building(self, row: int, can6: torch.Tensor, jj6: torch.Tensor, bb6: torch.Tensor, price6: torch.Tensor) -> None:
         rows6 = can6.nonzero(as_tuple=True)[0]
         self.city_bldg[rows6, row, jj6[rows6], bb6[rows6]] = True
+        # CIV6 (Heartbeat of Steam, dark face): a purchased building is
+        # constructed too.
+        self._dedication_event(row, self._ded_steam, can6 & (self._b_era[bb6] >= self._industrial_era))
         self._eff_version += 1
         if self._walls_bidx >= 0:
             wm6 = rows6[bb6[rows6] == self._walls_bidx]
@@ -1217,6 +1220,73 @@ class SimSeats:
     def _suzerain_count(self, row: int) -> torch.Tensor:
         return self._suzerain_mask(row).sum(dim=1)
 
+    def _suz_effect_rows(self, code: int) -> torch.Tensor:
+        """`suzerainEffect` for every major row at once — [B, n_majors] bool,
+        true where the row holds a suzerain among the live minors whose perk
+        is the RULE `code` (an index into the rules' suz-effects order, -1 =
+        absent). Keyed (turn, _eff_version): every envoy write bumps
+        _eff_version, so the cache IS the TS live read within a turn."""
+        key = (self.turn, self._eff_version)
+        if self._suz_rows_cache is None or self._suz_rows_cache[0] != key:
+            self._suz_rows_cache = (key, {})
+        codes = self._suz_rows_cache[1]
+        if code not in codes:
+            if code < 0 or self.S == 0:
+                codes[code] = torch.zeros(self.B, self.n_majors, dtype=torch.bool, device=self.device)
+            else:
+                hold = self.citystate_suz_code[:, :self.S] == code
+                codes[code] = torch.stack(
+                    [(self._suzerain_mask(r) & hold).any(dim=1) for r in range(self.n_majors)], dim=1)
+        return codes[code]
+
+    def _suz_effect(self, row: int, code: int) -> torch.Tensor:
+        """[B] — does seat row `row` hold a suzerain whose perk is `code`?"""
+        return self._suz_effect_rows(code)[:, row]
+
+    def _cav_hill_cs(self, seat: torch.Tensor, types: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
+        """`cavalryHillCS`'s twin, [B] long. CIV6 (Preslav's suzerain): "Your
+        light and heavy cavalry units have +5 Strength when fighting on hill
+        tiles." The tile is the unit's OWN — the ground it fights from,
+        attacking or defending. Barbarians and empty (-1) seats score 0."""
+        if self._suz_c_hill < 0 or self.S == 0:
+            return torch.zeros_like(tiles)
+        ok = (seat >= 0) & (seat < self.n_majors)
+        s0 = torch.where(ok, seat, torch.zeros_like(seat))
+        suz = self._suz_effect_rows(self._suz_c_hill).gather(1, s0.unsqueeze(1)).squeeze(1) & ok
+        cav = self._type_cavalry[types.clamp(min=0, max=self.NU - 1)]
+        hill = self.hills.gather(1, tiles.clamp(min=0).unsqueeze(1)).squeeze(1)
+        return self._suz_hill_cs * (suz & cav & hill).long()
+
+    def _suz_xp_mult(self, seat: torch.Tensor) -> torch.Tensor:
+        """`gainAttackXp`'s multiplier, [B] long. CIV6 (Kabul's suzerain):
+        "Your units receive double experience from battles they initiate."
+        Defense XP never multiplies, and a barbarian holds no suzerain."""
+        if self._suz_c_xp < 0 or self.S == 0:
+            return torch.ones_like(seat)
+        ok = (seat >= 0) & (seat < self.n_majors)
+        s0 = torch.where(ok, seat, torch.zeros_like(seat))
+        suz = self._suz_effect_rows(self._suz_c_xp).gather(1, s0.unsqueeze(1)).squeeze(1) & ok
+        return 1 + (self._suz_xp_mult_k - 1) * suz.long()
+
+    def _naval_kill_event(self, killer, vict_type: torch.Tensor, vict_barb: torch.Tensor, killed: torch.Tensor) -> None:
+        """`navalKillEvent`'s twin — CIV6 (Hic Sunt Dracones, dark face): "+1
+        Era Score each time you kill a non-Barbarian naval unit in combat."
+        `killer` is a row int or a [B] seat tensor; a non-major killer (a
+        city-state or a camp) holds no dedications and scores 0."""
+        ev = killed & ~vict_barb & self.unit_naval[vict_type.clamp(min=0, max=self.NU - 1)]
+        if not bool(ev.any()):
+            return
+        if isinstance(killer, int):
+            if 0 <= killer < self.n_majors:
+                self._dedication_event(killer, self._ded_dracones, ev)
+            return
+        for g in range(self.n_majors):
+            m = ev & (killer == g)
+            if bool(m.any()):
+                self._dedication_event(g, self._ded_dracones, m)
+
+
+
     def _world_congress(self) -> None:
         """The `worldCongress` mirror. At every congressInterval turn, once ANY
         seat has reached congressMinEra (Medieval), one resolution runs: every
@@ -1475,6 +1545,11 @@ class SimSeats:
             if bool(hostv.any()):
                 d_v = self.pair_dist[tiles.unsqueeze(-1), self.major_unit_tile.clamp(min=0).unsqueeze(1)] <= 3
                 out = out | (d_v & hostv.unsqueeze(1)).any(dim=-1)
+        # CIV6 (Reform the Coinage, Golden face): "your Traders cannot be
+        # plundered."
+        gd = self._golden_ded(row, self._ded_coinage)
+        if bool(gd.any()):
+            out = out & ~gd.reshape(-1, 1)
         return out
 
     def _seat_route_income(self, row: int) -> torch.Tensor | None:
@@ -1565,6 +1640,15 @@ class SimSeats:
             inc.scatter_add_(1, from_j * 6 + 2, citystate_gold * pc)
             ycol = self._citystate_yidx[:, :S].gather(1, css)
             inc.scatter_add_(1, from_j * 6 + ycol, citystate_spec * pc)
+            # CIV6 (Kumasi's suzerain): routes to ANY city-state pay "+2
+            # Culture and +1 Gold for every specialty district in the origin
+            # city" — the ORIGIN's registry count, on each paying CS leg.
+            kum = self._suz_effect(row, self._suz_c_route)
+            if bool(kum.any()):
+                spec_o = self._district_counts(row)[1].gather(1, from_j).double()
+                kf = kum.double().unsqueeze(1) * pc * spec_o
+                inc.scatter_add_(1, from_j * 6 + 4, self._suz_route_cul * kf)
+                inc.scatter_add_(1, from_j * 6 + 2, self._suz_route_gold * kf)
         # INTERNATIONAL legs: a route to ANY OTHER MAJOR's city
         # (seat_route_dcity >= 0) pays intlGold + the dest city's completed
         # specialty count to GOLD only. Suspended while at war with the DEST's
@@ -1591,6 +1675,12 @@ class SimSeats:
             _spec_all = (_comp & self._is_specialty.reshape(1, 1, 1, -1)).sum(dim=3)  # [B, n_majors, RC]
             spec_dest = _spec_all.gather(1, _rx).gather(2, _col).squeeze(2)  # [B, K]
             gold_i = (self._trade_intl_gold + spec_dest).double()
+            # CIV6 (Reform the Coinage, Golden face): "International Trade
+            # Routes provide +3 Gold per specialty district in the foreign
+            # city."
+            gdc = self._golden_ded(row, self._ded_coinage)
+            if bool(gdc.any()):
+                gold_i = gold_i + self._coinage_spec_gold * spec_dest.double() * gdc.double().unsqueeze(1)
             # routeRaidedAt reads the RESOLVED city's centerIndex, so the
             # endpoint follows the lookup rather than a tile stored at creation.
             dest_tile = self.city_center.gather(1, _rx).gather(2, _col).squeeze(2).clamp(min=0)  # [B, K]
@@ -1685,6 +1775,10 @@ class SimSeats:
         alive = self.city_alive[:, row, :cols]
         dt_all = self.city_dist_tile[:, row, :cols]  # [B, cols, nD]
         ctrs = self.city_center[:, row, :cols].clamp(min=0)  # [B, cols] receiver centers
+        # CIV6 (Mexico City's suzerain): "Regional effects from your Industrial
+        # Zone, Water Park, and Entertainment Complex districts reach 3 tiles
+        # farther." Districts only — `_wonder_regional_amenities` keeps the base.
+        reach = self._regional_range + self._suz_reach_bonus * self._suz_effect(row, self._suz_c_reach).long().reshape(B, 1, 1)
         y6 = am = None
         for n in self._reg_bidx:
             own_n = self.city_bldg[:, row, :cols, n] & alive
@@ -1696,7 +1790,7 @@ class SimSeats:
             if not bool(ok.any()):
                 continue
             dd = self.pair_dist[stc.unsqueeze(2), ctrs.unsqueeze(1)]  # [B, src, recv] int16
-            has = (ok.unsqueeze(2) & (dd <= self._regional_range)).any(dim=1) & alive  # [B, cols recv]
+            has = (ok.unsqueeze(2) & (dd <= reach)).any(dim=1) & alive  # [B, cols recv]
             hf = has.double()
             if y6 is None:
                 y6 = torch.zeros(B, cols, 6, dtype=torch.float64, device=self.device)
@@ -2385,7 +2479,9 @@ class SimSeats:
             # found none and score 0.
             if major:
                 atk_e = atk_e + (self._rel_atk_cs(a_seat[:, u], tgt).to(atk_e.dtype))  # unit-vs-unit: never city-gated
+            atk_e = atk_e + self._cav_hill_cs(a_seat[:, u], a_type[:, u], here).to(atk_e.dtype)
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(def_is_barb, neg, d_seat_m), tgt).to(def_e.dtype))
+            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._cav_hill_cs(d_seat_m, d_type, ttc).to(def_e.dtype))
             # Great General / Admiral aura. Attacker keyed on its own tile `here`
             # (a CIV attacker gets its civ's aura; a BARB has none); defender
             # keyed on `tgt` — seat 0, a civ seat, or barb (-1). Embarked/naval →
@@ -2400,10 +2496,12 @@ class SimSeats:
             _wwh = self._ww_occ(tgt)
             _wwd = self._tile_mil_seat(tgt)
             if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
-                a_xp[:, u] = torch.where(mil_att, a_xp[:, u] + XP_ATTACK, a_xp[:, u])
+                a_xp[:, u] = torch.where(mil_att, a_xp[:, u] + XP_ATTACK * self._suz_xp_mult(a_seat[:, u]), a_xp[:, u])
             rows, def_dead, atk_dead = self._melee_exchange(
                 mil_att, tgt, ttc, d_slot, ~def_is_barb, a_hp, u, atk_e, def_e,
                 self._row_of(a_seat[:, u]))
+            self._naval_kill_event(a_seat[:, u], d_type, def_is_barb, def_dead)
+            self._naval_kill_event(d_seat_m, a_type[:, u], a_seat[:, u] == BARB_SEAT, atk_dead)
             self._ww_battle(mil_att, self._row_of(self._atk_seat(atk_kind, u)),
                             self._row_of(_wwd), tgt,
                             a_died=atk_dead, d_died=(_wwh & ~self._ww_occ(tgt)) != 0)
@@ -2788,12 +2886,13 @@ class SimSeats:
         if major:
             atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
             atk_e = atk_e + (self._rel_atk_cs(a_seat[:, u], tc).to(atk_e.dtype) if self._city_rel_live else 0)
+            atk_e = atk_e + self._cav_hill_cs(a_seat[:, u], a_type[:, u], a_tile[:, u]).to(atk_e.dtype)
             atk_e = atk_e + self._gen_aura_cs(a_seat[:, u], a_tile[:, u], atk_naval).to(atk_e.dtype)
         diff, cdiff = atk_e - def_cs, def_cs - atk_e
         d_enc = self._damage_roll(att, diff, k="enc", tile=tc)
         d_self = self._damage_roll(att, cdiff, k="encc", tile=tc)
         if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
-            a_xp[:, u] = torch.where(att, a_xp[:, u] + XP_ATTACK, a_xp[:, u])
+            a_xp[:, u] = torch.where(att, a_xp[:, u] + XP_ATTACK * self._suz_xp_mult(a_seat[:, u]), a_xp[:, u])
         rows = att.nonzero(as_tuple=True)[0]
         if len(rows) > 0:
             tr = tc[rows]
@@ -2887,6 +2986,7 @@ class SimSeats:
             atk_e = atk_e + self._xp_lvl_bonus(a_xp[:, u])
         if self._city_rel_live:
             atk_e = atk_e + self._rel_atk_cs(a_seat[:, u], tgt).to(atk_e.dtype)
+        atk_e = atk_e + self._cav_hill_cs(a_seat[:, u], a_type[:, u], a_tile[:, u]).to(atk_e.dtype)
         aura_civ = torch.where(a_seat[:, u] == BARB_SEAT,
                                torch.full_like(hrow, -1), a_seat[:, u])
         atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
@@ -2903,7 +3003,7 @@ class SimSeats:
         d_city = self._damage_roll(att, atk_e - def_cs, k="rcty", tile=tgt)
         d_atk = self._damage_roll(att, def_cs - atk_e, k="rctyc", tile=tgt)
         if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
-            a_xp[:, u] = torch.where(att, a_xp[:, u] + XP_ATTACK, a_xp[:, u])
+            a_xp[:, u] = torch.where(att, a_xp[:, u] + XP_ATTACK * self._suz_xp_mult(a_seat[:, u]), a_xp[:, u])
         rows = att.nonzero(as_tuple=True)[0]
         hr, sl = hrow[rows], slot[rows]
         outer = self.city_outer_hp[rows, hr, sl]
@@ -2913,6 +3013,7 @@ class SimSeats:
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
         died = att & (a_hp[:, u] <= 0)
         self._ww_battle(att, self._row_of(a_seat[:, u]), hrow, tgt, a_died=died, city=True)
+        self._naval_kill_event(hrow, a_type[:, u], a_seat[:, u] == BARB_SEAT, died)
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
             self._dig_at(dr, a_tile[dr, u], self._row_of(a_seat[dr, u]))
@@ -3015,6 +3116,7 @@ class SimSeats:
             atk_e = atk_e + self._xp_lvl_bonus(a_xp[:, u])
         if self._city_rel_live:
             atk_e = atk_e + self._rel_atk_cs(a_seat[:, u], tgt).to(atk_e.dtype)
+        atk_e = atk_e + self._cav_hill_cs(a_seat[:, u], at0, a_tile[:, u]).to(atk_e.dtype)
         aura_civ = torch.where(a_seat[:, u] == BARB_SEAT,
                                torch.full_like(a_seat[:, u], -1), a_seat[:, u])
         atk_naval = self.unit_naval[at0] | a_emb[:, u]
@@ -3022,7 +3124,7 @@ class SimSeats:
         d_cs = self._damage_roll(att, atk_e - def_cs, k="csty", tile=tgt)
         d_atk = self._damage_roll(att, def_cs - atk_e, k="cstyc", tile=tgt)
         if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
-            a_xp[:, u] = torch.where(att, a_xp[:, u] + XP_ATTACK, a_xp[:, u])
+            a_xp[:, u] = torch.where(att, a_xp[:, u] + XP_ATTACK * self._suz_xp_mult(a_seat[:, u]), a_xp[:, u])
         rows = att.nonzero(as_tuple=True)[0]
         self.citystate_hp[rows, citystate_sc[rows]] -= d_cs[rows]
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
@@ -3046,6 +3148,11 @@ class SimSeats:
         d = self._damage_roll(strike, atk_cs - def_e, k=key, tile=tt)
         self._ww_battle(strike, striker_row, self._row_of(d_seat), tt,
                         d_died=strike & (d_slot >= 0) & ((def_hp - d) <= 0), city=True)
+        self._naval_kill_event(
+            striker_row,
+            self.unit_type.gather(1, d_slot.clamp(min=0).unsqueeze(1)).squeeze(1),
+            d_seat == BARB_SEAT,
+            strike & (d_slot >= 0) & ((def_hp - d) <= 0))
         rows = strike.nonzero(as_tuple=True)[0]
         for grp, occ_map in ((okm, self.military_at), (~okm & okc, self.civilian_at)):
             g = rows[grp[rows]]
@@ -3203,6 +3310,7 @@ class SimSeats:
             if not barb:
                 atk_e = atk_e + (self._rel_atk_cs(a_seat, tgt).to(atk_e.dtype))  # NEVER gated
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
+            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._cav_hill_cs(d_seat, d_type, ttc).to(def_e.dtype))
             if not barb:
                 atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_e.dtype)
             def_civ_u = torch.where(d_is_mil & ~d_barb, d_seat, neg)
@@ -3227,6 +3335,8 @@ class SimSeats:
             self._ww_battle(unit_att, self._row_of(self._atk_seat(atk_kind, u)),
                             self._row_of(d_seat), tgt,
                             d_died=unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
+            self._naval_kill_event(self._atk_seat(atk_kind, u), d_type, d_barb,
+                                   unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
             if bool((unit_att & civ_def).any()):
                 self._gen_ver += 1
             # a surviving MILITARY defender earns +2 (barbs never accrue).
@@ -3240,7 +3350,7 @@ class SimSeats:
         # unit); a barbarian never accrues (gainXp guards); a strike that hit
         # neither returns empty and spends nothing.
         if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
-            _xp_p[:, u] = torch.where(city_att | unit_att, _xp_p[:, u] + XP_ATTACK, _xp_p[:, u])
+            _xp_p[:, u] = torch.where(city_att | unit_att, _xp_p[:, u] + XP_ATTACK * self._suz_xp_mult(_seat_p[:, u]), _xp_p[:, u])
         return city_att | unit_att
 
     def _ranged_attack(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str,
@@ -3342,6 +3452,7 @@ class SimSeats:
             def_e = def_e + torch.where(
                 d_emb, torch.zeros_like(def_e),
                 self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
+            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._cav_hill_cs(d_seat, d_type, ttc).to(def_e.dtype))
             def_naval = d_emb | (~d_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
             def_e = def_e + self._gen_aura_cs(
                 torch.where(ok_m & ~d_barb, d_seat, neg), tgt, def_naval).to(def_e.dtype)
@@ -3362,6 +3473,8 @@ class SimSeats:
             self._ww_battle(unit_att, self._row_of(self._atk_seat(atk_kind, u)),
                             self._row_of(d_seat), tgt,
                             d_died=unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
+            self._naval_kill_event(self._atk_seat(atk_kind, u), d_type, d_barb,
+                                   unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
             if bool((unit_att & ~ok_m).any()):
                 self._gen_ver += 1
             surv = (unit_att & ok_m & ~d_barb).nonzero(as_tuple=True)[0]
@@ -3371,7 +3484,7 @@ class SimSeats:
                     self.unit_xp[sp, d_slot[sp]] += XP_DEFEND
         fired = city_att | cs_att | unit_att
         if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
-            a_xp[:, u] = torch.where(fired, a_xp[:, u] + XP_ATTACK, a_xp[:, u])
+            a_xp[:, u] = torch.where(fired, a_xp[:, u] + XP_ATTACK * self._suz_xp_mult(aseat), a_xp[:, u])
         return fired
 
     def _seat_influence_phase(self, row: int, active: torch.Tensor) -> None:
@@ -3704,6 +3817,11 @@ class SimSeats:
         act = self.seat_routes[:, row, :, 0] >= 0
         exp = self.seat_route_exp[:, row]
         expired = act & (exp >= 0) & (exp <= int(self.turn))
+        # CIV6 (Reform the Coinage, dark face): "+1 Era Score each time you
+        # successfully complete a Trade Route" — the term running out, never a
+        # dead-destination cut.
+        if row < self.n_majors:
+            self._dedication_event(row, self._ded_coinage, expired.sum(dim=1))
         dst, dc = self._route_dest_alive(row)
         dest_gone = act & (dc >= 0) & ~dst
         drop = expired | dest_gone

@@ -259,18 +259,49 @@ export const ADMIRAL_MARCH_LIVE = true;
  *   1 FREE_INQUIRY        +1 era score per EUREKA (tech boost) triggered
  *   2 PEN_BRUSH_AND_VOICE +1 era score per INSPIRATION (civic boost) triggered
  *   3 EXODUS_OF_THE_EVANGELISTS  +2 era score per city converted to your religion
+ *   4 TO_ARMS             +1 era score per non-barbarian CORPS killed (+2 per
+ *                         ARMY) — formations do not exist here, so the event
+ *                         cannot occur, exactly as in Civ 6 before Nationalism
+ *   5 HIC_SUNT_DRACONES   +3 era score per natural wonder discovered, +1 per
+ *                         non-barbarian NAVAL unit killed in combat (the
+ *                         new-continent clause cannot occur: one continent)
+ *   6 REFORM_THE_COINAGE  +1 era score per trade route successfully completed
+ *   7 HEARTBEAT_OF_STEAM  +2 era score per Industrial-or-later building built
  *
  * The GOLDEN face of each pays its sourced standing bonuses (movement,
  * boost overflow, culture per district, prophet points, charges, the
  * Monumentality faith purchases + 30% discount) — see `eras.goldenDedication`'s
  * callers. There is NO flat per-turn payout on either face in real Civ 6.
+ *
+ * Residual, recorded: the per-era availability windows are not published in
+ * the Civilopedia (it names only Automaton Warfare's), so the round-robin
+ * offers every entry in every era; To Arms!'s special Casus Belli needs a
+ * denouncement system; the remaining four catalog entries (Sky and Stars,
+ * Bodyguard of Lies, Automaton Warfare, Wish You Were Here) need air units /
+ * spies / GDRs / seaside-resort tourism scopes that are absent, BOTH faces.
  */
-export const DEDICATIONS = ['MONUMENTALITY', 'FREE_INQUIRY', 'PEN_BRUSH_AND_VOICE', 'EXODUS_OF_THE_EVANGELISTS'] as const;
+export const DEDICATIONS = ['MONUMENTALITY', 'FREE_INQUIRY', 'PEN_BRUSH_AND_VOICE', 'EXODUS_OF_THE_EVANGELISTS', 'TO_ARMS', 'HIC_SUNT_DRACONES', 'REFORM_THE_COINAGE', 'HEARTBEAT_OF_STEAM'] as const;
 export const DED_MONUMENTALITY = 0;
 export const DED_FREE_INQUIRY = 1;
 export const DED_PEN_BRUSH_AND_VOICE = 2;
 export const DED_EXODUS = 3;
-export const DED_EVENT_SCORE = [1, 1, 1, 2] as const;
+export const DED_TO_ARMS = 4;
+export const DED_DRACONES = 5;
+export const DED_COINAGE = 6;
+export const DED_STEAM = 7;
+export const DED_EVENT_SCORE = [1, 1, 1, 2, 1, 1, 1, 2] as const;
+/** CIV6 (To Arms!, Golden face): "+15% Production towards military units." */
+export const TO_ARMS_MIL_PROD_MULT = 1.15;
+/** CIV6 (Hic Sunt Dracones, dark face): "+3 Era Score each time you discover
+ *  a new Continent or natural wonder" — per-event score on top of the
+ *  catalog's per-kill 1. */
+export const DRACONES_DISCOVERY_SCORE = 3;
+/** CIV6 (Reform the Coinage, Golden face): "International Trade Routes
+ *  provide +3 Gold per specialty district in the foreign city." */
+export const COINAGE_INTL_GOLD_PER_SPEC = 3;
+/** CIV6 (Heartbeat of Steam, Golden face): "+10% Production toward Industrial
+ *  era and later wonders." */
+export const STEAM_WONDER_PROD_MULT = 1.1;
 
 export const DEDICATION_PAYOUTS_LIVE = true;
 

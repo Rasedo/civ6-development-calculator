@@ -126,6 +126,7 @@ class Rules:
     b_regional: torch.Tensor  # bool [NB] — regional building (leaves local sums; delivered by range)
     regional_range: int  # REGIONAL_RANGE (hex distance, source district tile -> receiver center)
     b_worship: torch.Tensor  # bool [NB] — worship building (faith-purchase-only; every production/gold picker skips)
+    b_era: torch.Tensor  # long [NB] — the era the building first unlocks (Heartbeat of Steam's gate)
     b_train_xp: torch.Tensor  # long [NB] — flat training XP a unit trained/purchased in a city holding this Encampment military building starts with (best tier over present buildings; 0 for non-military buildings)
     worship_bidx: list  # the 5 worship rows in WORSHIP_BUILDINGS order (religion id % 5 indexes THIS)
     temple_bidx: int  # TEMPLE row (worship prerequisite), -1 if absent
@@ -207,6 +208,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         regional_range=int(r.get("regionalRange", 6)),
         b_worship=torch.tensor([bool(b.get("worship", 0)) for b in B], dtype=torch.bool),
         b_train_xp=torch.tensor([int(b.get("trainXp", 0)) for b in B], dtype=torch.long),
+        b_era=torch.tensor([int(b.get("eraIdx", 0)) for b in B], dtype=torch.long),
         worship_bidx=r.get("worshipBidx", []),
         temple_bidx=int(r.get("templeBidx", -1)),
         worship_faith_cost=float(r.get("worshipFaithCost", 114)),

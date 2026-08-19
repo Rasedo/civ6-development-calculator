@@ -1018,9 +1018,31 @@ class SimEconomy:
         cen = self.city_center[:, :NSC].clamp(min=0)
         d_all = self.pair_dist[cen.unsqueeze(3), ht.reshape(B, 1, 1, O)].to(torch.long)
         liv = self.city_alive[:, :NSC]
-        add = (d_all <= RANGE.reshape(B, 1, 1, O)) & founded.reshape(B, 1, 1, O) & liv.unsqueeze(3)
+        add = ((d_all <= RANGE.reshape(B, 1, 1, O)) & founded.reshape(B, 1, 1, O) & liv.unsqueeze(3)).long()
+        # CIV6 (Jerusalem's suzerain): "Your cities with Holy Sites exert
+        # pressure as if they were Holy Cities (4x Religion pressure on all
+        # cities within 10 tiles)." Only Holy Cities exert pressure in this
+        # engine, so each completed-unpillaged-Holy-Site city of the suzerain
+        # becomes one more source at the holy city's own rate and range; the
+        # Holy City itself already exerts and is not doubled.
+        if self._suz_c_holy >= 0 and self._hs_idx >= 0:
+            for g in range(O):
+                jm = self._suz_effect(g, self._suz_c_holy) & founded[:, g]
+                if not bool(jm.any()):
+                    continue
+                hs = self.city_dist_tile[:, g, :, self._hs_idx]  # [B, RC]
+                hsc = hs.clamp(min=0)
+                src_ok = (jm.unsqueeze(1) & self.city_alive[:, g] & (hs >= 0)
+                          & self.district_complete.gather(1, hsc) & ~self.district_pillaged.gather(1, hsc)
+                          & (self.city_center[:, g] != self.holy_tile[:, g].unsqueeze(1)))
+                if not bool(src_ok.any()):
+                    continue
+                sc = self.city_center[:, g].clamp(min=0)  # [B, RC] source centres
+                d_g = self.pair_dist[cen.unsqueeze(3), sc.reshape(B, 1, 1, -1)].to(torch.long)
+                within = (d_g <= RANGE[:, g].reshape(B, 1, 1, 1)) & src_ok.reshape(B, 1, 1, -1) & liv.unsqueeze(3)
+                add[:, :, :, g] += within.sum(dim=3)
         self.city_pressure[:, :NSC].copy_(
-            torch.where(liv.unsqueeze(3), self.city_pressure[:, :NSC] + add.long(), torch.zeros_like(self.city_pressure[:, :NSC]))
+            torch.where(liv.unsqueeze(3), self.city_pressure[:, :NSC] + add, torch.zeros_like(self.city_pressure[:, :NSC]))
         )
         tot = self.city_pressure[:, :NSC].sum(dim=3)
         best = self.city_pressure[:, :NSC].argmax(dim=3)                  # ties -> lowest id
@@ -1605,6 +1627,7 @@ class SimEconomy:
         dlive = dcomp & ~self.district_pillaged.gather(1, dflat).reshape_as(dreg)
         hs_adj = None
         fi_adj = None
+        st_adj = None
         for di, dd in enumerate(self.districts_cat):
             yc = int(dd.get("adjYield", -1))
             if yc < 0:
@@ -1617,6 +1640,8 @@ class SimEconomy:
                 hs_adj = add
             elif di == self._commhub_idx or di == self._harbor_idx:
                 fi_adj = add if fi_adj is None else fi_adj + add
+            elif di == self._campus_idx:
+                st_adj = add
         if fol_live and hs_adj is not None:
             dist_y[:, :, 1] = dist_y[:, :, 1] + hs_adj * self._fol_tab("we", fol_id)
         # CIV6 (GS Civilopedia, Free Inquiry, Golden face): "Commercial Hub and
@@ -1625,6 +1650,12 @@ class SimEconomy:
             _fi = self._golden_ded(row, self._ded_free_inquiry)
             if bool(_fi.any()):
                 dist_y[:, :, 3] = dist_y[:, :, 3] + fi_adj * _fi.double().unsqueeze(1)
+        # CIV6 (Heartbeat of Steam, Golden face): "Campus district's Science
+        # adjacency bonus provides Production as well."
+        if st_adj is not None:
+            _st = self._golden_ded(row, self._ded_steam)
+            if bool(_st.any()):
+                dist_y[:, :, 1] = dist_y[:, :, 1] + st_adj * _st.double().unsqueeze(1)
 
         bld_y = self._palace_y.double().reshape(1, 1, 6) * is_cap.unsqueeze(2)
         selb = bldg & ~self._bldg_dark(dreg) & ~self._b_regional.reshape(1, 1, -1)
@@ -1672,6 +1703,14 @@ class SimEconomy:
         if bool(_pb.any()):
             bld_y[:, :, 4] = bld_y[:, :, 4] + _pb.double().unsqueeze(1) * self._district_counts(row)[1][:, sl].double() * alivef
         bld_y[:, :, 5] = bld_y[:, :, 5] + self._relic_faith * self.city_relics[:, row, sl].double() * alivef
+        # CIV6 (Anshan's suzerain): "+2 Science from each Great Work of
+        # Writing. +1 Science from each Relic and Artifact."
+        _ans = self._suz_effect(row, self._suz_c_works)
+        if bool(_ans.any()):
+            bld_y[:, :, 3] = bld_y[:, :, 3] + _ans.double().unsqueeze(1) * (
+                self._suz_writing_sci * self.city_gw_writing[:, row, sl].double()
+                + self._suz_relic_sci * (self.city_relics[:, row, sl] + self.city_artifacts[:, row, sl]).double()
+            ) * alivef
 
         # ================= bucket 4: CITIZENS ===============================
         # THE non-dyadic term (CITIZEN_CULTURE = 0.3), so its POSITION is the

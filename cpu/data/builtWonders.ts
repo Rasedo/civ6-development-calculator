@@ -295,3 +295,17 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     }),
   ].map((w) => [w.id, w]),
 );
+
+/** the ERA a wonder first becomes available — its unlock's era index. */
+import { TECHS, ERAS } from './techs';
+import { CIVICS } from './civics';
+export const WONDER_ERA_INDEX: Record<string, number> = Object.fromEntries(
+  Object.values(BUILT_WONDERS).map((w) => [
+    w.id,
+    w.requiresTech
+      ? Math.max(0, ERAS.indexOf(TECHS[w.requiresTech]?.era))
+      : w.requiresCivic
+        ? Math.max(0, ERAS.indexOf(CIVICS[w.requiresCivic]?.era))
+        : 0,
+  ]),
+);

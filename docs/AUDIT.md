@@ -50,16 +50,16 @@ nothing carries forward.
 |---|---|---|
 | **A. Engine vs engine** | **0** | |
 | B-20r tourism tails | 7 | national parks, civ Archaeologists, theming, shipwrecks, digs |
-| B-21r suzerain rows | 3 | 10 descoped channels, each needing its own mechanic |
+| B-21r suzerain rows | 1 | the residual descoped rows all need whole absent systems |
 | B-22r World Congress | 6 | one resolution type of many; emergencies and competitions absent |
-| B-24r Ages/governors | 2 | eight dedication catalog entries, dark-age policies, governor promotions, per-civ era drift |
+| B-24r Ages/governors | 2 | four system-less dedication entries, dark-age policies, governor promotions, per-civ era drift |
 | B-30r specialists | 6 | a mechanic neither engine has: wire column, assignment, yields |
 | B-31r trade-route tails | 6 | a Trader UNIT and a route wire verb |
 | B-D unsourced data values | 5 | a residual CLASS: every invented magnitude, re-sourced |
 | B-35r theological damage | 1 | deterministic and LINEAR where real Civ 6 rolls; the martyr draw shows a mirrored conditional draw is available |
 | B-34r flood tails | 1 | GS floods also damage UNITS and kill citizens, and a centre on a floodplain loses HP; and the Dam/Great Bath that mitigates a river is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **37** | |
-| **OPEN, TOTAL** | **37** | |
+| **B. Fidelity vs real Civ 6** | **35** | |
+| **OPEN, TOTAL** | **35** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -115,11 +115,14 @@ Civ 6 source or is recorded as unverifiable.
   (mean 1.3) against a domestic peak of 67, putting the culture
   victory ~11x out of reach. Re-measure before
   quoting it — every round since has moved the economy.
-- **B-21r. City-state suzerain rows:** 14 shipped (`CITY_STATE_SUZERAIN_LIVE`)
-  / 10 descoped, each carrying its reason in its `CITY_STATES` catalog entry's
-  `note` — unit-XP, cavalry, apostle-promotion, trade-route, power and
-  amenities channels. Shipped rows degrade %-scaling and conditionals to a
-  flat channel yield.
+- **B-21r. City-state suzerain rows:** six perks are RULES (`SuzEffect`,
+  both engines): Kabul double attack XP, Preslav cavalry-on-hills CS, Mexico
+  City/Toronto regional reach, Anshan works science, Kumasi per-specialty
+  route yields, Jerusalem Holy-Site pressure. The remaining catalog rows carry
+  their reason in their `CITY_STATE_SUZERAIN_BONUS` entry's `note`: whole
+  absent systems (POWER, trading posts, route PATHS, unit promotions, unique
+  improvements/luxuries, a faith-purchase class, random-Inspiration draws) or
+  a flat channel standing in for a %-scaling.
 - **B-22r. World Congress tails:** one resolution type only (real GS
   rotates many); Emergencies and Scored Competitions — the main real
   DVP sources — are unmodeled (awarding via the resolution winner is
@@ -127,16 +130,21 @@ Civ 6 source or is recorded as unverifiable.
   (no vote-size chooser on any seat); peace deals carry no terms; the
   favor PENALTIES (CO2, global grievances, occupied capitals) are
   named by sources without rates — recorded, not invented.
-- **B-24r. Ages/governors tails:** the eight unmodeled dedication
-  catalog entries (To Arms!, Hic Sunt Dracones, Reform the Coinage,
-  Heartbeat of Steam, plus four needing spies / air units / artifact
-  systems / GDRs — each needs BOTH faces sourced and hooked, and any
-  catalog growth reshuffles every round-robin pick); dark-age
-  policies; governor PROMOTIONS (the 5-turn establishment clock gates
-  only promotions — the +8 loyalty is by-assignment in real R&F,
-  sourced, so the stateless greedy ranking is faithful for the one
-  governor channel modeled); per-civ tech-era drift (eras are global
-  50-turn blocks).
+- **B-24r. Ages/governors tails:** the DEDICATION catalog now holds eight,
+  both faces sourced and hooked for the four addable ones (To Arms!, Hic Sunt
+  Dracones, Reform the Coinage, Heartbeat of Steam); residuals: the four
+  entries needing spies / air units / GDRs / seaside-resort tourism (both
+  faces), the per-era availability windows (the Civilopedia publishes only
+  Automaton Warfare's), To Arms!'s special Casus Belli (no denouncements),
+  and the corps/army kill event (no formations — a faithful zero, like Civ 6
+  before Nationalism). Also open: dark-age policies; governor PROMOTIONS, blocked on
+  governor IDENTITY — a promotion attaches to a NAMED governor persisted in
+  one city, needing assignment state and the establishment clock, where
+  titles here are anonymous per-turn seats (the 5-turn clock gates only
+  promotions — the +8 loyalty is by-assignment in real R&F, sourced, so the
+  stateless greedy ranking is faithful for the one channel modeled); per-civ
+  tech-era drift
+  (eras are global 50-turn blocks).
 - **B-35r. Theological damage is deterministic and LINEAR.** Real Civ 6
   rolls; `theologicalCombatPhase` / `_theological_combat_phase` take
   theoBaseDamage plus theoDamage x the religious-strength difference with no

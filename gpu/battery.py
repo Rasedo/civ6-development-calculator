@@ -185,6 +185,8 @@ def main() -> int:
                 ("flood_district", [py, "tests/gpu/flood_district_test.py"], 2),  # a flood pillages the district on the floodplain
                 ("martyr", [py, "tests/gpu/martyr_test.py"], 2),  # one relic in nine apostle deaths, drawn where TS draws
                 ("barb_camps", [py, "tests/gpu/barb_camps_test.py"], 2),  # a camp's class is its ground; ranged is nobody's class
+                ("suzerain_rules", [py, "tests/gpu/suzerain_rules_test.py"], 2),  # the six suz-coded perks, strict-suzerain-only
+                ("dedications", [py, "tests/gpu/dedications_test.py"], 2),  # both faces of the four new catalog entries
                 ("civ_pair_strike", [py, "tests/gpu/civ_pair_strike_test.py"], 2),  # a civ city fires on an enemy civ
                 ("spawn_reclaim", [py, "tests/gpu/spawn_reclaim_test.py"], 2),  # a reclaimed slot hands on no drowned unit's MP
                 ("centre_defence", [py, "tests/gpu/centre_defence_test.py"], 2),  # a centre is attacked as the CITY

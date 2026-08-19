@@ -5,6 +5,8 @@ import { tilesWithin, hexDistance } from '../../world/hex';
 import { nextRandom } from './rand';
 import { isWater, isImpassable } from '../../world/query';
 import { TECHS } from '../data/techs';
+import { dedicationEvent } from './eras';
+import { DED_DRACONES, DRACONES_DISCOVERY_SCORE } from '../data/seats';
 
 export const SIGHT_RANGE = 2;
 
@@ -32,9 +34,15 @@ export function revealAround(
   if (!s) return;
   if (s.explored.length === 0) s.explored = new Array(state.map.tiles.length).fill(0);
   const t = state.map.tiles[tileIndex];
+  let found = 0;
   for (const n of tilesWithin(state.map, t.col, t.row, radius)) {
+    if (s.explored[n.index] !== 1 && n.wonder) found++;
     s.explored[n.index] = 1;
   }
+  // CIV6 (Hic Sunt Dracones, dark face): "+3 Era Score each time you discover
+  // a new Continent or natural wonder" — one continent here, so wonders are
+  // the whole event.
+  if (found > 0) dedicationEvent(state, seat, DED_DRACONES, DRACONES_DISCOVERY_SCORE * found);
 }
 
 export function unexploredByAll(state: GameState, tileIndex: number): boolean {

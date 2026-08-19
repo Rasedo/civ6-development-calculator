@@ -99,3 +99,23 @@ export function buildingsForDistrict(district: DistrictId): BuildingDef[] {
 }
 
 export const SCRIPTED_HELD_BUILDINGS: ReadonlySet<string> = new Set();
+
+/** the ERA a building first becomes available — the era index of the tech or
+ *  civic that unlocks it (0 = unlocked from the start). Heartbeat of Steam's
+ *  "Industrial or later building" gate reads this. */
+import { TECHS, ERAS } from './techs';
+import { CIVICS } from './civics';
+export const BUILDING_ERA_INDEX: Record<string, number> = (() => {
+  const out: Record<string, number> = {};
+  for (const t of Object.values(TECHS)) {
+    for (const fx of t.effects ?? []) {
+      if (fx.kind === 'unlockBuilding') out[fx.building] = Math.max(0, ERAS.indexOf(t.era));
+    }
+  }
+  for (const c of Object.values(CIVICS)) {
+    for (const fx of c.effects ?? []) {
+      if (fx.kind === 'unlockBuilding') out[fx.building] = Math.max(0, ERAS.indexOf(c.era));
+    }
+  }
+  return out;
+})();

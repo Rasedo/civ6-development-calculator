@@ -10,7 +10,8 @@ import { PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/seats';
 import { TERRAINS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_BUILDINGS, CITY_STATE_NAMES, CITY_STATE_MAX_HP, CITY_STATE_CAPITAL_BONUS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_LIVE, CITY_STATE_SUZERAIN_YIELD, SUZERAIN_ENVOYS, CITY_STATE_TYPE_DISTRICT } from '../data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_BUILDINGS, CITY_STATE_NAMES, CITY_STATE_MAX_HP, CITY_STATE_CAPITAL_BONUS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_LIVE, CITY_STATE_SUZERAIN_YIELD, SUZERAIN_ENVOYS, CITY_STATE_TYPE_DISTRICT } from '../data/cityStates';
+import { REGIONAL_RANGE } from '../data/constants';
 import { warWearinessPeace } from './weariness';
 
 const ok: RuleResult = { ok: true };
@@ -126,6 +127,26 @@ export function isSuzerain(cityState: CityState, seat: number): boolean {
   const mine = envoysOf(cityState, seat);
   if (mine < SUZERAIN_ENVOYS) return false;
   return Object.entries(cityState.envoys).every(([k, e]) => Number(k) === seat || mine > (e ?? 0));
+}
+
+/**
+ * Does `seat` hold a suzerain whose perk is the RULE `effect`? The perks that
+ * are rules rather than flat capital yields carry a `suz` code in
+ * CITY_STATE_SUZERAIN_BONUS; every rule site asks this one question.
+ */
+export function suzerainEffect(state: GameState, seat: number, effect: SuzEffect): boolean {
+  for (const cityState of state.cityStates ?? []) {
+    if (!isSuzerain(cityState, seat)) continue;
+    if (CITY_STATE_SUZERAIN_BONUS[cityState.name]?.suz === effect) return true;
+  }
+  return false;
+}
+
+/** CIV 6, Mexico City's suzerain (Toronto in rulesets without Canada):
+ *  "Regional effects from your Industrial Zone, Water Park, and Entertainment
+ *  Complex districts reach 3 tiles farther." */
+export function regionalReach(state: GameState, seat: number): number {
+  return REGIONAL_RANGE + (suzerainEffect(state, seat, 'regionalReach') ? REGIONAL_REACH_BONUS : 0);
 }
 
 export function cityStateTradeCapacityBonus(state: GameState, seat: number): number {

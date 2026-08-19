@@ -538,7 +538,24 @@ class SimMasks:
         if not self.fog_of_war or rows.numel() == 0:
             return
         disk = self.pair_dist[tiles.clamp(min=0)] <= radius
+        new = disk & ~self.seat_explored[rows, seat_row]
         self.seat_explored[rows, seat_row] |= disk
+        # CIV6 (Hic Sunt Dracones, dark face): "+3 Era Score each time you
+        # discover a new Continent or natural wonder" — one continent here,
+        # so wonders are the whole event.
+        cnt = (new & self.nwonder[rows]).sum(dim=1) * self._dracones_disc
+        if bool((cnt > 0).any()):
+            full = torch.zeros(self.B, dtype=torch.long, device=self.device)
+            if isinstance(seat_row, int):
+                full.index_add_(0, rows, cnt)
+                self._dedication_event(seat_row, self._ded_dracones, full)
+            else:
+                for g in range(self.n_majors):
+                    m = seat_row == g
+                    if bool(m.any()):
+                        full.zero_()
+                        full.index_add_(0, rows[m], cnt[m])
+                        self._dedication_event(g, self._ded_dracones, full)
 
     def _explored_at(self, seat_row, tiles: torch.Tensor) -> torch.Tensor:
         if not self.fog_of_war:
@@ -709,6 +726,12 @@ class SimMasks:
                 continue
             holds = self._golden_ded_table(kind).gather(1, civ)
             out = torch.where(civ_ok & tsel & holds, torch.full_like(out, self._golden_move), out)
+        # CIV6 (Hic Sunt Dracones, Golden face): "+2 Movement for naval and
+        # embarked units."
+        emb = getattr(self, f"{pre}_unit_emb", None)
+        nsel = self.unit_naval[typ] if emb is None else (self.unit_naval[typ] | emb)
+        holds_d = self._golden_ded_table(self._ded_dracones).gather(1, civ)
+        out = torch.where(civ_ok & nsel & holds_d, torch.full_like(out, self._golden_move), out)
         return out
 
     def _golden_ded(self, civ, kind: int) -> torch.Tensor:

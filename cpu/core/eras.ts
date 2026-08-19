@@ -1,5 +1,7 @@
 import type { GameState } from './types';
-import { seatOf, isBarbSeat } from './seats';
+import { seatOf, isBarbSeat, isCiv } from './seats';
+import { UNITS } from '../data/units';
+import { DED_DRACONES } from '../data/seats';
 import { DEDICATIONS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/seats';
 
 
@@ -59,14 +61,23 @@ export function eraBoundary(state: GameState): void {
  * twice. Zero-draw, integer-only; both engines call this at the same event
  * sites.
  */
-export function dedicationEvent(state: GameState, civ: number, kind: number): void {
-  if (!DEDICATION_PAYOUTS_LIVE) return;
+export function dedicationEvent(state: GameState, civ: number, kind: number, events = 1): void {
+  if (!DEDICATION_PAYOUTS_LIVE || events <= 0) return;
   if (((seatOf(state, civ)?.age ?? 1)) === 2) return; // a GOLDEN age takes bonuses, not era score
   const picks = seatOf(state, civ)?.dedicationPicks;
   if (!picks) return;
   let n = 0;
   for (const p of picks) if (p === kind) n++;
-  if (n > 0) addEraScore(state, civ, n * DED_EVENT_SCORE[kind]);
+  if (n > 0) addEraScore(state, civ, events * n * DED_EVENT_SCORE[kind]);
+}
+
+/** CIV6 (Hic Sunt Dracones, dark face): "+1 Era Score each time you kill a
+ *  non-Barbarian naval unit in combat." The killer must be a MAJOR — a
+ *  city-state or a camp that lands the blow holds no dedications. */
+export function navalKillEvent(state: GameState, killerSeat: number, victim: { type: string; seat: number }): void {
+  if (!isCiv(killerSeat) || isBarbSeat(victim.seat)) return;
+  if (!UNITS[victim.type]?.naval) return;
+  dedicationEvent(state, killerSeat, DED_DRACONES);
 }
 
 export function isHeroicAge(state: GameState, civ: number): boolean {
@@ -112,13 +123,18 @@ export function goldenDedication(state: GameState, civ: number, kind: number): b
  * one reset rule and one step contract, so the bonus has exactly one place to
  * live on each side.
  */
-export function goldenMoveBonus(state: GameState, unit: { type: string; seat: number }): number {
+export function goldenMoveBonus(state: GameState, unit: { type: string; seat: number; embarked?: boolean }): number {
   const civ = isBarbSeat(unit.seat) ? -1 : unit.seat; // barbarians hold no dedications
   if (unit.type === 'BUILDER') {
     return goldenDedication(state, civ, DED_MONUMENTALITY) ? GOLDEN_MOVE_BONUS : 0;
   }
   if (unit.type === 'MISSIONARY' || unit.type === 'APOSTLE') {
     return goldenDedication(state, civ, DED_EXODUS) ? GOLDEN_MOVE_BONUS : 0;
+  }
+  /* CIV6 (Hic Sunt Dracones, Golden face): "+2 Movement for naval and
+     embarked units." */
+  if (UNITS[unit.type]?.naval || unit.embarked) {
+    return goldenDedication(state, civ, DED_DRACONES) ? GOLDEN_MOVE_BONUS : 0;
   }
   return 0;
 }

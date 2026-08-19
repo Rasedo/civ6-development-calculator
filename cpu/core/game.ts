@@ -13,7 +13,7 @@ import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, builderCost, sett
 import { barbarianPhase, encampmentTrainXp } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
-import { placeCityStates, cityStatePhase } from './cityStates';
+import { placeCityStates, cityStatePhase, suzerainEffect } from './cityStates';
 import { placeSeats, seatPhase, worldCongress, nextCityName } from './phase';
 import { commitProduction, commitResearch } from './seatTurn';
 import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY } from '../data/seats';
@@ -32,6 +32,9 @@ import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { BARB_SEAT, allCities, allSeats, citiesOf, emptySeat, seatOf, seatOfCityState, setTileOwner, tileClaimed, unitSeat } from './seats';
+import { DED_STEAM } from '../data/seats';
+import { BUILDING_ERA_INDEX } from '../data/buildings';
+import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 
 export const TURN_LIMIT = 250;
 
@@ -451,6 +454,7 @@ export function purchaseBuilding(state: GameState, cityId: number, buildingId: s
     }
   }
   city.buildings.push(buildingId);
+  if ((BUILDING_ERA_INDEX[buildingId] ?? 0) >= INDUSTRIAL_ERA_INDEX) dedicationEvent(state, city.seat, DED_STEAM);
   if (buildingId === 'ANCIENT_WALLS') city.outerHp = WALLS_HP;
   return { ok: true };
 }
@@ -1044,12 +1048,28 @@ function theologicalCombatPhase(state: GameState): void {
 
 function spreadReligiousPressure(state: GameState): void {
   const nRel = state.seats.length;
-  const holy: number[] = new Array(nRel).fill(-1);
+  const sources: number[][] = state.seats.map(() => []);
   for (const sx of state.seats) {
     const r = sx.religion;
-    if (r.founded && r.holyTile != null && r.holyTile >= 0) holy[sx.seat] = r.holyTile;
+    if (r.founded && r.holyTile != null && r.holyTile >= 0) sources[sx.seat].push(r.holyTile);
   }
-  if (!holy.some((h) => h >= 0)) return; // no religion exists yet — nothing to spread
+  if (!sources.some((src) => src.length > 0)) return; // no religion exists yet — nothing to spread
+  /* CIV6 (Jerusalem's suzerain): "Your cities with Holy Sites exert pressure
+   * as if they were Holy Cities (4x Religion pressure on all cities within 10
+   * tiles)." Only Holy Cities exert pressure in this engine, so each
+   * completed-Holy-Site city becomes one more source at the holy city's own
+   * rate and range. */
+  for (const sx of state.seats) {
+    if (sources[sx.seat].length === 0) continue; // the perk spreads a religion, so it needs one
+    if (!suzerainEffect(state, sx.seat, 'holySitePressure')) continue;
+    for (const city of sx.cities) {
+      if (city.centerIndex === sources[sx.seat][0]) continue; // the Holy City already exerts
+      const hs = city.districts.find((d) => d.type === 'HOLY_SITE');
+      if (!hs) continue;
+      const ht = state.map.tiles[hs.tileIndex];
+      if (ht.districtComplete && !ht.districtPillaged) sources[sx.seat].push(city.centerIndex);
+    }
+  }
   const range: number[] = new Array(nRel).fill(RELIGION_PRESSURE_RANGE);
   for (const sx of state.seats) {
     const eb = sx.religion.enhancer;
@@ -1066,10 +1086,11 @@ function spreadReligiousPressure(state: GameState): void {
     }
     const cc = tiles[city.centerIndex];
     for (let g = 0; g < nRel; g++) {
-      if (holy[g] < 0) continue;
-      const h = tiles[holy[g]];
-      if (hexDistance(cc.col, cc.row, h.col, h.row) <= range[g]) {
-        pres[g] += RELIGION_PRESSURE_PER_TURN;
+      for (const src of sources[g]) {
+        const h = tiles[src];
+        if (hexDistance(cc.col, cc.row, h.col, h.row) <= range[g]) {
+          pres[g] += RELIGION_PRESSURE_PER_TURN;
+        }
       }
     }
     let best = -1;

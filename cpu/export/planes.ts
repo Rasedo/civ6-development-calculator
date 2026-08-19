@@ -26,7 +26,7 @@ import { TERRAINS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { PLACEABLE_DISTRICTS } from '../data/districts';
-import { CITY_STATE_TYPES, CITY_STATE_SUZERAIN_LIVE } from '../data/cityStates';
+import { CITY_STATE_TYPES, CITY_STATE_SUZERAIN_LIVE, CITY_STATE_SUZERAIN_BONUS, SUZ_EFFECTS } from '../data/cityStates';
 import { HOUSING_COASTAL, HOUSING_FRESH_WATER, HOUSING_NO_WATER } from '../data/constants';
 import { IMPROVEMENT_IDS } from '../core/unitActions';
 import { LUXURY_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, featIdx, wonderStaticOk, staticAdjRaw, featureAdjContribution, chopKeyCode, chopUnlockTech } from './catalog';
@@ -37,12 +37,17 @@ export function buildFixture(state: GameState, world: WorldFile): object {
   // any seat's research, and the GPU applies each row's own on top.
   const ctx = baseYieldCtx(state);
 
+  const suzCodeOf = (name: string): number => {
+    const rule = CITY_STATE_SUZERAIN_BONUS[name]?.suz;
+    return rule ? SUZ_EFFECTS.indexOf(rule) : -1;
+  };
   const cityStateAtStart = state.cityStates.map((cityState) => ({
     id: cityState.id,
     type: CITY_STATE_TYPES.indexOf(cityState.type),
     center: cityState.centerIndex,
     pop: 3,
     suzKey: CITY_STATE_SUZERAIN_LIVE[cityState.name] ? YIELD_KEYS.indexOf(CITY_STATE_SUZERAIN_LIVE[cityState.name]) : -1,
+    suzCode: suzCodeOf(cityState.name),
   }));
 
   const unitRosterIdx = new Map(Object.values(UNITS).map((u, i) => [u.id, i]));

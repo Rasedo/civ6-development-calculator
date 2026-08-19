@@ -49,6 +49,11 @@ import { addEraScore, agePressureFactor, governorPicks, governorTitles, goldenBo
 import { NO_SEAT, atWarWithAny, citiesOf, civHasStrategic, civsAtWar, emptySeat, isCiv, prophetsOf, seatOf, seatOfCityState, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, spreadFromUnit } from './unitOrders';
+import { navalKillEvent, dedicationEvent, goldenDedication } from './eras';
+import { DED_COINAGE, DED_TO_ARMS, DED_STEAM, TO_ARMS_MIL_PROD_MULT, STEAM_WONDER_PROD_MULT } from '../data/seats';
+import { WONDER_ERA_INDEX } from '../data/builtWonders';
+import { BUILDING_ERA_INDEX } from '../data/buildings';
+import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -1096,6 +1101,7 @@ export function seatPhase(state: GameState): void {
               if (Math.round((actor.treasury ?? 0) * 1000) >= Math.round((price + reserve) * 1000)) {
                 actor.treasury = (actor.treasury ?? 0) - price;
                 civCity.buildings.push(def.id);
+                if ((BUILDING_ERA_INDEX[def.id] ?? 0) >= INDUSTRIAL_ERA_INDEX) dedicationEvent(state, civCity.seat, DED_STEAM);
                 if (def.id === 'ANCIENT_WALLS') civCity.outerHp = WALLS_HP;
                 bought = true;
               }
@@ -1243,6 +1249,11 @@ export function seatPhase(state: GameState): void {
           if (fromRc && destIdx >= 0) layTradeRoad(state, fromRc.centerIndex, destIdx);
         }
       }
+      // CIV6 (Reform the Coinage, dark face): "+1 Era Score each time you
+      // successfully complete a Trade Route" — completion is the term running
+      // out, never a route cut short by a dead destination.
+      const _completedRoutes = routes.filter((x) => x.expiresTurn !== undefined && x.expiresTurn <= state.turn).length;
+      if (_completedRoutes > 0) dedicationEvent(state, actor.seat, DED_COINAGE, _completedRoutes);
       actor.tradeRoutes = routes.filter(
         (x) =>
           (x.expiresTurn === undefined || x.expiresTurn > state.turn) &&
@@ -1299,7 +1310,13 @@ export function seatPhase(state: GameState): void {
         // `game.ts` has always applied to the seat 0's queue head and the
         // seat's add never did. A seat that adopts the government owns
         // its effects; the multiplier keys on the ITEM, not on the seat.
-        const _em = isEncampmentItem(q) ? seatMods.encampmentProdMult : 1;
+        let _em = isEncampmentItem(q) ? seatMods.encampmentProdMult : 1;
+        // CIV6 (To Arms!, Golden face): "+15% Production towards military
+        // units." (Heartbeat of Steam, Golden face): "+10% Production toward
+        // Industrial era and later wonders." The three item classes are
+        // disjoint, so the multiplier order is association-free.
+        if (q.kind === 'unit' && unitDomain(q.unit) === 'military' && goldenDedication(state, civCity.seat, DED_TO_ARMS)) _em *= TO_ARMS_MIL_PROD_MULT;
+        if (q.kind === 'wonder' && (WONDER_ERA_INDEX[q.wonder] ?? 0) >= INDUSTRIAL_ERA_INDEX && goldenDedication(state, civCity.seat, DED_STEAM)) _em *= STEAM_WONDER_PROD_MULT;
         q.progress += production * _em;
         // Pay in the bank, exactly where the seat 0's endTurn does
         // (game.ts, right after the production add). Without this the field
@@ -1386,7 +1403,10 @@ export function seatPhase(state: GameState): void {
             { dDied: defender.hp <= 0, city: true });
           // The STRIKER is the city, so the dig's era gate is its owner's —
           // the GPU passes `striker_row` at the same site.
-          if (defender.hp <= 0) killUnit(state, defender, civCity.seat);
+          if (defender.hp <= 0) {
+            navalKillEvent(state, civCity.seat, defender);
+            killUnit(state, defender, civCity.seat);
+          }
         }
       }
       if (civCity.districts.some((dd) => encampmentIntact(state.map.tiles[dd.tileIndex]))) {
@@ -1421,7 +1441,10 @@ export function seatPhase(state: GameState): void {
             { dDied: defender.hp <= 0, city: true });
           // The STRIKER is the city, so the dig's era gate is its owner's —
           // the GPU passes `striker_row` at the same site.
-          if (defender.hp <= 0) killUnit(state, defender, civCity.seat);
+          if (defender.hp <= 0) {
+            navalKillEvent(state, civCity.seat, defender);
+            killUnit(state, defender, civCity.seat);
+          }
         }
       }
       const besieged = neighbors(state.map, civCityCenter).some((n) =>

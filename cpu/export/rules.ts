@@ -14,6 +14,7 @@ import { IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
 import type { ImprovementId } from '../core/types';
 import { GENERAL_AURA_CS, GENERAL_AURA_RANGE, BARB_SCOUT_OPENER_LIVE } from '../core/combat';
 import { GENERAL_AURA_MP } from '../core/aura';
+import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_HILL_CS, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD } from '../data/cityStates';
 import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_BUILDINGS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_YIELD, CITY_STATE_MAX_HP, CITY_STATE_MEET_RANGE, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_CULTURE, ARTIFACT_TOURISM } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, MARTYR_CHANCE, type BeliefEffects } from '../data/religion';
@@ -47,6 +48,9 @@ import { IMPROVEMENT_IDS } from '../core/unitActions'; // ONE roster, core-owned
 
  
 import { techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, RESOURCE_IDS, BUILT_WONDER_LIST } from './catalog';
+import { DED_TO_ARMS, DED_DRACONES, DED_COINAGE, DED_STEAM, TO_ARMS_MIL_PROD_MULT, DRACONES_DISCOVERY_SCORE, COINAGE_INTL_GOLD_PER_SPEC, STEAM_WONDER_PROD_MULT } from '../data/seats';
+import { BUILDING_ERA_INDEX } from '../data/buildings';
+import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 
 /** The REAL settler rule now: a 1-pop city may not train or buy one.
  *  Exported to the GPU as scenario.settlerPopGate. */
@@ -231,7 +235,7 @@ export function buildRules() {
       agePressure: AGE_PRESSURE,
       govCivicsPerTitle: GOV_CIVICS_PER_TITLE,
       govMaxTitles: GOV_MAX_TITLES,
-      allyMinPeace: ALLY_MIN_PEACE, warmongerDow: WARMONGER_DOW, warmongerCapture: WARMONGER_CAPTURE, warmongerGang: WARMONGER_GANG, diplomaticFavorPerSuzerain: DIPLO_FAVOR_PER_SUZERAIN, congressInterval: CONGRESS_INTERVAL, congressMinEra: CONGRESS_MIN_ERA, dvpPerResolution: DVP_PER_RESOLUTION, diploVictoryPoints: DIPLO_VICTORY_POINTS, dedicationPayoutsLive: DEDICATION_PAYOUTS_LIVE, dedMonumentality: DED_MONUMENTALITY, dedFreeInquiry: DED_FREE_INQUIRY, dedPenBrush: DED_PEN_BRUSH_AND_VOICE, dedExodus: DED_EXODUS, heroicDedications: HEROIC_DEDICATIONS, dedEventScore: [...DED_EVENT_SCORE], goldenMoveBonus: GOLDEN_MOVE_BONUS, governorLoyalty: GOVERNOR_LOYALTY,
+      allyMinPeace: ALLY_MIN_PEACE, warmongerDow: WARMONGER_DOW, warmongerCapture: WARMONGER_CAPTURE, warmongerGang: WARMONGER_GANG, diplomaticFavorPerSuzerain: DIPLO_FAVOR_PER_SUZERAIN, congressInterval: CONGRESS_INTERVAL, congressMinEra: CONGRESS_MIN_ERA, dvpPerResolution: DVP_PER_RESOLUTION, diploVictoryPoints: DIPLO_VICTORY_POINTS, dedicationPayoutsLive: DEDICATION_PAYOUTS_LIVE, dedMonumentality: DED_MONUMENTALITY, dedFreeInquiry: DED_FREE_INQUIRY, dedPenBrush: DED_PEN_BRUSH_AND_VOICE, dedExodus: DED_EXODUS, heroicDedications: HEROIC_DEDICATIONS, dedEventScore: [...DED_EVENT_SCORE], goldenMoveBonus: GOLDEN_MOVE_BONUS, governorLoyalty: GOVERNOR_LOYALTY, dedToArms: DED_TO_ARMS, dedDracones: DED_DRACONES, dedCoinage: DED_COINAGE, dedSteam: DED_STEAM, toArmsMilProd: TO_ARMS_MIL_PROD_MULT, draconesDiscoveryScore: DRACONES_DISCOVERY_SCORE, coinageIntlGoldPerSpec: COINAGE_INTL_GOLD_PER_SPEC, steamWonderProd: STEAM_WONDER_PROD_MULT, industrialEra: INDUSTRIAL_ERA_INDEX,
     },
     boosts: boostRows,
     cityState: {
@@ -251,6 +255,18 @@ export function buildRules() {
       typeB1Idx: CITY_STATE_TYPES.map((t) => buildingIdx.get(CITY_STATE_TYPE_BUILDINGS[t][0]) ?? -1),
       typeB2Idx: CITY_STATE_TYPES.map((t) => buildingIdx.get(CITY_STATE_TYPE_BUILDINGS[t][1]) ?? -1),
       suzerainYield: CITY_STATE_SUZERAIN_YIELD,
+      // Suzerain perks modeled as RULES — `effects` is the code order the
+      // per-CS `suzCode` plane indexes.
+      suz: {
+        effects: SUZ_EFFECTS,
+        xpMult: KABUL_XP_MULT,
+        hillCs: PRESLAV_HILL_CS,
+        reachBonus: REGIONAL_REACH_BONUS,
+        writingScience: ANSHAN_WRITING_SCIENCE,
+        relicScience: ANSHAN_RELIC_SCIENCE,
+        routeCulture: KUMASI_ROUTE_CULTURE,
+        routeGold: KUMASI_ROUTE_GOLD,
+      },
       // CIV-SEAT levy — a militaristic CS's suzerain (a civ seat) at war
       // spawns levyUnits units at levyGoldCost off its treasury, levyCooldown
       // per CS shared across seats. (Seat-0 levy is UI-only, absent from the
@@ -521,6 +537,7 @@ export function buildRules() {
       rangedRange: u.ranged?.range ?? 0,
       moves: u.moves,
       naval: u.naval ? 1 : 0,
+      cavalry: u.cavalry ? 1 : 0, // Preslav's hill bonus keys on the class
       // faith-purchase-only (MISSIONARY) — the trainableUnits filter's
       // mirror; masks the type out of the GPU purchase path.
       fo: u.faithOnly ? 1 : 0,
@@ -627,6 +644,7 @@ export function buildRules() {
       river: b.special === 'WATER_MILL',
       farmBonusFood: b.special === 'WATER_MILL',
       unlockTech: buildingUnlockTech.get(b.id) ?? -1,
+      eraIdx: BUILDING_ERA_INDEX[b.id] ?? 0,
       unlockCivic: buildingUnlockCivic.get(b.id) ?? -1,
       reqDistrict: b.district === 'CITY_CENTER' ? -1 : PLACEABLE_DISTRICTS.indexOf(b.district),
       reqBuildings: (b.requiresAny ?? []).map((id) => buildingIdx.get(id) ?? -1).filter((i) => i >= 0),

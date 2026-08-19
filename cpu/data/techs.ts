@@ -16,6 +16,7 @@ export type Era =
 /** ERAS index of 'Modern' — antiquity sites stop being created
  *  once the world reaches it (real Civ 6). Derived below, not hardcoded. */
 export const MODERN_ERA_INDEX = 5;
+export const INDUSTRIAL_ERA_INDEX = 4;
 
 export const ERAS: Era[] = [
   'Ancient',

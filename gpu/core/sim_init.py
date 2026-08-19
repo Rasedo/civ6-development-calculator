@@ -160,6 +160,7 @@ class SimInit:
         self.citystate_pop = self.city_pop[:, _m0:_m0 + s_pad, 0]
         self.register_alias("citystate_pop", lambda sim: sim.city_pop[:, sim._CITY_MINOR0:sim._CITY_MINOR0 + max(sim.S, 1), 0])
         self.citystate_suz_key = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
+        self.citystate_suz_code = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         for b, f in enumerate(fixtures):
             for s, cs in enumerate(f.get("cityStates", [])):
                 self.citystate_alive[b, s] = True
@@ -167,6 +168,7 @@ class SimInit:
                 self.citystate_center[b, s] = cs["center"]
                 self.citystate_pop[b, s] = cs["pop"]
                 self.citystate_suz_key[b, s] = cs.get("suzKey", -1)
+                self.citystate_suz_code[b, s] = cs.get("suzCode", -1)
         # A city-state's tile ownership lives in `tile_seat` (seeded below off
         # the wire's `ownerSeatInit` plane); `citystate_at` is a derived view.
         # The (seat, city-state) relations live on `seat_citystate_*`
@@ -211,6 +213,23 @@ class SimInit:
         self._citystate_b1idx = torch.tensor(citystate_b1, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S]
         self._citystate_b2idx = torch.tensor(citystate_b2, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S]
         self._citystate_suz_amt = float(rules.citystate.get("suzerainYield", 3))  # flat suzerain capital-yield amount
+        # Suzerain perks modeled as RULES — `effects` is the code order the
+        # per-CS `suzCode` plane indexes; -1 = the perk is not in this build.
+        _suz = rules.citystate["suz"]
+        _sfx = list(_suz["effects"])
+        self._suz_c_xp = _sfx.index("xpDouble") if "xpDouble" in _sfx else -1
+        self._suz_c_hill = _sfx.index("cavalryHills") if "cavalryHills" in _sfx else -1
+        self._suz_c_reach = _sfx.index("regionalReach") if "regionalReach" in _sfx else -1
+        self._suz_c_works = _sfx.index("worksScience") if "worksScience" in _sfx else -1
+        self._suz_c_route = _sfx.index("csRouteYields") if "csRouteYields" in _sfx else -1
+        self._suz_c_holy = _sfx.index("holySitePressure") if "holySitePressure" in _sfx else -1
+        self._suz_xp_mult_k = int(_suz["xpMult"])
+        self._suz_hill_cs = int(_suz["hillCs"])
+        self._suz_reach_bonus = int(_suz["reachBonus"])
+        self._suz_writing_sci = float(_suz["writingScience"])
+        self._suz_relic_sci = float(_suz["relicScience"])
+        self._suz_route_cul = float(_suz["routeCulture"])
+        self._suz_route_gold = float(_suz["routeGold"])
 
         rr = rules.seats
         n_gp = len(rr.get("gpClassDistrict", [])) or 5
@@ -323,6 +342,15 @@ class SimInit:
         self._ded_event_score = [int(x) for x in _er.get("dedEventScore", [1, 1, 1, 2])]
         self._n_ded = len(self._ded_event_score)
         self._gov_loy = float(_er.get("governorLoyalty", 8))
+        self._ded_to_arms = int(_er["dedToArms"])
+        self._ded_dracones = int(_er["dedDracones"])
+        self._ded_coinage = int(_er["dedCoinage"])
+        self._ded_steam = int(_er["dedSteam"])
+        self._to_arms_prod = float(_er["toArmsMilProd"])
+        self._dracones_disc = int(_er["draconesDiscoveryScore"])
+        self._coinage_spec_gold = float(_er["coinageIntlGoldPerSpec"])
+        self._steam_wonder_prod = float(_er["steamWonderProd"])
+        self._industrial_era = int(_er["industrialEra"])
         nt_b3, nc_b3 = len(rules.t_cost), len(rules.c_cost)
         # The per-seat RESEARCH vectors, merged like the scalars. Placed here
         # because their width is only known once the rules tables are read.
@@ -904,6 +932,7 @@ class SimInit:
         )
         self._harbor_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HARBOR"), -1)
         self._hs_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HOLY_SITE"), -1)
+        self._campus_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "CAMPUS"), -1)
         self._commhub_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "COMMERCIAL_HUB"), -1)
         self._shipyard_bidx = int(rules.shipyard_bidx)
         self._walls_bidx = int(rules.ancient_walls_bidx)
@@ -951,6 +980,7 @@ class SimInit:
         self._nprod_cache: tuple[int, torch.Tensor] | None = None
         # Civ-phase caches, same single-slot-by-key shape as _rcy_globals.
         self._seat_route_cache = None   # ((turn,r,_eff_version,_rp_kill_version), [B,RC]|None)
+        self._suz_rows_cache = None  # ((turn, _eff_version), {code: [B, n_majors] bool})
         self._belief_feat_cache = None   # ((r,_eff_version,_bel_version), [B,T,6])
         self._bel_add_memo = None        # (_bel_version, {(fn,key,r): tensor})
         self._gov_pol_cache = None       # (_eff_version, {seat_tag: 5-tuple})
@@ -1022,7 +1052,8 @@ class SimInit:
         # Worship buildings are faith-purchase-only — every production/gold
         # picker masks them; only the worship faith-buy sets their civ_city_bldg bits.
         self._b_worship = rules.b_worship.to(device)  # [NB] bool
-        self._b_train_xp = rules.b_train_xp.to(device)  # [NB] long — per-building training XP (best tier over present buildings)
+        self._b_train_xp = rules.b_train_xp.to(device)  # [NB] long
+        self._b_era = rules.b_era.to(device)  # [NB] long — unlock era (Heartbeat of Steam's gate) — per-building training XP (best tier over present buildings)
         self._worship_bidx = [int(x) for x in rules.worship_bidx]
         self._temple_bidx = int(rules.temple_bidx)
         self._worship_cost = float(rules.worship_faith_cost)
@@ -1116,6 +1147,7 @@ class SimInit:
         # natively; an embarked LAND mover stands on water via the embark gate.
         # Read at the war-march passability composition.
         self.unit_naval = torch.tensor([bool(u.get("naval", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._type_cavalry = torch.tensor([bool(u.get("cavalry", 0)) for u in ru], dtype=torch.bool, device=device)  # light+heavy cavalry (Preslav)
         self._type_tech = torch.tensor([u["requiresTech"] for u in ru], dtype=torch.long, device=device)
         self._type_civic = torch.tensor([u.get("requiresCivic", -1) for u in ru], dtype=torch.long, device=device)
         self._type_needs_slot = torch.tensor([bool(u.get("needsArtifactSlot", 0)) for u in ru], dtype=torch.bool, device=device)
@@ -1246,7 +1278,7 @@ class SimInit:
         self._bel_version += 1
         self._rp_kill_version += 1
         self._claim_version += 1
-        self._seat_route_cache = self._belief_feat_cache = None
+        self._seat_route_cache = self._belief_feat_cache = self._suz_rows_cache = None
         self._bel_add_memo = self._gov_pol_cache = None
 
     def register_alias(self, name: str, recompute) -> None:
@@ -1410,7 +1442,7 @@ class SimInit:
         self._gen_ver += 1
         self._rp_kill_version += 1
         self._claim_version += 1
-        self._seat_route_cache = self._belief_feat_cache = None
+        self._seat_route_cache = self._belief_feat_cache = self._suz_rows_cache = None
         self._bel_add_memo = self._gov_pol_cache = None
 
     @staticmethod

@@ -12,7 +12,7 @@ import { tileAppeal } from './appeal'; // the Seaside Resort's dynamic gold
 import { WONDERS } from '../../world/wonders';
 import { DISTRICTS, type AdjacencyRule } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
-import { REGIONAL_RANGE } from '../data/constants';
+import { regionalReach } from './cityStates';
 
 function terrainYields(tile: Tile): Yields {
   const out = emptyYields();
@@ -194,8 +194,19 @@ export interface RegionalEffects {
   amenities: number;
 }
 
+/** Districts this city has FINISHED — `specialtyOnly` drops the centre and
+ *  anything outside the specialty cap. */
+export function completedDistrictCount(state: GameState, city: City, specialtyOnly: boolean): number {
+  return city.districts.filter((d) => {
+    if (d.type === 'CITY_CENTER') return false;
+    if (!state.map.tiles[d.tileIndex].districtComplete) return false;
+    return specialtyOnly ? DISTRICTS[d.type].countsTowardLimit : true;
+  }).length;
+}
+
 export function regionalEffects(state: GameState, city: City): RegionalEffects {
   const center = state.map.tiles[city.centerIndex];
+  const reach = regionalReach(state, city.seat); // a Mexico City suzerain reaches 3 farther
   const seen = new Set<string>();
   const out: RegionalEffects = { yields: emptyYields(), amenities: 0 };
   for (const other of citiesOf(state, city.seat)) {
@@ -206,7 +217,7 @@ export function regionalEffects(state: GameState, city: City): RegionalEffects {
         const def = BUILDINGS[id];
         if (!def || !def.regional || def.district !== inst.type) continue;
         if (seen.has(id)) continue;
-        if (hexDistance(tile.col, tile.row, center.col, center.row) > REGIONAL_RANGE) continue;
+        if (hexDistance(tile.col, tile.row, center.col, center.row) > reach) continue;
         seen.add(id);
         if (def.yields) addYields(out.yields, def.yields);
         if (def.amenities) out.amenities += def.amenities;

@@ -7,6 +7,9 @@ import { addEraScore, dedicationEvent } from './eras';
 import { spawnUnit } from './units';
 import { encampmentTrainXp } from './combat';
 import { applyLumpYield } from './economy';
+import { DED_STEAM } from '../data/seats';
+import { BUILDING_ERA_INDEX } from '../data/buildings';
+import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 
 export function completeProject(state: GameState, city: City, projectId: string, cost: number, sciPerTurn = 0): void {
   const def = PROJECTS[projectId];
@@ -99,6 +102,9 @@ export function completeQueueItem(
       break;
     case 'building':
       city.buildings.push(item.building);
+      // CIV6 (Heartbeat of Steam, dark face): "+2 Era Score for each
+      // Industrial or later building constructed."
+      if ((BUILDING_ERA_INDEX[item.building] ?? 0) >= INDUSTRIAL_ERA_INDEX) dedicationEvent(state, city.seat, DED_STEAM);
       if (item.building === 'ANCIENT_WALLS') city.outerHp = WALLS_HP;
       break;
   }

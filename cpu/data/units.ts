@@ -23,6 +23,10 @@ export interface UnitDef {
    * units exist yet (N2 adds GALLEY/QUADRIREME) — the field is plumbed now so
    * passability/spawn/combat can branch on it. Default false. */
   naval?: boolean;
+  /** CIV 6 unit class: LIGHT cavalry (Horseman) and HEAVY cavalry (Knight).
+   * The pair real suzerain/policy text addresses as "light and heavy
+   * cavalry"; nothing else in this roster is mounted. */
+  cavalry?: boolean;
   /** faith-purchase-only (MISSIONARY) — never offered by trainableUnits,
    * so it can't be queued or gold-purchased by either seat. */
   faithOnly?: boolean;
@@ -119,6 +123,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       cost: 80,
       maintenance: 2,
       moves: 4,
+      cavalry: true, // LIGHT cavalry
       combat: 36, // real Civ 6 Horseman
       requiresTech: 'HORSEBACK_RIDING',
       requiresResource: 'HORSES', // retroactive — its own description flagged this gap
@@ -166,6 +171,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       cost: 220,
       maintenance: 4,
       moves: 4,
+      cavalry: true, // HEAVY cavalry
       combat: 50,
       requiresTech: 'STIRRUPS',
       requiresResource: 'IRON',

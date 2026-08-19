@@ -8,14 +8,12 @@
  * City-state / Suzerain pages. CORRECT: the SUZERAIN rule (most envoys AND at
  * least 3) and the 3-/6-envoy THRESHOLDS.
  *
- * ONE SOURCED DEVIATION, recorded not fixed: the FIRST envoy grants **+1** of
- * the city-state's yield in real Civ 6 — not +2 — with TRADE city-states the
- * lone exception at +2 Gold (and their 3-envoy step at +4 Gold rather than +2).
- * This model pays a flat +2 for every type at 1 envoy. Correcting it is a yield
- * change needing its own gated round on both engines, and it interacts with the
- * note below (the real 3-/6-envoy steps also key on the district's
- * BUILDING TIERS, already recorded there as a degraded channel). The exact
- * numbers are captured here so that round starts from a source.
+ * The ENVOY LADDER is the real one, checked per city-state against the GS
+ * Civilopedia: Geneva reads "+2 Science in your Capital / +2 Science in every
+ * Campus district / Additional +2", Kumasi the same shape in Culture. What
+ * stays degraded is the 3-/6-envoy step's KEY — real Civ 6 counts the
+ * district's BUILDING TIERS, this model counts the district (see
+ * CITY_STATE_TYPE_BUILDINGS, the catalog for that round).
  */
 
 import type { CityStateType, DistrictId, YieldKey } from '../core/types';
@@ -65,38 +63,71 @@ export const CITY_STATE_TYPE_BUILDINGS: Record<CityStateType, string[]> = {
   religious: ['SHRINE', 'TEMPLE'],
 };
 
+/**
+ * A suzerain perk this engine models as a RULE rather than a flat capital
+ * yield. Each name is one Civilopedia line, quoted at its row.
+ */
+export type SuzEffect =
+  | 'xpDouble'          // Kabul
+  | 'cavalryHills'      // Preslav
+  | 'regionalReach'     // Mexico City (Toronto in rulesets without Canada)
+  | 'worksScience'      // Anshan
+  | 'csRouteYields'     // Kumasi
+  | 'holySitePressure'; // Jerusalem
+
+export const SUZ_EFFECTS: SuzEffect[] = [
+  'xpDouble', 'cavalryHills', 'regionalReach', 'worksScience', 'csRouteYields', 'holySitePressure',
+];
+
+/** Kabul: "Your units receive double experience from battles they initiate." */
+export const KABUL_XP_MULT = 2;
+/** Preslav: "+5 Strength when fighting on hill tiles" (light and heavy cavalry). */
+export const PRESLAV_HILL_CS = 5;
+/** Mexico City: "Regional effects ... reach 3 tiles farther." */
+export const REGIONAL_REACH_BONUS = 3;
+/** Anshan: "+2 Science from each Great Work of Writing. +1 Science from each
+ *  Relic and Artifact." */
+export const ANSHAN_WRITING_SCIENCE = 2;
+export const ANSHAN_RELIC_SCIENCE = 1;
+/** Kumasi: routes to any city-state pay "+2 Culture and +1 Gold for every
+ *  specialty district in the origin city". */
+export const KUMASI_ROUTE_CULTURE = 2;
+export const KUMASI_ROUTE_GOLD = 1;
 export interface SuzerainBonusDef {
   name: string;
   type: CityStateType;
   bonus: string;
   channel?: YieldKey | 'amenities' | 'production-capital' | 'none';
+  /** the modeled RULE, when the perk is one; rows without it pay the flat
+   *  channel yield or nothing. */
+  suz?: SuzEffect;
   note?: string;
 }
 export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
-  Geneva: { name: 'Geneva', type: 'scientific', bonus: '+15% science while not at war with any civ.', channel: 'science' },
+  Geneva: { name: 'Geneva', type: 'scientific', bonus: 'Your cities earn +15% Science whenever you are not at war with any civilization.', channel: 'science', note: 'the +15% is degraded to the flat channel yield' },
   Stockholm: { name: 'Stockholm', type: 'scientific', bonus: '+2 science per specialty district building tier.', channel: 'science' },
   Seoul: { name: 'Seoul', type: 'scientific', bonus: '+science per turn per Campus adjacency.', channel: 'science' },
-  Anshan: { name: 'Anshan', type: 'scientific', bonus: '+1 science & +1 culture from Great Works / relics.', channel: 'science', note: 'per-WORK rate; the channel is a flat per-city yield' },
-  Vilnius: { name: 'Vilnius', type: 'cultural', bonus: '+2 culture per specialty district building tier.', channel: 'culture' },
-  Antioch: { name: 'Antioch', type: 'cultural', bonus: 'Extra trade-route yields / market access.', channel: 'gold', note: 'per-ROUTE rate; the channel is a flat per-city yield' },
-  Kumasi: { name: 'Kumasi', type: 'cultural', bonus: '+2 culture & +1 faith from trade routes to city-states.', channel: 'culture', note: 'per-ROUTE rate; the channel is a flat per-city yield' },
-  Caguana: { name: 'Caguana', type: 'cultural', bonus: '+1 culture from plantations / +appeal.', channel: 'culture', note: 'appeal partly modeled' },
-  Amsterdam: { name: 'Amsterdam', type: 'trade', bonus: '+gold from trade routes / luxuries.', channel: 'gold', note: 'per-ROUTE rate; the channel is a flat per-city yield' },
-  Zanzibar: { name: 'Zanzibar', type: 'trade', bonus: 'Monopoly luxuries: +amenities & +gold.', channel: 'gold' },
-  'Bandar Brunei': { name: 'Bandar Brunei', type: 'trade', bonus: '+gold from sea resources.', channel: 'gold', note: 'naval yields degraded' },
-  Hunza: { name: 'Hunza', type: 'trade', bonus: '+gold on trade routes per resource passed.', channel: 'gold', note: 'a route has no PATH here, so nothing counts resources passed' },
-  Toronto: { name: 'Toronto', type: 'industrial', bonus: '+production toward wonders/buildings when powered.', channel: 'production', note: 'power system not modeled' },
-  'Buenos Aires': { name: 'Buenos Aires', type: 'industrial', bonus: 'Bonus resources also give +amenities.', channel: 'amenities' },
-  Cardiff: { name: 'Cardiff', type: 'industrial', bonus: '+production & +gold from Harbor power.', channel: 'production', note: 'power system not modeled' },
-  'Mexico City': { name: 'Mexico City', type: 'industrial', bonus: '+15% production toward Projects.', channel: 'production' },
-  Kabul: { name: 'Kabul', type: 'militaristic', bonus: 'Units earn +XP from combat.', channel: 'none', note: 'XP exists; this is a per-COMBAT rate, not a yield' },
+  Anshan: { name: 'Anshan', type: 'scientific', bonus: '+2 Science from each Great Work of Writing. +1 Science from each Relic and Artifact.', suz: 'worksScience' },
+  Vilnius: { name: 'Vilnius', type: 'cultural', bonus: 'When you enter a new era, earn 1 random Inspiration from that era.', channel: 'culture', note: 'boosts exist, but picking a random unearned one at an era edge is its own rule; the flat channel stands in' },
+  Antioch: { name: 'Antioch', type: 'cultural', bonus: 'Extra trade-route yields / market access.', channel: 'gold', note: 'NOT a Gathering Storm city-state (replaced), so no GS line can be quoted for it; the flat channel stands in' },
+  Kumasi: { name: 'Kumasi', type: 'cultural', bonus: 'Your Trade Routes to any city-state provide +2 Culture and +1 Gold for every specialty district in the origin city.', suz: 'csRouteYields' },
+  Caguana: { name: 'Caguana', type: 'cultural', bonus: 'Your Builders can now make Batey improvements. +1 Culture. +1 Culture for every adjacent Bonus resource and Entertainment Complex.', channel: 'culture', note: 'a whole IMPROVEMENT with its own adjacency and a Flight-gated tourism term; the flat channel stands in' },
+  Amsterdam: { name: 'Amsterdam', type: 'trade', bonus: '+gold from trade routes / luxuries.', channel: 'gold', note: 'NOT a Gathering Storm city-state (replaced), so no GS line can be quoted for it; the flat channel stands in' },
+  Zanzibar: { name: 'Zanzibar', type: 'trade', bonus: 'Receive the Cinnamon and Cloves Luxury resources. These cannot be earned any other way in the game, and provide 6 Amenities each.', channel: 'gold', note: 'two luxuries that exist nowhere else on the map; the flat channel stands in' },
+  'Bandar Brunei': { name: 'Bandar Brunei', type: 'trade', bonus: 'Your Trading Posts in foreign cities provide +1 Gold to your Trade Routes passing through or going to the city.', channel: 'gold', note: 'TRADING POSTS are not modeled — a route lays roads and pays yields, it plants nothing' },
+  Hunza: { name: 'Hunza', type: 'trade', bonus: 'Your Trade Routes generate +1 Gold for every 5 tiles they travel.', channel: 'gold', note: 'a route has no PATH here and nothing walks it, so there is no tile count to pay on' },
+  Toronto: { name: 'Toronto', type: 'industrial', bonus: 'Regional effects from your Industrial Zone, Water Park, and Entertainment Complex districts reach 3 tiles farther.', suz: 'regionalReach', note: 'the same city-state as Mexico City — one replaces the other by ruleset, and this roster carries both' },
+  'Buenos Aires': { name: 'Buenos Aires', type: 'industrial', bonus: 'Your Bonus resources behave like Luxury resources, providing 1 Amenity per type.', channel: 'amenities' },
+  Cardiff: { name: 'Cardiff', type: 'industrial', bonus: 'Cities receive +2 Power for every Harbor building.', channel: 'production', note: 'POWER is not modeled at all — no plant, no grid, no powered-building term' },
+  'Mexico City': { name: 'Mexico City', type: 'industrial', bonus: 'Regional effects from your Industrial Zone, Water Park, and Entertainment Complex districts reach 3 tiles farther.', suz: 'regionalReach' },
+  Kabul: { name: 'Kabul', type: 'militaristic', bonus: 'Your units receive double experience from battles they initiate.', suz: 'xpDouble' },
   Carthage: { name: 'Carthage', type: 'militaristic', bonus: '+Encampment building production; free maintenance for melee.', channel: 'production' },
-  Preslav: { name: 'Preslav', type: 'militaristic', bonus: 'Heavy/light cavalry +combat & +movement in enemy land.', channel: 'none', note: 'the roster has cavalry; a territory-conditional combat modifier is not a yield' },
-  Valletta: { name: 'Valletta', type: 'militaristic', bonus: 'Gold-purchase Renaissance/ancient walls & buildings in cities with a wall.', channel: 'production' },
-  Jerusalem: { name: 'Jerusalem', type: 'religious', bonus: 'Your religion counts as majority for envoy effects; +faith.', channel: 'faith', note: 'the +faith half ships; the majority-override clause is a conditional the channel cannot carry' },
-  'La Venta': { name: 'La Venta', type: 'religious', bonus: 'Builders can build a special improvement for faith.', channel: 'faith' },
-  Yerevan: { name: 'Yerevan', type: 'religious', bonus: 'Apostles gain a promotion of choice.', channel: 'none', note: 'apostles and theological combat ship; unit PROMOTIONS do not' },
-  Armagh: { name: 'Armagh', type: 'religious', bonus: 'Builders can build a Monastery for faith/production.', channel: 'faith' },
+  Preslav: { name: 'Preslav', type: 'militaristic', bonus: 'Your light and heavy cavalry units have +5 Strength when fighting on hill tiles.', suz: 'cavalryHills' },
+  Valletta: { name: 'Valletta', type: 'militaristic', bonus: 'City Center buildings and Encampment district buildings can be bought with Faith. Cost of purchasing Ancient, Medieval, and Renaissance Walls is reduced, but they can only be bought with Faith.', channel: 'production', note: 'a FAITH-purchase channel for a class of buildings; the flat production channel stands in' },
+  Jerusalem: { name: 'Jerusalem', type: 'religious', bonus: 'Your cities with Holy Sites exert pressure as if they were Holy Cities (4x Religion pressure on all cities within 10 tiles).', suz: 'holySitePressure' },
+  'La Venta': { name: 'La Venta', type: 'religious', bonus: 'Your Builders can now make Colossal Head improvements.', channel: 'faith', note: 'a whole IMPROVEMENT with its own adjacency; the flat channel stands in' },
+  Yerevan: { name: 'Yerevan', type: 'religious', bonus: 'Your Apostle units can choose from any possible promotion instead of receiving a random promotion.', channel: 'none', note: 'unit PROMOTIONS are not modeled — the only one that reaches a rule is MARTYR, drawn at the death, and CHOOSING it would be a decision with no wire record' },
+  Armagh: { name: 'Armagh', type: 'religious', bonus: 'Your Builders can now make Monastery improvements.', channel: 'faith', note: 'a whole IMPROVEMENT with its own adjacency; the flat channel stands in' },
 };
 
 export const CITY_STATE_SUZERAIN_YIELD = 3;
@@ -104,15 +135,12 @@ export const CITY_STATE_SUZERAIN_LIVE: Record<string, YieldKey> = {
   Geneva: 'science',
   Stockholm: 'science',
   Seoul: 'science',
-  Anshan: 'science',
   Vilnius: 'culture',
   Caguana: 'culture',
   Zanzibar: 'gold',
   'Bandar Brunei': 'gold',
-  'Mexico City': 'production',
   Carthage: 'production',
   Valletta: 'production',
-  Jerusalem: 'faith',
   'La Venta': 'faith',
   Armagh: 'faith',
 };

@@ -337,6 +337,22 @@ class SimPhase:
             if self._encamp_si >= 0:
                 enc_i = enc_i | (cur == self.DISTRICT_BASE + self._encamp_si)
             prod = torch.where(enc_i, prod * em, prod)
+        # CIV6 (To Arms!, Golden face): "+15% Production towards military
+        # units." (Heartbeat of Steam, Golden face): "+10% Production toward
+        # Industrial era and later wonders." Item classes are disjoint, so the
+        # multiplier order is association-free.
+        ta = self._golden_ded(row, self._ded_to_arms)
+        if bool(ta.any()):
+            mil_i = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU) \
+                & ~self._type_civilian[(cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)]
+            prod = torch.where(ta & mil_i, prod * self._to_arms_prod, prod)
+        stm = self._golden_ded(row, self._ded_steam)
+        if bool(stm.any()):
+            nw = self._wonder_era.shape[0]
+            wid = (cur - self.WONDER_BASE).clamp(min=0, max=nw - 1)
+            won_i = (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + nw) \
+                & (self._wonder_era[wid] >= self._industrial_era)
+            prod = torch.where(stm & won_i, prod * self._steam_wonder_prod, prod)
         # VETERANCY multiplies FIRST, then the banked chop adds unmultiplied —
         # phase.ts spends the bank right after the production add.
         prog = self.city_progress[bidx, row, col]
@@ -393,6 +409,9 @@ class SimPhase:
             br = made_b2.nonzero(as_tuple=True)[0]
             bi = cur.clamp(min=0, max=self.NB - 1)
             self.city_bldg[br, row, col[br], bi[br]] = True
+            # CIV6 (Heartbeat of Steam, dark face): "+2 Era Score for each
+            # Industrial or later building constructed."
+            self._dedication_event(row, self._ded_steam, made_b2 & (self._b_era[bi] >= self._industrial_era))
             # A completed REGIONAL building reaches OTHER cities' yields, so
             # the caches must see the write even though this turn's own walk
             # reads the loop-top snapshot.

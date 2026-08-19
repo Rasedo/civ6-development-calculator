@@ -2,7 +2,7 @@
 import { addYields, emptyYields, type City, type GameState, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
 import { tilesWithin, hexDistance } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable } from '../../world/query';
-import { tileYields, cityDistrictYields, cityBuildingYields, regionalEffects, localBuildingAmenities, pillagedDistrictTypes, effectiveAdjacency } from './yields';
+import { tileYields, cityDistrictYields, cityBuildingYields, regionalEffects, localBuildingAmenities, pillagedDistrictTypes, effectiveAdjacency, completedDistrictCount } from './yields';
 import { getModifiers, makeYieldCtx, withFollowerBelief, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
@@ -18,11 +18,14 @@ import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { goldenCulturePerDistrict, goldenDedication } from './eras';
 import { SPECIALIST_YIELDS, greatWorkCulture, greatWorkTourism, relicFaith, relicTourism, artifactCulture, artifactTourism, GW_PRINTING_TECH } from '../data/greatPeople';
+import { suzerainEffect } from './cityStates';
+import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE } from '../data/cityStates';
 import { warWearinessPenalty, DED_FREE_INQUIRY } from '../data/seats';
 import { RESOURCES } from '../../world/resources';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, REGIONAL_RANGE, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, type AmenityTier } from '../data/constants';
 import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf, tileClaimed } from './seats';
 import { wwMax } from './weariness';
+import { DED_STEAM } from '../data/seats';
 
 export interface CityStats {
   city: City;
@@ -168,14 +171,6 @@ export function tileYieldsForCenter(ctx: YieldCtx, center: Tile): Yields {
   y.food = Math.max(y.food, CITY_CENTER_MIN_FOOD);
   y.production = Math.max(y.production, CITY_CENTER_MIN_PRODUCTION);
   return y;
-}
-
-function completedDistrictCount(state: GameState, city: City, specialtyOnly: boolean): number {
-  return city.districts.filter((d) => {
-    if (d.type === 'CITY_CENTER') return false;
-    if (!state.map.tiles[d.tileIndex].districtComplete) return false;
-    return specialtyOnly ? DISTRICTS[d.type].countsTowardLimit : true;
-  }).length;
 }
 
 export function computeHousing(state: GameState, city: City, mods?: Modifiers): number {
@@ -351,9 +346,9 @@ function wonderRegionalAmenities(state: GameState, city: City): number {
       const amt = w.def.effects?.regionalAmenities;
       if (!amt) continue;
       const t = state.map.tiles[w.tileIndex];
-      // Measured from the WONDER TILE, not from the city holding it, and on
-      // the same REGIONAL_RANGE regional buildings use — one knob, so the two
-      // reaches cannot drift (the GPU reads `regionalRange` for both).
+      // Measured from the WONDER TILE, not from the city holding it, on the
+      // BASE reach. A Mexico City suzerain extends the DISTRICT regional
+      // effects its Civilopedia line names, which a wonder's aura is not.
       if (hexDistance(t.col, t.row, center.col, center.row) <= REGIONAL_RANGE) n += amt;
     }
   }
@@ -473,6 +468,16 @@ export function computeCityStats(
       districts.science += effectiveAdjacency(ctx, t, d.type);
     }
   }
+  // CIV6 (Heartbeat of Steam, Golden face): "Campus district's Science
+  // adjacency bonus provides Production as well."
+  if (goldenDedication(state, city.seat, DED_STEAM)) {
+    for (const d of city.districts) {
+      if (d.type !== 'CAMPUS') continue;
+      const t = map.tiles[d.tileIndex];
+      if (!t.districtComplete || t.districtPillaged) continue;
+      districts.production += effectiveAdjacency(ctx, t, 'CAMPUS');
+    }
+  }
   for (const [tileIndex, n] of specialists) {
     const inst = city.districts.find((d) => d.tileIndex === tileIndex);
     const y = inst ? SPECIALIST_YIELDS[inst.type] : undefined;
@@ -491,6 +496,12 @@ export function computeCityStats(
   // THIS CITY'S OWNER's dedication, which is the row the GPU reads.
   buildings.culture += goldenCulturePerDistrict(state, city.seat) * completedDistrictCount(state, city, true);
   buildings.faith += relicFaith(city);
+  // CIV 6, Anshan's suzerain: "+2 Science from each Great Work of Writing.
+  // +1 Science from each Relic and Artifact."
+  if (suzerainEffect(state, city.seat, 'worksScience')) {
+    buildings.science += ANSHAN_WRITING_SCIENCE * (city.greatWorksWriting ?? 0)
+      + ANSHAN_RELIC_SCIENCE * ((city.relics ?? 0) + (city.artifacts ?? 0));
+  }
 
   const trade = cityTradeYields(state, city);
 

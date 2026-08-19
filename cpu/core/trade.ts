@@ -9,10 +9,13 @@ import { isBarbSeat, seatOf, citiesOf, civsAtWar } from './seats';
 import { hexDistance } from '../../world/hex';
 import { layTradeRoad } from './units'; // Traders lay road
 import { DISTRICTS } from '../data/districts';
-import { cityStateTradeCapacityBonus, hasMet } from './cityStates';
-import { CITY_STATE_TYPE_YIELD } from '../data/cityStates';
+import { cityStateTradeCapacityBonus, hasMet, suzerainEffect } from './cityStates';
+import { completedDistrictCount } from './yields';
+import { CITY_STATE_TYPE_YIELD, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD } from '../data/cityStates';
 import { ENHANCER_BELIEFS } from '../data/religion';
 import type { RuleResult } from './rules';
+import { goldenDedication } from './eras';
+import { DED_COINAGE, COINAGE_INTL_GOLD_PER_SPEC } from '../data/seats';
 
 export const TRADE_ROUTE_RANGE = 15;
 
@@ -79,6 +82,8 @@ export function cityStateRouteYields(cityState: CityState): Yields {
  */
 export function routeRaidedAt(state: GameState, endpoints: number[], seat: number): boolean {
   if (!state.unitsMode) return false;
+  // CIV6 (Reform the Coinage, Golden face): "your Traders cannot be plundered."
+  if (goldenDedication(state, seat, DED_COINAGE)) return false;
   for (const u of state.units) {
     const hostile = isBarbSeat(u.seat) || (u.seat !== seat && civsAtWar(state, u.seat, seat));
     if (!hostile) continue;
@@ -104,6 +109,14 @@ export function cityTradeYields(state: GameState, city: City): Yields {
       const cityState = state.cityStates.find((c) => c.id === route.toCs);
       if (cityState && !routeRaidedAt(state, [city.centerIndex, cityState.centerIndex], seat)) {
         addYields(out, cityStateRouteYields(cityState));
+        // CIV 6, Kumasi's suzerain: "Your Trade Routes to any city-state
+        // provide +2 Culture and +1 Gold for every specialty district in the
+        // ORIGIN city" — this city, whichever minor the route reaches.
+        if (suzerainEffect(state, seat, 'csRouteYields')) {
+          const n = completedDistrictCount(state, city, true);
+          out.culture += KUMASI_ROUTE_CULTURE * n;
+          out.gold += KUMASI_ROUTE_GOLD * n;
+        }
       }
       continue;
     }
@@ -112,6 +125,11 @@ export function cityTradeYields(state: GameState, city: City): Yields {
       const civCity = civSeat?.cities.find((c) => c.id === route.toSeatCity);
       if (civSeat && civCity && !civsAtWar(state, civSeat.seat, seat) && !routeRaidedAt(state, [city.centerIndex, civCity.centerIndex], seat)) {
         addYields(out, routeYieldsInternational(state, civCity));
+        // CIV6 (Reform the Coinage, Golden face): "International Trade Routes
+        // provide +3 Gold per specialty district in the foreign city."
+        if (goldenDedication(state, seat, DED_COINAGE)) {
+          out.gold += COINAGE_INTL_GOLD_PER_SPEC * specialtyDistricts(state, civCity);
+        }
       }
       continue;
     }
