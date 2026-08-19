@@ -241,6 +241,8 @@ class SimEconomy:
         self.war[:, cs, foe] &= ~rel
         self.war_turns[:, foe, cs].masked_fill_(rel, 0)
         self.war_turns[:, cs, foe].masked_fill_(rel, 0)
+        self.treaty_turns[:, foe, cs].masked_fill_(rel, self._treaty_turns)
+        self.treaty_turns[:, cs, foe].masked_fill_(rel, self._treaty_turns)
         for _s in range(self.S):
             self._ww_peace(rel[:, _s], foe, _cs0 + _s)
 
@@ -427,6 +429,15 @@ class SimEconomy:
         ok = (self.improvement[rows, tiles] >= 0) & ~self.pillaged[rows, tiles]
         self.pillaged[rows[ok], tiles[ok]] = True
 
+    def _flood_district(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
+        """CIV6 (Gathering Storm): a flood damages the DISTRICT on the
+        floodplain, not just the improvement — the buildings inside go dark with
+        it, which is what a Dam is built to prevent. The `district` plane never
+        encodes a city CENTRE, so centres are outside this by construction."""
+        ok = ((self.district[rows, tiles] >= 0) & self.district_complete[rows, tiles]
+              & ~self.district_pillaged[rows, tiles])
+        self.district_pillaged[rows[ok], tiles[ok]] = True
+
     def _pick_static(self, mask_hit: torch.Tensor, cand_list: tuple[torch.Tensor, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
         idx, cnt = cand_list
         has = mask_hit & (cnt > 0)
@@ -446,6 +457,7 @@ class SimEconomy:
         if bool(hit.any()):
             rows = hit.nonzero(as_tuple=True)[0]
             self._scorch(rows, tile[rows])
+            self._flood_district(rows, tile[rows])
             self._fertilize(rows, tile[rows])
 
         er_rows, er_volc = [], []

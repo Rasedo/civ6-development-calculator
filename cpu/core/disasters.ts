@@ -25,6 +25,15 @@ function scorch(tile: Tile): void {
   if (tile.improvement && !tile.pillaged) tile.pillaged = true;
 }
 
+/** CIV6 (Gathering Storm): a flood damages the DISTRICT on the floodplain, not
+ *  just the improvement — the buildings inside it go dark with it, which is
+ *  what a Dam is built to prevent. A city CENTER is never pillaged. */
+function floodDistrict(tile: Tile): void {
+  if (tile.district && tile.district !== 'CITY_CENTER' && tile.districtComplete && !tile.districtPillaged) {
+    tile.districtPillaged = true;
+  }
+}
+
 function fertilize(tile: Tile): void {
   if (!isWater(tile) && tile.elevation !== 'MOUNTAIN') {
     tile.fertility = Math.min(FERTILITY_CAP, tile.fertility + 1);
@@ -42,6 +51,7 @@ export function disasterPhase(state: GameState): void {
     const target = pick(state, map.tiles.filter((t) => t.feature === 'FLOODPLAINS'));
     if (target) {
       scorch(target);
+      floodDistrict(target);
       fertilize(target);
       log(state, `Flood at (${target.col}, ${target.row}) — silt enriches the floodplain.`);
     }

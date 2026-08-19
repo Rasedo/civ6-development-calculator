@@ -434,6 +434,16 @@
      ]
     },
     {
+     "name": "treatyTurns",
+     "compare": "exact",
+     "covers": [
+      "GameState.treatyTurns"
+     ],
+     "planes": [
+      "treaty_turns"
+     ]
+    },
+    {
      "name": "peaceTurns",
      "compare": "exact",
      "covers": [
@@ -870,6 +880,14 @@
      "compare": "exact",
      "covers": [
       "GameState.warTurns"
+     ],
+     "planes": []
+    },
+    {
+     "name": "treatyTurns",
+     "compare": "exact",
+     "covers": [
+      "GameState.treatyTurns"
      ],
      "planes": []
     }

@@ -36,6 +36,29 @@ describe('combat', () => {
     expect(atk.movesLeft).toBe(0);
   });
 
+  it('a fallen city takes its garrison with it', () => {
+    const state = makeState(makeMap(20, 20));
+    state.unitsMode = true;
+    state.seats.push(emptySeat(1));
+    const city = settleAt(state, tileAtCoords(state.map, 9, 9).index, 1);
+    setWar(state, 0, 1, true);
+    const garrison = spawnUnit(state, 'WARRIOR', city.centerIndex, 1)!;
+    const civilian = spawnUnit(state, 'BUILDER', city.centerIndex, 1)!;
+    const from = tileAtCoords(state.map, 8, 9);
+    const atk = spawnUnit(state, 'WARRIOR', from.index, 0)!;
+    city.hp = 1;
+
+    // CITY-FIRST: the garrison is not a separate defender, so the blow lands
+    // on the centre and the city falls with both units still standing on it.
+    expect(meleeAttack(state, atk.id, city.centerIndex, 0).ok).toBe(true);
+    expect(seatOf(state, 1)!.cities.length).toBe(0);
+    expect(seatOf(state, 0)!.cities.some((c) => c.centerIndex === city.centerIndex)).toBe(true);
+    expect(state.units.some((u) => u.id === garrison.id)).toBe(false);
+    expect(state.units.some((u) => u.id === civilian.id)).toBe(false);
+    expect(state.units.some((u) => u.id === atk.id)).toBe(true); // the captor never entered
+    expect(state.map.tiles[city.centerIndex].antiquity).toBeFalsy(); // a centre carries a district
+  });
+
   it('is reproducible from the serialized RNG state', () => {
     const setup = () => {
       const { state } = battlefield();
@@ -78,8 +101,9 @@ describe('combat', () => {
     const state = makeState(makeMap(20, 20));
     state.unitsMode = true;
     settleAt(state, tileAtCoords(state.map, 9, 9).index);
-    // campNo % 4 === 1 is the naval camp, so camp 0 is a landlocked decoy.
-    state.barbSeat.camps.push(tileAtCoords(state.map, 3, 3).index);
+    // A reachable coast makes it a PIRATE camp; the raid rotation reaches its
+    // CLASS slot when (campNo + turn) % 3 === 0.
+    state.turn = 3;
     const camp1 = tileAtCoords(state.map, 15, 15);
     state.barbSeat.camps.push(camp1.index);
     for (const n of neighbors(state.map, camp1)) n.terrain = 'COAST';

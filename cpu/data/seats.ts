@@ -68,6 +68,10 @@ export const CITY_SLOTS_PER_SEAT = 24;
  *  (the leaders' action panel unlocks the offer then). One floor for every
  *  pairing here, majors and city-states alike. */
 export const WAR_MIN_TURNS = 10;
+/** CIV 6: a peace treaty BINDS for **10** turns — once peace is made neither
+ *  side may declare on the other again until the term runs out. One term for
+ *  every pairing, majors and city-states alike. */
+export const PEACE_TREATY_TURNS = 10;
 export const PEACE_GOLD_COST = (warTurns: number) => 150 + 10 * warTurns;
 
 

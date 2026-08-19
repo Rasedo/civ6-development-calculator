@@ -199,6 +199,16 @@ def _war_clock_line(sim, b: int, seat: int) -> list[int]:
     return [x for p in pairs for x in p]
 
 
+def _treaty_clock_line(sim, b: int, seat: int) -> list[int]:
+    """[opponentSeat, turnsBound, ...] — the same flat shape for the PEACE
+    TREATY, over every opponent still bound, in ascending opponent-seat
+    order."""
+    row = _seat_row(sim, seat)
+    tt = sim.treaty_turns[b, row].tolist()
+    pairs = sorted((int(sim._ROW_SEAT[j]), int(v)) for j, v in enumerate(tt) if v > 0)
+    return [x for p in pairs for x in p]
+
+
 GAME = {
     "turn": lambda sim, b, rows: [sim.turn],
     "rng": lambda sim, b, rows: [int(sim.rng_state[b])],
@@ -358,6 +368,7 @@ SEAT = {
     ],
     "wars": lambda sim, b, rows: [_wars_of(sim, b, c) for c in rows],
     "warTurns": lambda sim, b, rows: [_war_clock_line(sim, b, c) for c in rows],
+    "treatyTurns": lambda sim, b, rows: [_treaty_clock_line(sim, b, c) for c in rows],
     "peaceTurns": lambda sim, b, rows: [int(sim.peace_turns[b, _seat_row(sim, c)]) for c in rows],
     "warWeariness": _ww_pairs("ww", lambda v: v != 0),
     "warWearinessTurn": _ww_pairs("ww_turn", lambda v: v >= 0),
@@ -429,6 +440,7 @@ CITY_STATE = {
          for c in _civ_seats(sim)] for s in rows],
     "lastLevyTurn": lambda sim, b, rows: [int(sim.citystate_last_levy[b, s]) for s in rows],
     "warTurns": lambda sim, b, rows: [_war_clock_line(sim, b, 100 + s) for s in rows],
+    "treatyTurns": lambda sim, b, rows: [_treaty_clock_line(sim, b, 100 + s) for s in rows],
 }
 
 

@@ -49,14 +49,6 @@ class SimSeats:
             has_alive_e = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._eng_idx)).any(dim=1)
             has_q_e = ((self.city_current[:, row] == self.UNIT_BASE + self._eng_idx) & alive).any(dim=1)
             ovr.append((self._eng_idx, ~(has_alive_e | has_q_e) & self._seat_fort_job_mask(row).any(dim=1)))
-        if self._galley_idx >= 0 and self._sailing_tech >= 0:
-            has_sail_g = self.civ_techs[:, row, self._sailing_tech]
-            vt_allm = self.major_unit_type.clamp(min=0, max=self.NU - 1)
-            naval_live_g = (self.major_unit_alive & (self.major_unit_seat == row) & self.unit_naval[vt_allm]).any(dim=1)
-            qcur_g = self.city_current[:, row]
-            q_nav_g = (qcur_g >= self.UNIT_BASE) & (qcur_g < self.UNIT_BASE + self.NU) & alive \
-                & self.unit_naval[(qcur_g - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)]
-            ovr.append((self._galley_idx, has_sail_g & ~(naval_live_g | q_nav_g.any(dim=1))))
         # A district's unlock and a wonder's unlock/already-built pair are per
         # SEAT too, so both tables are built once for the whole column sweep.
         d_tech = [
@@ -77,13 +69,14 @@ class SimSeats:
             ok_b = bld_q[:, j]
             ok_s = (self.city_pop[:, row, j] >= self.rules.settler_pop_gate).unsqueeze(1)
             # units: `trainableUnits` for this row and city — the SAME body the
-            # apply re-validates against — narrowed to the MILITARY LAND lane
-            # the production ladder selects from. Naval hulls get the dedicated
-            # galley column below; civilians (combat 0) are produced by no seat
-            # ladder. Every override below re-applies tr_j, so no column can
+            # apply re-validates against — narrowed to the MILITARY lane the
+            # production ladder selects from (civilians, combat 0, are produced
+            # by no seat ladder). HULLS ride the same columns: `tr_j` already
+            # carries the naval-capable-city gate, which is the only thing real
+            # Civ 6 asks. Every override below re-applies tr_j, so no column can
             # smuggle an untrainable chassis past the legality body.
             tr_j = tr_city[:, j]  # [B, NU]
-            ok_u = tr_j & (self._type_combat.unsqueeze(0) > 0) & ~self.unit_naval.unsqueeze(0)
+            ok_u = tr_j & (self._type_combat.unsqueeze(0) > 0)
             for _ui, _gate in ovr:
                 ok_u[:, _ui] = tr_j[:, _ui] & _gate
             ok_d = torch.zeros(B, nS, dtype=torch.bool, device=dev)
@@ -181,6 +174,13 @@ class SimSeats:
         self.war_turns[:, i, j] = torch.where(mask, torch.zeros_like(self.war_turns[:, i, j]), self.war_turns[:, i, j])
         self.war_turns[:, j, i] = self.war_turns[:, i, j]
 
+    def _stamp_treaty(self, i: int, j: int, mask: torch.Tensor) -> None:
+        """Bind the pair to a PEACE TREATY — the makePeace twin. The term is
+        one number for every pairing, majors and city-states alike."""
+        term = torch.full_like(self.treaty_turns[:, i, j], self._treaty_turns)
+        self.treaty_turns[:, i, j] = torch.where(mask, term, self.treaty_turns[:, i, j])
+        self.treaty_turns[:, j, i] = self.treaty_turns[:, i, j]
+
     def _apply_war_column(self, row: int, war: torch.Tensor) -> None:
         if self.n_majors == 1:
             return
@@ -192,7 +192,7 @@ class SimSeats:
         for k, tgt in enumerate(self.war_targets(row)):
             live = mine & self.civ_alive[:, tgt]
             at_war = self.war[:, row, tgt]
-            declare = (w == k) & ext & live & ~at_war & ~self.seat_allied[:, row, tgt]
+            declare = (w == k) & ext & live & ~at_war & ~self.seat_allied[:, row, tgt]                 & (self.treaty_turns[:, row, tgt] == 0)
             if bool(declare.any()):
                 self.war[:, row, tgt] |= declare
                 self.war[:, tgt, row] |= declare
@@ -221,6 +221,7 @@ class SimSeats:
                 self._citystate_suzerain_release(row, tgt, peace)
                 self._citystate_suzerain_release(tgt, row, peace)
                 self._reset_war_clock(row, tgt, peace)
+                self._stamp_treaty(row, tgt, peace)
                 for _pr in (row, tgt):
                     self.peace_turns[:, _pr] = torch.where(peace, torch.zeros_like(self.peace_turns[:, _pr]), self.peace_turns[:, _pr])
 
@@ -363,6 +364,9 @@ class SimSeats:
         ) & self._res_avail_mask(self.tile_seat == row)
 
     def _seat_buy_unit_candidates(self, row: int, tr_u: torch.Tensor) -> torch.Tensor:
+        # No hull on the GOLD rung: it spawns at the capital and asks no city
+        # question, and `trainableUnits(state, seat)` with no city refuses every
+        # naval chassis outright (`d.naval` returns `!!city && ...`).
         mil = tr_u & (self._type_combat.unsqueeze(0) > 0) & ~self.unit_naval.unsqueeze(0)
         if self._scout_idx >= 0:
             mil[:, self._scout_idx] = False
@@ -1012,6 +1016,15 @@ class SimSeats:
         adj = (host[:, nb] & (self.neigh >= 0).unsqueeze(0)).any(dim=2)
         return base & adj
 
+    def _martyr_draw(self, rows: torch.Tensor) -> torch.Tensor:
+        """One MARTYR draw per fallen apostle, for the games in `rows` — the
+        `martyrs()` twin. Returns the [n] keep mask aligned with `rows`; the
+        stream advances in exactly those games, which is where TS's own draw
+        lands."""
+        m = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        m[rows] = True
+        return self._next_random(m)[rows] < self._martyr_chance
+
     def _theological_combat_phase(self) -> None:
         """THEOLOGICAL COMBAT — ONE pass, every seat, at one schedule position.
 
@@ -1021,8 +1034,8 @@ class SimSeats:
         theoBaseDamage plus the religious-strength difference scaled by
         theoDamage, floored at 1; a unit at 0 HP dies; the loser's religion
         sheds theoPressureSwing in every city within theoPressureRange of the
-        fallen unit while the winner's gains it. ZERO-DRAW by construction, so
-        this pass cannot move the RNG stream.
+        fallen unit while the winner's gains it. The ONE draw is the MARTYR
+        roll, taken per fallen apostle at the relic site.
 
         ORDER: slot order for the attacker walk AND the defender pick — the
         twin of TS's `state.units` array order. A dead attacker (killed earlier
@@ -1098,22 +1111,25 @@ class SimSeats:
                     self.city_pressure[dr[k], msk, wr[k]] += sw
                     _cur = self.city_pressure[dr[k], msk, lr[k]]
                     self.city_pressure[dr[k], msk, lr[k]] = (_cur - sw).clamp(min=0)
-            # RELICS — every APOSTLE that falls here martyrs (promotions are
-            # unmodeled and this routine is zero-draw, so MARTYR is assumed:
-            # a recorded overstatement). Granted BEFORE the disbands and in
-            # TS's order, defender then attacker, so slot placement is
-            # order-exact. A dead MISSIONARY yields nothing; the attacker is
-            # always an apostle.
-            if self._relic_bidx >= 0:
-                if bool(def_dead.any()):
-                    _dr = rows[def_dead]
-                    _dj = j[_dr]
-                    _ap = self.major_unit_type[_dr, _dj] == self._apostle_idx
-                    if bool(_ap.any()):
-                        self._grant_relic(_dr[_ap], self.major_unit_seat[_dr[_ap], _dj[_ap]])
-                if bool(atk_dead.any()):
-                    _ar = rows[atk_dead]
-                    self._grant_relic(_ar, a_seat[_ar])
+            # RELICS — a fallen APOSTLE martyrs only if it carried the MARTYR
+            # promotion, which is DRAWN here (see MARTYR_CHANCE in
+            # data/religion). Drawn and granted BEFORE the disbands and in TS's
+            # order, defender then attacker, so both the RNG stream and the
+            # relic's slot are order-exact. A dead MISSIONARY yields nothing;
+            # the attacker is always an apostle.
+            _dr = rows[def_dead]
+            _dj = j[_dr]
+            _dcand = _dr[self.major_unit_type[_dr, _dj] == self._apostle_idx]
+            if _dcand.numel():
+                _dseat = self.major_unit_seat[_dcand, j[_dcand]]
+                _keep = self._martyr_draw(_dcand)
+                if bool(_keep.any()) and self._relic_bidx >= 0:
+                    self._grant_relic(_dcand[_keep], _dseat[_keep])
+            _ar = rows[atk_dead]
+            if _ar.numel():
+                _keep = self._martyr_draw(_ar)
+                if bool(_keep.any()) and self._relic_bidx >= 0:
+                    self._grant_relic(_ar[_keep], a_seat[_ar][_keep])
             # A killed unit must also LEAVE ITS TILE: TS's `disbandUnit` drops
             # it from `state.units` entirely, so clearing `alive` alone would
             # leave the occupancy plane pointing at the corpse and block the
@@ -1122,22 +1138,22 @@ class SimSeats:
             if bool(def_dead.any()):
                 _dd = rows[def_dead]
                 self.major_unit_alive[_dd, j[_dd]] = False
-                self._vacate_major(_dd, j[_dd])
+                self._vacate("major", _dd, j[_dd])
             if bool(atk_dead.any()):
                 _ad = rows[atk_dead]
                 self.major_unit_alive[_ad, u] = False
-                self._vacate_major(_ad, torch.full_like(_ad, u))
+                self._vacate("major", _ad, torch.full_like(_ad, u))
         self._eff_version += 1
 
-    def _vacate_major(self, rows: torch.Tensor, slots: torch.Tensor) -> None:
-        """Clear whichever occupancy plane points at these MAJOR slots. A slot
-        whose unit is gone must not keep holding its tile — religious units are
+    def _vacate(self, pool: str, rows: torch.Tensor, slots: torch.Tensor) -> None:
+        """Clear whichever occupancy plane points at these slots. A slot whose
+        unit is gone must not keep holding its tile — religious units are
         civilians, but clearing both planes means a military defender can never
         leak either."""
         if rows.numel() == 0:
             return
-        t = self.major_unit_tile[rows, slots]
-        lo = self.POOL_LO["major"]
+        t = getattr(self, f"{pool}_unit_tile")[rows, slots]
+        lo = self.POOL_LO[pool]
         civ = self.civilian_at[rows, t] == slots + lo
         if bool(civ.any()):
             self.civilian_at[(rows[civ], t[civ])] = -1
@@ -2904,6 +2920,27 @@ class SimSeats:
             a_alive[:, u] = a_alive[:, u] & ~died
         return rows, hrow, slot, died, ttc
 
+    def _raze_garrison(self, rows: torch.Tensor, centres: torch.Tensor, captor: torch.Tensor) -> None:
+        """CIV6: "when a city is captured, all units within it are destroyed" —
+        the garrison falls with the centre it was holding, whoever it belongs
+        to. Runs BEFORE the transfer, so the centre is still registered and the
+        deaths leave no dig, exactly as TS's `markAntiquitySite` refuses a tile
+        carrying a district."""
+        if rows.numel() == 0:
+            return
+        for pool in ("major", "barb"):
+            tiles = getattr(self, f"{pool}_unit_tile")[rows]
+            seats = getattr(self, f"{pool}_unit_seat")[rows]
+            hit = (getattr(self, f"{pool}_unit_alive")[rows]
+                   & (tiles == centres.unsqueeze(1)) & (seats != captor.unsqueeze(1)))
+            if not bool(hit.any()):
+                continue
+            ri, si = hit.nonzero(as_tuple=True)
+            gr = rows[ri]
+            self._dig_at(gr, centres[ri], self._row_of(captor[ri]))  # killUnit's ACTING seat
+            getattr(self, f"{pool}_unit_alive")[gr, si] = False
+            self._vacate(pool, gr, si)
+
     def _melee_city(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int) -> None:
         """The battle in `_assault_city`, then the aftermath the ATTACKER's
         class decides: a MAJOR takes the city (one `_transfer_city`, which pays
@@ -2923,8 +2960,9 @@ class SimSeats:
         fell = rows[self.city_hp[rows, hrow[rows], slot[rows]] <= 0]
         if fell.numel() == 0:
             return
+        a_seat = self._pool_of(atk_kind)[6]
+        self._raze_garrison(fell, self.city_center[fell, hrow[fell], slot[fell]], a_seat[fell, u])
         if POOL_CLASS[atk_kind] == "major":
-            a_seat = self._pool_of(atk_kind)[6]
             for _b in fell.tolist():
                 self._transfer_city(_b, int(hrow[_b]), int(slot[_b]), int(a_seat[_b, u]), conquest=True)
             return

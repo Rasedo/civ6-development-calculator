@@ -279,6 +279,16 @@ export const THEO_BASE_DAMAGE = 30;
 export const THEO_PRESSURE_RANGE = 6;
 export const THEO_PRESSURE_SWING = 15;
 
+/** CIV 6: MARTYR — "a Relic is created if this Apostle dies in Theological
+ *  Combat" — is ONE of the NINE Apostle promotions (Chaplain, Debater, Heathen
+ *  Conversion, Indulgence Vendor, Martyr, Orator, Pilgrim, Proselytizer,
+ *  Translator). Picking a promotion is a DECISION and neither engine takes one
+ *  without a wire record, so the promotion is DRAWN uniformly instead. The draw
+ *  sits at the only moment it can matter — the apostle's death — which is
+ *  distributionally identical to drawing it at creation and costs no per-unit
+ *  plane. */
+export const MARTYR_CHANCE = 1 / 9;
+
 /**
  * pressure→yields coupling master switch (Round B3, slice U). When false
  * (INERT), a city's FOLLOWER-belief yields key on the OWNER civ's religion —

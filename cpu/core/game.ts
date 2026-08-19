@@ -27,7 +27,8 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, MISSIONARY_CAP, APOSTLE_CAP, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE } from '../data/religion';
+import { nextRandom } from './rand';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, MISSIONARY_CAP, APOSTLE_CAP, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, MARTYR_CHANCE } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { BARB_SEAT, allCities, allSeats, citiesOf, emptySeat, seatOf, seatOfCityState, setTileOwner, tileClaimed, unitSeat } from './seats';
@@ -1028,14 +1029,14 @@ function theologicalCombatPhase(state: GameState): void {
         if (loserRel >= 0) pres[loserRel] = Math.max(0, pres[loserRel] - THEO_PRESSURE_SWING);
       }
     }
-    // RELICS. Real Civ 6 creates one when an Apostle killed here carried the
-    // MARTYR promotion; promotions are unmodeled and this routine is
-    // zero-draw, so every dead APOSTLE martyrs — a recorded overstatement (see
-    // the RELIC_* comment in data/greatPeople). A dead MISSIONARY yields
-    // nothing. Granted in the SAME order as the two disbands below (defender
-    // first, then attacker) so slot placement is order-exact across engines.
-    if (def.hp <= 0 && def.type === 'APOSTLE') placeRelic(citiesOf(state, unitSeat(def)));
-    if (att.hp <= 0) placeRelic(citiesOf(state, g)); // the attacker is always an APOSTLE
+    // RELICS. CIV 6 creates one when the Apostle killed here carried the
+    // MARTYR promotion — one of nine, DRAWN here (see MARTYR_CHANCE). A dead
+    // MISSIONARY yields nothing. Drawn and granted in the SAME order as the two
+    // disbands below (defender first, then attacker) so both the RNG stream and
+    // the relic's slot are order-exact across engines.
+    const martyrs = (): boolean => nextRandom(state) < MARTYR_CHANCE;
+    if (def.hp <= 0 && def.type === 'APOSTLE' && martyrs()) placeRelic(citiesOf(state, unitSeat(def)));
+    if (att.hp <= 0 && martyrs()) placeRelic(citiesOf(state, g)); // the attacker is always an APOSTLE
     if (def.hp <= 0) disbandUnit(state, def.id);
     if (att.hp <= 0) disbandUnit(state, att.id);
   }

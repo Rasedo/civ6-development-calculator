@@ -125,6 +125,8 @@ export interface GameState {
   roadBridges?: boolean;
   congressSessions?: number;
   warTurns?: Record<string, number>;
+  /** turns a pair's PEACE TREATY still binds, keyed like `warTurns`. */
+  treatyTurns?: Record<string, number>;
   map: GameMap;
   turn: number;
   seatActions?: SeatActionLog;

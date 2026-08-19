@@ -4,15 +4,11 @@ import { placeRelic, relicFaith, relicTourism, RELIC_BUILDING, RELIC_SLOTS_PER_B
 // RELICS. Real Civ 6 counts a Relic as a Great Work held in a
 // TEMPLE's single slot, paying +4 Faith and +8 Tourism — the densest tourism
 // source in the game. Created when an Apostle carrying the MARTYR promotion is
-// killed in theological combat; promotions are unmodeled and that routine is
-// deliberately zero-draw, so EVERY apostle killed there martyrs (a recorded
-// overstatement, see the RELIC_* comment in src/data/greatPeople.ts).
+// killed in theological combat; MARTYR is one of nine apostle promotions and
+// `theologicalCombatPhase` draws for it at the death (see MARTYR_CHANCE).
 //
-// MEASURED reachable: 26 relics are held at t250 across 4 of the 24 scripted
-// seeds, which lifted the tourism ceiling from 7 visiting tourists to 12. The
-// scripted gate therefore exercises the grant, and rFaith/rTourism are both
-// compared trace columns — these pokes pin the PLACEMENT rules the gate can't
-// isolate.
+// rFaith/rTourism are both compared trace columns, so the gate exercises the
+// grant — these pokes pin the PLACEMENT rules the gate cannot isolate.
 
 const city = (buildings: string[], relics?: number) => ({ buildings, relics });
 

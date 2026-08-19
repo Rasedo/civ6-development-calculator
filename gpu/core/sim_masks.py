@@ -55,7 +55,7 @@ class SimMasks:
         at_war = self.war[:, row, idx]                      # [B, n_opponents]
         wt = self.war_turns[:, row, idx]                    # [B, n_opponents] THIS war's clock
         cost = rr.get("peaceGold0", 150) + rr.get("peaceGoldSlope", 10) * wt.to(torch.float64)
-        declare = live & ~at_war
+        declare = live & ~at_war & (self.treaty_turns[:, row, idx] == 0)
         peace = (
             live & at_war
             & (wt >= rr.get("warMinTurns", 14))

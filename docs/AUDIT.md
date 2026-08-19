@@ -53,17 +53,13 @@ nothing carries forward.
 | B-21r suzerain rows | 3 | 10 descoped channels, each needing its own mechanic |
 | B-22r World Congress | 6 | one resolution type of many; emergencies and competitions absent |
 | B-24r Ages/governors | 2 | eight dedication catalog entries, dark-age policies, governor promotions, per-civ era drift |
-| B-26r barb escalation | 2 | camp-spawn ladder beyond melee |
-| B-27r martyr relics | 1 | the ~7x relic overstatement; the resolver's other two simplifications are recorded deviations |
-| B-28r naval production | 3 | one heuristic column where `trainableUnits` belongs |
-| B-29r peace-treaty cooldown | 1 | a per-pair clock and its gate, both engines |
 | B-30r specialists | 6 | a mechanic neither engine has: wire column, assignment, yields |
-| B-32r captured-city garrison | 1 | units on a captured centre must die with the city; both engines leave them standing |
-| B-33r floods vs districts | 1 | GS floods damage districts/buildings on floodplains (the Dam's reason to exist); both engines only pillage improvements and fertilize |
 | B-31r trade-route tails | 6 | a Trader UNIT and a route wire verb |
 | B-D unsourced data values | 5 | a residual CLASS: every invented magnitude, re-sourced |
-| **B. Fidelity vs real Civ 6** | **44** | |
-| **OPEN, TOTAL** | **44** | |
+| B-35r theological damage | 1 | deterministic and LINEAR where real Civ 6 rolls; the martyr draw shows a mirrored conditional draw is available |
+| B-34r flood tails | 1 | GS floods also damage UNITS and kill citizens, and a centre on a floodplain loses HP; and the Dam/Great Bath that mitigates a river is not in the district roster |
+| **B. Fidelity vs real Civ 6** | **37** | |
+| **OPEN, TOTAL** | **37** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -109,14 +105,15 @@ Civ 6 source or is recorded as unverifiable.
   museum slots) and the wonder-era term all exist and are digest-
   compared. Open: NATIONAL PARKS (no concept); recorded-not-modeled:
   theming bonuses, shipwreck excavation, trading works between civs,
-  open-borders digs. The martyr-relic overstatement (~7x) is B-27r(3).
+  open-borders digs. The relic rate no longer overstates: only a MARTYR
+  apostle leaves one, and the promotion is drawn at the death.
   NOT a gap: the Archaeologist trains on every row — `trainableUnits` /
   `_trainable_units` gate it on the museum's free artifact slot through
   `_type_civic_slot_ok`, one body per engine. What no seat does is PICK
   the column, which is a ladder question, not a wiring one.
-  MEASURED BEFORE THE FREEZE, and stale by construction: visiting
-  tourists peaked ~7 against ~97 domestic at t250, putting the culture
-  victory ~14x out of reach. Re-measure at the first serve run before
+  MEASURED, 12 seeds x 250 turns driven: visiting tourists peak at 6
+  (mean 1.3) against a domestic peak of 67, putting the culture
+  victory ~11x out of reach. Re-measure before
   quoting it — every round since has moved the economy.
 - **B-21r. City-state suzerain rows:** 14 shipped (`CITY_STATE_SUZERAIN_LIVE`)
   / 10 descoped, each carrying its reason in its `CITY_STATES` catalog entry's
@@ -140,31 +137,14 @@ Civ 6 source or is recorded as unverifiable.
   sourced, so the stateless greedy ranking is faithful for the one
   governor channel modeled); per-civ tech-era drift (eras are global
   50-turn blocks).
-- **B-26r. Barbarian camp-spawn escalation** beyond the melee ladder
-  (cliffs, ranged barbs and naval barbs all landed).
-- **B-27r. Every fallen apostle martyrs into a relic.** Real Civ 6 needs the
-  MARTYR promotion; promotions are unmodeled and `theologicalCombatPhase` /
-  `_theological_combat_phase` are zero-draw, so relic frequency is an
-  OVERSTATEMENT of roughly 7x (recorded at the RELIC_* site in
-  data/greatPeople). It feeds faith, tourism and the culture victory, so
-  B-20r's rate cannot be read until this is fixed or bounded.
-- **B-28r. THE NAVAL PRODUCTION SURFACE is one heuristic column.** `ok_u`
-  masks out every hull (`~unit_naval`) and a single hand-rolled GALLEY
-  column (`_galley_idx`, sim_seats.py) is added back, legal only while the
-  seat owns zero naval units live or queued. Real Civ 6 offers whatever
-  `trainableUnits` allows in a naval-capable city, with no one-ship cap.
-  The fix is to drop `~unit_naval` and let the capability gate that already
-  rides in `tr_j` answer, deleting the galley column — a behaviour round
-  that needs the serve gate live.
-  REACHABILITY: no seat fields a second ship in driven games, so every
-  naval rule past the first hull is poke-covered only.
-- **B-29r. No peace-treaty cooldown.** Real Civ 6 binds a peace treaty for
-  a fixed term — a seat that just made peace cannot re-declare on that
-  opponent for ~10 turns. Neither engine models it: `_apply_war_column` /
-  `makePeace` reset the pair clock and the declare column reopens the very
-  next turn, so a rich seat can thrash war→peace→war on one opponent. The
-  clock to gate on already exists per-pair (#111 s5's `war_turns`); what is
-  missing is a per-pair PEACE stamp beside it.
+- **B-35r. Theological damage is deterministic and LINEAR.** Real Civ 6
+  rolls; `theologicalCombatPhase` / `_theological_combat_phase` take
+  theoBaseDamage plus theoDamage x the religious-strength difference with no
+  random multiplier, and the linear curve is this repo's own, not the game's
+  exponential one. The reason this stood — "a conditional draw would have to
+  be mirrored draw-for-draw" — no longer holds: the MARTYR draw in the same
+  routine is mirrored and the 250-turn gate is green over it. Closing this
+  needs the real religious-combat formula sourced, not just a multiplier.
 - **B-30r. SPECIALISTS are not a mechanic on either engine.** Real Civ 6
   lets a city work a district slot instead of a tile; here TS only ever
   writes `city.specialists` from `setSpecialists`, a UI verb, so it is `{}`
@@ -206,12 +186,15 @@ above.
 - **Ranged strikes against a DISTRICT** are out of scope, matching the
   ranged-vs-city scope-out. The rest of the Encampment (`encamp_hp` pool,
   movement block, garrison pool, district strike, training XP) is complete.
-- **The theological resolver is DETERMINISTIC.** Real Civ 6 rolls; ours takes
-  theoBaseDamage plus the strength difference with no RNG multiplier, because
-  a conditional draw would have to be mirrored draw-for-draw across engines.
 - **Only APOSTLES initiate theological combat.** Real Civ 6 also allows
   Inquisitors; this roster has no INQUISITOR unit at all, so the pair we model
   is the whole class.
+- **A garrison does not BLOCK a capture; it dies with the city.** Real Civ 6
+  takes a city by moving a melee unit onto the centre, so a defender standing
+  there has to be destroyed first. Here the centre is taken the moment its HP
+  reaches 0 and CITY-FIRST targeting means the garrison was never attackable in
+  its own right, so blocking would deadlock: the units on the centre die with
+  it instead ("when a city is captured, all units within it are destroyed").
 - **The science victory's three small deviations.** The Terrestrial Laser
   Station's powered-city condition (there is no power system), the Lagrange
   Laser Station's 30 Aluminum (there are no strategic-resource stockpiles),
@@ -228,11 +211,11 @@ three of them overturned what this section used to assert:
 | mechanic | seeds reaching | first |
 |---|---|---|
 | faith-buy kind 6 (APOSTLE purchase) | 12/12 | t58 |
-| two enemy religious units ADJACENT (theological combat's precondition) | 8/12 | t98 |
+| two enemy religious units ADJACENT (theological combat's precondition) | 7/12 | t98 |
+| a second HULL on any seat | 7/12 | t129 |
+| an INTERNATIONAL trade leg | 1/12 | t213 |
 | URBANIZATION civic | 0/12 | never |
 | a NEIGHBORHOOD placed | 0/12 | never |
-| a second HULL on any seat | 0/12 | never |
-| an INTERNATIONAL trade leg | 0/12 | never |
 | an antiquity dig (artifact in a slot) | 0/12 | never |
 
 - THEOLOGICAL COMBAT IS REACHED, in two-thirds of seeds from t98. The old
@@ -244,9 +227,12 @@ three of them overturned what this section used to assert:
 - The NEIGHBORHOOD column is poke-covered only: no seed reaches
   URBANIZATION (an Industrial civic, cost 1060, behind CIVIL_ENGINEERING and
   NATIONALISM) inside 250 turns, so nothing places one.
-- No seat fields a second ship (B-28r), and no INTERNATIONAL trade leg ever
-  fires — which also bounds the new `routes` digest field: its domestic and
-  city-state arms are exercised every game, its international arm by nothing.
+- A SECOND HULL now reaches 7 of 12 seeds from t129, where the one-galley
+  heuristic held it at zero: dropping it put every naval rule past the first
+  ship inside the gate. The same wider trajectory finally fires an
+  INTERNATIONAL trade leg, in one seed at t213 — so the `routes` digest
+  field's international arm is exercised, barely, and its domestic and
+  city-state arms every game.
 - No antiquity dig happens at all, so the finer question this section used to
   ask — a dig by a seat whose ERA differs from row 0's — is doubly moot:
   eras are global 50-turn blocks (B-24r), so no two seats can be in different

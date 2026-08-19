@@ -645,6 +645,11 @@ class SimOrders:
             if self.turn > cb.get("crossbowmanAfterTurn", 120)
             else self._barb_galley_idx
         )
+        cav_type = (
+            self._barb_knight_idx
+            if self.turn > cb.get("crossbowmanAfterTurn", 120)
+            else self._barb_horseman_idx
+        )
 
         any_city = self.city_alive[:, :self.n_majors].reshape(B, -1).any(dim=1)
         can_roll = any_city & (self.n_camps < self.max_camps)
@@ -703,37 +708,55 @@ class SimOrders:
             if not bool(active.any()):
                 continue
             near_any = near_any_all[:, k]
-            self._spawn_barb(active & ~near_any, camp, melee_type)
+            # A camp's CLASS is its LOCATION's: Horses within barbHorseRange
+            # makes it a cavalry outpost, a reachable coast a pirate camp. The
+            # horse test is per game because the camp tile is.
+            horse = (
+                ((self.pair_dist[camp.clamp(min=0)] <= self._barb_horse_range)
+                 & (self.res_id == self._barb_horse_res)).any(dim=1)
+                & active & (cav_type >= 0)
+            )
+            # REGARRISON on the camp's own land ladder — a hull cannot hold a
+            # camp. Per game only one of the two masks fires, so the pool's
+            # append order is the TS spawn order in every game.
+            _rg = active & ~near_any
+            self._spawn_barb(_rg & horse, camp, cav_type)
+            self._spawn_barb(_rg & ~horse, camp, melee_type)
             can_grow = active & near_any & (self.barb_unit_alive.sum(dim=1) < self.n_camps * cb.get("maxBarbPerCamp", 3))
             r = self._next_random(can_grow)
-            # Every THIRD camp raids RANGED, the rest melee. `k` IS the TS
-            # `campNo`: camps append at n_camps and _clear_camp_at splices left
-            # exactly like state.barbCamps.splice, so slots 0..n_camps-1 are
-            # dense and in the same order as the TS array.
-            grow_type = ranged_type if k % 3 == 0 else melee_type
             _raid = can_grow & (r < cb.get("garrisonGrowChance", 0.1))
-            # Every FOURTH camp (a residue that never collides with the ranged
-            # rule) puts out a naval HULL instead when it is coastal, on the
-            # LOWEST-index free water neighbour. Zero-draw: the 0.1 roll above
-            # already fired and nothing else is consulted.
-            _nav_done = torch.zeros_like(_raid)
-            if k % 4 == 1 and self._barb_naval_type >= 0:
-                _nb = self.neigh[camp.clamp(min=0)]
-                _nbc = _nb.clamp(min=0)
-                _free = (
-                    (_nb >= 0)
-                    & self.wpass.gather(1, _nbc)
-                    & ~self.ocean_tile.gather(1, _nbc)  # barbarians have no CARTOGRAPHY
-                    & (self.military_at.gather(1, _nbc) < 0)  # no unit at all
-                    & (self.civilian_at.gather(1, _nbc) < 0)
-                )
-                _key = torch.where(_free, _nb, torch.full_like(_nb, self.T + 1))
-                _best = _key.min(dim=1).values
-                _nav = _raid & (_best <= self.T)
-                if bool(_nav.any()):
-                    self._spawn_barb(_nav, _best.clamp(max=self.T - 1), self._barb_naval_type, naval=True)
-                    _nav_done = _nav
-            self._spawn_barb(_raid & ~_nav_done, camp, grow_type)
+            # The raid ROTATES: the camp's CLASS unit, then ranged, then melee,
+            # so every camp fields melee and ranged whatever it stands on. `k`
+            # IS the TS `campNo`: camps append at n_camps and _clear_camp_at
+            # splices left exactly like state.barbCamps.splice, so slots
+            # 0..n_camps-1 are dense and in the same order as the TS array.
+            # Zero-draw: the 0.1 roll above already fired and nothing else is
+            # consulted.
+            _slot = (k + self.turn) % 3
+            if _slot == 1:
+                self._spawn_barb(_raid, camp, ranged_type)
+            elif _slot == 2:
+                self._spawn_barb(_raid, camp, melee_type)
+            else:
+                _nav = torch.zeros_like(_raid)
+                if self._barb_naval_type >= 0:
+                    _nb = self.neigh[camp.clamp(min=0)]
+                    _nbc = _nb.clamp(min=0)
+                    _free = (
+                        (_nb >= 0)
+                        & self.wpass.gather(1, _nbc)
+                        & ~self.ocean_tile.gather(1, _nbc)  # barbarians have no CARTOGRAPHY
+                        & (self.military_at.gather(1, _nbc) < 0)  # no unit at all
+                        & (self.civilian_at.gather(1, _nbc) < 0)
+                    )
+                    _key = torch.where(_free, _nb, torch.full_like(_nb, self.T + 1))
+                    _best = _key.min(dim=1).values
+                    _nav = _raid & (_best <= self.T)
+                    if bool(_nav.any()):
+                        self._spawn_barb(_nav, _best.clamp(max=self.T - 1), self._barb_naval_type, naval=True)
+                _land = _raid & ~_nav
+                self._spawn_barb(_land & horse, camp, cav_type)
+                self._spawn_barb(_land & ~horse, camp, melee_type)
 
         # One guard stays home per camp: first unit (in unit order) within
         # reach of each camp (in camp order), like the TS guard set. Only

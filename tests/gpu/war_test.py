@@ -117,6 +117,7 @@ def test_peace(rules, path):
     sim.civ_treasury[:, 0] -= cost  # IN PLACE — treasury is a view of civ_treasury
     sim.war[:, 0, 1 + 0] = sim.war[:, 1 + 0, 0] = False
     sim._reset_war_clock(0, 1, torch.ones(sim.B, dtype=torch.bool))
+    sim._stamp_treaty(0, 1, torch.ones(sim.B, dtype=torch.bool))  # peace BINDS the pair
     sim.peace_turns[:, 0] = 0  # the treaty restarts BOTH parties' peace clocks
     sim.peace_turns[:, 1 + 0] = 0
     sim.step()

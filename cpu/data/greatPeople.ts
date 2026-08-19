@@ -218,14 +218,10 @@ export function greatWorkTourism(city: GwCity, printing = false): number {
  * "Relics"/"Great Work (Civ6)", Gathering Storm). Relics pay no culture, which
  * is why they sit outside the GW_* kind arrays above.
  *
- * SOURCE, and the one deliberate deviation: real Civ 6 creates a relic when an
- * Apostle carrying the MARTYR promotion is killed in theological combat.
- * Promotions are not modeled, and `theologicalCombatPhase` is deliberately ZERO-DRAW
- * (a conditional RNG draw there would have to be mirrored draw-for-draw across
- * both engines), so rolling for Martyr is not available. Every APOSTLE killed
- * in theological combat martyrs instead. That OVERSTATES relic frequency by
- * roughly the promotion odds (~1 in 7); it is recorded rather than hidden, and
- * it keeps the routine draw-count exact. A dead MISSIONARY never yields a relic.
+ * SOURCE: real Civ 6 creates a relic when an Apostle carrying the MARTYR
+ * promotion is killed in theological combat. `theologicalCombatPhase` draws for
+ * it at the death — see `MARTYR_CHANCE` in data/religion for why the draw sits
+ * there and not at the apostle's creation. A dead MISSIONARY never yields one.
  */
 export const RELIC_BUILDING = 'TEMPLE';
 export const RELIC_SLOTS_PER_BUILDING = 1;

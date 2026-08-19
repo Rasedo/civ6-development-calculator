@@ -44,9 +44,9 @@ import { DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex } from './unitActions';
 
 const A_FOUND_CITY = unitActionIndex(IMPROVEMENT_IDS).FOUND_CITY;
-import { ALLY_MIN_PEACE, CIV_LEADERS, FORMAL_WAR_MIN_TURNS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION } from '../data/seats';
+import { ALLY_MIN_PEACE, CIV_LEADERS, FORMAL_WAR_MIN_TURNS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION } from '../data/seats';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles, goldenBoostBonus } from './eras';
-import { NO_SEAT, atWarWithAny, citiesOf, civHasStrategic, civsAtWar, emptySeat, isCiv, prophetsOf, seatOf, seatOfCityState, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, warTurnsWith, warsOf } from './seats';
+import { NO_SEAT, atWarWithAny, citiesOf, civHasStrategic, civsAtWar, emptySeat, isCiv, prophetsOf, seatOf, seatOfCityState, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, spreadFromUnit } from './unitOrders';
 
@@ -202,6 +202,8 @@ export function declareWar(state: GameState, actorSeat: number, seat: number): R
   const actor = seatOf(state, actorSeat);
   if (!actor) return no('No such civilization.');
   if (civsAtWar(state, actor.seat, seat)) return no('Already at war.');
+  const bound = treatyTurnsWith(state, actor.seat, seat);
+  if (bound > 0) return no(`The peace treaty binds for another ${bound} turns.`);
   setWar(state, actor.seat, seat, true);
   setWarTurnsWith(state, actor.seat, seat, 0);
   seatOf(state, seat)!.warmonger = (seatOf(state, seat)!.warmonger ?? 0) + WARMONGER_DOW;
@@ -231,6 +233,7 @@ function makePeace(state: GameState, actor: Seat, foe: number): void {
   setWarFormal(state, actor.seat, foe, false);
   warWearinessPeace(state, foe, actor.seat);
   setWarTurnsWith(state, actor.seat, foe, 0);
+  setTreatyTurnsWith(state, actor.seat, foe, PEACE_TREATY_TURNS);
   actor.peaceTurns = 0;
   const foeSeat = seatOf(state, foe);
   if (foeSeat && 'peaceTurns' in foeSeat) (foeSeat as Seat).peaceTurns = 0;
@@ -239,6 +242,7 @@ function makePeace(state: GameState, actor: Seat, foe: number): void {
       if (civsAtWar(state, cityState.seat, opponent) && isSuzerain(cityState, patron)) {
         setWar(state, cityState.seat, opponent, false);
         setWarTurnsWith(state, cityState.seat, opponent, 0);
+        setTreatyTurnsWith(state, cityState.seat, opponent, PEACE_TREATY_TURNS);
         warWearinessPeace(state, opponent, seatOfCityState(cityState.id));
         state.eventLog.push(`${cityState.name} makes peace alongside its suzerain.`);
       }
@@ -694,7 +698,8 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
     const targets = warTargets(state, actor.seat);
     const foe = targets[warCol < nOpp ? warCol : warCol - nOpp];
     if (foe !== undefined && actor.seat !== foe) {
-      if (warCol < nOpp && !civsAtWar(state, actor.seat, foe) && !seatsAllied(state, actor.seat, foe)) {
+      if (warCol < nOpp && !civsAtWar(state, actor.seat, foe) && !seatsAllied(state, actor.seat, foe)
+          && treatyTurnsWith(state, actor.seat, foe) === 0) {
         setWar(state, actor.seat, foe, true);
         setWarTurnsWith(state, actor.seat, foe, 0);
         actor.warmonger = (actor.warmonger ?? 0) + WARMONGER_DOW;
@@ -1567,6 +1572,13 @@ export function seatPhase(state: GameState): void {
       // ONE tick per pair per turn, at the pair's LOWER seat's tail — a major
       // always outranks its city-state foes (their seat ids sit at 100+).
       if (actor.seat < foe) setWarTurnsWith(state, actor.seat, foe, warTurnsWith(state, actor.seat, foe) + 1);
+    }
+    // ONE treaty countdown per pair per turn, at the pair's LOWER seat's tail —
+    // the war clock's discipline, over the pairs that are NOT at war.
+    for (const other of [...state.seats.map((x) => x.seat), ...(state.cityStates ?? []).map((c) => c.seat)]) {
+      if (actor.seat >= other) continue;
+      const bound = treatyTurnsWith(state, actor.seat, other);
+      if (bound > 0) setTreatyTurnsWith(state, actor.seat, other, bound - 1);
     }
     if (!anyWar) actor.peaceTurns += 1;
     if (recU) applySeatUnitOrders(state, actor, recU.units);

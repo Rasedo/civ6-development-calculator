@@ -180,6 +180,11 @@ def main() -> int:
                 ("occupancy", [py, "tests/gpu/occupancy_test.py"], 4),
                 ("domination", [py, "tests/gpu/domination_test.py"], 4),
                 ("peace_target", [py, "tests/gpu/peace_target_test.py"], 2),  # no attack without a war
+                ("peace_treaty", [py, "tests/gpu/peace_treaty_test.py"], 2),  # the treaty shuts the declare column for its term
+                ("city_falls", [py, "tests/gpu/city_falls_test.py"], 2),  # a fallen city takes its garrison with it
+                ("flood_district", [py, "tests/gpu/flood_district_test.py"], 2),  # a flood pillages the district on the floodplain
+                ("martyr", [py, "tests/gpu/martyr_test.py"], 2),  # one relic in nine apostle deaths, drawn where TS draws
+                ("barb_camps", [py, "tests/gpu/barb_camps_test.py"], 2),  # a camp's class is its ground; ranged is nobody's class
                 ("civ_pair_strike", [py, "tests/gpu/civ_pair_strike_test.py"], 2),  # a civ city fires on an enemy civ
                 ("spawn_reclaim", [py, "tests/gpu/spawn_reclaim_test.py"], 2),  # a reclaimed slot hands on no drowned unit's MP
                 ("centre_defence", [py, "tests/gpu/centre_defence_test.py"], 2),  # a centre is attacked as the CITY

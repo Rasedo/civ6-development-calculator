@@ -191,6 +191,17 @@ export function setWarTurnsWith(state: GameState, a: number, b: number, v: numbe
   state.warTurns[warClockKey(a, b)] = v;
 }
 
+export function treatyTurnsWith(state: GameState, a: number, b: number): number {
+  if (a === b) return 0;
+  return state.treatyTurns?.[warClockKey(a, b)] ?? 0;
+}
+
+export function setTreatyTurnsWith(state: GameState, a: number, b: number, v: number): void {
+  if (a === b) return;
+  if (!state.treatyTurns) state.treatyTurns = {};
+  state.treatyTurns[warClockKey(a, b)] = v;
+}
+
 export function warIsFormal(state: GameState, a: number, b: number): boolean {
   return seatOf(state, a)?.formalWars.includes(b) ?? false;
 }

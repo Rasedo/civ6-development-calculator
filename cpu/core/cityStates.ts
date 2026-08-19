@@ -1,12 +1,12 @@
 
 import type { City, CityState, CityStateQuest, CityStateType, GameState, Tile, Yields } from './types';
-import { NO_SEAT, citiesOf, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setWar, setWarTurnsWith, tileSeat, warTurnsWith } from './seats';
+import { NO_SEAT, citiesOf, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileSeat, treatyTurnsWith, warTurnsWith } from './seats';
 import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from '../../world/hex';
 import { isWater, isImpassable, hasFreshWater } from '../../world/query';
 import { nextRandom } from './rand';
 import type { RuleResult } from './rules';
-import { WAR_MIN_TURNS } from '../data/seats';
+import { PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/seats';
 import { TERRAINS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
@@ -291,6 +291,8 @@ export function declareWarOnCityState(state: GameState, cityStateId: number, sea
   if (!cityState) return { ok: false, reason: 'No such city-state.' };
   if (!hasMet(cityState, seat)) return { ok: false, reason: 'You have not met this city-state.' };
   if (civsAtWar(state, cityState.seat, seat)) return { ok: false, reason: 'Already at war.' };
+  const bound = treatyTurnsWith(state, cityState.seat, seat);
+  if (bound > 0) return { ok: false, reason: `The peace treaty binds for another ${bound} turns.` };
   setWar(state, cityState.seat, seat, true);
   state.eventLog.push(`You have declared war on ${cityState.name}!`);
   return { ok: true };
@@ -300,8 +302,8 @@ export function declareWarOnCityState(state: GameState, cityStateId: number, sea
  * SUE FOR PEACE with a city-state. SOURCED: real Civ 6 unlocks the
  * offer once 10 turns have passed since the war began, and a city-state
  * "will always accept an offer of peace without preconditions" — so there is no
- * acceptance roll here, only the cooldown. Peace resets the counter, so a
- * re-declaration must wait out the floor again.
+ * acceptance roll here, only the cooldown. The treaty it stamps binds a
+ * re-declaration for PEACE_TREATY_TURNS.
  */
 export function sueForPeaceWithCityState(state: GameState, cityStateId: number, seat: number): RuleResult {
   const cityState = (state.cityStates ?? []).find((c) => c.id === cityStateId);
@@ -317,6 +319,7 @@ export function sueForPeaceWithCityState(state: GameState, cityStateId: number, 
   }
   setWar(state, cityState.seat, seat, false);
   setWarTurnsWith(state, cityState.seat, seat, 0);
+  setTreatyTurnsWith(state, cityState.seat, seat, PEACE_TREATY_TURNS);
   warWearinessPeace(state, seat, seatOfCityState(cityState.id));
   state.eventLog.push(`You have made peace with ${cityState.name}.`);
   return { ok: true };

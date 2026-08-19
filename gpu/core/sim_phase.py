@@ -200,6 +200,12 @@ class SimPhase:
         pair[:, :row + 1] = False
         self.war_turns[:, row] += pair.long()
         self.war_turns[:, :, row] += pair.long()
+        # The TREATY counts DOWN on the same discipline — once per pair per turn
+        # at the pair's lower row, over the pairs that are NOT at war.
+        bound = active.unsqueeze(1) & (self.treaty_turns[:, row] > 0)
+        bound[:, :row + 1] = False
+        self.treaty_turns[:, row] -= bound.long()
+        self.treaty_turns[:, :, row] -= bound.long()
         self.peace_turns[:, row] = self.peace_turns[:, row] + (active & ~any_war).long()
 
     def _seat_governor_seats(self, row: int) -> torch.Tensor:

@@ -192,7 +192,11 @@ class SimInit:
         # `peace_turns[b, row]` is per SEAT and stays that way: it counts turns
         # at war with NOBODY, which is the driver's peacefulness heuristic
         # rather than a Civ 6 rule.
+        #
+        # `treaty_turns[b, i, j]` is the PEACE TREATY the pair signed, counting
+        # down: while it is above zero neither side may declare on the other.
         self.war_turns = torch.zeros(B, self.NS, self.NS, dtype=torch.long, device=device)
+        self.treaty_turns = torch.zeros(B, self.NS, self.NS, dtype=torch.long, device=device)
         self.peace_turns = torch.zeros(B, self.NS, dtype=torch.long, device=device)
         citystate_yidx = rules.citystate.get("typeYieldIdx", [3, 4, 2, 1, 1, 5])
         self._citystate_yidx = torch.tensor(citystate_yidx, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S]
@@ -281,6 +285,7 @@ class SimInit:
         _er = rules.eras
         self._ally_min_peace = int((rules.seats.get("eras") or {}).get("allyMinPeace", 30))
         self._formal_war_min = int(rules.seats.get("formalWarMinTurns", 5))
+        self._treaty_turns = int(rules.seats["peaceTreatyTurns"])
         _er2 = rules.seats.get("eras") or {}
         self._wm_dow = int(_er2.get("warmongerDow", 4))
         self._wm_cap = int(_er2.get("warmongerCapture", 3))
@@ -506,6 +511,7 @@ class SimInit:
         self._theo_base = int(_bl.get("theoBaseDamage", 30))
         self._theo_swing = float(_bl.get("theoPressureSwing", 15))
         self._theo_range = int(_bl.get("theoPressureRange", 6))
+        self._martyr_chance = float(_bl["martyrChance"])
         self._enh = {
             "presR": torch.tensor([0.0] + [float(x.get("presR", 0)) for x in _erows], dtype=torch.float64, device=device),
             "tradeRel": torch.tensor([[0.0] * 6] + [list(x.get("tradeRel", [0.0] * 6)) for x in _erows], dtype=torch.float64, device=device),
@@ -1074,6 +1080,11 @@ class SimInit:
         _bn = rules.combat.get("barbNavalTypes", []) or []
         self._barb_galley_idx = int(_bn[0]) if len(_bn) > 0 else -1
         self._barb_quad_idx = int(_bn[1]) if len(_bn) > 1 else -1
+        _bc = rules.combat.get("barbCavalryTypes", []) or []
+        self._barb_horseman_idx = int(_bc[0]) if len(_bc) > 0 else -1
+        self._barb_knight_idx = int(_bc[1]) if len(_bc) > 1 else -1
+        self._barb_horse_res = int(rules.combat["barbHorseRes"])
+        self._barb_horse_range = int(rules.combat["barbHorseRange"])
         # EMBARK: flat embarked MP, the water-step master switch
         # (`embarkState.live` on the TS side) and the embark/ocean tech gate
         # indices (military embarks on SHIPBUILDING, civilians on SAILING,
@@ -1081,7 +1092,6 @@ class SimInit:
         self._embark_moves = int(cb.get("embarkMoves", 2))
         self._embarked_defense_cs = float(cb.get("embarkedDefenseCs", 10))
         self._embark_live = bool(cb.get("embarkLive", 0))
-        self._sailing_tech = int(cb.get("sailingTech", -1))
         self._shipbuilding_tech = int(cb.get("shipbuildingTech", -1))
         self._cartography_tech = int(cb.get("cartographyTech", -1))
         ru = rules.units or [{"id": "WARRIOR", "cost": 40, "combat": 20, "maintenance": 0, "civilian": 0, "requiresTech": -1}]
@@ -1123,7 +1133,6 @@ class SimInit:
         # leave SCOUT the only affordable candidate, so it is masked out of the
         # buy set to mirror TS.
         self._scout_idx = next((i for i, u in enumerate(ru) if u["id"] == "SCOUT"), -1)
-        self._galley_idx = next((i for i, u in enumerate(ru) if u["id"] == "GALLEY"), -1)
         self._general_unit_idx = int(rr.get("generalUnitIdx", -1))
         self._admiral_unit_idx = int(rr.get("admiralUnitIdx", -1))
         self._admiral_march_live = bool(rr.get("admiralMarchLive", False))

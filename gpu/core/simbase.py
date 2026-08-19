@@ -502,5 +502,5 @@ _MUTABLE = [
     "seat_explored",
     "civ_culture", "civ_faith", "civ_tourism", "civ_warmonger", "civ_gpp",
     "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_is_cap", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts", "city_bldg",
-    "war_turns", "peace_turns",
+    "war_turns", "treaty_turns", "peace_turns",
 ]

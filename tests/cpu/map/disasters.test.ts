@@ -37,6 +37,40 @@ describe('disasters', () => {
     expect(slope.fertility).toBe(before);
   });
 
+  it('a flood pillages the district on the floodplain, not just the improvement', () => {
+    const state = makeState(makeMap(16, 16));
+    state.disasters = true;
+    const plain = tileAtCoords(state.map, 4, 4);
+    plain.feature = 'FLOODPLAINS';
+    plain.district = 'CAMPUS';
+    plain.districtComplete = true;
+    setTileOwner(plain, 0);
+
+    let guard = 0;
+    while (!plain.districtPillaged && guard++ < 600) disasterPhase(state);
+    expect(plain.districtPillaged).toBe(true);
+    expect(state.eventLog.some((e) => e.includes('Flood'))).toBe(true);
+  });
+
+  it('a flood leaves an UNFINISHED district and a city centre alone', () => {
+    const state = makeState(makeMap(16, 16));
+    state.disasters = true;
+    const site = tileAtCoords(state.map, 4, 4);
+    site.feature = 'FLOODPLAINS';
+    site.district = 'CAMPUS'; // queued, not complete
+    const centre = tileAtCoords(state.map, 6, 6);
+    centre.feature = 'FLOODPLAINS';
+    centre.district = 'CITY_CENTER';
+    centre.districtComplete = true;
+
+    for (let i = 0; i < 600; i++) disasterPhase(state);
+    // both tiles were flooded many times over (the silt proves it landed)
+    expect(site.fertility).toBeGreaterThan(0);
+    expect(centre.fertility).toBeGreaterThan(0);
+    expect(site.districtPillaged).toBeFalsy();
+    expect(centre.districtPillaged).toBeFalsy();
+  });
+
   it('fertility adds food; drought subtracts and expires', () => {
     const map = makeMap();
     const t = tileAtCoords(map, 5, 5);

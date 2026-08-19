@@ -40,7 +40,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import type { City, CityState, GameState, Seat, Tile, Unit } from './types';
-import { prophetsOf, seatOf, warsOf, warTurnsWith } from './seats';
+import { prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
 import { questFor } from './observe';
 import { envoysOf } from './cityStates';
 import { prodLayout } from './prodLayout';
@@ -253,6 +253,18 @@ const warClockLine = (state: GameState, seat: number): Val => {
   return out;
 };
 
+/** The same FLAT shape for the PEACE TREATY: every opponent this seat is still
+ *  bound to, in ascending seat order, with the turns left. */
+const treatyClockLine = (state: GameState, seat: number): Val => {
+  const out: number[] = [];
+  const others = [...state.seats.map((x) => x.seat), ...(state.cityStates ?? []).map((c) => c.seat)];
+  for (const other of others.sort((a, b) => a - b)) {
+    const bound = treatyTurnsWith(state, seat, other);
+    if (bound > 0) out.push(other, bound);
+  }
+  return out;
+};
+
 const GAME: Record<string, Extractor> = {
   turn: (s) => [s.turn],
   rng: (s) => [s.rngState >>> 0],
@@ -332,6 +344,7 @@ const SEAT: Record<string, Extractor> = {
   cityCount: overSeats((s) => s.cities.length),
   wars: overSeats((s) => [...s.wars].sort((a, b) => a - b)),
   warTurns: overSeats((s, state) => warClockLine(state, s.seat)),
+  treatyTurns: overSeats((s, state) => treatyClockLine(state, s.seat)),
   peaceTurns: overSeats((s) => s.peaceTurns),
   warWeariness: overSeats((s) => wwPairs(s.ww, (v) => v !== 0)),
   warWearinessTurn: overSeats((s) => wwPairs(s.wwTurn, (v) => v >= 0)),
@@ -417,6 +430,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   ),
   lastLevyTurn: overCityStates((cityState) => cityState.lastLevyTurn ?? -LEVY_COOLDOWN),
   warTurns: overCityStates((cityState, state) => warClockLine(state, cityState.seat)),
+  treatyTurns: overCityStates((cityState, state) => treatyClockLine(state, cityState.seat)),
 };
 
 const CITY: Record<string, Extractor> = {

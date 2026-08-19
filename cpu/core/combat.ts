@@ -765,9 +765,12 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
 function attackCity(state: GameState, attacker: Unit, holder: Seat, city: City, seat: number): void {
   cityAssault(state, attacker, city, 'rcty', 'rctyc', seat);
   if (city.hp > 0) return;
-  // CIV6: a garrison never HOLDS a fallen city — units on the centre do not
-  // block capture (the real game destroys them with the city; both engines
-  // leave them standing, recorded as B-32r).
+  // CIV6: "when a city is captured, all units within it are destroyed" — the
+  // garrison falls with the centre it was holding. Array order, and the centre
+  // carries a district so no death leaves a dig.
+  for (const garrison of unitsAt(state, city.centerIndex).filter((u) => unitSeat(u) !== attacker.seat)) {
+    killUnit(state, garrison, seat);
+  }
   const captor = seatOf(state, attacker.seat);
   if (captor && !isBarbSeat(attacker.seat)) {
     transferCity(state, holder.seat, captor, city, 'conquered');  // pays the plunder itself
@@ -1048,25 +1051,43 @@ function barbMeleeType(turn: number): string {
 }
 
 /**
- * The RANGED barb ladder — real Civ 6 barbarian camps field
- * archers alongside melee. Every third camp (by its index in `state.barbSeat.camps`,
- * NOT its tile) raids with a ranged unit instead of the melee ladder type.
- * Spawn TYPE only: the 0.1 raid roll above is untouched, so this is
- * draw-count neutral in both engines. TS needed no dispatch work —
- * `hostileUnitAct` already routes any `UNITS[type].ranged` attacker through
- * `hostileRangedStrike`; the GPU raider block needed a new ranged path.
+ * The RANGED barb ladder. CIV 6: "regardless of position every
+ * outpost will spawn melee and ranged units", so RANGED is not a camp class —
+ * every camp takes its turn at it in `barbarianPhase`'s raid rotation. ARCHER, then
+ * CROSSBOWMAN past the era turn. TS needed no dispatch work — `hostileUnitAct`
+ * already routes any `UNITS[type].ranged` attacker through
+ * `hostileRangedStrike`; the GPU raider block has its own ranged path.
  */
 function barbRangedType(turn: number): string {
   return turn > 120 ? 'CROSSBOWMAN' : 'ARCHER';
 }
 
 /**
- * The barbarian NAVAL ladder. Real Civ 6 coastal camps put
- * out hulls, not just land raiders. GALLEY, then QUADRIREME past the same era
- * turn the crossbow ladder uses. Spawn TYPE only — draw-count neutral.
+ * The barbarian NAVAL ladder — what a PIRATE camp (one with a
+ * reachable coast) puts out. GALLEY, then QUADRIREME past the same era turn the
+ * crossbow ladder uses.
  */
 function barbNavalType(turn: number): string {
   return turn > 120 ? 'QUADRIREME' : 'GALLEY';
+}
+
+/**
+ * The barbarian CAVALRY ladder — what a HORSE camp fields.
+ * CIV 6: "cavalry outposts spawn when they have a horse resource within 6
+ * tiles ... and will employ mounted units in their assaults". HORSEMAN, then
+ * KNIGHT past the same era turn.
+ */
+function barbCavalryType(turn: number): string {
+  return turn > 120 ? 'KNIGHT' : 'HORSEMAN';
+}
+
+export const BARB_HORSE_RANGE = 6;
+
+/** CIV 6: a camp is a HORSE camp when a Horses resource sits within 6 tiles. */
+function campNearHorses(state: GameState, campIdx: number): boolean {
+  const camp = state.map.tiles[campIdx];
+  return tilesWithin(state.map, camp.col, camp.row, BARB_HORSE_RANGE)
+    .some((t) => t.resource === 'HORSES');
 }
 
 /**
@@ -1105,7 +1126,7 @@ export function barbarianPhase(state: GameState): void {
 
   const barbs = barbUnits(state);
   // Indexed loop (identical iteration ORDER, so no draw-order change)
-  // because the ranged ladder keys off the camp's INDEX, not its tile.
+  // because the raid ROTATION keys off the camp's index as well as the turn.
   for (let campNo = 0; campNo < state.barbSeat.camps.length; campNo++) {
     const campIdx = state.barbSeat.camps[campNo];
     const camp = map.tiles[campIdx];
@@ -1113,8 +1134,10 @@ export function barbarianPhase(state: GameState): void {
       (u) =>
         hexDistance(map.tiles[u.tileIndex].col, map.tiles[u.tileIndex].row, camp.col, camp.row) <= 1,
     );
+    const horseCamp = campNearHorses(state, campIdx);
     if (nearCamp.length === 0) {
-      spawnUnit(state, barbMeleeType(state.turn), campIdx, BARB_SEAT); // the melee era ladder
+      // REGARRISON on the camp's own land ladder — a hull cannot hold a camp.
+      spawnUnit(state, horseCamp ? barbCavalryType(state.turn) : barbMeleeType(state.turn), campIdx, BARB_SEAT);
     } else if (
       barbUnits(state).length < state.barbSeat.camps.length * MAX_BARB_PER_CAMP &&
       nextRandom(state) < 0.1
@@ -1131,11 +1154,21 @@ export function barbarianPhase(state: GameState): void {
             unitsAt(state, n.index).length === 0,
         )
         .sort((x, y) => x.index - y.index)[0];
-      if (campNo % 4 === 1 && water) {
+      // A camp's raid ROTATES: its CLASS unit, then ranged, then melee. CIV 6
+      // classes a camp by where it stands — a reachable coast makes it a
+      // pirate camp, Horses within 6 a cavalry outpost, everything else a land
+      // camp — and every camp fields melee and ranged whatever its class. The
+      // rotation is the turn plus the camp's index, so it costs no draw and
+      // neighbouring camps do not move in lockstep.
+      const slot = (campNo + state.turn) % 3;
+      if (slot === 1) {
+        spawnUnit(state, barbRangedType(state.turn), campIdx, BARB_SEAT);
+      } else if (slot === 2) {
+        spawnUnit(state, barbMeleeType(state.turn), campIdx, BARB_SEAT);
+      } else if (water) {
         spawnUnit(state, barbNavalType(state.turn), water.index, BARB_SEAT);
       } else {
-        const type = campNo % 3 === 0 ? barbRangedType(state.turn) : barbMeleeType(state.turn);
-        spawnUnit(state, type, campIdx, BARB_SEAT);
+        spawnUnit(state, horseCamp ? barbCavalryType(state.turn) : barbMeleeType(state.turn), campIdx, BARB_SEAT);
       }
     }
   }
