@@ -93,6 +93,16 @@
      ]
     },
     {
+     "name": "congressActive",
+     "compare": "exact",
+     "covers": [
+      "GameState.congress"
+     ],
+     "planes": [
+      "congress_active"
+     ]
+    },
+    {
      "name": "roadBridges",
      "compare": "exact",
      "covers": [

@@ -15,6 +15,7 @@ import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase, suzerainEffect } from './cityStates';
 import { placeSeats, seatPhase, worldCongress, nextCityName } from './phase';
+import { congressUdtBlockedDistrict } from './congress';
 import { commitProduction, commitResearch } from './seatTurn';
 import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY } from '../data/seats';
 import { addEraScore, eraBoundary, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
@@ -514,6 +515,9 @@ export function buyWorshipBuilding(state: GameState, cityId: number, seat: numbe
   const buyer = seatOf(state, seat);
   if (!buyer) return { ok: false, reason: 'No such seat.' };
   if (!buyer.religion.founded) return { ok: false, reason: 'No founded religion.' };
+  // CIV6 (Urban Development Treaty, outcome B): a faith purchase still
+  // CREATES a building in the district, so the ban covers it.
+  if (congressUdtBlockedDistrict(state) === 'HOLY_SITE') return { ok: false, reason: 'The World Congress bans new Holy Site buildings.' };
   const city = citiesOf(state, seat).find((c) => c.id === cityId);
   if (!city) return { ok: false, reason: 'No such city.' };
   const wid = WORSHIP_BUILDINGS[seat % WORSHIP_BUILDINGS.length];

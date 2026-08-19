@@ -7,6 +7,8 @@ import { addEraScore, dedicationEvent } from './eras';
 import { spawnUnit } from './units';
 import { encampmentTrainXp } from './combat';
 import { applyLumpYield } from './economy';
+import { congressGppFactor } from './congress';
+import { BUILT_WONDERS } from '../data/builtWonders';
 import { DED_STEAM } from '../data/seats';
 import { BUILDING_ERA_INDEX } from '../data/buildings';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
@@ -55,7 +57,7 @@ export function completeProject(state: GameState, city: City, projectId: string,
   if (classes.length) {
     const pts = Math.round(cost * gppFractionOf(def));
     for (const gc of classes) {
-      owner.gpp[gc] = (owner.gpp[gc] ?? 0) + pts;
+      owner.gpp[gc] = (owner.gpp[gc] ?? 0) + pts * congressGppFactor(state, gc);
     }
     if (!def.yield) state.eventLog.push(`${city.name} completed ${def.name}: +${pts} ${classes.join('/')} points.`);
   }
@@ -78,10 +80,15 @@ export function completeQueueItem(
       if (dt.district === 'ENCAMPMENT') dt.encampHp = ENCAMPMENT_HP;
       break;
     }
-    case 'wonder':
+    case 'wonder': {
       state.map.tiles[item.tileIndex].builtWonderComplete = true;
       addEraScore(state, city.seat, ERA_SCORE_WONDER);
+      // CIV6: Statue of Liberty pays +4 Diplomatic Victory points on
+      // completion, Potala Palace +1.
+      const dvp = BUILT_WONDERS[item.wonder]?.effects?.dvp ?? 0;
+      if (dvp) owner.diplomaticPoints = (owner.diplomaticPoints ?? 0) + dvp;
       break;
+    }
     case 'settler':
       // Real Civ 6: a completed Settler costs the city 1 pop and SPAWNS at
       // the city — a unit like any other, moved and founded by orders.

@@ -530,12 +530,16 @@ def main() -> None:
     print("diplomatic favor OK — suzerain contest, tie rule, tier+suz accrual, _MUTABLE")
 
     # --- the WORLD CONGRESS + the DIPLOMATIC victory -------------------------
-    for _f in ("congress_sessions", "civ_diplo_points"):
+    for _f in ("congress_sessions", "congress_active", "civ_diplo_points"):
         assert _round_trips(_f, _MUT2), f"{_f} must round-trip through _MUTABLE"
     s6 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     assert s6._congress_interval == 30, f"GS convenes every 30 turns, got {s6._congress_interval}"
     assert s6._congress_min_era == 2, f"GS starts at the MEDIEVAL era (index 2), got {s6._congress_min_era}"
     assert s6._dvp_win == 20, f"GS diplomatic victory is 20 points, got {s6._dvp_win}"
+    assert s6._congress_dv_min == 5, "the DV resolution enters at MODERN (index 5)"
+    assert len(s6._congress_res) == 4, "the modeled catalog is 4 resolutions"
+    # CIV6: SoL +4 DVP, Potala +1 DVP + a diplomatic slot; FC's wildcard slot
+    assert int(s6._wond_dvp.sum()) == 5 and int(s6._wond_dslot.sum()) == 1 and int(s6._wond_wslot.sum()) == 1
 
     # not a session turn -> nothing happens, favor untouched
     s6.civ_diplo_favor[:, 0] = 50
@@ -559,34 +563,81 @@ def main() -> None:
             break
     assert _era_ok is not None, "no tech reaches the Medieval era — check the era table"
     if s6.n_majors > 1:
-        s6.civ_diplo_favor[:, 1] = 90  # the civ seat outspends seat 0, 90 vs 50
+        s6.civ_diplo_favor[:, 1] = 90
     s6._world_congress()
     assert int(s6.congress_sessions[0]) == 1, "the session must convene"
-    assert int(s6.civ_diplo_favor[0, 0]) == 0, "every commitment is spent"
-    if s6.n_majors > 1:
-        assert int(s6.civ_diplo_favor[0, 1]) == 0, "the winner's favor is spent too"
-        assert int(s6.civ_diplo_points[0, 1]) == s6._dvp_per_res, "the largest commitment takes the point"
-        assert int(s6.civ_diplo_points[0, 0]) == 0, "the loser takes nothing"
+    # pre-Modern there is no DV resolution, so the favor curve never walks
+    assert int(s6.civ_diplo_favor[0, 0]) == 50 and int(s6.civ_diplo_favor[0, 1]) == 90, "favor spends on the DV resolution only"
+    # the Medieval-eligible slate is UDT (0) then Patronage (1), outcome A
+    assert s6.congress_active[0, :, 0].tolist() == [0, 1], "the Medieval slate is UDT + Patronage"
+    assert s6.congress_active[0, :, 1].tolist() == [0, 0], "every free vote is outcome A"
+    # every alive major voted the winning combo -> +1 DVP each per resolution
+    for _r in range(s6.n_majors):
+        assert int(s6.civ_diplo_points[0, _r]) == 2 * s6._dvp_per_res, "winning-combo voters each take the point"
 
-    # a TIE keeps the LOWER seat id (seat 0)
+    # the SLATE ROTATES: at Industrial three rows are eligible (UDT,
+    # Patronage, Migration), and session 2 starts its window at rank 2
     s7 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    _era_ind = None
+    for _t in range(s7.civ_techs.shape[2]):
+        s7.civ_techs[:, 0].zero_(); s7.civ_techs[:, 0, _t] = True
+        if int(s7._civ_era(s7.civ_techs[:, 0], s7.civ_civics[:, 0])[0]) == 4:
+            _era_ind = _t
+            break
+    assert _era_ind is not None, "no tech lands exactly on the Industrial era"
     s7.turn = s7._congress_interval
-    s7.civ_techs[:, 0].zero_(); s7.civ_techs[:, 0, _era_ok] = True
-    s7.civ_diplo_favor[:, 0] = 25
-    if s7.n_majors > 1:
-        s7.civ_diplo_favor[:, 1] = 25
+    s7.congress_sessions[:] = 1  # pretend session 1 already ran
     s7._world_congress()
-    assert int(s7.civ_diplo_points[0, 0]) == s7._dvp_per_res, "a tie must go to the lower civ id"
-    if s7.n_majors > 1:
-        assert int(s7.civ_diplo_points[0, 1]) == 0
+    assert s7.congress_active[0, :, 0].tolist() == [2, 0], "session 2 at Industrial slates Migration then UDT"
+    # Migration's scripted vote is A-on-self; ties keep the LOWER seat
+    assert s7.congress_active[0, 0, 1].tolist() == 0 and s7.congress_active[0, 0, 2].tolist() == 0
 
-    # zero favor everywhere: the session counts but awards nothing
+    # the DV resolution from Modern: the favor curve, the pile-on, the refunds
     s8 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    _era_mod = None
+    for _t in range(s8.civ_techs.shape[2]):
+        s8.civ_techs[:, 0].zero_(); s8.civ_techs[:, 0, _t] = True
+        if int(s8._civ_era(s8.civ_techs[:, 0], s8.civ_civics[:, 0])[0]) >= s8._congress_dv_min:
+            _era_mod = _t
+            break
+    assert _era_mod is not None, "no tech reaches the Modern era"
+    assert s8.n_majors >= 3, "the DV poke wants three voters"
     s8.turn = s8._congress_interval
-    s8.civ_techs[:, 0].zero_(); s8.civ_techs[:, 0, _era_ok] = True
-    s8.civ_diplo_favor[:, 0].zero_(); s8.civ_diplo_favor[:, 1:].zero_()
+    s8.civ_diplo_points[:, 1] = 5      # seat 1 leads
+    s8.civ_diplo_favor[:, 0] = 65      # walks 3 extra votes (60), 5 short of the 4th
+    s8.civ_diplo_favor[:, 1] = 60      # walks exactly 3
+    s8.civ_diplo_favor[:, 2] = 0       # the free vote only
     s8._world_congress()
-    assert int(s8.congress_sessions[0]) == 1 and int(s8.civ_diplo_points[0, 0]) == 0, "no favor -> no award"
+    # regular slates pay every voter +2 first; then the leader scan finds
+    # seat 1 (7 vs 2), seat 1 votes A-on-self weight 4, seats 0+2 vote
+    # B-on-leader weights 4+1: B wins 5-4
+    assert int(s8.civ_diplo_favor[0, 1]) == 60, "the losing outcome is refunded 100%"
+    assert int(s8.civ_diplo_favor[0, 0]) == 5, "a winning-combo voter keeps no refund"
+    assert int(s8.civ_diplo_favor[0, 2]) == 0
+    assert int(s8.civ_diplo_points[0, 1]) == 5 + 2 - s8._congress_dv_delta, "the leader loses the DV delta"
+    assert int(s8.civ_diplo_points[0, 0]) == 3 and int(s8.civ_diplo_points[0, 2]) == 3, "B voters take the combo point"
+
+    # the standing effects: write the plane directly, read every helper
+    s8.congress_active[:, 0, :] = torch.tensor([1, 0, 2], dtype=torch.long)   # Patronage A on class 2
+    s8.congress_active[:, 1, :] = torch.tensor([2, 1, 0], dtype=torch.long)   # Migration B on seat 0
+    s8._eff_version += 1
+    assert float(s8._congress_gpp_factor(2)[0]) == 2.0 and float(s8._congress_gpp_factor(0)[0]) == 1.0
+    assert float(s8._congress_growth(0)[0]) == 0.8 and float(s8._congress_growth(1)[0]) == 1.0
+    assert float(s8._congress_loyalty(0)[0]) == s8._c_mig_loy and float(s8._congress_loyalty(1)[0]) == 0.0
+    s8.congress_active[:, 0, :] = torch.tensor([3, 0, 1], dtype=torch.long)   # Heritage A on ART
+    assert s8._congress_gw_kmult()[0].tolist() == [1, 2, 1]
+    s8.congress_active[:, 0, :] = torch.tensor([3, 1, 2], dtype=torch.long)   # Heritage B on MUSIC
+    assert s8._congress_gw_kmult()[0].tolist() == [1, 1, 0]
+    # the UDT ban empties the banned district's building columns in the mask
+    s8.congress_active[:, 0, :] = torch.tensor([0, 1, 0], dtype=torch.long)   # UDT B on district 0
+    s8._eff_version += 1
+    _bb = s8._seat_buildable(0)
+    _banned_cols = (s8._b_req_district == 0).nonzero(as_tuple=True)[0]
+    assert len(_banned_cols) > 0, "district 0 must own buildings"
+    assert not bool(_bb[:, :, _banned_cols].any()), "the UDT ban must empty the district's building columns"
+    if s8._holy_didx >= 0:
+        s8.congress_active[:, 0, :] = torch.tensor([0, 1, s8._holy_didx], dtype=torch.long)
+        assert bool(s8._congress_holy_blocked().all()), "a HOLY_SITE ban refuses the worship faith-buy"
 
     # the victory check itself
     s9 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
@@ -598,7 +649,7 @@ def main() -> None:
         s9.civ_diplo_points[:, 0].zero_()
         s9.civ_diplo_points[:, 1] = s9._dvp_win
         assert int(s9._diplomatic_victor()[0]) == 1, "a civ wins at the threshold"
-    print("world congress OK — schedule, Medieval gate, vote, tie rule, spend, DVP, victory")
+    print("world congress OK — schedule, slate rotation, combo DVP, DV curve+refunds, effect readers, UDT ban, victory")
 
 
 

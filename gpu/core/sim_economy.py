@@ -554,6 +554,11 @@ class SimEconomy:
             & (~rd.b_river.reshape(1, 1, -1) | river_c.unsqueeze(2))
             & ~self._b_worship.reshape(1, 1, -1)
         )
+        # CIV6 (Urban Development Treaty, outcome B): "No buildings can be
+        # created in this district." New picks only — in-flight items finish.
+        _pu, _bl = self._congress_udt()
+        _blk = (_bl >= 0).unsqueeze(1) & (self._b_req_district.unsqueeze(0) == _bl.unsqueeze(1))
+        base = base & ~_blk.unsqueeze(1)
         if self.districts_on and self._b_has_reqs:
             rq = self._b_req_district  # [NB] the district each building needs, -1 = none
             reg = self.city_dist_tile[:, row][:, :, rq.clamp(min=0)]  # [B, C, NB] registry tile per building
@@ -716,7 +721,7 @@ class SimEconomy:
         adopted, has_gov = self._adopted_gov(civics2)
         return torch.where(has_gov, self._gov_tier[adopted], torch.zeros(B, dtype=torch.long, device=self.device))
 
-    def _gov_policy_mods(self, civics2: torch.Tensor) -> tuple[
+    def _gov_policy_mods(self, civics2: torch.Tensor, extra_d: torch.Tensor | None = None, extra_w: torch.Tensor | None = None) -> tuple[
         torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
     ]:
         """(cityYields [B,6], capitalYields [B,6], housingAll [B], yieldMult
@@ -764,6 +769,15 @@ class SimEconomy:
         tpmult = torch.where(has_gov, self._gov_tpmult[adopted], tpmult)
         if self._npol:
             nslots = self._gov_slots[adopted] * has_gov.long().unsqueeze(1)  # [B, 4]
+            # Wonder-granted slots (Potala diplomatic, Forbidden City
+            # wildcard) — TS appends them to computeAdoption's slot list; a
+            # seat with no government slots nothing either way.
+            if extra_d is not None and extra_w is not None:
+                nslots = torch.stack((
+                    nslots[:, 0], nslots[:, 1],
+                    nslots[:, 2] + extra_d * has_gov.long(),
+                    nslots[:, 3] + extra_w * has_gov.long(),
+                ), dim=1)
             puc = self._pol_unlock_civic  # [nPol]
             pol_unlocked = torch.where(
                 puc.unsqueeze(0) >= 0,
@@ -824,7 +838,8 @@ class SimEconomy:
         d = self._gov_pol_cache[1]
         v = d.get(row)
         if v is None:
-            v = self._gov_policy_mods(self._seat_civics(row))
+            xd, xw = self._wonder_extra_slots(row)
+            v = self._gov_policy_mods(self._seat_civics(row), xd, xw)
             d[row] = v
         return v
 
@@ -1352,7 +1367,7 @@ class SimEconomy:
         era = self._civ_era(self.civ_techs[b, idx], self.civ_civics[b, idx])
         return torch.where(major, era, torch.zeros_like(era))
 
-    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, relics: torch.Tensor | None = None, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None) -> torch.Tensor:
+    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, relics: torch.Tensor | None = None, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None, gw_kmult: torch.Tensor | None = None) -> torch.Tensor:
         """[B] — a seat's per-turn TOURISM, the `seatTourism` twin. Great Works
         pay the values that pair tourism with culture; every OWNED unpillaged
         SEASIDE RESORT pays its tile's APPEAL (floored at 0), attributed by
@@ -1369,10 +1384,12 @@ class SimEconomy:
             torch.full((self.B,), self._gw_printing_mult, dtype=torch.long, device=self.device),
             torch.ones(self.B, dtype=torch.long, device=self.device),
         )
+        # CIV6 (Heritage Organization): x2 / x0 tourism by Great Work KIND.
+        km = gw_kmult if gw_kmult is not None else torch.ones(self.B, 3, dtype=torch.long, device=self.device)
         t = (
-            _wmult * (gw_w * alive.long()).sum(dim=1)
-            + self._gw_tour_k[1] * (gw_a * alive.long()).sum(dim=1)
-            + self._gw_tour_k[2] * (gw_m * alive.long()).sum(dim=1)
+            _wmult * km[:, 0] * (gw_w * alive.long()).sum(dim=1)
+            + self._gw_tour_k[1] * km[:, 1] * (gw_a * alive.long()).sum(dim=1)
+            + self._gw_tour_k[2] * km[:, 2] * (gw_m * alive.long()).sum(dim=1)
         )
         if relics is not None:
             t = t + self._relic_tour * (relics * alive.long()).sum(dim=1)
@@ -1809,9 +1826,13 @@ class SimEconomy:
         hf = torch.where(head >= 2, torch.ones_like(head),
                          torch.where(head >= 1, torch.full_like(head, 0.5), torch.full_like(head, 0.25)))
         eff = surplus * hf * growth_f
+        # `empireGrowthMult`: the Migration Treaty factor FIRST, the wonder
+        # products after, ONE number multiplied in — the TS association.
+        em = self._congress_growth(row)
         hg = self._wonder_growth_mult(self._completed_wonders(row))
         if hg is not None:
-            eff = eff * hg.unsqueeze(1)
+            em = em * hg
+        eff = eff * em.unsqueeze(1)
         if self._seat_has_beliefs(row):
             eff = eff * self._bel_mul("growth", row).unsqueeze(1)
         eff = torch.where(surplus > 0, eff, surplus)

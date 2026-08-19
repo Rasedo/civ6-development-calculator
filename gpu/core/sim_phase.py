@@ -257,7 +257,8 @@ class SimPhase:
         press = torch.where(tot > 0, scale * (own - foreign) / tot.clamp(min=1e-9), torch.zeros_like(tot))
         delta = (press
                  + self._loyalty_amenity[tier.clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)].double()
-                 + gov.double() * self._gov_loy)
+                 + gov.double() * self._gov_loy
+                 + self._congress_loyalty(row))
         loy = self.city_loyalty[bidx, row, col]
         upd = act & others
         nxt = torch.where(upd, (loy + delta).clamp(min=0, max=lmax), loy)
@@ -360,6 +361,13 @@ class SimPhase:
             won_i = (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + nw) \
                 & (self._wonder_era[wid] >= self._industrial_era)
             prod = torch.where(stm & won_i, prod * self._steam_wonder_prod, prod)
+        # CIV6 (Urban Development Treaty, outcome A): "+100% Production
+        # towards buildings in this district." The x2 is exact in f64, so the
+        # multiplier order against VETERANCY cannot re-associate anything.
+        _cp, _cb = self._congress_udt()
+        _bldg_i = (cur >= 0) & (cur < self.NB) & (_cp >= 0) \
+            & (self._b_req_district[cur.clamp(min=0, max=self.NB - 1)] == _cp)
+        prod = torch.where(_bldg_i, prod * self._c_prod_mult, prod)
         # VETERANCY multiplies FIRST, then the banked chop adds unmultiplied —
         # phase.ts spends the bank right after the production add.
         prog = self.city_progress[bidx, row, col]
@@ -436,6 +444,9 @@ class SimPhase:
                 wt = self.city_wonder[bidx, row, col, :][wr, wi[wr]]
                 self.built_wonder_complete[wr, wt.clamp(min=0)] = True
                 self.era_score[wr, row] += self._era_pts["wonder"]
+                # CIV6: Statue of Liberty +4 Diplomatic Victory points on
+                # completion, Potala Palace +1.
+                self.civ_diplo_points[wr, row] += self._wond_dvp[wi[wr]]
                 self._eff_version += 1
 
         if self._proj_rows:
@@ -467,7 +478,9 @@ class SimPhase:
                         g_list = [g_one] if g_one >= 0 else []
                     for g_i in (int(x) for x in g_list):
                         if 0 <= g_i < self.civ_gpp.shape[2]:
-                            self.civ_gpp[:, row, g_i] = torch.where(hit, self.civ_gpp[:, row, g_i] + amt_g, self.civ_gpp[:, row, g_i])
+                            # CIV6 (Patronage): project points scale too.
+                            amt_gc = amt_g * self._congress_gpp_factor(g_i)
+                            self.civ_gpp[:, row, g_i] = torch.where(hit, self.civ_gpp[:, row, g_i] + amt_gc, self.civ_gpp[:, row, g_i])
                     if int(prow.get("ls", 0)):
                         # A laser station: repeatable, +1 LY/turn for the craft.
                         self.space_lasers[:, row] += hit.long()
@@ -601,6 +614,7 @@ class SimPhase:
             self.city_relics[:, row],
             self.civ_techs[:, row, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,
             self.city_artifacts[:, row],
+            gw_kmult=self._congress_gw_kmult(),
         ))
         bank(self.civ_diplo_favor,
              self._adopted_gov_tier(self.civ_civics[:, row]) + self._favor_per_suz * self._suzerain_count(row))
@@ -659,6 +673,9 @@ class SimPhase:
                 pts = torch.zeros(B, dtype=torch.float64, device=dev)
             if cls == self._prophet_cls:
                 pts = pts + self._golden_ded(row, self._ded_exodus).double() * 4.0
+            # CIV6 (Patronage resolution): the factor covers every per-turn
+            # source, the golden prophet term included.
+            pts = pts * self._congress_gpp_factor(cls)
             self.civ_gpp[:, row, cls] = torch.where(
                 active & (pts > 0), self.civ_gpp[:, row, cls] + pts, self.civ_gpp[:, row, cls]
             )

@@ -4,6 +4,7 @@ import { hexDistance, neighbors } from '../../world/hex';
 import { isWater, isImpassable, isMountain, isCoastalWater, hasRiver } from '../../world/query';
 import { computeUnlocks, isTechComplete, isCivicComplete, type Unlocks } from './effects';
 import { isExplored } from './fog';
+import { congressUdtBlockedDistrict } from './congress';
 import { tileAppeal } from './appeal'; // SEASIDE_RESORT gates on appeal
 import { SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
 import { FEATURES } from '../../world/features';
@@ -290,7 +291,11 @@ export function availableBuildings(state: GameState, city: City): BuildingDef[] 
   const center = map.tiles[city.centerIndex];
 
   const out: BuildingDef[] = [];
+  // CIV6 (Urban Development Treaty, outcome B): "No buildings can be created
+  // in this district." New picks only — in-flight items finish.
+  const blockedD = congressUdtBlockedDistrict(state);
   for (const type of placed) {
+    if (type === blockedD) continue;
     for (const def of buildingsForDistrict(type)) {
       if (have.has(def.id) || queued.has(def.id)) continue;
       if (def.worship) {

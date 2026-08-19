@@ -2,6 +2,7 @@
 import type { GameState, GreatPersonClass } from './types';
 import { citiesOf, seatOf } from './seats';
 import { GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, GW_CLASS_KIND, GW_WONDER_SLOTS, GW_WORK_CLASSES, gpCost, placeGreatWorks } from '../data/greatPeople';
+import { congressGppFactor } from './congress';
 import { BUILDINGS } from '../data/buildings';
 import { ERA_SCORE_GP } from '../data/seats';
 import { addEraScore, goldenProphetPoints } from './eras';
@@ -33,6 +34,9 @@ export function greatPersonPointsPerTurn(
         + city.buildings.filter((b) => BUILDINGS[b]?.district === district).length;
     }
   }
+  // CIV6 (Patronage resolution): the factor covers every source, the golden
+  // prophet term included — so it applies after all of them.
+  for (const cls of GP_CLASSES) out[cls] *= congressGppFactor(state, cls);
   return out;
 }
 

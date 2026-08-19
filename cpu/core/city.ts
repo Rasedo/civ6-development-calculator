@@ -18,6 +18,7 @@ import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { goldenCulturePerDistrict, goldenDedication } from './eras';
 import { SPECIALIST_YIELDS, greatWorkCulture, greatWorkTourism, relicFaith, relicTourism, artifactCulture, artifactTourism, GW_PRINTING_TECH } from '../data/greatPeople';
+import { congressGrowthMult, congressGwMult } from './congress';
 import { suzerainEffect } from './cityStates';
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE } from '../data/cityStates';
 import { warWearinessPenalty, DED_FREE_INQUIRY } from '../data/seats';
@@ -330,7 +331,8 @@ function completedWonders(state: GameState, city: City) {
 }
 
 export function empireGrowthMult(state: GameState, seat: number): number {
-  let mult = 1;
+  // Migration Treaty first, wonders after — the GPU folds in this order.
+  let mult = congressGrowthMult(state, seat);
   for (const c of citiesOf(state, seat)) {
     for (const w of completedWonders(state, c)) {
       if (w.def.effects?.growthAllMult) mult *= w.def.effects.growthAllMult;
@@ -412,7 +414,8 @@ export function seatTourism(state: GameState, seat: number): number {
   if (!s) return 0;
   let t = 0;
   const printing = s.research.techs.includes(GW_PRINTING_TECH);
-  for (const c of citiesOf(state, seat)) t += greatWorkTourism(c, printing) + relicTourism(c) + artifactTourism(c);
+  const km = congressGwMult(state);
+  for (const c of citiesOf(state, seat)) t += greatWorkTourism(c, printing, km) + relicTourism(c) + artifactTourism(c);
   const owns = (tile: Tile) => tileOwnedByCiv(tile, seat);
   const era = civEraIndex(s.research.techs, s.research.civics);
   return t + resortTourism(state, owns) + wonderTourism(state, era, owns);

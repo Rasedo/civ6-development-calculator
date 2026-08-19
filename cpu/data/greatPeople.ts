@@ -206,9 +206,9 @@ function gwSet(city: GwCity, kind: number, n: number): void {
 export const GW_PRINTING_TECH = 'PRINTING';
 export const GW_PRINTING_WRITING_MULT = 2;
 
-export function greatWorkTourism(city: GwCity, printing = false): number {
-  const writing = GW_TOURISM[GW_WRITING] * (printing ? GW_PRINTING_WRITING_MULT : 1) * gwCount(city, GW_WRITING);
-  return writing + GW_TOURISM[GW_ART] * gwCount(city, GW_ART) + GW_TOURISM[GW_MUSIC] * gwCount(city, GW_MUSIC);
+export function greatWorkTourism(city: GwCity, printing = false, kmult: readonly [number, number, number] = [1, 1, 1]): number {
+  const writing = GW_TOURISM[GW_WRITING] * (printing ? GW_PRINTING_WRITING_MULT : 1) * gwCount(city, GW_WRITING) * kmult[0];
+  return writing + GW_TOURISM[GW_ART] * gwCount(city, GW_ART) * kmult[1] + GW_TOURISM[GW_MUSIC] * gwCount(city, GW_MUSIC) * kmult[2];
 }
 
 /**

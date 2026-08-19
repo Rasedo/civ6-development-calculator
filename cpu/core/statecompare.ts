@@ -272,6 +272,10 @@ const GAME: Record<string, Extractor> = {
   victoryType: (s) => [s.victoryType ?? 0],
   victoryRow: (s) => [s.victoryRow ?? -1],
   congressSessions: (s) => [s.congressSessions ?? 0],
+  congressActive: (s) => [0, 1].flatMap((i) => {
+    const a = s.congress?.[i];
+    return a ? [a.res, a.outcome, a.target] : [-1, -1, -1];
+  }),
   roadBridges: (s) => [s.roadBridges ? 1 : 0],
   pantheonsClaimed: (s) => [s.claimedPantheons.length],
   beliefsClaimed: (s) => [s.claimedBeliefs.length],

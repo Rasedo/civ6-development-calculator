@@ -18,6 +18,11 @@ is open work, stated against the current engine by symbol.
   with Civ 6.
 - Every landed mechanic records WHICH lane can reach it. A green gate
   over an unreached mechanic proves nothing.
+- NOTHING IS CLOSED BY RECORDING ALONE (owner, 2026-08-19). A fidelity
+  gap deferred because a mechanic is unimplemented becomes TWO open
+  items: one for the missing mechanic, one for the deferred gap (naming
+  the mechanic item as its blocker). "Recorded, not fixed" /
+  "descoped" / "unmodeled" are deferrals, never permanent closures.
 
 **State:** P8 training PARKED until this file is clean. The battery is
 GREEN end to end: the serve gate runs 12 seeds x 250 turns with the
@@ -51,15 +56,15 @@ nothing carries forward.
 | **A. Engine vs engine** | **0** | |
 | B-20r tourism tails | 7 | national parks, civ Archaeologists, theming, shipwrecks, digs |
 | B-21r suzerain rows | 1 | the residual descoped rows all need whole absent systems |
-| B-22r World Congress | 6 | one resolution type of many; emergencies and competitions absent |
+| B-22r World Congress | 4 | the vote is scripted (wire head pending); emergencies/competitions absent; 4 of ~18 resolutions |
 | B-24r Ages/governors | 2 | four system-less dedication entries, dark-age policies, governor promotions, per-civ era drift |
 | B-30r specialists | 6 | a mechanic neither engine has: wire column, assignment, yields |
 | B-31r trade-route tails | 6 | a Trader UNIT and a route wire verb |
 | B-D unsourced data values | 1 | swept; residuals are NAMED stylizations, each labelled at its definition |
 | B-35r theological damage | 1 | deterministic and LINEAR where real Civ 6 rolls; the martyr draw shows a mirrored conditional draw is available |
 | B-34r flood tails | 1 | GS floods also damage UNITS and kill citizens, and a centre on a floodplain loses HP; and the Dam/Great Bath that mitigates a river is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **31** | |
-| **OPEN, TOTAL** | **31** | |
+| **B. Fidelity vs real Civ 6** | **29** | |
+| **OPEN, TOTAL** | **29** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -123,13 +128,44 @@ Civ 6 source or is recorded as unverifiable.
   absent systems (POWER, trading posts, route PATHS, unit promotions, unique
   improvements/luxuries, a faith-purchase class, random-Inspiration draws) or
   a flat channel standing in for a %-scaling.
-- **B-22r. World Congress tails:** one resolution type only (real GS
-  rotates many); Emergencies and Scored Competitions — the main real
-  DVP sources — are unmodeled (awarding via the resolution winner is
-  faithful in shape, overstated in rate); every civ commits ALL favor
-  (no vote-size chooser on any seat); peace deals carry no terms; the
-  favor PENALTIES (CO2, global grievances, occupied capitals) are
-  named by sources without rates — recorded, not invented.
+- **B-22r. World Congress residuals.** The session is real now: a
+  rotating two-slot slate off `CONGRESS_RESOLUTIONS` (Urban Development
+  Treaty, Patronage, Migration Treaty, Heritage Organization — era
+  windows and A/B texts verbatim from the GS wiki table), the always-3rd
+  Diplomatic Victory resolution from Modern (+/-2 DVP on the leader),
+  the 10k vote-cost curve, outcome-then-target plurality, +1 DVP to
+  every winning-combo voter, refund tiers 0/50/100, and the standing
+  effects consumed on both engines (`congressSession` /
+  `_world_congress`, readers `congressGppFactor` /
+  `_congress_gpp_factor` and siblings); Statue of Liberty and Potala
+  pay their sourced DVP at completion and Potala's diplomatic slot (and
+  Forbidden City's wildcard) enter the live adoption
+  (`wonderExtraSlots`). REACHABILITY (driven 250-turn rollouts, 4
+  seeds): 5 sessions per seed, a standing slate on 132 of 250 turns,
+  UDT/Patronage/Migration all reached, DVP spread 4-11 (the 20-point
+  win stays poke-only); the DV resolution fired on ONE seed (its curve
+  and refunds ran in-game); HERITAGE ORGANIZATION never stands in-gate
+  (Modern arrives too late for its rotation slot) — the geopolitics
+  pokes are its bar. OPEN:
+  - **THE VOTE IS SCRIPTED.** Outcome, target and spend are one
+    deterministic self-interest rule (`preference`/`_congress_pref`:
+    free vote everywhere, ALL favor on the DV resolution). Real GS
+    gives each player the choice, so the vote belongs on the WIRE as
+    its own head (per-slot outcome bit + target + favor count) with the
+    standing slate rendered into the observation — an action-space
+    change, kept open by the no-permanent-closure rule.
+  - **4 of ~18 resolutions.** Trade Policy rides the trader work
+    (B-31r); Treaty Organization and Sovereignty need per-CS-type favor
+    accounting; World Religion, Mercenary Companies, Arms Control,
+    Public Works, Global Energy Treaty and the rest each name a system
+    to carry them. Luxury Policy's outcome-A magnitude has no sourced
+    number yet.
+  - **Emergencies, Special Sessions, Scored Competitions.** The main
+    real DVP faucet beside the DV vote. Floods already fire, so an
+    Aid-Request-shaped competition has a trigger to hang off.
+  - **Peace deals carry no terms;** the favor PENALTIES (CO2, global
+    grievances, occupied capitals) are named by sources without rates —
+    open, not invented.
 - **B-24r. Ages/governors tails:** the DEDICATION catalog now holds eight,
   both faces sourced and hooked for the four addable ones (To Arms!, Hic Sunt
   Dracones, Reform the Coinage, Heartbeat of Steam); residuals: the four

@@ -290,6 +290,9 @@ class SimInit:
         self.seat_denounced = torch.full((B, _pw, _pw), -1, dtype=torch.long, device=device)
         self.seat_allied = torch.zeros_like(self.seat_denounced, dtype=torch.bool)
         self.congress_sessions = torch.zeros(B, dtype=torch.long, device=device)
+        # Standing World Congress resolutions of the LAST session, 2 slots x
+        # (res, outcome 0=A/1=B, target); -1 empty. Replaced every session.
+        self.congress_active = torch.full((B, 2, 3), -1, dtype=torch.long, device=device)
         # Per-seat era-score accumulator, one column per seat row — the TS
         # `state.eraScore` mirror. Integer, zero-draw;
         # resets at every eraLength boundary (right after `self.turn += 1`, the
@@ -302,18 +305,36 @@ class SimInit:
             for c, v in enumerate(esi[: self.n_majors]):
                 self.era_score[b, c] = int(v)
         _er = rules.eras
-        self._ally_min_peace = int((rules.seats.get("eras") or {}).get("allyMinPeace", 30))
+        self._ally_min_peace = int(rules.eras["allyMinPeace"])
         self._formal_war_min = int(rules.seats.get("formalWarMinTurns", 5))
         self._treaty_turns = int(rules.seats["peaceTreatyTurns"])
-        _er2 = rules.seats.get("eras") or {}
-        self._wm_dow = int(_er2.get("warmongerDow", 4))
-        self._wm_cap = int(_er2.get("warmongerCapture", 3))
-        self._wm_gang = int(_er2.get("warmongerGang", 6))
-        self._favor_per_suz = int(_er2.get("diplomaticFavorPerSuzerain", 1))
-        self._congress_interval = int(_er2.get("congressInterval", 30))
-        self._congress_min_era = int(_er2.get("congressMinEra", 2))
-        self._dvp_per_res = int(_er2.get("dvpPerResolution", 1))
-        self._dvp_win = int(_er2.get("diploVictoryPoints", 20))
+        # rules.eras is the exporter's eras bag (the diplomacy/congress
+        # scalars ride it); reading it off rules.seats returned {} and every
+        # .get below silently DEFAULTED — hard reads keep that from recurring.
+        _er2 = rules.eras
+        self._wm_dow = int(_er2["warmongerDow"])
+        self._wm_cap = int(_er2["warmongerCapture"])
+        self._wm_gang = int(_er2["warmongerGang"])
+        self._favor_per_suz = int(_er2["diplomaticFavorPerSuzerain"])
+        self._congress_interval = int(_er2["congressInterval"])
+        self._congress_min_era = int(_er2["congressMinEra"])
+        self._dvp_per_res = int(_er2["dvpPerResolution"])
+        self._dvp_win = int(_er2["diploVictoryPoints"])
+        # WORLD CONGRESS catalog + magnitudes (data/seats.ts carries the
+        # sources). Hard reads — a missing key must fail loud, not default.
+        self._congress_res = [
+            {"min": int(r["min"]), "max": int(r["max"]), "t": int(r["t"])}
+            for r in _er2["congressResolutions"]
+        ]
+        self._congress_dv_min = int(_er2["congressDvMinEra"])
+        self._congress_dv_delta = int(_er2["congressDvDelta"])
+        self._congress_vstep = int(_er2["congressVoteStep"])
+        self._c_prod_mult = float(_er2["congressProdMult"])
+        self._c_gpp_mult = float(_er2["congressGppMult"])
+        self._c_grow_a = float(_er2["congressGrowthA"])
+        self._c_grow_b = float(_er2["congressGrowthB"])
+        self._c_mig_loy = float(_er2["congressMigLoyalty"])
+        self._c_gw_mult = int(_er2["congressGwMult"])
         self._era_len = int(_er.get("length", 50))
         self._era_pts = {k: int(_er.get(k, d)) for k, d in (("found", 2), ("conquer", 3), ("wonder", 3), ("pantheon", 1), ("religion", 2), ("gp", 1))}
         # Per-seat Age (0 Dark / 1 Normal / 2 Golden), assigned at each era
@@ -591,6 +612,9 @@ class SimInit:
             # 2, Colosseum 1). Reaches the tier balance only, never the luxury
             # ranking's baseHave (city.ts luxuryAmenities).
             self._wond_regam = torch.tensor([float(w.get("regionalAmenities", 0)) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
+            self._wond_dvp = torch.tensor([int(w["dvp"]) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] DVP paid at completion
+            self._wond_dslot = torch.tensor([int(w["dslot"]) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] extra diplomatic policy slots
+            self._wond_wslot = torch.tensor([int(w["wslot"]) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] extra wildcard policy slots
             # Per-wonder Great Work slots [nW, 3] in kind order (writing, art,
             # music), additive with the GW_BUILDINGS slots.
             self._wond_gw = torch.tensor([list(w.get("gwslots", [0, 0, 0])) for w in self._wond_rows], dtype=torch.long, device=device)
@@ -827,6 +851,9 @@ class SimInit:
         # district and its buildings — cpu/core/game.ts isEncampHarborItem).
         self._encamp_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "ENCAMPMENT"), -1)
         self._harbor_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HARBOR"), -1)
+        # The Urban Development Treaty ban on HOLY_SITE also refuses the
+        # worship faith-buy (a purchase still CREATES the building).
+        self._holy_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HOLY_SITE"), -1)
         # Districts that LOWER neighbouring appeal (cpu/core/appeal.ts), and the
         # NEIGHBORHOOD column whose housing reads the appeal tier.
         self._appeal_bad_dist = [

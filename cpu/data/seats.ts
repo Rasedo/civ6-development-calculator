@@ -209,31 +209,86 @@ export const GOV_MAX_TITLES = 5;
 export const DIPLO_FAVOR_PER_SUZERAIN = 1;
 
 /**
- * The WORLD CONGRESS. Sourced (Civilopedia GS "World Congress"):
- * the Congress begins meeting once the game reaches the MEDIEVAL era and
- * convenes every 30 turns on Standard speed. Resolutions are voted on with
- * DIPLOMATIC FAVOR, and ties go to whoever spent the greater PERCENTAGE of
- * their favor. Diplomatic Victory needs 20 Diplomatic Victory Points (wiki,
- * "Victory (Civ6)").
+ * The WORLD CONGRESS. Sourced (Civ 6 wiki, GS "World Congress (Civ6)"):
+ * the Congress begins meeting in the MEDIEVAL era and convenes every 30 turns
+ * on Standard speed. Each Regular Session proposes resolutions "about topics
+ * relevant for the current world"; every resolution has two OUTCOMES (A/B),
+ * each applying to a TARGET. Voting: "Casting a single vote on a Resolution
+ * is free. The cost of each subsequent vote, however, scales linearly by a
+ * factor of 10" (the k-th extra vote costs 10k favor). The OUTCOME with more
+ * votes wins, then the TARGET by plurality among the winning outcome's votes.
+ * "Every civilization which voted for the outcome/target combo that
+ * eventually won gets 1 Diplomatic Victory point" (June 2019 rule). Refunds:
+ * winning combo 0%, winning outcome with a losing target 50%, losing outcome
+ * 100%. "Starting from the Modern Era, a Resolution on Diplomatic Victory
+ * points will always be available as the 3rd Resolution" — A: target gains 2
+ * DVP, B: target loses 2. Diplomatic Victory needs 20 Diplomatic Victory
+ * Points (wiki, "Victory (Civ6)").
  *
- * TWO RECORDED STYLIZATIONS, both because the real thing needs subsystems that
- * do not exist here:
- *  1. VOTE SIZE. Real Civ 6 lets each civ choose how much favor to commit.
- *     There is no chooser on either seat (and a roll would break the zero-draw
- *     contract), so every civ commits ALL its favor. The tie-break by
- *     percentage-of-favor-spent is then always 100% and resolves to civ id —
- *     kept in the code anyway so the rule is right when a chooser arrives.
- *  2. DVP SOURCE. Real Civ 6 awards Diplomatic Victory Points mainly through
- *     Emergencies and Scored Competitions, neither of which is modeled. GS
- *     does also award them through a late-game World Congress resolution, so
- *     awarding DVP to the resolution winner is faithful in SHAPE while
- *     overstating the rate. Recorded, not hidden.
+ * SCRIPTED-CHOOSER STYLIZATION: real Civ 6 lets each player choose outcome,
+ * target and favor spend per resolution. There is no vote head on the wire
+ * yet (an open AUDIT item), so both engines run the SAME zero-draw scripted
+ * policy: every alive civ casts its free vote by a deterministic
+ * self-interest rule, spends favor ONLY on the Diplomatic Victory resolution
+ * (all of it, up the real cost curve), and ties resolve to outcome A / the
+ * lower target index / the lower seat. The real slate is a random draw among
+ * era-eligible resolutions; here it rotates deterministically by session.
  */
 export const CONGRESS_INTERVAL = 30;
 export const CONGRESS_MIN_ERA = 2;
 export const DVP_PER_RESOLUTION = 1;
 /** Diplomatic Victory threshold (real Civ 6 GS: 20 points). */
 export const DIPLO_VICTORY_POINTS = 20;
+
+export type CongressTargetKind = 'district' | 'gpClass' | 'gwKind' | 'seat';
+export interface CongressResolutionDef {
+  id: string;
+  name: string;
+  /** civEraIndex floor for the slate (0 = from the congress's own gate). */
+  minEra: number;
+  /** civEraIndex ceiling, inclusive (99 = none). */
+  maxEra: number;
+  target: CongressTargetKind;
+}
+/**
+ * The modeled resolution subset — the rows whose BOTH outcomes land on
+ * existing engine channels, era windows verbatim from the wiki table.
+ * Catalog order is load-bearing: the slate rotation and the wire's res
+ * indices key on it. The unmodeled rows (Trade Policy, Treaty Organization,
+ * World Religion, Mercenary Companies, ...) are open AUDIT items.
+ */
+export const CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
+  // CIV6: "A: +100% Production towards buildings in this district. /
+  // B: No buildings can be created in this district." (through Modern)
+  { id: 'URBAN_DEVELOPMENT_TREATY', name: 'Urban Development Treaty', minEra: 0, maxEra: 5, target: 'district' },
+  // CIV6: "A: +100% points towards Great People of this class. / B: No
+  // points earned towards Great People of this class" — B zeroes EVERY
+  // source, districts, buildings and projects alike. (through Modern)
+  { id: 'PATRONAGE', name: 'Patronage', minEra: 0, maxEra: 5, target: 'gpClass' },
+  // CIV6: "A: +20% Population growth but -5 Loyalty per turn in target
+  // player's cities. / B: +5 Loyalty per turn but -20% growth." (Industrial+)
+  { id: 'MIGRATION_TREATY', name: 'Migration Treaty', minEra: 4, maxEra: 99, target: 'seat' },
+  // CIV6: "A: Great Works of this type generate +100% Tourism. / B: No
+  // Tourism from Great Works of this type." (Modern+)
+  { id: 'HERITAGE_ORGANIZATION', name: 'Heritage Organization', minEra: 5, maxEra: 99, target: 'gwKind' },
+];
+export const CONGRESS_UDT = 0;
+export const CONGRESS_PATRONAGE = 1;
+export const CONGRESS_MIGRATION = 2;
+export const CONGRESS_HERITAGE = 3;
+/** The always-3rd Diplomatic Victory resolution enters at Modern. */
+export const CONGRESS_DV_MIN_ERA = 5;
+export const CONGRESS_DV_DELTA = 2;
+/** The k-th EXTRA vote costs CONGRESS_VOTE_STEP * k favor. */
+export const CONGRESS_VOTE_STEP = 10;
+export const CONGRESS_PROD_MULT = 2;
+export const CONGRESS_GPP_MULT = 2;
+/** Migration Treaty growth factors as LITERALS — both engines must see
+ * the identical double, and 1 +/- 0.2 does not round to these. */
+export const CONGRESS_GROWTH_A = 1.2;
+export const CONGRESS_GROWTH_B = 0.8;
+export const CONGRESS_MIG_LOYALTY = 5;
+export const CONGRESS_GW_MULT = 2;
 
 export const TOURISM_PER_VISITOR_PER_CIV = 200;
 export const CULTURE_PER_DOMESTIC_TOURIST = 100;

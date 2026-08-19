@@ -467,7 +467,7 @@ class SimSeats:
         founded = active & self.civ_religion_done[:, row]
         elig_w = self._worship_city_ok(row)
         if bool(elig_w.any()):
-            w_ok = founded & self._afford(self.civ_faith[:, row], self._worship_cost) & elig_w.any(dim=1)
+            w_ok = founded & self._afford(self.civ_faith[:, row], self._worship_cost) & elig_w.any(dim=1) & ~self._congress_holy_blocked()
             w_j = torch.where(w_ok, elig_w.long().argmax(dim=1), w_j)
         elig_s = self._seat_religious_city_ok(row)
         first_s = elig_s.long().argmax(dim=1)
@@ -1288,34 +1288,253 @@ class SimSeats:
 
 
     def _world_congress(self) -> None:
-        """The `worldCongress` mirror. At every congressInterval turn, once ANY
-        seat has reached congressMinEra (Medieval), one resolution runs: every
-        seat commits ALL its favor as votes, the LARGEST commitment wins
-        DVP_PER_RESOLUTION Diplomatic Victory Points, and every commitment is
-        spent. Ties keep the LOWER seat id (the ascending scan). A seat with zero
-        favor casts no vote and cannot win. Zero-draw — a pure function of
-        state."""
+        """The `worldCongress`/`congressSession` mirror — one Regular Session
+        at every congressInterval turn once ANY major is Medieval: two
+        era-eligible resolutions off the deterministic rotation, then the
+        Diplomatic Victory resolution from Modern. Mechanics sourced at the
+        catalog (CONGRESS_RESOLUTIONS): the free vote + the 10k favor curve
+        (spent on the DV resolution only — the scripted chooser), outcome
+        before target, +1 DVP to every winning-combo voter, refund tiers.
+        Zero-draw — a pure function of state."""
         if self._congress_interval <= 0:
             return
-        fires = (self.turn % self._congress_interval) == 0
-        if not fires:
+        if (self.turn % self._congress_interval) != 0:
             return
-        era_ok = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        B, dev = self.B, self.device
+        world_era = torch.full((B,), -1, dtype=torch.long, device=dev)
         for row in range(self.n_majors):
-            era_ok = era_ok | (self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]) >= self._congress_min_era)
-        if not bool(era_ok.any()):
+            world_era = torch.maximum(world_era, self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]))
+        fires = world_era >= self._congress_min_era
+        if not bool(fires.any()):
             return
-        self.congress_sessions.add_(era_ok.long())
-        best = torch.zeros(self.B, dtype=self.civ_diplo_favor.dtype, device=self.device)
-        win = torch.full_like(best, -1)
-        for row in range(self.n_majors):
-            v = self.civ_diplo_favor[:, row]
-            take = (v > 0) & (v > best)
-            win = torch.where(take, torch.full_like(win, row), win)
-            best = torch.where(take, v, best)
-        for row in range(self.n_majors):
-            self.civ_diplo_favor[:, row] = torch.where(era_ok, torch.zeros_like(self.civ_diplo_favor[:, row]), self.civ_diplo_favor[:, row])
-            self.civ_diplo_points[:, row] = self.civ_diplo_points[:, row] + (era_ok & (win == row)).long() * self._dvp_per_res
+        self.congress_sessions.add_(fires.long())
+        # The standing set is REPLACED wholesale where a session fires, and
+        # the cached legality bodies must see the change.
+        for k in range(2):
+            for f in range(3):
+                self.congress_active[:, k, f] = torch.where(fires, torch.full_like(world_era, -1), self.congress_active[:, k, f])
+        self._eff_version += 1
+        NR = len(self._congress_res)
+        if NR:
+            elig = torch.stack([
+                fires & (world_era >= r["min"]) & (world_era <= r["max"]) for r in self._congress_res
+            ], dim=1)  # [B, NR]
+            E = elig.long().sum(dim=1)
+            rank = elig.long().cumsum(dim=1) - 1
+            sess = self.congress_sessions
+            j0 = (2 * (sess - 1)) % E.clamp(min=1)
+            j1 = (2 * (sess - 1) + 1) % E.clamp(min=1)
+            res0 = torch.full((B,), -1, dtype=torch.long, device=dev)
+            res1 = torch.full_like(res0, -1)
+            for r in range(NR):
+                er = elig[:, r]
+                res0 = torch.where(er & (rank[:, r] == j0), torch.full_like(res0, r), res0)
+                res1 = torch.where(er & (rank[:, r] == j1), torch.full_like(res1, r), res1)
+            # a one-eligible slate runs its resolution once (TS's s0 === s1)
+            res1 = torch.where(res1 == res0, torch.full_like(res1, -1), res1)
+            for slot, sel in ((0, res0), (1, res1)):
+                for r in range(NR):
+                    m = fires & (sel == r)
+                    if bool(m.any()):
+                        self._congress_regular(r, m, slot)
+        dv = fires & (world_era >= self._congress_dv_min)
+        if bool(dv.any()):
+            self._congress_dv(dv)
+
+    def _congress_space(self, kind: int) -> int:
+        if kind == 0:
+            return int(self.city_dist_tile.shape[3])
+        if kind == 1:
+            return int(self.civ_gpp.shape[2])
+        if kind == 2:
+            return 3
+        return self.n_majors
+
+    def _congress_pref(self, kind: int, row: int) -> torch.Tensor:
+        """[B] — seat `row`'s scripted free-vote target (the `preference`
+        twin): outcome A on the target it holds the most of, argmax with ties
+        to the LOWER index; kinds 0 district / 1 gpClass / 2 gwKind / 3 self."""
+        B, dev = self.B, self.device
+        if kind == 3:
+            return torch.full((B,), row, dtype=torch.long, device=dev)
+        if kind == 0:
+            reg = self.city_dist_tile[:, row]  # [B, C, nD]
+            comp = self.district_complete.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape_as(reg)
+            counts = ((reg >= 0) & comp & self.city_alive[:, row].unsqueeze(2)).long().sum(dim=1).double()
+        elif kind == 1:
+            counts = self.civ_gpp[:, row].double()
+        else:
+            al = self.city_alive[:, row].long()
+            counts = torch.stack([
+                (self.city_gw_writing[:, row] * al).sum(dim=1),
+                (self.city_gw_art[:, row] * al).sum(dim=1),
+                (self.city_gw_music[:, row] * al).sum(dim=1),
+            ], dim=1).double()
+        best = torch.full((B,), float("-inf"), dtype=torch.float64, device=dev)
+        at = torch.zeros(B, dtype=torch.long, device=dev)
+        for t in range(counts.shape[1]):
+            take = counts[:, t] > best
+            at = torch.where(take, torch.full_like(at, t), at)
+            best = torch.where(take, counts[:, t], best)
+        return at
+
+    def _congress_regular(self, r: int, m: torch.Tensor, slot: int) -> None:
+        """One non-DV resolution for the games in `m` (the `runResolution`
+        twin): every alive major casts one free vote — outcome A always, so
+        the outcome tally is A's — the target wins by plurality with ties to
+        the LOWER index, and every winning-combo voter takes
+        dvpPerResolution. The winner enters `congress_active[slot]`."""
+        B, dev = self.B, self.device
+        kind = self._congress_res[r]["t"]
+        nrow = self.n_majors
+        alive = torch.stack([self.city_alive[:, row].any(dim=1) for row in range(nrow)], dim=1)
+        tgt = torch.stack([self._congress_pref(kind, row) for row in range(nrow)], dim=1)
+        size = self._congress_space(kind)
+        counts = torch.zeros(B, size, dtype=torch.long, device=dev)
+        for row in range(nrow):
+            oh = torch.nn.functional.one_hot(tgt[:, row].clamp(min=0, max=size - 1), size)
+            counts = counts + oh * alive[:, row].long().unsqueeze(1)
+        best = torch.full((B,), -1, dtype=torch.long, device=dev)
+        win_t = torch.zeros(B, dtype=torch.long, device=dev)
+        for t in range(size):
+            take = counts[:, t] > best
+            win_t = torch.where(take, torch.full_like(win_t, t), win_t)
+            best = torch.where(take, counts[:, t], best)
+        voted = m & alive.any(dim=1)
+        for row in range(nrow):
+            hit = voted & alive[:, row] & (tgt[:, row] == win_t)
+            self.civ_diplo_points[:, row] = self.civ_diplo_points[:, row] + hit.long() * self._dvp_per_res
+        self.congress_active[:, slot, 0] = torch.where(voted, torch.full_like(win_t, r), self.congress_active[:, slot, 0])
+        self.congress_active[:, slot, 1] = torch.where(voted, torch.zeros_like(win_t), self.congress_active[:, slot, 1])
+        self.congress_active[:, slot, 2] = torch.where(voted, win_t, self.congress_active[:, slot, 2])
+
+    def _congress_dv(self, m: torch.Tensor) -> None:
+        """The Diplomatic Victory resolution (the `runDvResolution` twin):
+        leader = argmax DVP among alive majors, ties low. The leader votes A
+        on itself, everyone else B on the leader, and every voter pours ALL
+        its favor into extra votes up the 10k curve. Losing-outcome voters
+        take the 100% refund, winning-combo voters 0% and +1 DVP; the 50%
+        wrong-target tier cannot fire under this chooser (every vote names
+        the leader) but belongs to the tally, not the chooser. The +/-2 lands
+        immediately, unclamped — the win check is a >= threshold."""
+        B, dev = self.B, self.device
+        nrow = self.n_majors
+        alive = torch.stack([self.city_alive[:, row].any(dim=1) for row in range(nrow)], dim=1)
+        lead = torch.full((B,), -1, dtype=torch.long, device=dev)
+        best = torch.full((B,), -(2 ** 62), dtype=torch.long, device=dev)
+        for row in range(nrow):
+            p = self.civ_diplo_points[:, row]
+            take = alive[:, row] & (p > best)
+            lead = torch.where(take, torch.full_like(lead, row), lead)
+            best = torch.where(take, p, best)
+        m = m & (lead >= 0)
+        if not bool(m.any()):
+            return
+        weight = torch.zeros(B, nrow, dtype=torch.long, device=dev)
+        spent = torch.zeros(B, nrow, dtype=self.civ_diplo_favor.dtype, device=dev)
+        for row in range(nrow):
+            voter = m & alive[:, row]
+            fav = self.civ_diplo_favor[:, row].clone()
+            extra = torch.zeros(B, dtype=torch.long, device=dev)
+            # 64 rungs exhaust only above 20800 favor — beyond any 250-turn bank
+            for k in range(1, 65):
+                cost = self._congress_vstep * k
+                can = voter & (fav >= cost)
+                fav = torch.where(can, fav - cost, fav)
+                extra = extra + can.long()
+            spent[:, row] = torch.where(voter, self.civ_diplo_favor[:, row] - fav, spent[:, row])
+            self.civ_diplo_favor[:, row] = torch.where(voter, fav, self.civ_diplo_favor[:, row])
+            weight[:, row] = torch.where(voter, 1 + extra, weight[:, row])
+        a_w = torch.zeros(B, dtype=torch.long, device=dev)
+        b_w = torch.zeros(B, dtype=torch.long, device=dev)
+        for row in range(nrow):
+            is_lead = lead == row
+            a_w = a_w + torch.where(is_lead, weight[:, row], torch.zeros_like(a_w))
+            b_w = b_w + torch.where(is_lead, torch.zeros_like(b_w), weight[:, row])
+        win_out = (b_w > a_w).long()  # tie -> A, TS's `b > a ? 1 : 0`
+        for row in range(nrow):
+            voter = m & alive[:, row]
+            my_out = torch.where(lead == row, torch.zeros_like(win_out), torch.ones_like(win_out))
+            lost = voter & (my_out != win_out)
+            self.civ_diplo_favor[:, row] = self.civ_diplo_favor[:, row] + torch.where(lost, spent[:, row], torch.zeros_like(spent[:, row]))
+            won = voter & (my_out == win_out)
+            self.civ_diplo_points[:, row] = self.civ_diplo_points[:, row] + won.long() * self._dvp_per_res
+        delta = torch.where(win_out == 0,
+                            torch.full((B,), self._congress_dv_delta, dtype=torch.long, device=dev),
+                            torch.full((B,), -self._congress_dv_delta, dtype=torch.long, device=dev))
+        for row in range(nrow):
+            hit = m & (lead == row)
+            self.civ_diplo_points[:, row] = self.civ_diplo_points[:, row] + torch.where(hit, delta, torch.zeros_like(delta))
+
+    def _congress_slot(self, r: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """(outcome, target) [B] of standing resolution `r` — catalog order:
+        0 Urban Development Treaty / 1 Patronage / 2 Migration Treaty /
+        3 Heritage Organization (CONGRESS_RESOLUTIONS). Outcome -1 = not
+        standing."""
+        out = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        tgt = torch.full_like(out, -1)
+        for k in range(self.congress_active.shape[1]):
+            hit = self.congress_active[:, k, 0] == r
+            out = torch.where(hit, self.congress_active[:, k, 1], out)
+            tgt = torch.where(hit, self.congress_active[:, k, 2], tgt)
+        return out, tgt
+
+    def _congress_udt(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """[B] x2 — (district idx whose buildings take +100% production,
+        district idx where buildings are banned); -1 where not standing."""
+        out, tgt = self._congress_slot(0)
+        return (torch.where(out == 0, tgt, torch.full_like(tgt, -1)),
+                torch.where(out == 1, tgt, torch.full_like(tgt, -1)))
+
+    def _congress_gpp_factor(self, cls: int) -> torch.Tensor:
+        """[B] f64 — the Patronage factor for GP class `cls`: x2 (A), x0 (B)
+        or 1. Covers every point source (the wiki footnote zeroes districts,
+        buildings and projects alike)."""
+        out, tgt = self._congress_slot(1)
+        hit = (out >= 0) & (tgt == cls)
+        fac = torch.where(out == 0,
+                          torch.full((self.B,), self._c_gpp_mult, dtype=torch.float64, device=self.device),
+                          torch.zeros(self.B, dtype=torch.float64, device=self.device))
+        return torch.where(hit, fac, torch.ones_like(fac))
+
+    def _congress_growth(self, row: int) -> torch.Tensor:
+        """[B] f64 — the Migration Treaty growth factor on this row's cities."""
+        out, tgt = self._congress_slot(2)
+        hit = (out >= 0) & (tgt == row)
+        fac = torch.where(out == 0,
+                          torch.full((self.B,), self._c_grow_a, dtype=torch.float64, device=self.device),
+                          torch.full((self.B,), self._c_grow_b, dtype=torch.float64, device=self.device))
+        return torch.where(hit, fac, torch.ones_like(fac))
+
+    def _congress_loyalty(self, row: int) -> torch.Tensor:
+        """[B] f64 — the Migration Treaty loyalty term on this row's cities
+        (A pays growth and COSTS loyalty; B is the reverse)."""
+        out, tgt = self._congress_slot(2)
+        hit = (out >= 0) & (tgt == row)
+        term = torch.where(out == 0,
+                           torch.full((self.B,), -self._c_mig_loy, dtype=torch.float64, device=self.device),
+                           torch.full((self.B,), self._c_mig_loy, dtype=torch.float64, device=self.device))
+        return torch.where(hit, term, torch.zeros_like(term))
+
+    def _congress_gw_kmult(self) -> torch.Tensor:
+        """[B, 3] long — Heritage Organization tourism factors by Great Work
+        kind [writing, art, music]."""
+        out, tgt = self._congress_slot(3)
+        km = torch.ones(self.B, 3, dtype=torch.long, device=self.device)
+        for k in range(3):
+            hit = (out >= 0) & (tgt == k)
+            km[:, k] = torch.where(
+                hit,
+                torch.where(out == 0, torch.full_like(km[:, k], self._c_gw_mult), torch.zeros_like(km[:, k])),
+                km[:, k])
+        return km
+
+    def _congress_holy_blocked(self) -> torch.Tensor:
+        """[B] — the Urban Development Treaty ban stands on HOLY_SITE, which
+        also refuses the worship faith-buy (a purchase still CREATES the
+        building)."""
+        _p, blk = self._congress_udt()
+        return (blk >= 0) & (blk == self._holy_didx)
 
     def _diplomatic_victor(self) -> torch.Tensor:
         """The `diplomaticVictor` mirror: [B] the lowest seat id holding
@@ -1727,6 +1946,17 @@ class SimSeats:
         cols = self.RC
         reg = self.city_wonder[:, row, :cols]
         return (reg >= 0) & self.built_wonder_complete.gather(1, reg.clamp(min=0).reshape(self.B, -1)).reshape_as(reg)
+
+    def _wonder_extra_slots(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """[B] long x2 — the (diplomatic, wildcard) policy slots this seat's
+        COMPLETE wonders add (the `wonderExtraSlots` twin)."""
+        z = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        compw = self._completed_wonders(row)
+        if compw is None:
+            return z, z
+        d = (compw & (self._wond_dslot > 0).reshape(1, 1, -1)).sum(dim=(1, 2))
+        w = (compw & (self._wond_wslot > 0).reshape(1, 1, -1)).sum(dim=(1, 2))
+        return d, w
 
     def _wonder_growth_mult(self, compw: torch.Tensor | None) -> torch.Tensor | None:
         if compw is None:

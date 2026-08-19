@@ -5,6 +5,7 @@ import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef } from '../data/policies';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
 import { seatOf, citiesOf } from './seats';
+import { BUILT_WONDERS } from '../data/builtWonders';
 import { cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus } from './cityStates';
 
 
@@ -225,7 +226,10 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
 
   const mods = modifiersFromResearch(s.research);
 
-  if (GOVERNMENTS_ADOPTION_LIVE) applyGovernment(mods, s.research);
+  if (GOVERNMENTS_ADOPTION_LIVE) {
+    const xs = wonderExtraSlots(state, seat);
+    applyGovernment(mods, s.research, xs.diplo, xs.wild);
+  }
 
   const beliefSeat = { followers: pop, cities: cities.length };
   applyBeliefEffects(mods, rel?.pantheon ? PANTHEONS[rel.pantheon] : undefined, beliefSeat);
@@ -311,7 +315,22 @@ function applyBeliefEffects(
  * wildcard) so the scripted both seats seats adopt symmetrically — the
  * GPU mirror computes the same set from the seat's tracked civics.
  */
-export function computeAdoption(research: ResearchState): {
+/** Count the wonder-granted policy slots (Potala's diplomatic, Forbidden
+ * City's wildcard) — the LIVE adoption and the boost census both take them. */
+export function wonderExtraSlots(state: GameState, seat: number): { diplo: number; wild: number } {
+  let diplo = 0, wild = 0;
+  for (const c of citiesOf(state, seat)) {
+    for (const w of c.wonders ?? []) {
+      if (!state.map.tiles[w.tileIndex].builtWonderComplete) continue;
+      const fx = BUILT_WONDERS[w.id]?.effects;
+      if (fx?.extraDiploSlot) diplo++;
+      if (fx?.extraWildcardSlot) wild++;
+    }
+  }
+  return { diplo, wild };
+}
+
+export function computeAdoption(research: ResearchState, extraDiplo = 0, extraWild = 0): {
   government: string | null;
   policies: (string | null)[];
 } {
@@ -322,7 +341,11 @@ export function computeAdoption(research: ResearchState): {
     if (!chosen || g.tier > chosen.tier) chosen = g;
   }
   if (!chosen) return { government: null, policies: [] };
+  // Wonder-granted slots append AFTER the base list so the greedy fill's
+  // order stays the government's own; wildcards last, like every base list.
   const slots = [...chosen.slots];
+  for (let i = 0; i < extraDiplo; i++) slots.push('diplomatic');
+  for (let i = 0; i < extraWild; i++) slots.push('wildcard');
   const policies: (string | null)[] = slots.map(() => null);
   for (const card of Object.values(POLICIES)) {
     if (!u.policies.has(card.id)) continue;
@@ -332,8 +355,8 @@ export function computeAdoption(research: ResearchState): {
   return { government: chosen.id, policies };
 }
 
-function applyGovernment(mods: Modifiers, research: ResearchState): void {
-  const { government, policies } = computeAdoption(research);
+function applyGovernment(mods: Modifiers, research: ResearchState, extraDiplo = 0, extraWild = 0): void {
+  const { government, policies } = computeAdoption(research, extraDiplo, extraWild);
   const gov = government ? GOVERNMENTS[government] : null;
   if (!gov) return;
   applyPolicyEffects(mods, gov.effects);
@@ -412,11 +435,8 @@ export function governmentSlots(state: GameState, seat: number): import('../data
   const gov = govId ? GOVERNMENTS[govId] : null;
   if (!gov) return [];
   const slots = [...gov.slots];
-  const hasFC = seatOf(state, seat)!.cities.some((c) =>
-    c.wonders?.some(
-      (w) => w.id === 'FORBIDDEN_CITY' && state.map.tiles[w.tileIndex].builtWonderComplete,
-    ),
-  );
-  if (hasFC) slots.push('wildcard');
+  const xs = wonderExtraSlots(state, seat);
+  for (let i = 0; i < xs.diplo; i++) slots.push('diplomatic');
+  for (let i = 0; i < xs.wild; i++) slots.push('wildcard');
   return slots;
 }

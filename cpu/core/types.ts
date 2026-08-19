@@ -124,6 +124,10 @@ export interface GameState {
   victoryRow?: number;
   roadBridges?: boolean;
   congressSessions?: number;
+  /** Standing World Congress resolutions from the LAST session (res index
+   * into CONGRESS_RESOLUTIONS, winning outcome 0=A/1=B, target index),
+   * replaced wholesale each session. */
+  congress?: { res: number; outcome: number; target: number }[];
   warTurns?: Record<string, number>;
   /** turns a pair's PEACE TREATY still binds, keyed like `warTurns`. */
   treatyTurns?: Record<string, number>;

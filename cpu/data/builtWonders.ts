@@ -44,6 +44,9 @@ export interface BuiltWonderDef {
     petraDesert?: boolean;
     cityYieldMult?: Partial<Yields>;
     extraWildcardSlot?: boolean;
+    extraDiploSlot?: boolean;
+    /** Diplomatic Victory points paid ONCE at completion. */
+    dvp?: number;
   };
   description: string;
 }
@@ -265,7 +268,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       id: 'POTALA_PALACE', name: 'Potala Palace', code: 'PP', cost: 1060,
       requiresTech: 'ASTRONOMY', placement: { hillsOnly: true },
       cityYields: { science: 2, faith: 1 },
-      description: '+2 science, +1 faith. (Diplomatic policy slot dropped.)',
+      effects: { dvp: 1, extraDiploSlot: true },
+      description: '+2 science, +1 faith, +1 Diplomatic Victory point, +1 Diplomatic policy slot.',
     }),
 
     W({
@@ -284,7 +288,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       id: 'STATUE_OF_LIBERTY', name: 'Statue of Liberty', code: 'SL', cost: 1240,
       requiresCivic: 'CIVIL_ENGINEERING', placement: { flatOnly: true, adjacentDistrict: 'HARBOR' },
       cityYields: { culture: 3 },
-      description: '+3 culture. (Free-Great-Person + loyalty ability dropped.)',
+      effects: { dvp: 4 },
+      description: '+3 culture, +4 Diplomatic Victory points on completion. (Free-Great-Person + loyalty aura dropped.)',
     }),
     W({
       id: 'CRISTO_REDENTOR', name: 'Cristo Redentor', code: 'CR', cost: 1620,

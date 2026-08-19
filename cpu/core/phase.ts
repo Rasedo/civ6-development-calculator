@@ -34,6 +34,7 @@ import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEO
 import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, borderGrowthCost, EMBARKED_DEFENSE_CS } from '../data/constants';
 import type { CityStats } from './city';
 import { civEraIndex, computeCityStats, luxuryAmenities, pickBorderTile, acquireTile } from './city';
+import { congressSession, congressLoyaltyDelta, congressUdtProdDistrict } from './congress';
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { hasRiver, hasFreshWater, isCoastalWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
@@ -44,7 +45,7 @@ import { DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex } from './unitActions';
 
 const A_FOUND_CITY = unitActionIndex(IMPROVEMENT_IDS).FOUND_CITY;
-import { ALLY_MIN_PEACE, CIV_LEADERS, FORMAL_WAR_MIN_TURNS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION } from '../data/seats';
+import { ALLY_MIN_PEACE, CIV_LEADERS, FORMAL_WAR_MIN_TURNS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles, goldenBoostBonus } from './eras';
 import { NO_SEAT, atWarWithAny, citiesOf, civHasStrategic, civsAtWar, emptySeat, isCiv, prophetsOf, seatOf, seatOfCityState, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
@@ -312,7 +313,7 @@ export function applyLoyalty(state: GameState, city: City, amenityTierName: stri
     city.loyalty = LOYALTY_MAX;
     return false;
   }
-  const next = (city.loyalty ?? LOYALTY_MAX) + loyaltyDelta(state, city, amenityTierName) + govBonus;
+  const next = (city.loyalty ?? LOYALTY_MAX) + loyaltyDelta(state, city, amenityTierName) + govBonus + congressLoyaltyDelta(state, city.seat);
   city.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));
   return city.loyalty <= 0;
 }
@@ -480,33 +481,23 @@ export function queueSeatProject(state: GameState, civCity: City, projId: string
 
 
 /**
- * The WORLD CONGRESS session. Convenes at every CONGRESS_INTERVAL
- * turn once ANY civ has reached CONGRESS_MIN_ERA (Medieval), and runs one
- * resolution: every civ commits ALL its DIPLOMATIC FAVOR as votes, the largest
- * commitment wins and takes DVP_PER_RESOLUTION Diplomatic Victory Points, and
- * every commitment is spent. Ties go to the greater PERCENTAGE of favor spent
- * (always 100% while there is no chooser — see the constants' comment), then to
- * the lowest unified civ id.
- *
- * A civ with ZERO favor casts no vote and cannot win; if nobody has favor the
- * session still counts but awards nothing. Zero-draw and integer-only: the
- * outcome is a pure function of state, never a roll. Called from endTurn right
- * after eraBoundary, the same position the GPU mirrors.
+ * The WORLD CONGRESS trigger: at every CONGRESS_INTERVAL turn, once ANY civ
+ * has reached CONGRESS_MIN_ERA (Medieval), one Regular Session runs — the
+ * mechanics and their sources live at `congressSession` and the catalog
+ * (CONGRESS_RESOLUTIONS). The slate keys on the MAX era across civs, the
+ * wiki's "topics relevant for the current world". Zero-draw: a pure function
+ * of state. Called from endTurn right after eraBoundary, the same position
+ * the GPU mirrors.
  */
 export function worldCongress(state: GameState): void {
   if (state.turn % CONGRESS_INTERVAL !== 0) return;
-  if (!state.seats.some((sx) => civEraIndex(sx.research.techs, sx.research.civics) >= CONGRESS_MIN_ERA)) return;
-  state.congressSessions = (state.congressSessions ?? 0) + 1;
-  const votes = state.seats.map((sx) => sx.diplomaticFavor ?? 0);
-  let win = -1;
-  for (let c = 0; c < votes.length; c++) {
-    if (votes[c] <= 0) continue; // no favor, no vote
-    if (win < 0 || votes[c] > votes[win]) win = c; // ties keep the LOWER seat
+  let worldEra = -1;
+  for (const sx of state.seats) {
+    const e = civEraIndex(sx.research.techs, sx.research.civics);
+    if (e > worldEra) worldEra = e;
   }
-  for (const sx of state.seats) sx.diplomaticFavor = 0;
-  if (win < 0) return; // nobody could vote
-  const winner = state.seats[win];
-  winner.diplomaticPoints = (winner.diplomaticPoints ?? 0) + DVP_PER_RESOLUTION;
+  if (worldEra < CONGRESS_MIN_ERA) return;
+  congressSession(state, worldEra);
 }
 
 
@@ -1317,6 +1308,10 @@ export function seatPhase(state: GameState): void {
         // disjoint, so the multiplier order is association-free.
         if (q.kind === 'unit' && unitDomain(q.unit) === 'military' && goldenDedication(state, civCity.seat, DED_TO_ARMS)) _em *= TO_ARMS_MIL_PROD_MULT;
         if (q.kind === 'wonder' && (WONDER_ERA_INDEX[q.wonder] ?? 0) >= INDUSTRIAL_ERA_INDEX && goldenDedication(state, civCity.seat, DED_STEAM)) _em *= STEAM_WONDER_PROD_MULT;
+        // CIV6 (Urban Development Treaty, outcome A): "+100% Production
+        // towards buildings in this district."
+        const _udtD = congressUdtProdDistrict(state);
+        if (q.kind === 'building' && _udtD !== null && BUILDINGS[q.building]?.district === _udtD) _em *= CONGRESS_PROD_MULT;
         q.progress += production * _em;
         // Pay in the bank, exactly where the seat 0's endTurn does
         // (game.ts, right after the production add). Without this the field
