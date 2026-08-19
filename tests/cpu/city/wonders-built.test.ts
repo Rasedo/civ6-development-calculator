@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { greatPeopleEarned, greatPersonPointsPerTurn } from '../../../cpu/core/greatPeople';
 import { seatOf, tileCity } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
-import { foundCity, queueDistrict, queueBuilding, queueWonder, setSpecialists, setGovernment, endTurn } from '../../../cpu/core/game';
+import { foundCity, queueDistrict, queueBuilding, queueWonder, setGovernment, endTurn } from '../../../cpu/core/game';
 import { canPlaceWonder, wonderExists } from '../../../cpu/core/rules';
-import { computeCityStats, citySpecialistSlots } from '../../../cpu/core/city';
+import { computeCityStats, citySpecialistSlots, workableTiles } from '../../../cpu/core/city';
 import { districtAdjacency } from '../../../cpu/core/yields';
 import { governmentSlots } from '../../../cpu/core/effects';
 import { grantCivics, expandBorders } from '../helpers';
@@ -103,31 +103,31 @@ describe('world wonders', () => {
 });
 
 describe('specialists', () => {
-  it('slots equal buildings in the district; specialists trade tiles for district yields', () => {
+  it('slots equal buildings in the district; OVERFLOW citizens man them automatically', () => {
     const { state, city } = sandboxCity();
-    city.population = 4;
     queueDistrict(state, city.id, 'CAMPUS', tileAtCoords(state.map, 9, 8).index, 0);
     expect(citySpecialistSlots(state, city).size).toBe(0); // no buildings yet
     queueBuilding(state, city.id, 'LIBRARY', 0);
     const campusTile = tileAtCoords(state.map, 9, 8).index;
     expect(citySpecialistSlots(state, city).get(campusTile)).toBe(1);
 
+    // population within the workable pool -> every citizen works a tile
+    city.population = 4;
     const before = computeCityStats(state, city);
-    expect(setSpecialists(state, city.id, campusTile, 1, 0).ok).toBe(true);
+    expect(before.specialistTotal).toBe(0);
+    // one citizen beyond the pool mans the Campus slot: +2 science
+    city.population = workableTiles(state, city).length + 1;
     const after = computeCityStats(state, city);
     expect(after.specialistTotal).toBe(1);
-    expect(after.workedTiles.length).toBe(before.workedTiles.length - 1);
     expect(after.breakdown.districts.science - before.breakdown.districts.science).toBe(2);
   });
 
-  it('clamps to slots', () => {
+  it('the assignment clamps to open slots', () => {
     const { state, city } = sandboxCity();
-    city.population = 5;
     queueDistrict(state, city.id, 'CAMPUS', tileAtCoords(state.map, 9, 8).index, 0);
     queueBuilding(state, city.id, 'LIBRARY', 0);
-    const campusTile = tileAtCoords(state.map, 9, 8).index;
-    setSpecialists(state, city.id, campusTile, 99, 0);
-    expect(computeCityStats(state, city).specialistTotal).toBe(1);
+    city.population = workableTiles(state, city).length + 99;
+    expect(computeCityStats(state, city).specialistTotal).toBe(1); // one building, one slot
   });
 });
 

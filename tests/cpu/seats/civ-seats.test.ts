@@ -78,7 +78,6 @@ function addCivCity(state: GameState, civ: Seat, col: number, row: number): City
     buildings: [],
     districts: [{ type: 'CITY_CENTER', tileIndex: tile.index }],
     wonders: [],
-    specialists: {},
     hp: 200,
     foundedTurn: 1,
   };
@@ -363,7 +362,6 @@ describe('conquest keeps infrastructure', () => {
         buildings: [],
         districts: [{ type: 'CITY_CENTER', tileIndex: 20 + i }],
         wonders: [],
-        specialists: {},
         hp: CITY_MAX_HP,
       });
     }
@@ -430,7 +428,6 @@ describe('civ trade routes', () => {
       buildings: [],
       districts: [{ type: 'CITY_CENTER', tileIndex: tile.index }],
       wonders: [],
-      specialists: {},
       hp: 200,
       foundedTurn: 1,
     };

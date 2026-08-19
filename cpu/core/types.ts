@@ -44,7 +44,6 @@ export interface City {
   buildings: string[];
   districts: { type: DistrictId; tileIndex: number }[];
   wonders: { id: string; tileIndex: number }[];
-  specialists: Record<string, number>;
   productionBank?: number;
   loyalty?: number;
   outerHp?: number;

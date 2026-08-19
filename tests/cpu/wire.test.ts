@@ -41,8 +41,7 @@ function addCiv(state: GameState, col: number, row: number): Seat {
     id: civ.nextCityId++, name: 'Roma', seat: civ.seat, centerIndex: tile.index,
     population: 5, foodBox: 0, cultureBox: 0, tilesAcquired: 0, lockedTiles: [],
     focus: 'balanced', queue: [], isCapital: true, buildings: [],
-    districts: [{ type: 'CITY_CENTER', tileIndex: tile.index }], wonders: [],
-    specialists: {}, hp: 200, foundedTurn: 1,
+    districts: [{ type: 'CITY_CENTER', tileIndex: tile.index }], wonders: [], hp: 200, foundedTurn: 1,
   };
   tile.district = 'CITY_CENTER';
   tile.districtComplete = true;

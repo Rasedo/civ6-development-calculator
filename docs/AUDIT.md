@@ -58,13 +58,13 @@ nothing carries forward.
 | B-21r suzerain rows | 1 | the residual descoped rows all need whole absent systems |
 | B-22r World Congress | 4 | the vote is scripted (wire head pending); emergencies/competitions absent; 4 of ~18 resolutions |
 | B-24r Ages/governors | 2 | four system-less dedication entries, dark-age policies, governor promotions, per-civ era drift |
-| B-30r specialists | 6 | a mechanic neither engine has: wire column, assignment, yields |
+| B-30r specialists | 2 | the mechanic is live; the free-assignment wire head and its observation stay open |
 | B-31r trade-route tails | 6 | a Trader UNIT and a route wire verb |
 | B-D unsourced data values | 1 | swept; residuals are NAMED stylizations, each labelled at its definition |
 | B-35r theological damage | 1 | deterministic and LINEAR where real Civ 6 rolls; the martyr draw shows a mirrored conditional draw is available |
 | B-34r flood tails | 1 | GS floods also damage UNITS and kill citizens, and a centre on a floodplain loses HP; and the Dam/Great Bath that mitigates a river is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **29** | |
-| **OPEN, TOTAL** | **29** | |
+| **B. Fidelity vs real Civ 6** | **25** | |
+| **OPEN, TOTAL** | **25** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -189,14 +189,32 @@ Civ 6 source or is recorded as unverifiable.
   be mirrored draw-for-draw" — no longer holds: the MARTYR draw in the same
   routine is mirrored and the 250-turn gate is green over it. Closing this
   needs the real religious-combat formula sourced, not just a multiplier.
-- **B-30r. SPECIALISTS are not a mechanic on either engine.** Real Civ 6
-  lets a city work a district slot instead of a tile; here TS only ever
-  writes `city.specialists` from `setSpecialists`, a UI verb, so it is `{}`
-  in every simulated game, and the GPU's greedy assignment was deleted
-  rather than mirrored — assigning a citizen is a CHOICE, and neither
-  engine takes a choice without a wire record. REOPENING IT is a wire
-  column, the way district placement records its TILE, plus the assignment
-  rule and the yields; it is not an engine-rule fix.
+- **B-30r. SPECIALIST residuals.** Specialists are a mechanic now, on both
+  engines: slots = the district's standing buildings (max 3, dark under
+  pillage), the sourced GS yields with the TOP-building tiers
+  (`SPECIALIST_YIELDS`/`SPECIALIST_TIERS` — Commanders exist, the old "no
+  Encampment specialist" note was wrong; wiki "Specialists (Civ6)"), and
+  the AUTOMATIC assignment: OVERFLOW citizens — population beyond the
+  workable pool — fill slots in PLACEABLE_DISTRICTS order
+  (`effectiveSpecialists` / `_city_specialists`, a compared digest column).
+  Citizen assignment was already an in-engine automatic rule for TILES
+  (`assignWorkedTiles`), so specialists ride the same channel; the manual
+  `setSpecialists` verb and its dead `city.specialists` map are deleted.
+  REACHABILITY (driven 250-turn rollouts, 4 seeds): 3 of 4 seeds grow
+  specialists in-game (first at t154/t183/t196; a standing specialist on
+  72 and 69 of 250 turns on two seeds; one seed never overflows), so the
+  serve gate exercises the base rule and its digest column late-game;
+  the TIERS, the catalog-order fill and the pillage gate are poke-only
+  (`district_breadth_test` section i). OPEN:
+  - **THE ASSIGNMENT IS NOT A CHOICE.** Real Civ 6 lets the player place
+    citizens freely (tiles AND slots); both engines run the one overflow
+    rule. The override is a wire head — per-city slot counts, the same
+    surface as a worked-tile override — and the observation renders
+    neither. One item with the tile-assignment choice itself.
+  - Specialists provide yields ONLY in Civ 6 (sourced — no GPP, unlike
+    Civ 5); the Film Studio alternative for the Theater tier and the
+    coal/oil/nuclear plant split remain unmodeled upstream (B-D records
+    the generic POWER_PLANT).
 - **B-31r. Trade-route tails.** (1) No physical Trader UNIT — routes lay
   roads (`layTradeRoad` / `_lay_trade_road`) but nothing walks the path, so
   a route cannot be plundered en route and its range is not a journey.

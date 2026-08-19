@@ -359,7 +359,6 @@ describe('N2 naval spawn + combat', () => {
       buildings: [],
       districts: [{ type: 'CITY_CENTER', tileIndex: civCityCenter.index }],
       wonders: [],
-      specialists: {},
       hp: 200,
       foundedTurn: 1,
     };
@@ -400,7 +399,6 @@ describe('N2 naval spawn + combat', () => {
       buildings: [],
       districts: [{ type: 'CITY_CENTER', tileIndex: civCityCenter.index }],
       wonders: [],
-      specialists: {},
       hp: 200,
       foundedTurn: 1,
     };

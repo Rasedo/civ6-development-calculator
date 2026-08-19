@@ -1080,6 +1080,18 @@ class SimInit:
         # Worship buildings are faith-purchase-only — every production/gold
         # picker masks them; only the worship faith-buy sets their civ_city_bldg bits.
         self._b_worship = rules.b_worship.to(device)  # [NB] bool
+        # SPECIALISTS (data/greatPeople.ts SPECIALIST_YIELDS / SPECIALIST_TIERS,
+        # exported per PLACEABLE district): base yields, the TOP building that
+        # upgrades them (-2 = any worship building), and its add.
+        _ndc = max(len(self.districts_cat), 1)
+        self._spec_y = torch.tensor([[float(x) for x in d["spec"]] for d in self.districts_cat] or [[0.0] * 6], dtype=torch.float64, device=device)  # [nD, 6]
+        self._spec_tb = torch.tensor([int(d["specTB"]) for d in self.districts_cat] or [-1], dtype=torch.long, device=device)  # [nD]
+        self._spec_ta = torch.tensor([[float(x) for x in d["specTA"]] for d in self.districts_cat] or [[0.0] * 6], dtype=torch.float64, device=device)  # [nD, 6]
+        self._spec_any = self._spec_y.abs().sum(dim=1) > 0  # [nD]
+        self._b_dist_oh = (
+            torch.nn.functional.one_hot(self._b_req_district.clamp(min=0), _ndc).to(torch.float64)
+            * (self._b_req_district >= 0).double().unsqueeze(1)
+        )  # [NB, nD] building -> its district column
         self._b_train_xp = rules.b_train_xp.to(device)  # [NB] long
         self._b_era = rules.b_era.to(device)  # [NB] long — unlock era (Heartbeat of Steam's gate) — per-building training XP (best tier over present buildings)
         self._worship_bidx = [int(x) for x in rules.worship_bidx]

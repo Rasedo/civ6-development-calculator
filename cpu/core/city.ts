@@ -13,11 +13,11 @@ import { cityTradeYields } from './trade';
 import { hasRiver } from '../../world/query';
 import { revealAround } from './fog';
 import { IMPROVEMENTS } from '../data/improvements';
-import { DISTRICTS } from '../data/districts';
+import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { goldenCulturePerDistrict, goldenDedication } from './eras';
-import { SPECIALIST_YIELDS, greatWorkCulture, greatWorkTourism, relicFaith, relicTourism, artifactCulture, artifactTourism, GW_PRINTING_TECH } from '../data/greatPeople';
+import { SPECIALIST_YIELDS, SPECIALIST_TIERS, greatWorkCulture, greatWorkTourism, relicFaith, relicTourism, artifactCulture, artifactTourism, GW_PRINTING_TECH } from '../data/greatPeople';
 import { congressGrowthMult, congressGwMult } from './congress';
 import { suzerainEffect } from './cityStates';
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE } from '../data/cityStates';
@@ -111,18 +111,43 @@ export function citySpecialistSlots(state: GameState, city: City): Map<number, n
   return out;
 }
 
+/** The automatic specialist assignment: OVERFLOW citizens — population
+ * beyond the city's workable tiles — fill open slots in PLACEABLE_DISTRICTS
+ * order. CIV6 (wiki "Specialists (Civ6)"): "Specialists are also
+ * particularly useful when a city grows large later in the game, and has
+ * more Population than there are normal tiles to work." Real Civ 6 lets the
+ * player assign specialists freely; that override is an open AUDIT item
+ * (B-30r), so both engines run this one zero-draw rule. */
 export function effectiveSpecialists(state: GameState, city: City): Map<number, number> {
   const slots = citySpecialistSlots(state, city);
   const out = new Map<number, number>();
-  let budget = city.population;
-  for (const [tileIndex, max] of slots) {
-    const wanted = city.specialists[String(tileIndex)] ?? 0;
-    const n = Math.max(0, Math.min(wanted, max, budget));
+  let budget = Math.max(0, city.population - workableTiles(state, city).length);
+  for (const type of PLACEABLE_DISTRICTS) {
+    if (budget <= 0) break;
+    const inst = city.districts.find((d) => d.type === type);
+    if (!inst) continue;
+    const max = slots.get(inst.tileIndex) ?? 0;
+    const n = Math.min(max, budget);
     if (n > 0) {
-      out.set(tileIndex, n);
+      out.set(inst.tileIndex, n);
       budget -= n;
     }
   }
+  return out;
+}
+
+/** A specialist's yields in this city: the base row, upgraded when the
+ * district's TOP building stands ('WORSHIP' = any worship building). */
+export function specialistYields(district: import('./types').DistrictId, buildings: readonly string[]): Partial<Yields> | undefined {
+  const base = SPECIALIST_YIELDS[district];
+  if (!base) return undefined;
+  const tier = SPECIALIST_TIERS[district];
+  const has = tier
+    ? (tier.building === 'WORSHIP' ? buildings.some((b) => BUILDINGS[b]?.worship) : buildings.includes(tier.building))
+    : false;
+  if (!tier || !has) return base;
+  const out: Partial<Yields> = { ...base };
+  for (const [k, v] of Object.entries(tier.add) as [YieldKey, number][]) out[k] = (out[k] ?? 0) + v;
   return out;
 }
 
@@ -484,7 +509,7 @@ export function computeCityStats(
   }
   for (const [tileIndex, n] of specialists) {
     const inst = city.districts.find((d) => d.tileIndex === tileIndex);
-    const y = inst ? SPECIALIST_YIELDS[inst.type] : undefined;
+    const y = inst ? specialistYields(inst.type, city.buildings) : undefined;
     if (y) addYields(districts, y, n);
   }
   const buildings = cityBuildingYields(ctx, city);

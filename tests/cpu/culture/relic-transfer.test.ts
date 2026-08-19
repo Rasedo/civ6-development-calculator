@@ -65,7 +65,6 @@ function addCiv(state: GameState, col: number, row: number, name: string): Seat 
     buildings: ['TEMPLE'],
     districts: [{ type: 'CITY_CENTER', tileIndex: tile.index }],
     wonders: [],
-    specialists: {},
     hp: 200,
     foundedTurn: 1,
   };

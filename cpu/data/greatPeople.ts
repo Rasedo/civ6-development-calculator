@@ -285,6 +285,11 @@ export function placeGreatWorks(
 }
 
 /** Specialist yields per district type (Civ 6-ish; only these take specialists). */
+/** CIV6 (wiki "Specialists (Civ6)", GS values): base yields per specialist
+ * by district — Scientists +2 science, Priests +2 faith, Merchants +4 gold,
+ * Captains +1 food +2 gold, Artists +2 culture, Engineers +2 production,
+ * Commanders +1 production +2 gold. One slot per BUILDING in the district
+ * (max 3); a pillaged district's slots stop working. */
 export const SPECIALIST_YIELDS: Partial<Record<DistrictId, Partial<Record<'food' | 'production' | 'gold' | 'science' | 'culture' | 'faith', number>>>> = {
   CAMPUS: { science: 2 },
   HOLY_SITE: { faith: 2 },
@@ -292,17 +297,23 @@ export const SPECIALIST_YIELDS: Partial<Record<DistrictId, Partial<Record<'food'
   HARBOR: { gold: 2, food: 1 },
   THEATER_SQUARE: { culture: 2 },
   INDUSTRIAL_ZONE: { production: 2 },
-  // The Encampment takes specialists too (real Civ 6 has no
-  // citizen specialist for the Encampment — this is the model stylization, a
-  // production/gold garrison yield consistent with the district's character).
-  // Data-driven: citySpecialistSlots keys off SPECIALIST_YIELDS, so this row
-  // is the whole change.
-  //
-  // THIS WHOLE TABLE IS UI-ONLY. setSpecialists is a manual verb and nothing
-  // in the turn loop writes city.specialists, so effectiveSpecialists is empty
-  // in every simulated game and every citizen works a tile. The table is NOT
-  // exported to the GPU, because assigning a citizen is a DECISION and the
-  // wire has no column for it. Turning specialists into a real choice means
-  // adding that column, not an engine rule.
-  ENCAMPMENT: { production: 1, gold: 1 },
+  ENCAMPMENT: { production: 1, gold: 2 },
+};
+
+/** CIV6 (same page): the district's TOP building upgrades its specialists —
+ * "+3 Science instead with a Research Lab", "+3 Faith instead with a Tier 3
+ * Worship building", "+2 Production and +2 Gold instead with a Military
+ * Academy", "+2 Food and +2 Gold instead with a Seaport", "+6 Gold instead
+ * with a Stock Exchange", "+3 Production instead with a Power Plant"
+ * (coal/oil/nuclear — the generic POWER_PLANT stands in), "+3 Culture
+ * instead with a Broadcast Center" (Film Studio unmodeled). `building` is a
+ * building id, or 'WORSHIP' = any worship building. */
+export const SPECIALIST_TIERS: Partial<Record<DistrictId, { building: string; add: Partial<Record<'food' | 'production' | 'gold' | 'science' | 'culture' | 'faith', number>> }>> = {
+  CAMPUS: { building: 'RESEARCH_LAB', add: { science: 1 } },
+  HOLY_SITE: { building: 'WORSHIP', add: { faith: 1 } },
+  ENCAMPMENT: { building: 'MILITARY_ACADEMY', add: { production: 1 } },
+  HARBOR: { building: 'SEAPORT', add: { food: 1 } },
+  COMMERCIAL_HUB: { building: 'STOCK_EXCHANGE', add: { gold: 2 } },
+  INDUSTRIAL_ZONE: { building: 'POWER_PLANT', add: { production: 1 } },
+  THEATER_SQUARE: { building: 'BROADCAST_CENTER', add: { culture: 1 } },
 };

@@ -1481,6 +1481,62 @@ class SimEconomy:
             tier = tier + techs[:, self._farmadj_tech].long()
         return tier
 
+    def _workable_count(self, row: int) -> torch.Tensor:
+        """[B, RC] — len(workableTiles) per city. ORACLE: this predicate must
+        stay the SAME as `_seat_city_walk`'s `valid` (the walk keeps its own
+        copy because its gathers feed the yield ranking too)."""
+        B, cols = self.B, self.RC
+        ctr = self.city_center[:, row].clamp(min=0)
+        ids = self.city_id[:, row]
+        tiles = tiles_from_offsets(ctr.reshape(-1), self._off3, self.W, self.H).reshape(B, cols, -1)
+        M = tiles.shape[2]
+        tcf = tiles.clamp(min=0).reshape(B, cols * M)
+
+        def gat(plane: torch.Tensor) -> torch.Tensor:
+            return plane.gather(1, tcf).reshape(B, cols, M)
+
+        valid = (
+            (tiles >= 0)
+            & (gat(self.tile_seat) == row)
+            & (gat(self.tile_city) == ids.unsqueeze(2))
+            & gat(self.work_ok)
+            & (tiles != ctr.unsqueeze(2))
+            & (gat(self.district) < 0)
+            & (gat(self.built_wonder) < 0)
+        )
+        return valid.sum(dim=2)
+
+    def _city_specialists(self, row: int, sl: slice | None = None, workable: torch.Tensor | None = None) -> torch.Tensor:
+        """[B, n, nD] long — the `effectiveSpecialists` twin for ANY seat row:
+        OVERFLOW citizens (population beyond the workable pool) fill open
+        slots in PLACEABLE_DISTRICTS order; slots = the district's standing
+        buildings, dark while the district is incomplete or pillaged. The
+        player's free assignment is an open AUDIT item (B-30r) — both
+        engines run this one zero-draw rule."""
+        if sl is None:
+            sl = slice(0, self.RC)
+        B = self.B
+        nDc = len(self.districts_cat)
+        pop = self.city_pop[:, row, sl]
+        alive = self.city_alive[:, row, sl]
+        if nDc == 0:
+            return torch.zeros(B, pop.shape[1], 1, dtype=torch.long, device=self.device)
+        if workable is None:
+            workable = self._workable_count(row)[:, sl]
+        bldg = self.city_bldg[:, row, sl]
+        dreg = self.city_dist_tile[:, row, sl]
+        dflat = dreg.clamp(min=0).reshape(B, -1)
+        dlive = (dreg >= 0) & self.district_complete.gather(1, dflat).reshape_as(dreg) & ~self.district_pillaged.gather(1, dflat).reshape_as(dreg)
+        gate = dlive & self._spec_any.reshape(1, 1, -1) & alive.unsqueeze(2)
+        slots = (bldg.double() @ self._b_dist_oh).long() * gate.long()
+        rem = (pop - workable).clamp(min=0) * alive.long()
+        spec = torch.zeros_like(slots)
+        for di in range(nDc):
+            tk = torch.minimum(slots[:, :, di], rem)
+            spec[:, :, di] = tk
+            rem = rem - tk
+        return spec
+
     def _seat_city_walk(self, row: int, j: int | None = None, *, amen_yf: torch.Tensor) -> torch.Tensor:
         """THE computeCityStats twin — [B, n, 6] f64 per-city totals in engine
         yield order (food, production, gold, science, culture, faith) for ANY
@@ -1572,7 +1628,11 @@ class SimEconomy:
         )
         self._tiebreak_key_dtype = key.dtype
         top_vals, top_idx = key.topk(M, dim=2)
-        take = (torch.arange(M, device=dev).reshape(1, 1, M) < pop.unsqueeze(2)) & (top_vals > -1e17)
+        # SPECIALISTS divert the overflow citizens before tiles are taken
+        # (assignWorkedTiles runs on population - specialistTotal).
+        spec_d = self._city_specialists(row, sl, workable=valid.sum(dim=2))
+        pop_t = pop - spec_d.sum(dim=2)
+        take = (torch.arange(M, device=dev).reshape(1, 1, M) < pop_t.unsqueeze(2)) & (top_vals > -1e17)
         takef = take.double()
         sel = [
             c.gather(2, top_idx) * takef
@@ -1673,6 +1733,24 @@ class SimEconomy:
             _st = self._golden_ded(row, self._ded_steam)
             if bool(_st.any()):
                 dist_y[:, :, 1] = dist_y[:, :, 1] + st_adj * _st.double().unsqueeze(1)
+        # SPECIALISTS (computeCityStats' specialist loop): count x (base +
+        # the tier add when the TOP building stands; -2 = any worship
+        # building). Integer-valued, so the add order is exact at any
+        # association.
+        if bool(spec_d.any()):
+            for di in range(len(self.districts_cat)):
+                cnt = spec_d[:, :, di]
+                if not bool(cnt.any()):
+                    continue
+                t_b = int(self._spec_tb[di])
+                if t_b == -2:
+                    has_t = (bldg & self._b_worship.reshape(1, 1, -1)).any(dim=2)
+                elif t_b >= 0:
+                    has_t = bldg[:, :, t_b]
+                else:
+                    has_t = torch.zeros(B, n, dtype=torch.bool, device=dev)
+                y6 = self._spec_y[di].reshape(1, 1, 6) + has_t.double().unsqueeze(2) * self._spec_ta[di].reshape(1, 1, 6)
+                dist_y = dist_y + cnt.double().unsqueeze(2) * y6
 
         bld_y = self._palace_y.double().reshape(1, 1, 6) * is_cap.unsqueeze(2)
         selb = bldg & ~self._bldg_dark(dreg) & ~self._b_regional.reshape(1, 1, -1)

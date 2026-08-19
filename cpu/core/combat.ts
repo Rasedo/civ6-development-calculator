@@ -875,7 +875,6 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
     buildings: [],
     districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }],
     wonders: [],
-    specialists: {},
     hp: Math.round(CITY_MAX_HP / 2), // a conquered CS joins at half HP
   });
   revealAround(state, seat, cityState.centerIndex, 3);
@@ -920,7 +919,6 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
     buildings: [],
     districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }],
     wonders: [],
-    specialists: {},
     hp: Math.round(CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   });

@@ -1021,6 +1021,18 @@
      ]
     },
     {
+     "name": "specialists",
+     "compare": "exact",
+     "covers": [
+      "City.population"
+     ],
+     "planes": [
+      "city_bldg",
+      "city_pop"
+     ],
+     "note": "effectiveSpecialists per PLACEABLE district: the automatic overflow assignment, derived live on both engines."
+    },
+    {
      "name": "queueFront",
      "compare": "exact",
      "covers": [
@@ -1512,10 +1524,6 @@
    {
     "path": "City.lockedTiles",
     "why": "manual tile locks from the UI; no GPU plane."
-   },
-   {
-    "path": "City.specialists",
-    "why": "manual specialist assignment; the GPU assigns greedily per read and stores none."
    },
    {
     "path": "City.districts",

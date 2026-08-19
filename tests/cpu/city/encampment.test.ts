@@ -35,7 +35,7 @@ function addEncampment(state: any, city: any, col: number, row: number) {
 
 describe('Encampment', () => {
   it('specialist slot: SPECIALIST_YIELDS.ENCAMPMENT and citySpecialistSlots', () => {
-    expect(SPECIALIST_YIELDS.ENCAMPMENT).toEqual({ production: 1, gold: 1 });
+    expect(SPECIALIST_YIELDS.ENCAMPMENT).toEqual({ production: 1, gold: 2 }); // CIV6: Commanders +1 production +2 gold
     const { state, city } = battlefield();
     const enc = addEncampment(state, city, 10, 9);
     city.buildings.push('BARRACKS'); // one Encampment building -> one specialist slot

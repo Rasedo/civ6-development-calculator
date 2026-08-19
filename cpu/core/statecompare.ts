@@ -45,6 +45,7 @@ import { questFor } from './observe';
 import { envoysOf } from './cityStates';
 import { prodLayout } from './prodLayout';
 import { SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
+import { effectiveSpecialists } from './city';
 import { IMPROVEMENT_IDS } from './unitActions';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
@@ -458,6 +459,13 @@ const CITY: Record<string, Extractor> = {
   ),
   productionBank: overCities((r) => r.city.productionBank ?? 0),
   queueFront: overCities((r) => [queueColumn(r.city.queue[0]), queueTile(r.city.queue[0])]),
+  specialists: overCities((r, state) => {
+    const eff = effectiveSpecialists(state, r.city);
+    return PLACEABLE_DISTRICTS.map((type) => {
+      const inst = r.city.districts.find((d) => d.type === type);
+      return inst ? eff.get(inst.tileIndex) ?? 0 : 0;
+    });
+  }),
   queueProgress: overCities((r) => r.city.queue[0]?.progress ?? 0),
   queueCost: overCities((r) => queueItemCost(r.city.queue[0])),
   followedReligion: overCities((r) => r.city.followedReligion ?? -1),

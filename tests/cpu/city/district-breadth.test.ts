@@ -59,7 +59,6 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
     buildings: ['PALACE'],
     districts: [{ type: 'CITY_CENTER', tileIndex: tile.index }],
     wonders: [],
-    specialists: {},
     hp: 200,
     foundedTurn: 1,
   };
@@ -95,7 +94,6 @@ function makeSourceCity(civ: Seat, centerIndex: number, izTileIndex: number): Ci
     buildings: ['FACTORY'],
     districts: [{ type: 'INDUSTRIAL_ZONE', tileIndex: izTileIndex }],
     wonders: [],
-    specialists: {},
     hp: 200,
     foundedTurn: 1,
   };

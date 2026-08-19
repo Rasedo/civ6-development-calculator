@@ -452,6 +452,18 @@ def _cty(plane: str):
     return get
 
 
+def _spec_rows(sim, b, rows):
+    # one _city_specialists call per distinct seat row — the digest asks
+    # per city and the recompute walks the tile window
+    cache: dict = {}
+    out = []
+    for c, s in rows:
+        if c not in cache:
+            cache[c] = sim._city_specialists(c)
+        out.append([int(x) for x in cache[c][b, s].tolist()])
+    return out
+
+
 def _qfront(sim, b, c, s):
     # ORACLE: TS's queueTile reads the queue item's own tileIndex for both
     # district and wonder kinds. Here the district pick is city_qtile; a
@@ -479,6 +491,7 @@ CITY = {
         float(sim.city_prod_bank[b, c, s]) for c, s in rows
     ],
     "queueFront": lambda sim, b, rows: [_qfront(sim, b, c, s) for c, s in rows],
+    "specialists": _spec_rows,
     "queueProgress": _cty("city_progress"),
     "queueCost": _cty("city_cost"),
     "followedReligion": _cty("city_followed"),

@@ -4,7 +4,7 @@ import { greatPeopleEarned } from './greatPeople';
 import { placeRelic } from '../data/greatPeople';
 import { generateMap } from '../../world/mapgen';
 import { tilesWithin, hexDistance } from '../../world/hex';
-import { acquireTile, borderCandidates, citySpecialistSlots } from './city';
+import { acquireTile, borderCandidates } from './city';
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots } from './effects';
 import type { Modifiers, Unlocks } from './effects';
@@ -182,7 +182,6 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     buildings: list.length === 0 ? ['PALACE'] : [],
     districts: [{ type: 'CITY_CENTER', tileIndex: tile.index }],
     wonders: [],
-    specialists: {},
     hp: CITY_MAX_HP,
     foundedTurn: state.turn,
   };
@@ -639,24 +638,6 @@ export function itemLabel(item: QueueItem): string {
   if (item.kind === 'unit') return UNITS[item.unit]?.name ?? item.unit;
   if (item.kind === 'project') return PROJECTS[item.project]?.name ?? item.project;
   return BUILDINGS[item.building].name;
-}
-
-export function setSpecialists(
-  state: GameState,
-  cityId: number,
-  tileIndex: number,
-  count: number,
-  seat: number,
-): RuleResult {
-  const city = citiesOf(state, seat).find((c) => c.id === cityId);
-  if (!city) return { ok: false, reason: 'No such city.' };
-  const slots = citySpecialistSlots(state, city);
-  const max = slots.get(tileIndex) ?? 0;
-  if (max === 0) return { ok: false, reason: 'That district has no specialist slots.' };
-  const clamped = Math.max(0, Math.min(count, max));
-  if (clamped === 0) delete city.specialists[String(tileIndex)];
-  else city.specialists[String(tileIndex)] = clamped;
-  return { ok: true };
 }
 
 /** CIV6 (Veterancy): "+30% Production toward Encampment districts, Harbor
@@ -1205,7 +1186,6 @@ export function deserialize(json: string): GameState {
       civCity.buildings ??= [];
       civCity.districts ??= [{ type: 'CITY_CENTER', tileIndex: civCity.centerIndex }];
       civCity.wonders ??= [];
-      civCity.specialists ??= {};
     }
   }
   state.claimedPantheons ??= [];
@@ -1230,7 +1210,6 @@ export function deserialize(json: string): GameState {
     c.cultureBox ??= 0;
     c.tilesAcquired ??= 0;
     c.wonders ??= [];
-    c.specialists ??= {};
     // productionBank stays optional (readers use ?? 0) so that adding it
     // here cannot desync serialize(live) vs serialize(roundtripped).
   }

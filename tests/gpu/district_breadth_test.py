@@ -30,6 +30,9 @@ Covered:
      completed IZ/ENCAMPMENT/THEATER_SQUARE (via GP_CLASS_DISTRICT).
   h. Dtype: the building masks (_b_regional/_b_worship) stay bool and the
      walk's regional terms are consistent under dtype=torch.float32.
+  i. SPECIALISTS: overflow citizens man building slots (effectiveSpecialists
+     twin) — the base yield, the TOP-building tier, the worship (-2) tier,
+     the catalog-order fill, and the pillage gate.
 """
 
 from __future__ import annotations
@@ -478,6 +481,92 @@ def poke_gp_district_accrual(rules, rj, path):
     print(f"  g GP-district accrual OK (classes {[c for c, _ in targets]} accrue for IZ/ENCAMPMENT/THEATER_SQUARE)")
 
 
+def poke_specialists(rules, rj, path):
+    """i. SPECIALISTS: population beyond the workable pool mans district
+    building slots. Base CAMPUS yield 2 science; RESEARCH_LAB upgrades to 3;
+    a worship building upgrades the HOLY_SITE priest to 3 faith (tier code
+    -2); the fill walks the catalog order; a pillaged district's slots go
+    dark. Yield deltas are read through the walk at a FIXED amenity tier, so
+    each expectation is exact in f64."""
+    sim = build(rules, path)
+    r, j = 1, 0
+    assert bool(sim.city_alive[0, r, j]), "civ capital must be alive"
+    CA, HS = didx(rj, "CAMPUS"), didx(rj, "HOLY_SITE")
+    LIB, LAB = bidx(rj, "LIBRARY"), bidx(rj, "RESEARCH_LAB")
+    wb = sim._worship_bidx[0]
+    cit_sci = float(rj["citizenScience"])
+
+    def sci_yf():
+        yf = sim._seat_amenity(r)[2]
+        tot = sim._seat_city_walk(r, amen_yf=yf)
+        return float(tot[0, j, 3]), float(tot[0, j, 5]), float(yf[0, j])
+
+    # a complete CAMPUS with a LIBRARY: one slot
+    T_ca = free_tiles(sim, 1)[0]
+    sim.district[0, T_ca] = CA
+    sim.district_complete[0, T_ca] = True
+    sim.district_pillaged[0, T_ca] = False
+    sim.city_dist_tile[0, r, j, CA] = T_ca
+    sim.city_bldg[0, r, j, LIB] = True
+
+    W = int(sim._workable_count(r)[0, j])
+    sim.city_pop[0, r, j] = W
+    assert int(sim._city_specialists(r)[0, j].sum()) == 0, "pop within the pool -> no specialists"
+    s0, _f0, yf0 = sci_yf()
+    sim.city_pop[0, r, j] = W + 1
+    spec = sim._city_specialists(r)[0, j]
+    assert int(spec[CA]) == 1 and int(spec.sum()) == 1, f"one overflow citizen must man the Campus, got {spec.tolist()}"
+    s1, _f1, yf1 = sci_yf()
+    assert yf0 == yf1, "the amenity tier moved with +1 pop — pick another fixture city for this poke"
+    exp = (2.0 + cit_sci) * yf0
+    assert abs((s1 - s0) - exp) < 1e-9, f"specialist science delta {s1 - s0} != {exp}"
+
+    # the TOP building upgrades the specialist (+1 science) and adds a slot
+    lab_sci = float(rj["buildings"][LAB]["yields"][3])  # exported 6-vector, science at 3
+    sim.city_bldg[0, r, j, LAB] = True
+    s2, _f2, yf2 = sci_yf()
+    assert yf2 == yf1, "amenity tier moved on adding the Lab"
+    assert abs((s2 - s1) - (lab_sci + 1.0) * yf1) < 1e-9, (
+        f"RESEARCH_LAB tier delta {s2 - s1} != building {lab_sci} + spec +1, x yf {yf1}"
+    )
+
+    # catalog-order fill + the worship tier: a HOLY_SITE with a worship
+    # building; ONE overflow citizen goes to the LOWER catalog index
+    T_hs = free_tiles(sim, 1, banned=(T_ca,))[0]
+    sim.district[0, T_hs] = HS
+    sim.district_complete[0, T_hs] = True
+    sim.district_pillaged[0, T_hs] = False
+    sim.city_dist_tile[0, r, j, HS] = T_hs
+    # the Temple keeps a slot standing when the worship building toggles off
+    sim.city_bldg[0, r, j, sim._temple_bidx] = True
+    sim.city_bldg[0, r, j, wb] = True
+    W2 = int(sim._workable_count(r)[0, j])
+    sim.city_pop[0, r, j] = W2 + 1
+    spec = sim._city_specialists(r)[0, j]
+    lo = min(CA, HS)
+    assert int(spec[lo]) == 1 and int(spec.sum()) == 1, f"the fill must walk catalog order, got {spec.tolist()}"
+    # enough overflow for ONE priest: the worship tier pays 2+1 faith
+    sim.city_pop[0, r, j] = W2 + 3  # campus 2 slots (LIB+LAB) + 1 priest
+    spec = sim._city_specialists(r)[0, j]
+    assert int(spec[CA]) == 2 and int(spec[HS]) == 1, f"slots cap the fill, got {spec.tolist()}"
+    _s3, f3, yf3 = sci_yf()
+    sim.city_bldg[0, r, j, wb] = False  # the Temple keeps the slot; the tier drops
+    _s4, f4, yf4 = sci_yf()
+    assert yf3 == yf4, "amenity tier moved on the worship toggle"
+    assert int(sim._city_specialists(r)[0, j][HS]) == 1, "the Temple slot keeps the priest"
+    wb_faith = float(rj["buildings"][wb]["yields"][5])  # faith at 5
+    # the toggle drops the building's own faith AND one tier on the priest
+    assert abs((f3 - f4) - (wb_faith + 1.0) * yf3) < 1e-9, (
+        f"worship tier delta {f3 - f4} != building {wb_faith} + priest tier 1, x yf {yf3}"
+    )
+
+    # a pillaged district's slots go dark
+    sim.district_pillaged[0, T_ca] = True
+    spec = sim._city_specialists(r)[0, j]
+    assert int(spec[CA]) == 0, "a pillaged Campus keeps no working specialists"
+    print(f"  i specialists OK (overflow fill, x2 base, LAB/worship tiers, catalog order, pillage gate; W={W})")
+
+
 def poke_float32_dtype(rules, path):
     """h. The building masks (_b_regional/_b_worship) and the walk's regional
     terms are consistent under a float32 build: 30 turns at
@@ -522,6 +611,7 @@ def main() -> None:
     poke_worship_buy(rules, rj, path)
     poke_civ_palace(rules, rj, path)
     poke_gp_district_accrual(rules, rj, path)
+    poke_specialists(rules, rj, path)
     poke_float32_dtype(rules, path)
     print("DISTRICT BREADTH POKES OK")
 

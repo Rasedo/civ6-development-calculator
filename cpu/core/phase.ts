@@ -571,7 +571,6 @@ export function transferCity(
     buildings: keptBuildings,
     districts: keptDistricts,
     wonders: civCity.wonders.filter((w) => tileBelongsTo(state.map.tiles[w.tileIndex], { seat: to.seat, id: newId })).map((w) => ({ ...w })),
-    specialists: {},
     // GREAT WORKS AND RELICS RIDE WITH THE CITY. Real Civ 6: the
     // victor gains control of the Great Works held in a captured city's
     // buildings/districts/wonders — and `keptBuildings` above already carries
