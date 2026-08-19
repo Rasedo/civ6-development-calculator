@@ -22,8 +22,8 @@ the freeze (wire verbs #104/#107, protagonist #75, the storage
 renumbering, the city-block unification #109, the vocabulary purge) and
 opens the hunt. After that, the open engine work in rough order:
 
-- A-26 — evict the seat-0 mask-policy exclusions (naval/snipe/spread);
-  adopt the capability gate both engines already agree on in TS.
+- The one-galley naval column — drop `~unit_naval` and let the capability
+  gate both engines already agree on answer (task #121).
 - #73 seat-0 pantheon founding (GPU twin; storage rows are ready),
   #74 seat-0 pool embark.
 - #97 district-placement fidelity + the tile choice onto the wire.

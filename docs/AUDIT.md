@@ -49,15 +49,12 @@ nothing carries forward.
 | Open item | Weight | What the weight is for |
 |---|---|---|
 | **A. Engine vs engine** | **0** | |
-| B-17r Encampment strikes | 1 | scoped out with ranged-vs-city; the rest of the district is done |
-| B-18r religion tails | 2 | complete on every seat; one latent lifecycle drift to hunt |
 | B-20r tourism tails | 7 | national parks, civ Archaeologists, theming, shipwrecks, digs |
 | B-21r suzerain rows | 3 | 10 descoped channels, each needing its own mechanic |
 | B-22r World Congress | 6 | one resolution type of many; emergencies and competitions absent |
 | B-24r Ages/governors | 2 | eight dedication catalog entries, dark-age policies, governor promotions, per-civ era drift |
-| B-25r victory tails | 1 | science victory fully sourced; residual = B-20r cross-ref + three recorded deviations |
 | B-26r barb escalation | 2 | camp-spawn ladder beyond melee |
-| B-27r theological combat | 2 | resolver simplifications, incl. the ~7x martyr-relic overstatement |
+| B-27r martyr relics | 1 | the ~7x relic overstatement; the resolver's other two simplifications are recorded deviations |
 | B-28r naval production | 3 | one heuristic column where `trainableUnits` belongs |
 | B-29r peace-treaty cooldown | 1 | a per-pair clock and its gate, both engines |
 | B-30r specialists | 6 | a mechanic neither engine has: wire column, assignment, yields |
@@ -65,8 +62,8 @@ nothing carries forward.
 | B-33r floods vs districts | 1 | GS floods damage districts/buildings on floodplains (the Dam's reason to exist); both engines only pillage improvements and fertilize |
 | B-31r trade-route tails | 6 | a Trader UNIT and a route wire verb |
 | B-D unsourced data values | 5 | a residual CLASS: every invented magnitude, re-sourced |
-| **B. Fidelity vs real Civ 6** | **49** | |
-| **OPEN, TOTAL** | **49** | |
+| **B. Fidelity vs real Civ 6** | **44** | |
+| **OPEN, TOTAL** | **44** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -82,6 +79,21 @@ An empty chapter means only that this is what the instrument found, never
 that the rest agrees — "Reachability" below is the boundary of what the
 green gate reaches.
 
+WHAT THE INSTRUMENT CAN SEE IS ITSELF AUDITABLE, and it was shallower than
+it read. Coverage proved every `_MUTABLE` plane was NAMED by some field; it
+could not prove the field's extractor READ what it named. Two fields were
+counting rather than comparing: `routeCount` named four route planes and
+compared only how many routes existed (destination, expiry and pair
+identity went unverified on both engines), and `religionFounded` compared
+`holy_tile >= 0` — a proxy — where every founded-gate in the GPU reads
+`civ_religion_done`. Both now compare the fact itself: `routes` emits each
+route as [fromTile, destTile, kind, expiresTurn] in CENTRE-TILE space, and
+the belief DONE bits (`pantheonDone`, `enhancerDone`, `religionFounded`)
+are compared against their TS predicates. The census enforces the rule that
+found them — a field naming more than one plane must state what it
+compares. The 250-turn gate is green WITH those comparisons live, which is
+a stronger green than the one before it.
+
 What is NOT a source of new members: a seat asymmetry. Seat 0 rides the same
 machinery as every other row, and `tools/gpu/seat_symmetry_check.py` holds
 that with both allowlists empty.
@@ -92,18 +104,6 @@ NO GATE CAN CATCH THIS CLASS. Parity proves the two engines match, never
 that either matches the real game, so every entry here closes against a
 Civ 6 source or is recorded as unverifiable.
 
-- **B-17r. Encampment:** ranged-vs-district strikes are out of scope,
-  matching the ranged-vs-city scope-out. The rest of the district
-  (`encamp_hp` pool, movement block, garrison pool, district strike,
-  training XP) is complete.
-- **B-18r. Religion tails.** The mechanic is complete on every seat
-  (pantheon/founder/enhancer races, pressure, missionaries, apostles,
-  theological combat, worship buildings, faith buys on the wire — and
-  faith is the only way to a religious unit in real Civ 6 too, so the
-  absence of a production column is faithful, not a gap).
-  KNOWN LATENT: a religious-unit lifecycle drift becomes
-  reachable the moment the driver emits faith-buy kind 6 — expect it at
-  its causal turn in the first post-freeze serve hunt.
 - **B-20r. Tourism tails.** Tourism, Great Works of writing/music/ART,
   relics, artifacts + archaeology (Archaeologist, antiquity sites,
   museum slots) and the wonder-era term all exist and are digest-
@@ -140,38 +140,14 @@ Civ 6 source or is recorded as unverifiable.
   sourced, so the stateless greedy ranking is faithful for the one
   governor channel modeled); per-civ tech-era drift (eras are global
   50-turn blocks).
-- **B-25r. Victory tails:** every named Civ 6 victory exists on both engines
-  and every one is REACHABLE. The science victory is now the sourced GS
-  shape end to end: the SPACEPORT district (Rocketry, flat 1080, flat land,
-  outside the specialty cap, -1 adjacent appeal), real per-step prices
-  (540/900/1080/1260 speed-scaled; the Mars Colony's 1800 is the one figure
-  without a direct quote — wiki GS data module confirms 900/1500/2100 and
-  1800 completes that ladder), the three side effects (full-map reveal /
-  10x-science Culture lump / nothing), and the light-year FLIGHT — the
-  Exoplanet craft flies 30 LY at 1 LY/turn plus one per completed laser
-  station (`TERRESTRIAL_LASER_STATION` / `LAGRANGE_LASER_STATION`,
-  repeatable, Offworld Mission, 360 each) and the win fires on ARRIVAL.
-  Only the two poke lanes reach any of it (`space_race_test` /
-  `space-victory.test`): Smart Materials sits far past TURN_LIMIT, which is
-  also the RECORDED reason the flight state is not rendered into the
-  observation and the win pays no terminal reward — nothing reachable this
-  phase could learn from it. Open: the culture win's tourism gap (B-20r),
-  and three small sourced deviations — the Terrestrial station's
-  powered-city condition (no power system), the Lagrange station's
-  30 Aluminum (no strategic-resource stockpiles), and the Spaceport's
-  upkeep left at the generic 1 gold (unsourced, the B-D class).
 - **B-26r. Barbarian camp-spawn escalation** beyond the melee ladder
   (cliffs, ranged barbs and naval barbs all landed).
-- **B-27r. Theological-combat simplifications.** The resolver runs on both
-  engines (`theologicalCombatPhase` / `_theological_combat_phase`). What
-  deviates from real Civ 6: (1) it is DETERMINISTIC — real Civ 6 rolls, ours
-  takes theoBaseDamage plus the strength difference with no RNG multiplier,
-  because a conditional draw would have to be mirrored draw-for-draw across
-  engines; (2) only APOSTLES initiate — real Civ 6 also allows Inquisitors,
-  which we do not model; (3) promotions are unmodeled, so EVERY fallen
-  apostle martyrs into a relic where real Civ 6 needs the MARTYR promotion,
-  an OVERSTATEMENT of relic frequency (see the RELIC_* comment in
-  data/greatPeople).
+- **B-27r. Every fallen apostle martyrs into a relic.** Real Civ 6 needs the
+  MARTYR promotion; promotions are unmodeled and `theologicalCombatPhase` /
+  `_theological_combat_phase` are zero-draw, so relic frequency is an
+  OVERSTATEMENT of roughly 7x (recorded at the RELIC_* site in
+  data/greatPeople). It feeds faith, tourism and the culture victory, so
+  B-20r's rate cannot be read until this is fixed or bounded.
 - **B-28r. THE NAVAL PRODUCTION SURFACE is one heuristic column.** `ok_u`
   masks out every hull (`~unit_naval`) and a single hand-rolled GALLEY
   column (`_galley_idx`, sim_seats.py) is added back, legal only while the
@@ -202,49 +178,86 @@ Civ 6 source or is recorded as unverifiable.
   a route cannot be plundered en route and its range is not a journey.
   (2) No seat's wire carries a trade-route DECISION: route creation is an
   eager rule on both engines, where a real player spends a Trader on a
-  chosen pair. A route verb is P8-surface work. The destination-STORAGE
-  divergence between the engines is A-31r, not this entry.
+  chosen pair. A route verb is P8-surface work.
 - **B-D. UNSOURCED DATA VALUES — a residual class, not one item.**
   Mechanics are sourced item by item; the DATA layer largely is not, and a
   wrong CONSTANT passes every gate because both engines agree on the wrong
-  number. **The marker grep no longer finds this class.** It used to: a
-  sweep for `eyeballed` / `approximate` / `stand-in` named a dozen files.
-  The comment purge deleted most of those markers along with the prose
-  around them, so what survives is 11 occurrences over 7 files
-  (`builtWonders` costs plus three stand-in unlock techs, `units` costs,
-  `policies` numbers and its stand-in card effects, `economy`'s harvest
-  gating, and two RECORDED-not-approximated notes in `cityStates` /
-  `units` that are deliberate omissions, not unsourced magnitudes).
-  `improvements` now states the opposite — every yield sourced to the GS
-  Civilopedia, no markers left — and `projects` was sourced with #83.
-  So the sweep cannot be scoped by grepping; it has to walk cpu/data file
-  by file, checking each magnitude against a real Civ 6 source and either
-  correcting it or recording it as a deliberate stylization. Re-marking as
-  it goes is what makes the class shrinkable again.
+  number. THE LIVE CENSUS, re-counted by grepping `eyeballed` /
+  `approximate` / `stand-in` / `unsourced` over cpu/data: 7 markers over 3
+  files — `builtWonders` (costs, plus three stand-in unlock techs:
+  CELESTIAL_NAVIGATION for Shipbuilding, EDUCATION for Printing, ASTRONOMY
+  for Scientific Theory, each of which moves WHEN a wonder unlocks, not
+  just its price), `policies` (numbers, plus stand-in inherent bonuses
+  "where the real one needs systems we don't model"), and `units` (costs).
+  `improvements` matches the grep only because its header states the
+  opposite — every yield sourced to the GS Civilopedia, no markers left.
+  THE MARKERS ARE A FLOOR, NOT THE CLASS: the comment purge deleted most of
+  the old ones along with the prose around them, so the sweep has to walk
+  cpu/data file by file, check each magnitude against a real Civ 6 source,
+  and either correct it or record it as a deliberate stylization —
+  re-marking as it goes, which is what makes the class shrinkable again.
+
+## Recorded deviations — decided, sourced, and NOT open work
+
+These are not gaps waiting on a round; they are choices with a reason, kept
+here so nobody re-opens them as findings. They carry no weight in the table
+above.
+
+- **Ranged strikes against a DISTRICT** are out of scope, matching the
+  ranged-vs-city scope-out. The rest of the Encampment (`encamp_hp` pool,
+  movement block, garrison pool, district strike, training XP) is complete.
+- **The theological resolver is DETERMINISTIC.** Real Civ 6 rolls; ours takes
+  theoBaseDamage plus the strength difference with no RNG multiplier, because
+  a conditional draw would have to be mirrored draw-for-draw across engines.
+- **Only APOSTLES initiate theological combat.** Real Civ 6 also allows
+  Inquisitors; this roster has no INQUISITOR unit at all, so the pair we model
+  is the whole class.
+- **The science victory's three small deviations.** The Terrestrial Laser
+  Station's powered-city condition (there is no power system), the Lagrange
+  Laser Station's 30 Aluminum (there are no strategic-resource stockpiles),
+  and the Spaceport's upkeep left at the generic 1 gold (unsourced — it is a
+  B-D magnitude, not a mechanic).
 
 ## Reachability — what the green gate does NOT prove
 
 A green serve run proves the two engines agree over the regime the scripted
-seeds actually enter. These mechanics are NOT in that regime, so the gate
-says nothing about them; each needs its own measurement before a green run
-is read as evidence about it:
+seeds actually enter. MEASURED, 12 seeds x 250 turns driven
+(`tools/gpu/reachability_probe.py`) — these are counts, not estimates, and
+three of them overturned what this section used to assert:
 
-- Theological combat needs two ADJACENT religious units of different
-  religions. A gate that never puts two apostles side by side proves
-  nothing about it.
-- The NEIGHBORHOOD column: URBANIZATION is an Industrial civic (cost 1060,
-  after CIVIL_ENGINEERING and NATIONALISM), so MEASURE whether any seed
-  reaches it inside 250 turns before reading a green run as evidence about
-  the multi-Neighborhood rules. If none does, the column is poke-covered
-  only.
-- No seat fields a second ship under the current masks (B-28r), and the
-  international trade-route leg only fires when a seat exhausts domestic +
-  city-state destinations — re-measure both before reading a green run as
-  evidence about either.
+| mechanic | seeds reaching | first |
+|---|---|---|
+| faith-buy kind 6 (APOSTLE purchase) | 12/12 | t58 |
+| two enemy religious units ADJACENT (theological combat's precondition) | 8/12 | t98 |
+| URBANIZATION civic | 0/12 | never |
+| a NEIGHBORHOOD placed | 0/12 | never |
+| a second HULL on any seat | 0/12 | never |
+| an INTERNATIONAL trade leg | 0/12 | never |
+| an antiquity dig (artifact in a slot) | 0/12 | never |
+
+- THEOLOGICAL COMBAT IS REACHED, in two-thirds of seeds from t98. The old
+  claim here — "a gate that never puts two apostles side by side proves
+  nothing about it" — was wrong: the gate does, so the resolver's
+  deterministic damage and its apostle-only initiation ARE gate-covered.
+- The APOSTLE BUY fires in every seed from t58 and the 250-turn gate is
+  green, which is what closed B-18r's predicted lifecycle drift.
+- The NEIGHBORHOOD column is poke-covered only: no seed reaches
+  URBANIZATION (an Industrial civic, cost 1060, behind CIVIL_ENGINEERING and
+  NATIONALISM) inside 250 turns, so nothing places one.
+- No seat fields a second ship (B-28r), and no INTERNATIONAL trade leg ever
+  fires — which also bounds the new `routes` digest field: its domestic and
+  city-state arms are exercised every game, its international arm by nothing.
+- No antiquity dig happens at all, so the finer question this section used to
+  ask — a dig by a seat whose ERA differs from row 0's — is doubly moot:
+  eras are global 50-turn blocks (B-24r), so no two seats can be in different
+  eras by construction.
+- The CULTURE VICTORY's distance, re-measured (the pre-freeze figure was ~7
+  visiting vs ~97 domestic): at t250 visiting peaks at 6 (mean 1.3) against a
+  domestic peak of 68 (mean 41) — still an order of magnitude out of reach,
+  now ~11x rather than ~14x. B-20r's scope should be read off this, not the
+  old number.
 - The space race needs Information-era techs no gate lane reaches; its poke
   lanes are the proof.
-- An antiquity dig by a seat whose era differs from seat 0's — no
-  early-game lane reaches one.
 - A barbarian march choosing a CIV row's city while a row-0 city stands
   in reach — the tie key was verified by reading, never by the gate.
 - The `R = 0` phantom row: no seeder configuration produces a one-major

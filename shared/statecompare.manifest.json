@@ -10,7 +10,7 @@
   "scalar": "one row per game; key 0",
   "per-seat": "one row per CIV seat; key = the absolute seat id (cpu/core/seats.ts)",
   "per-city-state": "one row per living city-state; key = its id",
-  "per-city": "one row per living city of any civ seat; key = the city's CENTER TILE index — globally unique, stable across capture, and stored by both engines. Slot index, founding order and array position are all engine-local and none of them is a valid join.",
+  "per-city": "one row per living city of any civ seat; key = the city's CENTER TILE index \u2014 globally unique, stable across capture, and stored by both engines. Slot index, founding order and array position are all engine-local and none of them is a valid join.",
   "per-unit": "one row per living unit; key = tileIndex * 2 + (civilian ? 1 : 0). Both engines allow at most one military and one civilian unit per tile (the GPU's military_at/civilian_at pair), so the pair is unique. `game.unitCount` guards the assumption: two units colliding on one key would merge silently in the digest but change the count.",
   "per-tile": "one row per map tile; key = the tile index"
  },
@@ -109,7 +109,8 @@
      "planes": [
       "pan_claimed",
       "pantheon_claimed_n"
-     ]
+     ],
+     "note": "the global COUNT; which pantheon each seat took is the per-seat `beliefPantheon` field, and the claim mask is that set"
     },
     {
      "name": "beliefsClaimed",
@@ -134,7 +135,8 @@
      "planes": [
       "enh_claimed",
       "claimed_e_n"
-     ]
+     ],
+     "note": "the global COUNT; which enhancer each seat took is the per-seat `beliefEnhancer` field, and the claim mask is that set"
     },
     {
      "name": "greatPeopleByClass",
@@ -316,7 +318,7 @@
      "planes": [
       "civ_techs"
      ],
-     "note": "the SET of researched tech indices, not the count — a count cannot tell two different trees of the same size apart."
+     "note": "the SET of researched tech indices, not the count \u2014 a count cannot tell two different trees of the same size apart."
     },
     {
      "name": "civics",
@@ -337,7 +339,8 @@
      "planes": [
       "civ_tech_boosted",
       "civ_civic_boosted"
-     ]
+     ],
+     "note": "both boost masks, tech then civic, in one vector"
     },
     {
      "name": "currentTech",
@@ -449,7 +452,7 @@
      "planes": [
       "ww"
      ],
-     "note": "per-opponent, as (opponent seat, points) pairs sorted by opponent — the sum and the max both cancel a pair of opposite errors."
+     "note": "per-opponent, as (opponent seat, points) pairs sorted by opponent \u2014 the sum and the max both cancel a pair of opposite errors."
     },
     {
      "name": "warWearinessTurn",
@@ -538,8 +541,32 @@
      "covers": [
       "ReligionState.founded"
      ],
-     "planes": [],
+     "planes": [
+      "civ_religion_done"
+     ],
      "note": "read off holy_tile >= 0 on the GPU: the holy tile is written exactly when a religion is founded, and it is the only founding record seat 0 has."
+    },
+    {
+     "name": "pantheonDone",
+     "compare": "exact",
+     "covers": [
+      "ReligionState.pantheon"
+     ],
+     "planes": [
+      "civ_pantheon_done"
+     ],
+     "note": "the GPU keeps a DONE bit beside the chosen id; this side has only the id, so the comparison is `pantheon !== null` vs `civ_pantheon_done`"
+    },
+    {
+     "name": "enhancerDone",
+     "compare": "exact",
+     "covers": [
+      "ReligionState.enhancer"
+     ],
+     "planes": [
+      "civ_enhancer_done"
+     ],
+     "note": "the GPU keeps a DONE bit beside the chosen id; this side has only the id, so the comparison is `enhancer != null` vs `civ_enhancer_done`"
     },
     {
      "name": "gpPoints",
@@ -588,11 +615,23 @@
       "Seat.tradeRoutes"
      ],
      "planes": [
+      "seat_routes"
+     ],
+     "note": "count only \u2014 route IDENTITY is the `routes` field beside it"
+    },
+    {
+     "name": "routes",
+     "compare": "exact",
+     "covers": [
+      "Seat.tradeRoutes"
+     ],
+     "planes": [
       "seat_routes",
       "seat_route_dseat",
       "seat_route_dcity",
       "seat_route_exp"
-     ]
+     ],
+     "note": "per-route [fromTile, destTile, kind, expiresTurn], sorted; destinations in CENTRE-TILE space because city ids are not compared"
     },
     {
      "name": "scienceTotal",
@@ -642,8 +681,7 @@
       "ReligionState.pantheon"
      ],
      "planes": [
-      "civ_pantheon",
-      "civ_pantheon_done"
+      "civ_pantheon"
      ]
     },
     {
@@ -663,8 +701,7 @@
       "ReligionState.founder"
      ],
      "planes": [
-      "civ_founder",
-      "civ_religion_done"
+      "civ_founder"
      ]
     },
     {
@@ -674,8 +711,7 @@
       "ReligionState.enhancer"
      ],
      "planes": [
-      "civ_enhancer",
-      "civ_enhancer_done"
+      "civ_enhancer"
      ]
     },
     {
@@ -765,7 +801,7 @@
      "planes": [
       "seat_citystate_envoys"
      ],
-     "note": "a vector over civ seats in seat order — one store for every seat, which is what makes the suzerain contest one comparison."
+     "note": "a vector over civ seats in seat order \u2014 one store for every seat, which is what makes the suzerain contest one comparison."
     },
     {
      "name": "met",
@@ -817,7 +853,7 @@
      "planes": [
       "seat_citystate_quest"
      ],
-     "gap": "Both engines DERIVE the asked district (a kind-3 quest always asks the CS type's own): TS digests PLACEABLE_DISTRICTS.indexOf(quest.district), the GPU digests _citystate_didx (a districts_cat index). Different lists — the numbers only agree where the orders coincide."
+     "gap": "Both engines DERIVE the asked district (a kind-3 quest always asks the CS type's own): TS digests PLACEABLE_DISTRICTS.indexOf(quest.district), the GPU digests _citystate_didx (a districts_cat index). Different lists \u2014 the numbers only agree where the orders coincide."
     },
     {
      "name": "lastLevyTurn",
@@ -944,7 +980,7 @@
      "planes": [
       "city_bldg"
      ],
-     "note": "the SET of building indices in cpu/core/prodLayout.ts order — the order rules.json ships and the GPU's city_bldg column order."
+     "note": "the SET of building indices in cpu/core/prodLayout.ts order \u2014 the order rules.json ships and the GPU's city_bldg column order."
     },
     {
      "name": "productionBank",
@@ -966,7 +1002,7 @@
       "city_current",
       "city_qtile"
      ],
-     "note": "the front item as a production-layout column plus its target tile. The GPU queue is depth ONE — city_current holds a single item — so anything TS has queued behind the front has no twin to compare."
+     "note": "the front item as a production-layout column plus its target tile. The GPU queue is depth ONE \u2014 city_current holds a single item \u2014 so anything TS has queued behind the front has no twin to compare."
     },
     {
      "name": "queueProgress",
@@ -1073,7 +1109,8 @@
      "planes": [
       "unit_seat",
       "unit_alive"
-     ]
+     ],
+     "note": "`unit_alive` is the row filter for the whole unit group (group_rows), not a column of this field"
     },
     {
      "name": "type",
@@ -1084,7 +1121,7 @@
      "planes": [
       "unit_type"
      ],
-     "note": "the roster index — cpu/core/prodLayout.ts rosterUnitIds() order, which IS rules.json's units order and the GPU's unit_type space."
+     "note": "the roster index \u2014 cpu/core/prodLayout.ts rosterUnitIds() order, which IS rules.json's units order and the GPU's unit_type space."
     },
     {
      "name": "hp",
@@ -1146,7 +1183,7 @@
      "planes": [
       "unit_mp"
      ],
-     "gap": "the GPU's unit_mp/unit_mp_full pair is maintained but is not yet the movement source of truth — the walkers still carry the remainder in locals — so between phases the two engines answer 'how much movement is left' from different places."
+     "gap": "the GPU's unit_mp/unit_mp_full pair is maintained but is not yet the movement source of truth \u2014 the walkers still carry the remainder in locals \u2014 so between phases the two engines answer 'how much movement is left' from different places."
     },
     {
      "name": "movesFull",
@@ -1470,7 +1507,7 @@
    },
    {
     "path": "Unit.mission",
-    "why": "the 'explore' standing order — scripted-policy state, replaced by the decision server; no GPU plane."
+    "why": "the 'explore' standing order \u2014 scripted-policy state, replaced by the decision server; no GPU plane."
    },
    {
     "path": "Tile.col",
@@ -1506,7 +1543,7 @@
    },
    {
     "path": "Tile.goodyHut",
-    "why": "tribal villages are TS-only — the GPU carries no goody-hut plane and never claims one. A real coverage gap."
+    "why": "tribal villages are TS-only \u2014 the GPU carries no goody-hut plane and never claims one. A real coverage gap."
    },
    {
     "path": "TradeRoute.from",
@@ -1540,11 +1577,11 @@
   "gpu": [
    {
     "plane": "winner",
-    "why": "the winner is DERIVED, not stored, on the TS side — domination first, else the score leader once the game is over, recomputed per read. Comparing the GPU's cache means recomputing that derivation in the adapter, which is exactly what gpu-trace.ts's `winner` column already does. The manifest describes STATE; derived quantities are compared by the observation and by the trace."
+    "why": "the winner is DERIVED, not stored, on the TS side \u2014 domination first, else the score leader once the game is over, recomputed per read. Comparing the GPU's cache means recomputing that derivation in the adapter, which is exactly what gpu-trace.ts's `winner` column already does. The manifest describes STATE; derived quantities are compared by the observation and by the trace."
    },
    {
     "plane": "centre_slot_at",
-    "why": "the city slot at a centre tile, every seat row — the join key behind the per-city groups; the centers themselves are covered (City.centerIndex / the site planes)."
+    "why": "the city slot at a centre tile, every seat row \u2014 the join key behind the per-city groups; the centers themselves are covered (City.centerIndex / the site planes)."
    },
    {
     "plane": "tdef",
@@ -1588,7 +1625,7 @@
    },
    {
     "plane": "seat_ext",
-    "why": "which seats are driven from outside rather than by the built-in AI — a harness flag, not game state."
+    "why": "which seats are driven from outside rather than by the built-in AI \u2014 a harness flag, not game state."
    },
    {
     "plane": "city_dist_tile",
@@ -1600,7 +1637,7 @@
    },
    {
     "plane": "d_static_adj",
-    "why": "static per-tile district adjacency, mutated only when a founding clears a feature — derived from the map plus feat_stripped, both covered."
+    "why": "static per-tile district adjacency, mutated only when a founding clears a feature \u2014 derived from the map plus feat_stripped, both covered."
    }
   ]
  }

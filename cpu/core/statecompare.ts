@@ -40,7 +40,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import type { City, CityState, GameState, Seat, Tile, Unit } from './types';
-import { prophetsOf, warsOf, warTurnsWith } from './seats';
+import { prophetsOf, seatOf, warsOf, warTurnsWith } from './seats';
 import { questFor } from './observe';
 import { envoysOf } from './cityStates';
 import { prodLayout } from './prodLayout';
@@ -343,9 +343,35 @@ const SEAT: Record<string, Extractor> = {
   capitalTile: overSeats((s) => s.capitalTile ?? -1),
   holyTile: overSeats((s) => s.religion.holyTile ?? -1),
   religionFounded: overSeats((s) => (s.religion.founded ? 1 : 0)),
+  // The GPU carries a DONE bit per belief race beside the chosen id; this side
+  // gates on the id being set. Comparing them is what would show the two
+  // coming apart (a seat that has spent its pick but holds no belief).
+  pantheonDone: overSeats((s) => (s.religion.pantheon !== null ? 1 : 0)),
+  enhancerDone: overSeats((s) => ((s.religion.enhancer ?? null) !== null ? 1 : 0)),
   gpPoints: overSeats((s) => GP_CLASSES.map((c) => s.gpp[c] ?? 0)),
   spaceProjects: overSeats((s) => s.spaceProjects.length),
   routeCount: overSeats((s) => (s.tradeRoutes ?? []).length),
+  // Every route's IDENTITY, not just how many. Destinations are keyed by
+  // CENTRE TILE — the digest's own city join key — so the comparison does not
+  // ride on city-id minting, which the city group deliberately does not
+  // compare. Kind: 0 domestic, 1 city-state, 2 international. Sorted, because
+  // the GPU holds routes in fixed slots and this side holds a filtered array.
+  routes: overSeats((s, state) => {
+    const centreOf = (seat: number, cityId: number): number =>
+      seatOf(state, seat)?.cities.find((c) => c.id === cityId)?.centerIndex ?? -1;
+    const rows = (s.tradeRoutes ?? []).map((r) => {
+      const kind = (r.toCs ?? -1) >= 0 ? 1 : (r.toSeat ?? -1) >= 0 ? 2 : 0;
+      const dest =
+        kind === 1
+          ? state.cityStates?.find((c) => c.id === r.toCs)?.centerIndex ?? -1
+          : kind === 2
+            ? centreOf(r.toSeat!, r.toSeatCity ?? -1)
+            : centreOf(s.seat, r.to ?? -1);
+      return [centreOf(s.seat, r.from), dest, kind, r.expiresTurn ?? -1];
+    });
+    rows.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3]);
+    return rows.flat();
+  }),
   prophets: overSeats((s) => prophetsOf(s)),
   beliefPantheon: overSeats((s) => idx(PANTHEON_IDX, s.religion.pantheon)),
   beliefFollower: overSeats((s) => idx(FOLLOWER_IDX, s.religion.follower)),

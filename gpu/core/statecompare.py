@@ -279,6 +279,53 @@ def _seat_pair_relation(plane: str, live):
     return get
 
 
+
+def _centre_of(sim, b: int, row: int, city_id: int) -> int:
+    """The centre TILE of seat row `row`'s city `city_id`, or -1. Routes are
+    compared in centre-tile space because `city_id` is not compared at all —
+    the city group joins on the centre tile."""
+    if city_id < 0:
+        return -1
+    ids = sim.city_id[b, row].tolist()
+    alive = sim.city_alive[b, row].tolist()
+    for j, cid in enumerate(ids):
+        if alive[j] and int(cid) == city_id:
+            return int(sim.city_center[b, row, j])
+    return -1
+
+
+def _routes_of(sim, b: int, seat: int) -> list[int]:
+    """Every live route of `seat`, as flattened [fromTile, destTile, kind, exp]
+    rows sorted ascending — the `routes` extractor's twin. Kind: 0 domestic,
+    1 city-state, 2 international. `seat_routes[..., 1]` carries the domestic
+    destination city id, or -(2 + city-state index), or -1 for international
+    (whose destination is the dseat/dcity pair)."""
+    row = _seat_row(sim, seat)
+    rr = sim.seat_routes[b, row].tolist()
+    ds = sim.seat_route_dseat[b, row].tolist()
+    dc = sim.seat_route_dcity[b, row].tolist()
+    ex = sim.seat_route_exp[b, row].tolist()
+    out: list[list[int]] = []
+    for k, pair in enumerate(rr):
+        frm = int(pair[0])
+        if frm < 0:
+            continue
+        raw = int(pair[1])
+        d_seat, d_city = int(ds[k]), int(dc[k])
+        if raw >= 0:
+            kind, dest = 0, _centre_of(sim, b, row, raw)
+        elif raw <= -2:
+            cs = -raw - 2
+            kind = 1
+            dest = int(sim.citystate_center[b, cs]) if cs < sim.S else -1
+        else:
+            kind = 2
+            dest = _centre_of(sim, b, d_seat, d_city) if d_seat >= 0 else -1
+        out.append([_centre_of(sim, b, row, frm), dest, kind, int(ex[k])])
+    out.sort()
+    return [x for t in out for x in t]
+
+
 SEAT = {
     # Fog — the seat_explored [n_majors, T] row per seat, dense 0/1 (the TS
     # extractor renders its empty-array state dense the same way).
@@ -321,7 +368,13 @@ SEAT = {
     "dedicationPicks": lambda sim, b, rows: [sorted(int(x) for x in sim.ded_picks[b, c].tolist() if x >= 0) for c in rows],
     "capitalTile": _capital_tile,
     "holyTile": lambda sim, b, rows: [int(sim.holy_tile[b, c]) for c in rows],
-    "religionFounded": lambda sim, b, rows: [1 if int(sim.holy_tile[b, c]) >= 0 else 0 for c in rows],
+    # The BIT THE RULES READ, not a proxy for it: every founded-gate in this
+    # engine tests `civ_religion_done`, so that is what must match TS's
+    # `religion.founded`. Deriving it from `holy_tile` compared a different
+    # fact and could not see the two coming apart.
+    "religionFounded": lambda sim, b, rows: [1 if bool(sim.civ_religion_done[b, c]) else 0 for c in rows],
+    "pantheonDone": lambda sim, b, rows: [1 if bool(sim.civ_pantheon_done[b, c]) else 0 for c in rows],
+    "enhancerDone": lambda sim, b, rows: [1 if bool(sim.civ_enhancer_done[b, c]) else 0 for c in rows],
     "gpPoints": lambda sim, b, rows: [[float(x) for x in sim.civ_gpp[b, c].tolist()] for c in rows],
     "spaceProjects": lambda sim, b, rows: [sum(1 for x in sim.space_done[b, c].tolist() if x) for c in rows],
     "spaceLy": _civ_scalar("space_ly"),
@@ -329,6 +382,7 @@ SEAT = {
     "routeCount": lambda sim, b, rows: [
         sum(1 for r in sim.seat_routes[b, _seat_row(sim, c)].tolist() if r[0] >= 0) for c in rows
     ],
+    "routes": lambda sim, b, rows: [_routes_of(sim, b, c) for c in rows],
     "prophets": _civ_scalar("civ_prophets"),
     "beliefPantheon": _civ_scalar("civ_pantheon"),
     "beliefFollower": _civ_scalar("civ_follower"),
@@ -693,6 +747,17 @@ def census(manifest: dict | None = None) -> list[str]:
     for e in man["exclusions"]["gpu"]:
         if not e.get("why"):
             bad.append(f"excluded plane {e['plane']!r} carries no reason")
+    # DEPTH, not just naming. Coverage above proves a plane is NAMED by some
+    # field; it cannot prove the field's extractor reads it. A field naming
+    # several planes is where the two come apart — one that compares a COUNT
+    # over four planes reads as covered while three of them go unverified — so
+    # a multi-plane field must say in its `note` what it actually compares.
+    for g in man["groups"]:
+        for f in g["fields"]:
+            if len(f.get("planes", [])) > 1 and not f.get("note"):
+                bad.append(
+                    f"field {g['name']}.{f['name']!r} names {len(f['planes'])} planes with no `note` — "
+                    "state what it compares, or split it into one field per fact")
     return bad
 
 

@@ -53,6 +53,9 @@ POKE_COST = {
     "centre_defence": 14.0,
 }
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "gpu"))
+import test_stats as _stats  # noqa: E402
+
 results: list[tuple[str, float, int]] = []
 lock = threading.Lock()
 failed = threading.Event()
@@ -254,6 +257,10 @@ def main() -> int:
         print(f"{name:<14} {dt:6.1f}s  {'ok' if rc == 0 else 'SKIP' if rc == -1 else 'BAIL' if rc == -3 else 'FAIL'}")
     serial = sum(dt for _, dt, _ in results)
     print(f"\nwall {wall:.0f}s (serial-equivalent {serial:.0f}s, {serial / max(wall, 1):.1f}x)")
+    # Every run records itself — stats/battery.jsonl, read by
+    # tools/gpu/test_stats.py. Which lanes ever catch anything is a
+    # question for data, not for memory.
+    _stats.record(results, wall, not failed.is_set())
     if failed.is_set():
         print("BATTERY FAILED")
         return 1
