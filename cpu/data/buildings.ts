@@ -42,44 +42,44 @@ const rawList: BuildingDef[] = [
   { id: 'MONUMENT', name: 'Monument', district: 'CITY_CENTER', cost: 60, yields: { culture: 2 }, maintenance: 0 },
   { id: 'GRANARY', name: 'Granary', district: 'CITY_CENTER', cost: 65, yields: { food: 1 }, housing: 2, maintenance: 0 },
   { id: 'WATER_MILL', name: 'Water Mill', district: 'CITY_CENTER', cost: 80, yields: { food: 1, production: 1 }, special: 'WATER_MILL', maintenance: 0 },
-  { id: 'SEWER', name: 'Sewer', district: 'CITY_CENTER', cost: 405, housing: 2, maintenance: 2 },
+  { id: 'SEWER', name: 'Sewer', district: 'CITY_CENTER', cost: 200, housing: 2, maintenance: 2 },
   { id: 'ANCIENT_WALLS', name: 'Ancient Walls', district: 'CITY_CENTER', cost: 80, maintenance: 0 },
 
-  { id: 'LIBRARY', name: 'Library', district: 'CAMPUS', cost: 80, yields: { science: 2 }, maintenance: 1 },
-  { id: 'UNIVERSITY', name: 'University', district: 'CAMPUS', cost: 225, requiresAny: ['LIBRARY'], yields: { science: 4 }, housing: 1, maintenance: 2 },
-  { id: 'RESEARCH_LAB', name: 'Research Lab', district: 'CAMPUS', cost: 525, requiresAny: ['UNIVERSITY'], yields: { science: 5 }, maintenance: 3 },
+  { id: 'LIBRARY', name: 'Library', district: 'CAMPUS', cost: 90, yields: { science: 2 }, maintenance: 1 },
+  { id: 'UNIVERSITY', name: 'University', district: 'CAMPUS', cost: 250, requiresAny: ['LIBRARY'], yields: { science: 4 }, housing: 1, maintenance: 2 },
+  { id: 'RESEARCH_LAB', name: 'Research Lab', district: 'CAMPUS', cost: 440, requiresAny: ['UNIVERSITY'], yields: { science: 5 }, maintenance: 3 },
 
-  { id: 'SHRINE', name: 'Shrine', district: 'HOLY_SITE', cost: 65, yields: { faith: 2 }, maintenance: 1 },
-  { id: 'TEMPLE', name: 'Temple', district: 'HOLY_SITE', cost: 105, requiresAny: ['SHRINE'], yields: { faith: 4 }, maintenance: 2 },
+  { id: 'SHRINE', name: 'Shrine', district: 'HOLY_SITE', cost: 70, yields: { faith: 2 }, maintenance: 1 },
+  { id: 'TEMPLE', name: 'Temple', district: 'HOLY_SITE', cost: 120, requiresAny: ['SHRINE'], yields: { faith: 4 }, maintenance: 2 },
   { id: 'CATHEDRAL', name: 'Cathedral', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, culture: 3 }, worship: true },
   { id: 'GURDWARA', name: 'Gurdwara', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, food: 2 }, worship: true },
   { id: 'MEETING_HOUSE', name: 'Meeting House', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, production: 2 }, worship: true },
   { id: 'PAGODA', name: 'Pagoda', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, housing: 1, worship: true },
   { id: 'STUPA', name: 'Stupa', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, amenities: 1, worship: true },
 
-  { id: 'AMPHITHEATER', name: 'Amphitheater', district: 'THEATER_SQUARE', cost: 135, yields: { culture: 2 }, maintenance: 1 },
-  { id: 'MUSEUM', name: 'Museum', district: 'THEATER_SQUARE', cost: 265, requiresAny: ['AMPHITHEATER'], exclusiveWith: ['ARCHAEOLOGICAL_MUSEUM'], yields: { culture: 2 }, maintenance: 2 },
-  { id: 'BROADCAST_CENTER', name: 'Broadcast Center', district: 'THEATER_SQUARE', cost: 525, requiresAny: ['MUSEUM'], yields: { culture: 4 }, maintenance: 3 },
-  { id: 'MARKET', name: 'Market', district: 'COMMERCIAL_HUB', cost: 105, yields: { gold: 3 }, maintenance: 0 },
-  { id: 'BANK', name: 'Bank', district: 'COMMERCIAL_HUB', cost: 265, requiresAny: ['MARKET'], yields: { gold: 5 }, maintenance: 0 },
-  { id: 'STOCK_EXCHANGE', name: 'Stock Exchange', district: 'COMMERCIAL_HUB', cost: 355, requiresAny: ['BANK'], yields: { gold: 7 }, maintenance: 0 },
+  { id: 'AMPHITHEATER', name: 'Amphitheater', district: 'THEATER_SQUARE', cost: 150, yields: { culture: 2 }, maintenance: 1 },
+  { id: 'MUSEUM', name: 'Museum', district: 'THEATER_SQUARE', cost: 290, requiresAny: ['AMPHITHEATER'], exclusiveWith: ['ARCHAEOLOGICAL_MUSEUM'], yields: { culture: 2 }, maintenance: 2 },
+  { id: 'BROADCAST_CENTER', name: 'Broadcast Center', district: 'THEATER_SQUARE', cost: 440, requiresAny: ['MUSEUM'], yields: { culture: 4 }, maintenance: 3 },
+  { id: 'MARKET', name: 'Market', district: 'COMMERCIAL_HUB', cost: 120, yields: { gold: 2 }, maintenance: 0 },
+  { id: 'BANK', name: 'Bank', district: 'COMMERCIAL_HUB', cost: 290, requiresAny: ['MARKET'], yields: { gold: 5 }, maintenance: 0 },
+  { id: 'STOCK_EXCHANGE', name: 'Stock Exchange', district: 'COMMERCIAL_HUB', cost: 330, requiresAny: ['BANK'], yields: { gold: 7 }, maintenance: 0 },
 
-  { id: 'LIGHTHOUSE', name: 'Lighthouse', district: 'HARBOR', cost: 105, yields: { food: 1, gold: 1 }, housing: 1, maintenance: 0 },
-  { id: 'SHIPYARD', name: 'Shipyard', district: 'HARBOR', cost: 265, requiresAny: ['LIGHTHOUSE'], special: 'SHIPYARD', maintenance: 1 },
-  { id: 'SEAPORT', name: 'Seaport', district: 'HARBOR', cost: 525, requiresAny: ['SHIPYARD'], yields: { food: 2, gold: 2 }, maintenance: 0 },
+  { id: 'LIGHTHOUSE', name: 'Lighthouse', district: 'HARBOR', cost: 120, yields: { food: 1, gold: 1 }, housing: 1, maintenance: 0 },
+  { id: 'SHIPYARD', name: 'Shipyard', district: 'HARBOR', cost: 290, requiresAny: ['LIGHTHOUSE'], special: 'SHIPYARD', maintenance: 1 },
+  { id: 'SEAPORT', name: 'Seaport', district: 'HARBOR', cost: 440, requiresAny: ['SHIPYARD'], yields: { food: 2, gold: 2 }, housing: 1, maintenance: 0 },
 
-  { id: 'WORKSHOP', name: 'Workshop', district: 'INDUSTRIAL_ZONE', cost: 175, yields: { production: 2 }, maintenance: 1 },
-  { id: 'FACTORY', name: 'Factory', district: 'INDUSTRIAL_ZONE', cost: 355, requiresAny: ['WORKSHOP'], yields: { production: 3 }, regional: true, maintenance: 2 },
-  { id: 'POWER_PLANT', name: 'Power Plant', district: 'INDUSTRIAL_ZONE', cost: 525, requiresAny: ['FACTORY'], yields: { production: 4 }, regional: true, maintenance: 3 },
+  { id: 'WORKSHOP', name: 'Workshop', district: 'INDUSTRIAL_ZONE', cost: 195, yields: { production: 3 }, maintenance: 1 },
+  { id: 'FACTORY', name: 'Factory', district: 'INDUSTRIAL_ZONE', cost: 330, requiresAny: ['WORKSHOP'], yields: { production: 3 }, regional: true, maintenance: 2 },
+  { id: 'POWER_PLANT', name: 'Power Plant', district: 'INDUSTRIAL_ZONE', cost: 580, requiresAny: ['FACTORY'], yields: { production: 4 }, regional: true, maintenance: 3 },
 
-  { id: 'BARRACKS', name: 'Barracks', district: 'ENCAMPMENT', cost: 80, exclusiveWith: ['STABLE'], yields: { production: 1 }, housing: 1, maintenance: 1, trainXp: 5 },
-  { id: 'STABLE', name: 'Stable', district: 'ENCAMPMENT', cost: 105, exclusiveWith: ['BARRACKS'], yields: { production: 1 }, housing: 1, maintenance: 1, trainXp: 5 },
-  { id: 'ARMORY', name: 'Armory', district: 'ENCAMPMENT', cost: 175, requiresAny: ['BARRACKS', 'STABLE'], yields: { production: 2 }, maintenance: 2, trainXp: 10 },
-  { id: 'MILITARY_ACADEMY', name: 'Military Academy', district: 'ENCAMPMENT', cost: 355, requiresAny: ['ARMORY'], yields: { production: 3 }, housing: 1, maintenance: 2, trainXp: 15 },
+  { id: 'BARRACKS', name: 'Barracks', district: 'ENCAMPMENT', cost: 90, exclusiveWith: ['STABLE'], yields: { production: 1 }, housing: 1, maintenance: 1, trainXp: 5 },
+  { id: 'STABLE', name: 'Stable', district: 'ENCAMPMENT', cost: 120, exclusiveWith: ['BARRACKS'], yields: { production: 1 }, housing: 1, maintenance: 1, trainXp: 5 },
+  { id: 'ARMORY', name: 'Armory', district: 'ENCAMPMENT', cost: 195, requiresAny: ['BARRACKS', 'STABLE'], yields: { production: 3 }, maintenance: 2, trainXp: 10 },
+  { id: 'MILITARY_ACADEMY', name: 'Military Academy', district: 'ENCAMPMENT', cost: 330, requiresAny: ['ARMORY'], yields: { production: 4 }, housing: 1, maintenance: 2, trainXp: 15 },
 
-  { id: 'ARENA', name: 'Arena', district: 'ENTERTAINMENT_COMPLEX', cost: 135, amenities: 2, yields: { culture: 1 }, maintenance: 1 },
-  { id: 'ZOO', name: 'Zoo', district: 'ENTERTAINMENT_COMPLEX', cost: 405, requiresAny: ['ARENA'], amenities: 1, regional: true, maintenance: 2 },
-  { id: 'STADIUM', name: 'Stadium', district: 'ENTERTAINMENT_COMPLEX', cost: 600, requiresAny: ['ZOO'], amenities: 1, regional: true, maintenance: 3 },
+  { id: 'ARENA', name: 'Arena', district: 'ENTERTAINMENT_COMPLEX', cost: 150, amenities: 2, yields: { culture: 1 }, maintenance: 1 },
+  { id: 'ZOO', name: 'Zoo', district: 'ENTERTAINMENT_COMPLEX', cost: 360, requiresAny: ['ARENA'], amenities: 1, regional: true, maintenance: 2 },
+  { id: 'STADIUM', name: 'Stadium', district: 'ENTERTAINMENT_COMPLEX', cost: 480, requiresAny: ['ZOO'], amenities: 1, regional: true, maintenance: 3 },
 
   // ARCHAEOLOGICAL MUSEUM — in real Civ 6 the Theater Square offers
   // the ART MUSEUM or the ARCHAEOLOGICAL MUSEUM as a choice; same district,
@@ -87,7 +87,7 @@ const rawList: BuildingDef[] = [
   // purpose: roster order IS the GPU's building index, so inserting it beside
   // the other Theater Square rows would renumber every downstream building in
   // both engines and in every exported fixture.
-  { id: 'ARCHAEOLOGICAL_MUSEUM', name: 'Archaeological Museum', district: 'THEATER_SQUARE', cost: 265, requiresAny: ['AMPHITHEATER'], exclusiveWith: ['MUSEUM'], yields: { culture: 2 }, maintenance: 2 },
+  { id: 'ARCHAEOLOGICAL_MUSEUM', name: 'Archaeological Museum', district: 'THEATER_SQUARE', cost: 290, requiresAny: ['AMPHITHEATER'], exclusiveWith: ['MUSEUM'], yields: { culture: 2 }, maintenance: 2 },
 ];
 
 const list: BuildingDef[] = rawList.map((b) => ({ ...b, cost: Math.round(b.cost * GAME_SPEED) }));

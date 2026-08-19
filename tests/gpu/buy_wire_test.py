@@ -103,7 +103,7 @@ def case_building(sim, base, row: int, mon: int) -> None:
     assert not bool(sim.city_bldg[0, row, j, b])
     g0 = float(sim.civ_treasury[0, row])
     sim._stash_buy(row, buy=(t1(0), t1(j), t1(b)))
-    sim._seat_buy_ladder(row, ACTIVE)
+    sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
     assert bool(sim.city_bldg[0, row, j, b]), f"row {row}: bought building not granted"
     assert abs((g0 - float(sim.civ_treasury[0, row])) - pr) < 1e-6, (
         f"row {row}: building charged {g0 - float(sim.civ_treasury[0, row])}, want {pr}"
@@ -116,7 +116,7 @@ def case_building(sim, base, row: int, mon: int) -> None:
     sim._eff_version += 1
     sim.civ_treasury[0, row] = pr + reserve - 0.001
     sim._stash_buy(row, buy=(t1(0), t1(j), t1(b)))
-    sim._seat_buy_ladder(row, ACTIVE)
+    sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
     assert not bool(sim.city_bldg[0, row, j, b]), (
         f"row {row}: bought a building one milli below price + the {reserve:.0f} reserve"
     )
@@ -131,7 +131,7 @@ def case_building(sim, base, row: int, mon: int) -> None:
     sim.civ_treasury[0, row] = RICH
     g0 = float(sim.civ_treasury[0, row])
     sim._stash_buy(row, buy=(t1(0), t1(j), t1(b)))
-    sim._seat_buy_ladder(row, ACTIVE)
+    sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
     assert abs(float(sim.civ_treasury[0, row]) - g0) < 1e-6, (
         f"row {row}: paid for a building the city already had"
     )
@@ -164,7 +164,7 @@ def case_settler(sim, base, row: int) -> None:
     sim.civ_treasury[0, row] = price
     pop0, live0 = int(sim.city_pop[0, row, j]), int(sim._seat_settlers(row)[0])
     sim._stash_buy(row, buy=(t1(1), t1(-1), t1(-1)))
-    sim._seat_buy_ladder(row, ACTIVE)
+    sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
     assert int(sim._seat_settlers(row)[0]) == live0 + 1, f"row {row}: no settler spawned at its price"
     assert abs(float(sim.civ_treasury[0, row])) < 1e-6, f"row {row}: settler price not charged in full"
     assert int(sim.city_pop[0, row, j]) == pop0 - 1, f"row {row}: bought settler cost the city no pop"
@@ -176,7 +176,7 @@ def case_settler(sim, base, row: int) -> None:
     sim.civ_treasury[0, row] = settler_price(sim, row) - 0.001
     live0 = int(sim._seat_settlers(row)[0])
     sim._stash_buy(row, buy=(t1(1), t1(-1), t1(-1)))
-    sim._seat_buy_ladder(row, ACTIVE)
+    sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
     assert int(sim._seat_settlers(row)[0]) == live0, f"row {row}: settler bought below its price"
 
     # the POP GATE: a 1-pop spawn city may not buy one however rich the seat
@@ -186,7 +186,7 @@ def case_settler(sim, base, row: int) -> None:
     sim.civ_treasury[0, row] = RICH
     live0 = int(sim._seat_settlers(row)[0])
     sim._stash_buy(row, buy=(t1(1), t1(-1), t1(-1)))
-    sim._seat_buy_ladder(row, ACTIVE)
+    sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
     assert int(sim._seat_settlers(row)[0]) == live0, f"row {row}: 1-pop city bought a settler"
     print(f"  row {row}: settler buy OK ({price:.0f} gold, -1 pop, gate and threshold hold)")
 
@@ -239,7 +239,7 @@ def case_unit(sim, base, row: int) -> None:
     sim.civ_treasury[0, row] = price
     n0 = units_of(sim, row)
     sim._stash_buy(row, buy=(t1(2), t1(-1), t1(-1)))
-    sim._seat_buy_ladder(row, ACTIVE)
+    sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
     assert units_of(sim, row) == n0 + 1, f"row {row}: no unit spawned at the warrior price"
     got = int(sim.major_unit_type[0, int(sim.unit_next[0]) - 1])
     assert got == warr, f"row {row}: strongest-affordable picked type {got} at the warrior price"
@@ -254,7 +254,7 @@ def case_unit(sim, base, row: int) -> None:
     sim.civ_treasury[0, row] = price
     n0 = units_of(sim, row)
     sim._stash_buy(row, buy=(t1(2), t1(-1), t1(-1)))
-    sim._seat_buy_ladder(row, ACTIVE)
+    sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
     assert units_of(sim, row) == n0, f"row {row}: bought a unit at the {quota}-unit quota"
 
     # REFUND on no spawn spot: block the capital ring; the price is kept
@@ -267,7 +267,7 @@ def case_unit(sim, base, row: int) -> None:
     sim.civ_treasury[0, row] = price
     n0 = units_of(sim, row)
     sim._stash_buy(row, buy=(t1(2), t1(-1), t1(-1)))
-    sim._seat_buy_ladder(row, ACTIVE)
+    sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
     assert units_of(sim, row) == n0, f"row {row}: a unit spawned with every spot blocked"
     assert abs(float(sim.civ_treasury[0, row]) - price) < 1e-6, (
         f"row {row}: a refused spawn still charged {price - float(sim.civ_treasury[0, row])} gold"
@@ -300,7 +300,7 @@ def case_tile(sim, base, row: int) -> None:
     bought0 = int(sim.civ_tiles_purchased[0, row])
     acq0 = int(sim.city_acquired[0, row, j])
     sim._stash_buy(row, buy=(t1(3), t1(tgt), t1(j)))
-    sim._seat_buy_ladder(row, ACTIVE)
+    sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
     assert int(sim.tile_seat[0, tgt]) == row, f"row {row}: bought tile not claimed"
     assert int(sim.tile_city[0, tgt]) == int(cid[0]), f"row {row}: bought tile not filed under the city"
     assert abs((RICH - float(sim.civ_treasury[0, row])) - cost) < 1e-6, (
@@ -318,7 +318,7 @@ def case_tile(sim, base, row: int) -> None:
         cl = int(claimed[0])
         owner0 = int(sim.tile_seat[0, cl])
         sim._stash_buy(row, buy=(t1(3), t1(cl), t1(j)))
-        sim._seat_buy_ladder(row, ACTIVE)
+        sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
         assert int(sim.tile_seat[0, cl]) == owner0, f"row {row}: bought an already-claimed tile"
         assert abs(float(sim.civ_treasury[0, row]) - RICH) < 1e-6, f"row {row}: charged for a refused tile"
     print(f"  row {row}: tile buy OK (tile {tgt}, {cost:.0f} gold; claimed tile refused)")
@@ -363,7 +363,7 @@ def case_worship(sim, base, row: int) -> None:
     )
     f0, g0 = float(sim.civ_faith[0, row]), float(sim.civ_treasury[0, row])
     sim._stash_buy(row, worship=t1(j))
-    sim._seat_buy_ladder(row, ACTIVE)
+    sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
     assert bool(sim.city_bldg[0, row, j, wj]), f"row {row}: worship purchase not granted"
     assert abs((f0 - float(sim.civ_faith[0, row])) - sim._worship_cost) < 1e-6, (
         f"row {row}: worship charged {f0 - float(sim.civ_faith[0, row])} faith, want {sim._worship_cost}"
@@ -376,7 +376,7 @@ def case_worship(sim, base, row: int) -> None:
     endow_worship(sim, row, j)
     sim.civ_religion_done[0, row] = False
     sim._stash_buy(row, worship=t1(j))
-    sim._seat_buy_ladder(row, ACTIVE)
+    sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
     assert not bool(sim.city_bldg[0, row, j, wj]), f"row {row}: worship bought with no religion founded"
     print(f"  row {row}: worship buy OK (-{sim._worship_cost:.0f} faith, gold untouched, religion gate holds)")
 
@@ -406,7 +406,7 @@ def case_levy(sim, base, row: int) -> None:
     assert bool(sim._suzerain_mask(row)[0, s]), f"row {row}: envoys did not make it suzerain"
     n0 = units_of(sim, row)
     sim._stash_buy(row, levy=t1(s))
-    sim._seat_buy_ladder(row, ACTIVE)
+    sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
     assert units_of(sim, row) == n0 + n_lv, (
         f"row {row}: levy spawned {units_of(sim, row) - n0} units, want {n_lv}"
     )
@@ -422,7 +422,7 @@ def case_levy(sim, base, row: int) -> None:
     sim.civ_treasury[0, row] = RICH
     n0 = units_of(sim, row)
     sim._stash_buy(row, levy=t1(s))
-    sim._seat_buy_ladder(row, ACTIVE)
+    sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
     assert units_of(sim, row) == n0, f"row {row}: levied a city-state it is not suzerain of"
     assert abs(float(sim.civ_treasury[0, row]) - RICH) < 1e-6, f"row {row}: charged for a refused levy"
     print(f"  row {row}: levy OK ({n_lv} units, {cost:.0f} gold, suzerainty gate holds)")

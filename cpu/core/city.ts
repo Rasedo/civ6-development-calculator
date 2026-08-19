@@ -219,10 +219,11 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
   }
 
   total += m.housingAll;
-  const districtCount = completedDistrictCount(state, city, false);
+  /* CIV6 (Insulae / Medina Quarter): "+1/+2 Housing in all cities with at
+   * least 2/3 specialty districts." */
   const specialtyCount = completedDistrictCount(state, city, true);
   for (const rule of m.housingIfDistricts) {
-    if (districtCount >= rule.min) total += rule.housing;
+    if (specialtyCount >= rule.min) total += rule.housing;
   }
   for (const rule of m.newDeal) {
     if (specialtyCount >= rule.min) total += rule.housing;

@@ -39,7 +39,7 @@ import { hasRiver, hasFreshWater, isCoastalWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { disbandUnit, builderCost, builderRemoveFeature, trainableUnits } from './units';
 import { killUnit } from './combat';
-import { availableProjects, buyTile, buyWorshipBuilding, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampmentItem, purchaseCivilianWithFaith, purchaseReligiousUnit, purchaseSettler, queueProject, settlerCost } from './game';
+import { availableProjects, buyTile, buyWorshipBuilding, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, purchaseCivilianWithFaith, purchaseReligiousUnit, purchaseSettler, queueProject, settlerCost } from './game';
 import { DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex } from './unitActions';
 
@@ -1306,11 +1306,11 @@ export function seatPhase(state: GameState): void {
       seatGrowth(civCity, stats.effectiveFoodSurplus, stats.growthNeeded);
       const q = civCity.queue[0];
       if (q && (q.kind === 'settler' || q.kind === 'unit' || q.kind === 'district' || q.kind === 'building' || q.kind === 'project' || q.kind === 'wonder')) {
-        // The seat's GOVERNMENT/POLICY encampmentProdMult, which
+        // The seat's GOVERNMENT/POLICY encampHarborProdMult, which
         // `game.ts` has always applied to the seat 0's queue head and the
         // seat's add never did. A seat that adopts the government owns
         // its effects; the multiplier keys on the ITEM, not on the seat.
-        let _em = isEncampmentItem(q) ? seatMods.encampmentProdMult : 1;
+        let _em = isEncampHarborItem(q) ? seatMods.encampHarborProdMult : 1;
         // CIV6 (To Arms!, Golden face): "+15% Production towards military
         // units." (Heartbeat of Steam, Golden face): "+10% Production toward
         // Industrial era and later wonders." The three item classes are

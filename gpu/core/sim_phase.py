@@ -111,8 +111,9 @@ class SimPhase:
             # TS's eliminated-actor `continue` — but the stashed intents are for
             # THIS turn and must not survive into the next one. Both drains pop
             # unconditionally and apply nothing under an all-False mask.
+            army0 = self._seat_army_count(row)
             self._seat_record_apply(row, active)
-            self._seat_buy_ladder(row, active)
+            self._seat_buy_ladder(row, active, army0)
             return active
         self._ww_decay(row, active)
         # Eurekas/inspirations from this seat — the TS twin runs at the
@@ -120,8 +121,12 @@ class SimPhase:
         self._detect_seat_boosts(row, active)
         self._seat_influence_phase(row, active)
         self._seat_quest_phase(row, active)
+        # ORACLE: TS takes its melee+ranged census at the seat block TOP,
+        # BEFORE applySeatActionRecord writes this turn's queue picks — so the
+        # buy ladder's quota must read the pre-apply count, not the live one.
+        army0 = self._seat_army_count(row)
         self._seat_record_apply(row, active)
-        self._seat_buy_ladder(row, active)
+        self._seat_buy_ladder(row, active, army0)
         self._seat_trade_phase(row, active)
         alive_c = self.city_alive[:, row].clone()
 
@@ -332,10 +337,12 @@ class SimPhase:
             return
         if self._gov_has_effects and self._encamp_didx >= 0:
             em = self._gov_mods(row)[5]
-            enc_i = (cur >= 0) & (cur < self.NB) & (
-                self._b_req_district[cur.clamp(min=0, max=self.NB - 1)] == self._encamp_didx)
+            _bd = self._b_req_district[cur.clamp(min=0, max=self.NB - 1)]
+            enc_i = (cur >= 0) & (cur < self.NB) & ((_bd == self._encamp_didx) | (_bd == self._harbor_didx))
             if self._encamp_si >= 0:
                 enc_i = enc_i | (cur == self.DISTRICT_BASE + self._encamp_si)
+            if self._harbor_si >= 0:
+                enc_i = enc_i | (cur == self.DISTRICT_BASE + self._harbor_si)
             prod = torch.where(enc_i, prod * em, prod)
         # CIV6 (To Arms!, Golden face): "+15% Production towards military
         # units." (Heartbeat of Steam, Golden face): "+10% Production toward

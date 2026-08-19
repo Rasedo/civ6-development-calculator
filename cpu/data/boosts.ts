@@ -74,7 +74,7 @@ export const BOOSTS: Record<string, BoostDef> = {
   // roster improvements). Military/naval/absent-system eurekas are unboostable
   // in this model (IRON_WORKING, MACHINERY, GUNPOWDER, METAL_CASTING,
   // SQUARE_RIGGING, SIEGE_TACTICS, BALLISTICS, RIFLING, FLIGHT, COMBUSTION,
-  // PLASTICS, ELECTRONICS, and every Atomic/Information/Future node).
+  // PLASTICS and every Atomic/Information/Future node).
   CARTOGRAPHY: { desc: 'Build 2 Harbors.', check: { kind: 'district', type: 'HARBOR', count: 2 } },
   PRINTING: { desc: 'Build 2 Universities.', check: { kind: 'building', id: 'UNIVERSITY', count: 2 } },
   STEAM_POWER: { desc: 'Build 2 Shipyards.', check: { kind: 'building', id: 'SHIPYARD', count: 2 } },

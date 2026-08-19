@@ -82,7 +82,7 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
   // identical value (the GPU indexes these by civ_only_enhancer + a base-value pad):
   mchg: def.effects.missionaryChargeBonus ?? 0,  // Scripture +1 charge
   mlump: Math.round(SPREAD_PRESSURE * (def.effects.spreadPressureMult ?? 1)),  // Scripture 15, base 10
-  mcost: Math.round((UNITS.MISSIONARY?.cost ?? 0) * (def.effects.missionaryCostMult ?? 1)),  // Holy Order 42, base 60
+  mcost: Math.round((UNITS.MISSIONARY?.cost ?? 0) * (def.effects.missionaryCostMult ?? 1)),  // Holy Order 63, base 90
   impY: IMPROVEMENT_IDS.map((id) => YIELD_KEYS.map((k) => def.effects.improvementYields?.[id]?.[k] ?? 0)),
   impRes: (() => {
     const rows = [0, 1, 2, 3].map(() => YIELD_KEYS.map(() => 0 as number));
@@ -197,7 +197,7 @@ export function buildRules() {
     ancientWallsBidx: buildingIdx.get('ANCIENT_WALLS') ?? -1,
     worshipBidx: WORSHIP_BUILDINGS.map((id) => buildingIdx.get(id) ?? -1),
     templeBidx: buildingIdx.get('TEMPLE') ?? -1,
-    worshipFaithCost: Math.round(190 * GAME_SPEED),
+    worshipFaithCost: Math.round(380 * GAME_SPEED),
     shrineBidx: buildingIdx.get('SHRINE') ?? -1,
     trade: {
       marketBidx: buildingIdx.get('MARKET') ?? -1,
@@ -672,7 +672,7 @@ export function buildRules() {
     // cityYields/capitalYields channels are exported (the GPU-implemented gov/
     // policy effects); other PolicyEffects channels (adjacencyMult,
     // buildingYieldMult, housing/amenity conditionals, yieldMult,
-    // encampmentProdMult, tilePurchaseMult) are TS-only — no adopted government
+    // encampHarborProdMult, tilePurchaseMult) are TS-only — no adopted government
     // or slotted card in the scripted 100-turn gate uses a LIVE instance of one
     // (verified: seat 0 slots VETERANCY[inert]+URBAN_PLANNING, opponents adopt
     // AUTOCRACY and slot the same), so they stay inert here.
@@ -699,7 +699,7 @@ export function buildRules() {
       adjacencyMult: PLACEABLE_DISTRICTS.map((d) => g.effects.adjacencyMult?.[d] ?? 1),
       buildingYieldMult: PLACEABLE_DISTRICTS.map((d) => g.effects.buildingYieldMult?.[d] ?? 1),
       tilePurchaseMult: g.effects.tilePurchaseMult ?? 1,
-      encampmentProdMult: g.effects.encampmentProdMult ?? 1, // VETERANCY went live with the Encampment scaffold
+      encampHarborProdMult: g.effects.encampHarborProdMult ?? 1, // VETERANCY: Encampment + Harbor items
       housingIfDistricts: g.effects.housingIfDistricts ? [g.effects.housingIfDistricts.min, g.effects.housingIfDistricts.housing] : [-1, 0],
       amenitiesIfSpecialty: g.effects.amenitiesIfSpecialty ? [g.effects.amenitiesIfSpecialty.min, g.effects.amenitiesIfSpecialty.amenities] : [-1, 0],
       newDeal: g.effects.newDeal ? [g.effects.newDeal.min, g.effects.newDeal.housing, g.effects.newDeal.amenities] : [-1, 0, 0],
@@ -718,7 +718,7 @@ export function buildRules() {
       adjacencyMult: PLACEABLE_DISTRICTS.map((d) => p.effects.adjacencyMult?.[d] ?? 1),
       buildingYieldMult: PLACEABLE_DISTRICTS.map((d) => p.effects.buildingYieldMult?.[d] ?? 1),
       tilePurchaseMult: p.effects.tilePurchaseMult ?? 1,
-      encampmentProdMult: p.effects.encampmentProdMult ?? 1, // VETERANCY went live with the Encampment scaffold
+      encampHarborProdMult: p.effects.encampHarborProdMult ?? 1, // VETERANCY: Encampment + Harbor items
       housingIfDistricts: p.effects.housingIfDistricts ? [p.effects.housingIfDistricts.min, p.effects.housingIfDistricts.housing] : [-1, 0],
       amenitiesIfSpecialty: p.effects.amenitiesIfSpecialty ? [p.effects.amenitiesIfSpecialty.min, p.effects.amenitiesIfSpecialty.amenities] : [-1, 0],
       newDeal: p.effects.newDeal ? [p.effects.newDeal.min, p.effects.newDeal.housing, p.effects.newDeal.amenities] : [-1, 0, 0],

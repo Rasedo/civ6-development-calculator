@@ -1,5 +1,10 @@
 /**
- * Governments and policy cards (base-game style, eyeballed numbers).
+ * Governments and policy cards. Every card with a LIVE effect is sourced
+ * verbatim from the GS Civilopedia (adjacency doublers, building-yield
+ * doublers, housing/amenity conditionals, Veterancy, Land Surveyors, God
+ * King, Urban Planning). Still eyeballed: the INERT catalog rows' one-line
+ * descriptions and the GOVERNMENTS' inherent bonuses below (stand-ins where
+ * the real one needs systems we don't model).
  *
  * Slot rules follow Civ 6: a card fits a slot of its own kind, and any card
  * fits a wildcard slot. With no other civs/units/trade in this calculator,
@@ -41,7 +46,7 @@ export interface PolicyEffects {
   amenitiesIfSpecialty?: { min: number; amenities: number };
   newDeal?: { min: number; housing: number; amenities: number };
   tilePurchaseMult?: number;
-  encampmentProdMult?: number;
+  encampHarborProdMult?: number;
   yieldMult?: Partial<Yields>;
   amenitiesAll?: number;
   housingAll?: number;
@@ -69,11 +74,11 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     P('LAND_SURVEYORS', 'Land Surveyors', 'economic', 'Purchasing tiles costs 20% less gold.', {
       tilePurchaseMult: 0.8,
     }),
-    P('INSULAE', 'Insulae', 'economic', '+1 housing in cities with 2+ districts.', {
+    P('INSULAE', 'Insulae', 'economic', '+1 housing in cities with 2+ specialty districts.', {
       housingIfDistricts: { min: 2, housing: 1 },
     }),
-    P('VETERANCY', 'Veterancy', 'military', '+30% production toward Encampment district and its buildings.', {
-      encampmentProdMult: 1.3,
+    P('VETERANCY', 'Veterancy', 'military', '+30% production toward Encampment and Harbor districts and their buildings.', {
+      encampHarborProdMult: 1.3,
     }),
     P('NATURAL_PHILOSOPHY', 'Natural Philosophy', 'economic', '+100% Campus adjacency bonuses.', {
       adjacencyMult: { CAMPUS: 2 },
@@ -93,26 +98,26 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     P('AESTHETICS', 'Aesthetics', 'economic', '+100% Theater Square adjacency bonuses.', {
       adjacencyMult: { THEATER_SQUARE: 2 },
     }),
-    P('MEDINA_QUARTER', 'Medina Quarter', 'economic', '+2 housing in cities with 3+ districts.', {
+    P('MEDINA_QUARTER', 'Medina Quarter', 'economic', '+2 housing in cities with 3+ specialty districts.', {
       housingIfDistricts: { min: 3, housing: 2 },
     }),
-    P('SIMULTANEUM', 'Simultaneum', 'economic', '+50% faith from Holy Site buildings.', {
-      buildingYieldMult: { HOLY_SITE: 1.5 },
+    P('SIMULTANEUM', 'Simultaneum', 'economic', 'Doubles faith from Holy Site buildings.', {
+      buildingYieldMult: { HOLY_SITE: 2 },
     }),
-    P('GRAND_OPERA', 'Grand Opéra', 'economic', '+50% culture from Theater Square buildings.', {
-      buildingYieldMult: { THEATER_SQUARE: 1.5 },
+    P('GRAND_OPERA', 'Grand Opéra', 'economic', '+100% culture from Theater Square buildings.', {
+      buildingYieldMult: { THEATER_SQUARE: 2 },
     }),
-    P('RATIONALISM', 'Rationalism', 'economic', '+50% science from Campus buildings.', {
-      buildingYieldMult: { CAMPUS: 1.5 },
+    P('RATIONALISM', 'Rationalism', 'economic', '+100% science from Campus buildings.', {
+      buildingYieldMult: { CAMPUS: 2 },
     }),
-    P('FREE_MARKETS', 'Free Markets', 'economic', '+50% gold from Commercial Hub buildings.', {
-      buildingYieldMult: { COMMERCIAL_HUB: 1.5 },
+    P('FREE_MARKETS', 'Free Market', 'economic', '+100% gold from Commercial Hub buildings.', {
+      buildingYieldMult: { COMMERCIAL_HUB: 2 },
     }),
     P('LIBERALISM', 'Liberalism', 'economic', '+1 amenity in cities with 2+ specialty districts.', {
       amenitiesIfSpecialty: { min: 2, amenities: 1 },
     }),
-    P('NEW_DEAL', 'New Deal', 'wildcard', '+2 housing and +1 amenity in cities with 3+ specialty districts.', {
-      newDeal: { min: 3, housing: 2, amenities: 1 },
+    P('NEW_DEAL', 'New Deal', 'wildcard', '+4 housing and +2 amenities in cities with 3+ specialty districts.', {
+      newDeal: { min: 3, housing: 4, amenities: 2 },
     }),
     P('FIVE_YEAR_PLAN', 'Five-Year Plan', 'wildcard', '+100% Campus and Industrial Zone adjacency bonuses.', {
       adjacencyMult: { CAMPUS: 2, INDUSTRIAL_ZONE: 2 },

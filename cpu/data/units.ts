@@ -1,7 +1,8 @@
 /**
- * Unit types (stage 11a ships the civilian economy; the military roster,
- * combat stats and barbarians arrive with stage 11b). Costs eyeballed
- * base Civ 6.
+ * Unit types. SOURCED: every row's cost, maintenance, movement, combat,
+ * ranged stats and charges fetched one by one from the GS Civilopedia
+ * (GENERAL/ADMIRAL excepted — support chassis this model prices at 0 by
+ * design; great people arrive by points, never production).
  */
 
 import { GAME_SPEED } from './constants';
@@ -145,7 +146,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'PIKEMAN',
       name: 'Pikeman',
       code: 'K',
-      cost: 100,
+      cost: 180,
       maintenance: 2,
       moves: 2,
       combat: 45,
@@ -195,7 +196,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       cost: 65,
       maintenance: 1,
       moves: 3,
-      combat: 25,
+      combat: 30,
       requiresTech: 'SAILING',
       naval: true,
       description: 'Classical naval melee unit — captures coastal cities from the sea.',
@@ -221,13 +222,13 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'MISSIONARY',
       name: 'Missionary',
       code: 'I',
-      cost: 100, // ×GAME_SPEED → 60 faith (faith-only; never a production cost)
+      cost: 150, // ×GAME_SPEED → 90 faith (faith-only; never a production cost)
       maintenance: 0,
       moves: 4,
       combat: 0,
       charges: 3,
       faithOnly: true,
-      religiousStrength: 25, // defends theological combat, never initiates
+      religiousStrength: 100, // defends theological combat, never initiates
       description: 'Spreads its religion to nearby cities (3 charges, faith purchase only).',
     }),
     // The Great General / Great Admiral support chassis (appended
@@ -274,17 +275,17 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'APOSTLE',
       name: 'Apostle',
       code: 'A',
-      cost: 200, // ×GAME_SPEED → 120 faith (faith-only; never a production cost)
+      cost: 400, // ×GAME_SPEED → 240 faith (faith-only; never a production cost)
       maintenance: 0,
       moves: 4,
       combat: 0, // civilian: never garrisons, flanks, supports or fights normal combat
       charges: 3,
       faithOnly: true,
-      religiousStrength: 35,
+      religiousStrength: 110,
       description: 'Spreads its religion and wins theological combat (3 charges, faith purchase only).',
     }),
     // The MILITARY ENGINEER, sourced from the Gathering Storm
-    // Civilopedia — 170 Production, 2 Movement, 2 build charges, prerequisite
+    // Civilopedia — 170 Production, 2 Gold, 2 Movement, 2 build charges, prerequisite
     // tech Military Engineering. APPENDED LAST on purpose: roster order is the
     // GPU's unit index, so inserting anywhere else renumbers every downstream
     // unit in both engines AND in every exported fixture.
@@ -297,7 +298,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       name: 'Military Engineer',
       code: 'ME',
       cost: 170,
-      maintenance: 0,
+      maintenance: 2,
       moves: 2,
       combat: 0, // civilian: never garrisons, flanks, supports or fights
       charges: 2,
@@ -313,9 +314,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'ARCHAEOLOGIST',
       name: 'Archaeologist',
       code: 'Ar',
-      cost: 195,
+      cost: 400,
       maintenance: 0,
-      moves: 2,
+      moves: 4,
       combat: 0, // civilian
       charges: 3,
       requiresCivic: 'NATURAL_HISTORY',

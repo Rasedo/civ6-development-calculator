@@ -107,23 +107,23 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'unlockDistrict', district: 'COMMERCIAL_HUB' },
       { kind: 'unlockBuilding', building: 'MARKET' },
     ]),
-    T('HORSEBACK_RIDING', 'Horseback Riding', 'Classical', 120, ['ANIMAL_HUSBANDRY'], [
+    T('HORSEBACK_RIDING', 'Horseback Riding', 'Classical', 120, ['ARCHERY'], [
       { kind: 'unlockBuilding', building: 'STABLE' },
     ]),
     T('MATHEMATICS', 'Mathematics', 'Classical', 200, ['CURRENCY']),
-    T('CONSTRUCTION', 'Construction', 'Classical', 200, ['WHEEL', 'HORSEBACK_RIDING'], [
+    T('CONSTRUCTION', 'Construction', 'Classical', 200, ['MASONRY', 'HORSEBACK_RIDING'], [
       { kind: 'unlockImprovement', improvement: 'LUMBER_MILL' },
     ]),
     T('ENGINEERING', 'Engineering', 'Classical', 200, ['WHEEL'], [
       { kind: 'unlockDistrict', district: 'AQUEDUCT' },
     ]),
 
-    T('APPRENTICESHIP', 'Apprenticeship', 'Medieval', 275, ['CURRENCY', 'HORSEBACK_RIDING'], [
+    T('APPRENTICESHIP', 'Apprenticeship', 'Medieval', 300, ['CURRENCY', 'HORSEBACK_RIDING'], [
       { kind: 'unlockDistrict', district: 'INDUSTRIAL_ZONE' },
       { kind: 'unlockBuilding', building: 'WORKSHOP' },
       { kind: 'improvementYields', improvement: 'MINE', yields: { production: 1 } },
     ]),
-    T('MILITARY_ENGINEERING', 'Military Engineering', 'Medieval', 335, ['CONSTRUCTION'], [
+    T('MILITARY_ENGINEERING', 'Military Engineering', 'Medieval', 390, ['CONSTRUCTION'], [
       { kind: 'unlockBuilding', building: 'ARMORY' },
       // The FORT ships with its improvement def, its
       // Military-Engineer-only placement rule, its +4 terrain defence and two
@@ -137,47 +137,48 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       // that trains the Military Engineer.
       { kind: 'unlockImprovement', improvement: 'FORT' },
     ]),
-    T('EDUCATION', 'Education', 'Medieval', 335, ['APPRENTICESHIP', 'MATHEMATICS'], [
+    T('EDUCATION', 'Education', 'Medieval', 390, ['APPRENTICESHIP', 'MATHEMATICS'], [
       { kind: 'unlockBuilding', building: 'UNIVERSITY' },
     ]),
-    T('BANKING', 'Banking', 'Medieval', 390, ['EDUCATION'], [
+    T('BANKING', 'Banking', 'Renaissance', 600, ['EDUCATION', 'STIRRUPS'], [
       { kind: 'unlockBuilding', building: 'BANK' },
     ]),
 
-    T('MASS_PRODUCTION', 'Mass Production', 'Renaissance', 580, ['EDUCATION', 'CONSTRUCTION'], [
+    T('MASS_PRODUCTION', 'Mass Production', 'Renaissance', 600, ['EDUCATION', 'BUTTRESS', 'MILITARY_TACTICS'], [
       { kind: 'unlockBuilding', building: 'SHIPYARD' },
     ]),
-    T('ASTRONOMY', 'Astronomy', 'Renaissance', 580, ['EDUCATION']),
+    T('ASTRONOMY', 'Astronomy', 'Renaissance', 730, ['EDUCATION']),
 
-    T('INDUSTRIALIZATION', 'Industrialization', 'Industrial', 930, ['MASS_PRODUCTION'], [
+    T('INDUSTRIALIZATION', 'Industrialization', 'Industrial', 930, ['SQUARE_RIGGING', 'MASS_PRODUCTION'], [
       { kind: 'unlockBuilding', building: 'FACTORY' },
       { kind: 'improvementYields', improvement: 'MINE', yields: { production: 1 } },
     ]),
-    T('SANITATION', 'Sanitation', 'Industrial', 930, ['MASS_PRODUCTION'], [
+    T('SCIENTIFIC_THEORY', 'Scientific Theory', 'Industrial', 930, ['ASTRONOMY', 'BANKING']),
+    T('SANITATION', 'Sanitation', 'Industrial', 1070, ['SCIENTIFIC_THEORY'], [
       { kind: 'unlockBuilding', building: 'SEWER' },
     ]),
-    T('ECONOMICS', 'Economics', 'Industrial', 930, ['BANKING'], [
+    T('ECONOMICS', 'Economics', 'Industrial', 1070, ['SCIENTIFIC_THEORY', 'METAL_CASTING'], [
       { kind: 'unlockBuilding', building: 'STOCK_EXCHANGE' },
     ]),
-    T('MILITARY_SCIENCE', 'Military Science', 'Industrial', 1070, ['MILITARY_ENGINEERING'], [
+    T('MILITARY_SCIENCE', 'Military Science', 'Industrial', 930, ['SIEGE_TACTICS', 'PRINTING'], [
       { kind: 'unlockBuilding', building: 'MILITARY_ACADEMY' },
     ]),
 
-    T('ELECTRICITY', 'Electricity', 'Modern', 1250, ['INDUSTRIALIZATION'], [
+    T('ELECTRICITY', 'Electricity', 'Modern', 1370, ['STEAM_POWER'], [
       { kind: 'unlockBuilding', building: 'POWER_PLANT' },
       { kind: 'unlockBuilding', building: 'SEAPORT' },
     ]),
-    T('RADIO', 'Radio', 'Modern', 1250, ['INDUSTRIALIZATION'], [
+    T('RADIO', 'Radio', 'Modern', 1370, ['STEAM_POWER', 'FLIGHT'], [
       { kind: 'unlockBuilding', building: 'BROADCAST_CENTER' },
       { kind: 'unlockImprovement', improvement: 'SEASIDE_RESORT' },
     ]),
-    T('CHEMISTRY', 'Chemistry', 'Modern', 1250, ['SANITATION'], [
+    T('CHEMISTRY', 'Chemistry', 'Modern', 1370, ['SANITATION', 'REPLACEABLE_PARTS'], [
       { kind: 'unlockBuilding', building: 'RESEARCH_LAB' },
     ]),
-    T('STEEL', 'Steel', 'Modern', 1370, ['INDUSTRIALIZATION'], [
+    T('STEEL', 'Steel', 'Modern', 1250, ['RIFLING'], [
       { kind: 'unlockImprovement', improvement: 'OIL_WELL' },
     ]),
-    T('REPLACEABLE_PARTS', 'Replaceable Parts', 'Modern', 1370, ['ECONOMICS'], [
+    T('REPLACEABLE_PARTS', 'Replaceable Parts', 'Modern', 1250, ['ECONOMICS'], [
       { kind: 'farmAdjacency' },
     ]),
 
@@ -185,47 +186,51 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('IRON_WORKING', 'Iron Working', 'Classical', 120, ['BRONZE_WORKING']),
     T('SHIPBUILDING', 'Shipbuilding', 'Classical', 200, ['SAILING']),
 
-    T('MACHINERY', 'Machinery', 'Medieval', 275, ['IRON_WORKING']),
-    T('MILITARY_TACTICS', 'Military Tactics', 'Medieval', 275, ['MATHEMATICS']),
-    T('STIRRUPS', 'Stirrups', 'Medieval', 390, ['HORSEBACK_RIDING']),
+    T('MACHINERY', 'Machinery', 'Medieval', 300, ['IRON_WORKING', 'ENGINEERING']),
+    T('BUTTRESS', 'Buttress', 'Medieval', 300, ['SHIPBUILDING', 'MATHEMATICS']),
+    T('MILITARY_TACTICS', 'Military Tactics', 'Medieval', 300, ['MATHEMATICS']),
+    T('STIRRUPS', 'Stirrups', 'Medieval', 390, ['HORSEBACK_RIDING', 'APPRENTICESHIP']),
     T('CASTLES', 'Castles', 'Medieval', 390, ['CONSTRUCTION']),
 
-    T('GUNPOWDER', 'Gunpowder', 'Renaissance', 490, ['MILITARY_ENGINEERING', 'STIRRUPS']),
-    T('METAL_CASTING', 'Metal Casting', 'Renaissance', 500, ['GUNPOWDER']),
-    T('CARTOGRAPHY', 'Cartography', 'Renaissance', 490, ['SHIPBUILDING']),
-    T('PRINTING', 'Printing', 'Renaissance', 490, ['MACHINERY']),
-    T('SQUARE_RIGGING', 'Square Rigging', 'Renaissance', 580, ['CARTOGRAPHY']),
-    T('SIEGE_TACTICS', 'Siege Tactics', 'Renaissance', 580, ['CASTLES']),
+    T('GUNPOWDER', 'Gunpowder', 'Renaissance', 600, ['APPRENTICESHIP', 'STIRRUPS', 'MILITARY_ENGINEERING']),
+    T('METAL_CASTING', 'Metal Casting', 'Renaissance', 730, ['GUNPOWDER']),
+    T('CARTOGRAPHY', 'Cartography', 'Renaissance', 600, ['BUTTRESS']),
+    T('PRINTING', 'Printing', 'Renaissance', 600, ['MACHINERY']),
+    T('SQUARE_RIGGING', 'Square Rigging', 'Renaissance', 730, ['CARTOGRAPHY']),
+    T('SIEGE_TACTICS', 'Siege Tactics', 'Renaissance', 730, ['CASTLES']),
 
-    T('STEAM_POWER', 'Steam Power', 'Industrial', 930, ['INDUSTRIALIZATION', 'SQUARE_RIGGING']),
-    T('BALLISTICS', 'Ballistics', 'Industrial', 1070, ['METAL_CASTING']),
-    T('RIFLING', 'Rifling', 'Industrial', 1250, ['BALLISTICS', 'STEEL']),
+    T('STEAM_POWER', 'Steam Power', 'Industrial', 1070, ['INDUSTRIALIZATION']),
+    T('BALLISTICS', 'Ballistics', 'Industrial', 930, ['METAL_CASTING']),
+    T('RIFLING', 'Rifling', 'Industrial', 1070, ['BALLISTICS', 'MILITARY_SCIENCE']),
 
-    T('FLIGHT', 'Flight', 'Modern', 1250, ['RADIO', 'STEEL']),
-    T('COMBUSTION', 'Combustion', 'Modern', 1250, ['STEAM_POWER', 'RIFLING']),
-    T('REFINING', 'Refining', 'Modern', 1250, ['STEEL']),
-    T('PLASTICS', 'Plastics', 'Modern', 1560, ['COMBUSTION', 'REFINING']),
-    T('ELECTRONICS', 'Electronics', 'Modern', 1560, ['ELECTRICITY', 'RADIO']),
+    T('FLIGHT', 'Flight', 'Modern', 1250, ['INDUSTRIALIZATION', 'SCIENTIFIC_THEORY']),
+    T('COMBUSTION', 'Combustion', 'Modern', 1370, ['STEEL', 'REFINING']),
+    T('REFINING', 'Refining', 'Modern', 1250, ['RIFLING']),
+    T('PLASTICS', 'Plastics', 'Atomic', 1480, ['COMBUSTION']),
 
-    T('COMPUTERS', 'Computers', 'Atomic', 1800, ['ELECTRONICS']),
-    T('NUCLEAR_FISSION', 'Nuclear Fission', 'Atomic', 1800, ['COMBUSTION', 'PLASTICS']),
-    T('ROCKETRY', 'Rocketry', 'Atomic', 1900, ['FLIGHT', 'RADIO'], [
+    T('COMPUTERS', 'Computers', 'Atomic', 1660, ['ELECTRICITY', 'RADIO']),
+    T('NUCLEAR_FISSION', 'Nuclear Fission', 'Atomic', 1660, ['ADVANCED_BALLISTICS', 'COMBINED_ARMS']),
+    T('ROCKETRY', 'Rocketry', 'Atomic', 1480, ['RADIO', 'CHEMISTRY'], [
       { kind: 'unlockDistrict', district: 'SPACEPORT' },
     ]),
-    T('ADVANCED_FLIGHT', 'Advanced Flight', 'Atomic', 1900, ['FLIGHT']),
-    T('COMBINED_ARMS', 'Combined Arms', 'Atomic', 2000, ['STEEL', 'FLIGHT']),
-    T('SYNTHETIC_MATERIALS', 'Synthetic Materials', 'Atomic', 2200, ['PLASTICS']),
+    T('ADVANCED_FLIGHT', 'Advanced Flight', 'Atomic', 1480, ['RADIO']),
+    T('COMBINED_ARMS', 'Combined Arms', 'Atomic', 1480, ['STEEL', 'COMBUSTION']),
+    T('ADVANCED_BALLISTICS', 'Advanced Ballistics', 'Atomic', 1480, ['REPLACEABLE_PARTS', 'STEEL']),
+    T('SYNTHETIC_MATERIALS', 'Synthetic Materials', 'Atomic', 1660, ['PLASTICS']),
+    T('COMPOSITES', 'Composites', 'Information', 1850, ['SYNTHETIC_MATERIALS']),
 
-    T('SATELLITES', 'Satellites', 'Information', 2470, ['ROCKETRY', 'COMPUTERS']),
-    T('GUIDANCE_SYSTEMS', 'Guidance Systems', 'Information', 2470, ['ROCKETRY', 'ADVANCED_FLIGHT']),
-    T('LASERS', 'Lasers', 'Information', 2600, ['NUCLEAR_FISSION']),
-    T('NANOTECHNOLOGY', 'Nanotechnology', 'Information', 2600, ['SYNTHETIC_MATERIALS']),
-    T('NUCLEAR_FUSION', 'Nuclear Fusion', 'Information', 2600, ['LASERS']),
-    T('ROBOTICS', 'Robotics', 'Information', 2470, ['COMPUTERS']),
-    T('TELECOMMUNICATIONS', 'Telecommunications', 'Information', 2600, ['SATELLITES', 'COMPUTERS']),
+    T('SATELLITES', 'Satellites', 'Information', 1850, ['ADVANCED_FLIGHT', 'ROCKETRY']),
+    T('GUIDANCE_SYSTEMS', 'Guidance Systems', 'Information', 1850, ['ROCKETRY', 'ADVANCED_BALLISTICS']),
+    T('LASERS', 'Lasers', 'Information', 1850, ['NUCLEAR_FISSION']),
+    T('NANOTECHNOLOGY', 'Nanotechnology', 'Information', 2155, ['COMPOSITES']),
+    T('NUCLEAR_FUSION', 'Nuclear Fusion', 'Information', 2155, ['LASERS']),
+    T('ROBOTICS', 'Robotics', 'Information', 2155, ['COMPUTERS', 'SATELLITES', 'GUIDANCE_SYSTEMS', 'LASERS']),
+    T('TELECOMMUNICATIONS', 'Telecommunications', 'Information', 1850, ['COMPUTERS']),
 
-    T('OFFWORLD_MISSION', 'Offworld Mission', 'Future', 3200, ['TELECOMMUNICATIONS', 'NUCLEAR_FUSION']),
-    T('SMART_MATERIALS', 'Smart Materials', 'Future', 3200, ['NANOTECHNOLOGY', 'ROBOTICS']),
-    T('ADVANCED_POWER_CELLS', 'Advanced Power Cells', 'Future', 3400, ['NUCLEAR_FUSION']),
+    // CIV6: the Future techs' only published gate is the Future ERA; the
+    // deepest Information-era nodes stand in as prereqs.
+    T('OFFWORLD_MISSION', 'Offworld Mission', 'Future', 2500, ['TELECOMMUNICATIONS', 'NUCLEAR_FUSION']),
+    T('SMART_MATERIALS', 'Smart Materials', 'Future', 2200, ['NANOTECHNOLOGY', 'ROBOTICS']),
+    T('ADVANCED_POWER_CELLS', 'Advanced Power Cells', 'Future', 2200, ['NUCLEAR_FUSION']),
   ].map((t) => [t.id, t]),
 );

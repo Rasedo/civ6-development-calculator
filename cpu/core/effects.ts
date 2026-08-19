@@ -122,7 +122,7 @@ export interface Modifiers {
   amenitiesIfSpecialty: { min: number; amenities: number }[];
   newDeal: { min: number; housing: number; amenities: number }[];
   tilePurchaseMult: number;
-  encampmentProdMult: number;
+  encampHarborProdMult: number;
   yieldMult: Partial<Yields>;
   featureYields: Partial<Record<string, Partial<Yields>>>;
   improvementOnResource: { category: ResourceCategory; yields: Partial<Yields> }[];
@@ -152,7 +152,7 @@ export function defaultModifiers(): Modifiers {
     amenitiesIfSpecialty: [],
     newDeal: [],
     tilePurchaseMult: 1,
-    encampmentProdMult: 1,
+    encampHarborProdMult: 1,
     yieldMult: {},
     featureYields: {},
     improvementOnResource: [],
@@ -190,7 +190,7 @@ function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.amenitiesIfSpecialty) mods.amenitiesIfSpecialty.push(fx.amenitiesIfSpecialty);
   if (fx.newDeal) mods.newDeal.push(fx.newDeal);
   if (fx.tilePurchaseMult) mods.tilePurchaseMult *= fx.tilePurchaseMult;
-  if (fx.encampmentProdMult) mods.encampmentProdMult *= fx.encampmentProdMult;
+  if (fx.encampHarborProdMult) mods.encampHarborProdMult *= fx.encampHarborProdMult;
   for (const [k, m] of Object.entries(fx.yieldMult ?? {})) {
     const key = k as keyof Yields;
     mods.yieldMult[key] = (mods.yieldMult[key] ?? 1) * (m ?? 1);

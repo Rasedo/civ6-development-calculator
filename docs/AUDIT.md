@@ -55,11 +55,11 @@ nothing carries forward.
 | B-24r Ages/governors | 2 | four system-less dedication entries, dark-age policies, governor promotions, per-civ era drift |
 | B-30r specialists | 6 | a mechanic neither engine has: wire column, assignment, yields |
 | B-31r trade-route tails | 6 | a Trader UNIT and a route wire verb |
-| B-D unsourced data values | 5 | a residual CLASS: every invented magnitude, re-sourced |
+| B-D unsourced data values | 1 | swept; residuals are NAMED stylizations, each labelled at its definition |
 | B-35r theological damage | 1 | deterministic and LINEAR where real Civ 6 rolls; the martyr draw shows a mirrored conditional draw is available |
 | B-34r flood tails | 1 | GS floods also damage UNITS and kill citizens, and a centre on a floodplain loses HP; and the Dam/Great Bath that mitigates a river is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **35** | |
-| **OPEN, TOTAL** | **35** | |
+| **B. Fidelity vs real Civ 6** | **31** | |
+| **OPEN, TOTAL** | **31** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -167,23 +167,24 @@ Civ 6 source or is recorded as unverifiable.
   (2) No seat's wire carries a trade-route DECISION: route creation is an
   eager rule on both engines, where a real player spends a Trader on a
   chosen pair. A route verb is P8-surface work.
-- **B-D. UNSOURCED DATA VALUES — a residual class, not one item.**
-  Mechanics are sourced item by item; the DATA layer largely is not, and a
-  wrong CONSTANT passes every gate because both engines agree on the wrong
-  number. THE LIVE CENSUS, re-counted by grepping `eyeballed` /
-  `approximate` / `stand-in` / `unsourced` over cpu/data: 7 markers over 3
-  files — `builtWonders` (costs, plus three stand-in unlock techs:
-  CELESTIAL_NAVIGATION for Shipbuilding, EDUCATION for Printing, ASTRONOMY
-  for Scientific Theory, each of which moves WHEN a wonder unlocks, not
-  just its price), `policies` (numbers, plus stand-in inherent bonuses
-  "where the real one needs systems we don't model"), and `units` (costs).
-  `improvements` matches the grep only because its header states the
-  opposite — every yield sourced to the GS Civilopedia, no markers left.
-  THE MARKERS ARE A FLOOR, NOT THE CLASS: the comment purge deleted most of
-  the old ones along with the prose around them, so the sweep has to walk
-  cpu/data file by file, check each magnitude against a real Civ 6 source,
-  and either correct it or record it as a deliberate stylization —
-  re-marking as it goes, which is what makes the class shrinkable again.
+- **B-D. UNSOURCED DATA VALUES — swept; named stylizations remain.**
+  The full cpu/data walk fetched every magnitude from the GS Civilopedia
+  row by row: all 28 wonders (12 corrected, every unlock now the real
+  tech/civic), every unit, every technology and every civic (era, cost,
+  prereqs — both trees were systematically off and now match the real
+  tree, with BUTTRESS, SCIENTIFIC_THEORY, ADVANCED_BALLISTICS, COMPOSITES
+  and the SCORCHED_EARTH civic entering, and ELECTRONICS deleted as not a
+  GS node), every building (costs; worship faith price 380), and every
+  policy card with a live effect. What remains is RECORDED, not unsourced,
+  each labelled at its definition: GAME_SPEED 0.6 (the one global speed
+  stylization), the POWERED-yield splits (GS puts part of late building
+  yields behind POWER, unmodeled — the vanilla flat yields stand in,
+  sourced from the standard-rules Civilopedia, incl. the generic
+  POWER_PLANT for the coal/oil/nuclear family), the GOVERNMENTS' inherent
+  bonuses and inert policy one-liners (`policies` header), the BELIEF
+  magnitudes (`religion` header), Monument's loyalty term and Lighthouse's
+  per-coast-tile food (flat stand-ins), and the deliberate tuning
+  constants in `seats` (its header names them).
 
 ## Recorded deviations — decided, sourced, and NOT open work
 
@@ -258,10 +259,10 @@ three of them overturned what this section used to assert:
   world, so the solo-game arm cannot be validated by the gate — named here
   so nobody hunts for it.
 
-STILL UNVERIFIED data, and NOT changed on a guess: our feature-removal
-techs are Woods -> Mining and Marsh -> Irrigation (Rainforest -> Bronze
-Working checks out against a real source); both are load-bearing for
-district placement, so the B-D sweep should source them first.
+The feature-removal techs are VERIFIED against the GS Civilopedia tech
+pages: Mining "Allows chopping of Woods", Irrigation "Allows clearing of
+Marsh", Bronze Working "Allows chopping of Rainforest" — all three as
+implemented.
 
 Hunt discipline: scripted-reachability first (the digest gate names the
 turn), checkpoint-bracket from the nearest earlier checkpoint (validate a

@@ -540,7 +540,7 @@ class SimSeats:
             (alive_row & (self.city_current[:, row] == self.SETTLER)).sum(dim=1),
         )
 
-    def _seat_buy_ladder(self, row: int, active: torch.Tensor) -> None:
+    def _seat_buy_ladder(self, row: int, active: torch.Tensor, army0: torch.Tensor) -> None:
         """THE gold/faith spending block for seat row `row`, at the seatPhase
         position (after the production picks, before the trade block) — ONE
         body every seat runs.
@@ -604,7 +604,7 @@ class SimSeats:
                 self.city_pop[bidx, row, spawn_slot] = torch.where(landed_s, (_pop_col - 1).clamp(min=1), _pop_col)
                 bought = bought | landed_s
         if kind is not None:
-            want_u = active & ext & ~bought & (kind == 2) & (self._seat_army_count(row) < 2 * n_cities)
+            want_u = active & ext & ~bought & (kind == 2) & (army0 < 2 * n_cities)
             if bool(want_u.any()):
                 cand_u = self._seat_buy_unit_candidates(row, self._seat_trainable_units(row))
                 elig_u = want_u & cand_u.any(dim=1)
@@ -1919,8 +1919,8 @@ class SimSeats:
         if self._gov_has_effects:
             gm = self._gov_mods(row)
             housing = housing + gm[2].double().unsqueeze(1)
-            all_d, spec_d = self._district_counts(row)
-            housing = housing + self._cond_house_amen(gm[8], gm[9], all_d, spec_d)[0]
+            spec_d = self._district_counts(row)[1]
+            housing = housing + self._cond_house_amen(gm[8], gm[9], spec_d)[0]
         return maint, torch.where(alive, housing, torch.zeros_like(housing))
 
     def _seat_amenity(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -1960,8 +1960,8 @@ class SimSeats:
         if self._gov_has_effects:
             _gm = self._gov_mods(row)
             _g_amen, _g_hid, _g_nd = _gm[7], _gm[8], _gm[9]
-            _all_d, _spec_d = self._district_counts(row)
-            _, _cond_amen = self._cond_house_amen(_g_hid, _g_nd, _all_d, _spec_d)
+            _spec_d = self._district_counts(row)[1]
+            _, _cond_amen = self._cond_house_amen(_g_hid, _g_nd, _spec_d)
             have = have + _g_amen.unsqueeze(1) + _cond_amen
         # Regional WONDER amenities (Great Bath / Alhambra / Colosseum) join the
         # TIER balance after the grant — city.ts leaves them out of baseHave.

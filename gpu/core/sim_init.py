@@ -822,10 +822,11 @@ class SimInit:
         self.CAMPUS = int(sc.get("campusIdx", 0))
         self.campus_unlock_tech = int(sc.get("campusUnlockTech", -1))  # WRITING
         self._scaffold = [(int(p["idx"]), int(p["unlockTech"]), int(p.get("unlockCivic", -1)), int(p.get("placement", 0)), int(p.get("fixedCost", -1))) for p in sc.get("place", [])]  # (district idx, unlock tech idx, unlock CIVIC idx — at most one of the two >= 0, placement: 0 land / 1 aqueduct / 2 coastal / 3 encampment / 4 flat, fixed cost or -1 = the research curve)
-        # VETERANCY's encampmentProdMult needs the ENCAMPMENT district idx and
-        # its scaffold slot (the queue head codes for the district and its
-        # buildings — cpu/core/game.ts isEncampmentItem).
+        # VETERANCY's encampHarborProdMult needs the ENCAMPMENT and HARBOR
+        # district idxs and scaffold slots (the queue head codes for the
+        # district and its buildings — cpu/core/game.ts isEncampHarborItem).
         self._encamp_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "ENCAMPMENT"), -1)
+        self._harbor_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HARBOR"), -1)
         # Districts that LOWER neighbouring appeal (cpu/core/appeal.ts), and the
         # NEIGHBORHOOD column whose housing reads the appeal tier.
         self._appeal_bad_dist = [
@@ -836,6 +837,7 @@ class SimInit:
         self._appeal_cuts = [(4, 6), (2, 5), (-1, 4), (-3, 3)]
         self._appeal_floor = 2
         self._encamp_si = next((si for si, (di, _ut, _uc, _plc, _fc) in enumerate(self._scaffold) if di == self._encamp_didx), -1)
+        self._harbor_si = next((si for si, (di, _ut, _uc, _plc, _fc) in enumerate(self._scaffold) if di == self._harbor_didx), -1)
         self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
         # The seat-0 diplomacy head (declareWar / sueForPeace on a civ). While
         # False, war_mask() is all-False and step(war=…) is ignored, so nothing
@@ -885,13 +887,12 @@ class SimInit:
             # (MERCHANT_REPUBLIC gold, THEOCRACY faith, DEMOCRACY culture,
             # COMMUNISM production).
             self._gov_ymult = torch.tensor([[float(x) for x in g.get("yieldMult", [1] * 6)] for g in _govs], dtype=dtype, device=device)  # [nGov,6]
-            self._gov_encamp = torch.tensor([float(g.get("encampmentProdMult", 1)) for g in _govs], dtype=dtype, device=device)  # [nGov] channel-complete; no government carries it
+            self._gov_ehprod = torch.tensor([float(g.get("encampHarborProdMult", 1)) for g in _govs], dtype=dtype, device=device)  # [nGov] channel-complete; no government carries it
             self._gov_tpmult = torch.tensor([float(g.get("tilePurchaseMult", 1)) for g in _govs], dtype=dtype, device=device)  # [nGov]
             # The amenity + district-conditional channels, applied for EVERY
             # seat (computeHousing / computeCityStats). newDeal carries housing
-            # AND amenities on one
-            # specialty threshold; housingIfDistricts counts ALL completed
-            # districts.
+            # AND amenities; both it and housingIfDistricts key on SPECIALTY
+            # district counts.
             self._gov_amen = torch.tensor([float(g.get("amenitiesAll", 0)) for g in _govs], dtype=dtype, device=device)
             _ghid = [g.get("housingIfDistricts", [-1, 0]) for g in _govs]
             self._gov_hid_min = torch.tensor([int(x[0]) for x in _ghid], dtype=torch.long, device=device)
@@ -908,13 +909,13 @@ class SimInit:
             self._pol_cap_y = torch.tensor([[float(x) for x in p["capitalYields"]] for p in _pols], dtype=dtype, device=device)
             self._pol_housing = torch.tensor([float(p.get("housingAll", 0)) for p in _pols], dtype=dtype, device=device)  # [nPol]
             # housingIfDistricts (INSULAE {min 2, +1}): +housing to a city with
-            # >= min completed districts.
+            # >= min completed SPECIALTY districts.
             _hid = [p.get("housingIfDistricts", [-1, 0]) for p in _pols]
             self._pol_hid_min = torch.tensor([int(x[0]) for x in _hid], dtype=torch.long, device=device)  # [nPol] (-1 = none)
             self._pol_hid_house = torch.tensor([float(x[1]) for x in _hid], dtype=dtype, device=device)  # [nPol]
-            # VETERANCY: a production multiplier toward the Encampment district
-            # and its buildings (cpu/core/game.ts isEncampmentItem).
-            self._pol_encamp = torch.tensor([float(p.get("encampmentProdMult", 1)) for p in _pols], dtype=dtype, device=device)  # [nPol]
+            # VETERANCY: a production multiplier toward Encampment and Harbor
+            # items (cpu/core/game.ts isEncampHarborItem).
+            self._pol_ehprod = torch.tensor([float(p.get("encampHarborProdMult", 1)) for p in _pols], dtype=dtype, device=device)  # [nPol]
             self._pol_tpmult = torch.tensor([float(p.get("tilePurchaseMult", 1)) for p in _pols], dtype=dtype, device=device)  # [nPol] (LAND_SURVEYORS = 0.8)
             self._pol_amen = torch.tensor([float(p.get("amenitiesAll", 0)) for p in _pols], dtype=dtype, device=device)
             _pnd = [p.get("newDeal", [-1, 0, 0]) for p in _pols]
@@ -927,8 +928,8 @@ class SimInit:
         # False the tables load but change nothing.
         self._gov_live = bool(getattr(rules, "governments_live", False))
         self._gov_has_effects = self._gov_live and bool(
-            (self._ngov and float(self._gov_city_y.abs().sum() + self._gov_cap_y.abs().sum() + self._gov_housing.abs().sum() + (self._gov_ymult - 1).abs().sum() + (self._gov_encamp - 1).abs().sum() + (self._gov_tpmult - 1).abs().sum()) > 0)
-            or (self._npol and float(self._pol_city_y.abs().sum() + self._pol_cap_y.abs().sum() + self._pol_housing.abs().sum() + self._pol_hid_house.abs().sum() + (self._pol_encamp - 1).abs().sum() + (self._pol_tpmult - 1).abs().sum()) > 0)
+            (self._ngov and float(self._gov_city_y.abs().sum() + self._gov_cap_y.abs().sum() + self._gov_housing.abs().sum() + (self._gov_ymult - 1).abs().sum() + (self._gov_ehprod - 1).abs().sum() + (self._gov_tpmult - 1).abs().sum()) > 0)
+            or (self._npol and float(self._pol_city_y.abs().sum() + self._pol_cap_y.abs().sum() + self._pol_housing.abs().sum() + self._pol_hid_house.abs().sum() + (self._pol_ehprod - 1).abs().sum() + (self._pol_tpmult - 1).abs().sum()) > 0)
         )
         self._harbor_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HARBOR"), -1)
         self._hs_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HOLY_SITE"), -1)

@@ -408,11 +408,11 @@ export function buildingPurchaseCost(buildingId: string): number {
   return (BUILDINGS[buildingId]?.cost ?? 0) * GOLD_PURCHASE_MULT;
 }
 
-/** Faith price of a worship building. Real Civ 6 charges a FLAT
- * 190 faith for worship buildings (speed-scaled like every other cost);
+/** Faith price of a worship building. CIV6 (GS Civilopedia, Cathedral):
+ * a FLAT 380 faith at standard speed (speed-scaled like every other cost);
  * anything else keeps the production×mult schedule. */
 export function buildingFaithCost(buildingId: string): number {
-  if (BUILDINGS[buildingId]?.worship) return Math.round(190 * GAME_SPEED);
+  if (BUILDINGS[buildingId]?.worship) return Math.round(380 * GAME_SPEED);
   return (BUILDINGS[buildingId]?.cost ?? 0) * FAITH_PURCHASE_MULT;
 }
 
@@ -655,10 +655,13 @@ export function setSpecialists(
   return { ok: true };
 }
 
-export function isEncampmentItem(item: QueueItem): boolean {
-  if (item.kind === 'district') return item.district === 'ENCAMPMENT';
+/** CIV6 (Veterancy): "+30% Production toward Encampment districts, Harbor
+ * districts, and buildings for these districts." */
+export function isEncampHarborItem(item: QueueItem): boolean {
+  if (item.kind === 'district') return item.district === 'ENCAMPMENT' || item.district === 'HARBOR';
   if (item.kind !== 'building') return false;
-  return BUILDINGS[item.building]?.district === 'ENCAMPMENT';
+  const d = BUILDINGS[item.building]?.district;
+  return d === 'ENCAMPMENT' || d === 'HARBOR';
 }
 
 

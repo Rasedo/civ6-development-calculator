@@ -1,10 +1,11 @@
 /**
  * World wonders (base-game subset whose effects fit the modeled systems).
- * One per world; they occupy a tile like a district. Costs/effects are
- * SOURCING SWEEP, spot-checked against the GS CIVILOPEDIA by
- * direct fetch: PYRAMIDS 220 Production and GREAT_LIBRARY 400 Production are
- * both CORRECT as written. The remaining wonder COSTS are not individually
- * fetched, and the EFFECTS are not swept at all — NARROWED marker.
+ * One per world; they occupy a tile like a district. COSTS AND UNLOCKS
+ * SOURCED: all 28 rows fetched one by one from the GS Civilopedia — every
+ * cost and every requiresTech/requiresCivic is the real one (BUTTRESS and
+ * SCIENTIFIC_THEORY entered the tech tree to carry Hagia Sophia and Oxford
+ * University). The EFFECTS are not swept, and PLACEMENT rules are eyeballed
+ * where the real rule needs unmodeled terrain — NARROWED marker.
  *
  * SOURCED RESIDUAL noticed in the same pass: the real GREAT_LIBRARY carries
  * "+2 Great Works of Writing slots" on top of its yields. This model has no
@@ -12,8 +13,6 @@
  * GW_BUILDINGS in data/greatPeople.ts), so a wonder that adds slots is
  * unmodeled. Recorded, not fixed.
  *
- * eyeballed base Civ 6; a few unlock techs are stand-ins where the real
- * unlock isn't in our compact tree (noted inline).
  */
 
 import type { DistrictId, TerrainId, Yields } from '../core/types';
@@ -129,7 +128,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       name: 'Colossus',
       code: 'CS',
       cost: 400,
-      requiresTech: 'CELESTIAL_NAVIGATION', // stand-in for Shipbuilding
+      requiresTech: 'SHIPBUILDING',
       placement: { onCoastalWater: true, adjacentDistrict: 'HARBOR' },
       cityYields: { gold: 3 },
       description: '+3 gold. Coastal water adjacent to a Harbor.',
@@ -138,7 +137,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       id: 'GREAT_ZIMBABWE',
       name: 'Great Zimbabwe',
       code: 'GZ',
-      cost: 680,
+      cost: 920,
       requiresTech: 'BANKING',
       placement: { flatOnly: true, adjacentDistrict: 'COMMERCIAL_HUB' },
       cityYields: { gold: 5 },
@@ -149,7 +148,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       name: 'Forbidden City',
       code: 'FC',
       cost: 920,
-      requiresTech: 'EDUCATION', // stand-in for Printing
+      requiresTech: 'PRINTING',
       placement: { flatOnly: true, adjacentDistrict: 'CITY_CENTER' },
       cityYields: { culture: 5 },
       effects: { extraWildcardSlot: true },
@@ -159,8 +158,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       id: 'OXFORD_UNIVERSITY',
       name: 'Oxford University',
       code: 'OX',
-      cost: 1450,
-      requiresTech: 'ASTRONOMY', // stand-in for Scientific Theory
+      cost: 1240,
+      requiresTech: 'SCIENTIFIC_THEORY',
       placement: { flatOnly: true, adjacentDistrict: 'CAMPUS' },
       cityYields: { science: 3 },
       effects: { cityYieldMult: { science: 1.1 } },
@@ -170,7 +169,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       id: 'RUHR_VALLEY',
       name: 'Ruhr Valley',
       code: 'RV',
-      cost: 1450,
+      cost: 1240,
       requiresTech: 'INDUSTRIALIZATION',
       placement: { requiresRiver: true, adjacentDistrict: 'INDUSTRIAL_ZONE' },
       effects: { cityYieldMult: { production: 1.2 } },
@@ -196,7 +195,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       description: '+4 food. (Real per-Camp/Pasture/Plantation amenities dropped — no channel.)',
     }),
     W({
-      id: 'GREAT_BATH', name: 'Great Bath', code: 'GT', cost: 90,
+      id: 'GREAT_BATH', name: 'Great Bath', code: 'GT', cost: 180,
       requiresTech: 'POTTERY', placement: { requiresRiver: true },
       cityYields: { faith: 1 }, effects: { regionalAmenities: 1 },
       description: '+1 faith, +1 regional amenity. (Housing + flood protection dropped.)',
@@ -214,8 +213,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       description: '+2 culture. (Envoys-on-wonder-build dropped — no channel.)',
     }),
     W({
-      id: 'MAUSOLEUM_AT_HALICARNASSUS', name: 'Mausoleum at Halicarnassus', code: 'MH', cost: 290,
-      requiresTech: 'CELESTIAL_NAVIGATION', placement: { flatOnly: true, adjacentDistrict: 'HARBOR' },
+      id: 'MAUSOLEUM_AT_HALICARNASSUS', name: 'Mausoleum at Halicarnassus', code: 'MH', cost: 400,
+      requiresCivic: 'DEFENSIVE_TACTICS', placement: { flatOnly: true, adjacentDistrict: 'HARBOR' },
       cityYields: { science: 1, faith: 1, culture: 1 },
       description: '+1 science/faith/culture. (Free Great Engineer/Admiral charges dropped.)',
     }),
@@ -227,8 +226,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       description: '+2 regional amenities. (Military policy slot + defense dropped; Encampment adjacency is required.)',
     }),
     W({
-      id: 'HAGIA_SOPHIA', name: 'Hagia Sophia', code: 'HS', cost: 540,
-      requiresCivic: 'THEOLOGY', placement: { flatOnly: true, adjacentDistrict: 'HOLY_SITE' },
+      id: 'HAGIA_SOPHIA', name: 'Hagia Sophia', code: 'HS', cost: 710,
+      requiresTech: 'BUTTRESS', placement: { flatOnly: true, adjacentDistrict: 'HOLY_SITE' },
       cityYields: { faith: 4 },
       description: '+4 faith. (Missionary/Apostle spread bonus dropped.)',
     }),
@@ -257,39 +256,39 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       description: '+3 faith, +1 culture. (Relic slots + tundra-yield bonus dropped.)',
     }),
     W({
-      id: 'TAJ_MAHAL', name: 'Taj Mahal', code: 'TM', cost: 850,
+      id: 'TAJ_MAHAL', name: 'Taj Mahal', code: 'TM', cost: 920,
       requiresCivic: 'HUMANISM', placement: { requiresRiver: true },
       cityYields: { faith: 2, culture: 2 },
       description: '+2 faith, +2 culture. (Era-score-on-completion bonus dropped.)',
     }),
     W({
-      id: 'POTALA_PALACE', name: 'Potala Palace', code: 'PP', cost: 1450,
+      id: 'POTALA_PALACE', name: 'Potala Palace', code: 'PP', cost: 1060,
       requiresTech: 'ASTRONOMY', placement: { hillsOnly: true },
       cityYields: { science: 2, faith: 1 },
       description: '+2 science, +1 faith. (Diplomatic policy slot dropped.)',
     }),
 
     W({
-      id: 'HERMITAGE', name: 'Hermitage', code: 'HM', cost: 1200,
+      id: 'HERMITAGE', name: 'Hermitage', code: 'HM', cost: 1450,
       requiresCivic: 'NATURAL_HISTORY', placement: { flatOnly: true, adjacentDistrict: 'THEATER_SQUARE' },
       cityYields: { culture: 3 },
       description: '+3 culture. (Great Work of Art slots dropped — Great-Works surface is Slice Q.)',
     }),
     W({
-      id: 'BOLSHOI_THEATRE', name: 'Bolshoi Theatre', code: 'BT', cost: 1450,
+      id: 'BOLSHOI_THEATRE', name: 'Bolshoi Theatre', code: 'BT', cost: 1240,
       requiresCivic: 'OPERA_AND_BALLET', placement: { flatOnly: true, adjacentDistrict: 'THEATER_SQUARE' },
       cityYields: { culture: 3 },
       description: '+3 culture. (Great Writer/Musician points + Work slots dropped.)',
     }),
     W({
-      id: 'STATUE_OF_LIBERTY', name: 'Statue of Liberty', code: 'SL', cost: 1450,
-      requiresTech: 'ELECTRICITY', placement: { flatOnly: true, adjacentDistrict: 'HARBOR' },
+      id: 'STATUE_OF_LIBERTY', name: 'Statue of Liberty', code: 'SL', cost: 1240,
+      requiresCivic: 'CIVIL_ENGINEERING', placement: { flatOnly: true, adjacentDistrict: 'HARBOR' },
       cityYields: { culture: 3 },
       description: '+3 culture. (Free-Great-Person + loyalty ability dropped.)',
     }),
     W({
-      id: 'CRISTO_REDENTOR', name: 'Cristo Redentor', code: 'CR', cost: 1600,
-      requiresTech: 'RADIO', placement: { hillsOnly: true },
+      id: 'CRISTO_REDENTOR', name: 'Cristo Redentor', code: 'CR', cost: 1620,
+      requiresCivic: 'MASS_MEDIA', placement: { hillsOnly: true },
       cityYields: { culture: 4 },
       description: '+4 culture. (Tourism / appeal ability dropped — no channel.)',
     }),

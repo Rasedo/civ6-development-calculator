@@ -79,7 +79,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     ]),
     // MARTYRDOM: real Civ 6 unlock is a religious civic; placed on Theology
     // (repo tags the card 'diplomatic' — a pre-existing kind approximation).
-    C('THEOLOGY', 'Theology', 'Classical', 120, ['MYSTICISM'], [
+    C('THEOLOGY', 'Theology', 'Classical', 120, ['DRAMA_AND_POETRY', 'MYSTICISM'], [
       { kind: 'unlockBuilding', building: 'TEMPLE' },
       { kind: 'unlockPolicy', policy: 'SCRIPTURE' },
       { kind: 'unlockPolicy', policy: 'MARTYRDOM' },
@@ -87,42 +87,42 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('RECORDED_HISTORY', 'Recorded History', 'Classical', 175, ['POLITICAL_PHILOSOPHY', 'DRAMA_AND_POETRY'], [
       { kind: 'unlockPolicy', policy: 'NATURAL_PHILOSOPHY' },
     ]),
-    C('NAVAL_TRADITION', 'Naval Tradition', 'Classical', 200, ['GAMES_AND_RECREATION'], [
+    C('NAVAL_TRADITION', 'Naval Tradition', 'Medieval', 220, ['DEFENSIVE_TACTICS'], [
       { kind: 'unlockPolicy', policy: 'NAVAL_INFRASTRUCTURE' },
     ]),
 
-    C('FEUDALISM', 'Feudalism', 'Medieval', 275, ['THEOLOGY'], [
+    C('FEUDALISM', 'Feudalism', 'Medieval', 300, ['DEFENSIVE_TACTICS'], [
       { kind: 'farmAdjacency' },
       { kind: 'unlockPolicy', policy: 'FEUDAL_CONTRACT' },
       { kind: 'unlockPolicy', policy: 'SERFDOM' },
     ]),
-    C('CIVIL_SERVICE', 'Civil Service', 'Medieval', 275, ['RECORDED_HISTORY'], []),
-    C('GUILDS', 'Guilds', 'Medieval', 385, ['FEUDALISM', 'CIVIL_SERVICE'], [
+    C('CIVIL_SERVICE', 'Civil Service', 'Medieval', 300, ['DEFENSIVE_TACTICS', 'RECORDED_HISTORY'], []),
+    C('GUILDS', 'Guilds', 'Medieval', 420, ['FEUDALISM', 'CIVIL_SERVICE'], [
       { kind: 'unlockPolicy', policy: 'TOWN_CHARTERS' },
       { kind: 'unlockPolicy', policy: 'CRAFTSMEN' },
     ]),
-    C('MEDIEVAL_FAIRES', 'Medieval Faires', 'Medieval', 385, ['GUILDS'], [
+    C('MEDIEVAL_FAIRES', 'Medieval Faires', 'Medieval', 420, ['FEUDALISM'], [
       { kind: 'unlockPolicy', policy: 'AESTHETICS' },
     ]),
-    C('DIVINE_RIGHT', 'Divine Right', 'Medieval', 385, ['CIVIL_SERVICE'], [
+    C('DIVINE_RIGHT', 'Divine Right', 'Medieval', 340, ['CIVIL_SERVICE', 'THEOLOGY'], [
       { kind: 'unlockGovernment', government: 'MONARCHY' },
       { kind: 'unlockPolicy', policy: 'MEDINA_QUARTER' },
       { kind: 'unlockPolicy', policy: 'CHIVALRY' },
       { kind: 'unlockPolicy', policy: 'GOTHIC_ARCHITECTURE' },
     ]),
 
-    C('EXPLORATION', 'Exploration', 'Renaissance', 400, ['MEDIEVAL_FAIRES'], [
+    C('EXPLORATION', 'Exploration', 'Renaissance', 440, ['MERCENARIES', 'MEDIEVAL_FAIRES'], [
       { kind: 'unlockGovernment', government: 'MERCHANT_REPUBLIC' },
     ]),
     // GRAND_MASTERS_CHAPEL: SUBSTITUTION — real Civ 6 Grand Master's Chapel is
     // a Government-Plaza BUILDING (faith buys military), not a civic card.
     // Placed on Reformed Church, the closest religious-Renaissance civic.
-    C('REFORMED_CHURCH', 'Reformed Church', 'Renaissance', 400, ['DIVINE_RIGHT'], [
+    C('REFORMED_CHURCH', 'Reformed Church', 'Renaissance', 440, ['GUILDS', 'DIVINE_RIGHT'], [
       { kind: 'unlockGovernment', government: 'THEOCRACY' },
       { kind: 'unlockPolicy', policy: 'SIMULTANEUM' },
       { kind: 'unlockPolicy', policy: 'GRAND_MASTERS_CHAPEL' },
     ]),
-    C('HUMANISM', 'Humanism', 'Renaissance', 540, ['MEDIEVAL_FAIRES'], [
+    C('HUMANISM', 'Humanism', 'Renaissance', 600, ['MEDIEVAL_FAIRES', 'GUILDS'], [
       { kind: 'unlockBuilding', building: 'MUSEUM' },
       // Real Civ 6 unlocks BOTH museums with Humanism — the Art Museum and
       // the Archaeological Museum are the same choice point. A building with
@@ -133,45 +133,44 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockBuilding', building: 'ARCHAEOLOGICAL_MUSEUM' },
       { kind: 'unlockPolicy', policy: 'GRAND_OPERA' },
     ]),
-    C('ENLIGHTENMENT', 'The Enlightenment', 'Renaissance', 655, ['HUMANISM'], [
+    C('ENLIGHTENMENT', 'The Enlightenment', 'Renaissance', 720, ['HUMANISM', 'DIPLOMATIC_SERVICE'], [
       { kind: 'unlockPolicy', policy: 'RATIONALISM' },
       { kind: 'unlockPolicy', policy: 'FREE_MARKETS' },
       { kind: 'unlockPolicy', policy: 'LIBERALISM' },
     ]),
 
-    C('CIVIL_ENGINEERING', 'Civil Engineering', 'Industrial', 920, ['ENLIGHTENMENT'], [
+    C('CIVIL_ENGINEERING', 'Civil Engineering', 'Industrial', 1010, ['MERCANTILISM'], [
       { kind: 'hillFarms' },
       { kind: 'unlockPolicy', policy: 'PUBLIC_WORKS' },
       { kind: 'unlockPolicy', policy: 'SKYSCRAPERS' },
     ]),
     // ELITE_FORCES: best-known real unlock is an Industrial-era civic; placed on
     // Nationalism (repo tags the card 'military'; real Civ 6 slot is wildcard).
-    C('NATIONALISM', 'Nationalism', 'Industrial', 920, ['ENLIGHTENMENT'], [
+    C('NATIONALISM', 'Nationalism', 'Industrial', 1010, ['ENLIGHTENMENT'], [
       { kind: 'unlockPolicy', policy: 'ELITE_FORCES' },
     ]),
-    C('NATURAL_HISTORY', 'Natural History', 'Industrial', 870, ['ENLIGHTENMENT'], [
+    C('NATURAL_HISTORY', 'Natural History', 'Industrial', 1050, ['COLONIALISM'], [
       { kind: 'unlockBuilding', building: 'ZOO' },
     ]),
-    C('URBANIZATION', 'Urbanization', 'Industrial', 1060, ['CIVIL_ENGINEERING', 'NATIONALISM'], [
+    C('URBANIZATION', 'Urbanization', 'Industrial', 1210, ['CIVIL_ENGINEERING', 'NATIONALISM'], [
       { kind: 'unlockDistrict', district: 'NEIGHBORHOOD' },
     ]),
 
-    C('MASS_MEDIA', 'Mass Media', 'Modern', 1410, ['URBANIZATION']),
-    C('PROFESSIONAL_SPORTS', 'Professional Sports', 'Modern', 1480, ['URBANIZATION'], [
+    C('MASS_MEDIA', 'Mass Media', 'Modern', 1540, ['NATURAL_HISTORY', 'URBANIZATION']),
+    C('PROFESSIONAL_SPORTS', 'Professional Sports', 'Atomic', 2185, ['IDEOLOGY'], [
       { kind: 'unlockBuilding', building: 'STADIUM' },
     ]),
-    C('SUFFRAGE', 'Suffrage', 'Modern', 1715, ['MASS_MEDIA'], [
+    C('SUFFRAGE', 'Suffrage', 'Modern', 1640, ['IDEOLOGY'], [
       { kind: 'unlockGovernment', government: 'DEMOCRACY' },
       { kind: 'unlockPolicy', policy: 'NEW_DEAL' },
       { kind: 'unlockPolicy', policy: 'ECONOMIC_UNION' },
     ]),
-    C('CLASS_STRUGGLE', 'Class Struggle', 'Modern', 1715, ['MASS_MEDIA'], [
+    C('CLASS_STRUGGLE', 'Class Struggle', 'Modern', 1640, ['IDEOLOGY'], [
       { kind: 'unlockGovernment', government: 'COMMUNISM' },
       { kind: 'unlockPolicy', policy: 'FIVE_YEAR_PLAN' },
     ]),
-    C('TOTALITARIANISM', 'Totalitarianism', 'Modern', 1715, ['MASS_MEDIA'], [
+    C('TOTALITARIANISM', 'Totalitarianism', 'Modern', 1640, ['IDEOLOGY'], [
       { kind: 'unlockGovernment', government: 'FASCISM' },
-      { kind: 'unlockPolicy', policy: 'TOTAL_WAR' },
     ]),
 
 
@@ -180,45 +179,51 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockPolicy', policy: 'BASTIONS' },
     ]),
 
-    C('MERCENARIES', 'Mercenaries', 'Medieval', 385, ['FEUDALISM']),
+    C('MERCENARIES', 'Mercenaries', 'Medieval', 340, ['MILITARY_TRAINING', 'FEUDALISM']),
 
-    C('MERCANTILISM', 'Mercantilism', 'Renaissance', 655, ['HUMANISM'], [
+    C('MERCANTILISM', 'Mercantilism', 'Renaissance', 720, ['HUMANISM'], [
       { kind: 'unlockPolicy', policy: 'FREE_TRADE' },
     ]),
-    C('DIPLOMATIC_SERVICE', 'Diplomatic Service', 'Renaissance', 655, ['EXPLORATION']),
+    C('DIPLOMATIC_SERVICE', 'Diplomatic Service', 'Renaissance', 600, ['GUILDS']),
 
-    C('OPERA_AND_BALLET', 'Opera and Ballet', 'Industrial', 870, ['HUMANISM']),
-    C('COLONIALISM', 'Colonialism', 'Industrial', 920, ['MERCANTILISM']),
-    C('CONSERVATION', 'Conservation', 'Industrial', 1060, ['NATURAL_HISTORY']),
+    C('OPERA_AND_BALLET', 'Opera and Ballet', 'Industrial', 800, ['ENLIGHTENMENT']),
+    C('COLONIALISM', 'Colonialism', 'Industrial', 800, ['MERCANTILISM']),
+    C('CONSERVATION', 'Conservation', 'Modern', 1540, ['NATURAL_HISTORY']),
 
-    C('MOBILIZATION', 'Mobilization', 'Modern', 1410, ['NATIONALISM'], [
+    C('SCORCHED_EARTH', 'Scorched Earth', 'Industrial', 1210, ['NATIONALISM'], [
+      { kind: 'unlockPolicy', policy: 'TOTAL_WAR' },
+    ]),
+    C('MOBILIZATION', 'Mobilization', 'Modern', 1540, ['URBANIZATION', 'SCORCHED_EARTH'], [
       { kind: 'unlockPolicy', policy: 'LEVEE_EN_MASSE' },
       { kind: 'unlockPolicy', policy: 'REDOUBT' },
     ]),
     // MONUMENTALITY: SUBSTITUTION — a Golden-Age dedication policy in real Civ 6,
     // not civic-granted. Placed on Ideology, a Modern wildcard-flavored civic.
-    C('IDEOLOGY', 'Ideology', 'Modern', 660, ['MASS_MEDIA'], [
+    C('IDEOLOGY', 'Ideology', 'Modern', 1640, ['MASS_MEDIA', 'MOBILIZATION'], [
       { kind: 'unlockPolicy', policy: 'MONUMENTALITY' },
     ]),
-    C('NUCLEAR_PROGRAM', 'Nuclear Program', 'Modern', 1830, ['CLASS_STRUGGLE']),
-    C('CAPITALISM', 'Capitalism', 'Modern', 1620, ['MASS_MEDIA']),
-    C('CULTURAL_HERITAGE', 'Cultural Heritage', 'Modern', 1500, ['CONSERVATION']),
+    C('NUCLEAR_PROGRAM', 'Nuclear Program', 'Modern', 1715, ['IDEOLOGY']),
+    C('CAPITALISM', 'Capitalism', 'Modern', 1580, ['MASS_MEDIA']),
+    C('CULTURAL_HERITAGE', 'Cultural Heritage', 'Atomic', 1955, ['CONSERVATION']),
 
-    C('COLD_WAR', 'Cold War', 'Atomic', 2200, ['MOBILIZATION'], [
+    C('COLD_WAR', 'Cold War', 'Atomic', 2185, ['IDEOLOGY'], [
       { kind: 'unlockPolicy', policy: 'CONTAINMENT' },
     ]),
-    C('SPACE_RACE', 'Space Race', 'Atomic', 2200, ['COLD_WAR']),
-    C('RAPID_DEPLOYMENT', 'Rapid Deployment', 'Atomic', 2200, ['COLD_WAR'], [
+    C('SPACE_RACE', 'Space Race', 'Atomic', 2415, ['COLD_WAR']),
+    C('RAPID_DEPLOYMENT', 'Rapid Deployment', 'Atomic', 2415, ['COLD_WAR'], [
       { kind: 'unlockPolicy', policy: 'MILITARY_FIRST' },
     ]),
-    C('ENVIRONMENTALISM', 'Environmentalism', 'Atomic', 2340, ['CULTURAL_HERITAGE']),
+    C('ENVIRONMENTALISM', 'Environmentalism', 'Information', 2880, ['CULTURAL_HERITAGE', 'RAPID_DEPLOYMENT']),
 
-    C('GLOBALIZATION', 'Globalization', 'Information', 2500, ['SPACE_RACE', 'CAPITALISM']),
-    C('SOCIAL_MEDIA', 'Social Media', 'Information', 2500, ['GLOBALIZATION'], [
+    C('GLOBALIZATION', 'Globalization', 'Information', 2880, ['RAPID_DEPLOYMENT', 'SPACE_RACE']),
+    C('SOCIAL_MEDIA', 'Social Media', 'Information', 2880, ['SPACE_RACE', 'PROFESSIONAL_SPORTS'], [
       { kind: 'unlockPolicy', policy: 'COLLECTIVE_ACTIVISM' },
       { kind: 'unlockPolicy', policy: 'ONLINE_COMMUNITIES' },
     ]),
-    C('NEAR_FUTURE_GOVERNANCE', 'Near Future Governance', 'Information', 2600, ['GLOBALIZATION']),
-    C('INFORMATION_WARFARE', 'Information Warfare', 'Information', 2600, ['RAPID_DEPLOYMENT']),
+    C('NEAR_FUTURE_GOVERNANCE', 'Near Future Governance', 'Information', 3100, ['ENVIRONMENTALISM', 'GLOBALIZATION']),
+    // CIV6: Information Warfare's only published gate is the Future ERA; its
+    // real parents are Future civics this tree does not carry, so the deepest
+    // Information-era civic stands in as the prereq.
+    C('INFORMATION_WARFARE', 'Information Warfare', 'Future', 3200, ['NEAR_FUTURE_GOVERNANCE']),
   ].map((c) => [c.id, c]),
 );

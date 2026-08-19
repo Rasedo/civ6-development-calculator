@@ -179,7 +179,7 @@ def test_strike(rules, path) -> None:
 
 
 def test_civ_encamp_prod_mult(rules, path) -> None:
-    """A civ seat's GOVERNMENT encampmentProdMult scales its queue head when
+    """A civ seat's GOVERNMENT encampHarborProdMult scales its queue head when
     that head is an Encampment item, mirroring the seat-0 path.
 
     THIS POKE IS THE ONLY COVERAGE: the scripted export produces no civ
@@ -193,17 +193,17 @@ def test_civ_encamp_prod_mult(rules, path) -> None:
         return s
     sim = _prep()
     if not sim._gov_has_effects or sim._encamp_si < 0 or sim.n_majors < 2:
-        print("  civ encampmentProdMult SKIPPED (no gov effects / no Encampment scaffold)")
+        print("  civ encampHarborProdMult SKIPPED (no gov effects / no Encampment scaffold)")
         return
     r = 0
     live = (sim.city_alive[0, r + 1]).nonzero(as_tuple=True)[0]
     if not len(live):
-        print("  civ encampmentProdMult SKIPPED (no live civ city)")
+        print("  civ encampHarborProdMult SKIPPED (no live civ city)")
         return
     j = int(live[0])
     _ad, _has = sim._adopted_gov(sim.civ_civics[:, r + 1])
     if not bool(_has[0]):
-        print("  civ encampmentProdMult SKIPPED (civ has adopted no government)")
+        print("  civ encampHarborProdMult SKIPPED (civ has adopted no government)")
         return
     gi = int(_ad[0])
     enc_code = sim.DISTRICT_BASE + sim._encamp_si
@@ -214,16 +214,16 @@ def test_civ_encamp_prod_mult(rules, path) -> None:
         s.city_cost[0, r + 1, j] = 1e9      # never completes, so progress stays readable
         s.city_progress[0, r + 1, j] = 0.0
         s.city_prod_bank[0, r + 1, j] = 0.0
-        s._gov_encamp[:] = 1.0
-        s._gov_encamp[gi] = mult
+        s._gov_ehprod[:] = 1.0
+        s._gov_ehprod[gi] = mult
         s._eff_version += 1           # the gov/policy mods cache keys on this
         s.step()
         return float(s.city_progress[0, r + 1, j])
 
     plain, doubled = _run(1.0), _run(2.0)
     assert plain > 0, "the civ city produced nothing — poke cannot measure the multiplier"
-    assert abs(doubled - 2.0 * plain) < 1e-6, f"x2 encampmentProdMult: got {doubled}, plain {plain}"
-    print(f"  civ encampmentProdMult OK (x2 on the Encampment head: {plain} -> {doubled})")
+    assert abs(doubled - 2.0 * plain) < 1e-6, f"x2 encampHarborProdMult: got {doubled}, plain {plain}"
+    print(f"  civ encampHarborProdMult OK (x2 on the Encampment head: {plain} -> {doubled})")
 
 
 def main() -> None:

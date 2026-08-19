@@ -720,7 +720,7 @@ class SimEconomy:
         torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
     ]:
         """(cityYields [B,6], capitalYields [B,6], housingAll [B], yieldMult
-        [B,6], slotted-mask [B,nPol], encampmentProdMult [B],
+        [B,6], slotted-mask [B,nPol], encampHarborProdMult [B],
         tilePurchaseMult [B], amenitiesAll [B], housingIfDistricts triples,
         newDeal triples) for a seat's adopted government + greedily slotted
         policies, computed from its researched civics [B, NC]. The
@@ -740,7 +740,7 @@ class SimEconomy:
         nd = []    # list of (min[B], housing[B], amenities[B])
         ymult = torch.ones(B, 6, dtype=dt, device=dev)
         slotted = torch.zeros(B, self._npol, dtype=torch.bool, device=dev)
-        emult = torch.ones(B, dtype=dt, device=dev)  # encampmentProdMult product (VETERANCY)
+        emult = torch.ones(B, dtype=dt, device=dev)  # encampHarborProdMult product (VETERANCY)
         # tilePurchaseMult, the SAME shape of channel as emult — multiplicative,
         # from the adopted government and the slotted cards.
         tpmult = torch.ones(B, dtype=dt, device=dev)
@@ -760,7 +760,7 @@ class SimEconomy:
                    torch.where(has_gov, self._gov_nd_amen[adopted], _z0)))
         hous_all = hous_all + self._gov_housing[adopted] * has_gov.to(dt)
         ymult = torch.where(has_gov.unsqueeze(1), self._gov_ymult[adopted], ymult)
-        emult = torch.where(has_gov, self._gov_encamp[adopted], emult)
+        emult = torch.where(has_gov, self._gov_ehprod[adopted], emult)
         tpmult = torch.where(has_gov, self._gov_tpmult[adopted], tpmult)
         if self._npol:
             nslots = self._gov_slots[adopted] * has_gov.long().unsqueeze(1)  # [B, 4]
@@ -793,24 +793,24 @@ class SimEconomy:
                 nd.append((torch.where(_on, self._pol_nd_min[_pi].expand(B), _neg),
                            torch.where(_on, self._pol_nd_house[_pi].expand(B), _z),
                            torch.where(_on, self._pol_nd_amen[_pi].expand(B), _z)))
-            emult = emult * torch.where(slotted, self._pol_encamp.unsqueeze(0).expand(B, -1), torch.ones(B, self._npol, dtype=dt, device=dev)).prod(dim=1)
+            emult = emult * torch.where(slotted, self._pol_ehprod.unsqueeze(0).expand(B, -1), torch.ones(B, self._npol, dtype=dt, device=dev)).prod(dim=1)
             tpmult = tpmult * torch.where(slotted, self._pol_tpmult.unsqueeze(0).expand(B, -1), torch.ones(B, self._npol, dtype=dt, device=dev)).prod(dim=1)
         return city_y, cap_y, hous_all, ymult, slotted, emult, tpmult, amen_all, hid, nd
 
-    def _cond_house_amen(self, hid, nd, all_d, spec_d):
+    def _cond_house_amen(self, hid, nd, spec_d):
         """The two district-conditional rules, for ANY seat.
 
-        `housingIfDistricts` keys on ALL completed non-centre districts;
-        `newDeal` keys on SPECIALTY ones and pays housing AND amenities. TS
-        applies both in `computeHousing`/`computeCityStats`; one rule, so one
-        applier, shared by every seat's path.
+        CIV6 (Insulae / Medina Quarter / New Deal): all three key on SPECIALTY
+        districts — `housingIfDistricts` pays housing, `newDeal` pays housing
+        AND amenities. TS applies both in `computeHousing`/`computeCityStats`;
+        one rule, so one applier, shared by every seat's path.
 
-        `all_d`/`spec_d` are [B, C] district counts; returns (housing, amenities)
+        `spec_d` is a [B, C] district count; returns (housing, amenities)
         of the same shape."""
-        house = torch.zeros_like(all_d, dtype=self.dtype)
-        amen = torch.zeros_like(all_d, dtype=self.dtype)
+        house = torch.zeros_like(spec_d, dtype=self.dtype)
+        amen = torch.zeros_like(spec_d, dtype=self.dtype)
         for mn, hs in hid:
-            ok = (mn.unsqueeze(1) >= 0) & (all_d >= mn.unsqueeze(1))
+            ok = (mn.unsqueeze(1) >= 0) & (spec_d >= mn.unsqueeze(1))
             house = house + ok.to(self.dtype) * hs.unsqueeze(1)
         for mn, hs, am in nd:
             ok = (mn.unsqueeze(1) >= 0) & (spec_d >= mn.unsqueeze(1))
