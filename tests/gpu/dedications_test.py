@@ -119,19 +119,30 @@ def main() -> None:
 
     # ---- Reform the Coinage, Golden face: no plunder -----------------------
     commit(sim, 0, sim._ded_coinage, golden=True)
-    centres = sim.city_center[0:1, 0, :].clamp(min=0)
-    # park a live barb next to the capital
+    # a live barb REGISTERED on the walker's tile (plunder reads the
+    # military_at/civilian_at maps, the same lookup combat uses)
     bslot = 0
     cap_t = int(sim.city_center[0, 0, col])
     nb = int(sim.neigh[cap_t][0])
     sim.barb_unit_alive[0, bslot] = True
     sim.barb_unit_tile[0, bslot] = nb
-    near = sim._route_raided_near(0, sim.city_center[:, 0, :].clamp(min=0))
-    assert not bool(near[0].any()), "golden Coinage must suppress the raid"
-    commit(sim, 0, sim._ded_exodus, golden=True)
-    near = sim._route_raided_near(0, sim.city_center[:, 0, :].clamp(min=0))
-    assert bool(near[0, col]), "without the face the barb raids"
+    sim.military_at[0, nb] = bslot + sim.POOL_LO["barb"]
+    sim.seat_routes[0, 0, 0, 0] = sim.city_id[0, 0, col]
+    sim.seat_routes[0, 0, 0, 1] = sim.city_id[0, 0, col]
+    sim.seat_route_exp[0, 0, 0] = sim.turn + 20
+    sim.seat_route_walk[0, 0, 0] = nb
+    sim.seat_route_leg[0, 0, 0] = -1
+    act1 = torch.ones(sim.B, dtype=torch.bool)
+    sim._trade_walk_tick(0, act1)
+    assert int(sim.seat_routes[0, 0, 0, 0]) >= 0, "golden Coinage must suppress the plunder"
+    commit(sim, 0, sim._ded_exodus, golden=True)  # a different pick: the face lapses
+    gold0 = float(sim.civ_treasury[0, 0])
+    sim._trade_walk_tick(0, act1)
+    assert int(sim.seat_routes[0, 0, 0, 0]) == -1, "without the face the barb plunders"
+    # a BARBARIAN raider banks nothing (only a major has a treasury row here)
+    assert float(sim.civ_treasury[0, 0]) == gold0
     sim.barb_unit_alive[0, bslot] = False
+    sim.military_at[0, nb] = -1
     sim._eff_version += 1
     print("coinage no-plunder ok")
 

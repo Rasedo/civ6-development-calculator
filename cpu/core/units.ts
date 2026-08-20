@@ -16,6 +16,9 @@ import { UNITS, UNIT_HP, ENCAMPMENT_HP, type UnitDef } from '../data/units';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { goldenMoveBonus } from './eras'; // MONUMENTALITY / EXODUS +2 MP
 import { GAME_SPEED, EMBARK_MOVES } from '../data/constants';
+import { TECHS } from '../data/techs';
+import { CIVICS } from '../data/civics';
+import { tradeCapacity } from './trade';
 import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { FEATURES } from '../../world/features';
@@ -120,46 +123,51 @@ export function riverCharge(state: GameState, from: Tile, to: Tile): number {
 }
 
 /**
- * Lay the ROAD a new trade route's Trader would leave behind.
- *
- * Real Civ 6 builds roads automatically as a Trader walks its land route, so
- * the road network is a CONSEQUENCE of trade, not a builder job. This models
- * the trader's walk without the unit: from the origin centre, repeatedly step
- * to the neighbour with the lowest hexDistance to the destination (ties by
- * direction order) — the SAME integer stepping rule the war-march already
- * uses, so both engines can mirror it exactly. Zero draws, integer-only.
- *
- * A route whose walk needs a water or impassable tile is a SEA route: real
- * Civ 6 lays no road for those, so nothing is written at all (the walk is
- * collected first and committed only if it reaches the destination).
+ * ONE step of a Trader's walk: from `fromIndex`, the passable neighbour with
+ * the lowest hexDistance to `targetIndex` (ties by direction order) — the
+ * SAME integer stepping rule the war-march uses, so both engines agree by
+ * construction. Returns `fromIndex` unchanged when arrived or stuck (no
+ * strictly-closer passable neighbour). Zero draws, integer-only.
  */
-export function layTradeRoad(state: GameState, fromIndex: number, toIndex: number): void {
+export function tradeWalkStep(state: GameState, fromIndex: number, targetIndex: number): number {
   const map = state.map;
-  const dest = map.tiles[toIndex];
-  if (!dest || isWater(dest) || isImpassable(dest)) return;
-  let at = map.tiles[fromIndex];
-  if (!at || isWater(at) || isImpassable(at)) return;
-  const path: Tile[] = [at];
-  for (let step = 0; step < TRADE_ROAD_MAX_STEPS && at.index !== toIndex; step++) {
-    let best: Tile | undefined;
-    let bestD = hexDistance(at.col, at.row, dest.col, dest.row);
-    for (const n of neighbors(map, at)) {
-      if (isWater(n) || isImpassable(n)) continue;
-      const d = hexDistance(n.col, n.row, dest.col, dest.row);
-      if (d < bestD) {
-        bestD = d;
-        best = n;
-      }
+  const dest = map.tiles[targetIndex];
+  const at = map.tiles[fromIndex];
+  if (!dest || !at || fromIndex === targetIndex) return fromIndex;
+  let best: Tile | undefined;
+  let bestD = hexDistance(at.col, at.row, dest.col, dest.row);
+  for (const n of neighbors(map, at)) {
+    if (isWater(n) || isImpassable(n)) continue;
+    const d = hexDistance(n.col, n.row, dest.col, dest.row);
+    if (d < bestD) {
+      bestD = d;
+      best = n;
     }
-    if (!best) return; // blocked by water/impassable — a sea route lays nothing
-    path.push(best);
-    at = best;
   }
-  if (at.index !== toIndex) return; // never arrived — lay nothing
-  for (const t of path) t.road = true;
+  return best ? best.index : fromIndex;
 }
 
-/** the trade-road walk is bounded by the route range — a route
+/**
+ * Can a Trader WALK from `fromIndex` to `toIndex` over land? A route whose
+ * descent needs a water or impassable tile is a SEA route: its walker parks
+ * at the origin and lays no roads (real Civ 6 lays roads only on land legs).
+ */
+export function tradeLandReachable(state: GameState, fromIndex: number, toIndex: number): boolean {
+  const map = state.map;
+  const dest = map.tiles[toIndex];
+  const start = map.tiles[fromIndex];
+  if (!dest || isWater(dest) || isImpassable(dest)) return false;
+  if (!start || isWater(start) || isImpassable(start)) return false;
+  let at = fromIndex;
+  for (let step = 0; step < TRADE_ROAD_MAX_STEPS && at !== toIndex; step++) {
+    const next = tradeWalkStep(state, at, toIndex);
+    if (next === at) return false;
+    at = next;
+  }
+  return at === toIndex;
+}
+
+/** the trade walk is bounded by the route range — a route
  *  longer than this cannot exist (canAddTradeRoute gates on TRADE_ROUTE_RANGE),
  *  so the bound is a safety rail, not a rule. */
 export const TRADE_ROAD_MAX_STEPS = 32;
@@ -536,6 +544,21 @@ export function builderCost(state: GameState, seat: number): number {
 }
 
 /**
+ * The TRADER's live price. CIV6: the Trader's production cost is progressive
+ * with GAME PROGRESS (COST_PROGRESSION_GAME_PROGRESS, Param1 400): the base
+ * cost x (1 + 4 x p), p = floor(100 x the furthest tree fraction this seat
+ * has finished, techs or civics) / 100.
+ */
+export function traderCost(state: GameState, seat: number): number {
+  const r = seatOf(state, seat)!.research;
+  const p =
+    Math.floor(
+      100 * Math.max(r.techs.length / Object.keys(TECHS).length, r.civics.length / Object.keys(CIVICS).length),
+    ) / 100;
+  return Math.round(UNITS.TRADER.cost * (1 + 4 * p));
+}
+
+/**
  * A city may build/buy NAVAL units iff its CENTER is adjacent to a
  * water tile OR it owns a COMPLETED Harbor. Mirrors the GPU naval-build gate
  * (static center-water-adjacency plane | dynamic completed-Harbor). Works for
@@ -582,6 +605,15 @@ export function trainableUnits(
       const held = seatOf(state, seat)!.cities.find((c) => c.centerIndex === city.centerIndex);
       const has = (held?.buildings ?? []).includes(ARTIFACT_BUILDING);
       if (!has || (held?.artifacts ?? 0) >= ARTIFACT_SLOTS) return false;
+    }
+    // CIV6: "when the number of Traders equals the Trading Capacity you
+    // cannot build more Traders" — the count is free Trader units plus
+    // active routes (each active route embodies a spent Trader).
+    if (d.trader && !state.sandbox) {
+      const owned =
+        state.units.filter((u) => u.seat === seat && u.type === 'TRADER').length +
+        (seatOf(state, seat)?.tradeRoutes ?? []).length;
+      if (owned >= tradeCapacity(state, seat)) return false;
     }
     if (d.requiresResource && !state.sandbox && !civHasStrategic(state, seat, d.requiresResource)) return false;
     if (d.naval) return !!city && cityNavalCapable(state, city);

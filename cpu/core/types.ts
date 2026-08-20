@@ -110,6 +110,10 @@ export interface SeatActionRecord {
    * Gold, but NOT the one-gold-purchase slot — a levy is a diplomacy
    * action and rides beside `buy`, like real Civ 6. */
   levy?: number | null;
+  /** the route verb: [origin CENTRE tile, dest code] — dest is a CENTRE
+   * tile (an own or another major's city) or -(2+csIndex) for a city-state.
+   * Establishing spends a free Trader; both engines only re-validate. */
+  route?: [number, number] | null;
   denounce?: number[];
   ally?: number[];
 }
@@ -265,7 +269,26 @@ export interface Seat {
   /** Who this seat is ALLIED with, as absolute seat ids. Symmetric; broken by
    *  a denouncement or a war. Allies never declare war on each other. */
   allies: number[];
-  tradeRoutes?: { from: number; to?: number; toCs?: number; toSeat?: number; toSeatCity?: number; expiresTurn?: number }[];
+  tradeRoutes?: TradeRoute[];
+}
+
+/** One active trade route. Established by the route WIRE verb (spending a
+ * free Trader); its virtual walker advances one descent step per turn and is
+ * what plunder targets. Ends on a completed round trip after the era-scaled
+ * minimum (the Trader returns), or to a plunder (the Trader dies with it). */
+export interface TradeRoute {
+  from: number;
+  to?: number;
+  toCs?: number;
+  toSeat?: number;
+  toSeatCity?: number;
+  /** the round-trip MINIMUM end turn (createdTurn + tradeRouteMinDuration) */
+  expiresTurn?: number;
+  createdTurn?: number;
+  /** the servicing Trader's CURRENT tile (walks 1 tile/turn) */
+  walkTile?: number;
+  /** -1 parked at origin (sea route), 0 walking out, 1 walking home */
+  walkLeg?: number;
 }
 
 export interface ReligionState {
@@ -277,15 +300,6 @@ export interface ReligionState {
   worship: string | null;
   enhancer?: string | null;
   holyTile?: number | null;
-}
-
-export interface TradeRoute {
-  from: number;
-  to: number;
-  toCs?: number;
-  toSeat?: number;
-  toSeatCity?: number;
-  expiresTurn?: number;
 }
 
 export type CityStateType =

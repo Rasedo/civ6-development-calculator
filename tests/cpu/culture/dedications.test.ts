@@ -6,7 +6,7 @@ import { spawnUnit } from '../../../cpu/core/units';
 import { meleeAttack } from '../../../cpu/core/combat';
 import { revealAround } from '../../../cpu/core/fog';
 import { completeQueueItem } from '../../../cpu/core/production';
-import { routeRaidedAt, cityTradeYields } from '../../../cpu/core/trade';
+import { routePlunderer, cityTradeYields } from '../../../cpu/core/trade';
 import { computeCityStats } from '../../../cpu/core/city';
 import { effectiveAdjacency } from '../../../cpu/core/yields';
 import { goldenMoveBonus } from '../../../cpu/core/eras';
@@ -110,12 +110,13 @@ describe('the four new dedications', () => {
     dt.district = 'CAMPUS';
     dt.districtComplete = true;
     dest.districts.push({ type: 'CAMPUS', tileIndex: dt.index });
-    // a hostile barb parked on the origin raids the route...
-    spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 10, 9).index, BARB_SEAT);
-    expect(routeRaidedAt(state, [city.centerIndex], 0)).toBe(true);
+    // a hostile barb standing ON the Trader's tile plunders the route...
+    const bt = tileAtCoords(state.map, 10, 9).index;
+    spawnUnit(state, 'WARRIOR', bt, BARB_SEAT);
+    expect(routePlunderer(state, bt, 0)).toBe(BARB_SEAT);
     // ...until the Golden face
     commit(state, 0, DED_COINAGE, true);
-    expect(routeRaidedAt(state, [city.centerIndex], 0)).toBe(false);
+    expect(routePlunderer(state, bt, 0)).toBe(null);
     state.units = state.units.filter((u) => u.seat !== BARB_SEAT); // the raider leaves before the yield reads
     seatOf(state, 0)!.tradeRoutes = [
       { from: city.id, to: -1, toSeat: 1, toSeatCity: dest.id, expiresTurn: state.turn + 100 },

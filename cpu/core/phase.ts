@@ -1,5 +1,5 @@
 
-import type { City, DistrictId, GameState, ImprovementId, SeatActionRecord, Seat, Tile, Unit } from './types';
+import type { City, DistrictId, GameState, ImprovementId, SeatActionRecord, Seat, Tile, TradeRoute, Unit } from './types';
 import { advanceGreatPeople } from './greatPeople';
 import { completeQueueItem } from './production';
 import { isExplored, revealAround } from './fog';
@@ -7,7 +7,7 @@ import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { isWater, isImpassable } from '../../world/query';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
-import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, layTradeRoad, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit } from './units';
+import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, tradeWalkStep, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit } from './units';
 import { PILLAGE_HEAL_IMPROVEMENTS } from './combat';  // the replay's pillage arm mirrors hostileUnitAct's
 import { UNIT_HP } from '../data/units';
 import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, generalAuraCS, cityDefenseStrength } from './combat';
@@ -15,7 +15,7 @@ import { availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } f
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { selectResearch } from './economy';
 import { getModifiers } from './effects';
-import { routeYields, cityStateRouteYields, TRADE_ROUTE_RANGE, TRADE_ROUTE_DURATION, tradeCapacity } from './trade';
+import { addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, routeDestCenter, routePlunderer, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from './trade';
 import { addEnvoys, hasMet, isSuzerain, issueQuest, questSatisfied, setMet } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS } from '../data/cityStates';
 import { computeAdoption } from './effects';
@@ -38,7 +38,7 @@ import { congressSession, congressLoyaltyDelta, congressUdtProdDistrict } from '
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { hasRiver, hasFreshWater, isCoastalWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
-import { disbandUnit, builderCost, builderRemoveFeature, trainableUnits } from './units';
+import { disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits } from './units';
 import { killUnit } from './combat';
 import { availableProjects, buyTile, buyWorshipBuilding, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, purchaseCivilianWithFaith, purchaseReligiousUnit, purchaseSettler, queueProject, settlerCost } from './game';
 import { DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
@@ -212,6 +212,8 @@ export function declareWar(state: GameState, actorSeat: number, seat: number): R
   if (bound > 0) return no(`The peace treaty binds for another ${bound} turns.`);
   setWar(state, actor.seat, seat, true);
   setWarTurnsWith(state, actor.seat, seat, 0);
+  // CIV6: war cancels every route between the two civs; the Traders return.
+  cancelRoutesBetween(state, actor.seat, seat);
   seatOf(state, seat)!.warmonger = (seatOf(state, seat)!.warmonger ?? 0) + WARMONGER_DOW;
   state.eventLog.push(`War declared on ${actor.name}!`);
   return ok;
@@ -737,6 +739,8 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
         // cost here fell back to the base price and locked r1c1's builder at 30
         // where the GPU locked 32 t61, the qCost family).
         if (id === 'BUILDER') commitProduction(state, civCity.seat, civCity, { kind: 'unit', unit: id, progress: 0, cost: builderCost(state, actor.seat) });
+        // the TRADER prices off ITS escalator the same way (game progress)
+        else if (id === 'TRADER') commitProduction(state, civCity.seat, civCity, { kind: 'unit', unit: id, progress: 0, cost: traderCost(state, actor.seat) });
         else commitProduction(state, civCity.seat, civCity, { kind: 'unit', unit: id, progress: 0 });
       }
     }
@@ -1172,83 +1176,101 @@ export function seatPhase(state: GameState): void {
       }
     }
 
-    // Trade — ONE new route per civ per turn while
-    // capacity allows (trader-training pacing). Scan origins × destinations
-    // in city-array order — own cities first, then MET city-states (from
-    // asc, to asc, cityState asc — the deterministic GPU-mirrorable flat order);
-    // the best NEW in-range pair by the route's TOTAL yields (a CS route is
-    // 3 gold + 1 specialty = 4 flat), strictly-greater beats so ties keep the
-    // first-found.
+    // Trade. The route DECISION rides the wire — a real player spends a
+    // Trader on a chosen pair — so the engine only re-validates the named
+    // pair; the pair-picking scan lives with the deciders (the driver's
+    // candidate row / drive.py). The engine rules stay here: the walk,
+    // plunder, and the round-trip expiry.
     {
       const routes = (actor.tradeRoutes ??= []);
-      if (routes.length < tradeCapacity(state, actor.seat) && actor.cities.length >= 1) {
-        let best: { from: number; to?: number; toCs?: number; toSeat?: number; toSeatCity?: number; ySum: number } | null = null;
-        for (const from of actor.cities) {
-          const ft = state.map.tiles[from.centerIndex];
-          for (const to of actor.cities) {
-            if (to.id === from.id) continue;
-            if (routes.some((x) => x.from === from.id && x.to === to.id)) continue;
-            const tt = state.map.tiles[to.centerIndex];
-            if (hexDistance(ft.col, ft.row, tt.col, tt.row) > TRADE_ROUTE_RANGE) continue;
-            const y = routeYields(state, to);
-            const ySum = y.food + y.production;
-            if (!best || ySum > best.ySum) best = { from: from.id, to: to.id, ySum };
-          }
-          for (const cityState of state.cityStates) {
-            if (!hasMet(cityState, actor.seat)) continue;
-            if (routes.some((x) => x.from === from.id && x.toCs === cityState.id)) continue;
-            const ct = state.map.tiles[cityState.centerIndex];
-            if (hexDistance(ft.col, ft.row, ct.col, ct.row) > TRADE_ROUTE_RANGE) continue;
-            const cy = cityStateRouteYields(cityState);
-            const ySum = cy.food + cy.production + cy.gold + cy.science + cy.culture + cy.faith;
-            if (!best || ySum > best.ySum) best = { from: from.id, toCs: cityState.id, ySum };
-          }
+      // THE WALK: each land route's Trader advances one descent step toward
+      // its leg target, laying road as it goes; it turns around at the
+      // destination and starts a fresh round trip at home. (The two legs may
+      // descend different lines — the descent is greedy per step, not a
+      // stored path — so the return can lay a second road line.)
+      for (const r of routes) {
+        if ((r.walkLeg ?? -1) < 0 || r.walkTile === undefined) continue;
+        const originC = actor.cities.find((c) => c.id === r.from)?.centerIndex ?? -1;
+        const destC = routeDestCenter(state, actor, r);
+        if (originC < 0 || destC < 0) continue;
+        const target = r.walkLeg === 0 ? destC : originC;
+        const next = tradeWalkStep(state, r.walkTile, target);
+        if (next !== r.walkTile) {
+          r.walkTile = next;
+          state.map.tiles[next].road = true;
         }
-        if (!best) {
-          let bestIntl: { from: number; toSeat: number; toSeatCity: number; d: number } | null = null;
-          for (const from of actor.cities) {
-            const ft = state.map.tiles[from.centerIndex];
-            for (const other of state.seats) {
-              if (other.seat === actor.seat) continue;
-              for (const pc of other.cities) {
-                if (!isExplored(state, actor.seat, pc.centerIndex)) continue;
-                if (routes.some((x) => x.from === from.id && x.toSeat === other.seat && x.toSeatCity === pc.id)) continue;
-                const pt = state.map.tiles[pc.centerIndex];
-                const d = hexDistance(ft.col, ft.row, pt.col, pt.row);
-                if (d > TRADE_ROUTE_RANGE) continue;
-                if (!bestIntl || d < bestIntl.d) bestIntl = { from: from.id, toSeat: other.seat, toSeatCity: pc.id, d };
+        if (r.walkLeg === 0 && r.walkTile === destC) r.walkLeg = 1;
+        else if (r.walkLeg === 1 && r.walkTile === originC) r.walkLeg = 0;
+      }
+      // PLUNDER, real Civ 6: a unit hostile to the route's owner standing on
+      // the Trader's tile destroys the route AND its Trader, and a MAJOR
+      // raider banks the gold (a barbarian or city-state raider has no
+      // treasury here — seatOf answers majors only).
+      {
+        const plundered = new Set<TradeRoute>();
+        for (const r of routes) {
+          const raider = r.walkTile === undefined ? null : routePlunderer(state, r.walkTile, actor.seat);
+          if (raider === null) continue;
+          plundered.add(r);
+          const rs = seatOf(state, raider);
+          if (rs) rs.treasury += PLUNDER_ROUTE_GOLD;
+        }
+        if (plundered.size > 0) actor.tradeRoutes = routes.filter((r) => !plundered.has(r));
+      }
+      // the wire intent: [origin CENTRE, dest code] — a CENTRE tile, or
+      // -(2+csIndex) for a city-state. Re-validated like every wire intent
+      // (canAdd* checks capacity, range and the free Trader the verb spends).
+      const rv = rec?.route;
+      if (rv) {
+        const fromCity = actor.cities.find((c) => c.centerIndex === rv[0]);
+        if (fromCity) {
+          if (rv[1] <= -2) {
+            const cs = state.cityStates[-(rv[1] + 2)];
+            if (cs) addCsTradeRoute(state, fromCity.id, cs.id, actor.seat);
+          } else {
+            const own = actor.cities.find((c) => c.centerIndex === rv[1]);
+            if (own) addTradeRoute(state, fromCity.id, own.id, actor.seat);
+            else {
+              for (const other of state.seats) {
+                if (other.seat === actor.seat) continue;
+                const pc = other.cities.find((c) => c.centerIndex === rv[1]);
+                if (pc) {
+                  addIntlTradeRoute(state, fromCity.id, other.seat, pc.id, actor.seat);
+                  break;
+                }
               }
             }
           }
-          if (bestIntl) best = { from: bestIntl.from, toSeat: bestIntl.toSeat, toSeatCity: bestIntl.toSeatCity, ySum: 0 };
-        }
-        if (best) {
-          const route: { from: number; to?: number; toCs?: number; toSeat?: number; toSeatCity?: number; expiresTurn: number } =
-            { from: best.from, expiresTurn: state.turn + TRADE_ROUTE_DURATION };
-          if (best.toCs !== undefined) route.toCs = best.toCs;
-          else if (best.toSeatCity !== undefined) { route.toSeat = best.toSeat; route.toSeatCity = best.toSeatCity; }
-          else route.to = best.to!;
-          routes.push(route);
-          const fromRc = actor.cities.find((c) => c.id === route.from);
-          const destIdx =
-            route.toCs !== undefined
-              ? state.cityStates.find((c) => c.id === route.toCs)?.centerIndex ?? -1
-              : route.toSeatCity !== undefined
-              ? seatOf(state, route.toSeat ?? NO_SEAT)?.cities.find((c) => c.id === route.toSeatCity)?.centerIndex ?? -1
-              : actor.cities.find((c) => c.id === route.to)?.centerIndex ?? -1;
-          if (fromRc && destIdx >= 0) layTradeRoad(state, fromRc.centerIndex, destIdx);
         }
       }
       // CIV6 (Reform the Coinage, dark face): "+1 Era Score each time you
-      // successfully complete a Trade Route" — completion is the term running
-      // out, never a route cut short by a dead destination.
-      const _completedRoutes = routes.filter((x) => x.expiresTurn !== undefined && x.expiresTurn <= state.turn).length;
-      if (_completedRoutes > 0) dedicationEvent(state, actor.seat, DED_COINAGE, _completedRoutes);
-      actor.tradeRoutes = routes.filter(
-        (x) =>
-          (x.expiresTurn === undefined || x.expiresTurn > state.turn) &&
-          (x.toSeatCity === undefined || (seatOf(state, x.toSeat ?? NO_SEAT)?.cities ?? []).some((c) => c.id === x.toSeatCity)),
-      );
+      // successfully complete a Trade Route" — completion is the minimum
+      // term running out WITH the Trader home (the round-trip rule; a parked
+      // sea walker is always home, a stuck one ends at the rail). A route
+      // cut short — plunder, war, a dead destination — never scores.
+      const cur = actor.tradeRoutes ?? [];
+      const isDone = (x: TradeRoute): boolean => {
+        if (x.expiresTurn === undefined || state.turn < x.expiresTurn) return false;
+        if ((x.walkLeg ?? -1) < 0) return true;
+        if (state.turn >= x.expiresTurn + TRADE_WALK_EXPIRY_RAIL) return true;
+        return x.walkTile === actor.cities.find((c) => c.id === x.from)?.centerIndex;
+      };
+      const destGone = (x: TradeRoute): boolean =>
+        x.toSeatCity !== undefined && !(seatOf(state, x.toSeat ?? NO_SEAT)?.cities ?? []).some((c) => c.id === x.toSeatCity);
+      const done = cur.filter((x) => isDone(x));
+      if (done.length > 0) dedicationEvent(state, actor.seat, DED_COINAGE, done.length);
+      const ended = cur.filter((x) => isDone(x) || destGone(x));
+      if (ended.length > 0) {
+        // a route that ENDS (completes, or loses its destination) hands its
+        // Trader back at the origin; only plunder destroys the unit.
+        if (state.unitsMode) {
+          for (const r of ended) {
+            const oc = actor.cities.find((c) => c.id === r.from);
+            if (oc) spawnUnit(state, 'TRADER', oc.centerIndex, actor.seat);
+          }
+        }
+        actor.tradeRoutes = cur.filter((x) => !ended.includes(x));
+      }
     }
 
     // Cities: real tile yields drive growth and the production queues.

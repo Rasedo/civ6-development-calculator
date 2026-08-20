@@ -5,7 +5,7 @@ import { endTurn, foundCity, serialize, deserialize } from '../../../cpu/core/ga
 import { seatPhase } from '../../../cpu/core/phase';
 import { spawnUnit, builderRepair } from '../../../cpu/core/units';
 import { meleeAttack, rangedAttack, attackTargets, terrainDefense, barbarianPhase, FLANKING_CS, SUPPORT_CS, XP_ATTACK, XP_DEFEND, XP_LEVELS, xpLevelBonus, unitLevel, awardDefenseXp } from '../../../cpu/core/combat';
-import { routeRaided } from '../../../cpu/core/trade';
+import { routePlunderer } from '../../../cpu/core/trade';
 import { CITY_MAX_HP } from '../../../cpu/data/units';
 import { neighbors } from '../../../world/hex';
 import { isWater } from '../../../world/query';
@@ -190,13 +190,13 @@ describe('barbarians', () => {
     expect(city.hp).toBe(CITY_MAX_HP / 2 + 20);
   });
 
-  it('barbarians near a trade endpoint suspend the route', () => {
-    const { state, city } = battlefield();
-    const b = settleAt(state, tileAtCoords(state.map, 14, 9).index);
-    expect(routeRaided(state, city, b, 0)).toBe(false);
-    const barb = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 15, 9).index, BARB_SEAT)!;
-    barb.tileIndex = tileAtCoords(state.map, 15, 9).index;
-    expect(routeRaided(state, city, b, 0)).toBe(true);
+  it('a barbarian ON the Trader tile plunders the route', () => {
+    const { state } = battlefield();
+    settleAt(state, tileAtCoords(state.map, 14, 9).index);
+    const wt = tileAtCoords(state.map, 12, 9).index;
+    expect(routePlunderer(state, wt, 0)).toBe(null);
+    spawnUnit(state, 'WARRIOR', wt, BARB_SEAT);
+    expect(routePlunderer(state, wt, 0)).toBe(BARB_SEAT);
   });
 
   it('the barbarian phase runs inside endTurn without disturbing peace-mode saves', () => {

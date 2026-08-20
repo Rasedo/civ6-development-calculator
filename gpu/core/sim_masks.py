@@ -252,53 +252,48 @@ class SimMasks:
         friendly = present & (n_seat == d_seat)
         return hostile.long().sum(dim=1), friendly.long().sum(dim=1)
 
-    def _lay_trade_road(self, rows: torch.Tensor, frm: torch.Tensor, dest: torch.Tensor) -> None:
-        """The `layTradeRoad` twin — lay the ROAD a new trade
-        route's Trader would leave behind. From the origin centre, repeatedly
-        step to the neighbour with the lowest hexDistance to the destination
-        (ties by direction order — the same integer rule the war-march uses, so
-        both engines agree by construction). A walk that needs a water or
-        impassable tile is a SEA route and lays NOTHING, so the path is
-        collected first and committed only if it reaches the destination.
+    def _trade_walk_step(self, rows: torch.Tensor, cur: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        """ONE step of a Trader's walk (`tradeWalkStep`): the passable
+        neighbour strictly closer to `target` by hexDistance, ties by
+        direction order — the war-march's integer rule, so both engines agree
+        by construction. Arrived or stuck rows return `cur` unchanged.
         Zero draws, integer-only."""
-        if len(rows) == 0:
-            return
         dev = self.device
         ar6 = torch.arange(6, device=dev)
-        rows2 = rows.unsqueeze(1)
-        cur = frm.clone()
+        nb = self.neigh[cur.clamp(min=0)]
+        nbc = nb.clamp(min=0)
+        okn = (nb >= 0) & self.passable[rows.unsqueeze(1), nbc]
+        d_nb = self.pair_dist[target.clamp(min=0).unsqueeze(1), nbc].to(torch.long)
+        d_cur = self.pair_dist[target.clamp(min=0), cur.clamp(min=0)].to(torch.long)
+        key = torch.where(okn & (d_nb < d_cur.unsqueeze(1)), d_nb * 8 + ar6, 10**9)
+        best = key.min(dim=1).values
+        ok = (cur >= 0) & (target >= 0) & (cur != target) & (best < 10**9)
+        nxt = nb.gather(1, (best % 8).clamp(max=5).unsqueeze(1)).squeeze(1)
+        return torch.where(ok, nxt, cur)
+
+    def _trade_land_ok(self, rows: torch.Tensor, frm: torch.Tensor, dest: torch.Tensor) -> torch.Tensor:
+        """Can a Trader WALK from `frm` to `dest` over land — the
+        `tradeLandReachable` twin. A blocked descent is a SEA route: its
+        walker parks at the origin and lays no roads."""
+        if len(rows) == 0:
+            return torch.zeros(0, dtype=torch.bool, device=self.device)
         alive = (
-            (frm >= 0)
-            & (dest >= 0)
+            (frm >= 0) & (dest >= 0)
             & self.passable[rows, frm.clamp(min=0)]
             & self.passable[rows, dest.clamp(min=0)]
         )
+        cur = torch.where(alive, frm, torch.full_like(frm, -1))
         arrived = alive & (cur == dest)
-        path = [torch.where(alive, cur, torch.full_like(cur, -1))]
         for _ in range(TRADE_ROAD_MAX_STEPS):
             walking = alive & ~arrived
             if not bool(walking.any()):
                 break
-            nb = self.neigh[cur.clamp(min=0)]
-            nbc = nb.clamp(min=0)
-            okn = (nb >= 0) & self.passable[rows2, nbc]
-            d_nb = self.pair_dist[dest.clamp(min=0).unsqueeze(1), nbc].to(torch.long)
-            d_cur = self.pair_dist[dest.clamp(min=0), cur.clamp(min=0)].to(torch.long)
-            key = torch.where(okn & (d_nb < d_cur.unsqueeze(1)), d_nb * 8 + ar6, 10**9)
-            best = key.min(dim=1).values
-            step_ok = walking & (best < 10**9)
-            nxt = nb.gather(1, (best % 8).clamp(max=5).unsqueeze(1)).squeeze(1)
-            cur = torch.where(step_ok, nxt, cur)
-            path.append(torch.where(step_ok, cur, torch.full_like(cur, -1)))
-            alive = alive & (arrived | step_ok)
+            nxt = self._trade_walk_step(rows, cur.clamp(min=0), dest.clamp(min=0))
+            stepped = walking & (nxt != cur)
+            cur = torch.where(stepped, nxt, cur)
+            alive = alive & (arrived | stepped)
             arrived = arrived | (alive & (cur == dest))
-        commit = alive & arrived
-        if not bool(commit.any()):
-            return
-        for pt in path:
-            m = commit & (pt >= 0)
-            if bool(m.any()):
-                self.road[rows[m], pt[m]] = True
+        return arrived
 
     def _road_terms(self, frm: torch.Tensor, dest: torch.Tensor, river3: torch.Tensor):
         """The (terrain, river) MP terms a step pays, road-aware —

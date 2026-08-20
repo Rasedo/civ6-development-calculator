@@ -4,7 +4,7 @@ import { setWar, BARB_SEAT } from '../../../cpu/core/seats';
 import { createGame } from '../../../cpu/core/game';
 import { settleFirstCity } from '../helpers';
 import { spawnUnit, unitsHostile } from '../../../cpu/core/units';
-import { routeRaidedAt } from '../../../cpu/core/trade';
+import { routePlunderer } from '../../../cpu/core/trade';
 import { hostileRangedStrike, attackTargets } from '../../../cpu/core/combat';
 import { neighbors } from '../../../world/hex';
 import type { GameState } from '../../../cpu/core/types';
@@ -15,7 +15,7 @@ import type { GameState } from '../../../cpu/core/types';
 // exist, and both saying so in their own comments:
 //
 //   walls / Encampment STRIKE   filtered candidates with `!isCiv(u.seat)`
-//   trade route RAIDING         a civ↔civ raid flag left permanently off
+//   trade route PLUNDER         a civ↔civ hostility flag left permanently off
 //
 // The engines AGREED, so no gate caught it — it is a fidelity gap against
 // Civ 6, where a city's strike picks its target by combat strength and a war
@@ -50,7 +50,7 @@ function tilesNear(state: GameState, centre: number): { near: number; far: numbe
   return { near: near.index, far: far.index };
 }
 
-describe('civ↔civ trade raiding', () => {
+describe('civ↔civ trade plunder', () => {
   it('an at-war CIV SEAT suspends another civ\'s route, exactly as seat 0 does', () => {
     const state = newGame();
     const centre = seatOf(state, 0)!.cities[0].centerIndex;
@@ -59,51 +59,51 @@ describe('civ↔civ trade raiding', () => {
     const raider = 2;
 
     const u = spawnUnit(state, 'WARRIOR', far, raider)!;
-    expect(routeRaidedAt(state, [centre], owner)).toBe(false); // out of range
+    expect(routePlunderer(state, near, owner)).toBe(null); // not on the tile
 
     u.tileIndex = near;
-    expect(routeRaidedAt(state, [centre], owner)).toBe(false); // in range, at PEACE
+    expect(routePlunderer(state, near, owner)).toBe(null); // on the tile, at PEACE
 
     setWar(state, owner, raider, true);
-    expect(routeRaidedAt(state, [centre], owner)).toBe(true); // in range, AT WAR
+    expect(routePlunderer(state, near, owner)).toBe(raider); // AT WAR
 
     setWar(state, owner, raider, false);
-    expect(routeRaidedAt(state, [centre], owner)).toBe(false); // peace again
+    expect(routePlunderer(state, near, owner)).toBe(null); // peace again
   });
 
-  it('a barbarian raids with no war at all, and a THIRD civ at peace does not', () => {
+  it('a barbarian plunders with no war at all, and a THIRD civ at peace does not', () => {
     const state = newGame();
     const centre = seatOf(state, 0)!.cities[0].centerIndex;
     const { near, far } = tilesNear(state, centre);
     const owner = 1;
 
     const neutral = spawnUnit(state, 'WARRIOR', near, 3)!;
-    expect(routeRaidedAt(state, [centre], owner)).toBe(false);
+    expect(routePlunderer(state, near, owner)).toBe(null);
 
-    // ...and the barbarian standing on the same tile does raid it (caps.alwaysHostile)
+    // ...and the barbarian standing on the same tile does plunder (caps.alwaysHostile)
     neutral.tileIndex = far;
     spawnUnit(state, 'WARRIOR', near, BARB_SEAT);
-    expect(routeRaidedAt(state, [centre], owner)).toBe(true);
+    expect(routePlunderer(state, near, owner)).toBe(BARB_SEAT);
   });
 
-  it('a civ does not raid its OWN route', () => {
+  it('a civ does not plunder its OWN route', () => {
     const state = newGame();
     const centre = seatOf(state, 0)!.cities[0].centerIndex;
     const { near } = tilesNear(state, centre);
     const owner = 1;
     spawnUnit(state, 'WARRIOR', near, owner);
-    expect(routeRaidedAt(state, [centre], owner)).toBe(false);
+    expect(routePlunderer(state, near, owner)).toBe(null);
   });
 
-  it('raiding needs a war, whichever pair of seats it is', () => {
+  it('plunder needs a war, whichever pair of seats it is', () => {
     const state = newGame();
     const centre = seatOf(state, 0)!.cities[0].centerIndex;
     const { near } = tilesNear(state, centre);
     const raider = 1;
     spawnUnit(state, 'WARRIOR', near, raider);
-    expect(routeRaidedAt(state, [centre], 0)).toBe(false);
+    expect(routePlunderer(state, near, 0)).toBe(null);
     setWar(state, 0, raider, true);
-    expect(routeRaidedAt(state, [centre], 0)).toBe(true);
+    expect(routePlunderer(state, near, 0)).toBe(raider);
   });
 });
 

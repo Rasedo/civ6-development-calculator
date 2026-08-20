@@ -45,6 +45,11 @@ export interface UnitDef {
    * trainableUnits filters it out on every seat, exactly like faithOnly. */
   spawnOnly?: boolean;
   settler?: boolean;
+  /** the route-servicing civilian (TRADER) — spent by the route verb, walks
+   * the route, returned at completion. trainableUnits caps its count at the
+   * seat's trade capacity (free traders + active routes), the real Civ 6
+   * rule; its live price is traderCost(), progressive with game progress. */
+  trader?: boolean;
   description: string;
 }
 
@@ -340,6 +345,27 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       charges: 0,
       settler: true,
       description: 'Founds a new city (consumed on founding).',
+    }),
+    // The TRADER, sourced from the Civ 6 wiki — 40 Production (progressive:
+    // COST_PROGRESSION_GAME_PROGRESS Param1 400, so the live price is
+    // traderCost()'s base x (1 + 4 x game progress)), 0 maintenance,
+    // unlocked by FOREIGN_TRADE. APPENDED LAST (roster order is the GPU's
+    // unit index). A free Trader sits at a city centre until a route verb
+    // spends it; "Switch City" is instant in real Civ 6, so any own city may
+    // be the origin. trainableUnits blocks training at capacity ("when the
+    // number of Traders equals the Trading Capacity you cannot build more").
+    U({
+      id: 'TRADER',
+      name: 'Trader',
+      code: 'Td',
+      cost: 40,
+      maintenance: 0,
+      moves: 2,
+      combat: 0, // civilian: captured/killed rather than fighting
+      charges: 0,
+      trader: true,
+      requiresCivic: 'FOREIGN_TRADE',
+      description: 'Establishes a trade route (spent on the route, returned when it completes).',
     }),
   ].map((u) => [u.id, u]),
 );

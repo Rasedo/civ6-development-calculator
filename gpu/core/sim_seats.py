@@ -49,6 +49,12 @@ class SimSeats:
             has_alive_e = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._eng_idx)).any(dim=1)
             has_q_e = ((self.city_current[:, row] == self.UNIT_BASE + self._eng_idx) & alive).any(dim=1)
             ovr.append((self._eng_idx, ~(has_alive_e | has_q_e) & self._seat_fort_job_mask(row).any(dim=1)))
+        if self._trader_idx >= 0:
+            # `_trainable_units` already counts free Traders + active routes
+            # against tradeCapacity; the queue is the one thing it cannot see,
+            # so refuse while one is mid-production anywhere.
+            has_q_t = ((self.city_current[:, row] == self.UNIT_BASE + self._trader_idx) & alive).any(dim=1)
+            ovr.append((self._trader_idx, ~has_q_t))
         # A district's unlock and a wonder's unlock/already-built pair are per
         # SEAT too, so both tables are built once for the whole column sweep.
         d_tech = [
@@ -69,9 +75,9 @@ class SimSeats:
             ok_b = bld_q[:, j]
             ok_s = (self.city_pop[:, row, j] >= self.rules.settler_pop_gate).unsqueeze(1)
             # units: `trainableUnits` for this row and city — the SAME body the
-            # apply re-validates against — narrowed to the MILITARY lane the
-            # production ladder selects from (civilians, combat 0, are produced
-            # by no seat ladder). HULLS ride the same columns: `tr_j` already
+            # apply re-validates against — narrowed to the MILITARY lane; the
+            # civilian columns come back one by one via the overrides above.
+            # HULLS ride the same columns: `tr_j` already
             # carries the naval-capable-city gate, which is the only thing real
             # Civ 6 asks. Every override below re-applies tr_j, so no column can
             # smuggle an untrainable chassis past the legality body.
@@ -142,6 +148,7 @@ class SimSeats:
         relig: tuple | None = None,  # kinds 5/6: (kind [B], slot [B]) — the religious-unit faith buy
         levy: torch.Tensor | None = None,  # kind 7: CS index to levy (-1 = none)
         monu: tuple | None = None,  # kinds 8/9: (kind [B], slot [B]) — the Monumentality faith-civilian buy (8 builder, 9 settler)
+        route: tuple | None = None,  # the route verb: (origin CENTRE [B], dest code [B]) — a CENTRE tile or -(2+csIndex); -1 = none
     ) -> None:
         """Write seat ROW `row`'s choices BEFORE step(). Codes use the
         seat_masks layout; -1 = no action. Queue writes mirror the picker's exact
@@ -169,6 +176,8 @@ class SimSeats:
         self._stash_record(row, tech=tech, civic=civic, envoys=envoys, war=war,
                            production=production, pref=production_pref, dtile=production_tile)
         self._stash_buy(row, buy=buy, worship=worship, relig=relig, levy=levy, monu=monu)
+        if route is not None:
+            self._driven_route[row] = route
 
     def _reset_war_clock(self, i: int, j: int, mask: torch.Tensor) -> None:
         self.war_turns[:, i, j] = torch.where(mask, torch.zeros_like(self.war_turns[:, i, j]), self.war_turns[:, i, j])
@@ -197,6 +206,9 @@ class SimSeats:
                 self.war[:, row, tgt] |= declare
                 self.war[:, tgt, row] |= declare
                 self._reset_war_clock(row, tgt, declare)
+                # CIV6: war cancels every route between the two civs; the
+                # Traders return.
+                self._cancel_routes_pair(row, tgt, declare)
                 self.civ_warmonger[:, row] = self.civ_warmonger[:, row] + declare.long() * self._wm_dow
                 _dt = self.seat_denounced[:, row, tgt]
                 _formal = declare & (_dt >= 0) & ((int(self.turn) - _dt) >= self._formal_war_min)
@@ -816,6 +828,8 @@ class SimSeats:
                 if self._builder_idx >= 0:
                     cost_q = torch.where(ui == self._builder_idx,
                                          self._builder_cost(self.civ_builders_trained[:, row]).double(), cost_q)
+                # the TRADER prices off ITS escalator (game progress)
+                cost_q = torch.where(ui == self._trader_idx, self._trader_cost(row).double(), cost_q)
                 self.city_current[:, row, j] = torch.where(is_u, a, self.city_current[:, row, j])
                 self.city_cost[:, row, j] = torch.where(is_u, cost_q, self.city_cost[:, row, j])
                 self.city_progress[:, row, j] = torch.where(is_u, torch.zeros_like(self.city_progress[:, row, j]), self.city_progress[:, row, j])
@@ -1746,34 +1760,9 @@ class SimSeats:
         self._belief_feat_cache = (key, plane)
         return plane
 
-    def _route_raided_near(self, row: int, tiles: torch.Tensor) -> torch.Tensor:
-        """routeRaidedAt for seat row `row` over a tile set [..., N] — true where
-        a HOSTILE unit sits within 3. TS asks ONE predicate of every unit,
-        `isBarbSeat(u.seat) || (u.seat !== seat && civsAtWar(u.seat, seat))`,
-        which the war matrix answers for any seat pair; its diagonal is false,
-        so the row's OWN units drop out of both live arms without a special
-        case. unitsMode off raids nothing."""
-        out = torch.zeros(*tiles.shape, dtype=torch.bool, device=self.device)
-        if not self.units_mode:
-            return out
-        if self.barb_unit_tile.numel():
-            d_b = self.pair_dist[tiles.unsqueeze(-1), self.barb_unit_tile.clamp(min=0).unsqueeze(1)] <= 3
-            out = out | (d_b & self.barb_unit_alive.unsqueeze(1)).any(dim=-1)
-        if self.major_unit_tile.numel():
-            hostv = self.major_unit_alive & self.war[:, row, :].gather(1, self._seat_row[self.major_unit_seat.clamp(min=0)])
-            if bool(hostv.any()):
-                d_v = self.pair_dist[tiles.unsqueeze(-1), self.major_unit_tile.clamp(min=0).unsqueeze(1)] <= 3
-                out = out | (d_v & hostv.unsqueeze(1)).any(dim=-1)
-        # CIV6 (Reform the Coinage, Golden face): "your Traders cannot be
-        # plundered."
-        gd = self._golden_ded(row, self._ded_coinage)
-        if bool(gd.any()):
-            out = out & ~gd.reshape(-1, 1)
-        return out
-
     def _seat_route_income(self, row: int) -> torch.Tensor | None:
         """cityTradeYields for ANY seat row — per-COLUMN ORIGIN income from this
-        row's unraided outgoing routes, [B, cols, 6] double in engine yield
+        row's outgoing routes, [B, cols, 6] double in engine yield
         order (food, prod, gold, sci, cul, faith), or None when the row holds
         no active route batch-wide.
 
@@ -1787,7 +1776,9 @@ class SimSeats:
         routes at capture, and this gate is the mirror for the same-turn read.
         An INTERNATIONAL leg (seat_route_dcity >= 0, paired with
         seat_route_dseat) pays intlGold + the dest city's completed specialty
-        count to GOLD only, refused while at war with the dest's seat.
+        count to GOLD only. A route pays while it LIVES — interdiction is the
+        PLUNDER kill in _trade_walk_tick, and a war CANCELS the pair's routes
+        at the declaration, so no per-read war or raid gate survives here.
 
         Every specialty count is a DISTRICT REGISTRY read, for this row's own
         cities and for a foreign destination alike — specialtyDistricts walks
@@ -1823,16 +1814,9 @@ class SimSeats:
         from_j = fm.long().argmax(dim=2)
         dest_j = dm.long().argmax(dim=2)
         per = (1 + self._district_counts(row)[1] // 2).double()  # [B, cols] routeYields' food (= prod) column
-        centers = self.city_center[:, row, :cols].clamp(min=0)  # [B, cols]
-        # ONE hostile-near-endpoint mask [B, cols], reused by all three endpoint
-        # scans below — this row's own cities, a city-state destination and an
-        # international destination — because TS asks `routeRaidedAt(state,
-        # [origin, dest], seat)`, the same walk over every unit, for each.
-        near = self._route_raided_near(row, centers)
         inc = torch.zeros(B, cols * 6, dtype=torch.float64, device=self.device)
         # domestic legs
-        raided_d = near.gather(1, from_j) | near.gather(1, dest_j)  # [B, K]
-        pays_d = act & (rr[:, :, 1] >= 0) & has_from & has_dest & ~raided_d
+        pays_d = act & (rr[:, :, 1] >= 0) & has_from & has_dest
         pd = pays_d.double()
         inc.scatter_add_(1, from_j * 6 + 0, per.gather(1, dest_j) * pd)
         inc.scatter_add_(1, from_j * 6 + 1, per.gather(1, dest_j) * pd)
@@ -1849,12 +1833,9 @@ class SimSeats:
             _tr = self.rules.trade or {}
             citystate_gold = float(_tr.get("cityStateRouteGold", 3))
             citystate_spec = float(_tr.get("cityStateRouteSpec", 1))
-            csc = self.citystate_center[:, :S].clamp(min=0)
-            near_cs = self._route_raided_near(row, csc)
             css = citystate_s.clamp(max=S - 1)
             citystate_ok = self.citystate_alive[:, :S].gather(1, css) & (citystate_s < S)
-            raided_c = near.gather(1, from_j) | near_cs.gather(1, css)
-            pays_c = act & is_cs & has_from & citystate_ok & ~raided_c
+            pays_c = act & is_cs & has_from & citystate_ok
             pc = pays_c.double()
             inc.scatter_add_(1, from_j * 6 + 2, citystate_gold * pc)
             ycol = self._citystate_yidx[:, :S].gather(1, css)
@@ -1870,8 +1851,7 @@ class SimSeats:
                 inc.scatter_add_(1, from_j * 6 + 2, self._suz_route_gold * kf)
         # INTERNATIONAL legs: a route to ANY OTHER MAJOR's city
         # (seat_route_dcity >= 0) pays intlGold + the dest city's completed
-        # specialty count to GOLD only. Suspended while at war with the DEST's
-        # seat or while a hostile prowls within 3 of either endpoint.
+        # specialty count to GOLD only.
         rd_c = self.seat_route_dcity[:, row]  # [B, K] dest city id (>=0 = intl)
         intl = act & (rd_c >= 0)
         if bool(intl.any()):
@@ -1900,11 +1880,7 @@ class SimSeats:
             gdc = self._golden_ded(row, self._ded_coinage)
             if bool(gdc.any()):
                 gold_i = gold_i + self._coinage_spec_gold * spec_dest.double() * gdc.double().unsqueeze(1)
-            # routeRaidedAt reads the RESOLVED city's centerIndex, so the
-            # endpoint follows the lookup rather than a tile stored at creation.
-            dest_tile = self.city_center.gather(1, _rx).gather(2, _col).squeeze(2).clamp(min=0)  # [B, K]
-            raided_i = near.gather(1, from_j) | self._route_raided_near(row, dest_tile)
-            pays_i = intl & has_from & valid_dest & ~self.war[:, row, :].gather(1, dr) & ~raided_i
+            pays_i = intl & has_from & valid_dest
             inc.scatter_add_(1, from_j * 6 + 2, gold_i * pays_i.double())
         inc = inc.reshape(B, cols, 6)
         self._seat_route_cache = (key, inc)
@@ -2329,6 +2305,9 @@ class SimSeats:
         self.seat_route_dseat[b, src_row][kill] = -1
         self.seat_route_dcity[b, src_row][kill] = -1
         self.seat_route_exp[b, src_row][kill] = -1
+        self.seat_route_born[b, src_row][kill] = -1
+        self.seat_route_walk[b, src_row][kill] = -1
+        self.seat_route_leg[b, src_row][kill] = -1
         owned = (self.tile_seat[b] == src_row) & (self.tile_city[b] == cid)
         if conquest and int(self.city_alive[b, dst_row].sum()) >= int(self.rules.seats.get("maxCities", 6)):
             # The city simply ceases: tiles freed, centre unpaved (centre_slot_at
@@ -3833,41 +3812,26 @@ class SimSeats:
                 torch.where(issued, torch.full_like(cur2, -1), self.seat_citystate_quest_camp[:, row, :S]))
 
     def _seat_trade_phase(self, row: int, active: torch.Tensor) -> None:
-        """ONE new route per seat per turn while under capacity, then expiry —
-        the seatPhase creation block, for EVERY seat row.
+        """The seatPhase trade block, for EVERY seat row: the WALK and PLUNDER
+        engine rules, then the wire's route intent (the DECISION lives with
+        the policy — `_seat_route_candidate` is what the driver offers it),
+        then the round-trip expiry. Expiry ALWAYS runs — TS applies its filter
+        outside the intent block, so an at-capacity seat still sheds its
+        completing route."""
+        self._trade_walk_tick(row, active)
+        rv = self._driven_route.pop(row, None)
+        if rv is not None:
+            frm, dst = rv
+            self._apply_route(row, torch.where(active, frm, torch.full_like(frm, -1)), dst)
+        self._expire_seat_routes(row)
 
-        Capacity mirrors tradeCapacity: FOREIGN_TRADE civic +1, Market-OR-
-        Lighthouse per living city +1 (non-cumulative), each COMPLETED
-        Colossus/Great Zimbabwe in a city's wonder REGISTRY +1 (`c.wonders`,
-        not a tile scan), plus one per trade-type city-state this seat is
-        Suzerain of.
-
-        The pick mirrors the TS scan exactly: for each origin city in ARRAY
-        order, its own cities (array order) then the MET city-states (index
-        order); the best NEW in-range destination by the route's TOTAL yields —
-        domestic 2 + 2*floor(specialtyDistricts(dest)/2), a city-state's flat
-        gold+specialty — with strictly-greater-beats semantics, so ties keep the
-        FIRST pair in that flat scan order. `specialtyDistricts` counts the
-        destination's district REGISTRY, the same source TS filters.
-
-        Only when NO domestic or city-state candidate exists does the scan reach
-        INTERNATIONAL destinations: any OTHER major seat's city whose centre this
-        seat has EXPLORED (fog is the meeting rule here, as for city-states),
-        nearest first, ties by the same from-asc / seat-asc / city-asc order.
-        Rows are walked in block order, which IS `state.seats` order.
-
-        Slot order IS TS array order for every row: founding, capture and
-        transfer all append at last-alive+1 and _reclaim_cities is stable."""
+    def _trade_capacity(self, row: int) -> torch.Tensor:
+        """tradeCapacity: FOREIGN_TRADE civic +1, Market-OR-Lighthouse per
+        living city +1 (non-cumulative), each COMPLETED Colossus/Great
+        Zimbabwe in a city's wonder REGISTRY +1 (`c.wonders`, not a tile
+        scan), plus one per trade-type city-state this seat is Suzerain of."""
         B, RC, S, dev = self.B, self.RC, self.S, self.device
-        alive = self.city_alive[:, row]  # [B, RC]
-        rr = self.seat_routes[:, row]  # [B, K, 2]
-        # ONE city suffices — a met CS is a routable dest, and the TS gate is
-        # actor.cities.length >= 1. Domestic pairs still need 2, via the pair
-        # masks below.
-        want = active & (alive.sum(dim=1) >= 1)
-        if not bool(want.any()):
-            self._expire_seat_routes(row)
-            return
+        alive = self.city_alive[:, row]
         cap = torch.zeros(B, dtype=torch.long, device=dev)
         if self._trade_ftc >= 0:
             cap = cap + self._seat_civics(row)[:, self._trade_ftc].long()
@@ -3884,13 +3848,299 @@ class SimSeats:
         if S > 0:
             trade_ti = int(self.rules.citystate.get("tradeIdx", -1))
             cap = cap + (self._suzerain_mask(row)[:, :S] & (self.citystate_type[:, :S] == trade_ti)).sum(dim=1)
-        used = (rr[:, :, 0] >= 0).sum(dim=1)
-        want = want & (used < cap)
-        if not bool(want.any()):
-            self._expire_seat_routes(row)
+        return cap
+
+    def _free_trader(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """The seat's FREE Trader on the LOWEST tile — `freeTrader`'s twin.
+        (has [B] bool, major-pool slot [B], tile [B]). The tile is the
+        cross-engine key: one civilian per tile makes it unique."""
+        al = (
+            self.major_unit_alive
+            & (self.major_unit_seat == row)
+            & (self.major_unit_type == self._trader_idx)
+        )
+        t = torch.where(al, self.major_unit_tile, torch.full_like(self.major_unit_tile, 1 << 30))
+        tile_min, slot = t.min(dim=1)
+        return tile_min < (1 << 30), slot, tile_min
+
+    def _route_centres(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """[B, K] (origin centre, dest centre) per route slot, -1 where an
+        endpoint no longer names a living city — routeDestCenter plus the
+        origin's own lookup, all by PERSISTENT id."""
+        B, RC, S, dev = self.B, self.RC, self.S, self.device
+        rr = self.seat_routes[:, row]  # [B, K, 2]
+        K = rr.shape[1]
+        ids = self.city_id[:, row]
+        alive = self.city_alive[:, row]
+        ctr = self.city_center[:, row]
+        arc = torch.arange(RC, device=dev).reshape(1, 1, -1)
+
+        def own_centre(idt: torch.Tensor) -> torch.Tensor:
+            m = (idt.unsqueeze(2) == ids.unsqueeze(1)) & alive.unsqueeze(1) & (idt >= 0).unsqueeze(2)
+            hit = m.any(dim=2)
+            j = (m.long() * arc).sum(dim=2)  # ids unique per row: at most one hit
+            return torch.where(hit, ctr.gather(1, j), torch.full_like(idt, -1))
+
+        oc = own_centre(rr[:, :, 0])
+        to_id = rr[:, :, 1]
+        dc = own_centre(to_id.clamp(min=-1))
+        if S > 0:
+            csi = (-(to_id + 2)).clamp(min=0, max=S - 1)
+            csc = self.citystate_center[:, :S].gather(1, csi.reshape(B, -1)).reshape(B, K)
+            dc = torch.where(to_id <= -2, csc, dc)
+        rdc = self.seat_route_dcity[:, row]
+        if bool((rdc >= 0).any()):
+            dr = self.seat_route_dseat[:, row].clamp(min=0)
+            RCw = self.city_id.shape[2]
+            _rx = dr.unsqueeze(2).expand(B, K, RCw)
+            hit = (self.city_id.gather(1, _rx) == rdc.unsqueeze(2)) & self.city_alive.gather(1, _rx)
+            _col = hit.long().argmax(dim=2).unsqueeze(2)
+            i_ctr = self.city_center.gather(1, _rx).gather(2, _col).squeeze(2)
+            dc = torch.where((rdc >= 0) & hit.any(dim=2), i_ctr, dc)
+            dc = torch.where((rdc >= 0) & ~hit.any(dim=2), torch.full_like(dc, -1), dc)
+        return oc, dc
+
+    def _trade_min_duration(self) -> torch.Tensor:
+        """tradeRouteMinDuration: the base term plus the WORLD-era bump
+        (+10 per threshold era passed), [B] long."""
+        B, dev = self.B, self.device
+        we = torch.full((B,), -1, dtype=torch.long, device=dev)
+        for r in range(self.n_majors):
+            we = torch.maximum(we, self._civ_era(self.civ_techs[:, r], self.civ_civics[:, r]))
+        bump = torch.zeros(B, dtype=torch.long, device=dev)
+        for be in self._trade_dur_bumps:
+            bump = bump + (we >= be).long() * 10
+        return self._trade_duration + bump
+
+    def _trade_walk_tick(self, row: int, active: torch.Tensor) -> None:
+        """The Trader's WALK, then PLUNDER — phase.ts's trade-block head.
+
+        WALK: every land route's walker takes one descent step toward its leg
+        target (dest out, origin home), lays road where it lands, turns
+        around at the destination and starts a fresh round trip at home. The
+        two legs may descend different lines — the descent is greedy per
+        step, not a stored path.
+
+        PLUNDER: a unit hostile to the route's owner standing on the walker's
+        tile destroys the route AND its Trader; a MAJOR raider (the lowest
+        hostile seat id on a shared tile — the cross-engine tie-break) banks
+        the gold. CIV6 (Reform the Coinage, Golden face): "your Traders
+        cannot be plundered"."""
+        dev = self.device
+        act = self.seat_routes[:, row, :, 0] >= 0  # [B, K]
+        leg = self.seat_route_leg[:, row]
+        walking = act & (leg >= 0) & active.unsqueeze(1)
+        if bool(walking.any()):
+            oc, dc = self._route_centres(row)
+            live = walking & (oc >= 0) & (dc >= 0)
+            if bool(live.any()):
+                bb, kk = live.nonzero(as_tuple=True)
+                cur = self.seat_route_walk[bb, row, kk]
+                lg = leg[bb, kk]
+                tgt = torch.where(lg == 0, dc[bb, kk], oc[bb, kk])
+                nxt = self._trade_walk_step(bb, cur, tgt)
+                self.seat_route_walk[bb, row, kk] = nxt
+                moved = nxt != cur
+                if bool(moved.any()):
+                    self.road[bb[moved], nxt[moved]] = True
+                new_leg = torch.where((lg == 0) & (nxt == dc[bb, kk]), torch.ones_like(lg),
+                                      torch.where((lg == 1) & (nxt == oc[bb, kk]), torch.zeros_like(lg), lg))
+                self.seat_route_leg[bb, row, kk] = new_leg
+        wt = self.seat_route_walk[:, row]
+        chk = act & (wt >= 0) & active.unsqueeze(1)
+        if row < self.n_majors:
+            chk = chk & ~self._golden_ded(row, self._ded_coinage).unsqueeze(1)
+        if not bool(chk.any()):
             return
-        # dest score (destination-only): routeYields food+prod =
-        # 2 + 2*floor(destCompletedSpecialty/2)
+        bb, kk = chk.nonzero(as_tuple=True)
+        tiles = wt[bb, kk]
+        ms = self.military_at[bb, tiles]
+        cv = self.civilian_at[bb, tiles]
+        s_m = torch.where(ms >= 0, self.unit_seat[bb, ms.clamp(min=0)], torch.full_like(ms, -1))
+        s_c = torch.where(cv >= 0, self.unit_seat[bb, cv.clamp(min=0)], torch.full_like(cv, -1))
+
+        def hostile(sp: torch.Tensor) -> torch.Tensor:
+            valid = sp >= 0
+            barb = sp == BARB_SEAT
+            rb = self._seat_row[sp.clamp(min=0)]
+            at_war = self.war[bb, row, rb]
+            return valid & (sp != row) & (barb | at_war)
+
+        h_m, h_c = hostile(s_m), hostile(s_c)
+        big = torch.full_like(s_m, 1 << 30)
+        raider = torch.minimum(torch.where(h_m, s_m, big), torch.where(h_c, s_c, big))
+        hit = raider < (1 << 30)
+        if not bool(hit.any()):
+            return
+        hb, hk, hr = bb[hit], kk[hit], raider[hit]
+        mj = hr < self.n_majors
+        if bool(mj.any()):
+            self.civ_treasury.index_put_(
+                (hb[mj], hr[mj]),
+                torch.full((int(mj.sum()),), float(self._trade_plunder_gold), dtype=torch.float64, device=dev),
+                accumulate=True,
+            )
+        self.seat_routes[hb, row, hk] = -1
+        self.seat_route_dseat[hb, row, hk] = -1
+        self.seat_route_dcity[hb, row, hk] = -1
+        self.seat_route_exp[hb, row, hk] = -1
+        self.seat_route_born[hb, row, hk] = -1
+        self.seat_route_walk[hb, row, hk] = -1
+        self.seat_route_leg[hb, row, hk] = -1
+
+    def _free_route_slot(self, rws: torch.Tensor, row: int) -> torch.Tensor:
+        K = self.seat_routes.shape[2]
+        free = self.seat_routes[rws, row, :, 0] < 0
+        s = torch.where(free, torch.arange(K, device=self.device).reshape(1, -1), torch.full((1, K), K, device=self.device)).min(dim=1).values
+        assert int(s.max()) < K, "seat_routes columns exhausted — raise K above the capacity bound"
+        return s
+
+    def _apply_route(self, row: int, frm: torch.Tensor, dst: torch.Tensor) -> None:
+        """Apply the wire's route intent for seat row `row` — [origin CENTRE,
+        dest code (a CENTRE tile, or -(2+csIndex))]. Re-validates what canAdd*
+        validates — origin resolves, capacity, no duplicate, range, a free
+        Trader — then SPENDS the Trader and creates the route: exp = turn +
+        the era minimum, born = turn, the walker at the origin, leg 0 on a
+        land path (road on the origin) or -1 parked (a sea route)."""
+        B, S, dev = self.B, self.S, self.device
+        want = frm >= 0
+        if not bool(want.any()):
+            return
+        alive = self.city_alive[:, row]
+        ids = self.city_id[:, row]
+        centers = self.city_center[:, row]
+        rr = self.seat_routes[:, row]
+        fm = (centers == frm.unsqueeze(1)) & alive
+        has_o = fm.any(dim=1)
+        o_j = fm.long().argmax(dim=1)
+        used = (rr[:, :, 0] >= 0).sum(dim=1)
+        t_has, t_slot, t_tile = self._free_trader(row)
+        ok = want & has_o & (used < self._trade_capacity(row)) & t_has
+        if not bool(ok.any()):
+            return
+        o_id = ids.gather(1, o_j.unsqueeze(1)).squeeze(1)
+        o_ct = centers.gather(1, o_j.unsqueeze(1)).squeeze(1)
+        rng = self._trade_range
+        d = self.pair_dist[o_ct.clamp(min=0), dst.clamp(min=0)].to(torch.long)
+        to_code = torch.full((B,), -1, dtype=torch.long, device=dev)
+        dseat = torch.full((B,), -1, dtype=torch.long, device=dev)
+        dcity = torch.full((B,), -1, dtype=torch.long, device=dev)
+        dest_ct = torch.full((B,), -1, dtype=torch.long, device=dev)
+        take = torch.zeros(B, dtype=torch.bool, device=dev)
+        # DOMESTIC: my alive city with that centre, not the origin
+        dm = (centers == dst.unsqueeze(1)) & alive
+        dom = ok & (dst >= 0) & (dst != o_ct) & dm.any(dim=1)
+        if bool(dom.any()):
+            d_j = dm.long().argmax(dim=1)
+            d_id = ids.gather(1, d_j.unsqueeze(1)).squeeze(1)
+            dup = ((rr[:, :, 0] == o_id.unsqueeze(1)) & (rr[:, :, 1] == d_id.unsqueeze(1))).any(dim=1)
+            dom = dom & ~dup & (d <= rng)
+            to_code = torch.where(dom, d_id, to_code)
+            dest_ct = torch.where(dom, dst, dest_ct)
+            take = take | dom
+        # CITY-STATE: dest code -(2+csIndex); canAddCsTradeRoute's gates
+        if S > 0:
+            csi = (-(dst + 2)).clamp(min=0, max=S - 1)
+            met = self.seat_citystate_met[:, row, :S].gather(1, csi.unsqueeze(1)).squeeze(1)
+            csc = self.citystate_center[:, :S].gather(1, csi.unsqueeze(1)).squeeze(1)
+            d_cs = self.pair_dist[o_ct.clamp(min=0), csc.clamp(min=0)].to(torch.long)
+            dupc = ((rr[:, :, 0] == o_id.unsqueeze(1)) & (rr[:, :, 1] == dst.unsqueeze(1))).any(dim=1)
+            cs_ok = ok & (dst <= -2) & ((-(dst + 2)) < S) & met & ~dupc & (d_cs <= rng)
+            to_code = torch.where(cs_ok, dst, to_code)
+            dest_ct = torch.where(cs_ok, csc, dest_ct)
+            take = take | cs_ok
+        # INTERNATIONAL: another major's living city with that centre
+        intl_p = ok & (dst >= 0) & (dst != o_ct) & ~take
+        if bool(intl_p.any()) and self.n_majors > 1:
+            for r2 in range(self.n_majors):
+                if r2 == row:
+                    continue
+                m2 = (self.city_center[:, r2] == dst.unsqueeze(1)) & self.city_alive[:, r2]
+                hit2 = intl_p & m2.any(dim=1)
+                if not bool(hit2.any()):
+                    continue
+                j2 = m2.long().argmax(dim=1)
+                id2 = self.city_id[:, r2].gather(1, j2.unsqueeze(1)).squeeze(1)
+                dupi = (
+                    (rr[:, :, 0] == o_id.unsqueeze(1))
+                    & (self.seat_route_dseat[:, row] == r2)
+                    & (self.seat_route_dcity[:, row] == id2.unsqueeze(1))
+                ).any(dim=1)
+                hit2 = hit2 & ~dupi & (d <= rng)
+                dseat = torch.where(hit2, torch.full_like(dseat, r2), dseat)
+                dcity = torch.where(hit2, id2, dcity)
+                dest_ct = torch.where(hit2, dst, dest_ct)
+                take = take | hit2
+                intl_p = intl_p & ~hit2
+        if not bool(take.any()):
+            return
+        rows = take.nonzero(as_tuple=True)[0]
+        slot = self._free_route_slot(rows, row)
+        self.seat_routes[rows, row, slot, 0] = o_id[rows]
+        self.seat_routes[rows, row, slot, 1] = to_code[rows]
+        self.seat_route_dseat[rows, row, slot] = dseat[rows]
+        self.seat_route_dcity[rows, row, slot] = dcity[rows]
+        md = self._trade_min_duration()
+        self.seat_route_exp[rows, row, slot] = int(self.turn) + md[rows]
+        self.seat_route_born[rows, row, slot] = int(self.turn)
+        self.seat_route_walk[rows, row, slot] = o_ct[rows]
+        land = self._trade_land_ok(rows, o_ct[rows], dest_ct[rows])
+        self.seat_route_leg[rows, row, slot] = torch.where(land, torch.zeros_like(slot), torch.full_like(slot, -1))
+        lr = rows[land]
+        if len(lr) > 0:
+            # the walker lays road on every tile it stands on; the origin is turn 0
+            self.road[lr, o_ct[rows][land]] = True
+        # SPEND the Trader
+        self.major_unit_alive[rows, t_slot[rows]] = False
+        self.civilian_at[rows, t_tile[rows]] = -1
+
+    def _cancel_routes_pair(self, i: int, j: int, mask: torch.Tensor) -> None:
+        """cancelRoutesBetween's twin — a DECLARED war cancels every route
+        between the pair, both directions; each hands its Trader back at the
+        origin (a cancel is not a plunder — the unit survives)."""
+        for a, b in ((i, j), (j, i)):
+            kill = (self.seat_routes[:, a, :, 0] >= 0) & (self.seat_route_dseat[:, a] == b) & mask.unsqueeze(1)
+            if not bool(kill.any()):
+                continue
+            oc, _dc = self._route_centres(a)
+            K = self.seat_routes.shape[2]
+            for k in range(K):
+                m = kill[:, k] & (oc[:, k] >= 0)
+                if bool(m.any()):
+                    self._spawn_unit(a, m, oc[:, k].clamp(min=0), self._trader_idx)
+            self.seat_routes[:, a][kill] = -1
+            self.seat_route_dseat[:, a][kill] = -1
+            self.seat_route_dcity[:, a][kill] = -1
+            self.seat_route_exp[:, a][kill] = -1
+            self.seat_route_born[:, a][kill] = -1
+            self.seat_route_walk[:, a][kill] = -1
+            self.seat_route_leg[:, a][kill] = -1
+
+    def _seat_route_candidate(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """The route CANDIDATE this seat would take — routeCandidateRow's
+        twin: [B] origin CENTRE and [B] dest code (a CENTRE tile, or
+        -(2+csIndex)); -1/-1 where none.
+
+        The scan is the old eager rule's, verbatim: for each origin city in
+        ARRAY order, its own cities (array order) then the MET city-states
+        (index order); the best NEW in-range destination by the route's TOTAL
+        yields — domestic 2 + 2*floor(specialtyDistricts(dest)/2), a
+        city-state's flat gold+specialty — with strictly-greater-beats
+        semantics, so ties keep the FIRST pair in that flat scan order. Only
+        when NO domestic or city-state candidate exists does the scan reach
+        INTERNATIONAL destinations: any OTHER major's city whose centre this
+        seat has EXPLORED, nearest first, ties by the same from-asc /
+        seat-asc / city-asc order. Gated on capacity AND a free Trader — the
+        unit the verb spends. Slot order IS TS array order for every row."""
+        B, RC, S, dev = self.B, self.RC, self.S, self.device
+        neg = torch.full((B,), -1, dtype=torch.long, device=dev)
+        alive = self.city_alive[:, row]  # [B, RC]
+        rr = self.seat_routes[:, row]  # [B, K, 2]
+        want = alive.sum(dim=1) >= 1
+        used = (rr[:, :, 0] >= 0).sum(dim=1)
+        want = want & (used < self._trade_capacity(row)) & self._free_trader(row)[0]
+        if not bool(want.any()):
+            return neg, neg
         dt = self.city_dist_tile[:, row]  # [B, RC, nD] tile per district TYPE
         comp = (dt >= 0) & self.district_complete.gather(1, dt.clamp(min=0).reshape(B, -1)).reshape_as(dt)
         spec = (comp & self._is_specialty.reshape(1, 1, -1)).sum(dim=2)  # [B, RC]
@@ -3942,39 +4192,19 @@ class SimSeats:
         kf = key.reshape(B, RC * W2)  # i-major flat order = the TS from-asc, dests-then-CS scan
         kmax, _ = kf.max(dim=1)
         first = torch.where(kf == kmax.unsqueeze(1), torch.arange(RC * W2, device=dev).reshape(1, -1), torch.full((1, RC * W2), RC * W2, device=dev)).min(dim=1).values
-        K = self.seat_routes.shape[2]
-        exp_val = int(self.turn) + self._trade_duration
-
-        def _free_slot(rws: torch.Tensor) -> torch.Tensor:
-            free = self.seat_routes[rws, row, :, 0] < 0
-            s = torch.where(free, torch.arange(K, device=dev).reshape(1, -1), torch.full((1, K), K, device=dev)).min(dim=1).values
-            assert int(s.max()) < K, "seat_routes columns exhausted — raise K above the capacity bound"
-            return s
-
+        frm_c = neg.clone()
+        dest_c = neg.clone()
         do = want & (kmax >= 0)
         if bool(do.any()):
             rows = do.nonzero(as_tuple=True)[0]
-            i_pick = (first[rows] // W2)
-            jj_pick = (first[rows] % W2)
-            to_id = torch.where(jj_pick < RC, ids[rows, jj_pick.clamp(max=RC - 1)], -(2 + (jj_pick - RC)))
-            slot = _free_slot(rows)
-            self.seat_routes[rows, row, slot, 0] = ids[rows, i_pick]
-            self.seat_routes[rows, row, slot, 1] = to_id
-            self.seat_route_dseat[rows, row, slot] = -1
-            self.seat_route_dcity[rows, row, slot] = -1
-            self.seat_route_exp[rows, row, slot] = exp_val
-            _o = centers[rows, i_pick]
-            _d = torch.where(
-                jj_pick < RC,
-                centers[rows, jj_pick.clamp(max=RC - 1)],
-                self.citystate_center[rows, (jj_pick - RC).clamp(min=0, max=max(S - 1, 0))],
-            )
-            self._lay_trade_road(rows, _o, _d)
-
+            i_pick = first[rows] // W2
+            jj = first[rows] % W2
+            frm_c[rows] = centers[rows, i_pick]
+            dest_c[rows] = torch.where(jj < RC, centers[rows, jj.clamp(max=RC - 1)], -(2 + (jj - RC)))
         # international: rows that WANT a route but found no domestic/CS
         # candidate consider ANY OTHER MAJOR's city whose centre this seat has
         # EXPLORED, NEAREST first (ties keep from-asc, then the block-row scan
-        # order, which IS TS's `state.seats` order).
+        # order, which IS `state.seats` order).
         intl_want = want & (kmax < 0)
         dctr_l, dalv_l, did_l, drow_l = [], [], [], []
         for r2 in range(self.n_majors):
@@ -4019,47 +4249,55 @@ class SimSeats:
             doi = intl_want & (dmin < BIG)
             if bool(doi.any()):
                 rows = doi.nonzero(as_tuple=True)[0]
-                i_pick = (firsti[rows] // D)
-                c_pick = (firsti[rows] % D)
-                dest_tile = dctr[rows, c_pick]
-                slot = _free_slot(rows)
-                self.seat_routes[rows, row, slot, 0] = ids[rows, i_pick]
-                self.seat_routes[rows, row, slot, 1] = -1
-                self.seat_route_dseat[rows, row, slot] = drow[rows, c_pick]
-                self.seat_route_dcity[rows, row, slot] = did[rows, c_pick]
-                self.seat_route_exp[rows, row, slot] = exp_val
-                self._lay_trade_road(rows, centers[rows, i_pick], dest_tile)
-
-        # after the pick, expire due routes; freed capacity re-picks NEXT turn.
-        # This ALWAYS runs — TS applies the expiry filter OUTSIDE the
-        # capacity-gated pick block, so an at-capacity seat still sheds its
-        # expiring route, which is why the early returns above call it too.
-        self._expire_seat_routes(row)
+                i_pick = firsti[rows] // D
+                c_pick = firsti[rows] % D
+                frm_c[rows] = centers[rows, i_pick]
+                dest_c[rows] = dctr[rows, c_pick]
+        return frm_c, dest_c
 
     def _expire_seat_routes(self, row: int) -> None:
-        """Drop seat row `row`'s routes whose expiresTurn has arrived, plus any
-        international route whose (seat, city id) destination no longer names a
-        living city — the tradeRoutes filter's second arm,
-        `seatOf(toSeat).cities.some(c => c.id === toSeatCity)`. A CAPTURE mints
-        the flipped city a fresh id under the CAPTOR's seat, so both halves of
-        the pair stop matching and the route dies. Consumers gate on active
-        (seat_routes[..., 0] >= 0), so this is idempotent per turn."""
+        """End seat row `row`'s routes. COMPLETION is the minimum term (exp)
+        having arrived WITH the Trader home — the round-trip rule; a parked
+        sea walker (leg -1) is always home, a stuck one ends at the walk
+        rail. A completed or destination-dead route hands its Trader back at
+        the origin (only plunder destroys the unit); only COMPLETION scores
+        Coinage. An international destination dies when its (seat, city id)
+        stops naming a living city — a capture mints the flipped city a fresh
+        id under the CAPTOR's seat, so both halves stop matching."""
         act = self.seat_routes[:, row, :, 0] >= 0
         exp = self.seat_route_exp[:, row]
-        expired = act & (exp >= 0) & (exp <= int(self.turn))
+        leg = self.seat_route_leg[:, row]
+        wt = self.seat_route_walk[:, row]
+        oc, _dc = self._route_centres(row)
+        term = act & (exp >= 0) & (exp <= int(self.turn))
+        home = (leg < 0) | ((oc >= 0) & (wt == oc))
+        rail = (exp >= 0) & (exp + self._trade_walk_rail <= int(self.turn))
+        completed = term & (home | rail)
         # CIV6 (Reform the Coinage, dark face): "+1 Era Score each time you
-        # successfully complete a Trade Route" — the term running out, never a
-        # dead-destination cut.
+        # successfully complete a Trade Route" — the term running out with the
+        # round trip done, never a route cut short.
         if row < self.n_majors:
-            self._dedication_event(row, self._ded_coinage, expired.sum(dim=1))
-        dst, dc = self._route_dest_alive(row)
-        dest_gone = act & (dc >= 0) & ~dst
-        drop = expired | dest_gone
+            self._dedication_event(row, self._ded_coinage, completed.sum(dim=1))
+        dst, dc2 = self._route_dest_alive(row)
+        dest_gone = act & (dc2 >= 0) & ~dst
+        drop = completed | dest_gone
         if bool(drop.any()):
+            if row < self.n_majors:
+                # ended routes hand their Traders back at the origin, in slot
+                # order (TS array order) — the spot search fills outward when
+                # the centre is taken.
+                K = self.seat_routes.shape[2]
+                for k in range(K):
+                    m = drop[:, k] & (oc[:, k] >= 0)
+                    if bool(m.any()):
+                        self._spawn_unit(row, m, oc[:, k].clamp(min=0), self._trader_idx)
             self.seat_routes[:, row][drop] = -1
             self.seat_route_dseat[:, row][drop] = -1
             self.seat_route_dcity[:, row][drop] = -1
             self.seat_route_exp[:, row][drop] = -1
+            self.seat_route_born[:, row][drop] = -1
+            self.seat_route_walk[:, row][drop] = -1
+            self.seat_route_leg[:, row][drop] = -1
 
     def _route_dest_alive(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         """For each of seat row `row`'s route slots: does its INTERNATIONAL

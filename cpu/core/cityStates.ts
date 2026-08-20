@@ -1,6 +1,7 @@
 
 import type { City, CityState, CityStateQuest, CityStateType, GameState, Tile, Yields } from './types';
 import { NO_SEAT, citiesOf, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileSeat, treatyTurnsWith, warTurnsWith } from './seats';
+import { cancelRoutes } from './trade';
 import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from '../../world/hex';
 import { isWater, isImpassable, hasFreshWater } from '../../world/query';
@@ -315,6 +316,8 @@ export function declareWarOnCityState(state: GameState, cityStateId: number, sea
   const bound = treatyTurnsWith(state, cityState.seat, seat);
   if (bound > 0) return { ok: false, reason: `The peace treaty binds for another ${bound} turns.` };
   setWar(state, cityState.seat, seat, true);
+  // CIV6: war cancels the routes with the new enemy; the Traders return.
+  cancelRoutes(state, seat, (r) => r.toCs === cityStateId);
   state.eventLog.push(`You have declared war on ${cityState.name}!`);
   return { ok: true };
 }

@@ -59,12 +59,12 @@ nothing carries forward.
 | B-22r World Congress | 4 | the vote is scripted (wire head pending); emergencies/competitions absent; 4 of ~18 resolutions |
 | B-24r Ages/governors | 2 | four system-less dedication entries, dark-age policies, governor promotions, per-civ era drift |
 | B-30r specialists | 2 | the mechanic is live; the free-assignment wire head and its observation stay open |
-| B-31r trade-route tails | 6 | a Trader UNIT and a route wire verb |
+| B-31r trade-route tails | 2 | sea legs park at origin, no trading posts, plunder gold is a stylization, one candidate not a free pick |
 | B-D unsourced data values | 1 | swept; residuals are NAMED stylizations, each labelled at its definition |
 | B-35r theological damage | 1 | deterministic and LINEAR where real Civ 6 rolls; the martyr draw shows a mirrored conditional draw is available |
 | B-34r flood tails | 1 | GS floods also damage UNITS and kill citizens, and a centre on a floodplain loses HP; and the Dam/Great Bath that mitigates a river is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **25** | |
-| **OPEN, TOTAL** | **25** | |
+| **B. Fidelity vs real Civ 6** | **21** | |
+| **OPEN, TOTAL** | **21** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -88,7 +88,8 @@ compared only how many routes existed (destination, expiry and pair
 identity went unverified on both engines), and `religionFounded` compared
 `holy_tile >= 0` — a proxy — where every founded-gate in the GPU reads
 `civ_religion_done`. Both now compare the fact itself: `routes` emits each
-route as [fromTile, destTile, kind, expiresTurn] in CENTRE-TILE space, and
+route as [fromTile, destTile, kind, expiresTurn, createdTurn, walkTile,
+walkLeg] in CENTRE-TILE space, and
 the belief DONE bits (`pantheonDone`, `enhancerDone`, `religionFounded`)
 are compared against their TS predicates. The census enforces the rule that
 found them — a field naming more than one plane must state what it
@@ -125,7 +126,7 @@ Civ 6 source or is recorded as unverifiable.
   City/Toronto regional reach, Anshan works science, Kumasi per-specialty
   route yields, Jerusalem Holy-Site pressure. The remaining catalog rows carry
   their reason in their `CITY_STATE_SUZERAIN_BONUS` entry's `note`: whole
-  absent systems (POWER, trading posts, route PATHS, unit promotions, unique
+  absent systems (POWER, trading posts, unit promotions, unique
   improvements/luxuries, a faith-purchase class, random-Inspiration draws) or
   a flat channel standing in for a %-scaling.
 - **B-22r. World Congress residuals.** The session is real now: a
@@ -215,12 +216,25 @@ Civ 6 source or is recorded as unverifiable.
     Civ 5); the Film Studio alternative for the Theater tier and the
     coal/oil/nuclear plant split remain unmodeled upstream (B-D records
     the generic POWER_PLANT).
-- **B-31r. Trade-route tails.** (1) No physical Trader UNIT — routes lay
-  roads (`layTradeRoad` / `_lay_trade_road`) but nothing walks the path, so
-  a route cannot be plundered en route and its range is not a journey.
-  (2) No seat's wire carries a trade-route DECISION: route creation is an
-  eager rule on both engines, where a real player spends a Trader on a
-  chosen pair. A route verb is P8-surface work.
+- **B-31r. Trade-route tails.** The Trader is a UNIT now (Ancient
+  civilian, FOREIGN_TRADE, progressive cost) that a route SPENDS; it walks
+  the land path laying roads, holds the route open until the round trip
+  completes, comes back on completion or a war cancel, and DIES to an
+  at-war unit standing on its tile. The decision is a wire verb
+  (`SeatActionRecord.route`), re-validated by both appliers, with the
+  candidate row tripwire-compared in the serve gate. Open:
+  - SEA legs: real GS water routes have range 30 with harbor refuel and
+    the Trader embarks the journey; ours parks the Trader at the origin
+    (`walkLeg` -1) and the route ends on the term alone.
+  - TRADING POSTS are still not founded — no range refuel, no per-post
+    gold at repeat destinations (Bandar Brunei's row waits on them).
+  - `PLUNDER_ROUTE_GOLD` (50) is a stylization; no public source names
+    the real base magnitude.
+  - The destination is ONE candidate row plus a take/skip, not a free
+    pick over every legal pair, and the observation renders no
+    alternatives — the free-choice head is P8-surface work, alongside the
+    route verb joining `env.step` (which today carries no buy/levy
+    either).
 - **B-D. UNSOURCED DATA VALUES — swept; named stylizations remain.**
   The full cpu/data walk fetched every magnitude from the GS Civilopedia
   row by row: all 28 wonders (12 corrected, every unlock now the real
@@ -273,38 +287,43 @@ three of them overturned what this section used to assert:
 
 | mechanic | seeds reaching | first |
 |---|---|---|
-| faith-buy kind 6 (APOSTLE purchase) | 12/12 | t58 |
-| two enemy religious units ADJACENT (theological combat's precondition) | 7/12 | t98 |
-| a second HULL on any seat | 7/12 | t129 |
-| an INTERNATIONAL trade leg | 1/12 | t213 |
-| URBANIZATION civic | 0/12 | never |
-| a NEIGHBORHOOD placed | 0/12 | never |
+| faith-buy kind 6 (APOSTLE purchase) | 12/12 | t73 |
+| two enemy religious units ADJACENT (theological combat's precondition) | 5/12 | t125 |
+| a second HULL on any seat | 6/12 | t143 |
+| an INTERNATIONAL trade leg | 0/12 | never |
+| URBANIZATION civic | 1/12 | t242 |
+| a NEIGHBORHOOD placed | 1/12 | t243 |
 | an antiquity dig (artifact in a slot) | 0/12 | never |
 
-- THEOLOGICAL COMBAT IS REACHED, in two-thirds of seeds from t98. The old
+- THEOLOGICAL COMBAT IS REACHED, in 5 of 12 seeds from t125. The old
   claim here — "a gate that never puts two apostles side by side proves
   nothing about it" — was wrong: the gate does, so the resolver's
   deterministic damage and its apostle-only initiation ARE gate-covered.
-- The APOSTLE BUY fires in every seed from t58 and the 250-turn gate is
+- The APOSTLE BUY fires in every seed from t73 and the 250-turn gate is
   green, which is what closed B-18r's predicted lifecycle drift.
-- The NEIGHBORHOOD column is poke-covered only: no seed reaches
-  URBANIZATION (an Industrial civic, cost 1060, behind CIVIL_ENGINEERING and
-  NATIONALISM) inside 250 turns, so nothing places one.
-- A SECOND HULL now reaches 7 of 12 seeds from t129, where the one-galley
-  heuristic held it at zero: dropping it put every naval rule past the first
-  ship inside the gate. The same wider trajectory finally fires an
-  INTERNATIONAL trade leg, in one seed at t213 — so the `routes` digest
-  field's international arm is exercised, barely, and its domestic and
-  city-state arms every game.
+- URBANIZATION and a NEIGHBORHOOD arrive in ONE seed at t242/t243 — the
+  Trader-economy trajectory is the first to put the column inside the
+  gate at all; every other seed still leans on the poke lane.
+- A SECOND HULL reaches 6 of 12 seeds from t143. The route KINDS moved
+  the other way under the Trader economy: routes wait for FOREIGN_TRADE
+  plus a trained Trader (~t60+), by which point specialty districts lift
+  the domestic pair past the flat city-state yields in the candidate
+  scan, and a completion hands the Trader straight to the next domestic
+  pair. Measured over 12 driven seeds: 319 domestic routes (~27/seed,
+  239 natural round-trip completions, 13 early ends), 11 city-state
+  routes over 5 seeds, and the INTERNATIONAL arm fires in NONE — it was
+  1/12 before the rework. The intl arm lives in `trade2_test` pokes and
+  the TS trade-fidelity suite, and the serve gate's ROUTE tripwire still
+  compares the candidate pair on every turn a Trader is free — but the
+  digest's intl rows ride pokes alone.
 - No antiquity dig happens at all, so the finer question this section used to
   ask — a dig by a seat whose ERA differs from row 0's — is doubly moot:
   eras are global 50-turn blocks (B-24r), so no two seats can be in different
   eras by construction.
-- The CULTURE VICTORY's distance, re-measured (the pre-freeze figure was ~7
-  visiting vs ~97 domestic): at t250 visiting peaks at 6 (mean 1.3) against a
-  domestic peak of 68 (mean 41) — still an order of magnitude out of reach,
-  now ~11x rather than ~14x. B-20r's scope should be read off this, not the
-  old number.
+- The CULTURE VICTORY's distance, re-measured under the Trader economy:
+  at t250 visiting peaks at 5 (mean ~0.6) against a domestic peak of 79
+  (mean ~39) — the gap WIDENED to ~60x on means. B-20r's scope should be
+  read off this, not any older number.
 - The space race needs Information-era techs no gate lane reaches; its poke
   lanes are the proof.
 - A barbarian march choosing a CIV row's city while a row-0 city stands

@@ -378,7 +378,7 @@ SUPPORT_CS = 2
 # barb xp plane); civilians never fight. XP_LEVELS grant a flat +5 CS per level
 # at every roll the unit fights — an integer add into the CS assembly like the
 # flanking terms.
-TRADE_ROAD_MAX_STEPS = 32  # the layTradeRoad safety rail
+TRADE_ROAD_MAX_STEPS = 32  # the tradeLandReachable/walk safety rail
 XP_ATTACK = 5
 XP_DEFEND = 2
 XP_LEVEL_CS = 5
@@ -482,6 +482,7 @@ _MUTABLE = [
     "city_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dseat", "seat_route_dcity",  # international dest (seat row, city id), else -1/-1 (domestic/CS)
+    "seat_route_born", "seat_route_walk", "seat_route_leg",  # the Trader's walk (birth turn, tile, leg)
     "city_id",
     "unit_next",
     "gp_earned", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",

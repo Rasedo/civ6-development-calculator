@@ -22,10 +22,12 @@ import { GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT } from '../data/constants';
 import { PEACE_GOLD_COST, DED_MONUMENTALITY } from '../data/seats';
 import { SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
 import { BUY_UNITS } from '../core/phase';
+import { tradeCapacity, freeTrader, routeYields, cityStateRouteYields, TRADE_ROUTE_RANGE } from '../core/trade';
+import { isExplored } from '../core/fog';
 import { buildingFaithCost, endTurn, goldAffordable, settlerCost, tilePurchaseCost } from '../core/game';
 import { goldenDedication, monumentalityBuyMult } from '../core/eras';
 import { builderCost } from '../core/units';
-import { isSuzerain } from '../core/cityStates';
+import { hasMet, isSuzerain } from '../core/cityStates';
 import { pickBorderTile } from '../core/city';
 import { WORSHIP_BUILDINGS, MISSIONARY_CAP, APOSTLE_CAP, ENHANCER_BELIEFS } from '../data/religion';
 import { LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
@@ -51,6 +53,62 @@ export interface DriverOpts {
   civicList: { id: string }[];
   recv: () => Promise<string>;
   send: (msg: unknown) => void;
+}
+
+/** The route CANDIDATE this seat would take — the scan the old eager rule
+ * ran, now a decider-side row: own cities in array order, domestic dests
+ * then MET city-states (from asc, to asc, cityState asc), best NEW in-range
+ * pair by the route's TOTAL yields, strictly-greater beats; only when no
+ * domestic/CS pair exists, the nearest EXPLORED international city.
+ * [origin CENTRE, dest code (CENTRE or -(2+csIndex))], [-1,-1] = none.
+ * Gated on capacity AND a free Trader — the unit the verb spends. */
+export function routeCandidateRow(state: GameState, actor: Seat): number[] {
+  const routes = actor.tradeRoutes ?? [];
+  if (actor.cities.length < 1) return [-1, -1];
+  if (routes.length >= tradeCapacity(state, actor.seat)) return [-1, -1];
+  if (state.unitsMode && !freeTrader(state, actor.seat)) return [-1, -1];
+  let best: { from: number; dest: number; ySum: number } | null = null;
+  for (const from of actor.cities) {
+    const ft = state.map.tiles[from.centerIndex];
+    for (const to of actor.cities) {
+      if (to.id === from.id) continue;
+      if (routes.some((x) => x.from === from.id && x.to === to.id)) continue;
+      const tt = state.map.tiles[to.centerIndex];
+      if (hexDistance(ft.col, ft.row, tt.col, tt.row) > TRADE_ROUTE_RANGE) continue;
+      const y = routeYields(state, to);
+      const ySum = y.food + y.production;
+      if (!best || ySum > best.ySum) best = { from: from.centerIndex, dest: to.centerIndex, ySum };
+    }
+    for (let ci = 0; ci < state.cityStates.length; ci++) {
+      const cityState = state.cityStates[ci];
+      if (!hasMet(cityState, actor.seat)) continue;
+      if (routes.some((x) => x.from === from.id && x.toCs === cityState.id)) continue;
+      const ct = state.map.tiles[cityState.centerIndex];
+      if (hexDistance(ft.col, ft.row, ct.col, ct.row) > TRADE_ROUTE_RANGE) continue;
+      const cy = cityStateRouteYields(cityState);
+      const ySum = cy.food + cy.production + cy.gold + cy.science + cy.culture + cy.faith;
+      if (!best || ySum > best.ySum) best = { from: from.centerIndex, dest: -(2 + ci), ySum };
+    }
+  }
+  if (!best) {
+    let bi: { from: number; dest: number; d: number } | null = null;
+    for (const from of actor.cities) {
+      const ft = state.map.tiles[from.centerIndex];
+      for (const other of state.seats) {
+        if (other.seat === actor.seat) continue;
+        for (const pc of other.cities) {
+          if (!isExplored(state, actor.seat, pc.centerIndex)) continue;
+          if (routes.some((x) => x.from === from.id && x.toSeat === other.seat && x.toSeatCity === pc.id)) continue;
+          const pt = state.map.tiles[pc.centerIndex];
+          const d = hexDistance(ft.col, ft.row, pt.col, pt.row);
+          if (d > TRADE_ROUTE_RANGE) continue;
+          if (!bi || d < bi.d) bi = { from: from.centerIndex, dest: pc.centerIndex, d };
+        }
+      }
+    }
+    if (bi) best = { from: bi.from, dest: bi.dest, ySum: 0 };
+  }
+  return best ? [best.from, best.dest] : [-1, -1];
 }
 
 function buyCandidateRow(state: GameState, actor: Seat): number[] {
@@ -216,6 +274,7 @@ for (let t = 0; t < N_TURNS; t++) {
     const jobsMsg: Record<string, number[]> = {};
     const spreadsMsg: Record<string, number[]> = {};
     const buysMsg: Record<string, number[]> = {};
+    const routesMsg: Record<string, number[]> = {};
     const nT = state.map.tiles.length;
     for (let seat = 0; seat < N_MAJORS; seat++) {
       const actor = seatOf(state, seat);
@@ -256,11 +315,12 @@ for (let t = 0; t < N_TURNS; t++) {
           sr.push(st);
         }
         buysMsg[String(seat)] = buyCandidateRow(state, actor);
+        routesMsg[String(seat)] = routeCandidateRow(state, actor);
       }
       jobsMsg[String(seat)] = jr;   // seat-keyed wire
       spreadsMsg[String(seat)] = sr;
     }
-    o.send({ t: state.turn, obs, jobs: jobsMsg, spreads: spreadsMsg, buys: buysMsg });
+    o.send({ t: state.turn, obs, jobs: jobsMsg, spreads: spreadsMsg, buys: buysMsg, routes: routesMsg });
     const msg = JSON.parse(await o.recv()) as { recs?: Record<string, unknown> };
     if (msg.recs && Object.keys(msg.recs).length) {
       const bySeat: Record<number, unknown> = {};

@@ -10,7 +10,7 @@ import { canFoundCity } from '../../../cpu/core/rules';
 import { tilesWithin, hexDistance } from '../../../world/hex';
 import { applySeatUnitOrders, assertCityRegistryCoherent, declareWar, seatPhase, sueForPeace, transferCity } from '../../../cpu/core/phase';
 import { meleeAttack, attackTargets, captureCityState } from '../../../cpu/core/combat';
-import { routeRaidedAt, tradeCapacity } from '../../../cpu/core/trade';
+import { routePlunderer, tradeCapacity } from '../../../cpu/core/trade';
 import { spawnUnit, unitsHostile } from '../../../cpu/core/units';
 import { gpCost } from '../../../cpu/data/greatPeople';
 import type { CityState, GameState, City, Seat } from '../../../cpu/core/types';
@@ -450,19 +450,24 @@ describe('civ trade routes', () => {
     expect(tradeCapacity(state, civ.seat)).toBe(2);
   });
 
-  it('seatPhase forms one route per turn up to capacity; routes die with the city', () => {
+  it('the wire route verb forms a route; capacity refuses a second; routes die with the city', () => {
     const state = makeState();
     const civ = addCiv(state, 8, 8);
     const second = addSecondCity(state, civ, 11, 8);
     civ.research.civics.push('FOREIGN_TRADE');
+    const c0 = civ.cities[0];
+    ((state.seatActions ??= {})[state.turn - 1] ??= {})[civ.seat] = {
+      production: [], tech: null, civic: null, units: [], route: [c0.centerIndex, second.centerIndex],
+    };
     seatPhase(state);
     expect(civ.tradeRoutes?.length).toBe(1);
     const r0 = civ.tradeRoutes![0];
-    expect([civ.cities[0].id, second.id]).toContain(r0.from);
-    expect([civ.cities[0].id, second.id]).toContain(r0.to);
-    expect(r0.from).not.toBe(r0.to);
+    expect(r0.from).toBe(c0.id);
+    expect(r0.to).toBe(second.id);
+    // capacity 1: the next intent re-validates and refuses
+    state.seatActions![state.turn - 1][civ.seat].route = [second.centerIndex, c0.centerIndex];
     seatPhase(state);
-    expect(civ.tradeRoutes?.length).toBe(1); // capacity 1: no second route
+    expect(civ.tradeRoutes?.length).toBe(1);
     // endpoint death prunes
     civ.tradeRoutes = civ.tradeRoutes!.filter(() => true);
     civ.cities = civ.cities.filter((c) => c.id !== second.id);
@@ -470,34 +475,33 @@ describe('civ trade routes', () => {
     expect(civ.tradeRoutes.length).toBe(0);
   });
 
-  it('civ routes suspend for barbarians always and seat-0 units only at war', () => {
+  it('a hostile ON the Trader tile plunders: barbarians always, seat-0 units only at war', () => {
     const state = makeState();
     state.unitsMode = true;
     const civ = addCiv(state, 8, 8);
     const center = state.map.tiles[civ.cities[0].centerIndex];
-    const ends = [center.index];
-    expect(routeRaidedAt(state, ends, civ.seat)).toBe(false);
-    const mine = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, center.col + 2, center.row).index, 0)!;
-    expect(routeRaidedAt(state, ends, civ.seat)).toBe(false); // at peace
+    const wt = tileAtCoords(state.map, center.col + 2, center.row).index;
+    expect(routePlunderer(state, wt, civ.seat)).toBe(null);
+    const mine = spawnUnit(state, 'WARRIOR', wt, 0)!;
+    expect(routePlunderer(state, wt, civ.seat)).toBe(null); // at peace
     setWar(state, civ.seat, 0, true);
-    expect(routeRaidedAt(state, ends, civ.seat)).toBe(true);
+    expect(routePlunderer(state, wt, civ.seat)).toBe(0);
     state.units = state.units.filter((u) => u.id !== mine.id);
-    expect(routeRaidedAt(state, ends, civ.seat)).toBe(false);
-    spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, center.col + 2, center.row).index, BARB_SEAT);
+    expect(routePlunderer(state, wt, civ.seat)).toBe(null);
+    spawnUnit(state, 'WARRIOR', wt, BARB_SEAT);
     setWar(state, civ.seat, 0, false);
-    expect(routeRaidedAt(state, ends, civ.seat)).toBe(true); // barbs always
+    expect(routePlunderer(state, wt, civ.seat)).toBe(BARB_SEAT); // barbs always
   });
 
-  it('a route suspends for at-war units, whoever owns the route', () => {
+  it('an at-war unit plunders, whoever owns the route', () => {
     const state = makeState();
     state.unitsMode = true;
     const civ = addCiv(state, 10, 10);
-    const home = tileAtCoords(state.map, 4, 4);
-    const ends = [home.index];
-    spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 4).index, civ.seat);
-    expect(routeRaidedAt(state, ends, 0)).toBe(false); // at peace: no interdiction
+    const ht = tileAtCoords(state.map, 5, 4).index;
+    spawnUnit(state, 'WARRIOR', ht, civ.seat);
+    expect(routePlunderer(state, ht, 0)).toBe(null); // at peace: no plunder
     setWar(state, civ.seat, 0, true);
-    expect(routeRaidedAt(state, ends, 0)).toBe(true);
+    expect(routePlunderer(state, ht, 0)).toBe(civ.seat);
   });
 });
 
@@ -541,9 +545,17 @@ describe('civ CS trade routes', () => {
     setMet(cityState, civ.seat);
     const civCity = civ.cities[0];
     const y0 = computeCityStats(state, civCity).total;
+    const csIdx = state.cityStates.indexOf(cityState);
+    ((state.seatActions ??= {})[state.turn - 1] ??= {})[civ.seat] = {
+      production: [], tech: null, civic: null, units: [], route: [civCity.centerIndex, -(2 + csIdx)],
+    };
     seatPhase(state);
     expect(civ.tradeRoutes?.length).toBe(1);
-    expect(civ.tradeRoutes![0]).toEqual({ from: civCity.id, toCs: cityState.id, expiresTurn: state.turn + 20 }); // route duration
+    expect(civ.tradeRoutes![0]).toEqual({
+      from: civCity.id, to: -1, toCs: cityState.id,
+      expiresTurn: state.turn + 20, createdTurn: state.turn, // route duration, era 0
+      walkTile: civCity.centerIndex, walkLeg: 0,
+    });
     const y1 = computeCityStats(state, civCity).total;
     // cityStateRouteYields: +3 gold, +1 science (both tier-scaled; band like the
     // envoy tests — the phase also grew the city, so compare channels the

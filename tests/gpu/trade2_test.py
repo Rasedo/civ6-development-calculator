@@ -14,7 +14,7 @@ income + expiry):
   * seat_route_dseat / seat_route_dcity / seat_route_exp are _MUTABLE, long,
     [B, NS, K];
   * an international route pays intlGold + dest completed-specialty
-    count to GOLD only, and is suspended while at war with the destination;
+    count to GOLD only (war CANCELS routes at the declaration; no per-read gate);
   * duration expiry drops a due route (exp <= turn) and keeps a future one;
   * the destination is keyed by (SEAT, CITY ID), so a route to an id that
     seat no longer holds is dropped while a live pair survives;
@@ -50,11 +50,11 @@ def main() -> None:
 
     sim = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     assert sim._trade_intl_gold == 3 and sim._trade_duration == 20, "engine trade consts mismatch"
-    for _p in ("seat_route_dseat", "seat_route_dcity", "seat_route_exp"):
+    for _p in ("seat_route_dseat", "seat_route_dcity", "seat_route_exp", "seat_route_born", "seat_route_walk", "seat_route_leg"):
         assert _p in _MUTABLE, f"{_p} must be _MUTABLE — the route store rides snapshot/restore"
     B = sim.B
     K = sim.seat_routes.shape[2]
-    for _p in ("seat_route_dseat", "seat_route_dcity", "seat_route_exp"):
+    for _p in ("seat_route_dseat", "seat_route_dcity", "seat_route_exp", "seat_route_born", "seat_route_walk", "seat_route_leg"):
         _t = getattr(sim, _p)
         assert _t.shape == (B, sim.seat_routes.shape[1], K), f"{_p} shape"
         assert _t.dtype == torch.long == sim.seat_routes.dtype, f"{_p} dtype must match seat_routes"
@@ -83,14 +83,22 @@ def main() -> None:
     for col, name in [(0, "food"), (1, "prod"), (3, "sci"), (4, "cul"), (5, "faith")]:
         assert abs(float(inc[0, 0, col])) < 1e-9, f"intl route must not pay {name}"
 
-    # destination interdiction: war with the destination seat suspends income
-    sim.war[0, 0, 1] = sim.war[0, 1, 0] = True
-    sim.sync_war()  # close the poke under transpose
+    # a DECLARED war CANCELS the pair's routes (no per-read suspension in
+    # real Civ 6) — and the cancel hands a Trader back at the origin.
+    tr_before = int((sim.major_unit_alive[0] & (sim.major_unit_seat[0] == 1)
+                     & (sim.major_unit_type[0] == sim._trader_idx)).sum())
+    sim._cancel_routes_pair(1, 0, torch.ones(sim.B, dtype=torch.bool))
+    assert int(sim.seat_routes[0, 1, 0, 0]) == -1, "war must cancel the pair's routes"
+    tr_after = int((sim.major_unit_alive[0] & (sim.major_unit_seat[0] == 1)
+                    & (sim.major_unit_type[0] == sim._trader_idx)).sum())
+    assert tr_after == tr_before + 1, "the cancelled route must hand its Trader back"
+    # replant the route for the specialty half below
+    sim.seat_routes[0, 1, 0, 0] = int(sim.city_id[0, 1, 0])
+    sim.seat_routes[0, 1, 0, 1] = -1
+    sim.seat_route_dseat[0, 1, 0] = 0
+    sim.seat_route_dcity[0, 1, 0] = dest_cid
+    sim.seat_route_exp[0, 1, 0] = int(sim.turn) + sim._trade_duration
     sim._seat_route_cache = None
-    inc = sim._seat_route_income(1)
-    assert inc is None or abs(float(inc[0, 0, 2])) < 1e-9, "intl income must be suspended at war"
-    sim.war[0, 0, 1] = sim.war[0, 1, 0] = False
-    sim.sync_war()  # close the poke under transpose
 
     # a completed specialty district at the destination adds 1 gold each
     own = (sim.city_slot_at(0)[0] == 0)  # capital-owned tiles
@@ -169,7 +177,90 @@ def main() -> None:
     assert int(s3.seat_route_dseat[0, 1, 0]) == -1 and int(s3.seat_route_dcity[0, 1, 0]) == -1 \
         and int(s3.seat_route_exp[0, 1, 0]) == -1, "restore must roll back route metadata"
 
-    print("trade2_test OK — intl gold(+specialty)/gold-only/war-suspend, duration expiry, "
+    # --- 7) THE WALK: one descent step per turn, road behind ---------------
+    # paths[7] (seed9092) is the fixture whose two capitals share a land
+    # path; the fixture set is FIXED (worlds.lock), so assert rather than skip.
+    s5 = settle_all(BatchSim([load_fixture(paths[7])], rules, device="cpu", dtype=torch.float64))
+    o_t = int(s5.city_center[0, 1, 0])
+    d_t = int(s5.city_center[0, 0, 0])
+    land = bool(s5._trade_land_ok(torch.tensor([0]), torch.tensor([o_t]), torch.tensor([d_t]))[0])
+    assert land, "paths[7] must give a land capital pair — did the fixture set change?"
+    if land:
+        s5.seat_routes[0, 1, 0, 0] = int(s5.city_id[0, 1, 0])
+        s5.seat_routes[0, 1, 0, 1] = -1
+        s5.seat_route_dseat[0, 1, 0] = 0
+        s5.seat_route_dcity[0, 1, 0] = int(s5.city_id[0, 0, 0])
+        s5.seat_route_exp[0, 1, 0] = int(s5.turn) + s5._trade_duration
+        s5.seat_route_born[0, 1, 0] = int(s5.turn)
+        s5.seat_route_walk[0, 1, 0] = o_t
+        s5.seat_route_leg[0, 1, 0] = 0
+        s5._trade_walk_tick(1, torch.ones(s5.B, dtype=torch.bool))
+        w1 = int(s5.seat_route_walk[0, 1, 0])
+        assert w1 != o_t, "a land walker must step on turn one"
+        assert bool(s5.road[0, w1]), "the walker lays road where it lands"
+        d0 = int(s5.pair_dist[o_t, d_t])
+        assert int(s5.pair_dist[w1, d_t]) == d0 - 1, "the descent step closes on the destination"
+        # ROUND-TRIP EXPIRY: the term arriving with the walker OUT holds
+        s5.seat_route_exp[0, 1, 0] = int(s5.turn)
+        s5._expire_seat_routes(1)
+        assert int(s5.seat_routes[0, 1, 0, 0]) >= 0, "term + walker OUT must hold the route"
+        s5.seat_route_walk[0, 1, 0] = o_t  # home: the round trip completes
+        s5._expire_seat_routes(1)
+        assert int(s5.seat_routes[0, 1, 0, 0]) == -1, "term + walker HOME must end the route"
+        print("walk + round-trip expiry ok")
+
+    # --- 8) PLUNDER: an at-war major on the walker tile kills the route and
+    #        banks the gold; the Trader does NOT come back --------------------
+    s6 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    o6 = int(s6.city_center[0, 1, 0])
+    nb6 = int(s6.neigh[o6][0])
+    s6.seat_routes[0, 1, 0, 0] = int(s6.city_id[0, 1, 0])
+    s6.seat_routes[0, 1, 0, 1] = int(s6.city_id[0, 1, 0])
+    s6.seat_route_exp[0, 1, 0] = int(s6.turn) + s6._trade_duration
+    s6.seat_route_walk[0, 1, 0] = nb6
+    s6.seat_route_leg[0, 1, 0] = -1
+    spawned = s6._spawn_unit(0, torch.ones(s6.B, dtype=torch.bool), torch.full((s6.B,), nb6, dtype=torch.long), s6._warrior_idx)
+    assert bool(spawned[0]), "the raider must land for this lane to prove anything"
+    r_slot = int(((s6.major_unit_seat[0] == 0) & s6.major_unit_alive[0]
+                  & (s6.major_unit_type[0] == s6._warrior_idx)).long().argmax())
+    r_tile = int(s6.major_unit_tile[0, r_slot])
+    s6.seat_route_walk[0, 1, 0] = r_tile  # the walker under the raider's feet
+    s6.war[0, 0, 1] = s6.war[0, 1, 0] = True
+    s6.sync_war()  # close the poke under transpose
+    g0 = float(s6.civ_treasury[0, 0])
+    s6._trade_walk_tick(1, torch.ones(s6.B, dtype=torch.bool))
+    assert int(s6.seat_routes[0, 1, 0, 0]) == -1, "an at-war unit on the walker tile plunders"
+    assert abs(float(s6.civ_treasury[0, 0]) - g0 - s6._trade_plunder_gold) < 1e-9, "the raider banks plunderGold"
+    tr6 = int((s6.major_unit_alive[0] & (s6.major_unit_seat[0] == 1)
+               & (s6.major_unit_type[0] == s6._trader_idx)).sum())
+    assert tr6 == 0, "plunder DESTROYS the Trader — no return"
+    print("plunder ok")
+
+    # --- 9) the candidate + apply pair -------------------------------------
+    s7 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    # capacity and destinations first, so the refusal below isolates the
+    # TRADER gate: FOREIGN_TRADE grants +1 capacity, met city-states are in
+    # range of this fixture's row-1 capital.
+    s7.civ_civics[0, 1, s7._trade_ftc] = True
+    s7.seat_citystate_met[0, 1, :] = True
+    f7, d7 = s7._seat_route_candidate(1)
+    assert int(f7[0]) == -1, "no free Trader — the candidate must refuse"
+    ok_sp = s7._spawn_unit(1, torch.ones(s7.B, dtype=torch.bool), s7.city_center[:, 1, 0].clamp(min=0), s7._trader_idx)
+    assert bool(ok_sp[0])
+    f7b, d7b = s7._seat_route_candidate(1)
+    assert int(f7b[0]) == int(s7.city_center[0, 1, 0]), "capacity + Trader + met CS must yield a candidate"
+    assert int(d7b[0]) <= -2, "the in-range destination here is a city-state code"
+    s7._apply_route(1, f7b, d7b)
+    assert int(s7.seat_routes[0, 1, 0, 0]) >= 0, "the applied candidate must land"
+    assert int(s7.seat_route_born[0, 1, 0]) == int(s7.turn)
+    assert int(s7.seat_route_walk[0, 1, 0]) == int(f7b[0])
+    tr7 = int((s7.major_unit_alive[0] & (s7.major_unit_seat[0] == 1)
+               & (s7.major_unit_type[0] == s7._trader_idx)).sum())
+    assert tr7 == 0, "the applied route must SPEND the Trader"
+    print("candidate + apply ok")
+
+    print("trade2_test OK — intl gold(+specialty)/gold-only, war-cancel with Trader return, "
+          "round-trip expiry, walk + plunder, candidate/apply spend, "
           "(seat, city) dest keying incl. a capture, _MUTABLE round-trip")
 
 

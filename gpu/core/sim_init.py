@@ -416,6 +416,12 @@ class SimInit:
         self.seat_route_dseat = torch.full((B, self.n_majors + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
         self.seat_route_dcity = torch.full((B, self.n_majors + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
         self.seat_route_exp = torch.full((B, self.n_majors + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
+        # the WALK: the servicing Trader's turn of birth, current tile, and
+        # leg (-1 parked at origin/sea, 0 walking out, 1 walking home) — what
+        # plunder targets and the round-trip expiry reads.
+        self.seat_route_born = torch.full((B, self.n_majors + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
+        self.seat_route_walk = torch.full((B, self.n_majors + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
+        self.seat_route_leg = torch.full((B, self.n_majors + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
         self._alloc_cs_pairs(B, self.n_majors, s_pad, device)
 
         self.centre_slot_at = torch.full((B, T), -1, dtype=torch.long, device=device)
@@ -972,6 +978,10 @@ class SimInit:
         self._trade_range = int(_tr.get("range", 15))
         self._trade_intl_gold = int(_tr.get("intlGold", 3))  # international base gold
         self._trade_duration = int(_tr.get("duration", 20))  # route lifetime
+        self._trade_plunder_gold = int(_tr["plunderGold"])
+        self._trade_walk_rail = int(_tr["walkRail"])
+        self._trade_dur_bumps = [int(x) for x in _tr["durEraBumps"]]  # eras adding +10/+20/+30
+        self._trader_cost_prog = int(_tr["traderCostProg"])
         self._walls_hp = int(rules.combat.get("wallsHp", 100))
         # The ENCAMPMENT garrison pool cap (TS ENCAMPMENT_HP).
         self._encamp_hp_max = int(rules.combat.get("encampHp", 100))
@@ -1199,6 +1209,7 @@ class SimInit:
         self._warrior_idx = next((i for i, u in enumerate(ru) if u["id"] == "WARRIOR"), 0)
         self._settler_idx = next((i for i, u in enumerate(ru) if bool(u.get("settler", 0))), -1)
         self._type_settler = torch.tensor([bool(u.get("settler", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._trader_idx = next(i for i, u in enumerate(ru) if bool(u.get("trader", 0)))
         # SCOUT is a military explorer (combat 10) but never in the civ roster
         # (BUY_UNITS and the ladder exclude it). The production ladder
         # prefers WARRIOR anyway, but the gold buy's affordability gate can
@@ -1249,6 +1260,7 @@ class SimInit:
         self._driven_buy_relig: dict = {}
         self._driven_buy_monu: dict = {}
         self._driven_levy: dict = {}
+        self._driven_route: dict = {}
         self._driven_tech: dict = {}
         self._driven_civic: dict = {}
         self._driven_envoys: dict = {}

@@ -64,7 +64,7 @@ def main() -> None:
 
     urb = next((i for i, c in enumerate(rj["civics"]) if c["id"] == "URBANIZATION"), -1)
     assert urb >= 0, "URBANIZATION not in the exported civics table"
-    relig_t = torch.zeros(sim.unit_type.max().item() + 1, dtype=torch.bool)
+    relig_t = torch.zeros(sim.NU, dtype=torch.bool)
     for idx in (getattr(sim, "_missionary_idx", -1), getattr(sim, "_apostle_idx", -1)):
         if 0 <= idx < relig_t.numel():
             relig_t[idx] = True

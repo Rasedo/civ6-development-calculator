@@ -274,10 +274,15 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                 # EVERY seat, row 0 included.
                 bc = drive._buy_ctx(sim, seat)
                 gb_all = _buy_rows(sim, seat, bc)
+                # the ROUTE-candidate tripwire rides the same pattern: the
+                # GPU scan against the TS driver's routeCandidateRow, and the
+                # SAME reads feed the policy below.
+                gr_f, gr_d = sim._seat_route_candidate(seat)
                 # the decide pass reuses these pre-decide reads verbatim —
                 # nothing between here and _decide_turn mutates their inputs
                 # (geo_decide_and_apply only STASHES; observe reads none of it)
-                pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t, "bctx": bc, "obs": gobs_all}
+                pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t, "bctx": bc, "obs": gobs_all,
+                                  "route": (gr_f, gr_d)}
                 for b, msg in enumerate(msgs):
                     tobs = torch.tensor(msg["obs"][str(seat)], dtype=torch.float64)
                     gobs = gobs_all[b]
@@ -300,6 +305,10 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                         tb = msg.get("buys", {}).get(str(seat), [])
                         if tb and gb_all[b] != tb:
                             flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit,tileOk,tile,tileC,worshipC,religKind,religC,levy,monuKind,monuC]: GPU {gb_all[b]} vs TS {tb}")
+                        tr = msg.get("routes", {}).get(str(seat), [])
+                        gr_b = [int(gr_f[b]), int(gr_d[b])]
+                        if tr and gr_b != tr:
+                            flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: ROUTE [from,dest]: GPU {gr_b} vs TS {tr}")
             prof["obs+targets compare (GPU obs, buys, jobs)"] += _pc() - _t
             if bad:
                 break
@@ -526,11 +535,21 @@ def main() -> None:
             ts_ = msg.get("spreads", {}).get(str(seat), [])
             if True:
                 bc = drive._buy_ctx(sim, seat)
-                pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t, "bctx": bc, "obs": obs_seat[seat]}
+                gr_f, gr_d = sim._seat_route_candidate(seat)
+                pre_seat[seat] = {"jobs": gj_t, "spreads": gs_t, "bctx": bc, "obs": obs_seat[seat],
+                                  "route": (gr_f, gr_d)}
                 gb = _buy_rows(sim, seat, bc)[0]
                 tb = msg.get("buys", {}).get(str(seat), [])
                 if tb and gb != tb:
                     rep = f"turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit,tileOk,tile,tileC,worshipC,religKind,religC,levy,monuKind,monuC]: GPU {gb} vs TS {tb}"
+                    print(rep)
+                    if first_report is None:
+                        first_report = rep
+                    obs_bails += 1
+                tr = msg.get("routes", {}).get(str(seat), [])
+                gr_b = [int(gr_f[0]), int(gr_d[0])]
+                if tr and gr_b != tr:
+                    rep = f"turn {t + 1} seat {seat}: ROUTE [from,dest]: GPU {gr_b} vs TS {tr}"
                     print(rep)
                     if first_report is None:
                         first_report = rep

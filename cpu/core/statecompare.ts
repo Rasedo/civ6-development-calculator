@@ -385,7 +385,8 @@ const SEAT: Record<string, Extractor> = {
           : kind === 2
             ? centreOf(r.toSeat!, r.toSeatCity ?? -1)
             : centreOf(s.seat, r.to ?? -1);
-      return [centreOf(s.seat, r.from), dest, kind, r.expiresTurn ?? -1];
+      return [centreOf(s.seat, r.from), dest, kind, r.expiresTurn ?? -1,
+        r.createdTurn ?? -1, r.walkTile ?? -1, r.walkLeg ?? -1];
     });
     rows.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3]);
     return rows.flat();

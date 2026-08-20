@@ -643,15 +643,27 @@
      "name": "routes",
      "compare": "exact",
      "covers": [
-      "Seat.tradeRoutes"
+      "Seat.tradeRoutes",
+      "TradeRoute.from",
+      "TradeRoute.to",
+      "TradeRoute.toCs",
+      "TradeRoute.toSeat",
+      "TradeRoute.toSeatCity",
+      "TradeRoute.expiresTurn",
+      "TradeRoute.createdTurn",
+      "TradeRoute.walkTile",
+      "TradeRoute.walkLeg"
      ],
      "planes": [
       "seat_routes",
       "seat_route_dseat",
       "seat_route_dcity",
-      "seat_route_exp"
+      "seat_route_exp",
+      "seat_route_born",
+      "seat_route_walk",
+      "seat_route_leg"
      ],
-     "note": "per-route [fromTile, destTile, kind, expiresTurn], sorted; destinations in CENTRE-TILE space because city ids are not compared"
+     "note": "per-route [fromTile, destTile, kind, expiresTurn, createdTurn, walkTile, walkLeg], sorted; destinations in CENTRE-TILE space because city ids are not compared. The walk triple IS the Trader while it services the route."
     },
     {
      "name": "scienceTotal",
@@ -1580,30 +1592,6 @@
    {
     "path": "Tile.goodyHut",
     "why": "tribal villages are TS-only \u2014 the GPU carries no goody-hut plane and never claims one. A real coverage gap."
-   },
-   {
-    "path": "TradeRoute.from",
-    "why": "route CONTENTS. TS keys endpoints by city id; the GPU keys them by rc-id in `seat_routes` slot order. Joining the two needs the id map the city group deliberately avoids, so S2 compares the route COUNT and leaves the endpoints to the keyed dump."
-   },
-   {
-    "path": "TradeRoute.to",
-    "why": "route contents (see TradeRoute.from)."
-   },
-   {
-    "path": "TradeRoute.toCs",
-    "why": "route contents (see TradeRoute.from)."
-   },
-   {
-    "path": "TradeRoute.toSeat",
-    "why": "route contents (see TradeRoute.from)."
-   },
-   {
-    "path": "TradeRoute.toSeatCity",
-    "why": "route contents (see TradeRoute.from)."
-   },
-   {
-    "path": "TradeRoute.expiresTurn",
-    "why": "route contents (see TradeRoute.from)."
    },
    {
     "path": "CityState.name",

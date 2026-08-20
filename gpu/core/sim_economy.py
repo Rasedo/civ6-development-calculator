@@ -270,6 +270,15 @@ class SimEconomy:
         r = self.rules
         return js_round((r.builder_base + r.builder_per * n.to(self.dtype)) * r.game_speed)
 
+    def _trader_cost(self, row: int) -> torch.Tensor:
+        """traderCost: the roster base x (1 + prog x floor(100 x the furthest
+        tree fraction) / 100) — COST_PROGRESSION_GAME_PROGRESS, Param1 400."""
+        rdv = self.rules_dev
+        t_pct = self.civ_techs[:, row].sum(dim=1).double() / float(rdv.t_cost.shape[0])
+        c_pct = self.civ_civics[:, row].sum(dim=1).double() / float(rdv.c_cost.shape[0])
+        p = torch.floor(100.0 * torch.maximum(t_pct, c_pct)) / 100.0
+        return js_round(self._type_cost[self._trader_idx].double() * (1 + self._trader_cost_prog * p))
+
     def _seat_settlers(self, row: int) -> torch.Tensor:
         """[B] seat row `row`'s LIVE settler units — what the settlerCost
         escalator counts. `settlerCount` filters ONE array by seat; so does
@@ -614,6 +623,17 @@ class SimEconomy:
         out = ok.unsqueeze(1) & self._type_civic_slot_ok(row, True)
         if bool(self.unit_naval.any()):
             out = out & (~self.unit_naval.reshape(1, 1, -1) | self._naval_capable(row).unsqueeze(2))
+        # CIV6: "when the number of Traders equals the Trading Capacity you
+        # cannot build more" — free Traders plus active routes, against
+        # tradeCapacity. The trainableUnits twin of the same gate.
+        owned = (
+            (self.major_unit_alive & (self.major_unit_seat == row)
+             & (self.major_unit_type == self._trader_idx)).sum(dim=1)
+            + (self.seat_routes[:, row, :, 0] >= 0).sum(dim=1)
+        )
+        cap_ok = owned < self._trade_capacity(row)
+        is_tr = (torch.arange(self.NU, device=dev) == self._trader_idx).reshape(1, 1, -1)
+        out = out & (~is_tr | cap_ok.reshape(B, 1, 1))
         return out
 
     def _worship_bidx_of(self, row: int) -> int:

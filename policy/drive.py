@@ -342,6 +342,17 @@ def _war_ctx(blocks: dict) -> dict:
     }
 
 
+def _decide_route(sim, row: int, pre=None):
+    """The route verb: TAKE the candidate whenever one exists — the old
+    eager rule's pacing, now a policy choice on the wire. `pre` is the
+    serve tripwire's precomputed candidate (frm [B], dst [B]); without it
+    the sim's own `_seat_route_candidate` scan answers."""
+    frm, dst = pre if pre is not None else sim._seat_route_candidate(row)
+    if not bool((frm >= 0).any()):
+        return None
+    return (frm, dst)
+
+
 def _decide_buys(sim, row: int, bctx: dict | None = None):
     if bctx is None:
         bctx = _buy_ctx(sim, row)
@@ -511,12 +522,13 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     if seeds is not None and turn is not None and sim.S > 0:
         env_seq = _seat_envoys(sim, row)
     buy, worship, relig, levy, monu = _decide_buys(sim, row, bctx=None if pre is None else pre.get("bctx"))
+    route = _decide_route(sim, row, pre=None if pre is None else pre.get("route"))
     # production_tile rides along or the drive and its own record diverge: a
     # district column without its tile is refused at the apply, while the
     # replay side passes the recorded tile and places it.
     sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic,
                            war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
-                           monu=monu)
+                           monu=monu, route=route)
 
     # units, and the draw order: the driver PLANS, the PHASE executes.
     # Applying steps pre-step to re-observe would consume combat draws at a
@@ -588,10 +600,10 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
         sim._driven_useq = {}
     sim._driven_useq[row] = seq
-    return prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu
+    return prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, route
 
 
-def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, b: int) -> dict:
+def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, route, b: int) -> dict:
     _pr = prod[b]
     _ctr = sim.city_center[b, row]
     _alive_c = sim.city_alive[b, row]
@@ -615,6 +627,8 @@ def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, 
     _e = [] if env_seq is None else [int(x) for x in env_seq[b].tolist() if int(x) >= 0]
     rec = {"production": prod_pairs, "tech": _t, "civic": _c, "war": _w, "envoys": _e, "units": rows}
     rec.update(_buy_record_fields(sim, row, b, buy, worship, relig, levy, monu))
+    if route is not None and int(route[0][b]) >= 0:
+        rec["route"] = [int(route[0][b]), int(route[1][b])]
     return rec
 
 
@@ -739,9 +753,14 @@ def replay_seat(sim, row: int, rec: dict) -> None:
             monu = (torch.where(_mjt >= 0, torch.full_like(_mjt, _fk), torch.full_like(_mjt, -1)), _mjt)
     _lv = rec.get("levy")
     levy = None if _lv is None else torch.full((sim.B,), int(_lv), dtype=torch.long, device=dev)
+    _rv = rec.get("route")
+    route = None
+    if _rv is not None:
+        route = (torch.full((sim.B,), int(_rv[0]), dtype=torch.long, device=dev),
+                 torch.full((sim.B,), int(_rv[1]), dtype=torch.long, device=dev))
     sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic,
                            war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
-                           monu=monu)
+                           monu=monu, route=route)
     def _geo_mask(seats) -> torch.Tensor:
         m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=dev)
         for j in seats:

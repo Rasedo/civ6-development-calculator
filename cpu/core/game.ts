@@ -9,7 +9,7 @@ import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canR
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots } from './effects';
 import type { Modifiers, Unlocks } from './effects';
 import { effectiveResearchCostIn } from './boosts';
-import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, builderCost, settlerCount } from './units';
+import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, builderCost, traderCost, settlerCount } from './units';
 import { barbarianPhase, encampmentTrainXp } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
@@ -421,7 +421,7 @@ export function goldAffordable(treasury: number, cost: number): boolean {
 }
 
 export function unitPurchaseCost(state: GameState, unitType: string, seat: number): number {
-  const base = unitType === 'BUILDER' ? builderCost(state, seat) : UNITS[unitType]?.cost ?? 0;
+  const base = unitType === 'BUILDER' ? builderCost(state, seat) : unitType === 'TRADER' ? traderCost(state, seat) : UNITS[unitType]?.cost ?? 0;
   const m = unitType === 'BUILDER' ? monumentalityBuyMult(state, seat) : 1;
   return base * GOLD_PURCHASE_MULT * m;
 }
