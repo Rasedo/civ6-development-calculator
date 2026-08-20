@@ -68,10 +68,9 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
   // k of the head name the same seat. Everything is read from THIS seat's
   // point of view.
   //
-  // The last four are the DoW terms. They used to be a single pairwise
-  // reading in the ctx block, measured against one fixed seat, which is why a
-  // policy could not choose WHICH opponent to declare on. RAW and
-  // unscaled, like the ctx block and for the same reason.
+  // The last four are the DoW terms, rendered PER OPPONENT so the policy can
+  // choose WHICH one to declare on. RAW and unscaled, like the ctx block and
+  // for the same reason.
   //
   // `gpu/core/env.py:BatchEnv.observe` renders the identical layout — the two
   // engines must move together here, and the gate compares them field for

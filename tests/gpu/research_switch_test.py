@@ -47,7 +47,7 @@ def main() -> None:
     busy = sim._seat_tech_mask(row)
     assert int(busy[0].sum()) == n_free, (
         "a tech already underway must not close the head — that is the "
-        "action-space hole #72 closed"
+       "action-space hole closed"
     )
     assert bool(busy[0, t_b]), "the seat must be able to switch to another available tech"
 

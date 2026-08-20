@@ -846,8 +846,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           //
           // The ACTING seat, not the phase's ambient 0: both bodies thread it
           // to `killUnit` -> `markAntiquitySite`, whose ERA gate reads that
-          // seat's own research. A civ's unit dying used to leave (or not
-          // leave) a dig according to SEAT 0's era.
+          // seat's own research.
           if (UNITS[unit.type]?.ranged) rangedAttack(state, unit.id, to.index, actor.seat);
           else meleeAttack(state, unit.id, to.index, actor.seat);
         }
@@ -883,11 +882,9 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           // CHOP: `builderRemoveFeature`, the ONE remove body — removability,
           // the resource dependency, the feature-removal TECH, the LUMBER_MILL
           // that goes with the woods, the charge, and the YIELD LUMP into the
-          // owning city. The inline arm that used to stand here cleared the
-          // feature and paid NOTHING, so every seat driving this column banked
-          // a chop the GPU paid out (its own `_A_CHOP` arm grants
-          // `20 + 2.5*(techs+civics)`). Latent rather than live: the driver's
-          // builder ladder offers 13-15/18-24 and REPAIR, never column 16.
+          // owning city. ORACLE: the GPU's `_A_CHOP` arm pays the same lump,
+          // `20 + 2.5*(techs+civics)`. Nothing in-gate drives this column —
+          // the driver's builder ladder offers 13-15/18-24 and REPAIR.
           builderRemoveFeature(state, unit.id, actor.seat);
         } else if (a === 17) {
           if (unit.type !== 'BUILDER') return; // the GPU repair arm's builder gate

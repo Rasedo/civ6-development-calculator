@@ -130,7 +130,7 @@ def main() -> None:
     assert int(s3.protagonist()[0]) == 1, (
         "a dead seat 0 must yield the protagonist to the surviving civ"
     )
-    print("  #75 protagonist OK (winner first, city fence, leader fallback)")
+    print("  protagonist OK (winner first, city fence, leader fallback)")
 
     print("C2 SEAT SURFACE OK")
 

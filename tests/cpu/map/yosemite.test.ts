@@ -11,7 +11,7 @@ import { WONDERS } from '../../../world/wonders';
  * onto any map — parity green does not prove this one. These assertions pin the
  * data directly instead.
  */
-describe('#78 Yosemite', () => {
+describe('Yosemite', () => {
   it('is impassable', () => {
     expect(WONDERS.YOSEMITE.impassable).toBe(true);
   });
@@ -33,7 +33,7 @@ describe('#78 Yosemite', () => {
  * by overwriting the tile's own property rather than sending an adjacency
  * signal; none are modelled, so these values are final here.
  */
-describe('#78 fixed appeal bases', () => {
+describe('fixed appeal bases', () => {
   const map = (tiles: unknown[]) => ({ width: 3, height: 1, tiles }) as never;
   const t = (over: Record<string, unknown> = {}) =>
     ({

@@ -102,7 +102,7 @@ def main() -> None:
     sim2.apply_seat_actions(r + 1, production_pref=pref([d_col, legal_b2[0]]), production_tile=dt2)
     sim2._seat_record_apply(r + 1, ACTIVE)
     got2 = int(sim2.city_current[0, r + 1, j])
-    assert got2 != -1, "#87 REGRESSION: an unplaceable top pick left the city IDLE"
+    assert got2 != -1, "REGRESSION: an unplaceable top pick left the city IDLE"
     assert got2 == legal_b2[0], f"fallback must be the policy's OWN next rank, got {got2}"
     print("  2 unplaceable top pick falls to the policy's next rank (not idle) OK")
 
@@ -142,10 +142,10 @@ def main() -> None:
             wi5 = _wi
             sim5.civ_techs[0, r5 + 1, int(_wrow["ut"])] = True
             break
-    assert wi5 is not None, "#88: fixture has no forceable wonder candidate near r0c0"
+    assert wi5 is not None, "fixture has no forceable wonder candidate near r0c0"
     sim5.city_current[0, r5 + 1, j5] = -1  # these columns are idle-gated like every base column
     m5 = sim5.seat_masks(r5 + 1)["production"]
-    assert bool(m5[0, j5, w_lo5 + wi5]), "#88: the granted wonder column must read legal"
+    assert bool(m5[0, j5, w_lo5 + wi5]), "the granted wonder column must read legal"
     prod5 = torch.full((1, sim5.RC), -1, dtype=torch.long)
     prod5[0, j5] = w_lo5 + wi5
     sim5.apply_seat_actions(r5 + 1, production=prod5)
@@ -179,14 +179,14 @@ def main() -> None:
     sim7.city_current[0, r5 + 1, j5] = -1
     m7 = sim7.seat_masks(r5 + 1)["production"]
     p_lo7 = w_lo5 + sim7._wond_n
-    assert bool(m7[0, j5, p_lo7]), "#88: base project 0 must be legal on its completed district"
+    assert bool(m7[0, j5, p_lo7]), "base project 0 must be legal on its completed district"
     prod7 = torch.full((1, sim7.RC), -1, dtype=torch.long)
     prod7[0, j5] = p_lo7
     sim7.apply_seat_actions(r5 + 1, production=prod7)
     sim7._seat_record_apply(r5 + 1, ACTIVE)
     assert int(sim7.city_current[0, r5 + 1, j5]) == sim7.PROJECT_BASE + 0, "project code must queue"
     assert float(sim7.city_cost[0, r5 + 1, j5]) > 0, "project cost must lock"
-    print("  4 #88 wonder queues via shared scan, one-per-world refuses cross-seat, project queues OK")
+    print("  4 wonder queues via shared scan, one-per-world refuses cross-seat, project queues OK")
 
     # -- 5: ONE production mask — seat 0 reads the same body, same width ----
     # `production_mask()` IS `_seat_production_mask(0)`, so the seat-0 head and

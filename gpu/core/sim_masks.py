@@ -338,8 +338,8 @@ class SimMasks:
 
         Hostility mirrors `unitsHostile` exactly, which is to say it is
         civsAtWar(prober, owner) plus "barbarians are hostile to everyone", and
-        `_seats_hostile` is that one question — including the "never hostile to
-        yourself" arm the seat-0 fast path here used to state a second time.
+        `_seats_hostile` is that one question, including the "never hostile to
+        yourself" arm.
         `seat` may be an int or a [B, 1] tensor (the war-march probes per
         slot)."""
         live = self._encamp_live()

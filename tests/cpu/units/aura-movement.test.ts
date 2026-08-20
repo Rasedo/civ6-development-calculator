@@ -43,7 +43,7 @@ function tileAt(state: GameState, ctr: number, dist: number): number {
   return -1;
 }
 
-describe('#70/S3 general aura: +1 movement', () => {
+describe('general aura: +1 movement', () => {
   it('grants +1 MP inside the aura and nothing outside it', () => {
     const state = newGame();
     const ctr = seatOf(state, 0)!.cities[0].centerIndex;

@@ -84,7 +84,7 @@ def main() -> None:
     # pillage must NOT share a column with any build verb
     assert sim._A_PILLAGE not in sim._A_IMP, (
         f"PILLAGE column {sim._A_PILLAGE} collides with a BUILD column {sim._A_IMP} "
-        "— this is exactly the #78 FORT collision that made the verb dead"
+       "— this is exactly the FORT collision that made the verb dead"
     )
     for k, col in enumerate(sim._A_IMP):
         assert col == acts.index(f"BUILD_{imp_ids[k]}"), f"improvement {imp_ids[k]} dispatch column"

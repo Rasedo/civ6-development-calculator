@@ -108,7 +108,7 @@ def main() -> None:
     dmg_peace = run(at_war=False)
     assert dmg_war > 0, (
         "a walled civ city did NOT fire on an enemy CIV's unit standing in "
-        "range — the #59 fidelity gap is still open"
+       "range — the fidelity gap is still open"
     )
     assert dmg_peace == 0, (
         f"the victim took {dmg_peace} damage AT PEACE — this lane is measuring "

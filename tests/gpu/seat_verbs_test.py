@@ -88,7 +88,7 @@ def main() -> None:
     ch0 = int(sim.major_unit_charges[0, slot])
     order(sim, row, slot, res_lo + (k - 3))
     assert int(sim.improvement[0, tile]) == k, (
-        f"#89 DISPATCH DEAD: resource improvement column {res_lo + (k - 3)} did nothing "
+        f"DISPATCH DEAD: resource improvement column {res_lo + (k - 3)} did nothing "
         f"(improvement is {int(sim.improvement[0, tile])}, wanted {k})"
     )
     assert int(sim.major_unit_charges[0, slot]) == ch0 - 1, "a build must spend a charge"
@@ -103,7 +103,7 @@ def main() -> None:
     sim.pillaged[0, tile] = True
     sim._tile_owner_ver += 1
     order(sim, row, slot, A_REP)
-    assert not bool(sim.pillaged[0, tile]), "#89 DISPATCH DEAD: REPAIR left the tile pillaged"
+    assert not bool(sim.pillaged[0, tile]), "DISPATCH DEAD: REPAIR left the tile pillaged"
     print("  2 REPAIR clears a pillaged civ tile OK")
 
     # -- 3: PILLAGE wrecks an enemy improvement ----------------------------
@@ -118,7 +118,7 @@ def main() -> None:
     sim.district[0, tile] = -1
     sim._tile_owner_ver += 1
     order(sim, row, slot, A_PIL)
-    assert bool(sim.pillaged[0, tile]), "#89 DISPATCH DEAD: PILLAGE did not wreck the improvement"
+    assert bool(sim.pillaged[0, tile]), "DISPATCH DEAD: PILLAGE did not wreck the improvement"
     print("  3 PILLAGE wrecks an enemy improvement OK")
 
     # -- 4: PILLAGE is REFUSED on the civ's own land ----------------------
@@ -173,7 +173,7 @@ def main() -> None:
     s6.apply_seat_unit_sequence(row, seq_of([d0, d1], nrows2, rw6b))
     two_tile = int(s6.major_unit_tile[0, sl6b])
     assert two_tile != one_tile, (
-        f"#90 DEAD: the 2-step sequence ended where the 1-step did ({two_tile}) "
+        f"DEAD: the 2-step sequence ended where the 1-step did ({two_tile}) "
         "— the second rank never executed"
     )
     assert int(s6.pair_dist[start_t, two_tile]) >= 1
@@ -199,7 +199,7 @@ def main() -> None:
     d_dead, stop_tile = dead
     s7.apply_seat_unit_sequence(row, seq_of([d_dead, d_dead], nrows3, rw7))
     assert int(s7.major_unit_tile[0, sl7]) == stop_tile, (
-        f"#90: the walk did not stop at the illegal rank — ended {int(s7.major_unit_tile[0, sl7])}, "
+        f"the walk did not stop at the illegal rank — ended {int(s7.major_unit_tile[0, sl7])}, "
         f"expected {stop_tile}"
     )
     print(f"  5b the walk STOPS at an illegal later step (dir {d_dead}, halted at {stop_tile}) OK")
@@ -251,13 +251,13 @@ def main() -> None:
     sm7 = sim7._seat_slot_map(row)[0]
     rw7b = int((sm7 == sl7b).nonzero(as_tuple=True)[0][0])
     A_SN = sim7._A_SNIPE
-    assert bool(m7b[0, rw7b, A_SN + rk]), "#92: the snipe column for a ring-2 barb must be LEGAL"
+    assert bool(m7b[0, rw7b, A_SN + rk]), "the snipe column for a ring-2 barb must be LEGAL"
     hp0 = float(sim7.barb_unit_hp[0, bslot])
     acts7 = torch.full((1, sm7.shape[0]), -1, dtype=torch.long)
     acts7[0, rw7b] = A_SN + rk
     sim7._apply_seat_unit_actions(row, acts7)
     hp1 = float(sim7.barb_unit_hp[0, bslot]) if bool(sim7.barb_unit_alive[0, bslot]) else 0.0
-    assert hp1 < hp0, f"#92 DISPATCH DEAD: snipe left the barb at {hp1} hp (was {hp0})"
+    assert hp1 < hp0, f"DISPATCH DEAD: snipe left the barb at {hp1} hp (was {hp0})"
     assert float(sim7.major_unit_mp[0, sl7b]) == 0.0, "a snipe must spend the turn"
     print(f"  7 SNIPE strikes a ring-2 barbarian OK ({hp0:.0f} -> {hp1:.0f} hp)")
 
@@ -296,7 +296,7 @@ def main() -> None:
     acts8[0, rw8] = dir8
     sim8._apply_seat_unit_actions(row, acts8)
     assert int(sim8.major_unit_tile[0, sl8]) == nb8, (
-        f"#70 t43 sibling: a replayed naval water step must SAIL (stuck at {int(sim8.major_unit_tile[0, sl8])}, wanted {nb8})"
+        f"t43 sibling: a replayed naval water step must SAIL (stuck at {int(sim8.major_unit_tile[0, sl8])}, wanted {nb8})"
     )
     # and the same hull never walks onto land
     sim8.major_unit_mp[0, sl8] = 3.0

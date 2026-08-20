@@ -174,8 +174,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     env = BatchEnv(fixtures, rules, device="cpu", dtype=torch.float64)
     sim = env.sim
     # EVERY major row, seat 0 first — the order `_seat_phase` walks and the
-    # order TS's seatPhase applies records in. Seat 0 used to be decided by a
-    # hand-rolled block AFTER this list and applied last; that block is gone.
+    # order TS's seatPhase applies records in.
     seats = list(range(sim.n_majors))
     NB = sim.rules_dev.b_cost.shape[0]
     classes = ladder.prod_classes(NB, sim.NU, len(sim._scaffold), sim._wond_n if sim.districts_on else 0, len(sim._proj_rows) if sim.districts_on else 0)

@@ -82,7 +82,7 @@ def main() -> None:
     )
     print(f"  a exported table OK (Festival row {pi_fest}, classes {frow['gs']}, 0.11 each; others 0.22)")
     print(f"  b civ Festival paid {want_each} GPP to EACH of {sorted(paid)} and nothing elsewhere OK")
-    print("festival_test OK — #79 multi-class project award, 15% yield / 11% per class")
+    print("festival_test OK — multi-class project award, 15% yield / 11% per class")
 
 
 if __name__ == "__main__":

@@ -245,9 +245,8 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
     }
     let levyIdx = -1;
     // At war with ANY other major, read off this seat's own row — the GPU's
-    // `war[row, :1+R].any()` twin. It used to read a single war axis from
-    // whichever end the seat sat on, so a civ fighting only another civ read
-    // FALSE here and never levied.
+    // `war[row, :1+R].any()` twin. Reading one fixed axis instead would make a
+    // civ fighting only another civ read FALSE and never levy.
     const atWar = state.seats.some((o) => o.seat !== actor.seat && civsAtWar(state, actor.seat, o.seat));
     if (atWar && goldAffordable(actor.treasury ?? 0, LEVY_GOLD_COST)) {
       for (let ci = 0; ci < state.cityStates.length; ci++) {

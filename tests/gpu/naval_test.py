@@ -364,10 +364,10 @@ def poke_seat0_naval(rules, path, GALLEY, WARRIOR):
     before = int(sim.major_unit_tile[0, gslot])
     sim._apply_seat_unit_actions(0, order(sim, gslot, dm))  # a MOVE order (0..5)
     assert int(sim.major_unit_tile[0, gslot]) == before, (
-        "RL/controlled move stepped a ship onto water — the #50 residual (seat-0 naval "
+       "RL/controlled move stepped a ship onto water — the residual (seat-0 naval "
         "water-move columns) is unexpectedly LIVE; TS findPath is the naval-aware path"
     )
-    print("  5 seat-0 naval OK (spawn-on-water + attack; RL water-move is the documented #50 residual)")
+    print("  5 seat-0 naval OK (spawn-on-water + attack; RL water-move is the documented residual)")
 
 
 def poke_ocean_gate(rules, path, GALLEY):

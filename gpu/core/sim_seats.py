@@ -1114,11 +1114,10 @@ class SimSeats:
         twin of TS's `state.units` array order. A dead attacker (killed earlier
         in this same pass, as somebody's defender) is skipped by `alive`.
 
-        It is a PHASE, not a verb: the fight was never a choice. It used to
-        live inside the scripted missionary walk on both engines, which ran
-        only for civ seats and only while that seat was undriven — when the
-        wire took every decision both copies went inert together. Here it
-        belongs to no seat and inherits no replay-position fork.
+        It is a PHASE, not a verb: the fight was never a choice. Inside a
+        scripted walk it would run only for undriven seats and go inert the
+        moment the wire took that seat's decisions. Here it belongs to no seat
+        and inherits no replay-position fork.
         """
         if self._apostle_idx < 0 or not self.units_mode:
             return
@@ -3257,10 +3256,9 @@ class SimSeats:
         garrison pool takes the damage, and the attacker never advances.
 
         ONE roll key whoever owns the district: `enc` for the damage and `encc`
-        for the counter. The key used to split by owner seat, which was the last
-        place the combat log claimed a seat-0 Encampment is fought differently —
-        it is not, and the defense floor above is already one row-generic read.
-        Draw ORDER is TS's: damage-to-district, then counter."""
+        for the counter — an Encampment is fought the same way on every row, and
+        the defense floor above is already one row-generic read. Draw ORDER is
+        TS's: damage-to-district, then counter."""
         a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
         a_occ = self.military_at
         atk_cs = self._type_combat[a_type[:, u]]

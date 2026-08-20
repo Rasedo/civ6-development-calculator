@@ -67,7 +67,7 @@ function addCiv(state: GameState, id: number, atWar: boolean): Seat {
   return civ;
 }
 
-describe('#50: seat 0 <-> city-state peace', () => {
+describe('seat 0 <-> city-state peace', () => {
   it('peace is refused before the sourced 10-turn floor, then always accepted', () => {
     const state = makeState();
     const cityState = addCs(state, 1);

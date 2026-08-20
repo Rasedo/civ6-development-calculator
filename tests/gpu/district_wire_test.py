@@ -1,12 +1,12 @@
 """DISTRICT PLACEMENT IS A DECISION — it rides the wire, no engine scans.
 
-Both engines used to scan every owned tile for the best adjacency and had to
-agree forever. The choice is the policy's now: `ladder.pick_district_tile`
-ranks, the record carries the tile, and the engines only re-validate it.
+A per-engine scan of every owned tile would have to agree forever. The choice
+is the policy's: `ladder.pick_district_tile` ranks, the record carries the
+tile, and the engines only re-validate it.
 
 What this lane holds:
-  * the ladder's key IS the old engine key — highest adjacency floor, ties to
-    the LOWEST tile index, so the scripted trajectory does not move;
+  * the ladder's key — highest adjacency floor, ties to the LOWEST tile
+    index;
   * a district column with NO tile lands NOTHING (the engine never invents a
     plot to make a legal column work);
   * a named tile that is not eligible is REFUSED, never slid to a neighbour;
@@ -240,7 +240,7 @@ def main() -> None:
     assert c >= 0, "the control district did not go down even once"
     assert d2 < 0, f"a NON-repeatable district went down twice (tiles {c}, {d2})"
 
-    print("district_wire_test OK — ladder key == the old engine key, no tile places nothing, "
+    print("district_wire_test OK — the ladder key, no tile places nothing, "
           "an ineligible tile is refused, a suboptimal one is honoured, the feature-tech gate "
           "holds, the tile round-trips through the record, and a repeatable district goes down "
           "twice where a plain one is refused")

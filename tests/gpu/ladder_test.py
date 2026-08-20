@@ -174,7 +174,7 @@ def main() -> None:
     # project loses to EVERYTHING else and fires alone (the fallback tier)
     assert int(ladder.pick_production(mk8([plo, cls8["unit"][0] + 1]), cls8, ROSTER)[0, 0]) == cls8["unit"][0] + 1
     assert int(ladder.pick_production(mk8([plo + 1, plo]), cls8, ROSTER)[0, 0]) == plo
-    print("  j #88 wonder/project tiers OK (building > wonder > army > project; capital ctx; data-order ties)")
+    print("  j wonder/project tiers OK (building > wonder > army > project; capital ctx; data-order ties)")
 
     # CITIES ARE WALKED IN ORDER: the settler retires once some city takes it.
     # A snapshot mask says "legal" in every idle city, so scoring the cities
@@ -420,7 +420,7 @@ def main() -> None:
     wm2[0, R2 + 1] = True
     assert int(ladder.pick_war(wm2, base_ctx, lo_rng)[0]) == R2 + 1
     assert int(ladder.pick_war(wm2, base_ctx, hi_rng)[0]) == -1
-    print("  k #93 war verb OK (declare gates + rng arms, gang bypass, sue at 0.25, "
+    print("  k war verb OK (declare gates + rng arms, gang bypass, sue at 0.25, "
           "per-opponent choice, mask-gated)")
 
     # -- l: purchase priority — BUILDING > SETTLER > UNIT > TILE, one kind --
@@ -441,8 +441,8 @@ def main() -> None:
     import drive as _drv
     bctx = _drv._buy_ctx(s, 1)  # civ 0 is seat row 1
     assert bctx["can_building"].shape == (s.B,) == bctx["settler_ok"].shape == bctx["unit_ok"].shape, "buy ctx must be per-row"
-    assert bctx["tile_ok"].shape == (s.B,) == bctx["worship_ok"].shape == bctx["levy_ok"].shape, "#104 ctx must be per-row"
-    assert bctx["missionary_ok"].shape == (s.B,) == bctx["apostle_ok"].shape == bctx["levy_cs"].shape, "#104 ctx must be per-row"
+    assert bctx["tile_ok"].shape == (s.B,) == bctx["worship_ok"].shape == bctx["levy_ok"].shape, "ctx must be per-row"
+    assert bctx["missionary_ok"].shape == (s.B,) == bctx["apostle_ok"].shape == bctx["levy_cs"].shape, "ctx must be per-row"
     print("  l purchase priority OK (building > settler > unit > tile; faith m>a; per-row ctx)")
 
     print("LADDER CONTRACT OK")

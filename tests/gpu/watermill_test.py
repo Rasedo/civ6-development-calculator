@@ -105,7 +105,7 @@ def main() -> None:
     )
     print("  c resource-gated OK (plain Farms with no bonus resource get nothing)")
 
-    print("watermill_test OK — #78 Water Mill: +1 food per farm-improved bonus resource, building- and resource-gated")
+    print("watermill_test OK — Water Mill: +1 food per farm-improved bonus resource, building- and resource-gated")
 
 
 if __name__ == "__main__":

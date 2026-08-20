@@ -167,7 +167,7 @@ def main() -> None:
             assert int(s3.city_gw_music[0, 2, dest]) == 1, "music must ride the transfer"
             assert int(s3.city_relics[0, 1, j]) == 0, "the dead source slot must not keep a relic"
             assert int(s3.city_gw_art[0, 1, j]) == 0, "the dead source slot must not keep art"
-            print("  #79a works+relics ride the rc->rc transfer, source slot cleared OK")
+            print("  works+relics ride the rc->rc transfer, source slot cleared OK")
 
     # b. compaction must permute ALL FOUR planes with their city.
     s4 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
@@ -193,7 +193,7 @@ def main() -> None:
         f"got {int(s4.city_relics[0, row, k])}"
     )
     assert int(s4.city_gw_art[0, row, k]) == 4, "art must follow its city through compaction"
-    print("  #79b all four work planes ride the slot compaction OK")
+    print("  all four work planes ride the slot compaction OK")
 
     print("relics OK — constants, placement, wonder slots, dead-city masking, tourism term, _MUTABLE, transfer+compaction")
 

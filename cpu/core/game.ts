@@ -733,9 +733,8 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number, sea
   // Purchases claim the tile but do NOT advance the culture-growth BOX
   // (real Civ 6 keeps the two schedules separate). They DO advance the
   // acquired COUNT — the next border tile costs more however this one was
-  // gained — which is why the claim goes through acquireTile (this
-  // body used to hand-copy setTileOwner and silently skip tilesAcquired,
-  // the exact drift acquireTile exists to prevent).
+  // gained — which is why the claim goes through `acquireTile`: a
+  // hand-copied `setTileOwner` here would leave `tilesAcquired` behind.
   acquireTile(state, city, tileIndex);
   buyer.tilesPurchased = (buyer.tilesPurchased ?? 0) + 1;
   return { ok: true };
@@ -1009,12 +1008,11 @@ function religiousVictor(state: GameState): number {
  * position.
  *
  * WHY IT IS A PHASE AND NOT A VERB: the fight was never a choice — an apostle
- * standing next to an enemy apostle fought, before it could spread. It used to
- * live inside the SCRIPTED missionary walk, so it ran only for civ seats and
- * only while that seat was undriven (`if (!recU)`); when the wire took every
- * decision both engines' copies went inert together and the body was deleted
- * with the walker. Restored here as an eager RULE at ONE schedule position —
- * after every seat's turn, before the pressure spread reads the swing — so it
+ * standing next to an enemy apostle fights, before it can spread. Inside a
+ * scripted walk it would run only for undriven seats and go inert the moment
+ * the wire took that seat's decisions. It is an eager RULE at ONE schedule
+ * position — after every seat's turn, before the pressure spread reads the
+ * swing — so it
  * belongs to no seat and inherits no replay-position fork.
  */
 function theologicalCombatPhase(state: GameState): void {

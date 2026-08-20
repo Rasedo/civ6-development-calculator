@@ -56,7 +56,7 @@ function addCiv(state: GameState, col: number, row: number): Seat {
   return civ;
 }
 
-describe('#70 the action FILE drives the TS civ', () => {
+describe('the action FILE drives the TS civ', () => {
   it('applies the recorded SETTLER column instead of deciding', () => {
     const state = makeState(makeMap(14, 14, 'GRASSLAND'));
     const civ = addCiv(state, 6, 6);
@@ -156,7 +156,7 @@ describe('#70 the action FILE drives the TS civ', () => {
     expect(after!.tileIndex).not.toBe(before);
   });
 
-  it('a replayed WATER step is refused without SHIPBUILDING — and embarks with it (#70 t43)', () => {
+  it('a replayed WATER step is refused without SHIPBUILDING — and embarks with it (t43)', () => {
     // stepUnit's embark transition has no tech gate of its own (walkers gate
     // embark at CANDIDATE level), so the replay surface must refuse what the
     // GPU's apply refuses: t43 embarked a Shipbuilding-less warrior
@@ -199,7 +199,7 @@ describe('#70 the action FILE drives the TS civ', () => {
     expect(state.units.find((x) => x.id === u.id)!.tileIndex).toBe(home.index);
   });
 
-  it('#88: a recorded WONDER column places and queues — and one-per-world refuses cross-seat', () => {
+  it('a recorded WONDER column places and queues — and one-per-world refuses cross-seat', () => {
     const L = prodLayout();
     const oracleCol = L.wonderLo + L.wonders.indexOf('ORACLE');
     const mk = (claimed: boolean) => {
@@ -223,7 +223,7 @@ describe('#70 the action FILE drives the TS civ', () => {
     expect(rc2.queue.find((q) => q.kind === 'wonder')).toBeUndefined(); // refused, never double-built
   });
 
-  it('#88: a recorded PROJECT column queues on a completed district', () => {
+  it('a recorded PROJECT column queues on a completed district', () => {
     const L = prodLayout();
     const col = L.projectLo + L.projects.indexOf('RESEARCH_GRANTS');
     const state = makeState(makeMap(14, 14, 'GRASSLAND'));
@@ -238,7 +238,7 @@ describe('#70 the action FILE drives the TS civ', () => {
     expect(civCity.queue[0]?.kind).toBe('project');
   });
 
-  it('#93: a recorded DECLARE flips the seat to war; a recorded PEACE pays or refuses', () => {
+  it('a recorded DECLARE flips the seat to war; a recorded PEACE pays or refuses', () => {
     const declare = () => {
       const state = makeState(makeMap(14, 14, 'GRASSLAND'));
       const civ = addCiv(state, 6, 6);
@@ -271,7 +271,7 @@ describe('#70 the action FILE drives the TS civ', () => {
     expect(civsAtWar(early.state, early.civ.seat, 0)).toBe(true);
   });
 
-  it('#93: recorded ENVOYS land at the named city-state — bank first, else influence', () => {
+  it('recorded ENVOYS land at the named city-state — bank first, else influence', () => {
     const state = makeState(makeMap(14, 14, 'GRASSLAND'));
     const civ = addCiv(state, 6, 6);
     const cityState = state.cityStates[0];

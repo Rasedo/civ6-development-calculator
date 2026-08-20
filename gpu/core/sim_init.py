@@ -33,10 +33,8 @@ class SimInit:
         # 0 — which is a FILL, not a fork: every reader is the same expression.
         # ------------------------------------------------------------------
         # THE MAJOR ROSTER WIDTH, read off THE ROSTER: `civs[]` is seat-keyed
-        # and holds one entry per major, seat 0 among them. It used to be
-        # `1 + civMax`, a separate scalar wire key that counted the seats
-        # BESIDES seat 0 — the last place the player-and-rivals model was
-        # still writing itself down, and a second source of truth that could
+        # and holds one entry per major, seat 0 among them. A separate scalar
+        # wire key for the width would be a second source of truth that could
         # disagree with the array right beside it. An opponent count, where
         # one is genuinely meant (the war head's columns, the observation's
         # per-opponent block), is `n_majors - 1` written at the site that

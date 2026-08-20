@@ -559,8 +559,8 @@ def _district_tiles(sim, row: int, prod: torch.Tensor):
     """[B, RC, nS] the tile each city would put each district column on, or
     None when this world has no district columns.
 
-    The placement CHOICE, which is policy and belongs here: the engines used to
-    run a scan apiece and had to agree forever. Only the column a city actually
+    The placement CHOICE, which is policy and belongs here: a scan per engine
+    would have to agree forever. Only the column a city actually
     picked is filled — every other entry stays -1, and the apply refuses a
     district column whose tile is -1. A net driving `production_pref` must fill
     every column it wants reachable, through this same body.

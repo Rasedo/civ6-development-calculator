@@ -59,9 +59,8 @@ def split(obs: torch.Tensor, n_cs: int, n_opponents: int, n_cities: int,
     time — the second copy is how the schema drifts.
 
     `n_opponents` is the `cv` block's row count: an observation renders the
-    OTHER majors, never the asker, so it is one short of the roster. It was
-    called `n_civs` and fed `sim.R` until #115, which read like the roster
-    size and was not."""
+    OTHER majors, never the asker, so it is one short of the roster — never the
+    roster size itself."""
     b = obs.shape[0]
     i = EMP
     emp = obs[:, :i]
@@ -266,9 +265,8 @@ def pick_district_tile(elig: torch.Tensor, adj: torch.Tensor) -> torch.Tensor:
     adjacency, ties to the LOWEST tile index. -1 where nothing is eligible.
 
     This is the placement CHOICE, and it lives here rather than in either
-    engine: both used to run a scan of their own and had to agree forever.
-    Now the policy picks, the record carries the tile, and the engines only
-    re-validate it.
+    engine: a scan per engine would have to agree forever. The policy picks,
+    the record carries the tile, and the engines only re-validate it.
 
     `key = adj*T - idx` then argmax reproduces the TS scan's strict `>` (first
     wins over tile order) without depending on argmax's undefined tie-break.

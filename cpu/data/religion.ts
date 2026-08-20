@@ -223,55 +223,17 @@ export const SPREAD_PRESSURE = 10;
 export const MISSIONARY_CAP = 2;
 export const APOSTLE_CAP = 1;
 /**
- * THE APOSTLE HUNT RECORD (the buy is a wire decision —
- * its old master switch is gone).
- *
- * The apostle unit, its religious strength, theological combat and the
- * seat purchase are all on. Getting here took a long hunt whose
- * two REAL parity bugs are worth remembering, because both were in the GPU's
- * theological combat and both were invisible until an apostle existed:
- *
- * 1. STALE OCCUPANCY. A killed unit had `v_alive = False` set but its
- *    occupancy plane (`civilian_at` / `military_at`) was never cleared, while TS's
- *    `disbandUnit` drops the unit outright. The corpse blocked its tile
- *    FOREVER t87 alive=False hp=0 yet occ363 still read its slot),
- *    rerouting another civ's missionary and costing it a spread.
- * 2. PRE-PASS vs INTERLEAVE. The GPU resolved every apostle's fight BEFORE
- *    the spread/walk loop; TS interleaves it per unit. A fight KILLS units and
- *    thereby FREES TILES, so the pre-pass handed later movers a tile TS still
- *    had occupied t85: a missionary walked 341->340->296 straight
- *    through its OWN apostle's tile because the pre-pass had already killed
- *    it). Now resolved at each unit's position in the order.
- * 3. DEFENDER TIE-BREAK (fixed on the TS side). TS picked the defender by
- *    unit ID; the GPU picks by slot, which mirrors ARRAY order — and array
- *    order is this codebase's shared convention (capture deliberately
- *    moves a captured unit to the END of both the TS array and the GPU pool to
- *    keep them aligned). After any capture an id no longer reflects array
- *    position, so the engines chose different defenders t207: TS
- *    apostle vs GPU's lower-slotted #176 missionary), splitting the
- *    damage rolls. TS now scans `state.units` in array order.
- *
- * METHOD NOTE, dearly bought: every one of those was found by MEASURING —
- * printing the caller that removed a unit, dumping raw per-turn state, logging
- * the same EVENT on both sides. Every wrong turn came from inferring from
- * positions or comparing a mid-turn log against an end-of-turn snapshot.
- */
-/**
  * THEOLOGICAL COMBAT. Sourced shape — only an Apostle may
  * initiate against an adjacent religious unit of a DIFFERENT religion; both
  * sides take damage scaled by the RELIGIOUS-STRENGTH DIFFERENCE; a unit at 0
  * HP dies; and the loser's religion loses pressure in nearby cities while the
- * winner's gains. DELIBERATELY ZERO-DRAW: damage is the strength difference
- * scaled by THEO_DAMAGE, with no RNG multiplier. Real Civ 6 rolls, but a new
- * draw here would have to be mirrored draw-for-draw in both engines on a
- * conditional path — the exact surface the seat quests dissolved by
- * making the mechanic deterministic. Recorded simplification.
+ * winner's gains. ZERO-DRAW: damage is the strength difference scaled by
+ * THEO_DAMAGE, with no RNG multiplier. Real Civ 6 rolls, so this is an OPEN
+ * gap — closing it means mirroring a draw for a draw in both engines on a
+ * conditional path.
  */
-/** DEBT-2: the city-attack religion-adder switch, landed INERT. The term is
- * written and mirrored at all six sites (TS: seat attackers only, matching the
- * GPU, which never sets seat 0's holy city); only the switch is off,
- * because turning it on shifted seat combat outcomes and the engines split on
- * downstream unit counts. Flip when its hunt lands. */
+/** Master switch for the city-attack religion adder, written and mirrored at
+ * all six sites. */
 export const CITY_RELIGION_ADDER_LIVE = true;
 
 export const THEO_DAMAGE = 2;
@@ -290,15 +252,12 @@ export const THEO_PRESSURE_SWING = 15;
 export const MARTYR_CHANCE = 1 / 9;
 
 /**
- * pressure→yields coupling master switch (Round B3, slice U). When false
- * (INERT), a city's FOLLOWER-belief yields key on the OWNER civ's religion —
- * byte-identical to the pre-coupling per-civ application. When true (LIVE),
- * they key on the CITY's `followedReligion`, so a seat-0 city following a seat
- * religion draws that religion's follower belief and a city following none gets
- * no follower-belief yields. PANTHEON + FOUNDER + ENHANCER beliefs stay per-civ
- * either way. Mirrored to the GPU via rules.followerCoupling. The restructure
- * (follower belief moved out of getModifiers into the per-city
- * withFollowerBelief lookup) lands inert first; this flag flips the behavior in
- * its own commit alongside a fixture regen.
+ * Master switch for the pressure->yields coupling. LIVE: a city's
+ * FOLLOWER-belief yields key on the CITY's `followedReligion`, so a city
+ * following another seat's religion draws THAT religion's follower belief and
+ * a city following none gets no follower-belief yields. INERT: they key on the
+ * OWNER's religion instead. PANTHEON, FOUNDER and ENHANCER beliefs stay
+ * per-civ either way. The lookup is `withFollowerBelief`, not `getModifiers`.
+ * Mirrored to the GPU via `rules.followerCoupling`.
  */
 export const B18_FOLLOWER_COUPLING_LIVE = true;

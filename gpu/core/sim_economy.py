@@ -50,8 +50,8 @@ class SimEconomy:
                 f"WAR-WEARINESS SITE MISSING: game {g} turn {int(self.turn)} opened "
                 f"{int(self._ww_opened[g])} battle(s) but scored {int(self._ww_hooked[g])}. "
                 f"A damage roll keyed in WW_BATTLE_KEYS has no `_ww_battle` call "
-                f"beside it (or one fires under a different mask). See task #60: "
-                f"one TS rule, {len(WW_BATTLE_KEYS)} GPU appliers."
+                f"beside it (or one fires under a different mask): one TS rule, "
+                f"{len(WW_BATTLE_KEYS)} GPU appliers."
             )
         self._ww_opened.zero_()
         self._ww_hooked.zero_()
@@ -1095,9 +1095,8 @@ class SimEconomy:
         adders. terr[b, g, t] = tile t is OWNED by a city following religion g;
         near3[b, g, t] = some city following g has its CENTER within
         justWarRange of t. ONE derivation per plane over rows 0..n_majors-1 of the merged
-        city block — `tile_city` holds PERSISTENT ids for every seat, so
-        the id match that used to serve only the civ rows now answers for seat 0
-        too. Keyed (turn, _eff_version):
+        city block — `tile_city` holds PERSISTENT ids for every seat, so one
+        id match answers for every row. Keyed (turn, _eff_version):
         followedReligion moves once per turn (_spread_religious_pressure) and
         every city-set/ownership change (founding, capture, transfer, claim,
         compaction) bumps _eff_version — so the keyed cache IS the TS live
@@ -1936,12 +1935,10 @@ class SimEconomy:
         real Civ 6 banks a turn's yields off the state the turn opened with — a
         building finished this turn pays from the next one.
 
-        Both rows used to recompute mid-walk behind an (_eff_version,
-        _claim_version) key, one through _city_totals and one through a keyed
-        cache with a capital-belief escape hatch. That modelled a game.ts
-        endTurn city loop which no longer exists — seat 0 takes its turn
-        through seatPhase like every seat — and it was the last place where
-        two rows could read two different economies."""
+        Recomputing mid-walk behind an (_eff_version, _claim_version) key
+        would model a `game.ts` endTurn city loop that does not exist — every
+        seat takes its turn through `seatPhase` — and it would let two rows
+        read two different economies."""
         tier_idx, growth_f, yield_f, _lux = self._seat_amenity(row)
         total = self._seat_city_walk(row, amen_yf=yield_f)
         housing = self._seat_housing(row)[1]
@@ -1980,10 +1977,9 @@ class SimEconomy:
         keeps that true even mid-step, and dead columns add exact 0.0
         (association-neutral).
 
-        Accumulates in f64 like the TS doubles it mirrors, then casts once.
-        (Row 0 used to accumulate in the ENGINE dtype and the civ rows in f64,
-        so in an f32 lane `leader()` compared an f32-rounded seat 0 against f64
-        rivals. One body, one precision.)"""
+        Accumulates in f64 like the TS doubles it mirrors, then casts once —
+        one body, one precision, so an f32 lane cannot have `leader()` compare
+        a rounded row against an unrounded one."""
         rd = self.rules_dev
         w = rd.score_yield_weights
         pw = float(self.rules.score_pop_weight)

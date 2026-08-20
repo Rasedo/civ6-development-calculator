@@ -389,8 +389,7 @@ XP_LEVELS = (15, 45, 90)
 # order, seat 0 among them, each entry carrying its own absolute `seat` — and
 # that id IS the entry's row in every merged plane. City-states (100+) and
 # barbarians (200) stay outside the major numbering. There is no second index
-# space: the `r + 1` / `c - 1` conversion helpers that used to live here had no
-# caller left once every signature took the row, and went with it.
+# space, so no signature below converts between one and another.
 # NB: the `_type_civilian` unit tensor means "unit type is CIVILIAN" and is
 # unrelated to any of this.
 

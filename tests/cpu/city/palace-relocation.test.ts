@@ -19,7 +19,7 @@ const city = (name: string, population: number, isCapital = false, buildings: st
   name, population, isCapital, buildings: [...buildings],
 });
 
-describe('#70/S4 relocatePalace', () => {
+describe('relocatePalace', () => {
   it('crowns the highest-population survivor and grants it the Palace', () => {
     const cities = [city('small', 3), city('biggest', 9), city('mid', 6)];
     relocatePalace(cities);

@@ -53,7 +53,7 @@ describe('Great Works', () => {
   // MUSIC lives in the BROADCAST CENTER, its real Civ 6 home, and that
   // building has exactly ONE slot — so a Musician's 2 works always leave 1
   // overflowing. The Museum is the ART Museum now and holds 3 art works.
-  it('#70/S1: a MUSIC work pays double a writing work (4 vs 2) and no gold', () => {
+  it('a MUSIC work pays double a writing work (4 vs 2) and no gold', () => {
     const { state, city } = cityWithAmphitheater();
     expect(queueBuilding(state, city.id, 'MUSEUM', 0).ok).toBe(true); // requiresAny AMPHITHEATER
     expect(queueBuilding(state, city.id, 'BROADCAST_CENTER', 0).ok).toBe(true); // requiresAny MUSEUM
@@ -72,7 +72,7 @@ describe('Great Works', () => {
 
   // ART is a real kind — the ART MUSEUM's 3 slots, +2 culture apiece, and
   // a Great Artist carries exactly 3 works, so one Artist fills a Museum.
-  it('#73: an ARTIST fills the Art Museum (3 slots, +2 culture each)', () => {
+  it('an ARTIST fills the Art Museum (3 slots, +2 culture each)', () => {
     const { state, city } = cityWithAmphitheater();
     expect(queueBuilding(state, city.id, 'MUSEUM', 0).ok).toBe(true);
     const cul0 = computeCityStats(state, city).breakdown.buildings.culture;
@@ -89,7 +89,7 @@ describe('Great Works', () => {
   // PRINTING doubles the TOURISM of Great Works of WRITING (real
   // Civ 6 — the tourism, not the Amphitheater's slot count). Culture is
   // untouched, and the other two kinds are untouched.
-  it('#74: PRINTING doubles WRITING tourism only', () => {
+  it('PRINTING doubles WRITING tourism only', () => {
     const w = { greatWorksWriting: 2 };
     expect(greatWorkTourism(w, false)).toBe(GW_TOURISM[GW_WRITING] * 2);
     expect(greatWorkTourism(w, true)).toBe(GW_TOURISM[GW_WRITING] * 2 * 2);
@@ -100,7 +100,7 @@ describe('Great Works', () => {
     expect(greatWorkCulture(w)).toBe(GW_CULTURE[GW_WRITING] * 2);
   });
 
-  it('#70/S1: greatWorkCulture weights every kind separately', () => {
+  it('greatWorkCulture weights every kind separately', () => {
     expect(greatWorkCulture({ greatWorksWriting: 2 })).toBe(4);
     expect(greatWorkCulture({ greatWorksMusic: 2 })).toBe(8);
     expect(greatWorkCulture({ greatWorksArt: 2 })).toBe(4);

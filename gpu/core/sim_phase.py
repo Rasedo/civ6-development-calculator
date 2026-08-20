@@ -514,9 +514,8 @@ class SimPhase:
         city holding both rolls twice, and a walls kill removes a target the
         Encampment roll would have taken.
 
-        There is no second application anywhere: the seat-0 copy that used to
-        run inside barbarianPhase is gone from BOTH engines. Real Civ 6 fires
-        and heals a city in its OWNER's turn, once."""
+        There is no second application anywhere, on either engine. Real Civ 6
+        fires and heals a city in its OWNER's turn, once."""
         Bn, dev2 = self.B, self.device
         bidx = torch.arange(Bn, device=dev2)
         heal = int(self.rules.combat.get("cityHealPerTurn", 20))
