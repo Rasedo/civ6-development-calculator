@@ -93,6 +93,7 @@ class Rules:
     score_yield_weights: torch.Tensor  # [6]
     boosts: list  # [{target, idx, kind, ...}] — eureka/inspiration conditions
     combat: dict  # barbarian constants + the JS-computed damage-base table
+    disasters: dict  # the Flood (Civ6) severity tables
     units: list  # trainable roster [{id, cost, combat, maintenance, civilian, requiresTech}]
     citystate: dict  # city-state constants (envoy cost, influence rate, quest pacing, type→yield)
     seats: dict  # seat pacing, loyalty, GP costs, belief-pool sizes (cpu/data/seats.ts)
@@ -174,6 +175,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         score_yield_weights=torch.tensor(r["score"]["yieldWeights"], dtype=torch.float64),
         boosts=r.get("boosts", []),
         combat=r.get("combat", {}),
+        disasters=r.get("disasters", {}),
         units=r.get("units", []),
         citystate=r["cityState"],
         seats=r["seats"],  # the seat bag (cpu/data/seats.ts)
@@ -493,7 +495,7 @@ _MUTABLE = [
     "shipwreck", "shipwreck_era", "shipwreck_seat",  # the WATER dig
     "park",  # NATIONAL PARK tiles
     "built_wonder", "built_wonder_complete", "city_wonder",  # world wonders + the per-city registry
-    "fertility", "drought", "improvement", "pillaged", "district",
+    "fertility", "fertility_prod", "drought", "improvement", "pillaged", "district",
     "district_pillaged",  # raided-dark districts (tile plane, reclaim-safe)
     "d_static_adj",  # mutated when an in-game founding clears the center tile's removable feature
     # The merged unit pool. The BASES are registered, never the `major_`/`barb_`

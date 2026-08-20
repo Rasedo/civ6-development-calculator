@@ -398,7 +398,7 @@ class SimEconomy:
         THAT row's own techs, which is what TS does when it builds the yield
         context from `getModifiers(state, city.seat)`. Cached per
         _eff_version (improvement/pillage changes bump it)."""
-        base = self.tile_yields[:, :, 1]
+        base = self.tile_yields[:, :, 1] + self.fertility_prod.to(self.dtype)
         if not self.improvements_on:
             return base
         if self._nprod_cache is not None and self._nprod_cache[0] == self._eff_version:
@@ -463,11 +463,7 @@ class SimEconomy:
 
         r = self._next_random(every)
         hit, tile = self._pick_static(r < 0.05, self._flood_list)
-        if bool(hit.any()):
-            rows = hit.nonzero(as_tuple=True)[0]
-            self._scorch(rows, tile[rows])
-            self._flood_district(rows, tile[rows])
-            self._fertilize(rows, tile[rows])
+        self._flood_tile(hit, tile)
 
         er_rows, er_volc = [], []
         for k in range(self.volcano_tile.shape[1]):
@@ -515,6 +511,127 @@ class SimEconomy:
             self._scorch(rowm[valid], af[valid])
             on = valid & self.desert[rowm, af.clamp(min=0)]
             self._fertilize(rowm[on], af[on])
+
+    def _flood_tile(self, hit: torch.Tensor, tile: torch.Tensor) -> None:
+        """`floodTile` — ONE river flood on one Floodplains tile.
+
+        CIV6: a flood "damages or destroys Districts, improvements, and units on
+        the Floodplains tiles near the River. This may also include a City
+        Center, in which case it loses some HP and Defenses... May kill some
+        Citizens in a nearby city... Can fertilize affected tiles." The severity
+        ladder decides every magnitude, and the Great Bath cancels the damage
+        half while halving the fertility half.
+
+        EIGHT draws, always, whatever the tile holds — the count depends on the
+        flood alone, so the two engines cannot slip apart on what stood there.
+        """
+        B, dev = self.B, self.device
+        r_sev = self._next_random(hit)
+        sev = torch.zeros(B, dtype=torch.long, device=dev)
+        acc = 0.0
+        for i, p in enumerate(self._flood_sev_p):
+            lo, acc = acc, acc + p
+            sev = torch.where((r_sev >= lo) & (r_sev < acc), torch.full_like(sev, i), sev)
+        sev = torch.where(r_sev >= acc, torch.full_like(sev, len(self._flood_sev_p) - 1), sev)
+        r_destroy = self._next_random(hit)
+        r_district = self._next_random(hit)
+        r_damage = self._next_random(hit)
+        r_civilian = self._next_random(hit)
+        r_pop = self._next_random(hit)
+        r_food = self._next_random(hit)
+        r_prod = self._next_random(hit)
+        if not bool(hit.any()):
+            return
+        tc = tile.clamp(min=0)
+        seat_at = self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1)
+        mit = torch.zeros(B, dtype=torch.bool, device=dev)
+        if self._wond_n:
+            for _r in range(self.n_majors):
+                mit = mit | ((seat_at == _r) & self._seat_wonder_any(_r, self._wond_floodmit))
+        raw = hit & ~mit
+
+        rows = raw.nonzero(as_tuple=True)[0]
+        if rows.numel():
+            self._scorch(rows, tc[rows])
+            gone = rows[(r_destroy[rows] < self._flood_destroy_p[sev[rows]])
+                        & (self.improvement[rows, tc[rows]] >= 0)]
+            if gone.numel():
+                self.improvement[gone, tc[gone]] = -1
+                self.pillaged[gone, tc[gone]] = False
+            dist = rows[r_district[rows] < self._flood_district_p[sev[rows]]]
+            if dist.numel():
+                self._flood_district(dist, tc[dist])
+        lo, hi = self._flood_dmg_lo[sev], self._flood_dmg_hi[sev]
+        dmg = lo + torch.floor(r_damage * (hi - lo + 1).double()).to(torch.long)
+        dmg = torch.where(raw, dmg, torch.zeros_like(dmg))
+        hurt = raw & (dmg > 0)
+        if bool(hurt.any()):
+            # A CITY CENTER on the floodplain loses HP and, if it has one,
+            # perimeter.
+            ctr = self._centre_seat_plane().gather(1, tc.unsqueeze(1)).squeeze(1)
+            cr = (hurt & (ctr >= 0) & (ctr < self.n_majors)).nonzero(as_tuple=True)[0]
+            if cr.numel():
+                hrow = ctr[cr]
+                hcol = self.centre_slot_at.gather(1, tc.unsqueeze(1)).squeeze(1)[cr].clamp(min=0)
+                self.city_hp[cr, hrow, hcol] = (self.city_hp[cr, hrow, hcol] - dmg[cr]).clamp(min=1)
+                oh = self.city_outer_hp[cr, hrow, hcol]
+                self.city_outer_hp[cr, hrow, hcol] = torch.where(oh > 0, (oh - dmg[cr]).clamp(min=0), oh)
+            for pool in ("major", "barb"):
+                mil = getattr(self, f"{pool}_unit_alive")
+                lo_p, hi_p = self.POOL_LO[pool], self.POOL_HI[pool]
+                for plane, civilian in ((self.military_at, False), (self.civilian_at, True)):
+                    slot = plane.gather(1, tc.unsqueeze(1)).squeeze(1)
+                    on = hurt & (slot >= lo_p) & (slot < hi_p)
+                    if not bool(on.any()):
+                        continue
+                    ur = on.nonzero(as_tuple=True)[0]
+                    us = (slot[ur] - lo_p)
+                    if civilian:
+                        # "Civilians killed" is its own column — a chance, not
+                        # damage.
+                        keep = r_civilian[ur] < self._flood_pop_p[sev[ur]]
+                        ur, us = ur[keep], us[keep]
+                        if ur.numel() == 0:
+                            continue
+                        mil[ur, us] = False
+                        self._vacate(pool, ur, us)
+                    else:
+                        hp = getattr(self, f"{pool}_unit_hp")
+                        hp[ur, us] = hp[ur, us] - dmg[ur]
+                        dead = hp[ur, us] <= 0
+                        if bool(dead.any()):
+                            dr, ds = ur[dead], us[dead]
+                            mil[dr, ds] = False
+                            self._vacate(pool, dr, ds)
+        # A CITIZEN of the tile's owning city, on its own roll. TS puts this
+        # beside the damage block, not inside it — a city-state's tile pays
+        # nothing either way, since only a major keeps a city list.
+        pr = (raw & (r_pop < self._flood_pop_p[sev])).nonzero(as_tuple=True)[0]
+        if pr.numel():
+            for _r in range(self.n_majors):
+                sel = pr[seat_at[pr] == _r]
+                if sel.numel() == 0:
+                    continue
+                sl = self.city_slot_at(_r).gather(1, tc[sel].unsqueeze(1)).squeeze(1)
+                ok = sl >= 0
+                sel, sl = sel[ok], sl[ok].clamp(min=0)
+                if sel.numel() == 0:
+                    continue
+                pop = self.city_pop[sel, _r, sl]
+                self.city_pop[sel, _r, sl] = torch.where(pop > 1, pop - 1, pop)
+        # FERTILIZATION. Each yield is its own roll, so one flood may pay both.
+        # A mitigated river still silts, at half the rate.
+        col = self._flood_fert_col[self.terrain.gather(1, tc.unsqueeze(1)).squeeze(1).clamp(min=0)]
+        half = torch.where(mit, torch.full((B,), 0.5, dtype=torch.float64, device=dev),
+                           torch.ones(B, dtype=torch.float64, device=dev))
+        fr = (hit & (r_food < self._flood_fert_food[sev, col] * half)).nonzero(as_tuple=True)[0]
+        if fr.numel():
+            self._fertilize(fr, tc[fr])
+        pr2 = (hit & (r_prod < self._flood_fert_prod[sev, col] * half)).nonzero(as_tuple=True)[0]
+        if pr2.numel():
+            ok = self.fertilizable[pr2, tc[pr2]]
+            r2, t2 = pr2[ok], tc[pr2][ok]
+            self.fertility_prod[r2, t2] = (self.fertility_prod[r2, t2] + 1).clamp(max=3)
 
     def _seat_buildable(self, row: int, complete: bool = False) -> torch.Tensor:
         """[B, RC, NB] buildings seat row `row`'s cities may QUEUE now —
@@ -1396,7 +1513,7 @@ class SimEconomy:
                 distinct = distinct & (seats[:, :, i] != seats[:, :, j])
         return full & one_era & distinct
 
-    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, relics: torch.Tensor | None = None, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None, gw_kmult: torch.Tensor | None = None, themed: torch.Tensor | None = None, relic_mult: torch.Tensor | None = None, resort_mult: torch.Tensor | None = None) -> torch.Tensor:
+    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, relics: torch.Tensor | None = None, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None, gw_kmult: torch.Tensor | None = None, themed: torch.Tensor | None = None, relic_mult: torch.Tensor | None = None, resort_mult: torch.Tensor | None = None, park_mult: torch.Tensor | None = None, gov_tile: torch.Tensor | None = None) -> torch.Tensor:
         """[B] — a seat's per-turn TOURISM, the `seatTourism` twin. Great Works
         pay the values that pair tourism with culture; every OWNED unpillaged
         SEASIDE RESORT pays its tile's APPEAL (floored at 0), attributed by
@@ -1434,9 +1551,14 @@ class SimEconomy:
         w_live = (self.built_wonder >= 0) & self.built_wonder_complete & own
         if bool(w_live.any()):
             w_era = self._wonder_era[self.built_wonder.clamp(min=0, max=max(self._wonder_era.numel() - 1, 0))]
-            t = t + (
-                (self._wonder_tour_base + (era.unsqueeze(1) - w_era).clamp(min=0)) * w_live.long()
-            ).sum(dim=1)
+            wt = self._wonder_tour_base + (era.unsqueeze(1) - w_era).clamp(min=0)
+            if gov_tile is not None:
+                # CIV6 (Wish You Were Here, Golden face): "Cities with Governors
+                # receive 50% Tourism from World Wonders."
+                wt = torch.where(gov_tile,
+                                 torch.div(wt * self._wish_wond_num, self._wish_wond_den, rounding_mode="floor"),
+                                 wt)
+            t = t + (wt * w_live.long()).sum(dim=1)
         if self.SEASIDE >= 0:
             live = (self.improvement == self.SEASIDE) & ~self.pillaged & own
             if bool(live.any()):
@@ -1448,7 +1570,10 @@ class SimEconomy:
         # take a park's payout negative.
         pk = (self.park >= 0) & own
         if bool(pk.any()):
-            t = t + (self._tile_appeal() * pk.long()).sum(dim=1)
+            # CIV6 (Wish You Were Here, Golden face): "+100% Tourism to all
+            # National Parks."
+            pm = park_mult if park_mult is not None else torch.ones(self.B, dtype=torch.long, device=self.device)
+            t = t + (self._tile_appeal() * pk.long()).sum(dim=1) * pm
         return t
 
     def _seaside_ok(self) -> torch.Tensor:

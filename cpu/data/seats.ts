@@ -315,8 +315,10 @@ export const ADMIRAL_MARCH_LIVE = true;
  * Robots.
  *
  *   0 MONUMENTALITY       +1 era score per specialty DISTRICT completed
- *   1 FREE_INQUIRY        +1 era score per EUREKA (tech boost) triggered
- *   2 PEN_BRUSH_AND_VOICE +1 era score per INSPIRATION (civic boost) triggered
+ *   1 FREE_INQUIRY        +1 era score per EUREKA (tech boost) triggered, and
+ *                         per building constructed that provides SCIENCE
+ *   2 PEN_BRUSH_AND_VOICE +1 era score per INSPIRATION (civic boost) triggered,
+ *                         and per building constructed with a GREAT WORK slot
  *   3 EXODUS_OF_THE_EVANGELISTS  +2 era score per city converted to your religion
  *   4 TO_ARMS             +1 era score per non-barbarian CORPS killed (+2 per
  *                         ARMY) — formations do not exist here, so the event
@@ -332,14 +334,13 @@ export const ADMIRAL_MARCH_LIVE = true;
  * Monumentality faith purchases + 30% discount) — see `eras.goldenDedication`'s
  * callers. There is NO flat per-turn payout on either face in real Civ 6.
  *
- * Residual, recorded: the per-era availability windows are not published in
- * the Civilopedia (it names only Automaton Warfare's), so the round-robin
- * offers every entry in every era; To Arms!'s special Casus Belli needs a
- * denouncement system; the remaining four catalog entries (Sky and Stars,
- * Bodyguard of Lies, Automaton Warfare, Wish You Were Here) need air units /
- * spies / GDRs / seaside-resort tourism scopes that are absent, BOTH faces.
+ *   8 WISH_YOU_WERE_HERE   +1 era score per ARTIFACT extracted
+ *
+ * Residual, recorded: To Arms!'s special Casus Belli needs a denouncement
+ * system; Sky and Stars, Bodyguard of Lies and Automaton Warfare need air
+ * units, spies and Giant Death Robots, BOTH faces.
  */
-export const DEDICATIONS = ['MONUMENTALITY', 'FREE_INQUIRY', 'PEN_BRUSH_AND_VOICE', 'EXODUS_OF_THE_EVANGELISTS', 'TO_ARMS', 'HIC_SUNT_DRACONES', 'REFORM_THE_COINAGE', 'HEARTBEAT_OF_STEAM'] as const;
+export const DEDICATIONS = ['MONUMENTALITY', 'FREE_INQUIRY', 'PEN_BRUSH_AND_VOICE', 'EXODUS_OF_THE_EVANGELISTS', 'TO_ARMS', 'HIC_SUNT_DRACONES', 'REFORM_THE_COINAGE', 'HEARTBEAT_OF_STEAM', 'WISH_YOU_WERE_HERE'] as const;
 export const DED_MONUMENTALITY = 0;
 export const DED_FREE_INQUIRY = 1;
 export const DED_PEN_BRUSH_AND_VOICE = 2;
@@ -348,7 +349,41 @@ export const DED_TO_ARMS = 4;
 export const DED_DRACONES = 5;
 export const DED_COINAGE = 6;
 export const DED_STEAM = 7;
-export const DED_EVENT_SCORE = [1, 1, 1, 2, 1, 1, 1, 2] as const;
+export const DED_WISH = 8;
+export const DED_EVENT_SCORE = [1, 1, 1, 2, 1, 1, 1, 2, 1] as const;
+/**
+ * WHICH DEDICATIONS A WORLD ERA OFFERS, indexed by `ERAS`. Real Civ 6 draws
+ * each era's choice from a window — "the particular set of Dedications
+ * available changes according to the era the world enters into", and there are
+ * "always four different Dedications to choose from". Ancient offers none: a
+ * civ has earned no era score yet when the game opens.
+ *
+ * Every window below holds exactly the four the source lists, except Atomic and
+ * later, where three of the four (Sky and Stars, Bodyguard of Lies, Automaton
+ * Warfare) need systems this model has not got and are simply absent.
+ */
+export const DEDICATION_ERAS: readonly (readonly number[])[] = [
+  [],                                                                  // Ancient
+  [DED_MONUMENTALITY, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS], // Classical
+  [DED_MONUMENTALITY, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS], // Medieval
+  [DED_MONUMENTALITY, DED_EXODUS, DED_DRACONES, DED_COINAGE],          // Renaissance
+  [DED_DRACONES, DED_COINAGE, DED_STEAM, DED_TO_ARMS],                 // Industrial
+  [DED_DRACONES, DED_COINAGE, DED_STEAM, DED_TO_ARMS],                 // Modern
+  [DED_TO_ARMS, DED_WISH],                                             // Atomic
+  [DED_TO_ARMS, DED_WISH],                                             // Information
+  [DED_WISH],                                                          // Future
+];
+/** CIV6 (Wish You Were Here, Golden face): "+100% Tourism to all National
+ *  Parks." */
+export const WISH_PARK_TOURISM_MULT = 2;
+/**
+ * CIV6 (Wish You Were Here, Golden face): "Cities with Governors receive 50%
+ * Tourism from World Wonders" — an ADDITIONAL half, and the source is explicit
+ * that "it is completely irrelevant which Governor is in such a city".
+ * Expressed as a fraction so both engines fold the same integer.
+ */
+export const WISH_WONDER_TOURISM_NUM = 3;
+export const WISH_WONDER_TOURISM_DEN = 2;
 /** CIV6 (To Arms!, Golden face): "+15% Production towards military units." */
 export const TO_ARMS_MIL_PROD_MULT = 1.15;
 /** CIV6 (Hic Sunt Dracones, dark face): "+3 Era Score each time you discover

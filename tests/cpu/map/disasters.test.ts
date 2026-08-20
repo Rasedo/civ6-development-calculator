@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { setTileOwner } from '../../../cpu/core/seats';
-import { makeMap, makeState, tileAtCoords, bareCtx } from '../helpers';
+import { makeMap, makeState, settleAt, tileAtCoords, bareCtx } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
 import { disasterPhase, FERTILITY_CAP } from '../../../cpu/core/disasters';
+import { disbandUnit, spawnUnit } from '../../../cpu/core/units';
 import { tileYields } from '../../../cpu/core/yields';
 import { generateMap } from '../../../world/mapgen';
 
@@ -108,5 +109,100 @@ describe('disasters', () => {
     for (let i = 0; i < 30; i++) endTurn(calm);
     expect(calm.eventLog.length).toBe(0);
     expect(calm.map.tiles.every((t) => t.fertility === 0 && t.droughtTurns === 0)).toBe(true);
+  });
+
+  // The Flood page's two tables, poked one severity at a time. `disasterPhase`
+  // rolls the severity itself, so the assertions are about the BAND every
+  // outcome must sit in, driven until each one has been seen.
+  const floodBoard = () => {
+    const state = makeState(makeMap(18, 18));
+    state.disasters = true;
+    state.unitsMode = true;
+    const plain = tileAtCoords(state.map, 4, 4);
+    plain.feature = 'FLOODPLAINS';
+    plain.terrain = 'DESERT';
+    setTileOwner(plain, 0);
+    return { state, plain };
+  };
+
+  it('a flood pillages the improvement every time and sometimes takes it away', () => {
+    const { state, plain } = floodBoard();
+    plain.improvement = 'FARM';
+    let pillaged = 0;
+    let destroyed = 0;
+    for (let i = 0; i < 900; i++) {
+      const had = plain.improvement !== null;
+      disasterPhase(state);
+      if (had && plain.improvement === null) destroyed++;
+      if (plain.pillaged) pillaged++;
+      plain.improvement = 'FARM';
+      plain.pillaged = false;
+    }
+    expect(pillaged).toBeGreaterThan(0);
+    expect(destroyed).toBeGreaterThan(0);
+    // destruction is the rarer half of the pillage column
+    expect(destroyed).toBeLessThan(pillaged);
+  });
+
+  it('a flood damages a unit and a city centre, and can cost a citizen', () => {
+    const { state, plain } = floodBoard();
+    const city = settleAt(state, tileAtCoords(state.map, 9, 9).index);
+    setTileOwner(plain, 0);
+    plain.ownerCity = city.id;
+    city.population = 6;
+    const seen = new Set<number>();
+    let popLost = 0;
+    let centreHit = 0;
+    for (let i = 0; i < 900; i++) {
+      const u = spawnUnit(state, 'WARRIOR', plain.index, 0)!;
+      const pop = city.population;
+      const centre = state.map.tiles[city.centerIndex];
+      centre.feature = 'FLOODPLAINS';
+      disasterPhase(state);
+      if (city.population < pop) popLost++;
+      if (city.hp < 200) { centreHit++; city.hp = 200; }
+      const alive = state.units.find((x) => x.id === u.id);
+      if (alive) {
+        if (alive.hp < 100) seen.add(100 - alive.hp);
+        disbandUnit(state, u.id);
+      } else {
+        seen.add(100);
+      }
+      city.population = 6;
+    }
+    // every damage seen sits inside the two sourced bands (30-50, 50-70)
+    expect(seen.size).toBeGreaterThan(0);
+    for (const d of seen) {
+      expect(d === 100 || (d >= 30 && d <= 50) || (d >= 50 && d <= 70)).toBe(true);
+    }
+    expect(popLost).toBeGreaterThan(0);
+    expect(centreHit).toBeGreaterThan(0);
+  });
+
+  it('a flood silts FOOD and PRODUCTION on their own rolls', () => {
+    const { state, plain } = floodBoard();
+    for (let i = 0; i < 900 && (plain.fertility === 0 || plain.fertilityProd === 0); i++) {
+      disasterPhase(state);
+    }
+    expect(plain.fertility).toBeGreaterThan(0);
+    expect(plain.fertilityProd).toBeGreaterThan(0);
+    expect(tileYields(bareCtx(state.map), plain).production).toBeGreaterThanOrEqual(plain.fertilityProd);
+  });
+
+  it('the Great Bath spares the damage and halves the silt', () => {
+    const { state, plain } = floodBoard();
+    const city = settleAt(state, tileAtCoords(state.map, 9, 9).index);
+    plain.improvement = 'FARM';
+    plain.district = 'CAMPUS';
+    plain.districtComplete = true;
+    state.map.tiles[city.centerIndex].builtWonder = 'GREAT_BATH';
+    state.map.tiles[city.centerIndex].builtWonderComplete = true;
+    city.wonders.push({ id: 'GREAT_BATH', tileIndex: city.centerIndex });
+    setTileOwner(state.map.tiles[city.centerIndex], 0);
+    for (let i = 0; i < 900; i++) disasterPhase(state);
+    expect(plain.improvement).toBe('FARM');
+    expect(plain.pillaged).toBeFalsy();
+    expect(plain.districtPillaged).toBeFalsy();
+    expect(plain.fertility).toBeGreaterThan(0); // the river still silts
   });
 });

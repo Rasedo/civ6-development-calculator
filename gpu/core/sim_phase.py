@@ -178,7 +178,7 @@ class SimPhase:
             self._seat_city_fire_and_heal(row, jc, cact)
 
         self._seat_loyalty_flips(row, flip)
-        self._seat_research_tail(row, active, sci_sum, cul_sum, gold_sum, faith_sum)
+        self._seat_research_tail(row, active, sci_sum, cul_sum, gold_sum, faith_sum, gov)
         self._seat_war_peace_tail(row, active)
         return active
 
@@ -229,6 +229,17 @@ class SimPhase:
         rank = torch.empty_like(key)
         rank.scatter_(1, key.argsort(dim=1, stable=True), torch.arange(RC, device=dev).expand(B, RC))
         return (rank < titles.unsqueeze(1)) & alive
+
+    def _governor_tiles(self, row: int, gov: torch.Tensor) -> torch.Tensor:
+        """[B, T] bool — the row's tiles whose OWNING city is governor-seated,
+        all-False unless the seat is riding the GOLDEN Wish dedication (nothing
+        else reads it). `gov` is the loop-top seating, taken before any loyalty
+        moved, which is the snapshot `seatTourism` is handed."""
+        golden = self._golden_ded(row, self._ded_wish)
+        if not bool(golden.any()):
+            return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        slot = self.city_slot_at(row)
+        return golden.unsqueeze(1) & (slot >= 0) & gov.gather(1, slot.clamp(min=0))
 
     def _seat_city_loyalty(self, row: int, col: torch.Tensor, act: torch.Tensor,
                            tier: torch.Tensor, gov: torch.Tensor) -> torch.Tensor:
@@ -431,9 +442,7 @@ class SimPhase:
             br = made_b2.nonzero(as_tuple=True)[0]
             bi = cur.clamp(min=0, max=self.NB - 1)
             self.city_bldg[br, row, col[br], bi[br]] = True
-            # CIV6 (Heartbeat of Steam, dark face): "+2 Era Score for each
-            # Industrial or later building constructed."
-            self._dedication_event(row, self._ded_steam, made_b2 & (self._b_era[bi] >= self._industrial_era))
+            self._building_dedications(row, bi, made_b2)
             # A completed REGIONAL building reaches OTHER cities' yields, so
             # the caches must see the write even though this turn's own walk
             # reads the loop-top snapshot.
@@ -588,7 +597,7 @@ class SimPhase:
 
     def _seat_research_tail(self, row: int, active: torch.Tensor, sci_sum: torch.Tensor,
                             cul_sum: torch.Tensor, gold_sum: torch.Tensor,
-                            faith_sum: torch.Tensor) -> None:
+                            faith_sum: torch.Tensor, gov: torch.Tensor) -> None:
         """The seat block's TAIL, for seat row `row` — ONE body every seat runs.
 
         In seatPhase order: bank this turn's city sums (science, gold, faith),
@@ -649,6 +658,10 @@ class SimPhase:
             themed=self._museum_themed(row),
             relic_mult=self._city_wonder_mult(row, self._wond_relictour) if self._wond_n else None,
             resort_mult=self._seat_wonder_mult(row, self._wond_resorttour) if self._wond_n else None,
+            park_mult=torch.where(self._golden_ded(row, self._ded_wish),
+                                  torch.full((self.B,), int(self._wish_park), dtype=torch.long, device=self.device),
+                                  torch.ones(self.B, dtype=torch.long, device=self.device)),
+            gov_tile=self._governor_tiles(row, gov),
         ))
         bank(self.civ_diplo_favor,
              self._adopted_gov_tier(self.civ_civics[:, row]) + self._favor_per_suz * self._suzerain_count(row))

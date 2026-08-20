@@ -528,6 +528,7 @@ const TILE: Record<string, Extractor> = {
   encampHp: overTiles((t) => t.encampHp ?? 0),
   road: overTiles((t) => (t.road ? 1 : 0)),
   fertility: overTiles((t) => t.fertility),
+  fertilityProd: overTiles((t) => t.fertilityProd),
   droughtTurns: overTiles((t) => t.droughtTurns),
   hasFeature: overTiles((t) => (t.feature === null ? 0 : 1)),
   hasResource: overTiles((t) => (t.resource === null ? 0 : 1)),

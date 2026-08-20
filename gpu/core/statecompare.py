@@ -583,6 +583,7 @@ TILE = {
     "encampHp": _tile("encamp_hp"),
     "road": _tile("road"),
     "fertility": _tile("fertility"),
+    "fertilityProd": _tile("fertility_prod"),
     "droughtTurns": _tile("drought"),
     "hasFeature": lambda sim, b, rows: ((sim.feat_id[b] >= 0) & ~sim.feat_stripped[b]).long().numpy(),
     "hasResource": lambda sim, b, rows: ((sim.res_cat[b] != 0) & ~sim.res_stripped[b]).long().numpy(),

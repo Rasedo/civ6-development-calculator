@@ -55,6 +55,7 @@ export function loadWorld(world: WorldFile): GameState {
       goodyHut: m.goodyHut[i] !== 0,
       volcano: m.volcano[i] !== 0,
       fertility: 0,
+      fertilityProd: 0,
       droughtTurns: 0,
       ownerSeat: NO_SEAT,
       ownerCity: -1,

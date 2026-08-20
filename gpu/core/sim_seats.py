@@ -364,12 +364,21 @@ class SimSeats:
         can6 = has6 & (js_round(self.civ_treasury[:, row] * 1000) >= js_round((price6 + reserve6) * 1000))
         return jj6, bb6, can6, price6, elig6
 
+    def _building_dedications(self, row: int, bi: torch.Tensor, made: torch.Tensor) -> None:
+        """`buildingDedications` — every dedication a COMPLETED BUILDING pays.
+
+        CIV6: Heartbeat of Steam "+2 Era Score for each Industrial or later
+        building constructed"; Free Inquiry "+1 Era Score ... when constructing
+        a building which provides Science"; Pen, Brush and Voice "+1 Era Score
+        ... when you construct a building with a Great Work slot"."""
+        self._dedication_event(row, self._ded_steam, made & (self._b_era[bi] >= self._industrial_era))
+        self._dedication_event(row, self._ded_free_inquiry, made & self._b_science[bi])
+        self._dedication_event(row, self._ded_pen_brush, made & self._b_gwslot[bi])
+
     def _seat_buy_building(self, row: int, can6: torch.Tensor, jj6: torch.Tensor, bb6: torch.Tensor, price6: torch.Tensor) -> None:
         rows6 = can6.nonzero(as_tuple=True)[0]
         self.city_bldg[rows6, row, jj6[rows6], bb6[rows6]] = True
-        # CIV6 (Heartbeat of Steam, dark face): a purchased building is
-        # constructed too.
-        self._dedication_event(row, self._ded_steam, can6 & (self._b_era[bb6] >= self._industrial_era))
+        self._building_dedications(row, bb6, can6)  # a purchased building is constructed too
         self._eff_version += 1
         if self._walls_bidx >= 0:
             wm6 = rows6[bb6[rows6] == self._walls_bidx]
@@ -3146,6 +3155,9 @@ class SimSeats:
         self.city_artifact_era[rows, row, hslot, nxt] = era
         self.city_artifact_seat[rows, row, hslot, nxt] = dseat
         self.city_artifacts[rows, row, hslot] = self.city_artifacts[rows, row, hslot] + 1
+        # CIV6 (Wish You Were Here, dark face): "+1 Era Score for each Artifact
+        # extracted."
+        self._dedication_event(row, self._ded_wish, go)
         # clear whichever dig was worked
         lr = rows[land]
         wr = rows[~land]

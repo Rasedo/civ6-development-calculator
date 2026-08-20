@@ -57,7 +57,7 @@ nothing carries forward.
 | B-20r tourism tails | 3 | art-museum theming needs work TYPE and artist identity; open-borders digs and work TRADES need a treaty system |
 | B-21r suzerain rows | 1 | the residual descoped rows all need whole absent systems |
 | B-22r World Congress | 4 | the vote is scripted (wire head pending); emergencies/competitions absent; 4 of ~18 resolutions |
-| B-24r Ages/governors | 2 | four system-less dedication entries, dark-age policies, governor promotions, per-civ era drift |
+| B-24r Ages/governors | 1 | three system-less dedication entries, dark-age policies, governor promotions, per-civ era drift |
 | B-30r specialists | 2 | the mechanic is live; the free-assignment wire head and its observation stay open |
 | B-31r trade-route tails | 2 | sea legs park at origin, no trading posts, plunder gold is a stylization, one candidate not a free pick |
 | B-D unsourced data values | 3 | the sweep is done; nine NAMED stylizations stay open, each labelled at its definition |
@@ -71,8 +71,8 @@ nothing carries forward.
 | B-50r theological combat's other terms | 1 | flanking/support, territory bonuses, the Inquisitor, the winner's advance, Holy Site healing |
 | B-51r the Encampment has no perimeter | 1 | Civ 6 gives the district the City Center's wall HP; the assault path is handed a tile, not its city |
 | B-44r city-state war has no decider | 1 | both engines carry the machinery; no policy ever reaches it |
-| B-34r flood tails | 1 | GS floods also damage UNITS and kill citizens, and a centre on a floodplain loses HP; and the Dam/Great Bath that mitigates a river is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **30** | |
+| B-34r flood tails | 1 | the severity ladder ships; a flood still takes ONE tile where GS floods the river's whole reach, and the Dam that mitigates one is not in the district roster |
+| **B. Fidelity vs real Civ 6** | **29** | |
 | C-1 POWER | 5 | no plants, no grid, no powered-yield term — 4 gaps wait on it |
 | C-2 diplomatic agreements | 6 | war and peace and nothing between: open borders, work trades, alliances, denouncements |
 | C-3 unit promotions | 4 | only MARTYR reaches a rule; choosing one is also a wire head |
@@ -97,7 +97,7 @@ nothing carries forward.
 | C-22 the district roster is a subset | 3 | no Dam, Canal, Water Park, Preserve, Aerodrome, Government Plaza or Diplomatic Quarter |
 | C-23 nothing diminishes tourism | 1 | no rival's Enlightenment ever costs a tourist, so Cristo Redentor's cancelling clause has nothing to cancel |
 | **C. Absent systems** | **57** | |
-| **OPEN, TOTAL** | **87** | |
+| **OPEN, TOTAL** | **86** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -251,12 +251,25 @@ Civ 6 source or is recorded as unverifiable.
   - **Peace deals carry no terms;** the favor PENALTIES (CO2, global
     grievances, occupied capitals) are named by sources without rates —
     open, not invented.
-- **B-24r. Ages/governors tails:** the DEDICATION catalog now holds eight,
-  both faces sourced and hooked for the four addable ones (To Arms!, Hic Sunt
-  Dracones, Reform the Coinage, Heartbeat of Steam); residuals: the four
-  entries needing spies / air units / GDRs / seaside-resort tourism (both
-  faces), the per-era availability windows (the Civilopedia publishes only
-  Automaton Warfare's), To Arms!'s special Casus Belli (no denouncements),
+- **B-24r. Ages/governors tails:** the DEDICATION catalog now holds NINE,
+  both faces sourced and hooked (To Arms!, Hic Sunt Dracones, Reform the
+  Coinage, Heartbeat of Steam, Wish You Were Here). Two of this entry's own
+  residuals were premises that the source contradicts, and both are closed:
+  - **The per-era availability windows ARE published** — the Age page carries
+    the complete table, not just Automaton Warfare's row. `DEDICATION_ERAS` /
+    `_ded_eras` now hold it: Ancient offers none, every era through Modern
+    offers exactly the four the source lists, and Atomic onward offers what is
+    left after the three system-less entries drop out. The pick is still the
+    stateless round-robin, but over the WINDOW rather than over the catalog.
+  - **Wish You Were Here was not blocked on seaside-resort tourism.** Its
+    normal face is "+1 Era Score for each Artifact extracted" (excavation
+    exists) and its golden face is "Cities with Governors receive 50% Tourism
+    from World Wonders. +100% Tourism to all National Parks" — both faces ship,
+    the wonder half attributed per city through the loop-top governor seating
+    the loyalty payout already takes.
+  Residuals: the three entries needing spies / air units / GDRs (Bodyguard of
+  Lies, Sky and Stars, Automaton Warfare — both faces), To Arms!'s special
+  Casus Belli (no denouncements),
   and the corps/army kill event (no formations — a faithful zero, like Civ 6
   before Nationalism). Also open: dark-age policies; governor PROMOTIONS, blocked on
   governor IDENTITY — a promotion attaches to a NAMED governor persisted in
@@ -311,6 +324,38 @@ Civ 6 source or is recorded as unverifiable.
     alternatives — the free-choice head is P8-surface work, alongside the
     route verb joining `env.step` (which today carries no buy/levy
     either).
+- **B-34r. Flood tails.** The RIVER FLOOD now runs the Gathering Storm Flood
+  page's two tables rather than a pillage-and-silt stub. A flood rolls a
+  severity (Moderate / Major / 1000 Year) and then, at that severity's
+  published rates: always pillages the improvement and sometimes destroys it
+  (50% / 80%), damages the district and takes its buildings dark with it
+  (50% / 80%), deals 30-50 or 50-70 HP to every unit on the tile, kills a
+  civilian outright and costs the owning city a citizen (15% / 25%), takes the
+  same HP off a CITY CENTER standing on the floodplain along with its
+  perimeter, and silts FOOD and PRODUCTION on two independent rolls off the
+  terrain's own column — which is what `Tile.fertilityProd` / `fertility_prod`
+  is, a second fertility plane the yield walk reads. The GREAT BATH mitigates:
+  no destruction at all, fertilization at half rate, from the sourced
+  "Fertilization rates will drop about 50%, but there will be no destruction
+  anymore". The draw count is EIGHT, unconditionally — a count that depended
+  on what stood on the tile would have to be mirrored condition-for-condition
+  on the other engine.
+  OPEN:
+  - **The reach is one tile.** Real GS floods "all Floodplains tiles found
+    along the River"; both engines pick ONE. The reach needs a per-fixture
+    static river-component table and turns the eight draws into a
+    variable-length per-tile sequence, which is the whole reason it is
+    separate work rather than a wider mask.
+  - **The Great Bath's mitigation is seat-scoped, not river-scoped.** The
+    source says a Dam or Great Bath "along a River will mitigate floods
+    THERE"; here any complete Great Bath protects every floodplain its seat
+    holds. Same static river-component table as the reach.
+  - **The Great Bath's "+1 Faith for every time a tile belonging to this city
+    has been Flooded"** needs a per-tile flood COUNT that nothing stores.
+  - **The DAM is not in the district roster** (C-22), so the other half of the
+    published mitigation has nowhere to live.
+  - Climate change ending fertilization at Phase IV, the Egyptian ability, the
+    Soothsayer and COASTAL floods all wait on systems that do not exist here.
 - **B-36r. Appeal adjacency terms.** The four terms whose sources exist here
   now pay: an adjacent HOLY SITE, THEATER SQUARE or ENTERTAINMENT COMPLEX is
   +1 and an adjacent BARBARIAN OUTPOST is -1, on both engines
@@ -345,7 +390,7 @@ Civ 6 source or is recorded as unverifiable.
   Hermitage's LANDSCAPE-only art slots, both waiting on the per-work TYPE
   B-20r names; the Mausoleum's "all Engineers have an additional charge"
   (C-21 — a Great Person fires instantly here and is never a unit); the Great
-  Bath's flood terms (B-34r); and Cristo Redentor's clause that relic and
+  Bath's per-flood faith (B-34r); and Cristo Redentor's clause that relic and
   holy-city tourism is not diminished by a rival's Enlightenment (C-23).
 - **B-45r. The effects the SOURCED sweep found in the other rows.** Eight
   wonders pay something real Civ 6 gives them that no channel here can
@@ -442,9 +487,11 @@ Civ 6 source or is recorded as unverifiable.
     AMENITIES_*): one empire-wide penalty stands in for a per-city term.
   - the MILITARY ENGINEER production rule (`ENGINEER_LIVE` header) — authored,
     not sourced, and flipping it is a behaviour change on both engines.
-  - the DEDICATION per-era availability windows (`seats`) — the Civilopedia
-    publishes only Automaton Warfare's, so the round-robin offers every entry
-    in every era.
+  - the FLOOD SEVERITY split (`disasters`) — Moderate / Major / 1000 Year
+    come up 60 / 30 / 10 here. The Flood page publishes every per-severity
+    effect rate and no distribution at all, tying the frequencies to a
+    Disaster Intensity setting that has no counterpart here; the SHAPE is
+    sourced, the three numbers are not.
 
 ## C. ABSENT SYSTEMS — the blockers, and the gaps waiting on them
 
@@ -527,9 +574,10 @@ number was under-counting by treating deferrals as closures.
   deadlock is the symptom; the missing piece is the move-onto-centre capture
   model, and both halves are open.
 - **C-16. SPIES, AIR UNITS AND GIANT DEATH ROBOTS.** Weight 4. Whole unit
-  classes with no roster entry. Gaps: four dedication catalog entries (Sky
-  and Stars, Bodyguard of Lies, Automaton Warfare, Wish You Were Here) and
-  the Great Work Heist that C-2 also names.
+  classes with no roster entry. Gaps: three dedication catalog entries (Sky
+  and Stars, Bodyguard of Lies, Automaton Warfare) and the Great Work Heist
+  that C-2 also names. Wish You Were Here left this list: it needs neither
+  spies nor air units, and both its faces ship.
 - **C-17. EMBARKED MOVEMENT DOES NOT UPGRADE.** Weight 1. `constants` records
   that the tech upgrades to embarked movement are unmodeled; the flat
   EMBARK_MOVES stands in for every era.
@@ -563,8 +611,8 @@ number was under-counting by treating deferrals as closures.
 - **C-22. THE DISTRICT ROSTER IS A SUBSET.** Weight 3. Twelve of Civ 6's
   districts exist; the DAM, CANAL, WATER PARK, PRESERVE, AERODROME, GOVERNMENT
   PLAZA and DIPLOMATIC QUARTER do not. Gaps: their appeal terms (B-36r), the
-  Military Engineer's finish-a-district charge (C-20), the Dam's flood
-  protection that B-34r names, and the Preserve's housing table.
+  Military Engineer's finish-a-district charge (C-20), the Dam's half of the
+  flood mitigation that B-34r names, and the Preserve's housing table.
 
 ## Reachability — what the green gate does NOT prove
 

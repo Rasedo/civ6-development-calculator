@@ -71,6 +71,10 @@ export interface BuiltWonderDef {
     buildCharges?: number;
     /** Every Apostle the owner creates carries MARTYR — the draw is certain. */
     apostleMartyr?: boolean;
+    /** CIV6: "Building a Dam or the Great Bath along a River will mitigate
+     *  floods there. Fertilization rates will drop about 50%, but there will be
+     *  no destruction anymore." */
+    floodMitigation?: boolean;
     /** A trained naval unit arrives twice. Training only, never a purchase. */
     duplicateNavalTrain?: boolean;
     /** Multiplies the RELIC tourism of the holding city. */
@@ -250,8 +254,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     W({
       id: 'GREAT_BATH', name: 'Great Bath', code: 'GT', cost: 180,
       requiresTech: 'POTTERY', placement: { requiresRiver: true },
-      effects: { cityHousing: 3, cityAmenities: 1 },
-      description: '+3 housing, +1 amenity.',
+      effects: { cityHousing: 3, cityAmenities: 1, floodMitigation: true },
+      description: '+3 housing, +1 amenity, and floods along its river do no damage.',
     }),
     W({
       id: 'ETEMENANKI', name: 'Etemenanki', code: 'ET', cost: 220,

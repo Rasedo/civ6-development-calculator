@@ -54,10 +54,9 @@ import { addEraScore, agePressureFactor, governorPicks, governorTitles, goldenBo
 import { NO_SEAT, atWarWithAny, campTiles, citiesOf, civHasStrategic, civsAtWar, emptySeat, isCiv, prophetsOf, seatOf, seatOfCityState, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, spreadFromUnit } from './unitOrders';
-import { navalKillEvent, dedicationEvent, goldenDedication } from './eras';
+import { navalKillEvent, buildingDedications, dedicationEvent, goldenDedication } from './eras';
 import { DED_COINAGE, DED_TO_ARMS, DED_STEAM, TO_ARMS_MIL_PROD_MULT, STEAM_WONDER_PROD_MULT } from '../data/seats';
 import { WONDER_ERA_INDEX } from '../data/builtWonders';
-import { BUILDING_ERA_INDEX } from '../data/buildings';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 
 const ok: RuleResult = { ok: true };
@@ -1131,7 +1130,7 @@ export function seatPhase(state: GameState): void {
               if (Math.round((actor.treasury ?? 0) * 1000) >= Math.round((price + reserve) * 1000)) {
                 actor.treasury = (actor.treasury ?? 0) - price;
                 civCity.buildings.push(def.id);
-                if ((BUILDING_ERA_INDEX[def.id] ?? 0) >= INDUSTRIAL_ERA_INDEX) dedicationEvent(state, civCity.seat, DED_STEAM);
+                buildingDedications(state, civCity.seat, def.id);
                 if (def.id === 'ANCIENT_WALLS') civCity.outerHp = WALLS_HP;
                 bought = true;
               }
@@ -1563,7 +1562,7 @@ export function seatPhase(state: GameState): void {
     actor.cultureTotal = (actor.cultureTotal ?? 0) + culSum;
     actor.treasury = (actor.treasury ?? 0) + goldSum;
     actor.faith = (actor.faith ?? 0) + faithSum;
-    seatAccumulators(state, actor.seat);
+    seatAccumulators(state, actor.seat, rGovIds);
     actor.treasury -= state.units.reduce(
       (s, u) => s + (u.seat === actor.seat ? UNITS[u.type]?.maintenance ?? 0 : 0),
       0,

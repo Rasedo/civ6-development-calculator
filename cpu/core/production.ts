@@ -6,15 +6,12 @@ import { completedWonders, seatWonderFlag } from './wonders';
 import { UNITS, ENCAMPMENT_HP, WALLS_HP } from '../data/units';
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf } from '../data/projects';
 import { DED_MONUMENTALITY, ERA_SCORE_WONDER } from '../data/seats';
-import { addEraScore, dedicationEvent } from './eras';
+import { addEraScore, buildingDedications, dedicationEvent } from './eras';
 import { spawnUnit } from './units';
 import { encampmentTrainXp } from './combat';
 import { applyLumpYield } from './economy';
 import { congressGppFactor } from './congress';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { DED_STEAM } from '../data/seats';
-import { BUILDING_ERA_INDEX } from '../data/buildings';
-import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 
 /** Complete `n` techs or civics outright. Real Civ 6 draws them at random;
  *  this takes the first AVAILABLE rows in catalog order, the same order every
@@ -152,9 +149,7 @@ export function completeQueueItem(
       break;
     case 'building':
       city.buildings.push(item.building);
-      // CIV6 (Heartbeat of Steam, dark face): "+2 Era Score for each
-      // Industrial or later building constructed."
-      if ((BUILDING_ERA_INDEX[item.building] ?? 0) >= INDUSTRIAL_ERA_INDEX) dedicationEvent(state, city.seat, DED_STEAM);
+      buildingDedications(state, city.seat, item.building);
       if (item.building === 'ANCIENT_WALLS') city.outerHp = WALLS_HP;
       break;
   }

@@ -1,0 +1,177 @@
+"""The flood's SEVERITY LADDER, poked one column at a time.
+
+    python tests/gpu/flood_severity_test.py
+
+CIV 6 (Gathering Storm): a flood "damages or destroys Districts, improvements,
+and units on the Floodplains tiles near the River. This may also include a City
+Center, in which case it loses some HP and Defenses... May kill some Citizens in
+a nearby city... Can fertilize affected tiles." The severity decides every
+magnitude; the Great Bath cancels the damage half and halves the silt.
+
+Disasters are off in most fixtures and the flood picks one tile out of every
+floodplain on the map, so the driven gate reaches this at a rate no run can be
+counted on for — the lane pokes the phase directly.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import torch
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
+
+from core import BatchSim, load_rules, load_fixture, fixture_paths
+from warmup import settle_all
+
+N = 400
+
+
+def build():
+    rules = load_rules()
+    sim = settle_all(BatchSim([load_fixture(p) for p in fixture_paths()[:1]],
+                              rules, device="cpu", dtype=torch.float64))
+    for _ in range(12):
+        sim.step()
+    return sim
+
+
+def floodplain(sim) -> int:
+    tiles = [t for t in range(sim.T)
+             if bool(sim.floodplain[0, t]) and int(sim.centre_slot_at[0, t]) < 0]
+    assert tiles, "fixture has no non-centre floodplain tile"
+    return tiles[0]
+
+
+def solo(sim, t: int) -> None:
+    """Make `t` the ONLY floodplain the picker can reach, so a flood driven
+    through the whole disaster phase lands where the assertions read."""
+    idx, cnt = sim._flood_list
+    idx[0, :] = t
+    cnt[0] = 1
+
+
+def flood(sim, t: int) -> None:
+    """One flood on `t`, with the 5% gate and the picker taken out — the storm
+    and the eruption in the same phase scorch too, and would be read as the
+    river's work."""
+    sim._flood_tile(torch.ones(sim.B, dtype=torch.bool, device=sim.device),
+                    torch.full((sim.B,), t, dtype=torch.long, device=sim.device))
+
+
+def main() -> None:
+    sim = build()
+    t = floodplain(sim)
+    solo(sim, t)
+
+    # THE DRAW COUNT IS FIXED. Eight rolls per flood, whatever stands on the
+    # tile — TS spends the same eight, so a bare floodplain and a built-up one
+    # cannot slide the two streams apart.
+    seed = int(sim.rng_state[0])
+    sim.improvement[0, t] = -1
+    sim._disaster_phase()
+    bare = int(sim.rng_state[0])
+    sim.rng_state[0] = seed
+    sim.improvement[0, t] = 0
+    sim.pillaged[0, t] = False
+    sim._disaster_phase()
+    assert int(sim.rng_state[0]) == bare, (
+        "a flood over an IMPROVED tile spent a different number of draws than a bare one")
+    print("  a flood costs the same draws whatever stands on the tile")
+
+    # PILLAGE ALWAYS, DESTROY SOMETIMES — the page's "Pillaged: 100%;
+    # Destroyed: 50% / 80%".
+    pillaged = destroyed = 0
+    for _ in range(N):
+        sim.improvement[0, t] = 0
+        sim.pillaged[0, t] = False
+        flood(sim, t)
+        if int(sim.improvement[0, t]) < 0:
+            destroyed += 1
+        elif bool(sim.pillaged[0, t]):
+            pillaged += 1
+    assert pillaged + destroyed == N, "a flood left an improvement whole"
+    assert destroyed > 0, "no flood ever destroyed the improvement"
+    assert destroyed < pillaged, "destruction was not the rarer half of the pillage column"
+    print(f"  every one of {N} floods pillaged; {destroyed} took the improvement away")
+
+    # THE DAMAGE BANDS. 30-50 and 50-70 HP by severity; a Moderate flood pays
+    # nothing at all.
+    hurt = sim._flood_dmg_lo > 0
+    lo, hi = int(sim._flood_dmg_lo[hurt].min()), int(sim._flood_dmg_hi[hurt].max())
+    slot, pool = None, "major"
+    for p in ("major", "barb"):
+        live = getattr(sim, f"{p}_unit_alive")[0].nonzero().flatten()
+        if live.numel():
+            slot, pool = int(live[0]), p
+            break
+    assert slot is not None, "no unit in the fixture to stand on the floodplain"
+    hp_plane = getattr(sim, f"{pool}_unit_hp")
+    tile_plane = getattr(sim, f"{pool}_unit_tile")
+    seen = set()
+    for _ in range(N):
+        getattr(sim, f"{pool}_unit_alive")[0, slot] = True
+        tile_plane[0, slot] = t
+        hp_plane[0, slot] = 100
+        sim.military_at[0, t] = slot + sim.POOL_LO[pool]
+        sim.civilian_at[0, t] = -1
+        flood(sim, t)
+        if bool(getattr(sim, f"{pool}_unit_alive")[0, slot]):
+            seen.add(100 - int(hp_plane[0, slot]))
+    assert seen - {0}, "no flood ever damaged the unit standing on it"
+    assert 0 in seen, "a Moderate flood must leave the unit untouched"
+    for d in seen:
+        assert d == 0 or lo <= d <= hi, f"a flood dealt {d}, outside the sourced {lo}-{hi} band"
+    print(f"  unit damage stayed inside {lo}-{hi} over {len(seen)} distinct values")
+
+    # THE SILT. Food and production are separate rolls off the same flood, so
+    # one flood may pay both.
+    sim.fertility[0, t] = 0
+    sim.fertility_prod[0, t] = 0
+    for _ in range(N):
+        if int(sim.fertility[0, t]) and int(sim.fertility_prod[0, t]):
+            break
+        flood(sim, t)
+    assert int(sim.fertility[0, t]) > 0, "the flood never silted FOOD"
+    assert int(sim.fertility_prod[0, t]) > 0, "the flood never silted PRODUCTION"
+    print("  a river silts food and production on their own rolls")
+
+    # THE GREAT BATH. It spares the damage half outright and still lets the
+    # river silt.
+    assert bool(sim._wond_floodmit.any()), "no wonder in the catalog carries flood mitigation"
+    row = 0
+    widx = int(sim._wond_floodmit.nonzero()[0])
+    home = int(sim.city_alive[0, row].nonzero()[0])
+    ctr = int(sim.city_center[0, row, home])
+    seat_ok = (sim.tile_seat[0] == row).nonzero(as_tuple=True)[0].tolist()
+    site = next(int(x) for x in seat_ok
+                if x not in (ctr, t) and int(sim.built_wonder[0, x]) < 0 and int(sim.district[0, x]) < 0)
+    sim.city_wonder[0, row, home, widx] = site
+    sim.built_wonder[0, site] = widx
+    sim.built_wonder_complete[0, site] = True
+    # the floodplain has to be the wonder-holder's ground for the mitigation to
+    # reach it — the fixture's one floodplain sits outside every border
+    sim.tile_seat[0, t] = row
+    sim.tile_city[0, t] = int(sim.city_id[0, row, home])
+    sim._tile_owner_ver += 1
+    sim._eff_version += 1
+    sim.fertility[0, t] = 0
+    sim.district[0, t] = 0
+    sim.district_complete[0, t] = True
+    sim.district_pillaged[0, t] = False
+    for _ in range(N):
+        sim.improvement[0, t] = 0
+        sim.pillaged[0, t] = False
+        flood(sim, t)
+        assert int(sim.improvement[0, t]) >= 0, "the Great Bath let a flood destroy an improvement"
+        assert not bool(sim.pillaged[0, t]), "the Great Bath let a flood pillage an improvement"
+        assert not bool(sim.district_pillaged[0, t]), "the Great Bath let a flood take a district"
+    assert int(sim.fertility[0, t]) > 0, "a mitigated river stopped silting entirely"
+    print("  the Great Bath spares the damage and the river still silts")
+
+    print("FLOOD SEVERITY OK — the ladder, the bands, the two silts and the Bath")
+
+
+if __name__ == "__main__":
+    main()

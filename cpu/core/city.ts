@@ -28,7 +28,7 @@ import { RESOURCES } from '../../world/resources';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, REGIONAL_RANGE, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, type AmenityTier } from '../data/constants';
 import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf, tileClaimed, campTiles } from './seats';
 import { wwMax } from './weariness';
-import { DED_STEAM } from '../data/seats';
+import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
 
 export interface CityStats {
   city: City;
@@ -423,11 +423,19 @@ export function wonderEraIndex(id: string): number {
  * Civ 6: each wonder is worth 2 Tourism plus 1 for every era the owner has
  * advanced past the wonder's own era.
  */
-function wonderTourism(state: GameState, era: number, owns: (t: Tile) => boolean): number {
+function wonderTourism(
+  state: GameState,
+  era: number,
+  owns: (t: Tile) => boolean,
+  govCities: ReadonlySet<number> | null,
+): number {
   let t = 0;
   for (const tile of state.map.tiles) {
     if (!tile.builtWonder || !tile.builtWonderComplete || !owns(tile)) continue;
-    t += WONDER_TOURISM_BASE + Math.max(0, era - wonderEraIndex(tile.builtWonder));
+    const base = WONDER_TOURISM_BASE + Math.max(0, era - wonderEraIndex(tile.builtWonder));
+    t += govCities?.has(tile.ownerCity ?? -1)
+      ? Math.floor((base * WISH_WONDER_TOURISM_NUM) / WISH_WONDER_TOURISM_DEN)
+      : base;
   }
   return t;
 }
@@ -498,7 +506,11 @@ function parkTourism(state: GameState, owns: (t: Tile) => boolean): number {
   return t;
 }
 
-export function seatTourism(state: GameState, seat: number): number {
+export function seatTourism(
+  state: GameState,
+  seat: number,
+  govCityIds?: ReadonlySet<number>,
+): number {
   const s = seatOf(state, seat);
   if (!s) return 0;
   let t = 0;
@@ -512,8 +524,15 @@ export function seatTourism(state: GameState, seat: number): number {
   }
   const owns = (tile: Tile) => tileOwnedByCiv(tile, seat);
   const era = civEraIndex(s.research.techs, s.research.civics);
+  // CIV6 (Wish You Were Here, Golden face): "+100% Tourism to all National
+  // Parks", and "Cities with Governors receive 50% Tourism from World
+  // Wonders". `govCityIds` is the caller's loop-top governor seating — the
+  // same snapshot the loyalty payout used, taken before any loyalty moved.
+  const golden = goldenDedication(state, seat, DED_WISH);
+  const parkMult = golden ? WISH_PARK_TOURISM_MULT : 1;
   return t + resortTourism(state, owns) * wonderMult(state, cities, 'resortTourismMult')
-    + parkTourism(state, owns) + wonderTourism(state, era, owns);
+    + parkTourism(state, owns) * parkMult
+    + wonderTourism(state, era, owns, golden ? govCityIds ?? null : null);
 }
 
 export function computeCityStats(

@@ -2,8 +2,11 @@ import type { GameState } from './types';
 import { seatOf, isBarbSeat, isCiv } from './seats';
 import { seatWonderSum } from './wonders';
 import { UNITS } from '../data/units';
-import { DED_DRACONES } from '../data/seats';
-import { ERA_SCORE_MOMENT_MIN, DEDICATIONS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/seats';
+import { DED_DRACONES, DED_STEAM } from '../data/seats';
+import { BUILDINGS, BUILDING_ERA_INDEX } from '../data/buildings';
+import { GW_BUILDINGS } from '../data/greatPeople';
+import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
+import { ERA_SCORE_MOMENT_MIN, DEDICATION_ERAS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/seats';
 
 
 /** Pay era score for `count` moments each worth `per`. CIV6 (Taj Mahal):
@@ -43,14 +46,18 @@ export function eraBoundary(state: GameState): void {
     seat.prevAge = was;
     seat.age = now;
     seat.dedications = was === 0 && now === 2 ? HEROIC_DEDICATIONS : 1;
-    // Commit to NAMED dedications. Real Civ 6 lets each civ pick;
-    // there is no chooser on either seat and a roll would break the zero-draw
-    // contract, so the pick is a STATELESS ROUND-ROBIN over the catalog keyed
-    // on the era index — deterministic, identical on both engines, and it
-    // exercises every dedication in turn rather than pinning one forever.
-    // A HEROIC age takes the next `ded[c]` catalog entries (three).
+    // Commit to NAMED dedications. Real Civ 6 lets each civ pick from the
+    // WINDOW its world era offers; there is no chooser on either seat and a
+    // roll would break the zero-draw contract, so the pick is a STATELESS
+    // ROUND-ROBIN over that window keyed on the era index — deterministic,
+    // identical on both engines, and it exercises every offered dedication in
+    // turn rather than pinning one forever. A HEROIC age takes the next
+    // `ded[c]` entries of the same window (three).
     const era = Math.floor(state.turn / ERA_LENGTH);
-    seat.dedicationPicks = Array.from({ length: seat.dedications }, (_, k) => (era + c + k) % DEDICATIONS.length);
+    const window = DEDICATION_ERAS[Math.min(era, DEDICATION_ERAS.length - 1)];
+    seat.dedicationPicks = window.length === 0
+      ? []
+      : Array.from({ length: seat.dedications }, (_, k) => window[(era + c + k) % window.length]);
   }
   for (let c = 0; c < state.seats.length; c++) {
     const seat = seatOf(state, c);
@@ -77,6 +84,19 @@ export function dedicationEvent(state: GameState, civ: number, kind: number, eve
   let n = 0;
   for (const p of picks) if (p === kind) n++;
   if (n > 0) addEraScore(state, civ, DED_EVENT_SCORE[kind], events * n);
+}
+
+/**
+ * Every dedication a COMPLETED BUILDING pays, at one site both engines call.
+ * CIV6: Heartbeat of Steam "+2 Era Score for each Industrial or later building
+ * constructed"; Free Inquiry "+1 Era Score ... when constructing a building
+ * which provides Science"; Pen, Brush and Voice "+1 Era Score ... when you
+ * construct a building with a Great Work slot".
+ */
+export function buildingDedications(state: GameState, seat: number, buildingId: string): void {
+  if ((BUILDING_ERA_INDEX[buildingId] ?? 0) >= INDUSTRIAL_ERA_INDEX) dedicationEvent(state, seat, DED_STEAM);
+  if ((BUILDINGS[buildingId]?.yields?.science ?? 0) > 0) dedicationEvent(state, seat, DED_FREE_INQUIRY);
+  if ((GW_BUILDINGS as readonly string[]).includes(buildingId)) dedicationEvent(state, seat, DED_PEN_BRUSH_AND_VOICE);
 }
 
 /** CIV6 (Hic Sunt Dracones, dark face): "+1 Era Score each time you kill a

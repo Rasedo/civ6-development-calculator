@@ -146,6 +146,9 @@ export interface Tile {
   goodyHut: boolean;
   volcano: boolean;
   fertility: number;
+  /** the PRODUCTION half of flood silt — real Civ 6 fertilizes food and
+   *  production on separate rolls, so the two accumulate apart. */
+  fertilityProd: number;
   droughtTurns: number;
 }
 

@@ -31,6 +31,7 @@ import { unitActionNames } from '../core/unitActions';
 import { MAX_BARB_PER_CAMP, BARB_HORSE_RANGE } from '../core/combat';
 import { UNITS, UNIT_HP, CITY_MAX_HP, WALLS_HP, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, ENCAMPMENT_HP } from '../data/units';
 import { YIELD_KEYS } from '../core/types';
+import { FLOOD_SEVERITY_P, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn } from '../data/disasters';
 import { BUILDINGS } from '../data/buildings';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencySource } from '../data/districts';
 import { TECHS, ERAS, MODERN_ERA_INDEX } from '../data/techs'; // era scale
@@ -50,7 +51,7 @@ import { IMPROVEMENT_IDS } from '../core/unitActions'; // ONE roster, core-owned
 
  
 import { techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST } from './catalog';
-import { DED_TO_ARMS, DED_DRACONES, DED_COINAGE, DED_STEAM, TO_ARMS_MIL_PROD_MULT, DRACONES_DISCOVERY_SCORE, COINAGE_INTL_GOLD_PER_SPEC, STEAM_WONDER_PROD_MULT } from '../data/seats';
+import { DED_TO_ARMS, DED_DRACONES, DED_COINAGE, DED_STEAM, DED_WISH, DEDICATION_ERAS, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN, TO_ARMS_MIL_PROD_MULT, DRACONES_DISCOVERY_SCORE, COINAGE_INTL_GOLD_PER_SPEC, STEAM_WONDER_PROD_MULT } from '../data/seats';
 import { BUILDING_ERA_INDEX } from '../data/buildings';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 
@@ -246,7 +247,15 @@ export function buildRules() {
       agePressure: AGE_PRESSURE,
       govCivicsPerTitle: GOV_CIVICS_PER_TITLE,
       govMaxTitles: GOV_MAX_TITLES,
-      allyMinPeace: ALLY_MIN_PEACE, warmongerDow: WARMONGER_DOW, warmongerCapture: WARMONGER_CAPTURE, warmongerGang: WARMONGER_GANG, diplomaticFavorPerSuzerain: DIPLO_FAVOR_PER_SUZERAIN, congressInterval: CONGRESS_INTERVAL, congressMinEra: CONGRESS_MIN_ERA, dvpPerResolution: DVP_PER_RESOLUTION, diploVictoryPoints: DIPLO_VICTORY_POINTS, dedicationPayoutsLive: DEDICATION_PAYOUTS_LIVE, dedMonumentality: DED_MONUMENTALITY, dedFreeInquiry: DED_FREE_INQUIRY, dedPenBrush: DED_PEN_BRUSH_AND_VOICE, dedExodus: DED_EXODUS, heroicDedications: HEROIC_DEDICATIONS, dedEventScore: [...DED_EVENT_SCORE], goldenMoveBonus: GOLDEN_MOVE_BONUS, governorLoyalty: GOVERNOR_LOYALTY, dedToArms: DED_TO_ARMS, dedDracones: DED_DRACONES, dedCoinage: DED_COINAGE, dedSteam: DED_STEAM, toArmsMilProd: TO_ARMS_MIL_PROD_MULT, draconesDiscoveryScore: DRACONES_DISCOVERY_SCORE, coinageIntlGoldPerSpec: COINAGE_INTL_GOLD_PER_SPEC, steamWonderProd: STEAM_WONDER_PROD_MULT, industrialEra: INDUSTRIAL_ERA_INDEX,
+      allyMinPeace: ALLY_MIN_PEACE, warmongerDow: WARMONGER_DOW, warmongerCapture: WARMONGER_CAPTURE, warmongerGang: WARMONGER_GANG, diplomaticFavorPerSuzerain: DIPLO_FAVOR_PER_SUZERAIN, congressInterval: CONGRESS_INTERVAL, congressMinEra: CONGRESS_MIN_ERA, dvpPerResolution: DVP_PER_RESOLUTION, diploVictoryPoints: DIPLO_VICTORY_POINTS, dedicationPayoutsLive: DEDICATION_PAYOUTS_LIVE, dedMonumentality: DED_MONUMENTALITY, dedFreeInquiry: DED_FREE_INQUIRY, dedPenBrush: DED_PEN_BRUSH_AND_VOICE, dedExodus: DED_EXODUS, heroicDedications: HEROIC_DEDICATIONS, dedEventScore: [...DED_EVENT_SCORE], goldenMoveBonus: GOLDEN_MOVE_BONUS, governorLoyalty: GOVERNOR_LOYALTY, dedToArms: DED_TO_ARMS, dedDracones: DED_DRACONES, dedCoinage: DED_COINAGE, dedSteam: DED_STEAM, dedWish: DED_WISH,
+      // which catalog entries each WORLD ERA offers, padded to a rectangle
+      // with -1 (the GPU walks `dedEraLen` entries of each row)
+      dedEras: DEDICATION_ERAS.map((w) => {
+        const wide = Math.max(...DEDICATION_ERAS.map((x) => x.length));
+        return [...w, ...Array<number>(wide - w.length).fill(-1)];
+      }),
+      dedEraLen: DEDICATION_ERAS.map((w) => w.length),
+      wishParkTourism: WISH_PARK_TOURISM_MULT, wishWonderTourNum: WISH_WONDER_TOURISM_NUM, wishWonderTourDen: WISH_WONDER_TOURISM_DEN, toArmsMilProd: TO_ARMS_MIL_PROD_MULT, draconesDiscoveryScore: DRACONES_DISCOVERY_SCORE, coinageIntlGoldPerSpec: COINAGE_INTL_GOLD_PER_SPEC, steamWonderProd: STEAM_WONDER_PROD_MULT, industrialEra: INDUSTRIAL_ERA_INDEX,
       // t: the target-space kind, 0 district / 1 gpClass / 2 gwKind / 3 seat
       congressResolutions: CONGRESS_RESOLUTIONS.map((r) => ({ min: r.minEra, max: r.maxEra, t: ['district', 'gpClass', 'gwKind', 'seat'].indexOf(r.target) })),
       congressDvMinEra: CONGRESS_DV_MIN_ERA, congressDvDelta: CONGRESS_DV_DELTA, congressVoteStep: CONGRESS_VOTE_STEP, congressProdMult: CONGRESS_PROD_MULT, congressGppMult: CONGRESS_GPP_MULT, congressGrowthA: CONGRESS_GROWTH_A, congressGrowthB: CONGRESS_GROWTH_B, congressMigLoyalty: CONGRESS_MIG_LOYALTY, congressGwMult: CONGRESS_GW_MULT,
@@ -467,6 +476,7 @@ export function buildRules() {
         spreadCharges: w.effects?.spreadCharges ?? 0,
         buildCharges: w.effects?.buildCharges ?? 0,
         apostleMartyr: w.effects?.apostleMartyr ? 1 : 0,
+        floodMitigation: w.effects?.floodMitigation ? 1 : 0,
         dupNaval: w.effects?.duplicateNavalTrain ? 1 : 0,
         relicTourismMult: w.effects?.religiousTourismMult ?? 1,
         resortTourismMult: w.effects?.resortTourismMult ?? 1,
@@ -508,6 +518,19 @@ export function buildRules() {
       })),
       yieldFraction: PROJECT_YIELD_FRACTION,
       gppFraction: PROJECT_GPP_FRACTION,
+    },
+    // RIVER FLOOD magnitudes — the Flood (Civ6) tables, by severity.
+    disasters: {
+      floodSeverityP: [...FLOOD_SEVERITY_P],
+      floodDestroyP: [...FLOOD_DESTROY_P],
+      floodDistrictP: [...FLOOD_DISTRICT_P],
+      floodPopP: [...FLOOD_POP_P],
+      floodDmgLo: [...FLOOD_DAMAGE_LO],
+      floodDmgHi: [...FLOOD_DAMAGE_HI],
+      floodFertFood: FLOOD_FERT_FOOD.map((r) => [...r]),
+      floodFertProd: FLOOD_FERT_PROD.map((r) => [...r]),
+      // per TERRAIN id, which fertility column it reads
+      floodFertCol: TERRAIN_IDS.map((t) => floodTerrainColumn(t)),
     },
     combat: {
       unitHp: UNIT_HP,

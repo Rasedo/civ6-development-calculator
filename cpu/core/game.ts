@@ -19,7 +19,7 @@ import { congressUdtBlockedDistrict } from './congress';
 import { commitProduction, commitResearch } from './seatTurn';
 import { seatWonderFlag } from './wonders';
 import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY } from '../data/seats';
-import { addEraScore, eraBoundary, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
+import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
 import { UNITS, WALLS_HP, ENCAMPMENT_HP, CITY_MAX_HP } from '../data/units';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
@@ -34,9 +34,6 @@ import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { BARB_SEAT, allCities, allSeats, citiesOf, emptySeat, seatOf, seatOfCityState, setTileOwner, tileClaimed, unitSeat } from './seats';
-import { DED_STEAM } from '../data/seats';
-import { BUILDING_ERA_INDEX } from '../data/buildings';
-import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 
 export const TURN_LIMIT = 250;
 
@@ -461,7 +458,7 @@ export function purchaseBuilding(state: GameState, cityId: number, buildingId: s
     }
   }
   city.buildings.push(buildingId);
-  if ((BUILDING_ERA_INDEX[buildingId] ?? 0) >= INDUSTRIAL_ERA_INDEX) dedicationEvent(state, city.seat, DED_STEAM);
+  buildingDedications(state, city.seat, buildingId);
   if (buildingId === 'ANCIENT_WALLS') city.outerHp = WALLS_HP;
   return { ok: true };
 }
@@ -1262,6 +1259,7 @@ export function deserialize(json: string): GameState {
     (t as Tile).goodyHut ??= false;
     (t as Tile).volcano ??= false;
     (t as Tile).fertility ??= 0;
+    (t as Tile).fertilityProd ??= 0;
     (t as Tile).droughtTurns ??= 0;
   }
   for (const c of allCities(state)) {

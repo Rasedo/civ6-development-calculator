@@ -20,7 +20,8 @@ import { ARTIFACT_BUILDING, ARTIFACT_SLOTS } from '../data/greatPeople';
 import { clearCampFor } from './combat';
 import { UNITS, UNIT_HP, ENCAMPMENT_HP, WALLS_HP, type UnitDef } from '../data/units';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
-import { goldenMoveBonus } from './eras'; // MONUMENTALITY / EXODUS +2 MP
+import { dedicationEvent, goldenMoveBonus } from './eras'; // MONUMENTALITY / EXODUS +2 MP
+import { DED_WISH } from '../data/seats';
 import { GAME_SPEED, EMBARK_MOVES } from '../data/constants';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
@@ -686,6 +687,9 @@ export function archaeologistExcavate(state: GameState, unitId: number, seat: nu
     .sort((a, b) => a.id - b.id)[0];
   if (!home) return no('No Archaeological Museum has a free artifact slot.');
   home.artifacts = (home.artifacts ?? 0) + 1;
+  // CIV6 (Wish You Were Here, dark face): "+1 Era Score for each Artifact
+  // extracted."
+  dedicationEvent(state, unit.seat, DED_WISH);
   (home.artifactEras ??= []).push((kind === 'antiquity' ? tile.antiquityEra : tile.shipwreckEra) ?? 0);
   (home.artifactSeats ??= []).push((kind === 'antiquity' ? tile.antiquitySeat : tile.shipwreckSeat) ?? NO_SEAT);
   if (kind === 'antiquity') {

@@ -101,13 +101,20 @@ class SimStep:
                 torch.ones_like(self.dedications),
             ))
             _era_i = int(self.turn // self._era_len)
+            # Each civ picks from the WINDOW its world era offers, round-robin
+            # over that window rather than over the whole catalog.
+            _ew = min(_era_i, len(self._ded_eras) - 1)
+            _wlen = self._ded_era_len[_ew]
             self.ded_picks[:] = -1
             for _c in range(self.n_majors):
                 for _k in range(self.ded_picks.shape[2]):
+                    if _wlen == 0:
+                        continue
                     _take = self.dedications[:, _c] > _k
+                    _pick = self._ded_eras[_ew][(_era_i + _c + _k) % _wlen]
                     self.ded_picks[:, _c, _k] = torch.where(
                         _take,
-                        torch.full_like(self.ded_picks[:, _c, _k], (_era_i + _c + _k) % self._n_ded),
+                        torch.full_like(self.ded_picks[:, _c, _k], _pick),
                         torch.full_like(self.ded_picks[:, _c, _k], -1),
                     )
             self.era_score[:] = 0

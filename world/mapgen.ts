@@ -58,6 +58,7 @@ export function generateMap(opts: MapGenOptions): GameMap {
         goodyHut: false,
         volcano: false,
         fertility: 0,
+        fertilityProd: 0,
         droughtTurns: 0,
         ownerSeat: NO_SEAT,
         ownerCity: -1,

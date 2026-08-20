@@ -1462,6 +1462,16 @@
      ]
     },
     {
+     "name": "fertilityProd",
+     "compare": "exact",
+     "covers": [
+      "Tile.fertilityProd"
+     ],
+     "planes": [
+      "fertility_prod"
+     ]
+    },
+    {
      "name": "droughtTurns",
      "compare": "exact",
      "covers": [

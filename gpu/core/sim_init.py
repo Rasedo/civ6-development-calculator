@@ -369,6 +369,13 @@ class SimInit:
         self._ded_dracones = int(_er["dedDracones"])
         self._ded_coinage = int(_er["dedCoinage"])
         self._ded_steam = int(_er["dedSteam"])
+        self._ded_wish = int(_er["dedWish"])
+        # Which catalog entries each WORLD ERA offers, padded with -1.
+        self._ded_eras = [[int(x) for x in w] for w in _er["dedEras"]]
+        self._ded_era_len = [int(x) for x in _er["dedEraLen"]]
+        self._wish_park = float(_er["wishParkTourism"])
+        self._wish_wond_num = int(_er["wishWonderTourNum"])
+        self._wish_wond_den = int(_er["wishWonderTourDen"])
         self._to_arms_prod = float(_er["toArmsMilProd"])
         self._dracones_disc = int(_er["draconesDiscoveryScore"])
         self._coinage_spec_gold = float(_er["coinageIntlGoldPerSpec"])
@@ -644,6 +651,7 @@ class SimInit:
             self._wond_spread = torch.tensor([int(w["spreadCharges"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_build_ch = torch.tensor([int(w["buildCharges"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_martyr = torch.tensor([bool(w["apostleMartyr"]) for w in self._wond_rows], dtype=torch.bool, device=device)
+            self._wond_floodmit = torch.tensor([bool(w["floodMitigation"]) for w in self._wond_rows], dtype=torch.bool, device=device)
             self._wond_dupnaval = torch.tensor([bool(w["dupNaval"]) for w in self._wond_rows], dtype=torch.bool, device=device)
             self._wond_relictour = torch.tensor([float(w["relicTourismMult"]) for w in self._wond_rows], dtype=torch.float64, device=device)
             self._wond_resorttour = torch.tensor([float(w["resortTourismMult"]) for w in self._wond_rows], dtype=torch.float64, device=device)
@@ -759,6 +767,9 @@ class SimInit:
             for i, v in enumerate(f.get("volcanoes", [])):
                 self.volcano_tile[b, i] = v
         self.fertility = torch.zeros(B, T, dtype=torch.long, device=device)
+        # the PRODUCTION half of flood silt — real Civ 6 rolls food and
+        # production separately, so the two accumulate apart.
+        self.fertility_prod = torch.zeros(B, T, dtype=torch.long, device=device)
         self.drought = torch.zeros(B, T, dtype=torch.long, device=device)
 
         imp = rules.improvements or {}
@@ -1046,6 +1057,17 @@ class SimInit:
         self._trade_walk_rail = int(_tr["walkRail"])
         self._trade_dur_bumps = [int(x) for x in _tr["durEraBumps"]]  # eras adding +10/+20/+30
         self._trader_cost_prog = int(_tr["traderCostProg"])
+        # RIVER FLOOD, the Flood (Civ6) tables by severity.
+        _ds = rules.disasters
+        self._flood_sev_p = [float(x) for x in _ds["floodSeverityP"]]
+        self._flood_destroy_p = torch.tensor([float(x) for x in _ds["floodDestroyP"]], dtype=torch.float64, device=device)
+        self._flood_district_p = torch.tensor([float(x) for x in _ds["floodDistrictP"]], dtype=torch.float64, device=device)
+        self._flood_pop_p = torch.tensor([float(x) for x in _ds["floodPopP"]], dtype=torch.float64, device=device)
+        self._flood_dmg_lo = torch.tensor([int(x) for x in _ds["floodDmgLo"]], dtype=torch.long, device=device)
+        self._flood_dmg_hi = torch.tensor([int(x) for x in _ds["floodDmgHi"]], dtype=torch.long, device=device)
+        self._flood_fert_food = torch.tensor(_ds["floodFertFood"], dtype=torch.float64, device=device)  # [3, 3]
+        self._flood_fert_prod = torch.tensor(_ds["floodFertProd"], dtype=torch.float64, device=device)  # [3, 3]
+        self._flood_fert_col = torch.tensor([int(x) for x in _ds["floodFertCol"]], dtype=torch.long, device=device)  # [nTerrain]
         self._walls_hp = int(rules.combat.get("wallsHp", 100))
         # What `_city_damage_split` and `_ranged_city_penalty` read: the
         # perimeter's share of a melee and of a ranged hit, the fraction below
@@ -1176,6 +1198,14 @@ class SimInit:
         )  # [NB, nD] building -> its district column
         self._b_train_xp = rules.b_train_xp.to(device)  # [NB] long
         self._b_era = rules.b_era.to(device)  # [NB] long — unlock era (Heartbeat of Steam's gate) — per-building training XP (best tier over present buildings)
+        # What `_building_dedications` reads besides the era: Free Inquiry pays
+        # for a building that provides SCIENCE, Pen Brush and Voice for one
+        # carrying a GREAT WORK slot.
+        self._b_science = (rules.b_yields[:, 3] > 0).to(device)  # [NB] bool
+        self._b_gwslot = torch.zeros(self.NB, dtype=torch.bool, device=device)
+        for _k in self._gw_bidx:
+            if _k >= 0:
+                self._b_gwslot[_k] = True
         self._worship_bidx = [int(x) for x in rules.worship_bidx]
         self._temple_bidx = int(rules.temple_bidx)
         self._worship_cost = float(rules.worship_faith_cost)

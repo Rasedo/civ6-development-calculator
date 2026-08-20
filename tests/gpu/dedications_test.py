@@ -47,7 +47,14 @@ def score(sim, row: int) -> int:
 
 def main() -> None:
     sim = build()
-    assert sim._n_ded == 8, sim._n_ded
+    assert sim._n_ded == 9, sim._n_ded
+    # Every WORLD ERA offers a window, and Ancient offers none — a civ has
+    # earned no era score when the game opens.
+    assert sim._ded_era_len[0] == 0, sim._ded_era_len
+    for _e in range(1, 6):
+        assert sim._ded_era_len[_e] == 4, (_e, sim._ded_era_len)
+    for _e, _w in enumerate(sim._ded_eras):
+        assert len(set(_w[:sim._ded_era_len[_e]])) == sim._ded_era_len[_e], (_e, _w)
     B = sim.B
 
     # ---- Hic Sunt Dracones: wonder discovery, once -------------------------
@@ -231,7 +238,53 @@ def main() -> None:
     # full walk poke needs a placed campus with adjacency, so assert the wiring)
     assert sim._campus_idx >= 0
 
-    print("DEDICATIONS OK — both faces of all four new catalog entries fire, and only as sourced")
+    # ---- Wish You Were Here ------------------------------------------------
+    # NORMAL: "+1 Era Score for each Artifact extracted."
+    row = 0
+    col = int(sim.city_alive[0, row].nonzero()[0])
+    sim.city_bldg[0, row, col, sim._artifact_bidx] = True
+    sim.city_artifacts[0, row, col] = 0
+    dig = next(t for t in range(sim.T)
+               if int(sim.tile_seat[0, t]) == row and int(sim.centre_slot_at[0, t]) < 0)
+    sim.antiquity[0, dig] = True
+    sim.antiquity_era[0, dig] = 0
+    sim.antiquity_seat[0, dig] = row
+    commit(sim, row, sim._ded_wish)
+    sim._do_excavate(row, torch.ones(B, dtype=torch.bool), torch.full((B,), dig, dtype=torch.long),
+                     torch.zeros(B, dtype=torch.long))
+    assert int(sim.city_artifacts[0, row, col]) == 1, "the excavation never landed"
+    assert score(sim, row) == sim._ded_event_score[sim._ded_wish], score(sim, row)
+    print("wish artifact era score ok")
+
+    # GOLDEN: "Cities with Governors receive 50% Tourism from World Wonders."
+    wsite = next(t for t in range(sim.T)
+                 if int(sim.tile_seat[0, t]) == row and int(sim.built_wonder[0, t]) < 0
+                 and int(sim.district[0, t]) < 0 and int(sim.centre_slot_at[0, t]) < 0)
+    sim.built_wonder[0, wsite] = 0
+    sim.built_wonder_complete[0, wsite] = True
+    sim._eff_version += 1
+    zc = torch.zeros(B, sim.RC, dtype=torch.long)
+    alive_c = sim.city_alive[:, row]
+    own = sim.tile_seat == row
+    era_c = sim._civ_era(sim.civ_techs[:, row], sim.civ_civics[:, row])
+    plain = int(sim._tourism_of(zc, zc, zc, alive_c, own, era_c)[0])
+    sim.built_wonder_complete[0, wsite] = False
+    sim._eff_version += 1
+    floor_t = int(sim._tourism_of(zc, zc, zc, alive_c, own, era_c)[0])
+    sim.built_wonder_complete[0, wsite] = True
+    sim._eff_version += 1
+    base = plain - floor_t
+    assert base > 0, "the planted wonder paid no tourism"
+    with_gov = int(sim._tourism_of(zc, zc, zc, alive_c, own, era_c, gov_tile=own)[0])
+    assert with_gov - floor_t == (base * sim._wish_wond_num) // sim._wish_wond_den, (with_gov, floor_t, base)
+    # ...and the plane only lights up under the GOLDEN face
+    commit(sim, row, sim._ded_wish, golden=True)
+    assert bool(sim._governor_tiles(row, sim.city_alive[:, row]).any()), "golden Wish lit no governor tile"
+    commit(sim, row, sim._ded_wish)
+    assert not bool(sim._governor_tiles(row, sim.city_alive[:, row]).any()), "a NORMAL age paid the golden clause"
+    print("wish governor wonder tourism ok")
+
+    print("DEDICATIONS OK — both faces of all five new catalog entries fire, and only as sourced")
 
 
 if __name__ == "__main__":

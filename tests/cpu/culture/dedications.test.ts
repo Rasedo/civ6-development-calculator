@@ -1,15 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { BARB_SEAT, emptySeat, seatOf, setWar } from '../../../cpu/core/seats';
+import { BARB_SEAT, emptySeat, seatOf, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { endTurn } from '../../../cpu/core/game';
-import { spawnUnit } from '../../../cpu/core/units';
+import { archaeologistExcavate, spawnUnit } from '../../../cpu/core/units';
 import { meleeAttack } from '../../../cpu/core/combat';
 import { revealAround } from '../../../cpu/core/fog';
 import { completeQueueItem } from '../../../cpu/core/production';
 import { routePlunderer, cityTradeYields } from '../../../cpu/core/trade';
-import { computeCityStats } from '../../../cpu/core/city';
+import { computeCityStats, seatTourism } from '../../../cpu/core/city';
 import { effectiveAdjacency } from '../../../cpu/core/yields';
-import { goldenMoveBonus } from '../../../cpu/core/eras';
+import { eraBoundary, goldenMoveBonus } from '../../../cpu/core/eras';
 import {
   DEDICATIONS,
   DED_EVENT_SCORE,
@@ -18,6 +18,10 @@ import {
   DED_STEAM,
   DED_TO_ARMS,
   DED_MONUMENTALITY,
+  DED_EXODUS,
+  DED_WISH,
+  DEDICATION_ERAS,
+  ERA_LENGTH,
   DRACONES_DISCOVERY_SCORE,
   COINAGE_INTL_GOLD_PER_SPEC,
   GOLDEN_MOVE_BONUS,
@@ -34,9 +38,9 @@ function commit(state: GameState, seat: number, kind: number, golden = false): v
 }
 
 describe('the four new dedications', () => {
-  it('the catalog holds eight, with per-event scores', () => {
-    expect(DEDICATIONS.length).toBe(8);
-    expect(DED_EVENT_SCORE.length).toBe(8);
+  it('the catalog holds nine, with per-event scores', () => {
+    expect(DEDICATIONS.length).toBe(9);
+    expect(DED_EVENT_SCORE.length).toBe(9);
     expect(BUILDING_ERA_INDEX.FACTORY).toBeGreaterThanOrEqual(INDUSTRIAL_ERA_INDEX);
     expect(BUILDING_ERA_INDEX.GRANARY ?? 0).toBeLessThan(INDUSTRIAL_ERA_INDEX);
   });
@@ -172,5 +176,83 @@ describe('the four new dedications', () => {
     const golden = run(true);
     expect(normal).toBeGreaterThan(0);
     expect(golden).toBeCloseTo(normal * 1.15, 9);
+  });
+
+  it('a world era offers a WINDOW, and every pick comes out of it', () => {
+    // Ancient offers none — no civ has earned an era score when the game opens.
+    expect(DEDICATION_ERAS[0]).toEqual([]);
+    for (let era = 1; era < DEDICATION_ERAS.length; era++) {
+      expect(DEDICATION_ERAS[era].length).toBeGreaterThan(0);
+      for (const d of DEDICATION_ERAS[era]) {
+        expect(d).toBeGreaterThanOrEqual(0);
+        expect(d).toBeLessThan(DEDICATIONS.length);
+      }
+    }
+    // CIV6: "Exodus of the Evangelists is available only through the first 3
+    // eras (Classical through Renaissance), while Wish You Were Here is
+    // available only in the last 2 eras."
+    const has = (d: number) => DEDICATION_ERAS.map((w) => w.includes(d));
+    expect(has(DED_EXODUS)).toEqual([false, true, true, true, false, false, false, false, false]);
+    expect(has(DED_WISH)).toEqual([false, false, false, false, false, false, true, true, true]);
+
+    // and the commit at an era boundary draws from the window, never outside it
+    const state = makeState(makeMap(16, 16));
+    state.seats.push(emptySeat(1));
+    for (let era = 1; era <= 8; era++) {
+      state.turn = era * ERA_LENGTH;
+      eraBoundary(state);
+      const window = DEDICATION_ERAS[era];
+      for (const seat of state.seats) {
+        const picks = seat.dedicationPicks ?? [];
+        expect(picks.length).toBe(seat.dedications);
+        for (const d of picks) expect(window).toContain(d);
+      }
+    }
+  });
+
+  it('Wish You Were Here: +1 era score per artifact, golden parks and governor wonders', () => {
+    const state = makeState(makeMap(24, 24));
+    const city = settleAt(state, tileAtCoords(state.map, 9, 9).index);
+    city.buildings.push('ARCHAEOLOGICAL_MUSEUM');
+    const dig = tileAtCoords(state.map, 10, 9);
+    setTileOwner(dig, 0);
+    dig.antiquity = true;
+    const digger = spawnUnit(state, 'ARCHAEOLOGIST', dig.index, 0)!;
+    digger.charges = 1;
+    commit(state, 0, DED_WISH);
+    expect(archaeologistExcavate(state, digger.id, 0).ok).toBe(true);
+    expect(seatOf(state, 0)!.eraScore).toBe(DED_EVENT_SCORE[DED_WISH]);
+
+    // GOLDEN: a governor city's WORLD WONDER pays 50% more tourism, and a
+    // National Park doubles. The city holds the only governor title going.
+    const wt = tileAtCoords(state.map, 8, 9);
+    setTileOwner(wt, 0);
+    wt.ownerCity = city.id;
+    wt.builtWonder = 'PYRAMIDS';
+    wt.builtWonderComplete = true;
+    const govIds = new Set([city.id]);
+    commit(state, 0, DED_MONUMENTALITY, true);
+    const plain = seatTourism(state, 0, govIds);
+    wt.builtWonderComplete = false;
+    const noWonder = seatTourism(state, 0, govIds);
+    wt.builtWonderComplete = true;
+    const base = plain - noWonder;
+    expect(base).toBeGreaterThan(0);
+
+    commit(state, 0, DED_WISH, true);
+    expect(seatTourism(state, 0, new Set<number>())).toBe(plain); // no governor, no bonus
+    expect(seatTourism(state, 0, govIds) - noWonder).toBe(Math.floor((base * 3) / 2));
+
+    // ...and the National Park half of the same face doubles a park's payout
+    const park = tileAtCoords(state.map, 5, 5);
+    setTileOwner(park, 0);
+    park.park = 0;
+    tileAtCoords(state.map, 6, 5).feature = 'WOODS';
+    tileAtCoords(state.map, 4, 5).feature = 'WOODS';
+    const parked = seatTourism(state, 0, new Set<number>());
+    commit(state, 0, DED_MONUMENTALITY, true);
+    const parkedPlain = seatTourism(state, 0, new Set<number>());
+    expect(parkedPlain).toBeGreaterThan(plain);
+    expect(parked - plain).toBe(2 * (parkedPlain - plain));
   });
 });

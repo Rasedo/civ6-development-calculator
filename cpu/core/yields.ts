@@ -70,6 +70,7 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
   }
 
   if (tile.fertility > 0) out.food += tile.fertility;
+  if (tile.fertilityProd > 0) out.production += tile.fertilityProd;
   if (tile.droughtTurns > 0) out.food = Math.max(0, out.food - 1);
   return out;
 }

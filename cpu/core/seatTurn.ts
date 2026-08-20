@@ -30,10 +30,10 @@ export function atPeaceWithAllCivs(state: GameState, seat: number): boolean {
   return true;
 }
 
-export function seatAccumulators(state: GameState, seat: number): void {
+export function seatAccumulators(state: GameState, seat: number, govCityIds?: ReadonlySet<number>): void {
   const s = seatOf(state, seat);
   if (!s) return;
-  s.tourism = (s.tourism ?? 0) + seatTourism(state, seat);
+  s.tourism = (s.tourism ?? 0) + seatTourism(state, seat, govCityIds);
   s.diplomaticFavor = (s.diplomaticFavor ?? 0) + diplomaticFavorPerTurn(seatGovernmentId(state, seat), suzerainCount(state, seat));
   if ((s.warmonger ?? 0) > 0 && atPeaceWithAllCivs(state, seat)) {
     s.warmonger = (s.warmonger ?? 0) - 1;

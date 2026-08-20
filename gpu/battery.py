@@ -53,6 +53,7 @@ POKE_COST = {
     "centre_defence": 14.0,
     "wonder_effects": 20.0,
     "city_perimeter": 20.0,
+    "flood_severity": 12.0,
 }
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "gpu"))
@@ -185,6 +186,7 @@ def main() -> int:
                 ("peace_treaty", [py, "tests/gpu/peace_treaty_test.py"], 2),  # the treaty shuts the declare column for its term
                 ("city_falls", [py, "tests/gpu/city_falls_test.py"], 2),  # a fallen city takes its garrison with it
                 ("flood_district", [py, "tests/gpu/flood_district_test.py"], 2),  # a flood pillages the district on the floodplain
+                ("flood_severity", [py, "tests/gpu/flood_severity_test.py"], 2),  # the severity ladder: pillage, destroy, damage bands, the two silts, the Bath
                 ("martyr", [py, "tests/gpu/martyr_test.py"], 2),  # one relic in nine apostle deaths, drawn where TS draws
                 ("barb_camps", [py, "tests/gpu/barb_camps_test.py"], 2),  # a camp's class is its ground; ranged is nobody's class
                 ("suzerain_rules", [py, "tests/gpu/suzerain_rules_test.py"], 2),  # the six suz-coded perks, strict-suzerain-only
