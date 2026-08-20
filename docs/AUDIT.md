@@ -56,7 +56,7 @@ nothing carries forward.
 | **A. Engine vs engine** | **0** | |
 | B-20r tourism tails | 2 | theming ships; open-borders digs and work TRADES need a treaty system, and the Naturalist's progressive cost is unsourced |
 | B-21r suzerain rows | 1 | the residual descoped rows all need whole absent systems |
-| B-22r World Congress | 2 | 12 of the 21 regular resolutions ship and emergencies run as special sessions; nine resolutions and the scored competitions have no carrier; peace terms wait on C-2 and two favor penalties on C-19/C-24; the favor tie-break unmodeled |
+| B-22r World Congress | 2 | 13 of the 21 regular resolutions ship and emergencies run as special sessions; eight resolutions and the scored competitions have no carrier; peace terms wait on C-2 and two favor penalties on C-19/C-24; the favor tie-break unmodeled |
 | B-24r Ages/governors | 1 | three system-less dedication entries, dark-age policies, governor promotions, per-civ era drift |
 | B-30r specialists | 1 | the mechanic and both citizen overrides ship; the Theater tier's second building and the plant split wait upstream |
 | B-31r trade-route tails | 1 | sea legs ship; no trading posts, plunder gold is a stylization, one candidate not a free pick |
@@ -87,7 +87,7 @@ nothing carries forward.
 | C-11 terrain the wonder rules need | 2 | the NARROWED placements are deliberately narrower than Civ 6's |
 | C-12 the Film Studio is absent | 1 | the Theater tier's other top building, so its specialist upgrade has one path |
 | C-13 ranged vs districts/cities | 2 | a scope-out on both, with the rest of the Encampment complete |
-| C-14 no Inquisitor | 1 | "only Apostles initiate" is a roster gap, not a rule |
+| C-14 no Inquisitor | 1 | "only Apostles initiate" is a roster gap, not a rule; there is no CONDEMN verb either, and a resolution waits on it |
 | C-15 garrison does not block capture | 2 | the move-onto-centre capture model is what is missing |
 | C-16 spies / air units / GDRs | 4 | whole unit classes, and four dedications wait on them |
 | C-17 embarked movement never upgrades | 1 | the flat EMBARK_MOVES stands in for every era |
@@ -233,12 +233,13 @@ Civ 6 source or is recorded as unverifiable.
   improvements/luxuries, a faith-purchase class, random-Inspiration draws) or
   a flat channel standing in for a %-scaling.
 - **B-22r. World Congress residuals.** The session is real now: a
-  rotating two-slot slate off `CONGRESS_RESOLUTIONS` — TWELVE of the
+  rotating two-slot slate off `CONGRESS_RESOLUTIONS` — THIRTEEN of the
   twenty-one regular-session resolutions, era windows and A/B texts
   verbatim from the GS wiki table: Urban Development Treaty, Patronage,
   Migration Treaty, Heritage Organization, Mercenary Companies, Trade
   Policy, Policy Treaty, World Ideology, Border Control Treaty, Treaty
-  Organization, Sovereignty, Public Works Program — the always-3rd
+  Organization, Sovereignty, Public Works Program, Deforestation
+  Treaty — the always-3rd
   Diplomatic Victory resolution from Modern (+/-2 DVP on the winning
   TARGET),
   the 10k vote-cost curve, outcome-then-target plurality, +1 DVP to
@@ -273,20 +274,26 @@ Civ 6 source or is recorded as unverifiable.
     A ballot addresses the session about to run, and the resolutions it
     will carry are computable (`_congress_upcoming`) but not rendered, so
     a net votes on the previous session's slate.
-  - **NINE resolutions still have no carrier**, each blocked on a named
+  - **EIGHT resolutions still have no carrier**, each blocked on a named
     absence: Arms Control (weapons of mass destruction), Espionage Pact
     (spies), Governance Doctrine (a governor roster with appointment and
     promotion, B-24r), Military Advisory (a promotion-class axis, C-3),
-    Global Energy Treaty (POWER-consuming buildings, C-1), Public
-    Relations (grievances, C-19), Deforestation Treaty (the GPU carries
-    no feature-TYPE plane to address as a target), Luxury Policy (its
-    outcome-A magnitude — "additional Amenities" — has no sourced
-    number; outcome B is fully specified) and World Religion (outcome A
-    is fully specified at +10 Religious Combat Strength; outcome B pays
-    favor for CONDEMNING a unit and there is no condemn verb). A
+    Global Energy Treaty (POWER-consuming buildings, C-1, and the
+    climate arc, C-24), Public Relations (grievances, C-19), Luxury
+    Policy and World Religion. The last two are HALF-sourced, and a
     resolution whose two outcomes cannot both act is worse than an
-    absent one — it eats a rotation slot and passes a no-op — so the
-    two half-sourced rows wait with the rest.
+    absent one — it eats a rotation slot and passes a no-op — so they
+    wait with the rest:
+    - **Luxury Policy.** SOURCED: "A: Duplicates of this Luxury resource
+      grant additional Amenities. / B: This Luxury resource grants no
+      Amenities." B is fully specified; A publishes no number, and
+      nothing in either engine counts DUPLICATE copies of a luxury —
+      amenities come from distinct types.
+    - **World Religion.** SOURCED: "A: +10 Religious Combat Strength for
+      all units of this Religion. / B: Condemning a unit of this
+      Religion yields 25 Diplomatic Favor." Both magnitudes are
+      published; B's VERB is not — neither engine has a condemn action,
+      which belongs to the Inquisitor/Apostle interaction (C-14).
   - **THE CULTURE BOMB DOES NOT WIPE UNFINISHED CONSTRUCTION.** SOURCED
     (Culture Bomb): a bombed tile carrying a district or wonder still
     UNDER CONSTRUCTION is flipped anyway, "wiping out any unfinished

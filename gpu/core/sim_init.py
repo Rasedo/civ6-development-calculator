@@ -378,6 +378,8 @@ class SimInit:
         self._emg_at = {r["id"]: i for i, r in enumerate(self._emg_rows)}
         self._emg_slots = int(_er2["emergencySlots"])
         self._special_slot = 3  # the special session's slot in the vote head
+        # a Deforestation Treaty target `k` is the tile feature `_congress_feat[k]`
+        self._congress_feat = [int(x) for x in _er2.get("congressFeatures", [])]
         self._special_cost = float(_er2["specialSessionCost"])
         self._special_gap = int(_er2["specialSessionGap"])
         self._emg_member_favor = float(_er2["emergencyMemberFavor"])

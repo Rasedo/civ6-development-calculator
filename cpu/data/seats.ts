@@ -244,13 +244,13 @@ export const DVP_PER_RESOLUTION = 1;
 export const DIPLO_VICTORY_POINTS = 20;
 
 export type CongressTargetKind = 'district' | 'gpClass' | 'gwKind' | 'seat'
-  | 'currency' | 'policy' | 'government' | 'project' | 'csType';
+  | 'currency' | 'policy' | 'government' | 'project' | 'csType' | 'feature';
 /** The wire ORDER of the target kinds: a resolution's `t` on the exported
  *  rules is this array's index, so the GPU's `_congress_space` /
  *  `_congress_pref` switch on the same numbers. APPEND only. */
 export const CONGRESS_TARGET_KINDS: readonly CongressTargetKind[] = [
   'district', 'gpClass', 'gwKind', 'seat',
-  'currency', 'policy', 'government', 'project', 'csType',
+  'currency', 'policy', 'government', 'project', 'csType', 'feature',
 ];
 
 export interface CongressResolutionDef {
@@ -314,6 +314,11 @@ export const CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // CIV6: "A: +100% Production towards this Project. / B: -50% Production
   // towards this Project." (Atomic through Information)
   { id: 'PUBLIC_WORKS_PROGRAM', name: 'Public Works Program', minEra: 6, maxEra: 7, target: 'project' },
+  // CIV6: "A: Clearing Features of this type yields Gold equal to the
+  // Production and Food. / B: Features of this type cannot be cleared by any
+  // player." (Atomic through Information) The target space is the CLEARABLE
+  // features — the rows carrying a chopYield, in catalog order.
+  { id: 'DEFORESTATION_TREATY', name: 'Deforestation Treaty', minEra: 6, maxEra: 7, target: 'feature' },
 ];
 export const CONGRESS_UDT = 0;
 export const CONGRESS_PATRONAGE = 1;
@@ -327,6 +332,7 @@ export const CONGRESS_BORDER_CONTROL = 8;
 export const CONGRESS_TREATY_ORG = 9;
 export const CONGRESS_SOVEREIGNTY = 10;
 export const CONGRESS_PUBLIC_WORKS = 11;
+export const CONGRESS_DEFORESTATION = 12;
 /** The always-3rd Diplomatic Victory resolution enters at Modern. */
 export const CONGRESS_DV_MIN_ERA = 5;
 export const CONGRESS_DV_DELTA = 2;

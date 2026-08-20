@@ -4,7 +4,7 @@ import { hexDistance, neighbors } from '../../world/hex';
 import { isWater, isImpassable, isMountain, isCoastalWater, hasRiver } from '../../world/query';
 import { computeUnlocks, isTechComplete, isCivicComplete, type Unlocks } from './effects';
 import { isExplored } from './fog';
-import { congressUdtBlockedDistrict } from './congress';
+import { congressChopBanned, congressUdtBlockedDistrict } from './congress';
 import { tileAppeal } from './appeal'; // SEASIDE_RESORT gates on appeal
 import { SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
 import { FEATURES } from '../../world/features';
@@ -158,6 +158,7 @@ export function canRemoveFeature(state: GameState, tile: Tile, seat: number): Ru
   if (!tile.feature) return no('No feature here.');
   const def = FEATURES[tile.feature];
   if (!def.removable) return no(`${def.name} cannot be removed.`);
+  if (congressChopBanned(state, tile.feature)) return no(`The Congress protects ${def.name}.`);
   if (tile.resource) {
     const res = RESOURCES[tile.resource];
     if (res.requiresFeature?.includes(tile.feature)) {

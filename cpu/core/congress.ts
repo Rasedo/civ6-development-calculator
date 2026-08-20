@@ -15,6 +15,8 @@ import { GP_CLASSES } from '../data/greatPeople';
 import { CITY_STATE_TYPES } from '../data/cityStates';
 import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
+import { clearableFeatures } from '../../world/features';
+import { tileSeat } from './seats';
 import {
   CONGRESS_RESOLUTIONS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION,
   CONGRESS_HERITAGE, CONGRESS_DV_MIN_ERA, CONGRESS_DV_DELTA, CONGRESS_VOTE_STEP,
@@ -22,10 +24,12 @@ import {
   CONGRESS_GW_MULT, DVP_PER_RESOLUTION,
   CONGRESS_MERCENARY, CONGRESS_TRADE_POLICY, CONGRESS_POLICY_TREATY,
   CONGRESS_IDEOLOGY, CONGRESS_BORDER_CONTROL, CONGRESS_TREATY_ORG,
-  CONGRESS_SOVEREIGNTY, CONGRESS_PUBLIC_WORKS,
+  CONGRESS_SOVEREIGNTY, CONGRESS_PUBLIC_WORKS, CONGRESS_DEFORESTATION,
   CONGRESS_PLUS_100, CONGRESS_MINUS_50, CONGRESS_TRADE_GOLD,
   CONGRESS_TRADE_CAPACITY, CONGRESS_POLICY_FAVOR, CONGRESS_IDEOLOGY_SLOTS,
 } from '../data/seats';
+
+const CLEARABLE_FEATURES = clearableFeatures();
 
 interface Vote { seat: number; outcome: number; target: number; weight: number }
 
@@ -63,8 +67,8 @@ function argmaxLow(counts: readonly number[]): number {
 /** The AI free-vote preference for a non-DV resolution: outcome A on the
  * target the voter holds the most of (self for the Migration Treaty). What a
  * seat votes when its record carries no vote for this slot. */
-function preference(state: GameState, res: number, seat: number,
-                    ctx: CongressVoterCtx): { outcome: number; target: number } {
+export function preference(state: GameState, res: number, seat: number,
+                           ctx: CongressVoterCtx): { outcome: number; target: number } {
   const sx = state.seats[seat];
   switch (res) {
     case CONGRESS_UDT: {
@@ -116,6 +120,17 @@ function preference(state: GameState, res: number, seat: number,
           const i = PROJECT_LIST.findIndex((pr) => pr.id === front.project);
           if (i >= 0) counts[i]++;
         }
+      }
+      return { outcome: 0, target: argmaxLow(counts) };
+    }
+    case CONGRESS_DEFORESTATION: {
+      // A pays gold for clearing the named feature, so a seat names whichever
+      // clearable feature it owns the most of.
+      const counts = CLEARABLE_FEATURES.map(() => 0);
+      for (const t of state.map.tiles) {
+        if (tileSeat(t) !== seat || !t.feature) continue;
+        const i = CLEARABLE_FEATURES.indexOf(t.feature);
+        if (i >= 0) counts[i]++;
       }
       return { outcome: 0, target: argmaxLow(counts) };
     }
@@ -186,6 +201,7 @@ function targetSpaceSize(state: GameState, res: number): number {
     case 'government': return GOVERNMENT_LIST.length;
     case 'project': return PROJECT_LIST.length;
     case 'csType': return CITY_STATE_TYPES.length;
+    case 'feature': return CLEARABLE_FEATURES.length;
     default: return state.seats.length;
   }
 }
@@ -410,4 +426,24 @@ export function congressProjectMult(state: GameState, project: number): number {
   const e = congressEffect(state, CONGRESS_PUBLIC_WORKS);
   if (!e || e.target !== project) return 1;
   return e.outcome === 0 ? CONGRESS_PLUS_100 : CONGRESS_MINUS_50;
+}
+
+/** The Deforestation Treaty's standing outcome on a feature, or -1. */
+function deforestationOn(state: GameState, feature: string | null): number {
+  const e = congressEffect(state, CONGRESS_DEFORESTATION);
+  if (!e || !feature || CLEARABLE_FEATURES[e.target] !== feature) return -1;
+  return e.outcome;
+}
+
+/** CIV6 (Deforestation Treaty, B): "Features of this type cannot be cleared
+ *  by any player." */
+export function congressChopBanned(state: GameState, feature: string | null): boolean {
+  return deforestationOn(state, feature) === 1;
+}
+
+/** CIV6 (Deforestation Treaty, A): "Clearing Features of this type yields
+ *  Gold equal to the Production and Food" — a SECOND lump beside the chop's
+ *  own, in the same amount. */
+export function congressChopGold(state: GameState, feature: string | null, amount: number): number {
+  return deforestationOn(state, feature) === 0 ? amount : 0;
 }

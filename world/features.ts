@@ -19,6 +19,12 @@ export interface FeatureDef {
   chopYield?: YieldKey;
 }
 
+/** Features a builder can CLEAR — the Deforestation Treaty's target space,
+ *  and the order its wire target index addresses. */
+export function clearableFeatures(): string[] {
+  return Object.values(FEATURES).filter((f) => f.removable && f.chopYield).map((f) => f.id);
+}
+
 export const FEATURES: Record<string, FeatureDef> = {
   WOODS: {
     id: 'WOODS',

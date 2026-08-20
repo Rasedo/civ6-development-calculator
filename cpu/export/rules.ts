@@ -50,7 +50,8 @@ import { CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, FOOD_PER_CITIZEN, C
 import { IMPROVEMENT_IDS } from '../core/unitActions'; // ONE roster, core-owned (order is the column index; FORT appended LAST)
 
  
-import { techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST } from './catalog';
+import { techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, featIdx, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST } from './catalog';
+import { clearableFeatures } from '../../world/features';
 import { DED_TO_ARMS, DED_DRACONES, DED_COINAGE, DED_STEAM, DED_WISH, DEDICATION_ERAS, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN, TO_ARMS_MIL_PROD_MULT, DRACONES_DISCOVERY_SCORE, COINAGE_INTL_GOLD_PER_SPEC, STEAM_WONDER_PROD_MULT } from '../data/seats';
 import { BUILDING_ERA_INDEX } from '../data/buildings';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
@@ -259,6 +260,9 @@ export function buildRules() {
       wishParkTourism: WISH_PARK_TOURISM_MULT, wishWonderTourNum: WISH_WONDER_TOURISM_NUM, wishWonderTourDen: WISH_WONDER_TOURISM_DEN, toArmsMilProd: TO_ARMS_MIL_PROD_MULT, draconesDiscoveryScore: DRACONES_DISCOVERY_SCORE, coinageIntlGoldPerSpec: COINAGE_INTL_GOLD_PER_SPEC, steamWonderProd: STEAM_WONDER_PROD_MULT, industrialEra: INDUSTRIAL_ERA_INDEX,
       // t: the target-space kind, an index into CONGRESS_TARGET_KINDS
       congressResolutions: CONGRESS_RESOLUTIONS.map((r) => ({ id: r.id, min: r.minEra, max: r.maxEra, t: CONGRESS_TARGET_KINDS.indexOf(r.target) })),
+      // The Deforestation Treaty's target space, as FEATURE-CATALOG indices:
+      // a target `k` on the wire is the tile feature `congressFeatures[k]`.
+      congressFeatures: clearableFeatures().map((f) => featIdx.get(f) ?? -1),
       congressDvMinEra: CONGRESS_DV_MIN_ERA, congressDvDelta: CONGRESS_DV_DELTA, congressVoteStep: CONGRESS_VOTE_STEP, congressProdMult: CONGRESS_PROD_MULT, congressGppMult: CONGRESS_GPP_MULT, congressGrowthA: CONGRESS_GROWTH_A, congressGrowthB: CONGRESS_GROWTH_B, congressMigLoyalty: CONGRESS_MIG_LOYALTY, congressGwMult: CONGRESS_GW_MULT, congressPlus100: CONGRESS_PLUS_100, congressMinus50: CONGRESS_MINUS_50, congressTradeGold: CONGRESS_TRADE_GOLD, congressTradeCapacity: CONGRESS_TRADE_CAPACITY, congressPolicyFavor: CONGRESS_POLICY_FAVOR, congressIdeologySlots: CONGRESS_IDEOLOGY_SLOTS, cultureBombRange: CULTURE_BOMB_RANGE, favorOccupiedCapital: FAVOR_OCCUPIED_CAPITAL,
       // EMERGENCIES: the catalog (id + the turn limit) and every magnitude
       emergencies: EMERGENCIES.map((e) => ({ id: e.id, turns: e.turns })),

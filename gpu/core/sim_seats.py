@@ -1917,6 +1917,31 @@ class SimSeats:
         Routes to City-States gain +2 Gold"."""
         return self.civ_emg_route_gold[:, row].double() * self._emg_cs_route_gold
 
+    def _congress_chop(self, fid: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """(banned, paid) — the Deforestation Treaty standing on the feature
+        ids in `fid`, which may be any shape whose FIRST dim is the batch.
+        CIV6: "A: Clearing Features of this type yields Gold equal to the
+        Production and Food. / B: Features of this type cannot be cleared by
+        any player"."""
+        out, tgt = self._congress_by_id("DEFORESTATION_TREATY")
+        z = torch.zeros_like(fid, dtype=torch.bool)
+        if not self._congress_feat or not bool((out >= 0).any()):
+            return z, z
+        # the target index names a FEATURE-CATALOG id
+        want = torch.full_like(tgt, -1)
+        for t, f in enumerate(self._congress_feat):
+            want = torch.where(tgt == t, torch.full_like(want, f), want)
+        while want.dim() < fid.dim():
+            want = want.unsqueeze(-1)
+        live = out >= 0
+        while live.dim() < fid.dim():
+            live = live.unsqueeze(-1)
+        hit = live & (fid >= 0) & (fid == want)
+        b = out == 1
+        while b.dim() < fid.dim():
+            b = b.unsqueeze(-1)
+        return hit & b, hit & ~b
+
     def _congress_space(self, kind: int) -> int:
         """How many TARGETS a resolution of this kind offers — the
         `targetSpaceSize` twin, keyed by CONGRESS_TARGET_KINDS' index."""
@@ -1936,6 +1961,8 @@ class SimSeats:
             return max(1, len(self._proj_rows))
         if kind == 8:
             return self._cs_type_n
+        if kind == 9:
+            return max(1, len(self._congress_feat))
         return self.n_majors
 
     def _argmax_low(self, counts: torch.Tensor) -> torch.Tensor:
@@ -2003,6 +2030,14 @@ class SimSeats:
             counts = torch.zeros(B, nP, dtype=torch.float64, device=dev)
             for t in range(nP):
                 counts[:, t] = (live & (cur == t)).sum(dim=1).double()
+            return a, self._argmax_low(counts)
+        if name == "DEFORESTATION_TREATY":
+            # A pays gold for clearing the named feature, so a seat names
+            # whichever clearable feature it owns the most of.
+            mine = (self.tile_seat == row) & ~self.feat_stripped
+            counts = torch.zeros(B, max(1, len(self._congress_feat)), dtype=torch.float64, device=dev)
+            for t, fid in enumerate(self._congress_feat):
+                counts[:, t] = (mine & (self.feat_id == fid)).sum(dim=1).double()
             return a, self._argmax_low(counts)
         if kind == 3:
             return a, me

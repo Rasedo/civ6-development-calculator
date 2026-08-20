@@ -273,8 +273,52 @@ def main() -> None:
     assert int(sim2.tile_seat[0, paved]) == other, "the bomb took a tile carrying a district"
     print("  the bomb claims a foreign plot in range and skips a district tile")
 
+    # --- 9. the Deforestation Treaty, which addresses a FEATURE ------------
+    sim9 = build()
+    dr = sim9._congress_at["DEFORESTATION_TREATY"]
+    feats = sim9._congress_feat
+    assert len(feats) >= 2, "the clearable-feature target space collapsed"
+    assert sim9._congress_space(9) == len(feats)
+    tiles = torch.arange(sim9.T, dtype=torch.long).unsqueeze(0)
+    fid = sim9.feat_id.gather(1, tiles)
+    have = [t for t, f in enumerate(feats) if bool((fid == f).any())]
+    assert have, "no clearable feature on this map"
+    t0 = have[0]
+
+    sim9.congress_active[:] = -1
+    ban, pay = sim9._congress_chop(fid)
+    assert not bool(ban.any()) and not bool(pay.any()), "an empty slate banned a chop"
+
+    sim9.congress_active[:, 0, 0] = dr
+    sim9.congress_active[:, 0, 1] = 1          # outcome B
+    sim9.congress_active[:, 0, 2] = t0
+    ban, pay = sim9._congress_chop(fid)
+    assert bool(ban.any()) and not bool(pay.any()), "outcome B did not ban the chop"
+    assert bool((ban == (fid == feats[t0])).all()), "the ban strayed off its feature"
+
+    sim9.congress_active[:, 0, 1] = 0          # outcome A
+    ban, pay = sim9._congress_chop(fid)
+    assert not bool(ban.any()), "outcome A banned a chop"
+    assert bool((pay == (fid == feats[t0])).all()), "outcome A did not pay on its feature"
+    if len(have) > 1:
+        sim9.congress_active[:, 0, 2] = have[1]
+        _, pay2 = sim9._congress_chop(fid)
+        assert not bool((pay2 & (fid == feats[t0])).any()), "the payout ignored the target"
+
+    # the AI line names the clearable feature the seat owns most of
+    sim9.congress_active[:] = -1
+    own = (fid[0] == feats[t0]).nonzero(as_tuple=True)[0]
+    assert len(own) >= 1
+    sim9.tile_seat[0, own] = 0
+    for t, f in enumerate(feats):
+        if t != t0:
+            sim9.tile_seat[0, (fid[0] == f).nonzero(as_tuple=True)[0]] = -1
+    out9, tgt9 = sim9._congress_pref(dr, 0)
+    assert int(out9[0]) == 0 and int(tgt9[0]) == t0, "the AI line missed its own woods"
+    print("  the Deforestation Treaty bans and pays on the FEATURE its target names")
+
     print("CONGRESS VOTE OK — the slate, the override, the curve, both refunds, the DV target, "
-          "the wider slate, the route ban and the culture bomb")
+          "the wider slate, the route ban, the culture bomb and the feature target")
 
 
 if __name__ == "__main__":

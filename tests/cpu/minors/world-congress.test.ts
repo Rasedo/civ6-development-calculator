@@ -4,12 +4,15 @@ import { seatOf } from '../../../cpu/core/seats';
 import { createGame, endTurn } from '../../../cpu/core/game';
 import { worldCongress } from '../../../cpu/core/phase';
 import { settleFirstCity } from '../helpers';
-import { CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DIPLO_VICTORY_POINTS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION, CONGRESS_HERITAGE, CONGRESS_MERCENARY, CONGRESS_TRADE_POLICY, CONGRESS_POLICY_TREATY, CONGRESS_IDEOLOGY, CONGRESS_BORDER_CONTROL, CONGRESS_TREATY_ORG, CONGRESS_SOVEREIGNTY, CONGRESS_PUBLIC_WORKS, CONGRESS_RESOLUTIONS, CONGRESS_TARGET_KINDS } from '../../../cpu/data/seats';
-import { congressGppFactor, congressGrowthMult, congressLoyaltyDelta, congressUdtBlockedDistrict, congressUdtProdDistrict, congressGwMult, congressUnitBuyMult, congressTradeGold, congressRouteCapacity, congressIntlBanned, congressPolicyFavor, congressPolicyBlocked, congressWildcardDelta, congressCultureBombSeat, congressBorderFrozen, congressSuzFavorMult, congressCsRouteMult, congressSuzBonusBlocked, congressProjectMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_FAITH } from '../../../cpu/core/congress';
+import { CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DIPLO_VICTORY_POINTS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION, CONGRESS_HERITAGE, CONGRESS_MERCENARY, CONGRESS_TRADE_POLICY, CONGRESS_POLICY_TREATY, CONGRESS_IDEOLOGY, CONGRESS_BORDER_CONTROL, CONGRESS_TREATY_ORG, CONGRESS_SOVEREIGNTY, CONGRESS_PUBLIC_WORKS, CONGRESS_RESOLUTIONS, CONGRESS_TARGET_KINDS , CONGRESS_DEFORESTATION } from '../../../cpu/data/seats';
+import { preference as congressPreference, congressChopBanned, congressChopGold, congressGppFactor, congressGrowthMult, congressLoyaltyDelta, congressUdtBlockedDistrict, congressUdtProdDistrict, congressGwMult, congressUnitBuyMult, congressTradeGold, congressRouteCapacity, congressIntlBanned, congressPolicyFavor, congressPolicyBlocked, congressWildcardDelta, congressCultureBombSeat, congressBorderFrozen, congressSuzFavorMult, congressCsRouteMult, congressSuzBonusBlocked, congressProjectMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_FAITH } from '../../../cpu/core/congress';
 import { congressCancelBannedIntl } from '../../../cpu/core/trade';
 import { completeQueueItem } from '../../../cpu/core/production';
 import { setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
 import { neighbors } from '../../../world/hex';
+import { clearableFeatures } from '../../../world/features';
+import { canRemoveFeature } from '../../../cpu/core/rules';
+import { CITY_STATE_TYPES } from '../../../cpu/data/cityStates';
 import { isWater } from '../../../world/query';
 import { BUILT_WONDERS } from '../../../cpu/data/builtWonders';
 
@@ -345,5 +348,51 @@ describe('the culture bomb', () => {
     const foreign = neighbors(state.map, spot).find((t) => tileSeat(t) < 0)!;
     completeQueueItem(state, city, { kind: 'district', district: 'CAMPUS', tileIndex: spot.index, progress: 0 }, 0);
     expect(tileSeat(foreign)).toBe(-1);
+  });
+});
+
+describe('the Deforestation Treaty', () => {
+  // CIV6: "A: Clearing Features of this type yields Gold equal to the
+  // Production and Food. / B: Features of this type cannot be cleared by any
+  // player." The target is the FEATURE, so both outcomes read the tile.
+  const CLEARABLE = clearableFeatures();
+
+  it('outcome B refuses the chop, and only for the named feature', () => {
+    const state = newGame(1);
+    const woods = CLEARABLE.indexOf('WOODS');
+    expect(woods).toBeGreaterThanOrEqual(0);
+    expect(congressChopBanned(state, 'WOODS')).toBe(false);
+    state.congress = [{ res: CONGRESS_DEFORESTATION, outcome: 1, target: woods }];
+    expect(congressChopBanned(state, 'WOODS')).toBe(true);
+    expect(congressChopBanned(state, 'MARSH')).toBe(false);
+    expect(congressChopBanned(state, null)).toBe(false);
+    // and the gate is the one the builder verb asks
+    const t = state.map.tiles.find((x) => x.feature === 'WOODS' && !isWater(x))!;
+    seatOf(state, 0)!.research.techs.push('MINING', 'BRONZE_WORKING');
+    expect(canRemoveFeature(state, t, 0).ok).toBe(false);
+  });
+
+  it('outcome A pays a SECOND lump in gold, in the chop amount', () => {
+    const state = newGame(1);
+    const woods = CLEARABLE.indexOf('WOODS');
+    expect(congressChopGold(state, 'WOODS', 40)).toBe(0);
+    state.congress = [{ res: CONGRESS_DEFORESTATION, outcome: 0, target: woods }];
+    expect(congressChopGold(state, 'WOODS', 40)).toBe(40);
+    expect(congressChopGold(state, 'MARSH', 40)).toBe(0);
+    // A never bans
+    expect(congressChopBanned(state, 'WOODS')).toBe(false);
+  });
+
+  it('the AI line votes A on the clearable feature the seat owns most of', () => {
+    const state = newGame(1);
+    const city = seatOf(state, 0)!.cities[0];
+    const owned = state.map.tiles.filter((t) => tileSeat(t) === 0 && t.index !== city.centerIndex);
+    expect(owned.length).toBeGreaterThan(1);
+    const marsh = CLEARABLE.indexOf('MARSH');
+    for (const t of owned) t.feature = 'MARSH';
+    const p = congressPreference(state, CONGRESS_DEFORESTATION, 0,
+      { government: 0, policies: [], envoysByType: CITY_STATE_TYPES.map(() => 0) });
+    expect(p.outcome).toBe(0);
+    expect(p.target).toBe(marsh);
   });
 });

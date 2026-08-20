@@ -29,6 +29,7 @@ import { CIVICS } from '../data/civics';
 import { tradeCapacity } from './trade';
 import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
+import { congressChopGold } from './congress';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { NO_SEAT, capsOf, campTiles, civHasStrategic, civsAtWar, seatOf, tileClaimed, tileSeat } from './seats';
@@ -1022,12 +1023,15 @@ export function builderRemoveFeature(state: GameState, unitId: number, seat: num
   const check = canRemoveFeature(state, tile, seat);
   if (!check.ok) return check;
   const grant = state.sandbox ? null : chopGrant(state, tile, seat);
-  const featureName = tile.feature ? FEATURES[tile.feature]?.name ?? tile.feature : '';
+  const feature = tile.feature;
+  const featureName = feature ? FEATURES[feature]?.name ?? feature : '';
   if (tile.improvement === 'LUMBER_MILL' && tile.feature === 'WOODS') tile.improvement = null;
   tile.feature = null;
   if (grant) {
     applyLumpYield(state, tile.index, grant, seat);
     state.eventLog.push(`Chopped ${featureName}: +${grant.amount} ${grant.key}.`);
+    const gold = congressChopGold(state, feature, grant.amount);
+    if (gold) applyLumpYield(state, tile.index, { key: 'gold', amount: gold }, seat);
   }
   spendCharge(state, unit!);
   return ok;

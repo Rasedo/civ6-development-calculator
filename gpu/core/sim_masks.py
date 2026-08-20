@@ -1207,6 +1207,7 @@ class SimMasks:
             & (ftr_t > 0)
             & (ftu_t >= 0) & techs.gather(1, ftu_t.clamp(min=0))
             & ~self.feat_stripped.gather(1, tc)
+            & ~self._congress_chop(self.feat_id.gather(1, tc))[0]
         ).unsqueeze(2)
         # REPAIR (`builderRepair`): a builder on an OWN tile whose improvement
         # or district is pillaged. No charge is spent — the turn is.

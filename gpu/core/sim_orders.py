@@ -231,6 +231,7 @@ class SimOrders:
                     & (ftr > 0)
                     & (ftu >= 0) & techs.gather(1, ftu.clamp(min=0).unsqueeze(1)).squeeze(1)
                     & ~self.feat_stripped.gather(1, hc.unsqueeze(1)).squeeze(1)
+                    & ~self._congress_chop(self.feat_id.gather(1, hc.unsqueeze(1)).squeeze(1))[0]
                 )
                 if bool(chp.any()):
                     cr = chp.nonzero(as_tuple=True)[0]
@@ -243,12 +244,18 @@ class SimOrders:
                             was_l, torch.full_like(self.improvement[cr, ct], -1), self.improvement[cr, ct])
                     done = (techs.sum(dim=1) + civics.sum(dim=1)).to(self.dtype)
                     amount = js_round(20.0 + 2.5 * done)
+                    # the Deforestation Treaty pays a SECOND lump, in gold —
+                    # decided over the WHOLE batch, because `ct` is narrowed
+                    _dgold = self._congress_chop(self.feat_id.gather(1, hc.unsqueeze(1)).squeeze(1))[1]
                     col_c = self._city_col_at(row, cr, ct)
                     for i2 in range(len(cr)):
                         b2, j2 = int(cr[i2]), int(col_c[i2])
+                        amt = float(amount[b2])
+                        # gold lands in the BANK, so it needs no city column
+                        if bool(_dgold[b2]):
+                            self.civ_treasury[b2, row] += amt
                         if j2 < 0:
                             continue
-                        amt = float(amount[b2])
                         if int(ftr[cr[i2]]) == 1:
                             self.city_growth[b2, row, j2] += amt
                         elif int(self.city_current[b2, row, j2]) >= 0:
