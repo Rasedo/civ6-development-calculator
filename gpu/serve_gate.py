@@ -150,6 +150,15 @@ def _field_name(i: int, S: int, n_opponents: int, C: int, NT: int, NC: int) -> s
     if i < NC:
         return f"costCivic.{i}"
     i -= NC
+    if i < NT:
+        return f"progTech.{i}"
+    i -= NT
+    if i < NC:
+        return f"progCivic.{i}"
+    i -= NC
+    if i < ladder.CONGRESS:
+        return f"congress.{ladder.CONGRESS_FIELDS[i]}"
+    i -= ladder.CONGRESS
     return f"ctx.{ladder.CTX_FIELDS[i]}"
 
 

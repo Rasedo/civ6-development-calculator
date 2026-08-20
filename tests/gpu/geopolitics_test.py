@@ -72,11 +72,12 @@ def geo_denounce(sim) -> None:
 
 
 # Declaring and suing ride the seat's OWN war head — `war_targets(row)` order,
-# column k declares the k-th other major and column Rw+k sues it. Every row
-# has one, seat 0 included, and `_apply_war_column` is the only entry.
+# column k declares the k-th target and column len(targets)+k sues it. Every
+# row has one, seat 0 included, and `_apply_war_column` is the only entry.
 def war_column(sim, row: int, tgt: int, sue: bool = False) -> torch.Tensor:
-    k = sim.war_targets(row).index(tgt)
-    col = (sim.n_majors - 1 + k) if sue else k
+    targets = sim.war_targets(row)
+    k = targets.index(tgt)
+    col = (len(targets) + k) if sue else k
     return torch.full((sim.B,), col, dtype=torch.long, device=sim.device)
 
 

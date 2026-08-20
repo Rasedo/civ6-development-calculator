@@ -41,7 +41,8 @@ def main() -> None:
     # progress parked on it.
     width = (ladder.EMP + ladder.PER_CS * s.S + ladder.PER_CIV * (s.n_majors - 1)
              + ladder.PER_CITY * s.RC + ladder.ESCALATORS
-             + 2 * (s.civ_techs.shape[2] + s.civ_civics.shape[2]) + ladder.CTX_SEAT)
+             + 2 * (s.civ_techs.shape[2] + s.civ_civics.shape[2])
+             + ladder.CONGRESS + ladder.CTX_SEAT)
 
     shapes = {}
     for seat in (0, 1):

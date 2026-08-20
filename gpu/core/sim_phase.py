@@ -192,16 +192,16 @@ class SimPhase:
         member of, and the mirror write keeps the matrix symmetric. A seat
         fighting two opponents has two clocks and can sue either on that war's
         own terms. `peace_turns`
-        ticks while the seat is at war with NO major (atWarWithAny reads
-        Seat.wars — the majors' list — so a city-state war does not hold it
-        back). The two are exclusive: a war clock only moves inside a war,
-        which is a war with somebody.
+        ticks while the seat is at war with NOBODY — `Seat.wars` holds the
+        city-states too, so a minor war holds the clock back exactly as a
+        major one does. The two are exclusive: a war clock only moves inside a
+        war, which is a war with somebody.
 
         The war MATRIX makes this row-generic with nothing special-cased. A
         row's cell against ITSELF is structurally False, so it never counts a
         war with itself — exactly what `civsAtWar(state, s, s)` does on the TS
         side, and the reason row 0 looked like it needed a rule of its own."""
-        any_war = active & self.war[:, row, :self.n_majors].any(dim=1)
+        any_war = active & self.war[:, row].any(dim=1)
         pair = active.unsqueeze(1) & self.war[:, row]
         pair[:, :row + 1] = False
         self.war_turns[:, row] += pair.long()
@@ -666,8 +666,8 @@ class SimPhase:
         bank(self.civ_diplo_favor,
              self._adopted_gov_tier(self.civ_civics[:, row]) + self._favor_per_suz * self._suzerain_count(row))
         # grievances DECAY by 1 per turn at peace with every MAJOR — the row's
-        # own line of the war matrix, minus the city-state columns (TS's
-        # atWarWithAny reads Seat.wars, the majors' list).
+        # own line of the war matrix, minus the city-state columns, because
+        # `atPeaceWithAllCivs` walks `state.seats` and nothing else.
         at_peace = ~self.war[:, row, :self.n_majors].any(dim=1)
         self.civ_warmonger[:, row] = torch.where(
             active & at_peace & (self.civ_warmonger[:, row] > 0),

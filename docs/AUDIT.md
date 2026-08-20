@@ -56,9 +56,9 @@ nothing carries forward.
 | **A. Engine vs engine** | **0** | |
 | B-20r tourism tails | 2 | theming ships; open-borders digs and work TRADES need a treaty system, and the Naturalist's progressive cost is unsourced |
 | B-21r suzerain rows | 1 | the residual descoped rows all need whole absent systems |
-| B-22r World Congress | 4 | the vote is scripted (wire head pending); emergencies/competitions absent; 4 of ~18 resolutions |
+| B-22r World Congress | 3 | the ballot rides the wire now; emergencies/competitions absent; 4 of ~18 resolutions; the favor tie-break unmodeled |
 | B-24r Ages/governors | 1 | three system-less dedication entries, dark-age policies, governor promotions, per-civ era drift |
-| B-30r specialists | 2 | the mechanic is live; the free-assignment wire head and its observation stay open |
+| B-30r specialists | 1 | the mechanic and both citizen overrides ship; the Theater tier's second building and the plant split wait upstream |
 | B-31r trade-route tails | 1 | sea legs ship; no trading posts, plunder gold is a stylization, one candidate not a free pick |
 | B-53r the great-person roster | 2 | four fame-picked names per class on one ladder; real Civ 6 anchors each person to an ERA and offers a roster per era |
 | B-D unsourced data values | 3 | the sweep is done; nine NAMED stylizations stay open, each labelled at its definition |
@@ -71,9 +71,9 @@ nothing carries forward.
 | B-49r embarked defence is flat | 1 | Civ 6 keys it to the owner's era, 15 through 55 |
 | B-50r theological combat's other terms | 1 | flanking/support, territory bonuses, the Inquisitor, the winner's advance, Holy Site healing |
 | B-51r the Encampment has no perimeter | 1 | Civ 6 gives the district the City Center's wall HP; the assault path is handed a tile, not its city |
-| B-44r city-state war has no decider | 1 | both engines carry the machinery; no policy ever reaches it |
+| B-44r city-state war tails | 1 | the head and its policy ship; no walker ever MARCHES on a minor, and the diplomatic consequences wait on C-19 |
 | B-34r flood tails | 1 | the severity ladder ships; a flood still takes ONE tile where GS floods the river's whole reach, and the Dam that mitigates one is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **29** | |
+| **B. Fidelity vs real Civ 6** | **27** | |
 | C-1 POWER | 5 | no plants, no grid, no powered-yield term — 4 gaps wait on it |
 | C-2 diplomatic agreements | 6 | war and peace and nothing between: open borders, work trades, alliances, denouncements |
 | C-3 unit promotions | 4 | only MARTYR reaches a rule; choosing one is also a wire head |
@@ -98,7 +98,7 @@ nothing carries forward.
 | C-22 the district roster is a subset | 3 | no Dam, Canal, Water Park, Preserve, Aerodrome, Government Plaza or Diplomatic Quarter |
 | C-23 nothing diminishes tourism | 1 | no rival's Enlightenment ever costs a tourist, so Cristo Redentor's cancelling clause has nothing to cancel |
 | **C. Absent systems** | **57** | |
-| **OPEN, TOTAL** | **86** | |
+| **OPEN, TOTAL** | **84** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -235,7 +235,8 @@ Civ 6 source or is recorded as unverifiable.
   rotating two-slot slate off `CONGRESS_RESOLUTIONS` (Urban Development
   Treaty, Patronage, Migration Treaty, Heritage Organization — era
   windows and A/B texts verbatim from the GS wiki table), the always-3rd
-  Diplomatic Victory resolution from Modern (+/-2 DVP on the leader),
+  Diplomatic Victory resolution from Modern (+/-2 DVP on the winning
+  TARGET),
   the 10k vote-cost curve, outcome-then-target plurality, +1 DVP to
   every winning-combo voter, refund tiers 0/50/100, and the standing
   effects consumed on both engines (`congressSession` /
@@ -243,20 +244,31 @@ Civ 6 source or is recorded as unverifiable.
   `_congress_gpp_factor` and siblings); Statue of Liberty and Potala
   pay their sourced DVP at completion and Potala's diplomatic slot (and
   Forbidden City's wildcard) enter the live adoption
-  (`wonderExtraSlots`). REACHABILITY (driven 250-turn rollouts, 4
-  seeds): 5 sessions per seed, a standing slate on 132 of 250 turns,
+  (`wonderExtraSlots`). The BALLOT is a wire head: `SeatActionRecord.vote`
+  carries [outcome, target, extra votes] per slate slot, favor buys extra
+  votes on ANY resolution up the sourced curve, the refund tiers pay both
+  engines' losers alike, and a seat that submits none votes the AI line
+  (`preference` / `_congress_pref`). The observation carries the standing
+  slate (`ladder.CONGRESS_FIELDS`). REACHABILITY (driven, 12 seeds x 250
+  turns): a ballot rides the wire on 12 of 12 seeds from t119; (4 seeds)
+  5 sessions per seed, a standing slate on 132 of 250 turns,
   UDT/Patronage/Migration all reached, DVP spread 4-11 (the 20-point
   win stays poke-only); the DV resolution fired on ONE seed (its curve
   and refunds ran in-game); HERITAGE ORGANIZATION never stands in-gate
   (Modern arrives too late for its rotation slot) — the geopolitics
-  pokes are its bar. OPEN:
-  - **THE VOTE IS SCRIPTED.** Outcome, target and spend are one
-    deterministic self-interest rule (`preference`/`_congress_pref`:
-    free vote everywhere, ALL favor on the DV resolution). Real GS
-    gives each player the choice, so the vote belongs on the WIRE as
-    its own head (per-slot outcome bit + target + favor count) with the
-    standing slate rendered into the observation — an action-space
-    change, kept open by the no-permanent-closure rule.
+  pokes are its bar. A ballot that DIFFERS from the AI line is
+  `congress_vote_test` only: the ladder's own vote reproduces the AI line
+  exactly, so the gate exercises the wire, not the choice. OPEN:
+  - **THE FAVOR TIE-BREAK is unmodeled.** SOURCED: "Ties are broken by
+    the proportion of Diplomatic Favor a player commits." Both engines
+    break an outcome tie to A and a target tie to the lower index, which
+    is a stylization the source contradicts — closing it needs the
+    committed-favor totals carried into `tally` / `_congress_settle` on
+    both sides.
+  - **THE OBSERVATION RENDERS THE STANDING SLATE, not the UPCOMING one.**
+    A ballot addresses the session about to run, and the resolutions it
+    will carry are computable (`_congress_upcoming`) but not rendered, so
+    a net votes on the previous session's slate.
   - **4 of ~18 resolutions.** Trade Policy rides the trader work
     (B-31r); Treaty Organization and Sovereignty need per-CS-type favor
     accounting; World Religion, Mercenary Companies, Arms Control,
@@ -302,23 +314,31 @@ Civ 6 source or is recorded as unverifiable.
   pillage), the sourced GS yields with the TOP-building tiers
   (`SPECIALIST_YIELDS`/`SPECIALIST_TIERS` — Commanders exist, the old "no
   Encampment specialist" note was wrong; wiki "Specialists (Civ6)"), and
-  the AUTOMATIC assignment: OVERFLOW citizens — population beyond the
-  workable pool — fill slots in PLACEABLE_DISTRICTS order
-  (`effectiveSpecialists` / `_city_specialists`, a compared digest column).
-  Citizen assignment was already an in-engine automatic rule for TILES
-  (`assignWorkedTiles`), so specialists ride the same channel; the manual
+  the assignment: PINNED citizens first (`City.specialistPref` /
+  `city_spec_pin`, a wire head), then the OVERFLOW — population beyond the
+  workable pool — fills whatever slots are still free in PLACEABLE_DISTRICTS
+  order (`effectiveSpecialists` / `_city_specialists`, a compared digest
+  column). The TILE half of the same choice is `Tile.locked` /
+  `tile_locked`, flipped by `SeatActionRecord.lockTiles`: a locked plot the
+  city can work is taken before anything is ranked by score
+  (`assignWorkedTiles`, and the GPU work key's locked base). The manual
   `setSpecialists` verb and its dead `city.specialists` map are deleted.
-  REACHABILITY (driven 250-turn rollouts, 4 seeds): 3 of 4 seeds grow
-  specialists in-game (first at t154/t183/t196; a standing specialist on
-  72 and 69 of 250 turns on two seeds; one seed never overflows), so the
-  serve gate exercises the base rule and its digest column late-game;
+  REACHABILITY (driven, 12 seeds x 250 turns): the LOCK lands on 12 of 12
+  seeds from t2 (138 plots standing at t250) and the PIN on 11 of 12 from
+  t114 (36 slots standing), so both overrides ride the gate for most of a
+  game; (4 seeds) 3 of 4 grow OVERFLOW specialists in-game — first at
+  t154/t183/t196, standing on 72 and 69 of 250 turns on two seeds, one
+  seed never overflowing — so the digest column is exercised late-game;
   the TIERS, the catalog-order fill and the pillage gate are poke-only
-  (`district_breadth_test` section i). OPEN:
-  - **THE ASSIGNMENT IS NOT A CHOICE.** Real Civ 6 lets the player place
-    citizens freely (tiles AND slots); both engines run the one overflow
-    rule. The override is a wire head — per-city slot counts, the same
-    surface as a worked-tile override — and the observation renders
-    neither. One item with the tile-assignment choice itself.
+  (`district_breadth_test` section i), and the pin and the lock have their
+  own lane (`citizens_test`). OPEN:
+  - **A LOCK OUTLIVES THE CITY THAT SET IT.** The lock lives on the PLOT on
+    both engines, so a plot that changes hands carries it to the new owner,
+    where real Civ 6 loses citizen management with the city. One rule,
+    identical on both sides, and wrong in the same way — closing it needs
+    the lock cleared wherever tile ownership moves. The SPECIALIST pin does
+    not have the bug: it lives on the city and both engines drop it at a
+    capture, because TS's flipped literal carries no `specialistPref`.
   - Specialists provide yields ONLY in Civ 6 (sourced — no GPP, unlike
     Civ 5); the Film Studio alternative for the Theater tier and the
     coal/oil/nuclear plant split remain unmodeled upstream (B-D records
@@ -490,15 +510,25 @@ Civ 6 source or is recorded as unverifiable.
   perimeter; its DAMAGE does not, because the district pool and the city pool
   live in different registries and the assault path is handed a tile, not the
   city that owns it.
-- **B-44r. War with a city-state has NO DECIDER on either engine.** Both
-  halves of the machinery exist and agree: `declareWarOnCityState` /
-  `sueForPeaceWithCityState` on TS, the war plane and the CS-attack mask column
-  on the GPU. Neither engine has a production caller — TS's two entry points
-  are reached only from tests, and the GPU lane's own header says the scripted
-  gate cannot reach the mask column. So no seat is ever at war with a
-  city-state in a driven game, and the whole subsystem is poke-covered only.
-  It needs a wire head and a policy the way the trade route did. The
-  diplomatic consequences of declaring wait on C-19.
+- **B-44r. City-state war tails.** The decider exists now: `warTargets` /
+  `war_targets` run the whole minor roster after the majors, so the war head
+  is `[declare per target, sue per target]` over both, and the minor columns
+  carry the sourced gates — the meeting, the treaty term, the ten-turn
+  cooldown, the suzerain who will not talk while still fighting you, and a
+  peace that costs nothing. `ladder.pick_war` raids a minor the seat has no
+  envoys in. REACHABILITY (driven, 12 seeds x 250 turns): a minor war stands
+  on 4 of 12 seeds, first at t127, and the SUE column closes one on the same
+  4, first at t145 — 6.5 turns at war per seed on average, 30 on the loudest.
+  So the gate reaches the declare, the peace and the two clocks; the meeting
+  gate, the treaty term and the suzerain refusal are `cs_war_test` section d.
+  OPEN:
+  - **NO WALKER EVER MARCHES ON A MINOR.** `_war_march_target` and its TS
+    twin scan the cities and improvements of at-war MAJORS only, so a seat
+    that declares on a city-state has no reason to walk toward it: the
+    attack mask opens and nothing arrives. Both engines agree, and both are
+    wrong.
+  - The diplomatic consequences of declaring — grievances, the warmonger
+    penalty with other majors, the suzerain's reaction — wait on C-19.
 - **B-53r. The GREAT PERSON roster is four names per class, era-free.** Weight
   2. Each class holds exactly four people on one cost ladder, and the names
   were picked for fame rather than from the game. B-20r's theming work
@@ -662,39 +692,56 @@ number was under-counting by treating deferrals as closures.
 
 A green serve run proves the two engines agree over the regime the scripted
 seeds actually enter. MEASURED, 12 seeds x 250 turns driven
-(`tools/gpu/reachability_probe.py`) — these are counts, not estimates, and
-three of them overturned what this section used to assert:
+(`tools/gpu/reachability_probe.py`) — these are counts, not estimates. Every
+row is re-measured whenever the DRIVEN policy changes, because a new decision
+steers the games into a different regime and carries the older rows with it:
 
 | mechanic | seeds reaching | first |
 |---|---|---|
-| faith-buy kind 6 (APOSTLE purchase) | 12/12 | t73 |
-| two enemy religious units ADJACENT (theological combat's precondition) | 5/12 | t125 |
-| a second HULL on any seat | 6/12 | t143 |
-| an INTERNATIONAL trade leg | 0/12 | never |
-| URBANIZATION civic | 1/12 | t242 |
-| a NEIGHBORHOOD placed | 1/12 | t243 |
+| faith-buy kind 6 (APOSTLE purchase) | 12/12 | t78 |
+| a PLOT LOCK held by a citizen | 12/12 | t2 |
+| a WORLD CONGRESS ballot on the wire | 12/12 | t119 |
+| a SPECIALIST pinned into a slot | 11/12 | t114 |
+| a second HULL on any seat | 9/12 | t123 |
+| two enemy religious units ADJACENT (theological combat's precondition) | 4/12 | t107 |
+| WAR with a city-state | 4/12 | t127 |
+| PEACE with a city-state, through the sue column | 4/12 | t145 |
+| an INTERNATIONAL trade leg | 1/12 | t241 |
+| URBANIZATION civic | 0/12 | never |
+| a NEIGHBORHOOD placed | 0/12 | never |
 | an antiquity dig (artifact in a slot) | 0/12 | never |
 | NATURAL_HISTORY (the Archaeologist's civic) | 0/12 | never |
 | CONSERVATION (the Naturalist's civic) | 0/12 | never |
 
-- THEOLOGICAL COMBAT IS REACHED, in 5 of 12 seeds from t125. The old
+- THEOLOGICAL COMBAT IS REACHED, in 4 of 12 seeds from t107. The old
   claim here — "a gate that never puts two apostles side by side proves
   nothing about it" — was wrong: the gate does, so the resolver's
   deterministic damage and its apostle-only initiation ARE gate-covered.
-- The APOSTLE BUY fires in every seed from t73 and the 250-turn gate is
+- The APOSTLE BUY fires in every seed from t78 and the 250-turn gate is
   green, which is what closed B-18r's predicted lifecycle drift.
-- URBANIZATION and a NEIGHBORHOOD arrive in ONE seed at t242/t243 — the
-  Trader-economy trajectory is the first to put the column inside the
-  gate at all; every other seed still leans on the poke lane.
-- A SECOND HULL reaches 6 of 12 seeds from t143. The route KINDS moved
+- THE CITIZEN OVERRIDES are the widest-reaching heads in the gate: a plot
+  lock stands on every seed from t2 (138 plots at t250) and a pinned
+  specialist on 11 of 12 from t114 (36 slots), so both ride the digest for
+  most of a game rather than leaning on `citizens_test`.
+- WAR WITH A CITY-STATE stands on 4 of 12 seeds from t127 and closes through
+  the SUE column on the same 4 from t145 — 6.5 minor-war turns per seed,
+  30 on the loudest. The declare, the peace and both clocks are gate-covered;
+  the meeting gate, the treaty term and the suzerain refusal are not, and
+  `cs_war_test` section d is their bar.
+- URBANIZATION and a NEIGHBORHOOD dropped back OUT of the gate — they stood
+  in one seed at t242/t243 before the citizen and Congress heads changed the
+  late-game trajectory, and now no seed reaches either. The poke lane is
+  their only proof again. An INTERNATIONAL leg moved the other way, from
+  NEVER to one seed at t241.
+- A SECOND HULL reaches 9 of 12 seeds from t123. The route KINDS moved
   the other way under the Trader economy: routes wait for FOREIGN_TRADE
   plus a trained Trader (~t60+), by which point specialty districts lift
   the domestic pair past the flat city-state yields in the candidate
   scan, and a completion hands the Trader straight to the next domestic
   pair. Measured over 12 driven seeds: 319 domestic routes (~27/seed,
   239 natural round-trip completions, 13 early ends), 11 city-state
-  routes over 5 seeds, and the INTERNATIONAL arm fires in NONE — it was
-  1/12 before the rework. The intl arm lives in `trade2_test` pokes and
+  routes over 5 seeds, and the INTERNATIONAL arm now fires in ONE, at t241.
+  The intl arm still lives mainly in `trade2_test` pokes and
   the TS trade-fidelity suite, and the serve gate's ROUTE tripwire still
   compares the candidate pair on every turn a Trader is free — but the
   digest's intl rows ride pokes alone.
@@ -706,10 +753,9 @@ three of them overturned what this section used to assert:
   (The finer question this section used to ask — a dig by a seat whose ERA
   differs from row 0's — is doubly moot: eras are global 50-turn blocks
   per B-24r, so no two seats can be in different eras by construction.)
-- The CULTURE VICTORY's distance, re-measured under the Trader economy:
-  at t250 visiting peaks at 5 (mean ~0.6) against a domestic peak of 79
-  (mean ~39) — the gap WIDENED to ~60x on means. B-20r's scope should be
-  read off this, not any older number.
+- The CULTURE VICTORY's distance, re-measured: at t250 visiting peaks at 4
+  (mean ~0.5) against a domestic peak of 59 (mean ~36) — a ~70x gap on
+  means. B-20r's scope should be read off this, not any older number.
 - The space race needs Information-era techs no gate lane reaches; its poke
   lanes are the proof.
 - A barbarian march choosing a CIV row's city while a row-0 city stands

@@ -380,7 +380,11 @@ SUPPORT_CS = 2
 # barb xp plane); civilians never fight. XP_LEVELS grant a flat +5 CS per level
 # at every roll the unit fights — an integer add into the CS assembly like the
 # flanking terms.
-TRADE_ROAD_MAX_STEPS = 32  # the tradeLandReachable/walk safety rail
+TRADE_ROAD_MAX_STEPS = 32  # the `tradeWalkReachable`/walk safety rail
+#: the CITIZEN-ASSIGNMENT wire's "leave this pin alone" value. A pin is a
+#: count, -1 hands the slot back to the automatic rule, and this sits below
+#: both so a record can name one district without restating the rest.
+SPEC_KEEP = -2
 XP_ATTACK = 5
 XP_DEFEND = 2
 XP_LEVEL_CS = 5
@@ -479,7 +483,7 @@ _MUTABLE = [
     # only here (`citystate_at` is a view of it), so it must round-trip.
     "tile_seat", "tile_city",
     "citystate_last_levy",
-    "seat_warkind", "seat_denounced", "seat_allied", "congress_sessions", "congress_active", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "seat_ext", "city_prod_bank",
+    "seat_warkind", "seat_denounced", "seat_allied", "congress_sessions", "congress_active", "civ_congress_vote", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "seat_ext", "city_prod_bank",
     "city_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dseat", "seat_route_dcity",  # international dest (seat row, city id), else -1/-1 (domestic/CS)
@@ -495,7 +499,7 @@ _MUTABLE = [
     "shipwreck", "shipwreck_era", "shipwreck_seat",  # the WATER dig
     "park",  # NATIONAL PARK tiles
     "built_wonder", "built_wonder_complete", "city_wonder",  # world wonders + the per-city registry
-    "fertility", "fertility_prod", "drought", "improvement", "pillaged", "district",
+    "fertility", "fertility_prod", "tile_locked", "drought", "improvement", "pillaged", "district",
     "district_pillaged",  # raided-dark districts (tile plane, reclaim-safe)
     "d_static_adj",  # mutated when an in-game founding clears the center tile's removable feature
     # The merged unit pool. The BASES are registered, never the `major_`/`barb_`
@@ -508,6 +512,6 @@ _MUTABLE = [
     "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_camp", "seat_citystate_quest_issued",
     "seat_explored",
     "civ_culture", "civ_faith", "civ_tourism", "civ_warmonger", "civ_gpp",
-    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_is_cap", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts", "city_artifact_era", "city_artifact_seat", "city_gwart_type", "city_gwart_artist", "city_bldg",
+    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_is_cap", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts", "city_artifact_era", "city_artifact_seat", "city_gwart_type", "city_gwart_artist", "city_spec_pin", "city_bldg",
     "war_turns", "treaty_turns", "peace_turns",
 ]

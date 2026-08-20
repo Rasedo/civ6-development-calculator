@@ -498,6 +498,9 @@ CITY = {
     ],
     "queueFront": lambda sim, b, rows: [_qfront(sim, b, c, s) for c, s in rows],
     "specialists": _spec_rows,
+    "specialistPref": lambda sim, b, rows: [
+        [int(x) for x in sim.city_spec_pin[b, c, s].tolist()] for c, s in rows
+    ],
     "queueProgress": _cty("city_progress"),
     "queueCost": _cty("city_cost"),
     "followedReligion": _cty("city_followed"),
@@ -588,6 +591,7 @@ TILE = {
     "park": _tile("park"),
     "encampHp": _tile("encamp_hp"),
     "road": _tile("road"),
+    "locked": _tile("tile_locked"),
     "fertility": _tile("fertility"),
     "fertilityProd": _tile("fertility_prod"),
     "droughtTurns": _tile("drought"),

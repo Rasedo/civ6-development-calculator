@@ -290,7 +290,6 @@ def main() -> None:
             assert got == want, f"ocean at level {lvl}: {got}"
 
     # MARITIME ACCESS decides which range a pair gets
-    mar = s8._city_maritime(row)
     yes = torch.ones(s8.B, dtype=torch.bool)
     no = torch.zeros(s8.B, dtype=torch.bool)
     assert int(s8._trade_pair_range(row, yes, yes)[0]) == s8._trade_sea_range

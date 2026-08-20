@@ -17,7 +17,7 @@ import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { selectResearch } from './economy';
 import { getModifiers } from './effects';
 import { addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, routeDestCenter, routePlunderer, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from './trade';
-import { addEnvoys, hasMet, isSuzerain, issueQuest, questSatisfied, setMet } from './cityStates';
+import { addEnvoys, cityStateById, declareWarOnCityState, hasMet, isSuzerain, issueQuest, questSatisfied, setMet, sueForPeaceWithCityState } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS } from '../data/cityStates';
 import { computeAdoption } from './effects';
 import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
@@ -43,7 +43,7 @@ import { seatWonders } from './wonders';
 import { disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, archaeologistExcavate, naturalistPark } from './units';
 import { killUnit } from './combat';
 import { availableProjects, buyTile, buyWorshipBuilding, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseSettler, queueProject, settlerCost } from './game';
-import { DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
+import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex } from './unitActions';
 
 const A_FOUND_CITY = unitActionIndex(IMPROVEMENT_IDS).FOUND_CITY;
@@ -51,7 +51,7 @@ const A_EXCAVATE = unitActionIndex(IMPROVEMENT_IDS).EXCAVATE;
 const A_PARK = unitActionIndex(IMPROVEMENT_IDS).PARK;
 import { ALLY_MIN_PEACE, CIV_LEADERS, FORMAL_WAR_MIN_TURNS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles, goldenBoostBonus } from './eras';
-import { NO_SEAT, atWarWithAny, campTiles, citiesOf, civHasStrategic, civsAtWar, emptySeat, isCiv, prophetsOf, seatOf, seatOfCityState, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
+import { NO_SEAT, atWarWithAny, campTiles, citiesOf, civHasStrategic, civsAtWar, cityStateOfSeat, emptySeat, isCiv, isCityStateSeat, prophetsOf, seatOf, seatOfCityState, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, spreadFromUnit } from './unitOrders';
 import { navalKillEvent, buildingDedications, dedicationEvent, goldenDedication } from './eras';
@@ -88,13 +88,17 @@ export const BUY_UNITS: { id: string; tech?: string }[] = [
 
 
 /**
- * The seats a row's WAR HEAD addresses, in ascending seat order — every OTHER
- * major, so the head is one column per OPPONENT for every seat and column k
- * means the same kind of thing whoever asks. The GPU's `war_targets(row)`
- * twin.
+ * The seats a row's WAR HEAD addresses: every OTHER major in ascending seat
+ * order, then the whole CITY-STATE roster in ascending id order. Column k
+ * means the same kind of thing whoever asks, and the width is fixed for the
+ * game — a captured minor keeps its column and the column is simply never
+ * legal. The GPU's `war_targets(row)` twin.
  */
 export function warTargets(state: GameState, seat: number): number[] {
-  return state.seats.map((s) => s.seat).filter((s) => s !== seat);
+  const majors = state.seats.map((s) => s.seat).filter((s) => s !== seat);
+  const minors: number[] = [];
+  for (let i = 0; i < (state.cityStateMax ?? 0); i++) minors.push(seatOfCityState(i));
+  return majors.concat(minors);
 }
 
 function siteQuality(state: GameState, tile: Tile): number {
@@ -508,6 +512,8 @@ export function queueSeatProject(state: GameState, civCity: City, projId: string
  * the GPU mirrors.
  */
 export function worldCongress(state: GameState): void {
+  const recorded = state.seats.map((sx) => sx.congressVote ?? null);
+  for (const sx of state.seats) sx.congressVote = undefined;  // an intent is for THIS turn
   if (state.turn % CONGRESS_INTERVAL !== 0) return;
   let worldEra = -1;
   for (const sx of state.seats) {
@@ -515,7 +521,7 @@ export function worldCongress(state: GameState): void {
     if (e > worldEra) worldEra = e;
   }
   if (worldEra < CONGRESS_MIN_ERA) return;
-  congressSession(state, worldEra);
+  congressSession(state, worldEra, recorded);
 }
 
 
@@ -582,7 +588,6 @@ export function transferCity(
     foodBox: 0,
     cultureBox: 0,
     tilesAcquired: civCity.tilesAcquired,
-    lockedTiles: [],
     focus: 'balanced',
     queue: [],
     isCapital: false,
@@ -700,11 +705,11 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
   // re-validated. BANK ONLY — conversion is an eager RULE at the CS phase for
   // every seat, so a decide-time pick can never exceed the bank. A razed
   // city-state takes no envoy (real Civ 6, and the GPU mask's own term).
-  for (const cityStateIdx of rec.envoys ?? []) {
-    // a razed/captured city-state leaves the array entirely, so existence IS
+  for (const cityStateId of rec.envoys ?? []) {
+    // a razed/captured city-state leaves the roster entirely, so existence IS
     // the alive test — its city lives in the CityState's own flat fields,
     // never in the seat-idiom `cities` list, which stays empty for a minor.
-    const cityState = state.cityStates[cityStateIdx];
+    const cityState = cityStateById(state, cityStateId);
     if (!cityState) continue;
     if (!hasMet(cityState, actor.seat)) continue;
     if ((actor.envoysAvailable ?? 0) <= 0) continue;
@@ -713,11 +718,19 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
   }
   const warCol = rec.war;
   if (warCol !== null && warCol !== undefined && warCol >= 0) {
-    const nOpp = state.seats.length - 1;  // the head is one column per OPPONENT
     const targets = warTargets(state, actor.seat);
-    const foe = targets[warCol < nOpp ? warCol : warCol - nOpp];
-    if (foe !== undefined && actor.seat !== foe) {
-      if (warCol < nOpp && !civsAtWar(state, actor.seat, foe) && !seatsAllied(state, actor.seat, foe)
+    const nTgt = targets.length;   // the head is [declare per target, sue per target]
+    const declaring = warCol < nTgt;
+    const foe = targets[declaring ? warCol : warCol - nTgt];
+    if (foe !== undefined && isCityStateSeat(foe)) {
+      // A MINOR is a seat of its own: the two verbs carry the whole rule
+      // (met, the treaty term, the ten-turn cooldown, the suzerain block),
+      // and this arm only names which one the column asked for.
+      const csId = cityStateOfSeat(foe);
+      if (declaring) declareWarOnCityState(state, csId, actor.seat);
+      else sueForPeaceWithCityState(state, csId, actor.seat);
+    } else if (foe !== undefined && actor.seat !== foe) {
+      if (declaring && !civsAtWar(state, actor.seat, foe) && !seatsAllied(state, actor.seat, foe)
           && treatyTurnsWith(state, actor.seat, foe) === 0) {
         setWar(state, actor.seat, foe, true);
         setWarTurnsWith(state, actor.seat, foe, 0);
@@ -726,7 +739,7 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
         const formal = dt !== undefined && state.turn - dt >= FORMAL_WAR_MIN_TURNS;
         setWarFormal(state, actor.seat, foe, formal);
         state.eventLog.push(`${actor.name} declares ${formal ? 'a formal' : 'a surprise'} war on ${seatOf(state, foe)?.name ?? 'you'}!`);
-      } else if (warCol >= nOpp && civsAtWar(state, actor.seat, foe)) {
+      } else if (!declaring && civsAtWar(state, actor.seat, foe)) {
         const waited = warTurnsWith(state, actor.seat, foe);
         const cost = PEACE_GOLD_COST(waited);
         if (waited >= WAR_MIN_TURNS && goldAffordable(actor.treasury ?? 0, cost)) {
@@ -736,6 +749,21 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
       }
     }
   }
+  // CITIZEN ASSIGNMENT, in the GPU's arm order: the pins, then the plot
+  // flips. Both re-validate — a pin needs a living city of this seat, a flip
+  // needs the plot to be this seat's ground.
+  for (const [centre, di, n] of rec.specialists ?? []) {
+    const pinCity = actor.cities.find((c) => c.centerIndex === centre);
+    if (!pinCity || di < 0 || di >= PLACEABLE_DISTRICTS.length) continue;
+    (pinCity.specialistPref ??= PLACEABLE_DISTRICTS.map(() => -1))[di] = Math.max(-1, Math.trunc(n));
+  }
+  for (const tileIndex of rec.lockTiles ?? []) {
+    const plot = state.map.tiles[tileIndex];
+    if (plot && tileSeat(plot) === actor.seat) plot.locked = !plot.locked;
+  }
+  // The WORLD CONGRESS ballot is banked, not spent: the session runs at the
+  // turn tail, after every seat has had its phase.
+  if (rec.vote) actor.congressVote = rec.vote;
   for (const [centre, aCol, aTile] of prodPairs) {
     const civCity = actor.cities.find((c) => c.centerIndex === centre);
     if (!civCity) continue;                          // centre not this engine's city (drifted state)
@@ -1217,7 +1245,7 @@ export function seatPhase(state: GameState): void {
     {
       const lvi = rec?.levy;
       if (lvi !== undefined && lvi !== null && lvi >= 0) {
-        const cityStateL = state.cityStates[lvi];
+        const cityStateL = cityStateById(state, lvi);
         if (cityStateL) levyUnits(state, cityStateL.id, actor.seat);
       }
     }
@@ -1273,7 +1301,7 @@ export function seatPhase(state: GameState): void {
         const fromCity = actor.cities.find((c) => c.centerIndex === rv[0]);
         if (fromCity) {
           if (rv[1] <= -2) {
-            const cs = state.cityStates[-(rv[1] + 2)];
+            const cs = cityStateById(state, -(rv[1] + 2));
             if (cs) addCsTradeRoute(state, fromCity.id, cs.id, actor.seat);
           } else {
             const own = actor.cities.find((c) => c.centerIndex === rv[1]);

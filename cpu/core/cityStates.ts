@@ -88,6 +88,9 @@ export function placeCityStateAt(
   }
   setTileOwner(tile, seatOfCityState(cityState.id));
   state.cityStates.push(cityState);
+  // the ROSTER width, which capture must not shrink — the war head's minor
+  // columns and the observation's minor block are both sized off it.
+  state.cityStateMax = Math.max(state.cityStateMax ?? 0, id + 1);
   return cityState;
 }
 
@@ -100,6 +103,18 @@ export function cityStateAt(state: GameState, tileIndex: number): CityState | un
 
 export function metCityStates(state: GameState, seat: number): CityState[] {
   return state.cityStates.filter((cityState) => hasMet(cityState, seat));
+}
+
+/**
+ * The city-state with this ID, or undefined once it has been captured.
+ *
+ * Every wire field that names a city-state names its ID, never its position
+ * in `state.cityStates` — capture REMOVES the entry, so a position addresses
+ * a different minor afterwards while the ID keeps meaning what it meant. The
+ * GPU's `S` columns are id-indexed for the same reason.
+ */
+export function cityStateById(state: GameState, id: number): CityState | undefined {
+  return (state.cityStates ?? []).find((cityState) => cityState.id === id);
 }
 
 export function envoysOf(cityState: CityState, seat: number): number {

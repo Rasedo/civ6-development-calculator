@@ -54,6 +54,8 @@ POKE_COST = {
     "wonder_effects": 20.0,
     "city_perimeter": 20.0,
     "flood_severity": 12.0,
+    "citizens": 10.0,
+    "congress_vote": 8.0,
 }
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "gpu"))
@@ -150,8 +152,10 @@ def main() -> int:
         ("lint", [npx, "oxlint", "cpu", "seeder", "world", "tools", "tests"]),  # no-constant-binary-expression et al
         # F821 = UNDEFINED NAME on the Python side, ~0.3s. Without it an
         # undefined name in a rarely-reached engine branch presents as a crash
-        # or hang deep inside a lane instead of an import error.
-        ("f821", [str(ruff), "check", "--select", "F821", "gpu", "policy", "tools"]),
+        # or hang deep inside a lane instead of an import error. F841 rides
+        # along because a dangling local is what a half-finished edit leaves,
+        # and `tests` is in scope because a poke lane is engine code too.
+        ("f821", [str(ruff), "check", "--select", "F821,F841", "gpu", "policy", "tools", "tests"]),
         ("pyright", [npx, "pyright"]),
         # The lock check runs BEFORE seed: `seed` rewrites worlds.lock, so a
         # check placed after it diffs a generation against itself and can
@@ -187,6 +191,8 @@ def main() -> int:
                 ("city_falls", [py, "tests/gpu/city_falls_test.py"], 2),  # a fallen city takes its garrison with it
                 ("flood_district", [py, "tests/gpu/flood_district_test.py"], 2),  # a flood pillages the district on the floodplain
                 ("flood_severity", [py, "tests/gpu/flood_severity_test.py"], 2),  # the severity ladder: pillage, destroy, damage bands, the two silts, the Bath
+                ("citizens", [py, "tests/gpu/citizens_test.py"], 2),  # the specialist pin and the plot lock — the two citizen overrides
+                ("congress_vote", [py, "tests/gpu/congress_vote_test.py"], 2),  # the congress ballot: override, favor curve, both refund tiers, the DV target
                 ("martyr", [py, "tests/gpu/martyr_test.py"], 2),  # one relic in nine apostle deaths, drawn where TS draws
                 ("barb_camps", [py, "tests/gpu/barb_camps_test.py"], 2),  # a camp's class is its ground; ranged is nobody's class
                 ("suzerain_rules", [py, "tests/gpu/suzerain_rules_test.py"], 2),  # the six suz-coded perks, strict-suzerain-only
@@ -233,6 +239,7 @@ def main() -> int:
                 ("state_discipline", [py, "tests/gpu/state_discipline_test.py"], 4),  # alias-rebind + _MUTABLE drift net
                 ("inplace", [py, "tests/gpu/inplace_discipline_test.py"], 1),  # static — no self-rebinds, no stale captures
                 ("seat_symmetry", [py, "tools/gpu/seat_symmetry_check.py"], 1),  # static — dangling attrs, the alias/_MUTABLE contract, the seat-fork allowlist
+                ("gather_batch", [py, "tools/gpu/gather_batch_check.py"], 1),  # static — a gather whose index is already narrowed reads the wrong game's row
                 ("fort", [py, "tests/gpu/fort_test.py"], 4),  # Fort +4 defence — the serve gate never reaches it, so this lane is the only proof
                 ("ladder", [py, "tests/gpu/ladder_test.py"], 4),  # the shared decision ladder's own guard
                 ("food_order", [py, "tests/gpu/food_order_test.py"], 1),  # the farm-adjacency tier sits before the drought floor

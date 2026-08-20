@@ -46,7 +46,7 @@ def main() -> None:
     assert sim.n_majors >= 2, "the treaty is a PAIR fact — this fixture has one major"
     row, tgt = 0, 1
     k = sim.war_targets(row).index(tgt)
-    n_opp = sim.n_majors - 1
+    n_tgt = len(sim.war_targets(row))   # the head is [declare per target, sue per target]
     term = int(sim.rules.seats["peaceTreatyTurns"])
     active = torch.zeros(sim.B, dtype=torch.bool)
     active[0] = True
@@ -57,7 +57,7 @@ def main() -> None:
     sim.war_turns[0, row, tgt] = sim.war_turns[0, tgt, row] = int(sim.rules.seats["warMinTurns"]) + 5
     sim.civ_treasury[0, row] = 5000.0
 
-    sim._apply_war_column(row, war_column(sim, row, n_opp + k))  # SUE for peace
+    sim._apply_war_column(row, war_column(sim, row, n_tgt + k))  # SUE for peace
     assert not bool(sim.war[0, row, tgt]), "the peace verb did not end the war — the scene is inert"
     assert int(sim.treaty_turns[0, row, tgt]) == term, (
         f"peace left treaty_turns at {int(sim.treaty_turns[0, row, tgt])}, expected {term}")

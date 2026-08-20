@@ -1052,7 +1052,18 @@
       "city_bldg",
       "city_pop"
      ],
-     "note": "effectiveSpecialists per PLACEABLE district: the automatic overflow assignment, derived live on both engines."
+     "note": "effectiveSpecialists per PLACEABLE district: the pinned citizens plus the automatic overflow, derived live on both engines."
+    },
+    {
+     "name": "specialistPref",
+     "compare": "exact",
+     "covers": [
+      "City.specialistPref"
+     ],
+     "planes": [
+      "city_spec_pin"
+     ],
+     "note": "how many citizens the player PINNED into each district's slots, by PLACEABLE district index; -1 = the automatic rule decides."
     },
     {
      "name": "queueFront",
@@ -1465,6 +1476,17 @@
      ]
     },
     {
+     "name": "locked",
+     "compare": "exact",
+     "covers": [
+      "Tile.locked"
+     ],
+     "planes": [
+      "tile_locked"
+     ],
+     "note": "the citizen PINNED to this plot — the work ranking takes every locked plot before it ranks anything by score"
+    },
+    {
      "name": "fertility",
      "compare": "exact",
      "covers": [
@@ -1626,10 +1648,6 @@
     "why": "the citizen-allocation focus. The GPU allocates one way and stores no focus."
    },
    {
-    "path": "City.lockedTiles",
-    "why": "manual tile locks from the UI; no GPU plane."
-   },
-   {
     "path": "City.districts",
     "why": "the per-city district REGISTRY. The placements themselves are compared per tile (tile.district + tile.districtComplete); the GPU registry (`city_dist_tile`, every seat row) is derived bookkeeping over those same tiles, so comparing it would double-count the planes."
    },
@@ -1688,9 +1706,21 @@
    {
     "path": "CityState.name",
     "why": "presentation."
+   },
+   {
+    "path": "GameState.cityStateMax",
+    "why": "the city-state ROSTER width, read off the world file at load. Static for the game and mirrored by the GPU's `S`, which is where every id-keyed column takes its width."
+   },
+   {
+    "path": "Seat.congressVote",
+    "why": "THIS TURN's World Congress ballot. Written inside seatPhase and cleared by worldCongress at the turn tail whether a session fires or not, so it is never live at a turn boundary."
    }
   ],
   "gpu": [
+   {
+    "plane": "civ_congress_vote",
+    "why": "THIS TURN's World Congress ballot. Written inside seatPhase and cleared by worldCongress at the turn tail whether a session fires or not, so it is never live at a turn boundary and there is no TS field to compare it against."
+   },
    {
     "plane": "winner",
     "why": "the winner is DERIVED, not stored, on the TS side \u2014 domination first, else the score leader once the game is over, recomputed per read. Comparing the GPU's cache means recomputing that derivation in the adapter, which is exactly what gpu-trace.ts's `winner` column already does. The manifest describes STATE; derived quantities are compared by the observation and by the trace."

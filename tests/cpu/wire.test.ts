@@ -13,7 +13,10 @@
 import { describe, it, expect } from 'vitest';
 import { envoysOf, setMet } from '../../cpu/core/cityStates';
 import { makeMap, makeState, tileAtCoords } from './helpers';
-import { seatPhase } from '../../cpu/core/phase';
+import { seatPhase, warTargets, worldCongress } from '../../cpu/core/phase';
+import { effectiveSpecialists } from '../../cpu/core/city';
+import { placeCityStateAt } from '../../cpu/core/cityStates';
+import { PLACEABLE_DISTRICTS } from '../../cpu/data/districts';
 import { prodLayout } from '../../cpu/core/prodLayout';
 import { cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, setTileOwner, setWar, setWarTurnsWith, tileSeat } from '../../cpu/core/seats';
 import { tilesWithin, neighbors } from '../../world/hex';
@@ -39,8 +42,7 @@ function addCiv(state: GameState, col: number, row: number): Seat {
   };
   const city: City = {
     id: civ.nextCityId++, name: 'Roma', seat: civ.seat, centerIndex: tile.index,
-    population: 5, foodBox: 0, cultureBox: 0, tilesAcquired: 0, lockedTiles: [],
-    focus: 'balanced', queue: [], isCapital: true, buildings: [],
+    population: 5, foodBox: 0, cultureBox: 0, tilesAcquired: 0, focus: 'balanced', queue: [], isCapital: true, buildings: [],
     districts: [{ type: 'CITY_CENTER', tileIndex: tile.index }], wonders: [], hp: 200, foundedTurn: 1,
   };
   tile.district = 'CITY_CENTER';
@@ -286,6 +288,72 @@ describe('the action FILE drives the TS civ', () => {
     expect(civ.envoysAvailable).toBe(0);
     // the accrual may have added a few points this turn, but never 100
     expect(civ.influencePoints).toBeLessThan(100);
+  });
+
+  it('a recorded MINOR column declares on a city-state and sues it back for free', () => {
+    const state = makeState(makeMap(14, 14, 'GRASSLAND'));
+    const civ = addCiv(state, 6, 6);
+    const cityState = placeCityStateAt(state, 0, 'Kabul', 'militaristic', tileAtCoords(state.map, 2, 2).index);
+    setMet(cityState, civ.seat);
+    const targets = warTargets(state, civ.seat);
+    const declareCol = targets.indexOf(cityState.seat);
+    expect(declareCol).toBeGreaterThanOrEqual(0);
+    state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [], tech: null, civic: null, war: declareCol, units: [] } } };
+    seatPhase(state);
+    expect(civsAtWar(state, civ.seat, cityState.seat)).toBe(true);
+    // A minor accepts peace without preconditions once the clock is up, and
+    // takes no gold for it.
+    setWarTurnsWith(state, civ.seat, cityState.seat, 20);
+    civ.treasury = 0;
+    state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [], tech: null, civic: null, war: targets.length + declareCol, units: [] } } };
+    seatPhase(state);
+    expect(civsAtWar(state, civ.seat, cityState.seat)).toBe(false);
+    expect(civ.treasury).toBe(0);
+  });
+
+  it('a recorded SPECIALIST pin and PLOT lock move citizens off the automatic rule', () => {
+    const state = makeState(makeMap(14, 14, 'GRASSLAND'));
+    const civ = addCiv(state, 6, 6);
+    const city = civ.cities[0];
+    const dt = tileAtCoords(state.map, 7, 6);
+    dt.district = 'CAMPUS';
+    dt.districtComplete = true;
+    setTileOwner(dt, civ.seat, city.id);
+    city.districts.push({ type: 'CAMPUS', tileIndex: dt.index });
+    city.buildings.push('LIBRARY');
+    const di = PLACEABLE_DISTRICTS.indexOf('CAMPUS');
+    expect(effectiveSpecialists(state, city).get(dt.index) ?? 0).toBe(0);  // no overflow, nothing pinned
+    const plot = tileAtCoords(state.map, 5, 6);
+    setTileOwner(plot, civ.seat, city.id);
+    state.seatActions = { [state.turn - 1]: { [civ.seat]: {
+      production: [], tech: null, civic: null, units: [],
+      specialists: [[city.centerIndex, di, 1]], lockTiles: [plot.index],
+    } } };
+    seatPhase(state);
+    expect(city.specialistPref?.[di]).toBe(1);
+    expect(effectiveSpecialists(state, city).get(dt.index)).toBe(1);
+    expect(plot.locked).toBe(true);
+    // the flip is a TOGGLE, exactly as the city screen's click is
+    state.seatActions = { [state.turn - 1]: { [civ.seat]: {
+      production: [], tech: null, civic: null, units: [], lockTiles: [plot.index],
+    } } };
+    seatPhase(state);
+    expect(plot.locked).toBe(false);
+  });
+
+  it('a recorded BALLOT overrides the AI vote line', () => {
+    const state = makeState(makeMap(14, 14, 'GRASSLAND'));
+    const civ = addCiv(state, 6, 6);
+    const target = 3;
+    state.seatActions = { [state.turn - 1]: { [civ.seat]: {
+      production: [], tech: null, civic: null, units: [],
+      vote: [[0, target, 0], null, null],
+    } } };
+    seatPhase(state);
+    expect(civ.congressVote).toEqual([[0, target, 0], null, null]);
+    // `worldCongress` runs at the turn tail and clears the ballot either way
+    worldCongress(state);
+    expect(civ.congressVote).toBeUndefined();
   });
 
   it('a seat with NO record decides NOTHING — there is no ladder behind the wire', () => {

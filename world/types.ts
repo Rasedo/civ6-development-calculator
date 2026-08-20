@@ -145,6 +145,12 @@ export interface Tile {
   road?: boolean;
   goodyHut: boolean;
   volcano: boolean;
+  /** a CITIZEN is PINNED to this plot. `assignWorkedTiles` takes every
+   *  locked plot the city can work before it ranks anything by score, so a
+   *  lock is how a player overrides the automatic allocation for tiles the
+   *  way a specialist pin overrides it for slots. The lock is a property of
+   *  the PLOT and outlives whichever city works it. */
+  locked?: boolean;
   fertility: number;
   /** the PRODUCTION half of flood silt — real Civ 6 fertilizes food and
    *  production on separate rolls, so the two accumulate apart. */

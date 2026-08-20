@@ -132,7 +132,79 @@ def main() -> None:
     assert bool(s2.war[b, 0, s2.row_of(100 + cs)]), "a non-suzerain's peace must NOT free the city-state"
     print("  c suzerain release: war ends, BOTH clock cells reset, -%d ww OK" % shed)
 
-    print("cs_war_test OK — a major<->city-state war gates the attack mask")
+    # --- d: THE WAR HEAD'S MINOR COLUMNS -------------------------------------
+    # The head is [declare per target, sue per target] over `war_targets(row)`:
+    # every other major in ascending seat order, then the whole city-state
+    # roster. A captured minor keeps its column and the column is never legal.
+    n_opp = s2.n_majors - 1
+    n_tgt = n_opp + s2.S
+    assert s2.war_targets(0) == list(range(1, s2.n_majors)) + [s2.n_majors + x for x in range(s2.S)]
+    assert tuple(s2._seat_war_mask(0).shape) == (s2.B, 2 * n_tgt)
+
+    def declare_col(idx: int) -> int:
+        return n_opp + idx
+
+    def sue_col(idx: int) -> int:
+        return n_tgt + n_opp + idx
+
+    crow = s2.row_of(100 + cs)
+    def reset() -> None:
+        s2.war[b, 0, crow] = s2.war[b, crow, 0] = False
+        s2.war_turns[b, 0, crow] = s2.war_turns[b, crow, 0] = 0
+        s2.treaty_turns[b, 0, crow] = s2.treaty_turns[b, crow, 0] = 0
+        s2.seat_citystate_met[b, :, cs] = False
+        s2.seat_citystate_envoys[b, :, cs] = 0
+        s2.sync_war()
+
+    def fire(col: int) -> None:
+        w = torch.full((s2.B,), -1, dtype=torch.long)
+        w[b] = col
+        s2._apply_war_column(0, w)
+
+    # UNMET is refused: `declareWarOnCityState` needs the meeting.
+    reset()
+    assert not bool(s2._seat_war_mask(0)[b, declare_col(cs)]), "an unmet minor must not offer a declare"
+    fire(declare_col(cs))
+    assert not bool(s2.war[b, 0, crow]), "a declare on an unmet minor must be refused"
+
+    # MET: the column opens, the declaration lands on BOTH cells.
+    s2.seat_citystate_met[b, 0, cs] = True
+    assert bool(s2._seat_war_mask(0)[b, declare_col(cs)]), "a met, peaceful minor must offer a declare"
+    fire(declare_col(cs))
+    assert bool(s2.war[b, 0, crow]) and bool(s2.war[b, crow, 0]), "the declare must set both cells"
+    assert not bool(s2._seat_war_mask(0)[b, declare_col(cs)]), "an ongoing war closes the declare column"
+
+    # THE SUE takes the ten-turn clock and costs NO gold — a minor "will
+    # always accept an offer of peace without preconditions".
+    min_turns = int(s2.rules.seats.get("warMinTurns", 14))
+    s2.war_turns[b, 0, crow] = s2.war_turns[b, crow, 0] = min_turns - 1
+    assert not bool(s2._seat_war_mask(0)[b, sue_col(cs)]), "too early: the minor will not talk yet"
+    s2.war_turns[b, 0, crow] = s2.war_turns[b, crow, 0] = min_turns
+    s2.civ_treasury[b, 0] = 0
+    assert bool(s2._seat_war_mask(0)[b, sue_col(cs)]), "a broke seat can still make peace with a minor"
+    fire(sue_col(cs))
+    assert not bool(s2.war[b, 0, crow]), "the sue column must end the war"
+    assert int(s2.civ_treasury[b, 0]) == 0, "peace with a minor costs nothing"
+    assert int(s2.treaty_turns[b, 0, crow]) > 0, "the peace must stamp a treaty"
+    assert not bool(s2._seat_war_mask(0)[b, declare_col(cs)]), "the treaty shuts the declare column"
+
+    # A SUZERAIN STILL AT WAR blocks the talk.
+    if s2.n_majors > 1:
+        reset()
+        s2.seat_citystate_met[b, 0, cs] = True
+        s2.war[b, 0, crow] = s2.war[b, crow, 0] = True
+        s2.war_turns[b, 0, crow] = s2.war_turns[b, crow, 0] = min_turns
+        s2.war[b, 0, 1] = s2.war[b, 1, 0] = True
+        s2.seat_citystate_envoys[b, 1, cs] = suz_min + 2
+        s2.sync_war()
+        assert not bool(s2._seat_war_mask(0)[b, sue_col(cs)]), (
+            "a minor will not talk while its suzerain is still fighting you"
+        )
+        fire(sue_col(cs))
+        assert bool(s2.war[b, 0, crow]), "...and the apply refuses it too"
+    print("  d the war head's MINOR half: met, declare, the clock, the free peace, the suzerain block")
+
+    print("cs_war_test OK — a major<->city-state war gates the attack mask and rides the wire")
 
 
 if __name__ == "__main__":

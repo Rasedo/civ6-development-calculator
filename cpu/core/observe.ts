@@ -13,7 +13,7 @@
 import type { City, CityState, CityStateQuest, GameState, QueueItem } from './types';
 import { atWarWithAny, citiesOf, civsAtWar, isBarbSeat, seatOf, tileCity, tileSeat, warTurnsWith } from './seats';
 import { seatStrength, seatProximity } from './phase';
-import { WARMONGER_GANG } from '../data/seats';
+import { DIPLO_VICTORY_POINTS, WARMONGER_GANG } from '../data/seats';
 import { envoysOf, hasMet } from './cityStates';
 import { effectiveResearchCostIn } from './boosts';
 import { goldenBoostBonus } from './eras';
@@ -56,11 +56,14 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
   const nCs = cityStateMax ?? (state.cityStates ?? []).length;
   for (let i = 0; i < nCs; i++) {
     const c = (state.cityStates ?? []).find((x) => x.id === i);
-    if (!c) { cityState.push(0, 0, 0); continue; }
+    if (!c) { cityState.push(0, 0, 0, 0, 0); continue; }
     cityState.push(
       hasMet(c, seat) ? 1 : 0,
       envoysOf(c, seat) / 6.0,
       questFor(c, seat) ? 1 : 0,
+      // the war head's MINOR columns decide off these two
+      civsAtWar(state, c.seat, seat) ? 1 : 0,
+      warTurnsWith(state, c.seat, seat) / 14.0,
     );
   }
   // THE OPPONENT BLOCK, seat-symmetric: every OTHER civ seat in ascending
@@ -154,6 +157,17 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
   const nMeleeWQ = ownMil.filter((u) => !isRngType(u.type)).length
     + qMil.filter((q) => !isRngType((q as { unit: string }).unit)).length;
   const me = seatOf(state, seat);
+  // THE WORLD CONGRESS block: the ballot currency and the STANDING slate —
+  // what the last session passed and on whom. `env._congress_block` renders
+  // the identical layout.
+  const congress: number[] = [
+    (me?.diplomaticFavor ?? 0) / 100.0,
+    (me?.diplomaticPoints ?? 0) / DIPLO_VICTORY_POINTS,
+  ];
+  for (let k = 0; k < 2; k++) {
+    const a = (state.congress ?? [])[k];
+    congress.push(a ? a.res + 1 : 0, a ? a.outcome : 0, a ? a.target : 0);
+  }
   const atAny = atWarWithAny(state, seat);
   const ctx: number[] = [
     cities.length,
@@ -166,5 +180,5 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
     me?.peaceTurns ?? 0,
     atAny ? 1 : 0,
   ];
-  return [...emp, ...cityState, ...riv, ...per, ...esc, ...costT, ...costC, ...progT, ...progC, ...ctx];
+  return [...emp, ...cityState, ...riv, ...per, ...esc, ...costT, ...costC, ...progT, ...progC, ...congress, ...ctx];
 }

@@ -16,6 +16,13 @@ of the DRIVEN GAME, not of the comparison. What it answers, in order:
   theoAdjacent  two religious units of DIFFERENT religions standing adjacent —
                 theological combat's precondition, not its outcome
   antiquityDig  an antiquity site excavated
+  natHistory    NATURAL_HISTORY, the Archaeologist's civic — the dig's blocker
+  conservation  CONSERVATION, the Naturalist's civic
+  csWar         a (major, city-state) war cell live (B-44r)
+  csPeace       a minor war ENDED through the sue column
+  specPin       a citizen pinned into a district's specialist slots (B-30r)
+  tileLock      a plot pinned by the lock head
+  ballot        a turn on which the driver submits a Congress ballot (B-22r)
   tourists      visiting vs domestic at the final turn, per seat: the culture
                 victory's own comparison (`_culture_victor`)
 
@@ -39,7 +46,9 @@ import drive  # noqa: E402
 import ladder  # noqa: E402
 
 KEYS = ("apostleBuy", "urbanization", "neighborhood", "secondShip",
-        "intlRoute", "theoAdjacent", "antiquityDig")
+        "intlRoute", "theoAdjacent", "antiquityDig",
+        "csWar", "csPeace", "specPin", "tileLock", "ballot",
+        "natHistory", "conservation")
 
 
 def main() -> None:
@@ -62,8 +71,13 @@ def main() -> None:
     for row in seats:
         drive.take_seat(sim, row)
 
-    urb = next((i for i, c in enumerate(rj["civics"]) if c["id"] == "URBANIZATION"), -1)
-    assert urb >= 0, "URBANIZATION not in the exported civics table"
+    def civic_at(name: str) -> int:
+        i = next((k for k, c in enumerate(rj["civics"]) if c["id"] == name), -1)
+        assert i >= 0, f"{name} not in the exported civics table"
+        return i
+
+    urb = civic_at("URBANIZATION")
+    nat_hist, conserv = civic_at("NATURAL_HISTORY"), civic_at("CONSERVATION")
     relig_t = torch.zeros(sim.NU, dtype=torch.bool)
     for idx in (getattr(sim, "_missionary_idx", -1), getattr(sim, "_apostle_idx", -1)):
         if 0 <= idx < relig_t.numel():
@@ -71,6 +85,9 @@ def main() -> None:
 
     seeds_hit: dict[str, set[int]] = {k: set() for k in KEYS}
     first_turn: dict[str, int] = {}
+    cs_lo, cs_hi = sim.n_majors, sim.n_majors + sim.S
+    minor_war_turns = torch.zeros(sim.B, dtype=torch.long)
+    was_minor_war = torch.zeros(sim.B, dtype=torch.bool)
 
     def mark(key: str, mask, turn: int) -> None:
         for b in range(sim.B):
@@ -84,9 +101,14 @@ def main() -> None:
             relig = rec[9]
             if isinstance(relig, tuple) and len(relig) == 2 and relig[0] is not None:
                 mark("apostleBuy", (relig[0] == 6), t)
+            vote = rec[16]
+            if vote is not None:
+                mark("ballot", (vote[:, :, 0] >= 0).any(dim=1), t)
         sim.step()
 
         mark("urbanization", sim.civ_civics[:, :, urb].any(dim=1), t)
+        mark("natHistory", sim.civ_civics[:, :, nat_hist].any(dim=1), t)
+        mark("conservation", sim.civ_civics[:, :, conserv].any(dim=1), t)
         if sim._nbhd_didx >= 0:
             mark("neighborhood", (sim.district == sim._nbhd_didx).any(dim=1), t)
         nav_u = sim.unit_naval[sim.unit_type.clamp(min=0)]
@@ -94,6 +116,15 @@ def main() -> None:
             cnt = (sim.unit_alive & (sim.unit_seat == row) & nav_u).sum(dim=1)
             mark("secondShip", cnt >= 2, t)
         mark("intlRoute", (sim.seat_route_dseat >= 0).any(dim=2).any(dim=1), t)
+        # the MINOR half of the war head: a war cell between a major row and a
+        # city-state column, and the turn one of them closes.
+        minor_war = sim.war[:, :sim.n_majors, cs_lo:cs_hi].any(dim=2).any(dim=1)
+        mark("csWar", minor_war, t)
+        minor_war_turns += minor_war.long()
+        mark("csPeace", was_minor_war & ~minor_war, t)
+        was_minor_war = minor_war
+        mark("specPin", (sim.city_spec_pin >= 0).any(dim=3).any(dim=2).any(dim=1), t)
+        mark("tileLock", sim.tile_locked.any(dim=1), t)
         # a DIG's product is an ARTIFACT in a museum slot; the site plane
         # alone only says a site exists.
         mark("antiquityDig", (sim.city_artifacts > 0).any(dim=2).any(dim=1), t)
@@ -122,6 +153,9 @@ def main() -> None:
         n = len(seeds_hit[k])
         ft = first_turn.get(k)
         print(f"  {k:14s} {n}/{sim.B} seeds" + (f", first at t{ft}" if ft else "   NEVER"))
+    print(f"  minor-war turns per seed: max {int(minor_war_turns.max())}, "
+          f"mean {float(minor_war_turns.double().mean()):.1f}; standing at the final turn: "
+          f"{int((sim.city_spec_pin >= 0).sum())} pinned slots, {int(sim.tile_locked.sum())} locked plots")
 
     vis_div = sim.n_majors * sim._tourism_per_visitor
     print("  tourists at the final turn (visiting vs domestic, per seat):")

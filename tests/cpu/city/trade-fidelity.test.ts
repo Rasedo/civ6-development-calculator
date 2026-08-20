@@ -77,7 +77,6 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
     foodBox: 0,
     cultureBox: 0,
     tilesAcquired: 0,
-    lockedTiles: [],
     focus: 'balanced',
     queue: [],
     isCapital: true,

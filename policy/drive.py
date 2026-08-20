@@ -6,6 +6,7 @@ from pathlib import Path
 import torch
 
 import ladder
+from core import simbase
 
 
 def _prod_ctx(blocks: dict, sim, seat: int) -> dict:
@@ -404,6 +405,7 @@ def _seat_envoys(sim, seat: int):
 def _war_ctx(blocks: dict) -> dict:
     ctx, cv = blocks["ctx"], blocks["civ"]
     return {
+        "cs_envoys": blocks["cs"][:, :, 1],
         "opp_str": cv[:, :, 3],
         "prox": cv[:, :, 4].long(),
         "gang": cv[:, :, 5] > 0.5,
@@ -412,6 +414,68 @@ def _war_ctx(blocks: dict) -> dict:
         "aggression": ctx[:, 6],
         "peace_turns": ctx[:, 7].long(),
     }
+
+
+def _decide_citizens(sim, row: int):
+    """The CITIZEN-ASSIGNMENT verbs, once per city each: pin one citizen into
+    the first district that seats one, and one onto the first RESOURCE plot the
+    city can work. Everything else stays with the automatic rule."""
+    B = sim.B
+    alive = sim.city_alive[:, row]
+    spec = None
+    if len(sim.districts_cat):
+        pin = sim.city_spec_pin[:, row]
+        slots = sim._city_spec_slots(row)
+        want = (
+            (alive & (sim.city_pop[:, row] >= ladder.SPEC_PIN_POP) & ~(pin >= 0).any(dim=2)).unsqueeze(2)
+            & (slots > 0)
+        )
+        first = want & (want.long().cumsum(dim=2) == 1)
+        if bool(first.any()):
+            spec = torch.where(first, torch.ones_like(pin), torch.full_like(pin, simbase.SPEC_KEEP))
+    tiles, valid = sim._work_window(row)
+    tf = tiles.clamp(min=0).reshape(B, -1)
+    res = sim.res_priority.gather(1, tf).reshape_as(tiles) > 0
+    held = sim.tile_locked.gather(1, tf).reshape_as(tiles)
+    cand = valid & res & ~held & alive.unsqueeze(2) & ~(valid & held).any(dim=2).unsqueeze(2)
+    key = torch.where(cand, tiles, torch.full_like(tiles, 10 ** 9))
+    best = key.min(dim=2).values
+    lock = torch.where(best < 10 ** 9, best, torch.full_like(best, -1))
+    return spec, (lock if bool((lock >= 0).any()) else None)
+
+
+def _decide_vote(sim, row: int):
+    """The WORLD CONGRESS ballot for the session the coming step would run.
+    The ladder votes its own interest: outcome A on the target it holds the
+    most of, free; and on the Diplomatic Victory resolution it backs itself or
+    blocks the leader, with every point of favor it has. Returns [B, 3, 3] —
+    [outcome, target, extra votes] per slate slot — or None on a quiet turn."""
+    fires, res0, res1, dv = sim._congress_upcoming(int(sim.turn) + 1)
+    if not bool(fires.any()):
+        return None
+    B, dev = sim.B, sim.device
+    out = torch.full((B, 3, 3), -1, dtype=torch.long, device=dev)
+    zero = torch.zeros(B, dtype=torch.long, device=dev)
+    for slot, sel in ((0, res0), (1, res1)):
+        for r in range(len(sim._congress_res)):
+            m = fires & (sel == r)
+            if not bool(m.any()):
+                continue
+            t = sim._congress_pref(sim._congress_res[r]["t"], row)
+            out[:, slot, 0] = torch.where(m, zero, out[:, slot, 0])
+            out[:, slot, 1] = torch.where(m, t, out[:, slot, 1])
+            out[:, slot, 2] = torch.where(m, zero, out[:, slot, 2])
+    lead = sim._congress_leader(dv)
+    ok = dv & (lead >= 0)
+    if bool(ok.any()):
+        # ALL of it: the curve runs out of favor before it runs out of rungs,
+        # so favor/step + 1 is an upper bound on what the bank can buy.
+        want = torch.div(sim.civ_diplo_favor[:, row], max(1, sim._congress_vstep),
+                         rounding_mode="floor").long() + 1
+        out[:, 2, 0] = torch.where(ok, (lead != row).long(), out[:, 2, 0])
+        out[:, 2, 1] = torch.where(ok, lead.clamp(min=0), out[:, 2, 1])
+        out[:, 2, 2] = torch.where(ok, want, out[:, 2, 2])
+    return out if bool((out[:, :, 0] >= 0).any()) else None
 
 
 def _decide_route(sim, row: int, pre=None):
@@ -593,6 +657,7 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
         rng_w = {
             "dow": _policy_rng(sim, seeds, turn, row, 1),
             "peace": _policy_rng(sim, seeds, turn, row, 2),
+            "raid": _policy_rng(sim, seeds, turn, row, 3),
         }
         war = ladder.pick_war(m["war"], _war_ctx(blocks), rng_w)
     env_seq = None
@@ -600,12 +665,14 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
         env_seq = _seat_envoys(sim, row)
     buy, worship, relig, levy, monu, nat = _decide_buys(sim, row, bctx=None if pre is None else pre.get("bctx"))
     route = _decide_route(sim, row, pre=None if pre is None else pre.get("route"))
+    spec, lock = _decide_citizens(sim, row)
+    vote = _decide_vote(sim, row)
     # production_tile rides along or the drive and its own record diverge: a
     # district column without its tile is refused at the apply, while the
     # replay side passes the recorded tile and places it.
     sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic,
                            war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
-                           monu=monu, nat=nat, route=route)
+                           monu=monu, nat=nat, route=route, spec=spec, lock=lock, vote=vote)
 
     # units, and the draw order: the driver PLANS, the PHASE executes.
     # Applying steps pre-step to re-observe would consume combat draws at a
@@ -677,10 +744,10 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
         sim._driven_useq = {}
     sim._driven_useq[row] = seq
-    return prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, route
+    return prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, route, spec, lock, vote
 
 
-def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, route, b: int) -> dict:
+def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, route, spec, lock, vote, b: int) -> dict:
     _pr = prod[b]
     _ctr = sim.city_center[b, row]
     _alive_c = sim.city_alive[b, row]
@@ -706,6 +773,21 @@ def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, 
     rec.update(_buy_record_fields(sim, row, b, buy, worship, relig, levy, monu, nat))
     if route is not None and int(route[0][b]) >= 0:
         rec["route"] = [int(route[0][b]), int(route[1][b])]
+    if spec is not None:
+        pins = [[int(_ctr[j]), di, int(spec[b, j, di])]
+                for j in range(int(spec.shape[1])) if bool(_alive_c[j])
+                for di in range(int(spec.shape[2])) if int(spec[b, j, di]) > simbase.SPEC_KEEP]
+        if pins:
+            rec["specialists"] = pins
+    if lock is not None:
+        flips = [int(x) for x in lock[b].tolist() if int(x) >= 0]
+        if flips:
+            rec["lockTiles"] = flips
+    if vote is not None:
+        ballot = [[int(vote[b, k, f]) for f in range(3)] for k in range(3)]
+        ballot = [e if e[0] >= 0 else None for e in ballot]
+        if any(e is not None for e in ballot):
+            rec["vote"] = ballot
     return rec
 
 
@@ -842,9 +924,32 @@ def replay_seat(sim, row: int, rec: dict) -> None:
     if _rv is not None:
         route = (torch.full((sim.B,), int(_rv[0]), dtype=torch.long, device=dev),
                  torch.full((sim.B,), int(_rv[1]), dtype=torch.long, device=dev))
+    _sp = rec.get("specialists") or []
+    spec = None
+    if _sp:
+        nD = sim.city_spec_pin.shape[3]
+        spec = torch.full((sim.B, sim.RC, nD), simbase.SPEC_KEEP, dtype=torch.long, device=dev)
+        for _c, _di, _n in _sp:
+            _hj = _centre_slot(int(_c))
+            _rw = (_hj >= 0).nonzero(as_tuple=True)[0]
+            if len(_rw) and 0 <= int(_di) < nD:
+                spec[_rw, _hj[_rw], int(_di)] = int(_n)
+    _lk = rec.get("lockTiles") or []
+    lock = (torch.tensor(_lk, dtype=torch.long, device=dev).reshape(1, -1).expand(sim.B, -1)
+            if _lk else None)
+    _vt = rec.get("vote") or []
+    vote = None
+    if any(e is not None for e in _vt):
+        vote = torch.full((sim.B, 3, 3), -1, dtype=torch.long, device=dev)
+        for _k, _ent in enumerate(_vt[:3]):
+            if _ent is None:
+                continue
+            for _f in range(3):
+                vote[:, _k, _f] = int(_ent[_f])
     sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic,
                            war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
-                           monu=monu, nat=nat, route=route)
+                           monu=monu, nat=nat, route=route, spec=spec, lock=lock, vote=vote)
+
     def _geo_mask(seats) -> torch.Tensor:
         m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=dev)
         for j in seats:

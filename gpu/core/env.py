@@ -200,14 +200,18 @@ class BatchEnv:
         # THIS SEAT'S OWN courtship view: met, envoys and quest are all
         # seat-keyed stores, one row per seat, and every seat can hold a quest
         # (`_seat_quest_phase` runs on every row). Captured city-states ZERO.
+        cs_lo = s.n_majors
         cs = torch.stack(
             [
                 s.seat_citystate_met[:, row, : s.S].to(d),
                 s.seat_citystate_envoys[:, row, : s.S].to(d) / 6.0,
                 (s.seat_citystate_quest[:, row, : s.S] > 0).to(d),
+                # the war head's MINOR columns decide off these two
+                s.war[:, row, cs_lo:cs_lo + s.S].to(d),
+                s.war_turns[:, row, cs_lo:cs_lo + s.S].to(d) / 14.0,
             ],
             dim=2,
-        ) * s.citystate_alive.unsqueeze(2).to(d)  # [B, S, 3]
+        ) * s.citystate_alive.unsqueeze(2).to(d)  # [B, S, PER_CS]
         # OPPONENTS, seat-symmetric: every OTHER major seat in ascending seat
         # order — `war_targets(row)`, the war head's own order, so column k
         # here and column k of the head name the same seat. Everything is read
@@ -264,7 +268,23 @@ class BatchEnv:
                           # double-count.
                           s.civ_tech_retain[:, row].to(d) / 1000.0,
                           s.civ_civic_retain[:, row].to(d) / 1000.0,
+                          self._congress_block(row),
                           self._ctx_block(row)], dim=1)
+
+    def _congress_block(self, row: int) -> torch.Tensor:
+        """[B, ladder.CONGRESS] — the ballot currency and the STANDING slate,
+        the same layout `observeSeat` renders."""
+        s = self.sim
+        d = s.dtype
+        cols = [s.civ_diplo_favor[:, row].to(d) / 100.0,
+                s.civ_diplo_points[:, row].to(d) / float(s._dvp_win)]
+        for k in range(2):
+            res = s.congress_active[:, k, 0]
+            live = res >= 0
+            cols.append((res + 1).clamp(min=0).to(d))
+            cols.append(torch.where(live, s.congress_active[:, k, 1], torch.zeros_like(res)).to(d))
+            cols.append(torch.where(live, s.congress_active[:, k, 2], torch.zeros_like(res)).to(d))
+        return torch.stack(cols, dim=1)
 
     def _seat_strength(self, row: int) -> torch.Tensor:
         """[B] long — the `seatStrength` twin: 8 per city plus the combat of
@@ -292,10 +312,11 @@ class BatchEnv:
         n_units = mine.sum(dim=1) + q_u.sum(dim=1)
         n_rng = (mil & rng_t[ut]).sum(dim=1) + (q_mil & rng_t[q_ty]).sum(dim=1)
         n_mel = (mil & ~rng_t[ut]).sum(dim=1) + (q_mil & ~rng_t[q_ty]).sum(dim=1)
-        # atWarWithAny over the majors — this row's own line of the war matrix.
-        # It feeds BOTH the unit cap and the atWarAny column, as TS's one
-        # `atWarWithAny(state, seat)` feeds both.
-        at_war = s.war[:, row, : s.n_majors].any(dim=1)
+        # atWarWithAny — this row's whole line of the war matrix, majors and
+        # city-states alike, because `Seat.wars` holds both and nothing ever
+        # enters a war cell against the barbarian row. It feeds BOTH the unit
+        # cap and the atWarAny column, as TS's one call feeds both.
+        at_war = s.war[:, row].any(dim=1)
         return torch.stack([
             n_cities.to(d), n_units.to(d), n_mel.to(d), n_rng.to(d),
             (n_cities * 2 + torch.where(at_war, 3, 1)).to(d),

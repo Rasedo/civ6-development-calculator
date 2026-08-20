@@ -44,6 +44,13 @@ def war_vec(sim, code) -> torch.Tensor:
     return torch.full((sim.B,), code, dtype=torch.long)
 
 
+def sue_col(sim, k: int) -> int:
+    """The SUE column for the k-th target. The head is
+    [declare per target, sue per target] over `war_targets(row)`, which runs
+    the other majors and then the whole city-state roster."""
+    return len(sim.war_targets(0)) + k
+
+
 def test_inert_when_off(rules, path):
     """The flag ships ON, so what is under test is the NO-COLUMN path: a turn
     with no war column must be bit-identical to a sim with the head forced
@@ -71,7 +78,7 @@ def test_declare(rules, path):
     sim._rl_war_active = True
     m = sim._seat_war_mask(0)[0]
     assert bool(m[0]), "declare-war column should be open (civ 0 alive, at peace)"
-    assert not bool(m[sim.n_majors - 1]), "peace column must be closed while not at war"
+    assert not bool(m[sue_col(sim, 0)]), "peace column must be closed while not at war"
     snap = sim.snapshot()
     sim._apply_war_column(0, war_vec(sim, 0))  # the head, the one entry — same call every row makes
     sim.step()
@@ -99,16 +106,16 @@ def test_peace(rules, path):
     need = int(rr.get("warMinTurns", 10))  # sueForPeace's own gate key
     for _ in range(need):
         sim.civ_treasury[:, 0] = 0.0  # isolate the warTurns gate (a rich-enough world opens the gold gate mid-wait)
-        assert not bool(sim._seat_war_mask(0)[0, sim.n_majors - 1]), "peace column open too soon"
+        assert not bool(sim._seat_war_mask(0)[0, sue_col(sim, 0)]), "peace column open too soon"
         sim.step()
     assert bool(sim.war[0, 0, 1 + 0]), "war ended prematurely (civ auto-peace?)"
     sim.civ_treasury[:, 0] = RICH
     m = sim._seat_war_mask(0)[0]
-    assert bool(m[sim.n_majors - 1]), "peace column should be open now (rich + warTurns >= min)"
+    assert bool(m[sue_col(sim, 0)]), "peace column should be open now (rich + warTurns >= min)"
     wt = int(sim.war_turns[0, 0, 1])
     cost = float(rr.get("peaceGold0", 150) + rr.get("peaceGoldSlope", 10) * wt)
     snap = sim.snapshot()
-    sim._apply_war_column(0, war_vec(sim, sim.n_majors - 1))  # sue for peace with seat 1
+    sim._apply_war_column(0, war_vec(sim, sue_col(sim, 0)))  # sue for peace with seat 1
     sim.step()
     assert not bool(sim.war[0, 0, 1 + 0]), "peace did not clear war[seat 0, civ 0]"
     after = snap_all(sim)
@@ -128,7 +135,7 @@ def test_peace(rules, path):
     sim.war[:, 0, 1 + 0] = sim.war[:, 1 + 0, 0] = True
     sim.war_turns[:, 0, 1] = need + 1
     sim.war_turns[:, 1, 0] = need + 1
-    assert not bool(sim._seat_war_mask(0)[0, sim.n_majors - 1]), "peace column open at 0 gold"
+    assert not bool(sim._seat_war_mask(0)[0, sue_col(sim, 0)]), "peace column open at 0 gold"
     print(f"  sue-for-peace OK (cost {cost:.0f} at warTurns {wt}, bit-equal transition)")
 
 

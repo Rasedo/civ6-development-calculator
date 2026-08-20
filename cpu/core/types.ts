@@ -37,7 +37,10 @@ export interface City {
   foodBox: number;
   cultureBox: number;
   tilesAcquired: number;
-  lockedTiles: number[];
+  /** CITIZEN ASSIGNMENT for the district SLOTS: how many citizens the player
+   * has pinned into each district, by PLACEABLE_DISTRICTS index; -1 where the
+   * automatic rule decides. `Tile.locked` is the same choice for plots. */
+  specialistPref?: number[];
   focus: FocusId;
   queue: QueueItem[];
   isCapital: boolean;
@@ -127,7 +130,24 @@ export interface SeatActionRecord {
   route?: [number, number] | null;
   denounce?: number[];
   ally?: number[];
+  /** CITIZEN ASSIGNMENT for the district SLOTS: [centreTile, districtIndex,
+   * count] — how many citizens this city pins into that district. A negative
+   * count hands the slot back to the automatic rule. */
+  specialists?: [number, number, number][];
+  /** CITIZEN ASSIGNMENT for the PLOTS: the tiles whose citizen pin this seat
+   * FLIPS this turn, in order. A flip is what the city screen's click does,
+   * and both engines re-validate that the plot is this seat's ground. */
+  lockTiles?: number[];
+  /** The WORLD CONGRESS ballot, one entry per slate slot in slate order
+   * (slot 2 is the always-3rd Diplomatic Victory resolution): the outcome
+   * (0 = A, 1 = B), the target index, and how many EXTRA votes to buy up the
+   * favor curve. A slot the record leaves out votes the AI line. */
+  vote?: CongressVote;
 }
+
+/** One seat's ballot: [outcome, target, extraVotes] per slate slot, or null
+ * for a slot this seat leaves to the AI line. */
+export type CongressVote = ([number, number, number] | null)[];
 
 export type SeatActionLog = Record<number, Record<number, SeatActionRecord>>;
 
@@ -162,6 +182,11 @@ export interface GameState {
   autoResearch?: boolean;
   eventLog: string[];
   cityStates: CityState[];
+  /** The city-state ROSTER width — the id space, not the live count. Capture
+   * removes an entry from `cityStates` and this stays put, so every id-keyed
+   * column (the war head's minor half, the observation's minor block) keeps
+   * its width for the whole game. The GPU's `S`. */
+  cityStateMax?: number;
   barbSeat: Seat;
   claimedPantheons: string[];
   claimedBeliefs: string[];
@@ -220,6 +245,10 @@ export interface Seat {
   wwTurn: Record<number, number>;
   diplomaticFavor: number;
   diplomaticPoints: number;
+  /** THIS TURN's World Congress ballot, as the record left it. Written inside
+   * seatPhase and consumed by `worldCongress` at the turn tail, which clears
+   * every seat's whether a session fires or not — an intent is for one turn. */
+  congressVote?: CongressVote;
   influencePoints: number;
   envoysAvailable: number;
 

@@ -113,26 +113,40 @@ export function citySpecialistSlots(state: GameState, city: City): Map<number, n
   return out;
 }
 
-/** The automatic specialist assignment: OVERFLOW citizens — population
- * beyond the city's workable tiles — fill open slots in PLACEABLE_DISTRICTS
- * order. CIV6 (wiki "Specialists (Civ6)"): "Specialists are also
- * particularly useful when a city grows large later in the game, and has
- * more Population than there are normal tiles to work." Real Civ 6 lets the
- * player assign specialists freely; that override is an open AUDIT item
- * (B-30r), so both engines run this one zero-draw rule. */
+/** WHO MANS THE SLOTS. The citizens the player PINNED (`specialistPref`, a
+ * count per PLACEABLE_DISTRICTS index) go in first, clamped to the district's
+ * open slots and to the city's population; then the automatic rule spends the
+ * OVERFLOW — population beyond the workable plots — on whatever slots are
+ * still free, in PLACEABLE_DISTRICTS order. CIV6 (wiki "Specialists (Civ6)"):
+ * "Specialists are also particularly useful when a city grows large later in
+ * the game, and has more Population than there are normal tiles to work."
+ * With nothing pinned this is exactly the automatic rule, which is what an
+ * unmanaged city gets. Zero-draw on both engines. */
 export function effectiveSpecialists(state: GameState, city: City): Map<number, number> {
   const slots = citySpecialistSlots(state, city);
   const out = new Map<number, number>();
-  let budget = Math.max(0, city.population - workableTiles(state, city).length);
-  for (const type of PLACEABLE_DISTRICTS) {
-    if (budget <= 0) break;
+  let budget = Math.max(0, city.population);
+  PLACEABLE_DISTRICTS.forEach((type, di) => {
+    const pin = city.specialistPref?.[di] ?? -1;
+    if (pin <= 0 || budget <= 0) return;
     const inst = city.districts.find((d) => d.type === type);
-    if (!inst) continue;
-    const max = slots.get(inst.tileIndex) ?? 0;
-    const n = Math.min(max, budget);
+    if (!inst) return;
+    const n = Math.min(pin, slots.get(inst.tileIndex) ?? 0, budget);
     if (n > 0) {
       out.set(inst.tileIndex, n);
       budget -= n;
+    }
+  });
+  let overflow = Math.max(0, budget - workableTiles(state, city).length);
+  for (const type of PLACEABLE_DISTRICTS) {
+    if (overflow <= 0) break;
+    const inst = city.districts.find((d) => d.type === type);
+    if (!inst) continue;
+    const taken = out.get(inst.tileIndex) ?? 0;
+    const n = Math.min((slots.get(inst.tileIndex) ?? 0) - taken, overflow);
+    if (n > 0) {
+      out.set(inst.tileIndex, taken + n);
+      overflow -= n;
     }
   }
   return out;
@@ -184,7 +198,9 @@ export function assignWorkedTiles(
     .map((t) => ({ index: t.index, score: tileScore(tileYields(yctx, t), city.focus) }))
     .sort((a, b) => b.score - a.score || a.index - b.index);
 
-  const lockedValid = city.lockedTiles.filter((i) => candidates.some((c) => c.index === i));
+  // LOCKED plots first, in tile order — the citizens the player placed by
+  // hand, ahead of anything the score would have chosen.
+  const lockedValid = candidates.filter((t) => t.locked).map((t) => t.index).sort((a, b) => a - b);
   const worked: number[] = lockedValid.slice(0, workers);
   for (const s of scored) {
     if (worked.length >= workers) break;

@@ -2,11 +2,14 @@
  * WORLD CONGRESS sessions and the standing-resolution readers. The session
  * mechanics (vote cost curve, outcome-then-target plurality, the +1 DVP to
  * every winning-combo voter, refund tiers, the always-3rd Diplomatic Victory
- * resolution) are sourced verbatim at the catalog (data/seats.ts). The
- * CHOOSER is scripted — see the same comment block; putting the vote on the
- * wire is an open AUDIT item.
+ * resolution) are sourced verbatim at the catalog (data/seats.ts).
+ *
+ * The VOTE rides the wire: `SeatActionRecord.vote` carries one
+ * [outcome, target, extra votes] per slate slot, and a seat that submits none
+ * falls back to the deterministic self-interest rule below — the AI vote.
+ * Both engines only TALLY.
  */
-import type { DistrictId, GameState, GreatPersonClass } from './types';
+import type { CongressVote, DistrictId, GameState, GreatPersonClass, Seat } from './types';
 import { PLACEABLE_DISTRICTS } from '../data/districts';
 import { GP_CLASSES } from '../data/greatPeople';
 import {
@@ -18,6 +21,10 @@ import {
 
 interface Vote { seat: number; outcome: number; target: number; weight: number }
 
+/** The DIPLOMATIC VICTORY resolution's slot in the vote head — the always-3rd
+ * resolution, which stands outside the two-slot rotating slate. */
+export const CONGRESS_DV_SLOT = 2;
+
 /** Argmax with ties to the LOWER index — the shared tie rule of every
  * congress scan on both engines. */
 function argmaxLow(counts: readonly number[]): number {
@@ -26,8 +33,9 @@ function argmaxLow(counts: readonly number[]): number {
   return at;
 }
 
-/** The scripted free-vote preference for a non-DV resolution: outcome A on
- * the target the voter holds the most of (self for the Migration Treaty). */
+/** The AI free-vote preference for a non-DV resolution: outcome A on the
+ * target the voter holds the most of (self for the Migration Treaty). What a
+ * seat votes when its record carries no vote for this slot. */
 function preference(state: GameState, res: number, seat: number): { outcome: number; target: number } {
   const sx = state.seats[seat];
   switch (res) {
@@ -57,6 +65,25 @@ function preference(state: GameState, res: number, seat: number): { outcome: num
   }
 }
 
+/**
+ * BUY EXTRA VOTES up the sourced curve — the k-th extra vote costs
+ * CONGRESS_VOTE_STEP*k favor, and the curve restarts for every resolution
+ * ("it is thus wise to spend Diplomatic Favor on other resolutions if they are
+ * also important"). Stops at the first rung the bank cannot clear. Debits the
+ * bank and reports what it took, because the refund tiers pay that back.
+ */
+function buyVotes(sx: Seat, want: number): { extra: number; spent: number } {
+  let favor = sx.diplomaticFavor ?? 0;
+  let extra = 0, spent = 0;
+  while (extra < want && favor >= CONGRESS_VOTE_STEP * (extra + 1)) {
+    favor -= CONGRESS_VOTE_STEP * (extra + 1);
+    spent += CONGRESS_VOTE_STEP * (extra + 1);
+    extra++;
+  }
+  sx.diplomaticFavor = favor;
+  return { extra, spent };
+}
+
 /** Outcome first (more votes; tie -> A), then target by plurality among the
  * winning outcome's votes (tie -> lower target index). */
 function tally(votes: readonly Vote[], targetSpace: number): { outcome: number; target: number } {
@@ -68,6 +95,21 @@ function tally(votes: readonly Vote[], targetSpace: number): { outcome: number; 
   return { outcome, target: argmaxLow(tv) };
 }
 
+/**
+ * PAY OUT one resolution: +1 DVP to every seat whose outcome AND target both
+ * won, and the sourced refund tiers to everyone else — 100% of the favor a
+ * losing OUTCOME spent, 50% where the outcome won on a different target.
+ */
+function settle(state: GameState, votes: readonly Vote[], spent: readonly number[],
+                win: { outcome: number; target: number }): void {
+  for (const v of votes) {
+    const sx = state.seats[v.seat];
+    if (v.outcome !== win.outcome) sx.diplomaticFavor = (sx.diplomaticFavor ?? 0) + spent[v.seat];
+    else if (v.target !== win.target) sx.diplomaticFavor = (sx.diplomaticFavor ?? 0) + Math.floor(spent[v.seat] / 2);
+    else sx.diplomaticPoints = (sx.diplomaticPoints ?? 0) + DVP_PER_RESOLUTION;
+  }
+}
+
 function targetSpaceSize(state: GameState, res: number): number {
   switch (CONGRESS_RESOLUTIONS[res].target) {
     case 'district': return PLACEABLE_DISTRICTS.length;
@@ -77,29 +119,37 @@ function targetSpaceSize(state: GameState, res: number): number {
   }
 }
 
-function runResolution(state: GameState, res: number): void {
+function clamp(v: number, hi: number): number {
+  return Math.min(Math.max(Math.trunc(v), 0), hi);
+}
+
+function runResolution(state: GameState, res: number, slot: number,
+                       recorded: readonly (CongressVote | null)[]): void {
+  const space = targetSpaceSize(state, res);
   const votes: Vote[] = [];
+  const spent = state.seats.map(() => 0);
   for (let c = 0; c < state.seats.length; c++) {
-    if (state.seats[c].cities.length === 0) continue;
-    const p = preference(state, res, c);
-    votes.push({ seat: c, outcome: p.outcome, target: p.target, weight: 1 });
+    const sx = state.seats[c];
+    if (sx.cities.length === 0) continue;
+    const v = recorded[c]?.[slot];
+    const p = v ? { outcome: clamp(v[0], 1), target: clamp(v[1], space - 1) } : preference(state, res, c);
+    // NO favor without an intent: the AI free-votes on a regular resolution.
+    const bought = buyVotes(sx, v ? Math.max(0, Math.trunc(v[2])) : 0);
+    spent[c] = bought.spent;
+    votes.push({ seat: c, outcome: p.outcome, target: p.target, weight: 1 + bought.extra });
   }
   if (votes.length === 0) return;
-  const win = tally(votes, targetSpaceSize(state, res));
-  for (const v of votes) {
-    if (v.outcome !== win.outcome || v.target !== win.target) continue;
-    const sx = state.seats[v.seat];
-    sx.diplomaticPoints = (sx.diplomaticPoints ?? 0) + DVP_PER_RESOLUTION;
-  }
+  const win = tally(votes, space);
+  settle(state, votes, spent, win);
   state.congress!.push({ res, outcome: win.outcome, target: win.target });
 }
 
-/** The Diplomatic Victory resolution: every civ pours ALL its favor into
- * this vote (the scripted spend), the leader votes A on itself, everyone
- * else B on the leader. Refunds by tier; the +/-2 DVP applies immediately
- * (no clamp — the win check is a >= threshold, so negative points are
- * harmless and un-invented). */
-function runDvResolution(state: GameState): void {
+/** The Diplomatic Victory resolution. Without an intent a seat votes the AI
+ * line — the leader votes A on itself, everyone else B on the leader — and
+ * pours ALL its favor in. The +/-2 lands on the WINNING TARGET immediately
+ * (no clamp — the win check is a >= threshold, so negative points are harmless
+ * and un-invented). */
+function runDvResolution(state: GameState, recorded: readonly (CongressVote | null)[]): void {
   let leader = -1, bestP = -Infinity;
   for (let c = 0; c < state.seats.length; c++) {
     if (state.seats[c].cities.length === 0) continue;
@@ -107,28 +157,22 @@ function runDvResolution(state: GameState): void {
     if (p > bestP) { bestP = p; leader = c; }
   }
   if (leader < 0) return;
+  const space = state.seats.length;
   const votes: Vote[] = [];
   const spent = state.seats.map(() => 0);
   for (let c = 0; c < state.seats.length; c++) {
     const sx = state.seats[c];
     if (sx.cities.length === 0) continue;
-    let favor = sx.diplomaticFavor ?? 0, extra = 0;
-    while (favor >= CONGRESS_VOTE_STEP * (extra + 1)) {
-      favor -= CONGRESS_VOTE_STEP * (extra + 1);
-      extra++;
-    }
-    spent[c] = (sx.diplomaticFavor ?? 0) - favor;
-    sx.diplomaticFavor = favor;
-    votes.push({ seat: c, outcome: c === leader ? 0 : 1, target: leader, weight: 1 + extra });
+    const v = recorded[c]?.[CONGRESS_DV_SLOT];
+    const outcome = v ? clamp(v[0], 1) : (c === leader ? 0 : 1);
+    const target = v ? clamp(v[1], space - 1) : leader;
+    const bought = buyVotes(sx, v ? Math.max(0, Math.trunc(v[2])) : Number.MAX_SAFE_INTEGER);
+    spent[c] = bought.spent;
+    votes.push({ seat: c, outcome, target, weight: 1 + bought.extra });
   }
   if (votes.length === 0) return;
-  const win = tally(votes, state.seats.length);
-  for (const v of votes) {
-    const sx = state.seats[v.seat];
-    if (v.outcome !== win.outcome) sx.diplomaticFavor += spent[v.seat];
-    else if (v.target !== win.target) sx.diplomaticFavor += Math.floor(spent[v.seat] / 2);
-    else sx.diplomaticPoints = (sx.diplomaticPoints ?? 0) + DVP_PER_RESOLUTION;
-  }
+  const win = tally(votes, space);
+  settle(state, votes, spent, win);
   const t = state.seats[win.target];
   t.diplomaticPoints = (t.diplomaticPoints ?? 0) + (win.outcome === 0 ? CONGRESS_DV_DELTA : -CONGRESS_DV_DELTA);
 }
@@ -136,7 +180,8 @@ function runDvResolution(state: GameState): void {
 /** One Regular Session: two era-eligible resolutions off the deterministic
  * rotation, then the Diplomatic Victory resolution from Modern. The standing
  * effects REPLACE the previous session's and hold until the next one. */
-export function congressSession(state: GameState, worldEra: number): void {
+export function congressSession(state: GameState, worldEra: number,
+                                recorded: readonly (CongressVote | null)[]): void {
   state.congressSessions = (state.congressSessions ?? 0) + 1;
   const sess = state.congressSessions;
   const eligible: number[] = [];
@@ -147,9 +192,9 @@ export function congressSession(state: GameState, worldEra: number): void {
   if (eligible.length > 0) {
     const s0 = eligible[(2 * (sess - 1)) % eligible.length];
     const s1 = eligible[(2 * (sess - 1) + 1) % eligible.length];
-    for (const res of s0 === s1 ? [s0] : [s0, s1]) runResolution(state, res);
+    (s0 === s1 ? [s0] : [s0, s1]).forEach((res, slot) => runResolution(state, res, slot, recorded));
   }
-  if (worldEra >= CONGRESS_DV_MIN_ERA) runDvResolution(state);
+  if (worldEra >= CONGRESS_DV_MIN_ERA) runDvResolution(state, recorded);
 }
 
 function congressEffect(state: GameState, res: number): { outcome: number; target: number } | null {

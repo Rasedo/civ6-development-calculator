@@ -469,6 +469,7 @@ const CITY: Record<string, Extractor> = {
       return inst ? eff.get(inst.tileIndex) ?? 0 : 0;
     });
   }),
+  specialistPref: overCities((r) => PLACEABLE_DISTRICTS.map((_t, di) => r.city.specialistPref?.[di] ?? -1)),
   queueProgress: overCities((r) => r.city.queue[0]?.progress ?? 0),
   queueCost: overCities((r) => queueItemCost(r.city.queue[0])),
   followedReligion: overCities((r) => r.city.followedReligion ?? -1),
@@ -535,6 +536,7 @@ const TILE: Record<string, Extractor> = {
   park: overTiles((t) => t.park ?? -1),
   encampHp: overTiles((t) => t.encampHp ?? 0),
   road: overTiles((t) => (t.road ? 1 : 0)),
+  locked: overTiles((t) => (t.locked ? 1 : 0)),
   fertility: overTiles((t) => t.fertility),
   fertilityProd: overTiles((t) => t.fertilityProd),
   droughtTurns: overTiles((t) => t.droughtTurns),

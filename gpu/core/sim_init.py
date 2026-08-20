@@ -296,6 +296,11 @@ class SimInit:
         # Standing World Congress resolutions of the LAST session, 2 slots x
         # (res, outcome 0=A/1=B, target); -1 empty. Replaced every session.
         self.congress_active = torch.full((B, 2, 3), -1, dtype=torch.long, device=device)
+        # THIS TURN's ballot per major: [outcome, target, extra votes] for the
+        # two rotating slate slots and the always-3rd Diplomatic Victory
+        # resolution. -1 in the outcome field = no intent, vote the AI line.
+        # `_world_congress` clears it whether a session fires or not.
+        self.civ_congress_vote = torch.full((B, self.n_majors, 3, 3), -1, dtype=torch.long, device=device)
         # Per-seat era-score accumulator, one column per seat row — the TS
         # `state.eraScore` mirror. Integer, zero-draw;
         # resets at every eraLength boundary (right after `self.turn += 1`, the
@@ -405,6 +410,10 @@ class SimInit:
         # counts toward the cap and the one-per-type rule (city.districts in TS).
         nd_b4 = max(len(rules.districts or []), 1)
         self.city_dist_tile = torch.full((B, self.n_majors, civ_city_pad, nd_b4), -1, dtype=torch.long, device=device)
+        # CITIZENS PINNED into each district's specialist slots, -1 where the
+        # automatic rule decides (City.specialistPref). Same geometry as the
+        # registry above, because a pin names a district TYPE.
+        self.city_spec_pin = torch.full((B, self.n_majors, civ_city_pad, nd_b4), -1, dtype=torch.long, device=device)
         self.district_dead = torch.zeros(B, T, dtype=torch.bool, device=device)
         # Persistent city ids on the seat axis — the TS City.id, allocated per
         # seat from civ_next_city_id. tile_city stores THESE ids for every seat;
@@ -773,6 +782,9 @@ class SimInit:
         # the PRODUCTION half of flood silt — real Civ 6 rolls food and
         # production separately, so the two accumulate apart.
         self.fertility_prod = torch.zeros(B, T, dtype=torch.long, device=device)
+        # a CITIZEN is PINNED to this plot (Tile.locked): the work ranking takes
+        # every locked plot a city can reach before it ranks anything by score.
+        self.tile_locked = torch.zeros(B, T, dtype=torch.bool, device=device)
         self.drought = torch.zeros(B, T, dtype=torch.long, device=device)
 
         imp = rules.improvements or {}
@@ -1368,6 +1380,8 @@ class SimInit:
         self._driven_buy_monu: dict = {}
         self._driven_levy: dict = {}
         self._driven_route: dict = {}
+        self._driven_citizens: dict = {}
+        self._driven_vote: dict = {}
         self._driven_buy_nat: dict = {}
         self._driven_tech: dict = {}
         self._driven_civic: dict = {}

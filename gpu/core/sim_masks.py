@@ -42,25 +42,51 @@ class SimMasks:
         return self._seat_envoy_mask(0)
 
     def war_targets(self, row: int) -> list[int]:
-        return [k if k < row else k + 1 for k in range(self.n_majors - 1)]
+        """The seat ROWS this row's war head addresses: every OTHER major in
+        ascending seat order, then the whole city-state roster in ascending id
+        order. `warTargets`' twin. The width is fixed for the game — a captured
+        minor keeps its column and the column is simply never legal again."""
+        majors = [k if k < row else k + 1 for k in range(self.n_majors - 1)]
+        return majors + [self.n_majors + s for s in range(self.S)]
+
+    def _cs_suzerain_at_war(self, row: int) -> torch.Tensor:
+        """[B, S] — is any seat this row is AT WAR with the suzerain of this
+        minor? `sueForPeaceWithCityState`'s block: a minor will not talk while
+        its patron is still fighting you."""
+        out = torch.zeros(self.B, self.S, dtype=torch.bool, device=self.device)
+        for x in range(self.n_majors):
+            if x == row:
+                continue
+            out = out | (self._suzerain_mask(x)[:, : self.S] & self.war[:, row, x].unsqueeze(1))
+        return out
 
     def _seat_war_mask(self, row: int) -> torch.Tensor:
         B, dev = self.B, self.device
         n_opp = self.n_majors - 1
-        if n_opp == 0 or not self._rl_war_active:
-            return torch.zeros(B, 2 * n_opp, dtype=torch.bool, device=dev)
+        tgt = self.war_targets(row)
+        n = len(tgt)
+        if n == 0 or not self._rl_war_active:
+            return torch.zeros(B, 2 * n, dtype=torch.bool, device=dev)
         rr = self.rules.seats
-        idx = torch.tensor(self.war_targets(row), dtype=torch.long, device=dev)
-        live = self.civ_alive[:, row].unsqueeze(1) & self.civ_alive[:, idx]
-        at_war = self.war[:, row, idx]                      # [B, n_opponents]
-        wt = self.war_turns[:, row, idx]                    # [B, n_opponents] THIS war's clock
+        idx = torch.tensor(tgt, dtype=torch.long, device=dev)
+        cols = [self.civ_alive[:, t] for t in tgt[:n_opp]]
+        # A MINOR column needs the MEETING as well: `declareWarOnCityState`
+        # refuses an unmet city-state, and a captured one has left the roster.
+        cols += [self.citystate_alive[:, s] & self.seat_citystate_met[:, row, s]
+                 for s in range(self.S)]
+        live = self.civ_alive[:, row].unsqueeze(1) & torch.stack(cols, dim=1)
+        at_war = self.war[:, row, idx]                      # [B, n_targets]
+        wt = self.war_turns[:, row, idx]                    # [B, n_targets] THIS war's clock
         cost = rr.get("peaceGold0", 150) + rr.get("peaceGoldSlope", 10) * wt.to(torch.float64)
         declare = live & ~at_war & (self.treaty_turns[:, row, idx] == 0)
-        peace = (
-            live & at_war
-            & (wt >= rr.get("warMinTurns", 14))
-            & self._afford(self.civ_treasury[:, row].unsqueeze(1), cost)
-        )
+        # PEACE. A major sells it for gold up the clock's curve; a minor
+        # "will always accept an offer of peace without preconditions" and
+        # charges nothing, but will not talk while its suzerain is at war.
+        afford = torch.cat([
+            self._afford(self.civ_treasury[:, row].unsqueeze(1), cost[:, :n_opp]),
+            ~self._cs_suzerain_at_war(row),
+        ], dim=1)
+        peace = live & at_war & (wt >= rr.get("warMinTurns", 14)) & afford
         return torch.cat([declare, peace], dim=1)
 
 

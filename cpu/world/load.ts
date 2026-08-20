@@ -67,6 +67,9 @@ export function loadWorld(world: WorldFile): GameState {
   state.disasters = true;
   state.rngState = world.rngInit >>> 0;
 
+  // the exporter's MAX, not the placed count: placement drops a city-state it
+  // cannot site, and the id space stays the width the GPU allocates.
+  state.cityStateMax = world.gen.params.cityStateMax;
   world.cityStates.forEach((cityState, i) => {
     if (!CITY_STATE_TYPES.includes(cityState.type as CityStateType)) {
       throw new Error(`world file names city-state type '${cityState.type}' the engine does not know`);

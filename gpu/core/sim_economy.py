@@ -4,6 +4,11 @@ from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the sha
 from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star import
 from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must be read live
 
+#: the work-ranking key a LOCKED plot takes. An exact f64 integer four decades
+#: above the widest score key, so `base - tileIndex` stays exact and the
+#: locked group ties on tile index the way the scored group does.
+_LOCK_KEY_BASE = 1e12
+
 
 class SimEconomy:
     def _luxury_amenities(self, row: int, amen_have: torch.Tensor, amen_need: torch.Tensor) -> torch.Tensor:
@@ -612,7 +617,9 @@ class SimEconomy:
                 sel = pr[seat_at[pr] == _r]
                 if sel.numel() == 0:
                     continue
-                sl = self.city_slot_at(_r).gather(1, tc[sel].unsqueeze(1)).squeeze(1)
+                # gather over the WHOLE batch, then take `sel`: a gather whose
+                # index is already narrowed reads batch rows 0..len(sel)-1.
+                sl = self.city_slot_at(_r).gather(1, tc.unsqueeze(1)).squeeze(1)[sel]
                 ok = sl >= 0
                 sel, sl = sel[ok], sl[ok].clamp(min=0)
                 if sel.numel() == 0:
@@ -1703,10 +1710,11 @@ class SimEconomy:
             tier = tier + techs[:, self._farmadj_tech].long()
         return tier
 
-    def _workable_count(self, row: int) -> torch.Tensor:
-        """[B, RC] — len(workableTiles) per city. ORACLE: this predicate must
-        stay the SAME as `_seat_city_walk`'s `valid` (the walk keeps its own
-        copy because its gathers feed the yield ranking too)."""
+    def _work_window(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """(tiles, valid) [B, RC, M] — every plot inside each city's work
+        radius and whether `workableTiles` would offer it. ORACLE: this
+        predicate must stay the SAME as `_seat_city_walk`'s `valid` (the walk
+        keeps its own copy because its gathers feed the yield ranking too)."""
         B, cols = self.B, self.RC
         ctr = self.city_center[:, row].clamp(min=0)
         ids = self.city_id[:, row]
@@ -1726,15 +1734,35 @@ class SimEconomy:
             & (gat(self.district) < 0)
             & (gat(self.built_wonder) < 0)
         )
-        return valid.sum(dim=2)
+        return tiles, valid
+
+    def _workable_count(self, row: int) -> torch.Tensor:
+        """[B, RC] — len(workableTiles) per city."""
+        return self._work_window(row)[1].sum(dim=2)
+
+    def _city_spec_slots(self, row: int, sl: slice | None = None) -> torch.Tensor:
+        """[B, n, nD] long — the specialist SLOTS each district offers: its
+        standing buildings, dark while the district is incomplete or pillaged
+        and zero for a district type that seats no specialist
+        (`citySpecialistSlots`)."""
+        if sl is None:
+            sl = slice(0, self.RC)
+        B = self.B
+        alive = self.city_alive[:, row, sl]
+        bldg = self.city_bldg[:, row, sl]
+        dreg = self.city_dist_tile[:, row, sl]
+        dflat = dreg.clamp(min=0).reshape(B, -1)
+        dlive = (dreg >= 0) & self.district_complete.gather(1, dflat).reshape_as(dreg) & ~self.district_pillaged.gather(1, dflat).reshape_as(dreg)
+        gate = dlive & self._spec_any.reshape(1, 1, -1) & alive.unsqueeze(2)
+        return (bldg.double() @ self._b_dist_oh).long() * gate.long()
 
     def _city_specialists(self, row: int, sl: slice | None = None, workable: torch.Tensor | None = None) -> torch.Tensor:
-        """[B, n, nD] long — the `effectiveSpecialists` twin for ANY seat row:
-        OVERFLOW citizens (population beyond the workable pool) fill open
-        slots in PLACEABLE_DISTRICTS order; slots = the district's standing
-        buildings, dark while the district is incomplete or pillaged. The
-        player's free assignment is an open AUDIT item (B-30r) — both
-        engines run this one zero-draw rule."""
+        """[B, n, nD] long — the `effectiveSpecialists` twin for ANY seat row.
+        PINNED citizens (`city_spec_pin`) go in first; then the OVERFLOW —
+        population beyond the workable pool — fills whatever slots are still
+        free, in PLACEABLE_DISTRICTS order. Slots = the district's standing
+        buildings, dark while the district is incomplete or pillaged. Zero-draw
+        on both engines."""
         if sl is None:
             sl = slice(0, self.RC)
         B = self.B
@@ -1745,17 +1773,21 @@ class SimEconomy:
             return torch.zeros(B, pop.shape[1], 1, dtype=torch.long, device=self.device)
         if workable is None:
             workable = self._workable_count(row)[:, sl]
-        bldg = self.city_bldg[:, row, sl]
-        dreg = self.city_dist_tile[:, row, sl]
-        dflat = dreg.clamp(min=0).reshape(B, -1)
-        dlive = (dreg >= 0) & self.district_complete.gather(1, dflat).reshape_as(dreg) & ~self.district_pillaged.gather(1, dflat).reshape_as(dreg)
-        gate = dlive & self._spec_any.reshape(1, 1, -1) & alive.unsqueeze(2)
-        slots = (bldg.double() @ self._b_dist_oh).long() * gate.long()
-        rem = (pop - workable).clamp(min=0) * alive.long()
+        slots = self._city_spec_slots(row, sl)
+        # PINNED citizens first, clamped to the open slots and to population.
+        pin = self.city_spec_pin[:, row, sl].clamp(min=0)
+        budget = pop.clamp(min=0) * alive.long()
         spec = torch.zeros_like(slots)
         for di in range(nDc):
-            tk = torch.minimum(slots[:, :, di], rem)
+            tk = torch.minimum(torch.minimum(pin[:, :, di], slots[:, :, di]), budget)
             spec[:, :, di] = tk
+            budget = budget - tk
+        # then the OVERFLOW — what population is left over the workable pool —
+        # spends itself on whatever slots are still free, in catalog order.
+        rem = (budget - workable).clamp(min=0)
+        for di in range(nDc):
+            tk = torch.minimum(slots[:, :, di] - spec[:, :, di], rem)
+            spec[:, :, di] = spec[:, :, di] + tk
             rem = rem - tk
         return spec
 
@@ -1848,6 +1880,13 @@ class SimEconomy:
             (f * w[0] + p * w[1] + gat(oth_sc)) * 1e6 - tiles.double(),
             torch.tensor(-1e18, dtype=F64, device=dev),
         )
+        # A LOCKED plot outranks every score: `assignWorkedTiles` takes the
+        # locked plots first, in tile order, and only then fills by score. The
+        # base sits four decades above the widest score the term above can
+        # reach and stays an exact f64 integer, so the index tie-break inside
+        # the locked group is bit-exact.
+        key = torch.where(valid & gat(self.tile_locked).bool(),
+                          _LOCK_KEY_BASE - tiles.double(), key)
         self._tiebreak_key_dtype = key.dtype
         top_vals, top_idx = key.topk(M, dim=2)
         # SPECIALISTS divert the overflow citizens before tiles are taken

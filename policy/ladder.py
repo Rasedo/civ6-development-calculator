@@ -10,7 +10,7 @@ EMP_FIELDS = (
     "settlersQueued", "cities", "treasury", "envoysAvail", "influence",
     "camps", "barbs", "units", "rangedUnits",
 )
-PER_CS = 3    # met, envoys/6, hasQuest
+PER_CS = 5    # met, envoys/6, hasQuest, atWar, warTurns/14
 # THE OPPONENT BLOCK — one column per OTHER major, in ascending seat order,
 # everything measured from the asker's own point of view. The last four are
 # RAW and unscaled for the same reason the ctx block is: the DoW policy
@@ -48,6 +48,20 @@ CTX_FIELDS = (
     "atWarAny",       # 0/1: at war with ANYONE (the embark/cap arm's term)
 )
 PER_CITY = 10
+# THE WORLD CONGRESS block: this seat's ballot currency and the slate that is
+# STANDING — what the last session passed and on whom. A net votes off this;
+# the ladder's own vote reads the sim directly, the way the route verb does.
+CONGRESS = 8
+CONGRESS_FIELDS = (
+    "favor",          # diplomatic favor / 100
+    "dvPoints",       # diplomatic victory points / 20 (the win threshold)
+    "slot0Res",       # standing slate slot 0: resolution index + 1, 0 = none
+    "slot0Outcome",   # 0 = A, 1 = B (0 when nothing stands)
+    "slot0Target",    # the winning target index (0 when nothing stands)
+    "slot1Res",
+    "slot1Outcome",
+    "slot1Target",
+)
 
 
 def split(obs: torch.Tensor, n_cs: int, n_opponents: int, n_cities: int,
@@ -87,12 +101,14 @@ def split(obs: torch.Tensor, n_cs: int, n_opponents: int, n_cities: int,
     i += n_t
     prog_c = obs[:, i:i + n_c]
     i += n_c
+    congress = obs[:, i:i + CONGRESS]
+    i += CONGRESS
     ctx = obs[:, i:i + CTX_SEAT]
     i += CTX_SEAT
     assert i == obs.shape[1], f"observation width {obs.shape[1]} != layout {i}"
     return {"empire": emp, "cs": cs, "civ": cv, "city": city,
             "escalators": esc, "costTech": boost_t, "costCivic": boost_c,
-            "progTech": prog_t, "progCivic": prog_c, "ctx": ctx}
+            "progTech": prog_t, "progCivic": prog_c, "congress": congress, "ctx": ctx}
 
 
 def first_legal(mask: torch.Tensor) -> torch.Tensor:
@@ -199,14 +215,30 @@ def pick_monu(builder_ok: torch.Tensor, settler_ok: torch.Tensor) -> torch.Tenso
     return kind
 
 
+# A minor is a CITY, not an empire: the raid needs an army that can take one,
+# and a stake in the minor's courtship is worth more than its territory — a
+# seat that has spent envoys there leaves it alone.
+CS_RAID_STRENGTH = 40.0
+CS_RAID_RATE = 0.02
+
+# CITIZEN ASSIGNMENT. A city big enough to spare one puts a citizen in the
+# first district that seats one; a city puts one on the first RESOURCE plot it
+# can work. Both are ONE per city for the whole game — the automatic rule keeps
+# every other citizen, which is what an unmanaged city gets.
+SPEC_PIN_POP = 8
+
+
 def pick_war(mask: torch.Tensor, ctx: dict, rng: dict) -> torch.Tensor:
+    """The war head: `[declare per target, sue per target]` over
+    `war_targets(row)` — the other majors, then the city-state roster."""
     B, W2 = mask.shape
-    n_opp = W2 // 2
+    n = W2 // 2
     out = torch.full((B,), -1, dtype=torch.long, device=mask.device)
-    if n_opp == 0:
+    if n == 0:
         return out
-    sue_k = first_legal(mask[:, n_opp:] & (rng["peace"] < 0.25).unsqueeze(1))
-    out = torch.where(sue_k >= 0, n_opp + sue_k, out)
+    sue_k = first_legal(mask[:, n:] & (rng["peace"] < 0.25).unsqueeze(1))
+    out = torch.where(sue_k >= 0, n + sue_k, out)
+    n_opp = int(ctx["opp_str"].shape[1])
     dow_k = first_legal(
         mask[:, :n_opp]
         & ctx["has_cities"]
@@ -215,7 +247,17 @@ def pick_war(mask: torch.Tensor, ctx: dict, rng: dict) -> torch.Tensor:
         & (ctx["peace_turns"] > 20).unsqueeze(1)
         & (rng["dow"] < 0.08 * (0.5 + ctx["aggression"])).unsqueeze(1)
     )
-    return torch.where((out < 0) & (dow_k >= 0), dow_k, out)
+    out = torch.where((out < 0) & (dow_k >= 0), dow_k, out)
+    if n == n_opp:
+        return out
+    raid_k = first_legal(
+        mask[:, n_opp:n]
+        & (ctx["cs_envoys"] <= 0)
+        & (ctx["own_str"] > CS_RAID_STRENGTH).unsqueeze(1)
+        & (ctx["peace_turns"] > 20).unsqueeze(1)
+        & (rng["raid"] < CS_RAID_RATE * (0.5 + ctx["aggression"])).unsqueeze(1)
+    )
+    return torch.where((out < 0) & (raid_k >= 0), n_opp + raid_k, out)
 
 
 def unit_roster(units: list[dict]) -> dict:

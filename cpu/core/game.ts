@@ -33,7 +33,7 @@ import { nextRandom } from './rand';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, MISSIONARY_CAP, APOSTLE_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, MARTYR_CHANCE } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
-import { BARB_SEAT, allCities, allSeats, citiesOf, emptySeat, seatOf, seatOfCityState, setTileOwner, tileClaimed, unitSeat } from './seats';
+import { BARB_SEAT, allCities, allSeats, citiesOf, emptySeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, unitSeat } from './seats';
 
 export const TURN_LIMIT = 250;
 
@@ -179,7 +179,6 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     foodBox: 0,
     cultureBox: 0,
     tilesAcquired: 0,
-    lockedTiles: [],
     focus: 'balanced',
     queue: [],
     isCapital: list.length === 0,
@@ -1152,10 +1151,9 @@ function spreadReligiousPressure(state: GameState): void {
 
 export function toggleLockedTile(state: GameState, cityId: number, tileIndex: number, seat: number): void {
   const city = citiesOf(state, seat).find((c) => c.id === cityId);
-  if (!city) return;
-  const i = city.lockedTiles.indexOf(tileIndex);
-  if (i >= 0) city.lockedTiles.splice(i, 1);
-  else city.lockedTiles.push(tileIndex);
+  const tile = state.map.tiles[tileIndex];
+  if (!city || !tile || tileCity(tile) !== city.id) return;
+  tile.locked = !tile.locked;
 }
 
 
@@ -1234,7 +1232,6 @@ export function deserialize(json: string): GameState {
       civCity.foodBox ??= civCity.growthBox ?? 0;
       delete civCity.growthBox;
       civCity.cultureBox ??= 0;
-      civCity.lockedTiles ??= [];
       civCity.focus ??= 'balanced';
       civCity.queue ??= [];
       civCity.isCapital ??= false;
