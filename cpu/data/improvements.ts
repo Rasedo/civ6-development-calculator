@@ -118,8 +118,8 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
   // only on a FLAT COASTAL Grassland/Plains/Desert tile whose Appeal is
   // BREATHTAKING (>= 4), and it yields GOLD equal to that tile's Appeal —
   // a DYNAMIC yield, so `yields` here is empty and the gold is computed in
-  // tileYields. The matching TOURISM (also = Appeal) is NOT modeled: tourism
-  // does not exist in either engine yet (a recorded residual).
+  // tileYields, and the matching TOURISM (also = Appeal) is paid by
+  // `resortTourism` (core/city.ts).
   SEASIDE_RESORT: {
     id: 'SEASIDE_RESORT',
     name: 'Seaside Resort',

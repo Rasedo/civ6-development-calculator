@@ -2,8 +2,8 @@
  * Great Works. A WRITER/MUSICIAN carries 2 Great Works that fill open
  * AMPHITHEATER (writing, 2) / ART MUSEUM (art, 3) / BROADCAST CENTER (music, 1)
  * slots — the real Civ 6 homes — lowest city then lowest slot first. Each
- * slotted work yields building-tier culture BY KIND (the real GS values:
- * writing +2, music +4; no Great Work pays gold, and tourism is unmodeled).
+ * slotted work yields building-tier culture and tourism BY KIND (the real GS
+ * values: writing +2, music +4; no Great Work pays gold).
  * Charges with no open slot overflow to an instant culture lump.
  * These pin placeGreatWorks + cityGreatWorks +
  * greatWorkCulture + the building-tier yield; the GPU great_works_test battery
@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
 import { foundCity, queueDistrict, queueBuilding } from '../../../cpu/core/game';
 import { computeCityStats } from '../../../cpu/core/city';
-import { placeGreatWorks, cityGreatWorks, greatWorkCulture, greatWorkTourism, GW_TOURISM, GW_CULTURE, GW_WORKS_PER_PERSON, GW_SLOTS, GW_WRITING, GW_ART, GW_MUSIC } from '../../../cpu/data/greatPeople';
+import { placeGreatWorks, cityGreatWorks, greatWorkCulture, greatWorkTourism, GW_TOURISM, GW_CULTURE, GW_WORKS_PER_PERSON, GW_SLOTS, GW_WRITING, GW_ART, GW_MUSIC, GW_WONDER_SLOTS } from '../../../cpu/data/greatPeople';
 // The kind arrays replaced the writing/music pair — these aliases keep the
 // existing assertions readable now that ART is a real kind with its own slots.
 const GW_WRITING_CULTURE = GW_CULTURE[GW_WRITING];
@@ -136,5 +136,27 @@ describe('Great Works', () => {
     // Second Writer (2 works) -> A is full, both spill into B (only 1 slot fits... B has 2).
     expect(placeGreatWorks([a, b], GW_WRITING)).toBe(0);
     expect(b.greatWorksWriting).toBe(2);
+  });
+
+  it('sourced wonder slots: Great Library 2 writing, Hermitage 4 art, Bolshoi 1+1', () => {
+    expect(GW_WONDER_SLOTS.GREAT_LIBRARY).toEqual([2, 0, 0]);
+    expect(GW_WONDER_SLOTS.HERMITAGE).toEqual([0, 4, 0]);
+    expect(GW_WONDER_SLOTS.BOLSHOI_THEATRE).toEqual([1, 0, 1]);
+  });
+
+  it('a wonder holds works in a city with NO matching building, and adds to one that has', () => {
+    const bare = { buildings: [] as string[] } as unknown as City;
+    // Hermitage alone: 4 art slots, so a whole Artist (3 works) fits.
+    expect(placeGreatWorks([bare], GW_ART, () => GW_WONDER_SLOTS.HERMITAGE[GW_ART])).toBe(0);
+    expect(bare.greatWorksArt).toBe(GW_WORKS_PER_PERSON[GW_ART]);
+
+    // Amphitheater (2) + Great Library (2) = 4 writing slots: two Writers fit.
+    const lib = { buildings: ['AMPHITHEATER'] } as unknown as City;
+    const extra = () => GW_WONDER_SLOTS.GREAT_LIBRARY[GW_WRITING];
+    expect(placeGreatWorks([lib], GW_WRITING, extra)).toBe(0);
+    expect(placeGreatWorks([lib], GW_WRITING, extra)).toBe(0);
+    expect(lib.greatWorksWriting).toBe(4);
+    // The fifth work has nowhere to go and overflows.
+    expect(placeGreatWorks([lib], GW_WRITING, extra)).toBe(GW_WORKS_PER_PERSON[GW_WRITING]);
   });
 });

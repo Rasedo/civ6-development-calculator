@@ -626,6 +626,8 @@ class SimInit:
             # Per-wonder Great Work slots [nW, 3] in kind order (writing, art,
             # music), additive with the GW_BUILDINGS slots.
             self._wond_gw = torch.tensor([list(w.get("gwslots", [0, 0, 0])) for w in self._wond_rows], dtype=torch.long, device=device)
+            # Per-wonder RELIC slots [nW], additive with the relic building's.
+            self._wond_relic = torch.tensor([int(w["relicslots"]) for w in self._wond_rows], dtype=torch.long, device=device)
         self.feat_id = torch.tensor([[t.get("fid", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.feat_removable = torch.tensor([[bool(t.get("frm", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         for b, f in enumerate(fixtures):

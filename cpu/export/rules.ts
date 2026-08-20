@@ -18,7 +18,7 @@ import { GENERAL_AURA_CS, GENERAL_AURA_RANGE, BARB_SCOUT_OPENER_LIVE } from '../
 import { GENERAL_AURA_MP } from '../core/aura';
 import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_HILL_CS, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD } from '../data/cityStates';
 import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_BUILDINGS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_YIELD, CITY_STATE_MAX_HP, CITY_STATE_MEET_RANGE, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
-import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_CULTURE, ARTIFACT_TOURISM, THEMING_MULT, SPECIALIST_YIELDS, SPECIALIST_TIERS } from '../data/greatPeople';
+import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, RELIC_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_CULTURE, ARTIFACT_TOURISM, THEMING_MULT, SPECIALIST_YIELDS, SPECIALIST_TIERS } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, MARTYR_CHANCE, type BeliefEffects } from '../data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -301,8 +301,9 @@ export function buildRules() {
       // columns (b_cost catalog order) that hold writing/music works, the slots
       // per building, the works per person and the per-work culture yield BY KIND
       // (writing 2, music 4 — the real GS values; NO Great Work pays
-      // gold, and tourism is unmodeled). The GPU slots works into these building
-      // columns and adds the matching culture at the buildings-bucket position.
+      // gold). The GPU slots works into these building columns and adds the
+      // matching culture at the buildings-bucket position; `gwTourismByKind`
+      // carries the tourism the same way.
       // the three slotted Great Work kinds, in kind order
       // (0 WRITING / 1 ART / 2 MUSIC) — the REAL Civ 6 mapping:
       // Amphitheater 2 slots, Art Museum 3, Broadcast Center 1.
@@ -430,6 +431,7 @@ export function buildRules() {
         growAll: w.effects?.growthAllMult ?? 1,
         petra: w.effects?.petraDesert ? 1 : 0,
         gwslots: GW_WONDER_SLOTS[w.id] ?? [0, 0, 0],
+        relicslots: RELIC_WONDER_SLOTS[w.id] ?? 0,
         mult: YIELD_KEYS.map((k) => w.effects?.cityYieldMult?.[k] ?? 1),
         // adjacency requirement: -1 none, -2 CITY_CENTER, -3 required but
         // out-of-catalog (never placeable — Colosseum/Ruhr), else the

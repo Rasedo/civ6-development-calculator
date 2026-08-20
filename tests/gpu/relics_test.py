@@ -3,9 +3,8 @@
 Real Civ 6 counts a Relic as a Great Work held in a TEMPLE's single slot,
 paying +4 Faith and +8 Tourism (the densest tourism source in the game). A
 relic is created when an Apostle killed in theological combat carried the
-MARTYR promotion; promotions are unmodeled and `theologicalCombatPhase` is
-deliberately zero-draw, so every APOSTLE killed there martyrs — a recorded
-overstatement (see the RELIC_* comment in cpu/data/greatPeople.ts).
+MARTYR promotion, which `_martyr_draw` rolls at the death. A wonder can hold
+relics too (`RELIC_WONDER_SLOTS`), additive with the Temple's.
 
 Scripted play does reach the grant, and both rFaith and rTourism are compared
 trace columns, so this lane pins what the gate cannot isolate: the exported
@@ -86,6 +85,41 @@ def main() -> None:
     assert int(sim.city_relics[0, 0, 1]) == 0, "a dead city must never hold a relic"
     assert int(sim.city_relics[0, 0, 2]) == 1, "placement falls through to the next live temple city"
 
+    # --- 3b) a WONDER adds relic slots, and holds them with no Temple ------
+    # CIV6: St. Basil's Cathedral +3 Relic slots, Mont St. Michel 2. The
+    # capacity is the Temple's slots PLUS every complete wonder the city holds,
+    # which is the `placeRelic` expression.
+    wrelic = sim._wond_relic.tolist()
+    assert sum(wrelic) > 0, "no wonder exports a relic slot — RELIC_WONDER_SLOTS never reached the wire"
+    wi = int(torch.tensor(wrelic).argmax())
+    nslot = wrelic[wi]
+    sim.city_relics[:, 0].zero_()
+    sim.city_bldg[:, 0, :, b] = False
+    sim.city_alive[:, 0, :] = True
+    sim.city_wonder[:, 0, :, :] = -1
+    # city 0 holds the wonder and NO temple; park it on a tile marked complete
+    t0 = int(sim.city_center[0, 0, 0])
+    sim.city_wonder[:, 0, 0, wi] = t0
+    sim.built_wonder_complete[:, t0] = True
+    cap = sim._relic_cap()
+    assert int(cap[0, 0, 0]) == nslot, f"a temple-less wonder city must hold {nslot}, got {int(cap[0, 0, 0])}"
+    for _ in range(nslot):
+        sim._grant_relic(rows, torch.zeros(1, dtype=torch.long))
+    assert int(sim.city_relics[0, 0, 0]) == nslot, (
+        f"the wonder's {nslot} slots must all fill, got {int(sim.city_relics[0, 0, 0])}"
+    )
+    before = int(sim.city_relics[:, 0].sum())
+    sim._grant_relic(rows, torch.zeros(1, dtype=torch.long))
+    assert int(sim.city_relics[:, 0].sum()) == before, "the wonder's capacity must still run out"
+    # ... and an INCOMPLETE wonder grants nothing
+    sim.built_wonder_complete[:, t0] = False
+    assert int(sim._relic_cap()[0, 0, 0]) == 0, "an unfinished wonder must grant no slot"
+    # ... and a TEMPLE stacks on top of it
+    sim.built_wonder_complete[:, t0] = True
+    sim.city_bldg[:, 0, 0, b] = True
+    assert int(sim._relic_cap()[0, 0, 0]) == nslot + sim._relic_slots, "temple slots must ADD to the wonder's"
+    print(f"  wonder relic slots OK — {nslot} from wonder {wi}, additive with the Temple")
+
     # --- 4) the tourism term actually counts relics ------------------------
     s2 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     era = s2._civ_era(s2.civ_techs[:, 0], s2.civ_civics[:, 0])
@@ -161,7 +195,7 @@ def main() -> None:
     assert int(s4.city_gw_art[0, row, k]) == 4, "art must follow its city through compaction"
     print("  #79b all four work planes ride the slot compaction OK")
 
-    print("relics OK — constants, placement, dead-city masking, tourism term, _MUTABLE, #79 transfer+compaction")
+    print("relics OK — constants, placement, wonder slots, dead-city masking, tourism term, _MUTABLE, transfer+compaction")
 
 
 if __name__ == "__main__":

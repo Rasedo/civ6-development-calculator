@@ -60,11 +60,50 @@ nothing carries forward.
 | B-24r Ages/governors | 2 | four system-less dedication entries, dark-age policies, governor promotions, per-civ era drift |
 | B-30r specialists | 2 | the mechanic is live; the free-assignment wire head and its observation stay open |
 | B-31r trade-route tails | 2 | sea legs park at origin, no trading posts, plunder gold is a stylization, one candidate not a free pick |
-| B-D unsourced data values | 1 | swept; residuals are NAMED stylizations, each labelled at its definition |
+| B-D unsourced data values | 3 | the sweep is done; nine NAMED stylizations stay open, each labelled at its definition |
+| B-36r appeal adjacency terms | 2 | four terms real Civ 6 pays that this one does not, all four sources present |
+| B-38r no wonder pays per-turn GP points | 1 | Hermitage's Artist points and Bolshoi's Writer/Musician points; flat culture stands in |
+| B-39r wonder effects still dropped | 3 | fourteen rows name one each in their `description` |
+| B-40r production-cost tails | 2 | the builder's 4*(x+1)+46 curve and the district's 40% under-represented discount |
+| B-41r the wall pool is all-or-nothing | 1 | Civ 6 reduces centre damage instead, and scales wall damage by attacker class |
+| B-42r the damage random range is contested | 1 | 0.8-1.2 vs 0.75-1.25; the same source states both |
+| B-43r a homeless relic is LOST | 1 | Civ 6 holds it in reserve until a slot opens |
+| B-44r city-state war has no decider | 1 | both engines carry the machinery; no policy ever reaches it |
 | B-35r theological damage | 1 | deterministic and LINEAR where real Civ 6 rolls; the martyr draw shows a mirrored conditional draw is available |
 | B-34r flood tails | 1 | GS floods also damage UNITS and kill citizens, and a centre on a floodplain loses HP; and the Dam/Great Bath that mitigates a river is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **17** | |
-| **OPEN, TOTAL** | **17** | |
+| **B. Fidelity vs real Civ 6** | **31** | |
+| C-1 POWER | 5 | no plants, no grid, no powered-yield term — 4 gaps wait on it |
+| C-2 diplomatic agreements | 6 | war and peace and nothing between: open borders, work trades, alliances, denouncements |
+| C-3 unit promotions | 4 | only MARTYR reaches a rule; choosing one is also a wire head |
+| C-4 unique improvements | 3 | Batey / Colossal Head / Monastery, each a flat channel today |
+| C-5 strategic-resource stockpiles | 4 | resources gate, they never accumulate or get spent |
+| C-6 policy-card modifiers | 5 | ~38 adoptable cards are inert one-liners |
+| C-7 trading posts | 2 | a route lays roads and plants nothing |
+| C-8 draws made deterministic | 2 | inspirations, the religion pick, theological damage |
+| C-9 faith-purchase classes | 1 | faith buys named units, never a class of building |
+| C-10 non-GS city-state rows | 1 | Antioch/Amsterdam were replaced in GS; no line can be quoted |
+| C-11 terrain the wonder rules need | 2 | the NARROWED placements are deliberately narrower than Civ 6's |
+| C-12 the Film Studio is absent | 1 | the Theater tier's other top building, so its specialist upgrade has one path |
+| C-13 ranged vs districts/cities | 2 | a scope-out on both, with the rest of the Encampment complete |
+| C-14 no Inquisitor | 1 | "only Apostles initiate" is a roster gap, not a rule |
+| C-15 garrison does not block capture | 2 | the move-onto-centre capture model is what is missing |
+| C-16 spies / air units / GDRs | 4 | whole unit classes, and four dedications wait on them |
+| C-17 embarked movement never upgrades | 1 | the flat EMBARK_MOVES stands in for every era |
+| C-18 artifact civilization is the acting seat | 1 | real Civ 6 attributes the find to the event's own civ |
+| C-19 grievances and warmongering | 2 | war has no reputational consequence with anyone |
+| C-20 the Military Engineer's build list | 2 | five buildables and the finish-a-district charge |
+| C-21 Great Person ACTIVATED abilities | 2 | every GP fires instantly; none is placed and used |
+| C-22 the district roster is a subset | 3 | no Dam, Canal, Water Park, Preserve, Aerodrome, Government Plaza or Diplomatic Quarter |
+| **C. Absent systems** | **56** | |
+| **OPEN, TOTAL** | **87** | |
+
+THE TOTAL JUMPED from 17 to 87 while the code only got better. The old number
+counted the gaps somebody had written as gaps; chapter C counts the ones that
+had been written down as DECISIONS, and the new B rows are what the same sweep
+found at the definition sites — markers in the source that claimed a system was
+absent when it had since been built, or claimed a gap was closed by being
+written down. This is the honest figure, and it is the one the rule at the top
+of this file asks for.
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -278,48 +317,202 @@ Civ 6 source or is recorded as unverifiable.
     alternatives — the free-choice head is P8-surface work, alongside the
     route verb joining `env.step` (which today carries no buy/levy
     either).
-- **B-D. UNSOURCED DATA VALUES — swept; named stylizations remain.**
-  The full cpu/data walk fetched every magnitude from the GS Civilopedia
-  row by row: all 28 wonders (12 corrected, every unlock now the real
-  tech/civic), every unit, every technology and every civic (era, cost,
-  prereqs — both trees were systematically off and now match the real
-  tree, with BUTTRESS, SCIENTIFIC_THEORY, ADVANCED_BALLISTICS, COMPOSITES
-  and the SCORCHED_EARTH civic entering, and ELECTRONICS deleted as not a
-  GS node), every building (costs; worship faith price 380), and every
-  policy card with a live effect. What remains is RECORDED, not unsourced,
-  each labelled at its definition: GAME_SPEED 0.6 (the one global speed
-  stylization), the POWERED-yield splits (GS puts part of late building
-  yields behind POWER, unmodeled — the vanilla flat yields stand in,
-  sourced from the standard-rules Civilopedia, incl. the generic
-  POWER_PLANT for the coal/oil/nuclear family), the GOVERNMENTS' inherent
-  bonuses and inert policy one-liners (`policies` header), the BELIEF
-  magnitudes (`religion` header), Monument's loyalty term and Lighthouse's
-  per-coast-tile food (flat stand-ins), and the deliberate tuning
-  constants in `seats` (its header names them).
+- **B-36r. Appeal adjacency terms.** `tileAppeal` / `_tile_appeal` carry the
+  real Civ 6 list except for four terms whose sources all EXIST here: an
+  adjacent HOLY SITE, THEATER SQUARE or ENTERTAINMENT COMPLEX is +1 in real
+  Civ 6 (this model pays only the negative districts), and an adjacent
+  BARBARIAN OUTPOST is -1. Appeal feeds Neighborhood housing, the Seaside
+  Resort's gold and tourism and now National Park legality, so this moves the
+  economy on both engines. The rest of the real list (Dam, Canal, Water Park,
+  Preserve, the unique improvements, the appeal-granting Great People) waits
+  on C-22, C-4 and C-21.
+- **B-38r. No wonder pays PER-TURN Great Person points.** `BuiltWonderDef`
+  has no GP-point channel, so the Hermitage's "+3 Artist points per turn" and
+  the Bolshoi Theatre's "+2 Writer / +2 Musician points per turn" are stood in
+  for by flat `cityYields.culture`. The channel is the item; the two wonders
+  are its first users.
+- **B-39r. Wonder effects still dropped.** Fourteen `BUILT_WONDERS` rows name
+  one in their own `description` — Mont St. Michel's Martyr guarantee on every
+  Apostle, the Bolshoi's two free civics, St. Basil's +100% religious tourism
+  and tundra yields, the Taj Mahal's era score, Alhambra's military slot,
+  Venetian Arsenal's duplicate naval unit, Cristo Redentor's tourism ability,
+  and the rest. Each is one effect, so the weight is for the sweep. NOT open
+  any more: per-wonder Great Work and RELIC slots, which `GW_WONDER_SLOTS` and
+  `RELIC_WONDER_SLOTS` now pay (Great Library, Hermitage, Bolshoi Theatre, St.
+  Basil's, Mont St. Michel). The Hermitage's real slots take LANDSCAPE art
+  only; that restriction is the same missing per-work TYPE B-20r names.
+- **B-40r. Production-cost tails.** Two sourced curves, both live on every
+  turn of every game.
+  - The BUILDER costs `4 * (x + 1) + 46` in real Civ 6, where x is the number
+    you have trained or purchased (captured Builders do not count; free ones
+    do). `UNITS.BUILDER.cost` is the flat x=0 value, 50, forever.
+  - A specialty DISTRICT is discounted 40% when you have built fewer of its
+    type than the empire average (25% for the Government Plaza and Diplomatic
+    Quarter, neither in this roster). `districtCostIn` / `rules.district_cost`
+    charge the undiscounted curve.
+- **B-41r. The wall pool is all-or-nothing, and class-blind.** `cityAssault`
+  / `_assault_city` send the whole roll to `outerHp` until the pool is empty
+  and only the spillover to city HP. Two sourced differences: real Civ 6 has
+  the perimeter REDUCE damage to the centre rather than absorb it entirely
+  while it stands, and it scales damage to the perimeter by attacker class
+  (-85% for melee, -50% for ranged, full only for Bombard strength). So a
+  walled city here is cracked in the wrong ORDER and by the wrong units.
+- **B-42r. The combat damage RANDOM RANGE is contested.** The reverse-
+  engineered formula quotes 0.75-1.25 while the same source says equal-
+  strength hits land "reliably between 24 and 36", which is 30 x [0.8, 1.2]
+  exactly. Both engines use 0.8-1.2. Open until a source settles it — the
+  choice is currently made on internal consistency, not evidence.
+- **B-43r. A relic with no open slot is LOST.** `placeRelic` / `_grant_relic`
+  walk the seat's cities and discard the relic when every slot is full. Real
+  Civ 6 holds it in reserve until a slot opens.
+- **B-44r. War with a city-state has NO DECIDER on either engine.** Both
+  halves of the machinery exist and agree: `declareWarOnCityState` /
+  `sueForPeaceWithCityState` on TS, the war plane and the CS-attack mask column
+  on the GPU. Neither engine has a production caller — TS's two entry points
+  are reached only from tests, and the GPU lane's own header says the scripted
+  gate cannot reach the mask column. So no seat is ever at war with a
+  city-state in a driven game, and the whole subsystem is poke-covered only.
+  It needs a wire head and a policy the way the trade route did. The
+  diplomatic consequences of declaring wait on C-19.
+- **B-D. UNSOURCED DATA VALUES — swept once; the named stylizations are
+  OPEN, not closed.** The cpu/data walk fetched every magnitude from the GS
+  Civilopedia row by row: all 28 wonders (12 corrected, every unlock now the
+  real tech/civic), every unit, every technology and every civic (era, cost,
+  prereqs — both trees were systematically off and now match the real tree),
+  every building (costs; worship faith price 380), and every policy card
+  with a live effect. What is LEFT is each labelled at its definition, and
+  each is an open residual rather than a decision:
+  - `GAME_SPEED` 0.6 (`constants`) — the one global speed stylization; real
+    Civ 6 scales cost, yield and turn tables independently per speed.
+  - the GOVERNMENTS' inherent bonuses (`policies` header) — flat stand-ins
+    for the real per-government terms.
+  - the BELIEF magnitudes (`religion` header) — model numbers, not Civ 6's.
+  - Monument's loyalty term and Lighthouse's per-coast-tile food — flat
+    stand-ins for sourced-but-differently-shaped rules.
+  - the SPACEPORT's 1 gold upkeep — unsourced, left at the generic value.
+  - the deliberate tuning constants in `seats` (its header names them):
+    model tuning, not Civ 6 values, and every one is a place the two engines
+    agree on a number real Civ 6 never states.
+  - the per-CITY war-weariness split (`seats`, WAR_WEARINESS_LOSS_OVER_REQ_
+    AMENITIES_*): one empire-wide penalty stands in for a per-city term.
+  - the MILITARY ENGINEER production rule (`ENGINEER_LIVE` header) — authored,
+    not sourced, and flipping it is a behaviour change on both engines.
+  - the DEDICATION per-era availability windows (`seats`) — the Civilopedia
+    publishes only Automaton Warfare's, so the round-robin offers every entry
+    in every era.
 
-## Recorded deviations — decided, sourced, and NOT open work
+## C. ABSENT SYSTEMS — the blockers, and the gaps waiting on them
 
-These are not gaps waiting on a round; they are choices with a reason, kept
-here so nobody re-opens them as findings. They carry no weight in the table
-above.
+THIS CHAPTER EXISTS BECAUSE "recorded" IS NOT "closed" (owner, 2026-08-19).
+Every entry below was previously written down as a decision — "recorded, not
+fixed", "descoped", "unmodeled", "out of scope", "the flat channel stands
+in" — and each is really a DEFERRAL waiting on a system this engine does not
+have. The rule now: the missing system is one open item, and each gap that
+names it is another. The gaps are listed under their blocker so the
+dependency is readable, and both halves count.
 
-- **Ranged strikes against a DISTRICT** are out of scope, matching the
-  ranged-vs-city scope-out. The rest of the Encampment (`encamp_hp` pool,
-  movement block, garrison pool, district strike, training XP) is complete.
-- **Only APOSTLES initiate theological combat.** Real Civ 6 also allows
-  Inquisitors; this roster has no INQUISITOR unit at all, so the pair we model
-  is the whole class.
-- **A garrison does not BLOCK a capture; it dies with the city.** Real Civ 6
-  takes a city by moving a melee unit onto the centre, so a defender standing
-  there has to be destroyed first. Here the centre is taken the moment its HP
-  reaches 0 and CITY-FIRST targeting means the garrison was never attackable in
-  its own right, so blocking would deadlock: the units on the centre die with
-  it instead ("when a city is captured, all units within it are destroyed").
-- **The science victory's three small deviations.** The Terrestrial Laser
-  Station's powered-city condition (there is no power system), the Lagrange
-  Laser Station's 30 Aluminum (there are no strategic-resource stockpiles),
-  and the Spaceport's upkeep left at the generic 1 gold (unsourced — it is a
-  B-D magnitude, not a mechanic).
+The OPEN weight jumped when this chapter landed. That is the point: the old
+number was under-counting by treating deferrals as closures.
+
+- **C-1. POWER — no plants, no grid, no powered-yield term.** Weight 5.
+  Gaps waiting on it: the POWERED-yield SPLITS (GS puts part of late building
+  yields behind Power; the vanilla flat yields stand in, `buildings`); the
+  coal/oil/nuclear PLANT family, which the generic POWER_PLANT stands in for;
+  Cardiff's suzerain row (+2 Power per Harbor building, a flat production
+  channel today); and the Terrestrial Laser Station's powered-city condition
+  in the space race.
+- **C-2. DIPLOMATIC AGREEMENTS — no treaty of any kind.** Weight 6. There is
+  war and peace and nothing between them. Gaps: OPEN BORDERS, and with it an
+  Archaeologist working foreign ground (B-20r); TRADING Great Works between
+  civs and the Great Work Heist (B-20r); ALLIANCES; DENOUNCEMENTS, which To
+  Arms!'s casus belli needs (`seats` dedication header); and the World
+  Congress's Treaty Organization resolution (B-22r).
+- **C-3. UNIT PROMOTIONS — no promotion tree.** Weight 4. The only promotion
+  that reaches a rule is MARTYR, drawn at the death. Gaps: Yerevan's suzerain
+  row (choose an Apostle promotion instead of drawing it — and choosing is a
+  DECISION with no wire record, so it needs a head too); every promotion-
+  shaped policy card in `policies`; and veterancy beyond the flat XP levels.
+- **C-4. UNIQUE IMPROVEMENTS — the roster holds only the generic set.**
+  Weight 3. Gaps: Caguana's Batey, La Venta's Colossal Head and Armagh's
+  Monastery (each a whole improvement with its own adjacency, standing in as
+  a flat channel today), and the Chemamull-shaped appeal improvements.
+- **C-5. STRATEGIC-RESOURCE STOCKPILES — resources gate, they do not
+  accumulate.** Weight 4. `civHasStrategic` answers a boolean; real GS
+  accumulates and SPENDS. Gaps: the Lagrange Laser Station's 30 Aluminum;
+  unit resource COSTS and per-turn consumption; Zanzibar's two
+  exists-nowhere-else luxuries.
+- **C-6. POLICY-CARD MODIFIERS — ~38 cards are inert one-liners.** Weight 5.
+  `policies` carries them with "(not modeled)" in the description: combat
+  strength vs a class, production toward a unit class, per-unit maintenance
+  discounts, goody-hut speed. Each needs a modifier channel the yield/combat
+  bodies read. The cards EXIST and are adoptable, which makes this worse than
+  an absence: a seat can spend a slot on nothing.
+- **C-7. TRADING POSTS — a route lays roads and plants nothing.** Weight 2.
+  Gaps: Bandar Brunei's suzerain row; the water-route RANGE refuel and the
+  per-post gold at repeat destinations (B-31r).
+- **C-8. RANDOM DRAWS THE MODEL MAKES DETERMINISTIC.** Weight 2. Gaps:
+  Vilnius's random Inspiration at an era edge; the religion body's
+  deterministic pick (`religion`); theological damage, which is linear where
+  real Civ 6 rolls (B-35r names the same thing from the combat side).
+- **C-9. FAITH-PURCHASE CLASSES — faith buys the units the rules name, not
+  classes of BUILDING.** Weight 1. Gap: Valletta's suzerain row (City Center
+  and Encampment buildings buyable with Faith).
+- **C-10. THE CITY-STATE CATALOG HOLDS NON-GS ROWS.** Weight 1. Antioch and
+  Amsterdam were REPLACED in Gathering Storm, so no GS line can be quoted for
+  them and their flat channels stand in for text that no longer exists. Either
+  they leave the roster or the roster stops claiming to be GS.
+- **C-11. TERRAIN THE WONDER RULES NEED IS UNMODELED.** Weight 2. The
+  NARROWED marker in `builtWonders` names each wonder whose real placement
+  rule asks for terrain this map generator does not produce, so the modelled
+  rule is deliberately narrower than Civ 6's.
+- **C-12. THE FILM STUDIO IS NOT IN THE BUILDING ROSTER.** Weight 1. It is
+  the Theater Square's alternative top building, so `SPECIALIST_TIERS` names
+  the Broadcast Center alone where real Civ 6 accepts either.
+- **C-13. RANGED STRIKES DO NOT ENGAGE DISTRICTS OR CITIES.** Weight 2.
+  Recorded as a scope-out for both. The rest of the Encampment (`encamp_hp`
+  pool, movement block, garrison pool, district strike, training XP) is
+  complete, which is what makes the missing arm visible.
+- **C-14. NO INQUISITOR.** Weight 1. Real Civ 6 lets Inquisitors initiate
+  theological combat and defend against it; this roster has no such unit, so
+  "only Apostles initiate" is a roster gap, not a rule.
+- **C-15. A GARRISON DOES NOT BLOCK A CAPTURE.** Weight 2. Real Civ 6 takes a
+  city by moving a melee unit ONTO the centre, so a defender there must die
+  first. Here the centre falls at 0 HP and CITY-FIRST targeting never makes
+  the garrison attackable on its own, so blocking would deadlock — the
+  deadlock is the symptom; the missing piece is the move-onto-centre capture
+  model, and both halves are open.
+- **C-16. SPIES, AIR UNITS AND GIANT DEATH ROBOTS.** Weight 4. Whole unit
+  classes with no roster entry. Gaps: four dedication catalog entries (Sky
+  and Stars, Bodyguard of Lies, Automaton Warfare, Wish You Were Here) and
+  the Great Work Heist that C-2 also names.
+- **C-17. EMBARKED MOVEMENT DOES NOT UPGRADE.** Weight 1. `constants` records
+  that the tech upgrades to embarked movement are unmodeled; the flat
+  EMBARK_MOVES stands in for every era.
+- **C-18. AN ARTIFACT'S CIVILIZATION IS THE ACTING SEAT.** Weight 1. Both
+  engines stamp the seat whose ORDER buried the find, because that is the
+  only seat every death site on both engines holds. Real Civ 6 attributes it
+  to the event's own civilization. Named here rather than in B-20r because
+  the fix is a provenance plumbed through every death path.
+- **C-19. GRIEVANCES AND WARMONGERING — war costs nothing but the war.**
+  Weight 2. No seat's standing with anyone moves when it declares, razes or
+  conquers. Gaps: the diplomatic consequences of declaring on a city-state
+  (`declareWarOnCityState`), the suzerain's reaction, and the To Arms!
+  dedication's casus belli, which C-2 also names from the treaty side.
+- **C-20. THE MILITARY ENGINEER BUILDS ONE THING.** Weight 2. Real Civ 6 gives
+  it Fort, Airstrip, Missile Silo, Mountain Tunnel, Reinforced Barricade and
+  Modernized Trap, plus spending a charge to finish 20% of a Canal, Dam,
+  Aqueduct or Flood Barrier. Only the FORT exists here. The Airstrip waits on
+  C-16 and three of the four district charges wait on C-22.
+- **C-21. GREAT PEOPLE FIRE INSTANTLY; NONE IS PLACED.** Weight 2. A claimed
+  Great Person pays its effect at the claim (`recruit`). Real Civ 6 gives many
+  of them an ACTIVATED ability used later on a chosen tile. Gaps: the
+  appeal-granting Great People (Alvar Aalto, Charles Correa) that B-36r names,
+  and every "activate in a city" ability in the roster.
+- **C-22. THE DISTRICT ROSTER IS A SUBSET.** Weight 3. Twelve of Civ 6's
+  districts exist; the DAM, CANAL, WATER PARK, PRESERVE, AERODROME, GOVERNMENT
+  PLAZA and DIPLOMATIC QUARTER do not. Gaps: their appeal terms (B-36r), the
+  Military Engineer's finish-a-district charge (C-20), the Dam's flood
+  protection that B-34r names, and the Preserve's housing table.
 
 ## Reachability — what the green gate does NOT prove
 

@@ -1234,24 +1234,38 @@ class SimSeats:
         if bool(mil.any()):
             self.military_at[(rows[mil], t[mil])] = -1
 
+    def _relic_cap(self) -> torch.Tensor:
+        """[B, n_majors, RC] long — each city's relic capacity: the relic
+        building's slots plus every COMPLETE wonder it holds. The `placeRelic`
+        capacity expression, computed for every major row at once (the wonder
+        registry is majors-only, which is who can hold a wonder)."""
+        cap = self.city_bldg[:, : self.n_majors, :, self._relic_bidx].long() * self._relic_slots
+        if getattr(self, "_wond_relic", None) is None or int(self._wond_relic.sum()) == 0:
+            return cap
+        wreg = self.city_wonder  # [B, n_majors, RC, nW] tile index per wonder
+        compw = (wreg >= 0) & self.built_wonder_complete.gather(
+            1, wreg.clamp(min=0).reshape(self.B, -1)
+        ).reshape_as(wreg)
+        return cap + (compw.long() * self._wond_relic.reshape(1, 1, 1, -1)).sum(dim=3)
+
     def _grant_relic(self, rows: torch.Tensor, seat: torch.Tensor) -> None:
         """The `placeRelic` mirror: hand each row's seat ONE relic, placed in the
-        LOWEST city holding a TEMPLE with a free relic slot — city ARRAY order,
-        which the dense city/rc slot order mirrors. A relic that finds no slot is
-        LOST, as TS discards the return value the same way.
+        LOWEST city with a free relic slot — city ARRAY order, which the dense
+        city/rc slot order mirrors. A relic that finds no slot is LOST, as TS
+        discards the return value the same way.
 
         `seat` [n] IS the row in the merged city block, so one walk places
         every seat's relic."""
         if rows.numel() == 0 or self._relic_bidx < 0:
             return
         row = seat.clamp(min=0, max=self.n_majors - 1)
+        cap = self._relic_cap()
         placed = torch.zeros(rows.numel(), dtype=torch.bool, device=self.device)
         for j in range(self.RC):
             take = (
                 ~placed
                 & self.city_alive[rows, row, j]
-                & self.city_bldg[rows, row, j, self._relic_bidx].bool()
-                & (self.city_relics[rows, row, j] < self._relic_slots)
+                & (self.city_relics[rows, row, j] < cap[rows, row, j])
             )
             if bool(take.any()):
                 self.city_relics[rows[take], row[take], j] += 1

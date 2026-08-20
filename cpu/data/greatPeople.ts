@@ -188,8 +188,25 @@ export function artifactTourism(city: ArtCity): number {
   return (city.artifacts ?? 0) * ARTIFACT_TOURISM * (museumThemed(city) ? THEMING_MULT : 1);
 }
 export const GW_SLOTS = [2, 3, 1] as const;
+/** CIV6: Great Work slots a COMPLETE wonder adds to its city, in kind order
+ *  (writing, art, music) — additive with GW_BUILDINGS' slots, so a wonder
+ *  holds works in a city with no Amphitheater at all. Great Library "+2 Great
+ *  Works of Writing slots"; Hermitage "+4 Landscape Great Works of Art slots"
+ *  (the LANDSCAPE restriction needs a per-work TYPE this model does not
+ *  carry, so all four take any Art work); Bolshoi Theatre "+1 Great Work of
+ *  Writing slot, +1 Great Work of Music slot". */
 export const GW_WONDER_SLOTS: Record<string, readonly [number, number, number]> = {
   GREAT_LIBRARY: [2, 0, 0],
+  HERMITAGE: [0, 4, 0],
+  BOLSHOI_THEATRE: [1, 0, 1],
+};
+
+/** CIV6: RELIC slots a COMPLETE wonder adds to its city, additive with the
+ *  TEMPLE's. St. Basil's Cathedral "+3 Relic slots", Mont St. Michel
+ *  "2 Relic slots". */
+export const RELIC_WONDER_SLOTS: Record<string, number> = {
+  ST_BASILS_CATHEDRAL: 3,
+  MONT_ST_MICHEL: 2,
 };
 export const GW_WORKS_PER_PERSON = [2, 3, 2] as const;
 export const GW_CULTURE = [2, 2, 4] as const;
@@ -260,16 +277,21 @@ export function relicTourism(city: { relics?: number }): number {
 
 /**
  * Place ONE relic into `cities` (visited in array order — the
- * acquisition/slot order both engines share). It fills the LOWEST city with an
- * open TEMPLE relic slot. Returns true when it found a home; a relic with no
- * open slot anywhere is LOST (real Civ 6 would hold it in reserve for a later
- * slot — that storage is a recorded simplification, not modeled).
+ * acquisition/slot order both engines share). A city's capacity is its
+ * TEMPLE's slots plus `extra` (the wonder slots its caller sums), so a
+ * cathedral holds relics in a city with no Temple. Returns true when it found
+ * a home.
+ *
+ * A relic that finds no open slot anywhere is LOST. Real Civ 6 holds it in
+ * reserve until a slot opens; that reserve is an OPEN gap, not a decision.
  */
-export function placeRelic(cities: { buildings: string[]; relics?: number }[]): boolean {
+type RelicCity = { buildings: string[]; relics?: number; wonders?: { id: string; tileIndex: number }[] };
+
+export function placeRelic(cities: RelicCity[], extra?: (city: RelicCity) => number): boolean {
   for (const c of cities) {
-    if (!c.buildings.includes(RELIC_BUILDING)) continue;
+    const cap = (c.buildings.includes(RELIC_BUILDING) ? RELIC_SLOTS_PER_BUILDING : 0) + (extra?.(c) ?? 0);
     const used = c.relics ?? 0;
-    if (used >= RELIC_SLOTS_PER_BUILDING) continue;
+    if (used >= cap) continue;
     c.relics = used + 1;
     return true;
   }

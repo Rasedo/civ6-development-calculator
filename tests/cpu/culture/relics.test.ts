@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { placeRelic, relicFaith, relicTourism, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM } from '../../../cpu/data/greatPeople';
+import { placeRelic, relicFaith, relicTourism, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, RELIC_WONDER_SLOTS } from '../../../cpu/data/greatPeople';
 
 // RELICS. Real Civ 6 counts a Relic as a Great Work held in a
 // TEMPLE's single slot, paying +4 Faith and +8 Tourism — the densest tourism
@@ -51,5 +51,28 @@ describe('relics', () => {
 
   it('an empty civ (no cities) simply loses the relic', () => {
     expect(placeRelic([])).toBe(false);
+  });
+
+  it("sourced: St. Basil's holds 3 relics and Mont St. Michel 2", () => {
+    expect(RELIC_WONDER_SLOTS.ST_BASILS_CATHEDRAL).toBe(3);
+    expect(RELIC_WONDER_SLOTS.MONT_ST_MICHEL).toBe(2);
+  });
+
+  it('a wonder holds relics in a city with NO temple, and adds to one that has', () => {
+    const extra = (c: { buildings: string[] }) => (c.buildings.includes('_SB') ? 3 : 0);
+    const cities = [city(['_SB']), city(['TEMPLE'])];
+    expect(placeRelic(cities, extra)).toBe(true);
+    expect(cities[0].relics).toBe(1); // cathedral slot, no temple needed
+
+    const both = [city(['TEMPLE', '_SB'], 1)];
+    expect(placeRelic(both, extra)).toBe(true);
+    expect(both[0].relics).toBe(2); // temple 1 + wonder 3 = capacity 4
+  });
+
+  it('the wonder capacity still runs out', () => {
+    const extra = () => 2;
+    const cities = [city(['TEMPLE'], 3)];
+    expect(placeRelic(cities, extra)).toBe(false); // capacity 1 + 2 = 3, full
+    expect(cities[0].relics).toBe(3);
   });
 });

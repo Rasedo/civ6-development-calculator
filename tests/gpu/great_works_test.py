@@ -219,6 +219,39 @@ def main() -> None:
         assert int(sim.city_gw_writing[0, 1, 0]) == 2, "works must ride the slot permutation (writing)"
         assert int(sim.city_gw_music[0, 1, 0]) == 1, "works must ride the slot permutation (music)"
 
+    # --- a WONDER adds Great Work slots, additive with the building's ------
+    # CIV6: Great Library +2 Writing, Hermitage +4 Art, Bolshoi Theatre +1
+    # Writing and +1 Music. `_place_works` adds them to the building capacity,
+    # so a wonder holds works in a city with no Amphitheater at all.
+    kinds = sim._wond_gw.sum(dim=0).tolist()
+    assert sum(kinds) > 0, "no wonder exports a Great Work slot — GW_WONDER_SLOTS never reached the wire"
+    kind = int(torch.tensor(kinds).argmax())
+    wi = int(sim._wond_gw[:, kind].argmax())
+    nslot = int(sim._wond_gw[wi, kind])
+    s5 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    base = (s5.city_gw_writing, s5.city_gw_art, s5.city_gw_music)[kind]
+    bcol = s5._gw_bidx[kind]
+    s5.city_alive[:, 0, :] = True
+    base[:, 0].zero_()
+    if bcol >= 0:
+        s5.city_bldg[:, 0, :, bcol] = False   # NO matching building anywhere
+    s5.city_wonder[:, 0, :, :] = -1
+    t0 = int(s5.city_center[0, 0, 0])
+    s5.city_wonder[:, 0, 0, wi] = t0
+    s5.built_wonder_complete[:, t0] = True
+    hit = torch.ones(s5.B, dtype=torch.bool)
+    s5._place_works(0, hit, torch.zeros(s5.B, dtype=torch.float64), kind)
+    want = min(nslot, s5._gw_works_k[kind])
+    assert int(base[0, 0, 0]) == want, (
+        f"a temple-less wonder city must take {want} works of kind {kind}, got {int(base[0, 0, 0])}"
+    )
+    # an INCOMPLETE wonder holds nothing
+    base[:, 0].zero_()
+    s5.built_wonder_complete[:, t0] = False
+    s5._place_works(0, hit, torch.zeros(s5.B, dtype=torch.float64), kind)
+    assert int(base[0, 0, 0]) == 0, "an unfinished wonder must hold no work"
+    print(f"  wonder GW slots OK — {nslot} of kind {kind} from wonder {wi}")
+
     print("GREAT-WORKS OK")
 
 

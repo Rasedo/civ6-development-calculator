@@ -306,9 +306,10 @@ export const ADMIRAL_MARCH_LIVE = true;
  *
  * Verified against the Gathering Storm Civilopedia's "Dedications" concept.
  * The four modeled here are the ones whose EVENT already exists as a hook on
- * both engines; the rest of the catalog (To Arms!, Hic Sunt Dracones, Reform
- * the Coinage, Heartbeat of Steam, and the four that need spies / air units /
- * artifacts / Giant Death Robots) stays a recorded residual.
+ * both engines. The rest of the catalog is OPEN: To Arms!, Hic Sunt Dracones,
+ * Reform the Coinage and Heartbeat of Steam each need an event this model does
+ * not raise, and four more wait on spies / air units / artifacts / Giant Death
+ * Robots.
  *
  *   0 MONUMENTALITY       +1 era score per specialty DISTRICT completed
  *   1 FREE_INQUIRY        +1 era score per EUREKA (tech boost) triggered

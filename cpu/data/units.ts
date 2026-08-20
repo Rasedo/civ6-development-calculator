@@ -36,7 +36,8 @@ export interface UnitDef {
    * Only units that carry it can take part; only an APOSTLE may INITIATE
    * (real Civ 6: Apostles and Inquisitors attack, Missionaries only defend).
    * Magnitudes are stylized (the ORDER apostle > missionary is the sourced
-   * part); promotions and Inquisitors stay out of scope.
+   * part). Real Civ 6 also lets INQUISITORS attack and defend, and promotions
+   * change these numbers; neither exists here, and both stay open.
    */
   religiousStrength?: number;
   /** spawn-ONLY chassis (GENERAL/ADMIRAL) — never trainable,
@@ -65,7 +66,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'BUILDER',
       name: 'Builder',
       code: 'B',
-      cost: 50, // real Civ 6 base (the +4-per-builder escalation stays unmodeled - AUDIT)
+      cost: 50, // CIV6 4*(x+1)+46 at x=0; the per-builder escalation is open
       maintenance: 0,
       moves: 2,
       combat: 0,
@@ -249,8 +250,8 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     // spawnOnly → never trained/purchased/faith-bought. 4 MP so the seat
     // general keeps pace with the war march. No maintenance. The aura
     // (+5 CS within 2, combat.ts) is pure geometry; the retire ability is the
-    // roster's instant effect (kept). The +1 MP half of the real aura is
-    // DESCOPED (movement coupling — a recorded residual).
+    // roster's instant effect (kept). OPEN: the real aura also grants +1 MP,
+    // which this one does not — it would couple the aura to movement.
     U({
       id: 'GENERAL',
       name: 'Great General',
@@ -279,7 +280,8 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     // GPU's unit type ids and inserting anywhere else would renumber them.
     // Faith-purchase only like the Missionary, spreads like it, but carries a
     // higher religiousStrength and is the ONLY unit that may INITIATE
-    // theological combat (real Civ 6 also lets Inquisitors — out of scope).
+    // theological combat, because the roster holds no INQUISITOR — which real
+    // Civ 6 does, and which stays open.
     U({
       id: 'APOSTLE',
       name: 'Apostle',
@@ -300,8 +302,8 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     // unit in both engines AND in every exported fixture.
     // Its Civ 6 build list is Fort / Airstrip / Missile Silo / Mountain Tunnel /
     // Reinforced Barricade / Modernized Trap, plus spending a charge to finish
-    // 20% of a Canal, Dam, Aqueduct or Flood Barrier. Only the FORT exists in
-    // this model; the rest are recorded as unmodelled rather than stubbed.
+    // 20% of a Canal, Dam, Aqueduct or Flood Barrier. Only the FORT exists
+    // here; every other entry on that list is an open gap.
     U({
       id: 'MILITARY_ENGINEER',
       name: 'Military Engineer',

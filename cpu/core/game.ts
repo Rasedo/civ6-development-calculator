@@ -1,7 +1,7 @@
 
 import type { City, DistrictId, GameState, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, Seat, Unit } from './types';
 import { greatPeopleEarned } from './greatPeople';
-import { placeRelic } from '../data/greatPeople';
+import { placeRelic, RELIC_WONDER_SLOTS } from '../data/greatPeople';
 import { generateMap } from '../../world/mapgen';
 import { tilesWithin, hexDistance } from '../../world/hex';
 import { acquireTile, borderCandidates } from './city';
@@ -52,8 +52,10 @@ export function effectiveResearchCost(state: GameState, seat: number, id: string
  */
 export function districtCostIn(research: ResearchState): number {
   // The real Civ 6 curve — floor(54·(1 + 9·max(tech%, civic%)))
-  // (the tree you are FURTHER through drives the price, not the average;
-  // the 25% under-represented-district discount stays unmodeled — AUDIT).
+  // (the tree you are FURTHER through drives the price, not the average).
+  // OPEN: real Civ 6 also discounts a specialty district 40% when you have
+  // built fewer of its type than the empire average (25% for the Government
+  // Plaza and Diplomatic Quarter, which this roster does not carry).
   // The 54 base speed-scales like every other production cost.
   const tPct = research.techs.length / Object.keys(TECHS).length;
   const cPct = research.civics.length / Object.keys(CIVICS).length;
@@ -1060,8 +1062,15 @@ function theologicalCombatPhase(state: GameState): void {
     // disbands below (defender first, then attacker) so both the RNG stream and
     // the relic's slot are order-exact across engines.
     const martyrs = (): boolean => nextRandom(state) < MARTYR_CHANCE;
-    if (def.hp <= 0 && def.type === 'APOSTLE' && martyrs()) placeRelic(citiesOf(state, unitSeat(def)));
-    if (att.hp <= 0 && martyrs()) placeRelic(citiesOf(state, g)); // the attacker is always an APOSTLE
+    // Capacity is the TEMPLE's slot plus any wonder's, so the closure resolves
+    // completeness off the tile the way the Great-Works path does.
+    const relicSlots = (c: { wonders?: { id: string; tileIndex: number }[] }) =>
+      (c.wonders ?? []).reduce(
+        (n, w) => n + (state.map.tiles[w.tileIndex].builtWonderComplete ? RELIC_WONDER_SLOTS[w.id] ?? 0 : 0),
+        0,
+      );
+    if (def.hp <= 0 && def.type === 'APOSTLE' && martyrs()) placeRelic(citiesOf(state, unitSeat(def)), relicSlots);
+    if (att.hp <= 0 && martyrs()) placeRelic(citiesOf(state, g), relicSlots); // the attacker is always an APOSTLE
     if (def.hp <= 0) disbandUnit(state, def.id);
     if (att.hp <= 0) disbandUnit(state, att.id);
   }

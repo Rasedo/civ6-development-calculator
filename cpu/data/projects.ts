@@ -11,14 +11,11 @@
  * Shipping (gold / Great Admiral) and Encampment Training (no yield / Great
  * General).
  *
- * ONE SOURCED DEVIATION, recorded not fixed: the THEATER SQUARE FESTIVAL grants
- * Great WRITER, Great ARTIST **and** Great MUSICIAN points in real Civ 6 (each
- * ~11% of the production invested, Standard speed), converting 15% of the
- * city's production to Culture. This model awards the ARTIST class alone,
- * because `gpClass` is a single field. Fixing it means widening ProjectDef to a
- * class LIST and mirroring the multi-class award on the GPU — a behavioural
- * change to GP earn timing that needs its own gated round. The rate and the
- * class list are recorded here so that round does not have to re-derive them.
+ * The THEATER SQUARE FESTIVAL pays all three of its real classes — Great
+ * WRITER, ARTIST and MUSICIAN, each ~11% of the production invested (Standard
+ * speed) — through `gpClasses`, which `gpClassesOf` reads and the exporter
+ * writes as the `gs` column. `gpClass` stays the PRIMARY class so the index
+ * order is stable. Every other project pays one class.
  */
 
 import type { DistrictId, GreatPersonClass, YieldKey } from '../core/types';

@@ -283,9 +283,9 @@ export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = 
   // formula quotes 0.75–1.25, but the SAME source states equal-strength hits
   // land "reliably between 24 and 36" — and 30 × [0.75, 1.25] = [22.5, 37.5],
   // whereas 30 × [0.8, 1.2] = [24, 36] exactly. The repo's 0.8–1.2 is the
-  // internally consistent reading of that evidence, so it stands. Recorded
-  // rather than flipped: changing a live constant on contradictory sources is
-  // the same failure the sourcing sweep exists to fix.
+  // internally consistent reading of that evidence, so it stands until a
+  // source settles which half of the contradiction is right — an OPEN
+  // question, not a closed one.
   // StrengthDiff is now a multiple of 0.1 (wounded units subtract
   // hp/10; a river melee subtracts 5). Quantize it to 0.1 granularity so the
   // GPU's exp table — indexed by round(diff·10) — reproduces this exact JS
@@ -419,10 +419,13 @@ function assaultAtkCS(state: GameState, attacker: Unit, targetIndex: number): nu
  * which is what the both seats copies each did; nothing between them
  * touches the RNG, so this is the same stream either way.
  *
- * The ANCIENT_WALLS outer pool soaks the hit first — only the
- * spillover reaches city HP (a deliberate simplification of Civ 6's
- * percentage wall rules: outer absorbs the whole roll until depleted).
- * No walls → outerHp absent (0) → the full roll lands.
+ * The ANCIENT_WALLS outer pool soaks the hit first — only the spillover
+ * reaches city HP. No walls → outerHp absent (0) → the full roll lands.
+ * OPEN, both sourced: real Civ 6 lets the centre take REDUCED damage while
+ * the perimeter still stands rather than none at all, and it cuts damage TO
+ * the perimeter by unit class (-85% melee, -50% ranged; only Bombard strength
+ * hits full). Here the outer pool absorbs the whole roll until depleted and
+ * every class hits it the same.
  *
  * The caller decides what happens if the city falls; that branch is still
  * per-owner because a City and a City live in different registries.

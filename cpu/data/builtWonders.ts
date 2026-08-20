@@ -7,12 +7,10 @@
  * University). The EFFECTS are not swept, and PLACEMENT rules are eyeballed
  * where the real rule needs unmodeled terrain — NARROWED marker.
  *
- * SOURCED RESIDUAL noticed in the same pass: the real GREAT_LIBRARY carries
- * "+2 Great Works of Writing slots" on top of its yields. This model has no
- * per-WONDER Great Work slot channel (slots come from buildings only — see
- * GW_BUILDINGS in data/greatPeople.ts), so a wonder that adds slots is
- * unmodeled. Recorded, not fixed.
- *
+ * A wonder that adds GREAT WORK or RELIC slots pays them through
+ * `GW_WONDER_SLOTS` / `RELIC_WONDER_SLOTS` (data/greatPeople.ts), additive
+ * with the buildings' slots. Each row's `description` names what the real
+ * wonder does that this model still does not — read those as open gaps.
  */
 
 import type { DistrictId, TerrainId, Yields } from '../core/types';
@@ -238,7 +236,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       id: 'MONT_ST_MICHEL', name: 'Mont St. Michel', code: 'MS', cost: 710,
       requiresCivic: 'DIVINE_RIGHT', placement: { requiresRiver: true },
       cityYields: { faith: 2 },
-      description: '+2 faith. (Relic slots / Apostle martyrdom dropped.)',
+      description: '+2 faith, 2 relic slots. (The Martyr ability it grants every Apostle you create is not modeled.)',
     }),
     W({
       id: 'UNIVERSITY_OF_SANKORE', name: 'University of Sankoré', code: 'US', cost: 710,
@@ -256,7 +254,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       id: 'ST_BASILS_CATHEDRAL', name: "St. Basil's Cathedral", code: 'SB', cost: 920,
       requiresCivic: 'REFORMED_CHURCH', placement: { flatOnly: true },
       cityYields: { faith: 3, culture: 1 },
-      description: '+3 faith, +1 culture. (Relic slots + tundra-yield bonus dropped.)',
+      description: "+3 faith, +1 culture, 3 relic slots. (The +100% religious tourism from this city and the tundra yields are not modeled.)",
     }),
     W({
       id: 'TAJ_MAHAL', name: 'Taj Mahal', code: 'TM', cost: 920,
@@ -276,13 +274,13 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       id: 'HERMITAGE', name: 'Hermitage', code: 'HM', cost: 1450,
       requiresCivic: 'NATURAL_HISTORY', placement: { flatOnly: true, adjacentDistrict: 'THEATER_SQUARE' },
       cityYields: { culture: 3 },
-      description: '+3 culture. (Great Work of Art slots dropped — Great-Works surface is Slice Q.)',
+      description: '+3 culture, 4 Great Work of Art slots. (The culture stands in for the +3 Artist points per turn, which no wonder can pay.)',
     }),
     W({
       id: 'BOLSHOI_THEATRE', name: 'Bolshoi Theatre', code: 'BT', cost: 1240,
       requiresCivic: 'OPERA_AND_BALLET', placement: { flatOnly: true, adjacentDistrict: 'THEATER_SQUARE' },
       cityYields: { culture: 3 },
-      description: '+3 culture. (Great Writer/Musician points + Work slots dropped.)',
+      description: '+3 culture, +1 Writing and +1 Music Great Work slot. (The culture stands in for the per-turn Writer/Musician points; the 2 free civics at completion are not modeled.)',
     }),
     W({
       id: 'STATUE_OF_LIBERTY', name: 'Statue of Liberty', code: 'SL', cost: 1240,

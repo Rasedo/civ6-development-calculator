@@ -304,9 +304,9 @@ export function issueQuest(
  * it `attackTargets` could never legally offer a city-state centre, because
  * offering a PEACEFUL one is exactly what the autopilot invariant forbids.
  *
- * NOT MODELLED, recorded rather than approximated: the diplomatic consequences
- * (grievances/warmonger penalties with other civs, the suzerain's reaction) and
- * any peace-making path back. Declaring is one-way here.
+ * OPEN: the diplomatic consequences — grievances and warmonger penalties with
+ * other civs, and the suzerain's reaction — wait on a grievance system.
+ * `sueForPeaceWithCityState` below is the inverse verb.
  */
 export function declareWarOnCityState(state: GameState, cityStateId: number, seat: number): RuleResult {
   const cityState = (state.cityStates ?? []).find((c) => c.id === cityStateId);
