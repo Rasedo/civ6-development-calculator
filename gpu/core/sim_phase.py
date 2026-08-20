@@ -277,6 +277,7 @@ class SimPhase:
                  + self._loyalty_amenity[tier.clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)].double()
                  + gov.double() * self._gov_loy
                  + self._congress_loyalty(row)
+                 + self._building_loyalty(row, bidx, col)
                  + self._emergency_loyalty(row).gather(1, col.unsqueeze(1)).squeeze(1))
         loy = self.city_loyalty[bidx, row, col]
         upd = act & others

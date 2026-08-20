@@ -172,7 +172,9 @@ export interface GovernmentDef {
   name: string;
   tier: number;
   slots: SlotKind[];
-  /** Inherent bonus (eyeballed stand-ins where the real one needs systems we don't model). */
+  /** The government's inherent bonus. Each row's CIV6 quote sits at its
+   *  definition; where a term needs a channel this model has no shape for,
+   *  the row carries the half that fits and the rest is an open AUDIT item. */
   effects: PolicyEffects;
   description: string;
 }
@@ -197,12 +199,18 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
     // Slots sourced from the Gathering Storm Civilopedia: 1 Military,
     // 1 Economic, 1 Diplomatic, 1 Wildcard. Was [M, M, E, D] — the same TOTAL
     // of 4, which is why no gate ever caught the wrong composition.
+    // CIV6 (GS): "+1 to all yields for each government building and Palace in
+    // a city. +10% Production toward Wonders." The PALACE half is what this
+    // model can address — there is no Government Plaza to hold the rest.
     G('AUTOCRACY', 'Autocracy', 1, [M, E, D, W], { capitalYields: { food: 1, production: 1, gold: 1, science: 1, culture: 1, faith: 1 } },
-      '+1 to all yields in the capital.'),
+      '+1 to all yields in the capital, for its Palace.'),
     G('OLIGARCHY', 'Oligarchy', 1, [M, M, E, W], {},
       'Combat bonuses.'),
-    G('CLASSICAL_REPUBLIC', 'Classical Republic', 1, [E, E, D, W], { amenitiesAll: 1 },
-      '+1 amenity in all cities.'),
+    // CIV6 (GS): "All cities with a district receive +1 Housing and +1
+    // Amenity. +15% Great Person points."
+    G('CLASSICAL_REPUBLIC', 'Classical Republic', 1, [E, E, D, W],
+      { housingIfDistricts: { min: 1, housing: 1 }, amenitiesIfSpecialty: { min: 1, amenities: 1 } },
+      '+1 housing and +1 amenity in every city with a district.'),
     G('MONARCHY', 'Monarchy', 2, [M, M, E, D, W, W], { housingAll: 1 },
       '+1 housing in all cities.'),
     G('MERCHANT_REPUBLIC', 'Merchant Republic', 2, [M, E, E, D, D, W], { yieldMult: { gold: 1.1 } },
@@ -211,8 +219,10 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
       '+10% faith in all cities.'),
     G('DEMOCRACY', 'Democracy', 3, [M, E, E, E, D, D, W, W], { yieldMult: { culture: 1.1 } },
       '+10% culture in all cities.'),
-    G('COMMUNISM', 'Communism', 3, [M, M, M, E, E, E, D, W], { yieldMult: { production: 1.1 } },
-      '+10% production in all cities.'),
+    // CIV6 (GS): "+0.6 Production per Citizen in cities with Governors.
+    // +10% Science."
+    G('COMMUNISM', 'Communism', 3, [M, M, M, E, E, E, D, W], { yieldMult: { science: 1.1 } },
+      '+10% science in all cities.'),
     G('FASCISM', 'Fascism', 3, [M, M, M, M, E, D, W, W], {},
       'Combat bonuses.'),
   ].map((g) => [g.id, g]),

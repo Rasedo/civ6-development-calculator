@@ -380,6 +380,9 @@ class SimInit:
         self._special_slot = 3  # the special session's slot in the vote head
         # a Deforestation Treaty target `k` is the tile feature `_congress_feat[k]`
         self._congress_feat = [int(x) for x in _er2.get("congressFeatures", [])]
+        # the terrains the Lighthouse pays its food on
+        self._coast_food_terr = [int(x) for x in _er2.get("coastFoodTerrains", [])]
+        self._loyalty_max = float(rules.seats["loyaltyMax"])
         self._special_cost = float(_er2["specialSessionCost"])
         self._special_gap = int(_er2["specialSessionGap"])
         self._emg_member_favor = float(_er2["emergencyMemberFavor"])
@@ -1373,6 +1376,8 @@ class SimInit:
         self._type_tech = torch.tensor([u["requiresTech"] for u in ru], dtype=torch.long, device=device)
         self._type_civic = torch.tensor([u.get("requiresCivic", -1) for u in ru], dtype=torch.long, device=device)
         self._type_needs_slot = torch.tensor([bool(u.get("needsArtifactSlot", 0)) for u in ru], dtype=torch.bool, device=device)
+        # a building the TRAINING city must hold (the Military Engineer's Armory)
+        self._type_req_bldg = torch.tensor([int(u.get("requiresBuilding", -1)) for u in ru], dtype=torch.long, device=device)
         self._type_resource = torch.tensor([int(u.get("requiresResource", -1)) for u in ru], dtype=torch.long, device=device)
         self._res_unit_pairs = [(i, int(u.get("requiresResource", -1))) for i, u in enumerate(ru) if int(u.get("requiresResource", -1)) >= 0]
         self._type_charges = torch.tensor([u.get("charges", 0) for u in ru], dtype=torch.long, device=device)

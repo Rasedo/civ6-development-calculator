@@ -23,7 +23,7 @@ import { SPECIALIST_YIELDS, SPECIALIST_TIERS, greatWorkCulture, greatWorkTourism
 import { congressGrowthMult, congressGwMult } from './congress';
 import { suzerainEffect } from './cityStates';
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE } from '../data/cityStates';
-import { warWearinessPenalty, DED_FREE_INQUIRY } from '../data/seats';
+import { warWearinessPenalty, DED_FREE_INQUIRY, LOYALTY_MAX } from '../data/seats';
 import { RESOURCES } from '../../world/resources';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, REGIONAL_RANGE, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, type AmenityTier } from '../data/constants';
 import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf, tileClaimed, campTiles } from './seats';
@@ -598,12 +598,20 @@ export function computeCityStats(
     const r = RESOURCES[t.resource];
     if (r?.category === 'bonus' && r.improvement === 'FARM') tiles.food += 1;
   };
+  // CIV6 (Lighthouse): "+1 Food in Coast and Lake tiles controlled by the
+  // city" — the tile pays it, so only a WORKED one materializes.
+  const hasLighthouse = city.buildings.includes('LIGHTHOUSE');
+  const lighthouseBonus = (t: Tile) => {
+    if (hasLighthouse && (t.terrain === 'COAST' || t.terrain === 'LAKE')) tiles.food += 1;
+  };
   wonderTileBonus(center, true);
   waterMillBonus(center);
+  lighthouseBonus(center);
   for (const i of worked) {
     addYields(tiles, tileYields(ctx, map.tiles[i]));
     wonderTileBonus(map.tiles[i], false);
     waterMillBonus(map.tiles[i]);
+    lighthouseBonus(map.tiles[i]);
   }
 
   const districts = cityDistrictYields(ctx, city);
@@ -645,6 +653,10 @@ export function computeCityStats(
   // THIS CITY'S OWNER's dedication, which is the row the GPU reads.
   buildings.culture += goldenCulturePerDistrict(state, city.seat) * completedDistrictCount(state, city, true);
   buildings.faith += relicFaith(city);
+  // CIV6 (Monument): "+1 additional Culture if city is at maximum Loyalty."
+  if ((city.loyalty ?? LOYALTY_MAX) >= LOYALTY_MAX) {
+    for (const b of city.buildings) if (BUILDINGS[b]?.special === 'MONUMENT') buildings.culture += 1;
+  }
   // CIV 6, Anshan's suzerain: "+2 Science from each Great Work of Writing.
   // +1 Science from each Relic and Artifact."
   if (suzerainEffect(state, city.seat, 'worksScience')) {

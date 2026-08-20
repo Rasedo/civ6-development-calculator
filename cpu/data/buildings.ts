@@ -26,8 +26,12 @@ export interface BuildingDef {
   /**
    * WATER_MILL: city center must touch a river.
    * SHIPYARD: production equal to the Harbor's gold adjacency bonus.
+   * LIGHTHOUSE: +1 food on every Coast and Lake tile the city works.
+   * MONUMENT: +1 culture while the city sits at maximum loyalty.
    */
-  special?: 'WATER_MILL' | 'SHIPYARD';
+  special?: 'WATER_MILL' | 'SHIPYARD' | 'LIGHTHOUSE' | 'MONUMENT';
+  /** flat loyalty per turn while the building stands. */
+  loyalty?: number;
   /** Granted automatically to the capital; never buildable. */
   autoCapital?: boolean;
   worship?: boolean;
@@ -39,7 +43,9 @@ export interface BuildingDef {
 
 const rawList: BuildingDef[] = [
   { id: 'PALACE', name: 'Palace', district: 'CITY_CENTER', cost: 0, yields: { production: 2, gold: 5, science: 2, culture: 1 }, housing: 1, amenities: 1, autoCapital: true },
-  { id: 'MONUMENT', name: 'Monument', district: 'CITY_CENTER', cost: 60, yields: { culture: 2 }, maintenance: 0 },
+  // CIV6 (R&F/GS): "+1 Loyalty. +1 Culture. +1 additional Culture if city is
+  // at maximum Loyalty." The +2 culture flat is the VANILLA row.
+  { id: 'MONUMENT', name: 'Monument', district: 'CITY_CENTER', cost: 60, yields: { culture: 1 }, loyalty: 1, special: 'MONUMENT', maintenance: 0 },
   { id: 'GRANARY', name: 'Granary', district: 'CITY_CENTER', cost: 65, yields: { food: 1 }, housing: 2, maintenance: 0 },
   { id: 'WATER_MILL', name: 'Water Mill', district: 'CITY_CENTER', cost: 80, yields: { food: 1, production: 1 }, special: 'WATER_MILL', maintenance: 0 },
   { id: 'SEWER', name: 'Sewer', district: 'CITY_CENTER', cost: 200, housing: 2, maintenance: 2 },
@@ -64,7 +70,9 @@ const rawList: BuildingDef[] = [
   { id: 'BANK', name: 'Bank', district: 'COMMERCIAL_HUB', cost: 290, requiresAny: ['MARKET'], yields: { gold: 5 }, maintenance: 0 },
   { id: 'STOCK_EXCHANGE', name: 'Stock Exchange', district: 'COMMERCIAL_HUB', cost: 330, requiresAny: ['BANK'], yields: { gold: 7 }, maintenance: 0 },
 
-  { id: 'LIGHTHOUSE', name: 'Lighthouse', district: 'HARBOR', cost: 120, yields: { food: 1, gold: 1 }, housing: 1, maintenance: 0 },
+  // CIV6: "+1 Food. +1 Food in Coast and Lake tiles controlled by the city.
+  // +1 Gold. +1 Housing."
+  { id: 'LIGHTHOUSE', name: 'Lighthouse', district: 'HARBOR', cost: 120, yields: { food: 1, gold: 1 }, housing: 1, special: 'LIGHTHOUSE', maintenance: 0 },
   { id: 'SHIPYARD', name: 'Shipyard', district: 'HARBOR', cost: 290, requiresAny: ['LIGHTHOUSE'], special: 'SHIPYARD', maintenance: 1 },
   { id: 'SEAPORT', name: 'Seaport', district: 'HARBOR', cost: 440, requiresAny: ['SHIPYARD'], yields: { food: 2, gold: 2 }, housing: 1, maintenance: 0 },
 

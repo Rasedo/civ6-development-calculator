@@ -129,9 +129,10 @@ export const LOYALTY_AMENITY: Record<string, number> = {
 // NOT MODELLED, and now known to exist because the data names them:
 //   * WAR_WEARINESS_PER_WMD_LAUNCHED 10 — there are no nuclear weapons here.
 //   * WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_{AT_WAR_CITY 3, NONFOUNDED_CITY 1,
-//     FOUNDED_CITY 0} — a per-CITY component keyed on whether the city is at
-//     war and whether you founded it. This model applies one empire-wide
-//     penalty per seat; the per-city split is a recorded gap, not a decision.
+//     FOUNDED_CITY 0}. What these three DO is published nowhere; reading them
+//     as a per-city split is an inference off their names. The rule that IS
+//     published is the one below: "-1 Amenity for every 400 WWP you currently
+//     have, which is then applied to your cities".
 //
 // UNITS ARE NOW REAL WWP. The accumulator stays an INTEGER, so the derived
 // amenity penalty is integer too and there is no float-association risk.
@@ -537,11 +538,10 @@ export const DEDICATION_PAYOUTS_LIVE = true;
 /**
  * Seat MILITARY ENGINEER production.
  *
- * The production RULE is owner-chosen, not sourced: at war, one engineer at a
- * time, forting only tiles adjacent to a hostile civ's territory. Recorded as
- * authored — real Civ 6's AI forts chokepoints and no published rule quantifies
- * that. Flipping this flag is a behaviour change on both seats and needs its own
- * gated round.
+ * The unit's own data and its Armory gate are sourced (`data/units.ts`). What
+ * is authored is this: at war, one engineer at a time, forting only tiles
+ * adjacent to a hostile civ's territory. Real Civ 6's AI forts chokepoints and
+ * publishes no rule that quantifies it, so no source can settle this one.
  */
 export const ENGINEER_LIVE = true;
 

@@ -1046,7 +1046,15 @@ class SimMasks:
             room = (
                 self.city_bldg[:, row, :, self._artifact_bidx] & (self.city_artifacts[:, row] < self._artifact_slots)
             ).unsqueeze(2)
-        return civ_ok.unsqueeze(1) & (~need | room)
+        out = civ_ok.unsqueeze(1) & (~need | room)
+        # CIV6 (Military Engineer): "can only be built in a city that has an
+        # Encampment with an Armory" — the building carries its district.
+        if bool((self._type_req_bldg >= 0).any()):
+            held = torch.ones(B, C, self._type_req_bldg.shape[0], dtype=torch.bool, device=dev)
+            for t in (self._type_req_bldg >= 0).nonzero(as_tuple=True)[0].tolist():
+                held[:, :, t] = self.city_bldg[:, row, :, int(self._type_req_bldg[t])]
+            out = out & held
+        return out
 
     def _seat_slot_map(self, row: int) -> torch.Tensor:
         B = self.B

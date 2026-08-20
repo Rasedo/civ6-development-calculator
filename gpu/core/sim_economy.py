@@ -1999,6 +1999,21 @@ class SimEconomy:
                 & (self.res_imp.gather(1, stf) == self.FARM)  # ...whose improvement IS the farm
             ).reshape(B, n, M) & take
             tiles_y[:, :, 0] = tiles_y[:, :, 0] + (elig & wm.any(dim=2).unsqueeze(2)).sum(dim=2).double()
+        # CIV6 (Lighthouse): "+1 Food in Coast and Lake tiles controlled by the
+        # city" — the TILE pays it, so only a worked one materializes.
+        lh = bldg[:, :, rd.b_coastfood]
+        if lh.numel() and bool(lh.any()) and self._coast_food_terr:
+            tw = self.terrain.gather(1, stf).reshape(B, n, M)
+            tc = self.terrain.gather(1, ctr)
+            wet_w = torch.zeros_like(tw, dtype=torch.bool)
+            wet_c = torch.zeros_like(tc, dtype=torch.bool)
+            for _t in self._coast_food_terr:
+                wet_w = wet_w | (tw == _t)
+                wet_c = wet_c | (tc == _t)
+            has_lh = lh.any(dim=2)
+            tiles_y[:, :, 0] = (tiles_y[:, :, 0]
+                                + ((wet_w & take) & has_lh.unsqueeze(2)).sum(dim=2).double()
+                                + (wet_c & has_lh).double())
 
         # ================= bucket 2: DISTRICTS ==============================
         # THE DISTRICT REGISTRY IS THE ONE READ, on every seat row: TS walks
@@ -2106,6 +2121,12 @@ class SimEconomy:
         if bool(_pb.any()):
             bld_y[:, :, 4] = bld_y[:, :, 4] + _pb.double().unsqueeze(1) * self._district_counts(row)[1][:, sl].double() * alivef
         bld_y[:, :, 5] = bld_y[:, :, 5] + self._relic_faith * self.city_relics[:, row, sl].double() * alivef
+        # CIV6 (Monument): "+1 additional Culture if city is at maximum Loyalty."
+        _ml = bldg[:, :, rd.b_maxloy_culture]
+        if _ml.numel() and bool(_ml.any()):
+            bld_y[:, :, 4] = bld_y[:, :, 4] + (
+                _ml.sum(dim=2).double()
+                * (self.city_loyalty[:, row, sl].double() >= self._loyalty_max).double() * alivef)
         # CIV6 (Anshan's suzerain): "+2 Science from each Great Work of
         # Writing. +1 Science from each Relic and Artifact."
         _ans = self._suz_effect(row, self._suz_c_works)

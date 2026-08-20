@@ -263,6 +263,8 @@ export function buildRules() {
       // The Deforestation Treaty's target space, as FEATURE-CATALOG indices:
       // a target `k` on the wire is the tile feature `congressFeatures[k]`.
       congressFeatures: clearableFeatures().map((f) => featIdx.get(f) ?? -1),
+      // the terrains the Lighthouse pays its food on, as TERRAIN_IDS indices
+      coastFoodTerrains: ['COAST', 'LAKE'].map((t) => TERRAIN_IDS.indexOf(t)),
       congressDvMinEra: CONGRESS_DV_MIN_ERA, congressDvDelta: CONGRESS_DV_DELTA, congressVoteStep: CONGRESS_VOTE_STEP, congressProdMult: CONGRESS_PROD_MULT, congressGppMult: CONGRESS_GPP_MULT, congressGrowthA: CONGRESS_GROWTH_A, congressGrowthB: CONGRESS_GROWTH_B, congressMigLoyalty: CONGRESS_MIG_LOYALTY, congressGwMult: CONGRESS_GW_MULT, congressPlus100: CONGRESS_PLUS_100, congressMinus50: CONGRESS_MINUS_50, congressTradeGold: CONGRESS_TRADE_GOLD, congressTradeCapacity: CONGRESS_TRADE_CAPACITY, congressPolicyFavor: CONGRESS_POLICY_FAVOR, congressIdeologySlots: CONGRESS_IDEOLOGY_SLOTS, cultureBombRange: CULTURE_BOMB_RANGE, favorOccupiedCapital: FAVOR_OCCUPIED_CAPITAL,
       // EMERGENCIES: the catalog (id + the turn limit) and every magnitude
       emergencies: EMERGENCIES.map((e) => ({ id: e.id, turns: e.turns })),
@@ -622,6 +624,8 @@ export function buildRules() {
       // ARTIFACT-slot rule, so the GPU can refuse what trainableUnits refuses.
       requiresCivic: u.requiresCivic ? civicIdx.get(u.requiresCivic) ?? -1 : -1,
       needsArtifactSlot: u.id === 'ARCHAEOLOGIST' ? 1 : 0,
+      // a building the TRAINING city must hold (the Military Engineer's Armory)
+      requiresBuilding: u.requiresBuilding ? buildingIdx.get(u.requiresBuilding) ?? -1 : -1,
       // strategic-resource ACCESS gate — index into RESOURCE_IDS (the
       // same order the tile `rid` plane uses), or -1 = ungated. The GPU joins it
       // with the per-tile `rq`/res_imp plane to gate build+purchase per civ.
@@ -749,6 +753,9 @@ export function buildRules() {
       maintenance: b.cost === 0 ? 0 : b.maintenance !== undefined ? b.maintenance : b.worship || b.district === 'COMMERCIAL_HUB' ? 0 : b.cost >= 500 ? 3 : b.cost >= 190 ? 2 : 1, // the buildingMaintenance mirror
       river: b.special === 'WATER_MILL',
       farmBonusFood: b.special === 'WATER_MILL',
+      coastFood: b.special === 'LIGHTHOUSE',
+      cultureAtMaxLoyalty: b.special === 'MONUMENT',
+      loyalty: b.loyalty ?? 0,
       unlockTech: buildingUnlockTech.get(b.id) ?? -1,
       eraIdx: BUILDING_ERA_INDEX[b.id] ?? 0,
       unlockCivic: buildingUnlockCivic.get(b.id) ?? -1,

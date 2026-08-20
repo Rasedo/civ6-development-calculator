@@ -314,7 +314,15 @@ export function loyaltyDelta(state: GameState, city: City, amenityTierName: stri
   }
   const pressure =
     own + foreign === 0 ? 0 : (LOYALTY_PRESSURE_SCALE * (own - foreign)) / (own + foreign);
-  return pressure + (LOYALTY_AMENITY[amenityTierName] ?? 0);
+  return pressure + (LOYALTY_AMENITY[amenityTierName] ?? 0) + buildingLoyalty(city);
+}
+
+/** CIV6 (Monument, R&F/GS): "+1 Loyalty" — the flat per-turn term a standing
+ *  building adds, over every building that carries one. */
+export function buildingLoyalty(city: City): number {
+  let n = 0;
+  for (const b of city.buildings) n += BUILDINGS[b]?.loyalty ?? 0;
+  return n;
 }
 
 /**

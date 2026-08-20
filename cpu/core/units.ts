@@ -659,6 +659,13 @@ export function trainableUnits(
       const has = (held?.buildings ?? []).includes(ARTIFACT_BUILDING);
       if (!has || (held?.artifacts ?? 0) >= ARTIFACT_SLOTS) return false;
     }
+    // A unit whose CITY must already hold a building (the Military Engineer's
+    // Armory, which carries its Encampment with it).
+    if (d.requiresBuilding && !state.sandbox) {
+      if (!city) return false;
+      const held = seatOf(state, seat)!.cities.find((c) => c.centerIndex === city.centerIndex);
+      if (!(held?.buildings ?? []).includes(d.requiresBuilding)) return false;
+    }
     // CIV6: "when the number of Traders equals the Trading Capacity you
     // cannot build more Traders" — the count is free Trader units plus
     // active routes (each active route embodies a spent Trader).

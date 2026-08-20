@@ -1942,6 +1942,14 @@ class SimSeats:
             b = b.unsqueeze(-1)
         return hit & b, hit & ~b
 
+    def _building_loyalty(self, row: int, bidx: torch.Tensor, col: torch.Tensor) -> torch.Tensor:
+        """[n] f64 — CIV6 (Monument, R&F/GS): "+1 Loyalty", over every standing
+        building that carries a flat loyalty term."""
+        w = self.rules.b_loyalty
+        if not w.numel() or not bool((w != 0).any()):
+            return torch.zeros(bidx.shape[0], dtype=torch.float64, device=self.device)
+        return (self.city_bldg[bidx, row, col].double() * w.to(self.device).unsqueeze(0)).sum(dim=1)
+
     def _congress_space(self, kind: int) -> int:
         """How many TARGETS a resolution of this kind offers — the
         `targetSpaceSize` twin, keyed by CONGRESS_TARGET_KINDS' index."""

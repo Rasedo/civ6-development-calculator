@@ -61,7 +61,7 @@ nothing carries forward.
 | B-30r specialists | 1 | the mechanic and both citizen overrides ship; the Theater tier's second building and the plant split wait upstream |
 | B-31r trade-route tails | 1 | sea legs ship; no trading posts, plunder gold is a stylization, one candidate not a free pick |
 | B-53r the great-person roster | 2 | four fame-picked names per class on one ladder; real Civ 6 anchors each person to an ERA and offers a roster per era |
-| B-D unsourced data values | 3 | the sweep is done; nine NAMED stylizations stay open, each labelled at its definition |
+| B-D unsourced data values | 2 | the Monument, the Lighthouse and the Engineer's Armory shipped and one bullet was false; the governments are half-shipped, and the rest are shape differences or model tuning that no source can close |
 | B-36r appeal adjacency terms | 1 | the four reachable terms ship; Dam/Canal/Water Park/Preserve and the Great People wait on C-22, C-4, C-21 |
 | B-39r wonder effects still dropped | 1 | the sourced sweep shipped fourteen channels; five residuals, each blocked on B-20r, C-21, B-34r or C-23 |
 | B-45r sourced-sweep finds in the other rows | 2 | eight wonders pay effects no channel expresses: free units, patronage discount, tech boosts, route capacity and route yields |
@@ -73,7 +73,7 @@ nothing carries forward.
 | B-51r the Encampment has no perimeter | 1 | Civ 6 gives the district the City Center's wall HP; the assault path is handed a tile, not its city |
 | B-44r city-state war tails | 1 | the head and its policy ship; no walker ever MARCHES on a minor, and the diplomatic consequences wait on C-19 |
 | B-34r flood tails | 1 | the severity ladder ships; a flood still takes ONE tile where GS floods the river's whole reach, and the Dam that mitigates one is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **26** | |
+| **B. Fidelity vs real Civ 6** | **25** | |
 | C-1 POWER | 5 | no plants, no grid, no powered-yield term — 4 gaps wait on it |
 | C-2 diplomatic agreements | 6 | war and peace and nothing between: open borders, work trades, alliances, denouncements |
 | C-3 unit promotions | 4 | only MARTYR reaches a rule; choosing one is also a wire head |
@@ -99,7 +99,7 @@ nothing carries forward.
 | C-23 nothing diminishes tourism | 1 | no rival's Enlightenment ever costs a tourist, so Cristo Redentor's cancelling clause has nothing to cancel |
 | C-24 no CO2, no climate | 3 | GS's whole climate arc — emissions, warming bands, sea level, escalating disasters — and 2 gaps wait on it |
 | **C. Absent systems** | **60** | |
-| **OPEN, TOTAL** | **86** | |
+| **OPEN, TOTAL** | **85** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -616,21 +616,61 @@ Civ 6 source or is recorded as unverifiable.
   every building (costs; worship faith price 380), and every policy card
   with a live effect. What is LEFT is each labelled at its definition, and
   each is an open residual rather than a decision:
+  THREE ROWS CLOSED by reading their real text, and one bullet was FALSE:
+  - **The MONUMENT was carrying its VANILLA row.** SOURCED (R&F/GS): "+1
+    Loyalty. +1 Culture. +1 additional Culture if city is at maximum
+    Loyalty." It paid a flat +2 Culture and no loyalty at all. All three
+    clauses now ship: `BuildingDef.loyalty` feeds `buildingLoyalty` /
+    `_building_loyalty` into the loyalty delta, and the conditional point
+    rides `special: 'MONUMENT'` / `b_maxloy_culture`.
+  - **The LIGHTHOUSE was missing its tile clause.** SOURCED: "+1 Food. +1
+    Food in Coast and Lake tiles controlled by the city." Only the flat
+    point existed; the per-tile term now rides `special: 'LIGHTHOUSE'` /
+    `b_coastfood` over the terrains `coastFoodTerrains` names.
+  - **The MILITARY ENGINEER had no Armory gate.** SOURCED: "It can only be
+    built in a city that has an Encampment with an Armory." Its own data
+    (cost 170, GS maintenance 2, 2 moves, 2 charges, Military Engineering)
+    was already right; the per-CITY gate was absent on both engines and now
+    rides `UnitDef.requiresBuilding` / `_type_req_bldg`. What stays
+    AUTHORED is only the seat's PRODUCTION RULE (`ENGINEER_LIVE`) — real
+    Civ 6's AI forts chokepoints and publishes no rule that quantifies it.
+  - **THE SPACEPORT UPKEEP BULLET WAS FALSE.** There is no district upkeep
+    anywhere in either engine — `maintenance` is a BUILDING field, which
+    matches real Civ 6, where districts cost no gold. Nothing stood in for
+    anything; the bullet described code that does not exist.
+
+  What remains open, each with what a source would have to publish:
+  - **The GOVERNMENTS' inherent bonuses.** The GS rows ARE published, and
+    three of them now ship verbatim: Classical Republic's "+1 Housing and
+    +1 Amenity in cities with a district" (it paid +1 amenity everywhere),
+    Communism's "+10% Science" (it paid +10% production), and Autocracy's
+    Palace half, which its capital term already was. The rest need channels
+    this model does not have, and each names what: Oligarchy and Fascism
+    want a combat-CLASS axis (B-48r); Monarchy wants housing per WALL LEVEL
+    and a Renaissance-Walls favor term; Merchant Republic, Theocracy and
+    Communism's other half want a per-city GOVERNOR gate on a yield;
+    Theocracy and Democracy want a PURCHASE-price discount channel;
+    Democracy's GS row wants ALLIANCES (C-2); Autocracy's other half wants
+    a Government Plaza (C-22). Every legacy bonus is out of scope by
+    construction — R&F phased them out.
+  - **The per-CITY war-weariness split is NOT published, and the empire-wide
+    rule we implement IS.** SOURCED (War weariness): "At the end of each
+    turn, you receive -1 Amenity for every 400 WWP you currently have, which
+    is then applied to your cities" — exactly `warWearinessPenalty`'s shape.
+    The three GlobalParameters (`WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_`
+    `{AT_WAR_CITY 3, NONFOUNDED_CITY 1, FOUNDED_CITY 0}`) are real data, but
+    no source states what they DO; the per-city reading is an inference off
+    their names. Closing it needs the C++ behaviour, not a wiki page.
   - `GAME_SPEED` 0.6 (`constants`) — the one global speed stylization; real
-    Civ 6 scales cost, yield and turn tables independently per speed.
-  - the GOVERNMENTS' inherent bonuses (`policies` header) — flat stand-ins
-    for the real per-government terms.
+    Civ 6 scales cost, yield and turn tables independently per speed, so
+    this is a SHAPE difference, not a magnitude gap: closing it means
+    modelling three tables, and no single number can be right.
   - the BELIEF magnitudes (`religion` header) — model numbers, not Civ 6's.
-  - Monument's loyalty term and Lighthouse's per-coast-tile food — flat
-    stand-ins for sourced-but-differently-shaped rules.
-  - the SPACEPORT's 1 gold upkeep — unsourced, left at the generic value.
   - the deliberate tuning constants in `seats` (its header names them):
     model tuning, not Civ 6 values, and every one is a place the two engines
-    agree on a number real Civ 6 never states.
-  - the per-CITY war-weariness split (`seats`, WAR_WEARINESS_LOSS_OVER_REQ_
-    AMENITIES_*): one empire-wide penalty stands in for a per-city term.
-  - the MILITARY ENGINEER production rule (`ENGINEER_LIVE` header) — authored,
-    not sourced, and flipping it is a behaviour change on both engines.
+    agree on a number real Civ 6 never states. These will NEVER close by
+    sourcing — they are open because they are stylizations, and the honest
+    entry says so once rather than being re-checked every round.
   - the FLOOD SEVERITY split (`disasters`) — Moderate / Major / 1000 Year
     come up 60 / 30 / 10 here. The Flood page publishes every per-severity
     effect rate and no distribution at all, tying the frequencies to a

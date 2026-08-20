@@ -20,6 +20,9 @@ export interface UnitDef {
   requiresTech?: string;
   requiresCivic?: string;
   requiresResource?: string;
+  /** a building the TRAINING city must already hold (the Military Engineer's
+   *  Armory). Per-CITY, so it is enforced in `trainableUnits`. */
+  requiresBuilding?: string;
   /** a NAVAL unit lives on water natively (never `embarked`). No naval
    * units exist yet (N2 adds GALLEY/QUADRIREME) — the field is plumbed now so
    * passability/spawn/combat can branch on it. Default false. */
@@ -314,7 +317,10 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       combat: 0, // civilian: never garrisons, flanks, supports or fights
       charges: 2,
       requiresTech: 'MILITARY_ENGINEERING',
-      description: 'Builds Forts (2 charges).',
+      // CIV6: "It can only be built in a city that has an Encampment with an
+      // Armory." The building carries its district, so the Armory is the test.
+      requiresBuilding: 'ARMORY',
+      description: 'Builds Forts (2 charges). Needs an Armory.',
     }),
     // The ARCHAEOLOGIST, sourced from the Civ 6 wiki — 3 charges,
     // unlocked by the NATURAL HISTORY civic, and trainable only in a city whose
