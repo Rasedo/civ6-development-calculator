@@ -5,6 +5,8 @@ import { isWater, isImpassable } from '../../world/query';
 import { civEraIndex } from './city';
 import { logUnitOrder } from './seatTurn';
 import { MODERN_ERA_INDEX } from '../data/techs';
+import { emergencyAttackCS, raiseEmergency, EMERGENCY_CITY_STATE } from './emergency';
+import { envoysOf, hasMet } from './cityStates';
 import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP, WALLS_HP, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { CITY_STATE_MAX_HP, KABUL_XP_MULT, PRESLAV_HILL_CS } from '../data/cityStates';
@@ -652,7 +654,8 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
       return ok;
     }
   } else {
-    const atkCSf = atkCS + FLANKING_CS * flankCount(state, targetIndex, attacker, defender) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + cavalryHillCS(state, attacker, attacker.tileIndex) + generalAuraCS(state, attacker, attacker.tileIndex); // aura keyed on the ATTACKER's own tile
+    const atkCSf = atkCS + FLANKING_CS * flankCount(state, targetIndex, attacker, defender) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + cavalryHillCS(state, attacker, attacker.tileIndex) + generalAuraCS(state, attacker, attacker.tileIndex) // aura keyed on the ATTACKER's own tile
+      + emergencyAttackCS(state, attacker.seat, defender.seat); // an emergency MEMBER hits its target harder
     const defCSf = defenderCS(state, defender, targetIndex);
     defender.hp -= damageRoll(state, atkCSf - defCSf, 'mel', targetIndex);
     attacker.hp -= damageRoll(state, defCSf - atkCSf, 'melc', targetIndex);
@@ -893,6 +896,19 @@ function attackCityState(state: GameState, attacker: Unit, cityState: CityState,
   }
 }
 
+/** CIV6 (Emergency, participation): a civ may take part only if "they know
+ *  the reason for the Emergency ... they must have met and sent an Envoy to
+ *  the city-state". Taken at the moment of the conquest, because the conquest
+ *  deletes the city-state and its envoy ledger with it. */
+function csPatrons(state: GameState, cityState: CityState, captor: number): number[] {
+  const out: number[] = [];
+  for (const sx of state.seats) {
+    if (sx.seat === captor) continue;
+    if (hasMet(cityState, sx.seat) && envoysOf(cityState, sx.seat) >= 1) out.push(sx.seat);
+  }
+  return out;
+}
+
 export function captureCityState(state: GameState, cityState: CityState, seat: number): void {
   state.cityStates = state.cityStates.filter((c) => c.id !== cityState.id);
   for (const sx of state.seats) {
@@ -939,6 +955,7 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
     hp: Math.round(CITY_MAX_HP / 2), // a conquered CS joins at half HP
   });
   revealAround(state, seat, cityState.centerIndex, 3);
+  raiseEmergency(state, EMERGENCY_CITY_STATE, seat, id, csPatrons(state, cityState, seat));
   addEraScore(state, seat, ERA_SCORE_CONQUER); // the CONQUEROR gained a city
   state.eventLog.push(`${cityState.name} conquered — the city-state joins your empire.`);
 }
@@ -982,6 +999,7 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
     hp: Math.round(CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   });
+  raiseEmergency(state, EMERGENCY_CITY_STATE, actor.seat, id, csPatrons(state, cityState, actor.seat));
   addEraScore(state, actor.seat, ERA_SCORE_CONQUER); // gained a city (actor CS conquest)
   state.eventLog.push(`${cityState.name} has been conquered by ${actor.name}!`);
 }

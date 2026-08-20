@@ -138,7 +138,7 @@ function preference(state: GameState, res: number, seat: number,
  * also important"). Stops at the first rung the bank cannot clear. Debits the
  * bank and reports what it took, because the refund tiers pay that back.
  */
-function buyVotes(sx: Seat, want: number): { extra: number; spent: number } {
+export function buyVotes(sx: Seat, want: number): { extra: number; spent: number } {
   let favor = sx.diplomaticFavor ?? 0;
   let extra = 0, spent = 0;
   while (extra < want && favor >= CONGRESS_VOTE_STEP * (extra + 1)) {

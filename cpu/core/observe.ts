@@ -168,6 +168,17 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
     const a = (state.congress ?? [])[k];
     congress.push(a ? a.res + 1 : 0, a ? a.outcome : 0, a ? a.target : 0);
   }
+  // THE EMERGENCY a Special Session would put to this seat — the LOWEST live
+  // one by (kind, target, city). A ballot on the special-session slot is
+  // worthless without it, and array POSITION is engine-local.
+  const live = [...(state.emergencies ?? [])].sort(
+    (a, b) => a.kind - b.kind || a.target - b.target || a.city - b.city)[0];
+  congress.push(
+    live ? live.kind + 1 : 0,
+    live ? live.phase + 1 : 0,
+    live && live.target === seat ? 1 : 0,
+    live && live.members.includes(seat) ? 1 : 0,
+  );
   const atAny = atWarWithAny(state, seat);
   const ctx: number[] = [
     cities.length,

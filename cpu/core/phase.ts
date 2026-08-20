@@ -1,5 +1,5 @@
 
-import type { City, DistrictId, GameState, ImprovementId, SeatActionRecord, Seat, Tile, TradeRoute, Unit } from './types';
+import type { City, CongressVote, DistrictId, Emergency, GameState, ImprovementId, SeatActionRecord, Seat, Tile, TradeRoute, Unit } from './types';
 import { advanceGreatPeople } from './greatPeople';
 import { drainRelicReserve, RELIC_WONDER_SLOTS } from '../data/greatPeople';
 import { completeQueueItem } from './production';
@@ -38,6 +38,9 @@ import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, borderGrowthCost, EMB
 import type { CityStats } from './city';
 import { civEraIndex, computeCityStats, luxuryAmenities, pickBorderTile, acquireTile } from './city';
 import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressUdtProdDistrict, type CongressVoterCtx } from './congress';
+import { buyVotes } from './congress';
+import { CONGRESS_SPECIAL_SLOT, EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, emergencies, emergencyLoyalty, emergencyName, emergencyStrikeCS, raiseEmergency } from './emergency';
+import { EMERGENCIES, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP } from '../data/seats';
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { hasRiver, hasFreshWater, isCoastalWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
@@ -337,7 +340,8 @@ export function applyLoyalty(state: GameState, city: City, amenityTierName: stri
     city.loyalty = LOYALTY_MAX;
     return false;
   }
-  const next = (city.loyalty ?? LOYALTY_MAX) + loyaltyDelta(state, city, amenityTierName) + govBonus + congressLoyaltyDelta(state, city.seat);
+  const next = (city.loyalty ?? LOYALTY_MAX) + loyaltyDelta(state, city, amenityTierName) + govBonus
+    + congressLoyaltyDelta(state, city.seat) + emergencyLoyalty(state, city.seat, city.id);
   city.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));
   return city.loyalty <= 0;
 }
@@ -535,17 +539,146 @@ function congressVoter(state: GameState, seat: number): CongressVoterCtx {
   return { government, policies, envoysByType };
 }
 
+
+/** A member's war on the emergency's target. CIV6: "this action won't accrue
+ *  Grievances because it is considered an effort of the international
+ *  community", and an Emergency "can override the war status from previous
+ *  Emergencies" — so no warmonger, and no treaty to respect. */
+function emergencyWar(state: GameState, member: number, target: number): void {
+  if (member === target || civsAtWar(state, member, target)) return;
+  setWar(state, member, target, true);
+  setWarTurnsWith(state, member, target, 0);
+  setTreatyTurnsWith(state, member, target, 0);
+  cancelRoutesBetween(state, member, target);
+}
+
+/** The lowest AFFECTED seat that still lives and can pay the sponsorship.
+ *  CIV6: "All affected civilizations have the opportunity to do so, although
+ *  only one sponsor is required." */
+function emergencySponsor(state: GameState, e: Emergency): number {
+  for (const c of [...e.affected].sort((a, b) => a - b)) {
+    const sx = state.seats[c];
+    if (!sx || c === e.target || sx.cities.length === 0) continue;
+    if ((sx.diplomaticFavor ?? 0) >= SPECIAL_SESSION_COST) return c;
+  }
+  return -1;
+}
+
+/** ONE Special Session: every living seat votes for or against, the target
+ *  never joins its own, and the yes side carries a tie the way outcome A does
+ *  in a Regular Session. The losing side's favor comes back whole, the same
+ *  refund a losing outcome takes there. */
+function holdSpecialSession(state: GameState, e: Emergency,
+                            recorded: readonly (CongressVote | null)[]): boolean {
+  state.lastSessionTurn = state.turn;
+  const spent = state.seats.map(() => 0);
+  const cast: { seat: number; yes: boolean; weight: number }[] = [];
+  for (let c = 0; c < state.seats.length; c++) {
+    const sx = state.seats[c];
+    if (sx.cities.length === 0) continue;
+    const v = recorded[c]?.[CONGRESS_SPECIAL_SLOT];
+    const yes = c !== e.target && (v ? Math.trunc(v[0]) === 0 : true);
+    const bought = buyVotes(sx, v ? Math.max(0, Math.trunc(v[2])) : 0);
+    spent[c] = bought.spent;
+    cast.push({ seat: c, yes, weight: 1 + bought.extra });
+  }
+  if (cast.length === 0) return false;
+  let ay = 0, an = 0;
+  for (const v of cast) { if (v.yes) ay += v.weight; else an += v.weight; }
+  const passed = ay >= an;
+  for (const v of cast) {
+    if (v.yes !== passed) state.seats[v.seat].diplomaticFavor = (state.seats[v.seat].diplomaticFavor ?? 0) + spent[v.seat];
+  }
+  if (!passed) {
+    state.eventLog.push(`The ${emergencyName(e.kind)} against ${state.seats[e.target]?.name ?? 'them'} was voted down.`);
+    return false;
+  }
+  e.phase = EMG_RUNNING;
+  e.members = cast.filter((v) => v.yes && v.seat !== e.target).map((v) => v.seat);
+  e.act = state.turn + (EMERGENCIES[e.kind]?.turns ?? 30);
+  for (const m of e.members) emergencyWar(state, m, e.target);
+  state.eventLog.push(`${emergencyName(e.kind)} declared against ${state.seats[e.target]?.name ?? 'them'}.`);
+  return true;
+}
+
+/** Sponsor what can be sponsored, then hold what has waited its turn. */
+function specialSessions(state: GameState, recorded: readonly (CongressVote | null)[]): void {
+  for (const e of emergencies(state)) {
+    if (e.phase === EMG_CALLED) {
+      if (state.turn >= e.act && !holdSpecialSession(state, e, recorded)) e.phase = -1;
+      continue;
+    }
+    if (e.phase !== EMG_PENDING) continue;
+    // "as long as the previous session - Regular or Special - took place 15
+    // turns or prior"
+    if (state.lastSessionTurn !== undefined
+        && state.turn - state.lastSessionTurn < SPECIAL_SESSION_GAP) continue;
+    const sponsor = emergencySponsor(state, e);
+    if (sponsor < 0) continue;
+    state.seats[sponsor].diplomaticFavor = (state.seats[sponsor].diplomaticFavor ?? 0) - SPECIAL_SESSION_COST;
+    e.phase = EMG_CALLED;
+    e.act = state.turn + 1;   // "the Special Session occurs after the next turn"
+  }
+  state.emergencies = emergencies(state).filter((e) => e.phase >= 0);
+}
+
+/** CIV6: the goal is the contested city LIBERATED — here, simply no longer
+ *  the target's. Reaching it ends the emergency at once; the deadline hands
+ *  the win to the target. Every member is paid alike, "regardless of who
+ *  delivers the killing blow". */
+function resolveEmergencies(state: GameState): void {
+  const keep: Emergency[] = [];
+  for (const e of emergencies(state)) {
+    if (e.phase !== EMG_RUNNING) { keep.push(e); continue; }
+    const held = state.seats[e.target]?.cities.some((c) => c.id === e.city) ?? false;
+    if (held && state.turn < e.act) { keep.push(e); continue; }
+    payEmergency(state, e, !held);
+  }
+  state.emergencies = keep;
+}
+
+function payEmergency(state: GameState, e: Emergency, membersWon: boolean): void {
+  const bump = (arr: number[] | undefined, at: number): number[] => {
+    const out = arr ? [...arr] : [];
+    while (out.length <= at) out.push(0);
+    out[at] += 1;
+    return out;
+  };
+  if (membersWon) {
+    for (const m of e.members) {
+      const sx = state.seats[m];
+      if (!sx) continue;
+      sx.diplomaticFavor = (sx.diplomaticFavor ?? 0) + EMERGENCY_MEMBER_FAVOR;
+      if (e.kind === EMERGENCY_CITY_STATE) sx.emgEnvoyGold = (sx.emgEnvoyGold ?? 0) + 1;
+      else sx.emgHeal = bump(sx.emgHeal, e.target);
+    }
+  } else {
+    const t = state.seats[e.target];
+    if (t) {
+      t.diplomaticFavor = (t.diplomaticFavor ?? 0) + EMERGENCY_TARGET_FAVOR;
+      if (e.kind === EMERGENCY_CITY_STATE) t.emgRouteGold = (t.emgRouteGold ?? 0) + 1;
+      else for (const m of e.members) t.emgStrike = bump(t.emgStrike, m);
+    }
+  }
+  state.eventLog.push(
+    `${emergencyName(e.kind)}: ${membersWon ? 'the members' : state.seats[e.target]?.name ?? 'the target'} prevailed.`);
+}
+
 export function worldCongress(state: GameState): void {
   const recorded = state.seats.map((sx) => sx.congressVote ?? null);
   for (const sx of state.seats) sx.congressVote = undefined;  // an intent is for THIS turn
-  if (state.turn % CONGRESS_INTERVAL !== 0) return;
   let worldEra = -1;
   for (const sx of state.seats) {
     const e = civEraIndex(sx.research.techs, sx.research.civics);
     if (e > worldEra) worldEra = e;
   }
-  if (worldEra < CONGRESS_MIN_ERA) return;
+  // A Special Session may sit on ANY turn once the Congress is open; a running
+  // emergency is settled whether one sat or not.
+  if (worldEra >= CONGRESS_MIN_ERA) specialSessions(state, recorded);
+  resolveEmergencies(state);
+  if (state.turn % CONGRESS_INTERVAL !== 0 || worldEra < CONGRESS_MIN_ERA) return;
   congressSession(state, worldEra, recorded, state.seats.map((sx) => congressVoter(state, sx.seat)));
+  state.lastSessionTurn = state.turn;
   congressCancelBannedIntl(state);
 }
 
@@ -616,6 +749,9 @@ export function transferCity(
     focus: 'balanced',
     queue: [],
     isCapital: false,
+    // the flip does not make this city any less the FIRST city of whoever
+    // founded it — that is the whole point of the occupied-capital penalty
+    origCapitalSeat: civCity.origCapitalSeat ?? -1,
     buildings: keptBuildings,
     districts: keptDistricts,
     wonders: civCity.wonders.filter((w) => tileBelongsTo(state.map.tiles[w.tileIndex], { seat: to.seat, id: newId })).map((w) => ({ ...w })),
@@ -645,6 +781,11 @@ export function transferCity(
   };
   if (keptBuildings.includes('ANCIENT_WALLS')) flipped.outerHp = 0; // walls kept, outer pool 0
   to.cities.push(flipped);
+  // CIV6 (Military Emergency): "The Target has conquered the city of another
+  // nation; it must be Liberated!" The seat that LOST it is the affected one.
+  if (why === 'conquered' && isCiv(fromSeat) && isCiv(to.seat)) {
+    raiseEmergency(state, EMERGENCY_MILITARY, to.seat, flipped.id, [fromSeat]);
+  }
   addEraScore(state, to.seat, ERA_SCORE_CONQUER);
   revealAround(state, to.seat, civCity.centerIndex, 3);
   // Real Civ 6 pays the captor gold for taking a city. One rate, every captor.
@@ -1523,7 +1664,10 @@ export function seatPhase(state: GameState): void {
             ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
             : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender); // defender veterancy (embarked → flat, no xp)
           const defCSa = defCS + generalAuraCS(state, defender, bestTile);
-          const atkCS = cityDefenseStrength(state, civCity);
+          // a survived Military Emergency pays its target +2 CS on every
+          // City Strike against a member, forever
+          const atkCS = cityDefenseStrength(state, civCity)
+            + emergencyStrikeCS(state, civCity.seat, defender.seat);
           defender.hp -= damageRoll(state, atkCS - defCSa, 'cstk', bestTile);
           awardDefenseXp(defender); // +2 to a surviving military defender (attacker is the city)
           warWearinessBattle(state, civCity.seat, defender.seat, bestTile,

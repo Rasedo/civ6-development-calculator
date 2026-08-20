@@ -60,6 +60,7 @@ class SimInit:
             ("hp", torch.long, 0, int((rules.combat or {}).get("cityMaxHp", 200)), None),
             ("outer_hp", torch.long, 0, None, None),
             ("is_cap", torch.bool, False, None, None),
+            ("orig_cap", torch.long, -1, None, None),
             ("loyalty", dtype, 100.0, None, None),
             ("acquired", torch.long, 0, None, None),
             ("growth", dtype, 0, None, None),
@@ -298,10 +299,31 @@ class SimInit:
         # (res, outcome 0=A/1=B, target); -1 empty. Replaced every session.
         self.congress_active = torch.full((B, 2, 3), -1, dtype=torch.long, device=device)
         # THIS TURN's ballot per major: [outcome, target, extra votes] for the
-        # two rotating slate slots and the always-3rd Diplomatic Victory
-        # resolution. -1 in the outcome field = no intent, vote the AI line.
-        # `_world_congress` clears it whether a session fires or not.
-        self.civ_congress_vote = torch.full((B, self.n_majors, 3, 3), -1, dtype=torch.long, device=device)
+        # two rotating slate slots, the always-3rd Diplomatic Victory
+        # resolution and the SPECIAL SESSION. -1 in the outcome field = no
+        # intent, vote the AI line. `_world_congress` clears it whether a
+        # session fires or not.
+        self.civ_congress_vote = torch.full((B, self.n_majors, 4, 3), -1, dtype=torch.long, device=device)
+        # EMERGENCIES, one fixed table of slots. A live row carries its kind,
+        # the offending seat, the contested city id, the phase (0 pending, 1
+        # called, 2 running) and the turn that phase acts on; `emg_affected`
+        # is who may SPONSOR it and `emg_member` who voted it through.
+        _ke = int(rules.eras["emergencySlots"])  # the loader below re-reads it as _emg_slots
+        self.emg_kind = torch.full((B, _ke), -1, dtype=torch.long, device=device)
+        self.emg_target = torch.full((B, _ke), -1, dtype=torch.long, device=device)
+        self.emg_city = torch.full((B, _ke), -1, dtype=torch.long, device=device)
+        self.emg_phase = torch.full((B, _ke), -1, dtype=torch.long, device=device)
+        self.emg_act = torch.full((B, _ke), -1, dtype=torch.long, device=device)
+        self.emg_affected = torch.zeros(B, _ke, self.n_majors, dtype=torch.bool, device=device)
+        self.emg_member = torch.zeros(B, _ke, self.n_majors, dtype=torch.bool, device=device)
+        # the turn the Congress last sat, Regular or Special; -1 = never
+        self.last_session_turn = torch.full((B,), -1, dtype=torch.long, device=device)
+        # what RESOLVED emergencies left standing, forever — counters, because
+        # winning the same kind twice pays twice
+        self.civ_emg_heal = torch.zeros(B, self.n_majors, self.n_majors, dtype=torch.long, device=device)
+        self.civ_emg_strike = torch.zeros(B, self.n_majors, self.n_majors, dtype=torch.long, device=device)
+        self.civ_emg_envoy_gold = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
+        self.civ_emg_route_gold = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         # Per-seat era-score accumulator, one column per seat row — the TS
         # `state.eraScore` mirror. Integer, zero-draw;
         # resets at every eraLength boundary (right after `self.turn += 1`, the
@@ -350,6 +372,23 @@ class SimInit:
         self._c_policy_favor = float(_er2["congressPolicyFavor"])
         self._c_ideology_slots = int(_er2["congressIdeologySlots"])
         self._culture_bomb_range = int(_er2["cultureBombRange"])
+        self._favor_occ_capital = float(_er2["favorOccupiedCapital"])
+        # EMERGENCIES: the catalog and the magnitudes the special session pays out
+        self._emg_rows = [{"id": str(e["id"]), "turns": int(e["turns"])} for e in _er2["emergencies"]]
+        self._emg_at = {r["id"]: i for i, r in enumerate(self._emg_rows)}
+        self._emg_slots = int(_er2["emergencySlots"])
+        self._special_slot = 3  # the special session's slot in the vote head
+        self._special_cost = float(_er2["specialSessionCost"])
+        self._special_gap = int(_er2["specialSessionGap"])
+        self._emg_member_favor = float(_er2["emergencyMemberFavor"])
+        self._emg_target_favor = float(_er2["emergencyTargetFavor"])
+        self._emg_member_cs = float(_er2["emergencyMemberCs"])
+        self._emg_member_mp = int(_er2["emergencyMemberMp"])
+        self._emg_target_loyalty = float(_er2["emergencyTargetLoyalty"])
+        self._emg_member_heal = int(_er2["emergencyMemberHeal"])
+        self._emg_strike_cs = float(_er2["emergencyTargetStrikeCs"])
+        self._emg_envoy_gold = float(_er2["emergencyEnvoyGold"])
+        self._emg_cs_route_gold = float(_er2["emergencyCsRouteGold"])
         self._c_gpp_mult = float(_er2["congressGppMult"])
         self._c_grow_a = float(_er2["congressGrowthA"])
         self._c_grow_b = float(_er2["congressGrowthB"])

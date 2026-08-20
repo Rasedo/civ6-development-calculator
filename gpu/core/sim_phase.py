@@ -94,6 +94,12 @@ class SimPhase:
         gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == row)).long()
         bm = self.civ_best_melee[:, row]
         atk_cs = torch.maximum(bm, torch.full_like(bm, 15)) + gar * 5
+        # a SURVIVED Military Emergency pays its target +2 CS on every City
+        # Strike against a member, forever
+        _emg_s = torch.zeros(Bn, dtype=torch.float64, device=dev2)
+        for _d in range(self.n_majors):
+            _emg_s = _emg_s + (d_seat == _d).double() * self._emergency_strike_cs(row, _d)
+        atk_cs = atk_cs + _emg_s.to(atk_cs.dtype)
         def_hp = self.unit_hp[bidx, ds0]
         def_e = def_cs - self._wound(def_hp)
         _, _sp = self._flank_support(tt, d_seat, torch.full((Bn,), -1, dtype=torch.long, device=dev2))
@@ -270,7 +276,8 @@ class SimPhase:
         delta = (press
                  + self._loyalty_amenity[tier.clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)].double()
                  + gov.double() * self._gov_loy
-                 + self._congress_loyalty(row))
+                 + self._congress_loyalty(row)
+                 + self._emergency_loyalty(row).gather(1, col.unsqueeze(1)).squeeze(1))
         loy = self.city_loyalty[bidx, row, col]
         upd = act & others
         nxt = torch.where(upd, (loy + delta).clamp(min=0, max=lmax), loy)
@@ -634,6 +641,9 @@ class SimPhase:
         bank(self.civ_tech_prog, sci_sum)
         bank(self.seat_science_total, sci_sum)
         bank(self.civ_treasury, gold_sum)
+        # a WON City-State Emergency pays +1 gold/turn per envoy, banked before
+        # upkeep exactly as seatAccumulators is
+        bank(self.civ_treasury, self._emergency_envoy_gold(row).to(self.civ_treasury.dtype))
         bank(self.civ_faith, faith_sum)
         self._seat_upkeep_and_bankruptcy(row, active)
         for _ in range(RESEARCH_LOOPS):
@@ -679,12 +689,15 @@ class SimPhase:
         ))
         # POLICY TREATY outcome A pays every seat holding the named card, on
         # top of the government tier and the (Treaty-Organization-weighted)
-        # suzerain term.
+        # suzerain term; each ORIGINAL CAPITAL this row sits in costs it.
+        # The rate can go negative, and the bank floors at zero.
         bank(self.civ_diplo_favor,
              self._adopted_gov_tier(self.civ_civics[:, row])
              + self._favor_per_suz * self._suzerain_count(row)
              + self._congress_policy_favor(
-                 self._slotted_policies(self._seat_civics(row), self._wonder_extra_slots(row))))
+                 self._slotted_policies(self._seat_civics(row), self._wonder_extra_slots(row)))
+             - self._favor_occ_capital * self._occupied_capitals(row))
+        self.civ_diplo_favor[:, row] = self.civ_diplo_favor[:, row].clamp(min=0)
         # grievances DECAY by 1 per turn at peace with every MAJOR — the row's
         # own line of the war matrix, minus the city-state columns, because
         # `atPeaceWithAllCivs` walks `state.seats` and nothing else.
@@ -940,7 +953,7 @@ class SimPhase:
 
     _CITY_SLOT_FIELDS = (
         "city_alive", "city_center", "city_pop", "city_growth", "city_cbox", "city_loyalty",
-        "city_acquired", "city_hp", "city_outer_hp", "city_id", "city_is_cap", "city_current", "city_progress",
+        "city_acquired", "city_hp", "city_outer_hp", "city_id", "city_is_cap", "city_orig_cap", "city_current", "city_progress",
         "city_prod_bank",
         "city_cost", "city_qtile",
         "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts",

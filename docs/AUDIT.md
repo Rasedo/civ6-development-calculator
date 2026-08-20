@@ -56,7 +56,7 @@ nothing carries forward.
 | **A. Engine vs engine** | **0** | |
 | B-20r tourism tails | 2 | theming ships; open-borders digs and work TRADES need a treaty system, and the Naturalist's progressive cost is unsourced |
 | B-21r suzerain rows | 1 | the residual descoped rows all need whole absent systems |
-| B-22r World Congress | 3 | 12 of the 21 regular resolutions ship, nine blocked on absent systems; emergencies/competitions absent; peace terms and two favor penalties have no carrier; the favor tie-break unmodeled |
+| B-22r World Congress | 2 | 12 of the 21 regular resolutions ship and emergencies run as special sessions; nine resolutions and the scored competitions have no carrier; peace terms wait on C-2 and two favor penalties on C-19/C-24; the favor tie-break unmodeled |
 | B-24r Ages/governors | 1 | three system-less dedication entries, dark-age policies, governor promotions, per-civ era drift |
 | B-30r specialists | 1 | the mechanic and both citizen overrides ship; the Theater tier's second building and the plant split wait upstream |
 | B-31r trade-route tails | 1 | sea legs ship; no trading posts, plunder gold is a stylization, one candidate not a free pick |
@@ -73,7 +73,7 @@ nothing carries forward.
 | B-51r the Encampment has no perimeter | 1 | Civ 6 gives the district the City Center's wall HP; the assault path is handed a tile, not its city |
 | B-44r city-state war tails | 1 | the head and its policy ship; no walker ever MARCHES on a minor, and the diplomatic consequences wait on C-19 |
 | B-34r flood tails | 1 | the severity ladder ships; a flood still takes ONE tile where GS floods the river's whole reach, and the Dam that mitigates one is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **27** | |
+| **B. Fidelity vs real Civ 6** | **26** | |
 | C-1 POWER | 5 | no plants, no grid, no powered-yield term — 4 gaps wait on it |
 | C-2 diplomatic agreements | 6 | war and peace and nothing between: open borders, work trades, alliances, denouncements |
 | C-3 unit promotions | 4 | only MARTYR reaches a rule; choosing one is also a wire head |
@@ -97,8 +97,9 @@ nothing carries forward.
 | C-21 Great Person ACTIVATED abilities | 2 | every GP fires instantly; none is placed and used |
 | C-22 the district roster is a subset | 3 | no Dam, Canal, Water Park, Preserve, Aerodrome, Government Plaza or Diplomatic Quarter |
 | C-23 nothing diminishes tourism | 1 | no rival's Enlightenment ever costs a tourist, so Cristo Redentor's cancelling clause has nothing to cancel |
-| **C. Absent systems** | **57** | |
-| **OPEN, TOTAL** | **84** | |
+| C-24 no CO2, no climate | 3 | GS's whole climate arc — emissions, warming bands, sea level, escalating disasters — and 2 gaps wait on it |
+| **C. Absent systems** | **60** | |
+| **OPEN, TOTAL** | **86** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -295,21 +296,54 @@ Civ 6 source or is recorded as unverifiable.
     a district/wonder registry entry, the GPU holds one `city_current` +
     `city_qtile`, and dropping an item from the middle of the TS array
     has no GPU twin.
-  - **Emergencies, Special Sessions, Scored Competitions.** The main
-    real DVP faucet beside the DV vote. Floods already fire, so an
-    Aid-Request-shaped competition has a trigger to hang off.
+  - **EMERGENCIES AND SPECIAL SESSIONS SHIP** (`cpu/core/emergency.ts` +
+    the `phase` driver, `_raise_emergency` / `_special_sessions` /
+    `_hold_special_session` / `_resolve_emergencies` / `_pay_emergency`).
+    Both sourced rows are in the catalog with their verbatim texts:
+    conquering another major's city raises a MILITARY Emergency,
+    conquering a city-state a CITY_STATE one. A sponsor among the
+    affected pays 30 favor "as long as the previous session - Regular or
+    Special - took place 15 turns or prior", "the Special Session occurs
+    after the next turn", every living major votes and a tie carries the
+    way outcome A does, the losing side is refunded whole, and the
+    members go to war with the target with NO grievances — "an effort of
+    the international community". Liberating the contested city pays
+    every member 100 favor plus the permanent reward (+5 healing in the
+    target's territory, or +1 gold per envoy for the minor row);
+    surviving the 30-turn deadline pays the target 200 plus its own (+2
+    CS on City Strikes against members, or +2 gold on minor legs). While
+    it runs: +2 CS for a member, +1 MP on the target's ground, +20
+    loyalty in the contested city. The ballot's fourth slot carries the
+    special session (`CONGRESS_SPECIAL_SLOT` / `_special_slot`) and the
+    observation renders the lowest live record keyed on
+    (kind, target, city), because slot POSITION is engine-local.
+    REACHABILITY: the gate reaches the MILITARY trigger through
+    `transferCity` / `_transfer_city`; the CITY_STATE row needs a major
+    to take a minor's city, which no gate lane has done — the pokes
+    (`tests/cpu/minors/emergencies.test.ts`, `tests/gpu/emergency_test.py`)
+    are the bar for the whole ladder above the trigger.
+  - **SCORED COMPETITIONS are still absent.** The other real DVP faucet:
+    Aid Request, Border Dispute, Catastrophe, Military Competition and
+    the rest score participants over a window and pay the podium.
+    Floods already fire, so an Aid-Request-shaped competition has a
+    trigger to hang off; what it lacks is a per-seat scoring window and
+    the podium payout, neither of which the Congress code carries.
   - **Peace deals carry no terms.** Real Civ 6 brokers peace through the
     TRADE screen — cities, gold, resources and favor change hands on the
     same deal — and no source publishes the valuation, so the blocker is
     the deal system itself (C-2), not a missing number.
-  - **The favor PENALTIES are unmodeled, and their rates ARE published**
-    (Diplomatic Favor, "Losing Favor"): 200 Grievance = -1 favor/turn
-    with -1 more per 50 beyond, capping at -10; -1/turn per 3 pollution
-    points above the world average, capping at 20; and -5/turn for each
-    ORIGINAL CAPITAL a seat occupies, a loyalty flip counting as
-    occupation. The first waits on grievances (C-19) and the second on a
-    CO2/climate model that neither engine tracks; the third needs only a
-    city field that remembers whose capital a city was founded as.
+  - **THE OCCUPIED-CAPITAL PENALTY SHIPS; the other two favor penalties
+    do not.** All three rates ARE published (Diplomatic Favor, "Losing
+    Favor"). **-5 favor/turn for each ORIGINAL CAPITAL a seat holds that
+    is not its own** is live on both engines: `City.origCapitalSeat` /
+    `city_orig_cap` remembers whose capital a city was FOUNDED as,
+    survives every transfer, and `occupiedCapitals` /
+    `_occupied_capitals` feeds `diplomaticFavorPerTurn`, whose sum is
+    floored at zero. A loyalty flip counts as occupation because it goes
+    through the same transfer. Still open, each on a named absence: 200
+    Grievance = -1/turn with -1 more per 50 beyond, capping at -10
+    (grievances, C-19); and -1/turn per 3 pollution points above the
+    world average, capping at 20 (C-24).
 - **B-24r. Ages/governors tails:** the DEDICATION catalog now holds NINE,
   both faces sourced and hooked (To Arms!, Hic Sunt Dracones, Reform the
   Coinage, Heartbeat of Steam, Wish You Were Here). Two of this entry's own
@@ -704,6 +738,14 @@ number was under-counting by treating deferrals as closures.
   of them an ACTIVATED ability used later on a chosen tile. Gaps: the
   appeal-granting Great People (Alvar Aalto, Charles Correa) that B-36r names,
   and every "activate in a city" ability in the roster.
+- **C-24. NO CO2, NO CLIMATE.** Weight 3. Gathering Storm's whole climate
+  arc is absent: neither engine tracks CO2 emitted per seat, the world
+  temperature bands, ice melt, rising sea level or the flooding of coastal
+  tiles it causes. Floods and storms fire from `disaster` / `_disasters` on
+  a fixed per-turn draw, so severity never escalates with a warming world.
+  Gaps waiting on it: the pollution half of the diplomatic-favor penalty
+  (B-22r), and the Global Energy Treaty resolution, which is jointly
+  blocked on POWER (C-1).
 - **C-23. NOTHING DIMINISHES TOURISM.** Weight 1. Real Civ 6 reduces the
   tourism a civ earns from Relics and Holy Cities once other civs research
   The Enlightenment, and reduces Great Work tourism the same way through the

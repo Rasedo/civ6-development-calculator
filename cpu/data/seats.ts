@@ -356,6 +356,71 @@ export const CONGRESS_IDEOLOGY_SLOTS = 1;
 /** CIV6 (Culture Bomb): an annexed tile must fall "within 3 hexes of one of
  *  the owner's City Centers". */
 export const CULTURE_BOMB_RANGE = 3;
+/** CIV6 (Diplomatic Favor, "Losing Favor"): "you additionally receive a
+ *  -5/turn Diplomatic Favor penalty for each Original Capital city you occupy.
+ *  Note that gaining a Capital through Loyalty flip will also count as
+ *  occupation." A seat's own favor rate can go negative, and "you will get
+ *  stuck at 0 Favor until you manage to do something to earn a lump sum". */
+export const FAVOR_OCCUPIED_CAPITAL = 5;
+
+// ---------------------------------------------------------------------------
+// EMERGENCIES (GS), which the World Congress runs as SPECIAL SESSIONS.
+//
+// CIV6 (World Congress, Special Sessions): "A game event, such as an
+// aggressive move by a civilization ... triggers the necessity for a Special
+// Session" and "An affected civilization ... expends 30 Diplomatic Favor to
+// bring the proposal to the World Congress". A Special Session "may take place
+// at any moment as long as the previous session - Regular or Special - took
+// place 15 turns or prior", and "Once called, the Special Session occurs after
+// the next turn."
+//
+// CIV6 (Emergency): a civ may join only if it knows the reason and votes in
+// favor; every member goes to war with the target, and that war "won't accrue
+// Grievances because it is considered an effort of the international
+// community". "Most Emergencies have a 30-turn time limit, after which the
+// target wins"; reaching the goal earlier ends it immediately. Members share
+// the reward regardless of who lands the blow.
+//
+// THE CONDITION DOES NOT EXPIRE: a trigger fired before the Medieval era waits
+// for the Congress to open, and is called then if it still holds.
+// ---------------------------------------------------------------------------
+export const SPECIAL_SESSION_COST = 30;
+export const SPECIAL_SESSION_GAP = 15;
+/** Concurrent emergencies both engines carry. Real Civ 6 has no such cap. */
+export const EMERGENCY_SLOTS = 2;
+
+export interface EmergencyDef {
+  id: 'CITY_STATE' | 'MILITARY';
+  name: string;
+  turns: number;
+}
+export const EMERGENCIES: readonly EmergencyDef[] = [
+  // CIV6: "The Target has attacked and occupied a City-state; it must be
+  // Liberated!" Success: "Members gain +1 Gold/turn for each Envoy they have;
+  // members gain 100 Diplomatic Favor". Failure: "Target's Trade Routes to
+  // City-States gain +2 Gold; Target gains 200 Diplomatic Favor".
+  { id: 'CITY_STATE', name: 'City-State Emergency', turns: 30 },
+  // CIV6: "The Target has conquered the city of another nation; it must be
+  // Liberated!" Success: "Member units gain +5 Healing in the Target's
+  // territory; members gain 100 Diplomatic Favor". Failure: "Target gains +2 CS
+  // when attacking member units with a City Strike; Target gains 200
+  // Diplomatic Favor".
+  { id: 'MILITARY', name: 'Military Emergency', turns: 30 },
+];
+export const EMERGENCY_CITY_STATE = 0;
+export const EMERGENCY_MILITARY = 1;
+export const EMERGENCY_MEMBER_FAVOR = 100;
+export const EMERGENCY_TARGET_FAVOR = 200;
+/** CIV6 (both rows, "Specifics"): "Members gain +2 CS against targets' units;
+ *  +1 MP in target's territory; target gains +20 Loyalty in the target city." */
+export const EMERGENCY_MEMBER_CS = 2;
+export const EMERGENCY_MEMBER_MP = 1;
+export const EMERGENCY_TARGET_LOYALTY = 20;
+/** the permanent rewards, one per row per outcome */
+export const EMERGENCY_MEMBER_HEAL = 5;
+export const EMERGENCY_TARGET_STRIKE_CS = 2;
+export const EMERGENCY_ENVOY_GOLD = 1;
+export const EMERGENCY_CS_ROUTE_GOLD = 2;
 
 export const TOURISM_PER_VISITOR_PER_CIV = 200;
 export const CULTURE_PER_DOMESTIC_TOURIST = 100;

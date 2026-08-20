@@ -42,6 +42,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { City, CityState, GameState, Seat, Tile, Unit } from './types';
 import { prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
+import { EMERGENCY_SLOTS } from '../data/seats';
 import { questFor } from './observe';
 import { envoysOf } from './cityStates';
 import { prodLayout } from './prodLayout';
@@ -278,6 +279,22 @@ const GAME: Record<string, Extractor> = {
     const a = s.congress?.[i];
     return a ? [a.res, a.outcome, a.target] : [-1, -1, -1];
   }),
+  // Sorted by (kind, target, city) and padded to the slot table: the TS list
+  // is an array in trigger order and the GPU a fixed table, so the ORDER is
+  // not a fact either engine owns.
+  emergencyTable: (s) => {
+    const rows = [...(s.emergencies ?? [])].sort(
+      (a, b) => a.kind - b.kind || a.target - b.target || a.city - b.city);
+    const mask = (list: readonly number[]) => list.reduce((m, x) => m | (1 << x), 0);
+    const out: number[] = [];
+    for (let i = 0; i < EMERGENCY_SLOTS; i++) {
+      const e = rows[i];
+      out.push(...(e ? [e.kind, e.target, e.city, e.phase, e.act, mask(e.affected), mask(e.members)]
+                     : [-1, -1, -1, -1, -1, 0, 0]));
+    }
+    return out;
+  },
+  lastSessionTurn: (s) => [s.lastSessionTurn ?? -1],
   roadBridges: (s) => [s.roadBridges ? 1 : 0],
   pantheonsClaimed: (s) => [s.claimedPantheons.length],
   beliefsClaimed: (s) => [s.claimedBeliefs.length],
@@ -320,6 +337,13 @@ const SEAT: Record<string, Extractor> = {
   envoysAvailable: overSeats((s) => s.envoysAvailable),
   buildersTrained: overSeats((s) => s.buildersTrained),
   relicReserve: overSeats((s) => s.relicReserve ?? 0),
+  // what past emergencies left standing: envoy gold, minor-leg gold, then the
+  // per-seat heal and city-strike counts, both dense over the roster
+  emergencyRewards: overSeats((s, st) => [
+    s.emgEnvoyGold ?? 0, s.emgRouteGold ?? 0,
+    ...st.seats.map((o) => s.emgHeal?.[o.seat] ?? 0),
+    ...st.seats.map((o) => s.emgStrike?.[o.seat] ?? 0),
+  ]),
   bestMeleeCS: overSeats((s) => s.bestMeleeCS),
   spaceLy: overSeats((s) => s.spaceLy ?? -1),
   spaceLasers: overSeats((s) => s.spaceLasers ?? 0),
@@ -450,6 +474,7 @@ const CITY: Record<string, Extractor> = {
   foodBox: overCities((r) => r.city.foodBox),
   cultureBox: overCities((r) => r.city.cultureBox),
   tilesAcquired: overCities((r) => r.city.tilesAcquired),
+  origCapitalSeat: overCities((r) => r.city.origCapitalSeat ?? -1),
   loyalty: overCities((r) => r.city.loyalty ?? 100),
   // Ids the production layout does not carry (PALACE, the scripted-held
   // buildings) have no GPU column at all, so they are dropped rather than

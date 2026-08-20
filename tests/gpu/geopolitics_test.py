@@ -528,7 +528,28 @@ def main() -> None:
     assert int(s5.civ_diplo_favor[0, 0]) - f1 == exp, (
         f"favor step must be tier+suzerainties ({exp}), got {int(s5.civ_diplo_favor[0, 0]) - f1}"
     )
-    print("diplomatic favor OK — suzerain contest, tie rule, tier+suz accrual, _MUTABLE")
+    # CIV6 (Diplomatic Favor, "Losing Favor"): -5/turn per ORIGINAL CAPITAL
+    # occupied, and a negative rate leaves the bank stuck at 0.
+    assert _round_trips("city_orig_cap", _MUT2), "city_orig_cap must round-trip through _MUTABLE"
+    assert s5._favor_occ_capital == 5, f"GS charges 5 per occupied capital, got {s5._favor_occ_capital}"
+    _cap0 = (s5.city_orig_cap[0, 0] == 0) & s5.city_alive[0, 0]
+    assert bool(_cap0.any()), "the founding must stamp seat 0's first city"
+    assert int(_cap0.sum()) == 1, "only the FIRST city is an original capital"
+    assert float(s5._occupied_capitals(0)[0]) == 0.0, "a seat's own capital costs it nothing"
+    _col = int(_cap0.nonzero(as_tuple=True)[0][0])
+    s5.city_orig_cap[0, 0, _col] = 1  # as if seat 1 had founded it and seat 0 taken it
+    assert float(s5._occupied_capitals(0)[0]) == 1.0, "an occupied capital must be counted"
+    s5.civ_diplo_favor[:, 0] = 100   # clear of the floor, so the RATE is readable
+    f2 = int(s5.civ_diplo_favor[0, 0])
+    s5.step()
+    assert int(s5.civ_diplo_favor[0, 0]) - f2 == exp - int(s5._favor_occ_capital), (
+        "the penalty must ride the same tick as the tier and the suzerainties"
+    )
+    s5.civ_diplo_favor[:, 0] = 1
+    s5.step()
+    assert int(s5.civ_diplo_favor[0, 0]) == 0, "a negative rate floors the bank at zero"
+    print("diplomatic favor OK — suzerain contest, tie rule, tier+suz accrual, "
+          "the occupied-capital penalty and its floor, _MUTABLE")
 
     # --- the WORLD CONGRESS + the DIPLOMATIC victory -------------------------
     for _f in ("congress_sessions", "congress_active", "civ_diplo_points"):

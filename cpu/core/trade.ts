@@ -14,6 +14,7 @@ import { DISTRICTS } from '../data/districts';
 import { cityStateTradeCapacityBonus, hasMet, suzerainEffect } from './cityStates';
 import { completedDistrictCount } from './yields';
 import { CITY_STATE_TYPE_YIELD, CITY_STATE_TYPES, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD } from '../data/cityStates';
+import { emergencyCsRouteGold } from './emergency';
 import { congressCsRouteMult, congressIntlBanned, congressRouteCapacity, congressTradeGold } from './congress';
 import { ENHANCER_BELIEFS } from '../data/religion';
 import type { RuleResult } from './rules';
@@ -215,6 +216,9 @@ export function cityTradeYields(state: GameState, city: City): Yields {
         // the route sent to it.
         addYields(out, cityStateRouteYields(
           cityState, congressCsRouteMult(state, CITY_STATE_TYPES.indexOf(cityState.type))));
+        // a SURVIVED City-State Emergency pays its target +2 gold on every
+        // minor leg, forever
+        out.gold += emergencyCsRouteGold(state, seat);
         // CIV 6, Kumasi's suzerain: "Your Trade Routes to any city-state
         // provide +2 Culture and +1 Gold for every specialty district in the
         // ORIGIN city" — this city, whichever minor the route reaches.

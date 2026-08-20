@@ -4,8 +4,10 @@ import { seatOf, setWar } from '../../../cpu/core/seats';
 import { createGame, endTurn } from '../../../cpu/core/game';
 import { declareWar } from '../../../cpu/core/phase';
 import { grantCivics, settleFirstCity } from '../helpers';
-import { WARMONGER_DOW, WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN } from '../../../cpu/data/seats';
-import { diplomaticFavorPerTurn } from '../../../cpu/core/seatTurn';
+import { WARMONGER_DOW, WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL } from '../../../cpu/data/seats';
+import { diplomaticFavorPerTurn, occupiedCapitals } from '../../../cpu/core/seatTurn';
+import { foundCityAt } from '../../../cpu/core/game';
+import { transferCity } from '../../../cpu/core/phase';
 import { GOVERNMENTS } from '../../../cpu/data/policies';
 
 // THE WARMONGER score (grievances), one `Seat.warmonger` per seat. Real Civ 6
@@ -59,6 +61,44 @@ describe('diplomatic favor', () => {
     endTurn(state);
     // no suzerainties in a fresh game -> exactly the tier
     expect(seatOf(state, 0)!.diplomaticFavor).toBe(GOVERNMENTS.MONARCHY.tier);
+  });
+
+  // CIV6 (Diplomatic Favor, "Losing Favor"): -5/turn per ORIGINAL CAPITAL
+  // occupied, and a seat stuck on a negative rate sits at 0.
+  it('charges -5 per turn for each occupied original capital', () => {
+    expect(diplomaticFavorPerTurn('MONARCHY', 0, 0, 1))
+      .toBe(GOVERNMENTS.MONARCHY.tier - FAVOR_OCCUPIED_CAPITAL);
+    expect(diplomaticFavorPerTurn('MONARCHY', 0, 0, 2))
+      .toBe(GOVERNMENTS.MONARCHY.tier - 2 * FAVOR_OCCUPIED_CAPITAL);
+    expect(FAVOR_OCCUPIED_CAPITAL).toBe(5);
+  });
+
+  it('a founding stamps the original capital, and only the first city', () => {
+    const state = newGame(1);
+    settleFirstCity(state, 1);
+    const a = seatOf(state, 0)!;
+    expect(a.cities[0].origCapitalSeat).toBe(0);
+    expect((state.seats[1] as Seat).cities[0].origCapitalSeat).toBe(1);
+    const second = foundCityAt(state, 0, state.map.tiles[a.cities[0].centerIndex + 6], a);
+    expect(second.origCapitalSeat).toBe(-1);
+    expect(occupiedCapitals(state, 0)).toBe(0); // its own capital costs nothing
+  });
+
+  it('a captured capital still belongs to its founder, and the bank floors at zero', () => {
+    const state = newGame(1);
+    settleFirstCity(state, 1);
+    const a = seatOf(state, 0)!, b = state.seats[1] as Seat;
+    const taken = b.cities[0];
+    transferCity(state, b.seat, a, taken, 'conquered');
+    const flipped = a.cities[a.cities.length - 1];
+    expect(flipped.origCapitalSeat).toBe(1);   // whoever founded it, founded it
+    expect(flipped.isCapital).toBe(false);
+    expect(occupiedCapitals(state, 0)).toBe(1);
+    expect(occupiedCapitals(state, 1)).toBe(0);
+    // Chiefdom pays 0, so the rate is -5 and the bank cannot go under
+    a.diplomaticFavor = 2;
+    endTurn(state);
+    expect(a.diplomaticFavor).toBe(0);
   });
 });
 

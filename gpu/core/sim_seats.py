@@ -1449,6 +1449,13 @@ class SimSeats:
                 m = m & (mine > env[:, o])
         return m
 
+    def _occupied_capitals(self, row: int) -> torch.Tensor:
+        """[B] f64 — ORIGINAL CAPITALS this row holds that it did not found
+        (`occupiedCapitals`'s twin). A city whose founder is gone still counts:
+        the penalty is for sitting in it."""
+        orig = self.city_orig_cap[:, row]
+        return ((orig >= 0) & (orig != row) & self.city_alive[:, row]).sum(dim=1).double()
+
     def _suzerain_count(self, row: int) -> torch.Tensor:
         """Suzerained minors, each WEIGHTED by what Treaty Organization does to
         the favor its TYPE pays — x2 on outcome A, x0 on B. Unweighted this is
@@ -1575,10 +1582,16 @@ class SimSeats:
         Zero-draw — a pure function of state."""
         votes = self.civ_congress_vote.clone()
         self.civ_congress_vote[:] = -1  # an intent is for THIS turn
+        # A Special Session may sit on ANY turn once the Congress is open; a
+        # running emergency is settled whether one sat or not.
+        self._special_sessions(votes)
+        self._resolve_emergencies()
         fires, res0, res1, dv = self._congress_upcoming(int(self.turn))
         if not bool(fires.any()):
             return
         self.congress_sessions.add_(fires.long())
+        self.last_session_turn.copy_(torch.where(
+            fires, torch.full_like(self.last_session_turn, int(self.turn)), self.last_session_turn))
         # The standing set is REPLACED wholesale where a session fires, and
         # the cached legality bodies must see the change.
         for k in range(2):
@@ -1594,6 +1607,315 @@ class SimSeats:
         if bool(dv.any()):
             self._congress_dv(dv, votes)
         self._congress_cancel_banned_intl()
+
+    # --- EMERGENCIES -------------------------------------------------------
+    #
+    # The trigger, the sponsor's favor, the spacing, the hiatus, the vote, the
+    # war it forces and every magnitude are sourced at the TS catalog
+    # (data/seats.ts). PHASE 0 the condition holds; 1 a sponsor has paid and
+    # the session sits on `emg_act`; 2 it runs, and `emg_act` is its deadline.
+
+    def _congress_open(self) -> torch.Tensor:
+        """[B] — the Congress sits at all: the MAX era across majors has
+        reached congressMinEra. Independent of the 30-turn interval, because a
+        SPECIAL session may sit on any turn."""
+        world_era = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        for row in range(self.n_majors):
+            world_era = torch.maximum(world_era, self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]))
+        return world_era >= self._congress_min_era
+
+    def _emg_clear(self, k: int, m: torch.Tensor) -> None:
+        """Empty one slot where `m` holds — the `filter(e => e.phase >= 0)` twin."""
+        if not bool(m.any()):
+            return
+        for pl in (self.emg_kind, self.emg_target, self.emg_city, self.emg_phase, self.emg_act):
+            pl[:, k] = torch.where(m, torch.full_like(pl[:, k], -1), pl[:, k])
+        self.emg_affected[:, k] = self.emg_affected[:, k] & ~m.unsqueeze(1)
+        self.emg_member[:, k] = self.emg_member[:, k] & ~m.unsqueeze(1)
+
+    def _raise_emergency(self, kind: int, target: torch.Tensor, city: torch.Tensor,
+                         affected: torch.Tensor, m: torch.Tensor) -> None:
+        """`raiseEmergency`'s twin. The condition does NOT expire and does not
+        need the Congress open — only the CALL does. `affected` is [B, majors];
+        with nobody left to bring it, nothing is recorded, the same outrage is
+        not recorded twice, and the slot table is finite."""
+        m = m & affected.any(dim=1)
+        for k in range(self._emg_slots):
+            m = m & ~((self.emg_kind[:, k] == kind) & (self.emg_target[:, k] == target)
+                      & (self.emg_city[:, k] == city))
+        free = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        for k in reversed(range(self._emg_slots)):
+            free = torch.where(m & (self.emg_kind[:, k] < 0), torch.full_like(free, k), free)
+        m = m & (free >= 0)
+        if not bool(m.any()):
+            return
+        for k in range(self._emg_slots):
+            hit = m & (free == k)
+            if not bool(hit.any()):
+                continue
+            self.emg_kind[:, k] = torch.where(hit, torch.full_like(self.emg_kind[:, k], kind), self.emg_kind[:, k])
+            self.emg_target[:, k] = torch.where(hit, target, self.emg_target[:, k])
+            self.emg_city[:, k] = torch.where(hit, city, self.emg_city[:, k])
+            self.emg_phase[:, k] = torch.where(hit, torch.zeros_like(self.emg_phase[:, k]), self.emg_phase[:, k])
+            self.emg_act[:, k] = torch.where(hit, torch.full_like(self.emg_act[:, k], -1), self.emg_act[:, k])
+            self.emg_affected[:, k] = torch.where(hit.unsqueeze(1), affected, self.emg_affected[:, k])
+            self.emg_member[:, k] = self.emg_member[:, k] & ~hit.unsqueeze(1)
+
+    def _emg_turns(self, k: int) -> torch.Tensor:
+        """[B] long — the time limit of whatever kind sits in slot `k`."""
+        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        for i, r in enumerate(self._emg_rows):
+            out = torch.where(self.emg_kind[:, k] == i, torch.full_like(out, r["turns"]), out)
+        return out
+
+    def _emergency_war(self, member: int, k: int, m: torch.Tensor) -> None:
+        """A member's war on the emergency's target. CIV6: the war "won't
+        accrue Grievances because it is considered an effort of the
+        international community", and an Emergency "can override the war status
+        from previous Emergencies" — so no warmonger, and no treaty to respect."""
+        for tgt in range(self.n_majors):
+            if tgt == member:
+                continue
+            hit = m & (self.emg_target[:, k] == tgt) & ~self.war[:, member, tgt]
+            if not bool(hit.any()):
+                continue
+            self.war[:, member, tgt] |= hit
+            self.war[:, tgt, member] |= hit
+            self._reset_war_clock(member, tgt, hit)
+            self.treaty_turns[:, member, tgt] = torch.where(
+                hit, torch.zeros_like(self.treaty_turns[:, member, tgt]), self.treaty_turns[:, member, tgt])
+            self.treaty_turns[:, tgt, member] = torch.where(
+                hit, torch.zeros_like(self.treaty_turns[:, tgt, member]), self.treaty_turns[:, tgt, member])
+            self._cancel_routes_pair(member, tgt, hit)
+
+    def _hold_special_session(self, k: int, m: torch.Tensor, votes: torch.Tensor) -> None:
+        """`holdSpecialSession`'s twin: every living major votes for or against,
+        the target never joins its own, a tie carries the way outcome A does in
+        a Regular Session, and the losing side's favor comes back whole."""
+        B, dev, nrow = self.B, self.device, self.n_majors
+        self.last_session_turn.copy_(torch.where(
+            m, torch.full_like(self.last_session_turn, int(self.turn)), self.last_session_turn))
+        yes = torch.zeros(B, nrow, dtype=torch.bool, device=dev)
+        weight = torch.zeros(B, nrow, dtype=torch.long, device=dev)
+        spent = torch.zeros(B, nrow, dtype=self.civ_diplo_favor.dtype, device=dev)
+        for row in range(nrow):
+            voter = m & self.city_alive[:, row].any(dim=1)
+            v = votes[:, row, self._special_slot]
+            has = v[:, 0] >= 0
+            y = (self.emg_target[:, k] != row) & torch.where(has, v[:, 0] == 0, torch.ones_like(has))
+            ex, sp = self._congress_buy(
+                row, voter, torch.where(has, v[:, 2].clamp(min=0), torch.zeros_like(v[:, 2])))
+            yes[:, row] = voter & y
+            weight[:, row] = torch.where(voter, 1 + ex, weight[:, row])
+            spent[:, row] = sp
+        voting = weight > 0
+        ay = (weight * (yes & voting).long()).sum(dim=1)
+        an = (weight * (~yes & voting).long()).sum(dim=1)
+        passed = m & voting.any(dim=1) & (ay >= an)
+        for row in range(nrow):
+            lost = m & voting[:, row] & (yes[:, row] != passed)
+            self.civ_diplo_favor[:, row] = self.civ_diplo_favor[:, row] + torch.where(
+                lost, spent[:, row], torch.zeros_like(spent[:, row]))
+        self.emg_phase[:, k] = torch.where(
+            passed, torch.full_like(self.emg_phase[:, k], 2), self.emg_phase[:, k])
+        self.emg_act[:, k] = torch.where(passed, int(self.turn) + self._emg_turns(k), self.emg_act[:, k])
+        mem = yes & voting & (self.emg_target[:, k].unsqueeze(1)
+                              != torch.arange(nrow, device=dev).unsqueeze(0))
+        self.emg_member[:, k] = torch.where(passed.unsqueeze(1), mem, self.emg_member[:, k])
+        for row in range(nrow):
+            self._emergency_war(row, k, passed & self.emg_member[:, k, row])
+        self._emg_clear(k, m & ~passed)
+
+    def _special_sessions(self, votes: torch.Tensor) -> None:
+        """`specialSessions`' twin: sponsor what can be sponsored, then hold
+        what has waited its turn."""
+        open_now = self._congress_open()
+        turn = int(self.turn)
+        for k in range(self._emg_slots):
+            hold = open_now & (self.emg_phase[:, k] == 1) & (turn >= self.emg_act[:, k])
+            if bool(hold.any()):
+                self._hold_special_session(k, hold, votes)
+            # "as long as the previous session - Regular or Special - took
+            # place 15 turns or prior"
+            quiet = (self.last_session_turn < 0) | ((turn - self.last_session_turn) >= self._special_gap)
+            pend = open_now & quiet & (self.emg_phase[:, k] == 0)
+            if not bool(pend.any()):
+                continue
+            sponsor = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+            for row in reversed(range(self.n_majors)):
+                ok = (pend & self.emg_affected[:, k, row] & (self.emg_target[:, k] != row)
+                      & self.city_alive[:, row].any(dim=1)
+                      & (self.civ_diplo_favor[:, row] >= self._special_cost))
+                sponsor = torch.where(ok, torch.full_like(sponsor, row), sponsor)
+            paid = pend & (sponsor >= 0)
+            if not bool(paid.any()):
+                continue
+            for row in range(self.n_majors):
+                pay = paid & (sponsor == row)
+                self.civ_diplo_favor[:, row] = self.civ_diplo_favor[:, row] - torch.where(
+                    pay, torch.full_like(self.civ_diplo_favor[:, row], self._special_cost),
+                    torch.zeros_like(self.civ_diplo_favor[:, row]))
+            self.emg_phase[:, k] = torch.where(
+                paid, torch.ones_like(self.emg_phase[:, k]), self.emg_phase[:, k])
+            # "the Special Session occurs after the next turn"
+            self.emg_act[:, k] = torch.where(
+                paid, torch.full_like(self.emg_act[:, k], turn + 1), self.emg_act[:, k])
+
+    def _resolve_emergencies(self) -> None:
+        """`resolveEmergencies`' twin. CIV6: the goal is the contested city
+        LIBERATED — here, simply no longer the target's. Reaching it ends the
+        emergency at once; the deadline hands the win to the target. Every
+        member is paid alike, "regardless of who delivers the killing blow"."""
+        turn = int(self.turn)
+        for k in range(self._emg_slots):
+            live = self.emg_phase[:, k] == 2
+            if not bool(live.any()):
+                continue
+            held = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            for row in range(self.n_majors):
+                held = held | ((self.emg_target[:, k] == row)
+                               & ((self.city_id[:, row] == self.emg_city[:, k].unsqueeze(1))
+                                  & self.city_alive[:, row]).any(dim=1))
+            done = live & (~held | (turn >= self.emg_act[:, k]))
+            if bool(done.any()):
+                self._pay_emergency(k, done & ~held, True)
+                self._pay_emergency(k, done & held, False)
+                self._emg_clear(k, done)
+
+    def _pay_emergency(self, k: int, m: torch.Tensor, members_won: bool) -> None:
+        """`payEmergency`'s twin — the favor lump, and the PERMANENT counter
+        the winning side keeps."""
+        if not bool(m.any()):
+            return
+        zero_f = torch.zeros(self.B, dtype=self.civ_diplo_favor.dtype, device=self.device)
+        is_cs = self.emg_kind[:, k] == self._emg_at.get("CITY_STATE", -1)
+        for row in range(self.n_majors):
+            if members_won:
+                hit = m & self.emg_member[:, k, row]
+                if not bool(hit.any()):
+                    continue
+                self.civ_diplo_favor[:, row] = self.civ_diplo_favor[:, row] + torch.where(
+                    hit, zero_f + self._emg_member_favor, zero_f)
+                self.civ_emg_envoy_gold[:, row] += (hit & is_cs).long()
+                for tgt in range(self.n_majors):
+                    self.civ_emg_heal[:, row, tgt] += (hit & ~is_cs & (self.emg_target[:, k] == tgt)).long()
+            else:
+                hit = m & (self.emg_target[:, k] == row)
+                if not bool(hit.any()):
+                    continue
+                self.civ_diplo_favor[:, row] = self.civ_diplo_favor[:, row] + torch.where(
+                    hit, zero_f + self._emg_target_favor, zero_f)
+                self.civ_emg_route_gold[:, row] += (hit & is_cs).long()
+                for mem in range(self.n_majors):
+                    self.civ_emg_strike[:, row, mem] += (hit & ~is_cs & self.emg_member[:, k, mem]).long()
+
+    # --- what an emergency does while it runs, and what it leaves behind ----
+
+    def _emg_member_targets(self, row: int) -> torch.Tensor:
+        """[B, majors] — for each seat j, whether `row` is a MEMBER of an
+        emergency now RUNNING against j. The one membership question every
+        while-it-runs reader asks."""
+        out = torch.zeros(self.B, self.n_majors, dtype=torch.bool, device=self.device)
+        for k in range(self._emg_slots):
+            live = (self.emg_phase[:, k] == 2) & self.emg_member[:, k, row]
+            if not bool(live.any()):
+                continue
+            for tgt in range(self.n_majors):
+                out[:, tgt] = out[:, tgt] | (live & (self.emg_target[:, k] == tgt))
+        return out
+
+    def _special_upcoming(self, turn: int) -> torch.Tensor:
+        """[B] — a SPECIAL session would be held at `turn`: a called record
+        whose hiatus has run out, with the Congress open. What tells a driver
+        that the special-session slot of its ballot is worth filling."""
+        out = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        for k in range(self._emg_slots):
+            out = out | ((self.emg_phase[:, k] == 1) & (turn >= self.emg_act[:, k]))
+        return out & self._congress_open()
+
+    def _emergency_view(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """(kind+1, phase+1, isTarget, isMember) [B] each — the LOWEST live
+        emergency by (kind, target, city), as `observeSeat` renders it. Slot
+        POSITION is engine-local (TS pushes, the GPU fills the lowest hole), so
+        the ORDER has to come from the record itself."""
+        z = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        kind, phase, is_me, member = z.clone(), z.clone(), z.clone(), z.clone()
+        best = torch.full((self.B,), 1 << 60, dtype=torch.long, device=self.device)
+        for k in range(self._emg_slots):
+            live = self.emg_kind[:, k] >= 0
+            key = ((self.emg_kind[:, k] * (self.n_majors + 1)
+                    + self.emg_target[:, k]) << 20) + self.emg_city[:, k].clamp(min=0)
+            take = live & (key < best)
+            best = torch.where(take, key, best)
+            kind = torch.where(take, self.emg_kind[:, k] + 1, kind)
+            phase = torch.where(take, self.emg_phase[:, k] + 1, phase)
+            is_me = torch.where(take, (self.emg_target[:, k] == row).long(), is_me)
+            member = torch.where(take, self.emg_member[:, k, row].long(), member)
+        return kind, phase, is_me, member
+
+    def _emergency_pair_cs(self, attacker: torch.Tensor, defender: torch.Tensor) -> torch.Tensor:
+        """[B] f64 — CIV6 (Specifics): "Members gain +2 CS against targets'
+        units", for seat-valued attacker and defender columns."""
+        out = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        for row in range(self.n_majors):
+            tg = self._emg_member_targets(row)
+            if not bool(tg.any()):
+                continue
+            hit = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            for tgt in range(self.n_majors):
+                hit = hit | (tg[:, tgt] & (defender == tgt))
+            out = out + (hit & (attacker == row)).double() * self._emg_member_cs
+        return out
+
+    def _emergency_mp(self, pre: str) -> torch.Tensor:
+        """[B, P] long — CIV6 (Specifics): "+1 MP in target's territory" for a
+        member, per unit, because the bonus is where the unit stands."""
+        seat = getattr(self, f"{pre}_unit_seat")
+        tile = getattr(self, f"{pre}_unit_tile")
+        out = torch.zeros_like(tile)
+        if not self._emg_slots or pre != "major":
+            return out
+        ground = torch.where(tile >= 0, self.tile_seat.gather(1, tile.clamp(min=0)),
+                             torch.full_like(tile, -1))
+        for row in range(self.n_majors):
+            tg = self._emg_member_targets(row)
+            for tgt in range(self.n_majors):
+                if tgt == row or not bool(tg[:, tgt].any()):
+                    continue
+                out = out + (tg[:, tgt].unsqueeze(1) & (seat == row)
+                             & (ground == tgt)).long() * self._emg_member_mp
+        return out
+
+    def _emergency_loyalty(self, row: int) -> torch.Tensor:
+        """[B, RC] f64 — CIV6 (Specifics): "target gains +20 Loyalty in the
+        target city" while the emergency runs."""
+        out = torch.zeros(self.B, self.RC, dtype=torch.float64, device=self.device)
+        for k in range(self._emg_slots):
+            live = (self.emg_phase[:, k] == 2) & (self.emg_target[:, k] == row)
+            if bool(live.any()):
+                hit = live.unsqueeze(1) & (self.city_id[:, row] == self.emg_city[:, k].unsqueeze(1))
+                out = out + hit.double() * self._emg_target_loyalty
+        return out
+
+    def _emergency_strike_cs(self, city_owner: int, defender: int) -> torch.Tensor:
+        """[B] f64 — CIV6 (Military Emergency, failure): "Target gains +2 CS
+        when attacking member units with a City Strike"."""
+        z = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        if not (0 <= city_owner < self.n_majors) or not (0 <= defender < self.n_majors):
+            return z
+        return self.civ_emg_strike[:, city_owner, defender].double() * self._emg_strike_cs
+
+    def _emergency_envoy_gold(self, row: int) -> torch.Tensor:
+        """[B] f64 — CIV6 (City-State Emergency, success): "+1 Gold/turn for
+        each Envoy they have", over every envoy this seat has placed."""
+        placed = (self.seat_citystate_envoys[:, row, : self.S].sum(dim=1)
+                  if self.S else torch.zeros(self.B, dtype=torch.long, device=self.device))
+        return self.civ_emg_envoy_gold[:, row].double() * placed.double() * self._emg_envoy_gold
+
+    def _emergency_cs_route_gold(self, row: int) -> torch.Tensor:
+        """[B] f64 — CIV6 (City-State Emergency, failure): "Target's Trade
+        Routes to City-States gain +2 Gold"."""
+        return self.civ_emg_route_gold[:, row].double() * self._emg_cs_route_gold
 
     def _congress_space(self, kind: int) -> int:
         """How many TARGETS a resolution of this kind offers — the
@@ -2348,7 +2670,10 @@ class SimSeats:
             # SOVEREIGNTY outcome A doubles the CITY-STATE's own yield to a
             # route sent to a minor of the named TYPE.
             pc = pays_c.double() * self._congress_cs_route_mult().gather(1, css)
-            inc.scatter_add_(1, from_j * 6 + 2, citystate_gold * pc)
+            # a SURVIVED City-State Emergency pays its target +2 gold on every
+            # minor leg — added AFTER the yield, so Sovereignty does not double it
+            inc.scatter_add_(1, from_j * 6 + 2, citystate_gold * pc
+                             + pays_c.double() * self._emergency_cs_route_gold(row).unsqueeze(1))
             ycol = self._citystate_yidx[:, :S].gather(1, css)
             inc.scatter_add_(1, from_j * 6 + ycol, citystate_spec * pc)
             # CIV6 (Kumasi's suzerain): routes to ANY city-state pay "+2
@@ -2798,6 +3123,7 @@ class SimSeats:
         """
         self.city_alive[b, row, col] = False
         self.city_is_cap[b, row, col] = False
+        self.city_orig_cap[b, row, col] = -1
         self.city_pop[b, row, col] = 0
         self.city_growth[b, row, col] = 0
         self.city_cbox[b, row, col] = 0
@@ -2879,6 +3205,7 @@ class SimSeats:
         self.civ_warmonger[b, dst_row] += self._wm_cap
         old_pop = int(self.city_pop[b, src_row, src_col])
         old_acq = int(self.city_acquired[b, src_row, src_col])
+        old_orig = int(self.city_orig_cap[b, src_row, src_col])
         old_gww = int(self.city_gw_writing[b, src_row, src_col])
         old_gwa = int(self.city_gw_art[b, src_row, src_col])
         old_gwm = int(self.city_gw_music[b, src_row, src_col])
@@ -2924,6 +3251,20 @@ class SimSeats:
         self._add_era_score(dst_row, self._era_pts["conquer"], self._row_hot(b))
         self._reveal_around(_b1, dst_row, torch.tensor([c_t], dtype=torch.long, device=dev), 3)
         self.city_is_cap[b, dst_row, col] = False  # a received city is never a capital (TS isCapital: false)
+        self.city_orig_cap[b, dst_row, col] = old_orig  # ...but it is still whoever founded it
+        # CIV6 (Military Emergency): "The Target has conquered the city of
+        # another nation; it must be Liberated!" The seat that LOST it is the
+        # affected one.
+        _mil_kind = self._emg_at.get("MILITARY", -1)
+        if conquest and _mil_kind >= 0 and src_row < self.n_majors and dst_row < self.n_majors:
+            _aff = torch.zeros(self.B, self.n_majors, dtype=torch.bool, device=dev)
+            _aff[b, src_row] = True
+            _hot = torch.zeros(self.B, dtype=torch.bool, device=dev)
+            _hot[b] = True
+            self._raise_emergency(
+                _mil_kind,
+                torch.full((self.B,), dst_row, dtype=torch.long, device=dev),
+                torch.full((self.B,), new_id, dtype=torch.long, device=dev), _aff, _hot)
         self.city_center[b, dst_row, col] = c_t
         self.city_id[b, dst_row, col] = new_id
         self.civ_next_city_id[b, dst_row] += 1
@@ -3180,6 +3521,8 @@ class SimSeats:
         self.city_alive[rows, row, slot] = True
         self._add_era_score(row, self._era_pts["found"], self._row_hot(rows))
         self.city_is_cap[rows, row, slot] = new_cap
+        self.city_orig_cap[rows, row, slot] = torch.where(
+            new_cap, torch.full_like(s_idx, row), torch.full_like(s_idx, -1))
         self.civ_cap_tile[rows, row] = torch.where(new_cap, s_idx, self.civ_cap_tile[rows, row])
         self.city_center[rows, row, slot] = s_idx
         self.city_pop[rows, row, slot] = 1
@@ -3349,6 +3692,8 @@ class SimSeats:
             if major:
                 atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
                 atk_e = atk_e + self._gen_aura_cs(a_seat[:, u], here, atk_naval).to(atk_e.dtype)
+                # an emergency MEMBER hits its target harder
+                atk_e = atk_e + self._emergency_pair_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
             def_naval = d_emb | (~def_is_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
             def_civ_u = torch.where(def_is_barb, neg, d_seat_m)
             def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)

@@ -482,6 +482,21 @@ class SimOrders:
                                 torch.tensor([c_t], dtype=torch.long, device=dev), 3)
             self.city_id[b, row, col] = new_id
             self.city_is_cap[b, row, col] = False  # an annexed minor is never a capital
+            self.city_orig_cap[b, row, col] = -1   # ...and never anyone's original one
+            # CIV6 (City-State Emergency): the minor's PATRONS — met, with at
+            # least one envoy — are who may bring it to the Congress.
+            _cs_kind = self._emg_at.get("CITY_STATE", -1)
+            if _cs_kind >= 0:
+                _aff = torch.zeros(self.B, self.n_majors, dtype=torch.bool, device=dev)
+                _aff[b] = (self.seat_citystate_met[b, : self.n_majors, s]
+                           & (self.seat_citystate_envoys[b, : self.n_majors, s] >= 1))
+                _aff[b, row] = False
+                _hot = torch.zeros(self.B, dtype=torch.bool, device=dev)
+                _hot[b] = True
+                self._raise_emergency(
+                    _cs_kind,
+                    torch.full((self.B,), row, dtype=torch.long, device=dev),
+                    torch.full((self.B,), new_id, dtype=torch.long, device=dev), _aff, _hot)
             self.city_center[b, row, col] = c_t
             self.city_pop[b, row, col] = pop
             self.city_hp[b, row, col] = half_hp

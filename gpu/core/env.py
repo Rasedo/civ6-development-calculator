@@ -284,6 +284,8 @@ class BatchEnv:
             cols.append((res + 1).clamp(min=0).to(d))
             cols.append(torch.where(live, s.congress_active[:, k, 1], torch.zeros_like(res)).to(d))
             cols.append(torch.where(live, s.congress_active[:, k, 2], torch.zeros_like(res)).to(d))
+        kind, phase, is_me, member = s._emergency_view(row)
+        cols += [kind.to(d), phase.to(d), is_me.to(d), member.to(d)]
         return torch.stack(cols, dim=1)
 
     def _seat_strength(self, row: int) -> torch.Tensor:

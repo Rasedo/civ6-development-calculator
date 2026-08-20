@@ -37,6 +37,11 @@ export interface City {
   foodBox: number;
   cultureBox: number;
   tilesAcquired: number;
+  /** The seat this city was FOUNDED as the capital of; -1 for every other
+   * city. It does NOT move with the Palace — a relocated capital is a new
+   * capital, not an original one — so `origCapitalSeat !== seat` is exactly
+   * "somebody else is sitting in this seat's first city". */
+  origCapitalSeat?: number;
   /** CITIZEN ASSIGNMENT for the district SLOTS: how many citizens the player
    * has pinned into each district, by PLACEABLE_DISTRICTS index; -1 where the
    * automatic rule decides. `Tile.locked` is the same choice for plots. */
@@ -151,6 +156,17 @@ export type CongressVote = ([number, number, number] | null)[];
 
 export type SeatActionLog = Record<number, Record<number, SeatActionRecord>>;
 
+/** One emergency's record; `cpu/core/emergency.ts` owns the phases. */
+export interface Emergency {
+  kind: number;
+  target: number;
+  city: number;
+  phase: number;
+  act: number;
+  affected: number[];
+  members: number[];
+}
+
 export interface GameState {
   seats: Seat[];
   gameOver?: boolean;
@@ -162,6 +178,11 @@ export interface GameState {
    * into CONGRESS_RESOLUTIONS, winning outcome 0=A/1=B, target index),
    * replaced wholesale each session. */
   congress?: { res: number; outcome: number; target: number }[];
+  /** Emergencies at any stage — pending, called, running. */
+  emergencies?: Emergency[];
+  /** The turn the Congress last sat, Regular or Special. A Special Session
+   * needs SPECIAL_SESSION_GAP turns of quiet before it may be called. */
+  lastSessionTurn?: number;
   warTurns?: Record<string, number>;
   /** turns a pair's PEACE TREATY still binds, keyed like `warTurns`. */
   treatyTurns?: Record<string, number>;
@@ -249,6 +270,16 @@ export interface Seat {
    * seatPhase and consumed by `worldCongress` at the turn tail, which clears
    * every seat's whether a session fires or not — an intent is for one turn. */
   congressVote?: CongressVote;
+  /** WON EMERGENCIES, by the seat they were won against — a Military
+   * Emergency's +5 healing in that seat's territory, one count per win. */
+  emgHeal?: number[];
+  /** SURVIVED Military Emergencies, by member seat — +2 CS on a City Strike
+   * against that seat's units. */
+  emgStrike?: number[];
+  /** won City-State Emergencies: +1 Gold/turn per envoy each. */
+  emgEnvoyGold?: number;
+  /** survived City-State Emergencies: +2 Gold on this seat's minor legs each. */
+  emgRouteGold?: number;
   influencePoints: number;
   envoysAvailable: number;
 

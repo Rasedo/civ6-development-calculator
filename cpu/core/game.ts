@@ -182,6 +182,7 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     focus: 'balanced',
     queue: [],
     isCapital: list.length === 0,
+    origCapitalSeat: list.length === 0 ? seat : -1,
     buildings: list.length === 0 ? ['PALACE'] : [],
     districts: [{ type: 'CITY_CENTER', tileIndex: tile.index }],
     wonders: [],
@@ -1238,6 +1239,7 @@ export function deserialize(json: string): GameState {
       civCity.focus ??= 'balanced';
       civCity.queue ??= [];
       civCity.isCapital ??= false;
+      civCity.origCapitalSeat ??= -1;
       civCity.buildings ??= [];
       civCity.districts ??= [{ type: 'CITY_CENTER', tileIndex: civCity.centerIndex }];
       civCity.wonders ??= [];

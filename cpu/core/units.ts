@@ -18,6 +18,7 @@ import { PARK_MIN_APPEAL } from '../data/improvements';
 import { isTechComplete, isCivicComplete } from './effects';
 import { ARTIFACT_BUILDING, ARTIFACT_SLOTS } from '../data/greatPeople';
 import { clearCampFor } from './combat';
+import { emergencyHeal, emergencyMoveBonus } from './emergency';
 import { UNITS, UNIT_HP, ENCAMPMENT_HP, WALLS_HP, type UnitDef } from '../data/units';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { dedicationEvent, goldenMoveBonus } from './eras'; // MONUMENTALITY / EXODUS +2 MP
@@ -499,10 +500,13 @@ export type StepOutcome =
  * seatPhase and spawnUnit — and a bonus added to one of them is a bonus the
  * other three silently disagree about. The GPU's twin is `_full_mp`.
  */
-export function unitFullMoves(state: GameState, unit: { type: string; seat: number; embarked?: boolean }): number {
+export function unitFullMoves(state: GameState, unit: { type: string; seat: number; embarked?: boolean; tileIndex?: number }): number {
   const def = UNITS[unit.type];
   if (unit.embarked && !def?.naval) return EMBARK_MOVES;
-  return (def?.moves ?? 2) + goldenMoveBonus(state, unit);
+  return (def?.moves ?? 2) + goldenMoveBonus(state, unit)
+    // an emergency member marches faster on its target's ground
+    + emergencyMoveBonus(state, unit.seat,
+        unit.tileIndex === undefined ? NO_SEAT : tileSeat(state.map.tiles[unit.tileIndex]));
 }
 
 export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
@@ -904,11 +908,13 @@ export function refreshUnits(state: GameState): void {
     if (unit.movesLeft >= grantedLast) {
       const home = tileSeat(tile) === unit.seat;
       const onCamp = seatOf(state, unit.seat)?.camps.includes(unit.tileIndex) ?? false;
-      const heal = home && tile.district === 'CITY_CENTER' ? 20
+      const heal = (home && tile.district === 'CITY_CENTER' ? 20
         : home ? 15
         : onCamp ? 20
         : tileSeat(tile) === NO_SEAT ? 10
-        : 5;
+        : 5)
+        // a won Military Emergency heals its members in that seat's ground
+        + emergencyHeal(state, unit.seat, tileSeat(tile));
       unit.hp = Math.min(UNIT_HP, unit.hp + heal);
     }
     // FORTIFY: the EXACT heal gate (movesLeft >= full = spent

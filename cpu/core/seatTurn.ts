@@ -6,8 +6,9 @@ import { seatTourism } from './city';
 import { computeAdoption } from './effects';
 import { selectResearch } from './economy';
 import { GOVERNMENTS, GOVERNMENTS_ADOPTION_LIVE, POLICY_LIST } from '../data/policies';
-import { DIPLO_FAVOR_PER_SUZERAIN } from '../data/seats';
+import { DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL } from '../data/seats';
 import { CITY_STATE_TYPES } from '../data/cityStates';
+import { emergencyEnvoyGold } from './emergency';
 import { congressPolicyBlocked, congressPolicyFavor, congressSuzFavorMult } from './congress';
 import { wonderExtraSlots } from './effects';
 
@@ -20,9 +21,21 @@ export function suzerainCount(state: GameState, seat: number): number {
       ? congressSuzFavorMult(state, CITY_STATE_TYPES.indexOf(cityState.type)) : 0), 0);
 }
 
-export function diplomaticFavorPerTurn(gov: string | null, suzerains: number, treaty = 0): number {
+export function diplomaticFavorPerTurn(gov: string | null, suzerains: number, treaty = 0,
+                                       occupiedCapitals = 0): number {
   const tier = gov ? GOVERNMENTS[gov]?.tier ?? 0 : 0;
-  return tier + DIPLO_FAVOR_PER_SUZERAIN * suzerains + treaty;
+  return tier + DIPLO_FAVOR_PER_SUZERAIN * suzerains + treaty
+    - FAVOR_OCCUPIED_CAPITAL * occupiedCapitals;
+}
+
+/** Original capitals this seat holds that it did not found — the -5/turn
+ *  each. A city whose founder is gone still counts: the penalty is for
+ *  sitting in it, not for who is left to resent it. */
+export function occupiedCapitals(state: GameState, seat: number): number {
+  const s = seatOf(state, seat);
+  if (!s) return 0;
+  return s.cities.reduce((n, c) => n + ((c.origCapitalSeat ?? -1) >= 0
+    && (c.origCapitalSeat ?? -1) !== seat ? 1 : 0), 0);
 }
 
 /** POLICY TREATY outcome A pays every seat holding the named card. */
@@ -50,12 +63,22 @@ export function atPeaceWithAllCivs(state: GameState, seat: number): boolean {
   return true;
 }
 
+/** CIV6 (City-State Emergency, success): "+1 Gold/turn for each Envoy they
+ *  have" — every envoy this seat has placed, not just the ones at the minor
+ *  the emergency was about. */
+function emergencyEnvoyIncome(state: GameState, seat: number): number {
+  const placed = state.cityStates.reduce((n, cs) => n + (cs.envoys[seat] ?? 0), 0);
+  return emergencyEnvoyGold(state, seat, placed);
+}
+
 export function seatAccumulators(state: GameState, seat: number, govCityIds?: ReadonlySet<number>): void {
   const s = seatOf(state, seat);
   if (!s) return;
+  s.treasury = (s.treasury ?? 0) + emergencyEnvoyIncome(state, seat);
   s.tourism = (s.tourism ?? 0) + seatTourism(state, seat, govCityIds);
-  s.diplomaticFavor = (s.diplomaticFavor ?? 0)
-    + diplomaticFavorPerTurn(seatGovernmentId(state, seat), suzerainCount(state, seat), policyTreatyFavor(state, seat));
+  s.diplomaticFavor = Math.max(0, (s.diplomaticFavor ?? 0)
+    + diplomaticFavorPerTurn(seatGovernmentId(state, seat), suzerainCount(state, seat),
+                             policyTreatyFavor(state, seat), occupiedCapitals(state, seat)));
   if ((s.warmonger ?? 0) > 0 && atPeaceWithAllCivs(state, seat)) {
     s.warmonger = (s.warmonger ?? 0) - 1;
   }

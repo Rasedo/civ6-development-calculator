@@ -193,6 +193,7 @@ def main() -> int:
                 ("flood_severity", [py, "tests/gpu/flood_severity_test.py"], 2),  # the severity ladder: pillage, destroy, damage bands, the two silts, the Bath
                 ("citizens", [py, "tests/gpu/citizens_test.py"], 2),  # the specialist pin and the plot lock — the two citizen overrides
                 ("congress_vote", [py, "tests/gpu/congress_vote_test.py"], 2),  # the congress ballot: override, favor curve, both refund tiers, the DV target
+                ("emergency", [py, "tests/gpu/emergency_test.py"], 2),  # the special session above the trigger: sponsorship, quiet window, forced war, both outcomes
                 ("martyr", [py, "tests/gpu/martyr_test.py"], 2),  # one relic in nine apostle deaths, drawn where TS draws
                 ("barb_camps", [py, "tests/gpu/barb_camps_test.py"], 2),  # a camp's class is its ground; ranged is nobody's class
                 ("suzerain_rules", [py, "tests/gpu/suzerain_rules_test.py"], 2),  # the six suz-coded perks, strict-suzerain-only

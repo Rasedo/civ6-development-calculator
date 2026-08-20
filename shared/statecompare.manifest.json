@@ -103,6 +103,33 @@
      ]
     },
     {
+     "name": "emergencyTable",
+     "compare": "exact",
+     "covers": [
+      "GameState.emergencies"
+     ],
+     "planes": [
+      "emg_kind",
+      "emg_target",
+      "emg_city",
+      "emg_phase",
+      "emg_act",
+      "emg_affected",
+      "emg_member"
+     ],
+     "note": "sorted by (kind, target, city) and padded to EMERGENCY_SLOTS: the TS list is an array in trigger order, the GPU a fixed slot table, so slot POSITION is not a shared fact. Members and affected seats ride as bitmasks."
+    },
+    {
+     "name": "lastSessionTurn",
+     "compare": "exact",
+     "covers": [
+      "GameState.lastSessionTurn"
+     ],
+     "planes": [
+      "last_session_turn"
+     ]
+    },
+    {
      "name": "roadBridges",
      "compare": "exact",
      "covers": [
@@ -318,6 +345,23 @@
      "planes": [
       "civ_relic_reserve"
      ]
+    },
+    {
+     "name": "emergencyRewards",
+     "compare": "exact",
+     "covers": [
+      "Seat.emgEnvoyGold",
+      "Seat.emgRouteGold",
+      "Seat.emgHeal",
+      "Seat.emgStrike"
+     ],
+     "planes": [
+      "civ_emg_envoy_gold",
+      "civ_emg_route_gold",
+      "civ_emg_heal",
+      "civ_emg_strike"
+     ],
+     "note": "what a resolved emergency leaves standing, forever. Counters rather than a list of past emergencies: winning the same kind twice pays twice."
     },
     {
      "name": "bestMeleeCS",
@@ -1009,6 +1053,16 @@
      ],
      "planes": [
       "city_acquired"
+     ]
+    },
+    {
+     "name": "origCapitalSeat",
+     "compare": "exact",
+     "covers": [
+      "City.origCapitalSeat"
+     ],
+     "planes": [
+      "city_orig_cap"
      ]
     },
     {

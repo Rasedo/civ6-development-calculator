@@ -448,14 +448,21 @@ def _decide_vote(sim, row: int):
     """The WORLD CONGRESS ballot for the session the coming step would run.
     The ladder votes its own interest: outcome A on the target it holds the
     most of, free; and on the Diplomatic Victory resolution it backs itself or
-    blocks the leader, with every point of favor it has. Returns [B, 3, 3] —
-    [outcome, target, extra votes] per slate slot — or None on a quiet turn."""
+    blocks the leader, with every point of favor it has. Slot 3 is the SPECIAL
+    session — join every emergency it is not the target of. Returns [B, 4, 3] —
+    [outcome, target, extra votes] per slot — or None on a quiet turn."""
     fires, res0, res1, dv = sim._congress_upcoming(int(sim.turn) + 1)
-    if not bool(fires.any()):
+    special = sim._special_upcoming(int(sim.turn) + 1)
+    if not bool(fires.any()) and not bool(special.any()):
         return None
     B, dev = sim.B, sim.device
-    out = torch.full((B, 3, 3), -1, dtype=torch.long, device=dev)
+    out = torch.full((B, 4, 3), -1, dtype=torch.long, device=dev)
     zero = torch.zeros(B, dtype=torch.long, device=dev)
+    # THE SPECIAL SESSION: the ladder joins every emergency it is not the
+    # target of, which is also what a seat with no ballot does.
+    out[:, 3, 0] = torch.where(special, zero, out[:, 3, 0])
+    out[:, 3, 1] = torch.where(special, zero, out[:, 3, 1])
+    out[:, 3, 2] = torch.where(special, zero, out[:, 3, 2])
     for slot, sel in ((0, res0), (1, res1)):
         for r in range(len(sim._congress_res)):
             m = fires & (sel == r)
@@ -784,7 +791,7 @@ def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, 
         if flips:
             rec["lockTiles"] = flips
     if vote is not None:
-        ballot = [[int(vote[b, k, f]) for f in range(3)] for k in range(3)]
+        ballot = [[int(vote[b, k, f]) for f in range(3)] for k in range(vote.shape[1])]
         ballot = [e if e[0] >= 0 else None for e in ballot]
         if any(e is not None for e in ballot):
             rec["vote"] = ballot
@@ -940,8 +947,9 @@ def replay_seat(sim, row: int, rec: dict) -> None:
     _vt = rec.get("vote") or []
     vote = None
     if any(e is not None for e in _vt):
-        vote = torch.full((sim.B, 3, 3), -1, dtype=torch.long, device=dev)
-        for _k, _ent in enumerate(_vt[:3]):
+        _kn = sim.civ_congress_vote.shape[2]
+        vote = torch.full((sim.B, _kn, 3), -1, dtype=torch.long, device=dev)
+        for _k, _ent in enumerate(_vt[:_kn]):
             if _ent is None:
                 continue
             for _f in range(3):

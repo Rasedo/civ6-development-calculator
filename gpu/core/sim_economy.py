@@ -1465,7 +1465,21 @@ class SimEconomy:
                torch.where(here != NO_SEAT, torch.full_like(t, 5), torch.full_like(t, 10))))
         if camp is not None:
             heal = torch.where(camp & ~home, torch.full_like(t, 20), heal)
-        return heal
+        return heal + self._emergency_heal_mp(pre, seat, here)
+
+    def _emergency_heal_mp(self, pre: str, seat: torch.Tensor, here: torch.Tensor) -> torch.Tensor:
+        """[B, U] — CIV6 (Military Emergency, success): "Member units gain +5
+        Healing in the Target's territory", one count per win."""
+        out = torch.zeros_like(here)
+        if pre != "major":
+            return out
+        for row in range(self.n_majors):
+            for tgt in range(self.n_majors):
+                n = self.civ_emg_heal[:, row, tgt]
+                if not bool((n > 0).any()):
+                    continue
+                out = out + ((seat == row) & (here == tgt)).long() * (n * self._emg_member_heal).unsqueeze(1)
+        return out
 
     def _spent_mp(self, pre: str) -> torch.Tensor:
         """[B, U] — has this unit spent MP since its last refresh? TS asks
@@ -1491,7 +1505,7 @@ class SimEconomy:
             base = torch.where(
                 emb & ~self.unit_naval[typ], torch.full_like(base, self._embark_moves), base
             )
-        return base + getattr(self, f"{pre}_unit_aura_mp")
+        return base + getattr(self, f"{pre}_unit_aura_mp") + self._emergency_mp(pre)
 
     def _reset_mp(self, pre: str) -> None:
         """The movesLeft/movesFull reset: `granted = full + aura`, both fields.

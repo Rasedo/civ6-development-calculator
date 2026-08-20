@@ -217,6 +217,8 @@ GAME = {
     "victoryRow": lambda sim, b, rows: [int(sim.victory_row[b])],
     "congressSessions": lambda sim, b, rows: [int(sim.congress_sessions[b])],
     "congressActive": lambda sim, b, rows: [int(x) for x in sim.congress_active[b].reshape(-1).tolist()],
+    "emergencyTable": lambda sim, b, rows: _emg_table(sim, b),
+    "lastSessionTurn": lambda sim, b, rows: [int(sim.last_session_turn[b])],
     "roadBridges": lambda sim, b, rows: [1 if sim.road_bridged else 0],
     "pantheonsClaimed": lambda sim, b, rows: [int(sim.pantheon_claimed_n[b])],
     "beliefsClaimed": lambda sim, b, rows: [int(sim.claimed_f_n[b]) + int(sim.claimed_o_n[b])],
@@ -240,6 +242,35 @@ def _civ_mask(plane: str, offset: int = 0):
         m = getattr(sim, plane)[b].tolist()
         return [[i + offset for i, on in enumerate(m[c]) if on] for c in rows]
     return get
+
+
+def _emg_table(sim, b):
+    """Sorted by (kind, target, city) and padded to the slot table: the TS list
+    is an array in trigger order and the GPU a fixed table, so slot POSITION is
+    not a fact either engine owns."""
+    live = []
+    for k in range(sim.emg_kind.shape[1]):
+        kind = int(sim.emg_kind[b, k])
+        if kind < 0:
+            continue
+        mask = lambda pl: sum(1 << i for i in range(sim.n_majors) if bool(pl[b, k, i]))
+        live.append((kind, int(sim.emg_target[b, k]), int(sim.emg_city[b, k]),
+                     int(sim.emg_phase[b, k]), int(sim.emg_act[b, k]),
+                     mask(sim.emg_affected), mask(sim.emg_member)))
+    live.sort(key=lambda r: (r[0], r[1], r[2]))
+    out = []
+    for k in range(sim.emg_kind.shape[1]):
+        out.extend(live[k] if k < len(live) else (-1, -1, -1, -1, -1, 0, 0))
+    return out
+
+
+def _emg_rewards(sim, b, rows):
+    """What past emergencies left standing: envoy gold, minor-leg gold, then
+    the per-seat heal and city-strike counts, both dense over the roster."""
+    return [[int(sim.civ_emg_envoy_gold[b, c]), int(sim.civ_emg_route_gold[b, c])]
+            + [int(sim.civ_emg_heal[b, c, o]) for o in rows]
+            + [int(sim.civ_emg_strike[b, c, o]) for o in rows]
+            for c in rows]
 
 
 def _boosted(sim, b, rows):
@@ -357,6 +388,7 @@ SEAT = {
     "envoysAvailable": _civ_scalar("civ_envoys_avail"),
     "buildersTrained": _civ_scalar("civ_builders_trained"),
     "relicReserve": _civ_scalar("civ_relic_reserve"),
+    "emergencyRewards": _emg_rewards,
     "bestMeleeCS": _civ_scalar("civ_best_melee"),
     "techs": _civ_mask("civ_techs"),
     "civics": _civ_mask("civ_civics"),
@@ -489,6 +521,7 @@ CITY = {
     "foodBox": _cty("city_growth"),
     "cultureBox": _cty("city_cbox"),
     "tilesAcquired": _cty("city_acquired"),
+    "origCapitalSeat": _cty("city_orig_cap"),
     "loyalty": _cty("city_loyalty"),
     "buildings": lambda sim, b, rows: [
         [i for i, on in enumerate(sim.city_bldg[b, c, s].tolist()) if on] for c, s in rows

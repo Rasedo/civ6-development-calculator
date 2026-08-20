@@ -483,7 +483,7 @@ _MUTABLE = [
     # only here (`citystate_at` is a view of it), so it must round-trip.
     "tile_seat", "tile_city",
     "citystate_last_levy",
-    "seat_warkind", "seat_denounced", "seat_allied", "congress_sessions", "congress_active", "civ_congress_vote", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "seat_ext", "city_prod_bank",
+    "seat_warkind", "seat_denounced", "seat_allied", "congress_sessions", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "seat_ext", "city_prod_bank",
     "city_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dseat", "seat_route_dcity",  # international dest (seat row, city id), else -1/-1 (domestic/CS)
@@ -512,6 +512,6 @@ _MUTABLE = [
     "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_camp", "seat_citystate_quest_issued",
     "seat_explored",
     "civ_culture", "civ_faith", "civ_tourism", "civ_warmonger", "civ_gpp",
-    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_is_cap", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts", "city_artifact_era", "city_artifact_seat", "city_gwart_type", "city_gwart_artist", "city_spec_pin", "city_bldg",
+    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_is_cap", "city_orig_cap", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts", "city_artifact_era", "city_artifact_seat", "city_gwart_type", "city_gwart_artist", "city_spec_pin", "city_bldg",
     "war_turns", "treaty_turns", "peace_turns",
 ]

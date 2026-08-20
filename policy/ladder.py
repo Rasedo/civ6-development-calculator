@@ -51,7 +51,7 @@ PER_CITY = 10
 # THE WORLD CONGRESS block: this seat's ballot currency and the slate that is
 # STANDING — what the last session passed and on whom. A net votes off this;
 # the ladder's own vote reads the sim directly, the way the route verb does.
-CONGRESS = 8
+CONGRESS = 12
 CONGRESS_FIELDS = (
     "favor",          # diplomatic favor / 100
     "dvPoints",       # diplomatic victory points / 20 (the win threshold)
@@ -61,6 +61,12 @@ CONGRESS_FIELDS = (
     "slot1Res",
     "slot1Outcome",
     "slot1Target",
+    # THE EMERGENCY a Special Session would put to this seat: the ballot on
+    # slot 3 of the vote head is worthless without it.
+    "emgKind",        # kind + 1 of the FIRST live emergency, 0 = none
+    "emgPhase",       # 0 none, 1 pending, 2 called, 3 running
+    "emgIsMe",        # 1 when this seat is the TARGET
+    "emgMember",      # 1 when this seat is already a member
 )
 
 
