@@ -187,12 +187,37 @@ class SimMasks:
             )
         return dmg
 
+    def _city_damage_split(self, outer: torch.Tensor, roll: torch.Tensor,
+                           klass: str) -> tuple[torch.Tensor, torch.Tensor]:
+        """`cityDamageSplit` — how ONE hit on a city centre divides between the
+        outer-defense perimeter and the centre behind it. Both shares come out
+        of the same roll and neither draws again."""
+        o = outer.clamp(min=0)
+        frac = (o.double() / float(self._walls_hp)).clamp(max=1.0)
+        f = self._wall_dmg_melee if klass == "melee" else self._wall_dmg_ranged
+        wall = torch.where(
+            o > 0,
+            torch.minimum(o, js_round(roll.double() * f).clamp(min=1).to(o.dtype)),
+            torch.zeros_like(o),
+        )
+        through = ((1.0 - frac) / (1.0 - self._wall_breach)).clamp(0.0, 1.0)
+        centre = js_round(roll.double() * through).clamp(min=1).to(roll.dtype)
+        return wall, centre
+
+    def _ranged_city_penalty(self, type_idx: torch.Tensor, outer: torch.Tensor) -> torch.Tensor:
+        """`rangedCityPenalty` — the ranged attacker's penalty against city and
+        district defenses. Naval ranged pay it only while a perimeter stands."""
+        naval = self.unit_naval[type_idx.clamp(min=0, max=self.NU - 1)]
+        pen = torch.full(outer.shape, self._ranged_city_pen,
+                         dtype=torch.float64, device=outer.device)
+        return torch.where(naval & (outer <= 0), torch.zeros_like(pen), pen)
+
     def _wound(self, hp: torch.Tensor) -> torch.Tensor:
-        """A damaged unit's combat-strength penalty: −1 CS per 10 HP lost,
-        linear, up to −10 at 0 HP. Float64, no rounding (damageRoll quantizes
-        the final diff). hp is a unit-HP tensor; cities / city-states / walls
-        are NOT units and never pass through here."""
-        return 10.0 * ((100.0 - hp.double()) / 100.0)
+        """CIV6: "Damage of wounded units is diminished... The formula is
+        `round(10 - HP/10)`". The `woundPenalty` twin, RELIGIOUS Strength
+        included. hp is a unit-HP tensor; cities / city-states / walls are NOT
+        units and never pass through here."""
+        return js_round(10.0 - hp.double().clamp(min=0.0) / 10.0)
 
     def _xp_lvl_bonus(self, xp: torch.Tensor) -> torch.Tensor:
         """Mirrors combat.ts xpLevelBonus: the flat CS bonus a unit's veterancy

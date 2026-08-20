@@ -52,6 +52,7 @@ POKE_COST = {
     "spawn_reclaim": 6.0,
     "centre_defence": 14.0,
     "wonder_effects": 20.0,
+    "city_perimeter": 20.0,
 }
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "gpu"))
@@ -225,6 +226,7 @@ def main() -> int:
                 ("governors", [py, "tests/gpu/governors_test.py"], 4),  # era-score hooks + Ages loyalty modulation + governor anchors
                 ("watermill", [py, "tests/gpu/watermill_test.py"], 4),  # Water Mill: farm-improved bonus resources +1 food
                 ("wonder_effects", [py, "tests/gpu/wonder_effects_test.py"], 4),  # the fourteen wonder-effect channels the gate never finishes a wonder to reach
+                ("city_perimeter", [py, "tests/gpu/city_perimeter_test.py"], 4),  # the wall pool, the ranged city penalty and the theological roll — none of it reachable in the gate
                 ("unit_head", [py, "tests/gpu/unit_head_test.py"], 4),  # action enum == mask width == RL head width
                 ("state_discipline", [py, "tests/gpu/state_discipline_test.py"], 4),  # alias-rebind + _MUTABLE drift net
                 ("inplace", [py, "tests/gpu/inplace_discipline_test.py"], 1),  # static — no self-rebinds, no stale captures

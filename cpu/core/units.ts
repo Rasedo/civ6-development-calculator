@@ -18,7 +18,7 @@ import { PARK_MIN_APPEAL } from '../data/improvements';
 import { isTechComplete, isCivicComplete } from './effects';
 import { ARTIFACT_BUILDING, ARTIFACT_SLOTS } from '../data/greatPeople';
 import { clearCampFor } from './combat';
-import { UNITS, UNIT_HP, ENCAMPMENT_HP, type UnitDef } from '../data/units';
+import { UNITS, UNIT_HP, ENCAMPMENT_HP, WALLS_HP, type UnitDef } from '../data/units';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { goldenMoveBonus } from './eras'; // MONUMENTALITY / EXODUS +2 MP
 import { GAME_SPEED, EMBARK_MOVES } from '../data/constants';
@@ -216,6 +216,15 @@ export function unitsHostile(
   // express, because an all-false row means peace.
   if (capsOf(a.seat).alwaysHostile || capsOf(b.seat).alwaysHostile) return true;
   return civsAtWar(state, a.seat, b.seat);
+}
+
+/** The outer-defense pool a city has right now. Absent = FULL where the walls
+ * stand and 0 where they do not, the convention `encampmentIntact` uses for the
+ * Encampment garrison: the completion sites write the value explicitly, so an
+ * absent one means an imported or directly-constructed state, never a breach. */
+export function outerPool(city: { buildings: string[]; outerHp?: number }): number {
+  if (city.outerHp !== undefined) return city.outerHp;
+  return city.buildings.includes('ANCIENT_WALLS') ? WALLS_HP : 0;
 }
 
 export function encampmentIntact(tile: Tile): boolean {

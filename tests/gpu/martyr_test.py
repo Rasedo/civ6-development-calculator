@@ -72,8 +72,8 @@ def main() -> None:
 
     passes = 300
     for _ in range(passes):
-        # Both sides at 20 HP and equal religious strength: theoBaseDamage
-        # kills them both, so every pass offers TWO deaths to the draw.
+        # Both sides at 20 HP and equal religious strength: an even fight rolls
+        # 24-36, so every pass offers TWO deaths to the draw.
         place_apostle(sim, sa, ta, 0, 20)
         place_apostle(sim, sb, tb, 1, 20)
         sim._theological_combat_phase()

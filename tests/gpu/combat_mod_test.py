@@ -21,6 +21,7 @@ Checks:
 
 from __future__ import annotations
 
+import math
 import sys
 from pathlib import Path
 
@@ -93,10 +94,13 @@ def find_melee(rules, paths):
 def test_wound(sim) -> None:
     hp = torch.arange(0, 101, dtype=torch.long)
     got = sim._wound(hp)
-    want = torch.tensor([10.0 * ((100.0 - float(h)) / 100.0) for h in range(101)], dtype=torch.float64)
-    assert torch.equal(got, want), "wound penalty diverges from TS 10*((100-hp)/100)"
+    # CIV6: round(10 - HP/10) — the `woundPenalty` twin. Python's round() is
+    # banker's rounding, so the expectation is spelled the way JS rounds.
+    want = torch.tensor([float(math.floor(10.0 - h / 10.0 + 0.5)) for h in range(101)], dtype=torch.float64)
+    assert torch.equal(got, want), "wound penalty diverges from TS round(10 - hp/10)"
     assert float(sim._wound(torch.tensor([100]))[0]) == 0.0
-    assert float(sim._wound(torch.tensor([0]))[0]) == 10.0
+    assert float(sim._wound(torch.tensor([30]))[0]) == 7.0
+    assert float(sim._wound(torch.tensor([1]))[0]) == 10.0
     print("  A. _wound == TS woundPenalty, bit-exact for HP 0..100")
 
 
@@ -240,9 +244,12 @@ def test_integrated(sim, p, code, name) -> None:
 
     # reference (TS assembly): atk_e = combat - wound(64) - 5*river + 2*flank + xp;
     #                    def_e = combat + terrain + fortify - wound(88) + 2*support + xp
+    def wound(hp):
+        return math.floor(10.0 - hp / 10.0 + 0.5)  # CIV6 round(10 - HP/10)
+
     def ref_q(river):
-        atk_e = atk_combat - 10.0 * ((100.0 - ATK_HP) / 100.0) - (5.0 if river else 0.0) + FLANKING_CS * b7_flank + atk_xp_cs
-        def_e = def_combat + tdef + 3 * def_fort - 10.0 * ((100.0 - DEF_HP) / 100.0) + SUPPORT_CS * b7_support + def_xp_cs
+        atk_e = atk_combat - wound(ATK_HP) - (5.0 if river else 0.0) + FLANKING_CS * b7_flank + atk_xp_cs
+        def_e = def_combat + tdef + 3 * def_fort - wound(DEF_HP) + SUPPORT_CS * b7_support + def_xp_cs
         return round((atk_e - def_e) * 10), round((def_e - atk_e) * 10)
 
     ev0 = run(False)

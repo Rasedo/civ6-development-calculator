@@ -131,6 +131,11 @@ def build_strike_scene(rules, path):
     sim.major_unit_emb[0, vslot] = False
     sim.war[0, 0, 1 + 0] = sim.war[0, 1 + 0, 0] = True
     sim.sync_war()  # close the war matrix under transpose
+    # CIV6: the Encampment's defenses ARE the City Center's — walls "supply
+    # both" — and it strikes only while that perimeter stands.
+    assert sim._walls_bidx >= 0, "ANCIENT_WALLS not exported"
+    sim.city_bldg[0, 0, 0, sim._walls_bidx] = True
+    sim.city_outer_hp[0, 0, 0] = sim._walls_hp
     return sim, enc_tile, tgt, vslot
 
 
@@ -158,17 +163,13 @@ def test_strike(rules, path) -> None:
     sim2.district_complete[0, enc2] = False  # incomplete Encampment: no strike
     sim2._log_combat_b = 0
     sim2._combat_events = []
-    hp0b = int(sim2.major_unit_hp[0, v2])
     fire(sim2)
-    assert not any("k:estk" in e for e in sim2._combat_events), "incomplete Encampment still struck"
-    assert int(sim2.major_unit_hp[0, v2]) == hp0b, "control target lost HP with no complete Encampment"
-    print("  strike CONTROL OK: incomplete Encampment fires nothing, target untouched")
+    ks2 = [e.split()[0] for e in sim2._combat_events if ("k:cstk" in e or "k:estk" in e)]
+    assert ks2 == ["k:cstk"], f"incomplete Encampment still struck: {ks2}"
+    print("  strike CONTROL OK: an incomplete Encampment fires nothing; only the walls roll")
 
     # --- walls + Encampment: rolls TWICE, walls (cstk) BEFORE Encampment (estk)
     sim3, enc3, tgt3, v3 = build_strike_scene(rules, path)
-    assert sim3._walls_bidx >= 0, "ANCIENT_WALLS not exported"
-    sim3.city_bldg[0, 0, 0, sim3._walls_bidx] = True
-    sim3.city_outer_hp[0, 0, 0] = 0  # let the roll land on the unit, not the wall pool
     sim3._log_combat_b = 0
     sim3._combat_events = []
     fire(sim3)
@@ -176,6 +177,18 @@ def test_strike(rules, path) -> None:
     assert "k:cstk" in ks and "k:estk" in ks, f"both strikes must fire, got {ks}"
     assert ks.index("k:cstk") < ks.index("k:estk"), f"walls must roll BEFORE Encampment, got {ks}"
     print(f"  double-roll OK: walls-first order {ks}")
+
+    # --- a BREACHED perimeter silences both strikes
+    sim4, enc4, tgt4, v4 = build_strike_scene(rules, path)
+    sim4.city_outer_hp[0, 0, 0] = 0
+    sim4._log_combat_b = 0
+    sim4._combat_events = []
+    hp0c = int(sim4.major_unit_hp[0, v4])
+    fire(sim4)
+    ks4 = [e.split()[0] for e in sim4._combat_events if ("k:cstk" in e or "k:estk" in e)]
+    assert ks4 == [], f"a destroyed Outer Defense still struck: {ks4}"
+    assert int(sim4.major_unit_hp[0, v4]) == hp0c, "target lost HP with the perimeter down"
+    print("  breached-perimeter OK: neither the city nor its Encampment fires")
 
 
 def test_civ_encamp_prod_mult(rules, path) -> None:

@@ -5,13 +5,13 @@ import { isWater, isImpassable } from '../../world/query';
 import { civEraIndex } from './city';
 import { logUnitOrder } from './seatTurn';
 import { MODERN_ERA_INDEX } from '../data/techs';
-import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP } from '../data/units';
+import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP, WALLS_HP, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { CITY_STATE_MAX_HP, KABUL_XP_MULT, PRESLAV_HILL_CS } from '../data/cityStates';
 import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER } from '../data/seats';
 import { addEraScore } from './eras';
-import { nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, crossesRiver, cliffBlocksStep, stepUnit } from './units';
+import { nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, crossesRiver, cliffBlocksStep, stepUnit, outerPool } from './units';
 import { EMBARKED_DEFENSE_CS, embarkState } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, type BeliefEffects } from '../data/religion';
@@ -76,14 +76,16 @@ export function terrainDefense(tile: Tile): number {
   return d;
 }
 
-// A damaged unit fights at reduced combat strength —
-// −1 CS per 10 HP lost, LINEAR, up to −10 at 0 HP. Kept in float (no rounding);
-// the strengthDiff it feeds into is quantized to 0.1 inside damageRoll so the
-// GPU's exp table can reproduce the exact JS double. Cities / city-states /
-// walls are NOT units — they never call this.
 export const RIVER_ATTACK_PENALTY = 5; // melee across a river, attacker CS −5
+/**
+ * CIV6: "Damage of wounded units is diminished... The formula is
+ * `round(10 - HP/10)`... units with 30 HP will lose 7 Combat Strength and units
+ * with 1 HP will lose 10". The same penalty applies to RELIGIOUS Strength in
+ * theological combat. Cities / city-states / walls are not units and never call
+ * this.
+ */
 export function woundPenalty(unit: { hp: number }): number {
-  return 10 * ((UNIT_HP - unit.hp) / 100);
+  return Math.round(10 - Math.max(0, unit.hp) / (UNIT_HP / 10));
 }
 
 // flanking & support. Real Civ 6: a melee attacker gains +2 CS per
@@ -276,26 +278,14 @@ export function defenderCS(state: GameState, defender: Unit, defTileIndex: numbe
 }
 
 export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = -1): number {
-  // The real Civ 6 random factor is 0.8–1.2 (equal-strength hits land
-  // "reliably 24–36").
-  //
-  // SOURCING SWEEP. The BASE and the EXPONENT are VERIFIED
-  // EXACT against the reverse-engineered Civ 6 formula
-  // (damage = 30 * e^(strengthDiff / 25) * random): base 30 matches, and
-  // `30 * exp(0.04 * q / 10)` with q = round(diff*10) is exp(0.04*diff) =
-  // exp(diff/25) — the same curve, just pre-quantized for the GPU exp table.
-  //
-  // The RANDOM RANGE is CONTESTED and deliberately NOT changed. The community
-  // formula quotes 0.75–1.25, but the SAME source states equal-strength hits
-  // land "reliably between 24 and 36" — and 30 × [0.75, 1.25] = [22.5, 37.5],
-  // whereas 30 × [0.8, 1.2] = [24, 36] exactly. The repo's 0.8–1.2 is the
-  // internally consistent reading of that evidence, so it stands until a
-  // source settles which half of the contradiction is right — an OPEN
-  // question, not a closed one.
-  // StrengthDiff is now a multiple of 0.1 (wounded units subtract
-  // hp/10; a river melee subtracts 5). Quantize it to 0.1 granularity so the
-  // GPU's exp table — indexed by round(diff·10) — reproduces this exact JS
-  // double; one ulp in `base` can flip the rounded damage.
+  // CIV6: `Damage (HP) = 30 * e^(0.04 * StrengthDifference) *
+  // randomBetween(80%, 120%)`, where "randomBetween is a random multiplier
+  // between given arguments, including both ends". `30 * exp(0.04 * q / 10)`
+  // with q = round(diff·10) is the same curve, pre-quantized to 0.1 so the
+  // GPU's exp table — indexed by that q — reproduces this exact JS double;
+  // one ulp in `base` can flip the rounded damage.
+  // Theological and city combat resolve through here too: the same page says
+  // both "work the same way as normal combat".
   const q = Math.round(strengthDiff * 10);
   const base = 30 * Math.exp((0.04 * q) / 10);
   // Combat log (tooling): every roll of the
@@ -309,6 +299,39 @@ export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = 
   const cb = (globalThis as any).__cbLog;
   if (cb) cb.push(`k:${k} t:${t} c:${c0} diff${q} r${Math.round(r * 1e6)} dmg${dmg}`);
   return dmg;
+}
+
+/**
+ * How ONE hit on a city center divides between the outer-defense perimeter and
+ * the centre behind it. Both shares come out of the SAME roll — a city attack
+ * damages the perimeter and the city at once, each with its own reduction, and
+ * neither share draws again.
+ *
+ * CIV6: the perimeter takes -85% from a melee attack and -50% from a ranged
+ * one (nothing in this roster carries Bombard strength, which is what hits it
+ * at full). What reaches the centre opens as the perimeter is breached: 1
+ * damage while it is intact, "5-10" around 80%, reduced-but-real above 50%,
+ * full below the breach fraction.
+ */
+export function cityDamageSplit(
+  outerHp: number,
+  roll: number,
+  klass: 'melee' | 'ranged',
+): { wall: number; centre: number } {
+  const outer = Math.max(0, outerHp);
+  const frac = Math.min(1, outer / WALLS_HP);
+  const wall = outer > 0
+    ? Math.min(outer, Math.max(1, Math.round(roll * (klass === 'melee' ? WALL_DAMAGE_MELEE : WALL_DAMAGE_RANGED))))
+    : 0;
+  const through = Math.min(1, Math.max(0, (1 - frac) / (1 - WALL_BREACH_FRACTION)));
+  return { wall, centre: Math.max(1, Math.round(roll * through)) };
+}
+
+/** CIV6: a land ranged attack takes -17 against city and district defenses.
+ * Naval ranged pay it against the PERIMETER only, never against a bare city. */
+export function rangedCityPenalty(unitType: string, outerHp: number): number {
+  if (!UNITS[unitType]?.naval) return RANGED_CITY_PENALTY;
+  return outerHp > 0 ? RANGED_CITY_PENALTY : 0;
 }
 
 export function cityDefenseStrength(state: GameState, city: City): number {
@@ -425,13 +448,8 @@ function assaultAtkCS(state: GameState, attacker: Unit, targetIndex: number): nu
  * which is what the both seats copies each did; nothing between them
  * touches the RNG, so this is the same stream either way.
  *
- * The ANCIENT_WALLS outer pool soaks the hit first — only the spillover
- * reaches city HP. No walls → outerHp absent (0) → the full roll lands.
- * OPEN, both sourced: real Civ 6 lets the centre take REDUCED damage while
- * the perimeter still stands rather than none at all, and it cuts damage TO
- * the perimeter by unit class (-85% melee, -50% ranged; only Bombard strength
- * hits full). Here the outer pool absorbs the whole roll until depleted and
- * every class hits it the same.
+ * `cityDamageSplit` divides the city's roll between the perimeter and the
+ * centre. No walls → the full roll lands on the centre.
  *
  * The caller decides what happens if the city falls; that branch is still
  * per-owner because a City and a City live in different registries.
@@ -452,10 +470,10 @@ function cityAssault(
   const dmgToCity = damageRoll(state, atkCS - defCS, kCity, city.centerIndex);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, kAttacker, city.centerIndex);
   gainAttackXp(state, attacker); // +5 for the attack executed
-  const outer = city.outerHp ?? 0;
-  const absorbed = Math.min(outer, dmgToCity);
-  if (absorbed > 0) city.outerHp = outer - absorbed;
-  city.hp -= dmgToCity - absorbed;
+  const outer = outerPool(city);
+  const split = cityDamageSplit(outer, dmgToCity, 'melee');
+  if (split.wall > 0) city.outerHp = outer - split.wall;
+  city.hp -= split.centre;
   attacker.hp -= dmgToAttacker;
   attacker.movesLeft = 0;
   warWearinessBattle(state, attacker.seat, city.seat, city.centerIndex,
@@ -711,7 +729,11 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   const civCity = cityAtIndex(state, targetIndex);
   if (civCity && (capsOf(attacker.seat).alwaysHostile || civsAtWar(state, atkSeat, civCity.holder.seat))) {
     const defCS = cityDefenseStrength(state, civCity.city);
-    civCity.city.hp = Math.max(1, civCity.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex));
+    const outer = outerPool(civCity.city);
+    const roll = damageRoll(state, (def.ranged.strength - rangedCityPenalty(attacker.type, outer) - woundPenalty(attacker) + xpLevelBonus(attacker) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex);
+    const split = cityDamageSplit(outer, roll, 'ranged');
+    if (split.wall > 0) civCity.city.outerHp = outer - split.wall;
+    civCity.city.hp = Math.max(1, civCity.city.hp - split.centre);
     warWearinessBattle(state, attacker.seat, civCity.city.seat, targetIndex, { city: true });
     attacker.movesLeft = 0;
     gainAttackXp(state, attacker); // +5 for the bombardment (city not a unit — no defender xp)
@@ -725,7 +747,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   // seat you must declare on. See [[target-legality-gates]].
   if (cityState && cityState.centerIndex === targetIndex && cityStateAttackable(state, cityState, atkSeat)) {
     const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0);
-    cityState.hp = Math.max(1, (cityState.hp ?? CITY_STATE_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex));
+    cityState.hp = Math.max(1, (cityState.hp ?? CITY_STATE_MAX_HP) - damageRoll(state, (def.ranged.strength - rangedCityPenalty(attacker.type, 0) - woundPenalty(attacker) + xpLevelBonus(attacker) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex));
     warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), targetIndex, { city: true });
     attacker.movesLeft = 0;
     gainAttackXp(state, attacker); // +5 for the bombardment
@@ -763,10 +785,11 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
       : undefined;
   if (enemyCity) {
     const defCS = cityDefenseStrength(state, enemyCity);
-    enemyCity.hp = Math.max(
-      1,
-      enemyCity.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'vrngc', targetIndex),
-    );
+    const outer = outerPool(enemyCity);
+    const roll = damageRoll(state, (def.ranged.strength - rangedCityPenalty(attacker.type, outer) - woundPenalty(attacker) + xpLevelBonus(attacker) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'vrngc', targetIndex);
+    const split = cityDamageSplit(outer, roll, 'ranged');
+    if (split.wall > 0) enemyCity.outerHp = outer - split.wall;
+    enemyCity.hp = Math.max(1, enemyCity.hp - split.centre);
     warWearinessBattle(state, attacker.seat, enemyCity.seat, targetIndex, { city: true });
     attacker.movesLeft = 0;
     gainAttackXp(state, attacker); // +5 for the bombardment (city not a unit)

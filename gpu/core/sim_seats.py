@@ -1109,12 +1109,12 @@ class SimSeats:
 
         The `theologicalCombatPhase` twin. Only an APOSTLE initiates, and only
         against an ADJACENT religious unit of a DIFFERENT religion (religion id
-        == the founding seat, so the test is a seat compare). Both sides take
-        theoBaseDamage plus the religious-strength difference scaled by
-        theoDamage, floored at 1; a unit at 0 HP dies; the loser's religion
-        sheds theoPressureSwing in every city within theoPressureRange of the
-        fallen unit while the winner's gains it. The ONE draw is the MARTYR
-        roll, taken per fallen apostle at the relic site.
+        == the founding seat, so the test is a seat compare). Both sides roll
+        `_damage_roll` on the wounded religious-strength difference; a unit at 0
+        HP dies; the loser's religion sheds theoPressureSwing in every city
+        within theoPressureRange of the fallen unit while the winner's gains it.
+        Two damage draws per fight, ahead of the MARTYR roll taken per fallen
+        apostle at the relic site.
 
         ORDER: slot order for the attacker walk AND the defender pick — the
         twin of TS's `state.units` array order. A dead attacker (killed earlier
@@ -1155,9 +1155,16 @@ class SimSeats:
             if rows.numel() == 0:
                 continue
             j = first.long().argmax(dim=1)
-            d_str = (rs[self.major_unit_type.clamp(min=0)] * first.long()).sum(dim=1)
-            to_def = (self._theo_base + self._theo_dmg * (a_str - d_str)).clamp(min=1)
-            to_atk = (self._theo_base + self._theo_dmg * (d_str - a_str)).clamp(min=1)
+            _f = first.long()
+            d_str = (rs[self.major_unit_type.clamp(min=0)] * _f).sum(dim=1)
+            # The wounded religious strengths, then the two rolls in TS's draw
+            # order: the defender's blow first, the attacker's second.
+            a_eff = a_str - self._wound(self.major_unit_hp[:, u])
+            d_eff = d_str - self._wound((self.major_unit_hp * _f).sum(dim=1))
+            d_tile = (self.major_unit_tile * _f).sum(dim=1)
+            hit = first.any(dim=1)
+            to_def = self._damage_roll(hit, a_eff - d_eff, k="theo", tile=d_tile)
+            to_atk = self._damage_roll(hit, d_eff - a_eff, k="theoc", tile=self.major_unit_tile[:, u])
             hp = self.major_unit_hp
             hp[rows, j[rows]] = hp[rows, j[rows]] - to_def[rows].to(hp.dtype)
             hp[rows, u] = hp[rows, u] - to_atk[rows].to(hp.dtype)
@@ -3588,9 +3595,9 @@ class SimSeats:
         rows = att.nonzero(as_tuple=True)[0]
         hr, sl = hrow[rows], slot[rows]
         outer = self.city_outer_hp[rows, hr, sl]
-        absorbed = torch.minimum(outer, d_city[rows])
-        self.city_outer_hp[rows, hr, sl] = outer - absorbed
-        self.city_hp[rows, hr, sl] -= d_city[rows] - absorbed
+        wall, centre = self._city_damage_split(outer, d_city[rows], "melee")
+        self.city_outer_hp[rows, hr, sl] = outer - wall
+        self.city_hp[rows, hr, sl] -= centre
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
         died = att & (a_hp[:, u] <= 0)
         self._ww_battle(att, self._row_of(a_seat[:, u]), hrow, tgt, a_died=died, city=True)
@@ -3828,7 +3835,8 @@ class SimSeats:
             _gm = self.military_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
             gar = ((_gm >= 0) & (self.unit_seat[_bidx, _gm.clamp(min=0)] == hrow)).long()
             def_cs = torch.maximum(self.civ_best_melee[_bidx, hrow], torch.full_like(hrow, 15)) + gar * 5
-            atk_e = atk_rs - self._wound(a_hp) + a_lvl
+            outer_all = self.city_outer_hp[_bidx, hrow, hcol]
+            atk_e = atk_rs - self._ranged_city_penalty(ut0, outer_all) - self._wound(a_hp) + a_lvl
             if not barb:
                 # aura inside hostileRangedStrike's ranged-strength
                 # parentheses, after xpLevelBonus.
@@ -3841,7 +3849,10 @@ class SimSeats:
             self._ww_battle(city_att, self._row_of(self._atk_seat(atk_kind, u)), hrow, tgt, city=True)
             rows = city_att.nonzero(as_tuple=True)[0]
             hr_, hc_ = hrow[rows], hcol[rows]
-            self.city_hp[rows, hr_, hc_] = (self.city_hp[rows, hr_, hc_] - d_city[rows]).clamp(min=1)
+            outer = self.city_outer_hp[rows, hr_, hc_]
+            wall, centre = self._city_damage_split(outer, d_city[rows], "ranged")
+            self.city_outer_hp[rows, hr_, hc_] = outer - wall
+            self.city_hp[rows, hr_, hc_] = (self.city_hp[rows, hr_, hc_] - centre).clamp(min=1)
         mslot = self.military_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
         cslot = self.civilian_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
         neg = torch.full_like(mslot, -1)
@@ -3991,11 +4002,16 @@ class SimSeats:
             slot = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
             gar = ((mslot >= 0) & (m_seat == hrow)).long()
             def_cs = torch.maximum(self.civ_best_melee[bidx, hrow], torch.full_like(hrow, 15)) + gar * 5
-            d_city = self._damage_roll(city_att, atk_base + rel_city - def_cs, k="rngrc", tile=tgt)
+            outer_all = self.city_outer_hp[bidx, hrow, slot]
+            pen = self._ranged_city_penalty(at0, outer_all)
+            d_city = self._damage_roll(city_att, atk_base + rel_city - pen - def_cs, k="rngrc", tile=tgt)
             self._ww_battle(city_att, self._row_of(aseat), hrow, tgt, city=True)
             rr = city_att.nonzero(as_tuple=True)[0]
             hr, sl = hrow[rr], slot[rr]
-            self.city_hp[rr, hr, sl] = (self.city_hp[rr, hr, sl] - d_city[rr]).clamp(min=1)  # ranged never captures
+            outer = self.city_outer_hp[rr, hr, sl]
+            wall, centre = self._city_damage_split(outer, d_city[rr], "ranged")
+            self.city_outer_hp[rr, hr, sl] = outer - wall
+            self.city_hp[rr, hr, sl] = (self.city_hp[rr, hr, sl] - centre).clamp(min=1)  # ranged never captures
         if bool(cs_att.any()):
             csx = self.citystate_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
             mil_idx = int(self.rules.citystate.get("militaristicIdx", -1))
@@ -4003,7 +4019,8 @@ class SimSeats:
                 15 + self.citystate_pop.gather(1, csx.unsqueeze(1)).squeeze(1)
                 + (self.citystate_type.gather(1, csx.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
             )
-            d_cs = self._damage_roll(cs_att, atk_base + rel_city - def_cs, k="rngcs", tile=tgt)
+            cs_pen = self._ranged_city_penalty(at0, torch.zeros_like(def_cs))
+            d_cs = self._damage_roll(cs_att, atk_base + rel_city - cs_pen - def_cs, k="rngcs", tile=tgt)
             self._ww_battle(cs_att, self._row_of(aseat), self._row_of(100 + csx), tgt, city=True)
             rr = cs_att.nonzero(as_tuple=True)[0]
             self.citystate_hp[rr, csx[rr]] = (self.citystate_hp[rr, csx[rr]] - d_cs[rr]).clamp(min=1)

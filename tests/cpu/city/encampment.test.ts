@@ -66,38 +66,12 @@ describe('Encampment', () => {
     expect(state.units[state.units.length - 1].xp).toBe(5);
   });
 
-  it('the ADDITIONAL Encampment strike fires (and only when complete)', () => {
-    const { state, city } = battlefield();
-    addEncampment(state, city, 10, 9);
+  /** The strike keys a `seatPhase` fires at a raider standing next to the city. */
+  function strikeKeys(state: any, city: any): string[] {
     const center = state.map.tiles[city.centerIndex];
     const near = tileAtCoords(state.map, center.col - 1, center.row); // adjacent -> in range
     // a barbarian is hostile with no war bookkeeping and holds still through
     // seatPhase (barbarians act in barbarianPhase, which never runs here)
-    const raider = spawnUnit(state, 'SPEARMAN', near.index, BARB_SEAT)!;
-    raider.hp = 100;
-    seatPhase(state);
-    expect(raider.hp).toBeLessThan(100); // the Encampment strike landed
-    expect(raider.xp).toBeUndefined(); // barbarians never accrue XP (capsOf)
-  });
-
-  it('control: an incomplete Encampment strikes nothing', () => {
-    const { state, city } = battlefield();
-    const enc = addEncampment(state, city, 10, 9);
-    enc.districtComplete = false; // not yet built
-    const center = state.map.tiles[city.centerIndex];
-    const near = tileAtCoords(state.map, center.col - 1, center.row);
-    const raider = spawnUnit(state, 'SPEARMAN', near.index, BARB_SEAT)!;
-    raider.hp = 100;
-    seatPhase(state);
-    expect(raider.hp).toBe(100);
-  });
-
-  it('walls + Encampment rolls twice, walls first', () => {
-    const { state, city } = battlefield();
-    city.buildings.push('ANCIENT_WALLS');
-    addEncampment(state, city, 10, 9);
-    const center = state.map.tiles[city.centerIndex];
-    const near = tileAtCoords(state.map, center.col - 1, center.row);
     const raider = spawnUnit(state, 'SPEARMAN', near.index, BARB_SEAT)!;
     raider.hp = 100;
     const log: string[] = [];
@@ -107,9 +81,37 @@ describe('Encampment', () => {
     } finally {
       delete (globalThis as any).__cbLog;
     }
-    const ks = log.map((e) => e.split(' ')[0]).filter((k) => k === 'k:cstk' || k === 'k:estk');
+    expect(raider.xp).toBeUndefined(); // barbarians never accrue XP (capsOf)
+    return log.map((e) => e.split(' ')[0]).filter((k) => k === 'k:cstk' || k === 'k:estk');
+  }
+
+  it('walls + Encampment rolls twice, walls first', () => {
+    const { state, city } = battlefield();
+    city.buildings.push('ANCIENT_WALLS');
+    addEncampment(state, city, 10, 9);
+    const ks = strikeKeys(state, city);
     expect(ks).toContain('k:cstk');
     expect(ks).toContain('k:estk');
     expect(ks.indexOf('k:cstk')).toBeLessThan(ks.indexOf('k:estk')); // walls before Encampment
+  });
+
+  it('control: an incomplete Encampment strikes nothing', () => {
+    const { state, city } = battlefield();
+    city.buildings.push('ANCIENT_WALLS');
+    const enc = addEncampment(state, city, 10, 9);
+    enc.districtComplete = false; // not yet built
+    expect(strikeKeys(state, city)).toEqual(['k:cstk']);
+  });
+
+  it('CIV6: the Encampment strikes only while the city perimeter stands', () => {
+    const { state, city } = battlefield();
+    addEncampment(state, city, 10, 9);
+    expect(strikeKeys(state, city)).toEqual([]); // no walls -> no outer defense at all
+
+    const walled = battlefield();
+    walled.city.buildings.push('ANCIENT_WALLS');
+    walled.city.outerHp = 0; // the perimeter beaten down
+    addEncampment(walled.state, walled.city, 10, 9);
+    expect(strikeKeys(walled.state, walled.city)).toEqual([]);
   });
 });

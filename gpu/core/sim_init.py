@@ -564,8 +564,6 @@ class SimInit:
         _rs = _bl.get("relStrength") or []
         self._rel_strength = torch.tensor(list(_rs) + [0] * 64, dtype=torch.long, device=device)
         self._city_rel_live = bool(_bl.get("cityReligionAdderLive", False))
-        self._theo_dmg = int(_bl.get("theoDamage", 2))
-        self._theo_base = int(_bl.get("theoBaseDamage", 30))
         self._theo_swing = float(_bl.get("theoPressureSwing", 15))
         self._theo_range = int(_bl.get("theoPressureRange", 6))
         self._martyr_chance = float(_bl["martyrChance"])
@@ -1049,6 +1047,14 @@ class SimInit:
         self._trade_dur_bumps = [int(x) for x in _tr["durEraBumps"]]  # eras adding +10/+20/+30
         self._trader_cost_prog = int(_tr["traderCostProg"])
         self._walls_hp = int(rules.combat.get("wallsHp", 100))
+        # What `_city_damage_split` and `_ranged_city_penalty` read: the
+        # perimeter's share of a melee and of a ranged hit, the fraction below
+        # which the centre takes full damage, and the ranged penalty against
+        # city and district defenses.
+        self._wall_dmg_melee = float(rules.combat["wallDamageMelee"])
+        self._wall_dmg_ranged = float(rules.combat["wallDamageRanged"])
+        self._wall_breach = float(rules.combat["wallBreachFraction"])
+        self._ranged_city_pen = float(rules.combat["rangedCityPenalty"])
         # The ENCAMPMENT garrison pool cap (TS ENCAMPMENT_HP).
         self._encamp_hp_max = int(rules.combat.get("encampHp", 100))
         # Which district types count toward the specialty cap (Aqueduct/Neighborhood

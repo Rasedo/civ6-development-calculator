@@ -8,7 +8,7 @@ import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { isWater, isImpassable } from '../../world/query';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
-import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, tradeWalkStep, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit } from './units';
+import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, outerPool, tradeWalkStep, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit } from './units';
 import { PILLAGE_HEAL_IMPROVEMENTS } from './combat';  // the replay's pillage arm mirrors hostileUnitAct's
 import { UNIT_HP } from '../data/units';
 import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, generalAuraCS, cityDefenseStrength } from './combat';
@@ -1428,7 +1428,11 @@ export function seatPhase(state: GameState): void {
         acquireTile(state, civCity, next);
       }
       const civCityCenter = state.map.tiles[civCity.centerIndex];
-      if (civCity.buildings.includes('ANCIENT_WALLS')) {
+      // CIV6: walls give a city its ranged strike, and "if the Outer Defense of
+      // a city or defensible district has been completely destroyed, its ranged
+      // strike again becomes unavailable".
+      const perimeter = outerPool(civCity) > 0;
+      if (perimeter) {
         let bestTile = -1;
         let bestDist = 99;
         for (const t of state.map.tiles) {
@@ -1466,7 +1470,10 @@ export function seatPhase(state: GameState): void {
           }
         }
       }
-      if (civCity.districts.some((dd) => encampmentIntact(state.map.tiles[dd.tileIndex]))) {
+      // CIV6: the Encampment's defenses are the City Center's — "building any
+      // level of Walls in the city will supply both" — and it strikes on its
+      // own only "while its Wall defenses are still up".
+      if (perimeter && civCity.districts.some((dd) => encampmentIntact(state.map.tiles[dd.tileIndex]))) {
         let bestTile = -1;
         let bestDist = 99;
         for (const t of state.map.tiles) {
@@ -1513,7 +1520,7 @@ export function seatPhase(state: GameState): void {
       if (!besieged) {
         civCity.hp = Math.min(CITY_MAX_HP, civCity.hp + CITY_HEAL_PER_TURN);
         if (civCity.buildings.includes('ANCIENT_WALLS')) {
-          civCity.outerHp = Math.min(WALLS_HP, (civCity.outerHp ?? WALLS_HP) + CITY_HEAL_PER_TURN);
+          civCity.outerHp = Math.min(WALLS_HP, outerPool(civCity) + CITY_HEAL_PER_TURN);
         }
         for (const d of civCity.districts) {
           if (d.type !== 'ENCAMPMENT') continue;

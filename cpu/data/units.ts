@@ -35,9 +35,9 @@ export interface UnitDef {
    * RELIGIOUS STRENGTH — the stat theological combat resolves on.
    * Only units that carry it can take part; only an APOSTLE may INITIATE
    * (real Civ 6: Apostles and Inquisitors attack, Missionaries only defend).
-   * Magnitudes are stylized (the ORDER apostle > missionary is the sourced
-   * part). Real Civ 6 also lets INQUISITORS attack and defend, and promotions
-   * change these numbers; neither exists here, and both stay open.
+   * CIV6 magnitudes, exact: Apostle 110, Missionary 100. Real Civ 6 also lets
+   * INQUISITORS attack and defend, and promotions change these numbers;
+   * neither exists here, and both stay open.
    */
   religiousStrength?: number;
   /** spawn-ONLY chassis (GENERAL/ADMIRAL) — never trainable,
@@ -412,8 +412,29 @@ export const CITY_HEAL_PER_TURN = 20;
  * field.
  */
 export const ENCAMPMENT_HP = 100;
-/** the ANCIENT_WALLS outer-defense pool — full HP a walled city
- * gets on top of its normal HP. Damage depletes it first (combat.ts); it
- * heals with the city (CITY_HEAL_PER_TURN, unbesieged). The GPU reads it as
- * the exported `wallsHp` rules field. */
+/** CIV6 (Gathering Storm): Ancient Walls carry 100 HP of "outer defense"
+ * perimeter on top of the city's own 200. `cityDamageSplit` decides what a hit
+ * takes off each. The GPU reads it as the exported `wallsHp` rules field. */
 export const WALLS_HP = 100;
+/**
+ * CIV6: the perimeter "is much tougher, practically impervious to most
+ * conventional attacks" — "-85% for melee attacks... and -50% for ranged ones",
+ * and "only units with attacks that use Bombard Strength" hit it at full.
+ */
+export const WALL_DAMAGE_MELEE = 0.15;
+export const WALL_DAMAGE_RANGED = 0.5;
+/**
+ * CIV6: how much of a hit reaches the centre depends on how breached the
+ * perimeter is. Intact, "no attack can harm the city itself (it will do 1
+ * damage only)"; around 80% the city "will then suffer not more than 5-10
+ * damage per attack"; above 50% attacks "get through... but their force is
+ * still reduced"; below 20-30% "the city starts taking real hits (that is,
+ * full damage)". A share of `(1 - frac) / (1 - WALL_BREACH_FRACTION)` clamped
+ * to [0, 1] hits every one of those four readings.
+ */
+export const WALL_BREACH_FRACTION = 0.25;
+/** CIV6: "Ranged attacks receive a -17 penalty when attacking city and
+ * district defenses". Naval ranged pay it against the perimeter only — they
+ * "do not suffer the -17 RS penalty against cities (but still suffer against
+ * Walls, just like other ranged units)". */
+export const RANGED_CITY_PENALTY = 17;

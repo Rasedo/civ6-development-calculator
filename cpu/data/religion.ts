@@ -222,23 +222,18 @@ export const RELIGION_PRESSURE_PER_TURN = 1;
 export const SPREAD_PRESSURE = 10;
 export const MISSIONARY_CAP = 2;
 export const APOSTLE_CAP = 1;
-/**
- * THEOLOGICAL COMBAT. Sourced shape — only an Apostle may
- * initiate against an adjacent religious unit of a DIFFERENT religion; both
- * sides take damage scaled by the RELIGIOUS-STRENGTH DIFFERENCE; a unit at 0
- * HP dies; and the loser's religion loses pressure in nearby cities while the
- * winner's gains. ZERO-DRAW: damage is the strength difference scaled by
- * THEO_DAMAGE, with no RNG multiplier. Real Civ 6 rolls, so this is an OPEN
- * gap — closing it means mirroring a draw for a draw in both engines on a
- * conditional path.
- */
 /** Master switch for the city-attack religion adder, written and mirrored at
  * all six sites. */
 export const CITY_RELIGION_ADDER_LIVE = true;
 
-export const THEO_DAMAGE = 2;
-export const THEO_BASE_DAMAGE = 30;
-export const THEO_PRESSURE_RANGE = 6;
+/**
+ * THEOLOGICAL COMBAT. CIV6: the winner's religion gains pressure "in all
+ * cities within 10 tiles" and the loser's sheds the same. The real swing is
+ * 250, on a scale where a Missionary spread is ~200; `SPREAD_PRESSURE` puts
+ * this model at a twentieth of that, so the SWING is scale-relative where the
+ * RANGE is in tiles and is not.
+ */
+export const THEO_PRESSURE_RANGE = 10;
 export const THEO_PRESSURE_SWING = 15;
 
 /** CIV 6: MARTYR — "a Relic is created if this Apostle dies in Theological

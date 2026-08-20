@@ -545,9 +545,16 @@ class SimPhase:
         bidx = torch.arange(Bn, device=dev2)
         heal = int(self.rules.combat.get("cityHealPerTurn", 20))
         walled = None
+        # CIV6: walls give a city its ranged strike, and once the Outer Defense
+        # "has been completely destroyed, its ranged strike again becomes
+        # unavailable". The Encampment's defenses are the same perimeter —
+        # "building any level of Walls in the city will supply both" — so it
+        # strikes only "while its Wall defenses are still up".
+        perimeter = torch.zeros(Bn, dtype=torch.bool, device=dev2)
         if self._walls_bidx >= 0:
             walled = act & self.city_bldg[bidx, row, col, self._walls_bidx]
-            self._seat_city_strike(row, col, walled, "cstk")
+            perimeter = walled & (self.city_outer_hp[bidx, row, col] > 0)
+            self._seat_city_strike(row, col, perimeter, "cstk")
         enc_reg = e0 = None
         if self._encamp_didx >= 0 and self.districts_on:
             # the city's OWN registry, which a capture clears — the districts
@@ -555,7 +562,7 @@ class SimPhase:
             enc_reg = self.city_dist_tile[bidx, row, col, self._encamp_didx]  # [B]
             e0 = enc_reg.clamp(min=0)
             enc_live = (enc_reg >= 0) & self.district_complete[bidx, e0] & ~self.district_pillaged[bidx, e0]
-            self._seat_city_strike(row, col, act & enc_live & (self.encamp_hp[bidx, e0] > 0), "estk")
+            self._seat_city_strike(row, col, perimeter & enc_live & (self.encamp_hp[bidx, e0] > 0), "estk")
         ctr = self.city_center[bidx, row, col].clamp(min=0)
         nbh = self.neigh[ctr]
         nbc = nbh.clamp(min=0)

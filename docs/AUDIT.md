@@ -64,12 +64,15 @@ nothing carries forward.
 | B-36r appeal adjacency terms | 1 | the four reachable terms ship; Dam/Canal/Water Park/Preserve and the Great People wait on C-22, C-4, C-21 |
 | B-39r wonder effects still dropped | 1 | the sourced sweep shipped fourteen channels; five residuals, each blocked on B-20r, C-21, B-34r or C-23 |
 | B-45r sourced-sweep finds in the other rows | 2 | eight wonders pay effects no channel expresses: free units, patronage discount, tech boosts, route capacity and route yields |
-| B-41r the wall pool is all-or-nothing | 1 | Civ 6 reduces centre damage instead, and scales wall damage by attacker class |
-| B-42r the damage random range is contested | 1 | 0.8-1.2 vs 0.75-1.25; the same source states both |
+| B-46r no unit carries Bombard strength | 2 | the perimeter reduction ships, and nothing in the roster can breach a walled city at full damage |
+| B-47r outer defenses regenerate | 1 | Civ 6 repairs them from the production queue after three quiet turns, and besieges on FULL encirclement |
+| B-48r no combat class modifiers | 1 | melee +5 vs anti-cavalry and anti-cavalry +10 vs cavalry; no flag, and `defenderCS` never sees the attacker |
+| B-49r embarked defence is flat | 1 | Civ 6 keys it to the owner's era, 15 through 55 |
+| B-50r theological combat's other terms | 1 | flanking/support, territory bonuses, the Inquisitor, the winner's advance, Holy Site healing |
+| B-51r the Encampment has no perimeter | 1 | Civ 6 gives the district the City Center's wall HP; the assault path is handed a tile, not its city |
 | B-44r city-state war has no decider | 1 | both engines carry the machinery; no policy ever reaches it |
-| B-35r theological damage | 1 | deterministic and LINEAR where real Civ 6 rolls; the martyr draw shows a mirrored conditional draw is available |
 | B-34r flood tails | 1 | GS floods also damage UNITS and kill citizens, and a centre on a floodplain loses HP; and the Dam/Great Bath that mitigates a river is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **26** | |
+| **B. Fidelity vs real Civ 6** | **30** | |
 | C-1 POWER | 5 | no plants, no grid, no powered-yield term — 4 gaps wait on it |
 | C-2 diplomatic agreements | 6 | war and peace and nothing between: open borders, work trades, alliances, denouncements |
 | C-3 unit promotions | 4 | only MARTYR reaches a rule; choosing one is also a wire head |
@@ -77,7 +80,7 @@ nothing carries forward.
 | C-5 strategic-resource stockpiles | 4 | resources gate, they never accumulate or get spent |
 | C-6 policy-card modifiers | 5 | ~38 adoptable cards are inert one-liners |
 | C-7 trading posts | 2 | a route lays roads and plants nothing |
-| C-8 draws made deterministic | 2 | inspirations, the religion pick, theological damage, Oxford's and the Bolshoi's free research |
+| C-8 draws made deterministic | 2 | inspirations, the religion pick, Oxford's and the Bolshoi's free research |
 | C-9 faith-purchase classes | 1 | faith buys named units, never a class of building |
 | C-10 non-GS city-state rows | 1 | Antioch/Amsterdam were replaced in GS; no line can be quoted |
 | C-11 terrain the wonder rules need | 2 | the NARROWED placements are deliberately narrower than Civ 6's |
@@ -94,7 +97,7 @@ nothing carries forward.
 | C-22 the district roster is a subset | 3 | no Dam, Canal, Water Park, Preserve, Aerodrome, Government Plaza or Diplomatic Quarter |
 | C-23 nothing diminishes tourism | 1 | no rival's Enlightenment ever costs a tourist, so Cristo Redentor's cancelling clause has nothing to cancel |
 | **C. Absent systems** | **57** | |
-| **OPEN, TOTAL** | **83** | |
+| **OPEN, TOTAL** | **87** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -263,14 +266,6 @@ Civ 6 source or is recorded as unverifiable.
   stateless greedy ranking is faithful for the one channel modeled); per-civ
   tech-era drift
   (eras are global 50-turn blocks).
-- **B-35r. Theological damage is deterministic and LINEAR.** Real Civ 6
-  rolls; `theologicalCombatPhase` / `_theological_combat_phase` take
-  theoBaseDamage plus theoDamage x the religious-strength difference with no
-  random multiplier, and the linear curve is this repo's own, not the game's
-  exponential one. The reason this stood — "a conditional draw would have to
-  be mirrored draw-for-draw" — no longer holds: the MARTYR draw in the same
-  routine is mirrored and the 250-turn gate is green over it. Closing this
-  needs the real religious-combat formula sourced, not just a multiplier.
 - **B-30r. SPECIALIST residuals.** Specialists are a mechanic now, on both
   engines: slots = the district's standing buildings (max 3, dark under
   pillage), the sourced GS yields with the TOP-building tiers
@@ -367,18 +362,54 @@ Civ 6 source or is recorded as unverifiable.
   trade-route yield terms. The free units wait on C-21 and on a Trader grant
   path; the route terms wait on B-31r's route-yield work; the rest are new
   channels.
-- **B-41r. The wall pool is all-or-nothing, and class-blind.** `cityAssault`
-  / `_assault_city` send the whole roll to `outerHp` until the pool is empty
-  and only the spillover to city HP. Two sourced differences: real Civ 6 has
-  the perimeter REDUCE damage to the centre rather than absorb it entirely
-  while it stands, and it scales damage to the perimeter by attacker class
-  (-85% for melee, -50% for ranged, full only for Bombard strength). So a
-  walled city here is cracked in the wrong ORDER and by the wrong units.
-- **B-42r. The combat damage RANDOM RANGE is contested.** The reverse-
-  engineered formula quotes 0.75-1.25 while the same source says equal-
-  strength hits land "reliably between 24 and 36", which is 30 x [0.8, 1.2]
-  exactly. Both engines use 0.8-1.2. Open until a source settles it — the
-  choice is currently made on internal consistency, not evidence.
+- **B-46r. NOTHING IN THE ROSTER CARRIES BOMBARD STRENGTH.** The perimeter
+  now takes -85% from a melee attack and -50% from a ranged one, which is the
+  rule; what real Civ 6 puts on the other side of it is the SIEGE class
+  (Catapult, Bombard) plus the Ancient support units (Battering Ram, Siege
+  Tower) and Akkad's suzerain bonus, none of which exist here. So the rule is
+  faithful and the aggregate is not: no unit this roster can build breaches a
+  walled city at full damage. The class needs a Bombard-strength stat, a
+  support-unit channel that negates the reduction for melee and anti-cavalry,
+  and the walls tiers (Medieval, Renaissance, Urban Defenses) that turn each
+  of those off in turn.
+- **B-47r. Outer defenses regenerate on their own.** Real Civ 6: "once
+  damaged, the outer defenses of a City Center or defensible district will not
+  regenerate on their own" — they come back only through the Repair Outer
+  Defenses city project, which unlocks after three turns without damage and
+  runs one or two turns. Here the pool heals with the city, at the city's own
+  rate, on the same unbesieged gate. The siege gate is also wrong in the other
+  direction: real Civ 6 stops a city healing only when the attacker holds zone
+  of control on EVERY passable surrounding tile, where `seatPhase` /
+  `_seat_city_fire_and_heal` stop it for one adjacent hostile. Blocked on a
+  CITY_CENTER project channel — every `PROJECTS` row is keyed to a specialty
+  district.
+- **B-48r. No combat CLASS modifiers.** Real Civ 6 gives melee units +5 CS
+  against anti-cavalry and anti-cavalry units +10 against light, heavy and
+  ranged cavalry. The roster fields both sides of that pair (SPEARMAN and
+  PIKEMAN against HORSEMAN and KNIGHT) and neither modifier exists. Blocked
+  twice: `UnitDef` carries no anti-cavalry flag, and `defenderCS` is not told
+  who is attacking, so a pairwise term has nowhere to land.
+- **B-49r. Embarked defence is a flat number.** `EMBARKED_DEFENSE_CS` is 10
+  for everyone forever; real Civ 6 sets it from the owner's technological era
+  — 15 Classical and Medieval, 30 Renaissance, 35 Industrial, 50 Modern, 55
+  Atomic on — and updates it on the first tech or civic of each era. So a
+  Renaissance army crossing water defends at a third of its real strength.
+- **B-50r. Theological combat's other terms.** The damage formula is sourced
+  now; the rest of the Theological combat page is not. Missing: flanking and
+  support (which apply since the Fall 2017 update), the location bonuses (+5
+  in the territory of a city following the religion, +15 in its Holy City's
+  territory), the Inquisitor as a second attacker and a defensive specialist,
+  the winner ADVANCING into the fallen unit's tile, and religious healing (a
+  unit heals only on or beside its own Holy Site, at three times that site's
+  faith). Promotions are C-3's.
+- **B-51r. The Encampment has no perimeter of its own.** Real Civ 6 gives a
+  defensible district "Defenses HP equal to the City Center" — the same Walls
+  supply both — so a melee hit on an Encampment meets the same -85% the city
+  centre's perimeter gives. `attackEncampment` / `_attack_encampment` send
+  the whole roll to `encampHp`. Its ranged strike already asks the city's
+  perimeter; its DAMAGE does not, because the district pool and the city pool
+  live in different registries and the assault path is handed a tile, not the
+  city that owns it.
 - **B-44r. War with a city-state has NO DECIDER on either engine.** Both
   halves of the machinery exist and agree: `declareWarOnCityState` /
   `sueForPeaceWithCityState` on TS, the war plane and the CS-attack mask column

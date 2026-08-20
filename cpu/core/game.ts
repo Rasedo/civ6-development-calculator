@@ -10,7 +10,7 @@ import { computeUnlocks, getModifiers, availableTechs, availableCivics, governme
 import type { Modifiers, Unlocks } from './effects';
 import { effectiveResearchCostIn } from './boosts';
 import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, builderCost, traderCost, settlerCount } from './units';
-import { barbarianPhase, encampmentTrainXp } from './combat';
+import { barbarianPhase, damageRoll, encampmentTrainXp, woundPenalty } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase, suzerainEffect } from './cityStates';
@@ -30,7 +30,7 @@ import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
 import { nextRandom } from './rand';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, MISSIONARY_CAP, APOSTLE_CAP, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, MARTYR_CHANCE } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, MISSIONARY_CAP, APOSTLE_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, MARTYR_CHANCE } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { BARB_SEAT, allCities, allSeats, citiesOf, emptySeat, seatOf, seatOfCityState, setTileOwner, tileClaimed, unitSeat } from './seats';
@@ -999,12 +999,11 @@ function religiousVictor(state: GameState): number {
  *
  * Only an APOSTLE initiates (real Civ 6 also allows Inquisitors — out of
  * scope), and only against an ADJACENT religious unit of a DIFFERENT religion.
- * Both sides take THEO_BASE_DAMAGE plus the RELIGIOUS-STRENGTH difference
- * scaled by THEO_DAMAGE; a unit at 0 HP dies; the loser's religion sheds
- * THEO_PRESSURE_SWING in every city within THEO_PRESSURE_RANGE of the fallen
- * unit while the winner's gains it. DELIBERATELY ZERO-DRAW (see THEO_DAMAGE):
- * a conditional RNG draw here would have to be mirrored draw-for-draw on both
- * engines.
+ * Both sides roll `damageRoll` on the wounded RELIGIOUS-STRENGTH difference; a
+ * unit at 0 HP dies; the loser's religion sheds THEO_PRESSURE_SWING in every
+ * city within THEO_PRESSURE_RANGE of the fallen unit while the winner's gains
+ * it. Two damage draws per fight — the defender's wound, then the attacker's —
+ * ahead of the martyr rolls.
  *
  * ORDER is `state.units` ARRAY order for both the attacker walk and the
  * defender pick — this codebase's shared convention, which the GPU mirrors
@@ -1038,10 +1037,10 @@ function theologicalCombatPhase(state: GameState): void {
       break;
     }
     if (!def) continue;
-    const atkStr = relStr(att);
-    const defStr = relStr(def);
-    def.hp -= Math.max(1, THEO_BASE_DAMAGE + THEO_DAMAGE * (atkStr - defStr));
-    att.hp -= Math.max(1, THEO_BASE_DAMAGE + THEO_DAMAGE * (defStr - atkStr));
+    const atkStr = relStr(att) - woundPenalty(att);
+    const defStr = relStr(def) - woundPenalty(def);
+    def.hp -= damageRoll(state, atkStr - defStr, 'theo', def.tileIndex);
+    att.hp -= damageRoll(state, defStr - atkStr, 'theoc', att.tileIndex);
     att.movesLeft = 0;
     const loserRel = def.hp <= 0 ? unitSeat(def) : att.hp <= 0 ? g : -1;
     const winnerRel = def.hp <= 0 ? g : att.hp <= 0 ? unitSeat(def) : -1;

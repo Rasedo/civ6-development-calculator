@@ -440,6 +440,8 @@ def poke_walls_seat0(rules, path, GALLEY, WARRIOR):
     assert bool(sim.city_alive[0, 0, 0]), "seat-0 capital must be alive"
     c, ctr = 0, int(sim.city_center[0, 0, 0])
     sim.city_bldg[0, 0, c, sim._walls_bidx] = True
+    # CIV6: the strike is the Outer Defense's, and dies with it
+    sim.city_outer_hp[0, 0, c] = sim._walls_hp
     r = 0
     sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
@@ -489,6 +491,7 @@ def poke_walls_civ(rules, path, GALLEY, WARRIOR):
     _pl = sim.military_at  # clear only this window's entries
     _pl[(_pl >= sim.POOL_LO["barb"]) & (_pl < sim.POOL_HI["barb"])] = -1
     sim.city_bldg[0, r + 1, j, sim._walls_bidx] = True
+    sim.city_outer_hp[0, r + 1, j] = sim._walls_hp  # the perimeter the strike comes from
     sim.city_current[0, r + 1] = -1
     sim.city_progress[0, r + 1] = 0.0
     sim.city_cost[0, r + 1] = 1.0e9  # a galley-policy queue can never complete this phase

@@ -52,6 +52,8 @@ def setup(sim, at_war: bool) -> tuple[int, int]:
     j = next(j for j in range(sim.RC) if bool(sim.city_alive[0, STRIKER + 1, j]))
     ctr = int(sim.city_center[0, STRIKER + 1, j])
     sim.city_bldg[0, STRIKER + 1, j, sim._walls_bidx] = True
+    # CIV6: the strike comes from the Outer Defense, and stops when it does
+    sim.city_outer_hp[0, STRIKER + 1, j] = sim._walls_hp
 
     # a free land tile at range 1..2 of that centre
     tile = -1
