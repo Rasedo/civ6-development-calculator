@@ -243,7 +243,16 @@ export const DVP_PER_RESOLUTION = 1;
 /** Diplomatic Victory threshold (real Civ 6 GS: 20 points). */
 export const DIPLO_VICTORY_POINTS = 20;
 
-export type CongressTargetKind = 'district' | 'gpClass' | 'gwKind' | 'seat';
+export type CongressTargetKind = 'district' | 'gpClass' | 'gwKind' | 'seat'
+  | 'currency' | 'policy' | 'government' | 'project' | 'csType';
+/** The wire ORDER of the target kinds: a resolution's `t` on the exported
+ *  rules is this array's index, so the GPU's `_congress_space` /
+ *  `_congress_pref` switch on the same numbers. APPEND only. */
+export const CONGRESS_TARGET_KINDS: readonly CongressTargetKind[] = [
+  'district', 'gpClass', 'gwKind', 'seat',
+  'currency', 'policy', 'government', 'project', 'csType',
+];
+
 export interface CongressResolutionDef {
   id: string;
   name: string;
@@ -274,11 +283,50 @@ export const CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // CIV6: "A: Great Works of this type generate +100% Tourism. / B: No
   // Tourism from Great Works of this type." (Modern+)
   { id: 'HERITAGE_ORGANIZATION', name: 'Heritage Organization', minEra: 5, maxEra: 99, target: 'gwKind' },
+  // CIV6: "A: +100% cost when producing or purchasing military units using
+  // this currency type. / B: -50% cost ...". The target is the CURRENCY, so
+  // the multiplier rides the PURCHASE price in it; nothing in this model
+  // produces a unit in a currency.
+  { id: 'MERCENARY_COMPANIES', name: 'Mercenary Companies', minEra: 0, maxEra: 99, target: 'currency' },
+  // CIV6: "A: Each Trade Route sent to target player provides +4 Gold to the
+  // sender. This player receives +1 Trade Route capacity. / B: All active
+  // international Trade Routes between target player and other players are
+  // ended. No new routes of such kind can be established."
+  { id: 'TRADE_POLICY', name: 'Trade Policy', minEra: 0, maxEra: 99, target: 'seat' },
+  // CIV6: "A: All players with this Policy in their Government gain 1
+  // Diplomatic Favor per turn. / B: This Policy cannot be assigned by any
+  // player."
+  { id: 'POLICY_TREATY', name: 'Policy Treaty', minEra: 0, maxEra: 99, target: 'policy' },
+  // CIV6: "A: This Government type gains a Wildcard policy slot. / B: This
+  // Government type loses a Wildcard policy slot." (Modern+)
+  { id: 'WORLD_IDEOLOGY', name: 'World Ideology', minEra: 5, maxEra: 99, target: 'government' },
+  // CIV6: "A: New Districts built by target player act as Culture bombs. /
+  // B: Target player's borders cannot grow via Culture." (through Modern)
+  { id: 'BORDER_CONTROL_TREATY', name: 'Border Control Treaty', minEra: 0, maxEra: 5, target: 'seat' },
+  // CIV6: "A: Being Suzerain of a City-State of this type yields +100%
+  // Diplomatic Favor. / B: No Diplomatic Favor earned from being Suzerain of
+  // a City-State of this type."
+  { id: 'TREATY_ORGANIZATION', name: 'Treaty Organization', minEra: 0, maxEra: 99, target: 'csType' },
+  // CIV6: "A: +100% of the City-States' yield when sending a Trade Route to a
+  // City-State of this type. / B: City-States of this type do not provide
+  // their unique Suzerain bonus." (through Modern)
+  { id: 'SOVEREIGNTY', name: 'Sovereignty', minEra: 0, maxEra: 5, target: 'csType' },
+  // CIV6: "A: +100% Production towards this Project. / B: -50% Production
+  // towards this Project." (Atomic through Information)
+  { id: 'PUBLIC_WORKS_PROGRAM', name: 'Public Works Program', minEra: 6, maxEra: 7, target: 'project' },
 ];
 export const CONGRESS_UDT = 0;
 export const CONGRESS_PATRONAGE = 1;
 export const CONGRESS_MIGRATION = 2;
 export const CONGRESS_HERITAGE = 3;
+export const CONGRESS_MERCENARY = 4;
+export const CONGRESS_TRADE_POLICY = 5;
+export const CONGRESS_POLICY_TREATY = 6;
+export const CONGRESS_IDEOLOGY = 7;
+export const CONGRESS_BORDER_CONTROL = 8;
+export const CONGRESS_TREATY_ORG = 9;
+export const CONGRESS_SOVEREIGNTY = 10;
+export const CONGRESS_PUBLIC_WORKS = 11;
 /** The always-3rd Diplomatic Victory resolution enters at Modern. */
 export const CONGRESS_DV_MIN_ERA = 5;
 export const CONGRESS_DV_DELTA = 2;
@@ -292,6 +340,22 @@ export const CONGRESS_GROWTH_A = 1.2;
 export const CONGRESS_GROWTH_B = 0.8;
 export const CONGRESS_MIG_LOYALTY = 5;
 export const CONGRESS_GW_MULT = 2;
+/** "+100%" / "-50%" as the LITERAL doubles both engines must agree on. Every
+ *  congress magnitude below is one of these two faces of the same sourced
+ *  pair, so they are named once and shared. */
+export const CONGRESS_PLUS_100 = 2;
+export const CONGRESS_MINUS_50 = 0.5;
+/** Trade Policy outcome A: the sender's bonus per route to the target, and
+ *  the target's own extra route capacity. */
+export const CONGRESS_TRADE_GOLD = 4;
+export const CONGRESS_TRADE_CAPACITY = 1;
+/** Policy Treaty outcome A: favor per turn to every seat holding the card. */
+export const CONGRESS_POLICY_FAVOR = 1;
+/** World Ideology: the wildcard slot the targeted government gains or loses. */
+export const CONGRESS_IDEOLOGY_SLOTS = 1;
+/** CIV6 (Culture Bomb): an annexed tile must fall "within 3 hexes of one of
+ *  the owner's City Centers". */
+export const CULTURE_BOMB_RANGE = 3;
 
 export const TOURISM_PER_VISITOR_PER_CIV = 200;
 export const CULTURE_PER_DOMESTIC_TOURIST = 100;

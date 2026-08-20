@@ -2,7 +2,8 @@
 import type { DistrictId, GameState, GreatPersonClass, ImprovementId, ResearchState, ResourceCategory, Yields } from './types';
 import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
-import { GOVERNMENTS, POLICIES, SLOT_KINDS, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef, type SlotKind } from '../data/policies';
+import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef, type SlotKind } from '../data/policies';
+import { congressPolicyBlocked, congressWildcardDelta } from './congress';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
 import { seatOf, citiesOf, campTiles } from './seats';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -227,7 +228,7 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   const mods = modifiersFromResearch(s.research);
 
   if (GOVERNMENTS_ADOPTION_LIVE) {
-    applyGovernment(mods, s.research, wonderExtraSlots(state, seat));
+    applyGovernment(mods, s.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state));
   }
 
   const beliefSeat = { followers: pop, cities: cities.length };
@@ -326,10 +327,22 @@ export function wonderExtraSlots(state: GameState, seat: number): Record<SlotKin
       for (const k of SLOT_KINDS) out[k] += xs[k] ?? 0;
     }
   }
+  // WORLD IDEOLOGY moves a WILDCARD slot on one GOVERNMENT type. The
+  // government itself is picked by tier out of what is unlocked and never
+  // depends on the slot count, so it can be resolved first.
+  const s = seatOf(state, seat);
+  if (s) {
+    const gov = computeAdoption(s.research).government;
+    const i = gov ? GOVERNMENT_LIST.findIndex((g) => g.id === gov) : -1;
+    if (i >= 0) out.wildcard = Math.max(0, out.wildcard + congressWildcardDelta(state, i));
+  }
   return out;
 }
 
-export function computeAdoption(research: ResearchState, extra?: Record<SlotKind, number>): {
+/** `blocked` is the POLICY_LIST index POLICY TREATY outcome B forbids; -1
+ *  when nothing stands. A blocked card is simply never slotted. */
+export function computeAdoption(research: ResearchState, extra?: Record<SlotKind, number>,
+                                blocked = -1): {
   government: string | null;
   policies: (string | null)[];
 } {
@@ -345,16 +358,18 @@ export function computeAdoption(research: ResearchState, extra?: Record<SlotKind
   const slots = [...chosen.slots];
   for (const k of SLOT_KINDS) for (let i = 0; i < (extra?.[k] ?? 0); i++) slots.push(k);
   const policies: (string | null)[] = slots.map(() => null);
+  const banned = blocked >= 0 ? POLICY_LIST[blocked]?.id : undefined;
   for (const card of Object.values(POLICIES)) {
-    if (!u.policies.has(card.id)) continue;
+    if (!u.policies.has(card.id) || card.id === banned) continue;
     const slot = slots.findIndex((kind, i) => policies[i] === null && cardFitsSlot(card, kind));
     if (slot >= 0) policies[slot] = card.id;
   }
   return { government: chosen.id, policies };
 }
 
-function applyGovernment(mods: Modifiers, research: ResearchState, extra?: Record<SlotKind, number>): void {
-  const { government, policies } = computeAdoption(research, extra);
+function applyGovernment(mods: Modifiers, research: ResearchState, extra?: Record<SlotKind, number>,
+                         blocked = -1): void {
+  const { government, policies } = computeAdoption(research, extra, blocked);
   const gov = government ? GOVERNMENTS[government] : null;
   if (!gov) return;
   applyPolicyEffects(mods, gov.effects);

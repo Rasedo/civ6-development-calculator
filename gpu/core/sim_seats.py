@@ -501,7 +501,11 @@ class SimSeats:
         mil = tr_u & (self._type_combat.unsqueeze(0) > 0) & ~self.unit_naval.unsqueeze(0)
         if self._scout_idx >= 0:
             mil[:, self._scout_idx] = False
-        afford = self._afford(self.civ_treasury[:, row].unsqueeze(1), self._type_cost.double().unsqueeze(0) * self.rules.gold_purchase_mult)
+        # MERCENARY COMPANIES moves the GOLD price of a MILITARY unit, and
+        # every column offered here is one.
+        merc = self._congress_unit_buy_mult(0).unsqueeze(1)
+        afford = self._afford(self.civ_treasury[:, row].unsqueeze(1),
+                              self._type_cost.double().unsqueeze(0) * self.rules.gold_purchase_mult * merc)
         return mil & afford
 
     def _seat_tile_unclaimed(self, tc: torch.Tensor) -> torch.Tensor:
@@ -773,7 +777,8 @@ class SimSeats:
                     ctr_u = self.city_center[bidx, row, spawn_slot].clamp(min=0)
                     xp_u = (self.city_bldg[bidx, row, spawn_slot].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
                     landed_u = self._spawn_unit(row, elig_u, ctr_u, pick_ty, init_xp=xp_u)
-                    price_u = self._type_cost.gather(0, pick_ty).double() * mult
+                    price_u = (self._type_cost.gather(0, pick_ty).double() * mult
+                               * self._congress_unit_buy_mult(0))
                     self.civ_treasury[:, row] = torch.where(landed_u, self.civ_treasury[:, row] - price_u, self.civ_treasury[:, row])
                     bought = bought | landed_u
         if row in self._driven_buy_worship:
@@ -1445,7 +1450,16 @@ class SimSeats:
         return m
 
     def _suzerain_count(self, row: int) -> torch.Tensor:
-        return self._suzerain_mask(row).sum(dim=1)
+        """Suzerained minors, each WEIGHTED by what Treaty Organization does to
+        the favor its TYPE pays — x2 on outcome A, x0 on B. Unweighted this is
+        a plain count (`suzerainCount`'s twin)."""
+        return (self._suzerain_mask(row)[:, : self.S].double()
+                * self._congress_suz_favor_weight()).sum(dim=1)
+
+    def _suz_live_mask(self, row: int) -> torch.Tensor:
+        """[B, S] — the minors whose SUZERAIN bonus actually pays this row.
+        Sovereignty outcome B silences a whole city-state TYPE."""
+        return self._suzerain_mask(row)[:, : self.S] & ~self._congress_suz_bonus_blocked()
 
     def _suz_effect_rows(self, code: int) -> torch.Tensor:
         """`suzerainEffect` for every major row at once — [B, n_majors] bool,
@@ -1463,7 +1477,7 @@ class SimSeats:
             else:
                 hold = self.citystate_suz_code[:, :self.S] == code
                 codes[code] = torch.stack(
-                    [(self._suzerain_mask(r) & hold).any(dim=1) for r in range(self.n_majors)], dim=1)
+                    [(self._suz_live_mask(r) & hold[:, : self.S]).any(dim=1) for r in range(self.n_majors)], dim=1)
         return codes[code]
 
     def _suz_effect(self, row: int, code: int) -> torch.Tensor:
@@ -1579,24 +1593,97 @@ class SimSeats:
                     self._congress_regular(r, m, slot, votes)
         if bool(dv.any()):
             self._congress_dv(dv, votes)
+        self._congress_cancel_banned_intl()
 
     def _congress_space(self, kind: int) -> int:
+        """How many TARGETS a resolution of this kind offers — the
+        `targetSpaceSize` twin, keyed by CONGRESS_TARGET_KINDS' index."""
         if kind == 0:
             return int(self.city_dist_tile.shape[3])
         if kind == 1:
             return int(self.civ_gpp.shape[2])
         if kind == 2:
             return 3
+        if kind == 4:
+            return 2                       # gold, faith
+        if kind == 5:
+            return max(1, self._npol)
+        if kind == 6:
+            return max(1, self._ngov)
+        if kind == 7:
+            return max(1, len(self._proj_rows))
+        if kind == 8:
+            return self._cs_type_n
         return self.n_majors
 
-    def _congress_pref(self, kind: int, row: int) -> torch.Tensor:
-        """[B] — seat `row`'s AI free-vote target (the `preference` twin):
-        outcome A on the target it holds the most of, argmax with ties to the
-        LOWER index; kinds 0 district / 1 gpClass / 2 gwKind / 3 self. What a
-        seat votes when its record carries no ballot for the slot."""
+    def _argmax_low(self, counts: torch.Tensor) -> torch.Tensor:
+        """[B] — argmax along dim 1 with ties to the LOWER index, the shared
+        tie rule of every congress scan on both engines."""
+        best = torch.full((self.B,), float("-inf"), dtype=torch.float64, device=self.device)
+        at = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        for t in range(counts.shape[1]):
+            take = counts[:, t] > best
+            at = torch.where(take, torch.full_like(at, t), at)
+            best = torch.where(take, counts[:, t], best)
+        return at
+
+    def _congress_pref(self, r: int, row: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """(outcome, target) [B] — seat `row`'s AI free-vote, the `preference`
+        twin, keyed by RESOLUTION because three of them name a seat and want
+        different seats. Self-interest throughout: the outcome that PAYS the
+        voter, on the target it holds the most of, argmax with ties to the
+        LOWER index. What a seat votes when its record carries no ballot."""
         B, dev = self.B, self.device
+        name = self._congress_res[r]["id"]
+        kind = self._congress_res[r]["t"]
+        a = torch.zeros(B, dtype=torch.long, device=dev)
+        me = torch.full((B,), row, dtype=torch.long, device=dev)
+        if name == "MERCENARY_COMPANIES":
+            # A RAISES the price, so self-interest votes B on the currency this
+            # seat actually buys with — the one it holds the most of.
+            faith = self.civ_faith[:, row].double() > self.civ_treasury[:, row].double()
+            return a + 1, faith.long()
+        if name == "TRADE_POLICY":
+            # A pays the SENDER, so a seat names where its own routes go; with
+            # no international leg the vote is harmless and names itself.
+            counts = torch.zeros(B, self.n_majors, dtype=torch.float64, device=dev)
+            ds = self.seat_route_dseat[:, row]
+            for t in range(self.n_majors):
+                counts[:, t] = (ds == t).sum(dim=1).double()
+            best = self._argmax_low(counts)
+            any_intl = (ds >= 0).any(dim=1)
+            return a, torch.where(any_intl, best, me)
+        if name == "POLICY_TREATY":
+            slotted = self._slotted_policies(self._seat_civics(row), self._wonder_extra_slots(row))
+            first = slotted.long().cumsum(dim=1) == 1
+            idx = torch.arange(self._npol, device=dev).unsqueeze(0).expand(B, -1)
+            lowest = torch.where(first & slotted, idx, torch.full_like(idx, 10 ** 9)).min(dim=1).values
+            return a, torch.where(lowest < 10 ** 9, lowest, a)
+        if name == "WORLD_IDEOLOGY":
+            gov, _has = self._adopted_gov(self._seat_civics(row))
+            return a, gov
+        if name == "BORDER_CONTROL_TREATY":
+            # A is the gift (culture bombs), B the attack — a seat votes itself
+            # the gift.
+            return a, me
+        if name in ("TREATY_ORGANIZATION", "SOVEREIGNTY"):
+            # Both name a CITY-STATE TYPE and both pay the patron, so both read
+            # the same signal: where this seat's envoys already are.
+            env = self.seat_citystate_envoys[:, row, : self.S]
+            counts = torch.zeros(B, self._cs_type_n, dtype=torch.float64, device=dev)
+            for t in range(self._cs_type_n):
+                counts[:, t] = (env * (self.citystate_type[:, : self.S] == t).long()).sum(dim=1).double()
+            return a, self._argmax_low(counts)
+        if name == "PUBLIC_WORKS_PROGRAM":
+            nP = max(1, len(self._proj_rows))
+            cur = self.city_current[:, row] - self.PROJECT_BASE
+            live = self.city_alive[:, row] & (cur >= 0) & (cur < nP)
+            counts = torch.zeros(B, nP, dtype=torch.float64, device=dev)
+            for t in range(nP):
+                counts[:, t] = (live & (cur == t)).sum(dim=1).double()
+            return a, self._argmax_low(counts)
         if kind == 3:
-            return torch.full((B,), row, dtype=torch.long, device=dev)
+            return a, me
         if kind == 0:
             reg = self.city_dist_tile[:, row]  # [B, C, nD]
             comp = self.district_complete.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape_as(reg)
@@ -1610,13 +1697,7 @@ class SimSeats:
                 (self.city_gw_art[:, row] * al).sum(dim=1),
                 (self.city_gw_music[:, row] * al).sum(dim=1),
             ], dim=1).double()
-        best = torch.full((B,), float("-inf"), dtype=torch.float64, device=dev)
-        at = torch.zeros(B, dtype=torch.long, device=dev)
-        for t in range(counts.shape[1]):
-            take = counts[:, t] > best
-            at = torch.where(take, torch.full_like(at, t), at)
-            best = torch.where(take, counts[:, t], best)
-        return at
+        return a, self._argmax_low(counts)
 
     def _congress_buy(self, row: int, voter: torch.Tensor, want: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """`buyVotes`' twin — EXTRA votes up the sourced curve, the k-th
@@ -1690,8 +1771,9 @@ class SimSeats:
             voter = m & self.city_alive[:, row].any(dim=1)
             v = votes[:, row, slot]
             has = v[:, 0] >= 0
-            o = torch.where(has, v[:, 0].clamp(min=0, max=1), zero)
-            t = torch.where(has, v[:, 1].clamp(min=0, max=size - 1), self._congress_pref(kind, row))
+            ai_o, ai_t = self._congress_pref(r, row)
+            o = torch.where(has, v[:, 0].clamp(min=0, max=1), ai_o)
+            t = torch.where(has, v[:, 1].clamp(min=0, max=size - 1), ai_t)
             ex, sp = self._congress_buy(row, voter, torch.where(has, v[:, 2].clamp(min=0), zero))
             out[:, row] = torch.where(voter, o, out[:, row])
             tgt[:, row] = torch.where(voter, t, tgt[:, row])
@@ -1765,10 +1847,126 @@ class SimSeats:
             tgt = torch.where(hit, self.congress_active[:, k, 2], tgt)
         return out, tgt
 
+    def _congress_by_id(self, name: str) -> tuple[torch.Tensor, torch.Tensor]:
+        """(outcome, target) of the standing resolution with this catalog id.
+        Addressing by NAME because the catalog ORDER is the wire's, and a body
+        that hard-codes a position breaks silently when one is appended before
+        it."""
+        i = self._congress_at.get(name, -1)
+        if i < 0:
+            neg = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+            return neg, neg.clone()
+        return self._congress_slot(i)
+
+    def _congress_two_faced(self, name: str, hit: torch.Tensor,
+                            a: float, b: float) -> torch.Tensor:
+        """The shape these magnitudes share: `a` where outcome A stands on the
+        asked-for target, `b` where B does, 1 otherwise."""
+        out, _tgt = self._congress_by_id(name)
+        one = torch.ones(self.B, dtype=torch.float64, device=self.device)
+        fac = torch.where(out == 0, torch.full_like(one, a), torch.full_like(one, b))
+        return torch.where(hit, fac, one)
+
+    def _congress_unit_buy_mult(self, currency: int) -> torch.Tensor:
+        """[B] f64 — MERCENARY COMPANIES on a MILITARY unit's price in this
+        currency: x2 (A), x0.5 (B), 1 otherwise."""
+        out, tgt = self._congress_by_id("MERCENARY_COMPANIES")
+        return self._congress_two_faced(
+            "MERCENARY_COMPANIES", (out >= 0) & (tgt == currency),
+            self._c_plus100, self._c_minus50)
+
+    def _congress_trade_gold(self, dseat: torch.Tensor) -> torch.Tensor:
+        """f64, `dseat`-shaped — TRADE POLICY outcome A pays the SENDER this
+        much for every route ending at the named seat."""
+        out, tgt = self._congress_by_id("TRADE_POLICY")
+        sh = (slice(None),) + (None,) * (dseat.dim() - 1)
+        hit = (out[sh] == 0) & (dseat == tgt[sh])
+        z = torch.zeros(dseat.shape, dtype=torch.float64, device=self.device)
+        return torch.where(hit, z + self._c_trade_gold, z)
+
+    def _congress_route_capacity(self, row: int) -> torch.Tensor:
+        """[B] long — TRADE POLICY outcome A's extra capacity for the NAMED
+        seat."""
+        out, tgt = self._congress_by_id("TRADE_POLICY")
+        z = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        return torch.where((out == 0) & (tgt == row), z + self._c_trade_cap, z)
+
+    def _congress_intl_banned(self, row: int) -> torch.Tensor:
+        """[B] — TRADE POLICY outcome B: no international route may touch this
+        seat, as sender or as destination."""
+        out, tgt = self._congress_by_id("TRADE_POLICY")
+        return (out == 1) & (tgt == row)
+
+    def _congress_policy_blocked(self) -> torch.Tensor:
+        """[B] long — POLICY TREATY outcome B's forbidden card index; -1 none."""
+        out, tgt = self._congress_by_id("POLICY_TREATY")
+        return torch.where(out == 1, tgt, torch.full_like(tgt, -1))
+
+    def _congress_policy_favor(self, slotted: torch.Tensor) -> torch.Tensor:
+        """[B] f64 — POLICY TREATY outcome A pays every seat holding the card.
+        `slotted` is that seat's [B, nPol] card mask."""
+        out, tgt = self._congress_by_id("POLICY_TREATY")
+        z = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        if not self._npol:
+            return z
+        held = slotted.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1)
+        return torch.where((out == 0) & held, z + self._c_policy_favor, z)
+
+    def _congress_wildcard_delta(self, gov: torch.Tensor) -> torch.Tensor:
+        """[B] long — WORLD IDEOLOGY moves a WILDCARD slot on ONE government
+        type; `gov` is the seat's adopted government index."""
+        out, tgt = self._congress_by_id("WORLD_IDEOLOGY")
+        z = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        on = (out >= 0) & (tgt == gov)
+        return torch.where(on, torch.where(out == 0, z + self._c_ideology_slots,
+                                           z - self._c_ideology_slots), z)
+
+    def _congress_culture_bomb_seat(self) -> torch.Tensor:
+        """[B] long — BORDER CONTROL outcome A: the seat whose new districts act
+        as culture bombs; -1 when not standing."""
+        out, tgt = self._congress_by_id("BORDER_CONTROL_TREATY")
+        return torch.where(out == 0, tgt, torch.full_like(tgt, -1))
+
+    def _congress_border_frozen(self, row: int) -> torch.Tensor:
+        """[B] — BORDER CONTROL outcome B: this seat's borders cannot grow via
+        culture."""
+        out, tgt = self._congress_by_id("BORDER_CONTROL_TREATY")
+        return (out == 1) & (tgt == row)
+
+    def _congress_suz_favor_weight(self) -> torch.Tensor:
+        """[B, S] f64 — what one suzerained minor pays into the favor tick under
+        TREATY ORGANIZATION: x2 on A, x0 on B, 1 otherwise."""
+        out, tgt = self._congress_by_id("TREATY_ORGANIZATION")
+        hit = (out >= 0).unsqueeze(1) & (self.citystate_type[:, : self.S] == tgt.unsqueeze(1))
+        one = torch.ones(self.B, self.S, dtype=torch.float64, device=self.device)
+        fac = torch.where((out == 0).unsqueeze(1), one * self._c_plus100, torch.zeros_like(one))
+        return torch.where(hit, fac, one)
+
+    def _congress_cs_route_mult(self) -> torch.Tensor:
+        """[B, S] f64 — SOVEREIGNTY outcome A doubles what a minor of the named
+        TYPE pays the route sent to it."""
+        out, tgt = self._congress_by_id("SOVEREIGNTY")
+        hit = (out == 0).unsqueeze(1) & (self.citystate_type[:, : self.S] == tgt.unsqueeze(1))
+        one = torch.ones(self.B, self.S, dtype=torch.float64, device=self.device)
+        return torch.where(hit, one * self._c_plus100, one)
+
+    def _congress_suz_bonus_blocked(self) -> torch.Tensor:
+        """[B, S] — SOVEREIGNTY outcome B: a minor of this type provides no
+        unique suzerain bonus to anyone."""
+        out, tgt = self._congress_by_id("SOVEREIGNTY")
+        return (out == 1).unsqueeze(1) & (self.citystate_type[:, : self.S] == tgt.unsqueeze(1))
+
+    def _congress_project_mult(self, project: int) -> torch.Tensor:
+        """[B] f64 — PUBLIC WORKS PROGRAM on production toward this project."""
+        out, tgt = self._congress_by_id("PUBLIC_WORKS_PROGRAM")
+        return self._congress_two_faced(
+            "PUBLIC_WORKS_PROGRAM", (out >= 0) & (tgt == project),
+            self._c_plus100, self._c_minus50)
+
     def _congress_udt(self) -> tuple[torch.Tensor, torch.Tensor]:
         """[B] x2 — (district idx whose buildings take +100% production,
         district idx where buildings are banned); -1 where not standing."""
-        out, tgt = self._congress_slot(0)
+        out, tgt = self._congress_by_id("URBAN_DEVELOPMENT_TREATY")
         return (torch.where(out == 0, tgt, torch.full_like(tgt, -1)),
                 torch.where(out == 1, tgt, torch.full_like(tgt, -1)))
 
@@ -1776,7 +1974,7 @@ class SimSeats:
         """[B] f64 — the Patronage factor for GP class `cls`: x2 (A), x0 (B)
         or 1. Covers every point source (the wiki footnote zeroes districts,
         buildings and projects alike)."""
-        out, tgt = self._congress_slot(1)
+        out, tgt = self._congress_by_id("PATRONAGE")
         hit = (out >= 0) & (tgt == cls)
         fac = torch.where(out == 0,
                           torch.full((self.B,), self._c_gpp_mult, dtype=torch.float64, device=self.device),
@@ -1785,7 +1983,7 @@ class SimSeats:
 
     def _congress_growth(self, row: int) -> torch.Tensor:
         """[B] f64 — the Migration Treaty growth factor on this row's cities."""
-        out, tgt = self._congress_slot(2)
+        out, tgt = self._congress_by_id("MIGRATION_TREATY")
         hit = (out >= 0) & (tgt == row)
         fac = torch.where(out == 0,
                           torch.full((self.B,), self._c_grow_a, dtype=torch.float64, device=self.device),
@@ -1795,7 +1993,7 @@ class SimSeats:
     def _congress_loyalty(self, row: int) -> torch.Tensor:
         """[B] f64 — the Migration Treaty loyalty term on this row's cities
         (A pays growth and COSTS loyalty; B is the reverse)."""
-        out, tgt = self._congress_slot(2)
+        out, tgt = self._congress_by_id("MIGRATION_TREATY")
         hit = (out >= 0) & (tgt == row)
         term = torch.where(out == 0,
                            torch.full((self.B,), -self._c_mig_loy, dtype=torch.float64, device=self.device),
@@ -1805,7 +2003,7 @@ class SimSeats:
     def _congress_gw_kmult(self) -> torch.Tensor:
         """[B, 3] long — Heritage Organization tourism factors by Great Work
         kind [writing, art, music]."""
-        out, tgt = self._congress_slot(3)
+        out, tgt = self._congress_by_id("HERITAGE_ORGANIZATION")
         km = torch.ones(self.B, 3, dtype=torch.long, device=self.device)
         for k in range(3):
             hit = (out >= 0) & (tgt == k)
@@ -2147,7 +2345,9 @@ class SimSeats:
             css = citystate_s.clamp(max=S - 1)
             citystate_ok = self.citystate_alive[:, :S].gather(1, css) & (citystate_s < S)
             pays_c = act & is_cs & has_from & citystate_ok
-            pc = pays_c.double()
+            # SOVEREIGNTY outcome A doubles the CITY-STATE's own yield to a
+            # route sent to a minor of the named TYPE.
+            pc = pays_c.double() * self._congress_cs_route_mult().gather(1, css)
             inc.scatter_add_(1, from_j * 6 + 2, citystate_gold * pc)
             ycol = self._citystate_yidx[:, :S].gather(1, css)
             inc.scatter_add_(1, from_j * 6 + ycol, citystate_spec * pc)
@@ -2191,6 +2391,9 @@ class SimSeats:
             gdc = self._golden_ded(row, self._ded_coinage)
             if bool(gdc.any()):
                 gold_i = gold_i + self._coinage_spec_gold * spec_dest.double() * gdc.double().unsqueeze(1)
+            # TRADE POLICY outcome A pays the SENDER for every route that ends
+            # at the named seat.
+            gold_i = gold_i + self._congress_trade_gold(self.seat_route_dseat[:, row])
             pays_i = intl & has_from & valid_dest
             inc.scatter_add_(1, from_j * 6 + 2, gold_i * pays_i.double())
         inc = inc.reshape(B, cols, 6)
@@ -2241,12 +2444,16 @@ class SimSeats:
         return (reg >= 0) & self.built_wonder_complete.gather(1, reg.clamp(min=0).reshape(self.B, -1)).reshape_as(reg)
 
     def _wonder_extra_slots(self, row: int) -> torch.Tensor | None:
-        """[B, 4] long — the policy slots this seat's COMPLETE wonders add, in
-        SLOT_KINDS order (the `wonderExtraSlots` twin)."""
+        """[B, 4] long — the policy slots this seat holds beyond its
+        government's own, in SLOT_KINDS order (the `wonderExtraSlots` twin):
+        its COMPLETE wonders, and the WILDCARD that World Ideology moves on one
+        government type. A government never ends with fewer than none."""
         compw = self._completed_wonders(row)
-        if compw is None:
-            return None
-        return (compw.long().unsqueeze(3) * self._wond_slots.reshape(1, 1, -1, 4)).sum(dim=(1, 2))
+        out = (torch.zeros(self.B, 4, dtype=torch.long, device=self.device) if compw is None
+               else (compw.long().unsqueeze(3) * self._wond_slots.reshape(1, 1, -1, 4)).sum(dim=(1, 2)))
+        gov, _has = self._adopted_gov(self._seat_civics(row))
+        out[:, 3] = (out[:, 3] + self._congress_wildcard_delta(gov)).clamp(min=0)
+        return out
 
     def _seat_wonder_sum(self, row: int, per_wonder: torch.Tensor) -> torch.Tensor:
         """[B] — one per-wonder quantity summed over every COMPLETE wonder the
@@ -2779,6 +2986,45 @@ class SimSeats:
         self._eff_version += 1
         return True
 
+    def _culture_bomb(self, row: int, rows: torch.Tensor, tiles: torch.Tensor,
+                      cols: torch.Tensor) -> None:
+        """cultureBomb's twin — the six tiles around each of `tiles` annex to
+        the city in `cols`. A tile carrying a district (a CITY CENTRE included)
+        or a wonder is left alone, as is one further than
+        `_culture_bomb_range` from every living centre this row holds. The
+        claimed tiles are distinct, so claim ORDER cannot change the result."""
+        if rows.numel() == 0:
+            return
+        cid = self.city_id[rows, row, cols]
+        ctr = self.city_center[rows, row]  # [n, RC]
+        alive = self.city_alive[rows, row] & (ctr >= 0)
+        nb = self.neigh[tiles]  # [n, 6]
+        centre_at = self.centre_slot_at
+        hit = False
+        for k in range(nb.shape[1]):
+            tk = nb[:, k]
+            tc = tk.clamp(min=0)
+            near = ((self.pair_dist[tc.unsqueeze(1), ctr.clamp(min=0)] <= self._culture_bomb_range)
+                    & alive).any(dim=1)
+            take = (
+                (tk >= 0) & near
+                & (self.district[rows, tc] < 0)
+                & (self.built_wonder[rows, tc] < 0)
+                & (centre_at[rows, tc] < 0)
+                & ~((self.tile_seat[rows, tc] == row) & (self.tile_city[rows, tc] == cid))
+            )
+            if not bool(take.any()):
+                continue
+            rr, tt = rows[take], tk[take]
+            self.tile_seat[rr, tt] = row  # setTileOwner's two halves
+            self.tile_city[rr, tt] = cid[take]
+            self.city_acquired[rr, row, cols[take]] += 1
+            hit = True
+        if hit:
+            self._tile_owner_ver += 1
+            self._claim_version += 1
+            self._eff_version += 1
+
     def _seat_border_key(self, row: int, center: torch.Tensor):
         B = self.B
         tiles = tiles_from_offsets(center, self._off5, self.W, self.H)
@@ -2842,6 +3088,8 @@ class SimSeats:
             base = self._border_cost(self.city_acquired[bidx, row, col])
             return js_round(base * _bmul).to(base.dtype) if _bmul is not None else base
 
+        # BORDER CONTROL outcome B: the box still fills, nothing is bought.
+        act = act & ~self._congress_border_frozen(row)
         if not bool((act & (self.city_cbox[bidx, row, col] >= _cost())).any()):
             return
         tiles, tc, nbs, key0 = self._seat_border_key(row, center)
@@ -4426,7 +4674,8 @@ class SimSeats:
         """tradeCapacity: FOREIGN_TRADE civic +1, Market-OR-Lighthouse per
         living city +1 (non-cumulative), each COMPLETED Colossus/Great
         Zimbabwe in a city's wonder REGISTRY +1 (`c.wonders`, not a tile
-        scan), plus one per trade-type city-state this seat is Suzerain of."""
+        scan), one per trade-type city-state this seat is Suzerain of, and the
+        one TRADE POLICY outcome A hands the seat it names."""
         B, RC, S, dev = self.B, self.RC, self.S, self.device
         alive = self.city_alive[:, row]
         cap = torch.zeros(B, dtype=torch.long, device=dev)
@@ -4445,6 +4694,7 @@ class SimSeats:
         if S > 0:
             trade_ti = int(self.rules.citystate.get("tradeIdx", -1))
             cap = cap + (self._suzerain_mask(row)[:, :S] & (self.citystate_type[:, :S] == trade_ti)).sum(dim=1)
+        cap = cap + self._congress_route_capacity(row)
         return cap
 
     def _free_trader(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -4650,11 +4900,14 @@ class SimSeats:
             to_code = torch.where(cs_ok, dst, to_code)
             dest_ct = torch.where(cs_ok, csc, dest_ct)
             take = take | cs_ok
-        # INTERNATIONAL: another major's living city with that centre
-        intl_p = ok & (dst >= 0) & (dst != o_ct) & ~take
+        # INTERNATIONAL: another major's living city with that centre. TRADE
+        # POLICY outcome B forbids the leg at BOTH ends.
+        intl_p = ok & (dst >= 0) & (dst != o_ct) & ~take & ~self._congress_intl_banned(row)
         if bool(intl_p.any()) and self.n_majors > 1:
             for r2 in range(self.n_majors):
                 if r2 == row:
+                    continue
+                if bool(self._congress_intl_banned(r2).all()):
                     continue
                 m2 = (self.city_center[:, r2] == dst.unsqueeze(1)) & self.city_alive[:, r2]
                 hit2 = intl_p & m2.any(dim=1)
@@ -4668,7 +4921,7 @@ class SimSeats:
                     & (self.seat_route_dcity[:, row] == id2.unsqueeze(1))
                 ).any(dim=1)
                 mar2 = self._city_maritime(r2).gather(1, j2.unsqueeze(1)).squeeze(1)
-                hit2 = hit2 & ~dupi & (d <= self._trade_pair_range(row, mar_o, mar2))
+                hit2 = hit2 & ~dupi & ~self._congress_intl_banned(r2)                     & (d <= self._trade_pair_range(row, mar_o, mar2))
                 dseat = torch.where(hit2, torch.full_like(dseat, r2), dseat)
                 dcity = torch.where(hit2, id2, dcity)
                 dest_ct = torch.where(hit2, dst, dest_ct)
@@ -4721,6 +4974,39 @@ class SimSeats:
             self.seat_route_born[:, a][kill] = -1
             self.seat_route_walk[:, a][kill] = -1
             self.seat_route_leg[:, a][kill] = -1
+
+    def _cancel_intl_routes(self, row: int, mask: torch.Tensor) -> None:
+        """Drop every INTERNATIONAL leg this row sends, where `mask` holds —
+        `cancelRoutes(seat, r => r.toSeat >= 0)`. Each hands its Trader back at
+        the origin, exactly as a war cancel does."""
+        kill = (self.seat_routes[:, row, :, 0] >= 0) & (self.seat_route_dseat[:, row] >= 0) & mask.unsqueeze(1)
+        if not bool(kill.any()):
+            return
+        oc, _dc = self._route_centres(row)
+        for k in range(self.seat_routes.shape[2]):
+            m = kill[:, k] & (oc[:, k] >= 0)
+            if bool(m.any()):
+                self._spawn_unit(row, m, oc[:, k].clamp(min=0), self._trader_idx)
+        self.seat_routes[:, row][kill] = -1
+        self.seat_route_dseat[:, row][kill] = -1
+        self.seat_route_dcity[:, row][kill] = -1
+        self.seat_route_exp[:, row][kill] = -1
+        self.seat_route_born[:, row][kill] = -1
+        self.seat_route_walk[:, row][kill] = -1
+        self.seat_route_leg[:, row][kill] = -1
+
+    def _congress_cancel_banned_intl(self) -> None:
+        """TRADE POLICY outcome B ends the routes it forbids the moment it
+        passes — the banned seat's own international legs, and everyone else's
+        to it (`congressCancelBannedIntl`'s twin)."""
+        for row in range(self.n_majors):
+            banned = self._congress_intl_banned(row)
+            if not bool(banned.any()):
+                continue
+            self._cancel_intl_routes(row, banned)
+            for other in range(self.n_majors):
+                if other != row:
+                    self._cancel_routes_pair(other, row, banned)
 
     def _seat_route_candidate(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         """The route CANDIDATE this seat would take — routeCandidateRow's

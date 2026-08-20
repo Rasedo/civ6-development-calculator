@@ -165,3 +165,6 @@ export function gpClassesOf(p: ProjectDef): GreatPersonClass[] {
 export function gppFractionOf(p: ProjectDef): number {
   return p.gppFraction ?? PROJECT_GPP_FRACTION;
 }
+
+/** The projects in WIRE order — what the Public Works Program target names. */
+export const PROJECT_LIST: readonly ProjectDef[] = Object.values(PROJECTS);

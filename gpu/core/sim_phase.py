@@ -380,6 +380,15 @@ class SimPhase:
         _bldg_i = (cur >= 0) & (cur < self.NB) & (_cp >= 0) \
             & (self._b_req_district[cur.clamp(min=0, max=self.NB - 1)] == _cp)
         prod = torch.where(_bldg_i, prod * self._c_prod_mult, prod)
+        # CIV6 (Public Works Program): "+100% / -50% Production towards this
+        # Project."
+        if self._proj_rows:
+            nP = len(self._proj_rows)
+            pidx = cur - self.PROJECT_BASE
+            for _p in range(nP):
+                on = (pidx == _p)
+                if bool(on.any()):
+                    prod = torch.where(on, prod * self._congress_project_mult(_p), prod)
         # VETERANCY multiplies FIRST, then the banked chop adds unmultiplied —
         # phase.ts spends the bank right after the production add.
         prog = self.city_progress[bidx, row, col]
@@ -434,6 +443,11 @@ class SimPhase:
             self._dedication_event(row, 0, mon)
             enc = self.district[dr, dt] == self._encamp_didx
             self.encamp_hp[dr, dt] = torch.where(enc, torch.full_like(dt, self._encamp_hp_max), self.encamp_hp[dr, dt])
+            # BORDER CONTROL outcome A: this row's new districts are bombs.
+            bomb = self._congress_culture_bomb_seat()[dr] == row
+            if bool(bomb.any()):
+                br2 = dr[bomb]
+                self._culture_bomb(row, br2, dt[bomb], col[br2])
             self.city_qtile[bidx, row, col] = torch.where(made_d, torch.full_like(cur, -1), self.city_qtile[bidx, row, col])
             self._eff_version += 1
 
@@ -663,8 +677,14 @@ class SimPhase:
                                   torch.ones(self.B, dtype=torch.long, device=self.device)),
             gov_tile=self._governor_tiles(row, gov),
         ))
+        # POLICY TREATY outcome A pays every seat holding the named card, on
+        # top of the government tier and the (Treaty-Organization-weighted)
+        # suzerain term.
         bank(self.civ_diplo_favor,
-             self._adopted_gov_tier(self.civ_civics[:, row]) + self._favor_per_suz * self._suzerain_count(row))
+             self._adopted_gov_tier(self.civ_civics[:, row])
+             + self._favor_per_suz * self._suzerain_count(row)
+             + self._congress_policy_favor(
+                 self._slotted_policies(self._seat_civics(row), self._wonder_extra_slots(row))))
         # grievances DECAY by 1 per turn at peace with every MAJOR — the row's
         # own line of the war matrix, minus the city-state columns, because
         # `atPeaceWithAllCivs` walks `state.seats` and nothing else.

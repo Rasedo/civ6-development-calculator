@@ -13,7 +13,8 @@ import { civEraIndex } from './city';
 import { DISTRICTS } from '../data/districts';
 import { cityStateTradeCapacityBonus, hasMet, suzerainEffect } from './cityStates';
 import { completedDistrictCount } from './yields';
-import { CITY_STATE_TYPE_YIELD, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD } from '../data/cityStates';
+import { CITY_STATE_TYPE_YIELD, CITY_STATE_TYPES, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD } from '../data/cityStates';
+import { congressCsRouteMult, congressIntlBanned, congressRouteCapacity, congressTradeGold } from './congress';
 import { ENHANCER_BELIEFS } from '../data/religion';
 import type { RuleResult } from './rules';
 import { goldenDedication } from './eras';
@@ -162,7 +163,7 @@ export function tradeCapacity(state: GameState, seat: number): number {
       if (w.id === 'COLOSSUS' || w.id === 'GREAT_ZIMBABWE') cap += 1;
     }
   }
-  return cap + cityStateTradeCapacityBonus(state, seat);
+  return cap + cityStateTradeCapacityBonus(state, seat) + congressRouteCapacity(state, seat);
 }
 
 export function specialtyDistricts(state: GameState, city: City): number {
@@ -195,10 +196,10 @@ export function routeYieldsInternational(state: GameState, dest: City): Yields {
   return out;
 }
 
-export function cityStateRouteYields(cityState: CityState): Yields {
+export function cityStateRouteYields(cityState: CityState, mult = 1): Yields {
   const out = emptyYields();
-  out.gold += CITY_STATE_ROUTE_GOLD;
-  out[CITY_STATE_TYPE_YIELD[cityState.type]] += CITY_STATE_ROUTE_SPEC;
+  out.gold += CITY_STATE_ROUTE_GOLD * mult;
+  out[CITY_STATE_TYPE_YIELD[cityState.type]] += CITY_STATE_ROUTE_SPEC * mult;
   return out;
 }
 
@@ -210,7 +211,10 @@ export function cityTradeYields(state: GameState, city: City): Yields {
     if (route.toCs !== undefined) {
       const cityState = state.cityStates.find((c) => c.id === route.toCs);
       if (cityState) {
-        addYields(out, cityStateRouteYields(cityState));
+        // SOVEREIGNTY outcome A doubles what a minor of the named TYPE pays
+        // the route sent to it.
+        addYields(out, cityStateRouteYields(
+          cityState, congressCsRouteMult(state, CITY_STATE_TYPES.indexOf(cityState.type))));
         // CIV 6, Kumasi's suzerain: "Your Trade Routes to any city-state
         // provide +2 Culture and +1 Gold for every specialty district in the
         // ORIGIN city" — this city, whichever minor the route reaches.
@@ -227,6 +231,9 @@ export function cityTradeYields(state: GameState, city: City): Yields {
       const civCity = civSeat?.cities.find((c) => c.id === route.toSeatCity);
       if (civSeat && civCity) {
         addYields(out, routeYieldsInternational(state, civCity));
+        // TRADE POLICY outcome A pays the SENDER for every route that ends at
+        // the named seat.
+        out.gold += congressTradeGold(state, route.toSeat);
         // CIV6 (Reform the Coinage, Golden face): "International Trade Routes
         // provide +3 Gold per specialty district in the foreign city."
         if (goldenDedication(state, seat, DED_COINAGE)) {
@@ -347,6 +354,11 @@ export function canAddIntlTradeRoute(state: GameState, from: number, toSeat: num
   const civSeat = seatOf(state, toSeat);
   const civCity = civSeat?.cities.find((c) => c.id === seatCity);
   if (!a || !civSeat || !civCity) return { ok: false, reason: 'No such city / actor city.' };
+  // TRADE POLICY outcome B: no international route may touch the named seat,
+  // as sender or as destination.
+  if (congressIntlBanned(state, seat) || congressIntlBanned(state, toSeat)) {
+    return { ok: false, reason: 'The World Congress has ended international routes with this player.' };
+  }
   const routes = seatOf(state, seat)!.tradeRoutes ?? [];
   if (routes.length >= tradeCapacity(state, seat)) {
     return { ok: false, reason: `No spare trading capacity (${tradeCapacity(state, seat)} in use).` };
@@ -378,3 +390,14 @@ export function addIntlTradeRoute(state: GameState, from: number, toSeat: number
   return { ok: true };
 }
 
+/** TRADE POLICY outcome B ends the routes it forbids the moment it passes —
+ *  both the banned seat's own international legs and everyone else's to it. */
+export function congressCancelBannedIntl(state: GameState): void {
+  for (const sx of state.seats) {
+    if (!congressIntlBanned(state, sx.seat)) continue;
+    cancelRoutes(state, sx.seat, (r) => r.toSeat !== undefined && r.toSeat >= 0);
+    for (const other of state.seats) {
+      if (other.seat !== sx.seat) cancelRoutes(state, other.seat, (r) => r.toSeat === sx.seat);
+    }
+  }
+}

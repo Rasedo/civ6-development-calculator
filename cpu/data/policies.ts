@@ -221,3 +221,10 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
 export function cardFitsSlot(card: PolicyDef, slot: SlotKind): boolean {
   return slot === 'wildcard' || card.kind === slot;
 }
+
+/** The policy cards in WIRE order — the exported table's index space, which
+ *  the Policy Treaty resolution's target names. */
+export const POLICY_LIST: readonly PolicyDef[] = Object.values(POLICIES);
+
+/** The governments in WIRE order — what the World Ideology target names. */
+export const GOVERNMENT_LIST: readonly GovernmentDef[] = Object.values(GOVERNMENTS);

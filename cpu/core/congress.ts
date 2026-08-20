@@ -12,14 +12,41 @@
 import type { CongressVote, DistrictId, GameState, GreatPersonClass, Seat } from './types';
 import { PLACEABLE_DISTRICTS } from '../data/districts';
 import { GP_CLASSES } from '../data/greatPeople';
+import { CITY_STATE_TYPES } from '../data/cityStates';
+import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
+import { PROJECT_LIST } from '../data/projects';
 import {
   CONGRESS_RESOLUTIONS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION,
   CONGRESS_HERITAGE, CONGRESS_DV_MIN_ERA, CONGRESS_DV_DELTA, CONGRESS_VOTE_STEP,
   CONGRESS_GPP_MULT, CONGRESS_GROWTH_A, CONGRESS_GROWTH_B, CONGRESS_MIG_LOYALTY,
   CONGRESS_GW_MULT, DVP_PER_RESOLUTION,
+  CONGRESS_MERCENARY, CONGRESS_TRADE_POLICY, CONGRESS_POLICY_TREATY,
+  CONGRESS_IDEOLOGY, CONGRESS_BORDER_CONTROL, CONGRESS_TREATY_ORG,
+  CONGRESS_SOVEREIGNTY, CONGRESS_PUBLIC_WORKS,
+  CONGRESS_PLUS_100, CONGRESS_MINUS_50, CONGRESS_TRADE_GOLD,
+  CONGRESS_TRADE_CAPACITY, CONGRESS_POLICY_FAVOR, CONGRESS_IDEOLOGY_SLOTS,
 } from '../data/seats';
 
 interface Vote { seat: number; outcome: number; target: number; weight: number }
+
+/** Mercenary Companies names a CURRENCY, in this order on both engines. */
+export const CONGRESS_CURRENCIES = ['gold', 'faith'] as const;
+export const CONGRESS_CUR_GOLD = 0;
+export const CONGRESS_CUR_FAITH = 1;
+
+/**
+ * What a VOTER knows that this module deliberately cannot look up. Adoption
+ * lives in `effects`, which reads the standing slate back — so the facts come
+ * IN and this file stays a leaf. `worldCongress` builds one per seat.
+ */
+export interface CongressVoterCtx {
+  /** GOVERNMENT_LIST index of the seat's live government; 0 if none. */
+  government: number;
+  /** POLICY_LIST indices the seat currently has slotted, ascending. */
+  policies: readonly number[];
+  /** envoys held, per CITY_STATE_TYPES index. */
+  envoysByType: readonly number[];
+}
 
 /** The DIPLOMATIC VICTORY resolution's slot in the vote head — the always-3rd
  * resolution, which stands outside the two-slot rotating slate. */
@@ -36,7 +63,8 @@ function argmaxLow(counts: readonly number[]): number {
 /** The AI free-vote preference for a non-DV resolution: outcome A on the
  * target the voter holds the most of (self for the Migration Treaty). What a
  * seat votes when its record carries no vote for this slot. */
-function preference(state: GameState, res: number, seat: number): { outcome: number; target: number } {
+function preference(state: GameState, res: number, seat: number,
+                    ctx: CongressVoterCtx): { outcome: number; target: number } {
   const sx = state.seats[seat];
   switch (res) {
     case CONGRESS_UDT: {
@@ -53,6 +81,44 @@ function preference(state: GameState, res: number, seat: number): { outcome: num
       return { outcome: 0, target: argmaxLow(GP_CLASSES.map((cls) => sx.gpp[cls] ?? 0)) };
     case CONGRESS_MIGRATION:
       return { outcome: 0, target: seat };
+    case CONGRESS_MERCENARY:
+      // A RAISES the price, so self-interest votes B on the currency this
+      // seat actually buys with — the one it holds the most of.
+      return { outcome: 1, target: (sx.faith ?? 0) > (sx.treasury ?? 0) ? CONGRESS_CUR_FAITH : CONGRESS_CUR_GOLD };
+    case CONGRESS_TRADE_POLICY: {
+      // A pays the SENDER, so a seat names where its own routes go; with no
+      // international leg the vote is harmless and names itself.
+      const counts = state.seats.map(() => 0);
+      for (const r of sx.tradeRoutes ?? []) if (r.toSeat !== undefined && r.toSeat >= 0) counts[r.toSeat]++;
+      const most = argmaxLow(counts);
+      return { outcome: 0, target: counts[most] > 0 ? most : seat };
+    }
+    case CONGRESS_POLICY_TREATY: {
+      // A pays every holder of the card, so a seat names one it has slotted.
+      return { outcome: 0, target: ctx.policies.length ? ctx.policies[0] : 0 };
+    }
+    case CONGRESS_IDEOLOGY:
+      return { outcome: 0, target: ctx.government };
+    case CONGRESS_BORDER_CONTROL:
+      // A is the gift (culture bombs), B the attack — a seat votes itself the gift.
+      return { outcome: 0, target: seat };
+    case CONGRESS_TREATY_ORG:
+    case CONGRESS_SOVEREIGNTY: {
+      // Both name a CITY-STATE TYPE and both pay the patron, so both read the
+      // same signal: where this seat's envoys already are.
+      return { outcome: 0, target: argmaxLow(ctx.envoysByType) };
+    }
+    case CONGRESS_PUBLIC_WORKS: {
+      const counts = PROJECT_LIST.map(() => 0);
+      for (const city of sx.cities) {
+        const front = city.queue[0];
+        if (front?.kind === 'project') {
+          const i = PROJECT_LIST.findIndex((pr) => pr.id === front.project);
+          if (i >= 0) counts[i]++;
+        }
+      }
+      return { outcome: 0, target: argmaxLow(counts) };
+    }
     default: { // CONGRESS_HERITAGE
       const counts = [0, 0, 0];
       for (const city of sx.cities) {
@@ -115,6 +181,11 @@ function targetSpaceSize(state: GameState, res: number): number {
     case 'district': return PLACEABLE_DISTRICTS.length;
     case 'gpClass': return GP_CLASSES.length;
     case 'gwKind': return 3;
+    case 'currency': return CONGRESS_CURRENCIES.length;
+    case 'policy': return POLICY_LIST.length;
+    case 'government': return GOVERNMENT_LIST.length;
+    case 'project': return PROJECT_LIST.length;
+    case 'csType': return CITY_STATE_TYPES.length;
     default: return state.seats.length;
   }
 }
@@ -124,7 +195,8 @@ function clamp(v: number, hi: number): number {
 }
 
 function runResolution(state: GameState, res: number, slot: number,
-                       recorded: readonly (CongressVote | null)[]): void {
+                       recorded: readonly (CongressVote | null)[],
+                       voters: readonly CongressVoterCtx[]): void {
   const space = targetSpaceSize(state, res);
   const votes: Vote[] = [];
   const spent = state.seats.map(() => 0);
@@ -132,7 +204,7 @@ function runResolution(state: GameState, res: number, slot: number,
     const sx = state.seats[c];
     if (sx.cities.length === 0) continue;
     const v = recorded[c]?.[slot];
-    const p = v ? { outcome: clamp(v[0], 1), target: clamp(v[1], space - 1) } : preference(state, res, c);
+    const p = v ? { outcome: clamp(v[0], 1), target: clamp(v[1], space - 1) } : preference(state, res, c, voters[c]);
     // NO favor without an intent: the AI free-votes on a regular resolution.
     const bought = buyVotes(sx, v ? Math.max(0, Math.trunc(v[2])) : 0);
     spent[c] = bought.spent;
@@ -181,7 +253,8 @@ function runDvResolution(state: GameState, recorded: readonly (CongressVote | nu
  * rotation, then the Diplomatic Victory resolution from Modern. The standing
  * effects REPLACE the previous session's and hold until the next one. */
 export function congressSession(state: GameState, worldEra: number,
-                                recorded: readonly (CongressVote | null)[]): void {
+                                recorded: readonly (CongressVote | null)[],
+                                voters: readonly CongressVoterCtx[]): void {
   state.congressSessions = (state.congressSessions ?? 0) + 1;
   const sess = state.congressSessions;
   const eligible: number[] = [];
@@ -192,7 +265,7 @@ export function congressSession(state: GameState, worldEra: number,
   if (eligible.length > 0) {
     const s0 = eligible[(2 * (sess - 1)) % eligible.length];
     const s1 = eligible[(2 * (sess - 1) + 1) % eligible.length];
-    (s0 === s1 ? [s0] : [s0, s1]).forEach((res, slot) => runResolution(state, res, slot, recorded));
+    (s0 === s1 ? [s0] : [s0, s1]).forEach((res, slot) => runResolution(state, res, slot, recorded, voters));
   }
   if (worldEra >= CONGRESS_DV_MIN_ERA) runDvResolution(state, recorded);
 }
@@ -247,4 +320,94 @@ export function congressGwMult(state: GameState): [number, number, number] {
   const m: [number, number, number] = [1, 1, 1];
   if (e) m[e.target] = e.outcome === 0 ? CONGRESS_GW_MULT : 0;
   return m;
+}
+
+/** Mercenary Companies: the multiplier on a MILITARY unit's purchase price in
+ *  `currency` (CONGRESS_CUR_GOLD / CONGRESS_CUR_FAITH). */
+export function congressUnitBuyMult(state: GameState, currency: number): number {
+  const e = congressEffect(state, CONGRESS_MERCENARY);
+  if (!e || e.target !== currency) return 1;
+  return e.outcome === 0 ? CONGRESS_PLUS_100 : CONGRESS_MINUS_50;
+}
+
+/** Trade Policy outcome A: the gold a route pays its SENDER for ending at the
+ *  named seat. */
+export function congressTradeGold(state: GameState, destSeat: number): number {
+  const e = congressEffect(state, CONGRESS_TRADE_POLICY);
+  return e && e.outcome === 0 && e.target === destSeat ? CONGRESS_TRADE_GOLD : 0;
+}
+
+/** Trade Policy outcome A: the extra route capacity the NAMED seat receives. */
+export function congressRouteCapacity(state: GameState, seat: number): number {
+  const e = congressEffect(state, CONGRESS_TRADE_POLICY);
+  return e && e.outcome === 0 && e.target === seat ? CONGRESS_TRADE_CAPACITY : 0;
+}
+
+/** Trade Policy outcome B: this seat's INTERNATIONAL routes are ended and no
+ *  new one may be established. */
+export function congressIntlBanned(state: GameState, seat: number): boolean {
+  const e = congressEffect(state, CONGRESS_TRADE_POLICY);
+  return !!e && e.outcome === 1 && e.target === seat;
+}
+
+/** Policy Treaty outcome A: favor per turn for a seat holding the named card. */
+export function congressPolicyFavor(state: GameState, slotted: readonly number[]): number {
+  const e = congressEffect(state, CONGRESS_POLICY_TREATY);
+  return e && e.outcome === 0 && slotted.includes(e.target) ? CONGRESS_POLICY_FAVOR : 0;
+}
+
+/** Policy Treaty outcome B: the POLICY_LIST index no seat may slot; -1 none. */
+export function congressPolicyBlocked(state: GameState): number {
+  const e = congressEffect(state, CONGRESS_POLICY_TREATY);
+  return e && e.outcome === 1 ? e.target : -1;
+}
+
+/** World Ideology: the wildcard slots the named GOVERNMENT gains (A) or
+ *  loses (B). */
+export function congressWildcardDelta(state: GameState, government: number): number {
+  const e = congressEffect(state, CONGRESS_IDEOLOGY);
+  if (!e || e.target !== government) return 0;
+  return e.outcome === 0 ? CONGRESS_IDEOLOGY_SLOTS : -CONGRESS_IDEOLOGY_SLOTS;
+}
+
+/** Border Control Treaty outcome A: the seat whose new districts act as
+ *  culture bombs; -1 when not standing. */
+export function congressCultureBombSeat(state: GameState): number {
+  const e = congressEffect(state, CONGRESS_BORDER_CONTROL);
+  return e && e.outcome === 0 ? e.target : -1;
+}
+
+/** Border Control Treaty outcome B: this seat's borders cannot grow via
+ *  culture. */
+export function congressBorderFrozen(state: GameState, seat: number): boolean {
+  const e = congressEffect(state, CONGRESS_BORDER_CONTROL);
+  return !!e && e.outcome === 1 && e.target === seat;
+}
+
+/** Treaty Organization: the favor multiplier on being suzerain of a
+ *  city-state of this type. */
+export function congressSuzFavorMult(state: GameState, csType: number): number {
+  const e = congressEffect(state, CONGRESS_TREATY_ORG);
+  if (!e || e.target !== csType) return 1;
+  return e.outcome === 0 ? CONGRESS_PLUS_100 : 0;
+}
+
+/** Sovereignty outcome A: the multiplier on the CITY-STATE's own yield to a
+ *  route sent to a minor of this type. */
+export function congressCsRouteMult(state: GameState, csType: number): number {
+  const e = congressEffect(state, CONGRESS_SOVEREIGNTY);
+  return e && e.outcome === 0 && e.target === csType ? CONGRESS_PLUS_100 : 1;
+}
+
+/** Sovereignty outcome B: a minor of this type provides no suzerain bonus. */
+export function congressSuzBonusBlocked(state: GameState, csType: number): boolean {
+  const e = congressEffect(state, CONGRESS_SOVEREIGNTY);
+  return !!e && e.outcome === 1 && e.target === csType;
+}
+
+/** Public Works Program: the production multiplier toward the named project. */
+export function congressProjectMult(state: GameState, project: number): number {
+  const e = congressEffect(state, CONGRESS_PUBLIC_WORKS);
+  if (!e || e.target !== project) return 1;
+  return e.outcome === 0 ? CONGRESS_PLUS_100 : CONGRESS_MINUS_50;
 }

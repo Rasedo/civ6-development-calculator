@@ -1,11 +1,13 @@
 import type { City, GameState, Seat } from './types';
 import type { QueueItem } from './types';
-import { seatOf } from './seats';
+import { seatOf, setTileOwner, tileCity, tileSeat } from './seats';
+import { congressCultureBombSeat } from './congress';
+import { hexDistance, neighbors } from '../../world/hex';
 import { availableCivicsIn, availableTechsIn } from './effects';
 import { completedWonders, seatWonderFlag } from './wonders';
 import { UNITS, ENCAMPMENT_HP, WALLS_HP } from '../data/units';
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf } from '../data/projects';
-import { DED_MONUMENTALITY, ERA_SCORE_WONDER } from '../data/seats';
+import { CULTURE_BOMB_RANGE, DED_MONUMENTALITY, ERA_SCORE_WONDER } from '../data/seats';
 import { addEraScore, buildingDedications, dedicationEvent } from './eras';
 import { spawnUnit } from './units';
 import { encampmentTrainXp } from './combat';
@@ -98,6 +100,7 @@ export function completeQueueItem(
       dt.districtComplete = true;
       if (dt.district !== 'CITY_CENTER') dedicationEvent(state, city.seat, DED_MONUMENTALITY);
       if (dt.district === 'ENCAMPMENT') dt.encampHp = ENCAMPMENT_HP;
+      cultureBomb(state, city, item.tileIndex);
       break;
     }
     case 'wonder': {
@@ -152,5 +155,35 @@ export function completeQueueItem(
       buildingDedications(state, city.seat, item.building);
       if (item.building === 'ANCIENT_WALLS') city.outerHp = WALLS_HP;
       break;
+  }
+}
+
+/**
+ * CIV6 (Border Control Treaty, outcome A): "New Districts built by target
+ * player act as Culture bombs."
+ *
+ * CIV6 (Culture Bomb): "the immediate annexation of the six tiles surrounding
+ * the trigger tile, without districts or wonders and falling within 3 hexes of
+ * one of the owner's City Centers" — taking foreign-owned tiles is the whole
+ * point of a bomb. Ascending tile order, so both engines claim the same set in
+ * the same order.
+ *
+ * The source also flips a tile whose district or wonder is still UNDER
+ * CONSTRUCTION, wiping the unfinished build; here such a tile is left alone.
+ */
+function cultureBomb(state: GameState, city: City, tileIndex: number): void {
+  if (congressCultureBombSeat(state) !== city.seat) return;
+  const owner = seatOf(state, city.seat);
+  if (!owner) return;
+  for (const t of neighbors(state.map, state.map.tiles[tileIndex]).slice().sort((a, b) => a.index - b.index)) {
+    if (t.district || t.builtWonder) continue;
+    if (tileSeat(t) === city.seat && tileCity(t) === city.id) continue;
+    const near = owner.cities.some((c) => {
+      const ctr = state.map.tiles[c.centerIndex];
+      return hexDistance(ctr.col, ctr.row, t.col, t.row) <= CULTURE_BOMB_RANGE;
+    });
+    if (!near) continue;
+    setTileOwner(t, city.seat, city.id);
+    city.tilesAcquired += 1;
   }
 }

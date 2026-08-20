@@ -2,6 +2,7 @@
 import type { City, CityState, CityStateQuest, CityStateType, GameState, Tile, Yields } from './types';
 import { NO_SEAT, citiesOf, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileSeat, treatyTurnsWith, warTurnsWith } from './seats';
 import { cancelRoutes } from './trade';
+import { congressSuzBonusBlocked } from './congress';
 import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from '../../world/hex';
 import { isWater, isImpassable, hasFreshWater } from '../../world/query';
@@ -152,10 +153,16 @@ export function isSuzerain(cityState: CityState, seat: number): boolean {
  */
 export function suzerainEffect(state: GameState, seat: number, effect: SuzEffect): boolean {
   for (const cityState of state.cityStates ?? []) {
-    if (!isSuzerain(cityState, seat)) continue;
+    if (!isSuzerain(cityState, seat) || suzerainBonusBlocked(state, cityState)) continue;
     if (CITY_STATE_SUZERAIN_BONUS[cityState.name]?.suz === effect) return true;
   }
   return false;
+}
+
+/** SOVEREIGNTY outcome B: a minor of the named TYPE provides no unique
+ *  suzerain bonus to anyone. */
+export function suzerainBonusBlocked(state: GameState, cityState: CityState): boolean {
+  return congressSuzBonusBlocked(state, CITY_STATE_TYPES.indexOf(cityState.type));
 }
 
 /** CIV 6, Mexico City's suzerain (Toronto in rulesets without Canada):
@@ -210,7 +217,7 @@ export function cityStateEnvoyBonuses(state: GameState, seat: number): CsBonuses
 export function cityStateSuzerainCapitalBonus(state: GameState, seat: number): Partial<Yields> {
   const out: Partial<Yields> = {};
   for (const cityState of state.cityStates) {
-    if (!isSuzerain(cityState, seat)) continue;
+    if (!isSuzerain(cityState, seat) || suzerainBonusBlocked(state, cityState)) continue;
     const key = CITY_STATE_SUZERAIN_LIVE[cityState.name];
     if (!key) continue; // descoped row
     out[key] = (out[key] ?? 0) + CITY_STATE_SUZERAIN_YIELD;

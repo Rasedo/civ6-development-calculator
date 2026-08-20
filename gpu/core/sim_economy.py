@@ -865,6 +865,43 @@ class SimEconomy:
         adopted, has_gov = self._adopted_gov(civics2)
         return torch.where(has_gov, self._gov_tier[adopted], torch.zeros(B, dtype=torch.long, device=self.device))
 
+    def _slotted_policies(self, civics2: torch.Tensor,
+                          extra_slots: torch.Tensor | None = None) -> torch.Tensor:
+        """[B, nPol] — the cards a seat's adopted government greedily slots,
+        `computeAdoption().policies` as a mask over the card table.
+
+        WILDCARD slots fill with the within-kind OVERFLOW in card-table order
+        (TS findIndex: a card whose kind slots are full takes the first open
+        W; every catalog government lists its W slots LAST, so kind-first
+        matches findIndex). POLICY TREATY outcome B removes one card from the
+        pool entirely, exactly as `computeAdoption`'s `blocked` does."""
+        B, dev = civics2.shape[0], self.device
+        slotted = torch.zeros(B, self._npol, dtype=torch.bool, device=dev)
+        if not self._gov_has_effects or not self._ngov or not self._npol:
+            return slotted
+        adopted, has_gov = self._adopted_gov(civics2)
+        nslots = self._gov_slots[adopted] * has_gov.long().unsqueeze(1)  # [B, 4]
+        # Wonder- and congress-granted slots — TS appends them to
+        # computeAdoption's slot list; a seat with no government slots nothing.
+        if extra_slots is not None:
+            nslots = nslots + extra_slots * has_gov.long().unsqueeze(1)
+        puc = self._pol_unlock_civic  # [nPol]
+        pol_unlocked = torch.where(
+            puc.unsqueeze(0) >= 0,
+            civics2.gather(1, puc.clamp(min=0).unsqueeze(0).expand(B, -1)),
+            torch.zeros(B, self._npol, dtype=torch.bool, device=dev),
+        )  # [B, nPol]
+        banned = self._congress_policy_blocked()  # [B], -1 = nothing forbidden
+        pol_unlocked = pol_unlocked & (
+            torch.arange(self._npol, device=dev).unsqueeze(0) != banned.unsqueeze(1))
+        for k in range(3):  # military/economic/diplomatic
+            uk = pol_unlocked & (self._pol_kind == k).unsqueeze(0)  # [B, nPol]
+            cum = uk.long().cumsum(dim=1)  # inclusive rank among unlocked-of-kind, table order
+            slotted = slotted | (uk & (cum <= nslots[:, k : k + 1]))
+        overflow = pol_unlocked & ~slotted
+        w_rank = overflow.long().cumsum(dim=1)
+        return slotted | (overflow & (w_rank <= nslots[:, 3:4]))
+
     def _gov_policy_mods(self, civics2: torch.Tensor, extra_slots: torch.Tensor | None = None) -> tuple[
         torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
     ]:
@@ -912,24 +949,7 @@ class SimEconomy:
         emult = torch.where(has_gov, self._gov_ehprod[adopted], emult)
         tpmult = torch.where(has_gov, self._gov_tpmult[adopted], tpmult)
         if self._npol:
-            nslots = self._gov_slots[adopted] * has_gov.long().unsqueeze(1)  # [B, 4]
-            # Wonder-granted slots — TS appends them to computeAdoption's slot
-            # list; a seat with no government slots nothing either way.
-            if extra_slots is not None:
-                nslots = nslots + extra_slots * has_gov.long().unsqueeze(1)
-            puc = self._pol_unlock_civic  # [nPol]
-            pol_unlocked = torch.where(
-                puc.unsqueeze(0) >= 0,
-                civics2.gather(1, puc.clamp(min=0).unsqueeze(0).expand(B, -1)),
-                torch.zeros(B, self._npol, dtype=torch.bool, device=dev),
-            )  # [B, nPol]
-            for k in range(3):  # military/economic/diplomatic
-                uk = pol_unlocked & (self._pol_kind == k).unsqueeze(0)  # [B, nPol]
-                cum = uk.long().cumsum(dim=1)  # inclusive rank among unlocked-of-kind, table order
-                slotted = slotted | (uk & (cum <= nslots[:, k : k + 1]))
-            overflow = pol_unlocked & ~slotted
-            w_rank = overflow.long().cumsum(dim=1)
-            slotted = slotted | (overflow & (w_rank <= nslots[:, 3:4]))
+            slotted = self._slotted_policies(civics2, extra_slots)
             sd = slotted.to(dt)
             city_y = city_y + sd @ self._pol_city_y
             cap_y = cap_y + sd @ self._pol_cap_y
@@ -2108,10 +2128,13 @@ class SimEconomy:
             b_cap = b_cap.scatter_add(
                 1, self._citystate_yidx,
                 ((_env >= 1) & _acs).double() * float(self.rules.citystate.get("capitalBonus", 2)))
-            _suz = self._suzerain_mask(row)
+            # SOVEREIGNTY outcome B silences a whole city-state TYPE's unique
+            # suzerain bonus, which is this capital yield and `suzerainEffect`.
+            _suz = self._suz_live_mask(row)
             b_cap = b_cap.scatter_add(
-                1, self.citystate_suz_key.clamp(min=0),
-                _suz.double() * self._citystate_suz_amt * (self.citystate_suz_key >= 0).double())
+                1, self.citystate_suz_key[:, : self.S].clamp(min=0),
+                _suz.double() * self._citystate_suz_amt
+                * (self.citystate_suz_key[:, : self.S] >= 0).double())
         if has_bel:
             # Founder capital incomes — perF (per-N followers, empire-wide) +
             # perC (per live city). Followers = this row's own live pop sum

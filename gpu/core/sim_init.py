@@ -203,6 +203,7 @@ class SimInit:
         self.treaty_turns = torch.zeros(B, self.NS, self.NS, dtype=torch.long, device=device)
         self.peace_turns = torch.zeros(B, self.NS, dtype=torch.long, device=device)
         citystate_yidx = rules.citystate.get("typeYieldIdx", [3, 4, 2, 1, 1, 5])
+        self._cs_type_n = len(citystate_yidx)  # CITY_STATE_TYPES' width
         self._citystate_yidx = torch.tensor(citystate_yidx, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S]
         citystate_didx = rules.citystate.get("typeDistrictIdx", [0, 2, 3, 5, 6, 1])  # CS type -> district idx (Campus/Theater/CommHub/IZ/Encampment/HolySite)
         self._citystate_didx = torch.tensor(citystate_didx, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S] district each CS boosts at 3/6 envoys
@@ -331,13 +332,24 @@ class SimInit:
         # WORLD CONGRESS catalog + magnitudes (data/seats.ts carries the
         # sources). Hard reads — a missing key must fail loud, not default.
         self._congress_res = [
-            {"min": int(r["min"]), "max": int(r["max"]), "t": int(r["t"])}
+            {"id": str(r["id"]), "min": int(r["min"]), "max": int(r["max"]), "t": int(r["t"])}
             for r in _er2["congressResolutions"]
         ]
+        # A resolution is addressed by NAME: the catalog's ORDER is the wire's,
+        # and a body that hard-codes a position breaks silently when one is
+        # appended before it.
+        self._congress_at = {r["id"]: i for i, r in enumerate(self._congress_res)}
         self._congress_dv_min = int(_er2["congressDvMinEra"])
         self._congress_dv_delta = int(_er2["congressDvDelta"])
         self._congress_vstep = int(_er2["congressVoteStep"])
         self._c_prod_mult = float(_er2["congressProdMult"])
+        self._c_plus100 = float(_er2["congressPlus100"])
+        self._c_minus50 = float(_er2["congressMinus50"])
+        self._c_trade_gold = float(_er2["congressTradeGold"])
+        self._c_trade_cap = int(_er2["congressTradeCapacity"])
+        self._c_policy_favor = float(_er2["congressPolicyFavor"])
+        self._c_ideology_slots = int(_er2["congressIdeologySlots"])
+        self._culture_bomb_range = int(_er2["cultureBombRange"])
         self._c_gpp_mult = float(_er2["congressGppMult"])
         self._c_grow_a = float(_er2["congressGrowthA"])
         self._c_grow_b = float(_er2["congressGrowthB"])

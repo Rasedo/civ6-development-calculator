@@ -16,10 +16,12 @@ import { availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } f
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { selectResearch } from './economy';
 import { getModifiers } from './effects';
-import { addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, routeDestCenter, routePlunderer, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from './trade';
-import { addEnvoys, cityStateById, declareWarOnCityState, hasMet, isSuzerain, issueQuest, questSatisfied, setMet, sueForPeaceWithCityState } from './cityStates';
-import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS } from '../data/cityStates';
-import { computeAdoption } from './effects';
+import { addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from './trade';
+import { addEnvoys, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, setMet, sueForPeaceWithCityState } from './cityStates';
+import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPES } from '../data/cityStates';
+import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
+import { PROJECT_LIST } from '../data/projects';
+import { computeAdoption, wonderExtraSlots } from './effects';
 import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import type { RuleResult } from './rules';
 import { TERRAINS } from '../../world/terrains';
@@ -35,7 +37,7 @@ import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEO
 import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, borderGrowthCost, EMBARKED_DEFENSE_CS } from '../data/constants';
 import type { CityStats } from './city';
 import { civEraIndex, computeCityStats, luxuryAmenities, pickBorderTile, acquireTile } from './city';
-import { congressSession, congressLoyaltyDelta, congressUdtProdDistrict } from './congress';
+import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressUdtProdDistrict, type CongressVoterCtx } from './congress';
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { hasRiver, hasFreshWater, isCoastalWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
@@ -511,6 +513,28 @@ export function queueSeatProject(state: GameState, civCity: City, projId: string
  * of state. Called from endTurn right after eraBoundary, the same position
  * the GPU mirrors.
  */
+/** What a voter knows that `congress` cannot look up itself: the live
+ *  adoption (which reads the standing slate back) and the envoy spread. */
+function congressVoter(state: GameState, seat: number): CongressVoterCtx {
+  const sx = seatOf(state, seat)!;
+  const adoption = computeAdoption(sx.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state));
+  const policies: number[] = [];
+  for (const id of adoption.policies) {
+    const i = id ? POLICY_LIST.findIndex((card) => card.id === id) : -1;
+    if (i >= 0) policies.push(i);
+  }
+  policies.sort((a, b) => a - b);
+  const envoysByType = CITY_STATE_TYPES.map(() => 0);
+  for (const cityState of state.cityStates ?? []) {
+    const t = CITY_STATE_TYPES.indexOf(cityState.type);
+    if (t >= 0) envoysByType[t] += envoysOf(cityState, seat);
+  }
+  const government = adoption.government
+    ? Math.max(0, GOVERNMENT_LIST.findIndex((g) => g.id === adoption.government))
+    : 0;
+  return { government, policies, envoysByType };
+}
+
 export function worldCongress(state: GameState): void {
   const recorded = state.seats.map((sx) => sx.congressVote ?? null);
   for (const sx of state.seats) sx.congressVote = undefined;  // an intent is for THIS turn
@@ -521,7 +545,8 @@ export function worldCongress(state: GameState): void {
     if (e > worldEra) worldEra = e;
   }
   if (worldEra < CONGRESS_MIN_ERA) return;
-  congressSession(state, worldEra, recorded);
+  congressSession(state, worldEra, recorded, state.seats.map((sx) => congressVoter(state, sx.seat)));
+  congressCancelBannedIntl(state);
 }
 
 
@@ -1409,6 +1434,9 @@ export function seatPhase(state: GameState): void {
         // towards buildings in this district."
         const _udtD = congressUdtProdDistrict(state);
         if (q.kind === 'building' && _udtD !== null && BUILDINGS[q.building]?.district === _udtD) _em *= CONGRESS_PROD_MULT;
+        // CIV6 (Public Works Program): "+100% / -50% Production towards this
+        // Project."
+        if (q.kind === 'project') _em *= congressProjectMult(state, PROJECT_LIST.findIndex((pr) => pr.id === q.project));
         q.progress += production * _em;
         // Pay in the bank, exactly where the seat 0's endTurn does
         // (game.ts, right after the production add). Without this the field
@@ -1451,9 +1479,12 @@ export function seatPhase(state: GameState): void {
         }
       }
       civCity.cultureBox += culC;
+      // CIV6 (Border Control Treaty, outcome B): "Target player's borders
+      // cannot grow via Culture." The box still fills; nothing is bought.
+      const _frozen = congressBorderFrozen(state, actor.seat);
       const civCityBorderCost = () =>
         Math.round(borderGrowthCost(civCity.tilesAcquired) * getModifiers(state, actor.seat).borderCostMult);
-      while (civCity.cultureBox >= civCityBorderCost()) {
+      while (!_frozen && civCity.cultureBox >= civCityBorderCost()) {
         const next = pickBorderTile(state, civCity, { map: state.map, mods: getModifiers(state, actor.seat) });
         if (next === null) {
           civCity.cultureBox = Math.min(civCity.cultureBox, civCityBorderCost());

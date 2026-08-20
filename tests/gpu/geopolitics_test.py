@@ -538,7 +538,8 @@ def main() -> None:
     assert s6._congress_min_era == 2, f"GS starts at the MEDIEVAL era (index 2), got {s6._congress_min_era}"
     assert s6._dvp_win == 20, f"GS diplomatic victory is 20 points, got {s6._dvp_win}"
     assert s6._congress_dv_min == 5, "the DV resolution enters at MODERN (index 5)"
-    assert len(s6._congress_res) == 4, "the modeled catalog is 4 resolutions"
+    assert len(s6._congress_res) == len(rules.eras["congressResolutions"]), (
+        "the GPU catalog must carry every exported resolution row")
     # CIV6: SoL +4 DVP, Potala +1 DVP + a diplomatic slot; FC's wildcard slot
     assert int(s6._wond_dvp.sum()) == 5, "the two DVP wonders pay 4 and 1"
     assert s6._wond_slots.sum(dim=0).tolist() == [1, 1, 1, 1],         "one wonder each adds a military, economic, diplomatic and wildcard slot" 
@@ -590,7 +591,14 @@ def main() -> None:
     s7.turn = s7._congress_interval
     s7.congress_sessions[:] = 1  # pretend session 1 already ran
     s7._world_congress()
-    assert s7.congress_active[0, :, 0].tolist() == [2, 0], "session 2 at Industrial slates Migration then UDT"
+    # the rotation is a WINDOW over the era-eligible rows, so the expectation
+    # is computed from the catalog rather than pinned to catalog positions
+    _elig = [i for i, r in enumerate(s7._congress_res) if r["min"] <= 4 <= r["max"]]
+    assert len(_elig) >= 4, "the Industrial window wants at least four eligible rows"
+    assert s7.congress_active[0, :, 0].tolist() == [_elig[2], _elig[3]], (
+        f"session 2 must start its window at rank 2, got {s7.congress_active[0, :, 0].tolist()}"
+    )
+    assert s7._congress_res[_elig[2]]["id"] == "MIGRATION_TREATY", "rank 2 at Industrial is Migration"
     # Migration's scripted vote is A-on-self; ties keep the LOWER seat
     assert s7.congress_active[0, 0, 1].tolist() == 0 and s7.congress_active[0, 0, 2].tolist() == 0
 

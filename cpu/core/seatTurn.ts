@@ -5,16 +5,36 @@ import { isSuzerain } from './cityStates';
 import { seatTourism } from './city';
 import { computeAdoption } from './effects';
 import { selectResearch } from './economy';
-import { GOVERNMENTS, GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
+import { GOVERNMENTS, GOVERNMENTS_ADOPTION_LIVE, POLICY_LIST } from '../data/policies';
 import { DIPLO_FAVOR_PER_SUZERAIN } from '../data/seats';
+import { CITY_STATE_TYPES } from '../data/cityStates';
+import { congressPolicyBlocked, congressPolicyFavor, congressSuzFavorMult } from './congress';
+import { wonderExtraSlots } from './effects';
 
+/** Suzerained city-states, each weighted by what TREATY ORGANIZATION does to
+ *  the favor its TYPE pays — x2 on outcome A, x0 on B, 1 while nothing
+ *  stands. Unweighted this is a plain count. */
 export function suzerainCount(state: GameState, seat: number): number {
-  return state.cityStates.reduce((n, cityState) => n + (isSuzerain(cityState, seat) ? 1 : 0), 0);
+  return state.cityStates.reduce(
+    (n, cityState) => n + (isSuzerain(cityState, seat)
+      ? congressSuzFavorMult(state, CITY_STATE_TYPES.indexOf(cityState.type)) : 0), 0);
 }
 
-export function diplomaticFavorPerTurn(gov: string | null, suzerains: number): number {
+export function diplomaticFavorPerTurn(gov: string | null, suzerains: number, treaty = 0): number {
   const tier = gov ? GOVERNMENTS[gov]?.tier ?? 0 : 0;
-  return tier + DIPLO_FAVOR_PER_SUZERAIN * suzerains;
+  return tier + DIPLO_FAVOR_PER_SUZERAIN * suzerains + treaty;
+}
+
+/** POLICY TREATY outcome A pays every seat holding the named card. */
+function policyTreatyFavor(state: GameState, seat: number): number {
+  const sx = seatOf(state, seat);
+  if (!sx) return 0;
+  const held: number[] = [];
+  for (const id of computeAdoption(sx.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state)).policies) {
+    const i = id ? POLICY_LIST.findIndex((card) => card.id === id) : -1;
+    if (i >= 0) held.push(i);
+  }
+  return congressPolicyFavor(state, held);
 }
 
 export function seatGovernmentId(state: GameState, seat: number): string | null {
@@ -34,7 +54,8 @@ export function seatAccumulators(state: GameState, seat: number, govCityIds?: Re
   const s = seatOf(state, seat);
   if (!s) return;
   s.tourism = (s.tourism ?? 0) + seatTourism(state, seat, govCityIds);
-  s.diplomaticFavor = (s.diplomaticFavor ?? 0) + diplomaticFavorPerTurn(seatGovernmentId(state, seat), suzerainCount(state, seat));
+  s.diplomaticFavor = (s.diplomaticFavor ?? 0)
+    + diplomaticFavorPerTurn(seatGovernmentId(state, seat), suzerainCount(state, seat), policyTreatyFavor(state, seat));
   if ((s.warmonger ?? 0) > 0 && atPeaceWithAllCivs(state, seat)) {
     s.warmonger = (s.warmonger ?? 0) - 1;
   }

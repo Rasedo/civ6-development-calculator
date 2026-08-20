@@ -461,9 +461,9 @@ def _decide_vote(sim, row: int):
             m = fires & (sel == r)
             if not bool(m.any()):
                 continue
-            t = sim._congress_pref(sim._congress_res[r]["t"], row)
-            out[:, slot, 0] = torch.where(m, zero, out[:, slot, 0])
-            out[:, slot, 1] = torch.where(m, t, out[:, slot, 1])
+            ai_o, ai_t = sim._congress_pref(r, row)
+            out[:, slot, 0] = torch.where(m, ai_o, out[:, slot, 0])
+            out[:, slot, 1] = torch.where(m, ai_t, out[:, slot, 1])
             out[:, slot, 2] = torch.where(m, zero, out[:, slot, 2])
     lead = sim._congress_leader(dv)
     ok = dv & (lead >= 0)

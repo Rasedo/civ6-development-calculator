@@ -81,7 +81,7 @@ def main() -> None:
     size = sim._congress_space(kind)
     assert size >= 2, "this resolution has only one target — nothing to override"
     voter = 0
-    pref = int(sim._congress_pref(kind, voter)[0])
+    pref = int(sim._congress_pref(r, voter)[1][0])
     other = (pref + 1) % size
     for row in range(sim.n_majors):
         sim.civ_diplo_favor[:, row] = 0
@@ -161,7 +161,120 @@ def main() -> None:
     )
     print("  the +/-2 lands on the winning TARGET, not on the leader")
 
-    print("CONGRESS VOTE OK — the slate, the override, the curve, both refunds and the DV target")
+    # --- 6) THE WIDER SLATE: every reader, both faces -----------------------
+    # A standing resolution is three numbers, so the readers are pinned by
+    # PLANTING one rather than by winning a vote for each.
+    sim2 = build()
+    K = sim2.congress_active.shape[1]
+
+    def stand(name: str, outcome: int, target: int) -> None:
+        sim2.congress_active[:] = -1
+        i = sim2._congress_at.get(name, -1)
+        assert i >= 0, f"{name} is not in the catalog"
+        sim2.congress_active[:, 0] = torch.tensor([i, outcome, target])
+
+    stand("MERCENARY_COMPANIES", 0, 0)
+    assert float(sim2._congress_unit_buy_mult(0)[0]) == sim2._c_plus100
+    assert float(sim2._congress_unit_buy_mult(1)[0]) == 1.0
+    stand("MERCENARY_COMPANIES", 1, 1)
+    assert float(sim2._congress_unit_buy_mult(1)[0]) == sim2._c_minus50
+
+    stand("TRADE_POLICY", 0, 1)
+    ds = torch.tensor([[1, 0, -1]], dtype=torch.long)
+    assert [float(x) for x in sim2._congress_trade_gold(ds)[0]] == [sim2._c_trade_gold, 0.0, 0.0]
+    assert int(sim2._congress_route_capacity(1)[0]) == sim2._c_trade_cap
+    assert int(sim2._congress_route_capacity(0)[0]) == 0
+    assert not bool(sim2._congress_intl_banned(1)[0])
+    stand("TRADE_POLICY", 1, 1)
+    assert bool(sim2._congress_intl_banned(1)[0]) and not bool(sim2._congress_intl_banned(0)[0])
+
+    if sim2._npol:
+        pol = min(1, sim2._npol - 1)
+        held = torch.zeros(sim2.B, sim2._npol, dtype=torch.bool)
+        held[:, pol] = True
+        stand("POLICY_TREATY", 0, pol)
+        assert float(sim2._congress_policy_favor(held)[0]) == sim2._c_policy_favor
+        assert float(sim2._congress_policy_favor(~held)[0]) == 0.0
+        assert int(sim2._congress_policy_blocked()[0]) == -1
+        stand("POLICY_TREATY", 1, pol)
+        assert int(sim2._congress_policy_blocked()[0]) == pol
+
+    gov = torch.ones(sim2.B, dtype=torch.long)
+    stand("WORLD_IDEOLOGY", 0, 1)
+    assert int(sim2._congress_wildcard_delta(gov)[0]) == sim2._c_ideology_slots
+    assert int(sim2._congress_wildcard_delta(gov * 0)[0]) == 0
+    stand("WORLD_IDEOLOGY", 1, 1)
+    assert int(sim2._congress_wildcard_delta(gov)[0]) == -sim2._c_ideology_slots
+
+    stand("BORDER_CONTROL_TREATY", 0, 1)
+    assert int(sim2._congress_culture_bomb_seat()[0]) == 1
+    assert not bool(sim2._congress_border_frozen(1)[0])
+    stand("BORDER_CONTROL_TREATY", 1, 1)
+    assert int(sim2._congress_culture_bomb_seat()[0]) == -1
+    assert bool(sim2._congress_border_frozen(1)[0]) and not bool(sim2._congress_border_frozen(0)[0])
+
+    if sim2.S:
+        ct = int(sim2.citystate_type[0, 0])
+        stand("TREATY_ORGANIZATION", 0, ct)
+        assert float(sim2._congress_suz_favor_weight()[0, 0]) == sim2._c_plus100
+        stand("TREATY_ORGANIZATION", 1, ct)
+        assert float(sim2._congress_suz_favor_weight()[0, 0]) == 0.0
+        stand("SOVEREIGNTY", 0, ct)
+        assert float(sim2._congress_cs_route_mult()[0, 0]) == sim2._c_plus100
+        assert not bool(sim2._congress_suz_bonus_blocked()[0, 0])
+        stand("SOVEREIGNTY", 1, ct)
+        assert float(sim2._congress_cs_route_mult()[0, 0]) == 1.0
+        assert bool(sim2._congress_suz_bonus_blocked()[0, 0])
+
+    if sim2._proj_rows:
+        stand("PUBLIC_WORKS_PROGRAM", 0, 0)
+        assert float(sim2._congress_project_mult(0)[0]) == sim2._c_plus100
+        assert float(sim2._congress_project_mult(len(sim2._proj_rows) - 1)[0]) == (
+            sim2._c_plus100 if len(sim2._proj_rows) == 1 else 1.0)
+        stand("PUBLIC_WORKS_PROGRAM", 1, 0)
+        assert float(sim2._congress_project_mult(0)[0]) == sim2._c_minus50
+    print(f"  the twelve wider-slate readers answer both faces over {K} slate slots")
+
+    # --- 7) TRADE POLICY B ends the standing legs it forbids ----------------
+    row, other = 0, 1
+    sim2.seat_routes[:] = -1
+    sim2.seat_route_dseat[:] = -1
+    ocity = int(sim2.city_id[0, row, 0])
+    dcity = int(sim2.city_id[0, other, 0])
+    sim2.seat_routes[0, row, 0] = torch.tensor([ocity, -1])
+    sim2.seat_route_dseat[0, row, 0] = other
+    sim2.seat_route_dcity[0, row, 0] = dcity
+    sim2.seat_routes[0, other, 0] = torch.tensor([dcity, -1])
+    sim2.seat_route_dseat[0, other, 0] = row
+    sim2.seat_route_dcity[0, other, 0] = ocity
+    stand("TRADE_POLICY", 1, row)
+    sim2._congress_cancel_banned_intl()
+    assert int(sim2.seat_routes[0, row, 0, 0]) == -1, "the banned seat keeps an international leg"
+    assert int(sim2.seat_routes[0, other, 0, 0]) == -1, "a leg TO the banned seat survived"
+    print("  a passed Trade Policy B cancels the legs at both ends")
+
+    # --- 8) THE CULTURE BOMB claims the ring, and refuses a paved tile ------
+    stand("BORDER_CONTROL_TREATY", 0, row)
+    ctr = int(sim2.city_center[0, row, 0])
+    ring = [int(t) for t in sim2.neigh[ctr] if int(t) >= 0]
+    assert len(ring) >= 2, "the centre has no ring on this map"
+    spot, paved = ring[0], ring[1]
+    sim2.district[0, paved] = 0                       # a district is never bombed away
+    sim2.tile_seat[0, paved] = other
+    foreign = [int(t) for t in sim2.neigh[spot] if int(t) >= 0 and int(t) not in (ctr, paved)]
+    assert foreign, "the trigger tile has no free neighbour"
+    sim2.tile_seat[0, foreign[0]] = other
+    sim2.tile_city[0, foreign[0]] = 999
+    rows = torch.tensor([0], dtype=torch.long)
+    sim2._culture_bomb(row, rows, torch.tensor([spot], dtype=torch.long),
+                       torch.zeros(1, dtype=torch.long))
+    assert int(sim2.tile_seat[0, foreign[0]]) == row, "the bomb left a foreign plot alone"
+    assert int(sim2.tile_city[0, foreign[0]]) == int(sim2.city_id[0, row, 0])
+    assert int(sim2.tile_seat[0, paved]) == other, "the bomb took a tile carrying a district"
+    print("  the bomb claims a foreign plot in range and skips a district tile")
+
+    print("CONGRESS VOTE OK — the slate, the override, the curve, both refunds, the DV target, "
+          "the wider slate, the route ban and the culture bomb")
 
 
 if __name__ == "__main__":

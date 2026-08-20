@@ -15,7 +15,7 @@ import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase, suzerainEffect } from './cityStates';
 import { placeSeats, seatPhase, worldCongress, nextCityName } from './phase';
-import { congressUdtBlockedDistrict } from './congress';
+import { congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
 import { commitProduction, commitResearch } from './seatTurn';
 import { seatWonderFlag } from './wonders';
 import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY } from '../data/seats';
@@ -426,7 +426,10 @@ export function goldAffordable(treasury: number, cost: number): boolean {
 export function unitPurchaseCost(state: GameState, unitType: string, seat: number): number {
   const base = unitType === 'BUILDER' ? builderCost(state, seat) : unitType === 'TRADER' ? traderCost(state, seat) : UNITS[unitType]?.cost ?? 0;
   const m = unitType === 'BUILDER' ? monumentalityBuyMult(state, seat) : 1;
-  return base * GOLD_PURCHASE_MULT * m;
+  // Mercenary Companies names a CURRENCY and moves the price of a MILITARY
+  // unit bought with it.
+  const merc = (UNITS[unitType]?.combat ?? 0) > 0 ? congressUnitBuyMult(state, CONGRESS_CUR_GOLD) : 1;
+  return base * GOLD_PURCHASE_MULT * m * merc;
 }
 
 /**

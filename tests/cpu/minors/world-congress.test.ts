@@ -4,8 +4,13 @@ import { seatOf } from '../../../cpu/core/seats';
 import { createGame, endTurn } from '../../../cpu/core/game';
 import { worldCongress } from '../../../cpu/core/phase';
 import { settleFirstCity } from '../helpers';
-import { CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DIPLO_VICTORY_POINTS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION, CONGRESS_HERITAGE } from '../../../cpu/data/seats';
-import { congressGppFactor, congressGrowthMult, congressLoyaltyDelta, congressUdtBlockedDistrict, congressUdtProdDistrict, congressGwMult } from '../../../cpu/core/congress';
+import { CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DIPLO_VICTORY_POINTS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION, CONGRESS_HERITAGE, CONGRESS_MERCENARY, CONGRESS_TRADE_POLICY, CONGRESS_POLICY_TREATY, CONGRESS_IDEOLOGY, CONGRESS_BORDER_CONTROL, CONGRESS_TREATY_ORG, CONGRESS_SOVEREIGNTY, CONGRESS_PUBLIC_WORKS, CONGRESS_RESOLUTIONS, CONGRESS_TARGET_KINDS } from '../../../cpu/data/seats';
+import { congressGppFactor, congressGrowthMult, congressLoyaltyDelta, congressUdtBlockedDistrict, congressUdtProdDistrict, congressGwMult, congressUnitBuyMult, congressTradeGold, congressRouteCapacity, congressIntlBanned, congressPolicyFavor, congressPolicyBlocked, congressWildcardDelta, congressCultureBombSeat, congressBorderFrozen, congressSuzFavorMult, congressCsRouteMult, congressSuzBonusBlocked, congressProjectMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_FAITH } from '../../../cpu/core/congress';
+import { congressCancelBannedIntl } from '../../../cpu/core/trade';
+import { completeQueueItem } from '../../../cpu/core/production';
+import { setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
+import { neighbors } from '../../../world/hex';
+import { isWater } from '../../../world/query';
 import { BUILT_WONDERS } from '../../../cpu/data/builtWonders';
 
 // WORLD CONGRESS. Sourced (Civilopedia GS): the Congress begins
@@ -199,5 +204,146 @@ describe('diplomatic victory', () => {
     seatOf(state, 0)!.diplomaticPoints = DIPLO_VICTORY_POINTS;
     endTurn(state);
     expect(state.victoryType).toBe(5); // culture ranks first
+  });
+});
+
+// The EIGHT resolutions beyond the original slate. Each A/B text is quoted at
+// its catalog row; these pokes hold the reader that consumes it, both faces.
+describe('world congress: the wider slate', () => {
+  it('Mercenary Companies prices military purchases in the named currency', () => {
+    const state = newGame(1);
+    state.congress = [{ res: CONGRESS_MERCENARY, outcome: 0, target: CONGRESS_CUR_GOLD }];
+    expect(congressUnitBuyMult(state, CONGRESS_CUR_GOLD)).toBe(2);
+    expect(congressUnitBuyMult(state, CONGRESS_CUR_FAITH)).toBe(1);
+    state.congress = [{ res: CONGRESS_MERCENARY, outcome: 1, target: CONGRESS_CUR_FAITH }];
+    expect(congressUnitBuyMult(state, CONGRESS_CUR_FAITH)).toBe(0.5);
+    expect(congressUnitBuyMult(state, CONGRESS_CUR_GOLD)).toBe(1);
+  });
+
+  it('Trade Policy pays the sender and widens the target, or ends every international leg', () => {
+    const state = newGame(1);
+    state.congress = [{ res: CONGRESS_TRADE_POLICY, outcome: 0, target: 1 }];
+    expect(congressTradeGold(state, 1)).toBe(4);
+    expect(congressTradeGold(state, 0)).toBe(0);
+    expect(congressRouteCapacity(state, 1)).toBe(1);
+    expect(congressRouteCapacity(state, 0)).toBe(0);
+    expect(congressIntlBanned(state, 1)).toBe(false);
+    state.congress = [{ res: CONGRESS_TRADE_POLICY, outcome: 1, target: 1 }];
+    expect(congressIntlBanned(state, 1)).toBe(true);
+    expect(congressIntlBanned(state, 0)).toBe(false);
+    expect(congressTradeGold(state, 1)).toBe(0);
+  });
+
+  it('a passed Trade Policy B cancels the standing legs at both ends and hands the Traders back', () => {
+    const state = newGame(1);
+    settleFirstCity(state, 1);
+    const a = seatOf(state, 0)!, b = seatOf(state, 1)!;
+    a.tradeRoutes = [{ from: a.cities[0].id, to: -1, toSeat: 1, toSeatCity: b.cities[0].id }];
+    b.tradeRoutes = [{ from: b.cities[0].id, to: -1, toSeat: 0, toSeatCity: a.cities[0].id }];
+    state.congress = [{ res: CONGRESS_TRADE_POLICY, outcome: 1, target: 1 }];
+    congressCancelBannedIntl(state);
+    expect(a.tradeRoutes).toEqual([]);
+    expect(b.tradeRoutes).toEqual([]);
+  });
+
+  it('Policy Treaty pays every holder of the card, or bans it outright', () => {
+    const state = newGame(1);
+    state.congress = [{ res: CONGRESS_POLICY_TREATY, outcome: 0, target: 3 }];
+    expect(congressPolicyFavor(state, [1, 3])).toBe(1);
+    expect(congressPolicyFavor(state, [1, 2])).toBe(0);
+    expect(congressPolicyBlocked(state)).toBe(-1);
+    state.congress = [{ res: CONGRESS_POLICY_TREATY, outcome: 1, target: 3 }];
+    expect(congressPolicyBlocked(state)).toBe(3);
+    expect(congressPolicyFavor(state, [3])).toBe(0);
+  });
+
+  it('World Ideology moves one wildcard slot on the named government only', () => {
+    const state = newGame(1);
+    state.congress = [{ res: CONGRESS_IDEOLOGY, outcome: 0, target: 2 }];
+    expect(congressWildcardDelta(state, 2)).toBe(1);
+    expect(congressWildcardDelta(state, 1)).toBe(0);
+    state.congress = [{ res: CONGRESS_IDEOLOGY, outcome: 1, target: 2 }];
+    expect(congressWildcardDelta(state, 2)).toBe(-1);
+  });
+
+  it('Border Control names one bomber or one frozen seat, never both', () => {
+    const state = newGame(1);
+    state.congress = [{ res: CONGRESS_BORDER_CONTROL, outcome: 0, target: 1 }];
+    expect(congressCultureBombSeat(state)).toBe(1);
+    expect(congressBorderFrozen(state, 1)).toBe(false);
+    state.congress = [{ res: CONGRESS_BORDER_CONTROL, outcome: 1, target: 1 }];
+    expect(congressCultureBombSeat(state)).toBe(-1);
+    expect(congressBorderFrozen(state, 1)).toBe(true);
+    expect(congressBorderFrozen(state, 0)).toBe(false);
+  });
+
+  it('Treaty Organization and Sovereignty key on the city-state TYPE', () => {
+    const state = newGame(1);
+    state.congress = [
+      { res: CONGRESS_TREATY_ORG, outcome: 0, target: 2 },
+      { res: CONGRESS_SOVEREIGNTY, outcome: 0, target: 3 },
+    ];
+    expect(congressSuzFavorMult(state, 2)).toBe(2);
+    expect(congressSuzFavorMult(state, 1)).toBe(1);
+    expect(congressCsRouteMult(state, 3)).toBe(2);
+    expect(congressCsRouteMult(state, 2)).toBe(1);
+    expect(congressSuzBonusBlocked(state, 3)).toBe(false);
+    state.congress = [
+      { res: CONGRESS_TREATY_ORG, outcome: 1, target: 2 },
+      { res: CONGRESS_SOVEREIGNTY, outcome: 1, target: 3 },
+    ];
+    expect(congressSuzFavorMult(state, 2)).toBe(0);
+    expect(congressCsRouteMult(state, 3)).toBe(1);
+    expect(congressSuzBonusBlocked(state, 3)).toBe(true);
+  });
+
+  it('Public Works Program doubles or halves the named project', () => {
+    const state = newGame(1);
+    state.congress = [{ res: CONGRESS_PUBLIC_WORKS, outcome: 0, target: 1 }];
+    expect(congressProjectMult(state, 1)).toBe(2);
+    expect(congressProjectMult(state, 0)).toBe(1);
+    state.congress = [{ res: CONGRESS_PUBLIC_WORKS, outcome: 1, target: 1 }];
+    expect(congressProjectMult(state, 1)).toBe(0.5);
+  });
+
+  it('every resolution names a target space the vote can address', () => {
+    // A target index the tally can produce must be legal for the reader; the
+    // kinds are what size that space, so each one has to be known.
+    for (const r of CONGRESS_RESOLUTIONS) {
+      expect(CONGRESS_TARGET_KINDS).toContain(r.target);
+    }
+  });
+});
+
+describe('the culture bomb', () => {
+  it('claims a neighbour of a new district for the bomber, and skips a district tile', () => {
+    const state = newGame(1);
+    settleFirstCity(state, 1);
+    const city = seatOf(state, 0)!.cities[0];
+    state.congress = [{ res: CONGRESS_BORDER_CONTROL, outcome: 0, target: 0 }];
+    const around = neighbors(state.map, state.map.tiles[city.centerIndex]);
+    const spot = around.find((t) => !isWater(t) && t.index !== city.centerIndex)!;
+    const ring = neighbors(state.map, spot).filter((t) => t.index !== city.centerIndex);
+    const foreign = ring[0];
+    setTileOwner(foreign, 1, 999);       // another seat's plot, inside the blast
+    const paved = ring[1];
+    paved.district = 'CAMPUS';           // a district is never bombed away
+    const pavedOwner = tileSeat(paved);
+    const before = city.tilesAcquired;
+    completeQueueItem(state, city, { kind: 'district', district: 'CAMPUS', tileIndex: spot.index, progress: 0 }, 0);
+    expect(tileSeat(foreign)).toBe(0);
+    expect(tileCity(foreign)).toBe(city.id);
+    expect(tileSeat(paved)).toBe(pavedOwner);
+    expect(city.tilesAcquired).toBeGreaterThan(before);
+  });
+
+  it('does not fire for a seat the resolution did not name', () => {
+    const state = newGame(1);
+    const city = seatOf(state, 0)!.cities[0];
+    state.congress = [{ res: CONGRESS_BORDER_CONTROL, outcome: 0, target: 1 }];
+    const spot = neighbors(state.map, state.map.tiles[city.centerIndex]).find((t) => !isWater(t))!;
+    const foreign = neighbors(state.map, spot).find((t) => tileSeat(t) < 0)!;
+    completeQueueItem(state, city, { kind: 'district', district: 'CAMPUS', tileIndex: spot.index, progress: 0 }, 0);
+    expect(tileSeat(foreign)).toBe(-1);
   });
 });
