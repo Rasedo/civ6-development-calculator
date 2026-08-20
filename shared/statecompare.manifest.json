@@ -1164,6 +1164,19 @@
       "city_artifact_seat"
      ],
      "note": "era and civilization per artifact SLOT \u2014 the theming rule's inputs"
+    },
+    {
+     "name": "gwArtProv",
+     "compare": "exact",
+     "covers": [
+      "City.gwArtType",
+      "City.gwArtArtist"
+     ],
+     "planes": [
+      "city_gwart_type",
+      "city_gwart_artist"
+     ],
+     "note": "art TYPE and the ARTIST who made it, per ART MUSEUM slot \u2014 the other theming rule's inputs"
     }
    ]
   },

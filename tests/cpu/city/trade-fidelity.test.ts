@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { cityStateOfSeat, emptySeat, isCityStateSeat, setTileOwner, tileSeat } from '../../../cpu/core/seats';
+import { cityStateOfSeat, emptySeat, isCityStateSeat, seatOf, setTileOwner, tileSeat } from '../../../cpu/core/seats';
 import { settleAt, makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { tilesWithin } from '../../../world/hex';
-import { canAddTradeRoute, freeTrader, tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, specialtyDistricts, TRADE_ROUTE_DURATION, INTL_ROUTE_GOLD } from '../../../cpu/core/trade';
+import { canAddTradeRoute, freeTrader, tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, specialtyDistricts, cityMaritime, tradeRouteRange, TRADE_ROUTE_DURATION, TRADE_ROUTE_RANGE_LAND, TRADE_ROUTE_RANGE_SEA, INTL_ROUTE_GOLD } from '../../../cpu/core/trade';
+import { tradeWalkReachable, tradeWaterLevel, TRADE_WATER_NONE, TRADE_WATER_COAST } from '../../../cpu/core/units';
+import { isWater } from '../../../world/query';
+import { hexDistance } from '../../../world/hex';
 import { declareWar, seatPhase } from '../../../cpu/core/phase';
 import { routeCandidateRow } from '../../../cpu/driver/driver';
 import { spawnUnit, trainableUnits, traderCost } from '../../../cpu/core/units';
@@ -251,5 +254,87 @@ describe('the Trader unit', () => {
     for (const id of Object.keys(TECHS).slice(0, Math.ceil(nT / 2))) state.seats[0].research.techs.push(id);
     const p = Math.floor(100 * (state.seats[0].research.techs.length / nT)) / 100;
     expect(traderCost(state, 0)).toBe(Math.round(UNITS.TRADER.cost * (1 + 4 * p)));
+  });
+
+  // CIV6: "The base range for land trade routes is 15 tiles ... The base range
+  // for sea trade routes is 30 tiles", and "both the origin city and the
+  // destination city require maritime access ... in order to establish sea
+  // Trade Routes".
+  it('a sea route reaches twice as far, and only with maritime access at both ends', () => {
+    const state = makeState(makeMap(40, 12));
+    state.sandbox = true;
+    const origin = foundCity(state, tileAtCoords(state.map, 2, 6).index, 0).city!;
+    const far = foundCity(state, tileAtCoords(state.map, 24, 6).index, 0).city!;
+    origin.buildings.push('MARKET');
+    const d = hexDistance(
+      state.map.tiles[origin.centerIndex].col, state.map.tiles[origin.centerIndex].row,
+      state.map.tiles[far.centerIndex].col, state.map.tiles[far.centerIndex].row,
+    );
+    expect(d).toBeGreaterThan(TRADE_ROUTE_RANGE_LAND);
+    expect(d).toBeLessThanOrEqual(TRADE_ROUTE_RANGE_SEA);
+    expect(canAddTradeRoute(state, origin.id, far.id, 0).ok).toBe(false);
+
+    // give both centres a coastal neighbour...
+    tileAtCoords(state.map, 2, 5).terrain = 'COAST';
+    tileAtCoords(state.map, 24, 5).terrain = 'COAST';
+    expect(cityMaritime(state, origin.centerIndex, origin)).toBe(true);
+    expect(cityMaritime(state, far.centerIndex, far)).toBe(true);
+    // ...which is still not enough without Celestial Navigation
+    expect(canAddTradeRoute(state, origin.id, far.id, 0).ok).toBe(false);
+    seatOf(state, 0)!.research.techs.push('CELESTIAL_NAVIGATION');
+    expect(tradeRouteRange(state, 0, origin.centerIndex, far.centerIndex, origin, far))
+      .toBe(TRADE_ROUTE_RANGE_SEA);
+    expect(canAddTradeRoute(state, origin.id, far.id, 0).ok).toBe(true);
+
+    // a HARBOR gives the access a landlocked centre lacks
+    const inland = foundCity(state, tileAtCoords(state.map, 12, 9).index, 0).city!;
+    expect(cityMaritime(state, inland.centerIndex, inland)).toBe(false);
+    const ht = tileAtCoords(state.map, 12, 8);
+    ht.district = 'HARBOR';
+    ht.districtComplete = true;
+    inland.districts.push({ type: 'HARBOR', tileIndex: ht.index });
+    expect(cityMaritime(state, inland.centerIndex, inland)).toBe(true);
+  });
+
+  it('a Trader embarks the sea leg and lays no road on water', () => {
+    const state = makeState(makeMap(20, 8));
+    state.sandbox = true;
+    state.unitsMode = true;
+    // a one-tile channel splits the map; only a sea leg crosses it
+    for (let r = 0; r < 8; r++) tileAtCoords(state.map, 9, r).terrain = 'COAST';
+    const origin = foundCity(state, tileAtCoords(state.map, 4, 4).index, 0).city!;
+    const across = foundCity(state, tileAtCoords(state.map, 14, 4).index, 0).city!;
+    origin.buildings.push('MARKET');
+    const s = seatOf(state, 0)!;
+    spawnUnit(state, 'TRADER', origin.centerIndex, 0);
+
+    // WITHOUT Celestial Navigation the descent stops at the water and the
+    // Trader parks at the origin.
+    expect(tradeWalkReachable(state, origin.centerIndex, across.centerIndex, TRADE_WATER_NONE)).toBe(false);
+    expect(addTradeRoute(state, origin.id, across.id, 0).ok).toBe(true);
+    expect(s.tradeRoutes![0].walkLeg).toBe(-1);
+
+    // WITH it, the same pair walks.
+    s.tradeRoutes = [];
+    s.research.techs.push('CELESTIAL_NAVIGATION');
+    expect(tradeWaterLevel(state, 0)).toBe(TRADE_WATER_COAST);
+    expect(tradeWalkReachable(state, origin.centerIndex, across.centerIndex, TRADE_WATER_COAST)).toBe(true);
+    spawnUnit(state, 'TRADER', origin.centerIndex, 0);
+    expect(addTradeRoute(state, origin.id, across.id, 0).ok).toBe(true);
+    const route = s.tradeRoutes![0];
+    expect(route.walkLeg).toBe(0);
+
+    // walk it across the channel: the water tile it stands on takes NO road
+    let onWater = false;
+    for (let i = 0; i < 20 && route.walkTile !== across.centerIndex; i++) {
+      seatPhase(state);
+      const t = state.map.tiles[route.walkTile!];
+      if (isWater(t)) {
+        onWater = true;
+        expect(t.road).toBeFalsy();
+      }
+    }
+    expect(onWater).toBe(true);
+    expect(route.walkTile).toBe(across.centerIndex);
   });
 });

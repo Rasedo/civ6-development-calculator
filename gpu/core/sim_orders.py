@@ -505,6 +505,10 @@ class SimOrders:
             self.city_gw_music[b, row, col] = 0
             self.city_relics[b, row, col] = 0
             self.city_artifacts[b, row, col] = 0
+            self.city_artifact_era[b, row, col, :] = -1
+            self.city_artifact_seat[b, row, col, :] = -1
+            self.city_gwart_type[b, row, col, :] = -1
+            self.city_gwart_artist[b, row, col, :] = -1
             self.city_dist_tile[b, row, col, :] = -1
             self.city_wonder[b, row, col, :] = -1
             self.city_bldg[b, row, col, :] = False

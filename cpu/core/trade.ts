@@ -7,7 +7,8 @@
 import { addYields, emptyYields, type City, type CityState, type GameState, type Seat, type TradeRoute, type Unit, type Yields } from './types';
 import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar } from './seats';
 import { hexDistance } from '../../world/hex';
-import { tradeLandReachable, disbandUnit, spawnUnit, TRADE_ROAD_MAX_STEPS } from './units';
+import { isCoastalLand, isWater } from '../../world/query';
+import { tradeWalkReachable, tradeWaterLevel, disbandUnit, spawnUnit, TRADE_ROAD_MAX_STEPS } from './units';
 import { civEraIndex } from './city';
 import { DISTRICTS } from '../data/districts';
 import { cityStateTradeCapacityBonus, hasMet, suzerainEffect } from './cityStates';
@@ -18,7 +19,43 @@ import type { RuleResult } from './rules';
 import { goldenDedication } from './eras';
 import { DED_COINAGE, COINAGE_INTL_GOLD_PER_SPEC } from '../data/seats';
 
-export const TRADE_ROUTE_RANGE = 15;
+/**
+ * CIV6: "The base range for land trade routes is 15 tiles ... The base range
+ * for sea trade routes is 30 tiles." A route counts as a sea route when BOTH
+ * ends have maritime access and the seat can put a Trader on the water —
+ * "both the origin city and the destination city require maritime access ...
+ * in order to establish sea Trade Routes". Range is not extendable by
+ * technology in Civ 6; only Trading Posts extend it, and there are none here.
+ */
+export const TRADE_ROUTE_RANGE_LAND = 15;
+export const TRADE_ROUTE_RANGE_SEA = 30;
+
+/**
+ * CIV6: "Cities with maritime access are those that are adjacent to a body of
+ * water connected to the sea, or that have a Harbor on such a body."
+ */
+export function cityMaritime(state: GameState, centerIndex: number, city?: City): boolean {
+  const centre = state.map.tiles[centerIndex];
+  if (centre && isCoastalLand(state.map, centre)) return true;
+  return (city?.districts ?? []).some(
+    (d) => d.type === 'HARBOR' && state.map.tiles[d.tileIndex]?.districtComplete,
+  );
+}
+
+/** The range this origin/destination pair may span. */
+export function tradeRouteRange(
+  state: GameState,
+  seat: number,
+  originCenter: number,
+  destCenter: number,
+  origin?: City,
+  dest?: City,
+): number {
+  if (tradeWaterLevel(state, seat) === 0) return TRADE_ROUTE_RANGE_LAND;
+  return cityMaritime(state, originCenter, origin) && cityMaritime(state, destCenter, dest)
+    ? TRADE_ROUTE_RANGE_SEA
+    : TRADE_ROUTE_RANGE_LAND;
+}
 
 export const TRADE_ROUTE_DURATION = 20;
 
@@ -228,8 +265,9 @@ export function canAddTradeRoute(state: GameState, from: number, to: number, sea
   }
   const ta = state.map.tiles[a.centerIndex];
   const tb = state.map.tiles[b.centerIndex];
-  if (hexDistance(ta.col, ta.row, tb.col, tb.row) > TRADE_ROUTE_RANGE) {
-    return { ok: false, reason: `Beyond trade range (${TRADE_ROUTE_RANGE} tiles).` };
+  const rng = tradeRouteRange(state, seat, a.centerIndex, b.centerIndex, a, b);
+  if (hexDistance(ta.col, ta.row, tb.col, tb.row) > rng) {
+    return { ok: false, reason: `Beyond trade range (${rng} tiles).` };
   }
   return { ok: true };
 }
@@ -257,10 +295,14 @@ function commitRoute(state: GameState, seat: number, originCenter: number, destC
   route.expiresTurn = state.turn + tradeRouteMinDuration(state);
   route.createdTurn = state.turn;
   route.walkTile = originCenter;
-  const land = tradeLandReachable(state, originCenter, destCenter);
-  route.walkLeg = land ? 0 : -1;
-  // the walker lays road on every tile it stands on; the origin is turn 0
-  if (land) state.map.tiles[originCenter].road = true;
+  // The walk runs at the seat's own water level: a pure land descent when it
+  // has no Celestial Navigation, sea legs when it has. Only a pair NO descent
+  // reaches parks its Trader at the origin.
+  const water = tradeWaterLevel(state, seat);
+  const walks = tradeWalkReachable(state, originCenter, destCenter, water);
+  route.walkLeg = walks ? 0 : -1;
+  // the walker lays road on every LAND tile it stands on; the origin is turn 0
+  if (walks && !isWater(state.map.tiles[originCenter])) state.map.tiles[originCenter].road = true;
   (seatOf(state, seat)!.tradeRoutes ??= []).push(route);
 }
 
@@ -281,8 +323,9 @@ export function canAddCsTradeRoute(state: GameState, from: number, cityStateId: 
   }
   const ta = state.map.tiles[a.centerIndex];
   const tb = state.map.tiles[cityState.centerIndex];
-  if (hexDistance(ta.col, ta.row, tb.col, tb.row) > TRADE_ROUTE_RANGE) {
-    return { ok: false, reason: `Beyond trade range (${TRADE_ROUTE_RANGE} tiles).` };
+  const rng = tradeRouteRange(state, seat, a.centerIndex, cityState.centerIndex, a);
+  if (hexDistance(ta.col, ta.row, tb.col, tb.row) > rng) {
+    return { ok: false, reason: `Beyond trade range (${rng} tiles).` };
   }
   return { ok: true };
 }
@@ -316,8 +359,9 @@ export function canAddIntlTradeRoute(state: GameState, from: number, toSeat: num
   }
   const ta = state.map.tiles[a.centerIndex];
   const tb = state.map.tiles[civCity.centerIndex];
-  if (hexDistance(ta.col, ta.row, tb.col, tb.row) > TRADE_ROUTE_RANGE) {
-    return { ok: false, reason: `Beyond trade range (${TRADE_ROUTE_RANGE} tiles).` };
+  const rng = tradeRouteRange(state, seat, a.centerIndex, civCity.centerIndex, a, civCity);
+  if (hexDistance(ta.col, ta.row, tb.col, tb.row) > rng) {
+    return { ok: false, reason: `Beyond trade range (${rng} tiles).` };
   }
   return { ok: true };
 }

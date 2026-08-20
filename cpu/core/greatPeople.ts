@@ -66,7 +66,7 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
           n + (state.map.tiles[w.tileIndex].builtWonderComplete ? (GW_WONDER_SLOTS[w.id]?.[kind] ?? 0) : 0),
         0,
       );
-    const overflow = placeGreatWorks(cities, kind, wonderSlots);
+    const overflow = placeGreatWorks(cities, kind, wonderSlots, greatPeopleEarned(state, cls));
     if (fx.culture) owner.research.civicProgress += fx.culture * overflow;
   } else if (fx.culture) {
     owner.research.civicProgress += fx.culture;

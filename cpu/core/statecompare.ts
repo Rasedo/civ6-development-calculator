@@ -53,7 +53,7 @@ import { CIVICS } from '../data/civics';
 import { UNITS } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { ARTIFACT_SLOTS, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
+import { ARTIFACT_SLOTS, GW_SLOTS, GW_ART, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, LEVY_COOLDOWN } from '../data/cityStates';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS } from '../data/religion';
 
@@ -490,6 +490,14 @@ const CITY: Record<string, Extractor> = {
     const seats = r.city.artifactSeats ?? [];
     const out: number[] = [];
     for (let i = 0; i < ARTIFACT_SLOTS; i++) out.push(eras[i] ?? -1, seats[i] ?? -1);
+    return out;
+  }),
+  // the ART MUSEUM's provenance, slot by slot — the other theming rule.
+  gwArtProv: overCities((r) => {
+    const types = r.city.gwArtType ?? [];
+    const artists = r.city.gwArtArtist ?? [];
+    const out: number[] = [];
+    for (let i = 0; i < GW_SLOTS[GW_ART]; i++) out.push(types[i] ?? -1, artists[i] ?? -1);
     return out;
   }),
 };

@@ -646,7 +646,7 @@ class SimPhase:
         self.civ_tech_prog[:, row] = torch.where(no_t, torch.minimum(self.civ_tech_prog[:, row], torch.zeros_like(self.civ_tech_prog[:, row])), self.civ_tech_prog[:, row])
         bank(self.civ_tourism, self._tourism_of(
             self.city_gw_writing[:, row],
-            self.city_gw_art[:, row],
+            self.city_gw_art[:, row] + self._art_themed_works(row),
             self.city_gw_music[:, row],
             self.city_alive[:, row],
             self.tile_seat == row,
@@ -743,7 +743,7 @@ class SimPhase:
                 self.civ_tech_prog[:, row] = self.civ_tech_prog[:, row] + eff[:, 0].double() * hf
                 _kind = self._gw_cls.index(cls) if cls in self._gw_cls else -1
                 if _kind >= 0:
-                    self._place_works(row, hit, eff[:, 1].double(), _kind)
+                    self._place_works(row, hit, eff[:, 1].double(), _kind, earned_c)
                 else:
                     self.civ_civic_prog[:, row] = self.civ_civic_prog[:, row] + eff[:, 1].double() * hf
                 self.civ_treasury[:, row] = self.civ_treasury[:, row] + eff[:, 2].double() * hf

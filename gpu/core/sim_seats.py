@@ -2452,6 +2452,10 @@ class SimSeats:
         self.city_gw_music[b, row, col] = 0
         self.city_relics[b, row, col] = 0
         self.city_artifacts[b, row, col] = 0
+        self.city_artifact_era[b, row, col, :] = -1
+        self.city_artifact_seat[b, row, col, :] = -1
+        self.city_gwart_type[b, row, col, :] = -1
+        self.city_gwart_artist[b, row, col, :] = -1
         self.city_dist_tile[b, row, col, :] = -1
         self.city_wonder[b, row, col, :] = -1
         self.city_bldg[b, row, col, :] = False
@@ -2516,6 +2520,8 @@ class SimSeats:
         old_gwm = int(self.city_gw_music[b, src_row, src_col])
         old_rel = int(self.city_relics[b, src_row, src_col])
         old_art = int(self.city_artifacts[b, src_row, src_col])
+        old_prov = [getattr(self, _p)[b, src_row, src_col, :].clone() for _p in
+                    ("city_artifact_era", "city_artifact_seat", "city_gwart_type", "city_gwart_artist")]
         old_bldg = self.city_bldg[b, src_row, src_col, :].clone()
         # RELIGION TRAVELS WITH THE CITY (TS copies religionPressure and
         # followedReligion into the flipped literal). Both planes are slot
@@ -2575,6 +2581,9 @@ class SimSeats:
         self.city_gw_music[b, dst_row, col] = old_gwm
         self.city_relics[b, dst_row, col] = old_rel
         self.city_artifacts[b, dst_row, col] = old_art
+        for _p, _v in zip(("city_artifact_era", "city_artifact_seat",
+                           "city_gwart_type", "city_gwart_artist"), old_prov):
+            getattr(self, _p)[b, dst_row, col, :] = _v
         self.city_bldg[b, dst_row, col, :] = old_bldg
         self.city_followed[b, dst_row, col] = old_fol
         self.city_pressure[b, dst_row, col, :] = old_pres
@@ -2785,6 +2794,10 @@ class SimSeats:
         self.city_gw_music[rows, row, slot] = 0
         self.city_relics[rows, row, slot] = 0
         self.city_artifacts[rows, row, slot] = 0
+        self.city_artifact_era[rows, row, slot, :] = -1
+        self.city_artifact_seat[rows, row, slot, :] = -1
+        self.city_gwart_type[rows, row, slot, :] = -1
+        self.city_gwart_artist[rows, row, slot, :] = -1
         self.city_loyalty[rows, row, slot] = 100.0
         self.city_acquired[rows, row, slot] = 0
         self.city_hp[rows, row, slot] = self.rules.combat.get("cityMaxHp", 200)
@@ -4212,6 +4225,28 @@ class SimSeats:
                 want_camp, camp_nearest,
                 torch.where(issued, torch.full_like(cur2, -1), self.seat_citystate_quest_camp[:, row, :S]))
 
+    def _city_maritime(self, row: int) -> torch.Tensor:
+        """[B, RC] bool — `cityMaritime`. CIV6: "Cities with maritime access are
+        those that are adjacent to a body of water connected to the sea, or that
+        have a Harbor on such a body."
+        """
+        ctr = self.city_center[:, row].clamp(min=0)
+        out = self.coastal_land.gather(1, ctr)
+        if self._harbor_didx >= 0:
+            ht = self.city_dist_tile[:, row, :, self._harbor_didx]
+            out = out | ((ht >= 0) & self.district_complete.gather(1, ht.clamp(min=0)))
+        return out & self.city_alive[:, row]
+
+    def _trade_pair_range(self, row: int, mar_o: torch.Tensor, mar_d: torch.Tensor) -> torch.Tensor:
+        """`tradeRouteRange` — 30 tiles when BOTH ends have maritime access and
+        the seat can put a Trader on the water, else 15. `mar_o`/`mar_d`
+        broadcast to the caller's pair shape."""
+        sea = (self._trade_water_level(row) > 0) if row < self.n_majors else torch.zeros(
+            self.B, dtype=torch.bool, device=self.device)
+        wide = sea.reshape((-1,) + (1,) * (max(mar_o.dim(), mar_d.dim()) - 1)) & mar_o & mar_d
+        return torch.where(wide, torch.full_like(wide, self._trade_sea_range, dtype=torch.long),
+                           torch.full_like(wide, self._trade_range, dtype=torch.long))
+
     def _seat_trade_phase(self, row: int, active: torch.Tensor) -> None:
         """The seatPhase trade block, for EVERY seat row: the WALK and PLUNDER
         engine rules, then the wire's route intent (the DECISION lives with
@@ -4339,9 +4374,11 @@ class SimSeats:
                 cur = self.seat_route_walk[bb, row, kk]
                 lg = leg[bb, kk]
                 tgt = torch.where(lg == 0, dc[bb, kk], oc[bb, kk])
-                nxt = self._trade_walk_step(bb, cur, tgt)
+                wl = self._trade_water_level(row)[bb] if row < self.n_majors else torch.zeros_like(cur)
+                nxt = self._trade_walk_step(bb, cur, tgt, wl)
                 self.seat_route_walk[bb, row, kk] = nxt
-                moved = nxt != cur
+                # roads go on LAND only — a sea leg lays nothing
+                moved = (nxt != cur) & self.passable[bb, nxt.clamp(min=0)]
                 if bool(moved.any()):
                     self.road[bb[moved], nxt[moved]] = True
                 new_leg = torch.where((lg == 0) & (nxt == dc[bb, kk]), torch.ones_like(lg),
@@ -4421,7 +4458,8 @@ class SimSeats:
             return
         o_id = ids.gather(1, o_j.unsqueeze(1)).squeeze(1)
         o_ct = centers.gather(1, o_j.unsqueeze(1)).squeeze(1)
-        rng = self._trade_range
+        mar = self._city_maritime(row)
+        mar_o = mar.gather(1, o_j.unsqueeze(1)).squeeze(1)
         d = self.pair_dist[o_ct.clamp(min=0), dst.clamp(min=0)].to(torch.long)
         to_code = torch.full((B,), -1, dtype=torch.long, device=dev)
         dseat = torch.full((B,), -1, dtype=torch.long, device=dev)
@@ -4435,7 +4473,7 @@ class SimSeats:
             d_j = dm.long().argmax(dim=1)
             d_id = ids.gather(1, d_j.unsqueeze(1)).squeeze(1)
             dup = ((rr[:, :, 0] == o_id.unsqueeze(1)) & (rr[:, :, 1] == d_id.unsqueeze(1))).any(dim=1)
-            dom = dom & ~dup & (d <= rng)
+            dom = dom & ~dup & (d <= self._trade_pair_range(row, mar_o, mar.gather(1, d_j.unsqueeze(1)).squeeze(1)))
             to_code = torch.where(dom, d_id, to_code)
             dest_ct = torch.where(dom, dst, dest_ct)
             take = take | dom
@@ -4446,7 +4484,8 @@ class SimSeats:
             csc = self.citystate_center[:, :S].gather(1, csi.unsqueeze(1)).squeeze(1)
             d_cs = self.pair_dist[o_ct.clamp(min=0), csc.clamp(min=0)].to(torch.long)
             dupc = ((rr[:, :, 0] == o_id.unsqueeze(1)) & (rr[:, :, 1] == dst.unsqueeze(1))).any(dim=1)
-            cs_ok = ok & (dst <= -2) & ((-(dst + 2)) < S) & met & ~dupc & (d_cs <= rng)
+            mar_cs = self.coastal_land.gather(1, csc.clamp(min=0).unsqueeze(1)).squeeze(1)
+            cs_ok = ok & (dst <= -2) & ((-(dst + 2)) < S) & met & ~dupc & (d_cs <= self._trade_pair_range(row, mar_o, mar_cs))
             to_code = torch.where(cs_ok, dst, to_code)
             dest_ct = torch.where(cs_ok, csc, dest_ct)
             take = take | cs_ok
@@ -4467,7 +4506,8 @@ class SimSeats:
                     & (self.seat_route_dseat[:, row] == r2)
                     & (self.seat_route_dcity[:, row] == id2.unsqueeze(1))
                 ).any(dim=1)
-                hit2 = hit2 & ~dupi & (d <= rng)
+                mar2 = self._city_maritime(r2).gather(1, j2.unsqueeze(1)).squeeze(1)
+                hit2 = hit2 & ~dupi & (d <= self._trade_pair_range(row, mar_o, mar2))
                 dseat = torch.where(hit2, torch.full_like(dseat, r2), dseat)
                 dcity = torch.where(hit2, id2, dcity)
                 dest_ct = torch.where(hit2, dst, dest_ct)
@@ -4485,12 +4525,16 @@ class SimSeats:
         self.seat_route_exp[rows, row, slot] = int(self.turn) + md[rows]
         self.seat_route_born[rows, row, slot] = int(self.turn)
         self.seat_route_walk[rows, row, slot] = o_ct[rows]
-        land = self._trade_land_ok(rows, o_ct[rows], dest_ct[rows])
-        self.seat_route_leg[rows, row, slot] = torch.where(land, torch.zeros_like(slot), torch.full_like(slot, -1))
-        lr = rows[land]
+        # The walk runs at the seat's own water level: a pure land descent
+        # without Celestial Navigation, sea legs with it. Only a pair NO descent
+        # reaches parks its Trader at the origin.
+        wl = self._trade_water_level(row)[rows]
+        walks = self._trade_walk_ok(rows, o_ct[rows], dest_ct[rows], wl)
+        self.seat_route_leg[rows, row, slot] = torch.where(walks, torch.zeros_like(slot), torch.full_like(slot, -1))
+        lr = rows[walks & self.passable[rows, o_ct[rows]]]
         if len(lr) > 0:
-            # the walker lays road on every tile it stands on; the origin is turn 0
-            self.road[lr, o_ct[rows][land]] = True
+            # the walker lays road on every LAND tile it stands on; the origin is turn 0
+            self.road[lr, o_ct[lr]] = True
         # SPEND the Trader
         self.major_unit_alive[rows, t_slot[rows]] = False
         self.civilian_at[rows, t_tile[rows]] = -1
@@ -4556,11 +4600,12 @@ class SimSeats:
             & (rr[:, :, 1].reshape(B, 1, 1, -1) == ids.reshape(B, 1, RC, 1))
         ).any(dim=3)
         eye = torch.eye(RC, dtype=torch.bool, device=dev).reshape(1, RC, RC)
+        mar = self._city_maritime(row)  # [B, RC]
         valid = (
             alive.unsqueeze(2)
             & alive.unsqueeze(1)
             & ~eye
-            & (d <= self._trade_range)
+            & (d <= self._trade_pair_range(row, mar.unsqueeze(2), mar.unsqueeze(1)))
             & ~exists
             & want.reshape(B, 1, 1)
         )
@@ -4583,7 +4628,9 @@ class SimSeats:
             valid_cs = (
                 alive.unsqueeze(2)
                 & (self.seat_citystate_met[:, row, :S] & self.citystate_alive[:, :S]).unsqueeze(1)
-                & (d_cs <= self._trade_range)
+                & (d_cs <= self._trade_pair_range(
+                    row, mar.unsqueeze(2),
+                    self.coastal_land.gather(1, csc).unsqueeze(1)))
                 & ~exists_cs
                 & want.reshape(B, 1, 1)
             )
@@ -4607,7 +4654,7 @@ class SimSeats:
         # EXPLORED, NEAREST first (ties keep from-asc, then the block-row scan
         # order, which IS `state.seats` order).
         intl_want = want & (kmax < 0)
-        dctr_l, dalv_l, did_l, drow_l = [], [], [], []
+        dctr_l, dalv_l, did_l, drow_l, dmar_l = [], [], [], [], []
         for r2 in range(self.n_majors):
             if r2 == row:
                 continue
@@ -4615,11 +4662,13 @@ class SimSeats:
             dalv_l.append(self.city_alive[:, r2])
             did_l.append(self.city_id[:, r2])
             drow_l.append(torch.full_like(self.city_id[:, r2], r2))
+            dmar_l.append(self._city_maritime(r2))
         if bool(intl_want.any()) and dctr_l:
             dctr = torch.cat(dctr_l, dim=1)  # [B, D] dest centre tiles
             dalv = torch.cat(dalv_l, dim=1)  # [B, D]
             did = torch.cat(did_l, dim=1)    # [B, D] dest city id
             drow = torch.cat(drow_l, dim=1)  # [B, D] dest seat row
+            dmar = torch.cat(dmar_l, dim=1)  # [B, D] dest maritime access
             D = dctr.shape[1]
             d_ip = self.pair_dist[centers.unsqueeze(2), dctr.unsqueeze(1)]  # [B, RC, D]
             rds = self.seat_route_dseat[:, row]  # [B, K]
@@ -4638,7 +4687,7 @@ class SimSeats:
                 alive.unsqueeze(2)
                 & dalv.unsqueeze(1)
                 & self._explored_at(row, dctr).unsqueeze(1)
-                & (d_ip <= self._trade_range)
+                & (d_ip <= self._trade_pair_range(row, mar.unsqueeze(2), dmar.unsqueeze(1)))
                 & ~exists_ip
                 & intl_want.reshape(B, 1, 1)
             )

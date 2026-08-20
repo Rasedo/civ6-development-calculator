@@ -136,7 +136,30 @@ export function riverCharge(state: GameState, from: Tile, to: Tile): number {
  * construction. Returns `fromIndex` unchanged when arrived or stuck (no
  * strictly-closer passable neighbour). Zero draws, integer-only.
  */
-export function tradeWalkStep(state: GameState, fromIndex: number, targetIndex: number): number {
+/**
+ * How far out to sea a seat's Traders may go. CIV6: "The Celestial Navigation
+ * technology is required to move on Coast tiles. The Cartography technology is
+ * required to move on Ocean tiles." A seat with neither keeps to the land.
+ */
+export const TRADE_WATER_NONE = 0;
+export const TRADE_WATER_COAST = 1;
+export const TRADE_WATER_OCEAN = 2;
+
+export function tradeWaterLevel(state: GameState, seat: number): number {
+  const techs = seatOf(state, seat)?.research.techs;
+  if (!techs?.includes('CELESTIAL_NAVIGATION')) return TRADE_WATER_NONE;
+  return techs.includes('CARTOGRAPHY') ? TRADE_WATER_OCEAN : TRADE_WATER_COAST;
+}
+
+/** May a Trader at this water level stand here? */
+export function tradeWalkable(tile: Tile, water: number): boolean {
+  if (isImpassable(tile)) return false;
+  if (!isWater(tile)) return true;
+  if (water < TRADE_WATER_COAST) return false;
+  return tile.terrain !== 'OCEAN' || water >= TRADE_WATER_OCEAN;
+}
+
+export function tradeWalkStep(state: GameState, fromIndex: number, targetIndex: number, water: number): number {
   const map = state.map;
   const dest = map.tiles[targetIndex];
   const at = map.tiles[fromIndex];
@@ -144,7 +167,7 @@ export function tradeWalkStep(state: GameState, fromIndex: number, targetIndex: 
   let best: Tile | undefined;
   let bestD = hexDistance(at.col, at.row, dest.col, dest.row);
   for (const n of neighbors(map, at)) {
-    if (isWater(n) || isImpassable(n)) continue;
+    if (!tradeWalkable(n, water)) continue;
     const d = hexDistance(n.col, n.row, dest.col, dest.row);
     if (d < bestD) {
       bestD = d;
@@ -155,19 +178,21 @@ export function tradeWalkStep(state: GameState, fromIndex: number, targetIndex: 
 }
 
 /**
- * Can a Trader WALK from `fromIndex` to `toIndex` over land? A route whose
- * descent needs a water or impassable tile is a SEA route: its walker parks
- * at the origin and lays no roads (real Civ 6 lays roads only on land legs).
+ * Can a Trader descend from `fromIndex` to `toIndex` at this water level?
+ * CIV6: "the route may start in an inland city, then go to a coastal city ...
+ * move over sea to another city with a Harbor, then continue on land" — one
+ * descent walks both modes, and only a pair no descent reaches leaves its
+ * Trader parked at the origin.
  */
-export function tradeLandReachable(state: GameState, fromIndex: number, toIndex: number): boolean {
+export function tradeWalkReachable(state: GameState, fromIndex: number, toIndex: number, water: number): boolean {
   const map = state.map;
   const dest = map.tiles[toIndex];
   const start = map.tiles[fromIndex];
-  if (!dest || isWater(dest) || isImpassable(dest)) return false;
-  if (!start || isWater(start) || isImpassable(start)) return false;
+  if (!dest || !start) return false;
+  if (isImpassable(dest) || isImpassable(start)) return false;
   let at = fromIndex;
   for (let step = 0; step < TRADE_ROAD_MAX_STEPS && at !== toIndex; step++) {
-    const next = tradeWalkStep(state, at, toIndex);
+    const next = tradeWalkStep(state, at, toIndex, water);
     if (next === at) return false;
     at = next;
   }

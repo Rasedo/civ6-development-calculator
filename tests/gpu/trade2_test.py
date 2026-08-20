@@ -183,7 +183,8 @@ def main() -> None:
     s5 = settle_all(BatchSim([load_fixture(paths[7])], rules, device="cpu", dtype=torch.float64))
     o_t = int(s5.city_center[0, 1, 0])
     d_t = int(s5.city_center[0, 0, 0])
-    land = bool(s5._trade_land_ok(torch.tensor([0]), torch.tensor([o_t]), torch.tensor([d_t]))[0])
+    land = bool(s5._trade_walk_ok(torch.tensor([0]), torch.tensor([o_t]), torch.tensor([d_t]),
+                                  torch.zeros(1, dtype=torch.long))[0])
     assert land, "paths[7] must give a land capital pair — did the fixture set change?"
     if land:
         s5.seat_routes[0, 1, 0, 0] = int(s5.city_id[0, 1, 0])
@@ -259,9 +260,78 @@ def main() -> None:
     assert tr7 == 0, "the applied route must SPEND the Trader"
     print("candidate + apply ok")
 
+    # --- SEA LEGS: the water level, the two ranges, and roads on land only --
+    # CIV6: "The base range for land trade routes is 15 tiles ... The base range
+    # for sea trade routes is 30 tiles"; Celestial Navigation opens Coast and
+    # Cartography opens Ocean.
+    s8 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    assert s8._trade_sea_range == 2 * s8._trade_range, (s8._trade_sea_range, s8._trade_range)
+    assert s8._celestial_tech >= 0 and s8._cartography_tech >= 0
+    row = 0
+    s8.civ_techs[:, row, s8._celestial_tech] = False
+    s8.civ_techs[:, row, s8._cartography_tech] = False
+    assert int(s8._trade_water_level(row)[0]) == 0
+    s8.civ_techs[:, row, s8._celestial_tech] = True
+    assert int(s8._trade_water_level(row)[0]) == 1
+    s8.civ_techs[:, row, s8._cartography_tech] = True
+    assert int(s8._trade_water_level(row)[0]) == 2
+
+    # a WATER tile is walkable only from level 1, and an OCEAN one from 2
+    water = [t for t in range(s8.T) if bool(s8.wpass[0, t]) and not bool(s8.ocean_tile[0, t])]
+    ocean = [t for t in range(s8.T) if bool(s8.ocean_tile[0, t]) and bool(s8.wpass[0, t])]
+    assert water, "fixture has no shallow water"
+    r1 = torch.zeros(1, dtype=torch.long)
+    for lvl, want in ((0, False), (1, True), (2, True)):
+        got = bool(s8._trade_walkable(r1, torch.tensor([water[0]]), torch.tensor([lvl]))[0])
+        assert got == want, f"shallow water at level {lvl}: {got}"
+    if ocean:
+        for lvl, want in ((1, False), (2, True)):
+            got = bool(s8._trade_walkable(r1, torch.tensor([ocean[0]]), torch.tensor([lvl]))[0])
+            assert got == want, f"ocean at level {lvl}: {got}"
+
+    # MARITIME ACCESS decides which range a pair gets
+    mar = s8._city_maritime(row)
+    yes = torch.ones(s8.B, dtype=torch.bool)
+    no = torch.zeros(s8.B, dtype=torch.bool)
+    assert int(s8._trade_pair_range(row, yes, yes)[0]) == s8._trade_sea_range
+    assert int(s8._trade_pair_range(row, yes, no)[0]) == s8._trade_range
+    s8.civ_techs[:, row, s8._celestial_tech] = False
+    assert int(s8._trade_pair_range(row, yes, yes)[0]) == s8._trade_range,         "no Celestial Navigation, no sea range"
+    s8.civ_techs[:, row, s8._celestial_tech] = True
+    # a HARBOR gives a landlocked centre the access its tile lacks
+    col = int(s8.city_alive[0, row].nonzero()[0])
+    ctr = int(s8.city_center[0, row, col])
+    if not bool(s8.coastal_land[0, ctr]) and s8._harbor_didx >= 0:
+        ht = next(t for t in range(s8.T) if int(s8.district[0, t]) < 0 and t != ctr)
+        s8.city_dist_tile[0, row, col, s8._harbor_didx] = ht
+        s8.district_complete[0, ht] = True
+        assert bool(s8._city_maritime(row)[0, col]), "a complete Harbor must grant maritime access"
+    print(f"  sea range {s8._trade_sea_range} vs land {s8._trade_range}, water levels + maritime access ok")
+
+    # THE WALK lays road on LAND ONLY. Drive one step onto a water tile and
+    # check the tile stays roadless.
+    s9 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s9.civ_techs[:, 0, s9._celestial_tech] = True
+    wt = next(t for t in range(s9.T) if bool(s9.wpass[0, t]) and not bool(s9.ocean_tile[0, t]))
+    nb = [int(x) for x in s9.neigh[wt] if int(x) >= 0 and bool(s9.passable[0, int(x)])]
+    assert nb, "the water tile has no passable land neighbour"
+    col9 = int(s9.city_alive[0, 0].nonzero()[0])
+    s9.seat_routes[0, 0, 0, 0] = int(s9.city_id[0, 0, col9])
+    s9.seat_routes[0, 0, 0, 1] = -1
+    s9.seat_route_dseat[0, 0, 0] = 0
+    s9.seat_route_dcity[0, 0, 0] = int(s9.city_id[0, 0, col9])
+    s9.seat_route_walk[0, 0, 0] = nb[0]
+    s9.seat_route_leg[0, 0, 0] = 0
+    s9.road[0, wt] = False
+    step = s9._trade_walk_step(torch.tensor([0]), torch.tensor([nb[0]]), torch.tensor([wt]),
+                               s9._trade_water_level(0))
+    assert int(step[0]) == wt, "a sea-capable Trader must step onto the water"
+    assert not bool(s9.road[0, wt]), "the walk must lay no road on water"
+    print("  the sea leg steps onto water and lays no road there")
+
     print("trade2_test OK — intl gold(+specialty)/gold-only, war-cancel with Trader return, "
           "round-trip expiry, walk + plunder, candidate/apply spend, "
-          "(seat, city) dest keying incl. a capture, _MUTABLE round-trip")
+          "(seat, city) dest keying incl. a capture, sea legs, _MUTABLE round-trip")
 
 
 if __name__ == "__main__":

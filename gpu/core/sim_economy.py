@@ -1108,7 +1108,28 @@ class SimEconomy:
             self._eff_version += 1
         return place
 
-    def _place_works(self, row: int, hit: torch.Tensor, culture_val: torch.Tensor, kind: int) -> None:
+    def _art_museum_themed(self, row: int) -> torch.Tensor:
+        """[B, RC] bool — is this city's ART MUSEUM themed? CIV6: "its slots
+        must be filled with Great Works of Art of the same type ... made by
+        different Great Artists." `artMuseumThemed` is the twin."""
+        n = self._gw_slots_k[1]
+        types = self.city_gwart_type[:, row, :, :n]     # [B, RC, n]
+        artists = self.city_gwart_artist[:, row, :, :n]
+        full = (self.city_gw_art[:, row] >= n) & (types >= 0).all(dim=2)
+        one_type = (types == types[:, :, :1]).all(dim=2)
+        distinct = torch.ones_like(full)
+        for i in range(n):
+            for j in range(i + 1, n):
+                distinct = distinct & (artists[:, :, i] != artists[:, :, j])
+        return full & one_type & distinct
+
+    def _art_themed_works(self, row: int) -> torch.Tensor:
+        """[B, RC] long — how many ART works pay TWICE: the themed museum's own
+        slots, and only those. A wonder's art slots sit outside the bonus."""
+        return self._art_museum_themed(row).long() * ((self._theming_mult - 1) * self._gw_slots_k[1])
+
+    def _place_works(self, row: int, hit: torch.Tensor, culture_val: torch.Tensor, kind: int,
+                     artist: torch.Tensor | None = None) -> None:
         bcol, nslots, nworks = self._gw_bidx[kind], self._gw_slots_k[kind], self._gw_works_k[kind]
         dt = torch.float64
         civic = self.civ_civic_prog
@@ -1131,6 +1152,24 @@ class SimEconomy:
         alloc = (W.unsqueeze(1) - prefix).clamp(min=0).minimum(openc)
         placed = alloc.sum(dim=1)
         overflow = (W - placed).clamp(min=0)
+        if kind == 1 and artist is not None and self._artist_works:
+            # WHO made it and WHAT it is, for the museum's own slots. The work
+            # index is the ARTIST's (their first, second or third), which is
+            # what names the type; the slot index is the museum's.
+            works = torch.tensor(self._artist_works, dtype=torch.long, device=self.device)
+            aw = works[artist.clamp(min=0, max=works.shape[0] - 1)]  # [B, nworks]
+            # works already spent by EARLIER cities in slot order
+            spent = W.unsqueeze(1) - (W.unsqueeze(1) - prefix).clamp(min=0)
+            for sl in range(self._gw_slots_k[1]):
+                k = sl - used
+                on = (k >= 0) & (k < alloc) & (spent + k < nworks)
+                if not bool(on.any()):
+                    continue
+                wi = (spent + k).clamp(min=0, max=nworks - 1)
+                self.city_gwart_type[:, row, :, sl] = torch.where(
+                    on, aw.gather(1, wi.clamp(min=0, max=aw.shape[1] - 1)), self.city_gwart_type[:, row, :, sl])
+                self.city_gwart_artist[:, row, :, sl] = torch.where(
+                    on, artist.unsqueeze(1).expand_as(on), self.city_gwart_artist[:, row, :, sl])
         gw_base[:, row] = gw_base[:, row] + alloc
         civic[:, row] = civic[:, row] + overflow.to(dt) * culture_val
         if bool((alloc != 0).any()):
@@ -1985,7 +2024,7 @@ class SimEconomy:
         # tail of the buildings bucket.
         bld_y[:, :, 4] = bld_y[:, :, 4] + (
             self._gw_cul_k[0] * self.city_gw_writing[:, row, sl].double()
-            + self._gw_cul_k[1] * self.city_gw_art[:, row, sl].double()
+            + self._gw_cul_k[1] * (self.city_gw_art[:, row, sl] + self._art_themed_works(row)[:, sl]).double()
             + self._gw_cul_k[2] * self.city_gw_music[:, row, sl].double()
         ) * alivef
         _thm = torch.where(self._museum_themed(row)[:, sl], self._theming_mult, 1).double()

@@ -90,11 +90,15 @@ export const GREAT_PEOPLE: Record<GreatPersonClass, GreatPersonDef[]> = {
     P('PROPHET', 'GP_ZOROASTER', 'Zoroaster', { faith: 500 }, '+500 faith'),
     P('PROPHET', 'GP_LAOZI', 'Laozi', { faith: 1000 }, '+1000 faith'),
   ],
+  // CIV6 ("Great Artist (Civ6)"): every Great Artist in the real game is
+  // Renaissance or later, and each one's three Great Works of Art have NAMED
+  // types. These four are the Renaissance row, in the page's own order, so
+  // `ARTIST_WORKS` below can be transcribed rather than invented.
   ARTIST: [
-    P('ARTIST', 'GP_HOMER', 'Homer', { culture: 60 }, '+60 culture toward the current civic'),
+    P('ARTIST', 'GP_RUBLEV', 'Andrei Rublev', { culture: 60 }, '+60 culture toward the current civic'),
     P('ARTIST', 'GP_MICHELANGELO', 'Michelangelo', { culture: 150 }, '+150 culture toward the current civic'),
-    P('ARTIST', 'GP_SHAKESPEARE', 'William Shakespeare', { culture: 350 }, '+350 culture toward the current civic'),
-    P('ARTIST', 'GP_BEETHOVEN', 'Ludwig van Beethoven', { culture: 800 }, '+800 culture toward the current civic'),
+    P('ARTIST', 'GP_DONATELLO', 'Donatello', { culture: 350 }, '+350 culture toward the current civic'),
+    P('ARTIST', 'GP_BOSCH', 'Hieronymus Bosch', { culture: 800 }, '+800 culture toward the current civic'),
   ],
   ADMIRAL: [
     P('ADMIRAL', 'GP_ARTEMISIA', 'Artemisia', { gold: 60 }, '+60 gold (prize money)'),
@@ -209,6 +213,33 @@ export const RELIC_WONDER_SLOTS: Record<string, number> = {
   ST_BASILS_CATHEDRAL: 3,
   MONT_ST_MICHEL: 2,
 };
+/**
+ * The four TYPES a Great Work of Art can have, from the theming rule that
+ * reads them: "Great Works of Art of the same type (i.e., Sculptures,
+ * Portraits, Landscapes, or Religious)".
+ */
+export const ART_RELIGIOUS = 0;
+export const ART_SCULPTURE = 1;
+export const ART_PORTRAIT = 2;
+export const ART_LANDSCAPE = 3;
+
+/**
+ * The three works each Great Artist makes, in creation order — transcribed
+ * from the Great Artist (Civ6) roster's own "Great Works of Art" column,
+ * indexed the same way as `GREAT_PEOPLE.ARTIST`.
+ *
+ *   Andrei Rublev      Annunciation, Saviour in Glory, Ascension  — Religious x3
+ *   Michelangelo       Sistine Chapel Ceiling (Religious), Pietà, David (Sculpture)
+ *   Donatello          Saint Mark, Gattamelata, Judith            — Sculpture x3
+ *   Hieronymus Bosch   Earthly Delights, Last Judgement, Haywain  — Religious x3
+ */
+export const ARTIST_WORKS: readonly (readonly number[])[] = [
+  [ART_RELIGIOUS, ART_RELIGIOUS, ART_RELIGIOUS],
+  [ART_RELIGIOUS, ART_SCULPTURE, ART_SCULPTURE],
+  [ART_SCULPTURE, ART_SCULPTURE, ART_SCULPTURE],
+  [ART_RELIGIOUS, ART_RELIGIOUS, ART_RELIGIOUS],
+];
+
 export const GW_WORKS_PER_PERSON = [2, 3, 2] as const;
 export const GW_CULTURE = [2, 2, 4] as const;
 export const GW_TOURISM = [2, 2, 4] as const;
@@ -224,8 +255,32 @@ type GwCity = {
   greatWorksWriting?: number;
   greatWorksArt?: number;
   greatWorksMusic?: number;
+  /** The ART MUSEUM's own slots, in fill order: what each holds and who made
+   *  it. Only the museum themes, so only its `GW_SLOTS[GW_ART]` slots need a
+   *  provenance — a wonder's art slots never do. */
+  gwArtType?: number[];
+  gwArtArtist?: number[];
   wonders?: { id: string; tileIndex: number }[];
 };
+
+/**
+ * Is this city's ART MUSEUM themed? CIV6: "its slots must be filled with Great
+ * Works of Art of the same type ... made by different Great Artists. This means
+ * that a minimum of three Great Artists are needed to activate each Art
+ * Museum's theming bonus." A themed museum DOUBLES the yields of everything in
+ * it.
+ */
+export function artMuseumThemed(city: GwCity): boolean {
+  const n: number = GW_SLOTS[GW_ART];
+  const types = city.gwArtType ?? [];
+  const artists = city.gwArtArtist ?? [];
+  if (gwCount(city, GW_ART) < n || types.length < n || artists.length < n) return false;
+  for (let i = 1; i < n; i++) if (types[i] !== types[0]) return false;
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) if (artists[i] === artists[j]) return false;
+  }
+  return true;
+}
 
 export function gwCount(city: GwCity, kind: number): number {
   return (kind === GW_WRITING ? city.greatWorksWriting : kind === GW_ART ? city.greatWorksArt : city.greatWorksMusic) ?? 0;
@@ -246,9 +301,16 @@ function gwSet(city: GwCity, kind: number, n: number): void {
 export const GW_PRINTING_TECH = 'PRINTING';
 export const GW_PRINTING_WRITING_MULT = 2;
 
+/** How many ART works pay TWICE: the themed museum's own slots, and only
+ *  those — a wonder's art slots sit outside the bonus. */
+function artThemedWorks(city: GwCity): number {
+  return artMuseumThemed(city) ? (THEMING_MULT - 1) * GW_SLOTS[GW_ART] : 0;
+}
+
 export function greatWorkTourism(city: GwCity, printing = false, kmult: readonly [number, number, number] = [1, 1, 1]): number {
   const writing = GW_TOURISM[GW_WRITING] * (printing ? GW_PRINTING_WRITING_MULT : 1) * gwCount(city, GW_WRITING) * kmult[0];
-  return writing + GW_TOURISM[GW_ART] * gwCount(city, GW_ART) * kmult[1] + GW_TOURISM[GW_MUSIC] * gwCount(city, GW_MUSIC) * kmult[2];
+  const art = gwCount(city, GW_ART) + artThemedWorks(city);
+  return writing + GW_TOURISM[GW_ART] * art * kmult[1] + GW_TOURISM[GW_MUSIC] * gwCount(city, GW_MUSIC) * kmult[2];
 }
 
 /**
@@ -316,16 +378,19 @@ export function cityGreatWorks(city: GwCity): number {
 }
 
 export function greatWorkCulture(city: GwCity): number {
-  return GW_CULTURE[GW_WRITING] * gwCount(city, GW_WRITING) + GW_CULTURE[GW_ART] * gwCount(city, GW_ART) + GW_CULTURE[GW_MUSIC] * gwCount(city, GW_MUSIC);
+  const art = gwCount(city, GW_ART) + artThemedWorks(city);
+  return GW_CULTURE[GW_WRITING] * gwCount(city, GW_WRITING) + GW_CULTURE[GW_ART] * art + GW_CULTURE[GW_MUSIC] * gwCount(city, GW_MUSIC);
 }
 
 export function placeGreatWorks(
   cities: (GwCity & { buildings: string[] })[],
   kind: number,
   extra?: (city: GwCity & { buildings: string[] }) => number,
+  artist = 0,
 ): number {
   const building = GW_BUILDINGS[kind];
-  let remaining: number = GW_WORKS_PER_PERSON[kind];
+  const per: number = GW_WORKS_PER_PERSON[kind];
+  let remaining: number = per;
   for (const c of cities) {
     if (remaining <= 0) break;
     // Capacity is the BUILDING's slots plus any wonder's, so a wonder holds
@@ -335,6 +400,19 @@ export function placeGreatWorks(
     const open = cap - used;
     if (open <= 0) continue;
     const take = Math.min(open, remaining);
+    if (kind === GW_ART) {
+      // WHO made it and WHAT it is, for the museum's own slots. The work index
+      // is the ARTIST's (their first, second or third), which is what names
+      // the type; the slot index is the museum's.
+      const works = ARTIST_WORKS[artist] ?? ARTIST_WORKS[0];
+      const types = (c.gwArtType ??= []);
+      const artists = (c.gwArtArtist ??= []);
+      for (let s = types.length; s < GW_SLOTS[GW_ART]; s++) { types[s] = -1; artists[s] = -1; }
+      for (let k = 0; k < take && used + k < GW_SLOTS[GW_ART]; k++) {
+        types[used + k] = works[(per - remaining) + k] ?? works[0];
+        artists[used + k] = artist;
+      }
+    }
     gwSet(c, kind, used + take);
     remaining -= take;
   }

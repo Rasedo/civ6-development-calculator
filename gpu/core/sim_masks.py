@@ -277,8 +277,33 @@ class SimMasks:
         friendly = present & (n_seat == d_seat)
         return hostile.long().sum(dim=1), friendly.long().sum(dim=1)
 
-    def _trade_walk_step(self, rows: torch.Tensor, cur: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        """ONE step of a Trader's walk (`tradeWalkStep`): the passable
+    def _trade_water_level(self, row: int) -> torch.Tensor:
+        """[B] long — how far out to sea this seat's Traders may go
+        (`tradeWaterLevel`). CIV6: "The Celestial Navigation technology is
+        required to move on Coast tiles. The Cartography technology is required
+        to move on Ocean tiles."
+        """
+        B, dev = self.B, self.device
+        out = torch.zeros(B, dtype=torch.long, device=dev)
+        if self._celestial_tech < 0:
+            return out
+        celnav = self.civ_techs[:, row, self._celestial_tech]
+        carto = (self.civ_techs[:, row, self._cartography_tech]
+                 if self._cartography_tech >= 0 else torch.zeros_like(celnav))
+        return torch.where(celnav, torch.where(carto, out + 2, out + 1), out)
+
+    def _trade_walkable(self, rows: torch.Tensor, tiles: torch.Tensor, water: torch.Tensor) -> torch.Tensor:
+        """`tradeWalkable` — may a Trader at this water level stand here?
+        `water` broadcasts against `tiles`."""
+        return (
+            self.passable[rows, tiles]
+            | ((water >= 1) & self.wpass[rows, tiles]
+               & (~self.ocean_tile[rows, tiles] | (water >= 2)))
+        )
+
+    def _trade_walk_step(self, rows: torch.Tensor, cur: torch.Tensor, target: torch.Tensor,
+                         water: torch.Tensor) -> torch.Tensor:
+        """ONE step of a Trader's walk (`tradeWalkStep`): the walkable
         neighbour strictly closer to `target` by hexDistance, ties by
         direction order — the war-march's integer rule, so both engines agree
         by construction. Arrived or stuck rows return `cur` unchanged.
@@ -287,7 +312,7 @@ class SimMasks:
         ar6 = torch.arange(6, device=dev)
         nb = self.neigh[cur.clamp(min=0)]
         nbc = nb.clamp(min=0)
-        okn = (nb >= 0) & self.passable[rows.unsqueeze(1), nbc]
+        okn = (nb >= 0) & self._trade_walkable(rows.unsqueeze(1), nbc, water.unsqueeze(1))
         d_nb = self.pair_dist[target.clamp(min=0).unsqueeze(1), nbc].to(torch.long)
         d_cur = self.pair_dist[target.clamp(min=0), cur.clamp(min=0)].to(torch.long)
         key = torch.where(okn & (d_nb < d_cur.unsqueeze(1)), d_nb * 8 + ar6, 10**9)
@@ -296,16 +321,17 @@ class SimMasks:
         nxt = nb.gather(1, (best % 8).clamp(max=5).unsqueeze(1)).squeeze(1)
         return torch.where(ok, nxt, cur)
 
-    def _trade_land_ok(self, rows: torch.Tensor, frm: torch.Tensor, dest: torch.Tensor) -> torch.Tensor:
-        """Can a Trader WALK from `frm` to `dest` over land — the
-        `tradeLandReachable` twin. A blocked descent is a SEA route: its
-        walker parks at the origin and lays no roads."""
+    def _trade_walk_ok(self, rows: torch.Tensor, frm: torch.Tensor, dest: torch.Tensor,
+                       water: torch.Tensor) -> torch.Tensor:
+        """Can a Trader descend from `frm` to `dest` at this water level — the
+        `tradeWalkReachable` twin. Only a pair NO descent reaches leaves its
+        Trader parked at the origin."""
         if len(rows) == 0:
             return torch.zeros(0, dtype=torch.bool, device=self.device)
         alive = (
             (frm >= 0) & (dest >= 0)
-            & self.passable[rows, frm.clamp(min=0)]
-            & self.passable[rows, dest.clamp(min=0)]
+            & self._trade_walkable(rows, frm.clamp(min=0), water)
+            & self._trade_walkable(rows, dest.clamp(min=0), water)
         )
         cur = torch.where(alive, frm, torch.full_like(frm, -1))
         arrived = alive & (cur == dest)
@@ -313,7 +339,7 @@ class SimMasks:
             walking = alive & ~arrived
             if not bool(walking.any()):
                 break
-            nxt = self._trade_walk_step(rows, cur.clamp(min=0), dest.clamp(min=0))
+            nxt = self._trade_walk_step(rows, cur.clamp(min=0), dest.clamp(min=0), water)
             stepped = walking & (nxt != cur)
             cur = torch.where(stepped, nxt, cur)
             alive = alive & (arrived | stepped)

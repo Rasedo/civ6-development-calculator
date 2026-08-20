@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
 import { foundCity, queueDistrict, queueBuilding } from '../../../cpu/core/game';
 import { computeCityStats } from '../../../cpu/core/city';
-import { placeGreatWorks, cityGreatWorks, greatWorkCulture, greatWorkTourism, GW_TOURISM, GW_CULTURE, GW_WORKS_PER_PERSON, GW_SLOTS, GW_WRITING, GW_ART, GW_MUSIC, GW_WONDER_SLOTS } from '../../../cpu/data/greatPeople';
+import { placeGreatWorks, cityGreatWorks, greatWorkCulture, greatWorkTourism, artMuseumThemed, THEMING_MULT, ART_RELIGIOUS, ART_SCULPTURE, GW_TOURISM, GW_CULTURE, GW_WORKS_PER_PERSON, GW_SLOTS, GW_WRITING, GW_ART, GW_MUSIC, GW_WONDER_SLOTS } from '../../../cpu/data/greatPeople';
 // The kind arrays replaced the writing/music pair — these aliases keep the
 // existing assertions readable now that ART is a real kind with its own slots.
 const GW_WRITING_CULTURE = GW_CULTURE[GW_WRITING];
@@ -158,5 +158,61 @@ describe('Great Works', () => {
     expect(lib.greatWorksWriting).toBe(4);
     // The fifth work has nowhere to go and overflows.
     expect(placeGreatWorks([lib], GW_WRITING, extra)).toBe(GW_WORKS_PER_PERSON[GW_WRITING]);
+  });
+
+  // CIV6 ("Theming bonus (Civ6)"): an Art Museum themes when "its slots must
+  // be filled with Great Works of Art of the same type ... made by different
+  // Great Artists. This means that a minimum of three Great Artists are needed
+  // to activate each Art Museum's theming bonus."
+  it('every Great Work of Art records its TYPE and its ARTIST', () => {
+    const city = { buildings: ['MUSEUM'], greatWorksArt: 0 } as never;
+    // Michelangelo is artist index 1: Religious, Sculpture, Sculpture.
+    expect(placeGreatWorks([city], GW_ART, undefined, 1)).toBe(0);
+    expect((city as { gwArtType?: number[] }).gwArtType)
+      .toEqual([ART_RELIGIOUS, ART_SCULPTURE, ART_SCULPTURE]);
+    expect((city as { gwArtArtist?: number[] }).gwArtArtist).toEqual([1, 1, 1]);
+    // one artist's own three works can never theme a museum
+    expect(artMuseumThemed(city)).toBe(false);
+  });
+
+  it('three artists of ONE type theme the museum and double what it holds', () => {
+    const mk = () => ({ buildings: ['MUSEUM'], greatWorksArt: 0 }) as never;
+    // Rublev (0), Michelangelo (1) and Bosch (3) each open with a RELIGIOUS
+    // work, so one slot from each fills a same-type, three-artist museum.
+    const city = mk();
+    for (const artist of [0, 1, 3]) {
+      const one = mk();
+      placeGreatWorks([one], GW_ART, undefined, artist);
+      const t = (one as { gwArtType?: number[] }).gwArtType!;
+      const a = (one as { gwArtArtist?: number[] }).gwArtArtist!;
+      const c = city as { gwArtType?: number[]; gwArtArtist?: number[]; greatWorksArt?: number };
+      (c.gwArtType ??= []).push(t[0]);
+      (c.gwArtArtist ??= []).push(a[0]);
+      c.greatWorksArt = (c.greatWorksArt ?? 0) + 1;
+    }
+    expect(artMuseumThemed(city)).toBe(true);
+    // "the bonus doubles the yields of all items in the Museum"
+    expect(greatWorkCulture(city)).toBe(GW_CULTURE[GW_ART] * GW_SLOTS[GW_ART] * THEMING_MULT);
+    expect(greatWorkTourism(city)).toBe(GW_TOURISM[GW_ART] * GW_SLOTS[GW_ART] * THEMING_MULT);
+
+    // a repeated ARTIST breaks it, and so does a mismatched TYPE
+    const dupArtist = { ...(city as object) } as never;
+    (dupArtist as { gwArtArtist?: number[] }).gwArtArtist = [0, 0, 3];
+    expect(artMuseumThemed(dupArtist)).toBe(false);
+    const dupType = { ...(city as object) } as never;
+    (dupType as { gwArtType?: number[] }).gwArtType = [ART_RELIGIOUS, ART_SCULPTURE, ART_RELIGIOUS];
+    expect(artMuseumThemed(dupType)).toBe(false);
+  });
+
+  it('a WONDER art slot sits outside the theming bonus', () => {
+    const city = {
+      buildings: ['MUSEUM'],
+      greatWorksArt: 4, // three museum slots plus one Hermitage slot
+      gwArtType: [ART_RELIGIOUS, ART_RELIGIOUS, ART_RELIGIOUS],
+      gwArtArtist: [0, 1, 3],
+    } as never;
+    expect(artMuseumThemed(city)).toBe(true);
+    // three works double; the fourth pays once
+    expect(greatWorkCulture(city)).toBe(GW_CULTURE[GW_ART] * (4 + GW_SLOTS[GW_ART]));
   });
 });

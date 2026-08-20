@@ -54,12 +54,13 @@ nothing carries forward.
 | Open item | Weight | What the weight is for |
 |---|---|---|
 | **A. Engine vs engine** | **0** | |
-| B-20r tourism tails | 3 | art-museum theming needs work TYPE and artist identity; open-borders digs and work TRADES need a treaty system |
+| B-20r tourism tails | 2 | theming ships; open-borders digs and work TRADES need a treaty system, and the Naturalist's progressive cost is unsourced |
 | B-21r suzerain rows | 1 | the residual descoped rows all need whole absent systems |
 | B-22r World Congress | 4 | the vote is scripted (wire head pending); emergencies/competitions absent; 4 of ~18 resolutions |
 | B-24r Ages/governors | 1 | three system-less dedication entries, dark-age policies, governor promotions, per-civ era drift |
 | B-30r specialists | 2 | the mechanic is live; the free-assignment wire head and its observation stay open |
-| B-31r trade-route tails | 2 | sea legs park at origin, no trading posts, plunder gold is a stylization, one candidate not a free pick |
+| B-31r trade-route tails | 1 | sea legs ship; no trading posts, plunder gold is a stylization, one candidate not a free pick |
+| B-53r the great-person roster | 2 | four fame-picked names per class on one ladder; real Civ 6 anchors each person to an ERA and offers a roster per era |
 | B-D unsourced data values | 3 | the sweep is done; nine NAMED stylizations stay open, each labelled at its definition |
 | B-36r appeal adjacency terms | 1 | the four reachable terms ship; Dam/Canal/Water Park/Preserve and the Great People wait on C-22, C-4, C-21 |
 | B-39r wonder effects still dropped | 1 | the sourced sweep shipped fourteen channels; five residuals, each blocked on B-20r, C-21, B-34r or C-23 |
@@ -180,11 +181,28 @@ Civ 6 source or is recorded as unverifiable.
   these mechanics is a coverage FACT, not evidence they agree.
 
   Open:
-  - ART MUSEUM theming. Real Civ 6 themes it with Great Works of Art of
-    the SAME TYPE by DIFFERENT Great Artists. Our Great Works of Art are
-    per-city COUNTS with no work type and no artist identity, so the rule
-    has nothing to read. TWO items: the missing per-work provenance, and
-    the theming that waits on it.
+  ART MUSEUM THEMING SHIPS, and so does the per-work provenance it waited
+  on. Every Great Work of Art now records WHAT it is and WHO made it, for the
+  museum's own slots (`City.gwArtType`/`gwArtArtist`, `city_gwart_type`/
+  `city_gwart_artist`), and `artMuseumThemed` / `_art_museum_themed` reads the
+  sourced rule: "its slots must be filled with Great Works of Art of the same
+  type ... made by different Great Artists. This means that a minimum of three
+  Great Artists are needed to activate each Art Museum's theming bonus." A
+  themed museum doubles its OWN three works; a wonder's art slots sit outside
+  the bonus, because the theming rule names only the two Museums.
+  The types come from the Great Artist (Civ6) roster's own "Great Works of
+  Art" column (`ARTIST_WORKS`), which forced a correction: three of the four
+  entries in the ARTIST class were not Great Artists in real Civ 6 at all
+  (Homer and Shakespeare are Great Writers, Beethoven a Great Musician). The
+  class now holds the page's four RENAISSANCE artists, whose work triples the
+  table transcribes.
+  Also fixed while wiring it: a captured city's museum PROVENANCE was dropped
+  on both engines — the TS flip literal never listed `artifactEras`/
+  `artifactSeats` and the GPU left the destination slot's planes stale — so a
+  conquered themed museum kept its works and silently lost the bonus. Both
+  engines now carry all four provenance arrays across a capture, and a REUSED
+  city slot clears them.
+  Open:
   - OPEN-BORDERS digs. An Archaeologist may work foreign ground under an
     Open Borders treaty (or with the Terracotta Army). Neither engine has
     any diplomatic AGREEMENT at all. TWO items: the treaty system, and the
@@ -312,11 +330,28 @@ Civ 6 source or is recorded as unverifiable.
   at-war unit standing on its tile. The decision is a wire verb
   (`SeatActionRecord.route`), re-validated by both appliers, with the
   candidate row tripwire-compared in the serve gate. Open:
-  - SEA legs: real GS water routes have range 30 with harbor refuel and
-    the Trader embarks the journey; ours parks the Trader at the origin
-    (`walkLeg` -1) and the route ends on the term alone.
-  - TRADING POSTS are still not founded — no range refuel, no per-post
-    gold at repeat destinations (Bandar Brunei's row waits on them).
+  SEA LEGS ship, and this entry's own summary of them was wrong: real Civ 6
+  has no "harbor refuel". The sourced rule is two BASE RANGES — "the base
+  range for land trade routes is 15 tiles ... the base range for sea trade
+  routes is 30 tiles" — with maritime access at both ends the gate
+  ("both the origin city and the destination city require maritime access ...
+  in order to establish sea Trade Routes"), Celestial Navigation to move on
+  Coast and Cartography to move on Ocean. All of that is live on both engines:
+  `tradeRouteRange` / `_trade_pair_range` pick the range per pair,
+  `cityMaritime` / `_city_maritime` answer the access question (a coastal
+  centre or a complete Harbor), and `tradeWaterLevel` / `_trade_water_level`
+  decide how far out the descent may go. The Trader now EMBARKS: one descent
+  walks land and sea, "the route may start in an inland city, then go to a
+  coastal city ... move over sea to another city with a Harbor, then continue
+  on land", and roads are laid on land tiles only. `walkLeg` -1 has shrunk to
+  the pairs NO descent reaches at all.
+  Open:
+  - TRADING POSTS are still not founded — the only thing that extends range in
+    real Civ 6 ("{{TradeRoute6}} range cannot be enhanced via technology"), and
+    no per-post gold at repeat destinations (Bandar Brunei's row waits on them).
+  - A city-state's maritime access is its CENTRE's alone: a city-state cannot
+    build a Harbor in this model, so the district half of the test has nothing
+    to read on that side.
   - `PLUNDER_ROUTE_GOLD` (50) is a stylization; no public source names
     the real base magnitude.
   - The destination is ONE candidate row plus a take/skip, not a free
@@ -464,6 +499,15 @@ Civ 6 source or is recorded as unverifiable.
   city-state in a driven game, and the whole subsystem is poke-covered only.
   It needs a wire head and a policy the way the trade route did. The
   diplomatic consequences of declaring wait on C-19.
+- **B-53r. The GREAT PERSON roster is four names per class, era-free.** Weight
+  2. Each class holds exactly four people on one cost ladder, and the names
+  were picked for fame rather than from the game. B-20r's theming work
+  corrected the ARTIST class against the Great Artist (Civ6) page; the other
+  eight classes have not been checked, and the deeper problem the check
+  surfaced is structural: real Civ 6 anchors each Great Person to an ERA and
+  offers a whole roster per era (every Great Artist is Renaissance or later,
+  so this model's Ancient "artist" cannot exist). Closing this needs the
+  per-era rosters and the era-gated recruit, not a rename.
 - **B-D. UNSOURCED DATA VALUES — swept once; the named stylizations are
   OPEN, not closed.** The cpu/data walk fetched every magnitude from the GS
   Civilopedia row by row: all 28 wonders (12 corrected, every unlock now the

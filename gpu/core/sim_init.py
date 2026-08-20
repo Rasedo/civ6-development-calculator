@@ -75,6 +75,8 @@ class SimInit:
             ("artifacts", torch.long, 0, None, None),
             ("artifact_era", torch.long, -1, None, max(int((rules.seats or {}).get("artifactSlots", 3)), 1)),
             ("artifact_seat", torch.long, -1, None, max(int((rules.seats or {}).get("artifactSlots", 3)), 1)),
+            ("gwart_type", torch.long, -1, None, max(int((rules.seats or {}).get("gwSlotsByKind", [2, 3, 1])[1]), 1)),
+            ("gwart_artist", torch.long, -1, None, max(int((rules.seats or {}).get("gwSlotsByKind", [2, 3, 1])[1]), 1)),
             ("bldg", torch.bool, False, None, max(len(rules.b_cost), 1)),
         ):
             _shape = (B, self.n_majors + _sp, _rcp) + ((_ex,) if _ex else ())
@@ -709,6 +711,7 @@ class SimInit:
         self._artifact_culture = int(rr.get("artifactCulture", 3))
         self._artifact_tourism = int(rr.get("artifactTourism", 3))
         self._theming_mult = int(rr["themingMult"])
+        self._artist_works = [[int(x) for x in w] for w in rr.get("artistWorks", [])]
         _ri = rules.improvements or {}
         self._park_min_appeal = int(_ri["parkMinAppeal"])
         self._park_amen_owner = int(_ri["parkAmenitiesOwner"])
@@ -1051,6 +1054,7 @@ class SimInit:
         self._trade_ftc = int(_tr.get("foreignTradeCidx", -3))
         self._trade_wonders = [int(x) for x in _tr.get("capWonderWidx", [])]
         self._trade_range = int(_tr.get("range", 15))
+        self._trade_sea_range = int(_tr.get("seaRange", 30))
         self._trade_intl_gold = int(_tr.get("intlGold", 3))  # international base gold
         self._trade_duration = int(_tr.get("duration", 20))  # route lifetime
         self._trade_plunder_gold = int(_tr["plunderGold"])
@@ -1277,6 +1281,7 @@ class SimInit:
         self._embark_live = bool(cb.get("embarkLive", 0))
         self._shipbuilding_tech = int(cb.get("shipbuildingTech", -1))
         self._cartography_tech = int(cb.get("cartographyTech", -1))
+        self._celestial_tech = int(cb.get("celestialTech", -1))
         ru = rules.units or [{"id": "WARRIOR", "cost": 40, "combat": 20, "maintenance": 0, "civilian": 0, "requiresTech": -1}]
         self.NU = len(ru)
         # THE PRODUCTION LAYOUT (cpu/core/prodLayout.ts), named once. It is the

@@ -252,6 +252,51 @@ def main() -> None:
     assert int(base[0, 0, 0]) == 0, "an unfinished wonder must hold no work"
     print(f"  wonder GW slots OK — {nslot} of kind {kind} from wonder {wi}")
 
+    # --- ART MUSEUM THEMING: per-work provenance and the same-type,
+    # different-artists rule ------------------------------------------------
+    s6 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    n_art = s6._gw_slots_k[1]
+    assert s6._artist_works, "the exporter shipped no per-artist work table"
+    bi = s6._gw_bidx[1]
+    assert bi >= 0, "no ART MUSEUM in the building catalog"
+    s6.city_bldg[:, 0, :, bi] = False
+    s6.city_bldg[:, 0, 0, bi] = True
+    s6.city_gw_art[:, 0, :] = 0
+    s6.city_gwart_type[:, 0, :, :] = -1
+    s6.city_gwart_artist[:, 0, :, :] = -1
+    hit6 = torch.ones(s6.B, dtype=torch.bool)
+    zero6 = torch.zeros(s6.B, dtype=torch.float64)
+    # ONE artist fills the museum with their own three works — never themed.
+    art1 = torch.ones(s6.B, dtype=torch.long)  # Michelangelo: Religious, Sculpture, Sculpture
+    s6._place_works(0, hit6, zero6, 1, art1)
+    assert int(s6.city_gw_art[0, 0, 0]) == n_art, int(s6.city_gw_art[0, 0, 0])
+    assert [int(x) for x in s6.city_gwart_type[0, 0, 0, :n_art]] == s6._artist_works[1][:n_art]
+    assert [int(x) for x in s6.city_gwart_artist[0, 0, 0, :n_art]] == [1] * n_art
+    assert not bool(s6._art_museum_themed(0)[0, 0]), "one artist's own works must not theme"
+    assert int(s6._art_themed_works(0)[0, 0]) == 0
+
+    # THREE artists, one type: Rublev (0), Michelangelo (1) and Bosch (3) all
+    # open with the same work type, so one slot from each themes the museum.
+    opener = s6._artist_works[0][0]
+    trio = [a for a in range(len(s6._artist_works)) if s6._artist_works[a][0] == opener][:n_art]
+    assert len(trio) == n_art, f"need {n_art} artists whose FIRST work shares a type, got {trio}"
+    s6.city_gw_art[:, 0, 0] = 0
+    s6.city_gwart_type[:, 0, 0, :] = -1
+    s6.city_gwart_artist[:, 0, 0, :] = -1
+    for sl, a in enumerate(trio):
+        s6.city_gwart_type[:, 0, 0, sl] = opener
+        s6.city_gwart_artist[:, 0, 0, sl] = a
+    s6.city_gw_art[:, 0, 0] = n_art
+    assert bool(s6._art_museum_themed(0)[0, 0]), "same type, three artists must theme"
+    assert int(s6._art_themed_works(0)[0, 0]) == (s6._theming_mult - 1) * n_art
+    # a repeated ARTIST breaks it, and so does a mismatched TYPE
+    s6.city_gwart_artist[:, 0, 0, 1] = trio[0]
+    assert not bool(s6._art_museum_themed(0)[0, 0]), "a repeated artist must not theme"
+    s6.city_gwart_artist[:, 0, 0, 1] = trio[1]
+    s6.city_gwart_type[:, 0, 0, 1] = opener + 1
+    assert not bool(s6._art_museum_themed(0)[0, 0]), "a mismatched type must not theme"
+    print(f"  art museum theming OK — {n_art} slots, artists {trio}, type {opener}")
+
     print("GREAT-WORKS OK")
 
 

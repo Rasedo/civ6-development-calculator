@@ -61,6 +61,9 @@ export interface City {
   /** Great Works of ART, in ART MUSEUM slots (3) — the real Civ 6 home. */
   greatWorksArt?: number;
   greatWorksMusic?: number;
+  /** the ART MUSEUM's own slots, in fill order: what each holds, and who made it */
+  gwArtType?: number[];
+  gwArtArtist?: number[];
   /** RELICS held in this city's TEMPLE slot (cap 1). Each pays
    *  +4 faith and +8 tourism — the densest tourism source in real Civ 6. */
   relics?: number;

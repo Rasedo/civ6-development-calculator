@@ -22,7 +22,7 @@ import { GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT } from '../data/constants';
 import { PEACE_GOLD_COST, DED_MONUMENTALITY } from '../data/seats';
 import { SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
 import { BUY_UNITS } from '../core/phase';
-import { tradeCapacity, freeTrader, routeYields, cityStateRouteYields, TRADE_ROUTE_RANGE } from '../core/trade';
+import { tradeCapacity, freeTrader, routeYields, cityStateRouteYields, tradeRouteRange } from '../core/trade';
 import { isExplored } from '../core/fog';
 import { buildingFaithCost, endTurn, goldAffordable, naturalistCost, settlerCost, tilePurchaseCost } from '../core/game';
 import { goldenDedication, monumentalityBuyMult } from '../core/eras';
@@ -74,7 +74,8 @@ export function routeCandidateRow(state: GameState, actor: Seat): number[] {
       if (to.id === from.id) continue;
       if (routes.some((x) => x.from === from.id && x.to === to.id)) continue;
       const tt = state.map.tiles[to.centerIndex];
-      if (hexDistance(ft.col, ft.row, tt.col, tt.row) > TRADE_ROUTE_RANGE) continue;
+      if (hexDistance(ft.col, ft.row, tt.col, tt.row)
+          > tradeRouteRange(state, actor.seat, from.centerIndex, to.centerIndex, from, to)) continue;
       const y = routeYields(state, to);
       const ySum = y.food + y.production;
       if (!best || ySum > best.ySum) best = { from: from.centerIndex, dest: to.centerIndex, ySum };
@@ -84,7 +85,8 @@ export function routeCandidateRow(state: GameState, actor: Seat): number[] {
       if (!hasMet(cityState, actor.seat)) continue;
       if (routes.some((x) => x.from === from.id && x.toCs === cityState.id)) continue;
       const ct = state.map.tiles[cityState.centerIndex];
-      if (hexDistance(ft.col, ft.row, ct.col, ct.row) > TRADE_ROUTE_RANGE) continue;
+      if (hexDistance(ft.col, ft.row, ct.col, ct.row)
+          > tradeRouteRange(state, actor.seat, from.centerIndex, cityState.centerIndex, from)) continue;
       const cy = cityStateRouteYields(cityState);
       const ySum = cy.food + cy.production + cy.gold + cy.science + cy.culture + cy.faith;
       if (!best || ySum > best.ySum) best = { from: from.centerIndex, dest: -(2 + ci), ySum };
@@ -101,7 +103,7 @@ export function routeCandidateRow(state: GameState, actor: Seat): number[] {
           if (routes.some((x) => x.from === from.id && x.toSeat === other.seat && x.toSeatCity === pc.id)) continue;
           const pt = state.map.tiles[pc.centerIndex];
           const d = hexDistance(ft.col, ft.row, pt.col, pt.row);
-          if (d > TRADE_ROUTE_RANGE) continue;
+          if (d > tradeRouteRange(state, actor.seat, from.centerIndex, pc.centerIndex, from, pc)) continue;
           if (!bi || d < bi.d) bi = { from: from.centerIndex, dest: pc.centerIndex, d };
         }
       }

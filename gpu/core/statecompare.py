@@ -516,6 +516,12 @@ CITY = {
          for x in (sim.city_artifact_era[b, c, s, i], sim.city_artifact_seat[b, c, s, i])]
         for c, s in rows
     ],
+    # the ART MUSEUM's provenance, slot by slot: type then artist.
+    "gwArtProv": lambda sim, b, rows: [
+        [int(x) for i in range(sim._gw_slots_k[1])
+         for x in (sim.city_gwart_type[b, c, s, i], sim.city_gwart_artist[b, c, s, i])]
+        for c, s in rows
+    ],
 }
 
 

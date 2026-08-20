@@ -8,7 +8,7 @@ import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { isWater, isImpassable } from '../../world/query';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
-import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, outerPool, tradeWalkStep, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit } from './units';
+import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, outerPool, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit } from './units';
 import { PILLAGE_HEAL_IMPROVEMENTS } from './combat';  // the replay's pillage arm mirrors hostileUnitAct's
 import { UNIT_HP } from '../data/units';
 import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, generalAuraCS, cityDefenseStrength } from './combat';
@@ -604,6 +604,12 @@ export function transferCity(
     greatWorksMusic: civCity.greatWorksMusic,
     relics: civCity.relics,
     artifacts: civCity.artifacts, // artifacts ride the flip too
+    // ...and so does every museum's PROVENANCE, or a captured themed museum
+    // would keep its works and lose the bonus that reads them.
+    artifactEras: civCity.artifactEras ? [...civCity.artifactEras] : undefined,
+    artifactSeats: civCity.artifactSeats ? [...civCity.artifactSeats] : undefined,
+    gwArtType: civCity.gwArtType ? [...civCity.gwArtType] : undefined,
+    gwArtArtist: civCity.gwArtArtist ? [...civCity.gwArtArtist] : undefined,
     hp: Math.round(CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   };
@@ -1223,7 +1229,8 @@ export function seatPhase(state: GameState): void {
     // plunder, and the round-trip expiry.
     {
       const routes = (actor.tradeRoutes ??= []);
-      // THE WALK: each land route's Trader advances one descent step toward
+      const water = tradeWaterLevel(state, actor.seat);
+      // THE WALK: each route's Trader advances one descent step toward
       // its leg target, laying road as it goes; it turns around at the
       // destination and starts a fresh round trip at home. (The two legs may
       // descend different lines — the descent is greedy per step, not a
@@ -1234,10 +1241,11 @@ export function seatPhase(state: GameState): void {
         const destC = routeDestCenter(state, actor, r);
         if (originC < 0 || destC < 0) continue;
         const target = r.walkLeg === 0 ? destC : originC;
-        const next = tradeWalkStep(state, r.walkTile, target);
+        const next = tradeWalkStep(state, r.walkTile, target, water);
         if (next !== r.walkTile) {
           r.walkTile = next;
-          state.map.tiles[next].road = true;
+          // roads go on LAND only — a sea leg lays nothing
+          if (!isWater(state.map.tiles[next])) state.map.tiles[next].road = true;
         }
         if (r.walkLeg === 0 && r.walkTile === destC) r.walkLeg = 1;
         else if (r.walkLeg === 1 && r.walkTile === originC) r.walkLeg = 0;
