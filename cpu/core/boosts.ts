@@ -84,8 +84,7 @@ function checkSatisfied(state: GameState, seat: number, check: BoostCheck): bool
       // driven game, so counting it would make this boost unreachable.
       const rsr = seatOf(state, seat)?.research;
       if (!GOVERNMENTS_ADOPTION_LIVE || !rsr) return false;
-      const xs = wonderExtraSlots(state, seat);
-      return computeAdoption(rsr, xs.diplo, xs.wild).policies.filter((p) => p !== null).length >= check.count;
+      return computeAdoption(rsr, wonderExtraSlots(state, seat)).policies.filter((p) => p !== null).length >= check.count;
     }
     case 'cities':
       return citiesOf(state, seat).length >= check.count;

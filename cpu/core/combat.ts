@@ -13,6 +13,7 @@ import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER } from '../data/seats';
 import { addEraScore } from './eras';
 import { nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, crossesRiver, cliffBlocksStep, stepUnit } from './units';
 import { EMBARKED_DEFENSE_CS, embarkState } from '../data/constants';
+import { BUILT_WONDERS } from '../data/builtWonders';
 import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, type BeliefEffects } from '../data/religion';
 import { revealAround, unexploredByAll } from './fog';
 import { transferCity } from './phase';
@@ -59,7 +60,12 @@ export const PILLAGE_HEAL_IMPROVEMENTS: ReadonlySet<string> = new Set<Improvemen
 
 
 export function terrainDefense(tile: Tile): number {
-  let d = 0;
+  // CIV6 (Alhambra +4, Mont St. Michel +6): "Occupying unit receives +N
+  // Defense Strength". The fortification half of that line is a floor on the
+  // unit's own dig-in, applied at `refreshUnits`.
+  let d = tile.builtWonder && tile.builtWonderComplete
+    ? BUILT_WONDERS[tile.builtWonder]?.effects?.occupyDefense ?? 0
+    : 0;
   if (tile.elevation === 'HILLS') d += 3;
   if (tile.feature === 'WOODS' || tile.feature === 'RAINFOREST') d += 3;
   // Marsh and floodplains EXPOSE the defender (−2) —

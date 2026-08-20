@@ -19,6 +19,9 @@
 import type { DistrictId, Yields } from '../core/types';
 
 export type SlotKind = 'military' | 'economic' | 'diplomatic' | 'wildcard';
+/** Slot kinds in the order a wonder-granted slot appends to a government's
+ *  own list, and the order the GPU's per-kind slot counts are packed in. */
+export const SLOT_KINDS = ['military', 'economic', 'diplomatic', 'wildcard'] as const;
 
 /** Master switch for the whole government/policy layer: adoption
  * (`computeAdoption`), the government modifier layering and the GPU's

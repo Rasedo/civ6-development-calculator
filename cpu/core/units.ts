@@ -5,6 +5,10 @@
  */
 
 import type { GameState, City, Seat, Tile, Unit } from './types';
+import { seatWonderSum } from './wonders';
+import { BUILT_WONDERS } from '../data/builtWonders';
+/** CIV6: fortification tops out at two turns dug in. */
+const FORTIFY_MAX_TURNS = 2;
 import { logUnitOrder } from './seatTurn';
 import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial } from '../../world/hex';
 import { isWater, isImpassable } from '../../world/query';
@@ -270,7 +274,14 @@ export function inEnemyZoc(
 /** FORTIFY: the defender-strength bonus a unit's fortifyTurns grants
  * (+3 CS at >=1, +6 at >=2; cap 2). Civilians never fortify (0). */
 export function fortifyBonus(unit: { fortifyTurns?: number }): number {
-  return Math.min(2, unit.fortifyTurns ?? 0) * 3;
+  return Math.min(FORTIFY_MAX_TURNS, unit.fortifyTurns ?? 0) * 3;
+}
+
+/** The defence a COMPLETE wonder gives the unit standing on its tile. */
+export function wonderOccupyDefense(state: GameState, tileIndex: number): number {
+  const t = state.map.tiles[tileIndex];
+  if (!t?.builtWonder || !t.builtWonderComplete) return 0;
+  return BUILT_WONDERS[t.builtWonder]?.effects?.occupyDefense ?? 0;
 }
 
 
@@ -763,6 +774,15 @@ export function queueUnit(state: GameState, cityId: number, unitType: string, se
   return ok;
 }
 
+/** CIV6: the Pyramids give every Builder an extra build charge and the
+ *  Hagia Sophia gives every Missionary and Apostle an extra spread. Both are
+ *  paid at CREATION, so a unit that predates the wonder keeps its own count. */
+function wonderCharges(state: GameState, seat: number, unitType: string): number {
+  if (unitType === 'BUILDER') return seatWonderSum(state, seat, 'buildCharges');
+  if (unitType === 'MISSIONARY' || unitType === 'APOSTLE') return seatWonderSum(state, seat, 'spreadCharges');
+  return 0;
+}
+
 export function spawnUnit(
   state: GameState,
   unitType: string,
@@ -784,7 +804,7 @@ export function spawnUnit(
     tileIndex: spot.index,
     movesLeft: def.moves + goldenMoveBonus(state, { type: unitType, seat }),
     hp: UNIT_HP,
-    charges: def.charges ?? null,
+    charges: def.charges === undefined ? null : def.charges + wonderCharges(state, seat, unitType),
     path: null,
   };
   // FORTIFY: military units carry a fortify counter (civilians never do).
@@ -861,7 +881,10 @@ export function refreshUnits(state: GameState): void {
     // ships. (Embarked land units are still military but march every turn, so
     // their fortify gate resets to 0 in practice.)
     if (unitDomain(unit.type) === 'military' && !naval) {
-      unit.fortifyTurns = unit.movesLeft >= grantedLast ? Math.min(2, (unit.fortifyTurns ?? 0) + 1) : 0;
+      const dug = unit.movesLeft >= grantedLast ? Math.min(2, (unit.fortifyTurns ?? 0) + 1) : 0;
+      // CIV6 (Alhambra, Mont St. Michel): a unit occupying the wonder
+      // "automatically gains 2 turns of fortification" — a floor, not a step.
+      unit.fortifyTurns = wonderOccupyDefense(state, unit.tileIndex) > 0 ? FORTIFY_MAX_TURNS : dug;
     }
     // The Great General/Admiral aura grants +1 MP alongside its
     // +5 CS (real Civ 6). Record what was granted so NEXT turn's gates above

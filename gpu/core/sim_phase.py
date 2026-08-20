@@ -263,7 +263,7 @@ class SimPhase:
         loy = self.city_loyalty[bidx, row, col]
         upd = act & others
         nxt = torch.where(upd, (loy + delta).clamp(min=0, max=lmax), loy)
-        cap = self.city_is_cap[bidx, row, col]
+        cap = self.city_is_cap[bidx, row, col] | self._wonder_loyalty_aura(row, here)
         # f64 intermediates, stored at the PLANE's dtype (an f32 sim keeps an
         # f32 loyalty plane).
         self.city_loyalty[bidx, row, col] = torch.where(
@@ -401,6 +401,12 @@ class SimPhase:
             ui = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
             xp = (self.city_bldg[bidx, row, col, :].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
             self._spawn_unit(row, made_u, ctr, ui, init_xp=xp)
+            # CIV6 (Venetian Arsenal): a TRAINED naval unit arrives twice.
+            # Purchases are excluded in the real game and take another path.
+            if self._wond_n and bool(self._wond_dupnaval.any()):
+                twin = made_u & self.unit_naval[ui] & self._seat_wonder_any(row, self._wond_dupnaval)
+                if bool(twin.any()):
+                    self._spawn_unit(row, twin, ctr, ui, init_xp=xp)
             if self._builder_idx >= 0:
                 made_b = made_u & (ui == self._builder_idx)
                 self.civ_builders_trained[:, row] = self.civ_builders_trained[:, row] + made_b.long()
@@ -444,11 +450,29 @@ class SimPhase:
                 wi = (cur - self.WONDER_BASE).clamp(min=0)
                 wt = self.city_wonder[bidx, row, col, :][wr, wi[wr]]
                 self.built_wonder_complete[wr, wt.clamp(min=0)] = True
-                self.era_score[wr, row] += self._era_pts["wonder"]
+                self._add_era_score(row, self._era_pts["wonder"], made_w.long())
                 # CIV6: Statue of Liberty +4 Diplomatic Victory points on
                 # completion, Potala Palace +1.
                 self.civ_diplo_points[wr, row] += self._wond_dvp[wi[wr]]
+                # CIV6 (Big Ben): the treasury is multiplied once, at completion.
+                tmul = self._wond_treasury[wi[wr]]
+                self.civ_treasury[wr, row] = self.civ_treasury[wr, row] * tmul.to(self.civ_treasury.dtype)
                 self._eff_version += 1
+                # CIV6 (Apadana): every wonder completing in its city pays
+                # envoys, itself included — so the count is read AFTER the
+                # complete bit is set, and only the HOLDING city's wonders pay.
+                if int(self._wond_envoy.sum()) > 0:
+                    creg = self.city_wonder[bidx, row, col, :]
+                    chas = (creg >= 0) & self.built_wonder_complete.gather(1, creg.clamp(min=0))
+                    env = (chas.long() * self._wond_envoy.reshape(1, -1)).sum(dim=1)
+                    self.civ_envoys_avail[wr, row] += env[wr]
+                # CIV6 (Oxford, Bolshoi): free technologies and civics.
+                if int(self._wond_freetech.sum()) > 0 or int(self._wond_freeciv.sum()) > 0:
+                    ft = torch.zeros(self.B, dtype=torch.long, device=self.device)
+                    fc = torch.zeros(self.B, dtype=torch.long, device=self.device)
+                    ft[wr] = self._wond_freetech[wi[wr]]
+                    fc[wr] = self._wond_freeciv[wi[wr]]
+                    self._grant_free_research(row, ft, fc)
 
         if self._proj_rows:
             made_p = done & (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
@@ -616,6 +640,8 @@ class SimPhase:
             self.city_artifacts[:, row],
             gw_kmult=self._congress_gw_kmult(),
             themed=self._museum_themed(row),
+            relic_mult=self._city_wonder_mult(row, self._wond_relictour) if self._wond_n else None,
+            resort_mult=self._seat_wonder_mult(row, self._wond_resorttour) if self._wond_n else None,
         ))
         bank(self.civ_diplo_favor,
              self._adopted_gov_tier(self.civ_civics[:, row]) + self._favor_per_suz * self._suzerain_count(row))
@@ -674,6 +700,10 @@ class SimPhase:
                 pts = torch.zeros(B, dtype=torch.float64, device=dev)
             if cls == self._prophet_cls:
                 pts = pts + self._golden_ded(row, self._ded_exodus).double() * 4.0
+            # CIV6: a wonder's per-turn points are the OWNER's, paid whether or
+            # not the holding city has the class's district.
+            if self._wond_n and cls < self._wond_gpp.shape[1] and float(self._wond_gpp[:, cls].sum()) != 0.0:
+                pts = pts + self._seat_wonder_sum(row, self._wond_gpp[:, cls])
             # CIV6 (Patronage resolution): the factor covers every per-turn
             # source, the golden prophet term included.
             pts = pts * self._congress_gpp_factor(cls)
@@ -713,7 +743,7 @@ class SimPhase:
                     self.civ_prophets[:, row] = self.civ_prophets[:, row] + hit.long()
                 self.civ_gpp[:, row, cls] = torch.where(hit, self.civ_gpp[:, row, cls] - gcost, self.civ_gpp[:, row, cls])
                 self.gp_earned[:, cls] = self.gp_earned[:, cls] + hit.long()
-                self.era_score[:, row] += hit.long() * self._era_pts["gp"]  # per GP earned
+                self._add_era_score(row, self._era_pts["gp"], hit.long())  # per GP earned
                 # A GENERAL/ADMIRAL claim spawns its support unit
                 # (civilian, 4 MP) at the seat's capital (city_is_cap
                 # center), on top of the instant effect — the phase.ts
@@ -754,7 +784,7 @@ class SimPhase:
         self.civ_faith[:, row] = torch.where(popen, self.civ_faith[:, row] - pfc, self.civ_faith[:, row])
         self.pantheon_claimed_n.add_(popen.long())
         self.civ_pantheon_done[:, row] = self.civ_pantheon_done[:, row] | popen
-        self.era_score[:, row] += popen.long() * self._era_pts["pantheon"]
+        self._add_era_score(row, self._era_pts["pantheon"], popen.long())
         d_hs = int(self._gp_class_district[self._prophet_cls]) if self._prophet_cls < self._gp_nc else -1
         if d_hs >= 0 and self.districts_on:
             reg_hs = self.city_dist_tile[:, row, :, d_hs]
@@ -779,7 +809,7 @@ class SimPhase:
         self.claimed_f_n.add_(ropen.long())
         self.claimed_o_n.add_(ropen.long())
         self.civ_religion_done[:, row] = self.civ_religion_done[:, row] | ropen
-        self.era_score[:, row] += ropen.long() * self._era_pts["religion"]
+        self._add_era_score(row, self._era_pts["religion"], ropen.long())
         _alv = self.city_alive[:, row]
         _cap = self.city_is_cap[:, row] & _alv
         _ctr = self.city_center[:, row]

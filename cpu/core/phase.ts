@@ -39,6 +39,7 @@ import { congressSession, congressLoyaltyDelta, congressUdtProdDistrict } from '
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { hasRiver, hasFreshWater, isCoastalWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
+import { seatWonders } from './wonders';
 import { disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, archaeologistExcavate, naturalistPark } from './units';
 import { killUnit } from './combat';
 import { availableProjects, buyTile, buyWorshipBuilding, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseSettler, queueProject, settlerCost } from './game';
@@ -312,9 +313,22 @@ export function loyaltyDelta(state: GameState, city: City, amenityTierName: stri
  * Apply a turn of loyalty to `city` (called from endTurn with the stats it
  * already computed). Returns true when the city has hit 0 and must flip.
  */
+/** CIV6 (Statue of Liberty): "All your cities within 6 tiles are always 100%
+ *  Loyal." Measured from the WONDER TILE, like every other wonder aura. */
+function wonderLoyaltyAura(state: GameState, city: City): boolean {
+  const center = state.map.tiles[city.centerIndex];
+  for (const w of seatWonders(state, city.seat)) {
+    const range = w.def.effects?.loyaltyAura ?? 0;
+    if (!range) continue;
+    const t = state.map.tiles[w.tileIndex];
+    if (hexDistance(t.col, t.row, center.col, center.row) <= range) return true;
+  }
+  return false;
+}
+
 export function applyLoyalty(state: GameState, city: City, amenityTierName: string, govBonus = 0): boolean {
   if (!state.seats.some((s) => s.seat !== city.seat && s.cities.length > 0)) return false;
-  if (city.isCapital) {
+  if (city.isCapital || wonderLoyaltyAura(state, city)) {
     city.loyalty = LOYALTY_MAX;
     return false;
   }

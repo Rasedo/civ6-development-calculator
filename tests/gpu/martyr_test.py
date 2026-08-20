@@ -89,9 +89,10 @@ def main() -> None:
     # The draw must move the stream ONLY where an apostle actually fell, which
     # is what keeps it in step with TS's short-circuited `martyrs()`.
     before = sim.rng_state.clone()
-    sim._martyr_draw(torch.zeros(0, dtype=torch.long))
+    _z = torch.zeros(0, dtype=torch.long)
+    sim._martyr_draw(_z, _z)
     assert torch.equal(sim.rng_state, before), "an empty death set still advanced the RNG"
-    sim._martyr_draw(torch.tensor([0], dtype=torch.long))
+    sim._martyr_draw(torch.tensor([0], dtype=torch.long), torch.zeros(1, dtype=torch.long))
     assert int(sim.rng_state[0]) != int(before[0]), "a death did not advance the RNG"
     if sim.B > 1:
         assert torch.equal(sim.rng_state[1:], before[1:]), "one game's draw moved another game's stream"

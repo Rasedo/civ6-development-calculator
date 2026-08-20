@@ -15,7 +15,8 @@ import { revealAround } from './fog';
 import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
-import { BUILT_WONDERS } from '../data/builtWonders';
+import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
+import { completedWonders } from './wonders';
 import { goldenCulturePerDistrict, goldenDedication } from './eras';
 import { PARK_AMENITIES_OWNER, PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../data/improvements';
 import { SPECIALIST_YIELDS, SPECIALIST_TIERS, greatWorkCulture, greatWorkTourism, relicFaith, relicTourism, artifactCulture, artifactTourism, GW_PRINTING_TECH } from '../data/greatPeople';
@@ -339,24 +340,6 @@ export function acquireTile(state: GameState, city: City, tileIndex: number): vo
 }
 
 
-/** Catalog position per wonder id — the index the exported `wonders.rows`
- *  table is in, which is the order the GPU folds its per-wonder products in. */
-const WONDER_CATALOG_ORDER = new Map(Object.keys(BUILT_WONDERS).map((id, i) => [id, i]));
-
-function completedWonders(state: GameState, city: City) {
-  // CATALOG order, not build order. Two callers fold a FLOAT product over this
-  // list — `empireGrowthMult` over growthAllMult and `computeCityStats` over
-  // cityYieldMult — and the GPU's registry is keyed by wonder index and can
-  // only fold ascending, so two multipliers on one channel would otherwise
-  // associate differently on the two engines. Build order is not a Civ 6 fact;
-  // nothing in the game reads it.
-  return city.wonders
-    .filter((w) => state.map.tiles[w.tileIndex].builtWonderComplete)
-    .map((w) => ({ def: BUILT_WONDERS[w.id], tileIndex: w.tileIndex, idx: WONDER_CATALOG_ORDER.get(w.id) ?? 0 }))
-    .filter((w) => w.def)
-    .sort((a, b) => a.idx - b.idx);
-}
-
 export function empireGrowthMult(state: GameState, seat: number): number {
   // Migration Treaty first, wonders after — the GPU folds in this order.
   let mult = congressGrowthMult(state, seat);
@@ -366,6 +349,28 @@ export function empireGrowthMult(state: GameState, seat: number): number {
     }
   }
   return mult;
+}
+
+/** The flat amenities and housing a city's OWN complete wonders pay it. */
+function wonderCityFlat(state: GameState, city: City, key: 'cityAmenities' | 'cityHousing'): number {
+  let n = 0;
+  for (const w of completedWonders(state, city)) n += w.def.effects?.[key] ?? 0;
+  return n;
+}
+
+/** Amenities from the improvements around a wonder that pays per improvement
+ *  (Temple of Artemis counts Camps, Pastures and Plantations within 4). */
+function wonderImprovementAmenities(state: GameState, city: City): number {
+  let n = 0;
+  for (const w of completedWonders(state, city)) {
+    const rule = w.def.effects?.amenityPerImprovement;
+    if (!rule) continue;
+    const t = state.map.tiles[w.tileIndex];
+    for (const near of tilesWithin(state.map, t.col, t.row, rule.range)) {
+      if (near.improvement && (rule.improvements as readonly string[]).includes(near.improvement)) n += 1;
+    }
+  }
+  return n;
 }
 
 function wonderRegionalAmenities(state: GameState, city: City): number {
@@ -437,6 +442,14 @@ function resortTourism(state: GameState, owns: (t: Tile) => boolean): number {
   return t;
 }
 
+/** The product of one wonder-effect multiplier over a seat's complete
+ *  wonders, in CATALOG order so both engines fold it the same way. */
+function wonderMult(state: GameState, cities: readonly City[], key: 'religiousTourismMult' | 'resortTourismMult'): number {
+  let m = 1;
+  for (const c of cities) for (const w of completedWonders(state, c)) m *= w.def.effects?.[key] ?? 1;
+  return m;
+}
+
 /**
  * The AMENITIES a seat's National Parks pay this city. CIV6: a park
  * gives "2 Amenities to the city that owns it and 1 Amenity to the four
@@ -491,10 +504,16 @@ export function seatTourism(state: GameState, seat: number): number {
   let t = 0;
   const printing = s.research.techs.includes(GW_PRINTING_TECH);
   const km = congressGwMult(state);
-  for (const c of citiesOf(state, seat)) t += greatWorkTourism(c, printing, km) + relicTourism(c) + artifactTourism(c);
+  const cities = citiesOf(state, seat);
+  for (const c of cities) {
+    // CIV6 (St. Basil's): the religious-tourism multiplier is the HOLDING
+    // city's, so it lands inside the per-city sum.
+    t += greatWorkTourism(c, printing, km) + relicTourism(c) * wonderMult(state, [c], 'religiousTourismMult') + artifactTourism(c);
+  }
   const owns = (tile: Tile) => tileOwnedByCiv(tile, seat);
   const era = civEraIndex(s.research.techs, s.research.civics);
-  return t + resortTourism(state, owns) + parkTourism(state, owns) + wonderTourism(state, era, owns);
+  return t + resortTourism(state, owns) * wonderMult(state, cities, 'resortTourismMult')
+    + parkTourism(state, owns) + wonderTourism(state, era, owns);
 }
 
 export function computeCityStats(
@@ -509,7 +528,18 @@ export function computeCityStats(
   const map = state.map;
   const center = map.tiles[city.centerIndex];
   const wonders = completedWonders(state, city);
-  const hasPetra = wonders.some((w) => w.def.effects?.petraDesert);
+  // CIV6: a wonder that names a TERRAIN or FEATURE pays its yields on the
+  // city's own tiles; `empire` widens the payer to every city the seat holds
+  // (Etemenanki's Marsh). The centre counts — it is a worked tile — and a
+  // districted tile does not, since its terrain yields are dark anyway.
+  const tileRules: NonNullable<NonNullable<BuiltWonderDef['effects']>['tileYields']> = [];
+  for (const w of wonders) for (const r of w.def.effects?.tileYields ?? []) tileRules.push(r);
+  for (const c of citiesOf(state, city.seat)) {
+    if (c.id === city.id) continue;
+    for (const w of completedWonders(state, c)) {
+      for (const r of w.def.effects?.tileYields ?? []) if (r.empire) tileRules.push(r);
+    }
+  }
 
   const specialists = effectiveSpecialists(state, city);
   let specialistTotal = 0;
@@ -518,9 +548,13 @@ export function computeCityStats(
   const worked = assignWorkedTiles(state, city, ctx, city.population - specialistTotal);
   const tiles = emptyYields();
   addYields(tiles, tileYieldsForCenter(ctx, center));
-  const petraBonus = (t: Tile) => {
-    if (hasPetra && t.terrain === 'DESERT' && t.feature !== 'FLOODPLAINS' && !t.district) {
-      addYields(tiles, { food: 2, gold: 2, production: 1 });
+  const wonderTileBonus = (t: Tile, isCenter: boolean) => {
+    if (!tileRules.length || (t.district && !isCenter)) return;
+    for (const r of tileRules) {
+      if (r.terrain && t.terrain !== r.terrain) continue;
+      if (r.feature && t.feature !== r.feature) continue;
+      if (r.excludeFeature && t.feature === r.excludeFeature) continue;
+      addYields(tiles, r.yields);
     }
   };
   const hasWaterMill = city.buildings.includes('WATER_MILL');
@@ -529,11 +563,11 @@ export function computeCityStats(
     const r = RESOURCES[t.resource];
     if (r?.category === 'bonus' && r.improvement === 'FARM') tiles.food += 1;
   };
-  petraBonus(center);
+  wonderTileBonus(center, true);
   waterMillBonus(center);
   for (const i of worked) {
     addYields(tiles, tileYields(ctx, map.tiles[i]));
-    petraBonus(map.tiles[i]);
+    wonderTileBonus(map.tiles[i], false);
     waterMillBonus(map.tiles[i]);
   }
 
@@ -593,12 +627,14 @@ export function computeCityStats(
   addYields(bonuses, m.cityYields);
   if (city.isCapital) addYields(bonuses, m.capitalYields);
 
-  const housing = computeHousing(state, city, m);
+  const housing = computeHousing(state, city, m) + wonderCityFlat(state, city, 'cityHousing');
   let have =
     localBuildingAmenities(state, city) +
     parkAmenities(state, city) +
     regional.amenities +
     wonderRegionalAmenities(state, city) +
+    wonderCityFlat(state, city, 'cityAmenities') +
+    wonderImprovementAmenities(state, city) +
     m.amenitiesAll +
     (m.riverCity && hasRiver(center) ? m.riverCity.amenities : 0) +
     ((luxMap ?? luxuryAmenities(state, city.seat)).get(city.id) ?? 0);

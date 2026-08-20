@@ -197,6 +197,7 @@ export const GW_SLOTS = [2, 3, 1] as const;
  *  Writing slot, +1 Great Work of Music slot". */
 export const GW_WONDER_SLOTS: Record<string, readonly [number, number, number]> = {
   GREAT_LIBRARY: [2, 0, 0],
+  OXFORD_UNIVERSITY: [2, 0, 0],
   HERMITAGE: [0, 4, 0],
   BOLSHOI_THEATRE: [1, 0, 1],
 };

@@ -1,13 +1,21 @@
 import type { GameState } from './types';
 import { seatOf, isBarbSeat, isCiv } from './seats';
+import { seatWonderSum } from './wonders';
 import { UNITS } from '../data/units';
 import { DED_DRACONES } from '../data/seats';
-import { DEDICATIONS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/seats';
+import { ERA_SCORE_MOMENT_MIN, DEDICATIONS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/seats';
 
 
-export function addEraScore(state: GameState, seat: number, pts: number): void {
+/** Pay era score for `count` moments each worth `per`. CIV6 (Taj Mahal):
+ *  a moment worth ERA_SCORE_MOMENT_MIN or more pays its owner one more,
+ *  so the per-moment value has to survive as far as this call. */
+export function addEraScore(state: GameState, seat: number, per: number, count = 1): void {
   const s = seatOf(state, seat);
-  if (s) s.eraScore = (s.eraScore ?? 0) + pts;
+  if (!s || count <= 0) return;
+  s.eraScore = (s.eraScore ?? 0) + per * count;
+  if (per >= ERA_SCORE_MOMENT_MIN) {
+    s.eraScore += seatWonderSum(state, seat, 'eraScorePerMoment') * count;
+  }
 }
 
 /** Era boundary — runs right AFTER `state.turn += 1` in endTurn (the GPU
@@ -68,7 +76,7 @@ export function dedicationEvent(state: GameState, civ: number, kind: number, eve
   if (!picks) return;
   let n = 0;
   for (const p of picks) if (p === kind) n++;
-  if (n > 0) addEraScore(state, civ, events * n * DED_EVENT_SCORE[kind]);
+  if (n > 0) addEraScore(state, civ, DED_EVENT_SCORE[kind], events * n);
 }
 
 /** CIV6 (Hic Sunt Dracones, dark face): "+1 Era Score each time you kill a

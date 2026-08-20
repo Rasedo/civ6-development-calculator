@@ -23,10 +23,17 @@ class SimStep:
                 _spent = self._spent_mp(_pre)
                 _fort = getattr(self, f"{_pre}_unit_fortify")
                 _mil = (self._type_combat[_typ] > 0) & ~self.unit_naval[_typ]
-                _fort.copy_(torch.where(
+                _dug = torch.where(
                     _alive & _mil & ~_spent, (_fort + 1).clamp(max=2),
                     torch.where(_alive & _mil & _spent, torch.zeros_like(_fort), _fort),
-                ))
+                )
+                # CIV6 (Alhambra, Mont St. Michel): a unit occupying the wonder
+                # "automatically gains 2 turns of fortification" — a floor.
+                _occ = self._occupy_def()
+                if _occ is not None:
+                    _on = _occ.gather(1, getattr(self, f"{_pre}_unit_tile").clamp(min=0)) > 0
+                    _dug = torch.where(_alive & _mil & _on, torch.full_like(_dug, 2), _dug)
+                _fort.copy_(_dug)
             self._refresh_aura_mp()
             # The movesLeft/movesFull reset itself, for BOTH windows —
             # refreshUnits loops every unit regardless of seat. The major

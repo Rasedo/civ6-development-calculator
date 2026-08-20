@@ -2,7 +2,7 @@
 import type { DistrictId, GameState, GreatPersonClass, ImprovementId, ResearchState, ResourceCategory, Yields } from './types';
 import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
-import { GOVERNMENTS, POLICIES, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef } from '../data/policies';
+import { GOVERNMENTS, POLICIES, SLOT_KINDS, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef, type SlotKind } from '../data/policies';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
 import { seatOf, citiesOf, campTiles } from './seats';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -227,8 +227,7 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   const mods = modifiersFromResearch(s.research);
 
   if (GOVERNMENTS_ADOPTION_LIVE) {
-    const xs = wonderExtraSlots(state, seat);
-    applyGovernment(mods, s.research, xs.diplo, xs.wild);
+    applyGovernment(mods, s.research, wonderExtraSlots(state, seat));
   }
 
   const beliefSeat = { followers: pop, cities: cities.length };
@@ -315,22 +314,22 @@ function applyBeliefEffects(
  * wildcard) so the scripted both seats seats adopt symmetrically — the
  * GPU mirror computes the same set from the seat's tracked civics.
  */
-/** Count the wonder-granted policy slots (Potala's diplomatic, Forbidden
- * City's wildcard) — the LIVE adoption and the boost census both take them. */
-export function wonderExtraSlots(state: GameState, seat: number): { diplo: number; wild: number } {
-  let diplo = 0, wild = 0;
+/** Count the wonder-granted policy slots, by kind — the LIVE adoption and
+ * the boost census both take them. */
+export function wonderExtraSlots(state: GameState, seat: number): Record<SlotKind, number> {
+  const out: Record<SlotKind, number> = { military: 0, economic: 0, diplomatic: 0, wildcard: 0 };
   for (const c of citiesOf(state, seat)) {
     for (const w of c.wonders ?? []) {
       if (!state.map.tiles[w.tileIndex].builtWonderComplete) continue;
-      const fx = BUILT_WONDERS[w.id]?.effects;
-      if (fx?.extraDiploSlot) diplo++;
-      if (fx?.extraWildcardSlot) wild++;
+      const xs = BUILT_WONDERS[w.id]?.effects?.extraSlots;
+      if (!xs) continue;
+      for (const k of SLOT_KINDS) out[k] += xs[k] ?? 0;
     }
   }
-  return { diplo, wild };
+  return out;
 }
 
-export function computeAdoption(research: ResearchState, extraDiplo = 0, extraWild = 0): {
+export function computeAdoption(research: ResearchState, extra?: Record<SlotKind, number>): {
   government: string | null;
   policies: (string | null)[];
 } {
@@ -344,8 +343,7 @@ export function computeAdoption(research: ResearchState, extraDiplo = 0, extraWi
   // Wonder-granted slots append AFTER the base list so the greedy fill's
   // order stays the government's own; wildcards last, like every base list.
   const slots = [...chosen.slots];
-  for (let i = 0; i < extraDiplo; i++) slots.push('diplomatic');
-  for (let i = 0; i < extraWild; i++) slots.push('wildcard');
+  for (const k of SLOT_KINDS) for (let i = 0; i < (extra?.[k] ?? 0); i++) slots.push(k);
   const policies: (string | null)[] = slots.map(() => null);
   for (const card of Object.values(POLICIES)) {
     if (!u.policies.has(card.id)) continue;
@@ -355,8 +353,8 @@ export function computeAdoption(research: ResearchState, extraDiplo = 0, extraWi
   return { government: chosen.id, policies };
 }
 
-function applyGovernment(mods: Modifiers, research: ResearchState, extraDiplo = 0, extraWild = 0): void {
-  const { government, policies } = computeAdoption(research, extraDiplo, extraWild);
+function applyGovernment(mods: Modifiers, research: ResearchState, extra?: Record<SlotKind, number>): void {
+  const { government, policies } = computeAdoption(research, extra);
   const gov = government ? GOVERNMENTS[government] : null;
   if (!gov) return;
   applyPolicyEffects(mods, gov.effects);
@@ -432,13 +430,12 @@ export function baseYieldCtx(state: GameState): YieldCtx {
   return { map: state.map, mods: defaultModifiers(), camps: campTiles(state) };
 }
 
-export function governmentSlots(state: GameState, seat: number): import('../data/policies').SlotKind[] {
+export function governmentSlots(state: GameState, seat: number): SlotKind[] {
   const govId = seatOf(state, seat)!.government.current;
   const gov = govId ? GOVERNMENTS[govId] : null;
   if (!gov) return [];
   const slots = [...gov.slots];
   const xs = wonderExtraSlots(state, seat);
-  for (let i = 0; i < xs.diplo; i++) slots.push('diplomatic');
-  for (let i = 0; i < xs.wild; i++) slots.push('wildcard');
+  for (const k of SLOT_KINDS) for (let i = 0; i < xs[k]; i++) slots.push(k);
   return slots;
 }

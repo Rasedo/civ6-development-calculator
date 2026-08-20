@@ -8,6 +8,7 @@ import { BUILDINGS } from '../data/buildings';
 import { centerBuildingIds } from '../core/prodLayout';
 import { DISTRICTS, type AdjacencySource } from '../data/districts';
 import { FEATURES } from '../../world/features';
+import { TERRAINS } from '../../world/terrains';
 import { TECHS } from '../data/techs'; // era scale
 import { CIVICS } from '../data/civics';
 import { RESOURCES } from '../../world/resources';
@@ -65,6 +66,7 @@ civicList.forEach((c, i) => {
 });
 
 const FEAT_IDS = Object.keys(FEATURES);
+const TERRAIN_IDS = Object.keys(TERRAINS);
 const featIdx = new Map(FEAT_IDS.map((f, i) => [f, i]));
 const RESOURCE_IDS = Object.keys(RESOURCES);
 const BUILT_WONDER_LIST = Object.values(BUILT_WONDERS);
@@ -134,4 +136,4 @@ function featureAdjContribution(tile: Tile, id: DistrictId, removable = true): n
 }
 
 
-export { LUXURY_IDS, chopKeyCode, chopUnlockTech, techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, featIdx, RESOURCE_IDS, BUILT_WONDER_LIST, wonderStaticOk, staticAdjRaw, featureAdjContribution };
+export { LUXURY_IDS, chopKeyCode, chopUnlockTech, techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, featIdx, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, wonderStaticOk, staticAdjRaw, featureAdjContribution };

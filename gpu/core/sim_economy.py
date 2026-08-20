@@ -741,7 +741,7 @@ class SimEconomy:
         adopted, has_gov = self._adopted_gov(civics2)
         return torch.where(has_gov, self._gov_tier[adopted], torch.zeros(B, dtype=torch.long, device=self.device))
 
-    def _gov_policy_mods(self, civics2: torch.Tensor, extra_d: torch.Tensor | None = None, extra_w: torch.Tensor | None = None) -> tuple[
+    def _gov_policy_mods(self, civics2: torch.Tensor, extra_slots: torch.Tensor | None = None) -> tuple[
         torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
     ]:
         """(cityYields [B,6], capitalYields [B,6], housingAll [B], yieldMult
@@ -789,15 +789,10 @@ class SimEconomy:
         tpmult = torch.where(has_gov, self._gov_tpmult[adopted], tpmult)
         if self._npol:
             nslots = self._gov_slots[adopted] * has_gov.long().unsqueeze(1)  # [B, 4]
-            # Wonder-granted slots (Potala diplomatic, Forbidden City
-            # wildcard) — TS appends them to computeAdoption's slot list; a
-            # seat with no government slots nothing either way.
-            if extra_d is not None and extra_w is not None:
-                nslots = torch.stack((
-                    nslots[:, 0], nslots[:, 1],
-                    nslots[:, 2] + extra_d * has_gov.long(),
-                    nslots[:, 3] + extra_w * has_gov.long(),
-                ), dim=1)
+            # Wonder-granted slots — TS appends them to computeAdoption's slot
+            # list; a seat with no government slots nothing either way.
+            if extra_slots is not None:
+                nslots = nslots + extra_slots * has_gov.long().unsqueeze(1)
             puc = self._pol_unlock_civic  # [nPol]
             pol_unlocked = torch.where(
                 puc.unsqueeze(0) >= 0,
@@ -858,8 +853,7 @@ class SimEconomy:
         d = self._gov_pol_cache[1]
         v = d.get(row)
         if v is None:
-            xd, xw = self._wonder_extra_slots(row)
-            v = self._gov_policy_mods(self._seat_civics(row), xd, xw)
+            v = self._gov_policy_mods(self._seat_civics(row), self._wonder_extra_slots(row))
             d[row] = v
         return v
 
@@ -1402,7 +1396,7 @@ class SimEconomy:
                 distinct = distinct & (seats[:, :, i] != seats[:, :, j])
         return full & one_era & distinct
 
-    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, relics: torch.Tensor | None = None, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None, gw_kmult: torch.Tensor | None = None, themed: torch.Tensor | None = None) -> torch.Tensor:
+    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, relics: torch.Tensor | None = None, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None, gw_kmult: torch.Tensor | None = None, themed: torch.Tensor | None = None, relic_mult: torch.Tensor | None = None, resort_mult: torch.Tensor | None = None) -> torch.Tensor:
         """[B] — a seat's per-turn TOURISM, the `seatTourism` twin. Great Works
         pay the values that pair tourism with culture; every OWNED unpillaged
         SEASIDE RESORT pays its tile's APPEAL (floored at 0), attributed by
@@ -1427,7 +1421,10 @@ class SimEconomy:
             + self._gw_tour_k[2] * km[:, 2] * (gw_m * alive.long()).sum(dim=1)
         )
         if relics is not None:
-            t = t + self._relic_tour * (relics * alive.long()).sum(dim=1)
+            # CIV6 (St. Basil's): the religious-tourism multiplier is the
+            # HOLDING city's, so it lands inside the per-city sum.
+            rm = relic_mult.long() if relic_mult is not None else torch.ones_like(relics)
+            t = t + self._relic_tour * (relics * alive.long() * rm).sum(dim=1)
         if artifacts is not None:
             # a THEMED Archaeological Museum doubles what it holds.
             tm = torch.ones_like(artifacts)
@@ -1443,7 +1440,9 @@ class SimEconomy:
         if self.SEASIDE >= 0:
             live = (self.improvement == self.SEASIDE) & ~self.pillaged & own
             if bool(live.any()):
-                t = t + (self._tile_appeal().clamp(min=0) * live.long()).sum(dim=1)
+                # CIV6 (Cristo Redentor): the resort multiplier is the SEAT's.
+                sm = resort_mult.long() if resort_mult is not None else torch.ones(self.B, dtype=torch.long, device=self.device)
+                t = t + (self._tile_appeal().clamp(min=0) * live.long()).sum(dim=1) * sm
         # CIV6: a National Park pays "Tourism equal to the total Appeal of all
         # the tiles included in it" — NOT floored, so an ugly neighbour can
         # take a park's payout negative.
@@ -1725,24 +1724,36 @@ class SimEconomy:
         compw = self._completed_wonders(row)
         if compw is not None:
             compw = compw[:, sl]
-        # PETRA — +2 food / +2 gold / +1 production on each WORKED desert
-        # non-floodplain undistricted tile (petraBonus), POST-selection like TS
-        # (the score ranks without it). TS also calls petraBonus(center), but
-        # founding sets the centre's district to CITY_CENTER, so its
-        # `!t.district` arm can never fire there.
-        if compw is not None and bool(compw.any()):
-            hasP = (compw & self._wond_petra.reshape(1, 1, -1)).any(dim=2)
-            if bool(hasP.any()):
-                qual = (
-                    self.desert.gather(1, stf).reshape(B, n, M)
-                    & (self.feat_id.gather(1, stf).reshape(B, n, M) != self._fp_fid)
-                    & (self.district.gather(1, stf).reshape(B, n, M) < 0)
-                    & take
-                )
-                nq = (qual & hasP.unsqueeze(2)).sum(dim=2).double()
-                tiles_y[:, :, 0] = tiles_y[:, :, 0] + 2.0 * nq
-                tiles_y[:, :, 1] = tiles_y[:, :, 1] + nq
-                tiles_y[:, :, 2] = tiles_y[:, :, 2] + 2.0 * nq
+        # WONDER TILE YIELDS (`wonderTileBonus`) — a wonder naming a TERRAIN or
+        # FEATURE pays its yields on the city's own tiles; `emp` widens the
+        # payer to every city the seat holds. POST-selection like TS (the score
+        # ranks without it). The CENTRE always counts, a worked DISTRICT tile
+        # never does. A chopped feature is gone, so the live feature is
+        # feat_id masked by feat_stripped.
+        if compw is not None and self._wond_tiley and bool(compw.any()):
+            und = (self.district.gather(1, stf).reshape(B, n, M) < 0) & take
+            terr_w = self.terrain.gather(1, stf).reshape(B, n, M)
+            fl = torch.where(self.feat_stripped, torch.full_like(self.feat_id, -1), self.feat_id)
+            feat_w = fl.gather(1, stf).reshape(B, n, M)
+            terr_c = self.terrain.gather(1, ctr)
+            feat_c = fl.gather(1, ctr)
+            for _wi, _tid, _fid, _xfid, _emp, _y in self._wond_tiley:
+                has = compw[:, :, _wi]
+                if _emp:
+                    has = has.any(dim=1, keepdim=True).expand_as(has)
+                if not bool(has.any()):
+                    continue
+                qw, qc = und, torch.ones_like(terr_c, dtype=torch.bool)
+                if _tid >= 0:
+                    qw, qc = qw & (terr_w == _tid), qc & (terr_c == _tid)
+                if _fid >= 0:
+                    qw, qc = qw & (feat_w == _fid), qc & (feat_c == _fid)
+                if _xfid >= 0:
+                    qw, qc = qw & (feat_w != _xfid), qc & (feat_c != _xfid)
+                nq = (qw & has.unsqueeze(2)).sum(dim=2).double() + (qc & has).double()
+                for _k in range(6):
+                    if float(_y[_k]) != 0.0:
+                        tiles_y[:, :, _k] = tiles_y[:, :, _k] + float(_y[_k]) * nq
         wm = bldg[:, :, rd.b_farmbonus]
         if wm.numel() and bool(wm.any()):
             elig = (

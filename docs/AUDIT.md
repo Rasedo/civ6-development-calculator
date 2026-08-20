@@ -62,14 +62,14 @@ nothing carries forward.
 | B-31r trade-route tails | 2 | sea legs park at origin, no trading posts, plunder gold is a stylization, one candidate not a free pick |
 | B-D unsourced data values | 3 | the sweep is done; nine NAMED stylizations stay open, each labelled at its definition |
 | B-36r appeal adjacency terms | 1 | the four reachable terms ship; Dam/Canal/Water Park/Preserve and the Great People wait on C-22, C-4, C-21 |
-| B-38r no wonder pays per-turn GP points | 1 | Hermitage's Artist points and Bolshoi's Writer/Musician points; flat culture stands in |
-| B-39r wonder effects still dropped | 3 | fourteen rows name one each in their `description` |
+| B-39r wonder effects still dropped | 1 | the sourced sweep shipped fourteen channels; five residuals, each blocked on B-20r, C-21, B-34r or C-23 |
+| B-45r sourced-sweep finds in the other rows | 2 | eight wonders pay effects no channel expresses: free units, patronage discount, tech boosts, route capacity and route yields |
 | B-41r the wall pool is all-or-nothing | 1 | Civ 6 reduces centre damage instead, and scales wall damage by attacker class |
 | B-42r the damage random range is contested | 1 | 0.8-1.2 vs 0.75-1.25; the same source states both |
 | B-44r city-state war has no decider | 1 | both engines carry the machinery; no policy ever reaches it |
 | B-35r theological damage | 1 | deterministic and LINEAR where real Civ 6 rolls; the martyr draw shows a mirrored conditional draw is available |
 | B-34r flood tails | 1 | GS floods also damage UNITS and kill citizens, and a centre on a floodplain loses HP; and the Dam/Great Bath that mitigates a river is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **27** | |
+| **B. Fidelity vs real Civ 6** | **26** | |
 | C-1 POWER | 5 | no plants, no grid, no powered-yield term — 4 gaps wait on it |
 | C-2 diplomatic agreements | 6 | war and peace and nothing between: open borders, work trades, alliances, denouncements |
 | C-3 unit promotions | 4 | only MARTYR reaches a rule; choosing one is also a wire head |
@@ -77,7 +77,7 @@ nothing carries forward.
 | C-5 strategic-resource stockpiles | 4 | resources gate, they never accumulate or get spent |
 | C-6 policy-card modifiers | 5 | ~38 adoptable cards are inert one-liners |
 | C-7 trading posts | 2 | a route lays roads and plants nothing |
-| C-8 draws made deterministic | 2 | inspirations, the religion pick, theological damage |
+| C-8 draws made deterministic | 2 | inspirations, the religion pick, theological damage, Oxford's and the Bolshoi's free research |
 | C-9 faith-purchase classes | 1 | faith buys named units, never a class of building |
 | C-10 non-GS city-state rows | 1 | Antioch/Amsterdam were replaced in GS; no line can be quoted |
 | C-11 terrain the wonder rules need | 2 | the NARROWED placements are deliberately narrower than Civ 6's |
@@ -92,10 +92,11 @@ nothing carries forward.
 | C-20 the Military Engineer's build list | 2 | five buildables and the finish-a-district charge |
 | C-21 Great Person ACTIVATED abilities | 2 | every GP fires instantly; none is placed and used |
 | C-22 the district roster is a subset | 3 | no Dam, Canal, Water Park, Preserve, Aerodrome, Government Plaza or Diplomatic Quarter |
-| **C. Absent systems** | **56** | |
+| C-23 nothing diminishes tourism | 1 | no rival's Enlightenment ever costs a tourist, so Cristo Redentor's cancelling clause has nothing to cancel |
+| **C. Absent systems** | **57** | |
 | **OPEN, TOTAL** | **83** | |
 
-THE TOTAL JUMPED from 17 to 87 while the code only got better. The old number
+THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
 had been written down as DECISIONS, and the new B rows are what the same sweep
 found at the definition sites — markers in the source that claimed a system was
@@ -327,21 +328,45 @@ Civ 6 source or is recorded as unverifiable.
   OPEN, each blocked: the DAM, CANAL, WATER PARK and PRESERVE terms (C-22 —
   no such district here), the unique-improvement terms (C-4), and the
   appeal-granting Great People (C-21).
-- **B-38r. No wonder pays PER-TURN Great Person points.** `BuiltWonderDef`
-  has no GP-point channel, so the Hermitage's "+3 Artist points per turn" and
-  the Bolshoi Theatre's "+2 Writer / +2 Musician points per turn" are stood in
-  for by flat `cityYields.culture`. The channel is the item; the two wonders
-  are its first users.
-- **B-39r. Wonder effects still dropped.** Fourteen `BUILT_WONDERS` rows name
-  one in their own `description` — Mont St. Michel's Martyr guarantee on every
-  Apostle, the Bolshoi's two free civics, St. Basil's +100% religious tourism
-  and tundra yields, the Taj Mahal's era score, Alhambra's military slot,
-  Venetian Arsenal's duplicate naval unit, Cristo Redentor's tourism ability,
-  and the rest. Each is one effect, so the weight is for the sweep. NOT open
-  any more: per-wonder Great Work and RELIC slots, which `GW_WONDER_SLOTS` and
-  `RELIC_WONDER_SLOTS` now pay (Great Library, Hermitage, Bolshoi Theatre, St.
-  Basil's, Mont St. Michel). The Hermitage's real slots take LANDSCAPE art
-  only; that restriction is the same missing per-work TYPE B-20r names.
+- **B-39r. Wonder effects still dropped.** All THIRTY rows were re-fetched
+  from the GS Civilopedia one by one and the effect lists rewritten against
+  them, so `BUILT_WONDERS` is now a sourced table rather than a costs-and-
+  unlocks table with eyeballed effects. Fourteen new channels carry what that
+  found: per-turn Great Person points, city housing, city amenities,
+  terrain/feature tile yields (which `petraDesert` folded into), amenities per
+  nearby improvement, policy slots by KIND, envoys per wonder built, spread and
+  build charges, a certain Martyr, the duplicate naval train, the relic- and
+  resort-tourism multipliers, the loyalty aura, occupation defence, free
+  civics/techs, the treasury multiplier and era score per moment.
+  Twelve invented yield entries went with it — Etemenanki's and the Great
+  Bath's faith, Apadana's culture, the Mausoleum's three, St. Basil's faith and
+  culture, the Taj Mahal's faith and culture, the Statue of Liberty's culture, the
+  Hermitage's and the Bolshoi's culture, the Venetian Arsenal's production,
+  Big Ben's +10% gold and Oxford's flat science — none of which the real
+  wonder pays; and four wrong magnitudes were corrected (Colosseum 1 -> 3
+  amenities, Oxford +10% -> +20% science, Potala science/faith -> culture 2 /
+  faith 3, Sankoré 2 -> 3 science).
+  OPEN, each blocked: Apadana's "+2 Great Work slots (any type)" and the
+  Hermitage's LANDSCAPE-only art slots, both waiting on the per-work TYPE
+  B-20r names; the Mausoleum's "all Engineers have an additional charge"
+  (C-21 — a Great Person fires instantly here and is never a unit); the Great
+  Bath's flood terms (B-34r); and Cristo Redentor's clause that relic and
+  holy-city tourism is not diminished by a rival's Enlightenment (C-23).
+- **B-45r. The effects the SOURCED sweep found in the other rows.** Eight
+  wonders pay something real Civ 6 gives them that no channel here can
+  express yet, all discovered by B-39r's re-fetch and none of them a
+  self-declared gap before it: Stonehenge's free Prophet and its
+  found-a-religion-on-the-wonder clause, the Pyramids' free Builder, the
+  Oracle's 25%-cheaper Great Person patronage (nothing to discount — faith
+  never buys a Great Person here, C-9) and its "+2 Great Person points of
+  their type" for districts in that city, the Great Library's boosts to
+  every Ancient and Classical technology and its boost when a rival recruits a
+  Great Scientist, the Colossus' +1 trade-route capacity and free Trader,
+  Great Zimbabwe's +1 trade route and its per-bonus-resource route gold, Ruhr
+  Valley's +1 production per Mine and Quarry in its city, and Sankoré's three
+  trade-route yield terms. The free units wait on C-21 and on a Trader grant
+  path; the route terms wait on B-31r's route-yield work; the rest are new
+  channels.
 - **B-41r. The wall pool is all-or-nothing, and class-blind.** `cityAssault`
   / `_assault_city` send the whole roll to `outerHp` until the pool is empty
   and only the spillover to city HP. Two sourced differences: real Civ 6 has
@@ -497,6 +522,13 @@ number was under-counting by treating deferrals as closures.
   of them an ACTIVATED ability used later on a chosen tile. Gaps: the
   appeal-granting Great People (Alvar Aalto, Charles Correa) that B-36r names,
   and every "activate in a city" ability in the roster.
+- **C-23. NOTHING DIMINISHES TOURISM.** Weight 1. Real Civ 6 reduces the
+  tourism a civ earns from Relics and Holy Cities once other civs research
+  The Enlightenment, and reduces Great Work tourism the same way through the
+  era ladder. `seatTourism` / `_tourism_of` pay a flat value from every
+  source, so no rival's research ever costs a tourist. Cristo Redentor's
+  second clause exists to CANCEL that reduction, so the wonder cannot pay it
+  until the reduction exists.
 - **C-22. THE DISTRICT ROSTER IS A SUBSET.** Weight 3. Twelve of Civ 6's
   districts exist; the DAM, CANAL, WATER PARK, PRESERVE, AERODROME, GOVERNMENT
   PLAZA and DIPLOMATIC QUARTER do not. Gaps: their appeal terms (B-36r), the

@@ -1089,14 +1089,20 @@ class SimSeats:
         adj = (host[:, nb] & (self.neigh >= 0).unsqueeze(0)).any(dim=2)
         return base & adj
 
-    def _martyr_draw(self, rows: torch.Tensor) -> torch.Tensor:
+    def _martyr_draw(self, rows: torch.Tensor, seats: torch.Tensor) -> torch.Tensor:
         """One MARTYR draw per fallen apostle, for the games in `rows` — the
         `martyrs()` twin. Returns the [n] keep mask aligned with `rows`; the
         stream advances in exactly those games, which is where TS's own draw
-        lands."""
+        lands. CIV6 (Mont St. Michel): its owner's Apostles all carry MARTYR,
+        and the draw still runs so the stream is the same length either way."""
         m = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         m[rows] = True
-        return self._next_random(m)[rows] < self._martyr_chance
+        drew = self._next_random(m)[rows] < self._martyr_chance
+        if self._wond_n and bool(self._wond_martyr.any()):
+            certain = torch.stack([self._seat_wonder_any(r, self._wond_martyr)
+                                   for r in range(self.n_majors)], dim=1)  # [B, n_majors]
+            drew = drew | certain[rows, seats.clamp(min=0, max=self.n_majors - 1)]
+        return drew
 
     def _theological_combat_phase(self) -> None:
         """THEOLOGICAL COMBAT — ONE pass, every seat, at one schedule position.
@@ -1194,12 +1200,12 @@ class SimSeats:
             _dcand = _dr[self.major_unit_type[_dr, _dj] == self._apostle_idx]
             if _dcand.numel():
                 _dseat = self.major_unit_seat[_dcand, j[_dcand]]
-                _keep = self._martyr_draw(_dcand)
+                _keep = self._martyr_draw(_dcand, _dseat)
                 if bool(_keep.any()) and self._relic_bidx >= 0:
                     self._grant_relic(_dcand[_keep], _dseat[_keep])
             _ar = rows[atk_dead]
             if _ar.numel():
-                _keep = self._martyr_draw(_ar)
+                _keep = self._martyr_draw(_ar, a_seat[_ar])
                 if bool(_keep.any()) and self._relic_bidx >= 0:
                     self._grant_relic(_ar[_keep], a_seat[_ar][_keep])
             # A killed unit must also LEAVE ITS TILE: TS's `disbandUnit` drops
@@ -1674,7 +1680,46 @@ class SimSeats:
         n = (self.ded_picks[:, civ] == kind).sum(dim=1)
         pay = (self.civ_age[:, civ] != 2) & (n > 0)
         if bool(pay.any()):
-            self.era_score[:, civ] = self.era_score[:, civ] + pay.long() * cnt * n * self._ded_event_score[kind]
+            self._add_era_score(civ, int(self._ded_event_score[kind]), pay.long() * cnt * n)
+
+    def _grant_free_research(self, row: int, n_tech: torch.Tensor, n_civic: torch.Tensor) -> None:
+        """`grantFreeResearch` — complete N techs and N civics outright, taking
+        the FIRST available row in catalog order each time, then clearing the
+        pick and its parked progress the way the paid completion does."""
+        for is_civic in (0, 1):
+            n = n_civic if is_civic else n_tech
+            for k in range(int(n.max())):
+                want = n > k
+                if not bool(want.any()):
+                    continue
+                done = self.civ_civics[:, row] if is_civic else self.civ_techs[:, row]
+                pre = self._prereq_c if is_civic else self._prereq_t
+                avail = self._available_mask(done, pre)
+                hit = want & avail.any(dim=1)
+                if not bool(hit.any()):
+                    continue
+                pick = avail.long().argmax(dim=1)
+                r = hit.nonzero(as_tuple=True)[0]
+                if is_civic:
+                    self.civ_civics[r, row, pick[r]] = True
+                    self.civ_civic_retain[r, row, pick[r]] = 0
+                    cur = self.civ_cur_civic[:, row]
+                    self.civ_cur_civic[:, row] = torch.where(hit & (cur == pick), torch.full_like(cur, -1), cur)
+                else:
+                    self.civ_techs[r, row, pick[r]] = True
+                    self.civ_tech_retain[r, row, pick[r]] = 0
+                    cur = self.civ_cur_tech[:, row]
+                    self.civ_cur_tech[:, row] = torch.where(hit & (cur == pick), torch.full_like(cur, -1), cur)
+                self._eff_version += 1
+
+    def _add_era_score(self, row: int, per: int, count: torch.Tensor) -> None:
+        """`addEraScore` — era score for `count` moments each worth `per`.
+        CIV6 (Taj Mahal): a moment worth `_era_moment_min` or more pays its
+        owner one more, so the per-moment value has to reach this call."""
+        cnt = count.long()
+        self.era_score[:, row] = self.era_score[:, row] + cnt * int(per)
+        if per >= self._era_moment_min and self._wond_n and int(self._wond_erascore.sum()) > 0:
+            self.era_score[:, row] = self.era_score[:, row] + cnt * self._seat_wonder_sum(row, self._wond_erascore)
 
     def _culture_victor(self) -> torch.Tensor:
         """The `cultureVictor` mirror: [B] the lowest seat id whose VISITING
@@ -2010,6 +2055,12 @@ class SimSeats:
             torch.where(mask, t[:, 5], z),
         )
 
+    def _row_hot(self, rows: torch.Tensor | int) -> torch.Tensor:
+        """[B] long — 1 on the batch rows named, 0 elsewhere."""
+        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        out[rows] = 1
+        return out
+
     def _completed_wonders(self, row: int) -> torch.Tensor | None:
         if not self._wond_n:
             return None
@@ -2017,16 +2068,76 @@ class SimSeats:
         reg = self.city_wonder[:, row, :cols]
         return (reg >= 0) & self.built_wonder_complete.gather(1, reg.clamp(min=0).reshape(self.B, -1)).reshape_as(reg)
 
-    def _wonder_extra_slots(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
-        """[B] long x2 — the (diplomatic, wildcard) policy slots this seat's
-        COMPLETE wonders add (the `wonderExtraSlots` twin)."""
-        z = torch.zeros(self.B, dtype=torch.long, device=self.device)
+    def _wonder_extra_slots(self, row: int) -> torch.Tensor | None:
+        """[B, 4] long — the policy slots this seat's COMPLETE wonders add, in
+        SLOT_KINDS order (the `wonderExtraSlots` twin)."""
         compw = self._completed_wonders(row)
         if compw is None:
-            return z, z
-        d = (compw & (self._wond_dslot > 0).reshape(1, 1, -1)).sum(dim=(1, 2))
-        w = (compw & (self._wond_wslot > 0).reshape(1, 1, -1)).sum(dim=(1, 2))
-        return d, w
+            return None
+        return (compw.long().unsqueeze(3) * self._wond_slots.reshape(1, 1, -1, 4)).sum(dim=(1, 2))
+
+    def _seat_wonder_sum(self, row: int, per_wonder: torch.Tensor) -> torch.Tensor:
+        """[B] — one per-wonder quantity summed over every COMPLETE wonder the
+        seat holds (the `seatWonderSum` twin)."""
+        compw = self._completed_wonders(row)
+        if compw is None:
+            return torch.zeros(self.B, dtype=per_wonder.dtype, device=self.device)
+        return (compw.to(per_wonder.dtype) * per_wonder.reshape(1, 1, -1)).sum(dim=(1, 2))
+
+    def _seat_wonder_any(self, row: int, flag: torch.Tensor) -> torch.Tensor:
+        """[B] bool — does the seat hold a COMPLETE wonder carrying `flag`?"""
+        compw = self._completed_wonders(row)
+        if compw is None:
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        return (compw & flag.reshape(1, 1, -1)).any(dim=2).any(dim=1)
+
+    def _seat_wonder_mult(self, row: int, per_wonder: torch.Tensor) -> torch.Tensor:
+        """[B] f64 — the product of one per-wonder multiplier over the seat's
+        COMPLETE wonders, folded in CATALOG order like the TS twin."""
+        compw = self._completed_wonders(row)
+        if compw is None:
+            return torch.ones(self.B, dtype=torch.float64, device=self.device)
+        return torch.where(
+            compw, per_wonder.reshape(1, 1, -1).expand_as(compw), torch.ones_like(compw, dtype=torch.float64)
+        ).prod(dim=2).prod(dim=1)
+
+    def _city_wonder_mult(self, row: int, per_wonder: torch.Tensor) -> torch.Tensor:
+        """[B, cols] f64 — the product of a per-wonder multiplier over each
+        city's OWN complete wonders, folded in catalog order."""
+        compw = self._completed_wonders(row)
+        if compw is None:
+            return torch.ones(self.B, self.RC, dtype=torch.float64, device=self.device)
+        return torch.where(
+            compw, per_wonder.reshape(1, 1, -1).expand_as(compw), torch.ones_like(compw, dtype=torch.float64)
+        ).prod(dim=2)
+
+    def _city_wonder_flat(self, row: int, per_wonder: torch.Tensor) -> torch.Tensor:
+        """[B, cols] — a per-wonder amount paid to the city that HOLDS it."""
+        compw = self._completed_wonders(row)
+        if compw is None:
+            return torch.zeros(self.B, self.RC, dtype=per_wonder.dtype, device=self.device)
+        return (compw.to(per_wonder.dtype) * per_wonder.reshape(1, 1, -1)).sum(dim=2)
+
+    def _wonder_improvement_amenities(self, row: int) -> torch.Tensor:
+        """[B, cols] f64 — `wonderImprovementAmenities`: +1 amenity to the
+        HOLDING city per matching improvement within the wonder's reach,
+        measured from the WONDER TILE like every other wonder aura."""
+        cols = self.RC
+        z = torch.zeros(self.B, cols, dtype=torch.float64, device=self.device)
+        if not self._wond_n or not self._wond_amen_imp:
+            return z
+        wreg = self.city_wonder[:, row, :cols]  # [B, cols, nW] tile per wonder
+        for _wi, _imps, _rng in self._wond_amen_imp:
+            wt = wreg[:, :, _wi]
+            has = (wt >= 0) & self.built_wonder_complete.gather(1, wt.clamp(min=0))
+            if not bool(has.any()):
+                continue
+            near = self.pair_dist[wt.clamp(min=0)] <= _rng  # [B, cols, T]
+            ok = torch.zeros_like(self.improvement, dtype=torch.bool)
+            for _i in _imps:
+                ok = ok | (self.improvement == _i)
+            z = z + (near & ok.unsqueeze(1)).sum(dim=2).double() * has.double()
+        return z
 
     def _wonder_growth_mult(self, compw: torch.Tensor | None) -> torch.Tensor | None:
         if compw is None:
@@ -2221,6 +2332,7 @@ class SimSeats:
             housing = housing + gm[2].double().unsqueeze(1)
             spec_d = self._district_counts(row)[1]
             housing = housing + self._cond_house_amen(gm[8], gm[9], spec_d)[0]
+        housing = housing + self._city_wonder_flat(row, self._wond_cityhouse)[:, :cols]
         return maint, torch.where(alive, housing, torch.zeros_like(housing))
 
     def _seat_amenity(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -2266,11 +2378,14 @@ class SimSeats:
             _spec_d = self._district_counts(row)[1]
             _, _cond_amen = self._cond_house_amen(_g_hid, _g_nd, _spec_d)
             have = have + _g_amen.unsqueeze(1) + _cond_amen
-        # Regional WONDER amenities (Great Bath / Alhambra / Colosseum) join the
+        # WONDER amenities (Colosseum's regional reach, Alhambra's and Great
+        # Bath's local ones, Temple of Artemis' per-improvement count) join the
         # TIER balance after the grant — city.ts leaves them out of baseHave.
         _wregam = self._wonder_regional_amenities(row, self._completed_wonders(row))
         if _wregam is not None:
             have = have + _wregam
+        have = have + self._city_wonder_flat(row, self._wond_cityamen)[:, :cols]
+        have = have + self._wonder_improvement_amenities(row)
         extra = None
         if self._seat_has_beliefs(row):
             ctr = self.city_center[:, row, :cols].clamp(min=0)
@@ -2420,7 +2535,7 @@ class SimSeats:
         self._tile_owner_ver += 1  # seat + which city: the two halves TS calls ownerSeat/ownerCity
         col = self._seat_city_append(b, dst_row)
         self.city_alive[b, dst_row, col] = True
-        self.era_score[b, dst_row] += self._era_pts["conquer"]
+        self._add_era_score(dst_row, self._era_pts["conquer"], self._row_hot(b))
         self._reveal_around(_b1, dst_row, torch.tensor([c_t], dtype=torch.long, device=dev), 3)
         self.city_is_cap[b, dst_row, col] = False  # a received city is never a capital (TS isCapital: false)
         self.city_center[b, dst_row, col] = c_t
@@ -2630,7 +2745,7 @@ class SimSeats:
         # non-capital.
         new_cap = ~alive_row[rows].any(dim=1)
         self.city_alive[rows, row, slot] = True
-        self.era_score[rows, row] += self._era_pts["found"]
+        self._add_era_score(row, self._era_pts["found"], self._row_hot(rows))
         self.city_is_cap[rows, row, slot] = new_cap
         self.civ_cap_tile[rows, row] = torch.where(new_cap, s_idx, self.civ_cap_tile[rows, row])
         self.city_center[rows, row, slot] = s_idx
@@ -2850,6 +2965,49 @@ class SimSeats:
                 a_tile[vr, u] = ttc[vr]
                 a_occ[vr, ttc[vr]] = u + a_lo
 
+    def _wonder_charges(self, row: int, type_idx: torch.Tensor) -> torch.Tensor:
+        """[B] long — `wonderCharges`: the Pyramids' extra build charge on a
+        Builder, the Hagia Sophia's extra spread on a Missionary or Apostle.
+        Paid at CREATION, so a unit that predates the wonder keeps its count."""
+        z = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        if not self._wond_n:
+            return z
+        if int(self._wond_build_ch.sum()) > 0 and self._builder_idx >= 0:
+            z = z + (type_idx == self._builder_idx).long() * self._seat_wonder_sum(row, self._wond_build_ch)
+        if int(self._wond_spread.sum()) > 0:
+            spread = (type_idx == self._missionary_idx) | (type_idx == self._apostle_idx)
+            z = z + spread.long() * self._seat_wonder_sum(row, self._wond_spread)
+        return z
+
+    def _wonder_loyalty_aura(self, row: int, here: torch.Tensor) -> torch.Tensor:
+        """[B] bool — `wonderLoyaltyAura`: is the city centre at `here` within
+        reach of one of this seat's COMPLETE loyalty-aura wonders? Measured
+        from the WONDER TILE, like every other wonder aura."""
+        z = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        if not self._wond_n or int(self._wond_loyalty.sum()) == 0:
+            return z
+        compw = self._completed_wonders(row)
+        if compw is None:
+            return z
+        wreg = self.city_wonder[:, row, : self.RC]  # [B, cols, nW]
+        for _wi in (self._wond_loyalty > 0).nonzero(as_tuple=True)[0].tolist():
+            wt = wreg[:, :, _wi]
+            has = (wt >= 0) & self.built_wonder_complete.gather(1, wt.clamp(min=0))
+            if not bool(has.any()):
+                continue
+            d = self.pair_dist[wt.clamp(min=0), here.unsqueeze(1)]  # [B, cols]
+            z = z | (has & (d <= int(self._wond_loyalty[_wi]))).any(dim=1)
+        return z
+
+    def _occupy_def(self) -> torch.Tensor | None:
+        """[B, T] long — the defence a COMPLETE wonder gives the unit standing
+        on its tile (`terrainDefense`'s wonder term). None when no such wonder
+        is in the catalog."""
+        if not self._wond_n or int(self._wond_occdef.sum()) == 0:
+            return None
+        bw = self.built_wonder
+        return self._wond_occdef[bw.clamp(min=0)] * ((bw >= 0) & self.built_wonder_complete).long()
+
     def _tdef_g(self, tiles: torch.Tensor) -> torch.Tensor:
         """[B] terrain defence at `tiles`, INCLUDING a live FORT (+4).
 
@@ -2861,12 +3019,18 @@ class SimSeats:
         d = self.tdef.gather(1, tiles.unsqueeze(1)).squeeze(1)
         if self.FORT >= 0:
             d = d + 4 * (self.improvement.gather(1, tiles.unsqueeze(1)).squeeze(1) == self.FORT).long()
+        occ = self._occupy_def()
+        if occ is not None:
+            d = d + occ.gather(1, tiles.unsqueeze(1)).squeeze(1)
         return d
 
     def _tdef_i(self, bidx: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
         d = self.tdef[bidx, tiles]
         if self.FORT >= 0:
             d = d + 4 * (self.improvement[bidx, tiles] == self.FORT).long()
+        occ = self._occupy_def()
+        if occ is not None:
+            d = d + occ[bidx, tiles]
         return d
 
     def _nonbarb_unit_plane(self) -> torch.Tensor:

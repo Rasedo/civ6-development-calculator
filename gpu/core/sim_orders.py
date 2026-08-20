@@ -477,7 +477,7 @@ class SimOrders:
             self.tile_city[b, c_t] = new_id
             self._tile_owner_ver += 1
             self.city_alive[b, row, col] = True
-            self.era_score[b, row] += self._era_pts["conquer"]
+            self._add_era_score(row, self._era_pts["conquer"], self._row_hot(b))
             self._reveal_around(torch.tensor([b], dtype=torch.long, device=dev), row,
                                 torch.tensor([c_t], dtype=torch.long, device=dev), 3)
             self.city_id[b, row, col] = new_id

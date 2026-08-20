@@ -144,8 +144,8 @@ describe('world congress', () => {
     // and +1 Diplomatic policy slot.
     expect(BUILT_WONDERS.STATUE_OF_LIBERTY.effects?.dvp).toBe(4);
     expect(BUILT_WONDERS.POTALA_PALACE.effects?.dvp).toBe(1);
-    expect(BUILT_WONDERS.POTALA_PALACE.effects?.extraDiploSlot).toBe(true);
-    expect(BUILT_WONDERS.FORBIDDEN_CITY.effects?.extraWildcardSlot).toBe(true);
+    expect(BUILT_WONDERS.POTALA_PALACE.effects?.extraSlots?.diplomatic).toBe(1);
+    expect(BUILT_WONDERS.FORBIDDEN_CITY.effects?.extraSlots?.wildcard).toBe(1);
   });
 
   it('the Medieval gate reads ANY civ, not just seat 0', () => {

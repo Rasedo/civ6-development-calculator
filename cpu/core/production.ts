@@ -1,5 +1,8 @@
-import type { City, GameState, QueueItem } from './types';
+import type { City, GameState, Seat } from './types';
+import type { QueueItem } from './types';
 import { seatOf } from './seats';
+import { availableCivicsIn, availableTechsIn } from './effects';
+import { completedWonders, seatWonderFlag } from './wonders';
 import { UNITS, ENCAMPMENT_HP, WALLS_HP } from '../data/units';
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf } from '../data/projects';
 import { DED_MONUMENTALITY, ERA_SCORE_WONDER } from '../data/seats';
@@ -12,6 +15,26 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { DED_STEAM } from '../data/seats';
 import { BUILDING_ERA_INDEX } from '../data/buildings';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
+
+/** Complete `n` techs or civics outright. Real Civ 6 draws them at random;
+ *  this takes the first AVAILABLE rows in catalog order, the same order every
+ *  other unresearched-row walk uses. */
+function grantFreeResearch(owner: Seat, kind: 'tech' | 'civic', n: number): void {
+  const rsr = owner.research;
+  for (let i = 0; i < n; i++) {
+    const next = kind === 'tech' ? availableTechsIn(rsr)[0] : availableCivicsIn(rsr)[0];
+    if (!next) return; // the tree is exhausted
+    if (kind === 'tech') {
+      rsr.techs.push(next.id);
+      delete rsr.techRetained[next.id];
+      if (rsr.tech === next.id) rsr.tech = null;
+    } else {
+      rsr.civics.push(next.id);
+      delete rsr.civicRetained[next.id];
+      if (rsr.civic === next.id) rsr.civic = null;
+    }
+  }
+}
 
 export function completeProject(state: GameState, city: City, projectId: string, cost: number, sciPerTurn = 0): void {
   const def = PROJECTS[projectId];
@@ -83,10 +106,21 @@ export function completeQueueItem(
     case 'wonder': {
       state.map.tiles[item.tileIndex].builtWonderComplete = true;
       addEraScore(state, city.seat, ERA_SCORE_WONDER);
+      const fx = BUILT_WONDERS[item.wonder]?.effects;
       // CIV6: Statue of Liberty pays +4 Diplomatic Victory points on
       // completion, Potala Palace +1.
-      const dvp = BUILT_WONDERS[item.wonder]?.effects?.dvp ?? 0;
-      if (dvp) owner.diplomaticPoints = (owner.diplomaticPoints ?? 0) + dvp;
+      if (fx?.dvp) owner.diplomaticPoints = (owner.diplomaticPoints ?? 0) + fx.dvp;
+      // CIV6 (Big Ben): the treasury is multiplied once, at completion.
+      if (fx?.treasuryMult) owner.treasury *= fx.treasuryMult;
+      // CIV6 (Apadana): +2 envoys each time ANY wonder completes in its city,
+      // itself included — so the count is read AFTER this tile went complete.
+      const envoys = completedWonders(state, city).reduce((n, w) => n + (w.def.effects?.envoysPerWonder ?? 0), 0);
+      if (envoys) owner.envoysAvailable = (owner.envoysAvailable ?? 0) + envoys;
+      // CIV6 (Oxford, Bolshoi): free technologies and civics, drawn at random
+      // in the real game and taken here in the same available-order the
+      // research chooser uses.
+      if (fx?.freeTechs) grantFreeResearch(owner, 'tech', fx.freeTechs);
+      if (fx?.freeCivics) grantFreeResearch(owner, 'civic', fx.freeCivics);
       break;
     }
     case 'settler':
@@ -102,6 +136,15 @@ export function completeQueueItem(
         if (xp > 0) trained.xp = xp;
       }
       if (item.unit === 'BUILDER') owner.buildersTrained += 1;
+      // CIV6 (Venetian Arsenal): a TRAINED naval unit arrives twice. Purchases
+      // are excluded in the real game and take a different path here.
+      if (UNITS[item.unit]?.naval && seatWonderFlag(state, city.seat, 'duplicateNavalTrain')) {
+        const twin = spawnUnit(state, item.unit, city.centerIndex, city.seat);
+        if (twin && (UNITS[item.unit]?.combat ?? 0) > 0) {
+          const xp = encampmentTrainXp(city.buildings);
+          if (xp > 0) twin.xp = xp;
+        }
+      }
       break;
     }
     case 'project':

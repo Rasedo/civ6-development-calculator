@@ -17,6 +17,7 @@ import { placeCityStates, cityStatePhase, suzerainEffect } from './cityStates';
 import { placeSeats, seatPhase, worldCongress, nextCityName } from './phase';
 import { congressUdtBlockedDistrict } from './congress';
 import { commitProduction, commitResearch } from './seatTurn';
+import { seatWonderFlag } from './wonders';
 import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY } from '../data/seats';
 import { addEraScore, eraBoundary, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
 import { UNITS, WALLS_HP, ENCAMPMENT_HP, CITY_MAX_HP } from '../data/units';
@@ -1063,7 +1064,12 @@ function theologicalCombatPhase(state: GameState): void {
     // MISSIONARY yields nothing. Drawn and granted in the SAME order as the two
     // disbands below (defender first, then attacker) so both the RNG stream and
     // the relic's slot are order-exact across engines.
-    const martyrs = (): boolean => nextRandom(state) < MARTYR_CHANCE;
+    // CIV6 (Mont St. Michel): every Apostle its owner creates carries MARTYR.
+    // The draw still runs so the RNG stream is the same length either way.
+    const martyrs = (sx: number): boolean => {
+      const drew = nextRandom(state) < MARTYR_CHANCE;
+      return drew || seatWonderFlag(state, sx, 'apostleMartyr');
+    };
     // Capacity is the TEMPLE's slot plus any wonder's, so the closure resolves
     // completeness off the tile the way the Great-Works path does.
     const relicSlots = (c: { wonders?: { id: string; tileIndex: number }[] }) =>
@@ -1077,9 +1083,9 @@ function theologicalCombatPhase(state: GameState): void {
       const owner = seatOf(state, sx);
       if (owner) owner.relicReserve = (owner.relicReserve ?? 0) + 1;
     };
-    if (def.hp <= 0 && def.type === 'APOSTLE' && martyrs()
+    if (def.hp <= 0 && def.type === 'APOSTLE' && martyrs(unitSeat(def))
         && !placeRelic(citiesOf(state, unitSeat(def)), relicSlots)) reserve(unitSeat(def));
-    if (att.hp <= 0 && martyrs()
+    if (att.hp <= 0 && martyrs(g)
         && !placeRelic(citiesOf(state, g), relicSlots)) reserve(g); // the attacker is always an APOSTLE
     if (def.hp <= 0) disbandUnit(state, def.id);
     if (att.hp <= 0) disbandUnit(state, att.id);

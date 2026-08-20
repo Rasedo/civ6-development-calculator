@@ -178,6 +178,9 @@ export const ERA_SCORE_WONDER = 3; // completed a world wonder
 export const ERA_SCORE_PANTHEON = 1;
 export const ERA_SCORE_RELIGION = 2;
 export const ERA_SCORE_GP = 1; // earned a Great Person
+/** CIV6 (Taj Mahal): the wonder pays only for moments "usually worth 2 or
+ *  more Era Score", so the threshold is a rule, not a tuning knob. */
+export const ERA_SCORE_MOMENT_MIN = 2;
 export const ERA_DARK_T = 3;
 export const ERA_GOLDEN_T = 10;
 export const AGE_PRESSURE = [0.5, 1.0, 1.5];

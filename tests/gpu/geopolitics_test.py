@@ -539,7 +539,8 @@ def main() -> None:
     assert s6._congress_dv_min == 5, "the DV resolution enters at MODERN (index 5)"
     assert len(s6._congress_res) == 4, "the modeled catalog is 4 resolutions"
     # CIV6: SoL +4 DVP, Potala +1 DVP + a diplomatic slot; FC's wildcard slot
-    assert int(s6._wond_dvp.sum()) == 5 and int(s6._wond_dslot.sum()) == 1 and int(s6._wond_wslot.sum()) == 1
+    assert int(s6._wond_dvp.sum()) == 5, "the two DVP wonders pay 4 and 1"
+    assert s6._wond_slots.sum(dim=0).tolist() == [1, 1, 1, 1],         "one wonder each adds a military, economic, diplomatic and wildcard slot" 
 
     # not a session turn -> nothing happens, favor untouched
     s6.civ_diplo_favor[:, 0] = 50

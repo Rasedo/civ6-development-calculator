@@ -5,6 +5,7 @@ import { GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, GW_CLASS_KIND, GW_WONDER_S
 import { congressGppFactor } from './congress';
 import { BUILDINGS } from '../data/buildings';
 import { ERA_SCORE_GP } from '../data/seats';
+import { seatWonders } from './wonders';
 import { addEraScore, goldenProphetPoints } from './eras';
 import { getModifiers } from './effects';
 import { spawnUnit } from './units';
@@ -32,6 +33,13 @@ export function greatPersonPointsPerTurn(
       if (!inst) continue;
       out[cls] += 1 + (gppFlat[cls] ?? 0)
         + city.buildings.filter((b) => BUILDINGS[b]?.district === district).length;
+    }
+  }
+  // CIV6: a wonder's per-turn Great Person points are the owner's, paid
+  // whether or not the holding city has the class's district.
+  for (const w of seatWonders(state, seat)) {
+    for (const [cls, pts] of Object.entries(w.def.effects?.gpPoints ?? {})) {
+      out[cls as GreatPersonClass] += pts;
     }
   }
   // CIV6 (Patronage resolution): the factor covers every source, the golden

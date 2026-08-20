@@ -338,6 +338,7 @@ class SimInit:
         self._c_gw_mult = int(_er2["congressGwMult"])
         self._era_len = int(_er.get("length", 50))
         self._era_pts = {k: int(_er.get(k, d)) for k, d in (("found", 2), ("conquer", 3), ("wonder", 3), ("pantheon", 1), ("religion", 2), ("gp", 1))}
+        self._era_moment_min = int(_er["momentMin"])
         # Per-seat Age (0 Dark / 1 Normal / 2 Golden), assigned at each era
         # boundary from the just-ended window's score; era 0 is all Normal (the
         # TS civAges default — nothing exported at t0). _MUTABLE. _age_factor =
@@ -608,20 +609,52 @@ class SimInit:
         self.city_wonder = torch.full((B, self.n_majors, civ_city_pad, max(self._wond_n, 1)), -1, dtype=torch.long, device=device)
         self.res_id = torch.tensor([[t.get("rid", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.desert = torch.tensor([[t.get("des", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        self.terrain = torch.tensor([[t["terr"] for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.wok = torch.tensor([[t.get("wok", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         if self._wond_n:
             self._wond_cy = torch.tensor([w["cy"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW, 6]
             self._wond_mult = torch.tensor([w["mult"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW, 6]
             self._wond_grow = torch.tensor([w["growAll"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
-            self._wond_petra = torch.tensor([bool(w.get("petra", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)  # [nW]
             # wonderRegionalAmenities — amenities a COMPLETE wonder pays to every
-            # same-seat city centre within regional_range (Great Bath 1, Alhambra
-            # 2, Colosseum 1). Reaches the tier balance only, never the luxury
-            # ranking's baseHave (city.ts luxuryAmenities).
-            self._wond_regam = torch.tensor([float(w.get("regionalAmenities", 0)) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
+            # same-seat city centre within regional_range (Colosseum 3). Reaches
+            # the tier balance only, never the luxury ranking's baseHave
+            # (city.ts luxuryAmenities).
+            self._wond_regam = torch.tensor([float(w["regionalAmenities"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
+            # ...and the ones a wonder pays only to the city that holds it.
+            self._wond_cityamen = torch.tensor([float(w["cityAmenities"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
+            self._wond_cityhouse = torch.tensor([float(w["cityHousing"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
             self._wond_dvp = torch.tensor([int(w["dvp"]) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] DVP paid at completion
-            self._wond_dslot = torch.tensor([int(w["dslot"]) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] extra diplomatic policy slots
-            self._wond_wslot = torch.tensor([int(w["wslot"]) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] extra wildcard policy slots
+            # Policy slots [nW, 4] in SLOT_KINDS order (military, economic,
+            # diplomatic, wildcard) — the counts `_gov_policy_mods` adds.
+            self._wond_slots = torch.tensor([list(w["slots"]) for w in self._wond_rows], dtype=torch.long, device=device)
+            # Great Person points per turn [nW, nGpClasses], parallel to the
+            # GP class roster.
+            self._wond_gpp = torch.tensor([list(w["gpp"]) for w in self._wond_rows], dtype=torch.float64, device=device)
+            # Terrain/feature-keyed tile yields. One (terr, feat, xfeat, emp,
+            # y[6]) rule per entry, flattened with the wonder index it came
+            # from so the yield walk can loop over rules, not wonders.
+            self._wond_tiley = [
+                (wi, int(r["terr"]), int(r["feat"]), int(r["xfeat"]), bool(r["emp"]),
+                 torch.tensor(list(r["y"]), dtype=torch.float64, device=device))
+                for wi, w in enumerate(self._wond_rows) for r in w["tiley"]
+            ]
+            # Amenity-per-improvement (Temple of Artemis): improvement indices
+            # and the reach, per wonder.
+            self._wond_amen_imp = [(wi, list(w["amenImp"]), int(w["amenImpRange"]))
+                                   for wi, w in enumerate(self._wond_rows) if w["amenImp"]]
+            self._wond_envoy = torch.tensor([int(w["envoysPerWonder"]) for w in self._wond_rows], dtype=torch.long, device=device)
+            self._wond_spread = torch.tensor([int(w["spreadCharges"]) for w in self._wond_rows], dtype=torch.long, device=device)
+            self._wond_build_ch = torch.tensor([int(w["buildCharges"]) for w in self._wond_rows], dtype=torch.long, device=device)
+            self._wond_martyr = torch.tensor([bool(w["apostleMartyr"]) for w in self._wond_rows], dtype=torch.bool, device=device)
+            self._wond_dupnaval = torch.tensor([bool(w["dupNaval"]) for w in self._wond_rows], dtype=torch.bool, device=device)
+            self._wond_relictour = torch.tensor([float(w["relicTourismMult"]) for w in self._wond_rows], dtype=torch.float64, device=device)
+            self._wond_resorttour = torch.tensor([float(w["resortTourismMult"]) for w in self._wond_rows], dtype=torch.float64, device=device)
+            self._wond_loyalty = torch.tensor([int(w["loyaltyAura"]) for w in self._wond_rows], dtype=torch.long, device=device)
+            self._wond_occdef = torch.tensor([int(w["occupyDefense"]) for w in self._wond_rows], dtype=torch.long, device=device)
+            self._wond_freeciv = torch.tensor([int(w["freeCivics"]) for w in self._wond_rows], dtype=torch.long, device=device)
+            self._wond_freetech = torch.tensor([int(w["freeTechs"]) for w in self._wond_rows], dtype=torch.long, device=device)
+            self._wond_treasury = torch.tensor([float(w["treasuryMult"]) for w in self._wond_rows], dtype=torch.float64, device=device)
+            self._wond_erascore = torch.tensor([int(w["eraScorePerMoment"]) for w in self._wond_rows], dtype=torch.long, device=device)
             # Per-wonder Great Work slots [nW, 3] in kind order (writing, art,
             # music), additive with the GW_BUILDINGS slots.
             self._wond_gw = torch.tensor([list(w.get("gwslots", [0, 0, 0])) for w in self._wond_rows], dtype=torch.long, device=device)

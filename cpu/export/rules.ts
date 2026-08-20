@@ -24,7 +24,7 @@ import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { TRADE_ROUTE_RANGE, CITY_STATE_ROUTE_GOLD, CITY_STATE_ROUTE_SPEC, INTL_ROUTE_GOLD, TRADE_ROUTE_DURATION, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from '../core/trade';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
-import { MAX_CITIES_PER_SEAT, CITY_SLOTS_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, PEACE_GOLD_COST, WW_ERA_BASE_FORMAL, WW_ERA_BASE_SURPRISE, WW_ABROAD_MULT, WW_DEATH_MULT, WW_DECAY_AT_WAR, WW_DECAY_AT_PEACE, WW_PEACE_TREATY, WAR_WEARINESS_PER_AMENITY, DOW_PROXIMITY, FORMAL_WAR_MIN_TURNS, ERA_LENGTH, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, GOVERNOR_LOYALTY, HEROIC_DEDICATIONS, ADMIRAL_MARCH_LIVE, GOLDEN_MOVE_BONUS, DEDICATION_PAYOUTS_LIVE, ALLY_MIN_PEACE, WARMONGER_DOW, WARMONGER_CAPTURE, WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, CONGRESS_RESOLUTIONS, CONGRESS_DV_MIN_ERA, CONGRESS_DV_DELTA, CONGRESS_VOTE_STEP, CONGRESS_PROD_MULT, CONGRESS_GPP_MULT, CONGRESS_GROWTH_A, CONGRESS_GROWTH_B, CONGRESS_MIG_LOYALTY, CONGRESS_GW_MULT, DED_EVENT_SCORE, DIPLO_VICTORY_POINTS, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, ENGINEER_LIVE, DED_MONUMENTALITY, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS } from '../data/seats';
+import { MAX_CITIES_PER_SEAT, CITY_SLOTS_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, PEACE_GOLD_COST, WW_ERA_BASE_FORMAL, WW_ERA_BASE_SURPRISE, WW_ABROAD_MULT, WW_DEATH_MULT, WW_DECAY_AT_WAR, WW_DECAY_AT_PEACE, WW_PEACE_TREATY, WAR_WEARINESS_PER_AMENITY, DOW_PROXIMITY, FORMAL_WAR_MIN_TURNS, ERA_LENGTH, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, ERA_SCORE_MOMENT_MIN, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, GOVERNOR_LOYALTY, HEROIC_DEDICATIONS, ADMIRAL_MARCH_LIVE, GOLDEN_MOVE_BONUS, DEDICATION_PAYOUTS_LIVE, ALLY_MIN_PEACE, WARMONGER_DOW, WARMONGER_CAPTURE, WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, CONGRESS_RESOLUTIONS, CONGRESS_DV_MIN_ERA, CONGRESS_DV_DELTA, CONGRESS_VOTE_STEP, CONGRESS_PROD_MULT, CONGRESS_GPP_MULT, CONGRESS_GROWTH_A, CONGRESS_GROWTH_B, CONGRESS_MIG_LOYALTY, CONGRESS_GW_MULT, DED_EVENT_SCORE, DIPLO_VICTORY_POINTS, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, ENGINEER_LIVE, DED_MONUMENTALITY, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS } from '../data/seats';
 import { WONDER_TOURISM_BASE } from '../core/city';
 import { BALANCED_WEIGHTS } from '../core/score';
 import { unitActionNames } from '../core/unitActions';
@@ -35,7 +35,7 @@ import { BUILDINGS } from '../data/buildings';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencySource } from '../data/districts';
 import { TECHS, ERAS, MODERN_ERA_INDEX } from '../data/techs'; // era scale
 import { CIVICS } from '../data/civics';
-import { GOVERNMENTS, POLICIES, GOVERNMENTS_ADOPTION_LIVE, type SlotKind } from '../data/policies';
+import { GOVERNMENTS, POLICIES, SLOT_KINDS, GOVERNMENTS_ADOPTION_LIVE, type SlotKind } from '../data/policies';
 import { BOOSTS, BOOST_FRACTION } from '../data/boosts';
 import { CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, FOOD_PER_CITIZEN, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, LUXURY_AMENITY_CITIES, GAME_SPEED, REGIONAL_RANGE, EMBARK_MOVES, EMBARKED_DEFENSE_CS, embarkState } from '../data/constants';
 
@@ -49,7 +49,7 @@ import { CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, FOOD_PER_CITIZEN, C
 import { IMPROVEMENT_IDS } from '../core/unitActions'; // ONE roster, core-owned (order is the column index; FORT appended LAST)
 
  
-import { techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, RESOURCE_IDS, BUILT_WONDER_LIST } from './catalog';
+import { techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST } from './catalog';
 import { DED_TO_ARMS, DED_DRACONES, DED_COINAGE, DED_STEAM, TO_ARMS_MIL_PROD_MULT, DRACONES_DISCOVERY_SCORE, COINAGE_INTL_GOLD_PER_SPEC, STEAM_WONDER_PROD_MULT } from '../data/seats';
 import { BUILDING_ERA_INDEX } from '../data/buildings';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
@@ -240,6 +240,7 @@ export function buildRules() {
       pantheon: ERA_SCORE_PANTHEON,
       religion: ERA_SCORE_RELIGION,
       gp: ERA_SCORE_GP,
+      momentMin: ERA_SCORE_MOMENT_MIN,
       darkT: ERA_DARK_T,
       goldenT: ERA_GOLDEN_T,
       agePressure: AGE_PRESSURE,
@@ -429,9 +430,23 @@ export function buildRules() {
         uc: w.requiresCivic ? civicIdx.get(w.requiresCivic) ?? -3 : -1,
         cy: YIELD_KEYS.map((k) => w.cityYields?.[k] ?? 0),
         growAll: w.effects?.growthAllMult ?? 1,
-        petra: w.effects?.petraDesert ? 1 : 0,
         gwslots: GW_WONDER_SLOTS[w.id] ?? [0, 0, 0],
         relicslots: RELIC_WONDER_SLOTS[w.id] ?? 0,
+        // Great Person points per turn, parallel to GP_CLASSES.
+        gpp: GP_CLASSES.map((c) => w.effects?.gpPoints?.[c] ?? 0),
+        // Terrain/feature-keyed tile yields. terr/feat/xfeat are catalog
+        // indices, -1 for "no constraint"; emp = 1 pays every city the seat
+        // holds rather than only the wonder's own.
+        tiley: (w.effects?.tileYields ?? []).map((r) => ({
+          terr: r.terrain ? TERRAIN_IDS.indexOf(r.terrain) : -1,
+          feat: r.feature ? FEAT_IDS.indexOf(r.feature) : -1,
+          xfeat: r.excludeFeature ? FEAT_IDS.indexOf(r.excludeFeature) : -1,
+          emp: r.empire ? 1 : 0,
+          y: YIELD_KEYS.map((k) => r.yields[k] ?? 0),
+        })),
+        // improvement indices the wonder pays an amenity for, and the reach
+        amenImp: (w.effects?.amenityPerImprovement?.improvements ?? []).map((i) => IMPROVEMENT_IDS.indexOf(i)),
+        amenImpRange: w.effects?.amenityPerImprovement?.range ?? 0,
         mult: YIELD_KEYS.map((k) => w.effects?.cityYieldMult?.[k] ?? 1),
         // adjacency requirement: -1 none, -2 CITY_CENTER, -3 required but
         // out-of-catalog (never placeable — Colosseum/Ruhr), else the
@@ -445,9 +460,24 @@ export function buildRules() {
               : -3,
         adjR: w.placement.adjacentResource ? RESOURCE_IDS.indexOf(w.placement.adjacentResource) : -1,
         regionalAmenities: w.effects?.regionalAmenities ?? 0,
+        cityAmenities: w.effects?.cityAmenities ?? 0,
+        cityHousing: w.effects?.cityHousing ?? 0,
         dvp: w.effects?.dvp ?? 0,
-        dslot: w.effects?.extraDiploSlot ? 1 : 0,
-        wslot: w.effects?.extraWildcardSlot ? 1 : 0,
+        // policy slots, parallel to SLOT_KINDS
+        slots: SLOT_KINDS.map((k) => w.effects?.extraSlots?.[k] ?? 0),
+        envoysPerWonder: w.effects?.envoysPerWonder ?? 0,
+        spreadCharges: w.effects?.spreadCharges ?? 0,
+        buildCharges: w.effects?.buildCharges ?? 0,
+        apostleMartyr: w.effects?.apostleMartyr ? 1 : 0,
+        dupNaval: w.effects?.duplicateNavalTrain ? 1 : 0,
+        relicTourismMult: w.effects?.religiousTourismMult ?? 1,
+        resortTourismMult: w.effects?.resortTourismMult ?? 1,
+        loyaltyAura: w.effects?.loyaltyAura ?? 0,
+        occupyDefense: w.effects?.occupyDefense ?? 0,
+        freeCivics: w.effects?.freeCivics ?? 0,
+        freeTechs: w.effects?.freeTechs ?? 0,
+        treasuryMult: w.effects?.treasuryMult ?? 1,
+        eraScorePerMoment: w.effects?.eraScorePerMoment ?? 0,
       })),
       fpFid: FEAT_IDS.indexOf('FLOODPLAINS'),
     },

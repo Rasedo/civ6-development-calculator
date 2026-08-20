@@ -51,6 +51,7 @@ POKE_COST = {
     "civ_pair_strike": 12.0,
     "spawn_reclaim": 6.0,
     "centre_defence": 14.0,
+    "wonder_effects": 20.0,
 }
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "gpu"))
@@ -223,6 +224,7 @@ def main() -> int:
                 ("geopolitics", [py, "tests/gpu/geopolitics_test.py"], 4),  # per-pair wars + casus belli + civ-to-civ city transfer
                 ("governors", [py, "tests/gpu/governors_test.py"], 4),  # era-score hooks + Ages loyalty modulation + governor anchors
                 ("watermill", [py, "tests/gpu/watermill_test.py"], 4),  # Water Mill: farm-improved bonus resources +1 food
+                ("wonder_effects", [py, "tests/gpu/wonder_effects_test.py"], 4),  # the fourteen wonder-effect channels the gate never finishes a wonder to reach
                 ("unit_head", [py, "tests/gpu/unit_head_test.py"], 4),  # action enum == mask width == RL head width
                 ("state_discipline", [py, "tests/gpu/state_discipline_test.py"], 4),  # alias-rebind + _MUTABLE drift net
                 ("inplace", [py, "tests/gpu/inplace_discipline_test.py"], 1),  # static — no self-rebinds, no stale captures
