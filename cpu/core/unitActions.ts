@@ -19,6 +19,11 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   names.push('SPREAD_HERE');
   for (let d = 0; d < 6; d++) names.push(`SPREAD_${d}`);
   names.push('FOUND_CITY');
+  // APPENDED LAST, after FOUND_CITY: every index above is load-bearing on
+  // both engines (`A_PILLAGE`, `A_SNIPE`, the spread block), so a new verb
+  // joins at the end or it moves somebody else's column.
+  names.push('EXCAVATE');
+  names.push('PARK');
   return names;
 }
 

@@ -159,11 +159,33 @@ export const ARTIFACT_TOURISM = 3;
 export const ARCHAEOLOGIST_CHARGES = 3;
 export const ARCHAEOLOGIST_CIVIC = 'NATURAL_HISTORY';
 
-export function artifactCulture(city: { artifacts?: number }): number {
-  return (city.artifacts ?? 0) * ARTIFACT_CULTURE;
+type ArtCity = { artifacts?: number; artifactEras?: number[]; artifactSeats?: number[] };
+
+/**
+ * Is this city's ARCHAEOLOGICAL MUSEUM themed? CIV6: the slots must
+ * be full, every Artifact from the SAME ERA, and no two from the same
+ * civilization (a city-state, a Free City and the Barbarians each count as
+ * one). A themed museum DOUBLES the yields of everything in it.
+ */
+export function museumThemed(city: ArtCity): boolean {
+  if ((city.artifacts ?? 0) < ARTIFACT_SLOTS) return false;
+  const eras = city.artifactEras ?? [];
+  const seats = city.artifactSeats ?? [];
+  if (eras.length < ARTIFACT_SLOTS || seats.length < ARTIFACT_SLOTS) return false;
+  for (let i = 1; i < ARTIFACT_SLOTS; i++) if (eras[i] !== eras[0]) return false;
+  for (let i = 0; i < ARTIFACT_SLOTS; i++) {
+    for (let j = i + 1; j < ARTIFACT_SLOTS; j++) if (seats[i] === seats[j]) return false;
+  }
+  return true;
 }
-export function artifactTourism(city: { artifacts?: number }): number {
-  return (city.artifacts ?? 0) * ARTIFACT_TOURISM;
+
+export const THEMING_MULT = 2;
+
+export function artifactCulture(city: ArtCity): number {
+  return (city.artifacts ?? 0) * ARTIFACT_CULTURE * (museumThemed(city) ? THEMING_MULT : 1);
+}
+export function artifactTourism(city: ArtCity): number {
+  return (city.artifacts ?? 0) * ARTIFACT_TOURISM * (museumThemed(city) ? THEMING_MULT : 1);
 }
 export const GW_SLOTS = [2, 3, 1] as const;
 export const GW_WONDER_SLOTS: Record<string, readonly [number, number, number]> = {

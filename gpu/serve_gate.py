@@ -96,7 +96,8 @@ def _buy_row(sim, seat: int, bc: dict, rk, rj, mk, b: int) -> list:
     """One row of the BUY-candidate tripwire, in the TS driver twin's exact
     shape — shared by the batched and single-seed paths so the two cannot
     drift: [centre, bIdx, settlerOk, unitOk, tileOk, tile, tileCentre,
-    worshipCentre, religKind, religCentre, levyIdx, monuKind, monuCentre]."""
+    worshipCentre, religKind, religCentre, levyIdx, monuKind, monuCentre,
+    natKind, natCentre]."""
     def ctr(j: int) -> int:
         return int(sim.city_center[b, seat, j]) if j >= 0 else -1
     return [
@@ -112,6 +113,8 @@ def _buy_row(sim, seat: int, bc: dict, rk, rj, mk, b: int) -> list:
         int(bc["levy_cs"][b]) if bool(bc["levy_ok"][b]) else -1,
         int(mk[b]),
         ctr(int(bc["spawn_slot"][b])) if int(mk[b]) >= 0 else -1,
+        10 if bool(bc["nat_ok"][b]) else -1,
+        ctr(int(bc["nat_j"][b])) if bool(bc["nat_ok"][b]) else -1,
     ]
 
 
@@ -304,7 +307,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                     if True:
                         tb = msg.get("buys", {}).get(str(seat), [])
                         if tb and gb_all[b] != tb:
-                            flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit,tileOk,tile,tileC,worshipC,religKind,religC,levy,monuKind,monuC]: GPU {gb_all[b]} vs TS {tb}")
+                            flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit,tileOk,tile,tileC,worshipC,religKind,religC,levy,monuKind,monuC,natKind,natC]: GPU {gb_all[b]} vs TS {tb}")
                         tr = msg.get("routes", {}).get(str(seat), [])
                         gr_b = [int(gr_f[b]), int(gr_d[b])]
                         if tr and gr_b != tr:
@@ -541,7 +544,7 @@ def main() -> None:
                 gb = _buy_rows(sim, seat, bc)[0]
                 tb = msg.get("buys", {}).get(str(seat), [])
                 if tb and gb != tb:
-                    rep = f"turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit,tileOk,tile,tileC,worshipC,religKind,religC,levy,monuKind,monuC]: GPU {gb} vs TS {tb}"
+                    rep = f"turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit,tileOk,tile,tileC,worshipC,religKind,religC,levy,monuKind,monuC,natKind,natC]: GPU {gb} vs TS {tb}"
                     print(rep)
                     if first_report is None:
                         first_report = rep

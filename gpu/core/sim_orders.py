@@ -31,6 +31,8 @@ class SimOrders:
         _fc = getattr(self, "_A_FOUND", -1)
         _sn = getattr(self, "_A_SNIPE", -1) if getattr(self, "_snipe_on", False) else -1
         _sp = getattr(self, "_A_SPREAD", -1)
+        _xc = getattr(self, "_A_EXCAVATE", -1)
+        _pk = getattr(self, "_A_PARK", -1)
         _ic = [c for c in getattr(self, "_A_IMP", []) if c >= 0]
         if getattr(self, "_A_REPAIR", -1) >= 0:
             _ic.append(self._A_REPAIR)
@@ -45,9 +47,12 @@ class SimOrders:
             (torch.isin(_ab, torch.tensor(_ic, dtype=_ab.dtype, device=dev)) if _ic else _no).any(dim=0),
             ((_ab == self._A_PILLAGE) if self._act_names and self._A_PILLAGE > 0 else _no).any(dim=0),
             (((_ab >= _sp) & (_ab < _sp + 7)) if _sp >= 0 else _no).any(dim=0),  # spread
+            ((_ab == _xc) if _xc >= 0 else _no).any(dim=0),                     # excavate
+            ((_ab == _pk) if _pk >= 0 else _no).any(dim=0),                     # park
         ]).tolist()
         (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
-         _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread) = _tab
+         _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread,
+         _rk_excavate, _rk_park) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -77,6 +82,18 @@ class SimOrders:
                         fr = made.nonzero(as_tuple=True)[0]
                         self.civilian_at[fr, here[fr]] = -1
                         self.unit_alive[fr, sc[fr]] = False
+
+            if _rk_excavate[n] and _xc >= 0:
+                exc = act & (a == _xc) & self._excavate_ok(
+                    row, here.unsqueeze(1), utp.unsqueeze(1),
+                    u_charges.unsqueeze(1)).squeeze(1)
+                if bool(exc.any()):
+                    self._do_excavate(row, exc, here, sc)
+
+            if _rk_park[n] and _pk >= 0:
+                pkm = act & (a == _pk) & self._park_ok(row, here.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
+                if bool(pkm.any()):
+                    self._do_park(row, pkm, here, sc)
 
             mv = act & (a < 6) if _rk_move[n] else None
             if mv is not None and bool(mv.any()):

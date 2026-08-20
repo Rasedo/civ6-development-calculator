@@ -65,6 +65,14 @@ export interface City {
    *  +4 faith and +8 tourism — the densest tourism source in real Civ 6. */
   relics?: number;
   artifacts?: number;
+  /** the PROVENANCE of the artifacts in this city's Archaeological
+   *  Museum, in dig order: the era each was buried in, and the seat whose
+   *  event buried it. A THEMED museum is three full slots sharing ONE era
+   *  with no civilization repeated, and it DOUBLES its artifacts' culture
+   *  and tourism (real Civ 6: "the bonus doubles the yields of all items in
+   *  the Museum"). Parallel arrays, same length as `artifacts`. */
+  artifactEras?: number[];
+  artifactSeats?: number[];
 }
 
 /** Empire research progress (one tech + one civic at a time, like Civ 6). */

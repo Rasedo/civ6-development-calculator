@@ -615,6 +615,7 @@ class SimPhase:
             self.civ_techs[:, row, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,
             self.city_artifacts[:, row],
             gw_kmult=self._congress_gw_kmult(),
+            themed=self._museum_themed(row),
         ))
         bank(self.civ_diplo_favor,
              self._adopted_gov_tier(self.civ_civics[:, row]) + self._favor_per_suz * self._suzerain_count(row))

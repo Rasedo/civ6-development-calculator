@@ -646,6 +646,7 @@ class SimMasks:
             r[gd] = row
             row = r
         self._mark_antiquity(m, t, row)
+        self._mark_shipwreck(m, t, row)
 
     def _mark_antiquity(self, mask: torch.Tensor, tile: torch.Tensor, row) -> None:
         """The markAntiquitySite twin — stamp an ANTIQUITY SITE on
@@ -664,6 +665,10 @@ class SimMasks:
             mask
             & (tile >= 0)
             & (era < self._modern_era_index)
+            # a tile already carrying a dig does not stack — and since the dig
+            # now REMEMBERS its era and civilization, re-stamping would rewrite
+            # the provenance TS refuses to touch.
+            & ~self.antiquity.gather(1, t.unsqueeze(1)).squeeze(1)
             & ~self.water.gather(1, t.unsqueeze(1)).squeeze(1)
             # TS keeps ONE tile map, so `t.district` refuses EVERY seat's
             # district — and so does this plane: `_place_district` writes it
@@ -685,9 +690,135 @@ class SimMasks:
             return
         rows = okr.nonzero(as_tuple=True)[0]
         self.antiquity[rows, t[rows]] = True
+        # PROVENANCE travels with the Artifact: a themed museum wants one era
+        # and three civilizations. The stored id is the SEAT, not the row —
+        # `markAntiquitySite` records the seat it was handed, and a barbarian
+        # (seat 200) is a distinct civilization for theming.
+        self.antiquity_era[rows, t[rows]] = era[rows] if era.dim() else era
+        _r = row if torch.is_tensor(row) else torch.full((self.B,), int(row), dtype=torch.long, device=self.device)
+        self.antiquity_seat[rows, t[rows]] = self._seat_of_row(_r[rows])
+
+    def _seat_of_row(self, row: torch.Tensor) -> torch.Tensor:
+        """[n] — the SEAT ids behind these rows. Storage is row-indexed;
+        anything a seat WRITES about another seat's identity is a seat id."""
+        return torch.where(row >= 0, self._ROW_SEAT.to(row.device)[row.clamp(min=0)], torch.full_like(row, -1))
+
+    def _mark_shipwreck(self, mask: torch.Tensor, tile: torch.Tensor, row) -> None:
+        """The markShipwreck twin — the WATER dig. This model sources
+        dig placement from DEATHS rather than map generation, so a hull going
+        down leaves the wreck, under `markAntiquitySite`'s own era gate and
+        one-per-tile rule. `row` is the ACTING seat, like `_mark_antiquity`'s,
+        and its era and id are the wreck's provenance; the two bodies are
+        disjoint because one refuses water and the other requires it. A
+        barbarian or city-state actor leaves nothing to theme, which is what
+        `row < 0` says here."""
+        if not bool(mask.any()):
+            return
+        t = tile.clamp(min=0)
+        era = self._row_era(row)
+        _r = row if torch.is_tensor(row) else torch.full((self.B,), int(row), dtype=torch.long, device=self.device)
+        okr = (
+            mask
+            & (tile >= 0)
+            & (_r >= 0)
+            & (era < self._modern_era_index)
+            & self.water.gather(1, t.unsqueeze(1)).squeeze(1)
+            & ~self.shipwreck.gather(1, t.unsqueeze(1)).squeeze(1)
+        )
+        if not bool(okr.any()):
+            return
+        rows = okr.nonzero(as_tuple=True)[0]
+        self.shipwreck[rows, t[rows]] = True
+        self.shipwreck_era[rows, t[rows]] = era[rows] if era.dim() else era
+        self.shipwreck_seat[rows, t[rows]] = self._seat_of_row(_r[rows])
 
 
 
+
+    def _museum_room(self, row: int) -> torch.Tensor:
+        """[B] bool — does this seat hold an ARCHAEOLOGICAL MUSEUM with a
+        free artifact slot anywhere? The excavation's landing place."""
+        if self._artifact_bidx < 0:
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        return (
+            self.city_alive[:, row]
+            & self.city_bldg[:, row, :, self._artifact_bidx]
+            & (self.city_artifacts[:, row] < self._artifact_slots)
+        ).any(dim=1)
+
+    def _dig_here(self, row: int, tc: torch.Tensor) -> torch.Tensor:
+        """[B, N] bool — is there a workable dig under these tiles?
+        `digUnderfoot`'s twin: a land site always, a WRECK once this seat
+        holds the civic that reveals wrecks."""
+        land = self.antiquity.gather(1, tc)
+        if self._shipwreck_civic < 0:
+            return land
+        seen = self.civ_civics[:, row, self._shipwreck_civic].unsqueeze(1)
+        return land | (self.shipwreck.gather(1, tc) & seen)
+
+    def _excavate_ok(self, row: int, tc: torch.Tensor, utype: torch.Tensor, charges: torch.Tensor) -> torch.Tensor:
+        """[B, N] bool — the EXCAVATE column. An Archaeologist, a charge, a
+        dig underfoot, the tile own-or-unclaimed (real Civ 6 also allows
+        foreign ground under OPEN BORDERS, which neither engine models), and
+        a free artifact slot to land the find in."""
+        if getattr(self, "_archaeologist_idx", -1) < 0:
+            return torch.zeros_like(tc, dtype=torch.bool)
+        ts = self.tile_seat.gather(1, tc)
+        own_ok = (ts < 0) | (ts == row)
+        return (
+            (utype == self._archaeologist_idx)
+            & (charges > 0)
+            & self._dig_here(row, tc)
+            & own_ok
+            & self._museum_room(row).unsqueeze(1)
+        )
+
+    def _park_cluster(self, tc: torch.Tensor) -> torch.Tensor:
+        """[B, N, 6, 4] long — for each unit tile and each neighbour
+        direction, the four tiles of the rhombus that pair anchors: the pair
+        itself plus the two tiles adjacent to BOTH. -1 where the pair has
+        fewer than two shared neighbours (a map edge). `parkCluster`'s twin,
+        and like it the four come back SORTED so both engines name one set."""
+        B, N = tc.shape
+        nb = self.neigh[tc]                                  # [B, N, 6]
+        nb_of_nb = self.neigh[nb.clamp(min=0)]               # [B, N, 6, 6]
+        # shared = neighbours of the partner that are also neighbours of the
+        # anchor, in TILE order (the TS body sorts them).
+        same = (nb_of_nb.unsqueeze(4) == nb.unsqueeze(2).unsqueeze(2)).any(dim=4)  # [B, N, 6, 6]
+        cand = torch.where(same & (nb_of_nb >= 0), nb_of_nb, torch.full_like(nb_of_nb, 1 << 30))
+        srt, _ = cand.sort(dim=3)
+        s0, s1 = srt[:, :, :, 0], srt[:, :, :, 1]
+        ok = (nb >= 0) & (s1 < (1 << 30))
+        quad = torch.stack([tc.unsqueeze(2).expand(B, N, 6), nb, s0, s1], dim=3)
+        quad = torch.where(ok.unsqueeze(3), quad, torch.full_like(quad, -1))
+        quad, _ = quad.sort(dim=3)
+        return quad
+
+    def _park_cluster_legal(self, row: int, quad: torch.Tensor) -> torch.Tensor:
+        """[B, N, 6] bool — may this rhombus become a park?
+        `parkClusterLegal`'s twin: every tile Charming or better, all four in
+        ONE city of this seat, and nothing built on any of them."""
+        B, N, D, _ = quad.shape
+        q = quad.clamp(min=0).reshape(B, -1)
+        good = (
+            (self.tile_seat.gather(1, q) == row)
+            & (self.park.gather(1, q) < 0)
+            & (self.improvement.gather(1, q) < 0)
+            & (self.district.gather(1, q) < 0)
+            & (self.built_wonder.gather(1, q) < 0)
+            & (self._tile_appeal().gather(1, q) >= self._park_min_appeal)
+        ).reshape(B, N, D, 4)
+        city = self.city_slot_at(row).gather(1, q).reshape(B, N, D, 4)
+        one_city = (city == city[:, :, :, :1]).all(dim=3) & (city[:, :, :, 0] >= 0)
+        return (quad >= 0).all(dim=3) & good.all(dim=3) & one_city
+
+    def _park_ok(self, row: int, tc: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:
+        """[B, N] bool — the PARK column: a Naturalist standing on a tile that
+        anchors at least one legal rhombus."""
+        if getattr(self, "_naturalist_idx", -1) < 0:
+            return torch.zeros_like(tc, dtype=torch.bool)
+        legal = self._park_cluster_legal(row, self._park_cluster(tc)).any(dim=2)
+        return (utype == self._naturalist_idx) & legal
 
     def _golden_ded_table(self, kind: int) -> torch.Tensor:
         """[B, n_majors] bool — which civs are in a GOLDEN age holding `kind`."""
@@ -1068,9 +1199,17 @@ class SimMasks:
                    if self._settler_idx >= 0
                    else torch.zeros(B, N, 1, dtype=torch.bool, device=dev)]
 
+        _ex: list[torch.Tensor] = []
+        if getattr(self, "_A_EXCAVATE", -1) >= 0:
+            _ex = [(present & self._excavate_ok(row, tc, utype, u_charges)).unsqueeze(2)]
+
+        _pk: list[torch.Tensor] = []
+        if getattr(self, "_A_PARK", -1) >= 0:
+            _pk = [(present & self._park_ok(row, tc, utype)).unsqueeze(2)]
+
         out = torch.cat(
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
-            + _res_cols + [pillage] + _sn + _sp + _fd,
+            + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk,
             dim=2,
         )
         if self._act_names and self.improvements_on and self._builder_idx >= 0:

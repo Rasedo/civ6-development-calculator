@@ -75,6 +75,8 @@ class SimInit:
             ("gw_music", torch.long, 0, None, None),
             ("relics", torch.long, 0, None, None),
             ("artifacts", torch.long, 0, None, None),
+            ("artifact_era", torch.long, -1, None, max(int((rules.seats or {}).get("artifactSlots", 3)), 1)),
+            ("artifact_seat", torch.long, -1, None, max(int((rules.seats or {}).get("artifactSlots", 3)), 1)),
             ("bldg", torch.bool, False, None, max(len(rules.b_cost), 1)),
         ):
             _shape = (B, self.n_majors + _sp, _rcp) + ((_ex,) if _ex else ())
@@ -666,6 +668,13 @@ class SimInit:
         self._artifact_slots = int(rr.get("artifactSlots", 3))
         self._artifact_culture = int(rr.get("artifactCulture", 3))
         self._artifact_tourism = int(rr.get("artifactTourism", 3))
+        self._theming_mult = int(rr["themingMult"])
+        _ri = rules.improvements or {}
+        self._park_min_appeal = int(_ri["parkMinAppeal"])
+        self._park_amen_owner = int(_ri["parkAmenitiesOwner"])
+        self._park_amen_near = int(_ri["parkAmenitiesNear"])
+        self._park_amen_cities = int(_ri["parkAmenityCities"])
+        self._shipwreck_civic = int(_ri["shipwreckCivic"])
         self._relic_bidx = int(rr.get("relicBidx", -1))
         self._relic_slots = int(rr.get("relicSlots", 1))
         self._relic_faith = int(rr.get("relicFaith", 4))
@@ -682,6 +691,17 @@ class SimInit:
         _wera = (rules.wonders or {}).get("eras", []) or [0]
         self._wonder_era = torch.tensor(list(_wera), dtype=torch.long, device=device)
         self.antiquity = torch.zeros(B, self.T, dtype=torch.bool, device=device)
+        # A dig REMEMBERS its era and its civilization — the theming rule's
+        # inputs travel with the Artifact out of the ground.
+        self.antiquity_era = torch.full((B, self.T), -1, dtype=torch.long, device=device)
+        self.antiquity_seat = torch.full((B, self.T), -1, dtype=torch.long, device=device)
+        # SHIPWRECKS: the water dig, same provenance shape.
+        self.shipwreck = torch.zeros(B, self.T, dtype=torch.bool, device=device)
+        self.shipwreck_era = torch.full((B, self.T), -1, dtype=torch.long, device=device)
+        self.shipwreck_seat = torch.full((B, self.T), -1, dtype=torch.long, device=device)
+        # NATIONAL PARK membership: the ANCHOR tile that names this tile's
+        # park (its cluster's lowest index), -1 where there is none.
+        self.park = torch.full((B, self.T), -1, dtype=torch.long, device=device)
         self._loyalty_amenity = torch.tensor(rr.get("loyaltyAmenity", [6, 3, 0, -3, -6]), dtype=dtype, device=device)
         self._off3 = tiles_within_offsets(int(rr.get("workRadius", 3))).to(device)
         self._off5 = tiles_within_offsets(5).to(device)
@@ -692,6 +712,8 @@ class SimInit:
         self._spearman_idx = ids.index("SPEARMAN") if "SPEARMAN" in ids else 0
         self._horseman_idx = ids.index("HORSEMAN") if "HORSEMAN" in ids else 0
         self._slinger_idx = ids.index("SLINGER") if "SLINGER" in ids else -1
+        self._archaeologist_idx = ids.index("ARCHAEOLOGIST") if "ARCHAEOLOGIST" in ids else -1
+        self._naturalist_idx = next((i for i, u in enumerate(rules.units or []) if bool(u.get("naturalist", 0))), -1)
         self._archer_idx = ids.index("ARCHER") if "ARCHER" in ids else -1
 
         self.disasters = bool(f0.get("disasters", 0))
@@ -720,8 +742,11 @@ class SimInit:
             self._snipe_on = "SNIPE_0" in self._act
             self._A_SPREAD = self._act.get("SPREAD_HERE", -1)  # religious spread head
             self._A_FOUND = self._act.get("FOUND_CITY", -1)  # the settler's verb
+            self._A_EXCAVATE = self._act.get("EXCAVATE", -1)  # the archaeologist's
+            self._A_PARK = self._act.get("PARK", -1)          # the naturalist's
             _want = 13 + len(ids) + 3 + (12 if self._snipe_on else 0) + (7 if self._A_SPREAD >= 0 else 0) \
-                + (1 if self._A_FOUND >= 0 else 0)
+                + (1 if self._A_FOUND >= 0 else 0) + (1 if self._A_EXCAVATE >= 0 else 0) \
+                + (1 if self._A_PARK >= 0 else 0)
             assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
             self._A_CHOP = self._act["CHOP"]
             self._A_REPAIR = self._act["REPAIR"]
@@ -734,6 +759,8 @@ class SimInit:
             self._A_SNIPE = self._A_PILLAGE + 1
             self._A_SPREAD = -1  # no names -> no spread columns
             self._A_FOUND = -1  # no names -> no FOUND column
+            self._A_EXCAVATE = -1
+            self._A_PARK = -1
             self._snipe_on = False
             self._A_IMP = [13 + i if i < 3 else 18 + i - 3 for i in range(len(ids))]
         self.FARM = ids.index("FARM") if "FARM" in ids else 0
@@ -1261,6 +1288,7 @@ class SimInit:
         self._driven_buy_monu: dict = {}
         self._driven_levy: dict = {}
         self._driven_route: dict = {}
+        self._driven_buy_nat: dict = {}
         self._driven_tech: dict = {}
         self._driven_civic: dict = {}
         self._driven_envoys: dict = {}

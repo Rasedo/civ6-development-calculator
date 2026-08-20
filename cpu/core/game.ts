@@ -6,7 +6,7 @@ import { generateMap } from '../../world/mapgen';
 import { tilesWithin, hexDistance } from '../../world/hex';
 import { acquireTile, borderCandidates } from './city';
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
-import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots } from './effects';
+import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, isCivicComplete } from './effects';
 import type { Modifiers, Unlocks } from './effects';
 import { effectiveResearchCostIn } from './boosts';
 import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, builderCost, traderCost, settlerCount } from './units';
@@ -602,6 +602,39 @@ export function purchaseCivilianWithFaith(
   if (unitType === 'SETTLER') city.population = Math.max(1, city.population - 1);
   else buyer.buildersTrained += 1;
   return { ok: true };
+}
+
+/**
+ * BUY a NATURALIST with faith. CIV6: "It can only be purchased with
+ * Faith in any city" — no Holy Site, no Monumentality, no production column
+ * anywhere; the unit's own `cost` IS its faith price, like the religious
+ * units'. The CONSERVATION civic is the unlock, and the buyer needs a city to
+ * spawn beside.
+ */
+export function purchaseNaturalist(state: GameState, cityId: number, seat: number): RuleResult {
+  const buyer = seatOf(state, seat);
+  if (!buyer) return { ok: false, reason: 'No such seat.' };
+  const def = UNITS.NATURALIST;
+  if (def.requiresCivic && !isCivicComplete(state, def.requiresCivic, seat)) {
+    return { ok: false, reason: 'Needs the Conservation civic.' };
+  }
+  const city = citiesOf(state, seat).find((c) => c.id === cityId);
+  if (!city) return { ok: false, reason: 'No such city.' };
+  const cost = naturalistCost(state, seat);
+  if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
+  const u = spawnUnit(state, 'NATURALIST', city.centerIndex, seat);
+  if (!u) return { ok: false, reason: 'No free tile near the city center.' };
+  buyer.faith = (buyer.faith ?? 0) - cost;
+  return { ok: true };
+}
+
+/** the live faith price of a Naturalist. Real Civ 6 makes it
+ *  PROGRESSIVE; the progression's own magnitude is unsourced, so the flat GS
+ *  price stands and the progression is an open AUDIT residual. */
+export function naturalistCost(state: GameState, seat: number): number {
+  void state;
+  void seat;
+  return UNITS.NATURALIST.cost;
 }
 
 export function cancelQueueItem(state: GameState, cityId: number, index: number, seat: number): void {

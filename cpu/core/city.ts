@@ -17,6 +17,7 @@ import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { goldenCulturePerDistrict, goldenDedication } from './eras';
+import { PARK_AMENITIES_OWNER, PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../data/improvements';
 import { SPECIALIST_YIELDS, SPECIALIST_TIERS, greatWorkCulture, greatWorkTourism, relicFaith, relicTourism, artifactCulture, artifactTourism, GW_PRINTING_TECH } from '../data/greatPeople';
 import { congressGrowthMult, congressGwMult } from './congress';
 import { suzerainEffect } from './cityStates';
@@ -272,7 +273,7 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
 
   const baseHave = new Map<number, number>();
   for (const c of cities) {
-    baseHave.set(c.id, localBuildingAmenities(state, c) + regionalEffects(state, c).amenities);
+    baseHave.set(c.id, localBuildingAmenities(state, c) + parkAmenities(state, c) + regionalEffects(state, c).amenities);
   }
 
   for (let i = 0; i < luxuries.size; i++) {
@@ -434,6 +435,53 @@ function resortTourism(state: GameState, owns: (t: Tile) => boolean): number {
   return t;
 }
 
+/**
+ * The AMENITIES a seat's National Parks pay this city. CIV6: a park
+ * gives "2 Amenities to the city that owns it and 1 Amenity to the four
+ * closest cities in your empire" — closest by centre-tile hex distance to the
+ * park, ties by city id, and the OWNING city never double-dips as one of the
+ * four. A park is four tiles; the CLUSTER pays once, so the payout is keyed
+ * on the park tile with the LOWEST index in each owning-city group.
+ */
+export function parkAmenities(state: GameState, city: City): number {
+  const cities = citiesOf(state, city.seat);
+  if (cities.length === 0) return 0;
+  let have = 0;
+  for (const tile of state.map.tiles) {
+    // ONE payout per park, taken at its ANCHOR — the tile that names the
+    // cluster. Two parks side by side stay two parks.
+    if ((tile.park ?? -1) !== tile.index || tileSeat(tile) !== city.seat) continue;
+    const ownerId = tile.ownerCity;
+    if (ownerId === city.id) have += PARK_AMENITIES_OWNER;
+    const near = cities
+      .filter((c) => c.id !== ownerId)
+      .map((c) => ({ c, d: hexDistance2(state, c.centerIndex, tile.index) }))
+      .sort((a, b) => a.d - b.d || a.c.id - b.c.id)
+      .slice(0, PARK_AMENITY_CITIES);
+    if (near.some((n) => n.c.id === city.id)) have += PARK_AMENITIES_NEAR;
+  }
+  return have;
+}
+
+function hexDistance2(state: GameState, a: number, b: number): number {
+  const ta = state.map.tiles[a];
+  const tb = state.map.tiles[b];
+  if (!ta || !tb) return 1 << 20;
+  return hexDistance(ta.col, ta.row, tb.col, tb.row);
+}
+
+/** CIV6: a National Park "provides Tourism equal to the total Appeal of
+ *  all the tiles included in it" — read LIVE, so an appeal-lowering
+ *  neighbour moves the park's payout (and can take it negative). */
+function parkTourism(state: GameState, owns: (t: Tile) => boolean): number {
+  let t = 0;
+  for (const tile of state.map.tiles) {
+    if ((tile.park ?? -1) < 0 || !owns(tile)) continue;
+    t += tileAppeal(state.map, tile);
+  }
+  return t;
+}
+
 export function seatTourism(state: GameState, seat: number): number {
   const s = seatOf(state, seat);
   if (!s) return 0;
@@ -443,7 +491,7 @@ export function seatTourism(state: GameState, seat: number): number {
   for (const c of citiesOf(state, seat)) t += greatWorkTourism(c, printing, km) + relicTourism(c) + artifactTourism(c);
   const owns = (tile: Tile) => tileOwnedByCiv(tile, seat);
   const era = civEraIndex(s.research.techs, s.research.civics);
-  return t + resortTourism(state, owns) + wonderTourism(state, era, owns);
+  return t + resortTourism(state, owns) + parkTourism(state, owns) + wonderTourism(state, era, owns);
 }
 
 export function computeCityStats(
@@ -545,6 +593,7 @@ export function computeCityStats(
   const housing = computeHousing(state, city, m);
   let have =
     localBuildingAmenities(state, city) +
+    parkAmenities(state, city) +
     regional.amenities +
     wonderRegionalAmenities(state, city) +
     m.amenitiesAll +

@@ -54,7 +54,7 @@ nothing carries forward.
 | Open item | Weight | What the weight is for |
 |---|---|---|
 | **A. Engine vs engine** | **0** | |
-| B-20r tourism tails | 7 | national parks, civ Archaeologists, theming, shipwrecks, digs |
+| B-20r tourism tails | 3 | art-museum theming needs work TYPE and artist identity; open-borders digs and work TRADES need a treaty system |
 | B-21r suzerain rows | 1 | the residual descoped rows all need whole absent systems |
 | B-22r World Congress | 4 | the vote is scripted (wire head pending); emergencies/competitions absent; 4 of ~18 resolutions |
 | B-24r Ages/governors | 2 | four system-less dedication entries, dark-age policies, governor promotions, per-civ era drift |
@@ -63,8 +63,8 @@ nothing carries forward.
 | B-D unsourced data values | 1 | swept; residuals are NAMED stylizations, each labelled at its definition |
 | B-35r theological damage | 1 | deterministic and LINEAR where real Civ 6 rolls; the martyr draw shows a mirrored conditional draw is available |
 | B-34r flood tails | 1 | GS floods also damage UNITS and kill citizens, and a centre on a floodplain loses HP; and the Dam/Great Bath that mitigates a river is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **21** | |
-| **OPEN, TOTAL** | **21** | |
+| **B. Fidelity vs real Civ 6** | **17** | |
+| **OPEN, TOTAL** | **17** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -107,20 +107,63 @@ that either matches the real game, so every entry here closes against a
 Civ 6 source or is recorded as unverifiable.
 
 - **B-20r. Tourism tails.** Tourism, Great Works of writing/music/ART,
-  relics, artifacts + archaeology (Archaeologist, antiquity sites,
-  museum slots) and the wonder-era term all exist and are digest-
-  compared. Open: NATIONAL PARKS (no concept); recorded-not-modeled:
-  theming bonuses, shipwreck excavation, trading works between civs,
-  open-borders digs. The relic rate no longer overstates: only a MARTYR
-  apostle leaves one, and the promotion is drawn at the death.
-  NOT a gap: the Archaeologist trains on every row — `trainableUnits` /
-  `_trainable_units` gate it on the museum's free artifact slot through
-  `_type_civic_slot_ok`, one body per engine. What no seat does is PICK
-  the column, which is a ladder question, not a wiring one.
-  MEASURED, 12 seeds x 250 turns driven: visiting tourists peak at 6
-  (mean 1.3) against a domestic peak of 67, putting the culture
-  victory ~11x out of reach. Re-measure before
-  quoting it — every round since has moved the economy.
+  relics, artifacts, the wonder-era term, NATIONAL PARKS, SHIPWRECKS and
+  Archaeological-Museum THEMING all exist on both engines and are
+  digest-compared. The Naturalist is a faith-only Modern civilian that a
+  park CONSUMES; a park is the four-tile rhombus (Charming or better, one
+  city, nothing built), pays Tourism equal to its tiles' total Appeal and
+  2 amenities to its owner plus 1 to the four closest cities; a hull going
+  down leaves a wreck an Archaeologist works once CULTURAL_HERITAGE is in;
+  every dig carries an ERA and a CIVILIZATION into its museum slot, and a
+  full museum of one era and three civilizations DOUBLES what it holds.
+
+  TWO CORRECTIONS to what this entry used to claim.
+  (1) "NOT a gap: the Archaeologist trains on every row ... what no seat
+  does is PICK the column" was FALSE. There was no column:
+  `archaeologistExcavate` lived in TS only, no dispatcher called it, the
+  action enum had no EXCAVATE entry and the GPU had no twin, so
+  `city_artifacts` could never leave 0 in either engine. The reachability
+  probe's "antiquityDig 0/12 seeds" was reading an unimplemented verb, not
+  an unreached one. (2) The ARCHAEOLOGIST is a civilian, and the
+  production ladder's unit lane selects military chassis only — the same
+  bug the Trader hit, so nothing could train one either. Both are fixed:
+  EXCAVATE and PARK are appended verbs on both engines, and the
+  Archaeologist has a civilian override beside builder/engineer/trader.
+
+  REACHABILITY (measured, driven, 12 seeds x 250 turns): NEITHER chain is
+  gate-reachable. The Archaeologist waits on NATURAL_HISTORY (Industrial,
+  1050) and the Naturalist on CONSERVATION (Modern, 1540); no seed
+  researches either, and no seed builds an Archaeological Museum. The
+  proof is the poke pair `tests/gpu/parks_test.py` and
+  `tests/cpu/culture/parks-theming.test.ts`, and the gate's silence on
+  these mechanics is a coverage FACT, not evidence they agree.
+
+  Open:
+  - ART MUSEUM theming. Real Civ 6 themes it with Great Works of Art of
+    the SAME TYPE by DIFFERENT Great Artists. Our Great Works of Art are
+    per-city COUNTS with no work type and no artist identity, so the rule
+    has nothing to read. TWO items: the missing per-work provenance, and
+    the theming that waits on it.
+  - OPEN-BORDERS digs. An Archaeologist may work foreign ground under an
+    Open Borders treaty (or with the Terracotta Army). Neither engine has
+    any diplomatic AGREEMENT at all. TWO items: the treaty system, and the
+    dig gate that waits on it.
+  - TRADING Great Works between civs, and the Great Work Heist that also
+    moves one. Same missing system, so TWO items again.
+  - The NATURALIST's faith cost is PROGRESSIVE in real Civ 6; the
+    progression's magnitude is unsourced, so the flat GS price stands
+    (`naturalistCost`) and the progression is open.
+  - A park's ORIENTATION. Civ 6 fixes the rhombus vertical; our hex frame
+    has no canonical vertical, so every rhombus is offered.
+  - An ARTIFACT's civilization is the ACTING seat on both engines (the
+    only seat every death site on both engines holds). Real Civ 6
+    attributes the find to the event's own civilization.
+
+  MEASURED, 12 seeds x 250 turns driven, under the Trader economy: visiting
+  tourists peak at 5 (mean ~0.6) against a domestic peak of 79 (mean ~39).
+  The culture victory is further out of reach than the pre-freeze note
+  said, not closer — parks cannot move it while the civic that unlocks
+  them sits past the horizon.
 - **B-21r. City-state suzerain rows:** six perks are RULES (`SuzEffect`,
   both engines): Kabul double attack XP, Preslav cavalry-on-hills CS, Mexico
   City/Toronto regional reach, Anshan works science, Kumasi per-specialty
@@ -294,6 +337,8 @@ three of them overturned what this section used to assert:
 | URBANIZATION civic | 1/12 | t242 |
 | a NEIGHBORHOOD placed | 1/12 | t243 |
 | an antiquity dig (artifact in a slot) | 0/12 | never |
+| NATURAL_HISTORY (the Archaeologist's civic) | 0/12 | never |
+| CONSERVATION (the Naturalist's civic) | 0/12 | never |
 
 - THEOLOGICAL COMBAT IS REACHED, in 5 of 12 seeds from t125. The old
   claim here — "a gate that never puts two apostles side by side proves
@@ -316,10 +361,14 @@ three of them overturned what this section used to assert:
   the TS trade-fidelity suite, and the serve gate's ROUTE tripwire still
   compares the candidate pair on every turn a Trader is free — but the
   digest's intl rows ride pokes alone.
-- No antiquity dig happens at all, so the finer question this section used to
-  ask — a dig by a seat whose ERA differs from row 0's — is doubly moot:
-  eras are global 50-turn blocks (B-24r), so no two seats can be in different
-  eras by construction.
+- No antiquity dig happens at all, and the reason is now MEASURED rather
+  than assumed: no seed researches NATURAL_HISTORY, so no seat can train an
+  Archaeologist, and none builds the museum a dig lands in. The same
+  horizon hides the National Park, whose CONSERVATION civic sits a whole
+  era further out. Both mechanics are poke-covered only — see B-20r.
+  (The finer question this section used to ask — a dig by a seat whose ERA
+  differs from row 0's — is doubly moot: eras are global 50-turn blocks
+  per B-24r, so no two seats can be in different eras by construction.)
 - The CULTURE VICTORY's distance, re-measured under the Trader economy:
   at t250 visiting peaks at 5 (mean ~0.6) against a domestic peak of 79
   (mean ~39) — the gap WIDENED to ~60x on means. B-20r's scope should be

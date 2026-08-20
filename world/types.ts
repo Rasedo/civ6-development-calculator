@@ -110,6 +110,24 @@ export interface Tile {
    *  an Artifact. Real Civ 6 creates these from pre-Modern events (a razed
    *  barbarian outpost, a unit dying) and reveals them with Natural History. */
   antiquity?: boolean;
+  /** the ERA index and the SEAT whose event stamped the dig on this
+   *  tile. An Artifact carries its provenance out of the ground: a themed
+   *  Archaeological Museum needs three artifacts of ONE era from three
+   *  DIFFERENT civilizations. */
+  antiquityEra?: number;
+  antiquitySeat?: number;
+  /** a SHIPWRECK — the WATER dig. Real Civ 6 puts these on passable
+   *  water and reveals them with Cultural Heritage; an Archaeologist that
+   *  works one removes it from the map and excavates an Artifact. */
+  shipwreck?: boolean;
+  shipwreckEra?: number;
+  shipwreckSeat?: number;
+  /** the NATIONAL PARK this tile belongs to, named by the LOWEST tile
+   *  index in its four-tile cluster (its anchor); absent or -1 = no park.
+   *  The anchor is what gives a park an identity two adjacent parks cannot
+   *  blur: each pays its own amenities, and every tile pays TOURISM equal to
+   *  its own current appeal. */
+  park?: number;
   pillaged: boolean;
   districtPillaged?: boolean;
   /** the ENCAMPMENT garrison pool (max ENCAMPMENT_HP = 100), set

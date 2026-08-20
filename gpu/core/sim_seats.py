@@ -49,6 +49,13 @@ class SimSeats:
             has_alive_e = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._eng_idx)).any(dim=1)
             has_q_e = ((self.city_current[:, row] == self.UNIT_BASE + self._eng_idx) & alive).any(dim=1)
             ovr.append((self._eng_idx, ~(has_alive_e | has_q_e) & self._seat_fort_job_mask(row).any(dim=1)))
+        if getattr(self, "_archaeologist_idx", -1) >= 0:
+            # `_trainable_units` already asks for the museum's free slot; the
+            # queue is what it cannot see, so refuse a second one in flight.
+            has_alive_a = (self.major_unit_alive & (self.major_unit_seat == row)
+                           & (self.major_unit_type == self._archaeologist_idx)).any(dim=1)
+            has_q_a = ((self.city_current[:, row] == self.UNIT_BASE + self._archaeologist_idx) & alive).any(dim=1)
+            ovr.append((self._archaeologist_idx, ~(has_alive_a | has_q_a)))
         if self._trader_idx >= 0:
             # `_trainable_units` already counts free Traders + active routes
             # against tradeCapacity; the queue is the one thing it cannot see,
@@ -148,6 +155,7 @@ class SimSeats:
         relig: tuple | None = None,  # kinds 5/6: (kind [B], slot [B]) — the religious-unit faith buy
         levy: torch.Tensor | None = None,  # kind 7: CS index to levy (-1 = none)
         monu: tuple | None = None,  # kinds 8/9: (kind [B], slot [B]) — the Monumentality faith-civilian buy (8 builder, 9 settler)
+        nat: tuple | None = None,   # kind 10: (kind [B], slot [B]) — the NATURALIST, bought with faith alone
         route: tuple | None = None,  # the route verb: (origin CENTRE [B], dest code [B]) — a CENTRE tile or -(2+csIndex); -1 = none
     ) -> None:
         """Write seat ROW `row`'s choices BEFORE step(). Codes use the
@@ -175,7 +183,7 @@ class SimSeats:
         `pick_district_tile` is the body that chooses."""
         self._stash_record(row, tech=tech, civic=civic, envoys=envoys, war=war,
                            production=production, pref=production_pref, dtile=production_tile)
-        self._stash_buy(row, buy=buy, worship=worship, relig=relig, levy=levy, monu=monu)
+        self._stash_buy(row, buy=buy, worship=worship, relig=relig, levy=levy, monu=monu, nat=nat)
         if route is not None:
             self._driven_route[row] = route
 
@@ -315,7 +323,7 @@ class SimSeats:
         elif production is not None:
             self._apply_seat_production(row, production, dtile)
 
-    def _stash_buy(self, row: int, buy=None, worship=None, relig=None, levy=None, monu=None) -> None:
+    def _stash_buy(self, row: int, buy=None, worship=None, relig=None, levy=None, monu=None, nat=None) -> None:
         if buy is not None:
             self._driven_buy[row] = buy
         if worship is not None:
@@ -326,6 +334,8 @@ class SimSeats:
             self._driven_levy[row] = levy
         if monu is not None:
             self._driven_buy_monu[row] = monu
+        if nat is not None:
+            self._driven_buy_nat[row] = nat
 
     def _seat_buy_candidates(self, row: int, active: torch.Tensor):
         """The gold-purchase BUILDING candidate for seat row `row` — ONE
@@ -494,6 +504,36 @@ class SimSeats:
             a_ok = founded & (n_a < self._apostle_cap) & self._afford(self.civ_faith[:, row], acost) & elig_s.any(dim=1)
             a_j = torch.where(a_ok, first_s, a_j)
         return w_ok, w_j, m_ok, m_j, a_ok, a_j
+
+    def _seat_naturalist_candidate(self, row: int, active: torch.Tensor):
+        """Buy-kind 10: the NATURALIST. CIV6 sells it for FAITH ONLY, in any
+        city, behind the CONSERVATION civic — no Holy Site and no dedication,
+        so this candidate asks only for the civic, a city to spawn beside, and
+        the faith. ONE live Naturalist at a time is the LADDER's cap, matching
+        the driver's tripwire. Returns (ok [B], slot [B])."""
+        B, dev = self.B, self.device
+        ok = torch.zeros(B, dtype=torch.bool, device=dev)
+        slot = torch.full((B,), -1, dtype=torch.long, device=dev)
+        if getattr(self, "_naturalist_idx", -1) < 0:
+            return ok, slot
+        civ_i = int(self._type_civic[self._naturalist_idx])
+        if civ_i < 0:
+            return ok, slot
+        alive = self.city_alive[:, row]
+        is_cap = self.city_is_cap[:, row]
+        spawn = torch.where(is_cap.any(dim=1), is_cap.long().argmax(dim=1), alive.long().argmax(dim=1))
+        live = (self.major_unit_alive & (self.major_unit_seat == row)
+                & (self.major_unit_type == self._naturalist_idx)).sum(dim=1)
+        cost = torch.full((B,), float(self._type_cost[self._naturalist_idx]), dtype=torch.float64, device=dev)
+        ok = (
+            active
+            & alive.any(dim=1)
+            & self.civ_civics[:, row, civ_i]
+            & (live < 1)
+            & self._afford(self.civ_faith[:, row], cost)
+        )
+        slot = torch.where(ok, spawn, slot)
+        return ok, slot
 
     def _seat_levy_candidate(self, row: int, active: torch.Tensor):
         """Buy-kind 7: the LEVY candidate — the RULE half only (militaristic
@@ -697,6 +737,22 @@ class SimSeats:
                     self.civ_faith[:, row] = torch.where(landed_sl, self.civ_faith[:, row] - s_price, self.civ_faith[:, row])
                     _pop_m = self.city_pop[bidx, row, jm]
                     self.city_pop[bidx, row, jm] = torch.where(landed_sl, (_pop_m - 1).clamp(min=1), _pop_m)
+        n_kind, n_j = self._driven_buy_nat.pop(row) if row in self._driven_buy_nat else (None, None)
+        if n_kind is not None and n_j is not None and getattr(self, "_naturalist_idx", -1) >= 0:
+            # CIV6: the Naturalist "can only be purchased with Faith in any
+            # city" — its own cost IS the faith price, like the religious
+            # units', with no Holy Site and no dedication in the way.
+            civ_i = int(self._type_civic[self._naturalist_idx])
+            jn = n_j.clamp(min=0, max=self.RC - 1)
+            at_n = self.city_center[bidx, row, jn].clamp(min=0)
+            n_price = torch.full((B,), float(self._type_cost[self._naturalist_idx]), dtype=torch.float64, device=dev)
+            base_n = active & ext & (n_j >= 0) & (n_kind == 10) & self.city_alive[bidx, row, jn]
+            if civ_i >= 0:
+                base_n = base_n & self.civ_civics[:, row, civ_i]
+            buy_n = base_n & self._afford(self.civ_faith[:, row], n_price)
+            if bool(buy_n.any()):
+                landed_n = self._spawn_unit(row, buy_n, at_n, self._naturalist_idx)
+                self.civ_faith[:, row] = torch.where(landed_n, self.civ_faith[:, row] - n_price, self.civ_faith[:, row])
         if kind is not None:
             want_t = (kind == 3) & active & ext & ~bought & (bbw >= 0) & (jjw >= 0)
             if bool(want_t.any()):
@@ -2161,6 +2217,9 @@ class SimSeats:
         _regional = self._seat_regional(row)
         if _regional is not None:
             have = have + _regional[1]
+        # NATIONAL PARK amenities join baseHave BEFORE the luxury ranking,
+        # exactly where `parkAmenities` sits in city.ts.
+        have = have + self._park_amenities(row)
         need = torch.ceil((self.city_pop[:, row, :cols].double() - 2) / 2).clamp(min=0)
         lux_add = self._luxury_amenities(row, have, need)
         if self._gov_has_effects:
@@ -2815,6 +2874,118 @@ class SimSeats:
     def civilian_slot_of(self, seat) -> torch.Tensor:
         """[B, T] — the MERGED slot of `seat`'s CIVILIAN unit per tile."""
         return self._occ_slot_of(self.civilian_at, seat)
+
+    def _park_amenities(self, row: int) -> torch.Tensor:
+        """[B, cols] f64 — what this seat's National Parks pay each of its
+        cities. CIV6 (GlobalParameters NATIONAL_PARK_AMENITIES_OWNING_CITY /
+        NATIONAL_PARK_NUM_OTHER_AMENITY_CITIES): 2 to the owning city and 1 to
+        the four closest others. `parkAmenities` is the twin: one payout per
+        park, taken at the cluster's ANCHOR, and the four are ranked by hex
+        distance to that anchor with the city ID breaking ties."""
+        B, cols, dev = self.B, self.RC, self.device
+        out = torch.zeros(B, cols, dtype=torch.float64, device=dev)
+        tix = torch.arange(self.T, device=dev).reshape(1, -1)
+        anchor = (self.park == tix) & (self.tile_seat == row)   # [B, T]
+        if not bool(anchor.any()):
+            return out
+        alive = self.city_alive[:, row, :cols]
+        ctr = self.city_center[:, row, :cols].clamp(min=0)      # [B, cols]
+        owner = self.city_slot_at(row)                          # [B, T] owning slot
+        # OWNER: 2 per park whose anchor this city owns.
+        own_slot = torch.where(anchor, owner, torch.full_like(owner, -1))
+        for j in range(cols):
+            out[:, j] = self._park_amen_owner * (own_slot == j).sum(dim=1).double()
+        # NEAREST FOUR: rank the OTHER cities per anchor by (distance, id).
+        d = self.pair_dist[ctr.unsqueeze(2), tix.unsqueeze(0)]  # [B, cols, T]
+        cid = self.city_id[:, row, :cols]                       # [B, cols]
+        BIG = 1 << 40
+        key = d.long() * (1 << 20) + cid.unsqueeze(2).clamp(min=0)
+        skip = (~alive).unsqueeze(2) | (own_slot.unsqueeze(1) == torch.arange(cols, device=dev).reshape(1, -1, 1))
+        key = torch.where(skip | ~anchor.unsqueeze(1), torch.full_like(key, BIG), key)
+        rank = key.argsort(dim=1).argsort(dim=1)                # [B, cols, T]
+        near = (rank < self._park_amen_cities) & (key < BIG)
+        out = out + self._park_amen_near * (near & anchor.unsqueeze(1)).sum(dim=2).double()
+        return out * alive.double()
+
+    def _do_excavate(self, row: int, mask: torch.Tensor, tile: torch.Tensor, slot: torch.Tensor) -> None:
+        """EXCAVATE for the games in `mask` — `archaeologistExcavate`'s twin.
+        The find lands in the LOWEST-id own city holding an Archaeological
+        Museum with a free slot, carrying the dig's PROVENANCE into that
+        museum's next slot; the dig is cleared and a charge is spent. A unit
+        out of charges is disbanded, exactly as `spendCharge` does it."""
+        if not bool(mask.any()) or self._artifact_bidx < 0:
+            return
+        tc = tile.clamp(min=0)
+        room = (
+            self.city_alive[:, row]
+            & self.city_bldg[:, row, :, self._artifact_bidx]
+            & (self.city_artifacts[:, row] < self._artifact_slots)
+        )
+        # TS sorts the candidate cities by CITY ID; the id plane holds it.
+        BIG = 1 << 30
+        key = torch.where(room, self.city_id[:, row], torch.full_like(self.city_id[:, row], BIG))
+        best, home = key.min(dim=1)
+        go = mask & (best < BIG)
+        if not bool(go.any()):
+            return
+        rows = go.nonzero(as_tuple=True)[0]
+        hslot = home[rows]
+        land = self.antiquity[rows, tc[rows]]
+        era = torch.where(land, self.antiquity_era[rows, tc[rows]], self.shipwreck_era[rows, tc[rows]])
+        dseat = torch.where(land, self.antiquity_seat[rows, tc[rows]], self.shipwreck_seat[rows, tc[rows]])
+        nxt = self.city_artifacts[rows, row, hslot].clamp(max=self._artifact_slots - 1)
+        self.city_artifact_era[rows, row, hslot, nxt] = era
+        self.city_artifact_seat[rows, row, hslot, nxt] = dseat
+        self.city_artifacts[rows, row, hslot] = self.city_artifacts[rows, row, hslot] + 1
+        # clear whichever dig was worked
+        lr = rows[land]
+        wr = rows[~land]
+        if lr.numel():
+            self.antiquity[lr, tc[lr]] = False
+            self.antiquity_era[lr, tc[lr]] = -1
+            self.antiquity_seat[lr, tc[lr]] = -1
+        if wr.numel():
+            self.shipwreck[wr, tc[wr]] = False
+            self.shipwreck_era[wr, tc[wr]] = -1
+            self.shipwreck_seat[wr, tc[wr]] = -1
+        sc = slot[rows]
+        self.unit_charges[rows, sc] -= 1
+        self.unit_mp[rows, sc] = 0
+        spent = self.unit_charges[rows, sc] <= 0
+        if bool(spent.any()):
+            dr = rows[spent]
+            self.unit_alive[dr, sc[spent]] = False
+            self.civilian_at[(dr, tc[dr])] = -1
+        self._eff_version += 1
+
+    def _do_park(self, row: int, mask: torch.Tensor, tile: torch.Tensor, slot: torch.Tensor) -> None:
+        """DESIGNATE a National Park — `naturalistPark`'s twin. The FIRST
+        legal rhombus in the anchor's neighbour order (by TILE index, which is
+        the order TS sorts them in) is taken, its four tiles join the park,
+        and the Naturalist is consumed."""
+        if not bool(mask.any()) or getattr(self, "_naturalist_idx", -1) < 0:
+            return
+        tc = tile.clamp(min=0).unsqueeze(1)                 # [B, 1]
+        quad = self._park_cluster(tc)                       # [B, 1, 6, 4]
+        legal = self._park_cluster_legal(row, quad)         # [B, 1, 6]
+        # TS walks the anchor's neighbours sorted by TILE INDEX and takes the
+        # first legal one; rank the same way rather than by direction.
+        nb = self.neigh[tc]                                 # [B, 1, 6]
+        BIG = 1 << 30
+        key = torch.where(legal, nb, torch.full_like(nb, BIG))
+        best, pick = key.min(dim=2)                         # [B, 1]
+        go = mask & (best.squeeze(1) < BIG)
+        if not bool(go.any()):
+            return
+        rows = go.nonzero(as_tuple=True)[0]
+        chosen = quad[rows, 0, pick[rows, 0]]               # [n, 4], sorted
+        anchor = chosen[:, 0]                               # the cluster's name
+        for k in range(chosen.shape[1]):
+            self.park[rows, chosen[:, k]] = anchor
+        # the Naturalist is CONSUMED by the designation
+        self.unit_alive[rows, slot[rows]] = False
+        self.civilian_at[(rows, tile.clamp(min=0)[rows])] = -1
+        self._eff_version += 1
 
     def city_slot_at(self, row: int) -> torch.Tensor:
         """[B, T] — seat `row`'s city SLOT owning each tile, -1 for nobody.

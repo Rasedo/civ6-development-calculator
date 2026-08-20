@@ -9,6 +9,8 @@ import { logUnitOrder } from './seatTurn';
 import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial } from '../../world/hex';
 import { isWater, isImpassable } from '../../world/query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
+import { tileAppeal } from './appeal';
+import { PARK_MIN_APPEAL } from '../data/improvements';
 import { isTechComplete, isCivicComplete } from './effects';
 import { ARTIFACT_BUILDING, ARTIFACT_SLOTS } from '../data/greatPeople';
 import { clearCampFor } from './combat';
@@ -615,21 +617,38 @@ export function trainableUnits(
         (seatOf(state, seat)?.tradeRoutes ?? []).length;
       if (owned >= tradeCapacity(state, seat)) return false;
     }
+    // The NATURALIST is bought with FAITH and nothing else (real Civ 6), so
+    // it never joins a production column.
+    if (d.naturalist) return false;
     if (d.requiresResource && !state.sandbox && !civHasStrategic(state, seat, d.requiresResource)) return false;
     if (d.naval) return !!city && cityNavalCapable(state, city);
     return true;
   });
 }
 
+/** the civic that reveals SHIPWRECKS in real Civ 6, and so the one that
+ *  lets an Archaeologist work one. */
+export const SHIPWRECK_CIVIC = 'CULTURAL_HERITAGE';
+
+/** Is there a dig under this unit that it may work RIGHT NOW? Land
+ *  sites need nothing; a WRECK needs Cultural Heritage. */
+export function digUnderfoot(state: GameState, tile: Tile | undefined, seat: number): 'antiquity' | 'shipwreck' | null {
+  if (!tile) return null;
+  if (tile.antiquity) return 'antiquity';
+  if (tile.shipwreck && isCivicComplete(state, SHIPWRECK_CIVIC, seat)) return 'shipwreck';
+  return null;
+}
+
 /**
- * EXCAVATE an Antiquity Site into an Artifact. The Archaeologist
- * must stand on a site, hold a charge, and the tile must be the seat 0's own or
- * unclaimed — real Civ 6 additionally allows a seat's territory under OPEN
- * BORDERS, which this model has no concept of and which is recorded rather than
- * approximated. The artifact lands in the LOWEST-id own city that has an
- * ARCHAEOLOGICAL MUSEUM with a free slot (the placeRelic ordering), and the dig
- * is consumed. With no free slot anywhere the excavation is refused rather than
- * silently losing the find.
+ * EXCAVATE a dig into an Artifact. The Archaeologist must stand on
+ * an ANTIQUITY SITE or a SHIPWRECK, hold a charge, and the tile must be its
+ * own or unclaimed — real Civ 6 additionally allows foreign territory under
+ * an OPEN BORDERS treaty, which neither engine has any concept of. The
+ * artifact lands in the LOWEST-id own city that has an ARCHAEOLOGICAL MUSEUM
+ * with a free slot (the placeRelic ordering) and carries its PROVENANCE (the
+ * era it was buried in, and whose event buried it) into that museum's slot,
+ * where the theming rule reads it. The dig is consumed. With no free slot
+ * anywhere the excavation is refused rather than silently losing the find.
  */
 export function archaeologistExcavate(state: GameState, unitId: number, seat: number): RuleResult {
   const unit = state.units.find((u) => u.id === unitId);
@@ -637,7 +656,8 @@ export function archaeologistExcavate(state: GameState, unitId: number, seat: nu
   if (unit.type !== 'ARCHAEOLOGIST') return no('Only an Archaeologist can excavate.');
   if ((unit.charges ?? 0) <= 0) return no('No charges left.');
   const tile = state.map.tiles[unit.tileIndex];
-  if (!tile?.antiquity) return no('No antiquity site here.');
+  const kind = digUnderfoot(state, tile, seat);
+  if (!kind) return no('No dig here.');
   if (tileClaimed(tile) && tileSeat(tile) !== unit.seat) {
     return no('That dig lies in foreign territory.');
   }
@@ -646,10 +666,82 @@ export function archaeologistExcavate(state: GameState, unitId: number, seat: nu
     .sort((a, b) => a.id - b.id)[0];
   if (!home) return no('No Archaeological Museum has a free artifact slot.');
   home.artifacts = (home.artifacts ?? 0) + 1;
-  tile.antiquity = false;
+  (home.artifactEras ??= []).push((kind === 'antiquity' ? tile.antiquityEra : tile.shipwreckEra) ?? 0);
+  (home.artifactSeats ??= []).push((kind === 'antiquity' ? tile.antiquitySeat : tile.shipwreckSeat) ?? NO_SEAT);
+  if (kind === 'antiquity') {
+    tile.antiquity = false;
+    tile.antiquityEra = undefined;
+    tile.antiquitySeat = undefined;
+  } else {
+    tile.shipwreck = false;
+    tile.shipwreckEra = undefined;
+    tile.shipwreckSeat = undefined;
+  }
   spendCharge(state, unit);
   state.eventLog.push(`An Artifact was excavated and displayed in ${home.name}.`);
   return ok;
+}
+
+/** the four tiles a National Park would cover if it were anchored on
+ *  `a` toward its neighbour `b`: the pair itself plus the two tiles adjacent
+ *  to BOTH — the hex rhombus real Civ 6 outlines. Empty when the pair has no
+ *  two shared neighbours (a map edge). */
+export function parkCluster(state: GameState, a: number, b: number): number[] {
+  const ta = state.map.tiles[a];
+  const tb = state.map.tiles[b];
+  if (!ta || !tb) return [];
+  const na = new Set(neighbors(state.map, ta).map((t) => t.index));
+  if (!na.has(b)) return [];
+  const shared = neighbors(state.map, tb)
+    .map((t) => t.index)
+    .filter((i) => na.has(i))
+    .sort((x, y) => x - y);
+  if (shared.length < 2) return [];
+  return [a, b, shared[0], shared[1]].sort((x, y) => x - y);
+}
+
+/** may these four tiles become a National Park for `seat`? Real Civ 6:
+ *  every tile Charming or better, all four owned by ONE city of the seat, and
+ *  no improvement, district or wonder on any of them. */
+export function parkClusterLegal(state: GameState, cluster: number[], seat: number): boolean {
+  if (cluster.length !== 4) return false;
+  let city = -1;
+  for (const i of cluster) {
+    const t = state.map.tiles[i];
+    if (!t || (t.park ?? -1) >= 0 || t.improvement || t.district || t.builtWonder) return false;
+    if (tileSeat(t) !== seat) return false;
+    if (city < 0) city = t.ownerCity;
+    else if (t.ownerCity !== city) return false;
+    if (tileAppeal(state.map, t) < PARK_MIN_APPEAL) return false;
+  }
+  return city >= 0;
+}
+
+/**
+ * DESIGNATE a National Park. The Naturalist must stand on one of the
+ * four tiles (real Civ 6: "they must be able to move onto one of its tiles"),
+ * and is CONSUMED by the designation. The park pays its tourism and its
+ * amenities from the tiles themselves, so nothing is stored on the city.
+ */
+export function naturalistPark(state: GameState, unitId: number, seat: number): RuleResult {
+  const unit = state.units.find((u) => u.id === unitId);
+  if (!unit || unit.seat !== seat) return no('No such unit.');
+  if (!UNITS[unit.type]?.naturalist) return no('Only a Naturalist can designate a park.');
+  const here = state.map.tiles[unit.tileIndex];
+  if (!here) return no('No such tile.');
+  // The anchor's own neighbours, in TILE order, are the candidate partners;
+  // the FIRST legal rhombus is taken, so both engines pick the same four.
+  for (const nb of neighbors(state.map, here).slice().sort((x, y) => x.index - y.index)) {
+    const cluster = parkCluster(state, unit.tileIndex, nb.index);
+    if (!parkClusterLegal(state, cluster, seat)) continue;
+    // the cluster comes back SORTED, so its first tile is the anchor both
+    // engines name the park by.
+    for (const i of cluster) state.map.tiles[i].park = cluster[0];
+    disbandUnit(state, unit.id);
+    state.eventLog.push('A National Park was designated.');
+    return ok;
+  }
+  return no('No legal National Park cluster here.');
 }
 
 export function queueUnit(state: GameState, cityId: number, unitType: string, seat: number): RuleResult {

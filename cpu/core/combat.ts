@@ -314,6 +314,7 @@ export function cityDefenseStrength(state: GameState, city: City): number {
 
 export function killUnit(state: GameState, unit: Unit, seat: number): void {
   markAntiquitySite(state, unit.tileIndex, seat); // a death leaves a dig
+  markShipwreck(state, unit.tileIndex, seat); // ...at sea, a wreck
   disbandUnit(state, unit.id);
 }
 
@@ -329,8 +330,37 @@ export function killUnit(state: GameState, unit: Unit, seat: number): void {
 export function markAntiquitySite(state: GameState, tileIndex: number, seat: number): void {
   const t = state.map.tiles[tileIndex];
   if (!t || t.antiquity || isWater(t) || t.district || t.builtWonder) return;
-  if (civEraIndex(seatOf(state, seat)!.research.techs, seatOf(state, seat)!.research.civics) >= MODERN_ERA_INDEX) return;
+  const era = civEraIndex(seatOf(state, seat)!.research.techs, seatOf(state, seat)!.research.civics);
+  if (era >= MODERN_ERA_INDEX) return;
   t.antiquity = true;
+  // The dig REMEMBERS when and whose: a themed Archaeological Museum wants
+  // one era and three civilizations, so the Artifact has to carry both out
+  // of the ground.
+  t.antiquityEra = era;
+  t.antiquitySeat = seat;
+}
+
+/**
+ * Stamp a SHIPWRECK. Real Civ 6 puts wrecks on passable water and
+ * reveals them with Cultural Heritage; an Archaeologist that works one
+ * removes it from the map and excavates an Artifact. This model sources its
+ * dig placement from DEATHS rather than map generation (see
+ * `markAntiquitySite`), so a hull going down leaves the wreck, under the same
+ * pre-Modern era gate and the same one-per-tile rule. `seat` is the ACTING
+ * seat, exactly as `markAntiquitySite` takes it: both digs record the seat
+ * whose ORDER buried them, which is the only seat every call site on both
+ * engines holds.
+ */
+export function markShipwreck(state: GameState, tileIndex: number, seat: number): void {
+  const t = state.map.tiles[tileIndex];
+  if (!t || t.shipwreck || !isWater(t)) return;
+  const owner = seatOf(state, seat);
+  if (!owner) return; // barbarian and city-state hulls leave no wreck to theme
+  const era = civEraIndex(owner.research.techs, owner.research.civics);
+  if (era >= MODERN_ERA_INDEX) return;
+  t.shipwreck = true;
+  t.shipwreckEra = era;
+  t.shipwreckSeat = seat;
 }
 
 /** Sack: population and gold loss, improvements around the center pillaged.

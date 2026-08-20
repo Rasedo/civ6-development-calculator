@@ -165,10 +165,11 @@ def pick_research(blocks: dict, mask: torch.Tensor, kind: str) -> torch.Tensor:
 # reach capacity, so an early tier trains up to capacity and no more, where a
 # tier below "building" NEVER fires (a city almost always has something else
 # to raise; measured 0 traders over 250 driven turns).
-PROD_PRIORITY = ("settler", "trader", "district", "building", "wonder", "builder", "engineer", "unit", "galley", "project")
+PROD_PRIORITY = ("settler", "trader", "district", "building", "wonder", "builder", "archaeologist", "engineer", "unit", "galley", "project")
 
 SOLO_TIERS = {"builder": ("builder_idx", True),
               "trader": ("trader_idx", False),
+              "archaeologist": ("archaeologist_idx", False),
               "engineer": ("engineer_idx", True),
               "galley": ("galley_idx", False)}
 
@@ -240,6 +241,9 @@ def unit_roster(units: list[dict]) -> dict:
         # the trade-route servicer: legal only under capacity (the mask's
         # gate), so the lane trains one whenever a route slot has no Trader
         "trader_idx": ids.index("TRADER") if "TRADER" in ids else -1,
+        # the dig civilian: legal only where a museum slot is free (the mask's
+        # gate), and one in flight at a time
+        "archaeologist_idx": ids.index("ARCHAEOLOGIST") if "ARCHAEOLOGIST" in ids else -1,
     }
 
 

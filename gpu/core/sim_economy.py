@@ -1387,7 +1387,23 @@ class SimEconomy:
         era = self._civ_era(self.civ_techs[b, idx], self.civ_civics[b, idx])
         return torch.where(major, era, torch.zeros_like(era))
 
-    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, relics: torch.Tensor | None = None, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None, gw_kmult: torch.Tensor | None = None) -> torch.Tensor:
+    def _museum_themed(self, row: int) -> torch.Tensor:
+        """[B, RC] bool — is this city's ARCHAEOLOGICAL MUSEUM themed?
+        CIV6: every slot full, all Artifacts from ONE era, no two from the
+        same civilization; a themed museum DOUBLES the yields of what it
+        holds. `museumThemed` is the twin."""
+        n = self._artifact_slots
+        eras = self.city_artifact_era[:, row, :, :n]   # [B, RC, n]
+        seats = self.city_artifact_seat[:, row, :, :n]
+        full = self.city_artifacts[:, row] >= n
+        one_era = (eras == eras[:, :, :1]).all(dim=2)
+        distinct = torch.ones_like(full)
+        for i in range(n):
+            for j in range(i + 1, n):
+                distinct = distinct & (seats[:, :, i] != seats[:, :, j])
+        return full & one_era & distinct
+
+    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, relics: torch.Tensor | None = None, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None, gw_kmult: torch.Tensor | None = None, themed: torch.Tensor | None = None) -> torch.Tensor:
         """[B] — a seat's per-turn TOURISM, the `seatTourism` twin. Great Works
         pay the values that pair tourism with culture; every OWNED unpillaged
         SEASIDE RESORT pays its tile's APPEAL (floored at 0), attributed by
@@ -1414,7 +1430,11 @@ class SimEconomy:
         if relics is not None:
             t = t + self._relic_tour * (relics * alive.long()).sum(dim=1)
         if artifacts is not None:
-            t = t + self._artifact_tourism * (artifacts * alive.long()).sum(dim=1)
+            # a THEMED Archaeological Museum doubles what it holds.
+            tm = torch.ones_like(artifacts)
+            if themed is not None:
+                tm = torch.where(themed, self._theming_mult, 1)
+            t = t + self._artifact_tourism * (artifacts * alive.long() * tm).sum(dim=1)
         w_live = (self.built_wonder >= 0) & self.built_wonder_complete & own
         if bool(w_live.any()):
             w_era = self._wonder_era[self.built_wonder.clamp(min=0, max=max(self._wonder_era.numel() - 1, 0))]
@@ -1425,6 +1445,12 @@ class SimEconomy:
             live = (self.improvement == self.SEASIDE) & ~self.pillaged & own
             if bool(live.any()):
                 t = t + (self._tile_appeal().clamp(min=0) * live.long()).sum(dim=1)
+        # CIV6: a National Park pays "Tourism equal to the total Appeal of all
+        # the tiles included in it" — NOT floored, so an ugly neighbour can
+        # take a park's payout negative.
+        pk = (self.park >= 0) & own
+        if bool(pk.any()):
+            t = t + (self._tile_appeal() * pk.long()).sum(dim=1)
         return t
 
     def _seaside_ok(self) -> torch.Tensor:
@@ -1813,7 +1839,8 @@ class SimEconomy:
             + self._gw_cul_k[1] * self.city_gw_art[:, row, sl].double()
             + self._gw_cul_k[2] * self.city_gw_music[:, row, sl].double()
         ) * alivef
-        bld_y[:, :, 4] = bld_y[:, :, 4] + self._artifact_culture * self.city_artifacts[:, row, sl].double() * alivef
+        _thm = torch.where(self._museum_themed(row)[:, sl], self._theming_mult, 1).double()
+        bld_y[:, :, 4] = bld_y[:, :, 4] + self._artifact_culture * self.city_artifacts[:, row, sl].double() * _thm * alivef
         _pb = self._golden_ded(row, self._ded_pen_brush)
         if bool(_pb.any()):
             bld_y[:, :, 4] = bld_y[:, :, 4] + _pb.double().unsqueeze(1) * self._district_counts(row)[1][:, sl].double() * alivef

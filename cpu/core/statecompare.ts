@@ -34,7 +34,8 @@
  * different findings and the caller must be able to treat them differently.
  *
  * NODE ONLY: the manifest and the type surface are read off disk. Nothing in
- * the browser build imports this.
+ * the browser build
+imports this.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -52,7 +53,7 @@ import { CIVICS } from '../data/civics';
 import { UNITS } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
+import { ARTIFACT_SLOTS, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, LEVY_COOLDOWN } from '../data/cityStates';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS } from '../data/religion';
 
@@ -482,6 +483,14 @@ const CITY: Record<string, Extractor> = {
   greatWorksMusic: overCities((r) => r.city.greatWorksMusic ?? 0),
   relics: overCities((r) => r.city.relics ?? 0),
   artifacts: overCities((r) => r.city.artifacts ?? 0),
+  // the museum's PROVENANCE, slot by slot — what the theming rule reads.
+  artifactProv: overCities((r) => {
+    const eras = r.city.artifactEras ?? [];
+    const seats = r.city.artifactSeats ?? [];
+    const out: number[] = [];
+    for (let i = 0; i < ARTIFACT_SLOTS; i++) out.push(eras[i] ?? -1, seats[i] ?? -1);
+    return out;
+  }),
 };
 
 const UNIT_G: Record<string, Extractor> = {
@@ -511,6 +520,10 @@ const TILE: Record<string, Extractor> = {
   builtWonder: overTiles((t) => idx(WONDER_IDX, t.builtWonder)),
   builtWonderComplete: overTiles((t) => (t.builtWonderComplete ? 1 : 0)),
   antiquity: overTiles((t) => (t.antiquity ? 1 : 0)),
+  antiquityProv: overTiles((t) => [t.antiquity ? (t.antiquityEra ?? -1) : -1, t.antiquity ? (t.antiquitySeat ?? -1) : -1]),
+  shipwreck: overTiles((t) => (t.shipwreck ? 1 : 0)),
+  shipwreckProv: overTiles((t) => [t.shipwreck ? (t.shipwreckEra ?? -1) : -1, t.shipwreck ? (t.shipwreckSeat ?? -1) : -1]),
+  park: overTiles((t) => t.park ?? -1),
   encampHp: overTiles((t) => t.encampHp ?? 0),
   road: overTiles((t) => (t.road ? 1 : 0)),
   fertility: overTiles((t) => t.fertility),

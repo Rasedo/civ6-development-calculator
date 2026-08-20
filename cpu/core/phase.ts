@@ -38,13 +38,15 @@ import { congressSession, congressLoyaltyDelta, congressUdtProdDistrict } from '
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { hasRiver, hasFreshWater, isCoastalWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
-import { disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits } from './units';
+import { disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, archaeologistExcavate, naturalistPark } from './units';
 import { killUnit } from './combat';
-import { availableProjects, buyTile, buyWorshipBuilding, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, purchaseCivilianWithFaith, purchaseReligiousUnit, purchaseSettler, queueProject, settlerCost } from './game';
+import { availableProjects, buyTile, buyWorshipBuilding, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseSettler, queueProject, settlerCost } from './game';
 import { DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex } from './unitActions';
 
 const A_FOUND_CITY = unitActionIndex(IMPROVEMENT_IDS).FOUND_CITY;
+const A_EXCAVATE = unitActionIndex(IMPROVEMENT_IDS).EXCAVATE;
+const A_PARK = unitActionIndex(IMPROVEMENT_IDS).PARK;
 import { ALLY_MIN_PEACE, CIV_LEADERS, FORMAL_WAR_MIN_TURNS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles, goldenBoostBonus } from './eras';
 import { NO_SEAT, atWarWithAny, citiesOf, civHasStrategic, civsAtWar, emptySeat, isCiv, prophetsOf, seatOf, seatOfCityState, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
@@ -795,6 +797,17 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         if (res.ok && res.city) state.eventLog.push(`${actor.name} founded ${res.city.name}.`);
         return;
       }
+      if (a === A_EXCAVATE) {
+        // Both verbs RE-VALIDATE inside their rule body, so a row recorded
+        // before a mid-turn death or a filled museum slot refuses rather
+        // than substituting.
+        if (archaeologistExcavate(state, unit.id, actor.seat).ok) unit.movesLeft = 0;
+        return;
+      }
+      if (a === A_PARK) {
+        naturalistPark(state, unit.id, actor.seat);
+        return;
+      }
       if (a < 6) {
         const nb = neighbors(state.map, here);
         const to = nb[a];
@@ -1155,6 +1168,7 @@ export function seatPhase(state: GameState): void {
     {
       let boughtRelig = false;
       let boughtCivilian = false;
+      let boughtNaturalist = false;
       for (const [fk, centre] of rec?.buyFaith ?? []) {
         const civCityF = actor.cities.find((c) => c.centerIndex === centre);
         if (!civCityF) continue;
@@ -1164,6 +1178,10 @@ export function seatPhase(state: GameState): void {
         } else if ((fk === 8 || fk === 9) && !boughtCivilian) {
           // kinds 8/9 — the Monumentality faith-civilian (8 builder, 9 settler)
           boughtCivilian = purchaseCivilianWithFaith(state, civCityF.id, fk === 8 ? 'BUILDER' : 'SETTLER', actor.seat).ok;
+        } else if (fk === 10 && !boughtNaturalist) {
+          // kind 10 — the NATURALIST, faith-only in any city (no Holy Site,
+          // no dedication), one per turn like the other faith civilians.
+          boughtNaturalist = purchaseNaturalist(state, civCityF.id, actor.seat).ok;
         }
       }
     }

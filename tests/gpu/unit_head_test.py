@@ -50,11 +50,14 @@ def main() -> None:
     acts = rj["actions"]["unit"]
     imp_ids = rj["improvements"]["ids"]
     assert acts, "rules.actions.unit missing — the exporter must ship the enum"
-    assert len(acts) == 13 + len(imp_ids) + 3 + 12 + 7 + 1, (  # +12 SNIPE, +7 SPREAD, +1 FOUND_CITY
+    # +12 SNIPE, +7 SPREAD, +1 FOUND_CITY, +1 EXCAVATE, +1 PARK
+    assert len(acts) == 13 + len(imp_ids) + 3 + 12 + 7 + 3, (
         f"enum is {len(acts)} wide for {len(imp_ids)} improvements"
     )
-    assert acts[-8] == "SPREAD_HERE" and acts[-2] == "SPREAD_5", "SPREAD tail misplaced"
-    assert acts[-1] == "FOUND_CITY", "FOUND_CITY must stay the enum's last column"
+    assert acts[-10] == "SPREAD_HERE" and acts[-4] == "SPREAD_5", "SPREAD tail misplaced"
+    # the CIVILIAN VERBS close the enum, in this order: a new verb joins at
+    # the END or it moves a column somebody else already keys on.
+    assert acts[-3:] == ["FOUND_CITY", "EXCAVATE", "PARK"], "civilian verb tail misplaced"
 
     # PILLAGE is NOT the last column — the SNIPE ring and the SPREAD tail sit
     # after it — so PILLAGE and the ring must hold their exact seats and every

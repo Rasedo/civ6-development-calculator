@@ -171,7 +171,7 @@ def main() -> None:
     dt6 = torch.full((1, rec_sim.RC, len(rec_sim._scaffold)), -1, dtype=torch.long)
     dt6[0, j, si] = t6
     rec = drive._extract_record(rec_sim, row, prod6, dt6, None, None, None, None,
-                                torch.full((1, 1, 1), -1, dtype=torch.long), None, None, None, None, None, None, 0)
+                                torch.full((1, 1, 1), -1, dtype=torch.long), None, None, None, None, None, None, None, 0)
     ent = next(e for e in rec["production"] if int(e[1]) == rec_sim.DISTRICT_BASE + si)
     assert len(ent) == 3, f"a district entry must carry its tile, got {ent}"
     assert int(ent[2]) == t6, f"the record wrote tile {ent[2]}, the policy chose {t6}"

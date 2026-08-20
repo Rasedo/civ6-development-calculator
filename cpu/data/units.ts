@@ -50,6 +50,10 @@ export interface UnitDef {
    * seat's trade capacity (free traders + active routes), the real Civ 6
    * rule; its live price is traderCost(), progressive with game progress. */
   trader?: boolean;
+  /** the NATIONAL PARK civilian (NATURALIST) — real Civ 6 sells it for
+   * FAITH ONLY, in any city, so it never joins a production column. Consumed
+   * when it designates a park. */
+  naturalist?: boolean;
   description: string;
 }
 
@@ -366,6 +370,24 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       trader: true,
       requiresCivic: 'FOREIGN_TRADE',
       description: 'Establishes a trade route (spent on the route, returned when it completes).',
+    }),
+    // The NATURALIST, sourced from the GS Civilopedia via the wiki — a MODERN
+    // civilian behind the CONSERVATION civic, 4 moves, bought with FAITH ONLY
+    // ("It can only be purchased with Faith in any city"), 600 faith at GS
+    // prices and progressive, consumed when it designates a National Park.
+    // APPENDED LAST (roster order is the GPU's unit index).
+    U({
+      id: 'NATURALIST',
+      name: 'Naturalist',
+      code: 'Nt',
+      cost: 600,
+      maintenance: 0,
+      moves: 4,
+      combat: 0, // civilian
+      charges: 0,
+      naturalist: true,
+      requiresCivic: 'CONSERVATION',
+      description: 'Designates a National Park over four contiguous tiles (consumed).',
     }),
   ].map((u) => [u.id, u]),
 );

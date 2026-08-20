@@ -1141,6 +1141,19 @@
      "planes": [
       "city_artifacts"
      ]
+    },
+    {
+     "name": "artifactProv",
+     "compare": "exact",
+     "covers": [
+      "City.artifactEras",
+      "City.artifactSeats"
+     ],
+     "planes": [
+      "city_artifact_era",
+      "city_artifact_seat"
+     ],
+     "note": "era and civilization per artifact SLOT \u2014 the theming rule's inputs"
     }
    ]
   },
@@ -1360,6 +1373,52 @@
      ],
      "planes": [
       "antiquity"
+     ]
+    },
+    {
+     "name": "antiquityProv",
+     "compare": "exact",
+     "covers": [
+      "Tile.antiquityEra",
+      "Tile.antiquitySeat"
+     ],
+     "planes": [
+      "antiquity_era",
+      "antiquity_seat"
+     ],
+     "note": "a dig remembers its era and its civilization; cleared with the site"
+    },
+    {
+     "name": "shipwreck",
+     "compare": "exact",
+     "covers": [
+      "Tile.shipwreck"
+     ],
+     "planes": [
+      "shipwreck"
+     ]
+    },
+    {
+     "name": "shipwreckProv",
+     "compare": "exact",
+     "covers": [
+      "Tile.shipwreckEra",
+      "Tile.shipwreckSeat"
+     ],
+     "planes": [
+      "shipwreck_era",
+      "shipwreck_seat"
+     ],
+     "note": "the wreck's provenance, same shape as the land dig's"
+    },
+    {
+     "name": "park",
+     "compare": "exact",
+     "covers": [
+      "Tile.park"
+     ],
+     "planes": [
+      "park"
      ]
     },
     {

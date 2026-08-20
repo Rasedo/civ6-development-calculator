@@ -22,6 +22,14 @@ export interface ImprovementDef {
 /** the BREATHTAKING appeal bar a Seaside Resort needs (real Civ 6
  *  — the same >= 4 threshold `appealTier` calls Breathtaking). */
 export const SEASIDE_RESORT_MIN_APPEAL = 4;
+/** CIV6 (National Park): every tile in the cluster must be CHARMING or
+ *  better, and `appealTier` puts Charming at 2. */
+export const PARK_MIN_APPEAL = 2;
+/** CIV6: a National Park gives "2 Amenities to the city that owns it and
+ *  1 Amenity to the four closest cities in your empire". */
+export const PARK_AMENITIES_OWNER = 2;
+export const PARK_AMENITIES_NEAR = 1;
+export const PARK_AMENITY_CITIES = 4;
 
 export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
   FARM: {

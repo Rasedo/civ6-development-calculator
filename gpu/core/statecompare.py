@@ -508,6 +508,13 @@ CITY = {
     "greatWorksMusic": _cty("city_gw_music"),
     "relics": _cty("city_relics"),
     "artifacts": _cty("city_artifacts"),
+    # the museum's provenance, slot by slot: era then civilization, so one
+    # row reads [e0, s0, e1, s1, ...] exactly like the TS extractor.
+    "artifactProv": lambda sim, b, rows: [
+        [int(x) for i in range(sim._artifact_slots)
+         for x in (sim.city_artifact_era[b, c, s, i], sim.city_artifact_seat[b, c, s, i])]
+        for c, s in rows
+    ],
 }
 
 
@@ -564,6 +571,14 @@ TILE = {
     "builtWonder": _tile("built_wonder"),
     "builtWonderComplete": _tile("built_wonder_complete"),
     "antiquity": _tile("antiquity"),
+    "antiquityProv": lambda sim, b, rows: [
+        [int(sim.antiquity_era[b, t]), int(sim.antiquity_seat[b, t])] for t in range(sim.T)
+    ],
+    "shipwreck": _tile("shipwreck"),
+    "shipwreckProv": lambda sim, b, rows: [
+        [int(sim.shipwreck_era[b, t]), int(sim.shipwreck_seat[b, t])] for t in range(sim.T)
+    ],
+    "park": _tile("park"),
     "encampHp": _tile("encamp_hp"),
     "road": _tile("road"),
     "fertility": _tile("fertility"),

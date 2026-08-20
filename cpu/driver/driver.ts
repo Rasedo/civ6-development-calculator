@@ -24,7 +24,7 @@ import { SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
 import { BUY_UNITS } from '../core/phase';
 import { tradeCapacity, freeTrader, routeYields, cityStateRouteYields, TRADE_ROUTE_RANGE } from '../core/trade';
 import { isExplored } from '../core/fog';
-import { buildingFaithCost, endTurn, goldAffordable, settlerCost, tilePurchaseCost } from '../core/game';
+import { buildingFaithCost, endTurn, goldAffordable, naturalistCost, settlerCost, tilePurchaseCost } from '../core/game';
 import { goldenDedication, monumentalityBuyMult } from '../core/eras';
 import { builderCost } from '../core/units';
 import { hasMet, isSuzerain } from '../core/cityStates';
@@ -34,7 +34,7 @@ import { LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { observeSeat } from '../core/observe';
 import { stateDigest, groupDump } from '../core/statecompare';
 import { validImprovementsIn } from '../core/rules';
-import { computeUnlocksIn, getModifiers } from '../core/effects';
+import { computeUnlocksIn, getModifiers, isCivicComplete } from '../core/effects';
 import { hexDistance } from '../../world/hex';
 import { prodLayout } from '../core/prodLayout';
 import { UNITS } from '../data/units';
@@ -227,6 +227,22 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
         }
       }
     }
+    // The NATURALIST faith buy (kind 10) — faith-only in any city, behind
+    // CONSERVATION, spawning at the capital (else the first city) like the
+    // other faith civilians. ONE live Naturalist at a time is the ladder's
+    // own cap, not a game rule: the unit exists to be spent on a park.
+    let natKind = -1;
+    let natC = -1;
+    {
+      const natSpawn = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
+      const liveNat = state.units.filter((u) => u.seat === actor.seat && u.type === 'NATURALIST').length;
+      if (natSpawn && liveNat < 1
+        && isCivicComplete(state, UNITS.NATURALIST.requiresCivic!, actor.seat)
+        && goldAffordable(actor.faith ?? 0, naturalistCost(state, actor.seat))) {
+        natKind = 10;
+        natC = natSpawn.centerIndex;
+      }
+    }
     let levyIdx = -1;
     // At war with ANY other major, read off this seat's own row — the GPU's
     // `war[row, :1+R].any()` twin. It used to read a single war axis from
@@ -244,7 +260,8 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
       }
     }
   return [buyC, buyB, settlerOk ? 1 : 0, unitOk ? 1 : 0,
-    tileOk, tileT, tileC, worshipC, religKind, religC, levyIdx, monuKind, monuC];
+    tileOk, tileT, tileC, worshipC, religKind, religC, levyIdx, monuKind, monuC,
+    natKind, natC];
 }
 
 

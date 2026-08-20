@@ -40,7 +40,7 @@ POKE_OMP = 2
 
 POKE_COST = {
     "great_works": 2.7, "religion_gp": 3.2, "government": 3.3,
-    "relics": 3.4, "trade2": 3.5, "bankruptcy": 3.7, "domination": 3.8,
+    "relics": 3.4, "trade2": 3.5, "parks": 3.5, "bankruptcy": 3.7, "domination": 3.8,
     "culture_victory": 4.3, "space_race": 4.8, "encampment": 4.9, "citystate_verbs": 6.6,
     "citystate_bonus": 7.9, "buy_wire": 9.2, "city_registry": 12.4, "controlled": 13.8,
     "combat_mod": 17.1, "ranged": 18.5, "occupancy": 21.0,
@@ -219,6 +219,7 @@ def main() -> int:
                 ("citystate_bonus", [py, "tests/gpu/cs_bonus_test.py"], 4),  # CS envoy building re-key + suzerain perk (6-envoy tier unreachable in the gate)
                 ("citystate_verbs", [py, "tests/gpu/cs_verbs_test.py"], 4),  # levy + city-state quests
                 ("trade2", [py, "tests/gpu/trade2_test.py"], 4),  # international routes + route duration surfaces
+                ("parks", [py, "tests/gpu/parks_test.py"], 4),  # national parks, shipwrecks, museum theming
                 ("geopolitics", [py, "tests/gpu/geopolitics_test.py"], 4),  # per-pair wars + casus belli + civ-to-civ city transfer
                 ("governors", [py, "tests/gpu/governors_test.py"], 4),  # era-score hooks + Ages loyalty modulation + governor anchors
                 ("watermill", [py, "tests/gpu/watermill_test.py"], 4),  # Water Mill: farm-improved bonus resources +1 food
