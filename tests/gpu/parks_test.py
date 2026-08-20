@@ -225,8 +225,41 @@ def main() -> None:
     assert int(s5.city_artifact_era[0, 0, 0, 0]) == -1
     print("snapshot ok")
 
+    # --- the district and outpost appeal terms ----------------------------
+    # CIV6 ("Appeal"): +1 per adjacent Holy Site / Theater Square /
+    # Entertainment Complex, -1 per adjacent barbarian outpost.
+    s6 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    assert s6._appeal_good_dist, "no district raises appeal — the catalog lookup found nothing"
+    mid = int(s6.T // 2)
+    nb = [x for x in s6.neigh[mid].tolist() if x >= 0]
+    assert len(nb) >= 2, "need a tile with neighbours"
+    s6.district[0, :] = -1
+    s6.camp_tile[0, :] = -1
+    s6._eff_version += 1
+    base = int(s6._tile_appeal()[0, mid])
+    s6.district[0, nb[0]] = s6._appeal_good_dist[0]
+    s6._eff_version += 1
+    assert int(s6._tile_appeal()[0, mid]) == base + 1, "an adjacent good district must add +1"
+    if s6._appeal_bad_dist:
+        s6.district[0, nb[1]] = s6._appeal_bad_dist[0]
+        s6._eff_version += 1
+        assert int(s6._tile_appeal()[0, mid]) == base, "a bad district must cancel it, cumulatively"
+        s6.district[0, nb[1]] = -1
+        s6._eff_version += 1
+    # an OUTPOST on a neighbour costs 1, and the cache sees the camp write
+    s6.camp_tile[0, 0] = nb[1]
+    s6._eff_version += 1
+    assert int(s6._tile_appeal()[0, mid]) == base, "an adjacent outpost must subtract 1"
+    far = next((t for t in range(s6.T) if t != mid and nb[1] not in s6.neigh[t].tolist()), None)
+    if far is not None:
+        before_far = int(s6._tile_appeal()[0, far])
+        s6.camp_tile[0, 0] = -1
+        s6._eff_version += 1
+        assert int(s6._tile_appeal()[0, far]) == before_far, "a distant tile must not feel the outpost"
+    print("  appeal district + outpost terms OK")
+
     print("parks_test OK — constants + planes, the rhombus, designation with tourism and "
-          "amenities, both digs with provenance, theming, snapshot round-trip")
+          "amenities, both digs with provenance, theming, appeal terms, snapshot round-trip")
 
 
 if __name__ == "__main__":

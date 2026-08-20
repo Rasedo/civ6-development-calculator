@@ -11,19 +11,21 @@
  * quarry / oil well / industrial zone / encampment / spaceport / pillaged -1.
  * The modifiers are cumulative.
  *
- * OPEN, all of them adjacency terms the real game pays and this one does not:
- * an adjacent HOLY SITE, THEATER SQUARE or ENTERTAINMENT COMPLEX is +1 and an
- * adjacent BARBARIAN OUTPOST is -1 — all four exist here already, so nothing
- * blocks those terms but the work. The rest of the real list (Dam, Canal,
- * Water Park, Preserve, the unique improvements, the appeal-granting Great
- * People) waits on things this model does not have at all.
+ * `camps` is the barbarian OUTPOST set (`campTiles`) — an outpost is stored on
+ * the barbarian seat, not on its tile, so the one caller-supplied argument is
+ * how the tile walk sees it. Omitting it drops the penalty, so every caller
+ * passes it.
+ *
+ * OPEN: the rest of the real adjacency list — Dam, Canal, Water Park and
+ * Preserve (no such district here), the unique improvements, and the
+ * appeal-granting Great People — waits on systems this model does not have.
  */
 
 import type { GameMap, Tile } from './types';
 import { neighbors } from '../../world/hex';
 import { isMountain } from '../../world/query';
 
-export function tileAppeal(map: GameMap, tile: Tile): number {
+export function tileAppeal(map: GameMap, tile: Tile, camps?: ReadonlySet<number>): number {
   if (tile.wonder) return 5;
   if (isMountain(tile)) return 4;
   let appeal = 0;
@@ -34,7 +36,9 @@ export function tileAppeal(map: GameMap, tile: Tile): number {
     if (n.feature === 'WOODS') appeal += 1;
     if (isMountain(n) && !n.wonder) appeal += 1;
     if (n.terrain === 'COAST' || n.terrain === 'LAKE') appeal += 1;
-    if (n.feature === 'OASIS') appeal += 1; // sourced, was missing
+    if (n.feature === 'OASIS') appeal += 1;
+    if (n.district === 'HOLY_SITE' || n.district === 'THEATER_SQUARE' || n.district === 'ENTERTAINMENT_COMPLEX') appeal += 1;
+    if (camps?.has(n.index)) appeal -= 1;
     if (n.feature === 'RAINFOREST' || n.feature === 'MARSH') appeal -= 1;
     if (n.feature === 'FLOODPLAINS') appeal -= 1; // sourced, was missing
     if (n.pillaged) appeal -= 1; // "-1 each adjacent pillaged tile"

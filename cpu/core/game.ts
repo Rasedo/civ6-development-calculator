@@ -53,15 +53,19 @@ export function effectiveResearchCost(state: GameState, seat: number, id: string
 export function districtCostIn(research: ResearchState): number {
   // The real Civ 6 curve — floor(54·(1 + 9·max(tech%, civic%)))
   // (the tree you are FURTHER through drives the price, not the average).
-  // OPEN: real Civ 6 also discounts a specialty district 40% when you have
-  // built fewer of its type than the empire average (25% for the Government
-  // Plaza and Diplomatic Quarter, which this roster does not carry).
   // The 54 base speed-scales like every other production cost.
+  // `districtDiscounted` carries the under-represented discount on top.
   const tPct = research.techs.length / Object.keys(TECHS).length;
   const cPct = research.civics.length / Object.keys(CIVICS).length;
   return Math.floor(Math.round(54 * GAME_SPEED) * (1 + 9 * Math.max(tPct, cPct)));
 }
 
+/** CIV6 ("District", District discount mechanics): a specialty district is
+ *  40% off when BOTH hold — A = specialty types unlocked, B = specialty
+ *  districts COMPLETED, C(T) = districts of type T completed or placed:
+ *  B >= A, and C(T) < B/A. `n < ceil(D/U)` is that inequality over integers.
+ *  Government Plaza and Diplomatic Quarter take 25% instead; neither is in
+ *  this roster. A district's cost locks in when it is placed. */
 export function districtDiscounted(
   state: GameState,
   seat: number,
@@ -1067,8 +1071,16 @@ function theologicalCombatPhase(state: GameState): void {
         (n, w) => n + (state.map.tiles[w.tileIndex].builtWonderComplete ? RELIC_WONDER_SLOTS[w.id] ?? 0 : 0),
         0,
       );
-    if (def.hp <= 0 && def.type === 'APOSTLE' && martyrs()) placeRelic(citiesOf(state, unitSeat(def)), relicSlots);
-    if (att.hp <= 0 && martyrs()) placeRelic(citiesOf(state, g), relicSlots); // the attacker is always an APOSTLE
+    // CIV6: a Relic that finds no open slot waits in reserve for one to open;
+    // `drainRelicReserve` hands it out at the owner's next turn.
+    const reserve = (sx: number) => {
+      const owner = seatOf(state, sx);
+      if (owner) owner.relicReserve = (owner.relicReserve ?? 0) + 1;
+    };
+    if (def.hp <= 0 && def.type === 'APOSTLE' && martyrs()
+        && !placeRelic(citiesOf(state, unitSeat(def)), relicSlots)) reserve(unitSeat(def));
+    if (att.hp <= 0 && martyrs()
+        && !placeRelic(citiesOf(state, g), relicSlots)) reserve(g); // the attacker is always an APOSTLE
     if (def.hp <= 0) disbandUnit(state, def.id);
     if (att.hp <= 0) disbandUnit(state, att.id);
   }
@@ -1160,6 +1172,7 @@ export function deserialize(json: string): GameState {
     sx.religion ??= { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null };
     sx.religion.enhancer ??= null;
     sx.buildersTrained ??= 0;
+    sx.relicReserve ??= 0;
     sx.tilesPurchased ??= 0;
     sx.bestMeleeCS ??= Math.max(
       0,

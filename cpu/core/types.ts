@@ -231,6 +231,8 @@ export interface Seat {
   religion: ReligionState;
   gpp: Partial<Record<GreatPersonClass, number>>;
   buildersTrained: number;
+  /** CIV6: a Relic with no open slot is held until one opens, not lost. */
+  relicReserve: number;
   bestMeleeCS: number;
   tilesPurchased: number;
   spaceProjects: string[];

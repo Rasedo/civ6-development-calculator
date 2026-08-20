@@ -14,7 +14,7 @@ import { BUILDINGS, type BuildingDef, buildingsForDistrict } from '../data/build
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { CITY_MIN_DIST } from '../../world/types';
 import { CITY_WORK_RADIUS, maxSpecialtyDistricts } from '../data/constants';
-import { allCities, citiesOf, seatOf, tileBelongsTo, tileClaimed, tileSeat } from './seats';
+import { allCities, campTiles, citiesOf, seatOf, tileBelongsTo, tileClaimed, tileSeat } from './seats';
 
 export interface RuleResult {
   ok: boolean;
@@ -69,6 +69,7 @@ export function validImprovementsIn(
     unlocks: Unlocks | null;
     ownsTile: (t: Tile) => boolean;
     map?: GameMap;
+    camps?: ReadonlySet<number>;
     builder?: string;
   },
 ): ImprovementId[] {
@@ -137,7 +138,7 @@ export function validImprovementsIn(
     tile.feature === null &&
     (tile.terrain === 'GRASSLAND' || tile.terrain === 'PLAINS' || tile.terrain === 'DESERT') &&
     neighbors(opts.map, tile).some((n) => n.terrain === 'COAST') &&
-    tileAppeal(opts.map, tile) >= SEASIDE_RESORT_MIN_APPEAL
+    tileAppeal(opts.map, tile, opts.camps) >= SEASIDE_RESORT_MIN_APPEAL
   ) {
     out.push('SEASIDE_RESORT');
   }
@@ -149,6 +150,7 @@ export function validImprovements(state: GameState, tile: Tile, seat: number): I
     unlocks: gates(state, seat),
     ownsTile: (t) => tileSeat(t) === seat,
     map: state.map, // SEASIDE_RESORT needs coast adjacency + appeal
+    camps: campTiles(state),
   });
 }
 

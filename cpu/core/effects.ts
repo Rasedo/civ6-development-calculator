@@ -4,7 +4,7 @@ import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef } from '../data/policies';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
-import { seatOf, citiesOf } from './seats';
+import { seatOf, citiesOf, campTiles } from './seats';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus } from './cityStates';
 
@@ -416,10 +416,12 @@ export function followerReligionForCity(
 export interface YieldCtx {
   map: GameState['map'];
   mods: Modifiers;
+  /** barbarian outpost tiles — the Seaside Resort's gold reads tile appeal */
+  camps?: ReadonlySet<number>;
 }
 
 export function makeYieldCtx(state: GameState, seat: number): YieldCtx {
-  return { map: state.map, mods: getModifiers(state, seat) };
+  return { map: state.map, mods: getModifiers(state, seat), camps: campTiles(state) };
 }
 
 /** The BASE yield context: the map with NOBODY's modifiers. What a tile is
@@ -427,7 +429,7 @@ export function makeYieldCtx(state: GameState, seat: number): YieldCtx {
  *  GPU fixture's static tile plane stores, because the GPU applies each row's
  *  own techs/civics/beliefs at runtime. */
 export function baseYieldCtx(state: GameState): YieldCtx {
-  return { map: state.map, mods: defaultModifiers() };
+  return { map: state.map, mods: defaultModifiers(), camps: campTiles(state) };
 }
 
 export function governmentSlots(state: GameState, seat: number): import('../data/policies').SlotKind[] {

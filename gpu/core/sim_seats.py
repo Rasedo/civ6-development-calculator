@@ -1269,6 +1269,31 @@ class SimSeats:
             if bool(take.any()):
                 self.city_relics[rows[take], row[take], j] += 1
                 placed = placed | take
+        # CIV6: a homeless Relic is HELD, not lost — `_drain_relic_reserve`
+        # hands it out at the owner's next turn.
+        if bool((~placed).any()):
+            miss = ~placed
+            self.civ_relic_reserve[rows[miss], row[miss]] += 1
+        self._eff_version += 1
+
+    def _drain_relic_reserve(self, row: int, active: torch.Tensor) -> None:
+        """The `drainRelicReserve` mirror: hand held Relics to open slots,
+        LOWEST city first, until the reserve or the capacity runs out. One
+        prefix-sum allocation is the same fill a one-at-a-time loop makes."""
+        held = self.civ_relic_reserve[:, row]
+        run = active & (held > 0)
+        if not bool(run.any()):
+            return
+        cap = self._relic_cap()[:, row]                       # [B, RC]
+        used = self.city_relics[:, row]
+        openc = (cap - used).clamp(min=0) * self.city_alive[:, row].long()
+        want = torch.where(run, held, torch.zeros_like(held))
+        prefix = openc.cumsum(dim=1) - openc
+        alloc = (want.unsqueeze(1) - prefix).clamp(min=0).minimum(openc)
+        if not bool((alloc != 0).any()):
+            return
+        self.city_relics[:, row] = used + alloc
+        self.civ_relic_reserve[:, row] = held - alloc.sum(dim=1)
         self._eff_version += 1
 
     def _religious_victor(self) -> torch.Tensor:

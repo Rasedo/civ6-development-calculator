@@ -61,17 +61,15 @@ nothing carries forward.
 | B-30r specialists | 2 | the mechanic is live; the free-assignment wire head and its observation stay open |
 | B-31r trade-route tails | 2 | sea legs park at origin, no trading posts, plunder gold is a stylization, one candidate not a free pick |
 | B-D unsourced data values | 3 | the sweep is done; nine NAMED stylizations stay open, each labelled at its definition |
-| B-36r appeal adjacency terms | 2 | four terms real Civ 6 pays that this one does not, all four sources present |
+| B-36r appeal adjacency terms | 1 | the four reachable terms ship; Dam/Canal/Water Park/Preserve and the Great People wait on C-22, C-4, C-21 |
 | B-38r no wonder pays per-turn GP points | 1 | Hermitage's Artist points and Bolshoi's Writer/Musician points; flat culture stands in |
 | B-39r wonder effects still dropped | 3 | fourteen rows name one each in their `description` |
-| B-40r production-cost tails | 2 | the builder's 4*(x+1)+46 curve and the district's 40% under-represented discount |
 | B-41r the wall pool is all-or-nothing | 1 | Civ 6 reduces centre damage instead, and scales wall damage by attacker class |
 | B-42r the damage random range is contested | 1 | 0.8-1.2 vs 0.75-1.25; the same source states both |
-| B-43r a homeless relic is LOST | 1 | Civ 6 holds it in reserve until a slot opens |
 | B-44r city-state war has no decider | 1 | both engines carry the machinery; no policy ever reaches it |
 | B-35r theological damage | 1 | deterministic and LINEAR where real Civ 6 rolls; the martyr draw shows a mirrored conditional draw is available |
 | B-34r flood tails | 1 | GS floods also damage UNITS and kill citizens, and a centre on a floodplain loses HP; and the Dam/Great Bath that mitigates a river is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **31** | |
+| **B. Fidelity vs real Civ 6** | **27** | |
 | C-1 POWER | 5 | no plants, no grid, no powered-yield term — 4 gaps wait on it |
 | C-2 diplomatic agreements | 6 | war and peace and nothing between: open borders, work trades, alliances, denouncements |
 | C-3 unit promotions | 4 | only MARTYR reaches a rule; choosing one is also a wire head |
@@ -95,7 +93,7 @@ nothing carries forward.
 | C-21 Great Person ACTIVATED abilities | 2 | every GP fires instantly; none is placed and used |
 | C-22 the district roster is a subset | 3 | no Dam, Canal, Water Park, Preserve, Aerodrome, Government Plaza or Diplomatic Quarter |
 | **C. Absent systems** | **56** | |
-| **OPEN, TOTAL** | **87** | |
+| **OPEN, TOTAL** | **83** | |
 
 THE TOTAL JUMPED from 17 to 87 while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -317,15 +315,18 @@ Civ 6 source or is recorded as unverifiable.
     alternatives — the free-choice head is P8-surface work, alongside the
     route verb joining `env.step` (which today carries no buy/levy
     either).
-- **B-36r. Appeal adjacency terms.** `tileAppeal` / `_tile_appeal` carry the
-  real Civ 6 list except for four terms whose sources all EXIST here: an
-  adjacent HOLY SITE, THEATER SQUARE or ENTERTAINMENT COMPLEX is +1 in real
-  Civ 6 (this model pays only the negative districts), and an adjacent
-  BARBARIAN OUTPOST is -1. Appeal feeds Neighborhood housing, the Seaside
-  Resort's gold and tourism and now National Park legality, so this moves the
-  economy on both engines. The rest of the real list (Dam, Canal, Water Park,
-  Preserve, the unique improvements, the appeal-granting Great People) waits
-  on C-22, C-4 and C-21.
+- **B-36r. Appeal adjacency terms.** The four terms whose sources exist here
+  now pay: an adjacent HOLY SITE, THEATER SQUARE or ENTERTAINMENT COMPLEX is
+  +1 and an adjacent BARBARIAN OUTPOST is -1, on both engines
+  (`tileAppeal` / `_tile_appeal`). An outpost lives on the barbarian seat
+  rather than on its tile, so TS threads the camp set through the six appeal
+  call sites (`campTiles`) and the GPU builds the tile view from `camp_tile`,
+  bumping `_eff_version` at both camp writes so the appeal cache sees them.
+  Appeal feeds Neighborhood housing, Seaside Resort gold and tourism and
+  National Park legality, so the change is live on every seed.
+  OPEN, each blocked: the DAM, CANAL, WATER PARK and PRESERVE terms (C-22 —
+  no such district here), the unique-improvement terms (C-4), and the
+  appeal-granting Great People (C-21).
 - **B-38r. No wonder pays PER-TURN Great Person points.** `BuiltWonderDef`
   has no GP-point channel, so the Hermitage's "+3 Artist points per turn" and
   the Bolshoi Theatre's "+2 Writer / +2 Musician points per turn" are stood in
@@ -341,15 +342,6 @@ Civ 6 source or is recorded as unverifiable.
   `RELIC_WONDER_SLOTS` now pay (Great Library, Hermitage, Bolshoi Theatre, St.
   Basil's, Mont St. Michel). The Hermitage's real slots take LANDSCAPE art
   only; that restriction is the same missing per-work TYPE B-20r names.
-- **B-40r. Production-cost tails.** Two sourced curves, both live on every
-  turn of every game.
-  - The BUILDER costs `4 * (x + 1) + 46` in real Civ 6, where x is the number
-    you have trained or purchased (captured Builders do not count; free ones
-    do). `UNITS.BUILDER.cost` is the flat x=0 value, 50, forever.
-  - A specialty DISTRICT is discounted 40% when you have built fewer of its
-    type than the empire average (25% for the Government Plaza and Diplomatic
-    Quarter, neither in this roster). `districtCostIn` / `rules.district_cost`
-    charge the undiscounted curve.
 - **B-41r. The wall pool is all-or-nothing, and class-blind.** `cityAssault`
   / `_assault_city` send the whole roll to `outerHp` until the pool is empty
   and only the spillover to city HP. Two sourced differences: real Civ 6 has
@@ -362,9 +354,6 @@ Civ 6 source or is recorded as unverifiable.
   strength hits land "reliably between 24 and 36", which is 30 x [0.8, 1.2]
   exactly. Both engines use 0.8-1.2. Open until a source settles it — the
   choice is currently made on internal consistency, not evidence.
-- **B-43r. A relic with no open slot is LOST.** `placeRelic` / `_grant_relic`
-  walk the seat's cities and discard the relic when every slot is full. Real
-  Civ 6 holds it in reserve until a slot opens.
 - **B-44r. War with a city-state has NO DECIDER on either engine.** Both
   halves of the machinery exist and agree: `declareWarOnCityState` /
   `sueForPeaceWithCityState` on TS, the war plane and the CS-attack mask column

@@ -25,7 +25,7 @@ import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { NO_SEAT, capsOf, civHasStrategic, civsAtWar, seatOf, tileClaimed, tileSeat } from './seats';
+import { NO_SEAT, capsOf, campTiles, civHasStrategic, civsAtWar, seatOf, tileClaimed, tileSeat } from './seats';
 import type { ImprovementId } from './types';
 
 const ok: RuleResult = { ok: true };
@@ -705,6 +705,7 @@ export function parkCluster(state: GameState, a: number, b: number): number[] {
  *  no improvement, district or wonder on any of them. */
 export function parkClusterLegal(state: GameState, cluster: number[], seat: number): boolean {
   if (cluster.length !== 4) return false;
+  const camps = campTiles(state);
   let city = -1;
   for (const i of cluster) {
     const t = state.map.tiles[i];
@@ -712,7 +713,7 @@ export function parkClusterLegal(state: GameState, cluster: number[], seat: numb
     if (tileSeat(t) !== seat) return false;
     if (city < 0) city = t.ownerCity;
     else if (t.ownerCity !== city) return false;
-    if (tileAppeal(state.map, t) < PARK_MIN_APPEAL) return false;
+    if (tileAppeal(state.map, t, camps) < PARK_MIN_APPEAL) return false;
   }
   return city >= 0;
 }

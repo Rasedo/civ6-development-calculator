@@ -947,6 +947,7 @@ class SimMasks:
             camps[k:-1] = camps[k + 1 :].clone()
             camps[-1] = -1
             self.n_camps[b] -= 1
+            self._eff_version += 1  # a cleared outpost lifts its neighbours' appeal
             _s = int(seat[b])
             if 0 <= _s < self.n_majors:
                 self.civ_treasury[b, _s] += float(reward)

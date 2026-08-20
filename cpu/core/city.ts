@@ -25,7 +25,7 @@ import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE } from '../data/cityStates
 import { warWearinessPenalty, DED_FREE_INQUIRY } from '../data/seats';
 import { RESOURCES } from '../../world/resources';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, REGIONAL_RANGE, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, type AmenityTier } from '../data/constants';
-import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf, tileClaimed } from './seats';
+import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf, tileClaimed, campTiles } from './seats';
 import { wwMax } from './weariness';
 import { DED_STEAM } from '../data/seats';
 
@@ -222,12 +222,13 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
   }
 
   const pillaged = pillagedDistrictTypes(map, city.districts);
+  const camps = campTiles(state);
   let total = water;
   for (const d of city.districts) {
     const dt = map.tiles[d.tileIndex];
     if (!dt.districtComplete || dt.districtPillaged) continue; // a pillaged district's housing is dark
     if (d.type === 'NEIGHBORHOOD') {
-      total += appealTier(tileAppeal(map, dt)).housing;
+      total += appealTier(tileAppeal(map, dt, camps)).housing;
     } else {
       total += DISTRICTS[d.type].housing;
     }
@@ -428,9 +429,10 @@ function wonderTourism(state: GameState, era: number, owns: (t: Tile) => boolean
 
 function resortTourism(state: GameState, owns: (t: Tile) => boolean): number {
   let t = 0;
+  const camps = campTiles(state);
   for (const tile of state.map.tiles) {
     if (tile.improvement !== 'SEASIDE_RESORT' || tile.pillaged || !owns(tile)) continue;
-    t += Math.max(0, tileAppeal(state.map, tile));
+    t += Math.max(0, tileAppeal(state.map, tile, camps));
   }
   return t;
 }
@@ -475,9 +477,10 @@ function hexDistance2(state: GameState, a: number, b: number): number {
  *  neighbour moves the park's payout (and can take it negative). */
 function parkTourism(state: GameState, owns: (t: Tile) => boolean): number {
   let t = 0;
+  const camps = campTiles(state);
   for (const tile of state.map.tiles) {
     if ((tile.park ?? -1) < 0 || !owns(tile)) continue;
-    t += tileAppeal(state.map, tile);
+    t += tileAppeal(state.map, tile, camps);
   }
   return t;
 }

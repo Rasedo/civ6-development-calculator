@@ -310,6 +310,16 @@
      ]
     },
     {
+     "name": "relicReserve",
+     "compare": "exact",
+     "covers": [
+      "Seat.relicReserve"
+     ],
+     "planes": [
+      "civ_relic_reserve"
+     ]
+    },
+    {
      "name": "bestMeleeCS",
      "compare": "exact",
      "covers": [

@@ -356,6 +356,7 @@ SEAT = {
     "influencePoints": _civ_scalar("civ_influence"),
     "envoysAvailable": _civ_scalar("civ_envoys_avail"),
     "buildersTrained": _civ_scalar("civ_builders_trained"),
+    "relicReserve": _civ_scalar("civ_relic_reserve"),
     "bestMeleeCS": _civ_scalar("civ_best_melee"),
     "techs": _civ_mask("civ_techs"),
     "civics": _civ_mask("civ_civics"),

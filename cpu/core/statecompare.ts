@@ -319,6 +319,7 @@ const SEAT: Record<string, Extractor> = {
   influencePoints: overSeats((s) => s.influencePoints),
   envoysAvailable: overSeats((s) => s.envoysAvailable),
   buildersTrained: overSeats((s) => s.buildersTrained),
+  relicReserve: overSeats((s) => s.relicReserve ?? 0),
   bestMeleeCS: overSeats((s) => s.bestMeleeCS),
   spaceLy: overSeats((s) => s.spaceLy ?? -1),
   spaceLasers: overSeats((s) => s.spaceLasers ?? 0),

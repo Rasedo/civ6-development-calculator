@@ -99,6 +99,31 @@ describe('appeal & neighborhoods', () => {
     expect(tileAppeal(map, t)).toBe(0);
   });
 
+  it('CIV6: an adjacent Holy Site, Theater Square or Entertainment Complex is +1', () => {
+    const map = makeMap(12, 12);
+    const t = tileAtCoords(map, 5, 5);
+    expect(tileAppeal(map, t)).toBe(0);
+    tileAtCoords(map, 6, 5).district = 'HOLY_SITE';
+    expect(tileAppeal(map, t)).toBe(1);
+    tileAtCoords(map, 4, 5).district = 'THEATER_SQUARE';
+    tileAtCoords(map, 5, 4).district = 'ENTERTAINMENT_COMPLEX';
+    expect(tileAppeal(map, t)).toBe(3);
+    // ... and the negative districts still subtract, cumulatively
+    tileAtCoords(map, 5, 6).district = 'INDUSTRIAL_ZONE';
+    expect(tileAppeal(map, t)).toBe(2);
+  });
+
+  it('CIV6: an adjacent barbarian outpost is -1, and only to its neighbours', () => {
+    const map = makeMap(12, 12);
+    const t = tileAtCoords(map, 5, 5);
+    const camp = tileAtCoords(map, 6, 5);
+    const far = tileAtCoords(map, 9, 9);
+    const camps = new Set([camp.index]);
+    expect(tileAppeal(map, t, camps)).toBe(-1);
+    expect(tileAppeal(map, far, camps)).toBe(0);
+    expect(tileAppeal(map, t)).toBe(0); // no camp set passed -> no penalty
+  });
+
   it('neighborhood housing follows tile appeal', () => {
     const state = makeState(makeMap(16, 16));
     state.sandbox = true;

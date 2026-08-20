@@ -16,7 +16,7 @@
  */
 import { writeFileSync } from 'node:fs';
 import type { DistrictId, GameState, Seat, Tile } from '../core/types';
-import { allCities, civHasStrategic, civsAtWar, seatOf, tileOwnedByCiv } from '../core/seats';
+import { allCities, campTiles, civHasStrategic, civsAtWar, seatOf, tileOwnedByCiv } from '../core/seats';
 import { hasRiver, isWater } from '../../world/query';
 import { GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT } from '../data/constants';
 import { PEACE_GOLD_COST, DED_MONUMENTALITY } from '../data/seats';
@@ -299,10 +299,11 @@ for (let t = 0; t < N_TURNS; t++) {
       if (actor) {
         const owns = (t: Tile) => tileOwnedByCiv(t, seat);
         const unl = computeUnlocksIn(actor.research);
+        const camps = campTiles(state);
         const jobTiles = state.map.tiles.filter((t) =>
           owns(t) && !isWater(t)
           && (t.pillaged || t.districtPillaged
-            || (!t.improvement && validImprovementsIn(t, { unlocks: unl, ownsTile: owns, map: state.map }).length > 0)));
+            || (!t.improvement && validImprovementsIn(t, { unlocks: unl, ownsTile: owns, map: state.map, camps }).length > 0)));
         const spreadTargets = actor.religion.founded
           ? allCities(state).filter((c) => c.followedReligion !== seat)
           : [];

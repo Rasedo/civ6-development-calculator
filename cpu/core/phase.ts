@@ -1,6 +1,7 @@
 
 import type { City, DistrictId, GameState, ImprovementId, SeatActionRecord, Seat, Tile, TradeRoute, Unit } from './types';
 import { advanceGreatPeople } from './greatPeople';
+import { drainRelicReserve, RELIC_WONDER_SLOTS } from '../data/greatPeople';
 import { completeQueueItem } from './production';
 import { isExplored, revealAround } from './fog';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
@@ -49,7 +50,7 @@ const A_EXCAVATE = unitActionIndex(IMPROVEMENT_IDS).EXCAVATE;
 const A_PARK = unitActionIndex(IMPROVEMENT_IDS).PARK;
 import { ALLY_MIN_PEACE, CIV_LEADERS, FORMAL_WAR_MIN_TURNS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles, goldenBoostBonus } from './eras';
-import { NO_SEAT, atWarWithAny, citiesOf, civHasStrategic, civsAtWar, emptySeat, isCiv, prophetsOf, seatOf, seatOfCityState, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
+import { NO_SEAT, atWarWithAny, campTiles, citiesOf, civHasStrategic, civsAtWar, emptySeat, isCiv, prophetsOf, seatOf, seatOfCityState, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, spreadFromUnit } from './unitOrders';
 import { navalKillEvent, dedicationEvent, goldenDedication } from './eras';
@@ -900,7 +901,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           const imp = IMPROVEMENT_IDS[ii] as ImprovementId;
           const un = computeUnlocksIn(actor.research);
           if (!here.improvement && tileOwnedByCiv(here, actor.seat)
-              && validImprovementsIn(here, { unlocks: un, builder: unit.type, ownsTile: (t: Tile) => tileOwnedByCiv(t, actor.seat) }).includes(imp)) {
+              && validImprovementsIn(here, { unlocks: un, builder: unit.type, map: state.map, camps: campTiles(state), ownsTile: (t: Tile) => tileOwnedByCiv(t, actor.seat) }).includes(imp)) {
             here.improvement = imp;
             unit.charges = (unit.charges ?? 0) - 1;
             unit.movesLeft = 0;
@@ -978,6 +979,17 @@ export function seatPhase(state: GameState): void {
       // CIV6: a civ is eliminated when it holds neither a city nor a settler.
       if (recU) applySeatUnitOrders(state, actor, recU.units);
       continue;
+    }
+
+    // A Relic held for want of a slot goes out at the owner's next turn —
+    // before the yield walk, so a slot opened last turn pays this one.
+    if ((actor.relicReserve ?? 0) > 0) {
+      const relicSlots = (c: { wonders?: { id: string; tileIndex: number }[] }) =>
+        (c.wonders ?? []).reduce(
+          (n, w) => n + (state.map.tiles[w.tileIndex].builtWonderComplete ? RELIC_WONDER_SLOTS[w.id] ?? 0 : 0),
+          0,
+        );
+      actor.relicReserve = drainRelicReserve(actor.relicReserve, actor.cities, relicSlots);
     }
 
     warWearinessTurn(state, actor.seat);

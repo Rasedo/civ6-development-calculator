@@ -702,6 +702,7 @@ class SimOrders:
                 spot[wr] = sel_w.long().argmax(dim=1)
                 rows = has.nonzero(as_tuple=True)[0]
                 self.camp_tile[rows, self.n_camps[rows]] = spot[rows]
+                self._eff_version += 1  # a new outpost lowers its neighbours' appeal
                 self.n_camps[rows] += 1
                 # SCOUT-THEN-RAID: a BRAND-NEW camp opens with a SCOUT
                 # (barb_unit_type 6), the TS barbScoutType twin, while regarrison and

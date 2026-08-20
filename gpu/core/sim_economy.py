@@ -1477,9 +1477,11 @@ class SimEconomy:
         `appeal_base` carries the static part (natural wonder +2, mountain +1,
         coast/lake +1) plus the tile's t0 feature term; a chopped tile
         subtracts `appeal_feat` via feat_stripped. The rest is live: a
-        COMPLETED built wonder +1, MINE/QUARRY/OIL_WELL -1, and an
-        INDUSTRIAL_ZONE or ENCAMPMENT district -1. Version-cached like
-        _farmadj_qual — every contributing write already bumps _eff_version."""
+        COMPLETED built wonder +1, a HOLY_SITE/THEATER_SQUARE/
+        ENTERTAINMENT_COMPLEX district +1, MINE/QUARRY/OIL_WELL -1, an
+        INDUSTRIAL_ZONE/ENCAMPMENT/SPACEPORT district -1, a pillaged tile -1,
+        and a BARBARIAN OUTPOST -1. Version-cached like _farmadj_qual — every
+        contributing write bumps _eff_version, camps included."""
         if self._appeal_cache is not None and self._appeal_cache[0] == self._eff_version:
             return self._appeal_cache[1]
         contrib = self.appeal_base - torch.where(self.feat_stripped, self.appeal_feat, torch.zeros_like(self.appeal_feat))
@@ -1495,7 +1497,19 @@ class SimEconomy:
             for _d in self._appeal_bad_dist:
                 bad_d |= self.district == _d
             contrib = contrib - bad_d.long()
+        if self._appeal_good_dist:
+            good_d = torch.zeros_like(contrib, dtype=torch.bool)
+            for _d in self._appeal_good_dist:
+                good_d |= self.district == _d
+            contrib = contrib + good_d.long()
         contrib = contrib - self.pillaged.long()
+        # A barbarian OUTPOST lowers its neighbours. Camps live in `camp_tile`
+        # (-1 padded), the `barbSeat.camps` twin, so the tile view is built
+        # here rather than stored.
+        if bool((self.camp_tile >= 0).any()):
+            _t = torch.arange(contrib.shape[1], device=self.device)
+            camp_here = (self.camp_tile.unsqueeze(2) == _t.reshape(1, 1, -1)).any(dim=1)
+            contrib = contrib - camp_here.long()
         nb = self.neigh
         nbc = nb.clamp(min=0)
         out = (contrib[:, nbc] * (nb >= 0).unsqueeze(0).long()).sum(dim=2)  # [B, T]

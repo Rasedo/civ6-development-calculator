@@ -46,7 +46,7 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
     addYields(out, IMPROVEMENTS[imp].yields);
     // The Seaside Resort's gold IS the tile's appeal (real Civ 6),
     // so it cannot live in the static roster row. Negative appeal pays nothing.
-    if (imp === 'SEASIDE_RESORT') out.gold += Math.max(0, tileAppeal(ctx.map, tile));
+    if (imp === 'SEASIDE_RESORT') out.gold += Math.max(0, tileAppeal(ctx.map, tile, ctx.camps));
     const boost = ctx.mods.improvementYields[imp];
     if (boost) addYields(out, boost);
     if (tile.resource) {

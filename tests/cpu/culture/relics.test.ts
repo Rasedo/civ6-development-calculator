@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { placeRelic, relicFaith, relicTourism, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, RELIC_WONDER_SLOTS } from '../../../cpu/data/greatPeople';
+import { placeRelic, drainRelicReserve, relicFaith, relicTourism, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, RELIC_WONDER_SLOTS } from '../../../cpu/data/greatPeople';
 
 // RELICS. Real Civ 6 counts a Relic as a Great Work held in a
 // TEMPLE's single slot, paying +4 Faith and +8 Tourism — the densest tourism
@@ -67,6 +67,27 @@ describe('relics', () => {
     const both = [city(['TEMPLE', '_SB'], 1)];
     expect(placeRelic(both, extra)).toBe(true);
     expect(both[0].relics).toBe(2); // temple 1 + wonder 3 = capacity 4
+  });
+
+  it('a held relic goes out as soon as a slot opens, lowest city first', () => {
+    // CIV6: a Relic with no open slot waits in reserve.
+    const cities = [city(['SHRINE']), city(['SHRINE'])];
+    expect(placeRelic(cities)).toBe(false); // nothing to hold it -> held
+    let held = 3;
+    expect(drainRelicReserve(held, cities)).toBe(3); // still no capacity
+    cities[0].buildings.push('TEMPLE');
+    cities[1].buildings.push('TEMPLE');
+    held = drainRelicReserve(held, cities);
+    expect(cities[0].relics).toBe(1);
+    expect(cities[1].relics).toBe(1);
+    expect(held).toBe(1); // two slots opened, one relic still waiting
+  });
+
+  it('the drain never places more than it holds', () => {
+    const cities = [city(['TEMPLE']), city(['TEMPLE'])];
+    expect(drainRelicReserve(1, cities)).toBe(0);
+    expect(cities[0].relics).toBe(1);
+    expect(cities[1].relics ?? 0).toBe(0); // the second slot stays open
   });
 
   it('the wonder capacity still runs out', () => {

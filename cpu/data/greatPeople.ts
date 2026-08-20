@@ -298,6 +298,18 @@ export function placeRelic(cities: RelicCity[], extra?: (city: RelicCity) => num
   return false;
 }
 
+/** Hand out held Relics — one per open slot, LOWEST city first, until the
+ *  reserve or the capacity runs out. The `placeRelic` loop, drained. */
+export function drainRelicReserve(
+  held: number,
+  cities: RelicCity[],
+  extra?: (city: RelicCity) => number,
+): number {
+  let left = held;
+  while (left > 0 && placeRelic(cities, extra)) left -= 1;
+  return left;
+}
+
 export function cityGreatWorks(city: GwCity): number {
   return gwCount(city, GW_WRITING) + gwCount(city, GW_ART) + gwCount(city, GW_MUSIC);
 }

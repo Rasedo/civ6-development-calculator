@@ -66,7 +66,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'BUILDER',
       name: 'Builder',
       code: 'B',
-      cost: 50, // CIV6 4*(x+1)+46 at x=0; the per-builder escalation is open
+      cost: 50, // CIV6 4*(x+1)+46 at x=0; `builderCost` charges the curve
       maintenance: 0,
       moves: 2,
       combat: 0,

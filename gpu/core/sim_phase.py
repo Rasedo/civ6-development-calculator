@@ -115,6 +115,7 @@ class SimPhase:
             self._seat_record_apply(row, active)
             self._seat_buy_ladder(row, active, army0)
             return active
+        self._drain_relic_reserve(row, active)
         self._ww_decay(row, active)
         # Eurekas/inspirations from this seat — the TS twin runs at the
         # same point (the seat's block top).

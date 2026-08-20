@@ -120,6 +120,41 @@ def main() -> None:
     assert int(sim._relic_cap()[0, 0, 0]) == nslot + sim._relic_slots, "temple slots must ADD to the wonder's"
     print(f"  wonder relic slots OK — {nslot} from wonder {wi}, additive with the Temple")
 
+    # --- 3c) a homeless relic is HELD, and drains when a slot opens --------
+    # CIV6: a Relic with no open slot waits in reserve rather than vanishing.
+    s6 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s6.city_relics[:, 0].zero_()
+    s6.city_bldg[:, 0, :, b] = False        # no Temple anywhere
+    s6.city_wonder[:, 0, :, :] = -1
+    s6.city_alive[:, 0, :] = True
+    s6.civ_relic_reserve[:, 0] = 0
+    r0 = torch.zeros(1, dtype=torch.long)
+    s6._grant_relic(r0, torch.zeros(1, dtype=torch.long))
+    assert int(s6.civ_relic_reserve[0, 0]) == 1, (
+        f"a relic with no slot must be HELD, reserve is {int(s6.civ_relic_reserve[0, 0])}"
+    )
+    assert int(s6.city_relics[0, 0].sum()) == 0, "nothing must be placed while every slot is shut"
+    # a shut seat drains nothing
+    act = torch.ones(s6.B, dtype=torch.bool)
+    s6._drain_relic_reserve(0, act)
+    assert int(s6.civ_relic_reserve[0, 0]) == 1, "the drain must not invent capacity"
+    # two Temples open -> the reserve empties lowest city first
+    s6.civ_relic_reserve[:, 0] = 3
+    s6.city_bldg[:, 0, 0, b] = True
+    s6.city_bldg[:, 0, 1, b] = True
+    s6._drain_relic_reserve(0, act)
+    assert int(s6.city_relics[0, 0, 0]) == 1 and int(s6.city_relics[0, 0, 1]) == 1, (
+        f"both open slots must fill, got {s6.city_relics[0, 0, :2].tolist()}"
+    )
+    assert int(s6.civ_relic_reserve[0, 0]) == 1, (
+        f"one relic must still be held, reserve is {int(s6.civ_relic_reserve[0, 0])}"
+    )
+    # an INACTIVE row is skipped entirely
+    s6._drain_relic_reserve(0, torch.zeros(s6.B, dtype=torch.bool))
+    assert int(s6.civ_relic_reserve[0, 0]) == 1, "an inactive seat must not drain"
+    assert "civ_relic_reserve" in _MUTABLE, "civ_relic_reserve must be registered in _MUTABLE"
+    print("  relic reserve OK — held when shut, drained lowest city first, active-gated")
+
     # --- 4) the tourism term actually counts relics ------------------------
     s2 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     era = s2._civ_era(s2.civ_techs[:, 0], s2.civ_civics[:, 0])

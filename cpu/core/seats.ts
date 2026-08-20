@@ -70,6 +70,12 @@ export function civHasStrategic(state: GameState, civ: number, resourceId: strin
   return false;
 }
 
+/** The barbarian OUTPOST tiles, as a set. Appeal reads it (an adjacent
+ *  outpost is -1), and the camp list is the only place a camp is written. */
+export function campTiles(state: GameState): ReadonlySet<number> {
+  return new Set(state.barbSeat?.camps ?? []);
+}
+
 export function prophetsOf(seat: Seat): number {
   return seat.gpEarned.filter((id) => GREAT_PEOPLE.PROPHET.some((p) => p.id === id)).length;
 }
@@ -88,7 +94,7 @@ export function emptySeat(seat: number): Seat {
     government: { current: null, policies: [] },
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     gpp: {}, gpEarned: [],
-    buildersTrained: 0, bestMeleeCS: 0, tilesPurchased: 0,
+    buildersTrained: 0, relicReserve: 0, bestMeleeCS: 0, tilesPurchased: 0,
     spaceProjects: [], spaceLy: -1, spaceLasers: 0, camps: [], explored: [],
   };
 }

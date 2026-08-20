@@ -267,6 +267,7 @@ class SimInit:
 
         _civ_scalars = (
             ("best_melee", torch.long, 0), ("builders_trained", torch.long, 0),
+            ("relic_reserve", torch.long, 0),
             ("civic_prog", dtype, 0), ("cur_civic", torch.long, -1),
             ("cur_tech", torch.long, -1), ("diplo_favor", torch.long, 0),
             ("diplo_points", torch.long, 0), ("envoys_avail", torch.long, 0),
@@ -892,6 +893,11 @@ class SimInit:
         self._appeal_bad_dist = [
             i for i, d in enumerate(self.districts_cat)
             if d.get("id") in ("INDUSTRIAL_ZONE", "ENCAMPMENT", "SPACEPORT")
+        ]
+        # ... and the ones that RAISE it.
+        self._appeal_good_dist = [
+            i for i, d in enumerate(self.districts_cat)
+            if d.get("id") in ("HOLY_SITE", "THEATER_SQUARE", "ENTERTAINMENT_COMPLEX")
         ]
         self._nbhd_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "NEIGHBORHOOD"), -1)
         self._appeal_cuts = [(4, 6), (2, 5), (-1, 4), (-3, 3)]

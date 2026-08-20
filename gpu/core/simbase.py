@@ -500,7 +500,7 @@ _MUTABLE = [
     # RANGE VIEWS into them — snapshot/restore round-trips one tensor per plane
     # instead of three, and a view can never be half-restored.
     "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_emb", "unit_seat", "military_at", "civilian_at", "war", "ww", "ww_turn",
-    "civ_best_melee", "civ_builders_trained", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted", "civ_tech_retain", "civ_civic_retain",
+    "civ_best_melee", "civ_builders_trained", "civ_relic_reserve", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted", "civ_tech_retain", "civ_civic_retain",
     "civ_enhancer", "civ_enhancer_done", "civ_follower", "civ_founder", "civ_next_city_id",
     "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_tiles_purchased",
     "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_camp", "seat_citystate_quest_issued",
