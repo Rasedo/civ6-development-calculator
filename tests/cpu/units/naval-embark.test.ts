@@ -3,18 +3,17 @@ import { emptySeat, isCiv, seatOf, setTileOwner, setWar, tileCity } from '../../
 import { makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
 import { purchaseUnit } from '../../../cpu/core/game';
 import { moveCostInto, unitPassable, canEmbark, waterEnterable, ownerHasTech, inEnemyZoc, spawnUnit, tileFreeForUnit, cityNavalCapable, trainableUnits, queueUnit, orderMove, walkPath } from '../../../cpu/core/units';
-import { hostileUnitAct, meleeAttack, defenderCS, embarkedDefenseCS } from '../../../cpu/core/combat';
+import { hostileUnitAct, meleeAttack, attackTargets, defenderCS, embarkedDefenseCS, supportCount, AMPHIBIOUS_ATTACK_CS, SUPPORT_CS, FLANK_SUPPORT_CIVIC } from '../../../cpu/core/combat';
 import { neighbors } from '../../../world/hex';
 import { isWater } from '../../../world/query';
 import { EMBARKED_DEFENSE_CS_BY_ERA, setEmbarkLive } from '../../../cpu/data/constants';
-import type { GameState, City, Seat, Unit } from '../../../cpu/core/types';
+import type { GameState, City, Seat, Tile, Unit } from '../../../cpu/core/types';
 
-// the MOVEMENT + EMBARKATION model. The scripted civ war-march is
-// the only v1 surface that may take water steps, and it is behind the inert
-// `embarkState.live` master switch (default OFF → gates byte-identical). These
-// tests poke the switch ON to exercise the water-step path directly.
+// the MOVEMENT + EMBARKATION model. Every water step on both engines rides the
+// `embarkState.live` master switch, which SHIPS ON; the tests below poke it OFF
+// to prove the land-only fallback still holds.
 
-afterEach(() => setEmbarkLive(false)); // never leak the switch into other suites
+afterEach(() => setEmbarkLive(true)); // restore the shipped default
 
 function addCivAtWar(state: GameState, col: number, row: number, techs: string[]): Seat {
   const civ: Seat = {
@@ -431,5 +430,136 @@ describe('N2 naval spawn + combat', () => {
     const atk = meleeAttack(state, galley.id, civCityCenter.index, 0);
     expect(atk.ok).toBe(true);
     expect(civCity.hp).toBeLessThan(before);
+  });
+});
+
+
+// --- the AMPHIBIOUS ATTACK ---------------------------------------------------
+
+describe('the amphibious attack', () => {
+  /** an all-water map with ONE land tile, a seat-0 warrior on it, and the civ's
+   *  warrior embarked on the water tile next door. */
+  function shore(): { state: GameState; att: Unit; def: Unit; land: Tile; sea: Tile; civ: Seat } {
+    const state = makeState(makeMap(12, 12, 'COAST'));
+    state.unitsMode = true;
+    const civ = bareCiv(state);
+    const land = tileAtCoords(state.map, 5, 5);
+    land.terrain = 'GRASSLAND';
+    const def = spawnUnit(state, 'WARRIOR', land.index, 0)!;
+    const sea = neighbors(state.map, land).find((n) => isWater(n))!;
+    const att: Unit = {
+      id: state.nextUnitId++, type: 'WARRIOR', seat: civ.seat,
+      tileIndex: sea.index, movesLeft: 2, hp: 100, charges: null, path: null,
+      embarked: true,
+    };
+    state.units.push(att);
+    return { state, att, def, land, sea, civ };
+  }
+
+  it('an embarked melee unit strikes the shore, at the amphibious penalty', () => {
+    expect(AMPHIBIOUS_ATTACK_CS).toBe(10);
+    const wet = shore();
+    expect(attackTargets(wet.state, wet.att)).toContain(wet.land.index);
+    const r = meleeAttack(wet.state, wet.att.id, wet.land.index, wet.civ.seat);
+    expect(r.ok).toBe(true);
+    const amphibious = 100 - wet.def.hp;
+    expect(amphibious).toBeGreaterThan(0);
+
+    // the SAME exchange from dry land: one identical map, one identical RNG
+    // stream, the attacker ashore instead of afloat.
+    const dry = shore();
+    dry.att.embarked = false;
+    dry.att.tileIndex = dry.sea.index;
+    dry.sea.terrain = 'GRASSLAND';
+    const r2 = meleeAttack(dry.state, dry.att.id, dry.land.index, dry.civ.seat);
+    expect(r2.ok).toBe(true);
+    expect(100 - dry.def.hp).toBeGreaterThan(amphibious);
+  });
+
+  it('the victor comes ashore and is no longer embarked', () => {
+    const { state, att, def, land, civ } = shore();
+    def.hp = 1;
+    const r = meleeAttack(state, att.id, land.index, civ.seat);
+    expect(r.ok).toBe(true);
+    expect(state.units.some((u) => u.id === def.id)).toBe(false);
+    expect(att.tileIndex).toBe(land.index);
+    expect(att.embarked).toBe(false);
+  });
+
+  it('a CLIFF closes the shore entirely', () => {
+    const { state, att, def, land, civ } = shore();
+    land.cliffMask = 0b111111;
+    expect(attackTargets(state, att)).not.toContain(land.index);
+    const r = meleeAttack(state, att.id, land.index, civ.seat);
+    expect(r.ok).toBe(false);
+    expect(def.hp).toBe(100);
+  });
+
+  it('an embarked unit may not attack anything in the water', () => {
+    const { state, att, sea, civ } = shore();
+    const otherSea = neighbors(state.map, state.map.tiles[sea.index]).find(
+      (n) => isWater(n) && n.index !== sea.index,
+    )!;
+    const afloat: Unit = {
+      id: state.nextUnitId++, type: 'WARRIOR', seat: 0,
+      tileIndex: otherSea.index, movesLeft: 2, hp: 100, charges: null, path: null,
+      embarked: true,
+    };
+    state.units.push(afloat);
+    expect(attackTargets(state, att)).not.toContain(otherSea.index);
+    expect(meleeAttack(state, att.id, otherSea.index, civ.seat).ok).toBe(false);
+    expect(afloat.hp).toBe(100);
+  });
+
+  it('an embarked RANGED unit has no attack at all', () => {
+    const { state, att, land } = shore();
+    att.type = 'ARCHER';
+    expect(attackTargets(state, att)).toEqual([]);
+    expect(attackTargets(state, att)).not.toContain(land.index);
+  });
+
+  it('an embarked defender keeps its escort, except against a ship', () => {
+    const state = makeState(makeMap(12, 12, 'COAST'));
+    state.unitsMode = true;
+    grantTechs(state, 'SAILING');
+    const civ = bareCiv(state);
+    civ.research.civics.push(FLANK_SUPPORT_CIVIC);
+    const water = tileAtCoords(state.map, 5, 5);
+    const afloat: Unit = {
+      id: state.nextUnitId++, type: 'WARRIOR', seat: civ.seat,
+      tileIndex: water.index, movesLeft: 2, hp: 100, charges: null, path: null,
+      embarked: true,
+    };
+    const escort: Unit = {
+      id: state.nextUnitId++, type: 'WARRIOR', seat: civ.seat,
+      tileIndex: neighbors(state.map, water)[0].index, movesLeft: 2, hp: 100,
+      charges: null, path: null, embarked: true,
+    };
+    state.units.push(afloat, escort);
+    expect(supportCount(state, water.index, afloat)).toBe(1);
+
+    const shore = tileAtCoords(state.map, 3, 3);
+    shore.terrain = 'GRASSLAND';
+    const soldier = spawnUnit(state, 'WARRIOR', shore.index, 0)!;
+    const ship = spawnUnit(state, 'GALLEY', tileAtCoords(state.map, 8, 8).index, 0)!;
+    const flat = embarkedDefenseCS(state, civ.seat);
+    expect(defenderCS(state, afloat, water.index, { attacker: soldier, melee: true }))
+      .toBe(flat + SUPPORT_CS);
+    expect(defenderCS(state, afloat, water.index, { attacker: ship, melee: true })).toBe(flat);
+    // a ranged attack ignores Support whoever fires it
+    expect(defenderCS(state, afloat, water.index, { attacker: soldier, melee: false })).toBe(flat);
+  });
+
+  it('a REEF defends the ship standing on it', () => {
+    const state = makeState(makeMap(12, 12, 'COAST'));
+    state.unitsMode = true;
+    grantTechs(state, 'SAILING');
+    const bare = tileAtCoords(state.map, 5, 5);
+    const reef = tileAtCoords(state.map, 7, 7);
+    reef.feature = 'REEF';
+    const ship = spawnUnit(state, 'GALLEY', bare.index, 0)!;
+    const open = defenderCS(state, ship, bare.index);
+    ship.tileIndex = reef.index;
+    expect(defenderCS(state, ship, reef.index)).toBe(open + 3);
   });
 });

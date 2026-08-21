@@ -67,14 +67,15 @@ nothing carries forward.
 | B-45r sourced-sweep finds in the other rows | 2 | eight wonders pay effects no channel expresses: free units, patronage discount, tech boosts, route capacity and route yields |
 | B-46r the siege class's tails | 1 | the Bombard stat, both support chassis, all four walls tiers and the move-and-shoot rule ship; the middle siege rungs and Akkad's suzerain bonus do not |
 | B-54r flanking and support vs their own page | 1 | six rules the two engines agree on and the page does not: the Military Tradition gate, the flanking owner and river rules, support against ranged, embarked providers, and defensible districts |
+| B-55r a ship cannot carry a passenger | 1 | one MILITARY unit per tile, where Civ 6 stacks an embarked land unit with a naval one — which is where Support's 7th through 10th stacks live |
 | B-50r theological combat's other terms | 1 | flanking/support, territory bonuses, the Inquisitor, the winner's advance, Holy Site healing |
 | B-51r the Encampment's second pool | 1 | the district meets the city's perimeter and heals only while its tile is clear; Civ 6 tracks the two pools SEPARATELY, and a defeat pillages it |
 | B-44r city-state war tails | 1 | the head and its policy ship; no walker ever MARCHES on a minor, and the diplomatic consequences wait on C-19 |
 | B-34r flood tails | 1 | the severity ladder ships; a flood still takes ONE tile where GS floods the river's whole reach, and the Dam that mitigates one is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **22** | |
+| **B. Fidelity vs real Civ 6** | **23** | |
 | C-1 POWER | 5 | no plants, no grid, no powered-yield term — 4 gaps wait on it |
 | C-2 diplomatic agreements | 6 | war and peace and nothing between: open borders, work trades, alliances, denouncements |
-| C-3 unit promotions | 4 | only MARTYR reaches a rule; choosing one is also a wire head |
+| C-3 unit promotions | 5 | only MARTYR reaches a rule; choosing one is also a wire head, and Amphibious waives two penalties that now ship |
 | C-4 unique improvements | 3 | Batey / Colossal Head / Monastery, each a flat channel today |
 | C-5 strategic-resource stockpiles | 4 | resources gate, they never accumulate or get spent |
 | C-6 policy-card modifiers | 5 | ~38 adoptable cards are inert one-liners |
@@ -96,9 +97,10 @@ nothing carries forward.
 | C-22 the district roster is a subset | 3 | no Dam, Canal, Water Park, Preserve, Aerodrome, Government Plaza or Diplomatic Quarter |
 | C-23 nothing diminishes tourism | 1 | no rival's Enlightenment ever costs a tourist, so Cristo Redentor's cancelling clause has nothing to cancel |
 | C-24 no CO2, no climate | 3 | GS's whole climate arc — emissions, warming bands, sea level, escalating disasters — and 2 gaps wait on it |
+| C-26 no civilization uniques | 5 | seats are a name, a colour and a city list: no civ ability, no leader ability or agenda, no unique unit, no unique infrastructure |
 | C-25 no stealth (invisible) units | 2 | the whole naval-raider class is absent and nothing on either engine can be invisible |
-| **C. Absent systems** | **62** | |
-| **OPEN, TOTAL** | **84** | |
+| **C. Absent systems** | **68** | |
+| **OPEN, TOTAL** | **91** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -594,18 +596,36 @@ Civ 6 source or is recorded as unverifiable.
   rather than assuming one. Embarked land units "provide Support like normal"
   and only fail to flank, where both counts had excluded them. And "units will
   not gain Support when inside defensible Districts", though units inside one
-  still provide it.
+  still provide it. And an embarked defender keeps its escort: the page
+  withholds Support from one only "against attacks of enemy naval units",
+  where both engines had denied it to every attacker — `defenderCS`'s embarked
+  branch and `_hostile_vs_unit` now gate that on the ATTACKER being naval.
   REACHABILITY: the scripted gate reaches melee and city strikes on every seed,
   so the support removal is live everywhere; MILITARY_TRADITION is an Ancient
   civic the driver takes early, so the gate opens mid-game rather than never.
   OPEN:
   - **THE HIGHER-STACK UNITS AND PROMOTIONS.** Impi, Hypaspist, Double
-    Envelopment, Square, Shadow Strike and Georgy Zhukov each raise a stack
-    above +2 for their owner only. Unique units are B-D's, the promotions are
-    C-3's, and the Great General identities are B-53r's.
-  - **NO FLANKING ACROSS THE ATTACKER'S OWN RIVER.** The page's rule is about
-    the PROVIDER and the target; the attacker's own river crossing is a
-    separate -5 that both engines already pay.
+    Envelopment, Square, Shadow Strike, Georgy Zhukov and Horatio Nelson each
+    raise a stack above +2 for their owner only. The unique units are C-26's,
+    the promotions are C-3's, and the two Great Person identities are B-53r's.
+  - **THE STACKS STOP SHORT OF THEIR CIV 6 MAXIMA.** Flanking tops out at 5
+    here and 6 there; Support at 6 here and 10 there. Both ceilings are the
+    same blocker, B-55r: Civ 6 counts a water tile holding an embarked unit
+    AND a ship as two providers, and no tile on either engine can hold both.
+- **B-55r. A ship cannot carry a passenger.** `tileFreeForUnit` and
+  `_blocked_for` allow one unit per DOMAIN per tile and `unitDomain` has two,
+  so a naval unit and an embarked land unit — both military — can never share
+  a water tile. Civ 6 stacks them, and publishes rules that only make sense on
+  the stack: the Combat page settles who defends ("when a naval unit and an
+  embarked unit occupy the same hex, the unit with the higher Combat Strength
+  will defend against ranged attacks"), and Flanking and Support builds its
+  maxima on it ("a water tile containing an embarked unit and a naval unit
+  provides +4 Combat Strength to any friendly unit defending in an adjacent
+  tile"), which is how Support reaches 10 stacks across the 6 tiles a hex has.
+  So no escort can shield a transport by standing on it, and both bonuses stop
+  short of their real ceilings (B-54r). The third Civ 6 slot, the SUPPORT unit
+  class, is not the same gap: BATTERING_RAM and SIEGE_TOWER carry `charges`,
+  so `unitDomain` already files them as civilians and they stack with an army.
 - **B-50r. Theological combat's other terms.** The damage formula is sourced
   now; the rest of the Theological combat page is not. Missing: flanking and
   support (which apply since the Fall 2017 update), the location bonuses (+5
@@ -764,11 +784,14 @@ number was under-counting by treating deferrals as closures.
   civs and the Great Work Heist (B-20r); ALLIANCES; DENOUNCEMENTS, which To
   Arms!'s casus belli needs (`seats` dedication header); and the terms a
   PEACE DEAL carries, which real Civ 6 brokers on the trade screen (B-22r).
-- **C-3. UNIT PROMOTIONS — no promotion tree.** Weight 4. The only promotion
+- **C-3. UNIT PROMOTIONS — no promotion tree.** Weight 5. The only promotion
   that reaches a rule is MARTYR, drawn at the death. Gaps: Yerevan's suzerain
   row (choose an Apostle promotion instead of drawing it — and choosing is a
   DECISION with no wire record, so it needs a head too); every promotion-
-  shaped policy card in `policies`; and veterancy beyond the flat XP levels.
+  shaped policy card in `policies`; veterancy beyond the flat XP levels; and
+  AMPHIBIOUS, which "negates the defender's river defense bonus and doesn't
+  suffer the amphibious attack penalty when it attacks" — both of those
+  penalties now ship, so the waiver has something real to waive.
 - **C-4. UNIQUE IMPROVEMENTS — the roster holds only the generic set.**
   Weight 3. Gaps: Caguana's Batey, La Venta's Colossal Head and Armagh's
   Monastery (each a whole improvement with its own adjacency, standing in as
@@ -846,6 +869,21 @@ number was under-counting by treating deferrals as closures.
   of them an ACTIVATED ability used later on a chosen tile. Gaps: the
   appeal-granting Great People (Alvar Aalto, Charles Correa) that B-36r names,
   and every "activate in a city" ability in the roster.
+- **C-26. NO CIVILIZATION UNIQUES.** Weight 5. A major seat is a name, a
+  colour and a list of city names — `CIV_LEADERS` holds nothing else, and the
+  section it lives in says so: "Nothing here is keyed to which seat asks."
+  Real Civ 6 gives every civilization an ability of its own, its leader an
+  ability and an agenda, a unique unit, and a unique piece of infrastructure
+  (a building, a district or an improvement); none of the five exists on
+  either engine, and `aggression` / `warmonger` are this model's own tuning
+  rather than any published agenda. Gaps waiting on it: the Impi and the
+  Hypaspist, which raise a Flanking or Support stack above +2 for their owner
+  (B-54r); the Gauls' OPPIDUM, which is a third defensible district and so a
+  third place those bonuses are withheld; Ambiorix's leader ability, which
+  pays +2 Combat Strength per adjacent military unit and unlike Flanking and
+  Support applies to ranged attacks too, and Saladin's, which doubles both
+  bonuses outright; and the Nihang, the one unit that keeps a Combat Strength
+  bonus of its own while embarked, where every other unit normalizes.
 - **C-25. NO STEALTH (INVISIBLE) UNITS.** Weight 2. Nothing on either engine
   can be invisible: `unitsAt` / `military_at` answer the same question for
   every observer, and no unit carries a stealth flag because none of the units

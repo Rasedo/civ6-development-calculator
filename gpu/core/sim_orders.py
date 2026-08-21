@@ -131,13 +131,20 @@ class SimOrders:
             atk = (
                 act & (a >= 6) & (a < 12)
                 & (self._type_combat[utp.clamp(min=0)] > 0)  # civilians cannot attack
-                & ~u_emb                                     # nor can an embarked unit
             ) if _rk_atk[n] else None
             if atk is not None and bool(atk.any()):
                 dirs = (a - 6).clamp(min=0, max=5)
                 tgt = nb.gather(1, dirs.unsqueeze(1)).squeeze(1)
                 tc = tgt.clamp(min=0)
                 valid = atk & (tgt >= 0)
+                if bool(u_emb.any()):
+                    # the amphibious reach: an embarked unit strikes an open
+                    # LAND shore, with a MELEE attack, and nothing afloat.
+                    valid = valid & (~u_emb | (
+                        ~self.water.gather(1, tc.unsqueeze(1)).squeeze(1)
+                        & ~self._cliff_block_dirs(hc, nb, own_tile).gather(1, dirs.unsqueeze(1)).squeeze(1)
+                        & (self._type_ranged_strength[ut] <= 0)
+                    ))
                 if bool(valid.any()):
                     # WHO is on the target tile, and is any of them hostile to
                     # this seat? `unitsHostile` answers for every pair, so no

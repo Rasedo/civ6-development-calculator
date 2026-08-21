@@ -13,7 +13,7 @@ import { CITY_STATE_MAX_HP, KABUL_XP_MULT, PRESLAV_HILL_CS } from '../data/cityS
 import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER } from '../data/seats';
 import { addEraScore } from './eras';
-import { nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocksStep, stepUnit } from './units';
+import { nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit } from './units';
 import { outerPool, wallsMax, wallsTier } from './rules';
 import { EMBARKED_DEFENSE_CS_BY_ERA, embarkState } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -75,6 +75,10 @@ export function terrainDefense(tile: Tile): number {
   // they don't shelter like woods/rainforest. Marsh stays SLOW to enter
   // (moveCostInto, deliberately unchanged); only its DEFENSE value flips here.
   if (tile.feature === 'MARSH' || tile.feature === 'FLOODPLAINS') d -= 2;
+  // CIV6 (R&F): "Reefs provide a +3 Defensive CS bonus for units in the
+  // water" — a NAVAL defender's terrain, since an embarked one defends at the
+  // normalized CS that carries no terrain at all.
+  if (tile.feature === 'REEF') d += 3;
   if (tile.improvement === 'FORT') d += 4;
   return d;
 }
@@ -164,6 +168,27 @@ export function awardDefenseXp(defender: Unit): void {
  */
 export const CLASS_MELEE_VS_ANTICAV = 5;
 export const CLASS_ANTICAV_VS_CAV = 10;
+
+/**
+ * CIV6 (Combat, "Terrain"): "Amphibious attack is a negative modifier that
+ * applies to any attack made by an embarked unit against a unit or district on
+ * land that is unobstructed by Cliffs. This is the most complicated type of
+ * attack and carries a -10 CS penalty." A CLIFF does not soften the attack, it
+ * forbids it: "melee units have to physically be able to move into the attacked
+ * tile", and a cliff closes that shore. The Amphibious promotion that waives
+ * the penalty is C-3's.
+ */
+export const AMPHIBIOUS_ATTACK_CS = 10;
+
+/** May this unit, standing where it stands, strike that tile at all? CIV6:
+ *  "embarked units may not attack any other unit in the water, including other
+ *  embarked units", and only a MELEE attack goes ashore. */
+export function amphibiousReach(state: GameState, unit: Unit, targetIndex: number): boolean {
+  if (!unit.embarked) return true;
+  const target = state.map.tiles[targetIndex];
+  if (isWater(target)) return false;
+  return !cliffBlocks(state, state.map.tiles[unit.tileIndex], target, unit);
+}
 
 export function classMatchupCS(ownType: string, foeType: string): number {
   const me = UNITS[ownType];
@@ -305,12 +330,6 @@ export function religionDefenseCS(state: GameState, defender: Unit, defTileIndex
   return bonus;
 }
 
-/** the defender's total combat strength for a hit on `defTileIndex`,
- * including SUPPORT (which always accompanies the defender). An EMBARKED
- * defender overrides EVERYTHING: a flat EMBARKED_DEFENSE_CS − woundPenalty,
- * with NO terrain / fortify / support terms (real Civ 6 — ships-in-transit are
- * soft targets). Used by every melee/ranged/walls site so the override is
- * applied identically. Flanking (the attacker's term) is added separately. */
 /** CIV 6, Preslav's suzerain: "Your light and heavy cavalry units have +5
  *  Strength when fighting on hill tiles." The tile is the unit's OWN — the
  *  ground it fights from, attacking or defending. */
@@ -329,9 +348,23 @@ export function embarkedDefenseCS(state: GameState, seat: number): number {
   return EMBARKED_DEFENSE_CS_BY_ERA[Math.min(era, EMBARKED_DEFENSE_CS_BY_ERA.length - 1)];
 }
 
+/** The defender's total combat strength for a hit on `defTileIndex`. `vs` names
+ *  the attack it is defending against, because two terms need it: SUPPORT is a
+ *  melee-only bonus and the class matchup is pairwise. Flanking is the
+ *  attacker's own term and is added at the attack site. */
 export function defenderCS(state: GameState, defender: Unit, defTileIndex: number,
                            vs?: { attacker: Unit; melee: boolean }): number {
-  if (defender.embarked) return embarkedDefenseCS(state, defender.seat) - woundPenalty(defender) + generalAuraCS(state, defender, defTileIndex);
+  if (defender.embarked) {
+    // The normalized embarked CS replaces the unit's own strength, its terrain
+    // and its fortification. Support survives it: CIV6 (Flanking and Support)
+    // withholds Support from an embarked defender only "against attacks of
+    // enemy naval units".
+    const escort = vs?.melee && !UNITS[vs.attacker.type]?.naval
+      ? SUPPORT_CS * supportCount(state, defTileIndex, defender)
+      : 0;
+    return embarkedDefenseCS(state, defender.seat) - woundPenalty(defender) + escort
+      + generalAuraCS(state, defender, defTileIndex);
+  }
   const tile = state.map.tiles[defTileIndex];
   return (
     (UNITS[defender.type]?.combat ?? 0) +
@@ -577,7 +610,8 @@ function assaultAtkCS(state: GameState, attacker: Unit, targetIndex: number): nu
     woundPenalty(attacker) -
     (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[targetIndex])
       ? RIVER_ATTACK_PENALTY
-      : 0) +
+      : 0) -
+    (attacker.embarked ? AMPHIBIOUS_ATTACK_CS : 0) +
     xpLevelBonus(attacker) +
     (CITY_RELIGION_ADDER_LIVE && isCiv(attacker.seat)
       ? religionAttackCS(state, attacker, targetIndex)
@@ -751,12 +785,12 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   // is what it defends with.
   if (def.bombard !== undefined) return no('Siege units attack at range.');
   if (attacker.movesLeft <= 0) return no('No movement left.');
-  if (attacker.embarked) return no('Embarked units cannot attack.');
   const from = state.map.tiles[attacker.tileIndex];
   const target = state.map.tiles[targetIndex];
   if (hexDistance(from.col, from.row, target.col, target.row) !== 1) {
     return no('Target must be adjacent.');
   }
+  if (!amphibiousReach(state, attacker, targetIndex)) return no('Embarked units strike an open shore only.');
 
   const enemies = unitsAt(state, targetIndex).filter((u) => unitsHostile(state, attacker, u));
   const seatTarget = (() => {
@@ -818,7 +852,8 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   const defender =
     enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
   const defDef = UNITS[defender.type];
-  const atkCS = def.combat - woundPenalty(attacker) - (crossesRiver(from, target) ? RIVER_ATTACK_PENALTY : 0);
+  const atkCS = def.combat - woundPenalty(attacker) - (crossesRiver(from, target) ? RIVER_ATTACK_PENALTY : 0)
+    - (attacker.embarked ? AMPHIBIOUS_ATTACK_CS : 0);
 
   if ((defDef?.combat ?? 0) <= 0) {
     if (isBarbSeat(attacker.seat)) {
@@ -864,6 +899,8 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   attacker.movesLeft = 0;
   if (state.units.includes(attacker) && tileFreeForUnit(state, targetIndex, 0, attacker)) {
     attacker.tileIndex = targetIndex;
+    // an amphibious victor comes ashore: `stepUnit`'s own transition rule
+    if (!def.naval) attacker.embarked = isWater(state.map.tiles[targetIndex]);
     clearCampFor(state, attacker, targetIndex, seat); // every seat clears it
   }
   return ok;
@@ -1013,7 +1050,7 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
 export function attackTargets(state: GameState, unit: Unit): number[] {
   const def = UNITS[unit.type];
   if (!def || def.combat <= 0 || unit.movesLeft <= 0) return [];
-  if (unit.embarked) return []; // embarked units cannot attack
+  if (unit.embarked && def.ranged) return []; // only a MELEE attack goes ashore
   if (!siegeMayShoot(state, unit)) return [];
   const from = state.map.tiles[unit.tileIndex];
   const range = def.ranged?.range ?? 1;
@@ -1021,6 +1058,7 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
   for (const t of state.map.tiles) {
     const d = hexDistance(from.col, from.row, t.col, t.row);
     if (d < 1 || d > range) continue;
+    if (!amphibiousReach(state, unit, t.index)) continue;
     const hasEnemy = unitsAt(state, t.index).some(
       (u) => unitsHostile(state, unit, u) && !(def.ranged && isCiv(unit.seat) && isCiv(u.seat)),
     );

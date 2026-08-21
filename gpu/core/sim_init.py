@@ -1368,6 +1368,7 @@ class SimInit:
         self._class_melee_vs_anticav = int(cb.get("classMeleeVsAnticav", 5))
         self._class_anticav_vs_cav = int(cb.get("classAnticavVsCav", 10))
         self._flank_support_civic = int(cb.get("flankSupportCivic", -1))
+        self._amphibious_attack_cs = int(cb.get("amphibiousAttackCs", 10))
         self._embark_live = bool(cb.get("embarkLive", 0))
         self._shipbuilding_tech = int(cb.get("shipbuildingTech", -1))
         self._cartography_tech = int(cb.get("cartographyTech", -1))

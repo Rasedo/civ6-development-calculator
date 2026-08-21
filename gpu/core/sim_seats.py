@@ -3756,13 +3756,16 @@ class SimSeats:
             atk_lvl5 = (self._xp_lvl_bonus(a_xp[:, u]) if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]
                         else torch.zeros_like(a_hp[:, u]))
             atk_e = atk_cs_all - self._wound(a_hp[:, u]) - 5.0 * self._river_cross(here, tgt) + atk_lvl5
+            atk_e = atk_e - self._amph_atk_cs(a_emb[:, u]).to(atk_e.dtype)
             def_e = def_cs - self._wound(def_hp)
             # flanking helps the hostile attacker (barb/civ at `here`), support
             # helps the defender, whichever seat it belongs to.
             d_seat_m = torch.where(ok_m, m_seat, neg)
             _fl, _sp = self._flank_support(tgt, d_seat_m, here, a_seat[:, u])
             atk_e = atk_e + FLANKING_CS * _fl
-            def_e = def_e + SUPPORT_CS * torch.where(d_emb, torch.zeros_like(_sp), _sp)  # embarked → no support
+            # an embarked defender loses Support only to a NAVAL attacker
+            _no_sup = d_emb & self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)]
+            def_e = def_e + SUPPORT_CS * torch.where(_no_sup, torch.zeros_like(_sp), _sp)
             # the class matchup, one term on each side of the same roll; an
             # embarked defender's class is what the normalized CS removes
             _cls = self._class_matchup_cs(a_type[:, u], d_type)
@@ -3817,6 +3820,9 @@ class SimSeats:
                 a_occ[vr, here[vr]] = -1
                 a_tile[vr, u] = ttc[vr]
                 a_occ[vr, ttc[vr]] = u + a_lo
+                # an amphibious victor comes ashore, on `_step_verb`'s rule
+                a_emb[vr, u] = self.water[vr, ttc[vr]] & ~self.unit_naval[
+                    a_type[vr, u].clamp(min=0, max=self.NU - 1)]
                 if major:
                     self._clear_camp_at(adv, ttc, a_seat[:, u], self._row_of(a_seat[:, u]))
         if bool(civ_att.any()):
@@ -4355,6 +4361,7 @@ class SimSeats:
         atk_lvl5 = (self._xp_lvl_bonus(a_xp[:, u]) if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]
                     else torch.zeros_like(a_hp[:, u]))
         atk_e = atk_cs - self._wound(a_hp[:, u]) - 5.0 * self._river_cross(a_tile[:, u], tc) + atk_lvl5
+        atk_e = atk_e - self._amph_atk_cs(a_emb[:, u]).to(atk_e.dtype)
         if major:
             atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
             atk_e = atk_e + (self._rel_atk_cs(a_seat[:, u], tc).to(atk_e.dtype) if self._city_rel_live else 0)
@@ -4473,6 +4480,7 @@ class SimSeats:
         atk_e = (self._type_combat[a_type[:, u].clamp(min=0, max=self.NU - 1)]
                  - self._wound(a_hp[:, u])
                  - 5.0 * self._river_cross(a_tile[:, u], tgt))
+        atk_e = atk_e - self._amph_atk_cs(a_emb[:, u]).to(atk_e.dtype)
         if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
             atk_e = atk_e + self._xp_lvl_bonus(a_xp[:, u])
         if self._city_rel_live:
@@ -4608,6 +4616,7 @@ class SimSeats:
             + (self.citystate_type.gather(1, citystate_sc.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
         )
         atk_e = self._type_combat[at0] - self._wound(a_hp[:, u]) - 5.0 * self._river_cross(here, tgt)
+        atk_e = atk_e - self._amph_atk_cs(a_emb[:, u]).to(atk_e.dtype)
         if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
             atk_e = atk_e + self._xp_lvl_bonus(a_xp[:, u])
         if self._city_rel_live:

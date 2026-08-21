@@ -138,9 +138,21 @@ def empty_neighbor(sim, ctr: int) -> int:
     return -1
 
 
+def free_neighbor(sim, t: int, skip: int) -> int:
+    """First unoccupied non-centre neighbour of t other than `skip`."""
+    for d in range(6):
+        n = int(sim.neigh[t][d])
+        if n < 0 or n == skip or is_center(sim, n):
+            continue
+        if int(sim.military_at[0, n]) < 0 and int(sim.civilian_at[0, n]) < 0:
+            return n
+    return -1
+
+
 def force_water(sim, t: int, ocean: bool = False) -> None:
     """Force tile t to enterable water (COAST by default, OCEAN if ocean=True):
     on the naval `wpass` plane and OFF the land `passable` plane, like real water."""
+    sim.water[0, t] = True
     sim.wpass[0, t] = True
     sim.ocean_tile[0, t] = bool(ocean)
     sim.passable[0, t] = False
@@ -633,6 +645,128 @@ def poke_flank_support(rules, path, GALLEY):
     print(f"  9 flank/support OK (flank {int(flank0)}/support {int(sup0)}; embarked -> {int(flank1)}/{int(sup1)}, river -> 0)")
 
 
+def poke_amphibious(rules, path, WARRIOR, ARCHER):
+    """10. THE AMPHIBIOUS ATTACK. CIV6 (Combat): "Embarked units with melee
+    attacks may attack targets on land when adjacent to it, but they will
+    suffer the amphibious attack CS penalty", and they "may not attack any
+    other unit in the water, including other embarked units". A Cliff refuses
+    the attack outright rather than softening it, and the victor comes ashore.
+    """
+    def scene(emb: bool = True, utype: int | None = None, cliff: bool = False):
+        sim = build(rules, path)
+        for _ in range(25):
+            sim.step()
+        sim.war[0, 0, 1] = sim.war[0, 1, 0] = True
+        sim.sync_war()
+        _r, _j, ctr = first_civ_city(sim)
+        land = empty_neighbor(sim, ctr)
+        assert land >= 0
+        clear_tile(sim, land)
+        sea = free_neighbor(sim, land, ctr)
+        assert sea >= 0
+        force_water(sim, sea)
+        if cliff:
+            sim.cliff_mask[0, land] = 0b111111
+        dslot = place_mil(sim, 1, land, WARRIOR)
+        aslot = place_mil(sim, 0, sea, WARRIOR if utype is None else utype, emb=emb)
+        sim.major_unit_mp[0, aslot] = 2
+        sim.major_unit_mp_full[0, aslot] = 2
+        return sim, aslot, dslot, land, sea
+
+    def col(sim, slot: int, frm: int, to: int) -> bool:
+        rw = int((sim._seat_slot_map(0)[0] == slot).nonzero(as_tuple=True)[0][0])
+        d = dir_to(sim, frm, to)
+        assert d >= 0, "tiles must be adjacent"
+        return bool(sim._seat_unit_mask(0)[0, rw, 6 + d])
+
+    sim, aslot, dslot, land, sea = scene()
+    assert col(sim, aslot, sea, land), "an embarked melee unit must be offered the shore"
+    sim._apply_seat_unit_actions(0, order(sim, aslot, 6 + dir_to(sim, sea, land)))
+    wet = 100 - int(sim.major_unit_hp[0, dslot])
+    assert wet > 0, "the amphibious attack must reach the defender"
+
+    # the SAME exchange, one term apart: identical fixture, identical 25 steps,
+    # identical tiles and roll keys, the attacker afloat vs standing.
+    dry_sim, a2, d2, l2, s2 = scene(emb=False)
+    dry_sim._apply_seat_unit_actions(0, order(dry_sim, a2, 6 + dir_to(dry_sim, s2, l2)))
+    dry = 100 - int(dry_sim.major_unit_hp[0, d2])
+    pen = sim._amphibious_attack_cs
+    assert dry > wet, f"the -{pen} amphibious penalty must cost damage: afloat {wet}, ashore {dry}"
+
+    adv_sim, a3, d3, l3, s3 = scene()
+    adv_sim.major_unit_hp[0, d3] = 1
+    adv_sim._apply_seat_unit_actions(0, order(adv_sim, a3, 6 + dir_to(adv_sim, s3, l3)))
+    assert not bool(adv_sim.major_unit_alive[0, d3]), "the defender must die"
+    assert int(adv_sim.major_unit_tile[0, a3]) == l3, "the victor advances into the tile"
+    assert not bool(adv_sim.major_unit_emb[0, a3]), "and comes ashore doing it"
+
+    cliff_sim, a4, _d4, l4, s4 = scene(cliff=True)
+    assert not col(cliff_sim, a4, s4, l4), "a Cliff must close the shore entirely"
+
+    wet_sim, a5, _d5, l5, s5 = scene()
+    afloat = free_neighbor(wet_sim, s5, l5)
+    assert afloat >= 0
+    force_water(wet_sim, afloat)
+    place_mil(wet_sim, 1, afloat, WARRIOR, emb=True)
+    assert not col(wet_sim, a5, s5, afloat), "nothing in the water is ever a target"
+
+    arch_sim, a6, _d6, _l6, _s6 = scene(utype=ARCHER)
+    rw6 = int((arch_sim._seat_slot_map(0)[0] == a6).nonzero(as_tuple=True)[0][0])
+    assert not bool(arch_sim._seat_unit_mask(0)[0, rw6, 6:12].any()), \
+        "an embarked RANGED unit has no attack at all"
+    print(f"  10 amphibious OK (afloat {wet} vs ashore {dry} damage, -{pen} CS; "
+          "cliff/water/ranged all refused, victor disembarks)")
+
+
+def poke_embarked_support(rules, path, WARRIOR, GALLEY):
+    """11. CIV6 (Flanking and Support): "Embarked land units do not benefit from
+    Support against attacks of enemy naval units" — so an escort still counts
+    for them against everything else, on top of the normalized embarked CS."""
+    def scene(escorted: bool, naval: bool) -> int:
+        sim = build(rules, path)
+        for _ in range(25):
+            sim.step()
+        sim.war[0, 0, 1] = sim.war[0, 1, 0] = True
+        sim.sync_war()
+        sim.civ_civics[:, :, sim._flank_support_civic] = True
+        _r, _j, ctr = first_civ_city(sim)
+        land = empty_neighbor(sim, ctr)
+        assert land >= 0
+        clear_tile(sim, land)
+        sea = free_neighbor(sim, land, ctr)
+        assert sea >= 0
+        force_water(sim, sea)
+        dslot = place_mil(sim, 1, sea, WARRIOR, emb=True)
+        spare = [
+            n for n in (int(x) for x in sim.neigh[sea].tolist())
+            if n >= 0 and n != land and not is_center(sim, n)
+            and int(sim.military_at[0, n]) < 0 and int(sim.civilian_at[0, n]) < 0
+        ]
+        atile = land
+        if naval:
+            atile = spare.pop(0)
+            force_water(sim, atile)
+        if escorted:
+            esc = spare.pop(0)
+            force_water(sim, esc)
+            place_mil(sim, 1, esc, WARRIOR, emb=True)
+        aslot = place_mil(sim, 0, atile, GALLEY if naval else WARRIOR)
+        sim.major_unit_mp[0, aslot] = 2
+        sim.major_unit_mp_full[0, aslot] = 2
+        sim._apply_seat_unit_actions(0, order(sim, aslot, 6 + dir_to(sim, atile, sea)))
+        assert bool(sim.major_unit_alive[0, dslot]), "the poke needs a surviving defender"
+        return 100 - int(sim.major_unit_hp[0, dslot])
+
+    lone = scene(False, False)
+    held = scene(True, False)
+    assert lone > held > 0, f"an escort must blunt a LAND attack: alone {lone}, escorted {held}"
+    lone_n = scene(False, True)
+    held_n = scene(True, True)
+    assert held_n == lone_n > 0, f"a NAVAL attack ignores it: alone {lone_n}, escorted {held_n}"
+    print(f"  11 embarked support OK (land attack {lone}->{held} with an escort; "
+          f"naval attack {lone_n} either way)")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -643,6 +777,7 @@ def main() -> None:
     QUAD = idx(rules, "QUADRIREME")
     WARRIOR = idx(rules, "WARRIOR")
     BUILDER = idx(rules, "BUILDER")
+    ARCHER = idx(rules, "ARCHER")
     assert bool(load_rules().units), "no unit catalog"
 
     poke_galley_city(rules, path, GALLEY)
@@ -655,6 +790,8 @@ def main() -> None:
     poke_walls_civ(rules, path, GALLEY, WARRIOR)
     poke_embarked_capture(rules, path, WARRIOR, BUILDER)
     poke_flank_support(rules, path, GALLEY)
+    poke_amphibious(rules, path, WARRIOR, ARCHER)
+    poke_embarked_support(rules, path, WARRIOR, GALLEY)
     print("NAVAL POKES OK")
 
 

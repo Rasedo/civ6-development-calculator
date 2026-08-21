@@ -1197,6 +1197,14 @@ class SimMasks:
             free = free | ((self.district.gather(1, land) == self._harbor_idx) & own.gather(1, land))
         return trans & bit & ~free
 
+    def _amph_atk_cs(self, emb: torch.Tensor) -> torch.Tensor:
+        """[B] the attacker's amphibious penalty. CIV6 (Combat): an attack
+        "made by an embarked unit against a unit or district on land that is
+        unobstructed by Cliffs ... carries a -10 CS penalty". A Cliff refuses
+        the attack outright rather than softening it, so every attack that
+        reaches a resolver at all pays the full penalty."""
+        return emb.long() * self._amphibious_attack_cs
+
     def _cliff_edge(self, cur: torch.Tensor, dest: torch.Tensor, dir_i, own: torch.Tensor | None = None) -> torch.Tensor:
         """[B] bool: is the step cur->dest a land/water crossing that a
         CLIFF closes? The `cliffBlocks` twin. The mask lives on the LAND tile, so
@@ -1375,12 +1383,13 @@ class SimMasks:
             self._blocked_for(nbc, row).reshape(B, N, 6),
         )
         has_mp = (self.unit_mp.gather(1, sc) > 0).unsqueeze(2)
-        move = on_map & terr & ~_blk & alive & has_mp
+        cliff6 = torch.zeros(B, N, 6, dtype=torch.bool, device=dev)
         if self._embark_live:
             for _n in range(N):
                 if not bool(present[:, _n].any()):
                     break
-                move[:, _n] = move[:, _n] & ~self._cliff_block_dirs(tc[:, _n], nb[:, _n], own_tile)
+                cliff6[:, _n] = self._cliff_block_dirs(tc[:, _n], nb[:, _n], own_tile)
+        move = on_map & terr & ~_blk & alive & has_mp & ~cliff6
 
         # ---- ATTACK 6-11 -----------------------------------------------------
         # `unitsHostile` for the units, the centre plane for the cities: ONE
@@ -1402,11 +1411,16 @@ class SimMasks:
         # a live enemy Encampment is a MELEE target in its own right — the only
         # way to open its tile. `rangedAttack` has no district arm.
         enc_t = self._encamp_block(nbc, row).reshape(B, N, 6) & melee
-        # EMBARKED UNITS CANNOT ATTACK (meleeAttack/rangedAttack both refuse).
+        # CIV6: "Embarked units with melee attacks may attack targets on land
+        # when adjacent to it, but they will suffer the amphibious attack CS
+        # penalty", and "may not attack any other unit in the water, including
+        # other embarked units". A Cliff closes the shore entirely, and an
+        # embarked RANGED unit has no attack at all.
+        shore = melee & ~self.water.gather(1, nbc).reshape(B, N, 6) & ~cliff6
         may_shoot = self._siege_may_shoot("major").gather(1, sc).unsqueeze(2)
         attack = (
             on_map & (hostile_u | city_t | cs_t | enc_t)
-            & can_fight & ~u_emb.unsqueeze(2) & alive & has_mp & may_shoot
+            & can_fight & (~u_emb.unsqueeze(2) | shore) & alive & has_mp & may_shoot
         )
 
         hold = alive
