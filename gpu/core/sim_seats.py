@@ -4711,6 +4711,7 @@ class SimSeats:
 
     def _hostile_ranged_strike(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int) -> torch.Tensor:
         ttc = tgt.clamp(min=0)
+        att = att & self._siege_may_shoot(atk_kind)[:, u]
         _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(atk_kind)
         barb = POOL_CLASS[atk_kind] == "hostile"
         ut0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
@@ -4870,6 +4871,7 @@ class SimSeats:
         B, dev = self.B, self.device
         ttc = tgt.clamp(min=0)
         bidx = torch.arange(B, device=dev)
+        att = att & self._siege_may_shoot(atk_kind)[:, u]
         a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
         at0 = a_type[:, u].clamp(min=0, max=self.NU - 1)
         aseat = a_seat[:, u]

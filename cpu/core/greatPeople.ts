@@ -9,6 +9,7 @@ import { seatWonders } from './wonders';
 import { addEraScore, goldenProphetPoints } from './eras';
 import { getModifiers } from './effects';
 import { spawnUnit } from './units';
+import { repairDrip } from './rules';
 
 export function greatPeopleEarned(state: GameState, cls: GreatPersonClass): number {
   return state.claimedGreatPeople.filter((id) => GREAT_PEOPLE[cls].some((p) => p.id === id)).length;
@@ -77,7 +78,11 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
     const capital = cities.find((c) => c.isCapital);
     // Route the LUMP like completion overflow: into the queue head if there is
     // one, otherwise banked. Dropping it when the queue is empty is a leak.
-    if (capital && capital.queue.length > 0) capital.queue[0].progress += fx.productionToCapital;
+    if (capital && capital.queue.length > 0) {
+      const before = capital.queue[0].progress;
+      capital.queue[0].progress += fx.productionToCapital;
+      repairDrip(state, capital, before);
+    }
     else if (capital) capital.productionBank = (capital.productionBank ?? 0) + fx.productionToCapital;
   }
   if (cls === 'GENERAL' || cls === 'ADMIRAL') {

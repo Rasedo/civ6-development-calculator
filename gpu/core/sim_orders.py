@@ -248,6 +248,7 @@ class SimOrders:
                     # decided over the WHOLE batch, because `ct` is narrowed
                     _dgold = self._congress_chop(self.feat_id.gather(1, hc.unsqueeze(1)).squeeze(1))[1]
                     col_c = self._city_col_at(row, cr, ct)
+                    _drip_c = self.city_progress[:, row].clone()
                     for i2 in range(len(cr)):
                         b2, j2 = int(cr[i2]), int(col_c[i2])
                         amt = float(amount[b2])
@@ -262,6 +263,7 @@ class SimOrders:
                             self.city_progress[b2, row, j2] += amt
                         else:
                             self.city_prod_bank[b2, row, j2] += amt
+                    self._repair_drip(row, _drip_c)
                     self.unit_charges[cr, sc[cr]] -= 1
                     spent = chp & (self.unit_charges.gather(1, sc.unsqueeze(1)).squeeze(1) <= 0)
                     if bool(spent.any()):

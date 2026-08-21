@@ -364,6 +364,23 @@ export function siegeAssist(state: GameState, attacker: Unit, targetIndex: numbe
 }
 
 /**
+ * CIV6 (Movement): a unit whose attack "uses Bombard Strength" may move and
+ * shoot in the same turn only if "its maximum Movement is at least 1 greater
+ * than normal when it attempts to shoot"; and "if a unit has not moved, it can
+ * always shoot regardless of its maximum Movement". Whether it MOVED is
+ * `refreshUnits`' own gate — movesLeft against what this unit was GRANTED last
+ * refresh, not against its type's base moves, because the general's aura makes
+ * the granted pool vary per turn. Its maximum Movement is read fresh at the
+ * shot, which is what "when it attempts to shoot" asks for.
+ */
+export function siegeMayShoot(state: GameState, unit: Unit): boolean {
+  const def = UNITS[unit.type];
+  if (def?.bombard === undefined) return true;
+  if (unit.movesLeft >= (unit.movesFull ?? unitFullMoves(state, unit))) return true;
+  return unitFullMoves(state, unit) + generalAuraMP(state, unit) > (def.moves ?? 2);
+}
+
+/**
  * The damage class ONE attack brings to a perimeter. A siege unit's attack
  * "uses Bombard Strength" whichever verb ordered it; everything else is the
  * melee/ranged pair the reduction table is keyed on.
@@ -805,6 +822,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   const def = UNITS[attacker.type];
   if (!def?.ranged) return no('Not a ranged unit.');
   if (attacker.movesLeft <= 0) return no('No movement left.');
+  if (!siegeMayShoot(state, attacker)) return no('Siege units cannot move and shoot.');
   if (attacker.embarked) return no('Embarked units cannot attack.');
   const from = state.map.tiles[attacker.tileIndex];
   const target = state.map.tiles[targetIndex];
@@ -878,6 +896,7 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   const seat = attacker.seat;
   const def = UNITS[attacker.type];
   if (!def?.ranged) return;
+  if (!siegeMayShoot(state, attacker)) return;
   const target = state.map.tiles[targetIndex];
   const held = target.district === 'CITY_CENTER' ? cityAtIndex(state, targetIndex) : undefined;
   // The city arm asks `unitsHostile`'s own question, exactly as
@@ -927,6 +946,7 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
   const def = UNITS[unit.type];
   if (!def || def.combat <= 0 || unit.movesLeft <= 0) return [];
   if (unit.embarked) return []; // embarked units cannot attack
+  if (!siegeMayShoot(state, unit)) return [];
   const from = state.map.tiles[unit.tileIndex];
   const range = def.ranged?.range ?? 1;
   const out: number[] = [];

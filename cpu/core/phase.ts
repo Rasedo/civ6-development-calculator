@@ -32,7 +32,7 @@ import { CIVICS } from '../data/civics';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { UNITS, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_TECH } from '../data/units';
-import { outerPool, wallsMax, urbanDefensesFit } from './rules';
+import { outerPool, wallsMax, urbanDefensesFit, repairDrip } from './rules';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
 import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, borderGrowthCost, EMBARKED_DEFENSE_CS } from '../data/constants';
@@ -1588,6 +1588,7 @@ export function seatPhase(state: GameState): void {
         // CIV6 (Public Works Program): "+100% / -50% Production towards this
         // Project."
         if (q.kind === 'project') _em *= congressProjectMult(state, PROJECT_LIST.findIndex((pr) => pr.id === q.project));
+        const progressBefore = q.progress;
         q.progress += production * _em;
         // Pay in the bank, exactly where the seat 0's endTurn does
         // (game.ts, right after the production add). Without this the field
@@ -1596,6 +1597,7 @@ export function seatPhase(state: GameState): void {
           q.progress += civCity.productionBank;
           civCity.productionBank = 0;
         }
+        repairDrip(state, civCity, progressBefore);
         const cost =
           q.kind === 'unit'
             ? q.cost ?? UNITS[q.unit]?.cost ?? 54 // builders lock at queue

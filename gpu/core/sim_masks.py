@@ -351,6 +351,36 @@ class SimMasks:
         mx = self._walls_max_all(row)[:, j]
         return (mx - self.city_outer_hp[:, row, j]).clamp(min=1).to(self.dtype)
 
+    def _repair_drip(self, row: int, before: torch.Tensor) -> None:
+        """`repairDrip` — CIV6 (Repair Outer Defenses): "Walls gain HP equal to
+        the Production invested into the project (on Standard speed) each turn
+        the project runs." `before` is this row's whole progress plane as it
+        stood before whatever just paid into it, so a chop and a Great
+        Engineer's lump raise the perimeter exactly as the turn's own
+        production does — and damage taken mid-repair stays taken, which
+        reading the pool off total progress would silently undo."""
+        if self._repair_proj_idx < 0:
+            return
+        head = self.city_current[:, row] == self.PROJECT_BASE + self._repair_proj_idx
+        if not bool(head.any()):
+            return
+        gain = (js_round(self.city_progress[:, row].double())
+                - js_round(before.double())).long()
+        oh = self.city_outer_hp[:, row]
+        self.city_outer_hp[:, row] = torch.where(
+            head, torch.minimum(oh + gain, self._walls_max_all(row)), oh)
+
+    def _siege_may_shoot(self, pre: str) -> torch.Tensor:
+        """[B, U] `siegeMayShoot` — CIV6 (Movement): a unit whose attack "uses
+        Bombard Strength" may move and shoot in the same turn only if "its
+        maximum Movement is at least 1 greater than normal when it attempts to
+        shoot"; and "if a unit has not moved, it can always shoot regardless of
+        its maximum Movement". `_spent_mp` is refreshUnits' own gate — the pool
+        this unit was GRANTED last refresh, not its type's base moves."""
+        typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+        return ((self._type_bombard[typ] <= 0) | ~self._spent_mp(pre)
+                | (self._full_mp(pre) > self._type_moves[typ]))
+
     def _siege_assist(self, seat: torch.Tensor, type_idx: torch.Tensor,
                       tile: torch.Tensor, tier: torch.Tensor) -> torch.Tensor:
         """`siegeAssist` — the ASSIST_ bits a friendly Battering Ram or Siege
@@ -1332,9 +1362,10 @@ class SimMasks:
         # way to open its tile. `rangedAttack` has no district arm.
         enc_t = self._encamp_block(nbc, row).reshape(B, N, 6) & melee
         # EMBARKED UNITS CANNOT ATTACK (meleeAttack/rangedAttack both refuse).
+        may_shoot = self._siege_may_shoot("major").gather(1, sc).unsqueeze(2)
         attack = (
             on_map & (hostile_u | city_t | cs_t | enc_t)
-            & can_fight & ~u_emb.unsqueeze(2) & alive & has_mp
+            & can_fight & ~u_emb.unsqueeze(2) & alive & has_mp & may_shoot
         )
 
         hold = alive
@@ -1425,7 +1456,7 @@ class SimMasks:
             _ring_c = self._seats_hostile(row, self._centre_seat_plane().gather(1, ringc)).reshape(B, N, 12)
             _sn = [
                 present.unsqueeze(2) & rngd.unsqueeze(2) & ~u_emb.unsqueeze(2)
-                & (ring >= 0) & (_ring_u | _ring_c)
+                & may_shoot & (ring >= 0) & (_ring_u | _ring_c)
             ]
 
         _sp: list[torch.Tensor] = []

@@ -65,15 +65,14 @@ nothing carries forward.
 | B-36r appeal adjacency terms | 1 | the four reachable terms ship; Dam/Canal/Water Park/Preserve and the Great People wait on C-22, C-4, C-21 |
 | B-39r wonder effects still dropped | 1 | the sourced sweep shipped fourteen channels; five residuals, each blocked on B-20r, C-21, B-34r or C-23 |
 | B-45r sourced-sweep finds in the other rows | 2 | eight wonders pay effects no channel expresses: free units, patronage discount, tech boosts, route capacity and route yields |
-| B-46r the siege class's tails | 1 | the Bombard stat, both support chassis and all four walls tiers ship; the move-and-shoot rule, the middle siege rungs and Akkad's suzerain bonus do not |
-| B-47r the repair project's per-turn drip | 1 | the project, the three quiet turns and full encirclement all ship; walls gain their HP at COMPLETION rather than per turn |
+| B-46r the siege class's tails | 1 | the Bombard stat, both support chassis, all four walls tiers and the move-and-shoot rule ship; the middle siege rungs and Akkad's suzerain bonus do not |
 | B-48r no combat class modifiers | 1 | melee +5 vs anti-cavalry and anti-cavalry +10 vs cavalry; no flag, and `defenderCS` never sees the attacker |
 | B-49r embarked defence is flat | 1 | Civ 6 keys it to the owner's era, 15 through 55 |
 | B-50r theological combat's other terms | 1 | flanking/support, territory bonuses, the Inquisitor, the winner's advance, Holy Site healing |
 | B-51r the Encampment's second pool | 1 | the district meets the city's perimeter and heals only while its tile is clear; Civ 6 tracks the two pools SEPARATELY, and a defeat pillages it |
 | B-44r city-state war tails | 1 | the head and its policy ship; no walker ever MARCHES on a minor, and the diplomatic consequences wait on C-19 |
 | B-34r flood tails | 1 | the severity ladder ships; a flood still takes ONE tile where GS floods the river's whole reach, and the Dam that mitigates one is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **24** | |
+| **B. Fidelity vs real Civ 6** | **23** | |
 | C-1 POWER | 5 | no plants, no grid, no powered-yield term — 4 gaps wait on it |
 | C-2 diplomatic agreements | 6 | war and peace and nothing between: open borders, work trades, alliances, denouncements |
 | C-3 unit promotions | 4 | only MARTYR reaches a rule; choosing one is also a wire head |
@@ -98,8 +97,9 @@ nothing carries forward.
 | C-22 the district roster is a subset | 3 | no Dam, Canal, Water Park, Preserve, Aerodrome, Government Plaza or Diplomatic Quarter |
 | C-23 nothing diminishes tourism | 1 | no rival's Enlightenment ever costs a tourist, so Cristo Redentor's cancelling clause has nothing to cancel |
 | C-24 no CO2, no climate | 3 | GS's whole climate arc — emissions, warming bands, sea level, escalating disasters — and 2 gaps wait on it |
-| **C. Absent systems** | **60** | |
-| **OPEN, TOTAL** | **84** | |
+| C-25 no stealth (invisible) units | 2 | the whole naval-raider class is absent and nothing on either engine can be invisible |
+| **C. Absent systems** | **62** | |
+| **OPEN, TOTAL** | **85** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -548,16 +548,26 @@ Civ 6 source or is recorded as unverifiable.
   production. The ram stops at tier 1 and the tower at tier 2, so "whenever a
   city builds Renaissance Walls, only units with Bombard Strength will be able
   to inflict full damage to its defenses" holds by construction.
+  The MOVE-AND-SHOOT rule ships with them. The unit infoboxes' "3 or more
+  Movement" is the Catapult's instance of the general rule the Movement page
+  states: a unit whose attack uses Bombard Strength may move and shoot in one
+  turn only if "its maximum Movement is at least 1 greater than normal when it
+  attempts to shoot", and "if a unit has not moved, it can always shoot
+  regardless of its maximum Movement". `siegeMayShoot` / `_siege_may_shoot`
+  ask exactly that pair: whether the unit MOVED is `refreshUnits`' own gate
+  (movesLeft against the pool this unit was GRANTED last refresh, not against
+  its type's base moves, because a general's aura makes the granted pool vary
+  per turn), and its maximum Movement is read fresh at the shot, which is what
+  "when it attempts to shoot" asks for. The gate sits on `rangedAttackInner`,
+  `hostileRangedStrike` and `attackTargets`, and on the ATTACK and SNIPE mask
+  columns beside `_ranged_attack` and `_hostile_ranged_strike`.
   REACHABILITY: nothing in the scripted gate builds a Catapult or a support
   chassis, so the battery proves the two engines agree about these bodies and
   the poke lanes are what prove they agree with the pages.
   OPEN:
-  - **THE MOVE-AND-SHOOT RULE.** Real Civ 6 siege units "cannot move and
-    attack on the same turn unless they've earned the Expert Crew promotion"
-    (or reach 3 Movement). Neither engine has any notion of "has moved this
-    turn" — `movesLeft` / `unit_mp` would have to stand in for it, and the
-    gate would sit on the attack mask, which is the hottest parity surface in
-    the step. The promotion half additionally waits on C-3.
+  - **THE EXPERT CREW PROMOTION** is the rule's other half — a siege unit that
+    has earned it "may move and shoot in the same turn" at any Movement.
+    Blocked on C-3.
   - **THE MIDDLE AND LATE SIEGE RUNGS.** Trebuchet, Artillery and Rocket
     Artillery are absent, so the class has a Classical rung and a Renaissance
     one and nothing after Metal Casting. The Observation Balloon that lets a
@@ -566,30 +576,6 @@ Civ 6 source or is recorded as unverifiable.
     all levels of city defenses and against all cities (regardless of presence
     or absence of support units)". Akkad is not in the city-state roster —
     B-21r.
-- **B-47r. The repair project's per-turn drip.** Both halves this row named
-  ship. The outer pool no longer heals at all: `seatPhase` /
-  `_seat_city_fire_and_heal` regain only the city's own 20 HP, and the
-  perimeter comes back through REPAIR_DEFENSES, a project on the CITY CENTER —
-  the one district every city already has, which is why it needed a channel of
-  its own (`cc` on the exported project row) rather than a registry lookup. It
-  offers itself exactly when "it and/or its Encampment district have damaged
-  Walls and have not been attacked in the last three turns", counted off a new
-  per-city `lastHitTurn` / `city_last_hit` that every city-damage site stamps,
-  and on completion it "fully restores the HP of the city's (and Encampment's)
-  Outer Defenses". Its price is the HP it puts back. The siege gate is fixed in
-  the other direction too: `encircled` demands a hostile MILITARY unit on
-  EVERY passable neighbour of the centre, which is Civ 6's "zone of control on
-  all passable tiles surrounding the City Center", and the Encampment heals
-  only while "its tile is not occupied".
-  OPEN:
-  - **THE PER-TURN DRIP.** "Walls gain HP equal to the Production invested
-    into the project (on Standard speed) each turn the project runs"; here the
-    whole restore lands at COMPLETION. The totals agree, because the project's
-    price IS the missing HP, so only the intermediate turns of a multi-turn
-    repair differ. Writing the drip means rounding a float production tick into
-    an integer pool every turn inside the production advance — the hottest
-    parity path there is — for a difference that lasts one turn.
-  - **"STEALTH UNITS CANNOT BESIEGE A CITY."** There are no stealth units.
 - **B-48r. No combat CLASS modifiers.** Real Civ 6 gives melee units +5 CS
   against anti-cavalry and anti-cavalry units +10 against light, heavy and
   ranged cavalry. The roster fields both sides of that pair (SPEARMAN and
@@ -838,6 +824,20 @@ number was under-counting by treating deferrals as closures.
   of them an ACTIVATED ability used later on a chosen tile. Gaps: the
   appeal-granting Great People (Alvar Aalto, Charles Correa) that B-36r names,
   and every "activate in a city" ability in the roster.
+- **C-25. NO STEALTH (INVISIBLE) UNITS.** Weight 2. Nothing on either engine
+  can be invisible: `unitsAt` / `military_at` answer the same question for
+  every observer, and no unit carries a stealth flag because none of the units
+  that would is in the roster. Civ 6's complete list is the NAVAL RAIDER class
+  (Privateer, Sea Dog, Barbary Corsair, Submarine, U-Boat, Nuclear Submarine)
+  — of which this roster has none, its whole navy being the GALLEY and the
+  QUADRIREME — plus a Warrior Monk with Twilight Veil, a Recon unit with
+  Camouflage and a Soothsayer with Inquisitor, three units that are absent AND
+  promotion-gated (C-3). Gaps waiting on it: the siege rule "stealth units
+  cannot besiege a city", which `encircled` / `_seat_city_fire_and_heal` count
+  every hostile military unit toward; the hidden-while-adjacent-to-a-district
+  clause and the reveal-for-one-turn-after-attacking clause, which need a
+  visibility axis `isExplored` does not have; and the Reveal Stealth ability
+  that Scouts and Destroyers carry.
 - **C-24. NO CO2, NO CLIMATE.** Weight 3. Gathering Storm's whole climate
   arc is absent: neither engine tracks CO2 emitted per seat, the world
   temperature bands, ice melt, rising sea level or the flooding of coastal

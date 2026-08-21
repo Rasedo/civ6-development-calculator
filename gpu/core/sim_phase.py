@@ -402,9 +402,13 @@ class SimPhase:
         # phase.ts spends the bank right after the production add.
         prog = self.city_progress[bidx, row, col]
         bank = self.city_prod_bank[bidx, row, col]
+        _drip0 = self.city_progress[:, row].clone()
         # f64 intermediates, stored at the PLANE's dtype (see _seat_city_loyalty)
         self.city_progress[bidx, row, col] = torch.where(has_q, prog + prod + bank, prog).to(prog.dtype)
         self.city_prod_bank[bidx, row, col] = torch.where(has_q, torch.zeros_like(bank), bank)
+        # the perimeter takes its share BEFORE the completion below zeroes the
+        # progress it is measured against
+        self._repair_drip(row, _drip0)
         cost = self.city_cost[bidx, row, col].clone()
         done = has_q & (self.city_progress[bidx, row, col] >= cost)
         if not bool(done.any()):
@@ -804,7 +808,9 @@ class SimPhase:
                 if bool((prod_fx != 0).any()):
                     _capa = self.city_is_cap[:, row] & self.city_alive[:, row]
                     capm = _capa & (self.city_current[:, row] >= 0)
+                    _drip_gp = self.city_progress[:, row].clone()
                     self.city_progress[:, row] = self.city_progress[:, row] + torch.where(capm, prod_fx.unsqueeze(1), torch.zeros_like(self.city_progress[:, row]))
+                    self._repair_drip(row, _drip_gp)
                     # the phase.ts twin: bank it rather than drop it when
                     # the capital has nothing queued
                     _capb = _capa & (self.city_current[:, row] < 0)

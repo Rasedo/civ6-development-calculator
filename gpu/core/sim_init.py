@@ -673,6 +673,9 @@ class SimInit:
         # Laser-station rows: repeatable, tech-gated only, each completion
         # speeds the Exoplanet craft (+1 LY/turn) — cpu/data/projects.ts `laser`.
         self._laser_proj_idx = {i for i, row in enumerate(self._proj_rows) if int(row.get("ls", 0))}
+        # The REPAIR row, whose production pays the perimeter as it accrues.
+        self._repair_proj_idx = next(
+            (i for i, row in enumerate(self._proj_rows) if int(row.get("rep", 0))), -1)
         _wd = rules.wonders or {}
         self._wond_rows = list(_wd.get("rows", []))
         self._wond_n = len(self._wond_rows)

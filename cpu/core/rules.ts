@@ -14,6 +14,7 @@ import { BUILDINGS, type BuildingDef, buildingsForDistrict } from '../data/build
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { CITY_MIN_DIST } from '../../world/types';
 import { URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN } from '../data/units';
+import { PROJECTS } from '../data/projects';
 import { CITY_WORK_RADIUS, maxSpecialtyDistricts } from '../data/constants';
 import { allCities, campTiles, citiesOf, seatOf, tileBelongsTo, tileClaimed, tileSeat } from './seats';
 
@@ -297,6 +298,21 @@ export function wallsTier(state: GameState, city: { buildings: string[]; seat: n
   let tier = 0;
   for (const b of city.buildings) tier = Math.max(tier, BUILDINGS[b]?.walls ?? 0);
   return tier;
+}
+
+/**
+ * CIV6 (Repair Outer Defenses): "Walls gain HP equal to the Production
+ * invested into the project (on Standard speed) each turn the project runs."
+ * `before` is the head's progress as it stood before whatever just paid into
+ * it, so a chop and a Great Engineer's lump raise the perimeter exactly as
+ * the turn's own production does — and damage taken mid-repair stays taken,
+ * which reading the pool off total progress would silently undo.
+ */
+export function repairDrip(state: GameState, city: City, before: number): void {
+  const q = city.queue[0];
+  if (q?.kind !== 'project' || !PROJECTS[q.project]?.repair) return;
+  const max = wallsMax(state, city);
+  city.outerHp = Math.min(max, outerPool(state, city) + (Math.round(q.progress) - Math.round(before)));
 }
 
 /** The size of that tier's perimeter pool — what a fresh set of walls is

@@ -3,10 +3,11 @@ import { makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpe
 import { BARB_SEAT, emptySeat, seatOf, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { spawnUnit, unitsAt } from '../../../cpu/core/units';
 import { neighbors } from '../../../world/hex';
-import { outerPool, wallsMax, wallsTier, availableBuildings } from '../../../cpu/core/rules';
+import { outerPool, repairDrip, wallsMax, wallsTier, availableBuildings } from '../../../cpu/core/rules';
+import { applyLumpYield } from '../../../cpu/core/economy';
 import {
-  ASSIST_RAM, ASSIST_TOWER, cityDamageSplit, cityDefenseStrength, cityHitClass,
-  cityRangedStrength, encircled, meleeAttack, rangedAttack, siegeAssist,
+  ASSIST_RAM, ASSIST_TOWER, attackTargets, cityDamageSplit, cityDefenseStrength, cityHitClass,
+  cityRangedStrength, encircled, meleeAttack, rangedAttack, siegeAssist, siegeMayShoot,
 } from '../../../cpu/core/combat';
 import { availableProjects, projectCost, purchaseBuilding, queueProject } from '../../../cpu/core/game';
 import { completeProject } from '../../../cpu/core/production';
@@ -304,6 +305,54 @@ describe('Repair Outer Defenses', () => {
     expect(city.queue[0]).toMatchObject({ kind: 'project', project: 'REPAIR_DEFENSES', cost: 60 });
   });
 
+  function running() {
+    const { state, city } = damaged();
+    state.turn = 10;
+    city.lastHitTurn = 10 - REPAIR_QUIET_TURNS;
+    queueProject(state, city.id, 'REPAIR_DEFENSES', 0);
+    return { state, city };
+  }
+
+  it('CIV6: "Walls gain HP equal to the Production invested ... each turn the project runs"', () => {
+    const { state, city } = running();
+    const before = city.queue[0].progress;
+    city.queue[0].progress += 12.4;
+    repairDrip(state, city, before);
+    expect(city.outerHp).toBe(52); // 40 + round(12.4)
+    // and it never overshoots the tier's pool
+    const mid = city.queue[0].progress;
+    city.queue[0].progress += 1000;
+    repairDrip(state, city, mid);
+    expect(city.outerHp).toBe(WALLS_TIER_HP[1]);
+  });
+
+  it('damage taken mid-repair stays taken — the drip pays the DELTA, not the total', () => {
+    const { state, city } = running();
+    city.queue[0].progress = 30;
+    city.outerHp = 20; // a hit landed while the project ran
+    repairDrip(state, city, 30);
+    expect(city.outerHp).toBe(20);
+    const before = city.queue[0].progress;
+    city.queue[0].progress += 10;
+    repairDrip(state, city, before);
+    expect(city.outerHp).toBe(30);
+  });
+
+  it("a chop and a Great Engineer pay the perimeter as the turn's own production does", () => {
+    const { state, city } = running();
+    applyLumpYield(state, city.centerIndex, { key: 'production', amount: 15 }, 0);
+    expect(city.queue[0].progress).toBe(15);
+    expect(city.outerHp).toBe(55);
+  });
+
+  it("the seat phase drips the turn's production into the perimeter", () => {
+    const { state, city } = running();
+    seatPhase(state);
+    expect(city.queue[0]).toMatchObject({ kind: 'project', project: 'REPAIR_DEFENSES' });
+    expect(city.outerHp).toBe(40 + Math.round(city.queue[0].progress));
+    expect(city.outerHp).toBeGreaterThan(40);
+  });
+
   it('every city-damage site stamps the clock the repair counts from', () => {
     const { state, city } = damaged();
     state.turn = 12;
@@ -311,6 +360,48 @@ describe('Repair Outer Defenses', () => {
     const att = place(state, city.centerIndex, 'SWORDSMAN');
     expect(meleeAttack(state, att.id, city.centerIndex, ATK).ok).toBe(true);
     expect(city.lastHitTurn).toBe(12);
+  });
+});
+
+describe('the move-and-shoot rule', () => {
+  function scene() {
+    const { state, city } = war();
+    const cat = place(state, city.centerIndex, 'CATAPULT', 2);
+    cat.movesFull = UNITS.CATAPULT.moves;
+    cat.movesLeft = cat.movesFull;
+    return { state, city, cat };
+  }
+
+  it('CIV6: "if a unit has not moved, it can always shoot"', () => {
+    const { state, city, cat } = scene();
+    expect(siegeMayShoot(state, cat)).toBe(true);
+    expect(rangedAttack(state, cat.id, city.centerIndex, ATK).ok).toBe(true);
+  });
+
+  it('CIV6: having moved, a siege unit at its normal Movement may not shoot', () => {
+    const { state, city, cat } = scene();
+    cat.movesLeft = cat.movesFull! - 1;
+    expect(siegeMayShoot(state, cat)).toBe(false);
+    expect(rangedAttack(state, cat.id, city.centerIndex, ATK).ok).toBe(false);
+    expect(attackTargets(state, cat)).toEqual([]);
+  });
+
+  it('CIV6: "maximum Movement at least 1 greater than normal" lifts the gate', () => {
+    const { state, city, cat } = scene();
+    spawnUnit(state, 'GENERAL', cat.tileIndex, ATK);
+    cat.movesFull = UNITS.CATAPULT.moves + 1; // what refreshUnits granted beside the general
+    cat.movesLeft = cat.movesFull - 1;        // and it spent one of them
+    expect(siegeMayShoot(state, cat)).toBe(true);
+    expect(rangedAttack(state, cat.id, city.centerIndex, ATK).ok).toBe(true);
+  });
+
+  it("the gate is the siege class's alone — an Archer shoots after moving", () => {
+    const { state, city } = war();
+    const arc = place(state, city.centerIndex, 'ARCHER', 2);
+    arc.movesFull = UNITS.ARCHER.moves;
+    arc.movesLeft = arc.movesFull! - 1;
+    expect(siegeMayShoot(state, arc)).toBe(true);
+    expect(rangedAttack(state, arc.id, city.centerIndex, ATK).ok).toBe(true);
   });
 });
 

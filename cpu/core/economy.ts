@@ -3,6 +3,7 @@ import { seatOf, tileSeat, cityAtTile } from './seats';
 
 import type { City, GameState, ResearchState, Tile, YieldKey } from './types';
 import { computeUnlocksIn } from './effects';
+import { repairDrip } from './rules';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 
@@ -107,7 +108,9 @@ export function applyLumpYield(
     return;
   }
   if (city.queue.length > 0) {
+    const before = city.queue[0].progress;
     city.queue[0].progress += amount;
+    repairDrip(state, city, before);
   } else {
     city.productionBank = (city.productionBank ?? 0) + amount;
   }

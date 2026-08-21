@@ -149,6 +149,63 @@ def test_ranged_strength(sim) -> None:
     print(f"  penalty OK: land ranged always -{int(sim._ranged_city_pen)}, naval ranged only against Walls")
 
 
+def test_move_and_shoot(sim) -> None:
+    """CIV6 (Movement): a unit whose attack uses Bombard Strength "may move and
+    shoot in the same turn if ... its maximum Movement is at least 1 greater
+    than normal when it attempts to shoot"; and "if a unit has not moved, it
+    can always shoot regardless of its maximum Movement"."""
+    cat = next(i for i in range(sim.NU) if int(sim._type_bombard[i]) > 0)
+    arc = next(i for i in range(sim.NU)
+               if int(sim._type_ranged_strength[i]) > 0 and int(sim._type_bombard[i]) == 0)
+    s = 0
+    base = int(sim._type_moves[cat])
+    sim.major_unit_type[0, s] = cat
+    sim.major_unit_emb[0, s] = False
+    sim.major_unit_aura_mp[0, s] = 0
+    sim.major_unit_mp_full[0, s] = base
+    sim.major_unit_mp[0, s] = base
+    assert int(sim._full_mp("major")[0, s]) == base,         "the scene wants a siege unit at its NORMAL maximum Movement"
+    assert bool(sim._siege_may_shoot("major")[0, s]),         "a siege unit that has not moved must always shoot"
+    sim.major_unit_mp[0, s] = base - 1
+    assert not bool(sim._siege_may_shoot("major")[0, s]),         "having moved at its normal Movement, it must not shoot"
+    sim.major_unit_aura_mp[0, s] = 1  # a general stands beside it
+    sim.major_unit_mp_full[0, s] = base + 1
+    assert bool(sim._siege_may_shoot("major")[0, s]),         "+1 maximum Movement must lift the gate"
+    sim.major_unit_type[0, s] = arc
+    sim.major_unit_aura_mp[0, s] = 0
+    sim.major_unit_mp_full[0, s] = int(sim._type_moves[arc])
+    sim.major_unit_mp[0, s] = int(sim._type_moves[arc]) - 1
+    assert bool(sim._siege_may_shoot("major")[0, s]),         "the gate is the siege class's alone — an Archer shoots after moving"
+    print(f"  move-and-shoot OK: {base} MP shoots only unmoved, {base + 1} shoots either way")
+
+
+def test_repair_drip(rules, path) -> None:
+    """CIV6: "Walls gain HP equal to the Production invested into the project
+    (on Standard speed) each turn the project runs." The drip pays the DELTA,
+    so a hit landed mid-repair stays landed."""
+    sim = build(rules, path)
+    assert sim._repair_proj_idx >= 0, "the repair row must be findable by its flag"
+    sim.city_bldg[0, 0, 0, sim._walls_bidx] = True
+    sim.city_outer_hp[0, 0, 0] = 40
+    sim.city_current[0, 0, 0] = sim.PROJECT_BASE + sim._repair_proj_idx
+    sim.city_progress[0, 0, 0] = 0.0
+
+    def drip(add: float) -> int:
+        before = sim.city_progress[:, 0].clone()
+        sim.city_progress[0, 0, 0] = before[0, 0] + add
+        sim._repair_drip(0, before)
+        return int(sim.city_outer_hp[0, 0, 0])
+
+    assert drip(12.4) == 52, "a 12.4-production turn must pay round(12.4) HP"
+    assert drip(1000.0) == sim._walls_hp, "the drip must never overshoot the tier's pool"
+    sim.city_outer_hp[0, 0, 0] = 20  # a hit lands while the project runs
+    assert drip(0.0) == 20, "an unchanged progress plane must pay nothing"
+    assert drip(10.0) == 30, "and the next turn pays its own 10, not the total"
+    sim.city_current[0, 0, 0] = -1
+    assert drip(50.0) == 30, "production into any other head must leave the pool alone"
+    print("  repair drip OK: pays round(delta) per turn, caps at the tier pool, keeps damage taken")
+
+
 def scene(rules, path, walls: bool):
     """A seat-0 city at war with civ row 1, one attacker adjacent to the centre.
     Returns (sim, slot, ctr)."""
@@ -366,9 +423,11 @@ def main() -> None:
     test_bombard_and_support(sim)
     test_siege_tables(sim)
     test_ranged_strength(sim)
+    test_move_and_shoot(sim)
     test_assault(rules, path)
     test_walls_tiers(rules, path)
     test_repair_project(rules, path)
+    test_repair_drip(rules, path)
     test_encirclement(rules, path)
     test_theological(rules, path)
     print("CITY PERIMETER OK")
