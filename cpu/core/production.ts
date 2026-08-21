@@ -5,11 +5,13 @@ import { congressCultureBombSeat } from './congress';
 import { hexDistance, neighbors } from '../../world/hex';
 import { availableCivicsIn, availableTechsIn } from './effects';
 import { completedWonders, seatWonderFlag } from './wonders';
-import { UNITS, ENCAMPMENT_HP, WALLS_HP } from '../data/units';
+import { UNITS, ENCAMPMENT_HP, URBAN_DEFENSES_TECH } from '../data/units';
+import { BUILDINGS } from '../data/buildings';
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf } from '../data/projects';
 import { CULTURE_BOMB_RANGE, DED_MONUMENTALITY, ERA_SCORE_WONDER } from '../data/seats';
 import { addEraScore, buildingDedications, dedicationEvent } from './eras';
 import { spawnUnit } from './units';
+import { wallsMax, urbanDefensesFit } from './rules';
 import { encampmentTrainXp } from './combat';
 import { applyLumpYield } from './economy';
 import { congressGppFactor } from './congress';
@@ -18,12 +20,13 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 /** Complete `n` techs or civics outright. Real Civ 6 draws them at random;
  *  this takes the first AVAILABLE rows in catalog order, the same order every
  *  other unresearched-row walk uses. */
-function grantFreeResearch(owner: Seat, kind: 'tech' | 'civic', n: number): void {
+function grantFreeResearch(state: GameState, owner: Seat, kind: 'tech' | 'civic', n: number): void {
   const rsr = owner.research;
   for (let i = 0; i < n; i++) {
     const next = kind === 'tech' ? availableTechsIn(rsr)[0] : availableCivicsIn(rsr)[0];
     if (!next) return; // the tree is exhausted
     if (kind === 'tech') {
+      if (next.id === URBAN_DEFENSES_TECH) urbanDefensesFit(state, owner.seat);
       rsr.techs.push(next.id);
       delete rsr.techRetained[next.id];
       if (rsr.tech === next.id) rsr.tech = null;
@@ -41,6 +44,13 @@ export function completeProject(state: GameState, city: City, projectId: string,
   const owner = seatOf(state, city.seat);
   if (!owner) return;
 
+  if (def.repair) {
+    // CIV6: "Once completed, it fully restores the HP of the city's (and
+    // Encampment's) Outer Defenses." One perimeter serves both here.
+    city.outerHp = wallsMax(state, city);
+    state.eventLog.push(`${city.name} completed ${def.name}.`);
+    return;
+  }
   if (def.laser) {
     // Repeatable: each station speeds the Exoplanet craft by +1 LY/turn.
     owner.spaceLasers = (owner.spaceLasers ?? 0) + 1;
@@ -119,8 +129,8 @@ export function completeQueueItem(
       // CIV6 (Oxford, Bolshoi): free technologies and civics, drawn at random
       // in the real game and taken here in the same available-order the
       // research chooser uses.
-      if (fx?.freeTechs) grantFreeResearch(owner, 'tech', fx.freeTechs);
-      if (fx?.freeCivics) grantFreeResearch(owner, 'civic', fx.freeCivics);
+      if (fx?.freeTechs) grantFreeResearch(state, owner, 'tech', fx.freeTechs);
+      if (fx?.freeCivics) grantFreeResearch(state, owner, 'civic', fx.freeCivics);
       break;
     }
     case 'settler':
@@ -153,7 +163,7 @@ export function completeQueueItem(
     case 'building':
       city.buildings.push(item.building);
       buildingDedications(state, city.seat, item.building);
-      if (item.building === 'ANCIENT_WALLS') city.outerHp = WALLS_HP;
+      if (BUILDINGS[item.building]?.walls) city.outerHp = wallsMax(state, city);
       break;
   }
 }

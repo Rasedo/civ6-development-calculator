@@ -8,10 +8,10 @@ import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { isWater, isImpassable } from '../../world/query';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
-import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, outerPool, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit } from './units';
+import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit } from './units';
 import { PILLAGE_HEAL_IMPROVEMENTS } from './combat';  // the replay's pillage arm mirrors hostileUnitAct's
 import { UNIT_HP } from '../data/units';
-import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, generalAuraCS, cityDefenseStrength } from './combat';
+import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, generalAuraCS, cityDefenseStrength, encircled } from './combat';
 import { availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { selectResearch } from './economy';
@@ -31,7 +31,8 @@ import { prodLayout } from './prodLayout';   // ONE column layout, shared with t
 import { CIVICS } from '../data/civics';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP, ENCAMPMENT_HP, CITY_MAX_HP } from '../data/units';
+import { UNITS, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_TECH } from '../data/units';
+import { outerPool, wallsMax, urbanDefensesFit } from './rules';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
 import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, borderGrowthCost, EMBARKED_DEFENSE_CS } from '../data/constants';
@@ -787,7 +788,8 @@ export function transferCity(
     hp: Math.round(CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   };
-  if (keptBuildings.includes('ANCIENT_WALLS')) flipped.outerHp = 0; // walls kept, outer pool 0
+  // walls kept, outer pool 0 — a captured city stands behind a breach
+  if (keptBuildings.some((b) => BUILDINGS[b]?.walls)) flipped.outerHp = 0;
   to.cities.push(flipped);
   // CIV6 (Military Emergency): "The Target has conquered the city of another
   // nation; it must be Liberated!" The seat that LOST it is the affected one.
@@ -1339,7 +1341,7 @@ export function seatPhase(state: GameState): void {
                 actor.treasury = (actor.treasury ?? 0) - price;
                 civCity.buildings.push(def.id);
                 buildingDedications(state, civCity.seat, def.id);
-                if (def.id === 'ANCIENT_WALLS') civCity.outerHp = WALLS_HP;
+                if (def.walls) civCity.outerHp = wallsMax(state, civCity);
                 bought = true;
               }
             }
@@ -1646,7 +1648,7 @@ export function seatPhase(state: GameState): void {
       // CIV6: walls give a city its ranged strike, and "if the Outer Defense of
       // a city or defensible district has been completely destroyed, its ranged
       // strike again becomes unavailable".
-      const perimeter = outerPool(civCity) > 0;
+      const perimeter = outerPool(state, civCity) > 0;
       if (perimeter) {
         let bestTile = -1;
         let bestDist = 99;
@@ -1729,21 +1731,21 @@ export function seatPhase(state: GameState): void {
           }
         }
       }
-      const besieged = neighbors(state.map, civCityCenter).some((n) =>
-        unitsAt(state, n.index).some((u) => unitsHostile(state, u, { seat: actor.seat })),
-      );
-      // Unbesieged cities heal at a flat rate, war or not (real Civ 6). The
-      // outer wall pool heals on the same gate and rate (cap WALLS_HP),
-      // full-HP or not.
-      if (!besieged) {
+      // CIV6: "the city will automatically regain 20 HP per turn", war or
+      // not — until it is ENCIRCLED, at which point "it will no longer be
+      // able to repair the damage it suffers". The outer defenses are NOT on
+      // this gate: "once damaged, the outer defenses of a City Center or
+      // defensible district will not regenerate on their own", and come back
+      // only through the Repair Outer Defenses project.
+      if (!encircled(state, civCityCenter, actor.seat)) {
         civCity.hp = Math.min(CITY_MAX_HP, civCity.hp + CITY_HEAL_PER_TURN);
-        if (civCity.buildings.includes('ANCIENT_WALLS')) {
-          civCity.outerHp = Math.min(WALLS_HP, outerPool(civCity) + CITY_HEAL_PER_TURN);
-        }
         for (const d of civCity.districts) {
           if (d.type !== 'ENCAMPMENT') continue;
           const dt = state.map.tiles[d.tileIndex];
           if (dt.district !== 'ENCAMPMENT' || !dt.districtComplete || dt.districtPillaged) continue;
+          // "This is an automatic action, which happens if its tile is not
+          // occupied" — an enemy standing on the district holds it silent.
+          if (unitsAt(state, dt.index).some((u) => unitsHostile(state, u, { seat: actor.seat }))) continue;
           dt.encampHp = Math.min(ENCAMPMENT_HP, (dt.encampHp ?? ENCAMPMENT_HP) + CITY_HEAL_PER_TURN);
         }
       }
@@ -1767,6 +1769,7 @@ export function seatPhase(state: GameState): void {
     actor.scienceTotal = (actor.scienceTotal ?? 0) + sciSum;
     while (rsr.tech && rsr.techProgress >= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech)) {
       rsr.techProgress -= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech);
+      if (rsr.tech === URBAN_DEFENSES_TECH) urbanDefensesFit(state, actor.seat);
       rsr.techs.push(rsr.tech);
       delete rsr.techRetained[rsr.tech];
       rsr.tech = null;

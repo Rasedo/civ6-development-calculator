@@ -31,6 +31,32 @@ export interface UnitDef {
    * The pair real suzerain/policy text addresses as "light and heavy
    * cavalry"; nothing else in this roster is mounted. */
   cavalry?: boolean;
+  /** CIV 6 unit class: MELEE (Warrior, Swordsman, Musketman) — the first of
+   * the two classes a Battering Ram or a Siege Tower helps. */
+  melee?: boolean;
+  /** CIV 6 unit class: ANTI-CAVALRY (Spearman, Pikeman). The second class a
+   * Battering Ram or a Siege Tower helps — "both support units are effective
+   * for melee and anti-cavalry class units only". */
+  antiCavalry?: boolean;
+  /**
+   * BOMBARD STRENGTH — the stat a siege unit brings against a city or a
+   * defensible district, at FULL damage: "only units with attacks that use
+   * Bombard Strength ... may help breach city defenses", and siege units
+   * "always do full damage to them". `ranged.strength` carries the same
+   * number minus 17, which is what the unit brings against a land unit.
+   */
+  bombard?: number;
+  /**
+   * The siege SUPPORT chassis. A RAM adjacent to the target "negates the
+   * penalty completely", so an adjacent melee or anti-cavalry attacker hits
+   * the perimeter at full; a TOWER lets that attacker "bypass Walls and hit
+   * the city directly". Neither helps a ranged or a cavalry attacker.
+   */
+  siegeSupport?: 'RAM' | 'TOWER';
+  /** the highest walls tier this chassis still works against — Gathering
+   * Storm's "upgraded walls also gain engineering qualities which negate the
+   * effects of support units". */
+  siegeMaxWalls?: number;
   /** faith-purchase-only (MISSIONARY) — never offered by trainableUnits,
    * so it can't be queued or gold-purchased by either seat. */
   faithOnly?: boolean;
@@ -94,6 +120,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       maintenance: 0,
       moves: 2,
       combat: 20,
+      melee: true,
       description: 'Basic melee defender.',
     }),
     U({
@@ -127,6 +154,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       maintenance: 1,
       moves: 2,
       combat: 25,
+      antiCavalry: true,
       requiresTech: 'BRONZE_WORKING',
       description: 'Solid melee line unit.',
     }),
@@ -151,6 +179,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       maintenance: 2,
       moves: 2,
       combat: 35,
+      melee: true,
       requiresTech: 'IRON_WORKING',
       requiresResource: 'IRON',
       description: 'Classical heavy melee (needs Iron access).',
@@ -163,6 +192,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       maintenance: 2,
       moves: 2,
       combat: 45,
+      antiCavalry: true,
       requiresTech: 'MILITARY_TACTICS',
       description: 'Medieval anti-cavalry line unit.',
     }),
@@ -199,6 +229,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       maintenance: 4,
       moves: 2,
       combat: 55,
+      melee: true,
       requiresTech: 'GUNPOWDER',
       description: 'Renaissance gunpowder infantry.',
     }),
@@ -397,6 +428,70 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       requiresCivic: 'CONSERVATION',
       description: 'Designates a National Park over four contiguous tiles (consumed).',
     }),
+    // THE SIEGE CLASS and the two Ancient support chassis, APPENDED LAST
+    // (roster order is the GPU's unit index). Every column is the GS
+    // Civilopedia row. The siege pair carries BOMBARD strength, which is what
+    // hits a perimeter at full damage; their `ranged.strength` is that number
+    // minus the 17 real Civ 6 takes off "against land units".
+    U({
+      id: 'CATAPULT',
+      name: 'Catapult',
+      code: 'Cp',
+      cost: 120,
+      maintenance: 2,
+      moves: 2,
+      combat: 25,
+      ranged: { strength: 18, range: 2 },
+      bombard: 35,
+      requiresTech: 'ENGINEERING',
+      description: 'Classical siege engine: full damage to city and district defenses.',
+    }),
+    U({
+      id: 'BOMBARD',
+      name: 'Bombard',
+      code: 'Bd',
+      cost: 280,
+      maintenance: 4,
+      moves: 2,
+      combat: 45,
+      ranged: { strength: 38, range: 2 },
+      bombard: 55,
+      requiresTech: 'METAL_CASTING',
+      requiresResource: 'NITER',
+      description: 'Renaissance siege engine: full damage to city and district defenses.',
+    }),
+    // The support pair rides the CIVILIAN plane (`charges` present), which is
+    // where this model already puts real Civ 6's other support chassis, the
+    // Military Engineer: it stacks with the military unit it accompanies and
+    // never fights. Neither carries a build job, so both sit at 0 charges.
+    U({
+      id: 'BATTERING_RAM',
+      name: 'Battering Ram',
+      code: 'Rm',
+      cost: 65,
+      maintenance: 1,
+      moves: 2,
+      combat: 0,
+      charges: 0,
+      requiresTech: 'MASONRY',
+      siegeSupport: 'RAM',
+      siegeMaxWalls: 1,
+      description: 'Adjacent melee and anti-cavalry attackers do full damage to Ancient Walls.',
+    }),
+    U({
+      id: 'SIEGE_TOWER',
+      name: 'Siege Tower',
+      code: 'St',
+      cost: 100,
+      maintenance: 2,
+      moves: 2,
+      combat: 0,
+      charges: 0,
+      requiresTech: 'MACHINERY',
+      siegeSupport: 'TOWER',
+      siegeMaxWalls: 2,
+      description: 'Adjacent melee and anti-cavalry attackers ignore Walls up to Medieval.',
+    }),
   ].map((u) => [u.id, u]),
 );
 
@@ -418,10 +513,31 @@ export const CITY_HEAL_PER_TURN = 20;
  * field.
  */
 export const ENCAMPMENT_HP = 100;
-/** CIV6 (Gathering Storm): Ancient Walls carry 100 HP of "outer defense"
- * perimeter on top of the city's own 200. `cityDamageSplit` decides what a hit
- * takes off each. The GPU reads it as the exported `wallsHp` rules field. */
-export const WALLS_HP = 100;
+/**
+ * The outer-defense perimeter by WALLS TIER, 0 = no defenses. CIV6: "Ancient
+ * Walls have 50 HP, and each upgrade adds +50 HP, for a maximum of 150 for
+ * these so-called old-world defenses. In Gathering Storm the values are
+ * respectively +100 and +300", and Urban Defenses carry 400. The GPU reads the
+ * table as the exported `wallsTierHp` rules field.
+ */
+export const WALLS_TIER_HP = [0, 100, 200, 300, 400];
+/**
+ * CIV6: each pre-modern tier is "+3 Combat Strength" and they stack (total +9
+ * at Renaissance Walls); "Unlike other types of Walls, Urban Defenses doesn't
+ * increase the Combat Strength of defensible districts."
+ */
+export const WALLS_TIER_CS = [0, 3, 6, 9, 9];
+/** CIV6: Urban Defenses "is unlocked with Steel" and needs no production —
+ * unlocking it "builds modern fortifications around the City Centers of all
+ * current and future cities and their Encampment districts". */
+export const URBAN_DEFENSES_TECH = 'STEEL';
+export const WALLS_TIER_URBAN = 4;
+/** CIV6 (Repair Outer Defenses): a city may run the project only if it "and/or
+ * its Encampment district have damaged Walls and have not been attacked in the
+ * last three turns". */
+export const REPAIR_QUIET_TURNS = 3;
+/** the ANCIENT tier's pool, which is what a fresh set of Walls is worth. */
+export const WALLS_HP = WALLS_TIER_HP[1];
 /**
  * CIV6: the perimeter "is much tougher, practically impervious to most
  * conventional attacks" — "-85% for melee attacks... and -50% for ranged ones",

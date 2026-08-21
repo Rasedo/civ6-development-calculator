@@ -55,6 +55,9 @@ export interface City {
   productionBank?: number;
   loyalty?: number;
   outerHp?: number;
+  /** the turn this city (or its Encampment) last took combat damage — what
+   *  the repair project's three quiet turns are counted from. 0 = never. */
+  lastHitTurn?: number;
   religionPressure?: number[];
   followedReligion?: number | null;
   /**

@@ -5,7 +5,8 @@ import { isWater } from '../../world/query';
 import { nextRandom } from './rand';
 import { seatWonderFlag } from './wonders';
 import { isCiv, seatOf, tileSeat } from './seats';
-import { cityAtIndex, outerPool } from './units';
+import { cityAtIndex } from './units';
+import { outerPool } from './rules';
 import { unitsAt } from './units';
 import { disbandUnit } from './units';
 import { unitDomain } from './units';
@@ -95,7 +96,7 @@ function floodTile(state: GameState, tile: Tile): void {
       const held = cityAtIndex(state, tile.index);
       if (held) {
         held.city.hp = Math.max(1, held.city.hp - dmg);
-        const outer = outerPool(held.city);
+        const outer = outerPool(state, held.city);
         if (outer > 0) held.city.outerHp = Math.max(0, outer - dmg);
       }
       for (const u of [...unitsAt(state, tile.index)]) {

@@ -48,6 +48,10 @@ export interface ProjectDef {
   /** Marks a laser-station project: repeatable, `requiresTech`-gated, each
    *  completion adds +1 light-year/turn to this seat's Exoplanet craft. */
   laser?: boolean;
+  /** Marks the REPAIR project: it runs in the City Center, which every city
+   *  always has, and its price is the perimeter HP missing when it is queued
+   *  ("Walls gain HP equal to the Production invested into the project"). */
+  repair?: boolean;
   /** FIXED production cost (real Civ 6 value; the table mapper applies the
    *  game-speed coefficient). Absent = the generic district-project price. */
   cost?: number;
@@ -106,6 +110,24 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       yield: null,
       gpClass: 'GENERAL',
       description: 'Convert production into Great General points.',
+    }),
+
+    // REPAIR OUTER DEFENSES, the last of the BASE rows — the laser and space
+    // rows stay behind it, in chain order. CIV6: it runs in the City Center,
+    // the one district every city has and the only project row not keyed to a
+    // specialty district; it "becomes available after building Walls", needs
+    // damage and three quiet turns, and "fully restores the HP of the city's
+    // (and Encampment's) Outer Defenses". Its price is the HP missing when it
+    // is queued, because "Walls gain HP equal to the Production invested into
+    // the project".
+    P({
+      id: 'REPAIR_DEFENSES',
+      name: 'Repair Outer Defenses',
+      district: 'CITY_CENTER',
+      yield: null,
+      gpClass: null,
+      repair: true,
+      description: 'Restores the Walls of this city and its Encampment.',
     }),
 
     // THE LASER STATIONS (before the space rows so those stay LAST, in chain

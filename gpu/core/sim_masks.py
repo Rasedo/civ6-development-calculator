@@ -213,30 +213,187 @@ class SimMasks:
             )
         return dmg
 
-    def _city_damage_split(self, outer: torch.Tensor, roll: torch.Tensor,
-                           klass: str) -> tuple[torch.Tensor, torch.Tensor]:
+    def _city_damage_split(self, outer: torch.Tensor, walls_max: torch.Tensor,
+                           roll: torch.Tensor, klass: torch.Tensor,
+                           assist: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """`cityDamageSplit` — how ONE hit on a city centre divides between the
         outer-defense perimeter and the centre behind it. Both shares come out
-        of the same roll and neither draws again."""
+        of the same roll and neither draws again.
+
+        `klass` is a HIT_ code per game rather than one string, because a batch
+        can be swinging a Swordsman in one world and firing a Catapult in the
+        next; `assist` carries the ASSIST_ bits of whatever support chassis
+        stands beside the target."""
         o = outer.clamp(min=0)
-        frac = (o.double() / float(self._walls_hp)).clamp(max=1.0)
-        f = self._wall_dmg_melee if klass == "melee" else self._wall_dmg_ranged
+        wm = walls_max.clamp(min=0).double()
+        frac = torch.where(wm > 0, (o.double() / wm.clamp(min=1.0)).clamp(max=1.0),
+                           torch.zeros_like(wm))
+        f = torch.where(klass == HIT_MELEE,
+                        torch.full_like(wm, self._wall_dmg_melee),
+                        torch.full_like(wm, self._wall_dmg_ranged))
+        full = klass == HIT_BOMBARD
+        bypass = torch.zeros_like(full)
+        if assist is not None:
+            full = full | ((assist & ASSIST_RAM) != 0)
+            bypass = (assist & ASSIST_TOWER) != 0
+        f = torch.where(full, torch.ones_like(f), f)
         wall = torch.where(
             o > 0,
             torch.minimum(o, js_round(roll.double() * f).clamp(min=1).to(o.dtype)),
             torch.zeros_like(o),
         )
         through = ((1.0 - frac) / (1.0 - self._wall_breach)).clamp(0.0, 1.0)
+        through = torch.where(bypass, torch.ones_like(through), through)
         centre = js_round(roll.double() * through).clamp(min=1).to(roll.dtype)
         return wall, centre
 
-    def _ranged_city_penalty(self, type_idx: torch.Tensor, outer: torch.Tensor) -> torch.Tensor:
-        """`rangedCityPenalty` — the ranged attacker's penalty against city and
-        district defenses. Naval ranged pay it only while a perimeter stands."""
-        naval = self.unit_naval[type_idx.clamp(min=0, max=self.NU - 1)]
+    def _hit_class(self, type_idx: torch.Tensor, ranged: bool) -> torch.Tensor:
+        """`cityHitClass` — a siege unit's attack "uses Bombard Strength"
+        whichever verb ordered it; everything else is the melee/ranged pair the
+        reduction table is keyed on."""
+        t = type_idx.clamp(min=0, max=self.NU - 1)
+        base = HIT_RANGED if ranged else HIT_MELEE
+        return torch.where(self._type_bombard[t] > 0,
+                           torch.full_like(t, HIT_BOMBARD), torch.full_like(t, base))
+
+    def _walls_tier_at(self, row: torch.Tensor, col: torch.Tensor) -> torch.Tensor:
+        """`wallsTier` — the URBAN tier once the owner holds the tech that
+        "builds modern fortifications around the City Centers of all current
+        and future cities", otherwise the highest walls row the city has
+        finished. `row`/`col` are per-game, so a strike can ask about whichever
+        seat's city it is pointed at."""
+        b = torch.arange(self.B, device=self.device)
+        r0, c0 = row.clamp(min=0), col.clamp(min=0)
+        bl = self.city_bldg[b, r0, c0]  # [B, NB]
+        tier = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        for bi in self._walls_rows:
+            t = int(self._b_walls[bi])
+            tier = torch.maximum(tier, torch.where(bl[:, bi], torch.full_like(tier, t),
+                                                   torch.zeros_like(tier)))
+        if self._urban_def_tech >= 0:
+            tier = torch.where(self.civ_techs[b, r0, self._urban_def_tech],
+                               torch.full_like(tier, self._walls_tier_urban), tier)
+        return torch.where((row >= 0) & (col >= 0), tier, torch.zeros_like(tier))
+
+    def _owner_city_col(self, seat_row: torch.Tensor, tile: torch.Tensor) -> torch.Tensor:
+        """`cityAtTile` — the city SLOT owning this tile, for whichever major
+        row owns it, over the whole batch. -1 where nobody does."""
+        t0 = tile.clamp(min=0)
+        out = torch.full_like(t0, -1)
+        for r in range(self.n_majors):
+            sl = self.city_slot_at(r).gather(1, t0.unsqueeze(1)).squeeze(1)
+            out = torch.where((seat_row == r) & (sl >= 0), sl, out)
+        return torch.where(tile >= 0, out, torch.full_like(out, -1))
+
+    def _walls_max_at(self, row: torch.Tensor, col: torch.Tensor) -> torch.Tensor:
+        """`wallsMax` — the size of that tier's perimeter pool."""
+        return self._walls_tier_hp[self._walls_tier_at(row, col)]
+
+    def _urban_defenses_fit(self, row: int, hit: torch.Tensor) -> None:
+        """`urbanDefensesFit` — CIV6: unlocking Urban Defenses "builds modern
+        fortifications around the City Centers of all current and future
+        cities and their Encampment districts", with no production and no
+        building row at all, so the perimeter simply arrives at the new tier's
+        full pool. Cities founded afterwards read the same tier through
+        `_walls_max_all` and need no write; only the standing ones do, because
+        a breach they are already carrying is what the fortifications
+        replace."""
+        if self._urban_def_tech < 0 or not bool(hit.any()):
+            return
+        full = int(self._walls_tier_hp[self._walls_tier_urban])
+        oh = self.city_outer_hp[:, row]
+        self.city_outer_hp[:, row] = torch.where(
+            hit.unsqueeze(1) & self.city_alive[:, row], torch.full_like(oh, full), oh)
+
+    def _walls_tier_all(self, row: int) -> torch.Tensor:
+        """[B, RC] the walls tier of every one of this seat row's city columns
+        at once — the whole-row form of `_walls_tier_at`."""
+        bl = self.city_bldg[:, row]  # [B, RC, NB]
+        tier = torch.zeros(self.B, self.RC, dtype=torch.long, device=self.device)
+        for bi in self._walls_rows:
+            t = int(self._b_walls[bi])
+            tier = torch.maximum(tier, torch.where(bl[:, :, bi], torch.full_like(tier, t),
+                                                   torch.zeros_like(tier)))
+        if self._urban_def_tech >= 0:
+            tier = torch.where(self.civ_techs[:, row, self._urban_def_tech].unsqueeze(1),
+                               torch.full_like(tier, self._walls_tier_urban), tier)
+        return tier
+
+    def _walls_max_all(self, row: int) -> torch.Tensor:
+        """[B, RC] the perimeter pool every one of this row's columns carries."""
+        return self._walls_tier_hp[self._walls_tier_all(row)]
+
+    def _walls_build_ok(self, row: int) -> torch.Tensor:
+        """[B, RC] — CIV6: "While city defenses are damaged, you cannot build
+        higher levels of Walls." Read OUTSIDE `_seat_buildable`, whose cache
+        keys on the yield version and would never see a breach."""
+        return self.city_outer_hp[:, row] >= self._walls_max_all(row)
+
+    def _walls_tier_row(self, row: int, col: torch.Tensor) -> torch.Tensor:
+        """The `_walls_tier_at` a seat-loop body wants: one python row, the
+        per-game city column beside it."""
+        return self._walls_tier_at(torch.full_like(col, row), col)
+
+    def _repair_available(self, row: int, j: int) -> torch.Tensor:
+        """`repairAvailable` — CIV6: the repair "becomes available after
+        building Walls. A city can undertake this project if it and/or its
+        Encampment district have damaged Walls and have not been attacked in
+        the last three turns." One perimeter serves the centre and its
+        Encampment here, so one pool answers both."""
+        mx = self._walls_max_all(row)[:, j]
+        return ((mx > 0) & (self.city_outer_hp[:, row, j] < mx)
+                & ((self.turn - self.city_last_hit[:, row, j]) >= self._repair_quiet))
+
+    def _repair_cost(self, row: int, j: int) -> torch.Tensor:
+        """The perimeter HP missing right now — CIV6: "Walls gain HP equal to
+        the Production invested into the project", so the whole repair costs
+        exactly what it puts back."""
+        mx = self._walls_max_all(row)[:, j]
+        return (mx - self.city_outer_hp[:, row, j]).clamp(min=1).to(self.dtype)
+
+    def _siege_assist(self, seat: torch.Tensor, type_idx: torch.Tensor,
+                      tile: torch.Tensor, tier: torch.Tensor) -> torch.Tensor:
+        """`siegeAssist` — the ASSIST_ bits a friendly Battering Ram or Siege
+        Tower ADJACENT to the target lends this attacker. CIV6: "both support
+        units are effective for melee and anti-cavalry class units only", and
+        Gathering Storm's upgraded walls "gain engineering qualities which
+        negate the effects of support units" — the ram stops working above
+        Ancient Walls, the tower above Medieval.
+
+        The chassis rides the CIVILIAN plane, which is where this model already
+        puts real Civ 6's other support unit, so `civilian_at` is the scan."""
+        out = torch.zeros_like(tile)
+        if not self._siege_support_any:
+            return out
+        t = type_idx.clamp(min=0, max=self.NU - 1)
+        helped = self._type_melee[t] | self._type_anticav[t]
+        nb = self.neigh[tile.clamp(min=0)]  # [B, 6]
+        occ = self.civilian_at.gather(1, nb.clamp(min=0))  # [B, 6]
+        live = (nb >= 0) & (occ >= 0)
+        o0 = occ.clamp(min=0)
+        s = self.unit_seat.gather(1, o0)
+        ty = self.unit_type.gather(1, o0).clamp(min=0, max=self.NU - 1)
+        chassis = self._type_siege_support[ty]
+        ok = live & (s == seat.unsqueeze(1)) & (chassis > 0)
+        ok = ok & (tier.unsqueeze(1) <= self._type_siege_max_walls[ty])
+        for code, bit in ((1, ASSIST_RAM), (2, ASSIST_TOWER)):
+            hit = (ok & (chassis == code)).any(dim=1)
+            out = out | torch.where(hit, torch.full_like(out, bit), torch.zeros_like(out))
+        return torch.where(helped, out, torch.zeros_like(out))
+
+    def _city_ranged_strength(self, type_idx: torch.Tensor, outer: torch.Tensor) -> torch.Tensor:
+        """`cityRangedStrength` — what a RANGED order brings against a city or
+        district. A siege unit fires at its Bombard Strength and pays no city
+        penalty; the -17 it carries is "against land units", which its ranged
+        strength already holds. Everything else pays the ranged city penalty,
+        which naval ranged owe only while a perimeter stands."""
+        t = type_idx.clamp(min=0, max=self.NU - 1)
+        naval = self.unit_naval[t]
         pen = torch.full(outer.shape, self._ranged_city_pen,
                          dtype=torch.float64, device=outer.device)
-        return torch.where(naval & (outer <= 0), torch.zeros_like(pen), pen)
+        pen = torch.where(naval & (outer <= 0), torch.zeros_like(pen), pen)
+        base = self._type_ranged_strength[t].double() - pen
+        return torch.where(self._type_bombard[t] > 0, self._type_bombard[t].double(), base)
 
     def _wound(self, hp: torch.Tensor) -> torch.Tensor:
         """CIV6: "Damage of wounded units is diminished... The formula is

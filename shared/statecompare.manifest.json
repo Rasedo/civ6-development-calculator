@@ -1016,6 +1016,16 @@
      ]
     },
     {
+     "name": "lastHitTurn",
+     "compare": "exact",
+     "covers": [
+      "City.lastHitTurn"
+     ],
+     "planes": [
+      "city_last_hit"
+     ]
+    },
+    {
      "name": "isCapital",
      "compare": "exact",
      "covers": [

@@ -32,6 +32,14 @@ export interface BuildingDef {
   special?: 'WATER_MILL' | 'SHIPYARD' | 'LIGHTHOUSE' | 'MONUMENT';
   /** flat loyalty per turn while the building stands. */
   loyalty?: number;
+  /** the WALLS TIER this row supplies (1 Ancient, 2 Medieval, 3 Renaissance).
+   *  A city's perimeter pool and its defensive Combat Strength both read the
+   *  highest tier it holds; the tiers stack, so each row requires the one
+   *  below it. */
+  walls?: number;
+  /** CIV6 (Medieval and Renaissance Walls): "Cannot be purchased with
+   *  Gold." */
+  noPurchase?: boolean;
   /** Granted automatically to the capital; never buildable. */
   autoCapital?: boolean;
   worship?: boolean;
@@ -49,7 +57,7 @@ const rawList: BuildingDef[] = [
   { id: 'GRANARY', name: 'Granary', district: 'CITY_CENTER', cost: 65, yields: { food: 1 }, housing: 2, maintenance: 0 },
   { id: 'WATER_MILL', name: 'Water Mill', district: 'CITY_CENTER', cost: 80, yields: { food: 1, production: 1 }, special: 'WATER_MILL', maintenance: 0 },
   { id: 'SEWER', name: 'Sewer', district: 'CITY_CENTER', cost: 200, housing: 2, maintenance: 2 },
-  { id: 'ANCIENT_WALLS', name: 'Ancient Walls', district: 'CITY_CENTER', cost: 80, maintenance: 0 },
+  { id: 'ANCIENT_WALLS', name: 'Ancient Walls', district: 'CITY_CENTER', cost: 80, maintenance: 0, walls: 1 },
 
   { id: 'LIBRARY', name: 'Library', district: 'CAMPUS', cost: 90, yields: { science: 2 }, maintenance: 1 },
   { id: 'UNIVERSITY', name: 'University', district: 'CAMPUS', cost: 250, requiresAny: ['LIBRARY'], yields: { science: 4 }, housing: 1, maintenance: 2 },
@@ -96,6 +104,12 @@ const rawList: BuildingDef[] = [
   // the other Theater Square rows would renumber every downstream building in
   // both engines and in every exported fixture.
   { id: 'ARCHAEOLOGICAL_MUSEUM', name: 'Archaeological Museum', district: 'THEATER_SQUARE', cost: 290, requiresAny: ['AMPHITHEATER'], exclusiveWith: ['MUSEUM'], yields: { culture: 2 }, maintenance: 2 },
+
+  // THE UPGRADED WALLS, appended last for the same index-stability reason as
+  // the Archaeological Museum above. Both carry the Gathering Storm cost and
+  // require the tier below; both refuse a gold purchase.
+  { id: 'MEDIEVAL_WALLS', name: 'Medieval Walls', district: 'CITY_CENTER', cost: 220, requiresAny: ['ANCIENT_WALLS'], maintenance: 0, walls: 2, noPurchase: true },
+  { id: 'RENAISSANCE_WALLS', name: 'Renaissance Walls', district: 'CITY_CENTER', cost: 300, requiresAny: ['MEDIEVAL_WALLS'], maintenance: 0, walls: 3, noPurchase: true },
 ];
 
 const list: BuildingDef[] = rawList.map((b) => ({ ...b, cost: Math.round(b.cost * GAME_SPEED) }));

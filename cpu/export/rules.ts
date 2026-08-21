@@ -29,7 +29,7 @@ import { WONDER_TOURISM_BASE } from '../core/city';
 import { BALANCED_WEIGHTS } from '../core/score';
 import { unitActionNames } from '../core/unitActions';
 import { MAX_BARB_PER_CAMP, BARB_HORSE_RANGE } from '../core/combat';
-import { UNITS, UNIT_HP, CITY_MAX_HP, WALLS_HP, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, ENCAMPMENT_HP } from '../data/units';
+import { UNITS, UNIT_HP, CITY_MAX_HP, WALLS_TIER_HP, WALLS_TIER_CS, WALLS_TIER_URBAN, URBAN_DEFENSES_TECH, REPAIR_QUIET_TURNS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, ENCAMPMENT_HP } from '../data/units';
 import { YIELD_KEYS } from '../core/types';
 import { FLOOD_SEVERITY_P, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn } from '../data/disasters';
 import { BUILDINGS } from '../data/buildings';
@@ -533,6 +533,11 @@ export function buildRules() {
         pc: p.cost ?? -1,
         rt: p.requiresTech ? (techIdx.get(p.requiresTech) ?? -1) : -1,
         rp: p.requiresProject ? all.findIndex((q) => q.id === p.requiresProject) : -1,
+        // the CITY CENTER project channel: `cc` says the row runs in the one
+        // district every city already has, so it needs no registry lookup;
+        // `rep` marks the repair, whose price is the perimeter HP it restores.
+        cc: p.district === 'CITY_CENTER' ? 1 : 0,
+        rep: p.repair ? 1 : 0,
       })),
       yieldFraction: PROJECT_YIELD_FRACTION,
       gppFraction: PROJECT_GPP_FRACTION,
@@ -567,7 +572,14 @@ export function buildRules() {
       // barbRangedType hard-codes the same number.
       crossbowmanAfterTurn: 120,
       cityHealPerTurn: 20,
-      wallsHp: WALLS_HP, // the ANCIENT_WALLS outer-defense pool cap
+      // the outer-defense pool by WALLS TIER, and the Combat Strength each
+      // tier adds to the city it surrounds
+      wallsTierHp: [...WALLS_TIER_HP],
+      wallsTierCs: [...WALLS_TIER_CS],
+      // Urban Defenses arrive with a TECH and no building at all
+      urbanDefensesTech: techIdx.get(URBAN_DEFENSES_TECH) ?? -1,
+      wallsTierUrban: WALLS_TIER_URBAN,
+      repairQuietTurns: REPAIR_QUIET_TURNS,
       wallDamageMelee: WALL_DAMAGE_MELEE,
       wallDamageRanged: WALL_DAMAGE_RANGED,
       wallBreachFraction: WALL_BREACH_FRACTION,
@@ -635,6 +647,16 @@ export function buildRules() {
       moves: u.moves,
       naval: u.naval ? 1 : 0,
       cavalry: u.cavalry ? 1 : 0, // Preslav's hill bonus keys on the class
+      // the two classes a Battering Ram or a Siege Tower helps
+      melee: u.melee ? 1 : 0,
+      antiCavalry: u.antiCavalry ? 1 : 0,
+      // BOMBARD strength (0 = not a siege unit): full damage to a perimeter,
+      // no city penalty, and no melee attack at all.
+      bombard: u.bombard ?? 0,
+      // the siege SUPPORT chassis: 1 = Battering Ram, 2 = Siege Tower, and
+      // the highest walls tier it still works against.
+      siegeSupport: u.siegeSupport === 'RAM' ? 1 : u.siegeSupport === 'TOWER' ? 2 : 0,
+      siegeMaxWalls: u.siegeMaxWalls ?? 0,
       // faith-purchase-only (MISSIONARY) — the trainableUnits filter's
       // mirror; masks the type out of the GPU purchase path.
       fo: u.faithOnly ? 1 : 0,
@@ -765,6 +787,10 @@ export function buildRules() {
       regional: b.regional ? 1 : 0,
       // worship = faith-purchase-only (never queued, never gold-bought).
       worship: b.worship ? 1 : 0,
+      // the WALLS TIER this row supplies (0 = not a walls row), and the
+      // gold-purchase refusal the upgraded tiers carry
+      walls: b.walls ?? 0,
+      noPurchase: b.noPurchase ? 1 : 0,
       trainXp: b.trainXp ?? 0,
     })),
     techs: techList.map((t) => ({

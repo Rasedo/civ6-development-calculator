@@ -13,6 +13,7 @@ import { DISTRICTS } from '../data/districts';
 import { BUILDINGS, type BuildingDef, buildingsForDistrict } from '../data/buildings';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { CITY_MIN_DIST } from '../../world/types';
+import { URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN } from '../data/units';
 import { CITY_WORK_RADIUS, maxSpecialtyDistricts } from '../data/constants';
 import { allCities, campTiles, citiesOf, seatOf, tileBelongsTo, tileClaimed, tileSeat } from './seats';
 
@@ -283,6 +284,48 @@ export function districtPlacementTiles(state: GameState, city: City, type: Distr
  * satisfied by an owned OR already-queued building; the turn loop refuses to
  * finish a building before its district/prereqs exist.
  */
+/**
+ * The WALLS TIER a city stands behind: 4 once its owner holds Steel, which
+ * "builds modern fortifications around the City Centers of all current and
+ * future cities" with no production at all, otherwise the highest tier among
+ * the walls buildings it has finished.
+ */
+export function wallsTier(state: GameState, city: { buildings: string[]; seat: number }): number {
+  // a city-state's centre arrives here as a stand-in City whose seat has no
+  // Seat record at all, so the tech read has to tolerate one
+  if (seatOf(state, city.seat)?.research.techs.includes(URBAN_DEFENSES_TECH)) return WALLS_TIER_URBAN;
+  let tier = 0;
+  for (const b of city.buildings) tier = Math.max(tier, BUILDINGS[b]?.walls ?? 0);
+  return tier;
+}
+
+/** The size of that tier's perimeter pool — what a fresh set of walls is
+ *  worth and what a repair restores. */
+export function wallsMax(state: GameState, city: { buildings: string[]; seat: number }): number {
+  return WALLS_TIER_HP[wallsTier(state, city)] ?? 0;
+}
+
+/** The outer-defense pool a city has right now. Absent = FULL where the walls
+ * stand and 0 where they do not, the convention `encampmentIntact` uses for the
+ * Encampment garrison: the completion sites write the value explicitly, so an
+ * absent one means an imported or directly-constructed state, never a breach. */
+export function outerPool(state: GameState, city: { buildings: string[]; seat: number; outerHp?: number }): number {
+  const max = wallsMax(state, city);
+  return Math.min(city.outerHp ?? max, max);
+}
+
+/**
+ * CIV6: unlocking Urban Defenses "builds modern fortifications around the City
+ * Centers of all current and future cities and their Encampment districts" —
+ * no production, no building row, so the perimeter simply arrives at the new
+ * tier's full pool. Cities founded afterwards read the same tier through
+ * `wallsMax` and need no write; only the standing ones do, because a breach
+ * they are already carrying is what the fortifications replace.
+ */
+export function urbanDefensesFit(state: GameState, seat: number): void {
+  for (const c of seatOf(state, seat)?.cities ?? []) c.outerHp = WALLS_TIER_HP[WALLS_TIER_URBAN];
+}
+
 export function availableBuildings(state: GameState, city: City): BuildingDef[] {
   const map = state.map;
   const unlocks = gates(state, city.seat);
@@ -309,6 +352,9 @@ export function availableBuildings(state: GameState, city: City): BuildingDef[] 
       if (def.requiresAny && !def.requiresAny.some((r) => have.has(r) || queued.has(r))) continue;
       if (def.exclusiveWith?.some((x) => have.has(x) || queued.has(x))) continue;
       if (def.special === 'WATER_MILL' && !hasRiver(center)) continue;
+      // CIV6: "While city defenses are damaged, you cannot build higher
+      // levels of Walls."
+      if (def.walls && outerPool(state, city) < wallsMax(state, city)) continue;
       out.push(def);
     }
   }

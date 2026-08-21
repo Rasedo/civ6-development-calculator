@@ -29,6 +29,12 @@ class SimSeats:
         # QUEUE legality wants the district merely PLACED (availableBuildings),
         # which is what these columns offer.
         bld_q = self._seat_buildable(row)  # [B, RC, NB]
+        # CIV6: "While city defenses are damaged, you cannot build higher
+        # levels of Walls." Outside `_seat_buildable` because its cache cannot
+        # see a perimeter that moved.
+        if self._walls_rows:
+            bld_q = bld_q & (self._walls_build_ok(row).unsqueeze(2)
+                             | (self._b_walls.reshape(1, 1, -1) == 0))
         tr_city = self._trainable_units(row)  # [B, RC, NU]
         ones_b = torch.ones(B, dtype=torch.bool, device=dev)
         nW_m = self._wond_n if self.districts_on else 0
@@ -56,6 +62,11 @@ class SimSeats:
                            & (self.major_unit_type == self._archaeologist_idx)).any(dim=1)
             has_q_a = ((self.city_current[:, row] == self.UNIT_BASE + self._archaeologist_idx) & alive).any(dim=1)
             ovr.append((self._archaeologist_idx, ~(has_alive_a | has_q_a)))
+        # The siege SUPPORT chassis carry no combat strength, so the generic
+        # military arm below never offers them; `trainableUnits` gates them on
+        # nothing but their tech, and so does this.
+        for _si in self._siege_support_idx:
+            ovr.append((_si, ones_b))
         if self._trader_idx >= 0:
             # `_trainable_units` already counts free Traders + active routes
             # against tradeCapacity; the queue is the one thing it cannot see,
@@ -118,6 +129,14 @@ class SimSeats:
             ok_p = torch.zeros(B, max(nP_m, 0), dtype=torch.bool, device=dev)
             for pi_m, prow_m in enumerate(self._proj_rows if self.districts_on else []):
                 d_im = int(prow_m.get("d", -1))
+                if int(prow_m.get("cc", 0)):
+                    # the CITY CENTER channel: the one district every city
+                    # already has, so there is no registry entry to look up
+                    okp_m = self.city_alive[:, row, j]
+                    if int(prow_m.get("rep", 0)):
+                        okp_m = okp_m & self._repair_available(row, j)
+                    ok_p[:, pi_m] = okp_m
+                    continue
                 if d_im < 0 or d_im >= self.city_dist_tile.shape[3]:
                     continue
                 regp_m = self.city_dist_tile[:, row, j, d_im]
@@ -448,6 +467,13 @@ class SimSeats:
         rdv6 = self.rules_dev
         NB6 = rdv6.b_cost.shape[0]
         elig6 = self._seat_buildable(row, True) & (active.unsqueeze(1) & self.city_alive[:, row]).unsqueeze(2)
+        # CIV6 (Medieval and Renaissance Walls): "Cannot be purchased with
+        # Gold" — and no walls tier is buildable at all while the perimeter
+        # this city already has is damaged.
+        elig6 = elig6 & ~self._b_no_purchase.reshape(1, 1, -1)
+        if self._walls_rows:
+            elig6 = elig6 & (self._walls_build_ok(row).unsqueeze(2)
+                             | (self._b_walls.reshape(1, 1, -1) == 0))
         key6 = (rdv6.b_cost.reshape(1, 1, -1) * 1024 + torch.arange(NB6, device=dev, dtype=rdv6.b_cost.dtype).reshape(1, 1, -1)) * 32 \
             + torch.arange(self.RC, device=dev, dtype=rdv6.b_cost.dtype).reshape(1, -1, 1)
         key6 = torch.where(elig6, key6.expand(B, -1, -1), torch.tensor(float("inf"), dtype=rdv6.b_cost.dtype, device=dev))
@@ -477,10 +503,11 @@ class SimSeats:
         self.city_bldg[rows6, row, jj6[rows6], bb6[rows6]] = True
         self._building_dedications(row, bb6, can6)  # a purchased building is constructed too
         self._eff_version += 1
-        if self._walls_bidx >= 0:
-            wm6 = rows6[bb6[rows6] == self._walls_bidx]
+        if self._walls_rows:
+            wm6 = rows6[(self._b_walls[bb6[rows6]] > 0)]
             if len(wm6) > 0:
-                self.city_outer_hp[wm6, row, jj6[wm6]] = self._walls_hp
+                self.city_outer_hp[wm6, row, jj6[wm6]] = self._walls_max_at(
+                    torch.full_like(jj6, row), jj6)[wm6]
         self.civ_treasury[:, row] = torch.where(can6, self.civ_treasury[:, row] - price6, self.civ_treasury[:, row])
 
     def _seat_trainable_units(self, row: int) -> torch.Tensor:
@@ -977,6 +1004,8 @@ class SimSeats:
                 # building (faith-purchased, never built) — both live in
                 # _seat_buildable, which the mask asks too.
                 is_b = is_b & self._seat_buildable(row)[:, j].gather(1, bi.unsqueeze(1)).squeeze(1)
+                if self._walls_rows:
+                    is_b = is_b & (self._walls_build_ok(row)[:, j] | (self._b_walls[bi] == 0))
                 self.city_current[:, row, j] = torch.where(is_b, bi, self.city_current[:, row, j])
                 self.city_cost[:, row, j] = torch.where(is_b, rdv.b_cost.gather(0, bi).double(), self.city_cost[:, row, j])
                 self.city_progress[:, row, j] = torch.where(is_b, torch.zeros_like(self.city_progress[:, row, j]), self.city_progress[:, row, j])
@@ -1058,10 +1087,16 @@ class SimSeats:
                     pi_a = int(pcode) - self.PROJECT_BASE
                     prow_a = self._proj_rows[pi_a]
                     d_ia = int(prow_a.get("d", -1))
-                    if d_ia < 0 or d_ia >= self.city_dist_tile.shape[3]:
+                    cc_a = int(prow_a.get("cc", 0))
+                    if cc_a:
+                        has_pa = self.city_alive[:, row, j]
+                        if int(prow_a.get("rep", 0)):
+                            has_pa = has_pa & self._repair_available(row, j)
+                    elif d_ia < 0 or d_ia >= self.city_dist_tile.shape[3]:
                         continue
-                    regp_a = self.city_dist_tile[:, row, j, d_ia]
-                    has_pa = (regp_a >= 0) & self.district_complete.gather(1, regp_a.clamp(min=0).unsqueeze(1)).squeeze(1)
+                    else:
+                        regp_a = self.city_dist_tile[:, row, j, d_ia]
+                        has_pa = (regp_a >= 0) & self.district_complete.gather(1, regp_a.clamp(min=0).unsqueeze(1)).squeeze(1)
                     # RE-VALIDATE the chain at apply, not just at mask: a record
                     # is replayed a phase after the mask that justified it, and
                     # the step in front of it may have completed since.
@@ -1077,7 +1112,12 @@ class SimSeats:
                     # Space steps and laser stations carry their REAL fixed
                     # price (`pc`); everything else takes the generic curve.
                     pc_fixed = int(prow_a.get("pc", -1))
-                    price_a = torch.full_like(pc_a, float(pc_fixed)) if pc_fixed >= 0 else pc_a
+                    if int(prow_a.get("rep", 0)):
+                        price_a = self._repair_cost(row, j)
+                    elif pc_fixed >= 0:
+                        price_a = torch.full_like(pc_a, float(pc_fixed))
+                    else:
+                        price_a = pc_a
                     self.city_current[:, row, j] = torch.where(rows_p, torch.full_like(cur_j, self.PROJECT_BASE + pi_a), self.city_current[:, row, j])
                     self.city_cost[:, row, j] = torch.where(rows_p, price_a, self.city_cost[:, row, j])
                     self.city_progress[:, row, j] = torch.where(rows_p, torch.zeros_like(self.city_progress[:, row, j]), self.city_progress[:, row, j])
@@ -2445,6 +2485,7 @@ class SimSeats:
                     self.civ_tech_retain[r, row, pick[r]] = 0
                     cur = self.civ_cur_tech[:, row]
                     self.civ_cur_tech[:, row] = torch.where(hit & (cur == pick), torch.full_like(cur, -1), cur)
+                    self._urban_defenses_fit(row, hit & (pick == self._urban_def_tech))
                 self._eff_version += 1
 
     def _add_era_score(self, row: int, per: int, count: torch.Tensor) -> None:
@@ -3174,6 +3215,7 @@ class SimSeats:
         self.city_loyalty[b, row, col] = 100.0
         self.city_hp[b, row, col] = int(self.rules.combat.get("cityMaxHp", 200))
         self.city_outer_hp[b, row, col] = 0
+        self.city_last_hit[b, row, col] = 0
         self.city_current[b, row, col] = -1
         self.city_progress[b, row, col] = 0
         self.city_cost[b, row, col] = 0
@@ -3318,7 +3360,8 @@ class SimSeats:
         self.city_acquired[b, dst_row, col] = old_acq
         self.city_loyalty[b, dst_row, col] = 100.0
         self.city_hp[b, dst_row, col] = half_hp
-        self.city_outer_hp[b, dst_row, col] = 0  # ANCIENT_WALLS rides along at an EMPTY outer pool; it heals back, because the heal gate reads the walls bit in city_bldg
+        self.city_outer_hp[b, dst_row, col] = 0  # the Walls ride along, the perimeter does not: a captured city stands behind a breach until it runs the repair project
+        self.city_last_hit[b, dst_row, col] = 0
         self.city_current[b, dst_row, col] = -1  # TS queue: []
         self.city_progress[b, dst_row, col] = 0
         self.city_cost[b, dst_row, col] = 0
@@ -3597,6 +3640,7 @@ class SimSeats:
         self.city_acquired[rows, row, slot] = 0
         self.city_hp[rows, row, slot] = self.rules.combat.get("cityMaxHp", 200)
         self.city_outer_hp[rows, row, slot] = 0
+        self.city_last_hit[rows, row, slot] = 0
         self.city_current[rows, row, slot] = -1
         self.city_progress[rows, row, slot] = 0
         self.city_cost[rows, row, slot] = 0
@@ -4285,7 +4329,16 @@ class SimSeats:
         hseat = self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1)
         hrow = hseat.clamp(min=0, max=self.n_majors - 1)
         bidx = torch.arange(self.B, device=self.device)
-        def_cs = torch.maximum(self.civ_best_melee[bidx, hrow], torch.full_like(hrow, 15))
+        # CIV6 gives a defensible district Combat Strength "similar to the
+        # parent City Center, EXCLUDING any bonus obtained for a Garrisoned
+        # unit" — so the walls tier's own bonus is in and the garrison's +5 is
+        # not. `hcol` is the city behind the district; without one (a district
+        # whose city has fallen) the roll lands whole on the garrison, as it
+        # always did.
+        hcol = self._owner_city_col(hseat, tc)
+        wtier = self._walls_tier_at(hrow, hcol)
+        def_cs = (torch.maximum(self.civ_best_melee[bidx, hrow], torch.full_like(hrow, 15))
+                  + self._walls_tier_cs[wtier])
         # Attacker CS assembled exactly as `_assault_city` assembles it.
         # ASK THE TABLE, never branch on the pool name: veterancy is
         # `SEAT_CAPS[...]["xp"]` at every site, so the fact has one source.
@@ -4303,10 +4356,26 @@ class SimSeats:
         d_self = self._damage_roll(att, cdiff, k="encc", tile=tc)
         if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
             a_xp[:, u] = torch.where(att, a_xp[:, u] + XP_ATTACK * self._suz_xp_mult(a_seat[:, u]), a_xp[:, u])
+        # CIV6 gives the district "Defenses HP equal to the City Center" and
+        # one set of Walls supplies both, so the roll divides exactly as a hit
+        # on the centre does: the perimeter share off the city's pool, and only
+        # what gets through reaching the garrison.
+        _held = hcol >= 0
+        _hc0 = hcol.clamp(min=0)
+        _wall, _centre = self._city_damage_split(
+            self.city_outer_hp[bidx, hrow, _hc0], self._walls_tier_hp[wtier], d_enc,
+            self._hit_class(a_type[:, u], False),
+            self._siege_assist(a_seat[:, u], a_type[:, u], tc, wtier))
         rows = att.nonzero(as_tuple=True)[0]
         if len(rows) > 0:
             tr = tc[rows]
-            self.encamp_hp[rows, tr] = (self.encamp_hp[rows, tr] - d_enc[rows]).clamp(min=0)
+            _dmg = torch.where(_held, _centre, d_enc)
+            self.encamp_hp[rows, tr] = (self.encamp_hp[rows, tr] - _dmg[rows]).clamp(min=0)
+            hr2 = rows[_held[rows]]
+            if len(hr2) > 0:
+                hrr, hcc = hrow[hr2], _hc0[hr2]
+                self.city_outer_hp[hr2, hrr, hcc] = self.city_outer_hp[hr2, hrr, hcc] - _wall[hr2]
+                self.city_last_hit[hr2, hrr, hcc] = self.turn
         _ww_ad = att & ((a_hp[:, u] - d_self) <= 0)
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_self, a_hp[:, u])
         died = att & (a_hp[:, u] <= 0)
@@ -4388,7 +4457,10 @@ class SimSeats:
         gslot = self.military_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
         gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == hrow)).long()
         best_r = self.civ_best_melee[bidx, hrow]
-        def_cs = torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
+        # each pre-modern walls tier is "+3 Combat Strength" and they stack
+        _wtier = self._walls_tier_at(hrow, slot)
+        def_cs = (torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
+                  + self._walls_tier_cs[_wtier])
         atk_e = (self._type_combat[a_type[:, u].clamp(min=0, max=self.NU - 1)]
                  - self._wound(a_hp[:, u])
                  - 5.0 * self._river_cross(a_tile[:, u], tgt))
@@ -4414,12 +4486,17 @@ class SimSeats:
         d_atk = self._damage_roll(att, def_cs - atk_e, k="rctyc", tile=tgt)
         if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
             a_xp[:, u] = torch.where(att, a_xp[:, u] + XP_ATTACK * self._suz_xp_mult(a_seat[:, u]), a_xp[:, u])
+        _wmax = self._walls_tier_hp[_wtier]
+        _klass = self._hit_class(a_type[:, u], False)
+        _assist = self._siege_assist(a_seat[:, u], a_type[:, u], tgt, _wtier)
         rows = att.nonzero(as_tuple=True)[0]
         hr, sl = hrow[rows], slot[rows]
         outer = self.city_outer_hp[rows, hr, sl]
-        wall, centre = self._city_damage_split(outer, d_city[rows], "melee")
+        wall, centre = self._city_damage_split(outer, _wmax[rows], d_city[rows],
+                                               _klass[rows], _assist[rows])
         self.city_outer_hp[rows, hr, sl] = outer - wall
         self.city_hp[rows, hr, sl] -= centre
+        self.city_last_hit[rows, hr, sl] = self.turn
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
         died = att & (a_hp[:, u] <= 0)
         self._ww_battle(att, self._row_of(a_seat[:, u]), hrow, tgt, a_died=died, city=True)
@@ -4656,9 +4733,11 @@ class SimSeats:
             hcol = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
             _gm = self.military_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
             gar = ((_gm >= 0) & (self.unit_seat[_bidx, _gm.clamp(min=0)] == hrow)).long()
-            def_cs = torch.maximum(self.civ_best_melee[_bidx, hrow], torch.full_like(hrow, 15)) + gar * 5
+            _wtier = self._walls_tier_at(hrow, hcol)
+            def_cs = (torch.maximum(self.civ_best_melee[_bidx, hrow], torch.full_like(hrow, 15))
+                      + gar * 5 + self._walls_tier_cs[_wtier])
             outer_all = self.city_outer_hp[_bidx, hrow, hcol]
-            atk_e = atk_rs - self._ranged_city_penalty(ut0, outer_all) - self._wound(a_hp) + a_lvl
+            atk_e = self._city_ranged_strength(ut0, outer_all) - self._wound(a_hp) + a_lvl
             if not barb:
                 # aura inside hostileRangedStrike's ranged-strength
                 # parentheses, after xpLevelBonus.
@@ -4669,12 +4748,15 @@ class SimSeats:
                 atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_e.dtype)
             d_city = self._damage_roll(city_att, atk_e - def_cs, k="vrngc", tile=tgt)
             self._ww_battle(city_att, self._row_of(self._atk_seat(atk_kind, u)), hrow, tgt, city=True)
+            _wmax = self._walls_tier_hp[_wtier]
+            _klass = self._hit_class(ut0, True)
             rows = city_att.nonzero(as_tuple=True)[0]
             hr_, hc_ = hrow[rows], hcol[rows]
             outer = self.city_outer_hp[rows, hr_, hc_]
-            wall, centre = self._city_damage_split(outer, d_city[rows], "ranged")
+            wall, centre = self._city_damage_split(outer, _wmax[rows], d_city[rows], _klass[rows])
             self.city_outer_hp[rows, hr_, hc_] = outer - wall
             self.city_hp[rows, hr_, hc_] = (self.city_hp[rows, hr_, hc_] - centre).clamp(min=1)
+            self.city_last_hit[rows, hr_, hc_] = self.turn
         mslot = self.military_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
         cslot = self.civilian_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
         neg = torch.full_like(mslot, -1)
@@ -4794,7 +4876,8 @@ class SimSeats:
         a_lvl = (self._xp_lvl_bonus(a_xp[:, u]) if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]
                  else torch.zeros_like(a_hp[:, u]))
         a_naval = self.unit_naval[at0] | a_emb[:, u]
-        atk_base = self._type_ranged_strength[at0] - self._wound(a_hp[:, u]) + a_lvl
+        atk_rs0 = self._type_ranged_strength[at0]
+        atk_base = atk_rs0 - self._wound(a_hp[:, u]) + a_lvl
         atk_base = atk_base + self._gen_aura_cs(aseat, a_tile[:, u], a_naval).to(atk_base.dtype)
 
         # who holds the tile, and is any of them hostile? `unitsHostile`
@@ -4823,17 +4906,23 @@ class SimSeats:
             hrow = self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.n_majors - 1)
             slot = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
             gar = ((mslot >= 0) & (m_seat == hrow)).long()
-            def_cs = torch.maximum(self.civ_best_melee[bidx, hrow], torch.full_like(hrow, 15)) + gar * 5
+            _wtier = self._walls_tier_at(hrow, slot)
+            def_cs = (torch.maximum(self.civ_best_melee[bidx, hrow], torch.full_like(hrow, 15))
+                      + gar * 5 + self._walls_tier_cs[_wtier])
             outer_all = self.city_outer_hp[bidx, hrow, slot]
-            pen = self._ranged_city_penalty(at0, outer_all)
-            d_city = self._damage_roll(city_att, atk_base + rel_city - pen - def_cs, k="rngrc", tile=tgt)
+            _rs = self._city_ranged_strength(at0, outer_all)
+            d_city = self._damage_roll(city_att, atk_base - atk_rs0 + _rs + rel_city - def_cs,
+                                       k="rngrc", tile=tgt)
             self._ww_battle(city_att, self._row_of(aseat), hrow, tgt, city=True)
+            _wmax = self._walls_tier_hp[_wtier]
+            _klass = self._hit_class(at0, True)
             rr = city_att.nonzero(as_tuple=True)[0]
             hr, sl = hrow[rr], slot[rr]
             outer = self.city_outer_hp[rr, hr, sl]
-            wall, centre = self._city_damage_split(outer, d_city[rr], "ranged")
+            wall, centre = self._city_damage_split(outer, _wmax[rr], d_city[rr], _klass[rr])
             self.city_outer_hp[rr, hr, sl] = outer - wall
             self.city_hp[rr, hr, sl] = (self.city_hp[rr, hr, sl] - centre).clamp(min=1)  # ranged never captures
+            self.city_last_hit[rr, hr, sl] = self.turn
         if bool(cs_att.any()):
             csx = self.citystate_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
             mil_idx = int(self.rules.citystate.get("militaristicIdx", -1))
@@ -4841,8 +4930,9 @@ class SimSeats:
                 15 + self.citystate_pop.gather(1, csx.unsqueeze(1)).squeeze(1)
                 + (self.citystate_type.gather(1, csx.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
             )
-            cs_pen = self._ranged_city_penalty(at0, torch.zeros_like(def_cs))
-            d_cs = self._damage_roll(cs_att, atk_base + rel_city - cs_pen - def_cs, k="rngcs", tile=tgt)
+            _cs_rs = self._city_ranged_strength(at0, torch.zeros_like(def_cs))
+            d_cs = self._damage_roll(cs_att, atk_base - atk_rs0 + _cs_rs + rel_city - def_cs,
+                                     k="rngcs", tile=tgt)
             self._ww_battle(cs_att, self._row_of(aseat), self._row_of(100 + csx), tgt, city=True)
             rr = cs_att.nonzero(as_tuple=True)[0]
             self.citystate_hp[rr, csx[rr]] = (self.citystate_hp[rr, csx[rr]] - d_cs[rr]).clamp(min=1)

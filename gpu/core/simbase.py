@@ -132,6 +132,8 @@ class Rules:
     b_worship: torch.Tensor  # bool [NB] — worship building (faith-purchase-only; every production/gold picker skips)
     b_era: torch.Tensor  # long [NB] — the era the building first unlocks (Heartbeat of Steam's gate)
     b_train_xp: torch.Tensor  # long [NB] — flat training XP a unit trained/purchased in a city holding this Encampment military building starts with (best tier over present buildings; 0 for non-military buildings)
+    b_walls: torch.Tensor  # long [NB] — the WALLS TIER this row supplies (0 = not a walls row)
+    b_no_purchase: torch.Tensor  # bool [NB] — refuses a gold purchase (the upgraded walls)
     worship_bidx: list  # the 5 worship rows in WORSHIP_BUILDINGS order (religion id % 5 indexes THIS)
     temple_bidx: int  # TEMPLE row (worship prerequisite), -1 if absent
     worship_faith_cost: float  # flat worship faith price (round(190·GAME_SPEED))
@@ -216,6 +218,8 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         regional_range=int(r.get("regionalRange", 6)),
         b_worship=torch.tensor([bool(b.get("worship", 0)) for b in B], dtype=torch.bool),
         b_train_xp=torch.tensor([int(b.get("trainXp", 0)) for b in B], dtype=torch.long),
+        b_walls=torch.tensor([int(b.get("walls", 0)) for b in B], dtype=torch.long),
+        b_no_purchase=torch.tensor([bool(b.get("noPurchase", 0)) for b in B], dtype=torch.bool),
         b_era=torch.tensor([int(b.get("eraIdx", 0)) for b in B], dtype=torch.long),
         worship_bidx=r.get("worshipBidx", []),
         temple_bidx=int(r.get("templeBidx", -1)),
@@ -393,6 +397,15 @@ TRADE_ROAD_MAX_STEPS = 32  # the `tradeWalkReachable`/walk safety rail
 SPEC_KEEP = -2
 XP_ATTACK = 5
 XP_DEFEND = 2
+#: how ONE hit reaches a perimeter — the `cityDamageSplit` klass, as a code so
+#: a batch can carry a different verb per game.
+HIT_MELEE = 0
+HIT_RANGED = 1
+HIT_BOMBARD = 2
+#: the two siege support chassis, as BITS: a target can have both beside it,
+#: and each changes a different half of the split.
+ASSIST_RAM = 1
+ASSIST_TOWER = 2
 XP_LEVEL_CS = 5
 XP_LEVELS = (15, 45, 90)
 
@@ -518,6 +531,6 @@ _MUTABLE = [
     "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_camp", "seat_citystate_quest_issued",
     "seat_explored",
     "civ_culture", "civ_faith", "civ_tourism", "civ_warmonger", "civ_gpp",
-    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_is_cap", "city_orig_cap", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts", "city_artifact_era", "city_artifact_seat", "city_gwart_type", "city_gwart_artist", "city_spec_pin", "city_bldg",
+    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts", "city_artifact_era", "city_artifact_seat", "city_gwart_type", "city_gwart_artist", "city_spec_pin", "city_bldg",
     "war_turns", "treaty_turns", "peace_turns",
 ]

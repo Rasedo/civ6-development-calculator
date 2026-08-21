@@ -65,15 +65,15 @@ nothing carries forward.
 | B-36r appeal adjacency terms | 1 | the four reachable terms ship; Dam/Canal/Water Park/Preserve and the Great People wait on C-22, C-4, C-21 |
 | B-39r wonder effects still dropped | 1 | the sourced sweep shipped fourteen channels; five residuals, each blocked on B-20r, C-21, B-34r or C-23 |
 | B-45r sourced-sweep finds in the other rows | 2 | eight wonders pay effects no channel expresses: free units, patronage discount, tech boosts, route capacity and route yields |
-| B-46r no unit carries Bombard strength | 2 | the perimeter reduction ships, and nothing in the roster can breach a walled city at full damage |
-| B-47r outer defenses regenerate | 1 | Civ 6 repairs them from the production queue after three quiet turns, and besieges on FULL encirclement |
+| B-46r the siege class's tails | 1 | the Bombard stat, both support chassis and all four walls tiers ship; the move-and-shoot rule, the middle siege rungs and Akkad's suzerain bonus do not |
+| B-47r the repair project's per-turn drip | 1 | the project, the three quiet turns and full encirclement all ship; walls gain their HP at COMPLETION rather than per turn |
 | B-48r no combat class modifiers | 1 | melee +5 vs anti-cavalry and anti-cavalry +10 vs cavalry; no flag, and `defenderCS` never sees the attacker |
 | B-49r embarked defence is flat | 1 | Civ 6 keys it to the owner's era, 15 through 55 |
 | B-50r theological combat's other terms | 1 | flanking/support, territory bonuses, the Inquisitor, the winner's advance, Holy Site healing |
-| B-51r the Encampment has no perimeter | 1 | Civ 6 gives the district the City Center's wall HP; the assault path is handed a tile, not its city |
+| B-51r the Encampment's second pool | 1 | the district meets the city's perimeter and heals only while its tile is clear; Civ 6 tracks the two pools SEPARATELY, and a defeat pillages it |
 | B-44r city-state war tails | 1 | the head and its policy ship; no walker ever MARCHES on a minor, and the diplomatic consequences wait on C-19 |
 | B-34r flood tails | 1 | the severity ladder ships; a flood still takes ONE tile where GS floods the river's whole reach, and the Dam that mitigates one is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **25** | |
+| **B. Fidelity vs real Civ 6** | **24** | |
 | C-1 POWER | 5 | no plants, no grid, no powered-yield term — 4 gaps wait on it |
 | C-2 diplomatic agreements | 6 | war and peace and nothing between: open borders, work trades, alliances, denouncements |
 | C-3 unit promotions | 4 | only MARTYR reaches a rule; choosing one is also a wire head |
@@ -99,7 +99,7 @@ nothing carries forward.
 | C-23 nothing diminishes tourism | 1 | no rival's Enlightenment ever costs a tourist, so Cristo Redentor's cancelling clause has nothing to cancel |
 | C-24 no CO2, no climate | 3 | GS's whole climate arc — emissions, warming bands, sea level, escalating disasters — and 2 gaps wait on it |
 | **C. Absent systems** | **60** | |
-| **OPEN, TOTAL** | **85** | |
+| **OPEN, TOTAL** | **84** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -532,27 +532,64 @@ Civ 6 source or is recorded as unverifiable.
   trade-route yield terms. The free units wait on C-21 and on a Trader grant
   path; the route terms wait on B-31r's route-yield work; the rest are new
   channels.
-- **B-46r. NOTHING IN THE ROSTER CARRIES BOMBARD STRENGTH.** The perimeter
-  now takes -85% from a melee attack and -50% from a ranged one, which is the
-  rule; what real Civ 6 puts on the other side of it is the SIEGE class
-  (Catapult, Bombard) plus the Ancient support units (Battering Ram, Siege
-  Tower) and Akkad's suzerain bonus, none of which exist here. So the rule is
-  faithful and the aggregate is not: no unit this roster can build breaches a
-  walled city at full damage. The class needs a Bombard-strength stat, a
-  support-unit channel that negates the reduction for melee and anti-cavalry,
-  and the walls tiers (Medieval, Renaissance, Urban Defenses) that turn each
-  of those off in turn.
-- **B-47r. Outer defenses regenerate on their own.** Real Civ 6: "once
-  damaged, the outer defenses of a City Center or defensible district will not
-  regenerate on their own" — they come back only through the Repair Outer
-  Defenses city project, which unlocks after three turns without damage and
-  runs one or two turns. Here the pool heals with the city, at the city's own
-  rate, on the same unbesieged gate. The siege gate is also wrong in the other
-  direction: real Civ 6 stops a city healing only when the attacker holds zone
-  of control on EVERY passable surrounding tile, where `seatPhase` /
-  `_seat_city_fire_and_heal` stop it for one adjacent hostile. Blocked on a
-  CITY_CENTER project channel — every `PROJECTS` row is keyed to a specialty
-  district.
+- **B-46r. The siege class's tails.** All three things this row named now
+  ship. `UnitDef.bombard` / `_type_bombard` is the stat "only units with
+  attacks that use Bombard Strength" bring, and it hits a perimeter at FULL
+  damage with no city penalty, because the -17 a siege unit carries is the one
+  "against land units" that its ranged strength already holds — the CATAPULT
+  (35, Engineering) and the BOMBARD (55, Metal Casting, Niter) field it. The
+  BATTERING_RAM and the SIEGE_TOWER ride the civilian plane beside the army
+  they follow, and `siegeAssist` / `_siege_assist` lends their ASSIST_ bits to
+  an adjacent MELEE or ANTI-CAVALRY attacker only: a ram makes the perimeter
+  share full, a tower makes the centre share bypass the walls entirely. The
+  four walls TIERS are what turn each of those off — Ancient 100 / Medieval
+  200 / Renaissance 300, each +3 Combat Strength, and Urban Defenses 400 with
+  no Combat Strength at all, granted by Steel with no building and no
+  production. The ram stops at tier 1 and the tower at tier 2, so "whenever a
+  city builds Renaissance Walls, only units with Bombard Strength will be able
+  to inflict full damage to its defenses" holds by construction.
+  REACHABILITY: nothing in the scripted gate builds a Catapult or a support
+  chassis, so the battery proves the two engines agree about these bodies and
+  the poke lanes are what prove they agree with the pages.
+  OPEN:
+  - **THE MOVE-AND-SHOOT RULE.** Real Civ 6 siege units "cannot move and
+    attack on the same turn unless they've earned the Expert Crew promotion"
+    (or reach 3 Movement). Neither engine has any notion of "has moved this
+    turn" — `movesLeft` / `unit_mp` would have to stand in for it, and the
+    gate would sit on the attack mask, which is the hottest parity surface in
+    the step. The promotion half additionally waits on C-3.
+  - **THE MIDDLE AND LATE SIEGE RUNGS.** Trebuchet, Artillery and Rocket
+    Artillery are absent, so the class has a Classical rung and a Renaissance
+    one and nothing after Metal Casting. The Observation Balloon that lets a
+    siege unit outrange a city's defenses is absent too.
+  - **AKKAD's SUZERAIN BONUS** confers the Battering Ram's ability "against
+    all levels of city defenses and against all cities (regardless of presence
+    or absence of support units)". Akkad is not in the city-state roster —
+    B-21r.
+- **B-47r. The repair project's per-turn drip.** Both halves this row named
+  ship. The outer pool no longer heals at all: `seatPhase` /
+  `_seat_city_fire_and_heal` regain only the city's own 20 HP, and the
+  perimeter comes back through REPAIR_DEFENSES, a project on the CITY CENTER —
+  the one district every city already has, which is why it needed a channel of
+  its own (`cc` on the exported project row) rather than a registry lookup. It
+  offers itself exactly when "it and/or its Encampment district have damaged
+  Walls and have not been attacked in the last three turns", counted off a new
+  per-city `lastHitTurn` / `city_last_hit` that every city-damage site stamps,
+  and on completion it "fully restores the HP of the city's (and Encampment's)
+  Outer Defenses". Its price is the HP it puts back. The siege gate is fixed in
+  the other direction too: `encircled` demands a hostile MILITARY unit on
+  EVERY passable neighbour of the centre, which is Civ 6's "zone of control on
+  all passable tiles surrounding the City Center", and the Encampment heals
+  only while "its tile is not occupied".
+  OPEN:
+  - **THE PER-TURN DRIP.** "Walls gain HP equal to the Production invested
+    into the project (on Standard speed) each turn the project runs"; here the
+    whole restore lands at COMPLETION. The totals agree, because the project's
+    price IS the missing HP, so only the intermediate turns of a multi-turn
+    repair differ. Writing the drip means rounding a float production tick into
+    an integer pool every turn inside the production advance — the hottest
+    parity path there is — for a difference that lasts one turn.
+  - **"STEALTH UNITS CANNOT BESIEGE A CITY."** There are no stealth units.
 - **B-48r. No combat CLASS modifiers.** Real Civ 6 gives melee units +5 CS
   against anti-cavalry and anti-cavalry units +10 against light, heavy and
   ranged cavalry. The roster fields both sides of that pair (SPEARMAN and
@@ -572,14 +609,30 @@ Civ 6 source or is recorded as unverifiable.
   the winner ADVANCING into the fallen unit's tile, and religious healing (a
   unit heals only on or beside its own Holy Site, at three times that site's
   faith). Promotions are C-3's.
-- **B-51r. The Encampment has no perimeter of its own.** Real Civ 6 gives a
-  defensible district "Defenses HP equal to the City Center" — the same Walls
-  supply both — so a melee hit on an Encampment meets the same -85% the city
-  centre's perimeter gives. `attackEncampment` / `_attack_encampment` send
-  the whole roll to `encampHp`. Its ranged strike already asks the city's
-  perimeter; its DAMAGE does not, because the district pool and the city pool
-  live in different registries and the assault path is handed a tile, not the
-  city that owns it.
+- **B-51r. The Encampment's second pool.** An assault on the district now
+  meets the perimeter: `attackEncampment` / `_attack_encampment` find the city
+  behind the tile (`cityAtTile` / `_owner_city_col`) and divide the roll
+  through the same `cityDamageSplit` a hit on the centre uses, so the -85% and
+  the walls tiers apply and only what gets through reaches the garrison. The
+  district also fights at the city's Combat Strength INCLUDING the walls tier's
+  bonus and excluding the garrison's +5, which is Civ 6's "similar to the
+  parent City Center, excluding any bonus obtained for a Garrisoned unit". Its
+  heal now carries the sourced gate too: it regains 20 HP "if its tile is not
+  occupied", and the moment it does its tile blocks again.
+  OPEN:
+  - **THE TWO POOLS ARE ONE HERE.** Real Civ 6 gives the district its own
+    perimeter pool of the same size as the city's — you can beat down the
+    Encampment's walls while the centre's still stand, and the repair project
+    restores both. This model folds them into the city's pool, so damage to
+    either is damage to both. Splitting them is new per-tile wire state and a
+    second `outerHp` on every defensible district.
+  - **A DEFEAT DOES NOT PILLAGE THE DISTRICT.** Civ 6: "when defeated (the
+    Encampment's HP is brought down to 0), it and all its buildings are
+    pillaged automatically". Writing that here would silence the clause above
+    it, because `encampmentIntact` / `_encamp_block` read PILLAGED and HP
+    through one predicate — a pillaged district never blocks again, so the
+    "heals and re-blocks" rule would become dead. The two facts need to be
+    separate before either can be right.
 - **B-44r. City-state war tails.** The decider exists now: `warTargets` /
   `war_targets` run the whole minor roster after the majors, so the war head
   is `[declare per target, sue per target]` over both, and the minor columns

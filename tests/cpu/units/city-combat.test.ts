@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
-import { spawnUnit, outerPool } from '../../../cpu/core/units';
+import { spawnUnit } from '../../../cpu/core/units';
+import { outerPool } from '../../../cpu/core/rules';
 import { cityDamageSplit, rangedCityPenalty, woundPenalty, rangedAttack, meleeAttack } from '../../../cpu/core/combat';
 import { emptySeat, seatOf, setWar } from '../../../cpu/core/seats';
 import { WALLS_HP } from '../../../cpu/data/units';
@@ -26,34 +27,34 @@ describe('the wound penalty', () => {
 
 describe('the outer-defense perimeter', () => {
   it('CIV6: an intact perimeter holds the centre to 1 damage', () => {
-    const s = cityDamageSplit(WALLS_HP, 30, 'melee');
+    const s = cityDamageSplit(WALLS_HP, WALLS_HP, 30, 'melee');
     expect(s.centre).toBe(1);
   });
 
   it('CIV6: around 80% the centre "suffers not more than 5-10 damage"', () => {
-    expect(cityDamageSplit(0.8 * WALLS_HP, 30, 'ranged').centre).toBe(8);
+    expect(cityDamageSplit(0.8 * WALLS_HP, WALLS_HP, 30, 'ranged').centre).toBe(8);
   });
 
   it('CIV6: half-down lets a reduced hit through; past the breach it is full', () => {
-    const half = cityDamageSplit(0.5 * WALLS_HP, 30, 'ranged').centre;
+    const half = cityDamageSplit(0.5 * WALLS_HP, WALLS_HP, 30, 'ranged').centre;
     expect(half).toBeGreaterThan(8);
     expect(half).toBeLessThan(30);
-    expect(cityDamageSplit(0.25 * WALLS_HP, 30, 'ranged').centre).toBe(30);
-    expect(cityDamageSplit(0, 30, 'ranged').centre).toBe(30);
+    expect(cityDamageSplit(0.25 * WALLS_HP, WALLS_HP, 30, 'ranged').centre).toBe(30);
+    expect(cityDamageSplit(0, WALLS_HP, 30, 'ranged').centre).toBe(30);
   });
 
   it('CIV6: the perimeter itself takes -85% from melee and -50% from ranged', () => {
-    expect(cityDamageSplit(WALLS_HP, 40, 'melee').wall).toBe(6);
-    expect(cityDamageSplit(WALLS_HP, 40, 'ranged').wall).toBe(20);
+    expect(cityDamageSplit(WALLS_HP, WALLS_HP, 40, 'melee').wall).toBe(6);
+    expect(cityDamageSplit(WALLS_HP, WALLS_HP, 40, 'ranged').wall).toBe(20);
   });
 
   it('the pool never goes negative, and an unwalled city loses nothing to it', () => {
-    expect(cityDamageSplit(3, 40, 'ranged').wall).toBe(3);
-    expect(cityDamageSplit(0, 40, 'melee')).toEqual({ wall: 0, centre: 40 });
+    expect(cityDamageSplit(3, WALLS_HP, 40, 'ranged').wall).toBe(3);
+    expect(cityDamageSplit(0, WALLS_HP, 40, 'melee')).toEqual({ wall: 0, centre: 40 });
   });
 
   it('both shares come out of the SAME roll — a hit damages perimeter and centre at once', () => {
-    const s = cityDamageSplit(0.4 * WALLS_HP, 30, 'melee');
+    const s = cityDamageSplit(0.4 * WALLS_HP, WALLS_HP, 30, 'melee');
     expect(s.wall).toBeGreaterThan(0);
     expect(s.centre).toBeGreaterThan(1);
   });
@@ -88,7 +89,7 @@ describe('a city under attack', () => {
     const before = city.hp;
     expect(meleeAttack(state, att.id, city.centerIndex, 0).ok).toBe(true);
     expect(city.hp).toBeLessThan(before - 1);
-    expect(outerPool(city)).toBe(0);
+    expect(outerPool(state, city)).toBe(0);
   });
 
   it('a walled city loses perimeter and takes 1 on the centre', () => {
@@ -121,7 +122,7 @@ describe('a city under attack', () => {
     const { state, city } = war();
     city.buildings.push('ANCIENT_WALLS');
     expect(city.outerHp).toBeUndefined();
-    expect(outerPool(city)).toBe(WALLS_HP);
+    expect(outerPool(state, city)).toBe(WALLS_HP);
     const c = state.map.tiles[city.centerIndex];
     const att = spawnUnit(state, 'SWORDSMAN', tileAtCoords(state.map, c.col - 1, c.row).index, 0)!;
     expect(meleeAttack(state, att.id, city.centerIndex, 0).ok).toBe(true);

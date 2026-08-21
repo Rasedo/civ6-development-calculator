@@ -190,14 +190,18 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('BUTTRESS', 'Buttress', 'Medieval', 300, ['SHIPBUILDING', 'MATHEMATICS']),
     T('MILITARY_TACTICS', 'Military Tactics', 'Medieval', 300, ['MATHEMATICS']),
     T('STIRRUPS', 'Stirrups', 'Medieval', 390, ['HORSEBACK_RIDING', 'APPRENTICESHIP']),
-    T('CASTLES', 'Castles', 'Medieval', 390, ['CONSTRUCTION']),
+    T('CASTLES', 'Castles', 'Medieval', 390, ['CONSTRUCTION'], [
+      { kind: 'unlockBuilding', building: 'MEDIEVAL_WALLS' },
+    ]),
 
     T('GUNPOWDER', 'Gunpowder', 'Renaissance', 600, ['APPRENTICESHIP', 'STIRRUPS', 'MILITARY_ENGINEERING']),
     T('METAL_CASTING', 'Metal Casting', 'Renaissance', 730, ['GUNPOWDER']),
     T('CARTOGRAPHY', 'Cartography', 'Renaissance', 600, ['BUTTRESS']),
     T('PRINTING', 'Printing', 'Renaissance', 600, ['MACHINERY']),
     T('SQUARE_RIGGING', 'Square Rigging', 'Renaissance', 730, ['CARTOGRAPHY']),
-    T('SIEGE_TACTICS', 'Siege Tactics', 'Renaissance', 730, ['CASTLES']),
+    T('SIEGE_TACTICS', 'Siege Tactics', 'Renaissance', 730, ['CASTLES'], [
+      { kind: 'unlockBuilding', building: 'RENAISSANCE_WALLS' },
+    ]),
 
     T('STEAM_POWER', 'Steam Power', 'Industrial', 1070, ['INDUSTRIALIZATION']),
     T('BALLISTICS', 'Ballistics', 'Industrial', 930, ['METAL_CASTING']),

@@ -59,6 +59,7 @@ class SimInit:
             ("pop", torch.long, 0, None, None),
             ("hp", torch.long, 0, int((rules.combat or {}).get("cityMaxHp", 200)), None),
             ("outer_hp", torch.long, 0, None, None),
+            ("last_hit", torch.long, 0, None, None),
             ("is_cap", torch.bool, False, None, None),
             ("orig_cap", torch.long, -1, None, None),
             ("loyalty", dtype, 100.0, None, None),
@@ -1140,7 +1141,18 @@ class SimInit:
         self._flood_fert_food = torch.tensor(_ds["floodFertFood"], dtype=torch.float64, device=device)  # [3, 3]
         self._flood_fert_prod = torch.tensor(_ds["floodFertProd"], dtype=torch.float64, device=device)  # [3, 3]
         self._flood_fert_col = torch.tensor([int(x) for x in _ds["floodFertCol"]], dtype=torch.long, device=device)  # [nTerrain]
-        self._walls_hp = int(rules.combat.get("wallsHp", 100))
+        # The outer-defense pool and the defensive Combat Strength by WALLS
+        # TIER, plus the tech that grants the top tier outright.
+        self._walls_tier_hp = torch.tensor([int(x) for x in rules.combat["wallsTierHp"]], dtype=torch.long, device=device)
+        self._walls_tier_cs = torch.tensor([int(x) for x in rules.combat["wallsTierCs"]], dtype=torch.long, device=device)
+        self._walls_tier_urban = int(rules.combat["wallsTierUrban"])
+        self._urban_def_tech = int(rules.combat["urbanDefensesTech"])
+        self._repair_quiet = int(rules.combat["repairQuietTurns"])
+        self._b_walls = rules.b_walls.to(device)  # [NB] walls tier per building row
+        self._b_no_purchase = rules.b_no_purchase.to(device)  # [NB] bool
+        self._walls_rows = [i for i, t in enumerate(rules.b_walls.tolist()) if int(t) > 0]
+        # the ANCIENT tier's pool, which is what a fresh set of Walls is worth
+        self._walls_hp = int(self._walls_tier_hp[1])
         # What `_city_damage_split` and `_ranged_city_penalty` read: the
         # perimeter's share of a melee and of a ranged hit, the fraction below
         # which the centre takes full damage, and the ranged penalty against
@@ -1373,6 +1385,19 @@ class SimInit:
         # Read at the war-march passability composition.
         self.unit_naval = torch.tensor([bool(u.get("naval", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_cavalry = torch.tensor([bool(u.get("cavalry", 0)) for u in ru], dtype=torch.bool, device=device)  # light+heavy cavalry (Preslav)
+        # THE SIEGE CLASSES. `_type_bombard` > 0 marks a unit whose attack
+        # "uses Bombard Strength": full damage to a perimeter, no city penalty,
+        # and no melee attack at all. `_type_siege_support` is the support
+        # chassis (1 Battering Ram, 2 Siege Tower) and `_type_siege_max_walls`
+        # the highest walls tier it still works against. The ram and the tower
+        # help MELEE and ANTI-CAVALRY attackers and nobody else.
+        self._type_melee = torch.tensor([bool(u.get("melee", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._type_anticav = torch.tensor([bool(u.get("antiCavalry", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._type_bombard = torch.tensor([int(u.get("bombard", 0)) for u in ru], dtype=torch.long, device=device)
+        self._type_siege_support = torch.tensor([int(u.get("siegeSupport", 0)) for u in ru], dtype=torch.long, device=device)
+        self._type_siege_max_walls = torch.tensor([int(u.get("siegeMaxWalls", 0)) for u in ru], dtype=torch.long, device=device)
+        self._siege_support_any = bool((self._type_siege_support > 0).any())
+        self._siege_support_idx = [i for i, v in enumerate(self._type_siege_support.tolist()) if int(v) > 0]
         self._type_tech = torch.tensor([u["requiresTech"] for u in ru], dtype=torch.long, device=device)
         self._type_civic = torch.tensor([u.get("requiresCivic", -1) for u in ru], dtype=torch.long, device=device)
         self._type_needs_slot = torch.tensor([bool(u.get("needsArtifactSlot", 0)) for u in ru], dtype=torch.bool, device=device)

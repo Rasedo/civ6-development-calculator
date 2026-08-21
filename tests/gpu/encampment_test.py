@@ -191,6 +191,91 @@ def test_strike(rules, path) -> None:
     print("  breached-perimeter OK: neither the city nor its Encampment fires")
 
 
+def test_district_perimeter(rules, path) -> None:
+    """CIV6 gives a defensible district "Defenses HP equal to the City Center"
+    and one set of Walls "supplies both", so a melee assault on an Encampment
+    divides exactly as a hit on the centre does: the perimeter share comes off
+    the CITY's pool and only what gets through reaches the garrison. The
+    district also fights at the city's strength "excluding any bonus obtained
+    for a Garrisoned unit"."""
+    sim, enc_tile, _tgt, _v = build_strike_scene(rules, path)
+    # the attacker: a melee unit of seat row 1, standing beside the district
+    free = [int(t) for t in sim.neigh[enc_tile].tolist()
+            if t >= 0 and bool(sim.passable[0, t]) and int(sim.military_at[0, t]) < 0]
+    assert free, "no free tile beside the Encampment"
+    slot = int(sim.unit_next[0])
+    sim.unit_next[0] = slot + 1
+    ty = next(i for i in range(sim.NU)
+              if bool(sim._type_melee[i]) and not bool(sim._type_civilian[i]))
+    sim.major_unit_alive[0, slot] = True
+    sim.major_unit_seat[0, slot] = 1
+    sim.major_unit_type[0, slot] = ty
+    sim.major_unit_tile[0, slot] = free[0]
+    sim.major_unit_hp[0, slot] = 100
+    sim.military_at[0, free[0]] = slot + sim.POOL_LO["major"]
+    sim.encamp_hp[0, enc_tile] = sim._encamp_hp_max
+    sim.city_outer_hp[0, 0, 0] = sim._walls_hp
+    sim.city_last_hit[0, 0, 0] = 0
+
+    tile = torch.full((sim.B,), enc_tile, dtype=torch.long, device=sim.device)
+    sim._attack_encampment(torch.tensor([True], device=sim.device), tile, "major", slot)
+    perim_lost = sim._walls_hp - int(sim.city_outer_hp[0, 0, 0])
+    garrison_lost = sim._encamp_hp_max - int(sim.encamp_hp[0, enc_tile])
+    assert perim_lost > 0, "the assault never touched the city's perimeter"
+    assert garrison_lost == 1, \
+        f"an intact perimeter must hold the garrison to 1, like a centre: {garrison_lost}"
+    assert perim_lost < sim._walls_hp // 2, \
+        f"the perimeter took {perim_lost} — the -85% melee reduction is missing"
+    assert int(sim.city_last_hit[0, 0, 0]) == sim.turn, \
+        "a hit on the district must stamp the CITY's damage clock"
+    print(f"  district perimeter OK: perimeter -{perim_lost}, garrison -{garrison_lost} out of ONE roll")
+
+    # with the perimeter already gone, the whole roll reaches the garrison
+    sim2, enc2, _t2, _v2 = build_strike_scene(rules, path)
+    free2 = [int(t) for t in sim2.neigh[enc2].tolist()
+             if t >= 0 and bool(sim2.passable[0, t]) and int(sim2.military_at[0, t]) < 0]
+    s2 = int(sim2.unit_next[0]); sim2.unit_next[0] = s2 + 1
+    sim2.major_unit_alive[0, s2] = True
+    sim2.major_unit_seat[0, s2] = 1
+    sim2.major_unit_type[0, s2] = ty
+    sim2.major_unit_tile[0, s2] = free2[0]
+    sim2.major_unit_hp[0, s2] = 100
+    sim2.military_at[0, free2[0]] = s2 + sim2.POOL_LO["major"]
+    sim2.encamp_hp[0, enc2] = sim2._encamp_hp_max
+    sim2.city_outer_hp[0, 0, 0] = 0
+    t2 = torch.full((sim2.B,), enc2, dtype=torch.long, device=sim2.device)
+    sim2._attack_encampment(torch.tensor([True], device=sim2.device), t2, "major", s2)
+    breached = sim2._encamp_hp_max - int(sim2.encamp_hp[0, enc2])
+    assert breached > 10, f"a breached perimeter must let the roll through: {breached}"
+    print(f"  breached OK: with the pool at 0 the garrison takes {breached}")
+
+
+def test_district_heal_gate(rules, path) -> None:
+    """CIV6: the Encampment "is capable of Healing at the rate of 20 HP/turn.
+    This is an automatic action, which happens if its tile is not occupied."""
+    def run(occupy: bool) -> int:
+        sim, enc_tile, _t, _v = build_strike_scene(rules, path)
+        sim.encamp_hp[0, enc_tile] = 10
+        for n in [int(x) for x in sim.neigh[int(sim.city_center[0, 0, 0])].tolist() if x >= 0]:
+            sim.military_at[0, n] = -1
+        sim.military_at[0, enc_tile] = -1
+        if occupy:
+            slot = int(sim.unit_next[0]); sim.unit_next[0] = slot + 1
+            sim.major_unit_alive[0, slot] = True
+            sim.major_unit_seat[0, slot] = 1
+            sim.major_unit_type[0, slot] = sim._warrior_idx
+            sim.major_unit_tile[0, slot] = enc_tile
+            sim.major_unit_hp[0, slot] = 100
+            sim.military_at[0, enc_tile] = slot + sim.POOL_LO["major"]
+        fire(sim)
+        return int(sim.encamp_hp[0, enc_tile])
+
+    free_hp, held_hp = run(False), run(True)
+    assert free_hp > 10, f"an unoccupied Encampment must heal: {free_hp}"
+    assert held_hp == 10, f"an occupied Encampment must not heal: {held_hp}"
+    print(f"  district heal OK: 10 -> {free_hp} unoccupied, held at {held_hp} with an enemy on the tile")
+
+
 def test_civ_encamp_prod_mult(rules, path) -> None:
     """A civ seat's GOVERNMENT encampHarborProdMult scales its queue head when
     that head is an Encampment item, mirroring the seat-0 path.
@@ -248,6 +333,8 @@ def main() -> None:
     test_catalog(sim0)
     test_training_xp_wiring(rules, paths[0])
     test_strike(rules, paths[0])
+    test_district_perimeter(rules, paths[0])
+    test_district_heal_gate(rules, paths[0])
     test_civ_encamp_prod_mult(rules, paths[0])
     print("ENCAMPMENT OK")
 

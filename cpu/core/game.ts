@@ -20,7 +20,8 @@ import { commitProduction, commitResearch } from './seatTurn';
 import { seatWonderFlag } from './wonders';
 import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY } from '../data/seats';
 import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
-import { UNITS, WALLS_HP, ENCAMPMENT_HP, CITY_MAX_HP } from '../data/units';
+import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS } from '../data/units';
+import { outerPool, wallsMax } from './rules';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { DISTRICTS } from '../data/districts';
@@ -334,7 +335,7 @@ export function queueBuilding(state: GameState, cityId: number, buildingId: stri
   }
   if (state.sandbox) {
     city.buildings.push(buildingId);
-    if (buildingId === 'ANCIENT_WALLS') city.outerHp = WALLS_HP;
+    if (BUILDINGS[buildingId]?.walls) city.outerHp = wallsMax(state, city);
   } else {
     commitProduction(state, city.seat, city, { kind: 'building', building: buildingId, progress: 0 });
   }
@@ -368,12 +369,26 @@ export function queueWonder(
 }
 
 
-export function projectCost(state: GameState, seat: number, projectId?: string): number {
+export function projectCost(state: GameState, seat: number, projectId?: string, city?: City): number {
   // Space steps and laser stations carry their REAL fixed price (already
   // speed-scaled in the table); everything else takes the generic curve.
-  const fixed = projectId !== undefined ? PROJECTS[projectId]?.cost : undefined;
+  const def = projectId !== undefined ? PROJECTS[projectId] : undefined;
+  // CIV6: "Walls gain HP equal to the Production invested into the project" —
+  // so the whole repair costs exactly the perimeter HP it puts back.
+  if (def?.repair && city) return Math.max(1, wallsMax(state, city) - outerPool(state, city));
+  const fixed = def?.cost;
   if (fixed !== undefined) return fixed;
   return Math.max(Math.round(15 * GAME_SPEED), Math.round(districtCost(state, seat) * 0.5));
+}
+
+/** CIV6: the repair "becomes available after building Walls. A city can
+ *  undertake this project if it and/or its Encampment district have damaged
+ *  Walls and have not been attacked in the last three turns." One perimeter
+ *  serves the centre and its Encampment here, so one pool answers both. */
+export function repairAvailable(state: GameState, city: City): boolean {
+  const max = wallsMax(state, city);
+  if (max <= 0 || outerPool(state, city) >= max) return false;
+  return state.turn - (city.lastHitTurn ?? 0) >= REPAIR_QUIET_TURNS;
 }
 
 export function availableProjects(state: GameState, city: City): ProjectDef[] {
@@ -383,6 +398,7 @@ export function availableProjects(state: GameState, city: City): ProjectDef[] {
     if (!city.districts.some((d) => d.type === p.district && state.map.tiles[d.tileIndex].districtComplete)) {
       return false;
     }
+    if (p.repair) return repairAvailable(state, city);
     if (p.laser) {
       // Repeatable — tech-gated only, never in the one-time ledger.
       return !p.requiresTech || (owner?.research.techs.includes(p.requiresTech) ?? false);
@@ -402,7 +418,7 @@ export function queueProject(state: GameState, cityId: number, projectId: string
   if (!availableProjects(state, city).some((p) => p.id === projectId)) {
     return { ok: false, reason: 'Project needs its completed district in this city.' };
   }
-  commitProduction(state, city.seat, city, { kind: 'project', project: projectId, progress: 0, cost: projectCost(state, seat, projectId) });
+  commitProduction(state, city.seat, city, { kind: 'project', project: projectId, progress: 0, cost: projectCost(state, seat, projectId, city) });
   return { ok: true };
 }
 
@@ -448,6 +464,10 @@ export function purchaseBuilding(state: GameState, cityId: number, buildingId: s
   if (!buildingCompletable(state, city, buildingId)) {
     return { ok: false, reason: 'Its district (or prerequisite building) must be finished first.' };
   }
+  // CIV6 (Medieval and Renaissance Walls): "Cannot be purchased with Gold."
+  if (BUILDINGS[buildingId]?.noPurchase) {
+    return { ok: false, reason: 'These walls cannot be purchased with gold.' };
+  }
   const worship = BUILDINGS[buildingId]?.worship === true;
   if (!state.sandbox) {
     if (worship) {
@@ -462,7 +482,7 @@ export function purchaseBuilding(state: GameState, cityId: number, buildingId: s
   }
   city.buildings.push(buildingId);
   buildingDedications(state, city.seat, buildingId);
-  if (buildingId === 'ANCIENT_WALLS') city.outerHp = WALLS_HP;
+  if (BUILDINGS[buildingId]?.walls) city.outerHp = wallsMax(state, city);
   return { ok: true };
 }
 

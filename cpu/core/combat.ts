@@ -7,13 +7,14 @@ import { logUnitOrder } from './seatTurn';
 import { MODERN_ERA_INDEX } from '../data/techs';
 import { emergencyAttackCS, raiseEmergency, EMERGENCY_CITY_STATE } from './emergency';
 import { envoysOf, hasMet } from './cityStates';
-import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP, WALLS_HP, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY } from '../data/units';
+import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP, WALLS_TIER_CS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { CITY_STATE_MAX_HP, KABUL_XP_MULT, PRESLAV_HILL_CS } from '../data/cityStates';
 import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER } from '../data/seats';
 import { addEraScore } from './eras';
-import { nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, crossesRiver, cliffBlocksStep, stepUnit, outerPool } from './units';
+import { nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, crossesRiver, cliffBlocksStep, stepUnit } from './units';
+import { outerPool, wallsMax, wallsTier } from './rules';
 import { EMBARKED_DEFENSE_CS, embarkState } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, type BeliefEffects } from '../data/religion';
@@ -303,6 +304,11 @@ export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = 
   return dmg;
 }
 
+/** The two siege support chassis, as BITS — a target can have both beside it,
+ *  and each changes a different half of the split. */
+export const ASSIST_RAM = 1;
+export const ASSIST_TOWER = 2;
+
 /**
  * How ONE hit on a city center divides between the outer-defense perimeter and
  * the centre behind it. Both shares come out of the SAME roll — a city attack
@@ -310,23 +316,73 @@ export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = 
  * neither share draws again.
  *
  * CIV6: the perimeter takes -85% from a melee attack and -50% from a ranged
- * one (nothing in this roster carries Bombard strength, which is what hits it
- * at full). What reaches the centre opens as the perimeter is breached: 1
+ * one, while a BOMBARD attack and a Battering Ram's melee attacker "do full
+ * damage". What reaches the centre opens as the perimeter is breached: 1
  * damage while it is intact, "5-10" around 80%, reduced-but-real above 50%,
- * full below the breach fraction.
+ * full below the breach fraction — unless a Siege Tower lets the attacker
+ * "bypass Walls and hit the city directly, inflicting damage as if there were
+ * no walls protecting it".
  */
 export function cityDamageSplit(
   outerHp: number,
+  wallsMax: number,
   roll: number,
-  klass: 'melee' | 'ranged',
+  klass: 'melee' | 'ranged' | 'bombard',
+  assist = 0,
 ): { wall: number; centre: number } {
   const outer = Math.max(0, outerHp);
-  const frac = Math.min(1, outer / WALLS_HP);
-  const wall = outer > 0
-    ? Math.min(outer, Math.max(1, Math.round(roll * (klass === 'melee' ? WALL_DAMAGE_MELEE : WALL_DAMAGE_RANGED))))
-    : 0;
-  const through = Math.min(1, Math.max(0, (1 - frac) / (1 - WALL_BREACH_FRACTION)));
+  const frac = wallsMax > 0 ? Math.min(1, outer / wallsMax) : 0;
+  const full = klass === 'bombard' || (assist & ASSIST_RAM) !== 0;
+  const f = full ? 1 : klass === 'melee' ? WALL_DAMAGE_MELEE : WALL_DAMAGE_RANGED;
+  const wall = outer > 0 ? Math.min(outer, Math.max(1, Math.round(roll * f))) : 0;
+  const through = (assist & ASSIST_TOWER) !== 0
+    ? 1
+    : Math.min(1, Math.max(0, (1 - frac) / (1 - WALL_BREACH_FRACTION)));
   return { wall, centre: Math.max(1, Math.round(roll * through)) };
+}
+
+/**
+ * The support a friendly Battering Ram or Siege Tower ADJACENT to the target
+ * lends this attacker, as ASSIST_ bits. CIV6: "both support units are
+ * effective for melee and anti-cavalry class units only", and Gathering
+ * Storm's upgraded walls "gain engineering qualities which negate the effects
+ * of support units" — the ram stops at Ancient Walls, the tower at Medieval.
+ */
+export function siegeAssist(state: GameState, attacker: Unit, targetIndex: number, tier: number): number {
+  const d = UNITS[attacker.type];
+  if (!d || !(d.melee || d.antiCavalry)) return 0;
+  let bits = 0;
+  for (const t of neighbors(state.map, state.map.tiles[targetIndex])) {
+    for (const u of unitsAt(state, t.index)) {
+      if (u.seat !== attacker.seat) continue;
+      const s = UNITS[u.type];
+      if (!s?.siegeSupport || tier > (s.siegeMaxWalls ?? 0)) continue;
+      bits |= s.siegeSupport === 'TOWER' ? ASSIST_TOWER : ASSIST_RAM;
+    }
+  }
+  return bits;
+}
+
+/**
+ * The damage class ONE attack brings to a perimeter. A siege unit's attack
+ * "uses Bombard Strength" whichever verb ordered it; everything else is the
+ * melee/ranged pair the reduction table is keyed on.
+ */
+export function cityHitClass(unitType: string, ranged: boolean): 'melee' | 'ranged' | 'bombard' {
+  if (UNITS[unitType]?.bombard !== undefined) return 'bombard';
+  return ranged ? 'ranged' : 'melee';
+}
+
+/**
+ * The strength a RANGED order brings against a city or district. CIV6: a
+ * siege unit fires at its Bombard Strength and pays no city penalty — the -17
+ * it carries is "against land units", which its `ranged.strength` already
+ * holds.
+ */
+export function cityRangedStrength(unitType: string, outerHp: number): number {
+  const d = UNITS[unitType];
+  if (d?.bombard !== undefined) return d.bombard;
+  return (d?.ranged?.strength ?? 0) - rangedCityPenalty(unitType, outerHp);
 }
 
 /** CIV6: a land ranged attack takes -17 against city and district defenses.
@@ -340,7 +396,10 @@ export function cityDefenseStrength(state: GameState, city: City): number {
   const garrison = unitsAt(state, city.centerIndex).find(
     (u) => u.seat === city.seat && unitDomain(u.type) === 'military',
   );
-  return Math.max(15, seatOf(state, city.seat)?.bestMeleeCS ?? 0) + (garrison ? 5 : 0);
+  // CIV6: each pre-modern walls tier is "+3 Combat Strength" and they stack.
+  return Math.max(15, seatOf(state, city.seat)?.bestMeleeCS ?? 0)
+    + (WALLS_TIER_CS[wallsTier(state, city)] ?? 0)
+    + (garrison ? 5 : 0);
 }
 
 export function killUnit(state: GameState, unit: Unit, seat: number): void {
@@ -472,10 +531,13 @@ function cityAssault(
   const dmgToCity = damageRoll(state, atkCS - defCS, kCity, city.centerIndex);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, kAttacker, city.centerIndex);
   gainAttackXp(state, attacker); // +5 for the attack executed
-  const outer = outerPool(city);
-  const split = cityDamageSplit(outer, dmgToCity, 'melee');
+  const outer = outerPool(state, city);
+  const split = cityDamageSplit(outer, wallsMax(state, city), dmgToCity,
+    cityHitClass(attacker.type, false),
+    siegeAssist(state, attacker, city.centerIndex, wallsTier(state, city)));
   if (split.wall > 0) city.outerHp = outer - split.wall;
   city.hp -= split.centre;
+  city.lastHitTurn = state.turn;
   attacker.hp -= dmgToAttacker;
   attacker.movesLeft = 0;
   warWearinessBattle(state, attacker.seat, city.seat, city.centerIndex,
@@ -490,10 +552,16 @@ function cityAssault(
 /**
  * A melee assault ON an Encampment tile. Real Civ 6: the district
  * fights independently of its city, so the attacker trades rolls with it at the
- * CITY's defense strength and the district's own garrison pool takes the
- * damage. Beating it to 0 opens the tile (the block in `tileFreeForUnit` lifts)
- * and silences its strike — the game's "occupied Encampment". The attacker does
- * NOT advance: entry costs a separate move, exactly like a city assault.
+ * CITY's defense strength. Beating its garrison to 0 opens the tile (the block
+ * in `tileFreeForUnit` lifts) and silences its strike — the game's "occupied
+ * Encampment". The attacker does NOT advance: entry costs a separate move,
+ * exactly like a city assault.
+ *
+ * CIV6 gives a defensible district "Defenses HP equal to the City Center"
+ * and one set of Walls supplies both, so the roll divides exactly as a hit on
+ * the centre does: the perimeter share comes off the city's pool and only what
+ * gets through reaches the garrison. `cityAtTile` is what hands this path the
+ * city behind the district.
  *
  * The attacker's CS comes from the shared `assaultAtkCS`, so the assault kinds
  * cannot drift; only the target pool and the roll keys differ.
@@ -508,12 +576,43 @@ function attackEncampment(
   const dmgToEncamp = damageRoll(state, atkCS - defCS, 'enc', tileIndex);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, 'encc', tileIndex);
   gainAttackXp(state, attacker);
-  tile.encampHp = Math.max(0, (tile.encampHp ?? ENCAMPMENT_HP) - dmgToEncamp);
+  const held = cityAtTile(state, tile);
+  if (held) {
+    const outer = outerPool(state, held);
+    const split = cityDamageSplit(outer, wallsMax(state, held), dmgToEncamp,
+      cityHitClass(attacker.type, false),
+      siegeAssist(state, attacker, tileIndex, wallsTier(state, held)));
+    if (split.wall > 0) held.outerHp = outer - split.wall;
+    held.lastHitTurn = state.turn;
+    tile.encampHp = Math.max(0, (tile.encampHp ?? ENCAMPMENT_HP) - split.centre);
+  } else {
+    tile.encampHp = Math.max(0, (tile.encampHp ?? ENCAMPMENT_HP) - dmgToEncamp);
+  }
   attacker.hp -= dmgToAttacker;
   attacker.movesLeft = 0;
   warWearinessBattle(state, attacker.seat, tileSeat(tile), tileIndex,
     { aDied: attacker.hp <= 0, city: true });
   if (attacker.hp <= 0) killUnit(state, attacker, seat);
+}
+
+/**
+ * CIV6's siege: "if the invading army manages to establish zone of control on
+ * all passable tiles surrounding the City Center, it will no longer be able to
+ * repair the damage it suffers". Every passable neighbour has to be held —
+ * one raider standing beside a city is not a siege — and it takes a MILITARY
+ * unit, because a civilian exerts no zone of control.
+ */
+export function encircled(state: GameState, centre: Tile, seat: number): boolean {
+  let passable = 0;
+  for (const n of neighbors(state.map, centre)) {
+    if (isImpassable(n)) continue;
+    passable += 1;
+    const held = unitsAt(state, n.index).some(
+      (u) => unitDomain(u.type) === 'military' && unitsHostile(state, u, { seat }),
+    );
+    if (!held) return false;
+  }
+  return passable > 0;
 }
 
 export function encampmentDefense(
@@ -564,6 +663,9 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   if (!attacker) return no('No such unit.');
   const def = UNITS[attacker.type];
   if (!def || def.combat <= 0) return no('Civilians cannot attack.');
+  // CIV6: a siege unit's only attack is the bombard one — its Combat Strength
+  // is what it defends with.
+  if (def.bombard !== undefined) return no('Siege units attack at range.');
   if (attacker.movesLeft <= 0) return no('No movement left.');
   if (attacker.embarked) return no('Embarked units cannot attack.');
   const from = state.map.tiles[attacker.tileIndex];
@@ -732,11 +834,12 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   const civCity = cityAtIndex(state, targetIndex);
   if (civCity && (capsOf(attacker.seat).alwaysHostile || civsAtWar(state, atkSeat, civCity.holder.seat))) {
     const defCS = cityDefenseStrength(state, civCity.city);
-    const outer = outerPool(civCity.city);
-    const roll = damageRoll(state, (def.ranged.strength - rangedCityPenalty(attacker.type, outer) - woundPenalty(attacker) + xpLevelBonus(attacker) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex);
-    const split = cityDamageSplit(outer, roll, 'ranged');
+    const outer = outerPool(state, civCity.city);
+    const roll = damageRoll(state, (cityRangedStrength(attacker.type, outer) - woundPenalty(attacker) + xpLevelBonus(attacker) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex);
+    const split = cityDamageSplit(outer, wallsMax(state, civCity.city), roll, cityHitClass(attacker.type, true));
     if (split.wall > 0) civCity.city.outerHp = outer - split.wall;
     civCity.city.hp = Math.max(1, civCity.city.hp - split.centre);
+    civCity.city.lastHitTurn = state.turn;
     warWearinessBattle(state, attacker.seat, civCity.city.seat, targetIndex, { city: true });
     attacker.movesLeft = 0;
     gainAttackXp(state, attacker); // +5 for the bombardment (city not a unit — no defender xp)
@@ -750,7 +853,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   // seat you must declare on. See [[target-legality-gates]].
   if (cityState && cityState.centerIndex === targetIndex && cityStateAttackable(state, cityState, atkSeat)) {
     const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0);
-    cityState.hp = Math.max(1, (cityState.hp ?? CITY_STATE_MAX_HP) - damageRoll(state, (def.ranged.strength - rangedCityPenalty(attacker.type, 0) - woundPenalty(attacker) + xpLevelBonus(attacker) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex));
+    cityState.hp = Math.max(1, (cityState.hp ?? CITY_STATE_MAX_HP) - damageRoll(state, (cityRangedStrength(attacker.type, 0) - woundPenalty(attacker) + xpLevelBonus(attacker) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex));
     warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), targetIndex, { city: true });
     attacker.movesLeft = 0;
     gainAttackXp(state, attacker); // +5 for the bombardment
@@ -788,11 +891,12 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
       : undefined;
   if (enemyCity) {
     const defCS = cityDefenseStrength(state, enemyCity);
-    const outer = outerPool(enemyCity);
-    const roll = damageRoll(state, (def.ranged.strength - rangedCityPenalty(attacker.type, outer) - woundPenalty(attacker) + xpLevelBonus(attacker) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'vrngc', targetIndex);
-    const split = cityDamageSplit(outer, roll, 'ranged');
+    const outer = outerPool(state, enemyCity);
+    const roll = damageRoll(state, (cityRangedStrength(attacker.type, outer) - woundPenalty(attacker) + xpLevelBonus(attacker) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'vrngc', targetIndex);
+    const split = cityDamageSplit(outer, wallsMax(state, enemyCity), roll, cityHitClass(attacker.type, true));
     if (split.wall > 0) enemyCity.outerHp = outer - split.wall;
     enemyCity.hp = Math.max(1, enemyCity.hp - split.centre);
+    enemyCity.lastHitTurn = state.turn;
     warWearinessBattle(state, attacker.seat, enemyCity.seat, targetIndex, { city: true });
     attacker.movesLeft = 0;
     gainAttackXp(state, attacker); // +5 for the bombardment (city not a unit)

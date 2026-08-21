@@ -12,8 +12,9 @@ they came from:
   1. `_wound` is CIV6's `round(10 - HP/10)`: 30 HP loses 7, 1 HP loses 10.
   2. `_city_damage_split` reproduces all four bands City combat (Civ6) states,
      and takes -85% off a melee hit to the perimeter, -50% off a ranged one.
-  3. `_ranged_city_penalty` charges land ranged -17 always and naval ranged
-     only while a perimeter stands.
+  3. `_city_ranged_strength` charges land ranged -17 always and naval ranged
+     only while a perimeter stands, and a SIEGE unit fires at its Bombard
+     Strength with no penalty at all.
   4. A melee assault and a ranged bombardment both damage the perimeter AND
      the centre out of one roll, drawing no more than before.
   5. Theological combat rolls `_damage_roll` on the wounded religious-strength
@@ -29,6 +30,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
+from core.simbase import HIT_MELEE, HIT_RANGED, HIT_BOMBARD, ASSIST_RAM, ASSIST_TOWER
 from warmup import settle_all
 
 
@@ -52,9 +54,15 @@ def test_wound(sim) -> None:
     print("  wound OK: round(10 - HP/10) — 30 HP loses 7, 1 HP loses 10, always integral")
 
 
+def split(sim, outer, roll, klass, assist=0, wmax=None):
+    """`_city_damage_split` with the per-game codes spelled as scalars."""
+    W = sim._walls_hp if wmax is None else wmax
+    return sim._city_damage_split(L(sim, outer), L(sim, W), L(sim, roll),
+                                  L(sim, klass), L(sim, assist))
+
+
 def test_split(sim) -> None:
     W = sim._walls_hp
-    roll = L(sim, 30)
     bands = {
         W: 1,                       # intact: "1 damage only"
         int(0.8 * W): 8,            # "not more than 5-10 damage per attack"
@@ -62,33 +70,82 @@ def test_split(sim) -> None:
         0: 30,                      # no perimeter at all
     }
     for outer, want in bands.items():
-        _, centre = sim._city_damage_split(L(sim, outer), roll, "ranged")
+        _, centre = split(sim, outer, 30, HIT_RANGED)
         assert int(centre) == want, f"outer {outer}/{W}: centre {int(centre)}, want {want}"
-    _, half = sim._city_damage_split(L(sim, W // 2), roll, "ranged")
+    _, half = split(sim, W // 2, 30, HIT_RANGED)
     assert 8 < int(half) < 30, f"a half-down perimeter should reduce but not stop: {int(half)}"
 
-    wall_m, _ = sim._city_damage_split(L(sim, W), L(sim, 40), "melee")
-    wall_r, _ = sim._city_damage_split(L(sim, W), L(sim, 40), "ranged")
+    wall_m, _ = split(sim, W, 40, HIT_MELEE)
+    wall_r, _ = split(sim, W, 40, HIT_RANGED)
     assert int(wall_m) == 6, f"melee should take 15% of 40: {int(wall_m)}"
     assert int(wall_r) == 20, f"ranged should take 50% of 40: {int(wall_r)}"
-    capped, _ = sim._city_damage_split(L(sim, 3), L(sim, 40), "ranged")
+    capped, _ = split(sim, 3, 40, HIT_RANGED)
     assert int(capped) == 3, f"the perimeter share must cap at the pool: {int(capped)}"
-    none, full = sim._city_damage_split(L(sim, 0), L(sim, 40), "melee")
+    none, full = split(sim, 0, 40, HIT_MELEE)
     assert int(none) == 0 and int(full) == 40, "an unwalled city loses nothing to a pool it has not got"
     print(f"  split OK: 1 / 8 / reduced / full across the four bands, -85% melee and -50% ranged (walls {W})")
 
 
-def test_ranged_penalty(sim) -> None:
+def test_bombard_and_support(sim) -> None:
+    """CIV6: a BOMBARD attack and a Battering Ram's melee attacker "do full
+    damage" to the perimeter; a Siege Tower's attacker "bypasses Walls and hits
+    the city directly, inflicting damage as if there were no walls protecting
+    it". The tier gate is Gathering Storm's: the ram stops above Ancient Walls,
+    the tower above Medieval."""
+    W = sim._walls_hp
+    wall_b, _ = split(sim, W, 40, HIT_BOMBARD)
+    assert int(wall_b) == 40, f"a bombard hit must reach the perimeter at full: {int(wall_b)}"
+    wall_ram, centre_ram = split(sim, W, 40, HIT_MELEE, ASSIST_RAM)
+    assert int(wall_ram) == 40, f"a ram makes the melee share full: {int(wall_ram)}"
+    assert int(centre_ram) == 1, "a ram does NOT open the centre — 'damage against the city itself is still subject to damage reduction'"
+    wall_tw, centre_tw = split(sim, W, 40, HIT_MELEE, ASSIST_TOWER)
+    assert int(centre_tw) == 40, f"a tower hits the centre 'as if there were no walls': {int(centre_tw)}"
+    assert int(wall_tw) == 6, "a tower's own wall damage keeps the reduction"
+    both_w, both_c = split(sim, W, 40, HIT_MELEE, ASSIST_RAM | ASSIST_TOWER)
+    assert int(both_w) == 40 and int(both_c) == 40, "the two chassis change different halves"
+    # the CENTRE ramp reads the tier's own pool, not the Ancient one
+    for tier in range(1, len(sim._walls_tier_hp)):
+        mx = int(sim._walls_tier_hp[tier])
+        _, c = split(sim, mx, 30, HIT_RANGED, 0, mx)
+        assert int(c) == 1, f"an intact tier-{tier} perimeter ({mx}) must hold the centre to 1: {int(c)}"
+    print(f"  bombard/support OK: full wall share, the tower's bypass, and the ramp at every tier {sim._walls_tier_hp.tolist()}")
+
+
+def test_siege_tables(sim) -> None:
+    """The roster rows themselves, against the Civilopedia columns."""
+    bomb = [(i, int(v)) for i, v in enumerate(sim._type_bombard.tolist()) if v]
+    assert len(bomb) >= 2, f"the siege class is empty: {bomb}"
+    for i, v in bomb:
+        # "-17 Bombard Strength against land units" — the ranged column IS that
+        assert int(sim._type_ranged_strength[i]) == v - int(sim._ranged_city_pen), \
+            f"unit {i}: bombard {v} but ranged {int(sim._type_ranged_strength[i])}"
+        assert float(sim._city_ranged_strength(L(sim, i), L(sim, sim._walls_hp))[0]) == float(v), \
+            "a siege unit pays no city penalty"
+    chassis = [(i, int(sim._type_siege_support[i]), int(sim._type_siege_max_walls[i]))
+               for i in range(sim.NU) if int(sim._type_siege_support[i]) > 0]
+    assert sorted((c, m) for _, c, m in chassis) == [(1, 1), (2, 2)], \
+        f"want a ram capped at Ancient and a tower at Medieval, got {chassis}"
+    for i, _, _ in chassis:
+        assert bool(sim._type_civilian[i]), "a support chassis rides the civilian plane"
+    assert bool(sim._type_melee.any()) and bool(sim._type_anticav.any()), \
+        "the two classes a ram or a tower helps are unmarked"
+    print(f"  tables OK: bombard {bomb}, chassis {chassis}, tiers {sim._walls_tier_hp.tolist()} / CS {sim._walls_tier_cs.tolist()}")
+
+
+def test_ranged_strength(sim) -> None:
     land = next(i for i in range(sim.NU)
-                if float(sim._type_ranged_strength[i]) > 0 and not bool(sim.unit_naval[i]))
+                if float(sim._type_ranged_strength[i]) > 0 and not bool(sim.unit_naval[i])
+                and int(sim._type_bombard[i]) == 0)
     naval = next((i for i in range(sim.NU)
                   if float(sim._type_ranged_strength[i]) > 0 and bool(sim.unit_naval[i])), -1)
     assert naval >= 0, "no naval ranged unit in the roster"
+    base = float(sim._type_ranged_strength[land])
     for outer in (sim._walls_hp, 0):
-        got = float(sim._ranged_city_penalty(L(sim, land), L(sim, outer))[0])
-        assert got == sim._ranged_city_pen, f"land ranged owes the full penalty at outer {outer}: {got}"
-    assert float(sim._ranged_city_penalty(L(sim, naval), L(sim, sim._walls_hp))[0]) == sim._ranged_city_pen
-    assert float(sim._ranged_city_penalty(L(sim, naval), L(sim, 0))[0]) == 0.0
+        got = float(sim._city_ranged_strength(L(sim, land), L(sim, outer))[0])
+        assert got == base - sim._ranged_city_pen, f"land ranged owes the full penalty at outer {outer}: {got}"
+    nb = float(sim._type_ranged_strength[naval])
+    assert float(sim._city_ranged_strength(L(sim, naval), L(sim, sim._walls_hp))[0]) == nb - sim._ranged_city_pen
+    assert float(sim._city_ranged_strength(L(sim, naval), L(sim, 0))[0]) == nb
     print(f"  penalty OK: land ranged always -{int(sim._ranged_city_pen)}, naval ranged only against Walls")
 
 
@@ -104,6 +161,7 @@ def scene(rules, path, walls: bool):
     sim.n_camps[0] = sim.max_camps[0]
     sim.city_bldg[0, 0, 0, sim._walls_bidx] = walls
     sim.city_outer_hp[0, 0, 0] = sim._walls_hp if walls else 0
+    sim.city_last_hit[0, 0, 0] = 0
     sim.city_hp[0, 0, 0] = 200
     free = ((sim.pair_dist[ctr].to(torch.long) == 1)
             & (sim.military_at[0] < 0) & sim.passable[0]).nonzero(as_tuple=True)[0]
@@ -154,6 +212,121 @@ def test_assault(rules, path) -> None:
     print(f"  ranged OK: perimeter {sim3._walls_hp} -> {int(sim3.city_outer_hp[0, 0, 0])}, centre 200 -> 199")
 
 
+def test_walls_tiers(rules, path) -> None:
+    """CIV6: "Ancient Walls have 100 HP and each upgrade adds +100, for a
+    maximum of 300", Urban Defenses 400 and no Combat Strength; each pre-modern
+    tier is "+3 Combat Strength" and they stack. Urban Defenses "is unlocked
+    with Steel" and needs no building at all."""
+    sim = build(rules, path)
+    col = L(sim, 0)
+    row0 = torch.zeros_like(col)
+    assert sim._walls_tier_hp.tolist() == [0, 100, 200, 300, 400], sim._walls_tier_hp.tolist()
+    assert sim._walls_tier_cs.tolist() == [0, 3, 6, 9, 9], sim._walls_tier_cs.tolist()
+    for bi in sim._walls_rows:
+        sim.city_bldg[0, 0, 0, bi] = False
+    assert int(sim._walls_tier_at(row0, col)[0]) == 0
+    seen = []
+    for bi in sorted(sim._walls_rows, key=lambda i: int(sim._b_walls[i])):
+        sim.city_bldg[0, 0, 0, bi] = True
+        t = int(sim._walls_tier_at(row0, col)[0])
+        seen.append((t, int(sim._walls_max_at(row0, col)[0])))
+    assert seen == [(1, 100), (2, 200), (3, 300)], f"the tiers do not stack: {seen}"
+    # STEEL alone, no walls building at all, is the top tier
+    for bi in sim._walls_rows:
+        sim.city_bldg[0, 0, 0, bi] = False
+    assert sim._urban_def_tech >= 0, "no Urban Defenses tech exported"
+    sim.civ_techs[0, 0, sim._urban_def_tech] = True
+    assert int(sim._walls_tier_at(row0, col)[0]) == sim._walls_tier_urban
+    assert int(sim._walls_max_at(row0, col)[0]) == 400
+    # ...and it FITS the standing cities, breach and all
+    sim.civ_techs[0, 0, sim._urban_def_tech] = False
+    sim.city_outer_hp[0, 0, 0] = 0
+    sim._urban_defenses_fit(0, torch.tensor([True], device=sim.device))
+    sim.civ_techs[0, 0, sim._urban_def_tech] = True
+    assert int(sim.city_outer_hp[0, 0, 0]) == 400, int(sim.city_outer_hp[0, 0, 0])
+    print("  tiers OK: 100/200/300 stacked, +3 CS each, Steel alone gives 400 and refits a breach")
+
+
+def test_repair_project(rules, path) -> None:
+    """CIV6: the repair "becomes available after building Walls. A city can
+    undertake this project if it and/or its Encampment district have damaged
+    Walls and have not been attacked in the last three turns." Its price is the
+    HP it puts back, and completing it "fully restores" the pool."""
+    sim = build(rules, path)
+    rep = next(i for i, p in enumerate(sim._proj_rows) if int(p.get("rep", 0)))
+    assert int(sim._proj_rows[rep].get("cc", 0)) == 1, "the repair must ride the CITY CENTER channel"
+    assert not any(int(p.get("cc", 0)) and not int(p.get("rep", 0)) for p in sim._proj_rows), \
+        "only the repair uses the city-centre channel today"
+    for bi in sim._walls_rows:
+        sim.city_bldg[0, 0, 0, bi] = False
+    sim.city_outer_hp[0, 0, 0] = 0
+    sim.city_last_hit[0, 0, 0] = 0
+    assert not bool(sim._repair_available(0, 0)[0]), "no Walls, nothing to repair"
+    sim.city_bldg[0, 0, 0, sim._walls_bidx] = True
+    sim.city_outer_hp[0, 0, 0] = sim._walls_hp
+    assert not bool(sim._repair_available(0, 0)[0]), "an intact perimeter needs no repair"
+    sim.city_outer_hp[0, 0, 0] = 40
+    sim.city_last_hit[0, 0, 0] = sim.turn
+    assert not bool(sim._repair_available(0, 0)[0]), "hit THIS turn — the three quiet turns have not passed"
+    for d in range(1, sim._repair_quiet):
+        sim.city_last_hit[0, 0, 0] = sim.turn - d
+        assert not bool(sim._repair_available(0, 0)[0]), f"only {d} quiet turns"
+    sim.city_last_hit[0, 0, 0] = sim.turn - sim._repair_quiet
+    assert bool(sim._repair_available(0, 0)[0]), "three quiet turns and a breach: the project must offer"
+    assert int(sim._repair_cost(0, 0)[0]) == sim._walls_hp - 40, int(sim._repair_cost(0, 0)[0])
+    # the MASK offers it, and only in the column that qualifies
+    m = sim._seat_production_mask(0)
+    base = m.shape[2] - len(sim._proj_rows)
+    if bool(sim.city_alive[0, 0, 0]) and int(sim.city_current[0, 0, 0]) == -1:
+        assert bool(m[0, 0, base + rep]), "the repair column is closed on a city that qualifies"
+    print(f"  repair OK: gated on Walls + damage + {sim._repair_quiet} quiet turns, price {int(sim._repair_cost(0, 0)[0])} = the HP it restores")
+
+
+def test_encirclement(rules, path) -> None:
+    """CIV6: a city "will automatically regain 20 HP per turn" until "the
+    invading army manages to establish zone of control on all passable tiles
+    surrounding the City Center"; and the outer defenses never regenerate."""
+    sim = build(rules, path)
+    ctr = int(sim.city_center[0, 0, 0])
+    nbs = [int(n) for n in sim.neigh[ctr].tolist() if n >= 0]
+    passable = [t for t in nbs if bool(sim.passable[0, t] or sim.wpass[0, t])]
+    assert len(passable) >= 2, "need a ring to besiege"
+    for t in nbs:
+        sim.military_at[0, t] = -1
+    sim.city_bldg[0, 0, 0, sim._walls_bidx] = True
+
+    def one_turn(hostiles):
+        s = build(rules, path)
+        s.city_bldg[0, 0, 0, sim._walls_bidx] = True
+        s.city_hp[0, 0, 0] = 100
+        s.city_outer_hp[0, 0, 0] = 40
+        for t in [int(n) for n in s.neigh[ctr].tolist() if n >= 0]:
+            s.military_at[0, t] = -1
+        nxt = int(s.unit_next[0])
+        for k, t in enumerate(hostiles):
+            slot = nxt + k
+            s.major_unit_alive[0, slot] = True
+            s.major_unit_seat[0, slot] = 1
+            s.major_unit_type[0, slot] = s._warrior_idx
+            s.major_unit_tile[0, slot] = t
+            s.major_unit_hp[0, slot] = 100
+            s.military_at[0, t] = slot + s.POOL_LO["major"]
+        s.unit_next[0] = nxt + len(hostiles)
+        s.war[0, 0, 1] = s.war[0, 1, 0] = True
+        s.sync_war()
+        s._seat_city_fire_and_heal(0, L(s, 0), torch.tensor([True], device=s.device))
+        return int(s.city_hp[0, 0, 0]), int(s.city_outer_hp[0, 0, 0])
+
+    hp_free, outer_free = one_turn([])
+    assert hp_free == 120, f"an unbesieged city heals 20: {hp_free}"
+    assert outer_free == 40, "the outer pool must NOT regenerate"
+    hp_one, _ = one_turn(passable[:1])
+    assert hp_one == 120, f"ONE adjacent hostile is not a siege: {hp_one}"
+    hp_all, _ = one_turn(passable)
+    assert hp_all == 100, f"every passable neighbour held: the city must not heal: {hp_all}"
+    print(f"  siege OK: heals past 1 of {len(passable)} hostiles, stops at all {len(passable)}, perimeter never regenerates")
+
+
 def test_theological(rules, path) -> None:
     sim = build(rules, path)
     assert sim._apostle_idx >= 0, "no APOSTLE in the roster"
@@ -190,8 +363,13 @@ def main() -> None:
     sim = build(rules, path, turns=2)
     test_wound(sim)
     test_split(sim)
-    test_ranged_penalty(sim)
+    test_bombard_and_support(sim)
+    test_siege_tables(sim)
+    test_ranged_strength(sim)
     test_assault(rules, path)
+    test_walls_tiers(rules, path)
+    test_repair_project(rules, path)
+    test_encirclement(rules, path)
     test_theological(rules, path)
     print("CITY PERIMETER OK")
 

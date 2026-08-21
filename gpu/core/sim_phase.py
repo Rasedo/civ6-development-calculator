@@ -93,7 +93,8 @@ class SimPhase:
         gslot = self.military_at[bidx, ctr]
         gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == row)).long()
         bm = self.civ_best_melee[:, row]
-        atk_cs = torch.maximum(bm, torch.full_like(bm, 15)) + gar * 5
+        atk_cs = (torch.maximum(bm, torch.full_like(bm, 15)) + gar * 5
+                  + self._walls_tier_cs[self._walls_tier_row(row, col)])
         # a SURVIVED Military Emergency pays its target +2 CS on every City
         # Strike against a member, forever
         _emg_s = torch.zeros(Bn, dtype=torch.float64, device=dev2)
@@ -469,10 +470,11 @@ class SimPhase:
             # the caches must see the write even though this turn's own walk
             # reads the loop-top snapshot.
             self._eff_version += 1
-            if self._walls_bidx >= 0:
-                wm = br[bi[br] == self._walls_bidx]
+            if self._walls_rows:
+                wm = br[(self._b_walls[bi[br]] > 0)]
                 if len(wm) > 0:
-                    self.city_outer_hp[wm, row, col[wm]] = self._walls_hp
+                    self.city_outer_hp[wm, row, col[wm]] = self._walls_max_at(
+                        torch.full_like(col, row), col)[wm]
 
         if self._wond_n:
             made_w = done & (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + self._wond_n)
@@ -537,6 +539,14 @@ class SimPhase:
                             # CIV6 (Patronage): project points scale too.
                             amt_gc = amt_g * self._congress_gpp_factor(g_i)
                             self.civ_gpp[:, row, g_i] = torch.where(hit, self.civ_gpp[:, row, g_i] + amt_gc, self.civ_gpp[:, row, g_i])
+                    if int(prow.get("rep", 0)):
+                        # CIV6: "Once completed, it fully restores the HP of
+                        # the city's (and Encampment's) Outer Defenses." One
+                        # perimeter serves both here.
+                        _rr = hit.nonzero(as_tuple=True)[0]
+                        if len(_rr) > 0:
+                            _mx = self._walls_max_at(torch.full_like(col, row), col)
+                            self.city_outer_hp[_rr, row, col[_rr]] = _mx[_rr]
                     if int(prow.get("ls", 0)):
                         # A laser station: repeatable, +1 LY/turn for the craft.
                         self.space_lasers[:, row] += hit.long()
@@ -575,17 +585,14 @@ class SimPhase:
         Bn, dev2 = self.B, self.device
         bidx = torch.arange(Bn, device=dev2)
         heal = int(self.rules.combat.get("cityHealPerTurn", 20))
-        walled = None
         # CIV6: walls give a city its ranged strike, and once the Outer Defense
         # "has been completely destroyed, its ranged strike again becomes
         # unavailable". The Encampment's defenses are the same perimeter —
         # "building any level of Walls in the city will supply both" — so it
         # strikes only "while its Wall defenses are still up".
-        perimeter = torch.zeros(Bn, dtype=torch.bool, device=dev2)
-        if self._walls_bidx >= 0:
-            walled = act & self.city_bldg[bidx, row, col, self._walls_bidx]
-            perimeter = walled & (self.city_outer_hp[bidx, row, col] > 0)
-            self._seat_city_strike(row, col, perimeter, "cstk")
+        walled = act & (self._walls_max_at(torch.full_like(col, row), col) > 0)
+        perimeter = walled & (self.city_outer_hp[bidx, row, col] > 0)
+        self._seat_city_strike(row, col, perimeter, "cstk")
         enc_reg = e0 = None
         if self._encamp_didx >= 0 and self.districts_on:
             # the city's OWN registry, which a capture clears — the districts
@@ -598,22 +605,33 @@ class SimPhase:
         nbh = self.neigh[ctr]
         nbc = nbh.clamp(min=0)
         _am = self.military_at.gather(1, nbc)
-        _ac = self.civilian_at.gather(1, nbc)
         _as = torch.where(_am >= 0, self.unit_seat.gather(1, _am.clamp(min=0)), torch.full_like(_am, -1))
-        _acs = torch.where(_ac >= 0, self.unit_seat.gather(1, _ac.clamp(min=0)), torch.full_like(_ac, -1))
-        besieged = ((self._seats_hostile(row, _as) | self._seats_hostile(row, _acs)) & (nbh >= 0)).any(dim=1)
+        # CIV6's siege: "if the invading army manages to establish zone of
+        # control on all passable tiles surrounding the City Center, it will no
+        # longer be able to repair the damage it suffers". EVERY passable
+        # neighbour has to be held, and it takes a MILITARY unit — a civilian
+        # exerts no zone of control. `encircled` is the twin.
+        held = self._seats_hostile(row, _as) & (_am >= 0)
+        passable = (nbh >= 0) & (self.passable | self.wpass).gather(1, nbc)
+        besieged = passable.any(dim=1) & ~(passable & ~held).any(dim=1)
         ok = act & ~besieged
-        # Unbesieged cities heal the flat rate, war or not (real Civ 6). The
-        # outer wall pool heals on the SAME gate and rate, full-HP or not.
+        # "The city will automatically regain 20 HP per turn" until it is
+        # encircled. The outer defenses are NOT on this gate: "once damaged,
+        # the outer defenses of a City Center or defensible district will not
+        # regenerate on their own", and come back only through the repair
+        # project.
         hp = self.city_hp[bidx, row, col]
         self.city_hp[bidx, row, col] = torch.where(
             ok, (hp + heal).clamp(max=int(self.rules.combat.get("cityMaxHp", 200))), hp)
-        if walled is not None:
-            oh = self.city_outer_hp[bidx, row, col]
-            self.city_outer_hp[bidx, row, col] = torch.where(
-                ok & self.city_bldg[bidx, row, col, self._walls_bidx], (oh + heal).clamp(max=self._walls_hp), oh)
         if e0 is not None:
-            rep = ok & (enc_reg >= 0) & self.district_complete[bidx, e0] & ~self.district_pillaged[bidx, e0]
+            # "This is an automatic action, which happens if its tile is not
+            # occupied" — an enemy standing on the district holds it silent.
+            _em = self.military_at.gather(1, e0.unsqueeze(1)).squeeze(1)
+            _ec = self.civilian_at.gather(1, e0.unsqueeze(1)).squeeze(1)
+            _es = torch.where(_em >= 0, self.unit_seat.gather(1, _em.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_em, -1))
+            _ecs = torch.where(_ec >= 0, self.unit_seat.gather(1, _ec.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_ec, -1))
+            occupied = (self._seats_hostile(row, _es.unsqueeze(1)) | self._seats_hostile(row, _ecs.unsqueeze(1))).squeeze(1)
+            rep = ok & ~occupied & (enc_reg >= 0) & self.district_complete[bidx, e0] & ~self.district_pillaged[bidx, e0]
             cur = self.encamp_hp[bidx, e0]
             self.encamp_hp[bidx, e0] = torch.where(rep, (cur + heal).clamp(max=self._encamp_hp_max), cur)
 
@@ -660,6 +678,7 @@ class SimPhase:
             rows = fin.nonzero(as_tuple=True)[0]
             self.civ_techs[rows, row, curt[rows]] = True
             self._eff_version += 1
+            self._urban_defenses_fit(row, fin & (curt == self._urban_def_tech))
             self.civ_tech_prog[:, row] = torch.where(fin, self.civ_tech_prog[:, row] - cost_t, self.civ_tech_prog[:, row])
             # A finished tech holds no parked science — its slot was emptied
             # when it became current — but clear it anyway, so the partition
@@ -954,7 +973,7 @@ class SimPhase:
 
     _CITY_SLOT_FIELDS = (
         "city_alive", "city_center", "city_pop", "city_growth", "city_cbox", "city_loyalty",
-        "city_acquired", "city_hp", "city_outer_hp", "city_id", "city_is_cap", "city_orig_cap", "city_current", "city_progress",
+        "city_acquired", "city_hp", "city_outer_hp", "city_last_hit", "city_id", "city_is_cap", "city_orig_cap", "city_current", "city_progress",
         "city_prod_bank",
         "city_cost", "city_qtile",
         "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts",
