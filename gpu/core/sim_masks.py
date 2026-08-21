@@ -450,45 +450,86 @@ class SimMasks:
         bits = (rm.unsqueeze(1) >> arange6) & 1  # [B, 6]
         return (bits * match.long()).sum(dim=1)  # 0 or 1
 
+    def _flank_support_live(self, seat: torch.Tensor) -> torch.Tensor:
+        """[B] bool `flankSupportLive` — CIV6 (Flanking and Support): both
+        bonuses "are unavailable at the start of the game, and are unlocked
+        only after researching Military Tradition", and "Barbarians can gain
+        Flanking and Support once at least half of the major civilizations have
+        researched Military Tradition". Every seat that is not a major reads
+        that count."""
+        if self._flank_support_civic < 0:
+            return torch.zeros_like(seat, dtype=torch.bool)
+        col = self.civ_civics[:, :, self._flank_support_civic]  # [B, n_majors]
+        half = (col.long().sum(dim=1) * 2) >= self.n_majors
+        major = (seat >= 0) & (seat < self.n_majors)
+        own = col.gather(1, seat.clamp(min=0, max=self.n_majors - 1).unsqueeze(1)).squeeze(1)
+        return torch.where(major, own, half)
+
+    def _class_matchup_cs(self, own_type: torch.Tensor, foe_type: torch.Tensor) -> torch.Tensor:
+        """[B] long `classMatchupCS` — CIV6 (Combat, "Unit class modifiers"):
+        "Melee units receive a +5 CS bonus against anti-cavalry units.
+        Anti-cavalry units receive a +10 CS bonus against light cavalry, heavy
+        cavalry, or ranged cavalry units." Whichever side of the roll holds the
+        class asks this about the other."""
+        o = own_type.clamp(min=0, max=self.NU - 1)
+        f = foe_type.clamp(min=0, max=self.NU - 1)
+        out = torch.zeros_like(o)
+        out = torch.where(self._type_melee[o] & self._type_anticav[f],
+                          torch.full_like(out, self._class_melee_vs_anticav), out)
+        out = torch.where((out == 0) & self._type_anticav[o] & self._type_cavalry[f],
+                          torch.full_like(out, self._class_anticav_vs_cav), out)
+        return out
+
+    def _embarked_def_cs(self, seat: torch.Tensor) -> torch.Tensor:
+        """[B] long `embarkedDefenseCS` — the normalized CS an embarked unit of
+        this seat defends at, off the OWNER's technological era. A seat that
+        researches nothing of its own reads era 0."""
+        era = torch.zeros_like(seat)
+        for r in range(self.n_majors):
+            era = torch.where(seat == r, self._civ_era(self.civ_techs[:, r], self.civ_civics[:, r]), era)
+        return self._embarked_def_by_era[era.clamp(min=0, max=self._embarked_def_by_era.numel() - 1)]
+
     def _flank_support(
         self,
         def_tile: torch.Tensor,
         def_seat: torch.Tensor,
         attacker_tile: torch.Tensor,
+        attacker_seat: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Mirrors combat.ts flankCount/supportCount. For a UNIT defender on
-        def_tile [B], count the MILITARY units on the 6 adjacent tiles that
-        are hostile to (flanking) or friendly to (support) the defender.
+        """`flankCount` / `supportCount` for a UNIT defender on def_tile [B].
 
-        def_seat [B] long: the defender's seat (0..n_majors-1 for the majors, BARB_SEAT
-        barbarians). attacker_tile [B]: the tile of the melee attacker to
-        EXCLUDE from flanking (u != attacker); pass all -1 for a ranged/city
-        attacker (support-only sites — the returned flank is then unused).
+        FLANKING counts the military units on the 6 adjacent tiles that the
+        ATTACKER owns — "only units that are currently owned by the same player
+        can provide Flanking to one another" — never the attacker itself, never
+        an EMBARKED one ("embarked land units do not provide Flanking"), and
+        never one whose tile is across a River from the target.
+
+        SUPPORT counts the DEFENDER's own adjacent military, embarked ones
+        included ("embarked land units provide Support like normal"), and pays
+        nothing at all while the defender stands in a defensible district.
 
         Stacking blocks foreign units, so each tile holds at most ONE military
         unit — each of the 6 neighbours contributes 0 or 1. Returns
         (flank [B] long, support [B] long)."""
-        nb = self.neigh[def_tile.clamp(min=0)]
+        dt = def_tile.clamp(min=0)
+        nb = self.neigh[dt]
         nbc = nb.clamp(min=0)
         on = nb >= 0
-        # TWO gathers: the defender's SEAT and each neighbour's, in the one
-        # absolute space, so the unitsHostile question is asked once.
-        #
-        # An EMBARKED military unit flanks and supports for NOBODY. Barbarians
-        # never embark, so the merged emb plane answers for every unit with one
-        # read.
         mslot = self.military_at.gather(1, nbc)  # [B, 6]
-        present = (mslot >= 0) & on & ~self.unit_emb.gather(1, mslot.clamp(min=0))
-        d_seat = def_seat.reshape(self.B, 1)
-        n_seat = torch.where(
-            present, self.unit_seat.gather(1, mslot.clamp(min=0)), torch.full_like(nbc, -1)
-        )
+        here = (mslot >= 0) & on
+        emb = self.unit_emb.gather(1, mslot.clamp(min=0))
+        n_seat = torch.where(here, self.unit_seat.gather(1, mslot.clamp(min=0)), torch.full_like(nbc, -1))
 
-        hostile = self._seats_hostile(d_seat, n_seat)
+        riv = (self.river_mask.gather(1, dt.unsqueeze(1)) >> torch.arange(6, device=self.device)) & 1
         is_atk = (nb == attacker_tile.unsqueeze(1)) & (attacker_tile.unsqueeze(1) >= 0)
-        hostile = hostile & ~is_atk
-        friendly = present & (n_seat == d_seat)
-        return hostile.long().sum(dim=1), friendly.long().sum(dim=1)
+        mine = here & ~emb & (n_seat == attacker_seat.unsqueeze(1)) & ~is_atk & (riv == 0)
+        flank = mine.long().sum(dim=1) * self._flank_support_live(attacker_seat).long()
+
+        friendly = here & (n_seat == def_seat.unsqueeze(1))
+        sup = friendly.long().sum(dim=1) * self._flank_support_live(def_seat).long()
+        in_district = (self._centre_seat_plane().gather(1, dt.unsqueeze(1)).squeeze(1) >= 0) \
+            | self._encamp_live().gather(1, dt.unsqueeze(1)).squeeze(1)
+        return flank, torch.where(in_district, torch.zeros_like(sup), sup)
 
     def _trade_water_level(self, row: int) -> torch.Tensor:
         """[B] long — how far out to sea this seat's Traders may go

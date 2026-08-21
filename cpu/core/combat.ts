@@ -13,9 +13,9 @@ import { CITY_STATE_MAX_HP, KABUL_XP_MULT, PRESLAV_HILL_CS } from '../data/cityS
 import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER } from '../data/seats';
 import { addEraScore } from './eras';
-import { nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, crossesRiver, cliffBlocksStep, stepUnit } from './units';
+import { nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocksStep, stepUnit } from './units';
 import { outerPool, wallsMax, wallsTier } from './rules';
-import { EMBARKED_DEFENSE_CS, embarkState } from '../data/constants';
+import { EMBARKED_DEFENSE_CS_BY_ERA, embarkState } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, type BeliefEffects } from '../data/religion';
 import { revealAround, unexploredByAll } from './fog';
@@ -155,25 +155,81 @@ export function awardDefenseXp(defender: Unit): void {
   if (defender.hp > 0 && unitDomain(defender.type) === 'military') gainXp(defender, XP_DEFEND);
 }
 
-function flankCount(state: GameState, defTileIndex: number, attacker: Unit, defender: Unit): number {
+/**
+ * CIV6 (Combat, "Unit class modifiers"): "Melee units receive a +5 CS bonus
+ * against anti-cavalry units. Anti-cavalry units receive a +10 CS bonus
+ * against light cavalry, heavy cavalry, or ranged cavalry units." The modifier
+ * belongs to whichever unit holds the class, attacking or defending, so both
+ * sides of a roll ask it about the other.
+ */
+export const CLASS_MELEE_VS_ANTICAV = 5;
+export const CLASS_ANTICAV_VS_CAV = 10;
+
+export function classMatchupCS(ownType: string, foeType: string): number {
+  const me = UNITS[ownType];
+  const foe = UNITS[foeType];
+  if (!me || !foe) return 0;
+  if (me.melee && foe.antiCavalry) return CLASS_MELEE_VS_ANTICAV;
+  if (me.antiCavalry && foe.cavalry) return CLASS_ANTICAV_VS_CAV;
+  return 0;
+}
+
+/**
+ * CIV6 (Flanking and Support): both bonuses "are unavailable at the start of
+ * the game, and are unlocked only after researching Military Tradition", and
+ * "Barbarians can gain Flanking and Support once at least half of the major
+ * civilizations have researched Military Tradition". Every seat that is not a
+ * major reads that same count — a barbarian has a Seat record but never
+ * researches, so asking its own civics would keep it disarmed forever.
+ */
+export const FLANK_SUPPORT_CIVIC = 'MILITARY_TRADITION';
+
+export function flankSupportLive(state: GameState, seat: number): boolean {
+  if (isCiv(seat)) return seatOf(state, seat)?.research.civics.includes(FLANK_SUPPORT_CIVIC) ?? false;
+  const have = state.seats.filter((x) => x.research.civics.includes(FLANK_SUPPORT_CIVIC)).length;
+  return have * 2 >= state.seats.length;
+}
+
+/**
+ * CIV6 (Flanking): "The attacker will gain 2 Combat Strength for each friendly
+ * unit adjacent to the target of the attack" — friendly meaning "units that
+ * are currently owned by the same player", never an ally's and never a third
+ * party's. "The attacker itself does not count." "Embarked land units do not
+ * provide Flanking." "Units across a River from the targeted enemy do not
+ * provide Flanking."
+ */
+export function flankCount(state: GameState, defTileIndex: number, attacker: Unit): number {
+  if (!flankSupportLive(state, attacker.seat)) return 0;
+  const dt = state.map.tiles[defTileIndex];
   let n = 0;
-  for (const t of neighbors(state.map, state.map.tiles[defTileIndex])) {
+  for (const t of neighbors(state.map, dt)) {
+    if (crossesRiver(dt, t)) continue;
     for (const u of unitsAt(state, t.index)) {
       if (u.id === attacker.id) continue;
       if (unitDomain(u.type) !== 'military') continue;
-      if (u.embarked) continue; // embarked units flank for nobody
-      if (unitsHostile(state, u, defender)) n++;
+      if (u.embarked) continue;
+      if (u.seat === attacker.seat) n++;
     }
   }
   return n;
 }
 
+/**
+ * CIV6 (Support): "The defender will gain 2 Combat Strength for each adjacent
+ * friendly unit", same ownership only. "Embarked land units provide Support
+ * like normal" — the one place they differ from flanking. "Units will not gain
+ * Support when inside defensible Districts (City Center, Encampment)", though
+ * units inside one still provide it. Support is a MELEE-only term, and the
+ * callers hold that gate: a ranged attacker never asks for it.
+ */
 export function supportCount(state: GameState, defTileIndex: number, defender: Unit): number {
+  if (!flankSupportLive(state, defender.seat)) return 0;
+  const dt = state.map.tiles[defTileIndex];
+  if (dt.district === 'CITY_CENTER' || encampmentIntact(dt)) return 0;
   let n = 0;
-  for (const t of neighbors(state.map, state.map.tiles[defTileIndex])) {
+  for (const t of neighbors(state.map, dt)) {
     for (const u of unitsAt(state, t.index)) {
       if (unitDomain(u.type) !== 'military') continue;
-      if (u.embarked) continue; // embarked units support nobody
       if (u.seat === defender.seat) n++;
     }
   }
@@ -264,15 +320,26 @@ export function cavalryHillCS(state: GameState, unit: Unit, tileIndex: number): 
   return suzerainEffect(state, unitSeat(unit), 'cavalryHills') ? PRESLAV_HILL_CS : 0;
 }
 
-export function defenderCS(state: GameState, defender: Unit, defTileIndex: number): number {
-  if (defender.embarked) return EMBARKED_DEFENSE_CS - woundPenalty(defender) + generalAuraCS(state, defender, defTileIndex);
+/** The Combat Strength an embarked unit of this seat defends at — the owner's
+ *  technological era, which `civEraIndex` already measures the way the page
+ *  does ("the first technology or civic of that era"). */
+export function embarkedDefenseCS(state: GameState, seat: number): number {
+  const s = seatOf(state, seat);
+  const era = s ? civEraIndex(s.research.techs, s.research.civics) : 0;
+  return EMBARKED_DEFENSE_CS_BY_ERA[Math.min(era, EMBARKED_DEFENSE_CS_BY_ERA.length - 1)];
+}
+
+export function defenderCS(state: GameState, defender: Unit, defTileIndex: number,
+                           vs?: { attacker: Unit; melee: boolean }): number {
+  if (defender.embarked) return embarkedDefenseCS(state, defender.seat) - woundPenalty(defender) + generalAuraCS(state, defender, defTileIndex);
   const tile = state.map.tiles[defTileIndex];
   return (
     (UNITS[defender.type]?.combat ?? 0) +
     terrainDefense(tile) +
     fortifyBonus(defender) -
     woundPenalty(defender) +
-    SUPPORT_CS * supportCount(state, defTileIndex, defender) +
+    (vs?.melee ? SUPPORT_CS * supportCount(state, defTileIndex, defender) : 0) +
+    (vs ? classMatchupCS(defender.type, vs.attacker.type) : 0) +
     xpLevelBonus(defender) + // veterancy — an embarked defender got the flat override above (no xp)
     religionDefenseCS(state, defender, defTileIndex) + // enhancer adders (unit-vs-unit — every defenderCS caller is one; city strikes assemble inline without them)
     cavalryHillCS(state, defender, defTileIndex) + // Preslav's suzerain
@@ -773,9 +840,10 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
       return ok;
     }
   } else {
-    const atkCSf = atkCS + FLANKING_CS * flankCount(state, targetIndex, attacker, defender) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + cavalryHillCS(state, attacker, attacker.tileIndex) + generalAuraCS(state, attacker, attacker.tileIndex) // aura keyed on the ATTACKER's own tile
+    const atkCSf = atkCS + FLANKING_CS * flankCount(state, targetIndex, attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + cavalryHillCS(state, attacker, attacker.tileIndex) + generalAuraCS(state, attacker, attacker.tileIndex) // aura keyed on the ATTACKER's own tile
+      + classMatchupCS(attacker.type, defender.type)
       + emergencyAttackCS(state, attacker.seat, defender.seat); // an emergency MEMBER hits its target harder
-    const defCSf = defenderCS(state, defender, targetIndex);
+    const defCSf = defenderCS(state, defender, targetIndex, { attacker, melee: true });
     defender.hp -= damageRoll(state, atkCSf - defCSf, 'mel', targetIndex);
     attacker.hp -= damageRoll(state, defCSf - atkCSf, 'melc', targetIndex);
     gainAttackXp(state, attacker); // +5 for the attack executed
@@ -879,8 +947,8 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   }
   if (enemies.length === 0) return no('Nothing to attack there.');
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
-  const defCS = defenderCS(state, defender, targetIndex);
-  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rng', targetIndex);
+  const defCS = defenderCS(state, defender, targetIndex, { attacker, melee: false });
+  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type)) - defCS, 'rng', targetIndex);
   gainAttackXp(state, attacker); // +5 for the ranged attack executed
   awardDefenseXp(defender); // +2 to a surviving military defender (civilians excluded)
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
@@ -930,8 +998,8 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   );
   if (enemies.length === 0) return; // the CITY_CENTER quirk: a no-op, like meleeAttack's `no(...)`
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
-  const defCS = defenderCS(state, defender, targetIndex);
-  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'vrng', targetIndex);
+  const defCS = defenderCS(state, defender, targetIndex, { attacker, melee: false });
+  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type)) - defCS, 'vrng', targetIndex);
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
   gainAttackXp(state, attacker); // +5 for the ranged strike executed
   awardDefenseXp(defender); // +2 to a surviving military defender

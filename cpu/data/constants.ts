@@ -41,10 +41,18 @@ export const FOOD_PER_CITIZEN = 2;
  * at cost 1; embark/disembark transitions cost ALL remaining MP (real Civ 6). */
 export const EMBARK_MOVES = 2;
 
-/** an EMBARKED land unit defends at this flat combat strength (minus
- * its wound penalty) — NO terrain, fortify or support terms, and it cannot
- * attack. Real Civ 6 embarked units are highly vulnerable at sea. */
-export const EMBARKED_DEFENSE_CS = 10;
+/**
+ * CIV6 (Combat, "Attacking embarked units"): an embarked unit defends at a
+ * Combat Strength "normalized for all unit classes", which "is used when
+ * embarked units are defending, depends on the owner's current technological
+ * era (not the World Era), and is updated upon discovery of the first
+ * technology or civic of that era". Indexed by `ERAS`. The published list
+ * starts at Classical — embarking needs a Classical technology, so the Ancient
+ * row repeats the first stated tier rather than inventing one. NO terrain,
+ * fortify, support or class terms ride on top: the class is what the
+ * normalization removes.
+ */
+export const EMBARKED_DEFENSE_CS_BY_ERA: readonly number[] = [15, 15, 15, 30, 35, 50, 55, 55, 55];
 
 /** master switch for the LIVE scripted WATER movement (the seat
  * war-march taking water steps). N1 lands the full embark/movement MODEL and

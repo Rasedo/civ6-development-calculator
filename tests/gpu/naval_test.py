@@ -597,23 +597,40 @@ def poke_flank_support(rules, path, GALLEY):
             break
     assert dt >= 0, "no isolated tile for the flank/support scenario"
     n_sup = int(sim.neigh[dt][0])  # a naval ALLY of the civ-seat defender (support)
-    n_flk = int(sim.neigh[dt][1])  # a seat-0 ship HOSTILE to that defender (flank)
+    n_flk = int(sim.neigh[dt][1])  # a ship the seat-0 ATTACKER owns (flank)
     ally = place_mil(sim, r + 1, n_sup, GALLEY)      # galley on the defender's own seat
-    foe = place_mil(sim, 0, n_flk, GALLEY)          # seat-0 galley
+    mine = place_mil(sim, 0, n_flk, GALLEY)          # seat-0 galley
 
-    # _flank_support takes the defender's SEAT
-    dtile = torch.tensor([dt]); dseat = torch.tensor([r + 1]); noatk = torch.tensor([-1])
-    flank0, sup0 = sim._flank_support(dtile, dseat, noatk)
+    dtile = torch.tensor([dt]); dseat = torch.tensor([r + 1])
+    noatk = torch.tensor([-1]); aseat = torch.tensor([0])
+    assert sim._flank_support_civic >= 0, "the rules must name the flank/support civic"
+
+    # CIV6: both bonuses "are unlocked only after researching Military Tradition"
+    sim.civ_civics[0, :, sim._flank_support_civic] = False
+    f_off, s_off = sim._flank_support(dtile, dseat, noatk, aseat)
+    assert int(f_off) == 0 and int(s_off) == 0, "no Military Tradition, no flanking and no support"
+    sim.civ_civics[0, :, sim._flank_support_civic] = True
+
+    flank0, sup0 = sim._flank_support(dtile, dseat, noatk, aseat)
     assert int(sup0) >= 1, "a civ naval ally must count for support"
-    assert int(flank0) >= 1, "a seat-0 naval unit must count for flanking"
+    assert int(flank0) >= 1, "a naval unit the ATTACKER owns must count for flanking"
 
-    # embark BOTH — neither contributes now.
+    # CIV6: "embarked land units do not provide Flanking", but they "provide
+    # Support like normal" — the one rule where the two part company.
     sim.major_unit_emb[0, ally] = True
-    sim.major_unit_emb[0, foe] = True
-    flank1, sup1 = sim._flank_support(dtile, dseat, noatk)
-    assert int(sup0) - int(sup1) == 1, "the naval ally embarked must drop support by exactly 1"
-    assert int(flank0) - int(flank1) == 1, "the naval unit embarked must drop flanking by exactly 1"
-    print(f"  9 flank/support OK (naval counts flank {int(flank0)}/support {int(sup0)}; embarked -> {int(flank1)}/{int(sup1)})")
+    sim.major_unit_emb[0, mine] = True
+    flank1, sup1 = sim._flank_support(dtile, dseat, noatk, aseat)
+    assert int(sup1) == int(sup0), "an embarked ally must still support"
+    assert int(flank0) - int(flank1) == 1, "an embarked unit must stop flanking"
+
+    # CIV6: "units across a River from the targeted enemy do not provide Flanking"
+    sim.major_unit_emb[0, mine] = False
+    was_river = int(sim.river_mask[0, dt])
+    sim.river_mask[0, dt] = 0b111111
+    flank2, _ = sim._flank_support(dtile, dseat, noatk, aseat)
+    assert int(flank2) == 0, "a river on every edge must leave no flanker"
+    sim.river_mask[0, dt] = was_river
+    print(f"  9 flank/support OK (flank {int(flank0)}/support {int(sup0)}; embarked -> {int(flank1)}/{int(sup1)}, river -> 0)")
 
 
 def main() -> None:

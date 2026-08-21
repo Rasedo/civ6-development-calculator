@@ -1360,7 +1360,14 @@ class SimInit:
         # indices (military embarks on SHIPBUILDING, civilians on SAILING,
         # OCEAN needs CARTOGRAPHY).
         self._embark_moves = int(cb.get("embarkMoves", 2))
-        self._embarked_defense_cs = float(cb.get("embarkedDefenseCs", 10))
+        # CIV6 (Combat): the CS an embarked unit DEFENDS at, by the OWNER's
+        # technological era; and the two "Unit class modifiers", with the civic
+        # that unlocks flanking and support at all.
+        self._embarked_def_by_era = torch.tensor(
+            [int(x) for x in cb.get("embarkedDefenseCsByEra", [15])], dtype=torch.long, device=device)
+        self._class_melee_vs_anticav = int(cb.get("classMeleeVsAnticav", 5))
+        self._class_anticav_vs_cav = int(cb.get("classAnticavVsCav", 10))
+        self._flank_support_civic = int(cb.get("flankSupportCivic", -1))
         self._embark_live = bool(cb.get("embarkLive", 0))
         self._shipbuilding_tech = int(cb.get("shipbuildingTech", -1))
         self._cartography_tech = int(cb.get("cartographyTech", -1))

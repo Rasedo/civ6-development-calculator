@@ -86,10 +86,11 @@ class SimPhase:
         d_type = self.unit_type[bidx, ds0]
         def_xp = torch.where(is_vet_mil, self._xp_lvl_bonus(self.unit_xp[bidx, ds0]), torch.zeros_like(tt))
         def_cs = self._type_combat[d_type] + self._tdef_i(bidx, tt) + def_xp
-        # An embarked target (military or civilian; barbs never embark) → flat
-        # CS, no terrain and no support.
+        # An embarked target (military or civilian; barbs never embark) → the
+        # era's normalized CS, no terrain and no support.
         d_emb = self.unit_emb[bidx, ds0] & (d_slot >= 0)
-        def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
+        if bool(d_emb.any()):
+            def_cs = torch.where(d_emb, self._embarked_def_cs(d_seat).to(def_cs.dtype), def_cs)
         gslot = self.military_at[bidx, ctr]
         gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == row)).long()
         bm = self.civ_best_melee[:, row]
@@ -102,9 +103,9 @@ class SimPhase:
             _emg_s = _emg_s + (d_seat == _d).double() * self._emergency_strike_cs(row, _d)
         atk_cs = atk_cs + _emg_s.to(atk_cs.dtype)
         def_hp = self.unit_hp[bidx, ds0]
+        # a CITY STRIKE is a ranged attack, and "ranged attacks ignore any
+        # Support received by the defender"
         def_e = def_cs - self._wound(def_hp)
-        _, _sp = self._flank_support(tt, d_seat, torch.full((Bn,), -1, dtype=torch.long, device=dev2))
-        def_e = def_e + SUPPORT_CS * torch.where(d_emb, torch.zeros_like(_sp), _sp)
         _def_seat = torch.where(is_vet_mil, d_seat, torch.full_like(tt, -1))
         _def_nav = torch.where(is_vet_mil, self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
         def_e = def_e + self._gen_aura_cs(_def_seat, tt, d_emb | _def_nav).to(def_e.dtype)

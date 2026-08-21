@@ -3,10 +3,10 @@ import { emptySeat, isCiv, seatOf, setTileOwner, setWar, tileCity } from '../../
 import { makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
 import { purchaseUnit } from '../../../cpu/core/game';
 import { moveCostInto, unitPassable, canEmbark, waterEnterable, ownerHasTech, inEnemyZoc, spawnUnit, tileFreeForUnit, cityNavalCapable, trainableUnits, queueUnit, orderMove, walkPath } from '../../../cpu/core/units';
-import { hostileUnitAct, meleeAttack, defenderCS } from '../../../cpu/core/combat';
+import { hostileUnitAct, meleeAttack, defenderCS, embarkedDefenseCS } from '../../../cpu/core/combat';
 import { neighbors } from '../../../world/hex';
 import { isWater } from '../../../world/query';
-import { EMBARKED_DEFENSE_CS, setEmbarkLive } from '../../../cpu/data/constants';
+import { EMBARKED_DEFENSE_CS_BY_ERA, setEmbarkLive } from '../../../cpu/data/constants';
 import type { GameState, City, Seat, Unit } from '../../../cpu/core/types';
 
 // the MOVEMENT + EMBARKATION model. The scripted civ war-march is
@@ -303,14 +303,23 @@ describe('N2 naval spawn + combat', () => {
       embarked: true, fortifyTurns: 2,
     };
     state.units.push(embarked);
-    expect(defenderCS(state, embarked, water.index)).toBe(EMBARKED_DEFENSE_CS);
+    const flat = embarkedDefenseCS(state, civ.seat);
+    expect(flat).toBe(EMBARKED_DEFENSE_CS_BY_ERA[0]);
+    expect(defenderCS(state, embarked, water.index)).toBe(flat);
     // wounded embarked: flat CS minus the linear wound penalty
     embarked.hp = 50;
-    expect(defenderCS(state, embarked, water.index)).toBe(EMBARKED_DEFENSE_CS - 5);
-    // grounded, it fights at full strength (override gone: combat 20 > 10)
+    expect(defenderCS(state, embarked, water.index)).toBe(flat - 5);
+    // CIV6: the flat CS "depends on the owner's current technological era ...
+    // and is updated upon discovery of the first technology or civic of that
+    // era" — one Renaissance civic doubles what this transport defends at.
     embarked.hp = 100;
+    civ.research.civics.push('EXPLORATION');
+    expect(embarkedDefenseCS(state, civ.seat)).toBe(EMBARKED_DEFENSE_CS_BY_ERA[3]);
+    expect(defenderCS(state, embarked, water.index)).toBe(EMBARKED_DEFENSE_CS_BY_ERA[3]);
+    // grounded, the override is gone: the unit's own 20 plus the two turns of
+    // fortification the flat CS was ignoring
     embarked.embarked = false;
-    expect(defenderCS(state, embarked, water.index)).toBeGreaterThan(EMBARKED_DEFENSE_CS);
+    expect(defenderCS(state, embarked, water.index)).toBe(20 + 6);
   });
 
   it('capturing an embarked civilian KEEPS it embarked and appends it pool-end', () => {

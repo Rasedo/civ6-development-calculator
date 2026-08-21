@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { BARB_SEAT, emptySeat, isBarbSeat, seatOf, setWar } from '../../../cpu/core/seats';
-import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
+import { makeMap, makeState, settleAt, tileAtCoords, grantCivics } from '../helpers';
 import { endTurn, foundCity, serialize, deserialize } from '../../../cpu/core/game';
 import { seatPhase } from '../../../cpu/core/phase';
 import { spawnUnit, builderRepair } from '../../../cpu/core/units';
-import { meleeAttack, rangedAttack, attackTargets, terrainDefense, barbarianPhase, FLANKING_CS, SUPPORT_CS, XP_ATTACK, XP_DEFEND, XP_LEVELS, xpLevelBonus, unitLevel, awardDefenseXp } from '../../../cpu/core/combat';
+import { meleeAttack, rangedAttack, attackTargets, terrainDefense, barbarianPhase, FLANKING_CS, SUPPORT_CS, XP_ATTACK, XP_DEFEND, XP_LEVELS, xpLevelBonus, unitLevel, awardDefenseXp, flankCount, supportCount, flankSupportLive, FLANK_SUPPORT_CIVIC, classMatchupCS, CLASS_MELEE_VS_ANTICAV, CLASS_ANTICAV_VS_CAV } from '../../../cpu/core/combat';
 import { routePlunderer } from '../../../cpu/core/trade';
 import { CITY_MAX_HP } from '../../../cpu/data/units';
 import { neighbors } from '../../../world/hex';
@@ -241,12 +241,39 @@ describe('flanking & support', () => {
     expect(SUPPORT_CS).toBe(2);
   });
 
+  // The scenes below all grant MILITARY_TRADITION to seat 0, which is also what
+  // switches the BARBARIANS on: with one major in the game, one researcher is
+  // "at least half of the major civilizations".
+  const armed = () => {
+    const b = battlefield();
+    grantCivics(b.state, FLANK_SUPPORT_CIVIC);
+    return b;
+  };
+
+  it('CIV6: neither bonus exists before Military Tradition', () => {
+    const { state } = battlefield();
+    const atkTile = tileAtCoords(state.map, 11, 9).index;
+    const defTile = tileAtCoords(state.map, 12, 9).index;
+    const atk = spawnUnit(state, 'WARRIOR', atkTile, 0)!;
+    const def = spawnUnit(state, 'WARRIOR', defTile, BARB_SEAT)!;
+    const fn = freeNeighbor(state, defTile, atkTile);
+    spawnUnit(state, 'WARRIOR', fn.index, 0);
+    expect(flankSupportLive(state, 0)).toBe(false);
+    expect(flankSupportLive(state, BARB_SEAT)).toBe(false);
+    expect(flankCount(state, defTile, atk)).toBe(0);
+    expect(supportCount(state, defTile, def)).toBe(0);
+    grantCivics(state, FLANK_SUPPORT_CIVIC);
+    expect(flankSupportLive(state, 0)).toBe(true);
+    expect(flankSupportLive(state, BARB_SEAT)).toBe(true); // 1 of 1 majors is half
+    expect(flankCount(state, defTile, atk)).toBe(1);
+  });
+
   it('a melee attacker gains +2 CS per flanker adjacent to the defender', () => {
     const base = battlefield();
     const atkTile = tileAtCoords(base.state.map, 11, 9).index;
     const defTile = tileAtCoords(base.state.map, 12, 9).index;
     const setup = () => {
-      const { state } = battlefield();
+      const { state } = armed();
       const atk = spawnUnit(state, 'WARRIOR', atkTile, 0)!;
       atk.tileIndex = atkTile;
       const def = spawnUnit(state, 'WARRIOR', defTile, BARB_SEAT)!;
@@ -263,14 +290,43 @@ describe('flanking & support', () => {
     flanker.tileIndex = fn.index;
     const d1 = rollDiff('mel', () => meleeAttack(flanked.state, flanked.atk.id, defTile, 0));
 
-    expect(d1).toBe(d0 + SUPPORT_CS * 0 + FLANKING_CS * 10); // +2 CS -> +20 in diff·10
+    expect(d1).toBe(d0 + FLANKING_CS * 10); // +2 CS -> +20 in diff·10
+  });
+
+  it('CIV6: only units the ATTACKER owns provide Flanking', () => {
+    const { state } = armed();
+    state.seats.push(emptySeat(1));
+    const atkTile = tileAtCoords(state.map, 11, 9).index;
+    const defTile = tileAtCoords(state.map, 12, 9).index;
+    const atk = spawnUnit(state, 'WARRIOR', atkTile, 0)!;
+    spawnUnit(state, 'WARRIOR', defTile, BARB_SEAT);
+    const fn = freeNeighbor(state, defTile, atkTile);
+    // hostile to the defender (barbarians are hostile to everyone) but NOT mine
+    const third = spawnUnit(state, 'WARRIOR', fn.index, 1)!;
+    third.tileIndex = fn.index;
+    expect(flankCount(state, defTile, atk)).toBe(0);
+    third.seat = 0;
+    expect(flankCount(state, defTile, atk)).toBe(1);
+  });
+
+  it('CIV6: "units across a River from the targeted enemy do not provide Flanking"', () => {
+    const { state } = armed();
+    const atkTile = tileAtCoords(state.map, 11, 9).index;
+    const defTile = tileAtCoords(state.map, 12, 9).index;
+    const atk = spawnUnit(state, 'WARRIOR', atkTile, 0)!;
+    spawnUnit(state, 'WARRIOR', defTile, BARB_SEAT);
+    const fn = freeNeighbor(state, defTile, atkTile);
+    spawnUnit(state, 'WARRIOR', fn.index, 0);
+    expect(flankCount(state, defTile, atk)).toBe(1);
+    state.map.tiles[defTile].riverMask = 0b111111; // a river on every edge
+    expect(flankCount(state, defTile, atk)).toBe(0);
   });
 
   it('a melee defender gains +2 CS per adjacent friendly military (support)', () => {
     const atkC = { col: 11, row: 9 };
     const defC = { col: 12, row: 9 };
     const setup = () => {
-      const { state } = battlefield();
+      const { state } = armed();
       const atkTile = tileAtCoords(state.map, atkC.col, atkC.row).index;
       const defTile = tileAtCoords(state.map, defC.col, defC.row).index;
       const atk = spawnUnit(state, 'WARRIOR', atkTile, 0)!;
@@ -292,9 +348,9 @@ describe('flanking & support', () => {
     expect(d1).toBe(d0 - SUPPORT_CS * 10); // defender +2 CS -> −20 in diff·10
   });
 
-  it('support also aids the defender against a ranged attack (no flanking there)', () => {
+  it('CIV6: "ranged attacks ignore any Support received by the defender"', () => {
     const setup = () => {
-      const { state } = battlefield();
+      const { state } = armed();
       const atkTile = tileAtCoords(state.map, 11, 9).index;
       const defTile = tileAtCoords(state.map, 13, 9).index; // range 2
       const archer = spawnUnit(state, 'ARCHER', atkTile, 0)!;
@@ -311,9 +367,64 @@ describe('flanking & support', () => {
     const sn = freeNeighbor(supported.state, supported.defTile, supported.atkTile);
     const helper = spawnUnit(supported.state, 'WARRIOR', sn.index, BARB_SEAT)!;
     helper.tileIndex = sn.index;
+    // the support is REAL — a melee attack would feel it
+    expect(supportCount(supported.state, supported.defTile, helper)).toBe(1);
     const d1 = rollDiff('rng', () => rangedAttack(supported.state, supported.archer.id, supported.defTile, 0));
 
-    expect(d1).toBe(d0 - SUPPORT_CS * 10);
+    expect(d1).toBe(d0);
+  });
+
+  it('CIV6: a defender inside a defensible district gains no Support', () => {
+    const { state, city } = armed();
+    const def = spawnUnit(state, 'WARRIOR', city.centerIndex, 0)!;
+    const sn = neighbors(state.map, state.map.tiles[city.centerIndex]).find((t) => unitPassable(t))!;
+    spawnUnit(state, 'WARRIOR', sn.index, 0);
+    expect(supportCount(state, city.centerIndex, def)).toBe(0);
+    // the same pair one tile off the centre does get it
+    expect(supportCount(state, sn.index, def)).toBeGreaterThan(0);
+  });
+});
+
+// CIV6 (Combat, "Unit class modifiers"): "Melee units receive a +5 CS bonus
+// against anti-cavalry units. Anti-cavalry units receive a +10 CS bonus against
+// light cavalry, heavy cavalry, or ranged cavalry units."
+describe('unit class modifiers', () => {
+  it('pays +5 melee-vs-anti-cavalry and +10 anti-cavalry-vs-cavalry, and nothing else', () => {
+    expect(classMatchupCS('WARRIOR', 'SPEARMAN')).toBe(CLASS_MELEE_VS_ANTICAV);
+    expect(classMatchupCS('MUSKETMAN', 'PIKEMAN')).toBe(CLASS_MELEE_VS_ANTICAV);
+    expect(classMatchupCS('SPEARMAN', 'HORSEMAN')).toBe(CLASS_ANTICAV_VS_CAV);
+    expect(classMatchupCS('PIKEMAN', 'KNIGHT')).toBe(CLASS_ANTICAV_VS_CAV);
+    // the pairings that do NOT exist
+    expect(classMatchupCS('SPEARMAN', 'WARRIOR')).toBe(0);   // anti-cav vs melee
+    expect(classMatchupCS('HORSEMAN', 'SPEARMAN')).toBe(0);  // cavalry vs anti-cav
+    expect(classMatchupCS('WARRIOR', 'KNIGHT')).toBe(0);     // melee vs cavalry
+    expect(classMatchupCS('ARCHER', 'SPEARMAN')).toBe(0);    // ranged is neither
+  });
+
+  it('both sides of one melee roll carry their own class term', () => {
+    const rollDiff = (tag: string, fn: () => void): number => {
+      const log: string[] = [];
+      (globalThis as any).__cbLog = log;
+      try { fn(); } finally { delete (globalThis as any).__cbLog; }
+      return Number(log.find((l) => l.startsWith(`k:${tag} `))!.match(/diff(-?\d+)/)![1]);
+    };
+    const scene = (atkType: string, defType: string) => {
+      const state = makeState(makeMap(20, 20));
+      state.unitsMode = true;
+      settleAt(state, tileAtCoords(state.map, 9, 9).index);
+      const atkTile = tileAtCoords(state.map, 11, 9).index;
+      const defTile = tileAtCoords(state.map, 12, 9).index;
+      const atk = spawnUnit(state, atkType, atkTile, 0)!;
+      spawnUnit(state, defType, defTile, BARB_SEAT);
+      return rollDiff('mel', () => meleeAttack(state, atk.id, defTile, 0));
+    };
+    const SPEAR_OVER_ARCHER = 25 - 15; // the two defenders' own Combat Strength
+    // a Warrior into a Spearman: +5 to me, nothing to it
+    expect(scene('WARRIOR', 'SPEARMAN') - scene('WARRIOR', 'ARCHER'))
+      .toBe((CLASS_MELEE_VS_ANTICAV - SPEAR_OVER_ARCHER) * 10);
+    // a Horseman into a Spearman: nothing to me, +10 to it
+    expect(scene('HORSEMAN', 'ARCHER') - scene('HORSEMAN', 'SPEARMAN'))
+      .toBe((SPEAR_OVER_ARCHER + CLASS_ANTICAV_VS_CAV) * 10);
   });
 });
 

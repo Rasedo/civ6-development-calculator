@@ -66,13 +66,12 @@ nothing carries forward.
 | B-39r wonder effects still dropped | 1 | the sourced sweep shipped fourteen channels; five residuals, each blocked on B-20r, C-21, B-34r or C-23 |
 | B-45r sourced-sweep finds in the other rows | 2 | eight wonders pay effects no channel expresses: free units, patronage discount, tech boosts, route capacity and route yields |
 | B-46r the siege class's tails | 1 | the Bombard stat, both support chassis, all four walls tiers and the move-and-shoot rule ship; the middle siege rungs and Akkad's suzerain bonus do not |
-| B-48r no combat class modifiers | 1 | melee +5 vs anti-cavalry and anti-cavalry +10 vs cavalry; no flag, and `defenderCS` never sees the attacker |
-| B-49r embarked defence is flat | 1 | Civ 6 keys it to the owner's era, 15 through 55 |
+| B-54r flanking and support vs their own page | 1 | six rules the two engines agree on and the page does not: the Military Tradition gate, the flanking owner and river rules, support against ranged, embarked providers, and defensible districts |
 | B-50r theological combat's other terms | 1 | flanking/support, territory bonuses, the Inquisitor, the winner's advance, Holy Site healing |
 | B-51r the Encampment's second pool | 1 | the district meets the city's perimeter and heals only while its tile is clear; Civ 6 tracks the two pools SEPARATELY, and a defeat pillages it |
 | B-44r city-state war tails | 1 | the head and its policy ship; no walker ever MARCHES on a minor, and the diplomatic consequences wait on C-19 |
 | B-34r flood tails | 1 | the severity ladder ships; a flood still takes ONE tile where GS floods the river's whole reach, and the Dam that mitigates one is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **23** | |
+| **B. Fidelity vs real Civ 6** | **22** | |
 | C-1 POWER | 5 | no plants, no grid, no powered-yield term — 4 gaps wait on it |
 | C-2 diplomatic agreements | 6 | war and peace and nothing between: open borders, work trades, alliances, denouncements |
 | C-3 unit promotions | 4 | only MARTYR reaches a rule; choosing one is also a wire head |
@@ -99,7 +98,7 @@ nothing carries forward.
 | C-24 no CO2, no climate | 3 | GS's whole climate arc — emissions, warming bands, sea level, escalating disasters — and 2 gaps wait on it |
 | C-25 no stealth (invisible) units | 2 | the whole naval-raider class is absent and nothing on either engine can be invisible |
 | **C. Absent systems** | **62** | |
-| **OPEN, TOTAL** | **85** | |
+| **OPEN, TOTAL** | **84** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -576,17 +575,37 @@ Civ 6 source or is recorded as unverifiable.
     all levels of city defenses and against all cities (regardless of presence
     or absence of support units)". Akkad is not in the city-state roster —
     B-21r.
-- **B-48r. No combat CLASS modifiers.** Real Civ 6 gives melee units +5 CS
-  against anti-cavalry and anti-cavalry units +10 against light, heavy and
-  ranged cavalry. The roster fields both sides of that pair (SPEARMAN and
-  PIKEMAN against HORSEMAN and KNIGHT) and neither modifier exists. Blocked
-  twice: `UnitDef` carries no anti-cavalry flag, and `defenderCS` is not told
-  who is attacking, so a pairwise term has nowhere to land.
-- **B-49r. Embarked defence is a flat number.** `EMBARKED_DEFENSE_CS` is 10
-  for everyone forever; real Civ 6 sets it from the owner's technological era
-  — 15 Classical and Medieval, 30 Renaissance, 35 Industrial, 50 Modern, 55
-  Atomic on — and updates it on the first tech or civic of each era. So a
-  Renaissance army crossing water defends at a third of its real strength.
+- **B-54r. Flanking and support against their own page.** Both bonuses ship,
+  and both were written from the Combat page's one-line summary rather than
+  from Flanking and Support (Civ6), which sourcing the class modifiers
+  finally opened. Six
+  rules moved. Neither exists before MILITARY TRADITION, and barbarians get
+  them "once at least half of the major civilizations have researched" it, so
+  `flankSupportLive` / `_flank_support_live` gate both counts — every seat that
+  is not a major reads that same count, because a barbarian holds a Seat record
+  and never researches. A flanker must be a unit "currently owned by the same
+  player" as the ATTACKER, where `flankCount` had counted anyone merely hostile
+  to the defender, which handed a third major's army to my attack. "Units
+  across a River from the targeted enemy do not provide Flanking", read off the
+  target tile's own `riverMask`. Support is a MELEE-only term — "ranged attacks
+  ignore any Support received by the defender" — so it left `rangedAttackInner`,
+  `hostileRangedStrike` and BOTH city-strike sites (`cstk` and `estk` are
+  bombardments), and `defenderCS` now takes the attack it is defending against
+  rather than assuming one. Embarked land units "provide Support like normal"
+  and only fail to flank, where both counts had excluded them. And "units will
+  not gain Support when inside defensible Districts", though units inside one
+  still provide it.
+  REACHABILITY: the scripted gate reaches melee and city strikes on every seed,
+  so the support removal is live everywhere; MILITARY_TRADITION is an Ancient
+  civic the driver takes early, so the gate opens mid-game rather than never.
+  OPEN:
+  - **THE HIGHER-STACK UNITS AND PROMOTIONS.** Impi, Hypaspist, Double
+    Envelopment, Square, Shadow Strike and Georgy Zhukov each raise a stack
+    above +2 for their owner only. Unique units are B-D's, the promotions are
+    C-3's, and the Great General identities are B-53r's.
+  - **NO FLANKING ACROSS THE ATTACKER'S OWN RIVER.** The page's rule is about
+    the PROVIDER and the target; the attacker's own river crossing is a
+    separate -5 that both engines already pay.
 - **B-50r. Theological combat's other terms.** The damage formula is sourced
   now; the rest of the Theological combat page is not. Missing: flanking and
   support (which apply since the Fall 2017 update), the location bonuses (+5
@@ -685,7 +704,10 @@ Civ 6 source or is recorded as unverifiable.
     Communism's "+10% Science" (it paid +10% production), and Autocracy's
     Palace half, which its capital term already was. The rest need channels
     this model does not have, and each names what: Oligarchy and Fascism
-    want a combat-CLASS axis (B-48r); Monarchy wants housing per WALL LEVEL
+    want a combat-CLASS axis, which the roster now carries (`UnitDef.melee` /
+    `antiCavalry` / `cavalry`, read by `classMatchupCS`), so those two are
+    unblocked and waiting on nothing but their own round; Monarchy wants
+    housing per WALL LEVEL
     and a Renaissance-Walls favor term; Merchant Republic, Theocracy and
     Communism's other half want a per-city GOVERNOR gate on a yield;
     Theocracy and Democracy want a PURCHASE-price discount channel;

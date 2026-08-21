@@ -28,7 +28,7 @@ import { MAX_CITIES_PER_SEAT, CITY_SLOTS_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_T
 import { WONDER_TOURISM_BASE } from '../core/city';
 import { BALANCED_WEIGHTS } from '../core/score';
 import { unitActionNames } from '../core/unitActions';
-import { MAX_BARB_PER_CAMP, BARB_HORSE_RANGE } from '../core/combat';
+import { MAX_BARB_PER_CAMP, BARB_HORSE_RANGE, CLASS_MELEE_VS_ANTICAV, CLASS_ANTICAV_VS_CAV, FLANK_SUPPORT_CIVIC } from '../core/combat';
 import { UNITS, UNIT_HP, CITY_MAX_HP, WALLS_TIER_HP, WALLS_TIER_CS, WALLS_TIER_URBAN, URBAN_DEFENSES_TECH, REPAIR_QUIET_TURNS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, ENCAMPMENT_HP } from '../data/units';
 import { YIELD_KEYS } from '../core/types';
 import { FLOOD_SEVERITY_P, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn } from '../data/disasters';
@@ -38,7 +38,7 @@ import { TECHS, ERAS, MODERN_ERA_INDEX } from '../data/techs'; // era scale
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, SLOT_KINDS, GOVERNMENTS_ADOPTION_LIVE, type SlotKind } from '../data/policies';
 import { BOOSTS, BOOST_FRACTION } from '../data/boosts';
-import { CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, FOOD_PER_CITIZEN, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, LUXURY_AMENITY_CITIES, GAME_SPEED, REGIONAL_RANGE, EMBARK_MOVES, EMBARKED_DEFENSE_CS, embarkState } from '../data/constants';
+import { CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, FOOD_PER_CITIZEN, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, LUXURY_AMENITY_CITIES, GAME_SPEED, REGIONAL_RANGE, EMBARK_MOVES, EMBARKED_DEFENSE_CS_BY_ERA, embarkState } from '../data/constants';
 
 // The GPU improvement index space (tile.improvement values, build codes 13-15).
 // the roster grew — indices 0-2 stay stable (every existing
@@ -615,7 +615,12 @@ export function buildRules() {
       // military embarks on SHIPBUILDING, civilians on SAILING, OCEAN needs
       // CARTOGRAPHY). The GPU mirrors these exactly.
       embarkMoves: EMBARK_MOVES,
-      embarkedDefenseCs: EMBARKED_DEFENSE_CS, // flat embarked-defender CS
+      embarkedDefenseCsByEra: EMBARKED_DEFENSE_CS_BY_ERA, // the embarked defender's CS, by the OWNER's tech era
+      // the two "Unit class modifiers" and the civic that unlocks flanking
+      // and support at all
+      classMeleeVsAnticav: CLASS_MELEE_VS_ANTICAV,
+      classAnticavVsCav: CLASS_ANTICAV_VS_CAV,
+      flankSupportCivic: civicIdx.get(FLANK_SUPPORT_CIVIC) ?? -1,
       embarkLive: embarkState.live ? 1 : 0,
       shipbuildingTech: techIdx.get('SHIPBUILDING') ?? -1,
       cartographyTech: techIdx.get('CARTOGRAPHY') ?? -1,

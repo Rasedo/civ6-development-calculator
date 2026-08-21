@@ -11,7 +11,7 @@ import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit } from './units';
 import { PILLAGE_HEAL_IMPROVEMENTS } from './combat';  // the replay's pillage arm mirrors hostileUnitAct's
 import { UNIT_HP } from '../data/units';
-import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, generalAuraCS, cityDefenseStrength, encircled } from './combat';
+import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, generalAuraCS, cityDefenseStrength, encircled } from './combat';
 import { availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { selectResearch } from './economy';
@@ -35,7 +35,7 @@ import { UNITS, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_T
 import { outerPool, wallsMax, urbanDefensesFit, repairDrip } from './rules';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
-import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, borderGrowthCost, EMBARKED_DEFENSE_CS } from '../data/constants';
+import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, borderGrowthCost } from '../data/constants';
 import type { CityStats } from './city';
 import { civEraIndex, computeCityStats, luxuryAmenities, pickBorderTile, acquireTile } from './city';
 import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressUdtProdDistrict, type CongressVoterCtx } from './congress';
@@ -1673,8 +1673,8 @@ export function seatPhase(state: GameState): void {
           const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
           const tt = state.map.tiles[bestTile];
           const defCS = defender.embarked
-            ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
-            : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender); // defender veterancy (embarked → flat, no xp)
+            ? embarkedDefenseCS(state, defender.seat) - woundPenalty(defender)
+            : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + xpLevelBonus(defender); // defender veterancy (embarked → flat, no xp)
           const defCSa = defCS + generalAuraCS(state, defender, bestTile);
           // a survived Military Emergency pays its target +2 CS on every
           // City Strike against a member, forever
@@ -1717,8 +1717,8 @@ export function seatPhase(state: GameState): void {
           const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
           const tt = state.map.tiles[bestTile];
           const defCS = defender.embarked
-            ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
-            : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender);
+            ? embarkedDefenseCS(state, defender.seat) - woundPenalty(defender)
+            : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + xpLevelBonus(defender);
           const defCSa = defCS + generalAuraCS(state, defender, bestTile); // the cstk mirror
           const atkCS = cityDefenseStrength(state, civCity);
           defender.hp -= damageRoll(state, atkCS - defCSa, 'estk', bestTile);

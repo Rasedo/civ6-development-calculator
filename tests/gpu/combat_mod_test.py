@@ -17,6 +17,11 @@ Checks:
      terrain + fortify - wound - 5*river); forcing the river edge drops the
      attacker's diff by exactly 50 (=5 CS) and lifts the counter's by 50; a
      RANGED strike across the same edge shows NO shift (river is melee-only).
+  F. _class_matchup_cs pays +5 melee-vs-anti-cavalry and +10
+     anti-cavalry-vs-cavalry, and nothing for any other pairing.
+  G. _embarked_def_cs reads the OWNER's technological era off the exported
+     table, and moves on one civic of a new era.
+  H. a defender inside a defensible district gains no Support.
 """
 
 from __future__ import annotations
@@ -102,6 +107,77 @@ def test_wound(sim) -> None:
     assert float(sim._wound(torch.tensor([30]))[0]) == 7.0
     assert float(sim._wound(torch.tensor([1]))[0]) == 10.0
     print("  A. _wound == TS woundPenalty, bit-exact for HP 0..100")
+
+
+def test_class_matchup(sim) -> None:
+    """CIV6 (Combat, "Unit class modifiers"): "Melee units receive a +5 CS bonus
+    against anti-cavalry units. Anti-cavalry units receive a +10 CS bonus
+    against light cavalry, heavy cavalry, or ranged cavalry units." Nothing
+    else in the roster pairs."""
+    mel = [i for i in range(sim.NU) if bool(sim._type_melee[i])]
+    anti = [i for i in range(sim.NU) if bool(sim._type_anticav[i])]
+    cav = [i for i in range(sim.NU) if bool(sim._type_cavalry[i])]
+    assert mel and anti and cav, f"the roster must field all three classes: {mel} {anti} {cav}"
+
+    def cs(a: int, d: int) -> int:
+        return int(sim._class_matchup_cs(torch.tensor([a]), torch.tensor([d]))[0])
+
+    for m in mel:
+        for a in anti:
+            assert cs(m, a) == sim._class_melee_vs_anticav, f"melee {m} vs anti-cav {a}"
+            assert cs(a, m) == 0, "an anti-cavalry unit gains nothing against melee"
+    for a in anti:
+        for c in cav:
+            assert cs(a, c) == sim._class_anticav_vs_cav, f"anti-cav {a} vs cavalry {c}"
+            assert cs(c, a) == 0, "a cavalry unit gains nothing against anti-cavalry"
+    for m in mel:
+        for c in cav:
+            assert cs(m, c) == 0, "melee gains nothing against cavalry"
+    print(f"  F. class modifiers OK: +{sim._class_melee_vs_anticav} melee-vs-anti-cav, "
+          f"+{sim._class_anticav_vs_cav} anti-cav-vs-cavalry, 0 everywhere else")
+
+
+def test_embarked_defense_by_era(sim) -> None:
+    """CIV6: the embarked defender's CS "depends on the owner's current
+    technological era (not the World Era), and is updated upon discovery of the
+    first technology or civic of that era" — 15 through Medieval, then 30 / 35 /
+    50 / 55."""
+    tbl = [int(x) for x in sim._embarked_def_by_era.tolist()]
+    assert tbl[:3] == [15, 15, 15] and tbl[3:7] == [30, 35, 50, 55], tbl
+    seat = torch.zeros(sim.B, dtype=torch.long, device=sim.device)
+    was = sim.civ_civics[:, 0].clone()
+    sim.civ_civics[:, 0] = False
+    sim.civ_techs[:, 0] = False
+    assert int(sim._embarked_def_cs(seat)[0]) == tbl[0], "an empty tree is the Ancient row"
+    ren = next((i for i in range(sim._civic_era.numel()) if int(sim._civic_era[i]) == 3), -1)
+    assert ren >= 0, "no Renaissance civic in the exported tree"
+    sim.civ_civics[:, 0, ren] = True
+    assert int(sim._embarked_def_cs(seat)[0]) == tbl[3], "one Renaissance CIVIC must move the tier"
+    sim.civ_civics[:, 0] = was
+    # a seat that researches nothing of its own reads the Ancient row
+    barb = torch.full((sim.B,), 200, dtype=torch.long, device=sim.device)
+    assert int(sim._embarked_def_cs(barb)[0]) == tbl[0]
+    print(f"  G. embarked defence OK: {tbl[0]} Ancient..Medieval, {tbl[3]} on one Renaissance civic")
+
+
+def test_support_in_district(sim) -> None:
+    """CIV6 (Support): "Units will not gain Support when inside defensible
+    Districts (City Center, Encampment). However, units inside these Districts
+    can still provide Support to their friends." """
+    sim.civ_civics[:, :, sim._flank_support_civic] = True
+    ctr = int(sim.city_center[0, 0, 0])
+    nb = [int(t) for t in sim.neigh[ctr].tolist() if t >= 0]
+    assert nb, "the centre has no neighbours"
+    open_t = nb[0]
+    dseat = torch.zeros(sim.B, dtype=torch.long, device=sim.device)
+    noatk = torch.full((sim.B,), -1, dtype=torch.long, device=sim.device)
+    on_ctr = torch.full((sim.B,), ctr, dtype=torch.long, device=sim.device)
+    off_ctr = torch.full((sim.B,), open_t, dtype=torch.long, device=sim.device)
+    _, s_ctr = sim._flank_support(on_ctr, dseat, noatk, dseat)
+    _, s_off = sim._flank_support(off_ctr, dseat, noatk, dseat)
+    assert int(s_ctr[0]) == 0, "a defender on a City Center must gain no Support"
+    assert int(s_off[0]) >= int(s_ctr[0]), "the same neighbours off the centre still support"
+    print(f"  H. district support OK: {int(s_ctr[0])} on the centre, {int(s_off[0])} one tile off")
 
 
 def test_river_cross(sim) -> None:
@@ -299,6 +375,9 @@ def main() -> None:
     sim, p, code, name = find_melee(rules, paths)
     print(f"combat_mod_test on {name}: melee slot {p}, code {code}, turn {sim.turn}")
     test_wound(sim)
+    test_class_matchup(sim)
+    test_embarked_defense_by_era(sim)
+    test_support_in_district(sim)
     test_river_cross(sim)
     test_damage_roll_table(sim)
     test_integrated(sim, p, code, name)

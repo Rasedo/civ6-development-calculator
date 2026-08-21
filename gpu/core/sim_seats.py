@@ -3747,7 +3747,9 @@ class SimSeats:
             # terrain/fortify/support (barbs never embark, so one merged plane
             # answers for every unit).
             d_emb = self.unit_emb.gather(1, ds0.unsqueeze(1)).squeeze(1) & ok_m
-            def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
+            if bool(d_emb.any()):
+                def_cs = torch.where(
+                    d_emb, self._embarked_def_cs(m_seat).to(def_cs.dtype), def_cs)
             def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
             # attacker veterancy, gated on the attacking class's `caps.xp` — one
             # table, never a hardcoded pool name.
@@ -3758,9 +3760,16 @@ class SimSeats:
             # flanking helps the hostile attacker (barb/civ at `here`), support
             # helps the defender, whichever seat it belongs to.
             d_seat_m = torch.where(ok_m, m_seat, neg)
-            _fl, _sp = self._flank_support(tgt, d_seat_m, here)
+            _fl, _sp = self._flank_support(tgt, d_seat_m, here, a_seat[:, u])
             atk_e = atk_e + FLANKING_CS * _fl
             def_e = def_e + SUPPORT_CS * torch.where(d_emb, torch.zeros_like(_sp), _sp)  # embarked → no support
+            # the class matchup, one term on each side of the same roll; an
+            # embarked defender's class is what the normalized CS removes
+            _cls = self._class_matchup_cs(a_type[:, u], d_type)
+            atk_e = atk_e + _cls.to(atk_e.dtype)
+            def_e = def_e + torch.where(
+                d_emb, torch.zeros_like(def_e),
+                self._class_matchup_cs(d_type, a_type[:, u]).to(def_e.dtype))
             # enhancer adders — a MAJOR attacker gets the attack terms (Just
             # War near + Crusade onto following territory); the defender gets
             # the defense terms (embarked = flat, none). A religion's id is its
@@ -4798,12 +4807,18 @@ class SimSeats:
             )
             def_cs = def_cs + self._tdef_g(ttc) + def_fort + def_xp
             d_emb = self.unit_emb.gather(1, ds0.unsqueeze(1)).squeeze(1) & (d_slot >= 0)
-            def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
+            if bool(d_emb.any()):
+                def_cs = torch.where(
+                    d_emb, self._embarked_def_cs(d_seat).to(def_cs.dtype), def_cs)
             def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)  # wounded defender
             atk_e = atk_rs - self._wound(a_hp) + a_lvl  # wound + attacker veterancy
             def_e = def_cs - self._wound(def_hp)
-            _, _sp = self._flank_support(tgt, d_seat, torch.full_like(tgt, -1))
-            def_e = def_e + SUPPORT_CS * torch.where(d_emb, torch.zeros_like(_sp), _sp)
+            # "Ranged attacks ignore any Support received by the defender."
+            _cls = self._class_matchup_cs(ut0, d_type)
+            atk_e = atk_e + _cls.to(atk_e.dtype)
+            def_e = def_e + torch.where(
+                d_emb, torch.zeros_like(def_e),
+                self._class_matchup_cs(d_type, ut0).to(def_e.dtype))
             if not barb:
                 atk_e = atk_e + (self._rel_atk_cs(a_seat, tgt).to(atk_e.dtype))  # NEVER gated
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
@@ -4955,12 +4970,17 @@ class SimSeats:
                 + self.unit_fortify.gather(1, ds0.unsqueeze(1)).squeeze(1) * 3 + def_xp
             )
             d_emb = self.unit_emb.gather(1, ds0.unsqueeze(1)).squeeze(1) & (d_slot >= 0)
-            def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
+            if bool(d_emb.any()):
+                def_cs = torch.where(
+                    d_emb, self._embarked_def_cs(d_seat).to(def_cs.dtype), def_cs)
             def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
             def_e = def_cs - self._wound(def_hp)
-            _, _sp = self._flank_support(tgt, d_seat, torch.full_like(tgt, -1))
-            def_e = def_e + SUPPORT_CS * torch.where(d_emb, torch.zeros_like(_sp), _sp)
+            # "Ranged attacks ignore any Support received by the defender."
+            def_e = def_e + torch.where(
+                d_emb, torch.zeros_like(def_e),
+                self._class_matchup_cs(d_type, at0).to(def_e.dtype))
             atk_e = atk_base + self._rel_atk_cs(aseat, tgt).to(atk_base.dtype)  # unit-vs-unit: never gated
+            atk_e = atk_e + self._class_matchup_cs(at0, d_type).to(atk_e.dtype)
             def_e = def_e + torch.where(
                 d_emb, torch.zeros_like(def_e),
                 self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
