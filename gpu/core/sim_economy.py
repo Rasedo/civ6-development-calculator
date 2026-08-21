@@ -919,6 +919,12 @@ class SimEconomy:
             civics2.gather(1, puc.clamp(min=0).unsqueeze(0).expand(B, -1)),
             torch.zeros(B, self._npol, dtype=torch.bool, device=dev),
         )  # [B, nPol]
+        obs = self._pol_obsolete_civic  # [nPol], -1 = never retires
+        pol_unlocked = pol_unlocked & ~torch.where(
+            obs.unsqueeze(0) >= 0,
+            civics2.gather(1, obs.clamp(min=0).unsqueeze(0).expand(B, -1)),
+            torch.zeros(B, self._npol, dtype=torch.bool, device=dev),
+        )
         banned = self._congress_policy_blocked()  # [B], -1 = nothing forbidden
         pol_unlocked = pol_unlocked & (
             torch.arange(self._npol, device=dev).unsqueeze(0) != banned.unsqueeze(1))
@@ -930,13 +936,13 @@ class SimEconomy:
         w_rank = overflow.long().cumsum(dim=1)
         return slotted | (overflow & (w_rank <= nslots[:, 3:4]))
 
-    def _gov_policy_mods(self, civics2: torch.Tensor, extra_slots: torch.Tensor | None = None) -> tuple[
-        torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
-    ]:
+    def _gov_policy_mods(self, civics2: torch.Tensor, extra_slots: torch.Tensor | None = None):
         """(cityYields [B,6], capitalYields [B,6], housingAll [B], yieldMult
         [B,6], slotted-mask [B,nPol], encampHarborProdMult [B],
         tilePurchaseMult [B], amenitiesAll [B], housingIfDistricts triples,
-        newDeal triples) for a seat's adopted government + greedily slotted
+        newDeal triples, adjacencyMult [B,nD], buildingYieldBoosts, the
+        remaining effect channels as a dict) for a seat's adopted government
+        + greedily slotted
         policies, computed from its researched civics [B, NC]. The
         effects.computeAdoption / applyGovernment twin.
 
@@ -958,8 +964,27 @@ class SimEconomy:
         # tilePurchaseMult, the SAME shape of channel as emult — multiplicative,
         # from the adopted government and the slotted cards.
         tpmult = torch.ones(B, dtype=dt, device=dev)
+        # adjacencyMult, one column per PLACEABLE district: the product of the
+        # adopted government's and every slotted card's. byb is the list of
+        # LIVE buildingYieldBoost rows — (active [B], the exported 7-tuple).
+        adjm = torch.ones(B, len(self.districts_cat), dtype=dt, device=dev)
+        byb: list = []
+        # The channels with no shape of their own: `prod` is a list of
+        # (active [B], wonderTarget, class mask, eraMax, pct), the rest are
+        # per-batch scalars that ADD, MULTIPLY or OR across the slotted cards.
+        _z = torch.zeros(B, dtype=dt, device=dev)
+        _o = torch.ones(B, dtype=dt, device=dev)
+        fx: dict = {
+            "prod": [], "bcharge": _z.clone(), "mcut": _z.clone(), "vbarb": _z.clone(),
+            "cdef": _z.clone(), "crng": _z.clone(), "rxp": _o.clone(), "rplun": _o.clone(),
+            "rgold": _z.clone(), "infl": _z.clone(),
+            "envoy1": torch.zeros(B, dtype=torch.bool, device=dev),
+            "culsuz": _z.clone(),
+            "gpp": torch.zeros(B, self._gov_gpp.shape[1], dtype=torch.float64, device=dev),
+        }
         if not self._gov_has_effects or not self._ngov:
-            return city_y, cap_y, hous_all, ymult, slotted, emult, tpmult, amen_all, hid, nd
+            return (city_y, cap_y, hous_all, ymult, slotted, emult, tpmult,
+                    amen_all, hid, nd, adjm, byb, fx)
         adopted, has_gov = self._adopted_gov(civics2)
         gmask = has_gov.to(dt).unsqueeze(1)
         city_y = city_y + self._gov_city_y[adopted] * gmask
@@ -976,6 +1001,27 @@ class SimEconomy:
         ymult = torch.where(has_gov.unsqueeze(1), self._gov_ymult[adopted], ymult)
         emult = torch.where(has_gov, self._gov_ehprod[adopted], emult)
         tpmult = torch.where(has_gov, self._gov_tpmult[adopted], tpmult)
+        adjm = adjm * torch.where(has_gov.unsqueeze(1), self._gov_adj_mult[adopted],
+                                  torch.ones_like(adjm))
+        for _gi in range(self._ngov):
+            if float(self._gov_byb[_gi, 0]) >= 0:
+                byb.append((has_gov & (adopted == _gi), self._gov_byb[_gi]))
+        if self._gov_fx_mag > 0:
+            _gf = has_gov.to(dt)
+            for _k, _t in (("bcharge", self._gov_bcharge), ("mcut", self._gov_mcut),
+                           ("vbarb", self._gov_vbarb), ("cdef", self._gov_cdef),
+                           ("crng", self._gov_crng), ("rgold", self._gov_rgold),
+                           ("infl", self._gov_infl), ("culsuz", self._gov_culsuz)):
+                fx[_k] = fx[_k] + _t[adopted] * _gf
+            fx["rxp"] = fx["rxp"] * torch.where(has_gov, self._gov_rxp[adopted], _o)
+            fx["rplun"] = fx["rplun"] * torch.where(has_gov, self._gov_rplun[adopted], _o)
+            fx["envoy1"] = fx["envoy1"] | (has_gov & self._gov_envoy1[adopted])
+            fx["gpp"] = fx["gpp"] + self._gov_gpp[adopted] * _gf.double().unsqueeze(1)
+            for _gi in range(self._ngov):
+                if float(self._gov_prodb[_gi, 0]) >= 0:
+                    _r = self._gov_prodb[_gi]
+                    fx["prod"].append((has_gov & (adopted == _gi), int(_r[0]), int(_r[1]),
+                                       int(_r[2]), float(_r[3])))
         if self._npol:
             slotted = self._slotted_policies(civics2, extra_slots)
             sd = slotted.to(dt)
@@ -996,7 +1042,33 @@ class SimEconomy:
                            torch.where(_on, self._pol_nd_amen[_pi].expand(B), _z)))
             emult = emult * torch.where(slotted, self._pol_ehprod.unsqueeze(0).expand(B, -1), torch.ones(B, self._npol, dtype=dt, device=dev)).prod(dim=1)
             tpmult = tpmult * torch.where(slotted, self._pol_tpmult.unsqueeze(0).expand(B, -1), torch.ones(B, self._npol, dtype=dt, device=dev)).prod(dim=1)
-        return city_y, cap_y, hous_all, ymult, slotted, emult, tpmult, amen_all, hid, nd
+            adjm = adjm * torch.where(
+                slotted.unsqueeze(2), self._pol_adj_mult.unsqueeze(0).expand(B, -1, -1),
+                torch.ones(1, 1, 1, dtype=dt, device=dev)).prod(dim=1)
+            for _pi in range(self._npol):
+                if float(self._pol_byb[_pi, 0]) >= 0:
+                    byb.append((slotted[:, _pi], self._pol_byb[_pi]))
+            ymult = ymult * torch.where(
+                slotted.unsqueeze(2), self._pol_ymult.unsqueeze(0).expand(B, -1, -1),
+                torch.ones(1, 1, 1, dtype=dt, device=dev)).prod(dim=1)
+            if self._pol_fx_mag > 0:
+                for _k, _t in (("bcharge", self._pol_bcharge), ("mcut", self._pol_mcut),
+                               ("vbarb", self._pol_vbarb), ("cdef", self._pol_cdef),
+                               ("crng", self._pol_crng), ("rgold", self._pol_rgold),
+                               ("infl", self._pol_infl), ("culsuz", self._pol_culsuz)):
+                    fx[_k] = fx[_k] + sd @ _t
+                _ones_p = torch.ones(B, self._npol, dtype=dt, device=dev)
+                fx["rxp"] = fx["rxp"] * torch.where(slotted, self._pol_rxp.unsqueeze(0).expand(B, -1), _ones_p).prod(dim=1)
+                fx["rplun"] = fx["rplun"] * torch.where(slotted, self._pol_rplun.unsqueeze(0).expand(B, -1), _ones_p).prod(dim=1)
+                fx["envoy1"] = fx["envoy1"] | (slotted & self._pol_envoy1.unsqueeze(0)).any(dim=1)
+                fx["gpp"] = fx["gpp"] + slotted.double() @ self._pol_gpp
+                for _pi in range(self._npol):
+                    if float(self._pol_prodb[_pi, 0]) >= 0:
+                        _r = self._pol_prodb[_pi]
+                        fx["prod"].append((slotted[:, _pi], int(_r[0]), int(_r[1]),
+                                           int(_r[2]), float(_r[3])))
+        return (city_y, cap_y, hous_all, ymult, slotted, emult, tpmult,
+                amen_all, hid, nd, adjm, byb, fx)
 
     def _cond_house_amen(self, hid, nd, spec_d):
         """The two district-conditional rules, for ANY seat.
@@ -1028,6 +1100,61 @@ class SimEconomy:
             v = self._gov_policy_mods(self._seat_civics(row), self._wonder_extra_slots(row))
             d[row] = v
         return v
+
+    def _fx_by_row(self, key: str) -> torch.Tensor:
+        """[B, n_majors] — one government/policy effect channel for EVERY major
+        row at once, for the sites that read the OWNER off a tile."""
+        if self._fx_row_cache is None or self._fx_row_cache[0] != self._eff_version:
+            self._fx_row_cache = (self._eff_version, {})
+        d = self._fx_row_cache[1]
+        v = d.get(key)
+        if v is None:
+            v = torch.stack([self._gov_mods(r)[12][key] for r in range(self.n_majors)], dim=1)
+            d[key] = v
+        return v
+
+    def _fx_at_seat(self, key: str, seat: torch.Tensor,
+                    rows: torch.Tensor | None = None) -> torch.Tensor:
+        """One effect channel for the seat each row names, 0 off the major
+        roster (a barbarian or a city-state adopts no government). `rows`
+        names the BATCH rows when the caller has already narrowed."""
+        z = torch.zeros_like(seat, dtype=self.dtype)
+        if not self._gov_has_effects:
+            return z
+        ok = (seat >= 0) & (seat < self.n_majors)
+        s0 = seat.clamp(min=0, max=self.n_majors - 1)
+        tab = self._fx_by_row(key)
+        v = tab[rows, s0] if rows is not None else tab.gather(1, s0.unsqueeze(1)).squeeze(1)
+        return torch.where(ok, v, z)
+
+    def _barb_cs(self, own: torch.Tensor, foe: torch.Tensor) -> torch.Tensor:
+        """[B] — CIV6 (Discipline): "+5 Combat Strength when fighting
+        Barbarians". A barbarian adopts no government, so the bonus only ever
+        runs one way."""
+        z = torch.zeros_like(own, dtype=self.dtype)
+        if not self._gov_has_effects:
+            return z
+        return torch.where(foe == BARB_SEAT, self._fx_at_seat("vbarb", own), z)
+
+    def _recon_xp_mult(self, seat: torch.Tensor, types: torch.Tensor,
+                       rows: torch.Tensor | None = None) -> torch.Tensor:
+        """long — CIV6 (Survey): "Doubles experience for recon units"."""
+        one = torch.ones_like(seat, dtype=torch.long)
+        if not self._gov_has_effects or not bool(self._type_recon.any()):
+            return one
+        m = self._fx_at_seat("rxp", seat, rows).long()
+        return torch.where(self._type_recon[types.clamp(min=0, max=self.NU - 1)], m.clamp(min=1), one)
+
+    def _unit_upkeep(self, row: int, types: torch.Tensor) -> torch.Tensor:
+        """The gold each unit costs this seat per turn — Conscription and
+        Levee en Masse take it down, never below free."""
+        base = self._type_maintenance[types.clamp(min=0, max=self.NU - 1)]
+        if not self._gov_has_effects:
+            return base
+        cut = self._gov_mods(row)[12]["mcut"]
+        while cut.dim() < base.dim():
+            cut = cut.unsqueeze(-1)
+        return (base - cut).clamp(min=0)
 
     def _district_adj_raw(self, di: int, adjc: torch.Tensor) -> torch.Tensor:
         raw = self.d_static_adj[:, :, di] + self._dyn_district[di] * adjc
@@ -1064,6 +1191,14 @@ class SimEconomy:
             v = torch.floor(self._district_adj_raw(di, self._adj_district_count().to(self.dtype)))
             d[di] = v
         return v
+
+    def _district_adj_seat(self, row: int, di: int) -> torch.Tensor:
+        """[B, T] — `effectiveAdjacency`: the FLOORED adjacency of a district
+        of type `di`, times this seat's adjacencyMult for that type. TS floors
+        the raw sum first and multiplies after, so a doubled +3 is +6, never
+        floor(3.5 * 2)."""
+        base = self._district_adj_floor(di)
+        return base * self._gov_mods(row)[10][:, di].unsqueeze(1)
 
     def _district_elig_site(self, row: int, j: int) -> torch.Tensor:
         """[B, T] the part of `canPlaceDistrictIn` that depends only on the CITY
@@ -1515,7 +1650,8 @@ class SimEconomy:
         live = ((self.district == self._hs_idx) & self.district_complete
                 & ~self.district_pillaged)
         if bool(live.any()):
-            out = self._district_adj_floor(self._hs_idx).long()
+            # the adjacency term is the OWNER's — a card that doubles Holy
+            # Site adjacency doubles its OWN seat's Holy Sites, nobody else's.
             bf = torch.zeros(B, T, dtype=torch.long, device=dev)
             for r in range(self.n_majors):
                 sl = self.city_slot_at(r)
@@ -1525,6 +1661,7 @@ class SimEconomy:
                 fsum = (self.city_bldg[:, r].long()
                         * self._b_hs_faith.reshape(1, 1, -1)).sum(dim=2)  # [B, RC]
                 bf = torch.where(mine, fsum.gather(1, sl.clamp(min=0)), bf)
+                out = torch.where(mine, self._district_adj_seat(r, self._hs_idx).long(), out)
             out = torch.where(live, out + bf, torch.zeros_like(out))
         self._hs_faith_cache = (self._eff_version, out)
         return out
@@ -2119,7 +2256,7 @@ class SimEconomy:
             if yc < 0:
                 continue
             t_d = dreg[:, :, di]  # [B, n] this city's tile of type di (-1 none)
-            adjv = self._district_adj_floor(di).gather(1, t_d.clamp(min=0)).double()  # (memoised)
+            adjv = self._district_adj_seat(row, di).gather(1, t_d.clamp(min=0)).double()  # (memoised)
             add = torch.where(dlive[:, :, di], adjv, torch.zeros_like(adjv))
             dist_y[:, :, yc] = dist_y[:, :, yc] + add
             if di == self._hs_idx:
@@ -2184,8 +2321,24 @@ class SimEconomy:
                 hbc = hb.clamp(min=0)
                 has_sy = alive & selb[:, :, self._shipyard_bidx] & (hb >= 0) & self.district_complete.gather(1, hbc)
                 if bool(has_sy.any()):
-                    hadj = self._district_adj_floor(self._harbor_idx).gather(1, hbc).double()
+                    hadj = self._district_adj_seat(row, self._harbor_idx).gather(1, hbc).double()
                     bld_y[:, :, 1] = bld_y[:, :, 1] + torch.where(has_sy, hadj, torch.zeros_like(hadj))
+        _byb = self._gov_mods(row)[11]
+        if _byb and bool(selb.any()):
+            for _act, _r7 in _byb:
+                _di, _yi = int(_r7[0]), int(_r7[1])
+                _live = dlive[:, :, _di] & _act.unsqueeze(1)
+                if not bool(_live.any()):
+                    continue
+                _pct = torch.full((B, n), float(_r7[2]), dtype=F64, device=dev)
+                _pct = _pct + (pop >= float(_r7[3])).double() * float(_r7[4])
+                _adjv = self._district_adj_seat(row, _di).gather(
+                    1, dreg[:, :, _di].clamp(min=0)).double()
+                _pct = _pct + (_adjv >= float(_r7[5])).double() * float(_r7[6])
+                _mine = (selb & (self._b_req_district.reshape(1, 1, -1) == _di)).double()
+                _base = _mine @ rd.b_yields[:, _yi].double()
+                bld_y[:, :, _yi] = bld_y[:, :, _yi] + torch.where(
+                    _live, _base * _pct, torch.zeros_like(_base))
         _reg = self._seat_regional(row)
         if _reg is not None:
             bld_y = bld_y + _reg[0][:, sl]
@@ -2280,6 +2433,11 @@ class SimEconomy:
         total = tiles_y + dist_y + bld_y + citz + bon + trade
         total[:, :, 1:] = total[:, :, 1:] * amen_yf.unsqueeze(2)
         if gym is not None:
+            if self._gov_has_effects:
+                _cz = self._gov_mods(row)[12]["culsuz"]
+                if bool((_cz != 0).any()):
+                    gym = gym.clone()
+                    gym[:, 4] = gym[:, 4] * (1 + _cz * self._suzerain_count(row).to(gym.dtype))
             total = total * gym.double().unsqueeze(1)
         if compw is not None and bool(compw.any()):
             # Each wonder's cityYieldMult (Ruhr production, Big Ben gold) LAST

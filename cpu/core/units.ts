@@ -15,7 +15,7 @@ import { isWater, isImpassable } from '../../world/query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
 import { tileAppeal } from './appeal';
 import { PARK_MIN_APPEAL } from '../data/improvements';
-import { isTechComplete, isCivicComplete, makeYieldCtx, type YieldCtx } from './effects';
+import { isTechComplete, isCivicComplete, makeYieldCtx, getModifiers, unitUpkeep, type YieldCtx } from './effects';
 import { effectiveAdjacency } from './yields';
 import { BUILDINGS } from '../data/buildings';
 import { ARTIFACT_BUILDING, ARTIFACT_SLOTS } from '../data/greatPeople';
@@ -817,11 +817,14 @@ export function queueUnit(state: GameState, cityId: number, unitType: string, se
   return ok;
 }
 
-/** CIV6: the Pyramids give every Builder an extra build charge and the
- *  Hagia Sophia gives every Missionary and Apostle an extra spread. Both are
- *  paid at CREATION, so a unit that predates the wonder keeps its own count. */
-function wonderCharges(state: GameState, seat: number, unitType: string): number {
-  if (unitType === 'BUILDER') return seatWonderSum(state, seat, 'buildCharges');
+/** CIV6: the Pyramids give every Builder an extra build charge, Serfdom and
+ *  Public Works give it two more, and the Hagia Sophia gives every Missionary
+ *  and Apostle an extra spread. All are paid at CREATION, so a unit that
+ *  predates the wonder or the card keeps its own count. */
+function extraCharges(state: GameState, seat: number, unitType: string): number {
+  if (unitType === 'BUILDER') {
+    return seatWonderSum(state, seat, 'buildCharges') + getModifiers(state, seat).builderCharges;
+  }
   if (unitType === 'MISSIONARY' || unitType === 'APOSTLE') return seatWonderSum(state, seat, 'spreadCharges');
   return 0;
 }
@@ -847,7 +850,7 @@ export function spawnUnit(
     tileIndex: spot.index,
     movesLeft: def.moves + goldenMoveBonus(state, { type: unitType, seat }),
     hp: UNIT_HP,
-    charges: def.charges === undefined ? null : def.charges + wonderCharges(state, seat, unitType),
+    charges: def.charges === undefined ? null : def.charges + extraCharges(state, seat, unitType),
     path: null,
   };
   // FORTIFY: military units carry a fortify counter (civilians never do).
@@ -885,10 +888,8 @@ export function settlerCount(state: GameState, seat: number): number {
 }
 
 export function unitMaintenance(state: GameState, seat: number): number {
-  return state.units.reduce(
-    (s, u) => s + (u.seat === seat ? UNITS[u.type]?.maintenance ?? 0 : 0),
-    0,
-  );
+  const mods = getModifiers(state, seat);
+  return state.units.reduce((s, u) => s + (u.seat === seat ? unitUpkeep(mods, u.type) : 0), 0);
 }
 
 /** CIV6 (Theological combat): "the HP gained per turn is equal to 3 times the

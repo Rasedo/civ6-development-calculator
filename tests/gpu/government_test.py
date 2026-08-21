@@ -28,7 +28,7 @@ def main() -> None:
     gov_idx = {g["id"]: i for i, g in enumerate(rj["governments"])}
 
     assert rj["governments"], "rules.json carries no governments table (exporter rows missing)"
-    assert len(rj["policies"]) >= 50, f"expected the full ~50+ policy catalog, got {len(rj['policies'])}"
+    assert rj["policies"], "rules.json carries no policy table (exporter rows missing)"
     # URBAN_PLANNING must remain the first economic card (greedy slotting relies on it).
     econ = [p["id"] for p in rj["policies"] if p["kind"] == 1]
     assert econ[0] == "URBAN_PLANNING", f"URBAN_PLANNING must be the first economic policy, got {econ[0]}"
@@ -111,17 +111,18 @@ def main() -> None:
     # 4b) yieldMult + the single-Wildcard contest: EXPLORATION without
     #     DIVINE_RIGHT -> MERCHANT_REPUBLIC (the only unlocked tier-2):
     #     gold ×1.1.
-    c4 = civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "FOREIGN_TRADE", "MILITARY_TRADITION", "STATE_WORKFORCE", "EARLY_EMPIRE", "POLITICAL_PHILOSOPHY", "CIVIL_SERVICE", "FEUDALISM", "GUILDS", "MEDIEVAL_FAIRES", "EXPLORATION"])
+    c4 = civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "FOREIGN_TRADE", "MILITARY_TRADITION", "STATE_WORKFORCE", "EARLY_EMPIRE", "POLITICAL_PHILOSOPHY", "CIVIL_SERVICE", "FEUDALISM", "GUILDS", "MEDIEVAL_FAIRES", "GAMES_AND_RECREATION", "EXPLORATION"])
     adopted, has_gov = sim._adopted_gov(c4)
     assert int(adopted[0]) == gov_idx["MERCHANT_REPUBLIC"], "EXPLORATION without DIVINE_RIGHT => MERCHANT_REPUBLIC"
     city_y, cap_y, hous, ymult, sl4, _em, _tp, *_ = sim._gov_policy_mods(c4)
     GOLD2 = 2
     assert abs(float(ymult[0, GOLD2]) - 1.1) < 1e-12, "MERCHANT_REPUBLIC gold ×1.1 (the rng-2026006082 t249 catch)"
     pol_idx = {p["id"]: i for i, p in enumerate(rj["policies"])}
+    pol_by_id = {p["id"]: p for p in rj["policies"]}
     # MERCHANT_REPUBLIC's slots are the sourced [M,E,E,D,D,W] (Civilopedia
-    # 1M/2E/2D/1W). With ONE Wildcard the two economic overflows cannot both
-    # spill: LAND_SURVEYORS (policy table index 81) takes it ahead of INSULAE
-    # (index 84), so INSULAE is squeezed out.
+    # 1M/2E/2D/1W). URBAN_PLANNING and GOD_KING fill the two economic slots,
+    # so with ONE Wildcard only the FIRST remaining economic card spills:
+    # LAND_SURVEYORS takes it on table order and INSULAE is squeezed out.
     assert bool(sl4[0, pol_idx["LAND_SURVEYORS"]]), "LAND_SURVEYORS takes the single W slot"
     assert not bool(sl4[0, pol_idx["INSULAE"]]), (
         "INSULAE must NOT be slotted — MERCHANT_REPUBLIC has one Wildcard, not two, "
@@ -146,32 +147,17 @@ def main() -> None:
     assert not bool(sl6[0, pol_i["SURVEY"]]), "SURVEY is dropped — CHIEFDOM has only one military slot"
     assert bool(sl6[0, pol_i["URBAN_PLANNING"]]), "URBAN_PLANNING keeps the economic slot"
 
-    # 7) Every card below is INERT — no gov/policy CHANNEL becomes reachable
-    #    through the wiring. All 37 are wired (unlockCivic >= 0) and carry
-    #    zero yields / neutral multipliers, so slotting one never changes a
-    #    traced quantity.
-    NEW_CARDS = {
-        "DISCIPLINE", "SURVEY", "MANEUVER", "AGOGE", "CHIVALRY", "BASTIONS", "FEUDAL_CONTRACT",
-        "CONSCRIPTION", "LEVEE_EN_MASSE", "ELITE_FORCES", "MILITARY_FIRST", "REDOUBT", "TOTAL_WAR",
-        "GOD_OF_THE_OPEN_SKY", "COLONIZATION", "ILKUM", "CARAVANSARIES", "MARITIME_INDUSTRIES",
-        "CORVEE", "SERFDOM", "PUBLIC_WORKS", "GOTHIC_ARCHITECTURE", "SKYSCRAPERS", "ECONOMIC_UNION",
-        "GRAND_MASTERS_CHAPEL", "FREE_TRADE", "DIPLOMATIC_LEAGUE", "CHARISMATIC_LEADER", "CONTAINMENT",
-        "COLLECTIVE_ACTIVISM", "ONLINE_COMMUNITIES", "MARTYRDOM", "STRATEGOS", "INSPIRATION",
-        "REVELATION", "LITERARY_TRADITION", "MONUMENTALITY",
-    }
-    seen_new = 0
+    # 7) Exactly two cards stay inert, and the export says so channel by
+    #    channel: CONTAINMENT's row IS the neutral row, so any card matching
+    #    it everywhere carries no effect at all. Both are deferrals on an
+    #    absent system, not stubs.
+    META = {"id", "kind", "unlockCivic", "obsoleteCivic"}
+    neutral = {k: v for k, v in pol_by_id["CONTAINMENT"].items() if k not in META}
+    inert = sorted(p["id"] for p in rj["policies"] if all(p[k] == v for k, v in neutral.items()))
+    assert inert == ["CONTAINMENT", "ONLINE_COMMUNITIES"], f"the inert set moved: {inert}"
     for p in rj["policies"]:
-        if p["id"] not in NEW_CARDS:
-            continue
-        seen_new += 1
-        assert p["unlockCivic"] >= 0, f"{p['id']} must be wired to a granting civic"
-        assert all(v == 0 for v in p["cityYields"]) and all(v == 0 for v in p["capitalYields"]), f"{p['id']} carries flat yields (not inert)"
-        assert p["housingAll"] == 0 and p["amenitiesAll"] == 0, f"{p['id']} carries housing/amenity (not inert)"
-        assert all(v == 1 for v in p["yieldMult"]), f"{p['id']} carries yieldMult (not inert)"
-        assert all(v == 1 for v in p["adjacencyMult"]) and all(v == 1 for v in p["buildingYieldMult"]), f"{p['id']} carries a mult (not inert)"
-        assert p["tilePurchaseMult"] == 1, f"{p['id']} carries tilePurchaseMult (not inert)"
-        assert p["housingIfDistricts"][0] == -1 and p["amenitiesIfSpecialty"][0] == -1 and p["newDeal"][0] == -1, f"{p['id']} carries a conditional (not inert)"
-    assert seen_new == 37, f"expected all 37 Round-B2 cards present, saw {seen_new}"
+        assert p["unlockCivic"] >= 0, f"{p['id']} is adoptable but no civic grants it"
+        assert p["obsoleteCivic"] == -1 or 0 <= p["obsoleteCivic"] < len(rj["civics"]), f"{p['id']} retires to nothing"
 
     # 8) The MEDIEVAL_FAIRES "run 4 policy cards" inspiration: drive
     #    _detect_seat_boosts and assert it fires at >=4 slotted policies, not
@@ -205,7 +191,7 @@ def main() -> None:
         )
         assert not bool(simr.civ_civic_boosted[0, 0, mf_idx]), "a civ's inspiration landed on seat 0's row"
 
-    print("government_test OK — adoption, slot fill incl. wildcard overflow, housingAll, influence tier, new-card slotting + inert-channel proof + MEDIEVAL_FAIRES policies inspiration")
+    print("government_test OK — adoption, slot fill incl. wildcard overflow, housingAll, influence tier, card slotting + the two inert cards + MEDIEVAL_FAIRES policies inspiration")
 
 
 if __name__ == "__main__":

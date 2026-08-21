@@ -392,7 +392,13 @@ class SimSeats:
                     & self._seat_envoy_mask(row).gather(1, ei.unsqueeze(1)).squeeze(1)
                 if bool(ok.any()):
                     rows = ok.nonzero(as_tuple=True)[0]
-                    self.seat_citystate_envoys[rows, row, ei[rows]] += 1
+                    _n = torch.ones(rows.shape[0], dtype=self.seat_citystate_envoys.dtype,
+                                    device=self.device)
+                    if self._gov_has_effects:
+                        _first = (self.seat_citystate_envoys[rows, row, ei[rows]] == 0) \
+                            & self._gov_mods(row)[12]["envoy1"][rows]
+                        _n = _n + _first.to(_n.dtype)
+                    self.seat_citystate_envoys[rows, row, ei[rows]] += _n
                     self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] - ok.long()
                     self._eff_version += 1
         if war is not None:
@@ -2794,6 +2800,10 @@ class SimSeats:
         dest_j = dm.long().argmax(dim=2)
         per = (1 + self._district_counts(row)[1] // 2).double()  # [B, cols] routeYields' food (= prod) column
         inc = torch.zeros(B, cols * 6, dtype=torch.float64, device=self.device)
+        if self._gov_has_effects:
+            _rg = self._gov_mods(row)[12]["rgold"]
+            if bool((_rg != 0).any()):
+                inc.scatter_add_(1, from_j * 6 + 2, _rg.double().unsqueeze(1) * (act & has_from).double())
         # domestic legs
         pays_d = act & (rr[:, :, 1] >= 0) & has_from & has_dest
         pd = pays_d.double()
@@ -3885,13 +3895,15 @@ class SimSeats:
                 atk_e = atk_e + self._gen_aura_cs(a_seat[:, u], here, atk_naval).to(atk_e.dtype)
                 # an emergency MEMBER hits its target harder
                 atk_e = atk_e + self._emergency_pair_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
+                atk_e = atk_e + self._barb_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
             def_naval = d_emb | (~def_is_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
             def_civ_u = torch.where(def_is_barb, neg, d_seat_m)
             def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
+            def_e = def_e + self._barb_cs(def_civ_u, a_seat[:, u]).to(def_e.dtype)
             _wwh = self._ww_occ(tgt)
             _wwd = self._tile_mil_seat(tgt)
             if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
-                a_xp[:, u] = torch.where(mil_att, a_xp[:, u] + XP_ATTACK * self._suz_xp_mult(a_seat[:, u]), a_xp[:, u])
+                a_xp[:, u] = torch.where(mil_att, a_xp[:, u] + XP_ATTACK * self._suz_xp_mult(a_seat[:, u]) * self._recon_xp_mult(a_seat[:, u], a_type[:, u]), a_xp[:, u])
             rows, def_dead, atk_dead = self._melee_exchange(
                 mil_att, tgt, ttc, d_slot, ~def_is_barb, a_hp, u, atk_e, def_e,
                 self._row_of(a_seat[:, u]))
@@ -3942,11 +3954,14 @@ class SimSeats:
                 a_tile[vr, u] = ttc[vr]
                 a_occ[vr, ttc[vr]] = u + a_lo
 
-    def _wonder_charges(self, row: int, type_idx: torch.Tensor) -> torch.Tensor:
-        """[B] long — `wonderCharges`: the Pyramids' extra build charge on a
-        Builder, the Hagia Sophia's extra spread on a Missionary or Apostle.
-        Paid at CREATION, so a unit that predates the wonder keeps its count."""
+    def _extra_charges(self, row: int, type_idx: torch.Tensor) -> torch.Tensor:
+        """[B] long — `extraCharges`: the Pyramids' extra build charge on a
+        Builder, Serfdom's and Public Works' two more, the Hagia Sophia's extra
+        spread on a Missionary or Apostle. All are paid at CREATION, so a unit
+        that predates the wonder or the card keeps its own count."""
         z = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        if self._gov_has_effects and self._builder_idx >= 0:
+            z = z + (type_idx == self._builder_idx).long() * self._gov_mods(row)[12]["bcharge"].long()
         if not self._wond_n:
             return z
         if int(self._wond_build_ch.sum()) > 0 and self._builder_idx >= 0:
@@ -4467,7 +4482,7 @@ class SimSeats:
         d_enc = self._damage_roll(att, diff, k="enc", tile=tc)
         d_self = self._damage_roll(att, cdiff, k="encc", tile=tc)
         if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
-            a_xp[:, u] = torch.where(att, a_xp[:, u] + XP_ATTACK * self._suz_xp_mult(a_seat[:, u]), a_xp[:, u])
+            a_xp[:, u] = torch.where(att, a_xp[:, u] + XP_ATTACK * self._suz_xp_mult(a_seat[:, u]) * self._recon_xp_mult(a_seat[:, u], a_type[:, u]), a_xp[:, u])
         # CIV6 gives the district "Defenses HP equal to the City Center" and
         # one set of Walls supplies both, so the roll divides exactly as a hit
         # on the centre does: the perimeter share off the city's pool, and only
@@ -4573,6 +4588,8 @@ class SimSeats:
         _wtier = self._walls_tier_at(hrow, slot)
         def_cs = (torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
                   + self._walls_tier_cs[_wtier])
+        if self._gov_has_effects:
+            def_cs = def_cs + self._fx_at_seat("cdef", hrow).to(def_cs.dtype)
         atk_e = (self._type_combat[a_type[:, u].clamp(min=0, max=self.NU - 1)]
                  - self._wound(a_hp[:, u])
                  - 5.0 * self._river_cross(a_tile[:, u], tgt))
@@ -4598,7 +4615,7 @@ class SimSeats:
         d_city = self._damage_roll(att, atk_e - def_cs, k="rcty", tile=tgt)
         d_atk = self._damage_roll(att, def_cs - atk_e, k="rctyc", tile=tgt)
         if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
-            a_xp[:, u] = torch.where(att, a_xp[:, u] + XP_ATTACK * self._suz_xp_mult(a_seat[:, u]), a_xp[:, u])
+            a_xp[:, u] = torch.where(att, a_xp[:, u] + XP_ATTACK * self._suz_xp_mult(a_seat[:, u]) * self._recon_xp_mult(a_seat[:, u], a_type[:, u]), a_xp[:, u])
         _wmax = self._walls_tier_hp[_wtier]
         _klass = self._hit_class(a_type[:, u], False)
         _assist = self._siege_assist(a_seat[:, u], a_type[:, u], tgt, _wtier)
@@ -4725,7 +4742,7 @@ class SimSeats:
         d_cs = self._damage_roll(att, atk_e - def_cs, k="csty", tile=tgt)
         d_atk = self._damage_roll(att, def_cs - atk_e, k="cstyc", tile=tgt)
         if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
-            a_xp[:, u] = torch.where(att, a_xp[:, u] + XP_ATTACK * self._suz_xp_mult(a_seat[:, u]), a_xp[:, u])
+            a_xp[:, u] = torch.where(att, a_xp[:, u] + XP_ATTACK * self._suz_xp_mult(a_seat[:, u]) * self._recon_xp_mult(a_seat[:, u], a_type[:, u]), a_xp[:, u])
         rows = att.nonzero(as_tuple=True)[0]
         self.citystate_hp[rows, citystate_sc[rows]] -= d_cs[rows]
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
@@ -4777,7 +4794,8 @@ class SimSeats:
             alive_now = self.unit_hp[surv, d_slot[surv]] > 0
             sp = surv[alive_now]
             if len(sp) > 0:
-                self.unit_xp[sp, d_slot[sp]] += XP_DEFEND
+                self.unit_xp[sp, d_slot[sp]] += XP_DEFEND * self._recon_xp_mult(
+                    self.unit_seat[sp, d_slot[sp]], self.unit_type[sp, d_slot[sp]], sp)
 
     def _melee_exchange(self, att: torch.Tensor, tgt: torch.Tensor, tile_c: torch.Tensor,
                         d_slot: torch.Tensor, def_can_xp: torch.Tensor,
@@ -4815,7 +4833,8 @@ class SimSeats:
             self._dig_at(gd, td, atk_row[gd])
         surv = (att & def_can_xp & ~def_dead).nonzero(as_tuple=True)[0]
         if len(surv) > 0:
-            self.unit_xp[surv, d_slot[surv]] += XP_DEFEND
+            self.unit_xp[surv, d_slot[surv]] += XP_DEFEND * self._recon_xp_mult(
+                self.unit_seat[surv, d_slot[surv]], self.unit_type[surv, d_slot[surv]], surv)
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
         atk_dead = att & (a_hp[:, u] <= 0)
         both = def_dead & atk_dead
@@ -4851,6 +4870,8 @@ class SimSeats:
             _wtier = self._walls_tier_at(hrow, hcol)
             def_cs = (torch.maximum(self.civ_best_melee[_bidx, hrow], torch.full_like(hrow, 15))
                       + gar * 5 + self._walls_tier_cs[_wtier])
+            if self._gov_has_effects:
+                def_cs = def_cs + self._fx_at_seat("cdef", hrow).to(def_cs.dtype)
             outer_all = self.city_outer_hp[_bidx, hrow, hcol]
             atk_e = self._city_ranged_strength(ut0, outer_all) - self._wound(a_hp) + a_lvl
             if not barb:
@@ -4933,6 +4954,8 @@ class SimSeats:
             def_civ_u = torch.where(d_is_mil & ~d_barb, d_seat, neg)
             def_naval = d_emb | (~d_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
             def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
+            def_e = def_e + self._barb_cs(d_seat, a_seat).to(def_e.dtype)
+            atk_e = atk_e + self._barb_cs(a_seat, d_seat).to(atk_e.dtype)
             def_hp0 = self.unit_hp[torch.arange(self.B, device=self.device), d_slot.clamp(min=0)]
             d_def = self._damage_roll(unit_att, atk_e - def_e, k="vrng", tile=tgt)
             g = unit_att.nonzero(as_tuple=True)[0]
@@ -4962,12 +4985,13 @@ class SimSeats:
                 sd = d_slot[surv]
                 sp = surv[self.unit_hp[surv, sd] > 0]
                 if len(sp) > 0:
-                    self.unit_xp[sp, d_slot[sp]] += XP_DEFEND
+                    self.unit_xp[sp, d_slot[sp]] += XP_DEFEND * self._recon_xp_mult(
+                        self.unit_seat[sp, d_slot[sp]], self.unit_type[sp, d_slot[sp]], sp)
         # the MAJOR attacker earns +5 for the attack executed (vs city or
         # unit); a barbarian never accrues (gainXp guards); a strike that hit
         # neither returns empty and spends nothing.
         if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
-            _xp_p[:, u] = torch.where(city_att | unit_att, _xp_p[:, u] + XP_ATTACK * self._suz_xp_mult(_seat_p[:, u]), _xp_p[:, u])
+            _xp_p[:, u] = torch.where(city_att | unit_att, _xp_p[:, u] + XP_ATTACK * self._suz_xp_mult(_seat_p[:, u]) * self._recon_xp_mult(_seat_p[:, u], _type_p[:, u]), _xp_p[:, u])
         return city_att | unit_att
 
     def _ranged_attack(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str,
@@ -5031,6 +5055,8 @@ class SimSeats:
             _wtier = self._walls_tier_at(hrow, slot)
             def_cs = (torch.maximum(self.civ_best_melee[bidx, hrow], torch.full_like(hrow, 15))
                       + gar * 5 + self._walls_tier_cs[_wtier])
+            if self._gov_has_effects:
+                def_cs = def_cs + self._fx_at_seat("cdef", hrow).to(def_cs.dtype)
             outer_all = self.city_outer_hp[bidx, hrow, slot]
             _rs = self._city_ranged_strength(at0, outer_all)
             d_city = self._damage_roll(city_att, atk_base - atk_rs0 + _rs + rel_city - def_cs,
@@ -5093,6 +5119,8 @@ class SimSeats:
             def_naval = d_emb | (~d_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
             def_e = def_e + self._gen_aura_cs(
                 torch.where(ok_m & ~d_barb, d_seat, neg), tgt, def_naval).to(def_e.dtype)
+            def_e = def_e + self._barb_cs(d_seat, aseat).to(def_e.dtype)
+            atk_e = atk_e + self._barb_cs(aseat, d_seat).to(atk_e.dtype)
             def_hp0 = self.unit_hp[bidx, ds0]
             d_def = self._damage_roll(unit_att, atk_e - def_e, k="rng", tile=tgt)
             g = unit_att.nonzero(as_tuple=True)[0]
@@ -5118,10 +5146,11 @@ class SimSeats:
             if len(surv) > 0:
                 sp = surv[self.unit_hp[surv, d_slot[surv]] > 0]
                 if len(sp) > 0:
-                    self.unit_xp[sp, d_slot[sp]] += XP_DEFEND
+                    self.unit_xp[sp, d_slot[sp]] += XP_DEFEND * self._recon_xp_mult(
+                        self.unit_seat[sp, d_slot[sp]], self.unit_type[sp, d_slot[sp]], sp)
         fired = city_att | cs_att | unit_att
         if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
-            a_xp[:, u] = torch.where(fired, a_xp[:, u] + XP_ATTACK * self._suz_xp_mult(aseat), a_xp[:, u])
+            a_xp[:, u] = torch.where(fired, a_xp[:, u] + XP_ATTACK * self._suz_xp_mult(aseat) * self._recon_xp_mult(aseat, at0), a_xp[:, u])
         return fired
 
     def _seat_influence_phase(self, row: int, active: torch.Tensor) -> None:
@@ -5150,6 +5179,8 @@ class SimSeats:
         pt = torch.full((B,), float(rr.get("influencePerTurn", 3)), dtype=torch.float64, device=dev)
         if self._gov_live:
             pt = pt + self._adopted_gov_tier(civics).double()
+            if self._gov_has_effects:
+                pt = pt + self._gov_mods(row)[12]["infl"].double()
         self.civ_influence[:, row] = self.civ_influence[:, row] + torch.where(any_met, pt, torch.zeros_like(pt)).to(self.civ_influence.dtype)
         cost = float(rr.get("envoyCost", 100))
         for _ in range(3):
@@ -5427,11 +5458,11 @@ class SimSeats:
         hb, hk, hr = bb[hit], kk[hit], raider[hit]
         mj = hr < self.n_majors
         if bool(mj.any()):
-            self.civ_treasury.index_put_(
-                (hb[mj], hr[mj]),
-                torch.full((int(mj.sum()),), float(self._trade_plunder_gold), dtype=torch.float64, device=dev),
-                accumulate=True,
-            )
+            _gold = torch.full((int(mj.sum()),), float(self._trade_plunder_gold),
+                               dtype=torch.float64, device=dev)
+            if self._gov_has_effects:
+                _gold = _gold * self._fx_at_seat("rplun", hr[mj], hb[mj]).double()
+            self.civ_treasury.index_put_((hb[mj], hr[mj]), _gold, accumulate=True)
         self.seat_routes[hb, row, hk] = -1
         self.seat_route_dseat[hb, row, hk] = -1
         self.seat_route_dcity[hb, row, hk] = -1

@@ -124,7 +124,7 @@ describe('international route yields', () => {
     expect(canAddIntlTradeRoute(state, origin.id, civ.seat, civ.cities[0].id, 0).ok).toBe(true);
     expect(addIntlTradeRoute(state, origin.id, civ.seat, civ.cities[0].id, 0).ok).toBe(true);
 
-    const peaceYields = cityTradeYields(state, origin);
+    const peaceYields = cityTradeYields(state, origin, 0);
     expect(peaceYields.gold).toBe(INTL_ROUTE_GOLD + 1); // 3 base + 1 specialty
     expect(peaceYields.food).toBe(0);
     expect(peaceYields.production).toBe(0);
@@ -133,7 +133,7 @@ describe('international route yields', () => {
     // income stops because the route is GONE.
     declareWar(state, 0, civ.seat);
     expect(state.seats[0].tradeRoutes!.length).toBe(0);
-    expect(cityTradeYields(state, origin).gold).toBe(0);
+    expect(cityTradeYields(state, origin, 0).gold).toBe(0);
   });
 
   it('the WAR COLUMN cancels the routes between the pair and recalls the Trader', () => {

@@ -25,6 +25,8 @@ of the DRIVEN GAME, not of the comparison. What it answers, in order:
   ballot        a turn on which the driver submits a Congress ballot (B-22r)
   tourists      visiting vs domestic at the final turn, per seat: the culture
                 victory's own comparison (`_culture_victor`)
+  policyCards   which policy cards the greedy slot fill ever puts in a slot,
+                and the most a seat holds at once
 
 Run: python tools/gpu/reachability_probe.py [--turns 250]
 """
@@ -83,6 +85,10 @@ def main() -> None:
         if 0 <= idx < relig_t.numel():
             relig_t[idx] = True
 
+    pol_ids = [p["id"] for p in rj["policies"]]
+    slotted_seen: set[str] = set()
+    slotted_max = 0
+
     seeds_hit: dict[str, set[int]] = {k: set() for k in KEYS}
     first_turn: dict[str, int] = {}
     cs_lo, cs_hi = sim.n_majors, sim.n_majors + sim.S
@@ -105,6 +111,12 @@ def main() -> None:
             if vote is not None:
                 mark("ballot", (vote[:, :, 0] >= 0).any(dim=1), t)
         sim.step()
+
+        for row in seats:
+            sl = sim._gov_policy_mods(sim.civ_civics[:, row])[4]
+            slotted_max = max(slotted_max, int(sl.sum(dim=1).max()))
+            for i in sl.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+                slotted_seen.add(pol_ids[i])
 
         mark("urbanization", sim.civ_civics[:, :, urb].any(dim=1), t)
         mark("natHistory", sim.civ_civics[:, :, nat_hist].any(dim=1), t)
@@ -156,6 +168,11 @@ def main() -> None:
     print(f"  minor-war turns per seed: max {int(minor_war_turns.max())}, "
           f"mean {float(minor_war_turns.double().mean()):.1f}; standing at the final turn: "
           f"{int((sim.city_spec_pin >= 0).sum())} pinned slots, {int(sim.tile_locked.sum())} locked plots")
+
+    print(f"  policy cards ever slotted: {len(slotted_seen)}/{len(pol_ids)}, "
+          f"at most {slotted_max} at once")
+    print("    " + ", ".join(sorted(slotted_seen)))
+    print("    never: " + ", ".join(p for p in sorted(pol_ids) if p not in slotted_seen))
 
     vis_div = sim.n_majors * sim._tourism_per_visitor
     print("  tourists at the final turn (visiting vs domestic, per seat):")

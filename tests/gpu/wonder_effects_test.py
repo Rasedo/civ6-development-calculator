@@ -172,14 +172,14 @@ def main() -> None:
     # --- 8) the wonder charges ride EVERY spawn path ------------------------
     s8 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     ti_b = torch.full((s8.B,), s8._builder_idx, dtype=torch.long)
-    assert int(s8._wonder_charges(0, ti_b)[0]) == 0, "no wonder, no extra charge"
+    assert int(s8._extra_charges(0, ti_b)[0]) == 0, "no wonder, no extra charge"
     plant(s8, 0, 0, pyramids)
-    assert int(s8._wonder_charges(0, ti_b)[0]) == 1, "the Pyramids give every Builder one more build charge"
+    assert int(s8._extra_charges(0, ti_b)[0]) == 1, "the Pyramids give every Builder one more build charge"
     ti_a = torch.full((s8.B,), s8._apostle_idx, dtype=torch.long)
-    assert int(s8._wonder_charges(0, ti_a)[0]) == 0, "the Pyramids say nothing about Apostles"
+    assert int(s8._extra_charges(0, ti_a)[0]) == 0, "the Pyramids say nothing about Apostles"
     plant(s8, 0, 0, hagia)
-    assert int(s8._wonder_charges(0, ti_a)[0]) == 1, "the Hagia Sophia gives every Apostle one more spread"
-    assert int(s8._wonder_charges(1, ti_a)[0]) == 0, "and only to its owner"
+    assert int(s8._extra_charges(0, ti_a)[0]) == 1, "the Hagia Sophia gives every Apostle one more spread"
+    assert int(s8._extra_charges(1, ti_a)[0]) == 0, "and only to its owner"
     print("  charges OK — builder and spread, per owner, at creation")
 
     # --- 9) free research completes the FIRST available rows ----------------

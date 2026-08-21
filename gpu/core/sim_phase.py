@@ -96,6 +96,8 @@ class SimPhase:
         bm = self.civ_best_melee[:, row]
         atk_cs = (torch.maximum(bm, torch.full_like(bm, 15)) + gar * 5
                   + self._walls_tier_cs[self._walls_tier_row(row, col)])
+        if self._gov_has_effects:
+            atk_cs = atk_cs + self._gov_mods(row)[12]["crng"].to(atk_cs.dtype)
         # a SURVIVED Military Emergency pays its target +2 CS on every City
         # Strike against a member, forever
         _emg_s = torch.zeros(Bn, dtype=torch.float64, device=dev2)
@@ -358,6 +360,10 @@ class SimPhase:
         has_q = act & (cur >= 0)
         if not bool(has_q.any()):
             return
+        # ONE multiplier, assembled in phase.ts's own order and applied once:
+        # a military unit under To Arms AND a production card takes
+        # `production * (a * b)`, never `(production * a) * b`.
+        _emall = torch.ones_like(prod)
         if self._gov_has_effects and self._encamp_didx >= 0:
             em = self._gov_mods(row)[5]
             _bd = self._b_req_district[cur.clamp(min=0, max=self.NB - 1)]
@@ -366,7 +372,7 @@ class SimPhase:
                 enc_i = enc_i | (cur == self.DISTRICT_BASE + self._encamp_si)
             if self._harbor_si >= 0:
                 enc_i = enc_i | (cur == self.DISTRICT_BASE + self._harbor_si)
-            prod = torch.where(enc_i, prod * em, prod)
+            _emall = torch.where(enc_i, em.to(_emall.dtype), _emall)
         # CIV6 (To Arms!, Golden face): "+15% Production towards military
         # units." (Heartbeat of Steam, Golden face): "+10% Production toward
         # Industrial era and later wonders." Item classes are disjoint, so the
@@ -375,21 +381,21 @@ class SimPhase:
         if bool(ta.any()):
             mil_i = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU) \
                 & ~self._type_civilian[(cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)]
-            prod = torch.where(ta & mil_i, prod * self._to_arms_prod, prod)
+            _emall = torch.where(ta & mil_i, _emall * self._to_arms_prod, _emall)
         stm = self._golden_ded(row, self._ded_steam)
         if bool(stm.any()):
             nw = self._wonder_era.shape[0]
             wid = (cur - self.WONDER_BASE).clamp(min=0, max=nw - 1)
             won_i = (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + nw) \
                 & (self._wonder_era[wid] >= self._industrial_era)
-            prod = torch.where(stm & won_i, prod * self._steam_wonder_prod, prod)
+            _emall = torch.where(stm & won_i, _emall * self._steam_wonder_prod, _emall)
         # CIV6 (Urban Development Treaty, outcome A): "+100% Production
         # towards buildings in this district." The x2 is exact in f64, so the
         # multiplier order against VETERANCY cannot re-associate anything.
         _cp, _cb = self._congress_udt()
         _bldg_i = (cur >= 0) & (cur < self.NB) & (_cp >= 0) \
             & (self._b_req_district[cur.clamp(min=0, max=self.NB - 1)] == _cp)
-        prod = torch.where(_bldg_i, prod * self._c_prod_mult, prod)
+        _emall = torch.where(_bldg_i, _emall * self._c_prod_mult, _emall)
         # CIV6 (Public Works Program): "+100% / -50% Production towards this
         # Project."
         if self._proj_rows:
@@ -398,7 +404,30 @@ class SimPhase:
             for _p in range(nP):
                 on = (pidx == _p)
                 if bool(on.any()):
-                    prod = torch.where(on, prod * self._congress_project_mult(_p), prod)
+                    _emall = torch.where(on, _emall * self._congress_project_mult(_p), _emall)
+        # The slotted production cards: CIV6 stacks production modifiers
+        # ADDITIVELY, so two cards that both name the item pay their
+        # percentages summed rather than compounded.
+        if self._gov_has_effects:
+            _pb = self._gov_mods(row)[12]["prod"]
+            if _pb:
+                _add = torch.zeros_like(prod)
+                for _pact, _isw, _cmask, _eramax, _pct in _pb:
+                    if _isw:
+                        _nw = self._wonder_era.shape[0]
+                        _wid = (cur - self.WONDER_BASE).clamp(min=0, max=_nw - 1)
+                        _hit = (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + _nw)
+                        if _eramax >= 0:
+                            _hit = _hit & (self._wonder_era[_wid] <= _eramax)
+                    else:
+                        _ui = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
+                        _hit = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU) \
+                            & ((self._type_cls[_ui] & _cmask) != 0)
+                        if _eramax >= 0:
+                            _hit = _hit & (self._type_era[_ui] <= _eramax)
+                    _add = _add + (_pact & _hit).to(_add.dtype) * _pct
+                _emall = _emall * (1 + _add)
+        prod = prod * _emall
         # VETERANCY multiplies FIRST, then the banked chop adds unmultiplied —
         # phase.ts spends the bank right after the production add.
         prog = self.city_progress[bidx, row, col]
@@ -802,6 +831,12 @@ class SimPhase:
                     gflat = self._bel_add("gpp", row)[:, cls].double().unsqueeze(1)
                 else:
                     gflat = torch.zeros(B, 1, dtype=torch.float64, device=dev)
+                # a policy card's flat points join the SAME per-city term:
+                # `mods.gppFlat` is one map over beliefs and cards alike.
+                if self._gov_has_effects:
+                    _pg = self._gov_mods(row)[12]["gpp"]
+                    if cls < _pg.shape[1]:
+                        gflat = gflat + _pg[:, cls].unsqueeze(1)
                 pts = (comp_c.double() * (1.0 + gflat + dgpp + nb_of.double())).sum(dim=1)
             else:
                 pts = torch.zeros(B, dtype=torch.float64, device=dev)

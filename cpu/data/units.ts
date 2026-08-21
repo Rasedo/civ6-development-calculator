@@ -6,6 +6,8 @@
  */
 
 import { GAME_SPEED } from './constants';
+import { TECHS, ERAS } from './techs';
+import { CIVICS } from './civics';
 
 export interface UnitDef {
   id: string;
@@ -84,6 +86,13 @@ export interface UnitDef {
    * FAITH ONLY, in any city, so it never joins a production column. Consumed
    * when it designates a park. */
   naturalist?: boolean;
+  /** CIV 6 unit class: BUILDER — the improvement civilian Ilkum, Public Works
+   *  and Serfdom address by name. Charges alone do not name it: a Military
+   *  Engineer, an Apostle and an Archaeologist all carry some. */
+  builder?: boolean;
+  /** CIV 6 unit class: RECON (Scout). The class Survey doubles experience
+   *  for, and the only class in this roster with no combat role. */
+  recon?: boolean;
   description: string;
 }
 
@@ -100,6 +109,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       moves: 2,
       combat: 0,
       charges: 3,
+      builder: true,
       description: 'Builds improvements, removes features and repairs pillaging (3 charges).',
     }),
     U({
@@ -110,6 +120,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       maintenance: 0,
       moves: 3,
       combat: 10,
+      recon: true,
       description: 'Fast, fragile explorer.',
     }),
     U({
@@ -493,6 +504,38 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       description: 'Adjacent melee and anti-cavalry attackers ignore Walls up to Medieval.',
     }),
   ].map((u) => [u.id, u]),
+);
+
+/** The CIV 6 unit CLASSES the policy cards address, in the bit order the
+ *  exported `cls` mask packs them in. `ranged` is the CLASS — a Quadrireme is
+ *  naval and a Catapult is siege, and neither is reached by a card that says
+ *  "ranged units", however loudly their ranged strength reads. */
+export const UNIT_CLASSES = ['melee', 'ranged', 'antiCavalry', 'cavalry', 'naval', 'recon', 'settler', 'builder'] as const;
+export type UnitClass = (typeof UNIT_CLASSES)[number];
+
+export function unitHasClass(def: UnitDef, cls: UnitClass): boolean {
+  switch (cls) {
+    case 'melee': return !!def.melee;
+    case 'ranged': return !!def.ranged && !def.naval && def.bombard === undefined;
+    case 'antiCavalry': return !!def.antiCavalry;
+    case 'cavalry': return !!def.cavalry;
+    case 'naval': return !!def.naval;
+    case 'recon': return !!def.recon;
+    case 'settler': return !!def.settler;
+    case 'builder': return !!def.builder;
+  }
+}
+
+/** the ERA a unit first becomes available — the era index of the tech or civic
+ *  that unlocks it (0 = trainable from the start). The production cards'
+ *  "Ancient and Classical era ... units" clause reads this. */
+export const UNIT_ERA_INDEX: Record<string, number> = Object.fromEntries(
+  Object.values(UNITS).map((u) => {
+    const t = u.requiresTech ? TECHS[u.requiresTech] : undefined;
+    const c = u.requiresCivic ? CIVICS[u.requiresCivic] : undefined;
+    const era = t ? ERAS.indexOf(t.era) : c ? ERAS.indexOf(c.era) : 0;
+    return [u.id, Math.max(0, era)];
+  }),
 );
 
 export const UNIT_HP = 100;

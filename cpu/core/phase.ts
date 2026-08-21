@@ -10,12 +10,13 @@ import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit } from './units';
 import { PILLAGE_HEAL_IMPROVEMENTS } from './combat';  // the replay's pillage arm mirrors hostileUnitAct's
+import { cityStrikeStrength } from './combat';
 import { UNIT_HP } from '../data/units';
-import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, generalAuraCS, cityDefenseStrength, encircled } from './combat';
+import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, generalAuraCS, encircled } from './combat';
 import { availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { selectResearch } from './economy';
-import { getModifiers } from './effects';
+import { getModifiers, prodBoostPct, unitUpkeep } from './effects';
 import { addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from './trade';
 import { addEnvoys, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, setMet, sueForPeaceWithCityState } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPES } from '../data/cityStates';
@@ -886,7 +887,9 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
     if (!hasMet(cityState, actor.seat)) continue;
     if ((actor.envoysAvailable ?? 0) <= 0) continue;
     actor.envoysAvailable = (actor.envoysAvailable ?? 0) - 1;
-    addEnvoys(cityState, actor.seat, 1);
+    const first = envoysOf(cityState, actor.seat) === 0
+      && getModifiers(state, actor.seat).firstEnvoyDouble;
+    addEnvoys(cityState, actor.seat, first ? 2 : 1);
   }
   const warCol = rec.war;
   if (warCol !== null && warCol !== undefined && warCol >= 0) {
@@ -1236,7 +1239,8 @@ export function seatPhase(state: GameState): void {
       if (state.cityStates.some((cityState) => hasMet(cityState, actor.seat))) {
         const gov = GOVERNMENTS_ADOPTION_LIVE ? computeAdoption(actor.research).government : null;
         const tier = gov ? GOV_INFLUENCE_TIER[gov] ?? 0 : 0;
-        actor.influencePoints = (actor.influencePoints ?? 0) + INFLUENCE_PER_TURN + tier;
+        actor.influencePoints = (actor.influencePoints ?? 0) + INFLUENCE_PER_TURN + tier
+          + getModifiers(state, actor.seat).influencePerTurn;
         // CONVERSION IS A RULE, for every seat. Real Civ 6 grants the
         // envoy the moment the meter fills, assigned or not. WHERE it is spent
         // is the decision, and that arrives on the wire.
@@ -1465,7 +1469,7 @@ export function seatPhase(state: GameState): void {
           if (raider === null) continue;
           plundered.add(r);
           const rs = seatOf(state, raider);
-          if (rs) rs.treasury += PLUNDER_ROUTE_GOLD;
+          if (rs) rs.treasury += PLUNDER_ROUTE_GOLD * getModifiers(state, raider).routePlunderMult;
         }
         if (plundered.size > 0) actor.tradeRoutes = routes.filter((r) => !plundered.has(r));
       }
@@ -1588,6 +1592,7 @@ export function seatPhase(state: GameState): void {
         // CIV6 (Public Works Program): "+100% / -50% Production towards this
         // Project."
         if (q.kind === 'project') _em *= congressProjectMult(state, PROJECT_LIST.findIndex((pr) => pr.id === q.project));
+        _em *= 1 + prodBoostPct(seatMods, q);
         const progressBefore = q.progress;
         q.progress += production * _em;
         // Pay in the bank, exactly where the seat 0's endTurn does
@@ -1678,10 +1683,10 @@ export function seatPhase(state: GameState): void {
           const defCSa = defCS + generalAuraCS(state, defender, bestTile);
           // a survived Military Emergency pays its target +2 CS on every
           // City Strike against a member, forever
-          const atkCS = cityDefenseStrength(state, civCity)
+          const atkCS = cityStrikeStrength(state, civCity)
             + emergencyStrikeCS(state, civCity.seat, defender.seat);
           defender.hp -= damageRoll(state, atkCS - defCSa, 'cstk', bestTile);
-          awardDefenseXp(defender); // +2 to a surviving military defender (attacker is the city)
+          awardDefenseXp(state, defender); // +2 to a surviving military defender (attacker is the city)
           warWearinessBattle(state, civCity.seat, defender.seat, bestTile,
             { dDied: defender.hp <= 0, city: true });
           // The STRIKER is the city, so the dig's era gate is its owner's —
@@ -1720,9 +1725,9 @@ export function seatPhase(state: GameState): void {
             ? embarkedDefenseCS(state, defender.seat) - woundPenalty(defender)
             : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + xpLevelBonus(defender);
           const defCSa = defCS + generalAuraCS(state, defender, bestTile); // the cstk mirror
-          const atkCS = cityDefenseStrength(state, civCity);
+          const atkCS = cityStrikeStrength(state, civCity);
           defender.hp -= damageRoll(state, atkCS - defCSa, 'estk', bestTile);
-          awardDefenseXp(defender);
+          awardDefenseXp(state, defender);
           warWearinessBattle(state, civCity.seat, defender.seat, bestTile,
             { dDied: defender.hp <= 0, city: true });
           // The STRIKER is the city, so the dig's era gate is its owner's —
@@ -1788,16 +1793,16 @@ export function seatPhase(state: GameState): void {
     actor.faith = (actor.faith ?? 0) + faithSum;
     seatAccumulators(state, actor.seat, rGovIds);
     actor.treasury -= state.units.reduce(
-      (s, u) => s + (u.seat === actor.seat ? UNITS[u.type]?.maintenance ?? 0 : 0),
+      (s, u) => s + (u.seat === actor.seat ? unitUpkeep(seatMods, u.type) : 0),
       0,
     );
     if (Math.round(actor.treasury * 1000) < 0) {
       let victim: Unit | undefined;
       for (const u of state.units) {
         if (u.seat !== actor.seat) continue;
-        const m = UNITS[u.type]?.maintenance ?? 0;
+        const m = unitUpkeep(seatMods, u.type);
         if (m <= 0) continue;
-        const vm = victim ? UNITS[victim.type]?.maintenance ?? 0 : 0;
+        const vm = victim ? unitUpkeep(seatMods, victim.type) : 0;
         if (!victim || m > vm || (m === vm && u.id < victim.id)) victim = u;
       }
       if (victim) disbandUnit(state, victim.id);

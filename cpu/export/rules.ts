@@ -29,14 +29,59 @@ import { WONDER_TOURISM_BASE } from '../core/city';
 import { BALANCED_WEIGHTS } from '../core/score';
 import { unitActionNames } from '../core/unitActions';
 import { MAX_BARB_PER_CAMP, BARB_HORSE_RANGE, CLASS_MELEE_VS_ANTICAV, CLASS_ANTICAV_VS_CAV, FLANK_SUPPORT_CIVIC, AMPHIBIOUS_ATTACK_CS, FORT_DEFENSE_CS, THEO_HOLY_GROUND_STRENGTH, THEO_HOLY_CITY_STRENGTH } from '../core/combat';
-import { UNITS, UNIT_HP, CITY_MAX_HP, WALLS_TIER_HP, WALLS_TIER_CS, WALLS_TIER_URBAN, URBAN_DEFENSES_TECH, REPAIR_QUIET_TURNS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, ENCAMPMENT_HP } from '../data/units';
+import { UNITS, UNIT_HP, CITY_MAX_HP, WALLS_TIER_HP, WALLS_TIER_CS, WALLS_TIER_URBAN, URBAN_DEFENSES_TECH, REPAIR_QUIET_TURNS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, ENCAMPMENT_HP, UNIT_CLASSES, UNIT_ERA_INDEX, unitHasClass } from '../data/units';
 import { YIELD_KEYS } from '../core/types';
 import { FLOOD_SEVERITY_P, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn } from '../data/disasters';
 import { BUILDINGS } from '../data/buildings';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencySource } from '../data/districts';
 import { TECHS, ERAS, MODERN_ERA_INDEX } from '../data/techs'; // era scale
 import { CIVICS } from '../data/civics';
-import { GOVERNMENTS, POLICIES, SLOT_KINDS, GOVERNMENTS_ADOPTION_LIVE, type SlotKind } from '../data/policies';
+import { GOVERNMENTS, POLICIES, SLOT_KINDS, GOVERNMENTS_ADOPTION_LIVE, type SlotKind, type BuildingYieldBoost, type PolicyEffects } from '../data/policies';
+
+/** A `buildingYieldBoost` as the GPU reads it:
+ *  [districtIndex, yieldIndex, pct, popMin, popPct, adjMin, adjPct].
+ *  districtIndex -1 = the row carries no boost. */
+const boostRow = (b: BuildingYieldBoost | undefined): number[] =>
+  b
+    ? [PLACEABLE_DISTRICTS.indexOf(b.district), YIELD_KEYS.indexOf(b.yield),
+       b.pct, b.popMin, b.popPct, b.adjMin, b.adjPct]
+    : [-1, -1, 0, 0, 0, 0, 0];
+
+/** Every channel a government or a policy card can carry, in one row so the
+ *  two tables cannot drift. A government and a card layer identically. */
+const effectRow = (fx: PolicyEffects) => ({
+  cityYields: YIELD_KEYS.map((k) => fx.cityYields?.[k] ?? 0),
+  capitalYields: YIELD_KEYS.map((k) => fx.capitalYields?.[k] ?? 0),
+  housingAll: fx.housingAll ?? 0,
+  amenitiesAll: fx.amenitiesAll ?? 0,
+  yieldMult: YIELD_KEYS.map((k) => fx.yieldMult?.[k] ?? 1),
+  adjacencyMult: PLACEABLE_DISTRICTS.map((d) => fx.adjacencyMult?.[d] ?? 1),
+  buildingYieldBoost: boostRow(fx.buildingYieldBoost),
+  tilePurchaseMult: fx.tilePurchaseMult ?? 1,
+  encampHarborProdMult: fx.encampHarborProdMult ?? 1, // VETERANCY: Encampment + Harbor items
+  housingIfDistricts: fx.housingIfDistricts ? [fx.housingIfDistricts.min, fx.housingIfDistricts.housing] : [-1, 0],
+  amenitiesIfSpecialty: fx.amenitiesIfSpecialty ? [fx.amenitiesIfSpecialty.min, fx.amenitiesIfSpecialty.amenities] : [-1, 0],
+  newDeal: fx.newDeal ? [fx.newDeal.min, fx.newDeal.housing, fx.newDeal.amenities] : [-1, 0, 0],
+  // [wonderTarget, unit-class mask over UNIT_CLASSES, eraMax, pct];
+  // wonderTarget -1 = the row carries no production boost.
+  prodBoost: fx.prodBoost
+    ? [fx.prodBoost.target === 'wonder' ? 1 : 0,
+       fx.prodBoost.classes.reduce((m, c) => m | (1 << UNIT_CLASSES.indexOf(c)), 0),
+       fx.prodBoost.eraMax, fx.prodBoost.pct]
+    : [-1, 0, 0, 0],
+  builderCharges: fx.builderCharges ?? 0,
+  unitMaintenanceCut: fx.unitMaintenanceCut ?? 0,
+  combatVsBarbarians: fx.combatVsBarbarians ?? 0,
+  cityDefense: fx.cityDefense ?? 0,
+  cityRanged: fx.cityRanged ?? 0,
+  reconXpMult: fx.reconXpMult ?? 1,
+  routePlunderMult: fx.routePlunderMult ?? 1,
+  routeGold: fx.routeGold ?? 0,
+  influencePerTurn: fx.influencePerTurn ?? 0,
+  firstEnvoyDouble: fx.firstEnvoyDouble ? 1 : 0,
+  culturePerSuzerain: fx.culturePerSuzerain ?? 0,
+  gpp: GP_CLASSES.map((c) => fx.gppFlat?.[c] ?? 0),
+});
 import { BOOSTS, BOOST_FRACTION } from '../data/boosts';
 import { CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, FOOD_PER_CITIZEN, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, LUXURY_AMENITY_CITIES, GAME_SPEED, REGIONAL_RANGE, EMBARK_MOVES, EMBARKED_DEFENSE_CS_BY_ERA, embarkState } from '../data/constants';
 
@@ -671,6 +716,10 @@ export function buildRules() {
       // the two classes a Battering Ram or a Siege Tower helps
       melee: u.melee ? 1 : 0,
       antiCavalry: u.antiCavalry ? 1 : 0,
+      // the UNIT_CLASSES bit mask and the era index a production card reads
+      cls: UNIT_CLASSES.reduce((m, c, i) => m | (unitHasClass(u, c) ? 1 << i : 0), 0),
+      era: UNIT_ERA_INDEX[u.id] ?? 0,
+      recon: u.recon ? 1 : 0, // Survey doubles what this class earns
       // BOMBARD strength (0 = not a siege unit): full damage to a perimeter,
       // no city penalty, and no melee attack at all.
       bombard: u.bombard ?? 0,
@@ -828,14 +877,10 @@ export function buildRules() {
     // adoption identically — see GOVERNMENTS_ADOPTION_LIVE.
     governmentsLive: GOVERNMENTS_ADOPTION_LIVE,
     // government + policy modifier tables (the belief-table shape).
-    // Slot kinds: military=0, economic=1, diplomatic=2, wildcard=3. Only the
-    // cityYields/capitalYields channels are exported (the GPU-implemented gov/
-    // policy effects); other PolicyEffects channels (adjacencyMult,
-    // buildingYieldMult, housing/amenity conditionals, yieldMult,
-    // encampHarborProdMult, tilePurchaseMult) are TS-only — no adopted government
-    // or slotted card in the scripted 100-turn gate uses a LIVE instance of one
-    // (verified: seat 0 slots VETERANCY[inert]+URBAN_PLANNING, opponents adopt
-    // AUTOCRACY and slot the same), so they stay inert here.
+    // Slot kinds: military=0, economic=1, diplomatic=2, wildcard=3. Every
+    // effect channel exports: off-script research can adopt ANY government
+    // (the Merchant-Republic catch) and slot any card, so every one is
+    // reachable and the two engines read the same table.
     governments: Object.values(GOVERNMENTS).map((g) => ({
       id: g.id,
       tier: g.tier,
@@ -848,21 +893,7 @@ export function buildRules() {
         g.slots.filter((s) => s === 'diplomatic').length,
         g.slots.filter((s) => s === 'wildcard').length,
       ],
-      cityYields: YIELD_KEYS.map((k) => g.effects.cityYields?.[k] ?? 0),
-      capitalYields: YIELD_KEYS.map((k) => g.effects.capitalYields?.[k] ?? 0),
-      // The full channel matrix: off-script research paths can adopt ANY
-      // government (the Merchant-Republic catch), so every effect channel a
-      // government or WIRED card carries is reachable and must export.
-      housingAll: g.effects.housingAll ?? 0,
-      amenitiesAll: g.effects.amenitiesAll ?? 0,
-      yieldMult: YIELD_KEYS.map((k) => g.effects.yieldMult?.[k] ?? 1),
-      adjacencyMult: PLACEABLE_DISTRICTS.map((d) => g.effects.adjacencyMult?.[d] ?? 1),
-      buildingYieldMult: PLACEABLE_DISTRICTS.map((d) => g.effects.buildingYieldMult?.[d] ?? 1),
-      tilePurchaseMult: g.effects.tilePurchaseMult ?? 1,
-      encampHarborProdMult: g.effects.encampHarborProdMult ?? 1, // VETERANCY: Encampment + Harbor items
-      housingIfDistricts: g.effects.housingIfDistricts ? [g.effects.housingIfDistricts.min, g.effects.housingIfDistricts.housing] : [-1, 0],
-      amenitiesIfSpecialty: g.effects.amenitiesIfSpecialty ? [g.effects.amenitiesIfSpecialty.min, g.effects.amenitiesIfSpecialty.amenities] : [-1, 0],
-      newDeal: g.effects.newDeal ? [g.effects.newDeal.min, g.effects.newDeal.housing, g.effects.newDeal.amenities] : [-1, 0, 0],
+      ...effectRow(g.effects),
     })),
     policies: Object.values(POLICIES).map((p) => ({
       id: p.id,
@@ -870,18 +901,9 @@ export function buildRules() {
       unlockCivic: civicList.findIndex((c) =>
         c.effects.some((e) => e.kind === 'unlockPolicy' && e.policy === p.id),
       ),
-      cityYields: YIELD_KEYS.map((k) => p.effects.cityYields?.[k] ?? 0),
-      capitalYields: YIELD_KEYS.map((k) => p.effects.capitalYields?.[k] ?? 0),
-      housingAll: p.effects.housingAll ?? 0,
-      amenitiesAll: p.effects.amenitiesAll ?? 0,
-      yieldMult: YIELD_KEYS.map((k) => p.effects.yieldMult?.[k] ?? 1),
-      adjacencyMult: PLACEABLE_DISTRICTS.map((d) => p.effects.adjacencyMult?.[d] ?? 1),
-      buildingYieldMult: PLACEABLE_DISTRICTS.map((d) => p.effects.buildingYieldMult?.[d] ?? 1),
-      tilePurchaseMult: p.effects.tilePurchaseMult ?? 1,
-      encampHarborProdMult: p.effects.encampHarborProdMult ?? 1, // VETERANCY: Encampment + Harbor items
-      housingIfDistricts: p.effects.housingIfDistricts ? [p.effects.housingIfDistricts.min, p.effects.housingIfDistricts.housing] : [-1, 0],
-      amenitiesIfSpecialty: p.effects.amenitiesIfSpecialty ? [p.effects.amenitiesIfSpecialty.min, p.effects.amenitiesIfSpecialty.amenities] : [-1, 0],
-      newDeal: p.effects.newDeal ? [p.effects.newDeal.min, p.effects.newDeal.housing, p.effects.newDeal.amenities] : [-1, 0, 0],
+      // the civic that RETIRES the card; -1 = it never leaves the pool
+      obsoleteCivic: p.obsoleteCivic ? civicIdx.get(p.obsoleteCivic) ?? -1 : -1,
+      ...effectRow(p.effects),
     })),
   };
   return rules;

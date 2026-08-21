@@ -176,8 +176,7 @@ export function cityBuildingYields(ctx: YieldCtx, city: City): Yields {
     if (!def) continue;
     if (def.regional) continue; // handled by regional scan (affects own city too)
     if (pillaged.has(def.district)) continue; // buildings in a pillaged district are dark
-    const mult = ctx.mods.buildingYieldMult[def.district] ?? 1;
-    if (def.yields) addYields(out, def.yields, mult);
+    if (def.yields) addYields(out, def.yields);
     const beliefAdd = ctx.mods.buildingYieldAdd[id];
     if (beliefAdd) addYields(out, beliefAdd);
     if (def.special === 'SHIPYARD') {
@@ -186,6 +185,24 @@ export function cityBuildingYields(ctx: YieldCtx, city: City): Yields {
         out.production += effectiveAdjacency(ctx, ctx.map.tiles[harbor.tileIndex], 'HARBOR');
       }
     }
+  }
+  for (const b of ctx.mods.buildingYieldBoosts) {
+    if (pillaged.has(b.district)) continue;
+    const d = city.districts.find((x) => x.type === b.district);
+    if (!d || !ctx.map.tiles[d.tileIndex].districtComplete) continue;
+    let pct = b.pct;
+    if (city.population >= b.popMin) pct += b.popPct;
+    // The adjacency the district ACTUALLY pays — a card that doubles it can
+    // push the district over this card's own threshold, which is what the
+    // player sees on the district.
+    if (effectiveAdjacency(ctx, ctx.map.tiles[d.tileIndex], b.district) >= b.adjMin) pct += b.adjPct;
+    let base = 0;
+    for (const id of city.buildings) {
+      const def = BUILDINGS[id];
+      if (!def || def.regional || def.district !== b.district) continue;
+      base += def.yields?.[b.yield] ?? 0;
+    }
+    out[b.yield] += base * pct;
   }
   return out;
 }

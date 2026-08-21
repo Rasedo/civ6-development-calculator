@@ -120,9 +120,9 @@ describe('suzerain rules (the `suz`-coded perks)', () => {
     completeDistrict(state, city, 'CAMPUS', 10, 9);
     completeDistrict(state, city, 'HOLY_SITE', 8, 9);
     seatOf(state, 0)!.tradeRoutes = [{ from: city.id, to: -1, toCs: kumasi.id, expiresTurn: state.turn + 100 }];
-    const withSuz = cityTradeYields(state, city);
+    const withSuz = cityTradeYields(state, city, 0);
     kumasi.envoys = {};
-    const without = cityTradeYields(state, city);
+    const without = cityTradeYields(state, city, 0);
     expect(withSuz.culture - without.culture).toBe(KUMASI_ROUTE_CULTURE * 2);
     expect(withSuz.gold - without.gold).toBe(KUMASI_ROUTE_GOLD * 2);
   });

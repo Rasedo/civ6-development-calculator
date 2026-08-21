@@ -125,9 +125,9 @@ describe('the four new dedications', () => {
     seatOf(state, 0)!.tradeRoutes = [
       { from: city.id, to: -1, toSeat: 1, toSeatCity: dest.id, expiresTurn: state.turn + 100 },
     ];
-    const withG = cityTradeYields(state, city).gold;
+    const withG = cityTradeYields(state, city, 0).gold;
     commit(state, 0, DED_MONUMENTALITY, true); // golden, different pick
-    const without = cityTradeYields(state, city).gold;
+    const without = cityTradeYields(state, city, 0).gold;
     expect(withG - without).toBe(COINAGE_INTL_GOLD_PER_SPEC * 1);
   });
 

@@ -626,7 +626,7 @@ class SimOrders:
         if not self.units_mode:
             return
         mine = self.unit_alive & (self.unit_seat == row)
-        upkeep = (self._type_maintenance[self.unit_type.clamp(min=0, max=self.NU - 1)] * mine.to(self.dtype)).sum(dim=1)
+        upkeep = (self._unit_upkeep(row, self.unit_type) * mine.to(self.dtype)).sum(dim=1)
         tre = self.civ_treasury[:, row]
         self.civ_treasury[:, row] = torch.where(active, tre - upkeep, tre)
         self._bankrupt_disband(row, active)
@@ -645,7 +645,7 @@ class SimOrders:
             insolvent = insolvent & active
         if not bool(insolvent.any()):
             return
-        maint = self._type_maintenance[self.unit_type.clamp(min=0, max=self.NU - 1)]
+        maint = self._unit_upkeep(row, self.unit_type)
         cand = self.unit_alive & (self.unit_seat == row) & (maint > 0)
         W = cand.shape[1]
         slots = torch.arange(W, device=self.device, dtype=maint.dtype).unsqueeze(0)  # [1, W]

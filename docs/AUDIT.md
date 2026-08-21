@@ -53,8 +53,7 @@ nothing carries forward.
 
 | Open item | Weight | What the weight is for |
 |---|---|---|
-| A-1r `adjacencyMult` / `buildingYieldMult` unread on the GPU | 2 | eleven policy cards double a district's adjacency or its buildings' yields; TS applies both, the GPU has no reader |
-| **A. Engine vs engine** | **2** | |
+| **A. Engine vs engine** | **0** | |
 | B-20r tourism tails | 2 | theming ships; open-borders digs and work TRADES need a treaty system, and the Naturalist's progressive cost is unsourced |
 | B-21r suzerain rows | 1 | the residual descoped rows all need whole absent systems |
 | B-22r World Congress | 2 | 13 of the 21 regular resolutions ship and emergencies run as special sessions; eight resolutions and the scored competitions have no carrier; peace terms wait on C-2 and two favor penalties on C-19/C-24; the favor tie-break unmodeled |
@@ -79,7 +78,7 @@ nothing carries forward.
 | C-3 unit promotions | 5 | only MARTYR reaches a rule; choosing one is also a wire head, and Amphibious waives two penalties that now ship |
 | C-4 unique improvements | 3 | Batey / Colossal Head / Monastery, each a flat channel today |
 | C-5 strategic-resource stockpiles | 4 | resources gate, they never accumulate or get spent |
-| C-6 policy-card modifiers | 5 | ~38 adoptable cards are inert one-liners |
+| C-6 policy-card modifiers | 1 | two of the 49 cards are inert, each blocked on a system below |
 | C-7 trading posts | 2 | a route lays roads and plants nothing |
 | C-8 draws made deterministic | 2 | inspirations, the religion pick, Oxford's and the Bolshoi's free research |
 | C-9 faith-purchase classes | 1 | faith buys named units, never a class of building |
@@ -100,8 +99,11 @@ nothing carries forward.
 | C-24 no CO2, no climate | 3 | GS's whole climate arc — emissions, warming bands, sea level, escalating disasters — and 2 gaps wait on it |
 | C-26 no civilization uniques | 5 | seats are a name, a colour and a city list: no civ ability, no leader ability or agenda, no unique unit, no unique infrastructure |
 | C-25 no stealth (invisible) units | 2 | the whole naval-raider class is absent and nothing on either engine can be invisible |
-| **C. Absent systems** | **68** | |
-| **OPEN, TOTAL** | **91** | |
+| C-27 pillaging pays no yields | 2 | the verb marks the tile and heals; nothing banks, and there is no coastal raid to bank from |
+| C-28 tourism is one lifetime scalar | 2 | it is banked per seat and divided by the civ count on read, so no rule can address one rival's tourism |
+| C-29 no RESOLVED suzerain | 1 | `isSuzerain` recomputes from the raw envoy store on every read, so a rule that changes envoy WEIGHT by who the suzerain is has no fixed point |
+| **C. Absent systems** | **69** | |
+| **OPEN, TOTAL** | **90** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -121,24 +123,12 @@ THE DIGEST IS THE ONLY INSTRUMENT FOR THIS CLASS — both engines can be
 equally faithful to Civ 6 and still disagree with each other, and a gate red
 is the only thing that would say so. Its current answer is green: 12 seeds x
 250 turns, compared per turn on every group. That green bounds nothing the
-gate does not reach — "Reachability" below is where that boundary runs, and
-the one entry here was found by READING the exporter against its readers,
-not by any red.
+gate does not reach — "Reachability" below is where that boundary runs.
 
-- **A-1r. The GPU never reads `adjacencyMult` or `buildingYieldMult`.**
-  Eleven policy cards double a district's adjacency or its buildings' yields
-  — `NATURAL_PHILOSOPHY` and `RATIONALISM` on the Campus, `SCRIPTURE` and
-  `SIMULTANEUM` on the Holy Site, `TOWN_CHARTERS` / `FREE_MARKETS` on the
-  Commercial Hub, `NAVAL_INFRASTRUCTURE` on the Harbor, `CRAFTSMEN` and
-  `FIVE_YEAR_PLAN` on the Industrial Zone, `AESTHETICS` and `GRAND_OPERA` on
-  the Theater Square. `buildRules` exports both arrays per government and per
-  policy row; TS reads them in `effectiveAdjacency` and `cityBuildingYields`
-  through `getModifiers`. The GPU has NO reader at all — `_gov_policy_mods`
-  returns ten channels and neither of these is among them, so a seat that
-  slots one of those cards banks a different yield on the two engines.
-  REACHABILITY: the 250-turn gate is green, so no driven seat reaches a
-  slotted card of these eleven in it; the class is real and unreached, which
-  is exactly the shape a digest cannot find for you.
+THIS CHAPTER IS EMPTY. That is a claim about the two instruments that fill
+it — the digest, which only ever speaks about what the gate REACHES, and a
+read of the exporter against its readers, which only ever speaks about the
+channels somebody thought to compare. Neither can say the class is closed.
 
 WHAT THE INSTRUMENT CAN SEE IS ITSELF AUDITABLE, and it was shallower than
 it read. Coverage proved every `_MUTABLE` plane was NAMED by some field; it
@@ -787,7 +777,7 @@ Civ 6 source or is recorded as unverifiable.
   real tech/civic), every unit, every technology and every civic (era, cost,
   prereqs — both trees were systematically off and now match the real tree),
   every building (costs; worship faith price 380), and every policy card
-  with a live effect. What is LEFT is each labelled at its definition, and
+  (all 49, each against its own Civilopedia page — see C-6). What is LEFT is each labelled at its definition, and
   each is an open residual rather than a decision:
   THREE ROWS CLOSED by reading their real text, and one bullet was FALSE:
   - **The MONUMENT was carrying its VANILLA row.** SOURCED (R&F/GS): "+1
@@ -882,8 +872,8 @@ number was under-counting by treating deferrals as closures.
 - **C-3. UNIT PROMOTIONS — no promotion tree.** Weight 5. The only promotion
   that reaches a rule is MARTYR, drawn at the death. Gaps: Yerevan's suzerain
   row (choose an Apostle promotion instead of drawing it — and choosing is a
-  DECISION with no wire record, so it needs a head too); every promotion-
-  shaped policy card in `policies`; veterancy beyond the flat XP levels; and
+  DECISION with no wire record, so it needs a head too); veterancy beyond
+  the flat XP levels; and
   AMPHIBIOUS, which "negates the defender's river defense bonus and doesn't
   suffer the amphibious attack penalty when it attacks" — both of those
   penalties now ship, so the waiver has something real to waive.
@@ -896,12 +886,25 @@ number was under-counting by treating deferrals as closures.
   accumulates and SPENDS. Gaps: the Lagrange Laser Station's 30 Aluminum;
   unit resource COSTS and per-turn consumption; Zanzibar's two
   exists-nowhere-else luxuries.
-- **C-6. POLICY-CARD MODIFIERS — ~38 cards are inert one-liners.** Weight 5.
-  `policies` carries them with "(not modeled)" in the description: combat
-  strength vs a class, production toward a unit class, per-unit maintenance
-  discounts, goody-hut speed. Each needs a modifier channel the yield/combat
-  bodies read. The cards EXIST and are adoptable, which makes this worse than
-  an absence: a seat can spend a slot on nothing.
+- **C-6. POLICY-CARD MODIFIERS — two of the 49 cards are inert.** Weight 1.
+  Every row in `POLICIES` was read against its own Civilopedia page: the
+  description quotes the card, the slot kind is the page's `type`, the
+  enabling civic is its `enabled_with` and `obsoleteCivic` its
+  `obsolete_with`. Seven rows named something that is not a Gathering Storm
+  policy card at all and are gone — a pantheon that `religion.ts` already
+  carries, a Dark Age card and a governor title (B-24r), a Golden Age
+  dedication this model already runs as `DED_MONUMENTALITY`, a Government
+  Plaza building (C-22), an Apostle promotion (C-3), and one card that does
+  not exist. What is left inert:
+  - `ONLINE_COMMUNITIES` — "+50% Tourism output to civilizations to which you
+    have a Trade Route". Blocked on C-28: tourism is one lifetime scalar per
+    seat, so there is no per-rival figure to raise.
+  - `CONTAINMENT` — "Each Envoy you send to a city-state counts as two, if its
+    Suzerain has a different government than you". Blocked on C-29: the
+    suzerain is recomputed from the raw envoy store at every read, so a rule
+    that reweights envoys BY the current suzerain has no fixed point.
+  - `TOTAL_WAR` ships its plunder half and not its pillage half — blocked on
+    C-27, where pillaging banks nothing to raise.
 - **C-7. TRADING POSTS — a route lays roads and plants nothing.** Weight 2.
   Gaps: Bandar Brunei's suzerain row; the water-route RANGE refuel and the
   per-post gold at repeat destinations (B-31r).
@@ -964,6 +967,23 @@ number was under-counting by treating deferrals as closures.
   of them an ACTIVATED ability used later on a chosen tile. Gaps: the
   appeal-granting Great People (Alvar Aalto, Charles Correa) that B-36r names,
   and every "activate in a city" ability in the roster.
+- **C-27. PILLAGING PAYS NO YIELDS.** Weight 2. The PILLAGE verb sets
+  `pillaged` on the tile, heals a food-improvement pillager and spends the
+  move; nothing is banked by anyone on either engine, and there is no coastal
+  raid to bank from either. Real Civ 6 pays the pillager a yield lump keyed to
+  what was wrecked. A gap waits on it: `TOTAL_WAR`'s pillage half (C-6).
+- **C-28. TOURISM IS ONE LIFETIME SCALAR PER SEAT.** Weight 2. `seat.tourism`
+  banks a single figure and the visitor split divides it by the civ count on
+  read, so no rule can address the tourism flowing to ONE rival. Real Civ 6
+  accrues tourism per foreign civ, which is what its per-civ modifiers key on.
+  C-23 is a different thinness in the same plane — nothing REDUCES what is
+  banked — and the two are independent. A gap waits on this one:
+  `ONLINE_COMMUNITIES` (C-6).
+- **C-29. THERE IS NO RESOLVED SUZERAIN.** Weight 1. `isSuzerain` answers
+  from the raw envoy store every time it is asked, and nothing stores the
+  answer. Any rule that changes an envoy's WEIGHT depending on who the
+  suzerain currently is therefore has no fixed point — the doubling moves the
+  suzerain, which moves the doubling. A gap waits on it: `CONTAINMENT` (C-6).
 - **C-26. NO CIVILIZATION UNIQUES.** Weight 5. A major seat is a name, a
   colour and a list of city names — `CIV_LEADERS` holds nothing else, and the
   section it lives in says so: "Nothing here is keyed to which seat asks."
@@ -1024,53 +1044,61 @@ steers the games into a different regime and carries the older rows with it:
 
 | mechanic | seeds reaching | first |
 |---|---|---|
-| faith-buy kind 6 (APOSTLE purchase) | 12/12 | t78 |
 | a PLOT LOCK held by a citizen | 12/12 | t2 |
-| a WORLD CONGRESS ballot on the wire | 12/12 | t119 |
-| a SPECIALIST pinned into a slot | 11/12 | t114 |
-| a second HULL on any seat | 9/12 | t123 |
-| two enemy religious units ADJACENT (theological combat's precondition) | 4/12 | t107 |
-| WAR with a city-state | 4/12 | t127 |
-| PEACE with a city-state, through the sue column | 4/12 | t145 |
-| an INTERNATIONAL trade leg | 1/12 | t241 |
+| faith-buy kind 6 (APOSTLE purchase) | 12/12 | t76 |
+| a WORLD CONGRESS ballot on the wire | 12/12 | t89 |
+| a SPECIALIST pinned into a slot | 12/12 | t116 |
+| an INTERNATIONAL trade leg | 11/12 | t75 |
+| two enemy religious units ADJACENT (theological combat's precondition) | 10/12 | t88 |
+| a second HULL on any seat | 4/12 | t103 |
+| WAR with a city-state | 4/12 | t142 |
+| PEACE with a city-state, through the sue column | 4/12 | t153 |
 | URBANIZATION civic | 0/12 | never |
 | a NEIGHBORHOOD placed | 0/12 | never |
 | an antiquity dig (artifact in a slot) | 0/12 | never |
 | NATURAL_HISTORY (the Archaeologist's civic) | 0/12 | never |
 | CONSERVATION (the Naturalist's civic) | 0/12 | never |
 
-- THEOLOGICAL COMBAT IS REACHED, in 4 of 12 seeds from t107. The old
-  claim here — "a gate that never puts two apostles side by side proves
-  nothing about it" — was wrong: the gate does, so the resolver's
-  deterministic damage and its apostle-only initiation ARE gate-covered.
-- The APOSTLE BUY fires in every seed from t78 and the 250-turn gate is
+- THE TABLE MOVED WHOLESALE when the policy cards started paying. A card in
+  a slot changes production, adjacency, envoys and barbarian combat, so the
+  driven games take a different route through the same seeds: an
+  INTERNATIONAL leg went from one seed to eleven, theological adjacency from
+  four to ten, and a second hull the other way, from nine to four. This is
+  the section's own rule doing its job — no row here survives a change to
+  what the driver decides, and none of these movements is a regression.
+- THEOLOGICAL COMBAT IS REACHED, in 10 of 12 seeds from t88, so the
+  resolver's deterministic damage and its apostle-only initiation ARE
+  gate-covered.
+- The APOSTLE BUY fires in every seed from t76 and the 250-turn gate is
   green, which is what closed B-18r's predicted lifecycle drift.
 - THE CITIZEN OVERRIDES are the widest-reaching heads in the gate: a plot
-  lock stands on every seed from t2 (138 plots at t250) and a pinned
-  specialist on 11 of 12 from t114 (36 slots), so both ride the digest for
+  lock stands on every seed from t2 (147 plots at t250) and a pinned
+  specialist on every seed from t116 (42 slots), so both ride the digest for
   most of a game rather than leaning on `citizens_test`.
-- WAR WITH A CITY-STATE stands on 4 of 12 seeds from t127 and closes through
-  the SUE column on the same 4 from t145 — 6.5 minor-war turns per seed,
+- WAR WITH A CITY-STATE stands on 4 of 12 seeds from t142 and closes through
+  the SUE column on the same 4 from t153 — 6.8 minor-war turns per seed,
   30 on the loudest. The declare, the peace and both clocks are gate-covered;
   the meeting gate, the treaty term and the suzerain refusal are not, and
   `cs_war_test` section d is their bar.
-- URBANIZATION and a NEIGHBORHOOD dropped back OUT of the gate — they stood
-  in one seed at t242/t243 before the citizen and Congress heads changed the
-  late-game trajectory, and now no seed reaches either. The poke lane is
-  their only proof again. An INTERNATIONAL leg moved the other way, from
-  NEVER to one seed at t241.
-- A SECOND HULL reaches 9 of 12 seeds from t123. The route KINDS moved
-  the other way under the Trader economy: routes wait for FOREIGN_TRADE
-  plus a trained Trader (~t60+), by which point specialty districts lift
-  the domestic pair past the flat city-state yields in the candidate
-  scan, and a completion hands the Trader straight to the next domestic
-  pair. Measured over 12 driven seeds: 319 domestic routes (~27/seed,
-  239 natural round-trip completions, 13 early ends), 11 city-state
-  routes over 5 seeds, and the INTERNATIONAL arm now fires in ONE, at t241.
-  The intl arm still lives mainly in `trade2_test` pokes and
-  the TS trade-fidelity suite, and the serve gate's ROUTE tripwire still
-  compares the candidate pair on every turn a Trader is free — but the
-  digest's intl rows ride pokes alone.
+- URBANIZATION and a NEIGHBORHOOD are still out of the gate entirely, on
+  every seed. The poke lane is their only proof.
+- A SECOND HULL reaches 4 of 12 seeds from t103, down from nine: the naval
+  arm is thinner under the new trajectory and `naval_test` carries more of
+  it than the table used to imply.
+- THE POLICY CARDS THEMSELVES ARE MOSTLY UNREACHED. The greedy fill puts 9
+  of the 49 cards in a slot across the whole run — URBAN_PLANNING, GOD_KING,
+  LAND_SURVEYORS, NATURAL_PHILOSOPHY, SCRIPTURE, DISCIPLINE, CHIVALRY,
+  VETERANCY, DIPLOMATIC_LEAGUE — at most six at once. The fill takes TABLE
+  order within a slot kind, so a late card is reachable only once the
+  earlier ones RETIRE, and the driven seeds never research far enough for
+  most of those civics. Eight effect channels ride the digest
+  (`cityYields`, `capitalYields`, `adjacencyMult`, `tilePurchaseMult`,
+  `encampHarborProdMult`, `prodBoost`, `combatVsBarbarians`,
+  `firstEnvoyDouble`); the other fourteen — `buildingYieldBoost`,
+  `builderCharges`, `unitMaintenanceCut`, `cityDefense`, `cityRanged`,
+  `reconXpMult`, `routePlunderMult`, `routeGold`, `influencePerTurn`,
+  `culturePerSuzerain`, `gpp`, and the three conditional-housing rows — are
+  proved by `policy_cards_test` and the TS `policy-cards` suite alone.
 - No antiquity dig happens at all, and the reason is now MEASURED rather
   than assumed: no seed researches NATURAL_HISTORY, so no seat can train an
   Archaeologist, and none builds the museum a dig lands in. The same
@@ -1079,9 +1107,9 @@ steers the games into a different regime and carries the older rows with it:
   (The finer question this section used to ask — a dig by a seat whose ERA
   differs from row 0's — is doubly moot: eras are global 50-turn blocks
   per B-24r, so no two seats can be in different eras by construction.)
-- The CULTURE VICTORY's distance, re-measured: at t250 visiting peaks at 4
-  (mean ~0.5) against a domestic peak of 59 (mean ~36) — a ~70x gap on
-  means. B-20r's scope should be read off this, not any older number.
+- The CULTURE VICTORY's distance, re-measured: at t250 visiting peaks at 5
+  (mean ~0.5 per seat) against a domestic peak of 61 (mean ~37) — a ~70x gap
+  on means. B-20r's scope should be read off this, not any older number.
 - The space race needs Information-era techs no gate lane reaches; its poke
   lanes are the proof.
 - A barbarian march choosing a CIV row's city while a row-0 city stands

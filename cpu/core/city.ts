@@ -675,7 +675,7 @@ export function computeCityStats(
       + ANSHAN_RELIC_SCIENCE * ((city.relics ?? 0) + (city.artifacts ?? 0));
   }
 
-  const trade = cityTradeYields(state, city);
+  const trade = cityTradeYields(state, city, m.routeGold);
 
   const citizens = emptyYields();
   citizens.science = city.population * CITIZEN_SCIENCE;

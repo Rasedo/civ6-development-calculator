@@ -135,7 +135,7 @@ describe('governments and policies', () => {
 
   it('policy cards respect slot kinds and uniqueness', () => {
     const { state } = withGovernment('CHIEFDOM'); // slots: [military, economic]
-    grantCivics(state, 'MILITARY_TRADITION'); // Veterancy
+    grantCivics(state, 'MILITARY_TRAINING'); // Veterancy's enabling civic
     expect(setPolicy(state, 0, 'URBAN_PLANNING', 0).ok).toBe(false); // economic into military slot
     expect(setPolicy(state, 1, 'URBAN_PLANNING', 0).ok).toBe(true);
     expect(setPolicy(state, 0, 'VETERANCY', 0).ok).toBe(true);

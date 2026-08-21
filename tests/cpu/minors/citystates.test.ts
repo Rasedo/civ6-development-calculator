@@ -202,7 +202,7 @@ describe('quests and trade', () => {
     const cityState = addCs(state, 9, 9, { type: 'scientific' });
     const r = addCsTradeRoute(state, city.id, cityState.id, 0);
     expect(r.ok).toBe(true);
-    const y = cityTradeYields(state, city);
+    const y = cityTradeYields(state, city, 0);
     expect(y.gold).toBe(3);
     expect(y.science).toBe(1);
     expect(addCsTradeRoute(state, city.id, cityState.id, 0).ok).toBe(false); // duplicate

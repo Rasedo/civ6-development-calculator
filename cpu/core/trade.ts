@@ -204,11 +204,14 @@ export function cityStateRouteYields(cityState: CityState, mult = 1): Yields {
   return out;
 }
 
-export function cityTradeYields(state: GameState, city: City): Yields {
+/** `routeGold` is CARAVANSARIES' "+2 Gold from all Trade Routes" — the
+ *  seat's own modifier, passed in because the yield walk already holds it. */
+export function cityTradeYields(state: GameState, city: City, routeGold: number): Yields {
   const seat = city.seat;
   const out = emptyYields();
   for (const route of seatOf(state, seat)?.tradeRoutes ?? []) {
     if (route.from !== city.id) continue;
+    out.gold += routeGold;
     if (route.toCs !== undefined) {
       const cityState = state.cityStates.find((c) => c.id === route.toCs);
       if (cityState) {

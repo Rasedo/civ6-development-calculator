@@ -505,15 +505,15 @@ describe('XP & levels', () => {
     const { state } = battlefield();
     const mil = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 3, 3).index, 0)!;
     mil.hp = 100;
-    awardDefenseXp(mil);
+    awardDefenseXp(state, mil);
     expect(mil.xp).toBe(2);
     const civ = spawnUnit(state, 'BUILDER', tileAtCoords(state.map, 4, 4).index, 0)!;
     civ.hp = 100;
-    awardDefenseXp(civ);
+    awardDefenseXp(state, civ);
     expect(civ.xp).toBe(0); // civilians never fight
     const dead = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 5).index, 0)!;
     dead.hp = 0;
-    awardDefenseXp(dead);
+    awardDefenseXp(state, dead);
     expect(dead.xp).toBe(0); // no XP for a killed defender
   });
 

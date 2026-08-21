@@ -912,7 +912,7 @@ class SimMasks:
         getattr(self, f"{pre}_unit_mp")[rows, slot] = _m
         getattr(self, f"{pre}_unit_mp_full")[rows, slot] = _m
         _ch = self._type_charges[type_idx[rows]] if charges is None else charges[rows]
-        getattr(self, f"{pre}_unit_charges")[rows, slot] = _ch + self._wonder_charges(row, type_idx)[rows]
+        getattr(self, f"{pre}_unit_charges")[rows, slot] = _ch + self._extra_charges(row, type_idx)[rows]
         off = self.POOL_LO[pre]
         cu_rows = is_civ_u[rows]
         mil_rows = rows[~cu_rows]

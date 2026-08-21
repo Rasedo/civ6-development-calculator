@@ -1,13 +1,14 @@
 
-import type { DistrictId, GameState, GreatPersonClass, ImprovementId, ResearchState, ResourceCategory, Yields } from './types';
+import type { DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Yields } from './types';
 import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
-import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef, type SlotKind } from '../data/policies';
+import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef, type SlotKind, type BuildingYieldBoost, type ProdBoost } from '../data/policies';
 import { congressPolicyBlocked, congressWildcardDelta } from './congress';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
 import { seatOf, citiesOf, campTiles } from './seats';
-import { BUILT_WONDERS } from '../data/builtWonders';
-import { cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus } from './cityStates';
+import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
+import { UNITS, UNIT_ERA_INDEX, unitHasClass } from '../data/units';
+import { cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus, isSuzerain } from './cityStates';
 
 
 export interface Unlocks {
@@ -73,6 +74,10 @@ export function computeUnlocksIn(research: ResearchState): Unlocks {
         break;
     }
   }
+  for (const id of [...u.policies]) {
+    const ob = POLICIES[id]?.obsoleteCivic;
+    if (ob && research.civics.includes(ob)) u.policies.delete(id);
+  }
   return u;
 }
 
@@ -115,7 +120,7 @@ export interface Modifiers {
   farmAdjTier: number;
   hillFarms: boolean;
   adjacencyMult: Partial<Record<DistrictId, number>>;
-  buildingYieldMult: Partial<Record<DistrictId, number>>;
+  buildingYieldBoosts: BuildingYieldBoost[];
   cityYields: Partial<Yields>;
   capitalYields: Partial<Yields>;
   amenitiesAll: number;
@@ -137,6 +142,19 @@ export interface Modifiers {
   riverCity: { amenities: number; housing: number } | null;
   faithPerWonder: number;
   districtYieldAdd: Partial<Record<DistrictId, Partial<Yields>>>;
+  prodBoosts: ProdBoost[];
+  builderCharges: number;
+  unitMaintenanceCut: number;
+  combatVsBarbarians: number;
+  cityDefense: number;
+  cityRanged: number;
+  reconXpMult: number;
+  pillageMult: number;
+  routePlunderMult: number;
+  routeGold: number;
+  influencePerTurn: number;
+  firstEnvoyDouble: boolean;
+  culturePerSuzerain: number;
 }
 
 export function defaultModifiers(): Modifiers {
@@ -145,7 +163,7 @@ export function defaultModifiers(): Modifiers {
     farmAdjTier: 0,
     hillFarms: false,
     adjacencyMult: {},
-    buildingYieldMult: {},
+    buildingYieldBoosts: [],
     cityYields: {},
     capitalYields: {},
     amenitiesAll: 0,
@@ -167,6 +185,19 @@ export function defaultModifiers(): Modifiers {
     riverCity: null,
     faithPerWonder: 0,
     districtYieldAdd: {},
+    prodBoosts: [],
+    builderCharges: 0,
+    unitMaintenanceCut: 0,
+    combatVsBarbarians: 0,
+    cityDefense: 0,
+    cityRanged: 0,
+    reconXpMult: 1,
+    pillageMult: 1,
+    routePlunderMult: 1,
+    routeGold: 0,
+    influencePerTurn: 0,
+    firstEnvoyDouble: false,
+    culturePerSuzerain: 0,
   };
 }
 
@@ -184,10 +215,7 @@ function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
     const key = d as DistrictId;
     mods.adjacencyMult[key] = (mods.adjacencyMult[key] ?? 1) * (m ?? 1);
   }
-  for (const [d, m] of Object.entries(fx.buildingYieldMult ?? {})) {
-    const key = d as DistrictId;
-    mods.buildingYieldMult[key] = (mods.buildingYieldMult[key] ?? 1) * (m ?? 1);
-  }
+  if (fx.buildingYieldBoost) mods.buildingYieldBoosts.push(fx.buildingYieldBoost);
   if (fx.housingIfDistricts) mods.housingIfDistricts.push(fx.housingIfDistricts);
   if (fx.amenitiesIfSpecialty) mods.amenitiesIfSpecialty.push(fx.amenitiesIfSpecialty);
   if (fx.newDeal) mods.newDeal.push(fx.newDeal);
@@ -199,6 +227,23 @@ function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   }
   if (fx.amenitiesAll) mods.amenitiesAll += fx.amenitiesAll;
   if (fx.housingAll) mods.housingAll += fx.housingAll;
+  if (fx.prodBoost) mods.prodBoosts.push(fx.prodBoost);
+  if (fx.builderCharges) mods.builderCharges += fx.builderCharges;
+  if (fx.unitMaintenanceCut) mods.unitMaintenanceCut += fx.unitMaintenanceCut;
+  if (fx.combatVsBarbarians) mods.combatVsBarbarians += fx.combatVsBarbarians;
+  if (fx.cityDefense) mods.cityDefense += fx.cityDefense;
+  if (fx.cityRanged) mods.cityRanged += fx.cityRanged;
+  if (fx.reconXpMult) mods.reconXpMult *= fx.reconXpMult;
+  if (fx.pillageMult) mods.pillageMult *= fx.pillageMult;
+  if (fx.routePlunderMult) mods.routePlunderMult *= fx.routePlunderMult;
+  if (fx.routeGold) mods.routeGold += fx.routeGold;
+  if (fx.influencePerTurn) mods.influencePerTurn += fx.influencePerTurn;
+  if (fx.firstEnvoyDouble) mods.firstEnvoyDouble = true;
+  if (fx.culturePerSuzerain) mods.culturePerSuzerain += fx.culturePerSuzerain;
+  for (const [cls, n] of Object.entries(fx.gppFlat ?? {})) {
+    const key = cls as GreatPersonClass;
+    mods.gppFlat[key] = (mods.gppFlat[key] ?? 0) + (n ?? 0);
+  }
 }
 
 export function modifiersFromResearch(research: ResearchState): Modifiers {
@@ -246,8 +291,41 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
       addPartial(cur, y);
     }
     addPartial(mods.capitalYields, cityStateSuzerainCapitalBonus(state, seat));
+    if (mods.culturePerSuzerain) {
+      const n = state.cityStates.filter((cs) => isSuzerain(cs, seat)).length;
+      if (n) mods.yieldMult.culture = (mods.yieldMult.culture ?? 1) * (1 + mods.culturePerSuzerain * n);
+    }
   }
   return mods;
+}
+
+/**
+ * The fraction this seat's slotted production cards add to a queue item.
+ * CIV6 stacks production modifiers ADDITIVELY, so two cards that both name
+ * the item pay their percentages summed rather than compounded.
+ */
+export function prodBoostPct(mods: Modifiers, q: QueueItem): number {
+  let pct = 0;
+  for (const b of mods.prodBoosts) {
+    if (b.target === 'wonder') {
+      if (q.kind !== 'wonder') continue;
+      if (b.eraMax >= 0 && (WONDER_ERA_INDEX[q.wonder] ?? 0) > b.eraMax) continue;
+    } else {
+      const id = q.kind === 'unit' ? q.unit : q.kind === 'settler' ? 'SETTLER' : null;
+      const def = id ? UNITS[id] : undefined;
+      if (!id || !def) continue;
+      if (b.eraMax >= 0 && (UNIT_ERA_INDEX[id] ?? 0) > b.eraMax) continue;
+      if (!b.classes.some((c) => unitHasClass(def, c))) continue;
+    }
+    pct += b.pct;
+  }
+  return pct;
+}
+
+/** The gold per turn one unit of this type costs a seat carrying `mods` —
+ *  Conscription and Levée en Masse take it down, never below free. */
+export function unitUpkeep(mods: Modifiers, unitType: string): number {
+  return Math.max(0, (UNITS[unitType]?.maintenance ?? 0) - mods.unitMaintenanceCut);
 }
 
 function applyBeliefEffects(

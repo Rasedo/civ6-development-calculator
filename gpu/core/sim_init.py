@@ -1141,6 +1141,43 @@ class SimInit:
             self._gov_nd_min = torch.tensor([int(x[0]) for x in _gnd], dtype=torch.long, device=device)
             self._gov_nd_house = torch.tensor([float(x[1]) for x in _gnd], dtype=dtype, device=device)
             self._gov_nd_amen = torch.tensor([float(x[2]) for x in _gnd], dtype=dtype, device=device)
+            # adjacencyMult: a MULTIPLIER on one district type's adjacency
+            # bonus, per PLACEABLE district column. buildingYieldBoost: one
+            # [district, yield, pct, popMin, popPct, adjMin, adjPct] row.
+            _nd_pl = len(self.districts_cat)
+            self._gov_adj_mult = torch.tensor(
+                [[float(x) for x in g.get("adjacencyMult", [1] * _nd_pl)] for g in _govs],
+                dtype=dtype, device=device)  # [nGov, nD]
+            self._gov_byb = torch.tensor(
+                [[float(x) for x in g.get("buildingYieldBoost", [-1, -1, 0, 0, 0, 0, 0])] for g in _govs],
+                dtype=torch.float64, device=device)  # [nGov, 7]
+            # prodBoost: [wonderTarget, unit-class mask, eraMax, pct], the
+            # production cards' two axes. wonderTarget -1 = no boost.
+            self._gov_prodb = torch.tensor(
+                [[float(x) for x in r.get("prodBoost", [-1, 0, 0, 0])] for r in _govs],
+                dtype=torch.float64, device=device)
+            self._gov_bcharge = torch.tensor([float(r.get("builderCharges", 0)) for r in _govs], dtype=dtype, device=device)
+            self._gov_mcut = torch.tensor([float(r.get("unitMaintenanceCut", 0)) for r in _govs], dtype=dtype, device=device)
+            self._gov_vbarb = torch.tensor([float(r.get("combatVsBarbarians", 0)) for r in _govs], dtype=dtype, device=device)
+            self._gov_cdef = torch.tensor([float(r.get("cityDefense", 0)) for r in _govs], dtype=dtype, device=device)
+            self._gov_crng = torch.tensor([float(r.get("cityRanged", 0)) for r in _govs], dtype=dtype, device=device)
+            self._gov_rxp = torch.tensor([float(r.get("reconXpMult", 1)) for r in _govs], dtype=dtype, device=device)
+            self._gov_rplun = torch.tensor([float(r.get("routePlunderMult", 1)) for r in _govs], dtype=dtype, device=device)
+            self._gov_rgold = torch.tensor([float(r.get("routeGold", 0)) for r in _govs], dtype=dtype, device=device)
+            self._gov_infl = torch.tensor([float(r.get("influencePerTurn", 0)) for r in _govs], dtype=dtype, device=device)
+            self._gov_envoy1 = torch.tensor([bool(r.get("firstEnvoyDouble", 0)) for r in _govs], dtype=torch.bool, device=device)
+            self._gov_culsuz = torch.tensor([float(r.get("culturePerSuzerain", 0)) for r in _govs], dtype=dtype, device=device)
+            self._gov_gpp = torch.tensor(
+                [[float(x) for x in r.get("gpp", [0] * n_gp)] for r in _govs],
+                dtype=torch.float64, device=device)
+            self._gov_fx_mag = float(
+                (self._gov_prodb[:, 0] >= 0).sum()
+                + self._gov_bcharge.abs().sum() + self._gov_mcut.abs().sum()
+                + self._gov_vbarb.abs().sum() + self._gov_cdef.abs().sum()
+                + self._gov_crng.abs().sum() + (self._gov_rxp - 1).abs().sum()
+                + (self._gov_rplun - 1).abs().sum() + self._gov_rgold.abs().sum()
+                + self._gov_infl.abs().sum() + self._gov_envoy1.sum()
+                + self._gov_culsuz.abs().sum() + self._gov_gpp.abs().sum())
             self._gov_arange = torch.arange(self._ngov, dtype=torch.long, device=device)
         if self._npol:
             self._pol_kind = torch.tensor([int(p["kind"]) for p in _pols], dtype=torch.long, device=device)
@@ -1162,14 +1199,53 @@ class SimInit:
             self._pol_nd_min = torch.tensor([int(x[0]) for x in _pnd], dtype=torch.long, device=device)
             self._pol_nd_house = torch.tensor([float(x[1]) for x in _pnd], dtype=dtype, device=device)
             self._pol_nd_amen = torch.tensor([float(x[2]) for x in _pnd], dtype=dtype, device=device)
+            _nd_pl = len(self.districts_cat)
+            self._pol_adj_mult = torch.tensor(
+                [[float(x) for x in p.get("adjacencyMult", [1] * _nd_pl)] for p in _pols],
+                dtype=dtype, device=device)  # [nPol, nD]
+            self._pol_byb = torch.tensor(
+                [[float(x) for x in p.get("buildingYieldBoost", [-1, -1, 0, 0, 0, 0, 0])] for p in _pols],
+                dtype=torch.float64, device=device)  # [nPol, 7]
+            # prodBoost: [wonderTarget, unit-class mask, eraMax, pct], the
+            # production cards' two axes. wonderTarget -1 = no boost.
+            self._pol_prodb = torch.tensor(
+                [[float(x) for x in r.get("prodBoost", [-1, 0, 0, 0])] for r in _pols],
+                dtype=torch.float64, device=device)
+            self._pol_bcharge = torch.tensor([float(r.get("builderCharges", 0)) for r in _pols], dtype=dtype, device=device)
+            self._pol_mcut = torch.tensor([float(r.get("unitMaintenanceCut", 0)) for r in _pols], dtype=dtype, device=device)
+            self._pol_vbarb = torch.tensor([float(r.get("combatVsBarbarians", 0)) for r in _pols], dtype=dtype, device=device)
+            self._pol_cdef = torch.tensor([float(r.get("cityDefense", 0)) for r in _pols], dtype=dtype, device=device)
+            self._pol_crng = torch.tensor([float(r.get("cityRanged", 0)) for r in _pols], dtype=dtype, device=device)
+            self._pol_rxp = torch.tensor([float(r.get("reconXpMult", 1)) for r in _pols], dtype=dtype, device=device)
+            self._pol_rplun = torch.tensor([float(r.get("routePlunderMult", 1)) for r in _pols], dtype=dtype, device=device)
+            self._pol_rgold = torch.tensor([float(r.get("routeGold", 0)) for r in _pols], dtype=dtype, device=device)
+            self._pol_infl = torch.tensor([float(r.get("influencePerTurn", 0)) for r in _pols], dtype=dtype, device=device)
+            self._pol_envoy1 = torch.tensor([bool(r.get("firstEnvoyDouble", 0)) for r in _pols], dtype=torch.bool, device=device)
+            self._pol_culsuz = torch.tensor([float(r.get("culturePerSuzerain", 0)) for r in _pols], dtype=dtype, device=device)
+            self._pol_gpp = torch.tensor(
+                [[float(x) for x in r.get("gpp", [0] * n_gp)] for r in _pols],
+                dtype=torch.float64, device=device)
+            # yieldMult, the channel a card gained with COLLECTIVE_ACTIVISM's
+            # per-suzerainty culture; the government table has always had it.
+            self._pol_ymult = torch.tensor([[float(x) for x in p.get("yieldMult", [1] * 6)] for p in _pols], dtype=dtype, device=device)  # [nPol,6]
+            # the civic that RETIRES the card; -1 = it never leaves the pool
+            self._pol_fx_mag = float(
+                (self._pol_prodb[:, 0] >= 0).sum()
+                + self._pol_bcharge.abs().sum() + self._pol_mcut.abs().sum()
+                + self._pol_vbarb.abs().sum() + self._pol_cdef.abs().sum()
+                + self._pol_crng.abs().sum() + (self._pol_rxp - 1).abs().sum()
+                + (self._pol_rplun - 1).abs().sum() + self._pol_rgold.abs().sum()
+                + self._pol_infl.abs().sum() + self._pol_envoy1.sum()
+                + self._pol_culsuz.abs().sum() + self._pol_gpp.abs().sum())
+            self._pol_obsolete_civic = torch.tensor([int(p.get("obsoleteCivic", -1)) for p in _pols], dtype=torch.long, device=device)
         # Master switch (rules.governmentsLive), mirroring the TS
         # GOVERNMENTS_ADOPTION_LIVE. Gates every gov/policy application and the
         # influence-tier addition, so the two engines flip in lockstep; when
         # False the tables load but change nothing.
         self._gov_live = bool(getattr(rules, "governments_live", False))
         self._gov_has_effects = self._gov_live and bool(
-            (self._ngov and float(self._gov_city_y.abs().sum() + self._gov_cap_y.abs().sum() + self._gov_housing.abs().sum() + (self._gov_ymult - 1).abs().sum() + (self._gov_ehprod - 1).abs().sum() + (self._gov_tpmult - 1).abs().sum()) > 0)
-            or (self._npol and float(self._pol_city_y.abs().sum() + self._pol_cap_y.abs().sum() + self._pol_housing.abs().sum() + self._pol_hid_house.abs().sum() + (self._pol_ehprod - 1).abs().sum() + (self._pol_tpmult - 1).abs().sum()) > 0)
+            (self._ngov and float(self._gov_city_y.abs().sum() + self._gov_cap_y.abs().sum() + self._gov_housing.abs().sum() + (self._gov_ymult - 1).abs().sum() + (self._gov_ehprod - 1).abs().sum() + (self._gov_tpmult - 1).abs().sum() + (self._gov_adj_mult - 1).abs().sum() + (self._gov_byb[:, 0] >= 0).sum()) > 0 or self._gov_fx_mag > 0)
+            or (self._npol and float(self._pol_city_y.abs().sum() + self._pol_cap_y.abs().sum() + self._pol_housing.abs().sum() + self._pol_hid_house.abs().sum() + (self._pol_ehprod - 1).abs().sum() + (self._pol_tpmult - 1).abs().sum() + (self._pol_adj_mult - 1).abs().sum() + (self._pol_byb[:, 0] >= 0).sum() + (self._pol_ymult - 1).abs().sum()) > 0 or self._pol_fx_mag > 0)
         )
         self._harbor_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HARBOR"), -1)
         self._hs_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HOLY_SITE"), -1)
@@ -1261,6 +1337,7 @@ class SimInit:
         self._bel_add_memo = None        # (_bel_version, {(fn,key,r): tensor})
         self._gov_pol_cache = None       # (_eff_version, {seat_tag: 5-tuple})
         self._dadj_cache = None          # (_eff_version, {di: floored [B,T] adjacency})
+        self._fx_row_cache = None        # (_eff_version, {channel: [B, n_majors]})
         self._hs_faith_cache = None      # (_eff_version, [B,T] Holy Site faith output)
         # Static candidate lists for _pick_static: the k-th candidate in
         # tile order, so a pick is one gather instead of a [B, T] cumsum.
@@ -1468,6 +1545,10 @@ class SimInit:
         self._type_melee = torch.tensor([bool(u.get("melee", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_anticav = torch.tensor([bool(u.get("antiCavalry", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_bombard = torch.tensor([int(u.get("bombard", 0)) for u in ru], dtype=torch.long, device=device)
+        # the CLASS bit mask and the ERA index a production card reads
+        self._type_cls = torch.tensor([int(u.get("cls", 0)) for u in ru], dtype=torch.long, device=device)
+        self._type_era = torch.tensor([int(u.get("era", 0)) for u in ru], dtype=torch.long, device=device)
+        self._type_recon = torch.tensor([bool(u.get("recon", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_siege_support = torch.tensor([int(u.get("siegeSupport", 0)) for u in ru], dtype=torch.long, device=device)
         self._type_siege_max_walls = torch.tensor([int(u.get("siegeMaxWalls", 0)) for u in ru], dtype=torch.long, device=device)
         self._siege_support_any = bool((self._type_siege_support > 0).any())
@@ -1606,6 +1687,7 @@ class SimInit:
         self._nprod_cache = None
         self._adjd_cache = self._adjc_cache = self._adjh_cache = self._adjt_cache = None
         self._dadj_cache = None
+        self._fx_row_cache = None
         self._fadjq_cache = self._rcy_cache = None
         self._bld_cache = {}
         self._bel_version += 1
@@ -1769,6 +1851,7 @@ class SimInit:
         self._nprod_cache = None
         self._adjd_cache = self._adjc_cache = self._adjh_cache = self._adjt_cache = None
         self._dadj_cache = None
+        self._fx_row_cache = None
         self._fadjq_cache = self._rcy_cache = None
         self._bld_cache = {}
         self._bel_version += 1
