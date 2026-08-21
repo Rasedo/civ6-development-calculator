@@ -22,9 +22,9 @@ import { GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT } from '../data/constants';
 import { PEACE_GOLD_COST, DED_MONUMENTALITY } from '../data/seats';
 import { SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
 import { BUY_UNITS } from '../core/phase';
-import { tradeCapacity, freeTrader, routeYields, cityStateRouteYields, tradeRouteRange } from '../core/trade';
+import { tradeCapacity, freeTrader, routeYields, routeYieldsInternational, cityStateRouteYields, tradeRouteRange } from '../core/trade';
 import { isExplored } from '../core/fog';
-import { buildingFaithCost, endTurn, goldAffordable, naturalistCost, settlerCost, tilePurchaseCost } from '../core/game';
+import { buildingFaithCost, endTurn, goldAffordable, naturalistCost, settlerCost, tilePurchaseCost, unitPurchaseCost } from '../core/game';
 import { goldenDedication, monumentalityBuyMult } from '../core/eras';
 import { builderCost } from '../core/units';
 import { hasMet, isSuzerain } from '../core/cityStates';
@@ -55,11 +55,11 @@ export interface DriverOpts {
   send: (msg: unknown) => void;
 }
 
-/** The route CANDIDATE this seat would take — the scan the old eager rule
- * ran, now a decider-side row: own cities in array order, domestic dests
- * then MET city-states (from asc, to asc, cityState asc), best NEW in-range
- * pair by the route's TOTAL yields, strictly-greater beats; only when no
- * domestic/CS pair exists, the nearest EXPLORED international city.
+/** The route CANDIDATE this seat would take — a decider-side row over EVERY
+ * legal destination at once: own cities in array order, then MET city-states,
+ * then every other major's EXPLORED cities (from asc, to asc, cityState asc,
+ * seat asc). Best NEW in-range pair by the route's TOTAL yields,
+ * strictly-greater beats, so ties keep the first pair in that scan order.
  * [origin CENTRE, dest code (CENTRE or -(2+csIndex))], [-1,-1] = none.
  * Gated on capacity AND a free Trader — the unit the verb spends. */
 export function routeCandidateRow(state: GameState, actor: Seat): number[] {
@@ -91,24 +91,22 @@ export function routeCandidateRow(state: GameState, actor: Seat): number[] {
       const ySum = cy.food + cy.production + cy.gold + cy.science + cy.culture + cy.faith;
       if (!best || ySum > best.ySum) best = { from: from.centerIndex, dest: -(2 + ci), ySum };
     }
-  }
-  if (!best) {
-    let bi: { from: number; dest: number; d: number } | null = null;
-    for (const from of actor.cities) {
-      const ft = state.map.tiles[from.centerIndex];
-      for (const other of state.seats) {
-        if (other.seat === actor.seat) continue;
-        for (const pc of other.cities) {
-          if (!isExplored(state, actor.seat, pc.centerIndex)) continue;
-          if (routes.some((x) => x.from === from.id && x.toSeat === other.seat && x.toSeatCity === pc.id)) continue;
-          const pt = state.map.tiles[pc.centerIndex];
-          const d = hexDistance(ft.col, ft.row, pt.col, pt.row);
-          if (d > tradeRouteRange(state, actor.seat, from.centerIndex, pc.centerIndex, from, pc)) continue;
-          if (!bi || d < bi.d) bi = { from: from.centerIndex, dest: pc.centerIndex, d };
-        }
+    // An INTERNATIONAL destination competes on the same total-yield key as a
+    // domestic or city-state one; it is not a fallback for when nothing else
+    // is reachable.
+    for (const other of state.seats) {
+      if (other.seat === actor.seat) continue;
+      for (const pc of other.cities) {
+        if (!isExplored(state, actor.seat, pc.centerIndex)) continue;
+        if (routes.some((x) => x.from === from.id && x.toSeat === other.seat && x.toSeatCity === pc.id)) continue;
+        const pt = state.map.tiles[pc.centerIndex];
+        if (hexDistance(ft.col, ft.row, pt.col, pt.row)
+            > tradeRouteRange(state, actor.seat, from.centerIndex, pc.centerIndex, from, pc)) continue;
+        const py = routeYieldsInternational(state, pc);
+        const ySum = py.food + py.production + py.gold + py.science + py.culture + py.faith;
+        if (!best || ySum > best.ySum) best = { from: from.centerIndex, dest: pc.centerIndex, ySum };
       }
     }
-    if (bi) best = { from: bi.from, dest: bi.dest, ySum: 0 };
   }
   return best ? [best.from, best.dest] : [-1, -1];
 }
@@ -159,7 +157,9 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
       const def = UNITS[cand.id];
       if (!def) continue;
       if (def.requiresResource && !civHasStrategic(state, actor.seat, def.requiresResource)) continue;
-      if (!goldAffordable(actor.treasury ?? 0, def.cost * GOLD_PURCHASE_MULT)) continue;
+      // `unitPurchaseCost` is the price the applier charges — Mercenary
+      // Companies moves it, and every column offered here is a military unit.
+      if (!goldAffordable(actor.treasury ?? 0, unitPurchaseCost(state, cand.id, actor.seat))) continue;
       anyU = true;
       break;
     }

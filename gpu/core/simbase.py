@@ -509,7 +509,7 @@ _MUTABLE = [
     "seat_route_born", "seat_route_walk", "seat_route_leg",  # the Trader's walk (birth turn, tile, leg)
     "city_id",
     "unit_next",
-    "gp_earned", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
+    "gp_earned", "gp_next", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
     "pan_claimed", "fol_claimed", "fou_claimed",  # belief-claim masks
     "enh_claimed",  # enhancer-claim mask
     "holy_tile", "city_pressure", "city_followed",  # ONE seat-indexed pressure+followed plane pair

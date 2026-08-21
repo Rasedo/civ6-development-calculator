@@ -8,7 +8,8 @@ import { computeCityStats, citySpecialistSlots, workableTiles } from '../../../c
 import { districtAdjacency } from '../../../cpu/core/yields';
 import { governmentSlots } from '../../../cpu/core/effects';
 import { grantCivics, expandBorders } from '../helpers';
-import { gpCost } from '../../../cpu/data/greatPeople';
+import { GREAT_PEOPLE, GP_ERA_GPP } from '../../../cpu/data/greatPeople';
+import { gpOfferCost } from '../../../cpu/core/greatPeople';
 
 function sandboxCity() {
   const state = makeState(makeMap(16, 16));
@@ -139,10 +140,10 @@ describe('great people', () => {
     expect(greatPersonPointsPerTurn(state, 0).SCIENTIST).toBe(2); // district + library
 
     const before = seatOf(state, 0)!.research.techProgress;
-    const turns = Math.ceil(gpCost(0) / 2);
+    const turns = Math.ceil(gpOfferCost(state, 'SCIENTIST') / 2);
     for (let i = 0; i < turns; i++) endTurn(state);
     expect(greatPeopleEarned(state, 'SCIENTIST')).toBe(1);
-    expect(state.claimedGreatPeople[0]).toBe('GP_ARYABHATA');
+    expect(state.claimedGreatPeople[0]).toBe(GREAT_PEOPLE.SCIENTIST[0].id);
     // +50 science landed somewhere in tech progress (research also ticked normally)
     expect(seatOf(state, 0)!.research.techProgress + 1e-9).toBeGreaterThanOrEqual(before);
   });
@@ -152,8 +153,9 @@ describe('great people', () => {
     queueDistrict(state, city.id, 'COMMERCIAL_HUB', tileAtCoords(state.map, 9, 8).index, 0);
     queueBuilding(state, city.id, 'MARKET', 0);
     const before = seatOf(state, 0)!.treasury;
-    for (let i = 0; i < 30; i++) endTurn(state);
+    const lump = GP_ERA_GPP[GREAT_PEOPLE.MERCHANT[0].era];
+    for (let i = 0; i < 60; i++) endTurn(state);
     expect(greatPeopleEarned(state, 'MERCHANT')).toBeGreaterThanOrEqual(1);
-    expect(seatOf(state, 0)!.treasury).toBeGreaterThan(before + 100); // Colaeus +100 plus income
+    expect(seatOf(state, 0)!.treasury).toBeGreaterThan(before + lump); // the claim plus income
   });
 });

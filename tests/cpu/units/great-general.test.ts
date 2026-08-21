@@ -7,7 +7,7 @@ import { isImpassable } from '../../../world/query';
 import { generalAuraCS, GENERAL_AURA_CS, meleeAttack } from '../../../cpu/core/combat';
 import { neighbors, hexDistance } from '../../../world/hex';
 import { UNITS } from '../../../cpu/data/units';
-import { gpCost } from '../../../cpu/data/greatPeople';
+import { gpOfferCost } from '../../../cpu/core/greatPeople';
 import type { GameState, Unit, Seat } from '../../../cpu/core/types';
 
 // — Great General & Great Admiral (the TS twin of the GPU
@@ -134,7 +134,7 @@ describe('spawn-at-claim & capture', () => {
   it('a seat-0 GENERAL claim spawns a general civilian at the capital', () => {
     const state = newGame();
     // fund exactly one GENERAL; advanceGreatPeople (in endTurn) claims + spawns.
-    seatOf(state, 0)!.gpp.GENERAL = gpCost(0);
+    seatOf(state, 0)!.gpp.GENERAL = gpOfferCost(state, 'GENERAL');
     const before = state.units.filter((u) => (u.seat) === 0 && u.type === 'GENERAL').length;
     endTurn(state);
     const after = state.units.filter((u) => (u.seat) === 0 && u.type === 'GENERAL');

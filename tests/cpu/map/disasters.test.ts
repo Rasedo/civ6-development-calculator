@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { setTileOwner } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, bareCtx } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
-import { disasterPhase, FERTILITY_CAP } from '../../../cpu/core/disasters';
+import { disasterPhase, riverReach, FERTILITY_CAP } from '../../../cpu/core/disasters';
+import { neighborTile } from '../../../world/hex';
+import type { Tile } from '../../../cpu/core/types';
 import { disbandUnit, spawnUnit } from '../../../cpu/core/units';
 import { tileYields } from '../../../cpu/core/yields';
 import { generateMap } from '../../../world/mapgen';
@@ -204,5 +206,68 @@ describe('disasters', () => {
     expect(plain.pillaged).toBeFalsy();
     expect(plain.districtPillaged).toBeFalsy();
     expect(plain.fertility).toBeGreaterThan(0); // the river still silts
+  });
+});
+
+describe('the flood reaches the whole river', () => {
+  /** Two tiles carry a river EDGE between them when both masks hold that bit —
+   *  the mapgen writes both flanks, so a river tile chain is symmetric. */
+  function link(map: ReturnType<typeof makeMap>, a: Tile, dir: number): Tile {
+    const b = neighborTile(map, a, dir)!;
+    a.riverMask |= 1 << dir;
+    b.riverMask |= 1 << ((dir + 3) % 6);
+    return b;
+  }
+
+  it('walks the river and stops where the river does', () => {
+    const state = makeState(makeMap(16, 16));
+    const a = tileAtCoords(state.map, 4, 4);
+    const b = link(state.map, a, 0);
+    const c = link(state.map, b, 0);
+    for (const t of [a, b, c]) t.feature = 'FLOODPLAINS';
+    // a floodplain OFF the river, and a river tile that is not floodplain
+    const off = tileAtCoords(state.map, 10, 10);
+    off.feature = 'FLOODPLAINS';
+    const dry = link(state.map, c, 1);
+
+    const reach = riverReach(state.map, a).map((t) => t.index);
+    expect(reach).toEqual([a, b, c].map((t) => t.index).sort((x, y) => x - y));
+    expect(reach).not.toContain(off.index);
+    expect(reach).not.toContain(dry.index);
+
+    // ...and from the far end it is the same river
+    expect(riverReach(state.map, c).map((t) => t.index)).toEqual(reach);
+    // a floodplain with no river at all floods alone
+    expect(riverReach(state.map, off).map((t) => t.index)).toEqual([off.index]);
+  });
+
+  it('one flood takes every floodplain along its river together', () => {
+    const state = makeState(makeMap(16, 16));
+    state.disasters = true;
+    const a = tileAtCoords(state.map, 4, 4);
+    const b = link(state.map, a, 0);
+    const c = link(state.map, b, 0);
+    const off = tileAtCoords(state.map, 10, 10);
+    for (const t of [a, b, c, off]) {
+      t.feature = 'FLOODPLAINS';
+      t.terrain = 'DESERT';
+      setTileOwner(t, 0);
+    }
+    const struck = (t: Tile) => t.pillaged || t.improvement === null;
+    let rivers = 0;
+    let alone = 0;
+    for (let i = 0; i < 900 && (rivers < 3 || alone < 1); i++) {
+      for (const t of [a, b, c, off]) { t.improvement = 'FARM'; t.pillaged = false; }
+      disasterPhase(state);
+      if (struck(a) || struck(b) || struck(c)) {
+        // one river, one flood: no tile of it is spared
+        expect([struck(a), struck(b), struck(c)]).toEqual([true, true, true]);
+        rivers += 1;
+      } else if (struck(off)) {
+        alone += 1; // the riverless floodplain floods by itself
+      }
+    }
+    expect(rivers).toBeGreaterThanOrEqual(3);
+    expect(alone).toBeGreaterThanOrEqual(1);
   });
 });

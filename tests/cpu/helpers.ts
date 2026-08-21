@@ -4,6 +4,7 @@ import type { City, GameMap, GameState, TerrainId, Tile } from '../../cpu/core/t
 import { BARB_SEAT, NO_SEAT, emptySeat, seatOf, setTileOwner, tileSeat } from '../../cpu/core/seats';
 import { foundCity } from '../../cpu/core/game';
 import { canFoundCity } from '../../cpu/core/rules';
+import { GP_CLASSES } from '../../cpu/data/greatPeople';
 import { spawnUnit } from '../../cpu/core/units';
 import { hexDistance } from '../../world/hex';
 import { tilesWithin } from '../../world/hex';
@@ -52,6 +53,7 @@ export function makeState(map: GameMap = makeMap()): GameState {
     turn: 1,
     sandbox: false,
     claimedGreatPeople: [],
+    gpNext: GP_CLASSES.map(() => 0),
     unitsMode: false,
     units: [],
     nextUnitId: 0,

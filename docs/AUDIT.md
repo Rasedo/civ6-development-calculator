@@ -53,26 +53,27 @@ nothing carries forward.
 
 | Open item | Weight | What the weight is for |
 |---|---|---|
-| **A. Engine vs engine** | **0** | |
+| A-1r `adjacencyMult` / `buildingYieldMult` unread on the GPU | 2 | eleven policy cards double a district's adjacency or its buildings' yields; TS applies both, the GPU has no reader |
+| **A. Engine vs engine** | **2** | |
 | B-20r tourism tails | 2 | theming ships; open-borders digs and work TRADES need a treaty system, and the Naturalist's progressive cost is unsourced |
 | B-21r suzerain rows | 1 | the residual descoped rows all need whole absent systems |
 | B-22r World Congress | 2 | 13 of the 21 regular resolutions ship and emergencies run as special sessions; eight resolutions and the scored competitions have no carrier; peace terms wait on C-2 and two favor penalties on C-19/C-24; the favor tie-break unmodeled |
 | B-24r Ages/governors | 1 | three system-less dedication entries, dark-age policies, governor promotions, per-civ era drift |
 | B-30r specialists | 1 | the mechanic and both citizen overrides ship; the Theater tier's second building and the plant split wait upstream |
-| B-31r trade-route tails | 1 | sea legs ship; no trading posts, plunder gold is a stylization, one candidate not a free pick |
-| B-53r the great-person roster | 2 | four fame-picked names per class on one ladder; real Civ 6 anchors each person to an ERA and offers a roster per era |
+| B-31r trade-route tails | 1 | sea legs and the whole-destination-set candidate ship; no trading posts, plunder gold is a stylization, the summed-yield key is a heuristic and the free-choice head is P8's |
+| B-53r the great-person queue | 1 | 205 sourced people, the era gate and the scaled price ship; the offer is re-derived each turn rather than frozen, and the payout is one era-sized lump instead of the person's own ability |
 | B-D unsourced data values | 2 | the Monument, the Lighthouse and the Engineer's Armory shipped and one bullet was false; the governments are half-shipped, and the rest are shape differences or model tuning that no source can close |
 | B-36r appeal adjacency terms | 1 | the four reachable terms ship; Dam/Canal/Water Park/Preserve and the Great People wait on C-22, C-4, C-21 |
 | B-39r wonder effects still dropped | 1 | the sourced sweep shipped fourteen channels; five residuals, each blocked on B-20r, C-21, B-34r or C-23 |
-| B-45r sourced-sweep finds in the other rows | 2 | eight wonders pay effects no channel expresses: free units, patronage discount, tech boosts, route capacity and route yields |
+| B-45r sourced-sweep finds in the other rows | 1 | three of the eight now have a channel; the five that do not need free units (C-21), faith-bought Great People (C-9), a rival-recruit event, or B-31r's route yields |
 | B-46r the siege class's tails | 1 | the Bombard stat, both support chassis, all four walls tiers and the move-and-shoot rule ship; the middle siege rungs and Akkad's suzerain bonus do not |
 | B-54r flanking and support vs their own page | 1 | six rules the two engines agree on and the page does not: the Military Tradition gate, the flanking owner and river rules, support against ranged, embarked providers, and defensible districts |
 | B-55r a ship cannot carry a passenger | 1 | one MILITARY unit per tile, where Civ 6 stacks an embarked land unit with a naval one — which is where Support's 7th through 10th stacks live |
-| B-50r theological combat's other terms | 1 | flanking/support, territory bonuses, the Inquisitor, the winner's advance, Holy Site healing |
+| B-50r theological combat's other terms | 1 | flanking/support, the territory bonuses, the winner's advance and Holy Site healing ship; the Inquisitor is C-14's, the promotions C-3's, and who PROVIDES flanking is this engine's own reading |
 | B-51r the Encampment's second pool | 1 | the district meets the city's perimeter and heals only while its tile is clear; Civ 6 tracks the two pools SEPARATELY, and a defeat pillages it |
-| B-44r city-state war tails | 1 | the head and its policy ship; no walker ever MARCHES on a minor, and the diplomatic consequences wait on C-19 |
-| B-34r flood tails | 1 | the severity ladder ships; a flood still takes ONE tile where GS floods the river's whole reach, and the Dam that mitigates one is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **23** | |
+| B-44r city-state war tails | 1 | the head, its policy and a SEAT's march on a minor ship; the barbarian walker still raids only majors because it beelines to one nearest city, and the diplomatic consequences wait on C-19 |
+| B-34r flood tails | 1 | the severity ladder and the river's whole reach ship; the Great Bath's mitigation is still seat-scoped rather than river-scoped, and the Dam is not in the district roster |
+| **B. Fidelity vs real Civ 6** | **21** | |
 | C-1 POWER | 5 | no plants, no grid, no powered-yield term — 4 gaps wait on it |
 | C-2 diplomatic agreements | 6 | war and peace and nothing between: open borders, work trades, alliances, denouncements |
 | C-3 unit promotions | 5 | only MARTYR reaches a rule; choosing one is also a wire head, and Amphibious waives two penalties that now ship |
@@ -116,13 +117,28 @@ not add a "done" column back.
 
 ## A. Engine vs engine — where the two implementations can answer differently
 
-THE CHAPTER IS EMPTY. The digest is the only instrument for this class —
-both engines can be equally faithful to Civ 6 and still disagree with each
-other, and a gate red is the only thing that would say so. Its current
-answer is green: 12 seeds x 250 turns, compared per turn on every group.
-An empty chapter means only that this is what the instrument found, never
-that the rest agrees — "Reachability" below is the boundary of what the
-green gate reaches.
+THE DIGEST IS THE ONLY INSTRUMENT FOR THIS CLASS — both engines can be
+equally faithful to Civ 6 and still disagree with each other, and a gate red
+is the only thing that would say so. Its current answer is green: 12 seeds x
+250 turns, compared per turn on every group. That green bounds nothing the
+gate does not reach — "Reachability" below is where that boundary runs, and
+the one entry here was found by READING the exporter against its readers,
+not by any red.
+
+- **A-1r. The GPU never reads `adjacencyMult` or `buildingYieldMult`.**
+  Eleven policy cards double a district's adjacency or its buildings' yields
+  — `NATURAL_PHILOSOPHY` and `RATIONALISM` on the Campus, `SCRIPTURE` and
+  `SIMULTANEUM` on the Holy Site, `TOWN_CHARTERS` / `FREE_MARKETS` on the
+  Commercial Hub, `NAVAL_INFRASTRUCTURE` on the Harbor, `CRAFTSMEN` and
+  `FIVE_YEAR_PLAN` on the Industrial Zone, `AESTHETICS` and `GRAND_OPERA` on
+  the Theater Square. `buildRules` exports both arrays per government and per
+  policy row; TS reads them in `effectiveAdjacency` and `cityBuildingYields`
+  through `getModifiers`. The GPU has NO reader at all — `_gov_policy_mods`
+  returns ten channels and neither of these is among them, so a seat that
+  slots one of those cards banks a different yield on the two engines.
+  REACHABILITY: the 250-turn gate is green, so no driven seat reaches a
+  slotted card of these eleven in it; the class is real and unreached, which
+  is exactly the shape a digest cannot find for you.
 
 WHAT THE INSTRUMENT CAN SEE IS ITSELF AUDITABLE, and it was shallower than
 it read. Coverage proved every `_MUTABLE` plane was NAMED by some field; it
@@ -445,11 +461,21 @@ Civ 6 source or is recorded as unverifiable.
     to read on that side.
   - `PLUNDER_ROUTE_GOLD` (50) is a stylization; no public source names
     the real base magnitude.
-  - The destination is ONE candidate row plus a take/skip, not a free
-    pick over every legal pair, and the observation renders no
-    alternatives — the free-choice head is P8-surface work, alongside the
-    route verb joining `env.step` (which today carries no buy/levy
-    either).
+  - **The destination is ONE candidate row plus a take/skip.** Every legal
+    destination now COMPETES for that row: `routeCandidateRow` /
+    `_seat_route_candidate` scan a seat's own cities, its met city-states and
+    every other major's explored cities in one pass, ranked on one key — the
+    route's total yields, `routeYieldsInternational`'s `intlGold + districts`
+    for a foreign city beside the domestic `2 + 2*floor(districts/2)` and a
+    city-state's flat gold+specialty. A foreign destination is no longer a
+    fallback reachable only when nothing domestic is. Two things stay open:
+    that single summed-yield key is this engine's heuristic and not a game
+    rule (real Civ 6 hands the player every legal pair and lets need decide,
+    and summing gold against food is what makes an international route win
+    almost every comparison here), and the POLICY still sees one candidate
+    and a take/skip — the observation renders no alternatives, so the
+    free-choice head is P8-surface work, alongside the route verb joining
+    `env.step` (which today carries no buy/levy either).
 - **B-34r. Flood tails.** The RIVER FLOOD now runs the Gathering Storm Flood
   page's two tables rather than a pillage-and-silt stub. A flood rolls a
   severity (Moderate / Major / 1000 Year) and then, at that severity's
@@ -466,16 +492,24 @@ Civ 6 source or is recorded as unverifiable.
   anymore". The draw count is EIGHT, unconditionally — a count that depended
   on what stood on the tile would have to be mirrored condition-for-condition
   on the other engine.
+  THE REACH IS THE RIVER. CIV6: "The level of the water rises, flooding all
+  Floodplains tiles found along the River, and then recedes on the next turn."
+  `riverReach` / `river_comp` walk it: two tiles are on the same river when a
+  river EDGE separates them, which is exact here because a river's edges are a
+  vertex-connected chain and any two edges meeting at a vertex are consecutive
+  edges of one common tile. `floodRiver` / `_flood_river` roll ONE severity
+  for the whole flood and then take every Floodplains tile of that river at
+  it, in ascending tile order — so the draw count is one severity roll plus
+  SEVEN per tile, still independent of what stands on any of them. A
+  Floodplains tile carrying no river floods alone. REACHABILITY: the fixtures
+  hold rivers of 12, 8, 6, 5, 3 and 2 floodplains, so the multi-tile reach is
+  live in the driven gate; `flood_severity_test` poke f pins it.
   OPEN:
-  - **The reach is one tile.** Real GS floods "all Floodplains tiles found
-    along the River"; both engines pick ONE. The reach needs a per-fixture
-    static river-component table and turns the eight draws into a
-    variable-length per-tile sequence, which is the whole reason it is
-    separate work rather than a wider mask.
   - **The Great Bath's mitigation is seat-scoped, not river-scoped.** The
     source says a Dam or Great Bath "along a River will mitigate floods
     THERE"; here any complete Great Bath protects every floodplain its seat
-    holds. Same static river-component table as the reach.
+    holds. `river_comp` is now the table that would key it, so what is left is
+    deciding which river a wonder stands on and gating the mitigation on it.
   - **The Great Bath's "+1 Faith for every time a tile belonging to this city
     has been Flooded"** needs a per-tile flood COUNT that nothing stores.
   - **The DAM is not in the district roster** (C-22), so the other half of the
@@ -518,21 +552,29 @@ Civ 6 source or is recorded as unverifiable.
   (C-21 — a Great Person fires instantly here and is never a unit); the Great
   Bath's per-flood faith (B-34r); and Cristo Redentor's clause that relic and
   holy-city tourism is not diminished by a rival's Enlightenment (C-23).
-- **B-45r. The effects the SOURCED sweep found in the other rows.** Eight
-  wonders pay something real Civ 6 gives them that no channel here can
-  express yet, all discovered by B-39r's re-fetch and none of them a
-  self-declared gap before it: Stonehenge's free Prophet and its
-  found-a-religion-on-the-wonder clause, the Pyramids' free Builder, the
-  Oracle's 25%-cheaper Great Person patronage (nothing to discount — faith
-  never buys a Great Person here, C-9) and its "+2 Great Person points of
-  their type" for districts in that city, the Great Library's boosts to
-  every Ancient and Classical technology and its boost when a rival recruits a
-  Great Scientist, the Colossus' +1 trade-route capacity and free Trader,
-  Great Zimbabwe's +1 trade route and its per-bonus-resource route gold, Ruhr
-  Valley's +1 production per Mine and Quarry in its city, and Sankoré's three
-  trade-route yield terms. The free units wait on C-21 and on a Trader grant
-  path; the route terms wait on B-31r's route-yield work; the rest are new
-  channels.
+- **B-45r. The effects the SOURCED sweep found in the other rows.** Three of
+  the eight now have a channel, each re-sourced at its own page before it was
+  written: `cityYieldPerImprovement` pays the Ruhr Valley's "+1 Production for
+  each Mine and Quarry in this city" off the tiles that city OWNS, a pillaged
+  improvement paying nothing (`_wonder_improvement_yields` is the twin);
+  `boostTechsThroughEra` gives the Great Library "boosts to all Ancient and
+  Classical era technologies" once at completion, one eureka per technology
+  not already boosted or researched and each a Free Inquiry event like any
+  other; `districtGpPoints` gives the Oracle's "+2 Great Person points of
+  their type" to every district in its own city. REACHABILITY: the gate
+  finishes no wonder, so `tests/gpu/wonder_effects_test.py` sections 13-15 and
+  `tests/cpu/city/wonder-effects.test.ts` are the only proof.
+  OPEN — the five that still have nowhere to live:
+  - Stonehenge's free Prophet and its found-a-religion-on-the-wonder clause,
+    and the Pyramids' free Builder: a wonder that GRANTS A UNIT has no path
+    (C-21).
+  - The Oracle's 25%-cheaper Great Person patronage: faith never buys a Great
+    Person here (C-9), so there is nothing to discount.
+  - The Great Library's boost when a RIVAL recruits a Great Scientist: no
+    engine raises an event on another seat's recruit.
+  - The Colossus' and Great Zimbabwe's +1 trade-route capacity and free
+    Trader, Great Zimbabwe's per-bonus-resource route gold and Sankoré's three
+    route-yield terms: all wait on B-31r's route-yield work.
 - **B-46r. The siege class's tails.** All three things this row named now
   ship. `UnitDef.bombard` / `_type_bombard` is the stat "only units with
   attacks that use Bombard Strength" bring, and it hits a perimeter at FULL
@@ -626,14 +668,31 @@ Civ 6 source or is recorded as unverifiable.
   short of their real ceilings (B-54r). The third Civ 6 slot, the SUPPORT unit
   class, is not the same gap: BATTERING_RAM and SIEGE_TOWER carry `charges`,
   so `unitDomain` already files them as civilians and they stack with an army.
-- **B-50r. Theological combat's other terms.** The damage formula is sourced
-  now; the rest of the Theological combat page is not. Missing: flanking and
-  support (which apply since the Fall 2017 update), the location bonuses (+5
-  in the territory of a city following the religion, +15 in its Holy City's
-  territory), the Inquisitor as a second attacker and a defensive specialist,
-  the winner ADVANCING into the fallen unit's tile, and religious healing (a
-  unit heals only on or beside its own Holy Site, at three times that site's
-  faith). Promotions are C-3's.
+- **B-50r. Theological combat's other terms.** Four of the six ship.
+  `theologicalCombatPhase` / `_theological_combat_phase` now add FLANKING to
+  the attacker and SUPPORT to the defender off the same `flankCount` /
+  `supportCount` the physical roll uses; `theoDefenseStrength` /
+  `_theo_def_strength` add the page's DEFENDING-ONLY location bonuses (+5 in
+  the territory of a city following the defender's religion, +15 on top in
+  that religion's Holy City, plus a defensive improvement — a FORT — and
+  nothing at all from physical terrain); the winner ADVANCES into the fallen
+  unit's tile when it survived and the tile is free; and `religiousHeal` /
+  `_religious_heal` heal a religious unit only on or beside a Holy Site in its
+  OWN territory, at `RELIGIOUS_HEAL_PER_FAITH` times that site's own faith
+  (its adjacency plus its buildings), a pillaged one paying nothing. Two
+  embarked units cannot fight each other. REACHABILITY: neither driven nor
+  scripted — `tests/cpu/religion/theological-combat.test.ts` and
+  `tests/gpu/religion2_test.py` pokes 11 and 12 are the only proof.
+  OPEN:
+  - **THE INQUISITOR** as a second attacker and a defensive specialist is a
+    roster gap (C-14), and the promotions that modify the roll are C-3's.
+  - **WHO PROVIDES FLANKING AND SUPPORT is this engine's own answer.** The
+    page says only that flanking and support apply; it does not say whether a
+    RELIGIOUS unit counts as a flanker for a physical battle, or whether a
+    military unit flanks a theological one. Both engines take the physical
+    predicate unchanged — any adjacent unit of a hostile/friendly seat — which
+    is a reading, not a quotation, and the two engines agree on it only
+    because they share the body.
 - **B-51r. The Encampment's second pool.** An assault on the district now
   meets the perimeter: `attackEncampment` / `_attack_encampment` find the city
   behind the tile (`cityAtTile` / `_owner_city_col`) and divide the roll
@@ -669,23 +728,59 @@ Civ 6 source or is recorded as unverifiable.
   4, first at t145 — 6.5 turns at war per seed on average, 30 on the loudest.
   So the gate reaches the declare, the peace and the two clocks; the meeting
   gate, the treaty term and the suzerain refusal are `cs_war_test` section d.
+  A WALKER NOW MARCHES ON ONE. `isTerritorial` replaced `isCiv` at every
+  hostile-tile test, so `_war_march_target` scans a city-state's improvements,
+  districts and CITY exactly like a major's; a minor keeps no `cities` array,
+  so its ONE city is its centre. The march key is unchanged in meaning —
+  distance, then the owner's seat id, then the centre tile — but its distance
+  term now scales by `2048 * 256`, wide enough for a 100+ seat id. The same
+  widening fixed a live engine-vs-engine divergence: `_seat_unit_mask` offered
+  PILLAGE on ANY city-state tile with no war term at all, while `phase.ts`'s
+  replay arm refused every one of them, so the column was a silent no-op; both
+  now require a war with the tile's owner. REACHABILITY: `cs_war_test` section
+  e is the only proof — the 250-turn gate declares on a minor on 4 of 12 seeds
+  but the driver's plan is what would have to reach the walk.
   OPEN:
-  - **NO WALKER EVER MARCHES ON A MINOR.** `_war_march_target` and its TS
-    twin scan the cities and improvements of at-war MAJORS only, so a seat
-    that declares on a city-state has no reason to walk toward it: the
-    attack mask opens and nothing arrives. Both engines agree, and both are
-    wrong.
+  - **THE BARBARIAN WALKER STILL RAIDS ONLY MAJORS, AND THE REASON IS THE
+    WALKER.** `hostileUnitAct` / the `sim_orders` barbarian arm pillage a
+    city-state's ground (`tOwned` is `isTerritorial` now) but scan only the
+    MAJORS' cities for a march target. Widening that scan to minors was tried
+    and reverted: this walker beelines to the single nearest city and stops
+    adjacent to it, so counting minors parked every camp's units on the
+    neighbouring city-state and no barbarian reached a major again — measured
+    over three fixtures at 90 turns, the nearest barbarian sat 1 tile from a
+    minor centre and 6, 19 and 4 tiles from the nearest major city, and the
+    `ranged` and `combat_mod` poke lanes lost their situation entirely. Real
+    Civ 6 barbarians raid whoever is near the camp; the target SET is the
+    small half of this, and the beeline is the part that has to go first.
   - The diplomatic consequences of declaring — grievances, the warmonger
     penalty with other majors, the suzerain's reaction — wait on C-19.
-- **B-53r. The GREAT PERSON roster is four names per class, era-free.** Weight
-  2. Each class holds exactly four people on one cost ladder, and the names
-  were picked for fame rather than from the game. B-20r's theming work
-  corrected the ARTIST class against the Great Artist (Civ6) page; the other
-  eight classes have not been checked, and the deeper problem the check
-  surfaced is structural: real Civ 6 anchors each Great Person to an ERA and
-  offers a whole roster per era (every Great Artist is Renaissance or later,
-  so this model's Ancient "artist" cannot exist). Closing this needs the
-  per-era rosters and the era-gated recruit, not a rename.
+- **B-53r. The Great Person QUEUE.** The roster is the game's now: all 205
+  people from the nine Great Person pages, each carrying the ERA its page's
+  own roster column names, ordered by era (`GREAT_PEOPLE`, `GP_FIRST_OF_ERA`).
+  `gpOffer` / `_gp_first_of_era` offer the next unclaimed person no earlier
+  than the WORLD era (`worldEraIndex` / `_world_era`), so anyone the world has
+  passed is gone for the rest of the game and a class whose roster ends before
+  the world era offers nobody at all — the Prophets run out after the
+  Renaissance, which is the page's own "Industrial: No more Great Prophets".
+  `gpCost` prices a recruit at its era base scaled by
+  "base cost * (1 + 0.3 * difference in era) ^ difference in era" against the
+  world era, except for the art classes and the Prophet, which the page
+  exempts; the exporter ships the floored table so both engines read the same
+  doubles. `state.gpNext` / `gp_next` carry the queue position beside the
+  claimed-count `gp_earned`, and the census compares both.
+  OPEN:
+  - **THE OFFER IS RE-DERIVED, NOT FROZEN.** Real Civ 6 fixes WHICH person is
+    on offer and WHAT it costs the moment they enter the queue; here both are
+    computed fresh each turn from the world era, so a person on offer can get
+    cheaper (or be skipped entirely) between one turn and the next without
+    anyone claiming them. An exact model needs two per-class state fields —
+    the frozen index and the frozen price — on both engines and on the wire.
+  - **THE PAYOUT IS ONE ERA-SIZED LUMP, not the person's own ability.** Every
+    recruit pays `GP_ERA_GPP[era]` in `GP_CURRENCY`'s currency for its class.
+    Real Civ 6 gives each Great Person a UNIQUE activated ability; that is
+    C-21's, and this row records that the roster now carries the names and
+    eras those abilities would hang off.
 - **B-D. UNSOURCED DATA VALUES — swept once; the named stylizations are
   OPEN, not closed.** The cpu/data walk fetched every magnitude from the GS
   Civilopedia row by row: all 28 wonders (12 corrected, every unlock now the

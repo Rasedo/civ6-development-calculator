@@ -1,6 +1,7 @@
 
 import type { GameState, Tile } from './types';
-import { neighbors, tilesWithin } from '../../world/hex';
+import type { GameMap } from '../../world/types';
+import { neighborTile, neighbors, tilesWithin } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { nextRandom } from './rand';
 import { seatWonderFlag } from './wonders';
@@ -49,6 +50,47 @@ function fertilize(tile: Tile): void {
 }
 
 /**
+ * Every Floodplains tile ALONG one river.
+ *
+ * CIV6 (Flood): "The level of the water rises, flooding all Floodplains tiles
+ * found along the River, and then recedes on the next turn." One severity for
+ * the whole flood, then each reached tile takes the effects at that severity.
+ */
+export function riverReach(map: GameMap, start: Tile): Tile[] {
+  // Two tiles are on the same river when a river EDGE separates them. A
+  // river's edges are a vertex-connected chain, and any two edges meeting at a
+  // vertex are consecutive edges of one common tile — so this tile walk covers
+  // exactly the one river and never leaks into another.
+  const seen = new Set<number>([start.index]);
+  const stack = [start];
+  while (stack.length) {
+    const t = stack.pop()!;
+    for (let d = 0; d < 6; d++) {
+      if (!(t.riverMask & (1 << d))) continue;
+      const n = neighborTile(map, t, d);
+      if (!n || seen.has(n.index)) continue;
+      seen.add(n.index);
+      stack.push(n);
+    }
+  }
+  const out = map.tiles.filter((t: Tile) => seen.has(t.index) && t.feature === 'FLOODPLAINS');
+  return out.length ? out : [start];
+}
+
+function floodRiver(state: GameState, start: Tile): Tile[] {
+  const rSev = nextRandom(state);
+  let sev = 0;
+  for (let i = 0, acc = 0; i < FLOOD_SEVERITY_P.length; i++) {
+    acc += FLOOD_SEVERITY_P[i];
+    if (rSev < acc) { sev = i; break; }
+    sev = i;
+  }
+  const reach = riverReach(state.map, start);
+  for (const t of reach) floodTile(state, t, sev);
+  return reach;
+}
+
+/**
  * ONE river flood on one Floodplains tile.
  *
  * CIV6: a flood "damages or destroys Districts, improvements, and units on the
@@ -58,18 +100,11 @@ function fertilize(tile: Tile): void {
  * every magnitude, and the Great Bath cancels the damage half while halving the
  * fertility half.
  *
- * EIGHT draws, always, whatever the tile holds — a draw count that depended on
- * what stood there would have to be mirrored condition-for-condition on the
- * other engine.
+ * SEVEN draws per tile, always, whatever the tile holds — a draw count that
+ * depended on what stood there would have to be mirrored
+ * condition-for-condition on the other engine.
  */
-function floodTile(state: GameState, tile: Tile): void {
-  const rSev = nextRandom(state);
-  let sev = 0;
-  for (let i = 0, acc = 0; i < FLOOD_SEVERITY_P.length; i++) {
-    acc += FLOOD_SEVERITY_P[i];
-    if (rSev < acc) { sev = i; break; }
-    sev = i;
-  }
+function floodTile(state: GameState, tile: Tile, sev: number): void {
   const rDestroy = nextRandom(state);
   const rDistrict = nextRandom(state);
   const rDamage = nextRandom(state);
@@ -136,8 +171,8 @@ export function disasterPhase(state: GameState): void {
   if (nextRandom(state) < FLOOD_CHANCE) {
     const target = pick(state, map.tiles.filter((t) => t.feature === 'FLOODPLAINS'));
     if (target) {
-      floodTile(state, target);
-      log(state, `Flood at (${target.col}, ${target.row}) — silt enriches the floodplain.`);
+      const reach = floodRiver(state, target);
+      log(state, `Flood at (${target.col}, ${target.row}) — ${reach.length} floodplain tiles along the river.`);
     }
   }
 

@@ -1255,6 +1255,38 @@ class SimSeats:
             drew = drew | certain[rows, seats.clamp(min=0, max=self.n_majors - 1)]
         return drew
 
+    def _theo_def_strength(self, seat: torch.Tensor, tile: torch.Tensor) -> torch.Tensor:
+        """[B] long — `theoDefenseStrength`, the DEFENDER's location bonuses.
+
+        CIV6 (Theological combat): "+5" in the territory of a city following
+        this religion, "+15" in the territory of that religion's Holy City, and
+        a defensive tile IMPROVEMENT. Physical terrain contributes nothing here,
+        so this is not `_tdef_g` with terms removed — it is its own read.
+        """
+        t = tile.clamp(min=0)
+        out = torch.zeros_like(t)
+        if self.FORT >= 0:
+            out = out + self._fort_def_cs * (
+                self.improvement.gather(1, t.unsqueeze(1)).squeeze(1) == self.FORT).long()
+        g = seat.clamp(min=0, max=self.n_majors - 1)
+        has = ((seat >= 0) & (seat < self.n_majors)
+               & self.civ_religion_done.gather(1, g.unsqueeze(1)).squeeze(1))
+        _near, terr = self._rel_combat_planes()
+        fol = (terr.gather(1, g.reshape(-1, 1, 1).expand(-1, -1, self.T)).squeeze(1)
+               .gather(1, t.unsqueeze(1)).squeeze(1))
+        out = out + (has & fol).long() * self._theo_holy_ground
+        holy = self.holy_tile.gather(1, g.unsqueeze(1)).squeeze(1)
+        hc = holy.clamp(min=0).unsqueeze(1)
+        same = (
+            (holy >= 0)
+            & (self.tile_seat.gather(1, t.unsqueeze(1)).squeeze(1)
+               == self.tile_seat.gather(1, hc).squeeze(1))
+            & (self.tile_city.gather(1, t.unsqueeze(1)).squeeze(1)
+               == self.tile_city.gather(1, hc).squeeze(1))
+        )
+        out = out + (has & same).long() * self._theo_holy_city
+        return torch.where(tile >= 0, out, torch.zeros_like(out))
+
     def _theological_combat_phase(self) -> None:
         """THEOLOGICAL COMBAT — ONE pass, every seat, at one schedule position.
 
@@ -1298,6 +1330,8 @@ class SimSeats:
                 self.major_unit_alive & (d == 1)
                 & (self.major_unit_seat != a_seat.unsqueeze(1))
                 & (rs[self.major_unit_type.clamp(min=0)] > 0)
+                # "Theological combat cannot happen between two Embarked units"
+                & ~(self.major_unit_emb[:, u].unsqueeze(1) & self.major_unit_emb)
             ) & att.unsqueeze(1)
             if not bool(elig.any()):
                 continue
@@ -1314,6 +1348,15 @@ class SimSeats:
             d_eff = d_str - self._wound((self.major_unit_hp * _f).sum(dim=1))
             d_tile = (self.major_unit_tile * _f).sum(dim=1)
             hit = first.any(dim=1)
+            # "Since the Fall 2017 Update, Flanking and Support bonuses apply
+            # in theological combat"; the location bonuses are the defender's.
+            d_seat = torch.where(hit, (self.major_unit_seat * _f).sum(dim=1),
+                                 torch.full_like(a_seat, -1))
+            _fl, _sp = self._flank_support(
+                torch.where(hit, d_tile, torch.full_like(d_tile, -1)),
+                d_seat, torch.full_like(a_seat, -1), a_seat)
+            a_eff = a_eff + FLANKING_CS * _fl
+            d_eff = d_eff + SUPPORT_CS * _sp + self._theo_def_strength(d_seat, d_tile)
             to_def = self._damage_roll(hit, a_eff - d_eff, k="theo", tile=d_tile)
             to_atk = self._damage_roll(hit, d_eff - a_eff, k="theoc", tile=self.major_unit_tile[:, u])
             hp = self.major_unit_hp
@@ -1379,6 +1422,32 @@ class SimSeats:
                 _ad = rows[atk_dead]
                 self.major_unit_alive[_ad, u] = False
                 self._vacate("major", _ad, torch.full_like(_ad, u))
+            # "If the defender is killed, the attacker enters its tile, just
+            # like in melee combat" — after the vacate, so the tile is clear.
+            _adv = def_dead & ~atk_dead
+            if bool(_adv.any()):
+                # `_blocked_for` reads the war matrix at `_bidx1`, so it answers
+                # for the WHOLE batch or for nothing: build the destination and
+                # the asking seat at full width and narrow the ANSWER.
+                _vr = rows[_adv]
+                _to = torch.zeros(self.B, dtype=torch.long, device=self.device)
+                _to[_vr] = self.major_unit_tile[_vr, j[_vr]]
+                _as = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+                _as[_vr] = a_seat[_vr]
+                _ok = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                _ok[_vr] = True
+                _ok = (_ok & self.passable.gather(1, _to.unsqueeze(1)).squeeze(1)
+                       & ~self._blocked_for(_to.unsqueeze(1), _as.unsqueeze(1),
+                                            is_civilian=True).squeeze(1))
+                if bool(_ok.any()):
+                    _mv = _ok.nonzero(as_tuple=True)[0]
+                    _dst = _to[_mv]
+                    self.civilian_at[(_mv, self.major_unit_tile[_mv, u])] = -1
+                    self.major_unit_tile[_mv, u] = _dst
+                    self.civilian_at[(_mv, _dst)] = u + self.POOL_LO["major"]
+                    # a victor that comes ashore stops being embarked — the
+                    # melee advance's rule, and a religious unit is never naval
+                    self.major_unit_emb[_mv, u] = self.water[_mv, _dst]
         self._eff_version += 1
 
     def _vacate(self, pool: str, rows: torch.Tensor, slots: torch.Tensor) -> None:
@@ -1589,9 +1658,7 @@ class SimSeats:
         neg = torch.full((B,), -1, dtype=torch.long, device=dev)
         if self._congress_interval <= 0 or (turn % self._congress_interval) != 0:
             return zero, neg, neg.clone(), zero
-        world_era = torch.full((B,), -1, dtype=torch.long, device=dev)
-        for row in range(self.n_majors):
-            world_era = torch.maximum(world_era, self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]))
+        world_era = self._world_era()
         fires = world_era >= self._congress_min_era
         res0, res1 = neg.clone(), neg.clone()
         NR = len(self._congress_res)
@@ -1659,10 +1726,7 @@ class SimSeats:
         """[B] — the Congress sits at all: the MAX era across majors has
         reached congressMinEra. Independent of the 30-turn interval, because a
         SPECIAL session may sit on any turn."""
-        world_era = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
-        for row in range(self.n_majors):
-            world_era = torch.maximum(world_era, self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]))
-        return world_era >= self._congress_min_era
+        return self._world_era() >= self._congress_min_era
 
     def _emg_clear(self, k: int, m: torch.Tensor) -> None:
         """Empty one slot where `m` holds — the `filter(e => e.phase >= 0)` twin."""
@@ -2927,6 +2991,33 @@ class SimSeats:
             z = z + (near & ok.unsqueeze(1)).sum(dim=2).double() * has.double()
         return z
 
+    def _wonder_improvement_yields(self, row: int) -> torch.Tensor | None:
+        """[B, cols, 6] f64 — CIV6 (Ruhr Valley): "+1 Production for each Mine
+        and Quarry in this city". The improvements on the tiles the HOLDING
+        city owns, a pillaged one paying nothing. None when no such wonder
+        stands."""
+        if not self._wond_n or not self._wond_imp_yield:
+            return None
+        cols = self.RC
+        wreg = self.city_wonder[:, row, :cols]
+        out = None
+        for _wi, _imps, _y in self._wond_imp_yield:
+            wt = wreg[:, :, _wi]
+            has = (wt >= 0) & self.built_wonder_complete.gather(1, wt.clamp(min=0))
+            if not bool(has.any()):
+                continue
+            ok = ~self.pillaged
+            _any = torch.zeros_like(ok)
+            for _i in _imps:
+                _any = _any | (self.improvement == _i)
+            ok = ok & _any
+            sel = torch.where(ok, self.city_slot_at(row), torch.full_like(self.improvement, -1))
+            per_col = torch.zeros(self.B, cols, dtype=torch.float64, device=self.device)
+            per_col.scatter_add_(1, sel.clamp(min=0, max=cols - 1), (sel >= 0).double())
+            add = (per_col * has.double()).unsqueeze(2) * _y.reshape(1, 1, -1)
+            out = add if out is None else out + add
+        return out
+
     def _wonder_growth_mult(self, compw: torch.Tensor | None) -> torch.Tensor | None:
         if compw is None:
             return None
@@ -3761,7 +3852,8 @@ class SimSeats:
             # flanking helps the hostile attacker (barb/civ at `here`), support
             # helps the defender, whichever seat it belongs to.
             d_seat_m = torch.where(ok_m, m_seat, neg)
-            _fl, _sp = self._flank_support(tgt, d_seat_m, here, a_seat[:, u])
+            _fl, _sp = self._flank_support(
+                tgt, d_seat_m, torch.full_like(here, a_lo + u), a_seat[:, u])
             atk_e = atk_e + FLANKING_CS * _fl
             # an embarked defender loses Support only to a NAVAL attacker
             _no_sup = d_emb & self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)]
@@ -3903,7 +3995,8 @@ class SimSeats:
         """
         d = self.tdef.gather(1, tiles.unsqueeze(1)).squeeze(1)
         if self.FORT >= 0:
-            d = d + 4 * (self.improvement.gather(1, tiles.unsqueeze(1)).squeeze(1) == self.FORT).long()
+            d = d + self._fort_def_cs * (
+                self.improvement.gather(1, tiles.unsqueeze(1)).squeeze(1) == self.FORT).long()
         occ = self._occupy_def()
         if occ is not None:
             d = d + occ.gather(1, tiles.unsqueeze(1)).squeeze(1)
@@ -3912,7 +4005,7 @@ class SimSeats:
     def _tdef_i(self, bidx: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
         d = self.tdef[bidx, tiles]
         if self.FORT >= 0:
-            d = d + 4 * (self.improvement[bidx, tiles] == self.FORT).long()
+            d = d + self._fort_def_cs * (self.improvement[bidx, tiles] == self.FORT).long()
         occ = self._occupy_def()
         if occ is not None:
             d = d + occ[bidx, tiles]
@@ -4278,7 +4371,8 @@ class SimSeats:
         the nearest unpillaged enemy improvement or complete district within 13,
         else the nearest enemy city on `hostileUnitAct`'s key: distance, then
         the owner's SEAT id, then the centre TILE. No owner is a separate arm
-        and none wins a tie by being row 0.
+        and none wins a tie by being row 0. A CITY-STATE holds territory and
+        cities and can be at war, so it is scanned exactly like a major.
 
         The row indexes the war matrix directly, so who this seat fights is
         read here rather than passed in — every cell of the row, including
@@ -4290,13 +4384,13 @@ class SimSeats:
         """
         B, T, dev = self.B, self.T, self.device
         arangeT = torch.arange(T, device=dev)
-        # AT WAR WITH THIS TILE'S OWNER — the TS `tOwned` term, for every major
-        # owner alike. A major's absolute seat IS its row, so the war lookup is
-        # one gather; a city-state or barbarian tile is masked out by `major`
-        # before it can index the row.
+        # AT WAR WITH THIS TILE'S OWNER — the TS `tOwned` term, for every
+        # territorial owner alike. A barbarian tile is masked out by `owned`
+        # before its seat can index the war row.
         _ts = self.tile_seat
-        major = (_ts >= 0) & (_ts < self.n_majors)
-        at_war_t = major & self.war[:, row].gather(1, torch.where(major, _ts, torch.zeros_like(_ts)))
+        owned = (_ts >= 0) & (_ts < BARB_SEAT)
+        at_war_t = owned & self.war[:, row].gather(
+            1, self._seat_row[torch.where(owned, _ts, torch.zeros_like(_ts))])
         if self.improvements_on or self.districts_on:
             imp_job = (self.improvement >= 0) & ~self.pillaged & at_war_t
             if self.districts_on:
@@ -4308,16 +4402,18 @@ class SimSeats:
         else:
             has_imp = torch.zeros(B, dtype=torch.bool, device=dev)
             imp_tgt = hc
-        # THE CITY SCAN — one total order over every major this seat is at
-        # war with, on the TS key: distance, then the seat id, then the centre
-        # tile. No seat is a separate arm and none wins a tie by being row 0.
-        # ONE argmin over the whole city block: the key is unique per live
-        # city, so the winner is the one a slot-by-slot scan would have kept.
-        _cc = self.city_center[:, :self.n_majors].reshape(B, -1).clamp(min=0)  # [B, M]
-        _ca = (self.city_alive[:, :self.n_majors].reshape(B, -1)
-               & self.war[:, row, :self.n_majors].repeat_interleave(self.RC, dim=1))
+        # THE CITY SCAN — one total order over every seat this one is at war
+        # with, majors and city-states alike, on the TS key: distance, then the
+        # seat id, then the centre tile. No seat is a separate arm and none
+        # wins a tie by being row 0. ONE argmin over the whole city block: the
+        # key is unique per live city, so the winner is the one a slot-by-slot
+        # scan would have kept.
+        _CB = self.city_center.shape[1]
+        _cc = self.city_center.reshape(B, -1).clamp(min=0)  # [B, M]
+        _ca = (self.city_alive.reshape(B, -1)
+               & self.war[:, row, :_CB].repeat_interleave(self.RC, dim=1))
         _d2 = self.pair_dist[hc.unsqueeze(1), _cc].to(torch.long)
-        _key = torch.where(_ca, _d2 * (2048 * 8) + self._march_seatkey + _cc,
+        _key = torch.where(_ca, _d2 * (2048 * 256) + self._march_seatkey + _cc,
                            torch.full_like(_d2, 10**18))
         ckey_min, _cwin = _key.min(dim=1)
         has_city = ckey_min < 10**18
@@ -5260,9 +5356,7 @@ class SimSeats:
         """tradeRouteMinDuration: the base term plus the WORLD-era bump
         (+10 per threshold era passed), [B] long."""
         B, dev = self.B, self.device
-        we = torch.full((B,), -1, dtype=torch.long, device=dev)
-        for r in range(self.n_majors):
-            we = torch.maximum(we, self._civ_era(self.civ_techs[:, r], self.civ_civics[:, r]))
+        we = self._world_era()
         bump = torch.zeros(B, dtype=torch.long, device=dev)
         for be in self._trade_dur_bumps:
             bump = bump + (we >= be).long() * 10
@@ -5522,16 +5616,14 @@ class SimSeats:
         twin: [B] origin CENTRE and [B] dest code (a CENTRE tile, or
         -(2+csIndex)); -1/-1 where none.
 
-        The scan is the old eager rule's, verbatim: for each origin city in
-        ARRAY order, its own cities (array order) then the MET city-states
-        (index order); the best NEW in-range destination by the route's TOTAL
-        yields — domestic 2 + 2*floor(specialtyDistricts(dest)/2), a
-        city-state's flat gold+specialty — with strictly-greater-beats
-        semantics, so ties keep the FIRST pair in that flat scan order. Only
-        when NO domestic or city-state candidate exists does the scan reach
-        INTERNATIONAL destinations: any OTHER major's city whose centre this
-        seat has EXPLORED, nearest first, ties by the same from-asc /
-        seat-asc / city-asc order. Gated on capacity AND a free Trader — the
+        For each origin city in ARRAY order: its own cities (array order),
+        then the MET city-states (index order), then every OTHER major's
+        EXPLORED cities (seat asc, city asc). EVERY legal destination competes
+        on ONE key, the route's TOTAL yields — domestic
+        2 + 2*floor(specialtyDistricts(dest)/2), a city-state's flat
+        gold+specialty, an international `intlGold + specialtyDistricts(dest)`
+        — with strictly-greater-beats semantics, so ties keep the FIRST pair
+        in that flat scan order. Gated on capacity AND a free Trader — the
         unit the verb spends. Slot order IS TS array order for every row."""
         B, RC, S, dev = self.B, self.RC, self.S, self.device
         neg = torch.full((B,), -1, dtype=torch.long, device=dev)
@@ -5593,24 +5685,10 @@ class SimSeats:
             key_cs = torch.where(valid_cs, torch.full((B, RC, S), ysum_cs, dtype=torch.long, device=dev), torch.full((B, RC, S), -1, dtype=torch.long, device=dev))
             key = torch.cat([key, key_cs], dim=2)
             W2 = RC + S
-        kf = key.reshape(B, RC * W2)  # i-major flat order = the TS from-asc, dests-then-CS scan
-        kmax, _ = kf.max(dim=1)
-        first = torch.where(kf == kmax.unsqueeze(1), torch.arange(RC * W2, device=dev).reshape(1, -1), torch.full((1, RC * W2), RC * W2, device=dev)).min(dim=1).values
-        frm_c = neg.clone()
-        dest_c = neg.clone()
-        do = want & (kmax >= 0)
-        if bool(do.any()):
-            rows = do.nonzero(as_tuple=True)[0]
-            i_pick = first[rows] // W2
-            jj = first[rows] % W2
-            frm_c[rows] = centers[rows, i_pick]
-            dest_c[rows] = torch.where(jj < RC, centers[rows, jj.clamp(max=RC - 1)], -(2 + (jj - RC)))
-        # international: rows that WANT a route but found no domestic/CS
-        # candidate consider ANY OTHER MAJOR's city whose centre this seat has
-        # EXPLORED, NEAREST first (ties keep from-asc, then the block-row scan
-        # order, which IS `state.seats` order).
-        intl_want = want & (kmax < 0)
-        dctr_l, dalv_l, did_l, drow_l, dmar_l = [], [], [], [], []
+        # INTERNATIONAL destinations join the SAME scan on the same key: any
+        # OTHER major's city whose centre this seat has EXPLORED.
+        _S_off = W2
+        dctr_l, dalv_l, did_l, drow_l, dmar_l, dspec_l = [], [], [], [], [], []
         for r2 in range(self.n_majors):
             if r2 == row:
                 continue
@@ -5619,12 +5697,16 @@ class SimSeats:
             did_l.append(self.city_id[:, r2])
             drow_l.append(torch.full_like(self.city_id[:, r2], r2))
             dmar_l.append(self._city_maritime(r2))
-        if bool(intl_want.any()) and dctr_l:
-            dctr = torch.cat(dctr_l, dim=1)  # [B, D] dest centre tiles
-            dalv = torch.cat(dalv_l, dim=1)  # [B, D]
-            did = torch.cat(did_l, dim=1)    # [B, D] dest city id
-            drow = torch.cat(drow_l, dim=1)  # [B, D] dest seat row
-            dmar = torch.cat(dmar_l, dim=1)  # [B, D] dest maritime access
+            _dt2 = self.city_dist_tile[:, r2]
+            _cp2 = (_dt2 >= 0) & self.district_complete.gather(1, _dt2.clamp(min=0).reshape(B, -1)).reshape_as(_dt2)
+            dspec_l.append((_cp2 & self._is_specialty.reshape(1, 1, -1)).sum(dim=2))
+        dctr = torch.cat(dctr_l, dim=1) if dctr_l else None
+        if dctr is not None:
+            dalv = torch.cat(dalv_l, dim=1)    # [B, D]
+            did = torch.cat(did_l, dim=1)      # [B, D] dest city id
+            drow = torch.cat(drow_l, dim=1)    # [B, D] dest seat row
+            dmar = torch.cat(dmar_l, dim=1)    # [B, D] dest maritime access
+            dspec = torch.cat(dspec_l, dim=1)  # [B, D] dest specialty districts
             D = dctr.shape[1]
             d_ip = self.pair_dist[centers.unsqueeze(2), dctr.unsqueeze(1)]  # [B, RC, D]
             rds = self.seat_route_dseat[:, row]  # [B, K]
@@ -5645,20 +5727,29 @@ class SimSeats:
                 & self._explored_at(row, dctr).unsqueeze(1)
                 & (d_ip <= self._trade_pair_range(row, mar.unsqueeze(2), dmar.unsqueeze(1)))
                 & ~exists_ip
-                & intl_want.reshape(B, 1, 1)
+                & want.reshape(B, 1, 1)
             )
-            BIG = 1 << 30
-            dkey = torch.where(valid_ip, d_ip.long(), torch.full((B, RC, D), BIG, dtype=torch.long, device=dev))
-            df = dkey.reshape(B, RC * D)
-            dmin, _ = df.min(dim=1)
-            firsti = torch.where(df == dmin.unsqueeze(1), torch.arange(RC * D, device=dev).reshape(1, -1), torch.full((1, RC * D), RC * D, device=dev)).min(dim=1).values
-            doi = intl_want & (dmin < BIG)
-            if bool(doi.any()):
-                rows = doi.nonzero(as_tuple=True)[0]
-                i_pick = firsti[rows] // D
-                c_pick = firsti[rows] % D
-                frm_c[rows] = centers[rows, i_pick]
-                dest_c[rows] = dctr[rows, c_pick]
+            ysum_ip = int((self.rules.trade or {}).get("intlGold", 3)) + dspec  # [B, D]
+            key_ip = torch.where(valid_ip, ysum_ip.unsqueeze(1).expand(B, RC, D),
+                                 torch.full((B, RC, D), -1, dtype=torch.long, device=dev))
+            key = torch.cat([key, key_ip], dim=2)
+            W2 = W2 + D
+        kf = key.reshape(B, RC * W2)  # i-major flat order = the TS from-asc, own-then-CS-then-foreign scan
+        kmax, _ = kf.max(dim=1)
+        first = torch.where(kf == kmax.unsqueeze(1), torch.arange(RC * W2, device=dev).reshape(1, -1), torch.full((1, RC * W2), RC * W2, device=dev)).min(dim=1).values
+        frm_c = neg.clone()
+        dest_c = neg.clone()
+        do = want & (kmax >= 0)
+        if bool(do.any()):
+            rows = do.nonzero(as_tuple=True)[0]
+            i_pick = first[rows] // W2
+            jj = first[rows] % W2
+            frm_c[rows] = centers[rows, i_pick]
+            _dest = torch.where(jj < RC, centers[rows, jj.clamp(max=RC - 1)],
+                                -(2 + (jj - RC).clamp(min=0)))
+            if dctr is not None:
+                _dest = torch.where(jj >= _S_off, dctr[rows, (jj - _S_off).clamp(min=0)], _dest)
+            dest_c[rows] = _dest
         return frm_c, dest_c
 
     def _expire_seat_routes(self, row: int) -> None:

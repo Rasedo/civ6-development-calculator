@@ -124,6 +124,10 @@ export const isBarbSeat = (seat: number): boolean => seat === BARB_SEAT;
 
 export const isCiv = (seat: number): boolean => seat >= 0 && seat < CITY_STATE_SEAT_BASE;
 
+/** A seat that HOLDS TERRITORY and can be warred: a major or a city-state.
+ *  What a pillage, a war march and a hostile tile test all ask. */
+export const isTerritorial = (seat: number): boolean => seat >= 0 && seat < BARB_SEAT;
+
 /** Is this a city-state? They hold territory and act, but are never civs. */
 export const isCityStateSeat = (seat: number): boolean => seat >= CITY_STATE_SEAT_BASE && seat < BARB_SEAT;
 

@@ -1,7 +1,7 @@
 
 import type { City, DistrictId, GameState, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, Seat, Unit } from './types';
 import { greatPeopleEarned } from './greatPeople';
-import { placeRelic, RELIC_WONDER_SLOTS } from '../data/greatPeople';
+import { placeRelic, GP_CLASSES, RELIC_WONDER_SLOTS } from '../data/greatPeople';
 import { generateMap } from '../../world/mapgen';
 import { tilesWithin, hexDistance } from '../../world/hex';
 import { acquireTile, borderCandidates } from './city';
@@ -9,8 +9,8 @@ import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canR
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, isCivicComplete } from './effects';
 import type { Modifiers, Unlocks } from './effects';
 import { effectiveResearchCostIn } from './boosts';
-import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, builderCost, traderCost, settlerCount } from './units';
-import { barbarianPhase, damageRoll, encampmentTrainXp, woundPenalty } from './combat';
+import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, tileFreeForUnit, builderCost, traderCost, settlerCount } from './units';
+import { barbarianPhase, damageRoll, encampmentTrainXp, woundPenalty, theoDefenseStrength, flankCount, supportCount, FLANKING_CS, SUPPORT_CS } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase, suzerainEffect } from './cityStates';
@@ -23,6 +23,7 @@ import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenB
 import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS } from '../data/units';
 import { outerPool, wallsMax } from './rules';
 import { FEATURES } from '../../world/features';
+import { isWater } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
@@ -119,6 +120,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     turn: 1,
     sandbox,
     claimedGreatPeople: [],
+    gpNext: GP_CLASSES.map(() => 0),
     unitsMode,
     units: [],
     nextUnitId: 0,
@@ -1051,14 +1053,25 @@ function theologicalCombatPhase(state: GameState): void {
     for (const u of state.units) {
       if (relStr(u) <= 0) continue;
       if (unitSeat(u) === g) continue; // same religion — no contest
+      // CIV6: "Theological combat cannot happen between two Embarked units;
+      // however, it can happen between an Embarked unit and another one on the
+      // shore." No amphibious penalty either — "this isn't physical combat".
+      if (att.embarked && u.embarked) continue;
       const ut = state.map.tiles[u.tileIndex];
       if (hexDistance(at.col, at.row, ut.col, ut.row) !== 1) continue;
       def = u;
       break;
     }
     if (!def) continue;
-    const atkStr = relStr(att) - woundPenalty(att);
-    const defStr = relStr(def) - woundPenalty(def);
+    // CIV6: "Since the Fall 2017 Update, Flanking and Support bonuses apply in
+    // theological combat" — the same two counts a melee exchange uses, since
+    // theological combat "follows the same rules of engagement as melee
+    // combat". The location bonuses are the DEFENDER's alone.
+    const atkStr = relStr(att) - woundPenalty(att)
+      + FLANKING_CS * flankCount(state, def.tileIndex, att);
+    const defStr = relStr(def) - woundPenalty(def)
+      + theoDefenseStrength(state, def, state.map.tiles[def.tileIndex])
+      + SUPPORT_CS * supportCount(state, def.tileIndex, def);
     def.hp -= damageRoll(state, atkStr - defStr, 'theo', def.tileIndex);
     att.hp -= damageRoll(state, defStr - atkStr, 'theoc', att.tileIndex);
     att.movesLeft = 0;
@@ -1108,6 +1121,14 @@ function theologicalCombatPhase(state: GameState): void {
         && !placeRelic(citiesOf(state, g), relicSlots)) reserve(g); // the attacker is always an APOSTLE
     if (def.hp <= 0) disbandUnit(state, def.id);
     if (att.hp <= 0) disbandUnit(state, att.id);
+    // CIV6: "If the defender is killed, the attacker enters its tile, just like
+    // in melee combat" — the ATTACKER's advance only, and only if it survived.
+    if (def.hp <= 0 && att.hp > 0 && tileFreeForUnit(state, def.tileIndex, 0, att)) {
+      att.tileIndex = def.tileIndex;
+      // a victor that comes ashore stops being embarked: `stepUnit`'s own
+      // transition rule, which a direct tile write does not reach.
+      att.embarked = isWater(state.map.tiles[def.tileIndex]);
+    }
   }
 }
 
@@ -1206,6 +1227,7 @@ export function deserialize(json: string): GameState {
     );
   }
   state.claimedGreatPeople ??= [];
+  if (!state.gpNext || state.gpNext.length !== GP_CLASSES.length) state.gpNext = GP_CLASSES.map((_, i) => state.gpNext?.[i] ?? 0);
   for (const t of state.map.tiles as (Tile & { wonder?: string | null })[]) {
     t.wonder ??= null;
     t.builtWonder ??= null;

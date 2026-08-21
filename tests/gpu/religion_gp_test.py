@@ -29,14 +29,28 @@ def main() -> None:
     rr = rules.seats
     bl = rules.beliefs
 
-    # --- era-anchored GP cost ladder ---------------------------------------
-    ladder = [60, 120, 200, 290, 390, 500, 620, 750]
-    assert rr["gpCosts"] == ladder, f"gpCosts not the era ladder: {rr['gpCosts']}"
+    # --- the ERA-KEYED price table -----------------------------------------
+    # [person era][eras the world is behind them]; column 0 is the era base
+    # (Classical 60, Medieval 120, Renaissance 240, Industrial 420, Modern 660,
+    # Atomic 960, Information 1320) and Ancient/Future mirror their neighbour.
+    ct = rr["gpCostTable"]
+    assert len(ct) == 9 and all(len(row) == 9 for row in ct), f"cost table shape: {len(ct)}"
+    assert [row[0] for row in ct] == [60, 60, 120, 240, 420, 660, 960, 1320, 1320],         f"era base costs: {[row[0] for row in ct]}"
+    assert ct[4][2] == 1075, f"the page's own worked example (420 x 1.6^2): {ct[4][2]}"
+    # the art classes and the Prophet do not scale
+    assert rr["gpFlatCost"] == [0, 0, 0, 1, 1, 0, 0, 1, 1], f"flat-cost classes: {rr['gpFlatCost']}"
 
     # --- Writer/Musician classes -> n_gp = 9 -------------------------------
     cd = rr["gpClassDistrict"]
     assert len(cd) == 9, f"expected 9 GP classes (Writer/Musician added), got {len(cd)}"
-    assert rr["gpRoster"] == [4] * 9, f"per-class rosters must stay rectangular: {rr['gpRoster']}"
+    assert rr["gpRoster"] == [24, 21, 24, 16, 23, 23, 27, 29, 18],         f"the nine sourced rosters: {rr['gpRoster']}"
+    # nobody is Ancient, the Artists start in the Renaissance, the Musicians in
+    # the Industrial era, and the Prophets run out after the Renaissance.
+    assert min(min(c) for c in rr["gpEra"]) == 1, "no Great Person is Ancient"
+    assert rr["gpEra"][4][0] == 3 and rr["gpEra"][8][0] == 4, "Artist/Musician first eras"
+    assert rr["gpFirstOfEra"][3][4] == rr["gpRoster"][3], "Industrial: no more Great Prophets"
+    for c, fe in enumerate(rr["gpFirstOfEra"]):
+        assert fe == sorted(fe) and fe[0] == 0, f"class {c} era index must ascend from 0"
     # GP_CLASSES order: SCIENTIST,ENGINEER,MERCHANT,PROPHET,ARTIST,ADMIRAL,
     # GENERAL,WRITER,MUSICIAN. The three culture classes share the Theater
     # Square district index; PROPHET keeps index 3 (prophetCls).
@@ -59,7 +73,8 @@ def main() -> None:
     assert sim._gp_nc == 9, f"engine n_gp must be 9, got {sim._gp_nc}"
     assert sim.gp_earned.shape[1] == 9 and sim.civ_gpp.shape[2] == 9
     assert sim.civ_gpp.shape[2] == 9, "civ gpp tensor must be n_gp wide"
-    assert list(sim._gp_costs.tolist()) == [float(x) for x in ladder]
+    assert [int(x) for x in sim._gp_cost_table[:, 0].tolist()] == [row[0] for row in ct]
+    assert sim._gp_era.shape[1] == max(rr["gpRoster"]) and sim._gp_effects.shape[1] == sim._gp_era.shape[1]
 
     # --- enhancer race state is wired (mirror of follower/founder) ---------
     assert sim._enh_any, "enhancer pool must be non-empty"
@@ -129,26 +144,49 @@ def main() -> None:
         sim.city_pressure[:, 1:sim.n_majors].zero_()
         sim.city_followed[:, 1:sim.n_majors].fill_(-1)
 
-    # --- ladder-boundary clamp (past the roster the top era holds) ---------
-    top = sim._gp_costs.shape[0] - 1
-    probe = torch.tensor([top, top + 5, 99])  # indices past the end
-    costs = sim._gp_costs[probe.clamp(max=top)]
-    assert bool((costs == 750.0).all()), "past-ladder cost must clamp to 750"
+    # --- the price a class pays depends on how far the WORLD is behind it ---
+    # A SCIENTIST (class 0, which scales) at queue position 0 is Classical: at
+    # an Ancient world era the difference is 1 and the price is 78, and once the
+    # world reaches Classical it drops to the 60 base. A flat class ignores it.
+    _we = sim._world_era()
+    assert bool((_we == 0).all()), f"a fresh fixture must be Ancient: {_we.tolist()}"
+    _at0 = torch.zeros(sim.B, dtype=torch.long, device=sim.device)
+    assert bool((sim._gp_cost(0, _at0, _we) == 78.0).all()), "Classical Scientist, Ancient world"
+    assert bool((sim._gp_cost(0, _at0, _we + 1) == 60.0).all()), "the world catches up"
+    assert bool((sim._gp_cost(3, _at0, _we) == 60.0).all()), "the Prophet never scales"
+
+    # --- the ERA GATE: a class whose roster the world has passed offers nobody
+    _pc = int(rr["prophetCls"])
+    assert int(sim._gp_first_of_era[_pc][4]) == int(sim._gp_roster[_pc]),         "Industrial: no more Great Prophets"
+    sim.gp_next[:, _pc] = 0
+    sim.gp_earned[:, _pc] = 0
+    _pro0 = sim.civ_prophets[:, 0].clone()
+    sim.civ_gpp[:, 0, _pc] = 100_000.0
+    for _r in range(sim.n_majors):
+        sim.civ_techs[:, _r, :] = True  # push the world era past the roster
+        sim.civ_civics[:, _r, :] = True
+    sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
+    assert int(sim.gp_earned[0, _pc]) == 0 and int(sim.gp_next[0, _pc]) == 0,         "an exhausted class must claim nobody, however fat the bank"
+    for _r in range(sim.n_majors):
+        sim.civ_techs[:, _r, :] = False
+        sim.civ_civics[:, _r, :] = False
+    sim.civ_prophets[:, 0] = _pro0
+    sim.civ_gpp[:, 0, _pc] = 0.0
 
     # --- a Writer (class 7) is earnable through the seat-0 advance loop,
     # proving the widened tensors flow end to end. Fresh turn 1: no districts
     # + no AMPHITHEATER, so both of the Writer's 2 Great Works OVERFLOW to the
-    # instant culture lump (2 works × first-era effect 45 = 90) and no slot is
-    # occupied.
+    # instant culture lump (2 works × the Classical lump 60 = 120) and no slot
+    # is occupied.
     if sim.districts_on:
         civic0 = sim.civ_civic_prog[:, 0].clone()
         earned0 = sim.gp_earned[:, 7].clone()
         gw0 = (sim.city_gw_writing[:, 0] + sim.city_gw_music[:, 0]).sum().item()
-        sim.civ_gpp[:, 0, 7] = 100.0  # >= gpCost(0) = 60
+        sim.civ_gpp[:, 0, 7] = 100.0  # >= the Writer's flat Classical 60
         sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
         assert bool((sim.gp_earned[:, 7] == earned0 + 1).all()), "Writer not earned"
         d_civic = (sim.civ_civic_prog[:, 0] - civic0)
-        assert bool((d_civic == 90.0).all()), f"Writer overflow lump wrong (want 2×45): {d_civic.tolist()}"
+        assert bool((d_civic == 120.0).all()), f"Writer overflow lump wrong (want 2×60): {d_civic.tolist()}"
         assert (sim.city_gw_writing[:, 0] + sim.city_gw_music[:, 0]).sum().item() == gw0, "no AMPHITHEATER -> no slotted work"
 
     # --- a seat-0 PROPHET banks its faith-column effect ---------------------
@@ -159,14 +197,14 @@ def main() -> None:
     if sim.districts_on:
         assert sim._gp_effects.shape[2] > 4, "gpEffects must carry the faith column"
         pc = int(rr["prophetCls"])  # 3
-        assert float(sim._gp_effects[pc, 0, 4]) == 100.0, "Confucius faith effect changed"
+        assert float(sim._gp_effects[pc, 0, 4]) == 60.0, "Confucius pays the Classical lump"
         faith0 = sim.civ_faith[:, 0].clone()
         pe0 = sim.gp_earned[:, pc].clone()
-        sim.civ_gpp[:, 0, pc] = 100.0  # >= gpCost(0) = 60, earns one Prophet
+        sim.civ_gpp[:, 0, pc] = 100.0  # >= the flat Classical 60, earns one Prophet
         sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
         assert bool((sim.gp_earned[:, pc] == pe0 + 1).all()), "Prophet not earned"
         d_faith = sim.civ_faith[:, 0] - faith0
-        assert bool((d_faith == 100.0).all()), f"seat-0 faith bank wrong: {d_faith.tolist()}"
+        assert bool((d_faith == 60.0).all()), f"seat-0 faith bank wrong: {d_faith.tolist()}"
 
     # snapshot/restore round-trips the GP tensors + the faith bank
     # and the enhancer race state (all registered in _MUTABLE).
@@ -179,6 +217,7 @@ def main() -> None:
     sim.city_followed[0, 0, 0] = 0
     snap = sim.snapshot()
     sim.gp_earned[:, 7] = 0
+    sim.gp_next[:, 7] = 0
     sim.civ_faith[:, 0] = -1.0
     sim.enh_claimed[0, 2] = False
     sim.civ_enhancer[0, 1] = -1
@@ -188,7 +227,8 @@ def main() -> None:
     sim.city_followed[0, 0, 0] = -1
     sim.restore(snap)
     assert int(sim.gp_earned[0, 7]) >= 1, "gp_earned not preserved across snapshot"
-    assert float(sim.civ_faith[0, 0]) >= 100.0, "faith not preserved across snapshot"
+    assert int(sim.gp_next[0, 7]) >= 1, "gp_next not preserved across snapshot"
+    assert float(sim.civ_faith[0, 0]) >= 60.0, "faith not preserved across snapshot"
     assert bool(sim.enh_claimed[0, 2]) and int(sim.civ_enhancer[0, 1]) == 2 and int(sim.claimed_e_n[0]) == 1, \
         "enhancer race state not preserved across snapshot"
     assert int(sim.holy_tile[0, 0]) == 42 and int(sim.city_pressure[0, 0, 0, 0]) == 5 and int(sim.city_followed[0, 0, 0]) == 0, \

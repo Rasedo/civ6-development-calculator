@@ -627,6 +627,13 @@ def poke_flank_support(rules, path, GALLEY):
     assert int(sup0) >= 1, "a civ naval ally must count for support"
     assert int(flank0) >= 1, "a naval unit the ATTACKER owns must count for flanking"
 
+    # "The attacker itself does not count" — by UNIT, not by tile. A religious
+    # attacker shares its tile with a military unit that flanks like any other,
+    # so only the attacker's own occupancy index drops out.
+    self_slot = torch.tensor([mine + sim.POOL_LO["major"]])
+    flank_self, _ = sim._flank_support(dtile, dseat, self_slot, aseat)
+    assert int(flank0) - int(flank_self) == 1, "the attacker itself must not flank"
+
     # CIV6: "embarked land units do not provide Flanking", but they "provide
     # Support like normal" — the one rule where the two part company.
     sim.major_unit_emb[0, ally] = True

@@ -461,7 +461,7 @@ def poke_gp_district_accrual(rules, rj, path):
 
     # prevent the shared-pool earn/consume from decrementing civ_only_gpp mid-phase
     for cls, _ in targets:
-        sim.gp_earned[:, cls] = int(sim._gp_roster[cls])
+        sim.gp_next[:, cls] = int(sim._gp_roster[cls])
 
     tiles = free_tiles(sim, len(targets))
     before = {}

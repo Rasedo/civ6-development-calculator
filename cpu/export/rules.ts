@@ -12,13 +12,13 @@
 import { TURN_LIMIT } from '../core/game';
 import { IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL, PARK_MIN_APPEAL, PARK_AMENITIES_OWNER,
   PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../data/improvements';
-import { SHIPWRECK_CIVIC } from '../core/units';
+import { SHIPWRECK_CIVIC, RELIGIOUS_HEAL_PER_FAITH } from '../core/units';
 import type { ImprovementId } from '../core/types';
 import { GENERAL_AURA_CS, GENERAL_AURA_RANGE, BARB_SCOUT_OPENER_LIVE } from '../core/combat';
 import { GENERAL_AURA_MP } from '../core/aura';
 import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_HILL_CS, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD } from '../data/cityStates';
 import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_BUILDINGS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_YIELD, CITY_STATE_MAX_HP, CITY_STATE_MEET_RANGE, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
-import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, RELIC_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_CULTURE, ARTIFACT_TOURISM, THEMING_MULT, ARTIST_WORKS, SPECIALIST_YIELDS, SPECIALIST_TIERS } from '../data/greatPeople';
+import { GP_CLASSES, GREAT_PEOPLE, GP_ERA_GPP, GP_FIRST_OF_ERA, GP_FLAT_COST_CLASSES, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, RELIC_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_CULTURE, ARTIFACT_TOURISM, THEMING_MULT, ARTIST_WORKS, SPECIALIST_YIELDS, SPECIALIST_TIERS } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, MARTYR_CHANCE, type BeliefEffects } from '../data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -28,7 +28,7 @@ import { MAX_CITIES_PER_SEAT, CITY_SLOTS_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_T
 import { WONDER_TOURISM_BASE } from '../core/city';
 import { BALANCED_WEIGHTS } from '../core/score';
 import { unitActionNames } from '../core/unitActions';
-import { MAX_BARB_PER_CAMP, BARB_HORSE_RANGE, CLASS_MELEE_VS_ANTICAV, CLASS_ANTICAV_VS_CAV, FLANK_SUPPORT_CIVIC, AMPHIBIOUS_ATTACK_CS } from '../core/combat';
+import { MAX_BARB_PER_CAMP, BARB_HORSE_RANGE, CLASS_MELEE_VS_ANTICAV, CLASS_ANTICAV_VS_CAV, FLANK_SUPPORT_CIVIC, AMPHIBIOUS_ATTACK_CS, FORT_DEFENSE_CS, THEO_HOLY_GROUND_STRENGTH, THEO_HOLY_CITY_STRENGTH } from '../core/combat';
 import { UNITS, UNIT_HP, CITY_MAX_HP, WALLS_TIER_HP, WALLS_TIER_CS, WALLS_TIER_URBAN, URBAN_DEFENSES_TECH, REPAIR_QUIET_TURNS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, ENCAMPMENT_HP } from '../data/units';
 import { YIELD_KEYS } from '../core/types';
 import { FLOOD_SEVERITY_P, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn } from '../data/disasters';
@@ -386,7 +386,13 @@ export function buildRules() {
       loyaltyRange: LOYALTY_RANGE,
       loyaltyScale: LOYALTY_PRESSURE_SCALE,
       loyaltyAmenity: ['Ecstatic', 'Happy', 'Content', 'Displeased', 'Unhappy'].map((n) => LOYALTY_AMENITY[n] ?? 0),
-      gpCosts: Array.from({ length: 8 }, (_, n) => gpCost(n)),
+      // the ERA space the queue and its price both live in. The cost table is
+      // computed HERE so both engines read the same floored doubles:
+      // [person era][eras the world is behind them].
+      gpCostTable: GP_ERA_GPP.map((base) => GP_ERA_GPP.map((_, d) => Math.floor(base * (1 + 0.3 * d) ** d))),
+      gpEra: GP_CLASSES.map((c) => GREAT_PEOPLE[c].map((p) => p.era)),
+      gpFirstOfEra: GP_CLASSES.map((c) => [...GP_FIRST_OF_ERA[c]]),
+      gpFlatCost: GP_CLASSES.map((c) => (GP_FLAT_COST_CLASSES.has(c) ? 1 : 0)),
       gpRoster: GP_CLASSES.map((c) => GREAT_PEOPLE[c].length),
       gpClassDistrict: GP_CLASSES.map((c) => PLACEABLE_DISTRICTS.indexOf(GP_CLASS_DISTRICT[c])),
       gpEffects: GP_CLASSES.map((c) =>
@@ -426,6 +432,9 @@ export function buildRules() {
       cityReligionAdderLive: CITY_RELIGION_ADDER_LIVE, // DEBT-2: inert pending its hunt
       theoPressureSwing: THEO_PRESSURE_SWING,
       theoPressureRange: THEO_PRESSURE_RANGE,
+      religiousHealPerFaith: RELIGIOUS_HEAL_PER_FAITH,
+      theoHolyGround: THEO_HOLY_GROUND_STRENGTH,
+      theoHolyCity: THEO_HOLY_CITY_STRENGTH,
       martyrChance: MARTYR_CHANCE,
       pantheons: Object.values(PANTHEONS).map(beliefRow),
       followers: Object.values(FOLLOWER_BELIEFS).map(beliefRow),
@@ -472,6 +481,11 @@ export function buildRules() {
         // improvement indices the wonder pays an amenity for, and the reach
         amenImp: (w.effects?.amenityPerImprovement?.improvements ?? []).map((i) => IMPROVEMENT_IDS.indexOf(i)),
         amenImpRange: w.effects?.amenityPerImprovement?.range ?? 0,
+        // improvement indices the HOLDING city is paid a yield for, and that yield
+        impY: (w.effects?.cityYieldPerImprovement?.improvements ?? []).map((i) => IMPROVEMENT_IDS.indexOf(i)),
+        impYYields: YIELD_KEYS.map((k) => w.effects?.cityYieldPerImprovement?.yields[k] ?? 0),
+        boostTechEra: w.effects?.boostTechsThroughEra ?? -1,
+        distGpp: w.effects?.districtGpPoints ?? 0,
         mult: YIELD_KEYS.map((k) => w.effects?.cityYieldMult?.[k] ?? 1),
         // adjacency requirement: -1 none, -2 CITY_CENTER, -3 required but
         // out-of-catalog (never placeable — Colosseum/Ruhr), else the
@@ -620,6 +634,7 @@ export function buildRules() {
       // and support at all
       classMeleeVsAnticav: CLASS_MELEE_VS_ANTICAV,
       classAnticavVsCav: CLASS_ANTICAV_VS_CAV,
+      fortDefenseCs: FORT_DEFENSE_CS,
       amphibiousAttackCs: AMPHIBIOUS_ATTACK_CS,
       flankSupportCivic: civicIdx.get(FLANK_SUPPORT_CIVIC) ?? -1,
       embarkLive: embarkState.live ? 1 : 0,

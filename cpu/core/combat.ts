@@ -21,7 +21,7 @@ import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, type Belief
 import { revealAround, unexploredByAll } from './fog';
 import { transferCity } from './phase';
 import type { RuleResult } from './rules';
-import { BARB_SEAT, NO_SEAT, allCities, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCiv, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat } from './seats';
+import { BARB_SEAT, NO_SEAT, allCities, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCiv, isTerritorial, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE, generalAuraMP } from './aura'; // the shared aura predicate
 // The ONE full-MP contract, so the barbarian phase's reset cannot
 // drift from every other seat's. units.ts already imports from here, so this
@@ -79,10 +79,11 @@ export function terrainDefense(tile: Tile): number {
   // water" — a NAVAL defender's terrain, since an embarked one defends at the
   // normalized CS that carries no terrain at all.
   if (tile.feature === 'REEF') d += 3;
-  if (tile.improvement === 'FORT') d += 4;
+  if (tile.improvement === 'FORT') d += FORT_DEFENSE_CS;
   return d;
 }
 
+export const FORT_DEFENSE_CS = 4; // the FORT improvement, physical and theological alike
 export const RIVER_ATTACK_PENALTY = 5; // melee across a river, attacker CS −5
 /**
  * CIV6: "Damage of wounded units is diminished... The formula is
@@ -304,6 +305,36 @@ function nearFollowingCity(state: GameState, tile: Tile, g: number): boolean {
     if (hexDistance(tile.col, tile.row, t.col, t.row) <= JUST_WAR_RANGE) return true;
   }
   return false;
+}
+
+export const THEO_HOLY_GROUND_STRENGTH = 5;
+export const THEO_HOLY_CITY_STRENGTH = 15;
+
+/**
+ * CIV6 (Theological combat): the LOCATION bonuses, "which are effective only
+ * when the unit is defending" — "being in the territory of a city following
+ * this religion confers a Holy Ground bonus of +5", "being in the territory of
+ * the Holy City of this religion confers a bonus of +15", and "being on a tile
+ * with a Fort, Alcazar, or other defensive tile improvement".
+ *
+ * PHYSICAL terrain does not count: "the terrain bonuses that apply have nothing
+ * to do with the physical qualities of the tile where the battle is fought —
+ * instead, they are related to whose territory this tile belongs to", and "it
+ * won't matter if the defending unit stays on a Hill or on the opposite bank of
+ * a River". The Fort is an IMPROVEMENT, which is why it survives that.
+ */
+export function theoDefenseStrength(state: GameState, defender: Unit, tile: Tile): number {
+  let bonus = tile.improvement === 'FORT' ? FORT_DEFENSE_CS : 0;
+  const g = unitReligion(state, defender);
+  const holder = cityAtTile(state, tile);
+  if (g < 0 || !holder) return bonus;
+  if (holder.followedReligion === g) bonus += THEO_HOLY_GROUND_STRENGTH;
+  const holy = seatOf(state, g)?.religion.holyTile;
+  if (holy != null && holy >= 0
+      && cityAtTile(state, state.map.tiles[holy])?.centerIndex === holder.centerIndex) {
+    bonus += THEO_HOLY_CITY_STRENGTH;
+  }
+  return bonus;
 }
 
 export function religionAttackCS(state: GameState, attacker: Unit, battleTileIndex: number): number {
@@ -1276,7 +1307,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   // BARBARIANS raid foreign improvements too; raiders keep pillaging
   // the seat 0 only (they never war the other seats).
   const here = tile();
-  const hereOwned = isCiv(tileSeat(here))
+  const hereOwned = isTerritorial(tileSeat(here))
     && (isBarbSeat(unit.seat) || civsAtWar(state, unitSeat(unit), tileSeat(here)));
   if (here.improvement && !here.pillaged && hereOwned) {
     here.pillaged = true;
@@ -1301,7 +1332,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   let target: Tile | null = null;
   let bestDist = 13;
   for (const t of map.tiles) {
-    const tOwned = isCiv(tileSeat(t))
+    const tOwned = isTerritorial(tileSeat(t))
       && (isBarbSeat(unit.seat) || civsAtWar(state, unitSeat(unit), tileSeat(t)));
     if (!tOwned) continue;
     const impJob = t.improvement !== null && !t.pillaged;
@@ -1324,12 +1355,18 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   if (!target) {
     let best: Tile | null = null;
     let bestKey = Infinity;
+    // The city scan is the MAJORS'. A city-state's ground is raided (`tOwned`
+    // above answers for it) but its CITY is not a march target: this walker
+    // beelines to the single nearest one and stops there, so counting minors
+    // parks every camp's units on the neighbouring minor and no barbarian
+    // reaches a major again. The distance term still carries a seat field wide
+    // enough for a 100+ id, which is what the GPU key packs.
     for (const other of state.seats) {
       if (other.seat === unit.seat) continue;
       if (!capsOf(unit.seat).alwaysHostile && !civsAtWar(state, unitSeat(unit), other.seat)) continue;
       for (const oc of other.cities) {
         const t = map.tiles[oc.centerIndex];
-        const key = hexDistance(here.col, here.row, t.col, t.row) * (2048 * 8)
+        const key = hexDistance(here.col, here.row, t.col, t.row) * (2048 * 256)
           + other.seat * 2048
           + oc.centerIndex;
         if (key < bestKey) {

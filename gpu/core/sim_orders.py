@@ -961,9 +961,10 @@ class SimOrders:
                 continue
             arangeT = self._arangeT
             if self.improvements_on or self.districts_on:
-                # `isCiv(tileSeat(t))` — owned by ANY major. A barbarian is
-                # hostile to all of them, so no war term joins it.
-                _owned = (self.tile_seat >= 0) & (self.tile_seat < self.n_majors)  # [B, T]
+                # `isTerritorial(tileSeat(t))` — owned by any major or
+                # city-state. A barbarian is hostile to all of them, so no war
+                # term joins it.
+                _owned = (self.tile_seat >= 0) & (self.tile_seat < BARB_SEAT)  # [B, T]
                 imp_job = (self.improvement >= 0) & ~self.pillaged & _owned  # [B, T]
                 if self.districts_on:  # pillageable districts join the union
                     imp_job = imp_job | ((self.district >= 0) & self.district_complete & ~self.district_pillaged & _owned)
@@ -974,15 +975,19 @@ class SimOrders:
             else:
                 has_imp = torch.zeros_like(act)
                 imp_tgt = here.clamp(min=0)
-            # BARBARIANS MARCH ON ANYONE — every major's cities, on the TS
-            # key: distance, then the seat id, then the centre tile
-            # (`caps.alwaysHostile`, so no war term). ONE argmin over the whole
-            # city block: the key is unique per live city, so the winner is the
-            # same one a slot-by-slot scan would have kept.
+            # BARBARIANS MARCH ON A MAJOR — `hostileUnitAct`'s city scan, on
+            # its key: distance, then the seat id, then the centre tile
+            # (`caps.alwaysHostile`, so no war term). A city-state's GROUND is
+            # raided, its CITY is not a target: this walker beelines to the
+            # single nearest one, so counting minors parks every camp on the
+            # neighbouring minor. ONE argmin over the major block: the key is
+            # unique per live city, so the winner is the same one a
+            # slot-by-slot scan would have kept.
+            _M0 = self.n_majors * self.RC
             _cc = self.city_center[:, :self.n_majors].reshape(B, -1).clamp(min=0)  # [B, M]
             _ca = self.city_alive[:, :self.n_majors].reshape(B, -1)                # [B, M]
             _d2 = self.pair_dist[here.clamp(min=0).unsqueeze(1), _cc].to(torch.long)
-            _key = torch.where(_ca, _d2 * (2048 * 8) + self._march_seatkey + _cc,
+            _key = torch.where(_ca, _d2 * (2048 * 256) + self._march_seatkey[:_M0] + _cc,
                                torch.full_like(_d2, 10**18))
             ckey_min, _cwin = _key.min(dim=1)
             city_tgt = torch.where(ckey_min < 10**18,

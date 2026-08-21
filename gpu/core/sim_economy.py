@@ -468,7 +468,7 @@ class SimEconomy:
 
         r = self._next_random(every)
         hit, tile = self._pick_static(r < 0.05, self._flood_list)
-        self._flood_tile(hit, tile)
+        self._flood_river(hit, tile)
 
         er_rows, er_volc = [], []
         for k in range(self.volcano_tile.shape[1]):
@@ -517,19 +517,12 @@ class SimEconomy:
             on = valid & self.desert[rowm, af.clamp(min=0)]
             self._fertilize(rowm[on], af[on])
 
-    def _flood_tile(self, hit: torch.Tensor, tile: torch.Tensor) -> None:
-        """`floodTile` — ONE river flood on one Floodplains tile.
-
-        CIV6: a flood "damages or destroys Districts, improvements, and units on
-        the Floodplains tiles near the River. This may also include a City
-        Center, in which case it loses some HP and Defenses... May kill some
-        Citizens in a nearby city... Can fertilize affected tiles." The severity
-        ladder decides every magnitude, and the Great Bath cancels the damage
-        half while halving the fertility half.
-
-        EIGHT draws, always, whatever the tile holds — the count depends on the
-        flood alone, so the two engines cannot slip apart on what stood there.
-        """
+    def _flood_river(self, hit: torch.Tensor, tile: torch.Tensor) -> None:
+        """`floodRiver` — CIV6 (Flood): "The level of the water rises, flooding
+        all Floodplains tiles found along the River, and then recedes on the
+        next turn." ONE severity for the whole flood, then every Floodplains
+        tile the river reaches takes the effects at that severity, in ascending
+        tile order so the draw stream is the TS walk's."""
         B, dev = self.B, self.device
         r_sev = self._next_random(hit)
         sev = torch.zeros(B, dtype=torch.long, device=dev)
@@ -538,6 +531,41 @@ class SimEconomy:
             lo, acc = acc, acc + p
             sev = torch.where((r_sev >= lo) & (r_sev < acc), torch.full_like(sev, i), sev)
         sev = torch.where(r_sev >= acc, torch.full_like(sev, len(self._flood_sev_p) - 1), sev)
+        if not bool(hit.any()):
+            return
+        tc = tile.clamp(min=0)
+        comp0 = self.river_comp.gather(1, tc.unsqueeze(1))  # [B, 1]
+        reach = (
+            (self.river_comp == comp0) & (comp0 >= 0)
+            & self.floodplain & hit.unsqueeze(1)
+        )
+        # a Floodplains tile carrying no river at all floods alone
+        reach[torch.arange(B, device=dev), tc] |= hit
+        order = reach.long().cumsum(dim=1) * reach.long()  # 1-based rank, 0 off-reach
+        for k in range(1, int(order.max()) + 1):
+            at = order == k
+            hit_k = at.any(dim=1)
+            if not bool(hit_k.any()):
+                break
+            tile_k = at.long().argmax(dim=1)
+            self._flood_tile(hit_k, torch.where(hit_k, tile_k, torch.full_like(tile_k, -1)), sev)
+
+    def _flood_tile(self, hit: torch.Tensor, tile: torch.Tensor, sev: torch.Tensor) -> None:
+        """`floodTile` — ONE river flood on one Floodplains tile, at the
+        severity its whole flood rolled.
+
+        CIV6: a flood "damages or destroys Districts, improvements, and units on
+        the Floodplains tiles near the River. This may also include a City
+        Center, in which case it loses some HP and Defenses... May kill some
+        Citizens in a nearby city... Can fertilize affected tiles." The severity
+        ladder decides every magnitude, and the Great Bath cancels the damage
+        half while halving the fertility half.
+
+        SEVEN draws per tile, always, whatever the tile holds — the count
+        depends on the flood alone, so the two engines cannot slip apart on
+        what stood there.
+        """
+        B, dev = self.B, self.device
         r_destroy = self._next_random(hit)
         r_district = self._next_random(hit)
         r_damage = self._next_random(hit)
@@ -1465,7 +1493,58 @@ class SimEconomy:
                torch.where(here != NO_SEAT, torch.full_like(t, 5), torch.full_like(t, 10))))
         if camp is not None:
             heal = torch.where(camp & ~home, torch.full_like(t, 20), heal)
-        return heal + self._emergency_heal_mp(pre, seat, here)
+        heal = heal + self._emergency_heal_mp(pre, seat, here)
+        # a RELIGIOUS unit heals by its own rule and by nothing above it
+        _rel = self._rel_strength[getattr(self, f"{pre}_unit_type").clamp(min=0)] > 0
+        if bool(_rel.any()):
+            heal = torch.where(_rel, self._religious_heal(pre), heal)
+        return heal
+
+    def _holy_site_faith(self) -> torch.Tensor:
+        """[B, T] long — each live Holy Site's OWN faith output: its adjacency
+        plus the faith of the buildings standing in it. Every other tile is 0.
+        The `holySiteFaith` twin, memoised on the effect version the district
+        adjacency itself is memoised on."""
+        if self._hs_faith_cache is not None and self._hs_faith_cache[0] == self._eff_version:
+            return self._hs_faith_cache[1]
+        B, T, dev = self.B, self.T, self.device
+        out = torch.zeros(B, T, dtype=torch.long, device=dev)
+        if self._hs_idx < 0:
+            self._hs_faith_cache = (self._eff_version, out)
+            return out
+        live = ((self.district == self._hs_idx) & self.district_complete
+                & ~self.district_pillaged)
+        if bool(live.any()):
+            out = self._district_adj_floor(self._hs_idx).long()
+            bf = torch.zeros(B, T, dtype=torch.long, device=dev)
+            for r in range(self.n_majors):
+                sl = self.city_slot_at(r)
+                mine = (self.tile_seat == r) & (sl >= 0)
+                if not bool(mine.any()):
+                    continue
+                fsum = (self.city_bldg[:, r].long()
+                        * self._b_hs_faith.reshape(1, 1, -1)).sum(dim=2)  # [B, RC]
+                bf = torch.where(mine, fsum.gather(1, sl.clamp(min=0)), bf)
+            out = torch.where(live, out + bf, torch.zeros_like(out))
+        self._hs_faith_cache = (self._eff_version, out)
+        return out
+
+    def _religious_heal(self, pre: str) -> torch.Tensor:
+        """[B, U] — `religiousHeal`. CIV6: religious units "Heal only when
+        standing on or next to a Holy Site in their own territory", at "3 times
+        the Faith output of the Holy Site"; the best site in reach, since "the
+        healing capability differs from one Holy Site to the next"."""
+        t = getattr(self, f"{pre}_unit_tile")
+        seat = getattr(self, f"{pre}_unit_seat")
+        B, U = t.shape
+        tc = t.clamp(min=0)
+        cand = torch.cat([tc.unsqueeze(2), self.neigh[tc]], dim=2)  # [B, U, 7]
+        on = (cand >= 0) & (t >= 0).unsqueeze(2)
+        cc = cand.clamp(min=0).reshape(B, -1)
+        f = self._holy_site_faith().gather(1, cc).reshape(B, U, 7)
+        own = self.tile_seat.gather(1, cc).reshape(B, U, 7) == seat.unsqueeze(2)
+        best = torch.where(on & own, f, torch.zeros_like(f)).amax(dim=2)
+        return best * self._relig_heal_per_faith
 
     def _emergency_heal_mp(self, pre: str, seat: torch.Tensor, here: torch.Tensor) -> torch.Tensor:
         """[B, U] — CIV6 (Military Emergency, success): "Member units gain +5
@@ -1559,6 +1638,14 @@ class SimEconomy:
         if nc:
             e = torch.maximum(e, (civics[:, :nc].long() * self._civic_era[:nc]).max(dim=1).values)
         return e
+
+    def _world_era(self) -> torch.Tensor:
+        """[B] — the `worldEraIndex` twin: the furthest era any major has
+        reached. -1 before anyone finishes anything."""
+        we = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        for r in range(self.n_majors):
+            we = torch.maximum(we, self._civ_era(self.civ_techs[:, r], self.civ_civics[:, r]))
+        return we
 
     def _row_era(self, row) -> torch.Tensor:
         """[B] — `civEraIndex(seatOf(state, seat).research)` for an arbitrary
@@ -2104,6 +2191,9 @@ class SimEconomy:
             bld_y = bld_y + _reg[0][:, sl]
         if compw is not None and bool(compw.any()):
             bld_y = bld_y + compw.double() @ self._wond_cy
+            _impy = self._wonder_improvement_yields(row)
+            if _impy is not None:
+                bld_y = bld_y + _impy[:, sl]
             if fol_live:
                 bld_y[:, :, 5] = bld_y[:, :, 5] + self._fol_tab("fpw", fol_id) * compw.sum(dim=2).double()
         # Slotted GREAT WORKS (culture/turn per work BY KIND), ARTIFACT culture,

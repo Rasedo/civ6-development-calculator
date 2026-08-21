@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { BUILT_WONDERS } from '../../../cpu/data/builtWonders';
 import { makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
-import { seatOf } from '../../../cpu/core/seats';
+import { seatOf, setTileOwner } from '../../../cpu/core/seats';
+import { ERAS, TECHS } from '../../../cpu/data/techs';
+import { completeQueueItem } from '../../../cpu/core/production';
 import { computeCityStats, computeHousing, seatTourism } from '../../../cpu/core/city';
 import { greatPersonPointsPerTurn } from '../../../cpu/core/greatPeople';
 import { wonderExtraSlots } from '../../../cpu/core/effects';
@@ -188,5 +190,59 @@ describe('wonder effects, sourced', () => {
   it('the Statue of Liberty keeps a city in range at full loyalty', () => {
     expect(BUILT_WONDERS.STATUE_OF_LIBERTY.effects?.loyaltyAura).toBe(6);
     expect(BUILT_WONDERS.STATUE_OF_LIBERTY.effects?.dvp).toBe(4);
+  });
+
+  it('Ruhr Valley pays production per Mine and Quarry the city owns', () => {
+    // CIV6: "+1 Production for each Mine and Quarry in this city."
+    const { state, city } = oneCity();
+    stand(state, city, 'RUHR_VALLEY', 9, 8);
+    // read the BUILDINGS bucket: the improvements also change what the tiles
+    // pay, and the wonder's own +20% multiplies the total.
+    const before = computeCityStats(state, city).breakdown.buildings.production;
+    const mine = tileAtCoords(state.map, 7, 8);
+    const quarry = tileAtCoords(state.map, 7, 9);
+    const other = tileAtCoords(state.map, 6, 8);
+    mine.improvement = 'MINE';
+    quarry.improvement = 'QUARRY';
+    other.improvement = 'FARM';
+    expect(computeCityStats(state, city).breakdown.buildings.production - before).toBe(2);
+    // a PILLAGED one produces nothing
+    mine.pillaged = true;
+    expect(computeCityStats(state, city).breakdown.buildings.production - before).toBe(1);
+    // ...and neither does one another city owns
+    mine.pillaged = false;
+    setTileOwner(mine, 1);
+    expect(computeCityStats(state, city).breakdown.buildings.production - before).toBe(1);
+  });
+
+  it('the Oracle gives every district in its city +2 points of its own type', () => {
+    // CIV6: "Districts in this city provide +2 Great Person points of their type."
+    const { state, city } = oneCity();
+    const site = tileAtCoords(state.map, 9, 9);
+    site.district = 'CAMPUS';
+    site.districtComplete = true;
+    city.districts.push({ type: 'CAMPUS', tileIndex: site.index });
+    const before = greatPersonPointsPerTurn(state, 0).SCIENTIST;
+    expect(before).toBe(1); // the bare district
+    stand(state, city, 'ORACLE', 9, 8);
+    expect(greatPersonPointsPerTurn(state, 0).SCIENTIST).toBe(before + 2);
+    // a class whose district the city does NOT hold is paid nothing
+    expect(greatPersonPointsPerTurn(state, 0).MERCHANT).toBe(0);
+  });
+
+  it('the Great Library boosts every Ancient and Classical technology', () => {
+    // CIV6: "Receive boosts to all Ancient and Classical era technologies."
+    expect(BUILT_WONDERS.GREAT_LIBRARY.effects?.boostTechsThroughEra).toBe(1);
+    const { state, city } = oneCity();
+    const seat = seatOf(state, 0)!;
+    const early = Object.entries(TECHS).filter(([, d]) => ERAS.indexOf(d.era) <= 1).map(([id]) => id);
+    const later = Object.entries(TECHS).filter(([, d]) => ERAS.indexOf(d.era) > 1).map(([id]) => id);
+    seat.research.techs = [early[0]]; // already researched: no eureka for it
+    const wt = stand(state, city, 'GREAT_LIBRARY', 9, 8);
+    completeQueueItem(state, city,
+      { kind: 'wonder', wonder: 'GREAT_LIBRARY', tileIndex: wt, progress: 0 }, 0);
+    for (const id of early.slice(1)) expect(seat.research.boosted).toContain(id);
+    expect(seat.research.boosted).not.toContain(early[0]);
+    for (const id of later) expect(seat.research.boosted).not.toContain(id);
   });
 });

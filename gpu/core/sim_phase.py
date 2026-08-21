@@ -511,6 +511,18 @@ class SimPhase:
                     ft[wr] = self._wond_freetech[wi[wr]]
                     fc[wr] = self._wond_freeciv[wi[wr]]
                     self._grant_free_research(row, ft, fc)
+                # CIV6 (Great Library): "Receive boosts to all Ancient and
+                # Classical era technologies" — one eureka per technology not
+                # already boosted or researched, each a Free Inquiry event.
+                if int((self._wond_boost_era >= 0).sum()) > 0:
+                    be = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+                    be[wr] = self._wond_boost_era[wi[wr]]
+                    if bool((be >= 0).any()):
+                        nt = min(self.civ_tech_boosted.shape[2], self._tech_era.numel())
+                        want = (self._tech_era[:nt].reshape(1, -1) <= be.reshape(-1, 1)) & (be >= 0).reshape(-1, 1)
+                        newly = want & ~self.civ_techs[:, row, :nt] & ~self.civ_tech_boosted[:, row, :nt]
+                        self.civ_tech_boosted[:, row, :nt] |= newly
+                        self._dedication_event(row, 1, newly.sum(dim=1))
 
         if self._proj_rows:
             made_p = done & (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
@@ -755,10 +767,27 @@ class SimPhase:
         self._advance_great_people(row, active)
         self._seat_belief_claims(row, active)
 
+    def _gp_cost(self, cls: int, at: torch.Tensor, world_era: torch.Tensor) -> torch.Tensor:
+        """[B] float64 — what the person at queue position `at` costs. CIV6:
+        "GPP cost = base cost * (1 + 0.3 * difference in era) ^ difference in
+        era", the difference measured from the WORLD era and never negative;
+        art-related People and the Great Prophet stay at the base."""
+        p_era = self._gp_era[cls, at].clamp(min=0, max=8)
+        d = (p_era - world_era).clamp(min=0, max=8)
+        if bool(self._gp_flat_cost[cls]):
+            d = torch.zeros_like(d)
+        return self._gp_cost_table[p_era, d]
+
     def _advance_great_people(self, row: int, active: torch.Tensor) -> None:
         if self._gp_nc == 0:
             return
         B, dev = self.B, self.device
+        world_era = self._world_era()
+        # CIV6 (Oracle): "Districts in this city provide +2 Great Person points
+        # of their type" — the HOLDING city's own districts only.
+        dgpp = (self._city_wonder_flat(row, self._wond_distgpp)
+                if self._wond_n and float(self._wond_distgpp.sum()) != 0.0
+                else torch.zeros(B, 1, dtype=torch.float64, device=dev))
         for cls in range(self._gp_nc):
             d_cls = int(self._gp_class_district[cls]) if cls < self._gp_nc else -1
             if d_cls >= 0 and self.districts_on:
@@ -773,7 +802,7 @@ class SimPhase:
                     gflat = self._bel_add("gpp", row)[:, cls].double().unsqueeze(1)
                 else:
                     gflat = torch.zeros(B, 1, dtype=torch.float64, device=dev)
-                pts = (comp_c.double() * (1.0 + gflat + nb_of.double())).sum(dim=1)
+                pts = (comp_c.double() * (1.0 + gflat + dgpp + nb_of.double())).sum(dim=1)
             else:
                 pts = torch.zeros(B, dtype=torch.float64, device=dev)
             if cls == self._prophet_cls:
@@ -789,19 +818,21 @@ class SimPhase:
                 active & (pts > 0), self.civ_gpp[:, row, cls] + pts, self.civ_gpp[:, row, cls]
             )
             maxN = self._gp_effects.shape[1]
+            floor_c = self._gp_first_of_era[cls][world_era.clamp(min=0, max=8)]
             for _ in range(maxN):
-                earned_c = self.gp_earned[:, cls]
-                has_person = earned_c < self._gp_roster[cls]
-                gcost = self._gp_costs[earned_c.clamp(max=self._gp_costs.shape[0] - 1)]
+                # the OFFER: never behind the queue, never behind the era gate
+                at_c = torch.maximum(self.gp_next[:, cls], floor_c)
+                has_person = at_c < self._gp_roster[cls]
+                gcost = self._gp_cost(cls, at_c.clamp(max=maxN - 1), world_era)
                 hit = active & has_person & (self.civ_gpp[:, row, cls] >= gcost)
                 if not bool(hit.any()):
                     break
                 hf = hit.to(torch.float64)
-                eff = self._gp_effects[cls, earned_c.clamp(max=maxN - 1)]
+                eff = self._gp_effects[cls, at_c.clamp(max=maxN - 1)]
                 self.civ_tech_prog[:, row] = self.civ_tech_prog[:, row] + eff[:, 0].double() * hf
                 _kind = self._gw_cls.index(cls) if cls in self._gw_cls else -1
                 if _kind >= 0:
-                    self._place_works(row, hit, eff[:, 1].double(), _kind, earned_c)
+                    self._place_works(row, hit, eff[:, 1].double(), _kind, at_c)
                 else:
                     self.civ_civic_prog[:, row] = self.civ_civic_prog[:, row] + eff[:, 1].double() * hf
                 self.civ_treasury[:, row] = self.civ_treasury[:, row] + eff[:, 2].double() * hf
@@ -823,6 +854,7 @@ class SimPhase:
                     self.civ_prophets[:, row] = self.civ_prophets[:, row] + hit.long()
                 self.civ_gpp[:, row, cls] = torch.where(hit, self.civ_gpp[:, row, cls] - gcost, self.civ_gpp[:, row, cls])
                 self.gp_earned[:, cls] = self.gp_earned[:, cls] + hit.long()
+                self.gp_next[:, cls] = torch.where(hit, at_c + 1, self.gp_next[:, cls])
                 self._add_era_score(row, self._era_pts["gp"], hit.long())  # per GP earned
                 # A GENERAL/ADMIRAL claim spawns its support unit
                 # (civilian, 4 MP) at the seat's capital (city_is_cap

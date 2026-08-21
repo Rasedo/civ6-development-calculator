@@ -204,6 +204,59 @@ def main() -> None:
         assert bool(s2.war[b, 0, crow]), "...and the apply refuses it too"
     print("  d the war head's MINOR half: met, declare, the clock, the free peace, the suzerain block")
 
+    # --- 5) the WAR MARCH reaches a minor ------------------------------------
+    # A seat that declares on a city-state has to have somewhere to walk: the
+    # target scan runs the minor rows exactly like the major ones, and the
+    # PILLAGE column opens on the minor's ground only once the war stands.
+    s5 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    for _ in range(20):
+        s5.step()
+    cs5 = next(s for s in range(s5.S) if bool(s5.citystate_alive[0, s]))
+    crow5 = s5.row_of(100 + cs5)
+    ctr5 = int(s5.citystate_center[0, cs5])
+    here = next(int(t) for t in range(s5.T)
+                if int(s5.pair_dist[ctr5, t]) == 5 and not bool(s5.water[0, t]))
+    hc = torch.full((s5.B,), here, dtype=torch.long, device=s5.device)
+
+    s5.war[:, 0, :] = False
+    s5.war[:, :, 0] = False
+    _t0, _i0, _c0 = s5._war_march_target(hc, 0)
+    assert not bool(_i0[0] or _c0[0]), "at peace with everyone there is nothing to march on"
+
+    s5.war[:, 0, crow5] = True
+    s5.war[:, crow5, 0] = True
+    tgt, has_i, has_c = s5._war_march_target(hc, 0)
+    assert bool(has_i[0] or has_c[0]), "a declared minor war left the walker no target"
+    # the minor's OWN ground is what it found — its centre, or an improvement
+    # or district on a tile the minor holds
+    t5 = int(tgt[0])
+    assert int(s5.tile_seat[0, t5]) == 100 + cs5, \
+        f"the march target sits on seat {int(s5.tile_seat[0, t5])}, not the minor"
+
+    # the PILLAGE column follows the same war: a minor's improvement is not
+    # free to wreck at peace.
+    ground = next((int(t) for t in range(s5.T)
+                   if int(s5.tile_seat[0, t]) == 100 + cs5 and t != ctr5), -1)
+    assert ground >= 0, "the minor holds no ground beside its centre"
+    s5.improvement[0, ground] = 0
+    s5.pillaged[0, ground] = False
+    slot = int(s5.major_unit_alive[0].nonzero()[0][0])
+    s5._vacate("major", torch.tensor([0]), torch.tensor([slot]))
+    s5.major_unit_tile[0, slot] = ground
+    s5.military_at[0, ground] = slot + s5.POOL_LO["major"]
+    s5.major_unit_seat[0, slot] = 0
+    s5.major_unit_mp[0, slot] = 2
+    smap = s5._seat_slot_map(0)
+    n5 = int((smap[0] == slot + s5.POOL_LO["major"]).nonzero()[0][0])
+    col = s5._A_PILLAGE
+    mask_war = s5._seat_unit_mask(0)
+    s5.war[:, 0, crow5] = False
+    s5.war[:, crow5, 0] = False
+    mask_peace = s5._seat_unit_mask(0)
+    assert bool(mask_war[0, n5, col]), "war with the minor must open PILLAGE on its ground"
+    assert not bool(mask_peace[0, n5, col]), "peace must shut it again"
+    print("  e the war march reaches a minor, and PILLAGE follows the same war")
+
     print("cs_war_test OK — a major<->city-state war gates the attack mask and rides the wire")
 
 

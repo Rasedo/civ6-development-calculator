@@ -197,6 +197,9 @@ export interface GameState {
    *  people are unique individuals, so the denial set is global. Each seat's
    *  own recruits are in `Seat.gpEarned`. */
   claimedGreatPeople: string[];
+  /** per GP class, the QUEUE POSITION the next recruit is offered from;
+   *  it steps PAST anyone the world era has already left behind. */
+  gpNext?: number[];
   unitsMode: boolean;
   units: Unit[];
   nextUnitId: number;

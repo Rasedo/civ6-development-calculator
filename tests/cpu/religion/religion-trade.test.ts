@@ -7,6 +7,7 @@ import { tileYields } from '../../../cpu/core/yields';
 import { makeYieldCtx } from '../../../cpu/core/effects';
 import { availableBuildings } from '../../../cpu/core/rules';
 import { tradeCapacity, addTradeRoute, routeYields, canAddTradeRoute } from '../../../cpu/core/trade';
+import { GREAT_PEOPLE } from '../../../cpu/data/greatPeople';
 
 function sandboxCity() {
   const state = makeState(makeMap(20, 20));
@@ -123,9 +124,9 @@ describe('founding a religion', () => {
     }, 0);
     state.sandbox = false;
     expect(canEnhanceReligion(state, 0).ok).toBe(false); // no prophet yet
-    state.claimedGreatPeople.push('GP_CONFUCIUS');
+    state.claimedGreatPeople.push(GREAT_PEOPLE.PROPHET[0].id);
     expect(canEnhanceReligion(state, 0).ok).toBe(false); // only one
-    state.claimedGreatPeople.push('GP_SIDDHARTHA');
+    state.claimedGreatPeople.push(GREAT_PEOPLE.PROPHET[1].id);
     expect(canEnhanceReligion(state, 0).ok).toBe(true); // second prophet
 
     // a civ already holding an enhancer excludes it from the pool

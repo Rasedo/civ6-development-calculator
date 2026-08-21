@@ -179,12 +179,14 @@
      "name": "greatPeopleByClass",
      "compare": "exact",
      "covers": [
-      "GameState.claimedGreatPeople"
+      "GameState.claimedGreatPeople",
+      "GameState.gpNext"
      ],
      "planes": [
-      "gp_earned"
+      "gp_earned",
+      "gp_next"
      ],
-     "note": "great people are drawn from ONE global pool on both engines, so the per-class recruited count is a game-level fact, not a per-seat one."
+     "note": "great people are drawn from ONE global pool on both engines, so the per-class QUEUE POSITION is a game-level fact, not a per-seat one. It is the position and not the count because the queue steps past anyone the world era has left behind; `claimedGreatPeople` is the id list that position walks."
     },
     {
      "name": "barbCamps",

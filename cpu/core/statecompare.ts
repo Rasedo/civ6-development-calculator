@@ -299,14 +299,11 @@ const GAME: Record<string, Extractor> = {
   pantheonsClaimed: (s) => [s.claimedPantheons.length],
   beliefsClaimed: (s) => [s.claimedBeliefs.length],
   enhancerBeliefsClaimed: (s) => [(s.claimedEnhancers ?? []).length],
-  greatPeopleByClass: (s) => {
-    const counts = GP_CLASSES.map(() => 0);
-    for (const id of s.claimedGreatPeople) {
-      const c = GP_CLASS_OF.get(id);
-      if (c !== undefined && c >= 0) counts[c] += 1;
-    }
-    return [counts];
-  },
+  greatPeopleByClass: (s) => [
+    GP_CLASSES.map((c) => s.claimedGreatPeople.filter(
+      (id) => GREAT_PEOPLE[c].some((p) => p.id === id)).length),
+    GP_CLASSES.map((_, i) => s.gpNext?.[i] ?? 0),
+  ],
   barbCamps: (s) => [[...s.barbSeat.camps].sort((a, b) => a - b)],
   cityCount: (s) => [civSeats(s).reduce((n, x) => n + x.cities.length, 0)],
   unitCount: (s) => [s.units.length],

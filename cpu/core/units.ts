@@ -15,7 +15,9 @@ import { isWater, isImpassable } from '../../world/query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
 import { tileAppeal } from './appeal';
 import { PARK_MIN_APPEAL } from '../data/improvements';
-import { isTechComplete, isCivicComplete } from './effects';
+import { isTechComplete, isCivicComplete, makeYieldCtx, type YieldCtx } from './effects';
+import { effectiveAdjacency } from './yields';
+import { BUILDINGS } from '../data/buildings';
 import { ARTIFACT_BUILDING, ARTIFACT_SLOTS } from '../data/greatPeople';
 import { clearCampFor } from './combat';
 import { emergencyHeal, emergencyMoveBonus } from './emergency';
@@ -32,7 +34,7 @@ import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { congressChopGold } from './congress';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { NO_SEAT, capsOf, campTiles, civHasStrategic, civsAtWar, seatOf, tileClaimed, tileSeat } from './seats';
+import { NO_SEAT, capsOf, campTiles, cityAtTile, civHasStrategic, civsAtWar, seatOf, tileClaimed, tileSeat } from './seats';
 import type { ImprovementId } from './types';
 
 const ok: RuleResult = { ok: true };
@@ -889,7 +891,50 @@ export function unitMaintenance(state: GameState, seat: number): number {
   );
 }
 
+/** CIV6 (Theological combat): "the HP gained per turn is equal to 3 times the
+ *  Faith output of the Holy Site". */
+export const RELIGIOUS_HEAL_PER_FAITH = 3;
+
+/** The FAITH a Holy Site district itself produces: its adjacency plus the faith
+ *  of the buildings standing in it. A pillaged or unfinished site produces
+ *  nothing, which is the same gate `cityDistrictYields` applies. */
+export function holySiteFaith(state: GameState, tile: Tile, ctx: YieldCtx): number {
+  if (tile.district !== 'HOLY_SITE' || !tile.districtComplete || tile.districtPillaged) return 0;
+  const city = cityAtTile(state, tile);
+  if (!city) return 0;
+  let faith = effectiveAdjacency(ctx, tile, 'HOLY_SITE');
+  for (const id of city.buildings) {
+    const def = BUILDINGS[id];
+    if (def?.district === 'HOLY_SITE') faith += def.yields?.faith ?? 0;
+  }
+  return faith;
+}
+
+/**
+ * CIV6 (Theological combat): "Injured religious units do not Heal in the normal
+ * way — that is, if they stay in one place, even inside your own territory,
+ * they will not regain lost HP. Instead, they Heal only when standing on or
+ * next to a Holy Site in their own territory. The parent city's religion is
+ * irrelevant." Several sites in reach heal at the best of them, since "the
+ * healing capability differs from one Holy Site to the next".
+ */
+export function religiousHeal(state: GameState, unit: Unit, ctx: YieldCtx): number {
+  const here = state.map.tiles[unit.tileIndex];
+  let best = 0;
+  for (const t of [here, ...neighbors(state.map, here)]) {
+    if (tileSeat(t) !== unit.seat) continue; // "in their own territory"
+    best = Math.max(best, holySiteFaith(state, t, ctx));
+  }
+  return RELIGIOUS_HEAL_PER_FAITH * best;
+}
+
 export function refreshUnits(state: GameState): void {
+  const ctxOf = new Map<number, YieldCtx>();
+  const yctx = (seat: number): YieldCtx => {
+    let c = ctxOf.get(seat);
+    if (!c) { c = makeYieldCtx(state, seat); ctxOf.set(seat, c); }
+    return c;
+  };
   for (const unit of state.units) {
     const tile = state.map.tiles[unit.tileIndex];
     const naval = !!UNITS[unit.type]?.naval;
@@ -907,13 +952,15 @@ export function refreshUnits(state: GameState): void {
     if (unit.movesLeft >= grantedLast) {
       const home = tileSeat(tile) === unit.seat;
       const onCamp = seatOf(state, unit.seat)?.camps.includes(unit.tileIndex) ?? false;
-      const heal = (home && tile.district === 'CITY_CENTER' ? 20
-        : home ? 15
-        : onCamp ? 20
-        : tileSeat(tile) === NO_SEAT ? 10
-        : 5)
-        // a won Military Emergency heals its members in that seat's ground
-        + emergencyHeal(state, unit.seat, tileSeat(tile));
+      const heal = (UNITS[unit.type]?.religiousStrength ?? 0) > 0
+        ? religiousHeal(state, unit, yctx(unit.seat))
+        : (home && tile.district === 'CITY_CENTER' ? 20
+          : home ? 15
+          : onCamp ? 20
+          : tileSeat(tile) === NO_SEAT ? 10
+          : 5)
+          // a won Military Emergency heals its members in that seat's ground
+          + emergencyHeal(state, unit.seat, tileSeat(tile));
       unit.hp = Math.min(UNIT_HP, unit.hp + heal);
     }
     // FORTIFY: the EXACT heal gate (movesLeft >= full = spent

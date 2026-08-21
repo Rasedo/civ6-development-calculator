@@ -1,4 +1,5 @@
 import type { GameState } from './types';
+import { civEraIndex } from './city';
 import { seatOf, isBarbSeat, isCiv } from './seats';
 import { seatWonderSum } from './wonders';
 import { UNITS } from '../data/units';
@@ -12,6 +13,18 @@ import { ERA_SCORE_MOMENT_MIN, DEDICATION_ERAS, DED_EVENT_SCORE, ERA_LENGTH, ERA
 /** Pay era score for `count` moments each worth `per`. CIV6 (Taj Mahal):
  *  a moment worth ERA_SCORE_MOMENT_MIN or more pays its owner one more,
  *  so the per-moment value has to survive as far as this call. */
+/** CIV6 (Great People): the WORLD era — "the era of the Great Person and the
+ *  World Era when the Great Person appears in the queue". The furthest any seat
+ *  has reached, which is also what the World Congress gates on. */
+export function worldEraIndex(state: GameState): number {
+  let era = -1;
+  for (const sx of state.seats) {
+    const e = civEraIndex(sx.research.techs, sx.research.civics);
+    if (e > era) era = e;
+  }
+  return era;
+}
+
 export function addEraScore(state: GameState, seat: number, per: number, count = 1): void {
   const s = seatOf(state, seat);
   if (!s || count <= 0) return;

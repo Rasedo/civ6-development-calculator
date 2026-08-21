@@ -170,10 +170,12 @@ def poke_seat0_spawn(rules, rj, path):
         sim.district_pillaged[0, dt] = False
         sim.tile_seat[0, dt] = 0
         sim.city_dist_tile[0, 0, 0, d] = dt  # accrual reads the seat-axis registry
-        # fund EXACTLY one person (gpCost(0)); the +1 district accrual keeps the
-        # leftover well under gpCost(1), so the claim loop fires exactly once.
+        # fund EXACTLY the offered person; the +1 district accrual keeps the
+        # leftover well under the NEXT one, so the claim loop fires once.
         sim.gp_earned[:, cls] = 0
-        sim.civ_gpp[0, 0, cls] = float(sim._gp_costs[0])
+        sim.gp_next[:, cls] = 0
+        _at0 = torch.zeros(sim.B, dtype=torch.long, device=sim.device)
+        sim.civ_gpp[0, 0, cls] = float(sim._gp_cost(cls, _at0, sim._world_era())[0])
         before = int((sim.major_unit_alive[0] & (sim.major_unit_type[0] == uidx)).sum())
         sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
         after = int((sim.major_unit_alive[0] & (sim.major_unit_type[0] == uidx)).sum())

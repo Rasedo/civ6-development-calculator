@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cityStateOfSeat, emptySeat, isCityStateSeat, seatOf, setTileOwner, tileSeat } from '../../../cpu/core/seats';
+import { cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, setTileOwner, tileSeat } from '../../../cpu/core/seats';
 import { settleAt, makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { tilesWithin } from '../../../world/hex';
@@ -7,7 +7,7 @@ import { canAddTradeRoute, freeTrader, tradeCapacity, addTradeRoute, addIntlTrad
 import { tradeWalkReachable, tradeWaterLevel, TRADE_WATER_NONE, TRADE_WATER_COAST } from '../../../cpu/core/units';
 import { isWater } from '../../../world/query';
 import { hexDistance } from '../../../world/hex';
-import { declareWar, seatPhase } from '../../../cpu/core/phase';
+import { applySeatActionRecord, declareWar, seatPhase, warTargets } from '../../../cpu/core/phase';
 import { routeCandidateRow } from '../../../cpu/driver/driver';
 import { spawnUnit, trainableUnits, traderCost } from '../../../cpu/core/units';
 import { UNITS } from '../../../cpu/data/units';
@@ -135,6 +135,26 @@ describe('international route yields', () => {
     expect(state.seats[0].tradeRoutes!.length).toBe(0);
     expect(cityTradeYields(state, origin).gold).toBe(0);
   });
+
+  it('the WAR COLUMN cancels the routes between the pair and recalls the Trader', () => {
+    const { state, origin } = twoCitySandbox();
+    const civ = addCiv(state, 12, 6);
+    addCompletedCampus(state, civ.cities[0], 12, 7);
+    expect(addIntlTradeRoute(state, origin.id, civ.seat, civ.cities[0].id, 0).ok).toBe(true);
+
+    const col = warTargets(state, 0).indexOf(civ.seat);
+    expect(col).toBeGreaterThanOrEqual(0);
+    state.unitsMode = true;
+    applySeatActionRecord(state, seatOf(state, 0)!, {
+      production: [], tech: null, civic: null, units: [], war: col,
+    });
+
+    expect(civsAtWar(state, 0, civ.seat)).toBe(true);
+    expect(state.seats[0].tradeRoutes!.length).toBe(0);
+    const recalled = state.units!.filter((u) => u.seat === 0 && u.type === 'TRADER');
+    expect(recalled.length).toBe(1);
+    expect(recalled[0]!.tileIndex).toBe(origin.centerIndex);
+  });
 });
 
 describe('route duration', () => {
@@ -181,7 +201,7 @@ describe('route duration', () => {
 });
 
 describe('civ international pick + income', () => {
-  it('a civ with spare capacity and no domestic/CS destination routes to the nearest seat-0 city', () => {
+  it('a civ with spare capacity routes to an explored seat-0 city', () => {
     const state = makeState(makeMap(24, 24));
     state.sandbox = true;
     const pcity = foundCity(state, tileAtCoords(state.map, 10, 10).index, 0).city!;
@@ -193,8 +213,8 @@ describe('civ international pick + income', () => {
     const civ = addCiv(state, 13, 10);
     expect(tradeCapacity(state, civ.seat)).toBeGreaterThanOrEqual(1);
 
-    // the pick is the DECIDER's now: the candidate row names the nearest
-    // explored seat-0 city, and the wire intent lands it through seatPhase.
+    // the pick is the DECIDER's now: the candidate row names an explored
+    // seat-0 city, and the wire intent lands it through seatPhase.
     const cand = routeCandidateRow(state, civ);
     expect(cand[0]).toBe(civ.cities[0].centerIndex);
     expect(cand[1]).toBe(pcity.centerIndex);
@@ -335,5 +355,46 @@ describe('the Trader unit', () => {
     }
     expect(onWater).toBe(true);
     expect(route.walkTile).toBe(across.centerIndex);
+  });
+});
+
+describe('the route candidate weighs every destination at once', () => {
+  it('an international city competes with a domestic one, it is not a fallback', () => {
+    const state = makeState(makeMap(24, 24));
+    state.sandbox = true;
+    // a two-city seat 0 — a DOMESTIC pair exists, so the old scan would never
+    // have looked abroad at all
+    const origin = foundCity(state, tileAtCoords(state.map, 6, 6).index, 0).city!;
+    const near = foundCity(state, tileAtCoords(state.map, 10, 6).index, 0).city!;
+    expandBorders(state, origin, 2);
+    expandBorders(state, near, 2);
+    origin.buildings.push('MARKET');
+    const civ = addCiv(state, 14, 6);
+
+    const cand = routeCandidateRow(state, state.seats[0]);
+    expect(cand[0]).toBe(origin.centerIndex);
+    // the foreign city pays INTL_ROUTE_GOLD + its districts; the domestic one
+    // pays 2 + 2*floor(districts/2), and the higher total takes the route
+    const intlSum = INTL_ROUTE_GOLD + specialtyDistricts(state, civ.cities[0]);
+    const domSum = 2 + 2 * Math.floor(specialtyDistricts(state, near) / 2);
+    expect(cand[1]).toBe(intlSum > domSum ? civ.cities[0].centerIndex : near.centerIndex);
+    expect(intlSum).toBeGreaterThan(domSum);
+  });
+
+  it('a foreign city out of trade range is no candidate at all', () => {
+    const state = makeState(makeMap(40, 24));
+    state.sandbox = true;
+    const origin = foundCity(state, tileAtCoords(state.map, 2, 6).index, 0).city!;
+    const near = foundCity(state, tileAtCoords(state.map, 6, 6).index, 0).city!;
+    expandBorders(state, origin, 2);
+    expandBorders(state, near, 2);
+    origin.buildings.push('MARKET');
+    const far = addCiv(state, 38, 20);
+    expect(hexDistance(
+      state.map.tiles[origin.centerIndex].col, state.map.tiles[origin.centerIndex].row,
+      state.map.tiles[far.cities[0].centerIndex].col,
+      state.map.tiles[far.cities[0].centerIndex].row)).toBeGreaterThan(TRADE_ROUTE_RANGE_LAND);
+    const cand = routeCandidateRow(state, state.seats[0]);
+    expect(cand[1]).toBe(near.centerIndex);
   });
 });

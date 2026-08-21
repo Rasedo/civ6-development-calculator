@@ -37,7 +37,7 @@ import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
 import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, borderGrowthCost } from '../data/constants';
 import type { CityStats } from './city';
-import { civEraIndex, computeCityStats, luxuryAmenities, pickBorderTile, acquireTile } from './city';
+import { computeCityStats, luxuryAmenities, pickBorderTile, acquireTile } from './city';
 import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressUdtProdDistrict, type CongressVoterCtx } from './congress';
 import { buyVotes } from './congress';
 import { CONGRESS_SPECIAL_SLOT, EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, emergencies, emergencyLoyalty, emergencyName, emergencyStrikeCS, raiseEmergency } from './emergency';
@@ -48,7 +48,7 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, archaeologistExcavate, naturalistPark } from './units';
 import { killUnit } from './combat';
-import { availableProjects, buyTile, buyWorshipBuilding, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseSettler, queueProject, settlerCost } from './game';
+import { availableProjects, buyTile, buyWorshipBuilding, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseSettler, queueProject, settlerCost, unitPurchaseCost } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex } from './unitActions';
 
@@ -56,8 +56,8 @@ const A_FOUND_CITY = unitActionIndex(IMPROVEMENT_IDS).FOUND_CITY;
 const A_EXCAVATE = unitActionIndex(IMPROVEMENT_IDS).EXCAVATE;
 const A_PARK = unitActionIndex(IMPROVEMENT_IDS).PARK;
 import { ALLY_MIN_PEACE, CIV_LEADERS, FORMAL_WAR_MIN_TURNS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
-import { addEraScore, agePressureFactor, governorPicks, governorTitles, goldenBoostBonus } from './eras';
-import { NO_SEAT, atWarWithAny, campTiles, citiesOf, civHasStrategic, civsAtWar, cityStateOfSeat, emptySeat, isCiv, isCityStateSeat, prophetsOf, seatOf, seatOfCityState, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
+import { addEraScore, agePressureFactor, governorPicks, governorTitles, goldenBoostBonus, worldEraIndex } from './eras';
+import { NO_SEAT, atWarWithAny, campTiles, citiesOf, civHasStrategic, civsAtWar, cityStateOfSeat, emptySeat, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, spreadFromUnit } from './unitOrders';
 import { navalKillEvent, buildingDedications, dedicationEvent, goldenDedication } from './eras';
@@ -676,11 +676,7 @@ function payEmergency(state: GameState, e: Emergency, membersWon: boolean): void
 export function worldCongress(state: GameState): void {
   const recorded = state.seats.map((sx) => sx.congressVote ?? null);
   for (const sx of state.seats) sx.congressVote = undefined;  // an intent is for THIS turn
-  let worldEra = -1;
-  for (const sx of state.seats) {
-    const e = civEraIndex(sx.research.techs, sx.research.civics);
-    if (e > worldEra) worldEra = e;
-  }
+  const worldEra = worldEraIndex(state);
   // A Special Session may sit on ANY turn once the Congress is open; a running
   // emergency is settled whether one sat or not.
   if (worldEra >= CONGRESS_MIN_ERA) specialSessions(state, recorded);
@@ -910,6 +906,10 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
           && treatyTurnsWith(state, actor.seat, foe) === 0) {
         setWar(state, actor.seat, foe, true);
         setWarTurnsWith(state, actor.seat, foe, 0);
+        // CIV6 (Trade Route): "When war is declared, any existing Trade Routes
+        // between the two civilizations are cancelled, and the Traders
+        // servicing them are immediately recalled to their origin cities."
+        cancelRoutesBetween(state, actor.seat, foe);
         actor.warmonger = (actor.warmonger ?? 0) + WARMONGER_DOW;
         const dt = actor.denounced[foe];
         const formal = dt !== undefined && state.turn - dt >= FORMAL_WAR_MIN_TURNS;
@@ -1085,7 +1085,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         // row onto a MISSIONARY, which pillaged a mine here and silently
         // no-opped on the GPU (9029 rng 2026006086 t239, esc +3600).
         if (!((UNITS[unit.type]?.combat ?? 0) > 0)) return;
-        const hereOwned = isCiv(tileSeat(here))
+        const hereOwned = isTerritorial(tileSeat(here))
           && civsAtWar(state, unitSeat(unit), tileSeat(here));
         if (here.improvement && !here.pillaged && hereOwned) {
           here.pillaged = true;
@@ -1362,7 +1362,7 @@ export function seatPhase(state: GameState): void {
           const def = UNITS[cand.id];
           if (!def) continue;
           if (def.requiresResource && !civHasStrategic(state, actor.seat, def.requiresResource)) continue;
-          if (!goldAffordable(actor.treasury ?? 0, def.cost * GOLD_PURCHASE_MULT)) continue;
+          if (!goldAffordable(actor.treasury ?? 0, unitPurchaseCost(state, cand.id, actor.seat))) continue;
           if (def.combat > pickCombat) {
             pickCombat = def.combat;
             pickId = cand.id;
@@ -1370,7 +1370,7 @@ export function seatPhase(state: GameState): void {
         }
         if (pickId) {
           const spawnCity = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
-          const price = UNITS[pickId].cost * GOLD_PURCHASE_MULT;
+          const price = unitPurchaseCost(state, pickId, actor.seat);
           const u = spawnUnit(state, pickId, spawnCity.centerIndex, actor.seat);
           if (u) {
             actor.treasury = (actor.treasury ?? 0) - price;

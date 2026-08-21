@@ -645,6 +645,17 @@ export function computeCityStats(
   addYields(buildings, regional.yields);
   for (const w of wonders) {
     if (w.def.cityYields) addYields(buildings, w.def.cityYields);
+    // CIV6 (Ruhr Valley): "+1 Production for each Mine and Quarry in this
+    // city" — the improvements on the tiles this city OWNS, a pillaged one
+    // producing nothing.
+    const perImp = w.def.effects?.cityYieldPerImprovement;
+    if (!perImp) continue;
+    let n = 0;
+    for (const t of map.tiles) {
+      if (!tileBelongsTo(t, city) || t.pillaged || !t.improvement) continue;
+      if ((perImp.improvements as readonly string[]).includes(t.improvement)) n += 1;
+    }
+    if (n) addYields(buildings, perImp.yields, n);
   }
   if (m.faithPerWonder > 0) buildings.faith += m.faithPerWonder * wonders.length;
   buildings.culture += greatWorkCulture(city);

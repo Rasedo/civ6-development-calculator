@@ -31,6 +31,10 @@ Covered (all gate-unreachable):
      not-every-seat refusal (-1), and the cityless-seat exclusion.
  10. Religious victor (through-step) — a step flips victory_type to 4 (religion)
      and to 6 (a civ seat), game_over set.
+ 11. Theological LOCATION bonuses — Holy Ground +5, the Holy City's territory
+     +15 on top, a FORT improvement, and nothing at all from terrain.
+ 12. Religious HEALING — 3x the Holy Site's own faith, on or beside it, in the
+     unit's own territory only, and nothing from a pillaged one.
 """
 
 from __future__ import annotations
@@ -667,6 +671,124 @@ def poke_victor_through_step(rules, rj, path):
     print("  10 religious victor (through-step) OK (seat 0 -> 5, civ -> 6, game_over)")
 
 
+def poke_theo_location(rules, rj, path):
+    """11. `_theo_def_strength` — the DEFENDER's location bonuses. CIV6: "+5" in
+    the territory of a city following this religion, "+15" in the territory of
+    that religion's Holy City, plus a defensive tile IMPROVEMENT, and NOTHING
+    from physical terrain."""
+    sim = build(rules, path)
+    r = 0
+    g = r + 1
+    sim.civ_religion_done[:, g] = True
+    c = 0
+    assert bool(sim.city_alive[0, 0, c])
+    ctr = int(sim.city_center[0, 0, c])
+    tile = torch.tensor([ctr])
+    seat = torch.tensor([g])
+
+    sim.city_followed[0, 0, c] = -1
+    sim.holy_tile[0, g] = -1
+    sim.tile_seat[0, ctr] = 0
+    sim._rel_planes_cache = None
+    assert int(sim._theo_def_strength(seat, tile)[0]) == 0, "no following city, no bonus"
+
+    sim.city_followed[0, 0, c] = g
+    sim._rel_planes_cache = None
+    ground = int(sim._theo_def_strength(seat, tile)[0])
+    assert ground == sim._theo_holy_ground, f"Holy Ground must be {sim._theo_holy_ground}, got {ground}"
+
+    # the same territory, now this religion's HOLY CITY: the two stack
+    sim.holy_tile[0, g] = ctr
+    both = int(sim._theo_def_strength(seat, tile)[0])
+    assert both == sim._theo_holy_ground + sim._theo_holy_city, \
+        f"Holy City territory must add {sim._theo_holy_city}, got {both}"
+
+    # a HILL is terrain and contributes nothing; a FORT is an improvement
+    sim.hills[0, ctr] = True
+    assert int(sim._theo_def_strength(seat, tile)[0]) == both, "physical terrain must not count"
+    if sim.FORT >= 0:
+        sim.improvement[0, ctr] = sim.FORT
+        assert int(sim._theo_def_strength(seat, tile)[0]) == both + sim._fort_def_cs, \
+            "a FORT is an improvement and does count"
+        sim.improvement[0, ctr] = -1
+
+    # a seat with no religion of its own reads nothing
+    assert int(sim._theo_def_strength(torch.tensor([200]), tile)[0]) == 0
+    print(f"  11 theo location OK (+{sim._theo_holy_ground} ground, "
+          f"+{sim._theo_holy_city} holy city, +{sim._fort_def_cs} fort, terrain 0)")
+
+
+def poke_religious_heal(rules, rj, path):
+    """12. `_religious_heal` — CIV6: religious units "Heal only when standing on
+    or next to a Holy Site in their own territory", at "3 times the Faith output
+    of the Holy Site"; a military unit keeps the ordinary ladder."""
+    sim = build(rules, path)
+    r = 0
+    g = r + 1
+    isolate_faith(sim, r)
+    j = 0
+    assert bool(sim.city_alive[0, g, j])
+    # one Holy Site in the whole world, so "no site in reach" means exactly that
+    _wipe = sim.district[0] == sim._hs_idx
+    sim.district[0, _wipe] = -1
+    hs = make_holy_site(sim, r, j)
+    sim.tile_seat[0, hs] = g
+    sim.tile_city[0, hs] = int(sim.city_id[0, g, j])
+    # a SHRINE stands INSIDE the Holy Site, so its faith is the site's output
+    sim.city_bldg[:, g, :, sim._shrine_bidx] = False
+    sim.city_bldg[0, g, j, sim._shrine_bidx] = True
+    sim._eff_version += 1
+    faith = int(sim._holy_site_faith()[0, hs])
+    assert faith > 0, "the poke needs a site that actually produces faith"
+
+    slot = place_missionary(sim, r, hs, 3)
+    heal = sim._religious_heal("major")
+    assert int(heal[0, slot]) == faith * sim._relig_heal_per_faith, \
+        f"on the site: {int(heal[0, slot])} != 3 x {faith}"
+
+    # NEXT to it heals the same; two tiles away heals nothing
+    nb = next((int(t) for t in sim.neigh[hs].tolist()
+               if t >= 0 and int(sim.civilian_at[0, int(t)]) < 0), -1)
+    assert nb >= 0, "the Holy Site has no free neighbour to stand on"
+    sim.civilian_at[0, hs] = -1
+    sim.major_unit_tile[0, slot] = nb
+    sim.civilian_at[0, nb] = slot + sim.POOL_LO["major"]
+    sim.tile_seat[0, nb] = g
+    assert int(sim._religious_heal("major")[0, slot]) == faith * sim._relig_heal_per_faith, \
+        "a site NEXT DOOR heals just as well"
+
+    far = next(t for t in free_tiles(sim, 12) if int(sim.pair_dist[hs, t]) >= 2)
+    sim.civilian_at[0, nb] = -1
+    sim.major_unit_tile[0, slot] = far
+    sim.civilian_at[0, far] = slot + sim.POOL_LO["major"]
+    sim.tile_seat[0, far] = g
+    assert int(sim._religious_heal("major")[0, slot]) == 0, "no site in reach, no heal"
+
+    # FOREIGN territory: the same site, the wrong owner
+    sim.civilian_at[0, far] = -1
+    sim.major_unit_tile[0, slot] = hs
+    sim.civilian_at[0, hs] = slot + sim.POOL_LO["major"]
+    sim.tile_seat[0, hs] = 0
+    assert int(sim._religious_heal("major")[0, slot]) == 0, \
+        "a Holy Site in someone else's territory heals nobody"
+    sim.tile_seat[0, hs] = g
+
+    # a PILLAGED site produces no faith and so heals nothing
+    sim.district_pillaged[0, hs] = True
+    sim._eff_version += 1
+    assert int(sim._holy_site_faith()[0, hs]) == 0
+    assert int(sim._religious_heal("major")[0, slot]) == 0
+    sim.district_pillaged[0, hs] = False
+    sim._eff_version += 1
+
+    # and the ORDINARY ladder still answers for a military unit
+    heal_all = sim._seat_heal("major")
+    assert int(heal_all[0, slot]) == faith * sim._relig_heal_per_faith, \
+        "_seat_heal must route a religious unit to its own rule"
+    print(f"  12 religious heal OK (site faith {faith} -> "
+          f"{faith * sim._relig_heal_per_faith} HP on and beside it, 0 elsewhere)")
+
+
 def main() -> None:
     rules = load_rules()
     rj = json.loads((FIXTURES / "rules.json").read_text())
@@ -684,6 +806,8 @@ def main() -> None:
     poke_messenger_route(rules, rj, path)
     poke_victor_direct(rules, rj, path)
     poke_victor_through_step(rules, rj, path)
+    poke_theo_location(rules, rj, path)
+    poke_religious_heal(rules, rj, path)
     print("RELIGION2 (B6) POKES OK")
 
 

@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { cityStateOfSeat, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, tileSeat } from '../../../cpu/core/seats';
-import { makeState, tileAtCoords } from '../helpers';
+import { makeMap, makeState, tileAtCoords } from '../helpers';
+import { neighbors } from '../../../world/hex';
+import { spawnUnit } from '../../../cpu/core/units';
+import { hostileUnitAct } from '../../../cpu/core/combat';
+import { BARB_SEAT } from '../../../cpu/core/seats';
 import { createGame, foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
 import { canFoundCity } from '../../../cpu/core/rules';
 import { seatPhase } from '../../../cpu/core/phase';
@@ -301,5 +305,48 @@ describe('suzerain unique perk (CITY_STATE_SUZERAIN_LIVE)', () => {
     expect(cityStateSuzerainCapitalBonus(state, 1).culture).toBe(CITY_STATE_SUZERAIN_YIELD);
     // no perk for a civ that is not the suzerain
     expect(cityStateSuzerainCapitalBonus(state, 2)).toEqual({});
+  });
+});
+
+describe('a hostile walker marches on a minor', () => {
+  function board(): { state: GameState; cs: CityState } {
+    const state = makeState(makeMap(24, 24));
+    state.unitsMode = true;
+    const cs = addCs(state, 18, 12);
+    return { state, cs };
+  }
+
+  it('pillages a city-state improvement it stands on', () => {
+    const { state, cs } = board();
+    const t = state.map.tiles[cs.centerIndex];
+    const ground = neighbors(state.map, t).find((n) => tileSeat(n) === cs.seat)!;
+    ground.improvement = 'FARM';
+    const barb = spawnUnit(state, 'WARRIOR', ground.index, BARB_SEAT)!;
+    hostileUnitAct(state, barb);
+    expect(ground.pillaged).toBe(true);
+  });
+
+  it('walks toward a city-state IMPROVEMENT within reach', () => {
+    const { state, cs } = board();
+    const t = state.map.tiles[cs.centerIndex];
+    const job = neighbors(state.map, t).find((n) => tileSeat(n) === cs.seat)!;
+    job.improvement = 'FARM';
+    const start = tileAtCoords(state.map, 12, 12);
+    const barb = spawnUnit(state, 'WARRIOR', start.index, BARB_SEAT)!;
+    const d = (a: { col: number; row: number }) => hexDistance(a.col, a.row, job.col, job.row);
+    expect(d(start)).toBeLessThan(13);
+    hostileUnitAct(state, barb);
+    expect(d(state.map.tiles[barb.tileIndex])).toBeLessThan(d(start));
+  });
+
+  it('does NOT beeline to the minor CITY when that is all there is', () => {
+    // The walker stops adjacent to the single nearest city, so a minor in the
+    // city scan would park every camp's units on it and no barbarian would
+    // reach a major again. Its ground is raided; its city is not a target.
+    const { state } = board();
+    const start = tileAtCoords(state.map, 6, 12);
+    const barb = spawnUnit(state, 'WARRIOR', start.index, BARB_SEAT)!;
+    hostileUnitAct(state, barb);
+    expect(barb.tileIndex).toBe(start.index);
   });
 });

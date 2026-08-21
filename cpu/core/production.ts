@@ -8,7 +8,8 @@ import { completedWonders, seatWonderFlag } from './wonders';
 import { UNITS, ENCAMPMENT_HP, URBAN_DEFENSES_TECH } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf } from '../data/projects';
-import { CULTURE_BOMB_RANGE, DED_MONUMENTALITY, ERA_SCORE_WONDER } from '../data/seats';
+import { CULTURE_BOMB_RANGE, DED_FREE_INQUIRY, DED_MONUMENTALITY, ERA_SCORE_WONDER } from '../data/seats';
+import { ERAS, TECHS } from '../data/techs';
 import { addEraScore, buildingDedications, dedicationEvent } from './eras';
 import { spawnUnit } from './units';
 import { wallsMax, urbanDefensesFit } from './rules';
@@ -131,6 +132,21 @@ export function completeQueueItem(
       // research chooser uses.
       if (fx?.freeTechs) grantFreeResearch(state, owner, 'tech', fx.freeTechs);
       if (fx?.freeCivics) grantFreeResearch(state, owner, 'civic', fx.freeCivics);
+      // CIV6 (Great Library): "Receive boosts to all Ancient and Classical era
+      // technologies" — one eureka per technology not already boosted or
+      // researched, each of which is a Free Inquiry event like any other.
+      const boostEra = fx?.boostTechsThroughEra ?? -1;
+      if (boostEra >= 0) {
+        const rsr = owner.research;
+        let fired = 0;
+        for (const [id, def] of Object.entries(TECHS)) {
+          if (ERAS.indexOf(def.era) > boostEra) continue;
+          if (rsr.techs.includes(id) || rsr.boosted.includes(id)) continue;
+          rsr.boosted.push(id);
+          fired += 1;
+        }
+        dedicationEvent(state, city.seat, DED_FREE_INQUIRY, fired);
+      }
       break;
     }
     case 'settler':

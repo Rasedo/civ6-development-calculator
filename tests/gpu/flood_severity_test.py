@@ -45,19 +45,21 @@ def floodplain(sim) -> int:
 
 
 def solo(sim, t: int) -> None:
-    """Make `t` the ONLY floodplain the picker can reach, so a flood driven
-    through the whole disaster phase lands where the assertions read."""
+    """Make `t` the ONLY floodplain the picker can reach AND the only one its
+    river reaches, so a flood driven through the whole disaster phase lands
+    where the assertions read. The reach itself is poke `f`."""
     idx, cnt = sim._flood_list
     idx[0, :] = t
     cnt[0] = 1
+    sim.river_comp[0, :] = -1
 
 
 def flood(sim, t: int) -> None:
     """One flood on `t`, with the 5% gate and the picker taken out — the storm
     and the eruption in the same phase scorch too, and would be read as the
-    river's work."""
-    sim._flood_tile(torch.ones(sim.B, dtype=torch.bool, device=sim.device),
-                    torch.full((sim.B,), t, dtype=torch.long, device=sim.device))
+    river's work. `_flood_river` rolls the severity the whole flood shares."""
+    sim._flood_river(torch.ones(sim.B, dtype=torch.bool, device=sim.device),
+                     torch.full((sim.B,), t, dtype=torch.long, device=sim.device))
 
 
 def main() -> None:
@@ -65,9 +67,9 @@ def main() -> None:
     t = floodplain(sim)
     solo(sim, t)
 
-    # THE DRAW COUNT IS FIXED. Eight rolls per flood, whatever stands on the
-    # tile — TS spends the same eight, so a bare floodplain and a built-up one
-    # cannot slide the two streams apart.
+    # THE DRAW COUNT IS FIXED. One severity roll plus seven per REACHED tile,
+    # whatever stands on it — TS spends the same, so a bare floodplain and a
+    # built-up one cannot slide the two streams apart.
     seed = int(sim.rng_state[0])
     sim.improvement[0, t] = -1
     sim._disaster_phase()
@@ -170,7 +172,56 @@ def main() -> None:
     assert int(sim.fertility[0, t]) > 0, "a mitigated river stopped silting entirely"
     print("  the Great Bath spares the damage and the river still silts")
 
-    print("FLOOD SEVERITY OK — the ladder, the bands, the two silts and the Bath")
+    poke_river_reach()
+    print("FLOOD SEVERITY OK — the ladder, the bands, the two silts, the Bath and the reach")
+
+
+def poke_river_reach() -> None:
+    """f. CIV6 (Flood): "The level of the water rises, flooding all Floodplains
+    tiles found along the River". One severity for the whole flood; every
+    Floodplains tile of the struck river takes it, nothing off that river
+    does, and the draw stream is one severity roll plus seven per tile."""
+    rules = load_rules()
+    best = None
+    for p in fixture_paths():
+        sim = BatchSim([load_fixture(p)], rules, device="cpu", dtype=torch.float64)
+        rc, fp = sim.river_comp[0], sim.floodplain[0]
+        total = int(fp.sum())
+        for c in set(int(x) for x in rc[fp].tolist()):
+            n = int(((rc == c) & fp).sum())
+            # a river with SEVERAL floodplains, and floodplains OFF it to spare
+            if c >= 0 and n > 1 and n < total and (best is None or n > best[2]):
+                best = (sim, c, n)
+        if best is not None and best[2] >= 4:
+            break
+    assert best is not None, "no fixture holds a multi-tile river beside another floodplain"
+    sim, comp, n = best
+    rc, fp = sim.river_comp[0], sim.floodplain[0]
+    reach = ((rc == comp) & fp).nonzero(as_tuple=True)[0].tolist()
+    off = [t for t in ((rc != comp) & fp).nonzero(as_tuple=True)[0].tolist()]
+    assert len(reach) == n
+
+    for t in reach + off:
+        sim.improvement[0, t] = 0
+        sim.pillaged[0, t] = False
+    seed = int(sim.rng_state[0])
+    sim._flood_river(torch.ones(1, dtype=torch.bool, device=sim.device),
+                     torch.tensor([reach[0]], dtype=torch.long, device=sim.device))
+    spent = 0
+    st = torch.tensor([seed], dtype=sim.rng_state.dtype, device=sim.device)
+    probe = sim.rng_state.clone()
+    sim.rng_state.copy_(st)
+    while int(sim.rng_state[0]) != int(probe[0]) and spent < 4096:
+        sim._next_random(torch.ones(1, dtype=torch.bool, device=sim.device))
+        spent += 1
+    assert spent == 1 + 7 * n, f"a {n}-tile flood spent {spent} draws, not 1 + 7 x {n}"
+    for t in reach:
+        assert bool(sim.pillaged[0, t]) or int(sim.improvement[0, t]) < 0, \
+            f"tile {t} is on the flooded river and kept its improvement whole"
+    for t in off:
+        assert not bool(sim.pillaged[0, t]) and int(sim.improvement[0, t]) >= 0, \
+            f"tile {t} is on ANOTHER river and the flood reached it"
+    print(f"  f river reach OK — {n} floodplains flooded together, {len(off)} off-river spared")
 
 
 if __name__ == "__main__":

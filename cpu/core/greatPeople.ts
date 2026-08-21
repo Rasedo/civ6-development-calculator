@@ -1,18 +1,37 @@
 
 import type { GameState, GreatPersonClass } from './types';
 import { citiesOf, seatOf } from './seats';
-import { GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, GW_CLASS_KIND, GW_WONDER_SLOTS, GW_WORK_CLASSES, gpCost, placeGreatWorks } from '../data/greatPeople';
+import { GP_CLASSES, GP_CLASS_DISTRICT, GP_FIRST_OF_ERA, GREAT_PEOPLE, GW_CLASS_KIND, GW_WONDER_SLOTS, GW_WORK_CLASSES, gpCost, placeGreatWorks } from '../data/greatPeople';
 import { congressGppFactor } from './congress';
 import { BUILDINGS } from '../data/buildings';
 import { ERA_SCORE_GP } from '../data/seats';
-import { seatWonders } from './wonders';
-import { addEraScore, goldenProphetPoints } from './eras';
+import { completedWonders, seatWonders } from './wonders';
+import { addEraScore, goldenProphetPoints, worldEraIndex } from './eras';
 import { getModifiers } from './effects';
 import { spawnUnit } from './units';
 import { repairDrip } from './rules';
 
 export function greatPeopleEarned(state: GameState, cls: GreatPersonClass): number {
   return state.claimedGreatPeople.filter((id) => GREAT_PEOPLE[cls].some((p) => p.id === id)).length;
+}
+
+/**
+ * The QUEUE POSITION this class offers next. CIV6: the replacement for a
+ * claimed person "is chosen randomly from those available in the current era,
+ * or the next if all those from the current era have been claimed", so the
+ * queue never走 backwards and anyone the world era has passed is gone for the
+ * rest of the game. Past the roster's end the class is exhausted.
+ */
+/** What the class's CURRENT offer costs — Infinity once the roster is spent. */
+export function gpOfferCost(state: GameState, cls: GreatPersonClass): number {
+  const p = GREAT_PEOPLE[cls][gpOffer(state, cls)];
+  return p ? gpCost(cls, p.era, worldEraIndex(state)) : Infinity;
+}
+
+export function gpOffer(state: GameState, cls: GreatPersonClass): number {
+  const i = GP_CLASSES.indexOf(cls);
+  const taken = state.gpNext?.[i] ?? 0;
+  return Math.max(taken, GP_FIRST_OF_ERA[cls][Math.max(0, Math.min(worldEraIndex(state), 8))]);
 }
 
 export function greatPersonPointsPerTurn(
@@ -23,6 +42,10 @@ export function greatPersonPointsPerTurn(
   const gppFlat = getModifiers(state, seat).gppFlat;
   out.PROPHET += goldenProphetPoints(state, seat);
   for (const city of citiesOf(state, seat)) {
+    // CIV6 (Oracle): "Districts in this city provide +2 Great Person points
+    // of their type" — the HOLDING city's districts only.
+    const distGpp = completedWonders(state, city)
+      .reduce((n, w) => n + (w.def.effects?.districtGpPoints ?? 0), 0);
     for (const cls of GP_CLASSES) {
       const district = GP_CLASS_DISTRICT[cls];
       const inst = city.districts.find(
@@ -32,7 +55,7 @@ export function greatPersonPointsPerTurn(
           !state.map.tiles[d.tileIndex].districtPillaged,
       );
       if (!inst) continue;
-      out[cls] += 1 + (gppFlat[cls] ?? 0)
+      out[cls] += 1 + (gppFlat[cls] ?? 0) + distGpp
         + city.buildings.filter((b) => BUILDINGS[b]?.district === district).length;
     }
   }
@@ -51,8 +74,10 @@ export function greatPersonPointsPerTurn(
 
 function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
   const owner = seatOf(state, seat);
-  const person = GREAT_PEOPLE[cls][greatPeopleEarned(state, cls)];
+  const at = gpOffer(state, cls);
+  const person = GREAT_PEOPLE[cls][at];
   if (!owner || !person) return; // class exhausted
+  (state.gpNext ??= GP_CLASSES.map(() => 0))[GP_CLASSES.indexOf(cls)] = at + 1;
   const cities = owner.cities;
   const fx = person.effect;
 
@@ -67,7 +92,7 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
           n + (state.map.tiles[w.tileIndex].builtWonderComplete ? (GW_WONDER_SLOTS[w.id]?.[kind] ?? 0) : 0),
         0,
       );
-    const overflow = placeGreatWorks(cities, kind, wonderSlots, greatPeopleEarned(state, cls));
+    const overflow = placeGreatWorks(cities, kind, wonderSlots, at);
     if (fx.culture) owner.research.civicProgress += fx.culture * overflow;
   } else if (fx.culture) {
     owner.research.civicProgress += fx.culture;
@@ -103,11 +128,11 @@ export function advanceGreatPeople(state: GameState, seat: number): void {
   for (const cls of GP_CLASSES) {
     let pts = (owner.gpp[cls] ?? 0) + perTurn[cls];
     if (pts === 0) continue;
-    let earned = greatPeopleEarned(state, cls);
-    while (earned < GREAT_PEOPLE[cls].length && pts >= gpCost(earned)) {
-      pts -= gpCost(earned);
+    for (;;) {
+      const cost = gpOfferCost(state, cls); // Infinity once the roster is spent
+      if (pts < cost) break;
+      pts -= cost;
       recruit(state, seat, cls);
-      earned++;
     }
     owner.gpp[cls] = pts;
   }

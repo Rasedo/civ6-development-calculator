@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { Seat } from '../../../cpu/core/types';
 import { seatOf } from '../../../cpu/core/seats';
-import { createGame, endTurn } from '../../../cpu/core/game';
-import { worldCongress } from '../../../cpu/core/phase';
+import { createGame, endTurn, unitPurchaseCost } from '../../../cpu/core/game';
+import { seatPhase, worldCongress } from '../../../cpu/core/phase';
 import { settleFirstCity } from '../helpers';
 import { CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DIPLO_VICTORY_POINTS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION, CONGRESS_HERITAGE, CONGRESS_MERCENARY, CONGRESS_TRADE_POLICY, CONGRESS_POLICY_TREATY, CONGRESS_IDEOLOGY, CONGRESS_BORDER_CONTROL, CONGRESS_TREATY_ORG, CONGRESS_SOVEREIGNTY, CONGRESS_PUBLIC_WORKS, CONGRESS_RESOLUTIONS, CONGRESS_TARGET_KINDS , CONGRESS_DEFORESTATION } from '../../../cpu/data/seats';
 import { preference as congressPreference, congressChopBanned, congressChopGold, congressGppFactor, congressGrowthMult, congressLoyaltyDelta, congressUdtBlockedDistrict, congressUdtProdDistrict, congressGwMult, congressUnitBuyMult, congressTradeGold, congressRouteCapacity, congressIntlBanned, congressPolicyFavor, congressPolicyBlocked, congressWildcardDelta, congressCultureBombSeat, congressBorderFrozen, congressSuzFavorMult, congressCsRouteMult, congressSuzBonusBlocked, congressProjectMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_FAITH } from '../../../cpu/core/congress';
@@ -15,6 +15,8 @@ import { canRemoveFeature } from '../../../cpu/core/rules';
 import { CITY_STATE_TYPES } from '../../../cpu/data/cityStates';
 import { isWater } from '../../../world/query';
 import { BUILT_WONDERS } from '../../../cpu/data/builtWonders';
+import { UNITS } from '../../../cpu/data/units';
+import { GOLD_PURCHASE_MULT } from '../../../cpu/data/constants';
 
 // WORLD CONGRESS. Sourced (Civilopedia GS): the Congress begins
 // meeting once the game reaches the MEDIEVAL era and convenes every 30 turns;
@@ -221,6 +223,23 @@ describe('world congress: the wider slate', () => {
     state.congress = [{ res: CONGRESS_MERCENARY, outcome: 1, target: CONGRESS_CUR_FAITH }];
     expect(congressUnitBuyMult(state, CONGRESS_CUR_FAITH)).toBe(0.5);
     expect(congressUnitBuyMult(state, CONGRESS_CUR_GOLD)).toBe(1);
+  });
+
+  it('the Mercenary price reaches the unit BUY applier, not just the helper', () => {
+    const state = newGame(1);
+    state.congress = [{ res: CONGRESS_MERCENARY, outcome: 1, target: CONGRESS_CUR_GOLD }];
+    const actor = state.seats[0] as Seat;
+    const full = (UNITS.WARRIOR?.cost ?? 0) * GOLD_PURCHASE_MULT;
+    expect(unitPurchaseCost(state, 'WARRIOR', actor.seat)).toBe(full / 2);
+
+    state.unitsMode = true;
+    actor.treasury = full / 2; // a purse only the DISCOUNTED price fits
+    state.seatActions = { [state.turn - 1]: { [actor.seat]: {
+      production: [], tech: null, civic: null, units: [], buy: [2, -1, -1],
+    } } };
+    seatPhase(state);
+    expect(state.units!.some((u) => u.seat === actor.seat && (UNITS[u.type]?.combat ?? 0) > 0)).toBe(true);
+    expect(actor.treasury).toBeLessThan(full); // never charged the undiscounted price
   });
 
   it('Trade Policy pays the sender and widens the target, or ends every international leg', () => {

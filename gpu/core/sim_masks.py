@@ -493,7 +493,7 @@ class SimMasks:
         self,
         def_tile: torch.Tensor,
         def_seat: torch.Tensor,
-        attacker_tile: torch.Tensor,
+        attacker_slot: torch.Tensor,
         attacker_seat: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """`flankCount` / `supportCount` for a UNIT defender on def_tile [B].
@@ -502,7 +502,10 @@ class SimMasks:
         ATTACKER owns — "only units that are currently owned by the same player
         can provide Flanking to one another" — never the attacker itself, never
         an EMBARKED one ("embarked land units do not provide Flanking"), and
-        never one whose tile is across a River from the target.
+        never one whose tile is across a River from the target. `attacker_slot`
+        is the attacker's own occupancy index, -1 when the attacker holds no
+        military slot: a RELIGIOUS attacker shares its tile with a military unit
+        that flanks like any other, so the exclusion is by unit, not by tile.
 
         SUPPORT counts the DEFENDER's own adjacent military, embarked ones
         included ("embarked land units provide Support like normal"), and pays
@@ -521,7 +524,7 @@ class SimMasks:
         n_seat = torch.where(here, self.unit_seat.gather(1, mslot.clamp(min=0)), torch.full_like(nbc, -1))
 
         riv = (self.river_mask.gather(1, dt.unsqueeze(1)) >> torch.arange(6, device=self.device)) & 1
-        is_atk = (nb == attacker_tile.unsqueeze(1)) & (attacker_tile.unsqueeze(1) >= 0)
+        is_atk = (mslot == attacker_slot.unsqueeze(1)) & (attacker_slot.unsqueeze(1) >= 0)
         mine = here & ~emb & (n_seat == attacker_seat.unsqueeze(1)) & ~is_atk & (riv == 0)
         flank = mine.long().sum(dim=1) * self._flank_support_live(attacker_seat).long()
 
@@ -1480,11 +1483,13 @@ class SimMasks:
                 else:
                     _ok = here_ok & (_rq == _k) & _unl
                 _res_cols.append(_ok.unsqueeze(2))
+        # PILLAGE needs a WAR with the tile's owner, city-state owners
+        # included — `phase.ts`'s replay arm re-validates exactly this and
+        # would silently no-op anything wider.
         _ts = self.tile_seat
-        _enemy = (
-            ((_ts >= 0) & (_ts < 100) & self.war[:, row].gather(1, _ts.clamp(min=0, max=self.NS - 1)))
-            | ((_ts >= 100) & (_ts < BARB_SEAT))
-        ).gather(1, tc)
+        _owned = (_ts >= 0) & (_ts < BARB_SEAT)
+        _enemy = (_owned & self.war[:, row].gather(
+            1, self._seat_row[torch.where(_owned, _ts, torch.zeros_like(_ts))])).gather(1, tc)
         _has_imp = (self.improvement.gather(1, tc) >= 0) & ~self.pillaged.gather(1, tc)
         _has_dis = (
             (self.district.gather(1, tc) >= 0)

@@ -12,7 +12,7 @@ import { applySeatUnitOrders, assertCityRegistryCoherent, declareWar, seatPhase,
 import { meleeAttack, attackTargets, captureCityState } from '../../../cpu/core/combat';
 import { routePlunderer, tradeCapacity } from '../../../cpu/core/trade';
 import { spawnUnit, unitsHostile } from '../../../cpu/core/units';
-import { gpCost } from '../../../cpu/data/greatPeople';
+import { gpOfferCost } from '../../../cpu/core/greatPeople';
 import type { CityState, GameState, City, Seat } from '../../../cpu/core/types';
 
 function addCiv(
@@ -178,7 +178,7 @@ describe('races', () => {
   it('a civ claiming a great person raises your next cost tier', () => {
     const state = makeState();
     const civ = addCiv(state, 6, 6);
-    civ.gpp.SCIENTIST = gpCost(0); // about to claim
+    civ.gpp.SCIENTIST = gpOfferCost(state, 'SCIENTIST'); // about to claim
     const before = greatPeopleEarned(state, 'SCIENTIST');
     seatPhase(state);
     expect(greatPeopleEarned(state, 'SCIENTIST')).toBe(before + 1);

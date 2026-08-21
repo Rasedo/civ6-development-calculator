@@ -66,6 +66,9 @@ def main() -> None:
     taj = _find(rows, lambda r: r["eraScorePerMoment"] > 0, "wonder paying era score per moment")
     artemis = _find(rows, lambda r: r["amenImp"], "wonder paying amenities per improvement")
     oxford = _find(rows, lambda r: r["freeTechs"] > 0, "wonder granting free technologies")
+    ruhr = _find(rows, lambda r: r["impY"], "wonder paying yields per improvement")
+    library = _find(rows, lambda r: r["boostTechEra"] >= 0, "wonder boosting an era of technologies")
+    oracle = _find(rows, lambda r: r["distGpp"] > 0, "wonder paying its districts GP points")
     bolshoi = _find(rows, lambda r: r["freeCivics"] > 0, "wonder granting free civics")
     assert rows[montsm]["apostleMartyr"] == 1, "the +6 defence wonder is Mont St. Michel — it grants MARTYR"
     assert rows[artemis]["amenImpRange"] == 4, "Temple of Artemis reaches 4 tiles"
@@ -80,6 +83,10 @@ def main() -> None:
     assert len(tiley_rows) == 4, f"four wonders key yields on terrain/feature, found {len(tiley_rows)}"
     assert any(t["emp"] for t in rows[[i for i in tiley_rows if any(x["emp"] for x in rows[i]["tiley"])][0]]["tiley"]), \
         "Etemenanki's Marsh term is EMPIRE-wide"
+    assert rows[ruhr]["impYYields"][1] == 1 and len(rows[ruhr]["impY"]) == 2, \
+        "Ruhr Valley pays +1 PRODUCTION for each of two improvements"
+    assert rows[library]["boostTechEra"] == 1, "the Great Library reaches the CLASSICAL era"
+    assert rows[oracle]["distGpp"] == 2, "the Oracle pays its districts +2"
     print(f"  catalog OK — {len(rows)} rows, {len(gpp_rows)} pay GP points, {len(tiley_rows)} key on terrain")
 
     sim = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
@@ -218,6 +225,74 @@ def main() -> None:
         s12.step()
     assert int(s12.turn) > 0, "the sim must still advance with every channel live"
     print("  step OK — eight wonders standing, six turns clean")
+
+    # --- 13) Ruhr Valley: +1 production per Mine and Quarry the CITY owns ---
+    s13 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    ctr13 = int(s13.city_center[0, 0, 0])
+    mine_i, quarry_i = s13._mine_iidx, s13._quarry_iidx
+    own = [int(t) for t in (s13.city_slot_at(0)[0] == 0).nonzero(as_tuple=True)[0].tolist()
+           if t != ctr13 and int(s13.district[0, t]) < 0 and int(s13.built_wonder[0, t]) < 0]
+    assert len(own) >= 3, "the fixture city owns too few plain tiles"
+    plant(s13, 0, 0, ruhr)
+    base13 = s13._wonder_improvement_yields(0)
+    assert base13 is not None and float(base13[0, 0, 1]) == 0.0, "no improvement, no production"
+    s13.improvement[0, own[0]] = mine_i
+    s13.improvement[0, own[1]] = quarry_i
+    s13._eff_version += 1
+    assert float(s13._wonder_improvement_yields(0)[0, 0, 1]) == 2.0, "a Mine and a Quarry pay 2"
+    s13.pillaged[0, own[0]] = True
+    assert float(s13._wonder_improvement_yields(0)[0, 0, 1]) == 1.0, "a pillaged Mine pays nothing"
+    s13.pillaged[0, own[0]] = False
+    s13.tile_seat[0, own[0]] = 1  # another seat's ground
+    s13._tile_owner_ver += 1
+    assert float(s13._wonder_improvement_yields(0)[0, 0, 1]) == 1.0, \
+        "a Mine outside the city pays nothing"
+    print("  Ruhr Valley OK — a Mine and a Quarry the city owns, pillage and ownership gated")
+
+    # --- 14) the Oracle: every district in ITS city, +2 of its own type -----
+    s14 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    cls14 = next(c for c in range(s14._gp_nc) if int(s14._gp_class_district[c]) >= 0)
+    d14 = int(s14._gp_class_district[cls14])
+    ctr14 = int(s14.city_center[0, 0, 0])
+    site = next(int(t) for t in (s14.pair_dist[ctr14] <= 3).nonzero(as_tuple=True)[0].tolist()
+                if t != ctr14 and int(s14.district[0, t]) < 0 and int(s14.built_wonder[0, t]) < 0)
+    s14.district[0, site] = d14
+    s14.district_complete[0, site] = True
+    s14.district_pillaged[0, site] = False
+    s14.city_dist_tile[0, 0, 0, d14] = site
+    s14._eff_version += 1
+    s14.civ_gpp[:, 0, cls14] = 0.0
+    s14._advance_great_people(0, torch.ones(s14.B, dtype=torch.bool, device=s14.device))
+    plain = float(s14.civ_gpp[0, 0, cls14])
+    assert plain >= 1.0, f"a bare district must pay at least 1, got {plain}"
+    plant(s14, 0, 0, oracle)
+    s14.civ_gpp[:, 0, cls14] = 0.0
+    s14._advance_great_people(0, torch.ones(s14.B, dtype=torch.bool, device=s14.device))
+    assert float(s14.civ_gpp[0, 0, cls14]) == plain + 2.0, \
+        f"the Oracle must add 2, got {float(s14.civ_gpp[0, 0, cls14])} vs {plain}"
+    print("  Oracle OK — its own city's district pays +2 of its class")
+
+    # --- 15) the Great Library boosts every Ancient/Classical technology ----
+    s15 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    nt15 = min(s15.civ_tech_boosted.shape[2], s15._tech_era.numel())
+    early = (s15._tech_era[:nt15] <= 1)
+    s15.civ_tech_boosted[:, 0, :nt15] = False
+    s15.civ_techs[:, 0, :nt15] = False
+    s15.civ_techs[0, 0, int(early.nonzero()[0])] = True  # already researched: no eureka
+    tile15 = plant(s15, 0, 0, library)
+    s15.built_wonder_complete[0, tile15] = False
+    s15.city_current[:, 0, 0] = s15.WONDER_BASE + library
+    s15.city_progress[:, 0, 0] = 10.0 ** 9
+    s15._seat_city_produce(
+        0, torch.zeros(s15.B, dtype=torch.long, device=s15.device),
+        torch.ones(s15.B, dtype=torch.bool, device=s15.device),
+        torch.zeros(s15.B, dtype=torch.float64, device=s15.device))
+    got = s15.civ_tech_boosted[0, 0, :nt15]
+    assert bool((got[early] | s15.civ_techs[0, 0, :nt15][early]).all()), \
+        "an Ancient or Classical technology was left unboosted"
+    assert not bool(got[~early].any()), "a later technology was boosted"
+    assert not bool(got[int(early.nonzero()[0])]), "a researched technology took a eureka"
+    print(f"  Great Library OK — {int(early.sum())} early technologies boosted, no later one")
 
     print("WONDER EFFECTS OK")
 

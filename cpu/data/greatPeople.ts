@@ -29,24 +29,65 @@ export const GP_CLASS_NAMES: Record<GreatPersonClass, string> = {
 };
 
 /**
- * Real Civ 6 (GS) great-person cost ladder. The n-th person of a class
- * (0-based, global first-come race) costs an ERA-ANCHORED threshold. These are
- * the standard-speed base GPP costs by era tier (Ancient..Information): each
- * recruitment step climbs one era. ONE ladder for every class, so both engines
- * read the SAME `gpCosts` array from the exporter — no per-class table.
+ * CIV6 (Great People, "GPP cost (on Standard speed)"): Classical 60, Medieval
+ * 120, Renaissance 240, Industrial 420, Modern 660, Atomic 960, Information
+ * 1320. Indexed in this engine's own era space, where nobody is Ancient and
+ * nobody is Future — those two ends mirror their neighbour and are unreachable.
  */
-export const GP_COST_LADDER = [60, 120, 200, 290, 390, 500, 620, 750];
+export const GP_ERA_GPP: readonly number[] = [60, 60, 120, 240, 420, 660, 960, 1320, 1320];
 
-/** Point cost of the n-th person of a class (0-based). Past the ladder end the
- * top era cost holds (rosters never exceed the ladder length today). */
-export function gpCost(n: number): number {
-  return GP_COST_LADDER[Math.min(n, GP_COST_LADDER.length - 1)];
+/**
+ * CIV6: "most Great People classes' GPP cost (all but art-related People and
+ * the Great Prophet) will scale up from the general era base cost".
+ */
+export const GP_FLAT_COST_CLASSES: ReadonlySet<GreatPersonClass> = new Set<GreatPersonClass>([
+  'WRITER', 'ARTIST', 'MUSICIAN', 'PROPHET',
+]);
+
+/**
+ * CIV6: "GPP cost = base cost * (1 + 0.3 * difference in era) ^ difference in
+ * era", where the difference is the eras between the person and the WORLD era,
+ * never negative. The page's own worked examples floor it (420 * 1.6^2 = 1075.2
+ * is quoted as 1075).
+ */
+export function gpCost(cls: GreatPersonClass, personEra: number, worldEra: number): number {
+  const base = GP_ERA_GPP[Math.min(Math.max(personEra, 0), GP_ERA_GPP.length - 1)];
+  if (GP_FLAT_COST_CLASSES.has(cls)) return base;
+  const d = Math.max(0, personEra - worldEra);
+  return Math.floor(base * (1 + 0.3 * d) ** d);
+}
+
+/**
+ * What one recruit pays out. Real Civ 6 gives every Great Person a UNIQUE
+ * ability, most of which this engine has no channel for (C-21); what it models
+ * instead is one lump in the class's own currency, sized by the era the person
+ * belongs to. The roster below supplies the names, the classes and the eras —
+ * the magnitude is this model's own.
+ */
+export const GP_CURRENCY: Record<GreatPersonClass, keyof GreatPersonDef['effect']> = {
+  SCIENTIST: 'science',
+  ENGINEER: 'productionToCapital',
+  MERCHANT: 'gold',
+  PROPHET: 'faith',
+  ARTIST: 'culture',
+  ADMIRAL: 'gold',
+  GENERAL: 'productionToCapital',
+  WRITER: 'culture',
+  MUSICIAN: 'culture',
+};
+
+export function gpEffect(cls: GreatPersonClass, era: number): GreatPersonDef['effect'] {
+  const lump = GP_ERA_GPP[Math.min(Math.max(era, 0), GP_ERA_GPP.length - 1)];
+  return { [GP_CURRENCY[cls]]: lump };
 }
 
 export interface GreatPersonDef {
   id: string;
   name: string;
   class: GreatPersonClass;
+  /** the ERA this person belongs to, which is what orders the class's queue
+   *  and what prices the recruit. */
+  era: number;
   effect: {
     science?: number; // added to current tech progress
     culture?: number; // added to current civic progress
@@ -54,79 +95,319 @@ export interface GreatPersonDef {
     gold?: number;
     productionToCapital?: number;
   };
-  effectText: string;
 }
 
-const P = (
-  cls: GreatPersonClass,
-  id: string,
-  name: string,
-  effect: GreatPersonDef['effect'],
-  effectText: string,
-): GreatPersonDef => ({ id, name, class: cls, effect, effectText });
+const P = (cls: GreatPersonClass, id: string, name: string, era: number): GreatPersonDef =>
+  ({ id, name, class: cls, era, effect: gpEffect(cls, era) });
 
+/**
+ * CIV6 (the nine Great Person pages): every person in the game, with the ERA
+ * each page's own roster column names. "All Great People of a certain class now
+ * come in a queue, arranged by era. The queue starts with People from the
+ * Classical Era, and finishes with those from the Information Era" — so nobody
+ * here is Ancient, Artists begin in the Renaissance, Musicians in the
+ * Industrial era, and the Prophets run out after the Renaissance, which is the
+ * page's own "Industrial: No more Great Prophets".
+ */
 export const GREAT_PEOPLE: Record<GreatPersonClass, GreatPersonDef[]> = {
   SCIENTIST: [
-    P('SCIENTIST', 'GP_ARYABHATA', 'Aryabhata', { science: 50 }, '+50 science toward the current tech'),
-    P('SCIENTIST', 'GP_HYPATIA', 'Hypatia', { science: 120 }, '+120 science toward the current tech'),
-    P('SCIENTIST', 'GP_NEWTON', 'Isaac Newton', { science: 300 }, '+300 science toward the current tech'),
-    P('SCIENTIST', 'GP_EINSTEIN', 'Albert Einstein', { science: 750 }, '+750 science toward the current tech'),
+    // Classical
+    P('SCIENTIST', 'GP_ZHANG_HENG', 'Zhang Heng', 1),
+    P('SCIENTIST', 'GP_ARYABHATA', 'Aryabhata', 1),
+    P('SCIENTIST', 'GP_EUCLID', 'Euclid', 1),
+    P('SCIENTIST', 'GP_HYPATIA', 'Hypatia', 1),
+    // Medieval
+    P('SCIENTIST', 'GP_ABU_AL_QASIM_AL_ZAHRAWI', 'Abu al-Qasim al-Zahrawi', 2),
+    P('SCIENTIST', 'GP_HILDEGARD_OF_BINGEN', 'Hildegard of Bingen', 2),
+    P('SCIENTIST', 'GP_OMAR_KHAYYAM', 'Omar Khayyam', 2),
+    // Renaissance
+    P('SCIENTIST', 'GP_IBN_KHALDUN', 'Ibn Khaldun', 3),
+    P('SCIENTIST', 'GP_EMILIE_DU_CHATELET', 'Emilie du Chatelet', 3),
+    P('SCIENTIST', 'GP_GALILEO_GALILEI', 'Galileo Galilei', 3),
+    P('SCIENTIST', 'GP_ISAAC_NEWTON', 'Isaac Newton', 3),
+    // Industrial
+    P('SCIENTIST', 'GP_CHARLES_DARWIN', 'Charles Darwin', 4),
+    P('SCIENTIST', 'GP_DMITRI_MENDELEEV', 'Dmitri Mendeleev', 4),
+    P('SCIENTIST', 'GP_JAMES_YOUNG', 'James Young', 4),
+    // Modern
+    P('SCIENTIST', 'GP_ALAN_TURING', 'Alan Turing', 5),
+    P('SCIENTIST', 'GP_ALBERT_EINSTEIN', 'Albert Einstein', 5),
+    P('SCIENTIST', 'GP_ALFRED_NOBEL', 'Alfred Nobel', 5),
+    // Atomic
+    P('SCIENTIST', 'GP_ERWIN_SCHRODINGER', 'Erwin Schrödinger', 6),
+    P('SCIENTIST', 'GP_JANAKI_AMMAL', 'Janaki Ammal', 6),
+    P('SCIENTIST', 'GP_MARY_LEAKEY', 'Mary Leakey', 6),
+    P('SCIENTIST', 'GP_MARGARET_MEAD', 'Margaret Mead', 6),
+    // Information
+    P('SCIENTIST', 'GP_CARL_SAGAN', 'Carl Sagan', 7),
+    P('SCIENTIST', 'GP_STEPHANIE_KWOLEK', 'Stephanie Kwolek', 7),
+    P('SCIENTIST', 'GP_ABDUS_SALAM', 'Abdus Salam', 7),
   ],
   ENGINEER: [
-    P('ENGINEER', 'GP_BI_SHENG', 'Bi Sheng', { productionToCapital: 100 }, '+100 production in the capital'),
-    P('ENGINEER', 'GP_ISIDORE', 'Isidore of Miletus', { productionToCapital: 220 }, '+220 production in the capital'),
-    P('ENGINEER', 'GP_DA_VINCI', 'Leonardo da Vinci', { productionToCapital: 500 }, '+500 production in the capital'),
-    P('ENGINEER', 'GP_WATT', 'James Watt', { productionToCapital: 1000 }, '+1000 production in the capital'),
+    // Medieval
+    P('ENGINEER', 'GP_IMHOTEP', 'Imhotep', 2),
+    P('ENGINEER', 'GP_BI_SHENG', 'Bi Sheng', 2),
+    P('ENGINEER', 'GP_ISIDORE_OF_MILETUS', 'Isidore of Miletus', 2),
+    P('ENGINEER', 'GP_JAMES_OF_ST_GEORGE', 'James of St. George', 2),
+    // Renaissance
+    P('ENGINEER', 'GP_FILIPPO_BRUNELLESCHI', 'Filippo Brunelleschi', 3),
+    P('ENGINEER', 'GP_LEONARDO_DA_VINCI', 'Leonardo da Vinci', 3),
+    P('ENGINEER', 'GP_MIMAR_SINAN', 'Mimar Sinan', 3),
+    // Industrial
+    P('ENGINEER', 'GP_ADA_LOVELACE', 'Ada Lovelace', 4),
+    P('ENGINEER', 'GP_GUSTAVE_EIFFEL', 'Gustave Eiffel', 4),
+    P('ENGINEER', 'GP_JAMES_WATT', 'James Watt', 4),
+    // Modern
+    P('ENGINEER', 'GP_SHAH_JAHAN', 'Shah Jahān', 5),
+    P('ENGINEER', 'GP_ALVAR_AALTO', 'Alvar Aalto', 5),
+    P('ENGINEER', 'GP_ROBERT_GODDARD', 'Robert Goddard', 5),
+    P('ENGINEER', 'GP_NIKOLA_TESLA', 'Nikola Tesla', 5),
+    // Atomic
+    P('ENGINEER', 'GP_JANE_DREW', 'Jane Drew', 6),
+    P('ENGINEER', 'GP_JOHN_ROEBLING', 'John Roebling', 6),
+    P('ENGINEER', 'GP_SERGEI_KOROLEV', 'Sergei Korolev', 6),
+    // Information
+    P('ENGINEER', 'GP_JOSEPH_PAXTON', 'Joseph Paxton', 7),
+    P('ENGINEER', 'GP_CHARLES_CORREA', 'Charles Correa', 7),
+    P('ENGINEER', 'GP_WERNHER_VON_BRAUN', 'Wernher von Braun', 7),
+    P('ENGINEER', 'GP_KENZO_TANGE', 'Kenzo Tange', 7),
   ],
   MERCHANT: [
-    P('MERCHANT', 'GP_COLAEUS', 'Colaeus', { gold: 100 }, '+100 gold'),
-    P('MERCHANT', 'GP_ZHANG_QIAN', 'Zhang Qian', { gold: 250 }, '+250 gold'),
-    P('MERCHANT', 'GP_MARCO_POLO', 'Marco Polo', { gold: 500 }, '+500 gold'),
-    P('MERCHANT', 'GP_ADAM_SMITH', 'Adam Smith', { gold: 1200 }, '+1200 gold'),
+    // Classical
+    P('MERCHANT', 'GP_COLAEUS', 'Colaeus', 1),
+    P('MERCHANT', 'GP_MARCUS_LICINIUS_CRASSUS', 'Marcus Licinius Crassus', 1),
+    P('MERCHANT', 'GP_ZHANG_QIAN', 'Zhang Qian', 1),
+    // Medieval
+    P('MERCHANT', 'GP_IBN_FADLAN', 'Ibn Fadlan', 2),
+    P('MERCHANT', 'GP_IRENE_OF_ATHENS', 'Irene of Athens', 2),
+    P('MERCHANT', 'GP_MARCO_POLO', 'Marco Polo', 2),
+    P('MERCHANT', 'GP_PIERO_DE_BARDI', 'Piero de\' Bardi', 2),
+    // Renaissance
+    P('MERCHANT', 'GP_ZHOU_DAGUAN', 'Zhou Daguan', 3),
+    P('MERCHANT', 'GP_GIOVANNI_DE_MEDICI', 'Giovanni de\' Medici', 3),
+    P('MERCHANT', 'GP_JAKOB_FUGGER', 'Jakob Fugger', 3),
+    P('MERCHANT', 'GP_RAJA_TODAR_MAL', 'Raja Todar Mal', 3),
+    // Industrial
+    P('MERCHANT', 'GP_ADAM_SMITH', 'Adam Smith', 4),
+    P('MERCHANT', 'GP_JOHN_JACOB_ASTOR', 'John Jacob Astor', 4),
+    P('MERCHANT', 'GP_JOHN_SPILSBURY', 'John Spilsbury', 4),
+    // Modern
+    P('MERCHANT', 'GP_STAMFORD_RAFFLES', 'Stamford Raffles', 5),
+    P('MERCHANT', 'GP_JOHN_ROCKEFELLER', 'John Rockefeller', 5),
+    P('MERCHANT', 'GP_SARAH_BREEDLOVE', 'Sarah Breedlove', 5),
+    P('MERCHANT', 'GP_MARY_KATHERINE_GODDARD', 'Mary Katherine Goddard', 5),
+    // Atomic
+    P('MERCHANT', 'GP_HELENA_RUBINSTEIN', 'Helena Rubinstein', 6),
+    P('MERCHANT', 'GP_LEVI_STRAUSS', 'Levi Strauss', 6),
+    P('MERCHANT', 'GP_MELITTA_BENTZ', 'Melitta Bentz', 6),
+    // Information
+    P('MERCHANT', 'GP_ESTEE_LAUDER', 'Estée Lauder', 7),
+    P('MERCHANT', 'GP_JAMSETJI_TATA', 'Jamsetji Tata', 7),
+    P('MERCHANT', 'GP_MASARU_IBUKA', 'Masaru Ibuka', 7),
   ],
   PROPHET: [
-    P('PROPHET', 'GP_CONFUCIUS', 'Confucius', { faith: 100 }, '+100 faith'),
-    P('PROPHET', 'GP_SIDDHARTHA', 'Siddhartha Gautama', { faith: 250 }, '+250 faith'),
-    P('PROPHET', 'GP_ZOROASTER', 'Zoroaster', { faith: 500 }, '+500 faith'),
-    P('PROPHET', 'GP_LAOZI', 'Laozi', { faith: 1000 }, '+1000 faith'),
+    // Classical
+    P('PROPHET', 'GP_CONFUCIUS', 'Confucius', 1),
+    P('PROPHET', 'GP_JOHN_THE_BAPTIST', 'John the Baptist', 1),
+    P('PROPHET', 'GP_LAOZI', 'Laozi', 1),
+    P('PROPHET', 'GP_SIDDHARTHA_GAUTAMA', 'Siddhartha Gautama', 1),
+    P('PROPHET', 'GP_SIMON_PETER', 'Simon Peter', 1),
+    P('PROPHET', 'GP_ZOROASTER', 'Zoroaster', 1),
+    // Medieval
+    P('PROPHET', 'GP_ADI_SHANKARA', 'Adi Shankara', 2),
+    P('PROPHET', 'GP_BODHIDHARMA', 'Bodhidharma', 2),
+    P('PROPHET', 'GP_IRENAEUS', 'Irenaeus', 2),
+    P('PROPHET', 'GP_O_NO_YASUMARO', 'O no Yasumaro', 2),
+    P('PROPHET', 'GP_SONGTSAN_GAMPO', 'Songtsan Gampo', 2),
+    // Renaissance
+    P('PROPHET', 'GP_HAJI_HUUD', 'Haji Huud', 3),
+    P('PROPHET', 'GP_MADHVA_ACHARYA', 'Madhva Acharya', 3),
+    P('PROPHET', 'GP_MARTIN_LUTHER', 'Martin Luther', 3),
+    P('PROPHET', 'GP_THOMAS_AQUINAS', 'Thomas Aquinas', 3),
+    P('PROPHET', 'GP_FRANCIS_OF_ASSISI', 'Francis of Assisi', 3),
   ],
-  // CIV6 ("Great Artist (Civ6)"): every Great Artist in the real game is
-  // Renaissance or later, and each one's three Great Works of Art have NAMED
-  // types. These four are the Renaissance row, in the page's own order, so
-  // `ARTIST_WORKS` below can be transcribed rather than invented.
   ARTIST: [
-    P('ARTIST', 'GP_RUBLEV', 'Andrei Rublev', { culture: 60 }, '+60 culture toward the current civic'),
-    P('ARTIST', 'GP_MICHELANGELO', 'Michelangelo', { culture: 150 }, '+150 culture toward the current civic'),
-    P('ARTIST', 'GP_DONATELLO', 'Donatello', { culture: 350 }, '+350 culture toward the current civic'),
-    P('ARTIST', 'GP_BOSCH', 'Hieronymus Bosch', { culture: 800 }, '+800 culture toward the current civic'),
+    // Renaissance
+    P('ARTIST', 'GP_ANDREI_RUBLEV', 'Andrei Rublev', 3),
+    P('ARTIST', 'GP_MICHELANGELO', 'Michelangelo', 3),
+    P('ARTIST', 'GP_DONATELLO', 'Donatello', 3),
+    P('ARTIST', 'GP_HIERONYMUS_BOSCH', 'Hieronymus Bosch', 3),
+    P('ARTIST', 'GP_KAMAL_UD_DIN_BEHZAD', 'Kamāl ud-Dīn Behzād', 3),
+    // Industrial
+    P('ARTIST', 'GP_REMBRANDT_VAN_RIJN', 'Rembrandt van Rijn', 4),
+    P('ARTIST', 'GP_EL_GRECO', 'El Greco', 4),
+    P('ARTIST', 'GP_QIU_YING', 'Qiu Ying', 4),
+    P('ARTIST', 'GP_TITIAN', 'Titian', 4),
+    P('ARTIST', 'GP_HASEGAWA_TOHAKU', 'Hasegawa Tōhaku', 4),
+    // Modern
+    P('ARTIST', 'GP_JANG_SEUNG_EOP', 'Jang Seung-eop', 5),
+    P('ARTIST', 'GP_SOFONISBA_ANGUISSOLA', 'Sofonisba Anguissola', 5),
+    P('ARTIST', 'GP_ANGELICA_KAUFFMAN', 'Angelica Kauffman', 5),
+    P('ARTIST', 'GP_KATSUSHIKA_HOKUSAI', 'Katsushika Hokusai', 5),
+    // Atomic
+    P('ARTIST', 'GP_EDMONIA_LEWIS', 'Edmonia Lewis', 6),
+    P('ARTIST', 'GP_CLAUDE_MONET', 'Claude Monet', 6),
+    P('ARTIST', 'GP_MARIE_ANNE_COLLOT', 'Marie-Anne Collot', 6),
+    P('ARTIST', 'GP_VINCENT_VAN_GOGH', 'Vincent van Gogh', 6),
+    // Information
+    P('ARTIST', 'GP_AMRITA_SHER_GIL', 'Amrita Sher-Gil', 7),
+    P('ARTIST', 'GP_BORIS_ORLOVSKY', 'Boris Orlovsky', 7),
+    P('ARTIST', 'GP_GUSTAV_KLIMT', 'Gustav Klimt', 7),
+    P('ARTIST', 'GP_MARY_CASSATT', 'Mary Cassatt', 7),
+    P('ARTIST', 'GP_WASSILY_KANDINSKY', 'Wassily Kandinsky', 7),
   ],
   ADMIRAL: [
-    P('ADMIRAL', 'GP_ARTEMISIA', 'Artemisia', { gold: 60 }, '+60 gold (prize money)'),
-    P('ADMIRAL', 'GP_THEMISTOCLES', 'Themistocles', { gold: 150 }, '+150 gold (prize money)'),
-    P('ADMIRAL', 'GP_ZHENG_HE', 'Zheng He', { gold: 350 }, '+350 gold (prize money)'),
-    P('ADMIRAL', 'GP_NELSON', 'Horatio Nelson', { gold: 800 }, '+800 gold (prize money)'),
+    // Classical
+    P('ADMIRAL', 'GP_ARTEMISIA', 'Artemisia', 1),
+    P('ADMIRAL', 'GP_GAIUS_DUILIUS', 'Gaius Duilius', 1),
+    P('ADMIRAL', 'GP_THEMISTOCLES', 'Themistocles', 1),
+    P('ADMIRAL', 'GP_HANNO_THE_NAVIGATOR', 'Hanno the Navigator', 1),
+    // Medieval
+    P('ADMIRAL', 'GP_HIMERIOS', 'Himerios', 2),
+    P('ADMIRAL', 'GP_LEIF_ERIKSON', 'Leif Erikson', 2),
+    P('ADMIRAL', 'GP_RAJENDRA_CHOLA', 'Rajendra Chola', 2),
+    P('ADMIRAL', 'GP_ZHENG_HE', 'Zheng He', 2),
+    // Renaissance
+    P('ADMIRAL', 'GP_FRANCIS_DRAKE', 'Francis Drake', 3),
+    P('ADMIRAL', 'GP_SANTA_CRUZ', 'Santa Cruz', 3),
+    P('ADMIRAL', 'GP_YI_SUN_SIN', 'Yi Sun-Sin', 3),
+    P('ADMIRAL', 'GP_FERDINAND_MAGELLAN', 'Ferdinand Magellan', 3),
+    // Industrial
+    P('ADMIRAL', 'GP_CHING_SHIH', 'Ching Shih', 4),
+    P('ADMIRAL', 'GP_HORATIO_NELSON', 'Horatio Nelson', 4),
+    P('ADMIRAL', 'GP_LASKARINA_BOUBOULINA', 'Laskarina Bouboulina', 4),
+    // Modern
+    P('ADMIRAL', 'GP_MATTHEW_PERRY', 'Matthew Perry', 5),
+    P('ADMIRAL', 'GP_FRANZ_VON_HIPPER', 'Franz von Hipper', 5),
+    P('ADMIRAL', 'GP_JOAQUIM_MARQUES_LISBOA', 'Joaquim Marques Lisboa', 5),
+    P('ADMIRAL', 'GP_TOGO_HEIHACHIRO', 'Togo Heihachiro', 5),
+    // Atomic
+    P('ADMIRAL', 'GP_CHESTER_NIMITZ', 'Chester Nimitz', 6),
+    P('ADMIRAL', 'GP_GRACE_HOPPER', 'Grace Hopper', 6),
+    P('ADMIRAL', 'GP_SERGEI_GORSHKOV', 'Sergei Gorshkov', 6),
+    // Information
+    P('ADMIRAL', 'GP_CLANCY_FERNANDO', 'Clancy Fernando', 7),
   ],
   GENERAL: [
-    P('GENERAL', 'GP_SUN_TZU', 'Sun Tzu', { culture: 50 }, '+50 culture (The Art of War)'),
-    P('GENERAL', 'GP_BOUDICA', 'Boudica', { productionToCapital: 120 }, '+120 production in the capital'),
-    P('GENERAL', 'GP_HANNIBAL', 'Hannibal Barca', { productionToCapital: 280 }, '+280 production in the capital'),
-    P('GENERAL', 'GP_EL_CID', 'El Cid', { productionToCapital: 600 }, '+600 production in the capital'),
+    // Classical
+    P('GENERAL', 'GP_BOUDICA', 'Boudica', 1),
+    P('GENERAL', 'GP_HANNIBAL_BARCA', 'Hannibal Barca', 1),
+    P('GENERAL', 'GP_SUN_TZU', 'Sun Tzu', 1),
+    P('GENERAL', 'GP_TRUNG_TRAC', 'Trưng Trắc', 1),
+    // Medieval
+    P('GENERAL', 'GP_THELFLD', 'Æthelflæd', 2),
+    P('GENERAL', 'GP_EL_CID', 'El Cid', 2),
+    P('GENERAL', 'GP_GENGHIS_KHAN_UNIT', 'Genghis Khan (unit)', 2),
+    P('GENERAL', 'GP_TIMUR', 'Timur', 2),
+    // Renaissance
+    P('GENERAL', 'GP_ANA_NZINGA', 'Ana Nzinga', 3),
+    P('GENERAL', 'GP_AMINA', 'Amina', 3),
+    P('GENERAL', 'GP_GUSTAVUS_ADOLPHUS', 'Gustavus Adolphus', 3),
+    P('GENERAL', 'GP_JEANNE_D_ARC', 'Jeanne d\'Arc', 3),
+    // Industrial
+    P('GENERAL', 'GP_DANDARA', 'Dandara', 4),
+    P('GENERAL', 'GP_SIMON_BOLIVAR_UNIT', 'Simón Bolívar (unit)', 4),
+    P('GENERAL', 'GP_JOSE_DE_SAN_MARTIN', 'José de San Martín', 4),
+    P('GENERAL', 'GP_NAPOLEON_BONAPARTE', 'Napoleon Bonaparte', 4),
+    P('GENERAL', 'GP_RANI_LAKSHMIBAI', 'Rani Lakshmibai', 4),
+    // Modern
+    P('GENERAL', 'GP_TUPAC_AMARU', 'Tupac Amaru', 5),
+    P('GENERAL', 'GP_JOHN_MONASH', 'John Monash', 5),
+    P('GENERAL', 'GP_MARINA_RASKOVA', 'Marina Raskova', 5),
+    P('GENERAL', 'GP_SAMORI_TOURE', 'Samori Touré', 5),
+    // Atomic
+    P('GENERAL', 'GP_DOUGLAS_MACARTHUR', 'Douglas MacArthur', 6),
+    P('GENERAL', 'GP_DWIGHT_EISENHOWER', 'Dwight Eisenhower', 6),
+    P('GENERAL', 'GP_GEORGY_ZHUKOV', 'Georgy Zhukov', 6),
+    P('GENERAL', 'GP_SUDIRMAN', 'Sudirman', 6),
+    // Information
+    P('GENERAL', 'GP_AHMAD_SHAH_MASSOUD', 'Ahmad Shah Massoud', 7),
+    P('GENERAL', 'GP_VIJAYA_WIMALARATNE', 'Vijaya Wimalaratne', 7),
   ],
   WRITER: [
-    P('WRITER', 'GP_LI_BAI', 'Li Bai', { culture: 45 }, '+45 culture toward the current civic'),
-    P('WRITER', 'GP_CHAUCER', 'Geoffrey Chaucer', { culture: 110 }, '+110 culture toward the current civic'),
-    P('WRITER', 'GP_SHELLEY', 'Mary Shelley', { culture: 260 }, '+260 culture toward the current civic'),
-    P('WRITER', 'GP_TOLSTOY', 'Leo Tolstoy', { culture: 600 }, '+600 culture toward the current civic'),
+    // Classical
+    P('WRITER', 'GP_HOMER', 'Homer', 1),
+    P('WRITER', 'GP_BHASA', 'Bhasa', 1),
+    P('WRITER', 'GP_QU_YUAN', 'Qu Yuan', 1),
+    P('WRITER', 'GP_OVID', 'Ovid', 1),
+    P('WRITER', 'GP_VALMIKI', 'Valmiki', 1),
+    // Medieval
+    P('WRITER', 'GP_GEOFFREY_CHAUCER', 'Geoffrey Chaucer', 2),
+    P('WRITER', 'GP_LI_BAI', 'Li Bai', 2),
+    P('WRITER', 'GP_MURASAKI_SHIKIBU', 'Murasaki Shikibu', 2),
+    P('WRITER', 'GP_RUMI', 'Rumi', 2),
+    // Renaissance
+    P('WRITER', 'GP_MIGUEL_DE_CERVANTES', 'Miguel de Cervantes', 3),
+    P('WRITER', 'GP_WILLIAM_SHAKESPEARE', 'William Shakespeare', 3),
+    P('WRITER', 'GP_NICCOLO_MACHIAVELLI', 'Niccolò Machiavelli', 3),
+    P('WRITER', 'GP_MARGARET_CAVENDISH', 'Margaret Cavendish', 3),
+    P('WRITER', 'GP_MARIE_CATHERINE_D_AULNOY', 'Marie-Catherine d\'Aulnoy', 3),
+    // Industrial
+    P('WRITER', 'GP_JANE_AUSTEN', 'Jane Austen', 4),
+    P('WRITER', 'GP_EDGAR_ALLAN_POE', 'Edgar Allan Poe', 4),
+    P('WRITER', 'GP_ALEXANDER_PUSHKIN', 'Alexander Pushkin', 4),
+    P('WRITER', 'GP_JOHANN_WOLFGANG_VON_GOETHE', 'Johann Wolfgang von Goethe', 4),
+    P('WRITER', 'GP_MARY_SHELLEY', 'Mary Shelley', 4),
+    // Modern
+    P('WRITER', 'GP_JAMES_JOYCE', 'James Joyce', 5),
+    P('WRITER', 'GP_EMILY_DICKINSON', 'Emily Dickinson', 5),
+    P('WRITER', 'GP_LEO_TOLSTOY', 'Leo Tolstoy', 5),
+    P('WRITER', 'GP_MARK_TWAIN', 'Mark Twain', 5),
+    P('WRITER', 'GP_BEATRIX_POTTER', 'Beatrix Potter', 5),
+    P('WRITER', 'GP_F_SCOTT_FITZGERALD', 'F. Scott Fitzgerald', 5),
+    // Atomic
+    P('WRITER', 'GP_RABINDRANATH_TAGORE', 'Rabindranath Tagore', 6),
+    P('WRITER', 'GP_H_G_WELLS', 'H. G. Wells', 6),
+    // Information
+    P('WRITER', 'GP_KAREL_CAPEK', 'Karel Capek', 7),
+    P('WRITER', 'GP_GABRIELA_MISTRAL', 'Gabriela Mistral', 7),
   ],
   MUSICIAN: [
-    P('MUSICIAN', 'GP_VIVALDI', 'Antonio Vivaldi', { culture: 50 }, '+50 culture toward the current civic'),
-    P('MUSICIAN', 'GP_MOZART', 'Wolfgang Amadeus Mozart', { culture: 130 }, '+130 culture toward the current civic'),
-    P('MUSICIAN', 'GP_CHOPIN', 'Frederic Chopin', { culture: 300 }, '+300 culture toward the current civic'),
-    P('MUSICIAN', 'GP_TCHAIKOVSKY', 'Pyotr Tchaikovsky', { culture: 700 }, '+700 culture toward the current civic'),
+    // Industrial
+    P('MUSICIAN', 'GP_LUDWIG_VAN_BEETHOVEN', 'Ludwig van Beethoven', 4),
+    P('MUSICIAN', 'GP_JOHANN_SEBASTIAN_BACH', 'Johann Sebastian Bach', 4),
+    P('MUSICIAN', 'GP_YATSUHASHI_KENGYO', 'Yatsuhashi Kengyo', 4),
+    P('MUSICIAN', 'GP_ANTONIO_VIVALDI', 'Antonio Vivaldi', 4),
+    P('MUSICIAN', 'GP_WOLFGANG_AMADEUS_MOZART', 'Wolfgang Amadeus Mozart', 4),
+    P('MUSICIAN', 'GP_DIMITRIE_CANTEMIR', 'Dimitrie Cantemir', 4),
+    // Modern
+    P('MUSICIAN', 'GP_FRANZ_LISZT', 'Franz Liszt', 5),
+    P('MUSICIAN', 'GP_PETER_ILYICH_TCHAIKOVSKY', 'Peter Ilyich Tchaikovsky', 5),
+    P('MUSICIAN', 'GP_ANTONIO_CARLOS_GOMES', 'Antônio Carlos Gomes', 5),
+    P('MUSICIAN', 'GP_LIU_TIANHUA', 'Liu Tianhua', 5),
+    P('MUSICIAN', 'GP_FREDERIC_CHOPIN', 'Frédéric Chopin', 5),
+    P('MUSICIAN', 'GP_SCOTT_JOPLIN', 'Scott Joplin', 5),
+    // Atomic
+    P('MUSICIAN', 'GP_JUVENTINO_ROSAS', 'Juventino Rosas', 6),
+    P('MUSICIAN', 'GP_ANTONIN_DVORAK', 'Antonín Dvořák', 6),
+    P('MUSICIAN', 'GP_LILI_UOKALANI', 'Lili\'uokalani', 6),
+    P('MUSICIAN', 'GP_CLARA_SCHUMANN', 'Clara Schumann', 6),
+    // Information
+    P('MUSICIAN', 'GP_MYKOLA_LEONTOVYCH', 'Mykola Leontovych', 7),
+    P('MUSICIAN', 'GP_GAUHAR_JAAN', 'Gauhar Jaan', 7),
   ],
 };
-
 export const GP_CLASSES = Object.keys(GP_CLASS_DISTRICT) as GreatPersonClass[];
+
+/**
+ * Per class, the QUEUE POSITION of the first person whose era is at least e.
+ * CIV6: "When a Great Person is claimed, the replacement is chosen randomly
+ * from those available in the current era, or the next if all those from the
+ * current era have been claimed" — a person the world has already passed can
+ * never be offered again, and a class whose roster ends before the world era
+ * offers nobody at all.
+ */
+export const GP_FIRST_OF_ERA: Record<GreatPersonClass, readonly number[]> = {
+  SCIENTIST: [0, 0, 4, 7, 11, 14, 17, 21, 24],
+  ENGINEER: [0, 0, 0, 4, 7, 10, 14, 17, 21],
+  MERCHANT: [0, 0, 3, 7, 11, 14, 18, 21, 24],
+  PROPHET: [0, 0, 6, 11, 16, 16, 16, 16, 16],
+  ARTIST: [0, 0, 0, 0, 5, 10, 14, 18, 23],
+  ADMIRAL: [0, 0, 4, 8, 12, 15, 19, 22, 23],
+  GENERAL: [0, 0, 4, 8, 12, 17, 21, 25, 27],
+  WRITER: [0, 0, 5, 9, 14, 19, 25, 27, 29],
+  MUSICIAN: [0, 0, 0, 0, 0, 6, 12, 16, 18],
+};
 
 /**
  * GREAT WORKS. A claimed WRITER, ARTIST or MUSICIAN carries
@@ -224,21 +505,36 @@ export const ART_PORTRAIT = 2;
 export const ART_LANDSCAPE = 3;
 
 /**
- * The three works each Great Artist makes, in creation order — transcribed
- * from the Great Artist (Civ6) roster's own "Great Works of Art" column,
- * indexed the same way as `GREAT_PEOPLE.ARTIST`.
- *
- *   Andrei Rublev      Annunciation, Saviour in Glory, Ascension  — Religious x3
- *   Michelangelo       Sistine Chapel Ceiling (Religious), Pietà, David (Sculpture)
- *   Donatello          Saint Mark, Gattamelata, Judith            — Sculpture x3
- *   Hieronymus Bosch   Earthly Delights, Last Judgement, Haywain  — Religious x3
+ * The three works each Great Artist makes, in creation order — transcribed from
+ * the Great Artist (Civ6) roster's own "Great Works of Art" column, one row per
+ * artist and indexed the same way as `GREAT_PEOPLE.ARTIST`.
  */
 export const ARTIST_WORKS: readonly (readonly number[])[] = [
   [ART_RELIGIOUS, ART_RELIGIOUS, ART_RELIGIOUS],
   [ART_RELIGIOUS, ART_SCULPTURE, ART_SCULPTURE],
   [ART_SCULPTURE, ART_SCULPTURE, ART_SCULPTURE],
   [ART_RELIGIOUS, ART_RELIGIOUS, ART_RELIGIOUS],
+  [ART_RELIGIOUS, ART_RELIGIOUS, ART_RELIGIOUS],
+  [ART_PORTRAIT, ART_PORTRAIT, ART_RELIGIOUS],
+  [ART_RELIGIOUS, ART_RELIGIOUS, ART_LANDSCAPE],
+  [ART_LANDSCAPE, ART_LANDSCAPE, ART_LANDSCAPE],
+  [ART_RELIGIOUS, ART_RELIGIOUS, ART_PORTRAIT],
+  [ART_RELIGIOUS, ART_RELIGIOUS, ART_RELIGIOUS],
+  [ART_LANDSCAPE, ART_LANDSCAPE, ART_LANDSCAPE],
+  [ART_PORTRAIT, ART_PORTRAIT, ART_PORTRAIT],
+  [ART_PORTRAIT, ART_PORTRAIT, ART_PORTRAIT],
+  [ART_LANDSCAPE, ART_LANDSCAPE, ART_LANDSCAPE],
+  [ART_SCULPTURE, ART_SCULPTURE, ART_SCULPTURE],
+  [ART_LANDSCAPE, ART_LANDSCAPE, ART_LANDSCAPE],
+  [ART_SCULPTURE, ART_SCULPTURE, ART_SCULPTURE],
+  [ART_LANDSCAPE, ART_LANDSCAPE, ART_LANDSCAPE],
+  [ART_PORTRAIT, ART_PORTRAIT, ART_PORTRAIT],
+  [ART_SCULPTURE, ART_SCULPTURE, ART_SCULPTURE],
+  [ART_PORTRAIT, ART_LANDSCAPE, ART_LANDSCAPE],
+  [ART_PORTRAIT, ART_PORTRAIT, ART_PORTRAIT],
+  [ART_RELIGIOUS, ART_RELIGIOUS, ART_RELIGIOUS],
 ];
+
 
 export const GW_WORKS_PER_PERSON = [2, 3, 2] as const;
 export const GW_CULTURE = [2, 2, 4] as const;

@@ -56,6 +56,17 @@ export interface BuiltWonderDef {
     /** +1 amenity to the holding city per matching improvement within
      *  `range` tiles of the WONDER (Temple of Artemis). */
     amenityPerImprovement?: { improvements: ImprovementId[]; range: number };
+    /** CIV6 (Ruhr Valley): "+1 Production for each Mine and Quarry in this
+     *  city" — yields the HOLDING city gains per matching unpillaged
+     *  improvement on a tile that city owns. */
+    cityYieldPerImprovement?: { improvements: ImprovementId[]; yields: Partial<Yields> };
+    /** CIV6 (Great Library): "Receive boosts to all Ancient and Classical era
+     *  technologies" — every technology of this era index or lower is boosted
+     *  once, at completion. -1 for none. */
+    boostTechsThroughEra?: number;
+    /** CIV6 (Oracle): "Districts in this city provide +2 Great Person points
+     *  of their type." */
+    districtGpPoints?: number;
     cityYieldMult?: Partial<Yields>;
     /** Policy slots the wonder appends to its owner's government. */
     extraSlots?: Partial<Record<SlotKind, number>>;
@@ -140,7 +151,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       requiresCivic: 'MYSTICISM',
       placement: { hillsOnly: true },
       cityYields: { culture: 1, faith: 1 },
-      description: '+1 culture, +1 faith. Hills.',
+      effects: { districtGpPoints: 2 },
+      description: '+1 culture, +1 faith, districts in this city give +2 Great Person points of their type. Hills.',
     }),
     W({
       id: 'GREAT_LIBRARY',
@@ -150,8 +162,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       requiresCivic: 'RECORDED_HISTORY',
       placement: { flatOnly: true, adjacentDistrict: 'CAMPUS' },
       cityYields: { science: 2 },
-      effects: { gpPoints: { SCIENTIST: 1, WRITER: 1 } },
-      description: '+2 science, +1 Scientist and +1 Writer point per turn, 2 Great Work of Writing slots. Flat land adjacent to a Campus.',
+      effects: { gpPoints: { SCIENTIST: 1, WRITER: 1 }, boostTechsThroughEra: 1 },
+      description: '+2 science, +1 Scientist and +1 Writer point per turn, 2 Great Work of Writing slots, boosts every Ancient and Classical technology. Flat land adjacent to a Campus.',
     }),
     W({
       id: 'COLOSSEUM',
@@ -226,8 +238,11 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       cost: 1240,
       requiresTech: 'INDUSTRIALIZATION',
       placement: { requiresRiver: true, adjacentDistrict: 'INDUSTRIAL_ZONE' },
-      effects: { cityYieldMult: { production: 1.2 } },
-      description: '+20% production in this city. River tile adjacent to an Industrial Zone.',
+      effects: {
+        cityYieldMult: { production: 1.2 },
+        cityYieldPerImprovement: { improvements: ['MINE', 'QUARRY'], yields: { production: 1 } },
+      },
+      description: '+20% production in this city, +1 production per Mine and Quarry it owns. River tile adjacent to an Industrial Zone.',
     }),
     W({
       id: 'BIG_BEN',

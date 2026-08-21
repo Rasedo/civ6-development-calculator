@@ -254,6 +254,34 @@ class SimInit:
         )
         self.hills = torch.tensor([[t.get("hl", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.river_mask = torch.tensor([[int(t.get("rm", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        # CIV6 (Flood): "flooding all Floodplains tiles found along the River".
+        # Which river a tile is on, -1 for none — `riverReach`'s twin. Two
+        # tiles share a river when a river EDGE separates them; a river's edges
+        # are a vertex-connected chain and any two edges meeting at a vertex
+        # are consecutive edges of one common tile, so this walk covers exactly
+        # one river. Static: rivers never move.
+        _rm = self.river_mask.tolist()
+        _nb = self.neigh.tolist()
+        _comp = [[-1] * T for _ in range(B)]
+        for _b in range(B):
+            _lbl, _next = _comp[_b], 0
+            for _t0 in range(T):
+                if _lbl[_t0] >= 0 or _rm[_b][_t0] == 0:
+                    continue
+                _lbl[_t0] = _next
+                _stack = [_t0]
+                while _stack:
+                    _t = _stack.pop()
+                    for _d in range(6):
+                        if not (_rm[_b][_t] >> _d) & 1:
+                            continue
+                        _n = _nb[_t][_d]
+                        if _n < 0 or _lbl[_n] >= 0:
+                            continue
+                        _lbl[_n] = _next
+                        _stack.append(_n)
+                _next += 1
+        self.river_comp = torch.tensor(_comp, dtype=torch.long, device=device)
         self.cliff_mask = torch.tensor([[int(t.get("cm", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # Per-tile APPEAL contribution (cpu/core/appeal.ts tileAppeal sums what
         # each NEIGHBOUR contributes). `ap` = static part + the t0 feature term;
@@ -565,6 +593,9 @@ class SimInit:
         self.military_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.civilian_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.gp_earned = torch.zeros(B, n_gp, dtype=torch.long, device=device)
+        # the QUEUE POSITION each class offers next, which runs AHEAD of
+        # `gp_earned` whenever the world era steps past an unclaimed person.
+        self.gp_next = torch.zeros(B, n_gp, dtype=torch.long, device=device)
         self.pantheon_claimed_n = torch.zeros(B, dtype=torch.long, device=device)
         self.claimed_f_n = torch.zeros(B, dtype=torch.long, device=device)
         self.claimed_o_n = torch.zeros(B, dtype=torch.long, device=device)
@@ -641,6 +672,9 @@ class SimInit:
         self._city_rel_live = bool(_bl.get("cityReligionAdderLive", False))
         self._theo_swing = float(_bl.get("theoPressureSwing", 15))
         self._theo_range = int(_bl.get("theoPressureRange", 6))
+        self._relig_heal_per_faith = int(_bl.get("religiousHealPerFaith", 3))
+        self._theo_holy_ground = int(_bl.get("theoHolyGround", 5))
+        self._theo_holy_city = int(_bl.get("theoHolyCity", 15))
         self._martyr_chance = float(_bl["martyrChance"])
         self._enh = {
             "presR": torch.tensor([0.0] + [float(x.get("presR", 0)) for x in _erows], dtype=torch.float64, device=device),
@@ -718,6 +752,15 @@ class SimInit:
             # and the reach, per wonder.
             self._wond_amen_imp = [(wi, list(w["amenImp"]), int(w["amenImpRange"]))
                                    for wi, w in enumerate(self._wond_rows) if w["amenImp"]]
+            # Ruhr Valley: the improvements the HOLDING city is paid a yield
+            # for, and that yield [6], per wonder that names any.
+            self._wond_imp_yield = [
+                (wi, list(w["impY"]), torch.tensor(list(w["impYYields"]), dtype=torch.float64, device=device))
+                for wi, w in enumerate(self._wond_rows) if w["impY"]]
+            # Great Library: boost every technology up to this era, -1 = none.
+            self._wond_boost_era = torch.tensor([int(w["boostTechEra"]) for w in self._wond_rows], dtype=torch.long, device=device)
+            # Oracle: what each of the holding city's districts adds to its own class.
+            self._wond_distgpp = torch.tensor([float(w["distGpp"]) for w in self._wond_rows], dtype=torch.float64, device=device)
             self._wond_envoy = torch.tensor([int(w["envoysPerWonder"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_spread = torch.tensor([int(w["spreadCharges"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_build_ch = torch.tensor([int(w["buildCharges"]) for w in self._wond_rows], dtype=torch.long, device=device)
@@ -754,12 +797,26 @@ class SimInit:
                     self.city_id[b, row, j] = rc["id"]
                     self.centre_slot_at[b, rc["center"]] = j
                 self.civ_next_city_id[b, row] = len(cv.get("cities", []))
-        self._gp_costs = torch.tensor(rr.get("gpCosts", [60 * 2**n for n in range(8)]), dtype=torch.float64, device=device)
+        # [person era, eras the world is BEHIND that person] -> GPP price,
+        # floored by the exporter so both engines read the same doubles.
+        self._gp_cost_table = torch.tensor(
+            rr.get("gpCostTable", [[60] * 9] * 9), dtype=torch.float64, device=device)
         self._gp_roster = torch.tensor(rr.get("gpRoster", [4, 4, 4, 4, 4]), dtype=torch.long, device=device)
+        self._gp_flat_cost = torch.tensor(
+            rr.get("gpFlatCost", [0] * n_gp), dtype=torch.bool, device=device)
         gp_cd = rr.get("gpClassDistrict", [])
         self._gp_class_district = torch.tensor(gp_cd if gp_cd else [-1] * n_gp, dtype=torch.long, device=device)
-        gp_fx = rr.get("gpEffects", [])
-        self._gp_effects = torch.tensor(gp_fx if gp_fx else [[[0, 0, 0, 0, 0]] * 4] * n_gp, dtype=dtype, device=device)  # [n_gp, maxN, 5] (col 4 = faith)
+        gp_fx = rr.get("gpEffects", []) or [[[0, 0, 0, 0, 0]] * 4] * n_gp
+        gp_ea = rr.get("gpEra", []) or [[0] * len(c) for c in gp_fx]
+        _maxN = max(1, max(len(c) for c in gp_fx))
+        # the rosters are RAGGED (each class has as many people as its page
+        # names); pad to the widest and let `_gp_roster` gate the tail.
+        self._gp_effects = torch.tensor(
+            [c + [[0, 0, 0, 0, 0]] * (_maxN - len(c)) for c in gp_fx], dtype=dtype, device=device)  # [n_gp, maxN, 5] (col 4 = faith)
+        self._gp_era = torch.tensor(
+            [c + [0] * (_maxN - len(c)) for c in gp_ea], dtype=torch.long, device=device)
+        self._gp_first_of_era = torch.tensor(
+            rr.get("gpFirstOfEra", [[0] * 9] * n_gp), dtype=torch.long, device=device)
         self._prophet_cls = int(rr.get("prophetCls", 3))  # PROPHET's class index
         self._gp_nc = int(self._gp_class_district.numel())
         self._alloc_civ_pairs(B, self.n_majors, dtype, device)
@@ -1204,6 +1261,7 @@ class SimInit:
         self._bel_add_memo = None        # (_bel_version, {(fn,key,r): tensor})
         self._gov_pol_cache = None       # (_eff_version, {seat_tag: 5-tuple})
         self._dadj_cache = None          # (_eff_version, {di: floored [B,T] adjacency})
+        self._hs_faith_cache = None      # (_eff_version, [B,T] Holy Site faith output)
         # Static candidate lists for _pick_static: the k-th candidate in
         # tile order, so a pick is one gather instead of a [B, T] cumsum.
         def cand_list(cand: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -1289,6 +1347,10 @@ class SimInit:
         # for a building that provides SCIENCE, Pen Brush and Voice for one
         # carrying a GREAT WORK slot.
         self._b_science = (rules.b_yields[:, 3] > 0).to(device)  # [NB] bool
+        # the FAITH a building adds to the Holy Site it stands in — what a
+        # religious unit heals off (`holySiteFaith`).
+        self._b_hs_faith = (rules.b_yields[:, 5].to(device).long()
+                            * (self._b_req_district == self._hs_idx).long())  # [NB]
         self._b_gwslot = torch.zeros(self.NB, dtype=torch.bool, device=device)
         for _k in self._gw_bidx:
             if _k >= 0:
@@ -1369,6 +1431,7 @@ class SimInit:
         self._class_anticav_vs_cav = int(cb.get("classAnticavVsCav", 10))
         self._flank_support_civic = int(cb.get("flankSupportCivic", -1))
         self._amphibious_attack_cs = int(cb.get("amphibiousAttackCs", 10))
+        self._fort_def_cs = int(cb.get("fortDefenseCs", 4))
         self._embark_live = bool(cb.get("embarkLive", 0))
         self._shipbuilding_tech = int(cb.get("shipbuildingTech", -1))
         self._cartography_tech = int(cb.get("cartographyTech", -1))
@@ -1449,11 +1512,13 @@ class SimInit:
         self._arange_bt = self._arangeT.unsqueeze(0).expand(B, T)
         self._tile_miss = torch.full((B, T), T + 1, dtype=torch.long, device=device)
         self._march_miss = torch.full((B, T), 10**9, dtype=torch.long, device=device)
-        # The barbarian march key's SEAT term, one entry per city-block cell in
-        # `city_center[:, :n_majors].reshape(B, -1)` order (row-major, so the
-        # column index runs fastest).
-        self._march_seatkey = (torch.arange(self.n_majors * self.RC, device=device)
-                               // self.RC) * 2048
+        # The march key's SEAT term, one entry per city-block cell in
+        # `city_center.reshape(B, -1)` order (row-major, so the column index
+        # runs fastest). A CITY-STATE row carries its 100+ seat id, which is
+        # why the distance term is scaled by 2048 * 256 rather than 2048 * 8.
+        _cell_row = torch.arange(self.city_center.shape[1] * self.RC, device=device) // self.RC
+        self._march_seatkey = torch.where(
+            _cell_row < self.n_majors, _cell_row, 100 + _cell_row - self.n_majors) * 2048
         self._bidx = torch.arange(B, device=device)
         self._inf_f = torch.tensor(float("inf"), dtype=dtype, device=device)
         self._adjd_cache = None
