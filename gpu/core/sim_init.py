@@ -283,6 +283,7 @@ class SimInit:
                 _next += 1
         self.river_comp = torch.tensor(_comp, dtype=torch.long, device=device)
         self.cliff_mask = torch.tensor([[int(t.get("cm", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        self._has_cliffs = bool(self.cliff_mask.any())
         # Per-tile APPEAL contribution (cpu/core/appeal.ts tileAppeal sums what
         # each NEIGHBOUR contributes). `ap` = static part + the t0 feature term;
         # `apf` isolates that feature term so a chopped tile subtracts

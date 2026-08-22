@@ -1181,24 +1181,28 @@ class SimMasks:
         return tab[:, civ]
 
     def _cliff_block_dirs(self, cur: torch.Tensor, nb6: torch.Tensor, own: torch.Tensor | None = None) -> torch.Tensor:
-        B, dev = self.B, self.device
-        if not bool(self.cliff_mask.any()):
-            return torch.zeros(B, 6, dtype=torch.bool, device=dev)
-        c = cur.clamp(min=0)
-        nbc = nb6.clamp(min=0)
-        cw = self.water.gather(1, c.unsqueeze(1))            # [B, 1]
-        nw = self.water.gather(1, nbc)                        # [B, 6]
+        """[B, N, 6] over unit SLOTS: which of the six steps a cliff closes,
+        the whole pool in one dispatch. `_cliff_edge`'s rule; a caller holding
+        a single unit passes N=1."""
+        B, N, dev = self.B, cur.shape[1], self.device
+        if not self._has_cliffs:
+            return torch.zeros(B, N, 6, dtype=torch.bool, device=dev)
+        c = cur.clamp(min=0)                                  # [B, N]
+        nbc3 = nb6.clamp(min=0)                               # [B, N, 6]
+        flat = nbc3.reshape(B, N * 6)
+        cw = self.water.gather(1, c).unsqueeze(2)             # [B, N, 1]
+        nw = self.water.gather(1, flat).reshape(B, N, 6)
         trans = (cw != nw) & (nb6 >= 0)
         if not bool(trans.any()):
-            return torch.zeros(B, 6, dtype=torch.bool, device=dev)
-        dirs = torch.arange(6, device=dev).reshape(1, 6).expand(B, 6)
-        land = torch.where(cw.expand(B, 6), nbc, c.unsqueeze(1).expand(B, 6))
-        dl = torch.where(cw.expand(B, 6), (dirs + 3) % 6, dirs)
+            return torch.zeros(B, N, 6, dtype=torch.bool, device=dev)
+        dirs = torch.arange(6, device=dev).reshape(1, 1, 6)
+        land = torch.where(cw, nbc3, c.unsqueeze(2)).reshape(B, N * 6)
+        dl = torch.where(cw, (dirs + 3) % 6, dirs).expand(B, N, 6).reshape(B, N * 6)
         bit = ((self.cliff_mask.gather(1, land) >> dl) & 1).bool()
         free = self.centre_slot_at.gather(1, land) >= 0
         if self._harbor_idx >= 0 and own is not None:
             free = free | ((self.district.gather(1, land) == self._harbor_idx) & own.gather(1, land))
-        return trans & bit & ~free
+        return trans & bit.reshape(B, N, 6) & ~free.reshape(B, N, 6)
 
     def _amph_atk_cs(self, emb: torch.Tensor) -> torch.Tensor:
         """[B] the attacker's amphibious penalty. CIV6 (Combat): an attack
@@ -1215,7 +1219,7 @@ class SimMasks:
         water side that is the OPPOSITE direction ((d + 3) % 6 on this hex
         layout). Sourced exceptions: a city centre and a HARBOR ignore cliffs.
         Cliffs never touch land-to-land steps."""
-        if not bool(self.cliff_mask.any()):
+        if not self._has_cliffs:
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         c = cur.clamp(min=0)
         d = dest.clamp(min=0)
@@ -1386,12 +1390,8 @@ class SimMasks:
             self._blocked_for(nbc, row).reshape(B, N, 6),
         )
         has_mp = (self.unit_mp.gather(1, sc) > 0).unsqueeze(2)
-        cliff6 = torch.zeros(B, N, 6, dtype=torch.bool, device=dev)
-        if self._embark_live:
-            for _n in range(N):
-                if not bool(present[:, _n].any()):
-                    break
-                cliff6[:, _n] = self._cliff_block_dirs(tc[:, _n], nb[:, _n], own_tile)
+        cliff6 = (self._cliff_block_dirs(tc, nb, own_tile) & alive if self._embark_live
+                  else torch.zeros(B, N, 6, dtype=torch.bool, device=dev))
         move = on_map & terr & ~_blk & alive & has_mp & ~cliff6
 
         # ---- ATTACK 6-11 -----------------------------------------------------

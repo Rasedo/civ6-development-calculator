@@ -122,7 +122,7 @@ class SimOrders:
                     )
                     any_war = self.war[:, row].any(dim=1)
                     terr = torch.where(is_nav, water, terr | (water & ship & ~is_nav & any_war))
-                clf = self._cliff_block_dirs(hc, nb, own_tile).gather(1, dirs.unsqueeze(1)).squeeze(1)
+                clf = self._cliff_block_dirs(hc.unsqueeze(1), nb.unsqueeze(1), own_tile)[:, 0].gather(1, dirs.unsqueeze(1)).squeeze(1)
                 mp = self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1)
                 ok = mv & (tgt >= 0) & terr & ~blocked & ~clf & (mp > 0)
                 if bool(ok.any()):
@@ -142,7 +142,7 @@ class SimOrders:
                     # LAND shore, with a MELEE attack, and nothing afloat.
                     valid = valid & (~u_emb | (
                         ~self.water.gather(1, tc.unsqueeze(1)).squeeze(1)
-                        & ~self._cliff_block_dirs(hc, nb, own_tile).gather(1, dirs.unsqueeze(1)).squeeze(1)
+                        & ~self._cliff_block_dirs(hc.unsqueeze(1), nb.unsqueeze(1), own_tile)[:, 0].gather(1, dirs.unsqueeze(1)).squeeze(1)
                         & (self._type_ranged_strength[ut] <= 0)
                     ))
                 if bool(valid.any()):

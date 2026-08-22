@@ -165,7 +165,7 @@ def _field_name(i: int, S: int, n_opponents: int, C: int, NT: int, NC: int) -> s
 def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                 ckpt_dir: Path | None = None, resume: int = 0,
                 profile: bool = False, cprofile: str = "",
-                only: list[int] | None = None) -> None:
+                only: list[int] | None = None, cprofile_out: str = "") -> None:
     """The battery-lane shape: ONE B=N GPU sim, one TS child per seed in
     PARALLEL, a per-turn barrier. Children run concurrently between barriers
     (independent processes); the GPU pays batched dispatch once per step
@@ -410,6 +410,9 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     if cp is not None:
         import pstats
         cp.create_stats()
+        if cprofile_out:
+            cp.dump_stats(cprofile_out)
+            print(f"\nCPROFILE — stats written to {cprofile_out}")
         print(f"\nCPROFILE — turns {cp_lo}..{cp_hi}, full loop body:")
         st = pstats.Stats(cp)
         st.sort_stats("cumulative").print_stats(30)
@@ -435,6 +438,7 @@ def main() -> None:
     ap.add_argument("--resume", type=int, default=0, help="resume from the checkpoint taken at this turn (a prior --ckpt-every run, same seeds)")
     ap.add_argument("--profile", action="store_true", help="batched only: print the turn-loop wall-time split (TS-children wait vs GPU vs digest)")
     ap.add_argument("--cprofile", default="", help="batched only: 'T0-T1' — cProfile the loop body over that turn window, in situ")
+    ap.add_argument("--cprofile-out", default="", help="with --cprofile: also dump the raw pstats there, for caller attribution")
     args = ap.parse_args()
     ckpt_dir = Path(args.ckpt_dir)
 
@@ -443,7 +447,8 @@ def main() -> None:
         if args.seeds and args.seeds != "all":
             only = [int(x) for x in args.seeds.split(",")]
         run_batched(args.turns, args.eps, args.ckpt_every, ckpt_dir, args.resume,
-                    profile=args.profile, cprofile=args.cprofile, only=only)
+                    profile=args.profile, cprofile=args.cprofile, only=only,
+                    cprofile_out=args.cprofile_out)
         return
 
     if args.seeds:
