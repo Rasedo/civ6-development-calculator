@@ -45,12 +45,16 @@ const RELAX: [number, number][] = [
 ];
 
 const CITY_STATE_TYPES = ['scientific', 'cultural', 'trade', 'industrial', 'militaristic', 'religious'] as const;
+// A COPY of `CITY_STATE_NAMES` in cpu/data/cityStates.ts: this directory is
+// hashed into `genStamp` and importing from cpu/ would make world generation
+// depend on an unhashed file. tests/cpu/data/cityStateRoster.test.ts asserts
+// every name here has a catalog row of the same type.
 const CITY_STATE_NAMES: Record<(typeof CITY_STATE_TYPES)[number], string[]> = {
-  scientific: ['Geneva', 'Stockholm', 'Bologna'],
-  cultural: ['Nan Madol', 'Kumasi', 'Vilnius'],
-  trade: ['Amsterdam', 'Antioch', 'Hunza'],
-  industrial: ['Hong Kong', 'Buenos Aires', 'Toronto'],
-  militaristic: ['Kabul', 'Valletta', 'Preslav'],
+  scientific: ['Geneva', 'Bologna', 'Anshan'],
+  cultural: ['Vilnius', 'Nan Madol', 'Kumasi'],
+  trade: ['Venice', 'Zanzibar', 'Bandar Brunei'],
+  industrial: ['Mexico City', 'Buenos Aires', 'Hong Kong'],
+  militaristic: ['Kabul', 'Ngazargamu', 'Preslav'],
   religious: ['Jerusalem', 'La Venta', 'Yerevan'],
 };
 

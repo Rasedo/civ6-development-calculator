@@ -229,6 +229,7 @@ class SimInit:
         self._suz_c_route = _sfx.index("csRouteYields") if "csRouteYields" in _sfx else -1
         self._suz_c_holy = _sfx.index("holySitePressure") if "holySitePressure" in _sfx else -1
         self._suz_c_apostle = _sfx.index("apostlePromoChoice") if "apostlePromoChoice" in _sfx else -1
+        self._suz_c_era = _sfx.index("eraInspiration") if "eraInspiration" in _sfx else -1
         self._suz_xp_mult_k = int(_suz["xpMult"])
         self._suz_hill_cs = int(_suz["hillCs"])
         self._suz_reach_bonus = int(_suz["reachBonus"])
@@ -441,6 +442,7 @@ class SimInit:
         self._c_mig_loy = float(_er2["congressMigLoyalty"])
         self._c_gw_mult = int(_er2["congressGwMult"])
         self._era_len = int(_er.get("length", 50))
+        self._era_count = int(_er["count"])
         self._era_pts = {k: int(_er.get(k, d)) for k, d in (("found", 2), ("conquer", 3), ("wonder", 3), ("pantheon", 1), ("religion", 2), ("gp", 1))}
         self._era_moment_min = int(_er["momentMin"])
         # Per-seat Age (0 Dark / 1 Normal / 2 Golden), assigned at each era
@@ -1042,7 +1044,11 @@ class SimInit:
 
         self.districts_cat = list(rules.districts or [])
         self.districts_on = bool(self.districts_cat)
-        self.district = torch.full((B, T), -1, dtype=torch.long, device=device)  # -1 none, else PLACEABLE_DISTRICTS idx
+        # -1 none, else PLACEABLE_DISTRICTS idx. CENTRES ARE NOT IN HERE —
+        # they live in `centre_slot_at`, while TS keeps one `tile.district`
+        # that `foundCity` sets to 'CITY_CENTER'. Every twin of a TS test that
+        # reads `t.district` must therefore name BOTH planes.
+        self.district = torch.full((B, T), -1, dtype=torch.long, device=device)
         # A queued district is placed but NOT complete; paving, eligibility and
         # cap consumers deliberately stay placement-based (TS paves and caps on
         # tile.district regardless of completeness).

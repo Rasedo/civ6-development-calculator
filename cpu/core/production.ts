@@ -18,15 +18,17 @@ import { promoClassOf } from './promotions';
 import { applyLumpYield } from './economy';
 import { congressGppFactor } from './congress';
 import { BUILT_WONDERS } from '../data/builtWonders';
+import { nextRandom } from './rand';
 
-/** Complete `n` techs or civics outright. Real Civ 6 draws them at random;
- *  this takes the first AVAILABLE rows in catalog order, the same order every
- *  other unresearched-row walk uses. */
+/** CIV6 (Oxford University, Bolshoi Theatre): the free technologies and civics
+ *  are DRAWN AT RANDOM. One draw per grant over the rows available at that
+ *  moment, so a seat with nothing available advances the stream not at all. */
 function grantFreeResearch(state: GameState, owner: Seat, kind: 'tech' | 'civic', n: number): void {
   const rsr = owner.research;
   for (let i = 0; i < n; i++) {
-    const next = kind === 'tech' ? availableTechsIn(rsr)[0] : availableCivicsIn(rsr)[0];
-    if (!next) return; // the tree is exhausted
+    const open = kind === 'tech' ? availableTechsIn(rsr) : availableCivicsIn(rsr);
+    if (open.length === 0) return; // the tree is exhausted
+    const next = open[Math.floor(nextRandom(state) * open.length)];
     if (kind === 'tech') {
       if (next.id === URBAN_DEFENSES_TECH) urbanDefensesFit(state, owner.seat);
       rsr.techs.push(next.id);

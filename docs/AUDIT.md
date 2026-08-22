@@ -74,24 +74,23 @@ nothing carries forward.
 | B-59r the religious spread is a flat lump | 2 | Civ 6 scales the pressure by the Apostle's HP and strips a quarter of every other religion; both engines add a constant and strip nothing without Proselytizer |
 | B-51r the Encampment's second pool | 1 | the district meets the city's perimeter and heals only while its tile is clear; Civ 6 tracks the two pools SEPARATELY, and a defeat pillages it |
 | B-44r city-state war tails | 1 | the head, its policy and a SEAT's march on a minor ship; the barbarian walker still raids only majors because it beelines to one nearest city, and the diplomatic consequences wait on C-19 |
+| B-60r the dig's DATE, and the hull nobody dates | 1 | the artifact's civilization is the event's own now; its ERA is still the ACTING seat's research, and a barbarian or minor sinking a hull leaves no wreck at all |
 | B-34r flood tails | 1 | the severity ladder and the river's whole reach ship; the Great Bath's mitigation is still seat-scoped rather than river-scoped, and the Dam is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **25** | |
+| **B. Fidelity vs real Civ 6** | **26** | |
 | C-1 POWER | 5 | no plants, no grid, no powered-yield term — 4 gaps wait on it |
 | C-2 diplomatic agreements | 3 | friendship, alliances, open borders, the closed border and the work gift ship on one 30-turn clock; alliance TYPES and LEVELS, the negotiated two-sided deal, and the four agreements that need one are open |
 | C-4 unique improvements | 3 | Batey / Colossal Head / Monastery, each a flat channel today |
 | C-5 strategic-resource stockpiles | 4 | resources gate, they never accumulate or get spent |
 | C-6 policy-card modifiers | 1 | two of the 49 cards are inert, each blocked on a system below |
 | C-7 trading posts | 2 | a route lays roads and plants nothing |
-| C-8 draws made deterministic | 2 | inspirations, the religion pick, Oxford's and the Bolshoi's free research |
+| C-8 draws made deterministic | 2 | the Great Person replacement walks a queue and the Congress slate rotates, where Civ 6 draws both |
 | C-9 faith-purchase classes | 1 | faith buys named units, never a class of building |
-| C-10 non-GS city-state rows | 1 | Antioch/Amsterdam were replaced in GS; no line can be quoted |
 | C-11 terrain the wonder rules need | 2 | the NARROWED placements are deliberately narrower than Civ 6's |
 | C-12 the Film Studio is absent | 1 | the Theater tier's other top building, so its specialist upgrade has one path |
 | C-13 ranged vs districts/cities | 2 | a scope-out on both, with the rest of the Encampment complete |
 | C-15 garrison does not block capture | 2 | the move-onto-centre capture model is what is missing |
 | C-16 spies / air units / GDRs | 4 | whole unit classes, and four dedications wait on them |
 | C-17 embarked movement never upgrades | 1 | the flat EMBARK_MOVES stands in for every era |
-| C-18 artifact civilization is the acting seat | 1 | real Civ 6 attributes the find to the event's own civ |
 | C-19 grievances and warmongering | 2 | war has no reputational consequence with anyone |
 | C-20 the Military Engineer's build list | 2 | five buildables and the finish-a-district charge |
 | C-21 Great Person ACTIVATED abilities | 2 | every GP fires instantly; none is placed and used |
@@ -104,8 +103,8 @@ nothing carries forward.
 | C-28 tourism is one lifetime scalar | 2 | it is banked per seat and divided by the civ count on read, so no rule can address one rival's tourism |
 | C-29 no RESOLVED suzerain | 1 | `isSuzerain` recomputes from the raw envoy store on every read, so a rule that changes envoy WEIGHT by who the suzerain is has no fixed point |
 | C-30 city-states carry no research | 1 | no techs, no civics, so nothing can say when a minor took Early Empire — its borders never close and the suzerain's passage lifts nothing |
-| **C. Absent systems** | **61** | |
-| **OPEN, TOTAL** | **86** | |
+| **C. Absent systems** | **59** | |
+| **OPEN, TOTAL** | **85** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -231,14 +230,16 @@ Civ 6 source or is recorded as unverifiable.
   The culture victory is further out of reach than the pre-freeze note
   said, not closer — parks cannot move it while the civic that unlocks
   them sits past the horizon.
-- **B-21r. City-state suzerain rows:** six perks are RULES (`SuzEffect`,
+- **B-21r. City-state suzerain rows:** eight perks are RULES (`SUZ_EFFECTS`,
   both engines): Kabul double attack XP, Preslav cavalry-on-hills CS, Mexico
-  City/Toronto regional reach, Anshan works science, Kumasi per-specialty
-  route yields, Jerusalem Holy-Site pressure. The remaining catalog rows carry
-  their reason in their `CITY_STATE_SUZERAIN_BONUS` entry's `note`: whole
-  absent systems (POWER, trading posts, unit promotions, unique
-  improvements/luxuries, a faith-purchase class, random-Inspiration draws) or
-  a flat channel standing in for a %-scaling.
+  City regional reach, Anshan works science, Kumasi per-specialty route
+  yields, Jerusalem Holy-Site pressure, Yerevan's free Apostle promotion
+  choice and Vilnius's era Inspiration. The remaining catalog rows carry
+  their reason in their `CITY_STATE_SUZERAIN_BONUS` entry's `note`, and the
+  roster is now current-ruleset throughout (see B-D), so the stand-ins are
+  whole absent systems (POWER, trading posts, unique improvements/luxuries,
+  a faith-purchase class, a gold-purchase discount, a per-district Great
+  Person channel) or a flat channel standing in for a %-scaling.
 - **B-22r. World Congress residuals.** The session is real now: a
   rotating two-slot slate off `CONGRESS_RESOLUTIONS` — THIRTEEN of the
   twenty-one regular-session resolutions, era windows and A/B texts
@@ -731,6 +732,22 @@ Civ 6 source or is recorded as unverifiable.
     clause has nothing to triple; it belongs with C-30's family of things a
     minor does not track.
 
+- **B-60r. The dig's DATE, and the hull nobody dates.** The artifact's
+  CIVILIZATION is the event's own on both engines now — `markAntiquitySite` /
+  `markShipwreck` and `_dig_at` take the actor and the buried civilization
+  separately, every death path hands over the seat of the unit that fell, and
+  a razed outpost hands over the barbarians. Two halves stay open:
+  - **THE ERA IS STILL THE ACTOR'S RESEARCH.** Real Civ 6 dates a find by the
+    era the EVENT happened in; both engines read `civEraIndex` of the acting
+    seat, so the same battle buries a different era depending on who struck
+    the blow. A world era exists (`worldEraIndex` / `_world_era`) and would be
+    the faithful reading, but changing it moves the pre-Modern gate that
+    decides whether a dig is created at all.
+  - **A BARBARIAN OR MINOR ACTOR SINKS A HULL THAT LEAVES NO WRECK.** The era
+    gate needs a research row and neither carries one, so `markShipwreck`
+    refuses outright — every hull a raider sinks vanishes without a dig. The
+    same world-era reading above would close it.
+
 - **B-51r. The Encampment's second pool.** An assault on the district now
   meets the perimeter: `attackEncampment` / `_attack_encampment` find the city
   behind the tile (`cityAtTile` / `_owner_city_col`) and divide the roll
@@ -849,6 +866,19 @@ Civ 6 source or is recorded as unverifiable.
     anywhere in either engine — `maintenance` is a BUILDING field, which
     matches real Civ 6, where districts cost no gold. Nothing stood in for
     anything; the bullet described code that does not exist.
+
+  THE CITY-STATE ROSTER was swept the same way, against the wiki's own
+  city-state list plus each row's page. SIX rows named a city-state that no
+  current ruleset places, each with a published successor, and every one is
+  replaced: Stockholm by Bologna, Seoul by Anshan, Amsterdam and Antioch by
+  Venice, Toronto by Mexico City, Carthage by Ngazargamu. Nine more rows
+  carried an invented paraphrase where the real line is published, and all
+  nine now quote it. The seeder held a SECOND copy of the placement pool
+  naming three city-states the catalog had no row for at all, so a placed
+  minor could carry no suzerain bonus of any kind. The pools agree now and
+  `tests/cpu/data/cityStateRoster.test.ts` asserts both directions, since the
+  copy exists because `seeder/` is hashed into `genStamp` and may not import
+  from `cpu/`.
 
   What remains open, each with what a source would have to publish:
   - **The GOVERNMENTS' inherent bonuses.** The GS rows ARE published, and
@@ -1000,17 +1030,32 @@ number was under-counting by treating deferrals as closures.
 - **C-7. TRADING POSTS — a route lays roads and plants nothing.** Weight 2.
   Gaps: Bandar Brunei's suzerain row; the water-route RANGE refuel and the
   per-post gold at repeat destinations (B-31r).
-- **C-8. RANDOM DRAWS THE MODEL MAKES DETERMINISTIC.** Weight 2. Gaps:
-  Vilnius's random Inspiration at an era edge; the religion body's
-  deterministic pick (`religion`); theological damage, which is linear where
-  real Civ 6 rolls (B-35r names the same thing from the combat side).
+- **C-8. RANDOM DRAWS THE MODEL MAKES DETERMINISTIC.** Weight 2. The class
+  was re-censused against the code rather than against this entry, and three
+  of the four things it used to name were already drawing: the belief race
+  (`_seat_belief_claims` and its TS twin both spend `_next_random` on the
+  pantheon, the follower, the founder and the enhancer), theological damage
+  (`damageRoll`, the same body melee uses), and the Apostle's three-column
+  promotion offer. Vilnius's Inspiration and the Oxford/Bolshoi free research
+  ship as draws now. TWO remain, each with what it would cost:
+  - **THE GREAT PERSON REPLACEMENT WALKS A QUEUE.** SOURCED: "When a Great
+    Person is claimed, the replacement is chosen randomly from those
+    available in the current era, or the next if all those from the current
+    era have been claimed." `gpOffer` / `GP_FIRST_OF_ERA` answer with the
+    first roster position the world era has not passed, which honours the
+    "never backwards" half and none of the draw. The blocker is storage:
+    `gpNext` is a per-class COUNTER, so WHICH people are still unclaimed is
+    not a fact either engine holds — a random pick needs a per-person claimed
+    set on both engines and in `shared/statecompare.manifest.json`.
+  - **THE CONGRESS SLATE ROTATES BY SESSION.** SOURCED: the real slate is a
+    random draw among era-eligible resolutions; `congressSession` /
+    `_world_congress` rotate deterministically on the session index instead
+    (`seats`' own header says so). It draws from the same era window either
+    way, so this is the ORDER of the slate, not its contents. B-22r carries
+    the rest of the Congress residuals.
 - **C-9. FAITH-PURCHASE CLASSES — faith buys the units the rules name, not
   classes of BUILDING.** Weight 1. Gap: Valletta's suzerain row (City Center
   and Encampment buildings buyable with Faith).
-- **C-10. THE CITY-STATE CATALOG HOLDS NON-GS ROWS.** Weight 1. Antioch and
-  Amsterdam were REPLACED in Gathering Storm, so no GS line can be quoted for
-  them and their flat channels stand in for text that no longer exists. Either
-  they leave the roster or the roster stops claiming to be GS.
 - **C-11. TERRAIN THE WONDER RULES NEED IS UNMODELED.** Weight 2. The
   NARROWED marker in `builtWonders` names each wonder whose real placement
   rule asks for terrain this map generator does not produce, so the modelled
@@ -1036,11 +1081,6 @@ number was under-counting by treating deferrals as closures.
 - **C-17. EMBARKED MOVEMENT DOES NOT UPGRADE.** Weight 1. `constants` records
   that the tech upgrades to embarked movement are unmodeled; the flat
   EMBARK_MOVES stands in for every era.
-- **C-18. AN ARTIFACT'S CIVILIZATION IS THE ACTING SEAT.** Weight 1. Both
-  engines stamp the seat whose ORDER buried the find, because that is the
-  only seat every death site on both engines holds. Real Civ 6 attributes it
-  to the event's own civilization. Named here rather than in B-20r because
-  the fix is a provenance plumbed through every death path.
 - **C-19. GRIEVANCES AND WARMONGERING — war costs nothing but the war.**
   Weight 2. No seat's standing with anyone moves when it declares, razes or
   conquers. Gaps: the diplomatic consequences of declaring on a city-state

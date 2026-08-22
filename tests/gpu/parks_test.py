@@ -85,11 +85,30 @@ def main() -> None:
     # --- 3) legality, the designation, and what a park pays ----------------
     s2 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     row = 1
-    ctr = int(s2.city_center[0, row, 0])
-    # pick a rhombus off the city centre and MAKE it legal: this seat's ground,
-    # nothing built, appeal lifted by planting woods around it.
-    q_all = s2._park_cluster(torch.tensor([[ctr]], dtype=torch.long))[0, 0]
-    pick = next(d for d in range(6) if int(q_all[d, 0]) >= 0)
+    # ANCHOR OFF EVERY CENTRE: a rhombus touching a city centre is refused
+    # (`foundCity` writes `tile.district = 'CITY_CENTER'` TS-side), so
+    # anchoring on one would make this whole lane assert the wrong answer.
+    _centre = s2.centre_slot_at[0]
+
+    def _clean(anchor: int):
+        q = s2._park_cluster(torch.tensor([[anchor]], dtype=torch.long))[0, 0]
+        for d in range(6):
+            if int(q[d, 0]) >= 0 and all(int(_centre[int(t)]) < 0 for t in q[d].tolist()):
+                return q, d
+        return None
+
+    ctr, found = -1, None
+    for _t in s2.neigh[s2.neigh[int(s2.city_center[0, row, 0])].clamp(min=0)].reshape(-1).tolist():
+        if _t < 0 or int(_centre[_t]) >= 0:
+            continue
+        found = _clean(_t)
+        if found is not None:
+            ctr = _t
+            break
+    assert found is not None, "no centre-free rhombus near this city — the lane cannot run"
+    # MAKE the rhombus legal: this seat's ground, nothing built, appeal lifted
+    # by planting woods around it.
+    q_all, pick = found
     quad4 = q_all[pick]
     for t in quad4.tolist():
         s2.tile_seat[0, t] = row
@@ -112,6 +131,14 @@ def main() -> None:
     s2.district[0, int(quad4[1])] = 0
     assert not bool(s2._park_cluster_legal(row, s2._park_cluster(torch.tensor([[ctr]], dtype=torch.long)))[0, 0, pick])
     s2.district[0, int(quad4[1])] = keep
+    # ...and so does a CITY CENTRE, which `foundCity` writes into
+    # `tile.district` TS-side and into the centre registry here
+    keepc = int(s2.centre_slot_at[0, int(quad4[1])])
+    s2.centre_slot_at[0, int(quad4[1])] = 0
+    assert not bool(s2._park_cluster_legal(row, s2._park_cluster(torch.tensor([[ctr]], dtype=torch.long)))[0, 0, pick]), \
+        "a rhombus touching a city centre must be refused"
+    s2.centre_slot_at[0, int(quad4[1])] = keepc
+    assert bool(s2._park_cluster_legal(row, s2._park_cluster(torch.tensor([[ctr]], dtype=torch.long)))[0, 0, pick])
 
     ok = s2._spawn_unit(row, torch.ones(s2.B, dtype=torch.bool),
                         torch.full((s2.B,), ctr, dtype=torch.long), s2._naturalist_idx)

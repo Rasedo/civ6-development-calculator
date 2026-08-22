@@ -125,7 +125,18 @@ def test_evaluator(sim) -> None:
     if int(rd.promo_rows[cls_of(sim, "MELEE")]) < rd.promo_cols:
         assert int(sim._promo_cs(t, lone, attacking=yes, foe_type=t)[0]) == 0, \
             "a bit past the end of the class list was scored"
-    print("  evaluator OK — attacking, the class mask, and the end of the list")
+    # `inDistrictTile` asks `!!t.district`, which a CITY CENTRE satisfies:
+    # two promotions read the answer about the other side, so the centre
+    # registry has to count here as well as the placeable-district plane.
+    ctr = int(sim.city_center[0, 0, 0])
+    plain = next(i for i in range(sim.T)
+                 if int(sim.centre_slot_at[0, i]) < 0 and int(sim.district[0, i]) < 0
+                 and (sim.FORT < 0 or int(sim.improvement[0, i]) != sim.FORT))
+    probe = torch.tensor([[ctr, plain]], dtype=torch.long).expand(sim.B, 2)
+    on = sim._on_district(probe)
+    assert bool(on[0, 0]), "a unit on a city CENTRE is not in a district"
+    assert not bool(on[0, 1]), "a bare tile reads as a district"
+    print("  evaluator OK — attacking, the class mask, the end of the list, the centre")
 
 
 def test_mask_and_apply(sim) -> None:

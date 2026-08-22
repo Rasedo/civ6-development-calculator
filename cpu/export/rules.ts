@@ -300,6 +300,7 @@ export function buildRules() {
     },
     eras: {
       length: ERA_LENGTH,
+      count: ERAS.length,
       found: ERA_SCORE_FOUND,
       conquer: ERA_SCORE_CONQUER,
       wonder: ERA_SCORE_WONDER,

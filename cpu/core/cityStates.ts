@@ -165,9 +165,8 @@ export function suzerainBonusBlocked(state: GameState, cityState: CityState): bo
   return congressSuzBonusBlocked(state, CITY_STATE_TYPES.indexOf(cityState.type));
 }
 
-/** CIV 6, Mexico City's suzerain (Toronto in rulesets without Canada):
- *  "Regional effects from your Industrial Zone, Water Park, and Entertainment
- *  Complex districts reach 3 tiles farther." */
+/** CIV 6, Mexico City's suzerain: "Regional effects from your Industrial Zone,
+ *  Entertainment Complex and Water Park districts reach 3 tiles farther." */
 export function regionalReach(state: GameState, seat: number): number {
   return REGIONAL_RANGE + (suzerainEffect(state, seat, 'regionalReach') ? REGIONAL_REACH_BONUS : 0);
 }

@@ -2693,9 +2693,11 @@ class SimSeats:
             self._add_era_score(civ, int(self._ded_event_score[kind]), pay.long() * cnt * n)
 
     def _grant_free_research(self, row: int, n_tech: torch.Tensor, n_civic: torch.Tensor) -> None:
-        """`grantFreeResearch` — complete N techs and N civics outright, taking
-        the FIRST available row in catalog order each time, then clearing the
-        pick and its parked progress the way the paid completion does."""
+        """`grantFreeResearch` — complete N techs and N civics outright, DRAWN
+        AT RANDOM over the rows available at that moment, then clearing the
+        pick and its parked progress the way the paid completion does. Techs
+        before civics and one draw per grant: TS spends the stream in that
+        order, and a seat with nothing available spends none of it."""
         for is_civic in (0, 1):
             n = n_civic if is_civic else n_tech
             for k in range(int(n.max())):
@@ -2706,9 +2708,10 @@ class SimSeats:
                 pre = self._prereq_c if is_civic else self._prereq_t
                 avail = self._available_mask(done, pre)
                 hit = want & avail.any(dim=1)
+                rnd = self._next_random(hit)
                 if not bool(hit.any()):
                     continue
-                pick = avail.long().argmax(dim=1)
+                pick = self._nth_open(avail, rnd)
                 r = hit.nonzero(as_tuple=True)[0]
                 if is_civic:
                     self.civ_civics[r, row, pick[r]] = True
@@ -2722,6 +2725,41 @@ class SimSeats:
                     self.civ_cur_tech[:, row] = torch.where(hit & (cur == pick), torch.full_like(cur, -1), cur)
                     self._urban_defenses_fit(row, hit & (pick == self._urban_def_tech))
                 self._eff_version += 1
+
+    def _nth_open(self, open_m: torch.Tensor, rnd: torch.Tensor) -> torch.Tensor:
+        """[B] — the column a uniform draw picks out of `open_m` [B, N]: the
+        k-th True in column order, k = floor(rnd * (how many are True)). The
+        TS twin indexes a FILTERED list, so the count is the list length and
+        the cumulative sum is the position inside it. Rows with nothing open
+        answer column 0; their caller masks the write."""
+        n_open = open_m.long().sum(dim=1)
+        k = torch.floor(rnd * n_open.to(torch.float64)).to(torch.long)
+        cum = open_m.long().cumsum(dim=1)
+        return (open_m & (cum == (k + 1).unsqueeze(1))).long().argmax(dim=1)
+
+    def _era_inspirations(self) -> None:
+        """CIV6 (Vilnius's suzerain): "When you enter a new era, earn 1 random
+        Inspiration from that era." Called at the era boundary, right after the
+        new age is committed, ascending row order. A row draws only where the
+        new era still holds a civic it has neither unlocked nor triggered, so
+        an unpayable row spends none of the shared stream. The granted
+        Inspiration pays Pen, Brush and Voice like a detected one."""
+        if self._suz_c_era < 0 or self.S == 0 or self._era_len <= 0:
+            return
+        era_i = min(int(self.turn // self._era_len), self._era_count - 1)
+        ncv = min(self.civ_civic_boosted.shape[2], self._civic_era.numel())
+        want = (self._civic_era[:ncv] == era_i).reshape(1, -1)
+        for row in range(self.n_majors):
+            open_m = want & ~self.civ_civics[:, row, :ncv] & ~self.civ_civic_boosted[:, row, :ncv]
+            hit = self._suz_effect(row, self._suz_c_era) & open_m.any(dim=1)
+            rnd = self._next_random(hit)
+            if not bool(hit.any()):
+                continue
+            pick = self._nth_open(open_m, rnd)
+            r = hit.nonzero(as_tuple=True)[0]
+            self.civ_civic_boosted[r, row, pick[r]] = True
+            self._dedication_event(row, self._ded_pen_brush, hit.long())
+            self._eff_version += 1
 
     def _add_era_score(self, row: int, per: int, count: torch.Tensor) -> None:
         """`addEraScore` — era score for `count` moments each worth `per`.
@@ -4092,7 +4130,7 @@ class SimSeats:
                             a_died=atk_dead, d_died=(_wwh & ~self._ww_occ(tgt)) != 0)
             if bool(atk_dead.any()):
                 ar = atk_dead.nonzero(as_tuple=True)[0]
-                self._dig_at(ar, here[ar], self._row_of(a_seat[ar, u]))
+                self._dig_at(ar, here[ar], self._row_of(a_seat[ar, u]), a_seat[ar, u])
                 a_occ[ar, here[ar]] = -1
                 a_alive[:, u] = a_alive[:, u] & ~atk_dead
             adv_terr = self._advance_terrain(a_type[:, u], a_seat[:, u], tgt)
@@ -4112,7 +4150,8 @@ class SimSeats:
             if major:
                 self._capture_unit(rows, cslot_raw[rows], atk_kind, a_seat[rows, u], ttc[rows])
             else:
-                self._dig_at(rows, ttc[rows], self._row_of(a_seat[rows, u]))
+                self._dig_at(rows, ttc[rows], self._row_of(a_seat[rows, u]),
+                             self.unit_seat[rows, cslot_raw[rows]])
                 self.civilian_at[(rows, ttc[rows])] = -1
                 self.unit_alive[rows, cslot_raw[rows]] = False
                 self._gen_ver += 1
@@ -4757,7 +4796,8 @@ class SimSeats:
                         tc, a_died=_ww_ad, city=True)
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
-            self._dig_at(dr, a_tile[dr, u], self._row_of(self._atk_seat(atk_kind, u)[dr]))
+            _as = self._atk_seat(atk_kind, u)[dr]
+            self._dig_at(dr, a_tile[dr, u], self._row_of(_as), _as)
             a_occ[dr, a_tile[dr, u]] = -1
             a_alive[:, u] = a_alive[:, u] & ~died
 
@@ -4987,7 +5027,7 @@ class SimSeats:
         self._naval_kill_event(hrow, a_type[:, u], a_seat[:, u] == BARB_SEAT, died)
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
-            self._dig_at(dr, a_tile[dr, u], self._row_of(a_seat[dr, u]))
+            self._dig_at(dr, a_tile[dr, u], self._row_of(a_seat[dr, u]), a_seat[dr, u])
             self.military_at[(dr, a_tile[dr, u])] = -1
             a_alive[:, u] = a_alive[:, u] & ~died
         return rows, hrow, slot, died, ttc
@@ -5009,7 +5049,7 @@ class SimSeats:
                 continue
             ri, si = hit.nonzero(as_tuple=True)
             gr = rows[ri]
-            self._dig_at(gr, centres[ri], self._row_of(captor[ri]))  # killUnit's ACTING seat
+            self._dig_at(gr, centres[ri], self._row_of(captor[ri]), seats[ri, si])
             getattr(self, f"{pool}_unit_alive")[gr, si] = False
             self._vacate(pool, gr, si)
 
@@ -5107,7 +5147,7 @@ class SimSeats:
                                         torch.full_like(_cshp, XP_CITY_ATTACK)))
         if bool(atk_dead.any()):
             ar = atk_dead.nonzero(as_tuple=True)[0]
-            self._dig_at(ar, here[ar], self._row_of(a_seat[ar, u]))
+            self._dig_at(ar, here[ar], self._row_of(a_seat[ar, u]), a_seat[ar, u])
             self.military_at[(ar, here[ar])] = -1
             a_alive[:, u] = a_alive[:, u] & ~atk_dead
         self._ww_battle(att, self._row_of(a_seat[:, u]), self._row_of(100 + citystate_sc), tgt,
@@ -5142,7 +5182,7 @@ class SimSeats:
             self.unit_alive[gd, ds[dead]] = False
             # a combat death leaves a DIG on the tile the dead unit stood on —
             # `combat.ts:killUnit`, not only at a razed outpost.
-            self._dig_at(gd, td, striker_row)
+            self._dig_at(gd, td, striker_row, d_seat[gd])
             if bool(dead.any()):
                 self._rp_kill_version += 1
         # a surviving MILITARY defender banks the flat defense base; the
@@ -5188,7 +5228,7 @@ class SimSeats:
             gd, td = rows[dead], tile_c[rows[dead]]
             self.unit_alive[gd, ds[dead]] = False
             self.military_at[gd, td] = -1
-            self._dig_at(gd, td, atk_row[gd])
+            self._dig_at(gd, td, atk_row[gd], self.unit_seat[gd, ds[dead]])
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
         atk_raw = att & (a_hp[:, u] <= 0)
         both = def_dead & atk_raw
@@ -5328,7 +5368,7 @@ class SimSeats:
             dead = self.unit_hp[g, ds] <= 0
             gd, td = g[dead], ttc[g[dead]]
             self.unit_alive[gd, ds[dead]] = False
-            self._dig_at(gd, td, self._row_of(self._atk_seat(atk_kind, u)[gd]))  # killUnit's dig
+            self._dig_at(gd, td, self._row_of(self._atk_seat(atk_kind, u)[gd]), d_seat[gd])
             # Clearing both maps is branch-free and exact: only one of them is
             # set on that tile.
             md = d_is_mil[gd]
@@ -5509,7 +5549,7 @@ class SimSeats:
             dead = self.unit_hp[g, ds] <= 0
             gd, td = g[dead], ttc[g[dead]]
             self.unit_alive[gd, ds[dead]] = False
-            self._dig_at(gd, td, self._row_of(self._atk_seat(atk_kind, u)[gd]))  # killUnit's dig
+            self._dig_at(gd, td, self._row_of(self._atk_seat(atk_kind, u)[gd]), d_seat[gd])
             # Clearing both maps is branch-free and exact: only one of them is
             # set on that tile.
             md = ok_m[gd]

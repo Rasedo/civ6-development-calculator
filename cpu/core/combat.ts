@@ -51,7 +51,8 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number, se
   const camp = state.barbSeat.camps.indexOf(tileIndex);
   if (camp < 0) return;
   state.barbSeat.camps.splice(camp, 1);
-  markAntiquitySite(state, tileIndex, seat); // a razed outpost leaves a dig
+  // the outpost was the BARBARIANS' — theirs is the civilization buried here
+  markAntiquitySite(state, tileIndex, seat, BARB_SEAT);
   const clearer = seatOf(state, unit.seat);
   if (clearer) clearer.treasury += CAMP_CLEAR_REWARD;
 }
@@ -679,8 +680,8 @@ export function barbarianCombatCS(state: GameState, own: number, foe: number): n
 }
 
 export function killUnit(state: GameState, unit: Unit, seat: number): void {
-  markAntiquitySite(state, unit.tileIndex, seat); // a death leaves a dig
-  markShipwreck(state, unit.tileIndex, seat); // ...at sea, a wreck
+  markAntiquitySite(state, unit.tileIndex, seat, unitSeat(unit)); // a death leaves a dig
+  markShipwreck(state, unit.tileIndex, seat, unitSeat(unit)); // ...at sea, a wreck
   disbandUnit(state, unit.id);
 }
 
@@ -692,18 +693,22 @@ export function killUnit(state: GameState, unit: Unit, seat: number): void {
  * The era gate is the sourced part: sites stop being created once the world
  * reaches the MODERN era (ERAS index 5).
  * A tile already carrying a site does not stack — one dig per tile, like Civ 6.
+ *
+ * `actor` is whose ORDER buried the find and dates it; `civSeat` is the
+ * EVENT's own civilization — the unit that died, the barbarians whose outpost
+ * was razed — which is what a themed museum reads.
  */
-export function markAntiquitySite(state: GameState, tileIndex: number, seat: number): void {
+export function markAntiquitySite(state: GameState, tileIndex: number, actor: number, civSeat: number): void {
   const t = state.map.tiles[tileIndex];
   if (!t || t.antiquity || isWater(t) || t.district || t.builtWonder) return;
-  const era = civEraIndex(seatOf(state, seat)!.research.techs, seatOf(state, seat)!.research.civics);
+  const era = civEraIndex(seatOf(state, actor)!.research.techs, seatOf(state, actor)!.research.civics);
   if (era >= MODERN_ERA_INDEX) return;
   t.antiquity = true;
   // The dig REMEMBERS when and whose: a themed Archaeological Museum wants
   // one era and three civilizations, so the Artifact has to carry both out
   // of the ground.
   t.antiquityEra = era;
-  t.antiquitySeat = seat;
+  t.antiquitySeat = civSeat;
 }
 
 /**
@@ -712,21 +717,20 @@ export function markAntiquitySite(state: GameState, tileIndex: number, seat: num
  * removes it from the map and excavates an Artifact. This model sources its
  * dig placement from DEATHS rather than map generation (see
  * `markAntiquitySite`), so a hull going down leaves the wreck, under the same
- * pre-Modern era gate and the same one-per-tile rule. `seat` is the ACTING
- * seat, exactly as `markAntiquitySite` takes it: both digs record the seat
- * whose ORDER buried them, which is the only seat every call site on both
- * engines holds.
+ * pre-Modern era gate and the same one-per-tile rule, and it splits `actor`
+ * from `civSeat` the same way. The era still needs a research row to read, so
+ * a barbarian or city-state ACTOR sinks a hull that leaves no wreck.
  */
-export function markShipwreck(state: GameState, tileIndex: number, seat: number): void {
+export function markShipwreck(state: GameState, tileIndex: number, actor: number, civSeat: number): void {
   const t = state.map.tiles[tileIndex];
   if (!t || t.shipwreck || !isWater(t)) return;
-  const owner = seatOf(state, seat);
-  if (!owner) return; // barbarian and city-state hulls leave no wreck to theme
+  const owner = seatOf(state, actor);
+  if (!owner) return;
   const era = civEraIndex(owner.research.techs, owner.research.civics);
   if (era >= MODERN_ERA_INDEX) return;
   t.shipwreck = true;
   t.shipwreckEra = era;
-  t.shipwreckSeat = seat;
+  t.shipwreckSeat = civSeat;
 }
 
 /** Sack: population and gold loss, improvements around the center pillaged.

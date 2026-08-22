@@ -590,9 +590,14 @@ class SimMasks:
 
     def _on_district(self, tiles: torch.Tensor) -> torch.Tensor:
         """the "occupying a district or Fort" test three promotions ask, over
-        any tile shape whose first dim is the batch."""
+        any tile shape whose first dim is the batch.
+
+        `inDistrictTile` asks `!!t.district`, and a CITY CENTRE carries
+        `tile.district = 'CITY_CENTER'` TS-side — so a unit standing on one IS
+        in a district. The `district` plane holds only PLACEABLE districts;
+        centres live in the centre registry, which is why it is named here."""
         tc = tiles.clamp(min=0).reshape(self.B, -1)
-        out = self.district.gather(1, tc) >= 0
+        out = (self.district.gather(1, tc) >= 0) | (self.centre_slot_at.gather(1, tc) >= 0)
         if self.FORT >= 0:
             out = out | (self.improvement.gather(1, tc) == self.FORT)
         return out.reshape(tiles.shape)
@@ -1327,7 +1332,7 @@ class SimMasks:
         return can
 
 
-    def _dig_at(self, gd: torch.Tensor, td: torch.Tensor, row) -> None:
+    def _dig_at(self, gd: torch.Tensor, td: torch.Tensor, row, civ) -> None:
         """Mark a DIG for the games in `gd` on the tiles in `td` — the
         row-index form of `_mark_antiquity`, which takes a [B] mask.
         Every COMBAT death goes through here, exactly as every TS combat death
@@ -1335,8 +1340,10 @@ class SimMasks:
         charge-exhaustion are NOT deaths and must not call it.
 
         `row` is the ACTING seat's row — `killUnit(state, unit, seat)` passes
-        the seat whose ORDER this is, and the era gate reads that seat. An int
-        or a tensor ALIGNED WITH `gd`, like `td`."""
+        the seat whose ORDER this is, and the era gate reads that seat. `civ`
+        is the EVENT's own civilization as a SEAT id: the unit that died, or
+        the barbarians whose outpost was razed. Either may be an int or a
+        tensor ALIGNED WITH `gd`, like `td`."""
         if len(gd) == 0:
             return
         m = torch.zeros(self.B, dtype=torch.bool, device=self.device)
@@ -1347,10 +1354,12 @@ class SimMasks:
             r = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
             r[gd] = row
             row = r
-        self._mark_antiquity(m, t, row)
-        self._mark_shipwreck(m, t, row)
+        c = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        c[gd] = int(civ) if isinstance(civ, int) else civ
+        self._mark_antiquity(m, t, row, c)
+        self._mark_shipwreck(m, t, row, c)
 
-    def _mark_antiquity(self, mask: torch.Tensor, tile: torch.Tensor, row) -> None:
+    def _mark_antiquity(self, mask: torch.Tensor, tile: torch.Tensor, row, civ: torch.Tensor) -> None:
         """The markAntiquitySite twin — stamp an ANTIQUITY SITE on
         `tile` for the rows in `mask`. Real Civ 6 creates these from PRE-MODERN
         events (a razed barbarian outpost, a unit dying), so the era gate is the
@@ -1358,7 +1367,8 @@ class SimMasks:
         districts and wonder tiles are refused exactly as TS refuses them.
 
         The era is the ACTING seat's, never one fixed seat's:
-        `markAntiquitySite` takes the seat and reads ITS research."""
+        `markAntiquitySite` takes the actor and reads ITS research, while the
+        stored civilization is the EVENT's own."""
         if not bool(mask.any()):
             return
         t = tile.clamp(min=0)
@@ -1393,27 +1403,21 @@ class SimMasks:
         rows = okr.nonzero(as_tuple=True)[0]
         self.antiquity[rows, t[rows]] = True
         # PROVENANCE travels with the Artifact: a themed museum wants one era
-        # and three civilizations. The stored id is the SEAT, not the row —
-        # `markAntiquitySite` records the seat it was handed, and a barbarian
-        # (seat 200) is a distinct civilization for theming.
+        # and three civilizations. The stored id is the SEAT of the EVENT's own
+        # civilization, and a barbarian (seat 200) is a distinct civilization
+        # for theming.
         self.antiquity_era[rows, t[rows]] = era[rows] if era.dim() else era
-        _r = row if torch.is_tensor(row) else torch.full((self.B,), int(row), dtype=torch.long, device=self.device)
-        self.antiquity_seat[rows, t[rows]] = self._seat_of_row(_r[rows])
+        self.antiquity_seat[rows, t[rows]] = civ[rows]
 
-    def _seat_of_row(self, row: torch.Tensor) -> torch.Tensor:
-        """[n] — the SEAT ids behind these rows. Storage is row-indexed;
-        anything a seat WRITES about another seat's identity is a seat id."""
-        return torch.where(row >= 0, self._ROW_SEAT.to(row.device)[row.clamp(min=0)], torch.full_like(row, -1))
-
-    def _mark_shipwreck(self, mask: torch.Tensor, tile: torch.Tensor, row) -> None:
+    def _mark_shipwreck(self, mask: torch.Tensor, tile: torch.Tensor, row, civ: torch.Tensor) -> None:
         """The markShipwreck twin — the WATER dig. This model sources
         dig placement from DEATHS rather than map generation, so a hull going
         down leaves the wreck, under `markAntiquitySite`'s own era gate and
-        one-per-tile rule. `row` is the ACTING seat, like `_mark_antiquity`'s,
-        and its era and id are the wreck's provenance; the two bodies are
-        disjoint because one refuses water and the other requires it. A
-        barbarian or city-state actor leaves nothing to theme, which is what
-        `row < 0` says here."""
+        one-per-tile rule, and it splits actor from civilization the same way;
+        the two bodies are disjoint because one refuses water and the other
+        requires it. The era still needs a research row to read, so a
+        barbarian or city-state ACTOR sinks a hull that leaves no wreck —
+        which is what `row < 0` says here."""
         if not bool(mask.any()):
             return
         t = tile.clamp(min=0)
@@ -1432,7 +1436,7 @@ class SimMasks:
         rows = okr.nonzero(as_tuple=True)[0]
         self.shipwreck[rows, t[rows]] = True
         self.shipwreck_era[rows, t[rows]] = era[rows] if era.dim() else era
-        self.shipwreck_seat[rows, t[rows]] = self._seat_of_row(_r[rows])
+        self.shipwreck_seat[rows, t[rows]] = civ[rows]
 
 
 
@@ -1500,7 +1504,15 @@ class SimMasks:
     def _park_cluster_legal(self, row: int, quad: torch.Tensor) -> torch.Tensor:
         """[B, N, 6] bool — may this rhombus become a park?
         `parkClusterLegal`'s twin: every tile Charming or better, all four in
-        ONE city of this seat, and nothing built on any of them."""
+        ONE city of this seat, and nothing built on any of them.
+
+        A CITY CENTRE is one of the things built on them: `foundCity` sets
+        `tile.district = 'CITY_CENTER'` and both capture paths keep it, so TS
+        refuses a rhombus touching one. The `district` plane does NOT encode
+        centres — they live in the seat-generic centre registry — so the
+        centre term is named separately, exactly as `_mark_antiquity` names
+        it. A CITY-STATE centre is deliberately not excluded: TS never writes
+        `tile.district` for a minor."""
         B, N, D, _ = quad.shape
         q = quad.clamp(min=0).reshape(B, -1)
         good = (
@@ -1508,6 +1520,7 @@ class SimMasks:
             & (self.park.gather(1, q) < 0)
             & (self.improvement.gather(1, q) < 0)
             & (self.district.gather(1, q) < 0)
+            & (self.centre_slot_at.gather(1, q) < 0)
             & (self.built_wonder.gather(1, q) < 0)
             & (self._tile_appeal().gather(1, q) >= self._park_min_appeal)
         ).reshape(B, N, D, 4)
@@ -1655,7 +1668,8 @@ class SimMasks:
         hit = mask & (self.camp_tile == tile.unsqueeze(1)).any(dim=1)
         if not bool(hit.any()):
             return
-        self._mark_antiquity(hit, tile, row)
+        # the outpost was the BARBARIANS' — theirs is the civilization buried
+        self._mark_antiquity(hit, tile, row, torch.full_like(tile, BARB_SEAT))
         reward = self.rules.combat.get("campClearReward", 50)
         for b in hit.nonzero(as_tuple=True)[0].tolist():
             camps = self.camp_tile[b]

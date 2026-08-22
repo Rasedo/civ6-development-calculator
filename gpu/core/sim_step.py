@@ -118,6 +118,7 @@ class SimStep:
                         torch.full_like(self.ded_picks[:, _c, _k], -1),
                     )
             self.era_score[:] = 0
+            self._era_inspirations()
         self._world_congress()
         # THE EXOPLANET FLIGHT — CIV6: 1 light-year/turn plus one per laser
         # station, and the win fires on ARRIVAL, not launch. Ties in one turn

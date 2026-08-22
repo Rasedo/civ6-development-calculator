@@ -278,8 +278,8 @@ describe('suzerain unique perk (CITY_STATE_SUZERAIN_LIVE)', () => {
 
   it('pays nothing for a descoped row or a non-suzerain', () => {
     const state = makeState();
-    // Antioch (cultural) is DESCOPED (trade-route bonus) -> no live channel.
-    const desc = addCs(state, 8, 8, { type: 'cultural', name: 'Antioch', envoys: { [0]: 4 } });
+    // Kumasi (cultural) pays a RULE, not a channel -> no live channel yield.
+    const desc = addCs(state, 8, 8, { type: 'cultural', name: 'Kumasi', envoys: { [0]: 4 } });
     expect(isSuzerain(desc, 0)).toBe(true);
     expect(cityStateSuzerainCapitalBonus(state, 0)).toEqual({});
     // A shipped row but only 2 envoys -> not suzerain -> no perk.
@@ -298,8 +298,8 @@ describe('suzerain unique perk (CITY_STATE_SUZERAIN_LIVE)', () => {
 
   it('grants the perk to a strict civ suzerain (the civ twin)', () => {
     const state = makeState();
-    // Vilnius (cultural) is SHIPPED -> culture channel.
-    const cityState = addCs(state, 8, 8, { type: 'cultural', name: 'Vilnius', envoys: { [0]: 0 } });
+    // Nan Madol (cultural) is SHIPPED -> culture channel.
+    const cityState = addCs(state, 8, 8, { type: 'cultural', name: 'Nan Madol', envoys: { [0]: 0 } });
     cityState.envoys = { [1]: 3 };
     expect(isSuzerain(cityState, 1)).toBe(true);
     expect(cityStateSuzerainCapitalBonus(state, 1).culture).toBe(CITY_STATE_SUZERAIN_YIELD);

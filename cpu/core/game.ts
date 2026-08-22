@@ -19,7 +19,7 @@ import { placeSeats, seatPhase, worldCongress, nextCityName } from './phase';
 import { congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
 import { commitProduction, commitResearch } from './seatTurn';
 import { seatWonderFlag } from './wonders';
-import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY } from '../data/seats';
+import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH } from '../data/seats';
 import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
 import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS } from '../data/units';
 import { outerPool, wallsMax } from './rules';
@@ -29,7 +29,7 @@ import { RESOURCES } from '../../world/resources';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { TECHS } from '../data/techs';
+import { TECHS, ERAS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
 import { nextRandom } from './rand';
@@ -1000,6 +1000,7 @@ export function endTurn(state: GameState): void {
 
   state.turn += 1;
   eraBoundary(state);
+  eraInspirations(state);
   worldCongress(state); // era-score window reset at ERA_LENGTH multiples (GPU mirrors at its turn increment)
   // THE EXOPLANET FLIGHT — CIV6: the craft covers 1 light-year/turn plus one
   // per completed laser station, and the win fires on ARRIVAL, not launch.
@@ -1166,6 +1167,31 @@ function religiousVictor(state: GameState): number {
  * objects (founded/flipped cities) carry no pressure — the reset-on-birth KILL
  * hygiene, mirrored on the GPU by zeroing dead/absent slots each turn.
  */
+/**
+ * CIV6 (Vilnius's suzerain): "When you enter a new era, earn 1 random
+ * Inspiration from that era." Runs at the era boundary, right after
+ * `eraBoundary` commits the new age, in ascending seat order. A seat draws
+ * only when the new era still holds a civic it has neither unlocked nor
+ * triggered — an unpayable seat must not advance the shared stream. The
+ * granted Inspiration is an Inspiration like any other, so it pays the Pen,
+ * Brush and Voice dedication the same way a detected one does.
+ */
+function eraInspirations(state: GameState): void {
+  if (state.turn % ERA_LENGTH !== 0) return;
+  const era = ERAS[Math.min(Math.floor(state.turn / ERA_LENGTH), ERAS.length - 1)];
+  for (let seat = 0; seat < state.seats.length; seat++) {
+    const sx = seatOf(state, seat);
+    if (!sx || !suzerainEffect(state, seat, 'eraInspiration')) continue;
+    const rsr = sx.research;
+    const open = Object.values(CIVICS).filter(
+      (c) => c.era === era && !rsr.civics.includes(c.id) && !rsr.boosted.includes(c.id),
+    );
+    if (open.length === 0) continue;
+    rsr.boosted.push(open[Math.floor(nextRandom(state) * open.length)].id);
+    dedicationEvent(state, seat, DED_PEN_BRUSH_AND_VOICE);
+  }
+}
+
 /**
  * THEOLOGICAL COMBAT — ONE pass, every seat, at one point in the schedule.
  *

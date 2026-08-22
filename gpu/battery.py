@@ -250,6 +250,7 @@ def main() -> int:
                 ("promotions", [py, "tests/gpu/promotions_test.py"], 4),  # the ladder, the PROMOTE head, the evaluator and the exact-integer XP award
                 ("inquisitor", [py, "tests/gpu/inquisitor_test.py"], 4),  # Launch Inquisition -> the purchase -> Remove Heresy -> Condemn, and the duel rules
                 ("promo_effects", [py, "tests/gpu/promo_effects_test.py"], 4),  # the seventeen promotion kinds that are not Combat Strength
+                ("era_draws", [py, "tests/gpu/era_draws_test.py"], 4),  # the restored random draws, and the artifact's own civilization
             ],
         ]
         # A lane that names a path nothing writes, or a test file no lane
