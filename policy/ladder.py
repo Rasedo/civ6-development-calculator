@@ -152,12 +152,27 @@ def pick_envoy(blocks: dict, mask: torch.Tensor) -> torch.Tensor:
     return torch.where(any_legal, idx, torch.full_like(idx, -1))
 
 
-def pick_research(blocks: dict, mask: torch.Tensor, kind: str) -> torch.Tensor:
+# The scripted player is also the gate's FUZZER. Cheapest-first is BREADTH
+# first: it maximises how many items a seat finishes and so pins every seat
+# to the shallow end of both trees, which is why the late catalog never
+# unlocks and the digest never compares the rules hanging off it. Per-decision
+# noise does not fix that — MEASURED: it only adds drag, and coverage fell.
+# A DEEP seat instead always takes the most advanced legal item, beelining
+# down the tree while its rivals broaden, so one gate run holds both regimes.
+# The style is drawn once per (game seed, seat) and never changes, and it can
+# only produce a different LEGAL game: the applier re-validates every pick and
+# the TS child replays what the driver chose.
+DEEP_SHARE = 0.34
+
+
+def pick_research(blocks: dict, mask: torch.Tensor, kind: str,
+                  deep: torch.Tensor | None = None) -> torch.Tensor:
     """[B] long — the RESEARCH verb (tech or civic).
 
-    Lowest `effectiveResearchCostIn` wins. TS sorts the available items and
-    `Array.prototype.sort` is stable, so equal costs keep CATALOG order — ties
-    break to the lowest index, the same convention as every other scripted
+    Lowest `effectiveResearchCostIn` wins, except on a DEEP row, which takes
+    the most advanced legal item instead (the catalogs are era-ordered, so the
+    highest legal index is the deepest reachable rung). Ties keep CATALOG
+    order — the lowest index, the same convention as every other scripted
     picker and the one the recorded action files depend on.
 
     The observation carries EFFECTIVE cost, not base cost plus a boost flag: a
@@ -178,6 +193,9 @@ def pick_research(blocks: dict, mask: torch.Tensor, kind: str) -> torch.Tensor:
     score = torch.where(mask, cost, big)
     any_legal = mask.any(dim=-1)
     idx = score.argmin(dim=-1)
+    if deep is not None:
+        rung = torch.arange(mask.shape[-1], device=mask.device).expand_as(mask)
+        idx = torch.where(deep, torch.where(mask, rung, torch.full_like(rung, -1)).argmax(dim=-1), idx)
     return torch.where(any_legal, idx, torch.full_like(idx, -1))
 
 

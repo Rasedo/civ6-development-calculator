@@ -1045,19 +1045,19 @@ steers the games into a different regime and carries the older rows with it:
 | mechanic | seeds reaching | first |
 |---|---|---|
 | a PLOT LOCK held by a citizen | 12/12 | t2 |
-| faith-buy kind 6 (APOSTLE purchase) | 12/12 | t76 |
+| faith-buy kind 6 (APOSTLE purchase) | 12/12 | t75 |
 | a WORLD CONGRESS ballot on the wire | 12/12 | t89 |
-| a SPECIALIST pinned into a slot | 12/12 | t116 |
+| a SPECIALIST pinned into a slot | 12/12 | t147 |
 | an INTERNATIONAL trade leg | 11/12 | t75 |
-| two enemy religious units ADJACENT (theological combat's precondition) | 10/12 | t88 |
-| a second HULL on any seat | 4/12 | t103 |
+| two enemy religious units ADJACENT (theological combat's precondition) | 10/12 | t84 |
+| a second HULL on any seat | 8/12 | t103 |
+| NATURAL_HISTORY (the Archaeologist's civic) | 5/12 | t153 |
 | WAR with a city-state | 4/12 | t142 |
-| PEACE with a city-state, through the sue column | 4/12 | t153 |
-| URBANIZATION civic | 0/12 | never |
-| a NEIGHBORHOOD placed | 0/12 | never |
-| an antiquity dig (artifact in a slot) | 0/12 | never |
-| NATURAL_HISTORY (the Archaeologist's civic) | 0/12 | never |
-| CONSERVATION (the Naturalist's civic) | 0/12 | never |
+| CONSERVATION (the Naturalist's civic) | 3/12 | t169 |
+| PEACE with a city-state, through the sue column | 3/12 | t155 |
+| an antiquity dig (artifact in a slot) | 1/12 | t229 |
+| URBANIZATION civic | 1/12 | t235 |
+| a NEIGHBORHOOD placed | 1/12 | t238 |
 
 - THE TABLE MOVED WHOLESALE when the policy cards started paying. A card in
   a slot changes production, adjacency, envoys and barbarian combat, so the
@@ -1076,39 +1076,49 @@ steers the games into a different regime and carries the older rows with it:
   specialist on every seed from t116 (42 slots), so both ride the digest for
   most of a game rather than leaning on `citizens_test`.
 - WAR WITH A CITY-STATE stands on 4 of 12 seeds from t142 and closes through
-  the SUE column on the same 4 from t153 — 6.8 minor-war turns per seed,
-  30 on the loudest. The declare, the peace and both clocks are gate-covered;
+  the SUE column on 3 of them from t155 — 11.6 minor-war turns per seed,
+  101 on the loudest. The declare, the peace and both clocks are gate-covered;
   the meeting gate, the treaty term and the suzerain refusal are not, and
   `cs_war_test` section d is their bar.
-- URBANIZATION and a NEIGHBORHOOD are still out of the gate entirely, on
-  every seed. The poke lane is their only proof.
-- A SECOND HULL reaches 4 of 12 seeds from t103, down from nine: the naval
-  arm is thinner under the new trajectory and `naval_test` carries more of
-  it than the table used to imply.
-- THE POLICY CARDS THEMSELVES ARE MOSTLY UNREACHED. The greedy fill puts 9
+- THE DRIVER RUNS TWO RESEARCH STYLES, and that is why the bottom of this
+  table exists at all. Cheapest-first is BREADTH first: it finishes the most
+  items and so parks every seat in the shallow end of both trees. A share of
+  seats (`ladder.DEEP_SHARE`, drawn once per game seed and seat) instead take
+  the most advanced legal item every time, and beeline. One gate run now holds
+  both regimes, and the seats inside a game are ASYMMETRIC, which the digest
+  compares for free. MEASURED alternative, rejected: per-decision epsilon
+  noise on the same pick reached nothing new and cost two seeds their
+  city-state war — the late catalog is gated on research DEPTH within 250
+  turns, and random detours only add drag.
+- URBANIZATION, a NEIGHBORHOOD and an antiquity DIG are each reached by ONE
+  seed, in the last twenty turns. They are gate-covered in the narrowest
+  sense; the poke lanes still carry them.
+- A SECOND HULL reaches 8 of 12 seeds from t103.
+- THE POLICY CARDS THEMSELVES ARE MOSTLY UNREACHED. The greedy fill puts 16
   of the 49 cards in a slot across the whole run — URBAN_PLANNING, GOD_KING,
   LAND_SURVEYORS, NATURAL_PHILOSOPHY, SCRIPTURE, DISCIPLINE, CHIVALRY,
-  VETERANCY, DIPLOMATIC_LEAGUE — at most six at once. The fill takes TABLE
-  order within a slot kind, so a late card is reachable only once the
-  earlier ones RETIRE, and the driven seeds never research far enough for
-  most of those civics. Eight effect channels ride the digest
-  (`cityYields`, `capitalYields`, `adjacencyMult`, `tilePurchaseMult`,
-  `encampHarborProdMult`, `prodBoost`, `combatVsBarbarians`,
-  `firstEnvoyDouble`); the other fourteen — `buildingYieldBoost`,
-  `builderCharges`, `unitMaintenanceCut`, `cityDefense`, `cityRanged`,
-  `reconXpMult`, `routePlunderMult`, `routeGold`, `influencePerTurn`,
-  `culturePerSuzerain`, `gpp`, and the three conditional-housing rows — are
+  VETERANCY, DIPLOMATIC_LEAGUE, plus BASTIONS, CONSCRIPTION, FEUDAL_CONTRACT,
+  INSULAE, LEVEE_EN_MASSE, SURVEY and TOWN_CHARTERS on the deep seats — at
+  most six at once. The fill takes TABLE order within a slot kind, so a late
+  card is reachable only once the earlier ones RETIRE. THIRTEEN effect channels
+  ride the digest (`cityYields`, `capitalYields`, `adjacencyMult`,
+  `tilePurchaseMult`, `encampHarborProdMult`, `prodBoost`,
+  `combatVsBarbarians`, `firstEnvoyDouble`, and — only on the deep seats —
+  `cityDefense`, `cityRanged`, `reconXpMult`, `unitMaintenanceCut`,
+  `housingIfDistricts`); the other nine — `buildingYieldBoost`,
+  `builderCharges`, `routePlunderMult`, `routeGold`, `influencePerTurn`,
+  `culturePerSuzerain`, `gpp`, `amenitiesIfSpecialty` and `newDeal` — are
   proved by `policy_cards_test` and the TS `policy-cards` suite alone.
-- No antiquity dig happens at all, and the reason is now MEASURED rather
-  than assumed: no seed researches NATURAL_HISTORY, so no seat can train an
-  Archaeologist, and none builds the museum a dig lands in. The same
-  horizon hides the National Park, whose CONSERVATION civic sits a whole
-  era further out. Both mechanics are poke-covered only — see B-20r.
+- THE DIG AND THE NATIONAL PARK CAME INTO REACH with the deep style:
+  NATURAL_HISTORY on 5 seeds from t153 and CONSERVATION on 3 from t169,
+  where both were NEVER. One seed carries a dig through to an artifact in a
+  slot. The horizon that hid them was the research ladder's, not the
+  engine's — see B-20r.
   (The finer question this section used to ask — a dig by a seat whose ERA
   differs from row 0's — is doubly moot: eras are global 50-turn blocks
   per B-24r, so no two seats can be in different eras by construction.)
 - The CULTURE VICTORY's distance, re-measured: at t250 visiting peaks at 5
-  (mean ~0.5 per seat) against a domestic peak of 61 (mean ~37) — a ~70x gap
+  (mean ~0.7 per seat) against a domestic peak of 78 (mean ~39) — a ~55x gap
   on means. B-20r's scope should be read off this, not any older number.
 - The space race needs Information-era techs no gate lane reaches; its poke
   lanes are the proof.

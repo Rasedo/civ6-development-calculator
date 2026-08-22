@@ -659,8 +659,11 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     blocks = _blocks(env, sim, row, obs=None if pre is None else pre.get("obs"))
     prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(blocks, sim, row))
     dtile = _district_tiles(sim, row, prod)
-    tech = ladder.pick_research(blocks, m["tech"], "tech") if bool(m["tech"].any()) else None
-    civic = ladder.pick_research(blocks, m["civic"], "civic") if bool(m["civic"].any()) else None
+    # turn 0 keeps the draw PERSISTENT: a seat's style is fixed for the game.
+    deep = (_policy_rng(sim, seeds, 0, row, 4) < ladder.DEEP_SHARE
+            if seeds is not None else None)
+    tech = ladder.pick_research(blocks, m["tech"], "tech", deep) if bool(m["tech"].any()) else None
+    civic = ladder.pick_research(blocks, m["civic"], "civic", deep) if bool(m["civic"].any()) else None
     war = None
     if seeds is not None and turn is not None:
         rng_w = {
