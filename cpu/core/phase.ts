@@ -12,7 +12,9 @@ import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, tradeWa
 import { PILLAGE_HEAL_IMPROVEMENTS } from './combat';  // the replay's pillage arm mirrors hostileUnitAct's
 import { cityStrikeStrength } from './combat';
 import { UNIT_HP } from '../data/units';
-import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, generalAuraCS, encircled } from './combat';
+import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, encircled } from './combat';
+import { promoCS, promoClassOf, promoValue, takePromotion } from './promotions';
+import { PROMO_COLS } from '../data/promotions';
 import { availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { selectResearch } from './economy';
@@ -49,13 +51,18 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, archaeologistExcavate, naturalistPark } from './units';
 import { killUnit } from './combat';
-import { availableProjects, buyTile, buyWorshipBuilding, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseSettler, queueProject, settlerCost, unitPurchaseCost } from './game';
+import { availableProjects, buyTile, buyWorshipBuilding, condemnHeretic, convertHeathens, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex } from './unitActions';
 
 const A_FOUND_CITY = unitActionIndex(IMPROVEMENT_IDS).FOUND_CITY;
 const A_EXCAVATE = unitActionIndex(IMPROVEMENT_IDS).EXCAVATE;
 const A_PARK = unitActionIndex(IMPROVEMENT_IDS).PARK;
+const A_PROMOTE = unitActionIndex(IMPROVEMENT_IDS).PROMOTE_0;
+const A_CONDEMN = unitActionIndex(IMPROVEMENT_IDS).CONDEMN_0;
+const A_REMOVE_HERESY = unitActionIndex(IMPROVEMENT_IDS).REMOVE_HERESY;
+const A_LAUNCH_INQUISITION = unitActionIndex(IMPROVEMENT_IDS).LAUNCH_INQUISITION;
+const A_CONVERT_HEATHEN = unitActionIndex(IMPROVEMENT_IDS).CONVERT_HEATHEN;
 import { AGREEMENT_TURNS, ALLIANCE_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles, goldenBoostBonus, worldEraIndex } from './eras';
 import { NO_SEAT, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civHasStrategic, civsAtWar, cityStateOfSeat, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
@@ -1073,6 +1080,27 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         naturalistPark(state, unit.id, actor.seat);
         return;
       }
+      if (a >= A_PROMOTE && a < A_PROMOTE + PROMO_COLS) {
+        takePromotion(unit, a - A_PROMOTE);
+        return;
+      }
+      if (a >= A_CONDEMN && a < A_CONDEMN + 6) {
+        const nb = neighbors(state.map, here)[a - A_CONDEMN];
+        if (nb) condemnHeretic(state, unit, nb.index);
+        return;
+      }
+      if (a === A_REMOVE_HERESY) {
+        removeHeresy(state, unit);
+        return;
+      }
+      if (a === A_LAUNCH_INQUISITION) {
+        launchInquisition(state, unit, actor);
+        return;
+      }
+      if (a === A_CONVERT_HEATHEN) {
+        convertHeathens(state, unit, actor);
+        return;
+      }
       if (a < 6) {
         const nb = neighbors(state.map, here);
         const to = nb[a];
@@ -1128,18 +1156,23 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         if (!((UNITS[unit.type]?.combat ?? 0) > 0)) return;
         const hereOwned = isTerritorial(tileSeat(here))
           && civsAtWar(state, unitSeat(unit), tileSeat(here));
+        // CIV6 (Depredation): "Pillaging costs only 1 Movement point."
+        const pillageCost = promoValue(unit, 'PILLAGE_CHEAP');
+        const spendPillage = (): void => {
+          unit.movesLeft = pillageCost > 0 ? Math.max(0, unit.movesLeft - pillageCost) : 0;
+        };
         if (here.improvement && !here.pillaged && hereOwned) {
           here.pillaged = true;
           if (PILLAGE_HEAL_IMPROVEMENTS.has(here.improvement)) {
             unit.hp = Math.min(UNIT_HP, unit.hp + 25);
           }
-          unit.movesLeft = 0;
+          spendPillage();
         } else if (
           hereOwned && here.district && here.district !== 'CITY_CENTER' &&
           here.districtComplete && !here.districtPillaged
         ) {
           here.districtPillaged = true;
-          unit.movesLeft = 0;
+          spendPillage();
         }
       } else if ((a >= 13 && a < 18) || (a >= 18 && a < 18 + IMPROVEMENT_IDS.length - DEDICATED_IMPROVEMENTS)) {
         if ((unit.charges ?? 0) <= 0 && a !== 17) return;
@@ -1486,10 +1519,7 @@ export function seatPhase(state: GameState): void {
           if (u) {
             actor.treasury = (actor.treasury ?? 0) - price;
             bought = true;
-            if ((UNITS[pickId]?.combat ?? 0) > 0) {
-              const xp = encampmentTrainXp(spawnCity.buildings);
-              if (xp > 0) u.xp = xp;
-            }
+            u.xpPct = trainXpPct(spawnCity.buildings, promoClassOf(pickId));
           }
         }
       }
@@ -1516,8 +1546,9 @@ export function seatPhase(state: GameState): void {
         const civCityF = actor.cities.find((c) => c.centerIndex === centre);
         if (!civCityF) continue;
         if (fk === 4) buyWorshipBuilding(state, civCityF.id, actor.seat);
-        else if ((fk === 5 || fk === 6) && !boughtRelig) {
-          boughtRelig = purchaseReligiousUnit(state, civCityF.id, fk === 5 ? 'MISSIONARY' : 'APOSTLE', actor.seat).ok;
+        else if ((fk === 5 || fk === 6 || fk === 11) && !boughtRelig) {
+          const rt = fk === 5 ? 'MISSIONARY' : fk === 6 ? 'APOSTLE' : 'INQUISITOR';
+          boughtRelig = purchaseReligiousUnit(state, civCityF.id, rt, actor.seat).ok;
         } else if ((fk === 8 || fk === 9) && !boughtCivilian) {
           // kinds 8/9 — the Monumentality faith-civilian (8 builder, 9 settler)
           boughtCivilian = purchaseCivilianWithFaith(state, civCityF.id, fk === 8 ? 'BUILDER' : 'SETTLER', actor.seat).ok;
@@ -1786,7 +1817,8 @@ export function seatPhase(state: GameState): void {
           const tt = state.map.tiles[bestTile];
           const defCS = defender.embarked
             ? embarkedDefenseCS(state, defender.seat) - woundPenalty(defender)
-            : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + xpLevelBonus(defender); // defender veterancy (embarked → flat, no xp)
+            : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender)
+              + promoCS(defender, { attacking: false, ranged: true, vsCity: true, tile: tt }); // the promotions it chose (embarked → flat override, none)
           const defCSa = defCS + generalAuraCS(state, defender, bestTile);
           // a survived Military Emergency pays its target +2 CS on every
           // City Strike against a member, forever
@@ -1830,7 +1862,8 @@ export function seatPhase(state: GameState): void {
           const tt = state.map.tiles[bestTile];
           const defCS = defender.embarked
             ? embarkedDefenseCS(state, defender.seat) - woundPenalty(defender)
-            : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + xpLevelBonus(defender);
+            : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender)
+              + promoCS(defender, { attacking: false, ranged: true, vsCity: true, tile: tt });
           const defCSa = defCS + generalAuraCS(state, defender, bestTile); // the cstk mirror
           const atkCS = cityStrikeStrength(state, civCity);
           defender.hp -= damageRoll(state, atkCS - defCSa, 'estk', bestTile);

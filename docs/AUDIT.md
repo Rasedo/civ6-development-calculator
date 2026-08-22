@@ -68,14 +68,16 @@ nothing carries forward.
 | B-46r the siege class's tails | 1 | the Bombard stat, both support chassis, all four walls tiers and the move-and-shoot rule ship; the middle siege rungs and Akkad's suzerain bonus do not |
 | B-54r flanking and support vs their own page | 1 | six rules the two engines agree on and the page does not: the Military Tradition gate, the flanking owner and river rules, support against ranged, embarked providers, and defensible districts |
 | B-55r a ship cannot carry a passenger | 1 | one MILITARY unit per tile, where Civ 6 stacks an embarked land unit with a naval one — which is where Support's 7th through 10th stacks live |
-| B-50r theological combat's other terms | 1 | flanking/support, the territory bonuses, the winner's advance and Holy Site healing ship; the Inquisitor is C-14's, the promotions C-3's, and who PROVIDES flanking is this engine's own reading |
+| B-56r the ten inert promotions | 2 | 62 of the 72 catalog rows fire a rule; ten name a mechanic neither engine has — a second attack per turn, sight-blocking, escort formations, class-aware zone of control — or wait on C-16/C-25 |
+| B-57r the SNIPE head stops at the distance-2 ring | 1 | a +1 Range promotion widens what the rule legalises and no seat can ORDER the shot, because the ring-3 columns do not exist |
+| B-58r the religious purchase asks for a Shrine | 1 | Civ 6 asks for a MAJORITY RELIGION and a Holy Site with a Temple; both engines ask for a Shrine and never read what the city follows |
+| B-59r the religious spread is a flat lump | 2 | Civ 6 scales the pressure by the Apostle's HP and strips a quarter of every other religion; both engines add a constant and strip nothing without Proselytizer |
 | B-51r the Encampment's second pool | 1 | the district meets the city's perimeter and heals only while its tile is clear; Civ 6 tracks the two pools SEPARATELY, and a defeat pillages it |
 | B-44r city-state war tails | 1 | the head, its policy and a SEAT's march on a minor ship; the barbarian walker still raids only majors because it beelines to one nearest city, and the diplomatic consequences wait on C-19 |
 | B-34r flood tails | 1 | the severity ladder and the river's whole reach ship; the Great Bath's mitigation is still seat-scoped rather than river-scoped, and the Dam is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **20** | |
+| **B. Fidelity vs real Civ 6** | **25** | |
 | C-1 POWER | 5 | no plants, no grid, no powered-yield term — 4 gaps wait on it |
 | C-2 diplomatic agreements | 3 | friendship, alliances, open borders, the closed border and the work gift ship on one 30-turn clock; alliance TYPES and LEVELS, the negotiated two-sided deal, and the four agreements that need one are open |
-| C-3 unit promotions | 5 | only MARTYR reaches a rule; choosing one is also a wire head, and Amphibious waives two penalties that now ship |
 | C-4 unique improvements | 3 | Batey / Colossal Head / Monastery, each a flat channel today |
 | C-5 strategic-resource stockpiles | 4 | resources gate, they never accumulate or get spent |
 | C-6 policy-card modifiers | 1 | two of the 49 cards are inert, each blocked on a system below |
@@ -86,7 +88,6 @@ nothing carries forward.
 | C-11 terrain the wonder rules need | 2 | the NARROWED placements are deliberately narrower than Civ 6's |
 | C-12 the Film Studio is absent | 1 | the Theater tier's other top building, so its specialist upgrade has one path |
 | C-13 ranged vs districts/cities | 2 | a scope-out on both, with the rest of the Encampment complete |
-| C-14 no Inquisitor | 1 | "only Apostles initiate" is a roster gap, not a rule; there is no CONDEMN verb either, and a resolution waits on it |
 | C-15 garrison does not block capture | 2 | the move-onto-centre capture model is what is missing |
 | C-16 spies / air units / GDRs | 4 | whole unit classes, and four dedications wait on them |
 | C-17 embarked movement never upgrades | 1 | the flat EMBARK_MOVES stands in for every era |
@@ -103,8 +104,8 @@ nothing carries forward.
 | C-28 tourism is one lifetime scalar | 2 | it is banked per seat and divided by the civ count on read, so no rule can address one rival's tourism |
 | C-29 no RESOLVED suzerain | 1 | `isSuzerain` recomputes from the raw envoy store on every read, so a rule that changes envoy WEIGHT by who the suzerain is has no fixed point |
 | C-30 city-states carry no research | 1 | no techs, no civics, so nothing can say when a minor took Early Empire — its borders never close and the suzerain's passage lifts nothing |
-| **C. Absent systems** | **67** | |
-| **OPEN, TOTAL** | **87** | |
+| **C. Absent systems** | **61** | |
+| **OPEN, TOTAL** | **86** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -283,7 +284,8 @@ Civ 6 source or is recorded as unverifiable.
   - **EIGHT resolutions still have no carrier**, each blocked on a named
     absence: Arms Control (weapons of mass destruction), Espionage Pact
     (spies), Governance Doctrine (a governor roster with appointment and
-    promotion, B-24r), Military Advisory (a promotion-class axis, C-3),
+    promotion, B-24r), Military Advisory (unblocked since the promotion
+      classes shipped — unwritten, not absent),
     Global Energy Treaty (POWER-consuming buildings, C-1, and the
     climate arc, C-24), Public Relations (grievances, C-19), Luxury
     Policy and World Religion. The last two are HALF-sourced, and a
@@ -298,8 +300,9 @@ Civ 6 source or is recorded as unverifiable.
     - **World Religion.** SOURCED: "A: +10 Religious Combat Strength for
       all units of this Religion. / B: Condemning a unit of this
       Religion yields 25 Diplomatic Favor." Both magnitudes are
-      published; B's VERB is not — neither engine has a condemn action,
-      which belongs to the Inquisitor/Apostle interaction (C-14).
+      published, and B's VERB now exists on both engines
+      (`condemnHeretic` / `_condemn_heretic`), so this one is unwritten
+      rather than blocked.
   - **THE CULTURE BOMB DOES NOT WIPE UNFINISHED CONSTRUCTION.** SOURCED
     (Culture Bomb): a bombed tile carrying a district or wonder still
     UNDER CONSTRUCTION is flipped anyway, "wiping out any unfinished
@@ -598,9 +601,6 @@ Civ 6 source or is recorded as unverifiable.
   chassis, so the battery proves the two engines agree about these bodies and
   the poke lanes are what prove they agree with the pages.
   OPEN:
-  - **THE EXPERT CREW PROMOTION** is the rule's other half — a siege unit that
-    has earned it "may move and shoot in the same turn" at any Movement.
-    Blocked on C-3.
   - **THE MIDDLE AND LATE SIEGE RUNGS.** Trebuchet, Artillery and Rocket
     Artillery are absent, so the class has a Classical rung and a Renaissance
     one and nothing after Metal Casting. The Observation Balloon that lets a
@@ -638,8 +638,10 @@ Civ 6 source or is recorded as unverifiable.
   OPEN:
   - **THE HIGHER-STACK UNITS AND PROMOTIONS.** Impi, Hypaspist, Double
     Envelopment, Square, Shadow Strike, Georgy Zhukov and Horatio Nelson each
-    raise a stack above +2 for their owner only. The unique units are C-26's,
-    the promotions are C-3's, and the two Great Person identities are B-53r's.
+    raise a stack above +2 for their owner only. Double Envelopment and Square
+    now ship as `FLANK_MULT` / `SUPPORT_MULT` rows their owner's unit must
+    hold; the unique units are C-26's, the two Great Person identities are
+    B-53r's, and Shadow Strike is not in the 72-row catalog.
   - **THE STACKS STOP SHORT OF THEIR CIV 6 MAXIMA.** Flanking tops out at 5
     here and 6 there; Support at 6 here and 10 there. Both ceilings are the
     same blocker, B-55r: Civ 6 counts a water tile holding an embarked unit
@@ -658,31 +660,77 @@ Civ 6 source or is recorded as unverifiable.
   short of their real ceilings (B-54r). The third Civ 6 slot, the SUPPORT unit
   class, is not the same gap: BATTERING_RAM and SIEGE_TOWER carry `charges`,
   so `unitDomain` already files them as civilians and they stack with an army.
-- **B-50r. Theological combat's other terms.** Four of the six ship.
-  `theologicalCombatPhase` / `_theological_combat_phase` now add FLANKING to
-  the attacker and SUPPORT to the defender off the same `flankCount` /
-  `supportCount` the physical roll uses; `theoDefenseStrength` /
-  `_theo_def_strength` add the page's DEFENDING-ONLY location bonuses (+5 in
-  the territory of a city following the defender's religion, +15 on top in
-  that religion's Holy City, plus a defensive improvement — a FORT — and
-  nothing at all from physical terrain); the winner ADVANCES into the fallen
-  unit's tile when it survived and the tile is free; and `religiousHeal` /
-  `_religious_heal` heal a religious unit only on or beside a Holy Site in its
-  OWN territory, at `RELIGIOUS_HEAL_PER_FAITH` times that site's own faith
-  (its adjacency plus its buildings), a pillaged one paying nothing. Two
-  embarked units cannot fight each other. REACHABILITY: neither driven nor
-  scripted — `tests/cpu/religion/theological-combat.test.ts` and
-  `tests/gpu/religion2_test.py` pokes 11 and 12 are the only proof.
-  OPEN:
-  - **THE INQUISITOR** as a second attacker and a defensive specialist is a
-    roster gap (C-14), and the promotions that modify the roll are C-3's.
-  - **WHO PROVIDES FLANKING AND SUPPORT is this engine's own answer.** The
-    page says only that flanking and support apply; it does not say whether a
-    RELIGIOUS unit counts as a flanker for a physical battle, or whether a
-    military unit flanks a theological one. Both engines take the physical
-    predicate unchanged — any adjacent unit of a hostile/friendly seat — which
-    is a reading, not a quotation, and the two engines agree on it only
-    because they share the body.
+- **B-56r. The ten inert promotions.** 62 of the 72 catalog rows in
+  `cpu/data/promotions.ts` reach a rule through `promoCS` / `_promo_cs` or one
+  of the flag and value kinds beside them. TEN carry `none` because the
+  mechanic they name is not in either engine, and each is recorded here with
+  its own blocker rather than as a data comment:
+  - **A SECOND ATTACK PER TURN** — Elite Guard's other half, Expert Marksman
+    and Breakthrough each grant "1 additional attack per turn". Neither engine
+    counts attacks: `spendAttack` expresses "the attack is spent" by ending the
+    unit's movement, so there is no counter to raise.
+  - **SENTRY** ("can see through Woods and Rainforest") — `revealAround` /
+    `_reveal_around` reveal a flat radius, so nothing blocks sight and the
+    promotion has nothing to lift.
+  - **SUPPRESSION** grants zone of control to a ranged unit. `inEnemyZoc` /
+    `_in_enemy_zoc` count EVERY hostile military unit, ranged included, so the
+    promotion has nothing to grant. The real gap is the other way round: a
+    ranged unit should not exert ZOC without it, and making it class-aware is
+    the fix this row is waiting on.
+  - **CONVOY and ESCORT_MOBILITY** move an escorted unit with its escort. No
+    formation model exists: `unitsAt` / the occupancy planes hold units, never
+    pairs, so there is no escort to speak of. Related to B-55r but not the
+    same gap — that one is about a tile holding two units, this one about two
+    units moving as one.
+  - **CAMOUFLAGE and CREEPING_ATTACK** need stealth: C-25.
+  - **PROXIMITY_FUSES** defends against air units: C-16.
+  REACHABILITY: the ten rows ARE offered — `_promo_offer_mask` opens them and
+  the driver takes them — so a unit can hold an inert promotion and nothing
+  will change. That is the visible symptom. The other 62 are proved by two
+  poke lanes rather than by the gate, which reaches a tier-4 row only by
+  accident: tests/gpu/promotions_test.py for the ladder, the head and the
+  Combat Strength evaluator, tests/gpu/promo_effects_test.py for the
+  seventeen kinds that are not Combat Strength.
+- **B-57r. The SNIPE head stops at the distance-2 ring.** `unitAttackRange` /
+  the barbarian scan both add the RANGE promotion's +1, so the RULE legalises a
+  distance-3 shot on both engines and `rangedAttackInner`'s own gate accepts
+  one. The driven wire cannot ask for it: the SNIPE block is twelve columns
+  over `snipeRing` / `ring2`, the distance-2 ring alone, so Forward Observers
+  and Coincidence Rangefinding widen a legality no seat can exercise. The fix
+  is 18 more columns (the distance-3 ring) appended after the last verb, plus
+  the ring itself on both engines — an append-only head change, not a blocked
+  one.
+
+- **B-58r. The religious purchase asks for a Shrine, not a majority religion.**
+  CIV6 (Apostle, and the Inquisitor page verbatim): the unit "can only be
+  purchased with Faith in a city that has a majority religion and a Holy Site
+  with a Temple (or one of its replacements)". `purchaseReligiousUnit` /
+  `_seat_religious_city_ok` ask for a SHRINE plus a complete unpillaged Holy
+  Site, and a TEMPLE on top for the Apostle and the Inquisitor — but neither
+  engine reads `city.followedReligion` / `city_followed` at the counter, so a
+  city pressed into a rival's religion still sells its owner's Apostles. The
+  Shrine is this engine's own stand-in and the majority test is the missing
+  half.
+
+- **B-59r. The religious spread is a flat lump.** CIV6 (Apostle): Spread
+  Religion "converts Citizens in adjacent city to Apostle's religion (Pressure
+  = 2.2 * Apostle's current HP) and reduces total Religious Pressure of all
+  foreign religions in the city by 25%". `spreadFromUnit` / the `_A_SPREAD`
+  arm add a constant `SPREAD_PRESSURE` times the enhancer multiplier and strip
+  nothing. Three halves are open:
+  - **THE PRESSURE DOES NOT SCALE WITH HP.** A wounded Apostle converts as
+    hard as a fresh one, so theological combat costs a spreader nothing but
+    the risk of dying.
+  - **THE BASE 25% STRIP IS ABSENT.** Only the Proselytizer promotion strips
+    anything (75%, sourced); the unpromoted spread leaves every rival's
+    pressure untouched. The two are meant to stack as base-and-upgrade.
+  - **A CITY-STATE CANNOT BE CONVERTED.** `allCities` is
+    `state.seats.flatMap` — majors only — and the GPU's spread scans
+    `city_alive[:, :n_majors]` to match, so the minors carry no religion on
+    either engine. That is why Translator's "this also applies to city-states"
+    clause has nothing to triple; it belongs with C-30's family of things a
+    minor does not track.
+
 - **B-51r. The Encampment's second pool.** An assault on the district now
   meets the perimeter: `attackEncampment` / `_attack_encampment` find the city
   behind the tile (`cityAtTile` / `_owner_city_col`) and divide the roll
@@ -921,14 +969,6 @@ number was under-counting by treating deferrals as closures.
     per foreign civilization; blocked on C-28.
   - **25 Grievances per denouncement** (GS); blocked on C-19.
   - The **GREAT WORK HEIST** is a spy operation, C-16.
-- **C-3. UNIT PROMOTIONS — no promotion tree.** Weight 5. The only promotion
-  that reaches a rule is MARTYR, drawn at the death. Gaps: Yerevan's suzerain
-  row (choose an Apostle promotion instead of drawing it — and choosing is a
-  DECISION with no wire record, so it needs a head too); veterancy beyond
-  the flat XP levels; and
-  AMPHIBIOUS, which "negates the defender's river defense bonus and doesn't
-  suffer the amphibious attack penalty when it attacks" — both of those
-  penalties now ship, so the waiver has something real to waive.
 - **C-4. UNIQUE IMPROVEMENTS — the roster holds only the generic set.**
   Weight 3. Gaps: Caguana's Batey, La Venta's Colossal Head and Armagh's
   Monastery (each a whole improvement with its own adjacency, standing in as
@@ -982,9 +1022,6 @@ number was under-counting by treating deferrals as closures.
   Recorded as a scope-out for both. The rest of the Encampment (`encamp_hp`
   pool, movement block, garrison pool, district strike, training XP) is
   complete, which is what makes the missing arm visible.
-- **C-14. NO INQUISITOR.** Weight 1. Real Civ 6 lets Inquisitors initiate
-  theological combat and defend against it; this roster has no such unit, so
-  "only Apostles initiate" is a roster gap, not a rule.
 - **C-15. A GARRISON DOES NOT BLOCK A CAPTURE.** Weight 2. Real Civ 6 takes a
   city by moving a melee unit ONTO the centre, so a defender there must die
   first. Here the centre falls at 0 HP and CITY-FIRST targeting never makes
@@ -1067,8 +1104,8 @@ number was under-counting by treating deferrals as closures.
   (Privateer, Sea Dog, Barbary Corsair, Submarine, U-Boat, Nuclear Submarine)
   — of which this roster has none, its whole navy being the GALLEY and the
   QUADRIREME — plus a Warrior Monk with Twilight Veil, a Recon unit with
-  Camouflage and a Soothsayer with Inquisitor, three units that are absent AND
-  promotion-gated (C-3). Gaps waiting on it: the siege rule "stealth units
+  Camouflage and a Soothsayer with Inquisitor, three units that are absent —
+  and Camouflage is one of B-56r's inert rows for the same reason. Gaps waiting on it: the siege rule "stealth units
   cannot besiege a city", which `encircled` / `_seat_city_fire_and_heal` count
   every hostile military unit toward; the hidden-while-adjacent-to-a-district
   clause and the reveal-for-one-turn-after-attacking clause, which need a

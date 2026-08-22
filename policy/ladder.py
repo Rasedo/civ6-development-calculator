@@ -253,8 +253,10 @@ def pick_purchase(can_building: torch.Tensor, settler_ok: torch.Tensor, unit_ok:
     return kind
 
 
-def pick_faith(worship_ok: torch.Tensor, missionary_ok: torch.Tensor, apostle_ok: torch.Tensor):
+def pick_faith(worship_ok: torch.Tensor, missionary_ok: torch.Tensor,
+               apostle_ok: torch.Tensor, inquisitor_ok: torch.Tensor):
     relig = torch.full(worship_ok.shape, -1, dtype=torch.long, device=worship_ok.device)
+    relig = torch.where(inquisitor_ok, torch.full_like(relig, 11), relig)
     relig = torch.where(apostle_ok, torch.full_like(relig, 6), relig)
     relig = torch.where(missionary_ok, torch.full_like(relig, 5), relig)
     return worship_ok, relig

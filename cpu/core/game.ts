@@ -3,14 +3,15 @@ import type { City, DistrictId, GameState, ImprovementId, MapGenOptions, QueueIt
 import { greatPeopleEarned } from './greatPeople';
 import { placeRelic, GP_CLASSES, RELIC_WONDER_SLOTS } from '../data/greatPeople';
 import { generateMap } from '../../world/mapgen';
-import { tilesWithin, hexDistance } from '../../world/hex';
+import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { acquireTile, borderCandidates } from './city';
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, isCivicComplete } from './effects';
 import type { Modifiers, Unlocks } from './effects';
 import { effectiveResearchCostIn } from './boosts';
-import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, tileFreeForUnit, builderCost, traderCost, settlerCount } from './units';
-import { barbarianPhase, damageRoll, encampmentTrainXp, woundPenalty, theoDefenseStrength, flankCount, supportCount, FLANKING_CS, SUPPORT_CS } from './combat';
+import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, tileFreeForUnit, builderCost, traderCost, settlerCount, unitsAt } from './units';
+import { promoClassOf, promoFlag, unitPromoRows, XP_PER_LEVEL } from './promotions';
+import { barbarianPhase, damageRoll, trainXpPct, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase, suzerainEffect } from './cityStates';
@@ -32,10 +33,10 @@ import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
 import { nextRandom } from './rand';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, MISSIONARY_CAP, APOSTLE_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, MARTYR_CHANCE } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, APOSTLE_PROMO_OFFER, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
-import { BARB_SEAT, allCities, allSeats, citiesOf, emptySeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, unitSeat } from './seats';
+import { BARB_SEAT, allCities, allSeats, citiesOf, civsAtWar, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat } from './seats';
 
 export const TURN_LIMIT = 250;
 
@@ -506,12 +507,7 @@ export function purchaseUnit(state: GameState, cityId: number, unitType: string,
     if (!state.sandbox) buyer.treasury += cost; // refund: nowhere to stand
     return { ok: false, reason: 'No free tile near the city center.' };
   }
-  // A purchased MILITARY unit starts with the city's
-  // Encampment training XP (best military-building tier; civilians never fight).
-  if ((UNITS[unitType]?.combat ?? 0) > 0) {
-    const xp = encampmentTrainXp(city.buildings);
-    if (xp > 0) unit.xp = xp;
-  }
+  unit.xpPct = trainXpPct(city.buildings, promoClassOf(unitType));
   if (unitType === 'BUILDER') buyer.buildersTrained += 1;
   return { ok: true };
 }
@@ -564,10 +560,151 @@ export function buyWorshipBuilding(state: GameState, cityId: number, seat: numbe
   return { ok: true };
 }
 
+/**
+ * CIV6 (Theological combat): "When a hostile military unit uses the Condemn
+ * Heretic action on a religious unit, the same effect is observed; however,
+ * only the losing side loses religious influence, the Religious Pressure lost
+ * is halved ... and it only affects cities within 6 tiles. The religion of the
+ * military unit does not gain influence." The action's own condition is "Must
+ * be at war with the owner of the religious unit."
+ */
+export function condemnHeretic(state: GameState, unit: Unit, tileIndex: number): RuleResult {
+  if ((UNITS[unit.type]?.combat ?? 0) <= 0) return { ok: false, reason: 'Not a military unit.' };
+  const target = state.units.find(
+    (u) => u.tileIndex === tileIndex && (UNITS[u.type]?.religiousStrength ?? 0) > 0
+      && unitSeat(u) !== unitSeat(unit),
+  );
+  if (!target) return { ok: false, reason: 'No enemy religious unit there.' };
+  if (!civsAtWar(state, unitSeat(unit), unitSeat(target))) {
+    return { ok: false, reason: 'Not at war with its owner.' };
+  }
+  const loser = unitSeat(target);
+  const nRel = state.seats.length;
+  const dt = state.map.tiles[tileIndex];
+  for (const c of allCities(state)) {
+    const ct = state.map.tiles[c.centerIndex];
+    if (hexDistance(dt.col, dt.row, ct.col, ct.row) > CONDEMN_PRESSURE_RANGE) continue;
+    let pres = c.religionPressure;
+    if (!pres || pres.length !== nRel) {
+      pres = new Array(nRel).fill(0);
+      c.religionPressure = pres;
+    }
+    pres[loser] = Math.max(0, pres[loser] - CONDEMN_PRESSURE_SWING);
+  }
+  disbandUnit(state, target.id);
+  unit.movesLeft = 0;
+  return { ok: true };
+}
+
+/**
+ * CIV6 (Inquisitor): "Using one charge in a City Center tile removes all
+ * religions ... from that city, besides your own", and Gathering Storm leaves
+ * a quarter of each standing: "Only remove 75% presence of other Religions
+ * instead of 100%."
+ */
+export function removeHeresy(state: GameState, unit: Unit): RuleResult {
+  if (unit.type !== 'INQUISITOR') return { ok: false, reason: 'Not an Inquisitor.' };
+  if ((unit.charges ?? 0) <= 0) return { ok: false, reason: 'No charges left.' };
+  const here = state.map.tiles[unit.tileIndex];
+  const city = citiesOf(state, unitSeat(unit)).find((c) => c.centerIndex === unit.tileIndex);
+  if (!city || here.district !== 'CITY_CENTER') return { ok: false, reason: 'Not in one of your City Centers.' };
+  const mine = unitSeat(unit);
+  const pres = city.religionPressure;
+  if (pres) {
+    for (let g = 0; g < pres.length; g++) {
+      if (g === mine) continue;
+      pres[g] = Math.floor(pres[g] * (100 - REMOVE_HERESY_PCT) / 100);
+    }
+  }
+  unit.charges = (unit.charges ?? 0) - 1;
+  unit.movesLeft = 0;
+  return { ok: true };
+}
+
+/**
+ * CIV6 (Heathen Conversion): "Can convert all adjacent Barbarians to your side
+ * by using a religious charge."
+ *
+ * The converts join their new owner in NEIGHBOUR-RING order on both engines —
+ * the pooled twin appends them in that order, and an array-order walk that
+ * disagreed would hand the next turn's orders to the wrong units.
+ */
+export function convertHeathens(state: GameState, unit: Unit, actor: Seat): RuleResult {
+  if (!promoFlag(unit, 'HEATHEN')) return { ok: false, reason: 'No such promotion.' };
+  if ((unit.charges ?? 0) <= 0) return { ok: false, reason: 'No charges left.' };
+  const here = state.map.tiles[unit.tileIndex];
+  const got: Unit[] = [];
+  for (const t of neighbors(state.map, here)) {
+    for (const u of unitsAt(state, t.index)) if (isBarbSeat(u.seat)) got.push(u);
+  }
+  if (got.length === 0) return { ok: false, reason: 'No Barbarians adjacent.' };
+  for (const u of got) {
+    u.seat = actor.seat;
+    u.movesLeft = 0;
+    state.units = state.units.filter((x) => x.id !== u.id);
+    state.units.push(u);
+  }
+  unit.charges = (unit.charges ?? 1) - 1;
+  unit.movesLeft = 0;
+  if ((unit.charges ?? 0) <= 0) disbandUnit(state, unit.id);
+  return { ok: true };
+}
+
+/**
+ * CIV6 (Apostle): "Launch Inquisition (only possible if your Religion hasn't
+ * unlocked Inquisitors), consumes Apostle, must have at least 3 charges" — and
+ * the Inquisitor page adds that the Apostle must use it "within your
+ * territory".
+ */
+export function launchInquisition(state: GameState, unit: Unit, actor: Seat): RuleResult {
+  if (unit.type !== 'APOSTLE') return { ok: false, reason: 'Not an Apostle.' };
+  if (actor.religion.inquisition) return { ok: false, reason: 'Already launched.' };
+  if ((unit.charges ?? 0) < LAUNCH_INQUISITION_CHARGES) return { ok: false, reason: 'Needs 3 charges.' };
+  const here = state.map.tiles[unit.tileIndex];
+  if (tileSeat(here) !== actor.seat) return { ok: false, reason: 'Must stand in your own territory.' };
+  actor.religion.inquisition = true;
+  disbandUnit(state, unit.id);
+  return { ok: true };
+}
+
+/**
+ * CIV6 (Apostle): "Acquire 1 Religious Promotion at the time of purchase...
+ * The player may choose between three promotions randomly chosen from the
+ * pool. If the player is the Suzerain of Yerevan, they are free to choose from
+ * the entire pool... if the player owns Mont St. Michel, all Apostles
+ * automatically receive the Martyr promotion in addition to another one they
+ * choose normally."
+ *
+ * The draw takes three DISTINCT columns without replacement, so the stream is
+ * exactly three numbers however the offer lands.
+ */
+function offerApostlePromotions(state: GameState, unit: Unit, seat: number): void {
+  const rows = unitPromoRows(unit);
+  const all = (1 << rows.length) - 1;
+  const free = suzerainEffect(state, seat, 'apostlePromoChoice');
+  let offer = 0;
+  for (let j = 0; j < APOSTLE_PROMO_OFFER; j++) {
+    let pick = Math.floor(nextRandom(state) * (rows.length - j));
+    for (let k = 0; k < rows.length; k++) {
+      if (offer & (1 << k)) continue;
+      if (pick === 0) { offer |= 1 << k; break; }
+      pick -= 1;
+    }
+  }
+  unit.promoOffer = free ? all : offer;
+  // An Apostle never levels, so the one promotion it may take is its level-2
+  // rung and nothing more.
+  unit.xp = XP_PER_LEVEL;
+  if (seatWonderFlag(state, seat, 'apostleMartyr')) {
+    const k = rows.findIndex((p) => p.id === 'MARTYR');
+    if (k >= 0) unit.promos = (unit.promos ?? 0) | (1 << k);
+  }
+}
+
 export function purchaseReligiousUnit(
   state: GameState,
   cityId: number,
-  unitType: 'MISSIONARY' | 'APOSTLE',
+  unitType: 'MISSIONARY' | 'APOSTLE' | 'INQUISITOR',
   seat: number,
 ): RuleResult {
   const buyer = seatOf(state, seat);
@@ -575,15 +712,27 @@ export function purchaseReligiousUnit(
   if (!buyer.religion.founded) return { ok: false, reason: 'No founded religion.' };
   const city = citiesOf(state, seat).find((c) => c.id === cityId);
   if (!city) return { ok: false, reason: 'No such city.' };
-  const cap = unitType === 'MISSIONARY' ? MISSIONARY_CAP : APOSTLE_CAP;
+  // CIV6: "You can only create Inquisitors if you have founded a religion and
+  // had an Apostle use the Launch Inquisition ability within your territory."
+  if (unitType === 'INQUISITOR' && !buyer.religion.inquisition) {
+    return { ok: false, reason: 'No Inquisition has been launched.' };
+  }
+  const cap = unitType === 'MISSIONARY' ? MISSIONARY_CAP
+    : unitType === 'APOSTLE' ? APOSTLE_CAP : INQUISITOR_CAP;
   const live = state.units.filter((u) => u.seat === seat && u.type === unitType).length;
   if (live >= cap) return { ok: false, reason: `${unitType} cap reached.` };
   const eb = buyer.religion.enhancer ? ENHANCER_BELIEFS[buyer.religion.enhancer]?.effects : undefined;
   const cost = unitType === 'MISSIONARY'
     ? Math.round(UNITS.MISSIONARY.cost * (eb?.missionaryCostMult ?? 1))
-    : Math.round(UNITS.APOSTLE.cost);
+    : Math.round(UNITS[unitType].cost);
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   if (!city.buildings.includes('SHRINE')) return { ok: false, reason: 'Needs a Shrine.' };
+  // CIV6: "the Apostle and the Guru require a Temple, and the Inquisitor
+  // requires both a Temple and an Apostle ... to have previously Launched an
+  // Inquisition."
+  if (unitType !== 'MISSIONARY' && !city.buildings.includes('TEMPLE')) {
+    return { ok: false, reason: 'Needs a Temple.' };
+  }
   const hs = city.districts.find((d) => d.type === 'HOLY_SITE');
   const ht = hs ? state.map.tiles[hs.tileIndex] : undefined;
   if (!ht?.districtComplete || ht.districtPillaged) {
@@ -593,6 +742,7 @@ export function purchaseReligiousUnit(
   if (!u) return { ok: false, reason: 'No free tile near the city center.' };
   buyer.faith = (buyer.faith ?? 0) - cost;
   if (unitType === 'MISSIONARY' && eb?.missionaryChargeBonus) u.charges = (u.charges ?? 0) + eb.missionaryChargeBonus;
+  if (unitType === 'APOSTLE') offerApostlePromotions(state, u, seat);
   // CIV6 (GS Civilopedia, Exodus of the Evangelists, Golden face): "newly
   // trained ones get +2 Charges" — Missionaries and Apostles alike.
   if (goldenDedication(state, seat, DED_EXODUS)) u.charges = (u.charges ?? 0) + 2;
@@ -1045,7 +1195,10 @@ function theologicalCombatPhase(state: GameState): void {
   const nRel = state.seats.length;
   const relStr = (u: Unit): number => UNITS[u.type]?.religiousStrength ?? 0;
   for (const att of [...state.units]) {
-    if (att.type !== 'APOSTLE' || att.hp <= 0) continue;
+    // CIV6: "only Apostles and Inquisitors can initiate theological combat...
+    // Missionaries and Gurus may become the target of such an attack, but they
+    // may not initiate it themselves."
+    if ((att.type !== 'APOSTLE' && att.type !== 'INQUISITOR') || att.hp <= 0) continue;
     if (!state.units.includes(att)) continue; // already fell this pass
     const at = state.map.tiles[att.tileIndex];
     const g = unitSeat(att);
@@ -1067,11 +1220,11 @@ function theologicalCombatPhase(state: GameState): void {
     // theological combat" — the same two counts a melee exchange uses, since
     // theological combat "follows the same rules of engagement as melee
     // combat". The location bonuses are the DEFENDER's alone.
-    const atkStr = relStr(att) - woundPenalty(att)
-      + FLANKING_CS * flankCount(state, def.tileIndex, att);
-    const defStr = relStr(def) - woundPenalty(def)
+    const atkStr = theoStrength(state, att)
+      + FLANKING_CS * theoFlankCount(state, def.tileIndex, att);
+    const defStr = theoStrength(state, def)
       + theoDefenseStrength(state, def, state.map.tiles[def.tileIndex])
-      + SUPPORT_CS * supportCount(state, def.tileIndex, def);
+      + SUPPORT_CS * theoSupportCount(state, def.tileIndex, def);
     def.hp -= damageRoll(state, atkStr - defStr, 'theo', def.tileIndex);
     att.hp -= damageRoll(state, defStr - atkStr, 'theoc', att.tileIndex);
     att.movesLeft = 0;
@@ -1091,17 +1244,12 @@ function theologicalCombatPhase(state: GameState): void {
         if (loserRel >= 0) pres[loserRel] = Math.max(0, pres[loserRel] - THEO_PRESSURE_SWING);
       }
     }
-    // RELICS. CIV 6 creates one when the Apostle killed here carried the
-    // MARTYR promotion — one of nine, DRAWN here (see MARTYR_CHANCE). A dead
-    // MISSIONARY yields nothing. Drawn and granted in the SAME order as the two
-    // disbands below (defender first, then attacker) so both the RNG stream and
-    // the relic's slot are order-exact across engines.
-    // CIV6 (Mont St. Michel): every Apostle its owner creates carries MARTYR.
-    // The draw still runs so the RNG stream is the same length either way.
-    const martyrs = (sx: number): boolean => {
-      const drew = nextRandom(state) < MARTYR_CHANCE;
-      return drew || seatWonderFlag(state, sx, 'apostleMartyr');
-    };
+    // RELICS. CIV 6 creates one when the Apostle killed here HELD the MARTYR
+    // promotion — one of the nine it chose from at purchase. A dead Missionary
+    // or Inquisitor yields nothing; neither carries the promotion list.
+    // Granted in the SAME order as the two disbands below (defender first,
+    // then attacker) so the relic's slot is order-exact across engines.
+    const martyrs = (u: Unit): boolean => promoFlag(u, 'MARTYR');
     // Capacity is the TEMPLE's slot plus any wonder's, so the closure resolves
     // completeness off the tile the way the Great-Works path does.
     const relicSlots = (c: { wonders?: { id: string; tileIndex: number }[] }) =>
@@ -1115,10 +1263,10 @@ function theologicalCombatPhase(state: GameState): void {
       const owner = seatOf(state, sx);
       if (owner) owner.relicReserve = (owner.relicReserve ?? 0) + 1;
     };
-    if (def.hp <= 0 && def.type === 'APOSTLE' && martyrs(unitSeat(def))
+    if (def.hp <= 0 && martyrs(def)
         && !placeRelic(citiesOf(state, unitSeat(def)), relicSlots)) reserve(unitSeat(def));
-    if (att.hp <= 0 && martyrs(g)
-        && !placeRelic(citiesOf(state, g), relicSlots)) reserve(g); // the attacker is always an APOSTLE
+    if (att.hp <= 0 && martyrs(att)
+        && !placeRelic(citiesOf(state, g), relicSlots)) reserve(g);
     if (def.hp <= 0) disbandUnit(state, def.id);
     if (att.hp <= 0) disbandUnit(state, att.id);
     // CIV6: "If the defender is killed, the attacker enters its tile, just like

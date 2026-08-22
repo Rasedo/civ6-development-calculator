@@ -6,6 +6,7 @@ import { nextRandom } from './rand';
 import { isWater, isImpassable } from '../../world/query';
 import { TECHS } from '../data/techs';
 import { dedicationEvent } from './eras';
+import { promoValue } from './promotions';
 import { DED_DRACONES, DRACONES_DISCOVERY_SCORE } from '../data/seats';
 
 export const SIGHT_RANGE = 2;
@@ -56,7 +57,8 @@ export function initFog(state: GameState): void {
       if (tileSeat(t) === s.seat) revealAround(state, s.seat, t.index, 1);
     }
     for (const c of citiesOf(state, s.seat)) revealAround(state, s.seat, c.centerIndex, 3);
-    for (const u of unitsOf(state, s.seat)) revealAround(state, s.seat, u.tileIndex);
+    // CIV6 (Spyglass / Rutter / Observation): "+1 sight range".
+    for (const u of unitsOf(state, s.seat)) revealAround(state, s.seat, u.tileIndex, SIGHT_RANGE + promoValue(u, 'SIGHT'));
   }
 }
 

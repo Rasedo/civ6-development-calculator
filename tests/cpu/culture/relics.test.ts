@@ -5,7 +5,7 @@ import { placeRelic, drainRelicReserve, relicFaith, relicTourism, RELIC_BUILDING
 // TEMPLE's single slot, paying +4 Faith and +8 Tourism — the densest tourism
 // source in the game. Created when an Apostle carrying the MARTYR promotion is
 // killed in theological combat; MARTYR is one of nine apostle promotions and
-// `theologicalCombatPhase` draws for it at the death (see MARTYR_CHANCE).
+// `theologicalCombatPhase` reads the promotion bit at the death.
 //
 // rFaith/rTourism are both compared trace columns, so the gate exercises the
 // grant — these pokes pin the PLACEMENT rules the gate cannot isolate.

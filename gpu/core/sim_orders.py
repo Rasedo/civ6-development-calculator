@@ -33,6 +33,12 @@ class SimOrders:
         _sp = getattr(self, "_A_SPREAD", -1)
         _xc = getattr(self, "_A_EXCAVATE", -1)
         _pk = getattr(self, "_A_PARK", -1)
+        _pm = getattr(self, "_A_PROMOTE", -1)
+        _cn = getattr(self, "_A_CONDEMN", -1)
+        _hx = getattr(self, "_A_HERESY", -1)
+        _lq = getattr(self, "_A_INQUISITION", -1)
+        _hn = getattr(self, "_A_HEATHEN", -1)
+        _pcol = self.rules.promo_cols
         _ic = [c for c in getattr(self, "_A_IMP", []) if c >= 0]
         if getattr(self, "_A_REPAIR", -1) >= 0:
             _ic.append(self._A_REPAIR)
@@ -49,10 +55,16 @@ class SimOrders:
             (((_ab >= _sp) & (_ab < _sp + 7)) if _sp >= 0 else _no).any(dim=0),  # spread
             ((_ab == _xc) if _xc >= 0 else _no).any(dim=0),                     # excavate
             ((_ab == _pk) if _pk >= 0 else _no).any(dim=0),                     # park
+            (((_ab >= _pm) & (_ab < _pm + _pcol)) if _pm >= 0 else _no).any(dim=0),  # promote
+            (((_ab >= _cn) & (_ab < _cn + 6)) if _cn >= 0 else _no).any(dim=0),  # condemn
+            ((_ab == _hx) if _hx >= 0 else _no).any(dim=0),                     # remove heresy
+            ((_ab == _lq) if _lq >= 0 else _no).any(dim=0),                     # launch inquisition
+            ((_ab == _hn) if _hn >= 0 else _no).any(dim=0),                      # convert heathen
         ]).tolist()
         (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
          _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread,
-         _rk_excavate, _rk_park) = _tab
+         _rk_excavate, _rk_park, _rk_promote, _rk_condemn,
+         _rk_heresy, _rk_inquis, _rk_heathen) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -95,6 +107,89 @@ class SimOrders:
                 if bool(pkm.any()):
                     self._do_park(row, pkm, here, sc)
 
+            if _rk_promote[n] and _pm >= 0:
+                pmv = act & (a >= _pm) & (a < _pm + _pcol)
+                if bool(pmv.any()):
+                    pk_c = (a - _pm).clamp(min=0, max=_pcol - 1)
+                    okp = pmv & self._promo_offer_mask(
+                        sc.unsqueeze(1), utp.unsqueeze(1)
+                    ).squeeze(1).gather(1, pk_c.unsqueeze(1)).squeeze(1)
+                    if bool(okp.any()):
+                        pr = okp.nonzero(as_tuple=True)[0]
+                        ps = sc[pr]
+                        self.unit_promos[pr, ps] |= torch.ones_like(ps) << pk_c[pr]
+                        self.unit_level[pr, ps] += 1
+                        self.unit_xp[pr, ps] = 0
+                        # "Upon selecting a promotion, a unit recovers 50 HP
+                        # and its turn ends."
+                        _cap = int(self.rules.combat.get("unitHp", 100))
+                        self.unit_hp[pr, ps] = (self.unit_hp[pr, ps] + PROMOTE_HEAL).clamp(max=_cap)
+                        self.unit_mp[pr, ps] = 0
+                        # CIV6 (Orator): "Can spread Religion 2 extra times" —
+                        # the charges arrive with the CHOICE, which is where
+                        # this roster's Apostle picks its promotion.
+                        self.unit_charges[pr, ps] += self._promo_val(
+                            utp[pr], self.unit_promos[pr, ps], "SPREAD_CHARGES")
+
+            if _rk_condemn[n] and _cn >= 0:
+                cdm = act & (a >= _cn) & (a < _cn + 6)
+                if bool(cdm.any()):
+                    dcn = (a - _cn).clamp(min=0, max=5)
+                    ctg = nb.gather(1, dcn.unsqueeze(1)).squeeze(1)
+                    ctc = ctg.clamp(min=0)
+                    rel = self._religious_at(ctc.unsqueeze(1)).squeeze(1)
+                    rsx = torch.where(rel >= 0,
+                                      self.unit_seat.gather(1, rel.clamp(min=0).unsqueeze(1)).squeeze(1),
+                                      torch.full_like(rel, -1))
+                    okc = (
+                        cdm & (ctg >= 0) & (rel >= 0) & (rsx >= 0) & (rsx != row)
+                        & (self._type_combat[utp.clamp(min=0)] > 0)
+                        & self.war[:, row].gather(1, self._seat_row[rsx.clamp(min=0)].unsqueeze(1)).squeeze(1)
+                    )
+                    if bool(okc.any()):
+                        self._condemn_heretic(row, okc, ctc, rel, sc)
+
+            if _rk_heresy[n] and _hx >= 0 and getattr(self, "_inquisitor_idx", -1) >= 0:
+                _cslot = self.centre_slot_at.gather(1, hc.unsqueeze(1)).squeeze(1)
+                hxm = (act & (a == _hx) & (utp == self._inquisitor_idx) & (u_charges > 0)
+                       & (_cslot >= 0)
+                       & (self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1) == row))
+                if bool(hxm.any()):
+                    hr = hxm.nonzero(as_tuple=True)[0]
+                    # CIV6 (GS): an Inquisitor's Remove Heresy leaves "only 75%
+                    # presence of other Religions" removed, not all of it.
+                    keep = 100 - self._remove_heresy_pct
+                    cs_h = _cslot[hr]
+                    for g in range(self.n_majors):
+                        if g == row:
+                            continue
+                        _cur = self.city_pressure[hr, row, cs_h, g]
+                        self.city_pressure[hr, row, cs_h, g] = torch.div(
+                            _cur * keep, 100, rounding_mode="floor")
+                    self.unit_charges[hr, sc[hr]] -= 1
+                    self.unit_mp[hr, sc[hr]] = 0
+
+            if _rk_inquis[n] and _lq >= 0 and getattr(self, "_apostle_idx", -1) >= 0:
+                lqm = (act & (a == _lq) & (utp == self._apostle_idx)
+                       & (u_charges >= self._launch_inquisition_charges)
+                       & (self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1) == row)
+                       & ~self.civ_inquisition[:, row])
+                if bool(lqm.any()):
+                    lr = lqm.nonzero(as_tuple=True)[0]
+                    self.civ_inquisition[lr, row] = True
+                    self.unit_alive[lr, sc[lr]] = False
+                    self.civilian_at[lr, hc[lr]] = -1
+                    self._gen_ver += 1
+
+            if _rk_heathen[n] and _hn >= 0:
+                hnm = (act & (a == _hn) & (u_charges > 0)
+                       & self._promo_flag(utp, self.unit_promos.gather(1, sc.unsqueeze(1)).squeeze(1),
+                                          "HEATHEN")
+                       & (self._barb_unit_plane().gather(1, nb.clamp(min=0).reshape(B, -1))
+                          .reshape(B, 6) & (nb >= 0)).any(dim=1))
+                if bool(hnm.any()):
+                    self._convert_heathens(row, hnm, here, sc)
+
             mv = act & (a < 6) if _rk_move[n] else None
             if mv is not None and bool(mv.any()):
                 dirs = a.clamp(min=0, max=5)
@@ -122,7 +217,9 @@ class SimOrders:
                     )
                     any_war = self.war[:, row].any(dim=1)
                     terr = torch.where(is_nav, water, terr | (water & ship & ~is_nav & any_war))
-                clf = self._cliff_block_dirs(hc.unsqueeze(1), nb.unsqueeze(1), own_tile)[:, 0].gather(1, dirs.unsqueeze(1)).squeeze(1)
+                _scale = self._promo_flag(ut, self.unit_promos.gather(1, sc.unsqueeze(1)).squeeze(1), "CLIFFS")
+                clf = self._cliff_block_dirs(hc.unsqueeze(1), nb.unsqueeze(1), own_tile,
+                                             _scale.unsqueeze(1))[:, 0].gather(1, dirs.unsqueeze(1)).squeeze(1)
                 mp = self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1)
                 shut = self._border_closed(tgt.unsqueeze(1), row, ut.unsqueeze(1)).squeeze(1)
                 ok = mv & (tgt >= 0) & terr & ~blocked & ~clf & ~shut & (mp > 0)
@@ -143,7 +240,10 @@ class SimOrders:
                     # LAND shore, with a MELEE attack, and nothing afloat.
                     valid = valid & (~u_emb | (
                         ~self.water.gather(1, tc.unsqueeze(1)).squeeze(1)
-                        & ~self._cliff_block_dirs(hc.unsqueeze(1), nb.unsqueeze(1), own_tile)[:, 0].gather(1, dirs.unsqueeze(1)).squeeze(1)
+                        & ~self._cliff_block_dirs(
+                            hc.unsqueeze(1), nb.unsqueeze(1), own_tile,
+                            self._promo_flag(ut, self.unit_promos.gather(1, sc.unsqueeze(1)).squeeze(1),
+                                             "CLIFFS").unsqueeze(1))[:, 0].gather(1, dirs.unsqueeze(1)).squeeze(1)
                         & (self._type_ranged_strength[ut] <= 0)
                     ))
                 if bool(valid.any()):
@@ -198,17 +298,18 @@ class SimOrders:
                                     self._capture_city_state(
                                         _csr[2].nonzero(as_tuple=True)[0], _css, self.unit_seat[:, v])
                             elif bool(unit_hit[b_]):
+                                # spends through `spendAttack`, inside the body
                                 self._hostile_vs_unit(one, tgt, "major", v)
+                                continue
                             else:
                                 continue  # nothing to attack — TS's `no(...)`, no MP spent
                             self.unit_mp[b_, v] = 0  # the turn is spent (TS movesLeft = 0)
                         else:
                             # rangedAttack: one roll, no retaliation, no
-                            # advance. It re-derives its own target and returns
-                            # the rows that actually fired — its refusals are
-                            # TS's early returns, which leave movesLeft alone.
-                            if bool(self._ranged_attack(one, tgt, "major", v, row)[b_]):
-                                self.unit_mp[b_, v] = 0
+                            # advance. It re-derives its own target and spends
+                            # the turn itself; its refusals are TS's early
+                            # returns, which leave movesLeft alone.
+                            self._ranged_attack(one, tgt, "major", v, row)
 
             if _rk_snipe[n]:
                 snp = act & (a >= self._A_SNIPE) & (a < self._A_SNIPE + 12) & ~is_civ
@@ -225,9 +326,9 @@ class SimOrders:
                         # SNIPE is `hostileRangedStrike`, NOT `rangedAttack`:
                         # its city arm floors at 1 HP without the melee counter
                         # and its scope-out keeps a major's fire off another
-                        # major's units. Spend only when it fired.
-                        if bool(self._hostile_ranged_strike(one, tgt_s, "major", v)[b_]):
-                            self.unit_mp[b_, v] = 0
+                        # major's units. It spends the turn itself, and only
+                        # when it fired.
+                        self._hostile_ranged_strike(one, tgt_s, "major", v)
 
             if _rk_chop[n] and self._builder_idx >= 0:
                 ftr = self.tile_ftr.gather(1, hc.unsqueeze(1)).squeeze(1)
@@ -378,7 +479,12 @@ class SimOrders:
                         self.unit_hp[_hr, sc[_hr]] = (self.unit_hp[_hr, sc[_hr]] + 25).clamp(max=_cap)
                     _pd = ~_pi & _hd[_r]
                     self.district_pillaged[_r[_pd], _tt[_pd]] = True
-                    self.unit_mp[_r, sc[_r]] = 0
+                    # CIV6 (Depredation): "Pillaging costs only 1 Movement
+                    # point" — without it the raid takes the whole turn.
+                    _pc = self._promo_val(utp[_r], self.unit_promos[_r, sc[_r]], "PILLAGE_CHEAP")
+                    _left = self.unit_mp[_r, sc[_r]]
+                    self.unit_mp[_r, sc[_r]] = torch.where(_pc > 0, (_left - _pc).clamp(min=0),
+                                                           torch.zeros_like(_left))
                     self._eff_version += 1
 
             if _rk_spread[n]:
@@ -409,7 +515,37 @@ class SimOrders:
                         )
                         pb, pr, pj = pm.nonzero(as_tuple=True)
                         if len(pb):
-                            self.city_pressure[pb, pr, pj, row] += lump[pb]
+                            _was = self._followed_religion(self.city_pressure[pb, pr, pj])
+                            # CIV6 (Translator): "Religious spread is triple
+                            # strength in cities of other civilizations."
+                            _tr = self._promo_val(utp[pb], self.unit_promos[pb, sc[pb]], "TRANSLATOR")
+                            _mul = torch.where((pr != row) & (_tr > 1), _tr, torch.ones_like(_tr))
+                            self.city_pressure[pb, pr, pj, row] += lump[pb] * _mul
+                            # CIV6 (Proselytizer): "Religious spread eliminates
+                            # 75% of existing pressure from other Religions in
+                            # the target city."
+                            _st = self._promo_val(utp[pb], self.unit_promos[pb, sc[pb]], "PROSELYTIZER")
+                            _hit = _st > 0
+                            if bool(_hit.any()):
+                                _hb, _hr, _hj, _hs = pb[_hit], pr[_hit], pj[_hit], _st[_hit]
+                                _cur = self.city_pressure[_hb, _hr, _hj]
+                                _keep = torch.div(_cur * (100 - _hs).unsqueeze(1), 100,
+                                                  rounding_mode="floor")
+                                _mine = torch.arange(_cur.shape[1], device=self.device) == row
+                                self.city_pressure[_hb, _hr, _hj] = torch.where(_mine, _cur, _keep)
+                            # CIV6 (Indulgence Vendor): "Gain 100 Gold if this
+                            # unit converts a city to your Religion for the
+                            # first time."
+                            _now = self._followed_religion(self.city_pressure[pb, pr, pj])
+                            _flip = (_now == row) & (_was != row)
+                            if bool(_flip.any()):
+                                _gv, _gu = self._promo_first_use(
+                                    utp[pb], self.unit_promos[pb, sc[pb]],
+                                    self.unit_promo_used[pb, sc[pb]], "INDULGENCE")
+                                _gv = torch.where(_flip, _gv, torch.zeros_like(_gv))
+                                self.unit_promo_used[pb, sc[pb]] = torch.where(
+                                    _gv > 0, _gu, self.unit_promo_used[pb, sc[pb]])
+                                self.civ_treasury[pb, row] += _gv.to(self.civ_treasury.dtype)
                         landed = pm.reshape(B, -1).any(dim=1)
                         if bool(landed.any()):
                             lr = landed.nonzero(as_tuple=True)[0]
@@ -878,7 +1014,10 @@ class SimOrders:
             # barbarian pays nothing for the [B, T] scan.
             rngd = u_rngd_all[:, u]
             if any_rngd and bool((act & rngd).any()):
-                rng_u = self._type_ranged_range[self.barb_unit_type[:, u].clamp(min=0, max=self.NU - 1)]
+                # CIV6 (Forward Observers / Coincidence Rangefinding): "+1
+                # Range" — the only thing that moves a chassis's own.
+                rng_u = (self._type_ranged_range[self.barb_unit_type[:, u].clamp(min=0, max=self.NU - 1)]
+                         + self._promo_pool_val("barb", "RANGE")[:, u])
                 d_all = self.pair_dist[here.clamp(min=0)].to(torch.long)
                 rng_valid = (
                     (d_all >= 1)
@@ -909,21 +1048,23 @@ class SimOrders:
                 self._hostile_vs_unit(unit_att, ttc, "barb", u)
             if enc_att is not None and bool(enc_att.any()):
                 self._attack_encampment(enc_att, ttc, "barb", u)
-            acted_att = city_att | unit_att
-            if enc_att is not None:
-                acted_att = acted_att | enc_att
+            # A blow at a CITY or an Encampment ends the raider's turn
+            # outright; the unit arms spend inside their own bodies, where the
+            # promotion that waives it is read.
+            city_spent = city_att | (enc_att if enc_att is not None else torch.zeros_like(city_att))
+            self.barb_unit_mp[:, u] = torch.where(
+                city_spent, torch.zeros_like(self.barb_unit_mp[:, u]), self.barb_unit_mp[:, u])
             # A RANGED raider strikes instead: hostileUnitAct routes any
             # UNITS[type].ranged attacker through hostileRangedStrike — ONE
             # roll, no retaliation, no advance, civilians take the roll, and a
             # seat-0 city floors at 1 HP and is never captured. The method
-            # returns the rows that actually rolled; a row that reaches only an
-            # ungarrisoned CIV centre (TS `enemyCity` resolves to seat-0 cities
-            # only) spends nothing, but `attack` still HOLDS the unit, because
-            # TS returns from hostileUnitAct before the pillage/march branches.
+            # spends the turn itself; a row that reaches only an ungarrisoned
+            # CIV centre (TS `enemyCity` resolves to seat-0 cities only) spends
+            # nothing, but `attack` still HOLDS the unit, because TS returns
+            # from hostileUnitAct before the pillage/march branches.
             rng_att = attack & rngd
             if any_rngd and bool(rng_att.any()):
-                acted_att = acted_att | self._hostile_ranged_strike(rng_att, ttc, "barb", u)
-            self.barb_unit_mp[:, u] = torch.where(acted_att, torch.zeros_like(self.barb_unit_mp[:, u]), self.barb_unit_mp[:, u])  # the turn is spent (TS movesLeft = 0)
+                self._hostile_ranged_strike(rng_att, ttc, "barb", u)
 
             pillage = torch.zeros_like(act)
             if self.improvements_on:

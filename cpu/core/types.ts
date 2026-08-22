@@ -266,11 +266,29 @@ export interface Unit {
   hp: number;
   charges: number | null;
   fortifyTurns?: number;
-  /** XP: combat experience (civ units; barbs accrue none).
-   * +5 per attack executed, +2 per attack survived as defender. XP_LEVELS
-   * [15,45,90] grant +5 CS/level at every roll the unit fights. Civilians never
-   * fight, so theirs stays 0. */
+  /**
+   * XP banked TOWARD THE NEXT LEVEL — never cumulative. CIV6: "earning more
+   * XP than needed to reach the next level will not transfer the excess XP to
+   * the pool of the next level", and a unit standing at its threshold "won't
+   * earn new XP until it finishes the level-up process". Barbarians accrue
+   * none and civilians never fight, so theirs stays 0.
+   */
   xp?: number;
+  /** 1..MAX_LEVEL. A unit holds `level - 1` promotions. */
+  level?: number;
+  /** the summed PERCENTAGE experience modifier of the city that trained it —
+   *  CIV6's Encampment and Harbor buildings — carried for life. */
+  xpPct?: number;
+  /** a bitmask over the rows of this unit's OWN class list (`promoRows`), so
+   *  bit k is column k of the PROMOTE head on both engines. */
+  promos?: number;
+  /** the columns this unit is ALLOWED to take, when the offer is narrower than
+   *  the list. CIV6 gives an Apostle "three promotions randomly chosen from
+   *  the pool"; 0 means every legal column, which is every other unit. */
+  promoOffer?: number;
+  /** the ONCE-ONLY promotions this unit has already collected, by the same
+   *  column bit `promos` uses. */
+  promoUsed?: number;
   path: number[] | null;
   mission?: 'explore' | null;
   /** A LAND unit currently on a water tile (embarked). Moves
@@ -391,6 +409,10 @@ export interface TradeRoute {
 }
 
 export interface ReligionState {
+  /** CIV6 (Inquisitor): "You can only create Inquisitors if you have founded a
+   *  religion and had an Apostle use the Launch Inquisition ability within
+   *  your territory." Latched once, never cleared. */
+  inquisition?: boolean;
   pantheon: string | null;
   founded: boolean;
   name: string | null;

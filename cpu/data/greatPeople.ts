@@ -659,9 +659,8 @@ export function greatWorkTourism(city: GwCity, printing = false, kmult: readonly
  * is why they sit outside the GW_* kind arrays above.
  *
  * SOURCE: real Civ 6 creates a relic when an Apostle carrying the MARTYR
- * promotion is killed in theological combat. `theologicalCombatPhase` draws for
- * it at the death — see `MARTYR_CHANCE` in data/religion for why the draw sits
- * there and not at the apostle's creation. A dead MISSIONARY never yields one.
+ * promotion is killed in theological combat, which `theologicalCombatPhase`
+ * reads off the unit's own promotion bits. A dead MISSIONARY never yields one.
  */
 export const RELIC_BUILDING = 'TEMPLE';
 export const RELIC_SLOTS_PER_BUILDING = 1;

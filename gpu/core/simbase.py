@@ -131,9 +131,24 @@ class Rules:
     regional_range: int  # REGIONAL_RANGE (hex distance, source district tile -> receiver center)
     b_worship: torch.Tensor  # bool [NB] — worship building (faith-purchase-only; every production/gold picker skips)
     b_era: torch.Tensor  # long [NB] — the era the building first unlocks (Heartbeat of Steam's gate)
-    b_train_xp: torch.Tensor  # long [NB] — flat training XP a unit trained/purchased in a city holding this Encampment military building starts with (best tier over present buildings; 0 for non-military buildings)
+    b_train_xp_pct: torch.Tensor  # long [NB] — the PERCENTAGE experience modifier this building grants a unit trained here; the Encampment and Harbor lines stack
+    b_train_xp_cls: torch.Tensor  # bool [NB, NPC] — which promotion classes `b_train_xp_pct` reaches
     b_walls: torch.Tensor  # long [NB] — the WALLS TIER this row supplies (0 = not a walls row)
     b_no_purchase: torch.Tensor  # bool [NB] — refuses a gold purchase (the upgraded walls)
+    #: THE PROMOTION CATALOG, per class and in COLUMN order (the PROMOTE head's
+    #: layout). `promo_req[c, k]` is the bitmask of columns that open row k of
+    #: class c; `promo_kind/v/mask[c, k, s]` are its effect slots.
+    promo_classes: list
+    promo_kinds: list
+    promo_cols: int
+    promo_req: torch.Tensor  # long [NPC, PCOL]
+    promo_kind: torch.Tensor  # long [NPC, PCOL, PSLOT]
+    promo_v: torch.Tensor  # long [NPC, PCOL, PSLOT]
+    promo_mask: torch.Tensor  # long [NPC, PCOL, PSLOT]
+    promo_rows: torch.Tensor  # long [NPC] — how many rows each class actually holds
+    u_promo_class: torch.Tensor  # long [NU] — the class each chassis promotes from, -1 = none
+    choke_features: list  # the feature indices CHOKE POINTS defends in (hills are their own plane)
+    woods_features: list  # the feature indices a 1-MP woods step waives (hills are their own plane)
     worship_bidx: list  # the 5 worship rows in WORSHIP_BUILDINGS order (religion id % 5 indexes THIS)
     temple_bidx: int  # TEMPLE row (worship prerequisite), -1 if absent
     worship_faith_cost: float  # flat worship faith price (round(190·GAME_SPEED))
@@ -148,9 +163,20 @@ class Rules:
     actions: dict  # {unit: [name, ...]} — the unit-action enum, index = mask column
 
 
+def _class_mask(rows: list, n: int) -> torch.Tensor:
+    """[len(rows), n] — the promotion classes each row names, as a bool mask."""
+    out = torch.zeros(len(rows), max(n, 1), dtype=torch.bool)
+    for i, cls in enumerate(rows):
+        for c in cls:
+            if 0 <= int(c) < out.shape[1]:
+                out[i, int(c)] = True
+    return out
+
+
 def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
     r = json.loads(Path(path).read_text())
     B = r["buildings"]
+    _P = r.get("promotions", {})
     return Rules(
         focus_base=torch.tensor(r["focusBase"], dtype=torch.float64),
         citizen_science=r["citizenScience"],
@@ -217,10 +243,22 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_regional=torch.tensor([bool(b.get("regional", 0)) for b in B], dtype=torch.bool),
         regional_range=int(r.get("regionalRange", 6)),
         b_worship=torch.tensor([bool(b.get("worship", 0)) for b in B], dtype=torch.bool),
-        b_train_xp=torch.tensor([int(b.get("trainXp", 0)) for b in B], dtype=torch.long),
+        b_train_xp_pct=torch.tensor([int(b.get("trainXpPct", 0)) for b in B], dtype=torch.long),
+        b_train_xp_cls=_class_mask([b.get("trainXpClasses", []) for b in B], len(_P.get("classes", []))),
         b_walls=torch.tensor([int(b.get("walls", 0)) for b in B], dtype=torch.long),
         b_no_purchase=torch.tensor([bool(b.get("noPurchase", 0)) for b in B], dtype=torch.bool),
         b_era=torch.tensor([int(b.get("eraIdx", 0)) for b in B], dtype=torch.long),
+        promo_classes=list(_P.get("classes", [])),
+        promo_kinds=list(_P.get("kinds", [])),
+        promo_cols=int(_P.get("cols", 0)),
+        promo_req=torch.tensor(_P.get("req", [[]]), dtype=torch.long),
+        promo_kind=torch.tensor(_P.get("kind", [[[]]]), dtype=torch.long),
+        promo_v=torch.tensor(_P.get("v", [[[]]]), dtype=torch.long),
+        promo_mask=torch.tensor(_P.get("mask", [[[]]]), dtype=torch.long),
+        promo_rows=torch.tensor([len(x) for x in _P.get("ids", [])], dtype=torch.long),
+        u_promo_class=torch.tensor(_P.get("unitClass", []), dtype=torch.long),
+        choke_features=list(_P.get("chokeFeatures", [])),
+        woods_features=list(_P.get("woodsFeatures", [])),
         worship_bidx=r.get("worshipBidx", []),
         temple_bidx=int(r.get("templeBidx", -1)),
         worship_faith_cost=float(r.get("worshipFaithCost", 114)),
@@ -384,12 +422,10 @@ NO_SEAT = -1  # "nobody" — the cpu/core/seats.ts NO_SEAT twin
 FLANKING_CS = 2
 SUPPORT_CS = 2
 
-# XP & levels (mirrors combat.ts). +5 XP per attack executed (any
-# roll-producing melee/ranged vs unit/city/CS/rc), +2 per attack survived as a
-# MILITARY defender (incl. city/walls strikes). Barbarians accrue nothing (no
-# barb xp plane); civilians never fight. XP_LEVELS grant a flat +5 CS per level
-# at every roll the unit fights — an integer add into the CS assembly like the
-# flanking terms.
+# XP & levels (mirrors cpu/core/promotions.ts). A unit banks XP TOWARD its next
+# level and stalls at the threshold until it promotes; the level itself pays no
+# Combat Strength — the CHOSEN PROMOTION does. Barbarians accrue nothing (no
+# barb xp plane) and civilians never fight.
 TRADE_ROAD_MAX_STEPS = 32  # the `tradeWalkReachable`/walk safety rail
 #: the CITIZEN-ASSIGNMENT wire's "leave this pin alone" value. A pin is a
 #: count, -1 hands the slot back to the automatic rule, and this sits below
@@ -399,8 +435,17 @@ SPEC_KEEP = -2
 # The DIPLOMATIC verbs, in the order both engines apply them. `apply_geo`
 # stashes by these names and `_geo_agreements` drains them in this order.
 GEO_VERBS = ("denounce", "friend", "ally", "borders", "gift")
-XP_ATTACK = 5
-XP_DEFEND = 2
+XP_PER_LEVEL = 15
+MAX_LEVEL = 8
+PROMOTE_HEAL = 50
+XP_BATTLE_CAP = 8
+XP_RANGED_BATTLE = 1
+XP_MELEE_BATTLE = 2
+XP_INITIATOR = 1
+XP_CITY_ATTACK = 3
+XP_CITY_DEFEND = 2
+XP_CITY_FELLED = 10
+XP_BARB_VETERAN = 1
 #: how ONE hit reaches a perimeter — the `cityDamageSplit` klass, as a code so
 #: a batch can carry a different verb per game.
 HIT_MELEE = 0
@@ -410,8 +455,7 @@ HIT_BOMBARD = 2
 #: and each changes a different half of the split.
 ASSIST_RAM = 1
 ASSIST_TOWER = 2
-XP_LEVEL_CS = 5
-XP_LEVELS = (15, 45, 90)
+
 
 # --- ONE INDEX SPACE ---------------------------------------------------------
 # A fixture's `civs[]` is SEAT-KEYED — the exporter writes `state.seats` in seat
@@ -528,10 +572,10 @@ _MUTABLE = [
     # The merged unit pool. The BASES are registered, never the `major_`/`barb_`
     # RANGE VIEWS into them — snapshot/restore round-trips one tensor per plane
     # instead of three, and a view can never be half-restored.
-    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_emb", "unit_seat", "military_at", "civilian_at", "war", "ww", "ww_turn",
+    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_xp_pct", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_emb", "unit_seat", "military_at", "civilian_at", "war", "ww", "ww_turn",
     "civ_best_melee", "civ_builders_trained", "civ_relic_reserve", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted", "civ_tech_retain", "civ_civic_retain",
     "civ_enhancer", "civ_enhancer_done", "civ_follower", "civ_founder", "civ_next_city_id",
-    "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_tiles_purchased",
+    "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_inquisition", "civ_tiles_purchased",
     "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_camp", "seat_citystate_quest_issued",
     "seat_explored",
     "civ_culture", "civ_faith", "civ_tourism", "civ_warmonger", "civ_gpp",

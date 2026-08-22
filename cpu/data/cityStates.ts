@@ -73,10 +73,12 @@ export type SuzEffect =
   | 'regionalReach'     // Mexico City (Toronto in rulesets without Canada)
   | 'worksScience'      // Anshan
   | 'csRouteYields'     // Kumasi
-  | 'holySitePressure'; // Jerusalem
+  | 'holySitePressure'   // Jerusalem
+  | 'apostlePromoChoice'; // Yerevan
 
 export const SUZ_EFFECTS: SuzEffect[] = [
   'xpDouble', 'cavalryHills', 'regionalReach', 'worksScience', 'csRouteYields', 'holySitePressure',
+  'apostlePromoChoice',
 ];
 
 /** Kabul: "Your units receive double experience from battles they initiate." */
@@ -126,7 +128,7 @@ export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   Valletta: { name: 'Valletta', type: 'militaristic', bonus: 'City Center buildings and Encampment district buildings can be bought with Faith. Cost of purchasing Ancient, Medieval, and Renaissance Walls is reduced, but they can only be bought with Faith.', channel: 'production', note: 'a FAITH-purchase channel for a class of buildings; the flat production channel stands in' },
   Jerusalem: { name: 'Jerusalem', type: 'religious', bonus: 'Your cities with Holy Sites exert pressure as if they were Holy Cities (4x Religion pressure on all cities within 10 tiles).', suz: 'holySitePressure' },
   'La Venta': { name: 'La Venta', type: 'religious', bonus: 'Your Builders can now make Colossal Head improvements.', channel: 'faith', note: 'a whole IMPROVEMENT with its own adjacency; the flat channel stands in' },
-  Yerevan: { name: 'Yerevan', type: 'religious', bonus: 'Your Apostle units can choose from any possible promotion instead of receiving a random promotion.', channel: 'none', note: 'unit PROMOTIONS are not modeled — the only one that reaches a rule is MARTYR, drawn at the death, and CHOOSING it would be a decision with no wire record' },
+  Yerevan: { name: 'Yerevan', type: 'religious', bonus: 'Your Apostle units can choose from any possible promotion instead of receiving a random promotion.', suz: 'apostlePromoChoice' },
   Armagh: { name: 'Armagh', type: 'religious', bonus: 'Your Builders can now make Monastery improvements.', channel: 'faith', note: 'a whole IMPROVEMENT with its own adjacency; the flat channel stands in' },
 };
 

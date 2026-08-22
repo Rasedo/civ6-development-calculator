@@ -1,4 +1,6 @@
 
+import { PROMO_COLS } from '../data/promotions';
+
 export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL', 'QUARRY', 'PASTURE', 'CAMP', 'PLANTATION', 'OIL_WELL', 'SEASIDE_RESORT', 'FORT'];
 
 export const DEDICATED_IMPROVEMENTS = 3;
@@ -24,6 +26,16 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // joins at the end or it moves somebody else's column.
   names.push('EXCAVATE');
   names.push('PARK');
+  // PROMOTE: column k takes row k of the acting unit's OWN class list, so one
+  // fixed-width head serves nine different promotion tables.
+  for (let k = 0; k < PROMO_COLS; k++) names.push(`PROMOTE_${k}`);
+  // CONDEMN HERETIC: a military unit's verb against an adjacent religious one.
+  for (let d = 0; d < 6; d++) names.push(`CONDEMN_${d}`);
+  names.push('REMOVE_HERESY');
+  names.push('LAUNCH_INQUISITION');
+  // HEATHEN CONVERSION: the Apostle promotion's own verb, adjacent-ring wide
+  // in one blow rather than one column per direction.
+  names.push('CONVERT_HEATHEN');
   return names;
 }
 

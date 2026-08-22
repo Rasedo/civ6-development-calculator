@@ -50,14 +50,23 @@ def main() -> None:
     acts = rj["actions"]["unit"]
     imp_ids = rj["improvements"]["ids"]
     assert acts, "rules.actions.unit missing — the exporter must ship the enum"
-    # +12 SNIPE, +7 SPREAD, +1 FOUND_CITY, +1 EXCAVATE, +1 PARK
-    assert len(acts) == 13 + len(imp_ids) + 3 + 12 + 7 + 3, (
-        f"enum is {len(acts)} wide for {len(imp_ids)} improvements"
+    # +12 SNIPE, +7 SPREAD, +1 FOUND_CITY, +1 EXCAVATE, +1 PARK, the PROMOTE
+    # head, +6 CONDEMN, +1 REMOVE_HERESY, +1 LAUNCH_INQUISITION,
+    # +1 CONVERT_HEATHEN
+    pcol = rj["promotions"]["cols"]
+    assert len(acts) == 13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 9, (
+        f"enum is {len(acts)} wide for {len(imp_ids)} improvements and a {pcol}-wide PROMOTE head"
     )
-    assert acts[-10] == "SPREAD_HERE" and acts[-4] == "SPREAD_5", "SPREAD tail misplaced"
-    # the CIVILIAN VERBS close the enum, in this order: a new verb joins at
-    # the END or it moves a column somebody else already keys on.
-    assert acts[-3:] == ["FOUND_CITY", "EXCAVATE", "PARK"], "civilian verb tail misplaced"
+    # the RELIGIOUS verbs close the enum now, in this order: a new verb joins
+    # at the END or it moves a column somebody else already keys on.
+    assert acts[-3:] == ["REMOVE_HERESY", "LAUNCH_INQUISITION", "CONVERT_HEATHEN"], \
+        "religious verb tail misplaced"
+    assert acts[-9] == "CONDEMN_0" and acts[-4] == "CONDEMN_5", "CONDEMN block misplaced"
+    assert acts[-9 - pcol] == "PROMOTE_0" and acts[-10] == f"PROMOTE_{pcol - 1}", \
+        "the PROMOTE head is not one contiguous run before CONDEMN"
+    assert acts[-12 - pcol:-9 - pcol] == ["FOUND_CITY", "EXCAVATE", "PARK"], \
+        "civilian verb tail misplaced"
+    assert acts[-19 - pcol] == "SPREAD_HERE" and acts[-13 - pcol] == "SPREAD_5", "SPREAD tail misplaced"
 
     # PILLAGE is NOT the last column — the SNIPE ring and the SPREAD tail sit
     # after it — so PILLAGE and the ring must hold their exact seats and every

@@ -1674,7 +1674,8 @@ class SimEconomy:
         """What this pool's units heal — the refreshUnits rule.
 
         ONE rule for every seat: this seat's own city centre 20, its own land
-        15, its own CAMP 20, neutral ground 10, anyone else's land 5.
+        15, its own CAMP 20, neutral ground 10, anyone else's land 5 — or 15
+        with the promotion that heals outside friendly territory.
 
         It reads as three rules only if you look at which terms are non-empty
         per class. A major holds no camps, so its camp term never fires; the
@@ -1691,17 +1692,48 @@ class SimEconomy:
         # one, and the one-owner invariant makes a centre tile its own seat's.
         center = self.centre_slot_at.gather(1, t) >= 0
         camp = (self.camp_tile.unsqueeze(2) == t.unsqueeze(1)).any(dim=1) if pre == "barb" else None
+        # CIV6 (Auxiliary Ships / Supply Fleet): "Heal outside of friendly
+        # territory" — the foreign-ground rate becomes the own-ground one.
+        foreign = torch.where(self._promo_pool_flag(pre, "HEAL_ANYWHERE"),
+                              torch.full_like(t, 15), torch.full_like(t, 5))
         heal = torch.where(home & center, torch.full_like(t, 20),
                torch.where(home, torch.full_like(t, 15),
-               torch.where(here != NO_SEAT, torch.full_like(t, 5), torch.full_like(t, 10))))
+               torch.where(here != NO_SEAT, foreign, torch.full_like(t, 10))))
         if camp is not None:
             heal = torch.where(camp & ~home, torch.full_like(t, 20), heal)
-        heal = heal + self._emergency_heal_mp(pre, seat, here)
+        heal = heal + self._emergency_heal_mp(pre, seat, here) + self._chaplain_heal(pre)
         # a RELIGIOUS unit heals by its own rule and by nothing above it
         _rel = self._rel_strength[getattr(self, f"{pre}_unit_type").clamp(min=0)] > 0
         if bool(_rel.any()):
             heal = torch.where(_rel, self._religious_heal(pre), heal)
         return heal
+
+    def _chaplain_heal(self, pre: str) -> torch.Tensor:
+        """[B, U] CIV6 (Chaplain): the Apostle "operates as a Medic, providing
+        extra healing to units within 1 tile", and the Medic page prices that
+        at "+20 HP/turn" for a stationary neighbour. Military units only, and
+        the strongest neighbouring chaplain answers — two do not stack."""
+        t = getattr(self, f"{pre}_unit_tile").clamp(min=0)
+        typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+        out = torch.zeros_like(t)
+        if self._pk.get("CHAPLAIN", -1) < 0:
+            return out
+        # every tile's chaplain value, by the RELIGIOUS occupant standing on it
+        occ = self.civilian_at
+        oc = occ.clamp(min=0)
+        val = torch.where(
+            occ >= 0,
+            self._promo_val(self.unit_type.gather(1, oc).clamp(min=0, max=self.NU - 1),
+                            self.unit_promos.gather(1, oc), "CHAPLAIN"),
+            torch.zeros_like(occ),
+        )
+        oseat = torch.where(occ >= 0, self.unit_seat.gather(1, oc), torch.full_like(occ, -1))
+        nb = self.neigh[t.reshape(-1)].reshape(t.shape[0], t.shape[1], 6)
+        nbc = nb.clamp(min=0).reshape(t.shape[0], -1)
+        near = (val.gather(1, nbc).reshape(nb.shape)
+                * ((nb >= 0) & (oseat.gather(1, nbc).reshape(nb.shape)
+                                == getattr(self, f"{pre}_unit_seat").unsqueeze(2))).long())
+        return torch.where(self._type_civilian[typ], out, near.amax(dim=2))
 
     def _holy_site_faith(self) -> torch.Tensor:
         """[B, T] long — each live Holy Site's OWN faith output: its adjacency
@@ -1776,6 +1808,11 @@ class SimEconomy:
         EMBARK_MOVES pool, everything else on its type's `moves`, plus whatever
         the frozen general/admiral aura granted.
 
+        CIV6 (Commando): the +1 Movement "also applies while the unit is
+        embarked", so the promotion adder joins AFTER the embark override —
+        while the emergency march joins BEFORE it, inside the land arm, and the
+        aura after, exactly where `unitFullMoves` and refreshUnits put them.
+
         Every walker and every afford rule (`mp >= full`) must read this same
         expression — `stepUnit` is embark-aware in both windows."""
         typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
@@ -1783,13 +1820,13 @@ class SimEconomy:
         # to the type pool and then OVERRIDDEN by the embark pool below —
         # embarkation speed is not a unit's movement stat. `unitFullMoves` has
         # the same shape (`if (embarked && !naval) return EMBARK_MOVES`).
-        base = self._type_moves[typ] + self._golden_move_mp(pre)
+        base = self._type_moves[typ] + self._golden_move_mp(pre) + self._emergency_mp(pre)
         if self._embark_live:
             emb = getattr(self, f"{pre}_unit_emb")
             base = torch.where(
                 emb & ~self.unit_naval[typ], torch.full_like(base, self._embark_moves), base
             )
-        return base + getattr(self, f"{pre}_unit_aura_mp") + self._emergency_mp(pre)
+        return base + self._promo_pool_val(pre, "MOVES") + getattr(self, f"{pre}_unit_aura_mp")
 
     def _reset_mp(self, pre: str) -> None:
         """The movesLeft/movesFull reset: `granted = full + aura`, both fields.

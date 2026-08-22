@@ -228,6 +228,7 @@ class SimInit:
         self._suz_c_works = _sfx.index("worksScience") if "worksScience" in _sfx else -1
         self._suz_c_route = _sfx.index("csRouteYields") if "csRouteYields" in _sfx else -1
         self._suz_c_holy = _sfx.index("holySitePressure") if "holySitePressure" in _sfx else -1
+        self._suz_c_apostle = _sfx.index("apostlePromoChoice") if "apostlePromoChoice" in _sfx else -1
         self._suz_xp_mult_k = int(_suz["xpMult"])
         self._suz_hill_cs = int(_suz["hillCs"])
         self._suz_reach_bonus = int(_suz["reachBonus"])
@@ -312,6 +313,7 @@ class SimInit:
             ("next_city_id", torch.long, 0), ("pantheon", torch.long, -1),
             ("pantheon_done", torch.bool, 0), ("prophets", torch.long, 0),
             ("religion_done", torch.bool, 0), ("tiles_purchased", torch.long, 0),
+            ("inquisition", torch.bool, 0),
         )
         for _nm, _dt, _fill in _civ_scalars:
             setattr(self, f"civ_{_nm}", torch.full((B, self.n_majors), _fill, dtype=_dt, device=device))
@@ -570,7 +572,12 @@ class SimInit:
             ("tile", torch.long),
             ("hp", torch.long),
             ("fortify", torch.long),    # fortifyTurns (military; cap 2)
-            ("xp", torch.long),         # combat experience
+            ("xp", torch.long),         # combat experience TOWARD the next level
+            ("level", torch.long),      # 1..MAX_LEVEL; the unit holds level-1 promotions
+            ("promos", torch.long),     # bitmask over the rows of this chassis's class list
+            ("promo_offer", torch.long),  # the columns this unit may take (0 = every legal one)
+            ("promo_used", torch.long),  # the ONCE-ONLY columns already collected
+            ("xp_pct", torch.long),     # the training city's percentage XP modifier, for life
             ("charges", torch.long),    # builder/missionary charges
             # The general/admiral aura's +MP, FROZEN at the refreshUnits site
             # (_refresh_aura_mp) — walkers read it instead of recomputing, so a
@@ -596,6 +603,7 @@ class SimInit:
                         :, sim.POOL_LO[pre]:sim.POOL_HI[pre]
                     ],
                 )
+        self.unit_level.fill_(1)  # a brand-new unit starts at level 1
         self.barb_unit_seat.fill_(BARB_SEAT)
         self.major_unit_seat.fill_(1)
 
@@ -677,6 +685,15 @@ class SimInit:
         self._apostle_idx = int(_bl.get("apostleIdx", -1))
         self._apostle_cost = float(_bl.get("apostleCost", 200))
         self._apostle_cap = int(_bl.get("apostleCap", 1))
+        self._inquisitor_idx = int(_bl.get("inquisitorIdx", -1))
+        self._inquisitor_cost = float(_bl.get("inquisitorCost", 100))
+        self._inquisitor_cap = int(_bl.get("inquisitorCap", 2))
+        self._apostle_promo_offer = int(_bl.get("apostlePromoOffer", 3))
+        self._inquisitor_home_strength = int(_bl.get("inquisitorHomeStrength", 35))
+        self._remove_heresy_pct = int(_bl.get("removeHeresyPct", 75))
+        self._launch_inquisition_charges = int(_bl.get("launchInquisitionCharges", 3))
+        self._condemn_range = int(_bl.get("condemnPressureRange", 6))
+        self._condemn_swing = int(_bl.get("condemnPressureSwing", 7))
         _rs = _bl.get("relStrength") or []
         self._rel_strength = torch.tensor(list(_rs) + [0] * 64, dtype=torch.long, device=device)
         self._city_rel_live = bool(_bl.get("cityReligionAdderLive", False))
@@ -685,7 +702,6 @@ class SimInit:
         self._relig_heal_per_faith = int(_bl.get("religiousHealPerFaith", 3))
         self._theo_holy_ground = int(_bl.get("theoHolyGround", 5))
         self._theo_holy_city = int(_bl.get("theoHolyCity", 15))
-        self._martyr_chance = float(_bl["martyrChance"])
         self._enh = {
             "presR": torch.tensor([0.0] + [float(x.get("presR", 0)) for x in _erows], dtype=torch.float64, device=device),
             "tradeRel": torch.tensor([[0.0] * 6] + [list(x.get("tradeRel", [0.0] * 6)) for x in _erows], dtype=torch.float64, device=device),
@@ -929,9 +945,17 @@ class SimInit:
             self._A_FOUND = self._act.get("FOUND_CITY", -1)  # the settler's verb
             self._A_EXCAVATE = self._act.get("EXCAVATE", -1)  # the archaeologist's
             self._A_PARK = self._act.get("PARK", -1)          # the naturalist's
+            self._A_PROMOTE = self._act.get("PROMOTE_0", -1)  # the level-up head
+            self._A_CONDEMN = self._act.get("CONDEMN_0", -1)  # vs an adjacent religious unit
+            self._A_HERESY = self._act.get("REMOVE_HERESY", -1)
+            self._A_INQUISITION = self._act.get("LAUNCH_INQUISITION", -1)
+            self._A_HEATHEN = self._act.get("CONVERT_HEATHEN", -1)
             _want = 13 + len(ids) + 3 + (12 if self._snipe_on else 0) + (7 if self._A_SPREAD >= 0 else 0) \
                 + (1 if self._A_FOUND >= 0 else 0) + (1 if self._A_EXCAVATE >= 0 else 0) \
-                + (1 if self._A_PARK >= 0 else 0)
+                + (1 if self._A_PARK >= 0 else 0) \
+                + (rules.promo_cols if self._A_PROMOTE >= 0 else 0) \
+                + (6 if self._A_CONDEMN >= 0 else 0) \
+                + (1 if self._A_HERESY >= 0 else 0) + (1 if self._A_INQUISITION >= 0 else 0)                 + (1 if self._A_HEATHEN >= 0 else 0)
             assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
             self._A_CHOP = self._act["CHOP"]
             self._A_REPAIR = self._act["REPAIR"]
@@ -946,6 +970,10 @@ class SimInit:
             self._A_FOUND = -1  # no names -> no FOUND column
             self._A_EXCAVATE = -1
             self._A_PARK = -1
+            self._A_PROMOTE = -1
+            self._A_CONDEMN = -1
+            self._A_HERESY = -1
+            self._A_INQUISITION = -1
             self._snipe_on = False
             self._A_IMP = [13 + i if i < 3 else 18 + i - 3 for i in range(len(ids))]
         self.FARM = ids.index("FARM") if "FARM" in ids else 0
@@ -1428,7 +1456,9 @@ class SimInit:
             torch.nn.functional.one_hot(self._b_req_district.clamp(min=0), _ndc).to(torch.float64)
             * (self._b_req_district >= 0).double().unsqueeze(1)
         )  # [NB, nD] building -> its district column
-        self._b_train_xp = rules.b_train_xp.to(device)  # [NB] long
+        self._pk = {n: i for i, n in enumerate(rules.promo_kinds)}
+        self._choke_feats = torch.tensor([int(x) for x in rules.choke_features if int(x) >= 0], dtype=torch.long, device=device)
+        self._woods_feats = torch.tensor([int(x) for x in rules.woods_features if int(x) >= 0], dtype=torch.long, device=device)
         self._b_era = rules.b_era.to(device)  # [NB] long — unlock era (Heartbeat of Steam's gate) — per-building training XP (best tier over present buildings)
         # What `_building_dedications` reads besides the era: Free Inquiry pays
         # for a building that provides SCIENCE, Pen Brush and Voice for one

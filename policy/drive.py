@@ -356,6 +356,34 @@ def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
     if A_PK >= 0 and um.shape[2] > A_PK:
         take_pk = present & um[:, :, A_PK]
         orders0 = torch.where(take_pk, torch.full_like(orders0, A_PK), orders0)
+    A_LQ = getattr(sim, "_A_INQUISITION", -1)
+    if A_LQ >= 0 and um.shape[2] > A_LQ:
+        orders0 = torch.where(present & um[:, :, A_LQ], torch.full_like(orders0, A_LQ), orders0)
+    A_HN = getattr(sim, "_A_HEATHEN", -1)
+    if A_HN >= 0 and um.shape[2] > A_HN:
+        orders0 = torch.where(present & um[:, :, A_HN], torch.full_like(orders0, A_HN), orders0)
+    A_HX = getattr(sim, "_A_HERESY", -1)
+    if A_HX >= 0 and um.shape[2] > A_HX:
+        orders0 = torch.where(present & um[:, :, A_HX], torch.full_like(orders0, A_HX), orders0)
+    A_CN = getattr(sim, "_A_CONDEMN", -1)
+    if A_CN >= 0 and um.shape[2] >= A_CN + 6:
+        cn = um[:, :, A_CN:A_CN + 6]
+        hit = present & cn.any(dim=2)
+        orders0 = torch.where(hit, A_CN + cn.float().argmax(dim=2), orders0)
+    A_PM = getattr(sim, "_A_PROMOTE", -1)
+    if A_PM >= 0 and um.shape[2] >= A_PM + sim.rules.promo_cols:
+        pm = um[:, :, A_PM:A_PM + sim.rules.promo_cols]
+        hasp = present & pm.any(dim=2)
+        # a promotion heals 50 and ends the turn, so it outranks every other
+        # verb the unit could have taken. WHICH row it takes alternates by
+        # seat and turn: the tree is only worth reaching if the driver walks
+        # more than one branch of it.
+        cols = torch.arange(sim.rules.promo_cols, device=um.device)
+        deep = ((seat + sim.turn) % 2) == 1
+        key = torch.where(pm, cols, torch.full_like(cols, -1)) if deep \
+            else torch.where(pm, cols, torch.full_like(cols, 1 << 20))
+        pick = key.amax(dim=2) if deep else key.amin(dim=2)
+        orders0 = torch.where(hasp, A_PM + pick, orders0)
     if bool(on_job.any()):
         # BY NAME, never by column number: the BUILD_* verbs are a RUN in the
         # middle of the action table, so an inserted verb walks a hardcoded
@@ -504,10 +532,13 @@ def _decide_buys(sim, row: int, bctx: dict | None = None):
     buy_kind = ladder.pick_purchase(bctx["can_building"], bctx["settler_ok"], bctx["unit_ok"], bctx["tile_ok"])
     buy_a = torch.where(buy_kind == 3, bctx["tile"], bctx["jj"])
     buy_b = torch.where(buy_kind == 3, bctx["tile_j"], bctx["bb"])
-    worship_ok, relig_kind = ladder.pick_faith(bctx["worship_ok"], bctx["missionary_ok"], bctx["apostle_ok"])
+    worship_ok, relig_kind = ladder.pick_faith(
+        bctx["worship_ok"], bctx["missionary_ok"], bctx["apostle_ok"], bctx["inquisitor_ok"])
     neg_w = torch.full_like(bctx["worship_j"], -1)
-    relig_j = torch.where(relig_kind == 5, bctx["missionary_j"],
-                          torch.where(relig_kind == 6, bctx["apostle_j"], neg_w))
+    relig_j = torch.where(
+        relig_kind == 5, bctx["missionary_j"],
+        torch.where(relig_kind == 6, bctx["apostle_j"],
+                    torch.where(relig_kind == 11, bctx["inquisitor_j"], neg_w)))
     monu_kind = ladder.pick_monu(bctx["monu_builder_ok"], bctx["monu_settler_ok"])
     monu_j = torch.where(monu_kind >= 0, bctx["spawn_slot"], torch.full_like(bctx["spawn_slot"], -1))
     nat_ok, nat_j = bctx["nat_ok"], bctx["nat_j"]
@@ -540,7 +571,7 @@ def _buy_ctx(sim, row: int) -> dict:
     cand_u = sim._seat_buy_unit_candidates(row, sim._seat_trainable_units(row))
     unit_ok = active & (sim._seat_army_count(row) < 2 * n_cities) & cand_u.any(dim=1)
     tile_j, tile_t, _tile_cost, tile_ok = sim._seat_tile_buy_candidate(row, active)
-    w_ok, w_j, m_ok, m_j, a_ok, a_j = sim._seat_faith_buy_candidates(row, active)
+    w_ok, w_j, m_ok, m_j, a_ok, a_j, q_ok, q_j = sim._seat_faith_buy_candidates(row, active)
     nat_ok, nat_j = sim._seat_naturalist_candidate(row, active)
     # CIV6 (GS Civilopedia, Monumentality, Golden face): "May purchase civilian
     # units with Faith. Builders and Settlers are 30% cheaper to purchase with
@@ -562,6 +593,7 @@ def _buy_ctx(sim, row: int) -> dict:
             "worship_ok": w_ok, "worship_j": w_j,
             "missionary_ok": m_ok, "missionary_j": m_j,
             "apostle_ok": a_ok, "apostle_j": a_j,
+            "inquisitor_ok": q_ok, "inquisitor_j": q_j,
             "levy_ok": levy_ok, "levy_cs": levy_cs,
             "nat_ok": nat_ok, "nat_j": nat_j}
 
@@ -873,7 +905,7 @@ def _buy_record_fields(sim, row: int, b: int, buy, worship, relig, levy, monu=No
         _c = _centre(int(worship[b]))
         if _c is not None:
             bf.append([4, _c])
-    if relig is not None and int(relig[0][b]) in (5, 6):
+    if relig is not None and int(relig[0][b]) in (5, 6, 11):
         _c = _centre(int(relig[1][b]))
         if _c is not None:
             bf.append([int(relig[0][b]), _c])
@@ -960,7 +992,7 @@ def replay_seat(sim, row: int, rec: dict) -> None:
         _fk, _fc = int(_ent[0]), int(_ent[1])
         if _fk == 4:
             worship = _centre_slot(_fc)
-        elif _fk in (5, 6):
+        elif _fk in (5, 6, 11):
             _rjt = _centre_slot(_fc)
             relig = (torch.where(_rjt >= 0, torch.full_like(_rjt, _fk), torch.full_like(_rjt, -1)), _rjt)
         elif _fk in (8, 9):

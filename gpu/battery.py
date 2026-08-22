@@ -194,7 +194,7 @@ def main() -> int:
                 ("citizens", [py, "tests/gpu/citizens_test.py"], 2),  # the specialist pin and the plot lock — the two citizen overrides
                 ("congress_vote", [py, "tests/gpu/congress_vote_test.py"], 2),  # the congress ballot: override, favor curve, both refund tiers, the DV target
                 ("emergency", [py, "tests/gpu/emergency_test.py"], 2),  # the special session above the trigger: sponsorship, quiet window, forced war, both outcomes
-                ("martyr", [py, "tests/gpu/martyr_test.py"], 2),  # one relic in nine apostle deaths, drawn where TS draws
+                ("martyr", [py, "tests/gpu/martyr_test.py"], 2),  # the relic rides the MARTYR promotion, and the death draws nothing
                 ("barb_camps", [py, "tests/gpu/barb_camps_test.py"], 2),  # a camp's class is its ground; ranged is nobody's class
                 ("suzerain_rules", [py, "tests/gpu/suzerain_rules_test.py"], 2),  # the six suz-coded perks, strict-suzerain-only
                 ("dedications", [py, "tests/gpu/dedications_test.py"], 2),  # both faces of the four new catalog entries
@@ -247,6 +247,9 @@ def main() -> int:
                 ("ladder", [py, "tests/gpu/ladder_test.py"], 4),  # the shared decision ladder's own guard
                 ("food_order", [py, "tests/gpu/food_order_test.py"], 1),  # the farm-adjacency tier sits before the drought floor
                 ("sc_census", [py, "tests/gpu/statecompare_census_test.py"], 1),  # static — every _MUTABLE plane is compared or excused
+                ("promotions", [py, "tests/gpu/promotions_test.py"], 4),  # the ladder, the PROMOTE head, the evaluator and the exact-integer XP award
+                ("inquisitor", [py, "tests/gpu/inquisitor_test.py"], 4),  # Launch Inquisition -> the purchase -> Remove Heresy -> Condemn, and the duel rules
+                ("promo_effects", [py, "tests/gpu/promo_effects_test.py"], 4),  # the seventeen promotion kinds that are not Combat Strength
             ],
         ]
         # A lane that names a path nothing writes, or a test file no lane

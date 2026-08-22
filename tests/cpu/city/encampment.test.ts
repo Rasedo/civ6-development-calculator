@@ -4,7 +4,7 @@ import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { purchaseUnit } from '../../../cpu/core/game';
 import { seatPhase } from '../../../cpu/core/phase';
 import { spawnUnit } from '../../../cpu/core/units';
-import { encampmentTrainXp } from '../../../cpu/core/combat';
+import { trainXpPct } from '../../../cpu/core/combat';
 import { citySpecialistSlots } from '../../../cpu/core/city';
 import { SPECIALIST_YIELDS } from '../../../cpu/data/greatPeople';
 
@@ -46,16 +46,16 @@ describe('Encampment', () => {
     expect(citySpecialistSlots(state, city).get(enc.index)).toBeUndefined();
   });
 
-  it('training XP ladder: best military-building tier, not the sum', () => {
-    expect(encampmentTrainXp([])).toBe(0);
-    expect(encampmentTrainXp(['MONUMENT'])).toBe(0);
-    expect(encampmentTrainXp(['BARRACKS'])).toBe(5);
-    expect(encampmentTrainXp(['STABLE'])).toBe(5);
-    expect(encampmentTrainXp(['BARRACKS', 'ARMORY'])).toBe(10); // best tier
-    expect(encampmentTrainXp(['ARMORY', 'MILITARY_ACADEMY'])).toBe(15);
+  it('training XP: the Encampment lines are a PERCENTAGE, and they stack', () => {
+    expect(trainXpPct([], 'MELEE')).toBe(0);
+    expect(trainXpPct(['MONUMENT'], 'MELEE')).toBe(0);
+    expect(trainXpPct(['BARRACKS'], 'MELEE')).toBe(25);
+    expect(trainXpPct(['STABLE'], 'HEAVY_CAV')).toBe(25);
+    expect(trainXpPct(['BARRACKS', 'ARMORY'], 'MELEE')).toBe(50);
+    expect(trainXpPct(['ARMORY', 'MILITARY_ACADEMY'], 'MELEE')).toBe(50);
   });
 
-  it('training XP end-to-end: a purchased military unit starts veteran', () => {
+  it('training XP end-to-end: a purchased military unit carries the percentage for life', () => {
     const { state, city } = battlefield();
     city.buildings.push('BARRACKS');
     seatOf(state, 0)!.treasury = 9999;
@@ -63,7 +63,9 @@ describe('Encampment', () => {
     const res = purchaseUnit(state, city.id, 'WARRIOR', 0);
     expect(res.ok).toBe(true);
     expect(state.units.length).toBe(before + 1);
-    expect(state.units[state.units.length - 1].xp).toBe(5);
+    const u = state.units[state.units.length - 1];
+    expect(u.xp).toBe(0); // the line is a MULTIPLIER, never a lump of starting XP
+    expect(u.xpPct).toBe(25);
   });
 
   /** The strike keys a `seatPhase` fires at a raider standing next to the city. */

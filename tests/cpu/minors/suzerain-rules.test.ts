@@ -3,7 +3,7 @@ import { BARB_SEAT, emptySeat, seatOf, seatOfCityState, setTileOwner } from '../
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { endTurn } from '../../../cpu/core/game';
 import { spawnUnit } from '../../../cpu/core/units';
-import { meleeAttack, cavalryHillCS, defenderCS, XP_ATTACK } from '../../../cpu/core/combat';
+import { meleeAttack, cavalryHillCS, defenderCS } from '../../../cpu/core/combat';
 import { suzerainEffect, regionalReach } from '../../../cpu/core/cityStates';
 import { computeCityStats } from '../../../cpu/core/city';
 import { cityTradeYields } from '../../../cpu/core/trade';
@@ -69,8 +69,9 @@ describe('suzerain rules (the `suz`-coded perks)', () => {
       expect(meleeAttack(state, atk.id, def.tileIndex, 0).ok).toBe(true);
       return atk.xp ?? 0;
     };
-    expect(run(false)).toBe(XP_ATTACK);
-    expect(run(true)).toBe(XP_ATTACK * KABUL_XP_MULT);
+    const base = run(false);
+    expect(base).toBeGreaterThan(0);
+    expect(run(true)).toBe(base * KABUL_XP_MULT);
   });
 
   it('Preslav pays +5 CS to cavalry FIGHTING ON hill tiles', () => {

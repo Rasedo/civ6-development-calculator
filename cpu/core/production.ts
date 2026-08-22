@@ -13,7 +13,8 @@ import { ERAS, TECHS } from '../data/techs';
 import { addEraScore, buildingDedications, dedicationEvent } from './eras';
 import { spawnUnit } from './units';
 import { wallsMax, urbanDefensesFit } from './rules';
-import { encampmentTrainXp } from './combat';
+import { trainXpPct } from './combat';
+import { promoClassOf } from './promotions';
 import { applyLumpYield } from './economy';
 import { congressGppFactor } from './congress';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -157,19 +158,13 @@ export function completeQueueItem(
       break;
     case 'unit': {
       const trained = spawnUnit(state, item.unit, city.centerIndex, city.seat);
-      if (trained && (UNITS[item.unit]?.combat ?? 0) > 0) {
-        const xp = encampmentTrainXp(city.buildings);
-        if (xp > 0) trained.xp = xp;
-      }
+      if (trained) trained.xpPct = trainXpPct(city.buildings, promoClassOf(item.unit));
       if (item.unit === 'BUILDER') owner.buildersTrained += 1;
       // CIV6 (Venetian Arsenal): a TRAINED naval unit arrives twice. Purchases
       // are excluded in the real game and take a different path here.
       if (UNITS[item.unit]?.naval && seatWonderFlag(state, city.seat, 'duplicateNavalTrain')) {
         const twin = spawnUnit(state, item.unit, city.centerIndex, city.seat);
-        if (twin && (UNITS[item.unit]?.combat ?? 0) > 0) {
-          const xp = encampmentTrainXp(city.buildings);
-          if (xp > 0) twin.xp = xp;
-        }
+        if (twin) twin.xpPct = trainXpPct(city.buildings, promoClassOf(item.unit));
       }
       break;
     }

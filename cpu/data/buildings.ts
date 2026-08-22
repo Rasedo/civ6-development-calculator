@@ -9,6 +9,7 @@
  */
 
 import type { DistrictId, Yields } from '../core/types';
+import type { PromoClass } from './promotions';
 import { GAME_SPEED } from './constants';
 
 export interface BuildingDef {
@@ -46,7 +47,14 @@ export interface BuildingDef {
   /** explicit gold upkeep (real Civ 6) — overrides the cost-tier
    * heuristic in buildingMaintenance where the wiki value is verified. */
   maintenance?: number;
-  trainXp?: number;
+  /**
+   * CIV6: "+25% combat experience for all <classes> units trained in this
+   * city" — a PERCENTAGE the trained unit carries for life, not starting XP,
+   * and the Encampment and Harbor lines STACK on each other.
+   */
+  trainXpPct?: number;
+  /** the promotion classes `trainXpPct` reaches. */
+  trainXpClasses?: readonly PromoClass[];
 }
 
 const rawList: BuildingDef[] = [
@@ -81,17 +89,17 @@ const rawList: BuildingDef[] = [
   // CIV6: "+1 Food. +1 Food in Coast and Lake tiles controlled by the city.
   // +1 Gold. +1 Housing."
   { id: 'LIGHTHOUSE', name: 'Lighthouse', district: 'HARBOR', cost: 120, yields: { food: 1, gold: 1 }, housing: 1, special: 'LIGHTHOUSE', maintenance: 0 },
-  { id: 'SHIPYARD', name: 'Shipyard', district: 'HARBOR', cost: 290, requiresAny: ['LIGHTHOUSE'], special: 'SHIPYARD', maintenance: 1 },
-  { id: 'SEAPORT', name: 'Seaport', district: 'HARBOR', cost: 440, requiresAny: ['SHIPYARD'], yields: { food: 2, gold: 2 }, housing: 1, maintenance: 0 },
+  { id: 'SHIPYARD', name: 'Shipyard', district: 'HARBOR', cost: 290, requiresAny: ['LIGHTHOUSE'], special: 'SHIPYARD', maintenance: 1, trainXpPct: 25, trainXpClasses: ['NAVAL_MELEE', 'NAVAL_RANGED'] },
+  { id: 'SEAPORT', name: 'Seaport', district: 'HARBOR', cost: 440, requiresAny: ['SHIPYARD'], yields: { food: 2, gold: 2 }, housing: 1, maintenance: 0, trainXpPct: 25, trainXpClasses: ['NAVAL_MELEE', 'NAVAL_RANGED'] },
 
   { id: 'WORKSHOP', name: 'Workshop', district: 'INDUSTRIAL_ZONE', cost: 195, yields: { production: 3 }, maintenance: 1 },
   { id: 'FACTORY', name: 'Factory', district: 'INDUSTRIAL_ZONE', cost: 330, requiresAny: ['WORKSHOP'], yields: { production: 3 }, regional: true, maintenance: 2 },
   { id: 'POWER_PLANT', name: 'Power Plant', district: 'INDUSTRIAL_ZONE', cost: 580, requiresAny: ['FACTORY'], yields: { production: 4 }, regional: true, maintenance: 3 },
 
-  { id: 'BARRACKS', name: 'Barracks', district: 'ENCAMPMENT', cost: 90, exclusiveWith: ['STABLE'], yields: { production: 1 }, housing: 1, maintenance: 1, trainXp: 5 },
-  { id: 'STABLE', name: 'Stable', district: 'ENCAMPMENT', cost: 120, exclusiveWith: ['BARRACKS'], yields: { production: 1 }, housing: 1, maintenance: 1, trainXp: 5 },
-  { id: 'ARMORY', name: 'Armory', district: 'ENCAMPMENT', cost: 195, requiresAny: ['BARRACKS', 'STABLE'], yields: { production: 3 }, maintenance: 2, trainXp: 10 },
-  { id: 'MILITARY_ACADEMY', name: 'Military Academy', district: 'ENCAMPMENT', cost: 330, requiresAny: ['ARMORY'], yields: { production: 4 }, housing: 1, maintenance: 2, trainXp: 15 },
+  { id: 'BARRACKS', name: 'Barracks', district: 'ENCAMPMENT', cost: 90, exclusiveWith: ['STABLE'], yields: { production: 1 }, housing: 1, maintenance: 1, trainXpPct: 25, trainXpClasses: ['MELEE', 'RANGED', 'ANTICAV'] },
+  { id: 'STABLE', name: 'Stable', district: 'ENCAMPMENT', cost: 120, exclusiveWith: ['BARRACKS'], yields: { production: 1 }, housing: 1, maintenance: 1, trainXpPct: 25, trainXpClasses: ['LIGHT_CAV', 'HEAVY_CAV', 'SIEGE'] },
+  { id: 'ARMORY', name: 'Armory', district: 'ENCAMPMENT', cost: 195, requiresAny: ['BARRACKS', 'STABLE'], yields: { production: 3 }, maintenance: 2, trainXpPct: 25, trainXpClasses: ['MELEE', 'ANTICAV', 'RANGED', 'LIGHT_CAV', 'HEAVY_CAV', 'SIEGE'] },
+  { id: 'MILITARY_ACADEMY', name: 'Military Academy', district: 'ENCAMPMENT', cost: 330, requiresAny: ['ARMORY'], yields: { production: 4 }, housing: 1, maintenance: 2, trainXpPct: 25, trainXpClasses: ['MELEE', 'ANTICAV', 'RANGED', 'LIGHT_CAV', 'HEAVY_CAV', 'SIEGE'] },
 
   { id: 'ARENA', name: 'Arena', district: 'ENTERTAINMENT_COMPLEX', cost: 150, amenities: 2, yields: { culture: 1 }, maintenance: 1 },
   { id: 'ZOO', name: 'Zoo', district: 'ENTERTAINMENT_COMPLEX', cost: 360, requiresAny: ['ARENA'], amenities: 1, regional: true, maintenance: 2 },

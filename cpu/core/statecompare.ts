@@ -400,6 +400,7 @@ const SEAT: Record<string, Extractor> = {
   capitalTile: overSeats((s) => s.capitalTile ?? -1),
   holyTile: overSeats((s) => s.religion.holyTile ?? -1),
   religionFounded: overSeats((s) => (s.religion.founded ? 1 : 0)),
+  inquisition: overSeats((s) => (s.religion.inquisition ? 1 : 0)),
   // The GPU carries a DONE bit per belief race beside the chosen id; this side
   // gates on the id being set. Comparing them is what would show the two
   // coming apart (a seat that has spent its pick but holds no belief).
@@ -552,6 +553,11 @@ const UNIT_G: Record<string, Extractor> = {
   charges: overUnits((u) => u.charges ?? 0),
   fortifyTurns: overUnits((u) => u.fortifyTurns ?? 0),
   xp: overUnits((u) => u.xp ?? 0),
+  level: overUnits((u) => u.level ?? 1),
+  promos: overUnits((u) => u.promos ?? 0),
+  promoOffer: overUnits((u) => u.promoOffer ?? 0),
+  promoUsed: overUnits((u) => u.promoUsed ?? 0),
+  xpPct: overUnits((u) => u.xpPct ?? 0),
   embarked: overUnits((u) => (u.embarked ? 1 : 0)),
   movesLeft: overUnits((u) => u.movesLeft),
   movesFull: overUnits((u) => u.movesFull ?? UNITS[u.type]?.moves ?? 0),

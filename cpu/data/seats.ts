@@ -23,11 +23,10 @@ export const SEAT_CAPS: Record<SeatClass, SeatCaps> = {
 /**
  * MINOR `xp` IS UNREACHED, NOT UNVERIFIED-BY-CHOICE. Neither engine gives a
  * city-state units yet, so no unit carries a minor seat and this cell is never
- * read. It holds `true` because that is what the code did before the table
- * existed — `gainXp` refused barbarians and nobody else — so the table changes
- * no behaviour. The day minors get units, this cell needs a Civ 6 source
- * before it is trusted; it is called out here rather than left to be
- * discovered as a silent default.
+ * read. It holds `true` because barbarians are the only class the XP award
+ * ever refused, so the table changes no behaviour. The day minors get units,
+ * this cell needs a Civ 6 source before it is trusted; it is called out here
+ * rather than left to be discovered as a silent default.
  */
 
 // ---------------------------------------------------------------------------

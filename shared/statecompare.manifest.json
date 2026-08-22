@@ -1,1877 +1,1942 @@
 {
- "version": 1,
- "what": "The declarative field manifest both engines compare through. cpu/core/statecompare.ts and gpu/core/statecompare.py each implement an extractor per (group, field) NAME; a name in this file with no extractor, or an extractor with no name here, is a hard error rather than a silently missing column.",
- "compare": {
-  "exact": "an integer-valued fact. The two engines must produce the same integer. Folded into the group's `exact` digest.",
-  "milli": "a float accumulator. Quantised to milli-units (JS Math.round of value*1000) and folded into the group's separate `milli` digest, so a float disagreement is reported apart from an integer one. A hash cannot carry a tolerance, which is why the two are separate digests rather than one."
- },
- "gap": "A field carrying `gap` is a KNOWN cross-engine storage asymmetry: both extractors exist and the census counts the field as covered, but the default digest skips it because it is guaranteed to disagree until the gap closes. Turning them on is a per-field decision, not a policy.",
- "keys": {
-  "scalar": "one row per game; key 0",
-  "per-seat": "one row per CIV seat; key = the absolute seat id (cpu/core/seats.ts)",
-  "per-city-state": "one row per living city-state; key = its id",
-  "per-city": "one row per living city of any civ seat; key = the city's CENTER TILE index \u2014 globally unique, stable across capture, and stored by both engines. Slot index, founding order and array position are all engine-local and none of them is a valid join.",
-  "per-unit": "one row per living unit; key = tileIndex * 2 + (civilian ? 1 : 0). Both engines allow at most one military and one civilian unit per tile (the GPU's military_at/civilian_at pair), so the pair is unique. `game.unitCount` guards the assumption: two units colliding on one key would merge silently in the digest but change the count.",
-  "per-tile": "one row per map tile; key = the tile index"
- },
- "censusTypes": [
-  "GameState",
-  "GameMap",
-  "Seat",
-  "City",
-  "Unit",
-  "Tile",
-  "CityState",
-  "CityStateQuest",
-  "ResearchState",
-  "GovernmentState",
-  "ReligionState",
-  "TradeRoute"
- ],
- "groups": [
-  {
-   "name": "game",
-   "kind": "scalar",
-   "covers": [],
-   "fields": [
-    {
-     "name": "turn",
-     "compare": "exact",
-     "covers": [
-      "GameState.turn"
-     ],
-     "planes": []
-    },
-    {
-     "name": "rng",
-     "compare": "exact",
-     "covers": [
-      "GameState.rngState"
-     ],
-     "planes": [
-      "rng_state"
-     ]
-    },
-    {
-     "name": "gameOver",
-     "compare": "exact",
-     "covers": [
-      "GameState.gameOver"
-     ],
-     "planes": [
-      "game_over"
-     ]
-    },
-    {
-     "name": "victoryType",
-     "compare": "exact",
-     "covers": [
-      "GameState.victoryType"
-     ],
-     "planes": [
-      "victory_type"
-     ]
-    },
-    {
-     "name": "victoryRow",
-     "compare": "exact",
-     "covers": [
-      "GameState.victoryRow"
-     ],
-     "planes": [
-      "victory_row"
-     ]
-    },
-    {
-     "name": "congressSessions",
-     "compare": "exact",
-     "covers": [
-      "GameState.congressSessions"
-     ],
-     "planes": [
-      "congress_sessions"
-     ]
-    },
-    {
-     "name": "congressActive",
-     "compare": "exact",
-     "covers": [
-      "GameState.congress"
-     ],
-     "planes": [
-      "congress_active"
-     ]
-    },
-    {
-     "name": "emergencyTable",
-     "compare": "exact",
-     "covers": [
-      "GameState.emergencies"
-     ],
-     "planes": [
-      "emg_kind",
-      "emg_target",
-      "emg_city",
-      "emg_phase",
-      "emg_act",
-      "emg_affected",
-      "emg_member"
-     ],
-     "note": "sorted by (kind, target, city) and padded to EMERGENCY_SLOTS: the TS list is an array in trigger order, the GPU a fixed slot table, so slot POSITION is not a shared fact. Members and affected seats ride as bitmasks."
-    },
-    {
-     "name": "lastSessionTurn",
-     "compare": "exact",
-     "covers": [
-      "GameState.lastSessionTurn"
-     ],
-     "planes": [
-      "last_session_turn"
-     ]
-    },
-    {
-     "name": "roadBridges",
-     "compare": "exact",
-     "covers": [
-      "GameState.roadBridges"
-     ],
-     "planes": []
-    },
-    {
-     "name": "pantheonsClaimed",
-     "compare": "exact",
-     "covers": [
-      "GameState.claimedPantheons"
-     ],
-     "planes": [
-      "pan_claimed",
-      "pantheon_claimed_n"
-     ],
-     "note": "the global COUNT; which pantheon each seat took is the per-seat `beliefPantheon` field, and the claim mask is that set"
-    },
-    {
-     "name": "beliefsClaimed",
-     "compare": "exact",
-     "covers": [
-      "GameState.claimedBeliefs"
-     ],
-     "planes": [
-      "fol_claimed",
-      "claimed_f_n",
-      "fou_claimed",
-      "claimed_o_n"
-     ],
-     "note": "TS keeps ONE claimedBeliefs list mixing follower and founder ids; the GPU counts the two pools separately. The comparison is over the total, because splitting the TS list needs the belief catalogs and the total is the fact both engines actually agree on."
-    },
-    {
-     "name": "enhancerBeliefsClaimed",
-     "compare": "exact",
-     "covers": [
-      "GameState.claimedEnhancers"
-     ],
-     "planes": [
-      "enh_claimed",
-      "claimed_e_n"
-     ],
-     "note": "the global COUNT; which enhancer each seat took is the per-seat `beliefEnhancer` field, and the claim mask is that set"
-    },
-    {
-     "name": "greatPeopleByClass",
-     "compare": "exact",
-     "covers": [
-      "GameState.claimedGreatPeople",
-      "GameState.gpNext"
-     ],
-     "planes": [
-      "gp_earned",
-      "gp_next"
-     ],
-     "note": "great people are drawn from ONE global pool on both engines, so the per-class QUEUE POSITION is a game-level fact, not a per-seat one. It is the position and not the count because the queue steps past anyone the world era has left behind; `claimedGreatPeople` is the id list that position walks."
-    },
-    {
-     "name": "barbCamps",
-     "compare": "exact",
-     "covers": [
-      "Seat.camps",
-      "GameState.barbSeat"
-     ],
-     "planes": [
-      "camp_tile",
-      "n_camps"
-     ],
-     "note": "camp TILES, sorted. Only the barbarian seat holds camps; every other seat's list is empty by rule, which is why this is one game-level field instead of a per-seat one."
-    },
-    {
-     "name": "cityCount",
-     "compare": "exact",
-     "covers": [],
-     "planes": [],
-     "derived": true,
-     "note": "guards the per-city key: two cities colliding on one center tile would merge in the city digest and change nothing else."
-    },
-    {
-     "name": "unitCount",
-     "compare": "exact",
-     "covers": [
-      "GameState.units"
-     ],
-     "planes": []
-    }
-   ]
+  "version": 1,
+  "what": "The declarative field manifest both engines compare through. cpu/core/statecompare.ts and gpu/core/statecompare.py each implement an extractor per (group, field) NAME; a name in this file with no extractor, or an extractor with no name here, is a hard error rather than a silently missing column.",
+  "compare": {
+    "exact": "an integer-valued fact. The two engines must produce the same integer. Folded into the group's `exact` digest.",
+    "milli": "a float accumulator. Quantised to milli-units (JS Math.round of value*1000) and folded into the group's separate `milli` digest, so a float disagreement is reported apart from an integer one. A hash cannot carry a tolerance, which is why the two are separate digests rather than one."
   },
-  {
-   "name": "seat",
-   "kind": "per-seat",
-   "covers": [
-    "GameState.seats",
-    "Seat.seat"
-   ],
-   "fields": [
-    {
-     "name": "explored",
-     "compare": "exact",
-     "covers": [
-      "Seat.explored"
-     ],
-     "planes": [
-      "seat_explored"
-     ],
-     "note": "per-seat fog, dense 0/1 over tiles. TS's empty array (nothing revealed yet) renders dense-zero; every seat reveals at its t0 spawn, so the empty state never reaches a digest."
-    },
-    {
-     "name": "treasury",
-     "compare": "milli",
-     "covers": [
-      "Seat.treasury"
-     ],
-     "planes": [
-      "civ_treasury"
-     ]
-    },
-    {
-     "name": "cultureTotal",
-     "compare": "milli",
-     "covers": [
-      "Seat.cultureTotal"
-     ],
-     "planes": [
-      "civ_culture"
-     ]
-    },
-    {
-     "name": "faith",
-     "compare": "milli",
-     "covers": [
-      "Seat.faith"
-     ],
-     "planes": [
-      "civ_faith"
-     ]
-    },
-    {
-     "name": "tourism",
-     "compare": "exact",
-     "covers": [
-      "Seat.tourism"
-     ],
-     "planes": [
-      "civ_tourism"
-     ]
-    },
-    {
-     "name": "warmonger",
-     "compare": "exact",
-     "covers": [
-      "Seat.warmonger"
-     ],
-     "planes": [
-      "civ_warmonger"
-     ]
-    },
-    {
-     "name": "diplomaticFavor",
-     "compare": "exact",
-     "covers": [
-      "Seat.diplomaticFavor"
-     ],
-     "planes": [
-      "civ_diplo_favor"
-     ]
-    },
-    {
-     "name": "diplomaticPoints",
-     "compare": "exact",
-     "covers": [
-      "Seat.diplomaticPoints"
-     ],
-     "planes": [
-      "civ_diplo_points"
-     ]
-    },
-    {
-     "name": "influencePoints",
-     "compare": "milli",
-     "covers": [
-      "Seat.influencePoints"
-     ],
-     "planes": [
-      "civ_influence"
-     ]
-    },
-    {
-     "name": "envoysAvailable",
-     "compare": "exact",
-     "covers": [
-      "Seat.envoysAvailable"
-     ],
-     "planes": [
-      "civ_envoys_avail"
-     ]
-    },
-    {
-     "name": "buildersTrained",
-     "compare": "exact",
-     "covers": [
-      "Seat.buildersTrained"
-     ],
-     "planes": [
-      "civ_builders_trained"
-     ]
-    },
-    {
-     "name": "relicReserve",
-     "compare": "exact",
-     "covers": [
-      "Seat.relicReserve"
-     ],
-     "planes": [
-      "civ_relic_reserve"
-     ]
-    },
-    {
-     "name": "emergencyRewards",
-     "compare": "exact",
-     "covers": [
-      "Seat.emgEnvoyGold",
-      "Seat.emgRouteGold",
-      "Seat.emgHeal",
-      "Seat.emgStrike"
-     ],
-     "planes": [
-      "civ_emg_envoy_gold",
-      "civ_emg_route_gold",
-      "civ_emg_heal",
-      "civ_emg_strike"
-     ],
-     "note": "what a resolved emergency leaves standing, forever. Counters rather than a list of past emergencies: winning the same kind twice pays twice."
-    },
-    {
-     "name": "bestMeleeCS",
-     "compare": "exact",
-     "covers": [
-      "Seat.bestMeleeCS"
-     ],
-     "planes": [
-      "civ_best_melee"
-     ]
-    },
-    {
-     "name": "techs",
-     "compare": "exact",
-     "covers": [
-      "ResearchState.techs"
-     ],
-     "planes": [
-      "civ_techs"
-     ],
-     "note": "the SET of researched tech indices, not the count \u2014 a count cannot tell two different trees of the same size apart."
-    },
-    {
-     "name": "civics",
-     "compare": "exact",
-     "covers": [
-      "ResearchState.civics"
-     ],
-     "planes": [
-      "civ_civics"
-     ]
-    },
-    {
-     "name": "boosted",
-     "compare": "exact",
-     "covers": [
-      "ResearchState.boosted"
-     ],
-     "planes": [
-      "civ_tech_boosted",
-      "civ_civic_boosted"
-     ],
-     "note": "both boost masks, tech then civic, in one vector"
-    },
-    {
-     "name": "currentTech",
-     "compare": "exact",
-     "covers": [
-      "ResearchState.tech"
-     ],
-     "planes": [
-      "civ_cur_tech"
-     ]
-    },
-    {
-     "name": "currentCivic",
-     "compare": "exact",
-     "covers": [
-      "ResearchState.civic"
-     ],
-     "planes": [
-      "civ_cur_civic"
-     ]
-    },
-    {
-     "name": "techProgress",
-     "compare": "milli",
-     "covers": [
-      "ResearchState.techProgress"
-     ],
-     "planes": [
-      "civ_tech_prog"
-     ]
-    },
-    {
-     "name": "civicProgress",
-     "compare": "milli",
-     "covers": [
-      "ResearchState.civicProgress"
-     ],
-     "planes": [
-      "civ_civic_prog"
-     ]
-    },
-    {
-     "name": "techRetained",
-     "compare": "milli",
-     "covers": [
-      "ResearchState.techRetained"
-     ],
-     "planes": [
-      "civ_tech_retain"
-     ]
-    },
-    {
-     "name": "civicRetained",
-     "compare": "milli",
-     "covers": [
-      "ResearchState.civicRetained"
-     ],
-     "planes": [
-      "civ_civic_retain"
-     ]
-    },
-    {
-     "name": "cityCount",
-     "compare": "exact",
-     "covers": [
-      "Seat.cities"
-     ],
-     "planes": [
-      "city_alive"
-     ]
-    },
-    {
-     "name": "wars",
-     "compare": "exact",
-     "covers": [
-      "Seat.wars"
-     ],
-     "planes": [
-      "war"
-     ],
-     "note": "the set of ABSOLUTE opponent seat ids, so a civ/civ war, a civ/city-state war and a civ/barbarian war are the same fact in the same field."
-    },
-    {
-     "name": "warTurns",
-     "compare": "exact",
-     "covers": [
-      "GameState.warTurns"
-     ],
-     "planes": [
-      "war_turns"
-     ]
-    },
-    {
-     "name": "treatyTurns",
-     "compare": "exact",
-     "covers": [
-      "GameState.treatyTurns"
-     ],
-     "planes": [
-      "treaty_turns"
-     ]
-    },
-    {
-     "name": "peaceTurns",
-     "compare": "exact",
-     "covers": [
-      "Seat.peaceTurns"
-     ],
-     "planes": [
-      "peace_turns"
-     ]
-    },
-    {
-     "name": "warWeariness",
-     "compare": "exact",
-     "covers": [
-      "Seat.ww"
-     ],
-     "planes": [
-      "ww"
-     ],
-     "note": "per-opponent, as (opponent seat, points) pairs sorted by opponent \u2014 the sum and the max both cancel a pair of opposite errors."
-    },
-    {
-     "name": "warWearinessTurn",
-     "compare": "exact",
-     "covers": [
-      "Seat.wwTurn"
-     ],
-     "planes": [
-      "ww_turn"
-     ]
-    },
-    {
-     "name": "eraScore",
-     "compare": "exact",
-     "covers": [
-      "Seat.eraScore"
-     ],
-     "planes": [
-      "era_score"
-     ]
-    },
-    {
-     "name": "age",
-     "compare": "exact",
-     "covers": [
-      "Seat.age"
-     ],
-     "planes": [
-      "civ_age"
-     ]
-    },
-    {
-     "name": "prevAge",
-     "compare": "exact",
-     "covers": [
-      "Seat.prevAge"
-     ],
-     "planes": [
-      "prev_age"
-     ]
-    },
-    {
-     "name": "dedications",
-     "compare": "exact",
-     "covers": [
-      "Seat.dedications"
-     ],
-     "planes": [
-      "dedications"
-     ]
-    },
-    {
-     "name": "dedicationPicks",
-     "compare": "exact",
-     "covers": [
-      "Seat.dedicationPicks"
-     ],
-     "planes": [
-      "ded_picks"
-     ]
-    },
-    {
-     "name": "capitalTile",
-     "compare": "exact",
-     "covers": [
-      "Seat.capitalTile"
-     ],
-     "planes": [
-      "civ_cap_tile"
-     ],
-     "note": "one seat-indexed plane; row 0 starts -1 (no capital yet) while civ rows are zero-initialised, so an unfounded civ seat reads tile 0 rather than 'none'."
-    },
-    {
-     "name": "holyTile",
-     "compare": "exact",
-     "covers": [
-      "ReligionState.holyTile"
-     ],
-     "planes": [
-      "holy_tile"
-     ]
-    },
-    {
-     "name": "religionFounded",
-     "compare": "exact",
-     "covers": [
-      "ReligionState.founded"
-     ],
-     "planes": [
-      "civ_religion_done"
-     ],
-     "note": "read off holy_tile >= 0 on the GPU: the holy tile is written exactly when a religion is founded, and it is the only founding record seat 0 has."
-    },
-    {
-     "name": "pantheonDone",
-     "compare": "exact",
-     "covers": [
-      "ReligionState.pantheon"
-     ],
-     "planes": [
-      "civ_pantheon_done"
-     ],
-     "note": "the GPU keeps a DONE bit beside the chosen id; this side has only the id, so the comparison is `pantheon !== null` vs `civ_pantheon_done`"
-    },
-    {
-     "name": "enhancerDone",
-     "compare": "exact",
-     "covers": [
-      "ReligionState.enhancer"
-     ],
-     "planes": [
-      "civ_enhancer_done"
-     ],
-     "note": "the GPU keeps a DONE bit beside the chosen id; this side has only the id, so the comparison is `enhancer != null` vs `civ_enhancer_done`"
-    },
-    {
-     "name": "gpPoints",
-     "compare": "milli",
-     "covers": [
-      "Seat.gpp"
-     ],
-     "planes": [
-      "civ_gpp"
-     ]
-    },
-    {
-     "name": "spaceProjects",
-     "compare": "exact",
-     "covers": [
-      "Seat.spaceProjects"
-     ],
-     "planes": [
-      "space_done"
-     ]
-    },
-    {
-     "name": "spaceLy",
-     "compare": "exact",
-     "covers": [
-      "Seat.spaceLy"
-     ],
-     "planes": [
-      "space_ly"
-     ]
-    },
-    {
-     "name": "spaceLasers",
-     "compare": "exact",
-     "covers": [
-      "Seat.spaceLasers"
-     ],
-     "planes": [
-      "space_lasers"
-     ]
-    },
-    {
-     "name": "routeCount",
-     "compare": "exact",
-     "covers": [
-      "Seat.tradeRoutes"
-     ],
-     "planes": [
-      "seat_routes"
-     ],
-     "note": "count only \u2014 route IDENTITY is the `routes` field beside it"
-    },
-    {
-     "name": "routes",
-     "compare": "exact",
-     "covers": [
-      "Seat.tradeRoutes",
-      "TradeRoute.from",
-      "TradeRoute.to",
-      "TradeRoute.toCs",
-      "TradeRoute.toSeat",
-      "TradeRoute.toSeatCity",
-      "TradeRoute.expiresTurn",
-      "TradeRoute.createdTurn",
-      "TradeRoute.walkTile",
-      "TradeRoute.walkLeg"
-     ],
-     "planes": [
-      "seat_routes",
-      "seat_route_dseat",
-      "seat_route_dcity",
-      "seat_route_exp",
-      "seat_route_born",
-      "seat_route_walk",
-      "seat_route_leg"
-     ],
-     "note": "per-route [fromTile, destTile, kind, expiresTurn, createdTurn, walkTile, walkLeg], sorted; destinations in CENTRE-TILE space because city ids are not compared. The walk triple IS the Trader while it services the route."
-    },
-    {
-     "name": "scienceTotal",
-     "compare": "milli",
-     "covers": [
-      "Seat.scienceTotal"
-     ],
-     "planes": [
-      "seat_science_total"
-     ]
-    },
-    {
-     "name": "tilesPurchased",
-     "compare": "exact",
-     "covers": [
-      "Seat.tilesPurchased"
-     ],
-     "planes": [
-      "civ_tiles_purchased"
-     ],
-     "gap": "seat 0's row of `civ_tiles_purchased` exists but nothing writes it until the seat-0 purchase wire; comparison opens with it."
-    },
-    {
-     "name": "nextCityId",
-     "compare": "exact",
-     "covers": [
-      "Seat.nextCityId"
-     ],
-     "planes": [
-      "civ_next_city_id"
-     ]
-    },
-    {
-     "name": "prophets",
-     "compare": "exact",
-     "covers": [
-      "Seat.gpEarned"
-     ],
-     "planes": [
-      "civ_prophets"
-     ]
-    },
-    {
-     "name": "beliefPantheon",
-     "compare": "exact",
-     "covers": [
-      "ReligionState.pantheon"
-     ],
-     "planes": [
-      "civ_pantheon"
-     ]
-    },
-    {
-     "name": "beliefFollower",
-     "compare": "exact",
-     "covers": [
-      "ReligionState.follower"
-     ],
-     "planes": [
-      "civ_follower"
-     ]
-    },
-    {
-     "name": "beliefFounder",
-     "compare": "exact",
-     "covers": [
-      "ReligionState.founder"
-     ],
-     "planes": [
-      "civ_founder"
-     ]
-    },
-    {
-     "name": "beliefEnhancer",
-     "compare": "exact",
-     "covers": [
-      "ReligionState.enhancer"
-     ],
-     "planes": [
-      "civ_enhancer"
-     ]
-    },
-    {
-     "name": "formalWars",
-     "compare": "exact",
-     "covers": [
-      "Seat.formalWars"
-     ],
-     "planes": [
-      "seat_warkind"
-     ]
-    },
-    {
-     "name": "denounced",
-     "compare": "exact",
-     "covers": [
-      "Seat.denounced"
-     ],
-     "planes": [
-      "seat_denounced"
-     ]
-    },
-    {
-     "name": "friendTurns",
-     "compare": "exact",
-     "covers": [
-      "GameState.friendTurns"
-     ],
-     "planes": [
-      "seat_friend_turns"
-     ]
-    },
-    {
-     "name": "allyTurns",
-     "compare": "exact",
-     "covers": [
-      "GameState.allyTurns"
-     ],
-     "planes": [
-      "seat_ally_turns"
-     ]
-    },
-    {
-     "name": "borderTurns",
-     "compare": "exact",
-     "covers": [
-      "GameState.borderTurns"
-     ],
-     "planes": [
-      "seat_borders_turns"
-     ],
-     "note": "DIRECTED: the row is what that seat GRANTS, never what it holds."
-    }
-   ]
+  "gap": "A field carrying `gap` is a KNOWN cross-engine storage asymmetry: both extractors exist and the census counts the field as covered, but the default digest skips it because it is guaranteed to disagree until the gap closes. Turning them on is a per-field decision, not a policy.",
+  "keys": {
+    "scalar": "one row per game; key 0",
+    "per-seat": "one row per CIV seat; key = the absolute seat id (cpu/core/seats.ts)",
+    "per-city-state": "one row per living city-state; key = its id",
+    "per-city": "one row per living city of any civ seat; key = the city's CENTER TILE index — globally unique, stable across capture, and stored by both engines. Slot index, founding order and array position are all engine-local and none of them is a valid join.",
+    "per-unit": "one row per living unit; key = tileIndex * 2 + (civilian ? 1 : 0). Both engines allow at most one military and one civilian unit per tile (the GPU's military_at/civilian_at pair), so the pair is unique. `game.unitCount` guards the assumption: two units colliding on one key would merge silently in the digest but change the count.",
+    "per-tile": "one row per map tile; key = the tile index"
   },
-  {
-   "name": "cityState",
-   "kind": "per-city-state",
-   "covers": [
-    "GameState.cityStates",
-    "CityState.id"
-   ],
-   "fields": [
-    {
-     "name": "type",
-     "compare": "exact",
-     "covers": [
-      "CityState.type"
-     ],
-     "planes": []
-    },
-    {
-     "name": "centerIndex",
-     "compare": "exact",
-     "covers": [
-      "CityState.centerIndex"
-     ],
-     "planes": [
-      "city_center"
-     ]
-    },
-    {
-     "name": "population",
-     "compare": "exact",
-     "covers": [
-      "CityState.population"
-     ],
-     "planes": [
-      "city_pop"
-     ]
-    },
-    {
-     "name": "hp",
-     "compare": "exact",
-     "covers": [
-      "CityState.hp"
-     ],
-     "planes": [
-      "city_hp"
-     ]
-    },
-    {
-     "name": "envoys",
-     "compare": "exact",
-     "covers": [
-      "CityState.envoys"
-     ],
-     "planes": [
-      "seat_citystate_envoys"
-     ],
-     "note": "a vector over civ seats in seat order \u2014 one store for every seat, which is what makes the suzerain contest one comparison."
-    },
-    {
-     "name": "met",
-     "compare": "exact",
-     "covers": [
-      "CityState.met"
-     ],
-     "planes": [
-      "seat_citystate_met"
-     ]
-    },
-    {
-     "name": "questKind",
-     "compare": "exact",
-     "covers": [
-      "CityState.seatQuest",
-      "CityStateQuest.kind"
-     ],
-     "planes": [
-      "seat_citystate_quest"
-     ]
-    },
-    {
-     "name": "questIssued",
-     "compare": "exact",
-     "covers": [
-      "CityState.seatQuestIssuedTurn"
-     ],
-     "planes": [
-      "seat_citystate_quest_issued"
-     ]
-    },
-    {
-     "name": "questCamp",
-     "compare": "exact",
-     "covers": [
-      "CityStateQuest.campIndex"
-     ],
-     "planes": [
-      "seat_citystate_quest_camp"
-     ]
-    },
-    {
-     "name": "questDistrict",
-     "compare": "exact",
-     "covers": [
-      "CityStateQuest.district"
-     ],
-     "planes": [
-      "seat_citystate_quest"
-     ],
-     "gap": "Both engines DERIVE the asked district (a kind-3 quest always asks the CS type's own): TS digests PLACEABLE_DISTRICTS.indexOf(quest.district), the GPU digests _citystate_didx (a districts_cat index). Different lists \u2014 the numbers only agree where the orders coincide."
-    },
-    {
-     "name": "lastLevyTurn",
-     "compare": "exact",
-     "covers": [
-      "CityState.lastLevyTurn"
-     ],
-     "planes": [
-      "citystate_last_levy"
-     ]
-    },
-    {
-     "name": "warTurns",
-     "compare": "exact",
-     "covers": [
-      "GameState.warTurns"
-     ],
-     "planes": []
-    },
-    {
-     "name": "treatyTurns",
-     "compare": "exact",
-     "covers": [
-      "GameState.treatyTurns"
-     ],
-     "planes": []
-    }
-   ]
-  },
-  {
-   "name": "city",
-   "kind": "per-city",
-   "covers": [
-    "Seat.cities",
-    "City.centerIndex"
-   ],
-   "fields": [
-    {
-     "name": "seat",
-     "compare": "exact",
-     "covers": [
-      "City.seat"
-     ],
-     "planes": []
-    },
-    {
-     "name": "population",
-     "compare": "exact",
-     "covers": [
-      "City.population"
-     ],
-     "planes": [
-      "city_pop"
-     ]
-    },
-    {
-     "name": "hp",
-     "compare": "exact",
-     "covers": [
-      "City.hp"
-     ],
-     "planes": [
-      "city_hp"
-     ]
-    },
-    {
-     "name": "outerHp",
-     "compare": "exact",
-     "covers": [
-      "City.outerHp"
-     ],
-     "planes": [
-      "city_outer_hp"
-     ]
-    },
-    {
-     "name": "lastHitTurn",
-     "compare": "exact",
-     "covers": [
-      "City.lastHitTurn"
-     ],
-     "planes": [
-      "city_last_hit"
-     ]
-    },
-    {
-     "name": "isCapital",
-     "compare": "exact",
-     "covers": [
-      "City.isCapital"
-     ],
-     "planes": [
-      "city_is_cap"
-     ]
-    },
-    {
-     "name": "foodBox",
-     "compare": "milli",
-     "covers": [
-      "City.foodBox"
-     ],
-     "planes": [
-      "city_growth"
-     ]
-    },
-    {
-     "name": "cultureBox",
-     "compare": "milli",
-     "covers": [
-      "City.cultureBox"
-     ],
-     "planes": [
-      "city_cbox"
-     ]
-    },
-    {
-     "name": "tilesAcquired",
-     "compare": "exact",
-     "covers": [
-      "City.tilesAcquired"
-     ],
-     "planes": [
-      "city_acquired"
-     ]
-    },
-    {
-     "name": "origCapitalSeat",
-     "compare": "exact",
-     "covers": [
-      "City.origCapitalSeat"
-     ],
-     "planes": [
-      "city_orig_cap"
-     ]
-    },
-    {
-     "name": "loyalty",
-     "compare": "milli",
-     "covers": [
-      "City.loyalty"
-     ],
-     "planes": [
-      "city_loyalty"
-     ]
-    },
-    {
-     "name": "buildings",
-     "compare": "exact",
-     "covers": [
-      "City.buildings"
-     ],
-     "planes": [
-      "city_bldg"
-     ],
-     "note": "the SET of building indices in cpu/core/prodLayout.ts order \u2014 the order rules.json ships and the GPU's city_bldg column order."
-    },
-    {
-     "name": "productionBank",
-     "compare": "milli",
-     "covers": [
-      "City.productionBank"
-     ],
-     "planes": [
-      "city_prod_bank"
-     ]
-    },
-    {
-     "name": "specialists",
-     "compare": "exact",
-     "covers": [
-      "City.population"
-     ],
-     "planes": [
-      "city_bldg",
-      "city_pop"
-     ],
-     "note": "effectiveSpecialists per PLACEABLE district: the pinned citizens plus the automatic overflow, derived live on both engines."
-    },
-    {
-     "name": "specialistPref",
-     "compare": "exact",
-     "covers": [
-      "City.specialistPref"
-     ],
-     "planes": [
-      "city_spec_pin"
-     ],
-     "note": "how many citizens the player PINNED into each district's slots, by PLACEABLE district index; -1 = the automatic rule decides."
-    },
-    {
-     "name": "queueFront",
-     "compare": "exact",
-     "covers": [
-      "City.queue"
-     ],
-     "planes": [
-      "city_current",
-      "city_qtile"
-     ],
-     "note": "the front item as a production-layout column plus its target tile. The GPU queue is depth ONE \u2014 city_current holds a single item \u2014 so anything TS has queued behind the front has no twin to compare."
-    },
-    {
-     "name": "queueProgress",
-     "compare": "milli",
-     "covers": [],
-     "planes": [
-      "city_progress"
-     ]
-    },
-    {
-     "name": "queueCost",
-     "compare": "milli",
-     "covers": [],
-     "planes": [
-      "city_cost"
-     ]
-    },
-    {
-     "name": "followedReligion",
-     "compare": "exact",
-     "covers": [
-      "City.followedReligion"
-     ],
-     "planes": [
-      "city_followed"
-     ]
-    },
-    {
-     "name": "religionPressure",
-     "compare": "exact",
-     "covers": [
-      "City.religionPressure"
-     ],
-     "planes": [
-      "city_pressure"
-     ]
-    },
-    {
-     "name": "greatWorksWriting",
-     "compare": "exact",
-     "covers": [
-      "City.greatWorksWriting"
-     ],
-     "planes": [
-      "city_gw_writing"
-     ]
-    },
-    {
-     "name": "greatWorksArt",
-     "compare": "exact",
-     "covers": [
-      "City.greatWorksArt"
-     ],
-     "planes": [
-      "city_gw_art"
-     ]
-    },
-    {
-     "name": "greatWorksMusic",
-     "compare": "exact",
-     "covers": [
-      "City.greatWorksMusic"
-     ],
-     "planes": [
-      "city_gw_music"
-     ]
-    },
-    {
-     "name": "relics",
-     "compare": "exact",
-     "covers": [
-      "City.relics"
-     ],
-     "planes": [
-      "city_relics"
-     ]
-    },
-    {
-     "name": "artifacts",
-     "compare": "exact",
-     "covers": [
-      "City.artifacts"
-     ],
-     "planes": [
-      "city_artifacts"
-     ]
-    },
-    {
-     "name": "artifactProv",
-     "compare": "exact",
-     "covers": [
-      "City.artifactEras",
-      "City.artifactSeats"
-     ],
-     "planes": [
-      "city_artifact_era",
-      "city_artifact_seat"
-     ],
-     "note": "era and civilization per artifact SLOT \u2014 the theming rule's inputs"
-    },
-    {
-     "name": "gwArtProv",
-     "compare": "exact",
-     "covers": [
-      "City.gwArtType",
-      "City.gwArtArtist"
-     ],
-     "planes": [
-      "city_gwart_type",
-      "city_gwart_artist"
-     ],
-     "note": "art TYPE and the ARTIST who made it, per ART MUSEUM slot \u2014 the other theming rule's inputs"
-    }
-   ]
-  },
-  {
-   "name": "unit",
-   "kind": "per-unit",
-   "covers": [
-    "GameState.units",
-    "Unit.tileIndex"
-   ],
-   "fields": [
-    {
-     "name": "seat",
-     "compare": "exact",
-     "covers": [
-      "Unit.seat"
-     ],
-     "planes": [
-      "unit_seat",
-      "unit_alive"
-     ],
-     "note": "`unit_alive` is the row filter for the whole unit group (group_rows), not a column of this field"
-    },
-    {
-     "name": "type",
-     "compare": "exact",
-     "covers": [
-      "Unit.type"
-     ],
-     "planes": [
-      "unit_type"
-     ],
-     "note": "the roster index \u2014 cpu/core/prodLayout.ts rosterUnitIds() order, which IS rules.json's units order and the GPU's unit_type space."
-    },
-    {
-     "name": "hp",
-     "compare": "exact",
-     "covers": [
-      "Unit.hp"
-     ],
-     "planes": [
-      "unit_hp"
-     ]
-    },
-    {
-     "name": "charges",
-     "compare": "exact",
-     "covers": [
-      "Unit.charges"
-     ],
-     "planes": [
-      "unit_charges"
-     ],
-     "note": "TS spells 'not a builder' as null and the GPU as 0; both are read as 0 here, so the field compares charge COUNT, never the builder/non-builder distinction (which `type` already carries)."
-    },
-    {
-     "name": "fortifyTurns",
-     "compare": "exact",
-     "covers": [
-      "Unit.fortifyTurns"
-     ],
-     "planes": [
-      "unit_fortify"
-     ]
-    },
-    {
-     "name": "xp",
-     "compare": "exact",
-     "covers": [
-      "Unit.xp"
-     ],
-     "planes": [
-      "unit_xp"
-     ]
-    },
-    {
-     "name": "embarked",
-     "compare": "exact",
-     "covers": [
-      "Unit.embarked"
-     ],
-     "planes": [
-      "unit_emb"
-     ]
-    },
-    {
-     "name": "movesLeft",
-     "compare": "exact",
-     "covers": [
-      "Unit.movesLeft"
-     ],
-     "planes": [
-      "unit_mp"
-     ],
-     "gap": "the GPU's unit_mp/unit_mp_full pair is maintained but is not yet the movement source of truth \u2014 the walkers still carry the remainder in locals \u2014 so between phases the two engines answer 'how much movement is left' from different places."
-    },
-    {
-     "name": "movesFull",
-     "compare": "exact",
-     "covers": [
-      "Unit.movesFull"
-     ],
-     "planes": [
-      "unit_mp_full"
-     ],
-     "gap": "see movesLeft."
-    }
-   ]
-  },
-  {
-   "name": "tile",
-   "kind": "per-tile",
-   "covers": [
-    "GameMap.tiles",
-    "Tile.index"
-   ],
-   "fields": [
-    {
-     "name": "ownerSeat",
-     "compare": "exact",
-     "covers": [
-      "Tile.ownerSeat"
-     ],
-     "planes": [
-      "tile_seat"
-     ]
-    },
-    {
-     "name": "ownerCity",
-     "compare": "exact",
-     "covers": [
-      "Tile.ownerCity"
-     ],
-     "planes": [
-      "tile_city"
-     ],
-     "note": "ONE ownerCity beside ownerSeat on both engines: `tile_city` carries the owning city's id for every seat, in that seat's own city-id space; `tile_seat` says whose."
-    },
-    {
-     "name": "improvement",
-     "compare": "exact",
-     "covers": [
-      "Tile.improvement"
-     ],
-     "planes": [
-      "improvement"
-     ],
-     "note": "index into rules.improvements.ids (cpu/core/unitActions.ts IMPROVEMENT_IDS), -1 = none."
-    },
-    {
-     "name": "pillaged",
-     "compare": "exact",
-     "covers": [
-      "Tile.pillaged"
-     ],
-     "planes": [
-      "pillaged"
-     ]
-    },
-    {
-     "name": "district",
-     "compare": "exact",
-     "covers": [
-      "Tile.district"
-     ],
-     "planes": [
-      "district"
-     ],
-     "note": "index into PLACEABLE_DISTRICTS, -1 = none."
-    },
-    {
-     "name": "districtComplete",
-     "compare": "exact",
-     "covers": [
-      "Tile.districtComplete"
-     ],
-     "planes": [
-      "district_complete"
-     ]
-    },
-    {
-     "name": "districtPillaged",
-     "compare": "exact",
-     "covers": [
-      "Tile.districtPillaged"
-     ],
-     "planes": [
-      "district_pillaged"
-     ]
-    },
-    {
-     "name": "builtWonder",
-     "compare": "exact",
-     "covers": [
-      "Tile.builtWonder"
-     ],
-     "planes": [
-      "built_wonder"
-     ],
-     "note": "index into cpu/core/prodLayout.ts wonderIds(), -1 = none."
-    },
-    {
-     "name": "builtWonderComplete",
-     "compare": "exact",
-     "covers": [
-      "Tile.builtWonderComplete"
-     ],
-     "planes": [
-      "built_wonder_complete"
-     ]
-    },
-    {
-     "name": "antiquity",
-     "compare": "exact",
-     "covers": [
-      "Tile.antiquity"
-     ],
-     "planes": [
-      "antiquity"
-     ]
-    },
-    {
-     "name": "antiquityProv",
-     "compare": "exact",
-     "covers": [
-      "Tile.antiquityEra",
-      "Tile.antiquitySeat"
-     ],
-     "planes": [
-      "antiquity_era",
-      "antiquity_seat"
-     ],
-     "note": "a dig remembers its era and its civilization; cleared with the site"
-    },
-    {
-     "name": "shipwreck",
-     "compare": "exact",
-     "covers": [
-      "Tile.shipwreck"
-     ],
-     "planes": [
-      "shipwreck"
-     ]
-    },
-    {
-     "name": "shipwreckProv",
-     "compare": "exact",
-     "covers": [
-      "Tile.shipwreckEra",
-      "Tile.shipwreckSeat"
-     ],
-     "planes": [
-      "shipwreck_era",
-      "shipwreck_seat"
-     ],
-     "note": "the wreck's provenance, same shape as the land dig's"
-    },
-    {
-     "name": "park",
-     "compare": "exact",
-     "covers": [
-      "Tile.park"
-     ],
-     "planes": [
-      "park"
-     ]
-    },
-    {
-     "name": "encampHp",
-     "compare": "exact",
-     "covers": [
-      "Tile.encampHp"
-     ],
-     "planes": [
-      "encamp_hp"
-     ]
-    },
-    {
-     "name": "road",
-     "compare": "exact",
-     "covers": [
-      "Tile.road"
-     ],
-     "planes": [
-      "road"
-     ]
-    },
-    {
-     "name": "locked",
-     "compare": "exact",
-     "covers": [
-      "Tile.locked"
-     ],
-     "planes": [
-      "tile_locked"
-     ],
-     "note": "the citizen PINNED to this plot — the work ranking takes every locked plot before it ranks anything by score"
-    },
-    {
-     "name": "fertility",
-     "compare": "exact",
-     "covers": [
-      "Tile.fertility"
-     ],
-     "planes": [
-      "fertility"
-     ]
-    },
-    {
-     "name": "fertilityProd",
-     "compare": "exact",
-     "covers": [
-      "Tile.fertilityProd"
-     ],
-     "planes": [
-      "fertility_prod"
-     ]
-    },
-    {
-     "name": "droughtTurns",
-     "compare": "exact",
-     "covers": [
-      "Tile.droughtTurns"
-     ],
-     "planes": [
-      "drought"
-     ]
-    },
-    {
-     "name": "hasFeature",
-     "compare": "exact",
-     "covers": [
-      "Tile.feature"
-     ],
-     "planes": [
-      "feat_stripped"
-     ],
-     "note": "PRESENCE only. The GPU keeps the feature id in a static plane (feat_id) and records removal with feat_stripped, so 'which feature' would need the fixture's t0 ids on the TS side; 'is there one' is fully determined by live state on both engines and is what a chop changes."
-    },
-    {
-     "name": "hasResource",
-     "compare": "exact",
-     "covers": [
-      "Tile.resource"
-     ],
-     "planes": [
-      "res_stripped"
-     ],
-     "note": "PRESENCE only, for the same reason as hasFeature: a district pave strips a BONUS resource and res_stripped is how the GPU records it."
-    }
-   ]
-  }
- ],
- "exclusions": {
-  "ts": [
-   {
-    "path": "GameState.map",
-    "why": "the map's dynamic surface is the `tile` group; the container itself holds nothing else."
-   },
-   {
-    "path": "GameState.seatActions",
-    "why": "the decision log the server writes into the engine, not engine state. The GPU's nearest twin is `seat_ext` (which seats are driven), a harness flag."
-   },
-   {
-    "path": "GameState.sandbox",
-    "why": "world-build configuration, fixed before turn 1 and carried by the fixture. The GPU compiles it into behaviour instead of storing a plane."
-   },
-   {
-    "path": "GameState.unitsMode",
-    "why": "world-build configuration (see GameState.sandbox)."
-   },
-   {
-    "path": "GameState.disasters",
-    "why": "world-build configuration (see GameState.sandbox)."
-   },
-   {
-    "path": "GameState.fogOfWar",
-    "why": "world-build configuration (see GameState.sandbox)."
-   },
-   {
-    "path": "GameState.autoResearch",
-    "why": "world-build configuration (see GameState.sandbox)."
-   },
-   {
-    "path": "GameState.nextUnitId",
-    "why": "TS's unit-id allocator. The GPU allocates slots (`unit_next` for the major window, `next_slot` for the barbarian one) in a different space, and the unit join key is (tile, military/civilian), so no unit id is ever compared."
-   },
-   {
-    "path": "GameState.eventLog",
-    "why": "a human-readable log; no rule reads it."
-   },
-   {
-    "path": "GameMap.width",
-    "why": "world geometry, fixed at build and identical by construction (both engines read one fixture)."
-   },
-   {
-    "path": "GameMap.height",
-    "why": "world geometry (see GameMap.width)."
-   },
-   {
-    "path": "GameMap.seed",
-    "why": "world identity (see GameMap.width)."
-   },
-   {
-    "path": "Seat.name",
-    "why": "presentation."
-   },
-   {
-    "path": "Seat.color",
-    "why": "presentation."
-   },
-   {
-    "path": "Seat.aggression",
-    "why": "a personality constant read only by the scripted picker, which the decision server replaces."
-   },
-   {
-    "path": "Seat.government",
-    "why": "GovernmentState is STORED per seat on TS and DERIVED per read on the GPU (computeAdoption's twin has no plane), so there is nothing on the GPU side to read back."
-   },
-   {
-    "path": "Seat.religion",
-    "why": "the container; its fields are covered one by one (holyTile, founded, and the four belief-identity gap fields)."
-   },
-   {
-    "path": "Seat.research",
-    "why": "the container; its fields are covered one by one."
-   },
-   {
-    "path": "GovernmentState.current",
-    "why": "no GPU plane (see Seat.government)."
-   },
-   {
-    "path": "GovernmentState.policies",
-    "why": "no GPU plane (see Seat.government)."
-   },
-   {
-    "path": "ReligionState.name",
-    "why": "presentation."
-   },
-   {
-    "path": "ReligionState.worship",
-    "why": "the worship building a founded religion unlocks; the GPU derives it from the founder belief rather than storing it."
-   },
-   {
-    "path": "City.id",
-    "why": "per-seat city id. The join key is the CENTER TILE, because ids are per-seat and the GPU keeps one only for civ rows (`civ_city_id`)."
-   },
-   {
-    "path": "City.name",
-    "why": "presentation."
-   },
-   {
-    "path": "City.foundedTurn",
-    "why": "no GPU plane."
-   },
-   {
-    "path": "City.focus",
-    "why": "the citizen-allocation focus. The GPU allocates one way and stores no focus."
-   },
-   {
-    "path": "City.districts",
-    "why": "the per-city district REGISTRY. The placements themselves are compared per tile (tile.district + tile.districtComplete); the GPU registry (`city_dist_tile`, every seat row) is derived bookkeeping over those same tiles, so comparing it would double-count the planes."
-   },
-   {
-    "path": "City.wonders",
-    "why": "the per-city wonder registry (see City.districts); placements are compared per tile."
-   },
-   {
-    "path": "Unit.id",
-    "why": "the join key is (tile, military/civilian); the GPU has no unit-id plane."
-   },
-   {
-    "path": "Unit.path",
-    "why": "a multi-turn movement path. The GPU walkers re-plan every turn and store no path."
-   },
-   {
-    "path": "Unit.mission",
-    "why": "the 'explore' standing order \u2014 scripted-policy state, replaced by the decision server; no GPU plane."
-   },
-   {
-    "path": "Tile.col",
-    "why": "world geometry, fixed at build."
-   },
-   {
-    "path": "Tile.row",
-    "why": "world geometry, fixed at build."
-   },
-   {
-    "path": "Tile.terrain",
-    "why": "world geometry. The GPU compiles terrain into yield/passability tables and keeps no terrain id."
-   },
-   {
-    "path": "Tile.elevation",
-    "why": "world geometry (see Tile.terrain)."
-   },
-   {
-    "path": "Tile.wonder",
-    "why": "natural wonder placement, fixed at build."
-   },
-   {
-    "path": "Tile.riverMask",
-    "why": "world geometry, fixed at build."
-   },
-   {
-    "path": "Tile.cliffMask",
-    "why": "world geometry, fixed at build."
-   },
-   {
-    "path": "Tile.volcano",
-    "why": "world geometry, fixed at build."
-   },
-   {
-    "path": "Tile.goodyHut",
-    "why": "tribal villages are TS-only \u2014 the GPU carries no goody-hut plane and never claims one. A real coverage gap."
-   },
-   {
-    "path": "CityState.name",
-    "why": "presentation."
-   },
-   {
-    "path": "GameState.cityStateMax",
-    "why": "the city-state ROSTER width, read off the world file at load. Static for the game and mirrored by the GPU's `S`, which is where every id-keyed column takes its width."
-   },
-   {
-    "path": "Seat.congressVote",
-    "why": "THIS TURN's World Congress ballot. Written inside seatPhase and cleared by worldCongress at the turn tail whether a session fires or not, so it is never live at a turn boundary."
-   }
+  "censusTypes": [
+    "GameState",
+    "GameMap",
+    "Seat",
+    "City",
+    "Unit",
+    "Tile",
+    "CityState",
+    "CityStateQuest",
+    "ResearchState",
+    "GovernmentState",
+    "ReligionState",
+    "TradeRoute"
   ],
-  "gpu": [
-   {
-    "plane": "civ_congress_vote",
-    "why": "THIS TURN's World Congress ballot. Written inside seatPhase and cleared by worldCongress at the turn tail whether a session fires or not, so it is never live at a turn boundary and there is no TS field to compare it against."
-   },
-   {
-    "plane": "winner",
-    "why": "the winner is DERIVED, not stored, on the TS side \u2014 domination first, else the score leader once the game is over, recomputed per read. Comparing the GPU's cache means recomputing that derivation in the adapter, which is exactly what gpu-trace.ts's `winner` column already does. The manifest describes STATE; derived quantities are compared by the observation and by the trace."
-   },
-   {
-    "plane": "centre_slot_at",
-    "why": "the city slot at a centre tile, every seat row \u2014 the join key behind the per-city groups; the centers themselves are covered (City.centerIndex / the site planes)."
-   },
-   {
-    "plane": "tdef",
-    "why": "per-tile defense modifier, derived from terrain and improvements; TS recomputes it per read."
-   },
-   {
-    "plane": "tmove",
-    "why": "per-tile movement cost, derived like tdef."
-   },
-   {
-    "plane": "next_slot",
-    "why": "unit-pool allocation cursor. Slot bookkeeping that exists because the GPU has slots and TS has arrays."
-   },
-   {
-    "plane": "unit_next",
-    "why": "unit-pool allocation cursor (see next_slot)."
-   },
-   {
-    "plane": "district_dead",
-    "why": "captured districts are paved but dead. The TS twin is 'the tile carries a district the owning city's registry does not list', and that registry is exactly the object City.districts is excluded for."
-   },
-   {
-    "plane": "city_id",
-    "why": "persistent city ids on the seat axis (TS City.id); the digest's city join key is the center tile, and the allocator itself is pinned by the nextCityId field."
-   },
-   {
-    "plane": "military_at",
-    "why": "the tile -> unit occupancy index, derived from unit_tile and unit_alive; it is the unit group's join key, not a separate fact."
-   },
-   {
-    "plane": "civilian_at",
-    "why": "occupancy index (see military_at)."
-   },
-   {
-    "plane": "unit_tile",
-    "why": "the unit join key itself."
-   },
-   {
-    "plane": "unit_aura_mp",
-    "why": "the frozen general/admiral +1 MP. TS folds it into Unit.movesFull, which is covered."
-   },
-   {
-    "plane": "seat_ext",
-    "why": "which seats are driven from outside rather than by the built-in AI \u2014 a harness flag, not game state."
-   },
-   {
-    "plane": "city_dist_tile",
-    "why": "the seat-axis district registry, every row (see the City.districts exclusion); placements are compared per tile, so the registry is a join cache, not a separate fact."
-   },
-   {
-    "plane": "city_wonder",
-    "why": "the seat-axis per-city wonder registry (see city_dist_tile)."
-   },
-   {
-    "plane": "d_static_adj",
-    "why": "static per-tile district adjacency, mutated only when a founding clears a feature \u2014 derived from the map plus feat_stripped, both covered."
-   }
-  ]
- }
+  "groups": [
+    {
+      "name": "game",
+      "kind": "scalar",
+      "covers": [],
+      "fields": [
+        {
+          "name": "turn",
+          "compare": "exact",
+          "covers": [
+            "GameState.turn"
+          ],
+          "planes": []
+        },
+        {
+          "name": "rng",
+          "compare": "exact",
+          "covers": [
+            "GameState.rngState"
+          ],
+          "planes": [
+            "rng_state"
+          ]
+        },
+        {
+          "name": "gameOver",
+          "compare": "exact",
+          "covers": [
+            "GameState.gameOver"
+          ],
+          "planes": [
+            "game_over"
+          ]
+        },
+        {
+          "name": "victoryType",
+          "compare": "exact",
+          "covers": [
+            "GameState.victoryType"
+          ],
+          "planes": [
+            "victory_type"
+          ]
+        },
+        {
+          "name": "victoryRow",
+          "compare": "exact",
+          "covers": [
+            "GameState.victoryRow"
+          ],
+          "planes": [
+            "victory_row"
+          ]
+        },
+        {
+          "name": "congressSessions",
+          "compare": "exact",
+          "covers": [
+            "GameState.congressSessions"
+          ],
+          "planes": [
+            "congress_sessions"
+          ]
+        },
+        {
+          "name": "congressActive",
+          "compare": "exact",
+          "covers": [
+            "GameState.congress"
+          ],
+          "planes": [
+            "congress_active"
+          ]
+        },
+        {
+          "name": "emergencyTable",
+          "compare": "exact",
+          "covers": [
+            "GameState.emergencies"
+          ],
+          "planes": [
+            "emg_kind",
+            "emg_target",
+            "emg_city",
+            "emg_phase",
+            "emg_act",
+            "emg_affected",
+            "emg_member"
+          ],
+          "note": "sorted by (kind, target, city) and padded to EMERGENCY_SLOTS: the TS list is an array in trigger order, the GPU a fixed slot table, so slot POSITION is not a shared fact. Members and affected seats ride as bitmasks."
+        },
+        {
+          "name": "lastSessionTurn",
+          "compare": "exact",
+          "covers": [
+            "GameState.lastSessionTurn"
+          ],
+          "planes": [
+            "last_session_turn"
+          ]
+        },
+        {
+          "name": "roadBridges",
+          "compare": "exact",
+          "covers": [
+            "GameState.roadBridges"
+          ],
+          "planes": []
+        },
+        {
+          "name": "pantheonsClaimed",
+          "compare": "exact",
+          "covers": [
+            "GameState.claimedPantheons"
+          ],
+          "planes": [
+            "pan_claimed",
+            "pantheon_claimed_n"
+          ],
+          "note": "the global COUNT; which pantheon each seat took is the per-seat `beliefPantheon` field, and the claim mask is that set"
+        },
+        {
+          "name": "beliefsClaimed",
+          "compare": "exact",
+          "covers": [
+            "GameState.claimedBeliefs"
+          ],
+          "planes": [
+            "fol_claimed",
+            "claimed_f_n",
+            "fou_claimed",
+            "claimed_o_n"
+          ],
+          "note": "TS keeps ONE claimedBeliefs list mixing follower and founder ids; the GPU counts the two pools separately. The comparison is over the total, because splitting the TS list needs the belief catalogs and the total is the fact both engines actually agree on."
+        },
+        {
+          "name": "enhancerBeliefsClaimed",
+          "compare": "exact",
+          "covers": [
+            "GameState.claimedEnhancers"
+          ],
+          "planes": [
+            "enh_claimed",
+            "claimed_e_n"
+          ],
+          "note": "the global COUNT; which enhancer each seat took is the per-seat `beliefEnhancer` field, and the claim mask is that set"
+        },
+        {
+          "name": "greatPeopleByClass",
+          "compare": "exact",
+          "covers": [
+            "GameState.claimedGreatPeople",
+            "GameState.gpNext"
+          ],
+          "planes": [
+            "gp_earned",
+            "gp_next"
+          ],
+          "note": "great people are drawn from ONE global pool on both engines, so the per-class QUEUE POSITION is a game-level fact, not a per-seat one. It is the position and not the count because the queue steps past anyone the world era has left behind; `claimedGreatPeople` is the id list that position walks."
+        },
+        {
+          "name": "barbCamps",
+          "compare": "exact",
+          "covers": [
+            "Seat.camps",
+            "GameState.barbSeat"
+          ],
+          "planes": [
+            "camp_tile",
+            "n_camps"
+          ],
+          "note": "camp TILES, sorted. Only the barbarian seat holds camps; every other seat's list is empty by rule, which is why this is one game-level field instead of a per-seat one."
+        },
+        {
+          "name": "cityCount",
+          "compare": "exact",
+          "covers": [],
+          "planes": [],
+          "derived": true,
+          "note": "guards the per-city key: two cities colliding on one center tile would merge in the city digest and change nothing else."
+        },
+        {
+          "name": "unitCount",
+          "compare": "exact",
+          "covers": [
+            "GameState.units"
+          ],
+          "planes": []
+        }
+      ]
+    },
+    {
+      "name": "seat",
+      "kind": "per-seat",
+      "covers": [
+        "GameState.seats",
+        "Seat.seat"
+      ],
+      "fields": [
+        {
+          "name": "explored",
+          "compare": "exact",
+          "covers": [
+            "Seat.explored"
+          ],
+          "planes": [
+            "seat_explored"
+          ],
+          "note": "per-seat fog, dense 0/1 over tiles. TS's empty array (nothing revealed yet) renders dense-zero; every seat reveals at its t0 spawn, so the empty state never reaches a digest."
+        },
+        {
+          "name": "treasury",
+          "compare": "milli",
+          "covers": [
+            "Seat.treasury"
+          ],
+          "planes": [
+            "civ_treasury"
+          ]
+        },
+        {
+          "name": "cultureTotal",
+          "compare": "milli",
+          "covers": [
+            "Seat.cultureTotal"
+          ],
+          "planes": [
+            "civ_culture"
+          ]
+        },
+        {
+          "name": "faith",
+          "compare": "milli",
+          "covers": [
+            "Seat.faith"
+          ],
+          "planes": [
+            "civ_faith"
+          ]
+        },
+        {
+          "name": "tourism",
+          "compare": "exact",
+          "covers": [
+            "Seat.tourism"
+          ],
+          "planes": [
+            "civ_tourism"
+          ]
+        },
+        {
+          "name": "warmonger",
+          "compare": "exact",
+          "covers": [
+            "Seat.warmonger"
+          ],
+          "planes": [
+            "civ_warmonger"
+          ]
+        },
+        {
+          "name": "diplomaticFavor",
+          "compare": "exact",
+          "covers": [
+            "Seat.diplomaticFavor"
+          ],
+          "planes": [
+            "civ_diplo_favor"
+          ]
+        },
+        {
+          "name": "diplomaticPoints",
+          "compare": "exact",
+          "covers": [
+            "Seat.diplomaticPoints"
+          ],
+          "planes": [
+            "civ_diplo_points"
+          ]
+        },
+        {
+          "name": "influencePoints",
+          "compare": "milli",
+          "covers": [
+            "Seat.influencePoints"
+          ],
+          "planes": [
+            "civ_influence"
+          ]
+        },
+        {
+          "name": "envoysAvailable",
+          "compare": "exact",
+          "covers": [
+            "Seat.envoysAvailable"
+          ],
+          "planes": [
+            "civ_envoys_avail"
+          ]
+        },
+        {
+          "name": "buildersTrained",
+          "compare": "exact",
+          "covers": [
+            "Seat.buildersTrained"
+          ],
+          "planes": [
+            "civ_builders_trained"
+          ]
+        },
+        {
+          "name": "relicReserve",
+          "compare": "exact",
+          "covers": [
+            "Seat.relicReserve"
+          ],
+          "planes": [
+            "civ_relic_reserve"
+          ]
+        },
+        {
+          "name": "emergencyRewards",
+          "compare": "exact",
+          "covers": [
+            "Seat.emgEnvoyGold",
+            "Seat.emgRouteGold",
+            "Seat.emgHeal",
+            "Seat.emgStrike"
+          ],
+          "planes": [
+            "civ_emg_envoy_gold",
+            "civ_emg_route_gold",
+            "civ_emg_heal",
+            "civ_emg_strike"
+          ],
+          "note": "what a resolved emergency leaves standing, forever. Counters rather than a list of past emergencies: winning the same kind twice pays twice."
+        },
+        {
+          "name": "bestMeleeCS",
+          "compare": "exact",
+          "covers": [
+            "Seat.bestMeleeCS"
+          ],
+          "planes": [
+            "civ_best_melee"
+          ]
+        },
+        {
+          "name": "techs",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.techs"
+          ],
+          "planes": [
+            "civ_techs"
+          ],
+          "note": "the SET of researched tech indices, not the count — a count cannot tell two different trees of the same size apart."
+        },
+        {
+          "name": "civics",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.civics"
+          ],
+          "planes": [
+            "civ_civics"
+          ]
+        },
+        {
+          "name": "boosted",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.boosted"
+          ],
+          "planes": [
+            "civ_tech_boosted",
+            "civ_civic_boosted"
+          ],
+          "note": "both boost masks, tech then civic, in one vector"
+        },
+        {
+          "name": "currentTech",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.tech"
+          ],
+          "planes": [
+            "civ_cur_tech"
+          ]
+        },
+        {
+          "name": "currentCivic",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.civic"
+          ],
+          "planes": [
+            "civ_cur_civic"
+          ]
+        },
+        {
+          "name": "techProgress",
+          "compare": "milli",
+          "covers": [
+            "ResearchState.techProgress"
+          ],
+          "planes": [
+            "civ_tech_prog"
+          ]
+        },
+        {
+          "name": "civicProgress",
+          "compare": "milli",
+          "covers": [
+            "ResearchState.civicProgress"
+          ],
+          "planes": [
+            "civ_civic_prog"
+          ]
+        },
+        {
+          "name": "techRetained",
+          "compare": "milli",
+          "covers": [
+            "ResearchState.techRetained"
+          ],
+          "planes": [
+            "civ_tech_retain"
+          ]
+        },
+        {
+          "name": "civicRetained",
+          "compare": "milli",
+          "covers": [
+            "ResearchState.civicRetained"
+          ],
+          "planes": [
+            "civ_civic_retain"
+          ]
+        },
+        {
+          "name": "cityCount",
+          "compare": "exact",
+          "covers": [
+            "Seat.cities"
+          ],
+          "planes": [
+            "city_alive"
+          ]
+        },
+        {
+          "name": "wars",
+          "compare": "exact",
+          "covers": [
+            "Seat.wars"
+          ],
+          "planes": [
+            "war"
+          ],
+          "note": "the set of ABSOLUTE opponent seat ids, so a civ/civ war, a civ/city-state war and a civ/barbarian war are the same fact in the same field."
+        },
+        {
+          "name": "warTurns",
+          "compare": "exact",
+          "covers": [
+            "GameState.warTurns"
+          ],
+          "planes": [
+            "war_turns"
+          ]
+        },
+        {
+          "name": "treatyTurns",
+          "compare": "exact",
+          "covers": [
+            "GameState.treatyTurns"
+          ],
+          "planes": [
+            "treaty_turns"
+          ]
+        },
+        {
+          "name": "peaceTurns",
+          "compare": "exact",
+          "covers": [
+            "Seat.peaceTurns"
+          ],
+          "planes": [
+            "peace_turns"
+          ]
+        },
+        {
+          "name": "warWeariness",
+          "compare": "exact",
+          "covers": [
+            "Seat.ww"
+          ],
+          "planes": [
+            "ww"
+          ],
+          "note": "per-opponent, as (opponent seat, points) pairs sorted by opponent — the sum and the max both cancel a pair of opposite errors."
+        },
+        {
+          "name": "warWearinessTurn",
+          "compare": "exact",
+          "covers": [
+            "Seat.wwTurn"
+          ],
+          "planes": [
+            "ww_turn"
+          ]
+        },
+        {
+          "name": "eraScore",
+          "compare": "exact",
+          "covers": [
+            "Seat.eraScore"
+          ],
+          "planes": [
+            "era_score"
+          ]
+        },
+        {
+          "name": "age",
+          "compare": "exact",
+          "covers": [
+            "Seat.age"
+          ],
+          "planes": [
+            "civ_age"
+          ]
+        },
+        {
+          "name": "prevAge",
+          "compare": "exact",
+          "covers": [
+            "Seat.prevAge"
+          ],
+          "planes": [
+            "prev_age"
+          ]
+        },
+        {
+          "name": "dedications",
+          "compare": "exact",
+          "covers": [
+            "Seat.dedications"
+          ],
+          "planes": [
+            "dedications"
+          ]
+        },
+        {
+          "name": "dedicationPicks",
+          "compare": "exact",
+          "covers": [
+            "Seat.dedicationPicks"
+          ],
+          "planes": [
+            "ded_picks"
+          ]
+        },
+        {
+          "name": "capitalTile",
+          "compare": "exact",
+          "covers": [
+            "Seat.capitalTile"
+          ],
+          "planes": [
+            "civ_cap_tile"
+          ],
+          "note": "one seat-indexed plane; row 0 starts -1 (no capital yet) while civ rows are zero-initialised, so an unfounded civ seat reads tile 0 rather than 'none'."
+        },
+        {
+          "name": "holyTile",
+          "compare": "exact",
+          "covers": [
+            "ReligionState.holyTile"
+          ],
+          "planes": [
+            "holy_tile"
+          ]
+        },
+        {
+          "name": "religionFounded",
+          "compare": "exact",
+          "covers": [
+            "ReligionState.founded"
+          ],
+          "planes": [
+            "civ_religion_done"
+          ],
+          "note": "read off holy_tile >= 0 on the GPU: the holy tile is written exactly when a religion is founded, and it is the only founding record seat 0 has."
+        },
+        {
+          "name": "inquisition",
+          "compare": "exact",
+          "covers": [
+            "ReligionState.inquisition"
+          ],
+          "planes": [
+            "civ_inquisition"
+          ],
+          "note": "the Apostle's Launch Inquisition, which is what unlocks the Inquisitor purchase."
+        },
+        {
+          "name": "pantheonDone",
+          "compare": "exact",
+          "covers": [
+            "ReligionState.pantheon"
+          ],
+          "planes": [
+            "civ_pantheon_done"
+          ],
+          "note": "the GPU keeps a DONE bit beside the chosen id; this side has only the id, so the comparison is `pantheon !== null` vs `civ_pantheon_done`"
+        },
+        {
+          "name": "enhancerDone",
+          "compare": "exact",
+          "covers": [
+            "ReligionState.enhancer"
+          ],
+          "planes": [
+            "civ_enhancer_done"
+          ],
+          "note": "the GPU keeps a DONE bit beside the chosen id; this side has only the id, so the comparison is `enhancer != null` vs `civ_enhancer_done`"
+        },
+        {
+          "name": "gpPoints",
+          "compare": "milli",
+          "covers": [
+            "Seat.gpp"
+          ],
+          "planes": [
+            "civ_gpp"
+          ]
+        },
+        {
+          "name": "spaceProjects",
+          "compare": "exact",
+          "covers": [
+            "Seat.spaceProjects"
+          ],
+          "planes": [
+            "space_done"
+          ]
+        },
+        {
+          "name": "spaceLy",
+          "compare": "exact",
+          "covers": [
+            "Seat.spaceLy"
+          ],
+          "planes": [
+            "space_ly"
+          ]
+        },
+        {
+          "name": "spaceLasers",
+          "compare": "exact",
+          "covers": [
+            "Seat.spaceLasers"
+          ],
+          "planes": [
+            "space_lasers"
+          ]
+        },
+        {
+          "name": "routeCount",
+          "compare": "exact",
+          "covers": [
+            "Seat.tradeRoutes"
+          ],
+          "planes": [
+            "seat_routes"
+          ],
+          "note": "count only — route IDENTITY is the `routes` field beside it"
+        },
+        {
+          "name": "routes",
+          "compare": "exact",
+          "covers": [
+            "Seat.tradeRoutes",
+            "TradeRoute.from",
+            "TradeRoute.to",
+            "TradeRoute.toCs",
+            "TradeRoute.toSeat",
+            "TradeRoute.toSeatCity",
+            "TradeRoute.expiresTurn",
+            "TradeRoute.createdTurn",
+            "TradeRoute.walkTile",
+            "TradeRoute.walkLeg"
+          ],
+          "planes": [
+            "seat_routes",
+            "seat_route_dseat",
+            "seat_route_dcity",
+            "seat_route_exp",
+            "seat_route_born",
+            "seat_route_walk",
+            "seat_route_leg"
+          ],
+          "note": "per-route [fromTile, destTile, kind, expiresTurn, createdTurn, walkTile, walkLeg], sorted; destinations in CENTRE-TILE space because city ids are not compared. The walk triple IS the Trader while it services the route."
+        },
+        {
+          "name": "scienceTotal",
+          "compare": "milli",
+          "covers": [
+            "Seat.scienceTotal"
+          ],
+          "planes": [
+            "seat_science_total"
+          ]
+        },
+        {
+          "name": "tilesPurchased",
+          "compare": "exact",
+          "covers": [
+            "Seat.tilesPurchased"
+          ],
+          "planes": [
+            "civ_tiles_purchased"
+          ],
+          "gap": "seat 0's row of `civ_tiles_purchased` exists but nothing writes it until the seat-0 purchase wire; comparison opens with it."
+        },
+        {
+          "name": "nextCityId",
+          "compare": "exact",
+          "covers": [
+            "Seat.nextCityId"
+          ],
+          "planes": [
+            "civ_next_city_id"
+          ]
+        },
+        {
+          "name": "prophets",
+          "compare": "exact",
+          "covers": [
+            "Seat.gpEarned"
+          ],
+          "planes": [
+            "civ_prophets"
+          ]
+        },
+        {
+          "name": "beliefPantheon",
+          "compare": "exact",
+          "covers": [
+            "ReligionState.pantheon"
+          ],
+          "planes": [
+            "civ_pantheon"
+          ]
+        },
+        {
+          "name": "beliefFollower",
+          "compare": "exact",
+          "covers": [
+            "ReligionState.follower"
+          ],
+          "planes": [
+            "civ_follower"
+          ]
+        },
+        {
+          "name": "beliefFounder",
+          "compare": "exact",
+          "covers": [
+            "ReligionState.founder"
+          ],
+          "planes": [
+            "civ_founder"
+          ]
+        },
+        {
+          "name": "beliefEnhancer",
+          "compare": "exact",
+          "covers": [
+            "ReligionState.enhancer"
+          ],
+          "planes": [
+            "civ_enhancer"
+          ]
+        },
+        {
+          "name": "formalWars",
+          "compare": "exact",
+          "covers": [
+            "Seat.formalWars"
+          ],
+          "planes": [
+            "seat_warkind"
+          ]
+        },
+        {
+          "name": "denounced",
+          "compare": "exact",
+          "covers": [
+            "Seat.denounced"
+          ],
+          "planes": [
+            "seat_denounced"
+          ]
+        },
+        {
+          "name": "friendTurns",
+          "compare": "exact",
+          "covers": [
+            "GameState.friendTurns"
+          ],
+          "planes": [
+            "seat_friend_turns"
+          ]
+        },
+        {
+          "name": "allyTurns",
+          "compare": "exact",
+          "covers": [
+            "GameState.allyTurns"
+          ],
+          "planes": [
+            "seat_ally_turns"
+          ]
+        },
+        {
+          "name": "borderTurns",
+          "compare": "exact",
+          "covers": [
+            "GameState.borderTurns"
+          ],
+          "planes": [
+            "seat_borders_turns"
+          ],
+          "note": "DIRECTED: the row is what that seat GRANTS, never what it holds."
+        }
+      ]
+    },
+    {
+      "name": "cityState",
+      "kind": "per-city-state",
+      "covers": [
+        "GameState.cityStates",
+        "CityState.id"
+      ],
+      "fields": [
+        {
+          "name": "type",
+          "compare": "exact",
+          "covers": [
+            "CityState.type"
+          ],
+          "planes": []
+        },
+        {
+          "name": "centerIndex",
+          "compare": "exact",
+          "covers": [
+            "CityState.centerIndex"
+          ],
+          "planes": [
+            "city_center"
+          ]
+        },
+        {
+          "name": "population",
+          "compare": "exact",
+          "covers": [
+            "CityState.population"
+          ],
+          "planes": [
+            "city_pop"
+          ]
+        },
+        {
+          "name": "hp",
+          "compare": "exact",
+          "covers": [
+            "CityState.hp"
+          ],
+          "planes": [
+            "city_hp"
+          ]
+        },
+        {
+          "name": "envoys",
+          "compare": "exact",
+          "covers": [
+            "CityState.envoys"
+          ],
+          "planes": [
+            "seat_citystate_envoys"
+          ],
+          "note": "a vector over civ seats in seat order — one store for every seat, which is what makes the suzerain contest one comparison."
+        },
+        {
+          "name": "met",
+          "compare": "exact",
+          "covers": [
+            "CityState.met"
+          ],
+          "planes": [
+            "seat_citystate_met"
+          ]
+        },
+        {
+          "name": "questKind",
+          "compare": "exact",
+          "covers": [
+            "CityState.seatQuest",
+            "CityStateQuest.kind"
+          ],
+          "planes": [
+            "seat_citystate_quest"
+          ]
+        },
+        {
+          "name": "questIssued",
+          "compare": "exact",
+          "covers": [
+            "CityState.seatQuestIssuedTurn"
+          ],
+          "planes": [
+            "seat_citystate_quest_issued"
+          ]
+        },
+        {
+          "name": "questCamp",
+          "compare": "exact",
+          "covers": [
+            "CityStateQuest.campIndex"
+          ],
+          "planes": [
+            "seat_citystate_quest_camp"
+          ]
+        },
+        {
+          "name": "questDistrict",
+          "compare": "exact",
+          "covers": [
+            "CityStateQuest.district"
+          ],
+          "planes": [
+            "seat_citystate_quest"
+          ],
+          "gap": "Both engines DERIVE the asked district (a kind-3 quest always asks the CS type's own): TS digests PLACEABLE_DISTRICTS.indexOf(quest.district), the GPU digests _citystate_didx (a districts_cat index). Different lists — the numbers only agree where the orders coincide."
+        },
+        {
+          "name": "lastLevyTurn",
+          "compare": "exact",
+          "covers": [
+            "CityState.lastLevyTurn"
+          ],
+          "planes": [
+            "citystate_last_levy"
+          ]
+        },
+        {
+          "name": "warTurns",
+          "compare": "exact",
+          "covers": [
+            "GameState.warTurns"
+          ],
+          "planes": []
+        },
+        {
+          "name": "treatyTurns",
+          "compare": "exact",
+          "covers": [
+            "GameState.treatyTurns"
+          ],
+          "planes": []
+        }
+      ]
+    },
+    {
+      "name": "city",
+      "kind": "per-city",
+      "covers": [
+        "Seat.cities",
+        "City.centerIndex"
+      ],
+      "fields": [
+        {
+          "name": "seat",
+          "compare": "exact",
+          "covers": [
+            "City.seat"
+          ],
+          "planes": []
+        },
+        {
+          "name": "population",
+          "compare": "exact",
+          "covers": [
+            "City.population"
+          ],
+          "planes": [
+            "city_pop"
+          ]
+        },
+        {
+          "name": "hp",
+          "compare": "exact",
+          "covers": [
+            "City.hp"
+          ],
+          "planes": [
+            "city_hp"
+          ]
+        },
+        {
+          "name": "outerHp",
+          "compare": "exact",
+          "covers": [
+            "City.outerHp"
+          ],
+          "planes": [
+            "city_outer_hp"
+          ]
+        },
+        {
+          "name": "lastHitTurn",
+          "compare": "exact",
+          "covers": [
+            "City.lastHitTurn"
+          ],
+          "planes": [
+            "city_last_hit"
+          ]
+        },
+        {
+          "name": "isCapital",
+          "compare": "exact",
+          "covers": [
+            "City.isCapital"
+          ],
+          "planes": [
+            "city_is_cap"
+          ]
+        },
+        {
+          "name": "foodBox",
+          "compare": "milli",
+          "covers": [
+            "City.foodBox"
+          ],
+          "planes": [
+            "city_growth"
+          ]
+        },
+        {
+          "name": "cultureBox",
+          "compare": "milli",
+          "covers": [
+            "City.cultureBox"
+          ],
+          "planes": [
+            "city_cbox"
+          ]
+        },
+        {
+          "name": "tilesAcquired",
+          "compare": "exact",
+          "covers": [
+            "City.tilesAcquired"
+          ],
+          "planes": [
+            "city_acquired"
+          ]
+        },
+        {
+          "name": "origCapitalSeat",
+          "compare": "exact",
+          "covers": [
+            "City.origCapitalSeat"
+          ],
+          "planes": [
+            "city_orig_cap"
+          ]
+        },
+        {
+          "name": "loyalty",
+          "compare": "milli",
+          "covers": [
+            "City.loyalty"
+          ],
+          "planes": [
+            "city_loyalty"
+          ]
+        },
+        {
+          "name": "buildings",
+          "compare": "exact",
+          "covers": [
+            "City.buildings"
+          ],
+          "planes": [
+            "city_bldg"
+          ],
+          "note": "the SET of building indices in cpu/core/prodLayout.ts order — the order rules.json ships and the GPU's city_bldg column order."
+        },
+        {
+          "name": "productionBank",
+          "compare": "milli",
+          "covers": [
+            "City.productionBank"
+          ],
+          "planes": [
+            "city_prod_bank"
+          ]
+        },
+        {
+          "name": "specialists",
+          "compare": "exact",
+          "covers": [
+            "City.population"
+          ],
+          "planes": [
+            "city_bldg",
+            "city_pop"
+          ],
+          "note": "effectiveSpecialists per PLACEABLE district: the pinned citizens plus the automatic overflow, derived live on both engines."
+        },
+        {
+          "name": "specialistPref",
+          "compare": "exact",
+          "covers": [
+            "City.specialistPref"
+          ],
+          "planes": [
+            "city_spec_pin"
+          ],
+          "note": "how many citizens the player PINNED into each district's slots, by PLACEABLE district index; -1 = the automatic rule decides."
+        },
+        {
+          "name": "queueFront",
+          "compare": "exact",
+          "covers": [
+            "City.queue"
+          ],
+          "planes": [
+            "city_current",
+            "city_qtile"
+          ],
+          "note": "the front item as a production-layout column plus its target tile. The GPU queue is depth ONE — city_current holds a single item — so anything TS has queued behind the front has no twin to compare."
+        },
+        {
+          "name": "queueProgress",
+          "compare": "milli",
+          "covers": [],
+          "planes": [
+            "city_progress"
+          ]
+        },
+        {
+          "name": "queueCost",
+          "compare": "milli",
+          "covers": [],
+          "planes": [
+            "city_cost"
+          ]
+        },
+        {
+          "name": "followedReligion",
+          "compare": "exact",
+          "covers": [
+            "City.followedReligion"
+          ],
+          "planes": [
+            "city_followed"
+          ]
+        },
+        {
+          "name": "religionPressure",
+          "compare": "exact",
+          "covers": [
+            "City.religionPressure"
+          ],
+          "planes": [
+            "city_pressure"
+          ]
+        },
+        {
+          "name": "greatWorksWriting",
+          "compare": "exact",
+          "covers": [
+            "City.greatWorksWriting"
+          ],
+          "planes": [
+            "city_gw_writing"
+          ]
+        },
+        {
+          "name": "greatWorksArt",
+          "compare": "exact",
+          "covers": [
+            "City.greatWorksArt"
+          ],
+          "planes": [
+            "city_gw_art"
+          ]
+        },
+        {
+          "name": "greatWorksMusic",
+          "compare": "exact",
+          "covers": [
+            "City.greatWorksMusic"
+          ],
+          "planes": [
+            "city_gw_music"
+          ]
+        },
+        {
+          "name": "relics",
+          "compare": "exact",
+          "covers": [
+            "City.relics"
+          ],
+          "planes": [
+            "city_relics"
+          ]
+        },
+        {
+          "name": "artifacts",
+          "compare": "exact",
+          "covers": [
+            "City.artifacts"
+          ],
+          "planes": [
+            "city_artifacts"
+          ]
+        },
+        {
+          "name": "artifactProv",
+          "compare": "exact",
+          "covers": [
+            "City.artifactEras",
+            "City.artifactSeats"
+          ],
+          "planes": [
+            "city_artifact_era",
+            "city_artifact_seat"
+          ],
+          "note": "era and civilization per artifact SLOT — the theming rule's inputs"
+        },
+        {
+          "name": "gwArtProv",
+          "compare": "exact",
+          "covers": [
+            "City.gwArtType",
+            "City.gwArtArtist"
+          ],
+          "planes": [
+            "city_gwart_type",
+            "city_gwart_artist"
+          ],
+          "note": "art TYPE and the ARTIST who made it, per ART MUSEUM slot — the other theming rule's inputs"
+        }
+      ]
+    },
+    {
+      "name": "unit",
+      "kind": "per-unit",
+      "covers": [
+        "GameState.units",
+        "Unit.tileIndex"
+      ],
+      "fields": [
+        {
+          "name": "seat",
+          "compare": "exact",
+          "covers": [
+            "Unit.seat"
+          ],
+          "planes": [
+            "unit_seat",
+            "unit_alive"
+          ],
+          "note": "`unit_alive` is the row filter for the whole unit group (group_rows), not a column of this field"
+        },
+        {
+          "name": "type",
+          "compare": "exact",
+          "covers": [
+            "Unit.type"
+          ],
+          "planes": [
+            "unit_type"
+          ],
+          "note": "the roster index — cpu/core/prodLayout.ts rosterUnitIds() order, which IS rules.json's units order and the GPU's unit_type space."
+        },
+        {
+          "name": "hp",
+          "compare": "exact",
+          "covers": [
+            "Unit.hp"
+          ],
+          "planes": [
+            "unit_hp"
+          ]
+        },
+        {
+          "name": "charges",
+          "compare": "exact",
+          "covers": [
+            "Unit.charges"
+          ],
+          "planes": [
+            "unit_charges"
+          ],
+          "note": "TS spells 'not a builder' as null and the GPU as 0; both are read as 0 here, so the field compares charge COUNT, never the builder/non-builder distinction (which `type` already carries)."
+        },
+        {
+          "name": "fortifyTurns",
+          "compare": "exact",
+          "covers": [
+            "Unit.fortifyTurns"
+          ],
+          "planes": [
+            "unit_fortify"
+          ]
+        },
+        {
+          "name": "xp",
+          "compare": "exact",
+          "covers": [
+            "Unit.xp"
+          ],
+          "planes": [
+            "unit_xp"
+          ]
+        },
+        {
+          "name": "level",
+          "compare": "exact",
+          "covers": [
+            "Unit.level"
+          ],
+          "planes": [
+            "unit_level"
+          ]
+        },
+        {
+          "name": "promos",
+          "compare": "exact",
+          "covers": [
+            "Unit.promos"
+          ],
+          "planes": [
+            "unit_promos"
+          ],
+          "note": "a bitmask over the rows of the unit's OWN promotion class, so bit k is column k of the PROMOTE head."
+        },
+        {
+          "name": "promoOffer",
+          "compare": "exact",
+          "covers": [
+            "Unit.promoOffer"
+          ],
+          "planes": [
+            "unit_promo_offer"
+          ],
+          "note": "the Apostle's three drawn columns; 0 means no restriction."
+        },
+        {
+          "name": "promoUsed",
+          "compare": "exact",
+          "covers": [
+            "Unit.promoUsed"
+          ],
+          "planes": [
+            "unit_promo_used"
+          ],
+          "note": "the ONCE-ONLY promotion columns this unit has already collected — Pilgrim's charges and the Indulgence Vendor's gold each pay a unit once."
+        },
+        {
+          "name": "xpPct",
+          "compare": "exact",
+          "covers": [
+            "Unit.xpPct"
+          ],
+          "planes": [
+            "unit_xp_pct"
+          ],
+          "note": "the training city's experience lines, carried for life."
+        },
+        {
+          "name": "embarked",
+          "compare": "exact",
+          "covers": [
+            "Unit.embarked"
+          ],
+          "planes": [
+            "unit_emb"
+          ]
+        },
+        {
+          "name": "movesLeft",
+          "compare": "exact",
+          "covers": [
+            "Unit.movesLeft"
+          ],
+          "planes": [
+            "unit_mp"
+          ],
+          "gap": "the GPU's unit_mp/unit_mp_full pair is maintained but is not yet the movement source of truth — the walkers still carry the remainder in locals — so between phases the two engines answer 'how much movement is left' from different places."
+        },
+        {
+          "name": "movesFull",
+          "compare": "exact",
+          "covers": [
+            "Unit.movesFull"
+          ],
+          "planes": [
+            "unit_mp_full"
+          ],
+          "gap": "see movesLeft."
+        }
+      ]
+    },
+    {
+      "name": "tile",
+      "kind": "per-tile",
+      "covers": [
+        "GameMap.tiles",
+        "Tile.index"
+      ],
+      "fields": [
+        {
+          "name": "ownerSeat",
+          "compare": "exact",
+          "covers": [
+            "Tile.ownerSeat"
+          ],
+          "planes": [
+            "tile_seat"
+          ]
+        },
+        {
+          "name": "ownerCity",
+          "compare": "exact",
+          "covers": [
+            "Tile.ownerCity"
+          ],
+          "planes": [
+            "tile_city"
+          ],
+          "note": "ONE ownerCity beside ownerSeat on both engines: `tile_city` carries the owning city's id for every seat, in that seat's own city-id space; `tile_seat` says whose."
+        },
+        {
+          "name": "improvement",
+          "compare": "exact",
+          "covers": [
+            "Tile.improvement"
+          ],
+          "planes": [
+            "improvement"
+          ],
+          "note": "index into rules.improvements.ids (cpu/core/unitActions.ts IMPROVEMENT_IDS), -1 = none."
+        },
+        {
+          "name": "pillaged",
+          "compare": "exact",
+          "covers": [
+            "Tile.pillaged"
+          ],
+          "planes": [
+            "pillaged"
+          ]
+        },
+        {
+          "name": "district",
+          "compare": "exact",
+          "covers": [
+            "Tile.district"
+          ],
+          "planes": [
+            "district"
+          ],
+          "note": "index into PLACEABLE_DISTRICTS, -1 = none."
+        },
+        {
+          "name": "districtComplete",
+          "compare": "exact",
+          "covers": [
+            "Tile.districtComplete"
+          ],
+          "planes": [
+            "district_complete"
+          ]
+        },
+        {
+          "name": "districtPillaged",
+          "compare": "exact",
+          "covers": [
+            "Tile.districtPillaged"
+          ],
+          "planes": [
+            "district_pillaged"
+          ]
+        },
+        {
+          "name": "builtWonder",
+          "compare": "exact",
+          "covers": [
+            "Tile.builtWonder"
+          ],
+          "planes": [
+            "built_wonder"
+          ],
+          "note": "index into cpu/core/prodLayout.ts wonderIds(), -1 = none."
+        },
+        {
+          "name": "builtWonderComplete",
+          "compare": "exact",
+          "covers": [
+            "Tile.builtWonderComplete"
+          ],
+          "planes": [
+            "built_wonder_complete"
+          ]
+        },
+        {
+          "name": "antiquity",
+          "compare": "exact",
+          "covers": [
+            "Tile.antiquity"
+          ],
+          "planes": [
+            "antiquity"
+          ]
+        },
+        {
+          "name": "antiquityProv",
+          "compare": "exact",
+          "covers": [
+            "Tile.antiquityEra",
+            "Tile.antiquitySeat"
+          ],
+          "planes": [
+            "antiquity_era",
+            "antiquity_seat"
+          ],
+          "note": "a dig remembers its era and its civilization; cleared with the site"
+        },
+        {
+          "name": "shipwreck",
+          "compare": "exact",
+          "covers": [
+            "Tile.shipwreck"
+          ],
+          "planes": [
+            "shipwreck"
+          ]
+        },
+        {
+          "name": "shipwreckProv",
+          "compare": "exact",
+          "covers": [
+            "Tile.shipwreckEra",
+            "Tile.shipwreckSeat"
+          ],
+          "planes": [
+            "shipwreck_era",
+            "shipwreck_seat"
+          ],
+          "note": "the wreck's provenance, same shape as the land dig's"
+        },
+        {
+          "name": "park",
+          "compare": "exact",
+          "covers": [
+            "Tile.park"
+          ],
+          "planes": [
+            "park"
+          ]
+        },
+        {
+          "name": "encampHp",
+          "compare": "exact",
+          "covers": [
+            "Tile.encampHp"
+          ],
+          "planes": [
+            "encamp_hp"
+          ]
+        },
+        {
+          "name": "road",
+          "compare": "exact",
+          "covers": [
+            "Tile.road"
+          ],
+          "planes": [
+            "road"
+          ]
+        },
+        {
+          "name": "locked",
+          "compare": "exact",
+          "covers": [
+            "Tile.locked"
+          ],
+          "planes": [
+            "tile_locked"
+          ],
+          "note": "the citizen PINNED to this plot — the work ranking takes every locked plot before it ranks anything by score"
+        },
+        {
+          "name": "fertility",
+          "compare": "exact",
+          "covers": [
+            "Tile.fertility"
+          ],
+          "planes": [
+            "fertility"
+          ]
+        },
+        {
+          "name": "fertilityProd",
+          "compare": "exact",
+          "covers": [
+            "Tile.fertilityProd"
+          ],
+          "planes": [
+            "fertility_prod"
+          ]
+        },
+        {
+          "name": "droughtTurns",
+          "compare": "exact",
+          "covers": [
+            "Tile.droughtTurns"
+          ],
+          "planes": [
+            "drought"
+          ]
+        },
+        {
+          "name": "hasFeature",
+          "compare": "exact",
+          "covers": [
+            "Tile.feature"
+          ],
+          "planes": [
+            "feat_stripped"
+          ],
+          "note": "PRESENCE only. The GPU keeps the feature id in a static plane (feat_id) and records removal with feat_stripped, so 'which feature' would need the fixture's t0 ids on the TS side; 'is there one' is fully determined by live state on both engines and is what a chop changes."
+        },
+        {
+          "name": "hasResource",
+          "compare": "exact",
+          "covers": [
+            "Tile.resource"
+          ],
+          "planes": [
+            "res_stripped"
+          ],
+          "note": "PRESENCE only, for the same reason as hasFeature: a district pave strips a BONUS resource and res_stripped is how the GPU records it."
+        }
+      ]
+    }
+  ],
+  "exclusions": {
+    "ts": [
+      {
+        "path": "GameState.map",
+        "why": "the map's dynamic surface is the `tile` group; the container itself holds nothing else."
+      },
+      {
+        "path": "GameState.seatActions",
+        "why": "the decision log the server writes into the engine, not engine state. The GPU's nearest twin is `seat_ext` (which seats are driven), a harness flag."
+      },
+      {
+        "path": "GameState.sandbox",
+        "why": "world-build configuration, fixed before turn 1 and carried by the fixture. The GPU compiles it into behaviour instead of storing a plane."
+      },
+      {
+        "path": "GameState.unitsMode",
+        "why": "world-build configuration (see GameState.sandbox)."
+      },
+      {
+        "path": "GameState.disasters",
+        "why": "world-build configuration (see GameState.sandbox)."
+      },
+      {
+        "path": "GameState.fogOfWar",
+        "why": "world-build configuration (see GameState.sandbox)."
+      },
+      {
+        "path": "GameState.autoResearch",
+        "why": "world-build configuration (see GameState.sandbox)."
+      },
+      {
+        "path": "GameState.nextUnitId",
+        "why": "TS's unit-id allocator. The GPU allocates slots (`unit_next` for the major window, `next_slot` for the barbarian one) in a different space, and the unit join key is (tile, military/civilian), so no unit id is ever compared."
+      },
+      {
+        "path": "GameState.eventLog",
+        "why": "a human-readable log; no rule reads it."
+      },
+      {
+        "path": "GameMap.width",
+        "why": "world geometry, fixed at build and identical by construction (both engines read one fixture)."
+      },
+      {
+        "path": "GameMap.height",
+        "why": "world geometry (see GameMap.width)."
+      },
+      {
+        "path": "GameMap.seed",
+        "why": "world identity (see GameMap.width)."
+      },
+      {
+        "path": "Seat.name",
+        "why": "presentation."
+      },
+      {
+        "path": "Seat.color",
+        "why": "presentation."
+      },
+      {
+        "path": "Seat.aggression",
+        "why": "a personality constant read only by the scripted picker, which the decision server replaces."
+      },
+      {
+        "path": "Seat.government",
+        "why": "GovernmentState is STORED per seat on TS and DERIVED per read on the GPU (computeAdoption's twin has no plane), so there is nothing on the GPU side to read back."
+      },
+      {
+        "path": "Seat.religion",
+        "why": "the container; its fields are covered one by one (holyTile, founded, and the four belief-identity gap fields)."
+      },
+      {
+        "path": "Seat.research",
+        "why": "the container; its fields are covered one by one."
+      },
+      {
+        "path": "GovernmentState.current",
+        "why": "no GPU plane (see Seat.government)."
+      },
+      {
+        "path": "GovernmentState.policies",
+        "why": "no GPU plane (see Seat.government)."
+      },
+      {
+        "path": "ReligionState.name",
+        "why": "presentation."
+      },
+      {
+        "path": "ReligionState.worship",
+        "why": "the worship building a founded religion unlocks; the GPU derives it from the founder belief rather than storing it."
+      },
+      {
+        "path": "City.id",
+        "why": "per-seat city id. The join key is the CENTER TILE, because ids are per-seat and the GPU keeps one only for civ rows (`civ_city_id`)."
+      },
+      {
+        "path": "City.name",
+        "why": "presentation."
+      },
+      {
+        "path": "City.foundedTurn",
+        "why": "no GPU plane."
+      },
+      {
+        "path": "City.focus",
+        "why": "the citizen-allocation focus. The GPU allocates one way and stores no focus."
+      },
+      {
+        "path": "City.districts",
+        "why": "the per-city district REGISTRY. The placements themselves are compared per tile (tile.district + tile.districtComplete); the GPU registry (`city_dist_tile`, every seat row) is derived bookkeeping over those same tiles, so comparing it would double-count the planes."
+      },
+      {
+        "path": "City.wonders",
+        "why": "the per-city wonder registry (see City.districts); placements are compared per tile."
+      },
+      {
+        "path": "Unit.id",
+        "why": "the join key is (tile, military/civilian); the GPU has no unit-id plane."
+      },
+      {
+        "path": "Unit.path",
+        "why": "a multi-turn movement path. The GPU walkers re-plan every turn and store no path."
+      },
+      {
+        "path": "Unit.mission",
+        "why": "the 'explore' standing order — scripted-policy state, replaced by the decision server; no GPU plane."
+      },
+      {
+        "path": "Tile.col",
+        "why": "world geometry, fixed at build."
+      },
+      {
+        "path": "Tile.row",
+        "why": "world geometry, fixed at build."
+      },
+      {
+        "path": "Tile.terrain",
+        "why": "world geometry. The GPU compiles terrain into yield/passability tables and keeps no terrain id."
+      },
+      {
+        "path": "Tile.elevation",
+        "why": "world geometry (see Tile.terrain)."
+      },
+      {
+        "path": "Tile.wonder",
+        "why": "natural wonder placement, fixed at build."
+      },
+      {
+        "path": "Tile.riverMask",
+        "why": "world geometry, fixed at build."
+      },
+      {
+        "path": "Tile.cliffMask",
+        "why": "world geometry, fixed at build."
+      },
+      {
+        "path": "Tile.volcano",
+        "why": "world geometry, fixed at build."
+      },
+      {
+        "path": "Tile.goodyHut",
+        "why": "tribal villages are TS-only — the GPU carries no goody-hut plane and never claims one. A real coverage gap."
+      },
+      {
+        "path": "CityState.name",
+        "why": "presentation."
+      },
+      {
+        "path": "GameState.cityStateMax",
+        "why": "the city-state ROSTER width, read off the world file at load. Static for the game and mirrored by the GPU's `S`, which is where every id-keyed column takes its width."
+      },
+      {
+        "path": "Seat.congressVote",
+        "why": "THIS TURN's World Congress ballot. Written inside seatPhase and cleared by worldCongress at the turn tail whether a session fires or not, so it is never live at a turn boundary."
+      }
+    ],
+    "gpu": [
+      {
+        "plane": "civ_congress_vote",
+        "why": "THIS TURN's World Congress ballot. Written inside seatPhase and cleared by worldCongress at the turn tail whether a session fires or not, so it is never live at a turn boundary and there is no TS field to compare it against."
+      },
+      {
+        "plane": "winner",
+        "why": "the winner is DERIVED, not stored, on the TS side — domination first, else the score leader once the game is over, recomputed per read. Comparing the GPU's cache means recomputing that derivation in the adapter, which is exactly what gpu-trace.ts's `winner` column already does. The manifest describes STATE; derived quantities are compared by the observation and by the trace."
+      },
+      {
+        "plane": "centre_slot_at",
+        "why": "the city slot at a centre tile, every seat row — the join key behind the per-city groups; the centers themselves are covered (City.centerIndex / the site planes)."
+      },
+      {
+        "plane": "tdef",
+        "why": "per-tile defense modifier, derived from terrain and improvements; TS recomputes it per read."
+      },
+      {
+        "plane": "tmove",
+        "why": "per-tile movement cost, derived like tdef."
+      },
+      {
+        "plane": "next_slot",
+        "why": "unit-pool allocation cursor. Slot bookkeeping that exists because the GPU has slots and TS has arrays."
+      },
+      {
+        "plane": "unit_next",
+        "why": "unit-pool allocation cursor (see next_slot)."
+      },
+      {
+        "plane": "district_dead",
+        "why": "captured districts are paved but dead. The TS twin is 'the tile carries a district the owning city's registry does not list', and that registry is exactly the object City.districts is excluded for."
+      },
+      {
+        "plane": "city_id",
+        "why": "persistent city ids on the seat axis (TS City.id); the digest's city join key is the center tile, and the allocator itself is pinned by the nextCityId field."
+      },
+      {
+        "plane": "military_at",
+        "why": "the tile -> unit occupancy index, derived from unit_tile and unit_alive; it is the unit group's join key, not a separate fact."
+      },
+      {
+        "plane": "civilian_at",
+        "why": "occupancy index (see military_at)."
+      },
+      {
+        "plane": "unit_tile",
+        "why": "the unit join key itself."
+      },
+      {
+        "plane": "unit_aura_mp",
+        "why": "the frozen general/admiral +1 MP. TS folds it into Unit.movesFull, which is covered."
+      },
+      {
+        "plane": "seat_ext",
+        "why": "which seats are driven from outside rather than by the built-in AI — a harness flag, not game state."
+      },
+      {
+        "plane": "city_dist_tile",
+        "why": "the seat-axis district registry, every row (see the City.districts exclusion); placements are compared per tile, so the registry is a join cache, not a separate fact."
+      },
+      {
+        "plane": "city_wonder",
+        "why": "the seat-axis per-city wonder registry (see city_dist_tile)."
+      },
+      {
+        "plane": "d_static_adj",
+        "why": "static per-tile district adjacency, mutated only when a founding clears a feature — derived from the map plus feat_stripped, both covered."
+      }
+    ]
+  }
 }

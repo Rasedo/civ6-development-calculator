@@ -434,6 +434,7 @@ SEAT = {
     # `religion.founded`. Deriving it from `holy_tile` compared a different
     # fact and could not see the two coming apart.
     "religionFounded": lambda sim, b, rows: [1 if bool(sim.civ_religion_done[b, c]) else 0 for c in rows],
+    "inquisition": lambda sim, b, rows: [1 if bool(sim.civ_inquisition[b, c]) else 0 for c in rows],
     "pantheonDone": lambda sim, b, rows: [1 if bool(sim.civ_pantheon_done[b, c]) else 0 for c in rows],
     "enhancerDone": lambda sim, b, rows: [1 if bool(sim.civ_enhancer_done[b, c]) else 0 for c in rows],
     "gpPoints": lambda sim, b, rows: [[float(x) for x in sim.civ_gpp[b, c].tolist()] for c in rows],
@@ -592,6 +593,11 @@ UNIT = {
     "charges": _unit("unit_charges"),
     "fortifyTurns": _unit("unit_fortify"),
     "xp": _unit("unit_xp"),
+    "level": _unit("unit_level"),
+    "promos": _unit("unit_promos"),
+    "promoOffer": _unit("unit_promo_offer"),
+    "promoUsed": _unit("unit_promo_used"),
+    "xpPct": _unit("unit_xp_pct"),
     "embarked": _unit("unit_emb"),
     "movesLeft": _unit("unit_mp"),
     "movesFull": _unit("unit_mp_full"),

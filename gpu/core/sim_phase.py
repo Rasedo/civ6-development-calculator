@@ -84,8 +84,11 @@ class SimPhase:
         # A MILITARY target whose seat class earns xp — never a barbarian.
         is_vet_mil = _okm & (d_seat != BARB_SEAT)
         d_type = self.unit_type[bidx, ds0]
-        def_xp = torch.where(is_vet_mil, self._xp_lvl_bonus(self.unit_xp[bidx, ds0]), torch.zeros_like(tt))
-        def_cs = self._type_combat[d_type] + self._tdef_i(bidx, tt) + def_xp
+        _t = torch.ones_like(tt, dtype=torch.bool)
+        def_promo = self._promo_cs(
+            d_type, self.unit_promos[bidx, ds0],
+            attacking=~_t, ranged=_t, vs_city=_t, tile=tt)
+        def_cs = self._type_combat[d_type] + self._tdef_i(bidx, tt) + def_promo
         # An embarked target (military or civilian; barbs never embark) → the
         # era's normalized CS, no terrain and no support.
         d_emb = self.unit_emb[bidx, ds0] & (d_slot >= 0)
@@ -478,7 +481,7 @@ class SimPhase:
         made_u = done & (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU)
         if bool(made_u.any()):
             ui = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
-            xp = (self.city_bldg[bidx, row, col, :].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
+            xp = self._train_xp_pct(self.city_bldg[bidx, row, col, :], ui)
             self._spawn_unit(row, made_u, ctr, ui, init_xp=xp)
             # CIV6 (Venetian Arsenal): a TRAINED naval unit arrives twice.
             # Purchases are excluded in the real game and take another path.
@@ -1001,16 +1004,21 @@ class SimPhase:
         self.claimed_e_n.add_(eopen.long())
         self.civ_enhancer_done[:, row] = self.civ_enhancer_done[:, row] | eopen
 
-    #: Every per-slot plane a captured unit must carry. One list, so a NEW
-    #: plane cannot be silently forgotten by a capture. Ownership-reset planes
-    #: are named separately below rather than copied.
-    _CAPTURE_CARRY = ("type", "hp", "charges", "emb", "xp", "mp_full")
-    #: Reset on an ownership change: a captured civilian never fortifies, never
-    #: auras, and has movesLeft = 0 (acted) so the heal skips it this turn.
+    #: Reset on an ownership change: a captured unit never carries its old
+    #: fortification, its old owner's aura, or movement — movesLeft = 0
+    #: (acted) so the heal skips it this turn.
     _CAPTURE_RESET = {"fortify": 0, "aura_mp": 0, "mp": 0}
+    #: Written by the capture itself, from its own arguments.
+    _CAPTURE_SET = ("alive", "seat", "tile")
 
     def _carry_capture(self, rows: torch.Tensor, src: torch.Tensor, dst: torch.Tensor) -> None:
-        vals = {k: getattr(self, f"unit_{k}")[rows, src].clone() for k in self._CAPTURE_CARRY}
+        """TS re-seats the SAME object, so EVERY field rides. The carry list is
+        DERIVED from the pool's plane list rather than transcribed: a
+        hand-written one drifts, and the destination slot may be a RECLAIMED
+        one still holding a dead unit's promotions."""
+        carry = [pl for pl in self._UNIT_PLANES
+                 if pl not in self._CAPTURE_RESET and pl not in self._CAPTURE_SET]
+        vals = {k: getattr(self, f"unit_{k}")[rows, src].clone() for k in carry}
         for k, v in vals.items():
             getattr(self, f"unit_{k}")[rows, dst] = v
         for k, v in self._CAPTURE_RESET.items():

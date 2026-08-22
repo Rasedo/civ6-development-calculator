@@ -3,7 +3,7 @@
 Real Civ 6 counts a Relic as a Great Work held in a TEMPLE's single slot,
 paying +4 Faith and +8 Tourism (the densest tourism source in the game). A
 relic is created when an Apostle killed in theological combat carried the
-MARTYR promotion, which `_martyr_draw` rolls at the death. A wonder can hold
+MARTYR promotion, one of the nine it chose from at purchase. A wonder can hold
 relics too (`RELIC_WONDER_SLOTS`), additive with the Temple's.
 
 Scripted play does reach the grant, and both rFaith and rTourism are compared

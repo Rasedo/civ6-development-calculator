@@ -376,9 +376,11 @@ class SimMasks:
         maximum Movement is at least 1 greater than normal when it attempts to
         shoot"; and "if a unit has not moved, it can always shoot regardless of
         its maximum Movement". `_spent_mp` is refreshUnits' own gate — the pool
-        this unit was GRANTED last refresh, not its type's base moves."""
+        this unit was GRANTED last refresh, not its type's base moves.
+        CIV6 (Expert Crew): "Can attack after moving" lifts the gate outright."""
         typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         return ((self._type_bombard[typ] <= 0) | ~self._spent_mp(pre)
+                | self._promo_pool_flag(pre, "SIEGE_MOVE_SHOOT")
                 | (self._full_mp(pre) > self._type_moves[typ]))
 
     def _siege_assist(self, seat: torch.Tensor, type_idx: torch.Tensor,
@@ -432,15 +434,295 @@ class SimMasks:
         units and never pass through here."""
         return js_round(10.0 - hp.double().clamp(min=0.0) / 10.0)
 
-    def _xp_lvl_bonus(self, xp: torch.Tensor) -> torch.Tensor:
-        """Mirrors combat.ts xpLevelBonus: the flat CS bonus a unit's veterancy
-        grants — XP_LEVEL_CS per XP_LEVELS threshold crossed. Integer add (long)
-        into the CS assembly. Barbarian slots never carry xp; pass a zero tensor
-        for them."""
-        level = torch.zeros_like(xp)
-        for t in XP_LEVELS:
-            level = level + (xp >= t).long()
-        return XP_LEVEL_CS * level
+    # ---- PROMOTIONS ------------------------------------------------------
+    # `promoCS` and its siblings, one body each. A unit's `promos` is a bitmask
+    # over the rows of its OWN class list, so bit k is column k of the PROMOTE
+    # head; every read below indexes the catalog by the chassis's class.
+
+    def _promo_slots(self, utype: torch.Tensor, promos: torch.Tensor):
+        """(kinds, vs, masks, live) — the effect slots a unit actually holds,
+        each [B, PCOL, PSLOT] and `live` the bool that says the slot counts."""
+        rd = self.rules_dev
+        cls = rd.u_promo_class[utype.clamp(min=0)]
+        clsc = cls.clamp(min=0)
+        kinds = rd.promo_kind[clsc]
+        vs = rd.promo_v[clsc]
+        masks = rd.promo_mask[clsc]
+        cols = torch.arange(rd.promo_cols, device=self.device)
+        held = ((promos.unsqueeze(1) >> cols.unsqueeze(0)) & 1) > 0  # [B, PCOL]
+        live = (held & (cls >= 0).unsqueeze(1)).unsqueeze(2).expand_as(kinds)
+        return kinds, vs, masks, live
+
+    def _promo_val(self, utype: torch.Tensor, promos: torch.Tensor, kind: str) -> torch.Tensor:
+        """the summed value of one non-combat effect kind, in `promos`' shape —
+        one unit, a whole pool, or a pool's six neighbour steps."""
+        k = self._pk.get(kind, -1)
+        if k < 0:
+            return torch.zeros_like(promos)
+        kinds, vs, _m, live = self._promo_slots(utype.reshape(-1), promos.reshape(-1))
+        return torch.where(live & (kinds == k), vs, torch.zeros_like(vs)).sum(dim=(1, 2)).reshape(promos.shape)
+
+    def _promo_flag(self, utype: torch.Tensor, promos: torch.Tensor, kind: str) -> torch.Tensor:
+        k = self._pk.get(kind, -1)
+        if k < 0:
+            return torch.zeros_like(promos, dtype=torch.bool)
+        kinds, _v, _m, live = self._promo_slots(utype.reshape(-1), promos.reshape(-1))
+        return (live & (kinds == k)).any(dim=2).any(dim=1).reshape(promos.shape)
+
+    def _promo_mult(self, utype: torch.Tensor, promos: torch.Tensor, kind: str) -> torch.Tensor:
+        """the flanking/support multiplier a promotion grants; 1 without."""
+        k = self._pk.get(kind, -1)
+        ones = torch.ones_like(promos)
+        if k < 0:
+            return ones
+        kinds, vs, _m, live = self._promo_slots(utype.reshape(-1), promos.reshape(-1))
+        best = torch.where(live & (kinds == k), vs, torch.zeros_like(vs)).amax(dim=2).amax(dim=1)
+        return torch.maximum(best.reshape(promos.shape), ones)
+
+    def _followed_religion(self, pres: torch.Tensor) -> torch.Tensor:
+        """the religion a pressure row follows — the argmax with ties to the
+        lowest id, and -1 when nothing presses at all. The turn's own resolver
+        scans the same way, so a mid-turn read cannot disagree with it."""
+        tot = pres.sum(dim=-1)
+        return torch.where(tot > 0, pres.argmax(dim=-1), torch.full_like(tot, -1))
+
+    def _promo_first_use(self, utype: torch.Tensor, promos: torch.Tensor,
+                         used: torch.Tensor, kind: str):
+        """(value, used') — `promoFirstUse`: the value of a ONCE-ONLY promotion
+        the first time it fires and 0 for ever after, with the paying column
+        stamped into the returned `used` mask."""
+        k = self._pk.get(kind, -1)
+        val = torch.zeros_like(promos)
+        if k < 0:
+            return val, used
+        rd = self.rules_dev
+        cls = rd.u_promo_class[utype.clamp(min=0)]
+        kinds = rd.promo_kind[cls.clamp(min=0)]
+        vs = rd.promo_v[cls.clamp(min=0)]
+        done = torch.zeros_like(promos, dtype=torch.bool)
+        for c in range(int(rd.promo_cols)):
+            hit = (~done & (cls >= 0) & (((promos >> c) & 1) > 0) & (((used >> c) & 1) == 0)
+                   & (kinds[:, c] == k).any(dim=1))
+            if not bool(hit.any()):
+                continue
+            v = torch.where(kinds[:, c] == k, vs[:, c], torch.zeros_like(vs[:, c])).sum(dim=1)
+            val = torch.where(hit, v, val)
+            used = torch.where(hit, used | (1 << c), used)
+            done = done | hit
+        return val, used
+
+    def _promo_pool_val(self, pre: str, kind: str) -> torch.Tensor:
+        """[B, U] one promotion VALUE over a whole unit pool."""
+        typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+        return self._promo_val(typ, getattr(self, f"{pre}_unit_promos"), kind)
+
+    def _promo_pool_flag(self, pre: str, kind: str) -> torch.Tensor:
+        """[B, U] one promotion FLAG over a whole unit pool."""
+        typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+        return self._promo_flag(typ, getattr(self, f"{pre}_unit_promos"), kind)
+
+    def _choke_cover(self, tiles: torch.Tensor) -> torch.Tensor:
+        """CIV6 (Choke Points): "defending in Woods, Jungle, Hills, or Marsh"."""
+        tc = tiles.clamp(min=0).reshape(self.B, -1)
+        out = self.hills.gather(1, tc)
+        if self._choke_feats.numel():
+            out = out | self._feature_live(tc, self._choke_feats)
+        return out.reshape(tiles.shape)
+
+    def _feature_live(self, tc: torch.Tensor, want: torch.Tensor) -> torch.Tensor:
+        """[B, N] — does each tile STILL carry one of `want`? `feat_id` keeps a
+        chopped tile's old id, so the strip flag is what makes this the live
+        `tile.feature` read TS does."""
+        fid = self.feat_id.gather(1, tc)
+        return (~self.feat_stripped.gather(1, tc)
+                & (fid.unsqueeze(2) == want.view(1, 1, -1)).any(dim=2))
+
+    def _barb_unit_plane(self) -> torch.Tensor:
+        """[B, T] — does a BARBARIAN unit stand on this tile? Both occupancy
+        slots answer, so a raider is found whichever plane holds it."""
+        out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        for occ in (self.military_at, self.civilian_at):
+            here = occ >= 0
+            out = out | (here & (self.unit_seat.gather(1, occ.clamp(min=0)) >= BARB_SEAT))
+        return out
+
+    def _religious_at(self, tiles: torch.Tensor) -> torch.Tensor:
+        """the RELIGIOUS unit standing on each tile, by merged slot; -1 = none.
+        Religious units "move in their own layer", so a tile can hold one
+        beside a military and a civilian occupant."""
+        occ = self.civilian_at.gather(1, tiles)
+        rel = torch.zeros_like(occ, dtype=torch.bool)
+        oc = occ.clamp(min=0)
+        t = self.unit_type.gather(1, oc)
+        for i in (getattr(self, "_missionary_idx", -1), getattr(self, "_apostle_idx", -1),
+                  getattr(self, "_inquisitor_idx", -1)):
+            if i >= 0:
+                rel = rel | (t == i)
+        return torch.where((occ >= 0) & rel, occ, torch.full_like(occ, -1))
+
+    def _promo_offer_mask(self, sc: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:
+        """[B, N, PCOL] `promoReady && promoAvailable` — the columns a unit may
+        take right now: it is owed no more XP, the row exists in its own class
+        list, it does not hold that row yet, one prerequisite row is held, and
+        the row is inside any offer the unit was handed."""
+        rd = self.rules_dev
+        B, N = sc.shape
+        cols = torch.arange(rd.promo_cols, device=self.device).view(1, 1, -1)
+        cls = rd.u_promo_class[utype.clamp(min=0)]
+        clsc = cls.clamp(min=0)
+        level = self.unit_level.gather(1, sc)
+        xp = self.unit_xp.gather(1, sc)
+        held = self.unit_promos.gather(1, sc)
+        offer = self.unit_promo_offer.gather(1, sc)
+        need = self._xp_to_next(level)
+        ready = (cls >= 0) & (need > 0) & (xp >= need)
+        bit = torch.ones_like(held).unsqueeze(2) << cols
+        exists = cols < rd.promo_rows[clsc].unsqueeze(2)
+        req = rd.promo_req[clsc]                      # [B, N, PCOL]
+        open_row = (req == 0) | ((req & held.unsqueeze(2)) != 0)
+        offered = (offer.unsqueeze(2) == 0) | ((offer.unsqueeze(2) & bit) != 0)
+        return (ready.unsqueeze(2) & exists & ((held.unsqueeze(2) & bit) == 0)
+                & open_row & offered)
+
+    def _damaged(self, hp: torch.Tensor) -> torch.Tensor:
+        """the "against damaged units" test two promotions ask of their foe."""
+        return hp < self.rules.combat.get("unitHp", 100)
+
+    def _on_district(self, tiles: torch.Tensor) -> torch.Tensor:
+        """the "occupying a district or Fort" test three promotions ask, over
+        any tile shape whose first dim is the batch."""
+        tc = tiles.clamp(min=0).reshape(self.B, -1)
+        out = self.district.gather(1, tc) >= 0
+        if self.FORT >= 0:
+            out = out | (self.improvement.gather(1, tc) == self.FORT)
+        return out.reshape(tiles.shape)
+
+    def _promo_cs(
+        self, utype: torch.Tensor, promos: torch.Tensor, *,
+        attacking: torch.Tensor, ranged: torch.Tensor | None = None,
+        foe_type: torch.Tensor | None = None, foe_damaged: torch.Tensor | None = None,
+        foe_fortified: torch.Tensor | None = None, foe_in_district: torch.Tensor | None = None,
+        vs_city: torch.Tensor | None = None, tile: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """[B] the whole Combat Strength adder a unit's promotions contribute to
+        ONE roll — `promoCS`'s twin, an integer add beside the support terms."""
+        rd = self.rules_dev
+        B, dev = promos.shape[0], self.device
+        NK = len(rd.promo_kinds)
+        if NK == 0:
+            return torch.zeros_like(promos)
+        kinds, vs, masks, live = self._promo_slots(utype, promos)
+        false_b = torch.zeros(B, dtype=torch.bool, device=dev)
+        atk = attacking.expand(B) if attacking.dim() else attacking.expand(B)
+        rng = false_b if ranged is None else ranged
+        dmg = false_b if foe_damaged is None else foe_damaged
+        frt = false_b if foe_fortified is None else foe_fortified
+        fid = false_b if foe_in_district is None else foe_in_district
+        cty = false_b if vs_city is None else vs_city
+        cover = false_b if tile is None else self._choke_cover(tile)
+        mine = false_b if tile is None else self._on_district(tile)
+        cond = torch.zeros(B, NK, dtype=torch.bool, device=dev)
+        pk = self._pk
+
+        def put(name: str, val: torch.Tensor) -> None:
+            k = pk.get(name, -1)
+            if k >= 0:
+                cond[:, k] = val
+
+        put("CS_ALL", torch.ones(B, dtype=torch.bool, device=dev))
+        put("CS_VS_CLASS_ATK", atk)
+        put("CS_VS_CLASS_ANY", torch.ones(B, dtype=torch.bool, device=dev))
+        put("CS_DEF_VS_CLASS", ~atk)
+        put("CS_DEF_RANGED", ~atk & rng)
+        put("CS_DEF_ANY", ~atk)
+        put("CS_DEF_VS_CITY", ~atk & cty)
+        put("CS_DEF_TERRAIN", ~atk & cover)
+        put("CS_IN_DISTRICT", mine)
+        put("CS_ATK_DISTRICT", atk & ~rng & (cty | fid))
+        put("CS_VS_IN_DISTRICT", fid)
+        put("CS_VS_DISTRICT_DEF", cty)
+        put("CS_VS_DAMAGED", dmg)
+        put("CS_VS_FORTIFIED", atk & frt)
+
+        hit = cond.gather(1, kinds.reshape(B, -1).clamp(min=0, max=NK - 1)).reshape(kinds.shape)
+        want_mask = torch.zeros(NK, dtype=torch.bool, device=dev)
+        for name in ("CS_VS_CLASS_ATK", "CS_VS_CLASS_ANY", "CS_DEF_VS_CLASS"):
+            k = pk.get(name, -1)
+            if k >= 0:
+                want_mask[k] = True
+        uses = want_mask[kinds.clamp(min=0, max=NK - 1)]
+        if foe_type is None:
+            bit = torch.zeros(B, dtype=torch.long, device=dev)
+        else:
+            fcls = rd.u_promo_class[foe_type.clamp(min=0)]
+            bit = torch.where(fcls >= 0, torch.ones_like(fcls) << fcls.clamp(min=0), torch.zeros_like(fcls))
+        maskhit = (masks & bit.view(B, 1, 1)) != 0
+        ok = live & hit & (~uses | maskhit)
+        return torch.where(ok, vs, torch.zeros_like(vs)).sum(dim=(1, 2))
+
+    # ---- THE XP AWARD ----------------------------------------------------
+    # EXACT INTEGER ARITHMETIC, exactly as cpu/core/promotions.ts does it: the
+    # only fraction in the rule is foeCS/ownCS, so one rational is rounded once
+    # and no float ever touches the result.
+
+    def _xp_to_next(self, level: torch.Tensor) -> torch.Tensor:
+        """[..] the XP this unit still owes; 0 once it is maxed."""
+        return torch.where(level >= MAX_LEVEL, torch.zeros_like(level), XP_PER_LEVEL * level)
+
+    def _bank_xp(self, xp: torch.Tensor, level: torch.Tensor, gain: torch.Tensor) -> torch.Tensor:
+        """the new xp pool: it clamps at the level's requirement and stops."""
+        need = self._xp_to_next(level)
+        return torch.where(need <= 0, xp, torch.minimum(need, torch.where(xp >= need, xp, xp + gain)))
+
+    def _battle_xp(
+        self, own_cs: torch.Tensor, foe_cs: torch.Tensor, *,
+        foe_died: torch.Tensor, ranged: bool, initiated: bool,
+        pct: torch.Tensor, mult: torch.Tensor,
+    ) -> torch.Tensor:
+        adds = (XP_RANGED_BATTLE if ranged else XP_MELEE_BATTLE) + (XP_INITIATOR if initiated else 0)
+        num = (foe_cs * torch.where(foe_died, 2, 1) + adds * own_cs) * (100 + pct) * mult
+        den = (own_cs * 100).clamp(min=1)
+        out = torch.div(2 * num + den, 2 * den, rounding_mode="floor")
+        return torch.where(own_cs > 0, out.clamp(max=XP_BATTLE_CAP), torch.zeros_like(out))
+
+    def _city_xp(self, base: torch.Tensor, pct: torch.Tensor, mult: torch.Tensor) -> torch.Tensor:
+        num = base * (100 + pct) * mult
+        return torch.div(2 * num + 100, 200, rounding_mode="floor")
+
+    def _xp_strength(self, t: torch.Tensor, shooting: bool) -> torch.Tensor:
+        """the strength a chassis brings to the XP ratio: its Ranged Strength
+        when it is the one shooting, its Combat Strength otherwise."""
+        c = self._type_combat[t.clamp(min=0)].long()
+        if not shooting:
+            return c
+        r = self._type_ranged_strength[t.clamp(min=0)].long()
+        return torch.where(r > 0, r, c)
+
+    def _battle_gain(
+        self, own_type: torch.Tensor, foe_type: torch.Tensor, own_seat: torch.Tensor,
+        own_level: torch.Tensor, own_pct: torch.Tensor, *,
+        ranged: bool, initiated: bool, foe_died: torch.Tensor, foe_is_barb: torch.Tensor,
+    ) -> torch.Tensor:
+        """[B] the XP ONE side earns from ONE battle — `awardBattleXp`'s per-side
+        half, the veteran-vs-barbarian flat rate included."""
+        own_cs = self._xp_strength(own_type, ranged and initiated)
+        foe_cs = self._xp_strength(foe_type, ranged and not initiated)
+        mult = self._recon_xp_mult(own_seat, own_type)
+        if initiated:
+            mult = mult * self._suz_xp_mult(own_seat)
+        g = self._battle_xp(own_cs, foe_cs, foe_died=foe_died, ranged=ranged,
+                            initiated=initiated, pct=own_pct, mult=mult)
+        vet = foe_is_barb & (own_level >= 2)
+        return torch.where(vet, torch.full_like(g, XP_BARB_VETERAN), g)
+
+    def _train_xp_pct(self, bldg: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:
+        """CIV6: the training city's Encampment and Harbor experience lines,
+        SUMMED over the buildings it holds that reach this chassis's class."""
+        rd = self.rules_dev
+        cls = rd.u_promo_class[utype.clamp(min=0)]
+        reach = rd.b_train_xp_cls[:, cls.clamp(min=0)].transpose(0, 1)  # [B, NB]
+        pct = (rd.b_train_xp_pct.view(1, -1) * (bldg & reach).long()).sum(dim=1)
+        return torch.where(cls >= 0, pct, torch.zeros_like(pct))
 
     def _river_cross(self, frm: torch.Tensor, to: torch.Tensor) -> torch.Tensor:
         arange6 = torch.arange(6, device=self.device)
@@ -534,6 +816,45 @@ class SimMasks:
             | self._encamp_live().gather(1, dt.unsqueeze(1)).squeeze(1)
         return flank, torch.where(in_district, torch.zeros_like(sup), sup)
 
+    def _theo_flank_support(
+        self, def_tile: torch.Tensor, def_seat: torch.Tensor,
+        atk_slot: torch.Tensor, atk_seat: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """`theoFlankCount` / `theoSupportCount` — the SAME two counts a melee
+        exchange takes, read off the RELIGIOUS layer. CIV6: religious units
+        "move in their own layer", and the advice that a swarm of them wins a
+        duel is only true if it is the swarm that provides the bonus."""
+        dt = def_tile.clamp(min=0)
+        nb = self.neigh[dt]
+        nbc = nb.clamp(min=0)
+        rslot = self._religious_at(nbc)
+        here = (rslot >= 0) & (nb >= 0)
+        n_seat = torch.where(here, self.unit_seat.gather(1, rslot.clamp(min=0)),
+                             torch.full_like(nbc, -1))
+        riv = (self.river_mask.gather(1, dt.unsqueeze(1)) >> torch.arange(6, device=self.device)) & 1
+        is_atk = (rslot == atk_slot.unsqueeze(1)) & (atk_slot.unsqueeze(1) >= 0)
+        mine = here & (n_seat == atk_seat.unsqueeze(1)) & ~is_atk & (riv == 0)
+        flank = mine.long().sum(dim=1) * self._flank_support_live(atk_seat).long()
+        friendly = here & (n_seat == def_seat.unsqueeze(1))
+        sup = friendly.long().sum(dim=1) * self._flank_support_live(def_seat).long()
+        in_district = (self._centre_seat_plane().gather(1, dt.unsqueeze(1)).squeeze(1) >= 0) \
+            | self._encamp_live().gather(1, dt.unsqueeze(1)).squeeze(1)
+        return flank, torch.where(in_district, torch.zeros_like(sup), sup)
+
+    def _theo_strength(self, utype: torch.Tensor, promos: torch.Tensor, hp: torch.Tensor,
+                       tile: torch.Tensor, seat: torch.Tensor) -> torch.Tensor:
+        """[B] `theoStrength` — the Religious Strength one unit brings to a
+        duel: its chassis stat, the wound penalty, DEBATER's "+20 Religious
+        Strength in Theological Combat", and the Inquisitor's "+35 Religious
+        Strength when in friendly territory"."""
+        base = (self._rel_strength[utype.clamp(min=0)] - self._wound(hp)
+                + self._promo_val(utype, promos, "RELIG_CS"))
+        if getattr(self, "_inquisitor_idx", -1) < 0:
+            return base
+        home = ((utype == self._inquisitor_idx)
+                & (self.tile_seat.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1) == seat))
+        return base + home.long() * self._inquisitor_home_strength
+
     def _trade_water_level(self, row: int) -> torch.Tensor:
         """[B] long — how far out to sea this seat's Traders may go
         (`tradeWaterLevel`). CIV6: "The Celestial Navigation technology is
@@ -603,16 +924,32 @@ class SimMasks:
             arrived = arrived | (alive & (cur == dest))
         return arrived
 
-    def _road_terms(self, frm: torch.Tensor, dest: torch.Tensor, river3: torch.Tensor):
+    def _road_terms(self, frm: torch.Tensor, dest: torch.Tensor, river3: torch.Tensor,
+                    utype: torch.Tensor | None = None, promos: torch.Tensor | None = None):
         """The (terrain, river) MP terms a step pays, road-aware —
         the `moveCostInto` + `riverCharge` twin. A ROAD-to-ROAD step ignores the
         terrain penalty entirely ("roads let a unit pass through Woods or Hills
         as if it were flat"), and once `road_bridged` latches at the first era
         boundary (Classical roads bring bridges) it ignores the river charge
-        too. A road on only ONE end does nothing, exactly as in real Civ 6."""
+        too. A road on only ONE end does nothing, exactly as in real Civ 6.
+
+        CIV6 (Alpine / Ranger): the promotion lets its holder "move onto a tile
+        with the appropriate terrain or terrain feature at the cost of only 1
+        Movement" — Ranger names Woods and Jungle, Alpine the Hills, and Marsh
+        is nobody's. `tmove` is the mover-free schedule, so each waived charge
+        is subtracted back out here."""
+        dc = dest.clamp(min=0)
         tm = torch.div(
-            self.tmove.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1), 3, rounding_mode="floor"
+            self.tmove.gather(1, dc.unsqueeze(1)).squeeze(1), 3, rounding_mode="floor"
         )
+        if utype is not None and promos is not None:
+            d1 = dc.unsqueeze(1)
+            hill = self.hills.gather(1, d1).squeeze(1)
+            tm = tm - (hill & self._promo_flag(utype, promos, "TERRAIN_MOVE_HILLS")).long()
+            if self._woods_feats.numel():
+                wood = self._feature_live(d1, self._woods_feats).squeeze(1)
+                tm = tm - (wood & self._promo_flag(utype, promos, "TERRAIN_MOVE_WOODS")).long()
+            tm = tm.clamp(min=0)
         rd = (
             self.road.gather(1, frm.clamp(min=0).unsqueeze(1)).squeeze(1)
             & self.road.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1)
@@ -691,7 +1028,9 @@ class SimMasks:
         territory of another civ if they have granted them Open Borders." War
         opens what the civic closed, and an ally needs no grant of its own:
         "Allies automatically have Open Borders." "Traders ignore borders", and
-        "Religious units also ignore borders".
+        "Religious units also ignore borders" — with the one exception the
+        Inquisitor page names for itself: it "cannot enter another
+        civilization's territory without Open Borders".
 
         CITY-STATE ground never closes: a city-state carries no research
         record, so nothing here can say when it took Early Empire. For the same
@@ -716,7 +1055,7 @@ class SimMasks:
         closed = foreign & civic & ~at_war & ~allied & ~granted
         if utype is not None:
             ut = utype.clamp(min=0).reshape(B, -1)
-            free = (ut == self._trader_idx) | (self._rel_strength[ut] > 0)
+            free = (ut == self._trader_idx) | ((self._rel_strength[ut] > 0) & (ut != self._inquisitor_idx))
             closed = closed & ~free.expand_as(closed)
         return closed.reshape(tiles.shape)
 
@@ -848,6 +1187,11 @@ class SimMasks:
         self.barb_unit_tile[rows, slot] = spot[rows]
         self.barb_unit_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
         self.barb_unit_fortify[rows, slot] = 0  # a fresh (possibly reclaimed) slot starts undug
+        self.barb_unit_xp[rows, slot] = 0
+        self.barb_unit_level[rows, slot] = 1
+        self.barb_unit_promos[rows, slot] = 0
+        self.barb_unit_promo_offer[rows, slot] = 0
+        self.barb_unit_xp_pct[rows, slot] = 0
         # TS spawnUnit writes `movesLeft: def.moves` plus the seat's golden
         # dedication and leaves movesFull undefined — a unit trained mid-turn
         # CAN move before its first refresh, and a reclaimed slot must not
@@ -859,11 +1203,12 @@ class SimMasks:
         self.military_at[(rows, spot[rows])] = slot + self.POOL_LO["barb"]
         self.next_slot[rows] += 1
 
-    def _reveal_around(self, rows: torch.Tensor, seat_row, tiles: torch.Tensor, radius: int) -> None:
+    def _reveal_around(self, rows: torch.Tensor, seat_row, tiles: torch.Tensor, radius) -> None:
         """revealAround's twin: lift `seat_row`'s fog within `radius` of
         `tiles`. rows [K] batch indices (UNIQUE per call — advanced-index
         assignment is last-write-wins), seat_row an int or [K] long, tiles
-        [K] long. No-op with fog off — TS's
+        [K] long, radius an int or a [K] long (the SIGHT promotion varies it
+        per mover). No-op with fog off — TS's
         revealAround gates on state.fogOfWar the same way, so a fog-off
         world accrues NO explored state on either engine.
 
@@ -881,7 +1226,8 @@ class SimMasks:
         one)."""
         if not self.fog_of_war or rows.numel() == 0:
             return
-        disk = self.pair_dist[tiles.clamp(min=0)] <= radius
+        disk = self.pair_dist[tiles.clamp(min=0)] <= (
+            radius.unsqueeze(1) if torch.is_tensor(radius) else radius)
         new = disk & ~self.seat_explored[rows, seat_row]
         self.seat_explored[rows, seat_row] |= disk
         # CIV6 (Hic Sunt Dracones, dark face): "+3 Era Score each time you
@@ -935,10 +1281,16 @@ class SimMasks:
         self._reveal_around(rows, row, spot[rows], 2)
         getattr(self, f"{pre}_unit_hp")[rows, slot] = self.rules.combat.get("unitHp", 100)
         getattr(self, f"{pre}_unit_fortify")[rows, slot] = 0
-        if init_xp is None:
-            getattr(self, f"{pre}_unit_xp")[rows, slot] = 0
-        else:
-            getattr(self, f"{pre}_unit_xp")[rows, slot] = torch.where(is_civ_u[rows], torch.zeros_like(slot), init_xp[rows])
+        getattr(self, f"{pre}_unit_xp")[rows, slot] = 0
+        getattr(self, f"{pre}_unit_level")[rows, slot] = 1
+        getattr(self, f"{pre}_unit_promos")[rows, slot] = 0
+        getattr(self, f"{pre}_unit_promo_offer")[rows, slot] = 0
+        getattr(self, f"{pre}_unit_promo_used")[rows, slot] = 0
+        # CIV6: the training city's Encampment and Harbor experience lines are a
+        # PERCENTAGE the unit carries for life, not a lump of starting XP.
+        getattr(self, f"{pre}_unit_xp_pct")[rows, slot] = (
+            torch.zeros_like(slot) if init_xp is None else init_xp[rows]
+        )
         # a unit spawned MID-turn has no frozen grant yet — TS leaves movesFull
         # undefined until its first refreshUnits and the `?? full` fallback
         # means no aura, so 0 is the faithful mirror (and it scrubs a reclaimed
@@ -1222,12 +1574,23 @@ class SimMasks:
             return tab.gather(1, civ.clamp(min=0).unsqueeze(1)).squeeze(1)
         return tab[:, civ]
 
-    def _cliff_block_dirs(self, cur: torch.Tensor, nb6: torch.Tensor, own: torch.Tensor | None = None) -> torch.Tensor:
+    def _cliff_block_dirs(self, cur: torch.Tensor, nb6: torch.Tensor, own: torch.Tensor | None = None,
+                          waive: torch.Tensor | None = None) -> torch.Tensor:
         """[B, N, 6] over unit SLOTS: which of the six steps a cliff closes,
-        the whole pool in one dispatch. `_cliff_edge`'s rule; a caller holding
-        a single unit passes N=1."""
+        the whole pool in one dispatch; a caller holding a single unit passes
+        N=1. The mask lives on the LAND tile, so read it there and test the bit
+        pointing at the water side — from the water side that is the OPPOSITE
+        direction ((d + 3) % 6 on this hex layout). Sourced exceptions: a city
+        centre and a HARBOR ignore cliffs, and CIV6 (Commando) "can scale Cliff
+        walls" — `waive` [B, N] is that promotion. Cliffs never touch
+        land-to-land steps.
+
+        SOURCED: the Harbor exception is OWNER-ONLY — "when YOUR units use it
+        they will be able to pass the Cliffs... Enemy units won't." Callers
+        pass `own` = the tiles this mover's civ holds; without it a Harbor
+        would be a hole in the wall for the besieger too."""
         B, N, dev = self.B, cur.shape[1], self.device
-        if not self._has_cliffs:
+        if not self._has_cliffs or (waive is not None and bool(waive.all())):
             return torch.zeros(B, N, 6, dtype=torch.bool, device=dev)
         c = cur.clamp(min=0)                                  # [B, N]
         nbc3 = nb6.clamp(min=0)                               # [B, N, 6]
@@ -1244,7 +1607,8 @@ class SimMasks:
         free = self.centre_slot_at.gather(1, land) >= 0
         if self._harbor_idx >= 0 and own is not None:
             free = free | ((self.district.gather(1, land) == self._harbor_idx) & own.gather(1, land))
-        return trans & bit.reshape(B, N, 6) & ~free.reshape(B, N, 6)
+        out = trans & bit.reshape(B, N, 6) & ~free.reshape(B, N, 6)
+        return out & ~waive.unsqueeze(2) if waive is not None else out
 
     def _amph_atk_cs(self, emb: torch.Tensor) -> torch.Tensor:
         """[B] the attacker's amphibious penalty. CIV6 (Combat): an attack
@@ -1254,35 +1618,24 @@ class SimMasks:
         reaches a resolver at all pays the full penalty."""
         return emb.long() * self._amphibious_attack_cs
 
-    def _cliff_edge(self, cur: torch.Tensor, dest: torch.Tensor, dir_i, own: torch.Tensor | None = None) -> torch.Tensor:
-        """[B] bool: is the step cur->dest a land/water crossing that a
-        CLIFF closes? The `cliffBlocks` twin. The mask lives on the LAND tile, so
-        read it there and test the bit pointing at the water side — from the
-        water side that is the OPPOSITE direction ((d + 3) % 6 on this hex
-        layout). Sourced exceptions: a city centre and a HARBOR ignore cliffs.
-        Cliffs never touch land-to-land steps."""
-        if not self._has_cliffs:
-            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        c = cur.clamp(min=0)
-        d = dest.clamp(min=0)
-        cw = self.water.gather(1, c.unsqueeze(1)).squeeze(1)
-        dw = self.water.gather(1, d.unsqueeze(1)).squeeze(1)
-        trans = cw != dw
-        if not bool(trans.any()):
-            return torch.zeros_like(trans)
-        land = torch.where(cw, d, c)
-        di = dir_i if torch.is_tensor(dir_i) else torch.full_like(c, int(dir_i))
-        dl = torch.where(cw, (di + 3) % 6, di)
-        bit = ((self.cliff_mask.gather(1, land.unsqueeze(1)).squeeze(1) >> dl) & 1).bool()
-        free = self.centre_slot_at.gather(1, land.unsqueeze(1)).squeeze(1) >= 0
-        # SOURCED: the Harbor exception is OWNER-ONLY — "when YOUR units use it
-        # they will be able to pass the Cliffs... Enemy units won't." Callers
-        # pass `own` = the tiles this mover's civ holds; without it a Harbor
-        # would be a hole in the wall for the besieger too.
-        if self._harbor_idx >= 0 and own is not None:
-            harbor = self.district.gather(1, land.unsqueeze(1)).squeeze(1) == self._harbor_idx
-            free = free | (harbor & own.gather(1, land.unsqueeze(1)).squeeze(1))
-        return trans & bit & ~free
+    def _atk_pens(self, utype: torch.Tensor, promos: torch.Tensor, frm: torch.Tensor,
+                  to: torch.Tensor, emb: torch.Tensor) -> torch.Tensor:
+        """[B] the river-crossing and from-the-sea penalties an attacker pays.
+        CIV6 (Amphibious): "No Combat Strength and Movement penalty when
+        attacking from Sea or over a River" waives BOTH."""
+        amph = self._promo_flag(utype, promos, "AMPHIBIOUS")
+        z = torch.zeros_like(frm)
+        pen = 5 * torch.where(amph, z, self._river_cross(frm, to))
+        return pen + torch.where(amph, z, self._amph_atk_cs(emb))
+
+    def _assault_promo_cs(self, utype: torch.Tensor, promos: torch.Tensor,
+                          frm: torch.Tensor, ranged: bool = False) -> torch.Tensor:
+        """the promotion term every attack ON A CITY contributes: attacking,
+        versus a city, keyed on the attacker's own tile. `ranged` is what tells
+        the district-assault promotions this is not a melee blow."""
+        t = torch.ones_like(frm, dtype=torch.bool)
+        return self._promo_cs(utype, promos, attacking=t, vs_city=t, tile=frm,
+                              ranged=t if ranged else ~t)
 
     def _clear_camp_at(self, mask: torch.Tensor, tile: torch.Tensor, seat: torch.Tensor, row) -> None:
         """A non-barbarian unit entering a camp tile clears it: +50 gold to
@@ -1432,8 +1785,9 @@ class SimMasks:
             self._blocked_for(nbc, row).reshape(B, N, 6),
         )
         has_mp = (self.unit_mp.gather(1, sc) > 0).unsqueeze(2)
-        cliff6 = (self._cliff_block_dirs(tc, nb, own_tile) & alive if self._embark_live
-                  else torch.zeros(B, N, 6, dtype=torch.bool, device=dev))
+        cliff6 = (self._cliff_block_dirs(tc, nb, own_tile,
+                                         self._promo_flag(ut, self.unit_promos.gather(1, sc), "CLIFFS")) & alive
+                  if self._embark_live else torch.zeros(B, N, 6, dtype=torch.bool, device=dev))
         shut = self._border_closed(nb, row, utype.unsqueeze(2).expand(B, N, 6))
         move = on_map & terr & ~_blk & alive & has_mp & ~cliff6 & ~shut
 
@@ -1586,9 +1940,53 @@ class SimMasks:
         if getattr(self, "_A_PARK", -1) >= 0:
             _pk = [(present & self._park_ok(row, tc, utype)).unsqueeze(2)]
 
+        _pr: list[torch.Tensor] = []
+        if getattr(self, "_A_PROMOTE", -1) >= 0:
+            _pr = [present.unsqueeze(2) & self._promo_offer_mask(sc, utype)]
+
+        _cd: list[torch.Tensor] = []
+        if getattr(self, "_A_CONDEMN", -1) >= 0:
+            # CIV6 (Condemn Heretic): "Must be at war with the owner of the
+            # religious unit" — a MILITARY unit's verb on an adjacent tile, and
+            # a WAR is what it asks for, not the wider hostility relation.
+            _hr = self._religious_at(nbc)
+            _hs = torch.where(_hr >= 0, self.unit_seat.gather(1, _hr.clamp(min=0)),
+                              torch.full_like(nbc, -1))
+            _hw = self.war[:, row].gather(
+                1, self._seat_row[_hs.clamp(min=0)]) & (_hs >= 0)
+            _cd = [(present & (self._type_combat[utype.clamp(min=0)] > 0)).unsqueeze(2)
+                   & on_map & _hw.reshape(B, N, 6)]
+
+        _rh: list[torch.Tensor] = []
+        if getattr(self, "_A_HERESY", -1) >= 0 and getattr(self, "_inquisitor_idx", -1) >= 0:
+            _rh = [(present & (utype == self._inquisitor_idx) & (u_charges > 0)
+                    & (self.centre_slot_at.gather(1, tc) >= 0)
+                    & (self.tile_seat.gather(1, tc) == row)).unsqueeze(2)]
+        elif getattr(self, "_A_HERESY", -1) >= 0:
+            _rh = [torch.zeros(B, N, 1, dtype=torch.bool, device=dev)]
+
+        _li: list[torch.Tensor] = []
+        if getattr(self, "_A_INQUISITION", -1) >= 0:
+            _ok = torch.zeros(B, N, dtype=torch.bool, device=dev)
+            if getattr(self, "_apostle_idx", -1) >= 0:
+                _ok = (present & (utype == self._apostle_idx)
+                       & (u_charges >= self._launch_inquisition_charges)
+                       & (self.tile_seat.gather(1, tc) == row)
+                       & ~self.civ_inquisition[:, row].unsqueeze(1))
+            _li = [_ok.unsqueeze(2)]
+
+        _hc: list[torch.Tensor] = []
+        if getattr(self, "_A_HEATHEN", -1) >= 0:
+            # CIV6 (Heathen Conversion): "Can convert all adjacent Barbarians to
+            # your side by using a religious charge."
+            _bs = self._barb_unit_plane()
+            _hc = [(present & (u_charges > 0)
+                    & self._promo_flag(utype, self.unit_promos.gather(1, sc), "HEATHEN")
+                    & (on_map & _bs.gather(1, nbc).reshape(B, N, 6)).any(dim=2)).unsqueeze(2)]
+
         out = torch.cat(
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
-            + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk,
+            + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc,
             dim=2,
         )
         if self._act_names and self.improvements_on and self._builder_idx >= 0:

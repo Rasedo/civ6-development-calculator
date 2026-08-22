@@ -4,7 +4,12 @@ import { makeMap, makeState, settleAt, tileAtCoords, grantCivics } from '../help
 import { endTurn, foundCity, serialize, deserialize } from '../../../cpu/core/game';
 import { seatPhase } from '../../../cpu/core/phase';
 import { spawnUnit, builderRepair } from '../../../cpu/core/units';
-import { meleeAttack, rangedAttack, attackTargets, terrainDefense, barbarianPhase, FLANKING_CS, SUPPORT_CS, XP_ATTACK, XP_DEFEND, XP_LEVELS, xpLevelBonus, unitLevel, awardDefenseXp, flankCount, supportCount, flankSupportLive, FLANK_SUPPORT_CIVIC, classMatchupCS, CLASS_MELEE_VS_ANTICAV, CLASS_ANTICAV_VS_CAV } from '../../../cpu/core/combat';
+import { meleeAttack, rangedAttack, attackTargets, terrainDefense, barbarianPhase, FLANKING_CS, SUPPORT_CS, awardDefenseXp, trainXpPct, flankCount, supportCount, flankSupportLive, FLANK_SUPPORT_CIVIC, classMatchupCS, CLASS_MELEE_VS_ANTICAV, CLASS_ANTICAV_VS_CAV } from '../../../cpu/core/combat';
+import {
+  XP_PER_LEVEL, MAX_LEVEL, PROMOTE_HEAL, XP_BATTLE_CAP, XP_CITY_DEFEND,
+  XP_BARB_VETERAN, battleXp, cityXp, bankXp, xpToNextLevel, unitLevel,
+  promoAvailable, promoReady, takePromotion, promoCS, unitPromoRows,
+} from '../../../cpu/core/promotions';
 import { routePlunderer } from '../../../cpu/core/trade';
 import { CITY_MAX_HP } from '../../../cpu/data/units';
 import { neighbors } from '../../../world/hex';
@@ -445,33 +450,68 @@ describe('XP & levels', () => {
   const atkTile = (s: ReturnType<typeof battlefield>['state']) => tileAtCoords(s.map, 11, 9).index;
   const defTile = (s: ReturnType<typeof battlefield>['state']) => tileAtCoords(s.map, 12, 9).index;
 
-  it('exports the XP constants and level helper', () => {
-    expect(XP_ATTACK).toBe(5);
-    expect(XP_DEFEND).toBe(2);
-    expect(XP_LEVELS).toEqual([15, 45, 90]);
-    expect(unitLevel({ xp: 0 })).toBe(0);
-    expect(unitLevel({ xp: 14 })).toBe(0);
-    expect(unitLevel({ xp: 15 })).toBe(1);
-    expect(unitLevel({ xp: 44 })).toBe(1);
-    expect(unitLevel({ xp: 45 })).toBe(2);
-    expect(unitLevel({ xp: 89 })).toBe(2);
-    expect(unitLevel({ xp: 90 })).toBe(3);
-    expect(xpLevelBonus({ xp: 0 })).toBe(0);
-    expect(xpLevelBonus({ xp: 15 })).toBe(5);
-    expect(xpLevelBonus({ xp: 45 })).toBe(10);
-    expect(xpLevelBonus({ xp: 90 })).toBe(15);
-    expect(xpLevelBonus({})).toBe(0); // undefined xp reads as 0
+  it('the ladder: 15 x the level it is on, 7 promotions to level 8', () => {
+    expect(XP_PER_LEVEL).toBe(15);
+    expect(MAX_LEVEL).toBe(8);
+    const owed = [1, 2, 3, 4, 5, 6, 7, 8].map((level) => xpToNextLevel({ level }));
+    expect(owed).toEqual([15, 30, 45, 60, 75, 90, 105, 0]);
+    // the page's own cumulative table, which is what those rungs sum to
+    let total = 0;
+    expect(owed.slice(0, 7).map((n) => (total += n))).toEqual([15, 45, 90, 150, 225, 315, 420]);
+    expect(unitLevel({})).toBe(1); // a brand new unit starts at level 1
   });
 
-  it('a fresh seat-0/civ unit starts at 0 xp; a barbarian carries none', () => {
+  it('battleXp: foeCS/ownCS, doubled for a kill, plus the battle and initiator terms', () => {
+    const o = { foeDied: false, ranged: false, initiated: false, pct: 0, mult: 1 };
+    // 20 vs 20, non-ranged, no initiator: 1 + 2 = 3
+    expect(battleXp(20, 20, o)).toBe(3);
+    // the initiator's +1
+    expect(battleXp(20, 20, { ...o, initiated: true })).toBe(4);
+    // a ranged battle pays +1 instead of +2
+    expect(battleXp(20, 20, { ...o, ranged: true })).toBe(2);
+    // "If one of the units is dead, the base XP is multiplied by 2"
+    expect(battleXp(20, 20, { ...o, foeDied: true })).toBe(4);
+    // 0.5 rounds UP: 10 vs 25 -> 2.5 + 2 = 4.5 -> 5
+    expect(battleXp(10, 25, o)).toBe(5);
+    // the cap
+    expect(battleXp(10, 200, o)).toBe(XP_BATTLE_CAP);
+    // the percentage modifiers ride the whole base
+    expect(battleXp(20, 20, { ...o, pct: 100 })).toBe(6);
+    expect(battleXp(20, 20, { ...o, mult: 2 })).toBe(6);
+    expect(battleXp(0, 20, o)).toBe(0); // a chassis with no strength banks nothing
+  });
+
+  it('cityXp: the flat base with the same modifiers and NO cap', () => {
+    expect(cityXp(3, 0, 1)).toBe(3);
+    expect(cityXp(10, 0, 1)).toBe(10); // the felling blow is not capped at 8
+    expect(cityXp(3, 100, 1)).toBe(6);
+    expect(cityXp(3, 50, 1)).toBe(5); // 4.5 rounds up
+  });
+
+  it('bankXp stalls at the threshold and carries no excess into the next level', () => {
+    const u = { level: 1, xp: 0, type: 'WARRIOR', hp: 100, movesLeft: 2 } as never as import('../../../cpu/core/types').Unit;
+    bankXp(u, 8);
+    expect(u.xp).toBe(8);
+    bankXp(u, 8);
+    expect(u.xp).toBe(15); // "earning more XP than needed ... will not transfer"
+    bankXp(u, 8);
+    expect(u.xp).toBe(15); // "won't earn new XP until it finishes the level-up process"
+    const maxed = { level: MAX_LEVEL, xp: 0, type: 'WARRIOR', hp: 100, movesLeft: 2 } as never as import('../../../cpu/core/types').Unit;
+    bankXp(maxed, 8);
+    expect(maxed.xp).toBe(0);
+  });
+
+  it('a fresh unit starts level 1 with no promotions; a barbarian banks nothing', () => {
     const { state } = battlefield();
     const p = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 5).index, 0)!;
     expect(p.xp).toBe(0);
+    expect(unitLevel(p)).toBe(1);
+    expect(p.promos ?? 0).toBe(0);
     const b = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 15, 15).index, BARB_SEAT)!;
     expect(b.xp).toBeUndefined();
   });
 
-  it('an attacker gains +5 per attack; a barbarian attacker accrues nothing', () => {
+  it('ONE battle pays BOTH sides; a barbarian pays and banks nothing', () => {
     const { state } = battlefield();
     const atk = spawnUnit(state, 'WARRIOR', atkTile(state), 0)!;
     atk.tileIndex = atkTile(state);
@@ -479,34 +519,40 @@ describe('XP & levels', () => {
     def.tileIndex = defTile(state);
     def.hp = 100; // survives the single hit
     meleeAttack(state, atk.id, def.tileIndex, 0);
-    expect(atk.xp).toBe(5);
+    // equal chassis, attacker initiates, defender survives
+    expect(atk.xp).toBe(4);
     expect(def.xp).toBeUndefined(); // barbarians never accrue
 
-    // a second attack stacks (the heal / MP aside — force another strike)
-    atk.movesLeft = 2;
-    meleeAttack(state, atk.id, def.tileIndex, 0);
-    expect(atk.xp).toBe(10);
-  });
-
-  it('a surviving military defender gains +2; a barbarian defender does not', () => {
-    const { state } = battlefield();
-    const barb = spawnUnit(state, 'WARRIOR', atkTile(state), BARB_SEAT)!;
-    barb.tileIndex = atkTile(state);
+    const { state: s2 } = battlefield();
+    const barb = spawnUnit(s2, 'WARRIOR', atkTile(s2), BARB_SEAT)!;
+    barb.tileIndex = atkTile(s2);
     barb.movesLeft = 2;
-    const def = spawnUnit(state, 'WARRIOR', defTile(state), 0)!;
-    def.tileIndex = defTile(state);
-    def.hp = 100; // survives
-    meleeAttack(state, barb.id, def.tileIndex, 0);
-    expect(def.xp).toBe(2); // survived the defense
+    const mine = spawnUnit(s2, 'WARRIOR', defTile(s2), 0)!;
+    mine.tileIndex = defTile(s2);
+    mine.hp = 100;
+    meleeAttack(s2, barb.id, mine.tileIndex, 0);
+    expect(mine.xp).toBe(3); // the defender's half: no initiator term
     expect(barb.xp).toBeUndefined();
   });
 
-  it('awardDefenseXp: military survivor +2, civilian and killed unit none', () => {
+  it('a VETERAN fighting barbarians earns exactly 1 XP', () => {
+    const { state } = battlefield();
+    const atk = spawnUnit(state, 'WARRIOR', atkTile(state), 0)!;
+    atk.tileIndex = atkTile(state);
+    atk.level = 2;
+    const def = spawnUnit(state, 'WARRIOR', defTile(state), BARB_SEAT)!;
+    def.tileIndex = defTile(state);
+    def.hp = 100;
+    meleeAttack(state, atk.id, def.tileIndex, 0);
+    expect(atk.xp).toBe(XP_BARB_VETERAN);
+  });
+
+  it('awardDefenseXp: military survivor banks the flat base, civilian and dead none', () => {
     const { state } = battlefield();
     const mil = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 3, 3).index, 0)!;
     mil.hp = 100;
     awardDefenseXp(state, mil);
-    expect(mil.xp).toBe(2);
+    expect(mil.xp).toBe(XP_CITY_DEFEND);
     const civ = spawnUnit(state, 'BUILDER', tileAtCoords(state.map, 4, 4).index, 0)!;
     civ.hp = 100;
     awardDefenseXp(state, civ);
@@ -517,41 +563,90 @@ describe('XP & levels', () => {
     expect(dead.xp).toBe(0); // no XP for a killed defender
   });
 
-  it('each level adds +5 CS at ATTACK (mel diff rises 5 CS per level)', () => {
-    const run = (atkXp: number): number => {
+  it('trainXpPct sums the buildings that reach the class, and misses the ones that do not', () => {
+    expect(trainXpPct([], 'MELEE')).toBe(0);
+    expect(trainXpPct(['MONUMENT'], 'MELEE')).toBe(0);
+    expect(trainXpPct(['BARRACKS'], 'MELEE')).toBe(25);
+    expect(trainXpPct(['BARRACKS'], 'HEAVY_CAV')).toBe(0); // Barracks misses cavalry
+    expect(trainXpPct(['STABLE'], 'HEAVY_CAV')).toBe(25);
+    expect(trainXpPct(['BARRACKS', 'ARMORY'], 'MELEE')).toBe(50); // the lines STACK
+    expect(trainXpPct(['ARMORY', 'MILITARY_ACADEMY'], 'SIEGE')).toBe(50);
+    expect(trainXpPct(['SHIPYARD', 'SEAPORT'], 'NAVAL_MELEE')).toBe(50);
+    expect(trainXpPct(['BARRACKS'], undefined)).toBe(0);
+  });
+
+  it('a promotion heals 50, ends the turn, and takes the next rung', () => {
+    const { state } = battlefield();
+    const u = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 5).index, 0)!;
+    u.hp = 40;
+    u.movesLeft = 2;
+    expect(promoReady(u)).toBe(false); // no XP banked yet
+    expect(takePromotion(u, 0)).toBe(false);
+    u.xp = XP_PER_LEVEL;
+    expect(promoReady(u)).toBe(true);
+    expect(takePromotion(u, 0)).toBe(true);
+    expect(u.hp).toBe(40 + PROMOTE_HEAL);
+    expect(u.movesLeft).toBe(0);
+    expect(unitLevel(u)).toBe(2);
+    expect(u.xp).toBe(0);
+    expect(u.promos).toBe(1);
+    expect(takePromotion(u, 0)).toBe(false); // held already, and no XP either
+  });
+
+  it('promoAvailable: a tier-2 row waits for one of its prerequisites', () => {
+    const rows = unitPromoRows({ type: 'WARRIOR' });
+    expect(rows.length).toBeGreaterThan(2);
+    const deep = rows.findIndex((p) => p.requires.length > 0);
+    expect(deep).toBeGreaterThan(-1);
+    const u = { type: 'WARRIOR', promos: 0 };
+    expect(promoAvailable(u, deep)).toBe(false);
+    const need = rows.findIndex((p) => p.id === rows[deep].requires[0]);
+    expect(promoAvailable(u, need)).toBe(true);
+    expect(promoAvailable({ ...u, promos: 1 << need }, deep)).toBe(true);
+    expect(promoAvailable(u, rows.length)).toBe(false); // off the end of its own class
+  });
+
+  it('promoAvailable: an OFFER, when one was handed out, is the whole choice', () => {
+    const u = { type: 'WARRIOR', promos: 0, promoOffer: 0b10 };
+    expect(promoAvailable(u, 1)).toBe(true);
+    expect(promoAvailable(u, 0)).toBe(false); // legal, but not offered
+    expect(promoAvailable({ ...u, promoOffer: 0 }, 0)).toBe(true); // no offer = no restriction
+  });
+
+  it('promoCS reads its context, not just the bit', () => {
+    const rows = unitPromoRows({ type: 'WARRIOR' });
+    const k = rows.findIndex((p) => p.id === 'BATTLECRY');
+    expect(k).toBeGreaterThan(-1);
+    const v = rows[k].effects.find((e) => e.kind === 'CS_VS_CLASS_ATK')!.v ?? 0;
+    const u = { type: 'WARRIOR', promos: 1 << k };
+    // "the Combat Strength bonus ... only when a unit with this promotion is
+    // attacking", and only against the three classes its mask names
+    expect(promoCS(u, { attacking: true, foeType: 'WARRIOR' })).toBe(v);
+    expect(promoCS(u, { attacking: true, foeType: 'HORSEMAN' })).toBe(0);
+    expect(promoCS(u, { attacking: false, foeType: 'WARRIOR' })).toBe(0);
+    expect(promoCS(u, { attacking: true })).toBe(0); // no foe named -> no class match
+    expect(promoCS({ type: 'WARRIOR', promos: 0 }, { attacking: true, foeType: 'WARRIOR' })).toBe(0);
+    expect(promoCS({ type: 'BUILDER', promos: 0xff }, { attacking: true, foeType: 'WARRIOR' })).toBe(0);
+  });
+
+  it('a held promotion moves the ROLL, not just the helper', () => {
+    const rows = unitPromoRows({ type: 'WARRIOR' });
+    const k = rows.findIndex((p) => p.id === 'BATTLECRY');
+    const v = rows[k].effects.find((e) => e.kind === 'CS_VS_CLASS_ATK')!.v ?? 0;
+    const run = (promos: number): number => {
       const { state } = battlefield();
       const atk = spawnUnit(state, 'WARRIOR', atkTile(state), 0)!;
       atk.tileIndex = atkTile(state);
-      atk.xp = atkXp;
+      atk.promos = promos;
       const def = spawnUnit(state, 'WARRIOR', defTile(state), BARB_SEAT)!;
       def.tileIndex = defTile(state);
       def.hp = 100;
       return rollDiff('mel', () => meleeAttack(state, atk.id, def.tileIndex, 0));
     };
-    const base = run(0);
-    expect(run(15)).toBe(base + 5 * 10); // level 1 → +5 CS → +50 in diff·10
-    expect(run(45)).toBe(base + 10 * 10); // level 2 → +10 CS
-    expect(run(90)).toBe(base + 15 * 10); // level 3 → +15 CS
+    expect(run(1 << k)).toBe(run(0) + v * 10); // diff is quantized to 0.1 CS
   });
 
-  it('each level adds +5 CS at DEFENSE (mel diff drops 5 CS per defender level)', () => {
-    const run = (defXp: number): number => {
-      const { state } = battlefield();
-      const barb = spawnUnit(state, 'WARRIOR', atkTile(state), BARB_SEAT)!;
-      barb.tileIndex = atkTile(state);
-      barb.movesLeft = 2;
-      const def = spawnUnit(state, 'WARRIOR', defTile(state), 0)!;
-      def.tileIndex = defTile(state);
-      def.hp = 100;
-      def.xp = defXp;
-      return rollDiff('mel', () => meleeAttack(state, barb.id, def.tileIndex, 0));
-    };
-    const base = run(0);
-    expect(run(15)).toBe(base - 5 * 10); // defender level 1 → def_e +5 → atk-def diff −50
-    expect(run(90)).toBe(base - 15 * 10); // defender level 3 → −15 CS
-  });
-
-  it('a city walls strike grants a surviving civ defender +2', () => {
+  it('a city walls strike grants a surviving civ defender the defense base', () => {
     const { state, city } = battlefield();
     city.buildings.push('ANCIENT_WALLS');
     // a CITYLESS civ at war: the seat loop skips it, so its spearman holds
@@ -566,6 +661,6 @@ describe('XP & levels', () => {
     expect(defender.xp ?? 0).toBe(0);
     seatPhase(state);
     expect(defender.hp).toBeLessThan(100); // the walls strike landed
-    expect(defender.xp).toBe(2); // survived → +2 (attacker is the city, no attacker xp)
+    expect(defender.xp).toBe(XP_CITY_DEFEND); // the attacker is the city, so no attacker xp
   });
 });

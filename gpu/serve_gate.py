@@ -121,9 +121,12 @@ def _buy_row(sim, seat: int, bc: dict, rk, rj, mk, b: int) -> list:
 def _buy_rows(sim, seat: int, bc: dict | None = None) -> list:
     if bc is None:
         bc = drive._buy_ctx(sim, seat)
-    _, rk = ladder.pick_faith(bc["worship_ok"], bc["missionary_ok"], bc["apostle_ok"])
+    _, rk = ladder.pick_faith(bc["worship_ok"], bc["missionary_ok"], bc["apostle_ok"],
+                              bc["inquisitor_ok"])
     rj = torch.where(rk == 5, bc["missionary_j"],
-                     torch.where(rk == 6, bc["apostle_j"], torch.full_like(rk, -1)))
+                     torch.where(rk == 6, bc["apostle_j"],
+                                 torch.where(rk == 11, bc["inquisitor_j"],
+                                             torch.full_like(rk, -1))))
     mk = ladder.pick_monu(bc["monu_builder_ok"], bc["monu_settler_ok"])
     return [_buy_row(sim, seat, bc, rk, rj, mk, b) for b in range(sim.B)]
 

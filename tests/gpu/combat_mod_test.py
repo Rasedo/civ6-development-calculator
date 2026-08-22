@@ -255,24 +255,25 @@ def test_integrated(sim, p, code, name) -> None:
     ua = torch.full((1, UNIT_SLOTS), HOLD, dtype=torch.long)
     ua[0, rank_of(sim, p)] = code
 
-    # XP: force known experience so the level term is exercised. Attacker
-    # 50 xp -> level 2 (+10 CS); civ defender 20 xp -> level 1 (+5 CS); a
-    # barbarian defender never accrues (no bonus). The bonus enters the CS
-    # assembly like the flank/support terms (integer add, once, before the
-    # paired rolls).
-    ATK_XP, DEF_XP = 50, 20
-    def xp_bonus(xp):
-        return 5 * sum(1 for t in (15, 45, 90) if xp >= t)
-    atk_xp_cs = xp_bonus(ATK_XP)  # +10
-    def_xp_cs = 0 if is_barb else xp_bonus(DEF_XP)  # +5 for a civ defender
+    # PROMOTIONS, not XP, are what a veteran brings to the roll. The driver
+    # has been taking them for 21 turns, so BOTH sides are cleared here and the
+    # reference assembles no promotion term at all; a second scene below hands
+    # the attacker exactly one and asks the roll to move by its value.
+    def clear_promos():
+        sim.major_unit_promos[0, p] = 0
+        sim.major_unit_level[0, p] = 1
+        if is_barb:
+            sim.barb_unit_promos[0, dslot] = 0
+        else:
+            sim.major_unit_promos[0, dslot] = 0
+            sim.major_unit_level[0, dslot] = 1
 
-    def run(river_bit):
+    def run(river_bit, atk_promos=0):
         snap = sim.snapshot()
         sim.major_unit_hp[0, p] = ATK_HP
         set_def_hp(DEF_HP)
-        sim.major_unit_xp[0, p] = ATK_XP  # attacker veterancy
-        if not is_barb:
-            sim.major_unit_xp[0, dslot] = DEF_XP  # civ defender veterancy
+        clear_promos()
+        sim.major_unit_promos[0, p] = atk_promos
         # force the river edge on/off explicitly (river_mask is static; set it
         # each run so restore can't leak the previous state)
         rm = int(sim.river_mask[0, here])
@@ -318,14 +319,14 @@ def test_integrated(sim, p, code, name) -> None:
 
     b7_flank, b7_support = flank_support_ref()
 
-    # reference (TS assembly): atk_e = combat - wound(64) - 5*river + 2*flank + xp;
-    #                    def_e = combat + terrain + fortify - wound(88) + 2*support + xp
+    # reference (TS assembly): atk_e = combat - wound(64) - 5*river + 2*flank;
+    #                    def_e = combat + terrain + fortify - wound(88) + 2*support
     def wound(hp):
         return math.floor(10.0 - hp / 10.0 + 0.5)  # CIV6 round(10 - HP/10)
 
     def ref_q(river):
-        atk_e = atk_combat - wound(ATK_HP) - (5.0 if river else 0.0) + FLANKING_CS * b7_flank + atk_xp_cs
-        def_e = def_combat + tdef + 3 * def_fort - wound(DEF_HP) + SUPPORT_CS * b7_support + def_xp_cs
+        atk_e = atk_combat - wound(ATK_HP) - (5.0 if river else 0.0) + FLANKING_CS * b7_flank
+        def_e = def_combat + tdef + 3 * def_fort - wound(DEF_HP) + SUPPORT_CS * b7_support
         return round((atk_e - def_e) * 10), round((def_e - atk_e) * 10)
 
     ev0 = run(False)
@@ -341,9 +342,35 @@ def test_integrated(sim, p, code, name) -> None:
     # at 0.1 granularity) and lifts the retaliation counter's by the same.
     assert _diff_of(ev1, "mel") == _diff_of(ev0, "mel") - 50, "river did not cut the melee diff by 50"
     assert _diff_of(ev1, "melc") == _diff_of(ev0, "melc") + 50, "river did not lift the counter diff by 50"
+    # ONE promotion, inside the real roll: an attack-only CS row must move the
+    # `mel` diff by exactly its value and leave the counter's mirrored.
+    d_type = int(sim.barb_unit_type[0, dslot] if is_barb else sim.major_unit_type[0, dslot])
+    a_cls = int(sim.rules_dev.u_promo_class[int(sim.major_unit_type[0, p])])
+    moved = None
+    if a_cls >= 0:
+        for k in range(int(sim.rules_dev.promo_rows[a_cls])):
+            if int(sim.rules_dev.promo_req[a_cls, k]) != 0:
+                continue
+            want = int(sim._promo_cs(
+                torch.tensor([int(sim.major_unit_type[0, p])]), torch.tensor([1 << k]),
+                attacking=torch.ones(1, dtype=torch.bool), foe_type=torch.tensor([d_type]),
+                foe_damaged=torch.tensor([True]),
+                foe_fortified=torch.tensor([def_fort > 0]),
+                foe_in_district=torch.tensor([False]), tile=torch.tensor([here]))[0])
+            if want == 0:
+                continue
+            evk = run(False, atk_promos=1 << k)
+            assert _diff_of(evk, "mel") == q_mel0 + want * 10, \
+                f"promotion {k} moved the mel diff by {_diff_of(evk,'mel') - q_mel0}, want {want * 10}"
+            assert _diff_of(evk, "melc") == q_melc0 - want * 10, "the counter did not mirror it"
+            moved = (k, want)
+            break
+    assert moved is not None, "no tier-1 promotion of the attacker's class pays against this defender"
+    print(f"  D2. promotion {moved[0]} of the attacker's class moved the roll by +{moved[1]} CS")
+
     print(
-        f"  D. melee on {name} slot {p}: wounded+xp assembly exact "
-        f"(atk +{atk_xp_cs}, def +{def_xp_cs} CS); "
+        f"  D. melee on {name} slot {p}: wounded assembly exact "
+        f"(no promotions held); "
         f"river mel {q_mel0}->{q_mel1} (-50), melc {q_melc0}->{q_melc1} (+50)"
     )
 

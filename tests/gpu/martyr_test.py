@@ -1,13 +1,11 @@
-"""Only a MARTYR apostle leaves a relic.
+"""Only an apostle HOLDING the Martyr promotion leaves a relic.
 
     python tests/gpu/martyr_test.py
 
 CIV 6 creates a relic when the Apostle killed in theological combat carried the
-MARTYR promotion — one of nine. Nothing here CHOOSES a promotion (no wire
-record), so the engines draw for it at the death, which is where TS's own
-`martyrs()` draw sits. This lane pins the RATE: every fallen apostle used to
-martyr, and the whole relic economy (faith, tourism, the culture victory) rides
-on it.
+MARTYR promotion — one of the nine it chose from at purchase. The death itself
+draws nothing, so this lane pins both halves: the relic follows the BIT, and the
+RNG stream is untouched by a fight's outcome.
 """
 
 from __future__ import annotations
@@ -46,12 +44,23 @@ def free_pair(sim):
     raise AssertionError("no free adjacent land pair")
 
 
-def place_apostle(sim, slot, tile, seat, hp):
+def martyr_col(sim) -> int:
+    """the column of the apostle list whose effect IS the martyr rule."""
+    rd = sim.rules_dev
+    cls = int(rd.u_promo_class[sim._apostle_idx])
+    assert cls >= 0, "the APOSTLE chassis promotes from no class"
+    hit = (rd.promo_kind[cls] == sim._pk["MARTYR"]).any(dim=1)
+    assert bool(hit.any()), "no MARTYR row in the apostle list"
+    return int(hit.long().argmax())
+
+
+def place_apostle(sim, slot, tile, seat, hp, promos=0):
     sim.major_unit_alive[0, slot] = True
     sim.major_unit_seat[0, slot] = seat
     sim.major_unit_type[0, slot] = sim._apostle_idx
     sim.major_unit_tile[0, slot] = tile
     sim.major_unit_hp[0, slot] = hp
+    sim.major_unit_promos[0, slot] = promos
     sim.civilian_at[0, tile] = slot + sim.POOL_LO["major"]
 
 
@@ -59,8 +68,7 @@ def main() -> None:
     sim = build()
     assert sim._apostle_idx >= 0, "no APOSTLE in the roster"
     assert sim.n_majors >= 2, "the fight needs two religions"
-    chance = float(sim.rules.beliefs["martyrChance"])
-    assert abs(chance - 1.0 / 9.0) < 1e-12, f"martyrChance is {chance}, expected one promotion in nine"
+    mcol = martyr_col(sim)
 
     ta, tb = free_pair(sim)
     sa, sb = int(sim.unit_next[0]), int(sim.unit_next[0]) + 1
@@ -70,35 +78,40 @@ def main() -> None:
     real_grant = sim._grant_relic
     sim._grant_relic = lambda rows, seat: grants.append(int(rows.numel()))
 
-    passes = 300
-    for _ in range(passes):
-        # Both sides at 20 HP and equal religious strength: an even fight rolls
-        # 24-36, so every pass offers TWO deaths to the draw.
-        place_apostle(sim, sa, ta, 0, 20)
-        place_apostle(sim, sb, tb, 1, 20)
+    # Both sides at 20 HP and equal religious strength: an even fight rolls
+    # 24-36, so every pass offers TWO deaths — and only the bit decides.
+    for promos_a, promos_b, want in (
+        (0, 0, 0),
+        (1 << mcol, 0, 1),
+        (0, 1 << mcol, 1),
+        (1 << mcol, 1 << mcol, 2),
+    ):
+        grants.clear()
+        place_apostle(sim, sa, ta, 0, 20, promos_a)
+        place_apostle(sim, sb, tb, 1, 20, promos_b)
         sim._theological_combat_phase()
+        assert not bool(sim.major_unit_alive[0, sa]) and not bool(sim.major_unit_alive[0, sb]), \
+            "the even fight did not kill both sides"
+        got = sum(grants)
+        assert got == want, f"promos {promos_a}/{promos_b} granted {got} relics, expected {want}"
+    print("  the relic follows the MARTYR bit, on either side of the duel")
 
+    # No draw at the death: the two damage rolls are the whole stream cost, so
+    # a martyr and a non-martyr advance it by exactly the same amount.
     sim._grant_relic = real_grant
-    deaths = 2 * passes
-    got = sum(grants)
-    rate = got / deaths
-    assert 0 < got < deaths, f"{got} relics from {deaths} deaths — the draw is not gating anything"
-    assert 0.05 < rate < 0.20, f"martyr rate {rate:.3f} is nowhere near one promotion in nine"
-    print(f"  {got} relics from {deaths} apostle deaths — rate {rate:.3f} (expected {chance:.3f})")
 
-    # The draw must move the stream ONLY where an apostle actually fell, which
-    # is what keeps it in step with TS's short-circuited `martyrs()`.
-    before = sim.rng_state.clone()
-    _z = torch.zeros(0, dtype=torch.long)
-    sim._martyr_draw(_z, _z)
-    assert torch.equal(sim.rng_state, before), "an empty death set still advanced the RNG"
-    sim._martyr_draw(torch.tensor([0], dtype=torch.long), torch.zeros(1, dtype=torch.long))
-    assert int(sim.rng_state[0]) != int(before[0]), "a death did not advance the RNG"
-    if sim.B > 1:
-        assert torch.equal(sim.rng_state[1:], before[1:]), "one game's draw moved another game's stream"
-    print("  the stream advances in exactly the games that lost an apostle")
+    def stream_cost(promos: int) -> int:
+        place_apostle(sim, sa, ta, 0, 20, promos)
+        place_apostle(sim, sb, tb, 1, 20, promos)
+        before = int(sim.rng_state[0])
+        sim._theological_combat_phase()
+        return (int(sim.rng_state[0]) - before) & 0xFFFFFFFF
 
-    print("MARTYR OK — one relic in nine deaths, drawn where TS draws it")
+    plain, martyr = stream_cost(0), stream_cost(1 << mcol)
+    assert plain == martyr, f"a martyr's death cost {martyr} of stream, a plain one {plain}"
+    print("  a death draws nothing — the promotion is not a roll")
+
+    print("MARTYR OK — the relic rides the promotion, and the stream never asks")
 
 
 if __name__ == "__main__":

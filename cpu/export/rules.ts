@@ -19,7 +19,7 @@ import { GENERAL_AURA_MP } from '../core/aura';
 import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_HILL_CS, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD } from '../data/cityStates';
 import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_BUILDINGS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_YIELD, CITY_STATE_MAX_HP, CITY_STATE_MEET_RANGE, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, GP_ERA_GPP, GP_FIRST_OF_ERA, GP_FLAT_COST_CLASSES, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, RELIC_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_CULTURE, ARTIFACT_TOURISM, THEMING_MULT, ARTIST_WORKS, SPECIALIST_YIELDS, SPECIALIST_TIERS } from '../data/greatPeople';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, MARTYR_CHANCE, type BeliefEffects } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, APOSTLE_PROMO_OFFER, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { TRADE_ROUTE_RANGE_LAND, TRADE_ROUTE_RANGE_SEA, CITY_STATE_ROUTE_GOLD, CITY_STATE_ROUTE_SPEC, INTL_ROUTE_GOLD, TRADE_ROUTE_DURATION, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from '../core/trade';
@@ -33,6 +33,24 @@ import { UNITS, UNIT_HP, CITY_MAX_HP, WALLS_TIER_HP, WALLS_TIER_CS, WALLS_TIER_U
 import { YIELD_KEYS } from '../core/types';
 import { FLOOD_SEVERITY_P, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn } from '../data/disasters';
 import { BUILDINGS } from '../data/buildings';
+import {
+  PROMO_CLASSES, PROMO_COLS, PROMO_KINDS, UNIT_PROMO_CLASS, promoRows,
+} from '../data/promotions';
+
+/** the widest effect list any promotion carries. */
+const PROMO_SLOTS = 2;
+/** pad a per-class column list out to the head's fixed width. */
+const padTo = <T,>(xs: T[], fill: T): T[] => {
+  const out = xs.slice();
+  while (out.length < PROMO_COLS) out.push(fill);
+  return out;
+};
+/** pad one row's effect list out to PROMO_SLOTS. */
+const slotsOf = (xs: number[]): number[] => {
+  const out = xs.slice(0, PROMO_SLOTS);
+  while (out.length < PROMO_SLOTS) out.push(0);
+  return out;
+};
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencySource } from '../data/districts';
 import { TECHS, ERAS, MODERN_ERA_INDEX } from '../data/techs'; // era scale
 import { CIVICS } from '../data/civics';
@@ -484,7 +502,15 @@ export function buildRules() {
       religiousHealPerFaith: RELIGIOUS_HEAL_PER_FAITH,
       theoHolyGround: THEO_HOLY_GROUND_STRENGTH,
       theoHolyCity: THEO_HOLY_CITY_STRENGTH,
-      martyrChance: MARTYR_CHANCE,
+      inquisitorIdx: Object.values(UNITS).findIndex((u) => u.id === 'INQUISITOR'),
+      inquisitorCost: UNITS.INQUISITOR.cost,
+      inquisitorCap: INQUISITOR_CAP,
+      apostlePromoOffer: APOSTLE_PROMO_OFFER,
+      inquisitorHomeStrength: INQUISITOR_HOME_STRENGTH,
+      removeHeresyPct: REMOVE_HERESY_PCT,
+      launchInquisitionCharges: LAUNCH_INQUISITION_CHARGES,
+      condemnPressureRange: CONDEMN_PRESSURE_RANGE,
+      condemnPressureSwing: CONDEMN_PRESSURE_SWING,
       pantheons: Object.values(PANTHEONS).map(beliefRow),
       followers: Object.values(FOLLOWER_BELIEFS).map(beliefRow),
       founders: Object.values(FOUNDER_BELIEFS).map(beliefRow),
@@ -691,6 +717,37 @@ export function buildRules() {
       cartographyTech: techIdx.get('CARTOGRAPHY') ?? -1,
       celestialTech: techIdx.get('CELESTIAL_NAVIGATION') ?? -1,
     },
+    // THE PROMOTION CATALOG, per class and in COLUMN order — the order IS the
+    // PROMOTE head's wire layout. `req` is a bitmask of the columns that open
+    // a row (0 = a tier-I root); each row carries up to PROMO_SLOTS effects.
+    promotions: {
+      classes: [...PROMO_CLASSES],
+      kinds: [...PROMO_KINDS],
+      cols: PROMO_COLS,
+      slots: PROMO_SLOTS,
+      ids: PROMO_CLASSES.map((c) => promoRows(c).map((p) => p.id)),
+      req: PROMO_CLASSES.map((c) => {
+        const rows = promoRows(c);
+        const col = new Map(rows.map((p, i) => [p.id, i]));
+        return padTo(rows.map((p) => p.requires.reduce((m, id) => m | (1 << (col.get(id) ?? 0)), 0)), 0);
+      }),
+      kind: PROMO_CLASSES.map((c) => padTo(promoRows(c).map(
+        (p) => slotsOf(p.effects.map((e) => PROMO_KINDS.indexOf(e.kind))),
+      ), slotsOf([]))),
+      v: PROMO_CLASSES.map((c) => padTo(promoRows(c).map(
+        (p) => slotsOf(p.effects.map((e) => e.v ?? 0)),
+      ), slotsOf([]))),
+      mask: PROMO_CLASSES.map((c) => padTo(promoRows(c).map(
+        (p) => slotsOf(p.effects.map((e) => e.mask ?? 0)),
+      ), slotsOf([]))),
+      unitClass: Object.values(UNITS).map((u) => PROMO_CLASSES.indexOf(UNIT_PROMO_CLASS[u.id] ?? ('' as never))),
+      // CHOKE POINTS names "Woods, Jungle, Hills, or Marsh"; hills are their
+      // own plane, so only the three FEATURES need naming here.
+      chokeFeatures: ['WOODS', 'RAINFOREST', 'MARSH'].map((f) => featIdx.get(f) ?? -1),
+      // RANGER names Woods and Jungle for its 1-MP step; MARSH is nobody's,
+      // so this list is the choke one MINUS the marsh.
+      woodsFeatures: ['WOODS', 'RAINFOREST'].map((f) => featIdx.get(f) ?? -1),
+    },
     // The trainable roster (mirrors trainableUnits + UNITS data). `civilian`
     // marks builder-type units (charges) — they hold the civilian stacking
     // slot and cannot attack.
@@ -865,7 +922,8 @@ export function buildRules() {
       // gold-purchase refusal the upgraded tiers carry
       walls: b.walls ?? 0,
       noPurchase: b.noPurchase ? 1 : 0,
-      trainXp: b.trainXp ?? 0,
+      trainXpPct: b.trainXpPct ?? 0,
+      trainXpClasses: (b.trainXpClasses ?? []).map((c) => PROMO_CLASSES.indexOf(c)),
     })),
     techs: techList.map((t) => ({
       id: t.id,

@@ -64,11 +64,10 @@ export interface UnitDef {
   faithOnly?: boolean;
   /**
    * RELIGIOUS STRENGTH — the stat theological combat resolves on.
-   * Only units that carry it can take part; only an APOSTLE may INITIATE
-   * (real Civ 6: Apostles and Inquisitors attack, Missionaries only defend).
-   * CIV6 magnitudes, exact: Apostle 110, Missionary 100. Real Civ 6 also lets
-   * INQUISITORS attack and defend, and promotions change these numbers;
-   * neither exists here, and both stay open.
+   * Only units that carry it can take part, and CIV6 lets only the APOSTLE
+   * and the INQUISITOR initiate: "Missionaries and Gurus may become the target
+   * of such an attack, but they may not initiate it themselves."
+   * CIV6 magnitudes, exact: Apostle 110, Missionary 100, Inquisitor 70.
    */
   religiousStrength?: number;
   /** spawn-ONLY chassis (GENERAL/ADMIRAL) — never trainable,
@@ -324,9 +323,8 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     // The APOSTLE — appended LAST, because roster indices ARE the
     // GPU's unit type ids and inserting anywhere else would renumber them.
     // Faith-purchase only like the Missionary, spreads like it, but carries a
-    // higher religiousStrength and is the ONLY unit that may INITIATE
-    // theological combat, because the roster holds no INQUISITOR — which real
-    // Civ 6 does, and which stays open.
+    // higher religiousStrength, takes a promotion at purchase, and may
+    // INITIATE theological combat.
     U({
       id: 'APOSTLE',
       name: 'Apostle',
@@ -502,6 +500,25 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       siegeSupport: 'TOWER',
       siegeMaxWalls: 2,
       description: 'Adjacent melee and anti-cavalry attackers ignore Walls up to Medieval.',
+    }),
+    // The INQUISITOR — appended LAST, because roster indices ARE the GPU's
+    // unit type ids. CIV6: 100 Faith (progressive), a Temple, 70 Religious
+    // Strength, 4 Movement, 3 charges of Remove Heresy, and it may only be
+    // bought once an Apostle has Launched an Inquisition in this seat's own
+    // territory. It is the ONE religious unit that "cannot enter another
+    // civilization's territory without Open Borders".
+    U({
+      id: 'INQUISITOR',
+      name: 'Inquisitor',
+      code: 'Q',
+      cost: 100, // ×GAME_SPEED faith (faith-only; never a production cost)
+      maintenance: 0,
+      moves: 4,
+      combat: 0,
+      charges: 3,
+      faithOnly: true,
+      religiousStrength: 70,
+      description: 'Removes other religions from a city and fights theological combat (faith purchase only).',
     }),
   ].map((u) => [u.id, u]),
 );

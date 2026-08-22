@@ -28,7 +28,7 @@ import { goldenDedication, monumentalityBuyMult } from '../core/eras';
 import { builderCost } from '../core/units';
 import { hasMet, isSuzerain } from '../core/cityStates';
 import { pickBorderTile } from '../core/city';
-import { WORSHIP_BUILDINGS, MISSIONARY_CAP, APOSTLE_CAP, ENHANCER_BELIEFS } from '../data/religion';
+import { WORSHIP_BUILDINGS, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, ENHANCER_BELIEFS } from '../data/religion';
 import { LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { observeSeat } from '../core/observe';
 import { stateDigest, groupDump } from '../core/statecompare';
@@ -184,20 +184,27 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
       if (goldAffordable(actor.faith ?? 0, buildingFaithCost(wid))) {
         worshipC = actor.cities.find((city) => !city.buildings.includes(wid) && city.buildings.includes('TEMPLE') && hsOk(city))?.centerIndex ?? -1;
       }
+      // A Shrine sells the Missionary; the Apostle and the Inquisitor need a
+      // TEMPLE on top, so the two arms walk to DIFFERENT cities.
       const shrineCity = actor.cities.find((city) => city.buildings.includes('SHRINE') && hsOk(city));
-      if (shrineCity) {
-        const eb = actor.religion.enhancer ? ENHANCER_BELIEFS[actor.religion.enhancer]?.effects : undefined;
-        const liveM = state.units.filter((u) => u.seat === actor.seat && u.type === 'MISSIONARY').length;
-        const mCost = Math.round(UNITS.MISSIONARY.cost * (eb?.missionaryCostMult ?? 1));
-        if (liveM < MISSIONARY_CAP && goldAffordable(actor.faith ?? 0, mCost)) {
-          religKind = 5;
-          religC = shrineCity.centerIndex;
-        } else {
-          const liveA = state.units.filter((u) => u.seat === actor.seat && u.type === 'APOSTLE').length;
-          if (liveA < APOSTLE_CAP && goldAffordable(actor.faith ?? 0, Math.round(UNITS.APOSTLE.cost))) {
-            religKind = 6;
-            religC = shrineCity.centerIndex;
-          }
+      const templeCity = actor.cities.find((city) => city.buildings.includes('SHRINE')
+        && city.buildings.includes('TEMPLE') && hsOk(city));
+      const eb = actor.religion.enhancer ? ENHANCER_BELIEFS[actor.religion.enhancer]?.effects : undefined;
+      const liveM = state.units.filter((u) => u.seat === actor.seat && u.type === 'MISSIONARY').length;
+      const mCost = Math.round(UNITS.MISSIONARY.cost * (eb?.missionaryCostMult ?? 1));
+      if (shrineCity && liveM < MISSIONARY_CAP && goldAffordable(actor.faith ?? 0, mCost)) {
+        religKind = 5;
+        religC = shrineCity.centerIndex;
+      } else if (templeCity) {
+        const liveA = state.units.filter((u) => u.seat === actor.seat && u.type === 'APOSTLE').length;
+        const liveQ = state.units.filter((u) => u.seat === actor.seat && u.type === 'INQUISITOR').length;
+        if (liveA < APOSTLE_CAP && goldAffordable(actor.faith ?? 0, Math.round(UNITS.APOSTLE.cost))) {
+          religKind = 6;
+          religC = templeCity.centerIndex;
+        } else if (actor.religion.inquisition && liveQ < INQUISITOR_CAP
+          && goldAffordable(actor.faith ?? 0, Math.round(UNITS.INQUISITOR.cost))) {
+          religKind = 11;
+          religC = templeCity.centerIndex;
         }
       }
     }

@@ -43,45 +43,58 @@ def bidx_of(bid: str) -> int:
 
 
 def test_catalog(sim) -> None:
-    want = {"BARRACKS": 5, "STABLE": 5, "ARMORY": 10, "MILITARY_ACADEMY": 15}
-    for bid, xp in want.items():
-        got = int(sim._b_train_xp[bidx_of(bid)])
-        assert got == xp, f"trainXp[{bid}] = {got}, want {xp}"
-    # every OTHER building is 0
+    """CIV6: every experience line reads "+25% combat experience", and the
+    classes each building reaches are what tell them apart."""
+    rd = sim.rules_dev
+    want = {"BARRACKS", "STABLE", "ARMORY", "MILITARY_ACADEMY", "SHIPYARD", "SEAPORT"}
+    for bid in want:
+        got = int(rd.b_train_xp_pct[bidx_of(bid)])
+        assert got == 25, f"trainXpPct[{bid}] = {got}, want 25"
+        assert bool(rd.b_train_xp_cls[bidx_of(bid)].any()), f"{bid} reaches no unit class"
     for i, bid in enumerate(BUILDING_IDS):
         if bid not in want:
-            assert int(sim._b_train_xp[i]) == 0, f"trainXp[{bid}] should be 0, got {int(sim._b_train_xp[i])}"
-    print(f"  catalog OK: BARRACKS/STABLE 5, ARMORY 10, MILITARY_ACADEMY 15; {len(BUILDING_IDS)} rows, rest 0")
+            assert int(rd.b_train_xp_pct[i]) == 0, f"trainXpPct[{bid}] should be 0"
+    cls = list(rd.promo_classes)
+    naval = [cls.index(c) for c in ("NAVAL_MELEE", "NAVAL_RANGED") if c in cls]
+    assert all(bool(rd.b_train_xp_cls[bidx_of("SHIPYARD"), c]) for c in naval), "Shipyard misses the fleet"
+    assert not bool(rd.b_train_xp_cls[bidx_of("BARRACKS"), cls.index("HEAVY_CAV")]), \
+        "Barracks names melee, ranged and anti-cavalry — never cavalry"
+    print(f"  catalog OK: six +25% lines over {len(BUILDING_IDS)} buildings, each to its own classes")
 
 
 def test_training_xp_wiring(rules, path) -> None:
     sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    # a military unit type and the builder (civilian) type
     mil_ty = int(torch.tensor([c if not bool(sim._type_civilian[i]) else -1 for i, c in enumerate(sim._type_combat.tolist())]).argmax())
     assert not bool(sim._type_civilian[mil_ty]) and float(sim._type_combat[mil_ty]) > 0, "no military unit type found"
+    ctr = sim.city_center[:, 0, 0].clamp(min=0)
+
+    # the line is a PERCENTAGE the unit carries for life, never starting XP
+    bl = torch.zeros_like(sim.city_bldg[:, 0, 0])  # [B, NB]
+    bl[:, bidx_of("BARRACKS")] = True
+    bl[:, bidx_of("ARMORY")] = True
+    pct = sim._train_xp_pct(bl, torch.tensor([mil_ty]))
+    assert int(pct[0]) == 50, f"a Barracks and an Armory on a melee chassis = {int(pct[0])}%, want 50"
+
+    slot0 = int(sim.unit_next[0])
+    sim._spawn_unit(0, torch.tensor([True]), ctr, torch.tensor([mil_ty]), init_xp=pct)
+    assert int(sim.unit_next[0]) == slot0 + 1, "military unit did not spawn"
+    assert int(sim.major_unit_xp[0, slot0]) == 0, "a fresh unit banks no XP"
+    assert int(sim.major_unit_xp_pct[0, slot0]) == 50, "the trained percentage did not land"
+    assert int(sim.major_unit_level[0, slot0]) == 1, "a brand new unit starts at level 1"
+    assert int(sim.major_unit_promos[0, slot0]) == 0, "a fresh unit holds no promotion"
+
+    # CIVILIAN: no class, so no percentage reaches it
     bld_ty = sim._builder_idx
     assert bld_ty >= 0 and bool(sim._type_civilian[bld_ty]), "builder type not civilian"
-    ctr = sim.city_center[:, 0, 0].clamp(min=0)
-    init = torch.tensor([10], dtype=torch.long)  # pretend the city holds ARMORY (best tier 10)
+    assert int(sim._train_xp_pct(bl, torch.tensor([bld_ty]))[0]) == 0, \
+        "a builder promotes from no class and reads no experience line"
 
-    # MILITARY: inherits init_xp
-    slot0 = int(sim.unit_next[0])
-    sim._spawn_unit(0, torch.tensor([True]), ctr, torch.tensor([mil_ty]), init_xp=init)
-    assert int(sim.unit_next[0]) == slot0 + 1, "military unit did not spawn"
-    assert int(sim.major_unit_xp[0, slot0]) == 10, f"military trained XP = {int(sim.major_unit_xp[0, slot0])}, want 10"
-
-    # CIVILIAN: stays 0 even under init_xp
-    slot1 = int(sim.unit_next[0])
-    sim._spawn_unit(0, torch.tensor([True]), ctr, torch.tensor([bld_ty]), init_xp=init)
-    assert int(sim.unit_next[0]) == slot1 + 1, "builder did not spawn"
-    assert int(sim.major_unit_xp[0, slot1]) == 0, f"civilian trained XP = {int(sim.major_unit_xp[0, slot1])}, want 0"
-
-    # CIV SEAT mirror: the same body on row 1 (civ 0) honours init_xp
+    # CIV SEAT mirror: the same body on row 1
     vslot = int(sim.unit_next[0])
-    sim._spawn_unit(1, torch.tensor([True]), ctr, torch.tensor([mil_ty]), init_xp=torch.tensor([15]))
+    sim._spawn_unit(1, torch.tensor([True]), ctr, torch.tensor([mil_ty]), init_xp=pct)
     assert int(sim.unit_next[0]) == vslot + 1, "civ unit did not spawn"
-    assert int(sim.major_unit_xp[0, vslot]) == 15, f"civ trained XP = {int(sim.major_unit_xp[0, vslot])}, want 15"
-    print("  training-XP wiring OK: military inherits tier XP (p=10, v=15), civilian stays 0")
+    assert int(sim.major_unit_xp_pct[0, vslot]) == 50, "the civ row lost the trained percentage"
+    print("  training-XP wiring OK: the lines stack to a lifetime 50%, and a civilian reads none")
 
 
 def build_strike_scene(rules, path):

@@ -23,13 +23,14 @@ import { clearCampFor } from './combat';
 import { emergencyHeal, emergencyMoveBonus } from './emergency';
 import { UNITS, UNIT_HP, ENCAMPMENT_HP, type UnitDef } from '../data/units';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
+import { promoFirstUse, promoFlag, promoValue } from './promotions';
 import { dedicationEvent, goldenMoveBonus } from './eras'; // MONUMENTALITY / EXODUS +2 MP
 import { DED_WISH, OPEN_BORDERS_CIVIC } from '../data/seats';
 import { GAME_SPEED, EMBARK_MOVES } from '../data/constants';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { tradeCapacity } from './trade';
-import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
+import { revealAround, claimGoodyHut, nearestUnexplored, SIGHT_RANGE } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { congressChopGold } from './congress';
 import { FEATURES } from '../../world/features';
@@ -118,12 +119,18 @@ export function roadBridges(state: GameState): boolean {
  * A ROAD-to-ROAD step ignores the terrain penalty entirely —
  * "roads let a unit pass through Woods or Hills as if it were flat".
  * `from` is the tile being left; passing the same tile twice is harmless. */
-export function moveCostInto(from: Tile, tile: Tile): number {
+export function moveCostInto(from: Tile, tile: Tile, mover?: { promos?: number; type: string }): number {
   if (isWater(tile)) return 1;
   if (roadStep(from, tile)) return 1;
   let cost = 1;
-  if (tile.elevation === 'HILLS') cost += 1;
-  if (tile.feature === 'WOODS' || tile.feature === 'RAINFOREST' || tile.feature === 'MARSH') cost += 1;
+  // CIV6 (Alpine / Ranger): the promotion lets its holder "move onto a tile
+  // with the appropriate terrain or terrain feature at the cost of only 1
+  // Movement". Ranger names Woods and Jungle; Marsh is nobody's.
+  const hills = !mover || !promoFlag(mover, 'TERRAIN_MOVE_HILLS');
+  const woods = !mover || !promoFlag(mover, 'TERRAIN_MOVE_WOODS');
+  if (tile.elevation === 'HILLS' && hills) cost += 1;
+  if (tile.feature === 'MARSH') cost += 1;
+  else if ((tile.feature === 'WOODS' || tile.feature === 'RAINFOREST') && woods) cost += 1;
   return cost;
 }
 
@@ -320,11 +327,13 @@ function tileOwnedByUnitOwner(t: Tile, unit: { seat: number }): boolean {
   return tileSeat(t) === unit.seat;
 }
 
-export function cliffBlocks(state: GameState, a: Tile, b: Tile, unit?: { seat: number }): boolean {
+export function cliffBlocks(state: GameState, a: Tile, b: Tile, unit?: { seat: number; type?: string; promos?: number }): boolean {
   const land = isWater(a) ? b : a;
   const water = isWater(a) ? a : b;
   if (isWater(land) || !isWater(water)) return false; // not a land/water edge
   if (!land.cliffMask) return false;
+  // CIV6 (Commando): "Can scale Cliff walls."
+  if (unit?.type && promoFlag({ type: unit.type, promos: unit.promos }, 'CLIFFS')) return false;
   if (land.district === 'CITY_CENTER') return false; // cities ignore cliffs
   if (land.district === 'HARBOR' && unit && tileOwnedByUnitOwner(land, unit)) return false;
   for (let d = 0; d < 6; d++) {
@@ -385,7 +394,10 @@ export function borderClosedTo(
   const owner = tileSeat(tile);
   if (owner === NO_SEAT || owner === seat) return false;
   if (!isCiv(seat) || !isCiv(owner)) return false;
-  if (unitType) {
+  // CIV6 (Movement): "Traders ignore borders" and "Religious units also ignore
+  // borders" — with the one exception the Inquisitor page names for itself:
+  // it "cannot enter another civilization's territory without Open Borders".
+  if (unitType && unitType !== 'INQUISITOR') {
     const def = UNITS[unitType];
     if (def?.trader || (def?.religiousStrength ?? 0) > 0) return false;
   }
@@ -473,7 +485,7 @@ export function findPath(state: GameState, unit: Unit, targetIndex: number): num
       if (closed.has(n.index) || !passOk(n)) continue;
       // Rivers cost +3 to cross — the same charge the walker pays (water steps
       // never pay a river charge, so naval routing skips it).
-      const g = cur.g + moveCostInto(curTile, n) + (naval ? 0 : riverCharge(state, curTile, n)); // roads
+      const g = cur.g + moveCostInto(curTile, n, unit) + (naval ? 0 : riverCharge(state, curTile, n)); // roads
       const existing = open.get(n.index);
       if (!existing || g < existing.g) {
         open.set(n.index, { g, f: g + hexDistance(n.col, n.row, target.col, target.row), from: bestIdx });
@@ -535,8 +547,11 @@ export type StepOutcome =
  */
 export function unitFullMoves(state: GameState, unit: { type: string; seat: number; embarked?: boolean; tileIndex?: number }): number {
   const def = UNITS[unit.type];
-  if (unit.embarked && !def?.naval) return EMBARK_MOVES;
-  return (def?.moves ?? 2) + goldenMoveBonus(state, unit)
+  // CIV6 (Commando): the +1 Movement "also applies while the unit is
+  // embarked", so the promotion adder joins both arms.
+  const promo = promoValue(unit, 'MOVES');
+  if (unit.embarked && !def?.naval) return EMBARK_MOVES + promo;
+  return (def?.moves ?? 2) + promo + goldenMoveBonus(state, unit)
     // an emergency member marches faster on its target's ground
     + emergencyMoveBonus(state, unit.seat,
         unit.tileIndex === undefined ? NO_SEAT : tileSeat(state.map.tiles[unit.tileIndex]));
@@ -551,14 +566,20 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   if (cliffBlocksStep(state, from, to, unit)) return 'blocked';
   const cost = transition
     ? unit.movesLeft
-    : moveCostInto(from, to) + riverCharge(state, from, to); // roads
+    : moveCostInto(from, to, unit) + riverCharge(state, from, to); // roads
   if (unit.movesLeft < cost && unit.movesLeft < full) return 'cantAfford';
   if (transition) unit.embarked = isWater(to);
   unit.tileIndex = to.index;
   logUnitOrder(state, unit.seat, unit.id, 'move', to.index);
   unit.movesLeft = Math.max(0, unit.movesLeft - cost);
   if (unit.seat === seat) {
-    revealAround(state, unit.seat, to.index);
+    revealAround(state, unit.seat, to.index, SIGHT_RANGE + promoValue(unit, 'SIGHT'));
+    // CIV6 (Pilgrim): "Gains 3 extra spreads when moving adjacent to a natural
+    // wonder for the first time."
+    if (neighbors(state.map, to).some((t) => t.wonder !== null)) {
+      const extra = promoFirstUse(unit, 'PILGRIM');
+      if (extra > 0) unit.charges = (unit.charges ?? 0) + extra;
+    }
     claimGoodyHut(state, unit);
   }
   clearCampFor(state, unit, to.index, seat);
@@ -971,6 +992,22 @@ export function religiousHeal(state: GameState, unit: Unit, ctx: YieldCtx): numb
   return RELIGIOUS_HEAL_PER_FAITH * best;
 }
 
+/** CIV6 (Chaplain): the Apostle "operates as a Medic, providing extra healing
+ *  to units within 1 tile", and the Medic page prices that at "+20 HP/turn"
+ *  for a STATIONARY neighbour. Military units only, and the strongest
+ *  neighbouring chaplain answers — two of them do not stack. */
+function chaplainHeal(state: GameState, unit: Unit): number {
+  if (unitDomain(unit.type) !== 'military') return 0;
+  let best = 0;
+  for (const t of neighbors(state.map, state.map.tiles[unit.tileIndex])) {
+    for (const u of unitsAt(state, t.index)) {
+      if (u.seat !== unit.seat) continue;
+      best = Math.max(best, promoValue(u, 'CHAPLAIN'));
+    }
+  }
+  return best;
+}
+
 export function refreshUnits(state: GameState): void {
   const ctxOf = new Map<number, YieldCtx>();
   const yctx = (seat: number): YieldCtx => {
@@ -1001,9 +1038,13 @@ export function refreshUnits(state: GameState): void {
           : home ? 15
           : onCamp ? 20
           : tileSeat(tile) === NO_SEAT ? 10
+          // CIV6 (Auxiliary Ships / Supply Fleet): "Heal outside of friendly
+          // territory" — the foreign-ground rate becomes the own-ground one.
+          : promoFlag(unit, 'HEAL_ANYWHERE') ? 15
           : 5)
           // a won Military Emergency heals its members in that seat's ground
-          + emergencyHeal(state, unit.seat, tileSeat(tile));
+          + emergencyHeal(state, unit.seat, tileSeat(tile))
+          + chaplainHeal(state, unit);
       unit.hp = Math.min(UNIT_HP, unit.hp + heal);
     }
     // FORTIFY: the EXACT heal gate (movesLeft >= full = spent

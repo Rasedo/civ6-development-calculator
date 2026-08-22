@@ -143,19 +143,25 @@ def main() -> None:
     assert s5._occupy_def() is None or int(s5._occupy_def()[0, wt]) == 0, "an unfinished wonder defends nobody"
     print("  occupation defence OK — complete only, through the tdef reader")
 
-    # --- 6) Mont St. Michel makes the MARTYR draw certain -------------------
+    # --- 6) Mont St. Michel hands every Apostle the MARTYR promotion --------
     s6 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
-    r0 = torch.zeros(1, dtype=torch.long)
-    got = 0
-    for _ in range(40):
-        got += int(s6._martyr_draw(r0, r0)[0])
-    assert got < 40, "a bare seat cannot martyr every apostle"
+    _rd = s6.rules_dev
+    _cls = int(_rd.u_promo_class[s6._apostle_idx])
+    _mcol = int((_rd.promo_kind[_cls] == s6._pk["MARTYR"]).any(dim=1).long().argmax())
+
+    def _offer(sim) -> int:
+        slot = int(sim.unit_next[0])
+        sim.unit_next[0] += 1
+        sim.major_unit_type[0, slot] = sim._apostle_idx
+        sim.major_unit_promos[0, slot] = 0
+        sim._offer_apostle_promos(0, torch.tensor([True]))
+        return int(sim.major_unit_promos[0, slot])
+
+    assert (_offer(s6) >> _mcol) & 1 == 0, "a bare seat's Apostle is handed no promotion outright"
     plant(s6, 0, 0, montsm)
-    st = s6.rng_state.clone()
-    assert all(bool(s6._martyr_draw(r0, r0)[0]) for _ in range(20)), \
+    assert all((_offer(s6) >> _mcol) & 1 for _ in range(5)), \
         "with Mont St. Michel every Apostle carries MARTYR"
-    assert int(s6.rng_state[0]) != int(st[0]), "the draw must still run, so the stream keeps its length"
-    print("  martyr OK — certain with the wonder, and the stream still advances")
+    print("  martyr OK — the wonder writes the promotion at purchase")
 
     # --- 7) the loyalty aura clamps a city in range -------------------------
     s7 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))

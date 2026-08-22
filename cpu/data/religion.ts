@@ -236,15 +236,29 @@ export const CITY_RELIGION_ADDER_LIVE = true;
 export const THEO_PRESSURE_RANGE = 10;
 export const THEO_PRESSURE_SWING = 15;
 
-/** CIV 6: MARTYR — "a Relic is created if this Apostle dies in Theological
- *  Combat" — is ONE of the NINE Apostle promotions (Chaplain, Debater, Heathen
- *  Conversion, Indulgence Vendor, Martyr, Orator, Pilgrim, Proselytizer,
- *  Translator). Picking a promotion is a DECISION and neither engine takes one
- *  without a wire record, so the promotion is DRAWN uniformly instead. The draw
- *  sits at the only moment it can matter — the apostle's death — which is
- *  distributionally identical to drawing it at creation and costs no per-unit
- *  plane. */
-export const MARTYR_CHANCE = 1 / 9;
+/** CIV6 (Apostle): "The player may choose between three promotions randomly
+ *  chosen from the pool. If the player is the Suzerain of Yerevan, they are
+ *  free to choose from the entire pool." */
+export const APOSTLE_PROMO_OFFER = 3;
+
+/** CIV6 (Inquisitor): the Apostle's "Launch Inquisition" needs friendly
+ *  territory and "at least 3 charges", and consumes the unit. */
+export const LAUNCH_INQUISITION_CHARGES = 3;
+export const INQUISITOR_CAP = 2;
+/** CIV6 (Inquisitor): "+35 Religious Strength when in friendly territory". */
+export const INQUISITOR_HOME_STRENGTH = 35;
+/** CIV6 (GS): an Inquisitor's Remove Heresy leaves "only 75% presence of other
+ *  Religions" removed, not all of it. */
+export const REMOVE_HERESY_PCT = 75;
+
+/** CIV6 (Theological combat): a military unit's CONDEMN HERETIC kills the
+ *  religious unit and "only the losing side loses religious influence, the
+ *  Religious Pressure lost is halved ... and it only affects cities within 6
+ *  tiles" — halved against the 250 the duel swings, which is
+ *  THEO_PRESSURE_SWING on this model's scale. */
+export const CONDEMN_PRESSURE_RANGE = 6;
+/** the halved swing, floored so it stays an integer on both engines. */
+export const CONDEMN_PRESSURE_SWING = Math.floor(THEO_PRESSURE_SWING / 2);
 
 /**
  * Master switch for the pressure->yields coupling. LIVE: a city's
