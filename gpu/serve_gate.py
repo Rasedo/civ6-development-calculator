@@ -164,8 +164,9 @@ def _field_name(i: int, S: int, n_opponents: int, C: int, NT: int, NC: int) -> s
 
 def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                 ckpt_dir: Path | None = None, resume: int = 0,
-                profile: bool = False, cprofile: str = "") -> None:
-    """The battery-lane shape: ONE B=12 GPU sim, one TS child per seed in
+                profile: bool = False, cprofile: str = "",
+                only: list[int] | None = None) -> None:
+    """The battery-lane shape: ONE B=N GPU sim, one TS child per seed in
     PARALLEL, a per-turn barrier. Children run concurrently between barriers
     (independent processes); the GPU pays batched dispatch once per step
     instead of one B=1 tax per seed. `main`'s sequential path is the
@@ -178,6 +179,11 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     sides from the turn-T checkpoint and continues."""
     rules = load_rules()
     paths = fixture_paths()
+    if only:
+        want = set(only)
+        paths = [p for p in paths if int(p.stem[4:]) in want]
+        missing = want - {int(p.stem[4:]) for p in paths}
+        assert not missing, f"no fixture for seed(s) {sorted(missing)}"
     fixtures = [load_fixture(p) for p in paths]
     seeds = [int(fx["seed"]) for fx in fixtures]
     env = BatchEnv(fixtures, rules, device="cpu", dtype=torch.float64)
@@ -418,7 +424,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, default=9002)
-    ap.add_argument("--seeds", default=None, help="'all' = every seeder/worlds/seed*.json, or comma-separated; overrides --seed")
+    ap.add_argument("--seeds", default=None, help="'all' = every seeder/worlds/seed*.json, or comma-separated; overrides --seed. With --batched a comma list narrows the BATCH")
     ap.add_argument("--batched", action="store_true", help="the battery-lane shape: ONE B=12 sim, all TS children in parallel")
     ap.add_argument("--turns", type=int, default=60)
     ap.add_argument("--eps", type=float, default=1e-9, help="scaled-float obs tolerance; the raw ctx block is compared EXACTLY")
@@ -433,8 +439,11 @@ def main() -> None:
     ckpt_dir = Path(args.ckpt_dir)
 
     if args.batched:
+        only = None
+        if args.seeds and args.seeds != "all":
+            only = [int(x) for x in args.seeds.split(",")]
         run_batched(args.turns, args.eps, args.ckpt_every, ckpt_dir, args.resume,
-                    profile=args.profile, cprofile=args.cprofile)
+                    profile=args.profile, cprofile=args.cprofile, only=only)
         return
 
     if args.seeds:
