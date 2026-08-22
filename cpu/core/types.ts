@@ -27,6 +27,9 @@ export type GreatPersonClass =
   | 'MUSICIAN';
 
 export interface City {
+  /** Completed Terrestrial Laser Stations here: each draws LASER_POWER_LOAD
+   *  and speeds the craft by 1 LY/turn only while this city is powered. */
+  laserStations?: number;
   foundedTurn: number;
   hp: number;
   id: number;
@@ -346,8 +349,9 @@ export interface Seat {
   /** Light-years the Exoplanet craft has travelled; -1 = no craft in flight.
    *  The win fires on ARRIVAL (spaceLy >= SPACE_FLIGHT_LY), not on launch. */
   spaceLy?: number;
-  /** Completed laser-station projects — each adds +1 LY/turn to the craft. */
-  spaceLasers?: number;
+  /** Completed LAGRANGE stations — each adds +1 LY/turn unconditionally. The
+   *  terrestrial ones are counted per city (`City.laserStations`). */
+  orbitalLasers?: number;
   camps: number[];
   gpEarned: string[];
   eraScore?: number;

@@ -144,9 +144,7 @@ class SimSeats:
                 if int(prow_m.get("sp", 0)):
                     okp_m = okp_m & self._space_step_ok(row, pi_m)
                 elif int(prow_m.get("ls", 0)):
-                    rt_m = int(prow_m.get("rt", -1))
-                    if rt_m >= 0:
-                        okp_m = okp_m & self.civ_techs[:, row, rt_m]
+                    okp_m = okp_m & self._laser_project_ok(row, pi_m)
                 ok_p[:, pi_m] = okp_m
             idle_j = idle[:, j].unsqueeze(1)
             prod_cols.append(torch.cat([base_j & idle_j, ok_w & idle_j, ok_p & idle_j], dim=1))
@@ -1209,9 +1207,7 @@ class SimSeats:
                     if int(prow_a.get("sp", 0)):
                         has_pa = has_pa & self._space_step_ok(row, pi_a)
                     elif int(prow_a.get("ls", 0)):
-                        rt_a = int(prow_a.get("rt", -1))
-                        if rt_a >= 0:
-                            has_pa = has_pa & self.civ_techs[:, row, rt_a]
+                        has_pa = has_pa & self._laser_project_ok(row, pi_a)
                     rows_p = is_p & (a == pcode) & has_pa
                     if not bool(rows_p.any()):
                         continue
@@ -1263,6 +1259,20 @@ class SimSeats:
         else:
             self.civ_tech_prog[:, row] = new_pool
             self.civ_cur_tech[:, row] = new_cur
+
+    def _laser_project_ok(self, row: int, pi: int) -> torch.Tensor:
+        """[B] — may this seat START laser row `pi`? Repeatable, so never in
+        the one-time ledger, but it still asks for its tech and for the craft
+        it speeds to have launched (`availableProjects`' laser arm)."""
+        prow = self._proj_rows[pi]
+        ok = torch.ones(self.B, dtype=torch.bool, device=self.device)
+        rt = int(prow.get("rt", -1))
+        if rt >= 0:
+            ok = ok & self.civ_techs[:, row, rt]
+        rp = int(prow.get("rp", -1))
+        if rp >= 0:
+            ok = ok & self.space_done[:, row, self._space_step[rp]]
+        return ok
 
     def _space_step_ok(self, row: int, pi: int) -> torch.Tensor:
         """[B] — may this seat START space-race step `pi` right now?
@@ -3261,16 +3271,79 @@ class SimSeats:
         amt = self._wond_regam.reshape(1, 1, nW).expand(B, cols, nW).reshape(B, cols * nW, 1)
         return (hit.double() * amt).sum(dim=1) * alive.double()
 
+    def _city_powered(self, row: int) -> torch.Tensor:
+        """The `cityPower` twin — [B, cols] bool, is this city POWERED?
+
+        CIV6 (Power): a city's base load is what its standing buildings demand
+        (a pillaged district's are dark, like their yields) plus
+        `laser_power_load` per Terrestrial Laser Station it has completed, and
+        the load is met all at once or not at all — "a city cannot supply Power
+        to some buildings and not to others". A city demanding nothing is not
+        powered; nothing reads the flag there.
+
+        Two supplies. A POWER PLANT "will attempt to provide required Power to
+        all cities within range", from its own Industrial Zone tile to the
+        receiving CITY CENTER, over the reach a regional building has (a Mexico
+        City suzerain widens both). RENEWABLE supply "provide[s] Power only for
+        [its] respective city" and is Cardiff's here. What a plant BURNS is not
+        modelled, so a plant in range meets whatever load it reaches; renewable
+        supply must cover the load by itself.
+
+        Reads LIVE state at call time, like `_seat_regional`."""
+        B, cols, dev = self.B, self.RC, self.device
+        alive = self.city_alive[:, row, :cols]
+        dreg = self.city_dist_tile[:, row, :cols]
+        stand = self.city_bldg[:, row, :cols] & ~self._bldg_dark(dreg)  # [B, cols, NB]
+        demand = stand.double() @ self._b_power
+        demand = demand + self._laser_power_load * self.city_lasers[:, row, :cols].double()
+        live = alive & (demand > 0)
+        if not bool(live.any()):
+            return torch.zeros(B, cols, dtype=torch.bool, device=dev)
+        supply = torch.zeros(B, cols, dtype=torch.float64, device=dev)
+        if self._harbor_idx >= 0 and self._suz_c_harbor_pow >= 0:
+            hb = (self._b_req_district == self._harbor_idx).reshape(1, 1, -1)
+            n_hb = (stand & hb).sum(dim=2).double()
+            supply = n_hb * self._cardiff_harbor_power \
+                * self._suz_effect(row, self._suz_c_harbor_pow).double().unsqueeze(1)
+        plant = torch.zeros(B, cols, dtype=torch.bool, device=dev)
+        if self._iz_idx >= 0 and self._plant_bidx:
+            has_p = torch.zeros(B, cols, dtype=torch.bool, device=dev)
+            for n in self._plant_bidx:
+                has_p = has_p | self.city_bldg[:, row, :cols, n]
+            st = dreg[:, :, self._iz_idx]
+            stc = st.clamp(min=0)
+            src = has_p & alive & (st >= 0) & self.district_complete.gather(1, stc) \
+                & ~self.district_pillaged.gather(1, stc)
+            if bool(src.any()):
+                reach = self._regional_range + self._suz_reach_bonus \
+                    * self._suz_effect(row, self._suz_c_reach).long().reshape(B, 1, 1)
+                ctrs = self.city_center[:, row, :cols].clamp(min=0)
+                dd = self.pair_dist[stc.unsqueeze(2), ctrs.unsqueeze(1)]  # [B, src, recv]
+                plant = (src.unsqueeze(2) & (dd <= reach)).any(dim=1)
+        return live & (plant | (supply >= demand))
+
+    def _laser_speed(self, row: int) -> torch.Tensor:
+        """[B] long — the craft's speed above its base 1 LY/turn: every orbital
+        station this seat launched, plus the terrestrial ones standing in
+        POWERED cities (`laserSpeed`)."""
+        lz = self.city_lasers[:, row, :self.RC]
+        n = self.civ_orbital_lasers[:, row]
+        if not bool((lz > 0).any()):
+            return n
+        return n + (lz * self._city_powered(row).long()).sum(dim=1)
+
     def _seat_regional(self, row: int) -> tuple[torch.Tensor, torch.Tensor] | None:
         """The regionalEffects twin for seat row `row`:
         each regional building owned by one of this seat's cities whose source
         district (city_dist_tile of the building's type) is COMPLETE and
         unpillaged reaches every ALIVE same-seat city center within
         regional_range of the source tile; the same building id never stacks
-        (any() over sources — TS's `seen` set). Reads LIVE state at call time
-        (the per-j path sees mid-phase completions, like TS). Returns
-        ([B, cols, 6] yields, [B, cols] amenities) in f64, or None when no city
-        of this seat owns a regional building."""
+        (any() over sources — TS's `seen` set). Its POWERED half is a second,
+        independent once: any in-range source city that is POWERED pays it.
+        Reads LIVE state at call time (the per-j path sees mid-phase
+        completions, like TS). Returns ([B, cols, 6] yields, [B, cols]
+        amenities) in f64, or None when no city of this seat owns a regional
+        building."""
         if not self._reg_bidx or not self.districts_on:
             return None
         B = self.B
@@ -3282,6 +3355,7 @@ class SimSeats:
         # Zone, Water Park, and Entertainment Complex districts reach 3 tiles
         # farther." Districts only — `_wonder_regional_amenities` keeps the base.
         reach = self._regional_range + self._suz_reach_bonus * self._suz_effect(row, self._suz_c_reach).long().reshape(B, 1, 1)
+        lit = None
         y6 = am = None
         for n in self._reg_bidx:
             own_n = self.city_bldg[:, row, :cols, n] & alive
@@ -3300,6 +3374,14 @@ class SimSeats:
                 am = torch.zeros(B, cols, dtype=torch.float64, device=self.device)
             y6 = y6 + hf.unsqueeze(2) * self.rules_dev.b_yields[n].double().reshape(1, 1, 6)
             am = am + hf * float(self.rules.b_amenities[n])
+            if float(self._b_pow_y[n].abs().sum()) == 0 and float(self._b_pow_am[n]) == 0:
+                continue
+            if lit is None:
+                lit = self._city_powered(row)
+            hp = (ok.unsqueeze(2) & lit.unsqueeze(2) & (dd <= reach)).any(dim=1) & alive
+            hpf = hp.double()
+            y6 = y6 + hpf.unsqueeze(2) * self._b_pow_y[n].reshape(1, 1, 6)
+            am = am + hpf * float(self._b_pow_am[n])
         return None if y6 is None else (y6, am)
 
     def _district_slot_free(self, row: int, j: int, di: int) -> torch.Tensor:
@@ -3450,6 +3532,9 @@ class SimSeats:
         dreg = self.city_dist_tile[:, row, :cols]
         selb = self.city_bldg[:, row, :cols] & ~self._bldg_dark(dreg) & ~self._b_regional.reshape(1, 1, -1)
         have = torch.einsum("bjn,n->bj", selb.to(torch.float64), rd.b_amenities.double())
+        if bool((selb & (self._b_pow_am > 0).reshape(1, 1, -1)).any()):
+            _powam = torch.einsum("bjn,n->bj", selb.to(torch.float64), self._b_pow_am)
+            have = have + _powam * self._city_powered(row).double()
         # PALACE amenity on the capital — baseHave sums city.buildings, which
         # hold the founding PALACE, so it joins BEFORE the luxury ranking.
         # CITY_CENTER never pillages.
@@ -3525,6 +3610,7 @@ class SimSeats:
         self.city_cost[b, row, col] = 0
         self.city_qtile[b, row, col] = -1
         self.city_prod_bank[b, row, col] = 0
+        self.city_lasers[b, row, col] = 0
         self.city_gw_writing[b, row, col] = 0
         self.city_gw_art[b, row, col] = 0
         self.city_gw_music[b, row, col] = 0
@@ -3600,6 +3686,7 @@ class SimSeats:
         old_gwm = int(self.city_gw_music[b, src_row, src_col])
         old_rel = int(self.city_relics[b, src_row, src_col])
         old_art = int(self.city_artifacts[b, src_row, src_col])
+        old_lz = int(self.city_lasers[b, src_row, src_col])
         old_prov = [getattr(self, _p)[b, src_row, src_col, :].clone() for _p in
                     ("city_artifact_era", "city_artifact_seat", "city_gwart_type", "city_gwart_artist")]
         old_bldg = self.city_bldg[b, src_row, src_col, :].clone()
@@ -3676,6 +3763,7 @@ class SimSeats:
         self.city_gw_music[b, dst_row, col] = old_gwm
         self.city_relics[b, dst_row, col] = old_rel
         self.city_artifacts[b, dst_row, col] = old_art
+        self.city_lasers[b, dst_row, col] = old_lz  # the stations ride the flip with the Spaceport that holds them
         for _p, _v in zip(("city_artifact_era", "city_artifact_seat",
                            "city_gwart_type", "city_gwart_artist"), old_prov):
             getattr(self, _p)[b, dst_row, col, :] = _v

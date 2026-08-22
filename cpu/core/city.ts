@@ -2,7 +2,7 @@
 import { addYields, emptyYields, type City, type GameState, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
 import { tilesWithin, hexDistance } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable } from '../../world/query';
-import { tileYields, cityDistrictYields, cityBuildingYields, regionalEffects, localBuildingAmenities, pillagedDistrictTypes, effectiveAdjacency, completedDistrictCount } from './yields';
+import { tileYields, cityDistrictYields, cityBuildingYields, cityPower, regionalEffects, localBuildingAmenities, pillagedDistrictTypes, effectiveAdjacency, completedDistrictCount } from './yields';
 import { getModifiers, makeYieldCtx, withFollowerBelief, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
@@ -159,7 +159,7 @@ export function specialistYields(district: import('./types').DistrictId, buildin
   if (!base) return undefined;
   const tier = SPECIALIST_TIERS[district];
   const has = tier
-    ? (tier.building === 'WORSHIP' ? buildings.some((b) => BUILDINGS[b]?.worship) : buildings.includes(tier.building))
+    ? tier.buildings.some((b) => (b === 'WORSHIP' ? buildings.some((x) => BUILDINGS[x]?.worship) : buildings.includes(b)))
     : false;
   if (!tier || !has) return base;
   const out: Partial<Yields> = { ...base };
@@ -640,7 +640,7 @@ export function computeCityStats(
     const y = inst ? specialistYields(inst.type, city.buildings) : undefined;
     if (y) addYields(districts, y, n);
   }
-  const buildings = cityBuildingYields(ctx, city);
+  const buildings = cityBuildingYields(ctx, city, cityPower(state, city).powered);
   const regional = regionalEffects(state, city);
   addYields(buildings, regional.yields);
   for (const w of wonders) {

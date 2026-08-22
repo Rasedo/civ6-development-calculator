@@ -686,13 +686,23 @@
           ]
         },
         {
-          "name": "spaceLasers",
+          "name": "laserSpeed",
           "compare": "exact",
           "covers": [
-            "Seat.spaceLasers"
+            "Seat.orbitalLasers"
           ],
           "planes": [
-            "space_lasers"
+            "civ_orbital_lasers"
+          ]
+        },
+        {
+          "name": "laserStations",
+          "compare": "exact",
+          "covers": [
+            "City.laserStations"
+          ],
+          "planes": [
+            "city_lasers"
           ]
         },
         {

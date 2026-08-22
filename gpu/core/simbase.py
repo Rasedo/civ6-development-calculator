@@ -129,6 +129,13 @@ class Rules:
     b_excl_buildings: list  # per building: exclusive-sibling indices (exclusiveWith — Barracks/Stable)
     b_regional: torch.Tensor  # bool [NB] — regional building (leaves local sums; delivered by range)
     regional_range: int  # REGIONAL_RANGE (hex distance, source district tile -> receiver center)
+    b_power: torch.Tensor  # f64 [NB] — GS Base Load: the Power this building demands while it stands
+    b_pow_yields: torch.Tensor  # f64 [NB, 6] — what it pays ON TOP of b_yields while its city is powered
+    b_pow_amenities: torch.Tensor  # f64 [NB] — the powered half of its amenities
+    b_powerplant: torch.Tensor  # bool [NB] — supplies its region from the Industrial Zone it stands in
+    b_iz_adj_prod: torch.Tensor  # bool [NB] — Coal Power Plant: adds its Industrial Zone's adjacency as production
+    cardiff_harbor_power: float  # renewable Power per Harbor building for a Cardiff suzerain
+    laser_power_load: float  # Power a Terrestrial Laser Station adds to its city
     b_worship: torch.Tensor  # bool [NB] — worship building (faith-purchase-only; every production/gold picker skips)
     b_era: torch.Tensor  # long [NB] — the era the building first unlocks (Heartbeat of Steam's gate)
     b_train_xp_pct: torch.Tensor  # long [NB] — the PERCENTAGE experience modifier this building grants a unit trained here; the Encampment and Harbor lines stack
@@ -242,6 +249,13 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_excl_buildings=[b.get("exclBuildings", []) for b in B],
         b_regional=torch.tensor([bool(b.get("regional", 0)) for b in B], dtype=torch.bool),
         regional_range=int(r.get("regionalRange", 6)),
+        b_power=torch.tensor([float(b["power"]) for b in B], dtype=torch.float64),
+        b_pow_yields=torch.tensor([b["poweredYields"] for b in B], dtype=torch.float64),
+        b_pow_amenities=torch.tensor([float(b["poweredAmenities"]) for b in B], dtype=torch.float64),
+        b_powerplant=torch.tensor([bool(b["powerPlant"]) for b in B], dtype=torch.bool),
+        b_iz_adj_prod=torch.tensor([bool(b["izAdjProduction"]) for b in B], dtype=torch.bool),
+        cardiff_harbor_power=float(r["cardiffHarborPower"]),
+        laser_power_load=float(r["laserPowerLoad"]),
         b_worship=torch.tensor([bool(b.get("worship", 0)) for b in B], dtype=torch.bool),
         b_train_xp_pct=torch.tensor([int(b.get("trainXpPct", 0)) for b in B], dtype=torch.long),
         b_train_xp_cls=_class_mask([b.get("trainXpClasses", []) for b in B], len(_P.get("classes", []))),
@@ -543,7 +557,7 @@ _MUTABLE = [
     "rng_state", "centre_slot_at", "tdef", "tmove",
     "next_slot", "camp_tile", "n_camps", "game_over",
     "victory_type", "victory_row", "winner", "space_done",  # space-race chain progress
-    "space_ly", "space_lasers",  # the Exoplanet flight (LY travelled, laser stations)
+    "space_ly", "civ_orbital_lasers", "city_lasers",  # the Exoplanet flight: LY travelled, the seat's orbital stations, the terrestrial ones per city
     "district_dead",  # captured districts are paved-but-dead
     "civ_cap_tile",  # capitalTiles — capital identity + the domination anchor
     # `tile_seat` is STATE — the city-state part of tile ownership is stored

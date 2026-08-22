@@ -230,6 +230,7 @@ class SimInit:
         self._suz_c_holy = _sfx.index("holySitePressure") if "holySitePressure" in _sfx else -1
         self._suz_c_apostle = _sfx.index("apostlePromoChoice") if "apostlePromoChoice" in _sfx else -1
         self._suz_c_era = _sfx.index("eraInspiration") if "eraInspiration" in _sfx else -1
+        self._suz_c_harbor_pow = _sfx.index("harborPower") if "harborPower" in _sfx else -1
         self._suz_xp_mult_k = int(_suz["xpMult"])
         self._suz_hill_cs = int(_suz["hillCs"])
         self._suz_reach_bonus = int(_suz["reachBonus"])
@@ -732,9 +733,13 @@ class SimInit:
         self._n_space = len(self._space_proj_idx)
         self._space_step = {pi: k for k, pi in enumerate(self._space_proj_idx)}
         self._space_victory_idx = {i for i in self._space_proj_idx if int(self._proj_rows[i].get("vic", 0))}
-        # Laser-station rows: repeatable, tech-gated only, each completion
-        # speeds the Exoplanet craft (+1 LY/turn) — cpu/data/projects.ts `laser`.
+        # Laser-station rows: repeatable, gated on the tech AND the finished
+        # expedition, each completion speeding the craft by +1 LY/turn. The
+        # ORBITAL one (`orb`) pays unconditionally; the terrestrial one draws
+        # `laser_power_load` from the city it stands in and pays only while
+        # that city is powered — cpu/data/projects.ts.
         self._laser_proj_idx = {i for i, row in enumerate(self._proj_rows) if int(row.get("ls", 0))}
+        self._orbital_proj_idx = {i for i in self._laser_proj_idx if int(self._proj_rows[i].get("orb", 0))}
         # The REPAIR row, whose production pays the perimeter as it accrues.
         self._repair_proj_idx = next(
             (i for i, row in enumerate(self._proj_rows) if int(row.get("rep", 0))), -1)
@@ -1295,6 +1300,7 @@ class SimInit:
         self._hs_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HOLY_SITE"), -1)
         self._campus_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "CAMPUS"), -1)
         self._commhub_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "COMMERCIAL_HUB"), -1)
+        self._iz_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "INDUSTRIAL_ZONE"), -1)
         self._shipyard_bidx = int(rules.shipyard_bidx)
         self._walls_bidx = int(rules.ancient_walls_bidx)
         _tr = rules.trade or {}
@@ -1450,12 +1456,26 @@ class SimInit:
         # Worship buildings are faith-purchase-only — every production/gold
         # picker masks them; only the worship faith-buy sets their civ_city_bldg bits.
         self._b_worship = rules.b_worship.to(device)  # [NB] bool
+        # GS POWER (data/buildings.ts): the base load a building demands, what
+        # it pays on top once its city is powered, and the two special rows —
+        # a PLANT supplies its region, the Coal one also banks its Industrial
+        # Zone's adjacency as production.
+        self._b_power = rules.b_power.to(device)  # [NB] f64
+        self._b_pow_y = rules.b_pow_yields.to(device)  # [NB, 6] f64
+        self._b_pow_am = rules.b_pow_amenities.to(device)  # [NB] f64
+        self._b_powerplant = rules.b_powerplant.to(device)  # [NB] bool
+        self._b_iz_adj = rules.b_iz_adj_prod.to(device)  # [NB] bool
+        self._b_pow_y_any = self._b_pow_y.abs().sum(dim=1) > 0  # [NB] bool
+        self._plant_bidx = [i for i in range(self.NB) if bool(self._b_powerplant[i])]
+        self._iz_adj_bidx = [i for i in range(self.NB) if bool(self._b_iz_adj[i])]
+        self._cardiff_harbor_power = float(rules.cardiff_harbor_power)
+        self._laser_power_load = float(rules.laser_power_load)
         # SPECIALISTS (data/greatPeople.ts SPECIALIST_YIELDS / SPECIALIST_TIERS,
-        # exported per PLACEABLE district): base yields, the TOP building that
-        # upgrades them (-2 = any worship building), and its add.
+        # exported per PLACEABLE district): base yields, the TOP buildings that
+        # upgrade them (any ONE of them; -2 = any worship building), and the add.
         _ndc = max(len(self.districts_cat), 1)
         self._spec_y = torch.tensor([[float(x) for x in d["spec"]] for d in self.districts_cat] or [[0.0] * 6], dtype=torch.float64, device=device)  # [nD, 6]
-        self._spec_tb = torch.tensor([int(d["specTB"]) for d in self.districts_cat] or [-1], dtype=torch.long, device=device)  # [nD]
+        self._spec_tb = [[int(b) for b in d["specTB"]] for d in self.districts_cat]  # [nD][*]
         self._spec_ta = torch.tensor([[float(x) for x in d["specTA"]] for d in self.districts_cat] or [[0.0] * 6], dtype=torch.float64, device=device)  # [nD, 6]
         self._spec_any = self._spec_y.abs().sum(dim=1) > 0  # [nD]
         self._b_dist_oh = (
@@ -1511,7 +1531,8 @@ class SimInit:
         # The Exoplanet flight: LY travelled (-1 = no craft in flight) and the
         # completed laser stations that speed it. Win on ARRIVAL, in step().
         self.space_ly = torch.full((B, self.n_majors), -1, dtype=torch.long, device=device)
-        self.space_lasers = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
+        self.civ_orbital_lasers = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
+        self.city_lasers = torch.zeros(B, self.n_majors + max(self.S, 1), self.RC, dtype=torch.long, device=device)
         self.camp_tile = torch.full((B, max(self.K, 1)), -1, dtype=torch.long, device=device)
         self.n_camps = torch.zeros(B, dtype=torch.long, device=device)
         self.unit_next = torch.zeros(B, dtype=torch.long, device=device)

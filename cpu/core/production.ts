@@ -56,8 +56,10 @@ export function completeProject(state: GameState, city: City, projectId: string,
     return;
   }
   if (def.laser) {
-    // Repeatable: each station speeds the Exoplanet craft by +1 LY/turn.
-    owner.spaceLasers = (owner.spaceLasers ?? 0) + 1;
+    // Repeatable: each station speeds the craft by +1 LY/turn. The orbital one
+    // is the seat's; the terrestrial one belongs to the city it powers from.
+    if (def.orbital) owner.orbitalLasers = (owner.orbitalLasers ?? 0) + 1;
+    else city.laserStations = (city.laserStations ?? 0) + 1;
     state.eventLog.push(`${city.name} completed ${def.name}.`);
     return;
   }

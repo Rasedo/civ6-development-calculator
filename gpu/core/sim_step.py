@@ -121,12 +121,13 @@ class SimStep:
             self._era_inspirations()
         self._world_congress()
         # THE EXOPLANET FLIGHT — CIV6: 1 light-year/turn plus one per laser
-        # station, and the win fires on ARRIVAL, not launch. Ties in one turn
-        # go to the lowest row (argmax takes the FIRST True), and the
-        # victory_type guard keeps an already-won space game's victor.
+        # station standing behind it, and the win fires on ARRIVAL, not launch.
+        # Ties in one turn go to the lowest row (argmax takes the FIRST True),
+        # and the victory_type guard keeps an already-won space game's victor.
         fly = self.space_ly >= 0  # [B, n_majors]
         if bool(fly.any()):
-            self.space_ly.copy_(torch.where(fly, self.space_ly + 1 + self.space_lasers, self.space_ly))
+            lz = torch.stack([self._laser_speed(r) for r in range(self.n_majors)], dim=1)
+            self.space_ly.copy_(torch.where(fly, self.space_ly + 1 + lz, self.space_ly))
             arrive = fly & (self.space_ly >= int(self.rules.space_ly_target))
             landed = arrive.any(dim=1) & (self.victory_type != 3)
             if bool(landed.any()):

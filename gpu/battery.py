@@ -251,6 +251,7 @@ def main() -> int:
                 ("inquisitor", [py, "tests/gpu/inquisitor_test.py"], 4),  # Launch Inquisition -> the purchase -> Remove Heresy -> Condemn, and the duel rules
                 ("promo_effects", [py, "tests/gpu/promo_effects_test.py"], 4),  # the seventeen promotion kinds that are not Combat Strength
                 ("era_draws", [py, "tests/gpu/era_draws_test.py"], 4),  # the restored random draws, and the artifact's own civilization
+                ("power", [py, "tests/gpu/power_test.py"], 4),  # GS POWER: demand, the plant's reach, Cardiff, the powered halves
             ],
         ]
         # A lane that names a path nothing writes, or a test file no lane

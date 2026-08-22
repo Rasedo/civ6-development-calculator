@@ -58,7 +58,7 @@ export const CITY_STATE_TYPE_BUILDINGS: Record<CityStateType, string[]> = {
   scientific: ['LIBRARY', 'UNIVERSITY', 'RESEARCH_LAB'],
   cultural: ['AMPHITHEATER', 'MUSEUM', 'BROADCAST_CENTER'],
   trade: ['MARKET', 'BANK', 'STOCK_EXCHANGE'],
-  industrial: ['WORKSHOP', 'FACTORY', 'POWER_PLANT'],
+  industrial: ['WORKSHOP', 'FACTORY', 'COAL_POWER_PLANT'],
   militaristic: ['BARRACKS', 'STABLE', 'ARMORY', 'MILITARY_ACADEMY'],
   religious: ['SHRINE', 'TEMPLE'],
 };
@@ -75,14 +75,18 @@ export type SuzEffect =
   | 'csRouteYields'     // Kumasi
   | 'holySitePressure'   // Jerusalem
   | 'apostlePromoChoice' // Yerevan
-  | 'eraInspiration';    // Vilnius
+  | 'eraInspiration'     // Vilnius
+  | 'harborPower';       // Cardiff
 
 /** The WIRE order the exported `suzCode` indexes — append only. */
 export const SUZ_EFFECTS: SuzEffect[] = [
   'xpDouble', 'cavalryHills', 'regionalReach', 'worksScience', 'csRouteYields', 'holySitePressure',
-  'apostlePromoChoice', 'eraInspiration',
+  'apostlePromoChoice', 'eraInspiration', 'harborPower',
 ];
 
+/** Cardiff: "Cities receive +2 Power for every Harbor building." Renewable,
+ *  so it never leaves the city that holds the buildings. */
+export const CARDIFF_HARBOR_POWER = 2;
 /** Kabul: "Your units receive double experience from battles they initiate." */
 export const KABUL_XP_MULT = 2;
 /** Preslav: "+5 Strength when fighting on hill tiles" (light and heavy cavalry). */
@@ -121,7 +125,7 @@ export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   Hunza: { name: 'Hunza', type: 'trade', bonus: 'Receive +1 Gold for every 5 tiles a Trade Route travels.', channel: 'gold', note: 'the Trader walks a real path now, but the gold channel is FLAT — the per-5-tiles scaling stands in' },
   'Hong Kong': { name: 'Hong Kong', type: 'industrial', bonus: 'Your Cities get +20% bonus Production towards city projects.', channel: 'production', note: 'a PROJECT-only production multiplier; the flat channel stands in' },
   'Buenos Aires': { name: 'Buenos Aires', type: 'industrial', bonus: 'Your bonus resources behave like luxury resources, providing +1 Amenity per resource.', channel: 'amenities' },
-  Cardiff: { name: 'Cardiff', type: 'industrial', bonus: 'Cities receive +2 Power for every Harbor building.', channel: 'production', note: 'POWER is not modeled at all — no plant, no grid, no powered-building term' },
+  Cardiff: { name: 'Cardiff', type: 'industrial', bonus: 'Cities receive +2 Power for every Harbor building.', suz: 'harborPower' },
   'Mexico City': { name: 'Mexico City', type: 'industrial', bonus: 'Regional effects from your Industrial Zone, Water Park, and Entertainment Complex districts reach 3 tiles farther.', suz: 'regionalReach' },
   Kabul: { name: 'Kabul', type: 'militaristic', bonus: 'Your units receive double experience from battles they initiate.', suz: 'xpDouble' },
   Ngazargamu: { name: 'Ngazargamu', type: 'militaristic', bonus: 'Land combat or support units are 20% cheaper to purchase with Gold for each Encampment district building in that city.', channel: 'production', note: 'a per-building GOLD PURCHASE discount; the flat production channel stands in' },

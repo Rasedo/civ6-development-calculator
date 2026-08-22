@@ -614,7 +614,15 @@ class SimPhase:
                             self.city_outer_hp[_rr, row, col[_rr]] = _mx[_rr]
                     if int(prow.get("ls", 0)):
                         # A laser station: repeatable, +1 LY/turn for the craft.
-                        self.space_lasers[:, row] += hit.long()
+                        # The ORBITAL one is the seat's and pays whatever
+                        # happens; the terrestrial one belongs to the city that
+                        # has to power it.
+                        if pidx in self._orbital_proj_idx:
+                            self.civ_orbital_lasers[:, row] += hit.long()
+                        else:
+                            _lr = hit.nonzero(as_tuple=True)[0]
+                            if len(_lr) > 0:
+                                self.city_lasers[_lr, row, col[_lr]] += 1
                     if int(prow.get("sp", 0)):
                         step_k = self._space_step[pidx]
                         self.space_done[hit, row, step_k] = True
@@ -1076,7 +1084,7 @@ class SimPhase:
     _CITY_SLOT_FIELDS = (
         "city_alive", "city_center", "city_pop", "city_growth", "city_cbox", "city_loyalty",
         "city_acquired", "city_hp", "city_outer_hp", "city_last_hit", "city_id", "city_is_cap", "city_orig_cap", "city_current", "city_progress",
-        "city_prod_bank",
+        "city_prod_bank", "city_lasers",
         "city_cost", "city_qtile",
         "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts",
     )

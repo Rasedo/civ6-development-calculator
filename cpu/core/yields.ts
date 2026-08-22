@@ -1,6 +1,6 @@
 
 import { addYields, emptyYields, type GameState, type City, type Tile, type Yields, type DistrictId, type ImprovementId } from './types';
-import { citiesOf } from './seats';
+import { citiesOf, seatOf } from './seats';
 import { neighbors, hexDistance } from '../../world/hex';
 import { isWater, isMountain, hasRiver } from '../../world/query';
 import type { YieldCtx } from './effects';
@@ -12,7 +12,9 @@ import { tileAppeal } from './appeal'; // the Seaside Resort's dynamic gold
 import { WONDERS } from '../../world/wonders';
 import { DISTRICTS, type AdjacencyRule } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
-import { regionalReach } from './cityStates';
+import { regionalReach, suzerainEffect } from './cityStates';
+import { CARDIFF_HARBOR_POWER } from '../data/cityStates';
+import { LASER_POWER_LOAD } from '../data/projects';
 
 function terrainYields(tile: Tile): Yields {
   const out = emptyYields();
@@ -168,7 +170,7 @@ export function cityDistrictYields(ctx: YieldCtx, city: City): Yields {
   return out;
 }
 
-export function cityBuildingYields(ctx: YieldCtx, city: City): Yields {
+export function cityBuildingYields(ctx: YieldCtx, city: City, powered = false): Yields {
   const out = emptyYields();
   const pillaged = pillagedDistrictTypes(ctx.map, city.districts);
   for (const id of city.buildings) {
@@ -177,6 +179,13 @@ export function cityBuildingYields(ctx: YieldCtx, city: City): Yields {
     if (def.regional) continue; // handled by regional scan (affects own city too)
     if (pillaged.has(def.district)) continue; // buildings in a pillaged district are dark
     if (def.yields) addYields(out, def.yields);
+    if (powered && def.poweredYields) addYields(out, def.poweredYields);
+    if (def.special === 'COAL_PLANT') {
+      const iz = city.districts.find((d) => d.type === 'INDUSTRIAL_ZONE');
+      if (iz && ctx.map.tiles[iz.tileIndex].districtComplete) {
+        out.production += effectiveAdjacency(ctx, ctx.map.tiles[iz.tileIndex], 'INDUSTRIAL_ZONE');
+      }
+    }
     const beliefAdd = ctx.mods.buildingYieldAdd[id];
     if (beliefAdd) addYields(out, beliefAdd);
     if (def.special === 'SHIPYARD') {
@@ -207,6 +216,69 @@ export function cityBuildingYields(ctx: YieldCtx, city: City): Yields {
   return out;
 }
 
+export interface CityPower {
+  demand: number;
+  supply: number;
+  powered: boolean;
+}
+
+/**
+ * CIV6 (Power): a city's BASE LOAD is what its standing buildings demand, and
+ * it is met all at once or not at all — "a city cannot supply Power to some
+ * buildings and not to others - if its total Power requirement is not met,
+ * then no buildings in it will be powered".
+ *
+ * Two supplies. A POWER PLANT "will attempt to provide required Power to all
+ * cities within range ... The Power range always counts from the District
+ * that generates Power to the City Center", which is the same reach a
+ * regional building has (a Mexico City suzerain widens both). The RENEWABLE
+ * half "provide[s] Power only for their respective city"; the one this engine
+ * carries is Cardiff's, "+2 Power for every Harbor building".
+ *
+ * What a plant BURNS is not modelled — the strategic stockpiles it draws from
+ * do not exist — so a plant in range meets whatever demand it reaches.
+ */
+export function cityPower(state: GameState, city: City): CityPower {
+  const pillaged = pillagedDistrictTypes(state.map, city.districts);
+  let demand = LASER_POWER_LOAD * (city.laserStations ?? 0);
+  for (const id of city.buildings) {
+    const def = BUILDINGS[id];
+    if (!def?.power || pillaged.has(def.district)) continue;
+    demand += def.power;
+  }
+  let supply = 0;
+  if (!pillaged.has('HARBOR') && suzerainEffect(state, city.seat, 'harborPower')) {
+    for (const id of city.buildings) {
+      if (BUILDINGS[id]?.district === 'HARBOR') supply += CARDIFF_HARBOR_POWER;
+    }
+  }
+  const center = state.map.tiles[city.centerIndex];
+  const reach = regionalReach(state, city.seat);
+  let plant = false;
+  for (const other of citiesOf(state, city.seat)) {
+    if (!other.buildings.some((b) => BUILDINGS[b]?.powerPlant)) continue;
+    for (const inst of other.districts) {
+      if (inst.type !== 'INDUSTRIAL_ZONE') continue;
+      const tile = state.map.tiles[inst.tileIndex];
+      if (!tile.districtComplete || tile.districtPillaged) continue;
+      if (hexDistance(tile.col, tile.row, center.col, center.row) > reach) continue;
+      plant = true;
+    }
+  }
+  return { demand, supply, powered: demand > 0 && (plant || supply >= demand) };
+}
+
+/** The craft's speed above its base 1 LY/turn: every orbital station this
+ *  seat has launched, plus the terrestrial ones standing in POWERED cities. */
+export function laserSpeed(state: GameState, seat: number): number {
+  let n = seatOf(state, seat)?.orbitalLasers ?? 0;
+  for (const city of citiesOf(state, seat)) {
+    if (!city.laserStations) continue;
+    if (cityPower(state, city).powered) n += city.laserStations;
+  }
+  return n;
+}
+
 export interface RegionalEffects {
   yields: Yields;
   amenities: number;
@@ -226,19 +298,32 @@ export function regionalEffects(state: GameState, city: City): RegionalEffects {
   const center = state.map.tiles[city.centerIndex];
   const reach = regionalReach(state, city.seat); // a Mexico City suzerain reaches 3 farther
   const seen = new Set<string>();
+  // CIV6: "multiple Factories within the 6-tile range will all draw Power
+  // without providing extra Production bonus" — the id pays once. Its POWERED
+  // half is a second, independent once: any in-range source city that is
+  // POWERED pays it, whether or not the source that paid the base was.
+  const seenPowered = new Set<string>();
   const out: RegionalEffects = { yields: emptyYields(), amenities: 0 };
   for (const other of citiesOf(state, city.seat)) {
+    let lit: boolean | null = null;
     for (const inst of other.districts) {
       const tile = state.map.tiles[inst.tileIndex];
       if (!tile.districtComplete || tile.districtPillaged) continue; // pillaged source is dark
       for (const id of other.buildings) {
         const def = BUILDINGS[id];
         if (!def || !def.regional || def.district !== inst.type) continue;
-        if (seen.has(id)) continue;
         if (hexDistance(tile.col, tile.row, center.col, center.row) > reach) continue;
-        seen.add(id);
-        if (def.yields) addYields(out.yields, def.yields);
-        if (def.amenities) out.amenities += def.amenities;
+        if (!seen.has(id)) {
+          seen.add(id);
+          if (def.yields) addYields(out.yields, def.yields);
+          if (def.amenities) out.amenities += def.amenities;
+        }
+        if ((!def.poweredYields && !def.poweredAmenities) || seenPowered.has(id)) continue;
+        if (lit === null) lit = cityPower(state, other).powered;
+        if (!lit) continue;
+        seenPowered.add(id);
+        if (def.poweredYields) addYields(out.yields, def.poweredYields);
+        out.amenities += def.poweredAmenities ?? 0;
       }
     }
   }
@@ -247,12 +332,17 @@ export function regionalEffects(state: GameState, city: City): RegionalEffects {
 
 export function localBuildingAmenities(state: GameState, city: City): number {
   const pillaged = pillagedDistrictTypes(state.map, city.districts);
+  let lit: boolean | null = null;
   let n = 0;
   for (const id of city.buildings) {
     const def = BUILDINGS[id];
-    if (!def || def.regional || !def.amenities) continue;
+    if (!def || def.regional) continue;
     if (pillaged.has(def.district)) continue; // pillaged district's amenities go dark
-    n += def.amenities;
+    n += def.amenities ?? 0;
+    if (def.poweredAmenities) {
+      if (lit === null) lit = cityPower(state, city).powered;
+      if (lit) n += def.poweredAmenities;
+    }
   }
   return n;
 }

@@ -151,6 +151,7 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
 
     T('INDUSTRIALIZATION', 'Industrialization', 'Industrial', 930, ['SQUARE_RIGGING', 'MASS_PRODUCTION'], [
       { kind: 'unlockBuilding', building: 'FACTORY' },
+      { kind: 'unlockBuilding', building: 'COAL_POWER_PLANT' },
       { kind: 'improvementYields', improvement: 'MINE', yields: { production: 1 } },
     ]),
     T('SCIENTIFIC_THEORY', 'Scientific Theory', 'Industrial', 930, ['ASTRONOMY', 'BANKING']),
@@ -165,7 +166,7 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     ]),
 
     T('ELECTRICITY', 'Electricity', 'Modern', 1370, ['STEAM_POWER'], [
-      { kind: 'unlockBuilding', building: 'POWER_PLANT' },
+      { kind: 'unlockBuilding', building: 'OIL_POWER_PLANT' },
       { kind: 'unlockBuilding', building: 'SEAPORT' },
     ]),
     T('RADIO', 'Radio', 'Modern', 1370, ['STEAM_POWER', 'FLIGHT'], [
@@ -213,7 +214,9 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('PLASTICS', 'Plastics', 'Atomic', 1480, ['COMBUSTION']),
 
     T('COMPUTERS', 'Computers', 'Atomic', 1660, ['ELECTRICITY', 'RADIO']),
-    T('NUCLEAR_FISSION', 'Nuclear Fission', 'Atomic', 1660, ['ADVANCED_BALLISTICS', 'COMBINED_ARMS']),
+    T('NUCLEAR_FISSION', 'Nuclear Fission', 'Atomic', 1660, ['ADVANCED_BALLISTICS', 'COMBINED_ARMS'], [
+      { kind: 'unlockBuilding', building: 'NUCLEAR_POWER_PLANT' },
+    ]),
     T('ROCKETRY', 'Rocketry', 'Atomic', 1480, ['RADIO', 'CHEMISTRY'], [
       { kind: 'unlockDistrict', district: 'SPACEPORT' },
     ]),

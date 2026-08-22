@@ -41,7 +41,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import type { City, CityState, GameState, Seat, Tile, Unit } from './types';
-import { allyTurnsWith, borderTurnsFrom, friendTurnsWith, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
+import { allyTurnsWith, borderTurnsFrom, citiesOf, friendTurnsWith, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
+import { laserSpeed } from './yields';
 import { EMERGENCY_SLOTS } from '../data/seats';
 import { questFor } from './observe';
 import { envoysOf } from './cityStates';
@@ -359,7 +360,10 @@ const SEAT: Record<string, Extractor> = {
   ]),
   bestMeleeCS: overSeats((s) => s.bestMeleeCS),
   spaceLy: overSeats((s) => s.spaceLy ?? -1),
-  spaceLasers: overSeats((s) => s.spaceLasers ?? 0),
+  // the craft's speed above its base 1 LY/turn, and the terrestrial stations
+  // standing behind it (the powered ones are what the speed counts)
+  laserSpeed: overSeats((s, st) => laserSpeed(st, s.seat)),
+  laserStations: overSeats((s, st) => citiesOf(st, s.seat).reduce((n, c) => n + (c.laserStations ?? 0), 0)),
   techs: overSeats((s) => s.research.techs.map((t) => idx(TECH_IDX, t)).sort((a, b) => a - b)),
   civics: overSeats((s) => s.research.civics.map((c) => idx(CIVIC_IDX, c)).sort((a, b) => a - b)),
   // TS keeps ONE `boosted` list mixing tech and civic ids; the GPU keeps two

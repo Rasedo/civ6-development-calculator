@@ -775,16 +775,16 @@ export const SPECIALIST_YIELDS: Partial<Record<DistrictId, Partial<Record<'food'
  * "+3 Science instead with a Research Lab", "+3 Faith instead with a Tier 3
  * Worship building", "+2 Production and +2 Gold instead with a Military
  * Academy", "+2 Food and +2 Gold instead with a Seaport", "+6 Gold instead
- * with a Stock Exchange", "+3 Production instead with a Power Plant"
- * (coal/oil/nuclear — the generic POWER_PLANT stands in), "+3 Culture
- * instead with a Broadcast Center" (Film Studio unmodeled). `building` is a
- * building id, or 'WORSHIP' = any worship building. */
-export const SPECIALIST_TIERS: Partial<Record<DistrictId, { building: string; add: Partial<Record<'food' | 'production' | 'gold' | 'science' | 'culture' | 'faith', number>> }>> = {
-  CAMPUS: { building: 'RESEARCH_LAB', add: { science: 1 } },
-  HOLY_SITE: { building: 'WORSHIP', add: { faith: 1 } },
-  ENCAMPMENT: { building: 'MILITARY_ACADEMY', add: { production: 1 } },
-  HARBOR: { building: 'SEAPORT', add: { food: 1 } },
-  COMMERCIAL_HUB: { building: 'STOCK_EXCHANGE', add: { gold: 2 } },
-  INDUSTRIAL_ZONE: { building: 'POWER_PLANT', add: { production: 1 } },
-  THEATER_SQUARE: { building: 'BROADCAST_CENTER', add: { culture: 1 } },
+ * with a Stock Exchange", "+3 Production instead with a Power Plant" (any of
+ * the three), "+3 Culture instead with a Broadcast Center". Each entry names
+ * the building ids that count, or 'WORSHIP' for any worship building. */
+export const SPECIALIST_TIERS: Partial<Record<DistrictId, { buildings: string[]; add: Partial<Record<'food' | 'production' | 'gold' | 'science' | 'culture' | 'faith', number>> }>> = {
+  CAMPUS: { buildings: ['RESEARCH_LAB'], add: { science: 1 } },
+  HOLY_SITE: { buildings: ['WORSHIP'], add: { faith: 1 } },
+  ENCAMPMENT: { buildings: ['MILITARY_ACADEMY'], add: { production: 1 } },
+  HARBOR: { buildings: ['SEAPORT'], add: { food: 1 } },
+  COMMERCIAL_HUB: { buildings: ['STOCK_EXCHANGE'], add: { gold: 2 } },
+  // ANY of the three plants is the Industrial Zone's top building.
+  INDUSTRIAL_ZONE: { buildings: ['COAL_POWER_PLANT', 'OIL_POWER_PLANT', 'NUCLEAR_POWER_PLANT'], add: { production: 1 } },
+  THEATER_SQUARE: { buildings: ['BROADCAST_CENTER'], add: { culture: 1 } },
 };

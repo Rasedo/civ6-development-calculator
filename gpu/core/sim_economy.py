@@ -2385,21 +2385,20 @@ class SimEconomy:
             if bool(_st.any()):
                 dist_y[:, :, 1] = dist_y[:, :, 1] + st_adj * _st.double().unsqueeze(1)
         # SPECIALISTS (computeCityStats' specialist loop): count x (base +
-        # the tier add when the TOP building stands; -2 = any worship
-        # building). Integer-valued, so the add order is exact at any
+        # the tier add when ANY ONE of the top buildings stands; -2 = any
+        # worship building). Integer-valued, so the add order is exact at any
         # association.
         if bool(spec_d.any()):
             for di in range(len(self.districts_cat)):
                 cnt = spec_d[:, :, di]
                 if not bool(cnt.any()):
                     continue
-                t_b = int(self._spec_tb[di])
-                if t_b == -2:
-                    has_t = (bldg & self._b_worship.reshape(1, 1, -1)).any(dim=2)
-                elif t_b >= 0:
-                    has_t = bldg[:, :, t_b]
-                else:
-                    has_t = torch.zeros(B, n, dtype=torch.bool, device=dev)
+                has_t = torch.zeros(B, n, dtype=torch.bool, device=dev)
+                for t_b in self._spec_tb[di]:
+                    if t_b == -2:
+                        has_t = has_t | (bldg & self._b_worship.reshape(1, 1, -1)).any(dim=2)
+                    elif t_b >= 0:
+                        has_t = has_t | bldg[:, :, t_b]
                 y6 = self._spec_y[di].reshape(1, 1, 6) + has_t.double().unsqueeze(2) * self._spec_ta[di].reshape(1, 1, 6)
                 dist_y = dist_y + cnt.double().unsqueeze(2) * y6
 
@@ -2421,6 +2420,24 @@ class SimEconomy:
                 csf.scatter_add_(1, self._citystate_b1idx.clamp(min=0) * 6 + self._citystate_yidx, per3)
                 csf.scatter_add_(1, self._citystate_b2idx.clamp(min=0) * 6 + self._citystate_yidx, per6)
                 bld_y = bld_y + torch.einsum("bjn,bnk->bjk", selbf, csf.reshape(B, nB, 6))
+            if bool((selb & self._b_pow_y_any.reshape(1, 1, -1)).any()):
+                # GS POWER: the second half of a late building's yields, paid
+                # while its city meets its whole load.
+                _lit = self._city_powered(row)[:, sl].double().unsqueeze(2)
+                bld_y = bld_y + (selbf * _lit) @ self._b_pow_y
+            if self._iz_idx >= 0 and self._iz_adj_bidx:
+                # CIV6 (Coal Power Plant): "Grants bonus Production equal to the
+                # district's current adjacency bonus", and unlike its two
+                # successors that Production is LOCAL.
+                izt = dreg[:, :, self._iz_idx]
+                izc = izt.clamp(min=0)
+                has_cp = torch.zeros(B, n, dtype=torch.bool, device=dev)
+                for _bi in self._iz_adj_bidx:
+                    has_cp = has_cp | selb[:, :, _bi]
+                has_cp = alive & has_cp & (izt >= 0) & self.district_complete.gather(1, izc)
+                if bool(has_cp.any()):
+                    iadj = self._district_adj_seat(row, self._iz_idx).gather(1, izc).double()
+                    bld_y[:, :, 1] = bld_y[:, :, 1] + torch.where(has_cp, iadj, torch.zeros_like(iadj))
             if self._harbor_idx >= 0 and self._shipyard_bidx >= 0:
                 hb = dreg[:, :, self._harbor_idx]
                 hbc = hb.clamp(min=0)

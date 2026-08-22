@@ -16,11 +16,12 @@ import { SHIPWRECK_CIVIC, RELIGIOUS_HEAL_PER_FAITH } from '../core/units';
 import type { ImprovementId } from '../core/types';
 import { GENERAL_AURA_CS, GENERAL_AURA_RANGE, BARB_SCOUT_OPENER_LIVE } from '../core/combat';
 import { GENERAL_AURA_MP } from '../core/aura';
+import { CARDIFF_HARBOR_POWER } from '../data/cityStates';
 import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_HILL_CS, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD } from '../data/cityStates';
 import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_BUILDINGS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_YIELD, CITY_STATE_MAX_HP, CITY_STATE_MEET_RANGE, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, GP_ERA_GPP, GP_FIRST_OF_ERA, GP_FLAT_COST_CLASSES, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, RELIC_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_CULTURE, ARTIFACT_TOURISM, THEMING_MULT, ARTIST_WORKS, SPECIALIST_YIELDS, SPECIALIST_TIERS } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, APOSTLE_PROMO_OFFER, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
-import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, gpClassesOf, gppFractionOf } from '../data/projects';
+import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, LASER_POWER_LOAD, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { TRADE_ROUTE_RANGE_LAND, TRADE_ROUTE_RANGE_SEA, CITY_STATE_ROUTE_GOLD, CITY_STATE_ROUTE_SPEC, INTL_ROUTE_GOLD, TRADE_ROUTE_DURATION, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from '../core/trade';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
@@ -246,6 +247,8 @@ export function buildRules() {
     centerMinProduction: CITY_CENTER_MIN_PRODUCTION,
     housing: { fresh: HOUSING_FRESH_WATER, coastal: HOUSING_COASTAL, none: HOUSING_NO_WATER, aqFreshBonus: AQUEDUCT_FRESH_BONUS, aqNoFreshTotal: AQUEDUCT_NO_FRESH_TOTAL },
     regionalRange: REGIONAL_RANGE, // regional-building reach (hex distance, city centers)
+    cardiffHarborPower: CARDIFF_HARBOR_POWER,
+    laserPowerLoad: LASER_POWER_LOAD,
     boostFraction: BOOST_FRACTION,
     // amenityTier(balance) thresholds, highest first (see data/constants.ts).
     // real Civ 6 bands — Content exactly 0, Displeased -1..-2.
@@ -605,7 +608,8 @@ export function buildRules() {
     // (rt = techs-table idx) and previous-step link (rp = projects-table idx),
     // which is what `_space_step_ok` reads. They sit LAST, in chain order: the
     // scripted greedy takes the lowest legal index, so a base project always
-    // shadows them. Laser rows (`ls`, repeatable, tech-gated only) sit between
+    // shadows them. Laser rows (`ls`, repeatable, gated on the tech and on the
+    // finished expedition; `orb` = the unconditional orbital one) sit between
     // the base rows and the chain; `pc` is a FIXED price (already speed-scaled)
     // where >= 0, else the generic curve applies.
     projects: {
@@ -619,6 +623,7 @@ export function buildRules() {
         gf: gppFractionOf(p),
         sp: p.space ? 1 : 0,
         ls: p.laser ? 1 : 0,
+        orb: p.orbital ? 1 : 0,
         vic: p.victory ? 1 : 0,
         pc: p.cost ?? -1,
         rt: p.requiresTech ? (techIdx.get(p.requiresTech) ?? -1) : -1,
@@ -870,7 +875,9 @@ export function buildRules() {
         // specialist base yields, and the TOP building that upgrades them
         // (-1 none, -2 = any worship building)
         spec: YIELD_KEYS.map((k) => SPECIALIST_YIELDS[id]?.[k] ?? 0),
-        specTB: SPECIALIST_TIERS[id] ? (SPECIALIST_TIERS[id]!.building === 'WORSHIP' ? -2 : buildingIdx.get(SPECIALIST_TIERS[id]!.building) ?? -1) : -1,
+        // the buildings that lift this district's specialists, -2 = any
+        // worship building; a district with no tier exports an empty list
+        specTB: (SPECIALIST_TIERS[id]?.buildings ?? []).map((b) => (b === 'WORSHIP' ? -2 : buildingIdx.get(b) ?? -1)).filter((i) => i !== -1),
         specTA: YIELD_KEYS.map((k) => SPECIALIST_TIERS[id]?.add[k] ?? 0),
       };
     }),
@@ -917,6 +924,13 @@ export function buildRules() {
       reqBuildings: (b.requiresAny ?? []).map((id) => buildingIdx.get(id) ?? -1).filter((i) => i >= 0),
       exclBuildings: (b.exclusiveWith ?? []).map((id) => buildingIdx.get(id) ?? -1).filter((i) => i >= 0),
       regional: b.regional ? 1 : 0,
+      // GS POWER: the base load this row demands, what it pays once its city
+      // is powered, and whether it SUPPLIES its region.
+      power: b.power ?? 0,
+      poweredYields: YIELD_KEYS.map((k) => b.poweredYields?.[k] ?? 0),
+      poweredAmenities: b.poweredAmenities ?? 0,
+      powerPlant: b.powerPlant ? 1 : 0,
+      izAdjProduction: b.special === 'COAL_PLANT' ? 1 : 0,
       // worship = faith-purchase-only (never queued, never gold-bought).
       worship: b.worship ? 1 : 0,
       // the WALLS TIER this row supplies (0 = not a walls row), and the

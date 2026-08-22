@@ -55,10 +55,10 @@ nothing carries forward.
 |---|---|---|
 | **A. Engine vs engine** | **0** | |
 | B-20r tourism tails | 1 | theming, the open-borders dig and the work GIFT all ship; the Naturalist's progressive cost is unsourced |
-| B-21r suzerain rows | 1 | the residual descoped rows all need whole absent systems |
+| B-21r suzerain rows | 1 | nine perks are rules; the residual descoped rows all need whole absent systems |
 | B-22r World Congress | 2 | 13 of the 21 regular resolutions ship and emergencies run as special sessions; eight resolutions and the scored competitions have no carrier; peace TERMS wait on the negotiated deal (C-2) and two favor penalties on C-19/C-24; the favor tie-break unmodeled |
 | B-24r Ages/governors | 1 | three system-less dedication entries, dark-age policies, governor promotions, per-civ era drift |
-| B-30r specialists | 1 | the mechanic and both citizen overrides ship; the Theater tier's second building and the plant split wait upstream |
+| B-30r specialists | 1 | the mechanic, both citizen overrides and the three-plant Industrial tier ship; a LOCK still outlives the city that set it |
 | B-31r trade-route tails | 1 | sea legs and the whole-destination-set candidate ship; no trading posts, plunder gold is a stylization, the summed-yield key is a heuristic and the free-choice head is P8's |
 | B-53r the great-person queue | 1 | 205 sourced people, the era gate and the scaled price ship; the offer is re-derived each turn rather than frozen, and the payout is one era-sized lump instead of the person's own ability |
 | B-D unsourced data values | 2 | the Monument, the Lighthouse and the Engineer's Armory shipped and one bullet was false; the governments are half-shipped, and the rest are shape differences or model tuning that no source can close |
@@ -75,18 +75,17 @@ nothing carries forward.
 | B-51r the Encampment's second pool | 1 | the district meets the city's perimeter and heals only while its tile is clear; Civ 6 tracks the two pools SEPARATELY, and a defeat pillages it |
 | B-44r city-state war tails | 1 | the head, its policy and a SEAT's march on a minor ship; the barbarian walker still raids only majors because it beelines to one nearest city, and the diplomatic consequences wait on C-19 |
 | B-60r the dig's DATE, and the hull nobody dates | 1 | the artifact's civilization is the event's own now; its ERA is still the ACTING seat's research, and a barbarian or minor sinking a hull leaves no wreck at all |
-| B-34r flood tails | 1 | the severity ladder and the river's whole reach ship; the Great Bath's mitigation is still seat-scoped rather than river-scoped, and the Dam is not in the district roster |
+| B-34r flood tails | 1 | the severity ladder and the river's whole reach ship; the Great Bath's mitigation is still seat-scoped rather than river-scoped, and the Dam — with the Hydroelectric Dam that needs it — is not in the district roster |
 | **B. Fidelity vs real Civ 6** | **26** | |
-| C-1 POWER | 5 | no plants, no grid, no powered-yield term — 4 gaps wait on it |
+| C-1 POWER | 3 | the grid, the three plants, Cardiff and the powered-yield split all ship; the FUEL waits on C-5, the CO2 and the Accords on C-24, and four renewable improvements, the Hydroelectric Dam and the Biosphere have no carrier |
 | C-2 diplomatic agreements | 3 | friendship, alliances, open borders, the closed border and the work gift ship on one 30-turn clock; alliance TYPES and LEVELS, the negotiated two-sided deal, and the four agreements that need one are open |
 | C-4 unique improvements | 3 | Batey / Colossal Head / Monastery, each a flat channel today |
-| C-5 strategic-resource stockpiles | 4 | resources gate, they never accumulate or get spent |
+| C-5 strategic-resource stockpiles | 4 | resources gate, they never accumulate or get spent; a Power Plant burns nothing |
 | C-6 policy-card modifiers | 1 | two of the 49 cards are inert, each blocked on a system below |
 | C-7 trading posts | 2 | a route lays roads and plants nothing |
 | C-8 draws made deterministic | 2 | the Great Person replacement walks a queue and the Congress slate rotates, where Civ 6 draws both |
 | C-9 faith-purchase classes | 1 | faith buys named units, never a class of building |
 | C-11 terrain the wonder rules need | 2 | the NARROWED placements are deliberately narrower than Civ 6's |
-| C-12 the Film Studio is absent | 1 | the Theater tier's other top building, so its specialist upgrade has one path |
 | C-13 ranged vs districts/cities | 2 | a scope-out on both, with the rest of the Encampment complete |
 | C-15 garrison does not block capture | 2 | the move-onto-centre capture model is what is missing |
 | C-16 spies / air units / GDRs | 4 | whole unit classes, and four dedications wait on them |
@@ -96,15 +95,15 @@ nothing carries forward.
 | C-21 Great Person ACTIVATED abilities | 2 | every GP fires instantly; none is placed and used |
 | C-22 the district roster is a subset | 3 | no Dam, Canal, Water Park, Preserve, Aerodrome, Government Plaza or Diplomatic Quarter |
 | C-23 nothing diminishes tourism | 1 | no rival's Enlightenment ever costs a tourist, so Cristo Redentor's cancelling clause has nothing to cancel |
-| C-24 no CO2, no climate | 3 | GS's whole climate arc — emissions, warming bands, sea level, escalating disasters — and 2 gaps wait on it |
-| C-26 no civilization uniques | 5 | seats are a name, a colour and a city list: no civ ability, no leader ability or agenda, no unique unit, no unique infrastructure |
+| C-24 no CO2, no climate | 3 | GS's whole climate arc — emissions, warming bands, sea level, escalating disasters — and 3 gaps wait on it |
+| C-26 no civilization uniques | 5 | seats are a name, a colour and a city list: no civ ability, no leader ability or agenda, no unique unit, no unique infrastructure (America's Film Studio among them) |
 | C-25 no stealth (invisible) units | 2 | the whole naval-raider class is absent and nothing on either engine can be invisible |
 | C-27 pillaging pays no yields | 2 | the verb marks the tile and heals; nothing banks, and there is no coastal raid to bank from |
 | C-28 tourism is one lifetime scalar | 2 | it is banked per seat and divided by the civ count on read, so no rule can address one rival's tourism |
 | C-29 no RESOLVED suzerain | 1 | `isSuzerain` recomputes from the raw envoy store on every read, so a rule that changes envoy WEIGHT by who the suzerain is has no fixed point |
 | C-30 city-states carry no research | 1 | no techs, no civics, so nothing can say when a minor took Early Empire — its borders never close and the suzerain's passage lifts nothing |
-| **C. Absent systems** | **59** | |
-| **OPEN, TOTAL** | **85** | |
+| **C. Absent systems** | **56** | |
+| **OPEN, TOTAL** | **82** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -230,16 +229,17 @@ Civ 6 source or is recorded as unverifiable.
   The culture victory is further out of reach than the pre-freeze note
   said, not closer — parks cannot move it while the civic that unlocks
   them sits past the horizon.
-- **B-21r. City-state suzerain rows:** eight perks are RULES (`SUZ_EFFECTS`,
+- **B-21r. City-state suzerain rows:** nine perks are RULES (`SUZ_EFFECTS`,
   both engines): Kabul double attack XP, Preslav cavalry-on-hills CS, Mexico
   City regional reach, Anshan works science, Kumasi per-specialty route
   yields, Jerusalem Holy-Site pressure, Yerevan's free Apostle promotion
-  choice and Vilnius's era Inspiration. The remaining catalog rows carry
-  their reason in their `CITY_STATE_SUZERAIN_BONUS` entry's `note`, and the
-  roster is now current-ruleset throughout (see B-D), so the stand-ins are
-  whole absent systems (POWER, trading posts, unique improvements/luxuries,
-  a faith-purchase class, a gold-purchase discount, a per-district Great
-  Person channel) or a flat channel standing in for a %-scaling.
+  choice, Vilnius's era Inspiration and Cardiff's +2 Power per Harbor
+  building. The remaining catalog rows carry their reason in their
+  `CITY_STATE_SUZERAIN_BONUS` entry's `note`, and the roster is now
+  current-ruleset throughout (see B-D), so the stand-ins are whole absent
+  systems (trading posts, unique improvements/luxuries, a faith-purchase
+  class, a gold-purchase discount, a per-district Great Person channel) or a
+  flat channel standing in for a %-scaling.
 - **B-22r. World Congress residuals.** The session is real now: a
   rotating two-slot slate off `CONGRESS_RESOLUTIONS` — THIRTEEN of the
   twenty-one regular-session resolutions, era windows and A/B texts
@@ -287,8 +287,9 @@ Civ 6 source or is recorded as unverifiable.
     (spies), Governance Doctrine (a governor roster with appointment and
     promotion, B-24r), Military Advisory (unblocked since the promotion
       classes shipped — unwritten, not absent),
-    Global Energy Treaty (POWER-consuming buildings, C-1, and the
-    climate arc, C-24), Public Relations (grievances, C-19), Luxury
+    Global Energy Treaty (its POWER-consuming buildings exist now; what
+    is left is the climate arc, C-24), Public Relations (grievances,
+    C-19), Luxury
     Policy and World Religion. The last two are HALF-sourced, and a
     resolution whose two outcomes cannot both act is worse than an
     absent one — it eats a rotation slot and passes a no-op — so they
@@ -421,9 +422,10 @@ Civ 6 source or is recorded as unverifiable.
     not have the bug: it lives on the city and both engines drop it at a
     capture, because TS's flipped literal carries no `specialistPref`.
   - Specialists provide yields ONLY in Civ 6 (sourced — no GPP, unlike
-    Civ 5); the Film Studio alternative for the Theater tier and the
-    coal/oil/nuclear plant split remain unmodeled upstream (B-D records
-    the generic POWER_PLANT).
+    Civ 5). The Industrial tier now names all three plants and the Theater
+    tier names the Broadcast Center alone, which is correct: the Film
+    Studio is an AMERICAN unique that REPLACES it, so it belongs to C-26,
+    not to this row.
 - **B-31r. Trade-route tails.** The Trader is a UNIT now (Ancient
   civilian, FOREIGN_TRADE, progressive cost) that a route SPENDS; it walks
   the land path laying roads, holds the route open until the round trip
@@ -507,7 +509,8 @@ Civ 6 source or is recorded as unverifiable.
   - **The Great Bath's "+1 Faith for every time a tile belonging to this city
     has been Flooded"** needs a per-tile flood COUNT that nothing stores.
   - **The DAM is not in the district roster** (C-22), so the other half of the
-    published mitigation has nowhere to live.
+    published mitigation has nowhere to live — and with it the
+    Hydroelectric Dam, the strongest renewable Power source (C-1).
   - Climate change ending fertilization at Phase IV, the Egyptian ability, the
     Soothsayer and COASTAL floods all wait on systems that do not exist here.
 - **B-36r. Appeal adjacency terms.** The four terms whose sources exist here
@@ -934,13 +937,64 @@ dependency is readable, and both halves count.
 The OPEN weight jumped when this chapter landed. That is the point: the old
 number was under-counting by treating deferrals as closures.
 
-- **C-1. POWER — no plants, no grid, no powered-yield term.** Weight 5.
-  Gaps waiting on it: the POWERED-yield SPLITS (GS puts part of late building
-  yields behind Power; the vanilla flat yields stand in, `buildings`); the
-  coal/oil/nuclear PLANT family, which the generic POWER_PLANT stands in for;
-  Cardiff's suzerain row (+2 Power per Harbor building, a flat production
-  channel today); and the Terrestrial Laser Station's powered-city condition
-  in the space race.
+- **C-1. POWER — the fuel, the emissions and the renewable roster.**
+  Weight 3. THE GRID SHIPS, on both engines: a city's base LOAD is what its
+  standing buildings ask (a pillaged district's ask nothing, like their
+  yields) plus 5 per Terrestrial Laser Station it has completed, and the
+  load is met in FULL or not at all — "a city cannot supply Power to some
+  buildings and not to others". Two supplies answer it. A POWER PLANT
+  "will attempt to provide required Power to all cities within range",
+  measured from its own Industrial Zone tile to the receiving CITY CENTER
+  over the reach a regional building has, so a Mexico City suzerain widens
+  the grid with it (`cityPower` / `_city_powered`). The RENEWABLE half
+  "provide[s] Power only for [its] respective city"; the one that exists
+  here is Cardiff's, "+2 Power for every Harbor building", now a
+  `SUZ_EFFECTS` rule rather than a flat channel.
+
+  The three plants are the real roster — Coal (Industrialization, 300),
+  Oil (Electricity, 360) and Nuclear (Nuclear Fission, 480), mutually
+  exclusive in one Industrial Zone, each maintenance 3. Oil and Nuclear pay
+  their production (and the Nuclear plant's science) REGIONALLY; the Coal
+  plant instead "Grants bonus Production equal to the district's current
+  adjacency bonus", and that half is LOCAL. All three lift the Industrial
+  Zone's specialists, so `SPECIALIST_TIERS` names a LIST of top buildings
+  rather than one.
+
+  Every powered-yield SPLIT is sourced from its own GS effect block and
+  ships as `power` + `poweredYields` / `poweredAmenities`: Factory 2 ->
+  +3 Production, Research Lab 3 -> +5 Science, Broadcast Center 3 ->
+  +4 Culture, Stock Exchange 3 -> +7 Gold, Stadium 2 -> +2 Amenities. A
+  REGIONAL building pays its powered half from any lit source that reaches,
+  independently of which source paid the base — "multiple Factories within
+  the 6-tile range will all draw Power without providing extra Production
+  bonus". The Terrestrial Laser Station is counted on the CITY that built
+  it and speeds the craft only while that city is powered; the Lagrange
+  station is the seat's and is unconditional (`laserSpeed` /
+  `_laser_speed`). Poke lanes: `tests/gpu/power_test.py`,
+  `tests/cpu/city/power.test.ts`, and the two space lanes for the stations.
+  REACHABILITY: the plants unlock in the Industrial era and the gate's
+  seats reach it, but nothing in the driven gate has yet BUILT one — the
+  grid is poke-proven, not gate-proven.
+
+  OPEN:
+  - **A PLANT BURNS NOTHING.** Coal at 1:4, Oil at 1:4 and Uranium at 1:16
+    per turn, the rule that a city in range of two plants uses "the Power
+    Plant which draws the resource of which you have a larger stockpile",
+    and the Decommission projects all need stockpiles that accumulate and
+    are SPENT; blocked on C-5. A plant here therefore meets whatever load
+    it reaches, for free, forever.
+  - **NO CO2, so no Accords and no reason to switch plants.** The whole
+    point of the three-plant ladder is that Coal emits most and Nuclear
+    least; blocked on C-24.
+  - **THE FOUR RENEWABLE GENERATORS** — Geothermal Plant, Solar Farm, Wind
+    Farm and Offshore Wind Farm — are improvements with their own terrain
+    gates, and none is in the improvement roster.
+  - **THE HYDROELECTRIC DAM**, "the first available and most potent source
+    of renewable Power", needs the Dam district (C-22, B-34r).
+  - **THE BIOSPHERE** raises every renewable source (Cardiff's included) by
+    200%; the wonder is not in the roster.
+  - **THE NUCLEAR PLANT'S REACTOR AGE** — the rising accident chance and
+    the Recommission Nuclear Reactor project that resets it — has no clock.
 - **C-2. DIPLOMATIC AGREEMENTS.** Weight 3. THIS ENTRY USED TO SAY "no treaty
   of any kind ... war and peace and nothing between them", and two of the five
   gaps it listed had shipped before it was written: alliances and
@@ -1006,8 +1060,9 @@ number was under-counting by treating deferrals as closures.
 - **C-5. STRATEGIC-RESOURCE STOCKPILES — resources gate, they do not
   accumulate.** Weight 4. `civHasStrategic` answers a boolean; real GS
   accumulates and SPENDS. Gaps: the Lagrange Laser Station's 30 Aluminum;
-  unit resource COSTS and per-turn consumption; Zanzibar's two
-  exists-nowhere-else luxuries.
+  unit resource COSTS and per-turn consumption; the three Power Plants'
+  fuel (C-1), which is what makes a plant a choice rather than a switch;
+  Zanzibar's two exists-nowhere-else luxuries.
 - **C-6. POLICY-CARD MODIFIERS — two of the 49 cards are inert.** Weight 1.
   Every row in `POLICIES` was read against its own Civilopedia page: the
   description quotes the card, the slot kind is the page's `type`, the
@@ -1060,9 +1115,6 @@ number was under-counting by treating deferrals as closures.
   NARROWED marker in `builtWonders` names each wonder whose real placement
   rule asks for terrain this map generator does not produce, so the modelled
   rule is deliberately narrower than Civ 6's.
-- **C-12. THE FILM STUDIO IS NOT IN THE BUILDING ROSTER.** Weight 1. It is
-  the Theater Square's alternative top building, so `SPECIALIST_TIERS` names
-  the Broadcast Center alone where real Civ 6 accepts either.
 - **C-13. RANGED STRIKES DO NOT ENGAGE DISTRICTS OR CITIES.** Weight 2.
   Recorded as a scope-out for both. The rest of the Encampment (`encamp_hp`
   pool, movement block, garrison pool, district strike, training XP) is
@@ -1157,8 +1209,9 @@ number was under-counting by treating deferrals as closures.
   tiles it causes. Floods and storms fire from `disaster` / `_disasters` on
   a fixed per-turn draw, so severity never escalates with a warming world.
   Gaps waiting on it: the pollution half of the diplomatic-favor penalty
-  (B-22r), and the Global Energy Treaty resolution, which is jointly
-  blocked on POWER (C-1).
+  (B-22r), the Global Energy Treaty resolution, and the three Power Plants'
+  emissions (C-1) — which is the whole reason a seat would ever trade a
+  Coal plant for a Nuclear one.
 - **C-23. NOTHING DIMINISHES TOURISM.** Weight 1. Real Civ 6 reduces the
   tourism a civ earns from Relics and Holy Cities once other civs research
   The Enlightenment, and reduces Great Work tourism the same way through the

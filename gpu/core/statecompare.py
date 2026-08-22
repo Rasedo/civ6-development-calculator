@@ -440,7 +440,10 @@ SEAT = {
     "gpPoints": lambda sim, b, rows: [[float(x) for x in sim.civ_gpp[b, c].tolist()] for c in rows],
     "spaceProjects": lambda sim, b, rows: [sum(1 for x in sim.space_done[b, c].tolist() if x) for c in rows],
     "spaceLy": _civ_scalar("space_ly"),
-    "spaceLasers": _civ_scalar("space_lasers"),
+    "laserSpeed": lambda sim, b, rows: [int(sim._laser_speed(c)[b]) for c in rows],
+    "laserStations": lambda sim, b, rows: [
+        int(sim.city_lasers[b, c, : sim.RC][sim.city_alive[b, c, : sim.RC]].sum()) for c in rows
+    ],
     "routeCount": lambda sim, b, rows: [
         sum(1 for r in sim.seat_routes[b, _seat_row(sim, c)].tolist() if r[0] >= 0) for c in rows
     ],

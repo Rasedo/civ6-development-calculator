@@ -45,6 +45,9 @@ export interface ProjectDef {
    *  `requiresProject`, and placed AFTER the base rows so a greedy
    *  lowest-index pick resolves to a base project first. */
   space?: boolean;
+  /** The ORBITAL laser: its bonus is unconditional, where the terrestrial
+   *  one draws Power in the city that built it. */
+  orbital?: boolean;
   /** Marks a laser-station project: repeatable, `requiresTech`-gated, each
    *  completion adds +1 light-year/turn to this seat's Exoplanet craft. */
   laser?: boolean;
@@ -131,15 +134,20 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
     }),
 
     // THE LASER STATIONS (before the space rows so those stay LAST, in chain
-    // order). CIV6 (GS, Arioch + wiki): both unlock with Offworld Mission,
-    // cost 600 production each, are REPEATABLE across cities, and each
-    // completion speeds the Exoplanet craft by +1 light-year/turn. Deviations,
-    // recorded in docs/AUDIT.md: the Terrestrial station's powered-city
-    // condition (no power system here) and the Lagrange station's 30 Aluminum
-    // (no strategic-resource stockpiles) are unmodelled, so the two rows are
-    // effectively twins.
-    P({ id: 'TERRESTRIAL_LASER_STATION', name: 'Terrestrial Laser Station', district: 'SPACEPORT', yield: null, gpClass: null, laser: true, cost: 600, requiresTech: 'OFFWORLD_MISSION', description: 'Repeatable: +1 light-year/turn for the Exoplanet craft.' }),
-    P({ id: 'LAGRANGE_LASER_STATION', name: 'Lagrange Laser Station', district: 'SPACEPORT', yield: null, gpClass: null, laser: true, cost: 600, requiresTech: 'OFFWORLD_MISSION', description: 'Repeatable: +1 light-year/turn for the Exoplanet craft.' }),
+    // order). CIV6 (GS wiki, both pages): each "becomes available after
+    // researching Offworld Mission and completing the Exoplanet Expedition
+    // project, and requires a Spaceport district", costs 600 production, is
+    // REPEATABLE, and speeds the craft by +1 light-year/turn.
+    //
+    // The two differ in what keeps the bonus alive. The TERRESTRIAL station
+    // "increases the city's Power requirement by 5 each time it is completed,
+    // and will cease to provide its bonus if the city is not powered" — so it
+    // is counted on the CITY that built it. The LAGRANGE station pays a
+    // one-time 30 Aluminum instead and "is guaranteed to provide its bonus";
+    // the stockpile it charges does not exist here (recorded in
+    // docs/AUDIT.md), so it is free and unconditional.
+    P({ id: 'TERRESTRIAL_LASER_STATION', name: 'Terrestrial Laser Station', district: 'SPACEPORT', yield: null, gpClass: null, laser: true, cost: 600, requiresTech: 'OFFWORLD_MISSION', requiresProject: 'EXOPLANET_EXPEDITION', description: 'Repeatable: +1 light-year/turn while this city is powered.' }),
+    P({ id: 'LAGRANGE_LASER_STATION', name: 'Lagrange Laser Station', district: 'SPACEPORT', yield: null, gpClass: null, laser: true, orbital: true, cost: 600, requiresTech: 'OFFWORLD_MISSION', requiresProject: 'EXOPLANET_EXPEDITION', description: 'Repeatable: +1 light-year/turn for the Exoplanet craft.' }),
 
     // THE SPACE RACE, four steps, each needing the previous one COMPLETE, all
     // run in a SPACEPORT. SOURCED against the Gathering Storm Civilopedia
@@ -169,6 +177,10 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
 export const SPACE_FLIGHT_LY = Math.round(50 * GAME_SPEED);
 
 export const SPACE_PROJECTS: ProjectDef[] = Object.values(PROJECTS).filter((p) => p.space);
+
+/** CIV6 (GS): a Terrestrial Laser Station "increases the city's Power
+ *  requirement by 5 each time it is completed". */
+export const LASER_POWER_LOAD = 5;
 
 /** Yield granted on completion = production cost × this.
  *  SOURCED: real Civ 6 converts **15%** of the city's production output to

@@ -6,6 +6,7 @@ import { canPlaceDistrict } from '../../../cpu/core/rules';
 import { queueSeatProject } from '../../../cpu/core/phase';
 import { settleFirstCity } from '../helpers';
 import { PROJECTS, SPACE_PROJECTS, SPACE_FLIGHT_LY } from '../../../cpu/data/projects';
+import { cityPower, laserSpeed } from '../../../cpu/core/yields';
 
 // space race / science victory. Gated on Information/Future techs, so no gate
 // lane reaches it and these pokes are the only proof of the semantics. The GPU
@@ -73,7 +74,7 @@ describe('science victory', () => {
     expect(canPlaceDistrict(state, city, 'SPACEPORT', spare.index).ok).toBe(false);
   });
 
-  it('gates each step on its tech AND the previous step (sequence); lasers are tech-only and repeatable', () => {
+  it('gates each step on its tech AND the previous step (sequence); a laser needs the craft in flight, then repeats', () => {
     const { state, city } = newGameWithSpaceport();
     // No gating techs yet: no space project is available.
     expect(availableProjects(state, city).some((p) => p.space || p.laser)).toBe(false);
@@ -88,12 +89,17 @@ describe('science victory', () => {
     avail = availableProjects(state, city).filter((p) => p.space).map((p) => p.id);
     expect(avail).toEqual(['LAUNCH_MOON_LANDING']);
 
-    // Lasers: closed without Offworld Mission, open with it, and STILL open
-    // after completing one (repeatable — never in the ledger).
+    // Lasers: closed without Offworld Mission, and STILL closed with it while
+    // the craft has not launched — both stations ask for the finished
+    // Exoplanet Expedition. Once it is in the ledger they open and STAY open
+    // however many are built (repeatable — never in the ledger themselves).
     expect(availableProjects(state, city).some((p) => p.laser)).toBe(false);
     seatOf(state, 0)!.research.techs.push('OFFWORLD_MISSION');
+    expect(availableProjects(state, city).some((p) => p.laser)).toBe(false);
+    seatOf(state, 0)!.spaceProjects = [...CHAIN];
     expect(availableProjects(state, city).filter((p) => p.laser)).toHaveLength(2);
-    seatOf(state, 0)!.spaceLasers = 3;
+    city.laserStations = 3;
+    seatOf(state, 0)!.orbitalLasers = 3;
     expect(availableProjects(state, city).filter((p) => p.laser)).toHaveLength(2);
   });
 
@@ -131,17 +137,36 @@ describe('science victory', () => {
     expect(state.gameOver).toBe(true);
   });
 
-  it('laser stations stack onto the craft speed (+1 LY/turn each)', () => {
+  it('laser stations stack onto the craft speed — the terrestrial one only while its city is powered', () => {
     const { state, city } = newGameWithSpaceport();
-    seatOf(state, 0)!.research.techs.push('OFFWORLD_MISSION');
+    const s = seatOf(state, 0)!;
+    s.research.techs.push('OFFWORLD_MISSION');
+    s.spaceProjects = [...CHAIN];
     completeThroughQueue(state, city, 'TERRESTRIAL_LASER_STATION');
     completeThroughQueue(state, city, 'LAGRANGE_LASER_STATION');
-    const s = seatOf(state, 0)!;
-    expect(s.spaceLasers).toBe(2);
-    expect(s.spaceProjects).toHaveLength(0); // lasers never enter the ledger
+    expect(city.laserStations).toBe(1);
+    expect(s.orbitalLasers).toBe(1);
+    expect(s.spaceProjects).toEqual(CHAIN); // lasers never enter the ledger
+
+    // The city draws 5 Power for the terrestrial station and has no supply, so
+    // only the orbital one speeds the craft.
+    expect(cityPower(state, city).demand).toBe(5);
+    expect(laserSpeed(state, 0)).toBe(1);
     s.spaceLy = 0;
     endTurn(state);
-    expect(s.spaceLy).toBe(3); // 1 base + 2 stations
+    expect(s.spaceLy).toBe(2); // 1 base + the orbital station
+
+    // A Coal Power Plant on a complete Industrial Zone lights the city, and
+    // the terrestrial station starts paying.
+    const iz = city.centerIndex + 2;
+    city.districts.push({ type: 'INDUSTRIAL_ZONE', tileIndex: iz });
+    state.map.tiles[iz].districtComplete = true;
+    city.buildings.push('COAL_POWER_PLANT');
+    expect(cityPower(state, city).powered).toBe(true);
+    expect(laserSpeed(state, 0)).toBe(2);
+    s.spaceLy = 0;
+    endTurn(state);
+    expect(s.spaceLy).toBe(3);
   });
 
   it('Launch Earth Satellite reveals the whole map (fog worlds only)', () => {

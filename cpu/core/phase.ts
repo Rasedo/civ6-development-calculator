@@ -812,6 +812,9 @@ export function transferCity(
     greatWorksArt: civCity.greatWorksArt,
     greatWorksMusic: civCity.greatWorksMusic,
     relics: civCity.relics,
+    // the laser stations ride the flip with the Spaceport that holds them —
+    // and go on drawing Power from whoever owns the city now
+    laserStations: civCity.laserStations,
     artifacts: civCity.artifacts, // artifacts ride the flip too
     // ...and so does every museum's PROVENANCE, or a captured themed museum
     // would keep its works and lose the bonus that reads them.

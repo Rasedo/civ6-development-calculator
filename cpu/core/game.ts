@@ -23,6 +23,7 @@ import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VI
 import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
 import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS } from '../data/units';
 import { outerPool, wallsMax } from './rules';
+import { laserSpeed } from './yields';
 import { FEATURES } from '../../world/features';
 import { isWater } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
@@ -403,8 +404,10 @@ export function availableProjects(state: GameState, city: City): ProjectDef[] {
     }
     if (p.repair) return repairAvailable(state, city);
     if (p.laser) {
-      // Repeatable — tech-gated only, never in the one-time ledger.
-      return !p.requiresTech || (owner?.research.techs.includes(p.requiresTech) ?? false);
+      // Repeatable, so never in the one-time ledger — but it still asks for
+      // its tech and for the craft it speeds to be in flight.
+      if (p.requiresTech && !owner?.research.techs.includes(p.requiresTech)) return false;
+      return !p.requiresProject || done.includes(p.requiresProject);
     }
     if (!p.space) return true;
     if (done.includes(p.id)) return false; // one-time
@@ -1008,7 +1011,7 @@ export function endTurn(state: GameState): void {
   // lowest row, and an already-won space game keeps its victor.
   for (const s of state.seats) {
     if ((s.spaceLy ?? -1) < 0) continue;
-    s.spaceLy = (s.spaceLy ?? 0) + 1 + (s.spaceLasers ?? 0);
+    s.spaceLy = (s.spaceLy ?? 0) + 1 + laserSpeed(state, s.seat);
     if (s.spaceLy >= SPACE_FLIGHT_LY && state.victoryType !== 3) {
       state.victoryType = 3;
       state.victoryRow = s.seat;
