@@ -41,6 +41,7 @@ import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEO
 import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, borderGrowthCost } from '../data/constants';
 import type { CityStats } from './city';
 import { computeCityStats, luxuryAmenities, pickBorderTile, acquireTile } from './city';
+import { accrueStockpiles, resolveSeatPower } from './stockpile';
 import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressUdtProdDistrict, type CongressVoterCtx } from './congress';
 import { buyVotes } from './congress';
 import { CONGRESS_SPECIAL_SLOT, EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, emergencies, emergencyLoyalty, emergencyName, emergencyStrikeCS, raiseEmergency } from './emergency';
@@ -815,6 +816,7 @@ export function transferCity(
     // the laser stations ride the flip with the Spaceport that holds them —
     // and go on drawing Power from whoever owns the city now
     laserStations: civCity.laserStations,
+    powered: false, // the new owner's own turn re-resolves the grid
     artifacts: civCity.artifacts, // artifacts ride the flip too
     // ...and so does every museum's PROVENANCE, or a captured themed museum
     // would keep its works and lose the bonus that reads them.
@@ -1349,6 +1351,12 @@ export function seatPhase(state: GameState): void {
       if (recU) applySeatUnitOrders(state, actor, recU.units);
       continue;
     }
+
+    // THE TURN'S RESOURCES, before anything reads them: every improved source
+    // pays into the stockpile, then the plants burn what they need and the
+    // POWERED flag every yield reader takes is set for the turn.
+    accrueStockpiles(state, actor.seat);
+    resolveSeatPower(state, actor.seat);
 
     // A Relic held for want of a slot goes out at the owner's next turn —
     // before the yield walk, so a slot opened last turn pays this one.

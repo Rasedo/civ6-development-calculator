@@ -128,6 +128,11 @@ class SimPhase:
             self._seat_record_apply(row, active)
             self._seat_buy_ladder(row, active, army0)
             return active
+        # THE TURN'S RESOURCES, before anything reads them: every improved
+        # source pays into the bank, then the plants burn what they need and
+        # the POWERED flag every yield reader takes is set for the turn.
+        self._seat_accrue_stockpile(row)
+        self._resolve_seat_power(row)
         self._drain_relic_reserve(row, active)
         self._ww_decay(row, active)
         # Eurekas/inspirations from this seat — the TS twin runs at the
@@ -1084,7 +1089,7 @@ class SimPhase:
     _CITY_SLOT_FIELDS = (
         "city_alive", "city_center", "city_pop", "city_growth", "city_cbox", "city_loyalty",
         "city_acquired", "city_hp", "city_outer_hp", "city_last_hit", "city_id", "city_is_cap", "city_orig_cap", "city_current", "city_progress",
-        "city_prod_bank", "city_lasers",
+        "city_prod_bank", "city_lasers", "city_powered",
         "city_cost", "city_qtile",
         "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts",
     )

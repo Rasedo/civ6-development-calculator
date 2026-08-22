@@ -24,6 +24,7 @@ import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenB
 import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS } from '../data/units';
 import { outerPool, wallsMax } from './rules';
 import { laserSpeed } from './yields';
+import { canRunProject, chargeUnitResource } from './stockpile';
 import { FEATURES } from '../../world/features';
 import { isWater } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
@@ -405,9 +406,11 @@ export function availableProjects(state: GameState, city: City): ProjectDef[] {
     if (p.repair) return repairAvailable(state, city);
     if (p.laser) {
       // Repeatable, so never in the one-time ledger — but it still asks for
-      // its tech and for the craft it speeds to be in flight.
+      // its tech, for the craft it speeds to be in flight, and for whatever
+      // strategic resource it charges.
       if (p.requiresTech && !owner?.research.techs.includes(p.requiresTech)) return false;
-      return !p.requiresProject || done.includes(p.requiresProject);
+      if (p.requiresProject && !done.includes(p.requiresProject)) return false;
+      return canRunProject(state, city.seat, p.id);
     }
     if (!p.space) return true;
     if (done.includes(p.id)) return false; // one-time
@@ -510,6 +513,7 @@ export function purchaseUnit(state: GameState, cityId: number, unitType: string,
     if (!state.sandbox) buyer.treasury += cost; // refund: nowhere to stand
     return { ok: false, reason: 'No free tile near the city center.' };
   }
+  if (!state.sandbox) chargeUnitResource(state, seat, unitType);
   unit.xpPct = trainXpPct(city.buildings, promoClassOf(unitType));
   if (unitType === 'BUILDER') buyer.buildersTrained += 1;
   return { ok: true };

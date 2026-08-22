@@ -48,6 +48,9 @@ export interface ProjectDef {
   /** The ORBITAL laser: its bonus is unconditional, where the terrestrial
    *  one draws Power in the city that built it. */
   orbital?: boolean;
+  /** A strategic resource this project charges once, when it is started. */
+  resource?: string;
+  resourceCost?: number;
   /** Marks a laser-station project: repeatable, `requiresTech`-gated, each
    *  completion adds +1 light-year/turn to this seat's Exoplanet craft. */
   laser?: boolean;
@@ -143,11 +146,10 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
     // "increases the city's Power requirement by 5 each time it is completed,
     // and will cease to provide its bonus if the city is not powered" — so it
     // is counted on the CITY that built it. The LAGRANGE station pays a
-    // one-time 30 Aluminum instead and "is guaranteed to provide its bonus";
-    // the stockpile it charges does not exist here (recorded in
-    // docs/AUDIT.md), so it is free and unconditional.
+    // one-time 30 Aluminum instead and "is guaranteed to provide its bonus" —
+    // a one-time charge, so it never goes dark once paid.
     P({ id: 'TERRESTRIAL_LASER_STATION', name: 'Terrestrial Laser Station', district: 'SPACEPORT', yield: null, gpClass: null, laser: true, cost: 600, requiresTech: 'OFFWORLD_MISSION', requiresProject: 'EXOPLANET_EXPEDITION', description: 'Repeatable: +1 light-year/turn while this city is powered.' }),
-    P({ id: 'LAGRANGE_LASER_STATION', name: 'Lagrange Laser Station', district: 'SPACEPORT', yield: null, gpClass: null, laser: true, orbital: true, cost: 600, requiresTech: 'OFFWORLD_MISSION', requiresProject: 'EXOPLANET_EXPEDITION', description: 'Repeatable: +1 light-year/turn for the Exoplanet craft.' }),
+    P({ id: 'LAGRANGE_LASER_STATION', name: 'Lagrange Laser Station', district: 'SPACEPORT', yield: null, gpClass: null, laser: true, orbital: true, resource: 'ALUMINUM', resourceCost: 30, cost: 600, requiresTech: 'OFFWORLD_MISSION', requiresProject: 'EXOPLANET_EXPEDITION', description: 'Repeatable: +1 light-year/turn for the Exoplanet craft.' }),
 
     // THE SPACE RACE, four steps, each needing the previous one COMPLETE, all
     // run in a SPACEPORT. SOURCED against the Gathering Storm Civilopedia

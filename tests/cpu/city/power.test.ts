@@ -12,6 +12,10 @@ import { makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
 import { foundCity, queueDistrict } from '../../../cpu/core/game';
 import { computeCityStats } from '../../../cpu/core/city';
 import { cityPower, regionalEffects } from '../../../cpu/core/yields';
+import { resolveSeatPower } from '../../../cpu/core/stockpile';
+import { seatOf } from '../../../cpu/core/seats';
+import { STRATEGIC_IDS } from '../../../cpu/data/constants';
+import type { City, GameState } from '../../../cpu/core/types';
 import { CARDIFF_HARBOR_POWER } from '../../../cpu/data/cityStates';
 import { REGIONAL_RANGE } from '../../../cpu/data/constants';
 import { hexDistance } from '../../../world/hex';
@@ -34,12 +38,21 @@ const cardiff = () =>
      envoys: [6, 0, 0], suzerain: 0, met: [true], influence: 0, quest: null, questCooldown: 0,
      levyTurn: -99, levySeat: -1, warTurns: [] }) as never;
 
+/** Resolve the grid with fuel to spare — the fuel's own rule has its own
+ *  cases below, and every other case is about demand and reach. */
+function lit(state: GameState, city: City): boolean {
+  seatOf(state, city.seat)!.stockpile = STRATEGIC_IDS.map(() => 99);
+  resolveSeatPower(state, city.seat);
+  return city.powered ?? false;
+}
+
 describe('power', () => {
   it('the base load is the sum of the standing buildings that ask for one', () => {
     const { state, city } = industrialCity();
-    expect(cityPower(state, city)).toEqual({ demand: 0, supply: 0, powered: false });
+    expect(cityPower(state, city)).toEqual({ demand: 0, supply: 0, plants: [] });
     city.buildings.push('RESEARCH_LAB'); // Base Load 3
-    expect(cityPower(state, city)).toEqual({ demand: 3, supply: 0, powered: false });
+    expect(cityPower(state, city)).toEqual({ demand: 3, supply: 0, plants: [] });
+    expect(lit(state, city)).toBe(false); // a load with no supply
     city.buildings.push('FACTORY'); // Base Load 2
     expect(cityPower(state, city).demand).toBe(5);
     // a building with no load never joins it
@@ -52,9 +65,29 @@ describe('power', () => {
     city.buildings.push('RESEARCH_LAB');
     const dark = computeCityStats(state, city).breakdown.buildings.science;
     city.buildings.push('COAL_POWER_PLANT');
-    expect(cityPower(state, city).powered).toBe(true);
+    expect(lit(state, city)).toBe(true);
     // CIV6 (Research Lab, GS): "+3 Science", "+5 Science additionally when Powered"
     expect(computeCityStats(state, city).breakdown.buildings.science - dark).toBe(5);
+  });
+
+  it('a plant with no fuel in the bank powers nothing, and burns what it uses', () => {
+    const { state, city } = industrialCity();
+    const seat = seatOf(state, 0)!;
+    city.buildings.push('RESEARCH_LAB'); // Base Load 3
+    city.buildings.push('COAL_POWER_PLANT');
+    seat.stockpile = STRATEGIC_IDS.map(() => 0);
+    resolveSeatPower(state, 0);
+    expect(city.powered).toBe(false); // the plant has nothing to convert
+    // CIV6 (Coal Power Plant): "Conversion rate: 1 Coal -> 4 Power", so a load
+    // of 3 costs one Coal
+    seat.stockpile[STRATEGIC_IDS.indexOf('COAL')] = 2;
+    resolveSeatPower(state, 0);
+    expect(city.powered).toBe(true);
+    expect(seat.stockpile[STRATEGIC_IDS.indexOf('COAL')]).toBe(1);
+    resolveSeatPower(state, 0);
+    expect(seat.stockpile[STRATEGIC_IDS.indexOf('COAL')]).toBe(0);
+    resolveSeatPower(state, 0);
+    expect(city.powered).toBe(false); // the bank ran out
   });
 
   it("the Coal Power Plant banks its Industrial Zone's adjacency as LOCAL production", () => {
@@ -64,6 +97,7 @@ describe('power', () => {
     mine.improvement = 'MINE';
     const before = computeCityStats(state, city).breakdown.buildings.production;
     city.buildings.push('COAL_POWER_PLANT');
+    lit(state, city);
     const adj = 1;
     expect(computeCityStats(state, city).breakdown.buildings.production - before).toBe(adj);
     // and it goes dark with its district, like every other building yield
@@ -80,9 +114,11 @@ describe('power', () => {
     state.cityStates = [cardiff()];
     // one Harbor building at Cardiff's rate is the whole supply
     city.buildings.push('FACTORY'); // Base Load 2
-    expect(cityPower(state, city)).toMatchObject({ demand: 2, supply: CARDIFF_HARBOR_POWER, powered: true });
+    expect(cityPower(state, city)).toMatchObject({ demand: 2, supply: CARDIFF_HARBOR_POWER });
+    expect(lit(state, city)).toBe(true);
     city.buildings.push('RESEARCH_LAB'); // +3, and the supply no longer covers it
-    expect(cityPower(state, city)).toMatchObject({ demand: 5, supply: CARDIFF_HARBOR_POWER, powered: false });
+    expect(cityPower(state, city)).toMatchObject({ demand: 5, supply: CARDIFF_HARBOR_POWER });
+    expect(lit(state, city)).toBe(false);
   });
 
   it('a plant reaches every city centre within the regional range of its Industrial Zone, and no farther', () => {
@@ -94,11 +130,11 @@ describe('power', () => {
     const far = foundCity(state, tileAtCoords(state.map, 9, 9 + REGIONAL_RANGE).index, 0).city!;
     expect(hexDistance(9, 8, 9, 9 + REGIONAL_RANGE)).toBe(REGIONAL_RANGE + 1);
     for (const c of [near, far]) c.buildings.push('RESEARCH_LAB');
-    expect(cityPower(state, near).powered).toBe(true);
-    expect(cityPower(state, far).powered).toBe(false);
+    expect(lit(state, near)).toBe(true);
+    expect(far.powered).toBe(false);
     // a pillaged Industrial Zone supplies nobody
     state.map.tiles[iz.index].districtPillaged = true;
-    expect(cityPower(state, near).powered).toBe(false);
+    expect(lit(state, near)).toBe(false);
   });
 
   it('a regional building pays its powered half from any POWERED source that reaches', () => {
@@ -118,13 +154,17 @@ describe('power', () => {
     // both cities hold a Factory; only `other` can meet its own load
     city.buildings.push('FACTORY');
     other.buildings.push('FACTORY');
-    expect(cityPower(state, city).powered).toBe(false);
-    expect(cityPower(state, other).powered).toBe(true);
+    expect(lit(state, city)).toBe(false);
+    expect(other.powered).toBe(true);
     // CIV6 (Factory, GS): "+3 Production to all City Centers within 6 tiles",
     // "+3 additional Production ... when Powered" — and the id pays once, so
     // this city's own dark Factory neither adds nor blocks.
     expect(regionalEffects(state, city).yields.production).toBe(6);
+    // drop the suzerain and re-resolve: the source city goes dark, and with it
+    // the powered half
     state.cityStates = [];
+    resolveSeatPower(state, 0);
+    expect(other.powered).toBe(false);
     expect(regionalEffects(state, city).yields.production).toBe(3);
   });
 
@@ -135,7 +175,7 @@ describe('power', () => {
     city.buildings.push('STADIUM');
     expect(regionalEffects(state, city).amenities).toBe(1);
     city.buildings.push('COAL_POWER_PLANT');
-    expect(cityPower(state, city).powered).toBe(true);
+    expect(lit(state, city)).toBe(true);
     // CIV6 (Stadium, GS): "+1 Amenity", "+2 Amenities additionally when Powered"
     expect(regionalEffects(state, city).amenities).toBe(3);
   });

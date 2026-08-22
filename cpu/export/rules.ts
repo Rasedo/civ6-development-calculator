@@ -102,6 +102,7 @@ const effectRow = (fx: PolicyEffects) => ({
   gpp: GP_CLASSES.map((c) => fx.gppFlat?.[c] ?? 0),
 });
 import { BOOSTS, BOOST_FRACTION } from '../data/boosts';
+import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST } from '../data/constants';
 import { CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, FOOD_PER_CITIZEN, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, LUXURY_AMENITY_CITIES, GAME_SPEED, REGIONAL_RANGE, EMBARK_MOVES, EMBARKED_DEFENSE_CS_BY_ERA, embarkState } from '../data/constants';
 
 // The GPU improvement index space (tile.improvement values, build codes 13-15).
@@ -612,6 +613,17 @@ export function buildRules() {
     // finished expedition; `orb` = the unconditional orbital one) sit between
     // the base rows and the chain; `pc` is a FIXED price (already speed-scaled)
     // where >= 0, else the generic curve applies.
+    // GS STRATEGIC STOCKPILES. `rid` maps a stockpile SLOT to the resource
+    // table the tile plane uses; `rate` is what one improved source pays per
+    // turn. `slotOf` inverts it so a tile or a unit gate can find its slot.
+    strategic: {
+      rid: STRATEGIC_IDS.map((id) => RESOURCE_IDS.indexOf(id)),
+      rate: STRATEGIC_IDS.map((id) => STRATEGIC_PER_TURN[id]),
+      slotOf: RESOURCE_IDS.map((id) => STRATEGIC_IDS.indexOf(id)),
+      capBase: STOCKPILE_CAP_BASE,
+      capPerEncampmentBuilding: STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING,
+      encampmentDidx: PLACEABLE_DISTRICTS.indexOf('ENCAMPMENT'),
+    },
     projects: {
       rows: Object.values(PROJECTS).map((p, _i, all) => ({
         d: PLACEABLE_DISTRICTS.indexOf(p.district),
@@ -624,6 +636,8 @@ export function buildRules() {
         sp: p.space ? 1 : 0,
         ls: p.laser ? 1 : 0,
         orb: p.orbital ? 1 : 0,
+        rs: p.resource ? STRATEGIC_IDS.indexOf(p.resource) : -1,
+        rc: p.resourceCost ?? 0,
         vic: p.victory ? 1 : 0,
         pc: p.cost ?? -1,
         rt: p.requiresTech ? (techIdx.get(p.requiresTech) ?? -1) : -1,
@@ -775,6 +789,9 @@ export function buildRules() {
       // same order the tile `rid` plane uses), or -1 = ungated. The GPU joins it
       // with the per-tile `rq`/res_imp plane to gate build+purchase per civ.
       requiresResource: u.requiresResource ? RESOURCE_IDS.indexOf(u.requiresResource) : -1,
+      // the STOCKPILE slot the unit charges, and what it charges
+      resSlot: u.requiresResource ? STRATEGIC_IDS.indexOf(u.requiresResource) : -1,
+      resCost: u.requiresResource ? UNIT_RESOURCE_COST : 0,
       rangedStrength: u.ranged?.strength ?? 0,
       rangedRange: u.ranged?.range ?? 0,
       moves: u.moves,
@@ -930,6 +947,9 @@ export function buildRules() {
       poweredYields: YIELD_KEYS.map((k) => b.poweredYields?.[k] ?? 0),
       poweredAmenities: b.poweredAmenities ?? 0,
       powerPlant: b.powerPlant ? 1 : 0,
+      // the plant's fuel SLOT and its published Power-per-unit rate
+      fuelSlot: b.fuel ? STRATEGIC_IDS.indexOf(b.fuel) : -1,
+      fuelRate: b.fuelRate ?? 0,
       izAdjProduction: b.special === 'COAL_PLANT' ? 1 : 0,
       // worship = faith-purchase-only (never queued, never gold-bought).
       worship: b.worship ? 1 : 0,

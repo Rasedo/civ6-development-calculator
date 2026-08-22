@@ -237,7 +237,8 @@ def main() -> None:
     # that cannot meet its own load pays nothing at all
     sim2.civ_orbital_lasers[0, r + 1] = 2
     sim2.city_lasers[0, r + 1, j] = 1
-    assert not bool(sim2._city_powered(r + 1)[0, j]), "the station's own 5 Power is not met by anything here"
+    sim2._resolve_seat_power(r + 1)
+    assert not bool(sim2.city_powered[0, r + 1, j]), "the station's own 5 Power is not met by anything here"
     assert int(sim2._laser_speed(r + 1)[0]) == 2, "an unpowered terrestrial station adds nothing"
     sim2.step()
     assert int(sim2.space_ly[0, r + 1]) == 4, "two orbital stations make the craft cover 3 LY/turn"
@@ -330,7 +331,8 @@ def main() -> None:
     # the city's load is 2 stations x 5 Power, and nothing here supplies it
     assert float((lz.city_bldg[0, 1, 0].double() @ lz._b_power)) + 2 * lz._laser_power_load \
         == 2 * lz._laser_power_load, "no building in the capital draws Power this early"
-    assert not bool(lz._city_powered(1)[0, 0]), "10 Power of demand and no supply leaves the city dark"
+    lz._resolve_seat_power(1)
+    assert not bool(lz.city_powered[0, 1, 0]), "10 Power of demand and no supply leaves the city dark"
     assert int(lz._laser_speed(1)[0]) == 1, "only the orbital station speeds the craft while the city is dark"
 
     # --- 4) the step() recompute preserves a science win --------------------

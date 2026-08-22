@@ -17,6 +17,7 @@
 import { writeFileSync } from 'node:fs';
 import type { DistrictId, GameState, Seat, Tile } from '../core/types';
 import { allCities, campTiles, civHasStrategic, civsAtWar, seatOf, tileOwnedByCiv } from '../core/seats';
+import { canTrainWithStockpile } from '../core/stockpile';
 import { isWater } from '../../world/query';
 import { GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT } from '../data/constants';
 import { PEACE_GOLD_COST, DED_MONUMENTALITY } from '../data/seats';
@@ -150,6 +151,7 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
       const def = UNITS[cand.id];
       if (!def) continue;
       if (def.requiresResource && !civHasStrategic(state, actor.seat, def.requiresResource)) continue;
+      if (!canTrainWithStockpile(state, actor.seat, cand.id)) continue;
       // `unitPurchaseCost` is the price the applier charges — Mercenary
       // Companies moves it, and every column offered here is a military unit.
       if (!goldAffordable(actor.treasury ?? 0, unitPurchaseCost(state, cand.id, actor.seat))) continue;

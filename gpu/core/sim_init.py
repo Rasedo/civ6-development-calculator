@@ -1470,6 +1470,19 @@ class SimInit:
         self._iz_adj_bidx = [i for i in range(self.NB) if bool(self._b_iz_adj[i])]
         self._cardiff_harbor_power = float(rules.cardiff_harbor_power)
         self._laser_power_load = float(rules.laser_power_load)
+        self._b_fuel_slot = rules.b_fuel_slot.to(device)  # [NB] long
+        self._b_fuel_rate = rules.b_fuel_rate.to(device)  # [NB] long
+        # GS STRATEGIC STOCKPILES: one slot per strategic resource, the
+        # resource-table id it reads a tile with, and what one improved source
+        # pays per turn. `_strat_slot_of` inverts the map for a tile's `rid`.
+        _st = rules.strategic
+        self._strat_rid = [int(x) for x in _st["rid"]]
+        self._strat_rate = [int(x) for x in _st["rate"]]
+        self._n_strategic = len(self._strat_rid)
+        self._strat_slot_of = torch.tensor([int(x) for x in _st["slotOf"]], dtype=torch.long, device=device)
+        self._stock_cap_base = int(_st["capBase"])
+        self._stock_cap_per_enc = int(_st["capPerEncampmentBuilding"])
+        self._encampment_didx = int(_st["encampmentDidx"])
         # SPECIALISTS (data/greatPeople.ts SPECIALIST_YIELDS / SPECIALIST_TIERS,
         # exported per PLACEABLE district): base yields, the TOP buildings that
         # upgrade them (any ONE of them; -2 = any worship building), and the add.
@@ -1533,6 +1546,10 @@ class SimInit:
         self.space_ly = torch.full((B, self.n_majors), -1, dtype=torch.long, device=device)
         self.civ_orbital_lasers = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self.city_lasers = torch.zeros(B, self.n_majors + max(self.S, 1), self.RC, dtype=torch.long, device=device)
+        # GS: the strategic banks, and the POWERED flag the grid resolves to
+        # once a turn (every yield reader takes the flag, not a live scan).
+        self.civ_stockpile = torch.zeros(B, self.n_majors, max(self._n_strategic, 1), dtype=torch.long, device=device)
+        self.city_powered = torch.zeros(B, self.n_majors + max(self.S, 1), self.RC, dtype=torch.bool, device=device)
         self.camp_tile = torch.full((B, max(self.K, 1)), -1, dtype=torch.long, device=device)
         self.n_camps = torch.zeros(B, dtype=torch.long, device=device)
         self.unit_next = torch.zeros(B, dtype=torch.long, device=device)
@@ -1627,6 +1644,11 @@ class SimInit:
         self._type_req_bldg = torch.tensor([int(u.get("requiresBuilding", -1)) for u in ru], dtype=torch.long, device=device)
         self._type_resource = torch.tensor([int(u.get("requiresResource", -1)) for u in ru], dtype=torch.long, device=device)
         self._res_unit_pairs = [(i, int(u.get("requiresResource", -1))) for i, u in enumerate(ru) if int(u.get("requiresResource", -1)) >= 0]
+        # GS: the STOCKPILE slot a unit charges, and what it charges.
+        self._type_res_slot = torch.tensor([int(u.get("resSlot", -1)) for u in ru], dtype=torch.long, device=device)
+        self._type_res_cost = torch.tensor([int(u.get("resCost", 0)) for u in ru], dtype=torch.long, device=device)
+        self._res_slot_units = [(i, int(u.get("resSlot", -1)), int(u.get("resCost", 0)))
+                                for i, u in enumerate(ru) if int(u.get("resSlot", -1)) >= 0]
         self._type_charges = torch.tensor([u.get("charges", 0) for u in ru], dtype=torch.long, device=device)
         self._type_faith_only = torch.tensor([bool(u.get("fo", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_spawn_only = torch.tensor([bool(u.get("so", 0)) for u in ru], dtype=torch.bool, device=device)

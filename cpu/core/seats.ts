@@ -3,6 +3,7 @@ import type { City, GameState, Seat, Tile, Unit } from './types';
 import type { SeatCaps, SeatClass } from '../data/seats';
 import { AGREEMENT_TURNS, FORMAL_WAR_MIN_TURNS, SEAT_CAPS } from '../data/seats';
 import { RESOURCES } from '../../world/resources';
+import { emptyStockpile } from '../data/constants';
 import { GREAT_PEOPLE } from '../data/greatPeople';
 
 import { NO_SEAT } from './types';
@@ -95,7 +96,7 @@ export function emptySeat(seat: number): Seat {
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     gpp: {}, gpEarned: [],
     buildersTrained: 0, relicReserve: 0, bestMeleeCS: 0, tilesPurchased: 0,
-    spaceProjects: [], spaceLy: -1, orbitalLasers: 0, camps: [], explored: [],
+    spaceProjects: [], spaceLy: -1, orbitalLasers: 0, stockpile: emptyStockpile(), camps: [], explored: [],
   };
 }
 

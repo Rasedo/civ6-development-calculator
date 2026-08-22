@@ -32,6 +32,10 @@ export interface BuildingDef {
    * COAL_PLANT: production equal to the Industrial Zone's own adjacency.
    */
   special?: 'WATER_MILL' | 'SHIPYARD' | 'LIGHTHOUSE' | 'MONUMENT' | 'COAL_PLANT';
+  /** A power plant's fuel and its published conversion rate (Power per unit
+   *  of the resource burned). */
+  fuel?: string;
+  fuelRate?: number;
   /**
    * CIV6 (GS Power): the building's BASE LOAD — the Power it demands. A city
    * meets its TOTAL demand or none of its buildings are powered, so this is a
@@ -108,13 +112,12 @@ const rawList: BuildingDef[] = [
 
   { id: 'WORKSHOP', name: 'Workshop', district: 'INDUSTRIAL_ZONE', cost: 195, yields: { production: 3 }, maintenance: 1 },
   { id: 'FACTORY', name: 'Factory', district: 'INDUSTRIAL_ZONE', cost: 330, requiresAny: ['WORKSHOP'], yields: { production: 3 }, power: 2, poweredYields: { production: 3 }, regional: true, maintenance: 2 },
-  // THE THREE POWER PLANTS. CIV6 (GS): one per Industrial Zone, each burning
-  // its own strategic resource — Coal at 1:4, Oil at 1:4, Uranium at 1:16.
-  // The FUEL half waits on strategic stockpiles; what ships is the roster,
-  // the unlock ladder, the yields and the regional supply.
-  { id: 'COAL_POWER_PLANT', name: 'Coal Power Plant', district: 'INDUSTRIAL_ZONE', cost: 300, requiresAny: ['FACTORY'], exclusiveWith: ['OIL_POWER_PLANT', 'NUCLEAR_POWER_PLANT'], special: 'COAL_PLANT', powerPlant: true, maintenance: 3 },
-  { id: 'OIL_POWER_PLANT', name: 'Oil Power Plant', district: 'INDUSTRIAL_ZONE', cost: 360, requiresAny: ['FACTORY'], exclusiveWith: ['COAL_POWER_PLANT', 'NUCLEAR_POWER_PLANT'], yields: { production: 3 }, regional: true, powerPlant: true, maintenance: 3 },
-  { id: 'NUCLEAR_POWER_PLANT', name: 'Nuclear Power Plant', district: 'INDUSTRIAL_ZONE', cost: 480, requiresAny: ['FACTORY'], exclusiveWith: ['COAL_POWER_PLANT', 'OIL_POWER_PLANT'], yields: { production: 4, science: 3 }, regional: true, powerPlant: true, maintenance: 3 },
+  // THE THREE POWER PLANTS. CIV6 (GS): one per Industrial Zone, each
+  // "convert[ing] stockpiles of the relevant resource into Power" at its own
+  // published rate — Coal 1:4, Oil 1:4, Uranium 1:16.
+  { id: 'COAL_POWER_PLANT', name: 'Coal Power Plant', district: 'INDUSTRIAL_ZONE', cost: 300, requiresAny: ['FACTORY'], exclusiveWith: ['OIL_POWER_PLANT', 'NUCLEAR_POWER_PLANT'], special: 'COAL_PLANT', powerPlant: true, fuel: 'COAL', fuelRate: 4, maintenance: 3 },
+  { id: 'OIL_POWER_PLANT', name: 'Oil Power Plant', district: 'INDUSTRIAL_ZONE', cost: 360, requiresAny: ['FACTORY'], exclusiveWith: ['COAL_POWER_PLANT', 'NUCLEAR_POWER_PLANT'], yields: { production: 3 }, regional: true, powerPlant: true, fuel: 'OIL', fuelRate: 4, maintenance: 3 },
+  { id: 'NUCLEAR_POWER_PLANT', name: 'Nuclear Power Plant', district: 'INDUSTRIAL_ZONE', cost: 480, requiresAny: ['FACTORY'], exclusiveWith: ['COAL_POWER_PLANT', 'OIL_POWER_PLANT'], yields: { production: 4, science: 3 }, regional: true, powerPlant: true, fuel: 'URANIUM', fuelRate: 16, maintenance: 3 },
 
   { id: 'BARRACKS', name: 'Barracks', district: 'ENCAMPMENT', cost: 90, exclusiveWith: ['STABLE'], yields: { production: 1 }, housing: 1, maintenance: 1, trainXpPct: 25, trainXpClasses: ['MELEE', 'RANGED', 'ANTICAV'] },
   { id: 'STABLE', name: 'Stable', district: 'ENCAMPMENT', cost: 120, exclusiveWith: ['BARRACKS'], yields: { production: 1 }, housing: 1, maintenance: 1, trainXpPct: 25, trainXpClasses: ['LIGHT_CAV', 'HEAVY_CAV', 'SIEGE'] },
@@ -143,6 +146,10 @@ const rawList: BuildingDef[] = [
 const list: BuildingDef[] = rawList.map((b) => ({ ...b, cost: Math.round(b.cost * GAME_SPEED) }));
 
 export const BUILDINGS: Record<string, BuildingDef> = Object.fromEntries(list.map((b) => [b.id, b]));
+
+/** The power plants, in catalog order — the order both engines walk when they
+ *  pick which plant's stockpile answers a city. */
+export const POWER_PLANT_IDS: string[] = list.filter((b) => b.powerPlant).map((b) => b.id);
 
 export function buildingsForDistrict(district: DistrictId): BuildingDef[] {
   return list.filter((b) => b.district === district && !b.autoCapital);

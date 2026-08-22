@@ -241,6 +241,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       combat: 55,
       melee: true,
       requiresTech: 'GUNPOWDER',
+      requiresResource: 'NITER',
       description: 'Renaissance gunpowder infantry.',
     }),
     U({

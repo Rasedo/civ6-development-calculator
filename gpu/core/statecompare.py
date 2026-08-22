@@ -444,6 +444,7 @@ SEAT = {
     "laserStations": lambda sim, b, rows: [
         int(sim.city_lasers[b, c, : sim.RC][sim.city_alive[b, c, : sim.RC]].sum()) for c in rows
     ],
+    "stockpile": lambda sim, b, rows: [[int(x) for x in sim.civ_stockpile[b, c].tolist()] for c in rows],
     "routeCount": lambda sim, b, rows: [
         sum(1 for r in sim.seat_routes[b, _seat_row(sim, c)].tolist() if r[0] >= 0) for c in rows
     ],
@@ -562,6 +563,7 @@ CITY = {
     "greatWorksWriting": _cty("city_gw_writing"),
     "greatWorksArt": _cty("city_gw_art"),
     "greatWorksMusic": _cty("city_gw_music"),
+    "powered": lambda sim, b, rows: [1 if sim.city_powered[b, c, s] else 0 for c, s in rows],
     "relics": _cty("city_relics"),
     "artifacts": _cty("city_artifacts"),
     # the museum's provenance, slot by slot: era then civilization, so one

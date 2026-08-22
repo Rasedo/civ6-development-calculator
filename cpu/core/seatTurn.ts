@@ -1,6 +1,7 @@
 
 import type { City, GameState, QueueItem } from './types';
 import { seatOf, civsAtWar, seatsAllied } from './seats';
+import { chargeProjectResource, chargeUnitResource } from './stockpile';
 import { isSuzerain } from './cityStates';
 import { seatTourism } from './city';
 import { computeAdoption } from './effects';
@@ -105,6 +106,8 @@ export function seatGrowth(city: City, surplus: number, growthNeeded: number): v
 }
 
 export function commitProduction(state: GameState, seat: number, city: City, item: QueueItem): void {
+  if (item.kind === 'unit') chargeUnitResource(state, seat, item.unit);
+  else if (item.kind === 'project') chargeProjectResource(state, seat, item.project);
   city.queue.push(item);
   if (process.env.CIV6_ALOG) {
     const what =

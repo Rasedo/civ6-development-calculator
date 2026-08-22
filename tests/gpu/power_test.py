@@ -7,7 +7,7 @@ city pays.
 Scripted parity proves the two engines agree; these pokes prove the RULES,
 because a gate lane reaches an Industrial-era grid only by accident:
 
-  1. `_city_powered` — the base load is what the standing buildings ask plus
+  1. `_city_power_need` + `_resolve_seat_power` — the base load is what the standing buildings ask plus
      `laser_power_load` per Terrestrial Laser Station; a pillaged district's
      buildings drop out of it; the load is met in FULL or not at all.
   2. THE PLANT — a power plant on a COMPLETE, unpillaged Industrial Zone
@@ -21,6 +21,9 @@ because a gate lane reaches an Industrial-era grid only by accident:
   5. THE COAL PLANT — its Industrial Zone's adjacency, as LOCAL production.
   6. `_spec_tb` — a district's specialist tier lifts on ANY ONE of its top
      buildings (the Industrial Zone accepts all three plants).
+  7. THE STOCKPILE the plants burn — `_seat_accrue_stockpile` per improved
+     source and its ceiling, `_charge_unit_resource` at the train, and the
+     heal `_res_starved` denies a unit whose source the seat has lost.
 """
 
 from __future__ import annotations
@@ -33,7 +36,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths  # noqa: E402
-from core.simbase import FIXTURES  # noqa: E402
+from core.simbase import FIXTURES, NO_SEAT  # noqa: E402
 from warmup import settle_all  # noqa: E402
 
 
@@ -58,6 +61,14 @@ BIDS = [b["id"] for b in json.loads((FIXTURES / "rules.json").read_text())["buil
 
 def bidx(sim, name: str) -> int:
     return BIDS.index(name)
+
+
+def lit(sim, row: int, j: int, fuel: int = 99) -> bool:
+    """Resolve the grid with fuel to spare — the fuel's own rule has its own
+    case, and every other case is about demand and reach."""
+    sim.civ_stockpile[:, row] = fuel
+    sim._resolve_seat_power(row)
+    return bool(sim.city_powered[0, row, j])
 
 
 def put_district(sim, row: int, j: int, di: int, *, complete: bool = True) -> int:
@@ -89,9 +100,9 @@ def test_demand(sim) -> None:
     fac, lab = bidx(sim, "FACTORY"), bidx(sim, "RESEARCH_LAB")
     assert float(sim._b_power[fac]) == 2.0, "CIV6 (Factory, GS): Base Load 2"
     assert float(sim._b_power[lab]) == 3.0, "CIV6 (Research Lab, GS): Base Load 3"
-    assert not bool(sim._city_powered(row)[0, j]), "a city with no load is not powered"
+    assert not lit(sim, row, j), "a city with no load is not powered"
     sim.city_bldg[0, row, j, fac] = True
-    assert not bool(sim._city_powered(row)[0, j]), "a load with no supply leaves the city dark"
+    assert not lit(sim, row, j), "a load with no supply leaves the city dark"
     assert demand_of(sim, row, j) == 2.0, "the Factory's load is the whole demand"
     # a laser station adds its own load, whether or not anything else does
     sim.city_lasers[0, row, j] = 2
@@ -110,7 +121,7 @@ def test_plant_reach(sim) -> None:
     assert bool(sim._b_powerplant[coal]), "the Coal Power Plant supplies its region"
     sim.city_bldg[0, row, j, fac] = True
     sim.city_bldg[0, row, j, coal] = True
-    assert bool(sim._city_powered(row)[0, j]), "a plant on a complete Zone lights its own city"
+    assert lit(sim, row, j), "a plant on a complete Zone lights its own city"
     # every same-seat centre within the regional reach, and no farther
     reach = sim._regional_range
     for k in range(sim.RC):
@@ -118,15 +129,15 @@ def test_plant_reach(sim) -> None:
             continue
         sim.city_bldg[0, row, k, fac] = True
         d = int(sim.pair_dist[izt, int(sim.city_center[0, row, k])])
-        assert bool(sim._city_powered(row)[0, k]) == (d <= reach), \
+        assert lit(sim, row, k) == (d <= reach), \
             f"city {k} at {d} hexes from the plant's Zone (reach {reach})"
     # a pillaged Zone supplies nobody, itself included
     sim.district_pillaged[0, izt] = True
-    assert not bool(sim._city_powered(row)[0, j]), "a pillaged Industrial Zone is not a supply"
+    assert not lit(sim, row, j), "a pillaged Industrial Zone is not a supply"
     sim.district_pillaged[0, izt] = False
     # ...and neither is an unfinished one
     sim.district_complete[0, izt] = False
-    assert not bool(sim._city_powered(row)[0, j]), "an unfinished Zone is not a supply"
+    assert not lit(sim, row, j), "an unfinished Zone is not a supply"
     print("  plant OK: the Zone's reach to a city CENTRE, complete and unpillaged")
 
 
@@ -140,7 +151,7 @@ def test_cardiff(sim) -> None:
     lgh, fac = bidx(sim, "LIGHTHOUSE"), bidx(sim, "FACTORY")
     sim.city_bldg[0, row, j, lgh] = True
     sim.city_bldg[0, row, j, fac] = True
-    assert not bool(sim._city_powered(row)[0, j]), "no suzerain, no renewable supply"
+    assert not lit(sim, row, j), "no suzerain, no renewable supply"
     # make this row the strict suzerain of a minor carrying Cardiff's rule
     assert sim.S > 0, "the fixture must carry a city-state to suzerain"
     sim.seat_citystate_envoys[0, :, 0] = 0
@@ -148,10 +159,10 @@ def test_cardiff(sim) -> None:
     sim.citystate_suz_code[0, 0] = sim._suz_c_harbor_pow
     sim._eff_version += 1
     assert float(sim._cardiff_harbor_power) == 2.0, "CIV6 (Cardiff): +2 Power per Harbor building"
-    assert bool(sim._city_powered(row)[0, j]), "one Harbor building covers the Factory's load of 2"
+    assert lit(sim, row, j, fuel=0), "one Harbor building covers the Factory's load of 2 with no plant at all"
     # a second load the supply cannot cover darkens the WHOLE city
     sim.city_bldg[0, row, j, bidx(sim, "RESEARCH_LAB")] = True
-    assert not bool(sim._city_powered(row)[0, j]), "the load is met in full or not at all"
+    assert not lit(sim, row, j, fuel=0), "the load is met in full or not at all"
     print("  cardiff OK: the renewable supply, and the all-or-nothing rule")
 
 
@@ -165,14 +176,15 @@ def test_powered_yields(sim) -> None:
     yf = torch.ones(sim.B, sim.RC, dtype=torch.float64, device=sim.device)
     dark = sim._seat_city_walk(row, j, amen_yf=yf[:, j:j + 1])[0, 0, 3]
     sim.city_bldg[0, row, j, bidx(sim, "COAL_POWER_PLANT")] = True
-    assert bool(sim._city_powered(row)[0, j])
-    lit = sim._seat_city_walk(row, j, amen_yf=yf[:, j:j + 1])[0, 0, 3]
+    assert lit(sim, row, j)
+    y_lit = sim._seat_city_walk(row, j, amen_yf=yf[:, j:j + 1])[0, 0, 3]
     # CIV6 (Research Lab, GS): "+3 Science", "+5 Science additionally when Powered"
-    assert float(lit - dark) == 5.0, f"the powered half must be +5 science, got {float(lit - dark)}"
+    assert float(y_lit - dark) == 5.0, f"the powered half must be +5 science, got {float(y_lit - dark)}"
     # THE COAL PLANT's own local production: the Zone's adjacency
     adj = float(sim._district_adj_seat(row, sim._iz_idx)[0, izt])
     prod_lit = sim._seat_city_walk(row, j, amen_yf=yf[:, j:j + 1])[0, 0, 1]
     sim.city_bldg[0, row, j, bidx(sim, "COAL_POWER_PLANT")] = False
+    lit(sim, row, j)
     prod_dark = sim._seat_city_walk(row, j, amen_yf=yf[:, j:j + 1])[0, 0, 1]
     assert float(prod_lit - prod_dark) == adj, \
         f"the Coal plant banks its Zone's adjacency ({adj}) as local production"
@@ -185,10 +197,12 @@ def test_regional_powered(sim) -> None:
     fac, coal = bidx(sim, "FACTORY"), bidx(sim, "COAL_POWER_PLANT")
     assert bool(sim._b_regional[fac]), "the Factory's production is regional"
     sim.city_bldg[0, row, j, fac] = True
+    lit(sim, row, j)
     base = sim._seat_regional(row)
     assert base is not None
     y_dark = float(base[0][0, j, 1])
     sim.city_bldg[0, row, j, coal] = True
+    assert lit(sim, row, j)
     y_lit = float(sim._seat_regional(row)[0][0, j, 1])
     # CIV6 (Factory, GS): +3 Production regionally, +3 more when powered
     assert y_lit - y_dark == float(sim._b_pow_y[fac, 1]) > 0, \
@@ -200,11 +214,145 @@ def test_regional_powered(sim) -> None:
     assert float(sim._b_pow_am[std]) == 2.0, "CIV6 (Stadium, GS): +2 Amenities when Powered"
     sim.city_bldg[0, row, j, std] = True
     sim.city_bldg[0, row, j, coal] = False
+    lit(sim, row, j)
     am_dark = float(sim._seat_regional(row)[1][0, j])
     sim.city_bldg[0, row, j, coal] = True
+    assert lit(sim, row, j)
     am_lit = float(sim._seat_regional(row)[1][0, j])
     assert am_lit - am_dark == 2.0, f"the Stadium's powered amenities must land, got {am_lit - am_dark}"
     print("  regional OK: the powered half rides the same reach, yields and amenities")
+
+
+def test_fuel(sim) -> None:
+    row, j = a_city(sim)
+    izt = put_district(sim, row, j, sim._iz_idx)
+    lab, coal = bidx(sim, "RESEARCH_LAB"), bidx(sim, "COAL_POWER_PLANT")
+    sim.city_bldg[0, row, j, lab] = True     # Base Load 3
+    sim.city_bldg[0, row, j, coal] = True
+    slot, rate = int(sim._b_fuel_slot[coal]), int(sim._b_fuel_rate[coal])
+    assert slot >= 0 and rate == 4, "CIV6 (Coal Power Plant): 1 Coal -> 4 Power"
+    sim.civ_stockpile[:, row] = 0
+    sim._resolve_seat_power(row)
+    assert not bool(sim.city_powered[0, row, j]), "a plant with nothing to convert powers nothing"
+    sim.civ_stockpile[:, row, slot] = 2
+    sim._resolve_seat_power(row)
+    assert bool(sim.city_powered[0, row, j]), "two Coal covers a load of 3"
+    assert int(sim.civ_stockpile[0, row, slot]) == 1, "a load of 3 at 1:4 costs ONE Coal"
+    sim._resolve_seat_power(row)
+    assert int(sim.civ_stockpile[0, row, slot]) == 0
+    sim._resolve_seat_power(row)
+    assert not bool(sim.city_powered[0, row, j]), "the bank ran out"
+    assert izt >= 0
+    print("  fuel OK: the plant converts its own stockpile, and stops when it is empty")
+
+
+def a_source(sim, row: int, rid: int = -1) -> tuple[int, int]:
+    """A map tile carrying a strategic resource, handed to seat `row` and
+    improved. Returns (tile, stockpile slot)."""
+    strat = {r: k for k, r in enumerate(sim._strat_rid)}
+    t = next(t for t in range(sim.T)
+             if int(sim.res_id[0, t]) in strat and rid in (-1, int(sim.res_id[0, t])))
+    sim.tile_seat[0, t] = row
+    sim.improvement[0, t] = sim.res_imp[0, t]
+    sim.pillaged[0, t] = False
+    sim._tile_owner_ver += 1
+    return t, strat[int(sim.res_id[0, t])]
+
+
+def test_accrual(sim) -> None:
+    row, _ = a_city(sim)
+    t, k = a_source(sim, row)
+    rate = sim._strat_rate[k]
+    assert int(sim.res_imp[0, t]) >= 0, "a strategic source names the improvement that works it"
+    sim.civ_stockpile[:, row] = 0
+    sim._seat_accrue_stockpile(row)
+    assert int(sim.civ_stockpile[0, row, k]) == rate, "one improved source pays its published number"
+    sim._seat_accrue_stockpile(row)
+    assert int(sim.civ_stockpile[0, row, k]) == 2 * rate
+    # pillaged, then unimproved, pays nothing
+    sim.pillaged[0, t] = True
+    sim._seat_accrue_stockpile(row)
+    assert int(sim.civ_stockpile[0, row, k]) == 2 * rate, "a pillaged source pays nothing"
+    sim.pillaged[0, t] = False
+    sim.improvement[0, t] = -1
+    sim._seat_accrue_stockpile(row)
+    assert int(sim.civ_stockpile[0, row, k]) == 2 * rate, "an unimproved source pays nothing"
+    # the CAP, and what an Encampment building does to it
+    cap0 = int(sim._stockpile_cap(row)[0])
+    assert cap0 == sim._stock_cap_base, "the ceiling starts at the published base"
+    enc = next(i for i in range(sim.NB) if int(sim._b_req_district[i]) == sim._encampment_didx)
+    j = int(sim.city_alive[0, row].nonzero().flatten()[0])
+    sim.city_bldg[0, row, j, enc] = True
+    assert int(sim._stockpile_cap(row)[0]) == cap0 + sim._stock_cap_per_enc, \
+        "every Encampment building raises the ceiling for ALL resources"
+    sim.city_bldg[0, row, j, enc] = False
+    sim.improvement[0, t] = sim.res_imp[0, t]
+    sim.civ_stockpile[:, row, k] = sim._stock_cap_base
+    sim._seat_accrue_stockpile(row)
+    assert int(sim.civ_stockpile[0, row, k]) == sim._stock_cap_base, "the bank stops at the ceiling"
+    print("  accrual OK: the published rate per improved source, and the ceiling")
+
+
+def test_unit_charge(sim) -> None:
+    row, _ = a_city(sim)
+    assert sim._res_slot_units, "the roster must carry a resource-gated unit"
+    u_idx, slot, cost = sim._res_slot_units[0]
+    assert cost == 20, "CIV6 (GS): 20 of the resource to train"
+    # give the seat ACCESS so only the bank is in question
+    a_source(sim, row, int(sim._type_resource[u_idx]))
+    sim.civ_techs[0, row, int(sim._type_tech[u_idx])] = True
+    sim.civ_stockpile[:, row] = 0
+    sim.civ_stockpile[0, row, slot] = cost - 1
+    assert not bool(sim._seat_trainable_units(row)[0, u_idx]), "19 does not pay for a 20"
+    sim.civ_stockpile[0, row, slot] = cost
+    assert bool(sim._seat_trainable_units(row)[0, u_idx]), "20 does"
+    # and the charge itself
+    hit = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
+    hit[0] = True
+    sim._charge_unit_resource(row, hit, u_idx)
+    assert int(sim.civ_stockpile[0, row, slot]) == 0, "entering production spends the 20"
+    assert not bool(sim._seat_trainable_units(row)[0, u_idx]), "and the next one waits for the mines"
+    print("  unit charge OK: the mask refuses what the bank cannot pay, and the charge lands")
+
+
+def place(sim, tile: int, utype: int, seat: int, hp: int = 40) -> int:
+    slot = int(sim.unit_next[0])
+    sim.unit_next[0] += 1
+    sim.major_unit_alive[0, slot] = True
+    sim.major_unit_seat[0, slot] = seat
+    sim.major_unit_type[0, slot] = utype
+    sim.major_unit_tile[0, slot] = tile
+    sim.major_unit_hp[0, slot] = hp
+    sim.major_unit_mp[0, slot] = 4
+    sim.major_unit_mp_full[0, slot] = 4
+    return slot
+
+
+def test_starved_heal(sim) -> None:
+    row, j = a_city(sim)
+    u_idx, res_idx = sim._res_unit_pairs[0]
+    t, _ = a_source(sim, row, res_idx)
+    slot = place(sim, int(sim.city_center[0, row, j]), u_idx, row)
+    assert not bool(sim._res_starved("major")[0, slot]), "an owned improved source IS access"
+    sim.pillaged[0, t] = True
+    assert bool(sim._res_starved("major")[0, slot]), "a pillaged source is not access"
+    sim.tile_seat[0, t] = NO_SEAT
+    sim.pillaged[0, t] = False
+    sim._tile_owner_ver += 1
+    assert bool(sim._res_starved("major")[0, slot]), "a source somebody else owns is not access"
+    # a type that asks for nothing is never starved, whatever the map says
+    free = next(u for u in range(sim.NU) if int(sim._type_resource[u]) < 0)
+    other = place(sim, int(sim.city_center[0, row, j]), free, row)
+    assert not bool(sim._res_starved("major")[0, other])
+    hp0 = int(sim.major_unit_hp[0, slot])
+    sim.step()
+    assert int(sim.major_unit_hp[0, slot]) == hp0, "a starved unit does not heal"
+    assert int(sim.major_unit_hp[0, other]) > hp0, "and the one beside it does"
+    sim.tile_seat[0, t] = row
+    sim._tile_owner_ver += 1
+    sim.step()
+    assert int(sim.major_unit_hp[0, slot]) > hp0, "restore the access and it heals again"
+    print("  starved heal OK: no access to the source, no heal — and only for the types that ask")
 
 
 def test_spec_tier(sim) -> None:
@@ -221,11 +369,14 @@ def main() -> None:
     rules = load_rules()
     path = fixture_paths()[0]
     for fn in (test_demand, test_plant_reach, test_cardiff, test_powered_yields,
-               test_regional_powered, test_spec_tier):
+               test_regional_powered, test_fuel, test_accrual, test_unit_charge,
+               test_starved_heal, test_spec_tier):
         fn(build(rules, path))
     print("power_test OK — demand (buildings + stations, dark under pillage), the plant's reach, "
           "Cardiff's renewable supply, all-or-nothing, the powered halves (local, regional, "
-          "amenities), the Coal plant's adjacency, and the three-plant specialist tier")
+          "amenities), the Coal plant's adjacency, the FUEL it converts, the stockpile accrual "
+          "and its ceiling, the unit charge, the heal a lost source denies, and the "
+          "three-plant specialist tier")
 
 
 if __name__ == "__main__":

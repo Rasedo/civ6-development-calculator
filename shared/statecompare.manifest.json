@@ -706,6 +706,16 @@
           ]
         },
         {
+          "name": "stockpile",
+          "compare": "exact",
+          "covers": [
+            "Seat.stockpile"
+          ],
+          "planes": [
+            "civ_stockpile"
+          ]
+        },
+        {
           "name": "routeCount",
           "compare": "exact",
           "covers": [
@@ -1249,6 +1259,16 @@
           ],
           "planes": [
             "city_gw_music"
+          ]
+        },
+        {
+          "name": "powered",
+          "compare": "exact",
+          "covers": [
+            "City.powered"
+          ],
+          "planes": [
+            "city_powered"
           ]
         },
         {

@@ -14,7 +14,8 @@ class SimStep:
             for _pre in ("barb", "major"):
                 _hp = getattr(self, f"{_pre}_unit_hp")
                 _hp.copy_(torch.where(
-                    getattr(self, f"{_pre}_unit_alive") & ~self._spent_mp(_pre),
+                    getattr(self, f"{_pre}_unit_alive") & ~self._spent_mp(_pre)
+                    & ~self._res_starved(_pre),
                     (_hp + self._seat_heal(_pre)).clamp(max=cap), _hp,
                 ))
             for _pre in ("barb", "major"):

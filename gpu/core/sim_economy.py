@@ -761,8 +761,9 @@ class SimEconomy:
         The filters, in TS order: faith-only (MISSIONARY), spawn-only
         (GENERAL/ADMIRAL), the SETTLER (which trains through its own
         escalating column), the tech gate, the civic gate, the
-        ARCHAEOLOGIST's free-artifact-slot rule, strategic-resource access,
-        and finally NAVAL hulls, which need a naval-capable city.
+        ARCHAEOLOGIST's free-artifact-slot rule, the strategic-resource
+        access AND stockpile, and finally NAVAL hulls, which need a
+        naval-capable city.
         """
         B, C, dev = self.B, self.RC, self.device
         if not self.units_mode:
@@ -770,7 +771,7 @@ class SimEconomy:
         ok = (self._type_tech.unsqueeze(0) < 0) | self.civ_techs[:, row].gather(
             1, self._type_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
         )
-        ok = ok & self._res_avail_mask(self.tile_seat == row)
+        ok = ok & self._res_avail_mask(self.tile_seat == row, row)
         ok = ok & ~(self._type_faith_only | self._type_spawn_only | self._type_settler).reshape(1, -1)
         out = ok.unsqueeze(1) & self._type_civic_slot_ok(row, True)
         if bool(self.unit_naval.any()):
@@ -1708,6 +1709,31 @@ class SimEconomy:
             heal = torch.where(_rel, self._religious_heal(pre), heal)
         return heal
 
+    def _res_starved(self, pre: str) -> torch.Tensor:
+        """[B, U] — CIV6 (Resource, GS): "if you had acquired Iron to produce
+        Swordsmen, but have no continuous access to Iron Mines, those Swordsmen
+        won't be able to Heal." ACCESS, not the bank: one owned, improved,
+        unpillaged source answers. A minor or the barbarians keep no bank and
+        are not held to it."""
+        typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+        seat = getattr(self, f"{pre}_unit_seat")
+        out = torch.zeros_like(typ, dtype=torch.bool)
+        if not self._res_unit_pairs:
+            return out
+        provides = (self.res_id >= 0) & (self.improvement == self.res_imp) & ~self.pillaged
+        rows = torch.arange(self.n_majors, device=self.device).reshape(1, -1, 1)
+        mine = self.tile_seat.unsqueeze(1) == rows                     # [B, majors, T]
+        acc: dict[int, torch.Tensor] = {}
+        for u_idx, res_idx in self._res_unit_pairs:
+            want = (typ == u_idx) & (seat >= 0) & (seat < self.n_majors)
+            if not bool(want.any()):
+                continue
+            if res_idx not in acc:
+                acc[res_idx] = (mine & (provides & (self.res_id == res_idx)).unsqueeze(1)).any(dim=2)
+            has = acc[res_idx].gather(1, seat.clamp(min=0, max=self.n_majors - 1))
+            out = out | (want & ~has)
+        return out
+
     def _chaplain_heal(self, pre: str) -> torch.Tensor:
         """[B, U] CIV6 (Chaplain): the Apostle "operates as a Medic, providing
         extra healing to units within 1 tile", and the Medic page prices that
@@ -2423,7 +2449,7 @@ class SimEconomy:
             if bool((selb & self._b_pow_y_any.reshape(1, 1, -1)).any()):
                 # GS POWER: the second half of a late building's yields, paid
                 # while its city meets its whole load.
-                _lit = self._city_powered(row)[:, sl].double().unsqueeze(2)
+                _lit = self.city_powered[:, row, sl].double().unsqueeze(2)
                 bld_y = bld_y + (selbf * _lit) @ self._b_pow_y
             if self._iz_idx >= 0 and self._iz_adj_bidx:
                 # CIV6 (Coal Power Plant): "Grants bonus Production equal to the
@@ -2692,7 +2718,10 @@ class SimEconomy:
         return torch.where(bad, torch.full((B,), -1, dtype=torch.long, device=dev), owner[:, 0])
 
 
-    def _res_avail_mask(self, owned: torch.Tensor) -> torch.Tensor:
+    def _res_avail_mask(self, owned: torch.Tensor, row: int = -1) -> torch.Tensor:
+        """[B, NU] — `trainableUnits`' resource arm: ACCESS opens the column
+        (an owned, improved, unpillaged source), and the STOCKPILE is what pays
+        for the unit. A row of -1 asks the ACCESS half only."""
         B, dev = self.B, self.device
         out = torch.ones(B, self.NU, dtype=torch.bool, device=dev)
         if not self._res_unit_pairs:
@@ -2700,4 +2729,7 @@ class SimEconomy:
         provides = (self.res_id >= 0) & (self.improvement == self.res_imp) & ~self.pillaged & owned
         for u_idx, res_idx in self._res_unit_pairs:
             out[:, u_idx] = (provides & (self.res_id == res_idx)).any(dim=1)
+        if row >= 0:
+            for u_idx, slot, cost in self._res_slot_units:
+                out[:, u_idx] = out[:, u_idx] & (self.civ_stockpile[:, row, slot] >= cost)
         return out

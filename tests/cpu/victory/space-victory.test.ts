@@ -7,6 +7,8 @@ import { queueSeatProject } from '../../../cpu/core/phase';
 import { settleFirstCity } from '../helpers';
 import { PROJECTS, SPACE_PROJECTS, SPACE_FLIGHT_LY } from '../../../cpu/data/projects';
 import { cityPower, laserSpeed } from '../../../cpu/core/yields';
+import { resolveSeatPower } from '../../../cpu/core/stockpile';
+import { STRATEGIC_IDS } from '../../../cpu/data/constants';
 
 // space race / science victory. Gated on Information/Future techs, so no gate
 // lane reaches it and these pokes are the only proof of the semantics. The GPU
@@ -97,6 +99,11 @@ describe('science victory', () => {
     seatOf(state, 0)!.research.techs.push('OFFWORLD_MISSION');
     expect(availableProjects(state, city).some((p) => p.laser)).toBe(false);
     seatOf(state, 0)!.spaceProjects = [...CHAIN];
+    // the Lagrange station charges 30 Aluminum, so only the terrestrial one is
+    // open on an empty bank
+    expect(availableProjects(state, city).filter((p) => p.laser).map((p) => p.id))
+      .toEqual(['TERRESTRIAL_LASER_STATION']);
+    seatOf(state, 0)!.stockpile = STRATEGIC_IDS.map(() => 99);
     expect(availableProjects(state, city).filter((p) => p.laser)).toHaveLength(2);
     city.laserStations = 3;
     seatOf(state, 0)!.orbitalLasers = 3;
@@ -151,6 +158,7 @@ describe('science victory', () => {
     // The city draws 5 Power for the terrestrial station and has no supply, so
     // only the orbital one speeds the craft.
     expect(cityPower(state, city).demand).toBe(5);
+    expect(city.powered ?? false).toBe(false);
     expect(laserSpeed(state, 0)).toBe(1);
     s.spaceLy = 0;
     endTurn(state);
@@ -162,7 +170,9 @@ describe('science victory', () => {
     city.districts.push({ type: 'INDUSTRIAL_ZONE', tileIndex: iz });
     state.map.tiles[iz].districtComplete = true;
     city.buildings.push('COAL_POWER_PLANT');
-    expect(cityPower(state, city).powered).toBe(true);
+    s.stockpile = STRATEGIC_IDS.map(() => 99); // the plant needs Coal to convert
+    resolveSeatPower(state, 0);
+    expect(city.powered).toBe(true);
     expect(laserSpeed(state, 0)).toBe(2);
     s.spaceLy = 0;
     endTurn(state);

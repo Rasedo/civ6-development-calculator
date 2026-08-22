@@ -36,6 +36,7 @@ import { congressChopGold } from './congress';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { NO_SEAT, borderTurnsFrom, capsOf, campTiles, cityAtTile, civHasStrategic, civsAtWar, isCiv, seatOf, seatsAllied, tileSeat } from './seats';
+import { canTrainWithStockpile, chargeUnitResource } from './stockpile';
 import type { ImprovementId } from './types';
 
 const ok: RuleResult = { ok: true };
@@ -731,7 +732,12 @@ export function trainableUnits(
     // The NATURALIST is bought with FAITH and nothing else (real Civ 6), so
     // it never joins a production column.
     if (d.naturalist) return false;
-    if (d.requiresResource && !state.sandbox && !civHasStrategic(state, seat, d.requiresResource)) return false;
+    // ACCESS opens the column; the STOCKPILE is what pays for the unit, and a
+    // seat that cannot pay must not be offered it — the applier re-asks.
+    if (d.requiresResource && !state.sandbox) {
+      if (!civHasStrategic(state, seat, d.requiresResource)) return false;
+      if (!canTrainWithStockpile(state, seat, d.id)) return false;
+    }
     if (d.naval) return !!city && cityNavalCapable(state, city);
     return true;
   });
@@ -872,6 +878,7 @@ export function queueUnit(state: GameState, cityId: number, unitType: string, se
     spawnUnit(state, unitType, city.centerIndex, seat);
     return ok;
   }
+  chargeUnitResource(state, seat, unitType);
   if (unitType === 'BUILDER') {
     city.queue.push({ kind: 'unit', unit: unitType, progress: 0, cost: builderCost(state, seat) });
   } else {
@@ -1029,7 +1036,13 @@ export function refreshUnits(state: GameState): void {
     // the granted pool vary per turn. `?? full` reproduces the pre-S3 gate for
     // units that have never been refreshed.
     const grantedLast = unit.movesFull ?? full;
-    if (unit.movesLeft >= grantedLast) {
+    // CIV6 (Resource, GS): "if you had acquired Iron to produce Swordsmen, but
+    // have no continuous access to Iron Mines, those Swordsmen won't be able to
+    // Heal." A minor or the barbarians keep no bank and are not held to it.
+    const need = UNITS[unit.type]?.requiresResource;
+    const starved = !!need && isCiv(unit.seat)
+      && !civHasStrategic(state, unit.seat, need);
+    if (unit.movesLeft >= grantedLast && !starved) {
       const home = tileSeat(tile) === unit.seat;
       const onCamp = seatOf(state, unit.seat)?.camps.includes(unit.tileIndex) ?? false;
       const heal = (UNITS[unit.type]?.religiousStrength ?? 0) > 0

@@ -130,6 +130,39 @@ export const LUXURY_AMENITY_CITIES = 4;
 
 export const REGIONAL_RANGE = 6;
 
+/**
+ * CIV6 (GS): "each source produces a certain number of the resource per turn,
+ * which is then added to your stockpile" — the number is the improved tile's
+ * own GS yield, per resource page. An unimproved or pillaged source produces
+ * nothing, which is the same predicate `civHasStrategic` already asks.
+ */
+export const STRATEGIC_PER_TURN: Record<string, number> = {
+  HORSES: 2, IRON: 2, NITER: 2, COAL: 3, OIL: 3, ALUMINUM: 2, URANIUM: 3,
+};
+
+/** The stockpile index space: one slot per strategic resource, in the order
+ *  above. Both engines address a stockpile by slot, and the wire ships the
+ *  slot -> resource-table mapping so a tile's `rid` can find it. */
+export const STRATEGIC_IDS: string[] = Object.keys(STRATEGIC_PER_TURN);
+
+/** A fresh, empty bank — the one place the stockpile's shape is written. */
+export function emptyStockpile(): number[] {
+  return STRATEGIC_IDS.map(() => 0);
+}
+
+/** CIV6 (GS): "The maximum stockpile amount is initially 50 for each resource
+ *  but constructing Encampment buildings in your empire (Barracks, Armory,
+ *  etc.) will increase your maximum stockpile by 10 per building for all
+ *  resources." */
+export const STOCKPILE_CAP_BASE = 50;
+export const STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING = 10;
+
+/** CIV6 (GS): every unit in this roster that asks for a strategic resource
+ *  asks for 20 of it, paid "at the moment you start production (or the moment
+ *  you purchase it)" — Horseman, Swordsman, Knight, Musketman and Bombard each
+ *  say so on their own page. */
+export const UNIT_RESOURCE_COST = 20;
+
 export function maxSpecialtyDistricts(pop: number): number {
   return Math.floor((pop - 1) / 3) + 1;
 }

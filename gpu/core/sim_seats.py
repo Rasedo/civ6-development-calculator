@@ -593,7 +593,7 @@ class SimSeats:
         return (
             (self._type_tech.unsqueeze(0) < 0)
             | self.civ_techs[:, row].gather(1, self._type_tech.clamp(min=0).unsqueeze(0).expand(B, -1))
-        ) & self._res_avail_mask(self.tile_seat == row)
+        ) & self._res_avail_mask(self.tile_seat == row, row)
 
     def _seat_buy_unit_candidates(self, row: int, tr_u: torch.Tensor) -> torch.Tensor:
         # No hull on the GOLD rung: it spawns at the capital and asks no city
@@ -897,6 +897,8 @@ class SimSeats:
                     price_u = (self._type_cost.gather(0, pick_ty).double() * mult
                                * self._congress_unit_buy_mult(0))
                     self.civ_treasury[:, row] = torch.where(landed_u, self.civ_treasury[:, row] - price_u, self.civ_treasury[:, row])
+                    for _ui, _sl, _c in self._res_slot_units:
+                        self._charge_unit_resource(row, landed_u & (pick_ty == _ui), _ui)
                     bought = bought | landed_u
         if row in self._driven_buy_worship:
             wj = self._driven_buy_worship.pop(row)
@@ -1131,6 +1133,8 @@ class SimSeats:
                 # the TRADER prices off ITS escalator (game progress)
                 cost_q = torch.where(ui == self._trader_idx, self._trader_cost(row).double(), cost_q)
                 self.city_current[:, row, j] = torch.where(is_u, a, self.city_current[:, row, j])
+                for _ui, _sl, _c in self._res_slot_units:
+                    self._charge_unit_resource(row, is_u & (ui == _ui), _ui)
                 self.city_cost[:, row, j] = torch.where(is_u, cost_q, self.city_cost[:, row, j])
                 self.city_progress[:, row, j] = torch.where(is_u, torch.zeros_like(self.city_progress[:, row, j]), self.city_progress[:, row, j])
             is_d = act & (a >= self.DISTRICT_BASE) & (a < self.DISTRICT_BASE + nS)
@@ -1221,6 +1225,7 @@ class SimSeats:
                     else:
                         price_a = pc_a
                     self.city_current[:, row, j] = torch.where(rows_p, torch.full_like(cur_j, self.PROJECT_BASE + pi_a), self.city_current[:, row, j])
+                    self._charge_project_resource(row, rows_p, pi_a)
                     self.city_cost[:, row, j] = torch.where(rows_p, price_a, self.city_cost[:, row, j])
                     self.city_progress[:, row, j] = torch.where(rows_p, torch.zeros_like(self.city_progress[:, row, j]), self.city_progress[:, row, j])
 
@@ -1262,8 +1267,9 @@ class SimSeats:
 
     def _laser_project_ok(self, row: int, pi: int) -> torch.Tensor:
         """[B] — may this seat START laser row `pi`? Repeatable, so never in
-        the one-time ledger, but it still asks for its tech and for the craft
-        it speeds to have launched (`availableProjects`' laser arm)."""
+        the one-time ledger, but it still asks for its tech, for the craft it
+        speeds to have launched, and for whatever strategic resource it charges
+        (`availableProjects`' laser arm)."""
         prow = self._proj_rows[pi]
         ok = torch.ones(self.B, dtype=torch.bool, device=self.device)
         rt = int(prow.get("rt", -1))
@@ -1272,7 +1278,33 @@ class SimSeats:
         rp = int(prow.get("rp", -1))
         if rp >= 0:
             ok = ok & self.space_done[:, row, self._space_step[rp]]
-        return ok
+        return ok & self._project_resource_ok(row, pi)
+
+    def _project_resource_ok(self, row: int, pi: int) -> torch.Tensor:
+        """[B] — can this seat pay the project's one-time resource charge?"""
+        prow = self._proj_rows[pi]
+        rs, rc = int(prow.get("rs", -1)), int(prow.get("rc", 0))
+        if rs < 0 or rc <= 0:
+            return torch.ones(self.B, dtype=torch.bool, device=self.device)
+        return self.civ_stockpile[:, row, rs] >= rc
+
+    def _charge_unit_resource(self, row: int, hit: torch.Tensor, u_idx: int) -> None:
+        """`chargeUnitResource` — the unit's stockpile cost, taken from the rows
+        that actually started it."""
+        slot, cost = int(self._type_res_slot[u_idx]), int(self._type_res_cost[u_idx])
+        if slot < 0 or cost <= 0 or not bool(hit.any()):
+            return
+        col = self.civ_stockpile[:, row, slot]
+        col.copy_(torch.where(hit, (col - cost).clamp(min=0), col))
+
+    def _charge_project_resource(self, row: int, hit: torch.Tensor, pi: int) -> None:
+        """`chargeProjectResource` — the Lagrange station's one-time Aluminum."""
+        prow = self._proj_rows[pi]
+        rs, rc = int(prow.get("rs", -1)), int(prow.get("rc", 0))
+        if rs < 0 or rc <= 0 or not bool(hit.any()):
+            return
+        col = self.civ_stockpile[:, row, rs]
+        col.copy_(torch.where(hit, (col - rc).clamp(min=0), col))
 
     def _space_step_ok(self, row: int, pi: int) -> torch.Tensor:
         """[B] — may this seat START space-race step `pi` right now?
@@ -3271,56 +3303,126 @@ class SimSeats:
         amt = self._wond_regam.reshape(1, 1, nW).expand(B, cols, nW).reshape(B, cols * nW, 1)
         return (hit.double() * amt).sum(dim=1) * alive.double()
 
-    def _city_powered(self, row: int) -> torch.Tensor:
-        """The `cityPower` twin — [B, cols] bool, is this city POWERED?
+    def _city_power_need(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """The `cityPower` twin — what each city of seat row `row` ASKS, what
+        its own renewables answer, and which plants could cover the rest.
+        Returns ([B, cols] demand, [B, cols] supply, [B, cols, nPlant] reach),
+        all fuel-free; `_resolve_seat_power` decides what the bank can run.
 
         CIV6 (Power): a city's base load is what its standing buildings demand
         (a pillaged district's are dark, like their yields) plus
         `laser_power_load` per Terrestrial Laser Station it has completed, and
         the load is met all at once or not at all — "a city cannot supply Power
-        to some buildings and not to others". A city demanding nothing is not
-        powered; nothing reads the flag there.
+        to some buildings and not to others".
 
         Two supplies. A POWER PLANT "will attempt to provide required Power to
         all cities within range", from its own Industrial Zone tile to the
         receiving CITY CENTER, over the reach a regional building has (a Mexico
         City suzerain widens both). RENEWABLE supply "provide[s] Power only for
-        [its] respective city" and is Cardiff's here. What a plant BURNS is not
-        modelled, so a plant in range meets whatever load it reaches; renewable
-        supply must cover the load by itself.
-
-        Reads LIVE state at call time, like `_seat_regional`."""
+        [its] respective city" and is Cardiff's here, so it must cover the load
+        by itself."""
         B, cols, dev = self.B, self.RC, self.device
         alive = self.city_alive[:, row, :cols]
         dreg = self.city_dist_tile[:, row, :cols]
         stand = self.city_bldg[:, row, :cols] & ~self._bldg_dark(dreg)  # [B, cols, NB]
         demand = stand.double() @ self._b_power
         demand = demand + self._laser_power_load * self.city_lasers[:, row, :cols].double()
-        live = alive & (demand > 0)
-        if not bool(live.any()):
-            return torch.zeros(B, cols, dtype=torch.bool, device=dev)
+        demand = torch.where(alive, demand, torch.zeros_like(demand))
+        nP = max(len(self._plant_bidx), 1)
         supply = torch.zeros(B, cols, dtype=torch.float64, device=dev)
+        reach_p = torch.zeros(B, cols, nP, dtype=torch.bool, device=dev)
+        if not bool((demand > 0).any()):
+            return demand, supply, reach_p
         if self._harbor_idx >= 0 and self._suz_c_harbor_pow >= 0:
             hb = (self._b_req_district == self._harbor_idx).reshape(1, 1, -1)
             n_hb = (stand & hb).sum(dim=2).double()
             supply = n_hb * self._cardiff_harbor_power \
                 * self._suz_effect(row, self._suz_c_harbor_pow).double().unsqueeze(1)
-        plant = torch.zeros(B, cols, dtype=torch.bool, device=dev)
         if self._iz_idx >= 0 and self._plant_bidx:
-            has_p = torch.zeros(B, cols, dtype=torch.bool, device=dev)
-            for n in self._plant_bidx:
-                has_p = has_p | self.city_bldg[:, row, :cols, n]
             st = dreg[:, :, self._iz_idx]
             stc = st.clamp(min=0)
-            src = has_p & alive & (st >= 0) & self.district_complete.gather(1, stc) \
+            zone = alive & (st >= 0) & self.district_complete.gather(1, stc) \
                 & ~self.district_pillaged.gather(1, stc)
-            if bool(src.any()):
+            if bool(zone.any()):
                 reach = self._regional_range + self._suz_reach_bonus \
                     * self._suz_effect(row, self._suz_c_reach).long().reshape(B, 1, 1)
                 ctrs = self.city_center[:, row, :cols].clamp(min=0)
                 dd = self.pair_dist[stc.unsqueeze(2), ctrs.unsqueeze(1)]  # [B, src, recv]
-                plant = (src.unsqueeze(2) & (dd <= reach)).any(dim=1)
-        return live & (plant | (supply >= demand))
+                near = zone.unsqueeze(2) & (dd <= reach)  # [B, src, recv]
+                for pi, n in enumerate(self._plant_bidx):
+                    src = near & self.city_bldg[:, row, :cols, n].unsqueeze(2)
+                    reach_p[:, :, pi] = src.any(dim=1)
+        return demand, supply, reach_p
+
+    def _resolve_seat_power(self, row: int) -> None:
+        """THE TURN'S POWER for seat row `row`: set `city_powered` and burn what
+        the plants convert.
+
+        CIV6: "Each turn a Power Plant will attempt to provide required Power to
+        all cities within range, converting stockpiles of the relevant resource
+        into Power", and "cities will consider their own renewable power
+        supplies first, before turning to a nearby Power Plant" — so a plant is
+        asked only for the shortfall. Where two kinds reach one city, "the game
+        engine will use the Power Plant which draws the resource of which you
+        have a larger stockpile". The order in which one bank is shared among
+        several cities is not published; this walks the city SLOTS in order, and
+        a city the fuel no longer covers stays dark (`resolveSeatPower`)."""
+        cols = self.RC
+        demand, supply, reach_p = self._city_power_need(row)
+        lit = (demand > 0) & (supply >= demand)
+        need = (demand - supply).clamp(min=0).long()
+        want = (demand > 0) & (supply < demand)
+        if bool(want.any()) and self._plant_bidx:
+            stock = self.civ_stockpile[:, row]
+            for j in range(cols):
+                cand = want[:, j] & reach_p[:, j].any(dim=1)
+                if not bool(cand.any()):
+                    continue
+                best_have = torch.full_like(cand, -1, dtype=torch.long)
+                best_cost = torch.zeros_like(best_have)
+                best_slot = torch.zeros_like(best_have)
+                for pi, n in enumerate(self._plant_bidx):
+                    slot, rate = int(self._b_fuel_slot[n]), int(self._b_fuel_rate[n])
+                    if slot < 0 or rate <= 0:
+                        continue
+                    have = stock[:, slot]
+                    take = cand & reach_p[:, j, pi] & (have > best_have)
+                    best_have = torch.where(take, have, best_have)
+                    best_cost = torch.where(take, (need[:, j] + rate - 1) // rate, best_cost)
+                    best_slot = torch.where(take, torch.full_like(best_slot, slot), best_slot)
+                pay = cand & (best_have >= 0) & (best_have >= best_cost)
+                lit[:, j] = lit[:, j] | pay
+                stock.scatter_add_(
+                    1, best_slot.unsqueeze(1),
+                    torch.where(pay, -best_cost, torch.zeros_like(best_cost)).unsqueeze(1))
+        self.city_powered[:, row, :cols] = lit
+
+    def _seat_accrue_stockpile(self, row: int) -> None:
+        """One turn's resource income (`accrueStockpiles`): every tile this seat
+        owns whose strategic resource stands under its own unpillaged
+        improvement pays that resource's published number, and the bank is then
+        clamped to `_stockpile_cap`."""
+        if self._n_strategic == 0:
+            return
+        owned = (self.tile_seat == row) & ~self.pillaged & (self.improvement == self.res_imp)
+        bank = self.civ_stockpile[:, row]
+        for k, (rid, rate) in enumerate(zip(self._strat_rid, self._strat_rate)):
+            n = (owned & (self.res_id == rid)).sum(dim=1)
+            if bool((n > 0).any()):
+                bank[:, k] += n * rate
+        cap = self._stockpile_cap(row).unsqueeze(1)
+        bank.copy_(torch.minimum(bank, cap))
+
+    def _stockpile_cap(self, row: int) -> torch.Tensor:
+        """[B] — CIV6 (GS): 50 for each resource, "+10 per building" for every
+        Encampment building standing in the empire."""
+        cols = self.RC
+        if self._encampment_didx < 0:
+            return torch.full((self.B,), self._stock_cap_base, dtype=torch.long, device=self.device)
+        enc = (self._b_req_district == self._encampment_didx).reshape(1, 1, -1)
+        stand = self.city_bldg[:, row, :cols] & ~self._bldg_dark(self.city_dist_tile[:, row, :cols])
+        n = (stand & enc & self.city_alive[:, row, :cols].unsqueeze(2)).sum(dim=(1, 2))
+        return self._stock_cap_base + self._stock_cap_per_enc * n
 
     def _laser_speed(self, row: int) -> torch.Tensor:
         """[B] long — the craft's speed above its base 1 LY/turn: every orbital
@@ -3330,7 +3432,7 @@ class SimSeats:
         n = self.civ_orbital_lasers[:, row]
         if not bool((lz > 0).any()):
             return n
-        return n + (lz * self._city_powered(row).long()).sum(dim=1)
+        return n + (lz * self.city_powered[:, row, :self.RC].long()).sum(dim=1)
 
     def _seat_regional(self, row: int) -> tuple[torch.Tensor, torch.Tensor] | None:
         """The regionalEffects twin for seat row `row`:
@@ -3377,7 +3479,7 @@ class SimSeats:
             if float(self._b_pow_y[n].abs().sum()) == 0 and float(self._b_pow_am[n]) == 0:
                 continue
             if lit is None:
-                lit = self._city_powered(row)
+                lit = self.city_powered[:, row, :cols]
             hp = (ok.unsqueeze(2) & lit.unsqueeze(2) & (dd <= reach)).any(dim=1) & alive
             hpf = hp.double()
             y6 = y6 + hpf.unsqueeze(2) * self._b_pow_y[n].reshape(1, 1, 6)
@@ -3534,7 +3636,7 @@ class SimSeats:
         have = torch.einsum("bjn,n->bj", selb.to(torch.float64), rd.b_amenities.double())
         if bool((selb & (self._b_pow_am > 0).reshape(1, 1, -1)).any()):
             _powam = torch.einsum("bjn,n->bj", selb.to(torch.float64), self._b_pow_am)
-            have = have + _powam * self._city_powered(row).double()
+            have = have + _powam * self.city_powered[:, row, :cols].double()
         # PALACE amenity on the capital — baseHave sums city.buildings, which
         # hold the founding PALACE, so it joins BEFORE the luxury ranking.
         # CITY_CENTER never pillages.
@@ -3611,6 +3713,7 @@ class SimSeats:
         self.city_qtile[b, row, col] = -1
         self.city_prod_bank[b, row, col] = 0
         self.city_lasers[b, row, col] = 0
+        self.city_powered[b, row, col] = False
         self.city_gw_writing[b, row, col] = 0
         self.city_gw_art[b, row, col] = 0
         self.city_gw_music[b, row, col] = 0
@@ -3764,6 +3867,7 @@ class SimSeats:
         self.city_relics[b, dst_row, col] = old_rel
         self.city_artifacts[b, dst_row, col] = old_art
         self.city_lasers[b, dst_row, col] = old_lz  # the stations ride the flip with the Spaceport that holds them
+        self.city_powered[b, dst_row, col] = False  # the new owner's own turn re-resolves the grid
         for _p, _v in zip(("city_artifact_era", "city_artifact_seat",
                            "city_gwart_type", "city_gwart_artist"), old_prov):
             getattr(self, _p)[b, dst_row, col, :] = _v

@@ -30,6 +30,9 @@ export interface City {
   /** Completed Terrestrial Laser Stations here: each draws LASER_POWER_LOAD
    *  and speeds the craft by 1 LY/turn only while this city is powered. */
   laserStations?: number;
+  /** Is this city POWERED? Resolved once a turn by `resolveSeatPower`, which
+   *  is also where a plant burns its fuel; every reader takes the flag. */
+  powered?: boolean;
   foundedTurn: number;
   hp: number;
   id: number;
@@ -352,6 +355,8 @@ export interface Seat {
   /** Completed LAGRANGE stations — each adds +1 LY/turn unconditionally. The
    *  terrestrial ones are counted per city (`City.laserStations`). */
   orbitalLasers?: number;
+  /** GS strategic stockpiles, dense over `STRATEGIC_IDS`. */
+  stockpile?: number[];
   camps: number[];
   gpEarned: string[];
   eraScore?: number;

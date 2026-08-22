@@ -77,10 +77,10 @@ nothing carries forward.
 | B-60r the dig's DATE, and the hull nobody dates | 1 | the artifact's civilization is the event's own now; its ERA is still the ACTING seat's research, and a barbarian or minor sinking a hull leaves no wreck at all |
 | B-34r flood tails | 1 | the severity ladder and the river's whole reach ship; the Great Bath's mitigation is still seat-scoped rather than river-scoped, and the Dam — with the Hydroelectric Dam that needs it — is not in the district roster |
 | **B. Fidelity vs real Civ 6** | **26** | |
-| C-1 POWER | 3 | the grid, the three plants, Cardiff and the powered-yield split all ship; the FUEL waits on C-5, the CO2 and the Accords on C-24, and four renewable improvements, the Hydroelectric Dam and the Biosphere have no carrier |
+| C-1 POWER | 2 | the grid, the three plants, Cardiff, the powered-yield split and the FUEL all ship; the CO2 and the Accords wait on C-24, four renewable improvements, the Hydroelectric Dam and the Biosphere have no carrier, nothing can retire a plant, and a minor's cities are never powered |
 | C-2 diplomatic agreements | 3 | friendship, alliances, open borders, the closed border and the work gift ship on one 30-turn clock; alliance TYPES and LEVELS, the negotiated two-sided deal, and the four agreements that need one are open |
 | C-4 unique improvements | 3 | Batey / Colossal Head / Monastery, each a flat channel today |
-| C-5 strategic-resource stockpiles | 4 | resources gate, they never accumulate or get spent; a Power Plant burns nothing |
+| C-5 strategic-resource stockpiles | 2 | the bank, its ceiling, the unit and project charges, the plants' fuel and the heal a lost source denies all ship; unit FUEL upkeep and the shortage penalty wait on C-31, and trading resources on C-2 |
 | C-6 policy-card modifiers | 1 | two of the 49 cards are inert, each blocked on a system below |
 | C-7 trading posts | 2 | a route lays roads and plants nothing |
 | C-8 draws made deterministic | 2 | the Great Person replacement walks a queue and the Congress slate rotates, where Civ 6 draws both |
@@ -102,8 +102,9 @@ nothing carries forward.
 | C-28 tourism is one lifetime scalar | 2 | it is banked per seat and divided by the civ count on read, so no rule can address one rival's tourism |
 | C-29 no RESOLVED suzerain | 1 | `isSuzerain` recomputes from the raw envoy store on every read, so a rule that changes envoy WEIGHT by who the suzerain is has no fixed point |
 | C-30 city-states carry no research | 1 | no techs, no civics, so nothing can say when a minor took Early Empire — its borders never close and the suzerain's passage lifts nothing |
-| **C. Absent systems** | **56** | |
-| **OPEN, TOTAL** | **82** | |
+| C-31 the unit roster stops in the Renaissance | 4 | the Musketman and the Bombard are the newest chassis, so half the military ladder and every fuel-consuming unit are absent |
+| **C. Absent systems** | **57** | |
+| **OPEN, TOTAL** | **83** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -608,7 +609,7 @@ Civ 6 source or is recorded as unverifiable.
   - **THE MIDDLE AND LATE SIEGE RUNGS.** Trebuchet, Artillery and Rocket
     Artillery are absent, so the class has a Classical rung and a Renaissance
     one and nothing after Metal Casting. The Observation Balloon that lets a
-    siege unit outrange a city's defenses is absent too.
+    siege unit outrange a city's defenses is absent too. Blocked on C-31.
   - **AKKAD's SUZERAIN BONUS** confers the Battering Ram's ability "against
     all levels of city defenses and against all cities (regardless of presence
     or absence of support units)". Akkad is not in the city-state roster —
@@ -937,8 +938,8 @@ dependency is readable, and both halves count.
 The OPEN weight jumped when this chapter landed. That is the point: the old
 number was under-counting by treating deferrals as closures.
 
-- **C-1. POWER — the fuel, the emissions and the renewable roster.**
-  Weight 3. THE GRID SHIPS, on both engines: a city's base LOAD is what its
+- **C-1. POWER — the emissions and the renewable roster.**
+  Weight 2. THE GRID SHIPS, on both engines: a city's base LOAD is what its
   standing buildings ask (a pillaged district's ask nothing, like their
   yields) plus 5 per Terrestrial Laser Station it has completed, and the
   load is met in FULL or not at all — "a city cannot supply Power to some
@@ -946,7 +947,7 @@ number was under-counting by treating deferrals as closures.
   "will attempt to provide required Power to all cities within range",
   measured from its own Industrial Zone tile to the receiving CITY CENTER
   over the reach a regional building has, so a Mexico City suzerain widens
-  the grid with it (`cityPower` / `_city_powered`). The RENEWABLE half
+  the grid with it (`cityPower` / `_city_power_need`). The RENEWABLE half
   "provide[s] Power only for [its] respective city"; the one that exists
   here is Cardiff's, "+2 Power for every Harbor building", now a
   `SUZ_EFFECTS` rule rather than a flat channel.
@@ -977,12 +978,13 @@ number was under-counting by treating deferrals as closures.
   grid is poke-proven, not gate-proven.
 
   OPEN:
-  - **A PLANT BURNS NOTHING.** Coal at 1:4, Oil at 1:4 and Uranium at 1:16
-    per turn, the rule that a city in range of two plants uses "the Power
-    Plant which draws the resource of which you have a larger stockpile",
-    and the Decommission projects all need stockpiles that accumulate and
-    are SPENT; blocked on C-5. A plant here therefore meets whatever load
-    it reaches, for free, forever.
+  - **THE DECOMMISSION AND RECOMMISSION PROJECTS.** A plant burns its fuel
+    now, but nothing can retire one: no project row takes a Coal or Oil
+    plant off the grid, and the Nuclear plant's reactor has no age to reset.
+  - **A CITY-STATE'S CITIES ARE NEVER POWERED.** `resolveSeatPower` /
+    `_resolve_seat_power` run inside the MAJOR seat loop, so a minor's
+    buildings ask for a load nothing ever answers and its `powered` flag
+    stays false for the whole game. Both engines agree; neither is Civ 6.
   - **NO CO2, so no Accords and no reason to switch plants.** The whole
     point of the three-plant ladder is that Coal emits most and Nuclear
     least; blocked on C-24.
@@ -1057,12 +1059,57 @@ number was under-counting by treating deferrals as closures.
   Weight 3. Gaps: Caguana's Batey, La Venta's Colossal Head and Armagh's
   Monastery (each a whole improvement with its own adjacency, standing in as
   a flat channel today), and the Chemamull-shaped appeal improvements.
-- **C-5. STRATEGIC-RESOURCE STOCKPILES — resources gate, they do not
-  accumulate.** Weight 4. `civHasStrategic` answers a boolean; real GS
-  accumulates and SPENDS. Gaps: the Lagrange Laser Station's 30 Aluminum;
-  unit resource COSTS and per-turn consumption; the three Power Plants'
-  fuel (C-1), which is what makes a plant a choice rather than a switch;
-  Zanzibar's two exists-nowhere-else luxuries.
+- **C-5. STRATEGIC-RESOURCE STOCKPILES — the bank ships; unit FUEL does
+  not.** Weight 2. Gathering Storm puts a strategic resource to three uses —
+  "unit production, as fuel for unit upkeep, and for Power production for
+  your cities" — and the first and third ship here.
+
+  THE BANK. Every tile a seat owns whose strategic resource stands under its
+  own unpillaged improvement pays that resource's published number into a
+  per-seat bank each turn: Horses, Iron, Niter and Aluminum 2, Coal, Oil and
+  Uranium 3, each sourced from its own resource page. The ceiling "is
+  initially 50 for each resource", and every Encampment building standing in
+  the empire raises it "by 10 per building for all resources"
+  (`accrueStockpiles` / `_seat_accrue_stockpile`, `stockpileCap` /
+  `_stockpile_cap`).
+
+  WHAT DRAWS ON IT. "Everything using the resource (units, buildings,
+  projects, etc.) will draw from this stockpile." A gated unit costs 20 of
+  its resource, charged "at the moment you start production (or the moment
+  you purchase it)" — so the charge lands where production STARTS and again
+  at the gold buy, not at the spawn. The Lagrange Laser Station charges 30
+  Aluminum once. A Power Plant converts its own fuel every turn at the
+  published rate (Coal 1:4, Oil 1:4, Uranium 1:16), a city asks a plant only
+  for what its renewables did not cover, and where two plants reach one city
+  the engine takes "the Power Plant which draws the resource of which you
+  have a larger stockpile". ACCESS still opens the production column and the
+  BANK is what pays for it — on the mask and again in the applier, because a
+  mask that offers what the applier refuses is a silent no-op. A unit whose
+  seat has LOST access to its resource "won't be able to Heal"
+  (`refreshUnits` / `_res_starved`). MUSKETMAN was missing its Niter
+  requirement entirely and now carries it.
+
+  Both new facts ride the digest — `stockpile` per seat, `powered` per city.
+  Poke lanes: `tests/gpu/power_test.py`,
+  `tests/cpu/city/strategic-resources.test.ts`.
+  REACHABILITY: the accrual, the ceiling and the unit charge are all in the
+  gate's reach — Horseman and Swordsman are Ancient/Classical and the
+  scripted seats train both. The plant's fuel burn is not: no lane has yet
+  built a Power Plant, so that half is poke-proven only.
+  OPEN:
+  - **UNIT FUEL UPKEEP.** "Each turn, the unit will consume a certain amount
+    of that resource as fuel", against a reduced up-front cost — the rule
+    that turns an army into a running bill. No unit in the roster consumes
+    fuel because no unit in the roster is Industrial or later; blocked on
+    C-31.
+  - **THE SHORTAGE PENALTY.** A seat short of a fuel resource takes a Combat
+    Strength penalty "proportional to the amount you're short". It reads the
+    same absent per-unit consumption; blocked on C-31.
+  - **RESOURCE TRADING.** "You can only trade lump quantities of Consumable
+    resources", which is a two-sided deal and has no offer/accept protocol;
+    blocked on C-2's negotiated deal.
+  - **ZANZIBAR'S TWO EXISTS-NOWHERE-ELSE LUXURIES** — a suzerain bonus whose
+    resources are on no tile in the catalog; B-21r.
 - **C-6. POLICY-CARD MODIFIERS — two of the 49 cards are inert.** Weight 1.
   Every row in `POLICIES` was read against its own Civilopedia page: the
   description quotes the card, the slot kind is the page's `type`, the
@@ -1162,6 +1209,16 @@ number was under-counting by treating deferrals as closures.
   banked — and the two are independent. Two gaps wait on this one:
   `ONLINE_COMMUNITIES` (C-6), and the "+25% for Open Borders" international
   modifier (C-2).
+- **C-31. THE UNIT ROSTER STOPS IN THE RENAISSANCE.** Weight 4. `UNITS`
+  holds 28 rows and the newest chassis are the Musketman and the Bombard;
+  there is no Industrial-or-later unit of any class, land or naval, and no
+  upgrade path past them. That is a whole half of the game's military
+  ladder, and it is what several rules elsewhere are really waiting on:
+  unit FUEL upkeep and the shortage Combat Strength penalty (C-5) both read
+  a per-unit consumption that no row in the roster has, and the middle and
+  late siege rungs (B-46r) are the same absence seen from the combat page.
+  The eras themselves are live — every seat researches to Modern and past
+  it — so the ladder simply runs out under them.
 - **C-30. A CITY-STATE CARRIES NO RESEARCH RECORD.** Weight 1. A minor has no
   techs and no civics on either engine, and real Civ 6 minors research like
   anyone else. One gap waits on it today: CIV6 (Movement) closes a territory

@@ -43,6 +43,7 @@ import { fileURLToPath } from 'node:url';
 import type { City, CityState, GameState, Seat, Tile, Unit } from './types';
 import { allyTurnsWith, borderTurnsFrom, citiesOf, friendTurnsWith, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
 import { laserSpeed } from './yields';
+import { emptyStockpile } from '../data/constants';
 import { EMERGENCY_SLOTS } from '../data/seats';
 import { questFor } from './observe';
 import { envoysOf } from './cityStates';
@@ -364,6 +365,9 @@ const SEAT: Record<string, Extractor> = {
   // standing behind it (the powered ones are what the speed counts)
   laserSpeed: overSeats((s, st) => laserSpeed(st, s.seat)),
   laserStations: overSeats((s, st) => citiesOf(st, s.seat).reduce((n, c) => n + (c.laserStations ?? 0), 0)),
+  // the GS stockpiles, dense over STRATEGIC_IDS, and the POWERED flag the
+  // whole grid resolves to
+  stockpile: overSeats((s) => [...(s.stockpile ?? emptyStockpile())]),
   techs: overSeats((s) => s.research.techs.map((t) => idx(TECH_IDX, t)).sort((a, b) => a - b)),
   civics: overSeats((s) => s.research.civics.map((c) => idx(CIVIC_IDX, c)).sort((a, b) => a - b)),
   // TS keeps ONE `boosted` list mixing tech and civic ids; the GPU keeps two
@@ -531,6 +535,7 @@ const CITY: Record<string, Extractor> = {
   greatWorksArt: overCities((r) => r.city.greatWorksArt ?? 0),
   greatWorksMusic: overCities((r) => r.city.greatWorksMusic ?? 0),
   relics: overCities((r) => r.city.relics ?? 0),
+  powered: overCities((r) => (r.city.powered ? 1 : 0)),
   artifacts: overCities((r) => r.city.artifacts ?? 0),
   // the museum's PROVENANCE, slot by slot — what the theming rule reads.
   artifactProv: overCities((r) => {
