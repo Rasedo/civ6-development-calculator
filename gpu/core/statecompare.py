@@ -596,6 +596,15 @@ def _tile(plane: str):
     return get
 
 
+def _prov(era: str, seat: str):
+    # Two C-level passes instead of 2*T scalar tensor reads, for the same
+    # uniform 2-element rows the vector fold path already handles.
+    def get(sim, b, rows):
+        return [[e, s] for e, s in zip(getattr(sim, era)[b].tolist(),
+                                       getattr(sim, seat)[b].tolist())]
+    return get
+
+
 def _owner_city(sim, b, rows):
     if _np is not None:
         seat = sim.tile_seat[b].numpy()
@@ -616,13 +625,9 @@ TILE = {
     "builtWonder": _tile("built_wonder"),
     "builtWonderComplete": _tile("built_wonder_complete"),
     "antiquity": _tile("antiquity"),
-    "antiquityProv": lambda sim, b, rows: [
-        [int(sim.antiquity_era[b, t]), int(sim.antiquity_seat[b, t])] for t in range(sim.T)
-    ],
+    "antiquityProv": _prov("antiquity_era", "antiquity_seat"),
     "shipwreck": _tile("shipwreck"),
-    "shipwreckProv": lambda sim, b, rows: [
-        [int(sim.shipwreck_era[b, t]), int(sim.shipwreck_seat[b, t])] for t in range(sim.T)
-    ],
+    "shipwreckProv": _prov("shipwreck_era", "shipwreck_seat"),
     "park": _tile("park"),
     "encampHp": _tile("encamp_hp"),
     "road": _tile("road"),
