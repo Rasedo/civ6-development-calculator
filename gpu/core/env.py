@@ -220,10 +220,11 @@ class BatchEnv:
         # `state.seats`, which has no such entry); the width stays n_opponents for every
         # asker.
         #
-        # The last four are the DoW terms. They were a single pairwise sextet
-        # in the ctx block, measured against one fixed seat, which is why a
-        # policy could not choose WHICH opponent to declare on. RAW
-        # and unscaled, like the ctx block and for the same reason.
+        # The DoW terms were a single pairwise sextet in the ctx block, measured
+        # against one fixed seat, which is why a policy could not choose WHICH
+        # opponent to declare on. RAW and unscaled, like the ctx block and for
+        # the same reason. The AGREEMENT clocks close the block: every one of
+        # them is the precondition of a verb this seat can play here.
         opp_cols = []
         for o in range(s.n_majors):
             if o == row:
@@ -246,6 +247,12 @@ class BatchEnv:
                         torch.where(pair_ok, d_pr, 999).reshape(B, -1).min(dim=1).values.to(d),
                         ((s.civ_warmonger[:, o] >= s._wm_gang) & ex).to(d),
                         (n_opp_cities > 0).to(d),
+                        s.seat_friend_turns[:, row, o].to(d) / s._agreement_turns,
+                        s.seat_ally_turns[:, row, o].to(d) / s._agreement_turns,
+                        s.seat_borders_turns[:, o, row].to(d) / s._agreement_turns,
+                        s.seat_borders_turns[:, row, o].to(d) / s._agreement_turns,
+                        s._denounce_left(row, o).to(d) / s._agreement_turns,
+                        s._denounce_left(o, row).to(d) / s._agreement_turns,
                     ],
                     dim=1,
                 )

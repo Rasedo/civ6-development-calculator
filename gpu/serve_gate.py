@@ -330,7 +330,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             if bad:
                 break
             _t = _pc()
-            geo = drive.geo_decide_and_apply(sim)
+            geo = drive.geo_decide_and_apply(sim, seeds)
             # ONE decide body, ONE record shape, every major row, seat 0 first.
             # Seat 0 rides `_decide_turn` like the rest, which also hands it the
             # MULTI-RANK unit plan every other row already had (its own block
@@ -609,7 +609,7 @@ def main() -> None:
                         break
         if obs_bails:
             break
-        geo = drive.geo_decide_and_apply(sim)
+        geo = drive.geo_decide_and_apply(sim, [args.seed])
         per_seat = {row: drive._decide_turn(env, sim, row, roster, classes, seeds=[args.seed], turn=t, pre=pre_seat.get(row)) for row in seats}
         recs = {str(row): {**drive._extract_record(sim, row, *per_seat[row], 0),
                            **drive._extract_geo(geo, row, 0)} for row in seats}

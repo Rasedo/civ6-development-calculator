@@ -138,6 +138,16 @@ export interface SeatActionRecord {
   route?: [number, number] | null;
   denounce?: number[];
   ally?: number[];
+  /** DECLARATION OF FRIENDSHIP: the seats this one offers friendship to.
+   *  Symmetric and instant — the prerequisite an Alliance asks for. */
+  friend?: number[];
+  /** OPEN BORDERS: the seats this one GRANTS passage to. Directed. */
+  borders?: number[];
+  /** GREAT WORKS given away: [work kind, recipient seat] each. The kind
+   *  indexes GW_KINDS. WHICH city gives and WHICH receives is not a decision —
+   *  the works are counts, not identities, so both engines take the giver's
+   *  first city holding one and the receiver's first with a free slot. */
+  gift?: [number, number][];
   /** CITIZEN ASSIGNMENT for the district SLOTS: [centreTile, districtIndex,
    * count] — how many citizens this city pins into that district. A negative
    * count hands the slot back to the automatic rule. */
@@ -189,6 +199,16 @@ export interface GameState {
   warTurns?: Record<string, number>;
   /** turns a pair's PEACE TREATY still binds, keyed like `warTurns`. */
   treatyTurns?: Record<string, number>;
+  /** Turns a DECLARATION OF FRIENDSHIP still runs, keyed like `warTurns`
+   *  (symmetric — one clock per unordered pair). */
+  friendTurns?: Record<string, number>;
+  /** Turns an ALLIANCE still runs, keyed like `warTurns`. The single storage:
+   *  `seatsAllied` is this clock above zero. */
+  allyTurns?: Record<string, number>;
+  /** Turns an OPEN BORDERS grant still runs, keyed `${grantor}>${guest}`.
+   *  DIRECTED, because granting is one-way: "Granting open borders to a rival
+   *  doesn't mean that rival also grants open borders to you." */
+  borderTurns?: Record<string, number>;
   map: GameMap;
   turn: number;
   seatActions?: SeatActionLog;
@@ -343,11 +363,11 @@ export interface Seat {
   wars: number[];
   formalWars: number[];
   /** Directed denouncement stamps keyed by absolute seat: `denounced[b] = t`
-   *  means this seat denounced b at turn t. A persistent grudge, never reset. */
+   *  means this seat denounced b at turn t. The stamp IS the clock: the
+   *  denouncement is live while `turn - t` is under AGREEMENT_TURNS, and the
+   *  Formal-War casus belli opens FORMAL_WAR_MIN_TURNS in. `denounceActive`
+   *  and `denounceCasusBelli` are the two readings. */
   denounced: Record<number, number>;
-  /** Who this seat is ALLIED with, as absolute seat ids. Symmetric; broken by
-   *  a denouncement or a war. Allies never declare war on each other. */
-  allies: number[];
   tradeRoutes?: TradeRoute[];
 }
 

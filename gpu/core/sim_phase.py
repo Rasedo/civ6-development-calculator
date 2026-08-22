@@ -11,7 +11,7 @@ class SimPhase:
             self._refresh_aura_mp()
             self._reset_mp("major")
         if self.n_majors > 1:
-            self._geo_denounce_and_ally()
+            self._geo_agreements()
         for row in range(self.n_majors):
             self._seat_turn(row)
 
@@ -222,6 +222,22 @@ class SimPhase:
         bound[:, :row + 1] = False
         self.treaty_turns[:, row] -= bound.long()
         self.treaty_turns[:, :, row] -= bound.long()
+        # Every DIPLOMATIC AGREEMENT runs the same countdown on the same
+        # discipline, and expires by reaching zero. Friendship and the alliance
+        # are symmetric, so one tick writes both cells; the Open Borders grant
+        # is DIRECTED, so the pair carries two clocks and both tick here.
+        if row < self.n_majors:
+            hi = active.unsqueeze(1).expand(self.B, self.n_majors).clone()
+            hi[:, :row + 1] = False
+            for plane in (self.seat_friend_turns, self.seat_ally_turns):
+                run = hi & (plane[:, row] > 0)
+                plane[:, row] -= run.long()
+                plane[:, :, row] -= run.long()
+            ob = self.seat_borders_turns
+            out = hi & (ob[:, row] > 0)
+            ob[:, row] -= out.long()
+            inb = hi & (ob[:, :, row] > 0)
+            ob[:, :, row] -= inb.long()
         self.peace_turns[:, row] = self.peace_turns[:, row] + (active & ~any_war).long()
 
     def _seat_governor_seats(self, row: int) -> torch.Tensor:
@@ -754,12 +770,16 @@ class SimPhase:
             gov_tile=self._governor_tiles(row, gov),
         ))
         # POLICY TREATY outcome A pays every seat holding the named card, on
-        # top of the government tier and the (Treaty-Organization-weighted)
-        # suzerain term; each ORIGINAL CAPITAL this row sits in costs it.
-        # The rate can go negative, and the bank floors at zero.
+        # top of the government tier, the (Treaty-Organization-weighted)
+        # suzerain term and CIV6 (Alliance): "In Gathering Storm, each Alliance
+        # gives you +1 Diplomatic Favor per turn per level" — levels are not
+        # modeled, so every live alliance pays the level-1 rate. Each ORIGINAL
+        # CAPITAL this row sits in costs it. The rate can go negative, and the
+        # bank floors at zero.
         bank(self.civ_diplo_favor,
              self._adopted_gov_tier(self.civ_civics[:, row])
              + self._favor_per_suz * self._suzerain_count(row)
+             + self._favor_per_alliance * (self.seat_ally_turns[:, row] > 0).sum(dim=1)
              + self._congress_policy_favor(
                  self._slotted_policies(self._seat_civics(row), self._wonder_extra_slots(row)))
              - self._favor_occ_capital * self._occupied_capitals(row))

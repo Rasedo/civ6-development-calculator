@@ -323,6 +323,16 @@ def _seat_pair_relation(plane: str, live):
 
 
 
+def _seat_pair_clock(plane: str):
+    """A DIPLOMATIC AGREEMENT clock read the flat way the war and treaty clocks
+    are: [opponentSeat, turnsLeft, ...] over the majors it still runs with, in
+    ascending seat order. Majors-only, so the row index IS the seat."""
+    def get(sim, b, rows):
+        m = getattr(sim, plane)[b].tolist()
+        return [[x for j, v in enumerate(m[c]) if v > 0 for x in (j, int(v))] for c in rows]
+    return get
+
+
 def _centre_of(sim, b: int, row: int, city_id: int) -> int:
     """The centre TILE of seat row `row`'s city `city_id`, or -1. Routes are
     compared in centre-tile space because `city_id` is not compared at all —
@@ -443,7 +453,10 @@ SEAT = {
     "scienceTotal": lambda sim, b, rows: [float(sim.seat_science_total[b, _seat_row(sim, c)]) for c in rows],
     "formalWars": _seat_pair_relation("seat_warkind", lambda v: bool(v)),
     "denounced": _seat_pair_relation("seat_denounced", lambda v: v >= 0),
-    "allies": _seat_pair_relation("seat_allied", lambda v: bool(v)),
+    "friendTurns": _seat_pair_clock("seat_friend_turns"),
+    "allyTurns": _seat_pair_clock("seat_ally_turns"),
+    # DIRECTED: the row is what that seat GRANTS, never what it holds.
+    "borderTurns": _seat_pair_clock("seat_borders_turns"),
     "tilesPurchased": _civ_only("civ_only_tiles_purchased", 0),
 }
 

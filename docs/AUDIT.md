@@ -54,9 +54,9 @@ nothing carries forward.
 | Open item | Weight | What the weight is for |
 |---|---|---|
 | **A. Engine vs engine** | **0** | |
-| B-20r tourism tails | 2 | theming ships; open-borders digs and work TRADES need a treaty system, and the Naturalist's progressive cost is unsourced |
+| B-20r tourism tails | 1 | theming, the open-borders dig and the work GIFT all ship; the Naturalist's progressive cost is unsourced |
 | B-21r suzerain rows | 1 | the residual descoped rows all need whole absent systems |
-| B-22r World Congress | 2 | 13 of the 21 regular resolutions ship and emergencies run as special sessions; eight resolutions and the scored competitions have no carrier; peace terms wait on C-2 and two favor penalties on C-19/C-24; the favor tie-break unmodeled |
+| B-22r World Congress | 2 | 13 of the 21 regular resolutions ship and emergencies run as special sessions; eight resolutions and the scored competitions have no carrier; peace TERMS wait on the negotiated deal (C-2) and two favor penalties on C-19/C-24; the favor tie-break unmodeled |
 | B-24r Ages/governors | 1 | three system-less dedication entries, dark-age policies, governor promotions, per-civ era drift |
 | B-30r specialists | 1 | the mechanic and both citizen overrides ship; the Theater tier's second building and the plant split wait upstream |
 | B-31r trade-route tails | 1 | sea legs and the whole-destination-set candidate ship; no trading posts, plunder gold is a stylization, the summed-yield key is a heuristic and the free-choice head is P8's |
@@ -72,9 +72,9 @@ nothing carries forward.
 | B-51r the Encampment's second pool | 1 | the district meets the city's perimeter and heals only while its tile is clear; Civ 6 tracks the two pools SEPARATELY, and a defeat pillages it |
 | B-44r city-state war tails | 1 | the head, its policy and a SEAT's march on a minor ship; the barbarian walker still raids only majors because it beelines to one nearest city, and the diplomatic consequences wait on C-19 |
 | B-34r flood tails | 1 | the severity ladder and the river's whole reach ship; the Great Bath's mitigation is still seat-scoped rather than river-scoped, and the Dam is not in the district roster |
-| **B. Fidelity vs real Civ 6** | **21** | |
+| **B. Fidelity vs real Civ 6** | **20** | |
 | C-1 POWER | 5 | no plants, no grid, no powered-yield term — 4 gaps wait on it |
-| C-2 diplomatic agreements | 6 | war and peace and nothing between: open borders, work trades, alliances, denouncements |
+| C-2 diplomatic agreements | 3 | friendship, alliances, open borders, the closed border and the work gift ship on one 30-turn clock; alliance TYPES and LEVELS, the negotiated two-sided deal, and the four agreements that need one are open |
 | C-3 unit promotions | 5 | only MARTYR reaches a rule; choosing one is also a wire head, and Amphibious waives two penalties that now ship |
 | C-4 unique improvements | 3 | Batey / Colossal Head / Monastery, each a flat channel today |
 | C-5 strategic-resource stockpiles | 4 | resources gate, they never accumulate or get spent |
@@ -102,8 +102,9 @@ nothing carries forward.
 | C-27 pillaging pays no yields | 2 | the verb marks the tile and heals; nothing banks, and there is no coastal raid to bank from |
 | C-28 tourism is one lifetime scalar | 2 | it is banked per seat and divided by the civ count on read, so no rule can address one rival's tourism |
 | C-29 no RESOLVED suzerain | 1 | `isSuzerain` recomputes from the raw envoy store on every read, so a rule that changes envoy WEIGHT by who the suzerain is has no fixed point |
-| **C. Absent systems** | **69** | |
-| **OPEN, TOTAL** | **90** | |
+| C-30 city-states carry no research | 1 | no techs, no civics, so nothing can say when a minor took Early Empire — its borders never close and the suzerain's passage lifts nothing |
+| **C. Absent systems** | **67** | |
+| **OPEN, TOTAL** | **87** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -211,12 +212,10 @@ Civ 6 source or is recorded as unverifiable.
   engines now carry all four provenance arrays across a capture, and a REUSED
   city slot clears them.
   Open:
-  - OPEN-BORDERS digs. An Archaeologist may work foreign ground under an
-    Open Borders treaty (or with the Terracotta Army). Neither engine has
-    any diplomatic AGREEMENT at all. TWO items: the treaty system, and the
-    dig gate that waits on it.
-  - TRADING Great Works between civs, and the Great Work Heist that also
-    moves one. Same missing system, so TWO items again.
+  - The GREAT WORK HEIST moves a work too, and it is a spy operation (C-16).
+    Its sibling — a work changing hands by agreement — no longer waits:
+    the Open Borders dig and the one-sided GIFT both ship with C-2's
+    treaty clock, and an Archaeologist digs wherever it may stand.
   - The NATURALIST's faith cost is PROGRESSIVE in real Civ 6; the
     progression's magnitude is unsourced, so the flat GS price stands
     (`naturalistCost`) and the progression is open.
@@ -344,8 +343,9 @@ Civ 6 source or is recorded as unverifiable.
     the podium payout, neither of which the Congress code carries.
   - **Peace deals carry no terms.** Real Civ 6 brokers peace through the
     TRADE screen — cities, gold, resources and favor change hands on the
-    same deal — and no source publishes the valuation, so the blocker is
-    the deal system itself (C-2), not a missing number.
+    same deal. The treaty SYSTEM is no longer the blocker; what is missing
+    is the NEGOTIATED two-sided deal inside it (C-2): no source publishes
+    the valuation, and the wire has no offer/accept protocol.
   - **THE OCCUPIED-CAPITAL PENALTY SHIPS; the other two favor penalties
     do not.** All three rates ARE published (Diplomatic Favor, "Losing
     Favor"). **-5 favor/turn for each ORIGINAL CAPITAL a seat holds that
@@ -863,12 +863,64 @@ number was under-counting by treating deferrals as closures.
   Cardiff's suzerain row (+2 Power per Harbor building, a flat production
   channel today); and the Terrestrial Laser Station's powered-city condition
   in the space race.
-- **C-2. DIPLOMATIC AGREEMENTS — no treaty of any kind.** Weight 6. There is
-  war and peace and nothing between them. Gaps: OPEN BORDERS, and with it an
-  Archaeologist working foreign ground (B-20r); TRADING Great Works between
-  civs and the Great Work Heist (B-20r); ALLIANCES; DENOUNCEMENTS, which To
-  Arms!'s casus belli needs (`seats` dedication header); and the terms a
-  PEACE DEAL carries, which real Civ 6 brokers on the trade screen (B-22r).
+- **C-2. DIPLOMATIC AGREEMENTS.** Weight 3. THIS ENTRY USED TO SAY "no treaty
+  of any kind ... war and peace and nothing between them", and two of the five
+  gaps it listed had shipped before it was written: alliances and
+  denouncements have been wire verbs with engine arms since the seat
+  unification. What was true is that both were STYLIZED — an alliance opened on
+  a bare turn-30 gate and never expired, a denouncement was a permanent grudge.
+
+  SHIPS NOW, every term read off the Civilopedia and the wiki's Diplomacy page:
+  **one 30-turn clock for every agreement** ("All of them have limited duration
+  of 30 turns, after which they have to be renewed"), carried per pair on both
+  engines (`friendTurns`/`seat_friend_turns`, `allyTurns`/`seat_ally_turns`,
+  the DIRECTED `borderTurns`/`seat_borders_turns`) and compared in the digest.
+  The **DECLARATION OF FRIENDSHIP** is a verb of its own, and Declared Friends
+  "cannot undertake hostile actions (such as Denouncing or going to war)
+  against each other". The **ALLIANCE** now asks what the source asks — the
+  Civil Service civic and a Declared Friend — expires with its clock, pays
+  GS's "+1 Diplomatic Favor per turn per level" at the level-1 rate, carries
+  Open Borders, and signs the **DEFENSIVE PACT** R&F folded into it, so a
+  third party's declaration drags the victim's allies in (and never the
+  aggressor's). The **DENOUNCEMENT** lasts its 30 turns and no longer forever,
+  which also closes the Formal-War casus belli window at [5, 30) — and since
+  "You cannot denounce Declared Friends or Allies", nothing breaks an
+  agreement any more; the guard replaced the break. **OPEN BORDERS** is a
+  directed grant off Early Empire, blocked by a denouncement in either
+  direction and cancelled by war, and it means something because the BORDER
+  now closes: after its owner takes Early Empire a major's ground refuses
+  foreign units unless they are at war, allied, or hold the grant, with the
+  page's two exemptions ("Traders ignore borders", "Religious units also
+  ignore borders"). An Archaeologist may dig behind a lifted border, which is
+  the whole of B-20r's open-borders half. The **GREAT WORK GIFT** is the
+  sourced one-sided half of the trade screen ("Click it and you gift your
+  items to your rival"), and the work carries its provenance to the receiving
+  museum. All five verbs ride the wire and enter the observation's opponent
+  block, so a policy can see what its head decides.
+
+  OPEN:
+  - **ALLIANCE TYPES AND LEVELS.** R&F broke the alliance into Research,
+    Military, Economic, Cultural and Religious, each levelling 1->3 on
+    Alliance Points (80, then 160 more). The POINT sources are fully
+    published and computable here — 1/turn for the alliance, 0.25 each way
+    for a trade route to or from the ally, 0.25 per side for Democracy — but
+    the fifteen level effects are fifteen separate channels, several of them
+    (shared visibility, suzerain-bonus sharing, a free promotion) needing
+    systems this engine does not have.
+  - **THE NEGOTIATED TWO-SIDED DEAL.** Gold, resources, cities, favor and
+    agreements traded FOR each other. Two things are missing and only one is
+    a number: no source publishes the AI's valuation, and the wire has no
+    offer/accept protocol — a record is one seat's unilateral intent, so
+    every agreement here is offered and accepted in the same act. Peace
+    terms (B-22r) wait on this, not on the treaty system.
+  - **JOINT WAR, JOIN ONGOING WAR, RESEARCH AGREEMENT and ASK-FOR-PROMISE**,
+    each a two-sided deal by construction, so each waits on the row above.
+  - **CITY-STATE BORDERS** never close (C-30), so a suzerain's passage lifts
+    nothing.
+  - The **+25% Open-Borders tourism** is an INTERNATIONAL modifier, applied
+    per foreign civilization; blocked on C-28.
+  - **25 Grievances per denouncement** (GS); blocked on C-19.
+  - The **GREAT WORK HEIST** is a spy operation, C-16.
 - **C-3. UNIT PROMOTIONS — no promotion tree.** Weight 5. The only promotion
   that reaches a rule is MARTYR, drawn at the death. Gaps: Yerevan's suzerain
   row (choose an Apostle promotion instead of drawing it — and choosing is a
@@ -955,8 +1007,9 @@ number was under-counting by treating deferrals as closures.
 - **C-19. GRIEVANCES AND WARMONGERING — war costs nothing but the war.**
   Weight 2. No seat's standing with anyone moves when it declares, razes or
   conquers. Gaps: the diplomatic consequences of declaring on a city-state
-  (`declareWarOnCityState`), the suzerain's reaction, and the To Arms!
-  dedication's casus belli, which C-2 also names from the treaty side.
+  (`declareWarOnCityState`), the suzerain's reaction, and the 25 Grievances
+  GS charges for a denouncement. (The To Arms! casus belli no longer waits
+  here: the denouncement it needed ships with its own 30-turn window.)
 - **C-20. THE MILITARY ENGINEER BUILDS ONE THING.** Weight 2. Real Civ 6 gives
   it Fort, Airstrip, Missile Silo, Mountain Tunnel, Reinforced Barricade and
   Modernized Trap, plus spending a charge to finish 20% of a Canal, Dam,
@@ -977,8 +1030,16 @@ number was under-counting by treating deferrals as closures.
   read, so no rule can address the tourism flowing to ONE rival. Real Civ 6
   accrues tourism per foreign civ, which is what its per-civ modifiers key on.
   C-23 is a different thinness in the same plane — nothing REDUCES what is
-  banked — and the two are independent. A gap waits on this one:
-  `ONLINE_COMMUNITIES` (C-6).
+  banked — and the two are independent. Two gaps wait on this one:
+  `ONLINE_COMMUNITIES` (C-6), and the "+25% for Open Borders" international
+  modifier (C-2).
+- **C-30. A CITY-STATE CARRIES NO RESEARCH RECORD.** Weight 1. A minor has no
+  techs and no civics on either engine, and real Civ 6 minors research like
+  anyone else. One gap waits on it today: CIV6 (Movement) closes a territory
+  when "a civ (or city-state) develops the Early Empire civic", so a minor's
+  ground stays open to everyone and the suzerain's exemption ("in the case of
+  a city-state, if they become its Suzerain") lifts a border that was never
+  down. For the same reason only a MAJOR's units are bound by the rule.
 - **C-29. THERE IS NO RESOLVED SUZERAIN.** Weight 1. `isSuzerain` answers
   from the raw envoy store every time it is asked, and nothing stores the
   answer. Any rule that changes an envoy's WEIGHT depending on who the
@@ -1048,16 +1109,22 @@ steers the games into a different regime and carries the older rows with it:
 | faith-buy kind 6 (APOSTLE purchase) | 12/12 | t75 |
 | a WORLD CONGRESS ballot on the wire | 12/12 | t89 |
 | a SPECIALIST pinned into a slot | 12/12 | t147 |
-| an INTERNATIONAL trade leg | 11/12 | t75 |
-| two enemy religious units ADJACENT (theological combat's precondition) | 10/12 | t84 |
-| a second HULL on any seat | 8/12 | t103 |
-| NATURAL_HISTORY (the Archaeologist's civic) | 5/12 | t153 |
-| WAR with a city-state | 4/12 | t142 |
-| CONSERVATION (the Naturalist's civic) | 3/12 | t169 |
-| PEACE with a city-state, through the sue column | 3/12 | t155 |
+| an OPEN BORDERS grant standing | 11/12 | t34 |
+| a DECLARATION OF FRIENDSHIP | 8/12 | t19 |
+| an ALLIANCE | 8/12 | t105 |
+| an INTERNATIONAL trade leg | 7/12 | t92 |
+| two enemy religious units ADJACENT (theological combat's precondition) | 6/12 | t86 |
+| a second HULL on any seat | 6/12 | t103 |
+| NATURAL_HISTORY (the Archaeologist's civic) | 5/12 | t151 |
+| CONSERVATION (the Naturalist's civic) | 3/12 | t166 |
+| WAR with a city-state | 2/12 | t142 |
+| PEACE with a city-state, through the sue column | 1/12 | t155 |
 | an antiquity dig (artifact in a slot) | 1/12 | t229 |
-| URBANIZATION civic | 1/12 | t235 |
+| URBANIZATION civic | 1/12 | t234 |
 | a NEIGHBORHOOD placed | 1/12 | t238 |
+| a unit standing against a CLOSED BORDER | 0/12 | NEVER |
+| a GREAT WORK given away | 0/12 | NEVER |
+| an ally dragged in by the DEFENSIVE PACT | 0/12 | NEVER |
 
 - THE TABLE MOVED WHOLESALE when the policy cards started paying. A card in
   a slot changes production, adjacency, envoys and barbarian combat, so the
@@ -1066,20 +1133,41 @@ steers the games into a different regime and carries the older rows with it:
   four to ten, and a second hull the other way, from nine to four. This is
   the section's own rule doing its job — no row here survives a change to
   what the driver decides, and none of these movements is a regression.
-- THEOLOGICAL COMBAT IS REACHED, in 10 of 12 seeds from t88, so the
+- THEOLOGICAL COMBAT IS REACHED, in 6 of 12 seeds from t86, so the
   resolver's deterministic damage and its apostle-only initiation ARE
   gate-covered.
-- The APOSTLE BUY fires in every seed from t76 and the 250-turn gate is
+- The APOSTLE BUY fires in every seed from t75 and the 250-turn gate is
   green, which is what closed B-18r's predicted lifecycle drift.
 - THE CITIZEN OVERRIDES are the widest-reaching heads in the gate: a plot
   lock stands on every seed from t2 (147 plots at t250) and a pinned
   specialist on every seed from t116 (42 slots), so both ride the digest for
   most of a game rather than leaning on `citizens_test`.
-- WAR WITH A CITY-STATE stands on 4 of 12 seeds from t142 and closes through
-  the SUE column on 3 of them from t155 — 11.6 minor-war turns per seed,
+- WAR WITH A CITY-STATE stands on 2 of 12 seeds from t142 and closes through
+  the SUE column on 1 of them from t155 — 9.5 minor-war turns per seed,
   101 on the loudest. The declare, the peace and both clocks are gate-covered;
   the meeting gate, the treaty term and the suzerain refusal are not, and
   `cs_war_test` section d is their bar.
+- THE DIPLOMATIC AXIS ENTERED THE GATE, and the probe had never measured it:
+  `geo_decide_and_apply` is the serve gate's own call and the probe did not
+  make it, so every table above this round was read off a driven game with no
+  denouncement in it. Adding the call costs nothing by itself — with the
+  diplomatic style off, every row reproduces the old table exactly, which is
+  also the proof that the treaty system, the reworked alliance and the closed
+  border change no reachability of their own.
+- THREE MECHANICS THE ENGINE OFFERS AND THESE GAMES NEVER PRESENT, each
+  poke-covered and none of them evidence of a bug:
+  - A CLOSED BORDER is never STOOD AGAINST. No major's unit is ever adjacent
+    to a foreign major's closed ground in 12 seeds x 250 turns, so the rule
+    never refuses a step in-gate; `geopolitics_test` poke i3 is its whole
+    bar. The three seats simply never crowd each other's territory.
+  - A GREAT WORK is never GIVEN, because there is almost nothing to give:
+    4 works exist across all 12 seeds at t250 against 21 slot buildings. The
+    gift is blocked by the great-person queue's output, not by its own gate
+    (poke i2). At an all-diplomat table it does fire, on 2 of 12 seeds.
+  - THE DEFENSIVE PACT never drags anyone in. Alliances stand on 8 of 12
+    seeds, but a third party has to declare on an ally while the alliance
+    runs, and the same style that forms alliances is the one that does not
+    fight. Poke i is the bar.
 - THE DRIVER RUNS TWO RESEARCH STYLES, and that is why the bottom of this
   table exists at all. Cheapest-first is BREADTH first: it finishes the most
   items and so parks every seat in the shallow end of both trees. A share of
@@ -1103,6 +1191,27 @@ steers the games into a different regime and carries the older rows with it:
   12/12 but drops `specPin` to 9/12, the international leg to 8/12 and the
   slotted cards to 14/49. COVERAGE COMES FROM THE MIXTURE OF STYLES, not from
   any one of them turned up; `DEEP_SHARE` 0.34 is that reading.
+- THE SECOND STYLE IS DIPLOMATIC (`ladder.DIPLO_SHARE`), and its whole shape
+  was decided by measurement:
+  - IT MUST BE EXCLUSIVE WITH THE GRUDGE. A diplomat that also denounces
+    reaches friendship on 1 seed and an alliance on none — a denouncement
+    blocks friendship in BOTH directions for its full term, renews the moment
+    it lapses, and the grievance it earns blocks friendship with every other
+    seat as well. Giving the two verbs DISJOINT targets (denounce the weaker,
+    court the stronger) reproduced that result exactly, because the stronger
+    seat denounces back down the same pair. Two refutations, one conclusion:
+    the styles are held apart per SEAT or not at all.
+  - THE SHARE IS 0.5. At 0.34 the alliance and open-borders rows each come in
+    a seed lower for identical cost everywhere else, and at 1.0 the war
+    regime is gone outright — no city-state war in any seed, a minor-war mean
+    of 0.0 — which is the collapse the knob exists to avoid.
+  - WHAT IT COSTS, stated plainly: the international leg 11 -> 7, theological
+    adjacency 10 -> 6, a second hull 8 -> 6, city-state war 4 -> 2 and its
+    peace 3 -> 1. Nothing reaches NEVER and war survives at 9.5 turns a seed.
+    The trade is three mechanics that were NEVER for five rows that thinned,
+    and it is a TRAJECTORY effect, not a mechanism: the costs are identical
+    at 0.34, 0.5 and 1.0 while the gains keep climbing, so what moves the
+    table is that the games diverge at all.
 - **OPEN — THE DRIVER NEEDS A REAL STYLE MECHANISM.** Not weighted here on
   purpose: this section's table prices FIDELITY gaps, and this is harness.
   Today a style is one boolean, `DEEP_SHARE`, drawn per (game seed, seat) off

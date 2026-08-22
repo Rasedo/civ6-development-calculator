@@ -184,9 +184,9 @@ class SimEconomy:
             # too, and unowned ground is foreign. `friendlyLand`'s twin.
             _own = owner == self._ROW_SEAT.gather(0, self_row.clamp(min=0))
             _rr = (self_row >= 0) & (self_row < self.n_majors) & (owner >= 0) & (owner < self.n_majors)
-            _n = self.seat_allied.shape[1]
+            _n = self.seat_ally_turns.shape[1]
             _fl = self_row.clamp(0, _n - 1) * _n + owner.clamp(0, _n - 1)
-            _ally = self.seat_allied.reshape(self.B, -1).gather(1, _fl.unsqueeze(1)).squeeze(1) & _rr
+            _ally = (self.seat_ally_turns.reshape(self.B, -1).gather(1, _fl.unsqueeze(1)).squeeze(1) > 0) & _rr
             at_home = (_own | _ally) & (not city)
             gain = base * torch.where(at_home, 1, abroad)
             if died is not None:
@@ -1364,6 +1364,74 @@ class SimEconomy:
         civic[:, row] = civic[:, row] + overflow.to(dt) * culture_val
         if bool((alloc != 0).any()):
             self._eff_version += 1
+
+    def _gw_capacity(self, row: int, kind: int) -> torch.Tensor:
+        """[B, RC] — how many works of `kind` each of this row's cities holds
+        room for: the slot BUILDING's own plus whatever its completed wonders
+        add. `gwCapacity`'s twin, and `_place_works`' own `cap`."""
+        bcol, nslots = self._gw_bidx[kind], self._gw_slots_k[kind]
+        base = self.city_gw_writing[:, row]
+        if bcol < 0:
+            return torch.zeros_like(base)
+        cap = self.city_bldg[:, row, :, bcol].long() * nslots
+        if getattr(self, "_wond_gw", None) is not None and int(self._wond_gw[:, kind].sum()) > 0:
+            wreg = self.city_wonder[:, row]
+            compw = (wreg >= 0) & self.built_wonder_complete.gather(
+                1, wreg.clamp(min=0).reshape(self.B, -1)
+            ).reshape_as(wreg)
+            cap = cap + (compw.long() * self._wond_gw[:, kind].reshape(1, 1, -1)).sum(dim=2)
+        return cap
+
+    def _gift_work(self, giver: int, taker: int, kind: int, ok: torch.Tensor) -> None:
+        """One GREAT WORK changes hands. CIV6 (Trading): "You may trade almost
+        anything in the game, including ... Great Works", and the one-sided
+        half of that screen is the gift — "Click it and you gift your items to
+        your rival."
+
+        The work leaves the giver's first city holding one and lands in the
+        taker's first with room, in the same city order `_place_works` fills.
+        An ART work carries its provenance with it: a gifted work is still that
+        artist's, which is what the receiving museum themes on. `gwTake` and
+        `gwGive`'s twin."""
+        B, RC = self.B, self.RC
+        gw = (self.city_gw_writing, self.city_gw_art, self.city_gw_music)[kind]
+        src_have = self.city_alive[:, giver] & (gw[:, giver] > 0)
+        dst_room = self.city_alive[:, taker] & (gw[:, taker] < self._gw_capacity(taker, kind))
+        move = ok & src_have.any(dim=1) & dst_room.any(dim=1)
+        if not bool(move.any()):
+            return
+        si = src_have.long().argmax(dim=1)
+        di = dst_room.long().argmax(dim=1)
+        col = torch.arange(RC, device=self.device).reshape(1, RC)
+        src_cell = move.unsqueeze(1) & (col == si.unsqueeze(1))
+        dst_cell = move.unsqueeze(1) & (col == di.unsqueeze(1))
+        if kind == 1:
+            ns = self._gw_slots_k[1]
+            su = gw[:, giver].gather(1, si.unsqueeze(1)).squeeze(1) - 1  # the giver's LAST filled slot
+            du = gw[:, taker].gather(1, di.unsqueeze(1)).squeeze(1)      # the taker's first free one
+            held = (su >= 0) & (su < ns)
+            sc = su.clamp(0, ns - 1).reshape(B, 1, 1).expand(B, 1, 1)
+            gi = si.reshape(B, 1, 1).expand(B, 1, ns)
+            ptype = torch.where(held, self.city_gwart_type[:, giver].gather(1, gi).squeeze(1).gather(1, sc.squeeze(2)).squeeze(1),
+                                torch.full_like(su, -1))
+            partist = torch.where(held, self.city_gwart_artist[:, giver].gather(1, gi).squeeze(1).gather(1, sc.squeeze(2)).squeeze(1),
+                                  torch.full_like(su, -1))
+            for sl in range(ns):
+                out = src_cell & (su.unsqueeze(1) == sl)
+                self.city_gwart_type[:, giver, :, sl] = torch.where(
+                    out, torch.full_like(self.city_gwart_type[:, giver, :, sl], -1),
+                    self.city_gwart_type[:, giver, :, sl])
+                self.city_gwart_artist[:, giver, :, sl] = torch.where(
+                    out, torch.full_like(self.city_gwart_artist[:, giver, :, sl], -1),
+                    self.city_gwart_artist[:, giver, :, sl])
+                into = dst_cell & (du.unsqueeze(1) == sl)
+                self.city_gwart_type[:, taker, :, sl] = torch.where(
+                    into, ptype.unsqueeze(1).expand(B, RC), self.city_gwart_type[:, taker, :, sl])
+                self.city_gwart_artist[:, taker, :, sl] = torch.where(
+                    into, partist.unsqueeze(1).expand(B, RC), self.city_gwart_artist[:, taker, :, sl])
+        gw[:, giver] = gw[:, giver] - src_cell.long()
+        gw[:, taker] = gw[:, taker] + dst_cell.long()
+        self._eff_version += 1
 
     def _spread_religious_pressure(self) -> None:
         """The spreadReligiousPressure twin: each founded religion's HOLY tile

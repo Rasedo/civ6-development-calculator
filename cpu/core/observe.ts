@@ -11,9 +11,9 @@
  * every seat.
  */
 import type { City, CityState, CityStateQuest, GameState, QueueItem } from './types';
-import { atWarWithAny, citiesOf, civsAtWar, isBarbSeat, seatOf, tileCity, tileSeat, warTurnsWith } from './seats';
+import { allyTurnsWith, atWarWithAny, borderTurnsFrom, citiesOf, civsAtWar, denounceLeft, friendTurnsWith, isBarbSeat, seatOf, tileCity, tileSeat, warTurnsWith } from './seats';
 import { seatStrength, seatProximity } from './phase';
-import { DIPLO_VICTORY_POINTS, WARMONGER_GANG } from '../data/seats';
+import { AGREEMENT_TURNS, DIPLO_VICTORY_POINTS, WARMONGER_GANG } from '../data/seats';
 import { envoysOf, hasMet } from './cityStates';
 import { effectiveResearchCostIn } from './boosts';
 import { goldenBoostBonus } from './eras';
@@ -71,9 +71,10 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
   // k of the head name the same seat. Everything is read from THIS seat's
   // point of view.
   //
-  // The last four are the DoW terms, rendered PER OPPONENT so the policy can
-  // choose WHICH one to declare on. RAW and unscaled, like the ctx block and
-  // for the same reason.
+  // The DoW terms are rendered PER OPPONENT so the policy can choose WHICH
+  // one to declare on. RAW and unscaled, like the ctx block and for the same
+  // reason. The AGREEMENT clocks close the block: every one of them is the
+  // precondition of a verb this seat can play against this opponent.
   //
   // `gpu/core/env.py:BatchEnv.observe` renders the identical layout — the two
   // engines must move together here, and the gate compares them field for
@@ -89,6 +90,12 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
       Math.min(seatProximity(state, o.seat, seat), 999),
       ((o.warmonger ?? 0) >= WARMONGER_GANG) ? 1 : 0,
       o.cities.length > 0 ? 1 : 0,
+      friendTurnsWith(state, seat, o.seat) / AGREEMENT_TURNS,
+      allyTurnsWith(state, seat, o.seat) / AGREEMENT_TURNS,
+      borderTurnsFrom(state, o.seat, seat) / AGREEMENT_TURNS,
+      borderTurnsFrom(state, seat, o.seat) / AGREEMENT_TURNS,
+      denounceLeft(state, seat, o.seat) / AGREEMENT_TURNS,
+      denounceLeft(state, o.seat, seat) / AGREEMENT_TURNS,
     );
   }
   const per: number[] = [];

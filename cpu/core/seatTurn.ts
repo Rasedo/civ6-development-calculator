@@ -1,12 +1,12 @@
 
 import type { City, GameState, QueueItem } from './types';
-import { seatOf, civsAtWar } from './seats';
+import { seatOf, civsAtWar, seatsAllied } from './seats';
 import { isSuzerain } from './cityStates';
 import { seatTourism } from './city';
 import { computeAdoption } from './effects';
 import { selectResearch } from './economy';
 import { GOVERNMENTS, GOVERNMENTS_ADOPTION_LIVE, POLICY_LIST } from '../data/policies';
-import { DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL } from '../data/seats';
+import { DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, FAVOR_PER_ALLIANCE } from '../data/seats';
 import { CITY_STATE_TYPES } from '../data/cityStates';
 import { emergencyEnvoyGold } from './emergency';
 import { congressPolicyBlocked, congressPolicyFavor, congressSuzFavorMult } from './congress';
@@ -22,10 +22,18 @@ export function suzerainCount(state: GameState, seat: number): number {
 }
 
 export function diplomaticFavorPerTurn(gov: string | null, suzerains: number, treaty = 0,
-                                       occupiedCapitals = 0): number {
+                                       occupiedCapitals = 0, alliances = 0): number {
   const tier = gov ? GOVERNMENTS[gov]?.tier ?? 0 : 0;
   return tier + DIPLO_FAVOR_PER_SUZERAIN * suzerains + treaty
+    + FAVOR_PER_ALLIANCE * alliances
     - FAVOR_OCCUPIED_CAPITAL * occupiedCapitals;
+}
+
+/** CIV6 (Alliance): "In Gathering Storm, each Alliance gives you +1
+ *  Diplomatic Favor per turn per level." Levels are not modeled, so every
+ *  live alliance pays the level-1 rate. */
+export function allianceCount(state: GameState, seat: number): number {
+  return state.seats.reduce((n, o) => n + (o.seat !== seat && seatsAllied(state, seat, o.seat) ? 1 : 0), 0);
 }
 
 /** Original capitals this seat holds that it did not found — the -5/turn
@@ -78,7 +86,8 @@ export function seatAccumulators(state: GameState, seat: number, govCityIds?: Re
   s.tourism = (s.tourism ?? 0) + seatTourism(state, seat, govCityIds);
   s.diplomaticFavor = Math.max(0, (s.diplomaticFavor ?? 0)
     + diplomaticFavorPerTurn(seatGovernmentId(state, seat), suzerainCount(state, seat),
-                             policyTreatyFavor(state, seat), occupiedCapitals(state, seat)));
+                             policyTreatyFavor(state, seat), occupiedCapitals(state, seat),
+                             allianceCount(state, seat)));
   if ((s.warmonger ?? 0) > 0 && atPeaceWithAllCivs(state, seat)) {
     s.warmonger = (s.warmonger ?? 0) - 1;
   }

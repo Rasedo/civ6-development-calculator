@@ -17,10 +17,9 @@
 import { writeFileSync } from 'node:fs';
 import type { DistrictId, GameState, Seat, Tile } from '../core/types';
 import { allCities, campTiles, civHasStrategic, civsAtWar, seatOf, tileOwnedByCiv } from '../core/seats';
-import { hasRiver, isWater } from '../../world/query';
+import { isWater } from '../../world/query';
 import { GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT } from '../data/constants';
 import { PEACE_GOLD_COST, DED_MONUMENTALITY } from '../data/seats';
-import { SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
 import { BUY_UNITS } from '../core/phase';
 import { tradeCapacity, freeTrader, routeYields, routeYieldsInternational, cityStateRouteYields, tradeRouteRange } from '../core/trade';
 import { isExplored } from '../core/fog';
@@ -33,7 +32,7 @@ import { WORSHIP_BUILDINGS, MISSIONARY_CAP, APOSTLE_CAP, ENHANCER_BELIEFS } from
 import { LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { observeSeat } from '../core/observe';
 import { stateDigest, groupDump } from '../core/statecompare';
-import { validImprovementsIn } from '../core/rules';
+import { availableBuildings, buildingCompletable, validImprovementsIn } from '../core/rules';
 import { computeUnlocksIn, getModifiers, isCivicComplete } from '../core/effects';
 import { hexDistance } from '../../world/hex';
 import { prodLayout } from '../core/prodLayout';
@@ -112,23 +111,17 @@ export function routeCandidateRow(state: GameState, actor: Seat): number[] {
 }
 
 function buyCandidateRow(state: GameState, actor: Seat): number[] {
-  const unl = computeUnlocksIn(actor.research);
     let buyC = -1;
     let buyB = -1;
     let bd: (typeof BUILDINGS)[string] | null = null;
     let bc: (typeof actor.cities)[number] | null = null;
+    // The purchase's OWN legality, not a second copy of it: `purchaseBuilding`
+    // admits what `availableBuildings` offers and `buildingCompletable`
+    // finishes, minus the walls no gold can buy.
     for (const city of actor.cities) {
-      const have = new Set(city.buildings);
-      const done = new Set(city.districts.filter((d: { tileIndex: number }) => state.map.tiles[d.tileIndex].districtComplete).map((d: { type: string }) => d.type));
-      const center = state.map.tiles[city.centerIndex];
-      for (const def of Object.values(BUILDINGS)) {
-        if (have.has(def.id) || def.worship || SCRIPTED_HELD_BUILDINGS.has(def.id)) continue;
-        if (!done.has(def.district)) continue;
-        if (!unl.buildings.has(def.id)) continue;
-        if (def.requiresAny && !def.requiresAny.some((x) => have.has(x))) continue;
-        if (def.exclusiveWith?.some((x) => have.has(x))) continue;
-        if (def.special === 'WATER_MILL' && !hasRiver(center)) continue;
-        if (city.queue[0]?.kind === 'building' && city.queue[0].building === def.id) continue;
+      for (const def of availableBuildings(state, city)) {
+        if (def.worship || def.noPurchase) continue;
+        if (!buildingCompletable(state, city, def.id)) continue;
         if (!bd || def.cost < bd.cost || (def.cost === bd.cost && def.id < bd.id)) {
           bd = def;
           bc = city;

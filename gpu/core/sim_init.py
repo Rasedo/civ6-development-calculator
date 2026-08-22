@@ -323,7 +323,13 @@ class SimInit:
         _pw = self.n_majors
         self.seat_warkind = torch.zeros(B, _pw, _pw, dtype=torch.bool, device=device)
         self.seat_denounced = torch.full((B, _pw, _pw), -1, dtype=torch.long, device=device)
-        self.seat_allied = torch.zeros_like(self.seat_denounced, dtype=torch.bool)
+        # THE DIPLOMATIC AGREEMENT CLOCKS, turns LEFT. Friendship and the
+        # alliance are symmetric; the Open Borders grant is DIRECTED - row a,
+        # column b is what a grants b. `seatsAllied` is the alliance clock
+        # above zero, the single storage for that fact.
+        self.seat_friend_turns = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
+        self.seat_ally_turns = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
+        self.seat_borders_turns = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
         self.congress_sessions = torch.zeros(B, dtype=torch.long, device=device)
         # Standing World Congress resolutions of the LAST session, 2 slots x
         # (res, outcome 0=A/1=B, target); -1 empty. Replaced every session.
@@ -366,8 +372,11 @@ class SimInit:
             for c, v in enumerate(esi[: self.n_majors]):
                 self.era_score[b, c] = int(v)
         _er = rules.eras
-        self._ally_min_peace = int(rules.eras["allyMinPeace"])
         self._formal_war_min = int(rules.seats.get("formalWarMinTurns", 5))
+        self._agreement_turns = int(rules.seats["agreementTurns"])
+        self._alliance_civic = int(rules.seats["allianceCivic"])
+        self._open_borders_civic = int(rules.seats["openBordersCivic"])
+        self._favor_per_alliance = int(rules.seats["favorPerAlliance"])
         self._treaty_turns = int(rules.seats["peaceTreatyTurns"])
         # rules.eras is the exporter's eras bag (the diplomacy/congress
         # scalars ride it); reading it off rules.seats returned {} and every
@@ -1629,6 +1638,9 @@ class SimInit:
         self._driven_envoys: dict = {}
         self._driven_picks: dict = {}
         self._driven_war: dict = {}
+        # One stash per DIPLOMATIC verb, allocated once and drained in place —
+        # a per-verb attribute would have to be rebound to exist.
+        self._driven_geo: dict = {v: {} for v in GEO_VERBS}
         self._arangeNB = torch.arange(NB, device=device)
 
         # EVERY seat's t0 units seed the pool HERE, through ONE body — after

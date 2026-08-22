@@ -823,14 +823,35 @@
      ]
     },
     {
-     "name": "allies",
+     "name": "friendTurns",
      "compare": "exact",
      "covers": [
-      "Seat.allies"
+      "GameState.friendTurns"
      ],
      "planes": [
-      "seat_allied"
+      "seat_friend_turns"
      ]
+    },
+    {
+     "name": "allyTurns",
+     "compare": "exact",
+     "covers": [
+      "GameState.allyTurns"
+     ],
+     "planes": [
+      "seat_ally_turns"
+     ]
+    },
+    {
+     "name": "borderTurns",
+     "compare": "exact",
+     "covers": [
+      "GameState.borderTurns"
+     ],
+     "planes": [
+      "seat_borders_turns"
+     ],
+     "note": "DIRECTED: the row is what that seat GRANTS, never what it holds."
     }
    ]
   },

@@ -272,6 +272,64 @@ class SimSeats:
             plane[:, row][kill] = -1
         self.seat_routes[:, row][kill] = -1
 
+    def _denounce_left(self, a: int, b: int) -> torch.Tensor:
+        """Turns a's denouncement of b still has to run; 0 when there is none.
+        CIV6 (Denouncing): "A Denunciation lasts for 30 turns, after which its
+        effects expire." The stamp IS the clock."""
+        dt = self.seat_denounced[:, a, b]
+        left = self._agreement_turns - (int(self.turn) - dt)
+        return torch.where(dt >= 0, left.clamp(min=0), torch.zeros_like(left))
+
+    def _denounce_active(self, a: int, b: int) -> torch.Tensor:
+        return self._denounce_left(a, b) > 0
+
+    def _denounce_casus_belli(self, a: int, b: int) -> torch.Tensor:
+        """CIV6: "Five turns after denouncing a rival, you gain a Formal War
+        Casus Belli against them" - and it expires with the denouncement that
+        opened it. `denounceCasusBelli`'s twin."""
+        dt = self.seat_denounced[:, a, b]
+        age = int(self.turn) - dt
+        return (dt >= 0) & (age >= self._formal_war_min) & (age < self._agreement_turns)
+
+    def _defensive_pact(self, aggressor: int, victim: int, declared: torch.Tensor) -> None:
+        """CIV6 (Defensive Pact, Rise and Fall onward): "allies automatically
+        sign a Defensive Pact and will come to each other's aid if a third
+        party attacks either one" - and its converse, "if a member of an
+        alliance declares war on a third party ..., his or her allies will not
+        automatically declare war on the target", is why this runs off the
+        VICTIM's allies alone.
+
+        The dragged ally pays no warmonger cost, because it did not choose the
+        war, and its war is FORMAL: an obligation answered is the opposite of
+        the surprise attack that reading carries. `defensivePact`'s twin.
+        """
+        n_c = self.city_alive[:, :self.n_majors].sum(dim=2)
+        for ally in range(self.n_majors):
+            if ally in (aggressor, victim):
+                continue
+            join = (declared & self.civ_alive[:, ally] & (n_c[:, ally] > 0)
+                    & (self.seat_ally_turns[:, ally, victim] > 0)
+                    & (self.seat_ally_turns[:, ally, aggressor] == 0)
+                    & ~self.war[:, ally, aggressor])
+            if not bool(join.any()):
+                continue
+            self.war[:, ally, aggressor] |= join
+            self.war[:, aggressor, ally] |= join
+            self._reset_war_clock(ally, aggressor, join)
+            self.seat_warkind[:, ally, aggressor] |= join
+            self.seat_warkind[:, aggressor, ally] |= join
+            self.treaty_turns[:, ally, aggressor] = torch.where(
+                join, torch.zeros_like(self.treaty_turns[:, ally, aggressor]),
+                self.treaty_turns[:, ally, aggressor])
+            self.treaty_turns[:, aggressor, ally] = torch.where(
+                join, torch.zeros_like(self.treaty_turns[:, aggressor, ally]),
+                self.treaty_turns[:, aggressor, ally])
+            self._cancel_routes_pair(ally, aggressor, join)
+            for _g, _h in ((ally, aggressor), (aggressor, ally)):
+                self.seat_borders_turns[:, _g, _h] = torch.where(
+                    join, torch.zeros_like(self.seat_borders_turns[:, _g, _h]),
+                    self.seat_borders_turns[:, _g, _h])
+
     def _apply_war_column(self, row: int, war: torch.Tensor) -> None:
         targets = self.war_targets(row)
         if not targets:
@@ -287,7 +345,13 @@ class SimSeats:
         for k, tgt in enumerate(targets[:n_opp]):
             live = mine & self.civ_alive[:, tgt]
             at_war = self.war[:, row, tgt]
-            declare = (w == k) & ext & live & ~at_war & ~self.seat_allied[:, row, tgt]                 & (self.treaty_turns[:, row, tgt] == 0)
+            # CIV6 (Declaring Friendship): Declared Friends "cannot undertake
+            # hostile actions (such as Denouncing or going to war) against
+            # each other".
+            declare = ((w == k) & ext & live & ~at_war
+                       & (self.seat_ally_turns[:, row, tgt] == 0)
+                       & (self.seat_friend_turns[:, row, tgt] == 0)
+                       & (self.treaty_turns[:, row, tgt] == 0))
             if bool(declare.any()):
                 self.war[:, row, tgt] |= declare
                 self.war[:, tgt, row] |= declare
@@ -295,11 +359,17 @@ class SimSeats:
                 # CIV6: war cancels every route between the two civs; the
                 # Traders return.
                 self._cancel_routes_pair(row, tgt, declare)
+                # An OPEN BORDERS grant cannot outlive the peace it was signed
+                # in; war opens the border it was lifting.
+                for _g, _h in ((row, tgt), (tgt, row)):
+                    self.seat_borders_turns[:, _g, _h] = torch.where(
+                        declare, torch.zeros_like(self.seat_borders_turns[:, _g, _h]),
+                        self.seat_borders_turns[:, _g, _h])
                 self.civ_warmonger[:, row] = self.civ_warmonger[:, row] + declare.long() * self._wm_dow
-                _dt = self.seat_denounced[:, row, tgt]
-                _formal = declare & (_dt >= 0) & ((int(self.turn) - _dt) >= self._formal_war_min)
+                _formal = declare & self._denounce_casus_belli(row, tgt)
                 self.seat_warkind[:, row, tgt] = torch.where(declare, _formal, self.seat_warkind[:, row, tgt])
                 self.seat_warkind[:, tgt, row] = torch.where(declare, _formal, self.seat_warkind[:, tgt, row])
+                self._defensive_pact(row, tgt, declare)
             wt = self.war_turns[:, row, tgt]
             pcost = sr.get("peaceGold0", 150) + sr.get("peaceGoldSlope", 10) * wt.to(torch.float64)
             peace = (
@@ -5858,57 +5928,102 @@ class SimSeats:
         pair_ok = self.city_alive[:, a].unsqueeze(2) & self.city_alive[:, b].unsqueeze(1)
         return torch.where(pair_ok, d_ab, 999).reshape(B, -1).min(dim=1).values
 
-    def apply_geo(self, row: int, denounce: torch.Tensor | None = None,
-                  ally: torch.Tensor | None = None) -> None:
-        if denounce is not None:
-            if getattr(self, "_driven_denounce", None) is None:
-                self._driven_denounce = {}
-            self._driven_denounce[row] = denounce
-        if ally is not None:
-            if getattr(self, "_driven_ally", None) is None:
-                self._driven_ally = {}
-            self._driven_ally[row] = ally
+    def apply_geo(self, row: int, **verbs) -> None:
+        """Park one row's DIPLOMATIC intents for `_geo_agreements` to drain.
+        Every verb is a [B, n_majors] want-mask over target rows, except
+        `gift`, which is [B, GW kinds, n_majors]."""
+        for name, want in verbs.items():
+            assert name in GEO_VERBS, f"no such diplomatic verb: {name}"
+            if want is not None:
+                self._driven_geo[name][row] = want
 
-    def _geo_denounce_and_ally(self) -> None:
-        dstash = getattr(self, "_driven_denounce", None)
-        astash = getattr(self, "_driven_ally", None)
-        if not dstash and not astash:
+    def _geo_agreements(self) -> None:
+        """THE DIPLOMATIC AGREEMENTS, verb-major in the TS arm order: denounce,
+        friendship, the alliance friendship unlocks, the border grant, the
+        gift. Every want-mask is re-validated here — the record only names the
+        target."""
+        stashes = self._driven_geo
+        if not any(stashes.values()):
             return
         nrow = self.n_majors
         n_c = self.city_alive[:, :nrow].sum(dim=2)
         alive_row = self.civ_alive[:, :nrow] & (n_c > 0)
-        if dstash:
-            for a in sorted(dstash.keys()):
-                want = dstash.pop(a)
+        term = self._agreement_turns
+
+        def pairs(verb):
+            stash = stashes[verb]
+            if not stash:
+                return
+            for a in sorted(stash.keys()):
+                want = stash.pop(a)
                 for b in range(nrow):
                     if b == a or not bool(want[:, b].any()):
                         continue
-                    den = (
-                        want[:, b] & alive_row[:, a] & alive_row[:, b]
-                        & (self.seat_denounced[:, a, b] < 0) & ~self.war[:, a, b]
-                    )
-                    if bool(den.any()):
-                        self.seat_denounced[:, a, b] = torch.where(
-                            den, torch.full_like(self.seat_denounced[:, a, b], int(self.turn)), self.seat_denounced[:, a, b]
-                        )
-                        self.seat_allied[:, a, b] = self.seat_allied[:, a, b] & ~den
-                        self.seat_allied[:, b, a] = self.seat_allied[:, b, a] & ~den
-        if astash:
-            era_open = int(self.turn) >= self._ally_min_peace
-            for a in sorted(astash.keys()):
-                want = astash.pop(a)
-                if not era_open:
-                    continue
-                for b in range(nrow):
-                    if b == a or not bool(want[:, b].any()):
-                        continue
-                    form = (
-                        want[:, b] & alive_row[:, a] & alive_row[:, b]
-                        & ~self.war[:, a, b] & ~self.seat_allied[:, a, b]
-                        & (self.seat_denounced[:, a, b] < 0) & (self.seat_denounced[:, b, a] < 0)
-                        & (self.civ_warmonger[:, a] <= 0) & (self.civ_warmonger[:, b] <= 0)
-                    )
-                    if bool(form.any()):
-                        self.seat_allied[:, a, b] = self.seat_allied[:, a, b] | form
-                        self.seat_allied[:, b, a] = self.seat_allied[:, b, a] | form
+                    yield a, b, want[:, b] & alive_row[:, a] & alive_row[:, b]
+
+        for a, b, ok in pairs("denounce"):
+            # CIV6 (Denouncing): "You cannot denounce Declared Friends or
+            # Allies - you have to wait until these states expire."
+            den = (ok & ~self._denounce_active(a, b) & ~self.war[:, a, b]
+                   & (self.seat_friend_turns[:, a, b] == 0)
+                   & (self.seat_ally_turns[:, a, b] == 0))
+            if bool(den.any()):
+                self.seat_denounced[:, a, b] = torch.where(
+                    den, torch.full_like(self.seat_denounced[:, a, b], int(self.turn)),
+                    self.seat_denounced[:, a, b])
+
+        for a, b, ok in pairs("friend"):
+            # CIV6 (Alliance): "A leader you've offended (or who has many
+            # Grievances against you in Gathering Storm) will not want to
+            # become Declared Friends with you." The warmonger score is this
+            # model's grievance.
+            frd = (ok & ~self.war[:, a, b] & (self.seat_friend_turns[:, a, b] == 0)
+                   & ~self._denounce_active(a, b) & ~self._denounce_active(b, a)
+                   & (self.civ_warmonger[:, a] <= 0) & (self.civ_warmonger[:, b] <= 0))
+            if bool(frd.any()):
+                for _x, _y in ((a, b), (b, a)):
+                    self.seat_friend_turns[:, _x, _y] = torch.where(
+                        frd, torch.full_like(self.seat_friend_turns[:, _x, _y], term),
+                        self.seat_friend_turns[:, _x, _y])
+
+        for a, b, ok in pairs("ally"):
+            # CIV6 (Alliance): "Alliances become possible after developing the
+            # Civil Service civic. You can only enter into an Alliance with a
+            # civilization if you and its leader are Declared Friends."
+            civic = (self.civ_civics[:, a, self._alliance_civic] if self._alliance_civic >= 0
+                     else torch.zeros_like(ok))
+            form = (ok & civic & (self.seat_friend_turns[:, a, b] > 0)
+                    & ~self.war[:, a, b] & (self.seat_ally_turns[:, a, b] == 0)
+                    & ~self._denounce_active(a, b) & ~self._denounce_active(b, a))
+            if bool(form.any()):
+                for _x, _y in ((a, b), (b, a)):
+                    self.seat_ally_turns[:, _x, _y] = torch.where(
+                        form, torch.full_like(self.seat_ally_turns[:, _x, _y], term),
+                        self.seat_ally_turns[:, _x, _y])
+
+        for a, b, ok in pairs("borders"):
+            # CIV6 (Open Borders): the agreement "becomes available" once the
+            # GRANTOR has Early Empire - the civic that closed the border in
+            # the first place. "Open Borders cannot be offered to or requested
+            # from a leader who has Denounced you, or whom you have Denounced."
+            civic = (self.civ_civics[:, a, self._open_borders_civic] if self._open_borders_civic >= 0
+                     else torch.zeros_like(ok))
+            grant = (ok & civic & ~self.war[:, a, b]
+                     & ~self._denounce_active(a, b) & ~self._denounce_active(b, a))
+            if bool(grant.any()):
+                self.seat_borders_turns[:, a, b] = torch.where(
+                    grant, torch.full_like(self.seat_borders_turns[:, a, b], term),
+                    self.seat_borders_turns[:, a, b])
+
+        gstash = stashes["gift"]
+        if gstash:
+            for a in sorted(gstash.keys()):
+                want = gstash.pop(a)
+                for kind in range(want.shape[1]):
+                    for b in range(nrow):
+                        if b == a or not bool(want[:, kind, b].any()):
+                            continue
+                        self._gift_work(a, b, kind,
+                                        want[:, kind, b] & alive_row[:, a] & alive_row[:, b]
+                                        & ~self.war[:, a, b])
 

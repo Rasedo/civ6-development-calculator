@@ -558,14 +558,37 @@ export const GOVERNOR_LOYALTY = 8;
 export const FORMAL_WAR_MIN_TURNS = 5;
 
 /**
- * ALLIANCES on the civ↔civ axis. Real Civ 6 requires a
- * Declaration of Friendship first and then an Alliance, and ALLIES CANNOT
- * DECLARE WAR ON EACH OTHER — that last rule is what this models. The
- * friendship prerequisite is stylized as "at peace for ALLY_MIN_PEACE turns
- * with NO denouncement in either direction"; a denouncement or a war breaks it
- * immediately. Zero-draw and symmetric, exactly like `Seat.wars`.
+ * EVERY DIPLOMATIC AGREEMENT RUNS THE SAME CLOCK.
+ * CIV6 (Diplomacy, Diplomatic Agreements): "There are a number of Agreements
+ * that leaders may enter into. All of them have limited duration of 30 turns,
+ * after which they have to be renewed." The Declaration of Friendship
+ * ("for 30 turns"), the Alliance ("Alliances expire after 30 turns on
+ * Standard speed") and the Denunciation ("A Denunciation lasts for 30 turns,
+ * after which its effects expire") all publish the same number.
  */
-export const ALLY_MIN_PEACE = 30;
+export const AGREEMENT_TURNS = 30;
+
+/**
+ * The civic that opens each agreement.
+ * CIV6: "After developing the Early Empire civic, civilizations no longer
+ * allow foreign units to enter their territory freely. At this point the Open
+ * Borders agreement becomes available." / "Alliances become possible after
+ * developing the Civil Service civic."
+ * The Declaration of Friendship publishes no civic — it is gated on the
+ * relationship reaching Friendly, and leader ATTITUDE (agendas and their
+ * modifiers) is not modeled, so friendship asks only that the pair be at
+ * peace with no live denouncement between them.
+ */
+export const OPEN_BORDERS_CIVIC = 'EARLY_EMPIRE';
+export const ALLIANCE_CIVIC = 'CIVIL_SERVICE';
+
+/**
+ * GS pays a standing Alliance in favor.
+ * CIV6 (Alliance): "In Gathering Storm, each Alliance gives you +1 Diplomatic
+ * Favor per turn per level." Alliance LEVELS are not modeled, so every live
+ * alliance pays its level-1 rate.
+ */
+export const FAVOR_PER_ALLIANCE = 1;
 
 /**
  * WARMONGER COST. Real Civ 6 makes aggression carry a

@@ -72,6 +72,17 @@ export function greatPersonPointsPerTurn(
   return out;
 }
 
+/** Great-work slots a city's WONDERS add, for one kind. It resolves here
+ *  because completeness lives on the tile and data/greatPeople.ts is map-free. */
+export function wonderGwSlots(state: GameState, kind: number) {
+  return (c: { wonders?: { id: string; tileIndex: number }[] }): number =>
+    (c.wonders ?? []).reduce(
+      (n, w) =>
+        n + (state.map.tiles[w.tileIndex].builtWonderComplete ? (GW_WONDER_SLOTS[w.id]?.[kind] ?? 0) : 0),
+      0,
+    );
+}
+
 function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
   const owner = seatOf(state, seat);
   const at = gpOffer(state, cls);
@@ -84,15 +95,7 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
   if (fx.science) owner.research.techProgress += fx.science;
   if (GW_WORK_CLASSES.has(cls)) {
     const kind = GW_CLASS_KIND[cls]!;
-    // Wonder-granted slots (Great Library +2 writing) resolve HERE because
-    // completeness lives on the tile and data/greatPeople.ts is map-free.
-    const wonderSlots = (c: { wonders?: { id: string; tileIndex: number }[] }) =>
-      (c.wonders ?? []).reduce(
-        (n, w) =>
-          n + (state.map.tiles[w.tileIndex].builtWonderComplete ? (GW_WONDER_SLOTS[w.id]?.[kind] ?? 0) : 0),
-        0,
-      );
-    const overflow = placeGreatWorks(cities, kind, wonderSlots, at);
+    const overflow = placeGreatWorks(cities, kind, wonderGwSlots(state, kind), at);
     if (fx.culture) owner.research.civicProgress += fx.culture * overflow;
   } else if (fx.culture) {
     owner.research.civicProgress += fx.culture;

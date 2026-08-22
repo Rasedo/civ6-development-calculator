@@ -24,7 +24,7 @@ import { emergencyHeal, emergencyMoveBonus } from './emergency';
 import { UNITS, UNIT_HP, ENCAMPMENT_HP, type UnitDef } from '../data/units';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { dedicationEvent, goldenMoveBonus } from './eras'; // MONUMENTALITY / EXODUS +2 MP
-import { DED_WISH } from '../data/seats';
+import { DED_WISH, OPEN_BORDERS_CIVIC } from '../data/seats';
 import { GAME_SPEED, EMBARK_MOVES } from '../data/constants';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
@@ -34,7 +34,7 @@ import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { congressChopGold } from './congress';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { NO_SEAT, capsOf, campTiles, cityAtTile, civHasStrategic, civsAtWar, seatOf, tileClaimed, tileSeat } from './seats';
+import { NO_SEAT, borderTurnsFrom, capsOf, campTiles, cityAtTile, civHasStrategic, civsAtWar, isCiv, seatOf, seatsAllied, tileSeat } from './seats';
 import type { ImprovementId } from './types';
 
 const ok: RuleResult = { ok: true };
@@ -359,6 +359,43 @@ export function cliffBlocksStep(
   return cliffBlocks(state, from, to, unit);
 }
 
+/**
+ * Is this ground closed to `seat`?
+ *
+ * CIV6 (Movement, "Entering other empires' borders"): "In the beginning of the
+ * game all units may enter freely all other civilizations' and city-states'
+ * territory. This changes only after a civ (or city-state) develops the Early
+ * Empire civic ... units of one civ may only enter the territory of another
+ * civ if they have granted them Open Borders." War opens what the civic
+ * closed, and an ally needs no grant of its own: "Allies automatically have
+ * Open Borders." "Traders ignore borders", and "Religious units also ignore
+ * borders".
+ *
+ * CITY-STATE ground never closes: a city-state carries no research record, so
+ * nothing here can say when it took Early Empire, and the suzerain's passage
+ * has no border to lift. For the same reason only a MAJOR's units are bound —
+ * a barbarian was never going to ask permission anyway.
+ */
+export function borderClosedTo(
+  state: GameState,
+  seat: number,
+  tile: Tile,
+  unitType?: string,
+): boolean {
+  const owner = tileSeat(tile);
+  if (owner === NO_SEAT || owner === seat) return false;
+  if (!isCiv(seat) || !isCiv(owner)) return false;
+  if (unitType) {
+    const def = UNITS[unitType];
+    if (def?.trader || (def?.religiousStrength ?? 0) > 0) return false;
+  }
+  const host = seatOf(state, owner);
+  if (!host?.research.civics.includes(OPEN_BORDERS_CIVIC)) return false;
+  if (civsAtWar(state, seat, owner)) return false;
+  if (seatsAllied(state, seat, owner)) return false;
+  return borderTurnsFrom(state, owner, seat) <= 0;
+}
+
 export function tileFreeForUnit(
   state: GameState,
   tileIndex: number,
@@ -383,6 +420,7 @@ export function tileFreeForUnit(
   // beat-it-down path is the melee attack ON the tile, never a move.
   if (unit && encampmentBlocks(state, tile, unit)) return false;
   const side = unit ? unit.seat : seat;
+  if (borderClosedTo(state, side, tile, unit?.type)) return false;
   const domain = unit ? unitDomain(unit.type) : 'civilian';
   for (const u of unitsAt(state, tileIndex)) {
     if (u.id === unit?.id) continue;
@@ -397,8 +435,9 @@ export function findPath(state: GameState, unit: Unit, targetIndex: number): num
   const target = map.tiles[targetIndex];
   const naval = !!UNITS[unit.type]?.naval;
   const passOk = (t: Tile): boolean =>
-    // Routing never plans THROUGH a live enemy Encampment.
+    // Routing never plans THROUGH a live enemy Encampment or closed ground.
     !encampmentBlocks(state, t, unit) &&
+    !borderClosedTo(state, unit.seat, t, unit.type) &&
     (naval ? isWater(t) && !isImpassable(t) && waterEnterable(state, t, unit) : unitPassable(t));
   if (!passOk(target)) return null;
   const start = map.tiles[unit.tileIndex];
@@ -709,8 +748,11 @@ export function archaeologistExcavate(state: GameState, unitId: number, seat: nu
   const tile = state.map.tiles[unit.tileIndex];
   const kind = digUnderfoot(state, tile, seat);
   if (!kind) return no('No dig here.');
-  if (tileClaimed(tile) && tileSeat(tile) !== unit.seat) {
-    return no('That dig lies in foreign territory.');
+  // CIV6 (Archaeologist): "Archaeologists cannot enter another civilization's
+  // territory without an Open Borders treaty" — ENTRY is what the rule gates,
+  // so the dig asks the same question the step did.
+  if (borderClosedTo(state, unit.seat, tile, unit.type)) {
+    return no('That dig lies behind a closed border.');
   }
   const home = seatOf(state, seat)!.cities
     .filter((c) => c.buildings.includes(ARTIFACT_BUILDING) && (c.artifacts ?? 0) < ARTIFACT_SLOTS)

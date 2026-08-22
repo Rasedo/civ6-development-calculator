@@ -679,6 +679,47 @@ class SimMasks:
         owner_seat = torch.where((ow >= 0) & (ow < self.n_majors), ow, torch.full_like(ow, -1))
         return live & self._seats_hostile(seat, owner_seat)
 
+    def _border_closed(self, tiles: torch.Tensor, row: int,
+                       utype: torch.Tensor | None = None) -> torch.Tensor:
+        """Is this ground CLOSED to seat row `row`? `borderClosedTo`'s twin,
+        over any `tiles` shape.
+
+        CIV6 (Movement, "Entering other empires' borders"): "In the beginning
+        of the game all units may enter freely all other civilizations' and
+        city-states' territory. This changes only after a civ (or city-state)
+        develops the Early Empire civic ... units of one civ may only enter the
+        territory of another civ if they have granted them Open Borders." War
+        opens what the civic closed, and an ally needs no grant of its own:
+        "Allies automatically have Open Borders." "Traders ignore borders", and
+        "Religious units also ignore borders".
+
+        CITY-STATE ground never closes: a city-state carries no research
+        record, so nothing here can say when it took Early Empire. For the same
+        reason only a MAJOR's units are bound - `row` outside the major range
+        walks free, which is what a barbarian was going to do anyway.
+        """
+        zero = torch.zeros(tiles.shape, dtype=torch.bool, device=tiles.device)
+        if self._open_borders_civic < 0 or row >= self.n_majors:
+            return zero
+        R, B = self.n_majors, self.B
+        tc = tiles.clamp(min=0).reshape(B, -1)
+        owner = self.tile_seat.gather(1, tc)
+        foreign = (tiles >= 0).reshape(B, -1) & (owner >= 0) & (owner < R) & (owner != row)
+        if not bool(foreign.any()):
+            return zero
+        oc = owner.clamp(min=0, max=R - 1)
+        civic = self.civ_civics[:, :R, self._open_borders_civic].gather(1, oc)
+        at_war = self.war[:, row, :R].gather(1, oc)
+        allied = (self.seat_ally_turns[:, row, :R] > 0).gather(1, oc)
+        # column `row` of the grant matrix: what each GRANTOR gives this seat.
+        granted = (self.seat_borders_turns[:, :R, row] > 0).gather(1, oc)
+        closed = foreign & civic & ~at_war & ~allied & ~granted
+        if utype is not None:
+            ut = utype.clamp(min=0).reshape(B, -1)
+            free = (ut == self._trader_idx) | (self._rel_strength[ut] > 0)
+            closed = closed & ~free.expand_as(closed)
+        return closed.reshape(tiles.shape)
+
     def _blocked_for(
         self,
         tiles: torch.Tensor,
@@ -1067,18 +1108,19 @@ class SimMasks:
 
     def _excavate_ok(self, row: int, tc: torch.Tensor, utype: torch.Tensor, charges: torch.Tensor) -> torch.Tensor:
         """[B, N] bool — the EXCAVATE column. An Archaeologist, a charge, a
-        dig underfoot, the tile own-or-unclaimed (real Civ 6 also allows
-        foreign ground under OPEN BORDERS, which neither engine models), and
-        a free artifact slot to land the find in."""
+        dig underfoot, ground this seat may stand on, and a free artifact slot
+        to land the find in.
+
+        CIV6 (Archaeologist): "Archaeologists cannot enter another
+        civilization's territory without an Open Borders treaty" — ENTRY is
+        what the rule gates, so the dig asks the same question the step did."""
         if getattr(self, "_archaeologist_idx", -1) < 0:
             return torch.zeros_like(tc, dtype=torch.bool)
-        ts = self.tile_seat.gather(1, tc)
-        own_ok = (ts < 0) | (ts == row)
         return (
             (utype == self._archaeologist_idx)
             & (charges > 0)
             & self._dig_here(row, tc)
-            & own_ok
+            & ~self._border_closed(tc, row)
             & self._museum_room(row).unsqueeze(1)
         )
 
@@ -1392,7 +1434,8 @@ class SimMasks:
         has_mp = (self.unit_mp.gather(1, sc) > 0).unsqueeze(2)
         cliff6 = (self._cliff_block_dirs(tc, nb, own_tile) & alive if self._embark_live
                   else torch.zeros(B, N, 6, dtype=torch.bool, device=dev))
-        move = on_map & terr & ~_blk & alive & has_mp & ~cliff6
+        shut = self._border_closed(nb, row, utype.unsqueeze(2).expand(B, N, 6))
+        move = on_map & terr & ~_blk & alive & has_mp & ~cliff6 & ~shut
 
         # ---- ATTACK 6-11 -----------------------------------------------------
         # `unitsHostile` for the units, the centre plane for the cities: ONE

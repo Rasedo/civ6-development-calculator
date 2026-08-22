@@ -15,7 +15,7 @@ PER_CS = 5    # met, envoys/6, hasQuest, atWar, warTurns/14
 # everything measured from the asker's own point of view. The last four are
 # RAW and unscaled for the same reason the ctx block is: the DoW policy
 # compares them exactly.
-PER_CIV = 7
+PER_CIV = 13
 PER_CIV_FIELDS = (
     "atWar",          # 0/1: this seat is at war with that opponent
     "warTurns",       # THAT war's own clock / 14
@@ -24,6 +24,16 @@ PER_CIV_FIELDS = (
     "prox",           # min pairwise dist(own centres, theirs); 999 = none
     "gang",           # 0/1: their warmonger >= the gang threshold
     "oppHasCities",   # 0/1: they hold any city (the DoW precondition)
+    # THE AGREEMENTS, every one of them the precondition of some verb. Turns
+    # LEFT rather than flags: a friendship with two turns to run is a
+    # different offer from one with twenty, and the denouncement clock carries
+    # the Formal-War window inside it.
+    "friendTurns",    # the Declaration of Friendship clock / 30
+    "allyTurns",      # the alliance clock / 30
+    "bordersIn",      # THEIR Open Borders grant to this seat / 30
+    "bordersOut",     # this seat's grant to them / 30
+    "denounceOut",    # this seat's denouncement of them / 30
+    "denounceIn",     # theirs of this seat / 30
 )
 ESCALATORS = 3  # district, settler, builder — the only NON-static prices
 # The CTX block: the decide-time counters no mask can express, carried IN
@@ -163,6 +173,26 @@ def pick_envoy(blocks: dict, mask: torch.Tensor) -> torch.Tensor:
 # only produce a different LEGAL game: the applier re-validates every pick and
 # the TS child replays what the driver chose.
 DEEP_SHARE = 0.34
+
+# The DIPLOMATIC style, drawn the same way and for the same reason: a diplomat
+# courts (friendship, alliance, open borders, a gift) where every other seat
+# keeps its grudges.
+#
+# THE TWO ARE PER-SEAT EXCLUSIVE, and that is MEASURED, not assumed. Letting a
+# diplomat denounce as well took friendship to 1 seed in 12 and alliances to
+# none: a denouncement blocks friendship in BOTH directions for its whole
+# term, is renewable the moment it lapses, and the grievance it earns blocks
+# friendship with everyone else too. Giving the two verbs disjoint targets
+# (denounce the weaker, court the stronger) changed nothing, because the
+# STRONGER seat denounces back down the same pair.
+#
+# The share is measured too: at 0.34 the agreement rows come in a seed lower
+# for exactly the same cost, and at 1.0 the war regime is gone outright — no
+# city-state war in any seed and a minor-war mean of 0.0, which is the
+# collapse this knob exists to avoid.
+DIPLO_SHARE = 0.5
+# Writing, art, music — the Great Work kinds the gift verb indexes.
+GW_KINDS = 3
 
 
 def pick_research(blocks: dict, mask: torch.Tensor, kind: str,

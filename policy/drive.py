@@ -566,13 +566,24 @@ def _buy_ctx(sim, row: int) -> dict:
             "nat_ok": nat_ok, "nat_j": nat_j}
 
 
-def _geo_turn(sim):
+def _geo_turn(sim, seeds=None):
+    """The five DIPLOMATIC want-masks, decided on the GPU and replayed by TS.
+
+    TWO STYLES, drawn once per (game seed, seat) and fixed for the game, the
+    research draw's discipline: a DIPLOMAT courts — friendship, then the
+    alliance friendship unlocks, then open borders and a gift — and everyone
+    else keeps to the grudge it already had. Held apart on purpose: a table
+    where every seat both courts and denounces settles into one behaviour, and
+    a table where everyone befriends everyone has no war left in it."""
     B, dev = sim.B, sim.device
     nrow = sim.n_majors
     den = torch.zeros(B, nrow, nrow, dtype=torch.bool, device=dev)
     ally = torch.zeros_like(den)
+    frd = torch.zeros_like(den)
+    bord = torch.zeros_like(den)
+    gift = torch.zeros(B, ladder.GW_KINDS, nrow, nrow, dtype=torch.bool, device=dev)
     if sim.n_majors < 2:
-        return den, ally
+        return den, frd, ally, bord, gift
     rr = sim.rules.seats
     n_c = sim.city_alive[:, :nrow].sum(dim=2)
     alive_row = sim.civ_alive[:, :nrow] & (n_c > 0)
@@ -583,44 +594,72 @@ def _geo_turn(sim):
         for b in range(nrow):
             if a != b:
                 prox[a, b] = sim._seat_proximity(a, b)
+    diplo = (torch.stack([_policy_rng(sim, seeds, 0, r, 5) for r in range(nrow)], dim=1)
+             < ladder.DIPLO_SHARE
+             if seeds is not None else torch.zeros(B, nrow, dtype=torch.bool, device=dev))
+    ob_civic = (sim.civ_civics[:, :nrow, sim._open_borders_civic]
+                if sim._open_borders_civic >= 0 else torch.zeros_like(alive_row))
+    al_civic = (sim.civ_civics[:, :nrow, sim._alliance_civic]
+                if sim._alliance_civic >= 0 else torch.zeros_like(alive_row))
+    gw_planes = (sim.city_gw_writing, sim.city_gw_art, sim.city_gw_music)
     for a in range(nrow):
         for b in range(nrow):
             if a == b:
                 continue
+            pair = alive_row[:, a] & alive_row[:, b] & ~sim.war[:, a, b]
+            quiet = pair & ~sim._denounce_active(a, b) & ~sim._denounce_active(b, a)
             den[:, a, b] = (
-                alive_row[:, a] & alive_row[:, b]
-                & (sim.seat_denounced[:, a, b] < 0) & ~sim.war[:, a, b]
+                pair & ~diplo[:, a] & ~sim._denounce_active(a, b)
+                & (sim.seat_friend_turns[:, a, b] == 0) & (sim.seat_ally_turns[:, a, b] == 0)
                 & (prox[a, b] <= prox_max) & (rstr[:, a] > rstr[:, b])
             )
-    if int(sim.turn) >= sim._ally_min_peace:
-        for a in range(nrow):
-            for b in range(a + 1, nrow):
-                ally[:, a, b] = (
-                    alive_row[:, a] & alive_row[:, b]
-                    & ~sim.war[:, a, b] & ~sim.seat_allied[:, a, b]
-                    & (sim.seat_denounced[:, a, b] < 0) & (sim.seat_denounced[:, b, a] < 0)
-                    & ~den[:, a, b] & ~den[:, b, a]
-                    & (sim.civ_warmonger[:, a] <= 0) & (sim.civ_warmonger[:, b] <= 0)
-                )
-    return den, ally
+            frd[:, a, b] = (
+                quiet & diplo[:, a] & (sim.seat_friend_turns[:, a, b] == 0)
+                & (prox[a, b] <= prox_max)
+                & (sim.civ_warmonger[:, a] <= 0) & (sim.civ_warmonger[:, b] <= 0)
+            )
+            ally[:, a, b] = (
+                quiet & diplo[:, a] & al_civic[:, a]
+                & (sim.seat_friend_turns[:, a, b] > 0) & (sim.seat_ally_turns[:, a, b] == 0)
+            )
+            # Granted to whoever this seat already trusts, and by a diplomat to
+            # any quiet neighbour — the grant is one-way, so it costs the
+            # grantor nothing but the passage.
+            bord[:, a, b] = (
+                quiet & ob_civic[:, a] & (sim.seat_borders_turns[:, a, b] == 0)
+                & (diplo[:, a] | (sim.seat_friend_turns[:, a, b] > 0)
+                   | (sim.seat_ally_turns[:, a, b] > 0))
+            )
+            # A gift goes to a FRIEND, and only down the gradient: the richer
+            # holder of that kind gives, which settles rather than ping-pongs.
+            trusted = (sim.seat_friend_turns[:, a, b] > 0) | (sim.seat_ally_turns[:, a, b] > 0)
+            for kind in range(ladder.GW_KINDS):
+                held = gw_planes[kind]
+                mine = (held[:, a] * sim.city_alive[:, a].long()).sum(dim=1)
+                theirs = (held[:, b] * sim.city_alive[:, b].long()).sum(dim=1)
+                gift[:, kind, a, b] = quiet & diplo[:, a] & trusted & (mine > theirs)
+    return den, frd, ally, bord, gift
 
 
-def geo_decide_and_apply(sim):
-    den, ally = _geo_turn(sim)
+def geo_decide_and_apply(sim, seeds=None):
+    geo = _geo_turn(sim, seeds)
+    den, frd, ally, bord, gift = geo
     for row in range(sim.n_majors):
-        sim.apply_geo(row, denounce=den[:, row], ally=ally[:, row])
-    return den, ally
+        sim.apply_geo(row, denounce=den[:, row], friend=frd[:, row], ally=ally[:, row],
+                      borders=bord[:, row], gift=gift[:, :, row])
+    return geo
 
 
 def _extract_geo(geo, row: int, b: int) -> dict:
-    den, ally = geo
+    den, frd, ally, bord, gift = geo
     out = {}
-    dl = den[b, row].nonzero(as_tuple=True)[0].tolist()
-    if dl:
-        out["denounce"] = dl
-    al = ally[b, row].nonzero(as_tuple=True)[0].tolist()
-    if al:
-        out["ally"] = al
+    for name, want in (("denounce", den), ("friend", frd), ("ally", ally), ("borders", bord)):
+        tl = want[b, row].nonzero(as_tuple=True)[0].tolist()
+        if tl:
+            out[name] = tl
+    gl = [[int(k), int(j)] for k, j in gift[b, :, row].nonzero(as_tuple=False).tolist()]
+    if gl:
+        out["gift"] = gl
     return out
 
 
@@ -972,10 +1011,15 @@ def replay_seat(sim, row: int, rec: dict) -> None:
         return m
 
     geo_kwargs = {}
-    if rec.get("denounce"):
-        geo_kwargs["denounce"] = _geo_mask(rec["denounce"])
-    if rec.get("ally"):
-        geo_kwargs["ally"] = _geo_mask(rec["ally"])
+    for _name in ("denounce", "friend", "ally", "borders"):
+        if rec.get(_name):
+            geo_kwargs[_name] = _geo_mask(rec[_name])
+    if rec.get("gift"):
+        _g = torch.zeros(sim.B, ladder.GW_KINDS, sim.n_majors, dtype=torch.bool, device=dev)
+        for _k, _j in rec["gift"]:
+            if 0 <= int(_k) < ladder.GW_KINDS and 0 <= int(_j) < sim.n_majors:
+                _g[:, int(_k), int(_j)] = True
+        geo_kwargs["gift"] = _g
     if geo_kwargs:
         sim.apply_geo(row, **geo_kwargs)
     ranks = []

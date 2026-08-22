@@ -1,7 +1,7 @@
 
 import type { City, CongressVote, DistrictId, Emergency, GameState, ImprovementId, SeatActionRecord, Seat, Tile, TradeRoute, Unit } from './types';
-import { advanceGreatPeople } from './greatPeople';
-import { drainRelicReserve, RELIC_WONDER_SLOTS } from '../data/greatPeople';
+import { advanceGreatPeople, wonderGwSlots } from './greatPeople';
+import { drainRelicReserve, gwCapacity, gwCount, gwGive, gwTake, GW_KINDS, RELIC_WONDER_SLOTS } from '../data/greatPeople';
 import { completeQueueItem } from './production';
 import { isExplored, revealAround } from './fog';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
@@ -56,9 +56,9 @@ import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex } from './unit
 const A_FOUND_CITY = unitActionIndex(IMPROVEMENT_IDS).FOUND_CITY;
 const A_EXCAVATE = unitActionIndex(IMPROVEMENT_IDS).EXCAVATE;
 const A_PARK = unitActionIndex(IMPROVEMENT_IDS).PARK;
-import { ALLY_MIN_PEACE, CIV_LEADERS, FORMAL_WAR_MIN_TURNS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { AGREEMENT_TURNS, ALLIANCE_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles, goldenBoostBonus, worldEraIndex } from './eras';
-import { NO_SEAT, atWarWithAny, campTiles, citiesOf, civHasStrategic, civsAtWar, cityStateOfSeat, emptySeat, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, setAllied, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
+import { NO_SEAT, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civHasStrategic, civsAtWar, cityStateOfSeat, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, spreadFromUnit } from './unitOrders';
 import { navalKillEvent, buildingDedications, dedicationEvent, goldenDedication } from './eras';
@@ -248,6 +248,36 @@ export function sueForPeace(state: GameState, actorSeat: number, seat: number): 
   }
   makePeace(state, actor, seat);
   return ok;
+}
+
+/**
+ * CIV6 (Defensive Pact, Rise and Fall onward): "allies automatically sign a
+ * Defensive Pact and will come to each other's aid if a third party attacks
+ * either one" — and the converse, "if a member of an alliance declares war on
+ * a third party ..., his or her allies will not automatically declare war on
+ * the target", is why this runs off the VICTIM's allies alone.
+ *
+ * The dragged ally pays no warmonger cost, because it did not choose the war,
+ * and its war is FORMAL: an obligation answered is the opposite of the
+ * surprise attack that reading carries. An ally already fighting, or allied to
+ * the aggressor too, stays where it is.
+ */
+function defensivePact(state: GameState, aggressor: number, victim: number): void {
+  for (const ally of state.seats) {
+    if (!isCiv(ally.seat) || ally.cities.length === 0) continue;
+    if (ally.seat === aggressor || ally.seat === victim) continue;
+    if (!seatsAllied(state, ally.seat, victim)) continue;
+    if (seatsAllied(state, ally.seat, aggressor)) continue;
+    if (civsAtWar(state, ally.seat, aggressor)) continue;
+    setWar(state, ally.seat, aggressor, true);
+    setWarTurnsWith(state, ally.seat, aggressor, 0);
+    setWarFormal(state, ally.seat, aggressor, true);
+    setTreatyTurnsWith(state, ally.seat, aggressor, 0);
+    cancelRoutesBetween(state, ally.seat, aggressor);
+    setBorderTurnsFrom(state, ally.seat, aggressor, 0);
+    setBorderTurnsFrom(state, aggressor, ally.seat, 0);
+    state.eventLog.push(`${ally.name} honours its alliance and joins the war.`);
+  }
 }
 
 function makePeace(state: GameState, actor: Seat, foe: number): void {
@@ -906,6 +936,10 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
       else sueForPeaceWithCityState(state, csId, actor.seat);
     } else if (foe !== undefined && actor.seat !== foe) {
       if (declaring && !civsAtWar(state, actor.seat, foe) && !seatsAllied(state, actor.seat, foe)
+          // CIV6 (Declaring Friendship): Declared Friends "cannot undertake
+          // hostile actions (such as Denouncing or going to war) against each
+          // other".
+          && !seatsFriends(state, actor.seat, foe)
           && treatyTurnsWith(state, actor.seat, foe) === 0) {
         setWar(state, actor.seat, foe, true);
         setWarTurnsWith(state, actor.seat, foe, 0);
@@ -913,11 +947,15 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
         // between the two civilizations are cancelled, and the Traders
         // servicing them are immediately recalled to their origin cities."
         cancelRoutesBetween(state, actor.seat, foe);
+        // An OPEN BORDERS grant cannot outlive the peace it was signed in;
+        // war opens the border it was lifting.
+        setBorderTurnsFrom(state, actor.seat, foe, 0);
+        setBorderTurnsFrom(state, foe, actor.seat, 0);
         actor.warmonger = (actor.warmonger ?? 0) + WARMONGER_DOW;
-        const dt = actor.denounced[foe];
-        const formal = dt !== undefined && state.turn - dt >= FORMAL_WAR_MIN_TURNS;
+        const formal = denounceCasusBelli(state, actor.seat, foe);
         setWarFormal(state, actor.seat, foe, formal);
         state.eventLog.push(`${actor.name} declares ${formal ? 'a formal' : 'a surprise'} war on ${seatOf(state, foe)?.name ?? 'you'}!`);
+        defensivePact(state, actor.seat, foe);
       } else if (!declaring && civsAtWar(state, actor.seat, foe)) {
         const waited = warTurnsWith(state, actor.seat, foe);
         const cost = PEACE_GOLD_COST(waited);
@@ -1169,17 +1207,40 @@ export function seatPhase(state: GameState): void {
     u.movesFull = u.movesLeft;
   }
 
+  // THE DIPLOMATIC AGREEMENTS, in the GPU's arm order: denounce, then
+  // friendship, then the alliance friendship unlocks, then the border grant.
+  // Every one is re-validated here — the record only names the target.
   for (const actor of state.seats) {
     if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
     const recG = state.seatActions?.[state.turn - 1]?.[actor.seat];
     for (const tj of recG?.denounce ?? []) {
       const target = seatOf(state, tj);
       if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
-      if (actor.denounced[target.seat] !== undefined) continue; // the grudge is permanent
+      if (denounceActive(state, actor.seat, target.seat)) continue; // already standing
       if (civsAtWar(state, actor.seat, target.seat)) continue;
+      // CIV6 (Denouncing): "You cannot denounce Declared Friends or Allies -
+      // you have to wait until these states expire."
+      if (seatsFriends(state, actor.seat, target.seat)) continue;
+      if (seatsAllied(state, actor.seat, target.seat)) continue;
       actor.denounced[target.seat] = state.turn;
-      setAllied(state, actor.seat, target.seat, false); // a denouncement breaks the alliance
       state.eventLog.push(`${actor.name} denounces ${target.name}.`);
+    }
+  }
+  for (const actor of state.seats) {
+    if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
+    const recG = state.seatActions?.[state.turn - 1]?.[actor.seat];
+    for (const tj of recG?.friend ?? []) {
+      const target = seatOf(state, tj);
+      if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
+      if (civsAtWar(state, actor.seat, target.seat)) continue;
+      if (seatsFriends(state, actor.seat, target.seat)) continue;
+      if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
+      // CIV6 (Alliance): "A leader you've offended (or who has many Grievances
+      // against you in Gathering Storm) will not want to become Declared
+      // Friends with you." The warmonger score is this model's grievance.
+      if ((actor.warmonger ?? 0) > 0 || (target.warmonger ?? 0) > 0) continue;
+      setFriendTurnsWith(state, actor.seat, target.seat, AGREEMENT_TURNS);
+      state.eventLog.push(`${actor.name} and ${target.name} declare friendship.`);
     }
   }
   for (const actor of state.seats) {
@@ -1188,12 +1249,58 @@ export function seatPhase(state: GameState): void {
     for (const tj of recG?.ally ?? []) {
       const target = seatOf(state, tj);
       if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
-      if (state.turn < ALLY_MIN_PEACE) continue; // the alliance era has not opened
+      // CIV6 (Alliance): "Alliances become possible after developing the Civil
+      // Service civic. You can only enter into an Alliance with a
+      // civilization if you and its leader are Declared Friends."
+      if (!actor.research.civics.includes(ALLIANCE_CIVIC)) continue;
+      if (!seatsFriends(state, actor.seat, target.seat)) continue;
       if (civsAtWar(state, actor.seat, target.seat) || seatsAllied(state, actor.seat, target.seat)) continue;
-      if (actor.denounced[target.seat] !== undefined || target.denounced[actor.seat] !== undefined) continue;
-      if ((actor.warmonger ?? 0) > 0 || (target.warmonger ?? 0) > 0) continue; // grievances block
-      setAllied(state, actor.seat, target.seat, true);
+      if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
+      setAllyTurnsWith(state, actor.seat, target.seat, AGREEMENT_TURNS);
       state.eventLog.push(`${actor.name} and ${target.name} form an alliance.`);
+    }
+  }
+  for (const actor of state.seats) {
+    if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
+    const recG = state.seatActions?.[state.turn - 1]?.[actor.seat];
+    for (const tj of recG?.borders ?? []) {
+      const target = seatOf(state, tj);
+      if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
+      // CIV6 (Open Borders): the agreement "becomes available" once the
+      // GRANTOR has Early Empire — the civic that closed the border in the
+      // first place. "Open Borders cannot be offered to or requested from a
+      // leader who has Denounced you, or whom you have Denounced."
+      if (!actor.research.civics.includes(OPEN_BORDERS_CIVIC)) continue;
+      if (civsAtWar(state, actor.seat, target.seat)) continue;
+      if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
+      setBorderTurnsFrom(state, actor.seat, target.seat, AGREEMENT_TURNS);
+      state.eventLog.push(`${actor.name} opens its borders to ${target.name}.`);
+    }
+  }
+  for (const actor of state.seats) {
+    if (!isCiv(actor.seat) || actor.cities.length === 0) continue;
+    const recG = state.seatActions?.[state.turn - 1]?.[actor.seat];
+    for (const [kind, tj] of recG?.gift ?? []) {
+      // CIV6 (Trading): "You may trade almost anything in the game, including
+      // ... Great Works", and the one-sided half of that screen is the gift —
+      // "Click it and you gift your items to your rival." A NEGOTIATED deal
+      // needs a valuation no source publishes, so only the gift ships.
+      // "You can trade with all the leaders except the ones you're at war
+      // with."
+      if (kind < 0 || kind >= GW_KINDS) continue;
+      const target = seatOf(state, tj);
+      if (!target || !isCiv(tj) || target.cities.length === 0) continue;
+      if (civsAtWar(state, actor.seat, tj)) continue;
+      // WHICH city gives and WHICH receives is not a decision — the works are
+      // counts, not identities, so both engines take the giver's FIRST city
+      // holding one and the receiver's first with a free slot, in the city
+      // order `placeGreatWorks` already walks.
+      const slots = wonderGwSlots(state, kind);
+      const from = actor.cities.find((c) => gwCount(c, kind) > 0);
+      const home = target.cities.find((c) => gwCount(c, kind) < gwCapacity(c, kind, slots(c)));
+      if (!from || !home) continue;
+      gwGive(home, kind, gwTake(from, kind));
+      state.eventLog.push(`${actor.name} gifts a Great Work to ${target.name}.`);
     }
   }
   for (const actor of state.seats) {
@@ -1889,11 +1996,22 @@ export function seatPhase(state: GameState): void {
       if (actor.seat < foe) setWarTurnsWith(state, actor.seat, foe, warTurnsWith(state, actor.seat, foe) + 1);
     }
     // ONE treaty countdown per pair per turn, at the pair's LOWER seat's tail —
-    // the war clock's discipline, over the pairs that are NOT at war.
+    // the war clock's discipline, over the pairs that are NOT at war. Every
+    // diplomatic AGREEMENT runs the same countdown here, and expires by
+    // reaching zero; the border grant is directed, so it ticks twice.
     for (const other of [...state.seats.map((x) => x.seat), ...(state.cityStates ?? []).map((c) => c.seat)]) {
       if (actor.seat >= other) continue;
       const bound = treatyTurnsWith(state, actor.seat, other);
       if (bound > 0) setTreatyTurnsWith(state, actor.seat, other, bound - 1);
+      if (!isCiv(other)) continue;
+      const fr = friendTurnsWith(state, actor.seat, other);
+      if (fr > 0) setFriendTurnsWith(state, actor.seat, other, fr - 1);
+      const al = allyTurnsWith(state, actor.seat, other);
+      if (al > 0) setAllyTurnsWith(state, actor.seat, other, al - 1);
+      for (const [g, h] of [[actor.seat, other], [other, actor.seat]] as const) {
+        const ob = borderTurnsFrom(state, g, h);
+        if (ob > 0) setBorderTurnsFrom(state, g, h, ob - 1);
+      }
     }
     if (!anyWar) actor.peaceTurns += 1;
     if (recU) applySeatUnitOrders(state, actor, recU.units);

@@ -1,7 +1,7 @@
 
 import type { City, GameState, Seat, Tile, Unit } from './types';
 import type { SeatCaps, SeatClass } from '../data/seats';
-import { SEAT_CAPS } from '../data/seats';
+import { AGREEMENT_TURNS, FORMAL_WAR_MIN_TURNS, SEAT_CAPS } from '../data/seats';
 import { RESOURCES } from '../../world/resources';
 import { GREAT_PEOPLE } from '../data/greatPeople';
 
@@ -86,7 +86,7 @@ export function emptySeat(seat: number): Seat {
     cities: [], nextCityId: 0,
     name: '', color: '', aggression: 0,
     warmonger: 0, ww: {}, wwTurn: {}, diplomaticFavor: 0, diplomaticPoints: 0,
-    wars: [], formalWars: [], denounced: {}, allies: [],
+    wars: [], formalWars: [], denounced: {},
     influencePoints: 0, envoysAvailable: 0,
     peaceTurns: 0,
     treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0,
@@ -232,23 +232,72 @@ export function setWarFormal(state: GameState, a: number, b: number, on: boolean
   put(sb, a);
 }
 
-export function seatsAllied(state: GameState, a: number, b: number): boolean {
-  if (a === b) return false;
-  return seatOf(state, a)?.allies.includes(b) ?? false;
+/** The DIRECTED key an Open Borders grant is stored under: `a` grants `b`. */
+export function grantKey(a: number, b: number): string {
+  return `${a}>${b}`;
 }
 
-export function setAllied(state: GameState, a: number, b: number, on: boolean): void {
+export function friendTurnsWith(state: GameState, a: number, b: number): number {
+  if (a === b) return 0;
+  return state.friendTurns?.[warClockKey(a, b)] ?? 0;
+}
+
+export function setFriendTurnsWith(state: GameState, a: number, b: number, v: number): void {
   if (a === b) return;
-  const sa = seatOf(state, a);
-  const sb = seatOf(state, b);
-  if (!sa || !sb) return;
-  const put = (s: Seat, other: number) => {
-    if (on) {
-      if (!s.allies.includes(other)) s.allies.push(other);
-    } else {
-      s.allies = s.allies.filter((x) => x !== other);
-    }
-  };
-  put(sa, b);
-  put(sb, a);
+  if (!state.friendTurns) state.friendTurns = {};
+  state.friendTurns[warClockKey(a, b)] = v;
+}
+
+export function seatsFriends(state: GameState, a: number, b: number): boolean {
+  return friendTurnsWith(state, a, b) > 0;
+}
+
+export function allyTurnsWith(state: GameState, a: number, b: number): number {
+  if (a === b) return 0;
+  return state.allyTurns?.[warClockKey(a, b)] ?? 0;
+}
+
+export function setAllyTurnsWith(state: GameState, a: number, b: number, v: number): void {
+  if (a === b) return;
+  if (!state.allyTurns) state.allyTurns = {};
+  state.allyTurns[warClockKey(a, b)] = v;
+}
+
+export function seatsAllied(state: GameState, a: number, b: number): boolean {
+  return allyTurnsWith(state, a, b) > 0;
+}
+
+/** Turns `grantor`'s OPEN BORDERS grant to `guest` still runs. Directed. */
+export function borderTurnsFrom(state: GameState, grantor: number, guest: number): number {
+  if (grantor === guest) return 0;
+  return state.borderTurns?.[grantKey(grantor, guest)] ?? 0;
+}
+
+export function setBorderTurnsFrom(state: GameState, grantor: number, guest: number, v: number): void {
+  if (grantor === guest) return;
+  if (!state.borderTurns) state.borderTurns = {};
+  state.borderTurns[grantKey(grantor, guest)] = v;
+}
+
+/** Is `a`'s denouncement of `b` still running? CIV6: "A Denunciation lasts for
+ *  30 turns, after which its effects expire." */
+export function denounceActive(state: GameState, a: number, b: number): boolean {
+  const t = seatOf(state, a)?.denounced[b];
+  return t !== undefined && state.turn - t < AGREEMENT_TURNS;
+}
+
+/** Turns `a`'s denouncement of `b` still has to run; 0 when there is none.
+ *  What the observation renders — the Formal-War window lives inside it. */
+export function denounceLeft(state: GameState, a: number, b: number): number {
+  const t = seatOf(state, a)?.denounced[b];
+  if (t === undefined) return 0;
+  return Math.max(0, AGREEMENT_TURNS - (state.turn - t));
+}
+
+/** Does `a` hold a FORMAL-WAR casus belli against `b`? CIV6: "Five turns after
+ *  denouncing a rival, you gain a Formal War Casus Belli against them" — and
+ *  it expires with the denouncement that opened it. */
+export function denounceCasusBelli(state: GameState, a: number, b: number): boolean {
+  const t = seatOf(state, a)?.denounced[b];
+  return t !== undefined && state.turn - t >= FORMAL_WAR_MIN_TURNS && state.turn - t < AGREEMENT_TURNS;
 }

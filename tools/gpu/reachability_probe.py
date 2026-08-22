@@ -52,7 +52,9 @@ import ladder  # noqa: E402
 KEYS = ("apostleBuy", "urbanization", "neighborhood", "secondShip",
         "intlRoute", "theoAdjacent", "antiquityDig",
         "csWar", "csPeace", "specPin", "tileLock", "ballot",
-        "natHistory", "conservation")
+        "natHistory", "conservation",
+        "friendship", "alliance", "openBorders", "closedStep", "workGift",
+        "defensivePact")
 
 
 def main() -> None:
@@ -60,9 +62,13 @@ def main() -> None:
     ap.add_argument("--turns", type=int, default=250)
     ap.add_argument("--deep-share", type=float, default=None,
                     help="override ladder.DEEP_SHARE for a coverage sweep")
+    ap.add_argument("--diplo-share", type=float, default=None,
+                    help="override ladder.DIPLO_SHARE for a coverage sweep")
     args = ap.parse_args()
     if args.deep_share is not None:
         ladder.DEEP_SHARE = args.deep_share
+    if args.diplo_share is not None:
+        ladder.DIPLO_SHARE = args.diplo_share
 
     rules = load_rules()
     fixtures = [load_fixture(p) for p in fixture_paths()]
@@ -107,7 +113,13 @@ def main() -> None:
                 seeds_hit[key].add(seeds[b])
                 first_turn.setdefault(key, turn + 1)
 
+    gw_before = None
     for t in range(args.turns):
+        # The DIPLOMATIC verbs are decided outside `_decide_turn`, so a probe
+        # that skips this measures a table with no agreements in it.
+        drive.geo_decide_and_apply(sim, seeds)
+        gw_before = [p[:, :sim.n_majors].clone() for p in
+                     (sim.city_gw_writing, sim.city_gw_art, sim.city_gw_music)]
         for row in seats:
             rec = drive._decide_turn(env, sim, row, roster, classes, seeds=seeds, turn=t)
             relig = rec[9]
@@ -142,6 +154,34 @@ def main() -> None:
         mark("csPeace", was_minor_war & ~minor_war, t)
         was_minor_war = minor_war
         mark("specPin", (sim.city_spec_pin >= 0).any(dim=3).any(dim=2).any(dim=1), t)
+        mark("friendship", (sim.seat_friend_turns > 0).any(dim=2).any(dim=1), t)
+        mark("alliance", (sim.seat_ally_turns > 0).any(dim=2).any(dim=1), t)
+        mark("openBorders", (sim.seat_borders_turns > 0).any(dim=2).any(dim=1), t)
+        # A CLOSED border is only a rule where a unit actually stands against
+        # one: the refusal, not the civic.
+        _ut = sim.unit_type.clamp(min=0)
+        for row in seats:
+            _mine = sim.unit_alive & (sim.unit_seat == row)
+            if not bool(_mine.any()):
+                continue
+            _nb = sim.neigh[sim.unit_tile.clamp(min=0)]
+            _shut = sim._border_closed(_nb, row, _ut.unsqueeze(2).expand_as(_nb))
+            mark("closedStep", (_shut & _mine.unsqueeze(2)).any(dim=2).any(dim=1), t)
+        # a WORK that changed hands: one seat's holding fell while the table's
+        # total held, which only the gift verb does.
+        if gw_before is not None:
+            for _now, _was in zip((sim.city_gw_writing, sim.city_gw_art, sim.city_gw_music), gw_before):
+                _n = _now[:, :sim.n_majors]
+                mark("workGift", ((_n.sum(dim=2) < _was.sum(dim=2)).any(dim=1)
+                                  & (_n.sum(dim=(1, 2)) >= _was.sum(dim=(1, 2)))), t)
+        # THE PACT'S EXACT SIGNATURE: the war head only ever marks a war FORMAL
+        # off the DECLARER's own denouncement, and writes the kind BOTH ways —
+        # so the stamp has to be absent in both directions before a formal war
+        # is a dragged ally rather than the victim's side of someone else's.
+        _R = sim.n_majors
+        _st = sim.seat_denounced[:, :_R, :_R]
+        mark("defensivePact", (sim.war[:, :_R, :_R] & sim.seat_warkind[:, :_R, :_R]
+                              & (_st < 0) & (_st.transpose(1, 2) < 0)).any(dim=2).any(dim=1), t)
         mark("tileLock", sim.tile_locked.any(dim=1), t)
         # a DIG's product is an ARTIFACT in a museum slot; the site plane
         # alone only says a site exists.
@@ -178,6 +218,16 @@ def main() -> None:
     wdone = sim.built_wonder_complete
     n_seeds_w = int(wdone.any(dim=1).sum())
     print(f"  wonders FINISHED: {int(wdone.sum())} across {n_seeds_w}/{sim.B} seeds")
+
+    _gw = sum(int(p[:, :sim.n_majors].sum()) for p in
+              (sim.city_gw_writing, sim.city_gw_art, sim.city_gw_music))
+    _slots = sum(int((sim.city_bldg[:, :sim.n_majors, :, c] & sim.city_alive[:, :sim.n_majors]).sum())
+                 for c in sim._gw_bidx if c >= 0)
+    print(f"  great works HELD at the final turn: {_gw}, in {_slots} slot buildings")
+
+    _liv = (sim.seat_friend_turns > 0).sum(), (sim.seat_ally_turns > 0).sum(), (sim.seat_borders_turns > 0).sum()
+    print(f"  agreements STANDING at the final turn (pair cells): "
+          f"{int(_liv[0])} friendship, {int(_liv[1])} alliance, {int(_liv[2])} open-borders grants")
 
     print(f"  policy cards ever slotted: {len(slotted_seen)}/{len(pol_ids)}, "
           f"at most {slotted_max} at once")

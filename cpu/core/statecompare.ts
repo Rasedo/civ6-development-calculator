@@ -41,7 +41,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import type { City, CityState, GameState, Seat, Tile, Unit } from './types';
-import { prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
+import { allyTurnsWith, borderTurnsFrom, friendTurnsWith, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
 import { EMERGENCY_SLOTS } from '../data/seats';
 import { questFor } from './observe';
 import { envoysOf } from './cityStates';
@@ -268,6 +268,22 @@ const treatyClockLine = (state: GameState, seat: number): Val => {
   return out;
 };
 
+/** The same FLAT shape for a DIPLOMATIC AGREEMENT clock: every major this
+ *  seat still holds one with, in ascending seat order, with the turns left.
+ *  `read` is the directed or symmetric accessor. */
+const agreementClockLine = (
+  state: GameState,
+  seat: number,
+  read: (state: GameState, a: number, b: number) => number,
+): Val => {
+  const out: number[] = [];
+  for (const other of state.seats.map((x) => x.seat).sort((a, b) => a - b)) {
+    const left = read(state, seat, other);
+    if (left > 0) out.push(other, left);
+  }
+  return out;
+};
+
 const GAME: Record<string, Extractor> = {
   turn: (s) => [s.turn],
   rng: (s) => [s.rngState >>> 0],
@@ -427,7 +443,10 @@ const SEAT: Record<string, Extractor> = {
       .map(Number)
       .sort((a, b) => a - b),
   ),
-  allies: overSeats((s) => [...s.allies].sort((a, b) => a - b)),
+  friendTurns: overSeats((s, state) => agreementClockLine(state, s.seat, friendTurnsWith)),
+  allyTurns: overSeats((s, state) => agreementClockLine(state, s.seat, allyTurnsWith)),
+  // DIRECTED: what this seat GRANTS, never what it was granted.
+  borderTurns: overSeats((s, state) => agreementClockLine(state, s.seat, borderTurnsFrom)),
   tilesPurchased: overSeats((s) => s.tilesPurchased),
 };
 

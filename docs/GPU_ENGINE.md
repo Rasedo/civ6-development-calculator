@@ -44,8 +44,12 @@ at the site that means it. There is no `R`.
   `citystate_at` is a cached DERIVED property keyed on `_tile_owner_ver` —
   never write it; write `tile_seat` and bump the version. Ownership is
   `tile_seat == row`, always.
-- Relations: `war/ww/ww_turns` and `seat_warkind/denounced/allied` over
-  the compact seat-row space, `seat_citystate_*` (seat, city-state) pairs.
+- Relations: `war/ww/ww_turns` and `seat_warkind`/`seat_denounced` over the
+  compact seat-row space, `seat_citystate_*` (seat, city-state) pairs. Every
+  diplomatic AGREEMENT is a per-pair COUNTDOWN in the same space:
+  `seat_friend_turns` and `seat_ally_turns` are symmetric,
+  `seat_borders_turns` is DIRECTED (row grants column), and a denouncement
+  needs no plane of its own — its turn stamp IS its clock.
 
 The four surviving `register_alias` entries are all one geometry the row
 index cannot reach: a city-state's city at `[:, n_majors+s, 0]`.

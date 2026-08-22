@@ -473,6 +473,8 @@ export function artifactTourism(city: ArtCity): number {
   return (city.artifacts ?? 0) * ARTIFACT_TOURISM * (museumThemed(city) ? THEMING_MULT : 1);
 }
 export const GW_SLOTS = [2, 3, 1] as const;
+/** How many KINDS of Great Work there are — writing, art, music. */
+export const GW_KINDS = 3;
 /** CIV6: Great Work slots a COMPLETE wonder adds to its city, in kind order
  *  (writing, art, music) — additive with GW_BUILDINGS' slots, so a wonder
  *  holds works in a city with no Amphitheater at all. Great Library "+2 Great
@@ -588,6 +590,46 @@ function gwSet(city: GwCity, kind: number, n: number): void {
   else city.greatWorksMusic = n;
 }
 
+/** How many works of `kind` this city can hold: the slot BUILDING's own,
+ *  plus whatever its completed wonders add. */
+export function gwCapacity(city: GwCity & { buildings: string[] }, kind: number, extra = 0): number {
+  return (city.buildings.includes(GW_BUILDINGS[kind]) ? GW_SLOTS[kind] : 0) + extra;
+}
+
+/** Hand a work OUT of this city, returning the provenance it was made with
+ *  ([-1, -1] for the two kinds that carry none). The LAST slot goes: the
+ *  museum fills from the front, so it is the only one whose removal leaves
+ *  the rest contiguous. */
+export function gwTake(city: GwCity, kind: number): [number, number] {
+  const used = gwCount(city, kind);
+  let prov: [number, number] = [-1, -1];
+  if (kind === GW_ART) {
+    const types = (city.gwArtType ??= []);
+    const artists = (city.gwArtArtist ??= []);
+    const at = used - 1;
+    if (at >= 0 && at < GW_SLOTS[GW_ART]) {
+      prov = [types[at] ?? -1, artists[at] ?? -1];
+      types[at] = -1;
+      artists[at] = -1;
+    }
+  }
+  gwSet(city, kind, Math.max(0, used - 1));
+  return prov;
+}
+
+/** Take a work IN, with the provenance it was made with — a gifted work is
+ *  still that artist's, which is what the receiving museum themes on. */
+export function gwGive(city: GwCity, kind: number, prov: [number, number]): void {
+  const used = gwCount(city, kind);
+  if (kind === GW_ART) {
+    const types = (city.gwArtType ??= []);
+    const artists = (city.gwArtArtist ??= []);
+    for (let s = types.length; s < GW_SLOTS[GW_ART]; s++) { types[s] = -1; artists[s] = -1; }
+    if (used < GW_SLOTS[GW_ART]) { types[used] = prov[0]; artists[used] = prov[1]; }
+  }
+  gwSet(city, kind, used + 1);
+}
+
 /**
  * PRINTING doubles the TOURISM of Great Works of WRITING (real
  * Civ 6 — verified against the Civilization wiki's Printing/Great Work pages;
@@ -684,14 +726,13 @@ export function placeGreatWorks(
   extra?: (city: GwCity & { buildings: string[] }) => number,
   artist = 0,
 ): number {
-  const building = GW_BUILDINGS[kind];
   const per: number = GW_WORKS_PER_PERSON[kind];
   let remaining: number = per;
   for (const c of cities) {
     if (remaining <= 0) break;
     // Capacity is the BUILDING's slots plus any wonder's, so a wonder holds
     // works in a city with no Amphitheater at all — which is how Civ 6 works.
-    const cap = (c.buildings.includes(building) ? GW_SLOTS[kind] : 0) + (extra?.(c) ?? 0);
+    const cap = gwCapacity(c, kind, extra?.(c) ?? 0);
     const used = gwCount(c, kind);
     const open = cap - used;
     if (open <= 0) continue;

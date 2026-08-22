@@ -1,36 +1,43 @@
-"""Geopolitics self-test — the gate-UNREACHABLE per-pair war surfaces the
-scripted rollout touches only organically (denounce gating, FORMAL-vs-SURPRISE
-stamping, the head's declare/peace gates, war-weariness accrual, seat-to-seat
-city transfer hygiene).
+"""Geopolitics self-test — the gate-UNREACHABLE per-pair diplomatic surfaces
+the scripted rollout touches only organically (the agreement clocks, denounce
+gating, FORMAL-vs-SURPRISE stamping, the head's declare/peace gates,
+war-weariness accrual, seat-to-seat city transfer hygiene).
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
     $env:PYTHONUTF8='1'; python tests/gpu/geopolitics_test.py
 
 Every poke builds a BatchSim from a fixture, forces the state in-memory, then
-drives the EXACT engine surface: drive._geo_turn decides the denounce/ally
-scans and `_geo_denounce_and_ally` re-validates and executes them, while
-DECLARING and SUING ride `_apply_war_column` — each seat's own war head, the
-one entry; plus _seat_phase and _transfer_city. Thresholds come from
-rules.json (never hardcoded).
+drives the EXACT engine surface: drive._geo_turn decides the five agreement
+scans and `_geo_agreements` re-validates and executes them, while DECLARING
+and SUING ride `_apply_war_column` — each seat's own war head, the one entry;
+plus _seat_phase and _transfer_city. Thresholds come from rules.json (never
+hardcoded).
 
 EVERY PAIR PLANE IS INDEXED BY SEAT ROW, seat 0 included: `seat_denounced`,
-`seat_warkind`, `seat_allied`, `war` and `war_turns` are all [.., 1+R, 1+R]
-and row 0 is a row like any other. The pokes below drive the SAME arm for a
-civ↔civ pair and for a pair seat 0 is in, and assert the same rules.
+`seat_warkind`, `seat_friend_turns`, `seat_ally_turns`,
+`seat_borders_turns`, `war` and `war_turns` are all [.., 1+R, 1+R] and row 0
+is a row like any other. The pokes below drive the SAME arm for a civ↔civ pair
+and for a pair seat 0 is in, and assert the same rules.
 
 Covered:
-  a. Substrate: war/seat_warkind symmetric with a false diagonal; all four
-     pair tensors (incl. the directed seat_denounced) survive snapshot/restore
-     (_MUTABLE coverage).
+  a. Substrate: war/seat_warkind symmetric with a false diagonal; every pair
+     tensor (incl. the directed seat_denounced and seat_borders_turns)
+     survives snapshot/restore (_MUTABLE coverage).
   b. Denounce: strictly-stronger + in-proximity + not-at-war stamps the turn;
-     the weaker side never stamps back; a grudge is set ONCE (no re-stamp); an
-     at-war pair does not stamp.
-  c. DoW kind: a stamp >= formalWarMinTurns old makes the war FORMAL; a younger
-     stamp or no stamp is SURPRISE; war writes are symmetric — for a civ↔civ
-     pair AND for a war seat 0 declares, through the one applier.
-  d. The head's DoW gates: ALLIES are never declared on, an existing war is a
-     no-op (no second grievance, no clock reset), and a declaration bumps the
-     aggressor's grievances by warmongerDow exactly once.
+     the weaker side never stamps back; a STANDING denouncement is never
+     re-stamped and an EXPIRED one may be renewed; an at-war pair does not
+     stamp.
+  c. DoW kind: a stamp between formalWarMinTurns and agreementTurns old makes
+     the war FORMAL; a younger stamp, an expired one or no stamp is SURPRISE;
+     war writes are symmetric — for a civ↔civ pair AND for a war seat 0
+     declares, through the one applier.
+  d. The head's DoW gates: ALLIES and Declared Friends are never declared on,
+     an existing war is a no-op (no second grievance, no clock reset), and a
+     declaration bumps the aggressor's grievances by warmongerDow exactly once.
+  i. The agreements themselves: friendship unlocks the alliance and the
+     alliance needs its civic, the border grant is DIRECTED and needs the
+     grantor's civic, war cancels the grant, an ally is dragged into a
+     defensive war, and a Great Work changes hands with its provenance.
   e. Peace: refused below warMinTurns and refused when broke; once priced and
      paid it clears the war both directions, clears the FORMAL flag, zeroes
      BOTH rows' peace clocks and restarts the pair's war clock, while the
@@ -61,14 +68,15 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "policy"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
+from core.simbase import BARB_SEAT
 from warmup import settle_all
 import drive
 
 
-# The denounce/ally pass: the ported scans decide, the engine arm re-validates.
+# The agreement pass: the ported scans decide, the engine arm re-validates.
 def geo_denounce(sim) -> None:
     drive.geo_decide_and_apply(sim)
-    sim._geo_denounce_and_ally()
+    sim._geo_agreements()
 
 
 # Declaring and suing ride the seat's OWN war head — `war_targets(row)` order,
@@ -104,7 +112,8 @@ def clear_pairs(sim):
     sim.war_turns[:, :nrow, :nrow] = 0
     sim.seat_warkind[:, :nrow, :nrow] = False
     sim.seat_denounced[:, :nrow, :nrow] = -1
-    sim.seat_allied[:, :nrow, :nrow] = False
+    for _p in (sim.seat_friend_turns, sim.seat_ally_turns, sim.seat_borders_turns):
+        _p[:, :nrow, :nrow] = 0
     sim.ww[:] = 0
 
 
@@ -142,6 +151,214 @@ def controlled_pair(rules, path, extra_for_a: bool = True):
 
 
 # ------------------------------------------------------------------ pokes -----
+def want(sim, row: int, verb: str, target: int, kind: int | None = None):
+    """Hand ONE want-mask to the engine arm and let it re-validate. The driver
+    decides these; a poke names the pair directly so the RULE is what is under
+    test, never the scan that proposed it."""
+    if kind is None:
+        m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=sim.device)
+        m[:, target] = True
+    else:
+        m = torch.zeros(sim.B, 3, sim.n_majors, dtype=torch.bool, device=sim.device)
+        m[:, kind, target] = True
+    sim.apply_geo(row, **{verb: m})
+    sim._geo_agreements()
+
+
+def poke_agreements(rules, path):
+    """i. The four AGREEMENTS and the gift, each on its own sourced gate."""
+    sim, _, _ = controlled_pair(rules, path)
+    term = int(sim._agreement_turns)
+    al_c, ob_c = int(sim._alliance_civic), int(sim._open_borders_civic)
+    assert al_c >= 0 and ob_c >= 0, "the two agreement civics must export"
+
+    # CIV6: "You can only enter into an Alliance with a civilization if you and
+    # its leader are Declared Friends", and the civic comes first either way.
+    sim.civ_civics[:, 1, al_c] = True
+    want(sim, 1, "ally", 2)
+    assert int(sim.seat_ally_turns[0, 1, 2]) == 0, "an alliance needs a Declared Friend"
+    want(sim, 1, "friend", 2)
+    assert int(sim.seat_friend_turns[0, 1, 2]) == term, "friendship runs the agreement term"
+    assert int(sim.seat_friend_turns[0, 2, 1]) == term, "friendship is symmetric"
+    sim.civ_civics[:, 1, al_c] = False
+    want(sim, 1, "ally", 2)
+    assert int(sim.seat_ally_turns[0, 1, 2]) == 0, "an alliance needs the Civil Service civic"
+    sim.civ_civics[:, 1, al_c] = True
+    want(sim, 1, "ally", 2)
+    assert int(sim.seat_ally_turns[0, 1, 2]) == term, "friends with the civic ALLY"
+    assert int(sim.seat_ally_turns[0, 2, 1]) == term, "an alliance is symmetric"
+
+    # CIV6: "You cannot denounce Declared Friends or Allies."
+    want(sim, 1, "denounce", 2)
+    assert int(sim.seat_denounced[0, 1, 2]) == -1, "an ally cannot be denounced"
+
+    # CIV6 (Open Borders): the grant is DIRECTED and needs the grantor's civic.
+    clear_pairs(sim)
+    want(sim, 1, "borders", 2)
+    assert int(sim.seat_borders_turns[0, 1, 2]) == 0, "the grant needs Early Empire"
+    sim.civ_civics[:, 1, ob_c] = True
+    want(sim, 1, "borders", 2)
+    assert int(sim.seat_borders_turns[0, 1, 2]) == term, "the grantor's own civic opens it"
+    assert int(sim.seat_borders_turns[0, 2, 1]) == 0, (
+        "granting open borders must NOT grant them back"
+    )
+    # ...and a denouncement in EITHER direction closes the offer.
+    clear_pairs(sim)
+    sim.seat_denounced[0, 2, 1] = int(sim.turn)
+    want(sim, 1, "borders", 2)
+    assert int(sim.seat_borders_turns[0, 1, 2]) == 0, "a denouncer is granted nothing"
+
+    # A DECLARED war cancels the grant both ways.
+    clear_pairs(sim)
+    sim.seat_borders_turns[0, 1, 2] = sim.seat_borders_turns[0, 2, 1] = term
+    head_war(sim, 1, 2)
+    assert bool(sim.war[0, 1, 2]), "the declaration must land for the rest of this check"
+    assert int(sim.seat_borders_turns[0, 1, 2]) == 0 and int(sim.seat_borders_turns[0, 2, 1]) == 0, (
+        "war opens the border the grant was lifting"
+    )
+
+    # CIV6 (Defensive Pact): an ally of the VICTIM joins; an ally of the
+    # AGGRESSOR does not, and the dragged ally pays no grievance.
+    clear_pairs(sim)
+    sim.civ_warmonger[:] = 0
+    sim.seat_ally_turns[0, 0, 2] = sim.seat_ally_turns[0, 2, 0] = term
+    head_war(sim, 1, 2)
+    assert bool(sim.war[0, 0, 1]) and bool(sim.war[0, 1, 0]), (
+        "the victim's ally must be dragged into the war"
+    )
+    assert bool(sim.seat_warkind[0, 0, 1]), "an obligation answered is a FORMAL war"
+    assert int(sim.civ_warmonger[0, 0]) == 0, "the dragged ally earns no grievances"
+    clear_pairs(sim)
+    sim.civ_warmonger[:] = 0
+    sim.seat_ally_turns[0, 0, 1] = sim.seat_ally_turns[0, 1, 0] = term
+    head_war(sim, 1, 2)
+    assert not bool(sim.war[0, 0, 2]), "an AGGRESSOR's ally is never dragged in"
+
+    # THE COUNTDOWN, at the pair's lower row's tail: symmetric clocks tick
+    # once, the directed grant ticks in both directions.
+    clear_pairs(sim)
+    sim.seat_friend_turns[0, 1, 2] = sim.seat_friend_turns[0, 2, 1] = 2
+    sim.seat_ally_turns[0, 1, 2] = sim.seat_ally_turns[0, 2, 1] = 2
+    sim.seat_borders_turns[0, 1, 2] = 2
+    sim.seat_borders_turns[0, 2, 1] = 1
+    live = torch.ones(sim.B, dtype=torch.bool, device=sim.device)
+    for r in range(sim.n_majors):
+        sim._seat_war_peace_tail(r, live)
+    assert int(sim.seat_friend_turns[0, 1, 2]) == 1 and int(sim.seat_friend_turns[0, 2, 1]) == 1
+    assert int(sim.seat_ally_turns[0, 1, 2]) == 1 and int(sim.seat_ally_turns[0, 2, 1]) == 1
+    assert int(sim.seat_borders_turns[0, 1, 2]) == 1, "the outgoing grant ticks"
+    assert int(sim.seat_borders_turns[0, 2, 1]) == 0, "the incoming grant EXPIRES at zero"
+    for r in range(sim.n_majors):
+        sim._seat_war_peace_tail(r, live)
+    assert int(sim.seat_ally_turns[0, 1, 2]) == 0, "an alliance expires by reaching zero"
+    assert int(sim.seat_borders_turns[0, 2, 1]) == 0, "an expired clock never goes negative"
+    print(f"  i agreements OK (friendship -> alliance, {term}-turn terms, directed grant, "
+          "defensive pact, countdown)")
+
+
+def poke_gift(rules, path):
+    """i2. A GREAT WORK changes hands: out of the giver's first holding city,
+    into the taker's first with room, provenance and all."""
+    sim, _, _ = controlled_pair(rules, path)
+    kind, bcol = 1, sim._gw_bidx[1]
+    if bcol < 0:
+        print("  i2 gift SKIPPED (no ART slot building in the catalog)")
+        return
+    ja = int(sim.city_alive[0, 1].nonzero(as_tuple=True)[0][0])
+    jb = int(sim.city_alive[0, 2].nonzero(as_tuple=True)[0][0])
+    sim.city_bldg[0, 1, ja, bcol] = True
+    sim.city_bldg[0, 2, jb, bcol] = True
+    sim.city_gw_art[0, 1, ja] = 1
+    sim.city_gwart_type[0, 1, ja, 0] = 7
+    sim.city_gwart_artist[0, 1, ja, 0] = 3
+
+    want(sim, 1, "gift", 2, kind=kind)
+    assert int(sim.city_gw_art[0, 1, ja]) == 0, "the giver loses the work"
+    assert int(sim.city_gw_art[0, 2, jb]) == 1, "the taker gains it"
+    assert int(sim.city_gwart_type[0, 1, ja, 0]) == -1, "the giver's slot empties"
+    assert int(sim.city_gwart_artist[0, 1, ja, 0]) == -1, "...artist and all"
+    assert int(sim.city_gwart_type[0, 2, jb, 0]) == 7, "the work keeps WHAT it is"
+    assert int(sim.city_gwart_artist[0, 2, jb, 0]) == 3, "...and WHO made it"
+
+    # nothing to give, and nowhere to put it, are both refusals
+    want(sim, 1, "gift", 2, kind=kind)
+    assert int(sim.city_gw_art[0, 2, jb]) == 1, "a seat with no work gives nothing"
+    sim.city_gw_art[0, 1, ja] = 1
+    sim.city_gw_art[0, 2, jb] = int(sim._gw_slots_k[1])
+    want(sim, 1, "gift", 2, kind=kind)
+    assert int(sim.city_gw_art[0, 1, ja]) == 1, "a full receiver refuses the gift"
+    # CIV6 (Trading): "You can trade with all the leaders except the ones
+    # you're at war with."
+    sim.city_gw_art[0, 2, jb] = 0
+    sim.war[0, 1, 2] = sim.war[0, 2, 1] = True
+    sim.sync_war()
+    want(sim, 1, "gift", 2, kind=kind)
+    assert int(sim.city_gw_art[0, 1, ja]) == 1, "a seat at war gives nothing"
+    print("  i2 gift OK (work + provenance move, empty/full/at-war all refuse)")
+
+
+def poke_closed_border(rules, path):
+    """i3. The border itself: `_border_closed` over one foreign tile, every
+    lift the source names, and the two unit classes that ignore it."""
+    sim = build(rules, path)
+    ob_c = int(sim._open_borders_civic)
+    term = int(sim._agreement_turns)
+    tile = (sim.tile_seat[0] == 2).nonzero(as_tuple=True)[0]
+    assert len(tile), "seed row 2 owns no tile at the poke turn"
+    t = tile[0].reshape(1, 1)
+
+    def shut(row, utype=None):
+        return bool(sim._border_closed(t, row, utype)[0, 0])
+
+    sim.civ_civics[:, 2, ob_c] = False
+    assert not shut(1), "ground is open until its owner takes Early Empire"
+    sim.civ_civics[:, 2, ob_c] = True
+    assert shut(1), "Early Empire closes the owner's ground to a foreign major"
+    assert not shut(2), "a seat is never shut out of its own ground"
+
+    sim.seat_borders_turns[0, 2, 1] = term
+    assert not shut(1), "the OWNER's grant lets this seat in"
+    sim.seat_borders_turns[0, 2, 1] = 0
+    sim.seat_borders_turns[0, 1, 2] = term
+    assert shut(1), "granting passage the other way lets nobody in"
+    sim.seat_borders_turns[0, 1, 2] = 0
+
+    sim.seat_ally_turns[0, 1, 2] = sim.seat_ally_turns[0, 2, 1] = term
+    assert not shut(1), "CIV6: allies automatically have Open Borders"
+    sim.seat_ally_turns[0, 1, 2] = sim.seat_ally_turns[0, 2, 1] = 0
+
+    sim.war[0, 1, 2] = sim.war[0, 2, 1] = True
+    sim.sync_war()
+    assert not shut(1), "war opens what the civic closed"
+    sim.war[0, 1, 2] = sim.war[0, 2, 1] = False
+    sim.sync_war()
+    assert shut(1), "and peace closes it again"
+
+    # CIV6 (Movement): "Traders ignore borders" / "Religious units also ignore
+    # borders". Everything else is bound.
+    ut = torch.full((1, 1), sim._trader_idx, dtype=torch.long, device=sim.device)
+    assert not shut(1, ut), "a Trader ignores borders"
+    rel = (sim._rel_strength > 0).nonzero(as_tuple=True)[0]
+    assert len(rel), "the roster must carry a religious unit"
+    assert not shut(1, torch.full((1, 1), int(rel[0]), dtype=torch.long, device=sim.device)), (
+        "a religious unit ignores borders"
+    )
+    war_idx = int((sim._type_combat > 0).nonzero(as_tuple=True)[0][0])
+    assert shut(1, torch.full((1, 1), war_idx, dtype=torch.long, device=sim.device)), (
+        "a military unit is bound by the border"
+    )
+
+    # A CITY-STATE's ground never closes, and a barbarian is never bound.
+    if sim.S > 0:
+        cs_tile = (sim.tile_seat[0] >= 100).nonzero(as_tuple=True)[0]
+        if len(cs_tile):
+            assert not bool(sim._border_closed(cs_tile[0].reshape(1, 1), 1)[0, 0]), (
+                "city-state ground carries no Early Empire to close it"
+            )
+    assert not bool(sim._border_closed(t, BARB_SEAT)[0, 0]), "a barbarian asks nobody"
+    print("  i3 closed border OK (civic, grant direction, ally, war, trader/religious exemptions)")
+
+
 def poke_substrate(rules, path):
     """a. Pair-matrix shape/symmetry + _MUTABLE snapshot/restore coverage. The
     block under test spans EVERY major row, seat 0 included — the round that
@@ -150,24 +367,28 @@ def poke_substrate(rules, path):
     nrow = sim.n_majors
     assert sim.war.dtype == torch.bool and sim.seat_warkind.dtype == torch.bool
     assert sim.seat_denounced.dtype == torch.long and sim.war_turns.dtype == torch.long
-    for _p in ("seat_warkind", "seat_denounced", "seat_allied"):
+    for _p in ("seat_warkind", "seat_denounced", "seat_friend_turns",
+               "seat_ally_turns", "seat_borders_turns"):
         _t = getattr(sim, _p)
         assert _t.shape[1] >= nrow and _t.shape[2] >= nrow, (
             f"{_p} must be a seat-PAIR plane covering row 0 (got {tuple(_t.shape)})"
         )
     diag = torch.arange(nrow)
     assert not bool(sim.war[0, diag, diag].any()), "the war diagonal must stay false"
-    for _p in ("war", "seat_warkind", "seat_allied"):
+    for _p in ("war", "seat_warkind", "seat_friend_turns", "seat_ally_turns"):
         blk = getattr(sim, _p)[0, :nrow, :nrow]
         assert bool((blk == blk.T).all()), f"the organic major block of {_p} must be symmetric"
 
     snap = sim.snapshot()
-    keep = {p: getattr(sim, p).clone() for p in ("war", "war_turns", "seat_warkind", "seat_denounced", "seat_allied")}
+    keep = {p: getattr(sim, p).clone() for p in ("war", "war_turns", "seat_warkind", "seat_denounced",
+                                                 "seat_friend_turns", "seat_ally_turns", "seat_borders_turns")}
     sim.war[:, :nrow, :nrow] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     sim.war_turns[:] = 11
     sim.seat_warkind[:] = True
-    sim.seat_allied[:] = True
+    sim.seat_friend_turns[:] = 5
+    sim.seat_ally_turns[:] = 5
+    sim.seat_borders_turns[:] = 5
     sim.seat_denounced[:] = 7
     sim.restore(snap)
     for _p, _v in keep.items():
@@ -185,9 +406,18 @@ def poke_denounce(rules, path):
     assert int(sim.seat_denounced[0, 1, 2]) == t, "the stronger row must stamp its grudge with the current turn"
     assert int(sim.seat_denounced[0, 2, 1]) == -1, "the strictly-weaker side must never stamp back"
 
-    sim.seat_denounced[0, 1, 2] = 3  # grudge persistence: set once, never re-stamped
+    sim.seat_denounced[0, 1, 2] = 3  # a STANDING denouncement is never re-stamped
     geo_denounce(sim)
-    assert int(sim.seat_denounced[0, 1, 2]) == 3, "an existing grudge must not be re-stamped"
+    assert int(sim.seat_denounced[0, 1, 2]) == 3, "a standing denouncement must not be re-stamped"
+
+    # CIV6: "A Denunciation lasts for 30 turns, after which its effects
+    # expire" — and an expired one may be renewed.
+    term = int(sim._agreement_turns)
+    sim.seat_denounced[0, 1, 2] = t - term
+    assert not bool(sim._denounce_active(1, 2)[0]), f"a denouncement must expire at {term} turns"
+    assert bool(sim._denounce_active(1, 2)[0].logical_not()), "expiry is the clock reaching zero"
+    geo_denounce(sim)
+    assert int(sim.seat_denounced[0, 1, 2]) == t, "an EXPIRED denouncement may be renewed"
 
     sim.seat_denounced[0, 1, 2] = -1
     sim.war[0, 1, 2] = sim.war[0, 2, 1] = True  # at-war pairs skip
@@ -219,6 +449,14 @@ def poke_dow_kind(rules, path):
     head_war(sim, 1, 2)
     assert bool(sim.war[0, 1, 2]) and not bool(sim.seat_warkind[0, 1, 2]), "a no-grudge war must be SURPRISE"
 
+    # ...and the casus belli EXPIRES with the denouncement that opened it.
+    clear_pairs(sim)
+    sim.seat_denounced[0, 1, 2] = t - int(sim._agreement_turns)
+    head_war(sim, 1, 2)
+    assert bool(sim.war[0, 1, 2]) and not bool(sim.seat_warkind[0, 1, 2]), (
+        "an EXPIRED denouncement carries no casus belli"
+    )
+
     # ROW 0 IS A ROW: the same head, the same applier, the same two outcomes.
     clear_pairs(sim)
     sim.seat_denounced[0, 0, 1] = t - fmin
@@ -244,13 +482,22 @@ def poke_dow_gates(rules, path):
     sim, _, _ = controlled_pair(rules, path)
     wm_dow = int(sim._wm_dow)
 
-    sim.seat_allied[0, 1, 2] = sim.seat_allied[0, 2, 1] = True
+    sim.seat_ally_turns[0, 1, 2] = sim.seat_ally_turns[0, 2, 1] = 30
     head_war(sim, 1, 2)
     assert not bool(sim.war[0, 1, 2]), "an ALLY must never be declared on"
     assert int(sim.civ_warmonger[0, 1]) == 0, "a refused declaration must not earn grievances"
 
+    # CIV6 (Declaring Friendship): Declared Friends "cannot undertake hostile
+    # actions (such as Denouncing or going to war) against each other".
+    clear_pairs(sim)
+    sim.civ_warmonger[0, 1] = 0
+    sim.seat_friend_turns[0, 1, 2] = sim.seat_friend_turns[0, 2, 1] = 30
+    head_war(sim, 1, 2)
+    assert not bool(sim.war[0, 1, 2]), "a Declared Friend must never be declared on"
+
     # the same gate on seat 0's own axis
-    sim.seat_allied[0, 0, 1] = sim.seat_allied[0, 1, 0] = True
+    clear_pairs(sim)
+    sim.seat_ally_turns[0, 0, 1] = sim.seat_ally_turns[0, 1, 0] = 30
     head_war(sim, 0, 1)
     assert not bool(sim.war[0, 0, 1]), "seat 0 must not declare on its ally either"
 
@@ -463,6 +710,9 @@ def main() -> None:
     poke_denounce(rules, path)
     poke_dow_kind(rules, path)
     poke_dow_gates(rules, path)
+    poke_agreements(rules, path)
+    poke_closed_border(rules, path)
+    poke_gift(rules, path)
     poke_peace(rules, path)
     poke_ww_differential(rules, path)
     poke_transfer(rules, path)

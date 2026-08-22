@@ -1244,7 +1244,6 @@ export function deserialize(json: string): GameState {
   for (const s of allSeats(state)) {
     s.wars ??= [];
     s.formalWars ??= [];
-    s.allies ??= [];
     s.denounced ??= {};
   }
   for (const s of allSeats(state)) {
