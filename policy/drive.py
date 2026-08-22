@@ -171,7 +171,7 @@ def _spread_targets(sim, seat: int) -> torch.Tensor:
         relig = torch.zeros_like(pres)
         if sim._missionary_idx >= 0:
             relig = relig | (vt == sim._missionary_idx)
-        if getattr(sim, "_apostle_idx", -1) >= 0:
+        if sim._apostle_idx >= 0:
             relig = relig | (vt == sim._apostle_idx)
         rows = pres & relig & (charges[:, n] > 0) & done
         if not bool(rows.any()):
@@ -197,7 +197,7 @@ def _settle_targets(sim, seat: int):
     T = sim.T
     out = torch.full((B, N), -1, dtype=torch.long, device=dev)
     ok = torch.zeros(B, T, dtype=torch.bool, device=dev)
-    if getattr(sim, "_settler_idx", -1) < 0 or getattr(sim, "_A_FOUND", -1) < 0:
+    if sim._settler_idx < 0 or sim._A_FOUND < 0:
         return out, ok
     is_settler = present & (types == sim._settler_idx)
     under_cap = sim.city_alive[:, seat].sum(dim=1) < int(sim.rules.seats.get("maxCities", 6))
@@ -241,7 +241,7 @@ def _dig_targets(sim, seat: int) -> torch.Tensor:
     smap, present, tiles, types, charges = _seat_units(sim, seat)
     B, N = smap.shape
     out = torch.full((B, N), -1, dtype=torch.long, device=sim.device)
-    if getattr(sim, "_archaeologist_idx", -1) < 0 or getattr(sim, "_A_EXCAVATE", -1) < 0:
+    if sim._archaeologist_idx < 0 or sim._A_EXCAVATE < 0:
         return out
     allt = torch.arange(sim.T, device=sim.device).reshape(1, -1).expand(B, -1)
     digs = sim._dig_here(seat, allt) & ((sim.tile_seat < 0) | (sim.tile_seat == seat))
@@ -270,7 +270,7 @@ def _park_targets(sim, seat: int) -> torch.Tensor:
     smap, present, tiles, types, _charges = _seat_units(sim, seat)
     B, N = smap.shape
     out = torch.full((B, N), -1, dtype=torch.long, device=sim.device)
-    if getattr(sim, "_naturalist_idx", -1) < 0 or getattr(sim, "_A_PARK", -1) < 0:
+    if sim._naturalist_idx < 0 or sim._A_PARK < 0:
         return out
     allt = torch.arange(sim.T, device=sim.device).reshape(1, -1).expand(B, -1)
     anchors = sim._park_cluster_legal(seat, sim._park_cluster(allt)).any(dim=2)
@@ -321,7 +321,7 @@ def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
         w_key = torch.where(closer, d_nb * 8 + torch.arange(6, device=um.device), torch.full_like(d_nb, 2 ** 30))
         has_w = walkers & closer.any(dim=2)
         orders0 = torch.where(has_w, w_key.argmin(dim=2), orders0)
-    A_SP = getattr(sim, "_A_SPREAD", -1)
+    A_SP = sim._A_SPREAD
     if A_SP >= 0 and bool((spread_t >= 0).any()):
         d_sp = sim.pair_dist[tiles.clamp(min=0), spread_t.clamp(min=0)].to(torch.long)
         close = (spread_t >= 0) & present & (d_sp <= 1)
@@ -336,8 +336,8 @@ def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
             valid_dir = (tiles == spread_t) | dir_hit.any(dim=2)
             take_sp = close & valid_dir
             orders0 = torch.where(take_sp, A_SP + dcol, orders0)
-    A_F = getattr(sim, "_A_FOUND", -1)
-    if A_F >= 0 and getattr(sim, "_settler_idx", -1) >= 0:
+    A_F = sim._A_FOUND
+    if A_F >= 0 and sim._settler_idx >= 0:
         is_settler = present & (_types == sim._settler_idx)
         if bool(is_settler.any()) and um.shape[2] > A_F:
             # FOUND only where canFoundCity's own terms say yes: the mask
@@ -346,20 +346,22 @@ def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
             # refused verb forever.
             take_f = is_settler & um[:, :, A_F] & found_ok.gather(1, tiles.clamp(min=0))
             orders0 = torch.where(take_f, torch.full_like(orders0, A_F), orders0)
-    A_X = getattr(sim, "_A_EXCAVATE", -1)
+    A_X = sim._A_EXCAVATE
     if A_X >= 0 and um.shape[2] > A_X:
         # standing ON the dig: work it. The mask carries every legality term,
         # so the pick is "the column is open", never a second opinion.
         take_x = present & (dig_t >= 0) & (tiles == dig_t) & um[:, :, A_X]
         orders0 = torch.where(take_x, torch.full_like(orders0, A_X), orders0)
-    A_PK = getattr(sim, "_A_PARK", -1)
+    A_PK = sim._A_PARK
     if A_PK >= 0 and um.shape[2] > A_PK:
         take_pk = present & um[:, :, A_PK]
         orders0 = torch.where(take_pk, torch.full_like(orders0, A_PK), orders0)
     if bool(on_job.any()):
-        W_u = um.shape[2]
-        rep_ok = um[:, :, 17] if W_u > 17 else torch.zeros_like(on_job)
-        bcols = list(range(13, 16)) + list(range(18, min(getattr(sim, "_A_PILLAGE", 25), W_u)))
+        # BY NAME, never by column number: the BUILD_* verbs are a RUN in the
+        # middle of the action table, so an inserted verb walks a hardcoded
+        # range onto the wrong column. `_A_IMP` is that run, roster-ordered.
+        rep_ok = um[:, :, sim._A_REPAIR]
+        bcols = [c for c in sim._A_IMP if c >= 0]
         bmask = torch.stack([um[:, :, c] for c in bcols], dim=2) if bcols else None
         pick_b = torch.full_like(orders0, -1)
         if bmask is not None:
@@ -367,7 +369,7 @@ def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
             firstb = bmask.float().argmax(dim=2)
             colt = torch.tensor(bcols, device=um.device)
             pick_b = torch.where(hasb, colt[firstb], pick_b)
-        chosen = torch.where(rep_ok, torch.full_like(orders0, 17), pick_b)
+        chosen = torch.where(rep_ok, torch.full_like(orders0, sim._A_REPAIR), pick_b)
         take_b = on_job & (chosen >= 0)
         orders0 = torch.where(take_b, chosen, orders0)
     return orders0, job_t, spread_t, settle_t, um, uo
@@ -700,6 +702,10 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     smap = sim._seat_slot_map(row)
     cur = sim.unit_tile.gather(1, smap.clamp(min=0))
     at_war_rows = uo[:, :, ladder.U_ATWAR] > 0
+    # the march targets are chosen ONCE, off the rank-0 positions, and the
+    # later ranks walk toward them; recomputing per rank would let a unit
+    # re-aim mid-plan at somebody the phase has not seen it approach.
+    vplan_tgts = None
     for _k in range(1, max_steps):
         prev = ranks[-1]
         moving = (prev >= 0) & (prev < 6)
@@ -712,17 +718,15 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
         # war rows: toward the recorded war target; peace rows: toward home,
         # respecting the stop radius. Distances are read-only pair_dist plans;
         # terrain/occupancy legality is the PHASE's re-validation problem.
-        wt = getattr(sim, "_vplan_wt", None)
-        if wt is None or wt.get("row") != row:
-            tgts = torch.full((B2, N2), -1, dtype=torch.long, device=sim.device)
+        if vplan_tgts is None:
+            vplan_tgts = torch.full((B2, N2), -1, dtype=torch.long, device=sim.device)
             for n in range(N2):
                 if not bool((smap[:, n] >= 0).any()):
                     break
                 tgt_n, hi, hcty = sim._war_march_target(cur[:, n].clamp(min=0), row)
                 has = hi | hcty
-                tgts[:, n] = torch.where(has, tgt_n, tgts[:, n])
-            sim._vplan_wt = {"row": row, "tgts": tgts}
-        tgts = sim._vplan_wt["tgts"]
+                vplan_tgts[:, n] = torch.where(has, tgt_n, vplan_tgts[:, n])
+        tgts = vplan_tgts
         for n in range(N2):
             rows_mv = moving[:, n]
             if not bool(rows_mv.any()):
@@ -745,7 +749,6 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
         if not bool((nxt >= 0).any()):
             ranks.pop()
             break
-    sim._vplan_wt = None
     K2 = len(ranks)
     seq = torch.stack(ranks, dim=2) if K2 > 1 else ranks[0].unsqueeze(2)
     if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
