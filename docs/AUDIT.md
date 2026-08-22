@@ -1090,6 +1090,44 @@ steers the games into a different regime and carries the older rows with it:
   noise on the same pick reached nothing new and cost two seeds their
   city-state war — the late catalog is gated on research DEPTH within 250
   turns, and random detours only add drag.
+- WONDERS FINISH, and the belief that they do not was load-bearing: 52
+  completed across 11 of 12 seeds. The `wonder_effects` lane was labelled as
+  the only proof of the fourteen effect channels "because the gate never
+  finishes a wonder" — false, and the probe could not have said so until it
+  counted them. What is actually unreached is the subset of channels no
+  FINISHED wonder in these games happens to carry.
+- MEASURED AND REJECTED, a wonder-first production style: it moved wonders
+  52 -> 62 (already covered) and cost the antiquity DIG its only seed plus a
+  seed each of NATURAL_HISTORY and theological adjacency. The share sweep
+  says the same thing from the other end — all-deep reaches NATURAL_HISTORY
+  12/12 but drops `specPin` to 9/12, the international leg to 8/12 and the
+  slotted cards to 14/49. COVERAGE COMES FROM THE MIXTURE OF STYLES, not from
+  any one of them turned up; `DEEP_SHARE` 0.34 is that reading.
+- **OPEN — THE DRIVER NEEDS A REAL STYLE MECHANISM.** Not weighted here on
+  purpose: this section's table prices FIDELITY gaps, and this is harness.
+  Today a style is one boolean, `DEEP_SHARE`, drawn per (game seed, seat) off
+  the policy stream and read at a single `if` inside `pick_research`. That
+  does not extend. Adding a second style meant a rank refactor of
+  `pick_production`'s class loop — a body whose docstring warns that the
+  settler latch and the army composition carry state ACROSS cities — and the
+  style it served was then rejected on measurement, so the refactor was
+  reverted with it. The next style will pay that cost again. What it should
+  be instead:
+  - NAMED KNOBS with documented ranges and defaults, each one thing a
+    scripted player can lean on: research depth vs breadth, production tier
+    order, war appetite, expansion appetite, faith/culture lean, naval lean.
+    A knob at its default must reproduce today's picks exactly.
+  - PRESETS built from those knobs — broad, deep, militarist, expansionist —
+    named, versioned, and assignable per actor, so a preset is a data row
+    rather than an edit to a picker body.
+  - AN ASSIGNMENT POLICY that is either a share-based draw off the existing
+    per-(seed, seat) stream or an explicit table, so a hunt can pin exactly
+    which actor played which preset and reproduce it.
+  - CLI SELECTION on the probe and the gate, so a sweep needs no source edit
+    (`--deep-share` is the one-off stand-in for this).
+  - The bar is the probe diff, and the rule the sweep already established:
+    a preset earns its place by ADDING rows without losing any, and the
+    mixture is what covers, not any single preset turned up.
 - URBANIZATION, a NEIGHBORHOOD and an antiquity DIG are each reached by ONE
   seed, in the last twenty turns. They are gate-covered in the narrowest
   sense; the poke lanes still carry them.

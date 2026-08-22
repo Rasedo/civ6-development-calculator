@@ -27,6 +27,8 @@ of the DRIVEN GAME, not of the comparison. What it answers, in order:
                 victory's own comparison (`_culture_victor`)
   policyCards   which policy cards the greedy slot fill ever puts in a slot,
                 and the most a seat holds at once
+  wonders       wonders actually FINISHED — the fourteen wonder-effect
+                channels have no gate coverage until one completes
 
 Run: python tools/gpu/reachability_probe.py [--turns 250]
 """
@@ -56,7 +58,11 @@ KEYS = ("apostleBuy", "urbanization", "neighborhood", "secondShip",
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--turns", type=int, default=250)
+    ap.add_argument("--deep-share", type=float, default=None,
+                    help="override ladder.DEEP_SHARE for a coverage sweep")
     args = ap.parse_args()
+    if args.deep_share is not None:
+        ladder.DEEP_SHARE = args.deep_share
 
     rules = load_rules()
     fixtures = [load_fixture(p) for p in fixture_paths()]
@@ -168,6 +174,10 @@ def main() -> None:
     print(f"  minor-war turns per seed: max {int(minor_war_turns.max())}, "
           f"mean {float(minor_war_turns.double().mean()):.1f}; standing at the final turn: "
           f"{int((sim.city_spec_pin >= 0).sum())} pinned slots, {int(sim.tile_locked.sum())} locked plots")
+
+    wdone = sim.built_wonder_complete
+    n_seeds_w = int(wdone.any(dim=1).sum())
+    print(f"  wonders FINISHED: {int(wdone.sum())} across {n_seeds_w}/{sim.B} seeds")
 
     print(f"  policy cards ever slotted: {len(slotted_seen)}/{len(pol_ids)}, "
           f"at most {slotted_max} at once")
