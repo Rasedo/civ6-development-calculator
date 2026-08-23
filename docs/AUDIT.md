@@ -66,10 +66,9 @@ nothing carries forward.
 | B-36r appeal adjacency terms | 1 | every district AND improvement term ships off one catalog column, and a Great Person can now grant a city's tiles appeal; the CIVILIZATION-unique improvements' terms (C-26) do not |
 | B-39r wonder effects still dropped | 1 | the sourced sweep shipped fourteen channels and the Mausoleum's engineer charge; three residuals, each blocked on B-20r, B-34r or C-23 |
 | B-45r sourced-sweep finds in the other rows | 1 | three of the eight now have a channel; the five that do not need a wonder that grants a UNIT, faith patronage (B-53r), a rival-recruit event, or B-31r's route yields |
-| B-46r the siege class's tails | 1 | the Bombard stat, both support chassis, all four walls tiers, the move-and-shoot rule and every siege rung through Rocket Artillery ship; Akkad's suzerain bonus does not |
-| B-54r flanking and support vs their own page | 1 | six rules the two engines agree on and the page does not: the Military Tradition gate, the flanking owner and river rules, support against ranged, embarked providers, and defensible districts |
+| B-54r flanking and support vs their own page | 1 | every rule on the page ships, and so do the four higher stacks a promotion or a Great Person raises; the two that a UNIQUE UNIT raises wait on C-26 |
 | B-64r embarking and disembarking cost the whole turn | 1 | Civ 6 charges the transition 3 MP and carries the remainder into the new movement mode; both engines spend everything and end the move |
-| B-56r the ten inert promotions | 2 | 62 of the 72 catalog rows fire a rule; ten name a mechanic neither engine has — a second attack per turn, sight-blocking, escort formations, class-aware zone of control, a promotion term in the air-strike roll, or stealth as a PROMOTION rather than a chassis flag |
+| B-56r the six inert promotions | 1 | 73 of the 79 catalog rows fire a rule; six name a mechanic neither engine has — sight-blocking, class-aware zone of control, escort formations, a promotion term in the air-strike roll, or a NAVAL RAIDER class to strike at |
 | B-57r the SNIPE head stops at the distance-2 ring | 1 | a +1 Range promotion widens what the rule legalises and no seat can ORDER the shot, because the ring-3 columns do not exist |
 | B-58r the religious purchase asks for a Shrine | 1 | Civ 6 asks for a MAJORITY RELIGION and a Holy Site with a Temple; both engines ask for a Shrine and never read what the city follows |
 | B-59r the religious spread is a flat lump | 2 | Civ 6 scales the pressure by the Apostle's HP and strips a quarter of every other religion; both engines add a constant and strip nothing without Proselytizer |
@@ -80,7 +79,7 @@ nothing carries forward.
 | B-34r flood tails | 1 | the severity ladder, the river's whole reach, the river-scoped shield and the Dam all ship; the per-tile flood count and the climate/coastal tails do not |
 | B-63r the grievance ledger's magnitudes | 1 | every sourced act pays the pair, the favor penalty and the era decay run, and PUBLIC RELATIONS scales what an act generates; the occupied and razed rows ship at their published CEILING because no pop or war-type scale is published, and the AI's gang-up bar is a heuristic |
 | B-62r a natural wonder takes no tile adds | 1 | the wonder's roster yields are the whole tile: no pantheon feature yield, no suzerain improvement adjacency and no Preserve band, though the Grove's own text pays any adjacent unimproved Breathtaking tile |
-| **B. Fidelity vs real Civ 6** | **31** | |
+| **B. Fidelity vs real Civ 6** | **29** | |
 | C-1 POWER | 2 | the grid, the three plants, Cardiff, the Hydroelectric Dam, the powered-yield split, the FUEL and its CO2 all ship; four renewable improvements and the Biosphere have no carrier, nothing can retire a plant, and a minor's cities are never powered |
 | C-2 diplomatic agreements | 3 | friendship, alliances, open borders, the closed border and the work gift ship on one 30-turn clock; alliance TYPES and LEVELS, the negotiated two-sided deal, and the four agreements that need one are open |
 | C-5 strategic-resource stockpiles | 2 | the bank, its ceiling, the unit and project charges, the plants' fuel, unit FUEL upkeep and the heal a lost source denies all ship; the shortage penalty's magnitude is unpublished and trading resources waits on C-2 |
@@ -104,7 +103,7 @@ nothing carries forward.
 | C-35 the land/water fact never moves | 2 | one static bit answers "is this sea", "can a hull stand here" and "is this coastal"; no tile can become water, which is what submersion and the Canal's passage each need |
 | C-36 no railroad | 2 | roads are one boolean tier; the railroad's own movement rate, its per-hex Iron and Coal charge and its CO2 have no carrier, which C-20's fifth verb and C-24's third emitter both wait on |
 | **C. Absent systems** | **41** | |
-| **OPEN, TOTAL** | **73** | |
+| **OPEN, TOTAL** | **71** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -254,12 +253,14 @@ Civ 6 source or is recorded as unverifiable.
   The culture victory is further out of reach than the pre-freeze note
   said, not closer — parks cannot move it while the civic that unlocks
   them sits past the horizon.
-- **B-21r. City-state suzerain rows:** nine perks are RULES (`SUZ_EFFECTS`,
+- **B-21r. City-state suzerain rows:** ten perks are RULES (`SUZ_EFFECTS`,
   both engines): Kabul double attack XP, Preslav cavalry-on-hills CS, Mexico
   City regional reach, Anshan works science, Kumasi per-specialty route
   yields, Jerusalem Holy-Site pressure, Yerevan's free Apostle promotion
-  choice, Vilnius's era Inspiration and Cardiff's +2 Power per Harbor
-  building. The remaining catalog rows carry their reason in their
+  choice, Vilnius's era Inspiration, Cardiff's +2 Power per Harbor building,
+  and Akkad's "melee and anti-cavalry units' attacks do full damage to the
+  city's walls" — the Battering Ram's own bit, at every walls tier and with
+  no support unit present (`siegeAssist` / `_siege_assist`). The remaining catalog rows carry their reason in their
   `CITY_STATE_SUZERAIN_BONUS` entry's `note`, and the roster is now
   current-ruleset throughout (see B-D), so the stand-ins are whole absent
   systems (trading posts, unique improvements/luxuries, a faith-purchase
@@ -619,43 +620,6 @@ Civ 6 source or is recorded as unverifiable.
   - The Colossus' and Great Zimbabwe's +1 trade-route capacity and free
     Trader, Great Zimbabwe's per-bonus-resource route gold and Sankoré's three
     route-yield terms: all wait on B-31r's route-yield work.
-- **B-46r. The siege class's tails.** All three things this row named now
-  ship. `UnitDef.bombard` / `_type_bombard` is the stat "only units with
-  attacks that use Bombard Strength" bring, and it hits a perimeter at FULL
-  damage with no city penalty, because the -17 a siege unit carries is the one
-  "against land units" that its ranged strength already holds — the CATAPULT
-  (35, Engineering) and the BOMBARD (55, Metal Casting, Niter) field it. The
-  BATTERING_RAM and the SIEGE_TOWER ride the civilian plane beside the army
-  they follow, and `siegeAssist` / `_siege_assist` lends their ASSIST_ bits to
-  an adjacent MELEE or ANTI-CAVALRY attacker only: a ram makes the perimeter
-  share full, a tower makes the centre share bypass the walls entirely. The
-  four walls TIERS are what turn each of those off — Ancient 100 / Medieval
-  200 / Renaissance 300, each +3 Combat Strength, and Urban Defenses 400 with
-  no Combat Strength at all, granted by Steel with no building and no
-  production. The ram stops at tier 1 and the tower at tier 2, so "whenever a
-  city builds Renaissance Walls, only units with Bombard Strength will be able
-  to inflict full damage to its defenses" holds by construction.
-  The MOVE-AND-SHOOT rule ships with them. The unit infoboxes' "3 or more
-  Movement" is the Catapult's instance of the general rule the Movement page
-  states: a unit whose attack uses Bombard Strength may move and shoot in one
-  turn only if "its maximum Movement is at least 1 greater than normal when it
-  attempts to shoot", and "if a unit has not moved, it can always shoot
-  regardless of its maximum Movement". `siegeMayShoot` / `_siege_may_shoot`
-  ask exactly that pair: whether the unit MOVED is `refreshUnits`' own gate
-  (movesLeft against the pool this unit was GRANTED last refresh, not against
-  its type's base moves, because a general's aura makes the granted pool vary
-  per turn), and its maximum Movement is read fresh at the shot, which is what
-  "when it attempts to shoot" asks for. The gate sits on `rangedAttackInner`,
-  `hostileRangedStrike` and `attackTargets`, and on the ATTACK and SNIPE mask
-  columns beside `_ranged_attack` and `_hostile_ranged_strike`.
-  REACHABILITY: nothing in the scripted gate builds a Catapult or a support
-  chassis, so the battery proves the two engines agree about these bodies and
-  the poke lanes are what prove they agree with the pages.
-  OPEN:
-  - **AKKAD's SUZERAIN BONUS** confers the Battering Ram's ability "against
-    all levels of city defenses and against all cities (regardless of presence
-    or absence of support units)". Akkad is not in the city-state roster —
-    B-21r.
 - **B-54r. Flanking and support against their own page.** Both bonuses ship,
   and both were written from the Combat page's one-line summary rather than
   from Flanking and Support (Civ6), which sourcing the class modifiers
@@ -682,13 +646,15 @@ Civ 6 source or is recorded as unverifiable.
   REACHABILITY: the scripted gate reaches melee and city strikes on every seed,
   so the support removal is live everywhere; MILITARY_TRADITION is an Ancient
   civic the driver takes early, so the gate opens mid-game rather than never.
+  The four HIGHER STACKS a promotion or a Great Person raises ship as well:
+  Double Envelopment, Square and Shadow Strike are `FLANK_MULT` / `SUPPORT_MULT`
+  rows the owner's unit must hold, and Georgy Zhukov and Horatio Nelson raise
+  the percentage itself — which is why `GP_PERM` splits it in two, since
+  Zhukov's "+50% flanking bonus" is for LAND units and Nelson's is for NAVAL.
   OPEN:
-  - **THE HIGHER-STACK UNITS AND PROMOTIONS.** Impi, Hypaspist, Double
-    Envelopment, Square, Shadow Strike, Georgy Zhukov and Horatio Nelson each
-    raise a stack above +2 for their owner only. Double Envelopment and Square
-    now ship as `FLANK_MULT` / `SUPPORT_MULT` rows their owner's unit must
-    hold; the unique units are C-26's, the two Great Person identities are
-    B-53r's, and Shadow Strike is not in the 72-row catalog.
+  - **THE TWO STACKS A UNIQUE UNIT RAISES.** Zulu's Impi and Macedon's
+    Hypaspist each raise flanking or support for themselves alone, and no
+    civilization unique exists in either engine — C-26.
 - **B-64r. Embarking and disembarking cost the whole turn.** Weight 1. CIV6
   (Movement, "Embarking"): the transition requires "either 3 Movement or all
   the unit's Movement for the round (if it has less than 3 Movement)", and "if
@@ -703,15 +669,11 @@ Civ 6 source or is recorded as unverifiable.
   keeps going. The page's own discount rides on the same rule and has no
   carrier either: "embarking to and from a tile with a Harbor district or a
   City Center tile (for a coastal city) ... costs only 1 Movement".
-- **B-56r. The ten inert promotions.** 62 of the 72 catalog rows in
+- **B-56r. The six inert promotions.** 73 of the 79 catalog rows in
   `cpu/data/promotions.ts` reach a rule through `promoCS` / `_promo_cs` or one
-  of the flag and value kinds beside them. TEN carry `none` because the
+  of the flag and value kinds beside them. SIX carry `none` because the
   mechanic they name is not in either engine, and each is recorded here with
   its own blocker rather than as a data comment:
-  - **A SECOND ATTACK PER TURN** — Elite Guard's other half, Expert Marksman
-    and Breakthrough each grant "1 additional attack per turn". Neither engine
-    counts attacks: `spendAttack` expresses "the attack is spent" by ending the
-    unit's movement, so there is no counter to raise.
   - **SENTRY** ("can see through Woods and Rainforest") — `revealAround` /
     `_reveal_around` reveal a flat radius, so nothing blocks sight and the
     promotion has nothing to lift.
@@ -725,12 +687,10 @@ Civ 6 source or is recorded as unverifiable.
     tile holds a stack now, but nothing binds one occupant's move to the
     other's: `unitStackSlot` / `_occ_set` file each unit on its own plane and
     every walker steps one slot at a time, so there is no formation to move.
-  - **CAMOUFLAGE and CREEPING_ATTACK** grant stealth to a RECON unit that
-    earns them. The axis exists now — `unitVisibleTo` / `_stealth_hidden` hide
-    a chassis and Reveal Stealth uncovers it — but both read the TYPE table
-    (`stealth` in `cpu/data/units.ts`), so nothing a unit EARNS can turn it on.
-    The fix is a per-unit grant beside the type flag, which is also what a
-    Warrior Monk's Twilight Veil and a Soothsayer's Inquisitor would need.
+  - **CREEPING_ATTACK** is not a stealth row at all, which this entry used to
+    claim: it is "+14 Combat Strength vs. naval raider units", and no such
+    class exists to name in a `CS_VS_CLASS_*` mask — C-32, where the three
+    raider chassis carry no promotion class of their own either.
   - **PROXIMITY_FUSES** is "+7 Combat Strength when defending against air
     attacks". Air attacks exist now, so C-16 is no longer what stops it; the
     blocker moved. `airStrike` / `_air_strike` roll the defender at
@@ -738,13 +698,13 @@ Civ 6 source or is recorded as unverifiable.
     `_promo_cs`, so NO promotion reaches that roll — threading the promotion
     term into the sortie is the work, and it changes every defensive
     promotion's reach at once, which belongs with B-54r's combat-page pass.
-  REACHABILITY: the ten rows ARE offered — `_promo_offer_mask` opens them and
+  REACHABILITY: the six rows ARE offered — `_promo_offer_mask` opens them and
   the driver takes them — so a unit can hold an inert promotion and nothing
-  will change. That is the visible symptom. The other 62 are proved by two
+  will change. That is the visible symptom. The other 73 are proved by two
   poke lanes rather than by the gate, which reaches a tier-4 row only by
   accident: tests/gpu/promotions_test.py for the ladder, the head and the
-  Combat Strength evaluator, tests/gpu/promo_effects_test.py for the
-  seventeen kinds that are not Combat Strength.
+  Combat Strength evaluator, tests/gpu/promo_effects_test.py for the twenty
+  kinds that are not Combat Strength.
 - **B-57r. The SNIPE head stops at the distance-2 ring.** `unitAttackRange` /
   the barbarian scan both add the RANGE promotion's +1, so the RULE legalises a
   distance-3 shot on both engines and `rangedAttackInner`'s own gate accepts
@@ -760,11 +720,14 @@ Civ 6 source or is recorded as unverifiable.
   purchased with Faith in a city that has a majority religion and a Holy Site
   with a Temple (or one of its replacements)". `purchaseReligiousUnit` /
   `_seat_religious_city_ok` ask for a SHRINE plus a complete unpillaged Holy
-  Site, and a TEMPLE on top for the Apostle and the Inquisitor — but neither
-  engine reads `city.followedReligion` / `city_followed` at the counter, so a
-  city pressed into a rival's religion still sells its owner's Apostles. The
-  Shrine is this engine's own stand-in and the majority test is the missing
-  half.
+  Site, and a TEMPLE on top for the Apostle and the Inquisitor — but at those
+  three counters neither engine reads `city.followedReligion` / `city_followed`,
+  so a city pressed into a rival's religion still sells its owner's Apostles.
+  The Shrine is this engine's own stand-in and the majority test is the missing
+  half. The WARRIOR MONK's counter is the one that reads it: `purchaseWarriorMonk`
+  / `_seat_monk_city_ok` ask what the city follows, whether THAT religion's
+  follower belief is Warrior Monks, and for a Temple — so the shape the other
+  three want is already written next door.
 
 - **B-59r. The religious spread is a flat lump.** CIV6 (Apostle): Spread
   Religion "converts Citizens in adjacent city to Apostle's religion (Pressure
@@ -971,7 +934,7 @@ Civ 6 source or is recorded as unverifiable.
   every building (costs; worship faith price 380), and every policy card
   (all 49, each against its own Civilopedia page — see C-6). What is LEFT is each labelled at its definition, and
   each is an open residual rather than a decision:
-  THREE ROWS CLOSED by reading their real text, and one bullet was FALSE:
+  FOUR ROWS CLOSED by reading their real text, and one bullet was FALSE:
   - **The MONUMENT was carrying its VANILLA row.** SOURCED (R&F/GS): "+1
     Loyalty. +1 Culture. +1 additional Culture if city is at maximum
     Loyalty." It paid a flat +2 Culture and no loyalty at all. All three
@@ -989,6 +952,9 @@ Civ 6 source or is recorded as unverifiable.
     rides `UnitDef.requiresBuilding` / `_type_req_bldg`. What stays
     AUTHORED is only the seat's PRODUCTION RULE (`ENGINEER_LIVE`) — real
     Civ 6's AI forts chokepoints and publishes no rule that quantifies it.
+  - **The MISSIONARY was priced at 150 FAITH.** SOURCED (its infobox): 100,
+    which is what the row carries now. The Shrine gate and the three spread
+    charges beside it were already right.
   - **THE SPACEPORT UPKEEP BULLET WAS FALSE.** There is no district upkeep
     anywhere in either engine — `maintenance` is a BUILDING field, which
     matches real Civ 6, where districts cost no gold. Nothing stood in for
@@ -1005,7 +971,9 @@ Civ 6 source or is recorded as unverifiable.
   minor could carry no suzerain bonus of any kind. The pools agree now and
   `tests/cpu/data/cityStateRoster.test.ts` asserts both directions, since the
   copy exists because `seeder/` is hashed into `genStamp` and may not import
-  from `cpu/`.
+  from `cpu/`. AKKAD joined the militaristic list afterwards, for the ram bit
+  its suzerain confers; the seeder places three minors of each type and so
+  reaches neither it nor Valletta — C-8.
 
   What remains open, each with what a source would have to publish:
   - **The GOVERNMENTS' inherent bonuses.** The GS rows ARE published, and
@@ -1039,6 +1007,11 @@ Civ 6 source or is recorded as unverifiable.
     Civ 6 scales cost, yield and turn tables independently per speed, so
     this is a SHAPE difference, not a magnitude gap: closing it means
     modelling three tables, and no single number can be right.
+  - **THE RELIGIOUS FAITH PRICES ARE FLAT.** Every religious infobox ends
+    "Faith cost is progressive", and `purchaseReligiousUnit` / the faith-buy
+    arm charge `UNITS[t].cost` unchanged however many the seat has already
+    bought. It is the same missing channel `naturalistCost` names, and the
+    same reason: no source publishes the progression's own magnitude.
   - the BELIEF magnitudes (`religion` header) — model numbers, not Civ 6's.
   - the deliberate tuning constants in `seats` (its header names them):
     model tuning, not Civ 6 values, and every one is a place the two engines
@@ -1338,6 +1311,15 @@ number was under-counting by treating deferrals as closures.
     (`seats`' own header says so). It draws from the same era window either
     way, so this is the ORDER of the slate, not its contents. B-22r carries
     the rest of the Congress residuals.
+  - **WHICH CITY-STATES A GAME GETS.** Real Civ 6 draws them from the whole
+    roster. `seeder/place.ts` keeps its own copy of `CITY_STATE_NAMES` holding
+    THREE names of each type and places them in order, so every world gets the
+    same eighteen minors and the catalog's later rows — Caguana, Hunza,
+    Cardiff, Valletta, Akkad, Armagh — are placed by no seed at all. Their
+    suzerain rules are written and gate-unreachable. The roster test asserts
+    the seeder's copy stays INSIDE the catalog, which is why the six extra rows
+    are invisible to it; drawing here would move `genStamp` and re-seed every
+    fixture.
 - **C-16. THE SPY'S SECOND HALF.** Weight 2. The Spy itself is a system on
   both engines: the capacity ladder, the jump between revealed foreign
   centres, the eleven-row mission catalog with its two heads, the level
@@ -1459,8 +1441,6 @@ number was under-counting by treating deferrals as closures.
   - **THE ROCK BAND.** A GS civilian that performs in a foreign city for a
     tourism lump against a level-scaled failure roll. It reads per-rival
     tourism, which is C-28.
-  Unit FUEL upkeep and the middle siege rungs left this row: both shipped with
-  the roster, and C-5 and B-46r are corrected accordingly.
 
 - **C-32. THE NEW CLASSES HAVE NO PROMOTION TREE.** Weight 2. `PROMO_CLASSES`
   covers the land, melee/ranged naval and religious chassis; the AIR, GIANT
@@ -1476,6 +1456,10 @@ number was under-counting by treating deferrals as closures.
   - **THE SPY PROMOTION POOL** — fourteen sourced rows, three offered at
     random per level (C-16). The random OFFER is also C-8's territory: the
     draw here would have to be a queue.
+  - **CREEPING ATTACK HAS NOTHING TO STRIKE AT.** "+14 Combat Strength vs.
+    naval raider units" names the missing class as a TARGET, so the row needs
+    a `CLASS_BIT` for it before a `CS_VS_CLASS_ANY` mask can address one —
+    B-56r carries the row itself.
   The GDR is a special case in the source's own words — it "cannot earn
   experience or Promotions" — so its absence from the tree is FAITHFUL and
   only the air, support and spy classes are the gap.
@@ -1782,6 +1766,14 @@ steers the games into a different regime and carries the older rows with it:
   purchase, the walls' gold refusal, the land-unit rung and their prices are
   proven by `cs_bonus_test`, `buy_wire_test` and
   `tests/cpu/city/faith-purchase.test.ts` and by nothing else.
+- THE WARRIOR MONK AND ITS TREE ARE POKE-PROVEN ONLY. The buy needs the
+  Warrior Monks follower belief, a Holy Site and a Temple in one city, and its
+  seven promotions sit on a class no other chassis enters; AKKAD is reachable
+  by no seed at all, because the seeder's pool never names it (C-8). So the
+  ram bit its suzerain confers, the monk's attack budget, Twilight Veil and
+  Disciples are proved by `tests/cpu/units/warrior-monk.test.ts`,
+  `tests/gpu/suzerain_rules_test.py` and `tests/gpu/promo_effects_test.py`,
+  and by no gate lane.
 - THE CITIZEN OVERRIDES ride the digest for most of a game rather than
   leaning on `citizens_test`: a plot lock stands on every seed from t2 (148
   plots at t250) and a pinned specialist on every seed from t116 (45 slots).

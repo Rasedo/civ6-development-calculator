@@ -2343,14 +2343,43 @@ class SimEconomy:
         base = base + self._sea_move_mp(getattr(self, f"{pre}_unit_seat"), emb, naval)
         return base + self._promo_pool_val(pre, "MOVES") + getattr(self, f"{pre}_unit_aura_mp")
 
+    def _attacks_after_moving(self, utype: torch.Tensor, promos: torch.Tensor) -> torch.Tensor:
+        """`attacksAfterMoving`, in `promos`' shape. CIV6 (Sweeping Wind / Elite
+        Guard / Breakthrough): "+1 additional attack per turn if Movement
+        allows" — every unit starts its turn with one, and moving costs it
+        none of these."""
+        return torch.ones_like(promos) + self._promo_val(utype, promos, "EXTRA_ATTACK")
+
+    def _attacks_per_turn(self, utype: torch.Tensor, promos: torch.Tensor) -> torch.Tensor:
+        """`attacksPerTurn`, in `promos`' shape. CIV6 (Expert Marksman): "+1
+        additional attack per turn if unit has not moved", whose own note reads
+        it as "the unit cannot make the additional attack if it moves AFTER
+        making its first attack. It can still move BEFORE it attacks"."""
+        return (self._attacks_after_moving(utype, promos)
+                + self._promo_val(utype, promos, "EXTRA_ATTACK_STILL"))
+
+    def _step_attacks_left(self, utype: torch.Tensor, promos: torch.Tensor,
+                           left: torch.Tensor) -> torch.Tensor:
+        """`stepAttacksLeft` — what a step leaves of the attack budget:
+        everything, until the unit has struck once."""
+        made = self._attacks_per_turn(utype, promos) - left
+        keep = (self._attacks_after_moving(utype, promos) - made).clamp(min=0)
+        return torch.where(made > 0, torch.minimum(left, keep), left)
+
+    def _full_attacks(self, pre: str) -> torch.Tensor:
+        """[B, U] — `attacksPerTurn` over a whole unit pool."""
+        typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+        return self._attacks_per_turn(typ, getattr(self, f"{pre}_unit_promos"))
+
     def _reset_mp(self, pre: str) -> None:
-        """The movesLeft/movesFull reset: `granted = full + aura`, both fields.
-        TS writes the pair together at refreshUnits and again at seatPhase;
-        writing only one breaks next turn's "spent no MP" gate for a seat that
-        never moved."""
+        """The movesLeft/movesFull/attacksLeft reset: `granted = full + aura`,
+        both movement fields, and the turn's attacks beside them. TS writes the
+        pair together at refreshUnits and again at seatPhase; writing only one
+        breaks next turn's "spent no MP" gate for a seat that never moved."""
         f = self._full_mp(pre)
         getattr(self, f"{pre}_unit_mp_full").copy_(f)
         getattr(self, f"{pre}_unit_mp").copy_(f)
+        getattr(self, f"{pre}_unit_attacks").copy_(self._full_attacks(pre))
 
     def _refresh_aura_mp(self) -> None:
         """FREEZE the aura's +generalAuraMp per unit slot, at the refreshUnits

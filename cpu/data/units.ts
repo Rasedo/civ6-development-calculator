@@ -323,7 +323,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     U({
       id: 'MISSIONARY',
       name: 'Missionary',
-      cost: 150, // ×GAME_SPEED → 90 faith (faith-only; never a production cost)
+      cost: 100, // ×GAME_SPEED → 60 faith (faith-only; never a production cost)
       maintenance: 0,
       moves: 4,
       combat: 0,
@@ -1202,6 +1202,22 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
         spawnOnly: true,
         description: `Great ${c[0]}${c.slice(1).toLowerCase()} — walks to a legal site and spends a charge there.`,
       })),
+    // The WARRIOR MONK, appended LAST (roster order is the GPU's unit type
+    // id). SOURCED: 200 Faith, 40 Combat Strength, 3 Movement, 2 Gold
+    // maintenance, and "It can only be purchased with Faith in a city that has
+    // a majority religion with the Warrior Monks Follower Belief and a Holy
+    // Site with a Temple". A MILITARY unit with its own promotion table — it
+    // is neither melee nor anti-cavalry, so no support chassis helps it.
+    U({
+      id: 'WARRIOR_MONK',
+      name: 'Warrior Monk',
+      cost: 200,
+      maintenance: 2,
+      moves: 3,
+      combat: 40,
+      faithOnly: true,
+      description: 'Faith-bought combat unit with its own promotion tree.',
+    }),
   ].map((u) => [u.id, u]),
 );
 

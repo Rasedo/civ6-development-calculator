@@ -307,6 +307,11 @@ export interface Unit {
   spyTarget?: number;
   spyLevel?: number;
   fortifyTurns?: number;
+  /** how many attacks this unit has left this turn. CIV6: a unit attacks
+   *  ONCE per turn; Sweeping Wind is the only row that buys a second. Reset
+   *  at the refresh; undefined before the first one, where readers fall back
+   *  to the single attack every unit has. */
+  attacksLeft?: number;
   /** the turn a STEALTH chassis last attacked. CIV6 (Unit): "if a stealth
    *  unit attacks, it will become visible for a turn before becoming
    *  invisible again", so it is seen while this equals the live turn. */

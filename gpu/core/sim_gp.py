@@ -122,9 +122,10 @@ class SimGp:
         sdist = self._gp_site_district[cls.clamp(min=0), at.clamp(min=0, max=self._gp_site.shape[1] - 1)]
         own = (self.tile_seat == row).gather(1, tc)
 
-        # 0 the class's own COMPLETED district, on this seat's ground
+        # 0 the class's own COMPLETED district, on this seat's ground — its
+        # pillage fact is the DISTRICT plane, never the improvement one
         a_dist = own & (self.district.gather(1, tc) == sdist) & (sdist >= 0) \
-            & self.district_complete.gather(1, tc) & ~self.pillaged.gather(1, tc)
+            & self.district_complete.gather(1, tc) & ~self.district_pillaged.gather(1, tc)
         # 1 anywhere the unit can already stand
         a_any = torch.ones_like(a_dist)
         # 2 a city of this seat with a free slot of the class's work kind

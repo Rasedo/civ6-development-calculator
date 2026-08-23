@@ -20,7 +20,8 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
-from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
+from core import BatchSim, load_rules, load_fixture, fixture_paths
+from core import simbase, FIXTURES
 from core.engine import _MUTABLE
 from warmup import plant_city, settle_all
 
@@ -176,7 +177,7 @@ def main() -> None:
     #   a. _transfer_city must clear EVERY work plane on the receiving slot
     #      and carry the source's across, or the new city inherits whatever the
     #      REUSED slot index still holds from a dead occupant.
-    #   b. _CITY_SLOT_FIELDS must name every work plane, or a compaction leaves
+    #   b. the derived compaction must ride every work plane, or one leaves
     #      one behind at the old index.
     s3 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     if s3.n_majors >= 3 and int(s3.city_alive[0, 1].sum()) >= 1:
@@ -204,10 +205,11 @@ def main() -> None:
             assert int(s3.city_gw_art[0, 1, j]) == 0, "the dead source slot must not keep art"
             print("  works+relics ride the rc->rc transfer, source slot cleared OK")
 
-    # b. compaction must permute ALL FOUR planes with their city.
+    # b. compaction must permute ALL FOUR planes with their city — the ride
+    # list is DERIVED from _MUTABLE by geometry, so membership there is the bar.
     s4 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     for nm in ("city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts"):
-        assert nm in s4._CITY_SLOT_FIELDS, f"{nm} missing from _CITY_SLOT_FIELDS — compaction drops it"
+        assert nm in simbase._MUTABLE and getattr(s4, nm).shape[2] == s4.RC,             f"{nm} does not ride the derived city compaction"
     # A civ holding two cities, through the engine's own FOUND verb — no seed
     # gamble, no bare stepping (a stepped world never develops on its own).
     row = 1

@@ -1,4 +1,4 @@
-"""The six `suz`-coded suzerain RULES fire on the GPU exactly as sourced.
+"""The seven `suz`-coded suzerain RULES fire on the GPU exactly as sourced.
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/suzerain_rules_test.py
@@ -7,7 +7,7 @@ Each rule is poked directly at its body with hand-set suzerainty (envoys +
 `citystate_suz_code`), asserting the same sourced numbers the TS vitest pins:
 Kabul x2 attack XP, Preslav +5 cavalry-on-hills CS, Mexico City +3 regional
 reach, Anshan works science, Kumasi per-specialty route yields, Jerusalem
-Holy-Site pressure sources.
+Holy-Site pressure sources, Akkad the Battering Ram's own bit.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
 from core import BatchSim, load_rules, load_fixture, fixture_paths
+from core.simbase import ASSIST_RAM
 from warmup import settle_all
 
 
@@ -221,7 +222,33 @@ def main() -> None:
     sim.sync_war()
     print("geneva ok — the flat channel is a PEACE channel, and only its own row")
 
-    print("SUZERAIN RULES OK — all six coded perks fire, only for the strict "
+    # --- Akkad lends the ram's bit, at every walls tier ----------------------
+    # CIV6 (Akkad): "Melee and anti-cavalry units' attacks do full damage to
+    # the city's walls" — the Battering Ram's own effect, with no support unit
+    # present and no tier that switches it off.
+    assert sim._suz_c_walls_full >= 0, "the walls-full suz code is missing from the rules"
+    melee = int((sim._type_melee & ~sim._type_civilian).long().argmax())
+    ranged = next(i for i in range(sim.NU)
+                  if not bool(sim._type_melee[i]) and not bool(sim._type_anticav[i]))
+    tile = torch.zeros(sim.B, dtype=torch.long)
+    seat0 = torch.zeros(sim.B, dtype=torch.long)
+    hold(sim, 0, sim._suz_c_walls_full)
+    for tier in range(4):
+        tt = torch.full((sim.B,), tier, dtype=torch.long)
+        got = int(sim._siege_assist(seat0, torch.full((sim.B,), melee, dtype=torch.long),
+                                    tile, tt)[0])
+        assert got & ASSIST_RAM, f"Akkad lent nothing at walls tier {tier}"
+        assert int(sim._siege_assist(seat0, torch.full((sim.B,), ranged, dtype=torch.long),
+                                     tile, tt)[0]) == 0,             "a chassis that is neither melee nor anti-cavalry took the ram bit"
+    assert int(sim._siege_assist(torch.ones(sim.B, dtype=torch.long),
+                                 torch.full((sim.B,), melee, dtype=torch.long),
+                                 tile, torch.zeros(sim.B, dtype=torch.long))[0]) == 0,         "a seat that is not the suzerain took the ram bit"
+    drop(sim)
+    assert int(sim._siege_assist(seat0, torch.full((sim.B,), melee, dtype=torch.long),
+                                 tile, torch.zeros(sim.B, dtype=torch.long))[0]) == 0,         "the bit outlived the suzerainty"
+    print("akkad ok — the ram's bit at every tier, for melee and anti-cavalry alone")
+
+    print("SUZERAIN RULES OK — all seven coded perks fire, only for the strict "
           "suzerain, and Geneva's channel only at peace")
 
 

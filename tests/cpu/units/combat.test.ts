@@ -184,6 +184,7 @@ describe('barbarians', () => {
     let guard = 0;
     while (city.hp > 0 && city.population === 8 && guard++ < 60) {
       barb.movesLeft = 4;
+      barb.attacksLeft = 1;
       barb.hp = 100;
       meleeAttack(state, barb.id, city.centerIndex, 0);
     }

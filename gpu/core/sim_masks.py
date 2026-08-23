@@ -407,10 +407,18 @@ class SimMasks:
         The chassis rides the CIVILIAN plane, which is where this model already
         puts real Civ 6's other support unit, so `civilian_at` is the scan."""
         out = torch.zeros_like(tile)
-        if not self._siege_support_any:
-            return out
         t = type_idx.clamp(min=0, max=self.NU - 1)
         helped = self._type_melee[t] | self._type_anticav[t]
+        # CIV6 (Akkad's suzerain): "Melee and anti-cavalry units' attacks do
+        # full damage to the city's walls" — the ram's own effect, at every
+        # walls tier and with no support unit anywhere near.
+        if self._suz_c_walls_full >= 0:
+            _r = self._row_of(seat).clamp(min=0, max=self.n_majors - 1)
+            _held = (self._row_of(seat) >= 0) & (self._row_of(seat) < self.n_majors) & (
+                self._suz_effect_rows(self._suz_c_walls_full).gather(1, _r.unsqueeze(1)).squeeze(1))
+            out = torch.where(_held, torch.full_like(out, ASSIST_RAM), out)
+        if not self._siege_support_any:
+            return torch.where(helped, out, torch.zeros_like(out))
         nb = self.neigh[tile.clamp(min=0)]  # [B, 6]
         occ = self.civilian_at.gather(1, nb.clamp(min=0))  # [B, 6]
         live = (nb >= 0) & (occ >= 0)
@@ -768,16 +776,21 @@ class SimMasks:
         own = col.gather(1, seat.clamp(min=0, max=self.n_majors - 1).unsqueeze(1)).squeeze(1)
         return torch.where(major, own, half)
 
-    def _advisory_cs(self, utype: torch.Tensor) -> torch.Tensor:
-        """`advisoryCS`' twin — MILITARY ADVISORY's flat adder on a unit's
-        own Combat Strength, keyed by the chassis's promotion class. Air units
-        carry no class, so no air roll can see it."""
+    def _congress_unit_cs(self, utype: torch.Tensor, seat: torch.Tensor) -> torch.Tensor:
+        """`congressUnitCS`' twin — the flat Combat Strength the WORLD
+        CONGRESS hands one unit. MILITARY ADVISORY pays the chassis's promotion
+        class, and air units carry no class, so no air roll can see that half;
+        CIV6 (World Religion, outcome A): "this outcome also gives Warrior Monks
+        +10 Combat Strength", where the monk's religion is its owner's."""
         out, tgt = self._congress_by_id("MILITARY_ADVISORY")
         cls = self.rules_dev.u_promo_class[utype.clamp(min=0)]
         sh = (slice(None),) + (None,) * (cls.dim() - 1)
         z = torch.zeros(cls.shape, dtype=torch.long, device=self.device)
         v = torch.where(out[sh] == 0, z + self._c_advisory_cs, z - self._c_advisory_cs)
-        return torch.where((out[sh] >= 0) & (cls >= 0) & (cls == tgt[sh]), v, z)
+        adv = torch.where((out[sh] >= 0) & (cls >= 0) & (cls == tgt[sh]), v, z)
+        if self._monk_idx < 0:
+            return adv
+        return adv + torch.where(utype == self._monk_idx, self._congress_relig_cs(seat), z)
 
     def _class_matchup_cs(self, own_type: torch.Tensor, foe_type: torch.Tensor) -> torch.Tensor:
         """[B] long `classMatchupCS` — CIV6 (Combat, "Unit class modifiers"):
@@ -823,7 +836,7 @@ class SimMasks:
         outright), so no scope-out downstream has to be re-asked per candidate.
 
         Returns the folded (mslot, m_seat, ok_m, cslot, c_seat, ok_c)."""
-        eslot = self.embarked_at.gather(1, tc.unsqueeze(1)).squeeze(1)
+        eslot = self._visible_embarked_at(seat).gather(1, tc.unsqueeze(1)).squeeze(1)
         neg = torch.full_like(eslot, -1)
         e0 = eslot.clamp(min=0).unsqueeze(1)
         e_seat = torch.where(eslot >= 0, self.unit_seat.gather(1, e0).squeeze(1), neg)
@@ -853,7 +866,7 @@ class SimMasks:
         return (torch.where(base > 0, base, torch.full_like(base, 2))
                 + self._promo_val(utype, promos, "SIGHT"))
 
-    def _stealth_hidden(self, seat) -> torch.Tensor:
+    def _stealth_hidden(self, seat, plane: torch.Tensor | None = None) -> torch.Tensor:
         """[B, T] — does this tile hold a STEALTH unit `seat` cannot see?
 
         CIV6 (Unit, "Stealth units"): they "are invisible to non-adjacent
@@ -863,18 +876,22 @@ class SimMasks:
         "allows them to see other stealth units within their Sight range".
         `unitVisibleTo` is the twin.
 
-        A district sees nothing of its own, so only UNITS light the map, and
-        every stealth chassis is a naval hull, so only `military_at` carries
-        one. The eye scan runs over the tiles that actually hold a hidden
-        hull, which is none in most games and a handful in the rest."""
-        mil = self.military_at
-        hidden = torch.zeros_like(mil, dtype=torch.bool)
+        A district sees nothing of its own, so only UNITS light the map.
+        `plane` is the occupancy the answer is wanted for: a stealth CHASSIS is
+        always a naval hull, but Twilight Veil hides a land unit, which crosses
+        water as a passenger. The eye scan runs over the tiles that actually
+        hold a hidden unit, which is none in most games and a handful in the
+        rest."""
+        occ = self.military_at if plane is None else plane
+        hidden = torch.zeros_like(occ, dtype=torch.bool)
         if not self._stealth_live:
             return hidden
         sc = seat.reshape(self.B, 1) if torch.is_tensor(seat) else seat
-        mslot = mil.clamp(min=0)
+        mslot = occ.clamp(min=0)
         mtype = self.unit_type.gather(1, mslot).clamp(min=0, max=self.NU - 1)
-        hid = ((mil >= 0) & self._type_stealth[mtype]
+        chassis = self._type_stealth[mtype]
+        veil = self._promo_flag(mtype, self.unit_promos.gather(1, mslot), "STEALTH")
+        hid = ((occ >= 0) & (chassis | veil)
                & (self.unit_revealed_turn.gather(1, mslot) < self.turn)
                & (self.unit_seat.gather(1, mslot) != sc))
         if not bool(hid.any()):
@@ -882,14 +899,24 @@ class SimMasks:
         tsel = hid.any(dim=0).nonzero(as_tuple=True)[0]
         dist = self.pair_dist[:, tsel].to(torch.long)  # [T, K]
         utype = self.unit_type.clamp(min=0, max=self.NU - 1)
-        reach = torch.where(self._type_reveal[utype],
-                            self._unit_sight(utype, self.unit_promos),
-                            torch.ones_like(utype))
+        # CIV6 (Twilight Veil): "Only adjacent enemy units can reveal this
+        # unit", so Reveal Stealth lengthens the look at a stealth CHASSIS and
+        # at nothing else — the reach is a (viewer, hidden tile) pair.
+        far = self._unit_sight(utype, self.unit_promos).unsqueeze(2)
+        reach = torch.where(self._type_reveal[utype].unsqueeze(2) & chassis[:, tsel].unsqueeze(1),
+                            far, torch.ones_like(far))
         mine = self.unit_alive & (self.unit_seat == sc)
         seen = (mine.unsqueeze(2)
-                & (dist[self.unit_tile.clamp(min=0)] <= reach.unsqueeze(2))).any(dim=1)
+                & (dist[self.unit_tile.clamp(min=0)] <= reach)).any(dim=1)
         hidden[:, tsel] = hid[:, tsel] & ~seen
         return hidden
+
+    def _visible_embarked_at(self, seat) -> torch.Tensor:
+        """`embarked_at` as `seat` sees it — a veiled passenger is not there."""
+        if not self._stealth_live:
+            return self.embarked_at
+        return torch.where(self._stealth_hidden(seat, self.embarked_at),
+                           torch.full_like(self.embarked_at, -1), self.embarked_at)
 
     def _visible_military_at(self, seat) -> torch.Tensor:
         """`military_at` as `seat` sees it: an unseen stealth hull is not there.
@@ -1358,6 +1385,7 @@ class SimMasks:
         _m = self._full_mp("barb")[rows, slot]
         self.barb_unit_mp[rows, slot] = _m
         self.barb_unit_mp_full[rows, slot] = _m
+        self.barb_unit_attacks[rows, slot] = 1
         self.military_at[(rows, spot[rows])] = slot + self.POOL_LO["barb"]
         self.next_slot[rows] += 1
 
@@ -1468,6 +1496,7 @@ class SimMasks:
         _m = self._full_mp(pre)[rows, slot]
         getattr(self, f"{pre}_unit_mp")[rows, slot] = _m
         getattr(self, f"{pre}_unit_mp_full")[rows, slot] = _m
+        getattr(self, f"{pre}_unit_attacks")[rows, slot] = 1
         # a GREAT PERSON chassis carries its queue position; every other unit
         # (and every reclaimed slot) carries the -1 sentinel.
         getattr(self, f"{pre}_unit_gp_at")[rows, slot] = (
@@ -1967,6 +1996,7 @@ class SimMasks:
             self._blocked_for(nbc, row, is_naval=_nav6).reshape(B, N, 6),
         )
         has_mp = (self.unit_mp.gather(1, sc) > 0).unsqueeze(2)
+        has_atk = (self.unit_attacks.gather(1, sc) > 0).unsqueeze(2)
         cliff6 = (self._cliff_block_dirs(tc, nb, own_tile,
                                          self._promo_flag(ut, self.unit_promos.gather(1, sc), "CLIFFS")) & alive
                   if self._embark_live else torch.zeros(B, N, 6, dtype=torch.bool, device=dev))
@@ -2004,7 +2034,7 @@ class SimMasks:
         may_shoot = self._siege_may_shoot("major").gather(1, sc).unsqueeze(2)
         attack = (
             on_map & (hostile_u | city_t | cs_t | enc_t)
-            & can_fight & (~u_emb.unsqueeze(2) | shore) & alive & has_mp & may_shoot
+            & can_fight & (~u_emb.unsqueeze(2) | shore) & alive & has_mp & has_atk & may_shoot
         )
 
         hold = alive
@@ -2128,7 +2158,7 @@ class SimMasks:
             _ring_e = self._encamp_block(ringc, row).reshape(B, N, 12)
             _sn = [
                 present.unsqueeze(2) & rngd.unsqueeze(2) & ~u_emb.unsqueeze(2)
-                & may_shoot & (ring >= 0) & (_ring_u | _ring_c | _ring_e)
+                & has_atk & may_shoot & (ring >= 0) & (_ring_u | _ring_c | _ring_e)
             ]
 
         _sp: list[torch.Tensor] = []
@@ -2316,6 +2346,7 @@ class SimMasks:
             (dist > 0) & (dist <= rngv) & offer
             & (k > 0).unsqueeze(2)
             & (self.unit_mp.gather(1, sc[:, cols]) > 0).unsqueeze(2)
+            & (self.unit_attacks.gather(1, sc[:, cols]) > 0).unsqueeze(2)
         )
         out[:, cols] = self._air_first_k(cand, W)
         return out

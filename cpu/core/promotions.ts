@@ -94,6 +94,35 @@ export function bankXp(unit: Unit, amount: number): void {
   unit.xp = Math.min(need, have + amount);
 }
 
+/** CIV6 (Expert Marksman): "+1 additional attack per turn if unit has not
+ *  moved", whose own note reads it as "the unit cannot make the additional
+ *  attack if it moves AFTER making its first attack. It can still move BEFORE
+ *  it attacks" — so the bonus is handed out at the refresh, survives a step
+ *  taken before any blow, and `stepAttacksLeft` revokes it after one. */
+export function attacksPerTurn(unit: { type: string; promos?: number }): number {
+  return attacksAfterMoving(unit) + promoValue(unit, 'EXTRA_ATTACK_STILL');
+}
+
+/** CIV6 (Sweeping Wind / Elite Guard / Breakthrough): "+1 additional attack
+ *  per turn if Movement allows." Every unit starts its turn with exactly one
+ *  attack, and moving does not cost it any of these. */
+export function attacksAfterMoving(unit: { type: string; promos?: number }): number {
+  return 1 + promoValue(unit, 'EXTRA_ATTACK');
+}
+
+/** what a STEP leaves of the attack budget: everything, until the unit has
+ *  struck once — after that the still-bonus is gone and the movement-permitting
+ *  attacks are all that is left. */
+export function stepAttacksLeft(unit: { type: string; promos?: number; attacksLeft?: number }): number {
+  const left = attacksLeftOf(unit);
+  const made = attacksPerTurn(unit) - left;
+  if (made <= 0) return left;
+  return Math.min(left, Math.max(0, attacksAfterMoving(unit) - made));
+}
+export function attacksLeftOf(unit: { attacksLeft?: number }): number {
+  return unit.attacksLeft ?? 1;
+}
+
 export function promoClassOf(unitType: string): string | undefined {
   return UNIT_PROMO_CLASS[unitType];
 }

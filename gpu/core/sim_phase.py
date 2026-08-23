@@ -121,7 +121,7 @@ class SimPhase:
         _def_seat = torch.where(is_vet_mil, d_seat, torch.full_like(tt, -1))
         _def_nav = torch.where(is_vet_mil, self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
         def_e = def_e + self._gen_aura_cs(_def_seat, tt, d_emb | _def_nav).to(def_e.dtype)
-        def_e = def_e + self._advisory_cs(d_type).to(def_e.dtype)
+        def_e = def_e + self._congress_unit_cs(d_type, _def_seat).to(def_e.dtype)
         self._city_strike_resolve(strike, tt, d_slot, d_seat, _okm, _okc, is_vet_mil,
                                   atk_cs, def_e, def_hp, row, key)
 
@@ -1172,13 +1172,6 @@ class SimPhase:
             # from another pool is out of range by construction.
             at.copy_(torch.where(mine, inv.gather(1, (at - lo).clamp(min=0, max=inv.shape[1] - 1)) + lo, at))
 
-    _CITY_SLOT_FIELDS = (
-        "city_alive", "city_center", "city_pop", "city_growth", "city_cbox", "city_loyalty",
-        "city_acquired", "city_hp", "city_outer_hp", "city_last_hit", "city_id", "city_is_cap", "city_orig_cap", "city_current", "city_progress",
-        "city_prod_bank", "city_lasers", "city_powered",
-        "city_cost", "city_qtile",
-        "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts",
-    )
     def _reclaim_cities(self) -> None:
         """Stably compacts city slots per (game, seat row), every major row.
 
@@ -1197,21 +1190,22 @@ class SimPhase:
         nrows = self.n_majors
         alive = self.city_alive[:, :nrows]  # [B, nrows, RC]
         perm = torch.argsort((~alive).long(), dim=2, stable=True)  # living first, order kept
+        # EVERY city plane rides the permutation, the list DERIVED from
+        # `_MUTABLE` by geometry <EM> a hand-transcribed list drifts and silently
+        # leaves a new plane's facts at the old slot index, handing one city's
+        # founder or pins to its neighbour at the first compaction.
         # In place, for the same reason as _reclaim_pool: these planes are
         # views of one merged city tensor, and a setattr rebind here would
         # orphan every alias at the first compaction.
-        for name in self._CITY_SLOT_FIELDS:
-            t = getattr(self, name)[:, :nrows]
-            t.copy_(t.gather(2, perm))
-        for name in ("city_dist_tile", "city_bldg", "city_wonder"):
-            t = getattr(self, name)[:, :nrows]
-            t.copy_(t.gather(2, perm.unsqueeze(3).expand(-1, -1, -1, t.shape[3])))
-        # The religion pair lives on the same seat axis. Both MUST ride the
-        # permutation or a compaction hands one city's faith to its neighbour.
-        _fol = self.city_followed[:, :nrows]
-        _fol.copy_(_fol.gather(2, perm))
-        _pre = self.city_pressure[:, :nrows]
-        _pre.copy_(_pre.gather(2, perm.unsqueeze(3).expand(-1, -1, -1, _pre.shape[3])))
+        for name in simbase._MUTABLE:
+            if not name.startswith("city_"):
+                continue
+            full = getattr(self, name)
+            assert full.dim() >= 3 and full.shape[2] == self.RC and full.shape[1] >= nrows,                 f"{name} is not a (B, rows, RC, ...) city-slot plane"
+            t = full[:, :nrows]
+            p = perm if t.dim() == 3 else perm.reshape(
+                perm.shape + (1,) * (t.dim() - 3)).expand_as(t)
+            t.copy_(t.gather(2, p))
         # centre_slot_at: the owning row's slot at each live centre, re-mapped
         # through the inverse permutation. This also ends the civ-row
         # staleness latent — center_at's value-readers see

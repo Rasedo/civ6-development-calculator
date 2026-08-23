@@ -13,7 +13,7 @@ _seat_route_income, _religious_victor) and assert TS-mirroring behaviour.
 
 Covered (all gate-unreachable):
   1. Missionary BUY — founder + Shrine + complete unpillaged Holy Site + 60
-     faith buys exactly one missionary at the city center, faith −90; the base
+     faith buys exactly one missionary at the city center, faith −60; the base
      row has 3 charges.
   2. Missionary BUY pricing — HOLY_ORDER prices it 42 (mcost row); SCRIPTURE
      grants 4 charges (mchg row).
@@ -189,9 +189,9 @@ def order_relig_buy(sim, r: int, j: int, kind: int = 5) -> None:
 
 # ------------------------------------------------------------------ pokes -----
 def poke_missionary_buy(rules, rj, path):
-    """1. A founder with the SHRINE + a complete unpillaged Holy Site + 90 faith
+    """1. A founder with the SHRINE + a complete unpillaged Holy Site + 60 faith
     buys exactly ONE missionary at the buying city center; faith debited exactly
-    90 (read as a BUY-vs-NO-BUY diff); base charges 3."""
+    60 (read as a BUY-vs-NO-BUY diff); base charges 3."""
     sim = build(rules, path)
     r, j = 0, 0
     assert bool(sim.city_alive[0, r + 1, j]), "civ capital slot must be alive"
@@ -233,20 +233,20 @@ def poke_missionary_buy(rules, rj, path):
     sim._seat_phase()
     assert len(live_missionaries(sim, r)) == 2, "cap control must not buy a 3rd missionary"
     faith_nobuy = float(sim.civ_faith[0, r + 1])
-    assert abs((faith_nobuy - faith_buy) - 90.0) < 1e-6, (
-        f"missionary debit not exactly 90 faith (nobuy {faith_nobuy} - buy {faith_buy} = {faith_nobuy - faith_buy})"
+    assert abs((faith_nobuy - faith_buy) - 60.0) < 1e-6, (
+        f"missionary debit not exactly 60 faith (nobuy {faith_nobuy} - buy {faith_buy} = {faith_nobuy - faith_buy})"
     )
-    print(f"  1 missionary buy OK (1 unit at center {ctr}, 3 charges, -90 faith exact)")
+    print(f"  1 missionary buy OK (1 unit at center {ctr}, 3 charges, -60 faith exact)")
 
 
 def poke_missionary_pricing(rules, rj, path):
-    """2. HOLY_ORDER prices the missionary at 63 (mcost row); SCRIPTURE grants 4
+    """2. HOLY_ORDER prices the missionary at 42 (mcost row); SCRIPTURE grants 4
     charges (mchg row)."""
     sim = build(rules, path)
     r, j = 0, 0
     E = enh_rows(sim)
     SHRINE, TEMPLE = sim._shrine_bidx, sim._temple_bidx
-    assert int(sim._enh["mcost"][E["HOLY_ORDER"] + 1]) == 63, "HOLY_ORDER mcost row must be 63"
+    assert int(sim._enh["mcost"][E["HOLY_ORDER"] + 1]) == 42, "HOLY_ORDER mcost row must be 42"
     assert int(sim._enh["mchg"][E["SCRIPTURE"] + 1]) == 1, "SCRIPTURE mchg row must be +1"
     assert int(sim._type_charges[sim._missionary_idx]) == 3, "base missionary charges must be 3"
 
@@ -276,10 +276,10 @@ def poke_missionary_pricing(rules, rj, path):
         debit = float(s.civ_faith[0, r + 1]) - faith_buy
         return ms, debit
 
-    # HOLY_ORDER: 63 faith affords the buy; the debit is exactly 63.
-    ms, debit = one_buy(E["HOLY_ORDER"], 63.0)
-    assert len(ms) == 1, "HOLY_ORDER founder with 63 faith did not buy"
-    assert abs(debit - 63.0) < 1e-6, f"HOLY_ORDER debit not 63 ({debit})"
+    # HOLY_ORDER: 42 faith affords the buy; the debit is exactly 42.
+    ms, debit = one_buy(E["HOLY_ORDER"], 42.0)
+    assert len(ms) == 1, "HOLY_ORDER founder with 42 faith did not buy"
+    assert abs(debit - 42.0) < 1e-6, f"HOLY_ORDER debit not 42 ({debit})"
 
     # SCRIPTURE: the bought missionary carries 4 charges (3 + mchg 1).
     s2 = build(rules, path)
@@ -299,7 +299,7 @@ def poke_missionary_pricing(rules, rj, path):
     ms2 = live_missionaries(s2, r)
     assert len(ms2) == 1, "SCRIPTURE founder did not buy"
     assert int(s2.major_unit_charges[0, ms2[0]]) == 4, f"SCRIPTURE missionary must carry 4 charges, got {int(s2.major_unit_charges[0, ms2[0]])}"
-    print("  2 missionary pricing OK (HOLY_ORDER -63 faith; SCRIPTURE 4 charges)")
+    print("  2 missionary pricing OK (HOLY_ORDER -42 faith; SCRIPTURE 4 charges)")
 
 
 def poke_missionary_gating(rules, rj, path):

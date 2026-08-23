@@ -596,6 +596,7 @@ const UNIT_G: Record<string, Extractor> = {
   embarked: overUnits((u) => (u.embarked ? 1 : 0)),
   movesLeft: overUnits((u) => u.movesLeft),
   movesFull: overUnits((u) => u.movesFull ?? UNITS[u.type]?.moves ?? 0),
+  attacksLeft: overUnits((u) => u.attacksLeft ?? 1),
   revealedTurn: overUnits((u) => u.revealedTurn ?? -1),
   spyMission: overUnits((u) => u.spyMission ?? SPY_IDLE),
   spyTurns: overUnits((u) => u.spyTurns ?? 0),

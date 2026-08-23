@@ -245,6 +245,7 @@ class SimInit:
         self._suz_c_apostle = _sfx.index("apostlePromoChoice") if "apostlePromoChoice" in _sfx else -1
         self._suz_c_era = _sfx.index("eraInspiration") if "eraInspiration" in _sfx else -1
         self._suz_c_harbor_pow = _sfx.index("harborPower") if "harborPower" in _sfx else -1
+        self._suz_c_walls_full = _sfx.index("wallsFullDamage") if "wallsFullDamage" in _sfx else -1
         self._suz_c_faith_bldg = _sfx.index("faithBuildings") if "faithBuildings" in _sfx else -1
         self._suz_xp_mult_k = int(_suz["xpMult"])
         self._suz_hill_cs = int(_suz["hillCs"])
@@ -682,6 +683,9 @@ class SimInit:
             ("aura_mp", torch.long),
             ("mp", torch.long),
             ("mp_full", torch.long),
+            # ATTACKS left this turn. CIV6: a unit attacks ONCE a turn, and
+            # Sweeping Wind is the only row that buys a second.
+            ("attacks", torch.long),
             # The OWNER of whatever sits in this slot, in the absolute seat
             # space TS uses (0 seat 0, 1..99 civs, 100+ city-states, 200 barbs)
             # — a value you can gather and compare without already knowing which
@@ -811,6 +815,9 @@ class SimInit:
         self._inquisitor_idx = int(_bl.get("inquisitorIdx", -1))
         self._inquisitor_cost = float(_bl.get("inquisitorCost", 100))
         self._inquisitor_cap = int(_bl.get("inquisitorCap", 2))
+        self._monk_idx = int(_bl.get("warriorMonkIdx", -1))
+        self._monk_cost = float(_bl.get("warriorMonkCost", 200))
+        self._monk_follower = int(_bl.get("warriorMonkFollower", -1))
         self._apostle_promo_offer = int(_bl.get("apostlePromoOffer", 3))
         self._inquisitor_home_strength = int(_bl.get("inquisitorHomeStrength", 35))
         self._remove_heresy_pct = int(_bl.get("removeHeresyPct", 75))
@@ -1007,6 +1014,7 @@ class SimInit:
         self._prophet_cls = int(rr.get("prophetCls", 3))  # PROPHET's class index
         self._gp_engineer_cls = int(rr.get("engineerCls", -1))  # the Great ENGINEER's
         self._promo_max_level = int(rr.get("promoMaxLevel", 8))
+        self._kill_spread_range = int(rr.get("killSpreadRange", 10))
         self._promo_xp_per_level = int(rr.get("promoXpPerLevel", 15))
         self._rainforest_fid = int(rr.get("rainforestFid", -1))
         self._gp_nc = int(self._gp_class_district.numel())
@@ -1944,7 +1952,10 @@ class SimInit:
         self._type_zoc_ignore = torch.tensor([bool(u.get("ignoresZoc", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_zoc_none = torch.tensor([bool(u.get("exertsNoZoc", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_sight = torch.tensor([int(u.get("sight", 0)) for u in ru], dtype=torch.long, device=device)
-        self._stealth_live = bool(self._type_stealth.any())
+        # a chassis is not the only hider: Twilight Veil is a PROMOTION.
+        _veil = self._pk.get("STEALTH", -1)
+        self._stealth_live = bool(self._type_stealth.any()) or (
+            _veil >= 0 and bool((rules.promo_kind == _veil).any()))
         self._type_siege_support = torch.tensor([int(u.get("siegeSupport", 0)) for u in ru], dtype=torch.long, device=device)
         self._type_siege_max_walls = torch.tensor([int(u.get("siegeMaxWalls", 0)) for u in ru], dtype=torch.long, device=device)
         self._siege_support_any = bool((self._type_siege_support > 0).any())
@@ -2077,6 +2088,7 @@ class SimInit:
                     _m0u = int(self._type_moves[ti])
                     self.major_unit_mp[b, i] = _m0u
                     self.major_unit_mp_full[b, i] = _m0u
+                    self.major_unit_attacks[b, i] = 1
                     if bool(self._type_civilian[ti]):
                         self.civilian_at[(b, int(u_["tile"]))] = i
                     else:

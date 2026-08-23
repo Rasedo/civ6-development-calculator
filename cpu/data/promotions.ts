@@ -15,7 +15,7 @@
 
 export const PROMO_CLASSES = [
   'RECON', 'MELEE', 'RANGED', 'ANTICAV', 'LIGHT_CAV', 'HEAVY_CAV',
-  'SIEGE', 'NAVAL_MELEE', 'NAVAL_RANGED', 'APOSTLE',
+  'SIEGE', 'NAVAL_MELEE', 'NAVAL_RANGED', 'APOSTLE', 'MONK',
 ] as const;
 export type PromoClass = (typeof PROMO_CLASSES)[number];
 
@@ -67,6 +67,10 @@ export const PROMO_KINDS = [
   'CHAPLAIN',            // heals adjacent own military units by v
   'HEATHEN',             // converts adjacent barbarians for a charge
   'PILGRIM',             // +v spreads on first reaching a natural wonder
+  'STEALTH',             // only an ADJACENT enemy unit sees this one
+  'EXTRA_ATTACK',        // +v attacks per turn, movement permitting
+  'EXTRA_ATTACK_STILL',  // +v attacks per turn, and only if it has not moved
+  'KILL_SPREAD',         // v religious pressure nearby on a non-barbarian kill
 ] as const;
 export type PromoKind = (typeof PROMO_KINDS)[number];
 
@@ -91,6 +95,11 @@ const P = (
 ): PromoDef => ({ id, cls, tier, requires, effects });
 
 const cs = (kind: PromoKind, v: number, mask = 0): PromoEffect => ({ kind, v, mask });
+
+/** CIV6 (Disciples): the promotion "applies 250 Religious Pressure to cities
+ *  within 10 hexes when it kills a non-Barbarian unit". */
+export const KILL_SPREAD_PRESSURE = 250;
+export const KILL_SPREAD_RANGE = 10;
 const none: PromoEffect = { kind: 'NONE' };
 
 export const PROMOTIONS: readonly PromoDef[] = [
@@ -101,7 +110,7 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('GUERRILLA', 'RECON', 2, ['RANGER', 'ALPINE'], { kind: 'MOVE_AFTER_ATTACK' }),
   P('SPYGLASS', 'RECON', 3, ['SENTRY'], cs('SIGHT', 1)),
   P('AMBUSH', 'RECON', 3, ['GUERRILLA'], cs('CS_ALL', 20)),
-  P('CAMOUFLAGE', 'RECON', 4, ['SPYGLASS', 'AMBUSH'], none),
+  P('CAMOUFLAGE', 'RECON', 4, ['SPYGLASS', 'AMBUSH'], { kind: 'STEALTH' }),
 
   // ---- MELEE ----------------------------------------------------------
   // CIV6 note on Battlecry: "the Combat Strength bonus also applies when
@@ -114,7 +123,8 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('AMPHIBIOUS', 'MELEE', 2, ['TORTOISE', 'COMMANDO'], { kind: 'AMPHIBIOUS' }),
   P('ZWEIHANDER', 'MELEE', 3, ['COMMANDO', 'AMPHIBIOUS'], cs('CS_VS_CLASS_ATK', 7, CLASS_BIT.ANTICAV)),
   P('URBAN_WARFARE', 'MELEE', 3, ['COMMANDO', 'AMPHIBIOUS'], cs('CS_ATK_DISTRICT', 10)),
-  P('ELITE_GUARD', 'MELEE', 4, ['ZWEIHANDER', 'URBAN_WARFARE'], { kind: 'MOVE_AFTER_ATTACK' }, none),
+  P('ELITE_GUARD', 'MELEE', 4, ['ZWEIHANDER', 'URBAN_WARFARE'],
+    { kind: 'MOVE_AFTER_ATTACK' }, cs('EXTRA_ATTACK', 1)),
 
   // ---- RANGED ---------------------------------------------------------
   P('VOLLEY', 'RANGED', 1, [], cs('CS_VS_CLASS_ATK', 5, MASK_LAND)),
@@ -123,7 +133,7 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('INCENDIARIES', 'RANGED', 2, ['GARRISON'], cs('CS_VS_DISTRICT_DEF', 7)),
   P('SUPPRESSION', 'RANGED', 3, ['ARROW_STORM', 'INCENDIARIES'], none),
   P('EMPLACEMENT', 'RANGED', 3, ['ARROW_STORM', 'INCENDIARIES'], cs('CS_DEF_VS_CITY', 10)),
-  P('EXPERT_MARKSMAN', 'RANGED', 4, ['SUPPRESSION', 'EMPLACEMENT'], none),
+  P('EXPERT_MARKSMAN', 'RANGED', 4, ['SUPPRESSION', 'EMPLACEMENT'], cs('EXTRA_ATTACK_STILL', 1)),
 
   // ---- ANTI-CAVALRY ---------------------------------------------------
   P('ECHELON', 'ANTICAV', 1, [], cs('CS_VS_CLASS_ANY', 5, MASK_CAVALRY)),
@@ -153,7 +163,7 @@ export const PROMOTIONS: readonly PromoDef[] = [
     cs('CS_VS_CLASS_ANY', 7, CLASS_BIT.HEAVY_CAV)),
   P('REACTIVE_ARMOR', 'HEAVY_CAV', 3, ['ROUT'],
     cs('CS_DEF_VS_CLASS', 7, CLASS_BIT.HEAVY_CAV | CLASS_BIT.ANTICAV)),
-  P('BREAKTHROUGH', 'HEAVY_CAV', 4, ['ARMOR_PIERCING', 'REACTIVE_ARMOR'], none),
+  P('BREAKTHROUGH', 'HEAVY_CAV', 4, ['ARMOR_PIERCING', 'REACTIVE_ARMOR'], cs('EXTRA_ATTACK', 1)),
 
   // ---- SIEGE ----------------------------------------------------------
   P('GRAPE_SHOT', 'SIEGE', 1, [], cs('CS_VS_CLASS_ANY', 7, MASK_LAND)),
@@ -193,6 +203,17 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('PILGRIM', 'APOSTLE', 0, [], cs('PILGRIM', 3)),
   P('PROSELYTIZER', 'APOSTLE', 0, [], cs('PROSELYTIZER', 75)),
   P('TRANSLATOR', 'APOSTLE', 0, [], cs('TRANSLATOR', 3)),
+
+  // ---- WARRIOR MONK ---------------------------------------------------
+  // Its own tree, and the only one whose tier-I roots are a flanking
+  // multiplier and invisibility rather than a combat number.
+  P('SHADOW_STRIKE', 'MONK', 1, [], cs('FLANK_MULT', 2)),
+  P('TWILIGHT_VEIL', 'MONK', 1, [], { kind: 'STEALTH' }),
+  P('EXPLODING_PALMS', 'MONK', 2, ['SHADOW_STRIKE', 'TWILIGHT_VEIL'], cs('CS_ALL', 10)),
+  P('DISCIPLES', 'MONK', 2, ['SHADOW_STRIKE', 'TWILIGHT_VEIL'], cs('KILL_SPREAD', KILL_SPREAD_PRESSURE)),
+  P('SWEEPING_WIND', 'MONK', 3, ['EXPLODING_PALMS', 'DISCIPLES'], cs('EXTRA_ATTACK', 1)),
+  P('DANCING_CRANE', 'MONK', 3, ['EXPLODING_PALMS', 'DISCIPLES'], cs('MOVES', 1)),
+  P('COBRA_STRIKE', 'MONK', 4, ['SWEEPING_WIND', 'DANCING_CRANE'], cs('CS_ALL', 15)),
 ];
 
 /** the promotions of one class, in catalog order — the ORDER IS THE WIRE:
@@ -226,12 +247,13 @@ export const UNIT_PROMO_CLASS: Readonly<Record<string, PromoClass>> = {
   QUADRIREME: 'NAVAL_RANGED', FRIGATE: 'NAVAL_RANGED',
   BATTLESHIP: 'NAVAL_RANGED', MISSILE_CRUISER: 'NAVAL_RANGED',
   APOSTLE: 'APOSTLE',
+  WARRIOR_MONK: 'MONK',
 };
 
 /** the class BIT a chassis presents to another unit's `CS_VS_*` mask. */
 export function classBitOf(unitType: string): number {
   const c = UNIT_PROMO_CLASS[unitType];
-  return c && c !== 'APOSTLE' ? CLASS_BIT[c] : 0;
+  return c && c !== 'APOSTLE' && c !== 'MONK' ? CLASS_BIT[c] : 0;
 }
 
 /** the catalog index of a promotion id — the bit it occupies in a unit's

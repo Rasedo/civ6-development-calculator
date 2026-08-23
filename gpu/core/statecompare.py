@@ -656,6 +656,7 @@ UNIT = {
     "embarked": _unit("unit_emb"),
     "movesLeft": _unit("unit_mp"),
     "movesFull": _unit("unit_mp_full"),
+    "attacksLeft": _unit("unit_attacks"),
     "spyMission": _unit("unit_spy_mission"),
     "spyTurns": _unit("unit_spy_turns"),
     "spyTarget": _unit("unit_spy_target"),

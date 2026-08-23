@@ -20,7 +20,7 @@ import { GOLD_PURCHASE_MULT } from '../../../cpu/data/constants';
 import { CONGRESS_PUBLIC_RELATIONS, CONGRESS_MILITARY_ADVISORY, CONGRESS_WORLD_RELIGION, CONGRESS_ADVISORY_CS, CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR, CONGRESS_VOTE_STEP, GRIEVANCE_DECAY_BASE } from '../../../cpu/data/seats';
 import { PROMO_CLASSES } from '../../../cpu/data/promotions';
 import { addGrievance, grievanceWith, decayGrievances } from '../../../cpu/core/grievance';
-import { advisoryCS, defenderCS, theoStrength } from '../../../cpu/core/combat';
+import { congressUnitCS, defenderCS, theoStrength } from '../../../cpu/core/combat';
 import { condemnHeretic } from '../../../cpu/core/game';
 import { spawnUnit } from '../../../cpu/core/units';
 import { setWar } from '../../../cpu/core/seats';
@@ -449,13 +449,25 @@ describe('the three unwritten resolutions', () => {
     const warrior = spawnUnit(state, 'WARRIOR', city.centerIndex, 0)!;
     const bare = defenderCS(state, warrior, warrior.tileIndex);
     state.congress = [{ res: CONGRESS_MILITARY_ADVISORY, outcome: 0, target: melee }];
-    expect(advisoryCS(state, 'WARRIOR')).toBe(CONGRESS_ADVISORY_CS);
-    expect(advisoryCS(state, 'ARCHER')).toBe(0);
-    expect(advisoryCS(state, 'BOMBER')).toBe(0);  // air carries no promotion class
+    expect(congressUnitCS(state, { type: 'WARRIOR', seat: 0 })).toBe(CONGRESS_ADVISORY_CS);
+    expect(congressUnitCS(state, { type: 'ARCHER', seat: 0 })).toBe(0);
+    expect(congressUnitCS(state, { type: 'BOMBER', seat: 0 })).toBe(0);  // air carries no promotion class
     expect(defenderCS(state, warrior, warrior.tileIndex)).toBe(bare + CONGRESS_ADVISORY_CS);
     state.congress = [{ res: CONGRESS_MILITARY_ADVISORY, outcome: 1, target: melee }];
-    expect(advisoryCS(state, 'WARRIOR')).toBe(-CONGRESS_ADVISORY_CS);
+    expect(congressUnitCS(state, { type: 'WARRIOR', seat: 0 })).toBe(-CONGRESS_ADVISORY_CS);
     expect(defenderCS(state, warrior, warrior.tileIndex)).toBe(bare - CONGRESS_ADVISORY_CS);
+  });
+
+  it("WORLD RELIGION outcome A pays the named religion's Warrior Monks", () => {
+    const state = newGame(2);
+    const monk = { type: 'WARRIOR_MONK', seat: 1 };
+    state.congress = [{ res: CONGRESS_WORLD_RELIGION, outcome: 0, target: 1 }];
+    expect(congressUnitCS(state, monk)).toBe(CONGRESS_WORLD_RELIGION_RS);
+    expect(congressUnitCS(state, { type: 'WARRIOR_MONK', seat: 0 })).toBe(0);
+    expect(congressUnitCS(state, { type: 'WARRIOR', seat: 1 })).toBe(0);
+    // outcome B is a favor channel, not a combat one
+    state.congress = [{ res: CONGRESS_WORLD_RELIGION, outcome: 1, target: 1 }];
+    expect(congressUnitCS(state, monk)).toBe(0);
   });
 
   it('WORLD RELIGION pays A in the duel and B at the condemnation', () => {

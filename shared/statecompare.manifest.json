@@ -1601,6 +1601,17 @@
           "gap": "see movesLeft."
         },
         {
+          "name": "attacksLeft",
+          "compare": "exact",
+          "covers": [
+            "Unit.attacksLeft"
+          ],
+          "planes": [
+            "unit_attacks"
+          ],
+          "note": "TS leaves the field absent until the first refresh and reads that as ONE; the GPU writes 1 at every spawn, so the two agree from birth."
+        },
+        {
           "name": "spyMission",
           "compare": "exact",
           "covers": [

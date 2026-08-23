@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
-import { spawnUnit, refreshUnits, moveCostInto, unitFullMoves } from '../../../cpu/core/units';
+import {
+  spawnUnit, refreshUnits, moveCostInto, unitFullMoves, stepUnit, unitVisibleTo,
+} from '../../../cpu/core/units';
 import { meleeAttack } from '../../../cpu/core/combat';
 import { convertHeathens } from '../../../cpu/core/game';
-import { promoFirstUse, promoValue, unitPromoRows } from '../../../cpu/core/promotions';
+import {
+  attacksAfterMoving, attacksLeftOf, attacksPerTurn, promoFirstUse, promoValue, unitPromoRows,
+} from '../../../cpu/core/promotions';
 import { spreadFromUnit } from '../../../cpu/core/unitOrders';
 import { emptySeat, BARB_SEAT, setTileOwner } from '../../../cpu/core/seats';
 import { SPREAD_PRESSURE } from '../../../cpu/data/religion';
@@ -164,5 +168,59 @@ describe('promotion effects that are not Combat Strength', () => {
     const { k } = col({ type: 'SCOUT' }, 'MOVE_AFTER_ATTACK');
     expect(blow(0)).toBe(0);
     expect(blow(1 << k)).toBeGreaterThan(0);
+  });
+
+  it('Expert Marksman keeps its extra attack across a move BEFORE the blow, and loses it after', () => {
+    const state = makeState(makeMap(20, 20));
+    state.unitsMode = true;
+    const arch = spawnUnit(state, 'ARCHER', tileAtCoords(state.map, 9, 9).index, 0)!;
+    hold(arch, 'EXTRA_ATTACK_STILL');
+    expect(attacksPerTurn(arch)).toBe(2);
+    expect(attacksAfterMoving(arch)).toBe(1);
+    refreshUnits(state);
+    expect(attacksLeftOf(arch)).toBe(2);
+    // "It can still move BEFORE it attacks, however."
+    expect(stepUnit(state, arch, tileAtCoords(state.map, 10, 9))).not.toBe('blocked');
+    expect(attacksLeftOf(arch)).toBe(2);
+    // and once it has struck, the next step revokes what it had not spent
+    arch.attacksLeft = 1;
+    arch.movesLeft = 2;
+    expect(stepUnit(state, arch, tileAtCoords(state.map, 11, 9))).not.toBe('blocked');
+    expect(attacksLeftOf(arch)).toBe(0);
+  });
+
+  it('Breakthrough keeps its extra attack across the step that follows a blow', () => {
+    const state = makeState(makeMap(20, 20));
+    state.unitsMode = true;
+    const kn = spawnUnit(state, 'KNIGHT', tileAtCoords(state.map, 4, 4).index, 0)!;
+    hold(kn, 'EXTRA_ATTACK');
+    expect(attacksPerTurn(kn)).toBe(2);
+    expect(attacksAfterMoving(kn)).toBe(2);
+    refreshUnits(state);
+    kn.attacksLeft = 1;                              // one blow struck
+    expect(stepUnit(state, kn, tileAtCoords(state.map, 5, 4))).not.toBe('blocked');
+    expect(attacksLeftOf(kn)).toBe(1);
+    // a unit with no attack row is untouched either way
+    const w = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 8, 4).index, 0)!;
+    refreshUnits(state);
+    expect(attacksLeftOf(w)).toBe(1);
+    expect(stepUnit(state, w, tileAtCoords(state.map, 9, 4))).not.toBe('blocked');
+    expect(attacksLeftOf(w)).toBe(1);
+  });
+
+  it('Camouflage hides a Scout from everything but an ADJACENT enemy', () => {
+    const state = makeState(makeMap(20, 20));
+    state.unitsMode = true;
+    state.seats.push(emptySeat(1));
+    const hide = tileAtCoords(state.map, 9, 9);
+    const scout = spawnUnit(state, 'SCOUT', hide.index, 0)!;
+    hold(scout, 'STEALTH');
+    // a SCOUT's Reveal Stealth lengthens the look at a stealth CHASSIS and at
+    // nothing else, so two tiles away it sees nothing
+    const eye = spawnUnit(state, 'SCOUT', tileAtCoords(state.map, 11, 9).index, 1)!;
+    expect(unitVisibleTo(state, scout, 1)).toBe(false);
+    expect(unitVisibleTo(state, scout, 0)).toBe(true);   // its own seat always sees it
+    eye.tileIndex = tileAtCoords(state.map, 10, 9).index;
+    expect(unitVisibleTo(state, scout, 1)).toBe(true);
   });
 });

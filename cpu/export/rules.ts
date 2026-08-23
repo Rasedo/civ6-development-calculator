@@ -23,6 +23,7 @@ import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BO
 import { GP_CITY_PERM, GP_FX, GP_PERM, GP_PER_ADJ_SOURCES, GP_SITES, GP_YIELD_KEYS, GW_WORK_CLASSES, gpChargesOf, gpEffectOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
 import { strategicSlot } from '../core/stockpile';
 import { MAX_LEVEL, XP_PER_LEVEL } from '../core/promotions';
+import { KILL_SPREAD_RANGE } from '../data/promotions';
 import { GP_CLASSES, GREAT_PEOPLE, GP_ERA_GPP, GP_FIRST_OF_ERA, GP_FLAT_COST_CLASSES, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, RELIC_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_CULTURE, ARTIFACT_TOURISM, THEMING_MULT, ARTIST_WORKS, SPECIALIST_YIELDS, SPECIALIST_TIERS } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, APOSTLE_PROMO_OFFER, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, LASER_POWER_LOAD, gpClassesOf, gppFractionOf } from '../data/projects';
@@ -175,7 +176,7 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
   // identical value (the GPU indexes these by civ_only_enhancer + a base-value pad):
   mchg: def.effects.missionaryChargeBonus ?? 0,  // Scripture +1 charge
   mlump: Math.round(SPREAD_PRESSURE * (def.effects.spreadPressureMult ?? 1)),  // Scripture 15, base 10
-  mcost: Math.round((UNITS.MISSIONARY?.cost ?? 0) * (def.effects.missionaryCostMult ?? 1)),  // Holy Order 63, base 90
+  mcost: Math.round((UNITS.MISSIONARY?.cost ?? 0) * (def.effects.missionaryCostMult ?? 1)),  // Holy Order 42, base 60
   impY: IMPROVEMENT_IDS.map((id) => YIELD_KEYS.map((k) => def.effects.improvementYields?.[id]?.[k] ?? 0)),
   impRes: (() => {
     const rows = [0, 1, 2, 3].map(() => YIELD_KEYS.map(() => 0 as number));
@@ -511,6 +512,9 @@ export function buildRules() {
       // the promotion ladder a granted LEVEL fills the bar toward
       promoMaxLevel: MAX_LEVEL,
       promoXpPerLevel: XP_PER_LEVEL,
+      // CIV6 (Disciples): the kill spreads its religion "to cities within
+      // 10 hexes".
+      killSpreadRange: KILL_SPREAD_RANGE,
       rainforestFid: FEAT_IDS.indexOf('RAINFOREST'),
       // Great Works. WRITER/MUSICIAN class indices, the building
       // columns (b_cost catalog order) that hold writing/music works, the slots
@@ -654,6 +658,13 @@ export function buildRules() {
       theoHolyCity: THEO_HOLY_CITY_STRENGTH,
       inquisitorIdx: Object.values(UNITS).findIndex((u) => u.id === 'INQUISITOR'),
       inquisitorCost: UNITS.INQUISITOR.cost,
+      // CIV6 (Warrior Monk): bought with Faith only, "in a city that has a
+      // majority religion with the Warrior Monks Follower Belief and a Holy
+      // Site with a Temple". The belief is the CITY's, so the GPU needs its
+      // catalog row and not just the buyer's own.
+      warriorMonkIdx: Object.values(UNITS).findIndex((u) => u.id === 'WARRIOR_MONK'),
+      warriorMonkCost: UNITS.WARRIOR_MONK.cost,
+      warriorMonkFollower: Object.keys(FOLLOWER_BELIEFS).indexOf('WARRIOR_MONKS'),
       inquisitorCap: INQUISITOR_CAP,
       apostlePromoOffer: APOSTLE_PROMO_OFFER,
       inquisitorHomeStrength: INQUISITOR_HOME_STRENGTH,

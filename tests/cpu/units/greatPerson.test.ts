@@ -103,7 +103,7 @@ describe('the activation site', () => {
     tile.districtComplete = false;
     expect(gpActivateOk(state, u)).toBe(false);
     tile.districtComplete = true;
-    tile.pillaged = true;
+    tile.districtPillaged = true;
     expect(gpActivateOk(state, u)).toBe(false);
   });
 

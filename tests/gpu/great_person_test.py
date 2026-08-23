@@ -170,7 +170,7 @@ def poke_sites(rules, path):
     sim.district_complete[0, bare] = False
     assert not site_ok(sim, ROW, v), "an UNFINISHED district satisfied the district site"
     sim.district_complete[0, bare] = True
-    sim.pillaged[0, bare] = True
+    sim.district_pillaged[0, bare] = True
     assert not site_ok(sim, ROW, v), "a PILLAGED district satisfied the district site"
     sim.pillaged[0, bare] = False
 

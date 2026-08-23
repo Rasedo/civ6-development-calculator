@@ -199,7 +199,7 @@ def main() -> int:
                 ("emergency", [py, "tests/gpu/emergency_test.py"], 2),  # the special session above the trigger: sponsorship, quiet window, forced war, both outcomes
                 ("martyr", [py, "tests/gpu/martyr_test.py"], 2),  # the relic rides the MARTYR promotion, and the death draws nothing
                 ("barb_camps", [py, "tests/gpu/barb_camps_test.py"], 2),  # a camp's class is its ground; ranged is nobody's class
-                ("suzerain_rules", [py, "tests/gpu/suzerain_rules_test.py"], 2),  # the six suz-coded perks, strict-suzerain-only
+                ("suzerain_rules", [py, "tests/gpu/suzerain_rules_test.py"], 2),  # the seven suz-coded perks, strict-suzerain-only
                 ("dedications", [py, "tests/gpu/dedications_test.py"], 2),  # both faces of the four new catalog entries
                 ("civ_pair_strike", [py, "tests/gpu/civ_pair_strike_test.py"], 2),  # a civ city fires on an enemy civ
                 ("spawn_reclaim", [py, "tests/gpu/spawn_reclaim_test.py"], 2),  # a reclaimed slot hands on no drowned unit's MP
@@ -255,7 +255,7 @@ def main() -> int:
                 ("sc_census", [py, "tests/gpu/statecompare_census_test.py"], 1),  # static — every _MUTABLE plane is compared or excused
                 ("promotions", [py, "tests/gpu/promotions_test.py"], 4),  # the ladder, the PROMOTE head, the evaluator and the exact-integer XP award
                 ("inquisitor", [py, "tests/gpu/inquisitor_test.py"], 4),  # Launch Inquisition -> the purchase -> Remove Heresy -> Condemn, and the duel rules
-                ("promo_effects", [py, "tests/gpu/promo_effects_test.py"], 4),  # the seventeen promotion kinds that are not Combat Strength
+                ("promo_effects", [py, "tests/gpu/promo_effects_test.py"], 4),  # the twenty promotion kinds that are not Combat Strength
                 ("era_draws", [py, "tests/gpu/era_draws_test.py"], 4),  # the restored random draws, and the artifact's own civilization
                 ("power", [py, "tests/gpu/power_test.py"], 4),  # GS POWER: demand, the plant's reach, Cardiff, the powered halves
                 ("climate", [py, "tests/gpu/climate_test.py"], 4),  # GS CLIMATE: carbon, the seven phases, the sea, the barrier, a warmed world's weather

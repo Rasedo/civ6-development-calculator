@@ -66,7 +66,7 @@ export function gpActivateOk(state: GameState, unit: Unit): boolean {
       return true;
     case 'district': {
       if (!tileOwnedByCiv(tile, unit.seat)) return false;
-      return tile.district === district && tile.districtComplete && !tile.pillaged;
+      return tile.district === district && tile.districtComplete && !tile.districtPillaged;
     }
     case 'gwSlot': {
       const kind = GW_CLASS_KIND[person.class];

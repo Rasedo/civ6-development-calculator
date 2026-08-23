@@ -1612,8 +1612,9 @@ export function seatPhase(state: GameState): void {
         const civCityF = actor.cities.find((c) => c.centerIndex === centre);
         if (!civCityF) continue;
         if (fk === 4) buyWorshipBuilding(state, civCityF.id, actor.seat);
-        else if ((fk === 5 || fk === 6 || fk === 11) && !boughtRelig) {
-          const rt = fk === 5 ? 'MISSIONARY' : fk === 6 ? 'APOSTLE' : 'INQUISITOR';
+        else if ((fk === 5 || fk === 6 || fk === 11 || fk === 14) && !boughtRelig) {
+          const rt = fk === 5 ? 'MISSIONARY' : fk === 6 ? 'APOSTLE'
+            : fk === 11 ? 'INQUISITOR' : 'WARRIOR_MONK';
           boughtRelig = purchaseReligiousUnit(state, civCityF.id, rt, actor.seat).ok;
         } else if ((fk === 8 || fk === 9) && !boughtCivilian) {
           // kinds 8/9 — the Monumentality faith-civilian (8 builder, 9 settler)

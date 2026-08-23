@@ -77,6 +77,7 @@ describe('the four new dedications', () => {
     const barb = spawnUnit(state, 'GALLEY', sea.index, BARB_SEAT)!;
     barb.hp = 1;
     atk.movesLeft = 2;
+    atk.attacksLeft = 1;
     expect(meleeAttack(state, atk.id, sea.index, 0).ok).toBe(true);
     expect(seatOf(state, 0)!.eraScore).toBe(0);
   });
@@ -349,6 +350,7 @@ describe('the three late-era dedications', () => {
     const barb = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 12, 9).index, BARB_SEAT)!;
     barb.hp = 1;
     robot.movesLeft = 4;
+    robot.attacksLeft = 1;
     expect(meleeAttack(state, robot.id, barb.tileIndex, 0).ok).toBe(true);
     expect(seatOf(state, 0)!.eraScore).toBe(0);
   });

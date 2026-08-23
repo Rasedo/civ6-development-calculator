@@ -813,7 +813,8 @@ export type GpSite =
 export const GP_PERM = [
   'spaceProdPct',        // Space Race project production, percent
   'warWearyPct',         // war weariness accrued, percent off
-  'flankPct',            // flanking bonus, percent
+  'flankPctLand',        // flanking bonus for LAND units, percent
+  'flankPctNaval',       // flanking bonus for NAVAL units, percent
   'unitProdPct',         // unit production, percent
   'routePlunderPct',     // gold from plundering a sea trade route, percent
   'healBonus',           // extra HP healed per turn
@@ -1030,7 +1031,7 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_SAMORI_TOURE: { unit: 'INFANTRY', unitPromotions: 1 },
   GP_DOUGLAS_MACARTHUR: { unit: 'TANK', unitPromotions: 1 },
   GP_DWIGHT_EISENHOWER: { perm: { unitProdPct: 5 } },
-  GP_GEORGY_ZHUKOV: { perm: { flankPct: 50 } },
+  GP_GEORGY_ZHUKOV: { perm: { flankPctLand: 50 } },
   GP_SUDIRMAN: { promotionLevels: 1, xpPct: 100 },
   GP_AHMAD_SHAH_MASSOUD: { unit: 'MODERN_AT', unitPromotions: 1 },
   GP_VIJAYA_WIMALARATNE: { promotionLevels: 1, xpPct: 100 },
@@ -1049,7 +1050,7 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_YI_SUN_SIN: { unit: 'IRONCLAD', unitPromotions: 1 },
   GP_FERDINAND_MAGELLAN: { cityPerm: { loyalty: 4 } },
   GP_CHING_SHIH: { gold: 100, perm: { routePlunderPct: 60 } },
-  GP_HORATIO_NELSON: { perm: { flankPct: 50 } },
+  GP_HORATIO_NELSON: { siteDistrict: 'HARBOR', buildings: ['LIGHTHOUSE', 'SHIPYARD'], perm: { flankPctNaval: 50 } },
   GP_LASKARINA_BOUBOULINA: { promotionLevels: 1, xpPct: 50 },
   GP_MATTHEW_PERRY: { site: 'cityState', unmodelled: true },
   GP_FRANZ_VON_HIPPER: { unit: 'BATTLESHIP', unitPromotions: 1 },

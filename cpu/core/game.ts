@@ -823,14 +823,19 @@ function offerApostlePromotions(state: GameState, unit: Unit, seat: number): voi
 export function purchaseReligiousUnit(
   state: GameState,
   cityId: number,
-  unitType: 'MISSIONARY' | 'APOSTLE' | 'INQUISITOR',
+  unitType: 'MISSIONARY' | 'APOSTLE' | 'INQUISITOR' | 'WARRIOR_MONK',
   seat: number,
 ): RuleResult {
   const buyer = seatOf(state, seat);
   if (!buyer) return { ok: false, reason: 'No such seat.' };
-  if (!buyer.religion.founded) return { ok: false, reason: 'No founded religion.' };
   const city = citiesOf(state, seat).find((c) => c.id === cityId);
   if (!city) return { ok: false, reason: 'No such city.' };
+  // CIV6 (Warrior Monk): "It can only be purchased with Faith in a city that
+  // has a majority religion with the Warrior Monks Follower Belief and a Holy
+  // Site with a Temple." The belief is the CITY's majority religion's, which
+  // need not be the buyer's own, so this arm asks nothing of `buyer.religion`.
+  if (unitType === 'WARRIOR_MONK') return purchaseWarriorMonk(state, city, buyer, seat);
+  if (!buyer.religion.founded) return { ok: false, reason: 'No founded religion.' };
   // CIV6: "You can only create Inquisitors if you have founded a religion and
   // had an Apostle use the Launch Inquisition ability within your territory."
   if (unitType === 'INQUISITOR' && !buyer.religion.inquisition) {
@@ -865,6 +870,26 @@ export function purchaseReligiousUnit(
   // CIV6 (GS Civilopedia, Exodus of the Evangelists, Golden face): "newly
   // trained ones get +2 Charges" — Missionaries and Apostles alike.
   if (goldenDedication(state, seat, DED_EXODUS)) u.charges = (u.charges ?? 0) + 2;
+  return { ok: true };
+}
+
+function purchaseWarriorMonk(state: GameState, city: City, buyer: Seat, seat: number): RuleResult {
+  const rel = city.followedReligion ?? -1;
+  if (rel < 0) return { ok: false, reason: 'The city follows no religion.' };
+  if (seatOf(state, rel)?.religion.follower !== 'WARRIOR_MONKS') {
+    return { ok: false, reason: 'The majority religion has no Warrior Monks belief.' };
+  }
+  if (!city.buildings.includes('TEMPLE')) return { ok: false, reason: 'Needs a Temple.' };
+  const hs = city.districts.find((d) => d.type === 'HOLY_SITE');
+  const ht = hs ? state.map.tiles[hs.tileIndex] : undefined;
+  if (!ht?.districtComplete || ht.districtPillaged) {
+    return { ok: false, reason: 'Needs a complete, unpillaged Holy Site.' };
+  }
+  const cost = Math.round(UNITS.WARRIOR_MONK.cost);
+  if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
+  const u = spawnUnit(state, 'WARRIOR_MONK', city.centerIndex, seat);
+  if (!u) return { ok: false, reason: 'No free tile near the city center.' };
+  buyer.faith = (buyer.faith ?? 0) - cost;
   return { ok: true };
 }
 

@@ -24,7 +24,9 @@ import { clearCampFor } from './combat';
 import { emergencyHeal, emergencyMoveBonus } from './emergency';
 import { UNITS, UNIT_HP, ENCAMPMENT_HP, type UnitDef } from '../data/units';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
-import { promoFirstUse, promoFlag, promoValue } from './promotions';
+import {
+  attacksPerTurn, promoFirstUse, promoFlag, promoValue, stepAttacksLeft,
+} from './promotions';
 import { dedicationEvent, goldenMoveBonus } from './eras'; // MONUMENTALITY / EXODUS +2 MP
 import { DED_WISH, OPEN_BORDERS_CIVIC } from '../data/seats';
 import { GAME_SPEED, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS } from '../data/constants';
@@ -294,14 +296,18 @@ export function unitsHostile(
  * also why an adjacent CITY does not give the hex away.
  */
 export function unitVisibleTo(state: GameState, u: Unit, seat: number): boolean {
-  if (!UNITS[u.type]?.stealth) return true;
+  // CIV6 (Twilight Veil): "Only adjacent enemy units can reveal this unit" —
+  // a promoted hider is never given away at range, so Reveal Stealth lengthens
+  // the look at a stealth CHASSIS and at nothing else.
+  const chassis = !!UNITS[u.type]?.stealth;
+  if (!chassis && !promoFlag(u, 'STEALTH')) return true;
   if (u.seat === seat) return true;
   if ((u.revealedTurn ?? -1) >= state.turn) return true;
   const t = state.map.tiles[u.tileIndex];
   for (const v of state.units) {
     if (v.seat !== seat) continue;
     const vt = state.map.tiles[v.tileIndex];
-    const reach = UNITS[v.type]?.revealStealth ? unitSight(v) : 1;
+    const reach = chassis && UNITS[v.type]?.revealStealth ? unitSight(v) : 1;
     if (hexDistance(vt.col, vt.row, t.col, t.row) <= reach) return true;
   }
   return false;
@@ -664,6 +670,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   carryAirWith(state, unit, from.index);
   logUnitOrder(state, unit.seat, unit.id, 'move', to.index);
   unit.movesLeft = Math.max(0, unit.movesLeft - cost);
+  unit.attacksLeft = stepAttacksLeft(unit);
   if (unit.seat === seat) {
     revealAround(state, unit.seat, to.index, unitSight(unit));
     // CIV6 (Pilgrim): "Gains 3 extra spreads when moving adjacent to a natural
@@ -1245,6 +1252,7 @@ export function refreshUnits(state: GameState): void {
     const granted = full + generalAuraMP(state, unit);
     unit.movesFull = granted;
     unit.movesLeft = granted;
+    unit.attacksLeft = attacksPerTurn(unit);
     if (unit.path) walkPath(state, unit);
     if (unit.mission === 'explore' && !unit.path && unit.movesLeft > 0) {
       const target = nearestUnexplored(state, unit);

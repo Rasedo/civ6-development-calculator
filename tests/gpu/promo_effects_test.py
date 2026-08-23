@@ -69,6 +69,7 @@ def place(sim, tile: int, utype: int, seat: int, *, hp=100, charges=0, promos=0)
     sim.major_unit_charges[0, slot] = charges
     sim.major_unit_mp[0, slot] = 4
     sim.major_unit_mp_full[0, slot] = 4
+    sim.major_unit_attacks[0, slot] = 1
     sim.major_unit_promos[0, slot] = promos
     sim.major_unit_promo_offer[0, slot] = 0
     sim.major_unit_promo_used[0, slot] = 0
@@ -344,6 +345,146 @@ def test_range(sim) -> None:
     print(f"  RANGE OK — column {k} adds {v} to the chassis reach")
 
 
+# ------------------------------------------------------------ the monk tree --
+def test_extra_attack(sim) -> None:
+    """CIV6 (Sweeping Wind): "+1 additional attack per turn if Movement
+    allows." Every other unit gets exactly one, and MOVE_AFTER_ATTACK buys
+    movement, never a second blow."""
+    _c, k, v = col_with_kind(sim, "MONK", "EXTRA_ATTACK")
+    assert v == 1, f"Sweeping Wind should add ONE attack, not {v}"
+    ty = type_in_class(sim, "MONK")
+    ctr = int(sim.city_center[0, ROW, 0])
+    slot = place(sim, free_tile(sim, ctr), ty, ROW)
+    fired = torch.zeros(sim.B, dtype=torch.bool)
+    fired[0] = True
+    assert int(sim._full_attacks("major")[0, slot]) == 1, "a plain unit gets one attack"
+    sim._spend_one_attack("major", slot, fired)
+    assert int(sim.major_unit_attacks[0, slot]) == 0, "the blow did not spend the attack"
+    sim._spend_one_attack("major", slot, fired)
+    assert int(sim.major_unit_attacks[0, slot]) == 0, "the counter went negative"
+    sim.major_unit_promos[0, slot] = 1 << k
+    assert int(sim._full_attacks("major")[0, slot]) == 2, "Sweeping Wind bought nothing"
+    sim.major_unit_alive[0, slot] = False
+    print("  EXTRA_ATTACK OK — one blow a turn, two with Sweeping Wind")
+
+
+def test_stealth_promo(sim) -> None:
+    """CIV6 (Twilight Veil): "Only adjacent enemy units can reveal this unit"
+    — and a blow gives it away for the turn."""
+    _c, k, _v = col_with_kind(sim, "MONK", "STEALTH")
+    ty = type_in_class(sim, "MONK")
+    assert sim._stealth_live, "the veil must arm the stealth machinery"
+    ctr = int(sim.city_center[0, ROW, 0])
+    hide = free_tile(sim, ctr)
+    slot = place(sim, hide, ty, ROW, promos=1 << k)
+    sim.major_unit_revealed_turn[0, slot] = -1
+    # an enemy TWO tiles away sees nothing; the same enemy adjacent does
+    far = next(x for x in range(sim.T)
+               if int(sim.pair_dist[hide, x]) == 2 and bool(sim.passable[0, x])
+               and int(sim.military_at[0, x]) < 0)
+    near = free_tile(sim, hide)
+    eye = place(sim, far, type_in_class(sim, "RECON"), 1)
+    assert bool(sim._stealth_hidden(1)[0, hide]), "a veiled unit was visible at range 2"
+    sim._occ_clear(torch.tensor([0]), torch.tensor([far]),
+                   torch.tensor([eye + sim.POOL_LO["major"]]))
+    sim.major_unit_tile[0, eye] = near
+    sim._occ_set(torch.tensor([0]), torch.tensor([near]),
+                 torch.tensor([eye + sim.POOL_LO["major"]]))
+    assert not bool(sim._stealth_hidden(1)[0, hide]), "an ADJACENT enemy must reveal it"
+    # a blow reveals it wherever it stands
+    sim.major_unit_tile[0, eye] = far
+    sim._occ_clear(torch.tensor([0]), torch.tensor([near]),
+                   torch.tensor([eye + sim.POOL_LO["major"]]))
+    sim._occ_set(torch.tensor([0]), torch.tensor([far]),
+                 torch.tensor([eye + sim.POOL_LO["major"]]))
+    assert bool(sim._stealth_hidden(1)[0, hide])
+    fired = torch.zeros(sim.B, dtype=torch.bool)
+    fired[0] = True
+    sim._spend_one_attack("major", slot, fired)
+    assert int(sim.major_unit_revealed_turn[0, slot]) == int(sim.turn), \
+        "the blow did not mark the hider"
+    assert not bool(sim._stealth_hidden(1)[0, hide]), "a hider that attacked is seen"
+    sim.major_unit_alive[0, slot] = False
+    sim.major_unit_alive[0, eye] = False
+    sim._occ_clear(torch.tensor([0, 0]), torch.tensor([hide, far]),
+                   torch.tensor([slot + sim.POOL_LO["major"], eye + sim.POOL_LO["major"]]))
+    print("  STEALTH OK — adjacency reveals, and so does its own blow")
+
+
+def test_kill_spread(sim) -> None:
+    """CIV6 (Disciples): 250 Religious Pressure "to cities within 10 hexes when
+    it kills a non-Barbarian unit"."""
+    _c, k, v = col_with_kind(sim, "MONK", "KILL_SPREAD")
+    assert v == 250, f"Disciples should apply 250 pressure, not {v}"
+    ty = type_in_class(sim, "MONK")
+    ctr = int(sim.city_center[0, ROW, 0])
+    sim.civ_religion_done[0, ROW] = True
+    sim.city_pressure[0, ROW, 0, ROW] = 0
+    killed = torch.zeros(sim.B, dtype=torch.bool)
+    killed[0] = True
+    tile = torch.full((sim.B,), ctr, dtype=torch.long)
+    seat = torch.zeros(sim.B, dtype=torch.long)
+    kt = torch.full((sim.B,), ty, dtype=torch.long)
+    kp = torch.full((sim.B,), 1 << k, dtype=torch.long)
+    barb = torch.zeros(sim.B, dtype=torch.bool)
+    sim._disciples_spread(seat, kt, kp, barb, tile, killed)
+    assert int(sim.city_pressure[0, ROW, 0, ROW]) == v, "the kill spread nothing"
+    # a BARBARIAN victim pays nothing, and neither does a monk without the row
+    sim._disciples_spread(seat, kt, kp, ~barb, tile, killed)
+    sim._disciples_spread(seat, kt, torch.zeros_like(kp), barb, tile, killed)
+    assert int(sim.city_pressure[0, ROW, 0, ROW]) == v, "a barbarian kill spread"
+    sim.city_pressure[0, ROW, 0, ROW] = 0
+    print("  KILL_SPREAD OK — a non-barbarian kill preaches, a barbarian one does not")
+
+
+def test_extra_attack_still(sim) -> None:
+    """CIV6 (Expert Marksman): "+1 additional attack per turn if unit has not
+    moved" — the refresh hands it out and the first step takes it back, while
+    Breakthrough's "if Movement allows" survives the same step."""
+    _c, k, v = col_with_kind(sim, "RANGED", "EXTRA_ATTACK_STILL")
+    assert v == 1, f"Expert Marksman should add ONE attack, not {v}"
+    ok = torch.zeros(sim.B, dtype=torch.bool)
+    ok[0] = True
+    ctr = int(sim.city_center[0, ROW, 0])
+
+    def walk(slot: int, here: int) -> int:
+        dest = free_tile(sim, here)
+        gs = torch.full((sim.B,), slot + sim.POOL_LO["major"], dtype=torch.long)
+        moved = sim._step_verb(
+            ok, gs, torch.full((sim.B,), here, dtype=torch.long),
+            torch.full((sim.B,), dest, dtype=torch.long),
+            torch.full((sim.B,), sim.neigh[here].tolist().index(dest), dtype=torch.long),
+            ROW, torch.ones(sim.B, dtype=torch.bool))
+        assert bool(moved[0]), "the step refused"
+        return dest
+
+    here = free_tile(sim, ctr)
+    slot = place(sim, here, type_in_class(sim, "RANGED"), ROW, promos=1 << k)
+    sim._reset_mp("major")
+    assert int(sim.major_unit_attacks[0, slot]) == 2, "the refresh withheld the still-bonus"
+    # "It can still move BEFORE it attacks, however."
+    here = walk(slot, here)
+    assert int(sim.major_unit_attacks[0, slot]) == 2, "a step before the blow cost an attack"
+    sim.major_unit_attacks[0, slot] = 1                       # one blow struck
+    sim.major_unit_mp[0, slot] = 4
+    here = walk(slot, here)
+    assert int(sim.major_unit_attacks[0, slot]) == 0, "the step kept the still-bonus"
+    # Breakthrough's is not a still-bonus, so the same step leaves it alone
+    _c2, k2, _v2 = col_with_kind(sim, "HEAVY_CAV", "EXTRA_ATTACK")
+    here2 = free_tile(sim, ctr)
+    slot2 = place(sim, here2, type_in_class(sim, "HEAVY_CAV"), ROW, promos=1 << k2)
+    sim._reset_mp("major")
+    assert int(sim.major_unit_attacks[0, slot2]) == 2
+    sim.major_unit_attacks[0, slot2] = 1
+    here2 = walk(slot2, here2)
+    assert int(sim.major_unit_attacks[0, slot2]) == 1, "a step took Breakthrough's attack"
+    for s, tl in ((slot, here), (slot2, here2)):
+        sim.major_unit_alive[0, s] = False
+        sim._occ_clear(torch.tensor([0]), torch.tensor([tl]),
+                       torch.tensor([s + sim.POOL_LO["major"]]))
+    print("  EXTRA_ATTACK_STILL OK — a step before the blow is free, one after revokes it")
+
+
 def main() -> None:
     sim = build()
     test_moves(sim)
@@ -359,6 +500,10 @@ def main() -> None:
     test_first_use(sim)
     test_spread_promos(sim)
     test_heathen(sim)
+    test_extra_attack(sim)
+    test_extra_attack_still(sim)
+    test_stealth_promo(sim)
+    test_kill_spread(sim)
     print("PROMO EFFECTS OK")
 
 

@@ -346,12 +346,28 @@ def main() -> None:
     sim.congress_active[:, 0, 0] = ma
     sim.congress_active[:, 0, 1] = 0
     sim.congress_active[:, 0, 2] = named
-    assert int(sim._advisory_cs(one.expand(sim.B))[0]) == sim._c_advisory_cs
+    seat0 = torch.zeros(sim.B, dtype=torch.long)
+    assert int(sim._congress_unit_cs(one.expand(sim.B), seat0)[0]) == sim._c_advisory_cs
     if off.numel():
-        assert int(sim._advisory_cs(off.expand(sim.B))[0]) == 0, "a classless chassis takes nothing"
+        assert int(sim._congress_unit_cs(off.expand(sim.B), seat0)[0]) == 0,             "a classless chassis takes nothing"
     sim.congress_active[:, 0, 1] = 1
-    assert int(sim._advisory_cs(one.expand(sim.B))[0]) == -sim._c_advisory_cs
+    assert int(sim._congress_unit_cs(one.expand(sim.B), seat0)[0]) == -sim._c_advisory_cs
     print("  MILITARY ADVISORY moves the named promotion class, on both faces")
+
+    # CIV6 (World Religion, outcome A): "this outcome also gives Warrior Monks
+    # +10 Combat Strength", and only to a monk of the named religion.
+    monk = torch.full((sim.B,), sim._monk_idx, dtype=torch.long)
+    sim.congress_active[:] = -1
+    sim.congress_active[:, 0, 0] = sim._congress_at["WORLD_RELIGION"]
+    sim.congress_active[:, 0, 1] = 0
+    sim.congress_active[:, 0, 2] = 1
+    assert int(sim._congress_unit_cs(monk, torch.ones(sim.B, dtype=torch.long))[0]) == sim._c_wr_rs
+    assert int(sim._congress_unit_cs(monk, seat0)[0]) == 0, "a rival religion's monk took it"
+    assert int(sim._congress_unit_cs(one.expand(sim.B),
+                                     torch.ones(sim.B, dtype=torch.long))[0]) == 0,         "the monk bonus reached a chassis that is not a monk"
+    sim.congress_active[:, 0, 1] = 1
+    assert int(sim._congress_unit_cs(monk, torch.ones(sim.B, dtype=torch.long))[0]) == 0,         "outcome B paid the monk"
+    print("  WORLD RELIGION outcome A pays the named religion's Warrior Monks — and nobody else")
 
     wr = sim._congress_at["WORLD_RELIGION"]
     sim.congress_active[:] = -1

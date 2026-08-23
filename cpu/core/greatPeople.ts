@@ -93,7 +93,7 @@ export function gpSpawnTile(state: GameState, seat: number, cls: GreatPersonClas
   for (const c of citiesOf(state, seat)) {
     const has = c.districts.some((d) => {
       const t = state.map.tiles[d.tileIndex];
-      return d.type === district && t.districtComplete && !t.pillaged;
+      return d.type === district && t.districtComplete && !t.districtPillaged;
     });
     if (has && (best < 0 || c.centerIndex < best)) best = c.centerIndex;
   }

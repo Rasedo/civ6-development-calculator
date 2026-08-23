@@ -78,12 +78,14 @@ export type SuzEffect =
   | 'eraInspiration'     // Vilnius
   | 'harborPower'        // Cardiff
   | 'faithBuildings'     // Valletta
+  | 'wallsFullDamage'    // Akkad
   | 'suzImprovement';    // Caguana / La Venta / Armagh
 
 /** The WIRE order the exported `suzCode` indexes — append only. */
 export const SUZ_EFFECTS: SuzEffect[] = [
   'xpDouble', 'cavalryHills', 'regionalReach', 'worksScience', 'csRouteYields', 'holySitePressure',
   'apostlePromoChoice', 'eraInspiration', 'harborPower', 'faithBuildings',
+  'wallsFullDamage',
   // the three whose whole perk is "your Builders can build X improvements",
   // which `validImprovementsIn`'s suzerain block answers off `suzerainOf`.
   'suzImprovement',
@@ -92,6 +94,9 @@ export const SUZ_EFFECTS: SuzEffect[] = [
 /** Cardiff: "Cities receive +2 Power for every Harbor building." Renewable,
  *  so it never leaves the city that holds the buildings. */
 export const CARDIFF_HARBOR_POWER = 2;
+/** Akkad: "Melee and anti-cavalry units' attacks do full damage to the
+ *  city's walls." The Battering Ram's own effect, at EVERY walls tier and
+ *  with no support unit present. */
 /** Kabul: "Your units receive double experience from battles they initiate." */
 export const KABUL_XP_MULT = 2;
 /** Preslav: "+5 Strength when fighting on hill tiles" (light and heavy cavalry). */
@@ -135,6 +140,7 @@ export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   'Buenos Aires': { name: 'Buenos Aires', type: 'industrial', bonus: 'Your bonus resources behave like luxury resources, providing +1 Amenity per resource.', channel: 'amenities' },
   Cardiff: { name: 'Cardiff', type: 'industrial', bonus: 'Cities receive +2 Power for every Harbor building.', suz: 'harborPower' },
   'Mexico City': { name: 'Mexico City', type: 'industrial', bonus: 'Regional effects from your Industrial Zone, Water Park, and Entertainment Complex districts reach 3 tiles farther.', suz: 'regionalReach' },
+  Akkad: { name: 'Akkad', type: 'militaristic', bonus: "Melee and anti-cavalry units' attacks do full damage to the city's walls.", suz: 'wallsFullDamage' },
   Kabul: { name: 'Kabul', type: 'militaristic', bonus: 'Your units receive double experience from battles they initiate.', suz: 'xpDouble' },
   Ngazargamu: { name: 'Ngazargamu', type: 'militaristic', bonus: 'Land combat or support units are 20% cheaper to purchase with Gold for each Encampment district building in that city.', channel: 'production', note: 'a per-building GOLD PURCHASE discount; the flat production channel stands in' },
   Preslav: { name: 'Preslav', type: 'militaristic', bonus: 'Your light and heavy cavalry units have +5 Strength when fighting on Hills tiles.', suz: 'cavalryHills' },
@@ -181,7 +187,7 @@ export const CITY_STATE_NAMES: Record<CityStateType, string[]> = {
   cultural: ['Vilnius', 'Nan Madol', 'Kumasi', 'Caguana'],
   trade: ['Venice', 'Zanzibar', 'Bandar Brunei', 'Hunza'],
   industrial: ['Mexico City', 'Buenos Aires', 'Hong Kong', 'Cardiff'],
-  militaristic: ['Kabul', 'Ngazargamu', 'Preslav', 'Valletta'],
+  militaristic: ['Kabul', 'Ngazargamu', 'Preslav', 'Valletta', 'Akkad'],
   religious: ['Jerusalem', 'La Venta', 'Yerevan', 'Armagh'],
 };
 

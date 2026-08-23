@@ -113,7 +113,7 @@ def test_launch(sim, ctr: int) -> None:
 def test_purchase(sim, ctr: int) -> None:
     assert sim._inquisitor_idx >= 0, "no INQUISITOR in the roster"
     sim.civ_faith[:, ROW] = 9999.0
-    _w, _wj, _m, _mj, _a, _aj, q_ok, q_j = sim._seat_faith_buy_candidates(
+    _w, _wj, _m, _mj, _a, _aj, q_ok, q_j, _k, _kj = sim._seat_faith_buy_candidates(
         ROW, torch.ones(sim.B, dtype=torch.bool))
     assert bool(q_ok[0]), "the Inquisitor is not on offer with the Inquisition launched"
 
@@ -129,7 +129,7 @@ def test_purchase(sim, ctr: int) -> None:
 
     # with the Inquisition CLOSED the column is gone again
     sim.civ_inquisition[:, ROW] = False
-    _w, _wj, _m, _mj, _a, _aj, q2, _qj = sim._seat_faith_buy_candidates(
+    _w, _wj, _m, _mj, _a, _aj, q2, _qj, _k2, _kj2 = sim._seat_faith_buy_candidates(
         ROW, torch.ones(sim.B, dtype=torch.bool))
     assert not bool(q2[0]), "the Inquisitor is on offer with no Inquisition launched"
     sim.civ_inquisition[:, ROW] = True
