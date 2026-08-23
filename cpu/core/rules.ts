@@ -5,7 +5,7 @@ import { isWater, isImpassable, isMountain, isCoastalWater, hasRiver } from '../
 import { computeUnlocks, isTechComplete, isCivicComplete, type Unlocks } from './effects';
 import { isExplored } from './fog';
 import { riverReach } from './disasters';
-import { congressChopBanned, congressUdtBlockedDistrict } from './congress';
+import { congressChopBanned, congressEnergyBlocked, congressEnergyDiscount, congressUdtBlockedDistrict } from './congress';
 import { tileAppeal } from './appeal'; // SEASIDE_RESORT gates on appeal
 import { SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
 import { FEATURES } from '../../world/features';
@@ -13,6 +13,7 @@ import { RESOURCES } from '../../world/resources';
 import { DISTRICTS } from '../data/districts';
 import { GOVERNMENTS } from '../data/policies';
 import { seatGovernmentId } from './seatTurn';
+import { cityLowlands, floodBarrierCost } from './climate';
 import { BUILDINGS, type BuildingDef, buildingsForDistrict } from '../data/buildings';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { CITY_MIN_DIST } from '../../world/types';
@@ -405,6 +406,26 @@ export function urbanDefensesFit(state: GameState, seat: number): void {
   for (const c of seatOf(state, seat)?.cities ?? []) c.outerHp = WALLS_TIER_HP[WALLS_TIER_URBAN];
 }
 
+/**
+ * What a building actually costs THIS city right now.
+ *
+ * Every row but one is its catalog constant. CIV6 (Flood Barrier): "Initial
+ * Production cost ... [is] variable based on the number of Coastal Lowland
+ * tiles in this city and the current sea level. The formula is (80 x coastal
+ * lowland tiles) + (80 x coastal lowland tiles x flood level)" — so its price
+ * climbs while it is being built, which is the whole reason a barrier can
+ * become the queue item that never finishes.
+ *
+ * The production MASK's column order still reads the catalog constant, so a
+ * live price never reshuffles the wire.
+ */
+export function buildingCostIn(state: GameState, city: City, id: string): number {
+  const def = BUILDINGS[id];
+  if (!def) return 0;
+  const base = def.floodBarrier ? floodBarrierCost(state, city) : def.cost;
+  return Math.round(base * congressEnergyDiscount(state, id));
+}
+
 export function availableBuildings(state: GameState, city: City): BuildingDef[] {
   const map = state.map;
   const unlocks = gates(state, city.seat);
@@ -419,6 +440,7 @@ export function availableBuildings(state: GameState, city: City): BuildingDef[] 
   // CIV6 (Urban Development Treaty, outcome B): "No buildings can be created
   // in this district." New picks only — in-flight items finish.
   const blockedD = congressUdtBlockedDistrict(state);
+  const blockedB = congressEnergyBlocked(state);
   for (const type of placed) {
     if (type === blockedD) continue;
     for (const def of buildingsForDistrict(type)) {
@@ -435,6 +457,12 @@ export function availableBuildings(state: GameState, city: City): BuildingDef[] 
       // running NOW, so a revolution can take an unbuilt row back off the list.
       if (def.govTier && governmentTier(state, city.seat) < def.govTier) continue;
       if (def.special === 'WATER_MILL' && !hasRiver(center)) continue;
+      // CIV6 (Flood Barrier): "Must be built in a city with one or more
+      // Coastal Lowland tiles."
+      if (def.floodBarrier && cityLowlands(state, city).length === 0) continue;
+      // CIV6 (Global Energy Treaty, outcome B): "Buildings of this type
+      // cannot be created by any player." New picks only.
+      if (def.id === blockedB) continue;
       // CIV6: "While city defenses are damaged, you cannot build higher
       // levels of Walls."
       if (def.walls && outerPool(state, city) < wallsMax(state, city)) continue;

@@ -55,7 +55,7 @@ import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { UNITS } from '../data/units';
 import { SPY_IDLE } from '../data/espionage';
-import { BUILDINGS } from '../data/buildings';
+import { buildingCostIn } from './rules';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { ARTIFACT_SLOTS, GW_SLOTS, GW_ART, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, LEVY_COOLDOWN } from '../data/cityStates';
@@ -214,7 +214,7 @@ function queueTile(q: City['queue'][number] | undefined): number {
  *  wonder items carry none at all and are priced from the catalog. The same
  *  rule as `the deleted trace, queueItemCost`, which is the derivation the
  *  trace's `civCity.cost` column is green against. */
-function queueItemCost(q: City['queue'][number] | undefined): number {
+function queueItemCost(state: GameState, city: City, q: City['queue'][number] | undefined): number {
   if (!q) return 0;
   switch (q.kind) {
     case 'settler':
@@ -224,7 +224,7 @@ function queueItemCost(q: City['queue'][number] | undefined): number {
     case 'unit':
       return q.cost ?? UNITS[q.unit]?.cost ?? 0;
     case 'building':
-      return BUILDINGS[q.building]?.cost ?? 0;
+      return buildingCostIn(state, city, q.building);
     case 'wonder':
       return BUILT_WONDERS[q.wonder]?.cost ?? 0;
   }
@@ -326,6 +326,9 @@ const GAME: Record<string, Extractor> = {
   barbCamps: (s) => [[...s.barbSeat.camps].sort((a, b) => a - b)],
   cityCount: (s) => [civSeats(s).reduce((n, x) => n + x.cities.length, 0)],
   unitCount: (s) => [s.units.length],
+  climatePhase: (s) => [s.climateIdx ?? -1],
+  removableAtStart: (s) => [s.removableAtStart ?? 0],
+  iceAtStart: (s) => [s.iceAtStart ?? 0],
 };
 
 const wwPairs = (rec: Record<number, number>, live: (v: number) => boolean): number[] => {
@@ -343,6 +346,7 @@ const SEAT: Record<string, Extractor> = {
   // at t0, so the empty state never survives to a digest in practice.
   explored: overSeats((s, st) => (s.explored?.length ? s.explored : new Array(st.map.tiles.length).fill(0))),
   treasury: overSeats((s) => s.treasury),
+  co2: overSeats((s) => s.co2 ?? 0),
   cultureTotal: overSeats((s) => s.cultureTotal),
   faith: overSeats((s) => s.faith),
   tourism: overSeats((s) => s.tourism ?? 0),
@@ -525,7 +529,7 @@ const CITY: Record<string, Extractor> = {
   }),
   specialistPref: overCities((r) => PLACEABLE_DISTRICTS.map((_t, di) => r.city.specialistPref?.[di] ?? -1)),
   queueProgress: overCities((r) => r.city.queue[0]?.progress ?? 0),
-  queueCost: overCities((r) => queueItemCost(r.city.queue[0])),
+  queueCost: overCities((r, state) => queueItemCost(state, r.city, r.city.queue[0])),
   followedReligion: overCities((r) => r.city.followedReligion ?? -1),
   // The GPU's pressure vector is one column per RELIGION, and religions are
   // indexed in the civ-seat space, so the vector is exactly as wide as the
@@ -605,6 +609,8 @@ const TILE: Record<string, Extractor> = {
   fertilityProd: overTiles((t) => t.fertilityProd),
   droughtTurns: overTiles((t) => t.droughtTurns),
   hasFeature: overTiles((t) => (t.feature === null ? 0 : 1)),
+  lowland: overTiles((t) => t.lowland ?? 0),
+  flooded: overTiles((t) => (t.flooded ? 1 : 0)),
   hasResource: overTiles((t) => (t.resource === null ? 0 : 1)),
 };
 

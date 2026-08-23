@@ -61,6 +61,12 @@ export interface ProjectDef {
   /** FIXED production cost (real Civ 6 value; the table mapper applies the
    *  game-speed coefficient). Absent = the generic district-project price. */
   cost?: number;
+  /** Gating CIVIC — the research half a tech cannot express. */
+  requiresCivic?: string;
+  /** CIV6 (Carbon Recapture): "awards 30 Diplomatic Favor and reduces the
+   *  civilization's lifetime carbon emissions by 50 CO2 points", and "allows
+   *  the lifetime carbon emissions of a civilization to go below 0". */
+  carbonRecapture?: boolean;
 }
 
 const P = (def: ProjectDef) => def;
@@ -166,6 +172,10 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
     // COSTS (GS, Standard speed): 900 / 1500 / 1800 / 2100 — 900, 1500 and
     // 2100 quoted directly (wiki GS data module, Arioch); 1800 is the GS data
     // value consistent with that ladder, the one figure without a direct quote.
+    // CIV6 (Carbon Recapture): an Industrial Zone project, unlocked by the
+    // Global Warming Mitigation civic; repeatable, and the only thing that
+    // takes carbon back out of the air.
+    P({ id: 'CARBON_RECAPTURE', name: 'Carbon Recapture', district: 'INDUSTRIAL_ZONE', yield: null, gpClass: null, requiresCivic: 'GLOBAL_WARMING_MITIGATION', carbonRecapture: true, description: 'Repeatable: -50 lifetime CO2 and +30 Diplomatic Favor.' }),
     P({ id: 'LAUNCH_EARTH_SATELLITE', name: 'Launch Earth Satellite', district: 'SPACEPORT', yield: null, gpClass: null, space: true, cost: 900, requiresTech: 'ROCKETRY', description: 'Space race step 1 of 4 — reveals the entire map.' }),
     P({ id: 'LAUNCH_MOON_LANDING', name: 'Launch Moon Landing', district: 'SPACEPORT', yield: null, gpClass: null, space: true, cost: 1500, requiresTech: 'SATELLITES', requiresProject: 'LAUNCH_EARTH_SATELLITE', description: 'Space race step 2 of 4 — one-time Culture of 10x science/turn.' }),
     P({ id: 'LAUNCH_MARS_COLONY', name: 'Launch Mars Colony', district: 'SPACEPORT', yield: null, gpClass: null, space: true, cost: 1800, requiresTech: 'NANOTECHNOLOGY', requiresProject: 'LAUNCH_MOON_LANDING', description: 'Space race step 3 of 4 — a human base on Mars.' }),

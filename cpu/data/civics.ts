@@ -216,5 +216,9 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     // real parents are Future civics this tree does not carry, so the deepest
     // Information-era civic stands in as the prereq.
     C('INFORMATION_WARFARE', 'Information Warfare', 'Future', 3200, ['NEAR_FUTURE_GOVERNANCE']),
+    // CIV6 (Global Warming Mitigation): a Future civic that "unlocks the
+    // Carbon Recapture project and awards 3 Envoys and 1 Diplomatic Victory
+    // point".
+    C('GLOBAL_WARMING_MITIGATION', 'Global Warming Mitigation', 'Future', 3200, ['NEAR_FUTURE_GOVERNANCE']),
   ].map((c) => [c.id, c]),
 );

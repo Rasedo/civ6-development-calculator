@@ -14,6 +14,16 @@
  */
 export const FLOOD_SEVERITY_P = [0.6, 0.3, 0.1] as const;
 
+/** The per-turn chance of each disaster before the climate scales it. NOT
+ *  sourced: the page publishes only that the base rate "is set for each game
+ *  at its start by the players themselves" through the Disaster Intensity
+ *  setting, and no numbers. */
+export const FLOOD_CHANCE = 0.05;
+export const ERUPTION_CHANCE_PER_VOLCANO = 0.02;
+export const DROUGHT_CHANCE = 0.02;
+export const STORM_CHANCE = 0.04;
+export const DROUGHT_LENGTH = 8;
+
 /** "Improvement — Pillaged: 100%; Destroyed: 50% / 80%". A flood always
  *  pillages; these are the chances it takes the improvement away entirely. */
 export const FLOOD_DESTROY_P = [0, 0.5, 0.8] as const;

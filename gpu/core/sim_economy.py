@@ -460,14 +460,223 @@ class SimEconomy:
         tile = idx.gather(1, k.clamp(min=0, max=idx.shape[1] - 1).unsqueeze(1)).squeeze(1)
         return has, tile
 
+    # ---- THE CLIMATE ARC -------------------------------------------------
+
+    def _deforestation_level(self) -> torch.Tensor:
+        """[B] in 0..1 — CIV6: "a percentage of number of features cleared
+        (Marshes, Woods, Rainforests) versus the total number of removable
+        features on the entire map". Counting what STANDS against the start
+        count catches every removal path, `deforestationLevel`'s twin."""
+        stand = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        for f in self._clear_fids.tolist():
+            stand |= self.feat_id == f
+        stand = stand & ~self.feat_stripped
+        total = self._removable_at_start.clamp(min=1).double()
+        gone = (self._removable_at_start - stand.sum(dim=1)).clamp(min=0).double()
+        return (gone / total).clamp(max=1.0)
+
+    def _defor_modifier(self) -> torch.Tensor:
+        """[B] — the CO2 modifier for the current deforestation level: the
+        first descending cut the level clears."""
+        lvl = self._deforestation_level()
+        out = torch.zeros_like(lvl)
+        done = torch.zeros_like(lvl, dtype=torch.bool)
+        for cut, mod in self._defor_cuts:
+            take = ~done & (lvl >= cut)
+            out = torch.where(take, torch.full_like(out, mod), out)
+            done = done | take
+        return out
+
+    def _world_carbon(self) -> torch.Tensor:
+        """[B] — every seat's lifetime carbon together, adjusted by how much of
+        the map has been cleared (`worldCarbon`)."""
+        return self.civ_co2.sum(dim=1).double() * (1.0 + self._defor_modifier())
+
+    def _climate_points(self) -> torch.Tensor:
+        """[B] — Climate Change points, 1 per 0.5 degrees."""
+        return (self._world_carbon().clamp(min=0) / self._co2_per_point).floor().long()
+
+    def _flood_level(self) -> torch.Tensor:
+        """[B] — the lowland bands the sea has already taken, which is what the
+        Flood Barrier prices itself against (`floodLevel`)."""
+        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        for p in range(len(self._cl_ice_melt)):
+            at = self.climate_idx >= p
+            band = torch.maximum(self._cl_flood[p], self._cl_submerge[p])
+            out = torch.where(at, torch.maximum(out, band.expand_as(out)), out)
+        return out
+
+    def _fertility_live(self) -> torch.Tensor:
+        """[B] — CIV6: "In Phase IV and beyond, Storms and Floods will no
+        longer provide fertility"."""
+        out = torch.ones(self.B, dtype=torch.bool, device=self.device)
+        for p, live in enumerate(self._cl_fertility):
+            if not live:
+                out &= self.climate_idx != p
+        return out
+
+    def _desertification_live(self) -> torch.Tensor:
+        """[B] — CIV6: past Phase IV "all Storms and Droughts now start
+        removing fertility from tiles instead of adding it"."""
+        out = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        for p, strip in enumerate(self._cl_desertify):
+            if strip:
+                out |= self.climate_idx == p
+        return out
+
+    def _disaster_rate(self) -> torch.Tensor:
+        """[B] — the per-turn chance multiplier: 1 + the phase's published
+        polar-melt fraction (`disasterRateMult`)."""
+        out = torch.ones(self.B, dtype=torch.float64, device=self.device)
+        for p, melt in enumerate(self._cl_ice_melt):
+            out = torch.where(self.climate_idx == p, torch.full_like(out, 1.0 + melt), out)
+        return out
+
+    def _severity_split(self, base: list) -> torch.Tensor:
+        """[B, n] — the flood severity split at each game's phase: that same
+        melt fraction of the mildest band's mass moved onto the worst
+        (`severitySplit`)."""
+        p = torch.zeros(self.B, len(base), dtype=torch.float64, device=self.device)
+        for i, v in enumerate(base):
+            p[:, i] = v
+        melt = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        for i, m in enumerate(self._cl_ice_melt):
+            melt = torch.where(self.climate_idx == i, torch.full_like(melt, m), melt)
+        if len(base) >= 2:
+            moved = p[:, 0] * melt
+            p[:, 0] = p[:, 0] - moved
+            p[:, -1] = p[:, -1] + moved
+        return p
+
+    def _defertilize(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
+        """CIV6 (past Phase IV): storms and droughts take the silt back off."""
+        if not rows.numel():
+            return
+        for plane in (self.fertility, self.fertility_prod):
+            flat = plane.reshape(-1)
+            gi = rows * self.T + tiles
+            cur = flat.gather(0, gi)
+            flat.scatter_(0, gi, (cur - 1).clamp(min=0))
+
+    def _power_cells(self, row: int) -> torch.Tensor:
+        """[B] f64 — the share a seat's units still emit: CIV6 (Advanced Power
+        Cells) "halves the CO2 emitted by units" (`powerCells`)."""
+        one = torch.ones(self.B, dtype=torch.float64, device=self.device)
+        if self._carbon_cells_tech < 0:
+            return one
+        has = self.civ_techs[:, row, self._carbon_cells_tech]
+        return torch.where(has, one * self._carbon_cells_share, one)
+
+    def _emit_carbon(self, row: int, raw: torch.Tensor) -> None:
+        """Bank raw carbon against a seat. Signed: Carbon Recapture takes the
+        lifetime total below zero, so nothing clamps (`emitCarbon`)."""
+        self.civ_co2[:, row] += raw.to(self.civ_co2.dtype)
+
+    def _pollution_points(self, raw: torch.Tensor) -> torch.Tensor:
+        return (raw.double() / self._pollution_divisor).floor()
+
+    def _pollution_favor_penalty(self, row: int) -> torch.Tensor:
+        """[B] — CIV6 (Losing Favor): "-1/turn for every 3 pollution points
+        higher than average. This penalty caps at 20"
+        (`pollutionFavorPenalty`)."""
+        pts = self._pollution_points(self.civ_co2)
+        avg = pts.mean(dim=1)
+        over = (pts[:, row] - avg).clamp(min=0)
+        return (over / self._favor_per_over).floor().clamp(max=self._favor_pollution_cap).long()
+
+    def _city_lowland_count(self, row: int) -> torch.Tensor:
+        """[B, RC] — the coastal-lowland tiles each of this row's cities holds,
+        which is what a Flood Barrier costs and covers (`cityLowlands`)."""
+        low = (self.tile_lowland > 0) & (self.tile_seat == row)  # [B, T]
+        ids = self.city_id[:, row]  # [B, RC]
+        # a dead column's id is 0, which is a LIVE id on row 0
+        per = (low.unsqueeze(2) & (self.tile_city.unsqueeze(2) == ids.unsqueeze(1))
+               & self.city_alive[:, row].unsqueeze(1))
+        return per.sum(dim=1)
+
+    def _flood_barrier_cost(self, row: int) -> torch.Tensor:
+        """[B, RC] — CIV6: "(80 x coastal lowland tiles) + (80 x coastal
+        lowland tiles x flood level)" (`floodBarrierCost`)."""
+        n = self._city_lowland_count(row)
+        return self._barrier_per_tile * n * (1 + self._flood_level().unsqueeze(1))
+
+    def _barrier_tiles(self) -> torch.Tensor:
+        """[B, T] — tiles standing behind a completed Flood Barrier."""
+        out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        if self._barrier_bidx < 0:
+            return out
+        for r in range(self.n_majors):
+            sl = self.city_slot_at(r)  # [B, T], -1 = not this row's
+            has = self.city_bldg[:, r, :, self._barrier_bidx]  # [B, RC]
+            ok = torch.zeros_like(out)
+            for j in range(self.RC):
+                ok |= (sl == j) & has[:, j].unsqueeze(1)
+            out |= ok
+        return out
+
+    def _repair_behind_barrier(self, row: int, col: torch.Tensor, hit: torch.Tensor) -> None:
+        """CIV6: a Flood Barrier built late repairs its city's flooded tiles
+        "in full ... along with anything that's on them"
+        (`repairBehindBarrier`)."""
+        if not bool(hit.any()):
+            return
+        ids = self.city_id[:, row].gather(1, col.clamp(min=0).unsqueeze(1))  # [B, 1]
+        mine = ((self.tile_seat == row) & (self.tile_city == ids)
+                & self.tile_flooded & hit.unsqueeze(1))
+        self.tile_flooded &= ~mine
+        self.pillaged &= ~mine
+        self.district_pillaged &= ~mine
+
+    def _melt_ice(self, at: torch.Tensor, fraction: float) -> None:
+        """CIV6: "the polar ice starts to melt (i.e., Ice tiles will disappear
+        and be replaced by Ocean tiles)". The melted set is always a PREFIX of
+        the map's ice in tile order, which is what TS's melt-from-the-front
+        walk leaves behind and what this ranks directly (`meltIce`)."""
+        ice = self.feat_id == self._ice_fid
+        target = (self._ice_at_start.double() * fraction).floor().long()  # [B]
+        rank = ice.long().cumsum(dim=1)  # 1-based among ice, in tile order
+        take = ice & (rank <= target.unsqueeze(1)) & at.unsqueeze(1)
+        self.feat_stripped |= take
+
+    def _climate_turn(self) -> None:
+        """The world's climate turn: bank the emissions into points and apply
+        every phase crossed. CIV6: "It is not possible to revert climate change
+        to an earlier phase" (`climateTurn`)."""
+        pts = self._climate_points()
+        now = torch.full_like(self.climate_idx, -1)
+        for p in range(len(self._cl_ice_melt)):
+            now = torch.where(pts >= self._cl_points[p], torch.full_like(now, p), now)
+        if not bool((now > self.climate_idx).any()):
+            return
+        barrier = self._barrier_tiles()
+        for p in range(len(self._cl_ice_melt)):
+            at = (self.climate_idx < p) & (now >= p)
+            if not bool(at.any()):
+                continue
+            self.climate_idx.copy_(torch.where(at, torch.full_like(self.climate_idx, p),
+                                               self.climate_idx))
+            self._melt_ice(at, self._cl_ice_melt[p])
+            fb = int(self._cl_flood[p])
+            if fb > 0:
+                wet = ((self.tile_lowland == fb) & ~barrier & at.unsqueeze(1)
+                       & ~self.tile_flooded)
+                self.tile_flooded |= wet
+                self.pillaged |= wet
+                self.district_pillaged |= wet & (self.district >= 0)
+        self._eff_version += 1
+
     def _disaster_phase(self) -> None:
         B, dev = self.B, self.device
         self._eff_version += 1
         self.drought.copy_((self.drought - 1).clamp(min=0))
         every = torch.ones(B, dtype=torch.bool, device=dev)
+        # A warming world runs every one of these draws more often, and its
+        # storms and droughts take fertility off instead of laying it down.
+        rate = self._disaster_rate()
+        strip = self._desertification_live()
 
         r = self._next_random(every)
-        hit, tile = self._pick_static(r < 0.05, self._flood_list)
+        hit, tile = self._pick_static(r < self._flood_chance * rate, self._flood_list)
         self._flood_river(hit, tile)
 
         er_rows, er_volc = [], []
@@ -477,7 +686,7 @@ class SimEconomy:
             if not bool(active.any()):
                 continue
             rv = self._next_random(active)
-            erupt = active & (rv < 0.02)
+            erupt = active & (rv < self._eruption_chance * rate)
             if bool(erupt.any()):
                 rows = erupt.nonzero(as_tuple=True)[0]
                 er_rows.append(rows)
@@ -489,10 +698,11 @@ class SimEconomy:
             nbf = nb.reshape(-1)
             on = nbf >= 0
             self._scorch(row6[on], nbf[on])
-            self._fertilize_counted(row6[on], nbf[on])
+            _live = self._fertility_live()[row6[on]]
+            self._fertilize_counted(row6[on][_live], nbf[on][_live])
 
         r = self._next_random(every)
-        hit, tile = self._pick_static(r < 0.02, self._droughtc_list)
+        hit, tile = self._pick_static(r < self._drought_chance * rate, self._droughtc_list)
         if bool(hit.any()):
             rows = hit.nonzero(as_tuple=True)[0]
             area = tiles_from_offsets(tile[rows], self._off2, self.W, self.H)
@@ -502,10 +712,12 @@ class SimEconomy:
             on = (af >= 0) & ~self.water[rowm, af.clamp(min=0)]
             flat = self.drought.reshape(-1)
             gi = rowm[on] * self.T + af[on]
-            flat.scatter_reduce_(0, gi, torch.full_like(gi, 8), reduce="amax")
+            flat.scatter_reduce_(0, gi, torch.full_like(gi, self._drought_length), reduce="amax")
+            dry = on & strip[rowm]
+            self._defertilize(rowm[dry], af[dry])
 
         r = self._next_random(every)
-        hit, tile = self._pick_static(r < 0.04, self._land_list)
+        hit, tile = self._pick_static(r < self._storm_chance * rate, self._land_list)
         if bool(hit.any()):
             rows = hit.nonzero(as_tuple=True)[0]
             area = tiles_from_offsets(tile[rows], self._off1, self.W, self.H)
@@ -514,8 +726,12 @@ class SimEconomy:
             af = area.reshape(-1)
             valid = af >= 0
             self._scorch(rowm[valid], af[valid])
-            on = valid & self.desert[rowm, af.clamp(min=0)]
-            self._fertilize(rowm[on], af[on])
+            # sandstorms deposit silt — until the world warms past Phase IV,
+            # from where the same storms take fertility off instead.
+            wet = valid & self.desert[rowm, af.clamp(min=0)] & ~strip[rowm] & self._fertility_live()[rowm]
+            self._fertilize(rowm[wet], af[wet])
+            dry = valid & strip[rowm]
+            self._defertilize(rowm[dry], af[dry])
 
     def _flood_river(self, hit: torch.Tensor, tile: torch.Tensor) -> None:
         """`floodRiver` — CIV6 (Flood): "The level of the water rises, flooding
@@ -525,12 +741,15 @@ class SimEconomy:
         tile order so the draw stream is the TS walk's."""
         B, dev = self.B, self.device
         r_sev = self._next_random(hit)
+        # A warmed world reaches its worst severities more often, so the split
+        # is per GAME now, not one scalar ladder.
+        sp = self._severity_split(self._flood_sev_p)
         sev = torch.zeros(B, dtype=torch.long, device=dev)
-        acc = 0.0
-        for i, p in enumerate(self._flood_sev_p):
-            lo, acc = acc, acc + p
+        acc = torch.zeros(B, dtype=torch.float64, device=dev)
+        for i in range(sp.shape[1]):
+            lo, acc = acc, acc + sp[:, i]
             sev = torch.where((r_sev >= lo) & (r_sev < acc), torch.full_like(sev, i), sev)
-        sev = torch.where(r_sev >= acc, torch.full_like(sev, len(self._flood_sev_p) - 1), sev)
+        sev = torch.where(r_sev >= acc, torch.full_like(sev, sp.shape[1] - 1), sev)
         if not bool(hit.any()):
             return
         tc = tile.clamp(min=0)
@@ -673,14 +892,51 @@ class SimEconomy:
         col = self._flood_fert_col[self.terrain.gather(1, tc.unsqueeze(1)).squeeze(1).clamp(min=0)]
         half = torch.where(mit, torch.full((B,), 0.5, dtype=torch.float64, device=dev),
                            torch.ones(B, dtype=torch.float64, device=dev))
-        fr = (hit & (r_food < self._flood_fert_food[sev, col] * half)).nonzero(as_tuple=True)[0]
+        live = self._fertility_live()
+        fr = (hit & live & (r_food < self._flood_fert_food[sev, col] * half)).nonzero(as_tuple=True)[0]
         if fr.numel():
             self._fertilize(fr, tc[fr])
-        pr2 = (hit & (r_prod < self._flood_fert_prod[sev, col] * half)).nonzero(as_tuple=True)[0]
+        pr2 = (hit & live & (r_prod < self._flood_fert_prod[sev, col] * half)).nonzero(as_tuple=True)[0]
         if pr2.numel():
             ok = self.fertilizable[pr2, tc[pr2]]
             r2, t2 = pr2[ok], tc[pr2][ok]
             self.fertility_prod[r2, t2] = (self.fertility_prod[r2, t2] + 1).clamp(max=3)
+
+    def _building_cost_in(self, row: int, j: int, bi: torch.Tensor) -> torch.Tensor:
+        """[B] — `buildingCostIn`: the catalog price for every row but the
+        FLOOD BARRIER, whose own is its city's lowland tiles and the sea
+        level, then the Global Energy Treaty's discount on the plant it
+        names."""
+        base = self.rules_dev.b_cost.gather(0, bi).double()
+        if self._barrier_bidx >= 0:
+            base = torch.where(bi == self._barrier_bidx,
+                               self._flood_barrier_cost(row)[:, j].double(), base)
+        disc = self._congress_energy_discount()
+        return torch.where((disc >= 0) & (bi == disc),
+                           js_round(base * self._c_energy_discount), base)
+
+    def _live_building_cost(self, row: int) -> torch.Tensor:
+        """[B, RC] — `buildingCostIn` for whatever BUILDING each of this row's
+        cities is producing, and the stored price wherever the queue head is
+        not a building. TS locks no building price at all: it re-reads
+        `buildingCostIn` at every completion check and again for its digest,
+        so a price that can MOVE while the item is queued — the Flood
+        Barrier's lowland formula, the Global Energy Treaty's discount —
+        has to be followed here rather than locked at queue."""
+        cur = self.city_current[:, row]                       # [B, RC]
+        bi = cur.clamp(min=0, max=self.NB - 1)
+        base = self.rules_dev.b_cost.gather(0, bi.reshape(-1)).reshape(bi.shape).double()
+        if self._barrier_bidx >= 0:
+            base = torch.where(bi == self._barrier_bidx,
+                               self._flood_barrier_cost(row).double(), base)
+        disc = self._congress_energy_discount().unsqueeze(1)  # [B, 1]
+        live = torch.where((disc >= 0) & (bi == disc),
+                           js_round(base * self._c_energy_discount), base)
+        return torch.where((cur >= 0) & (cur < self.NB),
+                           live.to(self.city_cost.dtype), self.city_cost[:, row])
+
+    def _reprice_live(self, row: int) -> None:
+        self.city_cost[:, row].copy_(self._live_building_cost(row))
 
     def _seat_buildable(self, row: int, complete: bool = False) -> torch.Tensor:
         """[B, RC, NB] buildings seat row `row`'s cities may QUEUE now —
@@ -761,6 +1017,19 @@ class SimEconomy:
                 if excl:
                     prereq_ok[:, :, nb] &= ~hq[:, :, excl].any(dim=2)
             base = base & district_ok & prereq_ok
+        if self._barrier_bidx >= 0:
+            # CIV6 (Flood Barrier): "Must be built in a city with one or more
+            # Coastal Lowland tiles."
+            _low = self._city_lowland_count(row) > 0  # [B, C]
+            _fb = torch.zeros(NB, dtype=torch.bool, device=dev)
+            _fb[self._barrier_bidx] = True
+            base = base & (~_fb.reshape(1, 1, -1) | _low.unsqueeze(2))
+        # CIV6 (Global Energy Treaty, outcome B): "Buildings of this type
+        # cannot be created by any player." New picks only.
+        _eb = self._congress_energy_blocked()  # [B] building index, -1 = none
+        if bool((_eb >= 0).any()):
+            _bidx = torch.arange(NB, device=dev).reshape(1, 1, -1)
+            base = base & ~((_eb >= 0).reshape(B, 1, 1) & (_bidx == _eb.reshape(B, 1, 1)))
         self._bld_cache[key] = (self._eff_version, base)
         return base
 

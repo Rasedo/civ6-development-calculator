@@ -216,6 +216,37 @@
             "GameState.units"
           ],
           "planes": []
+        },
+        {
+          "name": "climatePhase",
+          "compare": "exact",
+          "covers": [
+            "GameState.climateIdx"
+          ],
+          "planes": [
+            "climate_idx"
+          ],
+          "note": "the CLIMATE PHASE the world has reached, -1 before Phase I. Monotone on both engines."
+        },
+        {
+          "name": "removableAtStart",
+          "compare": "exact",
+          "covers": [
+            "GameState.removableAtStart"
+          ],
+          "planes": [],
+          "note": "the deforestation denominator, stamped at creation from the same fixture on both engines.",
+          "derived": true
+        },
+        {
+          "name": "iceAtStart",
+          "compare": "exact",
+          "covers": [
+            "GameState.iceAtStart"
+          ],
+          "planes": [],
+          "note": "the polar-melt denominator, stamped the same way.",
+          "derived": true
         }
       ]
     },
@@ -883,6 +914,17 @@
             "seat_borders_turns"
           ],
           "note": "DIRECTED: the row is what that seat GRANTS, never what it holds."
+        },
+        {
+          "name": "co2",
+          "compare": "milli",
+          "covers": [
+            "Seat.co2"
+          ],
+          "planes": [
+            "civ_co2"
+          ],
+          "note": "LIFETIME raw carbon; may go negative after Carbon Recapture, and carries half-units from unit emissions, which is why it is milli and not exact."
         }
       ]
     },
@@ -1207,8 +1249,10 @@
           "name": "queueCost",
           "compare": "milli",
           "covers": [],
+          "note": "the LIVE price of the queue head: a building row is re-read through buildingCostIn, every other kind carries the cost it locked, so the head's kind is read alongside the stored price",
           "planes": [
-            "city_cost"
+            "city_cost",
+            "city_current"
           ]
         },
         {
@@ -1783,6 +1827,26 @@
             "res_stripped"
           ],
           "note": "PRESENCE only, for the same reason as hasFeature: a district pave strips a BONUS resource and res_stripped is how the GPU records it."
+        },
+        {
+          "name": "lowland",
+          "compare": "exact",
+          "covers": [
+            "Tile.lowland"
+          ],
+          "planes": [],
+          "note": "the coastal-lowland band 1..3, 0 = none. Derived from the map at creation, so a disagreement is a derivation split, not a rule split.",
+          "derived": true
+        },
+        {
+          "name": "flooded",
+          "compare": "exact",
+          "covers": [
+            "Tile.flooded"
+          ],
+          "planes": [
+            "tile_flooded"
+          ]
         }
       ]
     }

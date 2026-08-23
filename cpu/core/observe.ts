@@ -107,7 +107,7 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
       1,
       c.population / 10.0,
       c.foodBox / Math.max(growthFoodNeeded(c.population), 1),
-      head ? head.progress / Math.max(itemCost(head), 1) : 0,
+      head ? head.progress / Math.max(itemCost(head, state, c), 1) : 0,
       c.cultureBox / Math.max(borderGrowthCost(c.tilesAcquired), 1),
       state.map.tiles.filter((t) => tileSeat(t) === seat && tileCity(t) === c.id).length / 20.0,
       c.hp / 200.0,

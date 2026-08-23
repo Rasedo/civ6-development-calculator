@@ -3,6 +3,7 @@
 import type { City, GameMap, GameState, TerrainId, Tile } from '../../cpu/core/types';
 import { BARB_SEAT, NO_SEAT, emptySeat, seatOf, setTileOwner, tileSeat } from '../../cpu/core/seats';
 import { foundCity } from '../../cpu/core/game';
+import { deriveLowlands, standingRemovable } from '../../cpu/core/climate';
 import { canFoundCity } from '../../cpu/core/rules';
 import { GP_CLASSES } from '../../cpu/data/greatPeople';
 import { spawnUnit } from '../../cpu/core/units';
@@ -47,8 +48,14 @@ export function makeMap(width = 12, height = 12, terrain: TerrainId = 'GRASSLAND
 }
 
 export function makeState(map: GameMap = makeMap()): GameState {
+  // The same stamps `createGameFromMap` makes, so a test state answers the
+  // climate the way a real one does.
+  deriveLowlands(map);
   return {
     map,
+    climateIdx: -1,
+    removableAtStart: standingRemovable(map),
+    iceAtStart: map.tiles.filter((t) => t.feature === 'ICE').length,
     barbSeat: emptySeat(BARB_SEAT),
     turn: 1,
     sandbox: false,

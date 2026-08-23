@@ -9,6 +9,8 @@ import { completedWonders, seatWonderFlag } from './wonders';
 import { UNITS, ENCAMPMENT_HP, URBAN_DEFENSES_TECH } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { DISTRICTS } from '../data/districts';
+import { CARBON_RECAPTURE_FAVOR, CARBON_RECAPTURE_UNITS } from '../data/climate';
+import { emitCarbon, repairBehindBarrier } from './climate';
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf } from '../data/projects';
 import { CULTURE_BOMB_RANGE, DED_FREE_INQUIRY, DED_MONUMENTALITY, ERA_SCORE_WONDER } from '../data/seats';
 import { ERAS, TECHS } from '../data/techs';
@@ -55,6 +57,15 @@ export function completeProject(state: GameState, city: City, projectId: string,
     // CIV6: "Once completed, it fully restores the HP of the city's (and
     // Encampment's) Outer Defenses." One perimeter serves both here.
     city.outerHp = wallsMax(state, city);
+    state.eventLog.push(`${city.name} completed ${def.name}.`);
+    return;
+  }
+  if (def.carbonRecapture) {
+    // CIV6 (Carbon Recapture): "-50 lifetime carbon emissions" and "+30
+    // Diplomatic Favor" per completion, repeatable, and the total may go
+    // below zero — `emitCarbon` never clamps.
+    emitCarbon(state, city.seat, -CARBON_RECAPTURE_UNITS);
+    owner.diplomaticFavor += CARBON_RECAPTURE_FAVOR;
     state.eventLog.push(`${city.name} completed ${def.name}.`);
     return;
   }
@@ -197,6 +208,9 @@ export function completeQueueItem(
       city.buildings.push(item.building);
       buildingDedications(state, city.seat, item.building);
       if (BUILDINGS[item.building]?.walls) city.outerHp = wallsMax(state, city);
+      // CIV6 (Flood Barrier): built late, "those tiles can be repaired in
+      // full and used again, along with anything that's on them".
+      if (BUILDINGS[item.building]?.floodBarrier) repairBehindBarrier(state, city);
       break;
   }
 }

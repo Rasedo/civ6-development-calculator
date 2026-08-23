@@ -145,6 +145,9 @@ class SimSeats:
                     okp_m = okp_m & self._space_step_ok(row, pi_m)
                 elif int(prow_m.get("ls", 0)):
                     okp_m = okp_m & self._laser_project_ok(row, pi_m)
+                _rv = int(prow_m.get("rv", -1))
+                if _rv >= 0:
+                    okp_m = okp_m & self.civ_civics[:, row, _rv]
                 ok_p[:, pi_m] = okp_m
             idle_j = idle[:, j].unsqueeze(1)
             prod_cols.append(torch.cat([base_j & idle_j, ok_w & idle_j, ok_p & idle_j], dim=1))
@@ -1151,7 +1154,8 @@ class SimSeats:
                 if self._walls_rows:
                     is_b = is_b & (self._walls_build_ok(row)[:, j] | (self._b_walls[bi] == 0))
                 self.city_current[:, row, j] = torch.where(is_b, bi, self.city_current[:, row, j])
-                self.city_cost[:, row, j] = torch.where(is_b, rdv.b_cost.gather(0, bi).double(), self.city_cost[:, row, j])
+                self.city_cost[:, row, j] = torch.where(
+                    is_b, self._building_cost_in(row, j, bi), self.city_cost[:, row, j])
                 self.city_progress[:, row, j] = torch.where(is_b, torch.zeros_like(self.city_progress[:, row, j]), self.city_progress[:, row, j])
             is_s = act & (a == self.SETTLER) & (self.city_pop[:, row, j] >= rls.settler_pop_gate)
             if bool(is_s.any()):
@@ -1250,6 +1254,9 @@ class SimSeats:
                         has_pa = has_pa & self._space_step_ok(row, pi_a)
                     elif int(prow_a.get("ls", 0)):
                         has_pa = has_pa & self._laser_project_ok(row, pi_a)
+                    _rva = int(prow_a.get("rv", -1))
+                    if _rva >= 0:
+                        has_pa = has_pa & self.civ_civics[:, row, _rva]
                     rows_p = is_p & (a == pcode) & has_pa
                     if not bool(rows_p.any()):
                         continue
@@ -1554,6 +1561,16 @@ class SimSeats:
                 if bool((n > 0).any()):
                     col = stock[:, slot]
                     col.copy_((col - n * rate).clamp(min=0))
+                    # CIV6 (Climate): a unit drawing Coal, Oil or Uranium
+                    # discharges "only half of Power Plants per unit of
+                    # resource", over half a resource unit, halved again by
+                    # Advanced Power Cells (`unitCarbon`). Every other slot's
+                    # rate is zero.
+                    self._emit_carbon(row, n.double() * rate
+                                      * self._carbon_unit_res_share
+                                      * self._carbon_per_resource[slot]
+                                      * self._carbon_unit_share
+                                      * self._power_cells(row))
 
     def _charge_unit_resource(self, row: int, hit: torch.Tensor, u_idx: int) -> None:
         """`chargeUnitResource` — the unit's stockpile cost, taken from the rows
@@ -1919,6 +1936,17 @@ class SimSeats:
                 _ok = (_ok & self.passable.gather(1, _to.unsqueeze(1)).squeeze(1)
                        & ~self._blocked_for(_to.unsqueeze(1), _as.unsqueeze(1),
                                             is_civilian=True).squeeze(1))
+                # THE ADVANCE IS AN ENTRY. `tileFreeForUnit` asks
+                # `borderClosedTo` for it, and CIV6 (Inquisitor) is the one
+                # religious unit the answer is ever yes for: it "cannot enter
+                # another civilization's territory without Open Borders".
+                _ut = self.major_unit_type[:, u].clamp(min=0)
+                for _r in a_seat[_vr].unique().tolist():
+                    if not 0 <= _r < self.n_majors:
+                        continue
+                    _shut = self._border_closed(_to.unsqueeze(1), int(_r),
+                                                _ut.unsqueeze(1)).squeeze(1)
+                    _ok = _ok & ~(_shut & (_as == _r))
                 if bool(_ok.any()):
                     _mv = _ok.nonzero(as_tuple=True)[0]
                     _dst = _to[_mv]
@@ -2594,6 +2622,8 @@ class SimSeats:
             return self._cs_type_n
         if kind == 9:
             return max(1, len(self._congress_feat))
+        if kind == 10:
+            return max(1, len(self._plant_bidx))
         return self.n_majors
 
     def _argmax_low(self, counts: torch.Tensor) -> torch.Tensor:
@@ -2633,6 +2663,13 @@ class SimSeats:
             best = self._argmax_low(counts)
             any_intl = (ds >= 0).any(dim=1)
             return a, torch.where(any_intl, best, me)
+        if name == "GLOBAL_ENERGY_TREATY":
+            # A is the discount, so a seat names the plant type it already
+            # runs most of; with none built it names the first row.
+            counts = torch.zeros(B, max(1, len(self._plant_bidx)), dtype=torch.float64, device=dev)
+            for t, bi in enumerate(self._plant_bidx):
+                counts[:, t] = self.city_bldg[:, row, :, bi].sum(dim=1).double()
+            return a, self._argmax_low(counts)
         if name == "POLICY_TREATY":
             slotted = self._slotted_policies(self._seat_civics(row), self._wonder_extra_slots(row))
             first = slotted.long().cumsum(dim=1) == 1
@@ -2957,6 +2994,28 @@ class SimSeats:
         out, tgt = self._congress_by_id("URBAN_DEVELOPMENT_TREATY")
         return (torch.where(out == 0, tgt, torch.full_like(tgt, -1)),
                 torch.where(out == 1, tgt, torch.full_like(tgt, -1)))
+
+    def _congress_energy_blocked(self) -> torch.Tensor:
+        """[B] — CIV6 (Global Energy Treaty, outcome B): the BUILDING index
+        "buildings of this type cannot be created by any player" names, -1
+        where the treaty is not standing that way (`congressEnergyBlocked`).
+        """
+        out, tgt = self._congress_by_id("GLOBAL_ENERGY_TREATY")
+        want = torch.full_like(tgt, -1)
+        for t, b in enumerate(self._plant_bidx):
+            want = torch.where(tgt == t, torch.full_like(want, b), want)
+        return torch.where(out == 1, want, torch.full_like(want, -1))
+
+    def _congress_energy_discount(self) -> torch.Tensor:
+        """[B] — CIV6 (Global Energy Treaty, outcome A): "50% discount on the
+        production of buildings of this type", 1 elsewhere. The BUILDING index
+        it names rides alongside (`congressEnergyDiscount`).
+        """
+        out, tgt = self._congress_by_id("GLOBAL_ENERGY_TREATY")
+        want = torch.full_like(tgt, -1)
+        for t, b in enumerate(self._plant_bidx):
+            want = torch.where(tgt == t, torch.full_like(want, b), want)
+        return torch.where(out == 0, want, torch.full_like(want, -1))
 
     def _congress_gpp_factor(self, cls: int) -> torch.Tensor:
         """[B] f64 — the Patronage factor for GP class `cls`: x2 (A), x0 (B)
@@ -3754,6 +3813,11 @@ class SimSeats:
                 stock.scatter_add_(
                     1, best_slot.unsqueeze(1),
                     torch.where(pay, -best_cost, torch.zeros_like(best_cost)).unsqueeze(1))
+                # CIV6 (Climate): the fuel a plant burns discharges carbon at
+                # its own published rate per unit (`plantCarbon`).
+                self._emit_carbon(row, torch.where(
+                    pay, best_cost.double() * self._carbon_per_resource[best_slot],
+                    torch.zeros_like(best_cost, dtype=torch.float64)))
         self.city_powered[:, row, :cols] = lit
 
     def _seat_accrue_stockpile(self, row: int) -> None:

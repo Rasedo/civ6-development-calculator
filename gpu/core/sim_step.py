@@ -78,6 +78,7 @@ class SimStep:
 
         self._theological_combat_phase()
         self._spread_religious_pressure()
+        self._climate_turn()
 
         self._ww_audit()
         self.turn += 1

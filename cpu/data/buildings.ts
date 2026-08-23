@@ -110,6 +110,14 @@ export interface BuildingDef {
   trainXpPct?: number;
   /** the promotion classes `trainXpPct` reaches. */
   trainXpClasses?: readonly PromoClass[];
+  /**
+   * CIV6 (Flood Barrier): "Constructed automatically around each Coastal
+   * Lowland tile belonging to the city; it protects them from flooding when
+   * sea level rises." Its price is not a constant — "(80 x coastal lowland
+   * tiles) + (80 x coastal lowland tiles x flood level)" — so the row's own
+   * `cost` is the per-tile figure and `floodBarrierCost` does the rest.
+   */
+  floodBarrier?: boolean;
 }
 
 const rawList: BuildingDef[] = [
@@ -120,6 +128,10 @@ const rawList: BuildingDef[] = [
   { id: 'GRANARY', name: 'Granary', district: 'CITY_CENTER', cost: 65, yields: { food: 1 }, housing: 2, maintenance: 0 },
   { id: 'WATER_MILL', name: 'Water Mill', district: 'CITY_CENTER', cost: 80, yields: { food: 1, production: 1 }, special: 'WATER_MILL', maintenance: 0 },
   { id: 'SEWER', name: 'Sewer', district: 'CITY_CENTER', cost: 200, housing: 2, maintenance: 2 },
+  // CIV6 (Flood Barrier): Atomic era, City Center, requires Computers, and
+  // "Cannot be Purchased with Gold". Its cost and maintenance are both
+  // "Variable" on the page, priced off the lowland tiles it covers.
+  { id: 'FLOOD_BARRIER', name: 'Flood Barrier', district: 'CITY_CENTER', cost: 80, maintenance: 0, noPurchase: true, floodBarrier: true },
   { id: 'ANCIENT_WALLS', name: 'Ancient Walls', district: 'CITY_CENTER', cost: 80, maintenance: 0, walls: 1 },
 
   { id: 'LIBRARY', name: 'Library', district: 'CAMPUS', cost: 90, yields: { science: 2 }, maintenance: 1 },

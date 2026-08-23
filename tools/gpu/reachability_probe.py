@@ -23,6 +23,10 @@ of the DRIVEN GAME, not of the comparison. What it answers, in order:
   specPin       a citizen pinned into a district's specialist slots (B-30r)
   tileLock      a plot pinned by the lock head
   ballot        a turn on which the driver submits a Congress ballot (B-22r)
+  carbon        any seat's lifetime CO2 above zero — a plant burning fuel or a
+                unit drawing it, the only two emitters that exist
+  climatePhase  the world crossing into Phase I, which is what every warming
+                body below it waits on (C-24)
   tourists      visiting vs domestic at the final turn, per seat: the culture
                 victory's own comparison (`_culture_victor`)
   policyCards   which policy cards the greedy slot fill ever puts in a slot,
@@ -59,7 +63,7 @@ KEYS = ("apostleBuy", "urbanization", "secondShip",
         "csWar", "csPeace", "specPin", "tileLock", "ballot",
         "natHistory", "conservation",
         "friendship", "alliance", "openBorders", "closedStep", "workGift",
-        "defensivePact") + tuple(f"placed:{d}" for d in DISTRICT_MARKS)
+        "defensivePact", "carbon", "climatePhase") + tuple(f"placed:{d}" for d in DISTRICT_MARKS)
 
 
 def main() -> None:
@@ -143,6 +147,8 @@ def main() -> None:
             for i in sl.any(dim=0).nonzero(as_tuple=True)[0].tolist():
                 slotted_seen.add(pol_ids[i])
 
+        mark("carbon", (sim.civ_co2 > 0).any(dim=1), t)
+        mark("climatePhase", sim.climate_idx >= 0, t)
         mark("urbanization", sim.civ_civics[:, :, urb].any(dim=1), t)
         mark("natHistory", sim.civ_civics[:, :, nat_hist].any(dim=1), t)
         mark("conservation", sim.civ_civics[:, :, conserv].any(dim=1), t)

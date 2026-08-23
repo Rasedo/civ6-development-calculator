@@ -16,6 +16,7 @@ import { citiesOf, seatOf, tileOwnedByCiv } from './seats';
 import { goldenDedication } from './eras';
 import { goldAffordable, unitPurchaseCost } from './game';
 import { cityPower, pillagedDistrictTypes } from './yields';
+import { emitCarbon, plantCarbon, powerCells, unitCarbon } from './climate';
 import type { GameState, Seat } from './types';
 
 export function strategicSlot(resourceId: string | undefined): number {
@@ -122,12 +123,16 @@ export function chargeUnitUpkeep(state: GameState, seat: number): void {
   const s = seatOf(state, seat);
   if (!s) return;
   const bk = bank(s);
+  const cells = powerCells(state, seat);
   for (const u of state.units) {
     if (u.seat !== seat) continue;
     const def = UNITS[u.type];
     const k = strategicSlot(def?.requiresResource);
     if (k < 0 || !def?.resourceUpkeep) continue;
     bk[k] = Math.max(0, bk[k] - def.resourceUpkeep);
+    // CIV6 (Climate): a unit burning Coal, Oil or Uranium discharges carbon
+    // too. `unitCarbon` is zero for every other slot.
+    emitCarbon(state, seat, unitCarbon(k, def.resourceUpkeep, cells));
   }
 }
 
@@ -236,6 +241,9 @@ export function resolveSeatPower(state: GameState, seat: number): void {
     }
     const burn = bestFuel ? Math.ceil((p.demand - p.supply) / bestRate) : 0;
     city.powered = bestFuel !== undefined && bestStock >= burn;
-    if (city.powered) spendStockpile(state, seat, bestFuel, burn);
+    if (city.powered) {
+      spendStockpile(state, seat, bestFuel, burn);
+      emitCarbon(state, seat, plantCarbon(bestFuel!, bestRate, burn));
+    }
   }
 }

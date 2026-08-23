@@ -15,6 +15,7 @@ import { promoClassOf, promoFlag, unitPromoRows, XP_PER_LEVEL } from './promotio
 import { barbarianPhase, damageRoll, trainXpPct, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
+import { climateTurn, deriveLowlands, standingRemovable } from './climate';
 import { placeCityStates, cityStatePhase, suzerainEffect } from './cityStates';
 import { placeSeats, seatPhase, worldCongress, nextCityName } from './phase';
 import { congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
@@ -23,7 +24,7 @@ import { seatWonderFlag } from './wonders';
 import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH } from '../data/seats';
 import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
 import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS } from '../data/units';
-import { outerPool, wallsMax } from './rules';
+import { buildingCostIn, outerPool, wallsMax } from './rules';
 import { laserSpeed } from './yields';
 import { canRunProject, chargeUnitResource } from './stockpile';
 import { FEATURES } from '../../world/features';
@@ -119,8 +120,15 @@ export function createGame(
 
 /** Fresh game state around an existing map (e.g. one imported from Civ 6). */
 export function createGameFromMap(map: GameState['map'], sandbox = false, unitsMode = false): GameState {
+  // The sea's reach and the two climate denominators are properties of the
+  // map as it was made, so they are stamped once, here, and never re-derived
+  // from a map the game has already changed.
+  deriveLowlands(map);
   return {
     map,
+    climateIdx: -1,
+    removableAtStart: standingRemovable(map),
+    iceAtStart: map.tiles.filter((t) => t.feature === 'ICE').length,
     turn: 1,
     sandbox,
     claimedGreatPeople: [],
@@ -404,6 +412,7 @@ export function availableProjects(state: GameState, city: City): ProjectDef[] {
     if (!city.districts.some((d) => d.type === p.district && state.map.tiles[d.tileIndex].districtComplete)) {
       return false;
     }
+    if (p.requiresCivic && !owner?.research.civics.includes(p.requiresCivic)) return false;
     if (p.repair) return repairAvailable(state, city);
     if (p.laser) {
       // Repeatable, so never in the one-time ledger — but it still asks for
@@ -847,13 +856,13 @@ export function cancelQueueItem(state: GameState, cityId: number, index: number,
   city.queue.splice(index, 1);
 }
 
-export function itemCost(item: QueueItem): number {
+export function itemCost(item: QueueItem, state?: GameState, city?: City): number {
   if (item.kind === 'district') return item.cost ?? DISTRICTS[item.district].cost;
   if (item.kind === 'wonder') return BUILT_WONDERS[item.wonder].cost;
   if (item.kind === 'settler') return item.cost;
   if (item.kind === 'unit') return item.cost ?? UNITS[item.unit]?.cost ?? 54; // builders lock at queue
   if (item.kind === 'project') return item.cost;
-  return BUILDINGS[item.building].cost;
+  return state && city ? buildingCostIn(state, city, item.building) : BUILDINGS[item.building].cost;
 }
 
 export function itemLabel(item: QueueItem): string {
@@ -1010,6 +1019,7 @@ export function endTurn(state: GameState): void {
 
   theologicalCombatPhase(state);
   spreadReligiousPressure(state);
+  climateTurn(state);
 
   state.turn += 1;
   eraBoundary(state);

@@ -93,7 +93,8 @@ class Rules:
     score_yield_weights: torch.Tensor  # [6]
     boosts: list  # [{target, idx, kind, ...}] — eureka/inspiration conditions
     combat: dict  # barbarian constants + the JS-computed damage-base table
-    disasters: dict  # the Flood (Civ6) severity tables
+    disasters: dict  # the Flood (Civ6) severity tables + the base per-turn chances
+    climate: dict  # the Climate (Civ6) arc: carbon rates, the seven phases, the deforestation bands
     units: list  # trainable roster [{id, cost, combat, maintenance, civilian, requiresTech}]
     citystate: dict  # city-state constants (envoy cost, influence rate, quest pacing, type→yield)
     seats: dict  # seat pacing, loyalty, GP costs, belief-pool sizes (cpu/data/seats.ts)
@@ -147,6 +148,7 @@ class Rules:
     b_favor: torch.Tensor  # long [NB] — diplomatic favor per turn, paid to the SEAT
     b_loy_no_gov: torch.Tensor  # f64 [NB] — loyalty per turn in every one of the seat's UNGOVERNED cities
     b_power_supply: torch.Tensor  # f64 [NB] — renewable Power it supplies its own city, no stockpile behind it
+    b_flood_barrier: torch.Tensor  # bool [NB] — the FLOOD BARRIER row, whose price is its city's lowland tiles
     b_regional_range: torch.Tensor  # long [NB] — this row's own regional reach, 0 = the shared default
     b_appeal_y: torch.Tensor  # f64 [NB, 2, 6] — what it pays an adjacent unimproved tile at Breathtaking, then Charming
     strategic: dict  # {rid, rate, slotOf, capBase, capPerEncampmentBuilding, encampmentDidx}
@@ -227,7 +229,8 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         score_yield_weights=torch.tensor(r["score"]["yieldWeights"], dtype=torch.float64),
         boosts=r.get("boosts", []),
         combat=r.get("combat", {}),
-        disasters=r.get("disasters", {}),
+        disasters=r["disasters"],
+        climate=r["climate"],
         units=r.get("units", []),
         citystate=r["cityState"],
         seats=r["seats"],  # the seat bag (cpu/data/seats.ts)
@@ -281,6 +284,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_favor=torch.tensor([int(b.get("favorPerTurn", 0)) for b in B], dtype=torch.long),
         b_loy_no_gov=torch.tensor([float(b.get("loyaltyWithoutGovernor", 0)) for b in B], dtype=torch.float64),
         b_power_supply=torch.tensor([float(b.get("powerSupply", 0)) for b in B], dtype=torch.float64),
+        b_flood_barrier=torch.tensor([bool(b["floodBarrier"]) for b in B], dtype=torch.bool),
         b_regional_range=torch.tensor([int(b.get("regionalRange", 0)) for b in B], dtype=torch.long),
         b_appeal_y=torch.tensor([b.get("appealYields") or [[0.0] * 6, [0.0] * 6] for b in B], dtype=torch.float64),
         strategic=r["strategic"],
@@ -626,4 +630,5 @@ _MUTABLE = [
     "civ_culture", "civ_faith", "civ_tourism", "civ_warmonger", "civ_gpp",
     "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts", "city_artifact_era", "city_artifact_seat", "city_gwart_type", "city_gwart_artist", "city_spec_pin", "city_bldg",
     "war_turns", "treaty_turns", "peace_turns",
+    "civ_co2", "climate_idx", "tile_flooded",
 ]

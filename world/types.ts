@@ -158,6 +158,14 @@ export interface Tile {
    *  way a specialist pin overrides it for slots. The lock is a property of
    *  the PLOT and outlives whichever city works it. */
   locked?: boolean;
+  /** the COASTAL LOWLAND band, 1 (drowns first) to 3; absent = highland or
+   *  inland, which the rising sea never reaches. Derived from the map at
+   *  creation by `deriveLowlands`, never read off the world file. */
+  lowland?: number;
+  /** the sea has been over this tile: it is pillaged and pays no improvement
+   *  bonus, but is still workable and can be repaired behind a Flood
+   *  Barrier. */
+  flooded?: boolean;
   fertility: number;
   /** the PRODUCTION half of flood silt — real Civ 6 fertilizes food and
    *  production on separate rolls, so the two accumulate apart. */

@@ -27,7 +27,9 @@ import {
   CONGRESS_SOVEREIGNTY, CONGRESS_PUBLIC_WORKS, CONGRESS_DEFORESTATION,
   CONGRESS_PLUS_100, CONGRESS_MINUS_50, CONGRESS_TRADE_GOLD,
   CONGRESS_TRADE_CAPACITY, CONGRESS_POLICY_FAVOR, CONGRESS_IDEOLOGY_SLOTS,
+  CONGRESS_GLOBAL_ENERGY, CONGRESS_ENERGY_DISCOUNT,
 } from '../data/seats';
+import { POWER_PLANT_IDS } from '../data/buildings';
 
 const CLEARABLE_FEATURES = clearableFeatures();
 
@@ -123,6 +125,17 @@ export function preference(state: GameState, res: number, seat: number,
       }
       return { outcome: 0, target: argmaxLow(counts) };
     }
+    case CONGRESS_GLOBAL_ENERGY: {
+      // A is the discount, so a seat names the plant type it already runs
+      // most of; with none built it names the first row.
+      const counts = POWER_PLANT_IDS.map(() => 0);
+      for (const city of sx.cities) {
+        for (let i = 0; i < POWER_PLANT_IDS.length; i++) {
+          if (city.buildings.includes(POWER_PLANT_IDS[i])) counts[i]++;
+        }
+      }
+      return { outcome: 0, target: argmaxLow(counts) };
+    }
     case CONGRESS_DEFORESTATION: {
       // A pays gold for clearing the named feature, so a seat names whichever
       // clearable feature it owns the most of.
@@ -202,6 +215,7 @@ function targetSpaceSize(state: GameState, res: number): number {
     case 'project': return PROJECT_LIST.length;
     case 'csType': return CITY_STATE_TYPES.length;
     case 'feature': return CLEARABLE_FEATURES.length;
+    case 'building': return POWER_PLANT_IDS.length;
     default: return state.seats.length;
   }
 }
@@ -426,6 +440,21 @@ export function congressProjectMult(state: GameState, project: number): number {
   const e = congressEffect(state, CONGRESS_PUBLIC_WORKS);
   if (!e || e.target !== project) return 1;
   return e.outcome === 0 ? CONGRESS_PLUS_100 : CONGRESS_MINUS_50;
+}
+
+/** CIV6 (Global Energy Treaty, outcome A): "50% discount on the production
+ *  of buildings of this type" — 1 where the treaty does not name this row. */
+export function congressEnergyDiscount(state: GameState, buildingId: string): number {
+  const e = congressEffect(state, CONGRESS_GLOBAL_ENERGY);
+  if (!e || e.outcome !== 0 || POWER_PLANT_IDS[e.target] !== buildingId) return 1;
+  return CONGRESS_ENERGY_DISCOUNT;
+}
+
+/** Outcome B: the plant "buildings of this type cannot be created by any
+ *  player" names; null when the treaty is not standing that way. */
+export function congressEnergyBlocked(state: GameState): string | null {
+  const e = congressEffect(state, CONGRESS_GLOBAL_ENERGY);
+  return e && e.outcome === 1 ? POWER_PLANT_IDS[e.target] ?? null : null;
 }
 
 /** The Deforestation Treaty's standing outcome on a feature, or -1. */

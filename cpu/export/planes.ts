@@ -164,6 +164,10 @@ export function buildFixture(state: GameState, world: WorldFile): object {
         return (s.food ?? 0) * 1.2 + (s.production ?? 0) + (s.gold ?? 0) * 0.5;
       }),
       hl: t.elevation === 'HILLS' ? 1 : 0,
+      // the COASTAL LOWLAND band, 1..3, 0 = none. `deriveLowlands` already
+      // ran on this state, so the fixture ships the band TS computed rather
+      // than asking the GPU to re-derive it — one BFS, two engines.
+      lw: t.lowland ?? 0,
       // tile APPEAL contributions. `tileAppeal` (core/appeal.ts)
       // sums what each NEIGHBOUR contributes, so ship the per-tile
       // contribution and let the GPU gather it over `neigh`. `ap` is the

@@ -54,6 +54,7 @@ POKE_COST = {
     "wonder_effects": 20.0,
     "city_perimeter": 20.0,
     "flood_severity": 12.0,
+    "climate": 20.0,
     "citizens": 10.0,
     "congress_vote": 8.0,
 }
@@ -255,6 +256,7 @@ def main() -> int:
                 ("promo_effects", [py, "tests/gpu/promo_effects_test.py"], 4),  # the seventeen promotion kinds that are not Combat Strength
                 ("era_draws", [py, "tests/gpu/era_draws_test.py"], 4),  # the restored random draws, and the artifact's own civilization
                 ("power", [py, "tests/gpu/power_test.py"], 4),  # GS POWER: demand, the plant's reach, Cardiff, the powered halves
+                ("climate", [py, "tests/gpu/climate_test.py"], 4),  # GS CLIMATE: carbon, the seven phases, the sea, the barrier, a warmed world's weather
             ],
         ]
         # A lane that names a path nothing writes, or a test file no lane

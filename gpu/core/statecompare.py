@@ -228,6 +228,9 @@ GAME = {
     "barbCamps": lambda sim, b, rows: [sorted(int(t) for t in sim.camp_tile[b].tolist() if t >= 0)],
     "cityCount": lambda sim, b, rows: [len(_city_rows(sim, b))],
     "unitCount": lambda sim, b, rows: [len(_unit_rows(sim, b))],
+    "climatePhase": lambda sim, b, rows: [int(sim.climate_idx[b])],
+    "removableAtStart": lambda sim, b, rows: [int(sim._removable_at_start[b])],
+    "iceAtStart": lambda sim, b, rows: [int(sim._ice_at_start[b])],
 }
 
 
@@ -389,6 +392,7 @@ SEAT = {
     # extractor renders its empty-array state dense the same way).
     "explored": _civ_scalar("seat_explored"),
     "treasury": _civ_scalar("civ_treasury"),
+    "co2": _civ_scalar("civ_co2"),
     "cultureTotal": _civ_scalar("civ_culture"),
     "faith": _civ_scalar("civ_faith"),
     "tourism": _civ_scalar("civ_tourism"),
@@ -509,6 +513,23 @@ def _cty(plane: str):
     return get
 
 
+def _queue_cost(sim, b, rows):
+    """`queueItemCost` — a BUILDING's price is read live, which is what TS
+    does; every other queue kind carries the cost it locked."""
+    stored = sim.city_cost[b].tolist()
+    cur = sim.city_current[b].tolist()
+    live: dict = {}
+    out = []
+    for c, s in rows:
+        if 0 <= cur[c][s] < sim.NB:
+            if c not in live:
+                live[c] = sim._live_building_cost(c)[b].tolist()
+            out.append(live[c][s])
+        else:
+            out.append(stored[c][s])
+    return out
+
+
 def _spec_rows(sim, b, rows):
     # one _city_specialists call per distinct seat row — the digest asks
     # per city and the recompute walks the tile window
@@ -559,7 +580,7 @@ CITY = {
         [int(x) for x in sim.city_spec_pin[b, c, s].tolist()] for c, s in rows
     ],
     "queueProgress": _cty("city_progress"),
-    "queueCost": _cty("city_cost"),
+    "queueCost": _queue_cost,
     "followedReligion": _cty("city_followed"),
     "religionPressure": lambda sim, b, rows: [
         [int(x) for x in sim.city_pressure[b, c, s].tolist()] for c, s in rows
@@ -668,6 +689,8 @@ TILE = {
     "fertilityProd": _tile("fertility_prod"),
     "droughtTurns": _tile("drought"),
     "hasFeature": lambda sim, b, rows: ((sim.feat_id[b] >= 0) & ~sim.feat_stripped[b]).long().numpy(),
+    "lowland": lambda sim, b, rows: sim.tile_lowland[b].long().numpy(),
+    "flooded": lambda sim, b, rows: sim.tile_flooded[b].long().numpy(),
     "hasResource": lambda sim, b, rows: ((sim.res_cat[b] != 0) & ~sim.res_stripped[b]).long().numpy(),
 }
 

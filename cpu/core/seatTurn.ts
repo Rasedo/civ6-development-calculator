@@ -10,6 +10,7 @@ import { GOVERNMENTS, GOVERNMENTS_ADOPTION_LIVE, POLICY_LIST } from '../data/pol
 import { DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, FAVOR_PER_ALLIANCE } from '../data/seats';
 import { CITY_STATE_TYPES } from '../data/cityStates';
 import { emergencyEnvoyGold } from './emergency';
+import { pollutionFavorPenalty } from './climate';
 import { congressPolicyBlocked, congressPolicyFavor, congressSuzFavorMult } from './congress';
 import { wonderExtraSlots } from './effects';
 
@@ -24,11 +25,11 @@ export function suzerainCount(state: GameState, seat: number): number {
 
 export function diplomaticFavorPerTurn(gov: string | null, suzerains: number, treaty = 0,
                                        occupiedCapitals = 0, alliances = 0,
-                                       buildings = 0): number {
+                                       buildings = 0, pollution = 0): number {
   const tier = gov ? GOVERNMENTS[gov]?.tier ?? 0 : 0;
   return tier + DIPLO_FAVOR_PER_SUZERAIN * suzerains + treaty
     + FAVOR_PER_ALLIANCE * alliances + buildings
-    - FAVOR_OCCUPIED_CAPITAL * occupiedCapitals;
+    - FAVOR_OCCUPIED_CAPITAL * occupiedCapitals - pollution;
 }
 
 /** CIV6 (Alliance): "In Gathering Storm, each Alliance gives you +1
@@ -90,7 +91,8 @@ export function seatAccumulators(state: GameState, seat: number, govCityIds?: Re
     + diplomaticFavorPerTurn(seatGovernmentId(state, seat), suzerainCount(state, seat),
                              policyTreatyFavor(state, seat), occupiedCapitals(state, seat),
                              allianceCount(state, seat),
-                             seatBuildingSum(state, seat, 'favorPerTurn')));
+                             seatBuildingSum(state, seat, 'favorPerTurn'),
+                             pollutionFavorPenalty(state, seat)));
   if ((s.warmonger ?? 0) > 0 && atPeaceWithAllCivs(state, seat)) {
     s.warmonger = (s.warmonger ?? 0) - 1;
   }

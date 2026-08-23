@@ -488,6 +488,12 @@ class SimPhase:
         # the perimeter takes its share BEFORE the completion below zeroes the
         # progress it is measured against
         self._repair_drip(row, _drip0)
+        # A BUILDING'S PRICE IS NEVER LOCKED. TS reads `buildingCostIn` at
+        # every completion check, and two rows can move under it: the Flood
+        # Barrier, whose price is "variable based on the number of Coastal
+        # Lowland tiles in this city and the current sea level", and whatever
+        # plant the Global Energy Treaty is discounting this session.
+        self._reprice_live(row)
         cost = self.city_cost[bidx, row, col].clone()
         done = has_q & (self.city_progress[bidx, row, col] >= cost)
         if not bool(done.any()):
@@ -581,6 +587,10 @@ class SimPhase:
                 if len(wm) > 0:
                     self.city_outer_hp[wm, row, col[wm]] = self._walls_max_at(
                         torch.full_like(col, row), col)[wm]
+            # CIV6 (Flood Barrier): built late, "those tiles can be repaired in
+            # full and used again, along with anything that's on them".
+            if self._barrier_bidx >= 0:
+                self._repair_behind_barrier(row, col, made_b2 & (bi == self._barrier_bidx))
 
         if self._wond_n:
             made_w = done & (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + self._wond_n)
@@ -657,6 +667,15 @@ class SimPhase:
                             # CIV6 (Patronage): project points scale too.
                             amt_gc = amt_g * self._congress_gpp_factor(g_i)
                             self.civ_gpp[:, row, g_i] = torch.where(hit, self.civ_gpp[:, row, g_i] + amt_gc, self.civ_gpp[:, row, g_i])
+                    if int(prow.get("cr", 0)):
+                        # CIV6 (Carbon Recapture): "-50 lifetime carbon
+                        # emissions" and "+30 Diplomatic Favor" per
+                        # completion, repeatable, and the total may go below
+                        # zero — `_emit_carbon` never clamps.
+                        self._emit_carbon(row, torch.where(
+                            hit, torch.full_like(hit, -self._recapture_units, dtype=torch.float64),
+                            torch.zeros(self.B, dtype=torch.float64, device=self.device)))
+                        self.civ_diplo_favor[:, row] += hit.long() * self._recapture_favor
                     if int(prow.get("rep", 0)):
                         # CIV6: "Once completed, it fully restores the HP of
                         # the city's (and Encampment's) Outer Defenses." One
@@ -848,6 +867,9 @@ class SimPhase:
                  self._slotted_policies(self._seat_civics(row), self._wonder_extra_slots(row)))
              # CIV6 (Foreign Ministry, GS): "+3 Diplomatic Favor per turn."
              + self._seat_building_sum(row, self._b_favor)
+             # CIV6 (Losing Favor): "-1/turn for every 3 pollution points
+             # higher than average", capped at 20.
+             - self._pollution_favor_penalty(row)
              - self._favor_occ_capital * self._occupied_capitals(row))
         self.civ_diplo_favor[:, row] = self.civ_diplo_favor[:, row].clamp(min=0)
         # grievances DECAY by 1 per turn at peace with every MAJOR — the row's

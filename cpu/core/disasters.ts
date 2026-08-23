@@ -13,13 +13,11 @@ import { unitsAt } from './units';
 import { disbandUnit } from './units';
 import { unitDomain } from './units';
 import { FLOOD_SEVERITY_P, FLOOD_DESTROY_P, FLOOD_DISTRICT_P, FLOOD_POP_P, FLOOD_DAMAGE_LO, FLOOD_DAMAGE_HI, FLOOD_FERT_FOOD, FLOOD_FERT_PROD, floodTerrainColumn } from '../data/disasters';
+import { FLOOD_CHANCE, ERUPTION_CHANCE_PER_VOLCANO, DROUGHT_CHANCE, STORM_CHANCE, DROUGHT_LENGTH } from '../data/disasters';
+import { disasterRateMult, severitySplit } from '../data/climate';
+import { defertilize, desertificationLive, fertilityLive } from './climate';
 
 export const FERTILITY_CAP = 3;
-const FLOOD_CHANCE = 0.05;
-const ERUPTION_CHANCE_PER_VOLCANO = 0.02;
-const DROUGHT_CHANCE = 0.02;
-const STORM_CHANCE = 0.04;
-const DROUGHT_LENGTH = 8;
 
 function log(state: GameState, text: string): void {
   state.eventLog.push(text);
@@ -44,7 +42,8 @@ function floodDistrict(tile: Tile): void {
   }
 }
 
-function fertilize(tile: Tile): void {
+function fertilize(state: GameState, tile: Tile): void {
+  if (!fertilityLive(state)) return;
   if (!isWater(tile) && tile.elevation !== 'MOUNTAIN') {
     tile.fertility = Math.min(FERTILITY_CAP, tile.fertility + 1);
   }
@@ -99,9 +98,11 @@ export function riverShielded(reach: Tile[]): boolean {
 
 export function floodRiver(state: GameState, start: Tile): Tile[] {
   const rSev = nextRandom(state);
+  // A warmed world reaches its worst severities more often.
+  const sevP = severitySplit(FLOOD_SEVERITY_P, state.climateIdx ?? -1);
   let sev = 0;
-  for (let i = 0, acc = 0; i < FLOOD_SEVERITY_P.length; i++) {
-    acc += FLOOD_SEVERITY_P[i];
+  for (let i = 0, acc = 0; i < sevP.length; i++) {
+    acc += sevP[i];
     if (rSev < acc) { sev = i; break; }
     sev = i;
   }
@@ -173,8 +174,8 @@ function floodTile(state: GameState, tile: Tile, sev: number, mitigated: boolean
   // FERTILIZATION. Each yield is its own roll, so one flood may pay both.
   // A mitigated river still silts, at half the rate.
   const half = mitigated ? 0.5 : 1;
-  if (rFood < FLOOD_FERT_FOOD[sev][col] * half) fertilize(tile);
-  if (rProd < FLOOD_FERT_PROD[sev][col] * half) {
+  if (rFood < FLOOD_FERT_FOOD[sev][col] * half) fertilize(state, tile);
+  if (rProd < FLOOD_FERT_PROD[sev][col] * half && fertilityLive(state)) {
     if (!isWater(tile) && tile.elevation !== 'MOUNTAIN') {
       tile.fertilityProd = Math.min(FERTILITY_CAP, tile.fertilityProd + 1);
     }
@@ -183,12 +184,15 @@ function floodTile(state: GameState, tile: Tile, sev: number, mitigated: boolean
 
 export function disasterPhase(state: GameState): void {
   const map = state.map;
+  // A warming world runs every one of these draws more often.
+  const rate = disasterRateMult(state.climateIdx ?? -1);
+  const strip = desertificationLive(state);
 
   for (const t of map.tiles) {
     if (t.droughtTurns > 0) t.droughtTurns -= 1;
   }
 
-  if (nextRandom(state) < FLOOD_CHANCE) {
+  if (nextRandom(state) < FLOOD_CHANCE * rate) {
     const target = pick(state, map.tiles.filter((t) => t.feature === 'FLOODPLAINS'));
     if (target) {
       const reach = floodRiver(state, target);
@@ -198,15 +202,15 @@ export function disasterPhase(state: GameState): void {
 
   for (const volcano of map.tiles) {
     if (!volcano.volcano) continue;
-    if (nextRandom(state) >= ERUPTION_CHANCE_PER_VOLCANO) continue;
+    if (nextRandom(state) >= ERUPTION_CHANCE_PER_VOLCANO * rate) continue;
     for (const n of neighbors(map, volcano)) {
       scorch(n);
-      fertilize(n);
+      fertilize(state, n);
     }
     log(state, `Volcanic eruption at (${volcano.col}, ${volcano.row}) — slopes scorched, soil enriched.`);
   }
 
-  if (nextRandom(state) < DROUGHT_CHANCE) {
+  if (nextRandom(state) < DROUGHT_CHANCE * rate) {
     const center = pick(
       state,
       map.tiles.filter(
@@ -215,19 +219,24 @@ export function disasterPhase(state: GameState): void {
     );
     if (center) {
       for (const t of tilesWithin(map, center.col, center.row, 2)) {
-        if (!isWater(t)) t.droughtTurns = Math.max(t.droughtTurns, DROUGHT_LENGTH);
+        if (isWater(t)) continue;
+        t.droughtTurns = Math.max(t.droughtTurns, DROUGHT_LENGTH);
+        if (strip) defertilize(t);
       }
       log(state, `Drought around (${center.col}, ${center.row}) — food suffers for ${DROUGHT_LENGTH} turns.`);
     }
   }
 
-  if (nextRandom(state) < STORM_CHANCE) {
+  if (nextRandom(state) < STORM_CHANCE * rate) {
     const center = pick(state, map.tiles.filter((t) => !isWater(t)));
     if (center) {
       const area = tilesWithin(map, center.col, center.row, 1);
       for (const t of area) {
         scorch(t);
-        if (t.terrain === 'DESERT') fertilize(t); // sandstorms deposit silt
+        // sandstorms deposit silt — until the world warms past Phase IV, from
+        // where the same storms take fertility off instead of laying it down.
+        if (strip) defertilize(t);
+        else if (t.terrain === 'DESERT') fertilize(state, t);
       }
       log(state, `Storm at (${center.col}, ${center.row}) — improvements damaged.`);
     }

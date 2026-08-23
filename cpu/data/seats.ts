@@ -244,13 +244,15 @@ export const DVP_PER_RESOLUTION = 1;
 export const DIPLO_VICTORY_POINTS = 20;
 
 export type CongressTargetKind = 'district' | 'gpClass' | 'gwKind' | 'seat'
-  | 'currency' | 'policy' | 'government' | 'project' | 'csType' | 'feature';
+  | 'currency' | 'policy' | 'government' | 'project' | 'csType' | 'feature'
+  | 'building';
 /** The wire ORDER of the target kinds: a resolution's `t` on the exported
  *  rules is this array's index, so the GPU's `_congress_space` /
  *  `_congress_pref` switch on the same numbers. APPEND only. */
 export const CONGRESS_TARGET_KINDS: readonly CongressTargetKind[] = [
   'district', 'gpClass', 'gwKind', 'seat',
   'currency', 'policy', 'government', 'project', 'csType', 'feature',
+  'building',
 ];
 
 export interface CongressResolutionDef {
@@ -319,6 +321,11 @@ export const CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // player." (Atomic through Information) The target space is the CLEARABLE
   // features — the rows carrying a chopYield, in catalog order.
   { id: 'DEFORESTATION_TREATY', name: 'Deforestation Treaty', minEra: 6, maxEra: 7, target: 'feature' },
+  // CIV6: "A: 50% discount on the production of buildings of this type. /
+  // B: Buildings of this type cannot be created by any player." (Modern+)
+  // The target space is the POWER PLANTS — the buildings the climate arc is
+  // about, in catalog order.
+  { id: 'GLOBAL_ENERGY_TREATY', name: 'Global Energy Treaty', minEra: 5, maxEra: 99, target: 'building' },
 ];
 export const CONGRESS_UDT = 0;
 export const CONGRESS_PATRONAGE = 1;
@@ -333,6 +340,10 @@ export const CONGRESS_TREATY_ORG = 9;
 export const CONGRESS_SOVEREIGNTY = 10;
 export const CONGRESS_PUBLIC_WORKS = 11;
 export const CONGRESS_DEFORESTATION = 12;
+export const CONGRESS_GLOBAL_ENERGY = 13;
+/** CIV6 (Global Energy Treaty, outcome A): "50% discount on the production
+ *  of buildings of this type." */
+export const CONGRESS_ENERGY_DISCOUNT = 0.5;
 /** The always-3rd Diplomatic Victory resolution enters at Modern. */
 export const CONGRESS_DV_MIN_ERA = 5;
 export const CONGRESS_DV_DELTA = 2;

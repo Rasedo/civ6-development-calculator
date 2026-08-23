@@ -221,6 +221,14 @@ export interface GameState {
    *  DIRECTED, because granting is one-way: "Granting open borders to a rival
    *  doesn't mean that rival also grants open borders to you." */
   borderTurns?: Record<string, number>;
+  /** the CLIMATE PHASE the world has reached, 0 = Phase I; absent or -1 =
+   *  no climate change yet. Monotone: it never steps back. */
+  climateIdx?: number;
+  /** how many removable features (Woods, Rainforest, Marsh) the map carried
+   *  at creation, and how many Ice tiles — the denominators the deforestation
+   *  level and the polar melt are measured against. */
+  removableAtStart?: number;
+  iceAtStart?: number;
   map: GameMap;
   turn: number;
   seatActions?: SeatActionLog;
@@ -327,6 +335,10 @@ export interface Seat {
   warmonger: number;
   ww: Record<number, number>;
   wwTurn: Record<number, number>;
+  /** LIFETIME raw carbon this seat has discharged. May go negative: CIV6
+   *  (Carbon Recapture) "allows the lifetime carbon emissions of a
+   *  civilization to go below 0". */
+  co2?: number;
   diplomaticFavor: number;
   diplomaticPoints: number;
   /** THIS TURN's World Congress ballot, as the record left it. Written inside

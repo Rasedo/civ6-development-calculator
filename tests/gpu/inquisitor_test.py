@@ -7,8 +7,9 @@ an Apostle use the Launch Inquisition ability within your territory." Nothing
 in a 250-turn scripted game is guaranteed to walk that chain, so this lane
 walks it end to end: the Apostle's Launch, the faith purchase behind it, the
 Inquisitor's Remove Heresy, a military unit's Condemn Heretic, and the two
-theological rules the Inquisitor brought with it — that it may INITIATE, and
-that it fights +35 stronger at home.
+theological rules the Inquisitor brought with it — that it may INITIATE, that
+it fights +35 stronger at home, and that winning a duel does not carry it into
+ground it may not enter.
 """
 
 from __future__ import annotations
@@ -263,6 +264,44 @@ def test_flanking_layer(sim) -> None:
     print("  flanking OK — the religious layer, not the military one")
 
 
+def test_advance_border(sim) -> None:
+    """The victor's advance onto the killed defender's tile is an ENTRY, so it
+    asks the same question the step did. CIV6 (Inquisitor): it "cannot enter
+    another civilization's territory without Open Borders"."""
+    if sim.n_majors < 2 or sim._open_borders_civic < 0:
+        print("  advance border SKIPPED (one major)")
+        return
+    for slot in sim.major_unit_alive[0].nonzero(as_tuple=True)[0].tolist():
+        sim.major_unit_alive[0, slot] = False
+        sim._vacate("major", torch.tensor([0]), torch.tensor([slot]))
+    ctr = int(sim.city_center[0, ROW, 0])
+    ta = free_tile(sim, ctr)
+    tb = free_tile(sim, ta)
+    sim.tile_seat[0, ta] = ROW
+    sim.tile_seat[0, tb] = 1                      # the neighbour's ground
+    sim.civ_civics[:, 1, sim._open_borders_civic] = True
+    sim.war[:, ROW, 1] = False
+    sim.war[:, 1, ROW] = False
+    sim.seat_ally_turns[:, ROW, 1] = 0
+    sim.seat_borders_turns[:, 1, ROW] = 0         # and no grant of its own
+    sim._eff_version += 1
+
+    q = place(sim, ta, sim._inquisitor_idx, ROW, hp=100, charges=3)
+    m = place(sim, tb, sim._missionary_idx, 1, hp=1, charges=2)
+    sim._theological_combat_phase()
+    assert not bool(sim.major_unit_alive[0, m]), "the duel did not kill the defender"
+    assert int(sim.major_unit_tile[0, q]) == ta, "the victor entered CLOSED ground"
+
+    sim.seat_borders_turns[:, 1, ROW] = 5
+    sim._eff_version += 1
+    m2 = place(sim, tb, sim._missionary_idx, 1, hp=1, charges=2)
+    sim.major_unit_hp[0, q] = 100
+    sim._theological_combat_phase()
+    assert not bool(sim.major_unit_alive[0, m2])
+    assert int(sim.major_unit_tile[0, q]) == tb, "the grant must let the victor in"
+    print("  advance border OK — the victor enters only where it may")
+
+
 def main() -> None:
     sim = build()
     assert sim._A_INQUISITION >= 0 and sim._A_HERESY >= 0 and sim._A_CONDEMN >= 0, \
@@ -274,6 +313,7 @@ def main() -> None:
     test_condemn(sim)
     test_theological(sim)
     test_flanking_layer(sim)
+    test_advance_border(sim)
     print("INQUISITOR OK")
 
 

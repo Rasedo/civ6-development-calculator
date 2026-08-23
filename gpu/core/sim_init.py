@@ -310,6 +310,8 @@ class SimInit:
             ("diplo_points", torch.long, 0), ("envoys_avail", torch.long, 0),
             ("influence", dtype, 0), ("tech_prog", dtype, 0),
             ("treasury", dtype, 0),
+            # LIFETIME raw carbon. Signed: Carbon Recapture takes it below 0.
+            ("co2", dtype, 0),
             ("enhancer", torch.long, -1), ("enhancer_done", torch.bool, 0),
             ("follower", torch.long, -1), ("founder", torch.long, -1),
             ("next_city_id", torch.long, 0), ("pantheon", torch.long, -1),
@@ -409,6 +411,7 @@ class SimInit:
         self._congress_vstep = int(_er2["congressVoteStep"])
         self._c_prod_mult = float(_er2["congressProdMult"])
         self._c_plus100 = float(_er2["congressPlus100"])
+        self._c_energy_discount = float(_er2["congressEnergyDiscount"])
         self._c_minus50 = float(_er2["congressMinus50"])
         self._c_trade_gold = float(_er2["congressTradeGold"])
         self._c_trade_cap = int(_er2["congressTradeCapacity"])
@@ -1000,6 +1003,7 @@ class SimInit:
         # every locked plot a city can reach before it ranks anything by score.
         self.tile_locked = torch.zeros(B, T, dtype=torch.bool, device=device)
         self.drought = torch.zeros(B, T, dtype=torch.long, device=device)
+        self._init_climate(fixtures)
 
         imp = rules.improvements or {}
         ids = imp.get("ids", [])
@@ -1422,6 +1426,12 @@ class SimInit:
         # RIVER FLOOD, the Flood (Civ6) tables by severity.
         _ds = rules.disasters
         self._flood_sev_p = [float(x) for x in _ds["floodSeverityP"]]
+        # the per-turn base chances the climate phase scales
+        self._flood_chance = float(_ds["floodChance"])
+        self._eruption_chance = float(_ds["eruptionChance"])
+        self._drought_chance = float(_ds["droughtChance"])
+        self._storm_chance = float(_ds["stormChance"])
+        self._drought_length = int(_ds["droughtLength"])
         self._flood_destroy_p = torch.tensor([float(x) for x in _ds["floodDestroyP"]], dtype=torch.float64, device=device)
         self._flood_district_p = torch.tensor([float(x) for x in _ds["floodDistrictP"]], dtype=torch.float64, device=device)
         self._flood_pop_p = torch.tensor([float(x) for x in _ds["floodPopP"]], dtype=torch.float64, device=device)
@@ -1601,6 +1611,8 @@ class SimInit:
         self._iz_adj_bidx = [i for i in range(self.NB) if bool(self._b_iz_adj[i])]
         self._cardiff_harbor_power = float(rules.cardiff_harbor_power)
         self._b_power_supply = rules.b_power_supply.to(device)  # [NB] renewable Power a row supplies its own city
+        self._b_flood_barrier = rules.b_flood_barrier.to(device)  # [NB] bool
+        self._barrier_bidx = next((i for i in range(self.NB) if bool(self._b_flood_barrier[i])), -1)
         self._b_regional_range = rules.b_regional_range.to(device)  # [NB] its own regional reach, 0 = the shared one
         self._b_gov_tier = rules.b_gov_tier.to(device)  # [NB] the government TIER a row demands
         self._b_gov_title = rules.b_gov_title.to(device)
@@ -1952,6 +1964,54 @@ class SimInit:
 
     def row_of(self, seat: int) -> int:
         return int(self._seat_row[seat])
+
+    def _init_climate(self, fixtures: list[dict]) -> None:
+        """THE CLIMATE ARC's planes and its two denominators.
+
+        The coastal-lowland band is READ, not re-derived: `deriveLowlands`
+        runs once on the TS side and the fixture ships what it computed, so
+        the two engines cannot disagree about which tiles the sea reaches."""
+        B, T, dev = self.B, self.T, self.device
+        c = self.rules.climate
+        self.tile_lowland = torch.tensor(
+            [[int(t.get("lw", 0)) for t in f["tiles"]] for f in fixtures],
+            dtype=torch.long, device=dev)
+        self.tile_flooded = torch.zeros(B, T, dtype=torch.bool, device=dev)
+        # -1 = no climate change yet; monotone, so it never steps back.
+        self.climate_idx = torch.full((B,), -1, dtype=torch.long, device=dev)
+
+        self._clear_fids = torch.tensor([int(x) for x in c["clearFids"] if int(x) >= 0],
+                                        dtype=torch.long, device=dev)
+        self._ice_fid = int(c["iceFid"])
+        _clear = torch.zeros(B, T, dtype=torch.bool, device=dev)
+        for _f in self._clear_fids.tolist():
+            _clear |= self.feat_id == _f
+        self._removable_at_start = _clear.sum(dim=1)
+        self._ice_at_start = (self.feat_id == self._ice_fid).sum(dim=1)
+
+        # [points, flood band, submerge band, iceMelt, fertility, desertify]
+        _ph = c["phases"]
+        self._cl_points = torch.tensor([r[0] for r in _ph], dtype=torch.long, device=dev)
+        self._cl_flood = torch.tensor([int(r[1]) for r in _ph], dtype=torch.long, device=dev)
+        self._cl_submerge = torch.tensor([int(r[2]) for r in _ph], dtype=torch.long, device=dev)
+        self._cl_ice_melt = [float(r[3]) for r in _ph]
+        self._cl_fertility = [bool(r[4]) for r in _ph]
+        self._cl_desertify = [bool(r[5]) for r in _ph]
+        self._defor_cuts = [(float(a), float(b)) for a, b in c["deforestation"]]
+
+        self._carbon_per_resource = torch.tensor(
+            [float(x) for x in c["carbonPerResource"]], dtype=torch.float64, device=dev)
+        self._carbon_unit_share = float(c["unitShare"])
+        self._carbon_unit_res_share = float(c["unitResourceShare"])
+        self._carbon_cells_share = float(c["cellsShare"])
+        self._carbon_cells_tech = int(c["cellsTech"])
+        self._co2_per_point = float(c["co2PerPoint"])
+        self._recapture_units = float(c["recaptureUnits"])
+        self._recapture_favor = int(c["recaptureFavor"])
+        self._barrier_per_tile = int(c["barrierPerTile"])
+        self._pollution_divisor = float(c["pollutionDivisor"])
+        self._favor_per_over = int(c["favorPerOver"])
+        self._favor_pollution_cap = int(c["favorCap"])
 
     def _check_seat_invariant(self) -> None:
         al = self.unit_alive

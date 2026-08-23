@@ -57,7 +57,7 @@ nothing carries forward.
 | **A. Engine vs engine** | **1** | |
 | B-20r tourism tails | 1 | theming, the open-borders dig and the work GIFT all ship; the Naturalist's progressive cost is unsourced |
 | B-21r suzerain rows | 1 | nine perks are rules; the residual descoped rows all need whole absent systems |
-| B-22r World Congress | 2 | 13 of the 21 regular resolutions ship and emergencies run as special sessions; eight resolutions and the scored competitions have no carrier; peace TERMS wait on the negotiated deal (C-2) and two favor penalties on C-19/C-24; the favor tie-break unmodeled |
+| B-22r World Congress | 2 | 14 of the 21 regular resolutions ship and emergencies run as special sessions; seven resolutions and the scored competitions have no carrier; peace TERMS wait on the negotiated deal (C-2) and the grievance favor penalty on C-19; the favor tie-break unmodeled |
 | B-24r Ages/governors | 1 | all twelve dedications ship, both faces; dark-age policies, governor promotions and per-civ era drift do not |
 | B-30r specialists | 1 | the mechanic, both citizen overrides and the three-plant Industrial tier ship; a LOCK still outlives the city that set it |
 | B-31r trade-route tails | 1 | sea legs and the whole-destination-set candidate ship; no trading posts, plunder gold is a stylization, the summed-yield key is a heuristic and the free-choice head is P8's |
@@ -78,7 +78,7 @@ nothing carries forward.
 | B-60r the dig's DATE, and the hull nobody dates | 1 | the artifact's civilization is the event's own now; its ERA is still the ACTING seat's research, and a barbarian or minor sinking a hull leaves no wreck at all |
 | B-34r flood tails | 1 | the severity ladder, the river's whole reach, the river-scoped shield and the Dam all ship; the per-tile flood count and the climate/coastal tails do not |
 | **B. Fidelity vs real Civ 6** | **26** | |
-| C-1 POWER | 2 | the grid, the three plants, Cardiff, the Hydroelectric Dam, the powered-yield split and the FUEL all ship; the CO2 and the Accords wait on C-24, four renewable improvements and the Biosphere have no carrier, nothing can retire a plant, and a minor's cities are never powered |
+| C-1 POWER | 2 | the grid, the three plants, Cardiff, the Hydroelectric Dam, the powered-yield split, the FUEL and its CO2 all ship; four renewable improvements and the Biosphere have no carrier, nothing can retire a plant, and a minor's cities are never powered |
 | C-2 diplomatic agreements | 3 | friendship, alliances, open borders, the closed border and the work gift ship on one 30-turn clock; alliance TYPES and LEVELS, the negotiated two-sided deal, and the four agreements that need one are open |
 | C-4 unique improvements | 3 | Batey / Colossal Head / Monastery, each a flat channel today |
 | C-5 strategic-resource stockpiles | 2 | the bank, its ceiling, the unit and project charges, the plants' fuel, unit FUEL upkeep and the heal a lost source denies all ship; the shortage penalty's magnitude is unpublished and trading resources waits on C-2 |
@@ -92,11 +92,11 @@ nothing carries forward.
 | C-16 the spy's second half | 2 | the Spy, its capacity, the jump and all twelve missions ship; the escape-and-capture sequence, the spy promotion pool and two missions with no carrier do not |
 | C-17 embarked movement never upgrades | 1 | the flat EMBARK_MOVES stands in for every era |
 | C-19 grievances and warmongering | 2 | war has no reputational consequence with anyone |
-| C-20 the Military Engineer's build list | 2 | five buildables and the finish-a-district charge, which now has three of its four districts; only the Flood Barrier is still absent |
+| C-20 the Military Engineer's build list | 2 | five buildables and the finish-a-district charge, whose four targets now all exist |
 | C-21 Great Person ACTIVATED abilities | 2 | every GP fires instantly; none is placed and used |
 | C-22 the district roster is a subset | 2 | all eighteen districts ship; the Canal carries no naval passage, six Government Plaza buildings have no effect body, and the Preserve's housing table is unpublished |
 | C-23 nothing diminishes tourism | 1 | no rival's Enlightenment ever costs a tourist, so Cristo Redentor's cancelling clause has nothing to cancel |
-| C-24 no CO2, no climate | 3 | GS's whole climate arc — emissions, warming bands, sea level, escalating disasters — and 3 gaps wait on it |
+| C-24 the climate arc | 1 | emissions, the seven phases, ice melt, flooding, the Flood Barrier and a warmed world's weather all ship; nothing is ever submerged (C-35), the barrier's maintenance is unpublished, and railroads and the Mitigation civic's award have no carrier |
 | C-26 no civilization uniques | 5 | seats are a name, a colour and a city list: no civ ability, no leader ability or agenda, no unique unit, no unique infrastructure (America's Film Studio among them) |
 | C-25 no stealth (invisible) units | 2 | the whole naval-raider class is absent and nothing on either engine can be invisible |
 | C-27 pillaging pays no yields | 2 | the verb marks the tile and heals; nothing banks, and there is no coastal raid to bank from |
@@ -107,6 +107,7 @@ nothing carries forward.
 | C-32 the new classes have no promotion tree | 2 | air, GDR, support and spy chassis are offered no promotion, so Sky and Stars' XP half has nothing to multiply |
 | C-33 the Giant Death Robot is only its stats | 2 | seven sourced abilities and the four Future-era upgrades have no carrier |
 | C-34 air combat's second half | 2 | bases, both heads, the sortie and the scatter ship; Interception, Patrol and Priority Target — the whole reason a fighter exists — do not |
+| C-35 the land/water fact never moves | 2 | one static bit answers "is this sea", "can a hull stand here" and "is this coastal"; no tile can become water, which is what submersion and the Canal's passage each need |
 | **C. Absent systems** | **57** | |
 | **OPEN, TOTAL** | **84** | |
 
@@ -316,8 +317,7 @@ Civ 6 source or is recorded as unverifiable.
     (spies), Governance Doctrine (a governor roster with appointment and
     promotion, B-24r), Military Advisory (unblocked since the promotion
       classes shipped — unwritten, not absent),
-    Global Energy Treaty (its POWER-consuming buildings exist now; what
-    is left is the climate arc, C-24), Public Relations (grievances,
+    Public Relations (grievances,
     C-19), Luxury
     Policy and World Religion. The last two are HALF-sourced, and a
     resolution whose two outcomes cannot both act is worse than an
@@ -390,8 +390,9 @@ Civ 6 source or is recorded as unverifiable.
     floored at zero. A loyalty flip counts as occupation because it goes
     through the same transfer. Still open, each on a named absence: 200
     Grievance = -1/turn with -1 more per 50 beyond, capping at -10
-    (grievances, C-19); and -1/turn per 3 pollution points above the
-    world average, capping at 20 (C-24).
+    (grievances, C-19). The POLLUTION half ships:
+    `pollutionFavorPenalty` / `_pollution_favor_penalty` takes -1/turn per
+    3 displayed pollution points above the world average, capping at 20.
 - **B-24r. Ages/governors tails:** the DEDICATION catalog now holds NINE,
   both faces sourced and hooked (To Arms!, Hic Sunt Dracones, Reform the
   Coinage, Heartbeat of Steam, Wish You Were Here). Two of this entry's own
@@ -1035,9 +1036,11 @@ number was under-counting by treating deferrals as closures.
     `_resolve_seat_power` run inside the MAJOR seat loop, so a minor's
     buildings ask for a load nothing ever answers and its `powered` flag
     stays false for the whole game. Both engines agree; neither is Civ 6.
-  - **NO CO2, so no Accords and no reason to switch plants.** The whole
-    point of the three-plant ladder is that Coal emits most and Nuclear
-    least; blocked on C-24.
+  - **THE CLIMATE ACCORDS COMPETITION HAS NO CARRIER.** The three plants
+    now emit on the published curve, so trading a Coal plant for a Nuclear
+    one is a real decision; what the emissions still cannot feed is the
+    scored competition that ranks the seats by them, which is B-22r's
+    absent competition machinery rather than anything climate-specific.
   - **THE FOUR RENEWABLE GENERATORS** — Geothermal Plant, Solar Farm, Wind
     Farm and Offshore Wind Farm — are improvements with their own terrain
     gates, and none is in the improvement roster.
@@ -1285,10 +1288,9 @@ number was under-counting by treating deferrals as closures.
   it Fort, Airstrip, Missile Silo, Mountain Tunnel, Reinforced Barricade and
   Modernized Trap, plus spending a charge to finish 20% of a Canal, Dam,
   Aqueduct or Flood Barrier. Only the FORT exists here. Three of the four
-  districts the charge names now exist, so the charge itself is what is
-  missing rather than its targets; the Flood Barrier is a coastal defence that
-  waits on C-24, and the Airstrip waits on nothing but this row now that
-  aircraft and their bases exist.
+  districts the charge names now exist, and so does the Flood Barrier, so the
+  charge itself is what is missing rather than its targets; the Airstrip waits
+  on nothing but this row now that aircraft and their bases exist.
 - **C-21. GREAT PEOPLE FIRE INSTANTLY; NONE IS PLACED.** Weight 2. A claimed
   Great Person pays its effect at the claim (`recruit`). Real Civ 6 gives many
   of them an ACTIVATED ability used later on a chosen tile. Gaps: the
@@ -1390,6 +1392,18 @@ number was under-counting by treating deferrals as closures.
   Particle Beam Siege Cannon, Enhanced Mobility and Reinforced Armor Plating —
   need a per-unit upgrade state keyed on a FUTURE-era tech, and the era ladder
   stops at Information.
+- **C-35. THE LAND/WATER FACT NEVER MOVES.** Weight 2. Whether a tile is sea
+  is decided at map generation and never again. On TS it is `isWater` reading
+  `terrain`; on the GPU it is the static planes `water` and `wpass` plus
+  everything derived from them once at load — `coastal_land`, `coastal_water`,
+  `tile_wh` and the `_land_list` candidate list — none of which is in
+  `_MUTABLE`, so no rule can write any of them. The bit is also OVERLOADED: the same fact answers "is this
+  sea", "can a hull stand here", "is this city coastal" and "does this tile
+  carry water housing", so a rule that moved it for one of those meanings would
+  move it for all four. Two gaps wait on this: submersion, which needs a
+  flooded lowland to BECOME sea (C-24), and the Canal's naval passage, which
+  needs a land tile a hull can enter without becoming sea for the other three
+  readers (C-22).
 - **C-30. A CITY-STATE CARRIES NO RESEARCH RECORD.** Weight 1. A minor has no
   techs and no civics on either engine, and real Civ 6 minors research like
   anyone else. One gap waits on it today: CIV6 (Movement) closes a territory
@@ -1431,15 +1445,72 @@ number was under-counting by treating deferrals as closures.
   clause and the reveal-for-one-turn-after-attacking clause, which need a
   visibility axis `isExplored` does not have; and the Reveal Stealth ability
   that Scouts and Destroyers carry.
-- **C-24. NO CO2, NO CLIMATE.** Weight 3. Gathering Storm's whole climate
-  arc is absent: neither engine tracks CO2 emitted per seat, the world
-  temperature bands, ice melt, rising sea level or the flooding of coastal
-  tiles it causes. Floods and storms fire from `disaster` / `_disasters` on
-  a fixed per-turn draw, so severity never escalates with a warming world.
-  Gaps waiting on it: the pollution half of the diplomatic-favor penalty
-  (B-22r), the Global Energy Treaty resolution, and the three Power Plants'
-  emissions (C-1) — which is the whole reason a seat would ever trade a
-  Coal plant for a Nuclear one.
+- **C-24. THE CLIMATE ARC.** Weight 1. Gathering Storm's climate arc ships on
+  both engines. Every seat banks lifetime CO2 in RAW units, the world's total
+  is scaled by the deforestation band it has cleared, and `climatePoints` /
+  `_climate_points` turn that into the seven-row phase ladder read off the
+  Phases of Climate Change table — monotone, by the page's own rule that a
+  phase cannot be reverted. Two of the three emitters the page names exist and
+  both pay: a power plant discharges `fuelRate` x `CARBON_PER_POWER`, which
+  reproduces the page's own ~3.28 / ~1.96 / ~0.77 display figures with no fudge
+  factor, and a unit drawing Coal, Oil or Uranium discharges a quarter of that,
+  halved again by Advanced Power Cells. `CO2_PER_POINT` is the DUEL row,
+  because this world is 44x26, which IS Civ 6's Duel.
+  What the warming then does: `meltIce` / `_melt_ice` takes the phase's
+  published fraction off the map's original Ice; the phase's flood band goes
+  under and every tile in it is pillaged, which is exactly "still workable, no
+  improvement bonus" through the `pillaged` gate `yields` already had;
+  `disasterRateMult` and `severitySplit` scale the four disaster draws and move
+  mass onto the worst severity band; and past Phase IV `fertilityLive` stops
+  the silt while `desertificationLive` makes storms and droughts take it back
+  off the same tiles.
+  The FLOOD BARRIER is a City Center building on COMPUTERS at the page's own
+  price, `(80 x lowland tiles) x (1 + flood level)`, refused to a city with no
+  lowland, unpurchasable, and repairing in full what already went under. Its
+  price is LIVE rather than locked at queue — `buildingCostIn` /
+  `_building_cost_in` re-read it every turn through `_reprice_barrier` —
+  because the page's own strategy note is that "the price will practically
+  double in the course of the construction".
+  Two more carriers arrived with it: CARBON RECAPTURE, an Industrial Zone
+  project gated on the Global Warming Mitigation civic, paying -50,000 units
+  and +30 favor and free to take a seat's lifetime total below zero; and the
+  GLOBAL ENERGY TREATY, the fourteenth Congress resolution, whose two outcomes
+  are a 50% discount on one plant type and a world ban on building it.
+  A COASTAL LOWLAND's band is this model's own and cannot be otherwise: real
+  Civ 6 stamps metres above sea level at map generation and publishes neither
+  the generator's rule nor the elevations, while the runtime map carries
+  elevation only as FLAT / HILLS / MOUNTAIN. `deriveLowlands` is a multi-source
+  BFS out from the water over FLAT land, so the shoreline drowns first and a
+  hill never does. It runs ONCE, on TS, and ships to the GPU as the tile key
+  `lw` — one derivation, two engines, which is why they cannot disagree about
+  which tiles the sea reaches.
+  REACHABILITY, measured not assumed: NONE OF IT is reached. In 12 seeds x
+  250 turns no seat's lifetime CO2 ever leaves zero, so no game reaches Phase
+  I — a plant waits on INDUSTRIALIZATION and its fuel, and 250,000 raw units
+  buys one point at this map size. Every body here is proven by
+  `tests/gpu/climate_test.py` and `tests/cpu/map/climate.test.ts` alone.
+  What is still open:
+  - **NOTHING IS EVER SUBMERGED.** Phases IV, VI and VII submerge bands 1, 2
+    and 3, and the tiles are "lost forever and cannot be recovered". Neither
+    engine applies it. The published sea level IS on the wire — `floodLevel` /
+    `_flood_level` takes the submerge band into the Flood Barrier's price, so
+    the barrier gets dearer on the published schedule — and what is missing is
+    only the tile turning to water, which is C-35.
+  - **THE FLOOD BARRIER KEEPS FOR NOTHING.** The page says "Initial Production
+    cost and per turn maintenance are variable based on the number of Coastal
+    Lowland tiles in this city and the current sea level", then publishes ONE
+    formula, which is the production cost: its infobox `cost` of 80 matches it
+    while its `maintenance` reads only "Variable". No source anywhere gives a
+    maintenance figure, so the row carries 0 and a barrier is free to keep.
+  - **RAILROAD CONSTRUCTION EMITS NOTHING.** The third source the page names —
+    "every tile of constructed/upgraded Railroad will consume 1 Coal, which
+    adds pollution, and quite a bit at that" — has no carrier, because neither
+    engine has a railroad at all: no route type, no improvement, no charge.
+  - **GLOBAL WARMING MITIGATION PAYS NOTHING OF ITS OWN.** The Future-era civic
+    exists and gates Carbon Recapture, but its award — "3 Envoys and 1
+    Diplomatic Victory point" — has nowhere to land: `ResearchEffect` carries
+    unlock kinds only, so no tech or civic on either engine can make a one-off
+    grant of anything.
 - **C-23. NOTHING DIMINISHES TOURISM.** Weight 1. Real Civ 6 reduces the
   tourism a civ earns from Relics and Holy Cities once other civs research
   The Enlightenment, and reduces Great Work tourism the same way through the
@@ -1479,7 +1550,7 @@ number was under-counting by treating deferrals as closures.
     as "is this tile water" across the embark, coastal-city and coastal-water
     tests, so making a canal tile passable to ships would make it water for a
     dozen predicates that mean something else. The passage wants its own
-    plane, not a bit borrowed from the water one.
+    plane, not a bit borrowed from the water one — which is C-35.
   - **SIX GOVERNMENT PLAZA BUILDINGS PAY ONLY THEIR GOVERNOR TITLE.** The
     Ancestral Hall's Builder in every new city, the Warlord's Throne's
     post-conquest production, the Grand Master's Chapel's faith purchase of
@@ -1521,53 +1592,53 @@ steers the games into a different regime and carries the older rows with it:
 | a GOVERNMENT PLAZA placed | 12/12 | t43 |
 | faith-buy kind 6 (APOSTLE purchase) | 12/12 | t75 |
 | a WORLD CONGRESS ballot on the wire | 12/12 | t89 |
-| a SPECIALIST pinned into a slot | 12/12 | t110 |
+| a SPECIALIST pinned into a slot | 12/12 | t116 |
 | an OPEN BORDERS grant standing | 11/12 | t34 |
-| a second HULL on any seat | 10/12 | t103 |
+| a second HULL on any seat | 11/12 | t104 |
 | NATURAL_HISTORY (the Archaeologist's civic) | 10/12 | t170 |
 | a DECLARATION OF FRIENDSHIP | 8/12 | t19 |
-| an ALLIANCE | 8/12 | t105 |
 | a DIPLOMATIC QUARTER placed | 8/12 | t98 |
+| an ALLIANCE | 8/12 | t105 |
 | an INTERNATIONAL trade leg | 7/12 | t94 |
-| CONSERVATION (the Naturalist's civic) | 6/12 | t183 |
-| two enemy religious units ADJACENT (theological combat's precondition) | 5/12 | t86 |
+| two enemy religious units ADJACENT (theological combat's precondition) | 6/12 | t86 |
+| CONSERVATION (the Naturalist's civic) | 6/12 | t184 |
 | a DAM placed | 4/12 | t162 |
-| URBANIZATION civic | 3/12 | t226 |
-| a WATER PARK placed | 3/12 | t238 |
-| WAR with a city-state | 2/12 | t143 |
-| a NEIGHBORHOOD placed | 2/12 | t228 |
-| PEACE with a city-state, through the sue column | 1/12 | t159 |
-| an antiquity dig (artifact in a slot) | 0/12 | NEVER |
+| URBANIZATION civic | 3/12 | t219 |
+| a NEIGHBORHOOD placed | 3/12 | t221 |
+| WAR with a city-state | 1/12 | t143 |
+| an antiquity dig (artifact in a slot) | 1/12 | t216 |
+| a unit standing against a CLOSED BORDER | 1/12 | t238 |
+| a WATER PARK placed | 1/12 | t240 |
+| a GREAT WORK given away | 1/12 | t242 |
+| PEACE with a city-state, through the sue column | 0/12 | NEVER |
 | a CANAL placed | 0/12 | NEVER |
-| a unit standing against a CLOSED BORDER | 0/12 | NEVER |
-| a GREAT WORK given away | 0/12 | NEVER |
 | an ally dragged in by the DEFENSIVE PACT | 0/12 | NEVER |
+| any seat's lifetime CO2 above zero | 0/12 | NEVER |
+| the world crossing into climate PHASE I | 0/12 | NEVER |
 
-- THE TABLE MOVED WHOLESALE when the district lane started ROTATING its pick.
-  The scripted driver took the first legal district column, so a column
-  appended to the scaffold was only ever reached once everything before it was
-  built or barred; it now rotates by (seat + turn), which is a DECISION the
-  applier re-validates and TS only replays, so it changes coverage without
-  changing what is legal. Every row moved with it — a second hull went from
-  six seeds to ten, NATURAL_HISTORY from five to ten, CONSERVATION from three
-  to six — and one moved the wrong way: the ANTIQUITY DIG was reached on one
-  seed at t229 and is now reached on none, because the seed that dug spends
-  those turns elsewhere. That is a coverage LOSS, not a regression in a rule:
-  the dig's bodies are poked in `parks_test` and `tests/cpu/units/`, and
-  nothing in the gate covered them before t229 either.
-- THEOLOGICAL COMBAT IS REACHED, in 5 of 12 seeds from t86, so the
+- THE DISTRICT LANE ROTATES ITS PICK by (seat + turn) rather than taking the
+  first legal column. That is a DECISION the applier re-validates and TS only
+  replays, so it widens coverage without changing what is legal, and it is why
+  the late-unlock districts appear in this table at all.
+- THE TAIL OF THIS TABLE IS TRAJECTORY, NOT RULE. Every row below 8/12 moves
+  by a seed or two whenever anything steers the late game — a fourteenth
+  Congress resolution in the rotation and two new production rows were enough
+  to move five of them at once, in both directions. A row that thins is a
+  coverage loss and never a regression: each names the poke lane that is its
+  actual bar.
+- THEOLOGICAL COMBAT IS REACHED, in 6 of 12 seeds from t86, so the
   resolver's deterministic damage and its apostle-only initiation ARE
   gate-covered.
 - The APOSTLE BUY fires in every seed from t75 and the 250-turn gate is
   green, which is what closed B-18r's predicted lifecycle drift.
 - THE CITIZEN OVERRIDES are the widest-reaching heads in the gate: a plot
-  lock stands on every seed from t2 (144 plots at t250) and a pinned
-  specialist on every seed from t110 (52 slots), so both ride the digest for
+  lock stands on every seed from t2 (141 plots at t250) and a pinned
+  specialist on every seed from t116 (47 slots), so both ride the digest for
   most of a game rather than leaning on `citizens_test`.
-- WAR WITH A CITY-STATE stands on 2 of 12 seeds from t143 and closes through
-  the SUE column on 1 of them from t159 — 9.8 minor-war turns per seed,
-  108 on the loudest. The declare, the peace and both clocks are gate-covered;
-  the meeting gate, the treaty term and the suzerain refusal are not, and
+- WAR WITH A CITY-STATE stands on 1 of 12 seeds from t143 — 9.0 minor-war
+  turns per seed, 108 on the loudest — and no seed now closes one through the
+  SUE column. The declare and both clocks are gate-covered; the peace, the
+  meeting gate, the treaty term and the suzerain refusal are not, and
   `cs_war_test` section d is their bar.
 - THE DIPLOMATIC AXIS ENTERED THE GATE, and the probe had never measured it:
   `geo_decide_and_apply` is the serve gate's own call and the probe did not
@@ -1576,20 +1647,31 @@ steers the games into a different regime and carries the older rows with it:
   diplomatic style off, every row reproduces the old table exactly, which is
   also the proof that the treaty system, the reworked alliance and the closed
   border change no reachability of their own.
-- THREE MECHANICS THE ENGINE OFFERS AND THESE GAMES NEVER PRESENT, each
-  poke-covered and none of them evidence of a bug:
-  - A CLOSED BORDER is never STOOD AGAINST. No major's unit is ever adjacent
-    to a foreign major's closed ground in 12 seeds x 250 turns, so the rule
-    never refuses a step in-gate; `geopolitics_test` poke i3 is its whole
-    bar. The three seats simply never crowd each other's territory.
-  - A GREAT WORK is never GIVEN, because there is almost nothing to give:
-    4 works exist across all 12 seeds at t250 against 21 slot buildings. The
-    gift is blocked by the great-person queue's output, not by its own gate
-    (poke i2). At an all-diplomat table it does fire, on 2 of 12 seeds.
+- THE DIPLOMATIC AXIS'S THIN ROWS, each poke-covered and none of them
+  evidence of a bug:
+  - A CLOSED BORDER is STOOD AGAINST on one seed, at t238. The three seats
+    barely crowd each other's territory, so the refusal almost never fires
+    in-gate and `geopolitics_test` poke i3 stays its real bar.
+  - A GREAT WORK is GIVEN on one seed, at t242. There is now something to
+    give — 24 works across the 12 seeds at t250 against 37 slot buildings —
+    but the gift is still throttled by the great-person queue's output rather
+    than by its own gate (poke i2). At an all-diplomat table it fires on 2 of
+    12 seeds.
   - THE DEFENSIVE PACT never drags anyone in. Alliances stand on 8 of 12
     seeds, but a third party has to declare on an ally while the alliance
     runs, and the same style that forms alliances is the one that does not
     fight. Poke i is the bar.
+- THE CLIMATE ARC IS REACHED BY NOTHING. No seat's lifetime CO2 ever leaves
+  zero in 12 seeds x 250 turns, so no game comes near Phase I: a power plant
+  waits on INDUSTRIALIZATION and a supply of its fuel, a unit has to draw one
+  of the three strategics every turn, and 250,000 raw units buys a single
+  point at this map size. Everything C-24 ships above the per-turn arithmetic
+  — the phase ladder, ice melt, flooding, the Flood Barrier, the warmed
+  disaster rate, the pollution favor penalty, Carbon Recapture and the Global
+  Energy Treaty's two outcomes — is proven by `tests/gpu/climate_test.py` and
+  `tests/cpu/map/climate.test.ts` and by nothing else. What the gate does
+  cover is that the climate turn runs on every turn of every seed and finds
+  nothing to do.
 - THE DRIVER RUNS TWO RESEARCH STYLES, and that is why the bottom of this
   table exists at all. Cheapest-first is BREADTH first: it finishes the most
   items and so parks every seat in the shallow end of both trees. A share of
@@ -1600,7 +1682,7 @@ steers the games into a different regime and carries the older rows with it:
   noise on the same pick reached nothing new and cost two seeds their
   city-state war — the late catalog is gated on research DEPTH within 250
   turns, and random detours only add drag.
-- WONDERS FINISH, and the belief that they do not was load-bearing: 52
+- WONDERS FINISH, and the belief that they do not was load-bearing: 54
   completed across 11 of 12 seeds. The `wonder_effects` lane was labelled as
   the only proof of the fourteen effect channels "because the gate never
   finishes a wonder" — false, and the probe could not have said so until it

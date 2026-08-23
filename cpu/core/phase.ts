@@ -35,7 +35,7 @@ import { CIVICS } from '../data/civics';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { UNITS, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_TECH } from '../data/units';
-import { outerPool, wallsMax, urbanDefensesFit, repairDrip } from './rules';
+import { buildingCostIn, outerPool, wallsMax, urbanDefensesFit, repairDrip } from './rules';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
 import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, borderGrowthCost } from '../data/constants';
@@ -1785,7 +1785,7 @@ export function seatPhase(state: GameState): void {
           q.kind === 'unit'
             ? q.cost ?? UNITS[q.unit]?.cost ?? 54 // builders lock at queue
             : q.kind === 'building'
-              ? BUILDINGS[q.building]?.cost ?? 54
+              ? buildingCostIn(state, civCity, q.building)
               : q.kind === 'wonder'
                 ? BUILT_WONDERS[q.wonder]?.cost ?? 54 // catalog cost (already speed-scaled)
                 : q.cost ?? 54; // settler / district / project carry their own cost
