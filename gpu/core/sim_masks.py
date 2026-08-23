@@ -1856,9 +1856,10 @@ class SimMasks:
             cs_t = (_cst.gather(1, nbc) & (ctr_nb >= 100)).reshape(B, N, 6)
         can_fight = (self._type_combat[utype] > 0).unsqueeze(2)
         melee = (self._type_ranged_strength[ut] <= 0).unsqueeze(2)
-        # a live enemy Encampment is a MELEE target in its own right — the only
-        # way to open its tile. `rangedAttack` has no district arm.
-        enc_t = self._encamp_block(nbc, row).reshape(B, N, 6) & melee
+        # A live enemy Encampment is a target in its own right, melee or shot:
+        # CIV6 charges a ranged attack -17 "when attacking city and district
+        # defenses", which prices the blow rather than refusing it.
+        enc_t = self._encamp_block(nbc, row).reshape(B, N, 6)
         # CIV6: "Embarked units with melee attacks may attack targets on land
         # when adjacent to it, but they will suffer the amphibious attack CS
         # penalty", and "may not attack any other unit in the water, including
@@ -1959,8 +1960,11 @@ class SimMasks:
         _enemy = (_owned & self.war[:, row].gather(
             1, self._seat_row[torch.where(_owned, _ts, torch.zeros_like(_ts))])).gather(1, tc)
         _has_imp = (self.improvement.gather(1, tc) >= 0) & ~self.pillaged.gather(1, tc)
+        # CIV6: the Encampment "cannot be pillaged normally" — a melee unit
+        # conquers it instead, which is where its pillage is written.
         _has_dis = (
             (self.district.gather(1, tc) >= 0)
+            & (self.district.gather(1, tc) != self._encamp_didx)
             & self.district_complete.gather(1, tc)
             & ~self.district_pillaged.gather(1, tc)
             & (self.centre_slot_at.gather(1, tc) < 0)
@@ -1982,9 +1986,11 @@ class SimMasks:
             # isCiv(b))`), so a major seat's ring targets are barbarian units.
             _ring_u = ((_rms == BARB_SEAT) | (_rcs == BARB_SEAT)).reshape(B, N, 12)
             _ring_c = self._seats_hostile(row, self._centre_seat_plane().gather(1, ringc)).reshape(B, N, 12)
+            # a district's defenses are a target at range too
+            _ring_e = self._encamp_block(ringc, row).reshape(B, N, 12)
             _sn = [
                 present.unsqueeze(2) & rngd.unsqueeze(2) & ~u_emb.unsqueeze(2)
-                & may_shoot & (ring >= 0) & (_ring_u | _ring_c)
+                & may_shoot & (ring >= 0) & (_ring_u | _ring_c | _ring_e)
             ]
 
         _sp: list[torch.Tensor] = []

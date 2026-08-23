@@ -5750,6 +5750,97 @@ class SimSeats:
         tgt = torch.where(has_imp, imp_tgt, city_tgt)
         return tgt, has_imp, has_city
 
+    def _encamp_terms(self, tc: torch.Tensor):
+        """(def_cs, hrow, hcol, wtier, held) for the Encampment on `tc`.
+
+        CIV6 gives a defensible district Combat Strength "similar to the parent
+        City Center, EXCLUDING any bonus obtained for a Garrisoned unit" — so
+        the walls tier's own bonus is in and the garrison's +5 is not. `hcol`
+        is the city behind the district; without one (a district whose city has
+        fallen) the roll lands whole on its own pool."""
+        hseat = self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1)
+        hrow = hseat.clamp(min=0, max=self.n_majors - 1)
+        bidx = torch.arange(self.B, device=self.device)
+        hcol = self._owner_city_col(hseat, tc)
+        wtier = self._walls_tier_at(hrow, hcol)
+        held = hcol >= 0
+        def_cs = (torch.maximum(self.civ_best_melee[bidx, hrow], torch.full_like(hrow, 15))
+                  + torch.where(held, self._walls_tier_cs[wtier],
+                                torch.zeros_like(self._walls_tier_cs[wtier])))
+        return def_cs, hrow, hcol, wtier, held
+
+    def _encamp_take_roll(self, m: torch.Tensor, tc: torch.Tensor, utype: torch.Tensor,
+                          useat: torch.Tensor, roll: torch.Tensor, ranged: bool) -> None:
+        """Apply ONE roll to the district: CIV6 gives it "Defenses HP equal to
+        the City Center" and one set of Walls supplies both, so the roll divides
+        exactly as a hit on the centre does — the perimeter share off the city's
+        pool, and only what gets through reaching `encamp_hp`."""
+        _dcs, hrow, hcol, wtier, held = self._encamp_terms(tc)
+        _hc0 = hcol.clamp(min=0)
+        bidx = torch.arange(self.B, device=self.device)
+        _assist = (torch.zeros_like(roll) if ranged
+                   else self._siege_assist(useat, utype, tc, wtier))
+        _wall, _centre = self._city_damage_split(
+            self.city_outer_hp[bidx, hrow, _hc0], self._walls_tier_hp[wtier], roll,
+            self._hit_class(utype, ranged), _assist)
+        rows = m.nonzero(as_tuple=True)[0]
+        if rows.numel() == 0:
+            return
+        tr = tc[rows]
+        _dmg = torch.where(held, _centre, roll)
+        self.encamp_hp[rows, tr] = (self.encamp_hp[rows, tr] - _dmg[rows]).clamp(min=0)
+        hr2 = rows[held[rows]]
+        if hr2.numel() > 0:
+            hrr, hcc = hrow[hr2], _hc0[hr2]
+            self.city_outer_hp[hr2, hrr, hcc] = self.city_outer_hp[hr2, hrr, hcc] - _wall[hr2]
+            self.city_last_hit[hr2, hrr, hcc] = self.turn
+
+    def _conquer_encampment(self, m: torch.Tensor, tc: torch.Tensor, captor: torch.Tensor) -> None:
+        """`conquerEncampment`'s twin. CIV6 (Combat): the Encampment "cannot be
+        pillaged normally - they have to be 'conquered' by a melee unit, as you
+        would a City Center. At this point the entire district and all
+        buildings in it are automatically pillaged, but you don't gain any
+        spoils from it" — and a unit sheltering there "will be destroyed
+        instantly, regardless of its remaining HP". A SHOT never conquers."""
+        rows = m.nonzero(as_tuple=True)[0]
+        if rows.numel() == 0:
+            return
+        self.district_pillaged[rows, tc[rows]] = True
+        self._air_scatter_from(rows, tc[rows])
+        self._raze_garrison(rows, tc[rows], captor[rows])
+        self._eff_version += 1
+
+    def _ranged_strike_encampment(self, att: torch.Tensor, tc: torch.Tensor, atk_kind: str,
+                                  u: int, rel: torch.Tensor, key: str) -> None:
+        """`rangedStrikeEncampment`'s twin. CIV6 (Combat): "Ranged attacks
+        receive a -17 penalty when attacking city and district defenses or
+        naval units" — the same penalty `_city_ranged_strength` already carries
+        for a centre. A shot takes the defenses down and stops there."""
+        a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
+        at0 = a_type[:, u].clamp(min=0, max=self.NU - 1)
+        a_promos = self._promo_pool(atk_kind)[0][:, u]
+        def_cs, hrow, hcol, _wt, held = self._encamp_terms(tc)
+        bidx = torch.arange(self.B, device=self.device)
+        outer = torch.where(held, self.city_outer_hp[bidx, hrow, hcol.clamp(min=0)],
+                            torch.zeros_like(def_cs))
+        atk_e = (self._city_ranged_strength(at0, outer) - self._wound(a_hp[:, u])
+                 + self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
+                 + rel.to(def_cs.dtype)
+                 + self._gen_aura_cs(a_seat[:, u], a_tile[:, u],
+                                     self.unit_naval[at0] | a_emb[:, u]).to(def_cs.dtype)
+                 + self._advisory_cs(at0).to(def_cs.dtype))
+        roll = self._damage_roll(att, atk_e - def_cs, k=key, tile=tc)
+        self._encamp_take_roll(att, tc, at0, a_seat[:, u], roll, True)
+        self._ww_battle(att, self._row_of(a_seat[:, u]),
+                        self._row_of(self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1)),
+                        tc, city=True)
+        _fell = self.encamp_hp.gather(1, tc.unsqueeze(1)).squeeze(1) <= 0
+        self._award_city_xp(att, atk_kind, u, a_type[:, u], a_seat[:, u],
+                            torch.where(_fell, torch.full_like(tc, XP_CITY_FELLED),
+                                        torch.full_like(tc, XP_CITY_ATTACK)))
+        _mp = getattr(self, f"{atk_kind}_unit_mp")
+        _mp[:, u] = torch.where(att, torch.zeros_like(_mp[:, u]), _mp[:, u])
+
     def _attack_encampment(self, att: torch.Tensor, tile: torch.Tensor, atk_kind: str, u: int) -> None:
         """The `attackEncampment` twin — a melee assault ON an Encampment tile.
         The district fights at its OWNER's seat-level defense floor
@@ -5766,24 +5857,9 @@ class SimSeats:
         atk_cs = self._type_combat[a_type[:, u]] + self._advisory_cs(a_type[:, u])
         major = POOL_CLASS[atk_kind] == "major"
         tc = tile.clamp(min=0)
-        hseat = self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1)
-        hrow = hseat.clamp(min=0, max=self.n_majors - 1)
-        bidx = torch.arange(self.B, device=self.device)
-        # CIV6 gives a defensible district Combat Strength "similar to the
-        # parent City Center, EXCLUDING any bonus obtained for a Garrisoned
-        # unit" — so the walls tier's own bonus is in and the garrison's +5 is
-        # not. `hcol` is the city behind the district; without one (a district
-        # whose city has fallen) the roll lands whole on the garrison, as it
-        # always did.
-        hcol = self._owner_city_col(hseat, tc)
-        wtier = self._walls_tier_at(hrow, hcol)
-        _held = hcol >= 0
         # CIV6 (Encampment): "Acquires Outer Defenses ... once Walls have been
-        # built" — the OWNING city's tier, and none where no city owns the
-        # tile (`_walls_tier_at` clamps a -1 slot onto slot 0).
-        def_cs = (torch.maximum(self.civ_best_melee[bidx, hrow], torch.full_like(hrow, 15))
-                  + torch.where(_held, self._walls_tier_cs[wtier],
-                                torch.zeros_like(self._walls_tier_cs[wtier])))
+        # built" — the OWNING city's tier, and none where no city owns the tile.
+        def_cs, hrow, hcol, wtier, _held = self._encamp_terms(tc)
         # Attacker CS assembled exactly as `_assault_city` assembles it.
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         atk_e = (atk_cs - self._wound(a_hp[:, u])
@@ -5799,25 +5875,10 @@ class SimSeats:
         d_self = self._damage_roll(att, cdiff, k="encc", tile=tc)
         self._award_city_xp(att, atk_kind, u, a_type[:, u], a_seat[:, u],
                             torch.full_like(tc, XP_CITY_ATTACK))
-        # CIV6 gives the district "Defenses HP equal to the City Center" and
-        # one set of Walls supplies both, so the roll divides exactly as a hit
-        # on the centre does: the perimeter share off the city's pool, and only
-        # what gets through reaching the garrison.
-        _hc0 = hcol.clamp(min=0)
-        _wall, _centre = self._city_damage_split(
-            self.city_outer_hp[bidx, hrow, _hc0], self._walls_tier_hp[wtier], d_enc,
-            self._hit_class(a_type[:, u], False),
-            self._siege_assist(a_seat[:, u], a_type[:, u], tc, wtier))
-        rows = att.nonzero(as_tuple=True)[0]
-        if len(rows) > 0:
-            tr = tc[rows]
-            _dmg = torch.where(_held, _centre, d_enc)
-            self.encamp_hp[rows, tr] = (self.encamp_hp[rows, tr] - _dmg[rows]).clamp(min=0)
-            hr2 = rows[_held[rows]]
-            if len(hr2) > 0:
-                hrr, hcc = hrow[hr2], _hc0[hr2]
-                self.city_outer_hp[hr2, hrr, hcc] = self.city_outer_hp[hr2, hrr, hcc] - _wall[hr2]
-                self.city_last_hit[hr2, hrr, hcc] = self.turn
+        self._encamp_take_roll(att, tc, a_type[:, u], a_seat[:, u], d_enc, False)
+        # the assault that empties the pool CONQUERS the district
+        self._conquer_encampment(
+            att & (self.encamp_hp.gather(1, tc.unsqueeze(1)).squeeze(1) <= 0), tc, a_seat[:, u])
         _ww_ad = att & ((a_hp[:, u] - d_self) <= 0)
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_self, a_hp[:, u])
         died = att & (a_hp[:, u] <= 0)
@@ -6327,6 +6388,14 @@ class SimSeats:
                                 torch.where(_chp <= 1,
                                             torch.full_like(_chp, XP_CITY_FELLED),
                                             torch.full_like(_chp, XP_CITY_ATTACK)))
+        # A district's defenses answer next, before any unit on the tile: the
+        # shelter rule makes the Encampment the target WHOEVER stands on it.
+        enc_att = att & ~city_att & self._encamp_block(ttc.unsqueeze(1), a_seat.unsqueeze(1)).squeeze(1)
+        if bool(enc_att.any()):
+            self._ranged_strike_encampment(
+                enc_att, ttc, atk_kind, u,
+                self._rel_atk_cs(a_seat, tgt) if self._city_rel_live else torch.zeros_like(a_hp),
+                "vrnge")
         mslot = self.military_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
         cslot = self.civilian_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
         neg = torch.full_like(mslot, -1)
@@ -6350,7 +6419,7 @@ class SimSeats:
         civ_def = ~elig_m & elig_c
         d_slot = torch.where(elig_m, mslot, torch.where(elig_c, cslot, neg))
         d_seat = torch.where(elig_m, m_seat, torch.where(elig_c, c_seat, neg))
-        unit_att = att & ~city_att & (d_slot >= 0)
+        unit_att = att & ~city_att & ~enc_att & (d_slot >= 0)
         if bool(unit_att.any()):
             ds0 = d_slot.clamp(min=0)
             d_barb = d_seat == BARB_SEAT
@@ -6480,8 +6549,12 @@ class SimSeats:
             _cst = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
             _cst.scatter_(1, self.citystate_center[:, :self.S].clamp(min=0), self._citystate_target(row))
             cs_t = _cst.gather(1, ttc.unsqueeze(1)).squeeze(1) & (ctr >= 100)
+        # A district's defenses sit BETWEEN the two centre arms, where
+        # `rangedAttackInner` places them.
+        enc_t = self._encamp_block(ttc.unsqueeze(1), aseat.unsqueeze(1)).squeeze(1)
         city_att = att & city_t
-        cs_att = att & ~city_t & cs_t
+        enc_att = att & ~city_t & enc_t
+        cs_att = att & ~city_t & ~enc_t & cs_t
         rel_city = (self._rel_atk_cs(aseat, tgt).to(atk_base.dtype) if self._city_rel_live
                     else torch.zeros_like(atk_base))
 
@@ -6535,7 +6608,9 @@ class SimSeats:
                                 torch.where(_cshp <= 1,
                                             torch.full_like(_cshp, XP_CITY_FELLED),
                                             torch.full_like(_cshp, XP_CITY_ATTACK)))
-        unit_att = att & ~city_att & ~cs_att & (ok_m | ok_c)
+        if bool(enc_att.any()):
+            self._ranged_strike_encampment(enc_att, ttc, atk_kind, u, rel_city, "rnge")
+        unit_att = att & ~city_att & ~enc_att & ~cs_att & (ok_m | ok_c)
         if bool(unit_att.any()):
             d_slot = torch.where(ok_m, mslot, torch.where(ok_c, cslot, neg))
             d_seat = torch.where(ok_m, m_seat, torch.where(ok_c, c_seat, neg))
@@ -6610,7 +6685,7 @@ class SimSeats:
         _mp = getattr(self, f"{atk_kind}_unit_mp")
         _mp[:, u] = torch.where(city_att | cs_att, torch.zeros_like(_mp[:, u]), _mp[:, u])
         self._spend_attack(atk_kind, u, unit_att)
-        return city_att | cs_att | unit_att
+        return city_att | enc_att | cs_att | unit_att
 
     def _seat_influence_phase(self, row: int, active: torch.Tensor) -> None:
         """Meet + influence → envoy conversion for ONE seat row — the

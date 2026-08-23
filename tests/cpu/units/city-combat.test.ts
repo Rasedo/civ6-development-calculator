@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { spawnUnit } from '../../../cpu/core/units';
 import { outerPool } from '../../../cpu/core/rules';
-import { cityDamageSplit, rangedCityPenalty, woundPenalty, rangedAttack, meleeAttack } from '../../../cpu/core/combat';
-import { emptySeat, seatOf, setWar } from '../../../cpu/core/seats';
-import { WALLS_HP } from '../../../cpu/data/units';
+import { cityDamageSplit, rangedCityPenalty, woundPenalty, rangedAttack, meleeAttack, hostileUnitAct } from '../../../cpu/core/combat';
+import { BARB_SEAT, emptySeat, seatOf, setTileOwner, setWar } from '../../../cpu/core/seats';
+import { ENCAMPMENT_HP, WALLS_HP } from '../../../cpu/data/units';
 
 // The city-combat formulas, against the pages they were sourced from:
 // Combat (Civ6) for the damage roll and the wound penalty, City combat (Civ6)
@@ -140,5 +140,86 @@ describe('a city under attack', () => {
     expect(city.outerHp).toBe(0);
     expect(before - city.hp).toBeGreaterThan(10);
     expect(seatOf(state, 1)!.cities[0].hp).toBe(city.hp);
+  });
+});
+
+// CIV6 (Combat): "A unit may take shelter (that is, avoid being attacked) if it
+// enters a City Center or Encampment tile. There it is invulnerable as long as
+// the city/Encampment stands." And an Encampment "cannot be pillaged normally -
+// they have to be 'conquered' by a melee unit, as you would a City Center. At
+// this point the entire district and all buildings in it are automatically
+// pillaged"; a unit sheltering there "will be destroyed instantly, regardless of
+// its remaining HP".
+describe('an Encampment under attack', () => {
+  function scene() {
+    const state = makeState(makeMap(20, 20));
+    state.unitsMode = true;
+    state.seats.push(emptySeat(1));
+    const city = settleAt(state, tileAtCoords(state.map, 9, 9).index, 1);
+    setWar(state, 0, 1, true);
+    const enc = tileAtCoords(state.map, 11, 9);
+    setTileOwner(enc, 1, city.id);
+    enc.district = 'ENCAMPMENT';
+    enc.districtComplete = true;
+    enc.districtPillaged = false;
+    enc.encampHp = ENCAMPMENT_HP;
+    city.districts.push({ type: 'ENCAMPMENT', tileIndex: enc.index });
+    const shelter = spawnUnit(state, 'WARRIOR', enc.index, 1)!;
+    const atk = spawnUnit(state, 'SWORDSMAN', tileAtCoords(state.map, 12, 9).index, 0)!;
+    const arch = spawnUnit(state, 'ARCHER', tileAtCoords(state.map, 12, 10).index, 0)!;
+    return { state, city, enc, shelter, atk, arch };
+  }
+
+  it('the DISTRICT takes the melee blow, not the unit sheltering on it', () => {
+    const { state, enc, shelter, atk } = scene();
+    meleeAttack(state, atk.id, enc.index, 0);
+    expect(shelter.hp).toBe(100);
+    expect(enc.encampHp!).toBeLessThan(ENCAMPMENT_HP);
+    expect(atk.hp).toBeLessThan(100); // the district trades rolls back
+  });
+
+  it('the DISTRICT takes the ranged blow too, and a shot never conquers', () => {
+    const { state, city, enc, shelter, arch } = scene();
+    city.outerHp = 0; // the perimeter already breached, so the roll lands whole
+    enc.encampHp = 1;
+    rangedAttack(state, arch.id, enc.index, 0);
+    expect(enc.encampHp).toBe(0);
+    expect(enc.districtPillaged).toBe(false);
+    expect(shelter.hp).toBe(100);
+    expect(state.units.some((u) => u.id === shelter.id)).toBe(true);
+  });
+
+  it('the melee assault that empties the pool CONQUERS: pillaged, shelterers destroyed', () => {
+    const { state, city, enc, shelter, atk } = scene();
+    city.outerHp = 0;
+    enc.encampHp = 1;
+    meleeAttack(state, atk.id, enc.index, 0);
+    expect(enc.encampHp).toBe(0);
+    expect(enc.districtPillaged).toBe(true);
+    expect(state.units.some((u) => u.id === shelter.id)).toBe(false);
+    expect(state.units.some((u) => u.id === atk.id)).toBe(true); // no advance
+    expect(state.map.tiles[atk.tileIndex].index).not.toBe(enc.index);
+  });
+
+  it('a raider never pillages an Encampment, even with its pool beaten to 0', () => {
+    const { state, enc, shelter, atk, arch } = scene();
+    enc.encampHp = 0; // the block has lifted, so the tile is enterable
+    // nothing to attack, so the raider reaches its pillage step
+    state.units = state.units.filter(
+      (u) => u.id !== shelter.id && u.id !== atk.id && u.id !== arch.id,
+    );
+    const raider = spawnUnit(state, 'WARRIOR', enc.index, BARB_SEAT)!;
+    hostileUnitAct(state, raider);
+    expect(enc.districtPillaged).toBe(false);
+
+    // control: any OTHER district on the same tile is pillaged by that step
+    const ctl = scene();
+    ctl.enc.district = 'CAMPUS';
+    ctl.enc.encampHp = 0;
+    ctl.state.units = ctl.state.units.filter(
+      (u) => u.id !== ctl.shelter.id && u.id !== ctl.atk.id && u.id !== ctl.arch.id,
+    );
+    hostileUnitAct(ctl.state, spawnUnit(ctl.state, 'WARRIOR', ctl.enc.index, BARB_SEAT)!);
+    expect(ctl.enc.districtPillaged).toBe(true);
   });
 });

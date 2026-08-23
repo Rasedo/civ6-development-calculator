@@ -851,6 +851,72 @@ function cityAssault(
 
 
 /**
+ * CIV6 (Combat): the Encampment "cannot be pillaged normally - they have to be
+ * 'conquered' by a melee unit, as you would a City Center. At this point the
+ * entire district and all buildings in it are automatically pillaged, but you
+ * don't gain any spoils from it." And a unit sheltering on the tile "will be
+ * destroyed instantly, regardless of its remaining HP".
+ *
+ * A SHOT never conquers, exactly as it never captures a city, so this runs
+ * only off the melee assault.
+ */
+function conquerEncampment(state: GameState, tile: Tile, attacker: Unit, seat: number): void {
+  tile.districtPillaged = true;
+  displaceAirFrom(state, tile.index);
+  for (const shelter of unitsAt(state, tile.index).filter((u) => unitSeat(u) !== attacker.seat)) {
+    killUnit(state, shelter, seat);
+  }
+}
+
+/**
+ * The share of ONE roll that reaches an Encampment's own pool. CIV6 gives a
+ * defensible district "Defenses HP equal to the City Center" and one set of
+ * Walls supplies both, so the roll divides exactly as a hit on the centre
+ * does: the perimeter share comes off the city's pool and only what gets
+ * through reaches the district. `cityAtTile` is what hands this the city
+ * behind the district.
+ */
+function encampSplit(state: GameState, tile: Tile, attacker: Unit, roll: number,
+                     ranged: boolean): number {
+  const held = cityAtTile(state, tile);
+  if (!held) return roll;
+  const outer = outerPool(state, held);
+  const split = cityDamageSplit(outer, wallsMax(state, held), roll,
+    cityHitClass(attacker.type, ranged),
+    ranged ? 0 : siegeAssist(state, attacker, tile.index, wallsTier(state, held)));
+  if (split.wall > 0) held.outerHp = outer - split.wall;
+  held.lastHitTurn = state.turn;
+  return split.centre;
+}
+
+/**
+ * A RANGED strike on an Encampment tile. CIV6 (Combat): "Ranged attacks
+ * receive a -17 penalty when attacking city and district defenses or naval
+ * units" — the same penalty `cityRangedStrength` already carries for a centre.
+ * A shot takes the defenses down and stops there.
+ */
+function rangedStrikeEncampment(state: GameState, attacker: Unit, tileIndex: number,
+                                defCS: number, relCity: number, key: string): void {
+  const tile = state.map.tiles[tileIndex];
+  const roll = damageRoll(state, (cityRangedStrength(attacker.type, encampOuter(state, tile))
+    - woundPenalty(attacker)
+    + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] })
+    + relCity + generalAuraCS(state, attacker, attacker.tileIndex)
+    + advisoryCS(state, attacker.type)) - defCS, key, tileIndex);
+  tile.encampHp = Math.max(0, (tile.encampHp ?? ENCAMPMENT_HP) - encampSplit(state, tile, attacker, roll, true));
+  warWearinessBattle(state, attacker.seat, tileSeat(tile), tileIndex, { city: true });
+  attacker.movesLeft = 0;
+  awardCityXp(state, attacker, (tile.encampHp ?? 0) <= 0 ? XP_CITY_FELLED : XP_CITY_ATTACK);
+}
+
+/** the perimeter a naval shot measures its penalty against: the district's
+ *  city pool, because one set of Walls supplies both. */
+function encampOuter(state: GameState, tile: Tile): number {
+  const held = cityAtTile(state, tile);
+  return held ? outerPool(state, held) : 0;
+}
+
+/**
  * A melee assault ON an Encampment tile. Real Civ 6: the district
  * fights independently of its city, so the attacker trades rolls with it at the
  * CITY's defense strength. Beating its garrison to 0 opens the tile (the block
@@ -877,18 +943,9 @@ function attackEncampment(
   const dmgToEncamp = damageRoll(state, atkCS - defCS, 'enc', tileIndex);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, 'encc', tileIndex);
   awardCityXp(state, attacker, XP_CITY_ATTACK);
-  const held = cityAtTile(state, tile);
-  if (held) {
-    const outer = outerPool(state, held);
-    const split = cityDamageSplit(outer, wallsMax(state, held), dmgToEncamp,
-      cityHitClass(attacker.type, false),
-      siegeAssist(state, attacker, tileIndex, wallsTier(state, held)));
-    if (split.wall > 0) held.outerHp = outer - split.wall;
-    held.lastHitTurn = state.turn;
-    tile.encampHp = Math.max(0, (tile.encampHp ?? ENCAMPMENT_HP) - split.centre);
-  } else {
-    tile.encampHp = Math.max(0, (tile.encampHp ?? ENCAMPMENT_HP) - dmgToEncamp);
-  }
+  tile.encampHp = Math.max(0, (tile.encampHp ?? ENCAMPMENT_HP)
+    - encampSplit(state, tile, attacker, dmgToEncamp, false));
+  if (tile.encampHp <= 0) conquerEncampment(state, tile, attacker, seat);
   attacker.hp -= dmgToAttacker;
   attacker.movesLeft = 0;
   warWearinessBattle(state, attacker.seat, tileSeat(tile), tileIndex,
@@ -1000,10 +1057,12 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     return cityStateAttackable(state, cityState, unitSeat(attacker)) ? cityState : undefined;
   })();
 
-  // A live enemy Encampment is a target in its own right. Checked
-  // BEFORE the "nothing to attack" bail and AFTER the unit scan, so a garrison
-  // standing on the district is fought first (real Civ 6 hits the unit).
-  const encamp = enemies.length === 0 ? encampmentDefense(state, attacker, target) : null;
+  // A live enemy Encampment is the target WHOEVER stands on it. CIV6 (Combat):
+  // "A unit may take shelter (that is, avoid being attacked) if it enters a
+  // City Center or Encampment tile. There it is invulnerable as long as the
+  // city/Encampment stands" — the same district-first rule the centre gets
+  // below, and the conquest is what destroys the shelterers.
+  const encamp = encampmentDefense(state, attacker, target);
   if (enemies.length === 0 && !seatTarget && !cityStateTarget && !encamp) {
     const civCityHere = cityAtIndex(state, targetIndex);
     if (civCityHere && !civsAtWar(state, unitSeat(attacker), civCityHere.holder.seat)) {
@@ -1235,6 +1294,11 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     awardCityXp(state, attacker, civCity.city.hp <= 1 ? XP_CITY_FELLED : XP_CITY_ATTACK);
     return ok;
   }
+  const encampR = encampmentDefense(state, attacker, target);
+  if (encampR) {
+    rangedStrikeEncampment(state, attacker, targetIndex, encampR.defCS, relCity, 'rnge');
+    return ok;
+  }
   const cityState = cityStateAt(state, targetIndex);
   // Bombardment needs a war exactly as melee does, and asks the SAME
   // question — `cityStateAttackable`, suzerain clause included. This arm
@@ -1312,6 +1376,13 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
     awardCityXp(state, attacker, enemyCity.hp <= 1 ? XP_CITY_FELLED : XP_CITY_ATTACK);
     return;
   }
+  const encampV = encampmentDefense(state, attacker, target);
+  if (encampV) {
+    rangedStrikeEncampment(
+      state, attacker, targetIndex, encampV.defCS,
+      CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0, 'vrnge');
+    return;
+  }
   // A RANGED unit does not engage another civ's units — the ranged-vs-civ
   // scope-out, the same predicate `attackTargets` applies. A civ unit standing
   // on a centre this strike could otherwise reach therefore makes the strike a
@@ -1375,7 +1446,9 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
       !def.ranged &&
       cityStateAttackable(state, cityStateHere, unitSeat(unit));
 
-    const encampTarget = d === 1 && !def.ranged && encampmentBlocks(state, t, unit);
+    // A district's defenses are a RANGED target too, at the same -17 every
+    // city perimeter costs; melee still has to be adjacent.
+    const encampTarget = encampmentBlocks(state, t, unit) && (def.ranged ? true : d === 1);
     if (hasEnemy || cityTarget || cityStateTarget || encampTarget) out.push(t.index);
   }
   return out;
@@ -1585,9 +1658,12 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     unit.movesLeft = 0;
     return;
   }
+  // CIV6: the Encampment "cannot be pillaged normally" — it is conquered by a
+  // melee unit instead, which pillages it at the assault site.
   if (
     here.district !== null &&
     here.district !== 'CITY_CENTER' &&
+    here.district !== 'ENCAMPMENT' &&
     here.districtComplete &&
     !here.districtPillaged &&
     hereOwned
@@ -1608,6 +1684,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     const distJob =
       t.district !== null &&
       t.district !== 'CITY_CENTER' &&
+      t.district !== 'ENCAMPMENT' &&
       t.districtComplete &&
       !t.districtPillaged;
     if (!impJob && !distJob) continue;

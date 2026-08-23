@@ -429,9 +429,11 @@ WW_BATTLE_KEYS = frozenset({
     "csty",     # melee vs a city-state centre - seat 0 AND a civ seat
     "rcty",     # melee assault on ANY seat's city - the one cityAssault
     "enc",      # melee assault on ANY seat's Encampment district
-    "vrngc",    # hostile ranged vs a seat-0 city
-    "rngrc",    # seat-0 ranged vs a civ-seat city
-    "rngcs",    # seat-0 ranged vs a city-state centre
+    "vrngc",    # hostile ranged vs ANY seat's city
+    "vrnge",    # hostile ranged vs ANY seat's Encampment district
+    "rngrc",    # ordered ranged vs ANY seat's city
+    "rnge",     # ordered ranged vs ANY seat's Encampment district
+    "rngcs",    # ordered ranged vs a city-state centre
     "cstk",     # ANY seat's city walls strike
     "estk",     # ANY seat's city Encampment strike
     "air",      # an AIR STRIKE on a unit - the sortie's own roll

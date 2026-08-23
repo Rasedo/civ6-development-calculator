@@ -1217,7 +1217,10 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           }
           spendPillage();
         } else if (
+          // CIV6: the Encampment "cannot be pillaged normally" -- a melee unit
+          // conquers it instead, and that assault is what pillages it.
           hereOwned && here.district && here.district !== 'CITY_CENTER' &&
+          here.district !== 'ENCAMPMENT' &&
           here.districtComplete && !here.districtPillaged
         ) {
           here.districtPillaged = true;

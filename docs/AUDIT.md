@@ -73,22 +73,20 @@ nothing carries forward.
 | B-57r the SNIPE head stops at the distance-2 ring | 1 | a +1 Range promotion widens what the rule legalises and no seat can ORDER the shot, because the ring-3 columns do not exist |
 | B-58r the religious purchase asks for a Shrine | 1 | Civ 6 asks for a MAJORITY RELIGION and a Holy Site with a Temple; both engines ask for a Shrine and never read what the city follows |
 | B-59r the religious spread is a flat lump | 2 | Civ 6 scales the pressure by the Apostle's HP and strips a quarter of every other religion; both engines add a constant and strip nothing without Proselytizer |
-| B-51r the Encampment's second pool | 1 | the district meets the city's perimeter and heals only while its tile is clear; Civ 6 tracks the two pools SEPARATELY, and a defeat pillages it |
+| B-51r the Encampment's second pool | 2 | the assault conquers the district and its shelterers now; the SEPARATE perimeter pool is an unsourced claim, and a district a SHOT has emptied is walk-over ground where Civ 6 has a melee unit conquer it on entry |
 | B-44r city-state war tails | 1 | the head, its policy, a SEAT's march on a minor and the declaration's grievances all ship; the barbarian walker still raids only majors because it beelines to one nearest city |
 | B-61r the Great Person clauses with no carrier | 2 | the roster is placed and used; 20 of the 205 rows name a mechanic nothing here has, and eight effect channels the sweep found were dropped with their blockers |
 | B-60r the dig's DATE, and the hull nobody dates | 1 | the artifact's civilization is the event's own now; its ERA is still the ACTING seat's research, and a barbarian or minor sinking a hull leaves no wreck at all |
 | B-34r flood tails | 1 | the severity ladder, the river's whole reach, the river-scoped shield and the Dam all ship; the per-tile flood count and the climate/coastal tails do not |
 | B-63r the grievance ledger's magnitudes | 1 | every sourced act pays the pair, the favor penalty and the era decay run, and PUBLIC RELATIONS scales what an act generates; the occupied and razed rows ship at their published CEILING because no pop or war-type scale is published, and the AI's gang-up bar is a heuristic |
 | B-62r a natural wonder takes no tile adds | 1 | the wonder's roster yields are the whole tile: no pantheon feature yield, no suzerain improvement adjacency and no Preserve band, though the Grove's own text pays any adjacent unimproved Breathtaking tile |
-| **B. Fidelity vs real Civ 6** | **30** | |
+| **B. Fidelity vs real Civ 6** | **31** | |
 | C-1 POWER | 2 | the grid, the three plants, Cardiff, the Hydroelectric Dam, the powered-yield split, the FUEL and its CO2 all ship; four renewable improvements and the Biosphere have no carrier, nothing can retire a plant, and a minor's cities are never powered |
 | C-2 diplomatic agreements | 3 | friendship, alliances, open borders, the closed border and the work gift ship on one 30-turn clock; alliance TYPES and LEVELS, the negotiated two-sided deal, and the four agreements that need one are open |
 | C-5 strategic-resource stockpiles | 2 | the bank, its ceiling, the unit and project charges, the plants' fuel, unit FUEL upkeep and the heal a lost source denies all ship; the shortage penalty's magnitude is unpublished and trading resources waits on C-2 |
 | C-6 policy-card modifiers | 1 | two of the 49 cards are inert, each blocked on a system below |
 | C-7 trading posts | 2 | a route lays roads and plants nothing |
 | C-8 draws made deterministic | 2 | the Great Person replacement walks a queue and the Congress slate rotates, where Civ 6 draws both |
-| C-13 ranged vs districts/cities | 2 | a scope-out on both, with the rest of the Encampment complete |
-| C-15 garrison does not block capture | 2 | the move-onto-centre capture model is what is missing |
 | C-16 the spy's second half | 2 | the Spy, its capacity, the jump and all twelve missions ship; the escape-and-capture sequence, the spy promotion pool and two missions with no carrier do not |
 | C-17 embarked movement never upgrades | 1 | the flat EMBARK_MOVES stands in for every era |
 | C-20 the Military Engineer's build list | 1 | the Fort, the Airstrip, the road and the 20% charge all ship; the Missile Silo waits on C-31, the Mountain Tunnel on C-35 and the railroad on C-36 |
@@ -107,8 +105,8 @@ nothing carries forward.
 | C-34 air combat's second half | 2 | bases, both heads, the sortie and the scatter ship; Interception, Patrol and Priority Target — the whole reason a fighter exists — do not |
 | C-35 the land/water fact never moves | 2 | one static bit answers "is this sea", "can a hull stand here" and "is this coastal"; no tile can become water, which is what submersion and the Canal's passage each need |
 | C-36 no railroad | 2 | roads are one boolean tier; the railroad's own movement rate, its per-hex Iron and Coal charge and its CO2 have no carrier, which C-20's fifth verb and C-24's third emitter both wait on |
-| **C. Absent systems** | **48** | |
-| **OPEN, TOTAL** | **79** | |
+| **C. Absent systems** | **44** | |
+| **OPEN, TOTAL** | **76** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -855,19 +853,47 @@ Civ 6 source or is recorded as unverifiable.
   parent City Center, excluding any bonus obtained for a Garrisoned unit". Its
   heal now carries the sourced gate too: it regains 20 HP "if its tile is not
   occupied", and the moment it does its tile blocks again.
+  The district is also a TARGET in its own right, and the tile's occupant is
+  not: CIV6 (Combat) says "A unit may take shelter (that is, avoid being
+  attacked) if it enters a City Center or Encampment tile. There it is
+  invulnerable as long as the city/Encampment stands; however, when an enemy
+  destroys/takes the city/Encampment, the unit inside will be destroyed
+  instantly, regardless of its remaining HP." Both engines fought whoever
+  stood on the district first; they now answer with the district, melee and
+  shot alike, and the melee assault that empties the pool CONQUERS it — the
+  page's "cannot be pillaged normally - they have to be 'conquered' by a melee
+  unit, as you would a City Center. At this point the entire district and all
+  buildings in it are automatically pillaged, but you don't gain any spoils
+  from it", with the shelterers razed by the same body a captured centre uses.
+  A shot prices the district instead of refusing it, at the sourced "-17
+  penalty when attacking city and district defenses", and never conquers. The
+  PILLAGE verb no longer offers an Encampment on either engine.
   REACHABILITY: the walls half of that strength was true of the GPU and NOT of
   TS until the driven gate reached an assault on a walled Encampment (seed
   9014, t170) — the entry asserted it for both engines while one of them read
   `Math.max(15, bestMeleeCS)` alone. `siege.test.ts`'s "defends at its city's
-  WALLS tier" lane and `encampment_test.py`'s `test_district_defence_terms`
-  are the bar now.
+  WALLS tier" lane, `encampment_test.py`'s district pokes and
+  `city-combat.test.ts`'s "an Encampment under attack" are the bar now.
   OPEN:
-  - **THE TWO POOLS ARE ONE HERE.** Real Civ 6 gives the district its own
-    perimeter pool of the same size as the city's — you can beat down the
-    Encampment's walls while the centre's still stand, and the repair project
-    restores both. This model folds them into the city's pool, so damage to
-    either is damage to both. Splitting them is new per-tile wire state and a
-    second `outerHp` on every defensible district.
+  - **THE TWO POOLS ARE ONE HERE.** This model folds the district's perimeter
+    into the city's, so damage to either is damage to both, and the claim that
+    Civ 6 keeps them SEPARATE is UNSOURCED: the Encampment page says only
+    "Acquires Outer Defenses and Ranged Strike along with the City Center once
+    Walls have been built", and neither it nor Ancient Walls says whether the
+    two pools are one or two, nor whether a repair restores them together.
+    Settle the claim before splitting them — the split is new per-tile wire
+    state and a second `outerHp` on every defensible district.
+  - **A DEFENSELESS DISTRICT IS WALK-OVER GROUND.** Only a melee ASSAULT
+    conquers here. A ranged strike can take `encampHp` to 0 without pillaging,
+    and the movement block lifts on that alone, so a foreign unit then walks
+    onto an intact enemy district and nothing happens. Real Civ 6 conquers it
+    on ENTRY by a melee unit ("as you would a City Center"), and the district
+    page's block reads "unless the district is pillaged" rather than "unless
+    its defenses are down". What a NON-melee unit may do with such a tile is
+    unsourced on both pages. The conquest body exists on both engines
+    (`conquerEncampment` / `_conquer_encampment`); what is missing is the
+    entry hook, and on TS `stepUnit` lives in `units.ts`, which `combat.ts`
+    already imports.
   - **A DEFEAT DOES NOT PILLAGE THE DISTRICT.** Civ 6: "when defeated (the
     Encampment's HP is brought down to 0), it and all its buildings are
     pillaged automatically". Writing that here would silence the clause above
@@ -1313,16 +1339,6 @@ number was under-counting by treating deferrals as closures.
     (`seats`' own header says so). It draws from the same era window either
     way, so this is the ORDER of the slate, not its contents. B-22r carries
     the rest of the Congress residuals.
-- **C-13. RANGED STRIKES DO NOT ENGAGE DISTRICTS OR CITIES.** Weight 2.
-  Recorded as a scope-out for both. The rest of the Encampment (`encamp_hp`
-  pool, movement block, garrison pool, district strike, training XP) is
-  complete, which is what makes the missing arm visible.
-- **C-15. A GARRISON DOES NOT BLOCK A CAPTURE.** Weight 2. Real Civ 6 takes a
-  city by moving a melee unit ONTO the centre, so a defender there must die
-  first. Here the centre falls at 0 HP and CITY-FIRST targeting never makes
-  the garrison attackable on its own, so blocking would deadlock — the
-  deadlock is the symptom; the missing piece is the move-onto-centre capture
-  model, and both halves are open.
 - **C-16. THE SPY'S SECOND HALF.** Weight 2. The Spy itself is a system on
   both engines: the capacity ladder, the jump between revealed foreign
   centres, the eleven-row mission catalog with its two heads, the level

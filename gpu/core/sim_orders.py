@@ -390,20 +390,20 @@ class SimOrders:
                     melee = self._type_ranged_strength[ut] <= 0
                     # meleeAttackInner's precedence as DISJOINT arms (a legal
                     # column landing in none of them is a silent no-op):
-                    #   1. a live enemy Encampment — only with the tile clear of
-                    #      hostile units and no centre on it (`rangedAttack` has
-                    #      no district arm at all),
+                    #   1. a live enemy Encampment, WHOEVER stands on it — a
+                    #      unit sheltering there is invulnerable while the
+                    #      district holds,
                     #   2. a MAJOR centre under city-first,
                     #   3. a CITY-STATE centre under city-first,
                     #   4. the unit resolver.
                     enc_t = (
                         self._encamp_block(tc.unsqueeze(1), row).squeeze(1)
-                        & melee & ~host_m & ~host_c & ~city_t & ~cs_t
+                        & ~city_t & ~cs_t
                         if self._encamp_didx >= 0 else torch.zeros_like(valid)
                     )
                     city_hit = city_t
                     cs_hit = cs_t & ~city_t
-                    unit_hit = (host_m | host_c) & ~city_hit & ~cs_hit
+                    unit_hit = (host_m | host_c) & ~city_hit & ~cs_hit & ~enc_t
                     _css = self.citystate_at.gather(1, tc.unsqueeze(1)).squeeze(1).clamp(min=0)
                     for b_ in valid.nonzero(as_tuple=True)[0].tolist():
                         v = int(sc[b_])
@@ -1161,10 +1161,14 @@ class SimOrders:
                 rng_u = (self._type_ranged_range[self.barb_unit_type[:, u].clamp(min=0, max=self.NU - 1)]
                          + self._promo_pool_val("barb", "RANGE")[:, u])
                 d_all = self.pair_dist[here.clamp(min=0)].to(torch.long)
+                # a district's defenses are a target at range, priced by the
+                # -17 rather than refused; the centre stays adjacent-only.
+                _enc_plane = (self._encamp_block_plane(BARB_SEAT) if self._encamp_didx >= 0
+                              else torch.zeros_like(self.centre_slot_at, dtype=torch.bool))
                 rng_valid = (
                     (d_all >= 1)
                     & (d_all <= rng_u.unsqueeze(1))
-                    & self._nonbarb_unit_plane()
+                    & (self._nonbarb_unit_plane() | _enc_plane)
                 ) | ((d_all == 1) & (self.centre_slot_at >= 0))
                 rng_key = torch.where(rng_valid, self._arange_bt, self._tile_miss)
                 target_tile = torch.where(rngd, rng_key.min(dim=1).values, target_tile)
@@ -1172,28 +1176,26 @@ class SimOrders:
             ttc = target_tile.clamp(max=T - 1)
             ctr_here = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0
             has_u = self._nonbarb_unit_at(ttc.unsqueeze(1)).squeeze(1)
-            city_att = attack & ~rngd & ctr_here
-            unit_att = attack & ~rngd & has_u & ~ctr_here
-            enc_att = (
-                attack
-                & ~rngd
-                & ~ctr_here
-                & ~has_u
-                & self._encamp_block(ttc.unsqueeze(1), BARB_SEAT).squeeze(1)
+            _enc_here = (
+                self._encamp_block(ttc.unsqueeze(1), BARB_SEAT).squeeze(1)
                 if self._encamp_didx >= 0
-                else None
+                else torch.zeros_like(attack)
             )
+            city_att = attack & ~rngd & ctr_here
+            # the district shelters whoever stands on it, so it answers first
+            unit_att = attack & ~rngd & has_u & ~ctr_here & ~_enc_here
+            enc_att = attack & ~rngd & ~ctr_here & _enc_here
 
             if bool(city_att.any()):
                 self._melee_city(city_att, ttc, "barb", u)
             if bool(unit_att.any()):
                 self._hostile_vs_unit(unit_att, ttc, "barb", u)
-            if enc_att is not None and bool(enc_att.any()):
+            if bool(enc_att.any()):
                 self._attack_encampment(enc_att, ttc, "barb", u)
             # A blow at a CITY or an Encampment ends the raider's turn
             # outright; the unit arms spend inside their own bodies, where the
             # promotion that waives it is read.
-            city_spent = city_att | (enc_att if enc_att is not None else torch.zeros_like(city_att))
+            city_spent = city_att | enc_att
             self.barb_unit_mp[:, u] = torch.where(
                 city_spent, torch.zeros_like(self.barb_unit_mp[:, u]), self.barb_unit_mp[:, u])
             # A RANGED raider strikes instead: hostileUnitAct routes any
@@ -1233,7 +1235,10 @@ class SimOrders:
                 h_dunpil = ~self.district_pillaged.gather(1, here.unsqueeze(1)).squeeze(1)
                 _hd_seat = self.tile_seat.gather(1, here.unsqueeze(1)).squeeze(1)
                 h_downed = (_hd_seat >= 0) & (_hd_seat < self.n_majors)
-                dist_pillage = act & ~attack & ~pillage & (h_dist >= 0) & h_dcomp & h_dunpil & h_downed
+                # CIV6: the Encampment "cannot be pillaged normally".
+                dist_pillage = (act & ~attack & ~pillage & (h_dist >= 0)
+                                & (h_dist != self._encamp_didx)
+                                & h_dcomp & h_dunpil & h_downed)
                 if bool(dist_pillage.any()):
                     rows = dist_pillage.nonzero(as_tuple=True)[0]
                     self.district_pillaged[rows, here[rows]] = True
@@ -1252,7 +1257,8 @@ class SimOrders:
                 _owned = (self.tile_seat >= 0) & (self.tile_seat < BARB_SEAT)  # [B, T]
                 imp_job = (self.improvement >= 0) & ~self.pillaged & _owned  # [B, T]
                 if self.districts_on:  # pillageable districts join the union
-                    imp_job = imp_job | ((self.district >= 0) & self.district_complete & ~self.district_pillaged & _owned)
+                    imp_job = imp_job | ((self.district >= 0) & (self.district != self._encamp_didx)
+                                         & self.district_complete & ~self.district_pillaged & _owned)
                 d_imp = self.pair_dist[here].to(torch.long)
                 ikey = torch.where(imp_job & (d_imp < 13), d_imp * (T + 1) + arangeT, self._march_miss)
                 imp_min, imp_tgt = ikey.min(dim=1)

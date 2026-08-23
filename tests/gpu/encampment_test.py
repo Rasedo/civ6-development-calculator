@@ -3,20 +3,17 @@
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/encampment_test.py
 
-Covers three Encampment surfaces on the GPU engine (the TS twin is
-tests/cpu/city/encampment.test.ts; scripted parity is the primary correctness
-bar — these pokes are gate-unreachable-surface coverage):
+The Encampment surfaces on the GPU engine (the TS twins are
+tests/cpu/city/encampment.test.ts and tests/cpu/units/city-combat.test.ts;
+scripted parity is the primary correctness bar — these pokes are
+gate-unreachable-surface coverage):
 
-  1. Training-XP catalog: _b_train_xp exports 5/5/10/15 for
-     BARRACKS/STABLE/ARMORY/MILITARY_ACADEMY and 0 for every other building.
-  2. Training XP wiring: _spawn_unit honours init_xp on every row — a
-     MILITARY unit inherits the city's best Encampment tier, a civilian stays
-     at 0.
-  3. The ADDITIONAL Encampment strike: a seat-0 city owning a COMPLETE
-     unpillaged Encampment fires a once/turn ranged strike (k="estk") at the
-     nearest hostile unit; removing the Encampment (control) removes the
-     strike. A city with BOTH walls and an Encampment rolls TWICE — walls first
-     (k="cstk"), then Encampment (k="estk").
+  1. The training-XP catalog and its wiring through _spawn_unit's init_xp.
+  2. The ADDITIONAL Encampment strike (k="estk"), which a city with Walls
+     fires SECOND, and which a breached perimeter silences.
+  3. The district AS A TARGET: its defence terms, the perimeter split it
+     shares with the centre, the shelter rule, the melee conquest and the two
+     shot bodies that never conquer, and the PILLAGE verb it is absent from.
 
 An AT-WAR civ unit is the strike target: civ units do NOT act in
 the shared per-city body directly, so the target is stationary and the strike
@@ -396,6 +393,133 @@ def test_civ_encamp_prod_mult(rules, path) -> None:
     print(f"  civ encampHarborProdMult OK (x2 on the Encampment head: {plain} -> {doubled})")
 
 
+def _assault_scene(rules, path, ranged: bool = False):
+    """A seat-0 Encampment at full pool with a seat-0 unit SHELTERING on it and
+    a hostile seat-1 attacker adjacent. Returns
+    (sim, enc_tile, atk_slot, shelter_slot, atk_tile)."""
+    sim, enc_tile, _tgt, _v = build_strike_scene(rules, path)
+    free = [int(t) for t in sim.neigh[enc_tile].tolist()
+            if t >= 0 and bool(sim.passable[0, t]) and int(sim.military_at[0, t]) < 0]
+    assert free, "no free tile beside the Encampment"
+    melee_ty = next(i for i in range(sim.NU)
+                    if bool(sim._type_melee[i]) and not bool(sim._type_civilian[i]))
+    if ranged:
+        ty = next(i for i in range(sim.NU)
+                  if int(sim._type_ranged_strength[i]) > 0
+                  and int(sim._type_bombard[i]) <= 0
+                  and not bool(sim._type_civilian[i]))
+    else:
+        ty = melee_ty
+    atk = int(sim.unit_next[0]); sim.unit_next[0] = atk + 1
+    sim.major_unit_alive[0, atk] = True
+    sim.major_unit_seat[0, atk] = 1
+    sim.major_unit_type[0, atk] = ty
+    sim.major_unit_tile[0, atk] = free[0]
+    sim.major_unit_hp[0, atk] = 100
+    sim.military_at[0, free[0]] = atk + sim.POOL_LO["major"]
+    # the SHELTERER: the district owner's own unit standing on the district
+    sh = int(sim.unit_next[0]); sim.unit_next[0] = sh + 1
+    sim.major_unit_alive[0, sh] = True
+    sim.major_unit_seat[0, sh] = 0
+    sim.major_unit_type[0, sh] = melee_ty
+    sim.major_unit_tile[0, sh] = enc_tile
+    sim.major_unit_hp[0, sh] = 100
+    sim.military_at[0, enc_tile] = sh + sim.POOL_LO["major"]
+    sim.encamp_hp[0, enc_tile] = sim._encamp_hp_max
+    return sim, enc_tile, atk, sh, free[0]
+
+
+def test_district_shelter(rules, path) -> None:
+    """CIV6 (Combat): "A unit may take shelter (that is, avoid being attacked)
+    if it enters a City Center or Encampment tile. There it is invulnerable as
+    long as the city/Encampment stands." The blow lands on the DISTRICT."""
+    sim, enc_tile, atk, sh, _ = _assault_scene(rules, path)
+    tile = torch.full((sim.B,), enc_tile, dtype=torch.long, device=sim.device)
+    one = torch.tensor([True], device=sim.device)
+    sim.city_outer_hp[0, 0, 0] = 0        # breached, so the roll reaches the pool
+    sim._attack_encampment(one, tile, "major", atk)
+    assert int(sim.major_unit_hp[0, sh]) == 100, \
+        f"the sheltering unit took {100 - int(sim.major_unit_hp[0, sh])} damage"
+    assert int(sim.encamp_hp[0, enc_tile]) < sim._encamp_hp_max, "the district took nothing"
+    assert int(sim.major_unit_hp[0, atk]) < 100, "the district never hit back"
+    print("  district shelter OK: the pool takes the blow, the unit on it is untouched")
+
+
+def test_district_conquest(rules, path) -> None:
+    """CIV6 (Combat): the Encampment "cannot be pillaged normally - they have to
+    be 'conquered' by a melee unit ... At this point the entire district and all
+    buildings in it are automatically pillaged", and a unit sheltering there
+    "will be destroyed instantly, regardless of its remaining HP"."""
+    sim, enc_tile, atk, sh, atk_tile = _assault_scene(rules, path)
+    tile = torch.full((sim.B,), enc_tile, dtype=torch.long, device=sim.device)
+    one = torch.tensor([True], device=sim.device)
+    sim.city_outer_hp[0, 0, 0] = 0
+    sim.encamp_hp[0, enc_tile] = 1
+    sim._attack_encampment(one, tile, "major", atk)
+    assert int(sim.encamp_hp[0, enc_tile]) == 0, "the pool survived a full roll at 1 HP"
+    assert bool(sim.district_pillaged[0, enc_tile]), "the conquered district was not pillaged"
+    assert not bool(sim.major_unit_alive[0, sh]), "the shelterer survived the conquest"
+    assert int(sim.military_at[0, enc_tile]) < 0, "the tile still registers the dead shelterer"
+    assert bool(sim.major_unit_alive[0, atk]), "the attacker died"
+    assert int(sim.major_unit_tile[0, atk]) == atk_tile, "the attacker advanced onto the district"
+    print("  district conquest OK: pillaged, shelterer destroyed, no advance")
+
+
+def test_district_ranged(rules, path) -> None:
+    """CIV6 (Combat): "Ranged attacks receive a -17 penalty when attacking city
+    and district defenses" — a shot prices the district rather than refusing it,
+    and it never conquers (only a melee unit does)."""
+    sim, enc_tile, atk, sh, _ = _assault_scene(rules, path, ranged=True)
+    tile = torch.full((sim.B,), enc_tile, dtype=torch.long, device=sim.device)
+    one = torch.tensor([True], device=sim.device)
+    sim.city_outer_hp[0, 0, 0] = 0
+    sim.encamp_hp[0, enc_tile] = 1
+    fired = sim._ranged_attack(one, tile, "major", atk, 1)
+    assert bool(fired[0]), "the shot never fired at the district"
+    assert int(sim.encamp_hp[0, enc_tile]) == 0, "the shot never reached the pool"
+    assert not bool(sim.district_pillaged[0, enc_tile]), "a SHOT conquered the district"
+    assert bool(sim.major_unit_alive[0, sh]), "a shot destroyed the sheltering unit"
+    assert int(sim.major_unit_hp[0, sh]) == 100, "a shot damaged the sheltering unit"
+    assert int(sim.major_unit_hp[0, atk]) == 100, "a ranged strike took retaliation"
+
+    # the SNIPE body is a different one: `_hostile_ranged_strike`, key "vrnge"
+    sim2, enc2, atk2, sh2, _ = _assault_scene(rules, path, ranged=True)
+    t2 = torch.full((sim2.B,), enc2, dtype=torch.long, device=sim2.device)
+    sim2.city_outer_hp[0, 0, 0] = 0
+    sim2.encamp_hp[0, enc2] = 1
+    sim2._hostile_ranged_strike(torch.tensor([True], device=sim2.device), t2, "major", atk2)
+    assert int(sim2.encamp_hp[0, enc2]) == 0, "the autonomous strike never reached the pool"
+    assert not bool(sim2.district_pillaged[0, enc2]), "a SNIPE conquered the district"
+    assert bool(sim2.major_unit_alive[0, sh2]), "a SNIPE destroyed the sheltering unit"
+    print("  district ranged OK: both shot bodies take the pool to 0, neither conquers")
+
+
+def test_pillage_never_offers_the_district(rules, path) -> None:
+    """The verb the conquest replaces: with the pool shot to 0 the block lifts
+    and a hostile unit can stand on the district, but PILLAGE is still not on
+    offer — a melee assault is the only way it comes down."""
+    sim, enc_tile, atk, sh, atk_tile = _assault_scene(rules, path)
+    sim.encamp_hp[0, enc_tile] = 0
+    sim.major_unit_alive[0, sh] = False
+    sim.military_at[0, atk_tile] = -1
+    sim.military_at[0, enc_tile] = atk + sim.POOL_LO["major"]
+    sim.major_unit_tile[0, atk] = enc_tile
+    gslot = atk + sim.POOL_LO["major"]
+
+    def _pillage_offered() -> bool:
+        m = sim._seat_unit_mask(1)
+        rank = int((sim._seat_slot_map(1)[0] == gslot).nonzero(as_tuple=True)[0][0])
+        return bool(m[0, rank, sim._A_PILLAGE])
+
+    assert not _pillage_offered(), "PILLAGE was offered on an Encampment"
+    other = next(i for i, d in enumerate(sim.districts_cat)
+                 if d.get("id") not in ("ENCAMPMENT", "CITY_CENTER"))
+    sim.district[0, enc_tile] = other
+    sim._eff_version += 1
+    assert _pillage_offered(), "control: PILLAGE must be offered on any other district"
+    print("  pillage exclusion OK: no column on an Encampment, one on every other district")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -408,6 +532,10 @@ def main() -> None:
     test_district_perimeter(rules, paths[0])
     test_district_defence_terms(rules, paths[0])
     test_district_heal_gate(rules, paths[0])
+    test_district_shelter(rules, paths[0])
+    test_district_conquest(rules, paths[0])
+    test_district_ranged(rules, paths[0])
+    test_pillage_never_offers_the_district(rules, paths[0])
     test_civ_encamp_prod_mult(rules, paths[0])
     print("ENCAMPMENT OK")
 
