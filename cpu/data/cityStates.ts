@@ -79,6 +79,7 @@ export type SuzEffect =
   | 'harborPower'        // Cardiff
   | 'faithBuildings'     // Valletta
   | 'wallsFullDamage'    // Akkad
+  | 'routePostGold'      // Bandar Brunei
   | 'suzImprovement';    // Caguana / La Venta / Armagh
 
 /** The WIRE order the exported `suzCode` indexes — append only. */
@@ -89,6 +90,7 @@ export const SUZ_EFFECTS: SuzEffect[] = [
   // the three whose whole perk is "your Builders can build X improvements",
   // which `validImprovementsIn`'s suzerain block answers off `suzerainOf`.
   'suzImprovement',
+  'routePostGold',
 ];
 
 /** Cardiff: "Cities receive +2 Power for every Harbor building." Renewable,
@@ -134,7 +136,7 @@ export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   Caguana: { name: 'Caguana', type: 'cultural', bonus: 'Your Builders can build Batey improvements.', suz: 'suzImprovement' },
   Venice: { name: 'Venice', type: 'trade', bonus: 'Your Trade Routes to foreign cities earn +1 Gold for each Luxury resource at the destination.', channel: 'gold', note: 'the destination luxury count is not a route term here; the flat channel stands in' },
   Zanzibar: { name: 'Zanzibar', type: 'trade', bonus: 'Receive the Cinnamon and Cloves Luxury resources. These cannot be earned any other way in the game, and provide 6 Amenities each.', channel: 'gold', note: 'two luxuries that exist nowhere else on the map; the flat channel stands in' },
-  'Bandar Brunei': { name: 'Bandar Brunei', type: 'trade', bonus: 'Your Trading Posts in foreign cities provide +1 Gold to your Trade Routes passing through or going to the city.', channel: 'gold', note: 'TRADING POSTS are not modeled — a route lays roads and pays yields, it plants nothing' },
+  'Bandar Brunei': { name: 'Bandar Brunei', type: 'trade', bonus: 'Your Trading Posts in foreign cities provide +1 Gold to your Trade Routes passing through or going to the city.', suz: 'routePostGold', note: 'the GOING-TO half; a route stores no path, so the PASSING-THROUGH half has no carrier' },
   Hunza: { name: 'Hunza', type: 'trade', bonus: 'Receive +1 Gold for every 5 tiles a Trade Route travels.', channel: 'gold', note: 'the Trader walks a real path now, but the gold channel is FLAT — the per-5-tiles scaling stands in' },
   'Hong Kong': { name: 'Hong Kong', type: 'industrial', bonus: 'Your Cities get +20% bonus Production towards city projects.', channel: 'production', note: 'a PROJECT-only production multiplier; the flat channel stands in' },
   'Buenos Aires': { name: 'Buenos Aires', type: 'industrial', bonus: 'Your bonus resources behave like luxury resources, providing +1 Amenity per resource.', channel: 'amenities' },
@@ -163,7 +165,6 @@ export const CITY_STATE_SUZERAIN_LIVE: Record<string, YieldKey> = {
   'Nan Madol': 'culture',
   Venice: 'gold',
   Zanzibar: 'gold',
-  'Bandar Brunei': 'gold',
   'Hong Kong': 'production',
   Ngazargamu: 'production',
 };

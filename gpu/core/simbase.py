@@ -610,6 +610,7 @@ _MUTABLE = [
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dseat", "seat_route_dcity",  # international dest (seat row, city id), else -1/-1 (domestic/CS)
     "seat_route_born", "seat_route_walk", "seat_route_leg",  # the Trader's walk (birth turn, tile, leg)
+    "trading_post",  # Trading Posts by (major row, centre tile)
     "city_id",
     "unit_next",
     "gp_earned", "gp_next", "civ_gp_used", "civ_gp_perm", "civ_gp_lux", "civ_gp_lux_n", "city_gp_perm", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",

@@ -458,6 +458,9 @@ const SEAT: Record<string, Extractor> = {
     rows.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3]);
     return rows.flat();
   }),
+  // sorted centre tiles — `stampTradingPost` keeps the array sorted, and
+  // the GPU's nonzero scan is ascending by construction.
+  tradingPosts: overSeats((s) => [...(s.tradingPosts ?? [])]),
   prophets: overSeats((s) => prophetsOf(s)),
   gpUsed: overSeats((s) => (s.gpActivated ?? []).length),
   gpPerm: overSeats((s) => GP_PERM.map((_k: string, i: number) => s.gpPerm?.[i] ?? 0)),

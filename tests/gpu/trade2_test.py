@@ -364,9 +364,106 @@ def main() -> None:
     assert not bool(s9.road[0, wt]), "the walk must lay no road on water"
     print("  the sea leg steps onto water and lays no road there")
 
+    # --- TRADING POSTS: the stamp, the chain, and the destination gold ---
+    # CIV6 (Trading Post): stamped in "the origin and destination cities"
+    # when a route runs its FULL term; each own post extends range one more
+    # leg; a foreign destination's post pays +1 gold (+1 under Bandar
+    # Brunei's suzerain).
+    s10 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    assert "trading_post" in _MUTABLE and s10.trading_post.dtype == torch.bool
+    assert tuple(s10.trading_post.shape) == (s10.B, s10.n_majors, s10.T)
+    row10 = 0
+    s10.civ_techs[:, row10, s10._celestial_tech] = False
+    s10.civ_techs[:, row10, s10._cartography_tech] = False  # land ranges only
+    colA = int(s10.city_alive[0, row10].nonzero()[0])
+    oA = int(s10.city_center[0, row10, colA])
+    rngL = s10._trade_range
+    # a mid tile one leg out and a target one leg beyond IT, over land range
+    mid = tgt = -1
+    for m in range(s10.T):
+        if int(s10.pair_dist[oA, m]) != rngL:
+            continue
+        far = ((s10.pair_dist[oA] > rngL) & (s10.pair_dist[m] <= rngL)).nonzero(as_tuple=True)[0]
+        if len(far) > 0:
+            mid, tgt = m, int(far[0])
+            break
+    assert mid >= 0, "no chainable (mid, target) pair on this map"
+    reach0 = s10._route_reach_from(row10)
+    assert bool(reach0[0, colA, mid]) and not bool(reach0[0, colA, tgt])
+    # a post with NO city at its centre chains nothing
+    s10.trading_post[0, row10, mid] = True
+    r_dead = s10._route_reach_from(row10)
+    assert not bool(r_dead[0, colA, tgt]), "a post with no living city must not chain"
+    # a living city at the post's centre opens the second leg
+    row_b = 1
+    col_b = int(s10.city_alive[0, row_b].nonzero()[0])
+    s10.city_center[0, row_b, col_b] = mid
+    r_live = s10._route_reach_from(row10)
+    assert bool(r_live[0, colA, tgt]), "an own post at a living city must extend one leg"
+    # a post at the ORIGIN's own centre is excluded from the chain
+    s10.trading_post[0, row10, mid] = False
+    s10.trading_post[0, row10, oA] = True
+    r_self = s10._route_reach_from(row10)
+    assert not bool(r_self[0, colA, tgt]), "a post at the origin itself must not extend"
+    s10.trading_post[0, row10, oA] = False
+    # ANOTHER row's post never chains for this row
+    s10.trading_post[0, row_b, mid] = True
+    r_other = s10._route_reach_from(row10)
+    assert not bool(r_other[0, colA, tgt]), "another civilization's post must not chain"
+    s10.trading_post[0, row_b, mid] = False
+    print("  the post chain: own posts at living cities only, origin excluded")
+
+    # destination gold: 0 bare, 1 with a post, 2 under Bandar Brunei's suzerain
+    csc10 = int(s10.citystate_center[0, 0])
+    dest_t = torch.tensor([[csc10]], dtype=torch.long)
+    assert int(s10._route_post_gold(row10, dest_t)[0, 0]) == 0
+    s10.trading_post[0, row10, csc10] = True
+    assert int(s10._route_post_gold(row10, dest_t)[0, 0]) == 1
+    assert int(s10._route_post_gold(row_b, dest_t)[0, 0]) == 0, "the post pays its OWNER only"
+    s10.seat_citystate_envoys[0, :, 1] = 0
+    s10.seat_citystate_envoys[0, row10, 1] = 3
+    s10.citystate_suz_code[0, 1] = s10._suz_c_route_post
+    s10._eff_version += 1
+    assert int(s10._route_post_gold(row10, dest_t)[0, 0]) == 2, "Bandar Brunei pays the destination again"
+    # the CS-leg income carries it: route colA -> CS 0
+    s10.seat_routes[0, row10, 0, 0] = int(s10.city_id[0, row10, colA])
+    s10.seat_routes[0, row10, 0, 1] = -2
+    s10.seat_route_exp[0, row10, 0] = int(s10.turn) + 5
+    inc_post = s10._seat_route_income(row10)
+    assert inc_post is not None
+    g_post = float(inc_post[0, colA, 2])
+    s10.trading_post[0, row10, csc10] = False
+    s10._eff_version += 1
+    g_bare = float(s10._seat_route_income(row10)[0, colA, 2])
+    assert abs((g_post - g_bare) - 2.0) < 1e-9, (g_post, g_bare)
+    print("  destination post gold: +1, +1 more under Brunei, on the CS leg income")
+
+    # COMPLETION stamps both endpoints; a dest-dead drop stamps nothing
+    s11 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    colC = int(s11.city_alive[0, 0].nonzero()[0])
+    oC = int(s11.city_center[0, 0, colC])
+    csC = int(s11.citystate_center[0, 0])
+    s11.seat_routes[0, 0, 0, 0] = int(s11.city_id[0, 0, colC])
+    s11.seat_routes[0, 0, 0, 1] = -2
+    s11.seat_route_exp[0, 0, 0] = int(s11.turn)  # term arrived
+    s11.seat_route_leg[0, 0, 0] = -1  # parked: always home
+    s11._expire_seat_routes(0)
+    assert int(s11.seat_routes[0, 0, 0, 0]) < 0, "the completed route must drop"
+    assert bool(s11.trading_post[0, 0, oC]) and bool(s11.trading_post[0, 0, csC]),         "completion must stamp BOTH endpoints"
+    s11.trading_post[0, 0, :] = False
+    s11.seat_routes[0, 0, 0, 0] = int(s11.city_id[0, 0, colC])
+    s11.seat_routes[0, 0, 0, 1] = -1
+    s11.seat_route_dseat[0, 0, 0] = 1
+    s11.seat_route_dcity[0, 0, 0] = 10 ** 6  # names no living city: dest GONE
+    s11.seat_route_exp[0, 0, 0] = int(s11.turn) + 5
+    s11._expire_seat_routes(0)
+    assert int(s11.seat_routes[0, 0, 0, 0]) < 0, "the dest-dead route must drop"
+    assert not bool(s11.trading_post[0, 0].any()), "a route cut short must stamp nothing"
+    print("  completion stamps both endpoints; a dest-dead drop stamps nothing")
+
     print("trade2_test OK — intl gold(+specialty)/gold-only, war-cancel with Trader return, "
           "round-trip expiry, walk + plunder, candidate/apply spend, "
-          "(seat, city) dest keying incl. a capture, sea legs, _MUTABLE round-trip")
+          "(seat, city) dest keying incl. a capture, sea legs, trading posts, _MUTABLE round-trip")
 
 
 if __name__ == "__main__":

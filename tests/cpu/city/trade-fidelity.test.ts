@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, setTileOwner, tileSeat } from '../../../cpu/core/seats';
+import { cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, tileSeat } from '../../../cpu/core/seats';
 import { settleAt, makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { tilesWithin } from '../../../world/hex';
-import { canAddTradeRoute, freeTrader, tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, specialtyDistricts, cityMaritime, tradeRouteRange, TRADE_ROUTE_DURATION, TRADE_ROUTE_RANGE_LAND, TRADE_ROUTE_RANGE_SEA, INTL_ROUTE_GOLD } from '../../../cpu/core/trade';
+import { canAddTradeRoute, freeTrader, tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, specialtyDistricts, cityMaritime, tradeRouteRange, routeInRange, stampTradingPost, routePostGold, TRADE_ROUTE_DURATION, TRADE_ROUTE_RANGE_LAND, TRADE_ROUTE_RANGE_SEA, INTL_ROUTE_GOLD } from '../../../cpu/core/trade';
 import { tradeWalkReachable, tradeWaterLevel, TRADE_WATER_NONE, TRADE_WATER_COAST } from '../../../cpu/core/units';
 import { isWater } from '../../../world/query';
 import { hexDistance } from '../../../world/hex';
@@ -12,7 +12,7 @@ import { routeCandidateRow } from '../../../cpu/driver/driver';
 import { spawnUnit, trainableUnits, traderCost } from '../../../cpu/core/units';
 import { UNITS } from '../../../cpu/data/units';
 import { TECHS } from '../../../cpu/data/techs';
-import type { City, GameState, Seat } from '../../../cpu/core/types';
+import type { City, CityState, CityStateType, GameState, Seat } from '../../../cpu/core/types';
 
 // A sandbox of two seat-0 cities where the origin holds a Market (so
 // tradeCapacity >= 1) and the destination holds a completed specialty district.
@@ -300,7 +300,7 @@ describe('the Trader unit', () => {
     // ...which is still not enough without Celestial Navigation
     expect(canAddTradeRoute(state, origin.id, far.id, 0).ok).toBe(false);
     seatOf(state, 0)!.research.techs.push('CELESTIAL_NAVIGATION');
-    expect(tradeRouteRange(state, 0, origin.centerIndex, far.centerIndex, origin, far))
+    expect(tradeRouteRange(state, 0, origin.centerIndex, far.centerIndex))
       .toBe(TRADE_ROUTE_RANGE_SEA);
     expect(canAddTradeRoute(state, origin.id, far.id, 0).ok).toBe(true);
 
@@ -395,5 +395,118 @@ describe('the route candidate weighs every destination at once', () => {
       state.map.tiles[far.cities[0].centerIndex].row)).toBeGreaterThan(TRADE_ROUTE_RANGE_LAND);
     const cand = routeCandidateRow(state, state.seats[0]);
     expect(cand[1]).toBe(near.centerIndex);
+  });
+});
+/** a city-state from the REAL catalog — `suzerainEffect` keys on the name. */
+function addNamedCs(state: GameState, name: string, type: CityStateType, col: number, row: number, envoys: Record<number, number> = {}): CityState {
+  const center = tileAtCoords(state.map, col, row);
+  const cs: CityState = {
+    ...emptySeat(seatOfCityState(state.cityStates.length)),
+    id: state.cityStates.length,
+    name,
+    type,
+    centerIndex: center.index,
+    population: 3,
+    envoys,
+    met: [0, 1],
+  };
+  setTileOwner(center, seatOfCityState(cs.id));
+  state.cityStates.push(cs);
+  return cs;
+}
+
+describe('trading posts', () => {
+  // CIV6 (Trading Post): "created in a city when a civilization finishes a
+  // Trade Route to that city for the first time" — and one at home, "in the
+  // origin and destination cities".
+  it('stampTradingPost keeps the list sorted and append-once', () => {
+    const owner = { ...emptySeat(0) };
+    stampTradingPost(owner, 40);
+    stampTradingPost(owner, 12);
+    stampTradingPost(owner, 40);
+    stampTradingPost(owner, -1);
+    expect(owner.tradingPosts).toEqual([12, 40]);
+  });
+
+  it('a route completing its FULL term stamps posts at BOTH endpoints', () => {
+    const { state, origin, dest } = twoCitySandbox();
+    state.turn = 1;
+    addTradeRoute(state, origin.id, dest.id, 0);
+    state.seats[0].tradeRoutes![0].walkLeg = -1; // parked: always home
+    state.turn = 1 + TRADE_ROUTE_DURATION;
+    seatPhase(state);
+    expect(state.seats[0].tradeRoutes!.length).toBe(0);
+    expect(state.seats[0].tradingPosts).toEqual(
+      [origin.centerIndex, dest.centerIndex].sort((a, b) => a - b));
+  });
+
+  it('a route cut short (destination gone) stamps nothing', () => {
+    const state = makeState(makeMap(24, 24));
+    state.sandbox = true;
+    const pcity = foundCity(state, tileAtCoords(state.map, 10, 10).index, 0).city!;
+    const civ = addCiv(state, 13, 10);
+    civ.cities[0].buildings.push('MARKET');
+    expect(addIntlTradeRoute(state, civ.cities[0].id, 0, pcity.id, civ.seat).ok).toBe(true);
+    state.seats[0].cities = []; // the destination city dies mid-term
+    seatPhase(state);
+    expect(civ.tradeRoutes!.length).toBe(0);
+    expect(civ.tradingPosts ?? []).toEqual([]);
+  });
+
+  // CIV6 (Trading Post): "If a Trade Route reaches a city with a Trading
+  // Post, it may then continue up to 15 additional tiles to reach another
+  // city" — and a civilization "cannot make use of Trading Posts established
+  // by other civilizations".
+  it('routeInRange chains one leg-range at a time through the seat OWN posts', () => {
+    const state = makeState(makeMap(24, 24));
+    state.sandbox = true;
+    const origin = foundCity(state, tileAtCoords(state.map, 2, 6).index, 0).city!;
+    const mid = foundCity(state, tileAtCoords(state.map, 11, 6).index, 0).city!;
+    const far = foundCity(state, tileAtCoords(state.map, 20, 6).index, 0).city!;
+    origin.buildings.push('MARKET');
+    expect(routeInRange(state, 0, origin.centerIndex, far.centerIndex)).toBe(false); // 18 > 15
+    expect(canAddTradeRoute(state, origin.id, far.id, 0).ok).toBe(false);
+    stampTradingPost(state.seats[0], mid.centerIndex);
+    expect(routeInRange(state, 0, origin.centerIndex, far.centerIndex)).toBe(true);
+    expect(canAddTradeRoute(state, origin.id, far.id, 0).ok).toBe(true);
+    // the chain reads the OWNER's posts alone
+    expect(routeInRange(state, 1, origin.centerIndex, far.centerIndex)).toBe(false);
+    // a post whose city has died chains nothing
+    state.seats[0].cities = state.seats[0].cities.filter((c) => c.id !== mid.id);
+    expect(routeInRange(state, 0, origin.centerIndex, far.centerIndex)).toBe(false);
+  });
+
+  it('a post at the origin own centre never extends the chain', () => {
+    const state = makeState(makeMap(24, 24));
+    state.sandbox = true;
+    const origin = foundCity(state, tileAtCoords(state.map, 2, 6).index, 0).city!;
+    foundCity(state, tileAtCoords(state.map, 20, 6).index, 0);
+    stampTradingPost(state.seats[0], origin.centerIndex);
+    expect(routeInRange(state, 0, origin.centerIndex,
+      tileAtCoords(state.map, 20, 6).index)).toBe(false);
+  });
+
+  // CIV6 (Trading Post): "Each foreign Trading Post also adds +1 Gold to the
+  // yields of every Trade Route which passes through this city"; Bandar
+  // Brunei's suzerain: "+1 Gold to your Trade Routes passing through or
+  // going to the city".
+  it('routePostGold pays +1 at a posted destination, +1 more under Bandar Brunei', () => {
+    const state = makeState(makeMap(24, 24));
+    state.sandbox = true;
+    const pcity = foundCity(state, tileAtCoords(state.map, 10, 10).index, 0).city!;
+    const civ = addCiv(state, 13, 10);
+    civ.cities[0].buildings.push('MARKET');
+    expect(addIntlTradeRoute(state, civ.cities[0].id, 0, pcity.id, civ.seat).ok).toBe(true);
+    const gold = () => cityTradeYields(state, civ.cities[0], 0).gold;
+    const bare = gold();
+    expect(routePostGold(state, civ.seat, pcity.centerIndex)).toBe(0);
+    stampTradingPost(civ, pcity.centerIndex);
+    expect(routePostGold(state, civ.seat, pcity.centerIndex)).toBe(1);
+    expect(gold()).toBe(bare + 1);
+    // seat 0 holds no post there — the post pays its OWNER only
+    expect(routePostGold(state, 0, pcity.centerIndex)).toBe(0);
+    addNamedCs(state, 'Bandar Brunei', 'trade', 3, 3, { [civ.seat]: 3 });
+    expect(routePostGold(state, civ.seat, pcity.centerIndex)).toBe(2);
+    expect(gold()).toBe(bare + 2);
   });
 });

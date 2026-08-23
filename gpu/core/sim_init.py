@@ -247,6 +247,7 @@ class SimInit:
         self._suz_c_harbor_pow = _sfx.index("harborPower") if "harborPower" in _sfx else -1
         self._suz_c_walls_full = _sfx.index("wallsFullDamage") if "wallsFullDamage" in _sfx else -1
         self._suz_c_faith_bldg = _sfx.index("faithBuildings") if "faithBuildings" in _sfx else -1
+        self._suz_c_route_post = _sfx.index("routePostGold") if "routePostGold" in _sfx else -1
         self._suz_xp_mult_k = int(_suz["xpMult"])
         self._suz_hill_cs = int(_suz["hillCs"])
         self._suz_reach_bonus = int(_suz["reachBonus"])
@@ -636,6 +637,11 @@ class SimInit:
         self.seat_route_born = torch.full((B, self.n_majors + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
         self.seat_route_walk = torch.full((B, self.n_majors + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
         self.seat_route_leg = torch.full((B, self.n_majors + s_pad + 1, k_routes), -1, dtype=torch.long, device=device)
+        # CIV6 (Trading Post): one bool per (major row, CENTRE tile) — the row
+        # holds a Trading Post there. Stamped at both endpoints when a route
+        # runs its FULL term; the chain and gold readers gate on a living city
+        # still standing at the centre.
+        self.trading_post = torch.zeros(B, self.n_majors, T, dtype=torch.bool, device=device)
         self._alloc_cs_pairs(B, self.n_majors, s_pad, device)
 
         self.centre_slot_at = torch.full((B, T), -1, dtype=torch.long, device=device)

@@ -20,7 +20,7 @@ import { availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } f
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { selectResearch } from './economy';
 import { getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
-import { addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from './trade';
+import { addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, stampTradingPost, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from './trade';
 import { addEnvoys, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, setMet, sueForPeaceWithCityState } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPES } from '../data/cityStates';
 import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
@@ -1731,7 +1731,17 @@ export function seatPhase(state: GameState): void {
       const destGone = (x: TradeRoute): boolean =>
         x.toSeatCity !== undefined && !(seatOf(state, x.toSeat ?? NO_SEAT)?.cities ?? []).some((c) => c.id === x.toSeatCity);
       const done = cur.filter((x) => isDone(x));
-      if (done.length > 0) dedicationEvent(state, actor.seat, DED_COINAGE, done.length);
+      if (done.length > 0) {
+        dedicationEvent(state, actor.seat, DED_COINAGE, done.length);
+        // CIV6 (Trading Post): "created in a city when a civilization
+        // finishes a Trade Route to that city for the first time" -- and one
+        // at home, "in the origin and destination cities". Only a FULL term
+        // stamps; a plundered or dest-dead route plants nothing.
+        for (const r of done) {
+          stampTradingPost(actor, actor.cities.find((c) => c.id === r.from)?.centerIndex ?? -1);
+          stampTradingPost(actor, routeDestCenter(state, actor, r));
+        }
+      }
       const ended = cur.filter((x) => isDone(x) || destGone(x));
       if (ended.length > 0) {
         // a route that ENDS (completes, or loses its destination) hands its

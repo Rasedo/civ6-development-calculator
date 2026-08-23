@@ -471,6 +471,9 @@ SEAT = {
         sum(1 for r in sim.seat_routes[b, _seat_row(sim, c)].tolist() if r[0] >= 0) for c in rows
     ],
     "routes": lambda sim, b, rows: [_routes_of(sim, b, c) for c in rows],
+    "tradingPosts": lambda sim, b, rows: [
+        sim.trading_post[b, _seat_row(sim, c)].nonzero(as_tuple=True)[0].tolist() for c in rows
+    ],
     "prophets": _civ_scalar("civ_prophets"),
     "gpUsed": _civ_scalar("civ_gp_used"),
     "gpPerm": lambda sim, b, rows: [[int(x) for x in sim.civ_gp_perm[b, c].tolist()] for c in rows],

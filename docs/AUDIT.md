@@ -56,11 +56,11 @@ nothing carries forward.
 | A-1r the district registry holds ONE tile per TYPE | 1 | a repeatable district's per-type columns are counted once on the GPU and per instance on TS; every such column is zero today, so nothing diverges yet |
 | **A. Engine vs engine** | **1** | |
 | B-20r tourism tails | 1 | theming, the open-borders dig and the work GIFT all ship; the Naturalist's progressive cost is unsourced |
-| B-21r suzerain rows | 1 | nine perks are rules and Geneva's channel is a PEACE channel; the residual descoped rows all need whole absent systems |
+| B-21r suzerain rows | 1 | eleven perks are rules and Geneva's channel is a PEACE channel; the residual descoped rows all need whole absent systems |
 | B-22r World Congress | 2 | 17 of the 21 regular resolutions ship, emergencies run as special sessions and a tie falls to the committed favor; four resolutions and the scored competitions have no carrier, and peace TERMS wait on the negotiated deal (C-2) |
 | B-24r Ages/governors | 1 | all twelve dedications ship, both faces; dark-age policies, governor promotions and per-civ era drift do not |
 | B-30r specialists | 1 | the mechanic, both citizen overrides and the three-plant Industrial tier ship; a LOCK still outlives the city that set it |
-| B-31r trade-route tails | 1 | sea legs and the whole-destination-set candidate ship; no trading posts, plunder gold is a stylization, the summed-yield key is a heuristic and the free-choice head is P8's |
+| B-31r trade-route tails | 1 | sea legs, trading posts and the whole-destination-set candidate ship; the pass-through half of the post gold has no carrier, plunder gold is a stylization, the summed-yield key is a heuristic and the free-choice head is P8's |
 | B-53r the great-person queue | 1 | 205 sourced people, the era gate, the scaled price and each person's own ability ship; the offer is re-derived each turn rather than frozen, and faith never patronizes one |
 | B-D unsourced data values | 2 | the Monument, the Lighthouse and the Engineer's Armory shipped and one bullet was false; the governments are half-shipped, and the rest are shape differences or model tuning that no source can close |
 | B-36r appeal adjacency terms | 1 | every district AND improvement term ships off one catalog column, and a Great Person can now grant a city's tiles appeal; the CIVILIZATION-unique improvements' terms (C-26) do not |
@@ -84,7 +84,6 @@ nothing carries forward.
 | C-2 diplomatic agreements | 3 | friendship, alliances, open borders, the closed border and the work gift ship on one 30-turn clock; alliance TYPES and LEVELS, the negotiated two-sided deal, and the four agreements that need one are open |
 | C-5 strategic-resource stockpiles | 2 | the bank, its ceiling, the unit and project charges, the plants' fuel, unit FUEL upkeep and the heal a lost source denies all ship; the shortage penalty's magnitude is unpublished and trading resources waits on C-2 |
 | C-6 policy-card modifiers | 1 | two of the 49 cards are inert, each blocked on a system below |
-| C-7 trading posts | 2 | a route lays roads and plants nothing |
 | C-8 draws made deterministic | 2 | the Great Person replacement walks a queue and the Congress slate rotates, where Civ 6 draws both |
 | C-16 the spy's second half | 2 | the Spy, its capacity, the jump and all twelve missions ship; the escape-and-capture sequence, the spy promotion pool and two missions with no carrier do not |
 | C-20 the Military Engineer's build list | 1 | the Fort, the Airstrip, the road and the 20% charge all ship; the Missile Silo waits on C-31, the Mountain Tunnel on C-35 and the railroad on C-36 |
@@ -102,8 +101,8 @@ nothing carries forward.
 | C-34 air combat's second half | 2 | bases, both heads, the sortie and the scatter ship; Interception, Patrol and Priority Target — the whole reason a fighter exists — do not |
 | C-35 the land/water fact never moves | 2 | one static bit answers "is this sea", "can a hull stand here" and "is this coastal"; no tile can become water, which is what submersion and the Canal's passage each need |
 | C-36 no railroad | 2 | roads are one boolean tier; the railroad's own movement rate, its per-hex Iron and Coal charge and its CO2 have no carrier, which C-20's fifth verb and C-24's third emitter both wait on |
-| **C. Absent systems** | **41** | |
-| **OPEN, TOTAL** | **71** | |
+| **C. Absent systems** | **39** | |
+| **OPEN, TOTAL** | **69** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -253,18 +252,20 @@ Civ 6 source or is recorded as unverifiable.
   The culture victory is further out of reach than the pre-freeze note
   said, not closer — parks cannot move it while the civic that unlocks
   them sits past the horizon.
-- **B-21r. City-state suzerain rows:** ten perks are RULES (`SUZ_EFFECTS`,
+- **B-21r. City-state suzerain rows:** eleven perks are RULES (`SUZ_EFFECTS`,
   both engines): Kabul double attack XP, Preslav cavalry-on-hills CS, Mexico
   City regional reach, Anshan works science, Kumasi per-specialty route
   yields, Jerusalem Holy-Site pressure, Yerevan's free Apostle promotion
   choice, Vilnius's era Inspiration, Cardiff's +2 Power per Harbor building,
-  and Akkad's "melee and anti-cavalry units' attacks do full damage to the
+  Akkad's "melee and anti-cavalry units' attacks do full damage to the
   city's walls" — the Battering Ram's own bit, at every walls tier and with
-  no support unit present (`siegeAssist` / `_siege_assist`). The remaining catalog rows carry their reason in their
+  no support unit present (`siegeAssist` / `_siege_assist`) — and Bandar
+  Brunei's +1 gold at a posted destination, riding the Trading Posts of
+  B-31r (`routePostGold` / `_route_post_gold`). The remaining catalog rows carry their reason in their
   `CITY_STATE_SUZERAIN_BONUS` entry's `note`, and the roster is now
   current-ruleset throughout (see B-D), so the stand-ins are whole absent
-  systems (trading posts, unique improvements/luxuries, a faith-purchase
-  class, a gold-purchase discount, a per-district Great Person channel) or a
+  systems (unique improvements/luxuries, a faith-purchase class, a
+  gold-purchase discount, a per-district Great Person channel) or a
   flat channel standing in for a %-scaling. ONE of those flat channels is
   CONDITIONAL and now says so: Geneva's reads "when you are not at war with
   any civilization", so `cityStateSuzerainCapitalBonus` /
@@ -482,9 +483,24 @@ Civ 6 source or is recorded as unverifiable.
   on land", and roads are laid on land tiles only. `walkLeg` -1 has shrunk to
   the pairs NO descent reaches at all.
   Open:
-  - TRADING POSTS are still not founded — the only thing that extends range in
-    real Civ 6 ("{{TradeRoute6}} range cannot be enhanced via technology"), and
-    no per-post gold at repeat destinations (Bandar Brunei's row waits on them).
+  - TRADING POSTS ship. A route that runs its FULL term stamps the owner's
+    post at both endpoints ("in the origin and destination cities" —
+    `stampTradingPost` / `trading_post`, a per-(major, centre-tile) plane in
+    the digest); a route may CHAIN one extra leg-range through each OWN post
+    standing at a living city ("cannot make use of Trading Posts established
+    by other civilizations" — `routeInRange` / `_route_reach_from`, each leg
+    at that leg's own land/sea range, a post at the origin's own centre
+    excluded); and a posted DESTINATION pays the route +1 gold, +1 more
+    under Bandar Brunei's suzerain (`routePostGold` / `_route_post_gold`),
+    a term the candidate key also carries. Reachability: the STAMP fires in
+    every rollout (routes complete throughout — the Coinage dark face
+    scores them), while a CHAINED pick needs a far pair bridged by a posted
+    mid city, which the fixed seeds need not contain; the poke tests pin
+    the chain, the exclusions and both gold magnitudes directly. OPEN: the
+    PASS-THROUGH half of the post gold ("+1 Gold to the yields of every
+    Trade Route which passes through this city") has no carrier — a route
+    stores its endpoints and a walking Trader, never the cities it passes,
+    so only the destination's post pays; blocked on a stored route PATH.
   - A city-state's maritime access is its CENTRE's alone: a city-state cannot
     build a Harbor in this model, so the district half of the test has nothing
     to read on that side.
@@ -1285,9 +1301,6 @@ number was under-counting by treating deferrals as closures.
     that reweights envoys BY the current suzerain has no fixed point.
   - `TOTAL_WAR` ships its plunder half and not its pillage half — blocked on
     C-27, where pillaging banks nothing to raise.
-- **C-7. TRADING POSTS — a route lays roads and plants nothing.** Weight 2.
-  Gaps: Bandar Brunei's suzerain row; the water-route RANGE refuel and the
-  per-post gold at repeat destinations (B-31r).
 - **C-8. RANDOM DRAWS THE MODEL MAKES DETERMINISTIC.** Weight 2. The class
   was re-censused against the code rather than against this entry, and three
   of the four things it used to name were already drawing: the belief race

@@ -785,6 +785,17 @@
           "note": "per-route [fromTile, destTile, kind, expiresTurn, createdTurn, walkTile, walkLeg], sorted; destinations in CENTRE-TILE space because city ids are not compared. The walk triple IS the Trader while it services the route."
         },
         {
+          "name": "tradingPosts",
+          "compare": "exact",
+          "covers": [
+            "Seat.tradingPosts"
+          ],
+          "planes": [
+            "trading_post"
+          ],
+          "note": "sorted centre tiles where the seat holds a Trading Post — stamped at both endpoints when a route runs its full term"
+        },
+        {
           "name": "scienceTotal",
           "compare": "milli",
           "covers": [

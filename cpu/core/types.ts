@@ -456,6 +456,10 @@ export interface Seat {
    *  and `denounceCasusBelli` are the two readings. */
   denounced: Record<number, number>;
   tradeRoutes?: TradeRoute[];
+  /** CIV6 (Trading Post): centre tiles where this civ holds one — stamped at
+   *  both endpoints when a route runs its full term. Sorted, append-once;
+   *  readers gate on a living city standing at the centre. */
+  tradingPosts?: number[];
 }
 
 /** One active trade route. Established by the route WIRE verb (spending a

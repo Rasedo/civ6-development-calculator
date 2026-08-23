@@ -3914,6 +3914,11 @@ class SimSeats:
                 kf = kum.double().unsqueeze(1) * pc * spec_o
                 inc.scatter_add_(1, from_j * 6 + 4, self._suz_route_cul * kf)
                 inc.scatter_add_(1, from_j * 6 + 2, self._suz_route_gold * kf)
+            # the destination's Trading Post gold (`_route_post_gold`) —
+            # added AFTER the yield, so Sovereignty does not double it
+            pg_c = self._route_post_gold(row, self.citystate_center[:, :S].gather(1, css))
+            if bool((pg_c > 0).any()):
+                inc.scatter_add_(1, from_j * 6 + 2, pg_c.double() * pays_c.double())
         # INTERNATIONAL legs: a route to ANY OTHER MAJOR's city
         # (seat_route_dcity >= 0) pays intlGold + the dest city's completed
         # specialty count to GOLD only.
@@ -3948,6 +3953,9 @@ class SimSeats:
             # TRADE POLICY outcome A pays the SENDER for every route that ends
             # at the named seat.
             gold_i = gold_i + self._congress_trade_gold(self.seat_route_dseat[:, row])
+            # the destination's Trading Post gold (`_route_post_gold`)
+            _dctr = self.city_center.gather(1, _rx).gather(2, _col).squeeze(2)  # [B, K]
+            gold_i = gold_i + self._route_post_gold(row, _dctr).double()
             pays_i = intl & has_from & valid_dest
             inc.scatter_add_(1, from_j * 6 + 2, gold_i * pays_i.double())
         inc = inc.reshape(B, cols, 6)
@@ -6938,6 +6946,93 @@ class SimSeats:
         return torch.where(wide, torch.full_like(wide, self._trade_sea_range, dtype=torch.long),
                            torch.full_like(wide, self._trade_range, dtype=torch.long))
 
+    def _centre_maritime_map(self) -> torch.Tensor:
+        """[B, T] bool — `centreMaritime` per TILE: coastal land, or a MAJOR's
+        living city stands there with a complete Harbor (a city-state's access
+        is its centre's coast alone — it cannot build one)."""
+        B, T, dev = self.B, self.T, self.device
+        acc = torch.zeros(B, T, dtype=torch.long, device=dev)
+        if self._harbor_didx >= 0:
+            for r2 in range(self.n_majors):
+                ht = self.city_dist_tile[:, r2, :, self._harbor_didx]
+                hb = (ht >= 0) & self.district_complete.gather(1, ht.clamp(min=0)) & self.city_alive[:, r2]
+                acc.scatter_add_(1, self.city_center[:, r2].clamp(min=0), hb.long())
+        return self.coastal_land | (acc > 0)
+
+    def _centre_city_map(self) -> torch.Tensor:
+        """[B, T] bool — `centreHasCity`: a LIVING city (any major's, or a
+        city-state) stands at this centre tile."""
+        B, T, dev = self.B, self.T, self.device
+        acc = torch.zeros(B, T, dtype=torch.long, device=dev)
+        for r2 in range(self.n_majors):
+            acc.scatter_add_(1, self.city_center[:, r2].clamp(min=0), self.city_alive[:, r2].long())
+        if self.S > 0:
+            acc.scatter_add_(1, self.citystate_center[:, :self.S].clamp(min=0), self.citystate_alive[:, :self.S].long())
+        return acc > 0
+
+    def _route_reach_from(self, row: int) -> torch.Tensor:
+        """[B, RC, T] bool — for each of this row's city slots as ORIGIN,
+        every tile a route may END at (`routeInRange`'s twin): one leg of
+        `_trade_pair_range`, or a CHAIN through the seat's OWN Trading Posts.
+        CIV6 (Trading Post): "If a Trade Route reaches a city with a Trading
+        Post, it may then continue up to 15 additional tiles to reach another
+        city. If that city also has a Trading Post, the route may extend a
+        further 15 tiles, and so on" — and a civilization "cannot make use of
+        Trading Posts established by other civilizations", so the walk is over
+        this row's posts alone, each leg at that leg's own land/sea range, a
+        post at the origin's own centre excluded. Post hops run per batch row,
+        gated on the row holding any post at a living city."""
+        RC, T, dev = self.RC, self.T, self.device
+        centers = self.city_center[:, row].clamp(min=0)  # [B, RC]
+        mar_t = self._centre_maritime_map()  # [B, T]
+        ok = self.pair_dist[centers].to(torch.long) <= self._trade_pair_range(
+            row, mar_t.gather(1, centers).unsqueeze(2), mar_t.unsqueeze(1))  # [B, RC, T]
+        if row >= self.n_majors or not bool(self.trading_post[:, row].any()):
+            return ok
+        posts_ok = self.trading_post[:, row] & self._centre_city_map()  # [B, T]
+        sea = self._trade_water_level(row) > 0  # [B]
+        land_t = torch.full((T,), self._trade_range, dtype=torch.long, device=dev)
+        for b in posts_ok.any(dim=1).nonzero(as_tuple=True)[0].tolist():
+            posts = posts_ok[b].nonzero(as_tuple=True)[0].tolist()
+            mb = mar_t[b]
+            sb = bool(sea[b])
+            sea_t = torch.where(mb, torch.full_like(land_t, self._trade_sea_range), land_t)
+
+            def leg_ok(a: int, c: int) -> bool:
+                rng = self._trade_sea_range if sb and bool(mb[a]) and bool(mb[c]) else self._trade_range
+                return int(self.pair_dist[a, c]) <= rng
+
+            for i in range(RC):
+                if not bool(self.city_alive[b, row, i]):
+                    continue
+                o = int(centers[b, i])
+                use = [p for p in posts if p != o]
+                reached: list[int] = []
+                frontier = [o]
+                while frontier:
+                    a = frontier.pop()
+                    for p in use:
+                        if p not in reached and leg_ok(a, p):
+                            reached.append(p)
+                            frontier.append(p)
+                for p in reached:
+                    rp = sea_t if sb and bool(mb[p]) else land_t
+                    ok[b, i] |= self.pair_dist[p].to(torch.long) <= rp
+        return ok
+
+    def _route_post_gold(self, row: int, dest_ct: torch.Tensor) -> torch.Tensor:
+        """`routePostGold`, shaped like `dest_ct` ([B, ...] CENTRE tiles) —
+        CIV6 (Trading Post): "Each foreign Trading Post also adds +1 Gold to
+        the yields of every Trade Route which passes through this city" — the
+        DESTINATION's post here (a route stores no path, so a pass-through
+        city has no carrier); Bandar Brunei's suzerain pays the same
+        destination again."""
+        if row >= self.n_majors:
+            return torch.zeros_like(dest_ct)
+        post = self.trading_post[:, row].gather(1, dest_ct.clamp(min=0).reshape(self.B, -1)).reshape(dest_ct.shape)
+        amt = 1 + self._suz_effect(row, self._suz_c_route_post).long()
+        return post.long() * amt.reshape((self.B,) + (1,) * (dest_ct.dim() - 1))
+
     def _seat_trade_phase(self, row: int, active: torch.Tensor) -> None:
         """The seatPhase trade block, for EVERY seat row: the WALK and PLUNDER
         engine rules, then the wire's route intent (the DECISION lives with
@@ -7134,8 +7229,8 @@ class SimSeats:
     def _apply_route(self, row: int, frm: torch.Tensor, dst: torch.Tensor) -> None:
         """Apply the wire's route intent for seat row `row` — [origin CENTRE,
         dest code (a CENTRE tile, or -(2+csIndex))]. Re-validates what canAdd*
-        validates — origin resolves, capacity, no duplicate, range, a free
-        Trader — then SPENDS the Trader and creates the route: exp = turn +
+        validates — origin resolves, capacity, no duplicate, range (chained
+        through the seat's own Trading Posts), a free Trader — then SPENDS the Trader and creates the route: exp = turn +
         the era minimum, born = turn, the walker at the origin, leg 0 on a
         land path (road on the origin) or -1 parked (a sea route)."""
         B, S, dev = self.B, self.S, self.device
@@ -7156,9 +7251,7 @@ class SimSeats:
             return
         o_id = ids.gather(1, o_j.unsqueeze(1)).squeeze(1)
         o_ct = centers.gather(1, o_j.unsqueeze(1)).squeeze(1)
-        mar = self._city_maritime(row)
-        mar_o = mar.gather(1, o_j.unsqueeze(1)).squeeze(1)
-        d = self.pair_dist[o_ct.clamp(min=0), dst.clamp(min=0)].to(torch.long)
+        reach_o = self._route_reach_from(row)[torch.arange(B, device=dev), o_j]  # [B, T]
         to_code = torch.full((B,), -1, dtype=torch.long, device=dev)
         dseat = torch.full((B,), -1, dtype=torch.long, device=dev)
         dcity = torch.full((B,), -1, dtype=torch.long, device=dev)
@@ -7171,7 +7264,7 @@ class SimSeats:
             d_j = dm.long().argmax(dim=1)
             d_id = ids.gather(1, d_j.unsqueeze(1)).squeeze(1)
             dup = ((rr[:, :, 0] == o_id.unsqueeze(1)) & (rr[:, :, 1] == d_id.unsqueeze(1))).any(dim=1)
-            dom = dom & ~dup & (d <= self._trade_pair_range(row, mar_o, mar.gather(1, d_j.unsqueeze(1)).squeeze(1)))
+            dom = dom & ~dup & reach_o.gather(1, dst.clamp(min=0).unsqueeze(1)).squeeze(1)
             to_code = torch.where(dom, d_id, to_code)
             dest_ct = torch.where(dom, dst, dest_ct)
             take = take | dom
@@ -7180,10 +7273,8 @@ class SimSeats:
             csi = (-(dst + 2)).clamp(min=0, max=S - 1)
             met = self.seat_citystate_met[:, row, :S].gather(1, csi.unsqueeze(1)).squeeze(1)
             csc = self.citystate_center[:, :S].gather(1, csi.unsqueeze(1)).squeeze(1)
-            d_cs = self.pair_dist[o_ct.clamp(min=0), csc.clamp(min=0)].to(torch.long)
             dupc = ((rr[:, :, 0] == o_id.unsqueeze(1)) & (rr[:, :, 1] == dst.unsqueeze(1))).any(dim=1)
-            mar_cs = self.coastal_land.gather(1, csc.clamp(min=0).unsqueeze(1)).squeeze(1)
-            cs_ok = ok & (dst <= -2) & ((-(dst + 2)) < S) & met & ~dupc & (d_cs <= self._trade_pair_range(row, mar_o, mar_cs))
+            cs_ok = ok & (dst <= -2) & ((-(dst + 2)) < S) & met & ~dupc & reach_o.gather(1, csc.clamp(min=0).unsqueeze(1)).squeeze(1)
             to_code = torch.where(cs_ok, dst, to_code)
             dest_ct = torch.where(cs_ok, csc, dest_ct)
             take = take | cs_ok
@@ -7207,8 +7298,7 @@ class SimSeats:
                     & (self.seat_route_dseat[:, row] == r2)
                     & (self.seat_route_dcity[:, row] == id2.unsqueeze(1))
                 ).any(dim=1)
-                mar2 = self._city_maritime(r2).gather(1, j2.unsqueeze(1)).squeeze(1)
-                hit2 = hit2 & ~dupi & ~self._congress_intl_banned(r2)                     & (d <= self._trade_pair_range(row, mar_o, mar2))
+                hit2 = hit2 & ~dupi & ~self._congress_intl_banned(r2)                     & reach_o.gather(1, dst.clamp(min=0).unsqueeze(1)).squeeze(1)
                 dseat = torch.where(hit2, torch.full_like(dseat, r2), dseat)
                 dcity = torch.where(hit2, id2, dcity)
                 dest_ct = torch.where(hit2, dst, dest_ct)
@@ -7306,7 +7396,8 @@ class SimSeats:
         on ONE key, the route's TOTAL yields — domestic
         2 + 2*floor(specialtyDistricts(dest)/2), a city-state's flat
         gold+specialty, an international `intlGold + specialtyDistricts(dest)`
-        — with strictly-greater-beats semantics, so ties keep the FIRST pair
+        — each FOREIGN key plus `_route_post_gold` at its destination —
+        with strictly-greater-beats semantics, so ties keep the FIRST pair
         in that flat scan order. Gated on capacity AND a free Trader — the
         unit the verb spends. Slot order IS TS array order for every row."""
         B, RC, S, dev = self.B, self.RC, self.S, self.device
@@ -7323,7 +7414,7 @@ class SimSeats:
         spec = (comp & self._is_specialty.reshape(1, 1, -1)).sum(dim=2)  # [B, RC]
         ysum = 2 + 2 * (spec // 2)  # [B, RC] long, >= 2
         centers = self.city_center[:, row].clamp(min=0)  # [B, RC]
-        d = self.pair_dist[centers.unsqueeze(2), centers.unsqueeze(1)]  # [B, RC, RC]
+        reach = self._route_reach_from(row)  # [B, RC, T] chained trade range
         # routes hold PERSISTENT ids; stale ids at dead columns are masked by
         # the alive gates in every valid* below.
         ids = self.city_id[:, row]  # [B, RC]
@@ -7332,12 +7423,11 @@ class SimSeats:
             & (rr[:, :, 1].reshape(B, 1, 1, -1) == ids.reshape(B, 1, RC, 1))
         ).any(dim=3)
         eye = torch.eye(RC, dtype=torch.bool, device=dev).reshape(1, RC, RC)
-        mar = self._city_maritime(row)  # [B, RC]
         valid = (
             alive.unsqueeze(2)
             & alive.unsqueeze(1)
             & ~eye
-            & (d <= self._trade_pair_range(row, mar.unsqueeze(2), mar.unsqueeze(1)))
+            & reach.gather(2, centers.unsqueeze(1).expand(B, RC, RC))
             & ~exists
             & want.reshape(B, 1, 1)
         )
@@ -7351,7 +7441,6 @@ class SimSeats:
             _tr = self.rules.trade or {}
             ysum_cs = int(_tr.get("cityStateRouteGold", 3)) + int(_tr.get("cityStateRouteSpec", 1))
             csc = self.citystate_center[:, :S].clamp(min=0)  # [B, S]
-            d_cs = self.pair_dist[centers.unsqueeze(2), csc.unsqueeze(1)]  # [B, RC, S]
             citystate_to = -(2 + torch.arange(S, device=dev))  # encoded dest ids
             exists_cs = (
                 (rr[:, :, 0].reshape(B, 1, 1, -1) == ids.reshape(B, RC, 1, 1))
@@ -7360,19 +7449,18 @@ class SimSeats:
             valid_cs = (
                 alive.unsqueeze(2)
                 & (self.seat_citystate_met[:, row, :S] & self.citystate_alive[:, :S]).unsqueeze(1)
-                & (d_cs <= self._trade_pair_range(
-                    row, mar.unsqueeze(2),
-                    self.coastal_land.gather(1, csc).unsqueeze(1)))
+                & reach.gather(2, csc.unsqueeze(1).expand(B, RC, S))
                 & ~exists_cs
                 & want.reshape(B, 1, 1)
             )
-            key_cs = torch.where(valid_cs, torch.full((B, RC, S), ysum_cs, dtype=torch.long, device=dev), torch.full((B, RC, S), -1, dtype=torch.long, device=dev))
+            key_cs = torch.where(valid_cs, ysum_cs + self._route_post_gold(row, csc).unsqueeze(1).expand(B, RC, S),
+                                 torch.full((B, RC, S), -1, dtype=torch.long, device=dev))
             key = torch.cat([key, key_cs], dim=2)
             W2 = RC + S
         # INTERNATIONAL destinations join the SAME scan on the same key: any
         # OTHER major's city whose centre this seat has EXPLORED.
         _S_off = W2
-        dctr_l, dalv_l, did_l, drow_l, dmar_l, dspec_l = [], [], [], [], [], []
+        dctr_l, dalv_l, did_l, drow_l, dspec_l = [], [], [], [], []
         for r2 in range(self.n_majors):
             if r2 == row:
                 continue
@@ -7380,7 +7468,6 @@ class SimSeats:
             dalv_l.append(self.city_alive[:, r2])
             did_l.append(self.city_id[:, r2])
             drow_l.append(torch.full_like(self.city_id[:, r2], r2))
-            dmar_l.append(self._city_maritime(r2))
             _dt2 = self.city_dist_tile[:, r2]
             _cp2 = (_dt2 >= 0) & self.district_complete.gather(1, _dt2.clamp(min=0).reshape(B, -1)).reshape_as(_dt2)
             dspec_l.append((_cp2 & self._is_specialty.reshape(1, 1, -1)).sum(dim=2))
@@ -7389,10 +7476,8 @@ class SimSeats:
             dalv = torch.cat(dalv_l, dim=1)    # [B, D]
             did = torch.cat(did_l, dim=1)      # [B, D] dest city id
             drow = torch.cat(drow_l, dim=1)    # [B, D] dest seat row
-            dmar = torch.cat(dmar_l, dim=1)    # [B, D] dest maritime access
             dspec = torch.cat(dspec_l, dim=1)  # [B, D] dest specialty districts
             D = dctr.shape[1]
-            d_ip = self.pair_dist[centers.unsqueeze(2), dctr.unsqueeze(1)]  # [B, RC, D]
             rds = self.seat_route_dseat[:, row]  # [B, K]
             rdc = self.seat_route_dcity[:, row]  # [B, K]
             act2 = rr[:, :, 0] >= 0  # [B, K]
@@ -7409,11 +7494,11 @@ class SimSeats:
                 alive.unsqueeze(2)
                 & dalv.unsqueeze(1)
                 & self._explored_at(row, dctr).unsqueeze(1)
-                & (d_ip <= self._trade_pair_range(row, mar.unsqueeze(2), dmar.unsqueeze(1)))
+                & reach.gather(2, dctr.unsqueeze(1).expand(B, RC, D))
                 & ~exists_ip
                 & want.reshape(B, 1, 1)
             )
-            ysum_ip = int((self.rules.trade or {}).get("intlGold", 3)) + dspec  # [B, D]
+            ysum_ip = int((self.rules.trade or {}).get("intlGold", 3)) + dspec + self._route_post_gold(row, dctr)  # [B, D]
             key_ip = torch.where(valid_ip, ysum_ip.unsqueeze(1).expand(B, RC, D),
                                  torch.full((B, RC, D), -1, dtype=torch.long, device=dev))
             key = torch.cat([key, key_ip], dim=2)
@@ -7449,7 +7534,7 @@ class SimSeats:
         exp = self.seat_route_exp[:, row]
         leg = self.seat_route_leg[:, row]
         wt = self.seat_route_walk[:, row]
-        oc, _dc = self._route_centres(row)
+        oc, dc = self._route_centres(row)
         term = act & (exp >= 0) & (exp <= int(self.turn))
         home = (leg < 0) | ((oc >= 0) & (wt == oc))
         rail = (exp >= 0) & (exp + self._trade_walk_rail <= int(self.turn))
@@ -7459,6 +7544,17 @@ class SimSeats:
         # round trip done, never a route cut short.
         if row < self.n_majors:
             self._dedication_event(row, self._ded_coinage, completed.sum(dim=1))
+        if row < self.n_majors and bool(completed.any()):
+            # CIV6 (Trading Post): "created in a city when a civilization
+            # finishes a Trade Route to that city for the first time" — and
+            # one at home, "in the origin and destination cities". Only a
+            # FULL term stamps; a plundered or dest-dead route plants nothing.
+            for src in (oc, dc):
+                m = completed & (src >= 0)
+                if bool(m.any()):
+                    bb, kk = m.nonzero(as_tuple=True)
+                    self.trading_post[bb, row, src[bb, kk]] = True
+            self._eff_version += 1
         dst, dc2 = self._route_dest_alive(row)
         dest_gone = act & (dc2 >= 0) & ~dst
         drop = completed | dest_gone

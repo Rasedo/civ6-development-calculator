@@ -28,7 +28,7 @@ import { gpPermOf } from '../data/greatPeople';
  * ends have maritime access and the seat can put a Trader on the water —
  * "both the origin city and the destination city require maritime access ...
  * in order to establish sea Trade Routes". Range is not extendable by
- * technology in Civ 6; only Trading Posts extend it, and there are none here.
+ * technology in Civ 6; only Trading Posts extend it (`routeInRange`).
  */
 export const TRADE_ROUTE_RANGE_LAND = 15;
 export const TRADE_ROUTE_RANGE_SEA = 30;
@@ -45,19 +45,87 @@ export function cityMaritime(state: GameState, centerIndex: number, city?: City)
   );
 }
 
-/** The range this origin/destination pair may span. */
+/** `cityMaritime` for a bare CENTRE tile — the city standing there is looked
+ *  up across every seat, because a Trading Post can sit at anyone's centre.
+ *  A city-state's access is its centre's coast alone (no Harbor to build). */
+export function centreMaritime(state: GameState, centerIndex: number): boolean {
+  const centre = state.map.tiles[centerIndex];
+  if (centre && isCoastalLand(state.map, centre)) return true;
+  for (const s of state.seats) {
+    const c = s.cities.find((x) => x.centerIndex === centerIndex);
+    if (c) return cityMaritime(state, centerIndex, c);
+  }
+  return false;
+}
+
+/** a living city — any major's, or a city-state — standing at this centre. */
+export function centreHasCity(state: GameState, centerIndex: number): boolean {
+  return state.seats.some((s) => s.cities.some((c) => c.centerIndex === centerIndex))
+    || state.cityStates.some((c) => c.centerIndex === centerIndex);
+}
+
+/** The range ONE leg between these two centres may span. */
 export function tradeRouteRange(
   state: GameState,
   seat: number,
   originCenter: number,
   destCenter: number,
-  origin?: City,
-  dest?: City,
 ): number {
   if (tradeWaterLevel(state, seat) === 0) return TRADE_ROUTE_RANGE_LAND;
-  return cityMaritime(state, originCenter, origin) && cityMaritime(state, destCenter, dest)
+  return centreMaritime(state, originCenter) && centreMaritime(state, destCenter)
     ? TRADE_ROUTE_RANGE_SEA
     : TRADE_ROUTE_RANGE_LAND;
+}
+
+/** CIV6 (Trading Post): "If a Trade Route reaches a city with a Trading Post,
+ *  it may then continue up to 15 additional tiles to reach another city. If
+ *  that city also has a Trading Post, the route may extend a further 15
+ *  tiles, and so on" — a breadth-first walk over the seat's OWN posts (a
+ *  civilization "cannot make use of Trading Posts established by other
+ *  civilizations"), each leg at that leg's own land/sea range. */
+export function routeInRange(
+  state: GameState,
+  seat: number,
+  originCenter: number,
+  destCenter: number,
+): boolean {
+  const legOk = (a: number, b: number): boolean => {
+    const at = state.map.tiles[a];
+    const bt = state.map.tiles[b];
+    return hexDistance(at.col, at.row, bt.col, bt.row) <= tradeRouteRange(state, seat, a, b);
+  };
+  const posts = (seatOf(state, seat)?.tradingPosts ?? [])
+    .filter((p) => p !== originCenter && centreHasCity(state, p));
+  const seen = new Set<number>([originCenter]);
+  const queue = [originCenter];
+  while (queue.length > 0) {
+    const a = queue.shift()!;
+    if (legOk(a, destCenter)) return true;
+    for (const p of posts) {
+      if (!seen.has(p) && legOk(a, p)) {
+        seen.add(p);
+        queue.push(p);
+      }
+    }
+  }
+  return false;
+}
+
+/** stamp one civ's Trading Post at a centre — sorted, append-once. */
+export function stampTradingPost(owner: Seat, centerIndex: number): void {
+  const posts = (owner.tradingPosts ??= []);
+  if (centerIndex < 0 || posts.includes(centerIndex)) return;
+  posts.push(centerIndex);
+  posts.sort((a, b) => a - b);
+}
+
+/** CIV6 (Trading Post): "Each foreign Trading Post also adds +1 Gold to the
+ *  yields of every Trade Route which passes through this city" — the
+ *  DESTINATION's post; the pass-through halves have no carrier because a
+ *  route stores no path. Bandar Brunei's suzerain pays the same city again. */
+export function routePostGold(state: GameState, seat: number, destCenter: number): number {
+  if (!(seatOf(state, seat)?.tradingPosts ?? []).includes(destCenter)) return 0;
+  return 1 + (suzerainEffect(state, seat, 'routePostGold') ? 1 : 0);
 }
 
 export const TRADE_ROUTE_DURATION = 20;
@@ -224,6 +292,7 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
         // a SURVIVED City-State Emergency pays its target +2 gold on every
         // minor leg, forever
         out.gold += emergencyCsRouteGold(state, seat);
+        out.gold += routePostGold(state, seat, cityState.centerIndex);
         // CIV 6, Kumasi's suzerain: "Your Trade Routes to any city-state
         // provide +2 Culture and +1 Gold for every specialty district in the
         // ORIGIN city" — this city, whichever minor the route reaches.
@@ -240,6 +309,7 @@ export function cityTradeYields(state: GameState, city: City, routeGold: number)
       const civCity = civSeat?.cities.find((c) => c.id === route.toSeatCity);
       if (civSeat && civCity) {
         addYields(out, routeYieldsInternational(state, civCity));
+        out.gold += routePostGold(state, seat, civCity.centerIndex);
         // TRADE POLICY outcome A pays the SENDER for every route that ends at
         // the named seat.
         out.gold += congressTradeGold(state, route.toSeat);
@@ -279,11 +349,8 @@ export function canAddTradeRoute(state: GameState, from: number, to: number, sea
   if (routes.some((r) => r.from === from && r.to === to)) {
     return { ok: false, reason: 'That route already runs.' };
   }
-  const ta = state.map.tiles[a.centerIndex];
-  const tb = state.map.tiles[b.centerIndex];
-  const rng = tradeRouteRange(state, seat, a.centerIndex, b.centerIndex, a, b);
-  if (hexDistance(ta.col, ta.row, tb.col, tb.row) > rng) {
-    return { ok: false, reason: `Beyond trade range (${rng} tiles).` };
+  if (!routeInRange(state, seat, a.centerIndex, b.centerIndex)) {
+    return { ok: false, reason: 'Beyond trade range.' };
   }
   return { ok: true };
 }
@@ -337,11 +404,8 @@ export function canAddCsTradeRoute(state: GameState, from: number, cityStateId: 
   if (routes.some((r) => r.from === from && r.toCs === cityStateId)) {
     return { ok: false, reason: 'That route already runs.' };
   }
-  const ta = state.map.tiles[a.centerIndex];
-  const tb = state.map.tiles[cityState.centerIndex];
-  const rng = tradeRouteRange(state, seat, a.centerIndex, cityState.centerIndex, a);
-  if (hexDistance(ta.col, ta.row, tb.col, tb.row) > rng) {
-    return { ok: false, reason: `Beyond trade range (${rng} tiles).` };
+  if (!routeInRange(state, seat, a.centerIndex, cityState.centerIndex)) {
+    return { ok: false, reason: 'Beyond trade range.' };
   }
   return { ok: true };
 }
@@ -378,11 +442,8 @@ export function canAddIntlTradeRoute(state: GameState, from: number, toSeat: num
   if (routes.some((r) => r.from === from && r.toSeat === toSeat && r.toSeatCity === seatCity)) {
     return { ok: false, reason: 'That route already runs.' };
   }
-  const ta = state.map.tiles[a.centerIndex];
-  const tb = state.map.tiles[civCity.centerIndex];
-  const rng = tradeRouteRange(state, seat, a.centerIndex, civCity.centerIndex, a, civCity);
-  if (hexDistance(ta.col, ta.row, tb.col, tb.row) > rng) {
-    return { ok: false, reason: `Beyond trade range (${rng} tiles).` };
+  if (!routeInRange(state, seat, a.centerIndex, civCity.centerIndex)) {
+    return { ok: false, reason: 'Beyond trade range.' };
   }
   return { ok: true };
 }
