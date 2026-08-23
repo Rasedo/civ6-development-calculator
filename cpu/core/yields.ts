@@ -23,6 +23,35 @@ function terrainYields(tile: Tile): Yields {
   return out;
 }
 
+/**
+ * What a SUZERAIN improvement's neighbours pay it. Each rule counts the
+ * neighbours matching any of its sources, divides by `per`, and pays its
+ * yields once per whole group; a civic in `ctx.mods.impUpgrades` swaps in the
+ * improved rate and payout (`_imp_adjacency`).
+ */
+export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: ImprovementId): Yields {
+  const rules = IMPROVEMENTS[imp].adjacency;
+  const out = emptyYields();
+  if (!rules) return out;
+  for (const r of rules) {
+    const up = !!r.upgradeCivic && ctx.mods.impUpgrades.has(r.upgradeCivic);
+    const per = (up && r.upgradePer) || r.per;
+    const pay = (up && r.upgradeYields) || r.yields;
+    let n = 0;
+    for (const nb of neighbors(ctx.map, tile)) {
+      const hit =
+        (r.bonusResource && nb.resource !== null && RESOURCES[nb.resource].category === 'bonus') ||
+        (r.anyDistrict && nb.district !== null && nb.districtComplete) ||
+        (!!r.district && nb.district === r.district && nb.districtComplete) ||
+        (!!r.features && nb.feature !== null && r.features.includes(nb.feature));
+      if (hit) n += 1;
+    }
+    const groups = Math.floor(n / Math.max(1, per));
+    if (groups > 0) addYields(out, pay, groups);
+  }
+  return out;
+}
+
 export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
   const out = emptyYields();
 
@@ -61,6 +90,7 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
       const adjFarms = neighbors(ctx.map, tile).filter((n) => n.improvement === 'FARM').length;
       if (adjFarms >= 2) out.food += ctx.mods.farmAdjTier;
     }
+    addYields(out, improvementAdjacency(ctx, tile, imp));
   }
 
   for (const n of neighbors(ctx.map, tile)) {

@@ -13,6 +13,7 @@ import { logUnitOrder } from './seatTurn';
 import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial } from '../../world/hex';
 import { isWater, isImpassable } from '../../world/query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
+import { IMPROVEMENTS } from '../data/improvements';
 import { tileAppeal } from './appeal';
 import { PARK_MIN_APPEAL } from '../data/improvements';
 import { isTechComplete, isCivicComplete, makeYieldCtx, getModifiers, unitUpkeep, type YieldCtx } from './effects';
@@ -1075,7 +1076,12 @@ export function religiousHeal(state: GameState, unit: Unit, ctx: YieldCtx): numb
     if (tileSeat(t) !== unit.seat) continue; // "in their own territory"
     best = Math.max(best, holySiteFaith(state, t, ctx));
   }
-  return RELIGIOUS_HEAL_PER_FAITH * best;
+  // CIV6 (Monastery): "+15 HP healing every turn for friendly religious
+  // units" — the improvement it stands on, and an unpillaged one.
+  const mon = here.improvement && !here.pillaged
+    ? IMPROVEMENTS[here.improvement as ImprovementId].religiousHeal ?? 0
+    : 0;
+  return RELIGIOUS_HEAL_PER_FAITH * best + (tileSeat(here) === unit.seat ? mon : 0);
 }
 
 /** CIV6 (Chaplain): the Apostle "operates as a Medic, providing extra healing

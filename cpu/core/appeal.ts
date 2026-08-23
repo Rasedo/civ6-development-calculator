@@ -16,16 +16,18 @@
  * how the tile walk sees it. Omitting it drops the penalty, so every caller
  * passes it.
  *
- * Every DISTRICT term comes off `DistrictDef.appealAdjacent`, so the walk
- * never names a district type and a new row carries its own appeal.
+ * Every DISTRICT term comes off `DistrictDef.appealAdjacent` and every
+ * IMPROVEMENT term off `ImprovementDef.appealAdjacent`, so the walk never
+ * names either type and a new row carries its own appeal.
  *
- * OPEN: the unique improvements and the appeal-granting Great People.
+ * OPEN: the appeal-granting Great People.
  */
 
-import type { GameMap, Tile } from './types';
+import type { GameMap, ImprovementId, Tile } from './types';
 import { neighbors } from '../../world/hex';
 import { isMountain } from '../../world/query';
 import { DISTRICTS } from '../data/districts';
+import { IMPROVEMENTS } from '../data/improvements';
 
 export function tileAppeal(map: GameMap, tile: Tile, camps?: ReadonlySet<number>): number {
   if (tile.wonder) return 5;
@@ -44,7 +46,7 @@ export function tileAppeal(map: GameMap, tile: Tile, camps?: ReadonlySet<number>
     if (n.feature === 'RAINFOREST' || n.feature === 'MARSH') appeal -= 1;
     if (n.feature === 'FLOODPLAINS') appeal -= 1; // sourced, was missing
     if (n.pillaged) appeal -= 1; // "-1 each adjacent pillaged tile"
-    if (n.improvement === 'MINE' || n.improvement === 'QUARRY' || n.improvement === 'OIL_WELL') appeal -= 1;
+    if (n.improvement) appeal += IMPROVEMENTS[n.improvement as ImprovementId].appealAdjacent ?? 0;
   }
   return appeal;
 }

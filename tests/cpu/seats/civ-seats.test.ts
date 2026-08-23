@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { IMPROVEMENT_IDS, unitActionIndex } from '../../../cpu/core/unitActions';
+
+const A_PILLAGE = unitActionIndex(IMPROVEMENT_IDS).PILLAGE;
 import { greatPeopleEarned } from '../../../cpu/core/greatPeople';
 import { computeCityStats } from '../../../cpu/core/city';
 import { setMet } from '../../../cpu/core/cityStates';
@@ -230,11 +233,11 @@ describe('war and peace', () => {
     farm.improvement = 'FARM';
     const raider = spawnUnit(state, 'WARRIOR', farm.index, civ.seat)!;
     raider.tileIndex = farm.index;
-    // pillage is a wire VERB (column 25), not an autonomous act
-    applySeatUnitOrders(state, civ, [[25]]);
+    // pillage is a wire VERB, not an autonomous act
+    applySeatUnitOrders(state, civ, [[A_PILLAGE]]);
     expect(farm.pillaged).toBe(false); // at peace: the apply re-validates and refuses
     setWar(state, civ.seat, 0, true);
-    applySeatUnitOrders(state, civ, [[25]]);
+    applySeatUnitOrders(state, civ, [[A_PILLAGE]]);
     expect(farm.pillaged).toBe(true);
   });
 

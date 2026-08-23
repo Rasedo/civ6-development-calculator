@@ -535,15 +535,15 @@ PATROL_DIR_PERM = (3, 4, 2, 5, 1, 0)
 U_DHOME, U_DNB, U_NBTILE, U_MP, U_CHARGES, U_CIVILIAN = 0, 1, 7, 13, 14, 15
 U_ATWAR, U_DWAR, U_DWARNB = 16, 17, 18   # the war half
 U_RINGTILE = 24                          # the 12 ring-2 tile ids
-#: unit-action enum geometry. PILLAGE is NOT the last column — SNIPE_0..11 sit
-#: after it. Consumers key on these, never on W-1.
-A_PILLAGE = 25
-A_SNIPE = 26
-
 PATROL_HOME_RADIUS = 3
 
 
-def pick_unit_orders(mask: torch.Tensor, obs: torch.Tensor, home_radius: int = PATROL_HOME_RADIUS) -> torch.Tensor:
+def pick_unit_orders(mask: torch.Tensor, obs: torch.Tensor, *, a_pillage: int, a_snipe: int,
+                     home_radius: int = PATROL_HOME_RADIUS) -> torch.Tensor:
+    """`a_pillage` / `a_snipe` are the PILLAGE and SNIPE_0 columns of the enum
+    the mask was built from. They are arguments and not constants because
+    appending one improvement moves both — every BUILD verb sits before them."""
+    A_PILLAGE, A_SNIPE = a_pillage, a_snipe
     B, N, W = mask.shape
     dev = mask.device
     atk = mask[:, :, 6:12]

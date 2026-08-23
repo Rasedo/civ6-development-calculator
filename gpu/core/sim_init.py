@@ -165,6 +165,8 @@ class SimInit:
         self.register_alias("citystate_pop", lambda sim: sim.city_pop[:, sim._CITY_MINOR0:sim._CITY_MINOR0 + max(sim.S, 1), 0])
         self.citystate_suz_key = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         self.citystate_suz_code = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
+        # the IMPROVEMENT this minor's suzerain may build, by roster index
+        self.citystate_suz_imp = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         for b, f in enumerate(fixtures):
             for s, cs in enumerate(f.get("cityStates", [])):
                 self.citystate_alive[b, s] = True
@@ -173,6 +175,7 @@ class SimInit:
                 self.citystate_pop[b, s] = cs["pop"]
                 self.citystate_suz_key[b, s] = cs.get("suzKey", -1)
                 self.citystate_suz_code[b, s] = cs.get("suzCode", -1)
+                self.citystate_suz_imp[b, s] = cs.get("suzImp", -1)
         # A city-state's tile ownership lives in `tile_seat` (seeded below off
         # the wire's `ownerSeatInit` plane); `citystate_at` is a derived view.
         # The (seat, city-state) relations live on `seat_citystate_*`
@@ -1030,6 +1033,8 @@ class SimInit:
             self._A_REBASE = self._act.get("REBASE_0", -1)
             self._A_SPY_TRAVEL = self._act.get("SPY_TRAVEL_0", -1)
             self._A_SPY_MISSION = self._act.get("SPY_MISSION_0", -1)
+            self._A_ROAD = self._act.get("BUILD_ROAD", -1)          # the engineer's
+            self._A_FINISH = self._act.get("FINISH_DISTRICT", -1)   # its 20% charge
             self._air_strike_cols = sum(1 for n in self._act_names if n.startswith("AIR_STRIKE_"))
             self._air_rebase_cols = sum(1 for n in self._act_names if n.startswith("REBASE_"))
             _stc = sum(1 for n in self._act_names if n.startswith("SPY_TRAVEL_"))
@@ -1044,6 +1049,7 @@ class SimInit:
                 + (6 if self._A_CONDEMN >= 0 else 0) \
                 + (1 if self._A_HERESY >= 0 else 0) + (1 if self._A_INQUISITION >= 0 else 0)                 + (1 if self._A_HEATHEN >= 0 else 0) \
                 + (1 if self._A_UPGRADE >= 0 else 0) \
+                + (1 if self._A_ROAD >= 0 else 0) + (1 if self._A_FINISH >= 0 else 0) \
                 + self._air_strike_cols + self._air_rebase_cols + _stc + _smc
             assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
             self._A_CHOP = self._act["CHOP"]
@@ -1069,14 +1075,14 @@ class SimInit:
             self._A_REBASE = -1
             self._A_SPY_TRAVEL = -1
             self._A_SPY_MISSION = -1
+            self._A_ROAD = -1
+            self._A_FINISH = -1
             self._air_strike_cols = 0
             self._air_rebase_cols = 0
             self._snipe_on = False
             self._A_IMP = [13 + i if i < 3 else 18 + i - 3 for i in range(len(ids))]
         self.FARM = ids.index("FARM") if "FARM" in ids else 0
         self.MINE = ids.index("MINE") if "MINE" in ids else -1        # -1 = not in scope
-        self.QUARRY = ids.index("QUARRY") if "QUARRY" in ids else -1  # appeal -1
-        self.OIL_WELL = ids.index("OIL_WELL") if "OIL_WELL" in ids else -1
         self.LUMBER = ids.index("LUMBER_MILL") if "LUMBER_MILL" in ids else -1
         self.SEASIDE = ids.index("SEASIDE_RESORT") if "SEASIDE_RESORT" in ids else -1
         self.FORT = ids.index("FORT") if "FORT" in ids else -1
@@ -1093,6 +1099,7 @@ class SimInit:
         self._builder_idx = int(imp.get("builderIdx", -1))
         self._eng_idx = int(imp.get("engineerIdx", -1))
         self._seat_eng_live = bool(imp.get("engineerLive", False))
+        self._eng_finish_frac = float(imp.get("engineerFinishFraction", 0.2))
         self._hillfarms_civic = int(imp.get("hillFarmsCivic", -1))
         self._farmadj_civic = int(imp.get("farmAdjCivic", -1))  # GS: Feudalism farm-adjacency +1 food
         self._farmadj_tech = int(imp.get("farmAdjTech", -1))    # GS: Replaceable Parts +1 more
@@ -1113,6 +1120,35 @@ class SimInit:
             self._imp_yields[i] = torch.tensor(row["yields"], dtype=dtype)
             self._imp_housing[i] = float(row["housing"])
             self._imp_unlock[i] = int(row["unlock"])
+        # THE SUZERAIN IMPROVEMENTS. Every clause is a catalog column: the
+        # ground it may stand on, the ban on standing beside its own kind,
+        # what its neighbours pay it, and the three tails (housing civic,
+        # religious healing, tourism) it carries.
+        self._imp_suz = [bool(r.get("suz", 0)) for r in imp["rows"]]
+        self._imp_terr = [list(r.get("terr", [])) for r in imp["rows"]]
+        self._imp_xterr = [list(r.get("xterr", [])) for r in imp["rows"]]
+        self._imp_elev = [list(r.get("elev", [])) for r in imp["rows"]]
+        self._imp_no_adj_same = [bool(r.get("noAdjSame", 0)) for r in imp["rows"]]
+        self._imp_adj = [list(r.get("adj", [])) for r in imp["rows"]]
+        self._imp_adj_live = any(self._imp_adj)
+        self._imp_house_civic = torch.tensor(
+            [int(r.get("houseCivic", -1)) for r in imp["rows"]], dtype=torch.long, device=device)
+        self._imp_rel_heal = torch.tensor(
+            [float(r.get("relHeal", 0)) for r in imp["rows"]], dtype=dtype, device=device)
+        self._imp_tour_y = [int(r.get("tourY", -1)) for r in imp["rows"]]
+        self._imp_tour_tech = [int(r.get("tourTech", -1)) for r in imp["rows"]]
+        # THE MILITARY ENGINEER'S ROWS. `eng` marks the ones it — and only it —
+        # builds; `noFeat` is the Fort's featureless-tile clause; `air` is what
+        # an Airstrip bases; `appeal` is what ANY improvement takes off its
+        # neighbours, the `DistrictDef.appealAdjacent` twin.
+        self._imp_eng = [bool(r.get("eng", 0)) for r in imp["rows"]]
+        self._imp_no_feat = [bool(r.get("noFeat", 0)) for r in imp["rows"]]
+        self._imp_air_slots = torch.tensor(
+            [int(r.get("air", 0)) for r in imp["rows"]], dtype=torch.long, device=device)
+        self._imp_appeal_adj = torch.tensor(
+            [int(r.get("appeal", 0)) for r in imp["rows"]], dtype=torch.long, device=device)
+        self._imp_appeal_any = bool((self._imp_appeal_adj != 0).any())
+        self._imp_air_any = bool((self._imp_air_slots > 0).any())
         self.res_imp = torch.tensor(
             [[t.get("rq", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device
         )
@@ -1474,6 +1510,12 @@ class SimInit:
             raise ValueError("a repeatable district that counts toward the specialty cap: "
                              "the cap and the discount both read the registry, which holds one tile per type")
         self._aqueduct_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "AQUEDUCT"), -1)
+        # CIV6 (Military Engineer): its charge finishes 20% of "an engineering
+        # type of district (Aqueduct, Bath, Canal, Dam)". The Bath is Rome's
+        # unique Aqueduct, which this model has no carrier for. Held as
+        # SCAFFOLD positions, which is what `city_current` stores.
+        _fin = {d for d in (self._aqueduct_idx, self._canal_didx, self._dam_didx) if d >= 0}
+        self._eng_finish_slots = [s for s, p in enumerate(self._scaffold) if p[0] in _fin]
         # The rest of the per-district catalog columns, every one read by index
         # rather than by id: the amenity the district itself pays, its flat
         # loyalty, the governor title and envoys it awards on completion, the

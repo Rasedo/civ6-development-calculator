@@ -7,7 +7,8 @@ import { isExplored } from './fog';
 import { riverReach } from './disasters';
 import { congressChopBanned, congressEnergyBlocked, congressEnergyDiscount, congressUdtBlockedDistrict } from './congress';
 import { tileAppeal } from './appeal'; // SEASIDE_RESORT gates on appeal
-import { SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
+import { IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
+import { isSuzerain } from './cityStates';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { DISTRICTS } from '../data/districts';
@@ -69,6 +70,25 @@ export function canFoundCity(state: GameState, tileIndex: number, seat: number):
 }
 
 
+/**
+ * CIV6 (Fort, Airstrip): each may be built "in your own or neutral territory",
+ * on land. The one predicate the engineer's improvements, its road and the
+ * GPU's `_eng_tile_ok` twin all answer to.
+ */
+export function engineerTileOk(tile: Tile, ownsTile: (t: Tile) => boolean): boolean {
+  if (isWater(tile) || isImpassable(tile)) return false;
+  return ownsTile(tile) || tileSeat(tile) < 0;
+}
+
+/**
+ * CIV6 (Military Engineer): "Can construct Roads ... (uses 1 charge)". A road
+ * already laid — by a trade route or by another engineer — is nothing to lay
+ * again.
+ */
+export function canBuildRoad(tile: Tile, ownsTile: (t: Tile) => boolean): boolean {
+  return !tile.road && engineerTileOk(tile, ownsTile);
+}
+
 export function validImprovementsIn(
   tile: Tile,
   opts: {
@@ -77,9 +97,10 @@ export function validImprovementsIn(
     map?: GameMap;
     camps?: ReadonlySet<number>;
     builder?: string;
+    /** the city-states this seat is SUZERAIN of, by name. */
+    suzerain?: ReadonlySet<string>;
   },
 ): ImprovementId[] {
-  if (!opts.ownsTile(tile)) return []; // must be inside the owner's borders
   // gate-catch (rng 2026006080 t246): builtWonder tiles are PAVED — an
   // in-flight wonder pave refuses improvements exactly like a district pave
   // (real Civ 6).
@@ -88,21 +109,25 @@ export function validImprovementsIn(
   const unlocks = opts.unlocks;
   const unlocked = (imp: ImprovementId) => !unlocks || unlocks.improvements.has(imp);
 
-  // A MILITARY ENGINEER builds ONLY military improvements. Its
-  // sourced Civ 6 build list is Fort / Airstrip / Missile Silo / Mountain
-  // Tunnel / Reinforced Barricade / Modernized Trap (plus spending a charge on
-  // a Canal/Dam/Aqueduct/Flood Barrier) — no Farm, Mine, Camp or Plantation.
-  // Only the FORT of that list exists in this model. Without the guard an
-  // engineer would be offered a Farm, and — because FORT carries `yields: {}`
-  // and therefore
-  // scores a flat 0 delta — the best-delta chooser would have picked the Farm
-  // every time, so an engineer could never have built the one thing it exists
-  // to build. Resource tiles return their own improvement below, which an
-  // engineer must not get either, so this sits ABOVE that early return.
+  // A MILITARY ENGINEER builds ONLY the rows the catalog marks `engineer`, and
+  // never a Farm, Mine, Camp or Plantation — without the guard the best-delta
+  // chooser would take the Farm every time, since a Fort yields nothing. Its
+  // rows sit ABOVE the ownership gate and the resource early return, because
+  // both of the Civ 6 pages read "in your own or neutral territory".
   if (opts.builder === 'MILITARY_ENGINEER') {
-    if (isWater(tile) || !unlocked('FORT')) return [];
-    return tile.improvement ? [] : ['FORT'];
+    if (!engineerTileOk(tile, opts.ownsTile) || tile.improvement) return [];
+    const out: ImprovementId[] = [];
+    for (const def of Object.values(IMPROVEMENTS)) {
+      if (!def.engineer || !unlocked(def.id)) continue;
+      if (def.noFeature && tile.feature) continue;
+      if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
+      if (def.excludeTerrains?.includes(tile.terrain)) continue;
+      if (def.elevations && !def.elevations.includes(tile.elevation)) continue;
+      out.push(def.id);
+    }
+    return out;
   }
+  if (!opts.ownsTile(tile)) return []; // must be inside the owner's borders
   // CIV6: every other improvement is the BUILDER's alone. A charge-carrying
   // Missionary/Apostle must refuse here exactly as the GPU improvement arm
   // does with its builder-type gate — a wire order for any other unit no-ops.
@@ -114,6 +139,18 @@ export function validImprovementsIn(
   if (isWater(tile)) return [];
 
   const out: ImprovementId[] = [];
+  // THE SUZERAIN IMPROVEMENTS. Each is offered only while this seat holds the
+  // named city-state's suzerainty, and each carries its own ground rules —
+  // terrain, elevation, and the ban on standing beside its own kind.
+  for (const def of Object.values(IMPROVEMENTS)) {
+    if (!def.suzerainOf || !opts.suzerain?.has(def.suzerainOf)) continue;
+    if (def.terrains && !def.terrains.includes(tile.terrain)) continue;
+    if (def.excludeTerrains?.includes(tile.terrain)) continue;
+    if (def.elevations && !def.elevations.includes(tile.elevation)) continue;
+    if (def.noAdjacentSame && opts.map
+        && neighbors(opts.map, tile).some((n) => n.improvement === def.id)) continue;
+    out.push(def.id);
+  }
   const flat = tile.elevation === 'FLAT';
   const hills = tile.elevation === 'HILLS';
   const hillFarmsOk = !unlocks || unlocks.hillFarms;
@@ -151,12 +188,21 @@ export function validImprovementsIn(
   return out;
 }
 
+/** The city-states this seat is suzerain of, by name — what gates a
+ *  suzerain improvement's row in `validImprovementsIn`. */
+export function suzerainNames(state: GameState, seat: number): ReadonlySet<string> {
+  const out = new Set<string>();
+  for (const cs of state.cityStates) if (isSuzerain(cs, seat)) out.add(cs.name);
+  return out;
+}
+
 export function validImprovements(state: GameState, tile: Tile, seat: number): ImprovementId[] {
   return validImprovementsIn(tile, {
     unlocks: gates(state, seat),
     ownsTile: (t) => tileSeat(t) === seat,
     map: state.map, // SEASIDE_RESORT needs coast adjacency + appeal
     camps: campTiles(state),
+    suzerain: suzerainNames(state, seat),
   });
 }
 
@@ -500,6 +546,43 @@ export function wonderExists(state: GameState, wonderId: string): boolean {
   return state.map.tiles.some((t) => t.builtWonder === wonderId);
 }
 
+/**
+ * The half of a wonder's placement the MAP alone decides — terrain,
+ * elevation, feature, river, coast and the mountain next door. The exporter
+ * bakes it into the `wok` tile bitmask the GPU reads, so both engines answer
+ * it out of this one body and neither re-derives it.
+ */
+export function wonderTerrainOk(def: BuiltWonderDef, tile: Tile, map: GameMap): boolean {
+  if (tile.wonder || isImpassable(tile)) return false;
+  const p = def.placement;
+  if (p.onCoastalWater) {
+    // CIV6: "on Coast adjacent to land", and every wonder that asks for it
+    // states "It cannot be built on a Lake" in the same breath.
+    if (tile.terrain !== 'COAST' || !isCoastalWater(map, tile)) return false;
+  } else {
+    if (isWater(tile)) return false;
+    if (p.onFeature) {
+      if (!tile.feature || !p.onFeature.includes(tile.feature)) return false;
+    } else {
+      if (tile.feature === 'FLOODPLAINS' && !p.allowFloodplains) return false;
+      if (tile.feature === 'OASIS') return false;
+    }
+    if (p.terrains && !p.terrains.includes(tile.terrain)) return false;
+    if (p.excludeTerrains?.includes(tile.terrain)) return false;
+    if (p.flatOnly && tile.elevation !== 'FLAT') return false;
+    if (p.hillsOnly && tile.elevation !== 'HILLS') return false;
+  }
+  if (p.requiresRiver && !hasRiver(tile)) return false;
+  if (p.adjacentMountain && !neighbors(map, tile).some((n) => isMountain(n))) return false;
+  return true;
+}
+
+/** The city holding this district tile, if any. */
+function cityAtTile(state: GameState, tile: Tile): City | undefined {
+  if (tile.ownerSeat < 0 || tile.ownerCity < 0) return undefined;
+  return citiesOf(state, tile.ownerSeat).find((c) => c.id === tile.ownerCity);
+}
+
 export function canPlaceWonder(
   state: GameState,
   city: City,
@@ -533,25 +616,17 @@ export function canPlaceWonder(
   }
 
   const p = def.placement;
-  if (p.onCoastalWater) {
-    if (!isCoastalWater(map, tile)) return no('Must be on coast/lake water adjacent to land.');
-  } else {
-    if (isWater(tile)) return no('Must be on land.');
-    if (tile.feature === 'FLOODPLAINS' && !p.allowFloodplains) {
-      return no('Cannot be built on floodplains.');
-    }
-    if (tile.feature === 'OASIS') return no('Cannot be built on an oasis.');
-    if (p.terrains && !p.terrains.includes(tile.terrain)) {
-      return no(`Requires ${p.terrains.join('/')} terrain.`);
-    }
-    if (p.flatOnly && tile.elevation !== 'FLAT') return no('Requires flat land.');
-    if (p.hillsOnly && tile.elevation !== 'HILLS') return no('Requires hills.');
-  }
-  if (p.requiresRiver && !hasRiver(tile)) return no('Must be adjacent to a river.');
+  if (!wonderTerrainOk(def, tile, map)) return no(`${def.name} cannot stand on this ground.`);
 
   const around = neighbors(map, tile);
   if (p.adjacentDistrict) {
-    const okAdj = around.some((n) => n.district === p.adjacentDistrict && n.districtComplete);
+    const okAdj = around.some(
+      (n) =>
+        n.district === p.adjacentDistrict &&
+        n.districtComplete &&
+        (!p.adjacentDistrictBuilding ||
+          !!cityAtTile(state, n)?.buildings.includes(p.adjacentDistrictBuilding)),
+    );
     if (!okAdj) return no(`Must be adjacent to a completed ${DISTRICTS[p.adjacentDistrict].name}.`);
   }
   if (p.adjacentResource) {
@@ -559,16 +634,30 @@ export function canPlaceWonder(
       return no(`Must be adjacent to ${p.adjacentResource.toLowerCase()}.`);
     }
   }
+  if (p.adjacentImprovement) {
+    if (!around.some((n) => n.improvement === p.adjacentImprovement)) {
+      return no(`Must be adjacent to a ${p.adjacentImprovement.toLowerCase()}.`);
+    }
+  }
+  if (p.adjacentCapital) {
+    const cap = citiesOf(state, seat).find((c) => c.isCapital);
+    if (!cap || !around.some((n) => n.index === cap.centerIndex)) {
+      return no('Must be adjacent to the capital.');
+    }
+  }
+  if (p.requiresReligion && !seatOf(state, seat)?.religion.founded) {
+    return no('Must have founded a religion.');
+  }
   return ok;
 }
 
-export function wonderPlacementTiles(state: GameState, city: City, wonderId: string): number[] {
+export function wonderPlacementTiles(state: GameState, city: City, wonderId: string, seat = city.seat): number[] {
   const center = state.map.tiles[city.centerIndex];
   const out: number[] = [];
   for (const t of state.map.tiles) {
     if (!tileBelongsTo(t, city)) continue;
     if (hexDistance(center.col, center.row, t.col, t.row) > CITY_WORK_RADIUS) continue;
-    if (canPlaceWonder(state, city, wonderId, t.index, 0).ok) out.push(t.index);
+    if (canPlaceWonder(state, city, wonderId, t.index, seat).ok) out.push(t.index);
   }
   return out;
 }
@@ -580,6 +669,6 @@ export function availableWonders(state: GameState, city: City, seat: number): Bu
       if (def.requiresTech && !isTechComplete(state, def.requiresTech, seat)) return false;
       if (def.requiresCivic && !isCivicComplete(state, def.requiresCivic, seat)) return false;
     }
-    return wonderPlacementTiles(state, city, def.id).length > 0;
+    return wonderPlacementTiles(state, city, def.id, seat).length > 0;
   });
 }

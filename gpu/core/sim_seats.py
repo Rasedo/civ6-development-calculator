@@ -54,7 +54,7 @@ class SimSeats:
         if self._seat_eng_live and self._eng_idx >= 0:
             has_alive_e = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._eng_idx)).any(dim=1)
             has_q_e = ((self.city_current[:, row] == self.UNIT_BASE + self._eng_idx) & alive).any(dim=1)
-            ovr.append((self._eng_idx, ~(has_alive_e | has_q_e) & self._seat_fort_job_mask(row).any(dim=1)))
+            ovr.append((self._eng_idx, ~(has_alive_e | has_q_e) & self._seat_engineer_job_mask(row).any(dim=1)))
         if getattr(self, "_archaeologist_idx", -1) >= 0:
             # `_trainable_units` already asks for the museum's free slot; the
             # queue is what it cannot see, so refuse a second one in flight.
@@ -1638,21 +1638,100 @@ class SimSeats:
             & ok
         ) | (owned & self.pillaged) | (owned & self.district_pillaged)
 
-    def _seat_fort_job_mask(self, row: int, techs: torch.Tensor | None = None) -> torch.Tensor:
+    def _imp_ground_ok(self, k: int) -> torch.Tensor:
+        """[B, T] — does improvement `k`'s own catalog clause allow this tile?
+        The terrain, elevation, feature and neighbour rules each row states for
+        itself, which `validImprovementsIn` asks of its suzerain rows and of
+        the Military Engineer's alike."""
+        B, dev = self.B, self.device
+        ok = torch.ones(B, self.T, dtype=torch.bool, device=dev)
+        terr = self._imp_terr[k]
+        if terr:
+            allow = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
+            for t in terr:
+                allow |= self.terrain == t
+            ok &= allow
+        for t in self._imp_xterr[k]:
+            ok &= self.terrain != t
+        elev = self._imp_elev[k]
+        if elev:
+            allow = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
+            for e in elev:
+                allow |= self.hills if e == 1 else ~self.hills
+            ok &= allow
+        if self._imp_no_feat[k]:
+            ok &= ~((self.feat_id >= 0) & ~self.feat_stripped)
+        if self._imp_no_adj_same[k]:
+            nb = self.neigh
+            nbc = nb.clamp(min=0)
+            same = ((self.improvement[:, nbc] == k) & (nb >= 0).unsqueeze(0)).any(dim=2)
+            ok &= ~same
+        return ok
+
+    def _suz_improvement_ok(self, row: int, k: int) -> torch.Tensor:
+        """[B, T] — may seat row `row` build suzerain improvement `k` here?
+        The suzerainty is a per-GAME pairing (the seeder draws which minors a
+        map holds), so it reads `citystate_suz_imp`; the rest is the row's own
+        catalog clause (`validImprovementsIn`'s suzerain block)."""
+        if not self._imp_suz[k]:
+            return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        held = (self._suzerain_mask(row) & (self.citystate_suz_imp[:, : self.S] == k)).any(dim=1)
+        return held.unsqueeze(1) & self._imp_ground_ok(k)
+
+    def _eng_finish_slot(self, row: int, tiles: torch.Tensor) -> torch.Tensor:
+        """[B, N] — the CITY COLUMN whose head a charge spent at each of
+        `tiles` would advance by 20%, -1 where none (`engineerFinishCity`). A
+        district's charge is spent ON the site it is being dug at, which is
+        `city_qtile`; the Flood Barrier is a building, so its charge is spent
+        at the city centre."""
+        B, N = tiles.shape
+        out = torch.full((B, N), -1, dtype=torch.long, device=self.device)
+        if self._eng_idx < 0 or not self._eng_finish_slots:
+            return out
+        cur = self.city_current[:, row]                              # [B, RC]
+        alive = self.city_alive[:, row]
+        for j in range(self.RC):
+            live = alive[:, j]
+            if not bool(live.any()):
+                continue
+            want = torch.zeros(B, dtype=torch.bool, device=self.device)
+            for s in self._eng_finish_slots:
+                want = want | (cur[:, j] == self.DISTRICT_BASE + s)
+            at = torch.where(want, self.city_qtile[:, row, j], torch.full_like(want, -1, dtype=torch.long))
+            if self._barrier_bidx >= 0:
+                at = torch.where(cur[:, j] == self._barrier_bidx, self.city_center[:, row, j], at)
+            hit = live.unsqueeze(1) & (at >= 0).unsqueeze(1) & (tiles == at.unsqueeze(1))
+            out = torch.where(hit & (out < 0), torch.full_like(out, j), out)
+        return out
+
+    def _eng_finish_at(self, row: int) -> torch.Tensor:
+        """[B, T] — every tile `_eng_finish_slot` would answer for, as a tile
+        plane for the mask column."""
+        span = torch.arange(self.T, device=self.device).reshape(1, -1).expand(self.B, self.T)
+        return self._eng_finish_slot(row, span) >= 0
+
+    def _seat_engineer_job_mask(self, row: int, techs: torch.Tensor | None = None) -> torch.Tensor:
+        """[B, T] — the tiles a Military Engineer of seat row `row` would have
+        work at. `trainableUnits` asks only for the Armory, so this is the
+        GPU's own reason to offer the column: one of the engineer's own
+        improvements it could place, a tile with no road on it, or a 20% charge
+        waiting to be spent. All three go "in your own or neutral territory"
+        (`engineerTileOk`).
+        """
         B = self.B
         dev = self.device
-        if self.FORT < 0 or self._eng_idx < 0:
+        if self._eng_idx < 0:
             return torch.zeros(B, self.T, dtype=torch.bool, device=dev)
         tk = techs if techs is not None else self.civ_techs[:, row]
-        ut = int(self._imp_unlock[self.FORT])
-        unl = tk[:, ut].unsqueeze(1) if ut >= 0 else torch.ones(B, 1, dtype=torch.bool, device=dev)
-        owned = self.tile_seat == row
-        base = (
-            owned
-            & unl
+        ground = (
+            ((self.tile_seat == row) | (self.tile_seat < 0))
             & self.passable
             & ~self.water
             & ~self.nwonder
+        )
+        out = ground & ~self.road
+        unpaved = (
+            ground
             & (self.improvement < 0)
             & (self.district < 0)
             & (self.built_wonder < 0)
@@ -1661,16 +1740,13 @@ class SimSeats:
             # carries.
             & (self.centre_slot_at < 0)
         )
-        if not bool(base.any()):
-            return base
-        host = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
-        for other in range(self.n_majors):
-            if other == row:
+        for k, is_eng in enumerate(self._imp_eng):
+            if not is_eng:
                 continue
-            host = host | ((self.tile_seat == other) & self.war[:, row, other].unsqueeze(1))
-        nb = self.neigh.clamp(min=0)
-        adj = (host[:, nb] & (self.neigh >= 0).unsqueeze(0)).any(dim=2)
-        return base & adj
+            ut = int(self._imp_unlock[k])
+            unl = tk[:, ut].unsqueeze(1) if ut >= 0 else torch.ones(B, 1, dtype=torch.bool, device=dev)
+            out = out | (unpaved & unl & self._imp_ground_ok(k))
+        return out | self._eng_finish_at(row)
 
     def _offer_apostle_promos(self, row: int, landed: torch.Tensor) -> None:
         """`offerApostlePromotions` — CIV6 (Apostle): "Acquire 1 Religious
@@ -3359,6 +3435,55 @@ class SimSeats:
             out = add if out is None else out + add
         return out
 
+    def _imp_adjacency(self, row: int) -> torch.Tensor | None:
+        """[B, T, 6] — what a SUZERAIN improvement's neighbours pay it, or None
+        where no such improvement stands on the map. Each catalog rule counts
+        the neighbours matching any of its sources, divides by `per`, and pays
+        once per whole group; the row's civics swap in the improved rate and
+        payout (`improvementAdjacency`)."""
+        if not self._imp_adj_live:
+            return None
+        live = (self.improvement >= 0) & ~self.pillaged
+        out = None
+        cv = self.civ_civics[:, row]
+        nb = self.neigh
+        nbc = nb.clamp(min=0)
+        on = (nb >= 0).unsqueeze(0)
+        for k, rules in enumerate(self._imp_adj):
+            if not rules:
+                continue
+            here = live & (self.improvement == k)
+            if not bool(here.any()):
+                continue
+            for r in rules:
+                uc = int(r.get("uc", -1))
+                up = (cv[:, uc] if uc >= 0 else
+                      torch.zeros(self.B, dtype=torch.bool, device=self.device))
+                hit = torch.zeros(self.B, self.T, 6, dtype=torch.bool, device=self.device)
+                if int(r.get("bres", 0)):
+                    hit |= (self.res_priority[:, nbc] == 1) & ~self.res_stripped[:, nbc]
+                di = int(r.get("dist", -1))
+                if int(r.get("anyd", 0)):
+                    hit |= (self.district[:, nbc] >= 0) & self.district_complete[:, nbc]
+                elif di >= 0:
+                    hit |= (self.district[:, nbc] == di) & self.district_complete[:, nbc]
+                for f in r.get("feats", []):
+                    hit |= (self.feat_id[:, nbc] == f) & ~self.feat_stripped[:, nbc]
+                n = (hit & on).sum(dim=2)                    # [B, T]
+                uper = int(r.get("uper", 0))
+                per = torch.where(up.unsqueeze(1) & (uper > 0),
+                                  torch.full_like(n, max(1, uper)),
+                                  torch.full_like(n, max(1, int(r["per"]))))
+                groups = torch.div(n, per.clamp(min=1), rounding_mode="floor").to(self.dtype)
+                base = torch.tensor(r["y"], dtype=self.dtype, device=self.device)
+                upy = torch.tensor(r.get("uy", [0] * 6), dtype=self.dtype, device=self.device)
+                pay = (torch.where(up.reshape(-1, 1, 1), upy.reshape(1, 1, 6),
+                                   base.reshape(1, 1, 6))
+                       if bool(upy.any()) else base.reshape(1, 1, 6))
+                add = groups.unsqueeze(2) * pay * here.unsqueeze(2).to(self.dtype)
+                out = add if out is None else out + add
+        return out
+
     def _seat_tile_add(self, row: int) -> torch.Tensor:
         """[B, T, 6] belief TILE adds — featureYields at tiles with a LIVE feature
         (fid >= 0 and not stripped), plus improvementOnResource at unpillaged
@@ -3374,10 +3499,13 @@ class SimSeats:
         key = (row, self._eff_version, self._bel_version)
         if self._belief_feat_cache is not None and self._belief_feat_cache[0] == key:
             return self._belief_feat_cache[1]
+        suz = self._imp_adjacency(row)
         if not self._seat_has_beliefs(row):
             pres = self._preserve_plane(row)
             plane = (pres if pres is not None
                      else torch.zeros(self.B, self.T, 6, dtype=self.dtype, device=self.device))
+            if suz is not None:
+                plane = plane + suz
             self._belief_feat_cache = (key, plane)
             return plane
         featA = self._bel_add("featY", row)
@@ -4062,6 +4190,14 @@ class SimSeats:
                 & (imp_w >= 0)
             )
             housing = housing + (self._imp_housing[imp_w.clamp(min=0)].double() * own.double()).sum(dim=2)
+            # CIV6 (Monastery): "+1 additional Housing (with Colonialism)"
+            hc = self._imp_house_civic[imp_w.clamp(min=0)]
+            if bool((hc >= 0).any()):
+                got = torch.where(hc >= 0,
+                                  self.civ_civics[:, row].gather(
+                                      1, hc.clamp(min=0).reshape(self.B, -1)).reshape_as(hc),
+                                  torch.zeros_like(hc, dtype=torch.bool))
+                housing = housing + (got & own).double().sum(dim=2)
         if self._gov_has_effects:
             gm = self._gov_mods(row)
             housing = housing + gm[2].double().unsqueeze(1)

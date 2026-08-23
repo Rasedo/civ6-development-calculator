@@ -7,7 +7,31 @@
  * Gathering Storm CIVILOPEDIA. No `eyeballed`/`approximate` markers remain.
  */
 
-import type { ImprovementId, Yields } from '../core/types';
+import type { DistrictId, ImprovementId, Yields, YieldKey } from '../core/types';
+import type { Elevation, FeatureId, TerrainId } from '../../world/types';
+
+/**
+ * What a neighbour pays a SUZERAIN improvement. Each row counts the
+ * neighbours that match ANY of its sources, divides by `per`, and pays
+ * `yields` for each whole group. A civic may improve the rate, the payout, or
+ * both — which is exactly how the three sourced rows below read.
+ */
+export interface ImpAdjacency {
+  /** count a neighbour carrying a BONUS resource. */
+  bonusResource?: boolean;
+  /** count a neighbour holding this completed district. */
+  district?: DistrictId;
+  /** count a neighbour holding ANY completed district. */
+  anyDistrict?: boolean;
+  /** count a neighbour carrying one of these live features. */
+  features?: FeatureId[];
+  per: number;
+  yields: Partial<Yields>;
+  /** the civic that improves the rule, and what it improves it to. */
+  upgradeCivic?: string;
+  upgradePer?: number;
+  upgradeYields?: Partial<Yields>;
+}
 
 export interface ImprovementDef {
   id: ImprovementId;
@@ -17,6 +41,33 @@ export interface ImprovementDef {
   housing: number;
   resourceOnly: boolean;
   description: string;
+  /** the CITY-STATE whose SUZERAIN may build it (a `CITY_STATE_SUZERAIN_BONUS` key). */
+  suzerainOf?: string;
+  /** terrain it may stand on; absent = any land. */
+  terrains?: TerrainId[];
+  /** terrain it refuses. */
+  excludeTerrains?: TerrainId[];
+  /** elevations it may stand on; absent = flat and hills alike. */
+  elevations?: Elevation[];
+  /** may not neighbour another of its own kind. */
+  noAdjacentSame?: boolean;
+  /** what its neighbours pay it. */
+  adjacency?: ImpAdjacency[];
+  /** the civic that adds one more Housing on top of `housing`. */
+  housingCivic?: string;
+  /** HP a friendly RELIGIOUS unit standing on it heals each turn. */
+  religiousHeal?: number;
+  /** tourism equal to this yield of its own, once `tourismTech` is in. */
+  tourismFrom?: YieldKey;
+  tourismTech?: string;
+  /** what it takes off a NEIGHBOUR's appeal, the district column's twin. */
+  appealAdjacent?: number;
+  /** aircraft it bases. */
+  airSlots?: number;
+  /** built by the MILITARY ENGINEER rather than the Builder. */
+  engineer?: boolean;
+  /** refuses a tile that still carries a feature. */
+  noFeature?: boolean;
 }
 
 /** the BREATHTAKING appeal bar a Seaside Resort needs (real Civ 6
@@ -43,6 +94,9 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
   },
   MINE: {
     id: 'MINE',
+    // CIV6 (Appeal): a mine, a quarry and an oil well each take a point off
+    // every neighbour.
+    appealAdjacent: -1,
     name: 'Mine',
     code: 'Mi',
     yields: { production: 1 },
@@ -52,6 +106,9 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
   },
   QUARRY: {
     id: 'QUARRY',
+    // CIV6 (Appeal): a mine, a quarry and an oil well each take a point off
+    // every neighbour.
+    appealAdjacent: -1,
     name: 'Quarry',
     code: 'Qu',
     yields: { production: 1 },
@@ -106,6 +163,9 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
   },
   OIL_WELL: {
     id: 'OIL_WELL',
+    // CIV6 (Appeal): a mine, a quarry and an oil well each take a point off
+    // every neighbour.
+    appealAdjacent: -1,
     name: 'Oil Well',
     code: 'Ow',
     yields: { production: 2 },
@@ -129,6 +189,8 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     resourceOnly: false,
     description: 'Flat coastal grassland/plains/desert with Breathtaking appeal. Gold equal to the tile appeal.',
   },
+  // THE MILITARY ENGINEER'S OWN TWO. Both pages read "in your own or neutral
+  // territory", which is the engineer branch's rule rather than a column.
   FORT: {
     id: 'FORT',
     name: 'Fort',
@@ -136,6 +198,92 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     yields: {},
     housing: 0,
     resourceOnly: false,
-    description: 'Military Engineer only. Occupying unit gets +4 defense strength and 2 turns of fortification.',
+    engineer: true,
+    // CIV6 (Fort): "can be built on any featureless land tile".
+    noFeature: true,
+    description: 'Military Engineer only, featureless land. Occupying unit gets +4 defense strength and 2 turns of fortification.',
+  },
+  // CIV6 (Airstrip): "provides a base for military aircraft and may be built
+  // on flat terrain"; "+3 aircraft slots", "-1 Appeal". Its infobox terrain
+  // list is every FLAT land terrain, so the elevation clause states it once.
+  AIRSTRIP: {
+    id: 'AIRSTRIP',
+    name: 'Airstrip',
+    code: 'As',
+    yields: {},
+    housing: 0,
+    resourceOnly: false,
+    engineer: true,
+    elevations: ['FLAT'],
+    appealAdjacent: -1,
+    airSlots: 3,
+    description: 'Military Engineer only, flat land. Bases 3 aircraft and costs its neighbours a point of appeal.',
+  },
+  // THE SUZERAIN IMPROVEMENTS. Each is built by "a player that is the
+  // Suzerain of" one city-state, and each row below is that improvement's own
+  // Civilopedia page, read line by line.
+  BATEY: {
+    id: 'BATEY',
+    name: 'Batey',
+    code: 'By',
+    yields: { culture: 1 },
+    housing: 0,
+    resourceOnly: false,
+    suzerainOf: 'Caguana',
+    terrains: ['DESERT', 'GRASSLAND', 'PLAINS', 'SNOW', 'TUNDRA'],
+    // CIV6: "Cannot be built on Hills tiles or adjacent to another Batey."
+    elevations: ['FLAT'],
+    noAdjacentSame: true,
+    // CIV6: "+1 Culture for every adjacent Bonus Resource or Entertainment
+    // Complex (increasing to +2 Culture with Exploration)."
+    adjacency: [{
+      bonusResource: true, district: 'ENTERTAINMENT_COMPLEX', per: 1,
+      yields: { culture: 1 }, upgradeCivic: 'EXPLORATION', upgradeYields: { culture: 2 },
+    }],
+    // CIV6: "Provides Tourism after researching Flight."
+    tourismFrom: 'culture',
+    tourismTech: 'FLIGHT',
+    description: '+1 culture, +1 more per adjacent bonus resource or Entertainment Complex (+2 with Exploration). Flat, not beside another Batey.',
+  },
+  COLOSSAL_HEADS: {
+    id: 'COLOSSAL_HEADS',
+    name: 'Colossal Heads',
+    code: 'Ch',
+    yields: { faith: 2 },
+    housing: 0,
+    resourceOnly: false,
+    suzerainOf: 'La Venta',
+    // CIV6: "Cannot be built on Snow or Snow Hills." The page's terrain list
+    // also names Volcanic Soil, which this map has no carrier for — an
+    // eruption enriches the ground it stands on instead of retexturing it.
+    excludeTerrains: ['SNOW'],
+    // CIV6: "+1 Faith for every 2 adjacent Woods or Rainforests (increasing to
+    // +1 Faith for every adjacent Woods or Rainforest with Humanism)."
+    adjacency: [{
+      features: ['WOODS', 'RAINFOREST'], per: 2, yields: { faith: 1 },
+      upgradeCivic: 'HUMANISM', upgradePer: 1,
+    }],
+    // CIV6: "Provides Tourism from Faith after researching Flight."
+    tourismFrom: 'faith',
+    tourismTech: 'FLIGHT',
+    description: '+2 faith, +1 more per 2 adjacent Woods/Rainforest (per 1 with Humanism). Anywhere but snow.',
+  },
+  MONASTERY: {
+    id: 'MONASTERY',
+    name: 'Monastery',
+    code: 'My',
+    yields: { faith: 2 },
+    // CIV6 [GS]: "+1 Housing" and "+1 additional Housing (with Colonialism)".
+    housing: 1,
+    housingCivic: 'COLONIALISM',
+    resourceOnly: false,
+    suzerainOf: 'Armagh',
+    // CIV6: "Cannot be adjacent to another Monastery."
+    noAdjacentSame: true,
+    // CIV6 [GS]: "+1 Faith for every 2 adjacent Districts."
+    adjacency: [{ anyDistrict: true, per: 2, yields: { faith: 1 } }],
+    // CIV6: "Provides +15 HP healing every turn for friendly religious units."
+    religiousHeal: 15,
+    description: '+2 faith, +1 more per 2 adjacent districts, +1 housing (+1 with Colonialism), heals religious units 15. Not beside another Monastery.',
   },
 };

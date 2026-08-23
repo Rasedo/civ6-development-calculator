@@ -1,4 +1,7 @@
 import { seatOf, unitsOf } from '../../../cpu/core/seats';
+import { IMPROVEMENT_IDS, unitActionIndex } from '../../../cpu/core/unitActions';
+
+const A_SPREAD = unitActionIndex(IMPROVEMENT_IDS).SPREAD_HERE;
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../../../cpu/core/game';
 import { applySeatUnitOrders } from '../../../cpu/core/phase';
@@ -22,10 +25,10 @@ function newGame(opponents = 1): GameState {
   return state;
 }
 
-/** SPREAD is a wire VERB (column 38 = underfoot); spreadFromUnit re-validates
+/** SPREAD is a wire VERB (SPREAD_HERE = underfoot); spreadFromUnit re-validates
  * type, charges and a FOUNDED religion. */
 function spreadHere(state: GameState, actor: Seat, unitId: number): void {
-  const row = unitsOf(state, actor.seat).map((x) => (x.id === unitId ? 38 : -1));
+  const row = unitsOf(state, actor.seat).map((x) => (x.id === unitId ? A_SPREAD : -1));
   applySeatUnitOrders(state, actor, [row]);
 }
 

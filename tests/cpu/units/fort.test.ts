@@ -5,10 +5,11 @@ import { validImprovementsIn } from '../../../cpu/core/rules';
 import type { Tile } from '../../../cpu/core/types';
 
 /**
- * — the FORT. MEASURED gate reachability is ZERO (no seed
- * builds a Military Engineer, so no fort is ever placed), which makes scripted
- * parity vacuous for this mechanic. These tests construct the configuration
- * directly instead of hoping a seed wanders into it.
+ * THE FORT'S DEFENCE. MEASURED gate reachability is ZERO — no seed reaches an
+ * Encampment with an Armory, so no Military Engineer is ever trained and no
+ * fort is ever placed, which makes scripted parity vacuous here. These tests
+ * construct the configuration directly instead of hoping a seed wanders into
+ * it; `engineer.test.ts` covers what BUILDS it.
  */
 const tile = (over: Partial<Tile> = {}): Tile =>
   ({

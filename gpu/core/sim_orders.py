@@ -6,6 +6,17 @@ from . import simbase  # the PATCHABLE globals (the pool caps/_ALIAS_CHECK) must
 
 
 class SimOrders:
+    def _spend_build_charge(self, r: torch.Tensor, sc: torch.Tensor, hc: torch.Tensor) -> None:
+        """A charge and the turn, and the unit vanishes on its last one — the
+        tail every Builder and Military Engineer verb shares."""
+        self.unit_charges[r, sc[r]] -= 1
+        self.unit_mp[r, sc[r]] = 0  # the turn is spent (TS movesLeft = 0)
+        gone = self.unit_charges[r, sc[r]] <= 0
+        if bool(gone.any()):
+            d = r[gone]
+            self.unit_alive[d, sc[d]] = False
+            self.civilian_at[(d, hc[d])] = -1
+
     def _apply_seat_unit_actions(self, row: int, actions: torch.Tensor) -> None:
         B, dev = self.B, self.device
         smap = self._seat_slot_map(row)
@@ -45,6 +56,8 @@ class SimOrders:
         _rbw = self._air_rebase_cols
         _stc = getattr(self, "_A_SPY_TRAVEL", -1)
         _smc = getattr(self, "_A_SPY_MISSION", -1)
+        _rdc = getattr(self, "_A_ROAD", -1)
+        _fnc = getattr(self, "_A_FINISH", -1)
         _stw = self._spy_travel_cols
         _smw = self._n_spy_missions
         _pcol = self.rules.promo_cols
@@ -74,12 +87,15 @@ class SimOrders:
             (((_ab >= _rbc) & (_ab < _rbc + _rbw)) if _rbc >= 0 else _no).any(dim=0),  # rebase
             (((_ab >= _stc) & (_ab < _stc + _stw)) if _stc >= 0 else _no).any(dim=0),  # spy travel
             (((_ab >= _smc) & (_ab < _smc + _smw)) if _smc >= 0 else _no).any(dim=0),  # spy mission
+            ((_ab == _rdc) if _rdc >= 0 else _no).any(dim=0),                    # build road
+            ((_ab == _fnc) if _fnc >= 0 else _no).any(dim=0),                    # finish district
         ]).tolist()
         (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
          _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread,
          _rk_excavate, _rk_park, _rk_promote, _rk_condemn,
          _rk_heresy, _rk_inquis, _rk_heathen, _rk_upgrade,
-         _rk_air, _rk_rebase, _rk_travel, _rk_mission) = _tab
+         _rk_air, _rk_rebase, _rk_travel, _rk_mission,
+         _rk_road, _rk_finish) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -209,6 +225,36 @@ class SimOrders:
                 ugm = act & (a == _ug)
                 if bool(ugm.any()):
                     self._upgrade_units(row, ugm, sc, utp)
+
+            # THE MILITARY ENGINEER'S TWO NON-IMPROVEMENT VERBS. Each spends a
+            # charge and the turn, and the unit vanishes on its last one.
+            if _rk_road[n] and _rdc >= 0 and self._eng_idx >= 0:
+                _rdm = (
+                    act & (a == _rdc) & (utp == self._eng_idx) & (u_charges > 0)
+                    & (own_tile | (self.tile_seat < 0)).gather(1, hc.unsqueeze(1)).squeeze(1)
+                    & self.passable.gather(1, hc.unsqueeze(1)).squeeze(1)
+                    & ~self.water.gather(1, hc.unsqueeze(1)).squeeze(1)
+                    & ~self.road.gather(1, hc.unsqueeze(1)).squeeze(1)
+                )
+                if bool(_rdm.any()):
+                    _r = _rdm.nonzero(as_tuple=True)[0]
+                    self.road[_r, hc[_r]] = True
+                    self._spend_build_charge(_r, sc, hc)
+
+            if _rk_finish[n] and _fnc >= 0 and self._eng_idx >= 0:
+                _fnm = act & (a == _fnc) & (utp == self._eng_idx) & (u_charges > 0)
+                if bool(_fnm.any()):
+                    _col = self._eng_finish_slot(row, here.unsqueeze(1)).squeeze(1)
+                    _fnm = _fnm & (_col >= 0)
+                    if bool(_fnm.any()):
+                        _r = _fnm.nonzero(as_tuple=True)[0]
+                        _c = _col[_r]
+                        # `itemCost`: a district's price locked at queue, a
+                        # building's read live.
+                        _cst = self._live_building_cost(row)[_r, _c].double()
+                        self.city_progress[_r, row, _c] += js_round(
+                            _cst * self._eng_finish_frac).to(self.city_progress.dtype)
+                        self._spend_build_charge(_r, sc, hc)
 
             if _rk_air[n] and _ar >= 0:
                 asm = act & (a >= _ar) & (a < _ar + _asw)
@@ -451,14 +497,25 @@ class SimOrders:
                           else torch.zeros(B, dtype=torch.bool, device=dev))
                 constr = (techs[:, self._lumber_unlock_tech] if self._lumber_unlock_tech >= 0
                           else torch.zeros(B, dtype=torch.bool, device=dev))
-                here_ok = (
-                    act & (utp == self._builder_idx) & (u_charges > 0)
-                    & own_tile.gather(1, hc.unsqueeze(1)).squeeze(1)
-                    & (self.centre_slot_at.gather(1, hc.unsqueeze(1)).squeeze(1) < 0)
+                _paved = (
+                    (self.centre_slot_at.gather(1, hc.unsqueeze(1)).squeeze(1) < 0)
                     & (self.improvement.gather(1, hc.unsqueeze(1)).squeeze(1) < 0)
                     & (self.district.gather(1, hc.unsqueeze(1)).squeeze(1) < 0)
                     & (self.built_wonder.gather(1, hc.unsqueeze(1)).squeeze(1) < 0)
                 )
+                here_ok = (
+                    act & (utp == self._builder_idx) & (u_charges > 0)
+                    & own_tile.gather(1, hc.unsqueeze(1)).squeeze(1) & _paved
+                )
+                # the MILITARY ENGINEER's rows reach neutral ground too
+                # (`engineerTileOk`), so its base differs from the Builder's.
+                eng_ok = (
+                    act & (utp == self._eng_idx) & (u_charges > 0)
+                    & (own_tile | (self.tile_seat < 0)).gather(1, hc.unsqueeze(1)).squeeze(1)
+                    & self.passable.gather(1, hc.unsqueeze(1)).squeeze(1)
+                    & ~self.water.gather(1, hc.unsqueeze(1)).squeeze(1)
+                    & _paved
+                ) if self._eng_idx >= 0 else torch.zeros(B, dtype=torch.bool, device=dev)
                 _rq = self.res_imp.gather(1, hc.unsqueeze(1)).squeeze(1)
                 did = torch.zeros(B, dtype=torch.bool, device=dev)
                 for _k in range(self._imp_unlock.numel()):
@@ -479,9 +536,16 @@ class SimOrders:
                                 else torch.ones(B, dtype=torch.bool, device=dev))
                         if self.SEASIDE >= 0 and _k == self.SEASIDE:
                             _valid = self._seaside_ok().gather(1, hc.unsqueeze(1)).squeeze(1) & _unl
+                        elif self._imp_suz[_k]:
+                            _valid = self._suz_improvement_ok(row, _k).gather(
+                                1, hc.unsqueeze(1)).squeeze(1)
+                        elif self._imp_eng[_k]:
+                            _valid = _unl & self._imp_ground_ok(_k).gather(
+                                1, hc.unsqueeze(1)).squeeze(1)
                         else:
                             _valid = (_rq == _k) & _unl
-                    _ok = here_ok & (a == _col) & _valid
+                    _base = eng_ok if self._imp_eng[_k] else here_ok
+                    _ok = _base & (a == _col) & _valid
                     if bool(_ok.any()):
                         _r = _ok.nonzero(as_tuple=True)[0]
                         self.improvement[_r, hc[_r]] = _k
@@ -489,14 +553,8 @@ class SimOrders:
                         did[_r] = True
                 if bool(did.any()):
                     _r = did.nonzero(as_tuple=True)[0]
-                    self.unit_charges[_r, sc[_r]] -= 1
-                    self.unit_mp[_r, sc[_r]] = 0  # the turn is spent (TS movesLeft = 0)
                     self._eff_version += 1
-                    _sp = did & (self.unit_charges.gather(1, sc.unsqueeze(1)).squeeze(1) <= 0)
-                    if bool(_sp.any()):
-                        _dr = _sp.nonzero(as_tuple=True)[0]
-                        self.unit_alive[_dr, sc[_dr]] = False
-                        self.civilian_at[(_dr, hc[_dr])] = -1
+                    self._spend_build_charge(_r, sc, hc)
                 # REPAIR (`builderRepair`): improvement first, else district;
                 # the turn is spent, NO charge.
                 _rp = (

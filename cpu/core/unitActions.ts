@@ -1,7 +1,7 @@
 
 import { PROMO_COLS } from '../data/promotions';
 
-export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL', 'QUARRY', 'PASTURE', 'CAMP', 'PLANTATION', 'OIL_WELL', 'SEASIDE_RESORT', 'FORT'];
+export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL', 'QUARRY', 'PASTURE', 'CAMP', 'PLANTATION', 'OIL_WELL', 'SEASIDE_RESORT', 'FORT', 'BATEY', 'COLOSSAL_HEADS', 'MONASTERY', 'AIRSTRIP'];
 
 export const DEDICATED_IMPROVEMENTS = 3;
 
@@ -29,8 +29,10 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   for (let d = 0; d < 6; d++) names.push(`SPREAD_${d}`);
   names.push('FOUND_CITY');
   // APPENDED LAST, after FOUND_CITY: every index above is load-bearing on
-  // both engines (`A_PILLAGE`, `A_SNIPE`, the spread block), so a new verb
-  // joins at the end or it moves somebody else's column.
+  // both engines (PILLAGE, the SNIPE ring, the spread block), so a new verb
+  // joins at the end or it moves somebody else's column. A new IMPROVEMENT
+  // moves them all regardless — every BUILD verb sits before PILLAGE — so no
+  // consumer may write one of these seats down.
   names.push('EXCAVATE');
   names.push('PARK');
   // PROMOTE: column k takes row k of the acting unit's OWN class list, so one
@@ -51,6 +53,11 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // catalog order, so column k means the same thing on both engines.
   for (let k = 0; k < SPY_TRAVEL_COLS; k++) names.push(`SPY_TRAVEL_${k}`);
   for (let k = 0; k < SPY_MISSIONS.length; k++) names.push(`SPY_MISSION_${k}`);
+  // THE MILITARY ENGINEER'S TWO NON-IMPROVEMENT VERBS: lay a road, and spend
+  // a charge into an engineering district or a Flood Barrier. Appended LAST,
+  // like every verb since FOUND_CITY.
+  names.push('BUILD_ROAD');
+  names.push('FINISH_DISTRICT');
   return names;
 }
 

@@ -29,6 +29,7 @@ import { PLACEABLE_DISTRICTS } from '../data/districts';
 import { CITY_STATE_TYPES, CITY_STATE_SUZERAIN_LIVE, CITY_STATE_SUZERAIN_BONUS, SUZ_EFFECTS } from '../data/cityStates';
 import { HOUSING_COASTAL, HOUSING_FRESH_WATER, HOUSING_NO_WATER } from '../data/constants';
 import { IMPROVEMENT_IDS } from '../core/unitActions';
+import { IMPROVEMENTS } from '../data/improvements';
 import { LUXURY_IDS, RESOURCE_IDS, TERRAIN_IDS, BUILT_WONDER_LIST, featIdx, wonderStaticOk, staticAdjRaw, featureAdjContribution, chopKeyCode, chopUnlockTech } from './catalog';
 
 export function buildFixture(state: GameState, world: WorldFile): object {
@@ -48,6 +49,12 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     pop: 3,
     suzKey: CITY_STATE_SUZERAIN_LIVE[cityState.name] ? YIELD_KEYS.indexOf(CITY_STATE_SUZERAIN_LIVE[cityState.name]) : -1,
     suzCode: suzCodeOf(cityState.name),
+    // the IMPROVEMENT this minor's suzerain may build, by roster index. The
+    // catalog names the minor and the seeder draws which minors a map holds,
+    // so the pairing can only be resolved here, per game.
+    suzImp: IMPROVEMENT_IDS.indexOf(
+      Object.values(IMPROVEMENTS).find((i) => i.suzerainOf === cityState.name)?.id ?? '',
+    ),
   }));
 
   const unitRosterIdx = new Map(Object.values(UNITS).map((u, i) => [u.id, i]));

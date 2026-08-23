@@ -1,9 +1,11 @@
 /**
  * World wonders (base-game subset whose effects fit the modeled systems).
  * One per world; they occupy a tile like a district. EVERY ROW IS SOURCED:
- * cost, requiresTech/requiresCivic and the whole effect list come from the GS
- * Civilopedia page for that wonder, fetched one by one. PLACEMENT rules are
- * eyeballed where the real rule needs unmodeled terrain — NARROWED marker.
+ * cost, requiresTech/requiresCivic, the whole effect list and the PLACEMENT
+ * clause come from the GS Civilopedia page for that wonder, fetched one by
+ * one. `wonderTerrainOk` (core/rules.ts) reads the static half of the clause
+ * and the exporter bakes it per tile into `wok`; everything that can change
+ * during a game stays live in `canPlaceWonder` / `_wonder_cand`.
  *
  * A wonder that adds GREAT WORK or RELIC slots pays them through
  * `GW_WONDER_SLOTS` / `RELIC_WONDER_SLOTS` (data/greatPeople.ts), additive
@@ -24,13 +26,30 @@ export interface BuiltWonderDef {
   requiresCivic?: string;
   placement: {
     terrains?: TerrainId[];
+    /** Terrain the wonder REFUSES — the Hermitage's "non-Desert and
+     *  non-Tundra tile" is the only shape the source states this way. */
+    excludeTerrains?: TerrainId[];
     flatOnly?: boolean;
     hillsOnly?: boolean;
     requiresRiver?: boolean;
+    /** Must stand ON one of these features. */
+    onFeature?: FeatureId[];
+    /** Must neighbor a MOUNTAIN. */
+    adjacentMountain?: boolean;
     /** Must neighbor a completed district of this type. */
     adjacentDistrict?: DistrictId;
+    /** ...and that district's city must hold this building. */
+    adjacentDistrictBuilding?: string;
     /** Must neighbor a tile with this resource. */
     adjacentResource?: string;
+    /** Must neighbor a tile carrying this improvement. */
+    adjacentImprovement?: ImprovementId;
+    /** Must neighbor the owner's CAPITAL city centre. */
+    adjacentCapital?: boolean;
+    /** The seat must have founded a religion. */
+    requiresReligion?: boolean;
+    /** CIV6: "on Coast adjacent to land" — every wonder that asks for it
+     *  also says "It cannot be built on a Lake", so this means COAST. */
     onCoastalWater?: boolean;
     allowFloodplains?: boolean;
   };
@@ -160,7 +179,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       code: 'GL',
       cost: 400,
       requiresCivic: 'RECORDED_HISTORY',
-      placement: { flatOnly: true, adjacentDistrict: 'CAMPUS' },
+      placement: { flatOnly: true, adjacentDistrict: 'CAMPUS', adjacentDistrictBuilding: 'LIBRARY' },
       cityYields: { science: 2 },
       effects: { gpPoints: { SCIENTIST: 1, WRITER: 1 }, boostTechsThroughEra: 1 },
       description: '+2 science, +1 Scientist and +1 Writer point per turn, 2 Great Work of Writing slots, boosts every Ancient and Classical technology. Flat land adjacent to a Campus.',
@@ -182,7 +201,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       code: 'PE',
       cost: 400,
       requiresTech: 'MATHEMATICS',
-      placement: { terrains: ['DESERT'], flatOnly: true },
+      placement: { terrains: ['DESERT'], flatOnly: true, allowFloodplains: true },
       effects: {
         tileYields: [{ terrain: 'DESERT', excludeFeature: 'FLOODPLAINS', yields: { food: 2, gold: 2, production: 1 } }],
       },
@@ -205,7 +224,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       code: 'GZ',
       cost: 920,
       requiresTech: 'BANKING',
-      placement: { flatOnly: true, adjacentDistrict: 'COMMERCIAL_HUB' },
+      placement: { adjacentResource: 'CATTLE', adjacentDistrict: 'COMMERCIAL_HUB', adjacentDistrictBuilding: 'MARKET' },
       cityYields: { gold: 5 },
       effects: { gpPoints: { MERCHANT: 2 } },
       description: '+5 gold, +2 Merchant points per turn. Flat land adjacent to a Commercial Hub.',
@@ -227,7 +246,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       code: 'OX',
       cost: 1240,
       requiresTech: 'SCIENTIFIC_THEORY',
-      placement: { flatOnly: true, adjacentDistrict: 'CAMPUS' },
+      placement: { terrains: ['GRASSLAND', 'PLAINS'], flatOnly: true, adjacentDistrict: 'CAMPUS', adjacentDistrictBuilding: 'UNIVERSITY' },
       effects: { gpPoints: { SCIENTIST: 3 }, cityYieldMult: { science: 1.2 }, freeTechs: 2 },
       description: '+3 Scientist points per turn, +20% science in this city, 2 free technologies at completion, 2 Great Work of Writing slots. Flat, adjacent to a Campus.',
     }),
@@ -237,7 +256,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       code: 'RV',
       cost: 1240,
       requiresTech: 'INDUSTRIALIZATION',
-      placement: { requiresRiver: true, adjacentDistrict: 'INDUSTRIAL_ZONE' },
+      placement: { requiresRiver: true, adjacentDistrict: 'INDUSTRIAL_ZONE', adjacentDistrictBuilding: 'FACTORY' },
       effects: {
         cityYieldMult: { production: 1.2 },
         cityYieldPerImprovement: { improvements: ['MINE', 'QUARRY'], yields: { production: 1 } },
@@ -250,7 +269,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       code: 'BB',
       cost: 1450,
       requiresTech: 'ECONOMICS',
-      placement: { requiresRiver: true, adjacentDistrict: 'COMMERCIAL_HUB' },
+      placement: { requiresRiver: true, adjacentDistrict: 'COMMERCIAL_HUB', adjacentDistrictBuilding: 'BANK' },
       cityYields: { gold: 6 },
       effects: { gpPoints: { MERCHANT: 3 }, extraSlots: { economic: 1 }, treasuryMult: 1.5 },
       description: '+6 gold, +3 Merchant points per turn, an extra economic policy slot, and half the treasury again at completion. River tile adjacent to a Commercial Hub.',
@@ -258,7 +277,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
 
     W({
       id: 'TEMPLE_OF_ARTEMIS', name: 'Temple of Artemis', code: 'TA', cost: 180,
-      requiresTech: 'ARCHERY', placement: { flatOnly: true },
+      requiresTech: 'ARCHERY', placement: { adjacentImprovement: 'CAMP' },
       cityYields: { food: 4 },
       effects: {
         cityHousing: 3,
@@ -268,13 +287,13 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     }),
     W({
       id: 'GREAT_BATH', name: 'Great Bath', code: 'GT', cost: 180,
-      requiresTech: 'POTTERY', placement: { requiresRiver: true },
+      requiresTech: 'POTTERY', placement: { onFeature: ['FLOODPLAINS'], allowFloodplains: true },
       effects: { cityHousing: 3, cityAmenities: 1, floodMitigation: true },
       description: '+3 housing, +1 amenity, and floods along its river do no damage.',
     }),
     W({
       id: 'ETEMENANKI', name: 'Etemenanki', code: 'ET', cost: 220,
-      requiresTech: 'WRITING', placement: { requiresRiver: true },
+      requiresTech: 'WRITING', placement: { onFeature: ['FLOODPLAINS', 'MARSH'], allowFloodplains: true },
       cityYields: { science: 2 },
       effects: {
         tileYields: [
@@ -286,13 +305,13 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     }),
     W({
       id: 'APADANA', name: 'Apadana', code: 'AP', cost: 400,
-      requiresCivic: 'POLITICAL_PHILOSOPHY', placement: { flatOnly: true, adjacentDistrict: 'CITY_CENTER' },
+      requiresCivic: 'POLITICAL_PHILOSOPHY', placement: { adjacentCapital: true },
       effects: { envoysPerWonder: 2 },
       description: '+2 envoys each time a wonder completes in this city, Apadana included.',
     }),
     W({
       id: 'MAUSOLEUM_AT_HALICARNASSUS', name: 'Mausoleum at Halicarnassus', code: 'MH', cost: 400,
-      requiresCivic: 'DEFENSIVE_TACTICS', placement: { flatOnly: true, adjacentDistrict: 'HARBOR' },
+      requiresCivic: 'DEFENSIVE_TACTICS', placement: { adjacentDistrict: 'HARBOR' },
       effects: { tileYields: [{ terrain: 'COAST', yields: { science: 1, faith: 1, culture: 1 } }] },
       description: "+1 science, +1 faith and +1 culture on this city's Coast tiles.",
     }),
@@ -305,34 +324,34 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     }),
     W({
       id: 'HAGIA_SOPHIA', name: 'Hagia Sophia', code: 'HS', cost: 710,
-      requiresTech: 'BUTTRESS', placement: { flatOnly: true, adjacentDistrict: 'HOLY_SITE' },
+      requiresTech: 'BUTTRESS', placement: { flatOnly: true, adjacentDistrict: 'HOLY_SITE', requiresReligion: true },
       cityYields: { faith: 4 },
       effects: { spreadCharges: 1 },
       description: '+4 faith; every Missionary and Apostle spreads one extra time.',
     }),
     W({
       id: 'MONT_ST_MICHEL', name: 'Mont St. Michel', code: 'MS', cost: 710,
-      requiresCivic: 'DIVINE_RIGHT', placement: { requiresRiver: true },
+      requiresCivic: 'DIVINE_RIGHT', placement: { onFeature: ['FLOODPLAINS', 'MARSH'], allowFloodplains: true },
       cityYields: { faith: 2 },
       effects: { apostleMartyr: true, occupyDefense: 6 },
       description: '+2 faith, 2 relic slots; every Apostle carries Martyr, and the unit standing on it gets +6 defence.',
     }),
     W({
       id: 'UNIVERSITY_OF_SANKORE', name: 'University of Sankoré', code: 'US', cost: 710,
-      requiresTech: 'EDUCATION', placement: { flatOnly: true, adjacentDistrict: 'CAMPUS' },
+      requiresTech: 'EDUCATION', placement: { terrains: ['DESERT'], adjacentDistrict: 'CAMPUS', adjacentDistrictBuilding: 'UNIVERSITY' },
       cityYields: { science: 3, faith: 1 },
       effects: { gpPoints: { SCIENTIST: 2 } },
       description: '+3 science, +1 faith, +2 Scientist points per turn.',
     }),
     W({
       id: 'VENETIAN_ARSENAL', name: 'Venetian Arsenal', code: 'VA', cost: 920,
-      requiresTech: 'MASS_PRODUCTION', placement: { flatOnly: true, adjacentDistrict: 'HARBOR' },
+      requiresTech: 'MASS_PRODUCTION', placement: { onCoastalWater: true, adjacentDistrict: 'INDUSTRIAL_ZONE' },
       effects: { gpPoints: { ENGINEER: 2 }, duplicateNavalTrain: true },
       description: '+2 Engineer points per turn; a trained naval unit arrives twice.',
     }),
     W({
       id: 'ST_BASILS_CATHEDRAL', name: "St. Basil's Cathedral", code: 'SB', cost: 920,
-      requiresCivic: 'REFORMED_CHURCH', placement: { flatOnly: true },
+      requiresCivic: 'REFORMED_CHURCH', placement: { adjacentDistrict: 'CITY_CENTER' },
       effects: {
         religiousTourismMult: 2,
         tileYields: [{ terrain: 'TUNDRA', yields: { food: 1, production: 1, culture: 1 } }],
@@ -347,7 +366,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     }),
     W({
       id: 'POTALA_PALACE', name: 'Potala Palace', code: 'PP', cost: 1060,
-      requiresTech: 'ASTRONOMY', placement: { hillsOnly: true },
+      requiresTech: 'ASTRONOMY', placement: { hillsOnly: true, adjacentMountain: true },
       cityYields: { culture: 2, faith: 3 },
       effects: { dvp: 1, extraSlots: { diplomatic: 1 } },
       description: '+2 culture, +3 faith, +1 Diplomatic Victory point, +1 diplomatic policy slot.',
@@ -355,7 +374,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
 
     W({
       id: 'HERMITAGE', name: 'Hermitage', code: 'HM', cost: 1450,
-      requiresCivic: 'NATURAL_HISTORY', placement: { flatOnly: true, adjacentDistrict: 'THEATER_SQUARE' },
+      requiresCivic: 'NATURAL_HISTORY', placement: { requiresRiver: true, excludeTerrains: ['DESERT', 'TUNDRA'] },
       effects: { gpPoints: { ARTIST: 3 } },
       description: '+3 Artist points per turn, 4 Great Work of Art slots.',
     }),
@@ -367,7 +386,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     }),
     W({
       id: 'STATUE_OF_LIBERTY', name: 'Statue of Liberty', code: 'SL', cost: 1240,
-      requiresCivic: 'CIVIL_ENGINEERING', placement: { flatOnly: true, adjacentDistrict: 'HARBOR' },
+      requiresCivic: 'CIVIL_ENGINEERING', placement: { onCoastalWater: true, adjacentDistrict: 'HARBOR' },
       effects: { dvp: 4, loyaltyAura: 6 },
       description: '+4 Diplomatic Victory points on completion; your cities within 6 tiles never lose loyalty.',
     }),

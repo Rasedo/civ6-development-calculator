@@ -118,34 +118,45 @@ def _seat_units(sim, seat: int):
             sim.unit_tile.gather(1, sc), sim.unit_type.gather(1, sc), sim.unit_charges.gather(1, sc))
 
 
+def _charge_jobs(sim, seat: int, idx: int, jobs: torch.Tensor,
+                 out: torch.Tensor, present, tiles, types, charges) -> torch.Tensor:
+    """The nearest tile with work on it for every unit of type `idx` that still
+    holds a charge, tile index breaking the tie."""
+    if idx < 0 or not bool(jobs.any()):
+        return out
+    arangeT = torch.arange(sim.T, device=sim.device)
+    for n in range(out.shape[1]):
+        pres = present[:, n]
+        if not bool(pres.any()):
+            break
+        vt = types[:, n].clamp(min=0, max=sim.NU - 1)
+        rows = pres & (vt == idx) & (charges[:, n] > 0)
+        if not bool(rows.any()):
+            continue
+        d = sim.pair_dist[tiles[:, n].clamp(min=0)].to(torch.long)
+        key = torch.where(jobs, d * sim.T + arangeT, torch.full_like(d, 2 ** 30))
+        best = key.argmin(dim=1)
+        has = rows & jobs.gather(1, best.unsqueeze(1)).squeeze(1)
+        out[:, n] = torch.where(has, best, out[:, n])
+    return out
+
+
 def _builder_jobs(sim, seat: int) -> torch.Tensor:
     smap, present, tiles, types, charges = _seat_units(sim, seat)
     B, N = smap.shape
     out = torch.full((B, N), -1, dtype=torch.long, device=sim.device)
     if not sim.improvements_on:
         return out
-    jobs = sim._seat_job_mask(seat)
-    if not bool(jobs.any()):
+    # BUILDERS take the improvement jobs — a missionary's charge is a spread,
+    # not a build. The MILITARY ENGINEER walks to its own list instead: its
+    # improvements, an unroaded tile, or a 20% charge waiting to be spent.
+    out = _charge_jobs(sim, seat, sim._builder_idx, sim._seat_job_mask(seat),
+                       out, present, tiles, types, charges)
+    eidx = getattr(sim, "_eng_idx", -1)
+    if eidx < 0 or not bool(((types == eidx) & present & (charges > 0)).any()):
         return out
-    arangeT = torch.arange(sim.T, device=sim.device)
-    for n in range(N):
-        pres = present[:, n]
-        if not bool(pres.any()):
-            break
-        vt = types[:, n].clamp(min=0, max=sim.NU - 1)
-        # BUILDERS only — a missionary's charge is a spread, not a build, and
-        # the engines' improvement arms refuse every other type anyway.
-        civ_row = (vt == sim._builder_idx) & (charges[:, n] > 0)
-        rows = pres & civ_row
-        if not bool(rows.any()):
-            continue
-        here = tiles[:, n]
-        d = sim.pair_dist[here.clamp(min=0)].to(torch.long)
-        key = torch.where(jobs, d * sim.T + arangeT, torch.full_like(d, 2 ** 30))
-        best = key.argmin(dim=1)
-        has = rows & jobs.gather(1, best.unsqueeze(1)).squeeze(1)
-        out[:, n] = torch.where(has, best, out[:, n])
-    return out
+    return _charge_jobs(sim, seat, eidx, sim._seat_engineer_job_mask(seat),
+                        out, present, tiles, types, charges)
 
 
 def _spread_targets(sim, seat: int) -> torch.Tensor:
@@ -299,7 +310,7 @@ def _park_targets(sim, seat: int) -> torch.Tensor:
 def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
     um = sim._seat_unit_mask(seat)
     uo = sim.seat_unit_obs(seat)
-    orders0 = ladder.pick_unit_orders(um, uo)
+    orders0 = ladder.pick_unit_orders(um, uo, a_pillage=sim._A_PILLAGE, a_snipe=sim._A_SNIPE)
     # the serve tripwire computes both target tables pre-decide at the same
     # state; passing them here skips the recomputation (pure reads either way)
     if job_t is None:
@@ -438,7 +449,11 @@ def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
         # middle of the action table, so an inserted verb walks a hardcoded
         # range onto the wrong column. `_A_IMP` is that run, roster-ordered.
         rep_ok = um[:, :, sim._A_REPAIR]
-        bcols = [c for c in sim._A_IMP if c >= 0]
+        # A 20% charge into a district beats an improvement, and laying road is
+        # the fallback when nothing else is placeable here.
+        bcols = ([c for c in (getattr(sim, "_A_FINISH", -1),) if c >= 0]
+                 + [c for c in sim._A_IMP if c >= 0]
+                 + [c for c in (getattr(sim, "_A_ROAD", -1),) if c >= 0])
         bmask = torch.stack([um[:, :, c] for c in bcols], dim=2) if bcols else None
         pick_b = torch.full_like(orders0, -1)
         if bmask is not None:

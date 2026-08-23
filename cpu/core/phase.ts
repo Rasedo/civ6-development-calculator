@@ -47,13 +47,13 @@ import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPo
 import { buyVotes } from './congress';
 import { CONGRESS_SPECIAL_SLOT, EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, emergencies, emergencyLoyalty, emergencyName, emergencyStrikeCS, raiseEmergency } from './emergency';
 import { EMERGENCIES, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP } from '../data/seats';
-import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
-import { hasRiver, hasFreshWater, isCoastalWater } from '../../world/query';
+import { canBuildRoad, canPlaceDistrictIn, canPlaceWonder, validImprovementsIn, wonderExists } from './rules';
+import { hasRiver, hasFreshWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, archaeologistExcavate, naturalistPark, upgradeUnit } from './units';
 import { killUnit } from './combat';
-import { availableProjects, buyTile, buyWorshipBuilding, condemnHeretic, convertHeathens, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost } from './game';
+import { availableProjects, buyTile, buyWorshipBuilding, condemnHeretic, convertHeathens, districtCostIn, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
 import { airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom } from './air';
@@ -72,6 +72,11 @@ const A_CONDEMN = unitActionIndex(IMPROVEMENT_IDS).CONDEMN_0;
 const A_REMOVE_HERESY = unitActionIndex(IMPROVEMENT_IDS).REMOVE_HERESY;
 const A_LAUNCH_INQUISITION = unitActionIndex(IMPROVEMENT_IDS).LAUNCH_INQUISITION;
 const A_CONVERT_HEATHEN = unitActionIndex(IMPROVEMENT_IDS).CONVERT_HEATHEN;
+const A_PILLAGE = unitActionIndex(IMPROVEMENT_IDS).PILLAGE;
+const A_SNIPE = unitActionIndex(IMPROVEMENT_IDS).SNIPE_0;
+const A_SPREAD = unitActionIndex(IMPROVEMENT_IDS).SPREAD_HERE;
+const A_BUILD_ROAD = unitActionIndex(IMPROVEMENT_IDS).BUILD_ROAD;
+const A_FINISH_DISTRICT = unitActionIndex(IMPROVEMENT_IDS).FINISH_DISTRICT;
 import { AGREEMENT_TURNS, ALLIANCE_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles, grantedGovernorTitles, goldenBoostBonus, worldEraIndex } from './eras';
 import { NO_SEAT, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
@@ -507,29 +512,8 @@ export function placeSeatWonder(state: GameState, actor: Seat, civCity: City, de
     if (wonderExists(state, def.id)) return false;
     if (def.requiresTech && !actor.research.techs.includes(def.requiresTech)) return false;
     if (def.requiresCivic && !actor.research.civics.includes(def.requiresCivic)) return false;
-    const p = def.placement;
     const cands = tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS)
-      .filter((t) => {
-        if (!tileOwnedByCiv(t, civ) || !tileBelongsTo(t, civCity) || t.index === civCity.centerIndex) return false;
-        if (t.district || t.builtWonder || t.wonder) return false;
-        if (isImpassable(t)) return false;
-        if (t.resource && RESOURCES[t.resource].category !== 'bonus') return false;
-        if (p.onCoastalWater) {
-          if (!isCoastalWater(state.map, t)) return false;
-        } else {
-          if (isWater(t)) return false;
-          if (t.feature === 'FLOODPLAINS' && !p.allowFloodplains) return false;
-          if (t.feature === 'OASIS') return false;
-          if (p.terrains && !p.terrains.includes(t.terrain)) return false;
-          if (p.flatOnly && t.elevation !== 'FLAT') return false;
-          if (p.hillsOnly && t.elevation !== 'HILLS') return false;
-        }
-        if (p.requiresRiver && !hasRiver(t)) return false;
-        const around = neighbors(state.map, t);
-        if (p.adjacentDistrict && !around.some((n) => n.district === p.adjacentDistrict && n.districtComplete)) return false;
-        if (p.adjacentResource && !around.some((n) => n.resource === p.adjacentResource)) return false;
-        return true;
-      })
+      .filter((t) => canPlaceWonder(state, civCity, def.id, t.index, civ).ok)
       .sort((a, b) => a.index - b.index);
     const tile = cands[0];
     if (!tile) return false;
@@ -1112,6 +1096,20 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         upgradeUnit(state, unit, actor.seat);
         return;
       }
+      // THE MILITARY ENGINEER'S TWO. Each spends a charge and the turn, and
+      // vanishes on its last one, exactly as a Builder's improvement does.
+      if (a === A_BUILD_ROAD || a === A_FINISH_DISTRICT) {
+        if (unit.type !== 'MILITARY_ENGINEER' || (unit.charges ?? 0) <= 0) return;
+        const owns = (t: Tile) => tileOwnedByCiv(t, actor.seat);
+        const did = a === A_BUILD_ROAD
+          ? (canBuildRoad(here, owns) ? ((here.road = true), true) : false)
+          : engineerFinish(state, actor.seat, here.index);
+        if (!did) return;
+        unit.charges = (unit.charges ?? 0) - 1;
+        unit.movesLeft = 0;
+        if (unit.charges <= 0) disbandUnit(state, unit.id);
+        return;
+      }
       if (a >= A_AIR_STRIKE && a < A_AIR_STRIKE + AIR_STRIKE_COLS) {
         const t = airStrikeTargets(state, unit, AIR_STRIKE_COLS)[a - A_AIR_STRIKE];
         if (t !== undefined) airStrike(state, unit.id, t, actor.seat);
@@ -1173,7 +1171,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           if (UNITS[unit.type]?.ranged) rangedAttack(state, unit.id, to.index, actor.seat);
           else meleeAttack(state, unit.id, to.index, actor.seat);
         }
-      } else if (a === 25) {
+      } else if (a === A_PILLAGE) {
         // PILLAGE underfoot — hostileUnitAct's own block, faithfully: an
         // improvement first (food improvements heal +25), else the
         // complete non-centre district. Enemy-ownership re-validated.
@@ -1228,7 +1226,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           const ii = a < 18 ? a - 13 : DEDICATED_IMPROVEMENTS + (a - 18);
           const imp = IMPROVEMENT_IDS[ii] as ImprovementId;
           const un = computeUnlocksIn(actor.research);
-          if (!here.improvement && tileOwnedByCiv(here, actor.seat)
+          if (!here.improvement
               && validImprovementsIn(here, { unlocks: un, builder: unit.type, map: state.map, camps: campTiles(state), ownsTile: (t: Tile) => tileOwnedByCiv(t, actor.seat) }).includes(imp)) {
             here.improvement = imp;
             unit.charges = (unit.charges ?? 0) - 1;
@@ -1236,11 +1234,11 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
             if (unit.charges <= 0) disbandUnit(state, unit.id);
           }
         }
-      } else if (a >= 38 && a < 45) {
-        const to38 = a === 38 ? here : neighbors(state.map, here)[a - 39];
-        if (to38) spreadFromUnit(state, unit, actor, to38);
-      } else if (a >= 26 && a < 38) {
-        const rt = snipeRing(state, here)[a - 26];
+      } else if (a >= A_SPREAD && a < A_SPREAD + 7) {
+        const toS = a === A_SPREAD ? here : neighbors(state.map, here)[a - A_SPREAD - 1];
+        if (toS) spreadFromUnit(state, unit, actor, toS);
+      } else if (a >= A_SNIPE && a < A_SNIPE + 12) {
+        const rt = snipeRing(state, here)[a - A_SNIPE];
         if (rt !== undefined && UNITS[unit.type]?.ranged) hostileRangedStrike(state, unit, rt);
       }
     });

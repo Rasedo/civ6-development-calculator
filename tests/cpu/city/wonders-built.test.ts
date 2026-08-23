@@ -78,6 +78,9 @@ describe('world wonders', () => {
     expect(
       queueDistrict(state, city.id, 'INDUSTRIAL_ZONE', tileAtCoords(state.map, 10, 8).index, 0).ok,
     ).toBe(true);
+    // CIV6: "adjacent to an Industrial Zone with a FACTORY" — the district
+    // alone is not the clause.
+    city.buildings.push('FACTORY');
     const base = computeCityStats(state, city);
     expect(queueWonder(state, city.id, 'RUHR_VALLEY', river.index, 0).ok).toBe(true);
     const boosted = computeCityStats(state, city);

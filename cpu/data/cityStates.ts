@@ -76,12 +76,16 @@ export type SuzEffect =
   | 'holySitePressure'   // Jerusalem
   | 'apostlePromoChoice' // Yerevan
   | 'eraInspiration'     // Vilnius
-  | 'harborPower';       // Cardiff
+  | 'harborPower'        // Cardiff
+  | 'suzImprovement';    // Caguana / La Venta / Armagh
 
 /** The WIRE order the exported `suzCode` indexes — append only. */
 export const SUZ_EFFECTS: SuzEffect[] = [
   'xpDouble', 'cavalryHills', 'regionalReach', 'worksScience', 'csRouteYields', 'holySitePressure',
   'apostlePromoChoice', 'eraInspiration', 'harborPower',
+  // the three whose whole perk is "your Builders can build X improvements",
+  // which `validImprovementsIn`'s suzerain block answers off `suzerainOf`.
+  'suzImprovement',
 ];
 
 /** Cardiff: "Cities receive +2 Power for every Harbor building." Renewable,
@@ -118,7 +122,7 @@ export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   Vilnius: { name: 'Vilnius', type: 'cultural', bonus: 'When you enter a new era, earn 1 random Inspiration from that era.', suz: 'eraInspiration' },
   'Nan Madol': { name: 'Nan Madol', type: 'cultural', bonus: 'Your districts on or next to Coast or Lake tiles provide +2 Culture.', channel: 'culture', note: 'a per-district water-adjacency term; the flat channel stands in' },
   Kumasi: { name: 'Kumasi', type: 'cultural', bonus: 'Your Trade Routes to any city-state provide +2 Culture and +1 Gold for every specialty district in the origin city.', suz: 'csRouteYields' },
-  Caguana: { name: 'Caguana', type: 'cultural', bonus: 'Your Builders can build Batey improvements.', channel: 'culture', note: 'a whole IMPROVEMENT with its own adjacency and a Flight-gated tourism term; the flat channel stands in' },
+  Caguana: { name: 'Caguana', type: 'cultural', bonus: 'Your Builders can build Batey improvements.', suz: 'suzImprovement' },
   Venice: { name: 'Venice', type: 'trade', bonus: 'Your Trade Routes to foreign cities earn +1 Gold for each Luxury resource at the destination.', channel: 'gold', note: 'the destination luxury count is not a route term here; the flat channel stands in' },
   Zanzibar: { name: 'Zanzibar', type: 'trade', bonus: 'Receive the Cinnamon and Cloves Luxury resources. These cannot be earned any other way in the game, and provide 6 Amenities each.', channel: 'gold', note: 'two luxuries that exist nowhere else on the map; the flat channel stands in' },
   'Bandar Brunei': { name: 'Bandar Brunei', type: 'trade', bonus: 'Your Trading Posts in foreign cities provide +1 Gold to your Trade Routes passing through or going to the city.', channel: 'gold', note: 'TRADING POSTS are not modeled — a route lays roads and pays yields, it plants nothing' },
@@ -132,9 +136,9 @@ export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   Preslav: { name: 'Preslav', type: 'militaristic', bonus: 'Your light and heavy cavalry units have +5 Strength when fighting on Hills tiles.', suz: 'cavalryHills' },
   Valletta: { name: 'Valletta', type: 'militaristic', bonus: 'City Center buildings and Encampment district buildings can be bought with Faith. Cost of purchasing Ancient, Medieval, and Renaissance Walls is reduced, but they can only be bought with Faith.', channel: 'production', note: 'a FAITH-purchase channel for a class of buildings; the flat production channel stands in' },
   Jerusalem: { name: 'Jerusalem', type: 'religious', bonus: 'Your cities with Holy Sites exert pressure as if they were Holy Cities (4x religious pressure on all cities within 10 tiles).', suz: 'holySitePressure' },
-  'La Venta': { name: 'La Venta', type: 'religious', bonus: 'Your Builders can build Colossal Heads improvements.', channel: 'faith', note: 'a whole IMPROVEMENT with its own adjacency; the flat channel stands in' },
+  'La Venta': { name: 'La Venta', type: 'religious', bonus: 'Your Builders can build Colossal Heads improvements.', suz: 'suzImprovement' },
   Yerevan: { name: 'Yerevan', type: 'religious', bonus: 'Your Apostle units can choose from any possible promotion instead of receiving a random promotion.', suz: 'apostlePromoChoice' },
-  Armagh: { name: 'Armagh', type: 'religious', bonus: 'Your Builders can build Monastery improvements.', channel: 'faith', note: 'a whole IMPROVEMENT with its own adjacency; the flat channel stands in' },
+  Armagh: { name: 'Armagh', type: 'religious', bonus: 'Your Builders can build Monastery improvements.', suz: 'suzImprovement' },
 };
 
 export const CITY_STATE_SUZERAIN_YIELD = 3;
@@ -142,15 +146,12 @@ export const CITY_STATE_SUZERAIN_LIVE: Record<string, YieldKey> = {
   Geneva: 'science',
   Bologna: 'science',
   'Nan Madol': 'culture',
-  Caguana: 'culture',
   Venice: 'gold',
   Zanzibar: 'gold',
   'Bandar Brunei': 'gold',
   'Hong Kong': 'production',
   Ngazargamu: 'production',
   Valletta: 'production',
-  'La Venta': 'faith',
-  Armagh: 'faith',
 };
 
 export const CITY_STATE_TYPE_COLORS: Record<CityStateType, string> = {

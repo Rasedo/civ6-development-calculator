@@ -10,10 +10,11 @@
  */
 import { UNITS } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
+import { IMPROVEMENTS } from '../data/improvements';
 import { hexDistance } from '../../world/hex';
 import { citiesOf, seatOf, tileSeat } from './seats';
 import { cityAtIndex, unitsAt, unitsHostile } from './units';
-import type { GameState, Tile, Unit } from './types';
+import type { GameState, ImprovementId, Tile, Unit } from './types';
 
 export const CITY_CENTER_AIR_SLOTS = 1;
 export const AERODROME_AIR_SLOTS = 2;
@@ -43,6 +44,12 @@ export function airSlotsAt(state: GameState, seat: number, tileIndex: number): n
   const hull = unitsAt(state, tileIndex).find((u) => u.seat === seat && (UNITS[u.type]?.airSlots ?? 0) > 0);
   if (hull) return UNITS[hull.type]!.airSlots!;
   if (tileSeat(tile) !== seat) return 0;
+  // CIV6 (Airstrip): "+3 aircraft slots". A pillaged one bases nothing, the
+  // same rule a wrecked Aerodrome answers to.
+  if (tile.improvement && !tile.pillaged) {
+    const slots = IMPROVEMENTS[tile.improvement as ImprovementId].airSlots ?? 0;
+    if (slots > 0) return slots;
+  }
   if (tile.district === 'CITY_CENTER') return CITY_CENTER_AIR_SLOTS;
   if (tile.district !== 'AERODROME') return 0;
   if (!tile.districtComplete || tile.districtPillaged) return 0;
@@ -65,6 +72,12 @@ export function airBasesOf(state: GameState, seat: number): number[] {
     for (const d of city.districts) {
       if (d.type === 'AERODROME' && airSlotsAt(state, seat, d.tileIndex) > 0) out.push(d.tileIndex);
     }
+  }
+  // an AIRSTRIP stands on no city's district list, so its tiles come off the
+  // map rather than off a city.
+  for (const t of state.map.tiles) {
+    if (!t.improvement || (IMPROVEMENTS[t.improvement as ImprovementId].airSlots ?? 0) <= 0) continue;
+    if (airSlotsAt(state, seat, t.index) > 0) out.push(t.index);
   }
   for (const u of state.units) {
     if (u.seat === seat && (UNITS[u.type]?.airSlots ?? 0) > 0) out.push(u.tileIndex);

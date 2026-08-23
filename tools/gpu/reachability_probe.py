@@ -27,6 +27,10 @@ of the DRIVEN GAME, not of the comparison. What it answers, in order:
                 unit drawing it, the only two emitters that exist
   climatePhase  the world crossing into Phase I, which is what every warming
                 body below it waits on (C-24)
+  engineer      a Military Engineer alive on the map at all
+  engImp        one of the engineer's own improvements standing somewhere
+  engRoadOffer  a turn on which the mask offers it the road column
+  engFinishOffer  ... and the 20% charge column
   tourists      visiting vs domestic at the final turn, per seat: the culture
                 victory's own comparison (`_culture_victor`)
   policyCards   which policy cards the greedy slot fill ever puts in a slot,
@@ -63,7 +67,8 @@ KEYS = ("apostleBuy", "urbanization", "secondShip",
         "csWar", "csPeace", "specPin", "tileLock", "ballot",
         "natHistory", "conservation",
         "friendship", "alliance", "openBorders", "closedStep", "workGift",
-        "defensivePact", "carbon", "climatePhase") + tuple(f"placed:{d}" for d in DISTRICT_MARKS)
+        "defensivePact", "carbon", "climatePhase",
+        "engineer", "engImp", "engRoadOffer", "engFinishOffer") + tuple(f"placed:{d}" for d in DISTRICT_MARKS)
 
 
 def main() -> None:
@@ -147,6 +152,23 @@ def main() -> None:
             for i in sl.any(dim=0).nonzero(as_tuple=True)[0].tolist():
                 slotted_seen.add(pol_ids[i])
 
+        _eidx = getattr(sim, "_eng_idx", -1)
+        if _eidx >= 0:
+            mark("engineer", (sim.unit_alive & (sim.unit_type == _eidx)).any(dim=1), t)
+            _std = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
+            _off_r, _off_f = torch.zeros_like(_std), torch.zeros_like(_std)
+            for _k, _e in enumerate(sim._imp_eng):
+                if _e:
+                    _std |= (sim.improvement == _k).any(dim=1)
+            for _row in seats:
+                _um = sim._seat_unit_mask(_row)
+                if sim._A_ROAD >= 0:
+                    _off_r |= _um[:, :, sim._A_ROAD].any(dim=1)
+                if sim._A_FINISH >= 0:
+                    _off_f |= _um[:, :, sim._A_FINISH].any(dim=1)
+            mark("engImp", _std, t)
+            mark("engRoadOffer", _off_r, t)
+            mark("engFinishOffer", _off_f, t)
         mark("carbon", (sim.civ_co2 > 0).any(dim=1), t)
         mark("climatePhase", sim.climate_idx >= 0, t)
         mark("urbanization", sim.civ_civics[:, :, urb].any(dim=1), t)

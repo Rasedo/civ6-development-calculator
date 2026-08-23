@@ -52,7 +52,8 @@ def main() -> None:
     assert acts, "rules.actions.unit missing — the exporter must ship the enum"
     # +12 SNIPE, +7 SPREAD, +1 FOUND_CITY, +1 EXCAVATE, +1 PARK, the PROMOTE
     # head, +6 CONDEMN, +1 REMOVE_HERESY, +1 LAUNCH_INQUISITION,
-    # +1 CONVERT_HEATHEN, +1 UPGRADE, then the four VARIABLE-width heads.
+    # +1 CONVERT_HEATHEN, +1 UPGRADE, the four VARIABLE-width heads, then the
+    # engineer's +1 BUILD_ROAD and +1 FINISH_DISTRICT.
     pcol = rj["promotions"]["cols"]
     esp = rj["eras"]["espionage"]
     heads = [
@@ -61,15 +62,17 @@ def main() -> None:
         ("SPY_TRAVEL_", esp["travelCols"]),
         ("SPY_MISSION_", len(esp["missions"])),
     ]
-    want = 13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads)
+    want = 13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads) + 2
     assert len(acts) == want, (
         f"enum is {len(acts)} wide, expected {want} for {len(imp_ids)} improvements, "
         f"a {pcol}-wide PROMOTE head and heads {heads}"
     )
     # A new verb joins at the END or it moves a column somebody else already
-    # keys on: the religious tail, the ladder's own verb, then the four heads
-    # in the order the exporter appends them.
-    _tailstart = len(acts) - sum(w for _p, w in heads)
+    # keys on: the religious tail, the ladder's own verb, the four heads in the
+    # order the exporter appends them, then the engineer's two.
+    _last = ["BUILD_ROAD", "FINISH_DISTRICT"]
+    assert acts[-len(_last):] == _last, f"the engineer's verbs must close the enum, got {acts[-2:]}"
+    _tailstart = len(acts) - len(_last) - sum(w for _p, w in heads)
     assert acts[_tailstart - 4:_tailstart] == [
         "REMOVE_HERESY", "LAUNCH_INQUISITION", "CONVERT_HEATHEN", "UPGRADE"], \
         "verb tail misplaced"
@@ -79,7 +82,7 @@ def main() -> None:
         assert acts[_at_h:_at_h + _w] == [f"{_pre}{k}" for k in range(_w)], \
             f"{_pre} head is not one contiguous run at {_at_h}"
         _at_h += _w
-    assert _at_h == len(acts), "a head runs past the end of the enum"
+    assert _at_h == len(acts) - len(_last), "a head runs past the end of the enum"
     at = {n: i for i, n in enumerate(acts)}
     assert [acts[at["CONDEMN_0"] + d] for d in range(6)] == [f"CONDEMN_{d}" for d in range(6)], \
         "CONDEMN block is not one contiguous run"
@@ -94,12 +97,15 @@ def main() -> None:
     assert at["SPREAD_HERE"] + 7 == at["FOUND_CITY"], "SPREAD must run into FOUND_CITY"
 
     # PILLAGE is NOT the last column — the SNIPE ring and the SPREAD tail sit
-    # after it — so PILLAGE and the ring must hold their exact seats and every
-    # consumer keys on a name or a fixed index, never on W-1 (see A_PILLAGE in
-    # policy/ladder.py).
-    assert acts[25] == "PILLAGE", f"PILLAGE must hold column 25, got {acts[25]}"
-    assert acts[26] == "SNIPE_0" and acts[37] == "SNIPE_11", (  # SPREAD sits past 37 — key on the SEAT, not W-1
-        f"SNIPE ring must be 26..37, got {acts[26]}..{acts[37]}"
+    # after it — and every BUILD verb sits BEFORE it, so appending one
+    # improvement moves it. Its seat is therefore derived, never written down:
+    # `pick_unit_orders` takes the two columns as arguments for exactly this
+    # reason, and this is the check that they line up with the enum.
+    _pil = 13 + len(imp_ids) + 2
+    assert acts[_pil] == "PILLAGE", f"PILLAGE must hold column {_pil}, got {acts[_pil]}"
+    assert acts[_pil + 1] == "SNIPE_0", "the SNIPE ring must open right after PILLAGE"
+    assert acts[_pil + 12] == "SNIPE_11", (  # SPREAD sits past the ring — key on the SEAT, not W-1
+        f"the SNIPE ring must be {_pil+1}..{_pil+12}, got {acts[_pil+1]}..{acts[_pil+12]}"
     )
     for i, name in enumerate(imp_ids[:3]):
         assert acts[13 + i] == f"BUILD_{name}", f"dedicated build col {13+i} is {acts[13+i]}"

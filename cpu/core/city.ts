@@ -2,7 +2,7 @@
 import { addYields, emptyYields, type City, type DistrictId, type GameState, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
 import { tilesWithin, hexDistance } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable } from '../../world/query';
-import { tileYields, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, pillagedDistrictTypes, effectiveAdjacency, completedDistrictCount } from './yields';
+import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, pillagedDistrictTypes, effectiveAdjacency, completedDistrictCount } from './yields';
 import { getModifiers, makeYieldCtx, withFollowerBelief, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier, appealBand, PRESERVE_APPEAL_HOUSING } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
@@ -282,7 +282,9 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
   if (m.riverCity && hasRiver(center)) total += m.riverCity.housing;
   for (const t of tilesWithin(map, center.col, center.row, CITY_WORK_RADIUS)) {
     if (!tileBelongsTo(t, city) || !t.improvement) continue;
-    total += IMPROVEMENTS[t.improvement as ImprovementId].housing;
+    const idef = IMPROVEMENTS[t.improvement as ImprovementId];
+    total += idef.housing;
+    if (idef.housingCivic && m.impUpgrades.has(idef.housingCivic)) total += 1;
   }
 
   total += m.housingAll;
@@ -478,6 +480,26 @@ function wonderTourism(
   return t;
 }
 
+/**
+ * CIV6: the Batey "provides Tourism after researching Flight" and the
+ * Colossal Heads "provide Tourism from Faith after researching Flight" — in
+ * both cases equal to the improvement's own output of the named yield, which
+ * is what the tile walk already computes.
+ */
+function suzerainTourism(state: GameState, seat: number, owns: (t: Tile) => boolean): number {
+  const techs = seatOf(state, seat)?.research.techs ?? [];
+  const ctx = makeYieldCtx(state, seat);
+  let t = 0;
+  for (const tile of state.map.tiles) {
+    if (!tile.improvement || tile.pillaged || !owns(tile)) continue;
+    const def = IMPROVEMENTS[tile.improvement as ImprovementId];
+    if (!def.tourismFrom || !def.tourismTech || !techs.includes(def.tourismTech)) continue;
+    const base = def.yields[def.tourismFrom] ?? 0;
+    t += base + (improvementAdjacency(ctx, tile, def.id)[def.tourismFrom] ?? 0);
+  }
+  return t;
+}
+
 function resortTourism(state: GameState, owns: (t: Tile) => boolean): number {
   let t = 0;
   const camps = campTiles(state);
@@ -568,7 +590,8 @@ export function seatTourism(
   // same snapshot the loyalty payout used, taken before any loyalty moved.
   const golden = goldenDedication(state, seat, DED_WISH);
   const parkMult = golden ? WISH_PARK_TOURISM_MULT : 1;
-  return t + resortTourism(state, owns) * wonderMult(state, cities, 'resortTourismMult')
+  return t + suzerainTourism(state, seat, owns)
+    + resortTourism(state, owns) * wonderMult(state, cities, 'resortTourismMult')
     + parkTourism(state, owns) * parkMult
     + wonderTourism(state, era, owns, golden ? govCityIds ?? null : null);
 }

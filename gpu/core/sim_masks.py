@@ -1900,6 +1900,25 @@ class SimMasks:
             & own_tile.gather(1, tc)
             & (self.pillaged.gather(1, tc) | self.district_pillaged.gather(1, tc))
         ).unsqueeze(2)
+        # THE MILITARY ENGINEER'S GROUND (`engineerTileOk`): its rows go "in
+        # your own or neutral territory", so the ownership term is wider than
+        # the Builder's, and its improvement columns carry their own catalog
+        # clauses rather than a resource match.
+        eng_ground = (
+            present
+            & ((utype == self._eng_idx) if self._eng_idx >= 0 else torch.zeros_like(present))
+            & (u_charges > 0)
+            & (own_tile | (self.tile_seat < 0)).gather(1, tc)
+            & self.passable.gather(1, tc)
+            & ~self.water.gather(1, tc)
+        )
+        eng_here = (
+            eng_ground
+            & (self.centre_slot_at.gather(1, tc) < 0)
+            & (self.improvement.gather(1, tc) < 0)
+            & (self.district.gather(1, tc) < 0)
+            & (self.built_wonder.gather(1, tc) < 0)
+        )
         _res_cols: list[torch.Tensor] = []
         if self.improvements_on and self._builder_idx >= 0:
             _rq = self.res_imp.gather(1, tc)
@@ -1909,6 +1928,10 @@ class SimMasks:
                         else torch.ones(B, 1, dtype=torch.bool, device=dev))
                 if self.SEASIDE >= 0 and _k == self.SEASIDE:
                     _ok = here_ok & self._seaside_ok().gather(1, tc) & _unl
+                elif self._imp_suz[_k]:
+                    _ok = here_ok & self._suz_improvement_ok(row, _k).gather(1, tc)
+                elif self._imp_eng[_k]:
+                    _ok = eng_here & _unl & self._imp_ground_ok(_k).gather(1, tc)
                 else:
                     _ok = here_ok & (_rq == _k) & _unl
                 _res_cols.append(_ok.unsqueeze(2))
@@ -2034,10 +2057,24 @@ class SimMasks:
         if getattr(self, "_A_SPY_MISSION", -1) >= 0:
             _sm = [present.unsqueeze(2) & self._spy_mission_mask(row, sc, tc, utype)]
 
+        # CIV6 (Military Engineer): "Can construct Roads ... (uses 1 charge)"
+        # (`canBuildRoad`) — a road already laid is nothing to lay again — and
+        # "Can spend a charge to complete 20% of an engineering type of
+        # district ... and Flood Barrier building" (`engineerFinishCity`).
+        _rd: list[torch.Tensor] = []
+        if getattr(self, "_A_ROAD", -1) >= 0:
+            _rd = [(eng_ground & ~self.road.gather(1, tc)).unsqueeze(2)]
+        _fi: list[torch.Tensor] = []
+        if getattr(self, "_A_FINISH", -1) >= 0:
+            _fi = [(present
+                    & ((utype == self._eng_idx) if self._eng_idx >= 0 else torch.zeros_like(present))
+                    & (u_charges > 0)
+                    & self._eng_finish_at(row).gather(1, tc)).unsqueeze(2)]
+
         out = torch.cat(
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
             + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc
-            + _ug + _as + _rb + _st + _sm,
+            + _ug + _as + _rb + _st + _sm + _rd + _fi,
             dim=2,
         )
         if self._act_names and self.improvements_on and self._builder_idx >= 0:

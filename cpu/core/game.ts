@@ -865,6 +865,41 @@ export function itemCost(item: QueueItem, state?: GameState, city?: City): numbe
   return state && city ? buildingCostIn(state, city, item.building) : BUILDINGS[item.building].cost;
 }
 
+/**
+ * CIV6 (Military Engineer): "Can spend a charge to complete 20% of an
+ * engineering type of district (Aqueduct, Bath, Canal, Dam) and Flood Barrier
+ * building." The Bath is Rome's unique Aqueduct, which this model has no
+ * carrier for.
+ */
+export const ENGINEER_FINISH_FRACTION = 0.2;
+export const ENGINEER_FINISH_DISTRICTS: readonly DistrictId[] = ['AQUEDUCT', 'CANAL', 'DAM'];
+export const ENGINEER_FINISH_BUILDING = 'FLOOD_BARRIER';
+
+/**
+ * The city whose head a charge spent at `tileIndex` would advance, or
+ * undefined. A district's charge is spent ON the site it is being dug at; the
+ * Flood Barrier is a building, so its charge is spent at the city centre.
+ */
+export function engineerFinishCity(state: GameState, seat: number, tileIndex: number): City | undefined {
+  for (const city of citiesOf(state, seat)) {
+    const q = city.queue[0];
+    if (!q) continue;
+    if (q.kind === 'district' && q.tileIndex === tileIndex
+        && ENGINEER_FINISH_DISTRICTS.includes(q.district)) return city;
+    if (q.kind === 'building' && q.building === ENGINEER_FINISH_BUILDING
+        && city.centerIndex === tileIndex) return city;
+  }
+  return undefined;
+}
+
+export function engineerFinish(state: GameState, seat: number, tileIndex: number): boolean {
+  const city = engineerFinishCity(state, seat, tileIndex);
+  if (!city) return false;
+  const q = city.queue[0];
+  q.progress += Math.round(itemCost(q, state, city) * ENGINEER_FINISH_FRACTION);
+  return true;
+}
+
 export function itemLabel(item: QueueItem): string {
   if (item.kind === 'district') return DISTRICTS[item.district].name;
   if (item.kind === 'wonder') return BUILT_WONDERS[item.wonder].name;

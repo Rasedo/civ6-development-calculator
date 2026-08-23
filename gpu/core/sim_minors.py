@@ -47,16 +47,68 @@ class SimMinors:
         return ok
 
     def _wonder_cand(self, row: int, j: int, wi: int, base_ok: torch.Tensor) -> torch.Tensor:
+        """`canPlaceWonder`'s live half. The terrain half rides the static
+        `wok` bitmask the exporter baked out of `wonderTerrainOk`, so nothing
+        here re-derives ground."""
         wrow = self._wond_rows[wi]
         cand_w = base_ok & ((self.wok >> wi) & 1).bool()
         adjD = int(wrow.get("adjD", -1))
+        adjDB = int(wrow.get("adjDB", -1))
         if adjD == -2:
             cand_w = cand_w & (self._adj_center_count() > 0)
         elif adjD >= 0:
-            cand_w = cand_w & self._adj_dtype_complete(adjD)
+            near = (self._adj_district_with(adjD, adjDB) if adjDB >= 0
+                    else self._adj_dtype_complete(adjD))
+            cand_w = cand_w & near
         if int(wrow.get("adjR", -1)) >= 0:
             cand_w = cand_w & self._adj_res_live(int(wrow["adjR"]))
+        if int(wrow.get("adjI", -1)) >= 0:
+            cand_w = cand_w & self._adj_improvement(int(wrow["adjI"]))
+        if int(wrow.get("adjCap", 0)):
+            cand_w = cand_w & self._adj_capital(row)
+        if int(wrow.get("needRel", 0)):
+            cand_w = cand_w & self.civ_religion_done[:, row].unsqueeze(1)
         return cand_w
+
+    def _adj_district_with(self, di: int, bi: int) -> torch.Tensor:
+        """[B, T] — a completed district of type `di` next door whose CITY
+        holds building `bi` (the Great Library's Library, Big Ben's Bank).
+        `cityAtTile`'s twin: the building lives on the city, not the tile."""
+        nb = self.neigh
+        nbc = nb.clamp(min=0)
+        hit = ((self.district[:, nbc] == di) & self.district_complete[:, nbc]
+               & (nb >= 0).unsqueeze(0))
+        if not bool(hit.any()):
+            return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        has = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        for r in range(self.n_majors):
+            sl = self.city_slot_at(r)  # [B, T] owning city SLOT, -1 = not this row's
+            for c in range(self.RC):
+                mine = (sl == c) & self.city_bldg[:, r, c, bi].unsqueeze(1)
+                if bool(mine.any()):
+                    has |= mine
+        return (hit & has[:, nbc]).any(dim=2)
+
+    def _adj_improvement(self, ii: int) -> torch.Tensor:
+        """[B, T] — a neighbour carries improvement `ii` (Temple of Artemis'
+        Camp)."""
+        nb = self.neigh
+        nbc = nb.clamp(min=0)
+        return ((self.improvement[:, nbc] == ii) & (nb >= 0).unsqueeze(0)).any(dim=2)
+
+    def _adj_capital(self, row: int) -> torch.Tensor:
+        """[B, T] — a neighbour IS this row's capital centre (the Apadana's
+        "adjacent to a civilization's Capital")."""
+        nb = self.neigh
+        nbc = nb.clamp(min=0)
+        cap = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        ctr = self.city_center[:, row]                    # [B, RC]
+        live = self.city_alive[:, row] & self.city_is_cap[:, row] & (ctr >= 0)
+        for c in range(self.RC):
+            k = live[:, c]
+            if bool(k.any()):
+                cap[k, ctr[k, c]] = True
+        return (cap[:, nbc] & (nb >= 0).unsqueeze(0)).any(dim=2)
 
     def _queue_wonder_at(self, row: int, j: int, wi: int, has_w: torch.Tensor, cand_w: torch.Tensor) -> None:
         wrow = self._wond_rows[wi]

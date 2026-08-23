@@ -62,6 +62,7 @@ const slotsOf = (xs: number[]): number[] => {
   return out;
 };
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencySource } from '../data/districts';
+import { ENGINEER_FINISH_FRACTION } from '../core/game';
 import { TECHS, ERAS, MODERN_ERA_INDEX } from '../data/techs'; // era scale
 import {
   SPY_CAPACITY_CIVICS, SPY_CAPACITY_TECHS, SPY_CAPACITY_MAX, SPY_MAX_LEVEL,
@@ -647,6 +648,17 @@ export function buildRules() {
               ? PLACEABLE_DISTRICTS.indexOf(w.placement.adjacentDistrict)
               : -3,
         adjR: w.placement.adjacentResource ? RESOURCE_IDS.indexOf(w.placement.adjacentResource) : -1,
+        // the BUILDING the adjacent district's city must hold, the
+        // IMPROVEMENT a neighbour must carry, and the two clauses that read
+        // the seat rather than the ground.
+        adjDB: w.placement.adjacentDistrictBuilding
+          ? buildingIdx.get(w.placement.adjacentDistrictBuilding) ?? -3
+          : -1,
+        adjI: w.placement.adjacentImprovement
+          ? IMPROVEMENT_IDS.indexOf(w.placement.adjacentImprovement)
+          : -1,
+        adjCap: w.placement.adjacentCapital ? 1 : 0,
+        needRel: w.placement.requiresReligion ? 1 : 0,
         regionalAmenities: w.effects?.regionalAmenities ?? 0,
         cityAmenities: w.effects?.cityAmenities ?? 0,
         cityHousing: w.effects?.cityHousing ?? 0,
@@ -950,6 +962,37 @@ export function buildRules() {
           unlock: techList.findIndex((t) =>
             t.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === id),
           ),
+          // THE SUZERAIN ROWS. `suz` = 1 marks an improvement whose whole
+          // offer rides a city-state's suzerainty (the fixture's `suzImp`
+          // names which minor); the rest is its own ground rule and its
+          // neighbours' payout, all catalog columns.
+          suz: def.suzerainOf ? 1 : 0,
+          terr: (def.terrains ?? []).map((t) => TERRAIN_IDS.indexOf(t)),
+          xterr: (def.excludeTerrains ?? []).map((t) => TERRAIN_IDS.indexOf(t)),
+          // 0 = FLAT, 1 = HILLS; MOUNTAIN is never improvable
+          elev: (def.elevations ?? []).map((e) => (e === 'FLAT' ? 0 : 1)),
+          noAdjSame: def.noAdjacentSame ? 1 : 0,
+          adj: (def.adjacency ?? []).map((r) => ({
+            bres: r.bonusResource ? 1 : 0,
+            dist: r.district ? PLACEABLE_DISTRICTS.indexOf(r.district) : -1,
+            anyd: r.anyDistrict ? 1 : 0,
+            feats: (r.features ?? []).map((f) => FEAT_IDS.indexOf(f)),
+            per: r.per,
+            y: YIELD_KEYS.map((k) => r.yields[k] ?? 0),
+            uc: r.upgradeCivic ? civicIdx.get(r.upgradeCivic) ?? -3 : -1,
+            uper: r.upgradePer ?? 0,
+            uy: YIELD_KEYS.map((k) => r.upgradeYields?.[k] ?? 0),
+          })),
+          houseCivic: def.housingCivic ? civicIdx.get(def.housingCivic) ?? -3 : -1,
+          relHeal: def.religiousHeal ?? 0,
+          tourY: def.tourismFrom ? YIELD_KEYS.indexOf(def.tourismFrom) : -1,
+          tourTech: def.tourismTech ? techIdx.get(def.tourismTech) ?? -3 : -1,
+          // THE MILITARY ENGINEER'S ROWS, and the appeal every improvement
+          // takes off its neighbours.
+          eng: def.engineer ? 1 : 0,
+          noFeat: def.noFeature ? 1 : 0,
+          air: def.airSlots ?? 0,
+          appeal: def.appealAdjacent ?? 0,
         };
       }),
       luxAmenityCities: LUXURY_AMENITY_CITIES,
@@ -962,6 +1005,10 @@ export function buildRules() {
       // so the GPU can mirror hasFortJob / the engineer job set.
       engineerIdx: Object.values(UNITS).findIndex((u) => u.id === 'MILITARY_ENGINEER'),
       engineerLive: ENGINEER_LIVE,
+      // the 20% charge. Its four targets are the Aqueduct, Canal and Dam
+      // districts and the Flood Barrier building, each of which the GPU
+      // already names for itself.
+      engineerFinishFraction: ENGINEER_FINISH_FRACTION,
       hillFarmsCivic: civicList.findIndex((c) => (c.effects ?? []).some((e) => e.kind === 'hillFarms')),
       farmAdjCivic: civicList.findIndex((c) => (c.effects ?? []).some((e) => e.kind === 'farmAdjacency')),
       farmAdjTech: techList.findIndex((t) => (t.effects ?? []).some((e) => e.kind === 'farmAdjacency')),

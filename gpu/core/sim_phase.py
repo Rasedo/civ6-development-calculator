@@ -851,6 +851,7 @@ class SimPhase:
                                   torch.full((self.B,), int(self._wish_park), dtype=torch.long, device=self.device),
                                   torch.ones(self.B, dtype=torch.long, device=self.device)),
             gov_tile=self._governor_tiles(row, gov),
+            suz_tour=self._suzerain_tourism(row, self.tile_seat == row),
         ))
         # POLICY TREATY outcome A pays every seat holding the named card, on
         # top of the government tier, the (Treaty-Organization-weighted)

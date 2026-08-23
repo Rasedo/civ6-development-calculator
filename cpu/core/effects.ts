@@ -122,6 +122,8 @@ export function availableCivics(state: GameState, seat: number): CivicDef[] {
 export interface Modifiers {
   improvementYields: Partial<Record<ImprovementId, Partial<Yields>>>;
   farmAdjTier: number;
+  /** the civics a suzerain improvement's adjacency rule may name. */
+  impUpgrades: Set<string>;
   hillFarms: boolean;
   adjacencyMult: Partial<Record<DistrictId, number>>;
   buildingYieldBoosts: BuildingYieldBoost[];
@@ -165,6 +167,7 @@ export function defaultModifiers(): Modifiers {
   return {
     improvementYields: {},
     farmAdjTier: 0,
+    impUpgrades: new Set<string>(),
     hillFarms: false,
     adjacencyMult: {},
     buildingYieldBoosts: [],
@@ -252,6 +255,9 @@ function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
 
 export function modifiersFromResearch(research: ResearchState): Modifiers {
   const mods = defaultModifiers();
+  // the civics a suzerain improvement's adjacency rule may name, and the one
+  // that adds a Monastery's second Housing
+  for (const id of research.civics) mods.impUpgrades.add(id);
   for (const fx of completedEffectsIn(research)) {
     if (fx.kind === 'improvementYields') {
       const cur = (mods.improvementYields[fx.improvement] ??= {});

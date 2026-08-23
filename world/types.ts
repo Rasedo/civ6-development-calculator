@@ -47,7 +47,13 @@ export type FeatureId =
 
 export type ResourceCategory = 'bonus' | 'luxury' | 'strategic';
 
+// The union is a SET; `IMPROVEMENT_IDS` (cpu/core/unitActions.ts) is the
+// ordered roster whose position is the GPU's improvement index and the build
+// column's number, so a new id appends THERE.
 export type ImprovementId =
+  | 'BATEY'
+  | 'COLOSSAL_HEADS'
+  | 'MONASTERY'
   | 'FARM'
   | 'MINE'
   | 'QUARRY'
@@ -57,10 +63,9 @@ export type ImprovementId =
   | 'PLANTATION'
   | 'FISHING_BOATS'
   | 'OIL_WELL'
-  // Roster order IS the GPU's improvement index. New entries append HERE;
-  // inserting anywhere above renumbers every improvement after it.
   | 'SEASIDE_RESORT'
-  | 'FORT';
+  | 'FORT'
+  | 'AIRSTRIP';
 
 export type DistrictId =
   | 'CITY_CENTER'

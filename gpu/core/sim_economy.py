@@ -1064,12 +1064,19 @@ class SimEconomy:
         """[B, T] — what each tile can BASE for seat row `row`. CIV6 (Air
         combat): a City Center has 1, an Aerodrome "has 2 slots initially, and
         can reach 4 slots after constructing the Hangar and the Airport", and
-        an Aircraft Carrier "starts with 2". A pillaged or unfinished district
-        bases nothing."""
+        an Aircraft Carrier "starts with 2"; an Airstrip carries its own
+        `airSlots`. A pillaged or unfinished district bases nothing."""
         B, T, dev = self.B, self.T, self.device
         out = torch.zeros(B, T, dtype=torch.long, device=dev)
         if not self._any_air:
             return out
+        # CIV6 (Airstrip): "+3 aircraft slots", on the seat's own tile and
+        # not while it is pillaged.
+        if self._imp_air_any:
+            out = out + torch.where(
+                (self.improvement >= 0) & ~self.pillaged & (self.tile_seat == row),
+                self._imp_air_slots[self.improvement.clamp(min=0)],
+                torch.zeros_like(out))
         cols = self.RC
         alive = self.city_alive[:, row, :cols]
         ctr = self.city_center[:, row, :cols]
@@ -2238,7 +2245,15 @@ class SimEconomy:
         f = self._holy_site_faith().gather(1, cc).reshape(B, U, 7)
         own = self.tile_seat.gather(1, cc).reshape(B, U, 7) == seat.unsqueeze(2)
         best = torch.where(on & own, f, torch.zeros_like(f)).amax(dim=2)
-        return best * self._relig_heal_per_faith
+        # CIV6 (Monastery): "+15 HP healing every turn for friendly religious
+        # units" — the unpillaged improvement it is standing on, in its own
+        # ground.
+        imp = self.improvement.gather(1, tc)
+        mon = torch.where((imp >= 0) & ~self.pillaged.gather(1, tc)
+                          & (self.tile_seat.gather(1, tc) == seat) & (t >= 0),
+                          self._imp_rel_heal[imp.clamp(min=0)],
+                          torch.zeros_like(f[:, :, 0]))
+        return best * self._relig_heal_per_faith + mon
 
     def _emergency_heal_mp(self, pre: str, seat: torch.Tensor, here: torch.Tensor) -> torch.Tensor:
         """[B, U] — CIV6 (Military Emergency, success): "Member units gain +5
@@ -2379,7 +2394,7 @@ class SimEconomy:
                 distinct = distinct & (seats[:, :, i] != seats[:, :, j])
         return full & one_era & distinct
 
-    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, relics: torch.Tensor | None = None, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None, gw_kmult: torch.Tensor | None = None, themed: torch.Tensor | None = None, relic_mult: torch.Tensor | None = None, resort_mult: torch.Tensor | None = None, park_mult: torch.Tensor | None = None, gov_tile: torch.Tensor | None = None) -> torch.Tensor:
+    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, relics: torch.Tensor | None = None, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None, gw_kmult: torch.Tensor | None = None, themed: torch.Tensor | None = None, relic_mult: torch.Tensor | None = None, resort_mult: torch.Tensor | None = None, park_mult: torch.Tensor | None = None, gov_tile: torch.Tensor | None = None, suz_tour: torch.Tensor | None = None) -> torch.Tensor:
         """[B] — a seat's per-turn TOURISM, the `seatTourism` twin. Great Works
         pay the values that pair tourism with culture; every OWNED unpillaged
         SEASIDE RESORT pays its tile's APPEAL (floored at 0), attributed by
@@ -2440,7 +2455,34 @@ class SimEconomy:
             # National Parks."
             pm = park_mult if park_mult is not None else torch.ones(self.B, dtype=torch.long, device=self.device)
             t = t + (self._tile_appeal() * pk.long()).sum(dim=1) * pm
+        if suz_tour is not None:
+            t = t + suz_tour
         return t
+
+    def _suzerain_tourism(self, row: int, own: torch.Tensor) -> torch.Tensor:
+        """[B] — CIV6: the Batey "provides Tourism after researching Flight"
+        and the Colossal Heads "provide Tourism from Faith after researching
+        Flight", in both cases equal to the improvement's own output of the
+        named yield — its catalog row plus what its neighbours pay it
+        (`suzerainTourism`)."""
+        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        adj = None
+        for k, yi in enumerate(self._imp_tour_y):
+            if yi < 0:
+                continue
+            tt = self._imp_tour_tech[k]
+            got = (self.civ_techs[:, row, tt] if tt >= 0
+                   else torch.ones(self.B, dtype=torch.bool, device=self.device))
+            live = (self.improvement == k) & ~self.pillaged & own
+            if not bool(live.any()):
+                continue
+            if adj is None:
+                adj = self._imp_adjacency(row)
+            per = torch.full_like(live, 0, dtype=self.dtype) + float(self._imp_yields[k, yi])
+            if adj is not None:
+                per = per + adj[:, :, yi]
+            out = out + (per * live.to(self.dtype)).sum(dim=1).long() * got.long()
+        return out
 
     def _seaside_ok(self) -> torch.Tensor:
         """[B, T] bool — where a SEASIDE RESORT may be built, the
@@ -2468,19 +2510,18 @@ class SimEconomy:
         coast/lake +1) plus the tile's t0 feature term; a chopped tile
         subtracts `appeal_feat` via feat_stripped. The rest is live: a
         COMPLETED built wonder +1, each district's own `_appeal_adj` column,
-        MINE/QUARRY/OIL_WELL -1, a pillaged tile -1, and a BARBARIAN OUTPOST
-        -1. Version-cached like _farmadj_qual — every contributing write bumps
-        _eff_version, camps included."""
+        each improvement's own `_imp_appeal_adj` column, a pillaged tile -1,
+        and a BARBARIAN OUTPOST -1. Version-cached like _farmadj_qual — every
+        contributing write bumps _eff_version, camps included."""
         if self._appeal_cache is not None and self._appeal_cache[0] == self._eff_version:
             return self._appeal_cache[1]
         contrib = self.appeal_base - torch.where(self.feat_stripped, self.appeal_feat, torch.zeros_like(self.appeal_feat))
         contrib = contrib + (self.built_wonder_complete & (self.built_wonder >= 0)).long()
-        imp = self.improvement
-        bad_imp = torch.zeros_like(contrib, dtype=torch.bool)
-        for _i in (self.MINE, self.QUARRY, self.OIL_WELL):
-            if _i >= 0:
-                bad_imp |= imp == _i
-        contrib = contrib - bad_imp.long()
+        if self._imp_appeal_any:
+            contrib = contrib + torch.where(
+                self.improvement >= 0,
+                self._imp_appeal_adj[self.improvement.clamp(min=0)],
+                torch.zeros_like(contrib))
         if self._appeal_adj_any:
             contrib = contrib + torch.where(
                 self.district >= 0,

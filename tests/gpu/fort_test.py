@@ -6,9 +6,10 @@ Civilopedia: "Occupying unit receives +4 Defense Strength". Built by a MILITARY
 ENGINEER only (prereq Siege Tactics; the engineer itself needs Military
 Engineering).
 
-The gate never produces a Military Engineer, so no fort is ever placed there and
-scripted parity says nothing about this mechanic. This lane writes the tile
-planes directly instead of waiting for a seed to build one.
+MEASURED gate reachability is ZERO — no seed reaches an Encampment with an
+Armory, so no Military Engineer is ever trained and no fort is ever placed.
+This lane writes the tile planes directly instead of waiting for a seed to
+build one; `engineer_test.py` pokes what BUILDS it.
 
 It pins the two things the implementation can get wrong:
   a. the bonus is exactly +4 and STACKS with terrain rather than replacing it;

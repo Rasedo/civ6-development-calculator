@@ -63,7 +63,7 @@ nothing carries forward.
 | B-31r trade-route tails | 1 | sea legs and the whole-destination-set candidate ship; no trading posts, plunder gold is a stylization, the summed-yield key is a heuristic and the free-choice head is P8's |
 | B-53r the great-person queue | 1 | 205 sourced people, the era gate and the scaled price ship; the offer is re-derived each turn rather than frozen, and the payout is one era-sized lump instead of the person's own ability |
 | B-D unsourced data values | 2 | the Monument, the Lighthouse and the Engineer's Armory shipped and one bullet was false; the governments are half-shipped, and the rest are shape differences or model tuning that no source can close |
-| B-36r appeal adjacency terms | 1 | every district term ships off one catalog column; the unique-improvement terms and the appeal-granting Great People wait on C-4 and C-21 |
+| B-36r appeal adjacency terms | 1 | every district AND improvement term ships off one catalog column; the CIVILIZATION-unique improvements' terms (C-26) and the appeal-granting Great People (C-21) do not |
 | B-39r wonder effects still dropped | 1 | the sourced sweep shipped fourteen channels; five residuals, each blocked on B-20r, C-21, B-34r or C-23 |
 | B-45r sourced-sweep finds in the other rows | 1 | three of the eight now have a channel; the five that do not need free units (C-21), faith-bought Great People (C-9), a rival-recruit event, or B-31r's route yields |
 | B-46r the siege class's tails | 1 | the Bombard stat, both support chassis, all four walls tiers, the move-and-shoot rule and every siege rung through Rocket Artillery ship; Akkad's suzerain bonus does not |
@@ -80,19 +80,17 @@ nothing carries forward.
 | **B. Fidelity vs real Civ 6** | **26** | |
 | C-1 POWER | 2 | the grid, the three plants, Cardiff, the Hydroelectric Dam, the powered-yield split, the FUEL and its CO2 all ship; four renewable improvements and the Biosphere have no carrier, nothing can retire a plant, and a minor's cities are never powered |
 | C-2 diplomatic agreements | 3 | friendship, alliances, open borders, the closed border and the work gift ship on one 30-turn clock; alliance TYPES and LEVELS, the negotiated two-sided deal, and the four agreements that need one are open |
-| C-4 unique improvements | 3 | Batey / Colossal Head / Monastery, each a flat channel today |
 | C-5 strategic-resource stockpiles | 2 | the bank, its ceiling, the unit and project charges, the plants' fuel, unit FUEL upkeep and the heal a lost source denies all ship; the shortage penalty's magnitude is unpublished and trading resources waits on C-2 |
 | C-6 policy-card modifiers | 1 | two of the 49 cards are inert, each blocked on a system below |
 | C-7 trading posts | 2 | a route lays roads and plants nothing |
 | C-8 draws made deterministic | 2 | the Great Person replacement walks a queue and the Congress slate rotates, where Civ 6 draws both |
 | C-9 faith-purchase classes | 1 | faith buys named units, never a class of building |
-| C-11 terrain the wonder rules need | 2 | the NARROWED placements are deliberately narrower than Civ 6's |
 | C-13 ranged vs districts/cities | 2 | a scope-out on both, with the rest of the Encampment complete |
 | C-15 garrison does not block capture | 2 | the move-onto-centre capture model is what is missing |
 | C-16 the spy's second half | 2 | the Spy, its capacity, the jump and all twelve missions ship; the escape-and-capture sequence, the spy promotion pool and two missions with no carrier do not |
 | C-17 embarked movement never upgrades | 1 | the flat EMBARK_MOVES stands in for every era |
 | C-19 grievances and warmongering | 2 | war has no reputational consequence with anyone |
-| C-20 the Military Engineer's build list | 2 | five buildables and the finish-a-district charge, whose four targets now all exist |
+| C-20 the Military Engineer's build list | 1 | the Fort, the Airstrip, the road and the 20% charge all ship; the Missile Silo waits on C-31, the Mountain Tunnel on C-35 and the railroad on C-36 |
 | C-21 Great Person ACTIVATED abilities | 2 | every GP fires instantly; none is placed and used |
 | C-22 the district roster is a subset | 2 | all eighteen districts ship; the Canal carries no naval passage, six Government Plaza buildings have no effect body, and the Preserve's housing table is unpublished |
 | C-23 nothing diminishes tourism | 1 | no rival's Enlightenment ever costs a tourist, so Cristo Redentor's cancelling clause has nothing to cancel |
@@ -108,8 +106,9 @@ nothing carries forward.
 | C-33 the Giant Death Robot is only its stats | 2 | seven sourced abilities and the four Future-era upgrades have no carrier |
 | C-34 air combat's second half | 2 | bases, both heads, the sortie and the scatter ship; Interception, Patrol and Priority Target — the whole reason a fighter exists — do not |
 | C-35 the land/water fact never moves | 2 | one static bit answers "is this sea", "can a hull stand here" and "is this coastal"; no tile can become water, which is what submersion and the Canal's passage each need |
-| **C. Absent systems** | **57** | |
-| **OPEN, TOTAL** | **84** | |
+| C-36 no railroad | 2 | roads are one boolean tier; the railroad's own movement rate, its per-hex Iron and Coal charge and its CO2 have no carrier, which C-20's fifth verb and C-24's third emitter both wait on |
+| **C. Absent systems** | **53** | |
+| **OPEN, TOTAL** | **80** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -558,14 +557,16 @@ Civ 6 source or is recorded as unverifiable.
   bumping `_eff_version` at both camp writes so the appeal cache sees them.
   Appeal feeds Neighborhood housing, Seaside Resort gold and tourism and
   National Park legality, so the change is live on every seed.
-  EVERY DISTRICT TERM IS NOW ONE CATALOG COLUMN. `DistrictDef.appealAdjacent`
-  / `_appeal_adj` is what both walks read, so the appeal walk names no district
-  type at all and a new row carries its own term: the Dam, Canal, Water Park
-  and Preserve are +1 like the three that shipped first, the Aerodrome is -1
-  like the other heavy-industry rows, and the Government Plaza and Diplomatic
-  Quarter are 0.
-  OPEN, each blocked: the unique-improvement terms (C-4) and the
-  appeal-granting Great People (C-21).
+  EVERY DISTRICT AND IMPROVEMENT TERM IS NOW ONE CATALOG COLUMN.
+  `DistrictDef.appealAdjacent` / `_appeal_adj` and
+  `ImprovementDef.appealAdjacent` / `_imp_appeal_adj` are what both walks read,
+  so the appeal walk names no district and no improvement type at all and a new
+  row carries its own term: the Dam, Canal, Water Park and Preserve are +1 like
+  the three that shipped first, the Aerodrome is -1 like the other
+  heavy-industry rows, the Government Plaza and Diplomatic Quarter are 0, and
+  the Airstrip joins the Mine, the Quarry and the Oil Well at -1.
+  OPEN, each blocked: the CIVILIZATION-unique improvements' terms (C-26) and
+  the appeal-granting Great People (C-21).
 - **B-39r. Wonder effects still dropped.** All THIRTY rows were re-fetched
   from the GS Civilopedia one by one and the effect lists rewritten against
   them, so `BUILT_WONDERS` is now a sourced table rather than a costs-and-
@@ -1107,10 +1108,6 @@ number was under-counting by treating deferrals as closures.
   - The **+25% Open-Borders tourism** is an INTERNATIONAL modifier, applied
     per foreign civilization; blocked on C-28.
   - **25 Grievances per denouncement** (GS); blocked on C-19.
-- **C-4. UNIQUE IMPROVEMENTS — the roster holds only the generic set.**
-  Weight 3. Gaps: Caguana's Batey, La Venta's Colossal Head and Armagh's
-  Monastery (each a whole improvement with its own adjacency, standing in as
-  a flat channel today), and the Chemamull-shaped appeal improvements.
 - **C-5. STRATEGIC-RESOURCE STOCKPILES — the bank ships; unit FUEL does
   not.** Weight 2. Gathering Storm puts a strategic resource to three uses —
   "unit production, as fuel for unit upkeep, and for Power production for
@@ -1208,10 +1205,6 @@ number was under-counting by treating deferrals as closures.
 - **C-9. FAITH-PURCHASE CLASSES — faith buys the units the rules name, not
   classes of BUILDING.** Weight 1. Gap: Valletta's suzerain row (City Center
   and Encampment buildings buyable with Faith).
-- **C-11. TERRAIN THE WONDER RULES NEED IS UNMODELED.** Weight 2. The
-  NARROWED marker in `builtWonders` names each wonder whose real placement
-  rule asks for terrain this map generator does not produce, so the modelled
-  rule is deliberately narrower than Civ 6's.
 - **C-13. RANGED STRIKES DO NOT ENGAGE DISTRICTS OR CITIES.** Weight 2.
   Recorded as a scope-out for both. The rest of the Encampment (`encamp_hp`
   pool, movement block, garrison pool, district strike, training XP) is
@@ -1284,13 +1277,39 @@ number was under-counting by treating deferrals as closures.
   (`declareWarOnCityState`), the suzerain's reaction, and the 25 Grievances
   GS charges for a denouncement. (The To Arms! casus belli no longer waits
   here: the denouncement it needed ships with its own 30-turn window.)
-- **C-20. THE MILITARY ENGINEER BUILDS ONE THING.** Weight 2. Real Civ 6 gives
-  it Fort, Airstrip, Missile Silo, Mountain Tunnel, Reinforced Barricade and
-  Modernized Trap, plus spending a charge to finish 20% of a Canal, Dam,
-  Aqueduct or Flood Barrier. Only the FORT exists here. Three of the four
-  districts the charge names now exist, and so does the Flood Barrier, so the
-  charge itself is what is missing rather than its targets; the Airstrip waits
-  on nothing but this row now that aircraft and their bases exist.
+- **C-20. THE MILITARY ENGINEER'S LAST THREE VERBS.** Weight 1. Its page reads
+  "Can construct Roads, Forts, Airstrips, and Missile Silos (uses 1 charge)",
+  "[GS] Can construct Railroads (costs no charge) and Mountain Tunnels (uses 1
+  charge)" and "[GS] Can spend a charge to complete 20% of an engineering type
+  of district (Aqueduct, Bath, Canal, Dam) and Flood Barrier building". Four of
+  those ship: the FORT on "any featureless land tile", the AIRSTRIP "on flat
+  terrain" with its "+3 aircraft slots" and "-1 Appeal", the ROAD, and the 20%
+  charge into an Aqueduct/Canal/Dam site or a Flood Barrier at the centre. All
+  of them go "in your own or NEUTRAL territory" (`engineerTileOk`), which is
+  the one build that reaches outside a seat's own borders.
+
+  Three residuals, each blocked on a system rather than on this row:
+  - **THE MISSILE SILO** bases nuclear devices, which is C-31.
+  - **THE MOUNTAIN TUNNEL** makes an impassable tile passable, and
+    passability is a static fixture plane on the GPU and `isImpassable` on TS
+    — C-35.
+  - **THE RAILROAD** is a second movement tier with a per-hex resource charge,
+    which is C-36.
+
+  Two more of the page's lines have no verb here either, and each names its
+  own absent system: "Can clean Nuclear Fallout" waits on C-31, and "Can Remove
+  Tile Improvements" is a verb neither engine has for any unit.
+
+  The Bath in the charge's district list is Rome's unique Aqueduct (C-26), and
+  the Reinforced Barricade and the Modernized Trap that an earlier draft of
+  this row named are exclusive to the ZOMBIE DEFENSE game mode, not the base
+  game — they were never in scope.
+
+  MEASURED GATE REACHABILITY IS ZERO: `engineer` reads 0/12 seeds over 250
+  turns, so no fort, airstrip, road or charge is ever built in the gate and
+  scripted parity says nothing about any of it. The chassis needs "a city that
+  has an Encampment with an Armory", which no seed reaches. `engineer_test.py`
+  pokes every rule directly instead.
 - **C-21. GREAT PEOPLE FIRE INSTANTLY; NONE IS PLACED.** Weight 2. A claimed
   Great Person pays its effect at the claim (`recruit`). Real Civ 6 gives many
   of them an ACTIVATED ability used later on a chosen tile. Gaps: the
@@ -1392,6 +1411,13 @@ number was under-counting by treating deferrals as closures.
   Particle Beam Siege Cannon, Enhanced Mobility and Reinforced Armor Plating —
   need a per-unit upgrade state keyed on a FUTURE-era tech, and the era ladder
   stops at Information.
+- **C-36. NO RAILROAD.** Weight 2. `Tile.road` / `sim.road` is ONE boolean
+  tier: a road-to-road step ignores the terrain penalty and, from the
+  Classical era, the river charge. Gathering Storm's railroad is a second tier
+  on top of it, and none of its three halves has a carrier — its own movement
+  rate, "1 Iron and 1 Coal per hex" charged against the stockpiles that
+  already exist, and the CO2 that "adds pollution, and quite a bit at that".
+  Two rows wait on it: C-20's fifth engineer verb and C-24's third emitter.
 - **C-35. THE LAND/WATER FACT NEVER MOVES.** Weight 2. Whether a tile is sea
   is decided at map generation and never again. On TS it is `isWater` reading
   `terrain`; on the GPU it is the static planes `water` and `wpass` plus
@@ -1505,7 +1531,7 @@ number was under-counting by treating deferrals as closures.
   - **RAILROAD CONSTRUCTION EMITS NOTHING.** The third source the page names —
     "every tile of constructed/upgraded Railroad will consume 1 Coal, which
     adds pollution, and quite a bit at that" — has no carrier, because neither
-    engine has a railroad at all: no route type, no improvement, no charge.
+    engine has a railroad at all (C-36).
   - **GLOBAL WARMING MITIGATION PAYS NOTHING OF ITS OWN.** The Future-era civic
     exists and gates Carbon Recapture, but its award — "3 Envoys and 1
     Diplomatic Victory point" — has nowhere to land: `ResearchEffect` carries

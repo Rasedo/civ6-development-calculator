@@ -216,7 +216,9 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('BALLISTICS', 'Ballistics', 'Industrial', 930, ['METAL_CASTING']),
     T('RIFLING', 'Rifling', 'Industrial', 1070, ['BALLISTICS', 'MILITARY_SCIENCE']),
 
-    T('FLIGHT', 'Flight', 'Modern', 1250, ['INDUSTRIALIZATION', 'SCIENTIFIC_THEORY']),
+    T('FLIGHT', 'Flight', 'Modern', 1250, ['INDUSTRIALIZATION', 'SCIENTIFIC_THEORY'], [
+      { kind: 'unlockImprovement', improvement: 'AIRSTRIP' },
+    ]),
     T('COMBUSTION', 'Combustion', 'Modern', 1370, ['STEEL', 'REFINING']),
     T('REFINING', 'Refining', 'Modern', 1250, ['RIFLING']),
     T('PLASTICS', 'Plastics', 'Atomic', 1480, ['COMBUSTION']),
