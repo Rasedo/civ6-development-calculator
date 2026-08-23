@@ -541,6 +541,7 @@ class SimEconomy:
         )
         # a Floodplains tile carrying no river at all floods alone
         reach[torch.arange(B, device=dev), tc] |= hit
+        shield = self._river_shielded(reach)
         order = reach.long().cumsum(dim=1) * reach.long()  # 1-based rank, 0 off-reach
         for k in range(1, int(order.max()) + 1):
             at = order == k
@@ -548,9 +549,26 @@ class SimEconomy:
             if not bool(hit_k.any()):
                 break
             tile_k = at.long().argmax(dim=1)
-            self._flood_tile(hit_k, torch.where(hit_k, tile_k, torch.full_like(tile_k, -1)), sev)
+            self._flood_tile(hit_k, torch.where(hit_k, tile_k, torch.full_like(tile_k, -1)),
+                             sev, shield)
 
-    def _flood_tile(self, hit: torch.Tensor, tile: torch.Tensor, sev: torch.Tensor) -> None:
+    def _river_shielded(self, reach: torch.Tensor) -> torch.Tensor:
+        """[B] — CIV6 (Dam): "Prevents damage from Floods on this River", and
+        "Reduces yields from Floods (Food and Production bonuses) by 50%", the
+        same two halves the GREAT BATH pays. The source's words for both are
+        that "a Dam or Great Bath along a River will mitigate floods THERE", so
+        the shield belongs to the RIVER: one complete, unpillaged Dam or Great
+        Bath standing anywhere along it covers every tile it floods, whoever
+        owns them. `riverShielded`'s twin."""
+        sh = (self.district >= 0) & self.district_complete & ~self.district_pillaged \
+            & self._d_flood_shield[self.district.clamp(min=0)]
+        if self._wond_n:
+            sh = sh | ((self.built_wonder >= 0) & self.built_wonder_complete
+                       & self._wond_floodmit[self.built_wonder.clamp(min=0)])
+        return (reach & sh).any(dim=1)
+
+    def _flood_tile(self, hit: torch.Tensor, tile: torch.Tensor, sev: torch.Tensor,
+                    mit: torch.Tensor) -> None:
         """`floodTile` — ONE river flood on one Floodplains tile, at the
         severity its whole flood rolled.
 
@@ -558,7 +576,7 @@ class SimEconomy:
         the Floodplains tiles near the River. This may also include a City
         Center, in which case it loses some HP and Defenses... May kill some
         Citizens in a nearby city... Can fertilize affected tiles." The severity
-        ladder decides every magnitude, and the Great Bath cancels the damage
+        ladder decides every magnitude, and a shielded river cancels the damage
         half while halving the fertility half.
 
         SEVEN draws per tile, always, whatever the tile holds — the count
@@ -577,10 +595,6 @@ class SimEconomy:
             return
         tc = tile.clamp(min=0)
         seat_at = self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1)
-        mit = torch.zeros(B, dtype=torch.bool, device=dev)
-        if self._wond_n:
-            for _r in range(self.n_majors):
-                mit = mit | ((seat_at == _r) & self._seat_wonder_any(_r, self._wond_floodmit))
         raw = hit & ~mit
 
         rows = raw.nonzero(as_tuple=True)[0]
@@ -720,6 +734,12 @@ class SimEconomy:
         _pu, _bl = self._congress_udt()
         _blk = (_bl >= 0).unsqueeze(1) & (self._b_req_district.unsqueeze(0) == _bl.unsqueeze(1))
         base = base & ~_blk.unsqueeze(1)
+        # CIV6: a government building "requires a Tier 2 government (Merchant
+        # Republic, Monarchy, or Theocracy)" — the tier of what the seat runs
+        # NOW, so a revolution can take an unbuilt row back off the list.
+        if bool((self._b_gov_tier > 0).any()):
+            _tier = self._adopted_gov_tier(self.civ_civics[:, row])
+            base = base & (self._b_gov_tier.reshape(1, 1, -1) <= _tier.reshape(B, 1, 1))
         if self.districts_on and self._b_has_reqs:
             rq = self._b_req_district  # [NB] the district each building needs, -1 = none
             reg = self.city_dist_tile[:, row][:, :, rq.clamp(min=0)]  # [B, C, NB] registry tile per building
@@ -1261,6 +1281,16 @@ class SimEconomy:
             if float(self._dyn_aqueduct[di]) != 0 and self._aqueduct_idx >= 0:
                 cnt = ((self.district[:, nbc] == self._aqueduct_idx) & self.district_complete[:, nbc] & on_map).sum(dim=2)
                 raw = raw + self._dyn_aqueduct[di] * cnt.to(self.dtype)
+        for _amt, _src in ((self._dyn_dam, self._dam_didx),
+                           (self._dyn_canal, self._canal_didx),
+                           (self._dyn_govplaza, self._govplaza_didx)):
+            if float(_amt[di]) == 0 or _src < 0:
+                continue
+            nb = self.neigh
+            nbc = nb.clamp(min=0)
+            cnt = ((self.district[:, nbc] == _src) & self.district_complete[:, nbc]
+                   & (nb >= 0).unsqueeze(0)).sum(dim=2)
+            raw = raw + _amt[di] * cnt.to(self.dtype)
         return raw
 
     def _district_adj_floor(self, di: int) -> torch.Tensor:
@@ -1321,16 +1351,68 @@ class SimEconomy:
         legal where the placer rejects it. It answers LEGALITY only — ranking
         the legal tiles is the policy's job (`district_rank_adj`).
         """
-        # Harbor sits on coastal water, the Spaceport on FLAT land (no Hills),
-        # everything else on any usable land.
+        # Harbor and Water Park sit on coastal water, the Spaceport and the
+        # Canal on FLAT land (no Hills), the Dam on a floodplain, everything
+        # else on any usable land.
         surface = (self.coastal_water if placement == 2
-                   else self.d_usable & ~self.hills if placement == 4
+                   else self.d_usable & ~self.hills if placement in (4, 6)
+                   else self.d_usable & self.floodplain if placement == 5
                    else self.d_usable)
         elig = (self._district_elig_site(row, j) if base is None else base) & surface
-        if placement in (1, 3):  # Aqueduct: adjacent-centre + water source; Encampment: NOT adjacent-centre
+        if placement in (1, 3):  # Aqueduct: adjacent-centre + water source; Encampment/Preserve: NOT adjacent-centre
             cc = self._adj_center_count()  # [B, T] adjacent CITY_CENTERs (any seat)
             elig = elig & ((cc >= 1) & self.aqsrc if placement == 1 else (cc == 0))
+        elif placement == 5:
+            elig = elig & self._dam_plot(di)
+        elif placement == 6:
+            elig = elig & self._canal_plot()
+        if bool(self._d_one_civ[di]):
+            # CIV6: "Limit of one per civilization" — one standing anywhere in
+            # this seat's empire closes every plot in every city.
+            held = ((self.city_dist_tile[:, row, :, di] >= 0) & self.city_alive[:, row]).any(dim=1)
+            elig = elig & ~held.unsqueeze(1)
+        for _x in self._d_exclusive[di]:
+            # CIV6 (Water Park): "cannot be built if an Entertainment Complex
+            # already exists in this city."
+            elig = elig & ~(self.city_dist_tile[:, row, j, _x] >= 0).unsqueeze(1)
         return elig
+
+    def _dam_plot(self, di: int) -> torch.Tensor:
+        """[B, T] CIV6 (Dam): "the River must traverse at least 2 adjacent sides
+        of the future Dam tile", with a "Limit of one per River" — one standing
+        Dam anywhere along the river closes every plot on it, whoever owns it.
+        The floodplain half is the surface test in `_district_elig`."""
+        sides = torch.zeros_like(self.river_mask)
+        for d in range(6):
+            sides = sides + ((self.river_mask >> d) & 1)
+        ok = (sides >= 2) & (self.river_comp >= 0)
+        taken = (self.district == di) & (self.river_comp >= 0)
+        if bool(taken.any()):
+            comp = self.river_comp.clamp(min=0)
+            nc = int(self.river_comp.max()) + 1
+            cnt = torch.zeros(self.B, nc, dtype=torch.long, device=self.device)
+            cnt.scatter_add_(1, comp, taken.long())
+            ok = ok & (cnt.gather(1, comp) == 0)
+        return ok
+
+    def _canal_plot(self) -> torch.Tensor:
+        """[B, T] CIV6 (Canal): "a Coast or Lake tile on one side, and either a
+        City Center or another body of water on the other. A single canal
+        passage may go either straight, or bend 60 degrees" — so the two sides
+        sit 2, 3 or 4 directions apart; 1 or 5 is the 120-degree turn the
+        source refuses. The flat-land half is the surface test."""
+        nb = self.neigh                       # [T, 6]
+        nbc = nb.clamp(min=0)
+        on = (nb >= 0).unsqueeze(0)           # [1, T, 6]
+        entry = self.water[:, nbc] & ~self.ocean_tile[:, nbc] & on   # COAST or LAKE
+        exit_ = (self.water[:, nbc] | (self.centre_slot_at[:, nbc] >= 0)) & on
+        out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        for a in range(6):
+            for b in range(6):
+                if (b - a) % 6 not in (2, 3, 4):
+                    continue
+                out = out | (entry[:, :, a] & exit_[:, :, b])
+        return out
 
     def district_rank_adj(self, di: int, placement: int = 0) -> torch.Tensor:
         """[B, T] the adjacency a district of type `di` WOULD earn on each tile
@@ -2116,11 +2198,10 @@ class SimEconomy:
         `appeal_base` carries the static part (natural wonder +2, mountain +1,
         coast/lake +1) plus the tile's t0 feature term; a chopped tile
         subtracts `appeal_feat` via feat_stripped. The rest is live: a
-        COMPLETED built wonder +1, a HOLY_SITE/THEATER_SQUARE/
-        ENTERTAINMENT_COMPLEX district +1, MINE/QUARRY/OIL_WELL -1, an
-        INDUSTRIAL_ZONE/ENCAMPMENT/SPACEPORT district -1, a pillaged tile -1,
-        and a BARBARIAN OUTPOST -1. Version-cached like _farmadj_qual — every
-        contributing write bumps _eff_version, camps included."""
+        COMPLETED built wonder +1, each district's own `_appeal_adj` column,
+        MINE/QUARRY/OIL_WELL -1, a pillaged tile -1, and a BARBARIAN OUTPOST
+        -1. Version-cached like _farmadj_qual — every contributing write bumps
+        _eff_version, camps included."""
         if self._appeal_cache is not None and self._appeal_cache[0] == self._eff_version:
             return self._appeal_cache[1]
         contrib = self.appeal_base - torch.where(self.feat_stripped, self.appeal_feat, torch.zeros_like(self.appeal_feat))
@@ -2131,16 +2212,11 @@ class SimEconomy:
             if _i >= 0:
                 bad_imp |= imp == _i
         contrib = contrib - bad_imp.long()
-        if self._appeal_bad_dist:
-            bad_d = torch.zeros_like(contrib, dtype=torch.bool)
-            for _d in self._appeal_bad_dist:
-                bad_d |= self.district == _d
-            contrib = contrib - bad_d.long()
-        if self._appeal_good_dist:
-            good_d = torch.zeros_like(contrib, dtype=torch.bool)
-            for _d in self._appeal_good_dist:
-                good_d |= self.district == _d
-            contrib = contrib + good_d.long()
+        if self._appeal_adj_any:
+            contrib = contrib + torch.where(
+                self.district >= 0,
+                self._appeal_adj[self.district.clamp(min=0)],
+                torch.zeros_like(contrib))
         contrib = contrib - self.pillaged.long()
         # A barbarian OUTPOST lowers its neighbours. Camps live in `camp_tile`
         # (-1 padded), the `barbSeat.camps` twin, so the tile view is built
@@ -2309,8 +2385,8 @@ class SimEconomy:
         fol_live = self._follower_live(row)
         fol_id = self._follower_id_for(self._city_rel(row)[:, sl]) if fol_live else None
         featP = None
-        if has_bel:
-            featP = self._belief_feat_plane(row)
+        if has_bel or self._b_appeal_rows:
+            featP = self._seat_tile_add(row)
             f_plane = f_plane + featP[:, :, 0]
             p_plane = p_plane + featP[:, :, 1]
             ty_oth = ty_oth + featP

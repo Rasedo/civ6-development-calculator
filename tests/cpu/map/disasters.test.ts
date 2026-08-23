@@ -191,21 +191,77 @@ describe('disasters', () => {
     expect(tileYields(bareCtx(state.map), plain).production).toBeGreaterThanOrEqual(plain.fertilityProd);
   });
 
-  it('the Great Bath spares the damage and halves the silt', () => {
-    const { state, plain } = floodBoard();
-    const city = settleAt(state, tileAtCoords(state.map, 9, 9).index);
+  // CIV6 (Dam): "a Dam or Great Bath along a River will mitigate floods
+  // THERE" — the shield belongs to the RIVER, not to the seat, so it has to
+  // stand on the water it protects.
+  const shieldBoard = () => {
+    const state = makeState(makeMap(18, 18));
+    state.disasters = true;
+    const plain = tileAtCoords(state.map, 4, 4);
+    const up = neighborTile(state.map, plain, 0)!;
+    plain.riverMask |= 1 << 0;
+    up.riverMask |= 1 << 3;
+    for (const t of [plain, up]) {
+      t.feature = 'FLOODPLAINS';
+      t.terrain = 'DESERT';
+      setTileOwner(t, 0);
+    }
     plain.improvement = 'FARM';
     plain.district = 'CAMPUS';
     plain.districtComplete = true;
-    state.map.tiles[city.centerIndex].builtWonder = 'GREAT_BATH';
-    state.map.tiles[city.centerIndex].builtWonderComplete = true;
-    city.wonders.push({ id: 'GREAT_BATH', tileIndex: city.centerIndex });
-    setTileOwner(state.map.tiles[city.centerIndex], 0);
+    return { state, plain, up };
+  };
+
+  it('a GREAT BATH on the river spares the damage and halves the silt', () => {
+    const { state, plain, up } = shieldBoard();
+    const city = settleAt(state, tileAtCoords(state.map, 9, 9).index);
+    up.builtWonder = 'GREAT_BATH';
+    up.builtWonderComplete = true;
+    city.wonders.push({ id: 'GREAT_BATH', tileIndex: up.index });
     for (let i = 0; i < 900; i++) disasterPhase(state);
     expect(plain.improvement).toBe('FARM');
     expect(plain.pillaged).toBeFalsy();
     expect(plain.districtPillaged).toBeFalsy();
     expect(plain.fertility).toBeGreaterThan(0); // the river still silts
+  });
+
+  it('a DAM on the river does the same, and a pillaged one does nothing', () => {
+    const { state, plain, up } = shieldBoard();
+    up.district = 'DAM';
+    up.districtComplete = true;
+    for (let i = 0; i < 900; i++) disasterPhase(state);
+    expect(plain.improvement).toBe('FARM');
+    expect(plain.districtPillaged).toBeFalsy();
+
+    const b2 = shieldBoard();
+    b2.up.district = 'DAM';
+    b2.up.districtComplete = true;
+    b2.up.districtPillaged = true;
+    let struck = 0;
+    for (let i = 0; i < 900; i++) {
+      disasterPhase(b2.state);
+      if (b2.plain.pillaged || b2.plain.improvement === null) struck++;
+      b2.plain.improvement = 'FARM';
+      b2.plain.pillaged = false;
+    }
+    expect(struck).toBeGreaterThan(0);
+  });
+
+  it('a shield off the river protects nothing', () => {
+    const { state, plain } = shieldBoard();
+    const city = settleAt(state, tileAtCoords(state.map, 9, 9).index);
+    const far = state.map.tiles[city.centerIndex];
+    far.builtWonder = 'GREAT_BATH';
+    far.builtWonderComplete = true;
+    city.wonders.push({ id: 'GREAT_BATH', tileIndex: far.index });
+    let struck = 0;
+    for (let i = 0; i < 900; i++) {
+      disasterPhase(state);
+      if (plain.pillaged || plain.improvement === null) struck++;
+      plain.improvement = 'FARM';
+      plain.pillaged = false;
+    }
+    expect(struck).toBeGreaterThan(0);
   });
 });
 

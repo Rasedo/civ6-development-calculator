@@ -21,12 +21,16 @@ import {
   SPY_PARTISANS_MIN, SPY_PARTISANS_MAX,
   SPY_M_GAIN_SOURCES, SPY_M_SIPHON_FUNDS, SPY_M_GREAT_WORK_HEIST,
   SPY_M_SABOTAGE_PRODUCTION, SPY_M_STEAL_TECH_BOOST, SPY_M_RECRUIT_PARTISANS,
-  SPY_M_DISRUPT_ROCKETRY, SPY_M_FOMENT_UNREST, SPY_M_NEUTRALIZE_GOVERNOR,
+  SPY_M_DISRUPT_ROCKETRY, SPY_M_FOMENT_UNREST, SPY_M_NEUTRALIZE_GOVERNOR, SPY_M_BREACH_DAM,
   SPY_M_COUNTERSPY,
 } from '../data/espionage';
 import { BARB_SEAT, citiesOf, isCiv, seatOf, seatsAllied } from './seats';
 import { DED_BODYGUARD } from '../data/seats';
-import { goldenDedication, dedicationEvent, governorPicks, governorTitles, worldEraIndex } from './eras';
+import { goldenDedication, dedicationEvent, governorPicks, governorTitles, grantedGovernorTitles, worldEraIndex } from './eras';
+import { seatBuildingSum } from './city';
+import { DISTRICTS } from '../data/districts';
+import { BUILDINGS } from '../data/buildings';
+import { floodRiver } from './disasters';
 import { LOYALTY_MAX } from '../data/seats';
 import { nextRandom } from './rand';
 import { disbandUnit, spawnUnit } from './units';
@@ -43,6 +47,8 @@ export function spyCapacity(state: GameState, seat: number): number {
   let n = 0;
   for (const id of SPY_CAPACITY_CIVICS) if (s.research.civics.includes(id)) n++;
   for (const id of SPY_CAPACITY_TECHS) if (s.research.techs.includes(id)) n++;
+  // CIV6 (Intelligence Agency): "+1 Spy and Spy capacity."
+  n += seatBuildingSum(state, seat, 'spyCapacity');
   return Math.min(n, SPY_CAPACITY_MAX);
 }
 
@@ -143,7 +149,7 @@ export function missionOffered(state: GameState, unit: Unit, m: number): boolean
   if (!cityHasDistrict(state, here.city, def.district)) return false;
   if (m === SPY_M_GREAT_WORK_HEIST && heistTarget(here.city) === null) return false;
   if (m === SPY_M_STEAL_TECH_BOOST && stealableTech(state, unit.seat, here.seat.seat) === null) return false;
-  if (m === SPY_M_NEUTRALIZE_GOVERNOR && !hasGovernor(here.seat, here.city)) return false;
+  if (m === SPY_M_NEUTRALIZE_GOVERNOR && !hasGovernor(state, here.seat, here.city)) return false;
   return true;
 }
 
@@ -171,20 +177,44 @@ export function spyLevel(unit: Unit): number {
   return Math.min(SPY_MAX_LEVEL, unit.spyLevel ?? 0);
 }
 
-/** CIV6 (Gain Sources): "Spies in this city operate at 2 levels higher for 24
- *  turns" — the seat's own clock on that city. */
-export function effectiveLevel(unit: Unit, city: City | undefined): number {
+/**
+ * CIV6 (Gain Sources): "Spies in this city operate at 2 levels higher for 24
+ * turns" — the seat's own clock on that city; and, the other way,
+ * (Diplomatic Quarter) "Enemy Spies operate at 2 levels below normal when
+ * targeting this district or adjacent districts" and (Consulate) "Spies
+ * operate at one level lower when targeting this city".
+ */
+export function effectiveLevel(state: GameState, unit: Unit, city: City | undefined): number {
   const boost = (city?.spySources ?? [])[unit.seat] ?? 0;
-  return spyLevel(unit) + (boost > 0 ? SPY_SOURCES_LEVELS : 0);
+  const lvl = spyLevel(unit) + (boost > 0 ? SPY_SOURCES_LEVELS : 0);
+  return Math.max(0, lvl - (city ? cityCounterLevels(state, city) : 0));
+}
+
+/** the levels a city's own defences take off a spy working there. */
+export function cityCounterLevels(state: GameState, city: City): number {
+  let n = 0;
+  const live = new Set<string>();
+  for (const d of city.districts) {
+    const t = state.map.tiles[d.tileIndex];
+    if (!t.districtComplete || t.districtPillaged) continue;
+    live.add(d.type);
+    n += DISTRICTS[d.type].spyLevelPenalty ?? 0;
+  }
+  for (const id of city.buildings) {
+    const def = BUILDINGS[id];
+    if (!def || !live.has(def.district)) continue;
+    n += def.spyLevelPenalty ?? 0;
+  }
+  return n;
 }
 
 /** CIV6 (Neutralize Governor): "can only be performed in a city with a
  *  Governor" — the holder's own stateless greedy pick, the twin of the one
  *  `seatPhase` takes. */
-function hasGovernor(holder: Seat, city: City): boolean {
+function hasGovernor(state: GameState, holder: Seat, city: City): boolean {
   const picks = governorPicks(
     holder.cities.map((c) => Math.round((c.loyalty ?? LOYALTY_MAX) * 1000)),
-    governorTitles(holder.research.civics.length),
+    governorTitles(holder.research.civics.length, grantedGovernorTitles(state, holder.seat)),
     new Set(holder.cities.map((c, i) => (governorSuppressed(c) ? i : -1)).filter((i) => i >= 0)),
   );
   const i = holder.cities.indexOf(city);
@@ -267,7 +297,7 @@ function resolveMission(state: GameState, unit: Unit, m: number): void {
     unit.spyTurns = missionTurns(state, unit.seat, m);
     return;
   }
-  const lvl = effectiveLevel(unit, here.city);
+  const lvl = effectiveLevel(state, unit, here.city);
   const ok = def.certain
     || roll(state, SPY_SUCCESS_BASE_PCT + SPY_SUCCESS_PER_LEVEL_PCT * lvl);
   if (ok) {
@@ -293,6 +323,20 @@ function applyMission(state: GameState, unit: Unit, m: number, city: City, holde
   const victim = seatOf(state, holder);
   if (!owner || !victim) return;
   switch (m) {
+    case SPY_M_BREACH_DAM: {
+      // CIV6 (Breach Dam): "damage (i.e., pillage) the district, causing a
+      // Flood and leaving the city vulnerable to damage from Floods until the
+      // Dam is repaired" — the pillage lands FIRST, so the flood it starts
+      // finds the shield already down.
+      const dam = city.districts.find(
+        (d) => DISTRICTS[d.type].floodShield && state.map.tiles[d.tileIndex].districtComplete,
+      );
+      if (!dam) return;
+      const dt = state.map.tiles[dam.tileIndex];
+      dt.districtPillaged = true;
+      floodRiver(state, dt);
+      return;
+    }
     case SPY_M_GAIN_SOURCES: {
       const src = city.spySources ?? (city.spySources = state.seats.map(() => 0));
       while (src.length <= unit.seat) src.push(0);

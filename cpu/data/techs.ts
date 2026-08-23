@@ -110,7 +110,10 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('HORSEBACK_RIDING', 'Horseback Riding', 'Classical', 120, ['ARCHERY'], [
       { kind: 'unlockBuilding', building: 'STABLE' },
     ]),
-    T('MATHEMATICS', 'Mathematics', 'Classical', 200, ['CURRENCY']),
+    T('MATHEMATICS', 'Mathematics', 'Classical', 200, ['CURRENCY'], [
+      { kind: 'unlockDistrict', district: 'DIPLOMATIC_QUARTER' },
+      { kind: 'unlockBuilding', building: 'CONSULATE' },
+    ]),
     T('CONSTRUCTION', 'Construction', 'Classical', 200, ['MASONRY', 'HORSEBACK_RIDING'], [
       { kind: 'unlockImprovement', improvement: 'LUMBER_MILL' },
     ]),
@@ -168,6 +171,7 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('ELECTRICITY', 'Electricity', 'Modern', 1370, ['STEAM_POWER'], [
       { kind: 'unlockBuilding', building: 'OIL_POWER_PLANT' },
       { kind: 'unlockBuilding', building: 'SEAPORT' },
+      { kind: 'unlockBuilding', building: 'HYDROELECTRIC_DAM' },
     ]),
     T('RADIO', 'Radio', 'Modern', 1370, ['STEAM_POWER', 'FLIGHT'], [
       { kind: 'unlockBuilding', building: 'BROADCAST_CENTER' },
@@ -188,7 +192,9 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('SHIPBUILDING', 'Shipbuilding', 'Classical', 200, ['SAILING']),
 
     T('MACHINERY', 'Machinery', 'Medieval', 300, ['IRON_WORKING', 'ENGINEERING']),
-    T('BUTTRESS', 'Buttress', 'Medieval', 300, ['SHIPBUILDING', 'MATHEMATICS']),
+    T('BUTTRESS', 'Buttress', 'Medieval', 300, ['SHIPBUILDING', 'MATHEMATICS'], [
+      { kind: 'unlockDistrict', district: 'DAM' },
+    ]),
     T('MILITARY_TACTICS', 'Military Tactics', 'Medieval', 300, ['MATHEMATICS']),
     T('STIRRUPS', 'Stirrups', 'Medieval', 390, ['HORSEBACK_RIDING', 'APPRENTICESHIP']),
     T('CASTLES', 'Castles', 'Medieval', 390, ['CONSTRUCTION'], [
@@ -204,7 +210,9 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'unlockBuilding', building: 'RENAISSANCE_WALLS' },
     ]),
 
-    T('STEAM_POWER', 'Steam Power', 'Industrial', 1070, ['INDUSTRIALIZATION']),
+    T('STEAM_POWER', 'Steam Power', 'Industrial', 1070, ['INDUSTRIALIZATION'], [
+      { kind: 'unlockDistrict', district: 'CANAL' },
+    ]),
     T('BALLISTICS', 'Ballistics', 'Industrial', 930, ['METAL_CASTING']),
     T('RIFLING', 'Rifling', 'Industrial', 1070, ['BALLISTICS', 'MILITARY_SCIENCE']),
 

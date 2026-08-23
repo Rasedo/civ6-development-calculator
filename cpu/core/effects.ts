@@ -6,6 +6,10 @@ import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFi
 import { congressPolicyBlocked, congressWildcardDelta } from './congress';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
 import { seatOf, citiesOf, campTiles } from './seats';
+import { BUILDINGS } from '../data/buildings';
+import { neighbors } from '../../world/hex';
+import { tileAppeal, appealBand } from './appeal';
+import { addYields, emptyYields } from './types';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { UNITS, UNIT_ERA_INDEX, unitHasClass } from '../data/units';
 import { cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus, isSuzerain } from './cityStates';
@@ -504,15 +508,62 @@ export function followerReligionForCity(
   return ownerReligionId;
 }
 
+/**
+ * CIV6 (Grove): "+1 Food and Faith to adjacent unimproved Charming tiles.
+ * Yields increased to +2 Food, Faith and Culture for adjacent unimproved
+ * Breathtaking tiles" — and the Sanctuary the same shape in Science/Gold.
+ *
+ * The two bands do NOT stack: a Breathtaking tile takes the Breathtaking row
+ * and nothing else. Two Preserves reaching one tile each pay it, which is what
+ * summing per district instance means.
+ */
+export function preserveTileYields(
+  state: GameState,
+  seat: number,
+  camps?: ReadonlySet<number>,
+): Map<number, Yields> {
+  const out = new Map<number, Yields>();
+  for (const city of citiesOf(state, seat)) {
+    for (const d of city.districts) {
+      const dt = state.map.tiles[d.tileIndex];
+      if (!dt.districtComplete || dt.districtPillaged) continue;
+      const rows = city.buildings
+        .map((id) => BUILDINGS[id])
+        .filter((b) => b && b.district === d.type && b.appealYields);
+      if (!rows.length) continue;
+      for (const n of neighbors(state.map, dt)) {
+        if (n.improvement || n.district || n.builtWonder) continue;
+        const band = appealBand(tileAppeal(state.map, n, camps));
+        if (band > 1) continue; // Breathtaking is band 0, Charming band 1
+        const cur = out.get(n.index) ?? emptyYields();
+        for (const b of rows) {
+          addYields(cur, band === 0 ? b!.appealYields!.breathtaking : b!.appealYields!.charming);
+        }
+        out.set(n.index, cur);
+      }
+    }
+  }
+  return out;
+}
+
 export interface YieldCtx {
   map: GameState['map'];
   mods: Modifiers;
   /** barbarian outpost tiles — the Seaside Resort's gold reads tile appeal */
   camps?: ReadonlySet<number>;
+  /** what this seat's Groves and Sanctuaries pay the tiles around their
+   *  Preserves, resolved once per context. */
+  preserve?: ReadonlyMap<number, Yields>;
 }
 
-export function makeYieldCtx(state: GameState, seat: number): YieldCtx {
-  return { map: state.map, mods: getModifiers(state, seat), camps: campTiles(state) };
+export function makeYieldCtx(state: GameState, seat: number, mods?: Modifiers): YieldCtx {
+  const camps = campTiles(state);
+  return {
+    map: state.map,
+    mods: mods ?? getModifiers(state, seat),
+    camps,
+    preserve: preserveTileYields(state, seat, camps),
+  };
 }
 
 /** The BASE yield context: the map with NOBODY's modifiers. What a tile is

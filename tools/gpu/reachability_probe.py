@@ -10,7 +10,7 @@ of the DRIVEN GAME, not of the comparison. What it answers, in order:
 
   apostleBuy    the driver emitting faith-buy kind 6 (B-18r's latent needs it)
   urbanization  the URBANIZATION civic, which gates the Neighborhood column
-  neighborhood  a Neighborhood actually placed
+  placed:<ID>   a district column actually placed, for the late-unlock rows
   secondShip    any seat holding two hulls at once (B-28r's one-galley cap)
   intlRoute     an INTERNATIONAL trade leg (B-31r)
   theoAdjacent  two religious units of DIFFERENT religions standing adjacent —
@@ -49,12 +49,17 @@ from core.simbase import js_round  # noqa: E402
 import drive  # noqa: E402
 import ladder  # noqa: E402
 
-KEYS = ("apostleBuy", "urbanization", "neighborhood", "secondShip",
+# The district columns worth counting: the pop-gated Neighborhood and the six
+# whose unlocks sit in the Industrial era or later.
+DISTRICT_MARKS = ("NEIGHBORHOOD", "DAM", "CANAL", "WATER_PARK", "PRESERVE",
+                  "GOVERNMENT_PLAZA", "DIPLOMATIC_QUARTER")
+
+KEYS = ("apostleBuy", "urbanization", "secondShip",
         "intlRoute", "theoAdjacent", "antiquityDig",
         "csWar", "csPeace", "specPin", "tileLock", "ballot",
         "natHistory", "conservation",
         "friendship", "alliance", "openBorders", "closedStep", "workGift",
-        "defensivePact")
+        "defensivePact") + tuple(f"placed:{d}" for d in DISTRICT_MARKS)
 
 
 def main() -> None:
@@ -90,6 +95,8 @@ def main() -> None:
         assert i >= 0, f"{name} not in the exported civics table"
         return i
 
+    dist_marks = [(f"placed:{dd['id']}", i) for i, dd in enumerate(sim.districts_cat)
+                  if dd["id"] in DISTRICT_MARKS]
     urb = civic_at("URBANIZATION")
     nat_hist, conserv = civic_at("NATURAL_HISTORY"), civic_at("CONSERVATION")
     relig_t = torch.zeros(sim.NU, dtype=torch.bool)
@@ -139,8 +146,8 @@ def main() -> None:
         mark("urbanization", sim.civ_civics[:, :, urb].any(dim=1), t)
         mark("natHistory", sim.civ_civics[:, :, nat_hist].any(dim=1), t)
         mark("conservation", sim.civ_civics[:, :, conserv].any(dim=1), t)
-        if sim._nbhd_didx >= 0:
-            mark("neighborhood", (sim.district == sim._nbhd_didx).any(dim=1), t)
+        for _k, _di in dist_marks:
+            mark(_k, (sim.district == _di).any(dim=1), t)
         nav_u = sim.unit_naval[sim.unit_type.clamp(min=0)]
         for row in seats:
             cnt = (sim.unit_alive & (sim.unit_seat == row) & nav_u).sum(dim=1)
@@ -210,7 +217,7 @@ def main() -> None:
     for k in KEYS:
         n = len(seeds_hit[k])
         ft = first_turn.get(k)
-        print(f"  {k:14s} {n}/{sim.B} seeds" + (f", first at t{ft}" if ft else "   NEVER"))
+        print(f"  {k:24s} {n}/{sim.B} seeds" + (f", first at t{ft}" if ft else "   NEVER"))
     print(f"  minor-war turns per seed: max {int(minor_war_turns.max())}, "
           f"mean {float(minor_war_turns.double().mean()):.1f}; standing at the final turn: "
           f"{int((sim.city_spec_pin >= 0).sum())} pinned slots, {int(sim.tile_locked.sum())} locked plots")

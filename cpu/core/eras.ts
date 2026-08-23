@@ -1,6 +1,7 @@
 import type { GameState } from './types';
-import { civEraIndex } from './city';
-import { seatOf, isBarbSeat, isCiv } from './seats';
+import { civEraIndex, seatBuildingSum } from './city';
+import { cityDistrictSum } from './yields';
+import { seatOf, isBarbSeat, isCiv, citiesOf } from './seats';
 import { seatWonderSum } from './wonders';
 import { UNITS } from '../data/units';
 import { DED_AUTOMATON, DED_DRACONES, DED_SKY, DED_STEAM, SKY_EUREKAS } from '../data/seats';
@@ -243,8 +244,17 @@ export function agePressureFactor(state: GameState, civ: number): number {
   return AGE_PRESSURE[(seatOf(state, civ)?.age ?? 1)];
 }
 
-export function governorTitles(nCivics: number): number {
-  return Math.min(GOV_MAX_TITLES, Math.floor(nCivics / GOV_CIVICS_PER_TITLE));
+export function governorTitles(nCivics: number, bonus = 0): number {
+  return Math.min(GOV_MAX_TITLES, Math.floor(nCivics / GOV_CIVICS_PER_TITLE) + bonus);
+}
+
+/** CIV6 (Government Plaza, and every building in it): "Awards +1 Governor
+ *  Title." Titles beyond the civics ladder, over every city this seat holds —
+ *  a pillaged Plaza pays none of them. */
+export function grantedGovernorTitles(state: GameState, seat: number): number {
+  let n = seatBuildingSum(state, seat, 'govTitle');
+  for (const city of citiesOf(state, seat)) n += cityDistrictSum(state, city, 'governorTitle');
+  return n;
 }
 
 /** The STATELESS greedy pick — the `titles` LOWEST-loyalty cities.

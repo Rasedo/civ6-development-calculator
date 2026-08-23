@@ -316,11 +316,10 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
   [
     G('CHIEFDOM', 'Chiefdom', 0, [M, E], {}, 'The starting government.'),
     // Slots sourced from the Gathering Storm Civilopedia: 1 Military,
-    // 1 Economic, 1 Diplomatic, 1 Wildcard. Was [M, M, E, D] — the same TOTAL
-    // of 4, which is why no gate ever caught the wrong composition.
+    // 1 Economic, 1 Diplomatic, 1 Wildcard.
     // CIV6 (GS): "+1 to all yields for each government building and Palace in
-    // a city. +10% Production toward Wonders." The PALACE half is what this
-    // model can address — there is no Government Plaza to hold the rest.
+    // a city. +10% Production toward Wonders." Only the PALACE half is paid
+    // here; the per-government-building half has no channel yet.
     G('AUTOCRACY', 'Autocracy', 1, [M, E, D, W], { capitalYields: { food: 1, production: 1, gold: 1, science: 1, culture: 1, faith: 1 } },
       '+1 to all yields in the capital, for its Palace.'),
     G('OLIGARCHY', 'Oligarchy', 1, [M, M, E, W], {},

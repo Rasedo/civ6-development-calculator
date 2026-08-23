@@ -3,7 +3,7 @@ import { seatOf, setTileOwner } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs, expandBorders } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { computeCityStats } from '../../../cpu/core/city';
-import { buildingLoyalty } from '../../../cpu/core/phase';
+import { standingLoyalty } from '../../../cpu/core/phase';
 import { trainableUnits } from '../../../cpu/core/units';
 import { LOYALTY_MAX } from '../../../cpu/data/seats';
 import { BUILDINGS } from '../../../cpu/data/buildings';
@@ -22,12 +22,12 @@ function oneCity() {
 
 describe('the Monument, at its Gathering Storm row', () => {
   it('carries +1 Loyalty rather than a second point of culture', () => {
-    const { city } = oneCity();
+    const { state, city } = oneCity();
     expect(BUILDINGS.MONUMENT.yields?.culture).toBe(1);
-    expect(buildingLoyalty(city)).toBe(0);
+    expect(standingLoyalty(state, city)).toBe(0);
     city.buildings.push('MONUMENT');
     // CIV6 (R&F/GS): "+1 Loyalty. +1 Culture."
-    expect(buildingLoyalty(city)).toBe(1);
+    expect(standingLoyalty(state, city)).toBe(1);
   });
 
   it('pays "+1 additional Culture if city is at maximum Loyalty", and only then', () => {

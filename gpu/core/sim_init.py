@@ -519,6 +519,7 @@ class SimInit:
         self._spy_m_unrest = _mid.index("FOMENT_UNREST")
         self._spy_m_governor = _mid.index("NEUTRALIZE_GOVERNOR")
         self._spy_m_counterspy = _mid.index("COUNTERSPY")
+        self._spy_m_breach = _mid.index("BREACH_DAM") if "BREACH_DAM" in _mid else -1
         self._spy_mission_turns_base = int(_sp["missionTurns"])
         self._spy_travel_min = int(_sp["travelMin"])
         self._spy_travel_per = int(_sp["travelTilesPerTurn"])
@@ -1196,20 +1197,23 @@ class SimInit:
         # The Urban Development Treaty ban on HOLY_SITE also refuses the
         # worship faith-buy (a purchase still CREATES the building).
         self._holy_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HOLY_SITE"), -1)
-        # Districts that LOWER neighbouring appeal (cpu/core/appeal.ts), and the
-        # NEIGHBORHOOD column whose housing reads the appeal tier.
-        self._appeal_bad_dist = [
-            i for i, d in enumerate(self.districts_cat)
-            if d.get("id") in ("INDUSTRIAL_ZONE", "ENCAMPMENT", "SPACEPORT")
-        ]
-        # ... and the ones that RAISE it.
-        self._appeal_good_dist = [
-            i for i, d in enumerate(self.districts_cat)
-            if d.get("id") in ("HOLY_SITE", "THEATER_SQUARE", "ENTERTAINMENT_COMPLEX")
-        ]
+        # What each district type does to its NEIGHBOURS' appeal, straight off
+        # the catalog column (`tileAppeal`'s `appealAdjacent`) — no type is
+        # named here, so a new district row carries its own term.
+        self._appeal_adj = torch.tensor(
+            [int(d.get("appealAdjacent", 0)) for d in self.districts_cat],
+            dtype=torch.long, device=device)  # [nD]
+        self._appeal_adj_any = bool((self._appeal_adj != 0).any())
         self._nbhd_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "NEIGHBORHOOD"), -1)
+        # The columns the three per-district-type adjacency sources count.
+        self._dam_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "DAM"), -1)
+        self._canal_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "CANAL"), -1)
+        self._govplaza_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "GOVERNMENT_PLAZA"), -1)
         self._appeal_cuts = [(4, 6), (2, 5), (-1, 4), (-3, 3)]
         self._appeal_floor = 2
+        # the same five bands, as the CUTS alone — what `appealBand` returns and
+        # the Preserve's housing table and the Grove's yield bands are keyed by.
+        self._appeal_bands = [c for c, _v in sorted(self._appeal_cuts, reverse=True)]
         self._encamp_si = next((si for si, (di, _ut, _uc, _plc, _fc) in enumerate(self._scaffold) if di == self._encamp_didx), -1)
         self._harbor_si = next((si for si, (di, _ut, _uc, _plc, _fc) in enumerate(self._scaffold) if di == self._harbor_didx), -1)
         self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
@@ -1243,6 +1247,13 @@ class SimInit:
         self._dyn_mine = torch.tensor([_src_amt(d, 11) for d in self.districts_cat], dtype=dtype, device=device)  # [nD]
         self._dyn_quarry = torch.tensor([_src_amt(d, 12) for d in self.districts_cat], dtype=dtype, device=device)  # [nD]
         self._dyn_aqueduct = torch.tensor([_src_amt(d, 13) for d in self.districts_cat], dtype=dtype, device=device)  # [nD]
+        # CIV6 (GS Industrial Zone): "+2 Production for each adjacent Aqueduct,
+        # Dam or Canal", and (Government Plaza) "+1 adjacency bonus to all
+        # adjacent districts" — three more per-district-type sources, each
+        # matching a COMPLETE district of that type on a neighbouring tile.
+        self._dyn_dam = torch.tensor([_src_amt(d, 14) for d in self.districts_cat], dtype=dtype, device=device)  # [nD]
+        self._dyn_canal = torch.tensor([_src_amt(d, 15) for d in self.districts_cat], dtype=dtype, device=device)  # [nD]
+        self._dyn_govplaza = torch.tensor([_src_amt(d, 16) for d in self.districts_cat], dtype=dtype, device=device)  # [nD]
         self._mine_iidx = 1   # IMPROVEMENT_IDS: FARM=0, MINE=1, LUMBER_MILL=2, QUARRY=3, ...
         self._quarry_iidx = 3
         _govs = rules.governments or []
@@ -1453,9 +1464,37 @@ class SimInit:
             raise ValueError("a repeatable district that counts toward the specialty cap: "
                              "the cap and the discount both read the registry, which holds one tile per type")
         self._aqueduct_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "AQUEDUCT"), -1)
+        # The rest of the per-district catalog columns, every one read by index
+        # rather than by id: the amenity the district itself pays, its flat
+        # loyalty, the governor title and envoys it awards on completion, the
+        # one-per-civilization limit, the types it refuses to share a city
+        # with, its appeal-based housing, its flood shield, and what it takes
+        # off an enemy spy's level.
+        self._d_amenity = torch.tensor([float(d.get("amenities", 0)) for d in self.districts_cat], dtype=dtype, device=device)
+        self._d_loyalty = torch.tensor([float(d.get("loyalty", 0)) for d in self.districts_cat], dtype=dtype, device=device)
+        self._d_gov_title = torch.tensor([int(d.get("governorTitle", 0)) for d in self.districts_cat], dtype=torch.long, device=device)
+        self._d_envoy_centre = torch.tensor([int(d.get("envoysNextToCenter", 0)) for d in self.districts_cat], dtype=torch.long, device=device)
+        self._d_one_civ = torch.tensor([bool(d.get("oneCivWide", 0)) for d in self.districts_cat], dtype=torch.bool, device=device)
+        self._d_exclusive = [[int(x) for x in d.get("exclusive", [])] for d in self.districts_cat]
+        self._d_appeal_housing = torch.tensor([bool(d.get("appealHousing", 0)) for d in self.districts_cat], dtype=torch.bool, device=device)
+        self._d_flood_shield = torch.tensor([bool(d.get("floodShield", 0)) for d in self.districts_cat], dtype=torch.bool, device=device)
+        self._d_bomb_unowned = torch.tensor([bool(d.get("cultureBombUnowned", 0)) for d in self.districts_cat], dtype=torch.bool, device=device)
+        self._d_spy_pen = torch.tensor([int(d.get("spyLevelPenalty", 0)) for d in self.districts_cat], dtype=torch.long, device=device)
+        self._preserve_housing = [int(x) for x in _er2.get("preserveHousing", [0, 0, 0, 0, 0])]
         self._d_unlock_t = torch.tensor([int(d.get("unlockTech", -1)) for d in self.districts_cat], dtype=torch.long, device=device)
         self._d_unlock_c = torch.tensor([int(d.get("unlockCivic", -1)) for d in self.districts_cat], dtype=torch.long, device=device)
         self._d_maint = torch.tensor([float(d.get("maintenance", 1)) for d in self.districts_cat], dtype=dtype, device=device)
+        self._d_housing = torch.tensor([float(d.get("housing", 0)) for d in self.districts_cat], dtype=dtype, device=device)
+        # The NEIGHBORHOOD ladder as a plain per-band list, the shape the
+        # Preserve's own table already has.
+        self._nbhd_housing = [v for _c, v in sorted(self._appeal_cuts, reverse=True)] + [self._appeal_floor]
+        # Types whose housing has to be counted off the TILE plane rather than
+        # the registry: a city may hold several, and the registry keeps one.
+        self._rep_house_idx = [
+            i for i in range(len(self.districts_cat))
+            if bool(self._is_repeatable[i]) and float(self._d_housing[i]) != 0
+        ]
+        self._appeal_house_idx = [i for i in range(len(self.districts_cat)) if bool(self._d_appeal_housing[i])]
         self._h_fresh = float(rules.housing_fresh)
         self._aq_fresh_bonus = float(rules.housing_aq_fresh_bonus)
         self._aq_no_fresh_total = float(rules.housing_aq_no_fresh)
@@ -1561,6 +1600,17 @@ class SimInit:
         self._plant_bidx = [i for i in range(self.NB) if bool(self._b_powerplant[i])]
         self._iz_adj_bidx = [i for i in range(self.NB) if bool(self._b_iz_adj[i])]
         self._cardiff_harbor_power = float(rules.cardiff_harbor_power)
+        self._b_power_supply = rules.b_power_supply.to(device)  # [NB] renewable Power a row supplies its own city
+        self._b_regional_range = rules.b_regional_range.to(device)  # [NB] its own regional reach, 0 = the shared one
+        self._b_gov_tier = rules.b_gov_tier.to(device)  # [NB] the government TIER a row demands
+        self._b_gov_title = rules.b_gov_title.to(device)
+        self._b_spy_capacity = rules.b_spy_capacity.to(device)
+        self._b_spy_pen = rules.b_spy_pen.to(device)
+        self._b_influence = rules.b_influence.to(device)
+        self._b_favor = rules.b_favor.to(device)
+        self._b_loy_no_gov = rules.b_loy_no_gov.to(device)
+        self._b_appeal_y = rules.b_appeal_y.to(device)  # [NB, 2, 6]
+        self._b_appeal_rows = [i for i in range(len(rules.b_appeal_y)) if float(rules.b_appeal_y[i].abs().sum()) != 0]
         self._laser_power_load = float(rules.laser_power_load)
         self._b_fuel_slot = rules.b_fuel_slot.to(device)  # [NB] long
         self._b_fuel_rate = rules.b_fuel_rate.to(device)  # [NB] long

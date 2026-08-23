@@ -8,10 +8,8 @@
  * without a locked cost.
  *
  * Sources the real game has and this map cannot express are simply absent:
- * Government Plaza, Ley Line, Geothermal Fissure, Dam/Canal/Bath (the
- * Industrial Zone's +2 reads off the Aqueduct alone), Lumber Mill and
- * strategic resources for the Industrial Zone, Entertainment Complex and
- * Water Park for the Theater Square.
+ * the Ley Line, the Geothermal Fissure, the Bath, and the Lumber Mill and
+ * strategic resources the Industrial Zone also reads.
  */
 
 import type { DistrictId, YieldKey } from '../core/types';
@@ -30,7 +28,13 @@ export type AdjacencySource =
   | 'SEA_RESOURCE' // per adjacent water tile with a resource
   | 'MINE' // per adjacent mine improvement (GS: +0.5 for Industrial Zone)
   | 'QUARRY' // per adjacent quarry improvement (GS: +1 for Industrial Zone)
-  | 'AQUEDUCT'; // per adjacent Aqueduct district (GS: +2 for Industrial Zone)
+  // CIV6 (GS Industrial Zone): "Major bonus (+2 Production) for each adjacent
+  // Aqueduct, Dam or Canal".
+  | 'AQUEDUCT'
+  | 'DAM'
+  | 'CANAL'
+  // CIV6 (Government Plaza): "+1 adjacency bonus to all adjacent districts."
+  | 'GOV_PLAZA';
 
 export interface AdjacencyRule {
   source: AdjacencySource;
@@ -53,6 +57,50 @@ export interface DistrictDef {
   adjacencyYield?: YieldKey;
   adjacency: AdjacencyRule[];
   housing: number;
+  /** gold upkeep per turn once the district is complete. */
+  maintenance: number;
+  /** CIV6 (Entertainment Complex, Water Park): "+1 Amenity from entertainment
+   *  to parent city" — the DISTRICT's own amenity, before any building. */
+  amenities?: number;
+  /**
+   * CIV6 (Appeal): "+1 for each adjacent Holy Site, Theater Square,
+   * Entertainment Complex, Water Park, Dam, Canal, Preserve, or wonder" and
+   * "-1 for each adjacent ... Industrial Zone, Encampment, Aerodrome, or
+   * Spaceport" — what this district does to every NEIGHBOURING tile's Appeal.
+   * `tileAppeal` / `_tile_appeal` read the whole term off this column, so a
+   * new district row carries its own appeal without touching either walk.
+   */
+  appealAdjacent: number;
+  /** CIV6 (Government Plaza): "+8 Loyalty to this city." A flat per-turn term
+   *  like a building's, paid while the district stands complete. */
+  loyalty?: number;
+  /** CIV6: "Limit of one per civilization" — the seat may hold one, over
+   *  every city it owns, rather than one per city. */
+  oneCivWide?: boolean;
+  /** CIV6 (Water Park): "cannot be built if an Entertainment Complex already
+   *  exists in this city" — and the Entertainment Complex refuses it back. */
+  exclusiveDistricts?: DistrictId[];
+  /** CIV6 (Government Plaza): "Awards +1 Governor Title." */
+  governorTitle?: number;
+  /** CIV6 (Diplomatic Quarter): "+1 Envoy when built next to the City
+   *  Center." */
+  envoysNextToCenter?: number;
+  /** CIV6 (Preserve): "Initiate a Culture Bomb on adjacent unowned tiles" the
+   *  moment it completes. */
+  cultureBombUnowned?: boolean;
+  /** CIV6 (Preserve): "Grants up to 3 Housing based on tile's Appeal" — the
+   *  district's housing reads the tile it sits on, like a Neighborhood's. */
+  appealHousing?: boolean;
+  /** CIV6 (Dam): "Prevents damage from Floods on this River", and halves the
+   *  Food/Production a flood would fertilize with. */
+  floodShield?: boolean;
+  /** CIV6 (Dam, Canal): "Military Engineers can spend a charge to complete
+   *  20% (rounded down) of a Dam's Production cost." The Aqueduct carries it
+   *  too; it is what "engineering district" means. */
+  /** CIV6 (Diplomatic Quarter): "Enemy Spies operate at N levels below normal
+   *  when targeting this district or adjacent districts." Read as a whole-city
+   *  term here, which is what the mission model can address. */
+  spyLevelPenalty?: number;
   placement: {
     /** Must be placed on coast/lake water adjacent to land (Harbor). */
     onCoastalWater?: boolean;
@@ -61,6 +109,14 @@ export interface DistrictDef {
     notAdjacentToCityCenter?: boolean;
     /** Refuses Hills (Spaceport: flat land only). */
     flatLand?: boolean;
+    /** CIV6 (Dam): "It must be built on a Floodplains tile and the River must
+     *  traverse at least 2 adjacent sides of the future Dam tile", with a
+     *  "limit of one per River". */
+    floodplainRiver?: boolean;
+    /** CIV6 (Canal): "must be built on flat land with a Coast or Lake tile on
+     *  one side, and either a City Center or another body of water on the
+     *  other". */
+    canalPassage?: boolean;
   };
   description: string;
 }
@@ -77,6 +133,8 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     countsTowardLimit: false,
     adjacency: [],
     housing: 0,
+    maintenance: 0,
+    appealAdjacent: 0,
     placement: {},
     description: 'Founded with the city.',
   }),
@@ -95,9 +153,12 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       { source: 'MOUNTAIN', amount: 1 },
       { source: 'RAINFOREST', amount: 0.5 },
       { source: 'REEF', amount: 2 },
+      { source: 'GOV_PLAZA', amount: 1 },
       { source: 'DISTRICT', amount: 0.5 },
     ],
     housing: 0,
+    maintenance: 1,
+    appealAdjacent: 0,
     placement: {},
     description: 'Science district.',
   }),
@@ -113,9 +174,12 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       { source: 'NATURAL_WONDER', amount: 2 },
       { source: 'MOUNTAIN', amount: 1 },
       { source: 'WOODS', amount: 0.5 },
+      { source: 'GOV_PLAZA', amount: 1 },
       { source: 'DISTRICT', amount: 0.5 },
     ],
     housing: 0,
+    maintenance: 1,
+    appealAdjacent: 1,
     placement: {},
     description: 'Faith district.',
   }),
@@ -131,9 +195,12 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     // bonus, not a standard one), +1 per two adjacent districts.
     adjacency: [
       { source: 'BUILT_WONDER', amount: 2 },
+      { source: 'GOV_PLAZA', amount: 1 },
       { source: 'DISTRICT', amount: 0.5 },
     ],
     housing: 0,
+    maintenance: 1,
+    appealAdjacent: 1,
     placement: {},
     description: 'Culture district (+1 per adjacent world wonder).',
   }),
@@ -148,9 +215,12 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     adjacency: [
       { source: 'RIVER', amount: 2 },
       { source: 'HARBOR_DISTRICT', amount: 2 },
+      { source: 'GOV_PLAZA', amount: 1 },
       { source: 'DISTRICT', amount: 0.5 },
     ],
     housing: 0,
+    maintenance: 0,
+    appealAdjacent: 0,
     placement: {},
     description: 'Gold district.',
   }),
@@ -167,9 +237,12 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     adjacency: [
       { source: 'CITY_CENTER', amount: 2 },
       { source: 'SEA_RESOURCE', amount: 1 },
+      { source: 'GOV_PLAZA', amount: 1 },
       { source: 'DISTRICT', amount: 0.5 },
     ],
     housing: 0,
+    maintenance: 0,
+    appealAdjacent: 0,
     placement: { onCoastalWater: true },
     description: 'Placed on coast/lake water adjacent to land.',
   }),
@@ -185,9 +258,14 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       { source: 'MINE', amount: 0.5 },
       { source: 'QUARRY', amount: 1 },
       { source: 'AQUEDUCT', amount: 2 },
+      { source: 'DAM', amount: 2 },
+      { source: 'CANAL', amount: 2 },
+      { source: 'GOV_PLAZA', amount: 1 },
       { source: 'DISTRICT', amount: 0.5 },
     ],
     housing: 0,
+    maintenance: 1,
+    appealAdjacent: -1,
     placement: {},
     description: 'Production district.',
   }),
@@ -200,6 +278,8 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     countsTowardLimit: true,
     adjacency: [],
     housing: 0,
+    maintenance: 1,
+    appealAdjacent: -1,
     placement: { notAdjacentToCityCenter: true },
     description: 'Military district (its buildings add production and housing).',
   }),
@@ -212,6 +292,8 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     countsTowardLimit: false,
     adjacency: [],
     housing: 0, // housing handled specially (depends on existing fresh water)
+    maintenance: 0,
+    appealAdjacent: 0,
     placement: { requiresAdjacentCityCenter: true, requiresWaterSourceOrMountain: true },
     description: 'Adjacent to City Center and a river/lake/oasis/mountain. +2 housing (fresh-water city) or +6 (otherwise).',
   }),
@@ -224,8 +306,12 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     countsTowardLimit: true,
     adjacency: [],
     housing: 0,
+    maintenance: 1,
+    amenities: 1,
+    appealAdjacent: 1,
+    exclusiveDistricts: ['WATER_PARK'],
     placement: {},
-    description: 'Amenities district.',
+    description: 'Amenities district. One or the other with the Water Park, never both.',
   }),
   NEIGHBORHOOD: D({
     id: 'NEIGHBORHOOD',
@@ -237,6 +323,8 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     allowMultiple: true,
     adjacency: [],
     housing: 0, // appeal-based (2-6), computed from the tile it sits on
+    maintenance: 0,
+    appealAdjacent: 0,
     placement: {},
     description: 'Housing based on tile appeal (2-6).',
   }),
@@ -253,7 +341,9 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     countsTowardLimit: true,
     adjacency: [],
     housing: 0,
-    // CIV6 (Aerodrome): "must be built on flat terrain", and -1 Appeal.
+    maintenance: 1,
+    appealAdjacent: -1,
+    // CIV6 (Aerodrome): "must be built on flat terrain".
     placement: { flatLand: true },
     description: 'Builds and bases aircraft. Flat land only.',
   }),
@@ -267,8 +357,126 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     countsTowardLimit: false,
     adjacency: [],
     housing: 0,
+    maintenance: 1,
+    appealAdjacent: -1,
     placement: { flatLand: true },
     description: 'Launch site for the Science Victory projects. Flat land only.',
+  }),
+  // CIV6 (Dam): "It must be built on a Floodplains tile and the River must
+  // traverse at least 2 adjacent sides of the future Dam tile", "Limit of one
+  // per River", and it "Does not depend on Population" — one of the three
+  // ENGINEERING districts, which is also what lets a Military Engineer rush it.
+  DAM: D({
+    id: 'DAM',
+    name: 'Dam',
+    code: 'DM',
+    color: '#5f87a8',
+    cost: 81,
+    countsTowardLimit: false,
+    allowMultiple: true, // "as many Dams as its territory covers different Rivers"
+    adjacency: [],
+    housing: 3,
+    maintenance: 0,
+    appealAdjacent: 1,
+    floodShield: true,
+    placement: { floodplainRiver: true },
+    description: 'On a floodplain with the river on two sides. +3 housing, and its river no longer floods.',
+  }),
+  // CIV6 (Canal): "provides passage from a body of water to a City Center or
+  // another body of water", "Does not depend on Population", "No limit on the
+  // number that can be built per city".
+  CANAL: D({
+    id: 'CANAL',
+    name: 'Canal',
+    code: 'CN',
+    color: '#4f9fbf',
+    cost: 81,
+    countsTowardLimit: false,
+    allowMultiple: true,
+    adjacency: [],
+    housing: 0,
+    maintenance: 0,
+    appealAdjacent: 1,
+    placement: { canalPassage: true },
+    description: 'Flat land between water and a City Center or a second body of water.',
+  }),
+  // CIV6 (Water Park): "must be built on a Coast or Lake tile adjacent to
+  // land", and "cannot be built if an Entertainment Complex already exists in
+  // this city".
+  WATER_PARK: D({
+    id: 'WATER_PARK',
+    name: 'Water Park',
+    code: 'WP',
+    color: '#4fb0c6',
+    cost: 54,
+    countsTowardLimit: true,
+    adjacency: [],
+    housing: 0,
+    maintenance: 1,
+    amenities: 1,
+    appealAdjacent: 1,
+    exclusiveDistricts: ['ENTERTAINMENT_COMPLEX'],
+    placement: { onCoastalWater: true },
+    description: 'The Entertainment Complex on the water. One or the other, never both.',
+  }),
+  // CIV6 (Preserve): "Grants up to 3 Housing based on tile's Appeal",
+  // "+1 Appeal", "Initiate a Culture Bomb on adjacent unowned tiles",
+  // "Cannot be built next to the City Center".
+  PRESERVE: D({
+    id: 'PRESERVE',
+    name: 'Preserve',
+    code: 'PR',
+    color: '#4f9f6a',
+    cost: 54,
+    countsTowardLimit: true,
+    adjacency: [],
+    housing: 0, // appeal-based, like the Neighborhood's
+    maintenance: 0,
+    appealAdjacent: 1,
+    appealHousing: true,
+    cultureBombUnowned: true,
+    placement: { notAdjacentToCityCenter: true },
+    description: 'Housing from the appeal of its own tile, and it annexes the unowned tiles it touches.',
+  }),
+  // CIV6 (Government Plaza): "+8 Loyalty to this city", "+1 adjacency bonus to
+  // all adjacent districts", "Awards +1 Governor Title", "Limit of one per
+  // civilization".
+  GOVERNMENT_PLAZA: D({
+    id: 'GOVERNMENT_PLAZA',
+    name: 'Government Plaza',
+    code: 'GP',
+    color: '#b0894f',
+    cost: 30,
+    countsTowardLimit: true,
+    adjacency: [],
+    housing: 0,
+    maintenance: 1,
+    appealAdjacent: 0,
+    loyalty: 8,
+    governorTitle: 1,
+    oneCivWide: true,
+    placement: {},
+    description: 'The seat of government: one per civilization, +8 loyalty, and a governor title.',
+  }),
+  // CIV6 (Diplomatic Quarter): "+1 Envoy when built next to the City Center",
+  // "Enemy Spies operate at 2 levels below normal when targeting this district
+  // or adjacent districts", "Limit of one per civilization".
+  DIPLOMATIC_QUARTER: D({
+    id: 'DIPLOMATIC_QUARTER',
+    name: 'Diplomatic Quarter',
+    code: 'DQ',
+    color: '#8f7fc6',
+    cost: 30,
+    countsTowardLimit: true,
+    adjacency: [],
+    housing: 0,
+    maintenance: 1,
+    appealAdjacent: 0,
+    envoysNextToCenter: 1,
+    spyLevelPenalty: 2,
+    oneCivWide: true,
+    placement: {},
+    description: 'One per civilization. An envoy if it touches the centre, and enemy spies work two levels down.',
   }),
 };
 
@@ -285,6 +493,12 @@ export const PLACEABLE_DISTRICTS: DistrictId[] = [
   'NEIGHBORHOOD',
   'SPACEPORT',
   'AERODROME', // appended LAST — earlier indices are wire meaning
+  'DAM',
+  'CANAL',
+  'WATER_PARK',
+  'PRESERVE',
+  'GOVERNMENT_PLAZA',
+  'DIPLOMATIC_QUARTER',
 ];
 
 /**
@@ -293,7 +507,7 @@ export const PLACEABLE_DISTRICTS: DistrictId[] = [
  * the wire's meaning and must never be re-sorted. `unlockKind: 'civic'` marks
  * a civic-tree unlock; the default is a tech id.
  */
-export const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; unlockKind?: 'civic'; placement?: 'aqueduct' | 'coastal' | 'encampment' | 'flat' }[] = [
+export const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; unlockKind?: 'civic'; placement?: 'aqueduct' | 'coastal' | 'encampment' | 'flat' | 'dam' | 'canal' }[] = [
   { id: 'CAMPUS', unlockId: 'WRITING' },
   { id: 'HOLY_SITE', unlockId: 'ASTROLOGY' },
   { id: 'COMMERCIAL_HUB', unlockId: 'CURRENCY' },
@@ -306,4 +520,10 @@ export const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; unlockKind?
   { id: 'AERODROME', unlockId: 'FLIGHT' },
   { id: 'NEIGHBORHOOD', unlockId: 'URBANIZATION', unlockKind: 'civic' },
   { id: 'SPACEPORT', unlockId: 'ROCKETRY', placement: 'flat' },
+  { id: 'PRESERVE', unlockId: 'MYSTICISM', unlockKind: 'civic', placement: 'encampment' },
+  { id: 'GOVERNMENT_PLAZA', unlockId: 'STATE_WORKFORCE', unlockKind: 'civic' },
+  { id: 'DIPLOMATIC_QUARTER', unlockId: 'MATHEMATICS' },
+  { id: 'DAM', unlockId: 'BUTTRESS', placement: 'dam' },
+  { id: 'WATER_PARK', unlockId: 'NATURAL_HISTORY', unlockKind: 'civic', placement: 'coastal' },
+  { id: 'CANAL', unlockId: 'STEAM_POWER', placement: 'canal' },
 ];

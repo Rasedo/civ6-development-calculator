@@ -261,7 +261,8 @@ class SimPhase:
         governorTitles(civics) of them. Read once per seat block, before any
         loyalty moves."""
         dev, B, RC = self.device, self.B, self.RC
-        titles = (self.civ_civics[:, row].sum(dim=1) // self._gov_per).clamp(max=self._gov_max)
+        titles = ((self.civ_civics[:, row].sum(dim=1) // self._gov_per)
+                  + self._granted_titles(row)).clamp(max=self._gov_max)
         # CIV6 (Neutralize Governor): a city whose governor is off duty is not
         # a candidate at all — TS drops it from the list the pick ranks.
         alive = self.city_alive[:, row] & (self.city_gov_out[:, row] <= 0)
@@ -270,6 +271,22 @@ class SimPhase:
         rank = torch.empty_like(key)
         rank.scatter_(1, key.argsort(dim=1, stable=True), torch.arange(RC, device=dev).expand(B, RC))
         return (rank < titles.unsqueeze(1)) & alive
+
+    def _granted_titles(self, row: int) -> torch.Tensor:
+        """[B] long — CIV6 (Government Plaza, and every building in it):
+        "Awards +1 Governor Title", over every city this seat holds. A pillaged
+        Plaza pays none of them."""
+        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        reg = self.city_dist_tile[:, row]  # [B, RC, nD]
+        alive = self.city_alive[:, row]
+        if self.districts_on and reg.shape[-1]:
+            flat = reg.clamp(min=0).reshape(self.B, -1)
+            live = (reg >= 0) & self.district_complete.gather(1, flat).reshape_as(reg) \
+                & ~self.district_pillaged.gather(1, flat).reshape_as(reg) & alive.unsqueeze(2)
+            out = out + torch.einsum("bjn,n->b", live.long(), self._d_gov_title)
+        if bool((self._b_gov_title > 0).any()):
+            out = out + self._seat_building_sum(row, self._b_gov_title)
+        return out
 
     def _governor_tiles(self, row: int, gov: torch.Tensor) -> torch.Tensor:
         """[B, T] bool — the row's tiles whose OWNING city is governor-seated,
@@ -296,6 +313,7 @@ class SimPhase:
         others = torch.cat((held[:, :row], held[:, row + 1:]), dim=1)
         others = others.any(dim=1) if others.shape[1] else torch.zeros(B, dtype=torch.bool, device=dev)
         here = self.city_center[bidx, row, col].clamp(min=0)
+        loy_gov = self._ungoverned_loyalty(row)
         ctr = self.city_center[:, :nrow].reshape(B, -1).clamp(min=0)
         d = self.pair_dist[here.unsqueeze(1), ctr].to(F)
         w = ((rng + 1 - d).clamp(min=0)
@@ -310,9 +328,9 @@ class SimPhase:
         press = torch.where(tot > 0, scale * (own - foreign) / tot.clamp(min=1e-9), torch.zeros_like(tot))
         delta = (press
                  + self._loyalty_amenity[tier.clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)].double()
-                 + gov.double() * self._gov_loy
+                 + torch.where(gov, torch.full_like(loy_gov, self._gov_loy), loy_gov)
                  + self._congress_loyalty(row)
-                 + self._building_loyalty(row, bidx, col)
+                 + self._standing_loyalty(row, bidx, col)
                  + self._emergency_loyalty(row).gather(1, col.unsqueeze(1)).squeeze(1))
         loy = self.city_loyalty[bidx, row, col]
         upd = act & others
@@ -510,6 +528,14 @@ class SimPhase:
             dr = made_d.nonzero(as_tuple=True)[0]
             dt = self.city_qtile[bidx, row, col][dr].clamp(min=0)
             self.district_complete[dr, dt] = True
+            # The registry holds ONE tile per type; TS walks every instance. So
+            # for a type a city may hold SEVERAL of, point the entry at the one
+            # that just finished — then "the registry names a complete tile"
+            # holds exactly when TS's `some(complete)` does.
+            _rep = self._is_repeatable[self.district[dr, dt].clamp(min=0)]
+            if bool(_rep.any()):
+                _rr = dr[_rep]
+                self.city_dist_tile[_rr, row, col[_rr], self.district[_rr, dt[_rep]]] = dt[_rep]
             # MONUMENTALITY pays era score per SPECIALTY district completed
             # (a city centre is never queued here).
             mon = torch.zeros(self.B, dtype=torch.bool, device=self.device)
@@ -517,11 +543,26 @@ class SimPhase:
             self._dedication_event(row, 0, mon)
             enc = self.district[dr, dt] == self._encamp_didx
             self.encamp_hp[dr, dt] = torch.where(enc, torch.full_like(dt, self._encamp_hp_max), self.encamp_hp[dr, dt])
-            # BORDER CONTROL outcome A: this row's new districts are bombs.
+            # BORDER CONTROL outcome A: this row's new districts are bombs —
+            # and it takes FOREIGN tiles too, so it subsumes the Preserve's own
+            # and only one of the two ever runs.
             bomb = self._congress_culture_bomb_seat()[dr] == row
             if bool(bomb.any()):
                 br2 = dr[bomb]
                 self._culture_bomb(row, br2, dt[bomb], col[br2])
+            own_bomb = ~bomb & self._d_bomb_unowned[self.district[dr, dt].clamp(min=0)]
+            if bool(own_bomb.any()):
+                br3 = dr[own_bomb]
+                self._culture_bomb(row, br3, dt[own_bomb], col[br3], unowned_only=True)
+            # CIV6 (Diplomatic Quarter): "+1 Envoy when built next to the City
+            # Center."
+            env = self._d_envoy_centre[self.district[dr, dt].clamp(min=0)]
+            if bool((env > 0).any()):
+                _ctr = self.city_center[bidx, row, col][dr].clamp(min=0)
+                _touch = (self.neigh[dt] == _ctr.unsqueeze(1)).any(dim=1)
+                _add = torch.zeros(self.B, dtype=torch.long, device=self.device)
+                _add.index_add_(0, dr, env * _touch.long())
+                self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] + _add
             self.city_qtile[bidx, row, col] = torch.where(made_d, torch.full_like(cur, -1), self.city_qtile[bidx, row, col])
             self._eff_version += 1
 
@@ -805,6 +846,8 @@ class SimPhase:
              + self._favor_per_alliance * (self.seat_ally_turns[:, row] > 0).sum(dim=1)
              + self._congress_policy_favor(
                  self._slotted_policies(self._seat_civics(row), self._wonder_extra_slots(row)))
+             # CIV6 (Foreign Ministry, GS): "+3 Diplomatic Favor per turn."
+             + self._seat_building_sum(row, self._b_favor)
              - self._favor_occ_capital * self._occupied_capitals(row))
         self.civ_diplo_favor[:, row] = self.civ_diplo_favor[:, row].clamp(min=0)
         # grievances DECAY by 1 per turn at peace with every MAJOR — the row's

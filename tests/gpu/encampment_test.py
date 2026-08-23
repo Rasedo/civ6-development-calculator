@@ -210,6 +210,59 @@ def test_strike(rules, path) -> None:
     print("  breached-perimeter OK: neither the city nor its Encampment fires")
 
 
+def place_attacker(sim, enc_tile: int) -> int:
+    """A seat-row-1 melee unit on a free tile beside the district."""
+    free = [int(t) for t in sim.neigh[enc_tile].tolist()
+            if t >= 0 and bool(sim.passable[0, t]) and int(sim.military_at[0, t]) < 0]
+    assert free, "no free tile beside the Encampment"
+    slot = int(sim.unit_next[0])
+    sim.unit_next[0] = slot + 1
+    ty = next(i for i in range(sim.NU)
+              if bool(sim._type_melee[i]) and not bool(sim._type_civilian[i]))
+    sim.major_unit_alive[0, slot] = True
+    sim.major_unit_seat[0, slot] = 1
+    sim.major_unit_type[0, slot] = ty
+    sim.major_unit_tile[0, slot] = free[0]
+    sim.major_unit_hp[0, slot] = 100
+    sim.military_at[0, free[0]] = slot + sim.POOL_LO["major"]
+    return slot
+
+
+def test_district_defence_terms(rules, path) -> None:
+    """CIV6 (Encampment): "Acquires Outer Defenses and Ranged Strike along with
+    the City Center once Walls have been built" — the district's own Combat
+    Strength carries its city's WALLS TIER, so a walled city's Encampment takes
+    less from the same assault. The perimeter pool is emptied first, so what
+    the two runs differ by is the STRENGTH term and not the split.
+    `encampmentDefense`'s twin."""
+    def garrison_damage(walls: bool) -> int:
+        sim, enc_tile, _tgt, _v = build_strike_scene(rules, path)
+        if not walls:
+            sim.city_bldg[0, 0, 0, sim._walls_bidx] = False
+        sim.city_outer_hp[0, 0, 0] = 0  # breached: the whole roll reaches the garrison
+        sim.encamp_hp[0, enc_tile] = sim._encamp_hp_max
+        slot = place_attacker(sim, enc_tile)
+        tile = torch.full((sim.B,), enc_tile, dtype=torch.long, device=sim.device)
+        sim._attack_encampment(torch.tensor([True], device=sim.device), tile, "major", slot)
+        return sim._encamp_hp_max - int(sim.encamp_hp[0, enc_tile])
+
+    walled, bare = garrison_damage(True), garrison_damage(False)
+    assert walled < bare, \
+        f"walls must raise the district's defence: {walled} taken walled vs {bare} bare"
+
+    # ...and the tier comes from the OWNING city: a tile no city owns resolves
+    # to slot -1, which is what keeps `_walls_tier_at`'s clamp off slot 0.
+    sim, enc_tile, _t, _v = build_strike_scene(rules, path)
+    loose = ((sim.city_slot_at(0)[0] < 0) & (sim.district[0] < 0)).nonzero(as_tuple=True)[0]
+    if len(loose):
+        col = sim._owner_city_col(torch.zeros(sim.B, dtype=torch.long, device=sim.device),
+                                  torch.full((sim.B,), int(loose[0]), dtype=torch.long,
+                                             device=sim.device))
+        assert int(col[0]) == -1, "an unowned tile must resolve to no city slot"
+    print(f"  district defence OK: walls tier is in the district's CS "
+          f"({walled} taken walled vs {bare} bare)")
+
+
 def test_district_perimeter(rules, path) -> None:
     """CIV6 gives a defensible district "Defenses HP equal to the City Center"
     and one set of Walls "supplies both", so a melee assault on an Encampment
@@ -353,6 +406,7 @@ def main() -> None:
     test_training_xp_wiring(rules, paths[0])
     test_strike(rules, paths[0])
     test_district_perimeter(rules, paths[0])
+    test_district_defence_terms(rules, paths[0])
     test_district_heal_gate(rules, paths[0])
     test_civ_encamp_prod_mult(rules, paths[0])
     print("ENCAMPMENT OK")

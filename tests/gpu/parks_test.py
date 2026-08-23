@@ -256,7 +256,9 @@ def main() -> None:
     # CIV6 ("Appeal"): +1 per adjacent Holy Site / Theater Square /
     # Entertainment Complex, -1 per adjacent barbarian outpost.
     s6 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
-    assert s6._appeal_good_dist, "no district raises appeal — the catalog lookup found nothing"
+    good = [i for i, v in enumerate(s6._appeal_adj.tolist()) if v > 0]
+    bad = [i for i, v in enumerate(s6._appeal_adj.tolist()) if v < 0]
+    assert good, "no district raises appeal — the catalog column is empty"
     mid = int(s6.T // 2)
     nb = [x for x in s6.neigh[mid].tolist() if x >= 0]
     assert len(nb) >= 2, "need a tile with neighbours"
@@ -264,11 +266,11 @@ def main() -> None:
     s6.camp_tile[0, :] = -1
     s6._eff_version += 1
     base = int(s6._tile_appeal()[0, mid])
-    s6.district[0, nb[0]] = s6._appeal_good_dist[0]
+    s6.district[0, nb[0]] = good[0]
     s6._eff_version += 1
     assert int(s6._tile_appeal()[0, mid]) == base + 1, "an adjacent good district must add +1"
-    if s6._appeal_bad_dist:
-        s6.district[0, nb[1]] = s6._appeal_bad_dist[0]
+    if bad:
+        s6.district[0, nb[1]] = bad[0]
         s6._eff_version += 1
         assert int(s6._tile_appeal()[0, mid]) == base, "a bad district must cancel it, cumulatively"
         s6.district[0, nb[1]] = -1

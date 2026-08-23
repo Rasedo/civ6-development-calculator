@@ -361,6 +361,51 @@ def main() -> None:
     assert float(sim9.major_unit_mp[0, sl9]) == 0.0, "and the turn is spent"
     print(f"  9 UPGRADE OK ({up_src} -> {up_dst}, {price9:.0f} gold, promotions kept, no heal)")
 
+    # --- 10 FOUND on the seat's OWN ground ---------------------------------
+    # CIV6 settling criteria name land, passability, the oasis, the natural
+    # wonder and the 4-hex spacing — not ownership. A city may be founded on
+    # ground this seat already holds; only FOREIGN territory refuses, which is
+    # `canFoundCity`'s `tileClaimed(tile) && tileSeat(tile) !== seat`.
+    sim10 = fresh(rules, path, turns=20)
+    nrows = sim10.n_majors
+    ctrs = [int(t) for t in sim10.city_center[0, :nrows].reshape(-1).tolist() if t >= 0]
+    ctrs += [int(t) for t in sim10.citystate_center[0].tolist() if t >= 0]
+
+    def spacious(t: int) -> bool:
+        return all(int(sim10.pair_dist[t, c]) >= 4 for c in ctrs)
+
+    cand = [t for t in range(sim10.T)
+            if bool(sim10.settle_ok[0, t]) and int(sim10.district[0, t]) < 0
+            and int(sim10.built_wonder[0, t]) < 0 and spacious(t)]
+    if not cand:
+        print("  10 FOUND-on-own-ground SKIPPED (no legally spaced tile on this fixture)")
+    else:
+        spot = cand[0]
+        want = torch.ones(sim10.B, dtype=torch.bool, device=sim10.device)
+        tile10 = torch.full((sim10.B,), spot, dtype=torch.long, device=sim10.device)
+
+        # (a) OWN ground: the tile belongs to this row already
+        sim10.tile_seat[0, spot] = row
+        sim10.tile_city[0, spot] = sim10.city_id[0, row, 0]
+        sim10._tile_owner_ver += 1
+        sim10._eff_version += 1
+        n_before = int(sim10.city_alive[0, row].sum())
+        assert bool(sim10._found_city_at(row, want, tile10)[0]), \
+            "a city must be foundable on ground this seat already owns"
+        assert int(sim10.city_alive[0, row].sum()) == n_before + 1
+
+        # (b) FOREIGN ground refuses
+        sim11 = fresh(rules, path, turns=20)
+        foreign = 1 if row != 1 else 0
+        sim11.tile_seat[0, spot] = foreign
+        sim11.tile_city[0, spot] = sim11.city_id[0, foreign, 0]
+        sim11._tile_owner_ver += 1
+        sim11._eff_version += 1
+        tile11 = torch.full((sim11.B,), spot, dtype=torch.long, device=sim11.device)
+        assert not bool(sim11._found_city_at(row, torch.ones(sim11.B, dtype=torch.bool), tile11)[0]), \
+            "FOREIGN territory must still refuse a settle"
+        print("  10 FOUND on own ground OK (and foreign ground still refuses)")
+
     print("CIV VERBS OK — including the upgrade ladder")
 
 

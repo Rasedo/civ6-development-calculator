@@ -6,7 +6,8 @@ CIV 6 (Gathering Storm): a flood "damages or destroys Districts, improvements,
 and units on the Floodplains tiles near the River. This may also include a City
 Center, in which case it loses some HP and Defenses... May kill some Citizens in
 a nearby city... Can fertilize affected tiles." The severity decides every
-magnitude; the Great Bath cancels the damage half and halves the silt.
+magnitude; a Dam or Great Bath along the river cancels the damage half for
+every tile that river floods and halves the silt.
 
 Disasters are off in most fixtures and the flood picks one tile out of every
 floodplain on the map, so the driven gate reaches this at a rate no run can be
@@ -139,24 +140,22 @@ def main() -> None:
     assert int(sim.fertility_prod[0, t]) > 0, "the flood never silted PRODUCTION"
     print("  a river silts food and production on their own rolls")
 
-    # THE GREAT BATH. It spares the damage half outright and still lets the
-    # river silt.
+    # THE GREAT BATH, AND WHERE IT HAS TO STAND. CIV6: a Dam or Great Bath
+    # "along a River will mitigate floods THERE", so the shield belongs to the
+    # RIVER — it spares the damage half on every tile that river floods,
+    # whoever owns them, and still lets the river silt at half rate.
     assert bool(sim._wond_floodmit.any()), "no wonder in the catalog carries flood mitigation"
-    row = 0
     widx = int(sim._wond_floodmit.nonzero()[0])
-    home = int(sim.city_alive[0, row].nonzero()[0])
-    ctr = int(sim.city_center[0, row, home])
-    seat_ok = (sim.tile_seat[0] == row).nonzero(as_tuple=True)[0].tolist()
-    site = next(int(x) for x in seat_ok
-                if x not in (ctr, t) and int(sim.built_wonder[0, x]) < 0 and int(sim.district[0, x]) < 0)
-    sim.city_wonder[0, row, home, widx] = site
-    sim.built_wonder[0, site] = widx
-    sim.built_wonder_complete[0, site] = True
-    # the floodplain has to be the wonder-holder's ground for the mitigation to
-    # reach it — the fixture's one floodplain sits outside every border
-    sim.tile_seat[0, t] = row
-    sim.tile_city[0, t] = int(sim.city_id[0, row, home])
-    sim._tile_owner_ver += 1
+    up = next(int(x) for x in sim.neigh[t].tolist()
+              if x >= 0 and int(sim.centre_slot_at[0, x]) < 0
+              and int(sim.built_wonder[0, x]) < 0 and int(sim.district[0, x]) < 0)
+    # a two-tile river: `t` and `up` share one component, so a shield on either
+    # covers both. `solo` cleared every component, so these two are the river.
+    sim.floodplain[0, up] = True
+    sim.river_comp[0, t] = 0
+    sim.river_comp[0, up] = 0
+    sim.built_wonder[0, up] = widx
+    sim.built_wonder_complete[0, up] = True
     sim._eff_version += 1
     sim.fertility[0, t] = 0
     sim.district[0, t] = 0
@@ -170,7 +169,21 @@ def main() -> None:
         assert not bool(sim.pillaged[0, t]), "the Great Bath let a flood pillage an improvement"
         assert not bool(sim.district_pillaged[0, t]), "the Great Bath let a flood take a district"
     assert int(sim.fertility[0, t]) > 0, "a mitigated river stopped silting entirely"
-    print("  the Great Bath spares the damage and the river still silts")
+
+    # ...and off that river it protects nothing: the same wonder, one river
+    # component away, leaves every flood on `t` unmitigated.
+    sim.river_comp[0, up] = 1
+    struck = 0
+    for _ in range(N):
+        sim.improvement[0, t] = 0
+        sim.pillaged[0, t] = False
+        sim.district_pillaged[0, t] = False
+        flood(sim, t)
+        if bool(sim.pillaged[0, t]) or int(sim.improvement[0, t]) < 0:
+            struck += 1
+    assert struck > 0, "a shield off the river spared a flood it has no business reaching"
+    sim.river_comp[0, up] = 0
+    print("  the Bath shields its own river, and only its own")
 
     poke_river_reach()
     print("FLOOD SEVERITY OK — the ladder, the bands, the two silts, the Bath and the reach")

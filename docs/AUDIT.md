@@ -53,7 +53,8 @@ nothing carries forward.
 
 | Open item | Weight | What the weight is for |
 |---|---|---|
-| **A. Engine vs engine** | **0** | |
+| A-1r the district registry holds ONE tile per TYPE | 1 | a repeatable district's per-type columns are counted once on the GPU and per instance on TS; every such column is zero today, so nothing diverges yet |
+| **A. Engine vs engine** | **1** | |
 | B-20r tourism tails | 1 | theming, the open-borders dig and the work GIFT all ship; the Naturalist's progressive cost is unsourced |
 | B-21r suzerain rows | 1 | nine perks are rules; the residual descoped rows all need whole absent systems |
 | B-22r World Congress | 2 | 13 of the 21 regular resolutions ship and emergencies run as special sessions; eight resolutions and the scored competitions have no carrier; peace TERMS wait on the negotiated deal (C-2) and two favor penalties on C-19/C-24; the favor tie-break unmodeled |
@@ -62,7 +63,7 @@ nothing carries forward.
 | B-31r trade-route tails | 1 | sea legs and the whole-destination-set candidate ship; no trading posts, plunder gold is a stylization, the summed-yield key is a heuristic and the free-choice head is P8's |
 | B-53r the great-person queue | 1 | 205 sourced people, the era gate and the scaled price ship; the offer is re-derived each turn rather than frozen, and the payout is one era-sized lump instead of the person's own ability |
 | B-D unsourced data values | 2 | the Monument, the Lighthouse and the Engineer's Armory shipped and one bullet was false; the governments are half-shipped, and the rest are shape differences or model tuning that no source can close |
-| B-36r appeal adjacency terms | 1 | the four reachable terms ship; Dam/Canal/Water Park/Preserve and the Great People wait on C-22, C-4, C-21 |
+| B-36r appeal adjacency terms | 1 | every district term ships off one catalog column; the unique-improvement terms and the appeal-granting Great People wait on C-4 and C-21 |
 | B-39r wonder effects still dropped | 1 | the sourced sweep shipped fourteen channels; five residuals, each blocked on B-20r, C-21, B-34r or C-23 |
 | B-45r sourced-sweep finds in the other rows | 1 | three of the eight now have a channel; the five that do not need free units (C-21), faith-bought Great People (C-9), a rival-recruit event, or B-31r's route yields |
 | B-46r the siege class's tails | 1 | the Bombard stat, both support chassis, all four walls tiers, the move-and-shoot rule and every siege rung through Rocket Artillery ship; Akkad's suzerain bonus does not |
@@ -75,9 +76,9 @@ nothing carries forward.
 | B-51r the Encampment's second pool | 1 | the district meets the city's perimeter and heals only while its tile is clear; Civ 6 tracks the two pools SEPARATELY, and a defeat pillages it |
 | B-44r city-state war tails | 1 | the head, its policy and a SEAT's march on a minor ship; the barbarian walker still raids only majors because it beelines to one nearest city, and the diplomatic consequences wait on C-19 |
 | B-60r the dig's DATE, and the hull nobody dates | 1 | the artifact's civilization is the event's own now; its ERA is still the ACTING seat's research, and a barbarian or minor sinking a hull leaves no wreck at all |
-| B-34r flood tails | 1 | the severity ladder and the river's whole reach ship; the Great Bath's mitigation is still seat-scoped rather than river-scoped, and the Dam — with the Hydroelectric Dam that needs it — is not in the district roster |
+| B-34r flood tails | 1 | the severity ladder, the river's whole reach, the river-scoped shield and the Dam all ship; the per-tile flood count and the climate/coastal tails do not |
 | **B. Fidelity vs real Civ 6** | **26** | |
-| C-1 POWER | 2 | the grid, the three plants, Cardiff, the powered-yield split and the FUEL all ship; the CO2 and the Accords wait on C-24, four renewable improvements, the Hydroelectric Dam and the Biosphere have no carrier, nothing can retire a plant, and a minor's cities are never powered |
+| C-1 POWER | 2 | the grid, the three plants, Cardiff, the Hydroelectric Dam, the powered-yield split and the FUEL all ship; the CO2 and the Accords wait on C-24, four renewable improvements and the Biosphere have no carrier, nothing can retire a plant, and a minor's cities are never powered |
 | C-2 diplomatic agreements | 3 | friendship, alliances, open borders, the closed border and the work gift ship on one 30-turn clock; alliance TYPES and LEVELS, the negotiated two-sided deal, and the four agreements that need one are open |
 | C-4 unique improvements | 3 | Batey / Colossal Head / Monastery, each a flat channel today |
 | C-5 strategic-resource stockpiles | 2 | the bank, its ceiling, the unit and project charges, the plants' fuel, unit FUEL upkeep and the heal a lost source denies all ship; the shortage penalty's magnitude is unpublished and trading resources waits on C-2 |
@@ -88,12 +89,12 @@ nothing carries forward.
 | C-11 terrain the wonder rules need | 2 | the NARROWED placements are deliberately narrower than Civ 6's |
 | C-13 ranged vs districts/cities | 2 | a scope-out on both, with the rest of the Encampment complete |
 | C-15 garrison does not block capture | 2 | the move-onto-centre capture model is what is missing |
-| C-16 the spy's second half | 2 | the Spy, its capacity, the jump and all eleven missions ship; the escape-and-capture sequence, the spy promotion pool and four missions with no carrier do not |
+| C-16 the spy's second half | 2 | the Spy, its capacity, the jump and all twelve missions ship; the escape-and-capture sequence, the spy promotion pool and two missions with no carrier do not |
 | C-17 embarked movement never upgrades | 1 | the flat EMBARK_MOVES stands in for every era |
 | C-19 grievances and warmongering | 2 | war has no reputational consequence with anyone |
-| C-20 the Military Engineer's build list | 2 | five buildables and the finish-a-district charge; the Airstrip no longer waits on anything but this row |
+| C-20 the Military Engineer's build list | 2 | five buildables and the finish-a-district charge, which now has three of its four districts; only the Flood Barrier is still absent |
 | C-21 Great Person ACTIVATED abilities | 2 | every GP fires instantly; none is placed and used |
-| C-22 the district roster is a subset | 3 | no Dam, Canal, Water Park, Preserve, Government Plaza or Diplomatic Quarter |
+| C-22 the district roster is a subset | 2 | all eighteen districts ship; the Canal carries no naval passage, six Government Plaza buildings have no effect body, and the Preserve's housing table is unpublished |
 | C-23 nothing diminishes tourism | 1 | no rival's Enlightenment ever costs a tourist, so Cristo Redentor's cancelling clause has nothing to cancel |
 | C-24 no CO2, no climate | 3 | GS's whole climate arc — emissions, warming bands, sea level, escalating disasters — and 3 gaps wait on it |
 | C-26 no civilization uniques | 5 | seats are a name, a colour and a city list: no civ ability, no leader ability or agenda, no unique unit, no unique infrastructure (America's Film Studio among them) |
@@ -106,7 +107,7 @@ nothing carries forward.
 | C-32 the new classes have no promotion tree | 2 | air, GDR, support and spy chassis are offered no promotion, so Sky and Stars' XP half has nothing to multiply |
 | C-33 the Giant Death Robot is only its stats | 2 | seven sourced abilities and the four Future-era upgrades have no carrier |
 | C-34 air combat's second half | 2 | bases, both heads, the sortie and the scatter ship; Interception, Patrol and Priority Target — the whole reason a fighter exists — do not |
-| **C. Absent systems** | **58** | |
+| **C. Absent systems** | **57** | |
 | **OPEN, TOTAL** | **84** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
@@ -129,10 +130,18 @@ is the only thing that would say so. Its current answer is green: 12 seeds x
 250 turns, compared per turn on every group. That green bounds nothing the
 gate does not reach — "Reachability" below is where that boundary runs.
 
-THIS CHAPTER IS EMPTY. That is a claim about the two instruments that fill
-it — the digest, which only ever speaks about what the gate REACHES, and a
-read of the exporter against its readers, which only ever speaks about the
-channels somebody thought to compare. Neither can say the class is closed.
+THIS CHAPTER HAS ONE MEMBER, and how it got one is the chapter's own point.
+The gate was green over 250 turns for rounds on end; then the district lane
+started ROTATING its pick, the driven games went somewhere new, and FOUR
+divergences fell out of the same green instrument in a single round — a yield
+context built by hand without its optional fields, an Encampment defending
+without its city's walls, a settle refused on the seat's OWN ground, and the
+registry undercount below. None was new code. All four had been sitting in
+paths no seed had walked. The digest only
+ever speaks about what the gate REACHES, and a read of the exporter against
+its readers only ever speaks about the channels somebody thought to compare;
+neither can say the class is closed, and a round that widens coverage is
+worth more to this chapter than a round that re-reads it.
 
 WHAT THE INSTRUMENT CAN SEE IS ITSELF AUDITABLE, and it was shallower than
 it read. Coverage proved every `_MUTABLE` plane was NAMED by some field; it
@@ -149,6 +158,26 @@ are compared against their TS predicates. The census enforces the rule that
 found them — a field naming more than one plane must state what it
 compares. The 250-turn gate is green WITH those comparisons live, which is
 a stronger green than the one before it.
+
+- **A-1r. THE DISTRICT REGISTRY HOLDS ONE TILE PER TYPE.** `city_dist_tile`
+  is [B, row, slot, nD] — one tile per (city, district type) — while TS keeps
+  `city.districts` as a LIST that may hold the same type twice. Three
+  districts are repeatable (`allowMultiple`): the NEIGHBORHOOD, the DAM and
+  the CANAL. Any consumer that COUNTS instances therefore reads one where TS
+  reads two, and the two consumers that would have are already off the tile
+  plane: `_seat_housing`'s repeatable loop (which is what pays a second Dam
+  its +3) and `_detect_seat_boosts`' repeatable branch (which is what fires
+  "Build 2 Neighborhoods" for two in ONE city — it read the registry until the
+  gate reached a second Neighborhood at seed 9092, t238).
+  What is still registry-counted, and so still one-per-type: district
+  MAINTENANCE, amenities, loyalty, governor titles and the spy penalty. Every
+  one of those columns is ZERO for all three repeatable districts, so nothing
+  diverges today — this is a trap for the next repeatable row, not a live
+  bug. Appeal is safe by construction: it reads the tile plane, never the
+  registry. Closing it means either a per-city COUNT plane beside the registry
+  or moving each column onto the tile walk; both cost a [B, T, RC] scan on a
+  per-turn path for no present gain, which is why it is recorded rather than
+  paid for now.
 
 What is NOT a source of new members: a seat asymmetry. Seat 0 rides the same
 machinery as every other row, and `tools/gpu/seat_symmetry_check.py` holds
@@ -507,17 +536,16 @@ Civ 6 source or is recorded as unverifiable.
   Floodplains tile carrying no river floods alone. REACHABILITY: the fixtures
   hold rivers of 12, 8, 6, 5, 3 and 2 floodplains, so the multi-tile reach is
   live in the driven gate; `flood_severity_test` poke f pins it.
+  THE SHIELD BELONGS TO THE RIVER. CIV6: a Dam or Great Bath "along a River
+  will mitigate floods THERE", so `riverShielded` / `_river_shielded` ask the
+  REACH, not the seat: one complete, unpillaged DAM or GREAT BATH standing
+  anywhere along the river cancels the destruction on every tile it floods and
+  halves the silt, whoever owns them. A shield off the river protects nothing,
+  and a pillaged one protects nothing — which is what BREACH DAM (C-16) trades
+  on.
   OPEN:
-  - **The Great Bath's mitigation is seat-scoped, not river-scoped.** The
-    source says a Dam or Great Bath "along a River will mitigate floods
-    THERE"; here any complete Great Bath protects every floodplain its seat
-    holds. `river_comp` is now the table that would key it, so what is left is
-    deciding which river a wonder stands on and gating the mitigation on it.
   - **The Great Bath's "+1 Faith for every time a tile belonging to this city
     has been Flooded"** needs a per-tile flood COUNT that nothing stores.
-  - **The DAM is not in the district roster** (C-22), so the other half of the
-    published mitigation has nowhere to live — and with it the
-    Hydroelectric Dam, the strongest renewable Power source (C-1).
   - Climate change ending fertilization at Phase IV, the Egyptian ability, the
     Soothsayer and COASTAL floods all wait on systems that do not exist here.
 - **B-36r. Appeal adjacency terms.** The four terms whose sources exist here
@@ -529,8 +557,13 @@ Civ 6 source or is recorded as unverifiable.
   bumping `_eff_version` at both camp writes so the appeal cache sees them.
   Appeal feeds Neighborhood housing, Seaside Resort gold and tourism and
   National Park legality, so the change is live on every seed.
-  OPEN, each blocked: the DAM, CANAL, WATER PARK and PRESERVE terms (C-22 —
-  no such district here), the unique-improvement terms (C-4), and the
+  EVERY DISTRICT TERM IS NOW ONE CATALOG COLUMN. `DistrictDef.appealAdjacent`
+  / `_appeal_adj` is what both walks read, so the appeal walk names no district
+  type at all and a new row carries its own term: the Dam, Canal, Water Park
+  and Preserve are +1 like the three that shipped first, the Aerodrome is -1
+  like the other heavy-industry rows, and the Government Plaza and Diplomatic
+  Quarter are 0.
+  OPEN, each blocked: the unique-improvement terms (C-4) and the
   appeal-granting Great People (C-21).
 - **B-39r. Wonder effects still dropped.** All THIRTY rows were re-fetched
   from the GS Civilopedia one by one and the effect lists rewritten against
@@ -770,6 +803,12 @@ Civ 6 source or is recorded as unverifiable.
   parent City Center, excluding any bonus obtained for a Garrisoned unit". Its
   heal now carries the sourced gate too: it regains 20 HP "if its tile is not
   occupied", and the moment it does its tile blocks again.
+  REACHABILITY: the walls half of that strength was true of the GPU and NOT of
+  TS until the driven gate reached an assault on a walled Encampment (seed
+  9014, t170) — the entry asserted it for both engines while one of them read
+  `Math.max(15, bestMeleeCS)` alone. `siege.test.ts`'s "defends at its city's
+  WALLS tier" lane and `encampment_test.py`'s `test_district_defence_terms`
+  are the bar now.
   OPEN:
   - **THE TWO POOLS ARE ONE HERE.** Real Civ 6 gives the district its own
     perimeter pool of the same size as the city's — you can beat down the
@@ -906,9 +945,12 @@ Civ 6 source or is recorded as unverifiable.
     and a Renaissance-Walls favor term; Merchant Republic, Theocracy and
     Communism's other half want a per-city GOVERNOR gate on a yield;
     Theocracy and Democracy want a PURCHASE-price discount channel;
-    Democracy's GS row wants ALLIANCES (C-2); Autocracy's other half wants
-    a Government Plaza (C-22). Every legacy bonus is out of scope by
-    construction — R&F phased them out.
+    Democracy's GS row wants ALLIANCES (C-2); Autocracy's "+1 to all yields
+    for each government building" wants a per-city count of GOVERNMENT
+    BUILDINGS folded into the yield bucket, which the Government Plaza's rows
+    now make countable (`BuildingDef.govTier` / `_b_gov_tier`) and no channel
+    yet reads. Every legacy bonus is out of scope by construction — R&F phased
+    them out.
   - **The per-CITY war-weariness split is NOT published, and the empire-wide
     rule we implement IS.** SOURCED (War weariness): "At the end of each
     turn, you receive -1 Amenity for every 400 WWP you currently have, which
@@ -1207,9 +1249,10 @@ number was under-counting by treating deferrals as closures.
     Spies cannot act in city-states", so the majors-only destination scan is
     faithful for vanilla and this mission is the R&F ruleset's; the minor
     city block carries no district registry to hang it on either.
-  - **BREACH DAM** needs the Dam district: C-22.
-  - **THE INTELLIGENCE AGENCY**, a Tier 2 government building, is the eighth
-    spy-capacity source; it needs the Government Plaza: C-22.
+  - **THE INTELLIGENCE AGENCY'S own success bonus.** Its spy-capacity half
+    ships (`seatBuildingSum` / `_seat_building_sum` over `spyCapacity`); the
+    source publishes no figure for what it adds to a mission's odds, so
+    nothing here adds one.
   - **SABOTAGE PRODUCTION pillages the BUILDINGS**, per the source, not the
     district. `districtPillaged` / `district_pillaged` is the only flag that
     darkens a district's yields here, so that is what the mission sets; a
@@ -1241,8 +1284,10 @@ number was under-counting by treating deferrals as closures.
 - **C-20. THE MILITARY ENGINEER BUILDS ONE THING.** Weight 2. Real Civ 6 gives
   it Fort, Airstrip, Missile Silo, Mountain Tunnel, Reinforced Barricade and
   Modernized Trap, plus spending a charge to finish 20% of a Canal, Dam,
-  Aqueduct or Flood Barrier. Only the FORT exists here. Three of the four district
-  charges wait on C-22; the Airstrip waits on nothing but this row now that
+  Aqueduct or Flood Barrier. Only the FORT exists here. Three of the four
+  districts the charge names now exist, so the charge itself is what is
+  missing rather than its targets; the Flood Barrier is a coastal defence that
+  waits on C-24, and the Airstrip waits on nothing but this row now that
   aircraft and their bases exist.
 - **C-21. GREAT PEOPLE FIRE INSTANTLY; NONE IS PLACED.** Weight 2. A claimed
   Great Person pays its effect at the claim (`recruit`). Real Civ 6 gives many
@@ -1402,15 +1447,64 @@ number was under-counting by treating deferrals as closures.
   source, so no rival's research ever costs a tourist. Cristo Redentor's
   second clause exists to CANCEL that reduction, so the wonder cannot pay it
   until the reduction exists.
-- **C-22. THE DISTRICT ROSTER IS A SUBSET.** Weight 3. Twelve of Civ 6's
-  districts exist; the DAM, CANAL, WATER PARK, PRESERVE, GOVERNMENT PLAZA and
-  DIPLOMATIC QUARTER do not. The AERODROME left this list — it ships with its
-  two base slots, the Hangar and Airport that widen them, and the training gate
-  that reads them. Gaps: their appeal terms (B-36r), the Military Engineer's
-  finish-a-district charge (C-20), the Dam's half of the flood mitigation that
-  B-34r names, the Preserve's housing table, the Government Plaza's
-  Intelligence Agency (C-16) and the Diplomatic Quarter's Listening Post
-  target.
+- **C-22. THE DISTRICT ROSTER.** Weight 2. All eighteen of Civ 6's districts
+  now exist. The six that arrived last — DAM, CANAL, WATER PARK, PRESERVE,
+  GOVERNMENT PLAZA, DIPLOMATIC QUARTER — brought their placement geometry and
+  their effects with them, and every one of those effects is a CATALOG COLUMN
+  both engines read by index rather than a type name in a rule body:
+  `appealAdjacent`, `maintenance`, `amenities`, `housing`, `loyalty`,
+  `governorTitle`, `envoysNextToCenter`, `oneCivWide`, `exclusiveDistricts`,
+  `appealHousing`, `floodShield`, `cultureBombUnowned` and `spyLevelPenalty`,
+  with `govTier`, `spyCapacity`, `influencePerTurn`, `favorPerTurn`,
+  `govTitle`, `loyaltyWithoutGovernor`, `powerSupply`, `regionalRange` and
+  `appealYields` on the sixteen buildings they carry.
+  The placement clauses are `riverSideCount` + `riverReach` for the Dam's
+  floodplain, two river sides and one-per-river; `canalPassageOk` /
+  `_canal_plot` for the Canal's entry-and-exit no sharper than a 60-degree
+  bend; `exclusiveDistricts` for the Water Park against the Entertainment
+  Complex, either way round; `notAdjacentToCityCenter` for the Preserve; and
+  `oneCivWide` for the Plaza and the Quarter, which scans every city the SEAT
+  holds rather than this one.
+  REACHABILITY, measured not assumed: the PRESERVE is placed on all 12 seeds
+  from t27 and the GOVERNMENT PLAZA on all 12 from t43, so their housing,
+  appeal, loyalty, governor-title and culture-bomb bodies ride the digest for
+  most of a driven game; the DIPLOMATIC QUARTER reaches 8 seeds, the DAM 4 and
+  the WATER PARK 3. The CANAL is reached by NONE — it unlocks at STEAM_POWER
+  and then wants a specific two-sided water geometry — so `canalPassageOk` /
+  `_canal_plot` are poke-proven only, and the same holds for the Hydroelectric
+  Dam and every Water Park building past the Ferris Wheel.
+  What is still open:
+  - **THE CANAL CARRIES NO NAVAL PASSAGE.** It is placed, it pays its appeal
+    and it costs nothing to keep, but no hull moves through it: `wpass` doubles
+    as "is this tile water" across the embark, coastal-city and coastal-water
+    tests, so making a canal tile passable to ships would make it water for a
+    dozen predicates that mean something else. The passage wants its own
+    plane, not a bit borrowed from the water one.
+  - **SIX GOVERNMENT PLAZA BUILDINGS PAY ONLY THEIR GOVERNOR TITLE.** The
+    Ancestral Hall's Builder in every new city, the Warlord's Throne's
+    post-conquest production, the Grand Master's Chapel's faith purchase of
+    land units, the National History Museum's Great Work slots, the Royal
+    Society's charge-into-production and the War Department's combat bonus
+    each need a channel this model does not have. The Audience Chamber's
+    "-2 Loyalty in Cities without Governors" ships; its governor-CONDITIONAL
+    amenities and housing do not, because the governor pick is decided from
+    loyalty, which reads the amenity tier — a circle that needs the pick
+    hoisted before the city walk to break.
+  - **THE PRESERVE'S HOUSING TABLE IS THIS MODEL'S OWN.** CIV6 publishes only
+    "Grants up to 3 Housing based on tile's Appeal" and, on the strategy half,
+    that a low-appeal region "will rarely gain more than 1 Housing from it".
+    `PRESERVE_APPEAL_HOUSING` / `preserveHousing` states the published ceiling
+    at Breathtaking, about one at Average and nothing below Uninviting, and
+    both engines read it off the wire. No source can close it.
+  - **THE DAM'S AND CANAL'S "+1 Amenity with Water Works"** is a Liang
+    governor TITLE, not a building, and governor promotions do not exist
+    (B-24r). Neither district pays an amenity here.
+  - **THE CONSULATE'S "or cities with Encampments" half.** Its flat
+    influence-per-turn ships; the clause that widens it reads a district count
+    the influence body never asks for.
+  - **THE INTELLIGENCE AGENCY'S "+1 Spy"** is a free UNIT at completion, the
+    same shape as every other free-unit grant (C-21); only its capacity half
+    ships.
 
 ## Reachability — what the green gate does NOT prove
 
@@ -1423,45 +1517,56 @@ steers the games into a different regime and carries the older rows with it:
 | mechanic | seeds reaching | first |
 |---|---|---|
 | a PLOT LOCK held by a citizen | 12/12 | t2 |
+| a PRESERVE placed | 12/12 | t27 |
+| a GOVERNMENT PLAZA placed | 12/12 | t43 |
 | faith-buy kind 6 (APOSTLE purchase) | 12/12 | t75 |
 | a WORLD CONGRESS ballot on the wire | 12/12 | t89 |
-| a SPECIALIST pinned into a slot | 12/12 | t147 |
+| a SPECIALIST pinned into a slot | 12/12 | t110 |
 | an OPEN BORDERS grant standing | 11/12 | t34 |
+| a second HULL on any seat | 10/12 | t103 |
+| NATURAL_HISTORY (the Archaeologist's civic) | 10/12 | t170 |
 | a DECLARATION OF FRIENDSHIP | 8/12 | t19 |
 | an ALLIANCE | 8/12 | t105 |
-| an INTERNATIONAL trade leg | 7/12 | t92 |
-| two enemy religious units ADJACENT (theological combat's precondition) | 6/12 | t86 |
-| a second HULL on any seat | 6/12 | t103 |
-| NATURAL_HISTORY (the Archaeologist's civic) | 5/12 | t151 |
-| CONSERVATION (the Naturalist's civic) | 3/12 | t166 |
-| WAR with a city-state | 2/12 | t142 |
-| PEACE with a city-state, through the sue column | 1/12 | t155 |
-| an antiquity dig (artifact in a slot) | 1/12 | t229 |
-| URBANIZATION civic | 1/12 | t234 |
-| a NEIGHBORHOOD placed | 1/12 | t238 |
+| a DIPLOMATIC QUARTER placed | 8/12 | t98 |
+| an INTERNATIONAL trade leg | 7/12 | t94 |
+| CONSERVATION (the Naturalist's civic) | 6/12 | t183 |
+| two enemy religious units ADJACENT (theological combat's precondition) | 5/12 | t86 |
+| a DAM placed | 4/12 | t162 |
+| URBANIZATION civic | 3/12 | t226 |
+| a WATER PARK placed | 3/12 | t238 |
+| WAR with a city-state | 2/12 | t143 |
+| a NEIGHBORHOOD placed | 2/12 | t228 |
+| PEACE with a city-state, through the sue column | 1/12 | t159 |
+| an antiquity dig (artifact in a slot) | 0/12 | NEVER |
+| a CANAL placed | 0/12 | NEVER |
 | a unit standing against a CLOSED BORDER | 0/12 | NEVER |
 | a GREAT WORK given away | 0/12 | NEVER |
 | an ally dragged in by the DEFENSIVE PACT | 0/12 | NEVER |
 
-- THE TABLE MOVED WHOLESALE when the policy cards started paying. A card in
-  a slot changes production, adjacency, envoys and barbarian combat, so the
-  driven games take a different route through the same seeds: an
-  INTERNATIONAL leg went from one seed to eleven, theological adjacency from
-  four to ten, and a second hull the other way, from nine to four. This is
-  the section's own rule doing its job — no row here survives a change to
-  what the driver decides, and none of these movements is a regression.
-- THEOLOGICAL COMBAT IS REACHED, in 6 of 12 seeds from t86, so the
+- THE TABLE MOVED WHOLESALE when the district lane started ROTATING its pick.
+  The scripted driver took the first legal district column, so a column
+  appended to the scaffold was only ever reached once everything before it was
+  built or barred; it now rotates by (seat + turn), which is a DECISION the
+  applier re-validates and TS only replays, so it changes coverage without
+  changing what is legal. Every row moved with it — a second hull went from
+  six seeds to ten, NATURAL_HISTORY from five to ten, CONSERVATION from three
+  to six — and one moved the wrong way: the ANTIQUITY DIG was reached on one
+  seed at t229 and is now reached on none, because the seed that dug spends
+  those turns elsewhere. That is a coverage LOSS, not a regression in a rule:
+  the dig's bodies are poked in `parks_test` and `tests/cpu/units/`, and
+  nothing in the gate covered them before t229 either.
+- THEOLOGICAL COMBAT IS REACHED, in 5 of 12 seeds from t86, so the
   resolver's deterministic damage and its apostle-only initiation ARE
   gate-covered.
 - The APOSTLE BUY fires in every seed from t75 and the 250-turn gate is
   green, which is what closed B-18r's predicted lifecycle drift.
 - THE CITIZEN OVERRIDES are the widest-reaching heads in the gate: a plot
-  lock stands on every seed from t2 (147 plots at t250) and a pinned
-  specialist on every seed from t116 (42 slots), so both ride the digest for
+  lock stands on every seed from t2 (144 plots at t250) and a pinned
+  specialist on every seed from t110 (52 slots), so both ride the digest for
   most of a game rather than leaning on `citizens_test`.
-- WAR WITH A CITY-STATE stands on 2 of 12 seeds from t142 and closes through
-  the SUE column on 1 of them from t155 — 9.5 minor-war turns per seed,
-  101 on the loudest. The declare, the peace and both clocks are gate-covered;
+- WAR WITH A CITY-STATE stands on 2 of 12 seeds from t143 and closes through
+  the SUE column on 1 of them from t159 — 9.8 minor-war turns per seed,
+  108 on the loudest. The declare, the peace and both clocks are gate-covered;
   the meeting gate, the treaty term and the suzerain refusal are not, and
   `cs_war_test` section d is their bar.
 - THE DIPLOMATIC AXIS ENTERED THE GATE, and the probe had never measured it:

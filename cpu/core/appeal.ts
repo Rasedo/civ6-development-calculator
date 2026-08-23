@@ -16,14 +16,16 @@
  * how the tile walk sees it. Omitting it drops the penalty, so every caller
  * passes it.
  *
- * OPEN: the rest of the real adjacency list — Dam, Canal, Water Park and
- * Preserve (no such district here), the unique improvements, and the
- * appeal-granting Great People — waits on systems this model does not have.
+ * Every DISTRICT term comes off `DistrictDef.appealAdjacent`, so the walk
+ * never names a district type and a new row carries its own appeal.
+ *
+ * OPEN: the unique improvements and the appeal-granting Great People.
  */
 
 import type { GameMap, Tile } from './types';
 import { neighbors } from '../../world/hex';
 import { isMountain } from '../../world/query';
+import { DISTRICTS } from '../data/districts';
 
 export function tileAppeal(map: GameMap, tile: Tile, camps?: ReadonlySet<number>): number {
   if (tile.wonder) return 5;
@@ -37,13 +39,12 @@ export function tileAppeal(map: GameMap, tile: Tile, camps?: ReadonlySet<number>
     if (isMountain(n) && !n.wonder) appeal += 1;
     if (n.terrain === 'COAST' || n.terrain === 'LAKE') appeal += 1;
     if (n.feature === 'OASIS') appeal += 1;
-    if (n.district === 'HOLY_SITE' || n.district === 'THEATER_SQUARE' || n.district === 'ENTERTAINMENT_COMPLEX') appeal += 1;
+    if (n.district) appeal += DISTRICTS[n.district].appealAdjacent;
     if (camps?.has(n.index)) appeal -= 1;
     if (n.feature === 'RAINFOREST' || n.feature === 'MARSH') appeal -= 1;
     if (n.feature === 'FLOODPLAINS') appeal -= 1; // sourced, was missing
     if (n.pillaged) appeal -= 1; // "-1 each adjacent pillaged tile"
     if (n.improvement === 'MINE' || n.improvement === 'QUARRY' || n.improvement === 'OIL_WELL') appeal -= 1;
-    if (n.district === 'INDUSTRIAL_ZONE' || n.district === 'ENCAMPMENT' || n.district === 'SPACEPORT') appeal -= 1;
   }
   return appeal;
 }
@@ -51,6 +52,27 @@ export function tileAppeal(map: GameMap, tile: Tile, camps?: ReadonlySet<number>
 export interface AppealTier {
   name: string;
   housing: number;
+}
+
+/**
+ * The Preserve's housing by appeal band. CIV6 publishes only "Grants up to 3
+ * Housing based on tile's Appeal" and, on the strategy half, that a low-appeal
+ * region "will rarely gain more than 1 Housing from it" — the per-band table
+ * is on no page, so THIS BLOCK IS THIS MODEL'S OWN: the published ceiling at
+ * Breathtaking, the published floor of about one at Average, and nothing below
+ * Uninviting. Both engines read it from the wire.
+ */
+export const PRESERVE_APPEAL_HOUSING = [3, 2, 1, 0, 0];
+
+/** The band index `PRESERVE_APPEAL_HOUSING` is keyed by, and the Neighborhood
+ *  housing ladder's own order: Breathtaking, Charming, Average, Uninviting,
+ *  Disgusting. */
+export function appealBand(appeal: number): number {
+  if (appeal >= 4) return 0;
+  if (appeal >= 2) return 1;
+  if (appeal >= -1) return 2;
+  if (appeal >= -3) return 3;
+  return 4;
 }
 
 export function appealTier(appeal: number): AppealTier {

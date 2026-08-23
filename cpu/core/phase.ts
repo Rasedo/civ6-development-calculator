@@ -18,7 +18,7 @@ import { PROMO_COLS } from '../data/promotions';
 import { availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { selectResearch } from './economy';
-import { getModifiers, prodBoostPct, unitUpkeep } from './effects';
+import { getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
 import { addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from './trade';
 import { addEnvoys, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, setMet, sueForPeaceWithCityState } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPES } from '../data/cityStates';
@@ -39,8 +39,9 @@ import { outerPool, wallsMax, urbanDefensesFit, repairDrip } from './rules';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
 import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, borderGrowthCost } from '../data/constants';
+import { cityDistrictSum, pillagedDistrictTypes } from './yields';
 import type { CityStats } from './city';
-import { computeCityStats, luxuryAmenities, pickBorderTile, acquireTile } from './city';
+import { computeCityStats, luxuryAmenities, pickBorderTile, acquireTile, seatBuildingSum } from './city';
 import { accrueStockpiles, chargeUnitUpkeep, resolveSeatPower } from './stockpile';
 import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressUdtProdDistrict, type CongressVoterCtx } from './congress';
 import { buyVotes } from './congress';
@@ -72,7 +73,7 @@ const A_REMOVE_HERESY = unitActionIndex(IMPROVEMENT_IDS).REMOVE_HERESY;
 const A_LAUNCH_INQUISITION = unitActionIndex(IMPROVEMENT_IDS).LAUNCH_INQUISITION;
 const A_CONVERT_HEATHEN = unitActionIndex(IMPROVEMENT_IDS).CONVERT_HEATHEN;
 import { AGREEMENT_TURNS, ALLIANCE_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
-import { addEraScore, agePressureFactor, governorPicks, governorTitles, goldenBoostBonus, worldEraIndex } from './eras';
+import { addEraScore, agePressureFactor, governorPicks, governorTitles, grantedGovernorTitles, goldenBoostBonus, worldEraIndex } from './eras';
 import { NO_SEAT, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, spreadFromUnit } from './unitOrders';
@@ -340,15 +341,29 @@ export function loyaltyDelta(state: GameState, city: City, amenityTierName: stri
   }
   const pressure =
     own + foreign === 0 ? 0 : (LOYALTY_PRESSURE_SCALE * (own - foreign)) / (own + foreign);
-  return pressure + (LOYALTY_AMENITY[amenityTierName] ?? 0) + buildingLoyalty(city);
+  return pressure + (LOYALTY_AMENITY[amenityTierName] ?? 0) + standingLoyalty(state, city);
 }
 
-/** CIV6 (Monument, R&F/GS): "+1 Loyalty" — the flat per-turn term a standing
- *  building adds, over every building that carries one. */
-export function buildingLoyalty(city: City): number {
-  let n = 0;
-  for (const b of city.buildings) n += BUILDINGS[b]?.loyalty ?? 0;
+/** CIV6 (Monument): "+1 Loyalty", and (Government Plaza) "+8 Loyalty to this
+ *  city" — the flat per-turn term everything standing in the city adds. A
+ *  district pays only once complete and unpillaged, and a dark district takes
+ *  its buildings with it. */
+export function standingLoyalty(state: GameState, city: City): number {
+  const dark = pillagedDistrictTypes(state.map, city.districts);
+  let n = cityDistrictSum(state, city, 'loyalty');
+  for (const b of city.buildings) {
+    const def = BUILDINGS[b];
+    if (!def || dark.has(def.district)) continue;
+    n += def.loyalty ?? 0;
+  }
   return n;
+}
+
+/** CIV6 (Audience Chamber): "-2 Loyalty in Cities without Governors." The
+ *  building stands in ONE city; the clause reaches every city its SEAT holds,
+ *  so it is summed over the seat and paid to whichever city has no governor. */
+export function ungovernedLoyalty(state: GameState, seat: number): number {
+  return seatBuildingSum(state, seat, 'loyaltyWithoutGovernor');
 }
 
 /**
@@ -368,7 +383,8 @@ function wonderLoyaltyAura(state: GameState, city: City): boolean {
   return false;
 }
 
-export function applyLoyalty(state: GameState, city: City, amenityTierName: string, govBonus = 0): boolean {
+export function applyLoyalty(state: GameState, city: City, amenityTierName: string, hasGovernor = false): boolean {
+  const govBonus = hasGovernor ? GOVERNOR_LOYALTY : ungovernedLoyalty(state, city.seat);
   if (!state.seats.some((s) => s.seat !== city.seat && s.cities.length > 0)) return false;
   if (city.isCapital || wonderLoyaltyAura(state, city)) {
     city.loyalty = LOYALTY_MAX;
@@ -1406,7 +1422,8 @@ export function seatPhase(state: GameState): void {
         const gov = GOVERNMENTS_ADOPTION_LIVE ? computeAdoption(actor.research).government : null;
         const tier = gov ? GOV_INFLUENCE_TIER[gov] ?? 0 : 0;
         actor.influencePoints = (actor.influencePoints ?? 0) + INFLUENCE_PER_TURN + tier
-          + getModifiers(state, actor.seat).influencePerTurn;
+          + getModifiers(state, actor.seat).influencePerTurn
+          + seatBuildingSum(state, actor.seat, 'influencePerTurn');
         // CONVERSION IS A RULE, for every seat. Real Civ 6 grants the
         // envoy the moment the meter fills, assigned or not. WHERE it is spent
         // is the decision, and that arrives on the wire.
@@ -1711,7 +1728,7 @@ export function seatPhase(state: GameState): void {
     // ties by array position == the GPU's civCity slot order).
     const rGovPicks = governorPicks(
       actor.cities.map((civCity) => Math.round((civCity.loyalty ?? LOYALTY_MAX) * 1000)),
-      governorTitles(actor.research.civics.length),
+      governorTitles(actor.research.civics.length, grantedGovernorTitles(state, actor.seat)),
       new Set(actor.cities.map((c, i) => (governorSuppressed(c) ? i : -1)).filter((i) => i >= 0)),
     );
     const rGovIds = new Set([...rGovPicks].map((i) => actor.cities[i].id));
@@ -1719,7 +1736,7 @@ export function seatPhase(state: GameState): void {
     for (const civCity of [...actor.cities]) {
       const stats = cityStats.get(civCity.id) ?? computeCityStats(state, civCity, luxMap, seatMods);
       const tier = stats.amenities.tier;
-      if (applyLoyalty(state, civCity, tier.name, rGovIds.has(civCity.id) ? GOVERNOR_LOYALTY : 0)) {
+      if (applyLoyalty(state, civCity, tier.name, rGovIds.has(civCity.id))) {
         civCityDefectors.push(civCity);
       }
       const y = stats.total;
@@ -1804,7 +1821,7 @@ export function seatPhase(state: GameState): void {
       const civCityBorderCost = () =>
         Math.round(borderGrowthCost(civCity.tilesAcquired) * getModifiers(state, actor.seat).borderCostMult);
       while (!_frozen && civCity.cultureBox >= civCityBorderCost()) {
-        const next = pickBorderTile(state, civCity, { map: state.map, mods: getModifiers(state, actor.seat) });
+        const next = pickBorderTile(state, civCity, makeYieldCtx(state, actor.seat));
         if (next === null) {
           civCity.cultureBox = Math.min(civCity.cultureBox, civCityBorderCost());
           break;

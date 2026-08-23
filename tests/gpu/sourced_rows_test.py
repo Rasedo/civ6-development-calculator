@@ -77,9 +77,9 @@ def main() -> None:
     b = torch.zeros(1, dtype=torch.long)
     c = torch.zeros(1, dtype=torch.long)
     sim.city_bldg[0, row, col, :] = False
-    assert float(sim._building_loyalty(row, b, c)[0]) == 0.0
+    assert float(sim._standing_loyalty(row, b, c)[0]) == 0.0
     sim.city_bldg[0, row, col, mon] = True
-    assert float(sim._building_loyalty(row, b, c)[0]) == 1.0, "the Monument pays no loyalty"
+    assert float(sim._standing_loyalty(row, b, c)[0]) == 1.0, "the Monument pays no loyalty"
 
     # The city walk's culture carries the empire's culture MULTIPLIER, so the
     # extra point is measured against the Monument's own flat point rather

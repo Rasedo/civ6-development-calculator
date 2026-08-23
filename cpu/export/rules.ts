@@ -10,6 +10,7 @@
 
 
 import { TURN_LIMIT } from '../core/game';
+import { PRESERVE_APPEAL_HOUSING } from '../core/appeal';
 import { IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL, PARK_MIN_APPEAL, PARK_AMENITIES_OWNER,
   PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../data/improvements';
 import { SHIPWRECK_CIVIC, RELIGIOUS_HEAL_PER_FAITH } from '../core/units';
@@ -238,12 +239,12 @@ for (const [id, def] of Object.entries(BOOSTS)) {
 const ADJ_SRC: AdjacencySource[] = [
   'MOUNTAIN', 'RAINFOREST', 'WOODS', 'REEF', 'NATURAL_WONDER', 'BUILT_WONDER',
   'RIVER', 'DISTRICT', 'CITY_CENTER', 'HARBOR_DISTRICT', 'SEA_RESOURCE',
-  'MINE', 'QUARRY', 'AQUEDUCT',
+  'MINE', 'QUARRY', 'AQUEDUCT', 'DAM', 'CANAL', 'GOV_PLAZA',
 ];
 
 const SCRIPTED_CAMPUS = true;
 
-const PLACEMENT_CODE = { aqueduct: 1, coastal: 2, encampment: 3, flat: 4 } as const;
+const PLACEMENT_CODE = { aqueduct: 1, coastal: 2, encampment: 3, flat: 4, dam: 5, canal: 6 } as const;
 
 const SLOT_KIND_IDX: Record<SlotKind, number> = { military: 0, economic: 1, diplomatic: 2, wildcard: 3 };
 
@@ -393,7 +394,7 @@ export function buildRules() {
       congressFeatures: clearableFeatures().map((f) => featIdx.get(f) ?? -1),
       // the terrains the Lighthouse pays its food on, as TERRAIN_IDS indices
       coastFoodTerrains: ['COAST', 'LAKE'].map((t) => TERRAIN_IDS.indexOf(t)),
-      congressDvMinEra: CONGRESS_DV_MIN_ERA, congressDvDelta: CONGRESS_DV_DELTA, congressVoteStep: CONGRESS_VOTE_STEP, congressProdMult: CONGRESS_PROD_MULT, congressGppMult: CONGRESS_GPP_MULT, congressGrowthA: CONGRESS_GROWTH_A, congressGrowthB: CONGRESS_GROWTH_B, congressMigLoyalty: CONGRESS_MIG_LOYALTY, congressGwMult: CONGRESS_GW_MULT, congressPlus100: CONGRESS_PLUS_100, congressMinus50: CONGRESS_MINUS_50, congressTradeGold: CONGRESS_TRADE_GOLD, congressTradeCapacity: CONGRESS_TRADE_CAPACITY, congressPolicyFavor: CONGRESS_POLICY_FAVOR, congressIdeologySlots: CONGRESS_IDEOLOGY_SLOTS, cultureBombRange: CULTURE_BOMB_RANGE, favorOccupiedCapital: FAVOR_OCCUPIED_CAPITAL,
+      congressDvMinEra: CONGRESS_DV_MIN_ERA, congressDvDelta: CONGRESS_DV_DELTA, congressVoteStep: CONGRESS_VOTE_STEP, congressProdMult: CONGRESS_PROD_MULT, congressGppMult: CONGRESS_GPP_MULT, congressGrowthA: CONGRESS_GROWTH_A, congressGrowthB: CONGRESS_GROWTH_B, congressMigLoyalty: CONGRESS_MIG_LOYALTY, congressGwMult: CONGRESS_GW_MULT, congressPlus100: CONGRESS_PLUS_100, congressMinus50: CONGRESS_MINUS_50, congressTradeGold: CONGRESS_TRADE_GOLD, congressTradeCapacity: CONGRESS_TRADE_CAPACITY, congressPolicyFavor: CONGRESS_POLICY_FAVOR, congressIdeologySlots: CONGRESS_IDEOLOGY_SLOTS, cultureBombRange: CULTURE_BOMB_RANGE, favorOccupiedCapital: FAVOR_OCCUPIED_CAPITAL, preserveHousing: PRESERVE_APPEAL_HOUSING,
       // EMERGENCIES: the catalog (id + the turn limit) and every magnitude
       emergencies: EMERGENCIES.map((e) => ({ id: e.id, turns: e.turns })),
       emergencySlots: EMERGENCY_SLOTS, specialSessionCost: SPECIAL_SESSION_COST,
@@ -954,13 +955,24 @@ export function buildRules() {
         adjYield: d.adjacencyYield ? YIELD_KEYS.indexOf(d.adjacencyYield) : -1,
         adjacency: d.adjacency.map((a) => ({ src: ADJ_SRC.indexOf(a.source), amount: a.amount })),
         housing: d.housing,
-        maintenance: ['CITY_CENTER', 'NEIGHBORHOOD', 'AQUEDUCT', 'COMMERCIAL_HUB', 'HARBOR'].includes(id) ? 0 : 1, // CH+Harbor exempt (real Civ 6)
+        maintenance: d.maintenance,
+        amenities: d.amenities ?? 0,
         countsTowardLimit: d.countsTowardLimit ? 1 : 0,
         allowMultiple: d.allowMultiple ? 1 : 0,
         onCoastalWater: d.placement.onCoastalWater ? 1 : 0,
         reqAdjCenter: d.placement.requiresAdjacentCityCenter ? 1 : 0,
         reqWaterOrMountain: d.placement.requiresWaterSourceOrMountain ? 1 : 0,
         notAdjCenter: d.placement.notAdjacentToCityCenter ? 1 : 0,
+        appealAdjacent: d.appealAdjacent,
+        loyalty: d.loyalty ?? 0,
+        oneCivWide: d.oneCivWide ? 1 : 0,
+        exclusive: (d.exclusiveDistricts ?? []).map((x) => PLACEABLE_DISTRICTS.indexOf(x)).filter((i) => i >= 0),
+        governorTitle: d.governorTitle ?? 0,
+        envoysNextToCenter: d.envoysNextToCenter ?? 0,
+        cultureBombUnowned: d.cultureBombUnowned ? 1 : 0,
+        appealHousing: d.appealHousing ? 1 : 0,
+        floodShield: d.floodShield ? 1 : 0,
+        spyLevelPenalty: d.spyLevelPenalty ?? 0,
         // specialist base yields, and the TOP building that upgrades them
         // (-1 none, -2 = any worship building)
         spec: YIELD_KEYS.map((k) => SPECIALIST_YIELDS[id]?.[k] ?? 0),
@@ -1023,6 +1035,23 @@ export function buildRules() {
       fuelSlot: b.fuel ? STRATEGIC_IDS.indexOf(b.fuel) : -1,
       fuelRate: b.fuelRate ?? 0,
       airSlots: b.airSlots ?? 0,
+      // the GOVERNMENT PLAZA rows: the government tier each needs, the title
+      // it awards, and the empire-wide channels they pay into.
+      govTier: b.govTier ?? 0,
+      govTitle: b.govTitle ?? 0,
+      spyCapacity: b.spyCapacity ?? 0,
+      spyLevelPenalty: b.spyLevelPenalty ?? 0,
+      influencePerTurn: b.influencePerTurn ?? 0,
+      favorPerTurn: b.favorPerTurn ?? 0,
+      loyaltyWithoutGovernor: b.loyaltyWithoutGovernor ?? 0,
+      powerSupply: b.powerSupply ?? 0,
+      regionalRange: b.regionalRange ?? 0,
+      // the PRESERVE rows: what they pay an adjacent unimproved tile at
+      // Breathtaking and at Charming, in that order (the bands do not stack).
+      appealYields: b.appealYields
+        ? [YIELD_KEYS.map((k) => b.appealYields!.breathtaking[k] ?? 0),
+           YIELD_KEYS.map((k) => b.appealYields!.charming[k] ?? 0)]
+        : [],
       izAdjProduction: b.special === 'COAL_PLANT' ? 1 : 0,
       // worship = faith-purchase-only (never queued, never gold-bought).
       worship: b.worship ? 1 : 0,

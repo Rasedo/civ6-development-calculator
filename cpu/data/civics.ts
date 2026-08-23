@@ -43,6 +43,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockPolicy', policy: 'STRATEGOS' },
     ]),
     C('STATE_WORKFORCE', 'State Workforce', 'Ancient', 70, ['CRAFTSMANSHIP'], [
+      { kind: 'unlockDistrict', district: 'GOVERNMENT_PLAZA' },
       { kind: 'unlockPolicy', policy: 'CONSCRIPTION' },
       { kind: 'unlockPolicy', policy: 'CORVEE' },
     ]),
@@ -51,6 +52,8 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockPolicy', policy: 'COLONIZATION' },
     ]),
     C('MYSTICISM', 'Mysticism', 'Ancient', 50, ['FOREIGN_TRADE'], [
+      { kind: 'unlockDistrict', district: 'PRESERVE' },
+      { kind: 'unlockBuilding', building: 'GROVE' },
       { kind: 'unlockPolicy', policy: 'INSPIRATION' },
       { kind: 'unlockPolicy', policy: 'REVELATION' },
     ]),
@@ -134,6 +137,9 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('NATIONALISM', 'Nationalism', 'Industrial', 1010, ['ENLIGHTENMENT']),
     C('NATURAL_HISTORY', 'Natural History', 'Industrial', 1050, ['COLONIALISM'], [
       { kind: 'unlockBuilding', building: 'ZOO' },
+      { kind: 'unlockDistrict', district: 'WATER_PARK' },
+      { kind: 'unlockBuilding', building: 'FERRIS_WHEEL' },
+      { kind: 'unlockBuilding', building: 'AQUARIUM' },
     ]),
     C('URBANIZATION', 'Urbanization', 'Industrial', 1210, ['CIVIL_ENGINEERING', 'NATIONALISM'], [
       { kind: 'unlockDistrict', district: 'NEIGHBORHOOD' },
@@ -142,6 +148,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('MASS_MEDIA', 'Mass Media', 'Modern', 1540, ['NATURAL_HISTORY', 'URBANIZATION']),
     C('PROFESSIONAL_SPORTS', 'Professional Sports', 'Atomic', 2185, ['IDEOLOGY'], [
       { kind: 'unlockBuilding', building: 'STADIUM' },
+      { kind: 'unlockBuilding', building: 'AQUATICS_CENTER' },
     ]),
     C('SUFFRAGE', 'Suffrage', 'Modern', 1640, ['IDEOLOGY'], [
       { kind: 'unlockGovernment', government: 'DEMOCRACY' },
@@ -167,13 +174,17 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('MERCENARIES', 'Mercenaries', 'Medieval', 340, ['MILITARY_TRAINING', 'FEUDALISM']),
 
     C('MERCANTILISM', 'Mercantilism', 'Renaissance', 720, ['HUMANISM']),
-    C('DIPLOMATIC_SERVICE', 'Diplomatic Service', 'Renaissance', 600, ['GUILDS']),
+    C('DIPLOMATIC_SERVICE', 'Diplomatic Service', 'Renaissance', 600, ['GUILDS'], [
+      { kind: 'unlockBuilding', building: 'CHANCERY' },
+    ]),
 
     C('OPERA_AND_BALLET', 'Opera and Ballet', 'Industrial', 800, ['ENLIGHTENMENT'], [
       { kind: 'unlockPolicy', policy: 'GRAND_OPERA' },
     ]),
     C('COLONIALISM', 'Colonialism', 'Industrial', 800, ['MERCANTILISM']),
-    C('CONSERVATION', 'Conservation', 'Modern', 1540, ['NATURAL_HISTORY']),
+    C('CONSERVATION', 'Conservation', 'Modern', 1540, ['NATURAL_HISTORY'], [
+      { kind: 'unlockBuilding', building: 'SANCTUARY' },
+    ]),
 
     C('SCORCHED_EARTH', 'Scorched Earth', 'Industrial', 1210, ['NATIONALISM'], [
       { kind: 'unlockPolicy', policy: 'TOTAL_WAR' },

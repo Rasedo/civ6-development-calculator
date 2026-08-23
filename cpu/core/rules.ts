@@ -1,15 +1,18 @@
 
 import type { City, DistrictId, GameMap, GameState, ImprovementId, Tile } from './types';
-import { hexDistance, neighbors } from '../../world/hex';
+import { hexDistance, neighbors, neighborTile } from '../../world/hex';
 import { isWater, isImpassable, isMountain, isCoastalWater, hasRiver } from '../../world/query';
 import { computeUnlocks, isTechComplete, isCivicComplete, type Unlocks } from './effects';
 import { isExplored } from './fog';
+import { riverReach } from './disasters';
 import { congressChopBanned, congressUdtBlockedDistrict } from './congress';
 import { tileAppeal } from './appeal'; // SEASIDE_RESORT gates on appeal
 import { SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { DISTRICTS } from '../data/districts';
+import { GOVERNMENTS } from '../data/policies';
+import { seatGovernmentId } from './seatTurn';
 import { BUILDINGS, type BuildingDef, buildingsForDistrict } from '../data/buildings';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { CITY_MIN_DIST } from '../../world/types';
@@ -216,8 +219,26 @@ export function canPlaceDistrictIn(
   } else if (isWater(tile)) {
     return no('Must be on land.');
   }
-  if (def.placement.flatLand && tile.elevation === 'HILLS') {
+  if ((def.placement.flatLand || def.placement.canalPassage) && tile.elevation === 'HILLS') {
     return no('Must be on flat land.');
+  }
+  // CIV6 (Dam): "It must be built on a Floodplains tile and the River must
+  // traverse at least 2 adjacent sides of the future Dam tile", with a
+  // "Limit of one per River".
+  if (def.placement.floodplainRiver) {
+    if (tile.feature !== 'FLOODPLAINS') return no('Must be on a floodplain.');
+    if (riverSideCount(tile) < 2) return no('The river must run along two of its sides.');
+    for (const t of riverReach(map, tile)) {
+      if (t.index !== tile.index && t.district === type) return no(`This river already has a ${def.name}.`);
+    }
+  }
+  // CIV6 (Canal): "must be built on flat land with a Coast or Lake tile on one
+  // side, and either a City Center or another body of water on the other. A
+  // single canal passage may go either straight, or bend 60 degrees" — so the
+  // two sides sit 2, 3 or 4 directions apart; 1 or 5 is the 120-degree turn
+  // the source refuses.
+  if (def.placement.canalPassage && !canalPassageOk(map, tile)) {
+    return no('Needs water on one side and a City Center or a second body of water on the other.');
   }
 
   if (tile.resource) {
@@ -227,6 +248,22 @@ export function canPlaceDistrictIn(
 
   if (!def.allowMultiple && city.districts.some((d) => d.type === type)) {
     return no(`${def.name} already exists in this city.`);
+  }
+  // CIV6 (Water Park): "cannot be built if an Entertainment Complex already
+  // exists in this city."
+  for (const x of def.exclusiveDistricts ?? []) {
+    if (city.districts.some((d) => d.type === x)) {
+      return no(`${DISTRICTS[x].name} already exists in this city.`);
+    }
+  }
+  // CIV6 (Government Plaza, Diplomatic Quarter): "Limit of one per
+  // civilization" — every city this seat holds, not just this one.
+  if (def.oneCivWide) {
+    for (const other of citiesOf(state, city.seat)) {
+      if (other.districts.some((d) => d.type === type)) {
+        return no(`${def.name} already exists in this civilization.`);
+      }
+    }
   }
   if (def.countsTowardLimit) {
     const specialty = city.districts.filter((d) => DISTRICTS[d.type].countsTowardLimit).length;
@@ -253,6 +290,32 @@ export function canPlaceDistrictIn(
     }
   }
   return ok;
+}
+
+/** CIV6 (Dam): "the River must traverse at least 2 adjacent sides". */
+export function riverSideCount(tile: Tile): number {
+  let n = 0;
+  for (let d = 0; d < 6; d++) if (tile.riverMask & (1 << d)) n += 1;
+  return n;
+}
+
+/** The Canal's two-sided passage test — a lake/coast entry and an exit that is
+ *  a City Center or any water, no sharper than a 60-degree bend. */
+export function canalPassageOk(map: GameMap, tile: Tile): boolean {
+  const around: (Tile | null)[] = [];
+  for (let d = 0; d < 6; d++) around.push(neighborTile(map, tile, d));
+  for (let a = 0; a < 6; a++) {
+    const na = around[a];
+    if (!na || (na.terrain !== 'COAST' && na.terrain !== 'LAKE')) continue;
+    for (let b = 0; b < 6; b++) {
+      const turn = (b - a + 6) % 6;
+      if (turn < 2 || turn > 4) continue;
+      const nb = around[b];
+      if (!nb) continue;
+      if (isWater(nb) || nb.district === 'CITY_CENTER') return true;
+    }
+  }
+  return false;
 }
 
 export function canPlaceDistrict(
@@ -367,6 +430,10 @@ export function availableBuildings(state: GameState, city: City): BuildingDef[] 
       }
       if (def.requiresAny && !def.requiresAny.some((r) => have.has(r) || queued.has(r))) continue;
       if (def.exclusiveWith?.some((x) => have.has(x) || queued.has(x))) continue;
+      // CIV6: a government building "requires a Tier 2 government (Merchant
+      // Republic, Monarchy, or Theocracy)" — the tier of what the seat is
+      // running NOW, so a revolution can take an unbuilt row back off the list.
+      if (def.govTier && governmentTier(state, city.seat) < def.govTier) continue;
       if (def.special === 'WATER_MILL' && !hasRiver(center)) continue;
       // CIV6: "While city defenses are damaged, you cannot build higher
       // levels of Walls."
@@ -377,9 +444,17 @@ export function availableBuildings(state: GameState, city: City): BuildingDef[] 
   return out;
 }
 
+/** The tier of the government this seat is running, 0 for Chiefdom or none.
+ *   is the one derivation both engines share. */
+export function governmentTier(state: GameState, seat: number): number {
+  const id = seatGovernmentId(state, seat);
+  return id ? GOVERNMENTS[id]?.tier ?? 0 : 0;
+}
+
 export function buildingCompletable(state: GameState, city: City, buildingId: string): boolean {
   const def = BUILDINGS[buildingId];
   if (!def) return false;
+  if (def.govTier && governmentTier(state, city.seat) < def.govTier) return false;
   const districtDone = city.districts.some(
     (d) => d.type === def.district && state.map.tiles[d.tileIndex].districtComplete,
   );

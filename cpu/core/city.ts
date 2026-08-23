@@ -1,10 +1,10 @@
 
-import { addYields, emptyYields, type City, type GameState, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
+import { addYields, emptyYields, type City, type DistrictId, type GameState, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
 import { tilesWithin, hexDistance } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable } from '../../world/query';
-import { tileYields, cityDistrictYields, cityBuildingYields, regionalEffects, localBuildingAmenities, pillagedDistrictTypes, effectiveAdjacency, completedDistrictCount } from './yields';
+import { tileYields, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, pillagedDistrictTypes, effectiveAdjacency, completedDistrictCount } from './yields';
 import { getModifiers, makeYieldCtx, withFollowerBelief, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
-import { tileAppeal, appealTier } from './appeal';
+import { tileAppeal, appealTier, appealBand, PRESERVE_APPEAL_HOUSING } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
 import { CIVICS } from '../data/civics';
 /** base tourism every completed wonder pays (real Civ 6). */
@@ -71,12 +71,31 @@ export function buildingMaintenance(id: string): number {
   return 1;
 }
 
-export function districtMaintenance(type: string): number {
-  // Real Civ 6 also exempts the Commercial Hub and Harbor.
-  return type === 'CITY_CENTER' || type === 'NEIGHBORHOOD' || type === 'AQUEDUCT' ||
-    type === 'COMMERCIAL_HUB' || type === 'HARBOR'
-    ? 0
-    : 1;
+export function districtMaintenance(type: DistrictId): number {
+  return DISTRICTS[type].maintenance;
+}
+
+/**
+ * Sum one numeric BuildingDef field over every building this seat holds whose
+ * district is complete and unpillaged — the shape of every empire-wide
+ * building term (spy capacity, influence, diplomatic favor), which pays from
+ * the one city that built it to the whole seat.
+ */
+export function seatBuildingSum(
+  state: GameState,
+  seat: number,
+  key: 'spyCapacity' | 'influencePerTurn' | 'favorPerTurn' | 'govTitle' | 'loyaltyWithoutGovernor',
+): number {
+  let n = 0;
+  for (const city of citiesOf(state, seat)) {
+    const dark = pillagedDistrictTypes(state.map, city.districts);
+    for (const id of city.buildings) {
+      const def = BUILDINGS[id];
+      if (!def || dark.has(def.district)) continue;
+      n += def[key] ?? 0;
+    }
+  }
+  return n;
 }
 
 export function cityMaintenance(state: GameState, city: City): number {
@@ -244,10 +263,13 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
   for (const d of city.districts) {
     const dt = map.tiles[d.tileIndex];
     if (!dt.districtComplete || dt.districtPillaged) continue; // a pillaged district's housing is dark
+    const ddef = DISTRICTS[d.type];
     if (d.type === 'NEIGHBORHOOD') {
       total += appealTier(tileAppeal(map, dt, camps)).housing;
+    } else if (ddef.appealHousing) {
+      total += PRESERVE_APPEAL_HOUSING[appealBand(tileAppeal(map, dt, camps))];
     } else {
-      total += DISTRICTS[d.type].housing;
+      total += ddef.housing;
     }
   }
   for (const id of city.buildings) {
@@ -291,7 +313,7 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
 
   const baseHave = new Map<number, number>();
   for (const c of cities) {
-    baseHave.set(c.id, localBuildingAmenities(state, c) + parkAmenities(state, c) + regionalEffects(state, c).amenities);
+    baseHave.set(c.id, localAmenities(state, c) + parkAmenities(state, c) + regionalEffects(state, c).amenities);
   }
 
   for (let i = 0; i < luxuries.size; i++) {
@@ -559,7 +581,7 @@ export function computeCityStats(
 ): CityStats {
   const base = mods ?? getModifiers(state, city.seat);
   const m = withFollowerBelief(state, base, followerReligionForCity(city.followedReligion, city.seat));
-  const ctx: YieldCtx = { map: state.map, mods: m };
+  const ctx = makeYieldCtx(state, city.seat, m);
   const map = state.map;
   const center = map.tiles[city.centerIndex];
   const wonders = completedWonders(state, city);
@@ -687,7 +709,7 @@ export function computeCityStats(
 
   const housing = computeHousing(state, city, m) + wonderCityFlat(state, city, 'cityHousing');
   let have =
-    localBuildingAmenities(state, city) +
+    localAmenities(state, city) +
     parkAmenities(state, city) +
     regional.amenities +
     wonderRegionalAmenities(state, city) +

@@ -31,7 +31,11 @@ def _prod_ctx(blocks: dict, sim, seat: int) -> dict:
     # `rules.seats.maxCities`, so the fork never carried a difference; the
     # storage rename left the name dangling and the branch pointless.)
     cap = int(sim.rules.seats.get("maxCities", 6))
+    nS = len(sim._scaffold) if sim.districts_on else 0
     return {
+        # WHICH district to place is a decision, and the driver rotates it so
+        # the whole scaffold is reached rather than only its head.
+        "dist_rot": ((seat + sim.turn) % nS) if nS else None,
         "settler_queued": emp[:, 6] > 0.5,  # raw queued-settler count
         "is_capital": is_cap,  # the wonder tier's capital heuristic (city col 9)
         "melee": ctx[:, 2].long(),

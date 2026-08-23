@@ -1,12 +1,14 @@
 import type { City, GameState, Seat } from './types';
 import type { QueueItem } from './types';
 import { seatOf, setTileOwner, tileCity, tileSeat } from './seats';
+import { NO_SEAT } from '../../world/types';
 import { congressCultureBombSeat } from './congress';
 import { hexDistance, neighbors } from '../../world/hex';
 import { availableCivicsIn, availableTechsIn } from './effects';
 import { completedWonders, seatWonderFlag } from './wonders';
 import { UNITS, ENCAMPMENT_HP, URBAN_DEFENSES_TECH } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
+import { DISTRICTS } from '../data/districts';
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf } from '../data/projects';
 import { CULTURE_BOMB_RANGE, DED_FREE_INQUIRY, DED_MONUMENTALITY, ERA_SCORE_WONDER } from '../data/seats';
 import { ERAS, TECHS } from '../data/techs';
@@ -117,7 +119,17 @@ export function completeQueueItem(
       dt.districtComplete = true;
       if (dt.district !== 'CITY_CENTER') dedicationEvent(state, city.seat, DED_MONUMENTALITY);
       if (dt.district === 'ENCAMPMENT') dt.encampHp = ENCAMPMENT_HP;
-      cultureBomb(state, city, item.tileIndex);
+      const ddef = dt.district ? DISTRICTS[dt.district] : null;
+      // CIV6 (Diplomatic Quarter): "+1 Envoy when built next to the City
+      // Center."
+      const envoysD = ddef?.envoysNextToCenter ?? 0;
+      if (envoysD && neighbors(state.map, dt).some((n) => n.index === city.centerIndex)) {
+        owner.envoysAvailable = (owner.envoysAvailable ?? 0) + envoysD;
+      }
+      // The Border Control Treaty bombs FOREIGN tiles too and so subsumes the
+      // Preserve's own; only one of the two ever runs.
+      if (congressCultureBombSeat(state) === city.seat) cultureBomb(state, city, item.tileIndex, false);
+      else if (ddef?.cultureBombUnowned) cultureBomb(state, city, item.tileIndex, true);
       break;
     }
     case 'wonder': {
@@ -191,7 +203,7 @@ export function completeQueueItem(
 
 /**
  * CIV6 (Border Control Treaty, outcome A): "New Districts built by target
- * player act as Culture bombs."
+ * player act as Culture bombs" — and, on its own, the Preserve.
  *
  * CIV6 (Culture Bomb): "the immediate annexation of the six tiles surrounding
  * the trigger tile, without districts or wonders and falling within 3 hexes of
@@ -202,12 +214,14 @@ export function completeQueueItem(
  * The source also flips a tile whose district or wonder is still UNDER
  * CONSTRUCTION, wiping the unfinished build; here such a tile is left alone.
  */
-function cultureBomb(state: GameState, city: City, tileIndex: number): void {
-  if (congressCultureBombSeat(state) !== city.seat) return;
+function cultureBomb(state: GameState, city: City, tileIndex: number, unownedOnly: boolean): void {
   const owner = seatOf(state, city.seat);
   if (!owner) return;
   for (const t of neighbors(state.map, state.map.tiles[tileIndex]).slice().sort((a, b) => a.index - b.index)) {
     if (t.district || t.builtWonder) continue;
+    // CIV6 (Preserve): "Initiate a Culture Bomb on adjacent UNOWNED tiles" —
+    // it annexes what nobody holds and never takes a rival's.
+    if (unownedOnly && tileSeat(t) !== NO_SEAT) continue;
     if (tileSeat(t) === city.seat && tileCity(t) === city.id) continue;
     const near = owner.cities.some((c) => {
       const ctr = state.map.tiles[c.centerIndex];

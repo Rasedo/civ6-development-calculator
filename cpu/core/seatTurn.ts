@@ -3,7 +3,7 @@ import type { City, GameState, QueueItem } from './types';
 import { seatOf, civsAtWar, seatsAllied } from './seats';
 import { chargeProjectResource, chargeUnitResource } from './stockpile';
 import { isSuzerain } from './cityStates';
-import { seatTourism } from './city';
+import { seatTourism, seatBuildingSum } from './city';
 import { computeAdoption } from './effects';
 import { selectResearch } from './economy';
 import { GOVERNMENTS, GOVERNMENTS_ADOPTION_LIVE, POLICY_LIST } from '../data/policies';
@@ -23,10 +23,11 @@ export function suzerainCount(state: GameState, seat: number): number {
 }
 
 export function diplomaticFavorPerTurn(gov: string | null, suzerains: number, treaty = 0,
-                                       occupiedCapitals = 0, alliances = 0): number {
+                                       occupiedCapitals = 0, alliances = 0,
+                                       buildings = 0): number {
   const tier = gov ? GOVERNMENTS[gov]?.tier ?? 0 : 0;
   return tier + DIPLO_FAVOR_PER_SUZERAIN * suzerains + treaty
-    + FAVOR_PER_ALLIANCE * alliances
+    + FAVOR_PER_ALLIANCE * alliances + buildings
     - FAVOR_OCCUPIED_CAPITAL * occupiedCapitals;
 }
 
@@ -88,7 +89,8 @@ export function seatAccumulators(state: GameState, seat: number, govCityIds?: Re
   s.diplomaticFavor = Math.max(0, (s.diplomaticFavor ?? 0)
     + diplomaticFavorPerTurn(seatGovernmentId(state, seat), suzerainCount(state, seat),
                              policyTreatyFavor(state, seat), occupiedCapitals(state, seat),
-                             allianceCount(state, seat)));
+                             allianceCount(state, seat),
+                             seatBuildingSum(state, seat, 'favorPerTurn')));
   if ((s.warmonger ?? 0) > 0 && atPeaceWithAllCivs(state, seat)) {
     s.warmonger = (s.warmonger ?? 0) - 1;
   }

@@ -2537,13 +2537,41 @@ class SimSeats:
             b = b.unsqueeze(-1)
         return hit & b, hit & ~b
 
-    def _building_loyalty(self, row: int, bidx: torch.Tensor, col: torch.Tensor) -> torch.Tensor:
-        """[n] f64 — CIV6 (Monument, R&F/GS): "+1 Loyalty", over every standing
-        building that carries a flat loyalty term."""
+    def _seat_building_sum(self, row: int, w: torch.Tensor) -> torch.Tensor:
+        """[B] — weight `w` [NB] summed over every building this seat holds
+        whose district is not dark: the shape of every empire-wide building
+        term (spy capacity, influence, diplomatic favor), which pays from the
+        one city that built it to the whole seat. `seatBuildingSum`'s twin."""
+        reg = self.city_dist_tile[:, row]  # [B, RC, nD]
+        stand = self.city_bldg[:, row] & ~self._bldg_dark(reg) & self.city_alive[:, row].unsqueeze(2)
+        return torch.einsum("bjn,n->b", stand.to(w.dtype), w)
+
+    def _standing_loyalty(self, row: int, bidx: torch.Tensor, col: torch.Tensor) -> torch.Tensor:
+        """[n] f64 — CIV6 (Monument): "+1 Loyalty", and (Government Plaza)
+        "+8 Loyalty to this city": the flat per-turn term everything standing in
+        the city adds. A district pays only complete and unpillaged, and a dark
+        district takes its buildings with it."""
+        out = torch.zeros(bidx.shape[0], dtype=torch.float64, device=self.device)
+        reg = self.city_dist_tile[bidx, row, col]  # [n, nD]
+        if self.districts_on and reg.shape[-1]:
+            flat = reg.clamp(min=0)
+            live = (reg >= 0) & self.district_complete[bidx.unsqueeze(1), flat] \
+                & ~self.district_pillaged[bidx.unsqueeze(1), flat]
+            out = out + (live.double() * self._d_loyalty.double().unsqueeze(0)).sum(dim=1)
         w = self.rules.b_loyalty
-        if not w.numel() or not bool((w != 0).any()):
-            return torch.zeros(bidx.shape[0], dtype=torch.float64, device=self.device)
-        return (self.city_bldg[bidx, row, col].double() * w.to(self.device).unsqueeze(0)).sum(dim=1)
+        if w.numel() and bool((w != 0).any()):
+            stand = self.city_bldg[bidx, row, col] & ~self._bldg_dark(reg)
+            out = out + (stand.double() * w.to(self.device).unsqueeze(0)).sum(dim=1)
+        return out
+
+    def _ungoverned_loyalty(self, row: int) -> torch.Tensor:
+        """[B] f64 — CIV6 (Audience Chamber): "-2 Loyalty in Cities without
+        Governors." The building stands in ONE city; the clause reaches every
+        city its SEAT holds, so it is summed over the seat and paid to whichever
+        city has no governor."""
+        if not bool((self._b_loy_no_gov != 0).any()):
+            return torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        return self._seat_building_sum(row, self._b_loy_no_gov)
 
     def _congress_space(self, kind: int) -> int:
         """How many TARGETS a resolution of this kind offers — the
@@ -3233,7 +3261,46 @@ class SimSeats:
             return self.city_followed[:, row]
         return torch.full((self.B, self.RC), row, dtype=torch.long, device=self.device)
 
-    def _belief_feat_plane(self, row: int) -> torch.Tensor:
+    def _preserve_plane(self, row: int) -> torch.Tensor | None:
+        """[B, T, 6] — CIV6 (Grove): "+1 Food and Faith to adjacent unimproved
+        Charming tiles. Yields increased to +2 Food, Faith and Culture for
+        adjacent unimproved Breathtaking tiles", and the Sanctuary the same
+        shape in Science/Gold. The two bands do NOT stack: a Breathtaking tile
+        takes the Breathtaking row and nothing else. Two Preserves reaching one
+        tile each pay it. `preserveTileYields`' twin."""
+        if not self._b_appeal_rows or not self.districts_on:
+            return None
+        B, T, dev = self.B, self.T, self.device
+        reg = self.city_dist_tile[:, row]  # [B, RC, nD]
+        alive = self.city_alive[:, row]
+        out = None
+        for n in self._b_appeal_rows:
+            di = int(self._b_req_district[n])
+            if di < 0:
+                continue
+            st = reg[:, :, di]
+            stc = st.clamp(min=0)
+            ok = (alive & (st >= 0) & self.district_complete.gather(1, stc)
+                  & ~self.district_pillaged.gather(1, stc) & self.city_bldg[:, row, :, n])
+            if not bool(ok.any()):
+                continue
+            bi, cj = ok.nonzero(as_tuple=True)
+            src = torch.zeros(B, T, dtype=torch.bool, device=dev)
+            src[bi, st[bi, cj]] = True
+            nb = self.neigh
+            cnt = (src[:, nb.clamp(min=0)] & (nb >= 0).unsqueeze(0)).sum(dim=2)  # [B, T]
+            elig = (self.improvement < 0) & (self.district < 0) & (self.built_wonder < 0)
+            ap = self._tile_appeal()
+            top = ap >= self._appeal_bands[0]
+            mid = ~top & (ap >= self._appeal_bands[1])
+            y = self._b_appeal_y[n].to(self.dtype)  # [2, 6]
+            add = (top.unsqueeze(2).to(self.dtype) * y[0].reshape(1, 1, 6)
+                   + mid.unsqueeze(2).to(self.dtype) * y[1].reshape(1, 1, 6))
+            add = add * (cnt * elig).unsqueeze(2).to(self.dtype)
+            out = add if out is None else out + add
+        return out
+
+    def _seat_tile_add(self, row: int) -> torch.Tensor:
         """[B, T, 6] belief TILE adds — featureYields at tiles with a LIVE feature
         (fid >= 0 and not stripped), plus improvementOnResource at unpillaged
         improvements on a LIVE resource (category = the res priority code), plus
@@ -3248,6 +3315,12 @@ class SimSeats:
         key = (row, self._eff_version, self._bel_version)
         if self._belief_feat_cache is not None and self._belief_feat_cache[0] == key:
             return self._belief_feat_cache[1]
+        if not self._seat_has_beliefs(row):
+            pres = self._preserve_plane(row)
+            plane = (pres if pres is not None
+                     else torch.zeros(self.B, self.T, 6, dtype=self.dtype, device=self.device))
+            self._belief_feat_cache = (key, plane)
+            return plane
         featA = self._bel_add("featY", row)
         plane = featA.gather(1, self.feat_id.clamp(min=0).unsqueeze(2).expand(-1, -1, 6))
         live = ((self.feat_id >= 0) & ~self.feat_stripped).unsqueeze(2).to(plane.dtype)
@@ -3265,6 +3338,9 @@ class SimSeats:
         impY = self._bel_add("impY", row)  # [B, nImp, 6]
         imp_live = ((self.improvement >= 0) & ~self.pillaged).unsqueeze(2).to(plane.dtype)
         plane = plane + impY.gather(1, self.improvement.clamp(min=0).unsqueeze(2).expand(-1, -1, 6)) * imp_live
+        pres = self._preserve_plane(row)
+        if pres is not None:
+            plane = plane + pres
         self._belief_feat_cache = (key, plane)
         return plane
 
@@ -3611,10 +3687,15 @@ class SimSeats:
         reach_p = torch.zeros(B, cols, nP, dtype=torch.bool, device=dev)
         if not bool((demand > 0).any()):
             return demand, supply, reach_p
+        # CIV6 (Hydroelectric Dam): "Provides 6 Power to the city from
+        # renewable water sources" — a renewable like Cardiff's, so it too must
+        # cover the whole load by itself before a plant is asked.
+        if bool((self._b_power_supply > 0).any()):
+            supply = supply + stand.double() @ self._b_power_supply
         if self._harbor_idx >= 0 and self._suz_c_harbor_pow >= 0:
             hb = (self._b_req_district == self._harbor_idx).reshape(1, 1, -1)
             n_hb = (stand & hb).sum(dim=2).double()
-            supply = n_hb * self._cardiff_harbor_power \
+            supply = supply + n_hb * self._cardiff_harbor_power \
                 * self._suz_effect(row, self._suz_c_harbor_pow).double().unsqueeze(1)
         if self._iz_idx >= 0 and self._plant_bidx:
             st = dreg[:, :, self._iz_idx]
@@ -3760,7 +3841,12 @@ class SimSeats:
             if not bool(ok.any()):
                 continue
             dd = self.pair_dist[stc.unsqueeze(2), ctrs.unsqueeze(1)]  # [B, src, recv] int16
-            has = (ok.unsqueeze(2) & (dd <= reach)).any(dim=1) & alive  # [B, cols recv]
+            # CIV6 (Aquarium, Aquatics Center): "This bonus extends to each City
+            # Center within 9 tiles" — a row with its own reach ignores the
+            # shared one, the suzerain bonus included.
+            _rr = int(self._b_regional_range[n])
+            reach_n = torch.full_like(reach, _rr) if _rr > 0 else reach
+            has = (ok.unsqueeze(2) & (dd <= reach_n)).any(dim=1) & alive  # [B, cols recv]
             hf = has.double()
             if y6 is None:
                 y6 = torch.zeros(B, cols, 6, dtype=torch.float64, device=self.device)
@@ -3771,7 +3857,7 @@ class SimSeats:
                 continue
             if lit is None:
                 lit = self.city_powered[:, row, :cols]
-            hp = (ok.unsqueeze(2) & lit.unsqueeze(2) & (dd <= reach)).any(dim=1) & alive
+            hp = (ok.unsqueeze(2) & lit.unsqueeze(2) & (dd <= reach_n)).any(dim=1) & alive
             hpf = hp.double()
             y6 = y6 + hpf.unsqueeze(2) * self._b_pow_y[n].reshape(1, 1, 6)
             am = am + hpf * float(self._b_pow_am[n])
@@ -3863,16 +3949,34 @@ class SimSeats:
         selb_h = bldg & ~self._bldg_dark(dreg)
         housing = water + torch.einsum("bjn,n->bj", selb_h.double(), rd.b_housing.double())
         housing = housing + self._palace_housing * is_cap_a
-        if self._nbhd_didx >= 0:
-            nb_ok = (self.district == self._nbhd_didx) & self.district_complete & ~self.district_pillaged & (self.tile_seat == row)
-            if bool(nb_ok.any()):
-                ap = self._tile_appeal()
-                hv = torch.full_like(ap, self._appeal_floor)
-                for cut, val in sorted(self._appeal_cuts):
-                    hv = torch.where(ap >= cut, torch.full_like(ap, val), hv)
-                ids = self.city_id[:, row, :cols]  # [B, cols] persistent ids
-                hit = nb_ok.unsqueeze(2) & (self.tile_city.unsqueeze(2) == ids.unsqueeze(1)) & alive.unsqueeze(1)  # [B, T, cols]
-                housing = housing + ((hv * nb_ok).double().unsqueeze(2) * hit.double()).sum(dim=1)
+        # THE DISTRICT'S OWN HOUSING (the Dam's +3). A type a city may hold
+        # SEVERAL of is counted off the tile plane below, because the registry
+        # keeps one tile per type; the Aqueduct's is the water rule above, and
+        # its catalog column is zero.
+        dpill = (dreg >= 0) & self.district_pillaged.gather(1, dflat).reshape_as(dreg)
+        dlive = dcomp & ~dpill
+        housing = housing + torch.einsum(
+            "bjn,n->bj",
+            (dlive & ~self._is_repeatable.reshape(1, 1, -1)).double(), self._d_housing.double())
+        for _di, _tab in ([(self._nbhd_didx, self._nbhd_housing)] if self._nbhd_didx >= 0 else []) \
+                + [(i, self._preserve_housing) for i in self._appeal_house_idx] \
+                + [(i, None) for i in self._rep_house_idx]:
+            if _di < 0:
+                continue
+            ok_d = (self.district == _di) & self.district_complete & ~self.district_pillaged & (self.tile_seat == row)
+            if not bool(ok_d.any()):
+                continue
+            ids = self.city_id[:, row, :cols]  # [B, cols] persistent ids
+            hit = ok_d.unsqueeze(2) & (self.tile_city.unsqueeze(2) == ids.unsqueeze(1)) & alive.unsqueeze(1)  # [B, T, cols]
+            if _tab is None:
+                housing = housing + float(self._d_housing[_di]) * hit.double().sum(dim=1)
+                continue
+            ap = self._tile_appeal()
+            hv = torch.full_like(ap, _tab[-1])
+            # LOWEST cut first, so the highest band a tile clears is what stays.
+            for _b in range(len(self._appeal_bands) - 1, -1, -1):
+                hv = torch.where(ap >= self._appeal_bands[_b], torch.full_like(ap, _tab[_b]), hv)
+            housing = housing + ((hv * ok_d).double().unsqueeze(2) * hit.double()).sum(dim=1)
         if self._follower_live(row):
             housing = housing + torch.einsum("bjn,bjn->bj", selb_h.double(), self._fol_tab("bldgH", self._follower_id_for(self._city_rel(row))))
         if self._seat_has_beliefs(row):
@@ -3925,6 +4029,14 @@ class SimSeats:
         dreg = self.city_dist_tile[:, row, :cols]
         selb = self.city_bldg[:, row, :cols] & ~self._bldg_dark(dreg) & ~self._b_regional.reshape(1, 1, -1)
         have = torch.einsum("bjn,n->bj", selb.to(torch.float64), rd.b_amenities.double())
+        # CIV6 (Entertainment Complex, Water Park): "+1 Amenity from
+        # entertainment to parent city" — the DISTRICT's own, before any
+        # building, and dark while it is pillaged.
+        _dc = self.city_dist_tile[:, row, :cols]
+        _df = _dc.clamp(min=0).reshape(self.B, -1)
+        _dlive = (_dc >= 0) & self.district_complete.gather(1, _df).reshape_as(_dc) \
+            & ~self.district_pillaged.gather(1, _df).reshape_as(_dc)
+        have = have + torch.einsum("bjn,n->bj", _dlive.double(), self._d_amenity.double())
         if bool((selb & (self._b_pow_am > 0).reshape(1, 1, -1)).any()):
             _powam = torch.einsum("bjn,n->bj", selb.to(torch.float64), self._b_pow_am)
             have = have + _powam * self.city_powered[:, row, :cols].double()
@@ -4201,12 +4313,15 @@ class SimSeats:
         return True
 
     def _culture_bomb(self, row: int, rows: torch.Tensor, tiles: torch.Tensor,
-                      cols: torch.Tensor) -> None:
+                      cols: torch.Tensor, unowned_only: bool = False) -> None:
         """cultureBomb's twin — the six tiles around each of `tiles` annex to
         the city in `cols`. A tile carrying a district (a CITY CENTRE included)
         or a wonder is left alone, as is one further than
         `_culture_bomb_range` from every living centre this row holds. The
-        claimed tiles are distinct, so claim ORDER cannot change the result."""
+        claimed tiles are distinct, so claim ORDER cannot change the result.
+
+        CIV6 (Preserve): "Initiate a Culture Bomb on adjacent UNOWNED tiles" —
+        `unowned_only` is that narrower bomb, which never takes a rival's."""
         if rows.numel() == 0:
             return
         cid = self.city_id[rows, row, cols]
@@ -4227,6 +4342,8 @@ class SimSeats:
                 & (centre_at[rows, tc] < 0)
                 & ~((self.tile_seat[rows, tc] == row) & (self.tile_city[rows, tc] == cid))
             )
+            if unowned_only:
+                take = take & (self.tile_seat[rows, tc] < 0)
             if not bool(take.any()):
                 continue
             rr, tt = rows[take], tk[take]
@@ -4258,8 +4375,8 @@ class SimSeats:
                 y_oth = y_oth + self._tile_appeal().clamp(min=0).to(self.dtype) * (
                     (self.improvement == self.SEASIDE).to(self.dtype) * live_imp
                 )
-        if self._seat_has_beliefs(row):
-            featP = self._belief_feat_plane(row)
+        if self._seat_has_beliefs(row) or self._b_appeal_rows:
+            featP = self._seat_tile_add(row)
             f_plane = f_plane + featP[:, :, 0]
             p_plane = p_plane + featP[:, :, 1]
             y_oth = y_oth + featP[:, :, 2:].sum(dim=2)
@@ -4353,9 +4470,14 @@ class SimSeats:
         consumed by the CALLER. Returns the games that founded."""
         seat = row
         tc = tile.clamp(min=0)
-        unowned = self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1) < 0
+        # CIV6 settling criteria name land, passability, the oasis, the natural
+        # wonder and the 4-hex spacing — not ownership: a city may be founded
+        # on ground this seat already holds, and only FOREIGN territory
+        # refuses. `canFoundCity`'s `tileClaimed(tile) && tileSeat !== seat`.
+        _tseat = self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1)
+        own_ok = (_tseat < 0) | (_tseat == row)
         okt = (
-            (tile >= 0) & unowned
+            (tile >= 0) & own_ok
             & self.settle_ok.gather(1, tc.unsqueeze(1)).squeeze(1)
             & (self.district.gather(1, tc.unsqueeze(1)).squeeze(1) < 0)
             & (self.built_wonder.gather(1, tc.unsqueeze(1)).squeeze(1) < 0)
@@ -4452,7 +4574,7 @@ class SimSeats:
         # `fresh_f` guards idempotence — an already-CHOPPED tile has nothing left
         # to withdraw. An UNREMOVABLE feature (oasis/floodplains) SURVIVES the
         # founding, so both writes gate on feat_removable: a blanket strip would
-        # starve _belief_feat_plane of yields TS still pays.
+        # starve _seat_tile_add of yields TS still pays.
         frm_f = self.feat_removable[rows, s_idx]
         self.tdef[rows, s_idx] = torch.where(frm_f, self.hills[rows, s_idx].long() * 3, self.tdef[rows, s_idx])
         self.tmove[rows, s_idx] = torch.where(frm_f, self.hills[rows, s_idx].long() * 3, self.tmove[rows, s_idx])
@@ -5232,8 +5354,13 @@ class SimSeats:
         # always did.
         hcol = self._owner_city_col(hseat, tc)
         wtier = self._walls_tier_at(hrow, hcol)
+        _held = hcol >= 0
+        # CIV6 (Encampment): "Acquires Outer Defenses ... once Walls have been
+        # built" — the OWNING city's tier, and none where no city owns the
+        # tile (`_walls_tier_at` clamps a -1 slot onto slot 0).
         def_cs = (torch.maximum(self.civ_best_melee[bidx, hrow], torch.full_like(hrow, 15))
-                  + self._walls_tier_cs[wtier])
+                  + torch.where(_held, self._walls_tier_cs[wtier],
+                                torch.zeros_like(self._walls_tier_cs[wtier])))
         # Attacker CS assembled exactly as `_assault_city` assembles it.
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         atk_e = (atk_cs - self._wound(a_hp[:, u])
@@ -5253,7 +5380,6 @@ class SimSeats:
         # one set of Walls supplies both, so the roll divides exactly as a hit
         # on the centre does: the perimeter share off the city's pool, and only
         # what gets through reaching the garrison.
-        _held = hcol >= 0
         _hc0 = hcol.clamp(min=0)
         _wall, _centre = self._city_damage_split(
             self.city_outer_hp[bidx, hrow, _hc0], self._walls_tier_hp[wtier], d_enc,
@@ -6084,6 +6210,9 @@ class SimSeats:
             pt = pt + self._adopted_gov_tier(civics).double()
             if self._gov_has_effects:
                 pt = pt + self._gov_mods(row)[12]["infl"].double()
+        # CIV6 (Consulate, Chancery): "+2/+3 Influence Points per turn."
+        if bool((self._b_influence != 0).any()):
+            pt = pt + self._seat_building_sum(row, self._b_influence).double()
         self.civ_influence[:, row] = self.civ_influence[:, row] + torch.where(any_met, pt, torch.zeros_like(pt)).to(self.civ_influence.dtype)
         cost = float(rr.get("envoyCost", 100))
         for _ in range(3):

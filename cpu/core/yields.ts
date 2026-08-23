@@ -74,6 +74,11 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
   if (tile.fertility > 0) out.food += tile.fertility;
   if (tile.fertilityProd > 0) out.production += tile.fertilityProd;
   if (tile.droughtTurns > 0) out.food = Math.max(0, out.food - 1);
+  // CIV6 (Grove, Sanctuary): what a PRESERVE's buildings pay the unimproved
+  // tiles around them, resolved per tile when the context was built. Past the
+  // drought floor, so a drought never eats the Grove's food.
+  const near = ctx.preserve?.get(tile.index);
+  if (near) addYields(out, near);
   return out;
 }
 
@@ -105,6 +110,12 @@ function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile): boolean {
       return neighbor.improvement === 'QUARRY';
     case 'AQUEDUCT':
       return neighbor.district === 'AQUEDUCT' && neighbor.districtComplete;
+    case 'DAM':
+      return neighbor.district === 'DAM' && neighbor.districtComplete;
+    case 'CANAL':
+      return neighbor.district === 'CANAL' && neighbor.districtComplete;
+    case 'GOV_PLAZA':
+      return neighbor.district === 'GOVERNMENT_PLAZA' && neighbor.districtComplete;
     case 'RIVER':
       return false; // handled separately (it's about the tile itself)
   }
@@ -250,6 +261,13 @@ export function cityPower(state: GameState, city: City): CityPower {
     demand += def.power;
   }
   let supply = 0;
+  // CIV6 (Hydroelectric Dam): "Provides 6 Power to the city from renewable
+  // water sources" — a supply with no stockpile behind it, which is why
+  // `resolveSeatPower` asks a plant only for the shortfall.
+  for (const id of city.buildings) {
+    const def = BUILDINGS[id];
+    if (def?.powerSupply && !pillaged.has(def.district)) supply += def.powerSupply;
+  }
   if (!pillaged.has('HARBOR') && suzerainEffect(state, city.seat, 'harborPower')) {
     for (const id of city.buildings) {
       if (BUILDINGS[id]?.district === 'HARBOR') supply += CARDIFF_HARBOR_POWER;
@@ -317,7 +335,7 @@ export function regionalEffects(state: GameState, city: City): RegionalEffects {
       for (const id of other.buildings) {
         const def = BUILDINGS[id];
         if (!def || !def.regional || def.district !== inst.type) continue;
-        if (hexDistance(tile.col, tile.row, center.col, center.row) > reach) continue;
+        if (hexDistance(tile.col, tile.row, center.col, center.row) > (def.regionalRange ?? reach)) continue;
         if (!seen.has(id)) {
           seen.add(id);
           if (def.yields) addYields(out.yields, def.yields);
@@ -334,9 +352,27 @@ export function regionalEffects(state: GameState, city: City): RegionalEffects {
   return out;
 }
 
-export function localBuildingAmenities(state: GameState, city: City): number {
-  const pillaged = pillagedDistrictTypes(state.map, city.districts);
+/** The amenities a city earns AT HOME: its own complete districts, then its
+ *  own non-regional buildings. A pillaged district darkens both. */
+/** Sum one numeric DistrictDef field over a city's complete, unpillaged
+ *  districts — the district-side twin of `seatBuildingSum`. */
+export function cityDistrictSum(
+  state: GameState,
+  city: City,
+  key: 'loyalty' | 'governorTitle' | 'amenities',
+): number {
   let n = 0;
+  for (const d of city.districts) {
+    const t = state.map.tiles[d.tileIndex];
+    if (!t.districtComplete || t.districtPillaged) continue;
+    n += DISTRICTS[d.type][key] ?? 0;
+  }
+  return n;
+}
+
+export function localAmenities(state: GameState, city: City): number {
+  const pillaged = pillagedDistrictTypes(state.map, city.districts);
+  let n = cityDistrictSum(state, city, 'amenities');
   for (const id of city.buildings) {
     const def = BUILDINGS[id];
     if (!def || def.regional) continue;

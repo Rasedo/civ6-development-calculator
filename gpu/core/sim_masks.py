@@ -151,6 +151,18 @@ class SimMasks:
                         pred = (on.any(dim=1) & self._is_specialty.reshape(1, -1)).sum(dim=1) >= brow["count"]
                     else:
                         pred = (on & self._is_specialty.reshape(1, 1, -1)).sum(dim=(1, 2)) >= brow["count"]
+                elif bool(self._is_repeatable[dtype]):
+                    # A city may hold SEVERAL of a repeatable district and the
+                    # registry keeps ONE tile per type, so the registry cannot
+                    # count them. TS walks every `c.districts` entry, which is
+                    # the tile plane here — complete, in a live city of this
+                    # row. Pillaged still counts, exactly as TS has it.
+                    ids = self.city_id[:, row]  # [B, RC]
+                    okd = ((self.district == dtype) & self.district_complete
+                           & (self.tile_seat == row))
+                    per = (okd.unsqueeze(2) & (self.tile_city.unsqueeze(2) == ids.unsqueeze(1))
+                           & alive.unsqueeze(1))
+                    pred = per.sum(dim=(1, 2)) >= brow["count"]
                 else:
                     pred = on[:, :, dtype].sum(dim=1) >= brow["count"]
             elif kind == "policies":

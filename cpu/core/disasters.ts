@@ -4,8 +4,9 @@ import type { GameMap } from '../../world/types';
 import { neighborTile, neighbors, tilesWithin } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { nextRandom } from './rand';
-import { seatWonderFlag } from './wonders';
-import { isCiv, seatOf, tileSeat } from './seats';
+import { seatOf, tileSeat } from './seats';
+import { DISTRICTS } from '../data/districts';
+import { BUILT_WONDERS } from '../data/builtWonders';
 import { cityAtIndex } from './units';
 import { outerPool } from './rules';
 import { unitsAt } from './units';
@@ -77,7 +78,26 @@ export function riverReach(map: GameMap, start: Tile): Tile[] {
   return out.length ? out : [start];
 }
 
-function floodRiver(state: GameState, start: Tile): Tile[] {
+/**
+ * CIV6 (Dam): "Prevents damage from Floods on this River", and "Reduces yields
+ * from Floods (Food and Production bonuses) by 50%" — the same two halves the
+ * GREAT BATH pays, and the source's own words for both are that "a Dam or
+ * Great Bath along a River will mitigate floods THERE". So the shield is a
+ * property of the RIVER, not of the seat: one complete, unpillaged Dam or
+ * Great Bath standing anywhere along it covers every tile it floods, whoever
+ * owns them.
+ */
+export function riverShielded(reach: Tile[]): boolean {
+  for (const t of reach) {
+    if (t.district && t.districtComplete && !t.districtPillaged
+        && DISTRICTS[t.district].floodShield) return true;
+    if (t.builtWonder && t.builtWonderComplete
+        && BUILT_WONDERS[t.builtWonder]?.effects?.floodMitigation) return true;
+  }
+  return false;
+}
+
+export function floodRiver(state: GameState, start: Tile): Tile[] {
   const rSev = nextRandom(state);
   let sev = 0;
   for (let i = 0, acc = 0; i < FLOOD_SEVERITY_P.length; i++) {
@@ -86,7 +106,8 @@ function floodRiver(state: GameState, start: Tile): Tile[] {
     sev = i;
   }
   const reach = riverReach(state.map, start);
-  for (const t of reach) floodTile(state, t, sev);
+  const shielded = riverShielded(reach);
+  for (const t of reach) floodTile(state, t, sev, shielded);
   return reach;
 }
 
@@ -104,7 +125,7 @@ function floodRiver(state: GameState, start: Tile): Tile[] {
  * depended on what stood there would have to be mirrored
  * condition-for-condition on the other engine.
  */
-function floodTile(state: GameState, tile: Tile, sev: number): void {
+function floodTile(state: GameState, tile: Tile, sev: number, mitigated: boolean): void {
   const rDestroy = nextRandom(state);
   const rDistrict = nextRandom(state);
   const rDamage = nextRandom(state);
@@ -114,7 +135,6 @@ function floodTile(state: GameState, tile: Tile, sev: number): void {
   const rProd = nextRandom(state);
 
   const seat = tileSeat(tile);
-  const mitigated = isCiv(seat) && seatWonderFlag(state, seat, 'floodMitigation');
   const col = floodTerrainColumn(tile.terrain);
 
   if (!mitigated) {

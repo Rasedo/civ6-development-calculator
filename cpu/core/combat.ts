@@ -911,7 +911,15 @@ export function encampmentDefense(
   if (!encampmentBlocks(state, tile, attacker)) return null;
   const owner = seatOf(state, tileSeat(tile));
   if (!owner) return null;
-  return { defCS: Math.max(15, owner.bestMeleeCS ?? 0) };
+  // CIV6 (Encampment): "Acquires Outer Defenses and Ranged Strike along with
+  // the City Center once Walls have been built" — so the district defends at
+  // its city's walls tier, which is the same pool the hit is split against
+  // below.
+  const held = cityAtTile(state, tile);
+  return {
+    defCS: Math.max(15, owner.bestMeleeCS ?? 0)
+      + (held ? WALLS_TIER_CS[wallsTier(state, held)] ?? 0 : 0),
+  };
 }
 
 

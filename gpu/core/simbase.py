@@ -139,6 +139,16 @@ class Rules:
     b_fuel_slot: torch.Tensor  # long [NB] — the stockpile slot a power plant burns, -1 = none
     b_fuel_rate: torch.Tensor  # long [NB] — Power produced per unit of that resource
     b_air_slots: torch.Tensor  # long [NB] — air-unit slots this building adds to its Aerodrome
+    b_gov_tier: torch.Tensor  # long [NB] — the GOVERNMENT TIER this row demands, 0 = none
+    b_gov_title: torch.Tensor  # long [NB] — governor titles it awards while it stands
+    b_spy_capacity: torch.Tensor  # long [NB] — spies its owner may keep beyond the research ladder
+    b_spy_pen: torch.Tensor  # long [NB] — levels it takes off an enemy spy working in its city
+    b_influence: torch.Tensor  # long [NB] — influence points per turn, paid to the SEAT
+    b_favor: torch.Tensor  # long [NB] — diplomatic favor per turn, paid to the SEAT
+    b_loy_no_gov: torch.Tensor  # f64 [NB] — loyalty per turn in every one of the seat's UNGOVERNED cities
+    b_power_supply: torch.Tensor  # f64 [NB] — renewable Power it supplies its own city, no stockpile behind it
+    b_regional_range: torch.Tensor  # long [NB] — this row's own regional reach, 0 = the shared default
+    b_appeal_y: torch.Tensor  # f64 [NB, 2, 6] — what it pays an adjacent unimproved tile at Breathtaking, then Charming
     strategic: dict  # {rid, rate, slotOf, capBase, capPerEncampmentBuilding, encampmentDidx}
     b_worship: torch.Tensor  # bool [NB] — worship building (faith-purchase-only; every production/gold picker skips)
     b_era: torch.Tensor  # long [NB] — the era the building first unlocks (Heartbeat of Steam's gate)
@@ -263,6 +273,16 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_fuel_slot=torch.tensor([int(b["fuelSlot"]) for b in B], dtype=torch.long),
         b_fuel_rate=torch.tensor([int(b["fuelRate"]) for b in B], dtype=torch.long),
         b_air_slots=torch.tensor([int(b.get("airSlots", 0)) for b in B], dtype=torch.long),
+        b_gov_tier=torch.tensor([int(b.get("govTier", 0)) for b in B], dtype=torch.long),
+        b_gov_title=torch.tensor([int(b.get("govTitle", 0)) for b in B], dtype=torch.long),
+        b_spy_capacity=torch.tensor([int(b.get("spyCapacity", 0)) for b in B], dtype=torch.long),
+        b_spy_pen=torch.tensor([int(b.get("spyLevelPenalty", 0)) for b in B], dtype=torch.long),
+        b_influence=torch.tensor([int(b.get("influencePerTurn", 0)) for b in B], dtype=torch.long),
+        b_favor=torch.tensor([int(b.get("favorPerTurn", 0)) for b in B], dtype=torch.long),
+        b_loy_no_gov=torch.tensor([float(b.get("loyaltyWithoutGovernor", 0)) for b in B], dtype=torch.float64),
+        b_power_supply=torch.tensor([float(b.get("powerSupply", 0)) for b in B], dtype=torch.float64),
+        b_regional_range=torch.tensor([int(b.get("regionalRange", 0)) for b in B], dtype=torch.long),
+        b_appeal_y=torch.tensor([b.get("appealYields") or [[0.0] * 6, [0.0] * 6] for b in B], dtype=torch.float64),
         strategic=r["strategic"],
         b_worship=torch.tensor([bool(b.get("worship", 0)) for b in B], dtype=torch.bool),
         b_train_xp_pct=torch.tensor([int(b.get("trainXpPct", 0)) for b in B], dtype=torch.long),

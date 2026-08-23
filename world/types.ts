@@ -75,7 +75,13 @@ export type DistrictId =
   | 'ENTERTAINMENT_COMPLEX'
   | 'NEIGHBORHOOD'
   | 'SPACEPORT'
-  | 'AERODROME';
+  | 'AERODROME'
+  | 'DAM'
+  | 'CANAL'
+  | 'WATER_PARK'
+  | 'PRESERVE'
+  | 'GOVERNMENT_PLAZA'
+  | 'DIPLOMATIC_QUARTER';
 
 /** "no seat" — the whole ownership space's null, here because `Tile` carries it. */
 export const NO_SEAT = -1;

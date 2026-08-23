@@ -493,6 +493,12 @@ def pick_production(
             if lo >= hi or lo >= W:
                 continue
             sub = mask[:, j, lo:min(hi, W)]
+            if name == "district" and ctx.get("dist_rot") is not None:
+                idx = (torch.arange(sub.shape[1], device=dev) + int(ctx["dist_rot"])) % sub.shape[1]
+                rolled = sub[:, idx]
+                best = torch.where((best < 0) & rolled.any(dim=1),
+                                   lo + idx[rolled.float().argmax(dim=1)], best)
+                continue
             if name == "settler":
                 sub = sub & ~taken.unsqueeze(1) & room.unsqueeze(1)
             elif name == "wonder":

@@ -7,7 +7,8 @@ import { outerPool, repairDrip, wallsMax, wallsTier, availableBuildings } from '
 import { applyLumpYield } from '../../../cpu/core/economy';
 import {
   ASSIST_RAM, ASSIST_TOWER, attackTargets, cityDamageSplit, cityDefenseStrength, cityHitClass,
-  cityRangedStrength, encircled, meleeAttack, rangedAttack, siegeAssist, siegeMayShoot,
+  cityRangedStrength, encampmentDefense, encircled, meleeAttack, rangedAttack, siegeAssist,
+  siegeMayShoot,
 } from '../../../cpu/core/combat';
 import { availableProjects, projectCost, purchaseBuilding, queueProject } from '../../../cpu/core/game';
 import { completeProject } from '../../../cpu/core/production';
@@ -430,6 +431,35 @@ describe('the Encampment perimeter', () => {
     expect(garrisonLost).toBe(1); // an intact perimeter holds it to 1, like a centre
     expect(perimeterLost).toBeLessThan(WALLS_TIER_HP[1] / 2); // the -85% is there
     expect(city.lastHitTurn).toBe(state.turn);
+  });
+
+  it('CIV6: the district defends at its city\'s WALLS tier, and not its garrison', () => {
+    const { state, enc } = withEncampment();
+    const att = spawnUnit(state, 'SWORDSMAN', tileAtCoords(state.map, enc.col + 1, enc.row).index, ATK)!;
+    const walled = encampmentDefense(state, att, enc)!.defCS;
+
+    const bare = withEncampment();
+    bare.city.buildings = bare.city.buildings.filter((b) => b !== 'ANCIENT_WALLS');
+    const att2 = spawnUnit(bare.state, 'SWORDSMAN',
+      tileAtCoords(bare.state.map, bare.enc.col + 1, bare.enc.row).index, ATK)!;
+    const unwalled = encampmentDefense(bare.state, att2, bare.enc)!.defCS;
+    // CIV6 (Encampment): "Acquires Outer Defenses and Ranged Strike along with
+    // the City Center once Walls have been built."
+    expect(walled - unwalled).toBe(WALLS_TIER_CS[1]);
+
+    // ...and "excluding any bonus obtained for a Garrisoned unit": a defender
+    // standing on the centre moves the CITY's strength and not the district's.
+    // The seat's best melee is pinned first, because SPAWNING the garrison
+    // would otherwise raise it and move both numbers for the wrong reason.
+    const gar = withEncampment();
+    seatOf(gar.state, 0)!.bestMeleeCS = 50;
+    const att3 = spawnUnit(gar.state, 'SWORDSMAN',
+      tileAtCoords(gar.state.map, gar.enc.col + 1, gar.enc.row).index, ATK)!;
+    const encBefore = encampmentDefense(gar.state, att3, gar.enc)!.defCS;
+    const cityBefore = cityDefenseStrength(gar.state, gar.city);
+    spawnUnit(gar.state, 'SWORDSMAN', gar.city.centerIndex, 0);
+    expect(encampmentDefense(gar.state, att3, gar.enc)!.defCS).toBe(encBefore);
+    expect(cityDefenseStrength(gar.state, gar.city)).toBe(cityBefore + 5);
   });
 
   it('with the perimeter gone the whole roll reaches the garrison', () => {

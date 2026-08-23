@@ -237,6 +237,7 @@ def main() -> int:
                 ("geopolitics", [py, "tests/gpu/geopolitics_test.py"], 4),  # per-pair wars + casus belli + civ-to-civ city transfer
                 ("governors", [py, "tests/gpu/governors_test.py"], 4),  # era-score hooks + Ages loyalty modulation + governor anchors
                 ("watermill", [py, "tests/gpu/watermill_test.py"], 4),  # Water Mill: farm-improved bonus resources +1 food
+                ("districts_new", [py, "tests/gpu/districts_new_test.py"], 4),  # Dam/Canal/Water Park/Preserve/Government Plaza/Diplomatic Quarter
                 ("sourced_rows", [py, "tests/gpu/sourced_rows_test.py"], 4),  # the Monument's loyalty clause, the Lighthouse's Coast/Lake food, the Engineer's Armory
                 ("wonder_effects", [py, "tests/gpu/wonder_effects_test.py"], 4),  # the fourteen wonder-effect channels, most of which no FINISHED wonder in the gate carries
                 ("city_perimeter", [py, "tests/gpu/city_perimeter_test.py"], 4),  # the wall pool, the ranged city penalty and the theological roll — none of it reachable in the gate

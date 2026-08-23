@@ -24,6 +24,9 @@ class SimSpy:
             n = n + self.civ_civics[:, row, c].long()
         for t in self._spy_cap_techs:
             n = n + self.civ_techs[:, row, t].long()
+        # CIV6 (Intelligence Agency): "+1 Spy and Spy capacity."
+        if bool((self._b_spy_capacity > 0).any()):
+            n = n + self._seat_building_sum(row, self._b_spy_capacity)
         return n.clamp(max=self._spy_cap_max)
 
     def _spies_of(self, row: int) -> torch.Tensor:
@@ -278,6 +281,7 @@ class SimSpy:
         lvl = int(self.unit_spy_level[b, v]) + (
             self._spy_sources_levels
             if int(self.city_spy_sources[b, hr, hc, row]) > 0 else 0)
+        lvl = max(0, lvl - self._counter_levels(b, hr, hc))
         ok = bool(mdef["certain"]) or self._spy_roll(
             b, self._spy_success_base + self._spy_success_per_level * lvl)
         if ok:
@@ -354,6 +358,42 @@ class SimSpy:
         elif m == self._spy_m_governor:
             self.city_gov_out[b, hr, hc] = (
                 self._spy_gov_turns + self._spy_gov_per_level * lvl)
+        elif m == self._spy_m_breach:
+            # CIV6 (Breach Dam): "damage (i.e., pillage) the district, causing a
+            # Flood and leaving the city vulnerable to damage from Floods until
+            # the Dam is repaired" — the pillage lands FIRST, so the flood it
+            # starts finds the shield already down.
+            dt = -1
+            for _di in range(self.city_dist_tile.shape[3]):
+                if not bool(self._d_flood_shield[_di]):
+                    continue
+                _t = int(self.city_dist_tile[b, hr, hc, _di])
+                if _t >= 0 and bool(self.district_complete[b, _t]):
+                    dt = _t
+                    break
+            if dt < 0:
+                return
+            self.district_pillaged[b, dt] = True
+            self._eff_version += 1
+            one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            one[b] = True
+            self._flood_river(one, torch.full((self.B,), dt, dtype=torch.long, device=self.device))
+
+    def _counter_levels(self, b: int, hr: int, hc: int) -> int:
+        """CIV6 (Diplomatic Quarter): "Enemy Spies operate at 2 levels below
+        normal when targeting this district or adjacent districts", and
+        (Consulate) "Spies operate at one level lower when targeting this
+        city" — both read as whole-city terms here, which is what a mission
+        that names a district but not a tile can address. `cityCounterLevels`'
+        twin."""
+        reg = self.city_dist_tile[b, hr, hc]              # [nD]
+        live = (reg >= 0) & self.district_complete[b, reg.clamp(min=0)] \
+            & ~self.district_pillaged[b, reg.clamp(min=0)]
+        n = int((live.long() * self._d_spy_pen).sum())
+        if bool((self._b_spy_pen > 0).any()):
+            stand = self.city_bldg[b, hr, hc] & ~self._bldg_dark(reg.reshape(1, 1, -1))[0, 0]
+            n += int((stand.long() * self._b_spy_pen).sum())
+        return n
 
     def _partisan_chassis(self) -> torch.Tensor:
         """[B] — the ANTI-CAVALRY chassis of the world era, the rebels' own

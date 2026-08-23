@@ -39,6 +39,41 @@ export interface BuildingDef {
   /** air-unit slots this building adds to its Aerodrome (Hangar, Airport). */
   airSlots?: number;
   /**
+   * CIV6: a GOVERNMENT BUILDING's tier — "requires a Tier 2 government
+   * (Merchant Republic, Monarchy, or Theocracy)". The seat's CURRENT
+   * government must sit at this tier or above.
+   */
+  govTier?: number;
+  /** CIV6 (every Government Plaza building): "Awards +1 Governor Title." */
+  govTitle?: number;
+  /** CIV6 (Intelligence Agency): "+1 Spy and Spy capacity." */
+  spyCapacity?: number;
+  /** CIV6 (Consulate): "Spies operate at one level lower when targeting this
+   *  city" — the Diplomatic Quarter itself carries the other two levels. */
+  spyLevelPenalty?: number;
+  /** CIV6 (Consulate, Chancery): "+2/+3 Influence Points per turn" — envoy
+   *  currency, paid to the SEAT rather than to the city. */
+  influencePerTurn?: number;
+  /** CIV6 (Foreign Ministry, GS): "+3 Diplomatic Favor per turn." */
+  favorPerTurn?: number;
+  /** CIV6 (Hydroelectric Dam): "Provides 6 Power to the city from renewable
+   *  water sources" — a supply with no fuel behind it. */
+  powerSupply?: number;
+  /** CIV6 (Aquarium, Aquatics Center): "This bonus extends to each City Center
+   *  within 9 tiles" — a REGIONAL row whose reach is its own, not the
+   *  6-tile default. */
+  regionalRange?: number;
+  /** CIV6 (Audience Chamber): "-2 Loyalty in Cities without Governors" — over
+   *  every city the OWNING SEAT holds, not just the building's own. */
+  loyaltyWithoutGovernor?: number;
+  /**
+   * CIV6 (Grove): "+1 Food and Faith to adjacent unimproved Charming tiles.
+   * Yields increased to +2 Food, Faith and Culture for adjacent unimproved
+   * Breathtaking tiles." The two bands do not stack: a Breathtaking tile takes
+   * the Breathtaking row and nothing else.
+   */
+  appealYields?: { charming: Partial<Yields>; breathtaking: Partial<Yields> };
+  /**
    * CIV6 (GS Power): the building's BASE LOAD — the Power it demands. A city
    * meets its TOTAL demand or none of its buildings are powered, so this is a
    * per-city sum, never a per-building test.
@@ -146,6 +181,41 @@ const rawList: BuildingDef[] = [
   // require the tier below; both refuse a gold purchase.
   { id: 'MEDIEVAL_WALLS', name: 'Medieval Walls', district: 'CITY_CENTER', cost: 220, requiresAny: ['ANCIENT_WALLS'], maintenance: 0, walls: 2, noPurchase: true },
   { id: 'RENAISSANCE_WALLS', name: 'Renaissance Walls', district: 'CITY_CENTER', cost: 300, requiresAny: ['MEDIEVAL_WALLS'], maintenance: 0, walls: 3, noPurchase: true },
+
+  // THE DAM. CIV6: "Provides 6 Power to the city from renewable water
+  // sources" — the earliest alternative to a fossil plant, and the densest.
+  { id: 'HYDROELECTRIC_DAM', name: 'Hydroelectric Dam', district: 'DAM', cost: 440, maintenance: 1, powerSupply: 6 },
+
+  // THE WATER PARK. The Aquarium and the Aquatics Center reach NINE tiles,
+  // not the six every other regional row reaches.
+  { id: 'FERRIS_WHEEL', name: 'Ferris Wheel', district: 'WATER_PARK', cost: 290, maintenance: 1, amenities: 2, yields: { culture: 3 } },
+  { id: 'AQUARIUM', name: 'Aquarium', district: 'WATER_PARK', cost: 360, requiresAny: ['FERRIS_WHEEL'], maintenance: 2, amenities: 1, regional: true, regionalRange: 9 },
+  { id: 'AQUATICS_CENTER', name: 'Aquatics Center', district: 'WATER_PARK', cost: 660, requiresAny: ['AQUARIUM'], maintenance: 3, amenities: 1, poweredAmenities: 2, power: 2, regional: true, regionalRange: 9 },
+
+  // THE PRESERVE. CIV6: "Unlike other district buildings, you can build these
+  // buildings in any order provided that you have unlocked them both" — which
+  // is why the Sanctuary requires nothing.
+  { id: 'GROVE', name: 'Grove', district: 'PRESERVE', cost: 150, appealYields: { charming: { food: 1, faith: 1 }, breathtaking: { food: 2, faith: 2, culture: 2 } } },
+  { id: 'SANCTUARY', name: 'Sanctuary', district: 'PRESERVE', cost: 440, appealYields: { charming: { science: 1, gold: 1 }, breathtaking: { science: 2, gold: 2, production: 2 } } },
+
+  // THE DIPLOMATIC QUARTER.
+  { id: 'CONSULATE', name: 'Consulate', district: 'DIPLOMATIC_QUARTER', cost: 150, maintenance: 1, influencePerTurn: 2, spyLevelPenalty: 1 },
+  { id: 'CHANCERY', name: 'Chancery', district: 'DIPLOMATIC_QUARTER', cost: 290, requiresAny: ['CONSULATE'], maintenance: 2, influencePerTurn: 3 },
+
+  // THE GOVERNMENT PLAZA, in three tiers. Each tier needs a government of its
+  // own tier and ONE finished building of the tier below, and the three rows
+  // of a tier exclude each other: a Plaza ends the game holding three
+  // buildings, one per tier. CIV6: "Government Plaza buildings, unlike those
+  // of other districts, cannot be purchased with Gold."
+  { id: 'ANCESTRAL_HALL', name: 'Ancestral Hall', district: 'GOVERNMENT_PLAZA', cost: 150, maintenance: 1, govTier: 1, govTitle: 1, noPurchase: true, exclusiveWith: ['AUDIENCE_CHAMBER', 'WARLORDS_THRONE'] },
+  { id: 'AUDIENCE_CHAMBER', name: 'Audience Chamber', district: 'GOVERNMENT_PLAZA', cost: 150, maintenance: 1, govTier: 1, govTitle: 1, noPurchase: true, exclusiveWith: ['ANCESTRAL_HALL', 'WARLORDS_THRONE'], loyaltyWithoutGovernor: -2 },
+  { id: 'WARLORDS_THRONE', name: "Warlord's Throne", district: 'GOVERNMENT_PLAZA', cost: 150, maintenance: 1, govTier: 1, govTitle: 1, noPurchase: true, exclusiveWith: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER'] },
+  { id: 'FOREIGN_MINISTRY', name: 'Foreign Ministry', district: 'GOVERNMENT_PLAZA', cost: 290, maintenance: 2, govTier: 2, govTitle: 1, noPurchase: true, favorPerTurn: 3, requiresAny: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER', 'WARLORDS_THRONE'], exclusiveWith: ['GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'] },
+  { id: 'GRAND_MASTERS_CHAPEL', name: "Grand Master's Chapel", district: 'GOVERNMENT_PLAZA', cost: 290, maintenance: 2, govTier: 2, govTitle: 1, noPurchase: true, yields: { faith: 5 }, requiresAny: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER', 'WARLORDS_THRONE'], exclusiveWith: ['FOREIGN_MINISTRY', 'INTELLIGENCE_AGENCY'] },
+  { id: 'INTELLIGENCE_AGENCY', name: 'Intelligence Agency', district: 'GOVERNMENT_PLAZA', cost: 290, maintenance: 2, govTier: 2, govTitle: 1, noPurchase: true, spyCapacity: 1, requiresAny: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER', 'WARLORDS_THRONE'], exclusiveWith: ['FOREIGN_MINISTRY', 'GRAND_MASTERS_CHAPEL'] },
+  { id: 'NATIONAL_HISTORY_MUSEUM', name: 'National History Museum', district: 'GOVERNMENT_PLAZA', cost: 440, maintenance: 3, govTier: 3, govTitle: 1, noPurchase: true, requiresAny: ['FOREIGN_MINISTRY', 'GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'], exclusiveWith: ['ROYAL_SOCIETY', 'WAR_DEPARTMENT'] },
+  { id: 'ROYAL_SOCIETY', name: 'Royal Society', district: 'GOVERNMENT_PLAZA', cost: 440, maintenance: 3, govTier: 3, govTitle: 1, noPurchase: true, requiresAny: ['FOREIGN_MINISTRY', 'GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'], exclusiveWith: ['NATIONAL_HISTORY_MUSEUM', 'WAR_DEPARTMENT'] },
+  { id: 'WAR_DEPARTMENT', name: 'War Department', district: 'GOVERNMENT_PLAZA', cost: 440, maintenance: 3, govTier: 3, govTitle: 1, noPurchase: true, requiresAny: ['FOREIGN_MINISTRY', 'GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'], exclusiveWith: ['NATIONAL_HISTORY_MUSEUM', 'ROYAL_SOCIETY'] },
 ];
 
 const list: BuildingDef[] = rawList.map((b) => ({ ...b, cost: Math.round(b.cost * GAME_SPEED) }));

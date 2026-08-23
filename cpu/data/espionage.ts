@@ -15,9 +15,9 @@ export const SPY_UNIT = 'SPY';
 
 /**
  * CIV6 (Spy): "A player's Spy capacity increases by 1 for each of these."
- * Two rows of that list are LEADER uniques (Wu Zetian's Defensive Tactics,
- * Catherine de Medici's Castles) and one is the Government Plaza's Tier-2
- * Intelligence Agency, a building this model has no district for.
+ * The Government Plaza's Tier-2 Intelligence Agency is the eighth source and
+ * carries its own `spyCapacity`; the two LEADER uniques (Wu Zetian's Defensive
+ * Tactics, Catherine de Medici's Castles) are civilization uniques.
  */
 export const SPY_CAPACITY_CIVICS = ['DIPLOMATIC_SERVICE', 'NATIONALISM', 'IDEOLOGY', 'COLD_WAR'] as const;
 export const SPY_CAPACITY_TECHS = ['COMPUTERS'] as const;
@@ -58,8 +58,8 @@ export interface SpyMissionDef {
  * lists them. THE ORDER IS THE WIRE: column k of the MISSION head is the k-th
  * row here on both engines.
  *
- * Absent, and recorded: Fabricate Scandal (a city-state target), Breach Dam
- * (no Dam district), Zombie Outbreak (a game mode).
+ * Absent, and recorded: Fabricate Scandal (a city-state target) and Zombie
+ * Outbreak (a game mode).
  */
 export const SPY_MISSIONS: readonly SpyMissionDef[] = [
   { id: 'GAIN_SOURCES', district: 'CITY_CENTER', offensive: false, certain: true },
@@ -72,19 +72,22 @@ export const SPY_MISSIONS: readonly SpyMissionDef[] = [
   { id: 'DISRUPT_ROCKETRY', district: 'SPACEPORT', offensive: true },
   { id: 'FOMENT_UNREST', district: 'CITY_CENTER', offensive: true },
   { id: 'NEUTRALIZE_GOVERNOR', district: 'CITY_CENTER', offensive: true },
+  { id: 'BREACH_DAM', district: 'DAM', offensive: true },
   { id: 'COUNTERSPY', district: 'CITY_CENTER', offensive: false, athome: true },
 ];
-export const SPY_M_GAIN_SOURCES = 0;
-export const SPY_M_LISTENING_POST = 1;
-export const SPY_M_SIPHON_FUNDS = 2;
-export const SPY_M_GREAT_WORK_HEIST = 3;
-export const SPY_M_SABOTAGE_PRODUCTION = 4;
-export const SPY_M_STEAL_TECH_BOOST = 5;
-export const SPY_M_RECRUIT_PARTISANS = 6;
-export const SPY_M_DISRUPT_ROCKETRY = 7;
-export const SPY_M_FOMENT_UNREST = 8;
-export const SPY_M_NEUTRALIZE_GOVERNOR = 9;
-export const SPY_M_COUNTERSPY = 10;
+const mi = (id: string): number => SPY_MISSIONS.findIndex((m) => m.id === id);
+export const SPY_M_GAIN_SOURCES = mi('GAIN_SOURCES');
+export const SPY_M_LISTENING_POST = mi('LISTENING_POST');
+export const SPY_M_SIPHON_FUNDS = mi('SIPHON_FUNDS');
+export const SPY_M_GREAT_WORK_HEIST = mi('GREAT_WORK_HEIST');
+export const SPY_M_SABOTAGE_PRODUCTION = mi('SABOTAGE_PRODUCTION');
+export const SPY_M_STEAL_TECH_BOOST = mi('STEAL_TECH_BOOST');
+export const SPY_M_RECRUIT_PARTISANS = mi('RECRUIT_PARTISANS');
+export const SPY_M_DISRUPT_ROCKETRY = mi('DISRUPT_ROCKETRY');
+export const SPY_M_FOMENT_UNREST = mi('FOMENT_UNREST');
+export const SPY_M_NEUTRALIZE_GOVERNOR = mi('NEUTRALIZE_GOVERNOR');
+export const SPY_M_BREACH_DAM = mi('BREACH_DAM');
+export const SPY_M_COUNTERSPY = mi('COUNTERSPY');
 
 /** how many destinations the TRAVEL head offers, cities in centre-tile order. */
 export const SPY_TRAVEL_COLS = 8;
