@@ -2,11 +2,13 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { emptySeat, isCiv, seatOf, setTileOwner, setWar, tileCity } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
 import { purchaseUnit } from '../../../cpu/core/game';
-import { moveCostInto, unitPassable, canEmbark, waterEnterable, ownerHasTech, inEnemyZoc, spawnUnit, tileFreeForUnit, cityNavalCapable, trainableUnits, queueUnit, orderMove, walkPath } from '../../../cpu/core/units';
-import { hostileUnitAct, meleeAttack, attackTargets, defenderCS, embarkedDefenseCS, supportCount, AMPHIBIOUS_ATTACK_CS, SUPPORT_CS, FLANK_SUPPORT_CIVIC } from '../../../cpu/core/combat';
-import { neighbors } from '../../../world/hex';
+import { moveCostInto, unitPassable, canEmbark, waterEnterable, ownerHasTech, inEnemyZoc, spawnUnit, tileFreeForUnit, cityNavalCapable, trainableUnits, queueUnit, orderMove, walkPath, unitFullMoves, unitVisibleTo, visibleHostilesAt } from '../../../cpu/core/units';
+import { hostileUnitAct, meleeAttack, rangedAttack, attackTargets, defenderCS, embarkedDefenseCS, supportCount, encircled, stackDefender, AMPHIBIOUS_ATTACK_CS, SUPPORT_CS, FLANK_SUPPORT_CIVIC } from '../../../cpu/core/combat';
+import { neighbors, hexDistance } from '../../../world/hex';
+import { unitSight, SIGHT_RANGE } from '../../../cpu/core/fog';
+import { UNITS } from '../../../cpu/data/units';
 import { isWater } from '../../../world/query';
-import { EMBARKED_DEFENSE_CS_BY_ERA, setEmbarkLive } from '../../../cpu/data/constants';
+import { EMBARKED_DEFENSE_CS_BY_ERA, setEmbarkLive, EMBARK_MOVES, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS } from '../../../cpu/data/constants';
 import type { GameState, City, Seat, Tile, Unit } from '../../../cpu/core/types';
 
 // the MOVEMENT + EMBARKATION model. Every water step on both engines rides the
@@ -559,5 +561,186 @@ describe('the amphibious attack', () => {
     const open = defenderCS(state, ship, bare.index);
     ship.tileIndex = reef.index;
     expect(defenderCS(state, ship, reef.index)).toBe(open + 3);
+  });
+});
+
+describe('embarked and sea movement climb the tech ladder', () => {
+  function afloat(state: GameState, techs: string[]): Unit {
+    grantTechs(state, ...techs);
+    const u = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 5).index, 0)!;
+    u.tileIndex = tileAtCoords(state.map, 6, 6).index;
+    u.embarked = true;
+    return u;
+  }
+
+  it('a passenger starts at EMBARK_MOVES and each embark tech adds its own', () => {
+    const state = makeState(makeMap(12, 12, 'COAST'));
+    tileAtCoords(state.map, 5, 5).terrain = 'GRASSLAND';
+    state.unitsMode = true;
+    const u = afloat(state, []);
+    expect(unitFullMoves(state, u)).toBe(EMBARK_MOVES);
+    grantTechs(state, 'SQUARE_RIGGING');
+    expect(unitFullMoves(state, u)).toBe(EMBARK_MOVES + 1);
+    grantTechs(state, 'STEAM_POWER');
+    expect(unitFullMoves(state, u)).toBe(EMBARK_MOVES + 3);
+    grantTechs(state, 'COMBUSTION');
+    expect(unitFullMoves(state, u)).toBe(EMBARK_MOVES + 4);
+  });
+
+  it('the sea-movement tech lifts a ship and a passenger alike, once', () => {
+    const state = makeState(makeMap(12, 12, 'COAST'));
+    tileAtCoords(state.map, 5, 5).terrain = 'GRASSLAND';
+    state.unitsMode = true;
+    grantTechs(state, 'SAILING');
+    const ship = spawnUnit(state, 'GALLEY', tileAtCoords(state.map, 8, 8).index, 0)!;
+    const hull = UNITS.GALLEY.moves;
+    expect(unitFullMoves(state, ship)).toBe(hull);
+    const u = afloat(state, []);
+    expect(unitFullMoves(state, u)).toBe(EMBARK_MOVES);
+    grantTechs(state, SEA_MOVE_TECH);
+    expect(unitFullMoves(state, ship)).toBe(hull + SEA_MOVE_TECH_BONUS);
+    expect(unitFullMoves(state, u)).toBe(EMBARK_MOVES + SEA_MOVE_TECH_BONUS);
+    // a LAND unit ashore gains nothing from it
+    const walker = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 5).index, 0)!;
+    expect(unitFullMoves(state, walker)).toBe(UNITS.WARRIOR.moves);
+  });
+});
+
+describe('the naval raider is invisible', () => {
+  /** seat 0's watcher and the rival's raider, `dist` hexes apart. */
+  function scene(watcher: string, dist: number): { state: GameState; eye: Unit; raider: Unit } {
+    const state = makeState(makeMap(16, 16, 'COAST'));
+    state.unitsMode = true;
+    state.turn = 40;
+    const civ = addCivAtWar(state, 15, 0, []); // its WARRIOR sits in the far corner
+    const home = tileAtCoords(state.map, 5, 5);
+    if (watcher === 'SCOUT') home.terrain = 'GRASSLAND';
+    const eye = spawnUnit(state, watcher, home.index, 0)!;
+    eye.tileIndex = home.index;
+    const spot = state.map.tiles.find(
+      (t) => isWater(t) && hexDistance(home.col, home.row, t.col, t.row) === dist,
+    )!;
+    const raider = spawnUnit(state, 'PRIVATEER', spot.index, civ.seat)!;
+    raider.tileIndex = spot.index;
+    return { state, eye, raider };
+  }
+
+  it('two hexes from every enemy eye, a Privateer is nothing a seat can act on', () => {
+    const { state, raider } = scene('FRIGATE', 2);
+    expect(unitVisibleTo(state, raider, 0)).toBe(false);
+    expect(visibleHostilesAt(state, raider.tileIndex, { seat: 0 })).toEqual([]);
+  });
+
+  it('an ADJACENT enemy unit sees it, and can then swing at it', () => {
+    const { state, eye, raider } = scene('IRONCLAD', 1);
+    expect(unitVisibleTo(state, raider, 0)).toBe(true);
+    expect(visibleHostilesAt(state, raider.tileIndex, { seat: 0 })).toEqual([raider]);
+    expect(attackTargets(state, eye)).toContain(raider.tileIndex);
+  });
+
+  it('Reveal Stealth reaches as far as the chassis sees', () => {
+    const two = scene('SCOUT', 2);
+    expect(unitSight(two.eye)).toBe(SIGHT_RANGE);
+    expect(unitVisibleTo(two.state, two.raider, 0)).toBe(true);
+
+    const three = scene('DESTROYER', 3);
+    expect(unitSight(three.eye)).toBe(3);
+    expect(unitVisibleTo(three.state, three.raider, 0)).toBe(true);
+
+    const blind = scene('FRIGATE', 3);
+    expect(unitVisibleTo(blind.state, blind.raider, 0)).toBe(false);
+  });
+
+  it('its own owner always sees it, and so does everyone once it fires', () => {
+    const { state, eye, raider } = scene('FRIGATE', 2);
+    expect(unitVisibleTo(state, raider, raider.seat)).toBe(true);
+    expect(rangedAttack(state, raider.id, eye.tileIndex, raider.seat).ok).toBe(true);
+    expect(raider.revealedTurn).toBe(state.turn);
+    expect(unitVisibleTo(state, raider, 0)).toBe(true);
+    state.turn += 1;
+    expect(unitVisibleTo(state, raider, 0)).toBe(false);
+  });
+});
+
+describe('the naval raider and the zone of control', () => {
+  function pair(rival: string, mover: string): { state: GameState; mover: Unit; dest: Tile } {
+    const state = makeState(makeMap(14, 14, 'COAST'));
+    state.unitsMode = true;
+    const civ = addCivAtWar(state, 13, 0, []);
+    const post = tileAtCoords(state.map, 6, 6);
+    const held = spawnUnit(state, rival, post.index, civ.seat)!;
+    held.tileIndex = post.index;
+    const dest = neighbors(state.map, post)[0];
+    const m = spawnUnit(state, mover, tileAtCoords(state.map, 3, 3).index, 0)!;
+    return { state, mover: m, dest };
+  }
+
+  it('a raider ignores enemy ZOC; an ordinary hull obeys it', () => {
+    const plain = pair('FRIGATE', 'FRIGATE');
+    expect(inEnemyZoc(plain.state, plain.dest.index, plain.mover)).toBe(true);
+    const raider = pair('FRIGATE', 'PRIVATEER');
+    expect(inEnemyZoc(raider.state, raider.dest.index, raider.mover)).toBe(false);
+  });
+
+  it('a submarine exerts none, so nothing it stands beside is halted', () => {
+    const sub = pair('SUBMARINE', 'FRIGATE');
+    expect(inEnemyZoc(sub.state, sub.dest.index, sub.mover)).toBe(false);
+    // its Renaissance ancestor still exerts one: only the two submarines lose it
+    const priv = pair('PRIVATEER', 'FRIGATE');
+    expect(inEnemyZoc(priv.state, priv.dest.index, priv.mover)).toBe(true);
+  });
+
+  it('and a ring of submarines is no siege', () => {
+    const state = makeState(makeMap(14, 14, 'COAST'));
+    state.unitsMode = true;
+    const civ = addCivAtWar(state, 13, 0, []);
+    const centre = tileAtCoords(state.map, 6, 6);
+    for (const n of neighbors(state.map, centre)) {
+      const u = spawnUnit(state, 'FRIGATE', n.index, civ.seat)!;
+      u.tileIndex = n.index;
+    }
+    expect(encircled(state, centre, 0)).toBe(true);
+    for (const u of state.units) if (u.type === 'FRIGATE') u.type = 'SUBMARINE';
+    expect(encircled(state, centre, 0)).toBe(false);
+  });
+});
+
+describe('a hull and its passenger share the hex', () => {
+  function stack(state: GameState, water: Tile, seat: number, hull: string): { hull: Unit; rider: Unit } {
+    const h = spawnUnit(state, hull, water.index, seat)!;
+    h.tileIndex = water.index;
+    const rider: Unit = {
+      id: state.nextUnitId++, type: 'WARRIOR', seat,
+      tileIndex: water.index, movesLeft: 2, hp: 100, charges: null, path: null, embarked: true,
+    };
+    state.units.push(rider);
+    return { hull: h, rider };
+  }
+
+  it('a second hull is refused where a passenger is welcome', () => {
+    const state = makeState(makeMap(12, 12, 'COAST'));
+    state.unitsMode = true;
+    grantTechs(state, 'SAILING', 'SHIPBUILDING');
+    const water = tileAtCoords(state.map, 5, 5);
+    const { hull, rider } = stack(state, water, 0, 'GALLEY');
+    expect(rider.tileIndex).toBe(hull.tileIndex);
+    const other = spawnUnit(state, 'GALLEY', tileAtCoords(state.map, 9, 9).index, 0)!;
+    expect(tileFreeForUnit(state, water.index, 0, other, true)).toBe(false);
+  });
+
+  it('a melee blow lands on the hull; a shot takes the higher chassis', () => {
+    const state = makeState(makeMap(12, 12, 'COAST'));
+    state.unitsMode = true;
+    const civ = addCivAtWar(state, 11, 0, ['SQUARE_RIGGING']); // a Renaissance passenger
+    const water = tileAtCoords(state.map, 5, 5);
+    const { hull, rider } = stack(state, water, civ.seat, 'QUADRIREME'); // combat 20
+    const flat = embarkedDefenseCS(state, civ.seat);
+    expect(flat).toBeGreaterThan(UNITS.QUADRIREME.combat);
+    const both = [hull, rider];
+    expect(stackDefender(state, both, false)).toBe(hull);
+    expect(stackDefender(state, both, true)).toBe(rider);
+    // a STRONGER hull answers the shot itself
+    hull.type = 'IRONCLAD';
+    expect(stackDefender(state, both, true)).toBe(hull);
   });
 });

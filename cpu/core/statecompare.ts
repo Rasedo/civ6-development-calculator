@@ -596,6 +596,7 @@ const UNIT_G: Record<string, Extractor> = {
   embarked: overUnits((u) => (u.embarked ? 1 : 0)),
   movesLeft: overUnits((u) => u.movesLeft),
   movesFull: overUnits((u) => u.movesFull ?? UNITS[u.type]?.moves ?? 0),
+  revealedTurn: overUnits((u) => u.revealedTurn ?? -1),
   spyMission: overUnits((u) => u.spyMission ?? SPY_IDLE),
   spyTurns: overUnits((u) => u.spyTurns ?? 0),
   spyTarget: overUnits((u) => u.spyTarget ?? -1),
@@ -679,7 +680,9 @@ export function groupKeys(group: string, rows: readonly unknown[]): number[] {
     case 'city':
       return (rows as CityRow[]).map((r) => r.city.centerIndex);
     case 'unit':
-      return (rows as Unit[]).map((u) => u.tileIndex * 2 + (isCivilianType(u.type) ? 1 : 0));
+      // three slots per tile, not two: a hull and its passenger share a hex.
+      return (rows as Unit[]).map(
+        (u) => u.tileIndex * 3 + (u.embarked ? 2 : isCivilianType(u.type) ? 1 : 0));
     case 'tile':
       return (rows as Tile[]).map((t) => t.index);
     default:

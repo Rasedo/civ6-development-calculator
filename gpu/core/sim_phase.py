@@ -64,12 +64,15 @@ class SimPhase:
         bidx = torch.arange(Bn, device=dev2)
         ctr = self.city_center[bidx, row, col].clamp(min=0)  # [B]
         dist = self.pair_dist[ctr].to(torch.long)  # [B, T]
-        _mil, _civ = self.military_at, self.civilian_at
+        _mil, _civ = self._visible_military_at(row), self.civilian_at
         _mseat = torch.where(_mil >= 0, self.unit_seat.gather(1, _mil.clamp(min=0)), torch.full_like(_mil, -1))
         _cseat = torch.where(_civ >= 0, self.unit_seat.gather(1, _civ.clamp(min=0)), torch.full_like(_civ, -1))
+        _emb = self.embarked_at
+        _eseat = torch.where(_emb >= 0, self.unit_seat.gather(1, _emb.clamp(min=0)), torch.full_like(_emb, -1))
         hm = self._seats_hostile(row, _mseat)
         hc = self._seats_hostile(row, _cseat)
-        valid = fire.unsqueeze(1) & (hm | hc) & (dist >= 1) & (dist <= 2)
+        he = self._seats_hostile(row, _eseat)
+        valid = fire.unsqueeze(1) & (hm | hc | he) & (dist >= 1) & (dist <= 2)
         arangeT = torch.arange(Tn, device=dev2)
         k = torch.where(valid, dist * (Tn + 1) + arangeT.reshape(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
         best_key = k.min(dim=1).values
@@ -78,8 +81,12 @@ class SimPhase:
         if not bool(strike.any()):
             return
         _okm, _okc = hm[bidx, tt], hc[bidx, tt]
-        d_slot = torch.where(_okm, _mil[bidx, tt], torch.where(_okc, _civ[bidx, tt], torch.full_like(tt, -1)))
-        d_seat = torch.where(_okm, _mseat[bidx, tt], torch.where(_okc, _cseat[bidx, tt], torch.full_like(tt, -1)))
+        # a city strike is a SHOT, so `stackDefender`'s higher-chassis arm picks
+        _ms_t, _mq_t, _okm, _cs_t, _cq_t, _okc = self._stack_fold(
+            tt, row, _mil[bidx, tt], _mseat[bidx, tt], _okm,
+            _civ[bidx, tt], _cseat[bidx, tt], _okc, ranged=True)
+        d_slot = torch.where(_okm, _ms_t, torch.where(_okc, _cs_t, torch.full_like(tt, -1)))
+        d_seat = torch.where(_okm, _mq_t, torch.where(_okc, _cq_t, torch.full_like(tt, -1)))
         ds0 = d_slot.clamp(min=0)
         # A MILITARY target whose seat class earns xp — never a barbarian.
         is_vet_mil = _okm & (d_seat != BARB_SEAT)
@@ -765,13 +772,15 @@ class SimPhase:
         nbh = self.neigh[ctr]
         nbc = nbh.clamp(min=0)
         _am = self.military_at.gather(1, nbc)
+        _at = self.unit_type.gather(1, _am.clamp(min=0)).clamp(min=0, max=self.NU - 1)
         _as = torch.where(_am >= 0, self.unit_seat.gather(1, _am.clamp(min=0)), torch.full_like(_am, -1))
         # CIV6's siege: "if the invading army manages to establish zone of
         # control on all passable tiles surrounding the City Center, it will no
         # longer be able to repair the damage it suffers". EVERY passable
-        # neighbour has to be held, and it takes a MILITARY unit — a civilian
-        # exerts no zone of control. `encircled` is the twin.
-        held = self._seats_hostile(row, _as) & (_am >= 0)
+        # neighbour has to be held by a unit that EXERTS one: a civilian does
+        # not, and CIV6 gives the two submarines "Does not exert zone of
+        # control". `encircled` is the twin.
+        held = self._seats_hostile(row, _as) & (_am >= 0) & ~self._type_zoc_none[_at]
         passable = (nbh >= 0) & (self.passable | self.wpass).gather(1, nbc)
         besieged = passable.any(dim=1) & ~(passable & ~held).any(dim=1)
         ok = act & ~besieged
@@ -1155,7 +1164,7 @@ class SimPhase:
             at = getattr(self, m)
             at.copy_(torch.where(at >= 0, inv.gather(1, at.clamp(min=0)), at))
         lo, hi = self.POOL_LO[prefix], self.POOL_HI[prefix]
-        for m in ("military_at", "civilian_at"):
+        for m in ("military_at", "civilian_at", "embarked_at"):
             at = getattr(self, m)
             mine = (at >= lo) & (at < hi)
             # gather evaluates EVERY lane, including the ones torch.where

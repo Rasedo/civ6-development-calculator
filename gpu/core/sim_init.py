@@ -698,6 +698,9 @@ class SimInit:
             # carrying, and so which sourced row its charge spends. -1 on
             # every other unit.
             ("gp_at", torch.long),
+            # the turn a STEALTH hull last attacked: CIV6 (Unit) says one that
+            # attacks "will become visible for a turn". -1 = never.
+            ("revealed_turn", torch.long),
         ):
             _base = torch.zeros(B, self.UNIT_MAX, dtype=_dt, device=device)
             setattr(self, f"unit_{_pl}", _base)
@@ -712,6 +715,7 @@ class SimInit:
                 )
         self.unit_level.fill_(1)  # a brand-new unit starts at level 1
         self.unit_gp_at.fill_(-1)
+        self.unit_revealed_turn.fill_(-1)
         self.unit_spy_mission.fill_(self._spy_idle)
         self.unit_spy_target.fill_(-1)
         self.barb_unit_seat.fill_(BARB_SEAT)
@@ -720,6 +724,11 @@ class SimInit:
         self.unit_next = torch.zeros(B, dtype=torch.long, device=device)
         self.military_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.civilian_at = torch.full((B, T), -1, dtype=torch.long, device=device)
+        # CIV6 (Movement, "Stacking"): "Embarked units are also considered a
+        # separate class, and may stack with both a military ship and an
+        # Admiral" — so a water tile holds a hull, an Admiral and ONE
+        # passenger, and the passenger needs a plane of its own.
+        self.embarked_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.gp_earned = torch.zeros(B, n_gp, dtype=torch.long, device=device)
         # the QUEUE POSITION each class offers next, which runs AHEAD of
         # `gp_earned` whenever the world era steps past an unclaimed person.
@@ -1868,11 +1877,16 @@ class SimInit:
         self._barb_knight_idx = int(_bc[1]) if len(_bc) > 1 else -1
         self._barb_horse_res = int(rules.combat["barbHorseRes"])
         self._barb_horse_range = int(rules.combat["barbHorseRange"])
-        # EMBARK: flat embarked MP, the water-step master switch
-        # (`embarkState.live` on the TS side) and the embark/ocean tech gate
-        # indices (military embarks on SHIPBUILDING, civilians on SAILING,
-        # OCEAN needs CARTOGRAPHY).
+        # EMBARK: the Classical embarked pool, the rungs that raise it, the
+        # Mathematics rung every hull and passenger reads, the water-step
+        # master switch (`embarkState.live` on the TS side) and the
+        # embark/ocean tech gate indices (military embarks on SHIPBUILDING,
+        # civilians on SAILING, OCEAN needs CARTOGRAPHY).
         self._embark_moves = int(cb.get("embarkMoves", 2))
+        self._embark_move_techs = [(int(a), int(b)) for a, b in cb.get("embarkMoveTechs", [])
+                                   if int(a) >= 0]
+        self._sea_move_tech = int(cb.get("seaMoveTech", -1))
+        self._sea_move_bonus = int(cb.get("seaMoveBonus", 1))
         # CIV6 (Combat): the CS an embarked unit DEFENDS at, by the OWNER's
         # technological era; and the two "Unit class modifiers", with the civic
         # that unlocks flanking and support at all.
@@ -1923,6 +1937,14 @@ class SimInit:
         self._type_cls = torch.tensor([int(u.get("cls", 0)) for u in ru], dtype=torch.long, device=device)
         self._type_era = torch.tensor([int(u.get("era", 0)) for u in ru], dtype=torch.long, device=device)
         self._type_recon = torch.tensor([bool(u.get("recon", 0)) for u in ru], dtype=torch.bool, device=device)
+        # THE NAVAL RAIDER AXIS. `_type_sight` is the chassis override; 0 means
+        # the SIGHT_RANGE default, which `_unit_sight` supplies.
+        self._type_stealth = torch.tensor([bool(u.get("stealth", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._type_reveal = torch.tensor([bool(u.get("revealStealth", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._type_zoc_ignore = torch.tensor([bool(u.get("ignoresZoc", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._type_zoc_none = torch.tensor([bool(u.get("exertsNoZoc", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._type_sight = torch.tensor([int(u.get("sight", 0)) for u in ru], dtype=torch.long, device=device)
+        self._stealth_live = bool(self._type_stealth.any())
         self._type_siege_support = torch.tensor([int(u.get("siegeSupport", 0)) for u in ru], dtype=torch.long, device=device)
         self._type_siege_max_walls = torch.tensor([int(u.get("siegeMaxWalls", 0)) for u in ru], dtype=torch.long, device=device)
         self._siege_support_any = bool((self._type_siege_support > 0).any())
@@ -2060,7 +2082,8 @@ class SimInit:
                     else:
                         self.military_at[(b, int(u_["tile"]))] = i
                     if self.fog_of_war:
-                        self.seat_explored[b, seat] |= self.pair_dist[int(u_["tile"])] <= 2
+                        _s0 = int(self._type_sight[ti]) or 2
+                        self.seat_explored[b, seat] |= self.pair_dist[int(u_["tile"])] <= _s0
                     self.unit_next[b] += 1
 
         # The FIXTURE-LOADED starting units must seed the best-melee trackers:

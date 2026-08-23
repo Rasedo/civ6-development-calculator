@@ -87,6 +87,24 @@ def main() -> None:
             tt2 = int(sim2.major_unit_tile[0, u])
             assert int(sim2.civilian_at[0, tt2]) == u, "alive builder not indexed by civilian_at"
 
+    # THE REVERSE DIRECTION, which the forward one cannot see: every plane
+    # entry must name a LIVE unit standing on that tile, in the plane its own
+    # stacking class names. A death or capture that clears the plane it GUESSED
+    # instead of the one the SLOT sits in leaves a corpse holding the hex, and
+    # every target scan keeps finding it (`_occ_clear` / `_occ_set`).
+    _planes = ((sim2.military_at, "military_at"), (sim2.civilian_at, "civilian_at"),
+               (sim2.embarked_at, "embarked_at"))
+    for _pl, _nm in _planes:
+        for _b, _t in (_pl >= 0).nonzero().tolist():
+            _s = int(_pl[_b, _t])
+            assert bool(sim2.unit_alive[_b, _s]), f"{_nm}[{_b},{_t}] names DEAD slot {_s}"
+            assert int(sim2.unit_tile[_b, _s]) == _t, (
+                f"{_nm}[{_b},{_t}] names slot {_s}, which stands at {int(sim2.unit_tile[_b, _s])}")
+            _emb = bool(sim2.unit_emb[_b, _s])
+            _civ = bool(sim2._type_civilian[int(sim2.unit_type[_b, _s])])
+            _want = "embarked_at" if _emb else ("civilian_at" if _civ else "military_at")
+            assert _nm == _want, f"slot {_s} is filed under {_nm} and belongs in {_want}"
+
     # spawn over an own builder: a fresh own-civ MILITARY spawn stacks with a
     # standing builder (cross-domain, tileFreeForUnit); a foreign spawn probe
     # bounces.

@@ -307,6 +307,10 @@ export interface Unit {
   spyTarget?: number;
   spyLevel?: number;
   fortifyTurns?: number;
+  /** the turn a STEALTH chassis last attacked. CIV6 (Unit): "if a stealth
+   *  unit attacks, it will become visible for a turn before becoming
+   *  invisible again", so it is seen while this equals the live turn. */
+  revealedTurn?: number;
   /**
    * XP banked TOWARD THE NEXT LEVEL — never cumulative. CIV6: "earning more
    * XP than needed to reach the next level will not transfer the excess XP to

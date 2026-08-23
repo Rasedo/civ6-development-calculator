@@ -116,6 +116,24 @@ export interface UnitDef {
   /** CIV 6 unit class: RECON (Scout). The class Survey doubles experience
    *  for, and the only class in this roster with no combat role. */
   recon?: boolean;
+  /** CIV6 unit ability STEALTH: "Remains hidden from units more than 1 hex
+   *  away." The NAVAL RAIDER class carries it, and the class page adds the
+   *  two exceptions: it stays hidden beside a City Center or an Encampment
+   *  "as long as they don't attack and there's no unit in the district", and
+   *  "if a stealth unit attacks, it will become visible for a turn". */
+  stealth?: boolean;
+  /** CIV6 unit ability REVEAL STEALTH: "Reveal stealth units on the map
+   *  within sight range." Held by every raider plus the Scout and the
+   *  Destroyer. */
+  revealStealth?: boolean;
+  /** CIV6: "Ignores enemy zone of control" — the mover is never halted. */
+  ignoresZoc?: boolean;
+  /** CIV6: "Does not exert zone of control" — the two submarines neither
+   *  halt a passing enemy nor count toward a city's encirclement. */
+  exertsNoZoc?: boolean;
+  /** the chassis's own SIGHT, when it differs from `SIGHT_RANGE` (the
+   *  Destroyer's "Has Sight of 3"). Reveal Stealth reaches this far. */
+  sight?: number;
   /** the ESPIONAGE civilian. It never walks — it jumps between revealed
    *  cities and runs one mission at a time out of a district. */
   spy?: boolean;
@@ -148,6 +166,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       moves: 3,
       combat: 10,
       recon: true,
+      revealStealth: true,
       description: 'Fast, fragile explorer.',
     }),
     U({
@@ -655,6 +674,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       naval: true,
       requiresCivic: 'MERCANTILISM',
       upgradesTo: 'SUBMARINE',
+      stealth: true,
+      revealStealth: true,
+      ignoresZoc: true,
       description: 'Renaissance naval raider.',
     }),
     U({
@@ -860,6 +882,10 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       resourceCost: 1,
       resourceUpkeep: 1,
       upgradesTo: 'NUCLEAR_SUBMARINE',
+      stealth: true,
+      revealStealth: true,
+      ignoresZoc: true,
+      exertsNoZoc: true,
       description: 'Modern naval raider: 1 Oil to train and 1 per turn to run.',
     }),
     U({
@@ -930,11 +956,14 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       maintenance: 7,
       moves: 4,
       combat: 85,
+      antiAir: 90,
       naval: true,
       requiresTech: 'COMBINED_ARMS',
       requiresResource: 'OIL',
       resourceCost: 1,
       resourceUpkeep: 1,
+      revealStealth: true,
+      sight: 3,
       description: 'Atomic naval melee: 1 Oil to train and 1 per turn to run.',
     }),
     U({
@@ -1029,6 +1058,10 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       ranged: { strength: 85, range: 2 },
       naval: true,
       requiresTech: 'TELECOMMUNICATIONS',
+      stealth: true,
+      revealStealth: true,
+      ignoresZoc: true,
+      exertsNoZoc: true,
       description: 'Information naval raider, and in GS it asks for no strategic resource.',
     }),
     U({

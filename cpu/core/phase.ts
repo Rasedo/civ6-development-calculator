@@ -9,11 +9,11 @@ import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { isWater, isImpassable } from '../../world/query';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
-import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit } from './units';
+import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt } from './units';
 import { PILLAGE_HEAL_IMPROVEMENTS } from './combat';  // the replay's pillage arm mirrors hostileUnitAct's
 import { cityStrikeStrength, airStrike } from './combat';
 import { UNIT_HP } from '../data/units';
-import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, encircled } from './combat';
+import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, encircled, stackDefender } from './combat';
 import { promoCS, promoClassOf, promoValue, takePromotion } from './promotions';
 import { PROMO_COLS } from '../data/promotions';
 import { availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
@@ -1882,17 +1882,15 @@ export function seatPhase(state: GameState): void {
           // ANY unit hostile to this civ. A city's strike picks its
           // target by distance and combat strength, never by which enemy the
           // unit belongs to.
-          if (!unitsAt(state, t.index).some((u) => unitsHostile(state, u, { seat: actor.seat }))) continue;
+          if (visibleHostilesAt(state, t.index, actor).length === 0) continue;
           if (d < bestDist) {
             bestDist = d;
             bestTile = t.index;
           }
         }
         if (bestTile >= 0) {
-          const hostiles = unitsAt(state, bestTile).filter(
-            (u) => unitsHostile(state, u, { seat: actor.seat }),
-          );
-          const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
+          const hostiles = visibleHostilesAt(state, bestTile, actor);
+          const defender = stackDefender(state, hostiles, true);  // a city strike is a SHOT
           const tt = state.map.tiles[bestTile];
           const defCS = defender.embarked
             ? embarkedDefenseCS(state, defender.seat) - woundPenalty(defender)
@@ -1927,17 +1925,15 @@ export function seatPhase(state: GameState): void {
           // ANY unit hostile to this civ. A city's strike picks its
           // target by distance and combat strength, never by which enemy the
           // unit belongs to.
-          if (!unitsAt(state, t.index).some((u) => unitsHostile(state, u, { seat: actor.seat }))) continue;
+          if (visibleHostilesAt(state, t.index, actor).length === 0) continue;
           if (d < bestDist) {
             bestDist = d;
             bestTile = t.index;
           }
         }
         if (bestTile >= 0) {
-          const hostiles = unitsAt(state, bestTile).filter(
-            (u) => unitsHostile(state, u, { seat: actor.seat }),
-          );
-          const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
+          const hostiles = visibleHostilesAt(state, bestTile, actor);
+          const defender = stackDefender(state, hostiles, true);  // a city strike is a SHOT
           const tt = state.map.tiles[bestTile];
           const defCS = defender.embarked
             ? embarkedDefenseCS(state, defender.seat) - woundPenalty(defender)

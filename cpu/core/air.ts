@@ -13,7 +13,7 @@ import { BUILDINGS } from '../data/buildings';
 import { IMPROVEMENTS } from '../data/improvements';
 import { hexDistance } from '../../world/hex';
 import { citiesOf, seatOf, tileSeat } from './seats';
-import { cityAtIndex, unitsAt, unitsHostile } from './units';
+import { cityAtIndex, unitsAt, unitsHostile, unitVisibleTo } from './units';
 import type { GameState, ImprovementId, Tile, Unit } from './types';
 
 export const CITY_CENTER_AIR_SLOTS = 1;
@@ -230,6 +230,7 @@ export function airStrikeOffers(state: GameState, unit: Unit, tileIndex: number)
   let sea = false;
   for (const u of unitsAt(state, tileIndex)) {
     if (isAirUnit(u.type) || !unitsHostile(state, unit, u)) continue;
+    if (!unitVisibleTo(state, u, unit.seat)) continue;
     if (UNITS[u.type]?.naval) sea = true;
     else land = true;
   }

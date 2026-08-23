@@ -27,11 +27,11 @@ import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { promoFirstUse, promoFlag, promoValue } from './promotions';
 import { dedicationEvent, goldenMoveBonus } from './eras'; // MONUMENTALITY / EXODUS +2 MP
 import { DED_WISH, OPEN_BORDERS_CIVIC } from '../data/seats';
-import { GAME_SPEED, EMBARK_MOVES } from '../data/constants';
+import { GAME_SPEED, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS } from '../data/constants';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { tradeCapacity } from './trade';
-import { revealAround, claimGoodyHut, nearestUnexplored, SIGHT_RANGE } from './fog';
+import { revealAround, claimGoodyHut, nearestUnexplored, unitSight } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { congressChopGold } from './congress';
 import { FEATURES } from '../../world/features';
@@ -257,6 +257,20 @@ export function unitDomain(type: string): 'civilian' | 'military' | 'air' {
   return UNITS[type]?.charges !== undefined ? 'civilian' : 'military';
 }
 
+/**
+ * The STACKING slot a unit holds on its tile. CIV6 (Movement, "Stacking"): "At
+ * sea, there are no support units, so there can only be one ship per tile.
+ * Great Admirals, as civilian units, may stack with ships. Embarked units are
+ * also considered a separate class, and may stack with both a military ship
+ * and an Admiral." So a water tile holds up to three: the hull, the Admiral,
+ * and ONE passenger of either domain.
+ */
+export type StackSlot = 'civilian' | 'military' | 'air' | 'embarked';
+export function unitStackSlot(u: { type: string; embarked?: boolean }): StackSlot {
+  const d = unitDomain(u.type);
+  return u.embarked && d !== 'air' ? 'embarked' : d;
+}
+
 export function unitsHostile(
   state: GameState,
   a: { seat: number },
@@ -267,6 +281,44 @@ export function unitsHostile(
   // express, because an all-false row means peace.
   if (capsOf(a.seat).alwaysHostile || capsOf(b.seat).alwaysHostile) return true;
   return civsAtWar(state, a.seat, b.seat);
+}
+
+/**
+ * Can `seat` SEE this unit? CIV6 (Unit, "Stealth units"): they "are invisible
+ * to non-adjacent units"; beside a City Center or an Encampment they "remain
+ * hidden as long as they don't attack and there's no unit in the district";
+ * once one attacks it "will become visible for a turn"; and the REVEAL STEALTH
+ * ability "allows them to see other stealth units within their Sight range".
+ *
+ * A district sees nothing of its own, so only UNITS answer here — which is
+ * also why an adjacent CITY does not give the hex away.
+ */
+export function unitVisibleTo(state: GameState, u: Unit, seat: number): boolean {
+  if (!UNITS[u.type]?.stealth) return true;
+  if (u.seat === seat) return true;
+  if ((u.revealedTurn ?? -1) >= state.turn) return true;
+  const t = state.map.tiles[u.tileIndex];
+  for (const v of state.units) {
+    if (v.seat !== seat) continue;
+    const vt = state.map.tiles[v.tileIndex];
+    const reach = UNITS[v.type]?.revealStealth ? unitSight(v) : 1;
+    if (hexDistance(vt.col, vt.row, t.col, t.row) <= reach) return true;
+  }
+  return false;
+}
+
+/** Hostile to `viewer` AND seen by it — the only units it may act against. */
+export function visibleHostilesAt(state: GameState, tileIndex: number, viewer: { seat: number }): Unit[] {
+  return unitsAt(state, tileIndex).filter(
+    (u) => unitsHostile(state, viewer, u) && unitVisibleTo(state, u, viewer.seat),
+  );
+}
+
+/** Does this unit project a zone of control at all? CIV6 gives the two
+ *  submarines "Does not exert zone of control", and an embarked unit exerts
+ *  none either. Air units are no garrison, so `unitDomain` filters them. */
+export function unitExertsZoc(u: Unit): boolean {
+  return unitDomain(u.type) === 'military' && !u.embarked && !UNITS[u.type]?.exertsNoZoc;
 }
 
 export function encampmentIntact(tile: Tile): boolean {
@@ -308,15 +360,14 @@ export function encampmentBlocks(
 export function inEnemyZoc(
   state: GameState,
   tileIndex: number,
-  mover: { seat: number },
+  mover: { seat: number; type?: string },
 ): boolean {
+  // CIV6: a naval raider "ignores enemy zone of control", so nothing halts it.
+  if (mover.type !== undefined && UNITS[mover.type]?.ignoresZoc) return false;
   const tile = state.map.tiles[tileIndex];
   for (const n of neighbors(state.map, tile)) {
     for (const u of unitsAt(state, n.index)) {
-      // EMBARKED units do NOT exert a zone of control (they still
-      // OBEY — the mover's halt rule below is unchanged). Naval military exert
-      // normally (no naval units yet, so that half is inert).
-      if (unitDomain(u.type) === 'military' && !u.embarked && unitsHostile(state, u, mover)) return true;
+      if (unitExertsZoc(u) && unitsHostile(state, u, mover)) return true;
     }
   }
   return false;
@@ -452,11 +503,15 @@ export function tileFreeForUnit(
   if (unit && encampmentBlocks(state, tile, unit)) return false;
   const side = unit ? unit.seat : seat;
   if (borderClosedTo(state, side, tile, unit?.type)) return false;
-  const domain = unit ? unitDomain(unit.type) : 'civilian';
+  // the slot the mover would hold HERE: a land unit standing on water is a
+  // passenger, whatever it is on land.
+  const domain: StackSlot = unit
+    ? (isWater(tile) && !naval ? 'embarked' : unitDomain(unit.type))
+    : 'civilian';
   for (const u of unitsAt(state, tileIndex)) {
     if (u.id === unit?.id || isAirUnit(u.type) || isSpy(u.type)) continue;
     if (u.seat !== side) return false; // foreign occupied
-    if (unitDomain(u.type) === domain) return false; // same-slot ally
+    if (unitStackSlot(u) === domain) return false; // same-slot ally
   }
   return true;
 }
@@ -569,11 +624,28 @@ export function unitFullMoves(state: GameState, unit: { type: string; seat: numb
   // CIV6 (Commando): the +1 Movement "also applies while the unit is
   // embarked", so the promotion adder joins both arms.
   const promo = promoValue(unit, 'MOVES');
-  if (unit.embarked && !def?.naval) return EMBARK_MOVES + promo;
-  return (def?.moves ?? 2) + promo + goldenMoveBonus(state, unit)
+  const atSea = seaMoveBonus(state, unit.seat);
+  if (unit.embarked && !def?.naval) {
+    return EMBARK_MOVES + embarkTechMoves(state, unit.seat) + atSea + promo;
+  }
+  return (def?.moves ?? 2) + (def?.naval ? atSea : 0) + promo + goldenMoveBonus(state, unit)
     // an emergency member marches faster on its target's ground
     + emergencyMoveBonus(state, unit.seat,
         unit.tileIndex === undefined ? NO_SEAT : tileSeat(state.map.tiles[unit.tileIndex]));
+}
+
+/** the Mathematics rung every hull and every passenger reads. */
+export function seaMoveBonus(state: GameState, seat: number): number {
+  return seatOf(state, seat)?.research.techs.includes(SEA_MOVE_TECH) ? SEA_MOVE_TECH_BONUS : 0;
+}
+
+/** the three rungs that raise the EMBARKED pool itself. */
+export function embarkTechMoves(state: GameState, seat: number): number {
+  const techs = seatOf(state, seat)?.research.techs;
+  if (!techs) return 0;
+  let n = 0;
+  for (const [id, v] of EMBARK_MOVE_TECHS) if (techs.includes(id)) n += v;
+  return n;
 }
 
 export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
@@ -593,7 +665,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   logUnitOrder(state, unit.seat, unit.id, 'move', to.index);
   unit.movesLeft = Math.max(0, unit.movesLeft - cost);
   if (unit.seat === seat) {
-    revealAround(state, unit.seat, to.index, SIGHT_RANGE + promoValue(unit, 'SIGHT'));
+    revealAround(state, unit.seat, to.index, unitSight(unit));
     // CIV6 (Pilgrim): "Gains 3 extra spreads when moving adjacent to a natural
     // wonder for the first time."
     if (neighbors(state.map, to).some((t) => t.wonder !== null)) {
@@ -1015,7 +1087,7 @@ export function spawnUnit(
   if (def.charges === undefined) unit.fortifyTurns = 0;
   if (capsOf(seat).xp) unit.xp = 0;
   state.units.push(unit);
-  revealAround(state, seat, unit.tileIndex);
+  revealAround(state, seat, unit.tileIndex, unitSight(unit));
   // Track the strongest MELEE unit each civ has ever fielded —
   // real Civ 6 bases city defense on it (spawnUnit is the chokepoint for
   // training, purchase, levies and seat production alike).

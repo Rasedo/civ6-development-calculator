@@ -127,7 +127,7 @@ const effectRow = (fx: PolicyEffects) => ({
 });
 import { BOOSTS, BOOST_FRACTION } from '../data/boosts';
 import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST } from '../data/constants';
-import { CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, FOOD_PER_CITIZEN, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, LUXURY_AMENITY_CITIES, GAME_SPEED, REGIONAL_RANGE, EMBARK_MOVES, EMBARKED_DEFENSE_CS_BY_ERA, embarkState } from '../data/constants';
+import { CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, FOOD_PER_CITIZEN, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, LUXURY_AMENITY_CITIES, GAME_SPEED, REGIONAL_RANGE, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS, EMBARKED_DEFENSE_CS_BY_ERA, embarkState } from '../data/constants';
 
 // The GPU improvement index space (tile.improvement values, build codes 13-15).
 // the roster grew — indices 0-2 stay stable (every existing
@@ -915,11 +915,15 @@ export function buildRules() {
       barbHorseRange: BARB_HORSE_RANGE,
       campClearReward: 50,
       dmgBase: Array.from({ length: 4001 }, (_, i) => 30 * Math.exp((0.04 * (i - 2000)) / 10)),
-      // EMBARK: flat embarked MP, the LIVE water-step master switch (N1
-      // ships it INERT), and the embark/ocean tech gates (index into rules techs;
-      // military embarks on SHIPBUILDING, civilians on SAILING, OCEAN needs
-      // CARTOGRAPHY). The GPU mirrors these exactly.
+      // EMBARK: the Classical embarked pool and the rungs that raise it, the
+      // Mathematics rung every hull and passenger reads, the LIVE water-step
+      // master switch, and the embark/ocean tech gates (indices into rules
+      // techs; military embarks on SHIPBUILDING, civilians on SAILING, OCEAN
+      // needs CARTOGRAPHY). The GPU mirrors these exactly.
       embarkMoves: EMBARK_MOVES,
+      embarkMoveTechs: EMBARK_MOVE_TECHS.map(([id, v]) => [techIdx.get(id) ?? -1, v]),
+      seaMoveTech: techIdx.get(SEA_MOVE_TECH) ?? -1,
+      seaMoveBonus: SEA_MOVE_TECH_BONUS,
       embarkedDefenseCsByEra: EMBARKED_DEFENSE_CS_BY_ERA, // the embarked defender's CS, by the OWNER's tech era
       // the two "Unit class modifiers" and the civic that unlocks flanking
       // and support at all
@@ -1012,6 +1016,14 @@ export function buildRules() {
       cls: UNIT_CLASSES.reduce((m, c, i) => m | (unitHasClass(u, c) ? 1 << i : 0), 0),
       era: UNIT_ERA_INDEX[u.id] ?? 0,
       recon: u.recon ? 1 : 0, // Survey doubles what this class earns
+      // the NAVAL RAIDER axis: STEALTH hides the chassis from anything more
+      // than a hex away, REVEAL STEALTH sees one within `sight`, and the two
+      // zone-of-control abilities are independent of both.
+      stealth: u.stealth ? 1 : 0,
+      revealStealth: u.revealStealth ? 1 : 0,
+      ignoresZoc: u.ignoresZoc ? 1 : 0,
+      exertsNoZoc: u.exertsNoZoc ? 1 : 0,
+      sight: u.sight ?? 0,
       // BOMBARD strength (0 = not a siege unit): full damage to a perimeter,
       // no city penalty, and no melee attack at all.
       bombard: u.bombard ?? 0,

@@ -26,6 +26,11 @@ Covered here (all gate-unreachable):
      damage comparison: lower def ⇒ strictly more damage on the same RNG).
   8. Embarked civilian CAPTURE — POOL-END invariant + keeps-embarked.
   9. Flank/support — a NAVAL ally counts; the same ally EMBARKED counts 0.
+ 12. STEALTH — hidden at 2 and 3, seen adjacent, seen by Reveal Stealth as far
+     as the chassis sees, and revealed for the turn it fires.
+ 13. The raider's two zone-of-control abilities — ignored, and not exerted.
+ 14. A ring that exerts no zone of control is no siege: the city heals.
+ 15. A dead or captured PASSENGER leaves its own occupancy plane.
 """
 
 from __future__ import annotations
@@ -55,6 +60,7 @@ def clear_tile(sim, t: int) -> None:
     # subscript write to one lands in a temporary and is silently discarded.
     sim.military_at[0, t] = -1
     sim.civilian_at[0, t] = -1
+    sim.embarked_at[0, t] = -1
 
 
 
@@ -73,7 +79,7 @@ def place_mil(sim, seat: int, t: int, type_idx: int, hp: int = 100, emb: bool = 
     sim.major_unit_charges[0, slot] = 0
     sim.major_unit_fortify[0, slot] = 0
     sim.major_unit_emb[0, slot] = emb
-    sim.military_at[0, t] = slot + sim.POOL_LO["major"]
+    (sim.embarked_at if emb else sim.military_at)[0, t] = slot + sim.POOL_LO["major"]
     sim.unit_next[0] += 1
     return slot
 
@@ -89,7 +95,7 @@ def place_civilian(sim, seat: int, t: int, type_idx: int, hp: int = 100, emb: bo
     sim.major_unit_charges[0, slot] = 0
     sim.major_unit_fortify[0, slot] = 0
     sim.major_unit_emb[0, slot] = emb
-    sim.civilian_at[0, t] = slot + sim.POOL_LO["major"]
+    (sim.embarked_at if emb else sim.civilian_at)[0, t] = slot + sim.POOL_LO["major"]
     sim.unit_next[0] += 1
     return slot
 
@@ -176,10 +182,8 @@ def neutralize_barbs(sim) -> None:
 def clear_all_major_units(sim) -> None:
     """Empty the shared major window — every seat's units, not one seat's."""
     sim.major_unit_alive[:] = False
-    _pl = sim.military_at  # clear only this window's entries
-    _pl[(_pl >= sim.POOL_LO["major"]) & (_pl < sim.POOL_HI["major"])] = -1
-    _pl = sim.civilian_at  # clear only this window's entries
-    _pl[(_pl >= sim.POOL_LO["major"]) & (_pl < sim.POOL_HI["major"])] = -1
+    for _pl in (sim.military_at, sim.civilian_at, sim.embarked_at):
+        _pl[(_pl >= sim.POOL_LO["major"]) & (_pl < sim.POOL_HI["major"])] = -1
 
 
 # ------------------------------------------------------------------ pokes -----
@@ -576,7 +580,7 @@ def poke_embarked_capture(rules, path, WARRIOR, BUILDER):
     assert bool(sim.major_unit_emb[0, cap]), "captured civilian must KEEP embarked under the new owner"
     assert cap > tail_slot, "capture must append at POOL END (after the pre-existing tail)"
     assert not bool(sim.major_unit_alive[0, bslot]), "the civ builder must despawn on capture"
-    assert int(sim.civilian_at[0, bt]) == cap, "captured civilian occupies the tile as a seat-0 unit"
+    assert int(sim.embarked_at[0, bt]) == cap, "an embarked captive holds the PASSENGER plane as a seat-0 unit"
     print(f"  8 embarked-civilian capture OK (pool-end slot {cap} > tail {tail_slot}, keeps embarked)")
 
 
@@ -774,6 +778,186 @@ def poke_embarked_support(rules, path, WARRIOR, GALLEY):
           f"naval attack {lone_n} either way)")
 
 
+def _lane(sim, a: int, d: int) -> int:
+    """a WATER tile exactly `d` hexes from `a`, forced enterable and empty."""
+    cand = (sim.pair_dist[a] == d).nonzero().flatten().tolist()
+    assert cand, f"no tile at distance {d}"
+    t = int(cand[0])
+    force_water(sim, t)
+    clear_tile(sim, t)
+    return t
+
+
+def _lone_war(sim) -> None:
+    """seat 0 and seat 1 at war, every other unit and camp off the board."""
+    neutralize_barbs(sim)
+    clear_all_major_units(sim)
+    sim.war[:, 0, 1:sim.n_majors] = sim.war[:, 1:sim.n_majors, 0] = False
+    sim.war[0, 0, 1] = sim.war[0, 1, 0] = True
+    sim.sync_war()
+
+
+def poke_stealth(rules, path, PRIVATEER, FRIGATE, DESTROYER, SCOUT):
+    """12. CIV6 (Unit): a stealth unit is "invisible to non-adjacent units",
+    REVEAL STEALTH sees one "within their Sight range", and one that attacks
+    "will become visible for a turn". `unitVisibleTo` is the TS twin."""
+    sim = build(rules, path)
+    _lone_war(sim)
+    a = _lane(sim, int(sim.city_center[0, 0, 0]), 5)
+    raider = place_mil(sim, 1, a, PRIVATEER) + sim.POOL_LO["major"]
+
+    def hidden() -> bool:
+        h = bool(sim._stealth_hidden(0)[0, a])
+        seen_slot = int(sim._visible_military_at(0)[0, a])
+        assert (seen_slot < 0) == h, "the hidden plane and the masked plane disagree"
+        return h
+
+    assert hidden(), "a raider nobody stands near is not hidden"
+
+    # an ordinary hull two hexes off sees nothing; one hex off sees everything
+    far = _lane(sim, a, 2)
+    eye = place_mil(sim, 0, far, FRIGATE)
+    assert hidden(), "a FRIGATE at 2 revealed a stealth hull"
+    near = _lane(sim, a, 1)
+    sim.military_at[0, far] = -1
+    sim.major_unit_tile[0, eye] = near
+    sim.military_at[0, near] = eye + sim.POOL_LO["major"]
+    assert not hidden(), "an ADJACENT unit did not reveal the stealth hull"
+
+    # Reveal Stealth reaches as far as the chassis sees: a Destroyer at 3 does,
+    # a Frigate at 3 does not.
+    sim.military_at[0, near] = -1
+    three = _lane(sim, a, 3)
+    sim.major_unit_tile[0, eye] = three
+    sim.military_at[0, three] = eye + sim.POOL_LO["major"]
+    assert hidden(), "a FRIGATE at 3 revealed a stealth hull"
+    sim.major_unit_type[0, eye] = DESTROYER
+    assert not hidden(), "Reveal Stealth at sight 3 missed the hull"
+    sim.major_unit_type[0, eye] = SCOUT
+    assert hidden(), "a Scout's sight 2 reached 3 hexes"
+
+    # its own seat always sees it, and so does everyone once it fires
+    assert not bool(sim._stealth_hidden(1)[0, a]), "a seat cannot see its own raider"
+    sim.unit_revealed_turn[0, raider] = sim.turn
+    assert not hidden(), "the attack stamp did not reveal the hull"
+    sim.unit_revealed_turn[0, raider] = sim.turn - 1
+    assert hidden(), "the reveal outlived its turn"
+
+    assert int(sim._unit_sight(torch.tensor([DESTROYER]), torch.zeros(1, dtype=torch.long))[0]) == 3
+    assert int(sim._unit_sight(torch.tensor([FRIGATE]), torch.zeros(1, dtype=torch.long))[0]) == 2
+    print("  12 stealth OK (hidden at 2/3, seen adjacent, Destroyer 3 / Scout 2, attack reveals for a turn)")
+
+
+def poke_raider_zoc(rules, path, PRIVATEER, SUBMARINE, FRIGATE):
+    """13. CIV6: a naval raider "ignores enemy zone of control"; the two
+    submarines additionally "do not exert zone of control"."""
+    sim = build(rules, path)
+    _lone_war(sim)
+    post = _lane(sim, int(sim.city_center[0, 0, 0]), 5)
+    dest = _lane(sim, post, 1)
+    holder = place_mil(sim, 1, post, FRIGATE)
+
+    def halted(mover: int) -> bool:
+        return bool(sim._in_enemy_zoc(
+            torch.full((sim.B,), dest, dtype=torch.long),
+            0,
+            torch.full((sim.B,), mover, dtype=torch.long))[0])
+
+    assert halted(FRIGATE), "an ordinary hull walked through a zone of control"
+    assert not halted(PRIVATEER), "the raider did not ignore the zone of control"
+    sim.major_unit_type[0, holder] = SUBMARINE
+    assert not halted(FRIGATE), "a submarine exerted a zone of control"
+    print("  13 raider ZOC OK (ignored by the raider, not exerted by the submarine)")
+
+
+def poke_submarine_siege(rules, path, FRIGATE, SUBMARINE):
+    """14. The siege gate is ZONE OF CONTROL — "if the invading army manages to
+    establish zone of control on all passable tiles surrounding the City
+    Center" — so a ring that exerts none lets the city heal."""
+    sim = build(rules, path)
+    _lone_war(sim)
+    ctr = int(sim.city_center[0, 0, 0])
+    ring = []
+    for d in range(6):
+        t = int(sim.neigh[ctr, d])
+        if t < 0:
+            continue
+        if not bool(sim.passable[0, t] or sim.wpass[0, t]):
+            continue
+        clear_tile(sim, t)
+        ring.append(place_mil(sim, 1, t, FRIGATE))
+    assert len(ring) >= 3, "no passable ring on this seed"
+
+    col = torch.zeros(sim.B, dtype=torch.long)
+    act = sim.city_alive[:, 0, 0]
+
+    def heal_of(kind: int) -> int:
+        for slot in ring:
+            sim.major_unit_type[0, slot] = kind
+        sim.city_hp[0, 0, 0] = 100
+        snap = sim.snapshot()
+        sim._seat_city_fire_and_heal(0, col, act)
+        got = int(sim.city_hp[0, 0, 0]) - 100
+        sim.restore(snap)
+        return got
+
+    besieged = heal_of(FRIGATE)
+    free = heal_of(SUBMARINE)
+    assert besieged == 0, f"a frigate ring did not besiege the city (healed {besieged})"
+    assert free > 0, "a submarine ring besieged the city it exerts no control over"
+    print(f"  14 submarine siege OK (frigate ring heals {besieged}, submarine ring heals {free})")
+
+def poke_passenger_death(rules, path, WARRIOR, BUILDER):
+    """15. A dead or captured PASSENGER must leave its own plane. Every kill and
+    capture is slot-keyed (`_occ_clear` / `_occ_set`), so a body that cleared
+    the class it GUESSED left the tile occupied by a corpse <EM> which a city then
+    struck again, turn after turn."""
+    sim = build(rules, path)
+    _lone_war(sim)
+    ctr = int(sim.city_center[0, 0, 0])
+
+    # -- the CITY STRIKE kills a lone embarked civilian.
+    tt = -1
+    for d in range(6):
+        t = int(sim.neigh[ctr, d])
+        if t >= 0 and t != ctr:
+            tt = t
+            break
+    assert tt >= 0
+    force_water(sim, tt)
+    clear_tile(sim, tt)
+    slot = place_civilian(sim, 1, tt, BUILDER, hp=1, emb=True)
+    assert int(sim.embarked_at[0, tt]) == slot + sim.POOL_LO["major"], "the fixture put it on the wrong plane"
+    sim.city_bldg[0, 0, 0, sim._walls_bidx] = True
+    sim.city_outer_hp[0, 0, 0] = sim._walls_hp
+    sim._seat_city_fire_and_heal(0, torch.zeros(sim.B, dtype=torch.long), sim.city_alive[:, 0, 0])
+    assert not bool(sim.major_unit_alive[0, slot]), "the city strike did not kill the passenger"
+    assert int(sim.embarked_at[0, tt]) < 0, "a dead passenger still holds its tile"
+
+    # -- and a CAPTURE re-files the captive on the plane its class names.
+    sim2 = build(rules, path)
+    _lone_war(sim2)
+    ctr2 = int(sim2.city_center[0, 0, 0])
+    land = empty_neighbor(sim2, ctr2)
+    assert land >= 0
+    clear_tile(sim2, land)
+    w = place_mil(sim2, 0, land, WARRIOR)
+    bt = free_neighbor(sim2, land, ctr2)
+    assert bt >= 0
+    force_water(sim2, bt)
+    clear_tile(sim2, bt)
+    cap0 = place_civilian(sim2, 1, bt, BUILDER, emb=True)
+    old_next = int(sim2.unit_next[0])
+    d = dir_to(sim2, land, bt)
+    assert d >= 0
+    sim2._apply_seat_unit_actions(0, order(sim2, w, 6 + d))
+    assert not bool(sim2.major_unit_alive[0, cap0]), "the captured builder must despawn"
+    assert bool(sim2.major_unit_emb[0, old_next]), "the captive keeps embarked"
+    assert int(sim2.embarked_at[0, bt]) == old_next + sim2.POOL_LO["major"], \
+        "the captive must occupy the PASSENGER plane, not the civilian one"
+    assert int(sim2.civilian_at[0, bt]) < 0, "the capture left the captive on the civilian plane"
+    print("  15 passenger death/capture OK (both leave and re-enter the passenger plane)")
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -785,6 +969,11 @@ def main() -> None:
     WARRIOR = idx(rules, "WARRIOR")
     BUILDER = idx(rules, "BUILDER")
     ARCHER = idx(rules, "ARCHER")
+    PRIVATEER = idx(rules, "PRIVATEER")
+    SUBMARINE = idx(rules, "SUBMARINE")
+    DESTROYER = idx(rules, "DESTROYER")
+    FRIGATE = idx(rules, "FRIGATE")
+    SCOUT = idx(rules, "SCOUT")
     assert bool(load_rules().units), "no unit catalog"
 
     poke_galley_city(rules, path, GALLEY)
@@ -799,6 +988,10 @@ def main() -> None:
     poke_flank_support(rules, path, GALLEY)
     poke_amphibious(rules, path, WARRIOR, ARCHER)
     poke_embarked_support(rules, path, WARRIOR, GALLEY)
+    poke_stealth(rules, path, PRIVATEER, FRIGATE, DESTROYER, SCOUT)
+    poke_raider_zoc(rules, path, PRIVATEER, SUBMARINE, FRIGATE)
+    poke_submarine_siege(rules, path, FRIGATE, SUBMARINE)
+    poke_passenger_death(rules, path, WARRIOR, BUILDER)
     print("NAVAL POKES OK")
 
 

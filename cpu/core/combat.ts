@@ -14,7 +14,7 @@ import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
 import { addEraScore } from './eras';
-import { nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit } from './units';
+import { nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc } from './units';
 import { isAirUnit, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirOf, displaceAirFrom } from './air';
 import { outerPool, wallsMax, wallsTier } from './rules';
 import { EMBARKED_DEFENSE_CS_BY_ERA, embarkState } from '../data/constants';
@@ -478,6 +478,27 @@ export function embarkedDefenseCS(state: GameState, seat: number): number {
 export function inDistrictTile(state: GameState, tileIndex: number): boolean {
   const t = state.map.tiles[tileIndex];
   return !!t && (!!t.district || t.improvement === 'FORT');
+}
+
+/**
+ * Who takes the blow on a STACKED hex. CIV6 (Combat): "When a naval unit and an
+ * embarked unit occupy the same hex, the unit with the higher Combat Strength
+ * will defend against ranged attacks" — and the page's own note that "strong
+ * but gravely injured embarked units can be prioritized over weak but healthy
+ * naval units" says the comparison is the CHASSIS strength, not the wounded
+ * one. The page states the rule for ranged fire alone; a melee or air blow
+ * lands on the hull, which is what an escort is for.
+ */
+export function stackDefenceCS(state: GameState, u: Unit): number {
+  return u.embarked ? embarkedDefenseCS(state, u.seat) : (UNITS[u.type]?.combat ?? 0);
+}
+export function stackDefender(state: GameState, enemies: Unit[], ranged: boolean): Unit {
+  const fighters = enemies.filter((u) => unitDomain(u.type) === 'military');
+  if (fighters.length === 0) return enemies[0];
+  if (!ranged) return fighters.find((u) => !u.embarked) ?? fighters[0];
+  let best = fighters[0];
+  for (const u of fighters) if (stackDefenceCS(state, u) > stackDefenceCS(state, best)) best = u;
+  return best;
 }
 
 /** The defender's total combat strength for a hit on `defTileIndex`. `vs` names
@@ -965,8 +986,10 @@ export function encircled(state: GameState, centre: Tile, seat: number): boolean
   for (const n of neighbors(state.map, centre)) {
     if (isImpassable(n)) continue;
     passable += 1;
+    // "establish zone of control on all passable tiles" — so the ring is held
+    // by what EXERTS it (`unitExertsZoc`), which a submarine never does.
     const held = unitsAt(state, n.index).some(
-      (u) => unitDomain(u.type) === 'military' && unitsHostile(state, u, { seat }),
+      (u) => unitExertsZoc(u) && unitsHostile(state, u, { seat }),
     );
     if (!held) return false;
   }
@@ -1016,11 +1039,24 @@ export function cityStateAttackable(state: GameState, cityState: CityState, seat
   );
 }
 
+/**
+ * CIV6 (Unit): "if a stealth unit attacks, it will become visible for a turn
+ * before becoming invisible again" — so the blow stamps the live turn and
+ * `unitVisibleTo` reads it until the turn rolls over. No AIR chassis is a
+ * stealth unit, so the air path carries no stamp.
+ */
+function markStealthAttack(state: GameState, u: Unit): void {
+  if (UNITS[u.type]?.stealth) u.revealedTurn = state.turn;
+}
+
 export function meleeAttack(state: GameState, attackerId: number, targetIndex: number, seat: number): RuleResult {
   const r = meleeAttackInner(state, attackerId, targetIndex, seat);
   if (r.ok) {
     const u = state.units.find((x) => x.id === attackerId);
-    if (u) logUnitOrder(state, u.seat, attackerId, 'melee', targetIndex);
+    if (u) {
+      markStealthAttack(state, u);
+      logUnitOrder(state, u.seat, attackerId, 'melee', targetIndex);
+    }
   }
   return r;
 }
@@ -1041,7 +1077,8 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   if (!amphibiousReach(state, attacker, targetIndex)) return no('Embarked units strike an open shore only.');
 
   const enemies = unitsAt(state, targetIndex).filter(
-    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type),
+    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type)
+      && unitVisibleTo(state, u, attacker.seat),
   );
   const seatTarget = (() => {
     const civCity = cityAtIndex(state, targetIndex);
@@ -1101,8 +1138,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     return ok;
   }
 
-  const defender =
-    enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
+  const defender = stackDefender(state, enemies, false);
   const defDef = UNITS[defender.type];
   const amph = promoFlag(attacker, 'AMPHIBIOUS');
   const atkCS = def.combat - woundPenalty(attacker) - (!amph && crossesRiver(from, target) ? RIVER_ATTACK_PENALTY : 0)
@@ -1210,10 +1246,13 @@ export function airStrike(state: GameState, attackerId: number, targetIndex: num
     return r;
   }
   const enemies = unitsAt(state, targetIndex).filter(
-    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type),
+    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type)
+      && unitVisibleTo(state, u, attacker.seat),
   );
   if (enemies.length === 0) return { ok: false, reason: 'Nothing to strike.' };
-  const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
+  // CIV6 (Air combat): "all air attacks are ranged", so the naval hex's
+  // higher-chassis rule answers this blow too.
+  const defender = stackDefender(state, enemies, true);
   const atk = UNITS[attacker.type]?.ranged?.strength ?? 0;
   const def = airDefenseOf(defender.type);
   const atkE = atk - woundPenalty(attacker);
@@ -1241,7 +1280,10 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
   const r = rangedAttackInner(state, attackerId, targetIndex, seat);
   if (r.ok) {
     const u = state.units.find((x) => x.id === attackerId);
-    if (u) logUnitOrder(state, u.seat, attackerId, 'ranged', targetIndex);
+    if (u) {
+      markStealthAttack(state, u);
+      logUnitOrder(state, u.seat, attackerId, 'ranged', targetIndex);
+    }
   }
   return r;
 }
@@ -1259,7 +1301,8 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     return no('Out of range.');
   }
   const enemies = unitsAt(state, targetIndex).filter(
-    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type),
+    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type)
+      && unitVisibleTo(state, u, attacker.seat),
   );
   // Ranged units CAN bombard cities — same fallback
   // chain as meleeAttack (seat city, then city-state center), one roll,
@@ -1314,7 +1357,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     return ok;
   }
   if (enemies.length === 0) return no('Nothing to attack there.');
-  const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
+  const defender = stackDefender(state, enemies, true);
   const defCS = defenderCS(state, defender, targetIndex, { attacker, melee: false });
   defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat) + advisoryCS(state, attacker.type)) - defCS, 'rng', targetIndex);
   awardBattleXp(state, attacker, defender, { ranged: true, aDied: false, dDied: defender.hp <= 0 });
@@ -1348,10 +1391,15 @@ function rangedCtx(state: GameState, attacker: Unit, defender: Unit, targetIndex
 }
 
 export function hostileRangedStrike(state: GameState, attacker: Unit, targetIndex: number): void {
+  if (hostileRangedStrikeInner(state, attacker, targetIndex)) markStealthAttack(state, attacker);
+}
+
+/** Did the strike actually resolve? Only a shot that lands reveals a raider. */
+function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex: number): boolean {
   const seat = attacker.seat;
   const def = UNITS[attacker.type];
-  if (!def?.ranged) return;
-  if (!siegeMayShoot(state, attacker)) return;
+  if (!def?.ranged) return false;
+  if (!siegeMayShoot(state, attacker)) return false;
   const target = state.map.tiles[targetIndex];
   const held = target.district === 'CITY_CENTER' ? cityAtIndex(state, targetIndex) : undefined;
   // The city arm asks `unitsHostile`'s own question, exactly as
@@ -1374,14 +1422,14 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
     warWearinessBattle(state, attacker.seat, enemyCity.seat, targetIndex, { city: true });
     attacker.movesLeft = 0;
     awardCityXp(state, attacker, enemyCity.hp <= 1 ? XP_CITY_FELLED : XP_CITY_ATTACK);
-    return;
+    return true;
   }
   const encampV = encampmentDefense(state, attacker, target);
   if (encampV) {
     rangedStrikeEncampment(
       state, attacker, targetIndex, encampV.defCS,
       CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0, 'vrnge');
-    return;
+    return true;
   }
   // A RANGED unit does not engage another civ's units — the ranged-vs-civ
   // scope-out, the same predicate `attackTargets` applies. A civ unit standing
@@ -1389,10 +1437,11 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   // no-op rather than a hit.
   const enemies = unitsAt(state, targetIndex).filter(
     (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type)
-      && !(isCiv(attacker.seat) && isCiv(u.seat)),
+      && !(isCiv(attacker.seat) && isCiv(u.seat))
+      && unitVisibleTo(state, u, attacker.seat),
   );
-  if (enemies.length === 0) return; // the CITY_CENTER quirk: a no-op, like meleeAttack's `no(...)`
-  const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
+  if (enemies.length === 0) return false; // the CITY_CENTER quirk: a no-op, like meleeAttack's `no(...)`
+  const defender = stackDefender(state, enemies, true);
   const defCS = defenderCS(state, defender, targetIndex, { attacker, melee: false });
   defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat) + advisoryCS(state, attacker.type)) - defCS, 'vrng', targetIndex);
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
@@ -1402,6 +1451,7 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
     killUnit(state, defender, seat);
   }
   spendAttack(attacker);
+  return true;
 }
 
 /** the tiles a unit's attack reaches. CIV6 (Forward Observers / Coincidence
@@ -1425,7 +1475,8 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
     if (d < 1 || d > range) continue;
     if (!amphibiousReach(state, unit, t.index)) continue;
     const hasEnemy = unitsAt(state, t.index).some(
-      (u) => unitsHostile(state, unit, u) && !(def.ranged && isCiv(unit.seat) && isCiv(u.seat)),
+      (u) => unitsHostile(state, unit, u) && !(def.ranged && isCiv(unit.seat) && isCiv(u.seat))
+        && unitVisibleTo(state, u, unit.seat),
     );
     const holder = cityAtIndex(state, t.index);
     const cityTarget =

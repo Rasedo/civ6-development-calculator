@@ -36,10 +36,27 @@ export const FAITH_PURCHASE_MULT = 2;
 
 export const FOOD_PER_CITIZEN = 2;
 
-/** EMBARK: flat movement points a land unit has while EMBARKED (on
- * water). Tech upgrades to embarked movement are unmodeled. Water tiles enter
- * at cost 1; embark/disembark transitions cost ALL remaining MP (real Civ 6). */
+/**
+ * EMBARK: the movement points a land unit has while EMBARKED (on water).
+ * CIV6 (Movement): "Embarked units have 2 Movement in the Classical Era;
+ * the following techs each add more: Square Rigging (+1), Steam Power (+2) and
+ * Combustion (+1)." Water tiles enter at cost 1.
+ */
 export const EMBARK_MOVES = 2;
+export const EMBARK_MOVE_TECHS: readonly (readonly [string, number])[] = [
+  ['SQUARE_RIGGING', 1], ['STEAM_POWER', 2], ['COMBUSTION', 1],
+];
+
+/**
+ * CIV6 (Movement): "all units moving at sea (including embarked land units)
+ * receive +1 Movement after researching Mathematics. Note that this detail
+ * doesn't appear anywhere in the Civilopedia information on naval units, so
+ * you shouldn't be surprised to see 5 Movement on a Frigate when its
+ * Civilopedia entry says it has only 4." So it rides on the chassis stat
+ * rather than being folded into it, and reaches HULLS as well as passengers.
+ */
+export const SEA_MOVE_TECH = 'MATHEMATICS';
+export const SEA_MOVE_TECH_BONUS = 1;
 
 /**
  * CIV6 (Combat, "Attacking embarked units"): an embarked unit defends at a

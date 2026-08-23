@@ -561,8 +561,12 @@ class SimMasks:
     def _religious_at(self, tiles: torch.Tensor) -> torch.Tensor:
         """the RELIGIOUS unit standing on each tile, by merged slot; -1 = none.
         Religious units "move in their own layer", so a tile can hold one
-        beside a military and a civilian occupant."""
+        beside a military and a civilian occupant. A religious unit crossing
+        water files as a PASSENGER, and no land civilian shares that tile, so
+        the two planes never both answer."""
         occ = self.civilian_at.gather(1, tiles)
+        emb = self.embarked_at.gather(1, tiles)
+        occ = torch.where(occ >= 0, occ, emb)
         rel = torch.zeros_like(occ, dtype=torch.bool)
         oc = occ.clamp(min=0)
         t = self.unit_type.gather(1, oc)
@@ -799,6 +803,102 @@ class SimMasks:
             era = torch.where(seat == r, self._civ_era(self.civ_techs[:, r], self.civ_civics[:, r]), era)
         return self._embarked_def_by_era[era.clamp(min=0, max=self._embarked_def_by_era.numel() - 1)]
 
+    def _stack_fold(self, tc: torch.Tensor, seat, mslot: torch.Tensor,
+                    m_seat: torch.Tensor, ok_m: torch.Tensor, cslot: torch.Tensor,
+                    c_seat: torch.Tensor, ok_c: torch.Tensor, ranged: bool):
+        """`stackDefender`'s twin: fold a hex's PASSENGER into the pair the
+        callers resolve on.
+
+        CIV6 (Combat): "All attacks against this tile will be absorbed by the
+        military unit of the formation", so a passenger answers in the class
+        its OWN chassis belongs to — an embarked Builder is still a civilian,
+        and is still captured rather than fought. Between a hull and a military
+        passenger, "the unit with the higher Combat Strength will defend
+        against ranged attacks", and the page's own note that a "gravely
+        injured" passenger still outranks a healthy hull makes that comparison
+        the CHASSIS strength, not the wounded one. A melee blow lands on the
+        hull; the passenger answers only for a hex without one.
+
+        Both occupants always share a seat (a foreign unit blocks the tile
+        outright), so no scope-out downstream has to be re-asked per candidate.
+
+        Returns the folded (mslot, m_seat, ok_m, cslot, c_seat, ok_c)."""
+        eslot = self.embarked_at.gather(1, tc.unsqueeze(1)).squeeze(1)
+        neg = torch.full_like(eslot, -1)
+        e0 = eslot.clamp(min=0).unsqueeze(1)
+        e_seat = torch.where(eslot >= 0, self.unit_seat.gather(1, e0).squeeze(1), neg)
+        e_civ = self._type_civilian[
+            self.unit_type.gather(1, e0).squeeze(1).clamp(min=0, max=self.NU - 1)]
+        ok_e = self._seats_hostile(seat, e_seat.unsqueeze(1)).squeeze(1)
+        e_mil = ok_e & ~e_civ
+        take = e_mil & ~ok_m
+        if ranged:
+            m_type = self.unit_type.gather(1, mslot.clamp(min=0).unsqueeze(1)).squeeze(1)
+            cs_m = self._type_combat[m_type.clamp(min=0, max=self.NU - 1)]
+            take = take | (e_mil & ok_m & (self._embarked_def_cs(e_seat) > cs_m))
+        e_pax = ok_e & e_civ
+        take_c = e_pax & ~ok_c
+        return (torch.where(take, eslot, mslot),
+                torch.where(take, e_seat, m_seat),
+                ok_m | e_mil,
+                torch.where(take_c, eslot, cslot),
+                torch.where(take_c, e_seat, c_seat),
+                ok_c | e_pax)
+
+    def _unit_sight(self, utype: torch.Tensor, promos: torch.Tensor) -> torch.Tensor:
+        """`unitSight`'s twin: the chassis's own SIGHT — 0 in the table means the
+        SIGHT_RANGE default — plus what CIV6 (Spyglass / Rutter / Observation)
+        calls "+1 sight range"."""
+        base = self._type_sight[utype.clamp(min=0, max=self.NU - 1)]
+        return (torch.where(base > 0, base, torch.full_like(base, 2))
+                + self._promo_val(utype, promos, "SIGHT"))
+
+    def _stealth_hidden(self, seat) -> torch.Tensor:
+        """[B, T] — does this tile hold a STEALTH unit `seat` cannot see?
+
+        CIV6 (Unit, "Stealth units"): they "are invisible to non-adjacent
+        units"; beside a City Center or an Encampment they "remain hidden as
+        long as they don't attack and there's no unit in the district"; one
+        that attacks "will become visible for a turn"; and REVEAL STEALTH
+        "allows them to see other stealth units within their Sight range".
+        `unitVisibleTo` is the twin.
+
+        A district sees nothing of its own, so only UNITS light the map, and
+        every stealth chassis is a naval hull, so only `military_at` carries
+        one. The eye scan runs over the tiles that actually hold a hidden
+        hull, which is none in most games and a handful in the rest."""
+        mil = self.military_at
+        hidden = torch.zeros_like(mil, dtype=torch.bool)
+        if not self._stealth_live:
+            return hidden
+        sc = seat.reshape(self.B, 1) if torch.is_tensor(seat) else seat
+        mslot = mil.clamp(min=0)
+        mtype = self.unit_type.gather(1, mslot).clamp(min=0, max=self.NU - 1)
+        hid = ((mil >= 0) & self._type_stealth[mtype]
+               & (self.unit_revealed_turn.gather(1, mslot) < self.turn)
+               & (self.unit_seat.gather(1, mslot) != sc))
+        if not bool(hid.any()):
+            return hidden
+        tsel = hid.any(dim=0).nonzero(as_tuple=True)[0]
+        dist = self.pair_dist[:, tsel].to(torch.long)  # [T, K]
+        utype = self.unit_type.clamp(min=0, max=self.NU - 1)
+        reach = torch.where(self._type_reveal[utype],
+                            self._unit_sight(utype, self.unit_promos),
+                            torch.ones_like(utype))
+        mine = self.unit_alive & (self.unit_seat == sc)
+        seen = (mine.unsqueeze(2)
+                & (dist[self.unit_tile.clamp(min=0)] <= reach.unsqueeze(2))).any(dim=1)
+        hidden[:, tsel] = hid[:, tsel] & ~seen
+        return hidden
+
+    def _visible_military_at(self, seat) -> torch.Tensor:
+        """`military_at` as `seat` sees it: an unseen stealth hull is not there.
+        `visibleHostilesAt` is the twin."""
+        if not self._stealth_live:
+            return self.military_at
+        return torch.where(self._stealth_hidden(seat),
+                           torch.full_like(self.military_at, -1), self.military_at)
+
     def _flank_support(
         self,
         def_tile: torch.Tensor,
@@ -838,8 +938,18 @@ class SimMasks:
         mine = here & ~emb & (n_seat == attacker_seat.unsqueeze(1)) & ~is_atk & (riv == 0)
         flank = mine.long().sum(dim=1) * self._flank_support_live(attacker_seat).long()
 
-        friendly = here & (n_seat == def_seat.unsqueeze(1))
-        sup = friendly.long().sum(dim=1) * self._flank_support_live(def_seat).long()
+        # CIV6 (Flanking and Support): "Embarked land units provide Support
+        # like normal. Since naval units provide Support to land units and vice
+        # versa, a water tile containing an embarked unit and a naval unit
+        # provides +4 Combat Strength to any friendly unit defending in an
+        # adjacent tile" — so the passenger plane is counted BESIDE the hull's,
+        # and one hex can pay twice. Flanking above takes hulls only.
+        eslot = self.embarked_at.gather(1, nbc)
+        e_here = (eslot >= 0) & on
+        e_seat = torch.where(e_here, self.unit_seat.gather(1, eslot.clamp(min=0)),
+                             torch.full_like(nbc, -1))
+        friendly = (here & (n_seat == def_seat.unsqueeze(1))).long()             + (e_here & (e_seat == def_seat.unsqueeze(1))).long()
+        sup = friendly.sum(dim=1) * self._flank_support_live(def_seat).long()
         in_district = (self._centre_seat_plane().gather(1, dt.unsqueeze(1)).squeeze(1) >= 0) \
             | self._encamp_live().gather(1, dt.unsqueeze(1)).squeeze(1)
         return flank, torch.where(in_district, torch.zeros_like(sup), sup)
@@ -1093,45 +1203,61 @@ class SimMasks:
         tiles: torch.Tensor,
         seat,
         is_civilian=False,
+        is_naval=False,
     ) -> torch.Tensor:
-        return self._stack_blocked(tiles, seat, is_civilian) | self._encamp_block(tiles, seat)
+        return (self._stack_blocked(tiles, seat, is_civilian, is_naval)
+                | self._encamp_block(tiles, seat))
 
     def _stack_blocked(
         self,
         tiles: torch.Tensor,
         seat,
         is_civilian=False,
+        is_naval=False,
     ) -> torch.Tensor:
         """Pure STACKING check for tiles [B, N] — no Encampment term.
 
         ONE rule, keyed on the mover's SEAT:
 
-            a FOREIGN unit blocks; an OWN unit of the SAME DOMAIN blocks;
-            own cross-domain stacks.
+            a FOREIGN unit blocks; an OWN unit of the SAME CLASS blocks;
+            own cross-class stacks.
 
-        `seat` may be an int or a [B, 1] tensor (the war-march probes per slot).
+        The class is where the mover would STAND, not what it is ashore: CIV6
+        (Movement, "Stacking") makes an embarked unit "a separate class", so a
+        land unit probing water asks the passenger plane and a hull asks the
+        military one. `tileFreeForUnit` decides it the same way.
+
+        `seat` may be an int or a [B, 1] tensor (the war-march probes per slot);
+        `is_civilian` / `is_naval` an int, a bool or a [B] tensor.
         """
         tc = tiles.clamp(min=0)
         mil_slot = self.military_at.gather(1, tc)
         civ_slot = self.civilian_at.gather(1, tc)
+        emb_slot = self.embarked_at.gather(1, tc)
 
-        if True:
-            neg = torch.full_like(tc, -1)
-            mil_seat = torch.where(
-                mil_slot >= 0, self.unit_seat.gather(1, mil_slot.clamp(min=0)), neg
-            )
-            civ_seat = torch.where(
-                civ_slot >= 0, self.unit_seat.gather(1, civ_slot.clamp(min=0)), neg
-            )
-            civ_b = (
-                is_civilian.unsqueeze(1)
-                if torch.is_tensor(is_civilian)
-                else torch.full((1, 1), bool(is_civilian), dtype=torch.bool, device=tc.device)
-            )
-            mil_blocks = (mil_seat >= 0) & ((mil_seat != seat) | ~civ_b)
-            civ_blocks = (civ_seat >= 0) & ((civ_seat != seat) | civ_b)
-            occupied = mil_blocks | civ_blocks
-        return occupied
+        neg = torch.full_like(tc, -1)
+        mil_seat = torch.where(
+            mil_slot >= 0, self.unit_seat.gather(1, mil_slot.clamp(min=0)), neg
+        )
+        civ_seat = torch.where(
+            civ_slot >= 0, self.unit_seat.gather(1, civ_slot.clamp(min=0)), neg
+        )
+        emb_seat = torch.where(
+            emb_slot >= 0, self.unit_seat.gather(1, emb_slot.clamp(min=0)), neg
+        )
+
+        def _flag(v):
+            if torch.is_tensor(v):
+                return v if v.dim() >= 2 else v.unsqueeze(1)
+            return torch.full((1, 1), bool(v), dtype=torch.bool, device=tc.device)
+
+        civ_b = _flag(is_civilian)
+        emb_b = (self.water.gather(1, tc) & ~_flag(is_naval)) if self._embark_live \
+            else torch.zeros_like(tc, dtype=torch.bool)
+        mil_blocks = (mil_seat >= 0) & ((mil_seat != seat) | (~civ_b & ~emb_b))
+        civ_blocks = (civ_seat >= 0) & ((civ_seat != seat) | (civ_b & ~emb_b))
+        emb_blocks = (emb_seat >= 0) & ((emb_seat != seat) | emb_b)
+        return mil_blocks | civ_blocks | emb_blocks
 
     def _first_free_spot(self, at_tile: torch.Tensor, seat: int, civ_mask: torch.Tensor | None = None, naval_mask: torch.Tensor | None = None, cart: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors spawnUnit's placement probe: the anchor if free, else the
@@ -1152,7 +1278,9 @@ class SimMasks:
         # `_blocked_for`, not `_stack_blocked`: TS's spawnUnit probes with
         # tileFreeForUnit (units.ts), which calls encampmentBlocks — so the
         # Encampment wall belongs here too.
-        blocked = self._blocked_for(cand7, seat, is_civilian=False if civ_mask is None else civ_mask)
+        blocked = self._blocked_for(cand7, seat,
+                                    is_civilian=False if civ_mask is None else civ_mask,
+                                    is_naval=False if naval_mask is None else naval_mask)
         terr = self.passable.gather(1, okc)
         if naval_mask is not None and bool(naval_mask.any()):
             ocean_ok = ~self.ocean_tile.gather(1, okc)
@@ -1216,6 +1344,7 @@ class SimMasks:
         self.barb_unit_tile[rows, slot] = spot[rows]
         self.barb_unit_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
         self.barb_unit_fortify[rows, slot] = 0  # a fresh (possibly reclaimed) slot starts undug
+        self.barb_unit_revealed_turn[rows, slot] = -1
         self.barb_unit_xp[rows, slot] = 0
         self.barb_unit_level[rows, slot] = 1
         self.barb_unit_promos[rows, slot] = 0
@@ -1311,9 +1440,11 @@ class SimMasks:
         self.major_unit_seat[rows, slot] = row
         getattr(self, f"{pre}_unit_type")[rows, slot] = type_idx[rows]
         getattr(self, f"{pre}_unit_tile")[rows, slot] = spot[rows]
-        self._reveal_around(rows, row, spot[rows], 2)
+        self._reveal_around(rows, row, spot[rows],
+                            self._unit_sight(type_idx[rows], torch.zeros_like(slot)))
         getattr(self, f"{pre}_unit_hp")[rows, slot] = self.rules.combat.get("unitHp", 100)
         getattr(self, f"{pre}_unit_fortify")[rows, slot] = 0
+        getattr(self, f"{pre}_unit_revealed_turn")[rows, slot] = -1
         getattr(self, f"{pre}_unit_xp")[rows, slot] = 0
         getattr(self, f"{pre}_unit_level")[rows, slot] = 1
         getattr(self, f"{pre}_unit_promos")[rows, slot] = 0
@@ -1804,11 +1935,13 @@ class SimMasks:
         nbc = nb.clamp(min=0).reshape(B, -1)
         on_map = nb >= 0
 
-        _ms = self.military_at.gather(1, nbc)
+        _ms = self._visible_military_at(row).gather(1, nbc)
         _cs = self.civilian_at.gather(1, nbc)
+        _es = self.embarked_at.gather(1, nbc)
         neg = torch.full_like(_ms, -1)
         m_seat = torch.where(_ms >= 0, self.unit_seat.gather(1, _ms.clamp(min=0)), neg)
         c_seat = torch.where(_cs >= 0, self.unit_seat.gather(1, _cs.clamp(min=0)), neg)
+        e_seat = torch.where(_es >= 0, self.unit_seat.gather(1, _es.clamp(min=0)), neg)
 
         is_civ = (self._type_civilian[utype.clamp(min=0)]).unsqueeze(2)
         passable = self.passable.gather(1, nbc).reshape(B, N, 6)
@@ -1827,10 +1960,11 @@ class SimMasks:
             terr = torch.where(is_nav, water, passable | embark)
         else:
             terr = passable
+        _nav6 = is_nav.expand(B, N, 6).reshape(B, -1)
         _blk = torch.where(
             is_civ,
-            self._blocked_for(nbc, row, is_civilian=True).reshape(B, N, 6),
-            self._blocked_for(nbc, row).reshape(B, N, 6),
+            self._blocked_for(nbc, row, is_civilian=True, is_naval=_nav6).reshape(B, N, 6),
+            self._blocked_for(nbc, row, is_naval=_nav6).reshape(B, N, 6),
         )
         has_mp = (self.unit_mp.gather(1, sc) > 0).unsqueeze(2)
         cliff6 = (self._cliff_block_dirs(tc, nb, own_tile,
@@ -1844,6 +1978,7 @@ class SimMasks:
         # hostility rule, so no seat needs a target clause of its own.
         hostile_u = (
             self._seats_hostile(row, m_seat) | self._seats_hostile(row, c_seat)
+            | self._seats_hostile(row, e_seat)
         ).reshape(B, N, 6)
         ctr_seat = self._centre_seat_plane()
         ctr_nb = ctr_seat.gather(1, nbc)
@@ -1984,7 +2119,10 @@ class SimMasks:
             # the strike's scope-out: a MAJOR's ranged fire engages barbarians
             # only (cpu/core/combat.ts hostileRangedStrike, `!(isCiv(a) &&
             # isCiv(b))`), so a major seat's ring targets are barbarian units.
-            _ring_u = ((_rms == BARB_SEAT) | (_rcs == BARB_SEAT)).reshape(B, N, 12)
+            _res_ = self.embarked_at.gather(1, ringc)
+            _res_s = torch.where(_res_ >= 0, self.unit_seat.gather(1, _res_.clamp(min=0)), _rneg)
+            _ring_u = ((_rms == BARB_SEAT) | (_rcs == BARB_SEAT)
+                       | (_res_s == BARB_SEAT)).reshape(B, N, 12)
             _ring_c = self._seats_hostile(row, self._centre_seat_plane().gather(1, ringc)).reshape(B, N, 12)
             # a district's defenses are a target at range too
             _ring_e = self._encamp_block(ringc, row).reshape(B, N, 12)
@@ -2134,7 +2272,7 @@ class SimMasks:
         neg = torch.full((B, T), -1, dtype=torch.long, device=dev)
         land = torch.zeros(B, T, dtype=torch.bool, device=dev)
         sea = torch.zeros(B, T, dtype=torch.bool, device=dev)
-        for plane in (self.military_at, self.civilian_at):
+        for plane in (self._visible_military_at(row), self.civilian_at, self.embarked_at):
             pc = plane.clamp(min=0)
             here = plane >= 0
             s = torch.where(here, self.unit_seat.gather(1, pc), neg)

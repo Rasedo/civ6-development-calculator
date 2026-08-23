@@ -162,7 +162,9 @@ def group_keys(sim, b: int, group: str, rows: list) -> list[int]:
     if group == "unit":
         tile = sim.unit_tile[b].tolist()
         typ = sim.unit_type[b].tolist()
-        return [tile[i] * 2 + (1 if _is_civilian(sim, typ[i]) else 0) for i in rows]
+        emb = sim.unit_emb[b].tolist()
+        return [tile[i] * 3 + (2 if emb[i] else 1 if _is_civilian(sim, typ[i]) else 0)
+                for i in rows]
     if group == "tile":
         return list(rows)
     raise KeyError(f"unknown manifest group {group!r}")
@@ -659,6 +661,7 @@ UNIT = {
     "spyTarget": _unit("unit_spy_target"),
     "spyLevel": _unit("unit_spy_level"),
     "gpAt": _unit("unit_gp_at"),
+    "revealedTurn": _unit("unit_revealed_turn"),
 }
 
 

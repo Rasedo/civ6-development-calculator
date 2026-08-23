@@ -68,8 +68,8 @@ nothing carries forward.
 | B-45r sourced-sweep finds in the other rows | 1 | three of the eight now have a channel; the five that do not need a wonder that grants a UNIT, faith patronage (B-53r), a rival-recruit event, or B-31r's route yields |
 | B-46r the siege class's tails | 1 | the Bombard stat, both support chassis, all four walls tiers, the move-and-shoot rule and every siege rung through Rocket Artillery ship; Akkad's suzerain bonus does not |
 | B-54r flanking and support vs their own page | 1 | six rules the two engines agree on and the page does not: the Military Tradition gate, the flanking owner and river rules, support against ranged, embarked providers, and defensible districts |
-| B-55r a ship cannot carry a passenger | 1 | one MILITARY unit per tile, where Civ 6 stacks an embarked land unit with a naval one — which is where Support's 7th through 10th stacks live |
-| B-56r the ten inert promotions | 2 | 62 of the 72 catalog rows fire a rule; ten name a mechanic neither engine has — a second attack per turn, sight-blocking, escort formations, class-aware zone of control, a promotion term in the air-strike roll — or wait on C-25 |
+| B-64r embarking and disembarking cost the whole turn | 1 | Civ 6 charges the transition 3 MP and carries the remainder into the new movement mode; both engines spend everything and end the move |
+| B-56r the ten inert promotions | 2 | 62 of the 72 catalog rows fire a rule; ten name a mechanic neither engine has — a second attack per turn, sight-blocking, escort formations, class-aware zone of control, a promotion term in the air-strike roll, or stealth as a PROMOTION rather than a chassis flag |
 | B-57r the SNIPE head stops at the distance-2 ring | 1 | a +1 Range promotion widens what the rule legalises and no seat can ORDER the shot, because the ring-3 columns do not exist |
 | B-58r the religious purchase asks for a Shrine | 1 | Civ 6 asks for a MAJORITY RELIGION and a Holy Site with a Temple; both engines ask for a Shrine and never read what the city follows |
 | B-59r the religious spread is a flat lump | 2 | Civ 6 scales the pressure by the Apostle's HP and strips a quarter of every other religion; both engines add a constant and strip nothing without Proselytizer |
@@ -88,14 +88,12 @@ nothing carries forward.
 | C-7 trading posts | 2 | a route lays roads and plants nothing |
 | C-8 draws made deterministic | 2 | the Great Person replacement walks a queue and the Congress slate rotates, where Civ 6 draws both |
 | C-16 the spy's second half | 2 | the Spy, its capacity, the jump and all twelve missions ship; the escape-and-capture sequence, the spy promotion pool and two missions with no carrier do not |
-| C-17 embarked movement never upgrades | 1 | the flat EMBARK_MOVES stands in for every era |
 | C-20 the Military Engineer's build list | 1 | the Fort, the Airstrip, the road and the 20% charge all ship; the Missile Silo waits on C-31, the Mountain Tunnel on C-35 and the railroad on C-36 |
 | C-22 the district roster is a subset | 2 | all eighteen districts ship; the Canal carries no naval passage, six Government Plaza buildings have no effect body, and the Preserve's housing table is unpublished |
 | C-23 nothing diminishes tourism | 1 | no rival's Enlightenment ever costs a tourist, so Cristo Redentor's cancelling clause has nothing to cancel |
 | C-24 the climate arc | 1 | emissions, the seven phases, ice melt, flooding, the Flood Barrier and a warmed world's weather all ship; nothing is ever submerged (C-35), the barrier's maintenance is unpublished, and railroads and the Mitigation civic's award have no carrier |
 | C-26 no civilization uniques | 5 | seats are a name, a colour and a city list: no civ ability, no leader ability or agenda, no unique unit, no unique infrastructure (America's Film Studio among them) |
-| C-25 no stealth (invisible) units | 2 | the whole naval-raider class is absent and nothing on either engine can be invisible |
-| C-27 pillaging pays no yields | 2 | the verb marks the tile and heals; nothing banks, and there is no coastal raid to bank from |
+| C-27 pillaging pays no yields | 2 | the verb marks the tile and heals; nothing banks, and the raider chassis that ship now carry no Coastal Raid to bank from |
 | C-28 tourism is one lifetime scalar | 2 | it is banked per seat and divided by the civ count on read, so no rule can address one rival's tourism |
 | C-29 no RESOLVED suzerain | 1 | `isSuzerain` recomputes from the raw envoy store on every read, so a rule that changes envoy WEIGHT by who the suzerain is has no fixed point |
 | C-30 city-states carry no research | 1 | no techs, no civics, so nothing can say when a minor took Early Empire — its borders never close and the suzerain's passage lifts nothing |
@@ -105,8 +103,8 @@ nothing carries forward.
 | C-34 air combat's second half | 2 | bases, both heads, the sortie and the scatter ship; Interception, Patrol and Priority Target — the whole reason a fighter exists — do not |
 | C-35 the land/water fact never moves | 2 | one static bit answers "is this sea", "can a hull stand here" and "is this coastal"; no tile can become water, which is what submersion and the Canal's passage each need |
 | C-36 no railroad | 2 | roads are one boolean tier; the railroad's own movement rate, its per-hex Iron and Coal charge and its CO2 have no carrier, which C-20's fifth verb and C-24's third emitter both wait on |
-| **C. Absent systems** | **44** | |
-| **OPEN, TOTAL** | **76** | |
+| **C. Absent systems** | **41** | |
+| **OPEN, TOTAL** | **73** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -691,24 +689,20 @@ Civ 6 source or is recorded as unverifiable.
     now ship as `FLANK_MULT` / `SUPPORT_MULT` rows their owner's unit must
     hold; the unique units are C-26's, the two Great Person identities are
     B-53r's, and Shadow Strike is not in the 72-row catalog.
-  - **THE STACKS STOP SHORT OF THEIR CIV 6 MAXIMA.** Flanking tops out at 5
-    here and 6 there; Support at 6 here and 10 there. Both ceilings are the
-    same blocker, B-55r: Civ 6 counts a water tile holding an embarked unit
-    AND a ship as two providers, and no tile on either engine can hold both.
-- **B-55r. A ship cannot carry a passenger.** `tileFreeForUnit` and
-  `_blocked_for` allow one unit per DOMAIN per tile and `unitDomain` has two,
-  so a naval unit and an embarked land unit — both military — can never share
-  a water tile. Civ 6 stacks them, and publishes rules that only make sense on
-  the stack: the Combat page settles who defends ("when a naval unit and an
-  embarked unit occupy the same hex, the unit with the higher Combat Strength
-  will defend against ranged attacks"), and Flanking and Support builds its
-  maxima on it ("a water tile containing an embarked unit and a naval unit
-  provides +4 Combat Strength to any friendly unit defending in an adjacent
-  tile"), which is how Support reaches 10 stacks across the 6 tiles a hex has.
-  So no escort can shield a transport by standing on it, and both bonuses stop
-  short of their real ceilings (B-54r). The third Civ 6 slot, the SUPPORT unit
-  class, is not the same gap: BATTERING_RAM and SIEGE_TOWER carry `charges`,
-  so `unitDomain` already files them as civilians and they stack with an army.
+- **B-64r. Embarking and disembarking cost the whole turn.** Weight 1. CIV6
+  (Movement, "Embarking"): the transition requires "either 3 Movement or all
+  the unit's Movement for the round (if it has less than 3 Movement)", and "if
+  a unit has more than 3 Movement available for either embarking or
+  disembarking, the remaining points are transferred to the new movement mode,
+  and that unit may manage to continue moving in this same turn" — the page's
+  own worked example is a 4-MP cavalry unit that embarks and still walks one
+  water tile, and its own rider is that "normal movement limits still apply
+  after the switch of movement mode". Both engines charge the whole pool
+  instead: `stepUnit`'s `transition` arm and `_step_verb`'s twin price the
+  step at everything the mover has left, so nothing ever enters the water and
+  keeps going. The page's own discount rides on the same rule and has no
+  carrier either: "embarking to and from a tile with a Harbor district or a
+  City Center tile (for a coastal city) ... costs only 1 Movement".
 - **B-56r. The ten inert promotions.** 62 of the 72 catalog rows in
   `cpu/data/promotions.ts` reach a rule through `promoCS` / `_promo_cs` or one
   of the flag and value kinds beside them. TEN carry `none` because the
@@ -721,17 +715,22 @@ Civ 6 source or is recorded as unverifiable.
   - **SENTRY** ("can see through Woods and Rainforest") — `revealAround` /
     `_reveal_around` reveal a flat radius, so nothing blocks sight and the
     promotion has nothing to lift.
-  - **SUPPRESSION** grants zone of control to a ranged unit. `inEnemyZoc` /
-    `_in_enemy_zoc` count EVERY hostile military unit, ranged included, so the
-    promotion has nothing to grant. The real gap is the other way round: a
-    ranged unit should not exert ZOC without it, and making it class-aware is
-    the fix this row is waiting on.
-  - **CONVOY and ESCORT_MOBILITY** move an escorted unit with its escort. No
-    formation model exists: `unitsAt` / the occupancy planes hold units, never
-    pairs, so there is no escort to speak of. Related to B-55r but not the
-    same gap — that one is about a tile holding two units, this one about two
-    units moving as one.
-  - **CAMOUFLAGE and CREEPING_ATTACK** need stealth: C-25.
+  - **SUPPRESSION** grants zone of control to a ranged unit. `unitExertsZoc` /
+    `_in_enemy_zoc` read one chassis flag (the submarines' "does not exert
+    zone of control") and otherwise count EVERY hostile military unit, ranged
+    included, so the promotion has nothing to grant. The real gap is the other
+    way round: a ranged unit should not exert ZOC without it, and making the
+    exert test CLASS-aware is the fix this row is waiting on.
+  - **CONVOY and ESCORT_MOBILITY** move an escorted unit with its escort. A
+    tile holds a stack now, but nothing binds one occupant's move to the
+    other's: `unitStackSlot` / `_occ_set` file each unit on its own plane and
+    every walker steps one slot at a time, so there is no formation to move.
+  - **CAMOUFLAGE and CREEPING_ATTACK** grant stealth to a RECON unit that
+    earns them. The axis exists now — `unitVisibleTo` / `_stealth_hidden` hide
+    a chassis and Reveal Stealth uncovers it — but both read the TYPE table
+    (`stealth` in `cpu/data/units.ts`), so nothing a unit EARNS can turn it on.
+    The fix is a per-unit grant beside the type flag, which is also what a
+    Warrior Monk's Twilight Veil and a Soothsayer's Inquisitor would need.
   - **PROXIMITY_FUSES** is "+7 Combat Strength when defending against air
     attacks". Air attacks exist now, so C-16 is no longer what stops it; the
     blocker moved. `airStrike` / `_air_strike` roll the defender at
@@ -1392,9 +1391,6 @@ number was under-counting by treating deferrals as closures.
   so treat the class as poke-proven until the reachability probe says
   otherwise; each mission body has its own section in `tests/gpu/spy_test.py`
   and `tests/cpu/units/spy.test.ts`.
-- **C-17. EMBARKED MOVEMENT DOES NOT UPGRADE.** Weight 1. `constants` records
-  that the tech upgrades to embarked movement are unmodeled; the flat
-  EMBARK_MOVES stands in for every era.
 - **C-20. THE MILITARY ENGINEER'S LAST THREE VERBS.** Weight 1. Its page reads
   "Can construct Roads, Forts, Airstrips, and Missile Silos (uses 1 charge)",
   "[GS] Can construct Railroads (costs no charge) and Mountain Tunnels (uses 1
@@ -1430,9 +1426,16 @@ number was under-counting by treating deferrals as closures.
   pokes every rule directly instead.
 - **C-27. PILLAGING PAYS NO YIELDS.** Weight 2. The PILLAGE verb sets
   `pillaged` on the tile, heals a food-improvement pillager and spends the
-  move; nothing is banked by anyone on either engine, and there is no coastal
-  raid to bank from either. Real Civ 6 pays the pillager a yield lump keyed to
-  what was wrecked. A gap waits on it: `TOTAL_WAR`'s pillage half (C-6).
+  move; nothing is banked by anyone on either engine. Real Civ 6 pays the
+  pillager a yield lump keyed to what was wrecked. Two gaps wait on it:
+  - **`TOTAL_WAR`'s pillage half** (C-6).
+  - **THE COASTAL RAID.** All three naval raiders ship now, and each one's
+    page lists "Can perform Coastal Raids" beside the abilities that do ship:
+    "To perform a Coastal Raid, the Privateer must be next to the land
+    improvement or district, and must have at least 3 Movement points
+    remaining." Neither engine offers a PILLAGE column to a hull at all
+    (`_seat_unit_mask` builds the verb over land movers), so the raid needs
+    the column before it can need a payout.
 - **C-28. TOURISM IS ONE LIFETIME SCALAR PER SEAT.** Weight 2. `seat.tourism`
   banks a single figure and the visitor split divides it by the civ count on
   read, so no rule can address the tourism flowing to ONE rival. Real Civ 6
@@ -1460,8 +1463,10 @@ number was under-counting by treating deferrals as closures.
   the roster, and C-5 and B-46r are corrected accordingly.
 
 - **C-32. THE NEW CLASSES HAVE NO PROMOTION TREE.** Weight 2. `PROMO_CLASSES`
-  covers the land, naval and religious chassis; the AIR, GIANT DEATH ROBOT and
-  SUPPORT classes have no entry, and neither does the SPY. `UNIT_PROMO_CLASS`
+  covers the land, melee/ranged naval and religious chassis; the AIR, GIANT
+  DEATH ROBOT, SUPPORT and NAVAL RAIDER classes have no entry, and neither
+  does the SPY — so the three raiders that now carry stealth are offered no
+  promotion at all. `UNIT_PROMO_CLASS`
   therefore maps every one of those chassis to nothing, `promoOffer` /
   `_promo_offer_mask` open no column for them, and a fighter that wins ten
   sorties stays at level 1 forever. Two rules wait on this one:
@@ -1570,20 +1575,6 @@ number was under-counting by treating deferrals as closures.
   Support applies to ranged attacks too, and Saladin's, which doubles both
   bonuses outright; and the Nihang, the one unit that keeps a Combat Strength
   bonus of its own while embarked, where every other unit normalizes.
-- **C-25. NO STEALTH (INVISIBLE) UNITS.** Weight 2. Nothing on either engine
-  can be invisible: `unitsAt` / `military_at` answer the same question for
-  every observer, and no unit carries a stealth flag because none of the units
-  that would is in the roster. Civ 6's complete list is the NAVAL RAIDER class
-  (Privateer, Sea Dog, Barbary Corsair, Submarine, U-Boat, Nuclear Submarine)
-  — of which this roster has none, its whole navy being the GALLEY and the
-  QUADRIREME — plus a Warrior Monk with Twilight Veil, a Recon unit with
-  Camouflage and a Soothsayer with Inquisitor, three units that are absent —
-  and Camouflage is one of B-56r's inert rows for the same reason. Gaps waiting on it: the siege rule "stealth units
-  cannot besiege a city", which `encircled` / `_seat_city_fire_and_heal` count
-  every hostile military unit toward; the hidden-while-adjacent-to-a-district
-  clause and the reveal-for-one-turn-after-attacking clause, which need a
-  visibility axis `isExplored` does not have; and the Reveal Stealth ability
-  that Scouts and Destroyers carry.
 - **C-24. THE CLIMATE ARC.** Weight 1. Gathering Storm's climate arc ships on
   both engines. Every seat banks lifetime CO2 in RAW units, the world's total
   is scaled by the deforestation band it has cleared, and `climatePoints` /

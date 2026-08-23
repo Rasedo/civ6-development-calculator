@@ -15,7 +15,7 @@ class SimOrders:
         if bool(gone.any()):
             d = r[gone]
             self.unit_alive[d, sc[d]] = False
-            self.civilian_at[(d, hc[d])] = -1
+            self._occ_clear(d, hc[d], sc[d])
 
     def _apply_seat_unit_actions(self, row: int, actions: torch.Tensor) -> None:
         B, dev = self.B, self.device
@@ -125,7 +125,7 @@ class SimOrders:
                     made = self._found_city_at(row, fnd, here)
                     if bool(made.any()):
                         fr = made.nonzero(as_tuple=True)[0]
-                        self.civilian_at[fr, here[fr]] = -1
+                        self._occ_clear(fr, here[fr], sc[fr])
                         self.unit_alive[fr, sc[fr]] = False
 
             if _rk_excavate[n] and _xc >= 0:
@@ -211,7 +211,7 @@ class SimOrders:
                     lr = lqm.nonzero(as_tuple=True)[0]
                     self.civ_inquisition[lr, row] = True
                     self.unit_alive[lr, sc[lr]] = False
-                    self.civilian_at[lr, hc[lr]] = -1
+                    self._occ_clear(lr, hc[lr], sc[lr])
                     self._gen_ver += 1
 
             if _rk_heathen[n] and _hn >= 0:
@@ -320,15 +320,16 @@ class SimOrders:
                 # Both arms are pure reads; build the civilian plane only when
                 # a civilian is actually moving this rank — most ranks are
                 # military-only and the second _blocked_for was half the cost.
-                blocked = self._blocked_for(tgt.unsqueeze(1), row).squeeze(1)
+                is_nav = self.unit_naval[ut]
+                blocked = self._blocked_for(tgt.unsqueeze(1), row, is_naval=is_nav).squeeze(1)
                 if bool((mv & is_civ).any()):
                     blocked = torch.where(
                         is_civ,
-                        self._blocked_for(tgt.unsqueeze(1), row, is_civilian=True).squeeze(1),
+                        self._blocked_for(tgt.unsqueeze(1), row, is_civilian=True,
+                                          is_naval=is_nav).squeeze(1),
                         blocked,
                     )
                 terr = self.passable.gather(1, tc.unsqueeze(1)).squeeze(1)
-                is_nav = self.unit_naval[ut]
                 if self._embark_live:
                     cart = (techs[:, self._cartography_tech] if self._cartography_tech >= 0
                             else torch.zeros(B, dtype=torch.bool, device=dev))
@@ -372,12 +373,16 @@ class SimOrders:
                     # WHO is on the target tile, and is any of them hostile to
                     # this seat? `unitsHostile` answers for every pair, so no
                     # seat needs a clause of its own.
-                    _ms = self.military_at.gather(1, tc.unsqueeze(1)).squeeze(1)
+                    _ms = self._visible_military_at(row).gather(1, tc.unsqueeze(1)).squeeze(1)
                     _cs = self.civilian_at.gather(1, tc.unsqueeze(1)).squeeze(1)
+                    _es = self.embarked_at.gather(1, tc.unsqueeze(1)).squeeze(1)
                     neg = torch.full_like(_ms, -1)
                     m_seat = torch.where(_ms >= 0, self.unit_seat.gather(1, _ms.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
                     c_seat = torch.where(_cs >= 0, self.unit_seat.gather(1, _cs.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
-                    host_m = self._seats_hostile(row, m_seat.unsqueeze(1)).squeeze(1)
+                    e_seat = torch.where(_es >= 0, self.unit_seat.gather(1, _es.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
+                    # the passenger is a target in its own right
+                    host_m = (self._seats_hostile(row, m_seat.unsqueeze(1))
+                              | self._seats_hostile(row, e_seat.unsqueeze(1))).squeeze(1)
                     host_c = self._seats_hostile(row, c_seat.unsqueeze(1)).squeeze(1)
                     ctr = self._centre_seat_plane().gather(1, tc.unsqueeze(1)).squeeze(1)
                     city_t = self._seats_hostile(
@@ -500,7 +505,7 @@ class SimOrders:
                     if bool(spent.any()):
                         dr = spent.nonzero(as_tuple=True)[0]
                         self.unit_alive[dr, sc[dr]] = False
-                        self.civilian_at[(dr, hc[dr])] = -1
+                        self._occ_clear(dr, hc[dr], sc[dr])
 
             if _rk_imp[n] and self.improvements_on and self._builder_idx >= 0:
                 hf = (civics[:, self._hillfarms_civic] if self._hillfarms_civic >= 0
@@ -690,7 +695,7 @@ class SimOrders:
                             if bool(dead.any()):
                                 dr = dead.nonzero(as_tuple=True)[0]
                                 self.unit_alive[dr, sc[dr]] = False
-                                self.civilian_at[(dr, hc[dr])] = -1
+                                self._occ_clear(dr, hc[dr], sc[dr])
 
     def _relocate_palace(self, rows: torch.Tensor, seat_row: torch.Tensor) -> None:
         """Re-crown a seat's capital — the `relocatePalace` mirror, ONE body
@@ -937,12 +942,7 @@ class SimOrders:
         rows = do_kill.nonzero(as_tuple=True)[0]
         vslot = victim[rows]
         vtile = self.unit_tile[rows, vslot]
-        vciv = self._type_civilian[self.unit_type[rows, vslot].clamp(min=0, max=self.NU - 1)]
-        mil = ~vciv
-        if bool(mil.any()):
-            self.military_at[(rows[mil], vtile[mil])] = -1
-        if bool(vciv.any()):
-            self.civilian_at[(rows[vciv], vtile[vciv])] = -1
+        self._occ_clear(rows, vtile, vslot)
         self.unit_alive[rows, vslot] = False
 
     def _barb_reset_mp(self) -> None:
@@ -1081,6 +1081,7 @@ class SimOrders:
                         & ~self.ocean_tile.gather(1, _nbc)  # barbarians have no CARTOGRAPHY
                         & (self.military_at.gather(1, _nbc) < 0)  # no unit at all
                         & (self.civilian_at.gather(1, _nbc) < 0)
+                        & (self.embarked_at.gather(1, _nbc) < 0)
                     )
                     _key = torch.where(_free, _nb, torch.full_like(_nb, self.T + 1))
                     _best = _key.min(dim=1).values
@@ -1137,9 +1138,11 @@ class SimOrders:
             # A NON-BARBARIAN unit is adjacent (a barbarian is not a target for
             # a barbarian). Civilians are never barbarian, so only the military
             # plane needs the seat test.
-            _mn = self.military_at.gather(1, nbc)
+            _mn = self._visible_military_at(BARB_SEAT).gather(1, nbc)
             _mn_seat = torch.where(_mn >= 0, self.unit_seat.gather(1, _mn.clamp(min=0)), torch.full_like(_mn, -1))
-            has_unit = ((_mn >= 0) & (_mn_seat != BARB_SEAT)) | (self.civilian_at.gather(1, nbc) >= 0)
+            has_unit = (((_mn >= 0) & (_mn_seat != BARB_SEAT))
+                        | (self.civilian_at.gather(1, nbc) >= 0)
+                        | (self.embarked_at.gather(1, nbc) >= 0))
             enc_nb = self._encamp_block(nb, BARB_SEAT) if self._encamp_didx >= 0 else None
             valid = (nb >= 0) & (ctr | has_unit | (enc_nb if enc_nb is not None else False))
             tkey = torch.where(valid, nb, T + 1)
@@ -1304,7 +1307,7 @@ class SimOrders:
                     self.wpass.gather(1, nb2c) & ~self.ocean_tile.gather(1, nb2c),
                     self.passable.gather(1, nb2c),
                 )
-                step_ok = (nb2 >= 0) & _plane & ~self._blocked_for(nb2, BARB_SEAT)
+                step_ok = (nb2 >= 0) & _plane & ~self._blocked_for(nb2, BARB_SEAT, is_naval=_navm)
                 d_nb = self.pair_dist[tgt.unsqueeze(1), nb2c].to(torch.long)
                 skey = torch.where(step_ok, d_nb * 8 + arange6, 10**9)
                 best = skey.min(dim=1).values

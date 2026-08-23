@@ -82,20 +82,6 @@ class SimEconomy:
         equal maximum. The `wwSum` twin."""
         return self.ww[:, row, :].sum(dim=1)
 
-    def _tile_mil_seat(self, tile: torch.Tensor) -> torch.Tensor:
-        """[B] long - the SEAT of the military unit on `tile`, NO_SEAT if none.
-        The unit pool is one plane with `unit_seat` carrying ownership, so this
-        is one gather rather than a per-pool chain."""
-        s = self.military_at.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1)
-        return torch.where(s >= 0, self.unit_seat.gather(1, s.clamp(min=0).unsqueeze(1)).squeeze(1),
-                           torch.full_like(s, NO_SEAT))
-
-    def _tile_civ_seat(self, tile: torch.Tensor) -> torch.Tensor:
-        """[B] long - the SEAT of the civilian on `tile`, NO_SEAT if none."""
-        s = self.civilian_at.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1)
-        return torch.where(s >= 0, self.unit_seat.gather(1, s.clamp(min=0).unsqueeze(1)).squeeze(1),
-                           torch.full_like(s, NO_SEAT))
-
     def _atk_seat(self, atk_kind: str, u: int) -> torch.Tensor:
         return getattr(self, f"{atk_kind}_unit_seat")[:, u]
 
@@ -113,7 +99,8 @@ class SimEconomy:
         """
         t = tile.clamp(min=0).unsqueeze(1)
         return ((self.military_at.gather(1, t).squeeze(1) >= 0).long()
-                | ((self.civilian_at.gather(1, t).squeeze(1) >= 0).long() << 1))
+                | ((self.civilian_at.gather(1, t).squeeze(1) >= 0).long() << 1)
+                | ((self.embarked_at.gather(1, t).squeeze(1) >= 0).long() << 2))
 
     def _ww_holds(self, row: int) -> bool:
         """Only MAJOR civs keep an accumulator: rows 0..n_majors-1. A city-state is a
@@ -862,7 +849,8 @@ class SimEconomy:
             for pool in ("major", "barb"):
                 mil = getattr(self, f"{pool}_unit_alive")
                 lo_p, hi_p = self.POOL_LO[pool], self.POOL_HI[pool]
-                for plane, civilian in ((self.military_at, False), (self.civilian_at, True)):
+                for plane, civilian in ((self.military_at, False), (self.civilian_at, True),
+                                        (self.embarked_at, False)):
                     slot = plane.gather(1, tc.unsqueeze(1)).squeeze(1)
                     on = hurt & (slot >= lo_p) & (slot < hi_p)
                     if not bool(on.any()):
@@ -2216,20 +2204,23 @@ class SimEconomy:
         if self._pk.get("CHAPLAIN", -1) < 0:
             return out
         # every tile's chaplain value, by the RELIGIOUS occupant standing on it
-        occ = self.civilian_at
-        oc = occ.clamp(min=0)
-        val = torch.where(
-            occ >= 0,
-            self._promo_val(self.unit_type.gather(1, oc).clamp(min=0, max=self.NU - 1),
-                            self.unit_promos.gather(1, oc), "CHAPLAIN"),
-            torch.zeros_like(occ),
-        )
-        oseat = torch.where(occ >= 0, self.unit_seat.gather(1, oc), torch.full_like(occ, -1))
+        # — ashore on the civilian plane, at sea on the passenger one.
         nb = self.neigh[t.reshape(-1)].reshape(t.shape[0], t.shape[1], 6)
         nbc = nb.clamp(min=0).reshape(t.shape[0], -1)
-        near = (val.gather(1, nbc).reshape(nb.shape)
-                * ((nb >= 0) & (oseat.gather(1, nbc).reshape(nb.shape)
-                                == getattr(self, f"{pre}_unit_seat").unsqueeze(2))).long())
+        seat = getattr(self, f"{pre}_unit_seat").unsqueeze(2)
+        near = torch.zeros(nb.shape, dtype=torch.long, device=self.device)
+        for occ in (self.civilian_at, self.embarked_at):
+            oc = occ.clamp(min=0)
+            val = torch.where(
+                occ >= 0,
+                self._promo_val(self.unit_type.gather(1, oc).clamp(min=0, max=self.NU - 1),
+                                self.unit_promos.gather(1, oc), "CHAPLAIN"),
+                torch.zeros_like(occ),
+            )
+            oseat = torch.where(occ >= 0, self.unit_seat.gather(1, oc), torch.full_like(occ, -1))
+            near = torch.maximum(near, val.gather(1, nbc).reshape(nb.shape)
+                                 * ((nb >= 0) & (oseat.gather(1, nbc).reshape(nb.shape)
+                                                 == seat)).long())
         return torch.where(self._type_civilian[typ], out, near.amax(dim=2))
 
     def _holy_site_faith(self) -> torch.Tensor:
@@ -2307,6 +2298,23 @@ class SimEconomy:
         `unit.movesLeft < grantedLast` and nothing else."""
         return getattr(self, f"{pre}_unit_mp") < getattr(self, f"{pre}_unit_mp_full")
 
+    def _sea_move_mp(self, seat: torch.Tensor, emb: torch.Tensor, naval: torch.Tensor) -> torch.Tensor:
+        """[B, U] — `seaMoveBonus` + `embarkTechMoves`. The Mathematics rung
+        reaches anything AT SEA (a hull or a passenger); the three embark rungs
+        raise the passenger's own pool. A seat with no research desk (a
+        barbarian, a city-state) reads neither."""
+        row = self._row_of(seat)
+        ok = (row >= 0) & (row < self.n_majors)
+        r0 = row.clamp(min=0, max=self.n_majors - 1)  # a minor/barb row is masked, not indexed
+        out = torch.zeros_like(row)
+        if self._sea_move_tech >= 0:
+            has = self.civ_techs[:, :, self._sea_move_tech].gather(1, r0)
+            out = out + (has & ok & (emb | naval)).long() * self._sea_move_bonus
+        for ti, v in self._embark_move_techs:
+            has = self.civ_techs[:, :, ti].gather(1, r0)
+            out = out + (has & ok & emb & ~naval).long() * v
+        return out
+
     def _full_mp(self, pre: str) -> torch.Tensor:
         """[B, U] — refreshUnits' `full + generalAuraMP(state, unit)`, one rule
         for both windows: an EMBARKED land unit marches on the flat
@@ -2326,11 +2334,13 @@ class SimEconomy:
         # embarkation speed is not a unit's movement stat. `unitFullMoves` has
         # the same shape (`if (embarked && !naval) return EMBARK_MOVES`).
         base = self._type_moves[typ] + self._golden_move_mp(pre) + self._emergency_mp(pre)
+        naval = self.unit_naval[typ]
+        emb = getattr(self, f"{pre}_unit_emb") if self._embark_live else torch.zeros_like(naval)
         if self._embark_live:
-            emb = getattr(self, f"{pre}_unit_emb")
             base = torch.where(
-                emb & ~self.unit_naval[typ], torch.full_like(base, self._embark_moves), base
+                emb & ~naval, torch.full_like(base, self._embark_moves), base
             )
+        base = base + self._sea_move_mp(getattr(self, f"{pre}_unit_seat"), emb, naval)
         return base + self._promo_pool_val(pre, "MOVES") + getattr(self, f"{pre}_unit_aura_mp")
 
     def _reset_mp(self, pre: str) -> None:

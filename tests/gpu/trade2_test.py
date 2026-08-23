@@ -20,6 +20,8 @@ income + expiry):
     seat no longer holds is dropped while a live pair survives;
   * a CAPTURED destination drops the route even though its centre tile is
     still a live city centre — the case a tile key could not see;
+  * plunder asks the walker's TILE and never a class, so an EMBARKED hostile
+    ends the route exactly as a hull or a civilian does;
   * the route tensors ride snapshot/restore.
 """
 
@@ -236,6 +238,40 @@ def main() -> None:
                & (s6.major_unit_type[0] == s6._trader_idx)).sum())
     assert tr6 == 0, "plunder DESTROYS the Trader — no return"
     print("plunder ok")
+
+    # --- 8b) the raider is a PASSENGER. `routePlunderer` asks the TILE and
+    #         never a class, so an embarked hostile ends the route too -------
+    s6b = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    sea = next((t_ for t_ in range(s6b.T)
+                if bool(s6b.wpass[0, t_]) and int(s6b.military_at[0, t_]) < 0
+                and int(s6b.civilian_at[0, t_]) < 0 and int(s6b.embarked_at[0, t_]) < 0), -1)
+    assert sea >= 0, "fixture has no free water tile"
+    s6b.seat_routes[0, 1, 0, 0] = int(s6b.city_id[0, 1, 0])
+    s6b.seat_routes[0, 1, 0, 1] = int(s6b.city_id[0, 1, 0])
+    s6b.seat_route_exp[0, 1, 0] = int(s6b.turn) + s6b._trade_duration
+    s6b.seat_route_walk[0, 1, 0] = sea
+    s6b.seat_route_leg[0, 1, 0] = -1          # parked: the walker stays under the raider
+    born = s6b._spawn_unit(0, torch.ones(s6b.B, dtype=torch.bool),
+                           torch.full((s6b.B,), int(s6b.city_center[0, 0, 0]), dtype=torch.long),
+                           s6b._warrior_idx)
+    assert bool(born[0]), "the raider must land for this lane to prove anything"
+    p_slot = int(((s6b.major_unit_seat[0] == 0) & s6b.major_unit_alive[0]
+                  & (s6b.major_unit_type[0] == s6b._warrior_idx)).long().argmax())
+    g6 = torch.tensor([p_slot + s6b.POOL_LO["major"]])
+    r6 = torch.zeros(1, dtype=torch.long)
+    s6b._occ_clear(r6, s6b.major_unit_tile[0:1, p_slot], g6)
+    s6b.major_unit_tile[0, p_slot] = sea
+    s6b.major_unit_emb[0, p_slot] = True
+    s6b._occ_set(r6, torch.tensor([sea]), g6)
+    assert int(s6b.embarked_at[0, sea]) == p_slot + s6b.POOL_LO["major"], "the raider must file as a PASSENGER"
+    assert int(s6b.military_at[0, sea]) < 0 and int(s6b.civilian_at[0, sea]) < 0, "and on NO other plane"
+    s6b.war[0, 0, 1] = s6b.war[0, 1, 0] = True
+    s6b.sync_war()
+    g6b = float(s6b.civ_treasury[0, 0])
+    s6b._trade_walk_tick(1, torch.ones(s6b.B, dtype=torch.bool))
+    assert int(s6b.seat_routes[0, 1, 0, 0]) == -1, "an EMBARKED hostile on the walker tile plunders too"
+    assert abs(float(s6b.civ_treasury[0, 0]) - g6b - s6b._trade_plunder_gold) < 1e-9, "the passenger banks plunderGold"
+    print("plunder (passenger) ok")
 
     # --- 9) the candidate + apply pair -------------------------------------
     s7 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))

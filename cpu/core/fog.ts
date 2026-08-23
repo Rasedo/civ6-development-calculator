@@ -8,8 +8,16 @@ import { TECHS } from '../data/techs';
 import { dedicationEvent } from './eras';
 import { promoValue } from './promotions';
 import { DED_DRACONES, DRACONES_DISCOVERY_SCORE } from '../data/seats';
+import { UNITS } from '../data/units';
 
 export const SIGHT_RANGE = 2;
+
+/** How far this chassis SEES: `SIGHT_RANGE` unless the row names its own (the
+ *  Destroyer's "Has Sight of 3"), plus what CIV6 (Spyglass / Rutter /
+ *  Observation) calls "+1 sight range". Reveal Stealth reaches exactly here. */
+export function unitSight(u: { type: string; promos?: number }): number {
+  return (UNITS[u.type]?.sight ?? SIGHT_RANGE) + promoValue(u, 'SIGHT');
+}
 
 export function fogActive(state: GameState): boolean {
   return state.unitsMode && state.fogOfWar;
@@ -57,8 +65,7 @@ export function initFog(state: GameState): void {
       if (tileSeat(t) === s.seat) revealAround(state, s.seat, t.index, 1);
     }
     for (const c of citiesOf(state, s.seat)) revealAround(state, s.seat, c.centerIndex, 3);
-    // CIV6 (Spyglass / Rutter / Observation): "+1 sight range".
-    for (const u of unitsOf(state, s.seat)) revealAround(state, s.seat, u.tileIndex, SIGHT_RANGE + promoValue(u, 'SIGHT'));
+        for (const u of unitsOf(state, s.seat)) revealAround(state, s.seat, u.tileIndex, unitSight(u));
   }
 }
 
