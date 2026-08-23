@@ -3,7 +3,9 @@ import { civEraIndex } from './city';
 import { seatOf, isBarbSeat, isCiv } from './seats';
 import { seatWonderSum } from './wonders';
 import { UNITS } from '../data/units';
-import { DED_DRACONES, DED_STEAM } from '../data/seats';
+import { DED_AUTOMATON, DED_DRACONES, DED_SKY, DED_STEAM, SKY_EUREKAS } from '../data/seats';
+import { TECHS } from '../data/techs';
+import { spawnUnit } from './units';
 import { BUILDINGS, BUILDING_ERA_INDEX } from '../data/buildings';
 import { GW_BUILDINGS } from '../data/greatPeople';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
@@ -71,6 +73,7 @@ export function eraBoundary(state: GameState): void {
     seat.dedicationPicks = window.length === 0
       ? []
       : Array.from({ length: seat.dedications }, (_, k) => window[(era + c + k) % window.length]);
+    commitGoldenGrants(state, c, era);
   }
   for (let c = 0; c < state.seats.length; c++) {
     const seat = seatOf(state, c);
@@ -108,6 +111,9 @@ export function dedicationEvent(state: GameState, civ: number, kind: number, eve
  */
 export function buildingDedications(state: GameState, seat: number, buildingId: string): void {
   if ((BUILDING_ERA_INDEX[buildingId] ?? 0) >= INDUSTRIAL_ERA_INDEX) dedicationEvent(state, seat, DED_STEAM);
+  // CIV6 (Sky and Stars): "+1 Era Score for each Aerodrome building
+  // constructed."
+  if (BUILDINGS[buildingId]?.district === 'AERODROME') dedicationEvent(state, seat, DED_SKY);
   if ((BUILDINGS[buildingId]?.yields?.science ?? 0) > 0) dedicationEvent(state, seat, DED_FREE_INQUIRY);
   if ((GW_BUILDINGS as readonly string[]).includes(buildingId)) dedicationEvent(state, seat, DED_PEN_BRUSH_AND_VOICE);
 }
@@ -115,10 +121,42 @@ export function buildingDedications(state: GameState, seat: number, buildingId: 
 /** CIV6 (Hic Sunt Dracones, dark face): "+1 Era Score each time you kill a
  *  non-Barbarian naval unit in combat." The killer must be a MAJOR — a
  *  city-state or a camp that lands the blow holds no dedications. */
-export function navalKillEvent(state: GameState, killerSeat: number, victim: { type: string; seat: number }): void {
+export function unitKillEvent(
+  state: GameState,
+  killerSeat: number,
+  killer: { type: string } | undefined,
+  victim: { type: string; seat: number },
+): void {
   if (!isCiv(killerSeat) || isBarbSeat(victim.seat)) return;
-  if (!UNITS[victim.type]?.naval) return;
-  dedicationEvent(state, killerSeat, DED_DRACONES);
+  // CIV6 (Hic Sunt Dracones, dark face): "+1 Era Score each time you kill a
+  // non-Barbarian Naval unit in combat."
+  if (UNITS[victim.type]?.naval) dedicationEvent(state, killerSeat, DED_DRACONES);
+  // CIV6 (Automaton Warfare): "+1 Era Score each time you kill a non-Barbarian
+  // unit with a Giant Death Robot."
+  if (killer && UNITS[killer.type]?.gdr) dedicationEvent(state, killerSeat, DED_AUTOMATON);
+}
+
+/**
+ * The GOLDEN dedications that pay ONCE, at the moment the face is committed:
+ * Sky and Stars' era-keyed Eurekas and Automaton Warfare's free Giant Death
+ * Robot. Everything else a golden face does is a standing read.
+ */
+function commitGoldenGrants(state: GameState, seat: number, era: number): void {
+  if (!goldenDedication(state, seat, DED_SKY) && !goldenDedication(state, seat, DED_AUTOMATON)) return;
+  const owner = seatOf(state, seat);
+  if (!owner) return;
+  if (goldenDedication(state, seat, DED_SKY)) {
+    for (const id of SKY_EUREKAS[era] ?? []) {
+      if (!TECHS[id]) continue;
+      if (owner.research.techs.includes(id) || owner.research.boosted.includes(id)) continue;
+      owner.research.boosted.push(id);
+    }
+  }
+  if (goldenDedication(state, seat, DED_AUTOMATON)) {
+    const capital = owner.cities.find((c) => c.isCapital);
+    const chassis = Object.keys(UNITS).find((u) => UNITS[u].gdr);
+    if (capital && chassis) spawnUnit(state, chassis, capital.centerIndex, seat);
+  }
 }
 
 export function isHeroicAge(state: GameState, civ: number): boolean {
@@ -220,8 +258,8 @@ export function governorTitles(nCivics: number): number {
  *  quantization lesson), ties broken by ARRAY position (the GPU mirrors
  *  with the slot index — slot order IS array order). Returns picked
  *  indices. */
-export function governorPicks(qLoys: number[], titles: number): Set<number> {
-  const idx = qLoys.map((q, i) => [q, i] as const);
+export function governorPicks(qLoys: number[], titles: number, blocked?: ReadonlySet<number>): Set<number> {
+  const idx = qLoys.map((q, i) => [q, i] as const).filter(([, i]) => !blocked?.has(i));
   idx.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   return new Set(idx.slice(0, titles).map(([, i]) => i));
 }

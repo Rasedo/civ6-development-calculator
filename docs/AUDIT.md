@@ -57,7 +57,7 @@ nothing carries forward.
 | B-20r tourism tails | 1 | theming, the open-borders dig and the work GIFT all ship; the Naturalist's progressive cost is unsourced |
 | B-21r suzerain rows | 1 | nine perks are rules; the residual descoped rows all need whole absent systems |
 | B-22r World Congress | 2 | 13 of the 21 regular resolutions ship and emergencies run as special sessions; eight resolutions and the scored competitions have no carrier; peace TERMS wait on the negotiated deal (C-2) and two favor penalties on C-19/C-24; the favor tie-break unmodeled |
-| B-24r Ages/governors | 1 | three system-less dedication entries, dark-age policies, governor promotions, per-civ era drift |
+| B-24r Ages/governors | 1 | all twelve dedications ship, both faces; dark-age policies, governor promotions and per-civ era drift do not |
 | B-30r specialists | 1 | the mechanic, both citizen overrides and the three-plant Industrial tier ship; a LOCK still outlives the city that set it |
 | B-31r trade-route tails | 1 | sea legs and the whole-destination-set candidate ship; no trading posts, plunder gold is a stylization, the summed-yield key is a heuristic and the free-choice head is P8's |
 | B-53r the great-person queue | 1 | 205 sourced people, the era gate and the scaled price ship; the offer is re-derived each turn rather than frozen, and the payout is one era-sized lump instead of the person's own ability |
@@ -65,10 +65,10 @@ nothing carries forward.
 | B-36r appeal adjacency terms | 1 | the four reachable terms ship; Dam/Canal/Water Park/Preserve and the Great People wait on C-22, C-4, C-21 |
 | B-39r wonder effects still dropped | 1 | the sourced sweep shipped fourteen channels; five residuals, each blocked on B-20r, C-21, B-34r or C-23 |
 | B-45r sourced-sweep finds in the other rows | 1 | three of the eight now have a channel; the five that do not need free units (C-21), faith-bought Great People (C-9), a rival-recruit event, or B-31r's route yields |
-| B-46r the siege class's tails | 1 | the Bombard stat, both support chassis, all four walls tiers and the move-and-shoot rule ship; the middle siege rungs and Akkad's suzerain bonus do not |
+| B-46r the siege class's tails | 1 | the Bombard stat, both support chassis, all four walls tiers, the move-and-shoot rule and every siege rung through Rocket Artillery ship; Akkad's suzerain bonus does not |
 | B-54r flanking and support vs their own page | 1 | six rules the two engines agree on and the page does not: the Military Tradition gate, the flanking owner and river rules, support against ranged, embarked providers, and defensible districts |
 | B-55r a ship cannot carry a passenger | 1 | one MILITARY unit per tile, where Civ 6 stacks an embarked land unit with a naval one — which is where Support's 7th through 10th stacks live |
-| B-56r the ten inert promotions | 2 | 62 of the 72 catalog rows fire a rule; ten name a mechanic neither engine has — a second attack per turn, sight-blocking, escort formations, class-aware zone of control — or wait on C-16/C-25 |
+| B-56r the ten inert promotions | 2 | 62 of the 72 catalog rows fire a rule; ten name a mechanic neither engine has — a second attack per turn, sight-blocking, escort formations, class-aware zone of control, a promotion term in the air-strike roll — or wait on C-25 |
 | B-57r the SNIPE head stops at the distance-2 ring | 1 | a +1 Range promotion widens what the rule legalises and no seat can ORDER the shot, because the ring-3 columns do not exist |
 | B-58r the religious purchase asks for a Shrine | 1 | Civ 6 asks for a MAJORITY RELIGION and a Holy Site with a Temple; both engines ask for a Shrine and never read what the city follows |
 | B-59r the religious spread is a flat lump | 2 | Civ 6 scales the pressure by the Apostle's HP and strips a quarter of every other religion; both engines add a constant and strip nothing without Proselytizer |
@@ -80,7 +80,7 @@ nothing carries forward.
 | C-1 POWER | 2 | the grid, the three plants, Cardiff, the powered-yield split and the FUEL all ship; the CO2 and the Accords wait on C-24, four renewable improvements, the Hydroelectric Dam and the Biosphere have no carrier, nothing can retire a plant, and a minor's cities are never powered |
 | C-2 diplomatic agreements | 3 | friendship, alliances, open borders, the closed border and the work gift ship on one 30-turn clock; alliance TYPES and LEVELS, the negotiated two-sided deal, and the four agreements that need one are open |
 | C-4 unique improvements | 3 | Batey / Colossal Head / Monastery, each a flat channel today |
-| C-5 strategic-resource stockpiles | 2 | the bank, its ceiling, the unit and project charges, the plants' fuel and the heal a lost source denies all ship; unit FUEL upkeep and the shortage penalty wait on C-31, and trading resources on C-2 |
+| C-5 strategic-resource stockpiles | 2 | the bank, its ceiling, the unit and project charges, the plants' fuel, unit FUEL upkeep and the heal a lost source denies all ship; the shortage penalty's magnitude is unpublished and trading resources waits on C-2 |
 | C-6 policy-card modifiers | 1 | two of the 49 cards are inert, each blocked on a system below |
 | C-7 trading posts | 2 | a route lays roads and plants nothing |
 | C-8 draws made deterministic | 2 | the Great Person replacement walks a queue and the Congress slate rotates, where Civ 6 draws both |
@@ -88,12 +88,12 @@ nothing carries forward.
 | C-11 terrain the wonder rules need | 2 | the NARROWED placements are deliberately narrower than Civ 6's |
 | C-13 ranged vs districts/cities | 2 | a scope-out on both, with the rest of the Encampment complete |
 | C-15 garrison does not block capture | 2 | the move-onto-centre capture model is what is missing |
-| C-16 spies / air units / GDRs | 4 | whole unit classes, and four dedications wait on them |
+| C-16 the spy's second half | 2 | the Spy, its capacity, the jump and all eleven missions ship; the escape-and-capture sequence, the spy promotion pool and four missions with no carrier do not |
 | C-17 embarked movement never upgrades | 1 | the flat EMBARK_MOVES stands in for every era |
 | C-19 grievances and warmongering | 2 | war has no reputational consequence with anyone |
-| C-20 the Military Engineer's build list | 2 | five buildables and the finish-a-district charge |
+| C-20 the Military Engineer's build list | 2 | five buildables and the finish-a-district charge; the Airstrip no longer waits on anything but this row |
 | C-21 Great Person ACTIVATED abilities | 2 | every GP fires instantly; none is placed and used |
-| C-22 the district roster is a subset | 3 | no Dam, Canal, Water Park, Preserve, Aerodrome, Government Plaza or Diplomatic Quarter |
+| C-22 the district roster is a subset | 3 | no Dam, Canal, Water Park, Preserve, Government Plaza or Diplomatic Quarter |
 | C-23 nothing diminishes tourism | 1 | no rival's Enlightenment ever costs a tourist, so Cristo Redentor's cancelling clause has nothing to cancel |
 | C-24 no CO2, no climate | 3 | GS's whole climate arc — emissions, warming bands, sea level, escalating disasters — and 3 gaps wait on it |
 | C-26 no civilization uniques | 5 | seats are a name, a colour and a city list: no civ ability, no leader ability or agenda, no unique unit, no unique infrastructure (America's Film Studio among them) |
@@ -102,9 +102,12 @@ nothing carries forward.
 | C-28 tourism is one lifetime scalar | 2 | it is banked per seat and divided by the civ count on read, so no rule can address one rival's tourism |
 | C-29 no RESOLVED suzerain | 1 | `isSuzerain` recomputes from the raw envoy store on every read, so a rule that changes envoy WEIGHT by who the suzerain is has no fixed point |
 | C-30 city-states carry no research | 1 | no techs, no civics, so nothing can say when a minor took Early Empire — its borders never close and the suzerain's passage lifts nothing |
-| C-31 the unit roster stops in the Renaissance | 4 | the Musketman and the Bombard are the newest chassis, so half the military ladder and every fuel-consuming unit are absent |
-| **C. Absent systems** | **57** | |
-| **OPEN, TOTAL** | **83** | |
+| C-31 the two chassis with a system behind them | 1 | the ladder runs to the Information era now; the nuclear devices and the Rock Band are each a whole absent system rather than a roster row |
+| C-32 the new classes have no promotion tree | 2 | air, GDR, support and spy chassis are offered no promotion, so Sky and Stars' XP half has nothing to multiply |
+| C-33 the Giant Death Robot is only its stats | 2 | seven sourced abilities and the four Future-era upgrades have no carrier |
+| C-34 air combat's second half | 2 | bases, both heads, the sortie and the scatter ship; Interception, Patrol and Priority Target — the whole reason a fighter exists — do not |
+| **C. Absent systems** | **58** | |
+| **OPEN, TOTAL** | **84** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -212,10 +215,6 @@ Civ 6 source or is recorded as unverifiable.
   engines now carry all four provenance arrays across a capture, and a REUSED
   city slot clears them.
   Open:
-  - The GREAT WORK HEIST moves a work too, and it is a spy operation (C-16).
-    Its sibling — a work changing hands by agreement — no longer waits:
-    the Open Borders dig and the one-sided GIFT both ship with C-2's
-    treaty clock, and an Archaeologist digs wherever it may stand.
   - The NATURALIST's faith cost is PROGRESSIVE in real Civ 6; the
     progression's magnitude is unsourced, so the flat GS price stands
     (`naturalistCost`) and the progression is open.
@@ -380,9 +379,16 @@ Civ 6 source or is recorded as unverifiable.
     from World Wonders. +100% Tourism to all National Parks" — both faces ship,
     the wonder half attributed per city through the loop-top governor seating
     the loyalty payout already takes.
-  Residuals: the three entries needing spies / air units / GDRs (Bodyguard of
-  Lies, Sky and Stars, Automaton Warfare — both faces), To Arms!'s special
-  Casus Belli (no denouncements),
+  - **The three system-less entries are systems now.** The catalog holds
+    TWELVE: Bodyguard of Lies, Sky and Stars and Automaton Warfare ship with
+    both faces, on the classes this round built. Bodyguard pays era score per
+    successful offensive spy operation and cuts every offensive clock by a
+    quarter; Sky and Stars pays for the flight eurekas and grants Aluminium
+    per turn; Automaton Warfare pays for a GDR kill, grants Uranium per turn
+    and per mine, and hands a free GDR at the era boundary. Sky and Stars'
+    OTHER golden half — "+100% XP for all Air Units" — has nothing to
+    multiply and is C-32.
+  Residuals: To Arms!'s special Casus Belli (no denouncements),
   and the corps/army kill event (no formations — a faithful zero, like Civ 6
   before Nationalism). Also open: dark-age policies; governor PROMOTIONS, blocked on
   governor IDENTITY — a promotion attaches to a NAMED governor persisted in
@@ -606,10 +612,6 @@ Civ 6 source or is recorded as unverifiable.
   chassis, so the battery proves the two engines agree about these bodies and
   the poke lanes are what prove they agree with the pages.
   OPEN:
-  - **THE MIDDLE AND LATE SIEGE RUNGS.** Trebuchet, Artillery and Rocket
-    Artillery are absent, so the class has a Classical rung and a Renaissance
-    one and nothing after Metal Casting. The Observation Balloon that lets a
-    siege unit outrange a city's defenses is absent too. Blocked on C-31.
   - **AKKAD's SUZERAIN BONUS** confers the Battering Ram's ability "against
     all levels of city defenses and against all cities (regardless of presence
     or absence of support units)". Akkad is not in the city-state roster —
@@ -688,7 +690,13 @@ Civ 6 source or is recorded as unverifiable.
     same gap — that one is about a tile holding two units, this one about two
     units moving as one.
   - **CAMOUFLAGE and CREEPING_ATTACK** need stealth: C-25.
-  - **PROXIMITY_FUSES** defends against air units: C-16.
+  - **PROXIMITY_FUSES** is "+7 Combat Strength when defending against air
+    attacks". Air attacks exist now, so C-16 is no longer what stops it; the
+    blocker moved. `airStrike` / `_air_strike` roll the defender at
+    `airDefenseOf` / `_type_anti_air` alone and never call `promoCS` /
+    `_promo_cs`, so NO promotion reaches that roll — threading the promotion
+    term into the sortie is the work, and it changes every defensive
+    promotion's reach at once, which belongs with B-54r's combat-page pass.
   REACHABILITY: the ten rows ARE offered — `_promo_offer_mask` opens them and
   the driver takes them — so a unit can hold an inert promotion and nothing
   will change. That is the visible symptom. The other 62 are proved by two
@@ -1054,7 +1062,6 @@ number was under-counting by treating deferrals as closures.
   - The **+25% Open-Borders tourism** is an INTERNATIONAL modifier, applied
     per foreign civilization; blocked on C-28.
   - **25 Grievances per denouncement** (GS); blocked on C-19.
-  - The **GREAT WORK HEIST** is a spy operation, C-16.
 - **C-4. UNIQUE IMPROVEMENTS — the roster holds only the generic set.**
   Weight 3. Gaps: Caguana's Batey, La Venta's Colossal Head and Armagh's
   Monastery (each a whole improvement with its own adjacency, standing in as
@@ -1097,14 +1104,12 @@ number was under-counting by treating deferrals as closures.
   scripted seats train both. The plant's fuel burn is not: no lane has yet
   built a Power Plant, so that half is poke-proven only.
   OPEN:
-  - **UNIT FUEL UPKEEP.** "Each turn, the unit will consume a certain amount
-    of that resource as fuel", against a reduced up-front cost — the rule
-    that turns an army into a running bill. No unit in the roster consumes
-    fuel because no unit in the roster is Industrial or later; blocked on
-    C-31.
   - **THE SHORTAGE PENALTY.** A seat short of a fuel resource takes a Combat
-    Strength penalty "proportional to the amount you're short". It reads the
-    same absent per-unit consumption; blocked on C-31.
+    Strength penalty "proportional to the amount you're short". The
+    consumption it reads is live now — `chargeUnitUpkeep` /
+    `_seat_charge_upkeep` bill every fuel chassis in the Industrial-and-later
+    roster — so what is missing is only the magnitude, which no source
+    publishes.
   - **RESOURCE TRADING.** "You can only trade lump quantities of Consumable
     resources", which is a two-sided deal and has no offer/accept protocol;
     blocked on C-2's negotiated deal.
@@ -1172,11 +1177,58 @@ number was under-counting by treating deferrals as closures.
   the garrison attackable on its own, so blocking would deadlock — the
   deadlock is the symptom; the missing piece is the move-onto-centre capture
   model, and both halves are open.
-- **C-16. SPIES, AIR UNITS AND GIANT DEATH ROBOTS.** Weight 4. Whole unit
-  classes with no roster entry. Gaps: three dedication catalog entries (Sky
-  and Stars, Bodyguard of Lies, Automaton Warfare) and the Great Work Heist
-  that C-2 also names. Wish You Were Here left this list: it needs neither
-  spies nor air units, and both its faces ship.
+- **C-16. THE SPY'S SECOND HALF.** Weight 2. The Spy itself is a system on
+  both engines: the capacity ladder, the jump between revealed foreign
+  centres, the eleven-row mission catalog with its two heads, the level
+  bonus, Gain Sources' per-seat clock, the counterspy post and the capture
+  roll. What the source describes and neither engine carries:
+  - **THE ESCAPE SEQUENCE.** "If a Spy is discovered, they will need to
+    escape from the target city", by Airplane, Boat, Vehicle or Foot — each
+    gated on a district, each with its own danger and return time, and a
+    survivor reappearing in the CAPITAL. Here a discovered spy simply dies on
+    one roll, so the four escape routes, the Aerodrome/Harbor/Commercial Hub
+    gates on them, and the Ace Driver promotion that improves them are all
+    absent.
+  - **CAPTURED SPIES.** "Captured Spies are imprisoned, but not killed", still
+    count against the owner's capacity, and can be traded back. That is a
+    prisoner store plus a two-sided deal (C-2), and nothing here holds a
+    captured unit.
+  - **THE SPY PROMOTION POOL.** Fourteen sourced promotions, three offered at
+    random per level. The chassis has no promotion class at all — C-32.
+  - **LEVELS FROM COUNTER-ESPIONAGE.** A spy also levels by "capturing enemy
+    Spies while counterspying"; the counterspy here raises the intruder's
+    catch chance and earns nothing for it.
+  - **"NO TWO SPIES MAY PERFORM THE SAME MISSION IN THE SAME CITY."** The
+    mission mask asks nothing about the other spies standing on the tile.
+  - **LISTENING POST** has no effect body: the source's payload is the
+    diplomatic VISIBILITY level, which neither engine models. The column is
+    offered and resolves to nothing.
+  - **FABRICATE SCANDAL** targets a city-state. "Under the vanilla ruleset,
+    Spies cannot act in city-states", so the majors-only destination scan is
+    faithful for vanilla and this mission is the R&F ruleset's; the minor
+    city block carries no district registry to hang it on either.
+  - **BREACH DAM** needs the Dam district: C-22.
+  - **THE INTELLIGENCE AGENCY**, a Tier 2 government building, is the eighth
+    spy-capacity source; it needs the Government Plaza: C-22.
+  - **SABOTAGE PRODUCTION pillages the BUILDINGS**, per the source, not the
+    district. `districtPillaged` / `district_pillaged` is the only flag that
+    darkens a district's yields here, so that is what the mission sets; a
+    per-building pillage flag is the difference.
+  - **THE CLOCK AND THE ODDS ARE THIS MODEL'S OWN.** The source says "all
+    missions have a uniform, fixed duration of turns" without naming it, and
+    the briefing screen's success, capture and travel numbers are on no page.
+    `SPY_MISSION_TURNS`, the three travel constants, `SPY_SUCCESS_BASE_PCT`,
+    `SPY_SUCCESS_PER_LEVEL_PCT`, `SPY_CAPTURE_PCT` and
+    `SPY_COUNTERSPY_CATCH_PCT` are stated model values, chosen so the
+    published modifiers (-25% duration, +1 level per success, +2 levels from
+    Gain Sources) express something. Everything they feed is sourced.
+  REACHABILITY: the scripted driver flies a spy — it jumps whenever the city
+  it stands in offers nothing but the counterspy post, and rotates the mission
+  pick by (seat + turn) so the catalog is walked rather than one row hammered.
+  Whether a 250-turn lane researches Diplomatic Service at all is UNMEASURED,
+  so treat the class as poke-proven until the reachability probe says
+  otherwise; each mission body has its own section in `tests/gpu/spy_test.py`
+  and `tests/cpu/units/spy.test.ts`.
 - **C-17. EMBARKED MOVEMENT DOES NOT UPGRADE.** Weight 1. `constants` records
   that the tech upgrades to embarked movement are unmodeled; the flat
   EMBARK_MOVES stands in for every era.
@@ -1189,8 +1241,9 @@ number was under-counting by treating deferrals as closures.
 - **C-20. THE MILITARY ENGINEER BUILDS ONE THING.** Weight 2. Real Civ 6 gives
   it Fort, Airstrip, Missile Silo, Mountain Tunnel, Reinforced Barricade and
   Modernized Trap, plus spending a charge to finish 20% of a Canal, Dam,
-  Aqueduct or Flood Barrier. Only the FORT exists here. The Airstrip waits on
-  C-16 and three of the four district charges wait on C-22.
+  Aqueduct or Flood Barrier. Only the FORT exists here. Three of the four district
+  charges wait on C-22; the Airstrip waits on nothing but this row now that
+  aircraft and their bases exist.
 - **C-21. GREAT PEOPLE FIRE INSTANTLY; NONE IS PLACED.** Weight 2. A claimed
   Great Person pays its effect at the claim (`recruit`). Real Civ 6 gives many
   of them an ACTIVATED ability used later on a chosen tile. Gaps: the
@@ -1209,16 +1262,89 @@ number was under-counting by treating deferrals as closures.
   banked — and the two are independent. Two gaps wait on this one:
   `ONLINE_COMMUNITIES` (C-6), and the "+25% for Open Borders" international
   modifier (C-2).
-- **C-31. THE UNIT ROSTER STOPS IN THE RENAISSANCE.** Weight 4. `UNITS`
-  holds 28 rows and the newest chassis are the Musketman and the Bombard;
-  there is no Industrial-or-later unit of any class, land or naval, and no
-  upgrade path past them. That is a whole half of the game's military
-  ladder, and it is what several rules elsewhere are really waiting on:
-  unit FUEL upkeep and the shortage Combat Strength penalty (C-5) both read
-  a per-unit consumption that no row in the roster has, and the middle and
-  late siege rungs (B-46r) are the same absence seen from the combat page.
-  The eras themselves are live — every seat researches to Modern and past
-  it — so the ladder simply runs out under them.
+- **C-31. THE TWO CHASSIS WITH A SYSTEM BEHIND THEM.** Weight 1. `UNITS`
+  holds 73 rows and the ladder runs to the Information era: every land,
+  naval, siege, support, air and GDR rung through Modern Armor, the Nuclear
+  Submarine, Rocket Artillery, the Jet Bomber and the Giant Death Robot, each
+  row's stats taken from its own page. What the standard rulesets still have
+  and this roster does not is two chassis that are each a whole system rather
+  than a row:
+  - **THE NUCLEAR AND THERMONUCLEAR DEVICE.** A one-shot weapon delivered by
+    a bomber, a silo or a submarine, with a blast radius, fallout that
+    persists on tiles, and a diplomatic reaction. Neither engine has an
+    area-effect attack, a fallout tile state, or the Missile Silo the delivery
+    needs (C-20).
+  - **THE ROCK BAND.** A GS civilian that performs in a foreign city for a
+    tourism lump against a level-scaled failure roll. It reads per-rival
+    tourism, which is C-28.
+  Unit FUEL upkeep and the middle siege rungs left this row: both shipped with
+  the roster, and C-5 and B-46r are corrected accordingly.
+
+- **C-32. THE NEW CLASSES HAVE NO PROMOTION TREE.** Weight 2. `PROMO_CLASSES`
+  covers the land, naval and religious chassis; the AIR, GIANT DEATH ROBOT and
+  SUPPORT classes have no entry, and neither does the SPY. `UNIT_PROMO_CLASS`
+  therefore maps every one of those chassis to nothing, `promoOffer` /
+  `_promo_offer_mask` open no column for them, and a fighter that wins ten
+  sorties stays at level 1 forever. Two rules wait on this one:
+  - **SKY AND STARS' golden half** is "+100% Experience for all Air Units"
+    beside the Aluminium grant. The grant ships; the XP half has no tree to
+    accelerate, and adding one widens `PROMO_COLS`, which is a wire change.
+  - **THE SPY PROMOTION POOL** — fourteen sourced rows, three offered at
+    random per level (C-16). The random OFFER is also C-8's territory: the
+    draw here would have to be a queue.
+  The GDR is a special case in the source's own words — it "cannot earn
+  experience or Promotions" — so its absence from the tree is FAITHFUL and
+  only the air, support and spy classes are the gap.
+
+- **C-34. AIR COMBAT'S SECOND HALF.** Weight 2. The class is a system on both
+  engines: bases and their slot counts (a City Center 1, an Aerodrome 2 rising
+  to 4 with the Hangar and the Airport, a carrier its hull's own), the training
+  gate that reads them, an aircraft that holds no plot, the AIR_STRIKE and
+  REBASE heads, the sortie that spends the turn, a carrier that carries what it
+  bases, and the scatter-or-die a lost base forces. What the Air combat page
+  describes and neither engine carries:
+  - **INTERCEPTION.** Fighters "have the special ability to Intercept, which
+    allows them to automatically attack incoming aircraft within their
+    operational range", and an intercepted strike lands "with a penalty to
+    their Combat Strength". That is the whole reason a fighter class exists,
+    and there is no reactive attack anywhere in either engine — every roll here
+    is initiated by an acting seat.
+  - **PATROL.** "All fighter-type airplanes may perform Patrol", deploying to a
+    tile inside their Moves range over own or neutral ground and taking a full
+    action. A patrolling plane is a standing interceptor, so this waits on the
+    row above.
+  - **PRIORITY TARGET.** A bomber's ability to reach the SUPPORT unit under a
+    stack; "a support unit targeted by either a direct air strike or the
+    Priority Target ability sustains 65 damage". Support chassis ride the
+    civilian plane here and a strike answers the tile's military occupant
+    first, so nothing can single one out.
+  - **THE RETALIATION MODEL IS THE SOURCE'S, AND IT LEAVES LAND AA INERT.**
+    "The attacking plane doesn't suffer damage in return unless it gets
+    Intercepted ... the only exceptions to this rule are ships with the
+    Anti-Air Strength stat." Both engines now answer a direct strike only from
+    an anti-air HULL. That is faithful — but it means the ANTI_AIR_GUN and the
+    MOBILE_SAM defend their tile with their Anti-Air Strength and never damage
+    an attacker, because the channel they would damage it through is
+    Interception. Their whole offensive value is parked on the first row of
+    this entry.
+  - **THE NUCLEAR DELIVERY.** Bombers, Jet Bombers, Nuclear Submarines and the
+    Missile Silo each deliver a device, and fighters intercept the bomber-borne
+    ones. The devices are C-31 and the silo is C-20; the interception half is
+    this row.
+
+- **C-33. THE GIANT DEATH ROBOT IS ONLY ITS STATS.** Weight 2. The chassis
+  ships with its published cost, maintenance, strengths, range, anti-air value
+  and its 1-Uranium charge plus 3-per-turn fuel bill, and it drives Automaton
+  Warfare's kill event and free-unit grant. Every ABILITY on its page is
+  absent: it moves and fights on Coast and Ocean "as it would on land" (the
+  hull/embark rules give it neither); it "cannot earn experience or
+  Promotions" (faithful today only because C-32 gives it no tree); it cannot
+  form Corps or Armies (no formations exist to refuse); it heals only in
+  friendly territory; and it takes -17 Ranged Strength against district
+  defenses and naval units. Its four Future-era upgrades — Drone Air Defense,
+  Particle Beam Siege Cannon, Enhanced Mobility and Reinforced Armor Plating —
+  need a per-unit upgrade state keyed on a FUTURE-era tech, and the era ladder
+  stops at Information.
 - **C-30. A CITY-STATE CARRIES NO RESEARCH RECORD.** Weight 1. A minor has no
   techs and no civics on either engine, and real Civ 6 minors research like
   anyone else. One gap waits on it today: CIV6 (Movement) closes a territory
@@ -1277,10 +1403,14 @@ number was under-counting by treating deferrals as closures.
   second clause exists to CANCEL that reduction, so the wonder cannot pay it
   until the reduction exists.
 - **C-22. THE DISTRICT ROSTER IS A SUBSET.** Weight 3. Twelve of Civ 6's
-  districts exist; the DAM, CANAL, WATER PARK, PRESERVE, AERODROME, GOVERNMENT
-  PLAZA and DIPLOMATIC QUARTER do not. Gaps: their appeal terms (B-36r), the
-  Military Engineer's finish-a-district charge (C-20), the Dam's half of the
-  flood mitigation that B-34r names, and the Preserve's housing table.
+  districts exist; the DAM, CANAL, WATER PARK, PRESERVE, GOVERNMENT PLAZA and
+  DIPLOMATIC QUARTER do not. The AERODROME left this list — it ships with its
+  two base slots, the Hangar and Airport that widen them, and the training gate
+  that reads them. Gaps: their appeal terms (B-36r), the Military Engineer's
+  finish-a-district charge (C-20), the Dam's half of the flood mitigation that
+  B-34r names, the Preserve's housing table, the Government Plaza's
+  Intelligence Agency (C-16) and the Diplomatic Quarter's Listening Post
+  target.
 
 ## Reachability — what the green gate does NOT prove
 

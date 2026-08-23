@@ -36,6 +36,8 @@ export interface BuildingDef {
    *  of the resource burned). */
   fuel?: string;
   fuelRate?: number;
+  /** air-unit slots this building adds to its Aerodrome (Hangar, Airport). */
+  airSlots?: number;
   /**
    * CIV6 (GS Power): the building's BASE LOAD — the Power it demands. A city
    * meets its TOTAL demand or none of its buildings are powered, so this is a
@@ -123,6 +125,9 @@ const rawList: BuildingDef[] = [
   { id: 'STABLE', name: 'Stable', district: 'ENCAMPMENT', cost: 120, exclusiveWith: ['BARRACKS'], yields: { production: 1 }, housing: 1, maintenance: 1, trainXpPct: 25, trainXpClasses: ['LIGHT_CAV', 'HEAVY_CAV', 'SIEGE'] },
   { id: 'ARMORY', name: 'Armory', district: 'ENCAMPMENT', cost: 195, requiresAny: ['BARRACKS', 'STABLE'], yields: { production: 3 }, maintenance: 2, trainXpPct: 25, trainXpClasses: ['MELEE', 'ANTICAV', 'RANGED', 'LIGHT_CAV', 'HEAVY_CAV', 'SIEGE'] },
   { id: 'MILITARY_ACADEMY', name: 'Military Academy', district: 'ENCAMPMENT', cost: 330, requiresAny: ['ARMORY'], yields: { production: 4 }, housing: 1, maintenance: 2, trainXpPct: 25, trainXpClasses: ['MELEE', 'ANTICAV', 'RANGED', 'LIGHT_CAV', 'HEAVY_CAV', 'SIEGE'] },
+
+  { id: 'HANGAR', name: 'Hangar', district: 'AERODROME', cost: 380, yields: { production: 2 }, maintenance: 1, airSlots: 1 },
+  { id: 'AIRPORT', name: 'Airport', district: 'AERODROME', cost: 480, requiresAny: ['HANGAR'], yields: { production: 3 }, maintenance: 2, airSlots: 1 },
 
   { id: 'ARENA', name: 'Arena', district: 'ENTERTAINMENT_COMPLEX', cost: 150, amenities: 2, yields: { culture: 1 }, maintenance: 1 },
   { id: 'ZOO', name: 'Zoo', district: 'ENTERTAINMENT_COMPLEX', cost: 360, requiresAny: ['ARENA'], amenities: 1, regional: true, maintenance: 2 },

@@ -561,6 +561,28 @@ class SimSeats:
         can6 = has6 & (js_round(self.civ_treasury[:, row] * 1000) >= js_round((price6 + reserve6) * 1000))
         return jj6, bb6, can6, price6, elig6
 
+    def _commit_golden_grants(self, era: int) -> None:
+        """The GOLDEN dedications that pay ONCE, where the face is committed.
+
+        CIV6 (Sky and Stars): "Unlocks the Eurekas for Advanced Flight, Nuclear
+        Fission, and Rocketry if in the Atomic Era" and the Information-era row
+        below it; (Automaton Warfare): "Gain a Giant Death Robot in your
+        capital"."""
+        techs = self._sky_eurekas[era] if 0 <= era < len(self._sky_eurekas) else []
+        for row in range(self.n_majors):
+            if techs:
+                sky = self._golden_ded(row, self._ded_sky)
+                if bool(sky.any()):
+                    for t in techs:
+                        self.civ_tech_boosted[:, row, t] = self.civ_tech_boosted[:, row, t] | (
+                            sky & ~self.civ_techs[:, row, t])
+            if self._gdr_idx >= 0:
+                auto = self._golden_ded(row, self._ded_automaton)
+                if bool(auto.any()):
+                    cap = self.civ_cap_tile[:, row]
+                    self._spawn_unit(row, auto & (cap >= 0), cap.clamp(min=0),
+                                     torch.full_like(cap, self._gdr_idx))
+
     def _building_dedications(self, row: int, bi: torch.Tensor, made: torch.Tensor) -> None:
         """`buildingDedications` — every dedication a COMPLETED BUILDING pays.
 
@@ -571,6 +593,11 @@ class SimSeats:
         self._dedication_event(row, self._ded_steam, made & (self._b_era[bi] >= self._industrial_era))
         self._dedication_event(row, self._ded_free_inquiry, made & self._b_science[bi])
         self._dedication_event(row, self._ded_pen_brush, made & self._b_gwslot[bi])
+        # CIV6 (Sky and Stars): "+1 Era Score for each Aerodrome building
+        # constructed."
+        if self._aerodrome_didx >= 0:
+            self._dedication_event(row, self._ded_sky,
+                                   made & (self._b_req_district[bi] == self._aerodrome_didx))
 
     def _seat_buy_building(self, row: int, can6: torch.Tensor, jj6: torch.Tensor, bb6: torch.Tensor, price6: torch.Tensor) -> None:
         rows6 = can6.nonzero(as_tuple=True)[0]
@@ -596,10 +623,19 @@ class SimSeats:
         ) & self._res_avail_mask(self.tile_seat == row, row)
 
     def _seat_buy_unit_candidates(self, row: int, tr_u: torch.Tensor) -> torch.Tensor:
-        # No hull on the GOLD rung: it spawns at the capital and asks no city
-        # question, and `trainableUnits(state, seat)` with no city refuses every
-        # naval chassis outright (`d.naval` returns `!!city && ...`).
-        mil = tr_u & (self._type_combat.unsqueeze(0) > 0) & ~self.unit_naval.unsqueeze(0)
+        # No hull and no plane on the GOLD rung: it spawns at the capital and
+        # asks no city question, and `trainableUnits(state, seat)` with no city
+        # refuses both outright (`d.naval` returns `!!city && ...`, and
+        # `canTrainAir` is `!!city && ...` too — neither can name the Harbor or
+        # the Aerodrome it would need).
+        mil = (tr_u & (self._type_combat.unsqueeze(0) > 0) & ~self.unit_naval.unsqueeze(0)
+               & (self._type_air.unsqueeze(0) == 0)
+               & ~self._type_no_gold.unsqueeze(0))  # CIV6 (Spy): "Cannot be purchased with Gold."
+        rc = self._type_civic
+        mil = mil & torch.where(
+            rc.unsqueeze(0) >= 0,
+            self.civ_civics[:, row].gather(1, rc.clamp(min=0).unsqueeze(0).expand(self.B, -1)),
+            torch.ones_like(mil))
         if self._scout_idx >= 0:
             mil[:, self._scout_idx] = False
         # MERCENARY COMPANIES moves the GOLD price of a MILITARY unit, and
@@ -893,7 +929,9 @@ class SimSeats:
                     pick_ty = key_u.argmax(dim=1)
                     ctr_u = self.city_center[bidx, row, spawn_slot].clamp(min=0)
                     xp_u = self._train_xp_pct(self.city_bldg[bidx, row, spawn_slot], pick_ty)
-                    landed_u = self._spawn_unit(row, elig_u, ctr_u, pick_ty, init_xp=xp_u)
+                    landed_u = self._spawn_unit(
+                        row, elig_u, self._air_spawn_at(row, pick_ty, spawn_slot, ctr_u),
+                        pick_ty, init_xp=xp_u)
                     price_u = (self._type_cost.gather(0, pick_ty).double() * mult
                                * self._congress_unit_buy_mult(0))
                     self.civ_treasury[:, row] = torch.where(landed_u, self.civ_treasury[:, row] - price_u, self.civ_treasury[:, row])
@@ -1287,6 +1325,235 @@ class SimSeats:
         if rs < 0 or rc <= 0:
             return torch.ones(self.B, dtype=torch.bool, device=self.device)
         return self.civ_stockpile[:, row, rs] >= rc
+
+    def _air_based_plane(self) -> torch.Tensor:
+        """[B, U] — the live AIRCRAFT of every seat, in merged pool slots."""
+        return self.unit_alive & (
+            self._type_air[self.unit_type.clamp(min=0, max=self.NU - 1)] > 0)
+
+    def _air_orphans_die(self) -> None:
+        """CIV6 (Air combat): "Should your Aircraft Carrier be destroyed, your
+        aircraft stationed within will be destroyed." A hull that sinks, or a
+        centre that changes hands, stops basing what stands on it; the
+        aircraft go down with it (`displaceAirFrom` with no scatter)."""
+        if not self._any_air:
+            return
+        air = self._air_based_plane()
+        if not bool(air.any()):
+            return
+        tile = self.unit_tile.clamp(min=0)
+        for r in range(self.n_majors):
+            mine = air & (self.unit_seat == r)
+            if not bool(mine.any()):
+                continue
+            gone = mine & (self._air_slots_at(r).gather(1, tile) <= 0)
+            if bool(gone.any()):
+                self.unit_alive[gone] = False
+
+    def _air_scatter_from(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
+        """CIV6 (Air combat): "Should your airbase be pillaged, your aircraft
+        stationed within will scatter to nearby valid bases instead of being
+        destroyed. If there are no nearby valid bases, the aircraft will be
+        destroyed." Nearest first, tile index breaking the tie, and each
+        landing takes the slot it fills (`displaceAirFrom`)."""
+        if not self._any_air or rows.numel() == 0:
+            return
+        air = self._air_based_plane()
+        if not bool(air.any()):
+            return
+        hit = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        hit[rows, tiles] = True
+        here = air & hit.gather(1, self.unit_tile.clamp(min=0))
+        if not bool(here.any()):
+            return
+        big = self.T + 1
+        span = torch.arange(self.T, device=self.device)
+        for b, v in zip(*(x.tolist() for x in here.nonzero(as_tuple=True))):
+            seat = int(self.unit_seat[b, v])
+            frm = int(self.unit_tile[b, v])
+            if seat < 0 or seat >= self.n_majors:
+                self.unit_alive[b, v] = False
+                continue
+            d = self.pair_dist[frm].long()
+            reach = 2 * int(self._type_moves[int(self.unit_type[b, v])])
+            free = self._air_free_at(seat)[b] & (d > 0) & (d <= reach)
+            if not bool(free.any()):
+                self.unit_alive[b, v] = False
+                continue
+            key = torch.where(free, d * big + span, torch.full_like(span, big * big))
+            self.unit_tile[b, v] = int(key.argmin())
+
+    def _air_carry_with(self, moved: torch.Tensor, gslot: torch.Tensor,
+                        frm: torch.Tensor, dest: torch.Tensor) -> None:
+        """A moving carrier takes its based aircraft along (`carryAirWith`)."""
+        if not self._any_air or not bool(moved.any()):
+            return
+        ty = self.unit_type.gather(1, gslot.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+        hull = moved & (self._type_air_slots[ty] > 0)
+        if not bool(hull.any()):
+            return
+        seat = self.unit_seat.gather(1, gslot.unsqueeze(1)).squeeze(1)
+        aboard = (
+            self._air_based_plane()
+            & (self.unit_seat == seat.unsqueeze(1))
+            & (self.unit_tile == frm.unsqueeze(1))
+            & hull.unsqueeze(1)
+        )
+        if bool(aboard.any()):
+            g, v = aboard.nonzero(as_tuple=True)
+            self.unit_tile[g, v] = dest[g]
+
+    def _air_strike(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str,
+                    u: int, row: int) -> None:
+        """`airStrike` — one sortie, and the turn goes with it.
+
+        CIV6 (Air combat): "the attacking unit's Ranged Strength will be
+        matched against the defending unit's Anti-Air Strength (even if its
+        Combat Strength is higher) or Combat Strength if it doesn't have any
+        Anti-Air Strength", and only an anti-air SHIP answers back. A BOMBER
+        pointed at a hostile centre fires the ordinary ranged attack instead."""
+        ttc = tgt.clamp(min=0)
+        _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(atk_kind)
+        at0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
+        a_seat = _seat_p[:, u]
+        ctr = self._centre_seat_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
+        cneg = torch.full_like(ctr, -1)
+        city = att & (self._type_air[at0] == 2) & self._seats_hostile(
+            row, torch.where((ctr >= 0) & (ctr < 100), ctr, cneg))
+        if bool(city.any()):
+            fired = self._ranged_attack(city, tgt, atk_kind, u, row)
+            _mp0 = getattr(self, f"{atk_kind}_unit_mp")
+            _mp0[:, u] = torch.where(fired, torch.zeros_like(_mp0[:, u]), _mp0[:, u])
+        mslot = self.military_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
+        cslot = self.civilian_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
+        neg = torch.full_like(mslot, -1)
+        m_seat = torch.where(mslot >= 0, self.unit_seat.gather(1, mslot.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
+        c_seat = torch.where(cslot >= 0, self.unit_seat.gather(1, cslot.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
+        elig_m = self._seats_hostile(row, m_seat)
+        elig_c = self._seats_hostile(row, c_seat)
+        # `enemies.find(military) ?? enemies[0]` — the tile's military occupant
+        # answers first, and a lone civilian answers when it is all there is.
+        d_slot = torch.where(elig_m, mslot, torch.where(elig_c, cslot, neg))
+        unit_att = att & ~city & (d_slot >= 0)
+        if not bool(unit_att.any()):
+            return
+        ds0 = d_slot.clamp(min=0)
+        d_seat = torch.where(elig_m, m_seat, c_seat)
+        d_type = self.unit_type.gather(1, ds0.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+        d_hp0 = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
+        aa = self._type_anti_air[d_type]
+        def_cs = torch.where(aa > 0, aa, self._type_combat[d_type])
+        atk_e = self._type_ranged_strength[at0] - self._wound(_hp_p[:, u])
+        def_e = def_cs - self._wound(d_hp0)
+        d_dmg = self._damage_roll(unit_att, atk_e - def_e, k="air", tile=tgt)
+        g = unit_att.nonzero(as_tuple=True)[0]
+        ds = d_slot[g]
+        self.unit_hp[g, ds] -= d_dmg[g]
+        _mp = getattr(self, f"{atk_kind}_unit_mp")
+        _mp[:, u] = torch.where(unit_att, torch.zeros_like(_mp[:, u]), _mp[:, u])
+        # the answer. CIV6 (Air combat): a plane "doesn't suffer damage in
+        # return unless it gets Intercepted", and "the only exceptions to this
+        # rule are SHIPS with the Anti-Air Strength stat - they have additional
+        # close-range defenses, which activate when they are attacked by an
+        # aircraft". A land anti-air unit answers by intercepting, which no
+        # engine here can do.
+        ret = unit_att & (aa > 0) & self.unit_naval[d_type]
+        a_died = torch.zeros_like(unit_att)
+        if bool(ret.any()):
+            a_dmg = self._damage_roll(ret, def_e - atk_e, k="airc", tile=tgt)
+            _hp_p[:, u] = torch.where(ret, _hp_p[:, u] - a_dmg, _hp_p[:, u])
+            a_died = ret & (_hp_p[:, u] <= 0)
+            if bool(a_died.any()):
+                _alive_p[:, u] = _alive_p[:, u] & ~a_died
+        d_died = unit_att & ((d_hp0 - d_dmg) <= 0)
+        self._ww_battle(unit_att, row, self._row_of(d_seat), tgt,
+                        a_died=a_died, d_died=d_died)
+        dead = self.unit_hp[g, ds] <= 0
+        gd, td = g[dead], ttc[g[dead]]
+        if len(gd) > 0:
+            self.unit_alive[gd, ds[dead]] = False
+            self._dig_at(gd, td, row, d_seat[gd])
+            md = elig_m[gd]
+            self.military_at[(gd[md], td[md])] = -1
+            self.civilian_at[(gd[~md], td[~md])] = -1
+            self._unit_kill_event(a_seat, d_type, d_seat == BARB_SEAT, d_died, at0)
+            self._gen_ver += 1
+
+    def _air_spawn_at(self, row: int, ty: torch.Tensor, col: torch.Tensor,
+                      ctr: torch.Tensor) -> torch.Tensor:
+        """[B] — where a newly built unit lands. CIV6: "Newly built aircraft
+        will spawn in the Aerodrome, as long as it still has empty slots";
+        everything else arrives at the city centre (`airTrainTile`)."""
+        if not self._any_air:
+            return ctr
+        air = self._type_air[ty.clamp(min=0, max=self.NU - 1)] > 0
+        if not bool(air.any()):
+            return ctr
+        at = self._air_train_tile(row).gather(1, col.clamp(min=0).unsqueeze(1)).squeeze(1)
+        return torch.where(air & (at >= 0), at, ctr)
+
+    def _upgrade_units(self, row: int, hit: torch.Tensor, sc: torch.Tensor,
+                       utp: torch.Tensor) -> None:
+        """`upgradeUnit` — the ordered rungs that pass `_upgrade_ok` change
+        chassis, pay the gold and the new chassis' resource, and spend the rest
+        of the turn. CIV6: promotions and experience ride along, and "units do
+        not Heal upon upgrading"."""
+        nxt = self._type_up_to[utp.clamp(min=0)]
+        ok = hit & (nxt >= 0) & (utp >= 0)
+        if not bool(ok.any()):
+            return
+        nc = nxt.clamp(min=0)
+        here = self.unit_tile.gather(1, sc.unsqueeze(1)).squeeze(1)
+        ok = ok & (self.tile_seat.gather(1, here.clamp(min=0).unsqueeze(1)).squeeze(1) == row) & (here >= 0)
+        ok = ok & (self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1) > 0)
+        rt, rc = self._type_tech[nc], self._type_civic[nc]
+        ok = ok & torch.where(rt >= 0, self.civ_techs[:, row].gather(1, rt.clamp(min=0).unsqueeze(1)).squeeze(1),
+                              torch.ones_like(ok))
+        ok = ok & torch.where(rc >= 0, self.civ_civics[:, row].gather(1, rc.clamp(min=0).unsqueeze(1)).squeeze(1),
+                              torch.ones_like(ok))
+        price = (self._type_cost[nc] - self._type_cost[utp.clamp(min=0)]).clamp(min=0).double() \
+            * self.rules.gold_purchase_mult
+        ok = ok & (self.civ_treasury[:, row] >= price)
+        slot, cost = self._type_res_slot[nc], self._type_res_cost[nc]
+        want = (slot >= 0) & (cost > 0) & (self._type_res_slot[utp.clamp(min=0)] != slot)
+        if self._n_strategic:
+            stock = self.civ_stockpile[:, row]
+            have = stock.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1)
+            ok = ok & (~want | (have >= cost))
+        if not bool(ok.any()):
+            return
+        self.civ_treasury[:, row] = torch.where(ok, self.civ_treasury[:, row] - price,
+                                                self.civ_treasury[:, row])
+        if self._n_strategic:
+            pay = (ok & want).long() * cost
+            self.civ_stockpile[:, row].scatter_add_(1, slot.clamp(min=0).unsqueeze(1), -pay.unsqueeze(1))
+        self.unit_type.scatter_(1, sc.unsqueeze(1),
+                                torch.where(ok, nc, utp).unsqueeze(1))
+        self.unit_mp.scatter_(1, sc.unsqueeze(1),
+                              torch.where(ok, torch.zeros_like(here),
+                                          self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1)).unsqueeze(1))
+
+    def _seat_charge_upkeep(self, row: int) -> None:
+        """`chargeUnitUpkeep` — CIV6 (Resource, GS): "each turn, the unit will
+        consume a certain amount of that resource as fuel". One pass over this
+        seat's living units, between the turn's income and the plants' burn,
+        because both come out of one bank. A bill the bank cannot meet takes
+        what is there."""
+        if not self._upkeep_units or not self._n_strategic:
+            return
+        stock = self.civ_stockpile[:, row]
+        for pre in ("barb", "major"):
+            alive = getattr(self, f"{pre}_unit_alive")
+            seat = getattr(self, f"{pre}_unit_seat")
+            typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+            mine = alive & (seat == row)
+            if not bool(mine.any()):
+                continue
+            for u_idx, slot, rate in self._upkeep_units:
+                n = (mine & (typ == u_idx)).sum(dim=1)
+                if bool((n > 0).any()):
+                    col = stock[:, slot]
+                    col.copy_((col - n * rate).clamp(min=0))
 
     def _charge_unit_resource(self, row: int, hit: torch.Tensor, u_idx: int) -> None:
         """`chargeUnitResource` — the unit's stockpile cost, taken from the rows
@@ -1838,17 +2105,28 @@ class SimSeats:
         suz = self._suz_effect_rows(self._suz_c_xp).gather(1, s0.unsqueeze(1)).squeeze(1) & ok
         return 1 + (self._suz_xp_mult_k - 1) * suz.long()
 
-    def _naval_kill_event(self, killer, vict_type: torch.Tensor, vict_barb: torch.Tensor, killed: torch.Tensor) -> None:
-        """`navalKillEvent`'s twin — CIV6 (Hic Sunt Dracones, dark face): "+1
-        Era Score each time you kill a non-Barbarian naval unit in combat."
-        `killer` is a row int or a [B] seat tensor; a non-major killer (a
-        city-state or a camp) holds no dedications and scores 0."""
-        ev = killed & ~vict_barb & self.unit_naval[vict_type.clamp(min=0, max=self.NU - 1)]
+    def _unit_kill_event(self, killer, vict_type: torch.Tensor, vict_barb: torch.Tensor,
+                         killed: torch.Tensor, killer_type: torch.Tensor | None = None) -> None:
+        """`unitKillEvent`'s twin — CIV6 (Hic Sunt Dracones, dark face): "+1
+        Era Score each time you kill a non-Barbarian naval unit in combat";
+        (Automaton Warfare): "+1 Era Score each time you kill a non-Barbarian
+        unit with a Giant Death Robot". `killer` is a row int or a [B] seat
+        tensor; a non-major killer (a city-state or a camp) holds no
+        dedications and scores 0, and a CITY has no chassis to check."""
+        alive = killed & ~vict_barb
+        if killer_type is not None and self._gdr_idx >= 0:
+            gdr = alive & (killer_type == self._gdr_idx)
+            if bool(gdr.any()):
+                self._ded_by_killer(killer, self._ded_automaton, gdr)
+        ev = alive & self.unit_naval[vict_type.clamp(min=0, max=self.NU - 1)]
         if not bool(ev.any()):
             return
+        self._ded_by_killer(killer, self._ded_dracones, ev)
+
+    def _ded_by_killer(self, killer, kind: int, ev: torch.Tensor) -> None:
         if isinstance(killer, int):
             if 0 <= killer < self.n_majors:
-                self._dedication_event(killer, self._ded_dracones, ev)
+                self._dedication_event(killer, kind, ev)
             return
         for g in range(self.n_majors):
             m = ev & (killer == g)
@@ -3409,7 +3687,20 @@ class SimSeats:
         for k, (rid, rate) in enumerate(zip(self._strat_rid, self._strat_rate)):
             n = (owned & (self.res_id == rid)).sum(dim=1)
             if bool((n > 0).any()):
-                bank[:, k] += n * rate
+                # CIV6 (Sky and Stars / Automaton Warfare, Golden faces):
+                # Aluminum mines accumulate +2 and Uranium mines +1 more per
+                # turn, so the bonus rides the SOURCE COUNT, not the seat.
+                per = torch.full_like(n, rate)
+                if k == self._sky_alu_slot:
+                    per = per + self._golden_ded(row, self._ded_sky).long() * self._sky_alu_rate
+                if k == self._auto_ura_slot:
+                    per = per + self._golden_ded(row, self._ded_automaton).long() * self._auto_ura_mine
+                bank[:, k] += n * per
+        # CIV6 (Automaton Warfare, Golden face): "Receive 3 Uranium per turn" —
+        # a standing grant, owed whether or not the seat mines any.
+        if self._auto_ura_slot >= 0:
+            bank[:, self._auto_ura_slot] += (
+                self._golden_ded(row, self._ded_automaton).long() * self._auto_ura_rate)
         cap = self._stockpile_cap(row).unsqueeze(1)
         bank.copy_(torch.minimum(bank, cap))
 
@@ -4315,16 +4606,16 @@ class SimSeats:
                 mil_att, a_kind=atk_kind, u=u, a_type=a_type[:, u], a_seat=a_seat[:, u],
                 d_slot=d_slot, d_type=d_type, d_is_barb=def_is_barb,
                 ranged=False, a_died=atk_raw, d_died=def_dead)
-            self._naval_kill_event(a_seat[:, u], d_type, def_is_barb, def_dead)
-            self._naval_kill_event(d_seat_m, a_type[:, u], a_seat[:, u] == BARB_SEAT, atk_dead)
+            self._unit_kill_event(a_seat[:, u], d_type, def_is_barb, def_dead, a_type[:, u])
+            self._unit_kill_event(d_seat_m, a_type[:, u], a_seat[:, u] == BARB_SEAT, atk_dead, d_type)
             self._ww_battle(mil_att, self._row_of(self._atk_seat(atk_kind, u)),
                             self._row_of(_wwd), tgt,
                             a_died=atk_dead, d_died=(_wwh & ~self._ww_occ(tgt)) != 0)
             if bool(atk_dead.any()):
                 ar = atk_dead.nonzero(as_tuple=True)[0]
+                a_alive[:, u] = a_alive[:, u] & ~atk_dead
                 self._dig_at(ar, here[ar], self._row_of(a_seat[ar, u]), a_seat[ar, u])
                 a_occ[ar, here[ar]] = -1
-                a_alive[:, u] = a_alive[:, u] & ~atk_dead
             adv_terr = self._advance_terrain(a_type[:, u], a_seat[:, u], tgt)
             adv = def_dead & ~atk_dead & ~self._blocked_for(tgt.unsqueeze(1), a_seat[:, u].unsqueeze(1)).squeeze(1) & adv_terr
             if bool(adv.any()):
@@ -4785,6 +5076,7 @@ class SimSeats:
             self.military_at[(mil_rows, here[mil_rows])] = -1
             self.military_at[(mil_rows, dest[mil_rows])] = gslot[mil_rows]
         self.unit_tile[rows, gs] = dest[rows]
+        self._air_carry_with(moved, gslot, here, dest)
         # stepUnit's revealAround: EVERY hop lifts the mover's fog, at
         # SIGHT_RANGE plus what CIV6 (Spyglass / Rutter) calls "+1 sight range".
         # Major seats only — revealAround gates to isCiv on TS the same way,
@@ -4989,9 +5281,9 @@ class SimSeats:
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
             _as = self._atk_seat(atk_kind, u)[dr]
+            a_alive[:, u] = a_alive[:, u] & ~died
             self._dig_at(dr, a_tile[dr, u], self._row_of(_as), _as)
             a_occ[dr, a_tile[dr, u]] = -1
-            a_alive[:, u] = a_alive[:, u] & ~died
 
     def _capture_unit(self, rows: torch.Tensor, src: torch.Tensor, pool: str,
                       dst_seat: torch.Tensor, tile: torch.Tensor) -> None:
@@ -5216,12 +5508,12 @@ class SimSeats:
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
         died = att & (a_hp[:, u] <= 0)
         self._ww_battle(att, self._row_of(a_seat[:, u]), hrow, tgt, a_died=died, city=True)
-        self._naval_kill_event(hrow, a_type[:, u], a_seat[:, u] == BARB_SEAT, died)
+        self._unit_kill_event(hrow, a_type[:, u], a_seat[:, u] == BARB_SEAT, died)
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
+            a_alive[:, u] = a_alive[:, u] & ~died
             self._dig_at(dr, a_tile[dr, u], self._row_of(a_seat[dr, u]), a_seat[dr, u])
             self.military_at[(dr, a_tile[dr, u])] = -1
-            a_alive[:, u] = a_alive[:, u] & ~died
         return rows, hrow, slot, died, ttc
 
     def _raze_garrison(self, rows: torch.Tensor, centres: torch.Tensor, captor: torch.Tensor) -> None:
@@ -5339,9 +5631,9 @@ class SimSeats:
                                         torch.full_like(_cshp, XP_CITY_ATTACK)))
         if bool(atk_dead.any()):
             ar = atk_dead.nonzero(as_tuple=True)[0]
+            a_alive[:, u] = a_alive[:, u] & ~atk_dead
             self._dig_at(ar, here[ar], self._row_of(a_seat[ar, u]), a_seat[ar, u])
             self.military_at[(ar, here[ar])] = -1
-            a_alive[:, u] = a_alive[:, u] & ~atk_dead
         self._ww_battle(att, self._row_of(a_seat[:, u]), self._row_of(100 + citystate_sc), tgt,
                         a_died=atk_dead, city=True)
         cap = att & (self.citystate_hp.gather(1, citystate_sc.unsqueeze(1)).squeeze(1) <= 0)
@@ -5356,7 +5648,7 @@ class SimSeats:
         d = self._damage_roll(strike, atk_cs - def_e, k=key, tile=tt)
         self._ww_battle(strike, striker_row, self._row_of(d_seat), tt,
                         d_died=strike & (d_slot >= 0) & ((def_hp - d) <= 0), city=True)
-        self._naval_kill_event(
+        self._unit_kill_event(
             striker_row,
             self.unit_type.gather(1, d_slot.clamp(min=0).unsqueeze(1)).squeeze(1),
             d_seat == BARB_SEAT,
@@ -5571,8 +5863,8 @@ class SimSeats:
             self._ww_battle(unit_att, self._row_of(self._atk_seat(atk_kind, u)),
                             self._row_of(d_seat), tgt,
                             d_died=unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
-            self._naval_kill_event(self._atk_seat(atk_kind, u), d_type, d_barb,
-                                   unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
+            self._unit_kill_event(self._atk_seat(atk_kind, u), d_type, d_barb,
+                                  unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0), ut0)
             if bool((unit_att & civ_def).any()):
                 self._gen_ver += 1
             self._award_pair_xp(
@@ -5750,8 +6042,8 @@ class SimSeats:
             self._ww_battle(unit_att, self._row_of(self._atk_seat(atk_kind, u)),
                             self._row_of(d_seat), tgt,
                             d_died=unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
-            self._naval_kill_event(self._atk_seat(atk_kind, u), d_type, d_barb,
-                                   unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
+            self._unit_kill_event(self._atk_seat(atk_kind, u), d_type, d_barb,
+                                  unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0), at0)
             if bool((unit_att & ~ok_m).any()):
                 self._gen_ver += 1
             self._award_pair_xp(

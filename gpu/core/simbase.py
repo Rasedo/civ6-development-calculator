@@ -138,6 +138,7 @@ class Rules:
     laser_power_load: float  # Power a Terrestrial Laser Station adds to its city
     b_fuel_slot: torch.Tensor  # long [NB] — the stockpile slot a power plant burns, -1 = none
     b_fuel_rate: torch.Tensor  # long [NB] — Power produced per unit of that resource
+    b_air_slots: torch.Tensor  # long [NB] — air-unit slots this building adds to its Aerodrome
     strategic: dict  # {rid, rate, slotOf, capBase, capPerEncampmentBuilding, encampmentDidx}
     b_worship: torch.Tensor  # bool [NB] — worship building (faith-purchase-only; every production/gold picker skips)
     b_era: torch.Tensor  # long [NB] — the era the building first unlocks (Heartbeat of Steam's gate)
@@ -261,6 +262,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         laser_power_load=float(r["laserPowerLoad"]),
         b_fuel_slot=torch.tensor([int(b["fuelSlot"]) for b in B], dtype=torch.long),
         b_fuel_rate=torch.tensor([int(b["fuelRate"]) for b in B], dtype=torch.long),
+        b_air_slots=torch.tensor([int(b.get("airSlots", 0)) for b in B], dtype=torch.long),
         strategic=r["strategic"],
         b_worship=torch.tensor([bool(b.get("worship", 0)) for b in B], dtype=torch.bool),
         b_train_xp_pct=torch.tensor([int(b.get("trainXpPct", 0)) for b in B], dtype=torch.long),
@@ -403,6 +405,7 @@ WW_BATTLE_KEYS = frozenset({
     "rngcs",    # seat-0 ranged vs a city-state centre
     "cstk",     # ANY seat's city walls strike
     "estk",     # ANY seat's city Encampment strike
+    "air",      # an AIR STRIKE on a unit - the sortie's own roll
 })
 
 BARB_SEAT = 200  # the barbarians — cpu/core/seats.ts BARB_SEAT
@@ -582,6 +585,7 @@ _MUTABLE = [
     "pan_claimed", "fol_claimed", "fou_claimed",  # belief-claim masks
     "enh_claimed",  # enhancer-claim mask
     "holy_tile", "city_pressure", "city_followed",  # ONE seat-indexed pressure+followed plane pair
+    "city_gov_out", "city_spy_sources",  # the two clocks a spy mission leaves behind
     "antiquity",  # ANTIQUITY SITES (bool tile plane)
     "antiquity_era", "antiquity_seat",  # ...and what a dug Artifact remembers
     "shipwreck", "shipwreck_era", "shipwreck_seat",  # the WATER dig
@@ -593,7 +597,7 @@ _MUTABLE = [
     # The merged unit pool. The BASES are registered, never the `major_`/`barb_`
     # RANGE VIEWS into them — snapshot/restore round-trips one tensor per plane
     # instead of three, and a view can never be half-restored.
-    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_xp_pct", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_emb", "unit_seat", "military_at", "civilian_at", "war", "ww", "ww_turn",
+    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_xp_pct", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_emb", "unit_seat", "unit_spy_mission", "unit_spy_turns", "unit_spy_target", "unit_spy_level", "military_at", "civilian_at", "war", "ww", "ww_turn",
     "civ_best_melee", "civ_builders_trained", "civ_relic_reserve", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted", "civ_tech_retain", "civ_civic_retain",
     "civ_enhancer", "civ_enhancer_done", "civ_follower", "civ_founder", "civ_next_city_id",
     "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_inquisition", "civ_tiles_purchased",

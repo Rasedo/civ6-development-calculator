@@ -47,7 +47,7 @@ def score(sim, row: int) -> int:
 
 def main() -> None:
     sim = build()
-    assert sim._n_ded == 9, sim._n_ded
+    assert sim._n_ded == 12, sim._n_ded
     # Every WORLD ERA offers a window, and Ancient offers none — a civ has
     # earned no era score when the game opens.
     assert sim._ded_era_len[0] == 0, sim._ded_era_len
@@ -80,16 +80,16 @@ def main() -> None:
     tt = torch.full((B,), nav_t, dtype=torch.long)
     no = torch.zeros(B, dtype=torch.bool)
     yes = torch.ones(B, dtype=torch.bool)
-    sim._naval_kill_event(torch.zeros(B, dtype=torch.long), tt, no, yes)
+    sim._unit_kill_event(torch.zeros(B, dtype=torch.long), tt, no, yes)
     assert score(sim, 0) == 1
-    sim._naval_kill_event(torch.zeros(B, dtype=torch.long), tt, yes, yes)  # barb victim
+    sim._unit_kill_event(torch.zeros(B, dtype=torch.long), tt, yes, yes)  # barb victim
     assert score(sim, 0) == 1
-    sim._naval_kill_event(torch.zeros(B, dtype=torch.long), torch.full((B,), foot_t, dtype=torch.long), no, yes)
+    sim._unit_kill_event(torch.zeros(B, dtype=torch.long), torch.full((B,), foot_t, dtype=torch.long), no, yes)
     assert score(sim, 0) == 1  # not naval
-    sim._naval_kill_event(150, tt, no, yes)  # a city-state killer holds no dedication
+    sim._unit_kill_event(150, tt, no, yes)  # a city-state killer holds no dedication
     assert score(sim, 0) == 1
     commit(sim, 0, sim._ded_dracones, golden=True)  # a GOLDEN age takes bonuses
-    sim._naval_kill_event(0, tt, no, yes)
+    sim._unit_kill_event(0, tt, no, yes)
     assert score(sim, 0) == 0
     print("dracones naval kill ok")
 
@@ -284,7 +284,92 @@ def main() -> None:
     assert not bool(sim._governor_tiles(row, sim.city_alive[:, row]).any()), "a NORMAL age paid the golden clause"
     print("wish governor wonder tourism ok")
 
-    print("DEDICATIONS OK — both faces of all five new catalog entries fire, and only as sourced")
+    # ---- Sky and Stars ------------------------------------------------------
+    # CIV6: "+1 Era Score for each Aerodrome building constructed. +1 Era Score
+    # each time a Great Person is Earned."
+    aero_b = [b for b in range(sim.NB) if int(sim._b_req_district[b]) == sim._aerodrome_didx]
+    assert aero_b, "the catalog carries no Aerodrome building"
+    yes = torch.ones(B, dtype=torch.bool)
+    commit(sim, row, sim._ded_sky)
+    sim._building_dedications(row, torch.full((B,), aero_b[0], dtype=torch.long), yes)
+    assert score(sim, row) == sim._ded_event_score[sim._ded_sky], score(sim, row)
+    commit(sim, row, sim._ded_sky)
+    other = next(b for b in range(sim.NB)
+                 if int(sim._b_req_district[b]) != sim._aerodrome_didx
+                 and int(sim._b_era[b]) < sim._industrial_era
+                 and not bool(sim._b_science[b]) and not bool(sim._b_gwslot[b]))
+    sim._building_dedications(row, torch.full((B,), other, dtype=torch.long), yes)
+    assert score(sim, row) == 0, "only an AERODROME building pays Sky and Stars"
+    print("sky aerodrome building ok")
+
+    # ---- Automaton Warfare: only a GDR kill pays ----------------------------
+    gdr = sim._gdr_idx
+    assert gdr >= 0, "the roster fields no Giant Death Robot"
+    prey = torch.full((B,), int((~sim.unit_naval).nonzero().flatten()[0]), dtype=torch.long)
+    no = torch.zeros(B, dtype=torch.bool)
+    commit(sim, row, sim._ded_automaton)
+    sim._unit_kill_event(row, prey, no, yes, torch.full((B,), gdr, dtype=torch.long))
+    assert score(sim, row) == sim._ded_event_score[sim._ded_automaton], score(sim, row)
+    commit(sim, row, sim._ded_automaton)
+    sim._unit_kill_event(row, prey, yes, yes, torch.full((B,), gdr, dtype=torch.long))
+    assert score(sim, row) == 0, "a BARBARIAN victim pays nothing"
+    commit(sim, row, sim._ded_automaton)
+    sim._unit_kill_event(row, prey, no, yes, prey)
+    assert score(sim, row) == 0, "an ordinary chassis pays nothing"
+    commit(sim, row, sim._ded_automaton)
+    sim._unit_kill_event(row, prey, no, yes)
+    assert score(sim, row) == 0, "a CITY has no chassis, and pays nothing"
+    print("automaton gdr kill ok")
+
+    # ---- the two golden faces the SOURCE pays in resources ------------------
+    # CIV6: "Aluminum mines accumulate +2 more resources per turn"; "Receive 3
+    # Uranium per turn. Uranium mines accumulate +1 more resource per turn."
+    def accrued(kind: int, slot: int, mine_rid: int | None) -> int:
+        commit(sim, row, kind, golden=True)
+        sim.civ_stockpile[:, row] = 0
+        if mine_rid is not None:
+            sim.res_id[0, mtile] = mine_rid
+            sim.res_imp[0, mtile] = 3
+            sim.improvement[0, mtile] = 3
+            sim.pillaged[0, mtile] = False
+            sim.tile_seat[0, mtile] = row
+            sim._tile_owner_ver += 1
+        sim._seat_accrue_stockpile(row)
+        return int(sim.civ_stockpile[0, row, slot])
+
+    mtile = int((sim.tile_seat[0] == row).nonzero().flatten()[0])
+    alu, ura = sim._sky_alu_slot, sim._auto_ura_slot
+    assert alu >= 0 and ura >= 0
+    base_a = accrued(sim._ded_monumentality, alu, int(sim._strat_rid[alu]))
+    with_a = accrued(sim._ded_sky, alu, int(sim._strat_rid[alu]))
+    assert with_a - base_a == sim._sky_alu_rate, (base_a, with_a)
+    base_u = accrued(sim._ded_monumentality, ura, int(sim._strat_rid[ura]))
+    with_u = accrued(sim._ded_automaton, ura, int(sim._strat_rid[ura]))
+    assert with_u - base_u == sim._auto_ura_rate + sim._auto_ura_mine, (base_u, with_u)
+    print("sky/automaton mine accrual ok")
+
+    # ---- the one-off grants at the era boundary -----------------------------
+    sim2 = build()
+    for r2 in range(sim2.n_majors):
+        commit(sim2, r2, sim2._ded_sky, golden=True)
+        sim2.ded_picks[:, r2, 0] = sim2._ded_sky
+        sim2.civ_age[:, r2] = 2
+    atomic = next(e for e, w in enumerate(sim2._sky_eurekas) if w)
+    sim2._commit_golden_grants(atomic)
+    for t2 in sim2._sky_eurekas[atomic]:
+        assert bool(sim2.civ_tech_boosted[0, 0, t2]), f"Sky and Stars left tech {t2} unboosted"
+    sim3 = build()
+    for r3 in range(sim3.n_majors):
+        commit(sim3, r3, sim3._ded_automaton, golden=True)
+        sim3.ded_picks[:, r3, 0] = sim3._ded_automaton
+        sim3.civ_age[:, r3] = 2
+    had = int((sim3.major_unit_alive & (sim3.major_unit_type == sim3._gdr_idx)).sum())
+    sim3._commit_golden_grants(atomic)
+    now = int((sim3.major_unit_alive & (sim3.major_unit_type == sim3._gdr_idx)).sum())
+    assert now > had, "Automaton Warfare's golden face put no robot in a capital"
+    print("sky eurekas + automaton robot ok")
+
+    print("DEDICATIONS OK — both faces of all eight new catalog entries fire, and only as sourced")
 
 
 if __name__ == "__main__":

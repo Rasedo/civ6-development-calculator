@@ -132,7 +132,12 @@ class SimPhase:
         # source pays into the bank, then the plants burn what they need and
         # the POWERED flag every yield reader takes is set for the turn.
         self._seat_accrue_stockpile(row)
+        self._seat_charge_upkeep(row)
         self._resolve_seat_power(row)
+        # ESPIONAGE: this seat's own spies move a turn closer to arriving or to
+        # resolving, and the clocks their missions left behind tick down.
+        self._tick_spies(row)
+        self._tick_spy_effects(row)
         self._drain_relic_reserve(row, active)
         self._ww_decay(row, active)
         # Eurekas/inspirations from this seat — the TS twin runs at the
@@ -257,7 +262,9 @@ class SimPhase:
         loyalty moves."""
         dev, B, RC = self.device, self.B, self.RC
         titles = (self.civ_civics[:, row].sum(dim=1) // self._gov_per).clamp(max=self._gov_max)
-        alive = self.city_alive[:, row]
+        # CIV6 (Neutralize Governor): a city whose governor is off duty is not
+        # a candidate at all — TS drops it from the list the pick ranks.
+        alive = self.city_alive[:, row] & (self.city_gov_out[:, row] <= 0)
         q = js_round(self.city_loyalty[:, row] * 1000).long()
         key = torch.where(alive, q * 256 + torch.arange(RC, device=dev).reshape(1, -1), torch.full_like(q, 1 << 40))
         rank = torch.empty_like(key)
@@ -487,7 +494,7 @@ class SimPhase:
         if bool(made_u.any()):
             ui = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
             xp = self._train_xp_pct(self.city_bldg[bidx, row, col, :], ui)
-            self._spawn_unit(row, made_u, ctr, ui, init_xp=xp)
+            self._spawn_unit(row, made_u, self._air_spawn_at(row, ui, col, ctr), ui, init_xp=xp)
             # CIV6 (Venetian Arsenal): a TRAINED naval unit arrives twice.
             # Purchases are excluded in the real game and take another path.
             if self._wond_n and bool(self._wond_dupnaval.any()):
@@ -927,6 +934,9 @@ class SimPhase:
                 self.gp_earned[:, cls] = self.gp_earned[:, cls] + hit.long()
                 self.gp_next[:, cls] = torch.where(hit, at_c + 1, self.gp_next[:, cls])
                 self._add_era_score(row, self._era_pts["gp"], hit.long())  # per GP earned
+                # CIV6 (Sky and Stars): "+1 Era Score each time a Great
+                # Person is Earned."
+                self._dedication_event(row, self._ded_sky, hit)
                 # A GENERAL/ADMIRAL claim spawns its support unit
                 # (civilian, 4 MP) at the seat's capital (city_is_cap
                 # center), on top of the instant effect — the phase.ts

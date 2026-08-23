@@ -1174,7 +1174,7 @@ class SimMasks:
         )
         return torch.where(self.unit_naval[u_type.clamp(min=0, max=self.NU - 1)], water_ok, land_ok)
 
-    def _spawn_barb(self, mask: torch.Tensor, at_tile: torch.Tensor, unit_type: int, naval: bool = False) -> None:
+    def _spawn_barb(self, mask: torch.Tensor, at_tile: torch.Tensor, unit_type: int, naval: bool = False, ladder: bool = True) -> None:
         if not bool(mask.any()):
             return
         # a NAVAL barb probes the WATER plane (its hull cannot stand ashore),
@@ -1188,7 +1188,7 @@ class SimMasks:
         slot = self.next_slot[rows]
         assert int(slot.max()) < simbase.BARB_POOL_MAX, "barbarian slot pool exhausted — raise simbase.BARB_POOL_MAX"
         self.barb_unit_alive[rows, slot] = True
-        self.barb_unit_type[rows, slot] = int(self._barb_ladder[unit_type])
+        self.barb_unit_type[rows, slot] = int(self._barb_ladder[unit_type]) if ladder else unit_type
         self.barb_unit_tile[rows, slot] = spot[rows]
         self.barb_unit_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
         self.barb_unit_fortify[rows, slot] = 0  # a fresh (possibly reclaimed) slot starts undug
@@ -1268,10 +1268,14 @@ class SimMasks:
         pre = "major"
         is_civ_u = self._type_civilian[type_idx.clamp(min=0)]
         ti_n = type_idx.clamp(min=0, max=self.NU - 1)
+        no_hold = (self._type_air[ti_n] > 0) | (ti_n == self._spy_idx)
         naval_m = self.unit_naval[ti_n] & mask
         techs2 = self.civ_techs[:, row]
         cart = techs2[:, self._cartography_tech] if self._cartography_tech >= 0 else None
         found, spot = self._first_free_spot(at_tile, row, civ_mask=is_civ_u, naval_mask=naval_m, cart=cart)
+        if bool(no_hold.any()):
+            found = torch.where(no_hold, at_tile >= 0, found)
+            spot = torch.where(no_hold, at_tile.clamp(min=0), spot)
         can = mask & found
         if not bool(can.any()):
             return can
@@ -1313,10 +1317,11 @@ class SimMasks:
         getattr(self, f"{pre}_unit_charges")[rows, slot] = _ch + self._extra_charges(row, type_idx)[rows]
         off = self.POOL_LO[pre]
         cu_rows = is_civ_u[rows]
-        mil_rows = rows[~cu_rows]
+        ar_rows = no_hold[rows]
+        mil_rows = rows[~cu_rows & ~ar_rows]
         if len(mil_rows) > 0:
             self.military_at[(mil_rows, spot[mil_rows])] = nxt[mil_rows] + off
-        cv_rows = rows[cu_rows]
+        cv_rows = rows[cu_rows & ~ar_rows]
         if len(cv_rows) > 0:
             self.civilian_at[(cv_rows, spot[cv_rows])] = nxt[cv_rows] + off
         nxt[rows] += 1
@@ -1358,6 +1363,7 @@ class SimMasks:
         c[gd] = int(civ) if isinstance(civ, int) else civ
         self._mark_antiquity(m, t, row, c)
         self._mark_shipwreck(m, t, row, c)
+        self._air_orphans_die()
 
     def _mark_antiquity(self, mask: torch.Tensor, tile: torch.Tensor, row, civ: torch.Tensor) -> None:
         """The markAntiquitySite twin — stamp an ANTIQUITY SITE on
@@ -1998,9 +2004,28 @@ class SimMasks:
                     & self._promo_flag(utype, self.unit_promos.gather(1, sc), "HEATHEN")
                     & (on_map & _bs.gather(1, nbc).reshape(B, N, 6)).any(dim=2)).unsqueeze(2)]
 
+        _ug: list[torch.Tensor] = []
+        if getattr(self, "_A_UPGRADE", -1) >= 0:
+            _ug = [(present & self._upgrade_ok(row, sc, tc, utype)).unsqueeze(2)]
+
+        _as: list[torch.Tensor] = []
+        if getattr(self, "_A_AIR_STRIKE", -1) >= 0:
+            _as = [present.unsqueeze(2) & self._air_target_mask(row, sc, tc, utype)]
+        _rb: list[torch.Tensor] = []
+        if getattr(self, "_A_REBASE", -1) >= 0:
+            _rb = [present.unsqueeze(2) & self._rebase_mask(row, sc, tc, utype)]
+
+        _st: list[torch.Tensor] = []
+        if getattr(self, "_A_SPY_TRAVEL", -1) >= 0:
+            _st = [present.unsqueeze(2) & self._spy_travel_mask(row, sc, tc, utype)]
+        _sm: list[torch.Tensor] = []
+        if getattr(self, "_A_SPY_MISSION", -1) >= 0:
+            _sm = [present.unsqueeze(2) & self._spy_mission_mask(row, sc, tc, utype)]
+
         out = torch.cat(
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
-            + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc,
+            + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc
+            + _ug + _as + _rb + _st + _sm,
             dim=2,
         )
         if self._act_names and self.improvements_on and self._builder_idx >= 0:
@@ -2008,6 +2033,145 @@ class SimMasks:
                 f"_seat_unit_mask is {out.shape[-1]} wide but the enum has {len(self._act_names)} entries"
             )
         return out
+
+    def _air_first_k(self, cand: torch.Tensor, width: int) -> torch.Tensor:
+        """[B, N, T] bool -> [B, N, width] TILE INDEX, -1 where a row offers
+        fewer. The first `width` set tiles in TILE-INDEX order, which is what
+        both engines mean by column k."""
+        B, N, T = cand.shape
+        dev = cand.device
+        rank = cand.long().cumsum(dim=2) - 1
+        keep = cand & (rank < width)
+        col = torch.where(keep, rank, torch.full_like(rank, width))
+        idx = torch.arange(T, device=dev).view(1, 1, T).expand(B, N, T)
+        pad = torch.full((B, N, width + 1), -1, dtype=torch.long, device=dev)
+        pad.scatter_(2, col, idx)
+        return pad[:, :, :width]
+
+    def _air_tile_offer(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """[B, T] x3 — hostile LAND units, hostile SHIPS, and a hostile major
+        CENTRE, per tile. An aircraft holds neither occupancy plane, so what
+        stands on a tile is exactly what those two carry (`airStrikeOffers`)."""
+        B, T, dev = self.B, self.T, self.device
+        neg = torch.full((B, T), -1, dtype=torch.long, device=dev)
+        land = torch.zeros(B, T, dtype=torch.bool, device=dev)
+        sea = torch.zeros(B, T, dtype=torch.bool, device=dev)
+        for plane in (self.military_at, self.civilian_at):
+            pc = plane.clamp(min=0)
+            here = plane >= 0
+            s = torch.where(here, self.unit_seat.gather(1, pc), neg)
+            t = torch.where(here, self.unit_type.gather(1, pc), neg)
+            h = self._seats_hostile(row, s)
+            nav = self.unit_naval[t.clamp(min=0, max=self.NU - 1)]
+            sea = sea | (h & nav)
+            land = land | (h & ~nav)
+        cs = self._centre_seat_plane()
+        ctr = self._seats_hostile(row, torch.where((cs >= 0) & (cs < 100), cs, neg))
+        return land, sea, ctr
+
+    def _air_cols(self, kind: torch.Tensor) -> torch.Tensor:
+        """the N-columns holding an aircraft in ANY batch row — every air body
+        narrows to these before it builds anything [B, N, T]."""
+        return (kind > 0).any(dim=0).nonzero(as_tuple=True)[0]
+
+    def _air_strike_targets(self, row: int, sc: torch.Tensor, tc: torch.Tensor,
+                            utype: torch.Tensor) -> torch.Tensor:
+        """[B, N, W] TILE INDEX, -1 on a dead column — `airStrikeTargets`.
+
+        CIV6 (Air combat): a strike reaches anything inside the aircraft's
+        OPERATIONAL RANGE, a FIGHTER's damage is "effective against land units,
+        but not against cities and naval units" and a BOMBER's "against cities
+        and naval units but not against land units"."""
+        B, N = tc.shape
+        W, dev = self._air_strike_cols, self.device
+        out = torch.full((B, N, W), -1, dtype=torch.long, device=dev)
+        ti = utype.clamp(min=0, max=self.NU - 1)
+        kind = torch.where(utype >= 0, self._type_air[ti], torch.zeros_like(ti))
+        cols = self._air_cols(kind)
+        if W == 0 or cols.numel() == 0:
+            return out
+        k, t2 = kind[:, cols], tc[:, cols]
+        dist = self.pair_dist[t2.reshape(-1)].reshape(B, cols.numel(), self.T).long()
+        rngv = self._type_ranged_range[ti[:, cols]].unsqueeze(2)
+        land, sea, ctr = self._air_tile_offer(row)
+        bomb = (k == 2).unsqueeze(2)
+        offer = torch.where(bomb, (ctr | sea).unsqueeze(1), (land & ~ctr).unsqueeze(1))
+        cand = (
+            (dist > 0) & (dist <= rngv) & offer
+            & (k > 0).unsqueeze(2)
+            & (self.unit_mp.gather(1, sc[:, cols]) > 0).unsqueeze(2)
+        )
+        out[:, cols] = self._air_first_k(cand, W)
+        return out
+
+    def _air_target_mask(self, row: int, sc: torch.Tensor, tc: torch.Tensor,
+                         utype: torch.Tensor) -> torch.Tensor:
+        return self._air_strike_targets(row, sc, tc, utype) >= 0
+
+    def _rebase_targets(self, row: int, sc: torch.Tensor, tc: torch.Tensor,
+                        utype: torch.Tensor) -> torch.Tensor:
+        """[B, N, W] TILE INDEX, -1 on a dead column — `rebaseTargets`: this
+        seat's own bases with room, in tile-index order. CIV6: "The maximum
+        re-base distance is twice the Moves of that air unit"."""
+        B, N = tc.shape
+        W, dev = self._air_rebase_cols, self.device
+        out = torch.full((B, N, W), -1, dtype=torch.long, device=dev)
+        ti = utype.clamp(min=0, max=self.NU - 1)
+        kind = torch.where(utype >= 0, self._type_air[ti], torch.zeros_like(ti))
+        cols = self._air_cols(kind)
+        if W == 0 or cols.numel() == 0:
+            return out
+        k, t2 = kind[:, cols], tc[:, cols]
+        dist = self.pair_dist[t2.reshape(-1)].reshape(B, cols.numel(), self.T).long()
+        reach = (2 * self._type_moves[ti[:, cols]]).unsqueeze(2)
+        cand = (
+            (dist > 0) & (dist <= reach)
+            & self._air_free_at(row).unsqueeze(1)
+            & (k > 0).unsqueeze(2)
+            & (self.unit_mp.gather(1, sc[:, cols]) > 0).unsqueeze(2)
+        )
+        out[:, cols] = self._air_first_k(cand, W)
+        return out
+
+    def _rebase_mask(self, row: int, sc: torch.Tensor, tc: torch.Tensor,
+                     utype: torch.Tensor) -> torch.Tensor:
+        return self._rebase_targets(row, sc, tc, utype) >= 0
+
+    def _upgrade_ok(self, row: int, sc: torch.Tensor, tc: torch.Tensor,
+                    utype: torch.Tensor) -> torch.Tensor:
+        """[B, N] — `canUpgradeUnit`. CIV6 (Unit): the chassis has a successor,
+        the successor is unlocked, the unit stands "in friendly territory" with
+        "more than 0 Movement left", and the seat can pay the Gold and whatever
+        strategic resource the NEW chassis asks for — "unless the unit you're
+        upgrading also requires the same resource, in which case you don't
+        need any"."""
+        B, N = utype.shape
+        dev = self.device
+        nxt = self._type_up_to[utype.clamp(min=0)]
+        ok = (nxt >= 0) & (utype >= 0)
+        if not bool(ok.any()):
+            return torch.zeros(B, N, dtype=torch.bool, device=dev)
+        nc = nxt.clamp(min=0)
+        rt, rc = self._type_tech[nc], self._type_civic[nc]
+        have_t = torch.where(rt >= 0, self.civ_techs[:, row].gather(1, rt.clamp(min=0)),
+                             torch.ones_like(ok))
+        have_c = torch.where(rc >= 0, self.civ_civics[:, row].gather(1, rc.clamp(min=0)),
+                             torch.ones_like(ok))
+        ok = ok & have_t & have_c
+        ok = ok & (self.tile_seat.gather(1, tc) == row)
+        ok = ok & (self.unit_mp.gather(1, sc) > 0)
+        # the GOLD: the two chassis' own purchase prices, as `upgradeGoldCost`
+        price = (self._type_cost[nc] - self._type_cost[utype.clamp(min=0)]).clamp(min=0).double() \
+            * self.rules.gold_purchase_mult
+        ok = ok & (self.civ_treasury[:, row].unsqueeze(1) >= price)
+        # the BANK: the new chassis' charge, and nothing when both rungs ask
+        # for the same resource
+        slot, cost = self._type_res_slot[nc], self._type_res_cost[nc]
+        same = self._type_res_slot[utype.clamp(min=0)] == slot
+        want = (slot >= 0) & (cost > 0) & ~same
+        have = self.civ_stockpile[:, row].gather(1, slot.clamp(min=0).reshape(B, -1)) \
+            if self._n_strategic else torch.zeros_like(cost)
+        return ok & (~want | (have >= cost))
 
     UNIT_OBS = (
         "d_home",           # 0    distance to this seat's nearest live city

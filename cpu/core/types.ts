@@ -60,6 +60,12 @@ export interface City {
   wonders: { id: string; tileIndex: number }[];
   productionBank?: number;
   loyalty?: number;
+  /** CIV6 (Neutralize Governor): turns this city's governor is "removed from
+   *  duty" for. The seat's stateless greedy pick skips a city while it runs. */
+  governorOutTurns?: number;
+  /** CIV6 (Gain Sources): turns each SEAT's spies "operate at 2 levels higher"
+   *  in this city, dense over seats. */
+  spySources?: number[];
   outerHp?: number;
   /** the turn this city (or its Encampment) last took combat damage — what
    *  the repair project's three quiet turns are counted from. 0 = never. */
@@ -271,6 +277,13 @@ export interface Unit {
   movesFull?: number;
   hp: number;
   charges: number | null;
+  /** SPY STATE. `spyMission` is SPY_IDLE, SPY_TRAVELLING or a `SPY_MISSIONS`
+   *  index; `spyTurns` is the clock it is running; `spyTarget` the centre tile
+   *  it is in transit to; `spyLevel` its rank, capped at Master Spy. */
+  spyMission?: number;
+  spyTurns?: number;
+  spyTarget?: number;
+  spyLevel?: number;
   fortifyTurns?: number;
   /**
    * XP banked TOWARD THE NEXT LEVEL — never cumulative. CIV6: "earning more

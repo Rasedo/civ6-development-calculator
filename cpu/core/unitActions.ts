@@ -5,6 +5,13 @@ export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL'
 
 export const DEDICATED_IMPROVEMENTS = 3;
 
+/** how many of the operational-range ring an AIR_STRIKE head offers, and how
+ *  many bases a REBASE head offers — both ordered by TILE INDEX ascending. */
+export const AIR_STRIKE_COLS = 12;
+import { SPY_TRAVEL_COLS, SPY_MISSIONS } from '../data/espionage';
+export { SPY_TRAVEL_COLS, SPY_MISSIONS };
+export const AIR_REBASE_COLS = 6;
+
 export function unitActionNames(improvementIds: readonly string[]): string[] {
   const names: string[] = [];
   for (let d = 0; d < 6; d++) names.push(`MOVE_${d}`); // 0-5
@@ -36,6 +43,14 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // HEATHEN CONVERSION: the Apostle promotion's own verb, adjacent-ring wide
   // in one blow rather than one column per direction.
   names.push('CONVERT_HEATHEN');
+  names.push('UPGRADE');
+  for (let k = 0; k < AIR_STRIKE_COLS; k++) names.push(`AIR_STRIKE_${k}`);
+  for (let k = 0; k < AIR_REBASE_COLS; k++) names.push(`REBASE_${k}`);
+  // ESPIONAGE: a spy JUMPS to the k-th revealed city, or starts the k-th
+  // mission where it stands. Both heads read their list in TILE-INDEX /
+  // catalog order, so column k means the same thing on both engines.
+  for (let k = 0; k < SPY_TRAVEL_COLS; k++) names.push(`SPY_TRAVEL_${k}`);
+  for (let k = 0; k < SPY_MISSIONS.length; k++) names.push(`SPY_MISSION_${k}`);
   return names;
 }
 

@@ -54,6 +54,7 @@ import { IMPROVEMENT_IDS } from './unitActions';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { UNITS } from '../data/units';
+import { SPY_IDLE } from '../data/espionage';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { ARTIFACT_SLOTS, GW_SLOTS, GW_ART, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
@@ -502,6 +503,8 @@ const CITY: Record<string, Extractor> = {
   tilesAcquired: overCities((r) => r.city.tilesAcquired),
   origCapitalSeat: overCities((r) => r.city.origCapitalSeat ?? -1),
   loyalty: overCities((r) => r.city.loyalty ?? 100),
+  governorOutTurns: overCities((r) => r.city.governorOutTurns ?? 0),
+  spySources: overCities((r) => (r.city.spySources ?? []).reduce((a, b) => a + b, 0)),
   // Ids the production layout does not carry (PALACE, the scripted-held
   // buildings) have no GPU column at all, so they are dropped rather than
   // encoded as -1 — a -1 would compare against a column that does not exist.
@@ -570,6 +573,10 @@ const UNIT_G: Record<string, Extractor> = {
   embarked: overUnits((u) => (u.embarked ? 1 : 0)),
   movesLeft: overUnits((u) => u.movesLeft),
   movesFull: overUnits((u) => u.movesFull ?? UNITS[u.type]?.moves ?? 0),
+  spyMission: overUnits((u) => u.spyMission ?? SPY_IDLE),
+  spyTurns: overUnits((u) => u.spyTurns ?? 0),
+  spyTarget: overUnits((u) => u.spyTarget ?? -1),
+  spyLevel: overUnits((u) => u.spyLevel ?? 0),
 };
 
 const TILE: Record<string, Extractor> = {

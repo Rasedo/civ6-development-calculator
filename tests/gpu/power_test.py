@@ -328,6 +328,34 @@ def place(sim, tile: int, utype: int, seat: int, hp: int = 40) -> int:
     return slot
 
 
+def test_upkeep(sim) -> None:
+    row, _ = a_city(sim)
+    assert sim._upkeep_units, "the roster must carry a FUEL unit"
+    u_idx, slot, rate = sim._upkeep_units[0]
+    assert rate > 0
+    home = int(sim.city_center[0, row, int(sim.city_alive[0, row].nonzero().flatten()[0])])
+    a = place(sim, home, u_idx, row)
+    sim.civ_stockpile[:, row] = 0
+    sim.civ_stockpile[0, row, slot] = 3 * rate
+    sim._seat_charge_upkeep(row)
+    assert int(sim.civ_stockpile[0, row, slot]) == 2 * rate, "one fuel unit bills its own rate"
+    b = place(sim, home, u_idx, row)
+    sim._seat_charge_upkeep(row)
+    assert int(sim.civ_stockpile[0, row, slot]) == 0, "two of them bill twice"
+    sim._seat_charge_upkeep(row)
+    assert int(sim.civ_stockpile[0, row, slot]) == 0, "and an empty bank floors at zero"
+    # a bill is the OWNER's: hand one unit to another row and it leaves
+    other = next((r for r in range(sim.n_majors) if r != row), None)
+    if other is not None:
+        sim.major_unit_seat[0, b] = other
+        sim.civ_stockpile[0, row, slot] = 3 * rate
+        sim._seat_charge_upkeep(row)
+        assert int(sim.civ_stockpile[0, row, slot]) == 2 * rate, "only this seat's units bill it"
+    sim.major_unit_alive[0, a] = False
+    sim.major_unit_alive[0, b] = False
+    print("  upkeep OK: the published per-turn rate, per living unit, out of the owner's own bank")
+
+
 def test_starved_heal(sim) -> None:
     row, j = a_city(sim)
     u_idx, res_idx = sim._res_unit_pairs[0]
@@ -370,13 +398,13 @@ def main() -> None:
     path = fixture_paths()[0]
     for fn in (test_demand, test_plant_reach, test_cardiff, test_powered_yields,
                test_regional_powered, test_fuel, test_accrual, test_unit_charge,
-               test_starved_heal, test_spec_tier):
+               test_upkeep, test_starved_heal, test_spec_tier):
         fn(build(rules, path))
     print("power_test OK — demand (buildings + stations, dark under pillage), the plant's reach, "
           "Cardiff's renewable supply, all-or-nothing, the powered halves (local, regional, "
           "amenities), the Coal plant's adjacency, the FUEL it converts, the stockpile accrual "
-          "and its ceiling, the unit charge, the heal a lost source denies, and the "
-          "three-plant specialist tier")
+          "and its ceiling, the unit charge, the per-turn FUEL upkeep, the heal a lost "
+          "source denies, and the three-plant specialist tier")
 
 
 if __name__ == "__main__":

@@ -244,6 +244,19 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   // (never scales with research, no discount), flat land only (no Hills),
   // does NOT count toward the population district limit, no adjacency, -1
   // appeal to adjacent tiles, and it hosts all four Science Victory projects.
+  AERODROME: D({
+    id: 'AERODROME',
+    name: 'Aerodrome',
+    code: 'AER',
+    color: '#7f8fa6',
+    cost: 54,
+    countsTowardLimit: true,
+    adjacency: [],
+    housing: 0,
+    // CIV6 (Aerodrome): "must be built on flat terrain", and -1 Appeal.
+    placement: { flatLand: true },
+    description: 'Builds and bases aircraft. Flat land only.',
+  }),
   SPACEPORT: D({
     id: 'SPACEPORT',
     name: 'Spaceport',
@@ -270,7 +283,8 @@ export const PLACEABLE_DISTRICTS: DistrictId[] = [
   'AQUEDUCT',
   'ENTERTAINMENT_COMPLEX',
   'NEIGHBORHOOD',
-  'SPACEPORT', // appended LAST — earlier indices are wire meaning
+  'SPACEPORT',
+  'AERODROME', // appended LAST — earlier indices are wire meaning
 ];
 
 /**
@@ -289,6 +303,7 @@ export const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; unlockKind?
   { id: 'THEATER_SQUARE', unlockId: 'DRAMA_AND_POETRY', unlockKind: 'civic' },
   { id: 'ENTERTAINMENT_COMPLEX', unlockId: 'GAMES_AND_RECREATION', unlockKind: 'civic' },
   { id: 'ENCAMPMENT', unlockId: 'BRONZE_WORKING', placement: 'encampment' },
+  { id: 'AERODROME', unlockId: 'FLIGHT' },
   { id: 'NEIGHBORHOOD', unlockId: 'URBANIZATION', unlockKind: 'civic' },
   { id: 'SPACEPORT', unlockId: 'ROCKETRY', placement: 'flat' },
 ];

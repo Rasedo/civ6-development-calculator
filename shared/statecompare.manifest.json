@@ -1316,6 +1316,28 @@
             "city_gwart_artist"
           ],
           "note": "art TYPE and the ARTIST who made it, per ART MUSEUM slot — the other theming rule's inputs"
+        },
+        {
+          "name": "governorOutTurns",
+          "compare": "exact",
+          "covers": [
+            "City.governorOutTurns"
+          ],
+          "planes": [
+            "city_gov_out"
+          ],
+          "note": "CIV6 (Neutralize Governor): turns the city's governor is off duty; the seat's greedy pick skips it meanwhile."
+        },
+        {
+          "name": "spySources",
+          "compare": "exact",
+          "covers": [
+            "City.spySources"
+          ],
+          "planes": [
+            "city_spy_sources"
+          ],
+          "note": "CIV6 (Gain Sources): per-SEAT turns remaining, summed here — the per-seat split rides the plane, and a sum moves whenever any seat's clock does."
         }
       ]
     },
@@ -1476,6 +1498,48 @@
             "unit_mp_full"
           ],
           "gap": "see movesLeft."
+        },
+        {
+          "name": "spyMission",
+          "compare": "exact",
+          "covers": [
+            "Unit.spyMission"
+          ],
+          "planes": [
+            "unit_spy_mission"
+          ],
+          "note": "SPY_IDLE, SPY_TRAVELLING or a SPY_MISSIONS index — what this spy is doing."
+        },
+        {
+          "name": "spyTurns",
+          "compare": "exact",
+          "covers": [
+            "Unit.spyTurns"
+          ],
+          "planes": [
+            "unit_spy_turns"
+          ]
+        },
+        {
+          "name": "spyTarget",
+          "compare": "exact",
+          "covers": [
+            "Unit.spyTarget"
+          ],
+          "planes": [
+            "unit_spy_target"
+          ],
+          "note": "the CENTRE TILE a travelling spy is bound for, -1 when it is not in transit."
+        },
+        {
+          "name": "spyLevel",
+          "compare": "exact",
+          "covers": [
+            "Unit.spyLevel"
+          ],
+          "planes": [
+            "unit_spy_level"
+          ]
         }
       ]
     },

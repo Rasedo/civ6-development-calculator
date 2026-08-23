@@ -118,6 +118,7 @@ class SimStep:
                         torch.full_like(self.ded_picks[:, _c, _k], _pick),
                         torch.full_like(self.ded_picks[:, _c, _k], -1),
                     )
+            self._commit_golden_grants(_era_i)
             self.era_score[:] = 0
             self._era_inspirations()
         self._world_congress()

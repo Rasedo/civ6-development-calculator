@@ -36,6 +36,9 @@ import { congressChopGold } from './congress';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { NO_SEAT, borderTurnsFrom, capsOf, campTiles, cityAtTile, civHasStrategic, civsAtWar, isCiv, seatOf, seatsAllied, tileSeat } from './seats';
+import { canPayStockpile, canPayUpgradeGold, spendStockpile, upgradeGoldCost, upgradeResourceCost } from './stockpile';
+import { canTrainAir, carryAirWith, isAirUnit } from './air';
+import { canTrainSpy, isSpy } from './espionage';
 import { canTrainWithStockpile, chargeUnitResource } from './stockpile';
 import type { ImprovementId } from './types';
 
@@ -240,7 +243,15 @@ export function unitsAt(state: GameState, tileIndex: number): Unit[] {
   return state.units.filter((u) => u.tileIndex === tileIndex);
 }
 
-export function unitDomain(type: string): 'civilian' | 'military' {
+/**
+ * The STACKING slot a chassis holds. Three, not two: CIV6 bases an air unit
+ * INSIDE a city centre, an Aerodrome or a carrier, where it neither blocks a
+ * land unit nor defends the tile. Every `=== 'military'` reader therefore
+ * keeps its meaning — a plane is no garrison, exerts no zone of control, is
+ * nobody's melee defender and never fortifies.
+ */
+export function unitDomain(type: string): 'civilian' | 'military' | 'air' {
+  if (UNITS[type]?.air !== undefined) return 'air';
   return UNITS[type]?.charges !== undefined ? 'civilian' : 'military';
 }
 
@@ -418,6 +429,11 @@ export function tileFreeForUnit(
 ): boolean {
   const tile = state.map.tiles[tileIndex];
   if (isImpassable(tile)) return false;
+  // An AIRCRAFT is BASED, not stationed: several of them share one plot, none
+  // of them holds it, and what gates the landing is the base's slot count
+  // (`airBaseFree`), never the tile. CIV6 (Espionage): a Spy likewise
+  // "jumps from city to city" rather than walking, so it holds no plot either.
+  if (unit && (isAirUnit(unit.type) || isSpy(unit.type))) return true;
   const naval = unit ? !!UNITS[unit.type]?.naval : false;
   if (isWater(tile)) {
     if (naval) {
@@ -436,7 +452,7 @@ export function tileFreeForUnit(
   if (borderClosedTo(state, side, tile, unit?.type)) return false;
   const domain = unit ? unitDomain(unit.type) : 'civilian';
   for (const u of unitsAt(state, tileIndex)) {
-    if (u.id === unit?.id) continue;
+    if (u.id === unit?.id || isAirUnit(u.type) || isSpy(u.type)) continue;
     if (u.seat !== side) return false; // foreign occupied
     if (unitDomain(u.type) === domain) return false; // same-slot ally
   }
@@ -571,6 +587,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   if (unit.movesLeft < cost && unit.movesLeft < full) return 'cantAfford';
   if (transition) unit.embarked = isWater(to);
   unit.tileIndex = to.index;
+  carryAirWith(state, unit, from.index);
   logUnitOrder(state, unit.seat, unit.id, 'move', to.index);
   unit.movesLeft = Math.max(0, unit.movesLeft - cost);
   if (unit.seat === seat) {
@@ -738,9 +755,69 @@ export function trainableUnits(
       if (!civHasStrategic(state, seat, d.requiresResource)) return false;
       if (!canTrainWithStockpile(state, seat, d.id)) return false;
     }
+    // CIV6 (Air combat): aircraft "can only be built in a city with an
+    // Aerodrome", and only while that Aerodrome "still has empty slots".
+    // CIV6 (Espionage): "you can never have more Spies than your current
+    // empire's development allows."
+    if (d.spy && !state.sandbox) return canTrainSpy(state, seat);
+    if (d.air && !state.sandbox) return canTrainAir(state, seat, city);
     if (d.naval) return !!city && cityNavalCapable(state, city);
     return true;
   });
+}
+
+/**
+ * The military chassis a seat may GOLD-buy, in UNITS-table order so a strict
+ * `>` on combat breaks ties to the LOWEST-index chassis (the GPU's
+ * `combat * NU - index` argmax mirror).
+ *
+ * It is the seat-level trainable set and nothing else: `trainableUnits` with
+ * no city is what refuses a hull and a plane, because the gold rung spawns at
+ * the capital and asks no city question, so neither can name the Harbor or the
+ * Aerodrome it would need. CIV6 (Spy): "Cannot be purchased with Gold."
+ */
+export function goldBuyableUnits(state: GameState, seat: number): UnitDef[] {
+  return trainableUnits(state, seat).filter(
+    (d) => (d.combat ?? 0) > 0 && !d.noGold && d.id !== 'SCOUT',
+  );
+}
+
+/**
+ * CIV6 (Unit): a unit upgrades when it is "in friendly territory", has "more
+ * than 0 Movement left", its owner can pay the Gold, and — in GS — holds the
+ * strategic resource the NEXT chassis asks for, "unless the unit you're
+ * upgrading also requires the same resource, in which case you don't need
+ * any". The new chassis must itself be unlocked. "Upgraded units retain all
+ * their Promotions and experience" and "units do not Heal upon upgrading".
+ *
+ * MODEL: the source does not say what movement an upgrade leaves behind, so
+ * this spends the rest of the turn, like every other verb here.
+ */
+export function canUpgradeUnit(state: GameState, unit: Unit, seat: number): boolean {
+  const next = UNITS[unit.type]?.upgradesTo;
+  if (!next || unit.seat !== seat || unit.movesLeft <= 0) return false;
+  const def = UNITS[next];
+  if (!def) return false;
+  if (def.requiresTech && !isTechComplete(state, def.requiresTech, seat)) return false;
+  if (def.requiresCivic && !isCivicComplete(state, def.requiresCivic, seat)) return false;
+  const tile = state.map.tiles[unit.tileIndex];
+  if (tileSeat(tile) !== seat) return false;
+  if (!canPayUpgradeGold(state, seat, unit.type)) return false;
+  const c = upgradeResourceCost(unit.type);
+  return !c || canPayStockpile(state, seat, c.id, c.n);
+}
+
+export function upgradeUnit(state: GameState, unit: Unit, seat: number): RuleResult {
+  if (!canUpgradeUnit(state, unit, seat)) return { ok: false, reason: 'Cannot upgrade here.' };
+  const next = UNITS[unit.type]!.upgradesTo!;
+  const s = seatOf(state, seat)!;
+  s.treasury -= upgradeGoldCost(state, seat, unit.type);
+  const c = upgradeResourceCost(unit.type);
+  if (c) spendStockpile(state, seat, c.id, c.n);
+  unit.type = next;
+  unit.movesLeft = 0;
+  unit.movesFull = unitFullMoves(state, unit);
+  return { ok: true };
 }
 
 /** the civic that reveals SHIPWRECKS in real Civ 6, and so the one that
@@ -909,9 +986,11 @@ export function spawnUnit(
   if (!def) return null;
   const near = state.map.tiles[nearIndex];
   const probe = { type: unitType, seat };
-  const spot = [near, ...neighbors(state.map, near)]
-    .sort((a, b) => hexDistance(near.col, near.row, a.col, a.row) - hexDistance(near.col, near.row, b.col, b.row))
-    .find((t) => tileFreeForUnit(state, t.index, seat, probe));
+  const spot = isAirUnit(unitType) || isSpy(unitType)
+    ? near
+    : [near, ...neighbors(state.map, near)]
+      .sort((a, b) => hexDistance(near.col, near.row, a.col, a.row) - hexDistance(near.col, near.row, b.col, b.row))
+      .find((t) => tileFreeForUnit(state, t.index, seat, probe));
   if (!spot) return null;
   const unit: Unit = {
     id: state.nextUnitId++,

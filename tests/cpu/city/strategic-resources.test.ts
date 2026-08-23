@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { UNITS } from '../../../cpu/data/units';
+import { UNITS, UNIT_ERA_INDEX } from '../../../cpu/data/units';
 import { makeMap, makeState, tileAtCoords, grantTechs, settleAt } from '../helpers';
 import { endTurn } from '../../../cpu/core/game';
 import { trainableUnits, queueUnit, refreshUnits, spawnUnit } from '../../../cpu/core/units';
@@ -92,13 +92,36 @@ describe('build/purchase gating', () => {
     expect(avail).not.toContain('MUSKETMAN'); // GUNPOWDER not researched
   });
 
-  it('the five resource units are exactly the ones real Civ 6 gates', () => {
-    // CIV6 (GS, each unit's own page): Horseman 20 Horses, Swordsman 20 Iron,
-    // Knight 20 Iron, Musketman 20 Niter, Bombard 20 Niter — and nothing else
-    // in this roster asks for a resource.
-    const gated = Object.values(UNITS).filter((u) => u.requiresResource).map((u) => u.id).sort();
-    expect(gated).toEqual(['BOMBARD', 'HORSEMAN', 'KNIGHT', 'MUSKETMAN', 'SWORDSMAN']);
-    for (const u of gated) expect(unitResourceCost(u)!.n).toBe(20);
+  it('every gated chassis charges on the side its resource belongs to', () => {
+    // CIV6 (Resource, GS) splits the strategic resources by USE: Horses, Iron
+    // and Niter are "used for unit production" and cost a flat 20 at the
+    // start; Coal, Oil, Uranium and Aluminum are "used as fuel for units",
+    // whose "upfront cost will be greatly reduced" to 1 and which then bill
+    // per turn. No chassis may sit on the wrong side of that line.
+    const PRODUCTION = new Set(['HORSES', 'IRON', 'NITER']);
+    const FUEL = new Set(['COAL', 'OIL', 'URANIUM', 'ALUMINUM']);
+    const gated = Object.values(UNITS).filter((u) => u.requiresResource);
+    expect(gated.length).toBeGreaterThan(20);
+    for (const u of gated) {
+      const res = u.requiresResource!;
+      expect(PRODUCTION.has(res) || FUEL.has(res)).toBe(true);
+      if (PRODUCTION.has(res)) {
+        expect(unitResourceCost(u.id)!.n).toBe(20);
+        expect(u.resourceUpkeep ?? 0).toBe(0);
+      } else {
+        expect(unitResourceCost(u.id)!.n).toBe(1);
+        expect(u.resourceUpkeep ?? 0).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('the ladder is a chain: every rung names a real successor', () => {
+    for (const u of Object.values(UNITS)) {
+      if (!u.upgradesTo) continue;
+      expect(UNITS[u.upgradesTo], `${u.id} -> ${u.upgradesTo}`).toBeDefined();
+      // and it never points backwards
+      expect(UNIT_ERA_INDEX[u.upgradesTo]).toBeGreaterThanOrEqual(UNIT_ERA_INDEX[u.id]);
+    }
   });
 
   it('sandbox bypasses the resource gate', () => {

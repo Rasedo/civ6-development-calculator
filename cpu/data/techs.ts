@@ -225,6 +225,7 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('ADVANCED_BALLISTICS', 'Advanced Ballistics', 'Atomic', 1480, ['REPLACEABLE_PARTS', 'STEEL']),
     T('SYNTHETIC_MATERIALS', 'Synthetic Materials', 'Atomic', 1660, ['PLASTICS']),
     T('COMPOSITES', 'Composites', 'Information', 1850, ['SYNTHETIC_MATERIALS']),
+    T('STEALTH_TECHNOLOGY', 'Stealth Technology', 'Information', 1850, ['SYNTHETIC_MATERIALS']),
 
     T('SATELLITES', 'Satellites', 'Information', 1850, ['ADVANCED_FLIGHT', 'ROCKETRY']),
     T('GUIDANCE_SYSTEMS', 'Guidance Systems', 'Information', 1850, ['ROCKETRY', 'ADVANCED_BALLISTICS']),

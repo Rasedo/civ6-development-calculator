@@ -52,21 +52,46 @@ def main() -> None:
     assert acts, "rules.actions.unit missing — the exporter must ship the enum"
     # +12 SNIPE, +7 SPREAD, +1 FOUND_CITY, +1 EXCAVATE, +1 PARK, the PROMOTE
     # head, +6 CONDEMN, +1 REMOVE_HERESY, +1 LAUNCH_INQUISITION,
-    # +1 CONVERT_HEATHEN
+    # +1 CONVERT_HEATHEN, +1 UPGRADE, then the four VARIABLE-width heads.
     pcol = rj["promotions"]["cols"]
-    assert len(acts) == 13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 9, (
-        f"enum is {len(acts)} wide for {len(imp_ids)} improvements and a {pcol}-wide PROMOTE head"
+    esp = rj["eras"]["espionage"]
+    heads = [
+        ("AIR_STRIKE_", sum(1 for n in acts if n.startswith("AIR_STRIKE_"))),
+        ("REBASE_", sum(1 for n in acts if n.startswith("REBASE_"))),
+        ("SPY_TRAVEL_", esp["travelCols"]),
+        ("SPY_MISSION_", len(esp["missions"])),
+    ]
+    want = 13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads)
+    assert len(acts) == want, (
+        f"enum is {len(acts)} wide, expected {want} for {len(imp_ids)} improvements, "
+        f"a {pcol}-wide PROMOTE head and heads {heads}"
     )
-    # the RELIGIOUS verbs close the enum now, in this order: a new verb joins
-    # at the END or it moves a column somebody else already keys on.
-    assert acts[-3:] == ["REMOVE_HERESY", "LAUNCH_INQUISITION", "CONVERT_HEATHEN"], \
-        "religious verb tail misplaced"
-    assert acts[-9] == "CONDEMN_0" and acts[-4] == "CONDEMN_5", "CONDEMN block misplaced"
-    assert acts[-9 - pcol] == "PROMOTE_0" and acts[-10] == f"PROMOTE_{pcol - 1}", \
-        "the PROMOTE head is not one contiguous run before CONDEMN"
-    assert acts[-12 - pcol:-9 - pcol] == ["FOUND_CITY", "EXCAVATE", "PARK"], \
+    # A new verb joins at the END or it moves a column somebody else already
+    # keys on: the religious tail, the ladder's own verb, then the four heads
+    # in the order the exporter appends them.
+    _tailstart = len(acts) - sum(w for _p, w in heads)
+    assert acts[_tailstart - 4:_tailstart] == [
+        "REMOVE_HERESY", "LAUNCH_INQUISITION", "CONVERT_HEATHEN", "UPGRADE"], \
+        "verb tail misplaced"
+    _at_h = _tailstart
+    for _pre, _w in heads:
+        assert _w > 0, f"{_pre} head is empty"
+        assert acts[_at_h:_at_h + _w] == [f"{_pre}{k}" for k in range(_w)], \
+            f"{_pre} head is not one contiguous run at {_at_h}"
+        _at_h += _w
+    assert _at_h == len(acts), "a head runs past the end of the enum"
+    at = {n: i for i, n in enumerate(acts)}
+    assert [acts[at["CONDEMN_0"] + d] for d in range(6)] == [f"CONDEMN_{d}" for d in range(6)], \
+        "CONDEMN block is not one contiguous run"
+    assert [acts[at["PROMOTE_0"] + k] for k in range(pcol)] == [f"PROMOTE_{k}" for k in range(pcol)], \
+        "the PROMOTE head is not one contiguous run"
+    assert at["PROMOTE_0"] + pcol == at["CONDEMN_0"], "PROMOTE must run straight into CONDEMN"
+    assert acts[at["FOUND_CITY"]:at["FOUND_CITY"] + 3] == ["FOUND_CITY", "EXCAVATE", "PARK"], \
         "civilian verb tail misplaced"
-    assert acts[-19 - pcol] == "SPREAD_HERE" and acts[-13 - pcol] == "SPREAD_5", "SPREAD tail misplaced"
+    assert at["FOUND_CITY"] + 3 == at["PROMOTE_0"], "the civilian tail must run into PROMOTE"
+    assert [acts[at["SPREAD_HERE"] + d] for d in range(7)] \
+        == ["SPREAD_HERE"] + [f"SPREAD_{d}" for d in range(6)], "SPREAD tail misplaced"
+    assert at["SPREAD_HERE"] + 7 == at["FOUND_CITY"], "SPREAD must run into FOUND_CITY"
 
     # PILLAGE is NOT the last column — the SNIPE ring and the SPREAD tail sit
     # after it — so PILLAGE and the ring must hold their exact seats and every
@@ -90,6 +115,10 @@ def main() -> None:
     assert sim._A_CHOP == acts.index("CHOP"), "CHOP dispatch column"
     assert sim._A_REPAIR == acts.index("REPAIR"), "REPAIR dispatch column"
     assert sim._A_FOUND == acts.index("FOUND_CITY"), "FOUND_CITY dispatch column"
+    assert sim._A_AIR_STRIKE == acts.index("AIR_STRIKE_0"), "AIR_STRIKE dispatch column"
+    assert sim._A_REBASE == acts.index("REBASE_0"), "REBASE dispatch column"
+    assert sim._A_SPY_TRAVEL == acts.index("SPY_TRAVEL_0"), "SPY_TRAVEL dispatch column"
+    assert sim._A_SPY_MISSION == acts.index("SPY_MISSION_0"), "SPY_MISSION dispatch column"
     # pillage must NOT share a column with any build verb
     assert sim._A_PILLAGE not in sim._A_IMP, (
         f"PILLAGE column {sim._A_PILLAGE} collides with a BUILD column {sim._A_IMP} "

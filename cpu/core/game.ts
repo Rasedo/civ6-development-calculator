@@ -1,6 +1,7 @@
 
 import type { City, DistrictId, GameState, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, Seat, Unit } from './types';
 import { greatPeopleEarned } from './greatPeople';
+import { airTrainTile } from './air';
 import { placeRelic, GP_CLASSES, RELIC_WONDER_SLOTS } from '../data/greatPeople';
 import { generateMap } from '../../world/mapgen';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
@@ -503,12 +504,17 @@ export function purchaseUnit(state: GameState, cityId: number, unitType: string,
   }
   const buyer = seatOf(state, seat);
   if (!buyer) return { ok: false, reason: 'No such seat.' };
+  // CIV6 (Spy): "Cannot be purchased with Gold."
+  if (UNITS[unitType]?.noGold) return { ok: false, reason: 'This unit cannot be purchased with Gold.' };
   const cost = unitPurchaseCost(state, unitType, seat);
   if (!state.sandbox) {
     if (!goldAffordable(buyer.treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
     buyer.treasury -= cost;
   }
-  const unit = spawnUnit(state, unitType, city.centerIndex, seat);
+  const where = UNITS[unitType]?.air
+    ? airTrainTile(state, seat, city) ?? city.centerIndex
+    : city.centerIndex;
+  const unit = spawnUnit(state, unitType, where, seat);
   if (!unit) {
     if (!state.sandbox) buyer.treasury += cost; // refund: nowhere to stand
     return { ok: false, reason: 'No free tile near the city center.' };

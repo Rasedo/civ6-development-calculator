@@ -754,6 +754,76 @@ class SimEconomy:
             out = out | ((hb >= 0) & self.district_complete.gather(1, hb.clamp(min=0)))
         return out
 
+    def _air_at(self, row: int) -> torch.Tensor:
+        """[B, T] — how many of seat row `row`'s aircraft are based on each
+        tile. A plane is not a tile OCCUPANT (it takes neither the military nor
+        the civilian slot), so its base's load is counted, not looked up."""
+        out = torch.zeros(self.B, self.T, dtype=torch.long, device=self.device)
+        if not self._any_air:
+            return out
+        for pre in ("major",):
+            alive = getattr(self, f"{pre}_unit_alive")
+            seat = getattr(self, f"{pre}_unit_seat")
+            typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+            tile = getattr(self, f"{pre}_unit_tile")
+            mine = alive & (seat == row) & (self._type_air[typ] > 0) & (tile >= 0)
+            if bool(mine.any()):
+                out.scatter_add_(1, tile.clamp(min=0), mine.long())
+        return out
+
+    def _air_slots_at(self, row: int) -> torch.Tensor:
+        """[B, T] — what each tile can BASE for seat row `row`. CIV6 (Air
+        combat): a City Center has 1, an Aerodrome "has 2 slots initially, and
+        can reach 4 slots after constructing the Hangar and the Airport", and
+        an Aircraft Carrier "starts with 2". A pillaged or unfinished district
+        bases nothing."""
+        B, T, dev = self.B, self.T, self.device
+        out = torch.zeros(B, T, dtype=torch.long, device=dev)
+        if not self._any_air:
+            return out
+        cols = self.RC
+        alive = self.city_alive[:, row, :cols]
+        ctr = self.city_center[:, row, :cols]
+        live = alive & (ctr >= 0)
+        if bool(live.any()):
+            out.scatter_add_(1, ctr.clamp(min=0),
+                             (live.long() * self._city_centre_air_slots))
+        if self._aerodrome_didx >= 0:
+            at = self.city_dist_tile[:, row, :cols, self._aerodrome_didx]
+            atc = at.clamp(min=0)
+            good = live & (at >= 0) & self.district_complete.gather(1, atc) \
+                & ~self.district_pillaged.gather(1, atc)
+            if bool(good.any()):
+                extra = torch.einsum("bjn,n->bj",
+                                     (self.city_bldg[:, row, :cols]
+                                      & (self._b_req_district == self._aerodrome_didx).reshape(1, 1, -1)).long(),
+                                     self._b_air_slots)
+                out.scatter_add_(1, atc, good.long() * (self._aerodrome_air_slots + extra))
+        # a CARRIER is a base wherever it floats
+        alive_u = self.major_unit_alive & (self.major_unit_seat == row)
+        typ = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+        hull = alive_u & (self._type_air_slots[typ] > 0)
+        if bool(hull.any()):
+            out.scatter_add_(1, self.major_unit_tile.clamp(min=0),
+                             torch.where(hull, self._type_air_slots[typ], torch.zeros_like(typ)))
+        return out
+
+    def _air_free_at(self, row: int) -> torch.Tensor:
+        """[B, T] — bases of seat row `row` with room for one more plane."""
+        return self._air_slots_at(row) > self._air_at(row)
+
+    def _air_train_tile(self, row: int) -> torch.Tensor:
+        """[B, RC] — the Aerodrome tile each city would spawn a plane at, -1
+        where it has none with a free slot (`airTrainTile`)."""
+        cols = self.RC
+        out = torch.full((self.B, cols), -1, dtype=torch.long, device=self.device)
+        if self._aerodrome_didx < 0 or not self._any_air:
+            return out
+        at = self.city_dist_tile[:, row, :cols, self._aerodrome_didx]
+        free = self._air_free_at(row)
+        ok = (at >= 0) & free.gather(1, at.clamp(min=0)) & self.city_alive[:, row, :cols]
+        return torch.where(ok, at, out)
+
     def _trainable_units(self, row: int) -> torch.Tensor:
         """[B, RC, NU] chassis seat row `row` may TRAIN or BUY in each city —
         `trainableUnits`, one body for every seat.
@@ -776,6 +846,11 @@ class SimEconomy:
         out = ok.unsqueeze(1) & self._type_civic_slot_ok(row, True)
         if bool(self.unit_naval.any()):
             out = out & (~self.unit_naval.reshape(1, 1, -1) | self._naval_capable(row).unsqueeze(2))
+        # CIV6 (Air combat): aircraft "can only be built in a city with an
+        # Aerodrome", and only while that Aerodrome "still has empty slots".
+        if self._any_air:
+            _air = (self._type_air > 0).reshape(1, 1, -1)
+            out = out & (~_air | (self._air_train_tile(row) >= 0).unsqueeze(2))
         # CIV6: "when the number of Traders equals the Trading Capacity you
         # cannot build more" — free Traders plus active routes, against
         # tradeCapacity. The trainableUnits twin of the same gate.
@@ -787,6 +862,11 @@ class SimEconomy:
         cap_ok = owned < self._trade_capacity(row)
         is_tr = (torch.arange(self.NU, device=dev) == self._trader_idx).reshape(1, 1, -1)
         out = out & (~is_tr | cap_ok.reshape(B, 1, 1))
+        # CIV6 (Spy): "you can never have more Spies than your current empire's
+        # development allows".
+        if self._spy_idx >= 0:
+            is_spy = (torch.arange(self.NU, device=dev) == self._spy_idx).reshape(1, 1, -1)
+            out = out & (~is_spy | self._can_train_spy(row).reshape(B, 1, 1))
         return out
 
     def _worship_bidx_of(self, row: int) -> int:

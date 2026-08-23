@@ -38,6 +38,15 @@ class SimOrders:
         _hx = getattr(self, "_A_HERESY", -1)
         _lq = getattr(self, "_A_INQUISITION", -1)
         _hn = getattr(self, "_A_HEATHEN", -1)
+        _ug = getattr(self, "_A_UPGRADE", -1)
+        _ar = getattr(self, "_A_AIR_STRIKE", -1)
+        _rbc = getattr(self, "_A_REBASE", -1)
+        _asw = self._air_strike_cols
+        _rbw = self._air_rebase_cols
+        _stc = getattr(self, "_A_SPY_TRAVEL", -1)
+        _smc = getattr(self, "_A_SPY_MISSION", -1)
+        _stw = self._spy_travel_cols
+        _smw = self._n_spy_missions
         _pcol = self.rules.promo_cols
         _ic = [c for c in getattr(self, "_A_IMP", []) if c >= 0]
         if getattr(self, "_A_REPAIR", -1) >= 0:
@@ -60,11 +69,17 @@ class SimOrders:
             ((_ab == _hx) if _hx >= 0 else _no).any(dim=0),                     # remove heresy
             ((_ab == _lq) if _lq >= 0 else _no).any(dim=0),                     # launch inquisition
             ((_ab == _hn) if _hn >= 0 else _no).any(dim=0),                      # convert heathen
+            ((_ab == _ug) if _ug >= 0 else _no).any(dim=0),                      # upgrade
+            (((_ab >= _ar) & (_ab < _ar + _asw)) if _ar >= 0 else _no).any(dim=0),   # air strike
+            (((_ab >= _rbc) & (_ab < _rbc + _rbw)) if _rbc >= 0 else _no).any(dim=0),  # rebase
+            (((_ab >= _stc) & (_ab < _stc + _stw)) if _stc >= 0 else _no).any(dim=0),  # spy travel
+            (((_ab >= _smc) & (_ab < _smc + _smw)) if _smc >= 0 else _no).any(dim=0),  # spy mission
         ]).tolist()
         (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
          _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread,
          _rk_excavate, _rk_park, _rk_promote, _rk_condemn,
-         _rk_heresy, _rk_inquis, _rk_heathen) = _tab
+         _rk_heresy, _rk_inquis, _rk_heathen, _rk_upgrade,
+         _rk_air, _rk_rebase, _rk_travel, _rk_mission) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -189,6 +204,55 @@ class SimOrders:
                           .reshape(B, 6) & (nb >= 0)).any(dim=1))
                 if bool(hnm.any()):
                     self._convert_heathens(row, hnm, here, sc)
+
+            if _rk_upgrade[n] and _ug >= 0:
+                ugm = act & (a == _ug)
+                if bool(ugm.any()):
+                    self._upgrade_units(row, ugm, sc, utp)
+
+            if _rk_air[n] and _ar >= 0:
+                asm = act & (a >= _ar) & (a < _ar + _asw)
+                if bool(asm.any()):
+                    _cols = self._air_strike_targets(
+                        row, sc.unsqueeze(1), hc.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
+                    _k = (a - _ar).clamp(min=0, max=_asw - 1)
+                    _tg = _cols.gather(1, _k.unsqueeze(1)).squeeze(1)
+                    _okA = asm & (_tg >= 0)
+                    for b_ in _okA.nonzero(as_tuple=True)[0].tolist():
+                        v = int(sc[b_])
+                        one = torch.zeros(B, dtype=torch.bool, device=dev)
+                        one[b_] = True
+                        self._air_strike(one, _tg, "major", v, row)
+
+            if _rk_rebase[n] and _rbc >= 0:
+                rbm = act & (a >= _rbc) & (a < _rbc + _rbw)
+                if bool(rbm.any()):
+                    _cols = self._rebase_targets(
+                        row, sc.unsqueeze(1), hc.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
+                    _k = (a - _rbc).clamp(min=0, max=_rbw - 1)
+                    _tg = _cols.gather(1, _k.unsqueeze(1)).squeeze(1)
+                    _okR = (rbm & (_tg >= 0)).nonzero(as_tuple=True)[0]
+                    if _okR.numel():
+                        self.unit_tile[_okR, sc[_okR]] = _tg[_okR]
+                        self.unit_mp[_okR, sc[_okR]] = 0
+
+            if _rk_travel[n] and _stc >= 0:
+                stm = act & (a >= _stc) & (a < _stc + _stw)
+                if bool(stm.any()):
+                    _cols = self._spy_destinations(
+                        row, sc.unsqueeze(1), hc.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
+                    _k = (a - _stc).clamp(min=0, max=_stw - 1)
+                    self._begin_travel(stm, sc, _cols.gather(1, _k.unsqueeze(1)).squeeze(1))
+
+            if _rk_mission[n] and _smc >= 0:
+                smm = act & (a >= _smc) & (a < _smc + _smw)
+                if bool(smm.any()):
+                    _mk = self._spy_mission_mask(
+                        row, sc.unsqueeze(1), hc.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
+                    _k = (a - _smc).clamp(min=0, max=_smw - 1)
+                    _okS = smm & _mk.gather(1, _k.unsqueeze(1)).squeeze(1)
+                    for _m in _k[_okS].unique().tolist():
+                        self._begin_mission(row, _okS & (_k == _m), sc, _m)
 
             mv = act & (a < 6) if _rk_move[n] else None
             if mv is not None and bool(mv.any()):
@@ -479,6 +543,7 @@ class SimOrders:
                         self.unit_hp[_hr, sc[_hr]] = (self.unit_hp[_hr, sc[_hr]] + 25).clamp(max=_cap)
                     _pd = ~_pi & _hd[_r]
                     self.district_pillaged[_r[_pd], _tt[_pd]] = True
+                    self._air_scatter_from(_r[_pd], _tt[_pd])
                     # CIV6 (Depredation): "Pillaging costs only 1 Movement
                     # point" — without it the raid takes the whole turn.
                     _pc = self._promo_val(utp[_r], self.unit_promos[_r, sc[_r]], "PILLAGE_CHEAP")
@@ -1095,6 +1160,7 @@ class SimOrders:
                 if bool(dist_pillage.any()):
                     rows = dist_pillage.nonzero(as_tuple=True)[0]
                     self.district_pillaged[rows, here[rows]] = True
+                    self._air_scatter_from(rows, here[rows])
                     self.barb_unit_mp[rows, u] = 0  # the turn is spent (TS movesLeft = 0)
                     self._eff_version += 1  # district yields just dropped
 

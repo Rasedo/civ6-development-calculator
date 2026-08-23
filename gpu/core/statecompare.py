@@ -543,6 +543,10 @@ CITY = {
     "tilesAcquired": _cty("city_acquired"),
     "origCapitalSeat": _cty("city_orig_cap"),
     "loyalty": _cty("city_loyalty"),
+    "governorOutTurns": _cty("city_gov_out"),
+    "spySources": lambda sim, b, rows: [
+        int(sim.city_spy_sources[b, c, s].sum()) for c, s in rows
+    ],
     "buildings": lambda sim, b, rows: [
         [i for i, on in enumerate(sim.city_bldg[b, c, s].tolist()) if on] for c, s in rows
     ],
@@ -606,6 +610,10 @@ UNIT = {
     "embarked": _unit("unit_emb"),
     "movesLeft": _unit("unit_mp"),
     "movesFull": _unit("unit_mp_full"),
+    "spyMission": _unit("unit_spy_mission"),
+    "spyTurns": _unit("unit_spy_turns"),
+    "spyTarget": _unit("unit_spy_target"),
+    "spyLevel": _unit("unit_spy_level"),
 }
 
 

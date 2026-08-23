@@ -210,6 +210,8 @@ def main() -> int:
                 ("controlled", [py, "tests/gpu/controlled_test.py"], 4),
                 ("pref_apply", [py, "tests/gpu/pref_apply_test.py"], 4),  # preference-order apply — the ONLY lane that reaches it
                 ("seat_verbs", [py, "tests/gpu/seat_verbs_test.py"], 4),  # the 9 civ unit verbs — asserts EXECUTION, not legality
+                ("air", [py, "tests/gpu/air_test.py"], 4),  # bases, slots, both air heads, the sortie and every way a base is lost
+                ("spy", [py, "tests/gpu/spy_test.py"], 4),  # capacity, the jump, both spy heads and what each mission does
                 ("drive", [py, "tests/gpu/drive_test.py"], 4),  # the ladder DRIVES a seat for a whole game
                 ("religion_gp", [py, "tests/gpu/religion_gp_test.py"], 4),
                 ("war_weariness", [py, "tests/gpu/war_weariness_test.py"], 4),

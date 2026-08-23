@@ -10,7 +10,7 @@ import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit } from './units';
 import { PILLAGE_HEAL_IMPROVEMENTS } from './combat';  // the replay's pillage arm mirrors hostileUnitAct's
-import { cityStrikeStrength } from './combat';
+import { cityStrikeStrength, airStrike } from './combat';
 import { UNIT_HP } from '../data/units';
 import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, encircled } from './combat';
 import { promoCS, promoClassOf, promoValue, takePromotion } from './promotions';
@@ -41,7 +41,7 @@ import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEO
 import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, borderGrowthCost } from '../data/constants';
 import type { CityStats } from './city';
 import { computeCityStats, luxuryAmenities, pickBorderTile, acquireTile } from './city';
-import { accrueStockpiles, resolveSeatPower } from './stockpile';
+import { accrueStockpiles, chargeUnitUpkeep, resolveSeatPower } from './stockpile';
 import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressUdtProdDistrict, type CongressVoterCtx } from './congress';
 import { buyVotes } from './congress';
 import { CONGRESS_SPECIAL_SLOT, EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, emergencies, emergencyLoyalty, emergencyName, emergencyStrikeCS, raiseEmergency } from './emergency';
@@ -50,14 +50,21 @@ import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { hasRiver, hasFreshWater, isCoastalWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
-import { disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, archaeologistExcavate, naturalistPark } from './units';
+import { disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, archaeologistExcavate, naturalistPark, upgradeUnit } from './units';
 import { killUnit } from './combat';
 import { availableProjects, buyTile, buyWorshipBuilding, condemnHeretic, convertHeathens, districtCostIn, districtDiscounted, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
-import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex } from './unitActions';
+import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
+import { airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom } from './air';
+import { beginMission, beginTravel, governorSuppressed, spyDestinations, tickSpies, tickSpyEffects } from './espionage';
 
 const A_FOUND_CITY = unitActionIndex(IMPROVEMENT_IDS).FOUND_CITY;
 const A_EXCAVATE = unitActionIndex(IMPROVEMENT_IDS).EXCAVATE;
+const A_UPGRADE = unitActionIndex(IMPROVEMENT_IDS).UPGRADE;
+const A_AIR_STRIKE = unitActionIndex(IMPROVEMENT_IDS).AIR_STRIKE_0;
+const A_REBASE = unitActionIndex(IMPROVEMENT_IDS).REBASE_0;
+const A_SPY_TRAVEL = unitActionIndex(IMPROVEMENT_IDS).SPY_TRAVEL_0;
+const A_SPY_MISSION = unitActionIndex(IMPROVEMENT_IDS).SPY_MISSION_0;
 const A_PARK = unitActionIndex(IMPROVEMENT_IDS).PARK;
 const A_PROMOTE = unitActionIndex(IMPROVEMENT_IDS).PROMOTE_0;
 const A_CONDEMN = unitActionIndex(IMPROVEMENT_IDS).CONDEMN_0;
@@ -66,10 +73,10 @@ const A_LAUNCH_INQUISITION = unitActionIndex(IMPROVEMENT_IDS).LAUNCH_INQUISITION
 const A_CONVERT_HEATHEN = unitActionIndex(IMPROVEMENT_IDS).CONVERT_HEATHEN;
 import { AGREEMENT_TURNS, ALLIANCE_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles, goldenBoostBonus, worldEraIndex } from './eras';
-import { NO_SEAT, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civHasStrategic, civsAtWar, cityStateOfSeat, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
+import { NO_SEAT, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, spreadFromUnit } from './unitOrders';
-import { navalKillEvent, buildingDedications, dedicationEvent, goldenDedication } from './eras';
+import { unitKillEvent, buildingDedications, dedicationEvent, goldenDedication } from './eras';
 import { DED_COINAGE, DED_TO_ARMS, DED_STEAM, TO_ARMS_MIL_PROD_MULT, STEAM_WONDER_PROD_MULT } from '../data/seats';
 import { WONDER_ERA_INDEX } from '../data/builtWonders';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
@@ -78,27 +85,6 @@ const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
 const CIV_SPACING = 10;
-
-/** The military units a scripted seat may gold-buy — the
- * same roster the production picker trains (WARRIOR/SLINGER ungated; the rest
- * on that seat's real techs), in UNITS-table order so strict `>` on combat
- * breaks ties to the lowest-index type (the GPU argmax mirror; HORSEMAN
- * precedes SWORDSMAN so the 36-combat tie keeps HORSEMAN). BUILDER/SCOUT are
- * excluded — never in the seat roster. requiresResource is gated in the buy
- * loop (data-driven off the catalog, verified there). */
-export const BUY_UNITS: { id: string; tech?: string }[] = [
-  { id: 'WARRIOR' },
-  { id: 'SLINGER' },
-  { id: 'ARCHER', tech: 'ARCHERY' },
-  { id: 'SPEARMAN', tech: 'BRONZE_WORKING' },
-  { id: 'HORSEMAN', tech: 'HORSEBACK_RIDING' },
-  { id: 'SWORDSMAN', tech: 'IRON_WORKING' },
-  { id: 'PIKEMAN', tech: 'MILITARY_TACTICS' },
-  { id: 'CROSSBOWMAN', tech: 'MACHINERY' },
-  { id: 'KNIGHT', tech: 'STIRRUPS' },
-  { id: 'MUSKETMAN', tech: 'GUNPOWDER' },
-];
-
 
 
 
@@ -1106,6 +1092,29 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         convertHeathens(state, unit, actor);
         return;
       }
+      if (a === A_UPGRADE) {
+        upgradeUnit(state, unit, actor.seat);
+        return;
+      }
+      if (a >= A_AIR_STRIKE && a < A_AIR_STRIKE + AIR_STRIKE_COLS) {
+        const t = airStrikeTargets(state, unit, AIR_STRIKE_COLS)[a - A_AIR_STRIKE];
+        if (t !== undefined) airStrike(state, unit.id, t, actor.seat);
+        return;
+      }
+      if (a >= A_REBASE && a < A_REBASE + AIR_REBASE_COLS) {
+        const t = rebaseTargets(state, unit, AIR_REBASE_COLS)[a - A_REBASE];
+        if (t !== undefined) rebaseAir(state, unit, t);
+        return;
+      }
+      if (a >= A_SPY_TRAVEL && a < A_SPY_TRAVEL + SPY_TRAVEL_COLS) {
+        const t = spyDestinations(state, unit, SPY_TRAVEL_COLS)[a - A_SPY_TRAVEL];
+        if (t !== undefined) beginTravel(state, unit, t);
+        return;
+      }
+      if (a >= A_SPY_MISSION && a < A_SPY_MISSION + SPY_MISSIONS.length) {
+        beginMission(state, unit, a - A_SPY_MISSION);
+        return;
+      }
       if (a < 6) {
         const nb = neighbors(state.map, here);
         const to = nb[a];
@@ -1177,6 +1186,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           here.districtComplete && !here.districtPillaged
         ) {
           here.districtPillaged = true;
+          displaceAirFrom(state, here.index);
           spendPillage();
         }
       } else if ((a >= 13 && a < 18) || (a >= 18 && a < 18 + IMPROVEMENT_IDS.length - DEDICATED_IMPROVEMENTS)) {
@@ -1356,7 +1366,12 @@ export function seatPhase(state: GameState): void {
     // pays into the stockpile, then the plants burn what they need and the
     // POWERED flag every yield reader takes is set for the turn.
     accrueStockpiles(state, actor.seat);
+    chargeUnitUpkeep(state, actor.seat);
     resolveSeatPower(state, actor.seat);
+    // ESPIONAGE: this seat's own spies move a turn closer to arriving or to
+    // resolving, and the clocks their missions left behind tick down.
+    tickSpies(state, actor.seat);
+    tickSpyEffects(state, actor.seat);
 
     // A Relic held for want of a slot goes out at the owner's next turn —
     // before the yield walk, so a slot opened last turn pays this one.
@@ -1512,15 +1527,11 @@ export function seatPhase(state: GameState): void {
       if (wantUnit && !bought && meleeCount + rangedCount < actor.cities.length * 2) {
         let pickId: string | null = null;
         let pickCombat = -Infinity;
-        for (const cand of BUY_UNITS) {
-          if (cand.tech && !actor.research.techs.includes(cand.tech)) continue;
-          const def = UNITS[cand.id];
-          if (!def) continue;
-          if (def.requiresResource && !civHasStrategic(state, actor.seat, def.requiresResource)) continue;
-          if (!goldAffordable(actor.treasury ?? 0, unitPurchaseCost(state, cand.id, actor.seat))) continue;
+        for (const def of goldBuyableUnits(state, actor.seat)) {
+          if (!goldAffordable(actor.treasury ?? 0, unitPurchaseCost(state, def.id, actor.seat))) continue;
           if (def.combat > pickCombat) {
             pickCombat = def.combat;
-            pickId = cand.id;
+            pickId = def.id;
           }
         }
         if (pickId) {
@@ -1701,6 +1712,7 @@ export function seatPhase(state: GameState): void {
     const rGovPicks = governorPicks(
       actor.cities.map((civCity) => Math.round((civCity.loyalty ?? LOYALTY_MAX) * 1000)),
       governorTitles(actor.research.civics.length),
+      new Set(actor.cities.map((c, i) => (governorSuppressed(c) ? i : -1)).filter((i) => i >= 0)),
     );
     const rGovIds = new Set([...rGovPicks].map((i) => actor.cities[i].id));
     const civCityDefectors: City[] = [];
@@ -1732,7 +1744,7 @@ export function seatPhase(state: GameState): void {
         // units." (Heartbeat of Steam, Golden face): "+10% Production toward
         // Industrial era and later wonders." The three item classes are
         // disjoint, so the multiplier order is association-free.
-        if (q.kind === 'unit' && unitDomain(q.unit) === 'military' && goldenDedication(state, civCity.seat, DED_TO_ARMS)) _em *= TO_ARMS_MIL_PROD_MULT;
+        if (q.kind === 'unit' && unitDomain(q.unit) !== 'civilian' && goldenDedication(state, civCity.seat, DED_TO_ARMS)) _em *= TO_ARMS_MIL_PROD_MULT;
         if (q.kind === 'wonder' && (WONDER_ERA_INDEX[q.wonder] ?? 0) >= INDUSTRIAL_ERA_INDEX && goldenDedication(state, civCity.seat, DED_STEAM)) _em *= STEAM_WONDER_PROD_MULT;
         // CIV6 (Urban Development Treaty, outcome A): "+100% Production
         // towards buildings in this district."
@@ -1842,7 +1854,7 @@ export function seatPhase(state: GameState): void {
           // The STRIKER is the city, so the dig's era gate is its owner's —
           // the GPU passes `striker_row` at the same site.
           if (defender.hp <= 0) {
-            navalKillEvent(state, civCity.seat, defender);
+            unitKillEvent(state, civCity.seat, undefined, defender);
             killUnit(state, defender, civCity.seat);
           }
         }
@@ -1884,7 +1896,7 @@ export function seatPhase(state: GameState): void {
           // The STRIKER is the city, so the dig's era gate is its owner's —
           // the GPU passes `striker_row` at the same site.
           if (defender.hp <= 0) {
-            navalKillEvent(state, civCity.seat, defender);
+            unitKillEvent(state, civCity.seat, undefined, defender);
             killUnit(state, defender, civCity.seat);
           }
         }

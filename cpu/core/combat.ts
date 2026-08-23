@@ -14,6 +14,7 @@ import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER } from '../data/seats';
 import { addEraScore } from './eras';
 import { nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit } from './units';
+import { isAirUnit, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirOf, displaceAirFrom } from './air';
 import { outerPool, wallsMax, wallsTier } from './rules';
 import { EMBARKED_DEFENSE_CS_BY_ERA, embarkState } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -35,7 +36,7 @@ import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE, generalAuraMP } fro
 // init, which is what makes that safe.
 import { unitFullMoves } from './units';
 import { warWearinessBattle } from './weariness';
-import { navalKillEvent } from './eras';
+import { unitKillEvent } from './eras';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -680,6 +681,9 @@ export function barbarianCombatCS(state: GameState, own: number, foe: number): n
 }
 
 export function killUnit(state: GameState, unit: Unit, seat: number): void {
+  // CIV6 (Air combat): "Should your Aircraft Carrier be destroyed, your
+  // aircraft stationed within will be destroyed."
+  if ((UNITS[unit.type]?.airSlots ?? 0) > 0) displaceAirFrom(state, unit.tileIndex, false);
   markAntiquitySite(state, unit.tileIndex, seat, unitSeat(unit)); // a death leaves a dig
   markShipwreck(state, unit.tileIndex, seat, unitSeat(unit)); // ...at sea, a wreck
   disbandUnit(state, unit.id);
@@ -827,7 +831,7 @@ function cityAssault(
   warWearinessBattle(state, attacker.seat, city.seat, city.centerIndex,
     { aDied: attacker.hp <= 0, city: true });
   if (attacker.hp <= 0) {
-    navalKillEvent(state, city.seat, attacker);
+    unitKillEvent(state, city.seat, undefined, attacker);
     killUnit(state, attacker, seat);
   }
 }
@@ -958,7 +962,9 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   }
   if (!amphibiousReach(state, attacker, targetIndex)) return no('Embarked units strike an open shore only.');
 
-  const enemies = unitsAt(state, targetIndex).filter((u) => unitsHostile(state, attacker, u));
+  const enemies = unitsAt(state, targetIndex).filter(
+    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type),
+  );
   const seatTarget = (() => {
     const civCity = cityAtIndex(state, targetIndex);
     if (!civCity) return undefined;
@@ -1062,11 +1068,11 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     warWearinessBattle(state, attacker.seat, defender.seat, targetIndex,
       { aDied: attacker.hp <= 0 && defender.hp > 0, dDied: defender.hp <= 0 });
     if (defender.hp <= 0) {
-      navalKillEvent(state, unitSeat(attacker), defender);
+      unitKillEvent(state, unitSeat(attacker), attacker, defender);
       killUnit(state, defender, seat);
       if (attacker.hp <= 0) attacker.hp = 1; // victor survives
     } else if (attacker.hp <= 0) {
-      navalKillEvent(state, unitSeat(defender), attacker);
+      unitKillEvent(state, unitSeat(defender), defender, attacker);
       killUnit(state, attacker, seat);
       attacker.movesLeft = 0;
       return ok;
@@ -1089,6 +1095,66 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
  *  ACTING SEAT — which is what made the city-first divergences of this round
  *  (a barbarian on a foreign centre; the GPU sieging a peaceful city-state) a
  *  state-column hunt instead of one diff. */
+/**
+ * AN AIR STRIKE. CIV6 (Air combat): "all air attacks are ranged, and the
+ * attacking plane doesn't suffer damage in return unless it gets Intercepted".
+ * The strike reaches anything inside the aircraft's OPERATIONAL RANGE measured
+ * from its base, and takes "a full action to perform".
+ *
+ * A FIGHTER's ranged damage is "effective against land units, but not against
+ * cities and naval units"; a BOMBER's bombard damage is "effective against
+ * cities and naval units but not against land units". What answers is the
+ * target's Anti-Air Strength "(even if its Combat Strength is higher) or
+ * Combat Strength if it doesn't have any".
+ *
+ * Not modelled here, and recorded rather than invented: PATROL, and with it
+ * fighter INTERCEPTION, which needs an air unit to hold a map tile it is not
+ * based on.
+ */
+export function airStrike(state: GameState, attackerId: number, targetIndex: number, seat: number): RuleResult {
+  const attacker = state.units.find((u) => u.id === attackerId && u.seat === seat);
+  if (!attacker) return { ok: false, reason: 'No such unit.' };
+  const kind = UNITS[attacker.type]?.air;
+  if (!kind) return { ok: false, reason: 'Not an air unit.' };
+  if (attacker.movesLeft <= 0) return { ok: false, reason: 'The sortie is spent.' };
+  if (!airStrikeReaches(state, attacker, targetIndex)) return { ok: false, reason: 'Out of operational range.' };
+  if (!airStrikeOffers(state, attacker, targetIndex)) {
+    return { ok: false, reason: 'Not a target this aircraft answers.' };
+  }
+  const holder = cityAtIndex(state, targetIndex);
+  if (kind === 'BOMBER' && holder && civsAtWar(state, seat, holder.holder.seat)) {
+    const r = rangedAttack(state, attackerId, targetIndex, seat);
+    if (r.ok) attacker.movesLeft = 0;
+    return r;
+  }
+  const enemies = unitsAt(state, targetIndex).filter(
+    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type),
+  );
+  if (enemies.length === 0) return { ok: false, reason: 'Nothing to strike.' };
+  const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
+  const atk = UNITS[attacker.type]?.ranged?.strength ?? 0;
+  const def = airDefenseOf(defender.type);
+  const atkE = atk - woundPenalty(attacker);
+  const defE = def - woundPenalty(defender);
+  defender.hp -= damageRoll(state, atkE - defE, 'air', targetIndex);
+  attacker.movesLeft = 0;
+  // the answer. CIV6 (Air combat): a plane "doesn't suffer damage in return
+  // unless it gets Intercepted", and "the only exceptions to this rule are
+  // SHIPS with the Anti-Air Strength stat - they have additional close-range
+  // defenses, which activate when they are attacked by an aircraft". A land
+  // anti-air unit answers by intercepting, which no engine here can do.
+  if (antiAirOf(defender.type) > 0 && UNITS[defender.type]?.naval) {
+    attacker.hp -= damageRoll(state, defE - atkE, 'airc', targetIndex);
+    if (attacker.hp <= 0) disbandUnit(state, attacker.id);
+  }
+  warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, {
+    aDied: attacker.hp <= 0, dDied: defender.hp <= 0,
+  });
+  if (defender.hp <= 0) killUnit(state, defender, seat);
+  logUnitOrder(state, seat, attackerId, 'ranged', targetIndex);
+  return { ok: true };
+}
+
 export function rangedAttack(state: GameState, attackerId: number, targetIndex: number, seat: number): RuleResult {
   const r = rangedAttackInner(state, attackerId, targetIndex, seat);
   if (r.ok) {
@@ -1110,7 +1176,9 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   if (hexDistance(from.col, from.row, target.col, target.row) > unitAttackRange(attacker)) {
     return no('Out of range.');
   }
-  const enemies = unitsAt(state, targetIndex).filter((u) => unitsHostile(state, attacker, u));
+  const enemies = unitsAt(state, targetIndex).filter(
+    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type),
+  );
   // Ranged units CAN bombard cities — same fallback
   // chain as meleeAttack (seat city, then city-state center), one roll,
   // no retaliation. Ranged fire never captures: the city holds at 1 HP
@@ -1165,7 +1233,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   awardBattleXp(state, attacker, defender, { ranged: true, aDied: false, dDied: defender.hp <= 0 });
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
   if (defender.hp <= 0) {
-    navalKillEvent(state, unitSeat(attacker), defender);
+    unitKillEvent(state, unitSeat(attacker), attacker, defender);
     killUnit(state, defender, seat);
   }
   spendAttack(attacker);
@@ -1226,7 +1294,8 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   // on a centre this strike could otherwise reach therefore makes the strike a
   // no-op rather than a hit.
   const enemies = unitsAt(state, targetIndex).filter(
-    (u) => unitsHostile(state, attacker, u) && !(isCiv(attacker.seat) && isCiv(u.seat)),
+    (u) => unitsHostile(state, attacker, u) && !isAirUnit(u.type)
+      && !(isCiv(attacker.seat) && isCiv(u.seat)),
   );
   if (enemies.length === 0) return; // the CITY_CENTER quirk: a no-op, like meleeAttack's `no(...)`
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
@@ -1235,7 +1304,7 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
   awardBattleXp(state, attacker, defender, { ranged: true, aDied: false, dDied: defender.hp <= 0 });
   if (defender.hp <= 0) {
-    navalKillEvent(state, unitSeat(attacker), defender);
+    unitKillEvent(state, unitSeat(attacker), attacker, defender);
     killUnit(state, defender, seat);
   }
   spendAttack(attacker);
@@ -1496,6 +1565,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     hereOwned
   ) {
     here.districtPillaged = true;
+    displaceAirFrom(state, here.index);
     unit.movesLeft = 0;
     return;
   }

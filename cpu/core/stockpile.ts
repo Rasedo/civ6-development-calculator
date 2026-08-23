@@ -9,9 +9,12 @@
 import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST, emptyStockpile } from '../data/constants';
 import { UNITS } from '../data/units';
 import { PROJECTS } from '../data/projects';
+import { DED_AUTOMATON, DED_SKY, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TURN, AUTOMATON_URANIUM_PER_MINE } from '../data/seats';
 import { BUILDINGS } from '../data/buildings';
 import { RESOURCES } from '../../world/resources';
 import { citiesOf, seatOf, tileOwnedByCiv } from './seats';
+import { goldenDedication } from './eras';
+import { goldAffordable, unitPurchaseCost } from './game';
 import { cityPower, pillagedDistrictTypes } from './yields';
 import type { GameState, Seat } from './types';
 
@@ -53,6 +56,18 @@ export function stockpileCap(state: GameState, seat: number): number {
  * published per-turn number. The stockpile is then clamped to the cap — a
  * seat over the ceiling (its Encampment just went dark) loses the excess.
  */
+/**
+ * What a golden dedication adds to ONE improved source's per-turn yield.
+ * CIV6 (Sky and Stars, GS): "Aluminum mines accumulate +2 more resources per
+ * turn"; (Automaton Warfare): "Uranium mines accumulate +1 more resource per
+ * turn."
+ */
+export function goldenMineBonus(state: GameState, seat: number, resourceId: string): number {
+  if (resourceId === 'ALUMINUM' && goldenDedication(state, seat, DED_SKY)) return SKY_ALUMINUM_PER_TURN;
+  if (resourceId === 'URANIUM' && goldenDedication(state, seat, DED_AUTOMATON)) return AUTOMATON_URANIUM_PER_MINE;
+  return 0;
+}
+
 export function accrueStockpiles(state: GameState, seat: number): void {
   const s = seatOf(state, seat);
   if (!s) return;
@@ -62,7 +77,13 @@ export function accrueStockpiles(state: GameState, seat: number): void {
     const k = strategicSlot(t.resource);
     if (k < 0 || t.improvement !== RESOURCES[t.resource]?.improvement) continue;
     if (!tileOwnedByCiv(t, seat)) continue;
-    bk[k] += STRATEGIC_PER_TURN[t.resource];
+    bk[k] += STRATEGIC_PER_TURN[t.resource] + goldenMineBonus(state, seat, t.resource);
+  }
+  // CIV6 (Automaton Warfare, Golden face): "Receive 3 Uranium per turn" — a
+  // standing grant, owed whether or not the seat mines any.
+  if (goldenDedication(state, seat, DED_AUTOMATON)) {
+    const u = strategicSlot('URANIUM');
+    if (u >= 0) bk[u] += AUTOMATON_URANIUM_PER_TURN;
   }
   const cap = stockpileCap(state, seat);
   for (let k = 0; k < bk.length; k++) if (bk[k] > cap) bk[k] = cap;
@@ -82,8 +103,65 @@ export function canPayStockpile(state: GameState, seat: number, resourceId: stri
  * this is charged once.
  */
 export function unitResourceCost(unitType: string): { id: string; n: number } | undefined {
-  const res = UNITS[unitType]?.requiresResource;
-  return res ? { id: res, n: UNIT_RESOURCE_COST } : undefined;
+  const def = UNITS[unitType];
+  return def?.requiresResource
+    ? { id: def.requiresResource, n: def.resourceCost ?? UNIT_RESOURCE_COST }
+    : undefined;
+}
+
+/**
+ * CIV6 (Resource, GS): a FUEL unit's up-front cost is small and then "each
+ * turn, the unit will consume a certain amount of that resource as fuel".
+ * One pass over the seat's living units, after the turn's income and before
+ * the plants burn, because a unit's fuel and a plant's come out of one bank.
+ * A bill the bank cannot meet takes what is there and leaves it at zero; the
+ * Combat Strength penalty real Civ 6 charges for the shortfall is a magnitude
+ * no source publishes.
+ */
+export function chargeUnitUpkeep(state: GameState, seat: number): void {
+  const s = seatOf(state, seat);
+  if (!s) return;
+  const bk = bank(s);
+  for (const u of state.units) {
+    if (u.seat !== seat) continue;
+    const def = UNITS[u.type];
+    const k = strategicSlot(def?.requiresResource);
+    if (k < 0 || !def?.resourceUpkeep) continue;
+    bk[k] = Math.max(0, bk[k] - def.resourceUpkeep);
+  }
+}
+
+/**
+ * CIV6 (Unit): a unit may upgrade when it stands "in friendly territory" with
+ * "more than 0 Movement left", the seat can pay the gold, and — in GS — the
+ * seat holds "the same [resources] you would normally need to produce the
+ * next-level unit (unless the unit you're upgrading also requires the same
+ * resource, in which case you don't need any)".
+ *
+ * MODEL: no source publishes the gold FORMULA, only that it "usually reflects
+ * how much its strength will increase". This charges the difference between
+ * the two chassis' own published purchase prices, floored at zero — built from
+ * numbers the pages do give, with no free constant.
+ */
+export function upgradeGoldCost(state: GameState, seat: number, unitType: string): number {
+  const next = UNITS[unitType]?.upgradesTo;
+  if (!next) return 0;
+  return Math.max(0, unitPurchaseCost(state, next, seat) - unitPurchaseCost(state, unitType, seat));
+}
+
+/** can this seat's treasury cover the upgrade? */
+export function canPayUpgradeGold(state: GameState, seat: number, unitType: string): boolean {
+  const s = seatOf(state, seat);
+  return !!s && goldAffordable(s.treasury, upgradeGoldCost(state, seat, unitType));
+}
+
+/** what the UPGRADE draws out of the bank: the new chassis' own charge, or
+ *  nothing at all when both rungs ask for the same resource. */
+export function upgradeResourceCost(unitType: string): { id: string; n: number } | undefined {
+  const next = UNITS[unitType]?.upgradesTo;
+  if (!next) return undefined;
+  const c = unitResourceCost(next);
+  return c && c.id !== UNITS[unitType]?.requiresResource ? c : undefined;
 }
 
 export function canTrainWithStockpile(state: GameState, seat: number, unitType: string): boolean {

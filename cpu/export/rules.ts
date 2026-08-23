@@ -25,7 +25,7 @@ import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { TRADE_ROUTE_RANGE_LAND, TRADE_ROUTE_RANGE_SEA, CITY_STATE_ROUTE_GOLD, CITY_STATE_ROUTE_SPEC, INTL_ROUTE_GOLD, TRADE_ROUTE_DURATION, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from '../core/trade';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
-import { MAX_CITIES_PER_SEAT, CITY_SLOTS_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, PEACE_GOLD_COST, WW_ERA_BASE_FORMAL, WW_ERA_BASE_SURPRISE, WW_ABROAD_MULT, WW_DEATH_MULT, WW_DECAY_AT_WAR, WW_DECAY_AT_PEACE, WW_PEACE_TREATY, WAR_WEARINESS_PER_AMENITY, DOW_PROXIMITY, FORMAL_WAR_MIN_TURNS, ERA_LENGTH, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, ERA_SCORE_MOMENT_MIN, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, GOVERNOR_LOYALTY, HEROIC_DEDICATIONS, ADMIRAL_MARCH_LIVE, GOLDEN_MOVE_BONUS, DEDICATION_PAYOUTS_LIVE, AGREEMENT_TURNS, ALLIANCE_CIVIC, OPEN_BORDERS_CIVIC, FAVOR_PER_ALLIANCE, WARMONGER_DOW, WARMONGER_CAPTURE, WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, CONGRESS_RESOLUTIONS, CONGRESS_DV_MIN_ERA, CONGRESS_DV_DELTA, CONGRESS_VOTE_STEP, CONGRESS_PROD_MULT, CONGRESS_GPP_MULT, CONGRESS_GROWTH_A, CONGRESS_GROWTH_B, CONGRESS_MIG_LOYALTY, CONGRESS_GW_MULT, CONGRESS_TARGET_KINDS, CONGRESS_PLUS_100, CONGRESS_MINUS_50, CONGRESS_TRADE_GOLD, CONGRESS_TRADE_CAPACITY, CONGRESS_POLICY_FAVOR, CONGRESS_IDEOLOGY_SLOTS, CULTURE_BOMB_RANGE, FAVOR_OCCUPIED_CAPITAL, EMERGENCIES, EMERGENCY_SLOTS, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, EMERGENCY_MEMBER_CS, EMERGENCY_MEMBER_MP, EMERGENCY_TARGET_LOYALTY, EMERGENCY_MEMBER_HEAL, EMERGENCY_TARGET_STRIKE_CS, EMERGENCY_ENVOY_GOLD, EMERGENCY_CS_ROUTE_GOLD, DED_EVENT_SCORE, DIPLO_VICTORY_POINTS, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, ENGINEER_LIVE, DED_MONUMENTALITY, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS } from '../data/seats';
+import { MAX_CITIES_PER_SEAT, CITY_SLOTS_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, PEACE_GOLD_COST, WW_ERA_BASE_FORMAL, WW_ERA_BASE_SURPRISE, WW_ABROAD_MULT, WW_DEATH_MULT, WW_DECAY_AT_WAR, WW_DECAY_AT_PEACE, WW_PEACE_TREATY, WAR_WEARINESS_PER_AMENITY, DOW_PROXIMITY, FORMAL_WAR_MIN_TURNS, ERA_LENGTH, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, ERA_SCORE_MOMENT_MIN, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, GOVERNOR_LOYALTY, HEROIC_DEDICATIONS, ADMIRAL_MARCH_LIVE, GOLDEN_MOVE_BONUS, DEDICATION_PAYOUTS_LIVE, AGREEMENT_TURNS, ALLIANCE_CIVIC, OPEN_BORDERS_CIVIC, FAVOR_PER_ALLIANCE, WARMONGER_DOW, WARMONGER_CAPTURE, WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, CONGRESS_RESOLUTIONS, CONGRESS_DV_MIN_ERA, CONGRESS_DV_DELTA, CONGRESS_VOTE_STEP, CONGRESS_PROD_MULT, CONGRESS_GPP_MULT, CONGRESS_GROWTH_A, CONGRESS_GROWTH_B, CONGRESS_MIG_LOYALTY, CONGRESS_GW_MULT, CONGRESS_TARGET_KINDS, CONGRESS_PLUS_100, CONGRESS_MINUS_50, CONGRESS_TRADE_GOLD, CONGRESS_TRADE_CAPACITY, CONGRESS_POLICY_FAVOR, CONGRESS_IDEOLOGY_SLOTS, CULTURE_BOMB_RANGE, FAVOR_OCCUPIED_CAPITAL, EMERGENCIES, EMERGENCY_SLOTS, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, EMERGENCY_MEMBER_CS, EMERGENCY_MEMBER_MP, EMERGENCY_TARGET_LOYALTY, EMERGENCY_MEMBER_HEAL, EMERGENCY_TARGET_STRIKE_CS, EMERGENCY_ENVOY_GOLD, EMERGENCY_CS_ROUTE_GOLD, DED_EVENT_SCORE, DIPLO_VICTORY_POINTS, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, ENGINEER_LIVE, DED_MONUMENTALITY, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_SKY, DED_BODYGUARD, DED_AUTOMATON, SKY_EUREKAS, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TURN, AUTOMATON_URANIUM_PER_MINE } from '../data/seats';
 import { WONDER_TOURISM_BASE } from '../core/city';
 import { BALANCED_WEIGHTS } from '../core/score';
 import { unitActionNames } from '../core/unitActions';
@@ -54,6 +54,16 @@ const slotsOf = (xs: number[]): number[] => {
 };
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencySource } from '../data/districts';
 import { TECHS, ERAS, MODERN_ERA_INDEX } from '../data/techs'; // era scale
+import {
+  SPY_CAPACITY_CIVICS, SPY_CAPACITY_TECHS, SPY_CAPACITY_MAX, SPY_MAX_LEVEL,
+  SPY_IDLE, SPY_TRAVELLING, SPY_TRAVEL_COLS, SPY_MISSIONS, SPY_MISSION_TURNS,
+  SPY_TRAVEL_TURNS_MIN, SPY_TRAVEL_TILES_PER_TURN, SPY_TRAVEL_TURNS_MAX,
+  SPY_SUCCESS_BASE_PCT, SPY_SUCCESS_PER_LEVEL_PCT, SPY_CAPTURE_PCT,
+  SPY_COUNTERSPY_CATCH_PCT, BODYGUARD_OP_NUM, BODYGUARD_OP_DEN,
+  SPY_UNREST_LOYALTY, SPY_UNREST_PER_LEVEL, SPY_GOVERNOR_TURNS,
+  SPY_GOVERNOR_PER_LEVEL, SPY_SOURCES_LEVELS, SPY_SOURCES_TURNS,
+  SPY_PARTISANS_MIN, SPY_PARTISANS_MAX,
+} from '../data/espionage';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, SLOT_KINDS, GOVERNMENTS_ADOPTION_LIVE, type SlotKind, type BuildingYieldBoost, type PolicyEffects } from '../data/policies';
 
@@ -317,7 +327,7 @@ export function buildRules() {
       agePressure: AGE_PRESSURE,
       govCivicsPerTitle: GOV_CIVICS_PER_TITLE,
       govMaxTitles: GOV_MAX_TITLES,
-      warmongerDow: WARMONGER_DOW, warmongerCapture: WARMONGER_CAPTURE, warmongerGang: WARMONGER_GANG, diplomaticFavorPerSuzerain: DIPLO_FAVOR_PER_SUZERAIN, congressInterval: CONGRESS_INTERVAL, congressMinEra: CONGRESS_MIN_ERA, dvpPerResolution: DVP_PER_RESOLUTION, diploVictoryPoints: DIPLO_VICTORY_POINTS, dedicationPayoutsLive: DEDICATION_PAYOUTS_LIVE, dedMonumentality: DED_MONUMENTALITY, dedFreeInquiry: DED_FREE_INQUIRY, dedPenBrush: DED_PEN_BRUSH_AND_VOICE, dedExodus: DED_EXODUS, heroicDedications: HEROIC_DEDICATIONS, dedEventScore: [...DED_EVENT_SCORE], goldenMoveBonus: GOLDEN_MOVE_BONUS, governorLoyalty: GOVERNOR_LOYALTY, dedToArms: DED_TO_ARMS, dedDracones: DED_DRACONES, dedCoinage: DED_COINAGE, dedSteam: DED_STEAM, dedWish: DED_WISH,
+      warmongerDow: WARMONGER_DOW, warmongerCapture: WARMONGER_CAPTURE, warmongerGang: WARMONGER_GANG, diplomaticFavorPerSuzerain: DIPLO_FAVOR_PER_SUZERAIN, congressInterval: CONGRESS_INTERVAL, congressMinEra: CONGRESS_MIN_ERA, dvpPerResolution: DVP_PER_RESOLUTION, diploVictoryPoints: DIPLO_VICTORY_POINTS, dedicationPayoutsLive: DEDICATION_PAYOUTS_LIVE, dedMonumentality: DED_MONUMENTALITY, dedFreeInquiry: DED_FREE_INQUIRY, dedPenBrush: DED_PEN_BRUSH_AND_VOICE, dedExodus: DED_EXODUS, heroicDedications: HEROIC_DEDICATIONS, dedEventScore: [...DED_EVENT_SCORE], goldenMoveBonus: GOLDEN_MOVE_BONUS, governorLoyalty: GOVERNOR_LOYALTY, dedToArms: DED_TO_ARMS, dedDracones: DED_DRACONES, dedCoinage: DED_COINAGE, dedSteam: DED_STEAM, dedWish: DED_WISH, dedSky: DED_SKY, dedBodyguard: DED_BODYGUARD, dedAutomaton: DED_AUTOMATON,
       // which catalog entries each WORLD ERA offers, padded to a rectangle
       // with -1 (the GPU walks `dedEraLen` entries of each row)
       dedEras: DEDICATION_ERAS.map((w) => {
@@ -325,6 +335,56 @@ export function buildRules() {
         return [...w, ...Array<number>(wide - w.length).fill(-1)];
       }),
       dedEraLen: DEDICATION_ERAS.map((w) => w.length),
+      // ESPIONAGE. The mission table's ORDER is the wire: column k of the
+      // MISSION head is row k here on both engines. `district` is a
+      // PLACEABLE_DISTRICTS index, -1 for the CITY CENTER (which every city
+      // has and no placeable row carries).
+      espionage: {
+        capacityCivics: SPY_CAPACITY_CIVICS.map((c) => Object.keys(CIVICS).indexOf(c)).filter((i) => i >= 0),
+        capacityTechs: SPY_CAPACITY_TECHS.map((t) => Object.keys(TECHS).indexOf(t)).filter((i) => i >= 0),
+        capacityMax: SPY_CAPACITY_MAX,
+        maxLevel: SPY_MAX_LEVEL,
+        idle: SPY_IDLE,
+        travelling: SPY_TRAVELLING,
+        travelCols: SPY_TRAVEL_COLS,
+        missions: SPY_MISSIONS.map((m) => ({
+          id: m.id,
+          district: m.district === 'CITY_CENTER' ? -1 : PLACEABLE_DISTRICTS.indexOf(m.district),
+          offensive: m.offensive ? 1 : 0,
+          certain: m.certain ? 1 : 0,
+          athome: m.athome ? 1 : 0,
+        })),
+        missionTurns: SPY_MISSION_TURNS,
+        travelMin: SPY_TRAVEL_TURNS_MIN,
+        travelTilesPerTurn: SPY_TRAVEL_TILES_PER_TURN,
+        travelMax: SPY_TRAVEL_TURNS_MAX,
+        successBase: SPY_SUCCESS_BASE_PCT,
+        successPerLevel: SPY_SUCCESS_PER_LEVEL_PCT,
+        capturePct: SPY_CAPTURE_PCT,
+        counterspyPct: SPY_COUNTERSPY_CATCH_PCT,
+        bodyguardNum: BODYGUARD_OP_NUM,
+        bodyguardDen: BODYGUARD_OP_DEN,
+        unrestLoyalty: SPY_UNREST_LOYALTY,
+        unrestPerLevel: SPY_UNREST_PER_LEVEL,
+        governorTurns: SPY_GOVERNOR_TURNS,
+        governorPerLevel: SPY_GOVERNOR_PER_LEVEL,
+        sourcesLevels: SPY_SOURCES_LEVELS,
+        sourcesTurns: SPY_SOURCES_TURNS,
+        partisansMin: SPY_PARTISANS_MIN,
+        partisansMax: SPY_PARTISANS_MAX,
+      },
+      // Sky and Stars' Eurekas, one padded row per WORLD ERA, as TECH indices
+      skyEurekas: ERAS.map((_, e) => {
+        const ids = SKY_EUREKAS[e] ?? [];
+        const wide = Math.max(...Object.values(SKY_EUREKAS).map((x) => x.length));
+        const cols = ids.map((id) => Object.keys(TECHS).indexOf(id)).filter((i) => i >= 0);
+        return [...cols, ...Array<number>(wide - cols.length).fill(-1)];
+      }),
+      skyAluminumSlot: STRATEGIC_IDS.indexOf('ALUMINUM'),
+      skyAluminumPerTurn: SKY_ALUMINUM_PER_TURN,
+      automatonUraniumSlot: STRATEGIC_IDS.indexOf('URANIUM'),
+      automatonUraniumPerTurn: AUTOMATON_URANIUM_PER_TURN,
+      automatonUraniumPerMine: AUTOMATON_URANIUM_PER_MINE,
       wishParkTourism: WISH_PARK_TOURISM_MULT, wishWonderTourNum: WISH_WONDER_TOURISM_NUM, wishWonderTourDen: WISH_WONDER_TOURISM_DEN, toArmsMilProd: TO_ARMS_MIL_PROD_MULT, draconesDiscoveryScore: DRACONES_DISCOVERY_SCORE, coinageIntlGoldPerSpec: COINAGE_INTL_GOLD_PER_SPEC, steamWonderProd: STEAM_WONDER_PROD_MULT, industrialEra: INDUSTRIAL_ERA_INDEX,
       // t: the target-space kind, an index into CONGRESS_TARGET_KINDS
       congressResolutions: CONGRESS_RESOLUTIONS.map((r) => ({ id: r.id, min: r.minEra, max: r.maxEra, t: CONGRESS_TARGET_KINDS.indexOf(r.target) })),
@@ -791,7 +851,19 @@ export function buildRules() {
       requiresResource: u.requiresResource ? RESOURCE_IDS.indexOf(u.requiresResource) : -1,
       // the STOCKPILE slot the unit charges, and what it charges
       resSlot: u.requiresResource ? STRATEGIC_IDS.indexOf(u.requiresResource) : -1,
-      resCost: u.requiresResource ? UNIT_RESOURCE_COST : 0,
+      resCost: u.requiresResource ? u.resourceCost ?? UNIT_RESOURCE_COST : 0,
+      // GS: a FUEL unit bills this out of the bank every turn it lives
+      resUpkeep: u.resourceUpkeep ?? 0,
+      // the chassis this one upgrades INTO, as a roster index
+      upTo: u.upgradesTo ? Object.keys(UNITS).indexOf(u.upgradesTo) : -1,
+      antiAir: u.antiAir ?? 0,
+      gdr: u.gdr ? 1 : 0,
+      spy: u.spy ? 1 : 0,
+      noGold: u.noGold ? 1 : 0,
+      // AIR: 0 = not an aircraft, 1 = fighter, 2 = bomber. `rangedRange` is
+      // the OPERATIONAL range, measured from the base.
+      air: u.air === 'FIGHTER' ? 1 : u.air === 'BOMBER' ? 2 : 0,
+      airSlots: u.airSlots ?? 0,
       rangedStrength: u.ranged?.strength ?? 0,
       rangedRange: u.ranged?.range ?? 0,
       moves: u.moves,
@@ -950,6 +1022,7 @@ export function buildRules() {
       // the plant's fuel SLOT and its published Power-per-unit rate
       fuelSlot: b.fuel ? STRATEGIC_IDS.indexOf(b.fuel) : -1,
       fuelRate: b.fuelRate ?? 0,
+      airSlots: b.airSlots ?? 0,
       izAdjProduction: b.special === 'COAL_PLANT' ? 1 : 0,
       // worship = faith-purchase-only (never queued, never gold-bought).
       worship: b.worship ? 1 : 0,

@@ -64,7 +64,13 @@ def test_catalog(sim) -> None:
 
 def test_training_xp_wiring(rules, path) -> None:
     sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-    mil_ty = int(torch.tensor([c if not bool(sim._type_civilian[i]) else -1 for i, c in enumerate(sim._type_combat.tolist())]).argmax())
+    # a MELEE chassis by its own promotion class — the Barracks and the Armory
+    # name melee, ranged and anti-cavalry, and the roster carries classes
+    # (support, naval raider, GDR) that no XP building addresses at all.
+    _melee = list(sim.rules.promo_classes).index("MELEE")
+    mil_ty = next(i for i in range(sim.NU)
+                  if int(sim.rules_dev.u_promo_class[i]) == _melee
+                  and not bool(sim._type_civilian[i]) and float(sim._type_combat[i]) > 0)
     assert not bool(sim._type_civilian[mil_ty]) and float(sim._type_combat[mil_ty]) > 0, "no military unit type found"
     ctr = sim.city_center[:, 0, 0].clamp(min=0)
 

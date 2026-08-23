@@ -4,9 +4,9 @@ import { citiesOf, seatOf } from './seats';
 import { GP_CLASSES, GP_CLASS_DISTRICT, GP_FIRST_OF_ERA, GREAT_PEOPLE, GW_CLASS_KIND, GW_WONDER_SLOTS, GW_WORK_CLASSES, gpCost, placeGreatWorks } from '../data/greatPeople';
 import { congressGppFactor } from './congress';
 import { BUILDINGS } from '../data/buildings';
-import { ERA_SCORE_GP } from '../data/seats';
+import { DED_SKY, ERA_SCORE_GP } from '../data/seats';
 import { completedWonders, seatWonders } from './wonders';
-import { addEraScore, goldenProphetPoints, worldEraIndex } from './eras';
+import { addEraScore, dedicationEvent, goldenProphetPoints, worldEraIndex } from './eras';
 import { getModifiers } from './effects';
 import { spawnUnit } from './units';
 import { repairDrip } from './rules';
@@ -121,6 +121,8 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
   state.claimedGreatPeople.push(person.id); // gone from the global pool...
   owner.gpEarned.push(person.id); // ...and recorded as this seat's recruit
   addEraScore(state, seat, ERA_SCORE_GP);
+  // CIV6 (Sky and Stars): "+1 Era Score each time a Great Person is Earned."
+  dedicationEvent(state, seat, DED_SKY);
   state.eventLog.push(`${owner.name} claimed ${person.name}.`);
 }
 

@@ -16,17 +16,15 @@
  */
 import { writeFileSync } from 'node:fs';
 import type { DistrictId, GameState, Seat, Tile } from '../core/types';
-import { allCities, campTiles, civHasStrategic, civsAtWar, seatOf, tileOwnedByCiv } from '../core/seats';
-import { canTrainWithStockpile } from '../core/stockpile';
+import { allCities, campTiles, civsAtWar, seatOf, tileOwnedByCiv } from '../core/seats';
 import { isWater } from '../../world/query';
 import { GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT } from '../data/constants';
 import { PEACE_GOLD_COST, DED_MONUMENTALITY } from '../data/seats';
-import { BUY_UNITS } from '../core/phase';
 import { tradeCapacity, freeTrader, routeYields, routeYieldsInternational, cityStateRouteYields, tradeRouteRange } from '../core/trade';
 import { isExplored } from '../core/fog';
 import { buildingFaithCost, endTurn, goldAffordable, naturalistCost, settlerCost, tilePurchaseCost, unitPurchaseCost } from '../core/game';
 import { goldenDedication, monumentalityBuyMult } from '../core/eras';
-import { builderCost } from '../core/units';
+import { builderCost, goldBuyableUnits } from '../core/units';
 import { hasMet, isSuzerain } from '../core/cityStates';
 import { pickBorderTile } from '../core/city';
 import { WORSHIP_BUILDINGS, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, ENHANCER_BELIEFS } from '../data/religion';
@@ -145,19 +143,11 @@ function buyCandidateRow(state: GameState, actor: Seat): number[] {
       const q = city.queue[0];
       if (q?.kind === 'unit' && q.unit && (UNITS[q.unit]?.combat ?? 0) > 0) mil += 1;
     }
-    let anyU = false;
-    for (const cand of BUY_UNITS) {
-      if (cand.tech && !actor.research.techs.includes(cand.tech)) continue;
-      const def = UNITS[cand.id];
-      if (!def) continue;
-      if (def.requiresResource && !civHasStrategic(state, actor.seat, def.requiresResource)) continue;
-      if (!canTrainWithStockpile(state, actor.seat, cand.id)) continue;
-      // `unitPurchaseCost` is the price the applier charges — Mercenary
-      // Companies moves it, and every column offered here is a military unit.
-      if (!goldAffordable(actor.treasury ?? 0, unitPurchaseCost(state, cand.id, actor.seat))) continue;
-      anyU = true;
-      break;
-    }
+    // `unitPurchaseCost` is the price the applier charges — Mercenary
+    // Companies moves it, and every column offered here is a military unit.
+    const anyU = goldBuyableUnits(state, actor.seat).some(
+      (def) => goldAffordable(actor.treasury ?? 0, unitPurchaseCost(state, def.id, actor.seat)),
+    );
     const unitOk = actor.cities.length > 0 && mil < actor.cities.length * 2 && anyU;
     let tileOk = 0;
     let tileT = -1;

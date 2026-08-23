@@ -477,6 +477,15 @@ class SimInit:
         self._ded_coinage = int(_er["dedCoinage"])
         self._ded_steam = int(_er["dedSteam"])
         self._ded_wish = int(_er["dedWish"])
+        self._ded_sky = int(_er["dedSky"])
+        self._ded_bodyguard = int(_er["dedBodyguard"])
+        self._ded_automaton = int(_er["dedAutomaton"])
+        self._sky_eurekas = [[int(x) for x in w if int(x) >= 0] for w in _er["skyEurekas"]]
+        self._sky_alu_slot = int(_er["skyAluminumSlot"])
+        self._sky_alu_rate = int(_er["skyAluminumPerTurn"])
+        self._auto_ura_slot = int(_er["automatonUraniumSlot"])
+        self._auto_ura_rate = int(_er["automatonUraniumPerTurn"])
+        self._auto_ura_mine = int(_er["automatonUraniumPerMine"])
         # Which catalog entries each WORLD ERA offers, padded with -1.
         self._ded_eras = [[int(x) for x in w] for w in _er["dedEras"]]
         self._ded_era_len = [int(x) for x in _er["dedEraLen"]]
@@ -488,6 +497,47 @@ class SimInit:
         self._coinage_spec_gold = float(_er["coinageIntlGoldPerSpec"])
         self._steam_wonder_prod = float(_er["steamWonderProd"])
         self._industrial_era = int(_er["industrialEra"])
+        _sp = _er["espionage"]
+        self._spy_cap_civics = [int(x) for x in _sp["capacityCivics"]]
+        self._spy_cap_techs = [int(x) for x in _sp["capacityTechs"]]
+        self._spy_cap_max = int(_sp["capacityMax"])
+        self._spy_max_level = int(_sp["maxLevel"])
+        self._spy_idle = int(_sp["idle"])
+        self._spy_travelling = int(_sp["travelling"])
+        self._spy_travel_cols = int(_sp["travelCols"])
+        self._spy_missions = [
+            {k: int(v) for k, v in m.items() if k != "id"} for m in _sp["missions"]
+        ]
+        _mid = [str(m["id"]) for m in _sp["missions"]]
+        self._spy_m_sources = _mid.index("GAIN_SOURCES")
+        self._spy_m_siphon = _mid.index("SIPHON_FUNDS")
+        self._spy_m_heist = _mid.index("GREAT_WORK_HEIST")
+        self._spy_m_sabotage = _mid.index("SABOTAGE_PRODUCTION")
+        self._spy_m_steal = _mid.index("STEAL_TECH_BOOST")
+        self._spy_m_partisans = _mid.index("RECRUIT_PARTISANS")
+        self._spy_m_rocketry = _mid.index("DISRUPT_ROCKETRY")
+        self._spy_m_unrest = _mid.index("FOMENT_UNREST")
+        self._spy_m_governor = _mid.index("NEUTRALIZE_GOVERNOR")
+        self._spy_m_counterspy = _mid.index("COUNTERSPY")
+        self._spy_mission_turns_base = int(_sp["missionTurns"])
+        self._spy_travel_min = int(_sp["travelMin"])
+        self._spy_travel_per = int(_sp["travelTilesPerTurn"])
+        self._spy_travel_max = int(_sp["travelMax"])
+        self._spy_success_base = int(_sp["successBase"])
+        self._spy_success_per_level = int(_sp["successPerLevel"])
+        self._spy_capture_pct = int(_sp["capturePct"])
+        self._spy_counterspy_pct = int(_sp["counterspyPct"])
+        self._bodyguard_num = int(_sp["bodyguardNum"])
+        self._bodyguard_den = int(_sp["bodyguardDen"])
+        self._spy_unrest = int(_sp["unrestLoyalty"])
+        self._spy_unrest_per_level = int(_sp["unrestPerLevel"])
+        self._spy_gov_turns = int(_sp["governorTurns"])
+        self._spy_gov_per_level = int(_sp["governorPerLevel"])
+        self._spy_sources_levels = int(_sp["sourcesLevels"])
+        self._spy_sources_turns = int(_sp["sourcesTurns"])
+        self._spy_partisans_min = int(_sp["partisansMin"])
+        self._spy_partisans_max = int(_sp["partisansMax"])
+        self._n_spy_missions = len(self._spy_missions)
         nt_b3, nc_b3 = len(rules.t_cost), len(rules.c_cost)
         # The per-seat RESEARCH vectors, merged like the scalars. Placed here
         # because their width is only known once the rules tables are read.
@@ -594,6 +644,13 @@ class SimInit:
             # — a value you can gather and compare without already knowing which
             # pool range you are looking at. Checked by _check_seat_invariant.
             ("seat", torch.long),
+            # ESPIONAGE. `spy_mission` is the idle sentinel, the travelling
+            # sentinel or a mission index; `spy_target` the CENTRE TILE a
+            # travelling spy is bound for.
+            ("spy_mission", torch.long),
+            ("spy_turns", torch.long),
+            ("spy_target", torch.long),
+            ("spy_level", torch.long),
         ):
             _base = torch.zeros(B, self.UNIT_MAX, dtype=_dt, device=device)
             setattr(self, f"unit_{_pl}", _base)
@@ -607,6 +664,8 @@ class SimInit:
                     ],
                 )
         self.unit_level.fill_(1)  # a brand-new unit starts at level 1
+        self.unit_spy_mission.fill_(self._spy_idle)
+        self.unit_spy_target.fill_(-1)
         self.barb_unit_seat.fill_(BARB_SEAT)
         self.major_unit_seat.fill_(1)
 
@@ -648,6 +707,10 @@ class SimInit:
         # other, matching TS's single `allCities(state)` loop over one
         # religionPressure field.
         self.city_pressure = torch.zeros(B, self.n_majors + s_pad, civ_city_pad, self.n_majors, dtype=torch.long, device=device)
+        # ESPIONAGE clocks: turns this city's governor is off duty, and the
+        # per-SEAT Gain Sources clock (a spy of that seat operates higher here).
+        self.city_gov_out = torch.zeros(B, self.n_majors + s_pad, civ_city_pad, dtype=torch.long, device=device)
+        self.city_spy_sources = torch.zeros(B, self.n_majors + s_pad, civ_city_pad, self.n_majors, dtype=torch.long, device=device)
         self.city_followed = torch.full((B, self.n_majors + s_pad, civ_city_pad), -1, dtype=torch.long, device=device)
         self._bel = {}
         for _pool, _rows in (("pan", _bl.get("pantheons", [])), ("fol", _bl.get("followers", [])), ("fou", _bl.get("founders", []))):
@@ -957,12 +1020,26 @@ class SimInit:
             self._A_HERESY = self._act.get("REMOVE_HERESY", -1)
             self._A_INQUISITION = self._act.get("LAUNCH_INQUISITION", -1)
             self._A_HEATHEN = self._act.get("CONVERT_HEATHEN", -1)
+            self._A_UPGRADE = self._act.get("UPGRADE", -1)   # the ladder's own verb
+            self._A_AIR_STRIKE = self._act.get("AIR_STRIKE_0", -1)
+            self._A_REBASE = self._act.get("REBASE_0", -1)
+            self._A_SPY_TRAVEL = self._act.get("SPY_TRAVEL_0", -1)
+            self._A_SPY_MISSION = self._act.get("SPY_MISSION_0", -1)
+            self._air_strike_cols = sum(1 for n in self._act_names if n.startswith("AIR_STRIKE_"))
+            self._air_rebase_cols = sum(1 for n in self._act_names if n.startswith("REBASE_"))
+            _stc = sum(1 for n in self._act_names if n.startswith("SPY_TRAVEL_"))
+            _smc = sum(1 for n in self._act_names if n.startswith("SPY_MISSION_"))
+            assert _stc == self._spy_travel_cols and _smc == self._n_spy_missions, (
+                f"spy heads are {_stc}/{_smc} wide, the wire says "
+                f"{self._spy_travel_cols}/{self._n_spy_missions}")
             _want = 13 + len(ids) + 3 + (12 if self._snipe_on else 0) + (7 if self._A_SPREAD >= 0 else 0) \
                 + (1 if self._A_FOUND >= 0 else 0) + (1 if self._A_EXCAVATE >= 0 else 0) \
                 + (1 if self._A_PARK >= 0 else 0) \
                 + (rules.promo_cols if self._A_PROMOTE >= 0 else 0) \
                 + (6 if self._A_CONDEMN >= 0 else 0) \
-                + (1 if self._A_HERESY >= 0 else 0) + (1 if self._A_INQUISITION >= 0 else 0)                 + (1 if self._A_HEATHEN >= 0 else 0)
+                + (1 if self._A_HERESY >= 0 else 0) + (1 if self._A_INQUISITION >= 0 else 0)                 + (1 if self._A_HEATHEN >= 0 else 0) \
+                + (1 if self._A_UPGRADE >= 0 else 0) \
+                + self._air_strike_cols + self._air_rebase_cols + _stc + _smc
             assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
             self._A_CHOP = self._act["CHOP"]
             self._A_REPAIR = self._act["REPAIR"]
@@ -981,6 +1058,14 @@ class SimInit:
             self._A_CONDEMN = -1
             self._A_HERESY = -1
             self._A_INQUISITION = -1
+            self._A_HEATHEN = -1
+            self._A_UPGRADE = -1
+            self._A_AIR_STRIKE = -1
+            self._A_REBASE = -1
+            self._A_SPY_TRAVEL = -1
+            self._A_SPY_MISSION = -1
+            self._air_strike_cols = 0
+            self._air_rebase_cols = 0
             self._snipe_on = False
             self._A_IMP = [13 + i if i < 3 else 18 + i - 3 for i in range(len(ids))]
         self.FARM = ids.index("FARM") if "FARM" in ids else 0
@@ -1301,6 +1386,13 @@ class SimInit:
         self._campus_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "CAMPUS"), -1)
         self._commhub_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "COMMERCIAL_HUB"), -1)
         self._iz_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "INDUSTRIAL_ZONE"), -1)
+        self._aerodrome_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "AERODROME"), -1)
+        self._spaceport_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "SPACEPORT"), -1)
+
+        # CIV6 (Air combat): a City Center bases 1, an Aerodrome 2 before its
+        # buildings.
+        self._city_centre_air_slots = 1
+        self._aerodrome_air_slots = 2
         self._shipyard_bidx = int(rules.shipyard_bidx)
         self._walls_bidx = int(rules.ancient_walls_bidx)
         _tr = rules.trade or {}
@@ -1472,6 +1564,7 @@ class SimInit:
         self._laser_power_load = float(rules.laser_power_load)
         self._b_fuel_slot = rules.b_fuel_slot.to(device)  # [NB] long
         self._b_fuel_rate = rules.b_fuel_rate.to(device)  # [NB] long
+        self._b_air_slots = rules.b_air_slots.to(device)  # [NB] long
         # GS STRATEGIC STOCKPILES: one slot per strategic resource, the
         # resource-table id it reads a tile with, and what one improved source
         # pays per turn. `_strat_slot_of` inverts the map for a tile's `rid`.
@@ -1649,6 +1742,22 @@ class SimInit:
         self._type_res_cost = torch.tensor([int(u.get("resCost", 0)) for u in ru], dtype=torch.long, device=device)
         self._res_slot_units = [(i, int(u.get("resSlot", -1)), int(u.get("resCost", 0)))
                                 for i, u in enumerate(ru) if int(u.get("resSlot", -1)) >= 0]
+        # GS: a FUEL unit bills its resource EVERY turn it lives.
+        self._type_res_upkeep = torch.tensor([int(u.get("resUpkeep", 0)) for u in ru], dtype=torch.long, device=device)
+        self._upkeep_units = [(i, int(u.get("resSlot", -1)), int(u.get("resUpkeep", 0)))
+                              for i, u in enumerate(ru)
+                              if int(u.get("resSlot", -1)) >= 0 and int(u.get("resUpkeep", 0)) > 0]
+        # the upgrade ladder: the roster index this chassis becomes.
+        self._type_up_to = torch.tensor([int(u.get("upTo", -1)) for u in ru], dtype=torch.long, device=device)
+        self._type_anti_air = torch.tensor([int(u.get("antiAir", 0)) for u in ru], dtype=torch.long, device=device)
+        # AIR: 0 = not an aircraft, 1 = fighter, 2 = bomber; `airSlots` is what
+        # a chassis provides as a BASE (the Aircraft Carrier).
+        self._type_air = torch.tensor([int(u.get("air", 0)) for u in ru], dtype=torch.long, device=device)
+        self._type_air_slots = torch.tensor([int(u.get("airSlots", 0)) for u in ru], dtype=torch.long, device=device)
+        self._gdr_idx = next((i for i, u in enumerate(ru) if int(u.get("gdr", 0))), -1)
+        self._spy_idx = next((i for i, u in enumerate(ru) if int(u.get("spy", 0))), -1)
+        self._type_no_gold = torch.tensor([bool(u.get("noGold", 0)) for u in ru], dtype=torch.bool, device=device)
+        self._any_air = bool((self._type_air > 0).any())
         self._type_charges = torch.tensor([u.get("charges", 0) for u in ru], dtype=torch.long, device=device)
         self._type_faith_only = torch.tensor([bool(u.get("fo", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_spawn_only = torch.tensor([bool(u.get("so", 0)) for u in ru], dtype=torch.bool, device=device)

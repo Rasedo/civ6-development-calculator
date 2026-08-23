@@ -384,6 +384,51 @@ def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
             else torch.where(pm, cols, torch.full_like(cols, 1 << 20))
         pick = key.amax(dim=2) if deep else key.amin(dim=2)
         orders0 = torch.where(hasp, A_PM + pick, orders0)
+    A_AS = getattr(sim, "_A_AIR_STRIKE", -1)
+    if A_AS >= 0 and um.shape[2] >= A_AS + sim._air_strike_cols:
+        _as = um[:, :, A_AS:A_AS + sim._air_strike_cols]
+        orders0 = torch.where(present & _as.any(dim=2),
+                              A_AS + _as.float().argmax(dim=2), orders0)
+        A_RB = getattr(sim, "_A_REBASE", -1)
+        if A_RB >= 0 and um.shape[2] >= A_RB + sim._air_rebase_cols:
+            # an aircraft with nothing to hit MOVES BASE — otherwise the whole
+            # air force sits on the aerodrome it was built in and the rebase
+            # head is never reached.
+            _rb = um[:, :, A_RB:A_RB + sim._air_rebase_cols]
+            _rk = torch.arange(sim._air_rebase_cols, device=um.device)
+            _rot = (seat + sim.turn) % max(sim._air_rebase_cols, 1)
+            _key = torch.where(_rb, (_rk - _rot) % max(sim._air_rebase_cols, 1),
+                               torch.full_like(_rk, 1 << 20))
+            orders0 = torch.where(present & ~_as.any(dim=2) & _rb.any(dim=2),
+                                  A_RB + _key.amin(dim=2), orders0)
+
+    A_SM = getattr(sim, "_A_SPY_MISSION", -1)
+    A_ST = getattr(sim, "_A_SPY_TRAVEL", -1)
+    if A_SM >= 0 and um.shape[2] >= A_SM + sim._n_spy_missions:
+        _sm = um[:, :, A_SM:A_SM + sim._n_spy_missions]
+        # counter-espionage RE-ARMS itself, so a spy that takes it never moves
+        # again: prefer the jump whenever nothing else is on offer where it
+        # stands, and rotate the mission pick so the catalog is walked rather
+        # than one row of it hammered.
+        _off = _sm.clone()
+        _off[:, :, sim._spy_m_counterspy] = False
+        _go = present & ~_off.any(dim=2)
+        _took = torch.zeros_like(present)
+        if A_ST >= 0 and um.shape[2] >= A_ST + sim._spy_travel_cols:
+            _st = um[:, :, A_ST:A_ST + sim._spy_travel_cols]
+            _tk = torch.arange(sim._spy_travel_cols, device=um.device)
+            _trot = (seat + sim.turn) % max(sim._spy_travel_cols, 1)
+            _tkey = torch.where(_st, (_tk - _trot) % max(sim._spy_travel_cols, 1),
+                                torch.full_like(_tk, 1 << 20))
+            _took = _go & _st.any(dim=2)
+            orders0 = torch.where(_took, A_ST + _tkey.amin(dim=2), orders0)
+        _mk = torch.arange(sim._n_spy_missions, device=um.device)
+        _mrot = (seat + sim.turn) % max(sim._n_spy_missions, 1)
+        _mkey = torch.where(_sm, (_mk - _mrot) % max(sim._n_spy_missions, 1),
+                            torch.full_like(_mk, 1 << 20))
+        orders0 = torch.where(present & ~_took & _sm.any(dim=2),
+                              A_SM + _mkey.amin(dim=2), orders0)
+
     if bool(on_job.any()):
         # BY NAME, never by column number: the BUILD_* verbs are a RUN in the
         # middle of the action table, so an inserted verb walks a hardcoded

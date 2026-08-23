@@ -12,6 +12,7 @@ import { CULTURE_BOMB_RANGE, DED_FREE_INQUIRY, DED_MONUMENTALITY, ERA_SCORE_WOND
 import { ERAS, TECHS } from '../data/techs';
 import { addEraScore, buildingDedications, dedicationEvent } from './eras';
 import { spawnUnit } from './units';
+import { airTrainTile } from './air';
 import { wallsMax, urbanDefensesFit } from './rules';
 import { trainXpPct } from './combat';
 import { promoClassOf } from './promotions';
@@ -161,7 +162,12 @@ export function completeQueueItem(
       city.population = Math.max(1, city.population - 1);
       break;
     case 'unit': {
-      const trained = spawnUnit(state, item.unit, city.centerIndex, city.seat);
+      // CIV6: "Newly built aircraft will spawn in the Aerodrome, as long as it
+      // still has empty slots."
+      const where = UNITS[item.unit]?.air
+        ? airTrainTile(state, city.seat, city) ?? city.centerIndex
+        : city.centerIndex;
+      const trained = spawnUnit(state, item.unit, where, city.seat);
       if (trained) trained.xpPct = trainXpPct(city.buildings, promoClassOf(item.unit));
       if (item.unit === 'BUILDER') owner.buildersTrained += 1;
       // CIV6 (Venetian Arsenal): a TRAINED naval unit arrives twice. Purchases

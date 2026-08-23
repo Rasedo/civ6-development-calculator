@@ -471,11 +471,16 @@ export const ADMIRAL_MARCH_LIVE = true;
  *
  *   8 WISH_YOU_WERE_HERE   +1 era score per ARTIFACT extracted
  *
+ *   9 SKY_AND_STARS      +1 era score per AERODROME BUILDING constructed, and
+ *                        +1 each time a Great Person is earned
+ *  10 BODYGUARD_OF_LIES   +1 era score per successful offensive spy operation
+ *  11 AUTOMATON_WARFARE   +1 era score per non-barbarian unit killed with a
+ *                        Giant Death Robot
+ *
  * Residual, recorded: To Arms!'s special Casus Belli needs a denouncement
- * system; Sky and Stars, Bodyguard of Lies and Automaton Warfare need air
- * units, spies and Giant Death Robots, BOTH faces.
+ * system.
  */
-export const DEDICATIONS = ['MONUMENTALITY', 'FREE_INQUIRY', 'PEN_BRUSH_AND_VOICE', 'EXODUS_OF_THE_EVANGELISTS', 'TO_ARMS', 'HIC_SUNT_DRACONES', 'REFORM_THE_COINAGE', 'HEARTBEAT_OF_STEAM', 'WISH_YOU_WERE_HERE'] as const;
+export const DEDICATIONS = ['MONUMENTALITY', 'FREE_INQUIRY', 'PEN_BRUSH_AND_VOICE', 'EXODUS_OF_THE_EVANGELISTS', 'TO_ARMS', 'HIC_SUNT_DRACONES', 'REFORM_THE_COINAGE', 'HEARTBEAT_OF_STEAM', 'WISH_YOU_WERE_HERE', 'SKY_AND_STARS', 'BODYGUARD_OF_LIES', 'AUTOMATON_WARFARE'] as const;
 export const DED_MONUMENTALITY = 0;
 export const DED_FREE_INQUIRY = 1;
 export const DED_PEN_BRUSH_AND_VOICE = 2;
@@ -485,7 +490,10 @@ export const DED_DRACONES = 5;
 export const DED_COINAGE = 6;
 export const DED_STEAM = 7;
 export const DED_WISH = 8;
-export const DED_EVENT_SCORE = [1, 1, 1, 2, 1, 1, 1, 2, 1] as const;
+export const DED_SKY = 9;
+export const DED_BODYGUARD = 10;
+export const DED_AUTOMATON = 11;
+export const DED_EVENT_SCORE = [1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1] as const;
 /**
  * WHICH DEDICATIONS A WORLD ERA OFFERS, indexed by `ERAS`. Real Civ 6 draws
  * each era's choice from a window — "the particular set of Dedications
@@ -493,9 +501,8 @@ export const DED_EVENT_SCORE = [1, 1, 1, 2, 1, 1, 1, 2, 1] as const;
  * "always four different Dedications to choose from". Ancient offers none: a
  * civ has earned no era score yet when the game opens.
  *
- * Every window below holds exactly the four the source lists, except Atomic and
- * later, where three of the four (Sky and Stars, Bodyguard of Lies, Automaton
- * Warfare) need systems this model has not got and are simply absent.
+ * Every window below is exactly the column the source's table ticks for that
+ * era. Information ticks five rather than four; the table is the source.
  */
 export const DEDICATION_ERAS: readonly (readonly number[])[] = [
   [],                                                                  // Ancient
@@ -504,9 +511,9 @@ export const DEDICATION_ERAS: readonly (readonly number[])[] = [
   [DED_MONUMENTALITY, DED_EXODUS, DED_DRACONES, DED_COINAGE],          // Renaissance
   [DED_DRACONES, DED_COINAGE, DED_STEAM, DED_TO_ARMS],                 // Industrial
   [DED_DRACONES, DED_COINAGE, DED_STEAM, DED_TO_ARMS],                 // Modern
-  [DED_TO_ARMS, DED_WISH],                                             // Atomic
-  [DED_TO_ARMS, DED_WISH],                                             // Information
-  [DED_WISH],                                                          // Future
+  [DED_TO_ARMS, DED_WISH, DED_SKY, DED_BODYGUARD],                     // Atomic
+  [DED_TO_ARMS, DED_WISH, DED_SKY, DED_BODYGUARD, DED_AUTOMATON],      // Information
+  [DED_WISH, DED_SKY, DED_BODYGUARD, DED_AUTOMATON],                   // Future
 ];
 /** CIV6 (Wish You Were Here, Golden face): "+100% Tourism to all National
  *  Parks." */
@@ -531,6 +538,25 @@ export const COINAGE_INTL_GOLD_PER_SPEC = 3;
 /** CIV6 (Heartbeat of Steam, Golden face): "+10% Production toward Industrial
  *  era and later wonders." */
 export const STEAM_WONDER_PROD_MULT = 1.1;
+/**
+ * CIV6 (Sky and Stars, Golden face): "Unlocks the Eurekas for Advanced Flight,
+ * Nuclear Fission, and Rocketry if in the Atomic Era. If in the Information
+ * Era the Eurekas for Satellites, Robotics, Nuclear Fusion, and Nanotechnology
+ * are unlocked." Keyed by the WORLD ERA the face is committed in; an era the
+ * table does not name unlocks nothing.
+ */
+export const SKY_EUREKAS: Readonly<Record<number, readonly string[]>> = {
+  6: ['ADVANCED_FLIGHT', 'NUCLEAR_FISSION', 'ROCKETRY'],
+  7: ['SATELLITES', 'ROBOTICS', 'NUCLEAR_FUSION', 'NANOTECHNOLOGY'],
+};
+/** CIV6 (Sky and Stars, Golden face, GS): "Aluminum mines accumulate +2 more
+ *  resources per turn." */
+export const SKY_ALUMINUM_PER_TURN = 2;
+/** CIV6 (Automaton Warfare, Golden face): "Receive 3 Uranium per turn." */
+export const AUTOMATON_URANIUM_PER_TURN = 3;
+/** CIV6 (Automaton Warfare, Golden face): "Uranium mines accumulate +1 more
+ *  resource per turn." */
+export const AUTOMATON_URANIUM_PER_MINE = 1;
 
 export const DEDICATION_PAYOUTS_LIVE = true;
 

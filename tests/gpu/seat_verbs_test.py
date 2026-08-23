@@ -307,7 +307,61 @@ def main() -> None:
         assert int(sim8.major_unit_tile[0, sl8]) == nb8, "a naval hull must refuse a land step at the apply"
     print(f"  8 replayed naval move sails OK ({wt8} -> {nb8}), land step refused")
 
-    print("CIV VERBS OK")
+    # --- 9) THE LADDER: the upgrade verb, its four gates and its charges ----
+    sim9 = fresh(rules, path, turns=20)
+    up_src = next((i for i in range(sim9.NU)
+                   if int(sim9._type_up_to[i]) >= 0
+                   and int(sim9._type_res_slot[int(sim9._type_up_to[i])]) < 0
+                   and float(sim9._type_combat[i]) > 0), None)
+    assert up_src is not None, "the roster must carry an upgradeable, resource-free rung"
+    up_dst = int(sim9._type_up_to[up_src])
+    sl9, wt9 = a_civ_soldier(sim9, row)
+    assert sl9 is not None
+    sim9.major_unit_type[0, sl9] = up_src
+    sim9.major_unit_mp[0, sl9] = 2.0
+    # stand it on its OWN ground, and unlock the successor
+    own = next(t for t in range(sim9.T) if int(sim9.tile_seat[0, t]) == row)
+    sim9.major_unit_tile[0, sl9] = own
+    rt9 = int(sim9._type_tech[up_dst])
+    if rt9 >= 0:
+        sim9.civ_techs[0, row, rt9] = True
+    rc9 = int(sim9._type_civic[up_dst])
+    if rc9 >= 0:
+        sim9.civ_civics[0, row, rc9] = True
+    price9 = max(0.0, float(sim9._type_cost[up_dst] - sim9._type_cost[up_src])) \
+        * sim9.rules.gold_purchase_mult
+
+    def offered(s) -> bool:
+        smap = s._seat_slot_map(row)[0]
+        rank = int((smap == sl9).nonzero(as_tuple=True)[0][0])
+        return bool(s._seat_unit_mask(row)[0, rank, s._A_UPGRADE])
+
+    sim9.civ_treasury[0, row] = price9 - 1.0
+    assert not offered(sim9), "the mask must refuse an upgrade the treasury cannot pay"
+    sim9.civ_treasury[0, row] = price9 + 50.0
+    assert offered(sim9), "gold in hand, on own ground, with the successor unlocked"
+    foreign = next((t for t in range(sim9.T)
+                    if int(sim9.tile_seat[0, t]) >= 0 and int(sim9.tile_seat[0, t]) != row), None)
+    if foreign is not None:
+        sim9.major_unit_tile[0, sl9] = foreign
+        assert not offered(sim9), "CIV6: a unit upgrades in FRIENDLY territory only"
+        sim9.major_unit_tile[0, sl9] = own
+    sim9.major_unit_mp[0, sl9] = 0.0
+    assert not offered(sim9), "CIV6: it needs more than 0 Movement left"
+    sim9.major_unit_mp[0, sl9] = 2.0
+    # and the verb itself
+    gold0 = float(sim9.civ_treasury[0, row])
+    sim9.major_unit_hp[0, sl9] = 40
+    sim9.major_unit_promos[0, sl9] = 5
+    order(sim9, row, sl9, sim9._A_UPGRADE)
+    assert int(sim9.major_unit_type[0, sl9]) == up_dst, "the chassis must change"
+    assert abs(float(sim9.civ_treasury[0, row]) - (gold0 - price9)) < 1e-6, "and pay for it"
+    assert int(sim9.major_unit_hp[0, sl9]) == 40, "CIV6: units do not Heal upon upgrading"
+    assert int(sim9.major_unit_promos[0, sl9]) == 5, "CIV6: promotions ride along"
+    assert float(sim9.major_unit_mp[0, sl9]) == 0.0, "and the turn is spent"
+    print(f"  9 UPGRADE OK ({up_src} -> {up_dst}, {price9:.0f} gold, promotions kept, no heal)")
+
+    print("CIV VERBS OK — including the upgrade ladder")
 
 
 if __name__ == "__main__":
