@@ -23,7 +23,7 @@ import { SPECIALIST_YIELDS, SPECIALIST_TIERS, greatWorkCulture, greatWorkTourism
 import { congressGrowthMult, congressGwMult } from './congress';
 import { suzerainEffect } from './cityStates';
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE } from '../data/cityStates';
-import { warWearinessPenalty, DED_FREE_INQUIRY, LOYALTY_MAX } from '../data/seats';
+import { warWearinessPenalty, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, LOYALTY_MAX } from '../data/seats';
 import { RESOURCES } from '../../world/resources';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, REGIONAL_RANGE, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, type AmenityTier } from '../data/constants';
 import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf, tileClaimed, campTiles } from './seats';
@@ -589,9 +589,7 @@ export function seatTourism(
   const km = congressGwMult(state);
   const cities = citiesOf(state, seat);
   for (const c of cities) {
-    // CIV6 (St. Basil's): the religious-tourism multiplier is the HOLDING
-    // city's, so it lands inside the per-city sum.
-    t += greatWorkTourism(c, printing, km) + relicTourism(c) * wonderMult(state, [c], 'religiousTourismMult') + artifactTourism(c);
+    t += greatWorkTourism(c, printing, km) + artifactTourism(c);
   }
   const owns = (tile: Tile) => tileOwnedByCiv(tile, seat);
   const era = civEraIndex(s.research.techs, s.research.civics);
@@ -605,6 +603,26 @@ export function seatTourism(
     + resortTourism(state, owns) * wonderMult(state, cities, 'resortTourismMult')
     + parkTourism(state, owns) * parkMult
     + wonderTourism(state, era, owns, golden ? govCityIds ?? null : null);
+}
+
+/** CIV6 (Tourism): the RELIGIOUS half of a seat's per-turn tourism — "Relics
+ *  generate Religious Tourism" and "Holy Cities generate +8 Religious Tourism
+ *  per turn" — banked apart (`Seat.tourismReligious`) because a rival's
+ *  Enlightenment or a different religion halves THIS half at the read
+ *  (`cultureVictor`), never the general half. St. Basil's multiplier is the
+ *  HOLDING city's, and a religion's Holy City pays its CURRENT owner. */
+export function seatTourismReligious(state: GameState, seat: number): number {
+  const cities = citiesOf(state, seat);
+  let t = 0;
+  for (const c of cities) {
+    t += relicTourism(c) * wonderMult(state, [c], 'religiousTourismMult');
+  }
+  for (const g of state.seats) {
+    const ht = g.religion.holyTile;
+    if (!g.religion.founded || ht == null || ht < 0) continue;
+    if (cities.some((c) => c.centerIndex === ht)) t += HOLY_CITY_TOURISM;
+  }
+  return t;
 }
 
 export function computeCityStats(

@@ -936,6 +936,7 @@ class SimInit:
             self._wond_dupnaval = torch.tensor([bool(w["dupNaval"]) for w in self._wond_rows], dtype=torch.bool, device=device)
             self._wond_relictour = torch.tensor([float(w["relicTourismMult"]) for w in self._wond_rows], dtype=torch.float64, device=device)
             self._wond_resorttour = torch.tensor([float(w["resortTourismMult"]) for w in self._wond_rows], dtype=torch.float64, device=device)
+            self._wond_holy_shield = torch.tensor([bool(w.get("holyShield", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)
             self._wond_loyalty = torch.tensor([int(w["loyaltyAura"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_occdef = torch.tensor([int(w["occupyDefense"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_freeciv = torch.tensor([int(w["freeCivics"]) for w in self._wond_rows], dtype=torch.long, device=device)
@@ -1068,6 +1069,8 @@ class SimInit:
         self._gw_printing_mult = int(rr.get("gwPrintingWritingMult", 2))
         self._wonder_tour_base = int(rr.get("wonderTourismBase", 2))
         self._tourism_per_visitor = int(rr.get("tourismPerVisitorPerCiv", 200))
+        self._holy_city_tour = int(rr.get("holyCityTourism", 8))
+        self._enl_cidx = int(rr.get("enlightenmentCidx", -3))
         self._culture_per_tourist = int(rr.get("culturePerDomesticTourist", 100))
         self._tech_era = torch.tensor(rr.get("techEra", []) or [0], dtype=torch.long, device=device)
         self._civic_era = torch.tensor(rr.get("civicEra", []) or [0], dtype=torch.long, device=device)
@@ -2221,6 +2224,7 @@ class SimInit:
         ("culture", None, None),
         ("faith", None, None),
         ("tourism", torch.long, None),
+        ("tourism_rel", torch.long, None),
         ("gpp", None, "_gp_nc"),
     )
 

@@ -466,6 +466,12 @@ export const EMERGENCY_CS_ROUTE_GOLD = 2;
 
 export const TOURISM_PER_VISITOR_PER_CIV = 200;
 export const CULTURE_PER_DOMESTIC_TOURIST = 100;
+/** CIV6 (Tourism): "Holy Cities generate +8 Religious Tourism per turn" —
+ *  paid to the holy city's CURRENT owner. */
+export const HOLY_CITY_TOURISM = 8;
+/** CIV6 (Tourism): "-50% (Religious Tourism only) if the foreign
+ *  civilization has The Enlightenment" — the read-side halving's key. */
+export const ENLIGHTENMENT_CIVIC = 'ENLIGHTENMENT';
 
 /** dedications granted on a HEROIC age (Dark -> Golden). Real
  * Civ 6 grants three; every other transition grants one. */

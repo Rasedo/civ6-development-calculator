@@ -156,20 +156,21 @@ def main() -> None:
     assert "civ_relic_reserve" in _MUTABLE, "civ_relic_reserve must be registered in _MUTABLE"
     print("  relic reserve OK — held when shut, drained lowest city first, active-gated")
 
-    # --- 4) the tourism term actually counts relics ------------------------
+    # --- 4) the RELIGIOUS tourism term actually counts relics ---------------
+    # relics live in the religious bank (`_tourism_religious_of`), the half a
+    # rival's Enlightenment can halve at the culture-victory read.
     s2 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
-    era = s2._civ_era(s2.civ_techs[:, 0], s2.civ_civics[:, 0])
-    base = s2._tourism_of(s2.city_gw_writing[:, 0], s2.city_gw_art[:, 0], s2.city_gw_music[:, 0], s2.city_alive[:, 0], s2.tile_seat == 0, era)
+    base = s2._tourism_religious_of(0)
     s2.city_alive[:, 0, 0] = True
     s2.city_relics[:, 0].zero_()
     s2.city_relics[:, 0, 0] = 2
-    with_relics = s2._tourism_of(s2.city_gw_writing[:, 0], s2.city_gw_art[:, 0], s2.city_gw_music[:, 0], s2.city_alive[:, 0], s2.tile_seat == 0, era, s2.city_relics[:, 0])
+    with_relics = s2._tourism_religious_of(0)
     assert int(with_relics[0] - base[0]) == 2 * s2._relic_tour, (
         f"two relics must add {2 * s2._relic_tour} tourism, got {int(with_relics[0] - base[0])}"
     )
     # ... and a DEAD city's relics pay nothing
     s2.city_alive[:, 0, 0] = False
-    dead = s2._tourism_of(s2.city_gw_writing[:, 0], s2.city_gw_art[:, 0], s2.city_gw_music[:, 0], s2.city_alive[:, 0], s2.tile_seat == 0, era, s2.city_relics[:, 0])
+    dead = s2._tourism_religious_of(0)
     assert int(dead[0] - base[0]) == 0, "a lost city must stop paying relic tourism"
 
     # --- 5) the works SURVIVE a transfer and a slot compaction --------------

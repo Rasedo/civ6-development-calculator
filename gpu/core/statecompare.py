@@ -414,6 +414,7 @@ SEAT = {
     "cultureTotal": _civ_scalar("civ_culture"),
     "faith": _civ_scalar("civ_faith"),
     "tourism": _civ_scalar("civ_tourism"),
+    "tourismReligious": _civ_scalar("civ_tourism_rel"),
     "grievances": _grievance_line,
     "diplomaticFavor": _civ_scalar("civ_diplo_favor"),
     "diplomaticPoints": _civ_scalar("civ_diplo_points"),

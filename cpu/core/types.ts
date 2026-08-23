@@ -398,6 +398,10 @@ export interface Seat {
   cultureTotal: number;
   faith: number;
   tourism: number;
+  /** the RELIGIOUS half (relics + holy cities), banked apart because a
+   *  rival's Enlightenment or a different religion halves it at the read
+   *  (`cultureVictor`) — the general bank above is never diminished. */
+  tourismReligious?: number;
 
   research: ResearchState;
   government: GovernmentState;

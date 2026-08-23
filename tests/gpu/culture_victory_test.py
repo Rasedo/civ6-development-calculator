@@ -7,11 +7,10 @@ DOMESTIC tourists, which it holds from its lifetime CULTURE (divided by 100). A
 civ wins the moment its visiting tourists exceed EVERY other civ's domestic
 tourists.
 
-The gate cannot reach a culture win: this model's tourism still lacks relics,
-artifacts, National Parks and Great Works of Art, so the two populations stay
-orders apart and scripted parity proves only the ACCUMULATOR (rCulture is a
-compared trace column). This lane is the bar for the CHECK, and it pins the same
-semantics the TS poke does:
+The gate cannot reach a culture win: every tourism source ships, but a
+driven game never closes the visiting-vs-domestic gap, so scripted parity
+proves only the ACCUMULATOR (rCulture is a compared trace column). This lane
+is the bar for the CHECK, and it pins the same semantics the TS poke does:
 
   * a culture win is victory_type 5 whoever takes it (+ game_over), and
     victory_row names the winning seat — no code says "seat 0 lost";
@@ -123,7 +122,55 @@ def main() -> None:
     s.restore(snap)
     assert float(s.civ_culture[0, 1]) == 1234.5, "civ_culture must survive snapshot/restore"
 
-    print("culture victory OK — kind 5 + a named victor + _MUTABLE round-trip")
+    # --- 9) THE RELIGIOUS HALF: banked apart, halved per rival ------------
+    # CIV6 (Tourism): "-50% (Religious Tourism only) if the foreign
+    # civilization has The Enlightenment" (Cristo Redentor's shield cancels
+    # it) and "-50% (Religious Tourism only) for Different Religions" (only
+    # once this seat FOUNDED one, against the rival's majority religion).
+    assert "civ_tourism_rel" in _MUTABLE, "the religious bank must ride snapshot/restore"
+    s9 = _sim(1)
+    assert s9._holy_city_tour == 8, s9._holy_city_tour
+    assert s9._enl_cidx >= 0, "the Enlightenment civic must export its index"
+    col = int(s9.city_alive[0, 0].nonzero()[0])
+    s9.city_relics[0, 0, col] = 2
+    s9.holy_tile[0, 0] = int(s9.city_center[0, 0, col])
+    got = int(s9._tourism_religious_of(0)[0])
+    assert got == 2 * s9._relic_tour + s9._holy_city_tour, got
+    # a religion's Holy City pays its CURRENT owner
+    col1 = int(s9.city_alive[0, 1].nonzero()[0])
+    s9.holy_tile[0, 0] = int(s9.city_center[0, 1, col1])
+    assert int(s9._tourism_religious_of(0)[0]) == 2 * s9._relic_tour
+    assert int(s9._tourism_religious_of(1)[0]) == s9._holy_city_tour
+
+    def victor_rel(enl_o: bool, shield_c: bool, dom_diff: bool, civ_cul: int = 6) -> int:
+        s = _sim(1)
+        s.civ_tourism[:, 0] = tourism_for(2)
+        s.civ_tourism_rel[:, 0] = tourism_for(6)
+        s.civ_culture[:, 0] = culture_for(1)
+        for row in range(1, s.n_majors):
+            s.civ_culture[:, row] = culture_for(civ_cul if row == 1 else 1)
+        if enl_o:
+            s.civ_civics[0, 1, s._enl_cidx] = True
+        if shield_c:
+            wi = int(s._wond_holy_shield.nonzero()[0])
+            cc = int(s.city_alive[0, 0].nonzero()[0])
+            ct = int(s.city_center[0, 0, cc])
+            s.city_wonder[0, 0, cc, wi] = ct
+            s.built_wonder_complete[0, ct] = True
+        if dom_diff:
+            s.civ_religion_done[0, 0] = True
+            s.city_followed[0, 1, : s.RC] = 1
+        return int(s._culture_victor()[0])
+
+    assert victor_rel(False, False, False) == 0, "2 + 6 = 8 > 6 must win"
+    assert victor_rel(True, False, False) == -1, "Enlightenment: 2 + 3 = 5 <= 6 must not"
+    assert victor_rel(True, False, False, civ_cul=4) == 0, "the GENERAL half is untouched: 5 > 4"
+    assert victor_rel(True, True, False) == 0, "Cristo Redentor keeps all 8"
+    assert victor_rel(False, False, True) == -1, "a different majority religion halves it too"
+    assert victor_rel(False, True, True) == -1, "the shield answers ENLIGHTENMENT only"
+
+    print("culture victory OK — kind 5 + a named victor + the religious half's "
+          "per-rival halvings + _MUTABLE round-trip")
 
 
 if __name__ == "__main__":

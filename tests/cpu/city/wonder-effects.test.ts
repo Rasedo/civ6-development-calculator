@@ -5,7 +5,7 @@ import { foundCity } from '../../../cpu/core/game';
 import { seatOf, setTileOwner } from '../../../cpu/core/seats';
 import { ERAS, TECHS } from '../../../cpu/data/techs';
 import { completeQueueItem } from '../../../cpu/core/production';
-import { computeCityStats, computeHousing, seatTourism } from '../../../cpu/core/city';
+import { computeCityStats, computeHousing, seatTourism, seatTourismReligious } from '../../../cpu/core/city';
 import { greatPersonPointsPerTurn } from '../../../cpu/core/greatPeople';
 import { wonderExtraSlots } from '../../../cpu/core/effects';
 import { terrainDefense } from '../../../cpu/core/combat';
@@ -173,18 +173,17 @@ describe('wonder effects, sourced', () => {
   });
 
   it('St. Basil’s doubles the relic tourism of its own city, Cristo the resorts', () => {
-    // A standing wonder pays its own tourism too, so the control stands a
-    // wonder with NO multiplier and the difference is the relics'.
-    const ctrl = oneCity();
-    ctrl.city.relics = 2;
-    stand(ctrl.state, ctrl.city, 'TAJ_MAHAL', 9, 8);
-    const plain = seatTourism(ctrl.state, 0);
-
+    // relics live in the RELIGIOUS bank, so the multiplier shows there and
+    // the GENERAL body never moves with them.
     const { state, city } = oneCity();
     city.relics = 2;
+    const plainGeneral = seatTourism(state, 0);
+    const plain = seatTourismReligious(state, 0);
     stand(state, city, 'ST_BASILS_CATHEDRAL', 9, 8);
-    expect(seatTourism(state, 0) - plain).toBe(2 * 8); // the relic term, paid twice over
+    expect(seatTourismReligious(state, 0) - plain).toBe(2 * 8); // the relic term, paid twice over
+    expect(seatTourism(state, 0) - plainGeneral).toBeGreaterThan(0); // the wonder's own era tourism only
     expect(BUILT_WONDERS.CRISTO_REDENTOR.effects?.resortTourismMult).toBe(2);
+    expect(BUILT_WONDERS.CRISTO_REDENTOR.effects?.holyTourismShield).toBe(true);
   });
 
   it('the Statue of Liberty keeps a city in range at full loyalty', () => {

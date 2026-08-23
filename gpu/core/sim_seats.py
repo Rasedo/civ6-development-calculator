@@ -2336,6 +2336,21 @@ class SimSeats:
             winner = torch.where((winner < 0) & ok, torch.full_like(winner, g), winner)
         return winner
 
+    def _dominant_religion(self) -> torch.Tensor:
+        """[B, n_majors] — the religion MORE THAN HALF of each seat's cities
+        follow (religion ids are founder seat ids), -1 none — the
+        `dominantReligion` twin, `_religious_victor`'s count read per seat.
+        At most one id can pass the bar, so the ascending scan is exact."""
+        nrow = self.n_majors
+        alive = self.city_alive[:, :nrow]
+        fol = self.city_followed[:, :nrow, : self.RC]
+        n = alive.sum(dim=2)
+        out = torch.full((self.B, nrow), -1, dtype=torch.long, device=self.device)
+        for g in range(nrow):
+            nf = (alive & (fol == g)).sum(dim=2)
+            out = torch.where((out < 0) & (2 * nf > n), torch.full_like(out, g), out)
+        return out
+
     def _suzerain_mask(self, row: int) -> torch.Tensor:
         """[B, S] city-states seat row `row` is Suzerain of — the `isSuzerain`
         twin: >= suzerainEnvoys, alive, and STRICTLY more envoys than every
@@ -3529,8 +3544,15 @@ class SimSeats:
         """The `cultureVictor` mirror: [B] the lowest seat id whose VISITING
         tourists exceed EVERY other seat's DOMESTIC tourists; -1 none.
 
-        visiting = lifetime tourism // (nCivs * TOURISM_PER_VISITOR_PER_CIV)
-        domestic = lifetime culture // CULTURE_PER_DOMESTIC_TOURIST
+        visiting(c vs o) = (general + religious // 2**pen)
+                           // (nCivs * TOURISM_PER_VISITOR_PER_CIV), where
+        pen counts the two CIV6 religious-tourism halvings against rival o:
+        "-50% (Religious Tourism only) if the foreign civilization has The
+        Enlightenment" (cancelled by Cristo Redentor's shield) and "-50%
+        (Religious Tourism only) for Different Religions" (only once this
+        seat FOUNDED one, against o's majority religion). The general bank
+        is never diminished.
+        domestic = lifetime culture // CULTURE_PER_DOMESTIC_TOURIST.
 
         Both floor to whole tourists, so the comparison is integer-exact and
         zero-draw. Culture is milli-rounded BEFORE the floor (the bankruptcy
@@ -3542,8 +3564,14 @@ class SimSeats:
         nrow = self.n_majors
         alive = [self.city_alive[:, row].any(dim=1) for row in range(nrow)]
         tour = [self.civ_tourism[:, row] for row in range(nrow)]
+        rel = [self.civ_tourism_rel[:, row] for row in range(nrow)]
         cul = [self.civ_culture[:, row] for row in range(nrow)]
-        visiting = [torch.div(t.long(), vis_div, rounding_mode="floor") for t in tour]
+        enl = [self._seat_civics(row)[:, self._enl_cidx] if self._enl_cidx >= 0
+               else torch.zeros(B, dtype=torch.bool, device=dev) for row in range(nrow)]
+        shield = [self._seat_wonder_any(row, self._wond_holy_shield) if self._wond_n
+                  else torch.zeros(B, dtype=torch.bool, device=dev) for row in range(nrow)]
+        founded = [self.civ_religion_done[:, row] for row in range(nrow)]
+        dom = self._dominant_religion()  # [B, nrow]
         domestic = [
             torch.div(js_round(c * 1000).long(), 1000 * self._culture_per_tourist, rounding_mode="floor")
             for c in cul
@@ -3554,7 +3582,11 @@ class SimSeats:
             for o in range(n_civs):
                 if o == c:
                     continue
-                ok = ok & (visiting[c] > domestic[o])
+                pen = ((enl[o] & ~shield[c]).long()
+                       + (founded[c] & (dom[:, o] >= 0) & (dom[:, o] != c)).long())
+                vis = torch.div(tour[c].long() + torch.div(rel[c].long(), 2 ** pen, rounding_mode="floor"),
+                                vis_div, rounding_mode="floor")
+                ok = ok & (vis > domestic[o])
             winner = torch.where((winner < 0) & ok, torch.full_like(winner, c), winner)
         return winner
 

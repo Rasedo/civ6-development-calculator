@@ -806,11 +806,8 @@ function sackCity(state: GameState, city: City | City, seat: number): void {
  *
  * The enhancer adders apply to city assaults too — Crusade/Just
  * War raise the UNIT's combat strength by where it STANDS, not by what it
- * hits. Scoped to CIV SEAT attackers only, because the GPU never sets the
- * SEAT 0's holy city (holy_tile[:, 0] is written nowhere), so a seat 0
- * religion exists in TS and not on the GPU. That asymmetry is PRE-EXISTING
- * (the unit-vs-unit sites carry it too, dormant). Drop this guard the moment
- * the GPU grows a holy city for that seat.
+ * hits. Scoped to MAJOR attackers: a barbarian or city-state carries no
+ * religion, so the adder has nothing to read for them.
  */
 function assaultAtkCS(state: GameState, attacker: Unit, targetIndex: number): number {
   const amph = promoFlag(attacker, 'AMPHIBIOUS');

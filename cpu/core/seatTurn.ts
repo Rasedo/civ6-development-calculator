@@ -4,7 +4,7 @@ import { seatOf, civsAtWar, seatsAllied } from './seats';
 import { decayGrievances, grievanceFavorPenalty, grievanceHeldCapitals } from './grievance';
 import { chargeProjectResource, chargeUnitResource } from './stockpile';
 import { isSuzerain } from './cityStates';
-import { seatTourism, seatBuildingSum } from './city';
+import { seatTourism, seatTourismReligious, seatBuildingSum } from './city';
 import { computeAdoption } from './effects';
 import { selectResearch } from './economy';
 import { GOVERNMENTS, GOVERNMENTS_ADOPTION_LIVE, POLICY_LIST } from '../data/policies';
@@ -88,6 +88,7 @@ export function seatAccumulators(state: GameState, seat: number, govCityIds?: Re
   if (!s) return;
   s.treasury = (s.treasury ?? 0) + emergencyEnvoyIncome(state, seat);
   s.tourism = (s.tourism ?? 0) + seatTourism(state, seat, govCityIds);
+  s.tourismReligious = (s.tourismReligious ?? 0) + seatTourismReligious(state, seat);
   s.diplomaticFavor = Math.max(0, (s.diplomaticFavor ?? 0)
     + diplomaticFavorPerTurn(seatGovernmentId(state, seat), suzerainCount(state, seat),
                              policyTreatyFavor(state, seat), occupiedCapitals(state, seat),

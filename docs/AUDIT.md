@@ -64,7 +64,7 @@ nothing carries forward.
 | B-53r the great-person queue | 1 | 205 sourced people, the era gate, the scaled price and each person's own ability ship; the offer is re-derived each turn rather than frozen, and faith never patronizes one |
 | B-D unsourced data values | 2 | the Monument, the Lighthouse and the Engineer's Armory shipped and one bullet was false; the governments are half-shipped, and the rest are shape differences or model tuning that no source can close |
 | B-36r appeal adjacency terms | 1 | every district AND improvement term ships off one catalog column, and a Great Person can now grant a city's tiles appeal; the CIVILIZATION-unique improvements' terms (C-26) do not |
-| B-39r wonder effects still dropped | 1 | the sourced sweep shipped fourteen channels and the Mausoleum's engineer charge; three residuals, each blocked on B-20r, B-34r or C-23 |
+| B-39r wonder effects still dropped | 1 | the sourced sweep shipped fourteen channels, the Mausoleum's engineer charge and Cristo Redentor's shield; two residuals, blocked on B-20r or B-34r |
 | B-45r sourced-sweep finds in the other rows | 1 | three of the eight now have a channel; the five that do not need a wonder that grants a UNIT, faith patronage (B-53r), a rival-recruit event, or B-31r's route yields |
 | B-54r flanking and support vs their own page | 1 | every rule on the page ships, and so do the four higher stacks a promotion or a Great Person raises; the two that a UNIQUE UNIT raises wait on C-26 |
 | B-64r embarking and disembarking cost the whole turn | 1 | Civ 6 charges the transition 3 MP and carries the remainder into the new movement mode; both engines spend everything and end the move |
@@ -88,11 +88,10 @@ nothing carries forward.
 | C-16 the spy's second half | 2 | the Spy, its capacity, the jump and all twelve missions ship; the escape-and-capture sequence, the spy promotion pool and two missions with no carrier do not |
 | C-20 the Military Engineer's build list | 1 | the Fort, the Airstrip, the road and the 20% charge all ship; the Missile Silo waits on C-31, the Mountain Tunnel on C-35 and the railroad on C-36 |
 | C-22 the district roster is a subset | 2 | all eighteen districts ship; the Canal carries no naval passage, six Government Plaza buildings have no effect body, and the Preserve's housing table is unpublished |
-| C-23 nothing diminishes tourism | 1 | no rival's Enlightenment ever costs a tourist, so Cristo Redentor's cancelling clause has nothing to cancel |
 | C-24 the climate arc | 1 | emissions, the seven phases, ice melt, flooding, the Flood Barrier and a warmed world's weather all ship; nothing is ever submerged (C-35), the barrier's maintenance is unpublished, and railroads and the Mitigation civic's award have no carrier |
 | C-26 no civilization uniques | 5 | seats are a name, a colour and a city list: no civ ability, no leader ability or agenda, no unique unit, no unique infrastructure (America's Film Studio among them) |
 | C-27 pillaging pays no yields | 2 | the verb marks the tile and heals; nothing banks, and the raider chassis that ship now carry no Coastal Raid to bank from |
-| C-28 tourism is one lifetime scalar | 2 | it is banked per seat and divided by the civ count on read, so no rule can address one rival's tourism |
+| C-28 tourism accrues to no one in particular | 2 | two lifetime banks (general + religious) divide by the civ count on read — the religious halvings apply per rival, but nothing can ACCRUE tourism toward one rival, which the international +25%s and the Rock Band key on |
 | C-29 no RESOLVED suzerain | 1 | `isSuzerain` recomputes from the raw envoy store on every read, so a rule that changes envoy WEIGHT by who the suzerain is has no fixed point |
 | C-30 city-states carry no research | 1 | no techs, no civics, so nothing can say when a minor took Early Empire — its borders never close and the suzerain's passage lifts nothing |
 | C-31 the two chassis with a system behind them | 1 | the ladder runs to the Information era now; the nuclear devices and the Rock Band are each a whole absent system rather than a roster row |
@@ -101,8 +100,8 @@ nothing carries forward.
 | C-34 air combat's second half | 2 | bases, both heads, the sortie and the scatter ship; Interception, Patrol and Priority Target — the whole reason a fighter exists — do not |
 | C-35 the land/water fact never moves | 2 | one static bit answers "is this sea", "can a hull stand here" and "is this coastal"; no tile can become water, which is what submersion and the Canal's passage each need |
 | C-36 no railroad | 2 | roads are one boolean tier; the railroad's own movement rate, its per-hex Iron and Coal charge and its CO2 have no carrier, which C-20's fifth verb and C-24's third emitter both wait on |
-| **C. Absent systems** | **39** | |
-| **OPEN, TOTAL** | **69** | |
+| **C. Absent systems** | **38** | |
+| **OPEN, TOTAL** | **68** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -608,11 +607,14 @@ Civ 6 source or is recorded as unverifiable.
   `engineerCharges` / `_wond_eng_ch`: paid once to every live engineer at
   completion and again at every later spawn, over both chassis
   (`isEngineer` / `_engineer_types`).
+  CRISTO REDENTOR'S SHIELD SHIPS beside the resort multiplier: "Tourism
+  output from Relics and Holy Cities is not diminished by other
+  civilizations who have researched The Enlightenment civic" is
+  `holyTourismShield` / `_wond_holy_shield`, read where the halving lives —
+  the culture-victory read over the RELIGIOUS tourism bank (see C-28).
   OPEN, each blocked: Apadana's "+2 Great Work slots (any type)" and the
   Hermitage's LANDSCAPE-only art slots, both waiting on the per-work TYPE
-  B-20r names; the Great Bath's per-flood faith (B-34r); and Cristo
-  Redentor's clause that relic and holy-city tourism is not diminished by a
-  rival's Enlightenment (C-23).
+  B-20r names; and the Great Bath's per-flood faith (B-34r).
 - **B-45r. The effects the SOURCED sweep found in the other rows.** Three of
   the eight now have a channel, each re-sourced at its own page before it was
   written: `cityYieldPerImprovement` pays the Ruhr Valley's "+1 Production for
@@ -802,8 +804,8 @@ Civ 6 source or is recorded as unverifiable.
   - a pillage yield percentage (C-27 — pillaging pays nothing to scale);
   - diplomatic visibility of a rival (no visibility system on either engine);
   - a district built OVER the population limit (no district pop limit here);
-  - a tourism percentage on a trade route, and district tourism (C-28's one
-    lifetime scalar, and C-23);
+  - a tourism percentage on a trade route, and district tourism (C-28 — the
+    international modifiers want per-rival ACCRUAL);
   - a seat-wide building yield add, and per-tile air slots;
   - science from an ARTIFACT beyond what the museum already pays;
   - CORPS/ARMY/FLEET/ARMADA — no formation system exists, so every clause
@@ -1431,14 +1433,23 @@ number was under-counting by treating deferrals as closures.
     remaining." Neither engine offers a PILLAGE column to a hull at all
     (`_seat_unit_mask` builds the verb over land movers), so the raid needs
     the column before it can need a payout.
-- **C-28. TOURISM IS ONE LIFETIME SCALAR PER SEAT.** Weight 2. `seat.tourism`
-  banks a single figure and the visitor split divides it by the civ count on
-  read, so no rule can address the tourism flowing to ONE rival. Real Civ 6
-  accrues tourism per foreign civ, which is what its per-civ modifiers key on.
-  C-23 is a different thinness in the same plane — nothing REDUCES what is
-  banked — and the two are independent. Two gaps wait on this one:
-  `ONLINE_COMMUNITIES` (C-6), and the "+25% for Open Borders" international
-  modifier (C-2).
+- **C-28. TOURISM ACCRUES TO NO ONE IN PARTICULAR.** Weight 2. The bank is
+  TWO lifetime scalars now — `Seat.tourism` / `civ_tourism` and the
+  RELIGIOUS half `Seat.tourismReligious` / `civ_tourism_rel` ("Relics
+  generate Religious Tourism", "Holy Cities generate +8 Religious Tourism
+  per turn", each holy city paying its CURRENT owner) — and the visitor
+  split divides each by the civ count on read. The split is what lets the
+  two sourced RELIGIOUS-tourism halvings apply PER RIVAL at the
+  culture-victory read (`cultureVictor` / `_culture_victor`): "-50%
+  (Religious Tourism only) if the foreign civilization has The
+  Enlightenment", cancelled by Cristo Redentor's `holyTourismShield`, and
+  "-50% (Religious Tourism only) for Different Religions" against the
+  rival's majority religion (`dominantReligion` / `_dominant_religion`),
+  never applied before this seat FOUNDED one. What is still missing is
+  ACCRUAL per foreign civ: real Civ 6 banks tourism toward each rival
+  separately, which is what the international +25% modifiers (Open Borders
+  — C-2 — and the trade-route pair), the up-to--40% different-governments
+  penalty, `ONLINE_COMMUNITIES` (C-6) and the Rock Band (C-31) all key on.
 - **C-31. THE TWO CHASSIS WITH A SYSTEM BEHIND THEM.** Weight 1. `UNITS`
   holds 73 rows and the ladder runs to the Information era: every land,
   naval, siege, support, air and GDR rung through Modern Armor, the Nuclear
@@ -1638,13 +1649,6 @@ number was under-counting by treating deferrals as closures.
     Diplomatic Victory point" — has nowhere to land: `ResearchEffect` carries
     unlock kinds only, so no tech or civic on either engine can make a one-off
     grant of anything.
-- **C-23. NOTHING DIMINISHES TOURISM.** Weight 1. Real Civ 6 reduces the
-  tourism a civ earns from Relics and Holy Cities once other civs research
-  The Enlightenment, and reduces Great Work tourism the same way through the
-  era ladder. `seatTourism` / `_tourism_of` pay a flat value from every
-  source, so no rival's research ever costs a tourist. Cristo Redentor's
-  second clause exists to CANCEL that reduction, so the wonder cannot pay it
-  until the reduction exists.
 - **C-22. THE DISTRICT ROSTER.** Weight 2. All eighteen of Civ 6's districts
   now exist. The six that arrived last — DAM, CANAL, WATER PARK, PRESERVE,
   GOVERNMENT PLAZA, DIPLOMATIC QUARTER — brought their placement geometry and

@@ -22,7 +22,7 @@ import { placeSeats, seatPhase, worldCongress, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
 import { commitProduction, commitResearch } from './seatTurn';
 import { seatWonderFlag } from './wonders';
-import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH } from '../data/seats';
+import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, ENLIGHTENMENT_CIVIC, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH } from '../data/seats';
 import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
 import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS } from '../data/units';
 import { buildingCostIn, outerPool, wallsMax } from './rules';
@@ -1249,6 +1249,20 @@ function diplomaticVictor(state: GameState): number {
   return -1;
 }
 
+/** The religion MORE THAN HALF of this seat's cities follow, or -1 —
+ *  religion ids are founder seat ids, and at most one id can pass the bar,
+ *  the `religiousVictor` count read per seat. */
+function dominantReligion(s: { cities: { followedReligion?: number | null }[] }): number {
+  const n = s.cities.length;
+  const count = new Map<number, number>();
+  for (const c of s.cities) {
+    if (c.followedReligion == null || c.followedReligion < 0) continue;
+    count.set(c.followedReligion, (count.get(c.followedReligion) ?? 0) + 1);
+  }
+  for (const [g, k] of count) if (k * 2 > n) return g;
+  return -1;
+}
+
 /**
  * The CULTURE victory. Real Civ 6 (Gathering Storm) counts two
  * populations — DOMESTIC tourists, which a civ attracts from its own lifetime
@@ -1256,10 +1270,17 @@ function diplomaticVictor(state: GameState): number {
  * lifetime TOURISM — and a civ wins the moment its visiting tourists exceed
  * EVERY other civ's domestic tourists.
  *
+ * The tourism bank is split: the RELIGIOUS half (relics + holy cities) is
+ * halved per rival by the two CIV6 modifiers — "-50% (Religious Tourism
+ * only) if the foreign civilization has The Enlightenment", cancelled by
+ * Cristo Redentor's shield, and "-50% (Religious Tourism only) for Different
+ * Religions", which "doesn't apply if you haven't founded a religion" and
+ * reads the rival's MAJORITY religion. The general half is never diminished.
+ *
  * Both counts floor to whole tourists, so this is integer-exact and zero-draw.
  * The divisor carries the number of civs because tourism in real Civ 6 is
- * accrued per foreign civ; this engine banks ONE lifetime tourism figure per
- * civ, so the per-civ divisor is applied to the total instead — the same
+ * accrued per foreign civ; this engine banks ONE lifetime figure per half,
+ * so the per-civ divisor is applied to the total instead — the same
  * threshold, without per-pair bookkeeping the engines do not have.
  *
  * Returns the winning SEAT id, or -1. A civ
@@ -1272,18 +1293,25 @@ function cultureVictor(state: GameState): number {
   const visitDiv = nCivs * TOURISM_PER_VISITOR_PER_CIV;
   const alive = state.seats.map((sx) => sx.cities.length > 0);
   const tourism = state.seats.map((sx) => sx.tourism ?? 0);
+  const relTourism = state.seats.map((sx) => sx.tourismReligious ?? 0);
   const culture = state.seats.map((sx) => sx.cultureTotal ?? 0);
+  const enlightened = state.seats.map((sx) => sx.research.civics.includes(ENLIGHTENMENT_CIVIC));
+  const shielded = state.seats.map((sx) => seatWonderFlag(state, sx.seat, 'holyTourismShield'));
+  const founded = state.seats.map((sx) => !!sx.religion.founded);
+  const dominant = state.seats.map((sx) => dominantReligion(sx));
   // Milli-rounded before the floor: culture is a non-dyadic float accumulator,
   // so a sub-milli drift must not move a tourist count across engines (the
   // GS bankruptcy-test convention).
   const domestic = culture.map((c) => Math.floor(Math.round(c * 1000) / 1000 / CULTURE_PER_DOMESTIC_TOURIST));
-  const visiting = tourism.map((t) => Math.floor(t / visitDiv));
   for (let c = 0; c < nCivs; c++) {
     if (!alive[c]) continue;
     let all = true;
     for (let o = 0; o < nCivs; o++) {
       if (o === c) continue;
-      if (visiting[c] <= domestic[o]) {
+      const pen = (enlightened[o] && !shielded[c] ? 1 : 0)
+        + (founded[c] && dominant[o] >= 0 && dominant[o] !== c ? 1 : 0);
+      const visiting = Math.floor((tourism[c] + Math.floor(relTourism[c] / 2 ** pen)) / visitDiv);
+      if (visiting <= domestic[o]) {
         all = false;
         break;
       }

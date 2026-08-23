@@ -864,12 +864,10 @@ class SimPhase:
             self.city_alive[:, row],
             self.tile_seat == row,
             self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]),
-            self.city_relics[:, row],
             self.civ_techs[:, row, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,
             self.city_artifacts[:, row],
             gw_kmult=self._congress_gw_kmult(),
             themed=self._museum_themed(row),
-            relic_mult=self._city_wonder_mult(row, self._wond_relictour) if self._wond_n else None,
             resort_mult=self._seat_wonder_mult(row, self._wond_resorttour) if self._wond_n else None,
             park_mult=torch.where(self._golden_ded(row, self._ded_wish),
                                   torch.full((self.B,), int(self._wish_park), dtype=torch.long, device=self.device),
@@ -877,6 +875,7 @@ class SimPhase:
             gov_tile=self._governor_tiles(row, gov),
             suz_tour=self._suzerain_tourism(row, self.tile_seat == row),
         ))
+        bank(self.civ_tourism_rel, self._tourism_religious_of(row))
         # POLICY TREATY outcome A pays every seat holding the named card, on
         # top of the government tier, the (Treaty-Organization-weighted)
         # suzerain term and CIV6 (Alliance): "In Gathering Storm, each Alliance

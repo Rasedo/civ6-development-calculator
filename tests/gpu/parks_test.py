@@ -149,7 +149,7 @@ def main() -> None:
         s2.city_gw_writing[:, row], s2.city_gw_art[:, row], s2.city_gw_music[:, row],
         s2.city_alive[:, row], s2.tile_seat == row,
         s2._civ_era(s2.civ_techs[:, row], s2.civ_civics[:, row]),
-        s2.city_relics[:, row], None, s2.city_artifacts[:, row],
+        None, s2.city_artifacts[:, row],
         themed=s2._museum_themed(row))[0]
     s2._do_park(row, torch.ones(s2.B, dtype=torch.bool),
                 torch.full((s2.B,), ctr, dtype=torch.long),
@@ -164,7 +164,7 @@ def main() -> None:
         s2.city_gw_writing[:, row], s2.city_gw_art[:, row], s2.city_gw_music[:, row],
         s2.city_alive[:, row], s2.tile_seat == row,
         s2._civ_era(s2.civ_techs[:, row], s2.civ_civics[:, row]),
-        s2.city_relics[:, row], None, s2.city_artifacts[:, row],
+        None, s2.city_artifacts[:, row],
         themed=s2._museum_themed(row))[0]
     want = sum(int(ap2[t]) for t in parked)
     assert int(tour_after - tour_before) == want, f"park tourism = total appeal ({want}), got {int(tour_after - tour_before)}"
@@ -233,10 +233,10 @@ def main() -> None:
     own = s4.tile_seat == row
     era = s4._civ_era(s4.civ_techs[:, row], s4.civ_civics[:, row])
     t_plain = s4._tourism_of(s4.city_gw_writing[:, row], s4.city_gw_art[:, row], s4.city_gw_music[:, row],
-                             s4.city_alive[:, row], own, era, s4.city_relics[:, row], None,
+                             s4.city_alive[:, row], own, era, None,
                              s4.city_artifacts[:, row], themed=None)[0]
     t_themed = s4._tourism_of(s4.city_gw_writing[:, row], s4.city_gw_art[:, row], s4.city_gw_music[:, row],
-                              s4.city_alive[:, row], own, era, s4.city_relics[:, row], None,
+                              s4.city_alive[:, row], own, era, None,
                               s4.city_artifacts[:, row], themed=s4._museum_themed(row))[0]
     assert int(t_themed - t_plain) == s4._artifact_tourism * n, "theming DOUBLES the museum's tourism"
     print("theming ok")

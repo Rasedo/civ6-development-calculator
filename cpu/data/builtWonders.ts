@@ -115,6 +115,8 @@ export interface BuiltWonderDef {
     religiousTourismMult?: number;
     /** Multiplies the owner's Seaside Resort tourism, empire-wide. */
     resortTourismMult?: number;
+    /** Cristo Redentor: relic and holy-city tourism ignores rival Enlightenment. */
+    holyTourismShield?: boolean;
     /** The owner's cities within this many tiles of the wonder never lose loyalty. */
     loyaltyAura?: number;
     /** Defence strength for a unit standing on the wonder tile, fortification included. */
@@ -398,8 +400,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       id: 'CRISTO_REDENTOR', name: 'Cristo Redentor', code: 'CR', cost: 1620,
       requiresCivic: 'MASS_MEDIA', placement: { hillsOnly: true },
       cityYields: { culture: 4 },
-      effects: { resortTourismMult: 2 },
-      description: '+4 culture; your Seaside Resorts pay double tourism.',
+      effects: { resortTourismMult: 2, holyTourismShield: true },
+      description: '+4 culture; your Seaside Resorts pay double tourism; your relic and holy-city tourism ignores rival Enlightenment.',
     }),
   ].map((w) => [w.id, w]),
 );

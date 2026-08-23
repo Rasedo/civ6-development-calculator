@@ -2466,7 +2466,7 @@ class SimEconomy:
                 distinct = distinct & (seats[:, :, i] != seats[:, :, j])
         return full & one_era & distinct
 
-    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, relics: torch.Tensor | None = None, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None, gw_kmult: torch.Tensor | None = None, themed: torch.Tensor | None = None, relic_mult: torch.Tensor | None = None, resort_mult: torch.Tensor | None = None, park_mult: torch.Tensor | None = None, gov_tile: torch.Tensor | None = None, suz_tour: torch.Tensor | None = None) -> torch.Tensor:
+    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None, gw_kmult: torch.Tensor | None = None, themed: torch.Tensor | None = None, resort_mult: torch.Tensor | None = None, park_mult: torch.Tensor | None = None, gov_tile: torch.Tensor | None = None, suz_tour: torch.Tensor | None = None) -> torch.Tensor:
         """[B] — a seat's per-turn TOURISM, the `seatTourism` twin. Great Works
         pay the values that pair tourism with culture; every OWNED unpillaged
         SEASIDE RESORT pays its tile's APPEAL (floored at 0), attributed by
@@ -2490,11 +2490,6 @@ class SimEconomy:
             + self._gw_tour_k[1] * km[:, 1] * (gw_a * alive.long()).sum(dim=1)
             + self._gw_tour_k[2] * km[:, 2] * (gw_m * alive.long()).sum(dim=1)
         )
-        if relics is not None:
-            # CIV6 (St. Basil's): the religious-tourism multiplier is the
-            # HOLDING city's, so it lands inside the per-city sum.
-            rm = relic_mult.long() if relic_mult is not None else torch.ones_like(relics)
-            t = t + self._relic_tour * (relics * alive.long() * rm).sum(dim=1)
         if artifacts is not None:
             # a THEMED Archaeological Museum doubles what it holds.
             tm = torch.ones_like(artifacts)
@@ -2529,6 +2524,26 @@ class SimEconomy:
             t = t + (self._tile_appeal() * pk.long()).sum(dim=1) * pm
         if suz_tour is not None:
             t = t + suz_tour
+        return t
+
+    def _tourism_religious_of(self, row: int) -> torch.Tensor:
+        """[B] — the RELIGIOUS half of a seat's per-turn tourism, banked apart
+        (`civ_tourism_rel`) because a rival's Enlightenment or a different
+        religion halves THIS half at the read (`_culture_victor`), never the
+        general half. CIV6 (Tourism): "Relics generate Religious Tourism"
+        (St. Basil's multiplier is the HOLDING city's) and "Holy Cities
+        generate +8 Religious Tourism per turn" — a religion's Holy City pays
+        its CURRENT owner (`seatTourismReligious`)."""
+        alive = self.city_alive[:, row]
+        relics = self.city_relics[:, row]
+        rm = (self._city_wonder_mult(row, self._wond_relictour).long()
+              if self._wond_n else torch.ones_like(relics))
+        t = self._relic_tour * (relics * alive.long() * rm).sum(dim=1)
+        centres = self.city_center[:, row]
+        for g in range(self.n_majors):
+            ht = self.holy_tile[:, g]
+            holds = (ht >= 0) & ((centres == ht.unsqueeze(1)) & alive).any(dim=1)
+            t = t + holds.long() * self._holy_city_tour
         return t
 
     def _suzerain_tourism(self, row: int, own: torch.Tensor) -> torch.Tensor:

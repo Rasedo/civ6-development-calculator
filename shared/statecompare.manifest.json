@@ -310,6 +310,17 @@
           ]
         },
         {
+          "name": "tourismReligious",
+          "compare": "exact",
+          "covers": [
+            "Seat.tourismReligious"
+          ],
+          "planes": [
+            "civ_tourism_rel"
+          ],
+          "note": "the RELIGIOUS half (relics + holy cities), banked apart so the read can halve it per rival"
+        },
+        {
           "name": "grievances",
           "compare": "exact",
           "covers": [

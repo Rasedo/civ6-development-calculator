@@ -364,6 +364,7 @@ const SEAT: Record<string, Extractor> = {
   cultureTotal: overSeats((s) => s.cultureTotal),
   faith: overSeats((s) => s.faith),
   tourism: overSeats((s) => s.tourism ?? 0),
+  tourismReligious: overSeats((s) => s.tourismReligious ?? 0),
   grievances: overSeats((s, state) => grievanceLine(state, s.seat)),
   diplomaticFavor: overSeats((s) => s.diplomaticFavor),
   diplomaticPoints: overSeats((s) => s.diplomaticPoints),
