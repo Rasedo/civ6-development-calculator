@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cityStateOfSeat, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, tileSeat } from '../../../cpu/core/seats';
+import { cityStateOfSeat, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setWar, tileSeat } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { neighbors } from '../../../world/hex';
 import { spawnUnit } from '../../../cpu/core/units';
@@ -294,6 +294,20 @@ describe('suzerain unique perk (CITY_STATE_SUZERAIN_LIVE)', () => {
     cityState.envoys = { [1]: 4 }; // civ 0 out-envoys seat 0
     expect(isSuzerain(cityState, 0)).toBe(false);
     expect(cityStateSuzerainCapitalBonus(state, 0)).toEqual({});
+  });
+
+  it("Geneva's channel is a PEACE channel, and a war silences only ITS row", () => {
+    // CIV6 (Geneva): "when you are not at war with any civilization".
+    const state = makeState();
+    state.seats.push(emptySeat(1));
+    const geneva = addCs(state, 8, 8, { type: 'scientific', name: 'Geneva', envoys: { [0]: 3 } });
+    const bologna = addCs(state, 4, 4, { type: 'scientific', name: 'Bologna', envoys: { [0]: 3 } });
+    expect(isSuzerain(geneva, 0) && isSuzerain(bologna, 0)).toBe(true);
+    expect(cityStateSuzerainCapitalBonus(state, 0).science).toBe(2 * CITY_STATE_SUZERAIN_YIELD);
+    setWar(state, 0, 1, true);
+    expect(cityStateSuzerainCapitalBonus(state, 0).science).toBe(CITY_STATE_SUZERAIN_YIELD);
+    setWar(state, 0, 1, false);
+    expect(cityStateSuzerainCapitalBonus(state, 0).science).toBe(2 * CITY_STATE_SUZERAIN_YIELD);
   });
 
   it('grants the perk to a strict civ suzerain (the civ twin)', () => {

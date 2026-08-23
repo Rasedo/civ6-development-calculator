@@ -246,6 +246,8 @@ class SimSeats:
                 self._reset_war_clock(row, crow, declare)
                 # CIV6: war cancels the routes with the new enemy; the Traders return.
                 self._cancel_routes_cs(row, s, declare)
+                # ...and it pays the minor's patrons, suzerain and envoy holder alike.
+                self._grievance_cs_war(row, s, declare)
             peace = (
                 (w == n_tgt + n_opp + s) & ext & self.war[:, row, crow]
                 & (self.war_turns[:, row, crow] >= min_turns) & ~suz_war[:, s]
@@ -302,7 +304,7 @@ class SimSeats:
         automatically declare war on the target", is why this runs off the
         VICTIM's allies alone.
 
-        The dragged ally pays no warmonger cost, because it did not choose the
+        The dragged ally earns no grievances, because it did not choose the
         war, and its war is FORMAL: an obligation answered is the opposite of
         the surprise attack that reading carries. `defensivePact`'s twin.
         """
@@ -368,10 +370,10 @@ class SimSeats:
                     self.seat_borders_turns[:, _g, _h] = torch.where(
                         declare, torch.zeros_like(self.seat_borders_turns[:, _g, _h]),
                         self.seat_borders_turns[:, _g, _h])
-                self.civ_warmonger[:, row] = self.civ_warmonger[:, row] + declare.long() * self._wm_dow
                 _formal = declare & self._denounce_casus_belli(row, tgt)
                 self.seat_warkind[:, row, tgt] = torch.where(declare, _formal, self.seat_warkind[:, row, tgt])
                 self.seat_warkind[:, tgt, row] = torch.where(declare, _formal, self.seat_warkind[:, tgt, row])
+                self._grievance_war_declared(row, tgt, declare, _formal)
                 self._defensive_pact(row, tgt, declare)
             wt = self.war_turns[:, row, tgt]
             pcost = sr.get("peaceGold0", 150) + sr.get("peaceGoldSlope", 10) * wt.to(torch.float64)
@@ -1952,6 +1954,10 @@ class SimSeats:
                 continue
             _cur = self.city_pressure[cr[k], msk, los[k]]
             self.city_pressure[cr[k], msk, los[k]] = (_cur - self._condemn_swing).clamp(min=0)
+        _rel_all = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        _rel_all[cr] = los
+        self.civ_diplo_favor[:, row] = (self.civ_diplo_favor[:, row]
+                                        + self._congress_condemn_favor(_rel_all) * live.long())
         self.unit_alive[cr, rel[cr]] = False
         self.civilian_at[(cr, dt)] = -1
         self.unit_mp[cr, sc[cr]] = 0
@@ -2506,7 +2512,7 @@ class SimSeats:
         """A member's war on the emergency's target. CIV6: the war "won't
         accrue Grievances because it is considered an effort of the
         international community", and an Emergency "can override the war status
-        from previous Emergencies" — so no warmonger, and no treaty to respect."""
+        from previous Emergencies" — so no grievances, and no treaty to respect."""
         for tgt in range(self.n_majors):
             if tgt == member:
                 continue
@@ -2835,6 +2841,8 @@ class SimSeats:
             return max(1, len(self._congress_feat))
         if kind == 10:
             return max(1, len(self._plant_bidx))
+        if kind == 11:
+            return max(1, len(self.rules.promo_classes))
         return self.n_majors
 
     def _argmax_low(self, counts: torch.Tensor) -> torch.Tensor:
@@ -2956,27 +2964,35 @@ class SimSeats:
 
     def _congress_settle(self, m: torch.Tensor, out: torch.Tensor, tgt: torch.Tensor,
                          weight: torch.Tensor, spent: torch.Tensor, size: int) -> tuple[torch.Tensor, torch.Tensor]:
-        """`tally` + `settle`: OUTCOME by weight (tie -> A), then TARGET by
-        plurality among the winning outcome's votes (tie -> lower index); then
-        +1 DVP to every winning-combo voter and the sourced refunds — 100% to
-        a losing outcome, 50% to the winning outcome on a different target.
-        Returns the winning (outcome, target)."""
+        """`tally` + `settle`: OUTCOME by weight, then TARGET by plurality
+        among the winning outcome's votes, each tie broken by the favor that
+        side COMMITTED and only then by A / the lower index; then +1 DVP to
+        every winning-combo voter and the sourced refunds — 100% to a losing
+        outcome, 50% to the winning outcome on a different target. Returns the
+        winning (outcome, target)."""
         B, dev = self.B, self.device
         nrow = self.n_majors
         voting = weight > 0
-        a_w = (weight * ((out == 0) & voting).long()).sum(dim=1)
-        b_w = (weight * ((out == 1) & voting).long()).sum(dim=1)
-        win_out = (b_w > a_w).long()
+        a_m = ((out == 0) & voting).long()
+        b_m = ((out == 1) & voting).long()
+        a_w, b_w = (weight * a_m).sum(dim=1), (weight * b_m).sum(dim=1)
+        a_f, b_f = (spent * a_m).sum(dim=1), (spent * b_m).sum(dim=1)
+        win_out = ((b_w > a_w) | ((b_w == a_w) & (b_f > a_f))).long()
         counts = torch.zeros(B, size, dtype=torch.long, device=dev)
+        favor = torch.zeros(B, size, dtype=spent.dtype, device=dev)
         for row in range(nrow):
             oh = torch.nn.functional.one_hot(tgt[:, row].clamp(min=0, max=size - 1), size)
-            counts = counts + oh * (weight[:, row] * (voting[:, row] & (out[:, row] == win_out)).long()).unsqueeze(1)
+            live = (voting[:, row] & (out[:, row] == win_out)).long()
+            counts = counts + oh * (weight[:, row] * live).unsqueeze(1)
+            favor = favor + oh.to(spent.dtype) * (spent[:, row] * live).unsqueeze(1)
         best = torch.full((B,), -1, dtype=torch.long, device=dev)
+        best_f = torch.zeros(B, dtype=spent.dtype, device=dev)
         win_t = torch.zeros(B, dtype=torch.long, device=dev)
         for t in range(size):
-            take = counts[:, t] > best
+            take = (counts[:, t] > best) | ((counts[:, t] == best) & (favor[:, t] > best_f))
             win_t = torch.where(take, torch.full_like(win_t, t), win_t)
             best = torch.where(take, counts[:, t], best)
+            best_f = torch.where(take, favor[:, t], best_f)
         for row in range(nrow):
             cast = m & voting[:, row]
             lost = cast & (out[:, row] != win_out)
@@ -3132,6 +3148,32 @@ class SimSeats:
         seat, as sender or as destination."""
         out, tgt = self._congress_by_id("TRADE_POLICY")
         return (out == 1) & (tgt == row)
+
+    def _congress_grievance_mult(self, victim: int, transgressor: int) -> torch.Tensor:
+        """[B] long PERCENTAGE — `congressGrievanceMult`. PUBLIC RELATIONS
+        scales every grievance write the named seat is either side of."""
+        out, tgt = self._congress_by_id("PUBLIC_RELATIONS")
+        hit = (out >= 0) & ((tgt == victim) | (tgt == transgressor))
+        pr = torch.where(out == 0,
+                         torch.full_like(tgt, self._c_pr_a),
+                         torch.full_like(tgt, self._c_pr_b))
+        return torch.where(hit, pr, torch.full_like(tgt, 100))
+
+    def _congress_relig_cs(self, religion: torch.Tensor) -> torch.Tensor:
+        """`congressReligiousCs` — WORLD RELIGION outcome A's Religious
+        Combat Strength for every unit of the named religion."""
+        out, tgt = self._congress_by_id("WORLD_RELIGION")
+        sh = (slice(None),) + (None,) * (religion.dim() - 1)
+        z = torch.zeros(religion.shape, dtype=torch.long, device=self.device)
+        return torch.where((out[sh] == 0) & (religion == tgt[sh]), z + self._c_wr_rs, z)
+
+    def _congress_condemn_favor(self, religion: torch.Tensor) -> torch.Tensor:
+        """`congressCondemnFavor` — WORLD RELIGION outcome B pays the
+        CONDEMNER for killing a unit of the named religion."""
+        out, tgt = self._congress_by_id("WORLD_RELIGION")
+        sh = (slice(None),) + (None,) * (religion.dim() - 1)
+        z = torch.zeros(religion.shape, dtype=torch.long, device=self.device)
+        return torch.where((out[sh] == 1) & (religion == tgt[sh]), z + self._c_wr_favor, z)
 
     def _congress_policy_blocked(self) -> torch.Tensor:
         """[B] long — POLICY TREATY outcome B's forbidden card index; -1 none."""
@@ -4457,6 +4499,7 @@ class SimSeats:
         self.city_alive[b, row, col] = False
         self.city_is_cap[b, row, col] = False
         self.city_orig_cap[b, row, col] = -1
+        self.city_founder[b, row, col] = -1
         self.city_pop[b, row, col] = 0
         self.city_growth[b, row, col] = 0
         self.city_cbox[b, row, col] = 0
@@ -4536,12 +4579,19 @@ class SimSeats:
         # its tile_seat value, which is how the territory scan finds its tiles.
         c_t = int(self.city_center[b, src_row, src_col])
         cid = int(self.city_id[b, src_row, src_col])
-        # Taking a city earns GRIEVANCES — every receiver, accrued at the TOP
-        # like TS's, so a raze at the cap earns them too.
-        self.civ_warmonger[b, dst_row] += self._wm_cap
+        # CONQUERING a city earns GRIEVANCES — accrued at the TOP like TS's, so
+        # a raze at the cap earns them too, and the loser's LAST city pays the
+        # whole world. A LOYALTY FLIP earns none: nobody declared anything.
+        if conquest and src_row < self.n_majors and dst_row < self.n_majors:
+            self._grievance_city_taken(
+                b, dst_row, src_row,
+                bool(self.city_alive[b, dst_row].sum() >= int(self.rules.seats.get("maxCities", 6))))
+            if int(self.city_alive[b, src_row].sum()) <= 1:
+                self._grievance_last_city(b, dst_row)
         old_pop = int(self.city_pop[b, src_row, src_col])
         old_acq = int(self.city_acquired[b, src_row, src_col])
         old_orig = int(self.city_orig_cap[b, src_row, src_col])
+        old_founder = int(self.city_founder[b, src_row, src_col])
         old_gww = int(self.city_gw_writing[b, src_row, src_col])
         old_gwa = int(self.city_gw_art[b, src_row, src_col])
         old_gwm = int(self.city_gw_music[b, src_row, src_col])
@@ -4589,6 +4639,7 @@ class SimSeats:
         self._reveal_around(_b1, dst_row, torch.tensor([c_t], dtype=torch.long, device=dev), 3)
         self.city_is_cap[b, dst_row, col] = False  # a received city is never a capital (TS isCapital: false)
         self.city_orig_cap[b, dst_row, col] = old_orig  # ...but it is still whoever founded it
+        self.city_founder[b, dst_row, col] = old_founder
         # CIV6 (Military Emergency): "The Target has conquered the city of
         # another nation; it must be Liberated!" The seat that LOST it is the
         # affected one.
@@ -4873,6 +4924,7 @@ class SimSeats:
         self.city_is_cap[rows, row, slot] = new_cap
         self.city_orig_cap[rows, row, slot] = torch.where(
             new_cap, torch.full_like(s_idx, row), torch.full_like(s_idx, -1))
+        self.city_founder[rows, row, slot] = row
         self.civ_cap_tile[rows, row] = torch.where(new_cap, s_idx, self.civ_cap_tile[rows, row])
         self.city_center[rows, row, slot] = s_idx
         self.city_pop[rows, row, slot] = 1
@@ -5071,10 +5123,12 @@ class SimSeats:
                 # an emergency MEMBER hits its target harder
                 atk_e = atk_e + self._emergency_pair_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
                 atk_e = atk_e + self._barb_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
+            atk_e = atk_e + self._advisory_cs(a_type[:, u]).to(atk_e.dtype)
             def_naval = d_emb | (~def_is_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
             def_civ_u = torch.where(def_is_barb, neg, d_seat_m)
             def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
             def_e = def_e + self._barb_cs(def_civ_u, a_seat[:, u]).to(def_e.dtype)
+            def_e = def_e + self._advisory_cs(d_type).to(def_e.dtype)
             _wwh = self._ww_occ(tgt)
             _wwd = self._tile_mil_seat(tgt)
             rows, def_dead, atk_dead, atk_raw = self._melee_exchange(
@@ -5709,7 +5763,7 @@ class SimSeats:
         TS's: damage-to-district, then counter."""
         a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
         a_occ = self.military_at
-        atk_cs = self._type_combat[a_type[:, u]]
+        atk_cs = self._type_combat[a_type[:, u]] + self._advisory_cs(a_type[:, u])
         major = POOL_CLASS[atk_kind] == "major"
         tc = tile.clamp(min=0)
         hseat = self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1)
@@ -5971,6 +6025,7 @@ class SimSeats:
                                torch.full_like(hrow, -1), a_seat[:, u])
         atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
         atk_e = atk_e + self._gen_aura_cs(aura_civ, a_tile[:, u], atk_naval).to(atk_e.dtype)
+        atk_e = atk_e + self._advisory_cs(a_type[:, u]).to(atk_e.dtype)
         if getattr(self, "_battle_probe", False) and bool(att.any()):
             for _b in att.nonzero(as_tuple=True)[0].tolist():
                 print(f"GPU-BATTLE b={_b} t={self.turn} tgt={int(tgt[_b])} "
@@ -6112,6 +6167,7 @@ class SimSeats:
                                torch.full_like(a_seat[:, u], -1), a_seat[:, u])
         atk_naval = self.unit_naval[at0] | a_emb[:, u]
         atk_e = atk_e + self._gen_aura_cs(aura_civ, a_tile[:, u], atk_naval).to(atk_e.dtype)
+        atk_e = atk_e + self._advisory_cs(at0).to(atk_e.dtype)
         d_cs = self._damage_roll(att, atk_e - def_cs, k="csty", tile=tgt)
         d_atk = self._damage_roll(att, def_cs - atk_e, k="cstyc", tile=tgt)
         rows = att.nonzero(as_tuple=True)[0]
@@ -6254,6 +6310,7 @@ class SimSeats:
                 # Inserted BEFORE the aura add so term order matches the TS assembly.
                 atk_e = atk_e + (self._rel_atk_cs(a_seat, tgt).to(atk_e.dtype) if self._city_rel_live else 0)
                 atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_e.dtype)
+            atk_e = atk_e + self._advisory_cs(ut0).to(atk_e.dtype)
             d_city = self._damage_roll(city_att, atk_e - def_cs, k="vrngc", tile=tgt)
             self._ww_battle(city_att, self._row_of(self._atk_seat(atk_kind, u)), hrow, tgt, city=True)
             _wmax = self._walls_tier_hp[_wtier]
@@ -6339,6 +6396,8 @@ class SimSeats:
             def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
             def_e = def_e + self._barb_cs(d_seat, a_seat).to(def_e.dtype)
             atk_e = atk_e + self._barb_cs(a_seat, d_seat).to(atk_e.dtype)
+            def_e = def_e + self._advisory_cs(d_type).to(def_e.dtype)
+            atk_e = atk_e + self._advisory_cs(ut0).to(atk_e.dtype)
             def_hp0 = self.unit_hp[torch.arange(self.B, device=self.device), d_slot.clamp(min=0)]
             d_def = self._damage_roll(unit_att, atk_e - def_e, k="vrng", tile=tgt)
             g = unit_att.nonzero(as_tuple=True)[0]
@@ -6402,6 +6461,7 @@ class SimSeats:
         atk_rs0 = self._type_ranged_strength[at0]
         atk_base = atk_rs0 - self._wound(a_hp[:, u])
         atk_base = atk_base + self._gen_aura_cs(aseat, a_tile[:, u], a_naval).to(atk_base.dtype)
+        atk_base = atk_base + self._advisory_cs(at0).to(atk_base.dtype)
 
         # who holds the tile, and is any of them hostile? `unitsHostile`
         # answers for every pair, so no seat needs a clause of its own.
@@ -6520,6 +6580,7 @@ class SimSeats:
                 torch.where(ok_m & ~d_barb, d_seat, neg), tgt, def_naval).to(def_e.dtype)
             def_e = def_e + self._barb_cs(d_seat, aseat).to(def_e.dtype)
             atk_e = atk_e + self._barb_cs(aseat, d_seat).to(atk_e.dtype)
+            def_e = def_e + self._advisory_cs(d_type).to(def_e.dtype)
             def_hp0 = self.unit_hp[bidx, ds0]
             d_def = self._damage_roll(unit_att, atk_e - def_e, k="rng", tile=tgt)
             g = unit_att.nonzero(as_tuple=True)[0]
@@ -7301,6 +7362,7 @@ class SimSeats:
                    & (self.seat_friend_turns[:, a, b] == 0)
                    & (self.seat_ally_turns[:, a, b] == 0))
             if bool(den.any()):
+                self._grievance_denounce(a, b, den)
                 self.seat_denounced[:, a, b] = torch.where(
                     den, torch.full_like(self.seat_denounced[:, a, b], int(self.turn)),
                     self.seat_denounced[:, a, b])
@@ -7308,11 +7370,11 @@ class SimSeats:
         for a, b, ok in pairs("friend"):
             # CIV6 (Alliance): "A leader you've offended (or who has many
             # Grievances against you in Gathering Storm) will not want to
-            # become Declared Friends with you." The warmonger score is this
-            # model's grievance.
+            # become Declared Friends with you." Either side's outstanding
+            # balance refuses.
             frd = (ok & ~self.war[:, a, b] & (self.seat_friend_turns[:, a, b] == 0)
                    & ~self._denounce_active(a, b) & ~self._denounce_active(b, a)
-                   & (self.civ_warmonger[:, a] <= 0) & (self.civ_warmonger[:, b] <= 0))
+                   & (self._grievance_with(a, b) == 0))
             if bool(frd.any()):
                 for _x, _y in ((a, b), (b, a)):
                     self.seat_friend_turns[:, _x, _y] = torch.where(

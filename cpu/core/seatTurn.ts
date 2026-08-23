@@ -1,6 +1,7 @@
 
 import type { City, GameState, QueueItem } from './types';
 import { seatOf, civsAtWar, seatsAllied } from './seats';
+import { decayGrievances, grievanceFavorPenalty, grievanceHeldCapitals } from './grievance';
 import { chargeProjectResource, chargeUnitResource } from './stockpile';
 import { isSuzerain } from './cityStates';
 import { seatTourism, seatBuildingSum } from './city';
@@ -25,11 +26,11 @@ export function suzerainCount(state: GameState, seat: number): number {
 
 export function diplomaticFavorPerTurn(gov: string | null, suzerains: number, treaty = 0,
                                        occupiedCapitals = 0, alliances = 0,
-                                       buildings = 0, pollution = 0): number {
+                                       buildings = 0, pollution = 0, grievances = 0): number {
   const tier = gov ? GOVERNMENTS[gov]?.tier ?? 0 : 0;
   return tier + DIPLO_FAVOR_PER_SUZERAIN * suzerains + treaty
     + FAVOR_PER_ALLIANCE * alliances + buildings
-    - FAVOR_OCCUPIED_CAPITAL * occupiedCapitals - pollution;
+    - FAVOR_OCCUPIED_CAPITAL * occupiedCapitals - pollution - grievances;
 }
 
 /** CIV6 (Alliance): "In Gathering Storm, each Alliance gives you +1
@@ -92,10 +93,13 @@ export function seatAccumulators(state: GameState, seat: number, govCityIds?: Re
                              policyTreatyFavor(state, seat), occupiedCapitals(state, seat),
                              allianceCount(state, seat),
                              seatBuildingSum(state, seat, 'favorPerTurn'),
-                             pollutionFavorPenalty(state, seat)));
-  if ((s.warmonger ?? 0) > 0 && atPeaceWithAllCivs(state, seat)) {
-    s.warmonger = (s.warmonger ?? 0) - 1;
-  }
+                             pollutionFavorPenalty(state, seat),
+                             grievanceFavorPenalty(state, seat)));
+  // The GRIEVANCE ledger's own turn: what this seat is still owed decays
+  // pairwise (once per pair, on its lower seat), and every original capital it
+  // sits in keeps charging while that war is over.
+  grievanceHeldCapitals(state, seat);
+  decayGrievances(state, seat);
 }
 
 export function seatGrowth(city: City, surplus: number, growthNeeded: number): void {

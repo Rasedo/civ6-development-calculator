@@ -19,7 +19,7 @@ import { disasterPhase } from './disasters';
 import { climateTurn, deriveLowlands, standingRemovable } from './climate';
 import { placeCityStates, cityStatePhase, suzerainEffect } from './cityStates';
 import { placeSeats, seatPhase, worldCongress, nextCityName } from './phase';
-import { congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
+import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
 import { commitProduction, commitResearch } from './seatTurn';
 import { seatWonderFlag } from './wonders';
 import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH } from '../data/seats';
@@ -199,6 +199,7 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     queue: [],
     isCapital: list.length === 0,
     origCapitalSeat: list.length === 0 ? seat : -1,
+    founderSeat: seat,
     buildings: list.length === 0 ? ['PALACE'] : [],
     districts: [{ type: 'CITY_CENTER', tileIndex: tile.index }],
     wonders: [],
@@ -694,6 +695,9 @@ export function condemnHeretic(state: GameState, unit: Unit, tileIndex: number):
     return { ok: false, reason: 'Not at war with its owner.' };
   }
   const loser = unitSeat(target);
+  // WORLD RELIGION outcome B pays the CONDEMNER for the act.
+  const condemner = seatOf(state, unitSeat(unit));
+  if (condemner) condemner.diplomaticFavor += congressCondemnFavor(state, loser);
   const nRel = state.seats.length;
   const dt = state.map.tiles[tileIndex];
   for (const c of allCities(state)) {
@@ -1606,6 +1610,7 @@ export function deserialize(json: string): GameState {
       civCity.queue ??= [];
       civCity.isCapital ??= false;
       civCity.origCapitalSeat ??= -1;
+      civCity.founderSeat ??= civCity.seat;
       civCity.buildings ??= [];
       civCity.districts ??= [{ type: 'CITY_CENTER', tileIndex: civCity.centerIndex }];
       civCity.wonders ??= [];

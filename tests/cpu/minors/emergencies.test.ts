@@ -16,6 +16,7 @@ import {
   emergencyCsRouteGold, emergencyEnvoyGold, emergencyHeal, emergencyLoyalty, emergencyMoveBonus,
   emergencyStrikeCS, raiseEmergency,
 } from '../../../cpu/core/emergency';
+import { grievancesAgainst } from '../../../cpu/core/grievance';
 
 // EMERGENCIES (GS) run as SPECIAL SESSIONS of the World Congress. Sourced at
 // the catalog: a sponsor pays 30 favor, the previous session must be 15 turns
@@ -141,7 +142,7 @@ describe('emergencies: the session, the war and the clock', () => {
     expect(e.act).toBe(8 + EMERGENCIES[EMERGENCY_MILITARY].turns);
     expect(civsAtWar(state, 0, 1)).toBe(true);
     // CIV6: the emergency's war "won't accrue Grievances"
-    expect((state.seats[1] as Seat).warmonger ?? 0).toBe(0);
+    expect(grievancesAgainst(state, 1)).toBe(0);
     expect(state.lastSessionTurn).toBe(8);
   });
 

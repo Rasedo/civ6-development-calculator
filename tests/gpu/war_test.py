@@ -88,7 +88,8 @@ def test_declare(rules, path):
     sim.restore(snap)
     sim.war[:, 0, 1 + 0] = sim.war[:, 1 + 0, 0] = True
     sim._reset_war_clock(0, 1, torch.ones(sim.B, dtype=torch.bool))
-    sim.civ_warmonger[:, 0] += sim._wm_dow  # declareWar's grievance stamp on the declarer
+    sim._grievance_war_declared(0, 1, torch.ones(sim.B, dtype=torch.bool, device=sim.device),
+                                sim._denounce_casus_belli(0, 1))  # declareWar's ledger stamp
     sim.step()
     d = drift(sim, after)
     assert not d, f"declare != poked declareWar + plain step: {d}"

@@ -12,6 +12,7 @@ import { BUILDINGS } from '../data/buildings';
 import { CITY_STATE_MAX_HP, KABUL_XP_MULT, PRESLAV_HILL_CS } from '../data/cityStates';
 import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER } from '../data/seats';
+import { grievanceCityStateTaken } from './grievance';
 import { addEraScore } from './eras';
 import { nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit } from './units';
 import { isAirUnit, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirOf, displaceAirFrom } from './air';
@@ -26,6 +27,8 @@ import {
   promoStackMult, promoValue, unitLevel, unitXpPct, type PromoCtx,
 } from './promotions';
 import { getModifiers } from './effects';
+import { congressPromoClassCs, congressReligiousCs } from './congress';
+import { UNIT_PROMO_CLASS } from '../data/promotions';
 import { transferCity } from './phase';
 import type { RuleResult } from './rules';
 import { BARB_SEAT, NO_SEAT, allCities, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCiv, isTerritorial, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat } from './seats';
@@ -394,7 +397,7 @@ export function theoSupportCount(state: GameState, defTileIndex: number, defende
  *  and the Inquisitor's "+35 Religious Strength when in friendly territory". */
 export function theoStrength(state: GameState, unit: Unit): number {
   const base = (UNITS[unit.type]?.religiousStrength ?? 0) - woundPenalty(unit)
-    + promoValue(unit, 'RELIG_CS');
+    + promoValue(unit, 'RELIG_CS') + congressReligiousCs(state, unitSeat(unit));
   const here = state.map.tiles[unit.tileIndex];
   return unit.type === 'INQUISITOR' && here && tileSeat(here) === unitSeat(unit)
     ? base + INQUISITOR_HOME_STRENGTH
@@ -493,6 +496,7 @@ export function defenderCS(state: GameState, defender: Unit, defTileIndex: numbe
       : 0;
     return embarkedDefenseCS(state, defender.seat) - woundPenalty(defender) + escort
       + generalAuraCS(state, defender, defTileIndex)
+      + advisoryCS(state, defender.type)
       + (vs ? barbarianCombatCS(state, defender.seat, vs.attacker.seat) : 0);
   }
   const tile = state.map.tiles[defTileIndex];
@@ -515,7 +519,8 @@ export function defenderCS(state: GameState, defender: Unit, defTileIndex: numbe
     religionDefenseCS(state, defender, defTileIndex) + // enhancer adders (unit-vs-unit — every defenderCS caller is one; city strikes assemble inline without them)
     cavalryHillCS(state, defender, defTileIndex) + // Preslav's suzerain
     generalAuraCS(state, defender, defTileIndex) + // Great General/Admiral aura
-    (vs ? barbarianCombatCS(state, defender.seat, vs.attacker.seat) : 0)
+    (vs ? barbarianCombatCS(state, defender.seat, vs.attacker.seat) : 0) +
+    advisoryCS(state, defender.type)
   );
 }
 
@@ -681,6 +686,12 @@ export function barbarianCombatCS(state: GameState, own: number, foe: number): n
   return getModifiers(state, own).combatVsBarbarians;
 }
 
+/** MILITARY ADVISORY's flat adder on a unit's own Combat Strength. Air units
+ *  carry no promotion class, so no air roll can see it. */
+export function advisoryCS(state: GameState, unitType: string): number {
+  return congressPromoClassCs(state, UNIT_PROMO_CLASS[unitType]);
+}
+
 export function killUnit(state: GameState, unit: Unit, seat: number): void {
   // CIV6 (Air combat): "Should your Aircraft Carrier be destroyed, your
   // aircraft stationed within will be destroyed."
@@ -788,7 +799,8 @@ function assaultAtkCS(state: GameState, attacker: Unit, targetIndex: number): nu
       ? religionAttackCS(state, attacker, targetIndex)
       : 0) +
     cavalryHillCS(state, attacker, attacker.tileIndex) + // Preslav's suzerain
-    generalAuraCS(state, attacker, attacker.tileIndex)
+    generalAuraCS(state, attacker, attacker.tileIndex) +
+    advisoryCS(state, attacker.type)
   );
 }
 
@@ -1069,7 +1081,8 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
       + religionAttackCS(state, attacker, targetIndex) + cavalryHillCS(state, attacker, attacker.tileIndex) + generalAuraCS(state, attacker, attacker.tileIndex) // aura keyed on the ATTACKER's own tile
       + classMatchupCS(attacker.type, defender.type)
       + emergencyAttackCS(state, attacker.seat, defender.seat) // an emergency MEMBER hits its target harder
-      + barbarianCombatCS(state, attacker.seat, defender.seat);
+      + barbarianCombatCS(state, attacker.seat, defender.seat)
+      + advisoryCS(state, attacker.type);
     const defCSf = defenderCS(state, defender, targetIndex, { attacker, melee: true });
     defender.hp -= damageRoll(state, atkCSf - defCSf, 'mel', targetIndex);
     attacker.hp -= damageRoll(state, defCSf - atkCSf, 'melc', targetIndex);
@@ -1212,7 +1225,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   if (civCity && (capsOf(attacker.seat).alwaysHostile || civsAtWar(state, atkSeat, civCity.holder.seat))) {
     const defCS = cityDefenseStrength(state, civCity.city);
     const outer = outerPool(state, civCity.city);
-    const roll = damageRoll(state, (cityRangedStrength(attacker.type, outer) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex);
+    const roll = damageRoll(state, (cityRangedStrength(attacker.type, outer) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + relCity + generalAuraCS(state, attacker, attacker.tileIndex) + advisoryCS(state, attacker.type)) - defCS, 'rngrc', targetIndex);
     const split = cityDamageSplit(outer, wallsMax(state, civCity.city), roll, cityHitClass(attacker.type, true));
     if (split.wall > 0) civCity.city.outerHp = outer - split.wall;
     civCity.city.hp = Math.max(1, civCity.city.hp - split.centre);
@@ -1230,7 +1243,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   // seat you must declare on. See [[target-legality-gates]].
   if (cityState && cityState.centerIndex === targetIndex && cityStateAttackable(state, cityState, atkSeat)) {
     const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0);
-    cityState.hp = Math.max(1, (cityState.hp ?? CITY_STATE_MAX_HP) - damageRoll(state, (cityRangedStrength(attacker.type, 0) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + relCity + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex));
+    cityState.hp = Math.max(1, (cityState.hp ?? CITY_STATE_MAX_HP) - damageRoll(state, (cityRangedStrength(attacker.type, 0) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + relCity + generalAuraCS(state, attacker, attacker.tileIndex) + advisoryCS(state, attacker.type)) - defCS, 'rngcs', targetIndex));
     warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), targetIndex, { city: true });
     attacker.movesLeft = 0;
     awardCityXp(state, attacker, cityState.hp <= 1 ? XP_CITY_FELLED : XP_CITY_ATTACK);
@@ -1239,7 +1252,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   if (enemies.length === 0) return no('Nothing to attack there.');
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
   const defCS = defenderCS(state, defender, targetIndex, { attacker, melee: false });
-  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat)) - defCS, 'rng', targetIndex);
+  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat) + advisoryCS(state, attacker.type)) - defCS, 'rng', targetIndex);
   awardBattleXp(state, attacker, defender, { ranged: true, aDied: false, dDied: defender.hp <= 0 });
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
   if (defender.hp <= 0) {
@@ -1289,7 +1302,7 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   if (enemyCity) {
     const defCS = cityDefenseStrength(state, enemyCity);
     const outer = outerPool(state, enemyCity);
-    const roll = damageRoll(state, (cityRangedStrength(attacker.type, outer) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'vrngc', targetIndex);
+    const roll = damageRoll(state, (cityRangedStrength(attacker.type, outer) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex) + advisoryCS(state, attacker.type)) - defCS, 'vrngc', targetIndex);
     const split = cityDamageSplit(outer, wallsMax(state, enemyCity), roll, cityHitClass(attacker.type, true));
     if (split.wall > 0) enemyCity.outerHp = outer - split.wall;
     enemyCity.hp = Math.max(1, enemyCity.hp - split.centre);
@@ -1310,7 +1323,7 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   if (enemies.length === 0) return; // the CITY_CENTER quirk: a no-op, like meleeAttack's `no(...)`
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
   const defCS = defenderCS(state, defender, targetIndex, { attacker, melee: false });
-  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat)) - defCS, 'vrng', targetIndex);
+  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat) + advisoryCS(state, attacker.type)) - defCS, 'vrng', targetIndex);
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
   awardBattleXp(state, attacker, defender, { ranged: true, aDied: false, dDied: defender.hp <= 0 });
   if (defender.hp <= 0) {
@@ -1421,12 +1434,14 @@ function csPatrons(state: GameState, cityState: CityState, captor: number): numb
 }
 
 export function captureCityState(state: GameState, cityState: CityState, seat: number): void {
+  grievanceCityStateTaken(state, seat, (seatOf(state, seat)?.cities.length ?? 0) >= MAX_CITIES_PER_SEAT);
+  // an annexed minor was founded by nobody who keeps a ledger
   state.cityStates = state.cityStates.filter((c) => c.id !== cityState.id);
   for (const sx of state.seats) {
     sx.tradeRoutes = sx.tradeRoutes?.filter((x) => x.toCs !== cityState.id);
   }
   const center = state.map.tiles[cityState.centerIndex];
-  if (seatOf(state, seat)!.cities.length >= 6) {
+  if (seatOf(state, seat)!.cities.length >= MAX_CITIES_PER_SEAT) {
     for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
       if (tileSeat(t) === seatOfCityState(cityState.id)) setTileOwner(t, NO_SEAT);
     }
@@ -1460,6 +1475,7 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
     focus: 'balanced',
     queue: [],
     isCapital: false,
+    founderSeat: -1,   // a minor founded it, and minors keep no ledger
     buildings: [],
     districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }],
     wonders: [],
@@ -1472,6 +1488,7 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
 }
 
 export function captureCityStateFor(state: GameState, actor: Seat, cityState: CityState): void {
+  grievanceCityStateTaken(state, actor.seat, actor.cities.length >= MAX_CITIES_PER_SEAT);
   state.cityStates = state.cityStates.filter((c) => c.id !== cityState.id);
   for (const sx of state.seats) {
     sx.tradeRoutes = sx.tradeRoutes?.filter((x) => x.toCs !== cityState.id);
@@ -1504,6 +1521,7 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
     focus: 'balanced',
     queue: [],
     isCapital: false,
+    founderSeat: -1,   // a minor founded it, and minors keep no ledger
     buildings: [],
     districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }],
     wonders: [],

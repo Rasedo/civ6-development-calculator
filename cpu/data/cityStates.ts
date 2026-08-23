@@ -146,6 +146,11 @@ export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
 };
 
 export const CITY_STATE_SUZERAIN_YIELD = 3;
+
+/** CIV6 (Geneva): "when you are not at war with any civilization" — the one
+ *  suzerain channel a war with a MAJOR silences. A city-state war does not:
+ *  a minor is not a civilization. */
+export const CITY_STATE_SUZERAIN_PEACE_ONLY: readonly string[] = ['Geneva'];
 export const CITY_STATE_SUZERAIN_LIVE: Record<string, YieldKey> = {
   Geneva: 'science',
   Bologna: 'science',

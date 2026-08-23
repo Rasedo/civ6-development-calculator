@@ -33,7 +33,7 @@ Covered:
      declares, through the one applier.
   d. The head's DoW gates: ALLIES and Declared Friends are never declared on,
      an existing war is a no-op (no second grievance, no clock reset), and a
-     declaration bumps the aggressor's grievances by warmongerDow exactly once.
+     declaration pays the target its sourced grievance row exactly once.
   i. The agreements themselves: friendship unlocks the alliance and the
      alliance needs its civic, the border grant is DIRECTED and needs the
      grantor's civic, war cancels the grant, an ally is dragged into a
@@ -220,16 +220,16 @@ def poke_agreements(rules, path):
     # CIV6 (Defensive Pact): an ally of the VICTIM joins; an ally of the
     # AGGRESSOR does not, and the dragged ally pays no grievance.
     clear_pairs(sim)
-    sim.civ_warmonger[:] = 0
+    sim.civ_grievance.zero_()
     sim.seat_ally_turns[0, 0, 2] = sim.seat_ally_turns[0, 2, 0] = term
     head_war(sim, 1, 2)
     assert bool(sim.war[0, 0, 1]) and bool(sim.war[0, 1, 0]), (
         "the victim's ally must be dragged into the war"
     )
     assert bool(sim.seat_warkind[0, 0, 1]), "an obligation answered is a FORMAL war"
-    assert int(sim.civ_warmonger[0, 0]) == 0, "the dragged ally earns no grievances"
+    assert int(sim._grievances_against(0)[0]) == 0, "the dragged ally earns no grievances"
     clear_pairs(sim)
-    sim.civ_warmonger[:] = 0
+    sim.civ_grievance.zero_()
     sim.seat_ally_turns[0, 0, 1] = sim.seat_ally_turns[0, 1, 0] = term
     head_war(sim, 1, 2)
     assert not bool(sim.war[0, 0, 2]), "an AGGRESSOR's ally is never dragged in"
@@ -480,17 +480,17 @@ def poke_dow_gates(rules, path):
     re-validates whoever asks: ALLIES are never declared on, an existing war
     is a no-op, and one declaration buys exactly one grievance."""
     sim, _, _ = controlled_pair(rules, path)
-    wm_dow = int(sim._wm_dow)
+    dow = int(sim._griev_war_surprise)  # no denouncement stands, so it is a SURPRISE war
 
     sim.seat_ally_turns[0, 1, 2] = sim.seat_ally_turns[0, 2, 1] = 30
     head_war(sim, 1, 2)
     assert not bool(sim.war[0, 1, 2]), "an ALLY must never be declared on"
-    assert int(sim.civ_warmonger[0, 1]) == 0, "a refused declaration must not earn grievances"
+    assert int(sim._grievances_against(1)[0]) == 0, "a refused declaration must not earn grievances"
 
     # CIV6 (Declaring Friendship): Declared Friends "cannot undertake hostile
     # actions (such as Denouncing or going to war) against each other".
     clear_pairs(sim)
-    sim.civ_warmonger[0, 1] = 0
+    sim.civ_grievance[0].zero_()
     sim.seat_friend_turns[0, 1, 2] = sim.seat_friend_turns[0, 2, 1] = 30
     head_war(sim, 1, 2)
     assert not bool(sim.war[0, 1, 2]), "a Declared Friend must never be declared on"
@@ -503,20 +503,20 @@ def poke_dow_gates(rules, path):
 
     # a live declaration: war both ways, clock at 0, exactly one grievance
     clear_pairs(sim)
-    sim.civ_warmonger[0, 1] = 0
+    sim.civ_grievance[0].zero_()
     sim.war_turns[0, 1, 2] = sim.war_turns[0, 2, 1] = 9
     head_war(sim, 1, 2)
     assert bool(sim.war[0, 1, 2]) and int(sim.war_turns[0, 1, 2]) == 0, "a declaration restarts THAT war's clock"
-    assert int(sim.civ_warmonger[0, 1]) == wm_dow, (
-        f"declaring must earn warmongerDow ({wm_dow}), got {int(sim.civ_warmonger[0, 1])}"
+    assert int(sim._grievance_with(2, 1)[0]) == dow, (
+        f"declaring must pay the target a surprise war ({dow}), got {int(sim._grievance_with(2, 1)[0])}"
     )
 
     # ...and declaring again on a war already running changes nothing
     sim.war_turns[0, 1, 2] = sim.war_turns[0, 2, 1] = 6
     head_war(sim, 1, 2)
     assert int(sim.war_turns[0, 1, 2]) == 6, "an existing war must not have its clock restarted"
-    assert int(sim.civ_warmonger[0, 1]) == wm_dow, "an existing war must not earn a SECOND grievance"
-    print(f"  d DoW gates OK (allies exempt on every axis, one clock reset, one grievance of {wm_dow})")
+    assert int(sim._grievance_with(2, 1)[0]) == dow, "an existing war must not earn a SECOND grievance"
+    print(f"  d DoW gates OK (allies exempt on every axis, one clock reset, one grievance of {dow})")
 
 
 def poke_peace(rules, path):
@@ -650,8 +650,13 @@ def poke_transfer(rules, path):
     occ = sim.city_alive[0, civ_only_to + 1].nonzero(as_tuple=True)[0]
     exp_slot = int(occ.max()) + 1 if len(occ) else 0
     ev0 = sim._eff_version
+    sim.civ_grievance.zero_()
 
     sim._transfer_city(0, civ_only_from + 1, j, civ_only_to + 1, conquest=False)
+
+    # A LOYALTY FLIP earns no grievances: nobody declared anything, and TS
+    # gates the whole accrual on `why === 'conquered'`.
+    assert int(sim.civ_grievance.abs().sum()) == 0, "a flip must not touch the ledger"
 
     assert not bool(sim.city_alive[0, civ_only_from + 1, j]), "the loser slot must die"
     assert int(sim.city_bldg[0, civ_only_from + 1, j].sum()) == 0 and int(sim.city_current[0, civ_only_from + 1, j]) == -1, (
@@ -720,34 +725,35 @@ def main() -> None:
     print("GEOPOLITICS POKES OK")
 
 
-    # --- seat 0's grievance twin ---------------------------------------------
+    # --- the grievance ledger ------------------------------------------------
     from core.engine import _MUTABLE as _MUT2
-    # `civ_warmonger [B, n_majors]` is ONE plane and the BASE is what carries
-    # the state through a snapshot. Registering a view beside its base would
-    # restore into fresh storage and orphan the other half.
-    assert "civ_warmonger" in _MUT2, "civ_warmonger must be registered in _MUTABLE"
-    assert "warmonger" not in _MUT2, "warmonger is a VIEW of civ_warmonger"
+    # `civ_grievance [B, NS, NS]` is ONE plane and the BASE is what carries the
+    # state through a snapshot.
+    assert "civ_grievance" in _MUT2, "civ_grievance must be registered in _MUTABLE"
     s3 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
-    assert s3.civ_warmonger[:, 0].shape == (1,), s3.civ_warmonger[:, 0].shape
-    assert s3.civ_warmonger[:, 0].data_ptr() == s3.civ_warmonger.data_ptr(), (
-        "warmonger must share storage with civ_warmonger[:, 0]"
-    )
+    # ANTISYMMETRY: one write pays a cell and its mirror, so the pair carries
+    # exactly one signed balance and the diagonal never moves.
+    s3._add_grievance(0, 1, 40)
+    assert int(s3.civ_grievance[0, 0, 1]) == 40 and int(s3.civ_grievance[0, 1, 0]) == -40
+    assert int(s3._grievance_with(0, 1)[0]) == 40 and int(s3._grievance_with(1, 0)[0]) == -40
+    assert int(s3._grievances_against(1)[0]) == 40, "the world's bill counts only what it is owed"
+    assert int(s3._grievances_against(0)[0]) == 0, "a pair a seat is WINNING adds nothing"
     # snapshot/restore round-trip
-    s3.civ_warmonger[:, 0] = 7
     _snap = s3.snapshot()
-    s3.civ_warmonger[:, 0] = 0
+    s3.civ_grievance.zero_()
     s3.restore(_snap)
-    assert int(s3.civ_warmonger[0, 0]) == 7, "warmonger must survive snapshot/restore"
-    # decay only at peace on EVERY axis, floored at 0
+    assert int(s3.civ_grievance[0, 0, 1]) == 40, "the ledger must survive snapshot/restore"
+    # decay runs only while THAT pair is at peace, and never overshoots zero
     s3.war[:, 0, 1:s3.n_majors] = s3.war[:, 1:s3.n_majors, 0] = False
     s3.sync_war()  # a poke writes one cell; close the war matrix under transpose
-    s3.civ_warmonger[:, 0] = 2
+    _base = max(s3._griev_decay_floor, s3._griev_decay_base - int(s3._world_era()[0]))
     s3.step()
-    assert int(s3.civ_warmonger[0, 0]) <= 1, "grievances must decay at peace"
-    s3.civ_warmonger[:, 0] = 0
+    assert int(s3.civ_grievance[0, 0, 1]) == 40 - _base, "the pair must decay at its era rate"
+    s3.civ_grievance[0, 0, 1] = 3
+    s3.civ_grievance[0, 1, 0] = -3
     s3.step()
-    assert int(s3.civ_warmonger[0, 0]) == 0, "decay floors at zero"
-    print("seat-0 grievances OK — _MUTABLE, decay, floor")
+    assert int(s3.civ_grievance[0, 0, 1]) == 0, "the step never overshoots the neutral point"
+    print("grievances OK — _MUTABLE, antisymmetry, the bill, decay")
 
     # --- DIPLOMATIC FAVOR ----------------------------------------------------
     assert _round_trips("civ_diplo_favor", _MUT2), "civ_diplo_favor must round-trip through _MUTABLE"

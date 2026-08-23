@@ -42,6 +42,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { City, CityState, GameState, Seat, Tile, Unit } from './types';
 import { allyTurnsWith, borderTurnsFrom, citiesOf, friendTurnsWith, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
+import { grievanceWith } from './grievance';
 import { GP_CITY_PERM, GP_PERM } from '../data/greatPeople';
 import { laserSpeed } from './yields';
 import { emptyStockpile } from '../data/constants';
@@ -260,6 +261,18 @@ const warClockLine = (state: GameState, seat: number): Val => {
   return out;
 };
 
+/** The GRIEVANCE ledger from ONE seat's side, FLAT and signed: every major it
+ *  carries a live balance with, in ascending seat order. Positive means that
+ *  seat transgressed against this one. */
+const grievanceLine = (state: GameState, seat: number): Val => {
+  const out: number[] = [];
+  for (const other of state.seats.map((x) => x.seat).sort((a, b) => a - b)) {
+    const g = grievanceWith(state, seat, other);
+    if (g !== 0) out.push(other, g);
+  }
+  return out;
+};
+
 /** The same FLAT shape for the PEACE TREATY: every opponent this seat is still
  *  bound to, in ascending seat order, with the turns left. */
 const treatyClockLine = (state: GameState, seat: number): Val => {
@@ -351,7 +364,7 @@ const SEAT: Record<string, Extractor> = {
   cultureTotal: overSeats((s) => s.cultureTotal),
   faith: overSeats((s) => s.faith),
   tourism: overSeats((s) => s.tourism ?? 0),
-  warmonger: overSeats((s) => s.warmonger),
+  grievances: overSeats((s, state) => grievanceLine(state, s.seat)),
   diplomaticFavor: overSeats((s) => s.diplomaticFavor),
   diplomaticPoints: overSeats((s) => s.diplomaticPoints),
   influencePoints: overSeats((s) => s.influencePoints),
@@ -511,6 +524,7 @@ const CITY: Record<string, Extractor> = {
   cultureBox: overCities((r) => r.city.cultureBox),
   tilesAcquired: overCities((r) => r.city.tilesAcquired),
   origCapitalSeat: overCities((r) => r.city.origCapitalSeat ?? -1),
+  founderSeat: overCities((r) => r.city.founderSeat ?? -1),
   loyalty: overCities((r) => r.city.loyalty ?? 100),
   governorOutTurns: overCities((r) => r.city.governorOutTurns ?? 0),
   spySources: overCities((r) => (r.city.spySources ?? []).reduce((a, b) => a + b, 0)),

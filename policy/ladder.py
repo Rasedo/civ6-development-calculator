@@ -22,7 +22,7 @@ PER_CIV_FIELDS = (
     "cities",         # the opponent's city count / 6
     "oppStr",         # opponent strength: cities*8 + Σ combat (the DoW site)
     "prox",           # min pairwise dist(own centres, theirs); 999 = none
-    "gang",           # 0/1: their warmonger >= the gang threshold
+    "gang",           # 0/1: the world's grievances against them clear the bar
     "oppHasCities",   # 0/1: they hold any city (the DoW precondition)
     # THE AGREEMENTS, every one of them the precondition of some verb. Turns
     # LEFT rather than flags: a friendship with two turns to run is a

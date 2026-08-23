@@ -79,7 +79,8 @@ const A_SPREAD = unitActionIndex(IMPROVEMENT_IDS).SPREAD_HERE;
 const A_BUILD_ROAD = unitActionIndex(IMPROVEMENT_IDS).BUILD_ROAD;
 const A_FINISH_DISTRICT = unitActionIndex(IMPROVEMENT_IDS).FINISH_DISTRICT;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
-import { AGREEMENT_TURNS, ALLIANCE_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { AGREEMENT_TURNS, ALLIANCE_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith } from './grievance';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles, grantedGovernorTitles, goldenBoostBonus, worldEraIndex } from './eras';
 import { NO_SEAT, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
@@ -232,7 +233,9 @@ export function declareWar(state: GameState, actorSeat: number, seat: number): R
   setWarTurnsWith(state, actor.seat, seat, 0);
   // CIV6: war cancels every route between the two civs; the Traders return.
   cancelRoutesBetween(state, actor.seat, seat);
-  seatOf(state, seat)!.warmonger = (seatOf(state, seat)!.warmonger ?? 0) + WARMONGER_DOW;
+  const formal = denounceCasusBelli(state, seat, actor.seat);
+  setWarFormal(state, actor.seat, seat, formal);
+  grievanceWarDeclared(state, seat, actor.seat, formal);
   state.eventLog.push(`War declared on ${actor.name}!`);
   return ok;
 }
@@ -261,7 +264,7 @@ export function sueForPeace(state: GameState, actorSeat: number, seat: number): 
  * a third party ..., his or her allies will not automatically declare war on
  * the target", is why this runs off the VICTIM's allies alone.
  *
- * The dragged ally pays no warmonger cost, because it did not choose the war,
+ * The dragged ally accrues no grievances, because it did not choose the war,
  * and its war is FORMAL: an obligation answered is the opposite of the
  * surprise attack that reading carries. An ally already fighting, or allied to
  * the aggressor too, stays where it is.
@@ -582,7 +585,7 @@ function congressVoter(state: GameState, seat: number): CongressVoterCtx {
 /** A member's war on the emergency's target. CIV6: "this action won't accrue
  *  Grievances because it is considered an effort of the international
  *  community", and an Emergency "can override the war status from previous
- *  Emergencies" — so no warmonger, and no treaty to respect. */
+ *  Emergencies" — so no grievances, and no treaty to respect. */
 function emergencyWar(state: GameState, member: number, target: number): void {
   if (member === target || civsAtWar(state, member, target)) return;
   setWar(state, member, target, true);
@@ -731,9 +734,15 @@ export function transferCity(
   why: string,
   plunder = why === 'conquered',
 ): boolean {
-  to.warmonger = (to.warmonger ?? 0) + WARMONGER_CAPTURE;
   // The losing seat's city list — one lookup, because every seat holds its own.
   const loser = seatOf(state, fromSeat);
+  if (why === 'conquered') {
+    grievanceCityTaken(state, to.seat, fromSeat, to.cities.length >= MAX_CITIES_PER_SEAT);
+    // "Captured the final city of a civilization: 150 (all remaining civs
+    // gain Grievances against you)" — the loser's list is about to lose this
+    // one, so one city left IS the last.
+    if ((loser?.cities.length ?? 0) <= 1) grievanceLastCity(state, to.seat);
+  }
   if (loser) {
     loser.cities = loser.cities.filter((c) => c.id !== civCity.id);
     relocatePalace(loser.cities);
@@ -787,6 +796,7 @@ export function transferCity(
     // the flip does not make this city any less the FIRST city of whoever
     // founded it — that is the whole point of the occupied-capital penalty
     origCapitalSeat: civCity.origCapitalSeat ?? -1,
+    founderSeat: civCity.founderSeat ?? -1,
     buildings: keptBuildings,
     districts: keptDistricts,
     wonders: civCity.wonders.filter((w) => tileBelongsTo(state.map.tiles[w.tileIndex], { seat: to.seat, id: newId })).map((w) => ({ ...w })),
@@ -954,9 +964,9 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
         // war opens the border it was lifting.
         setBorderTurnsFrom(state, actor.seat, foe, 0);
         setBorderTurnsFrom(state, foe, actor.seat, 0);
-        actor.warmonger = (actor.warmonger ?? 0) + WARMONGER_DOW;
         const formal = denounceCasusBelli(state, actor.seat, foe);
         setWarFormal(state, actor.seat, foe, formal);
+        grievanceWarDeclared(state, actor.seat, foe, formal);
         state.eventLog.push(`${actor.name} declares ${formal ? 'a formal' : 'a surprise'} war on ${seatOf(state, foe)?.name ?? 'you'}!`);
         defensivePact(state, actor.seat, foe);
       } else if (!declaring && civsAtWar(state, actor.seat, foe)) {
@@ -1296,6 +1306,7 @@ export function seatPhase(state: GameState): void {
       if (seatsFriends(state, actor.seat, target.seat)) continue;
       if (seatsAllied(state, actor.seat, target.seat)) continue;
       actor.denounced[target.seat] = state.turn;
+      grievanceDenounce(state, actor.seat, target.seat);
       state.eventLog.push(`${actor.name} denounces ${target.name}.`);
     }
   }
@@ -1310,8 +1321,8 @@ export function seatPhase(state: GameState): void {
       if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
       // CIV6 (Alliance): "A leader you've offended (or who has many Grievances
       // against you in Gathering Storm) will not want to become Declared
-      // Friends with you." The warmonger score is this model's grievance.
-      if ((actor.warmonger ?? 0) > 0 || (target.warmonger ?? 0) > 0) continue;
+      // Friends with you." Either side's outstanding balance refuses.
+      if (grievanceWith(state, actor.seat, target.seat) !== 0) continue;
       setFriendTurnsWith(state, actor.seat, target.seat, AGREEMENT_TURNS);
       state.eventLog.push(`${actor.name} and ${target.name} declare friendship.`);
     }

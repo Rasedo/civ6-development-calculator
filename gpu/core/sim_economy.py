@@ -1521,6 +1521,14 @@ class SimEconomy:
         v = tab[rows, s0] if rows is not None else tab.gather(1, s0.unsqueeze(1)).squeeze(1)
         return torch.where(ok, v, z)
 
+    def _suz_capital_mask(self, row: int) -> torch.Tensor:
+        """[B, S] — the city-states whose flat suzerain channel pays `row` this
+        turn. CIV6 (Geneva): "when you are not at war with any civilization",
+        which is a MAJOR, so a war with a minor leaves the channel standing."""
+        peace = ~self.war[:, row, : self.n_majors].any(dim=1)
+        return self._suz_live_mask(row) & (
+            peace.unsqueeze(1) | ~self.citystate_suz_peace[:, : self.S])
+
     def _barb_cs(self, own: torch.Tensor, foe: torch.Tensor) -> torch.Tensor:
         """[B] — CIV6 (Discipline): "+5 Combat Strength when fighting
         Barbarians". A barbarian adopts no government, so the bonus only ever
@@ -3051,7 +3059,7 @@ class SimEconomy:
                 ((_env >= 1) & _acs).double() * float(self.rules.citystate.get("capitalBonus", 2)))
             # SOVEREIGNTY outcome B silences a whole city-state TYPE's unique
             # suzerain bonus, which is this capital yield and `suzerainEffect`.
-            _suz = self._suz_live_mask(row)
+            _suz = self._suz_capital_mask(row)
             b_cap = b_cap.scatter_add(
                 1, self.citystate_suz_key[:, : self.S].clamp(min=0),
                 _suz.double() * self._citystate_suz_amt

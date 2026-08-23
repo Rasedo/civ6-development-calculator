@@ -19,7 +19,6 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
     color: '#8e3db8',
     aggression: 0.5,
     seat: 1,
-    warmonger: 0,
     ww: {}, wwTurn: {},
     diplomaticFavor: 0,
     diplomaticPoints: 0,

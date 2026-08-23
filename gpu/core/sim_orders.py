@@ -744,6 +744,12 @@ class SimOrders:
             c_t = int(self.citystate_center[b, s])
             pop = max(1, (int(self.citystate_pop[b, s]) * 3) // 4)
             self.citystate_alive[b, s] = False
+            # CIV6: "City-state conquered: 50 (all civs gain Grievances against
+            # you)", and "City-state razed: 100" when the captor is at its cap.
+            _one = torch.zeros(self.B, dtype=torch.bool, device=dev)
+            _one[b] = True
+            self._grievance_cs_taken(
+                row, torch.full_like(_one, int(self.city_alive[b, row].sum()) >= max_cities), _one)
             # A route dies with its endpoint, for WHICHEVER seat holds it — the
             # minor is encoded -(2+s) in every row's dest column, seat 0's too.
             dead_cs = self.seat_routes[b, :, :, 1] == -(2 + s)  # [NS, K]
@@ -771,6 +777,7 @@ class SimOrders:
             self.city_id[b, row, col] = new_id
             self.city_is_cap[b, row, col] = False  # an annexed minor is never a capital
             self.city_orig_cap[b, row, col] = -1   # ...and never anyone's original one
+            self.city_founder[b, row, col] = -1     # a minor founded it, and minors keep no ledger
             # CIV6 (City-State Emergency): the minor's PATRONS — met, with at
             # least one envoy — are who may bring it to the Congress.
             _cs_kind = self._emg_at.get("CITY_STATE", -1)

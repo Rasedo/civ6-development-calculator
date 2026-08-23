@@ -310,14 +310,15 @@
           ]
         },
         {
-          "name": "warmonger",
+          "name": "grievances",
           "compare": "exact",
           "covers": [
-            "Seat.warmonger"
+            "GameState.grievances"
           ],
           "planes": [
-            "civ_warmonger"
-          ]
+            "civ_grievance"
+          ],
+          "note": "[opponentSeat, balance, ...] from THIS seat's side, ascending opponent seat, only the pairs carrying a live balance. TS keys one signed value per unordered pair; the GPU keeps the antisymmetric matrix. The SIGN convention is the shared fact: positive means that opponent transgressed against this seat."
         },
         {
           "name": "diplomaticFavor",
@@ -1204,6 +1205,17 @@
           "planes": [
             "city_orig_cap"
           ]
+        },
+        {
+          "name": "founderSeat",
+          "compare": "exact",
+          "covers": [
+            "City.founderSeat"
+          ],
+          "planes": [
+            "city_founder"
+          ],
+          "note": "who FOUNDED the city, whoever holds it now: what the grievance decay's occupation modifier asks about. -1 on a city annexed from a minor, which no ledger remembers."
         },
         {
           "name": "loyalty",

@@ -89,7 +89,7 @@ export function emptySeat(seat: number): Seat {
     seat,
     cities: [], nextCityId: 0,
     name: '', color: '', aggression: 0,
-    warmonger: 0, ww: {}, wwTurn: {}, diplomaticFavor: 0, diplomaticPoints: 0,
+    ww: {}, wwTurn: {}, diplomaticFavor: 0, diplomaticPoints: 0,
     wars: [], formalWars: [], denounced: {},
     influencePoints: 0, envoysAvailable: 0,
     peaceTurns: 0,

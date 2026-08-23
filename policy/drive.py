@@ -799,7 +799,7 @@ def _geo_turn(sim, seeds=None):
             frd[:, a, b] = (
                 quiet & diplo[:, a] & (sim.seat_friend_turns[:, a, b] == 0)
                 & (prox[a, b] <= prox_max)
-                & (sim.civ_warmonger[:, a] <= 0) & (sim.civ_warmonger[:, b] <= 0)
+                & (sim._grievance_with(a, b) == 0)
             )
             ally[:, a, b] = (
                 quiet & diplo[:, a] & al_civic[:, a]

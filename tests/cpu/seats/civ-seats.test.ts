@@ -29,7 +29,6 @@ function addCiv(
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,
-    warmonger: 0,
     ww: {}, wwTurn: {},
     diplomaticFavor: 0,
     diplomaticPoints: 0,

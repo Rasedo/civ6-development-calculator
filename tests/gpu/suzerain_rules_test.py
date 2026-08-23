@@ -198,7 +198,31 @@ def main() -> None:
     assert with_s > 0 and without == 0, (with_s, without)
     print("mexico city ok")
 
-    print("SUZERAIN RULES OK — all six coded perks fire, and only for the strict suzerain")
+    # --- Geneva pays only at PEACE ------------------------------------------
+    # CIV6 (Geneva): "when you are not at war with any civilization" — the one
+    # flat suzerain channel a war silences.
+    flags = sim.citystate_suz_peace[0, : sim.S]
+    assert bool(flags.any()), "no peace-gated suzerain row in this fixture"
+    sp = int(flags.long().argmax())
+    hold(sim, 0, 0, sp)
+    foe = 1 % sim.n_majors
+    sim.war[0, 0, : sim.n_majors] = False
+    sim.war[0, : sim.n_majors, 0] = False
+    sim.sync_war()
+    assert bool(sim._suz_capital_mask(0)[0, sp]), "peace must pay the channel"
+    sim.war[0, 0, foe] = sim.war[0, foe, 0] = True
+    sim.sync_war()
+    assert not bool(sim._suz_capital_mask(0)[0, sp]), "a war with a MAJOR silences it"
+    other = next((s for s in range(sim.S) if s != sp and not bool(flags[s])), -1)
+    if other >= 0:
+        hold(sim, 0, 0, other)
+        assert bool(sim._suz_capital_mask(0)[0, other]), "an ungated row keeps paying"
+    sim.war[0, 0, foe] = sim.war[0, foe, 0] = False
+    sim.sync_war()
+    print("geneva ok — the flat channel is a PEACE channel, and only its own row")
+
+    print("SUZERAIN RULES OK — all six coded perks fire, only for the strict "
+          "suzerain, and Geneva's channel only at peace")
 
 
 if __name__ == "__main__":

@@ -26,7 +26,7 @@ import { TERRAINS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { PLACEABLE_DISTRICTS } from '../data/districts';
-import { CITY_STATE_TYPES, CITY_STATE_SUZERAIN_LIVE, CITY_STATE_SUZERAIN_BONUS, SUZ_EFFECTS } from '../data/cityStates';
+import { CITY_STATE_TYPES, CITY_STATE_SUZERAIN_LIVE, CITY_STATE_SUZERAIN_BONUS, CITY_STATE_SUZERAIN_PEACE_ONLY, SUZ_EFFECTS } from '../data/cityStates';
 import { HOUSING_COASTAL, HOUSING_FRESH_WATER, HOUSING_NO_WATER } from '../data/constants';
 import { IMPROVEMENT_IDS } from '../core/unitActions';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -48,6 +48,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     center: cityState.centerIndex,
     pop: 3,
     suzKey: CITY_STATE_SUZERAIN_LIVE[cityState.name] ? YIELD_KEYS.indexOf(CITY_STATE_SUZERAIN_LIVE[cityState.name]) : -1,
+    suzPeace: CITY_STATE_SUZERAIN_PEACE_ONLY.includes(cityState.name) ? 1 : 0,
     suzCode: suzCodeOf(cityState.name),
     // the IMPROVEMENT this minor's suzerain may build, by roster index. The
     // catalog names the minor and the seeder draws which minors a map holds,

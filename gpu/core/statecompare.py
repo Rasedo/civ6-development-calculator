@@ -199,6 +199,22 @@ def _war_clock_line(sim, b: int, seat: int) -> list[int]:
     return [x for p in pairs for x in p]
 
 
+def _grievance_line(sim, b: int, rows) -> list:
+    """[opponentSeat, balance, ...] per seat row, ascending opponent seat, only
+    the pairs carrying a live balance. Signed from THIS seat's side: positive
+    means that opponent transgressed against it."""
+    out = []
+    for row in rows:
+        line: list[int] = []
+        for o in range(sim.n_majors):
+            g = int(sim.civ_grievance[b, row, o])
+            if o != row and g != 0:
+                line.append(int(sim._ROW_SEAT[o]))
+                line.append(g)
+        out.append(line)
+    return out
+
+
 def _treaty_clock_line(sim, b: int, seat: int) -> list[int]:
     """[opponentSeat, turnsBound, ...] — the same flat shape for the PEACE
     TREATY, over every opponent still bound, in ascending opponent-seat
@@ -396,7 +412,7 @@ SEAT = {
     "cultureTotal": _civ_scalar("civ_culture"),
     "faith": _civ_scalar("civ_faith"),
     "tourism": _civ_scalar("civ_tourism"),
-    "warmonger": _civ_scalar("civ_warmonger"),
+    "grievances": _grievance_line,
     "diplomaticFavor": _civ_scalar("civ_diplo_favor"),
     "diplomaticPoints": _civ_scalar("civ_diplo_points"),
     "influencePoints": _civ_scalar("civ_influence"),
@@ -569,6 +585,7 @@ CITY = {
     "cultureBox": _cty("city_cbox"),
     "tilesAcquired": _cty("city_acquired"),
     "origCapitalSeat": _cty("city_orig_cap"),
+    "founderSeat": _cty("city_founder"),
     "loyalty": _cty("city_loyalty"),
     "governorOutTurns": _cty("city_gov_out"),
     "spySources": lambda sim, b, rows: [

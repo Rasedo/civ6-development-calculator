@@ -36,6 +36,7 @@ import {
 } from '../../../cpu/data/seats';
 import { tilesWithin } from '../../../world/hex';
 import type { City, GameState, Seat, SeatActionRecord } from '../../../cpu/core/types';
+import { grievanceWith } from '../../../cpu/core/grievance';
 
 function addSeat(state: GameState, seat: number, col: number, row: number): Seat {
   const tile = tileAtCoords(state.map, col, row);
@@ -182,7 +183,7 @@ describe('the agreements run on one 30-turn clock', () => {
     expect(state.seats[1].wars).toContain(2);
     expect(state.seats[0].wars).toContain(1);
     expect(warIsFormal(state, 0, 1)).toBe(true);
-    expect(state.seats[0].warmonger ?? 0).toBe(0);
+    expect(grievanceWith(state, 2, 0)).toBe(0);  // the dragged ally chose nothing
 
     const s2 = table();
     setAllyTurnsWith(s2, 0, 1, AGREEMENT_TURNS);

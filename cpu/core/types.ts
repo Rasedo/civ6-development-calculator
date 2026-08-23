@@ -48,6 +48,11 @@ export interface City {
    * capital, not an original one — so `origCapitalSeat !== seat` is exactly
    * "somebody else is sitting in this seat's first city". */
   origCapitalSeat?: number;
+  /** The seat that FOUNDED this city, whoever holds it now. What the
+   *  grievance decay's occupation modifier asks about ("occupying a city or
+   *  cities of the other party"), which the capital field alone cannot
+   *  answer. */
+  founderSeat?: number;
   /** CITIZEN ASSIGNMENT for the district SLOTS: how many citizens the player
    * has pinned into each district, by PLACEABLE_DISTRICTS index; -1 where the
    * automatic rule decides. `Tile.locked` is the same choice for plots. */
@@ -214,6 +219,10 @@ export interface GameState {
    * needs SPECIAL_SESSION_GAP turns of quiet before it may be called. */
   lastSessionTurn?: number;
   warTurns?: Record<string, number>;
+  /** GRIEVANCES, one SIGNED balance per unordered pair, keyed like
+   *  `warTurns`. Positive means the LOWER seat is the victim. Written only
+   *  through `addGrievance`, read only through `grievanceWith`. */
+  grievances?: Record<string, number>;
   /** turns a pair's PEACE TREATY still binds, keyed like `warTurns`. */
   treatyTurns?: Record<string, number>;
   /** Turns a DECLARATION OF FRIENDSHIP still runs, keyed like `warTurns`
@@ -341,7 +350,6 @@ export interface Seat {
    */
   cities: City[];
   nextCityId: number;
-  warmonger: number;
   ww: Record<number, number>;
   wwTurn: Record<number, number>;
   /** LIFETIME raw carbon this seat has discharged. May go negative: CIV6

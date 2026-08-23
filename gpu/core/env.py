@@ -245,7 +245,7 @@ class BatchEnv:
                         n_opp_cities.to(d) / 6.0,
                         torch.where(ex, self._seat_strength(o), torch.zeros_like(ex, dtype=torch.long)).to(d),
                         torch.where(pair_ok, d_pr, 999).reshape(B, -1).min(dim=1).values.to(d),
-                        ((s.civ_warmonger[:, o] >= s._wm_gang) & ex).to(d),
+                        ((s._grievances_against(o) >= s._griev_gang) & ex).to(d),
                         (n_opp_cities > 0).to(d),
                         s.seat_friend_turns[:, row, o].to(d) / s._agreement_turns,
                         s.seat_ally_turns[:, row, o].to(d) / s._agreement_turns,

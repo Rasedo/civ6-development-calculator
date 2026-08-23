@@ -13,7 +13,8 @@
 import type { City, CityState, CityStateQuest, GameState, QueueItem } from './types';
 import { allyTurnsWith, atWarWithAny, borderTurnsFrom, citiesOf, civsAtWar, denounceLeft, friendTurnsWith, isBarbSeat, seatOf, tileCity, tileSeat, warTurnsWith } from './seats';
 import { seatStrength, seatProximity } from './phase';
-import { AGREEMENT_TURNS, DIPLO_VICTORY_POINTS, WARMONGER_GANG } from '../data/seats';
+import { AGREEMENT_TURNS, DIPLO_VICTORY_POINTS, GRIEVANCE_GANG } from '../data/seats';
+import { grievancesAgainst } from './grievance';
 import { envoysOf, hasMet } from './cityStates';
 import { effectiveResearchCostIn } from './boosts';
 import { goldenBoostBonus } from './eras';
@@ -88,7 +89,7 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
       o.cities.length / 6.0,
       seatStrength(state, o.seat),
       Math.min(seatProximity(state, o.seat, seat), 999),
-      ((o.warmonger ?? 0) >= WARMONGER_GANG) ? 1 : 0,
+      (grievancesAgainst(state, o.seat) >= GRIEVANCE_GANG) ? 1 : 0,
       o.cities.length > 0 ? 1 : 0,
       friendTurnsWith(state, seat, o.seat) / AGREEMENT_TURNS,
       allyTurnsWith(state, seat, o.seat) / AGREEMENT_TURNS,

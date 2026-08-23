@@ -764,6 +764,17 @@ class SimMasks:
         own = col.gather(1, seat.clamp(min=0, max=self.n_majors - 1).unsqueeze(1)).squeeze(1)
         return torch.where(major, own, half)
 
+    def _advisory_cs(self, utype: torch.Tensor) -> torch.Tensor:
+        """`advisoryCS`' twin — MILITARY ADVISORY's flat adder on a unit's
+        own Combat Strength, keyed by the chassis's promotion class. Air units
+        carry no class, so no air roll can see it."""
+        out, tgt = self._congress_by_id("MILITARY_ADVISORY")
+        cls = self.rules_dev.u_promo_class[utype.clamp(min=0)]
+        sh = (slice(None),) + (None,) * (cls.dim() - 1)
+        z = torch.zeros(cls.shape, dtype=torch.long, device=self.device)
+        v = torch.where(out[sh] == 0, z + self._c_advisory_cs, z - self._c_advisory_cs)
+        return torch.where((out[sh] >= 0) & (cls >= 0) & (cls == tgt[sh]), v, z)
+
     def _class_matchup_cs(self, own_type: torch.Tensor, foe_type: torch.Tensor) -> torch.Tensor:
         """[B] long `classMatchupCS` — CIV6 (Combat, "Unit class modifiers"):
         "Melee units receive a +5 CS bonus against anti-cavalry units.
@@ -865,7 +876,8 @@ class SimMasks:
         Strength in Theological Combat", and the Inquisitor's "+35 Religious
         Strength when in friendly territory"."""
         base = (self._rel_strength[utype.clamp(min=0)] - self._wound(hp)
-                + self._promo_val(utype, promos, "RELIG_CS"))
+                + self._promo_val(utype, promos, "RELIG_CS")
+                + self._congress_relig_cs(seat))
         if getattr(self, "_inquisitor_idx", -1) < 0:
             return base
         home = ((utype == self._inquisitor_idx)

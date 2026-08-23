@@ -317,8 +317,81 @@ def main() -> None:
     assert int(out9[0]) == 0 and int(tgt9[0]) == t0, "the AI line missed its own woods"
     print("  the Deforestation Treaty bans and pays on the FEATURE its target names")
 
+    # --- PUBLIC RELATIONS, MILITARY ADVISORY, WORLD RELIGION ----------------
+    pr = sim._congress_at["PUBLIC_RELATIONS"]
+    sim.congress_active[:] = -1
+    sim.congress_active[:, 0, 0] = pr
+    sim.congress_active[:, 0, 1] = 0
+    sim.congress_active[:, 0, 2] = 1
+    sim.civ_grievance.zero_()
+    sim._add_grievance(0, 1, 100)
+    assert int(sim.civ_grievance[0, 0, 1]) == 200, "outcome A must double what the target generates"
+    if sim.n_majors > 2:
+        sim._add_grievance(0, 2, 100)
+        assert int(sim.civ_grievance[0, 0, 2]) == 100, "a pair the target is not in must stand"
+    sim.congress_active[:, 0, 1] = 1
+    sim.civ_grievance.zero_()
+    sim._add_grievance(0, 1, 100)
+    assert int(sim.civ_grievance[0, 0, 1]) == 50, "outcome B must halve it"
+    sim._add_grievance(0, 1, -20)                       # a decay step is a PAYBACK
+    assert int(sim.civ_grievance[0, 0, 1]) == 30, "the decay must not be scaled"
+    print("  PUBLIC RELATIONS scales what an act GENERATES, on both faces, never the decay")
+
+    ma = sim._congress_at["MILITARY_ADVISORY"]
+    cls = sim.rules_dev.u_promo_class
+    named = int(cls[cls >= 0][0])
+    one = (cls == named).nonzero(as_tuple=True)[0][:1]
+    off = (cls == -1).nonzero(as_tuple=True)[0][:1]
+    sim.congress_active[:] = -1
+    sim.congress_active[:, 0, 0] = ma
+    sim.congress_active[:, 0, 1] = 0
+    sim.congress_active[:, 0, 2] = named
+    assert int(sim._advisory_cs(one.expand(sim.B))[0]) == sim._c_advisory_cs
+    if off.numel():
+        assert int(sim._advisory_cs(off.expand(sim.B))[0]) == 0, "a classless chassis takes nothing"
+    sim.congress_active[:, 0, 1] = 1
+    assert int(sim._advisory_cs(one.expand(sim.B))[0]) == -sim._c_advisory_cs
+    print("  MILITARY ADVISORY moves the named promotion class, on both faces")
+
+    wr = sim._congress_at["WORLD_RELIGION"]
+    sim.congress_active[:] = -1
+    sim.congress_active[:, 0, 0] = wr
+    sim.congress_active[:, 0, 1] = 0
+    sim.congress_active[:, 0, 2] = 1
+    r0 = torch.zeros(sim.B, dtype=torch.long, device=sim.device)
+    assert int(sim._congress_relig_cs(r0 + 1)[0]) == sim._c_wr_rs
+    assert int(sim._congress_relig_cs(r0)[0]) == 0, "another religion's row takes nothing"
+    assert int(sim._congress_condemn_favor(r0 + 1)[0]) == 0, "outcome A pays no condemnation"
+    sim.congress_active[:, 0, 1] = 1
+    assert int(sim._congress_relig_cs(r0 + 1)[0]) == 0, "outcome B is not the duel bonus"
+    assert int(sim._congress_condemn_favor(r0 + 1)[0]) == sim._c_wr_favor
+    print("  WORLD RELIGION pays A in the duel and B at the condemnation")
+
+    # --- the favor tie-break ------------------------------------------------
+    # CIV6: "Ties are broken by the proportion of Diplomatic Favor a player
+    # commits" — so a tie on VOTES falls to the side that spent, not to A and
+    # not to the lower target index.
+    simT = build()
+    B, NR2 = simT.B, simT.n_majors
+    allb = torch.ones(B, dtype=torch.bool, device=simT.device)
+    zeros = torch.zeros(B, NR2, dtype=torch.long, device=simT.device)
+    out_t = zeros.clone()
+    out_t[:, NR2 - 1] = 1                       # the last seat alone votes B
+    weight = zeros.clone() + 1
+    weight[:, NR2 - 1] = NR2 - 1                # ...with exactly the others' weight
+    spent = zeros.clone()
+    spent[:, NR2 - 1] = 30
+    win_out, _ = simT._congress_settle(allb, out_t, zeros.clone(), weight, spent, 2)
+    assert int(win_out[0]) == 1, "the tied OUTCOME must go to the committed favor"
+    tgt_t = zeros.clone()
+    tgt_t[:, NR2 - 1] = 1                       # ...and the same shape on TARGETS
+    _, win_t = simT._congress_settle(allb, zeros.clone(), tgt_t, weight, spent, 2)
+    assert int(win_t[0]) == 1, "the tied TARGET must go to the committed favor"
+    print("  a tied vote goes to the side that COMMITTED the favor, outcome and target alike")
+
     print("CONGRESS VOTE OK — the slate, the override, the curve, both refunds, the DV target, "
-          "the wider slate, the route ban, the culture bomb and the feature target")
+          "the wider slate, the route ban, the culture bomb, the feature target, "
+          "the three late resolutions and the favor tie-break")
 
 
 if __name__ == "__main__":

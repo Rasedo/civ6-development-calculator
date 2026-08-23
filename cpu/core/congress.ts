@@ -28,8 +28,12 @@ import {
   CONGRESS_PLUS_100, CONGRESS_MINUS_50, CONGRESS_TRADE_GOLD,
   CONGRESS_TRADE_CAPACITY, CONGRESS_POLICY_FAVOR, CONGRESS_IDEOLOGY_SLOTS,
   CONGRESS_GLOBAL_ENERGY, CONGRESS_ENERGY_DISCOUNT,
+  CONGRESS_PUBLIC_RELATIONS, CONGRESS_MILITARY_ADVISORY, CONGRESS_WORLD_RELIGION,
+  CONGRESS_PR_MULT_A, CONGRESS_PR_MULT_B, CONGRESS_ADVISORY_CS,
+  CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR,
 } from '../data/seats';
 import { POWER_PLANT_IDS } from '../data/buildings';
+import { PROMO_CLASSES } from '../data/promotions';
 
 const CLEARABLE_FEATURES = clearableFeatures();
 
@@ -178,15 +182,32 @@ export function buyVotes(sx: Seat, want: number): { extra: number; spent: number
   return { extra, spent };
 }
 
-/** Outcome first (more votes; tie -> A), then target by plurality among the
- * winning outcome's votes (tie -> lower target index). */
-function tally(votes: readonly Vote[], targetSpace: number): { outcome: number; target: number } {
-  let a = 0, b = 0;
-  for (const v of votes) { if (v.outcome === 0) a += v.weight; else b += v.weight; }
-  const outcome = b > a ? 1 : 0;
+/**
+ * Outcome first (more votes), then target by plurality among the winning
+ * outcome's votes. CIV6: "Ties are broken by the proportion of Diplomatic
+ * Favor a player commits", so a tie on VOTES is settled by the favor the tied
+ * side committed, and only a tie there falls back to A / the lower index.
+ */
+function tally(votes: readonly Vote[], targetSpace: number,
+               spent: readonly number[]): { outcome: number; target: number } {
+  let a = 0, b = 0, fa = 0, fb = 0;
+  for (const v of votes) {
+    if (v.outcome === 0) { a += v.weight; fa += spent[v.seat]; }
+    else { b += v.weight; fb += spent[v.seat]; }
+  }
+  const outcome = b > a || (b === a && fb > fa) ? 1 : 0;
   const tv = new Array<number>(targetSpace).fill(0);
-  for (const v of votes) if (v.outcome === outcome) tv[v.target] += v.weight;
-  return { outcome, target: argmaxLow(tv) };
+  const tf = new Array<number>(targetSpace).fill(0);
+  for (const v of votes) {
+    if (v.outcome !== outcome) continue;
+    tv[v.target] += v.weight;
+    tf[v.target] += spent[v.seat];
+  }
+  let at = 0;
+  for (let i = 1; i < targetSpace; i++) {
+    if (tv[i] > tv[at] || (tv[i] === tv[at] && tf[i] > tf[at])) at = i;
+  }
+  return { outcome, target: at };
 }
 
 /**
@@ -216,6 +237,9 @@ function targetSpaceSize(state: GameState, res: number): number {
     case 'csType': return CITY_STATE_TYPES.length;
     case 'feature': return CLEARABLE_FEATURES.length;
     case 'building': return POWER_PLANT_IDS.length;
+    case 'promoClass': return PROMO_CLASSES.length;
+    // a religion IS its founder's seat here, so its space is the seat roster
+    case 'religion': return state.seats.length;
     default: return state.seats.length;
   }
 }
@@ -241,7 +265,7 @@ function runResolution(state: GameState, res: number, slot: number,
     votes.push({ seat: c, outcome: p.outcome, target: p.target, weight: 1 + bought.extra });
   }
   if (votes.length === 0) return;
-  const win = tally(votes, space);
+  const win = tally(votes, space, spent);
   settle(state, votes, spent, win);
   state.congress!.push({ res, outcome: win.outcome, target: win.target });
 }
@@ -273,7 +297,7 @@ function runDvResolution(state: GameState, recorded: readonly (CongressVote | nu
     votes.push({ seat: c, outcome, target, weight: 1 + bought.extra });
   }
   if (votes.length === 0) return;
-  const win = tally(votes, space);
+  const win = tally(votes, space, spent);
   settle(state, votes, spent, win);
   const t = state.seats[win.target];
   t.diplomaticPoints = (t.diplomaticPoints ?? 0) + (win.outcome === 0 ? CONGRESS_DV_DELTA : -CONGRESS_DV_DELTA);
@@ -326,6 +350,42 @@ export function congressGppFactor(state: GameState, cls: GreatPersonClass): numb
   const e = congressEffect(state, CONGRESS_PATRONAGE);
   if (!e || GP_CLASSES[e.target] !== cls) return 1;
   return e.outcome === 0 ? CONGRESS_GPP_MULT : 0;
+}
+
+/**
+ * PUBLIC RELATIONS scales every grievance write the target is either side of:
+ * CIV6 "A: Target player generates 100% more Grievances, and other players
+ * generate 100% more Grievances against this player. / B: ... 50% fewer ...".
+ * Returned as a PERCENTAGE so the ledger stays integer.
+ */
+export function congressGrievanceMult(state: GameState, victim: number, transgressor: number): number {
+  const e = congressEffect(state, CONGRESS_PUBLIC_RELATIONS);
+  if (!e || (e.target !== victim && e.target !== transgressor)) return 100;
+  return e.outcome === 0 ? CONGRESS_PR_MULT_A : CONGRESS_PR_MULT_B;
+}
+
+/** MILITARY ADVISORY: "+5 Combat Strength for units of this promotion class"
+ *  on outcome A, -5 on B. */
+export function congressPromoClassCs(state: GameState, promoClass: string | undefined): number {
+  const e = congressEffect(state, CONGRESS_MILITARY_ADVISORY);
+  if (!e || promoClass === undefined || PROMO_CLASSES[e.target] !== promoClass) return 0;
+  return e.outcome === 0 ? CONGRESS_ADVISORY_CS : -CONGRESS_ADVISORY_CS;
+}
+
+/** WORLD RELIGION outcome A: "+10 Religious Combat Strength for all units of
+ *  this Religion." */
+export function congressReligiousCs(state: GameState, religion: number): number {
+  const e = congressEffect(state, CONGRESS_WORLD_RELIGION);
+  if (!e || e.outcome !== 0 || e.target !== religion) return 0;
+  return CONGRESS_WORLD_RELIGION_RS;
+}
+
+/** WORLD RELIGION outcome B: "Condemning a unit of this Religion yields 25
+ *  Diplomatic Favor." */
+export function congressCondemnFavor(state: GameState, religion: number): number {
+  const e = congressEffect(state, CONGRESS_WORLD_RELIGION);
+  if (!e || e.outcome !== 1 || e.target !== religion) return 0;
+  return CONGRESS_WORLD_RELIGION_FAVOR;
 }
 
 /** Migration Treaty growth factor on this seat's cities. */

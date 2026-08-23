@@ -2,6 +2,7 @@
 import type { City, CityState, CityStateQuest, CityStateType, GameState, Tile, Yields } from './types';
 import { NO_SEAT, citiesOf, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileSeat, treatyTurnsWith, warTurnsWith } from './seats';
 import { cancelRoutes } from './trade';
+import { grievanceCityStateWar } from './grievance';
 import { congressSuzBonusBlocked } from './congress';
 import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from '../../world/hex';
@@ -12,7 +13,7 @@ import { PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/seats';
 import { TERRAINS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_BUILDINGS, CITY_STATE_NAMES, CITY_STATE_MAX_HP, CITY_STATE_CAPITAL_BONUS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_LIVE, CITY_STATE_SUZERAIN_YIELD, SUZERAIN_ENVOYS, CITY_STATE_TYPE_DISTRICT } from '../data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_BUILDINGS, CITY_STATE_NAMES, CITY_STATE_MAX_HP, CITY_STATE_CAPITAL_BONUS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_LIVE, CITY_STATE_SUZERAIN_YIELD, CITY_STATE_SUZERAIN_PEACE_ONLY, SUZERAIN_ENVOYS, CITY_STATE_TYPE_DISTRICT } from '../data/cityStates';
 import { REGIONAL_RANGE } from '../data/constants';
 import { warWearinessPeace } from './weariness';
 
@@ -215,8 +216,10 @@ export function cityStateEnvoyBonuses(state: GameState, seat: number): CsBonuses
 
 export function cityStateSuzerainCapitalBonus(state: GameState, seat: number): Partial<Yields> {
   const out: Partial<Yields> = {};
+  const atWar = state.seats.some((s) => s.seat !== seat && civsAtWar(state, seat, s.seat));
   for (const cityState of state.cityStates) {
     if (!isSuzerain(cityState, seat) || suzerainBonusBlocked(state, cityState)) continue;
+    if (atWar && CITY_STATE_SUZERAIN_PEACE_ONLY.includes(cityState.name)) continue;
     const key = CITY_STATE_SUZERAIN_LIVE[cityState.name];
     if (!key) continue; // descoped row
     out[key] = (out[key] ?? 0) + CITY_STATE_SUZERAIN_YIELD;
@@ -325,9 +328,10 @@ export function issueQuest(
  * it `attackTargets` could never legally offer a city-state centre, because
  * offering a PEACEFUL one is exactly what the autopilot invariant forbids.
  *
- * OPEN: the diplomatic consequences — grievances and warmonger penalties with
- * other civs, and the suzerain's reaction — wait on a grievance system.
- * `sueForPeaceWithCityState` below is the inverse verb.
+ * CIV6 pays the minor's patrons for it: "War declared on a city-state a civ
+ * is the Suzerain over: 100", and "War declared on a city-state friend or
+ * ally: 50 (to every civ that has at least 1 Envoy in that city-state, but is
+ * not its Suzerain)". `sueForPeaceWithCityState` below is the inverse verb.
  */
 export function declareWarOnCityState(state: GameState, cityStateId: number, seat: number): RuleResult {
   const cityState = (state.cityStates ?? []).find((c) => c.id === cityStateId);
@@ -339,6 +343,11 @@ export function declareWarOnCityState(state: GameState, cityStateId: number, sea
   setWar(state, cityState.seat, seat, true);
   // CIV6: war cancels the routes with the new enemy; the Traders return.
   cancelRoutes(state, seat, (r) => r.toCs === cityStateId);
+  grievanceCityStateWar(
+    state, seat,
+    state.seats.find((s) => isSuzerain(cityState, s.seat))?.seat ?? -1,
+    state.seats.filter((s) => (cityState.envoys[s.seat] ?? 0) > 0).map((s) => s.seat),
+  );
   state.eventLog.push(`You have declared war on ${cityState.name}!`);
   return { ok: true };
 }

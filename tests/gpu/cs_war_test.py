@@ -167,11 +167,26 @@ def main() -> None:
     fire(declare_col(cs))
     assert not bool(s2.war[b, 0, crow]), "a declare on an unmet minor must be refused"
 
-    # MET: the column opens, the declaration lands on BOTH cells.
+    # MET: the column opens, the declaration lands on BOTH cells, and it PAYS
+    # the minor's patrons — "War declared on a city-state a civ is the Suzerain
+    # over: 100", and 50 "to every civ that has at least 1 Envoy in that
+    # city-state, but is not its Suzerain".
     s2.seat_citystate_met[b, 0, cs] = True
     assert bool(s2._seat_war_mask(0)[b, declare_col(cs)]), "a met, peaceful minor must offer a declare"
+    if s2.n_majors > 2:
+        s2.seat_citystate_envoys[b, :, cs] = 0
+        s2.seat_citystate_envoys[b, 1, cs] = 3      # seat 1 is the suzerain
+        s2.seat_citystate_envoys[b, 2, cs] = 1      # seat 2 only holds an envoy
+        s2._eff_version += 1
+    s2.civ_grievance.zero_()
     fire(declare_col(cs))
     assert bool(s2.war[b, 0, crow]) and bool(s2.war[b, crow, 0]), "the declare must set both cells"
+    if s2.n_majors > 2:
+        assert int(s2.civ_grievance[b, 1, 0]) == s2._griev_war_on_suzerain, (
+            "the suzerain must be paid for its minor")
+        assert int(s2.civ_grievance[b, 2, 0]) == s2._griev_war_on_cs_friend, (
+            "an envoy holder that is not the suzerain takes the smaller row")
+        assert int(s2.civ_grievance[b, 0, 1]) == -s2._griev_war_on_suzerain, "the pair is antisymmetric"
     assert not bool(s2._seat_war_mask(0)[b, declare_col(cs)]), "an ongoing war closes the declare column"
 
     # THE SUE takes the ten-turn clock and costs NO gold — a minor "will

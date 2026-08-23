@@ -41,8 +41,7 @@ export const SEAT_CAPS: Record<SeatClass, SeatCaps> = {
 // DVP_PER_RESOLUTION, DIPLO_VICTORY_POINTS, DEDICATIONS, DED_EVENT_SCORE,
 // WAR_MIN_TURNS. The rest is deliberate model tuning, not Civ 6 values: the
 // aggression/settle cadence, the ERA_* thresholds (pinned to this model's own
-// measured distribution), the war/denounce/warmonger magnitudes, and the
-// governor constants.
+// measured distribution), the gang-up bar, and the governor constants.
 //
 // SHIPPED-ONLY: DOW_PROXIMITY has no TypeScript reader. It exists to reach
 // rules.json, where the denounce decider reads it.
@@ -245,14 +244,14 @@ export const DIPLO_VICTORY_POINTS = 20;
 
 export type CongressTargetKind = 'district' | 'gpClass' | 'gwKind' | 'seat'
   | 'currency' | 'policy' | 'government' | 'project' | 'csType' | 'feature'
-  | 'building';
+  | 'building' | 'promoClass' | 'religion';
 /** The wire ORDER of the target kinds: a resolution's `t` on the exported
  *  rules is this array's index, so the GPU's `_congress_space` /
  *  `_congress_pref` switch on the same numbers. APPEND only. */
 export const CONGRESS_TARGET_KINDS: readonly CongressTargetKind[] = [
   'district', 'gpClass', 'gwKind', 'seat',
   'currency', 'policy', 'government', 'project', 'csType', 'feature',
-  'building',
+  'building', 'promoClass', 'religion',
 ];
 
 export interface CongressResolutionDef {
@@ -326,6 +325,20 @@ export const CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // The target space is the POWER PLANTS — the buildings the climate arc is
   // about, in catalog order.
   { id: 'GLOBAL_ENERGY_TREATY', name: 'Global Energy Treaty', minEra: 5, maxEra: 99, target: 'building' },
+  // CIV6: "A: Target player generates 100% more Grievances, and other players
+  // generate 100% more Grievances against this player. / B: Target player
+  // generates 50% fewer Grievances, and other players generate 50% fewer
+  // Grievances against this player." (through Atomic) It scales EVERY write
+  // the target is either side of.
+  { id: 'PUBLIC_RELATIONS', name: 'Public Relations', minEra: 0, maxEra: 6, target: 'seat' },
+  // CIV6: "A: +5 Combat Strength for units of this promotion class. /
+  // B: -5 Combat Strength for units of this promotion class." (through Atomic)
+  { id: 'MILITARY_ADVISORY', name: 'Military Advisory', minEra: 0, maxEra: 6, target: 'promoClass' },
+  // CIV6: "A: +10 Religious Combat Strength for all units of this Religion. /
+  // B: Condemning a unit of this Religion yields 25 Diplomatic Favor."
+  // (Industrial+) A religion IS its founder's seat here, so the target space
+  // is the seat roster.
+  { id: 'WORLD_RELIGION', name: 'World Religion', minEra: 4, maxEra: 99, target: 'religion' },
 ];
 export const CONGRESS_UDT = 0;
 export const CONGRESS_PATRONAGE = 1;
@@ -341,6 +354,18 @@ export const CONGRESS_SOVEREIGNTY = 10;
 export const CONGRESS_PUBLIC_WORKS = 11;
 export const CONGRESS_DEFORESTATION = 12;
 export const CONGRESS_GLOBAL_ENERGY = 13;
+export const CONGRESS_PUBLIC_RELATIONS = 14;
+export const CONGRESS_MILITARY_ADVISORY = 15;
+export const CONGRESS_WORLD_RELIGION = 16;
+/** Public Relations' two outcomes, as PERCENTAGES of a grievance write. */
+export const CONGRESS_PR_MULT_A = 200;
+export const CONGRESS_PR_MULT_B = 50;
+/** Military Advisory pays its promotion class +/- this much Combat Strength. */
+export const CONGRESS_ADVISORY_CS = 5;
+/** World Religion outcome A's Religious Combat Strength, and outcome B's
+ *  favor for condemning a unit of the named religion. */
+export const CONGRESS_WORLD_RELIGION_RS = 10;
+export const CONGRESS_WORLD_RELIGION_FAVOR = 25;
 /** CIV6 (Global Energy Treaty, outcome A): "50% discount on the production
  *  of buildings of this type." */
 export const CONGRESS_ENERGY_DISCOUNT = 0.5;
@@ -627,18 +652,88 @@ export const ALLIANCE_CIVIC = 'CIVIL_SERVICE';
 export const FAVOR_PER_ALLIANCE = 1;
 
 /**
- * WARMONGER COST. Real Civ 6 makes aggression carry a
- * diplomatic price — declaring war and taking cities generate GRIEVANCES, and
- * a warmonger is shunned and ganged up on. Modeled as a per-civ score:
- * +WARMONGER_DOW on declaring, +WARMONGER_CAPTURE on taking a seat
- * city, decaying by 1 per turn while NOT at war (floor 0). Two costs follow —
- * a civ with any grievances cannot form an ALLIANCE, and once it passes
- * WARMONGER_GANG others may declare on it WITHOUT the usual strength
- * advantage. Zero-draw, integer-only.
+ * GRIEVANCES (GS). CIV6: "a score which each pair of civilizations keep for
+ * each other, reflecting serious transgressions which happened between them",
+ * organized "as a coordinate system, with the neutral point, 0, and
+ * Civilizations A and B standing on the two sides" — so ONE signed balance per
+ * unordered pair, tipped by whoever transgresses and decayed back toward zero
+ * while the pair is at peace.
+ *
+ * Every magnitude below is the Grievances page's own table row.
  */
-export const WARMONGER_DOW = 4;
-export const WARMONGER_CAPTURE = 3;
-export const WARMONGER_GANG = 6;
+/** "Surprise War declared" — a declaration with no casus belli. */
+export const GRIEVANCE_WAR_SURPRISE = 150;
+/** "Formal War declared" — the denouncement's casus belli. */
+export const GRIEVANCE_WAR_FORMAL = 100;
+/** "War declared on a Friend or Ally": 75, to the friend or ally. */
+export const GRIEVANCE_WAR_ON_FRIEND = 75;
+/** "War declared on a city-state a civ is the Suzerain over": 100. */
+export const GRIEVANCE_WAR_ON_SUZERAIN = 100;
+/** "War declared on a city-state friend or ally": 50, "to every civ that has
+ *  at least 1 Envoy in that city-state, but is not its Suzerain". */
+export const GRIEVANCE_WAR_ON_CS_FRIEND = 50;
+/** "City Occupied (capturing a city during war): Max 50 base value". The
+ *  page publishes the CEILING and says it "varies by city population and type
+ *  of war" without publishing either scale, so the ceiling is the value. */
+export const GRIEVANCE_CITY_TAKEN = 50;
+/** "City Razed (destroying a captured city): Max 150 base value ... (3x cost
+ *  of capturing the city)" — which is exactly 3x the row above. */
+export const GRIEVANCE_CITY_RAZED = 3 * GRIEVANCE_CITY_TAKEN;
+/** "Captured the final city of a civilization: 150 (all remaining civs gain
+ *  Grievances against you)". */
+export const GRIEVANCE_LAST_CITY = 150;
+/** "City-state conquered: 50 (all civs gain Grievances against you)". */
+export const GRIEVANCE_CS_CONQUERED = 50;
+/** "City-state razed: 100 (all civs gain Grievances against you)". */
+export const GRIEVANCE_CS_RAZED = 100;
+/** "Denounced: 25". */
+export const GRIEVANCE_DENOUNCE = 25;
+/** "Controlling the civ's original Capital: 3 per turn while not at war". */
+export const GRIEVANCE_HELD_CAPITAL_PER_TURN = 3;
+/** "allies of B will gain 50% of B's Grievances against A, and declared
+ *  friends of B will gain 25%", as hundredths. */
+export const GRIEVANCE_ALLY_SHARE = 50;
+export const GRIEVANCE_FRIEND_SHARE = 25;
+
+/**
+ * DECAY. CIV6: "The base decay rate of Grievances is equal to 10 - x per turn,
+ * where x is each era after the Ancient Era", reaching 2/turn by the Future
+ * era; the era is the WORLD era, the same one the Congress gates on. At war
+ * the pair does not decay at all.
+ */
+export const GRIEVANCE_DECAY_BASE = 10;
+export const GRIEVANCE_DECAY_FLOOR = 2;
+/**
+ * CIV6: "The base decay rate is modified if a party is currently occupying a
+ * city or cities of the other party ... the rate changes by -1 for the
+ * 'victim' party ... but by +1 for the occupying party ... it does not matter
+ * how many cities you occupy, the decay rate modifier is always 1. However, if
+ * you occupy someone's Capital the rate becomes 3." The wiki's own copy has
+ * lost the sign glyph in front of that 3, so the magnitude is read as the
+ * modifier's — 3 in place of 1, same sign convention.
+ */
+export const GRIEVANCE_OCCUPIED_DECAY = 1;
+export const GRIEVANCE_OCCUPIED_CAPITAL_DECAY = 3;
+
+/**
+ * CIV6 (Diplomatic Favor, "Losing Favor"): "200 Grievance = -1/turn", with
+ * "-1 more per 50 beyond", capping at -10. The score read is what every OTHER
+ * major holds against this seat.
+ */
+export const GRIEVANCE_FAVOR_FLOOR = 200;
+export const GRIEVANCE_FAVOR_STEP = 50;
+export const GRIEVANCE_FAVOR_MAX = 10;
+
+/**
+ * THE TWO AI HEURISTICS the grievance table now feeds. Neither is a published
+ * Civ 6 rule and neither has a published number: a seat carrying grievances
+ * with ANYONE cannot form an alliance, and once what the world holds against
+ * it passes GRIEVANCE_GANG others may declare on it without the usual
+ * strength advantage. The threshold is stated in the table's own units — two
+ * formal wars' worth — so it moves with the sourced magnitudes rather than
+ * standing on a number of its own.
+ */
+export const GRIEVANCE_GANG = 2 * GRIEVANCE_WAR_FORMAL;
 export function warWearinessPenalty(weariness: number): number {
   return Math.floor(Math.max(0, weariness) / WAR_WEARINESS_PER_AMENITY);
 }

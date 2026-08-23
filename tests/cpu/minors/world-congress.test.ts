@@ -17,6 +17,13 @@ import { isWater } from '../../../world/query';
 import { BUILT_WONDERS } from '../../../cpu/data/builtWonders';
 import { UNITS } from '../../../cpu/data/units';
 import { GOLD_PURCHASE_MULT } from '../../../cpu/data/constants';
+import { CONGRESS_PUBLIC_RELATIONS, CONGRESS_MILITARY_ADVISORY, CONGRESS_WORLD_RELIGION, CONGRESS_ADVISORY_CS, CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR, CONGRESS_VOTE_STEP, GRIEVANCE_DECAY_BASE } from '../../../cpu/data/seats';
+import { PROMO_CLASSES } from '../../../cpu/data/promotions';
+import { addGrievance, grievanceWith, decayGrievances } from '../../../cpu/core/grievance';
+import { advisoryCS, defenderCS, theoStrength } from '../../../cpu/core/combat';
+import { condemnHeretic } from '../../../cpu/core/game';
+import { spawnUnit } from '../../../cpu/core/units';
+import { setWar } from '../../../cpu/core/seats';
 
 // WORLD CONGRESS. Sourced (Civilopedia GS): the Congress begins
 // meeting once the game reaches the MEDIEVAL era and convenes every 30 turns;
@@ -413,5 +420,101 @@ describe('the Deforestation Treaty', () => {
       { government: 0, policies: [], envoysByType: CITY_STATE_TYPES.map(() => 0) });
     expect(p.outcome).toBe(0);
     expect(p.target).toBe(marsh);
+  });
+});
+
+describe('the three unwritten resolutions', () => {
+  it('PUBLIC RELATIONS scales what an ACT generates, never the decay, and only the named seat', () => {
+    const state = newGame(2);
+    state.congress = [{ res: CONGRESS_PUBLIC_RELATIONS, outcome: 0, target: 1 }];
+    addGrievance(state, 0, 1, 100);
+    expect(grievanceWith(state, 0, 1)).toBe(200);   // the target GENERATED it
+    addGrievance(state, 1, 2, 100);
+    expect(grievanceWith(state, 1, 2)).toBe(200);   // ...and the other side too
+    addGrievance(state, 0, 2, 100);
+    expect(grievanceWith(state, 0, 2)).toBe(100);   // a pair it is not in stands
+    // the decay is a PAYBACK: it walks the era rate, not the doubled one
+    decayGrievances(state, 0);
+    expect(grievanceWith(state, 0, 1)).toBe(200 - GRIEVANCE_DECAY_BASE);
+    const s2 = newGame(1);
+    s2.congress = [{ res: CONGRESS_PUBLIC_RELATIONS, outcome: 1, target: 1 }];
+    addGrievance(s2, 0, 1, 100);
+    expect(grievanceWith(s2, 0, 1)).toBe(50);
+  });
+
+  it('MILITARY ADVISORY moves the named promotion class, on both faces, in a real defence', () => {
+    const state = newGame(1);
+    const melee = PROMO_CLASSES.indexOf('MELEE');
+    const city = seatOf(state, 0)!.cities[0];
+    const warrior = spawnUnit(state, 'WARRIOR', city.centerIndex, 0)!;
+    const bare = defenderCS(state, warrior, warrior.tileIndex);
+    state.congress = [{ res: CONGRESS_MILITARY_ADVISORY, outcome: 0, target: melee }];
+    expect(advisoryCS(state, 'WARRIOR')).toBe(CONGRESS_ADVISORY_CS);
+    expect(advisoryCS(state, 'ARCHER')).toBe(0);
+    expect(advisoryCS(state, 'BOMBER')).toBe(0);  // air carries no promotion class
+    expect(defenderCS(state, warrior, warrior.tileIndex)).toBe(bare + CONGRESS_ADVISORY_CS);
+    state.congress = [{ res: CONGRESS_MILITARY_ADVISORY, outcome: 1, target: melee }];
+    expect(advisoryCS(state, 'WARRIOR')).toBe(-CONGRESS_ADVISORY_CS);
+    expect(defenderCS(state, warrior, warrior.tileIndex)).toBe(bare - CONGRESS_ADVISORY_CS);
+  });
+
+  it('WORLD RELIGION pays A in the duel and B at the condemnation', () => {
+    const state = newGame(1);
+    const city = seatOf(state, 0)!.cities[0];
+    const apostle = spawnUnit(state, 'APOSTLE', city.centerIndex, 0)!;
+    const bare = theoStrength(state, apostle);
+    state.congress = [{ res: CONGRESS_WORLD_RELIGION, outcome: 0, target: 0 }];
+    expect(theoStrength(state, apostle)).toBe(bare + CONGRESS_WORLD_RELIGION_RS);
+    state.congress = [{ res: CONGRESS_WORLD_RELIGION, outcome: 0, target: 1 }];
+    expect(theoStrength(state, apostle)).toBe(bare);  // another religion's row
+    // outcome B pays the CONDEMNER, and A pays nothing at a condemnation
+    const foe = state.seats[1].seat;
+    setWar(state, 0, foe, true);
+    for (const outcome of [0, 1]) {
+      const s2 = newGame(1);
+      const c2 = seatOf(s2, 0)!.cities[0];
+      const heretic = spawnUnit(s2, 'APOSTLE', c2.centerIndex, s2.seats[1].seat)!;
+      const soldier = spawnUnit(s2, 'WARRIOR', heretic.tileIndex, 0)!;
+      setWar(s2, 0, s2.seats[1].seat, true);
+      s2.congress = [{ res: CONGRESS_WORLD_RELIGION, outcome, target: s2.seats[1].seat }];
+      seatOf(s2, 0)!.diplomaticFavor = 0;
+      expect(condemnHeretic(s2, soldier, heretic.tileIndex).ok).toBe(true);
+      expect(seatOf(s2, 0)!.diplomaticFavor).toBe(outcome === 1 ? CONGRESS_WORLD_RELIGION_FAVOR : 0);
+    }
+  });
+
+  it('a tied vote goes to the side that COMMITTED the most favor, outcome and target alike', () => {
+    // 3 votes a side either way: three free ballots against one seat that
+    // bought two extra votes. CIV6: "Ties are broken by the proportion of
+    // Diplomatic Favor a player commits."
+    const outcomeWin = (rich: number) => {
+      const state = newGame(3);
+      medieval(state);
+      for (let s = 1; s < 4; s++) settleFirstCity(state, s);
+      state.turn = CONGRESS_INTERVAL;
+      for (const sx of state.seats) {
+        sx.diplomaticFavor = sx.seat === 3 ? CONGRESS_VOTE_STEP * 6 : 0;  // 1+2 rungs, twice
+        sx.congressVote = [[sx.seat === 3 ? rich : 0, 0, sx.seat === 3 ? 2 : 0],
+                           [sx.seat === 3 ? rich : 0, 0, sx.seat === 3 ? 2 : 0]];
+      }
+      worldCongress(state);
+      return state.congress!.map((a) => a.outcome);
+    };
+    expect(outcomeWin(1)).toEqual([1, 1]);   // B, on the favor it committed
+    expect(outcomeWin(0)).toEqual([0, 0]);   // and A when the same seat votes A
+
+    const state = newGame(3);
+    medieval(state);
+    for (let s = 1; s < 4; s++) settleFirstCity(state, s);
+    state.turn = CONGRESS_INTERVAL;
+    for (const sx of state.seats) {
+      sx.diplomaticFavor = sx.seat === 3 ? CONGRESS_VOTE_STEP * 6 : 0;  // 1+2 rungs, twice
+      const target = sx.seat === 3 ? 1 : 0;
+      sx.congressVote = [[0, target, sx.seat === 3 ? 2 : 0], [0, target, sx.seat === 3 ? 2 : 0]];
+    }
+    worldCongress(state);
+    // the HIGHER target index wins the tie, which the lower-index rule alone
+    // could never produce
+    expect(state.congress!.map((a) => a.target)).toEqual([1, 1]);
   });
 });

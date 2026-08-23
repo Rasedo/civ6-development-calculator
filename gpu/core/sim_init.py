@@ -62,6 +62,7 @@ class SimInit:
             ("last_hit", torch.long, 0, None, None),
             ("is_cap", torch.bool, False, None, None),
             ("orig_cap", torch.long, -1, None, None),
+            ("founder", torch.long, -1, None, None),
             ("loyalty", dtype, 100.0, None, None),
             ("acquired", torch.long, 0, None, None),
             ("growth", dtype, 0, None, None),
@@ -168,6 +169,7 @@ class SimInit:
         self.citystate_pop = self.city_pop[:, _m0:_m0 + s_pad, 0]
         self.register_alias("citystate_pop", lambda sim: sim.city_pop[:, sim._CITY_MINOR0:sim._CITY_MINOR0 + max(sim.S, 1), 0])
         self.citystate_suz_key = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
+        self.citystate_suz_peace = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
         self.citystate_suz_code = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         # the IMPROVEMENT this minor's suzerain may build, by roster index
         self.citystate_suz_imp = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
@@ -178,6 +180,7 @@ class SimInit:
                 self.citystate_center[b, s] = cs["center"]
                 self.citystate_pop[b, s] = cs["pop"]
                 self.citystate_suz_key[b, s] = cs.get("suzKey", -1)
+                self.citystate_suz_peace[b, s] = bool(cs.get("suzPeace", 0))
                 self.citystate_suz_code[b, s] = cs.get("suzCode", -1)
                 self.citystate_suz_imp[b, s] = cs.get("suzImp", -1)
         # A city-state's tile ownership lives in `tile_seat` (seeded below off
@@ -208,6 +211,10 @@ class SimInit:
         #
         # `treaty_turns[b, i, j]` is the PEACE TREATY the pair signed, counting
         # down: while it is above zero neither side may declare on the other.
+        # `civ_grievance[b, i, j]` is what i holds against j — ANTISYMMETRIC, so
+        # the pair carries ONE signed balance, the coordinate system the
+        # Grievances page describes. Majors only.
+        self.civ_grievance = torch.zeros(B, self.NS, self.NS, dtype=torch.long, device=device)
         self.war_turns = torch.zeros(B, self.NS, self.NS, dtype=torch.long, device=device)
         self.treaty_turns = torch.zeros(B, self.NS, self.NS, dtype=torch.long, device=device)
         self.peace_turns = torch.zeros(B, self.NS, dtype=torch.long, device=device)
@@ -396,9 +403,28 @@ class SimInit:
         # scalars ride it); reading it off rules.seats returned {} and every
         # .get below silently DEFAULTED — hard reads keep that from recurring.
         _er2 = rules.eras
-        self._wm_dow = int(_er2["warmongerDow"])
-        self._wm_cap = int(_er2["warmongerCapture"])
-        self._wm_gang = int(_er2["warmongerGang"])
+        self._griev_war_surprise = int(_er2["grievanceWarSurprise"])
+        self._griev_war_formal = int(_er2["grievanceWarFormal"])
+        self._griev_war_on_friend = int(_er2["grievanceWarOnFriend"])
+        self._griev_war_on_suzerain = int(_er2["grievanceWarOnSuzerain"])
+        self._griev_war_on_cs_friend = int(_er2["grievanceWarOnCsFriend"])
+        self._griev_city_taken = int(_er2["grievanceCityTaken"])
+        self._griev_city_razed = int(_er2["grievanceCityRazed"])
+        self._griev_last_city = int(_er2["grievanceLastCity"])
+        self._griev_cs_conquered = int(_er2["grievanceCsConquered"])
+        self._griev_cs_razed = int(_er2["grievanceCsRazed"])
+        self._griev_denounce = int(_er2["grievanceDenounce"])
+        self._griev_held_capital = int(_er2["grievanceHeldCapital"])
+        self._griev_ally_share = int(_er2["grievanceAllyShare"])
+        self._griev_friend_share = int(_er2["grievanceFriendShare"])
+        self._griev_decay_base = int(_er2["grievanceDecayBase"])
+        self._griev_decay_floor = int(_er2["grievanceDecayFloor"])
+        self._griev_occ_decay = int(_er2["grievanceOccupiedDecay"])
+        self._griev_occ_cap_decay = int(_er2["grievanceOccupiedCapitalDecay"])
+        self._griev_favor_floor = int(_er2["grievanceFavorFloor"])
+        self._griev_favor_step = int(_er2["grievanceFavorStep"])
+        self._griev_favor_max = int(_er2["grievanceFavorMax"])
+        self._griev_gang = int(_er2["grievanceGang"])
         self._favor_per_suz = int(_er2["diplomaticFavorPerSuzerain"])
         self._congress_interval = int(_er2["congressInterval"])
         self._congress_min_era = int(_er2["congressMinEra"])
@@ -424,6 +450,11 @@ class SimInit:
         self._c_trade_gold = float(_er2["congressTradeGold"])
         self._c_trade_cap = int(_er2["congressTradeCapacity"])
         self._c_policy_favor = float(_er2["congressPolicyFavor"])
+        self._c_pr_a = int(_er2["congressPrMultA"])
+        self._c_pr_b = int(_er2["congressPrMultB"])
+        self._c_advisory_cs = int(_er2["congressAdvisoryCs"])
+        self._c_wr_rs = int(_er2["congressWorldReligionRs"])
+        self._c_wr_favor = int(_er2["congressWorldReligionFavor"])
         self._c_ideology_slots = int(_er2["congressIdeologySlots"])
         self._culture_bomb_range = int(_er2["cultureBombRange"])
         self._favor_occ_capital = float(_er2["favorOccupiedCapital"])
@@ -2149,7 +2180,6 @@ class SimInit:
         ("culture", None, None),
         ("faith", None, None),
         ("tourism", torch.long, None),
-        ("warmonger", torch.long, None),
         ("gpp", None, "_gp_nc"),
     )
 

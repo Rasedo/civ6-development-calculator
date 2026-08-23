@@ -56,8 +56,8 @@ nothing carries forward.
 | A-1r the district registry holds ONE tile per TYPE | 1 | a repeatable district's per-type columns are counted once on the GPU and per instance on TS; every such column is zero today, so nothing diverges yet |
 | **A. Engine vs engine** | **1** | |
 | B-20r tourism tails | 1 | theming, the open-borders dig and the work GIFT all ship; the Naturalist's progressive cost is unsourced |
-| B-21r suzerain rows | 1 | nine perks are rules; the residual descoped rows all need whole absent systems |
-| B-22r World Congress | 2 | 14 of the 21 regular resolutions ship and emergencies run as special sessions; seven resolutions and the scored competitions have no carrier; peace TERMS wait on the negotiated deal (C-2) and the grievance favor penalty on C-19; the favor tie-break unmodeled |
+| B-21r suzerain rows | 1 | nine perks are rules and Geneva's channel is a PEACE channel; the residual descoped rows all need whole absent systems |
+| B-22r World Congress | 2 | 17 of the 21 regular resolutions ship, emergencies run as special sessions and a tie falls to the committed favor; four resolutions and the scored competitions have no carrier, and peace TERMS wait on the negotiated deal (C-2) |
 | B-24r Ages/governors | 1 | all twelve dedications ship, both faces; dark-age policies, governor promotions and per-civ era drift do not |
 | B-30r specialists | 1 | the mechanic, both citizen overrides and the three-plant Industrial tier ship; a LOCK still outlives the city that set it |
 | B-31r trade-route tails | 1 | sea legs and the whole-destination-set candidate ship; no trading posts, plunder gold is a stylization, the summed-yield key is a heuristic and the free-choice head is P8's |
@@ -74,12 +74,13 @@ nothing carries forward.
 | B-58r the religious purchase asks for a Shrine | 1 | Civ 6 asks for a MAJORITY RELIGION and a Holy Site with a Temple; both engines ask for a Shrine and never read what the city follows |
 | B-59r the religious spread is a flat lump | 2 | Civ 6 scales the pressure by the Apostle's HP and strips a quarter of every other religion; both engines add a constant and strip nothing without Proselytizer |
 | B-51r the Encampment's second pool | 1 | the district meets the city's perimeter and heals only while its tile is clear; Civ 6 tracks the two pools SEPARATELY, and a defeat pillages it |
-| B-44r city-state war tails | 1 | the head, its policy and a SEAT's march on a minor ship; the barbarian walker still raids only majors because it beelines to one nearest city, and the diplomatic consequences wait on C-19 |
+| B-44r city-state war tails | 1 | the head, its policy, a SEAT's march on a minor and the declaration's grievances all ship; the barbarian walker still raids only majors because it beelines to one nearest city |
 | B-61r the Great Person clauses with no carrier | 2 | the roster is placed and used; 20 of the 205 rows name a mechanic nothing here has, and eight effect channels the sweep found were dropped with their blockers |
 | B-60r the dig's DATE, and the hull nobody dates | 1 | the artifact's civilization is the event's own now; its ERA is still the ACTING seat's research, and a barbarian or minor sinking a hull leaves no wreck at all |
 | B-34r flood tails | 1 | the severity ladder, the river's whole reach, the river-scoped shield and the Dam all ship; the per-tile flood count and the climate/coastal tails do not |
+| B-63r the grievance ledger's magnitudes | 1 | every sourced act pays the pair, the favor penalty and the era decay run, and PUBLIC RELATIONS scales what an act generates; the occupied and razed rows ship at their published CEILING because no pop or war-type scale is published, and the AI's gang-up bar is a heuristic |
 | B-62r a natural wonder takes no tile adds | 1 | the wonder's roster yields are the whole tile: no pantheon feature yield, no suzerain improvement adjacency and no Preserve band, though the Grove's own text pays any adjacent unimproved Breathtaking tile |
-| **B. Fidelity vs real Civ 6** | **29** | |
+| **B. Fidelity vs real Civ 6** | **30** | |
 | C-1 POWER | 2 | the grid, the three plants, Cardiff, the Hydroelectric Dam, the powered-yield split, the FUEL and its CO2 all ship; four renewable improvements and the Biosphere have no carrier, nothing can retire a plant, and a minor's cities are never powered |
 | C-2 diplomatic agreements | 3 | friendship, alliances, open borders, the closed border and the work gift ship on one 30-turn clock; alliance TYPES and LEVELS, the negotiated two-sided deal, and the four agreements that need one are open |
 | C-5 strategic-resource stockpiles | 2 | the bank, its ceiling, the unit and project charges, the plants' fuel, unit FUEL upkeep and the heal a lost source denies all ship; the shortage penalty's magnitude is unpublished and trading resources waits on C-2 |
@@ -90,7 +91,6 @@ nothing carries forward.
 | C-15 garrison does not block capture | 2 | the move-onto-centre capture model is what is missing |
 | C-16 the spy's second half | 2 | the Spy, its capacity, the jump and all twelve missions ship; the escape-and-capture sequence, the spy promotion pool and two missions with no carrier do not |
 | C-17 embarked movement never upgrades | 1 | the flat EMBARK_MOVES stands in for every era |
-| C-19 grievances and warmongering | 2 | war has no reputational consequence with anyone |
 | C-20 the Military Engineer's build list | 1 | the Fort, the Airstrip, the road and the 20% charge all ship; the Missile Silo waits on C-31, the Mountain Tunnel on C-35 and the railroad on C-36 |
 | C-22 the district roster is a subset | 2 | all eighteen districts ship; the Canal carries no naval passage, six Government Plaza buildings have no effect body, and the Preserve's housing table is unpublished |
 | C-23 nothing diminishes tourism | 1 | no rival's Enlightenment ever costs a tourist, so Cristo Redentor's cancelling clause has nothing to cancel |
@@ -107,8 +107,8 @@ nothing carries forward.
 | C-34 air combat's second half | 2 | bases, both heads, the sortie and the scatter ship; Interception, Patrol and Priority Target — the whole reason a fighter exists — do not |
 | C-35 the land/water fact never moves | 2 | one static bit answers "is this sea", "can a hull stand here" and "is this coastal"; no tile can become water, which is what submersion and the Canal's passage each need |
 | C-36 no railroad | 2 | roads are one boolean tier; the railroad's own movement rate, its per-hex Iron and Coal charge and its CO2 have no carrier, which C-20's fifth verb and C-24's third emitter both wait on |
-| **C. Absent systems** | **50** | |
-| **OPEN, TOTAL** | **80** | |
+| **C. Absent systems** | **48** | |
+| **OPEN, TOTAL** | **79** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
 counted the gaps somebody had written as gaps; chapter C counts the ones that
@@ -268,18 +268,28 @@ Civ 6 source or is recorded as unverifiable.
   current-ruleset throughout (see B-D), so the stand-ins are whole absent
   systems (trading posts, unique improvements/luxuries, a faith-purchase
   class, a gold-purchase discount, a per-district Great Person channel) or a
-  flat channel standing in for a %-scaling.
+  flat channel standing in for a %-scaling. ONE of those flat channels is
+  CONDITIONAL and now says so: Geneva's reads "when you are not at war with
+  any civilization", so `cityStateSuzerainCapitalBonus` /
+  `_suz_capital_mask` pay it only while its suzerain is at peace with every
+  MAJOR — a war with a minor is not a war with a civilization, and no other
+  row in the table carries a condition. What survives of Geneva's row is the
+  magnitude alone: +15% of the city's Science against a flat +3.
 - **B-22r. World Congress residuals.** The session is real now: a
-  rotating two-slot slate off `CONGRESS_RESOLUTIONS` — THIRTEEN of the
+  rotating two-slot slate off `CONGRESS_RESOLUTIONS` — SEVENTEEN of the
   twenty-one regular-session resolutions, era windows and A/B texts
   verbatim from the GS wiki table: Urban Development Treaty, Patronage,
   Migration Treaty, Heritage Organization, Mercenary Companies, Trade
   Policy, Policy Treaty, World Ideology, Border Control Treaty, Treaty
-  Organization, Sovereignty, Public Works Program, Deforestation
-  Treaty — the always-3rd
+  Organization, Sovereignty, Public Works Program, Deforestation Treaty,
+  Global Energy Treaty, Public Relations, Military Advisory, World
+  Religion — the always-3rd
   Diplomatic Victory resolution from Modern (+/-2 DVP on the winning
   TARGET),
-  the 10k vote-cost curve, outcome-then-target plurality, +1 DVP to
+  the 10k vote-cost curve, outcome-then-target plurality broken by the
+  FAVOR each side committed (`tally` / `_congress_settle`, sourced: "Ties
+  are broken by the proportion of Diplomatic Favor a player commits" — only
+  a tie there falls back to A / the lower target index), +1 DVP to
   every winning-combo voter, refund tiers 0/50/100, and the standing
   effects consumed on both engines (`congressSession` /
   `_world_congress`, readers `congressGppFactor` /
@@ -300,39 +310,28 @@ Civ 6 source or is recorded as unverifiable.
   (Modern arrives too late for its rotation slot) — the geopolitics
   pokes are its bar. A ballot that DIFFERS from the AI line is
   `congress_vote_test` only: the ladder's own vote reproduces the AI line
-  exactly, so the gate exercises the wire, not the choice. OPEN:
-  - **THE FAVOR TIE-BREAK is unmodeled.** SOURCED: "Ties are broken by
-    the proportion of Diplomatic Favor a player commits." Both engines
-    break an outcome tie to A and a target tie to the lower index, which
-    is a stylization the source contradicts — closing it needs the
-    committed-favor totals carried into `tally` / `_congress_settle` on
-    both sides.
+  exactly, so the gate exercises the wire, not the choice. The three
+  late-added rows are POKE-ONLY by the rotation's own arithmetic: the slate
+  takes eligible ranks `2(s-1)` and `2(s-1)+1` of the session index, and a
+  250-turn seed holds five sessions, so nothing past rank 9 ever stands
+  (`world-congress.test.ts` and `congress_vote_test` are their bar).
+  OPEN:
   - **THE OBSERVATION RENDERS THE STANDING SLATE, not the UPCOMING one.**
     A ballot addresses the session about to run, and the resolutions it
     will carry are computable (`_congress_upcoming`) but not rendered, so
     a net votes on the previous session's slate.
-  - **EIGHT resolutions still have no carrier**, each blocked on a named
-    absence: Arms Control (weapons of mass destruction), Espionage Pact
-    (spies), Governance Doctrine (a governor roster with appointment and
-    promotion, B-24r), Military Advisory (unblocked since the promotion
-      classes shipped — unwritten, not absent),
-    Public Relations (grievances,
-    C-19), Luxury
-    Policy and World Religion. The last two are HALF-sourced, and a
-    resolution whose two outcomes cannot both act is worse than an
-    absent one — it eats a rotation slot and passes a no-op — so they
-    wait with the rest:
+  - **FOUR resolutions still have no carrier**, each blocked on a named
+    absence: Arms Control (weapons of mass destruction, C-31), Espionage
+    Pact (spies), Governance Doctrine (a governor roster with appointment
+    and promotion, B-24r), and Luxury Policy. The last is HALF-sourced, and
+    a resolution whose two outcomes cannot both act is worse than an absent
+    one — it eats a rotation slot and passes a no-op — so it waits with the
+    rest:
     - **Luxury Policy.** SOURCED: "A: Duplicates of this Luxury resource
       grant additional Amenities. / B: This Luxury resource grants no
       Amenities." B is fully specified; A publishes no number, and
       nothing in either engine counts DUPLICATE copies of a luxury —
       amenities come from distinct types.
-    - **World Religion.** SOURCED: "A: +10 Religious Combat Strength for
-      all units of this Religion. / B: Condemning a unit of this
-      Religion yields 25 Diplomatic Favor." Both magnitudes are
-      published, and B's VERB now exists on both engines
-      (`condemnHeretic` / `_condemn_heretic`), so this one is unwritten
-      rather than blocked.
   - **THE CULTURE BOMB DOES NOT WIPE UNFINISHED CONSTRUCTION.** SOURCED
     (Culture Bomb): a bombed tile carrying a district or wonder still
     UNDER CONSTRUCTION is flipped anyway, "wiping out any unfinished
@@ -387,9 +386,10 @@ Civ 6 source or is recorded as unverifiable.
     survives every transfer, and `occupiedCapitals` /
     `_occupied_capitals` feeds `diplomaticFavorPerTurn`, whose sum is
     floored at zero. A loyalty flip counts as occupation because it goes
-    through the same transfer. Still open, each on a named absence: 200
-    Grievance = -1/turn with -1 more per 50 beyond, capping at -10
-    (grievances, C-19). The POLLUTION half ships:
+    through the same transfer. The GRIEVANCE half ships too:
+    `grievanceFavorPenalty` / `_grievance_favor_penalty` take -1/turn at
+    200 Grievances held against a seat, -1 more per 50 beyond, capping at
+    -10. The POLLUTION half ships:
     `pollutionFavorPenalty` / `_pollution_favor_penalty` takes -1/turn per
     3 displayed pollution points above the world average, capping at 20.
 - **B-24r. Ages/governors tails:** the DEDICATION catalog now holds NINE,
@@ -911,8 +911,6 @@ Civ 6 source or is recorded as unverifiable.
     `ranged` and `combat_mod` poke lanes lost their situation entirely. Real
     Civ 6 barbarians raid whoever is near the camp; the target SET is the
     small half of this, and the beeline is the part that has to go first.
-  - The diplomatic consequences of declaring — grievances, the warmonger
-    penalty with other majors, the suzerain's reaction — wait on C-19.
 - **B-53r. The Great Person QUEUE.** The roster is the game's now: all 205
   people from the nine Great Person pages, each carrying the ERA its page's
   own roster column names, ordered by era (`GREAT_PEOPLE`, `GP_FIRST_OF_ERA`).
@@ -1062,6 +1060,35 @@ Civ 6 source or is recorded as unverifiable.
   covers the mountain and the impassable feature, where no citizen can be
   placed and only the border scan reads the tile at all.
 
+- **B-63r. The grievance ledger's two unpublished magnitudes.** The
+  mechanic itself is whole. GS keeps ONE signed balance per unordered pair
+  (sourced: the score is "organized as a coordinate system, with the
+  'neutral' point, 0, and Civilizations A and B standing on the two sides of
+  the neutral point"), so `state.grievances` keys it like every other pair
+  clock and `civ_grievance` is its antisymmetric matrix; the digest field
+  `grievances` compares them. Every published row pays: surprise war 150,
+  formal war 100, war on a friend or ally 75, war on a city-state's suzerain
+  100 and on an envoy holder 50, city occupied 50, razed 3x that, the final
+  city of a civ 150 to every survivor, a city-state conquered 50 and razed
+  100, a denouncement 25, and 3 per turn while holding a civ's original
+  capital at peace. Allies of the victim take 50% of the same act and
+  declared friends 25% (`spreadGrievance` / `_spread_grievance`). The ledger
+  decays at "10 - x per turn, where x is each era after the Ancient Era",
+  floored, only while THAT pair is at peace, slower for the party whose
+  founded cities are held and faster for the holder (`City.founderSeat` /
+  `city_founder` is what that asks about). It costs diplomatic favor at the
+  sourced ladder (B-20r), gates friendship, feeds the AI's gang-up read, and
+  PUBLIC RELATIONS scales what an act generates. OPEN, and neither can be
+  closed from a source:
+  - **THE OCCUPIED AND RAZED ROWS SHIP AT THEIR CEILING.** The table
+    publishes "City Occupied ... up to 50" and "City Razed ... up to 150"
+    without the pop or war-type scale that walks up to it, so both engines
+    charge the ceiling flat. A source that publishes the scale closes it.
+  - **THE GANG-UP BAR IS A HEURISTIC.** `GRIEVANCE_GANG` is twice a formal
+    declaration and is what the AI reads to decide a seat is a common enemy.
+    No source publishes an AI threshold; this is a tuning knob wearing a
+    sourced unit.
+
 ## C. ABSENT SYSTEMS — the blockers, and the gaps waiting on them
 
 THIS CHAPTER EXISTS BECAUSE "recorded" IS NOT "closed" (owner, 2026-08-19).
@@ -1192,7 +1219,6 @@ number was under-counting by treating deferrals as closures.
     nothing.
   - The **+25% Open-Borders tourism** is an INTERNATIONAL modifier, applied
     per foreign civilization; blocked on C-28.
-  - **25 Grievances per denouncement** (GS); blocked on C-19.
 - **C-5. STRATEGIC-RESOURCE STOCKPILES — the bank ships; unit FUEL does
   not.** Weight 2. Gathering Storm puts a strategic resource to three uses —
   "unit production, as fuel for unit upkeep, and for Power production for
@@ -1353,12 +1379,6 @@ number was under-counting by treating deferrals as closures.
 - **C-17. EMBARKED MOVEMENT DOES NOT UPGRADE.** Weight 1. `constants` records
   that the tech upgrades to embarked movement are unmodeled; the flat
   EMBARK_MOVES stands in for every era.
-- **C-19. GRIEVANCES AND WARMONGERING — war costs nothing but the war.**
-  Weight 2. No seat's standing with anyone moves when it declares, razes or
-  conquers. Gaps: the diplomatic consequences of declaring on a city-state
-  (`declareWarOnCityState`), the suzerain's reaction, and the 25 Grievances
-  GS charges for a denouncement. (The To Arms! casus belli no longer waits
-  here: the denouncement it needed ships with its own 30-turn window.)
 - **C-20. THE MILITARY ENGINEER'S LAST THREE VERBS.** Weight 1. Its page reads
   "Can construct Roads, Forts, Airstrips, and Missile Silos (uses 1 charge)",
   "[GS] Can construct Railroads (costs no charge) and Mountain Tunnels (uses 1
@@ -1525,8 +1545,8 @@ number was under-counting by treating deferrals as closures.
   Real Civ 6 gives every civilization an ability of its own, its leader an
   ability and an agenda, a unique unit, and a unique piece of infrastructure
   (a building, a district or an improvement); none of the five exists on
-  either engine, and `aggression` / `warmonger` are this model's own tuning
-  rather than any published agenda. Gaps waiting on it: the Impi and the
+  either engine, and `aggression` is this model's own tuning rather than any
+  published agenda. Gaps waiting on it: the Impi and the
   Hypaspist, which raise a Flanking or Support stack above +2 for their owner
   (B-54r); the Gauls' OPPIDUM, which is a third defensible district and so a
   third place those bonuses are withheld; Ambiorix's leader ability, which

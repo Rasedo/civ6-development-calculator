@@ -114,6 +114,7 @@ class SimPhase:
         _def_seat = torch.where(is_vet_mil, d_seat, torch.full_like(tt, -1))
         _def_nav = torch.where(is_vet_mil, self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
         def_e = def_e + self._gen_aura_cs(_def_seat, tt, d_emb | _def_nav).to(def_e.dtype)
+        def_e = def_e + self._advisory_cs(d_type).to(def_e.dtype)
         self._city_strike_resolve(strike, tt, d_slot, d_seat, _okm, _okc, is_vet_mil,
                                   atk_cs, def_e, def_hp, row, key)
 
@@ -885,17 +886,16 @@ class SimPhase:
              # CIV6 (Losing Favor): "-1/turn for every 3 pollution points
              # higher than average", capped at 20.
              - self._pollution_favor_penalty(row)
+             # CIV6 (Losing Favor): "200 Grievance = -1 Diplomatic Favor.
+             # Every 50 Grievance = -1", to a floor of -10.
+             - self._grievance_favor_penalty(row).double()
              - self._favor_occ_capital * self._occupied_capitals(row))
         self.civ_diplo_favor[:, row] = self.civ_diplo_favor[:, row].clamp(min=0)
-        # grievances DECAY by 1 per turn at peace with every MAJOR — the row's
-        # own line of the war matrix, minus the city-state columns, because
-        # `atPeaceWithAllCivs` walks `state.seats` and nothing else.
-        at_peace = ~self.war[:, row, :self.n_majors].any(dim=1)
-        self.civ_warmonger[:, row] = torch.where(
-            active & at_peace & (self.civ_warmonger[:, row] > 0),
-            self.civ_warmonger[:, row] - 1,
-            self.civ_warmonger[:, row],
-        )
+        # The GRIEVANCE ledger's own turn: every original capital this row
+        # sits in keeps charging while that war is over, and each pair decays
+        # once, on its lower seat.
+        self._grievance_held_capitals(row)
+        self._grievance_decay(row)
         bank(self.civ_civic_prog, cul_sum)
         bank(self.civ_culture, cul_sum)
         for _ in range(RESEARCH_LOOPS):

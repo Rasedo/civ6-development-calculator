@@ -1,26 +1,28 @@
 import { describe, it, expect } from 'vitest';
 import type { Seat } from '../../../cpu/core/types';
-import { seatOf, setWar } from '../../../cpu/core/seats';
+import { seatOf, setFriendTurnsWith, setWar } from '../../../cpu/core/seats';
 import { createGame, endTurn } from '../../../cpu/core/game';
 import { declareWar } from '../../../cpu/core/phase';
 import { grantCivics, settleFirstCity } from '../helpers';
-import { WARMONGER_DOW, WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL } from '../../../cpu/data/seats';
+import { DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, AGREEMENT_TURNS, FORMAL_WAR_MIN_TURNS,
+  GRIEVANCE_WAR_SURPRISE, GRIEVANCE_WAR_FORMAL, GRIEVANCE_DECAY_BASE, GRIEVANCE_DENOUNCE,
+  GRIEVANCE_FRIEND_SHARE, GRIEVANCE_CITY_TAKEN, GRIEVANCE_LAST_CITY, GRIEVANCE_GANG,
+  GRIEVANCE_HELD_CAPITAL_PER_TURN, GRIEVANCE_OCCUPIED_CAPITAL_DECAY,
+  GRIEVANCE_FAVOR_FLOOR, GRIEVANCE_FAVOR_STEP, GRIEVANCE_FAVOR_MAX } from '../../../cpu/data/seats';
+import { addGrievance, grievanceDenounce, grievanceFavorPenalty, grievanceWith, grievancesAgainst } from '../../../cpu/core/grievance';
 import { diplomaticFavorPerTurn, occupiedCapitals } from '../../../cpu/core/seatTurn';
 import { foundCityAt } from '../../../cpu/core/game';
 import { transferCity } from '../../../cpu/core/phase';
 import { GOVERNMENTS } from '../../../cpu/data/policies';
 
-// THE WARMONGER score (grievances), one `Seat.warmonger` per seat. Real Civ 6
-// prices aggression in grievances: declaring war and taking cities make a civ
-// shunned and ganged up on. Grows on declaring (+4) and on taking a foreign
-// city (+3), decays 1/turn while at peace with EVERY civ, floor 0. Past
-// WARMONGER_GANG a seat may be declared on WITHOUT the usual strength
-// advantage.
+// GRIEVANCES (GS), one signed balance per PAIR. Real Civ 6 prices aggression
+// in grievances: declaring war, taking cities, razing them and denouncing all
+// tip the pair's balance toward the victim, the world reads what a seat owes
+// everyone as one bill, and peace decays it era by era.
 //
-// MEASURED live in the gate: seat 0's score peaks at exactly the gang
-// threshold (6) with 192 civ-turns at or over it across the 24 scripted seeds,
-// so the changed DoW gate is genuinely exercised and `warmonger` is a compared
-// HEAD trace column. These pokes pin the accrual and decay rules themselves.
+// `grievances` is a compared digest field on both engines, so these pokes pin
+// the accrual, the spread to friends and allies, the decay and the favor
+// penalty that reads the whole bill.
 
 function newGame(opponents = 1) {
   const state = createGame({
@@ -102,47 +104,123 @@ describe('diplomatic favor', () => {
   });
 });
 
-describe('seat-0 grievances', () => {
-  it('declaring war earns grievances', () => {
+describe('grievances', () => {
+  // CIV6 (Grievances): "a score which each pair of civilizations keep for each
+  // other", one signed balance per pair, tipped by the transgressor and
+  // decayed back toward zero while the pair is at peace. Every magnitude here
+  // is the Grievances page's own table row.
+  it('a SURPRISE declaration pays the target 150, a FORMAL one 100', () => {
     const state = newGame(1);
-    expect(seatOf(state, 0)!.warmonger ?? 0).toBe(0);
-    expect(declareWar(state, (state.seats[1] as Seat).seat, 0).ok).toBe(true);
-    expect(seatOf(state, 0)!.warmonger).toBe(WARMONGER_DOW);
+    const foe = (state.seats[1] as Seat).seat;
+    expect(grievanceWith(state, foe, 0)).toBe(0);
+    expect(declareWar(state, foe, 0).ok).toBe(true);
+    expect(grievanceWith(state, foe, 0)).toBe(GRIEVANCE_WAR_SURPRISE);
+    // and the balance is one number seen from both sides
+    expect(grievanceWith(state, 0, foe)).toBe(-GRIEVANCE_WAR_SURPRISE);
+
+    const s2 = newGame(1);
+    const foe2 = (s2.seats[1] as Seat).seat;
+    seatOf(s2, 0)!.denounced[foe2] = s2.turn - FORMAL_WAR_MIN_TURNS;
+    expect(declareWar(s2, foe2, 0).ok).toBe(true);
+    // the denouncement itself is not paid here; only the declaration is
+    expect(grievanceWith(s2, foe2, 0)).toBe(GRIEVANCE_WAR_FORMAL);
   });
 
-  it('grievances do NOT decay while a war is still running', () => {
+  it('the ledger does NOT decay while that pair is still at war', () => {
     const state = newGame(1);
-    declareWar(state, (state.seats[1] as Seat).seat, 0);
-    const before = seatOf(state, 0)!.warmonger!;
+    const foe = (state.seats[1] as Seat).seat;
+    declareWar(state, foe, 0);
+    const before = grievanceWith(state, foe, 0);
     endTurn(state);
-    expect(seatOf(state, 0)!.warmonger).toBe(before); // still at war -> no decay
+    expect(grievanceWith(state, foe, 0)).toBe(before);
   });
 
-  it('grievances decay by 1 per turn once at peace with every civ', () => {
+  it('at peace it decays 10/turn in the Ancient era, and stops at zero', () => {
     const state = newGame(1);
-    declareWar(state, (state.seats[1] as Seat).seat, 0);
-    setWar(state, (state.seats[(0) + 1] as Seat).seat, 0, false); // peace on every axis
-    const before = seatOf(state, 0)!.warmonger!;
+    const foe = (state.seats[1] as Seat).seat;
+    declareWar(state, foe, 0);
+    setWar(state, foe, 0, false);
+    const before = grievanceWith(state, foe, 0);
     endTurn(state);
-    expect(seatOf(state, 0)!.warmonger).toBe(before - 1);
+    expect(grievanceWith(state, foe, 0)).toBe(before - GRIEVANCE_DECAY_BASE);
+    addGrievance(state, foe, 0, -(grievanceWith(state, foe, 0) - 3));
+    endTurn(state);
+    expect(grievanceWith(state, foe, 0)).toBe(0);  // the step never overshoots
+    endTurn(state);
+    expect(grievanceWith(state, foe, 0)).toBe(0);
   });
 
-  it('decay floors at zero and never goes negative', () => {
-    const state = newGame(1);
-    seatOf(state, 0)!.warmonger = 1;
-    endTurn(state);
-    expect(seatOf(state, 0)!.warmonger).toBe(0);
-    endTurn(state);
-    expect(seatOf(state, 0)!.warmonger).toBe(0); // stays put, never negative
+  it('denouncing pays 25, and a declared friend of the victim takes a quarter', () => {
+    const state = newGame(2);
+    const b = (state.seats[1] as Seat).seat;
+    const c = (state.seats[2] as Seat).seat;
+    setFriendTurnsWith(state, c, b, AGREEMENT_TURNS);
+    grievanceDenounce(state, 0, b);
+    expect(grievanceWith(state, b, 0)).toBe(GRIEVANCE_DENOUNCE);
+    expect(grievanceWith(state, c, 0)).toBe(Math.floor((GRIEVANCE_DENOUNCE * GRIEVANCE_FRIEND_SHARE) / 100));
   });
 
-  it('the gang threshold is a real bar the score can reach', () => {
-    // Two declarations put seat 0 at 8, past the gang threshold of 6 —
-    // the point at which opponents stop needing a strength advantage.
+  it('taking a city pays 50, and taking the LAST one pays every survivor 150', () => {
+    const state = newGame(2);
+    const loser = state.seats[1] as Seat;
+    const watcher = (state.seats[2] as Seat).seat;
+    settleFirstCity(state, loser.seat);
+    const city = loser.cities[0]!;
+    loser.cities = [city];  // the one it is about to lose IS its last
+    transferCity(state, loser.seat, seatOf(state, 0)!, city, 'conquered');
+    expect(grievanceWith(state, loser.seat, 0)).toBe(GRIEVANCE_CITY_TAKEN + GRIEVANCE_LAST_CITY);
+    expect(grievanceWith(state, watcher, 0)).toBe(GRIEVANCE_LAST_CITY);
+  });
+
+  it('a LOYALTY FLIP is free: the ledger only reads a conquest', () => {
+    const state = newGame(1);
+    const loser = state.seats[1] as Seat;
+    settleFirstCity(state, loser.seat);
+    transferCity(state, loser.seat, seatOf(state, 0)!, loser.cities[0]!, 'loyalty');
+    expect(grievanceWith(state, loser.seat, 0)).toBe(0);
+  });
+
+  it('sitting in a captured ORIGINAL CAPITAL charges 3 a turn once the war is over', () => {
+    const state = newGame(1);
+    const loser = state.seats[1] as Seat;
+    settleFirstCity(state, loser.seat);
+    transferCity(state, loser.seat, seatOf(state, 0)!, loser.cities[0]!, 'conquered');
+    const before = grievanceWith(state, loser.seat, 0);
+    endTurn(state);
+    // one held capital: +3 charged, and the victim's own balance decays
+    // SLOWER for it -- base minus the capital modifier
+    expect(grievanceWith(state, loser.seat, 0))
+      .toBe(Math.max(0, before + GRIEVANCE_HELD_CAPITAL_PER_TURN
+        - (GRIEVANCE_DECAY_BASE - GRIEVANCE_OCCUPIED_CAPITAL_DECAY)));
+  });
+
+  it('the favor penalty starts at 200 grievances and steps every 50, capping at 10', () => {
+    const state = newGame(1);
+    const foe = (state.seats[1] as Seat).seat;
+    expect(grievanceFavorPenalty(state, 0)).toBe(0);
+    addGrievance(state, foe, 0, GRIEVANCE_FAVOR_FLOOR - 1);
+    expect(grievanceFavorPenalty(state, 0)).toBe(0);
+    addGrievance(state, foe, 0, 1);
+    expect(grievanceFavorPenalty(state, 0)).toBe(1);
+    addGrievance(state, foe, 0, GRIEVANCE_FAVOR_STEP);
+    expect(grievanceFavorPenalty(state, 0)).toBe(2);
+    addGrievance(state, foe, 0, 100 * GRIEVANCE_FAVOR_STEP);
+    expect(grievanceFavorPenalty(state, 0)).toBe(GRIEVANCE_FAVOR_MAX);
+  });
+
+  it('a pair the transgressor is WINNING adds nothing to its bill', () => {
+    const state = newGame(1);
+    const foe = (state.seats[1] as Seat).seat;
+    addGrievance(state, 0, foe, 300);      // seat 0 is the victim here
+    expect(grievancesAgainst(state, 0)).toBe(0);
+    expect(grievancesAgainst(state, foe)).toBe(300);
+  });
+
+  it('the gang threshold is a bar the ledger can reach', () => {
     const state = newGame(2);
     declareWar(state, (state.seats[1] as Seat).seat, 0);
     declareWar(state, (state.seats[2] as Seat).seat, 0);
-    expect(seatOf(state, 0)!.warmonger).toBe(2 * WARMONGER_DOW);
-    expect(seatOf(state, 0)!.warmonger!).toBeGreaterThanOrEqual(WARMONGER_GANG);
+    expect(grievancesAgainst(state, 0)).toBe(2 * GRIEVANCE_WAR_SURPRISE);
+    expect(grievancesAgainst(state, 0)).toBeGreaterThanOrEqual(GRIEVANCE_GANG);
   });
 });
