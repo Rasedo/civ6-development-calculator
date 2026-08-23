@@ -58,6 +58,10 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // like every verb since FOUND_CITY.
   names.push('BUILD_ROAD');
   names.push('FINISH_DISTRICT');
+  // THE GREAT PERSON'S ONE VERB: spend a charge where this person's ability
+  // may be spent. One column for all nine classes — which person is acting is
+  // the unit's own chassis and queue position, not a column.
+  names.push('ACTIVATE_GP');
   return names;
 }
 

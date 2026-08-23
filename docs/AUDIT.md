@@ -61,11 +61,11 @@ nothing carries forward.
 | B-24r Ages/governors | 1 | all twelve dedications ship, both faces; dark-age policies, governor promotions and per-civ era drift do not |
 | B-30r specialists | 1 | the mechanic, both citizen overrides and the three-plant Industrial tier ship; a LOCK still outlives the city that set it |
 | B-31r trade-route tails | 1 | sea legs and the whole-destination-set candidate ship; no trading posts, plunder gold is a stylization, the summed-yield key is a heuristic and the free-choice head is P8's |
-| B-53r the great-person queue | 1 | 205 sourced people, the era gate and the scaled price ship; the offer is re-derived each turn rather than frozen, and the payout is one era-sized lump instead of the person's own ability |
+| B-53r the great-person queue | 1 | 205 sourced people, the era gate, the scaled price and each person's own ability ship; the offer is re-derived each turn rather than frozen, and faith never patronizes one |
 | B-D unsourced data values | 2 | the Monument, the Lighthouse and the Engineer's Armory shipped and one bullet was false; the governments are half-shipped, and the rest are shape differences or model tuning that no source can close |
-| B-36r appeal adjacency terms | 1 | every district AND improvement term ships off one catalog column; the CIVILIZATION-unique improvements' terms (C-26) and the appeal-granting Great People (C-21) do not |
-| B-39r wonder effects still dropped | 1 | the sourced sweep shipped fourteen channels; five residuals, each blocked on B-20r, C-21, B-34r or C-23 |
-| B-45r sourced-sweep finds in the other rows | 1 | three of the eight now have a channel; the five that do not need free units (C-21), faith-bought Great People (C-9), a rival-recruit event, or B-31r's route yields |
+| B-36r appeal adjacency terms | 1 | every district AND improvement term ships off one catalog column, and a Great Person can now grant a city's tiles appeal; the CIVILIZATION-unique improvements' terms (C-26) do not |
+| B-39r wonder effects still dropped | 1 | the sourced sweep shipped fourteen channels and the Mausoleum's engineer charge; three residuals, each blocked on B-20r, B-34r or C-23 |
+| B-45r sourced-sweep finds in the other rows | 1 | three of the eight now have a channel; the five that do not need a wonder that grants a UNIT, faith patronage (B-53r), a rival-recruit event, or B-31r's route yields |
 | B-46r the siege class's tails | 1 | the Bombard stat, both support chassis, all four walls tiers, the move-and-shoot rule and every siege rung through Rocket Artillery ship; Akkad's suzerain bonus does not |
 | B-54r flanking and support vs their own page | 1 | six rules the two engines agree on and the page does not: the Military Tradition gate, the flanking owner and river rules, support against ranged, embarked providers, and defensible districts |
 | B-55r a ship cannot carry a passenger | 1 | one MILITARY unit per tile, where Civ 6 stacks an embarked land unit with a naval one — which is where Support's 7th through 10th stacks live |
@@ -75,23 +75,23 @@ nothing carries forward.
 | B-59r the religious spread is a flat lump | 2 | Civ 6 scales the pressure by the Apostle's HP and strips a quarter of every other religion; both engines add a constant and strip nothing without Proselytizer |
 | B-51r the Encampment's second pool | 1 | the district meets the city's perimeter and heals only while its tile is clear; Civ 6 tracks the two pools SEPARATELY, and a defeat pillages it |
 | B-44r city-state war tails | 1 | the head, its policy and a SEAT's march on a minor ship; the barbarian walker still raids only majors because it beelines to one nearest city, and the diplomatic consequences wait on C-19 |
+| B-61r the Great Person clauses with no carrier | 2 | the roster is placed and used; 20 of the 205 rows name a mechanic nothing here has, and eight effect channels the sweep found were dropped with their blockers |
 | B-60r the dig's DATE, and the hull nobody dates | 1 | the artifact's civilization is the event's own now; its ERA is still the ACTING seat's research, and a barbarian or minor sinking a hull leaves no wreck at all |
 | B-34r flood tails | 1 | the severity ladder, the river's whole reach, the river-scoped shield and the Dam all ship; the per-tile flood count and the climate/coastal tails do not |
-| **B. Fidelity vs real Civ 6** | **26** | |
+| B-62r a natural wonder takes no tile adds | 1 | the wonder's roster yields are the whole tile: no pantheon feature yield, no suzerain improvement adjacency and no Preserve band, though the Grove's own text pays any adjacent unimproved Breathtaking tile |
+| **B. Fidelity vs real Civ 6** | **29** | |
 | C-1 POWER | 2 | the grid, the three plants, Cardiff, the Hydroelectric Dam, the powered-yield split, the FUEL and its CO2 all ship; four renewable improvements and the Biosphere have no carrier, nothing can retire a plant, and a minor's cities are never powered |
 | C-2 diplomatic agreements | 3 | friendship, alliances, open borders, the closed border and the work gift ship on one 30-turn clock; alliance TYPES and LEVELS, the negotiated two-sided deal, and the four agreements that need one are open |
 | C-5 strategic-resource stockpiles | 2 | the bank, its ceiling, the unit and project charges, the plants' fuel, unit FUEL upkeep and the heal a lost source denies all ship; the shortage penalty's magnitude is unpublished and trading resources waits on C-2 |
 | C-6 policy-card modifiers | 1 | two of the 49 cards are inert, each blocked on a system below |
 | C-7 trading posts | 2 | a route lays roads and plants nothing |
 | C-8 draws made deterministic | 2 | the Great Person replacement walks a queue and the Congress slate rotates, where Civ 6 draws both |
-| C-9 faith-purchase classes | 1 | faith buys named units, never a class of building |
 | C-13 ranged vs districts/cities | 2 | a scope-out on both, with the rest of the Encampment complete |
 | C-15 garrison does not block capture | 2 | the move-onto-centre capture model is what is missing |
 | C-16 the spy's second half | 2 | the Spy, its capacity, the jump and all twelve missions ship; the escape-and-capture sequence, the spy promotion pool and two missions with no carrier do not |
 | C-17 embarked movement never upgrades | 1 | the flat EMBARK_MOVES stands in for every era |
 | C-19 grievances and warmongering | 2 | war has no reputational consequence with anyone |
 | C-20 the Military Engineer's build list | 1 | the Fort, the Airstrip, the road and the 20% charge all ship; the Missile Silo waits on C-31, the Mountain Tunnel on C-35 and the railroad on C-36 |
-| C-21 Great Person ACTIVATED abilities | 2 | every GP fires instantly; none is placed and used |
 | C-22 the district roster is a subset | 2 | all eighteen districts ship; the Canal carries no naval passage, six Government Plaza buildings have no effect body, and the Preserve's housing table is unpublished |
 | C-23 nothing diminishes tourism | 1 | no rival's Enlightenment ever costs a tourist, so Cristo Redentor's cancelling clause has nothing to cancel |
 | C-24 the climate arc | 1 | emissions, the seven phases, ice melt, flooding, the Flood Barrier and a warmed world's weather all ship; nothing is ever submerged (C-35), the barrier's maintenance is unpublished, and railroads and the Mitigation civic's award have no carrier |
@@ -107,7 +107,7 @@ nothing carries forward.
 | C-34 air combat's second half | 2 | bases, both heads, the sortie and the scatter ship; Interception, Patrol and Priority Target — the whole reason a fighter exists — do not |
 | C-35 the land/water fact never moves | 2 | one static bit answers "is this sea", "can a hull stand here" and "is this coastal"; no tile can become water, which is what submersion and the Canal's passage each need |
 | C-36 no railroad | 2 | roads are one boolean tier; the railroad's own movement rate, its per-hex Iron and Coal charge and its CO2 have no carrier, which C-20's fifth verb and C-24's third emitter both wait on |
-| **C. Absent systems** | **53** | |
+| **C. Absent systems** | **50** | |
 | **OPEN, TOTAL** | **80** | |
 
 THE TOTAL IS FIVE TIMES WHAT IT WAS while the code only got better. The old number
@@ -565,8 +565,13 @@ Civ 6 source or is recorded as unverifiable.
   the three that shipped first, the Aerodrome is -1 like the other
   heavy-industry rows, the Government Plaza and Diplomatic Quarter are 0, and
   the Airstrip joins the Mine, the Quarry and the Oil Well at -1.
-  OPEN, each blocked: the CIVILIZATION-unique improvements' terms (C-26) and
-  the appeal-granting Great People (C-21).
+  A GREAT PERSON CAN NOW GRANT IT TOO. The `appeal` per-city channel
+  (`gpCityPermOf` / `_gp_tile_appeal`) adds to every tile the granting city
+  owns, threaded through all nine `tileAppeal` call sites as an optional
+  resolver (`gpAppealResolver` / `_gp_appeal_plane`) so no call site can
+  silently default, and read BEFORE the wonder/mountain override on both
+  engines.
+  OPEN: the CIVILIZATION-unique improvements' terms (C-26).
 - **B-39r. Wonder effects still dropped.** All THIRTY rows were re-fetched
   from the GS Civilopedia one by one and the effect lists rewritten against
   them, so `BUILT_WONDERS` is now a sourced table rather than a costs-and-
@@ -585,12 +590,16 @@ Civ 6 source or is recorded as unverifiable.
   wonder pays; and four wrong magnitudes were corrected (Colosseum 1 -> 3
   amenities, Oxford +10% -> +20% science, Potala science/faith -> culture 2 /
   faith 3, Sankoré 2 -> 3 science).
+  THE MAUSOLEUM'S CHARGE SHIPS. "All Engineers have an additional charge
+  (applies to both existing Great Engineers and Military Engineers)" is
+  `engineerCharges` / `_wond_eng_ch`: paid once to every live engineer at
+  completion and again at every later spawn, over both chassis
+  (`isEngineer` / `_engineer_types`).
   OPEN, each blocked: Apadana's "+2 Great Work slots (any type)" and the
   Hermitage's LANDSCAPE-only art slots, both waiting on the per-work TYPE
-  B-20r names; the Mausoleum's "all Engineers have an additional charge"
-  (C-21 — a Great Person fires instantly here and is never a unit); the Great
-  Bath's per-flood faith (B-34r); and Cristo Redentor's clause that relic and
-  holy-city tourism is not diminished by a rival's Enlightenment (C-23).
+  B-20r names; the Great Bath's per-flood faith (B-34r); and Cristo
+  Redentor's clause that relic and holy-city tourism is not diminished by a
+  rival's Enlightenment (C-23).
 - **B-45r. The effects the SOURCED sweep found in the other rows.** Three of
   the eight now have a channel, each re-sourced at its own page before it was
   written: `cityYieldPerImprovement` pays the Ruhr Valley's "+1 Production for
@@ -605,10 +614,10 @@ Civ 6 source or is recorded as unverifiable.
   `tests/cpu/city/wonder-effects.test.ts` are the only proof.
   OPEN — the five that still have nowhere to live:
   - Stonehenge's free Prophet and its found-a-religion-on-the-wonder clause,
-    and the Pyramids' free Builder: a wonder that GRANTS A UNIT has no path
-    (C-21).
+    and the Pyramids' free Builder: no wonder effect channel GRANTS A UNIT,
+    and the completion body has nowhere to spawn one from.
   - The Oracle's 25%-cheaper Great Person patronage: faith never buys a Great
-    Person here (C-9), so there is nothing to discount.
+    Person here (B-53r's own residual), so there is nothing to discount.
   - The Great Library's boost when a RIVAL recruits a Great Scientist: no
     engine raises an event on another seat's recruit.
   - The Colossus' and Great Zimbabwe's +1 trade-route capacity and free
@@ -795,6 +804,47 @@ Civ 6 source or is recorded as unverifiable.
     refuses outright — every hull a raider sinks vanishes without a dig. The
     same world-era reading above would close it.
 
+- **B-61r. The Great Person clauses with no carrier.** Weight 2. The roster is
+  PLACED AND USED: each of the 205 people is a unit on the map carrying its
+  queue position (`Unit.gpAt` / `unit_gp_at`), walks to the site its own row
+  names, and spends a charge there through one action column
+  (`ACTIVATE_GP` / `_A_GP`). `GP_ABILITY` is the sourced per-person table and
+  `gpEffectOf` is the one resolver both engines read; `GP_FX` names the dense
+  wire columns so neither engine writes a position down. Twenty-six effect
+  kinds fire, from the eureka draws through the instant buildings, the
+  invented luxuries, the per-adjacency yields and the two permanent runs
+  (`GP_PERM` per seat, `GP_CITY_PERM` per city).
+  WHAT DOES NOT. Twenty rows carry `unmodelled: true` — their clause names a
+  mechanic nothing here has, and the class lump stands in: Mary Leakey, Shah
+  Jahān, Nikola Tesla, Joseph Paxton, Kenzo Tange, Stamford Raffles, Sarah
+  Breedlove, Mary Katherine Goddard, Jamsetji Tata, Masaru Ibuka, Boudica,
+  El Cid, Dandara, Napoleon Bonaparte, Túpac Amaru, Marina Raskova, Gaius
+  Duilius, Leif Erikson, Santa Cruz, Matthew Perry. The flag is the honest
+  half of the table: a row that carries it is NOT claiming its Civilopedia
+  text is modelled.
+  The channels those clauses need, each with its own blocker:
+  - a pillage yield percentage (C-27 — pillaging pays nothing to scale);
+  - diplomatic visibility of a rival (no visibility system on either engine);
+  - a district built OVER the population limit (no district pop limit here);
+  - a tourism percentage on a trade route, and district tourism (C-28's one
+    lifetime scalar, and C-23);
+  - a seat-wide building yield add, and per-tile air slots;
+  - science from an ARTIFACT beyond what the museum already pays;
+  - CORPS/ARMY/FLEET/ARMADA — no formation system exists, so every clause
+    that forms or strengthens one is inert;
+  - a REGIONAL building's reach (Tesla, Paxton) — `regionalRange` is a
+    per-building constant with no per-seat modifier;
+  - absorbing a city-state (Raffles), converting a barbarian outpost
+    (Boudica), and annexing an adjacent tile (Crassus) — three verbs with no
+    entry point.
+  `luxuryFromTile` was mapped onto the generic `luxuryCopies` pass rather than
+  reading the person's named resource, which is a stylization, not a channel.
+  REACHABILITY: the driven 250-turn probe reaches a Great Person unit on all
+  12 seeds at t53, the ACTIVATE_GP column at t54 and a spent charge at t55;
+  the per-seat permanent run on 8/12 seeds and the per-city one on 6/12.
+  `tests/gpu/great_person_test.py` and `tests/cpu/units/greatPerson.test.ts`
+  hold the arms the gate does not.
+
 - **B-51r. The Encampment's second pool.** An assault on the district now
   meets the perimeter: `attackEncampment` / `_attack_encampment` find the city
   behind the tile (`cityAtTile` / `_owner_city_col`) and divide the roll
@@ -884,11 +934,12 @@ Civ 6 source or is recorded as unverifiable.
     cheaper (or be skipped entirely) between one turn and the next without
     anyone claiming them. An exact model needs two per-class state fields —
     the frozen index and the frozen price — on both engines and on the wire.
-  - **THE PAYOUT IS ONE ERA-SIZED LUMP, not the person's own ability.** Every
-    recruit pays `GP_ERA_GPP[era]` in `GP_CURRENCY`'s currency for its class.
-    Real Civ 6 gives each Great Person a UNIQUE activated ability; that is
-    C-21's, and this row records that the roster now carries the names and
-    eras those abilities would hang off.
+  - **FAITH NEVER PATRONIZES ONE.** CIV6 (Faith): "Faith can be used at all
+    times to purchase Great People via Patronage." Here the only currency on
+    the offer is the class's own Great Person points, so a seat with a large
+    faith income cannot outbid a rival for a person, and the Oracle's
+    25%-cheaper patronage (B-45r) has nothing to discount. The queue and the
+    price both exist; what is missing is the second purse on the same offer.
 - **B-D. UNSOURCED DATA VALUES — swept once; the named stylizations are
   OPEN, not closed.** The cpu/data walk fetched every magnitude from the GS
   Civilopedia row by row: all 28 wonders (12 corrected, every unlock now the
@@ -976,6 +1027,40 @@ Civ 6 source or is recorded as unverifiable.
     effect rate and no distribution at all, tying the frequencies to a
     Disaster Intensity setting that has no counterpart here; the SHAPE is
     sourced, the three numbers are not.
+  - **VALLETTA'S WALLS DISCOUNT HAS NO PUBLISHED MAGNITUDE.** SOURCED (its
+    suzerain row): "Cost of purchasing Ancient, Medieval, and Renaissance
+    Walls is reduced, but they can only be bought with Faith." The
+    faith-ONLY half ships (`wallsGoldBlocked` / the walls arm of
+    `_seat_buy_candidates`); the REDUCTION does not, because neither the
+    city-state page nor any of the three walls pages states a number, so the
+    walls price at the ordinary faith rate. One published figure closes it.
+  - **THE FAITH RATE FOR A LAND COMBAT UNIT IS INFERRED.** Valletta's page
+    publishes one faith rate and it is for BUILDINGS — "2 Faith for 1
+    Production", which is `FAITH_PURCHASE_MULT`. Theocracy's and the Grand
+    Master's Chapel's unit purchase (`unitFaithCost` /
+    `_seat_faith_unit_candidate`) reuses that same rate because no page
+    states the unit one; the Faith page only says the price rises "as with
+    Gold purchases".
+  - **THEOCRACY'S INHERENT ROW IS STILL THE MODEL'S.** SOURCED (GS): "+0.5
+    Faith per Citizen in cities with Governors. 15% Discount on Purchases
+    with Faith", beside the land-unit grant that now ships. The row pays
+    +10% faith in all cities instead — the governor-gated yield is the same
+    channel Merchant Republic and Communism wait on above, and the faith
+    discount is the purchase-price channel named there.
+
+- **B-62r. A natural wonder's tile pays its own roster row and nothing
+  else.** `tileYields` LEAVES on `tile.wonder`, so such a tile takes the
+  wonder's published yields and none of the runtime adds every other tile
+  gets: a pantheon's `featureYields`, a suzerain improvement's adjacency,
+  and the PRESERVE's own bands. The GPU used to pay those adds on top and
+  now masks them in `_tile_add_live`, so the engines agree — on the wrong
+  answer. SOURCED (Grove): "+1 Food and Faith to adjacent unimproved tiles
+  with Charming Appeal. Yields increased to +2 Food, Faith and Culture for
+  adjacent unimproved tiles with Breathtaking Appeal." A natural wonder is
+  unimproved and Breathtaking by construction (`tileAppeal` answers 5), so
+  the real building pays it and both engines refuse. The same early return
+  covers the mountain and the impassable feature, where no citizen can be
+  placed and only the border scan reads the tile at all.
 
 ## C. ABSENT SYSTEMS — the blockers, and the gaps waiting on them
 
@@ -1202,9 +1287,6 @@ number was under-counting by treating deferrals as closures.
     (`seats`' own header says so). It draws from the same era window either
     way, so this is the ORDER of the slate, not its contents. B-22r carries
     the rest of the Congress residuals.
-- **C-9. FAITH-PURCHASE CLASSES — faith buys the units the rules name, not
-  classes of BUILDING.** Weight 1. Gap: Valletta's suzerain row (City Center
-  and Encampment buildings buyable with Faith).
 - **C-13. RANGED STRIKES DO NOT ENGAGE DISTRICTS OR CITIES.** Weight 2.
   Recorded as a scope-out for both. The rest of the Encampment (`encamp_hp`
   pool, movement block, garrison pool, district strike, training XP) is
@@ -1310,11 +1392,6 @@ number was under-counting by treating deferrals as closures.
   scripted parity says nothing about any of it. The chassis needs "a city that
   has an Encampment with an Armory", which no seed reaches. `engineer_test.py`
   pokes every rule directly instead.
-- **C-21. GREAT PEOPLE FIRE INSTANTLY; NONE IS PLACED.** Weight 2. A claimed
-  Great Person pays its effect at the claim (`recruit`). Real Civ 6 gives many
-  of them an ACTIVATED ability used later on a chosen tile. Gaps: the
-  appeal-granting Great People (Alvar Aalto, Charles Correa) that B-36r names,
-  and every "activate in a city" ability in the roster.
 - **C-27. PILLAGING PAYS NO YIELDS.** Weight 2. The PILLAGE verb sets
   `pillaged` on the tile, heals a food-improvement pillager and spends the
   move; nothing is banked by anyone on either engine, and there is no coastal
@@ -1600,8 +1677,8 @@ number was under-counting by treating deferrals as closures.
     influence-per-turn ships; the clause that widens it reads a district count
     the influence body never asks for.
   - **THE INTELLIGENCE AGENCY'S "+1 Spy"** is a free UNIT at completion, the
-    same shape as every other free-unit grant (C-21); only its capacity half
-    ships.
+    same shape as the wonder free-unit grants B-45r names; no completion body
+    on either engine spawns one, and only its capacity half ships.
 
 ## Reachability — what the green gate does NOT prove
 
@@ -1616,31 +1693,39 @@ steers the games into a different regime and carries the older rows with it:
 | a PLOT LOCK held by a citizen | 12/12 | t2 |
 | a PRESERVE placed | 12/12 | t27 |
 | a GOVERNMENT PLAZA placed | 12/12 | t43 |
-| faith-buy kind 6 (APOSTLE purchase) | 12/12 | t75 |
+| a GREAT PERSON standing on the map as a unit | 12/12 | t53 |
+| the ACTIVATE_GP column offered to one | 12/12 | t54 |
+| a Great Person CHARGE SPENT | 12/12 | t55 |
+| faith-buy kind 6 (APOSTLE purchase) | 12/12 | t70 |
 | a WORLD CONGRESS ballot on the wire | 12/12 | t89 |
 | a SPECIALIST pinned into a slot | 12/12 | t116 |
 | an OPEN BORDERS grant standing | 11/12 | t34 |
-| a second HULL on any seat | 11/12 | t104 |
-| NATURAL_HISTORY (the Archaeologist's civic) | 10/12 | t170 |
-| a DECLARATION OF FRIENDSHIP | 8/12 | t19 |
-| a DIPLOMATIC QUARTER placed | 8/12 | t98 |
-| an ALLIANCE | 8/12 | t105 |
-| an INTERNATIONAL trade leg | 7/12 | t94 |
-| two enemy religious units ADJACENT (theological combat's precondition) | 6/12 | t86 |
-| CONSERVATION (the Naturalist's civic) | 6/12 | t184 |
-| a DAM placed | 4/12 | t162 |
-| URBANIZATION civic | 3/12 | t219 |
-| a NEIGHBORHOOD placed | 3/12 | t221 |
-| WAR with a city-state | 1/12 | t143 |
-| an antiquity dig (artifact in a slot) | 1/12 | t216 |
-| a unit standing against a CLOSED BORDER | 1/12 | t238 |
-| a WATER PARK placed | 1/12 | t240 |
-| a GREAT WORK given away | 1/12 | t242 |
-| PEACE with a city-state, through the sue column | 0/12 | NEVER |
-| a CANAL placed | 0/12 | NEVER |
+| a second HULL on any seat | 11/12 | t122 |
+| NATURAL_HISTORY (the Archaeologist's civic) | 10/12 | t172 |
+| a DECLARATION OF FRIENDSHIP | 9/12 | t19 |
+| an ALLIANCE | 9/12 | t105 |
+| a DIPLOMATIC QUARTER placed | 8/12 | t101 |
+| a permanent PER-SEAT channel left by a spent Great Person | 8/12 | t110 |
+| an INTERNATIONAL trade leg | 7/12 | t95 |
+| a permanent PER-CITY channel left by a spent Great Person | 6/12 | t155 |
+| two enemy religious units ADJACENT (theological combat's precondition) | 4/12 | t94 |
+| a DAM placed | 4/12 | t163 |
+| CONSERVATION (the Naturalist's civic) | 3/12 | t188 |
+| WAR with a city-state | 2/12 | t142 |
+| a WATER PARK placed | 2/12 | t205 |
+| a unit standing against a CLOSED BORDER | 1/12 | t154 |
+| PEACE with a city-state, through the sue column | 1/12 | t155 |
+| a CANAL placed | 1/12 | t230 |
+| URBANIZATION civic | 0/12 | NEVER |
+| a NEIGHBORHOOD placed | 0/12 | NEVER |
+| an antiquity dig (artifact in a slot) | 0/12 | NEVER |
+| a GREAT WORK given away | 0/12 | NEVER |
 | an ally dragged in by the DEFENSIVE PACT | 0/12 | NEVER |
 | any seat's lifetime CO2 above zero | 0/12 | NEVER |
 | the world crossing into climate PHASE I | 0/12 | NEVER |
+| a MILITARY ENGINEER alive at all (and so its three verbs) | 0/12 | NEVER |
+| a Valletta-shaped SUZERAIN, and the class purchase it sells | 0/12 | NEVER |
+| a seat that may buy LAND COMBAT UNITS with faith | 0/12 | NEVER |
 
 - THE DISTRICT LANE ROTATES ITS PICK by (seat + turn) rather than taking the
   first legal column. That is a DECISION the applier re-validates and TS only
@@ -1652,19 +1737,31 @@ steers the games into a different regime and carries the older rows with it:
   to move five of them at once, in both directions. A row that thins is a
   coverage loss and never a regression: each names the poke lane that is its
   actual bar.
-- THEOLOGICAL COMBAT IS REACHED, in 6 of 12 seeds from t86, so the
+- THEOLOGICAL COMBAT IS REACHED, in 4 of 12 seeds from t94, so the
   resolver's deterministic damage and its apostle-only initiation ARE
   gate-covered.
-- The APOSTLE BUY fires in every seed from t75 and the 250-turn gate is
+- The APOSTLE BUY fires in every seed from t70 and the 250-turn gate is
   green, which is what closed B-18r's predicted lifecycle drift.
-- THE CITIZEN OVERRIDES are the widest-reaching heads in the gate: a plot
-  lock stands on every seed from t2 (141 plots at t250) and a pinned
-  specialist on every seed from t116 (47 slots), so both ride the digest for
-  most of a game rather than leaning on `citizens_test`.
-- WAR WITH A CITY-STATE stands on 1 of 12 seeds from t143 — 9.0 minor-war
-  turns per seed, 108 on the loudest — and no seed now closes one through the
-  SUE column. The declare and both clocks are gate-covered; the peace, the
-  meeting gate, the treaty term and the suzerain refusal are not, and
+- THE GREAT PERSON IS THE WIDEST NEW HEAD IN THE GATE. A person stands as a
+  unit on every seed from t53, the mask offers it the spend a turn later, and
+  a charge is actually spent on every seed from t55 — so the roster, the
+  walk, the site predicate, the spend and `civ_gp_used` all ride the digest.
+  What the gate does NOT reach is the tail of the effect table: the two
+  permanent runs land on 8 and 6 of 12 seeds, and no seed spends a person
+  whose site is a city-state's ground or an owned luxury.
+- NEITHER FAITH-PURCHASE CLASS IS REACHED. No seed carries a minor to
+  suzerainty of a Valletta-shaped city-state, and none reaches Theocracy or
+  builds a Grand Master's Chapel, so both grants read 0/12. The class
+  purchase, the walls' gold refusal, the land-unit rung and their prices are
+  proven by `cs_bonus_test`, `buy_wire_test` and
+  `tests/cpu/city/faith-purchase.test.ts` and by nothing else.
+- THE CITIZEN OVERRIDES ride the digest for most of a game rather than
+  leaning on `citizens_test`: a plot lock stands on every seed from t2 (148
+  plots at t250) and a pinned specialist on every seed from t116 (45 slots).
+- WAR WITH A CITY-STATE stands on 2 of 12 seeds from t142 — 10.1 minor-war
+  turns per seed, 108 on the loudest — and one seed closes one through the
+  SUE column at t155. The declare, both clocks and the peace are gate-covered;
+  the meeting gate, the treaty term and the suzerain refusal are not, and
   `cs_war_test` section d is their bar.
 - THE DIPLOMATIC AXIS ENTERED THE GATE, and the probe had never measured it:
   `geo_decide_and_apply` is the serve gate's own call and the probe did not
@@ -1675,15 +1772,15 @@ steers the games into a different regime and carries the older rows with it:
   border change no reachability of their own.
 - THE DIPLOMATIC AXIS'S THIN ROWS, each poke-covered and none of them
   evidence of a bug:
-  - A CLOSED BORDER is STOOD AGAINST on one seed, at t238. The three seats
+  - A CLOSED BORDER is STOOD AGAINST on one seed, at t154. The three seats
     barely crowd each other's territory, so the refusal almost never fires
     in-gate and `geopolitics_test` poke i3 stays its real bar.
-  - A GREAT WORK is GIVEN on one seed, at t242. There is now something to
-    give — 24 works across the 12 seeds at t250 against 37 slot buildings —
-    but the gift is still throttled by the great-person queue's output rather
-    than by its own gate (poke i2). At an all-diplomat table it fires on 2 of
-    12 seeds.
-  - THE DEFENSIVE PACT never drags anyone in. Alliances stand on 8 of 12
+  - A GREAT WORK is GIVEN on no seed at all. There is something to give —
+    12 works across the 12 seeds at t250 against 32 slot buildings — but the
+    gift is throttled by the great-person queue's output rather than by its
+    own gate (poke i2), and a Great Person now WALKS to a free slot instead of
+    filling one at the claim, which is why the count fell.
+  - THE DEFENSIVE PACT never drags anyone in. Alliances stand on 9 of 12
     seeds, but a third party has to declare on an ally while the alliance
     runs, and the same style that forms alliances is the one that does not
     fight. Poke i is the bar.
@@ -1708,7 +1805,7 @@ steers the games into a different regime and carries the older rows with it:
   noise on the same pick reached nothing new and cost two seeds their
   city-state war — the late catalog is gated on research DEPTH within 250
   turns, and random detours only add drag.
-- WONDERS FINISH, and the belief that they do not was load-bearing: 54
+- WONDERS FINISH, and the belief that they do not was load-bearing: 55
   completed across 11 of 12 seeds. The `wonder_effects` lane was labelled as
   the only proof of the fourteen effect channels "because the gate never
   finishes a wonder" — false, and the probe could not have said so until it

@@ -20,6 +20,9 @@ import { GENERAL_AURA_MP } from '../core/aura';
 import { CARDIFF_HARBOR_POWER } from '../data/cityStates';
 import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_HILL_CS, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD } from '../data/cityStates';
 import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_BUILDINGS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_YIELD, CITY_STATE_MAX_HP, CITY_STATE_MEET_RANGE, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
+import { GP_CITY_PERM, GP_FX, GP_PERM, GP_PER_ADJ_SOURCES, GP_SITES, GP_YIELD_KEYS, GW_WORK_CLASSES, gpChargesOf, gpEffectOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
+import { strategicSlot } from '../core/stockpile';
+import { MAX_LEVEL, XP_PER_LEVEL } from '../core/promotions';
 import { GP_CLASSES, GREAT_PEOPLE, GP_ERA_GPP, GP_FIRST_OF_ERA, GP_FLAT_COST_CLASSES, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, RELIC_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_CULTURE, ARTIFACT_TOURISM, THEMING_MULT, ARTIST_WORKS, SPECIALIST_YIELDS, SPECIALIST_TIERS } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, APOSTLE_PROMO_OFFER, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, LASER_POWER_LOAD, gpClassesOf, gppFractionOf } from '../data/projects';
@@ -115,6 +118,7 @@ const effectRow = (fx: PolicyEffects) => ({
   cityRanged: fx.cityRanged ?? 0,
   reconXpMult: fx.reconXpMult ?? 1,
   routePlunderMult: fx.routePlunderMult ?? 1,
+  faithBuyLandUnits: fx.faithBuyLandUnits ? 1 : 0,
   routeGold: fx.routeGold ?? 0,
   influencePerTurn: fx.influencePerTurn ?? 0,
   firstEnvoyDouble: fx.firstEnvoyDouble ? 1 : 0,
@@ -257,6 +261,48 @@ const PLACEMENT_CODE = { aqueduct: 1, coastal: 2, encampment: 3, flat: 4, dam: 5
 
 const SLOT_KIND_IDX: Record<SlotKind, number> = { military: 0, economic: 1, diplomatic: 2, wildcard: 3 };
 
+
+/** ONE person's dense effect record, in `GP_FX` order with the two permanent
+ *  runs appended. Every magnitude is the sourced row's own. */
+function gpFxRow(p: GreatPersonDef): number[] {
+  const fx = gpEffectOf(p);
+  const v: Record<string, number> = {
+    science: fx.science ?? 0,
+    culture: fx.culture ?? 0,
+    gold: fx.gold ?? 0,
+    prodCapital: fx.productionToCapital ?? 0,
+    faith: fx.faith ?? 0,
+    eurekaRandom: fx.eurekaRandom ?? 0,
+    eurekaLo: fx.eurekaLo ?? 0,
+    eurekaHi: fx.eurekaHi ?? 0,
+    inspirationRandom: fx.inspirationRandom ?? 0,
+    eurekaEra: fx.eurekaEra ? 1 : 0,
+    freeTechRandom: fx.freeTechRandom ?? 0,
+    unitIdx: fx.unit ? Object.values(UNITS).findIndex((u) => u.id === fx.unit) : -1,
+    unitPromotions: fx.unitPromotions ?? 0,
+    promotionLevels: fx.promotionLevels ?? 0,
+    xpPct: fx.xpPct ?? 0,
+    envoys: fx.envoys ?? 0,
+    wonderProduction: fx.wonderProduction ?? 0,
+    wonderEraDouble: fx.wonderEraDouble ?? -1,
+    spaceProduction: fx.spaceProduction ?? 0,
+    perAdjSource: fx.perAdjacent ? GP_PER_ADJ_SOURCES.indexOf(fx.perAdjacent.source) : -1,
+    perAdjYield: fx.perAdjacent ? GP_YIELD_KEYS.indexOf(fx.perAdjacent.yield) : -1,
+    perAdjAmount: fx.perAdjacent?.amount ?? 0,
+    perAdjHere: fx.perAdjacent?.here ? 1 : 0,
+    luxuryCopies: fx.luxuryCopies ?? 0,
+    luxuryAmenities: fx.luxuryAmenities ?? 0,
+    greatWorkKind: fx.greatWorkKind ?? -1,
+    gppAll: fx.gppAll ?? 0,
+    strategicSlot: fx.strategic ? strategicSlot(fx.strategic.resource) : -1,
+    strategicAmount: fx.strategic?.amount ?? 0,
+  };
+  return [
+    ...GP_FX.map((k) => v[k] ?? 0),
+    ...GP_PERM.map((k) => fx.perm?.[k] ?? 0),
+    ...GP_CITY_PERM.map((k) => fx.cityPerm?.[k] ?? 0),
+  ];
+}
 
 export function buildRules() {
   const rules = {
@@ -461,6 +507,11 @@ export function buildRules() {
       settlerPer: Math.round(30 * GAME_SPEED),
       pantheonFaithCost: PANTHEON_FAITH_COST,
       prophetCls: GP_CLASSES.indexOf('PROPHET'),
+      engineerCls: GP_CLASSES.indexOf('ENGINEER'),
+      // the promotion ladder a granted LEVEL fills the bar toward
+      promoMaxLevel: MAX_LEVEL,
+      promoXpPerLevel: XP_PER_LEVEL,
+      rainforestFid: FEAT_IDS.indexOf('RAINFOREST'),
       // Great Works. WRITER/MUSICIAN class indices, the building
       // columns (b_cost catalog order) that hold writing/music works, the slots
       // per building, the works per person and the per-work culture yield BY KIND
@@ -537,9 +588,33 @@ export function buildRules() {
       gpFlatCost: GP_CLASSES.map((c) => (GP_FLAT_COST_CLASSES.has(c) ? 1 : 0)),
       gpRoster: GP_CLASSES.map((c) => GREAT_PEOPLE[c].length),
       gpClassDistrict: GP_CLASSES.map((c) => PLACEABLE_DISTRICTS.indexOf(GP_CLASS_DISTRICT[c])),
-      gpEffects: GP_CLASSES.map((c) =>
-        GREAT_PEOPLE[c].map((p) => [p.effect.science ?? 0, p.effect.culture ?? 0, p.effect.gold ?? 0, p.effect.productionToCapital ?? 0, p.effect.faith ?? 0]),
-      ),
+      // THE PERSON'S OWN ROW, one dense record per queue position. `gpFx`
+      // names the columns so neither engine writes a position down, and the
+      // two permanent runs ride the tail in GP_PERM / GP_CITY_PERM order.
+      gpFx: [...GP_FX],
+      gpPermKeys: [...GP_PERM],
+      gpCityPermKeys: [...GP_CITY_PERM],
+      gpEffects: GP_CLASSES.map((c) => GREAT_PEOPLE[c].map((p) => gpFxRow(p))),
+      // the SITE a charge may be spent at, and which district when it names one
+      gpSite: GP_CLASSES.map((c) => GREAT_PEOPLE[c].map((p) => GP_SITES.indexOf(gpSiteOf(p).site))),
+      gpSiteDistrict: GP_CLASSES.map((c) =>
+        GREAT_PEOPLE[c].map((p) => PLACEABLE_DISTRICTS.indexOf(gpSiteOf(p).district))),
+      gpCharges: GP_CLASSES.map((c) => GREAT_PEOPLE[c].map((p) => gpChargesOf(p))),
+      // the NAMED eurekas and the instant buildings, as catalog bitmasks
+      gpEureka: GP_CLASSES.map((c) => GREAT_PEOPLE[c].map((p) => {
+        const ids = new Set(gpEffectOf(p).eurekaTechs ?? []);
+        return Object.keys(TECHS).map((t) => (ids.has(t) ? 1 : 0));
+      })),
+      gpBuildings: GP_CLASSES.map((c) => GREAT_PEOPLE[c].map((p) => {
+        const ids = new Set(gpEffectOf(p).buildings ?? []);
+        for (const id of ids) {
+          if (buildingIdx.get(id) === undefined) throw new Error(`gpBuildings: ${id} is not a City Center-space building`);
+        }
+        return centerBuildings.map((b) => (ids.has(b.id) ? 1 : 0));
+      })),
+      // the CHASSIS each class arrives on — units roster order
+      gpClassUnitIdx: GP_CLASSES.map((c) => Object.values(UNITS).findIndex((u) => u.id === c)),
+      gpWorkClasses: GP_CLASSES.map((c) => (GW_WORK_CLASSES.has(c) ? 1 : 0)),
       generalClassIdx: GP_CLASSES.indexOf('GENERAL'),
       admiralClassIdx: GP_CLASSES.indexOf('ADMIRAL'),
       generalUnitIdx: Object.values(UNITS).findIndex((u) => u.id === 'GENERAL'),
@@ -668,6 +743,7 @@ export function buildRules() {
         envoysPerWonder: w.effects?.envoysPerWonder ?? 0,
         spreadCharges: w.effects?.spreadCharges ?? 0,
         buildCharges: w.effects?.buildCharges ?? 0,
+        engineerCharges: w.effects?.engineerCharges ?? 0,
         apostleMartyr: w.effects?.apostleMartyr ? 1 : 0,
         floodMitigation: w.effects?.floodMitigation ? 1 : 0,
         dupNaval: w.effects?.duplicateNavalTrain ? 1 : 0,
@@ -1134,6 +1210,7 @@ export function buildRules() {
       govTier: b.govTier ?? 0,
       govTitle: b.govTitle ?? 0,
       spyCapacity: b.spyCapacity ?? 0,
+      faithBuyUnits: b.faithBuyUnits ? 1 : 0,
       spyLevelPenalty: b.spyLevelPenalty ?? 0,
       influencePerTurn: b.influencePerTurn ?? 0,
       favorPerTurn: b.favorPerTurn ?? 0,

@@ -261,6 +261,7 @@ def main() -> int:
                 ("climate", [py, "tests/gpu/climate_test.py"], 4),  # GS CLIMATE: carbon, the seven phases, the sea, the barrier, a warmed world's weather
                 ("engineer", [py, "tests/gpu/engineer_test.py"], 4),  # the Military Engineer: fort, airstrip, road, the 20% charge
                 ("placement", [py, "tests/gpu/placement_test.py"], 4),  # a wonder's ground (static wok + the live clauses) and the suzerain improvements
+                ("great_person", [py, "tests/gpu/great_person_test.py"], 4),  # the six activation sites, the spend, and the two permanent runs
             ],
         ]
         # A lane that names a path nothing writes, or a test file no lane

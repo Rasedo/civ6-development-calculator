@@ -158,6 +158,7 @@ class Rules:
     b_train_xp_cls: torch.Tensor  # bool [NB, NPC] — which promotion classes `b_train_xp_pct` reaches
     b_walls: torch.Tensor  # long [NB] — the WALLS TIER this row supplies (0 = not a walls row)
     b_no_purchase: torch.Tensor  # bool [NB] — refuses a gold purchase (the upgraded walls)
+    b_faith_units: torch.Tensor  # bool [NB] — grants the seat the faith LAND-UNIT purchase (Grand Master's Chapel)
     #: THE PROMOTION CATALOG, per class and in COLUMN order (the PROMOTE head's
     #: layout). `promo_req[c, k]` is the bitmask of columns that open row k of
     #: class c; `promo_kind/v/mask[c, k, s]` are its effect slots.
@@ -293,6 +294,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_train_xp_cls=_class_mask([b.get("trainXpClasses", []) for b in B], len(_P.get("classes", []))),
         b_walls=torch.tensor([int(b.get("walls", 0)) for b in B], dtype=torch.long),
         b_no_purchase=torch.tensor([bool(b.get("noPurchase", 0)) for b in B], dtype=torch.bool),
+        b_faith_units=torch.tensor([bool(b.get("faithBuyUnits", 0)) for b in B], dtype=torch.bool),
         b_era=torch.tensor([int(b.get("eraIdx", 0)) for b in B], dtype=torch.long),
         promo_classes=list(_P.get("classes", [])),
         promo_kinds=list(_P.get("kinds", [])),
@@ -406,6 +408,9 @@ RESEARCH_LOOPS = 40  # > tree size: completes every ready tech/civic in one turn
 # seat 0 has no window of its own to be different in. The barbarians keep a
 # separate one only because nothing indexes them by seat row.
 MAJOR_POOL_MAX = 512
+#: how many INVENTED luxuries one seat can hold. Four Great Merchants make
+#: them, at most two apiece, so the row can never fill in a real game.
+GP_LUX_MAX = 8
 BARB_POOL_MAX = 256
 UNIT_SLOTS = 256
 
@@ -605,7 +610,7 @@ _MUTABLE = [
     "seat_route_born", "seat_route_walk", "seat_route_leg",  # the Trader's walk (birth turn, tile, leg)
     "city_id",
     "unit_next",
-    "gp_earned", "gp_next", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
+    "gp_earned", "gp_next", "civ_gp_used", "civ_gp_perm", "civ_gp_lux", "civ_gp_lux_n", "city_gp_perm", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
     "pan_claimed", "fol_claimed", "fou_claimed",  # belief-claim masks
     "enh_claimed",  # enhancer-claim mask
     "holy_tile", "city_pressure", "city_followed",  # ONE seat-indexed pressure+followed plane pair
@@ -621,7 +626,7 @@ _MUTABLE = [
     # The merged unit pool. The BASES are registered, never the `major_`/`barb_`
     # RANGE VIEWS into them — snapshot/restore round-trips one tensor per plane
     # instead of three, and a view can never be half-restored.
-    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_xp_pct", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_emb", "unit_seat", "unit_spy_mission", "unit_spy_turns", "unit_spy_target", "unit_spy_level", "military_at", "civilian_at", "war", "ww", "ww_turn",
+    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_xp_pct", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_emb", "unit_seat", "unit_spy_mission", "unit_spy_turns", "unit_spy_target", "unit_spy_level", "unit_gp_at", "military_at", "civilian_at", "war", "ww", "ww_turn",
     "civ_best_melee", "civ_builders_trained", "civ_relic_reserve", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted", "civ_tech_retain", "civ_civic_retain",
     "civ_enhancer", "civ_enhancer_done", "civ_follower", "civ_founder", "civ_next_city_id",
     "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_inquisition", "civ_tiles_purchased",

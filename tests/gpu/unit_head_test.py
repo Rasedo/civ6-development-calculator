@@ -52,8 +52,9 @@ def main() -> None:
     assert acts, "rules.actions.unit missing — the exporter must ship the enum"
     # +12 SNIPE, +7 SPREAD, +1 FOUND_CITY, +1 EXCAVATE, +1 PARK, the PROMOTE
     # head, +6 CONDEMN, +1 REMOVE_HERESY, +1 LAUNCH_INQUISITION,
-    # +1 CONVERT_HEATHEN, +1 UPGRADE, the four VARIABLE-width heads, then the
-    # engineer's +1 BUILD_ROAD and +1 FINISH_DISTRICT.
+    # +1 CONVERT_HEATHEN, +1 UPGRADE, the four VARIABLE-width heads, the
+    # engineer's +1 BUILD_ROAD and +1 FINISH_DISTRICT, then the Great Person's
+    # +1 ACTIVATE_GP.
     pcol = rj["promotions"]["cols"]
     esp = rj["eras"]["espionage"]
     heads = [
@@ -62,16 +63,17 @@ def main() -> None:
         ("SPY_TRAVEL_", esp["travelCols"]),
         ("SPY_MISSION_", len(esp["missions"])),
     ]
-    want = 13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads) + 2
+    want = 13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads) + 3
     assert len(acts) == want, (
         f"enum is {len(acts)} wide, expected {want} for {len(imp_ids)} improvements, "
         f"a {pcol}-wide PROMOTE head and heads {heads}"
     )
     # A new verb joins at the END or it moves a column somebody else already
     # keys on: the religious tail, the ladder's own verb, the four heads in the
-    # order the exporter appends them, then the engineer's two.
-    _last = ["BUILD_ROAD", "FINISH_DISTRICT"]
-    assert acts[-len(_last):] == _last, f"the engineer's verbs must close the enum, got {acts[-2:]}"
+    # order the exporter appends them, the engineer's two, then the Great
+    # Person's spend.
+    _last = ["BUILD_ROAD", "FINISH_DISTRICT", "ACTIVATE_GP"]
+    assert acts[-len(_last):] == _last, f"the trailing verbs must close the enum, got {acts[-3:]}"
     _tailstart = len(acts) - len(_last) - sum(w for _p, w in heads)
     assert acts[_tailstart - 4:_tailstart] == [
         "REMOVE_HERESY", "LAUNCH_INQUISITION", "CONVERT_HEATHEN", "UPGRADE"], \

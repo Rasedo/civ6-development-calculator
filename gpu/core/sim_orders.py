@@ -58,6 +58,7 @@ class SimOrders:
         _smc = getattr(self, "_A_SPY_MISSION", -1)
         _rdc = getattr(self, "_A_ROAD", -1)
         _fnc = getattr(self, "_A_FINISH", -1)
+        _gpc = getattr(self, "_A_GP", -1)
         _stw = self._spy_travel_cols
         _smw = self._n_spy_missions
         _pcol = self.rules.promo_cols
@@ -89,13 +90,14 @@ class SimOrders:
             (((_ab >= _smc) & (_ab < _smc + _smw)) if _smc >= 0 else _no).any(dim=0),  # spy mission
             ((_ab == _rdc) if _rdc >= 0 else _no).any(dim=0),                    # build road
             ((_ab == _fnc) if _fnc >= 0 else _no).any(dim=0),                    # finish district
+            ((_ab == _gpc) if _gpc >= 0 else _no).any(dim=0),  # activate a great person
         ]).tolist()
         (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
          _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread,
          _rk_excavate, _rk_park, _rk_promote, _rk_condemn,
          _rk_heresy, _rk_inquis, _rk_heathen, _rk_upgrade,
          _rk_air, _rk_rebase, _rk_travel, _rk_mission,
-         _rk_road, _rk_finish) = _tab
+         _rk_road, _rk_finish, _rk_gp) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -255,6 +257,16 @@ class SimOrders:
                         self.city_progress[_r, row, _c] += js_round(
                             _cst * self._eng_finish_frac).to(self.city_progress.dtype)
                         self._spend_build_charge(_r, sc, hc)
+
+            # THE GREAT PERSON'S ONE VERB. The site predicate is the mask's
+            # own, so a legal column cannot land in no arm.
+            if _rk_gp[n] and _gpc >= 0:
+                _gpm = act & (a == _gpc) & self._gp_site_ok(
+                    row, sc.unsqueeze(1), hc.unsqueeze(1)).squeeze(1)
+                if bool(_gpm.any()):
+                    self._gp_apply(row, _gpm, sc, hc)
+                    _r = _gpm.nonzero(as_tuple=True)[0]
+                    self._spend_build_charge(_r, sc, hc)
 
             if _rk_air[n] and _ar >= 0:
                 asm = act & (a >= _ar) & (a < _ar + _asw)

@@ -6,7 +6,7 @@ import { computeUnlocks, isTechComplete, isCivicComplete, type Unlocks } from '.
 import { isExplored } from './fog';
 import { riverReach } from './disasters';
 import { congressChopBanned, congressEnergyBlocked, congressEnergyDiscount, congressUdtBlockedDistrict } from './congress';
-import { tileAppeal } from './appeal'; // SEASIDE_RESORT gates on appeal
+import { tileAppeal, gpAppealResolver, type GpAppeal } from './appeal'; // SEASIDE_RESORT gates on appeal
 import { IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
 import { isSuzerain } from './cityStates';
 import { FEATURES } from '../../world/features';
@@ -96,6 +96,7 @@ export function validImprovementsIn(
     ownsTile: (t: Tile) => boolean;
     map?: GameMap;
     camps?: ReadonlySet<number>;
+    gpAppeal?: GpAppeal;
     builder?: string;
     /** the city-states this seat is SUZERAIN of, by name. */
     suzerain?: ReadonlySet<string>;
@@ -181,7 +182,7 @@ export function validImprovementsIn(
     tile.feature === null &&
     (tile.terrain === 'GRASSLAND' || tile.terrain === 'PLAINS' || tile.terrain === 'DESERT') &&
     neighbors(opts.map, tile).some((n) => n.terrain === 'COAST') &&
-    tileAppeal(opts.map, tile, opts.camps) >= SEASIDE_RESORT_MIN_APPEAL
+    tileAppeal(opts.map, tile, opts.camps, opts.gpAppeal) >= SEASIDE_RESORT_MIN_APPEAL
   ) {
     out.push('SEASIDE_RESORT');
   }
@@ -202,6 +203,7 @@ export function validImprovements(state: GameState, tile: Tile, seat: number): I
     ownsTile: (t) => tileSeat(t) === seat,
     map: state.map, // SEASIDE_RESORT needs coast adjacency + appeal
     camps: campTiles(state),
+    gpAppeal: gpAppealResolver(state),
     suzerain: suzerainNames(state, seat),
   });
 }

@@ -74,6 +74,10 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       y: YIELD_KEYS.map((k) => Math.round(y[k] * 1000) / 1000),
       res: t.resource ? (RESOURCES[t.resource].category === 'luxury' ? 3 : RESOURCES[t.resource].category === 'strategic' ? 2 : 1) : 0,
       wnear: t.wonder !== null || neighbors(map, t).some((n) => n.wonder !== null) ? 1 : 0,
+      // what a Great Person's per-adjacent clause counts: the MOUNTAIN is
+      // static, the natural wonder rides `nw` and RAINFOREST `fid` +
+      // feat_stripped.
+      mtn: t.elevation === 'MOUNTAIN' ? 1 : 0,
       cl: isCoastalLand(map, t) ? 1 : 0,
       fid: t.feature ? featIdx.get(t.feature) ?? -1 : -1,
       // off-script gate catch (rng 2026006108 t81): foundCity strips

@@ -9,9 +9,10 @@ from .sim_orders import SimOrders
 from .sim_minors import SimMinors
 from .sim_seats import SimSeats
 from .sim_spy import SimSpy
+from .sim_gp import SimGp
 from .sim_phase import SimPhase
 from .sim_step import SimStep
 
 
-class BatchSim(SimInit, SimEconomy, SimMasks, SimOrders, SimMinors, SimSeats, SimSpy, SimPhase, SimStep):
+class BatchSim(SimInit, SimEconomy, SimMasks, SimOrders, SimMinors, SimSeats, SimSpy, SimGp, SimPhase, SimStep):
     """One batched simulation over B games — see the mixins for each region."""

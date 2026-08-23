@@ -19,8 +19,10 @@ Covered per row: BUILDING (kind 0, price + the peace-gold reserve), SETTLER
 (kind 1, the pop gate, the live escalator, the pop it costs), MILITARY UNIT
 (kind 2, the 2x-cities quota, strongest-affordable, refund on no spawn spot),
 TILE (kind 3, unclaimed + adjacent + radius 5 at the live price), WORSHIP
-(kind 4, faith only), and the LEVY (kind 7, militaristic + suzerain +
-cooldown). The religious-unit rungs (5/6) ride religion2_test.
+(kind 4, faith only), the LAND COMBAT UNIT faith buys (kind 13, the grant
+gate + the faith price), and the LEVY (kind 7, militaristic + suzerain +
+cooldown). The religious-unit rungs (5/6) ride religion2_test, and Valletta's
+class purchase (kind 12) rides cs_bonus_test beside its suzerain.
 """
 
 from __future__ import annotations
@@ -382,6 +384,60 @@ def case_worship(sim, base, row: int) -> None:
 
 
 # ---------------------------------------------------------------------------
+# kind 13 — the LAND COMBAT UNIT faith buys
+# ---------------------------------------------------------------------------
+
+def case_faith_unit(sim, base, row: int) -> None:
+    """CIV6 (Theocracy): "Can buy land combat units with Faith"; (Grand
+    Master's Chapel): "Grants the ability to buy land military units with
+    Faith." Neither grant is in the gate's reach, so the class, the price and
+    the refusal without the grant are poked."""
+    chapel = [i for i, x in enumerate(sim._b_faith_units.tolist()) if x]
+    if not chapel:
+        print(f"  row {row}: faith unit buy SKIPPED (no granting building)")
+        return
+    sim.restore(base)
+    prep(sim, row)
+    j = cap_slot(sim, row)
+    sim.civ_faith[0, row] = RICH
+    sim.civ_treasury[0, row] = 0.0
+    sim._eff_version += 1
+
+    # no grant, no offer
+    assert not bool(sim._seat_faith_unit_grant(row)[0]), f"row {row}: the grant is held before anyone grants it"
+    ok0, _, _ = sim._seat_faith_unit_candidate(row, ACTIVE)
+    assert not bool(ok0[0]), f"row {row}: a faith unit was offered with no grant"
+
+    sim.city_bldg[0, row, j, chapel[0]] = True
+    sim._eff_version += 1
+    assert bool(sim._seat_faith_unit_grant(row)[0]), f"row {row}: the building did not grant the purchase"
+    ok, uj, ub = sim._seat_faith_unit_candidate(row, ACTIVE)
+    assert bool(ok[0]), f"row {row}: no land combat unit offered to a rich seat holding the grant"
+    ui = int(ub[0])
+    assert int(sim._type_combat[ui]) > 0 and not bool(sim.unit_naval[ui]) and int(sim._type_air[ui]) == 0,         f"row {row}: the faith rung named a unit that is not land combat"
+
+    n0 = units_of(sim, row)
+    f0, g0 = float(sim.civ_faith[0, row]), float(sim.civ_treasury[0, row])
+    price = float(sim._type_cost[ui]) * sim.rules.faith_purchase_mult
+    sim._stash_buy(row, ucls=(uj, ub))
+    sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
+    assert units_of(sim, row) == n0 + 1, f"row {row}: the faith unit did not spawn"
+    assert abs((f0 - float(sim.civ_faith[0, row])) - price) < 1e-6,         f"row {row}: charged {f0 - float(sim.civ_faith[0, row])} faith, want {price}"
+    assert abs(float(sim.civ_treasury[0, row]) - g0) < 1e-6, f"row {row}: a faith unit buy touched the treasury"
+
+    # the same intent with the grant gone is refused
+    sim.restore(base)
+    prep(sim, row)
+    sim.civ_faith[0, row] = RICH
+    sim._eff_version += 1
+    n1 = units_of(sim, row)
+    sim._stash_buy(row, ucls=(uj, ub))
+    sim._seat_buy_ladder(row, ACTIVE, sim._seat_army_count(row))
+    assert units_of(sim, row) == n1, f"row {row}: a faith unit landed without the grant"
+    print(f"  row {row}: faith unit buy OK ({price:.0f} faith, gold untouched, grant gate holds)")
+
+
+# ---------------------------------------------------------------------------
 # kind 7 — the LEVY
 # ---------------------------------------------------------------------------
 
@@ -454,6 +510,7 @@ def main() -> None:
         case_unit(sim, base, row)
         case_tile(sim, base, row)
         case_worship(sim, base, row)
+        case_faith_unit(sim, base, row)
         case_levy(sim, base, row)
 
     print("BUY WIRE OK")

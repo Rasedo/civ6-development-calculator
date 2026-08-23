@@ -1151,6 +1151,24 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       noGold: true,
       description: 'Runs secret missions in foreign cities and guards your own.',
     }),
+    // The seven remaining GREAT PERSON chassis, appended LAST beside the
+    // General and Admiral that already had one — roster indices ARE the GPU's
+    // unit type ids. Every class is a unit that walks to the place its ability
+    // may be spent; the id is the class's own name, which is what maps a
+    // chassis back to `GREAT_PEOPLE`. `charges` is a placeholder the recruit
+    // overwrites with that PERSON's count, and 4 MP is the General's pool.
+    ...(['SCIENTIST', 'ENGINEER', 'MERCHANT', 'PROPHET', 'ARTIST', 'WRITER', 'MUSICIAN'] as const).map((c) =>
+      U({
+        id: c,
+        name: `Great ${c[0]}${c.slice(1).toLowerCase()}`,
+        cost: 0,
+        maintenance: 0,
+        moves: 4,
+        combat: 0,
+        charges: 1,
+        spawnOnly: true,
+        description: `Great ${c[0]}${c.slice(1).toLowerCase()} — walks to a legal site and spends a charge there.`,
+      })),
   ].map((u) => [u.id, u]),
 );
 

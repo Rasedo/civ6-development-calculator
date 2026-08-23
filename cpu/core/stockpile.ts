@@ -90,6 +90,16 @@ export function accrueStockpiles(state: GameState, seat: number): void {
   for (let k = 0; k < bk.length; k++) if (bk[k] > cap) bk[k] = cap;
 }
 
+/** Put `n` of a strategic resource straight into the bank, under the same
+ *  ceiling the per-turn accrual respects. */
+export function grantStockpile(state: GameState, seat: number, resourceId: string, n: number): void {
+  const k = strategicSlot(resourceId);
+  const s = seatOf(state, seat);
+  if (k < 0 || !s || n <= 0) return;
+  const bk = bank(s);
+  bk[k] = Math.min(stockpileCap(state, seat), bk[k] + n);
+}
+
 /** Can this seat pay `n` of `resourceId` right now? */
 export function canPayStockpile(state: GameState, seat: number, resourceId: string | undefined, n: number): boolean {
   if (!resourceId) return true;

@@ -1,5 +1,6 @@
 
 import type { DistrictId, GreatPersonClass } from '../core/types';
+import { LUXURY_AMENITY_CITIES } from './constants';
 
 export const GP_CLASS_DISTRICT: Record<GreatPersonClass, DistrictId> = {
   SCIENTIST: 'CAMPUS',
@@ -64,7 +65,9 @@ export function gpCost(cls: GreatPersonClass, personEra: number, worldEra: numbe
  * belongs to. The roster below supplies the names, the classes and the eras —
  * the magnitude is this model's own.
  */
-export const GP_CURRENCY: Record<GreatPersonClass, keyof GreatPersonDef['effect']> = {
+export type GpLumpKey = 'science' | 'culture' | 'faith' | 'gold' | 'productionToCapital';
+
+export const GP_CURRENCY: Record<GreatPersonClass, GpLumpKey> = {
   SCIENTIST: 'science',
   ENGINEER: 'productionToCapital',
   MERCHANT: 'gold',
@@ -76,7 +79,7 @@ export const GP_CURRENCY: Record<GreatPersonClass, keyof GreatPersonDef['effect'
   MUSICIAN: 'culture',
 };
 
-export function gpEffect(cls: GreatPersonClass, era: number): GreatPersonDef['effect'] {
+export function gpEffect(cls: GreatPersonClass, era: number): GpEffect {
   const lump = GP_ERA_GPP[Math.min(Math.max(era, 0), GP_ERA_GPP.length - 1)];
   return { [GP_CURRENCY[cls]]: lump };
 }
@@ -88,13 +91,7 @@ export interface GreatPersonDef {
   /** the ERA this person belongs to, which is what orders the class's queue
    *  and what prices the recruit. */
   era: number;
-  effect: {
-    science?: number; // added to current tech progress
-    culture?: number; // added to current civic progress
-    faith?: number;
-    gold?: number;
-    productionToCapital?: number;
-  };
+  effect: GpEffect;
 }
 
 const P = (cls: GreatPersonClass, id: string, name: string, era: number): GreatPersonDef =>
@@ -788,3 +785,301 @@ export const SPECIALIST_TIERS: Partial<Record<DistrictId, { buildings: string[];
   INDUSTRIAL_ZONE: { buildings: ['COAL_POWER_PLANT', 'OIL_POWER_PLANT', 'NUCLEAR_POWER_PLANT'], add: { production: 1 } },
   THEATER_SQUARE: { buildings: ['BROADCAST_CENTER'], add: { culture: 1 } },
 };
+
+/**
+ * WHERE a Great Person's charge may be spent. CIV6 (Great People, "Activating
+ * Great People"): "For most Great People, these actions may only be taken in
+ * specific places (i.e., a city district relevant to their abilities). That
+ * would generally be the Campus for the Great Scientist, the Commercial Hub
+ * for the Great Merchant, the Industrial Zone for the Great Engineer, the
+ * Theater Square for the art-related Great Persons - and, of course, the Holy
+ * Site for the Great Prophet. The Great General's and Great Admiral's one-time
+ * abilities may usually be activated anywhere." The art classes carry the same
+ * page's stricter clause: they "need to be in a Theater Square or otherwise in
+ * a tile with a building which provides free slots for the relevant type of
+ * Great Work", and with every slot taken "you will be unable to Activate your
+ * Great Person". The rest are individual pages' own wording.
+ */
+export type GpSite =
+  | 'district'     // this seat's COMPLETED district — `siteDistrict`, or the class's own
+  | 'anywhere'     // any tile the unit can stand on
+  | 'gwSlot'       // a city of this seat with a free slot of the class's work kind
+  | 'cityState'    // inside a city-state's territory
+  | 'luxury'       // an owned tile carrying a luxury resource
+  | 'adjacentOwn'; // an unclaimed tile next to this seat's territory
+
+/** PERMANENT per-seat channels a Great Person adds to. The array position is
+ *  the wire index, so a new channel appends. */
+export const GP_PERM = [
+  'spaceProdPct',        // Space Race project production, percent
+  'warWearyPct',         // war weariness accrued, percent off
+  'flankPct',            // flanking bonus, percent
+  'unitProdPct',         // unit production, percent
+  'routePlunderPct',     // gold from plundering a sea trade route, percent
+  'healBonus',           // extra HP healed per turn
+  'tradeCapacity',       // extra simultaneous trade routes
+  'policySlotEconomic',  // extra Economic policy slots
+] as const;
+export type GpPermKey = (typeof GP_PERM)[number];
+
+/** PERMANENT per-city channels, same contract — the ACTIVATING city keeps them. */
+export const GP_CITY_PERM = ['housing', 'amenities', 'appeal', 'loyalty'] as const;
+export type GpCityPermKey = (typeof GP_CITY_PERM)[number];
+
+export type GpYieldKey = 'science' | 'culture' | 'gold' | 'faith';
+
+export function gpPermOf(seat: { gpPerm?: number[] } | undefined, key: GpPermKey): number {
+  return seat?.gpPerm?.[GP_PERM.indexOf(key)] ?? 0;
+}
+
+export function gpCityPermOf(city: { gpPerm?: number[] } | undefined, key: GpCityPermKey): number {
+  return city?.gpPerm?.[GP_CITY_PERM.indexOf(key)] ?? 0;
+}
+
+export interface GpEffect {
+  science?: number; // into the current technology's progress
+  culture?: number; // into the current civic's progress
+  faith?: number;
+  gold?: number;
+  productionToCapital?: number;
+  /** eurekas for NAMED technologies. CIV6 (Zhang Heng): "If they are already
+   *  triggered, instead completes the technology." */
+  eurekaTechs?: string[];
+  /** eurekas for N technologies drawn at random over the eras
+   *  `era + eurekaLo` .. `era + eurekaHi`, both 0 by default. */
+  eurekaRandom?: number;
+  eurekaLo?: number;
+  eurekaHi?: number;
+  /** the same draw against the CIVIC tree, over the same era window. */
+  inspirationRandom?: number;
+  /** every technology of the person's own era at once. */
+  eurekaEra?: boolean;
+  /** technologies COMPLETED outright, drawn over what is available. */
+  freeTechRandom?: number;
+  /** buildings finished instantly in the activating city. */
+  buildings?: string[];
+  /** a free unit at the activating tile, carrying `unitPromotions` levels. */
+  unit?: string;
+  unitPromotions?: number;
+  /** promotion levels for a unit ALREADY on the activating tile, plus a
+   *  permanent percentage experience bonus for that unit. */
+  promotionLevels?: number;
+  xpPct?: number;
+  envoys?: number;
+  /** production into a WONDER under construction in the activating city,
+   *  doubled when that wonder's era is at or below `wonderEraDouble`. */
+  wonderProduction?: number;
+  wonderEraDouble?: number;
+  /** production into a SPACE RACE project in the activating city. */
+  spaceProduction?: number;
+  /** `amount` of `yield` per neighbouring tile carrying `source`, and for the
+   *  activating tile itself when `here`. */
+  perAdjacent?: { source: 'MOUNTAIN' | 'NATURAL_WONDER' | 'RAINFOREST'; yield: GpYieldKey; amount: number; here?: boolean };
+  /** invented luxuries: `luxuryCopies` of them, each serving
+   *  `luxuryAmenities` cities the way a worked luxury resource does. */
+  luxuryCopies?: number;
+  luxuryAmenities?: number;
+  /** a Great Work of this kind, made on the spot. */
+  greatWorkKind?: number;
+  /** Great Person points toward EVERY class at once. */
+  gppAll?: number;
+  /** a strategic resource straight into the stockpile. */
+  strategic?: { resource: string; amount: number };
+  perm?: Partial<Record<GpPermKey, number>>;
+  cityPerm?: Partial<Record<GpCityPermKey, number>>;
+}
+
+/**
+ * THE DENSE EFFECT ROW both engines read, by name. The exporter emits this
+ * list beside the table, so the GPU never writes a column number down and a
+ * new channel appends here and nowhere else. `perm` and `cityPerm` ride the
+ * tail as their own runs, in `GP_PERM` / `GP_CITY_PERM` order.
+ */
+export const GP_FX = [
+  'science', 'culture', 'gold', 'prodCapital', 'faith',
+  'eurekaRandom', 'eurekaLo', 'eurekaHi', 'inspirationRandom', 'eurekaEra', 'freeTechRandom',
+  'unitIdx', 'unitPromotions', 'promotionLevels', 'xpPct',
+  'envoys', 'wonderProduction', 'wonderEraDouble', 'spaceProduction',
+  'perAdjSource', 'perAdjYield', 'perAdjAmount', 'perAdjHere',
+  'luxuryCopies', 'luxuryAmenities', 'greatWorkKind', 'gppAll',
+  'strategicSlot', 'strategicAmount',
+] as const;
+
+/** what a `perAdjacent` clause counts, in the wire's own order. */
+export const GP_PER_ADJ_SOURCES = ['MOUNTAIN', 'NATURAL_WONDER', 'RAINFOREST'] as const;
+/** and which ledger it pays into. */
+export const GP_YIELD_KEYS: readonly GpYieldKey[] = ['science', 'culture', 'gold', 'faith'];
+
+/** the ACTIVATION SITES, in the wire's own order. */
+export const GP_SITES: readonly GpSite[] = [
+  'district', 'anywhere', 'gwSlot', 'cityState', 'luxury', 'adjacentOwn',
+];
+
+export interface GpAbility extends GpEffect {
+  site?: GpSite;
+  siteDistrict?: DistrictId;
+  charges?: number;
+  /** this person's page clause has no carrier in this engine, so the class
+   *  lump stands in for it and the clause is an open audit item. */
+  unmodelled?: boolean;
+}
+
+/**
+ * WHAT EACH PERSON DOES, off that class's own wiki roster table. Only the five
+ * one-off classes are listed: a Prophet founds a religion and a Writer, Artist
+ * or Musician makes Great Works, both of which this engine already models in
+ * kind, so those four keep the class lump `gpEffect` sizes by era.
+ *
+ * A clause with no carrier is absent from its row, and a person whose WHOLE
+ * clause has no carrier is marked `unmodelled` rather than quietly dropped.
+ */
+export const GP_ABILITY: Record<string, GpAbility> = {
+  // ---- SCIENTIST: eurekas, and the Campus that hosts them ----
+  GP_ZHANG_HENG: { eurekaTechs: ['CELESTIAL_NAVIGATION', 'MATHEMATICS', 'ENGINEERING'] },
+  GP_ARYABHATA: { eurekaRandom: 3, eurekaHi: 1 },
+  GP_EUCLID: { eurekaTechs: ['MATHEMATICS'], eurekaRandom: 1, eurekaLo: 1, eurekaHi: 1 },
+  GP_HYPATIA: { buildings: ['LIBRARY'] },
+  GP_ABU_AL_QASIM_AL_ZAHRAWI: { site: 'anywhere', eurekaRandom: 1, eurekaHi: 1, perm: { healBonus: 5 } },
+  GP_HILDEGARD_OF_BINGEN: { siteDistrict: 'HOLY_SITE', faith: 100 },
+  GP_OMAR_KHAYYAM: { eurekaRandom: 2, eurekaHi: 1, inspirationRandom: 1 },
+  GP_IBN_KHALDUN: { cityPerm: { housing: 2, amenities: 1 } },
+  GP_EMILIE_DU_CHATELET: { eurekaRandom: 3, eurekaHi: 1 },
+  GP_GALILEO_GALILEI: { perAdjacent: { source: 'MOUNTAIN', yield: 'science', amount: 250 } },
+  GP_ISAAC_NEWTON: { buildings: ['LIBRARY', 'UNIVERSITY'] },
+  GP_CHARLES_DARWIN: { perAdjacent: { source: 'NATURAL_WONDER', yield: 'science', amount: 500 } },
+  GP_DMITRI_MENDELEEV: { eurekaTechs: ['CHEMISTRY'], eurekaRandom: 1 },
+  GP_JAMES_YOUNG: { eurekaRandom: 2, eurekaHi: 1 },
+  GP_ALAN_TURING: { eurekaTechs: ['COMPUTERS'], eurekaRandom: 1 },
+  GP_ALBERT_EINSTEIN: { eurekaRandom: 1 },
+  GP_ALFRED_NOBEL: { eurekaRandom: 1, eurekaHi: 1, gppAll: 100 },
+  GP_ERWIN_SCHRODINGER: { eurekaRandom: 3, eurekaHi: 1 },
+  GP_JANAKI_AMMAL: { perAdjacent: { source: 'RAINFOREST', yield: 'science', amount: 400, here: true } },
+  GP_MARY_LEAKEY: { unmodelled: true },
+  GP_MARGARET_MEAD: { science: 1000, culture: 1000 },
+  GP_CARL_SAGAN: { spaceProduction: 3000 },
+  GP_STEPHANIE_KWOLEK: { perm: { spaceProdPct: 100 } },
+  GP_ABDUS_SALAM: { eurekaEra: true },
+
+  // ---- ENGINEER: wonders, buildings and the Space Race ----
+  GP_IMHOTEP: { charges: 2, wonderProduction: 175, wonderEraDouble: 1 },
+  GP_BI_SHENG: { eurekaTechs: ['PRINTING'] },
+  GP_ISIDORE_OF_MILETUS: { charges: 2, wonderProduction: 215 },
+  GP_JAMES_OF_ST_GEORGE: { charges: 3, buildings: ['ANCIENT_WALLS', 'MEDIEVAL_WALLS'] },
+  GP_FILIPPO_BRUNELLESCHI: { charges: 2, wonderProduction: 315 },
+  GP_LEONARDO_DA_VINCI: { eurekaRandom: 1, eurekaLo: 2, eurekaHi: 2 },
+  GP_MIMAR_SINAN: { cityPerm: { housing: 1, amenities: 1 } },
+  GP_ADA_LOVELACE: { eurekaTechs: ['COMPUTERS'] },
+  GP_GUSTAVE_EIFFEL: { charges: 2, wonderProduction: 480 },
+  GP_JAMES_WATT: { buildings: ['WORKSHOP', 'FACTORY'] },
+  GP_SHAH_JAHAN: { unmodelled: true },
+  GP_ALVAR_AALTO: { cityPerm: { appeal: 1 } },
+  GP_ROBERT_GODDARD: { eurekaTechs: ['ROCKETRY'], perm: { spaceProdPct: 20 } },
+  GP_NIKOLA_TESLA: { unmodelled: true },
+  GP_JANE_DREW: { cityPerm: { housing: 4, amenities: 3 } },
+  GP_JOHN_ROEBLING: { charges: 2, cityPerm: { housing: 2, amenities: 1 } },
+  GP_SERGEI_KOROLEV: { spaceProduction: 1500 },
+  GP_JOSEPH_PAXTON: { unmodelled: true },
+  GP_CHARLES_CORREA: { cityPerm: { appeal: 2 } },
+  GP_WERNHER_VON_BRAUN: { perm: { spaceProdPct: 100 } },
+  GP_KENZO_TANGE: { unmodelled: true },
+
+  // ---- MERCHANT: gold, envoys, trade capacity and invented luxuries ----
+  GP_COLAEUS: { site: 'luxury', faith: 100, luxuryCopies: 1, luxuryAmenities: LUXURY_AMENITY_CITIES },
+  GP_MARCUS_LICINIUS_CRASSUS: { site: 'adjacentOwn', charges: 3, gold: 60 },
+  GP_ZHANG_QIAN: { perm: { tradeCapacity: 1 } },
+  GP_IBN_FADLAN: { perm: { tradeCapacity: 1 } },
+  GP_IRENE_OF_ATHENS: { site: 'luxury', perm: { tradeCapacity: 1 }, luxuryCopies: 1, luxuryAmenities: LUXURY_AMENITY_CITIES },
+  GP_MARCO_POLO: { unit: 'TRADER', perm: { tradeCapacity: 1 } },
+  GP_ZHOU_DAGUAN: { site: 'cityState', envoys: 3 },
+  GP_JAKOB_FUGGER: { gold: 200, envoys: 2 },
+  GP_RAJA_TODAR_MAL: { envoys: 1 },
+  GP_ADAM_SMITH: { perm: { policySlotEconomic: 1 } },
+  GP_JOHN_JACOB_ASTOR: { gold: 500, envoys: 2 },
+  GP_JOHN_SPILSBURY: { luxuryCopies: 1, luxuryAmenities: 4 },
+  GP_STAMFORD_RAFFLES: { unmodelled: true },
+  GP_JOHN_ROCKEFELLER: { strategic: { resource: 'OIL', amount: 1 } },
+  GP_SARAH_BREEDLOVE: { unmodelled: true },
+  GP_MARY_KATHERINE_GODDARD: { unmodelled: true },
+  GP_HELENA_RUBINSTEIN: { luxuryCopies: 2, luxuryAmenities: 4 },
+  GP_LEVI_STRAUSS: { luxuryCopies: 2, luxuryAmenities: 4 },
+  GP_MELITTA_BENTZ: { perm: { tradeCapacity: 1 } },
+  GP_ESTEE_LAUDER: { luxuryCopies: 2, luxuryAmenities: 6 },
+  GP_JAMSETJI_TATA: { siteDistrict: 'CAMPUS', unmodelled: true },
+  GP_MASARU_IBUKA: { siteDistrict: 'INDUSTRIAL_ZONE', unmodelled: true },
+
+  // ---- GENERAL: promotions, free units, and the war-weariness cut ----
+  GP_BOUDICA: { unmodelled: true },
+  GP_HANNIBAL_BARCA: { promotionLevels: 1 },
+  GP_SUN_TZU: { greatWorkKind: 0 }, // GW_WRITING
+  GP_TRUNG_TRAC: { perm: { warWearyPct: 25 } },
+  GP_THELFLD: { unit: 'KNIGHT' },
+  GP_EL_CID: { unmodelled: true },
+  GP_GENGHIS_KHAN_UNIT: { promotionLevels: 1, xpPct: 25 },
+  GP_TIMUR: { promotionLevels: 1, xpPct: 25 },
+  GP_ANA_NZINGA: { envoys: 1 },
+  GP_AMINA: { envoys: 1 },
+  GP_GUSTAVUS_ADOLPHUS: { unit: 'BOMBARD', unitPromotions: 1 },
+  GP_DANDARA: { unmodelled: true },
+  GP_SIMON_BOLIVAR_UNIT: { envoys: 2 },
+  GP_JOSE_DE_SAN_MARTIN: { envoys: 2 },
+  GP_NAPOLEON_BONAPARTE: { unmodelled: true },
+  GP_RANI_LAKSHMIBAI: { unit: 'CAVALRY', unitPromotions: 1 },
+  GP_TUPAC_AMARU: { unmodelled: true },
+  GP_JOHN_MONASH: { promotionLevels: 1, xpPct: 75 },
+  GP_MARINA_RASKOVA: { siteDistrict: 'AERODROME', unmodelled: true },
+  GP_SAMORI_TOURE: { unit: 'INFANTRY', unitPromotions: 1 },
+  GP_DOUGLAS_MACARTHUR: { unit: 'TANK', unitPromotions: 1 },
+  GP_DWIGHT_EISENHOWER: { perm: { unitProdPct: 5 } },
+  GP_GEORGY_ZHUKOV: { perm: { flankPct: 50 } },
+  GP_SUDIRMAN: { promotionLevels: 1, xpPct: 100 },
+  GP_AHMAD_SHAH_MASSOUD: { unit: 'MODERN_AT', unitPromotions: 1 },
+  GP_VIJAYA_WIMALARATNE: { promotionLevels: 1, xpPct: 100 },
+
+  // ---- ADMIRAL: the same shape at sea, plus the plunder rewards ----
+  GP_ARTEMISIA: { promotionLevels: 1 },
+  GP_GAIUS_DUILIUS: { unmodelled: true },
+  GP_THEMISTOCLES: { unit: 'QUADRIREME' },
+  GP_HANNO_THE_NAVIGATOR: { unit: 'GALLEY' },
+  GP_HIMERIOS: { promotionLevels: 1, xpPct: 25 },
+  GP_LEIF_ERIKSON: { unmodelled: true },
+  GP_RAJENDRA_CHOLA: { gold: 50 },
+  GP_ZHENG_HE: { envoys: 1 },
+  GP_FRANCIS_DRAKE: { gold: 75, perm: { routePlunderPct: 50 } },
+  GP_SANTA_CRUZ: { unmodelled: true },
+  GP_YI_SUN_SIN: { unit: 'IRONCLAD', unitPromotions: 1 },
+  GP_FERDINAND_MAGELLAN: { cityPerm: { loyalty: 4 } },
+  GP_CHING_SHIH: { gold: 100, perm: { routePlunderPct: 60 } },
+  GP_HORATIO_NELSON: { perm: { flankPct: 50 } },
+  GP_LASKARINA_BOUBOULINA: { promotionLevels: 1, xpPct: 50 },
+  GP_MATTHEW_PERRY: { site: 'cityState', unmodelled: true },
+  GP_FRANZ_VON_HIPPER: { unit: 'BATTLESHIP', unitPromotions: 1 },
+  GP_JOAQUIM_MARQUES_LISBOA: { perm: { warWearyPct: 25 } },
+  GP_TOGO_HEIHACHIRO: { promotionLevels: 1, xpPct: 75 },
+  GP_CHESTER_NIMITZ: { perm: { unitProdPct: 20 } },
+  GP_GRACE_HOPPER: { freeTechRandom: 1 },
+  GP_SERGEI_GORSHKOV: { promotionLevels: 1, xpPct: 100 },
+  GP_CLANCY_FERNANDO: { promotionLevels: 1, xpPct: 200 },
+};
+
+/** The class's own district is the default activation site; the art classes
+ *  need a free Great Work slot and the two military classes may spend their
+ *  charge anywhere. */
+export function gpSiteOf(person: GreatPersonDef): { site: GpSite; district: DistrictId } {
+  const a = GP_ABILITY[person.id];
+  const dflt: GpSite = GW_WORK_CLASSES.has(person.class)
+    ? 'gwSlot'
+    : person.class === 'GENERAL' || person.class === 'ADMIRAL' ? 'anywhere' : 'district';
+  return { site: a?.site ?? dflt, district: a?.siteDistrict ?? GP_CLASS_DISTRICT[person.class] };
+}
+
+export function gpChargesOf(person: GreatPersonDef): number {
+  return GP_ABILITY[person.id]?.charges ?? 1;
+}
+
+/** What ONE charge pays out. A person with no sourced row — the four classes
+ *  modelled in kind — and one whose whole clause has no carrier both fall back
+ *  to the class lump the roster built. */
+export function gpEffectOf(person: GreatPersonDef): GpEffect {
+  const a = GP_ABILITY[person.id];
+  return !a || a.unmodelled ? person.effect : a;
+}

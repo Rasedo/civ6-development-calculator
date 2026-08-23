@@ -1,12 +1,13 @@
 import type { City, GameState, Seat } from './types';
 import type { QueueItem } from './types';
-import { seatOf, setTileOwner, tileCity, tileSeat } from './seats';
+import { seatOf, setTileOwner, tileCity, tileSeat, unitSeat } from './seats';
 import { NO_SEAT } from '../../world/types';
 import { congressCultureBombSeat } from './congress';
 import { hexDistance, neighbors } from '../../world/hex';
 import { availableCivicsIn, availableTechsIn } from './effects';
 import { completedWonders, seatWonderFlag } from './wonders';
 import { UNITS, ENCAMPMENT_HP, URBAN_DEFENSES_TECH } from '../data/units';
+import { isEngineer } from './units';
 import { BUILDINGS } from '../data/buildings';
 import { DISTRICTS } from '../data/districts';
 import { CARBON_RECAPTURE_FAVOR, CARBON_RECAPTURE_UNITS } from '../data/climate';
@@ -152,6 +153,13 @@ export function completeQueueItem(
       if (fx?.dvp) owner.diplomaticPoints = (owner.diplomaticPoints ?? 0) + fx.dvp;
       // CIV6 (Big Ben): the treasury is multiplied once, at completion.
       if (fx?.treasuryMult) owner.treasury *= fx.treasuryMult;
+      // CIV6 (Mausoleum): the charge reaches the engineers ALREADY standing,
+      // not just the ones born after it.
+      if (fx?.engineerCharges) {
+        for (const u of state.units) {
+          if (unitSeat(u) === owner.seat && isEngineer(u.type)) u.charges = (u.charges ?? 0) + fx.engineerCharges;
+        }
+      }
       // CIV6 (Apadana): +2 envoys each time ANY wonder completes in its city,
       // itself included — so the count is read AFTER this tile went complete.
       const envoys = completedWonders(state, city).reduce((n, w) => n + (w.def.effects?.envoysPerWonder ?? 0), 0);

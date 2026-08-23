@@ -3,6 +3,7 @@ import type { City, DistrictId, GameState, ImprovementId, MapGenOptions, QueueIt
 import { greatPeopleEarned } from './greatPeople';
 import { airTrainTile } from './air';
 import { placeRelic, GP_CLASSES, RELIC_WONDER_SLOTS } from '../data/greatPeople';
+import { VALLETTA_FAITH_DISTRICTS } from '../data/cityStates';
 import { generateMap } from '../../world/mapgen';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { acquireTile, borderCandidates } from './city';
@@ -455,6 +456,44 @@ export function buildingFaithCost(buildingId: string): number {
   return (BUILDINGS[buildingId]?.cost ?? 0) * FAITH_PURCHASE_MULT;
 }
 
+/**
+ * CIV6 (Valletta's suzerain): "City Center buildings and Encampment district
+ * buildings can be bought with Faith. Cost of purchasing Ancient, Medieval,
+ * and Renaissance Walls is reduced, but they can only be bought with Faith."
+ * The class is the building's own district; the walls DISCOUNT has no
+ * published magnitude and is not modelled, so they price like any other row.
+ */
+export function faithBuyableClass(state: GameState, seat: number, buildingId: string): boolean {
+  const def = BUILDINGS[buildingId];
+  if (!def || def.worship) return false;
+  if (!VALLETTA_FAITH_DISTRICTS.includes(def.district)) return false;
+  return suzerainEffect(state, seat, 'faithBuildings');
+}
+
+/** The three walls are gold-buyable until a Valletta suzerain makes them
+ *  faith-only. `noPurchase` already refuses the upgraded two outright. */
+export function wallsGoldBlocked(state: GameState, seat: number, buildingId: string): boolean {
+  return (BUILDINGS[buildingId]?.walls ?? 0) > 0 && suzerainEffect(state, seat, 'faithBuildings');
+}
+
+/**
+ * CIV6 (Theocracy): "Can buy land combat units with Faith"; (Grand Master's
+ * Chapel): "Grants the ability to buy land military units with Faith." Either
+ * grant is empire-wide, so the question is the SEAT's.
+ */
+export function faithBuysLandUnits(state: GameState, seat: number): boolean {
+  const s = seatOf(state, seat);
+  if (!s) return false;
+  if (getModifiers(state, seat).faithBuyLandUnits) return true;
+  return citiesOf(state, seat).some((c) => c.buildings.some((b) => BUILDINGS[b]?.faithBuyUnits));
+}
+
+/** the faith price of a land combat unit — the one published faith rate, the
+ *  same `FAITH_PURCHASE_MULT` a building is bought at. */
+export function unitFaithCost(unitType: string): number {
+  return (UNITS[unitType]?.cost ?? 0) * FAITH_PURCHASE_MULT;
+}
+
 export function goldAffordable(treasury: number, cost: number): boolean {
   return Math.round(treasury * 1000) >= Math.round(cost * 1000);
 }
@@ -484,7 +523,7 @@ export function purchaseBuilding(state: GameState, cityId: number, buildingId: s
     return { ok: false, reason: 'Its district (or prerequisite building) must be finished first.' };
   }
   // CIV6 (Medieval and Renaissance Walls): "Cannot be purchased with Gold."
-  if (BUILDINGS[buildingId]?.noPurchase) {
+  if (BUILDINGS[buildingId]?.noPurchase || wallsGoldBlocked(state, seat, buildingId)) {
     return { ok: false, reason: 'These walls cannot be purchased with gold.' };
   }
   const worship = BUILDINGS[buildingId]?.worship === true;
@@ -579,6 +618,60 @@ export function buyWorshipBuilding(state: GameState, cityId: number, seat: numbe
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   buyer.faith = (buyer.faith ?? 0) - cost;
   city.buildings.push(wid);
+  return { ok: true };
+}
+
+/**
+ * Buy a City Center or Encampment building with FAITH — Valletta's suzerain
+ * class purchase. Same legality as the gold buy, a different currency, and
+ * its own once-per-turn slot: faith and gold are independent purses.
+ */
+export function purchaseBuildingWithFaith(state: GameState, cityId: number, buildingId: string, seat: number): RuleResult {
+  const city = citiesOf(state, seat).find((c) => c.id === cityId);
+  if (!city) return { ok: false, reason: 'No such city.' };
+  const buyer = seatOf(state, seat);
+  if (!buyer) return { ok: false, reason: 'No such seat.' };
+  if (!faithBuyableClass(state, seat, buildingId)) return { ok: false, reason: 'Not a faith-buyable building.' };
+  if (!availableBuildings(state, city).some((b) => b.id === buildingId)) {
+    return { ok: false, reason: 'Building not available in this city.' };
+  }
+  if (!buildingCompletable(state, city, buildingId)) {
+    return { ok: false, reason: 'Its district (or prerequisite building) must be finished first.' };
+  }
+  const cost = buildingFaithCost(buildingId);
+  if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
+  buyer.faith = (buyer.faith ?? 0) - cost;
+  city.buildings.push(buildingId);
+  buildingDedications(state, city.seat, buildingId);
+  if (BUILDINGS[buildingId]?.walls) city.outerHp = wallsMax(state, city);
+  return { ok: true };
+}
+
+/**
+ * Buy a LAND COMBAT unit with FAITH — Theocracy's and the Grand Master's
+ * Chapel's grant. The unit spawns at the named city like the gold rung's, and
+ * faith is its own purse, so this rides beside the one gold purchase.
+ */
+export function purchaseUnitWithFaith(state: GameState, cityId: number, unitType: string, seat: number): RuleResult {
+  const city = citiesOf(state, seat).find((c) => c.id === cityId);
+  if (!city) return { ok: false, reason: 'No such city.' };
+  const buyer = seatOf(state, seat);
+  if (!buyer) return { ok: false, reason: 'No such seat.' };
+  if (!faithBuysLandUnits(state, seat)) return { ok: false, reason: 'Faith buys no land units here.' };
+  const def = UNITS[unitType];
+  if (!def || (def.combat ?? 0) <= 0 || def.naval || def.air !== undefined) {
+    return { ok: false, reason: 'Not a land combat unit.' };
+  }
+  if (!trainableUnits(state, seat, city).some((d) => d.id === unitType)) {
+    return { ok: false, reason: 'Unit not available (enable units mode / research).' };
+  }
+  const cost = unitFaithCost(unitType);
+  if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
+  const u = spawnUnit(state, unitType, city.centerIndex, seat);
+  if (!u) return { ok: false, reason: 'Nowhere to place it.' };
+  buyer.faith = (buyer.faith ?? 0) - cost;
+  u.xpPct = trainXpPct(city.buildings, promoClassOf(unitType));
+  chargeUnitResource(state, seat, unitType);
   return { ok: true };
 }
 

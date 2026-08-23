@@ -99,6 +99,10 @@ export interface BuiltWonderDef {
     spreadCharges?: number;
     /** Extra build charges on every Builder the owner trains. */
     buildCharges?: number;
+    /** CIV6 (Mausoleum at Halicarnassus): "All Engineers have an additional
+     *  charge. (Applies to both existing Great Engineers and Military
+     *  Engineers.)" — so it is paid once to the live ones AND at creation. */
+    engineerCharges?: number;
     /** Every Apostle the owner creates carries MARTYR — the draw is certain. */
     apostleMartyr?: boolean;
     /** CIV6: "Building a Dam or the Great Bath along a River will mitigate
@@ -312,8 +316,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     W({
       id: 'MAUSOLEUM_AT_HALICARNASSUS', name: 'Mausoleum at Halicarnassus', code: 'MH', cost: 400,
       requiresCivic: 'DEFENSIVE_TACTICS', placement: { adjacentDistrict: 'HARBOR' },
-      effects: { tileYields: [{ terrain: 'COAST', yields: { science: 1, faith: 1, culture: 1 } }] },
-      description: "+1 science, +1 faith and +1 culture on this city's Coast tiles.",
+      effects: { tileYields: [{ terrain: 'COAST', yields: { science: 1, faith: 1, culture: 1 } }], engineerCharges: 1 },
+      description: "+1 science, +1 faith and +1 culture on this city's Coast tiles. Every Engineer gains a charge.",
     }),
 
     W({

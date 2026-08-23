@@ -1,6 +1,7 @@
 
 import type { City, CongressVote, DistrictId, Emergency, GameState, ImprovementId, SeatActionRecord, Seat, Tile, TradeRoute, Unit } from './types';
 import { advanceGreatPeople, wonderGwSlots } from './greatPeople';
+import { activateGreatPerson } from './gpAbility';
 import { drainRelicReserve, gwCapacity, gwCount, gwGive, gwTake, GW_KINDS, RELIC_WONDER_SLOTS } from '../data/greatPeople';
 import { completeQueueItem } from './production';
 import { isExplored, revealAround } from './fog';
@@ -53,7 +54,7 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, archaeologistExcavate, naturalistPark, upgradeUnit } from './units';
 import { killUnit } from './combat';
-import { availableProjects, buyTile, buyWorshipBuilding, condemnHeretic, convertHeathens, districtCostIn, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost } from './game';
+import { availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, condemnHeretic, convertHeathens, districtCostIn, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
 import { airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom } from './air';
@@ -77,6 +78,7 @@ const A_SNIPE = unitActionIndex(IMPROVEMENT_IDS).SNIPE_0;
 const A_SPREAD = unitActionIndex(IMPROVEMENT_IDS).SPREAD_HERE;
 const A_BUILD_ROAD = unitActionIndex(IMPROVEMENT_IDS).BUILD_ROAD;
 const A_FINISH_DISTRICT = unitActionIndex(IMPROVEMENT_IDS).FINISH_DISTRICT;
+const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
 import { AGREEMENT_TURNS, ALLIANCE_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, ERA_SCORE_CONQUER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, GOVERNOR_LOYALTY, WARMONGER_DOW, WARMONGER_CAPTURE, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles, grantedGovernorTitles, goldenBoostBonus, worldEraIndex } from './eras';
 import { NO_SEAT, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
@@ -87,6 +89,8 @@ import { DED_COINAGE, DED_TO_ARMS, DED_STEAM, TO_ARMS_MIL_PROD_MULT, STEAM_WONDE
 import { WONDER_ERA_INDEX } from '../data/builtWonders';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 
+import { gpCityPermOf, gpPermOf } from '../data/greatPeople';
+import { gpAppealResolver } from './appeal';
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
@@ -396,6 +400,7 @@ export function applyLoyalty(state: GameState, city: City, amenityTierName: stri
     return false;
   }
   const next = (city.loyalty ?? LOYALTY_MAX) + loyaltyDelta(state, city, amenityTierName) + govBonus
+    + gpCityPermOf(city, 'loyalty')
     + congressLoyaltyDelta(state, city.seat) + emergencyLoyalty(state, city.seat, city.id);
   city.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));
   return city.loyalty <= 0;
@@ -1110,6 +1115,12 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         if (unit.charges <= 0) disbandUnit(state, unit.id);
         return;
       }
+      // THE GREAT PERSON'S ONE VERB — the charge, the site and the payout
+      // are all the person's own.
+      if (a === A_ACTIVATE_GP) {
+        activateGreatPerson(state, unit);
+        return;
+      }
       if (a >= A_AIR_STRIKE && a < A_AIR_STRIKE + AIR_STRIKE_COLS) {
         const t = airStrikeTargets(state, unit, AIR_STRIKE_COLS)[a - A_AIR_STRIKE];
         if (t !== undefined) airStrike(state, unit.id, t, actor.seat);
@@ -1227,7 +1238,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           const imp = IMPROVEMENT_IDS[ii] as ImprovementId;
           const un = computeUnlocksIn(actor.research);
           if (!here.improvement
-              && validImprovementsIn(here, { unlocks: un, builder: unit.type, map: state.map, camps: campTiles(state), ownsTile: (t: Tile) => tileOwnedByCiv(t, actor.seat) }).includes(imp)) {
+              && validImprovementsIn(here, { unlocks: un, builder: unit.type, map: state.map, camps: campTiles(state), gpAppeal: gpAppealResolver(state), ownsTile: (t: Tile) => tileOwnedByCiv(t, actor.seat) }).includes(imp)) {
             here.improvement = imp;
             unit.charges = (unit.charges ?? 0) - 1;
             unit.movesLeft = 0;
@@ -1507,7 +1518,8 @@ export function seatPhase(state: GameState): void {
           const civCity = actor.cities.find((c) => c.centerIndex === bv[1]);
           const bid = prodLayout().buildings[bv[2]];
           const def = bid ? BUILDINGS[bid] : undefined;
-          if (civCity && def && !def.worship && !SCRIPTED_HELD_BUILDINGS.has(def.id)) {
+          if (civCity && def && !def.worship && !SCRIPTED_HELD_BUILDINGS.has(def.id)
+              && !def.noPurchase && !wallsGoldBlocked(state, actor.seat, def.id)) {
             const have = new Set(civCity.buildings);
             const done = new Set(
               civCity.districts.filter((d) => state.map.tiles[d.tileIndex].districtComplete).map((d) => d.type),
@@ -1579,7 +1591,10 @@ export function seatPhase(state: GameState): void {
       let boughtRelig = false;
       let boughtCivilian = false;
       let boughtNaturalist = false;
-      for (const [fk, centre] of rec?.buyFaith ?? []) {
+      let boughtClass = false;
+      let boughtLandUnit = false;
+      for (const ent of rec?.buyFaith ?? []) {
+        const [fk, centre] = ent;
         const civCityF = actor.cities.find((c) => c.centerIndex === centre);
         if (!civCityF) continue;
         if (fk === 4) buyWorshipBuilding(state, civCityF.id, actor.seat);
@@ -1589,6 +1604,15 @@ export function seatPhase(state: GameState): void {
         } else if ((fk === 8 || fk === 9) && !boughtCivilian) {
           // kinds 8/9 — the Monumentality faith-civilian (8 builder, 9 settler)
           boughtCivilian = purchaseCivilianWithFaith(state, civCityF.id, fk === 8 ? 'BUILDER' : 'SETTLER', actor.seat).ok;
+        } else if (fk === 12 && !boughtClass) {
+          // kind 12 — Valletta's class purchase, its own once-per-turn slot.
+          const cbid = prodLayout().buildings[ent[2] ?? -1];
+          if (cbid) boughtClass = purchaseBuildingWithFaith(state, civCityF.id, cbid, actor.seat).ok;
+        } else if (fk === 13 && !boughtLandUnit) {
+          // kind 13 — the land combat unit Theocracy and the Grand Master's
+          // Chapel sell for faith.
+          const cuid = prodLayout().units[ent[2] ?? -1];
+          if (cuid) boughtLandUnit = purchaseUnitWithFaith(state, civCityF.id, cuid, actor.seat).ok;
         } else if (fk === 10 && !boughtNaturalist) {
           // kind 10 — the NATURALIST, faith-only in any city (no Holy Site,
           // no dedication), one per turn like the other faith civilians.
@@ -1644,7 +1668,10 @@ export function seatPhase(state: GameState): void {
           if (raider === null) continue;
           plundered.add(r);
           const rs = seatOf(state, raider);
-          if (rs) rs.treasury += PLUNDER_ROUTE_GOLD * getModifiers(state, raider).routePlunderMult;
+          if (rs) {
+            rs.treasury += PLUNDER_ROUTE_GOLD * getModifiers(state, raider).routePlunderMult
+              * (1 + gpPermOf(rs, 'routePlunderPct') / 100);
+          }
         }
         if (plundered.size > 0) actor.tradeRoutes = routes.filter((r) => !plundered.has(r));
       }
@@ -1768,7 +1795,7 @@ export function seatPhase(state: GameState): void {
         // CIV6 (Public Works Program): "+100% / -50% Production towards this
         // Project."
         if (q.kind === 'project') _em *= congressProjectMult(state, PROJECT_LIST.findIndex((pr) => pr.id === q.project));
-        _em *= 1 + prodBoostPct(seatMods, q);
+        _em *= 1 + prodBoostPct(seatMods, q, actor.gpPerm);
         const progressBefore = q.progress;
         q.progress += production * _em;
         // Pay in the bank, exactly where the seat 0's endTurn does

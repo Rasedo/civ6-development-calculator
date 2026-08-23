@@ -3,6 +3,7 @@ import { WW_ERA_BASE_FORMAL, WW_ERA_BASE_SURPRISE, WW_ABROAD_MULT, WW_DEATH_MULT
 import { atWarWithAny, isBarbSeat, isCiv, seatOf, seatsAllied, tileSeat, warIsFormal } from './seats';
 import { civEraIndex } from './city';
 
+import { gpPermOf } from '../data/greatPeople';
 /**
  * WAR WEARINESS, one seat-generic model.
  *
@@ -78,7 +79,10 @@ function addWw(state: GameState, seat: number, other: number, amount: number): v
   if (!s) return;
   (s.ww ??= {});
   (s.wwTurn ??= {});
-  s.ww[other] = Math.max(0, (s.ww[other] ?? 0) + amount);
+  // CIV6 (Trung Trac, Joaquim Marques Lisboa): a permanent percentage off
+  // everything this seat accrues from here on.
+  const cut = Math.min(100, gpPermOf(s, 'warWearyPct'));
+  s.ww[other] = Math.max(0, (s.ww[other] ?? 0) + Math.floor((amount * (100 - cut)) / 100));
   s.wwTurn[other] = state.turn;
 }
 

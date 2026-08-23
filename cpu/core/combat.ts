@@ -38,6 +38,7 @@ import { unitFullMoves } from './units';
 import { warWearinessBattle } from './weariness';
 import { unitKillEvent } from './eras';
 
+import { gpPermOf } from '../data/greatPeople';
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
@@ -1057,6 +1058,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     }
   } else {
     const atkCSf = atkCS + FLANKING_CS * promoStackMult(attacker, 'FLANK_MULT') * flankCount(state, targetIndex, attacker)
+      * (1 + gpPermOf(seatOf(state, attacker.seat), 'flankPct') / 100)
       + promoCS(attacker, {
         attacking: true, foeType: defender.type, foeDamaged: defender.hp < UNIT_HP,
         foeFortified: (defender.fortifyTurns ?? 0) > 0,

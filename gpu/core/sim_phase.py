@@ -331,7 +331,8 @@ class SimPhase:
                  + torch.where(gov, torch.full_like(loy_gov, self._gov_loy), loy_gov)
                  + self._congress_loyalty(row)
                  + self._standing_loyalty(row, bidx, col)
-                 + self._emergency_loyalty(row).gather(1, col.unsqueeze(1)).squeeze(1))
+                 + self._emergency_loyalty(row).gather(1, col.unsqueeze(1)).squeeze(1)
+                 + self._gp_city_perm(row, "loyalty").gather(1, col.unsqueeze(1)).squeeze(1).double())
         loy = self.city_loyalty[bidx, row, col]
         upd = act & others
         nxt = torch.where(upd, (loy + delta).clamp(min=0, max=lmax), loy)
@@ -457,10 +458,10 @@ class SimPhase:
         # The slotted production cards: CIV6 stacks production modifiers
         # ADDITIVELY, so two cards that both name the item pay their
         # percentages summed rather than compounded.
+        _add = torch.zeros_like(prod)
         if self._gov_has_effects:
             _pb = self._gov_mods(row)[12]["prod"]
             if _pb:
-                _add = torch.zeros_like(prod)
                 for _pact, _isw, _cmask, _eramax, _pct in _pb:
                     if _isw:
                         _nw = self._wonder_era.shape[0]
@@ -475,7 +476,9 @@ class SimPhase:
                         if _eramax >= 0:
                             _hit = _hit & (self._type_era[_ui] <= _eramax)
                     _add = _add + (_pact & _hit).to(_add.dtype) * _pct
-                _emall = _emall * (1 + _add)
+        # A Great Person's permanent share joins the SAME additive sum.
+        _add = _add + self._gp_prod_pct(row, cur).to(_add.dtype)
+        _emall = _emall * (1 + _add)
         prod = prod * _emall
         # VETERANCY multiplies FIRST, then the banked chop adds unmultiplied —
         # phase.ts spends the bank right after the production add.
@@ -603,6 +606,17 @@ class SimPhase:
                 # CIV6: Statue of Liberty +4 Diplomatic Victory points on
                 # completion, Potala Palace +1.
                 self.civ_diplo_points[wr, row] += self._wond_dvp[wi[wr]]
+                # CIV6 (Mausoleum): the charge reaches the engineers ALREADY
+                # standing, not just the ones born after it.
+                if int(self._wond_eng_ch.sum()) > 0:
+                    _ec = torch.zeros(self.B, dtype=torch.long, device=self.device)
+                    _ec[wr] = self._wond_eng_ch[wi[wr]]
+                    if bool((_ec > 0).any()):
+                        _mine = self.major_unit_alive & (self.major_unit_seat == row)                             & self._engineer_types(self.major_unit_type.clamp(min=0))
+                        self.major_unit_charges += torch.where(
+                            _mine, _ec.reshape(-1, 1).expand_as(self.major_unit_charges),
+                            torch.zeros_like(self.major_unit_charges))
+                        self._gen_ver += 1
                 # CIV6 (Big Ben): the treasury is multiplied once, at completion.
                 tmul = self._wond_treasury[wi[wr]]
                 self.civ_treasury[wr, row] = self.civ_treasury[wr, row] * tmul.to(self.civ_treasury.dtype)
@@ -928,6 +942,7 @@ class SimPhase:
                 else torch.zeros(B, 1, dtype=torch.float64, device=dev))
         for cls in range(self._gp_nc):
             d_cls = int(self._gp_class_district[cls]) if cls < self._gp_nc else -1
+            comp_c = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
             if d_cls >= 0 and self.districts_on:
                 reg_c = self.city_dist_tile[:, row, :, d_cls]  # [B, cols]
                 comp_c = (reg_c >= 0) & self.district_complete.gather(1, reg_c.clamp(min=0)) & ~self.district_pillaged.gather(1, reg_c.clamp(min=0))  # a pillaged district earns no GPP
@@ -971,31 +986,6 @@ class SimPhase:
                 hit = active & has_person & (self.civ_gpp[:, row, cls] >= gcost)
                 if not bool(hit.any()):
                     break
-                hf = hit.to(torch.float64)
-                eff = self._gp_effects[cls, at_c.clamp(max=maxN - 1)]
-                self.civ_tech_prog[:, row] = self.civ_tech_prog[:, row] + eff[:, 0].double() * hf
-                _kind = self._gw_cls.index(cls) if cls in self._gw_cls else -1
-                if _kind >= 0:
-                    self._place_works(row, hit, eff[:, 1].double(), _kind, at_c)
-                else:
-                    self.civ_civic_prog[:, row] = self.civ_civic_prog[:, row] + eff[:, 1].double() * hf
-                self.civ_treasury[:, row] = self.civ_treasury[:, row] + eff[:, 2].double() * hf
-                prod_fx = eff[:, 3].double() * hf
-                if bool((prod_fx != 0).any()):
-                    _capa = self.city_is_cap[:, row] & self.city_alive[:, row]
-                    capm = _capa & (self.city_current[:, row] >= 0)
-                    _drip_gp = self.city_progress[:, row].clone()
-                    self.city_progress[:, row] = self.city_progress[:, row] + torch.where(capm, prod_fx.unsqueeze(1), torch.zeros_like(self.city_progress[:, row]))
-                    self._repair_drip(row, _drip_gp)
-                    # the phase.ts twin: bank it rather than drop it when
-                    # the capital has nothing queued
-                    _capb = _capa & (self.city_current[:, row] < 0)
-                    self.city_prod_bank[:, row] = self.city_prod_bank[:, row] + torch.where(
-                        _capb, prod_fx.unsqueeze(1), torch.zeros_like(self.city_prod_bank[:, row]))
-                if self._gp_effects.shape[2] > 4:
-                    self.civ_faith[:, row] = self.civ_faith[:, row] + eff[:, 4].double() * hf
-                if cls == self._prophet_cls:
-                    self.civ_prophets[:, row] = self.civ_prophets[:, row] + hit.long()
                 self.civ_gpp[:, row, cls] = torch.where(hit, self.civ_gpp[:, row, cls] - gcost, self.civ_gpp[:, row, cls])
                 self.gp_earned[:, cls] = self.gp_earned[:, cls] + hit.long()
                 self.gp_next[:, cls] = torch.where(hit, at_c + 1, self.gp_next[:, cls])
@@ -1003,16 +993,27 @@ class SimPhase:
                 # CIV6 (Sky and Stars): "+1 Era Score each time a Great
                 # Person is Earned."
                 self._dedication_event(row, self._ded_sky, hit)
-                # A GENERAL/ADMIRAL claim spawns its support unit
-                # (civilian, 4 MP) at the seat's capital (city_is_cap
-                # center), on top of the instant effect — the phase.ts
-                # spawn-at-claim mirror. Draws no RNG.
-                if (cls == self._general_cls and self._general_unit_idx >= 0) or (cls == self._admiral_cls and self._admiral_unit_idx >= 0):
-                    guidx = self._general_unit_idx if cls == self._general_cls else self._admiral_unit_idx
-                    if bool(hit.any()):
-                        cap_t = torch.where(self.city_is_cap[:, row] & self.city_alive[:, row], self.city_center[:, row], torch.full_like(self.city_center[:, row], -1)).max(dim=1).values
-                        self._spawn_unit(row, hit & (cap_t >= 0), cap_t, guidx)
-                        self._gen_ver += 1
+                # CIV6: the recruit is a UNIT and nothing is paid out here.
+                # It arrives in the city holding a completed district of its
+                # own class (lowest centre tile), the capital otherwise, and
+                # carries the queue position its charge will spend. Draws no RNG.
+                guidx = int(self._gp_class_unit[cls]) if cls < int(self._gp_class_unit.numel()) else -1
+                if guidx >= 0 and bool(hit.any()):
+                    cap_t = torch.where(self.city_is_cap[:, row] & self.city_alive[:, row],
+                                        self.city_center[:, row],
+                                        torch.full_like(self.city_center[:, row], -1)).max(dim=1).values
+                    if d_cls >= 0 and self.districts_on:
+                        _okc = comp_c & self.city_alive[:, row]
+                        _cand = torch.where(_okc, self.city_center[:, row],
+                                            torch.full_like(self.city_center[:, row], 1 << 30))
+                        _at = _cand.min(dim=1).values
+                        born_t = torch.where(_at >= (1 << 30), cap_t, _at)
+                    else:
+                        born_t = cap_t
+                    self._spawn_unit(row, hit & (born_t >= 0), born_t, guidx,
+                                     charges=self._gp_charges[cls, at_c.clamp(max=maxN - 1)],
+                                     gp_at=at_c.clamp(max=maxN - 1))
+                    self._gen_ver += 1
 
     def _seat_belief_claims(self, row: int, active: torch.Tensor) -> None:
         """The BELIEF RACES for ONE seat row, at the

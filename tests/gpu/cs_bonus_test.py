@@ -225,6 +225,79 @@ def test_suzerain(rules, path) -> None:
         print("  seat-0 suzerain CONTEST OK: a civ out-envoys seat 0 -> no perk")
 
 
+def test_faith_class(rules, path) -> None:
+    """CIV6 (Valletta's suzerain): "City Center buildings and Encampment
+    district buildings can be bought with Faith. Cost of purchasing Ancient,
+    Medieval, and Renaissance Walls is reduced, but they can only be bought
+    with Faith." Unreachable in the gate — the scripted seats never carry a
+    minor past one envoy — so the class rule, the currency and the gold
+    refusal are poked."""
+    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+    for _ in range(20):
+        sim.step()
+    assert sim._suz_c_faith_bldg >= 0, "the suz-effect table carries no faithBuildings code"
+    row = 1
+    if sim.S > 1:
+        sim.citystate_alive[0, 1:] = False
+    sim.citystate_alive[0, 0] = True
+    sim.citystate_suz_code[0, 0] = sim._suz_c_faith_bldg
+    sim.seat_citystate_envoys[0, :, 0] = 0
+    sim.seat_citystate_envoys[0, row, 0] = 4
+    sim._eff_version += 1
+    assert bool(sim._suz_effect(row, sim._suz_c_faith_bldg)[0]), "the suzerain read did not take"
+
+    held = torch.ones(1, dtype=torch.bool)
+    sim.civ_faith[0, row] = 10_000.0
+    ok, j, b = sim._seat_class_buy_candidate(row, held)
+    assert bool(ok[0]), "no class purchase offered to a Valletta suzerain with a full purse"
+    bi = int(b[0])
+    rq = int(sim._b_req_district[bi])
+    assert rq == -1 or rq == sim._encamp_didx,         f"the candidate named {BUILDING_IDS[bi]}, which is neither a City Center nor an Encampment row"
+
+    # the FAITH price, and the write
+    price = float(sim._class_faith_cost(b)[0])
+    assert abs(price - float(sim.rules_dev.b_cost[bi]) * sim.rules.faith_purchase_mult) < 1e-9,         "the class purchase is not priced at the faith rate"
+    f0, jc = float(sim.civ_faith[0, row]), int(j[0])
+    sim._seat_buy_building_faith(row, ok, j, b, sim._class_faith_cost(b))
+    assert bool(sim.city_bldg[0, row, jc, bi]), "the faith-bought building did not land in the city"
+    assert abs(float(sim.civ_faith[0, row]) - (f0 - price)) < 1e-9, "the faith was not spent"
+
+    # a seat with no such suzerain is offered nothing
+    sim.seat_citystate_envoys[0, row, 0] = 0
+    sim._eff_version += 1
+    ok2, _, _ = sim._seat_class_buy_candidate(row, held)
+    assert not bool(ok2[0]), "the class purchase survived the loss of the suzerain"
+    print(f"  faith-class OK: {BUILDING_IDS[bi]} bought for {price:.0f} faith, gone without the suzerain")
+
+
+def test_walls_faith_only(rules, path) -> None:
+    """... and the walls half: with the suzerain held, no walls row is offered
+    to the GOLD buy any more."""
+    sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
+    for _ in range(20):
+        sim.step()
+    assert sim._walls_rows, "no walls rows in this build"
+    row = 1
+    active = torch.ones(1, dtype=torch.bool)
+    sim.civ_treasury[0, row] = 100_000.0
+    if sim.S > 1:
+        sim.citystate_alive[0, 1:] = False
+    sim.citystate_alive[0, 0] = True
+    sim.citystate_suz_code[0, 0] = sim._suz_c_faith_bldg
+    sim.seat_citystate_envoys[0, :, 0] = 0
+    sim._eff_version += 1
+    _, _, _, _, elig_free = sim._seat_buy_candidates(row, active)
+    sim.seat_citystate_envoys[0, row, 0] = 4
+    sim._eff_version += 1
+    _, _, _, _, elig_suz = sim._seat_buy_candidates(row, active)
+    wr = torch.tensor(sim._walls_rows, dtype=torch.long)
+    assert not bool(elig_suz[:, :, wr].any()), "a walls row survived the gold buy under the suzerain"
+    kept = elig_suz[:, :, [i for i in range(elig_suz.shape[2]) if i not in set(sim._walls_rows)]]
+    kept_free = elig_free[:, :, [i for i in range(elig_free.shape[2]) if i not in set(sim._walls_rows)]]
+    assert bool((kept == kept_free).all()), "the walls refusal moved a NON-walls row"
+    print("  walls faith-only OK: the three walls leave the gold buy, nothing else moves")
+
+
 def test_civ_bonus(rules, path) -> None:
     sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
     for _ in range(20):
@@ -282,6 +355,8 @@ def main() -> None:
     test_building_bonus(rules, p)
     test_building_pillage(rules, p)
     test_suzerain(rules, p)
+    test_faith_class(rules, p)
+    test_walls_faith_only(rules, p)
     test_civ_bonus(rules, p)
     print("CS_BONUS OK")
 

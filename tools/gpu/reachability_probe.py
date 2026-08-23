@@ -37,6 +37,15 @@ of the DRIVEN GAME, not of the comparison. What it answers, in order:
                 and the most a seat holds at once
   wonders       wonders actually FINISHED — the fourteen wonder-effect
                 channels have no gate coverage until one completes
+  gpUnit        a Great Person standing on the map as a UNIT
+  gpOffer       a turn on which the mask offers one the ACTIVATE_GP column
+  gpSpent       a charge actually spent — the ability fired
+  gpPerm        a permanent per-seat channel a spent person left behind
+  gpCityPerm    ... and a permanent per-city one
+  vallettaSuz   a seat holding the faith-buys-a-class suzerain
+  vallettaBuy   ... and a legal, affordable class purchase for it to take (C-9)
+  faithUnitGrant  a seat that may buy land combat units with Faith (C-9)
+  faithUnitBuy    ... and an affordable land unit for it to take
 
 Run: python tools/gpu/reachability_probe.py [--turns 250]
 """
@@ -68,7 +77,9 @@ KEYS = ("apostleBuy", "urbanization", "secondShip",
         "natHistory", "conservation",
         "friendship", "alliance", "openBorders", "closedStep", "workGift",
         "defensivePact", "carbon", "climatePhase",
-        "engineer", "engImp", "engRoadOffer", "engFinishOffer") + tuple(f"placed:{d}" for d in DISTRICT_MARKS)
+        "engineer", "engImp", "engRoadOffer", "engFinishOffer",
+        "gpUnit", "gpOffer", "gpSpent", "gpPerm", "gpCityPerm",
+        "vallettaSuz", "vallettaBuy", "faithUnitGrant", "faithUnitBuy") + tuple(f"placed:{d}" for d in DISTRICT_MARKS)
 
 
 def main() -> None:
@@ -141,7 +152,7 @@ def main() -> None:
             relig = rec[9]
             if isinstance(relig, tuple) and len(relig) == 2 and relig[0] is not None:
                 mark("apostleBuy", (relig[0] == 6), t)
-            vote = rec[16]
+            vote = rec[18]
             if vote is not None:
                 mark("ballot", (vote[:, :, 0] >= 0).any(dim=1), t)
         sim.step()
@@ -169,6 +180,45 @@ def main() -> None:
             mark("engImp", _std, t)
             mark("engRoadOffer", _off_r, t)
             mark("engFinishOffer", _off_f, t)
+        # THE GREAT PERSON, end to end: a unit on the map, the verb offered,
+        # a charge spent, and the two permanent channels a spent one leaves.
+        _gp_t = torch.zeros(sim.NU, dtype=torch.bool)
+        for _c in range(int(sim._gp_class_unit.numel())):
+            _gi = int(sim._gp_class_unit[_c])
+            if 0 <= _gi < sim.NU:
+                _gp_t[_gi] = True
+        mark("gpUnit", (sim.unit_alive & _gp_t[sim.unit_type.clamp(min=0)]).any(dim=1), t)
+        if getattr(sim, "_A_GP", -1) >= 0:
+            _off_g = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
+            for _row in seats:
+                _umg = sim._seat_unit_mask(_row)
+                if _umg.shape[2] > sim._A_GP:
+                    _off_g |= _umg[:, :, sim._A_GP].any(dim=1)
+            mark("gpOffer", _off_g, t)
+        mark("gpSpent", (sim.civ_gp_used > 0).any(dim=1), t)
+        mark("gpPerm", (sim.civ_gp_perm != 0).any(dim=2).any(dim=1), t)
+        mark("gpCityPerm", (sim.city_gp_perm != 0).any(dim=3).any(dim=2).any(dim=1), t)
+        # C-9: the suzerain that sells a CLASS of building for faith, and the
+        # purchase itself landing.
+        if getattr(sim, "_suz_c_faith_bldg", -1) >= 0:
+            _vsz = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
+            _vby = torch.zeros_like(_vsz)
+            for _row in seats:
+                _held = sim._suz_effect(_row, sim._suz_c_faith_bldg)
+                _vsz |= _held
+                _cok, _cj, _cb = sim._seat_class_buy_candidate(_row, _held)
+                _vby |= _cok
+            mark("vallettaSuz", _vsz, t)
+            mark("vallettaBuy", _vby, t)
+        _fug = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
+        _fub = torch.zeros_like(_fug)
+        for _row in seats:
+            _g = sim._seat_faith_unit_grant(_row)
+            _fug |= _g
+            _uok, _, _ = sim._seat_faith_unit_candidate(_row, torch.ones_like(_g))
+            _fub |= _uok
+        mark("faithUnitGrant", _fug, t)
+        mark("faithUnitBuy", _fub, t)
         mark("carbon", (sim.civ_co2 > 0).any(dim=1), t)
         mark("climatePhase", sim.climate_idx >= 0, t)
         mark("urbanization", sim.civ_civics[:, :, urb].any(dim=1), t)

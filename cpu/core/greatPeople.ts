@@ -1,7 +1,7 @@
 
 import type { GameState, GreatPersonClass } from './types';
 import { citiesOf, seatOf } from './seats';
-import { GP_CLASSES, GP_CLASS_DISTRICT, GP_FIRST_OF_ERA, GREAT_PEOPLE, GW_CLASS_KIND, GW_WONDER_SLOTS, GW_WORK_CLASSES, gpCost, placeGreatWorks } from '../data/greatPeople';
+import { GP_CLASSES, GP_CLASS_DISTRICT, GP_FIRST_OF_ERA, GREAT_PEOPLE, GW_WONDER_SLOTS, gpChargesOf, gpCost } from '../data/greatPeople';
 import { congressGppFactor } from './congress';
 import { BUILDINGS } from '../data/buildings';
 import { DED_SKY, ERA_SCORE_GP } from '../data/seats';
@@ -9,7 +9,6 @@ import { completedWonders, seatWonders } from './wonders';
 import { addEraScore, dedicationEvent, goldenProphetPoints, worldEraIndex } from './eras';
 import { getModifiers } from './effects';
 import { spawnUnit } from './units';
-import { repairDrip } from './rules';
 
 export function greatPeopleEarned(state: GameState, cls: GreatPersonClass): number {
   return state.claimedGreatPeople.filter((id) => GREAT_PEOPLE[cls].some((p) => p.id === id)).length;
@@ -83,39 +82,41 @@ export function wonderGwSlots(state: GameState, kind: number) {
     );
 }
 
+/**
+ * WHERE A RECRUIT ARRIVES: the seat's city holding a completed, unpillaged
+ * district of this class — the site the person's own charge will need —
+ * lowest centre tile first, and the capital when no city has one.
+ */
+export function gpSpawnTile(state: GameState, seat: number, cls: GreatPersonClass): number {
+  const district = GP_CLASS_DISTRICT[cls];
+  let best = -1;
+  for (const c of citiesOf(state, seat)) {
+    const has = c.districts.some((d) => {
+      const t = state.map.tiles[d.tileIndex];
+      return d.type === district && t.districtComplete && !t.pillaged;
+    });
+    if (has && (best < 0 || c.centerIndex < best)) best = c.centerIndex;
+  }
+  if (best >= 0) return best;
+  return citiesOf(state, seat).find((c) => c.isCapital)?.centerIndex ?? -1;
+}
+
 function recruit(state: GameState, seat: number, cls: GreatPersonClass): void {
   const owner = seatOf(state, seat);
   const at = gpOffer(state, cls);
   const person = GREAT_PEOPLE[cls][at];
   if (!owner || !person) return; // class exhausted
   (state.gpNext ??= GP_CLASSES.map(() => 0))[GP_CLASSES.indexOf(cls)] = at + 1;
-  const cities = owner.cities;
-  const fx = person.effect;
 
-  if (fx.science) owner.research.techProgress += fx.science;
-  if (GW_WORK_CLASSES.has(cls)) {
-    const kind = GW_CLASS_KIND[cls]!;
-    const overflow = placeGreatWorks(cities, kind, wonderGwSlots(state, kind), at);
-    if (fx.culture) owner.research.civicProgress += fx.culture * overflow;
-  } else if (fx.culture) {
-    owner.research.civicProgress += fx.culture;
-  }
-  if (fx.faith) owner.faith += fx.faith;
-  if (fx.gold) owner.treasury += fx.gold;
-  if (fx.productionToCapital) {
-    const capital = cities.find((c) => c.isCapital);
-    // Route the LUMP like completion overflow: into the queue head if there is
-    // one, otherwise banked. Dropping it when the queue is empty is a leak.
-    if (capital && capital.queue.length > 0) {
-      const before = capital.queue[0].progress;
-      capital.queue[0].progress += fx.productionToCapital;
-      repairDrip(state, capital, before);
+  // CIV6: the recruit is a UNIT. Nothing is paid out here — the person walks
+  // to a site their ability may be spent at and spends a charge there.
+  const where = gpSpawnTile(state, seat, cls);
+  if (where >= 0) {
+    const u = spawnUnit(state, cls, where, seat);
+    if (u) {
+      u.gpAt = at;
+      u.charges = gpChargesOf(person);
     }
-    else if (capital) capital.productionBank = (capital.productionBank ?? 0) + fx.productionToCapital;
-  }
-  if (cls === 'GENERAL' || cls === 'ADMIRAL') {
-    const capital = cities.find((c) => c.isCapital);
-    if (capital) spawnUnit(state, cls, capital.centerIndex, seat);
   }
 
   state.claimedGreatPeople.push(person.id); // gone from the global pool...

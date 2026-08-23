@@ -80,6 +80,7 @@ class SimInit:
             ("gwart_type", torch.long, -1, None, max(int((rules.seats or {}).get("gwSlotsByKind", [2, 3, 1])[1]), 1)),
             ("gwart_artist", torch.long, -1, None, max(int((rules.seats or {}).get("gwSlotsByKind", [2, 3, 1])[1]), 1)),
             ("bldg", torch.bool, False, None, max(len(rules.b_cost), 1)),
+            ("gp_perm", dtype, 0, None, max(len((rules.seats or {}).get("gpCityPermKeys", [])), 1)),
         ):
             _shape = (B, self.n_majors + _sp, _rcp) + ((_ex,) if _ex else ())
             _base = torch.full(_shape, _rf, dtype=_dt, device=device)
@@ -93,6 +94,9 @@ class SimInit:
         self.tile_yields = ften(lambda f: [t["y"] for t in f["tiles"]], (T, 6))
         self.res_priority = torch.tensor([[t["res"] for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.wonder_near = torch.tensor([[t.get("wnear", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        # what a Great Person's per-adjacent clause counts. Both are static;
+        # RAINFOREST is `feat_id` minus whatever has since been chopped.
+        self.tile_mountain = torch.tensor([[t.get("mtn", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.coastal_land = torch.tensor([[t.get("cl", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.passable = torch.tensor([[t["pass"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.wpass = torch.tensor([[t.get("wpass", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
@@ -234,6 +238,7 @@ class SimInit:
         self._suz_c_apostle = _sfx.index("apostlePromoChoice") if "apostlePromoChoice" in _sfx else -1
         self._suz_c_era = _sfx.index("eraInspiration") if "eraInspiration" in _sfx else -1
         self._suz_c_harbor_pow = _sfx.index("harborPower") if "harborPower" in _sfx else -1
+        self._suz_c_faith_bldg = _sfx.index("faithBuildings") if "faithBuildings" in _sfx else -1
         self._suz_xp_mult_k = int(_suz["xpMult"])
         self._suz_hill_cs = int(_suz["hillCs"])
         self._suz_reach_bonus = int(_suz["reachBonus"])
@@ -658,6 +663,10 @@ class SimInit:
             ("spy_turns", torch.long),
             ("spy_target", torch.long),
             ("spy_level", torch.long),
+            # a GREAT PERSON chassis's QUEUE POSITION — which person it is
+            # carrying, and so which sourced row its charge spends. -1 on
+            # every other unit.
+            ("gp_at", torch.long),
         ):
             _base = torch.zeros(B, self.UNIT_MAX, dtype=_dt, device=device)
             setattr(self, f"unit_{_pl}", _base)
@@ -671,6 +680,7 @@ class SimInit:
                     ],
                 )
         self.unit_level.fill_(1)  # a brand-new unit starts at level 1
+        self.unit_gp_at.fill_(-1)
         self.unit_spy_mission.fill_(self._spy_idle)
         self.unit_spy_target.fill_(-1)
         self.barb_unit_seat.fill_(BARB_SEAT)
@@ -867,6 +877,7 @@ class SimInit:
             self._wond_envoy = torch.tensor([int(w["envoysPerWonder"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_spread = torch.tensor([int(w["spreadCharges"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_build_ch = torch.tensor([int(w["buildCharges"]) for w in self._wond_rows], dtype=torch.long, device=device)
+            self._wond_eng_ch = torch.tensor([int(w.get("engineerCharges", 0)) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_martyr = torch.tensor([bool(w["apostleMartyr"]) for w in self._wond_rows], dtype=torch.bool, device=device)
             self._wond_floodmit = torch.tensor([bool(w["floodMitigation"]) for w in self._wond_rows], dtype=torch.bool, device=device)
             self._wond_dupnaval = torch.tensor([bool(w["dupNaval"]) for w in self._wond_rows], dtype=torch.bool, device=device)
@@ -909,19 +920,65 @@ class SimInit:
             rr.get("gpFlatCost", [0] * n_gp), dtype=torch.bool, device=device)
         gp_cd = rr.get("gpClassDistrict", [])
         self._gp_class_district = torch.tensor(gp_cd if gp_cd else [-1] * n_gp, dtype=torch.long, device=device)
-        gp_fx = rr.get("gpEffects", []) or [[[0, 0, 0, 0, 0]] * 4] * n_gp
+        # THE PERSON'S OWN ROW. `gpFx` names the dense columns and the two
+        # permanent runs ride its tail, so nothing here writes a position down.
+        self._gp_fx_names = list(rr.get("gpFx", []))
+        self._gp_perm_names = list(rr.get("gpPermKeys", []))
+        self._gp_city_perm_names = list(rr.get("gpCityPermKeys", []))
+        self._GPFX = {n: i for i, n in enumerate(self._gp_fx_names)}
+        self._GP_PERM0 = len(self._gp_fx_names)
+        self._GP_CPERM0 = self._GP_PERM0 + len(self._gp_perm_names)
+        _fxw = self._GP_CPERM0 + len(self._gp_city_perm_names)
+        gp_fx = rr.get("gpEffects", []) or [[[0] * max(1, _fxw)] * 4] * n_gp
         gp_ea = rr.get("gpEra", []) or [[0] * len(c) for c in gp_fx]
         _maxN = max(1, max(len(c) for c in gp_fx))
+        _fxw = max(_fxw, max((len(r) for c in gp_fx for r in c), default=1))
         # the rosters are RAGGED (each class has as many people as its page
         # names); pad to the widest and let `_gp_roster` gate the tail.
         self._gp_effects = torch.tensor(
-            [c + [[0, 0, 0, 0, 0]] * (_maxN - len(c)) for c in gp_fx], dtype=dtype, device=device)  # [n_gp, maxN, 5] (col 4 = faith)
+            [c + [[0] * _fxw] * (_maxN - len(c)) for c in gp_fx], dtype=dtype, device=device)  # [n_gp, maxN, fxw]
         self._gp_era = torch.tensor(
             [c + [0] * (_maxN - len(c)) for c in gp_ea], dtype=torch.long, device=device)
+
+        def _gp_pad(key: str, fill: int) -> torch.Tensor:
+            rows = rr.get(key, []) or [[fill] * _maxN for _ in range(n_gp)]
+            return torch.tensor([c + [fill] * (_maxN - len(c)) for c in rows], dtype=torch.long, device=device)
+
+        self._gp_site = _gp_pad("gpSite", 0)               # GP_SITES index
+        self._gp_site_district = _gp_pad("gpSiteDistrict", -1)
+        self._gp_charges = _gp_pad("gpCharges", 1)
+        # the NAMED eurekas and the instant buildings, catalog bitmasks
+        _eu = rr.get("gpEureka", [])
+        _bl_gp = rr.get("gpBuildings", [])
+        _euw = max((len(r) for c in _eu for r in c), default=1)
+        _blw = max((len(r) for c in _bl_gp for r in c), default=1)
+        self._gp_eureka = torch.tensor(
+            [c + [[0] * _euw] * (_maxN - len(c)) for c in _eu] if _eu
+            else [[[0] * _euw] * _maxN for _ in range(n_gp)], dtype=torch.bool, device=device)
+        self._gp_bldg = torch.tensor(
+            [c + [[0] * _blw] * (_maxN - len(c)) for c in _bl_gp] if _bl_gp
+            else [[[0] * _blw] * _maxN for _ in range(n_gp)], dtype=torch.bool, device=device)
+        self._gp_class_unit = torch.tensor(
+            rr.get("gpClassUnitIdx", [-1] * n_gp), dtype=torch.long, device=device)
+        self._gp_work_class = [bool(x) for x in rr.get("gpWorkClasses", [0] * n_gp)]
+        self._gp_any_fx = bool((self._gp_effects != 0).any()) if self._gp_effects.numel() else False
         self._gp_first_of_era = torch.tensor(
             rr.get("gpFirstOfEra", [[0] * 9] * n_gp), dtype=torch.long, device=device)
         self._prophet_cls = int(rr.get("prophetCls", 3))  # PROPHET's class index
+        self._gp_engineer_cls = int(rr.get("engineerCls", -1))  # the Great ENGINEER's
+        self._promo_max_level = int(rr.get("promoMaxLevel", 8))
+        self._promo_xp_per_level = int(rr.get("promoXpPerLevel", 15))
+        self._rainforest_fid = int(rr.get("rainforestFid", -1))
         self._gp_nc = int(self._gp_class_district.numel())
+        # PERMANENT channels a spent Great Person leaves behind, the count of
+        # charges actually spent (which is what a founded religion reads), and
+        # the INVENTED luxuries — each entry how many cities that copy reaches,
+        # with `civ_gp_lux_n` saying how many of the row are live.
+        self.civ_gp_used = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
+        self.civ_gp_perm = torch.zeros(
+            B, self.n_majors, max(1, len(self._gp_perm_names)), dtype=dtype, device=device)
+        self.civ_gp_lux = torch.zeros(B, self.n_majors, simbase.GP_LUX_MAX, dtype=torch.long, device=device)
+        self.civ_gp_lux_n = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self._alloc_civ_pairs(B, self.n_majors, dtype, device)
         # GREAT WORKS, in three slotted kinds (0 WRITING / 1 ART / 2 MUSIC). A
         # claimed WRITER / ARTIST / MUSICIAN (gwClsByKind) slots gwWorksByKind
@@ -1035,6 +1092,7 @@ class SimInit:
             self._A_SPY_MISSION = self._act.get("SPY_MISSION_0", -1)
             self._A_ROAD = self._act.get("BUILD_ROAD", -1)          # the engineer's
             self._A_FINISH = self._act.get("FINISH_DISTRICT", -1)   # its 20% charge
+            self._A_GP = self._act.get("ACTIVATE_GP", -1)           # the great person's
             self._air_strike_cols = sum(1 for n in self._act_names if n.startswith("AIR_STRIKE_"))
             self._air_rebase_cols = sum(1 for n in self._act_names if n.startswith("REBASE_"))
             _stc = sum(1 for n in self._act_names if n.startswith("SPY_TRAVEL_"))
@@ -1050,6 +1108,7 @@ class SimInit:
                 + (1 if self._A_HERESY >= 0 else 0) + (1 if self._A_INQUISITION >= 0 else 0)                 + (1 if self._A_HEATHEN >= 0 else 0) \
                 + (1 if self._A_UPGRADE >= 0 else 0) \
                 + (1 if self._A_ROAD >= 0 else 0) + (1 if self._A_FINISH >= 0 else 0) \
+                + (1 if self._A_GP >= 0 else 0) \
                 + self._air_strike_cols + self._air_rebase_cols + _stc + _smc
             assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
             self._A_CHOP = self._act["CHOP"]
@@ -1077,6 +1136,7 @@ class SimInit:
             self._A_SPY_MISSION = -1
             self._A_ROAD = -1
             self._A_FINISH = -1
+            self._A_GP = -1
             self._air_strike_cols = 0
             self._air_rebase_cols = 0
             self._snipe_on = False
@@ -1348,6 +1408,7 @@ class SimInit:
             self._gov_crng = torch.tensor([float(r.get("cityRanged", 0)) for r in _govs], dtype=dtype, device=device)
             self._gov_rxp = torch.tensor([float(r.get("reconXpMult", 1)) for r in _govs], dtype=dtype, device=device)
             self._gov_rplun = torch.tensor([float(r.get("routePlunderMult", 1)) for r in _govs], dtype=dtype, device=device)
+            self._gov_faith_units = torch.tensor([bool(r.get("faithBuyLandUnits", 0)) for r in _govs], dtype=torch.bool, device=device)
             self._gov_rgold = torch.tensor([float(r.get("routeGold", 0)) for r in _govs], dtype=dtype, device=device)
             self._gov_infl = torch.tensor([float(r.get("influencePerTurn", 0)) for r in _govs], dtype=dtype, device=device)
             self._gov_envoy1 = torch.tensor([bool(r.get("firstEnvoyDouble", 0)) for r in _govs], dtype=torch.bool, device=device)
@@ -1485,6 +1546,7 @@ class SimInit:
         self._repair_quiet = int(rules.combat["repairQuietTurns"])
         self._b_walls = rules.b_walls.to(device)  # [NB] walls tier per building row
         self._b_no_purchase = rules.b_no_purchase.to(device)  # [NB] bool
+        self._b_faith_units = rules.b_faith_units.to(device)  # [NB] bool
         self._walls_rows = [i for i, t in enumerate(rules.b_walls.tolist()) if int(t) > 0]
         # the ANCIENT tier's pool, which is what a fresh set of Walls is worth
         self._walls_hp = int(self._walls_tier_hp[1])
@@ -1925,6 +1987,8 @@ class SimInit:
         self._driven_citizens: dict = {}
         self._driven_vote: dict = {}
         self._driven_buy_nat: dict = {}
+        self._driven_buy_cls: dict = {}
+        self._driven_buy_ucls: dict = {}
         self._driven_tech: dict = {}
         self._driven_civic: dict = {}
         self._driven_envoys: dict = {}

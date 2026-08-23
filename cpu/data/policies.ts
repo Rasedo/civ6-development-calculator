@@ -96,6 +96,8 @@ export interface PolicyEffects {
   pillageMult?: number;
   /** multiplies the gold a plundered trade route pays */
   routePlunderMult?: number;
+  /** CIV6 (Theocracy): "Can buy land combat units with Faith." */
+  faithBuyLandUnits?: boolean;
   /** gold added to every trade route this seat runs */
   routeGold?: number;
   /** influence points per turn toward the next envoy */
@@ -333,8 +335,8 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
       '+1 housing in all cities.'),
     G('MERCHANT_REPUBLIC', 'Merchant Republic', 2, [M, E, E, D, D, W], { yieldMult: { gold: 1.1 } },
       '+10% gold in all cities.'),
-    G('THEOCRACY', 'Theocracy', 2, [M, M, E, E, D, W], { yieldMult: { faith: 1.1 } },
-      '+10% faith in all cities.'),
+    G('THEOCRACY', 'Theocracy', 2, [M, M, E, E, D, W], { yieldMult: { faith: 1.1 }, faithBuyLandUnits: true },
+      '+10% faith in all cities. Can buy land combat units with Faith.'),
     G('DEMOCRACY', 'Democracy', 3, [M, E, E, E, D, D, W, W], { yieldMult: { culture: 1.1 } },
       '+10% culture in all cities.'),
     // CIV6 (GS): "+0.6 Production per Citizen in cities with Governors.

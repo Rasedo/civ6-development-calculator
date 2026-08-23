@@ -42,6 +42,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { City, CityState, GameState, Seat, Tile, Unit } from './types';
 import { allyTurnsWith, borderTurnsFrom, citiesOf, friendTurnsWith, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
+import { GP_CITY_PERM, GP_PERM } from '../data/greatPeople';
 import { laserSpeed } from './yields';
 import { emptyStockpile } from '../data/constants';
 import { EMERGENCY_SLOTS } from '../data/seats';
@@ -445,6 +446,9 @@ const SEAT: Record<string, Extractor> = {
     return rows.flat();
   }),
   prophets: overSeats((s) => prophetsOf(s)),
+  gpUsed: overSeats((s) => (s.gpActivated ?? []).length),
+  gpPerm: overSeats((s) => GP_PERM.map((_k: string, i: number) => s.gpPerm?.[i] ?? 0)),
+  gpLuxuries: overSeats((s) => [...(s.gpLuxuries ?? [])]),
   beliefPantheon: overSeats((s) => idx(PANTHEON_IDX, s.religion.pantheon)),
   beliefFollower: overSeats((s) => idx(FOLLOWER_IDX, s.religion.follower)),
   beliefFounder: overSeats((s) => idx(FOUNDER_IDX, s.religion.founder)),
@@ -497,6 +501,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
 
 const CITY: Record<string, Extractor> = {
   seat: overCities((r) => r.seat),
+  gpPerm: overCities((r) => GP_CITY_PERM.map((_k: string, i: number) => r.city.gpPerm?.[i] ?? 0)),
   population: overCities((r) => r.city.population),
   hp: overCities((r) => r.city.hp),
   outerHp: overCities((r) => r.city.outerHp ?? 0),
@@ -581,6 +586,7 @@ const UNIT_G: Record<string, Extractor> = {
   spyTurns: overUnits((u) => u.spyTurns ?? 0),
   spyTarget: overUnits((u) => u.spyTarget ?? -1),
   spyLevel: overUnits((u) => u.spyLevel ?? 0),
+  gpAt: overUnits((u) => u.gpAt ?? -1),
 };
 
 const TILE: Record<string, Extractor> = {

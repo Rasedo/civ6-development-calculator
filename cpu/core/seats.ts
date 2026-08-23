@@ -77,8 +77,11 @@ export function campTiles(state: GameState): ReadonlySet<number> {
   return new Set(state.barbSeat?.camps ?? []);
 }
 
+/** Prophets this seat has SPENT. A Great Prophet founds a religion by walking
+ *  to a Holy Site and spending its charge there — being recruited is not
+ *  being used. */
 export function prophetsOf(seat: Seat): number {
-  return seat.gpEarned.filter((id) => GREAT_PEOPLE.PROPHET.some((p) => p.id === id)).length;
+  return (seat.gpActivated ?? []).filter((id) => GREAT_PEOPLE.PROPHET.some((p) => p.id === id)).length;
 }
 
 export function emptySeat(seat: number): Seat {

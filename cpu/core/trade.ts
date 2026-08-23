@@ -21,6 +21,7 @@ import type { RuleResult } from './rules';
 import { goldenDedication } from './eras';
 import { DED_COINAGE, COINAGE_INTL_GOLD_PER_SPEC } from '../data/seats';
 
+import { gpPermOf } from '../data/greatPeople';
 /**
  * CIV6: "The base range for land trade routes is 15 tiles ... The base range
  * for sea trade routes is 30 tiles." A route counts as a sea route when BOTH
@@ -164,7 +165,8 @@ export function tradeCapacity(state: GameState, seat: number): number {
       if (w.id === 'COLOSSUS' || w.id === 'GREAT_ZIMBABWE') cap += 1;
     }
   }
-  return cap + cityStateTradeCapacityBonus(state, seat) + congressRouteCapacity(state, seat);
+  return cap + cityStateTradeCapacityBonus(state, seat) + congressRouteCapacity(state, seat)
+    + gpPermOf(s, 'tradeCapacity');
 }
 
 export function specialtyDistricts(state: GameState, city: City): number {

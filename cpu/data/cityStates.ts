@@ -77,12 +77,13 @@ export type SuzEffect =
   | 'apostlePromoChoice' // Yerevan
   | 'eraInspiration'     // Vilnius
   | 'harborPower'        // Cardiff
+  | 'faithBuildings'     // Valletta
   | 'suzImprovement';    // Caguana / La Venta / Armagh
 
 /** The WIRE order the exported `suzCode` indexes — append only. */
 export const SUZ_EFFECTS: SuzEffect[] = [
   'xpDouble', 'cavalryHills', 'regionalReach', 'worksScience', 'csRouteYields', 'holySitePressure',
-  'apostlePromoChoice', 'eraInspiration', 'harborPower',
+  'apostlePromoChoice', 'eraInspiration', 'harborPower', 'faithBuildings',
   // the three whose whole perk is "your Builders can build X improvements",
   // which `validImprovementsIn`'s suzerain block answers off `suzerainOf`.
   'suzImprovement',
@@ -101,6 +102,9 @@ export const REGIONAL_REACH_BONUS = 3;
  *  Relic and Artifact." */
 export const ANSHAN_WRITING_SCIENCE = 2;
 export const ANSHAN_RELIC_SCIENCE = 1;
+/** Valletta: "City Center buildings and Encampment district buildings can be
+ *  bought with Faith." The class is the building's own district. */
+export const VALLETTA_FAITH_DISTRICTS: DistrictId[] = ['CITY_CENTER', 'ENCAMPMENT'];
 /** Kumasi: routes to any city-state pay "+2 Culture and +1 Gold for every
  *  specialty district in the origin city". */
 export const KUMASI_ROUTE_CULTURE = 2;
@@ -134,7 +138,7 @@ export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   Kabul: { name: 'Kabul', type: 'militaristic', bonus: 'Your units receive double experience from battles they initiate.', suz: 'xpDouble' },
   Ngazargamu: { name: 'Ngazargamu', type: 'militaristic', bonus: 'Land combat or support units are 20% cheaper to purchase with Gold for each Encampment district building in that city.', channel: 'production', note: 'a per-building GOLD PURCHASE discount; the flat production channel stands in' },
   Preslav: { name: 'Preslav', type: 'militaristic', bonus: 'Your light and heavy cavalry units have +5 Strength when fighting on Hills tiles.', suz: 'cavalryHills' },
-  Valletta: { name: 'Valletta', type: 'militaristic', bonus: 'City Center buildings and Encampment district buildings can be bought with Faith. Cost of purchasing Ancient, Medieval, and Renaissance Walls is reduced, but they can only be bought with Faith.', channel: 'production', note: 'a FAITH-purchase channel for a class of buildings; the flat production channel stands in' },
+  Valletta: { name: 'Valletta', type: 'militaristic', bonus: 'City Center buildings and Encampment district buildings can be bought with Faith. Cost of purchasing Ancient, Medieval, and Renaissance Walls is reduced, but they can only be bought with Faith.', suz: 'faithBuildings', note: 'the walls DISCOUNT has no published magnitude, so the three walls are faith-only at the ordinary faith price' },
   Jerusalem: { name: 'Jerusalem', type: 'religious', bonus: 'Your cities with Holy Sites exert pressure as if they were Holy Cities (4x religious pressure on all cities within 10 tiles).', suz: 'holySitePressure' },
   'La Venta': { name: 'La Venta', type: 'religious', bonus: 'Your Builders can build Colossal Heads improvements.', suz: 'suzImprovement' },
   Yerevan: { name: 'Yerevan', type: 'religious', bonus: 'Your Apostle units can choose from any possible promotion instead of receiving a random promotion.', suz: 'apostlePromoChoice' },
@@ -151,7 +155,6 @@ export const CITY_STATE_SUZERAIN_LIVE: Record<string, YieldKey> = {
   'Bandar Brunei': 'gold',
   'Hong Kong': 'production',
   Ngazargamu: 'production',
-  Valletta: 'production',
 };
 
 export const CITY_STATE_TYPE_COLORS: Record<CityStateType, string> = {

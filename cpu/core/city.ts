@@ -4,7 +4,7 @@ import { tilesWithin, hexDistance } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable } from '../../world/query';
 import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, pillagedDistrictTypes, effectiveAdjacency, completedDistrictCount } from './yields';
 import { getModifiers, makeYieldCtx, withFollowerBelief, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
-import { tileAppeal, appealTier, appealBand, PRESERVE_APPEAL_HOUSING } from './appeal';
+import { tileAppeal, appealTier, appealBand, gpAppealResolver, PRESERVE_APPEAL_HOUSING } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
 import { CIVICS } from '../data/civics';
 /** base tourism every completed wonder pays (real Civ 6). */
@@ -30,6 +30,7 @@ import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf
 import { wwMax } from './weariness';
 import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
 
+import { gpCityPermOf } from '../data/greatPeople';
 export interface CityStats {
   city: City;
   housing: number;
@@ -259,15 +260,16 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
 
   const pillaged = pillagedDistrictTypes(map, city.districts);
   const camps = campTiles(state);
+  const gpa = gpAppealResolver(state);
   let total = water;
   for (const d of city.districts) {
     const dt = map.tiles[d.tileIndex];
     if (!dt.districtComplete || dt.districtPillaged) continue; // a pillaged district's housing is dark
     const ddef = DISTRICTS[d.type];
     if (d.type === 'NEIGHBORHOOD') {
-      total += appealTier(tileAppeal(map, dt, camps)).housing;
+      total += appealTier(tileAppeal(map, dt, camps, gpa)).housing;
     } else if (ddef.appealHousing) {
-      total += PRESERVE_APPEAL_HOUSING[appealBand(tileAppeal(map, dt, camps))];
+      total += PRESERVE_APPEAL_HOUSING[appealBand(tileAppeal(map, dt, camps, gpa))];
     } else {
       total += ddef.housing;
     }
@@ -318,13 +320,20 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
     baseHave.set(c.id, localAmenities(state, c) + parkAmenities(state, c) + regionalEffects(state, c).amenities);
   }
 
-  for (let i = 0; i < luxuries.size; i++) {
+  // CIV6 (John Spilsbury, Helena Rubinstein, Levi Strauss, Estee Lauder): an
+  // INVENTED luxury serves cities exactly like a worked one, and its own row
+  // says how many it reaches.
+  const reach = [
+    ...new Array<number>(luxuries.size).fill(LUXURY_AMENITY_CITIES),
+    ...(seatOf(state, seat)?.gpLuxuries ?? []),
+  ];
+  for (const n of reach) {
     const ranked = [...cities].sort((a, b) => {
       const needA = amenitiesNeeded(a.population) - (baseHave.get(a.id)! + result.get(a.id)!);
       const needB = amenitiesNeeded(b.population) - (baseHave.get(b.id)! + result.get(b.id)!);
       return needB - needA || a.id - b.id;
     });
-    for (const c of ranked.slice(0, LUXURY_AMENITY_CITIES)) {
+    for (const c of ranked.slice(0, n)) {
       result.set(c.id, result.get(c.id)! + 1);
     }
   }
@@ -503,9 +512,10 @@ function suzerainTourism(state: GameState, seat: number, owns: (t: Tile) => bool
 function resortTourism(state: GameState, owns: (t: Tile) => boolean): number {
   let t = 0;
   const camps = campTiles(state);
+  const gpa = gpAppealResolver(state);
   for (const tile of state.map.tiles) {
     if (tile.improvement !== 'SEASIDE_RESORT' || tile.pillaged || !owns(tile)) continue;
-    t += Math.max(0, tileAppeal(state.map, tile, camps));
+    t += Math.max(0, tileAppeal(state.map, tile, camps, gpa));
   }
   return t;
 }
@@ -559,9 +569,10 @@ function hexDistance2(state: GameState, a: number, b: number): number {
 function parkTourism(state: GameState, owns: (t: Tile) => boolean): number {
   let t = 0;
   const camps = campTiles(state);
+  const gpa = gpAppealResolver(state);
   for (const tile of state.map.tiles) {
     if ((tile.park ?? -1) < 0 || !owns(tile)) continue;
-    t += tileAppeal(state.map, tile, camps);
+    t += tileAppeal(state.map, tile, camps, gpa);
   }
   return t;
 }
@@ -730,7 +741,8 @@ export function computeCityStats(
   addYields(bonuses, m.cityYields);
   if (city.isCapital) addYields(bonuses, m.capitalYields);
 
-  const housing = computeHousing(state, city, m) + wonderCityFlat(state, city, 'cityHousing');
+  const housing = computeHousing(state, city, m) + wonderCityFlat(state, city, 'cityHousing')
+    + gpCityPermOf(city, 'housing');
   let have =
     localAmenities(state, city) +
     parkAmenities(state, city) +
@@ -740,7 +752,8 @@ export function computeCityStats(
     wonderImprovementAmenities(state, city) +
     m.amenitiesAll +
     (m.riverCity && hasRiver(center) ? m.riverCity.amenities : 0) +
-    ((luxMap ?? luxuryAmenities(state, city.seat)).get(city.id) ?? 0);
+    ((luxMap ?? luxuryAmenities(state, city.seat)).get(city.id) ?? 0) +
+    gpCityPermOf(city, 'amenities');
   have -= warWearinessPenalty(wwMax(seatOf(state, city.seat)));
   const specialtyCount = completedDistrictCount(state, city, true);
   for (const rule of m.amenitiesIfSpecialty) {

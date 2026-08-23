@@ -174,26 +174,37 @@ def main() -> None:
     sim.civ_gpp[:, 0, _pc] = 0.0
 
     # --- a Writer (class 7) is earnable through the seat-0 advance loop,
-    # proving the widened tensors flow end to end. Fresh turn 1: no districts
-    # + no AMPHITHEATER, so both of the Writer's 2 Great Works OVERFLOW to the
-    # instant culture lump (2 works × the Classical lump 60 = 120) and no slot
-    # is occupied.
+    # proving the widened tensors flow end to end. The CLAIM only stands the
+    # person up as a unit: nothing is paid and no slot is taken until a charge
+    # is spent. Fresh turn 1 with no AMPHITHEATER, so the spend overflows both
+    # of the Writer's Great Works to the instant culture lump (2 x the
+    # Classical 60 = 120).
     if sim.districts_on:
         civic0 = sim.civ_civic_prog[:, 0].clone()
         earned0 = sim.gp_earned[:, 7].clone()
         gw0 = (sim.city_gw_writing[:, 0] + sim.city_gw_music[:, 0]).sum().item()
+        live0 = sim.major_unit_alive[0].sum().item()
         sim.civ_gpp[:, 0, 7] = 100.0  # >= the Writer's flat Classical 60
         sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
         assert bool((sim.gp_earned[:, 7] == earned0 + 1).all()), "Writer not earned"
+        assert sim.major_unit_alive[0].sum().item() == live0 + 1, "the claim did not spawn the Writer as a unit"
+        assert bool((sim.civ_civic_prog[:, 0] == civic0).all()), "the claim paid a lump it no longer owes"
+
+        guidx = int(sim._gp_class_unit[7])
+        mine = sim.major_unit_alive & (sim.major_unit_seat == 0) & (sim.major_unit_type == guidx) \
+            & (sim.major_unit_gp_at >= 0)
+        assert bool(mine.any(dim=1).all()), "no Writer unit standing after the claim"
+        sc_w = mine.long().argmax(dim=1)
+        hc_w = sim.city_center[:, 0, 0].clamp(min=0)
+        sim._gp_apply(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device), sc_w, hc_w)
         d_civic = (sim.civ_civic_prog[:, 0] - civic0)
-        assert bool((d_civic == 120.0).all()), f"Writer overflow lump wrong (want 2×60): {d_civic.tolist()}"
+        assert bool((d_civic == 120.0).all()), f"Writer overflow lump wrong (want 2x60): {d_civic.tolist()}"
         assert (sim.city_gw_writing[:, 0] + sim.city_gw_music[:, 0]).sum().item() == gw0, "no AMPHITHEATER -> no slotted work"
 
-    # --- a seat-0 PROPHET banks its faith-column effect ---------------------
-    # Confucius (PROPHET class 3, roster idx 0) carries fx.faith = 100; the TS
-    # applyGreatPersonEffect banks it into the seat's faith total and the civ
-    # GP loop applies its col-4 into civ_only_faith. Drive a fresh seat-0 Prophet
-    # claim and assert faith rises by exactly the effect.
+    # --- a seat-0 PROPHET banks its faith-column effect at the SPEND --------
+    # Confucius (PROPHET class 3, roster idx 0) carries fx.faith; `_gp_apply`
+    # banks it into the seat's faith total, and the claim before it only
+    # stands the Prophet up as a unit.
     if sim.districts_on:
         assert sim._gp_effects.shape[2] > 4, "gpEffects must carry the faith column"
         pc = int(rr["prophetCls"])  # 3
@@ -203,6 +214,14 @@ def main() -> None:
         sim.civ_gpp[:, 0, pc] = 100.0  # >= the flat Classical 60, earns one Prophet
         sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
         assert bool((sim.gp_earned[:, pc] == pe0 + 1).all()), "Prophet not earned"
+        assert bool((sim.civ_faith[:, 0] == faith0).all()), "the claim banked faith it no longer owes"
+        puidx = int(sim._gp_class_unit[pc])
+        pmine = sim.major_unit_alive & (sim.major_unit_seat == 0) & (sim.major_unit_type == puidx) \
+            & (sim.major_unit_gp_at >= 0)
+        assert bool(pmine.any(dim=1).all()), "no Prophet unit standing after the claim"
+        sc_p = pmine.long().argmax(dim=1)
+        hc_p = sim.city_center[:, 0, 0].clamp(min=0)
+        sim._gp_apply(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device), sc_p, hc_p)
         d_faith = sim.civ_faith[:, 0] - faith0
         assert bool((d_faith == 60.0).all()), f"seat-0 faith bank wrong: {d_faith.tolist()}"
 

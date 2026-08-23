@@ -8,13 +8,15 @@ import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOL
 import { seatOf, citiesOf, campTiles } from './seats';
 import { BUILDINGS } from '../data/buildings';
 import { neighbors } from '../../world/hex';
-import { tileAppeal, appealBand } from './appeal';
+import { tileAppeal, appealBand, gpAppealResolver, type GpAppeal } from './appeal';
 import { addYields, emptyYields } from './types';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { UNITS, UNIT_ERA_INDEX, unitHasClass } from '../data/units';
 import { cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus, isSuzerain } from './cityStates';
 
 
+import { GP_PERM } from '../data/greatPeople';
+import { PROJECTS } from '../data/projects';
 export interface Unlocks {
   improvements: Set<string>;
   districts: Set<string>;
@@ -158,6 +160,7 @@ export interface Modifiers {
   pillageMult: number;
   routePlunderMult: number;
   routeGold: number;
+  faithBuyLandUnits: boolean;
   influencePerTurn: number;
   firstEnvoyDouble: boolean;
   culturePerSuzerain: number;
@@ -201,6 +204,7 @@ export function defaultModifiers(): Modifiers {
     reconXpMult: 1,
     pillageMult: 1,
     routePlunderMult: 1,
+    faithBuyLandUnits: false,
     routeGold: 0,
     influencePerTurn: 0,
     firstEnvoyDouble: false,
@@ -243,6 +247,7 @@ function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.reconXpMult) mods.reconXpMult *= fx.reconXpMult;
   if (fx.pillageMult) mods.pillageMult *= fx.pillageMult;
   if (fx.routePlunderMult) mods.routePlunderMult *= fx.routePlunderMult;
+  if (fx.faithBuyLandUnits) mods.faithBuyLandUnits = true;
   if (fx.routeGold) mods.routeGold += fx.routeGold;
   if (fx.influencePerTurn) mods.influencePerTurn += fx.influencePerTurn;
   if (fx.firstEnvoyDouble) mods.firstEnvoyDouble = true;
@@ -314,8 +319,12 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
  * CIV6 stacks production modifiers ADDITIVELY, so two cards that both name
  * the item pay their percentages summed rather than compounded.
  */
-export function prodBoostPct(mods: Modifiers, q: QueueItem): number {
+export function prodBoostPct(mods: Modifiers, q: QueueItem, gpPerm?: number[]): number {
   let pct = 0;
+  // A Great Person's permanent share stacks additively with the cards, which
+  // is how CIV6 stacks production modifiers.
+  if (q.kind === 'unit' || q.kind === 'settler') pct += (gpPerm?.[GP_PERM.indexOf('unitProdPct')] ?? 0) / 100;
+  if (q.kind === 'project' && PROJECTS[q.project]?.space) pct += (gpPerm?.[GP_PERM.indexOf('spaceProdPct')] ?? 0) / 100;
   for (const b of mods.prodBoosts) {
     if (b.target === 'wonder') {
       if (q.kind !== 'wonder') continue;
@@ -407,6 +416,8 @@ function applyBeliefEffects(
  * the boost census both take them. */
 export function wonderExtraSlots(state: GameState, seat: number): Record<SlotKind, number> {
   const out: Record<SlotKind, number> = { military: 0, economic: 0, diplomatic: 0, wildcard: 0 };
+  // CIV6 (Adam Smith): "Adds +1 Economic Policy slot to your government."
+  out.economic += seatOf(state, seat)?.gpPerm?.[GP_PERM.indexOf('policySlotEconomic')] ?? 0;
   for (const c of citiesOf(state, seat)) {
     for (const w of c.wonders ?? []) {
       if (!state.map.tiles[w.tileIndex].builtWonderComplete) continue;
@@ -529,6 +540,7 @@ export function preserveTileYields(
   camps?: ReadonlySet<number>,
 ): Map<number, Yields> {
   const out = new Map<number, Yields>();
+  const gpa = gpAppealResolver(state);
   for (const city of citiesOf(state, seat)) {
     for (const d of city.districts) {
       const dt = state.map.tiles[d.tileIndex];
@@ -539,7 +551,7 @@ export function preserveTileYields(
       if (!rows.length) continue;
       for (const n of neighbors(state.map, dt)) {
         if (n.improvement || n.district || n.builtWonder) continue;
-        const band = appealBand(tileAppeal(state.map, n, camps));
+        const band = appealBand(tileAppeal(state.map, n, camps, gpa));
         if (band > 1) continue; // Breathtaking is band 0, Charming band 1
         const cur = out.get(n.index) ?? emptyYields();
         for (const b of rows) {
@@ -560,6 +572,8 @@ export interface YieldCtx {
   /** what this seat's Groves and Sanctuaries pay the tiles around their
    *  Preserves, resolved once per context. */
   preserve?: ReadonlyMap<number, Yields>;
+  /** the appeal an owner city adds to its own tiles. */
+  gpAppeal?: GpAppeal;
 }
 
 export function makeYieldCtx(state: GameState, seat: number, mods?: Modifiers): YieldCtx {
@@ -569,6 +583,7 @@ export function makeYieldCtx(state: GameState, seat: number, mods?: Modifiers): 
     mods: mods ?? getModifiers(state, seat),
     camps,
     preserve: preserveTileYields(state, seat, camps),
+    gpAppeal: gpAppealResolver(state),
   };
 }
 

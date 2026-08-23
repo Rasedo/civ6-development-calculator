@@ -170,16 +170,29 @@ def main() -> None:
     assert bool((sim.city_gw_art[:, 0, 0] == 3).all()), "one Artist fills the Art Museum's 3 slots exactly"
     assert bool((sim.civ_civic_prog[:, 0] == civicB).all()), "a fully-slotted Artist applies no lump"
 
-    # --- end-to-end: a WRITER earned through the advance loop slots, no lump -
+    # --- end-to-end: a WRITER is EARNED as a unit and slots its works only
+    # when the charge is spent, which is where the ability lives now ---------
     sim.city_gw_writing[:, 0].zero_(); sim.city_gw_art[:, 0].zero_(); sim.city_gw_music[:, 0].zero_()
     sim.city_bldg[:, 0, 0, amph] = True
     civicE = sim.civ_civic_prog[:, 0].clone()
     earned0 = sim.gp_earned[:, wc].clone()
+    live0 = sim.major_unit_alive[0].sum().item()
     sim.civ_gpp[:, 0, wc] = 100.0  # >= gpCost(0) = 60
     sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
     assert bool((sim.gp_earned[:, wc] == earned0 + 1).all()), "Writer not earned"
-    assert bool((sim.city_gw_writing[:, 0, 0] == 2).all()), "earned Writer's works slot into the Amphitheater"
-    assert bool((sim.civ_civic_prog[:, 0] == civicE).all()), "a slotted earned Writer applies NO instant culture lump"
+    assert sim.major_unit_alive[0].sum().item() == live0 + 1, "the claim did not spawn the Writer as a unit"
+    assert bool((sim.city_gw_writing[:, 0, 0] == 0).all()), "the CLAIM slotted works; the SPEND does that now"
+    assert bool((sim.civ_civic_prog[:, 0] == civicE).all()), "the claim paid a lump it no longer owes"
+
+    guidx = int(sim._gp_class_unit[wc])
+    mine = sim.major_unit_alive & (sim.major_unit_seat == 0) & (sim.major_unit_type == guidx) \
+        & (sim.major_unit_gp_at >= 0)
+    assert bool(mine.any(dim=1).all()), "no Writer unit standing after the claim"
+    sc_w = mine.long().argmax(dim=1)
+    hc_w = sim.city_center[:, 0, 0].clamp(min=0)
+    sim._gp_apply(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device), sc_w, hc_w)
+    assert bool((sim.city_gw_writing[:, 0, 0] == 2).all()), "the spent Writer's works did not slot into the Amphitheater"
+    assert bool((sim.civ_civic_prog[:, 0] == civicE).all()), "a fully-slotted Writer applied an instant culture lump"
 
     # --- civ-seat placement: _place_civ_works fills rc slots + overflows ---
     if sim.n_majors > 1 and bool(sim.city_alive[:, 1, 0].any()):

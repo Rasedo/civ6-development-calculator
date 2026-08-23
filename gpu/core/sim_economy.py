@@ -23,17 +23,29 @@ class SimEconomy:
         counts = torch.zeros(B, self._n_lux, dtype=torch.long, device=self.device)
         counts.scatter_add_(1, self.lux_id.clamp(min=0), improved.long())
         rounds = (counts > 0).long().sum(dim=1)
-        mx = int(rounds.max().item())
+        # CIV6 (John Spilsbury and the three after him): an INVENTED luxury
+        # serves cities exactly like a worked one, and its own row says how
+        # many it reaches. They rank AFTER the worked ones, in creation order.
+        gp_n = self.civ_gp_lux_n[:, row]
+        gp_reach = self.civ_gp_lux[:, row]
+        total = rounds + gp_n
+        mx = int(total.max().item())
         if mx == 0:
             return out
         seq = torch.arange(cols, device=self.device, dtype=dt)
-        k = min(self._lux_k, cols)
+        kmax = max(self._lux_k, int(gp_reach.max().item()) if bool((gp_n > 0).any()) else 0)
+        k = min(kmax, cols)
+        krank = torch.arange(k, device=self.device).reshape(1, -1)
         for rnd in range(mx):
-            act = rounds > rnd
+            act = total > rnd
+            gi = (rnd - rounds).clamp(min=0, max=gp_reach.shape[1] - 1)
+            reach = torch.where(rnd < rounds,
+                                torch.full_like(rounds, self._lux_k),
+                                gp_reach.gather(1, gi.unsqueeze(1)).squeeze(1))
             need = amen_need - (amen_have + out)
             key = torch.where(alive, need * 64 - seq, torch.full_like(need, -1e9))
             top_v, top_i = key.topk(k, dim=1)
-            grant = (top_v > -1e8) & act.unsqueeze(1)
+            grant = (top_v > -1e8) & act.unsqueeze(1) & (krank < reach.unsqueeze(1))
             out.scatter_add_(1, top_i, grant.to(dt))
         return out
 
@@ -191,6 +203,11 @@ class SimEconomy:
             gain = base * torch.where(at_home, 1, abroad)
             if died is not None:
                 gain = gain + torch.where(died, base * death, zeros)
+            # CIV6 (Trung Trac, Joaquim Marques Lisboa): a permanent percentage
+            # off everything this seat accrues from here on. Integer both
+            # sides — `ww` is a long plane and the TS twin floors to match.
+            _cut = self._gp_perm_at(self_row, "warWearyPct").long().clamp(min=0, max=100)
+            gain = torch.div(gain * (100 - _cut), 100, rounding_mode="floor")
             idx = (self_row.clamp(min=0) * NS + foe_row.clamp(min=0)).unsqueeze(1)
             flat_ww.scatter_add_(1, idx, torch.where(score, gain, zeros).unsqueeze(1))
             flat_turn.scatter_(1, idx, torch.where(
@@ -1758,7 +1775,11 @@ class SimEconomy:
         return self._art_museum_themed(row).long() * ((self._theming_mult - 1) * self._gw_slots_k[1])
 
     def _place_works(self, row: int, hit: torch.Tensor, culture_val: torch.Tensor, kind: int,
-                     artist: torch.Tensor | None = None) -> None:
+                     artist: torch.Tensor | None = None,
+                     only_col: torch.Tensor | None = None) -> None:
+        """`only_col` narrows the walk to ONE city column per game — what an
+        ACTIVATION does, where the works land in the city the charge was spent
+        in rather than across the whole seat."""
         bcol, nslots, nworks = self._gw_bidx[kind], self._gw_slots_k[kind], self._gw_works_k[kind]
         dt = torch.float64
         civic = self.civ_civic_prog
@@ -1776,6 +1797,9 @@ class SimEconomy:
             cap = cap + (compw.long() * self._wond_gw[:, kind].reshape(1, 1, -1)).sum(dim=2)
         alive = self.city_alive[:, row]  # [B, RC]
         openc = (cap - used).clamp(min=0) * alive.long()  # [B, RC] open slots per live city
+        if only_col is not None:
+            _sel = torch.arange(openc.shape[1], device=openc.device).reshape(1, -1) == only_col.unsqueeze(1)
+            openc = openc * _sel.long()
         W = nworks * hit.long()  # [B] works to place this earn
         prefix = openc.cumsum(dim=1) - openc  # exclusive prefix in slot order
         alloc = (W.unsqueeze(1) - prefix).clamp(min=0).minimum(openc)
@@ -2140,7 +2164,8 @@ class SimEconomy:
                torch.where(here != NO_SEAT, foreign, torch.full_like(t, 10))))
         if camp is not None:
             heal = torch.where(camp & ~home, torch.full_like(t, 20), heal)
-        heal = heal + self._emergency_heal_mp(pre, seat, here) + self._chaplain_heal(pre)
+        heal = heal + self._emergency_heal_mp(pre, seat, here) + self._chaplain_heal(pre) \
+            + self._gp_perm_at(seat, "healBonus").to(heal.dtype)
         # a RELIGIOUS unit heals by its own rule and by nothing above it
         _rel = self._rel_strength[getattr(self, f"{pre}_unit_type").clamp(min=0)] > 0
         if bool(_rel.any()):
@@ -2542,6 +2567,10 @@ class SimEconomy:
         # appeal, not a neighbour contribution, so they are added AFTER the
         # gather — the two leading lines of tileAppeal.
         out = out + self.appeal_self
+        # CIV6 (Alvar Aalto, Charles Correa): "+N Appeal to any tile it owns".
+        # It sits BEFORE the wonder/mountain override, which the TS twin takes
+        # as an early return.
+        out = out + self._gp_appeal_plane().long()
         out = torch.where(self.appeal_over > -999, self.appeal_over, out)
         self._appeal_cache = (self._eff_version, out)
         return out

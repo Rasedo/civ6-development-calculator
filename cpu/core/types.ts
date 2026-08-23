@@ -87,6 +87,9 @@ export interface City {
   /** the ART MUSEUM's own slots, in fill order: what each holds, and who made it */
   gwArtType?: number[];
   gwArtArtist?: number[];
+  /** permanent per-city adders a Great Person left behind, by `GP_CITY_PERM`
+   *  position. */
+  gpPerm?: number[];
   /** RELICS held in this city's TEMPLE slot (cap 1). Each pays
    *  +4 faith and +8 tourism — the densest tourism source in real Civ 6. */
   relics?: number;
@@ -139,7 +142,9 @@ export interface SeatActionRecord {
   civic: number | null;
   units: number[][];
   buy?: [number, number, number] | null;
-  buyFaith?: [number, number][];
+  /** [kind, city CENTRE tile] per faith purchase; kind 12 (a Valletta-class
+   *  building) carries a third slot naming the building's prodLayout index. */
+  buyFaith?: ([number, number] | [number, number, number])[];
   /** The city-state LEVY: the CS index to levy, or null/absent.
    * Gold, but NOT the one-gold-purchase slot — a levy is a diplomacy
    * action and rides beside `buy`, like real Civ 6. */
@@ -316,6 +321,10 @@ export interface Unit {
   /** the ONCE-ONLY promotions this unit has already collected, by the same
    *  column bit `promos` uses. */
   promoUsed?: number;
+  /** a GREAT PERSON unit's QUEUE POSITION in its class's roster — which
+   *  person this chassis is carrying, and so which ability its charge spends.
+   *  Undefined on every other unit. */
+  gpAt?: number;
   path: number[] | null;
   mission?: 'explore' | null;
   /** A LAND unit currently on a water tile (embarked). Moves
@@ -355,6 +364,15 @@ export interface Seat {
   emgEnvoyGold?: number;
   /** survived City-State Emergencies: +2 Gold on this seat's minor legs each. */
   emgRouteGold?: number;
+  /** GREAT PEOPLE this seat has recruited AND SPENT — the ids whose charge
+   *  actually fired, which is what a founded religion counts, not the claim. */
+  gpActivated?: string[];
+  /** INVENTED LUXURIES a Great Merchant made, each entry the number of cities
+   *  that copy serves the way a worked luxury resource does. */
+  gpLuxuries?: number[];
+  /** permanent per-seat adders a Great Person left behind, by `GP_PERM`
+   *  position. */
+  gpPerm?: number[];
   influencePoints: number;
   envoysAvailable: number;
 

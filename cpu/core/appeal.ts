@@ -29,10 +29,16 @@ import { isMountain } from '../../world/query';
 import { DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
 
-export function tileAppeal(map: GameMap, tile: Tile, camps?: ReadonlySet<number>): number {
+import { GP_CITY_PERM } from '../data/greatPeople';
+/** what the tile's OWNER CITY adds to it, for a caller that can reach the
+ *  city list. Undefined when no city in the game carries the channel, which
+ *  is the case in every game where no Great Engineer has spent that charge. */
+export type GpAppeal = ((t: Tile) => number) | undefined;
+
+export function tileAppeal(map: GameMap, tile: Tile, camps?: ReadonlySet<number>, gpAppeal?: GpAppeal): number {
   if (tile.wonder) return 5;
   if (isMountain(tile)) return 4;
-  let appeal = 0;
+  let appeal = gpAppeal?.(tile) ?? 0;
   if (tile.riverMask !== 0 || tile.terrain === 'LAKE') appeal += 1;
   for (const n of neighbors(map, tile)) {
     if (n.wonder) appeal += 2;
@@ -50,6 +56,26 @@ export function tileAppeal(map: GameMap, tile: Tile, camps?: ReadonlySet<number>
   }
   return appeal;
 }
+
+/** CIV6 (Alvar Aalto, Charles Correa): "This city provides +N Appeal to any
+ *  tile it owns." One closure over the seats' cities, built once per walk. */
+export function gpAppealResolver(state: {
+  seats: { cities: { id: number; seat: number; gpPerm?: number[] }[] }[];
+}): GpAppeal {
+  const k = GP_CITY_PERM.indexOf('appeal');
+  const by = new Map<number, number>();
+  for (const s of state.seats) {
+    for (const c of s.cities) {
+      const n = c.gpPerm?.[k] ?? 0;
+      if (n) by.set(c.seat * GP_APPEAL_SEAT_STRIDE + c.id, n);
+    }
+  }
+  if (by.size === 0) return undefined;
+  return (t: Tile) => (t.ownerCity < 0 ? 0 : by.get(t.ownerSeat * GP_APPEAL_SEAT_STRIDE + t.ownerCity) ?? 0);
+}
+
+/** the (seat, city id) key's stride — wider than any city id a seat can reach. */
+const GP_APPEAL_SEAT_STRIDE = 1 << 20;
 
 export interface AppealTier {
   name: string;

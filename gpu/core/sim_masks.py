@@ -1270,7 +1270,7 @@ class SimMasks:
         ex = self.seat_explored[:, seat_row] if isinstance(seat_row, int) else self.seat_explored[torch.arange(self.B, device=self.device), seat_row]
         return ex.gather(1, tiles.clamp(min=0).reshape(self.B, -1)).reshape(tiles.shape)
 
-    def _spawn_unit(self, row: int, mask: torch.Tensor, at_tile: torch.Tensor, type_idx, init_xp: torch.Tensor | None = None, charges: torch.Tensor | None = None) -> torch.Tensor:
+    def _spawn_unit(self, row: int, mask: torch.Tensor, at_tile: torch.Tensor, type_idx, init_xp: torch.Tensor | None = None, charges: torch.Tensor | None = None, gp_at: torch.Tensor | None = None) -> torch.Tensor:
         if not bool(mask.any()):
             return torch.zeros_like(mask)
         if isinstance(type_idx, int):
@@ -1325,6 +1325,10 @@ class SimMasks:
         _m = self._full_mp(pre)[rows, slot]
         getattr(self, f"{pre}_unit_mp")[rows, slot] = _m
         getattr(self, f"{pre}_unit_mp_full")[rows, slot] = _m
+        # a GREAT PERSON chassis carries its queue position; every other unit
+        # (and every reclaimed slot) carries the -1 sentinel.
+        getattr(self, f"{pre}_unit_gp_at")[rows, slot] = (
+            torch.full_like(slot, -1) if gp_at is None else gp_at[rows])
         _ch = self._type_charges[type_idx[rows]] if charges is None else charges[rows]
         getattr(self, f"{pre}_unit_charges")[rows, slot] = _ch + self._extra_charges(row, type_idx)[rows]
         off = self.POOL_LO[pre]
@@ -2071,10 +2075,17 @@ class SimMasks:
                     & (u_charges > 0)
                     & self._eng_finish_at(row).gather(1, tc)).unsqueeze(2)]
 
+        # THE GREAT PERSON'S ONE VERB: spend a charge where this person's
+        # ability may be spent. Which person is acting is the chassis and its
+        # queue position, never a column of its own.
+        _gp: list[torch.Tensor] = []
+        if getattr(self, "_A_GP", -1) >= 0:
+            _gp = [(present & self._gp_site_ok(row, sc, tc)).unsqueeze(2)]
+
         out = torch.cat(
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
             + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc
-            + _ug + _as + _rb + _st + _sm + _rd + _fi,
+            + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp,
             dim=2,
         )
         if self._act_names and self.improvements_on and self._builder_idx >= 0:

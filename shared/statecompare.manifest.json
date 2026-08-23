@@ -925,6 +925,40 @@
             "civ_co2"
           ],
           "note": "LIFETIME raw carbon; may go negative after Carbon Recapture, and carries half-units from unit emissions, which is why it is milli and not exact."
+        },
+        {
+          "name": "gpUsed",
+          "compare": "exact",
+          "covers": [
+            "Seat.gpActivated"
+          ],
+          "planes": [
+            "civ_gp_used"
+          ],
+          "note": "how many recruited Great People this seat has actually SPENT."
+        },
+        {
+          "name": "gpPerm",
+          "compare": "exact",
+          "covers": [
+            "Seat.gpPerm"
+          ],
+          "planes": [
+            "civ_gp_perm"
+          ],
+          "note": "the permanent per-seat channels a Great Person left behind, in GP_PERM order."
+        },
+        {
+          "name": "gpLuxuries",
+          "compare": "exact",
+          "covers": [
+            "Seat.gpLuxuries"
+          ],
+          "planes": [
+            "civ_gp_lux",
+            "civ_gp_lux_n"
+          ],
+          "note": "the INVENTED luxuries, each entry the number of cities that copy reaches."
         }
       ]
     },
@@ -1382,6 +1416,17 @@
             "city_spy_sources"
           ],
           "note": "CIV6 (Gain Sources): per-SEAT turns remaining, summed here — the per-seat split rides the plane, and a sum moves whenever any seat's clock does."
+        },
+        {
+          "name": "gpPerm",
+          "compare": "exact",
+          "covers": [
+            "City.gpPerm"
+          ],
+          "planes": [
+            "city_gp_perm"
+          ],
+          "note": "the permanent per-city channels, in GP_CITY_PERM order."
         }
       ]
     },
@@ -1584,6 +1629,17 @@
           "planes": [
             "unit_spy_level"
           ]
+        },
+        {
+          "name": "gpAt",
+          "compare": "exact",
+          "covers": [
+            "Unit.gpAt"
+          ],
+          "planes": [
+            "unit_gp_at"
+          ],
+          "note": "the queue position of the Great Person this chassis carries; -1 on every other unit."
         }
       ]
     },

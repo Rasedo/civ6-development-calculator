@@ -454,6 +454,11 @@ SEAT = {
     ],
     "routes": lambda sim, b, rows: [_routes_of(sim, b, c) for c in rows],
     "prophets": _civ_scalar("civ_prophets"),
+    "gpUsed": _civ_scalar("civ_gp_used"),
+    "gpPerm": lambda sim, b, rows: [[int(x) for x in sim.civ_gp_perm[b, c].tolist()] for c in rows],
+    "gpLuxuries": lambda sim, b, rows: [
+        [int(x) for x in sim.civ_gp_lux[b, c, : int(sim.civ_gp_lux_n[b, c])].tolist()] for c in rows
+    ],
     "beliefPantheon": _civ_scalar("civ_pantheon"),
     "beliefFollower": _civ_scalar("civ_follower"),
     "beliefFounder": _civ_scalar("civ_founder"),
@@ -554,6 +559,7 @@ def _qfront(sim, b, c, s):
 
 CITY = {
     "seat": lambda sim, b, rows: [c for c, _ in rows],
+    "gpPerm": lambda sim, b, rows: [[int(x) for x in sim.city_gp_perm[b, c, s].tolist()] for c, s in rows],
     "population": _cty("city_pop"),
     "hp": _cty("city_hp"),
     "outerHp": _cty("city_outer_hp"),
@@ -635,6 +641,7 @@ UNIT = {
     "spyTurns": _unit("unit_spy_turns"),
     "spyTarget": _unit("unit_spy_target"),
     "spyLevel": _unit("unit_spy_level"),
+    "gpAt": _unit("unit_gp_at"),
 }
 
 

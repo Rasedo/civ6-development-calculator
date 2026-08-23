@@ -159,6 +159,80 @@ def _builder_jobs(sim, seat: int) -> torch.Tensor:
                         out, present, tiles, types, charges)
 
 
+def _gp_site_plane(sim, seat: int, site: int, arg: int) -> torch.Tensor:
+    """[B, T] — where a charge with this SITE code may be spent. The mask is
+    the authority on legality; this is only what a Great Person walks toward,
+    so it answers per site rather than per person."""
+    own = sim.tile_seat == seat
+    if site == 0:  # the class's own completed district
+        if arg < 0:
+            return torch.zeros_like(own)
+        return own & (sim.district == arg) & sim.district_complete & ~sim.pillaged
+    if site == 1:  # anywhere — nothing to walk to
+        return torch.ones_like(own)
+    if site == 2:  # a city with a free Great Work slot of this class's kind
+        out = torch.zeros_like(own)
+        col = sim.city_slot_at(seat)
+        for kind in range(3):
+            if sim._gw_cls[kind] < 0:
+                continue
+            used = (sim.city_gw_writing, sim.city_gw_art, sim.city_gw_music)[kind][:, seat]
+            free = ((sim._gw_capacity(seat, kind) - used) > 0) & sim.city_alive[:, seat]
+            out = out | (own & (col >= 0) & free.gather(1, col.clamp(min=0)))
+        return out
+    if site == 3:  # inside any city-state's territory
+        return (sim.tile_seat >= 100) & (sim.tile_seat < simbase.BARB_SEAT)
+    if site == 4:  # an owned tile carrying a luxury
+        return own & (sim.lux_id >= 0)
+    # 5: unclaimed ground next to this seat's territory
+    nb = sim.neigh
+    adj = (own[:, nb.clamp(min=0).reshape(-1)].reshape(own.shape[0], sim.T, 6)
+           & (nb >= 0).unsqueeze(0)).any(dim=2)
+    return (sim.tile_seat < 0) & adj
+
+
+def _gp_jobs(sim, seat: int) -> torch.Tensor:
+    """[B, N] — the nearest tile each Great Person can spend its charge on,
+    tile index breaking the tie. -1 for every other unit and for a person
+    whose site exists nowhere yet."""
+    smap, present, tiles, types, charges = _seat_units(sim, seat)
+    B, N = smap.shape
+    out = torch.full((B, N), -1, dtype=torch.long, device=sim.device)
+    if getattr(sim, "_A_GP", -1) < 0:
+        return out
+    sc = smap.clamp(min=0)
+    cls = sim._gp_cls_of(types)
+    at = sim.unit_gp_at.gather(1, sc)
+    live = present & (cls >= 0) & (at >= 0) & (charges > 0)
+    if not bool(live.any()):
+        return out
+    maxN = sim._gp_site.shape[1] - 1
+    site = sim._gp_site[cls.clamp(min=0), at.clamp(min=0, max=maxN)]
+    sdist = sim._gp_site_district[cls.clamp(min=0), at.clamp(min=0, max=maxN)]
+    arangeT = torch.arange(sim.T, device=sim.device)
+    planes: dict = {}
+    for n in range(N):
+        rows = live[:, n]
+        if not bool(rows.any()):
+            continue
+        for key in {(int(a), int(b)) for a, b in zip(site[rows, n].tolist(), sdist[rows, n].tolist())}:
+            if key[0] == 1:
+                continue  # activates where it stands
+            pl = planes.get(key)
+            if pl is None:
+                pl = _gp_site_plane(sim, seat, key[0], key[1])
+                planes[key] = pl
+            take = rows & (site[:, n] == key[0]) & (sdist[:, n] == key[1])
+            if not bool(take.any()) or not bool(pl.any()):
+                continue
+            d = sim.pair_dist[tiles[:, n].clamp(min=0)].to(torch.long)
+            k = torch.where(pl, d * sim.T + arangeT, torch.full_like(d, 2 ** 30))
+            best = k.argmin(dim=1)
+            has = take & pl.gather(1, best.unsqueeze(1)).squeeze(1)
+            out[:, n] = torch.where(has, best, out[:, n])
+    return out
+
+
 def _spread_targets(sim, seat: int) -> torch.Tensor:
     smap, present, tiles, types, charges = _seat_units(sim, seat)
     B, N = smap.shape
@@ -326,7 +400,9 @@ def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
     # target): the virtual planner extends MOVE rows only, so rank 0 must
     # itself step or the unit never leaves the city it spawned in.
     tgt = torch.where(job_t >= 0, job_t, torch.where(spread_t >= 0, spread_t, settle_t))
+    gp_t = _gp_jobs(sim, seat)
     tgt = torch.where(tgt >= 0, tgt, torch.where(dig_t >= 0, dig_t, park_t))
+    tgt = torch.where(tgt >= 0, tgt, gp_t)
     walkers = present & (tgt >= 0) & (tiles != tgt)
     if bool(walkers.any()):
         nbr = sim.neigh[tiles.clamp(min=0)]  # [B, N, 6]
@@ -371,6 +447,11 @@ def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
     if A_PK >= 0 and um.shape[2] > A_PK:
         take_pk = present & um[:, :, A_PK]
         orders0 = torch.where(take_pk, torch.full_like(orders0, A_PK), orders0)
+    A_GP = getattr(sim, "_A_GP", -1)
+    if A_GP >= 0 and um.shape[2] > A_GP:
+        # standing where the charge may be spent: spend it. The mask carries
+        # every legality term the person's own row asks for.
+        orders0 = torch.where(present & um[:, :, A_GP], torch.full_like(orders0, A_GP), orders0)
     A_LQ = getattr(sim, "_A_INQUISITION", -1)
     if A_LQ >= 0 and um.shape[2] > A_LQ:
         orders0 = torch.where(present & um[:, :, A_LQ], torch.full_like(orders0, A_LQ), orders0)
@@ -612,7 +693,9 @@ def _decide_buys(sim, row: int, bctx: dict | None = None):
             (relig_kind, relig_j),
             torch.where(bctx["levy_ok"], bctx["levy_cs"], torch.full_like(bctx["levy_cs"], -1)),
             (monu_kind, monu_j),
-            (nat_kind, nat_j))
+            (nat_kind, nat_j),
+            (bctx["cls_j"], bctx["cls_b"]),
+            (bctx["ucls_j"], bctx["ucls_b"]))
 
 
 def _buy_ctx(sim, row: int) -> dict:
@@ -648,6 +731,8 @@ def _buy_ctx(sim, row: int) -> dict:
         monu_b_ok = active & mon_g & (n_bl < 1) & sim._afford(sim.civ_faith[:, row], bl_cost)
     monu_s_ok = active & mon_g & (_spawn_pop >= sim.rules.settler_pop_gate) \
         & sim._afford(sim.civ_faith[:, row], sett_base * sim.rules.faith_purchase_mult * 0.7)
+    cls_ok, cls_j, cls_b = sim._seat_class_buy_candidate(row, active)
+    ucls_ok, ucls_j, ucls_b = sim._seat_faith_unit_candidate(row, active)
     levy_ok, levy_cs = sim._seat_levy_candidate(row, active)
     levy_ok = levy_ok & sim.war[:, row, : sim.n_majors].any(dim=1)
     return {"jj": jj, "bb": bb, "can_building": can_b, "price": price,
@@ -659,7 +744,9 @@ def _buy_ctx(sim, row: int) -> dict:
             "apostle_ok": a_ok, "apostle_j": a_j,
             "inquisitor_ok": q_ok, "inquisitor_j": q_j,
             "levy_ok": levy_ok, "levy_cs": levy_cs,
-            "nat_ok": nat_ok, "nat_j": nat_j}
+            "nat_ok": nat_ok, "nat_j": nat_j,
+            "cls_ok": cls_ok, "cls_j": cls_j, "cls_b": cls_b,
+            "ucls_ok": ucls_ok, "ucls_j": ucls_j, "ucls_b": ucls_b}
 
 
 def _geo_turn(sim, seeds=None):
@@ -810,7 +897,7 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     env_seq = None
     if seeds is not None and turn is not None and sim.S > 0:
         env_seq = _seat_envoys(sim, row)
-    buy, worship, relig, levy, monu, nat = _decide_buys(sim, row, bctx=None if pre is None else pre.get("bctx"))
+    buy, worship, relig, levy, monu, nat, cls, ucls = _decide_buys(sim, row, bctx=None if pre is None else pre.get("bctx"))
     route = _decide_route(sim, row, pre=None if pre is None else pre.get("route"))
     spec, lock = _decide_citizens(sim, row)
     vote = _decide_vote(sim, row)
@@ -819,7 +906,7 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     # replay side passes the recorded tile and places it.
     sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic,
                            war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
-                           monu=monu, nat=nat, route=route, spec=spec, lock=lock, vote=vote)
+                           monu=monu, nat=nat, cls=cls, ucls=ucls, route=route, spec=spec, lock=lock, vote=vote)
 
     # units, and the draw order: the driver PLANS, the PHASE executes.
     # Applying steps pre-step to re-observe would consume combat draws at a
@@ -892,10 +979,10 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
         sim._driven_useq = {}
     sim._driven_useq[row] = seq
-    return prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, route, spec, lock, vote
+    return prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, route, spec, lock, vote
 
 
-def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, route, spec, lock, vote, b: int) -> dict:
+def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, route, spec, lock, vote, b: int) -> dict:
     _pr = prod[b]
     _ctr = sim.city_center[b, row]
     _alive_c = sim.city_alive[b, row]
@@ -918,7 +1005,7 @@ def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, 
     _w = None if war is None or int(war[b]) < 0 else int(war[b])
     _e = [] if env_seq is None else [int(x) for x in env_seq[b].tolist() if int(x) >= 0]
     rec = {"production": prod_pairs, "tech": _t, "civic": _c, "war": _w, "envoys": _e, "units": rows}
-    rec.update(_buy_record_fields(sim, row, b, buy, worship, relig, levy, monu, nat))
+    rec.update(_buy_record_fields(sim, row, b, buy, worship, relig, levy, monu, nat, cls, ucls))
     if route is not None and int(route[0][b]) >= 0:
         rec["route"] = [int(route[0][b]), int(route[1][b])]
     if spec is not None:
@@ -939,7 +1026,7 @@ def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, 
     return rec
 
 
-def _buy_record_fields(sim, row: int, b: int, buy, worship, relig, levy, monu=None, nat=None) -> dict:
+def _buy_record_fields(sim, row: int, b: int, buy, worship, relig, levy, monu=None, nat=None, cls=None, ucls=None) -> dict:
     """The GOLD/FAITH/LEVY half of a seat's record, for ANY seat row — every
     city reference is CENTRE-KEYED like production, because ids are
     engine-local and centres are the shared vocabulary. Every field is
@@ -981,6 +1068,14 @@ def _buy_record_fields(sim, row: int, b: int, buy, worship, relig, levy, monu=No
         _c = _centre(int(nat[1][b]))
         if _c is not None:
             bf.append([10, _c])
+    if cls is not None and int(cls[1][b]) >= 0:
+        _c = _centre(int(cls[0][b]))
+        if _c is not None:
+            bf.append([12, _c, int(cls[1][b])])
+    if ucls is not None and int(ucls[1][b]) >= 0:
+        _c = _centre(int(ucls[0][b]))
+        if _c is not None:
+            bf.append([13, _c, int(ucls[1][b])])
     if bf:
         out["buyFaith"] = bf
     if levy is not None and int(levy[b]) >= 0:
@@ -1051,9 +1146,17 @@ def replay_seat(sim, row: int, rec: dict) -> None:
             hj = torch.where(mm, torch.full_like(hj, j), hj)
         return hj
 
-    worship = relig = monu = nat = None
+    worship = relig = monu = nat = cls = ucls = None
     for _ent in rec.get("buyFaith") or []:
         _fk, _fc = int(_ent[0]), int(_ent[1])
+        if _fk in (12, 13):
+            _cjt = _centre_slot(_fc)
+            _pair = (_cjt, torch.where(_cjt >= 0, torch.full_like(_cjt, int(_ent[2])), torch.full_like(_cjt, -1)))
+            if _fk == 12:
+                cls = _pair
+            else:
+                ucls = _pair
+            continue
         if _fk == 4:
             worship = _centre_slot(_fc)
         elif _fk in (5, 6, 11):
@@ -1097,7 +1200,7 @@ def replay_seat(sim, row: int, rec: dict) -> None:
                 vote[:, _k, _f] = int(_ent[_f])
     sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic,
                            war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
-                           monu=monu, nat=nat, route=route, spec=spec, lock=lock, vote=vote)
+                           monu=monu, nat=nat, cls=cls, ucls=ucls, route=route, spec=spec, lock=lock, vote=vote)
 
     def _geo_mask(seats) -> torch.Tensor:
         m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=dev)

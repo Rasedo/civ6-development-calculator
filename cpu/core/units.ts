@@ -14,7 +14,7 @@ import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial } from 
 import { isWater, isImpassable } from '../../world/query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
 import { IMPROVEMENTS } from '../data/improvements';
-import { tileAppeal } from './appeal';
+import { tileAppeal, gpAppealResolver } from './appeal';
 import { PARK_MIN_APPEAL } from '../data/improvements';
 import { isTechComplete, isCivicComplete, makeYieldCtx, getModifiers, unitUpkeep, type YieldCtx } from './effects';
 import { effectiveAdjacency } from './yields';
@@ -43,6 +43,7 @@ import { canTrainSpy, isSpy } from './espionage';
 import { canTrainWithStockpile, chargeUnitResource } from './stockpile';
 import type { ImprovementId } from './types';
 
+import { gpPermOf } from '../data/greatPeople';
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
@@ -914,7 +915,7 @@ export function parkClusterLegal(state: GameState, cluster: number[], seat: numb
     if (tileSeat(t) !== seat) return false;
     if (city < 0) city = t.ownerCity;
     else if (t.ownerCity !== city) return false;
-    if (tileAppeal(state.map, t, camps) < PARK_MIN_APPEAL) return false;
+    if (tileAppeal(state.map, t, camps, gpAppealResolver(state)) < PARK_MIN_APPEAL) return false;
   }
   return city >= 0;
 }
@@ -974,7 +975,14 @@ function extraCharges(state: GameState, seat: number, unitType: string): number 
     return seatWonderSum(state, seat, 'buildCharges') + getModifiers(state, seat).builderCharges;
   }
   if (unitType === 'MISSIONARY' || unitType === 'APOSTLE') return seatWonderSum(state, seat, 'spreadCharges');
+  if (isEngineer(unitType)) return seatWonderSum(state, seat, 'engineerCharges');
   return 0;
+}
+
+/** The two chassis the Mausoleum's clause names: the Great Engineer and the
+ *  Military Engineer. */
+export function isEngineer(unitType: string): boolean {
+  return unitType === 'ENGINEER' || unitType === 'MILITARY_ENGINEER';
 }
 
 export function spawnUnit(
@@ -1142,7 +1150,8 @@ export function refreshUnits(state: GameState): void {
           : 5)
           // a won Military Emergency heals its members in that seat's ground
           + emergencyHeal(state, unit.seat, tileSeat(tile))
-          + chaplainHeal(state, unit);
+          + chaplainHeal(state, unit)
+          + gpPermOf(seatOf(state, unit.seat), 'healBonus');
       unit.hp = Math.min(UNIT_HP, unit.hp + heal);
     }
     // FORTIFY: the EXACT heal gate (movesLeft >= full = spent
