@@ -314,8 +314,14 @@ class SimMasks:
             return
         full = int(self._walls_tier_hp[self._walls_tier_urban])
         oh = self.city_outer_hp[:, row]
-        self.city_outer_hp[:, row] = torch.where(
-            hit.unsqueeze(1) & self.city_alive[:, row], torch.full_like(oh, full), oh)
+        alive_hit = hit.unsqueeze(1) & self.city_alive[:, row]
+        self.city_outer_hp[:, row] = torch.where(alive_hit, torch.full_like(oh, full), oh)
+        if self._encamp_didx >= 0 and self.districts_on:
+            et = self.city_dist_tile[:, row, :, self._encamp_didx]
+            e0 = et.clamp(min=0)
+            w = (alive_hit & (et >= 0) & self.district_complete.gather(1, e0)).nonzero(as_tuple=True)
+            if w[0].numel():
+                self.encamp_outer_hp[w[0], et[w[0], w[1]]] = full
 
     def _walls_tier_all(self, row: int) -> torch.Tensor:
         """[B, RC] the walls tier of every one of this seat row's city columns
@@ -346,14 +352,45 @@ class SimMasks:
         per-game city column beside it."""
         return self._walls_tier_at(torch.full_like(col, row), col)
 
+    def _fit_encamp_outer(self, bsel: torch.Tensor, row: int, colsel: torch.Tensor,
+                          full: torch.Tensor) -> None:
+        """`fitEncampOuter` — CIV6 (Encampment): the district's Defenses are
+        their OWN pool. "Building any level of Walls in the city will supply
+        both", yet destroying one does not destroy the other — so every walls
+        site that refits the centre's perimeter refits this pool too, at the
+        same tier's `full` value. `bsel`/`colsel`/`full` are aligned batch
+        rows, city columns and pool sizes."""
+        if self._encamp_didx < 0 or not self.districts_on or bsel.numel() == 0:
+            return
+        et = self.city_dist_tile[bsel, row, colsel, self._encamp_didx]
+        ok = (et >= 0) & self.district_complete[bsel, et.clamp(min=0)]
+        r2 = ok.nonzero(as_tuple=True)[0]
+        if r2.numel() == 0:
+            return
+        self.encamp_outer_hp[bsel[r2], et[r2]] = full[r2]
+
+    def _enc_outer_missing(self, row: int) -> torch.Tensor:
+        """[B, RC] `encampOuterMissing` — the Encampment perimeter HP each
+        column's district is missing, what the repair project must put back
+        beyond the centre's own breach."""
+        mx = self._walls_max_all(row)
+        if self._encamp_didx < 0 or not self.districts_on:
+            return torch.zeros_like(mx)
+        et = self.city_dist_tile[:, row, :, self._encamp_didx]
+        e0 = et.clamp(min=0)
+        live = (et >= 0) & self.district_complete.gather(1, e0)
+        ecur = torch.minimum(self.encamp_outer_hp.gather(1, e0), mx)
+        return torch.where(live, mx - ecur, torch.zeros_like(mx))
+
     def _repair_available(self, row: int, j: int) -> torch.Tensor:
         """`repairAvailable` — CIV6: the repair "becomes available after
         building Walls. A city can undertake this project if it and/or its
         Encampment district have damaged Walls and have not been attacked in
-        the last three turns." One perimeter serves the centre and its
-        Encampment here, so one pool answers both."""
+        the last three turns." The centre and its Encampment each hold their
+        OWN pool; a breach in either makes the project available."""
         mx = self._walls_max_all(row)[:, j]
-        return ((mx > 0) & (self.city_outer_hp[:, row, j] < mx)
+        breached = (self.city_outer_hp[:, row, j] < mx) | (self._enc_outer_missing(row)[:, j] > 0)
+        return ((mx > 0) & breached
                 & ((self.turn - self.city_last_hit[:, row, j]) >= self._repair_quiet))
 
     def _repair_cost(self, row: int, j: int) -> torch.Tensor:
@@ -361,7 +398,8 @@ class SimMasks:
         the Production invested into the project", so the whole repair costs
         exactly what it puts back."""
         mx = self._walls_max_all(row)[:, j]
-        return (mx - self.city_outer_hp[:, row, j]).clamp(min=1).to(self.dtype)
+        return ((mx - self.city_outer_hp[:, row, j])
+                + self._enc_outer_missing(row)[:, j]).clamp(min=1).to(self.dtype)
 
     def _repair_drip(self, row: int, before: torch.Tensor) -> None:
         """`repairDrip` — CIV6 (Repair Outer Defenses): "Walls gain HP equal to
@@ -379,8 +417,20 @@ class SimMasks:
         gain = (js_round(self.city_progress[:, row].double())
                 - js_round(before.double())).long()
         oh = self.city_outer_hp[:, row]
-        self.city_outer_hp[:, row] = torch.where(
-            head, torch.minimum(oh + gain, self._walls_max_all(row)), oh)
+        mx = self._walls_max_all(row)
+        add = torch.minimum(gain, (mx - oh).clamp(min=0))
+        self.city_outer_hp[:, row] = torch.where(head, oh + add, oh)
+        # what the centre's pool cannot hold falls on the Encampment's own
+        if self._encamp_didx >= 0 and self.districts_on:
+            rem = (gain - add).clamp(min=0)
+            et = self.city_dist_tile[:, row, :, self._encamp_didx]
+            e0 = et.clamp(min=0)
+            ecur = torch.minimum(self.encamp_outer_hp.gather(1, e0), mx)
+            eadd = torch.minimum(rem, (mx - ecur).clamp(min=0))
+            w = (head & (et >= 0) & self.district_complete.gather(1, e0)
+                 & (eadd > 0)).nonzero(as_tuple=True)
+            if w[0].numel():
+                self.encamp_outer_hp[w[0], et[w[0], w[1]]] = (ecur + eadd)[w[0], w[1]]
 
     def _siege_may_shoot(self, pre: str) -> torch.Tensor:
         """[B, U] `siegeMayShoot` — CIV6 (Movement): a unit whose attack "uses
@@ -2311,10 +2361,36 @@ class SimMasks:
         if getattr(self, "_A_GP", -1) >= 0:
             _gp = [(present & self._gp_site_ok(row, sc, tc)).unsqueeze(2)]
 
+        _sn3: list[torch.Tensor] = []
+        if getattr(self, "_snipe3_on", False):
+            # CIV6: distance 3 needs ATTACK RANGE 3 — chassis range plus the
+            # RANGE promotion, which is what `unitAttackRange` sums on TS.
+            _rt3 = self._promo_val(ut, self.unit_promos.gather(1, sc), "RANGE")
+            rngd3 = (self._type_ranged_strength[ut] > 0) & ((self._type_ranged_range[ut] + _rt3) >= 3)
+            ring3 = self.ring3[tc]
+            ring3c = ring3.clamp(min=0).reshape(B, -1)
+            _rm3 = self.military_at.gather(1, ring3c)
+            _rc3 = self.civilian_at.gather(1, ring3c)
+            _rneg3 = torch.full_like(_rm3, -1)
+            _rms3 = torch.where(_rm3 >= 0, self.unit_seat.gather(1, _rm3.clamp(min=0)), _rneg3)
+            _rcs3 = torch.where(_rc3 >= 0, self.unit_seat.gather(1, _rc3.clamp(min=0)), _rneg3)
+            _res3 = self.embarked_at.gather(1, ring3c)
+            _res3s = torch.where(_res3 >= 0, self.unit_seat.gather(1, _res3.clamp(min=0)), _rneg3)
+            # same scope-out as the SNIPE head: a major's ranged fire engages
+            # barbarian units, hostile centres, and district defenses.
+            _ring3u = ((_rms3 == BARB_SEAT) | (_rcs3 == BARB_SEAT)
+                       | (_res3s == BARB_SEAT)).reshape(B, N, 18)
+            _ring3ct = self._seats_hostile(row, self._centre_seat_plane().gather(1, ring3c)).reshape(B, N, 18)
+            _ring3e = self._encamp_block(ring3c, row).reshape(B, N, 18)
+            _sn3 = [
+                present.unsqueeze(2) & rngd3.unsqueeze(2) & ~u_emb.unsqueeze(2)
+                & has_atk & may_shoot & (ring3 >= 0) & (_ring3u | _ring3ct | _ring3e)
+            ]
+
         out = torch.cat(
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
             + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc
-            + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp,
+            + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3,
             dim=2,
         )
         if self._act_names and self.improvements_on and self._builder_idx >= 0:

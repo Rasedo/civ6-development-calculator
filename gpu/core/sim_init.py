@@ -132,6 +132,15 @@ class SimInit:
                 _ring[t, k] = x
         self.ring2 = _ring  # [T, 12]
         self.pair_dist = pair_distances(self.W, self.H).to(device)  # [T, T] int16
+        # The distance-3 ring, [T, 18], sorted ascending and padded -1 at map
+        # edges — the SNIPE ring's contract one hex out, so SNIPE3 columns
+        # scan ring tiles in tile-index order like SNIPE columns do.
+        _pd3 = (self.pair_dist == 3).cpu()
+        _r3 = torch.full((self.T, 18), -1, dtype=torch.long)
+        for t in range(self.T):
+            cand = _pd3[t].nonzero(as_tuple=True)[0]
+            _r3[t, :min(cand.numel(), 18)] = cand[:18]
+        self.ring3 = _r3.to(device)  # [T, 18]
 
         # --- per-slot city data (dynamic: a slot binds to a tile when a SETTLER
         # founds there; nothing is pre-founded, and every center stat below is
@@ -1133,6 +1142,7 @@ class SimInit:
         self._act = {n: i for i, n in enumerate(self._act_names)}
         if self._act_names:
             self._snipe_on = "SNIPE_0" in self._act
+            self._snipe3_on = "SNIPE3_0" in self._act
             self._A_SPREAD = self._act.get("SPREAD_HERE", -1)  # religious spread head
             self._A_FOUND = self._act.get("FOUND_CITY", -1)  # the settler's verb
             self._A_EXCAVATE = self._act.get("EXCAVATE", -1)  # the archaeologist's
@@ -1157,7 +1167,8 @@ class SimInit:
             assert _stc == self._spy_travel_cols and _smc == self._n_spy_missions, (
                 f"spy heads are {_stc}/{_smc} wide, the wire says "
                 f"{self._spy_travel_cols}/{self._n_spy_missions}")
-            _want = 13 + len(ids) + 3 + (12 if self._snipe_on else 0) + (7 if self._A_SPREAD >= 0 else 0) \
+            _want = 13 + len(ids) + 3 + (12 if self._snipe_on else 0) \
+                + (18 if self._snipe3_on else 0) + (7 if self._A_SPREAD >= 0 else 0) \
                 + (1 if self._A_FOUND >= 0 else 0) + (1 if self._A_EXCAVATE >= 0 else 0) \
                 + (1 if self._A_PARK >= 0 else 0) \
                 + (rules.promo_cols if self._A_PROMOTE >= 0 else 0) \
@@ -1172,6 +1183,7 @@ class SimInit:
             self._A_REPAIR = self._act["REPAIR"]
             self._A_PILLAGE = self._act["PILLAGE"]
             self._A_SNIPE = self._act.get("SNIPE_0", self._A_PILLAGE + 1)
+            self._A_SNIPE3 = self._act.get("SNIPE3_0", -1)
             self._A_IMP = [self._act.get(f"BUILD_{n}", -1) for n in ids]
         else:
             self._A_CHOP, self._A_REPAIR = 16, 17
@@ -1197,6 +1209,8 @@ class SimInit:
             self._air_strike_cols = 0
             self._air_rebase_cols = 0
             self._snipe_on = False
+            self._snipe3_on = False
+            self._A_SNIPE3 = -1
             self._A_IMP = [13 + i if i < 3 else 18 + i - 3 for i in range(len(ids))]
         self.FARM = ids.index("FARM") if "FARM" in ids else 0
         self.MINE = ids.index("MINE") if "MINE" in ids else -1        # -1 = not in scope
@@ -1307,6 +1321,7 @@ class SimInit:
         # assault depletes it, and at 0 the tile opens and the strike goes
         # silent.
         self.encamp_hp = torch.zeros(B, T, dtype=torch.long, device=device)
+        self.encamp_outer_hp = torch.zeros(B, T, dtype=torch.long, device=device)
         # The ROAD plane (the TS `Tile.road` twin). Laid by trade routes; a
         # road-to-road step ignores the terrain penalty, and once `road_bridged`
         # latches at the first era boundary, the river charge too.
@@ -1845,6 +1860,10 @@ class SimInit:
             * (self._b_req_district >= 0).double().unsqueeze(1)
         )  # [NB, nD] building -> its district column
         self._pk = {n: i for i, n in enumerate(rules.promo_kinds)}
+        # the two promo classes the ZOC exert test names — CIV6 (Zone of
+        # Control): "Ranged and Bombard class units do not exert ZOC"
+        self._pc_ranged = rules.promo_classes.index("RANGED") if "RANGED" in rules.promo_classes else -1
+        self._pc_siege = rules.promo_classes.index("SIEGE") if "SIEGE" in rules.promo_classes else -1
         self._choke_feats = torch.tensor([int(x) for x in rules.choke_features if int(x) >= 0], dtype=torch.long, device=device)
         self._woods_feats = torch.tensor([int(x) for x in rules.woods_features if int(x) >= 0], dtype=torch.long, device=device)
         self._b_era = rules.b_era.to(device)  # [NB] long — unlock era (Heartbeat of Steam's gate) — per-building training XP (best tier over present buildings)

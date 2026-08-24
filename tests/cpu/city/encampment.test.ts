@@ -105,15 +105,23 @@ describe('Encampment', () => {
     expect(strikeKeys(state, city)).toEqual(['k:cstk']);
   });
 
-  it('CIV6: the Encampment strikes only while the city perimeter stands', () => {
+  it('CIV6: the Encampment strikes only while ITS OWN perimeter stands', () => {
     const { state, city } = battlefield();
     addEncampment(state, city, 10, 9);
     expect(strikeKeys(state, city)).toEqual([]); // no walls -> no outer defense at all
 
+    // the pools are SEPARATE: the city's breach does not silence the district
     const walled = battlefield();
     walled.city.buildings.push('ANCIENT_WALLS');
-    walled.city.outerHp = 0; // the perimeter beaten down
+    walled.city.outerHp = 0; // the CITY perimeter beaten down
     addEncampment(walled.state, walled.city, 10, 9);
-    expect(strikeKeys(walled.state, walled.city)).toEqual([]);
+    expect(strikeKeys(walled.state, walled.city)).toEqual(['k:estk']);
+
+    // ...and the DISTRICT's own breach does
+    const breached = battlefield();
+    breached.city.buildings.push('ANCIENT_WALLS');
+    const benc = addEncampment(breached.state, breached.city, 10, 9);
+    benc.encampOuterHp = 0;
+    expect(strikeKeys(breached.state, breached.city)).toEqual(['k:cstk']);
   });
 });

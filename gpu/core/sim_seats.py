@@ -624,8 +624,9 @@ class SimSeats:
         if self._walls_rows:
             wm6 = rows6[(self._b_walls[bb6[rows6]] > 0)]
             if len(wm6) > 0:
-                self.city_outer_hp[wm6, row, jj6[wm6]] = self._walls_max_at(
-                    torch.full_like(jj6, row), jj6)[wm6]
+                _wf6 = self._walls_max_at(torch.full_like(jj6, row), jj6)[wm6]
+                self.city_outer_hp[wm6, row, jj6[wm6]] = _wf6
+                self._fit_encamp_outer(wm6, row, jj6[wm6], _wf6)
         self.civ_treasury[:, row] = torch.where(can6, self.civ_treasury[:, row] - price6, self.civ_treasury[:, row])
 
     def _seat_buy_building_faith(self, row: int, ok: torch.Tensor, jj: torch.Tensor, bb: torch.Tensor, price: torch.Tensor) -> None:
@@ -637,8 +638,9 @@ class SimSeats:
         if self._walls_rows:
             wm = rows[(self._b_walls[bb[rows]] > 0)]
             if len(wm) > 0:
-                self.city_outer_hp[wm, row, jj[wm]] = self._walls_max_at(
-                    torch.full_like(jj, row), jj)[wm]
+                _wf = self._walls_max_at(torch.full_like(jj, row), jj)[wm]
+                self.city_outer_hp[wm, row, jj[wm]] = _wf
+                self._fit_encamp_outer(wm, row, jj[wm], _wf)
         self.civ_faith[:, row] = torch.where(ok, self.civ_faith[:, row] - price, self.civ_faith[:, row])
 
     def _seat_trainable_units(self, row: int) -> torch.Tensor:
@@ -5721,9 +5723,13 @@ class SimSeats:
 
         `gslot` is a MERGED pool slot, so the occupancy and tile writes below are
         the same two lines whoever is moving.
-          * EMBARK/DISEMBARK — a LAND unit crossing land<->water pays ALL
-            remaining MP and flips `emb`; a water->water step enters at 1 with
-            no river charge. LIVE-gated (`_embark_live`), like TS's embarkState.
+          * EMBARK/DISEMBARK — a LAND unit crossing land<->water pays the
+            step's own cost plus a 2-MP penalty (CIV6: "either 3 Movement or
+            all the unit's Movement for the round"), waived at a Harbor water
+            tile or a coastal City Center land tile; leftover MP transfers to
+            the new mode, capped at its full pool. A water->water step enters
+            at 1 with no river charge. LIVE-gated (`_embark_live`), like TS's
+            embarkState.
             The candidate scan stays with the caller: which neighbours are
             enterable, and the cliff that closes a transition edge, are
             target-choice questions.
@@ -5747,8 +5753,19 @@ class SimSeats:
             emb = self.unit_emb.gather(1, gs1).squeeze(1)
             to_water = self.wpass.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1)
             transition = (emb != to_water) & ~naval
+            base_step = torch.where(to_water, torch.ones_like(land_cost), land_cost)
+            w_end = torch.where(to_water, dest.clamp(min=0), hc)
+            l_end = torch.where(to_water, hc, dest.clamp(min=0))
+            easy_dock = (
+                (self.district.gather(1, w_end.unsqueeze(1)).squeeze(1) == self._harbor_didx)
+                | ((self.centre_slot_at.gather(1, l_end.unsqueeze(1)).squeeze(1) >= 0)
+                   & self.coastal_land.gather(1, l_end.unsqueeze(1)).squeeze(1))
+            )
             cost = torch.where(
-                transition, mp, torch.where(to_water, torch.ones_like(land_cost), land_cost)
+                transition,
+                base_step + torch.where(easy_dock, torch.zeros_like(land_cost),
+                                        torch.full_like(land_cost, 2)),
+                base_step,
             )
         else:
             cost = land_cost
@@ -5790,11 +5807,45 @@ class SimSeats:
             self.unit_emb[rows, gs] = (to_water & ~naval)[rows]
         self._occ_set(rows, dest[rows], gs)
         spent = (mp - cost).clamp(min=0)
+        if self._embark_live and bool((moved & transition).any()):
+            # the transfer cap, and the stored full pool refreshed for the
+            # flipped slots — every later afford this turn must read the NEW
+            # mode, exactly as `unitFullMoves` answers live on TS
+            for _pre in ("major", "barb"):
+                _lo = self.POOL_LO[_pre]
+                _tr = moved & transition & (gslot >= _lo) & (gslot < self.POOL_HI[_pre])
+                if not bool(_tr.any()):
+                    continue
+                _f = self._full_mp(_pre)
+                _r = _tr.nonzero(as_tuple=True)[0]
+                _s = gslot[_r] - _lo
+                self.unit_mp_full[_r, gslot[_r]] = _f[_r, _s]
+                spent[_r] = torch.minimum(spent[_r], _f[_r, _s])
         spent = torch.where(self._in_enemy_zoc(dest, seat, u_type), torch.zeros_like(spent), spent)
         self.unit_mp[rows, gs] = spent[rows]
         _ty = u_type.clamp(min=0, max=self.NU - 1)
         self.unit_attacks[rows, gs] = self._step_attacks_left(
             _ty[rows], u_promos[rows], self.unit_attacks[rows, gs])
+        if self._encamp_didx >= 0 and self.districts_on:
+            # CIV6 (Combat): an Encampment emptied of its garrison is not
+            # walk-over ground — it is "'conquered' by a melee unit, as you
+            # would a City Center", and a SHOT never conquers, so the
+            # shot-emptied district waits for this entry. A ranged walker
+            # only OCCUPIES the tile (holding its heal silent).
+            d0 = dest.clamp(min=0)
+            dt1 = d0.unsqueeze(1)
+            enc_t = ((self.district.gather(1, dt1).squeeze(1) == self._encamp_didx)
+                     & self.district_complete.gather(1, dt1).squeeze(1)
+                     & ~self.district_pillaged.gather(1, dt1).squeeze(1)
+                     & (self.encamp_hp.gather(1, dt1).squeeze(1) <= 0))
+            if bool((moved & enc_t).any()):
+                _own = self.tile_seat.gather(1, dt1).squeeze(1)
+                _ms = self.unit_seat.gather(1, gs1).squeeze(1)
+                melee = ((self._type_combat[_ty] > 0) & (self._type_ranged_strength[_ty] <= 0)
+                         & ~self._type_civilian[_ty])
+                hit = (moved & enc_t & melee & (_own >= 0) & (_own < BARB_SEAT)
+                       & self._seats_hostile(_ms.unsqueeze(1), _own.unsqueeze(1)).squeeze(1))
+                self._conquer_encampment(hit, d0, _ms)
         return moved
 
     def _in_enemy_zoc(self, dest: torch.Tensor, seat, mover_type: torch.Tensor) -> torch.Tensor:
@@ -5805,19 +5856,27 @@ class SimSeats:
         Hostility is unitsHostile, exactly: barbarians are hostile to every
         non-barbarian and vice versa; otherwise it is civsAtWar(seat, other).
 
-        CIV6 gives a naval raider "Ignores enemy zone of control", so nothing
-        halts it; the two submarines additionally "do not exert zone of
-        control", and an embarked unit exerts none either."""
+        CIV6 gives a naval raider "Ignores enemy zone of control" (cavalry
+        classes ignore it too); "Ranged and Bombard class units do not exert
+        ZOC" unless SUPPRESSION hands it back; the two submarines additionally
+        "do not exert zone of control"; an embarked unit exerts none; and a
+        river between the exerter and the entered tile blocks the halt."""
         mil = self.military_at
         here = mil >= 0
         mslot = mil.clamp(min=0)
         mtype = self.unit_type.gather(1, mslot).clamp(min=0, max=self.NU - 1)
         mseat = torch.where(here, self.unit_seat.gather(1, mslot), torch.full_like(mil, -1))
-        exert = here & ~self.unit_emb.gather(1, mslot) & ~self._type_zoc_none[mtype]
+        mpromos = self.unit_promos.gather(1, mslot)
+        pc = self.rules_dev.u_promo_class[mtype]
+        no_exert_cls = ((pc == self._pc_ranged) | (pc == self._pc_siege))             & ~self._promo_flag(mtype, mpromos, "ZOC_EXERT")
+        exert = here & ~self.unit_emb.gather(1, mslot) & ~self._type_zoc_none[mtype] & ~no_exert_cls
         hostmil = exert & self._seats_hostile(seat, mseat)
         dn = self.neigh[dest.clamp(min=0)]
-        halt = ((dn >= 0) & hostmil.gather(1, dn.clamp(min=0))).any(dim=1)
-        return halt & ~self._type_zoc_ignore[mover_type.clamp(min=0, max=self.NU - 1)]
+        riv = (self.river_mask.gather(1, dest.clamp(min=0).unsqueeze(1))
+               >> torch.arange(6, device=self.device).unsqueeze(0)) & 1
+        halt = ((dn >= 0) & (riv == 0) & hostmil.gather(1, dn.clamp(min=0))).any(dim=1)
+        ign = self._type_zoc_ignore | self._type_cavalry
+        return halt & ~ign[mover_type.clamp(min=0, max=self.NU - 1)]
 
     def _war_march_targets(self, hcs: torch.Tensor, row: int):
         """The war-march DESTINATION for seat `row`'s units standing at `hcs`
@@ -5904,16 +5963,19 @@ class SimSeats:
     def _encamp_take_roll(self, m: torch.Tensor, tc: torch.Tensor, utype: torch.Tensor,
                           useat: torch.Tensor, roll: torch.Tensor, ranged: bool) -> None:
         """Apply ONE roll to the district: CIV6 gives it "Defenses HP equal to
-        the City Center" and one set of Walls supplies both, so the roll divides
-        exactly as a hit on the centre does — the perimeter share off the city's
-        pool, and only what gets through reaching `encamp_hp`."""
+        the City Center" and one set of Walls supplies both — each its OWN
+        pool — so the roll divides exactly as a hit on the centre does: the
+        perimeter share off `encamp_outer_hp`, and only what gets through
+        reaching `encamp_hp`."""
         _dcs, hrow, hcol, wtier, held = self._encamp_terms(tc)
         _hc0 = hcol.clamp(min=0)
         bidx = torch.arange(self.B, device=self.device)
         _assist = (torch.zeros_like(roll) if ranged
                    else self._siege_assist(useat, utype, tc, wtier))
+        _emax = self._walls_tier_hp[wtier]
+        _eouter = torch.minimum(self.encamp_outer_hp[bidx, tc], _emax)
         _wall, _centre = self._city_damage_split(
-            self.city_outer_hp[bidx, hrow, _hc0], self._walls_tier_hp[wtier], roll,
+            _eouter, _emax, roll,
             self._hit_class(utype, ranged), _assist)
         rows = m.nonzero(as_tuple=True)[0]
         if rows.numel() == 0:
@@ -5923,9 +5985,8 @@ class SimSeats:
         self.encamp_hp[rows, tr] = (self.encamp_hp[rows, tr] - _dmg[rows]).clamp(min=0)
         hr2 = rows[held[rows]]
         if hr2.numel() > 0:
-            hrr, hcc = hrow[hr2], _hc0[hr2]
-            self.city_outer_hp[hr2, hrr, hcc] = self.city_outer_hp[hr2, hrr, hcc] - _wall[hr2]
-            self.city_last_hit[hr2, hrr, hcc] = self.turn
+            self.encamp_outer_hp[hr2, tc[hr2]] = (_eouter - _wall)[hr2]
+            self.city_last_hit[hr2, hrow[hr2], _hc0[hr2]] = self.turn
 
     def _conquer_encampment(self, m: torch.Tensor, tc: torch.Tensor, captor: torch.Tensor) -> None:
         """`conquerEncampment`'s twin. CIV6 (Combat): the Encampment "cannot be
@@ -5953,7 +6014,8 @@ class SimSeats:
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         def_cs, hrow, hcol, _wt, held = self._encamp_terms(tc)
         bidx = torch.arange(self.B, device=self.device)
-        outer = torch.where(held, self.city_outer_hp[bidx, hrow, hcol.clamp(min=0)],
+        outer = torch.where(held,
+                            torch.minimum(self.encamp_outer_hp[bidx, tc], self._walls_tier_hp[_wt]),
                             torch.zeros_like(def_cs))
         atk_e = (self._city_ranged_strength(at0, outer) - self._wound(a_hp[:, u])
                  + self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
@@ -6404,6 +6466,11 @@ class SimSeats:
         self._spend_one_attack(atk_kind, u, att)
         rows = att.nonzero(as_tuple=True)[0]
         self.citystate_hp[rows, citystate_sc[rows]] -= d_cs[rows]
+        if atk_kind == "barb":
+            # CIV6: barbarians never capture a city — their assault leaves the
+            # minor standing at 1 HP, `_hostile_ranged_strike`'s own floor.
+            self.citystate_hp[rows, citystate_sc[rows]] = \
+                self.citystate_hp[rows, citystate_sc[rows]].clamp(min=1)
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
         atk_dead = att & (a_hp[:, u] <= 0)
         # the award follows the counter here, so a dead attacker banks nothing

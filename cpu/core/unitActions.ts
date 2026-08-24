@@ -62,6 +62,10 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // may be spent. One column for all nine classes — which person is acting is
   // the unit's own chassis and queue position, not a column.
   names.push('ACTIVATE_GP');
+  // CIV6: a unit whose ATTACK RANGE reaches 3 (battleship chassis, or the
+  // EXPERT_MARKSMAN promotion on siege) may strike the distance-3 ring. Same
+  // contract as the SNIPE head one hex out: column order is TILE INDEX order.
+  for (let k = 0; k < 18; k++) names.push(`SNIPE3_${k}`);
   return names;
 }
 

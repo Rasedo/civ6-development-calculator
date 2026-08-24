@@ -593,10 +593,12 @@ PATROL_HOME_RADIUS = 3
 
 
 def pick_unit_orders(mask: torch.Tensor, obs: torch.Tensor, *, a_pillage: int, a_snipe: int,
+                     a_snipe3: int = -1,
                      home_radius: int = PATROL_HOME_RADIUS) -> torch.Tensor:
-    """`a_pillage` / `a_snipe` are the PILLAGE and SNIPE_0 columns of the enum
-    the mask was built from. They are arguments and not constants because
-    appending one improvement moves both — every BUILD verb sits before them."""
+    """`a_pillage` / `a_snipe` / `a_snipe3` are the PILLAGE, SNIPE_0 and
+    SNIPE3_0 columns of the enum the mask was built from. They are arguments
+    and not constants because appending one improvement moves them — every
+    BUILD verb sits before them."""
     A_PILLAGE, A_SNIPE = a_pillage, a_snipe
     B, N, W = mask.shape
     dev = mask.device
@@ -616,9 +618,21 @@ def pick_unit_orders(mask: torch.Tensor, obs: torch.Tensor, *, a_pillage: int, a
     else:
         sn_min = torch.full((B, N), BIG, dtype=obs.dtype, device=dev)
         sn_col = torch.zeros(B, N, dtype=torch.long, device=dev)
-    has_atk = (adj_min < BIG) | (sn_min < BIG)
+    if a_snipe3 >= 0 and W > a_snipe3:
+        s3 = mask[:, :, a_snipe3:a_snipe3 + 18]
+        # no ring-3 tile ids in the obs — take the FIRST legal column, which
+        # is the lowest ring tile by index (column order IS tile-index order)
+        k3 = torch.where(s3, torch.arange(18, device=dev).view(1, 1, 18).expand(B, N, 18),
+                         torch.full((B, N, 18), 10 ** 9, dtype=torch.long, device=dev))
+        has_s3 = s3.any(dim=2)
+        s3_col = k3.argmin(dim=2) + a_snipe3
+    else:
+        has_s3 = torch.zeros(B, N, dtype=torch.bool, device=dev)
+        s3_col = torch.zeros(B, N, dtype=torch.long, device=dev)
+    has_atk = (adj_min < BIG) | (sn_min < BIG) | has_s3
     use_ring = sn_min < adj_min
     atk_col = torch.where(use_ring, sn_col, adj_dir + 6)
+    atk_col = torch.where((adj_min >= BIG) & (sn_min >= BIG) & has_s3, s3_col, atk_col)
 
     at_war = obs[:, :, U_ATWAR] > 0
     d_war = obs[:, :, U_DWAR]

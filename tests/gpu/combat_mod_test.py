@@ -34,6 +34,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
+from core.simbase import BARB_SEAT
 from core.engine import UNIT_SLOTS, js_round, FLANKING_CS, SUPPORT_CS
 from warmup import settle_all
 
@@ -77,22 +78,71 @@ def cb_events(sim, ua):
 
 
 def find_melee(rules, paths):
-    """Scripted-advance until a seat-0 MELEE unit can strike an adjacent
-    barb/civ unit (not a city) — returns (sim, p, code, name)."""
+    """A seat-0 MELEE unit and a barbarian PLANTED on adjacent open tiles by
+    the capital — hand-built on the settled scene, because driverless play
+    declares no wars and the marauding raiders besiege whichever city is
+    nearest their camp (often a minor), so a scripted hunt for the scene goes
+    dry. Both hulls are the same plain melee chassis, so the attacker's
+    tier-1 class promotion is guaranteed to pay against the defender.
+    Returns (sim, p, code, name)."""
     for path in paths:
         sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
-        for _ in range(120):
-            smap = sim._seat_slot_map(0)[0]
-            m = sim._seat_unit_mask(0)[0]  # [N, A] — head rows, not slots
-            for n in m[:, 6:12].any(dim=1).nonzero(as_tuple=True)[0].tolist():
-                p = int(smap[n])
-                if p < 0 or float(sim._type_ranged_strength[sim.unit_type[0, p]]) > 0:
-                    continue  # want a melee unit
-                for d in m[n, 6:12].nonzero(as_tuple=True)[0].tolist():
-                    tgt = int(sim.neigh[int(sim.unit_tile[0, p]), d])
-                    if tgt >= 0 and (int(sim.barb_at[0, tgt]) >= 0 or civ_mil_at(sim, tgt) >= 0):
-                        return sim, p, 6 + d, path.name
-            sim.step()
+        _mcls = rules.promo_classes.index("MELEE")
+        bty = next(i for i in range(sim.NU)
+                   if float(sim._type_combat[i]) > 0
+                   and float(sim._type_ranged_strength[i]) == 0
+                   and not bool(sim._type_civilian[i]) and not bool(sim.unit_naval[i])
+                   and int(sim.rules_dev.u_promo_class[i]) == _mcls)
+        ctr = int(sim.city_center[0, 0, 0])
+        if ctr < 0:
+            continue
+        near = (sim.pair_dist[ctr] <= 3).nonzero(as_tuple=True)[0].tolist()
+
+        def open_tile(x: int) -> bool:
+            return (bool(sim.passable[0, x])
+                    and int(sim.military_at[0, x]) < 0 and int(sim.civilian_at[0, x]) < 0
+                    and int(sim.embarked_at[0, x]) < 0
+                    and int(sim.centre_slot_at[0, x]) < 0 and int(sim.district[0, x]) < 0)
+
+        for a_tile in near:
+            a_tile = int(a_tile)
+            if not open_tile(a_tile):
+                continue
+            for d, x in enumerate(sim.neigh[a_tile].tolist()):
+                x = int(x)
+                if x < 0 or x == a_tile or not open_tile(x):
+                    continue
+                aslot = int(sim.unit_next[0])
+                sim.unit_next[0] = aslot + 1
+                sim.major_unit_alive[0, aslot] = True
+                sim.major_unit_type[0, aslot] = bty
+                sim.major_unit_tile[0, aslot] = a_tile
+                sim.major_unit_hp[0, aslot] = 100
+                sim.major_unit_seat[0, aslot] = 0
+                sim.major_unit_mp[0, aslot] = 2
+                sim.major_unit_attacks[0, aslot] = 1
+                bslot = int((~sim.barb_unit_alive[0]).nonzero(as_tuple=True)[0][0])
+                sim.barb_unit_alive[0, bslot] = True
+                sim.barb_unit_type[0, bslot] = bty
+                sim.barb_unit_tile[0, bslot] = x
+                sim.barb_unit_hp[0, bslot] = 100
+                sim.barb_unit_seat[0, bslot] = BARB_SEAT
+                if sim._embark_live:
+                    sim.major_unit_emb[0, aslot] = False
+                    sim.barb_unit_emb[0, bslot] = False
+                sim.military_at[0, a_tile] = aslot + sim.POOL_LO["major"]
+                sim.military_at[0, x] = bslot + sim.POOL_LO["barb"]
+                p = aslot + sim.POOL_LO["major"]
+                n = rank_of(sim, p)
+                m = sim._seat_unit_mask(0)[0]  # [N, A] — head rows, not slots
+                if bool(m[n, 6 + d]):
+                    return sim, p, 6 + d, path.name
+                # fog or a gate refused the column — unwind and try elsewhere
+                sim.military_at[0, a_tile] = -1
+                sim.military_at[0, x] = -1
+                sim.major_unit_alive[0, aslot] = False
+                sim.barb_unit_alive[0, bslot] = False
+                sim.unit_next[0] = aslot
     raise AssertionError("no adjacent-hostile melee situation found in scripted play")
 
 

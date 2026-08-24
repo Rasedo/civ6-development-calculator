@@ -18,7 +18,7 @@ import { ERAS, TECHS } from '../data/techs';
 import { addEraScore, buildingDedications, dedicationEvent } from './eras';
 import { spawnUnit } from './units';
 import { airTrainTile } from './air';
-import { wallsMax, urbanDefensesFit } from './rules';
+import { wallsMax, urbanDefensesFit, fitEncampOuter } from './rules';
 import { trainXpPct } from './combat';
 import { promoClassOf } from './promotions';
 import { applyLumpYield } from './economy';
@@ -56,8 +56,9 @@ export function completeProject(state: GameState, city: City, projectId: string,
 
   if (def.repair) {
     // CIV6: "Once completed, it fully restores the HP of the city's (and
-    // Encampment's) Outer Defenses." One perimeter serves both here.
+    // Encampment's) Outer Defenses" — each to its OWN full pool.
     city.outerHp = wallsMax(state, city);
+    fitEncampOuter(state, city);
     state.eventLog.push(`${city.name} completed ${def.name}.`);
     return;
   }
@@ -130,7 +131,12 @@ export function completeQueueItem(
       const dt = state.map.tiles[item.tileIndex];
       dt.districtComplete = true;
       if (dt.district !== 'CITY_CENTER') dedicationEvent(state, city.seat, DED_MONUMENTALITY);
-      if (dt.district === 'ENCAMPMENT') dt.encampHp = ENCAMPMENT_HP;
+      if (dt.district === 'ENCAMPMENT') {
+        dt.encampHp = ENCAMPMENT_HP;
+        // its OWN perimeter arrives at whatever tier the city's walls
+        // already supply — 0 where none stand yet (`fitEncampOuter`)
+        dt.encampOuterHp = wallsMax(state, city);
+      }
       const ddef = dt.district ? DISTRICTS[dt.district] : null;
       // CIV6 (Diplomatic Quarter): "+1 Envoy when built next to the City
       // Center."
@@ -215,7 +221,7 @@ export function completeQueueItem(
     case 'building':
       city.buildings.push(item.building);
       buildingDedications(state, city.seat, item.building);
-      if (BUILDINGS[item.building]?.walls) city.outerHp = wallsMax(state, city);
+      if (BUILDINGS[item.building]?.walls) { city.outerHp = wallsMax(state, city); fitEncampOuter(state, city); }
       // CIV6 (Flood Barrier): built late, "those tiles can be repaired in
       // full and used again, along with anything that's on them".
       if (BUILDINGS[item.building]?.floodBarrier) repairBehindBarrier(state, city);

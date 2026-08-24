@@ -426,7 +426,22 @@ export function repairDrip(state: GameState, city: City, before: number): void {
   const q = city.queue[0];
   if (q?.kind !== 'project' || !PROJECTS[q.project]?.repair) return;
   const max = wallsMax(state, city);
-  city.outerHp = Math.min(max, outerPool(state, city) + (Math.round(q.progress) - Math.round(before)));
+  let gain = Math.round(q.progress) - Math.round(before);
+  const cur = outerPool(state, city);
+  const add = Math.min(gain, Math.max(0, max - cur));
+  city.outerHp = cur + add;
+  gain -= add;
+  // what the centre's pool cannot hold falls on the Encampment's own
+  if (gain > 0) {
+    for (const d of city.districts) {
+      const t = state.map.tiles[d.tileIndex];
+      if (t.district !== 'ENCAMPMENT' || !t.districtComplete) continue;
+      const ecur = encampOuterPool(state, city, t);
+      const eadd = Math.min(gain, Math.max(0, max - ecur));
+      t.encampOuterHp = ecur + eadd;
+      gain -= eadd;
+    }
+  }
 }
 
 /** The size of that tier's perimeter pool — what a fresh set of walls is
@@ -453,7 +468,51 @@ export function outerPool(state: GameState, city: { buildings: string[]; seat: n
  * they are already carrying is what the fortifications replace.
  */
 export function urbanDefensesFit(state: GameState, seat: number): void {
-  for (const c of seatOf(state, seat)?.cities ?? []) c.outerHp = WALLS_TIER_HP[WALLS_TIER_URBAN];
+  for (const c of seatOf(state, seat)?.cities ?? []) {
+    c.outerHp = WALLS_TIER_HP[WALLS_TIER_URBAN];
+    // every completion hook fires BEFORE the tech lands in `research.techs`,
+    // so the encampment write uses the same constant the centre does —
+    // `fitEncampOuter`'s `wallsMax` recompute would still answer the old tier
+    for (const d of c.districts) {
+      const t = state.map.tiles[d.tileIndex];
+      if (t.district === 'ENCAMPMENT' && t.districtComplete) t.encampOuterHp = WALLS_TIER_HP[WALLS_TIER_URBAN];
+    }
+  }
+}
+
+/** CIV6 (Encampment): the district's Defenses are their OWN pool — "building
+ *  any level of Walls in the city will supply both", yet destroying one does
+ *  not destroy the other. Absent = FULL at the tier the owning city's walls
+ *  supply, `outerPool`'s own convention. */
+export function encampOuterPool(
+  state: GameState,
+  city: { buildings: string[]; seat: number },
+  tile: { encampOuterHp?: number },
+): number {
+  const max = wallsMax(state, city);
+  return Math.min(tile.encampOuterHp ?? max, max);
+}
+
+/** the Encampment perimeter HP this city's district is missing — what the
+ *  repair project must put back beyond the centre's own breach. */
+export function encampOuterMissing(state: GameState, city: City): number {
+  const max = wallsMax(state, city);
+  let missing = 0;
+  for (const d of city.districts) {
+    const t = state.map.tiles[d.tileIndex];
+    if (t.district === 'ENCAMPMENT' && t.districtComplete) missing += max - encampOuterPool(state, city, t);
+  }
+  return missing;
+}
+
+/** the write half: every walls site that refits the centre's perimeter refits
+ *  the Encampment's own pool too, at the same tier's full value. */
+export function fitEncampOuter(state: GameState, city: City): void {
+  const max = wallsMax(state, city);
+  for (const d of city.districts) {
+    const t = state.map.tiles[d.tileIndex];
+    if (t.district === 'ENCAMPMENT' && t.districtComplete) t.encampOuterHp = max;
+  }
 }
 
 /**

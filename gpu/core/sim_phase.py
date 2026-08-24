@@ -567,6 +567,10 @@ class SimPhase:
             self._dedication_event(row, 0, mon)
             enc = self.district[dr, dt] == self._encamp_didx
             self.encamp_hp[dr, dt] = torch.where(enc, torch.full_like(dt, self._encamp_hp_max), self.encamp_hp[dr, dt])
+            # its OWN perimeter arrives at whatever tier the city's walls
+            # already supply — 0 where none stand yet (`fitEncampOuter`)
+            _ewf = self._walls_max_at(torch.full_like(col, row), col)[dr]
+            self.encamp_outer_hp[dr, dt] = torch.where(enc, _ewf, self.encamp_outer_hp[dr, dt])
             # BORDER CONTROL outcome A: this row's new districts are bombs —
             # and it takes FOREIGN tiles too, so it subsumes the Preserve's own
             # and only one of the two ever runs.
@@ -603,8 +607,9 @@ class SimPhase:
             if self._walls_rows:
                 wm = br[(self._b_walls[bi[br]] > 0)]
                 if len(wm) > 0:
-                    self.city_outer_hp[wm, row, col[wm]] = self._walls_max_at(
-                        torch.full_like(col, row), col)[wm]
+                    _wf = self._walls_max_at(torch.full_like(col, row), col)[wm]
+                    self.city_outer_hp[wm, row, col[wm]] = _wf
+                    self._fit_encamp_outer(wm, row, col[wm], _wf)
             # CIV6 (Flood Barrier): built late, "those tiles can be repaired in
             # full and used again, along with anything that's on them".
             if self._barrier_bidx >= 0:
@@ -761,9 +766,9 @@ class SimPhase:
         heal = int(self.rules.combat.get("cityHealPerTurn", 20))
         # CIV6: walls give a city its ranged strike, and once the Outer Defense
         # "has been completely destroyed, its ranged strike again becomes
-        # unavailable". The Encampment's defenses are the same perimeter —
-        # "building any level of Walls in the city will supply both" — so it
-        # strikes only "while its Wall defenses are still up".
+        # unavailable". "Building any level of Walls in the city will supply
+        # both" the centre and its Encampment — each with its OWN pool — so
+        # the district strikes only while ITS defenses are still up.
         walled = act & (self._walls_max_at(torch.full_like(col, row), col) > 0)
         perimeter = walled & (self.city_outer_hp[bidx, row, col] > 0)
         self._seat_city_strike(row, col, perimeter, "cstk")
@@ -774,7 +779,10 @@ class SimPhase:
             enc_reg = self.city_dist_tile[bidx, row, col, self._encamp_didx]  # [B]
             e0 = enc_reg.clamp(min=0)
             enc_live = (enc_reg >= 0) & self.district_complete[bidx, e0] & ~self.district_pillaged[bidx, e0]
-            self._seat_city_strike(row, col, perimeter & enc_live & (self.encamp_hp[bidx, e0] > 0), "estk")
+            _eperim = walled & (torch.minimum(
+                self.encamp_outer_hp[bidx, e0],
+                self._walls_max_at(torch.full_like(col, row), col)) > 0)
+            self._seat_city_strike(row, col, _eperim & enc_live & (self.encamp_hp[bidx, e0] > 0), "estk")
         ctr = self.city_center[bidx, row, col].clamp(min=0)
         nbh = self.neigh[ctr]
         nbc = nbh.clamp(min=0)
@@ -785,9 +793,13 @@ class SimPhase:
         # control on all passable tiles surrounding the City Center, it will no
         # longer be able to repair the damage it suffers". EVERY passable
         # neighbour has to be held by a unit that EXERTS one: a civilian does
-        # not, and CIV6 gives the two submarines "Does not exert zone of
-        # control". `encircled` is the twin.
-        held = self._seats_hostile(row, _as) & (_am >= 0) & ~self._type_zoc_none[_at]
+        # not, "Ranged and Bombard class units do not exert ZOC" (SUPPRESSION
+        # hands it back), and CIV6 gives the two submarines "Does not exert
+        # zone of control". `encircled` is the twin.
+        _ap = self.unit_promos.gather(1, _am.clamp(min=0))
+        _apc = self.rules_dev.u_promo_class[_at]
+        _no_ex = ((_apc == self._pc_ranged) | (_apc == self._pc_siege))             & ~self._promo_flag(_at, _ap, "ZOC_EXERT")
+        held = self._seats_hostile(row, _as) & (_am >= 0) & ~self._type_zoc_none[_at] & ~_no_ex
         passable = (nbh >= 0) & (self.passable | self.wpass).gather(1, nbc)
         besieged = passable.any(dim=1) & ~(passable & ~held).any(dim=1)
         ok = act & ~besieged

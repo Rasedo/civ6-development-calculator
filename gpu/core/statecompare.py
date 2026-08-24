@@ -715,6 +715,7 @@ TILE = {
     "shipwreckProv": _prov("shipwreck_era", "shipwreck_seat"),
     "park": _tile("park"),
     "encampHp": _tile("encamp_hp"),
+    "encampOuterHp": _tile("encamp_outer_hp"),
     "road": _tile("road"),
     "locked": _tile("tile_locked"),
     "fertility": _tile("fertility"),

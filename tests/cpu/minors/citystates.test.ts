@@ -333,7 +333,11 @@ describe('a hostile walker marches on a minor', () => {
   it('pillages a city-state improvement it stands on', () => {
     const { state, cs } = board();
     const t = state.map.tiles[cs.centerIndex];
-    const ground = neighbors(state.map, t).find((n) => tileSeat(n) === cs.seat)!;
+    // hand the minor a distance-2 tile: an ADJACENT raider attacks the city
+    // first (the majors' own precedence), so the pillage needs open ground
+    const ground = state.map.tiles.find((n) =>
+      hexDistance(n.col, n.row, t.col, t.row) === 2)!;
+    setTileOwner(ground, cs.seat);
     ground.improvement = 'FARM';
     const barb = spawnUnit(state, 'WARRIOR', ground.index, BARB_SEAT)!;
     hostileUnitAct(state, barb);
@@ -353,14 +357,27 @@ describe('a hostile walker marches on a minor', () => {
     expect(d(state.map.tiles[barb.tileIndex])).toBeLessThan(d(start));
   });
 
-  it('does NOT beeline to the minor CITY when that is all there is', () => {
-    // The walker stops adjacent to the single nearest city, so a minor in the
-    // city scan would park every camp's units on it and no barbarian would
-    // reach a major again. Its ground is raided; its city is not a target.
-    const { state } = board();
+  it('beelines to the minor CITY — barbarians raid anyone', () => {
+    // Real Civ 6 barbarians raid whoever is near the camp: a city-state's
+    // CITY is a march target like any major's, and the walker stops adjacent.
+    const { state, cs } = board();
     const start = tileAtCoords(state.map, 6, 12);
     const barb = spawnUnit(state, 'WARRIOR', start.index, BARB_SEAT)!;
+    const ct = state.map.tiles[cs.centerIndex];
+    const d = (a: { col: number; row: number }) => hexDistance(a.col, a.row, ct.col, ct.row);
+    const d0 = d(start);
     hostileUnitAct(state, barb);
-    expect(barb.tileIndex).toBe(start.index);
+    expect(d(state.map.tiles[barb.tileIndex])).toBeLessThan(d0);
+  });
+
+  it('assaults an adjacent minor and floors it at 1 HP — never a capture', () => {
+    const { state, cs } = board();
+    const ct = state.map.tiles[cs.centerIndex];
+    const ring = neighbors(state.map, ct).find((n) => tileSeat(n) === cs.seat)!;
+    const barb = spawnUnit(state, 'WARRIOR', ring.index, BARB_SEAT)!;
+    cs.hp = 5;
+    hostileUnitAct(state, barb);
+    expect(cs.hp).toBe(1);
+    expect(state.cityStates.some((c) => c.id === cs.id)).toBe(true);
   });
 });

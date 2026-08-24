@@ -149,6 +149,9 @@ export interface Tile {
    *  the TILE (not the city) so every walker's legality check stays O(1) and
    *  the GPU can mirror it as one [B, T] plane. */
   encampHp?: number;
+  /** the Encampment's OWN outer-defense pool, walls-tier sized and separate
+   *  from the city's (`encampOuterPool` resolves the absent-=-FULL default). */
+  encampOuterHp?: number;
   /** a ROAD lies on this tile. Laid by trade routes (real Civ 6:
    *  Traders lay road as they serve a land route). A step from one road tile
    *  to another ignores the terrain penalty, and from the Classical era on it

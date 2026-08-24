@@ -13,7 +13,7 @@ import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, tradeWa
 import { PILLAGE_HEAL_IMPROVEMENTS } from './combat';  // the replay's pillage arm mirrors hostileUnitAct's
 import { cityStrikeStrength, airStrike } from './combat';
 import { UNIT_HP } from '../data/units';
-import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, encircled, stackDefender } from './combat';
+import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, encircled, stackDefender, unitAttackRange } from './combat';
 import { promoCS, promoClassOf, promoValue, takePromotion } from './promotions';
 import { PROMO_COLS } from '../data/promotions';
 import { availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
@@ -36,7 +36,7 @@ import { CIVICS } from '../data/civics';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { UNITS, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_TECH } from '../data/units';
-import { availableBuildings, buildingCostIn, outerPool, wallsMax, urbanDefensesFit, repairDrip } from './rules';
+import { availableBuildings, buildingCostIn, outerPool, wallsMax, urbanDefensesFit, repairDrip, fitEncampOuter, encampOuterPool } from './rules';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
 import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, borderGrowthCost } from '../data/constants';
@@ -75,6 +75,7 @@ const A_LAUNCH_INQUISITION = unitActionIndex(IMPROVEMENT_IDS).LAUNCH_INQUISITION
 const A_CONVERT_HEATHEN = unitActionIndex(IMPROVEMENT_IDS).CONVERT_HEATHEN;
 const A_PILLAGE = unitActionIndex(IMPROVEMENT_IDS).PILLAGE;
 const A_SNIPE = unitActionIndex(IMPROVEMENT_IDS).SNIPE_0;
+const A_SNIPE3 = unitActionIndex(IMPROVEMENT_IDS).SNIPE3_0;
 const A_SPREAD = unitActionIndex(IMPROVEMENT_IDS).SPREAD_HERE;
 const A_BUILD_ROAD = unitActionIndex(IMPROVEMENT_IDS).BUILD_ROAD;
 const A_FINISH_DISTRICT = unitActionIndex(IMPROVEMENT_IDS).FINISH_DISTRICT;
@@ -84,7 +85,7 @@ import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarD
 import { addEraScore, agePressureFactor, governorPicks, governorTitles, grantedGovernorTitles, goldenBoostBonus, worldEraIndex } from './eras';
 import { NO_SEAT, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, denounceActive, denounceCasusBelli, emptySeat, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, prophetsOf, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarFormal, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileClaimed, tileOwnedByCiv, tileSeat, unitSeat, unitsOf, treatyTurnsWith, warTurnsWith, warsOf } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
-import { snipeRing, spreadFromUnit } from './unitOrders';
+import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
 import { unitKillEvent, buildingDedications, dedicationEvent, goldenDedication } from './eras';
 import { DED_COINAGE, DED_TO_ARMS, DED_STEAM, TO_ARMS_MIL_PROD_MULT, STEAM_WONDER_PROD_MULT } from '../data/seats';
 import { WONDER_ERA_INDEX } from '../data/builtWonders';
@@ -1268,6 +1269,11 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
       } else if (a >= A_SNIPE && a < A_SNIPE + 12) {
         const rt = snipeRing(state, here)[a - A_SNIPE];
         if (rt !== undefined && UNITS[unit.type]?.ranged) hostileRangedStrike(state, unit, rt);
+      } else if (a >= A_SNIPE3 && a < A_SNIPE3 + 18) {
+        const rt = snipeRing3(state, here)[a - A_SNIPE3];
+        // CIV6: distance 3 needs ATTACK RANGE 3 — chassis range plus the
+        // RANGE promotion, which is what `unitAttackRange` sums.
+        if (rt !== undefined && UNITS[unit.type]?.ranged && unitAttackRange(unit) >= 3) hostileRangedStrike(state, unit, rt);
       }
     });
   }
@@ -1556,7 +1562,7 @@ export function seatPhase(state: GameState): void {
                 actor.treasury = (actor.treasury ?? 0) - price;
                 civCity.buildings.push(def.id);
                 buildingDedications(state, civCity.seat, def.id);
-                if (def.walls) civCity.outerHp = wallsMax(state, civCity);
+                if (def.walls) { civCity.outerHp = wallsMax(state, civCity); fitEncampOuter(state, civCity); }
                 bought = true;
               }
             }
@@ -1928,10 +1934,13 @@ export function seatPhase(state: GameState): void {
           }
         }
       }
-      // CIV6: the Encampment's defenses are the City Center's — "building any
-      // level of Walls in the city will supply both" — and it strikes on its
-      // own only "while its Wall defenses are still up".
-      if (perimeter && civCity.districts.some((dd) => encampmentIntact(state.map.tiles[dd.tileIndex]))) {
+      // CIV6: "building any level of Walls in the city will supply both" the
+      // centre and the Encampment — each with its OWN pool — and the district
+      // strikes on its own only "while its Wall defenses are still up".
+      if (civCity.districts.some((dd) => {
+        const edt = state.map.tiles[dd.tileIndex];
+        return encampmentIntact(edt) && encampOuterPool(state, civCity, edt) > 0;
+      })) {
         let bestTile = -1;
         let bestDist = 99;
         for (const t of state.map.tiles) {

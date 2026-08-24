@@ -25,7 +25,7 @@ import { seatWonderFlag } from './wonders';
 import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, ENLIGHTENMENT_CIVIC, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH } from '../data/seats';
 import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
 import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS } from '../data/units';
-import { buildingCostIn, outerPool, wallsMax } from './rules';
+import { buildingCostIn, outerPool, wallsMax, fitEncampOuter, encampOuterMissing } from './rules';
 import { laserSpeed } from './yields';
 import { canRunProject, chargeUnitResource } from './stockpile';
 import { FEATURES } from '../../world/features';
@@ -351,7 +351,7 @@ export function queueBuilding(state: GameState, cityId: number, buildingId: stri
   }
   if (state.sandbox) {
     city.buildings.push(buildingId);
-    if (BUILDINGS[buildingId]?.walls) city.outerHp = wallsMax(state, city);
+    if (BUILDINGS[buildingId]?.walls) { city.outerHp = wallsMax(state, city); fitEncampOuter(state, city); }
   } else {
     commitProduction(state, city.seat, city, { kind: 'building', building: buildingId, progress: 0 });
   }
@@ -391,7 +391,7 @@ export function projectCost(state: GameState, seat: number, projectId?: string, 
   const def = projectId !== undefined ? PROJECTS[projectId] : undefined;
   // CIV6: "Walls gain HP equal to the Production invested into the project" —
   // so the whole repair costs exactly the perimeter HP it puts back.
-  if (def?.repair && city) return Math.max(1, wallsMax(state, city) - outerPool(state, city));
+  if (def?.repair && city) return Math.max(1, wallsMax(state, city) - outerPool(state, city) + encampOuterMissing(state, city));
   const fixed = def?.cost;
   if (fixed !== undefined) return fixed;
   return Math.max(Math.round(15 * GAME_SPEED), Math.round(districtCost(state, seat) * 0.5));
@@ -403,7 +403,7 @@ export function projectCost(state: GameState, seat: number, projectId?: string, 
  *  serves the centre and its Encampment here, so one pool answers both. */
 export function repairAvailable(state: GameState, city: City): boolean {
   const max = wallsMax(state, city);
-  if (max <= 0 || outerPool(state, city) >= max) return false;
+  if (max <= 0 || (outerPool(state, city) >= max && encampOuterMissing(state, city) <= 0)) return false;
   return state.turn - (city.lastHitTurn ?? 0) >= REPAIR_QUIET_TURNS;
 }
 
@@ -541,7 +541,7 @@ export function purchaseBuilding(state: GameState, cityId: number, buildingId: s
   }
   city.buildings.push(buildingId);
   buildingDedications(state, city.seat, buildingId);
-  if (BUILDINGS[buildingId]?.walls) city.outerHp = wallsMax(state, city);
+  if (BUILDINGS[buildingId]?.walls) { city.outerHp = wallsMax(state, city); fitEncampOuter(state, city); }
   return { ok: true };
 }
 
@@ -644,7 +644,7 @@ export function purchaseBuildingWithFaith(state: GameState, cityId: number, buil
   buyer.faith = (buyer.faith ?? 0) - cost;
   city.buildings.push(buildingId);
   buildingDedications(state, city.seat, buildingId);
-  if (BUILDINGS[buildingId]?.walls) city.outerHp = wallsMax(state, city);
+  if (BUILDINGS[buildingId]?.walls) { city.outerHp = wallsMax(state, city); fitEncampOuter(state, city); }
   return { ok: true };
 }
 

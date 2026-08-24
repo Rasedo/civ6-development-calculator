@@ -56,19 +56,18 @@ from the list below.
 | B-39r wonder effects still dropped | 1 | two residuals, blocked on B-20r or B-34r |
 | B-45r sourced-sweep finds in the other rows | 1 | five effects need a unit-granting wonder channel, faith patronage (B-53r), a rival-recruit event, or B-31r's route yields |
 | B-54r flanking and support vs their own page | 1 | the two stacks a UNIQUE UNIT raises wait on C-26 |
-| B-64r embarking and disembarking cost the whole turn | 1 | Civ 6 charges the transition 3 MP and carries the remainder; both engines spend everything |
-| B-56r the six inert promotions | 1 | six rows name a mechanic neither engine has — sight-blocking, class-aware ZOC, escort formations, an air-roll promotion term, a NAVAL RAIDER class |
-| B-57r the SNIPE head stops at the distance-2 ring | 1 | the ring-3 columns do not exist, so a +1 Range promotion widens a legality no seat can order |
+| B-56r the five inert promotions | 1 | five rows name a mechanic neither engine has — sight-blocking, escort formations, an air-roll promotion term, a NAVAL RAIDER class |
 | B-58r the religious purchase asks for a Shrine | 1 | Civ 6 asks for a MAJORITY RELIGION and a Temple; neither engine reads what the city follows |
 | B-59r the religious spread is a flat lump | 2 | no HP scaling, no base 25% strip, and a city-state cannot be converted |
-| B-51r the Encampment's second pool | 2 | the separate-pools claim is unsourced; a shot-emptied district is walk-over ground where Civ 6 conquers on entry |
-| B-44r city-state war tails | 1 | the barbarian walker raids only majors because it beelines to one nearest city |
+| B-51r Encampment residuals | 1 | the district's strike is measured from the CITY CENTRE's tile, and a capture leaves its own pool standing (unsourced either way) |
+| B-44r city-state war tails | 1 | a ranged raider never shoots a minor centre (the seat verbs' own ranged-vs-city-state scope-out) |
+| B-65 religious zone of control | 1 | Civ 6 scopes a religious unit's ZOC to other religious units BOTH ways; the engines run one military-only rule |
 | B-61r the Great Person clauses with no carrier | 2 | 20 rows name a mechanic nothing here has; eight sweep-found channels dropped with their blockers |
 | B-60r the dig's DATE, and the hull nobody dates | 1 | the era is the ACTOR's research, and a barbarian or minor kill leaves no wreck |
 | B-34r flood tails | 1 | no per-tile flood count (the Great Bath's faith), and the climate/coastal tails wait on their systems |
 | B-63r the grievance ledger's magnitudes | 1 | the occupied/razed rows ship at their published CEILING; the gang-up bar is a heuristic |
 | B-62r a natural wonder takes no tile adds | 1 | no pantheon feature yield, suzerain adjacency or Preserve band on a natural-wonder tile, against the Grove's own text |
-| **B. Fidelity vs real Civ 6** | **29** | |
+| **B. Fidelity vs real Civ 6** | **27** | |
 | C-1 POWER | 2 | four renewables, the Biosphere, the Hydroelectric Dam building, decommission/recommission, the reactor age, minors never powered |
 | C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, diplomatic visibility, the negotiated two-sided deal, and the agreements that need one |
 | C-5 strategic-resource stockpiles | 2 | the shortage penalty's magnitude is unpublished; resource trading waits on C-2 |
@@ -90,7 +89,7 @@ from the list below.
 | C-35 the land/water fact never moves | 2 | one overloaded static bit blocks submersion and the Canal's passage |
 | C-36 no railroad | 2 | no second movement tier, no per-hex Iron/Coal charge, no CO2 |
 | **C. Absent systems** | **38** | |
-| **OPEN, TOTAL** | **68** | |
+| **OPEN, TOTAL** | **67** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -265,28 +264,12 @@ Civ 6 source or is recorded as unverifiable.
   raises. OPEN: **the two stacks a UNIQUE UNIT raises** — Zulu's Impi and
   Macedon's Hypaspist raise flanking or support for themselves alone, and
   no civilization unique exists (C-26).
-- **B-64r. Embarking and disembarking cost the whole turn.** Weight 1.
-  CIV6 (Movement, "Embarking"): the transition requires "either 3 Movement
-  or all the unit's Movement for the round (if it has less than 3
-  Movement)", and "if a unit has more than 3 Movement available for either
-  embarking or disembarking, the remaining points are transferred to the
-  new movement mode, and that unit may manage to continue moving in this
-  same turn" — the page's own example is a 4-MP cavalry unit that embarks
-  and still walks one water tile. Both engines charge the whole pool
-  instead: `stepUnit`'s `transition` arm and `_step_verb`'s twin price the
-  step at everything the mover has left. The page's discount has no
-  carrier either: "embarking to and from a tile with a Harbor district or
-  a City Center tile (for a coastal city) ... costs only 1 Movement".
-- **B-56r. The six inert promotions.** 73 of the 79 catalog rows in
+- **B-56r. The five inert promotions.** 74 of the 79 catalog rows in
   `cpu/data/promotions.ts` reach a rule; the poke bar is
-  `tests/gpu/promotions_test.py` + `tests/gpu/promo_effects_test.py`. SIX
+  `tests/gpu/promotions_test.py` + `tests/gpu/promo_effects_test.py`. FIVE
   carry `none`, each with its blocker:
   - **SENTRY** ("can see through Woods and Rainforest") — `revealAround`
     / `_reveal_around` reveal a flat radius; nothing blocks sight.
-  - **SUPPRESSION** grants zone of control to a ranged unit.
-    `unitExertsZoc` / `_in_enemy_zoc` count EVERY hostile military unit,
-    ranged included — the real gap is the exert test not being
-    CLASS-aware, which is the fix this row waits on.
   - **CONVOY and ESCORT_MOBILITY** move an escorted unit with its escort;
     nothing binds one occupant's move to another's, so there is no
     formation to move.
@@ -298,12 +281,6 @@ Civ 6 source or is recorded as unverifiable.
     `airDefenseOf` / `_type_anti_air` alone and never call `promoCS` /
     `_promo_cs` — threading the promotion term into the sortie changes
     every defensive promotion's reach at once (C-34's pass).
-- **B-57r. The SNIPE head stops at the distance-2 ring.** `unitAttackRange`
-  and the barbarian scan add the RANGE promotion's +1, so the RULE
-  legalises a distance-3 shot — but the SNIPE block is twelve columns over
-  `snipeRing` / `ring2`, so no seat can ORDER one. The fix is 18 more
-  columns (the distance-3 ring) appended after the last verb, plus the
-  ring itself on both engines — an append-only head change.
 - **B-58r. The religious purchase asks for a Shrine, not a majority
   religion.** CIV6 (Apostle; the Inquisitor page verbatim): the unit "can
   only be purchased with Faith in a city that has a majority religion and
@@ -327,37 +304,41 @@ Civ 6 source or is recorded as unverifiable.
     the GPU spread scans `city_alive[:, :n_majors]` to match — minors
     carry no religion (C-30's family), which is also why Translator's
     "this also applies to city-states" has nothing to triple.
-- **B-51r. The Encampment's second pool.** The assault, the shelter rule,
-  the conquest and the -17 shot pricing all ship (`attackEncampment` /
-  `_attack_encampment`, `conquerEncampment` / `_conquer_encampment`;
-  `siege.test.ts`, `encampment_test.py`, `city-combat.test.ts`). OPEN:
-  - **THE TWO POOLS ARE ONE HERE**, and the claim that Civ 6 keeps the
-    district's perimeter SEPARATE from the city's is UNSOURCED — neither
-    the Encampment page nor Ancient Walls says whether the pools are one
-    or two, nor whether a repair restores them together. Settle the claim
-    before splitting them; the split is new per-tile wire state.
-  - **A DEFENSELESS DISTRICT IS WALK-OVER GROUND.** A ranged strike can
-    take `encampHp` to 0 without pillaging, the movement block lifts, and
-    a foreign unit walks onto an intact enemy district. Real Civ 6
-    conquers it on ENTRY by a melee unit ("as you would a City Center").
-    The conquest body exists on both engines; what is missing is the
-    entry hook (TS `stepUnit` lives in `units.ts`, which `combat.ts`
-    already imports).
-  - **A DEFEAT DOES NOT PILLAGE THE DISTRICT.** Civ 6: "when defeated ...
-    it and all its buildings are pillaged automatically". Writing that
-    would silence the heal-and-re-block rule, because `encampmentIntact`
-    / `_encamp_block` read PILLAGED and HP through one predicate — the
-    two facts need separating before either can be right.
+- **B-51r. Encampment residuals.** The district holds its OWN
+  outer-defense pool (`Tile.encampOuterHp` / `encamp_outer_hp` — CIV6:
+  one set of Walls "supplies both", yet "destroying the one does not
+  destroy the other"): the assault and the -17 shot split against it, its
+  own pool gates the `estk` strike, the repair project prices and refills
+  BOTH pools (centre first), and a melee walker ENTERING a shot-emptied
+  district conquers it "as you would a City Center" (the `stepUnit` /
+  `_step_verb` entry hook; a ranged walker only OCCUPIES it, and the
+  20 HP/turn heal re-blocks). OPEN:
+  - **THE DISTRICT'S STRIKE IS MEASURED FROM THE CENTRE.** The `estk`
+    target scan walks distance 1..2 of the CITY CENTRE's tile
+    (`seatPhase`'s strike block / `_seat_city_fire_and_heal`); real Civ 6
+    fires from the district's own tile.
+  - **A CAPTURE LEAVES THE POOL STANDING.** `city_outer_hp` zeroes on a
+    city capture; the district's own pool rides through unchanged on both
+    engines — no source says which is right.
 - **B-44r. City-state war tails.** The minor war head, its clocks, the
-  suzerain refusal and a seat's march on a minor all ship (`warTargets` /
-  `war_targets`; `cs_war_test` holds what the gate does not). OPEN:
-  - **THE BARBARIAN WALKER STILL RAIDS ONLY MAJORS, AND THE REASON IS THE
-    WALKER.** `hostileUnitAct` / the `sim_orders` barbarian arm pillage a
-    minor's ground but scan only the MAJORS' cities for a march target.
-    Widening the scan was tried and reverted: this walker beelines to the
-    single nearest city and stops adjacent, so counting minors parked
-    every camp on the neighbouring city-state. Real Civ 6 barbarians raid
-    whoever is near the camp; the beeline has to go first.
+  suzerain refusal, a seat's march on a minor and the barbarian MARAUD
+  all ship (`warTargets` / `war_targets`; the walker's city scan covers
+  majors and minors on one key, an adjacent minor CENTRE is a melee
+  target — `cityStateAttackable` answers for an alwaysHostile seat — and
+  a barbarian assault floors the minor at 1 HP, never a capture;
+  `cs_war_test` and `citystates.test.ts` hold what the gate does not).
+  OPEN:
+  - **A RANGED RAIDER NEVER SHOOTS A MINOR CENTRE.** `attackTargets`'
+    cityStateTarget arm carries `!def.ranged` — the seat verbs' own
+    ranged-vs-city-state scope-out — so a barbarian archer parked beside
+    a minor holds its ring tile and fires nothing, where real Civ 6
+    shoots.
+- **B-65. Religious zone of control.** Weight 1. CIV6 (Zone of Control):
+  a religious unit ignores the ZOC military units exert, and exerts one
+  that affects only OTHER RELIGIOUS units. `inEnemyZoc` / `_in_enemy_zoc`
+  run one military-only rule: a Missionary is halted at a hostile
+  Musketman's ring, and no religious unit exerts anything against
+  another.
 - **B-53r. The Great Person QUEUE.** All 205 people ship with the era
   gate and the scaled price (`gpOffer` / `_gp_first_of_era`, `gpCost`).
   OPEN:

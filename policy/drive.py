@@ -408,7 +408,7 @@ def _park_targets(sim, seat: int) -> torch.Tensor:
 def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
     um = sim._seat_unit_mask(seat)
     uo = sim.seat_unit_obs(seat)
-    orders0 = ladder.pick_unit_orders(um, uo, a_pillage=sim._A_PILLAGE, a_snipe=sim._A_SNIPE)
+    orders0 = ladder.pick_unit_orders(um, uo, a_pillage=sim._A_PILLAGE, a_snipe=sim._A_SNIPE, a_snipe3=sim._A_SNIPE3)
     # the serve tripwire computes both target tables pre-decide at the same
     # state; passing them here skips the recomputation (pure reads either way)
     if job_t is None:

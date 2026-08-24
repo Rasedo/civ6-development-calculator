@@ -71,6 +71,7 @@ export const PROMO_KINDS = [
   'EXTRA_ATTACK',        // +v attacks per turn, movement permitting
   'EXTRA_ATTACK_STILL',  // +v attacks per turn, and only if it has not moved
   'KILL_SPREAD',         // v religious pressure nearby on a non-barbarian kill
+  'ZOC_EXERT',           // a RANGED-class unit exerts zone of control
 ] as const;
 export type PromoKind = (typeof PROMO_KINDS)[number];
 
@@ -131,7 +132,7 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('GARRISON', 'RANGED', 1, [], cs('CS_IN_DISTRICT', 10)),
   P('ARROW_STORM', 'RANGED', 2, ['VOLLEY'], cs('CS_VS_CLASS_ATK', 7, MASK_LAND | MASK_NAVAL)),
   P('INCENDIARIES', 'RANGED', 2, ['GARRISON'], cs('CS_VS_DISTRICT_DEF', 7)),
-  P('SUPPRESSION', 'RANGED', 3, ['ARROW_STORM', 'INCENDIARIES'], none),
+  P('SUPPRESSION', 'RANGED', 3, ['ARROW_STORM', 'INCENDIARIES'], cs('ZOC_EXERT', 1)),
   P('EMPLACEMENT', 'RANGED', 3, ['ARROW_STORM', 'INCENDIARIES'], cs('CS_DEF_VS_CITY', 10)),
   P('EXPERT_MARKSMAN', 'RANGED', 4, ['SUPPRESSION', 'EMPLACEMENT'], cs('EXTRA_ATTACK_STILL', 1)),
 

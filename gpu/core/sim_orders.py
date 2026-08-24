@@ -41,6 +41,7 @@ class SimOrders:
         _no = torch.zeros_like(_cmd)
         _fc = getattr(self, "_A_FOUND", -1)
         _sn = getattr(self, "_A_SNIPE", -1) if getattr(self, "_snipe_on", False) else -1
+        _sn3 = getattr(self, "_A_SNIPE3", -1) if getattr(self, "_snipe3_on", False) else -1
         _sp = getattr(self, "_A_SPREAD", -1)
         _xc = getattr(self, "_A_EXCAVATE", -1)
         _pk = getattr(self, "_A_PARK", -1)
@@ -71,7 +72,8 @@ class SimOrders:
             ((_ab >= 0) & (_ab < 6)).any(dim=0),                                # move
             ((_ab >= 6) & (_ab < 12)).any(dim=0),                               # attack
             ((_ab == _fc) if _fc >= 0 else _no).any(dim=0),                     # found
-            (((_ab >= _sn) & (_ab < _sn + 12)) if _sn >= 0 else _no).any(dim=0),  # snipe
+            ((((_ab >= _sn) & (_ab < _sn + 12)) if _sn >= 0 else _no)
+             | (((_ab >= _sn3) & (_ab < _sn3 + 18)) if _sn3 >= 0 else _no)).any(dim=0),  # snipe
             ((_ab == getattr(self, "_A_CHOP", -1)) if getattr(self, "_A_CHOP", -1) >= 0 else _no).any(dim=0),
             (torch.isin(_ab, torch.tensor(_ic, dtype=_ab.dtype, device=dev)) if _ic else _no).any(dim=0),
             ((_ab == self._A_PILLAGE) if self._act_names and self._A_PILLAGE > 0 else _no).any(dim=0),
@@ -456,6 +458,24 @@ class SimOrders:
                         # major's units. It spends the turn itself, and only
                         # when it fired.
                         self._hostile_ranged_strike(one, tgt_s, "major", v)
+
+                if getattr(self, "_A_SNIPE3", -1) >= 0:
+                    snp3 = act & (a >= self._A_SNIPE3) & (a < self._A_SNIPE3 + 18) & ~is_civ
+                    if bool(snp3.any()):
+                        tgt_3 = self.ring3[hc].gather(1, (a - self._A_SNIPE3).clamp(min=0, max=17).unsqueeze(1)).squeeze(1)
+                        # CIV6: distance 3 needs ATTACK RANGE 3 — chassis
+                        # range plus the RANGE promotion (`unitAttackRange`).
+                        rng3 = (self._type_ranged_range[ut]
+                                + self._promo_val(ut, self.unit_promos.gather(1, sc.unsqueeze(1)).squeeze(1), "RANGE"))
+                        ok_3 = (
+                            snp3 & (tgt_3 >= 0) & ~u_emb
+                            & (self._type_ranged_strength[ut] > 0) & (rng3 >= 3)
+                        )
+                        for b_ in ok_3.nonzero(as_tuple=True)[0].tolist():
+                            v = int(sc[b_])
+                            one = torch.zeros(B, dtype=torch.bool, device=dev)
+                            one[b_] = True
+                            self._hostile_ranged_strike(one, tgt_3, "major", v)
 
             if _rk_chop[n] and self._builder_idx >= 0:
                 ftr = self.tile_ftr.gather(1, hc.unsqueeze(1)).squeeze(1)
@@ -1130,11 +1150,15 @@ class SimOrders:
             here = self.barb_unit_tile[:, u]
             nb = self.neigh[here]
             nbc = nb.clamp(min=0)
-            # A MAJOR's centre is a melee target whoever holds it —
-            # `caps.alwaysHostile` needs no war and `cityAtIndex` names no
-            # seat. `centre_slot_at` carries only major centres, so this one
-            # predicate is the whole test.
+            # ANY adjacent centre is a melee target — `caps.alwaysHostile`
+            # needs no war, `cityAtIndex` names no seat, and a CITY-STATE
+            # centre answers through `attackTargets`'s cityStateTarget arm
+            # (melee and adjacent only). `centre_slot_at` carries the majors'
+            # centres, `citystate_at` the minors'.
             ctr = self.centre_slot_at.gather(1, nbc) >= 0
+            # the CENTRE tile only — TS's cityStateTarget arm keys on
+            # `centerIndex`, never on territory, and only for a LIVE minor
+            cs_nb = self._centre_seat_plane().gather(1, nbc) >= 100
             # A NON-BARBARIAN unit is adjacent (a barbarian is not a target for
             # a barbarian). Civilians are never barbarian, so only the military
             # plane needs the seat test.
@@ -1144,7 +1168,7 @@ class SimOrders:
                         | (self.civilian_at.gather(1, nbc) >= 0)
                         | (self.embarked_at.gather(1, nbc) >= 0))
             enc_nb = self._encamp_block(nb, BARB_SEAT) if self._encamp_didx >= 0 else None
-            valid = (nb >= 0) & (ctr | has_unit | (enc_nb if enc_nb is not None else False))
+            valid = (nb >= 0) & (ctr | cs_nb | has_unit | (enc_nb if enc_nb is not None else False))
             tkey = torch.where(valid, nb, T + 1)
             target_tile = tkey.min(dim=1).values
             # A RANGED raider (ARCHER/CROSSBOWMAN) scans its FULL range
@@ -1165,7 +1189,10 @@ class SimOrders:
                          + self._promo_pool_val("barb", "RANGE")[:, u])
                 d_all = self.pair_dist[here.clamp(min=0)].to(torch.long)
                 # a district's defenses are a target at range, priced by the
-                # -17 rather than refused; the centre stays adjacent-only.
+                # -17 rather than refused; the centre stays adjacent-only, and
+                # a CITY-STATE centre is a MELEE target only (`attackTargets`'s
+                # cityStateTarget arm carries `!def.ranged`), so the ranged
+                # scan leaves it out.
                 _enc_plane = (self._encamp_block_plane(BARB_SEAT) if self._encamp_didx >= 0
                               else torch.zeros_like(self.centre_slot_at, dtype=torch.bool))
                 rng_valid = (
@@ -1178,6 +1205,9 @@ class SimOrders:
             attack = act & (target_tile <= T)
             ttc = target_tile.clamp(max=T - 1)
             ctr_here = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0
+            _csp = self._centre_seat_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
+            cs_here = _csp >= 100
+            _csi = (_csp - 100).clamp(min=0)
             has_u = self._nonbarb_unit_at(ttc.unsqueeze(1)).squeeze(1)
             _enc_here = (
                 self._encamp_block(ttc.unsqueeze(1), BARB_SEAT).squeeze(1)
@@ -1185,12 +1215,17 @@ class SimOrders:
                 else torch.zeros_like(attack)
             )
             city_att = attack & ~rngd & ctr_here
+            cs_att = attack & ~rngd & cs_here & ~ctr_here
             # the district shelters whoever stands on it, so it answers first
-            unit_att = attack & ~rngd & has_u & ~ctr_here & ~_enc_here
-            enc_att = attack & ~rngd & ~ctr_here & _enc_here
+            unit_att = attack & ~rngd & has_u & ~ctr_here & ~cs_here & ~_enc_here
+            enc_att = attack & ~rngd & ~ctr_here & ~cs_here & _enc_here
 
             if bool(city_att.any()):
                 self._melee_city(city_att, ttc, "barb", u)
+            if bool(cs_att.any()):
+                # the shared assault floors the minor at 1 HP for a barbarian
+                # attacker, so the capture tail it returns is always empty here
+                self._assault_city_state(cs_att, _csi.clamp(min=0), ttc, "barb", u)
             if bool(unit_att.any()):
                 self._hostile_vs_unit(unit_att, ttc, "barb", u)
             if bool(enc_att.any()):
@@ -1198,7 +1233,7 @@ class SimOrders:
             # A blow at a CITY or an Encampment ends the raider's turn
             # outright; the unit arms spend inside their own bodies, where the
             # promotion that waives it is read.
-            city_spent = city_att | enc_att
+            city_spent = city_att | cs_att | enc_att
             self.barb_unit_mp[:, u] = torch.where(
                 city_spent, torch.zeros_like(self.barb_unit_mp[:, u]), self.barb_unit_mp[:, u])
             # A RANGED raider strikes instead: hostileUnitAct routes any
@@ -1218,7 +1253,8 @@ class SimOrders:
                 h_imp = self.improvement.gather(1, here.unsqueeze(1)).squeeze(1) >= 0
                 h_unpil = ~self.pillaged.gather(1, here.unsqueeze(1)).squeeze(1)
                 _h_seat = self.tile_seat.gather(1, here.unsqueeze(1)).squeeze(1)
-                h_owned = (_h_seat >= 0) & (_h_seat < self.n_majors)
+                # `isTerritorial` — owned by any major OR city-state
+                h_owned = (_h_seat >= 0) & (_h_seat < BARB_SEAT)
                 pillage = act & ~attack & h_imp & h_unpil & h_owned
                 if bool(pillage.any()):
                     rows = pillage.nonzero(as_tuple=True)[0]
@@ -1237,7 +1273,8 @@ class SimOrders:
                 h_dcomp = self.district_complete.gather(1, here.unsqueeze(1)).squeeze(1)
                 h_dunpil = ~self.district_pillaged.gather(1, here.unsqueeze(1)).squeeze(1)
                 _hd_seat = self.tile_seat.gather(1, here.unsqueeze(1)).squeeze(1)
-                h_downed = (_hd_seat >= 0) & (_hd_seat < self.n_majors)
+                # `isTerritorial` — owned by any major OR city-state
+                h_downed = (_hd_seat >= 0) & (_hd_seat < BARB_SEAT)
                 # CIV6: the Encampment "cannot be pillaged normally".
                 dist_pillage = (act & ~attack & ~pillage & (h_dist >= 0)
                                 & (h_dist != self._encamp_didx)
@@ -1269,19 +1306,18 @@ class SimOrders:
             else:
                 has_imp = torch.zeros_like(act)
                 imp_tgt = here.clamp(min=0)
-            # BARBARIANS MARCH ON A MAJOR — `hostileUnitAct`'s city scan, on
-            # its key: distance, then the seat id, then the centre tile
-            # (`caps.alwaysHostile`, so no war term). A city-state's GROUND is
-            # raided, its CITY is not a target: this walker beelines to the
-            # single nearest one, so counting minors parks every camp on the
-            # neighbouring minor. ONE argmin over the major block: the key is
-            # unique per live city, so the winner is the same one a
+            # BARBARIANS MARCH ON ANYONE — `hostileUnitAct`'s city scan over
+            # majors AND city-states (real Civ 6 barbarians raid whoever is
+            # near the camp), on its key: distance, then the seat id, then the
+            # centre tile (`caps.alwaysHostile`, so no war term). An adjacent
+            # minor centre is a melee target now, so a parked raider fights
+            # rather than stands. ONE argmin over the whole city block: the
+            # key is unique per live city, so the winner is the same one a
             # slot-by-slot scan would have kept.
-            _M0 = self.n_majors * self.RC
-            _cc = self.city_center[:, :self.n_majors].reshape(B, -1).clamp(min=0)  # [B, M]
-            _ca = self.city_alive[:, :self.n_majors].reshape(B, -1)                # [B, M]
+            _cc = self.city_center.reshape(B, -1).clamp(min=0)  # [B, M]
+            _ca = self.city_alive.reshape(B, -1)                # [B, M]
             _d2 = self.pair_dist[here.clamp(min=0).unsqueeze(1), _cc].to(torch.long)
-            _key = torch.where(_ca, _d2 * (2048 * 256) + self._march_seatkey[:_M0] + _cc,
+            _key = torch.where(_ca, _d2 * (2048 * 256) + self._march_seatkey + _cc,
                                torch.full_like(_d2, 10**18))
             ckey_min, _cwin = _key.min(dim=1)
             city_tgt = torch.where(ckey_min < 10**18,

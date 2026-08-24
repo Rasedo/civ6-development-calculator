@@ -16,7 +16,7 @@ import { grievanceCityStateTaken } from './grievance';
 import { addEraScore } from './eras';
 import { nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc } from './units';
 import { isAirUnit, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirOf, displaceAirFrom } from './air';
-import { outerPool, wallsMax, wallsTier } from './rules';
+import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { EMBARKED_DEFENSE_CS_BY_ERA, embarkState } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, INQUISITOR_HOME_STRENGTH, type BeliefEffects } from '../data/religion';
@@ -886,7 +886,7 @@ function cityAssault(
  * A SHOT never conquers, exactly as it never captures a city, so this runs
  * only off the melee assault.
  */
-function conquerEncampment(state: GameState, tile: Tile, attacker: Unit, seat: number): void {
+export function conquerEncampment(state: GameState, tile: Tile, attacker: Unit, seat: number): void {
   tile.districtPillaged = true;
   displaceAirFrom(state, tile.index);
   for (const shelter of unitsAt(state, tile.index).filter((u) => unitSeat(u) !== attacker.seat)) {
@@ -895,22 +895,22 @@ function conquerEncampment(state: GameState, tile: Tile, attacker: Unit, seat: n
 }
 
 /**
- * The share of ONE roll that reaches an Encampment's own pool. CIV6 gives a
+ * The share of ONE roll that reaches an Encampment's garrison. CIV6 gives a
  * defensible district "Defenses HP equal to the City Center" and one set of
- * Walls supplies both, so the roll divides exactly as a hit on the centre
- * does: the perimeter share comes off the city's pool and only what gets
- * through reaches the district. `cityAtTile` is what hands this the city
- * behind the district.
+ * Walls supplies both — but each supplies its OWN pool, and destroying one
+ * does not destroy the other. So the roll divides exactly as a hit on the
+ * centre does, with the perimeter share coming off the DISTRICT's own pool.
+ * `cityAtTile` is what hands this the city whose walls size that pool.
  */
 function encampSplit(state: GameState, tile: Tile, attacker: Unit, roll: number,
                      ranged: boolean): number {
   const held = cityAtTile(state, tile);
   if (!held) return roll;
-  const outer = outerPool(state, held);
+  const outer = encampOuterPool(state, held, tile);
   const split = cityDamageSplit(outer, wallsMax(state, held), roll,
     cityHitClass(attacker.type, ranged),
     ranged ? 0 : siegeAssist(state, attacker, tile.index, wallsTier(state, held)));
-  if (split.wall > 0) held.outerHp = outer - split.wall;
+  if (split.wall > 0) tile.encampOuterHp = outer - split.wall;
   held.lastHitTurn = state.turn;
   return split.centre;
 }
@@ -935,11 +935,11 @@ function rangedStrikeEncampment(state: GameState, attacker: Unit, tileIndex: num
   awardCityXp(state, attacker, (tile.encampHp ?? 0) <= 0 ? XP_CITY_FELLED : XP_CITY_ATTACK);
 }
 
-/** the perimeter a naval shot measures its penalty against: the district's
- *  city pool, because one set of Walls supplies both. */
+/** the perimeter a shot measures its penalty against: the district's OWN
+ *  pool, at the tier the owning city's walls supply. */
 function encampOuter(state: GameState, tile: Tile): number {
   const held = cityAtTile(state, tile);
-  return held ? outerPool(state, held) : 0;
+  return held ? encampOuterPool(state, held, tile) : 0;
 }
 
 /**
@@ -951,10 +951,10 @@ function encampOuter(state: GameState, tile: Tile): number {
  * exactly like a city assault.
  *
  * CIV6 gives a defensible district "Defenses HP equal to the City Center"
- * and one set of Walls supplies both, so the roll divides exactly as a hit on
- * the centre does: the perimeter share comes off the city's pool and only what
- * gets through reaches the garrison. `cityAtTile` is what hands this path the
- * city behind the district.
+ * and one set of Walls supplies both — each with its OWN pool — so the roll
+ * divides exactly as a hit on the centre does: the perimeter share comes off
+ * the district's own pool and only what gets through reaches the garrison.
+ * `cityAtTile` is what hands this path the city whose walls size that pool.
  *
  * The attacker's CS comes from the shared `assaultAtkCS`, so the assault kinds
  * cannot drift; only the target pool and the roll keys differ.
@@ -1038,7 +1038,10 @@ export function encampmentDefense(
  * offered target list refused (the GPU's `_citystate_target` twin).
  */
 export function cityStateAttackable(state: GameState, cityState: CityState, seat: number): boolean {
+  // CIV6: barbarians raid whoever is near the camp — a minor needs no
+  // declared war to be their target.
   return (
+    capsOf(seat).alwaysHostile ||
     civsAtWar(state, cityState.seat, seat) ||
     state.seats.some((sx) => isSuzerain(cityState, sx.seat) && civsAtWar(state, sx.seat, seat))
   );
@@ -1569,6 +1572,9 @@ function attackCityState(state: GameState, attacker: Unit, cityState: CityState,
   const atkCS = assaultAtkCS(state, attacker, cityState.centerIndex);
   const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0);
   cityState.hp = (cityState.hp ?? CITY_STATE_MAX_HP) - damageRoll(state, atkCS - defCS, 'csty', cityState.centerIndex);
+  // CIV6: barbarians never capture a city — their assault leaves the minor
+  // standing at 1 HP, `hostileRangedStrike`'s own city floor.
+  if (capsOf(attacker.seat).alwaysHostile) cityState.hp = Math.max(1, cityState.hp);
   attacker.hp -= damageRoll(state, defCS - atkCS, 'cstyc', cityState.centerIndex);
   warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), cityState.centerIndex,
     { aDied: attacker.hp <= 0, city: true });
@@ -1737,8 +1743,8 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   // 2. Pillage the improvement underfoot. Real Civ 6: only FOOD
   // improvements heal the pillager (+25); the rest are wrecked for yields
   // the raiders here can't bank — pillaged, no heal.
-  // BARBARIANS raid foreign improvements too; raiders keep pillaging
-  // the seat 0 only (they never war the other seats).
+  // BARBARIANS raid ANY territorial owner, majors and minors alike; a
+  // non-barbarian hostile walker still needs its war.
   const here = tile();
   const hereOwned = isTerritorial(tileSeat(here))
     && (isBarbSeat(unit.seat) || civsAtWar(state, unitSeat(unit), tileSeat(here)));
@@ -1793,12 +1799,11 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   if (!target) {
     let best: Tile | null = null;
     let bestKey = Infinity;
-    // The city scan is the MAJORS'. A city-state's ground is raided (`tOwned`
-    // above answers for it) but its CITY is not a march target: this walker
-    // beelines to the single nearest one and stops there, so counting minors
-    // parks every camp's units on the neighbouring minor and no barbarian
-    // reaches a major again. The distance term still carries a seat field wide
-    // enough for a 100+ id, which is what the GPU key packs.
+    // The city scan is ANY hostile owner's, majors and city-states alike —
+    // real Civ 6 barbarians raid whoever is near the camp, and an adjacent
+    // minor centre IS a melee target (`attackTargets`'s cityStateTarget arm),
+    // so a parked raider fights rather than stands. The key packs distance,
+    // then the seat id (wide enough for a 100+ minor), then the centre tile.
     for (const other of state.seats) {
       if (other.seat === unit.seat) continue;
       if (!capsOf(unit.seat).alwaysHostile && !civsAtWar(state, unitSeat(unit), other.seat)) continue;
@@ -1811,6 +1816,17 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
           bestKey = key;
           best = t;
         }
+      }
+    }
+    for (const csx of state.cityStates) {
+      if (!cityStateAttackable(state, csx, unitSeat(unit))) continue;
+      const t = map.tiles[csx.centerIndex];
+      const key = hexDistance(here.col, here.row, t.col, t.row) * (2048 * 256)
+        + seatOfCityState(csx.id) * 2048
+        + csx.centerIndex;
+      if (key < bestKey) {
+        bestKey = key;
+        best = t;
       }
     }
     target = best;

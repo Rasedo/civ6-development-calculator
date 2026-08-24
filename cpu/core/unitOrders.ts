@@ -13,6 +13,19 @@ export function snipeRing(state: GameState, here: Tile): number[] {
     .sort((x, y) => x - y);
 }
 
+/** the distance-3 ring, ordered by TILE INDEX ascending — `snipeRing`'s
+ *  contract one hex out, so SNIPE3 columns scan it in the same order on both
+ *  engines. */
+export function snipeRing3(state: GameState, here: Tile): number[] {
+  const nb1 = neighbors(state.map, here).filter((t): t is Tile => !!t);
+  const d1 = new Set(nb1.map((t) => t.index));
+  const r2 = snipeRing(state, here);
+  const d2 = new Set(r2);
+  return [...new Set(r2.flatMap((i) => neighbors(state.map, state.map.tiles[i])).filter((t): t is Tile => !!t).map((t) => t.index))]
+    .filter((i) => i !== here.index && !d1.has(i) && !d2.has(i))
+    .sort((x, y) => x - y);
+}
+
 export function spreadFromUnit(state: GameState, unit: Unit, actor: Seat, toTile: Tile): void {
   if (unit.type !== 'MISSIONARY' && unit.type !== 'APOSTLE') return;
   if ((unit.charges ?? 0) <= 0 || !actor.religion.founded) return;

@@ -629,6 +629,7 @@ const TILE: Record<string, Extractor> = {
   shipwreckProv: overTiles((t) => [t.shipwreck ? (t.shipwreckEra ?? -1) : -1, t.shipwreck ? (t.shipwreckSeat ?? -1) : -1]),
   park: overTiles((t) => t.park ?? -1),
   encampHp: overTiles((t) => t.encampHp ?? 0),
+  encampOuterHp: overTiles((t) => t.encampOuterHp ?? 0),
   road: overTiles((t) => (t.road ? 1 : 0)),
   locked: overTiles((t) => (t.locked ? 1 : 0)),
   fertility: overTiles((t) => t.fertility),

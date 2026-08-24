@@ -1868,6 +1868,16 @@
           ]
         },
         {
+          "name": "encampOuterHp",
+          "compare": "exact",
+          "covers": [
+            "Tile.encampOuterHp"
+          ],
+          "planes": [
+            "encamp_outer_hp"
+          ]
+        },
+        {
           "name": "road",
           "compare": "exact",
           "covers": [

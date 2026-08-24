@@ -11,7 +11,7 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 const FORTIFY_MAX_TURNS = 2;
 import { logUnitOrder } from './seatTurn';
 import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial } from '../../world/hex';
-import { isWater, isImpassable } from '../../world/query';
+import { isWater, isImpassable, isCoastalLand } from '../../world/query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
 import { IMPROVEMENTS } from '../data/improvements';
 import { tileAppeal, gpAppealResolver } from './appeal';
@@ -20,9 +20,10 @@ import { isTechComplete, isCivicComplete, makeYieldCtx, getModifiers, unitUpkeep
 import { effectiveAdjacency } from './yields';
 import { BUILDINGS } from '../data/buildings';
 import { ARTIFACT_BUILDING, ARTIFACT_SLOTS } from '../data/greatPeople';
-import { clearCampFor } from './combat';
+import { clearCampFor, conquerEncampment } from './combat';
 import { emergencyHeal, emergencyMoveBonus } from './emergency';
 import { UNITS, UNIT_HP, ENCAMPMENT_HP, type UnitDef } from '../data/units';
+import { UNIT_PROMO_CLASS } from '../data/promotions';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import {
   attacksPerTurn, promoFirstUse, promoFlag, promoValue, stepAttacksLeft,
@@ -320,11 +321,16 @@ export function visibleHostilesAt(state: GameState, tileIndex: number, viewer: {
   );
 }
 
-/** Does this unit project a zone of control at all? CIV6 gives the two
- *  submarines "Does not exert zone of control", and an embarked unit exerts
- *  none either. Air units are no garrison, so `unitDomain` filters them. */
+/** Does this unit project a zone of control at all? CIV6 (Zone of Control):
+ *  "Ranged and Bombard class units do not exert ZOC" — SUPPRESSION hands it
+ *  back to a ranged unit. The two submarines carry "Does not exert zone of
+ *  control" on the chassis, and an embarked unit exerts none either. Air
+ *  units are no garrison, so `unitDomain` filters them. */
 export function unitExertsZoc(u: Unit): boolean {
-  return unitDomain(u.type) === 'military' && !u.embarked && !UNITS[u.type]?.exertsNoZoc;
+  if (unitDomain(u.type) !== 'military' || u.embarked || UNITS[u.type]?.exertsNoZoc) return false;
+  const cls = UNIT_PROMO_CLASS[u.type];
+  if ((cls === 'RANGED' || cls === 'SIEGE') && !promoFlag(u, 'ZOC_EXERT')) return false;
+  return true;
 }
 
 export function encampmentIntact(tile: Tile): boolean {
@@ -368,10 +374,14 @@ export function inEnemyZoc(
   tileIndex: number,
   mover: { seat: number; type?: string },
 ): boolean {
-  // CIV6: a naval raider "ignores enemy zone of control", so nothing halts it.
-  if (mover.type !== undefined && UNITS[mover.type]?.ignoresZoc) return false;
+  // CIV6: a naval raider "ignores enemy zone of control", and cavalry-class
+  // units ignore it too.
+  if (mover.type !== undefined && (UNITS[mover.type]?.ignoresZoc || UNITS[mover.type]?.cavalry)) return false;
   const tile = state.map.tiles[tileIndex];
   for (const n of neighbors(state.map, tile)) {
+    // CIV6 (Zone of Control): rivers block ZOC — an exerter across a river
+    // from the entered tile halts nothing.
+    if (crossesRiver(tile, n)) continue;
     for (const u of unitsAt(state, n.index)) {
       if (unitExertsZoc(u) && unitsHostile(state, u, mover)) return true;
     }
@@ -595,8 +605,13 @@ export type StepOutcome =
  *     river crossing, and needs that much MP left — except a unit at FULL MP
  *     may always take one step, paying everything it has. No Civ-5-style
  *     "enter on fumes", no river-zeroing.
- *   - Embark/disembark (a LAND unit crossing land↔water) costs ALL remaining
- *     MP. Naval units never transition; water steps never pay a river charge.
+ *   - Embark/disembark (a LAND unit crossing land↔water) costs the step's
+ *     own cost plus a 2-MP penalty — CIV6 (Movement): "either 3 Movement or
+ *     all the unit's Movement for the round (if it has less than 3)" — and
+ *     leftover MP transfers to the new mode, capped at its full pool. The
+ *     penalty is waived at a Harbor water tile or a coastal City Center land
+ *     tile ("costs only 1 Movement"). Naval units never transition; water
+ *     steps never pay a river charge.
  *     An embarked land unit's pool is EMBARK_MOVES, not its land allowance.
  *   - a CLIFF is an unbreakable barrier to that transition —
  *     their entire function, and what makes a cliff-ringed city safe from
@@ -658,11 +673,19 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   const seat = unit.seat;
   const from = state.map.tiles[unit.tileIndex];
   const naval = !!UNITS[unit.type]?.naval;
-  const full = unitFullMoves(state, unit);
+  // CIV6 (Movement): the one-step allowance reads "full Movement" as "has
+  // spent nothing this turn" — measured against the GRANTED pool, exactly as
+  // the heal gate's `grantedLast`. A live recompute drifts the moment a tech
+  // or aura lands mid-turn, and the GPU afford reads its stored pool.
+  const full = unit.movesFull ?? unitFullMoves(state, unit);
   const transition = !naval && isWater(from) !== isWater(to);
   if (cliffBlocksStep(state, from, to, unit)) return 'blocked';
+  const wEnd = isWater(to) ? to : from;
+  const lEnd = isWater(to) ? from : to;
+  const easyDock = wEnd.district === 'HARBOR'
+    || (lEnd.district === 'CITY_CENTER' && isCoastalLand(state.map, lEnd));
   const cost = transition
-    ? unit.movesLeft
+    ? moveCostInto(from, to, unit) + (easyDock ? 0 : 2)
     : moveCostInto(from, to, unit) + riverCharge(state, from, to); // roads
   if (unit.movesLeft < cost && unit.movesLeft < full) return 'cantAfford';
   if (transition) unit.embarked = isWater(to);
@@ -670,7 +693,24 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   carryAirWith(state, unit, from.index);
   logUnitOrder(state, unit.seat, unit.id, 'move', to.index);
   unit.movesLeft = Math.max(0, unit.movesLeft - cost);
+  // the transfer cap: what carries over can never exceed the NEW mode's
+  // pool — which becomes the granted pool every later afford this turn reads
+  if (transition) {
+    const modeFull = unitFullMoves(state, unit);
+    unit.movesLeft = Math.min(unit.movesLeft, modeFull);
+    unit.movesFull = modeFull;
+  }
   unit.attacksLeft = stepAttacksLeft(unit);
+  // CIV6 (Combat): an Encampment emptied of its garrison is not walk-over
+  // ground — it is "'conquered' by a melee unit, as you would a City Center",
+  // and a SHOT never conquers, so the shot-emptied district waits for this
+  // entry. A ranged walker only OCCUPIES the tile (holding its heal silent).
+  if (to.district === 'ENCAMPMENT' && to.districtComplete && !to.districtPillaged
+      && (to.encampHp ?? ENCAMPMENT_HP) <= 0
+      && unitDomain(unit.type) === 'military' && !UNITS[unit.type]?.ranged) {
+    const side = tileOwnerSide(to);
+    if (side !== null && unitsHostile(state, unit, side)) conquerEncampment(state, to, unit, unit.seat);
+  }
   if (unit.seat === seat) {
     revealAround(state, unit.seat, to.index, unitSight(unit));
     // CIV6 (Pilgrim): "Gains 3 extra spreads when moving adjacent to a natural

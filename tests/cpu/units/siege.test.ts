@@ -421,13 +421,15 @@ describe('the Encampment perimeter', () => {
     return { state, city, enc };
   }
 
-  it('CIV6: one set of Walls "supplies both", so the assault divides like a hit on the centre', () => {
+  it('CIV6: one set of Walls "supplies both" — each its OWN pool — and the assault divides against the DISTRICT pool', () => {
     const { state, city, enc } = withEncampment();
     const att = spawnUnit(state, 'SWORDSMAN', tileAtCoords(state.map, enc.col + 1, enc.row).index, ATK)!;
     expect(meleeAttack(state, att.id, enc.index, ATK).ok).toBe(true);
-    const perimeterLost = WALLS_TIER_HP[1] - city.outerHp!;
+    const perimeterLost = WALLS_TIER_HP[1] - enc.encampOuterHp!;
     const garrisonLost = 100 - enc.encampHp!;
     expect(perimeterLost).toBeGreaterThan(0);
+    // "destroying the one does not destroy the other" — the CITY pool stands
+    expect(city.outerHp).toBe(WALLS_TIER_HP[1]);
     expect(garrisonLost).toBe(1); // an intact perimeter holds it to 1, like a centre
     expect(perimeterLost).toBeLessThan(WALLS_TIER_HP[1] / 2); // the -85% is there
     expect(city.lastHitTurn).toBe(state.turn);
@@ -462,9 +464,10 @@ describe('the Encampment perimeter', () => {
     expect(cityDefenseStrength(gar.state, gar.city)).toBe(cityBefore + 5);
   });
 
-  it('with the perimeter gone the whole roll reaches the garrison', () => {
+  it("with the DISTRICT's perimeter gone the whole roll reaches the garrison", () => {
     const { state, city, enc } = withEncampment();
-    city.outerHp = 0;
+    enc.encampOuterHp = 0;
+    city.outerHp = WALLS_TIER_HP[1]; // the CITY pool standing shields nothing here
     const att = spawnUnit(state, 'SWORDSMAN', tileAtCoords(state.map, enc.col + 1, enc.row).index, ATK)!;
     expect(meleeAttack(state, att.id, enc.index, ATK).ok).toBe(true);
     expect(100 - enc.encampHp!).toBeGreaterThan(10);

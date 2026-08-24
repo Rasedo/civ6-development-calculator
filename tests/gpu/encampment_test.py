@@ -147,11 +147,13 @@ def build_strike_scene(rules, path):
     sim.major_unit_emb[0, vslot] = False
     sim.war[0, 0, 1 + 0] = sim.war[0, 1 + 0, 0] = True
     sim.sync_war()  # close the war matrix under transpose
-    # CIV6: the Encampment's defenses ARE the City Center's — walls "supply
-    # both" — and it strikes only while that perimeter stands.
+    # CIV6: walls "supply both" the centre and its Encampment — each with its
+    # OWN pool — and the district strikes only while ITS defenses stand. The
+    # completion sites write both pools; a hand-built scene writes them too.
     assert sim._walls_bidx >= 0, "ANCIENT_WALLS not exported"
     sim.city_bldg[0, 0, 0, sim._walls_bidx] = True
     sim.city_outer_hp[0, 0, 0] = sim._walls_hp
+    sim.encamp_outer_hp[0, enc_tile] = sim._walls_hp
     return sim, enc_tile, tgt, vslot
 
 
@@ -194,9 +196,10 @@ def test_strike(rules, path) -> None:
     assert ks.index("k:cstk") < ks.index("k:estk"), f"walls must roll BEFORE Encampment, got {ks}"
     print(f"  double-roll OK: walls-first order {ks}")
 
-    # --- a BREACHED perimeter silences both strikes
+    # --- a BREACHED perimeter silences both strikes — each pool its own
     sim4, enc4, tgt4, v4 = build_strike_scene(rules, path)
     sim4.city_outer_hp[0, 0, 0] = 0
+    sim4.encamp_outer_hp[0, enc4] = 0
     sim4._log_combat_b = 0
     sim4._combat_events = []
     hp0c = int(sim4.major_unit_hp[0, v4])
@@ -236,7 +239,7 @@ def test_district_defence_terms(rules, path) -> None:
         sim, enc_tile, _tgt, _v = build_strike_scene(rules, path)
         if not walls:
             sim.city_bldg[0, 0, 0, sim._walls_bidx] = False
-        sim.city_outer_hp[0, 0, 0] = 0  # breached: the whole roll reaches the garrison
+        sim.encamp_outer_hp[0, enc_tile] = 0  # breached: the whole roll reaches the garrison
         sim.encamp_hp[0, enc_tile] = sim._encamp_hp_max
         slot = place_attacker(sim, enc_tile)
         tile = torch.full((sim.B,), enc_tile, dtype=torch.long, device=sim.device)
@@ -262,11 +265,11 @@ def test_district_defence_terms(rules, path) -> None:
 
 def test_district_perimeter(rules, path) -> None:
     """CIV6 gives a defensible district "Defenses HP equal to the City Center"
-    and one set of Walls "supplies both", so a melee assault on an Encampment
-    divides exactly as a hit on the centre does: the perimeter share comes off
-    the CITY's pool and only what gets through reaches the garrison. The
-    district also fights at the city's strength "excluding any bonus obtained
-    for a Garrisoned unit"."""
+    and one set of Walls "supplies both" — each with its OWN pool, and
+    destroying one does not destroy the other. A melee assault on an
+    Encampment divides exactly as a hit on the centre does: the perimeter
+    share comes off the DISTRICT's pool and only what gets through reaches
+    the garrison; the CITY's pool never moves."""
     sim, enc_tile, _tgt, _v = build_strike_scene(rules, path)
     # the attacker: a melee unit of seat row 1, standing beside the district
     free = [int(t) for t in sim.neigh[enc_tile].tolist()
@@ -288,9 +291,10 @@ def test_district_perimeter(rules, path) -> None:
 
     tile = torch.full((sim.B,), enc_tile, dtype=torch.long, device=sim.device)
     sim._attack_encampment(torch.tensor([True], device=sim.device), tile, "major", slot)
-    perim_lost = sim._walls_hp - int(sim.city_outer_hp[0, 0, 0])
+    perim_lost = sim._walls_hp - int(sim.encamp_outer_hp[0, enc_tile])
     garrison_lost = sim._encamp_hp_max - int(sim.encamp_hp[0, enc_tile])
-    assert perim_lost > 0, "the assault never touched the city's perimeter"
+    assert perim_lost > 0, "the assault never touched the district's perimeter"
+    assert int(sim.city_outer_hp[0, 0, 0]) == sim._walls_hp,         "destroying the one must not destroy the other — the CITY pool moved"
     assert garrison_lost == 1, \
         f"an intact perimeter must hold the garrison to 1, like a centre: {garrison_lost}"
     assert perim_lost < sim._walls_hp // 2, \
@@ -311,7 +315,7 @@ def test_district_perimeter(rules, path) -> None:
     sim2.major_unit_hp[0, s2] = 100
     sim2.military_at[0, free2[0]] = s2 + sim2.POOL_LO["major"]
     sim2.encamp_hp[0, enc2] = sim2._encamp_hp_max
-    sim2.city_outer_hp[0, 0, 0] = 0
+    sim2.encamp_outer_hp[0, enc2] = 0
     t2 = torch.full((sim2.B,), enc2, dtype=torch.long, device=sim2.device)
     sim2._attack_encampment(torch.tensor([True], device=sim2.device), t2, "major", s2)
     breached = sim2._encamp_hp_max - int(sim2.encamp_hp[0, enc2])
