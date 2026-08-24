@@ -475,19 +475,27 @@ class SimMasks:
 
     def _promo_val(self, utype: torch.Tensor, promos: torch.Tensor, kind: str) -> torch.Tensor:
         """the summed value of one non-combat effect kind, in `promos`' shape —
-        one unit, a whole pool, or a pool's six neighbour steps."""
+        one unit, a whole pool, or a pool's six neighbour steps. Reads the
+        catalog through the per-(kind, class) folds (`promo_col_val`), never a
+        [rows, PCOL, PSLOT] gather; the fold is exact because `promo_v` is
+        integral."""
         k = self._pk.get(kind, -1)
         if k < 0:
             return torch.zeros_like(promos)
-        kinds, vs, _m, live = self._promo_slots(utype.reshape(-1), promos.reshape(-1))
-        return torch.where(live & (kinds == k), vs, torch.zeros_like(vs)).sum(dim=(1, 2)).reshape(promos.shape)
+        rd = self.rules_dev
+        cls = rd.u_promo_class[utype.clamp(min=0)].reshape(-1)
+        cols = torch.arange(rd.promo_cols, device=self.device)
+        held = (promos.reshape(-1).unsqueeze(1) >> cols) & 1
+        v = (held * rd.promo_col_val[k][cls.clamp(min=0)]).sum(dim=1)
+        return torch.where(cls >= 0, v, torch.zeros_like(v)).reshape(promos.shape)
 
     def _promo_flag(self, utype: torch.Tensor, promos: torch.Tensor, kind: str) -> torch.Tensor:
         k = self._pk.get(kind, -1)
         if k < 0:
             return torch.zeros_like(promos, dtype=torch.bool)
-        kinds, _v, _m, live = self._promo_slots(utype.reshape(-1), promos.reshape(-1))
-        return (live & (kinds == k)).any(dim=2).any(dim=1).reshape(promos.shape)
+        rd = self.rules_dev
+        cls = rd.u_promo_class[utype.clamp(min=0)]
+        return ((promos & rd.promo_flag_bits[k][cls.clamp(min=0)]) != 0) & (cls >= 0)
 
     def _promo_mult(self, utype: torch.Tensor, promos: torch.Tensor, kind: str) -> torch.Tensor:
         """the flanking/support multiplier a promotion grants; 1 without."""
@@ -495,8 +503,12 @@ class SimMasks:
         ones = torch.ones_like(promos)
         if k < 0:
             return ones
-        kinds, vs, _m, live = self._promo_slots(utype.reshape(-1), promos.reshape(-1))
-        best = torch.where(live & (kinds == k), vs, torch.zeros_like(vs)).amax(dim=2).amax(dim=1)
+        rd = self.rules_dev
+        cls = rd.u_promo_class[utype.clamp(min=0)].reshape(-1)
+        cols = torch.arange(rd.promo_cols, device=self.device)
+        cm = rd.promo_col_max[k][cls.clamp(min=0)]
+        held = (((promos.reshape(-1).unsqueeze(1) >> cols) & 1) > 0) & (cls >= 0).unsqueeze(1)
+        best = torch.where(held, cm, torch.zeros_like(cm)).amax(dim=1)
         return torch.maximum(best.reshape(promos.shape), ones)
 
     def _followed_religion(self, pres: torch.Tensor) -> torch.Tensor:
@@ -903,6 +915,14 @@ class SimMasks:
         occ = self.military_at if plane is None else plane
         hidden = torch.zeros_like(occ, dtype=torch.bool)
         if not self._stealth_live:
+            return hidden
+        # No stealth-CAPABLE unit alive anywhere in the batch — the plane is
+        # all-False without the tile scan. Chassis and veil both need a live
+        # carrier, so the unit pool answers before any [B, T] gather.
+        ut_all = self.unit_type.clamp(min=0, max=self.NU - 1)
+        if not bool((self.unit_alive
+                     & (self._type_stealth[ut_all]
+                        | self._promo_flag(ut_all, self.unit_promos, "STEALTH"))).any()):
             return hidden
         sc = seat.reshape(self.B, 1) if torch.is_tensor(seat) else seat
         mslot = occ.clamp(min=0)
@@ -2516,12 +2536,8 @@ class SimMasks:
         at_war = self.war[:, row].any(dim=1)
         war_tgt = torch.full((B, smap.shape[1]), -1, dtype=torch.long, device=dev)
         if bool(at_war.any()):
-            for n in range(int(present.any(dim=0).sum())):
-                if not bool(present[:, n].any()):
-                    break
-                tgt_n, hi, hc_n = self._war_march_target(tiles[:, n].clamp(min=0), row)
-                has = (hi | hc_n) & present[:, n] & at_war
-                war_tgt[:, n] = torch.where(has, tgt_n, war_tgt[:, n])
+            tgt_b, hi_b, hc_b = self._war_march_targets(tiles.clamp(min=0), row)
+            war_tgt = torch.where((hi_b | hc_b) & present & at_war.unsqueeze(1), tgt_b, war_tgt)
         return self._unit_obs(
             tiles, present,
             self.city_center[:, row], self.city_alive[:, row],

@@ -5819,13 +5819,15 @@ class SimSeats:
         halt = ((dn >= 0) & hostmil.gather(1, dn.clamp(min=0))).any(dim=1)
         return halt & ~self._type_zoc_ignore[mover_type.clamp(min=0, max=self.NU - 1)]
 
-    def _war_march_target(self, hc: torch.Tensor, row: int):
-        """The war-march DESTINATION for seat `row`'s units standing at `hc` —
-        the nearest unpillaged enemy improvement or complete district within 13,
-        else the nearest enemy city on `hostileUnitAct`'s key: distance, then
-        the owner's SEAT id, then the centre TILE. No owner is a separate arm
-        and none wins a tie by being row 0. A CITY-STATE holds territory and
-        cities and can be at war, so it is scanned exactly like a major.
+    def _war_march_targets(self, hcs: torch.Tensor, row: int):
+        """The war-march DESTINATION for seat `row`'s units standing at `hcs`
+        [B, N] — the nearest unpillaged enemy improvement or complete district
+        within 13, else the nearest enemy city on `hostileUnitAct`'s key:
+        distance, then the owner's SEAT id, then the centre TILE. No owner is
+        a separate arm and none wins a tie by being row 0. A CITY-STATE holds
+        territory and cities and can be at war, so it is scanned exactly like
+        a major. Every column shares one scan of the planes — the stands
+        differ only in the distance gather.
 
         The row indexes the war matrix directly, so who this seat fights is
         read here rather than passed in — every cell of the row, including
@@ -5833,9 +5835,10 @@ class SimSeats:
 
         ONE implementation shared by the per-unit OBSERVATION and the driver;
         separate copies would drift.
-        Returns (tgt, has_imp, has_city).
+        Returns (tgt, has_imp, has_city), each [B, N].
         """
         B, T, dev = self.B, self.T, self.device
+        N = hcs.shape[1]
         arangeT = torch.arange(T, device=dev)
         # AT WAR WITH THIS TILE'S OWNER — the TS `tOwned` term, for every
         # territorial owner alike. A barbarian tile is masked out by `owned`
@@ -5848,13 +5851,13 @@ class SimSeats:
             imp_job = (self.improvement >= 0) & ~self.pillaged & at_war_t
             if self.districts_on:
                 imp_job = imp_job | ((self.district >= 0) & self.district_complete & ~self.district_pillaged & at_war_t)
-            d_imp = self.pair_dist[hc.unsqueeze(1), arangeT.unsqueeze(0)].to(torch.long)
-            ikey = torch.where(imp_job & (d_imp < 13), d_imp * (T + 1) + arangeT, torch.full_like(d_imp, 10**9))
-            imp_min, imp_tgt = ikey.min(dim=1)
+            d_imp = self.pair_dist[hcs.unsqueeze(2), arangeT.view(1, 1, T)].to(torch.long)
+            ikey = torch.where(imp_job.unsqueeze(1) & (d_imp < 13), d_imp * (T + 1) + arangeT, torch.full_like(d_imp, 10**9))
+            imp_min, imp_tgt = ikey.min(dim=2)
             has_imp = imp_min < 10**9
         else:
-            has_imp = torch.zeros(B, dtype=torch.bool, device=dev)
-            imp_tgt = hc
+            has_imp = torch.zeros(B, N, dtype=torch.bool, device=dev)
+            imp_tgt = hcs
         # THE CITY SCAN — one total order over every seat this one is at war
         # with, majors and city-states alike, on the TS key: distance, then the
         # seat id, then the centre tile. No seat is a separate arm and none
@@ -5865,14 +5868,19 @@ class SimSeats:
         _cc = self.city_center.reshape(B, -1).clamp(min=0)  # [B, M]
         _ca = (self.city_alive.reshape(B, -1)
                & self.war[:, row, :_CB].repeat_interleave(self.RC, dim=1))
-        _d2 = self.pair_dist[hc.unsqueeze(1), _cc].to(torch.long)
-        _key = torch.where(_ca, _d2 * (2048 * 256) + self._march_seatkey + _cc,
+        _d2 = self.pair_dist[hcs.unsqueeze(2), _cc.unsqueeze(1)].to(torch.long)
+        _key = torch.where(_ca.unsqueeze(1), _d2 * (2048 * 256) + (self._march_seatkey + _cc).unsqueeze(1),
                            torch.full_like(_d2, 10**18))
-        ckey_min, _cwin = _key.min(dim=1)
+        ckey_min, _cwin = _key.min(dim=2)
         has_city = ckey_min < 10**18
-        city_tgt = torch.where(has_city, _cc.gather(1, _cwin.unsqueeze(1)).squeeze(1), hc)
+        city_tgt = torch.where(has_city, _cc.gather(1, _cwin), hcs)
         tgt = torch.where(has_imp, imp_tgt, city_tgt)
         return tgt, has_imp, has_city
+
+    def _war_march_target(self, hc: torch.Tensor, row: int):
+        """One-stand [B] view of `_war_march_targets`."""
+        tgt, hi, hcty = self._war_march_targets(hc.unsqueeze(1), row)
+        return tgt.squeeze(1), hi.squeeze(1), hcty.squeeze(1)
 
     def _encamp_terms(self, tc: torch.Tensor):
         """(def_cs, hrow, hcol, wtier, held) for the Encampment on `tc`.

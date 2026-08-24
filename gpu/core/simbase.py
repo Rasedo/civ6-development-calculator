@@ -169,6 +169,9 @@ class Rules:
     promo_kind: torch.Tensor  # long [NPC, PCOL, PSLOT]
     promo_v: torch.Tensor  # long [NPC, PCOL, PSLOT]
     promo_mask: torch.Tensor  # long [NPC, PCOL, PSLOT]
+    promo_flag_bits: torch.Tensor  # long [NK, NPC] — bit c set when column c carries kind k
+    promo_col_val: torch.Tensor  # long [NK, NPC, PCOL] — per-column sum of kind k's values
+    promo_col_max: torch.Tensor  # long [NK, NPC, PCOL] — per-column max of kind k's values
     promo_rows: torch.Tensor  # long [NPC] — how many rows each class actually holds
     u_promo_class: torch.Tensor  # long [NU] — the class each chassis promotes from, -1 = none
     choke_features: list  # the feature indices CHOKE POINTS defends in (hills are their own plane)
@@ -201,6 +204,23 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
     r = json.loads(Path(path).read_text())
     B = r["buildings"]
     _P = r.get("promotions", {})
+    # The promotion catalog folded per (kind, class), for the hot helpers: a
+    # FLAG becomes one bit-test against the columns carrying the kind, a
+    # VALUE a per-column dot product — never a [rows, PCOL, PSLOT] gather per
+    # call. promo_v is integral (long), so the per-column pre-sum is exact.
+    _pk3 = torch.tensor(_P.get("kind", [[[]]]), dtype=torch.long)
+    _pv3 = torch.tensor(_P.get("v", [[[]]]), dtype=torch.long)
+    _nk = max(len(_P.get("kinds", [])), 1)
+    if _pk3.shape[2]:
+        _hit = _pk3.unsqueeze(0) == torch.arange(_nk).view(-1, 1, 1, 1)
+        _pv0 = torch.where(_hit, _pv3.unsqueeze(0), torch.zeros_like(_pv3).unsqueeze(0))
+        _pf_bits = (_hit.any(dim=3).long() << torch.arange(_pk3.shape[1]).view(1, 1, -1)).sum(dim=2)
+        _pf_colv = _pv0.sum(dim=3)
+        _pf_colm = _pv0.amax(dim=3)
+    else:
+        _pf_bits = torch.zeros(_nk, _pk3.shape[0], dtype=torch.long)
+        _pf_colv = torch.zeros(_nk, _pk3.shape[0], _pk3.shape[1], dtype=torch.long)
+        _pf_colm = torch.zeros(_nk, _pk3.shape[0], _pk3.shape[1], dtype=torch.long)
     return Rules(
         focus_base=torch.tensor(r["focusBase"], dtype=torch.float64),
         citizen_science=r["citizenScience"],
@@ -303,6 +323,9 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         promo_kind=torch.tensor(_P.get("kind", [[[]]]), dtype=torch.long),
         promo_v=torch.tensor(_P.get("v", [[[]]]), dtype=torch.long),
         promo_mask=torch.tensor(_P.get("mask", [[[]]]), dtype=torch.long),
+        promo_flag_bits=_pf_bits,
+        promo_col_val=_pf_colv,
+        promo_col_max=_pf_colm,
         promo_rows=torch.tensor([len(x) for x in _P.get("ids", [])], dtype=torch.long),
         u_promo_class=torch.tensor(_P.get("unitClass", []), dtype=torch.long),
         choke_features=list(_P.get("chokeFeatures", [])),

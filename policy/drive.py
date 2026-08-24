@@ -947,13 +947,9 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
         # respecting the stop radius. Distances are read-only pair_dist plans;
         # terrain/occupancy legality is the PHASE's re-validation problem.
         if vplan_tgts is None:
-            vplan_tgts = torch.full((B2, N2), -1, dtype=torch.long, device=sim.device)
-            for n in range(N2):
-                if not bool((smap[:, n] >= 0).any()):
-                    break
-                tgt_n, hi, hcty = sim._war_march_target(cur[:, n].clamp(min=0), row)
-                has = hi | hcty
-                vplan_tgts[:, n] = torch.where(has, tgt_n, vplan_tgts[:, n])
+            tgt_b, hi_b, hcty_b = sim._war_march_targets(cur.clamp(min=0), row)
+            vplan_tgts = torch.where(hi_b | hcty_b, tgt_b,
+                                     torch.full((B2, N2), -1, dtype=torch.long, device=sim.device))
         tgts = vplan_tgts
         for n in range(N2):
             rows_mv = moving[:, n]
