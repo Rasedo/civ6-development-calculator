@@ -8,6 +8,9 @@ import { MODERN_ERA_INDEX } from '../data/techs';
 import { emergencyAttackCS, raiseEmergency, EMERGENCY_CITY_STATE } from './emergency';
 import { envoysOf, hasMet } from './cityStates';
 import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP, WALLS_TIER_CS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY } from '../data/units';
+import { IMPROVEMENTS } from '../data/improvements';
+import { DISTRICTS } from '../data/districts';
+import { pillagePlunder } from './economy';
 import { BUILDINGS } from '../data/buildings';
 import { CITY_STATE_MAX_HP, KABUL_XP_MULT, PRESLAV_HILL_CS } from '../data/cityStates';
 import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
@@ -62,17 +65,6 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): v
   const clearer = seatOf(state, unit.seat);
   if (clearer) clearer.treasury += CAMP_CLEAR_REWARD;
 }
-
-/** food improvements heal their pillager (real Civ 6); the rest
- * grant yields the pillager banks — nothing, for barbs and raiders.
- * (Tile.improvement is a plain string, hence Set<string>.) */
-export const PILLAGE_HEAL_IMPROVEMENTS: ReadonlySet<string> = new Set<ImprovementId>([
-  'FARM',
-  'PASTURE',
-  'CAMP',
-  'PLANTATION',
-  'FISHING_BOATS',
-]);
 
 
 export function terrainDefense(tile: Tile): number {
@@ -1739,9 +1731,9 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     return;
   }
 
-  // 2. Pillage the improvement underfoot. Real Civ 6: only FOOD
-  // improvements heal the pillager (+25); the rest are wrecked for yields
-  // the raiders here can't bank — pillaged, no heal.
+  // 2. Pillage the improvement underfoot, paying the target's own plunder
+  // row — a barbarian still HEALS off a heal row, and only a major banks
+  // a yield lump (`pillagePlunder`).
   // BARBARIANS raid ANY territorial owner, majors and minors alike; a
   // non-barbarian hostile walker still needs its war.
   const here = tile();
@@ -1749,9 +1741,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     && (isBarbSeat(unit.seat) || civsAtWar(state, unitSeat(unit), tileSeat(here)));
   if (here.improvement && !here.pillaged && hereOwned) {
     here.pillaged = true;
-    if (PILLAGE_HEAL_IMPROVEMENTS.has(here.improvement)) {
-      unit.hp = Math.min(UNIT_HP, unit.hp + 25);
-    }
+    pillagePlunder(state, unit, IMPROVEMENTS[here.improvement as ImprovementId]?.plunder);
     unit.movesLeft = 0;
     return;
   }
@@ -1766,6 +1756,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     hereOwned
   ) {
     here.districtPillaged = true;
+    pillagePlunder(state, unit, DISTRICTS[here.district].plunder, true);
     displaceAirFrom(state, here.index);
     unit.movesLeft = 0;
     return;

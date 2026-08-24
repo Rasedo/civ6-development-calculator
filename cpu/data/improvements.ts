@@ -7,7 +7,7 @@
  * Gathering Storm CIVILOPEDIA. No `eyeballed`/`approximate` markers remain.
  */
 
-import type { DistrictId, ImprovementId, Yields, YieldKey } from '../core/types';
+import type { DistrictId, ImprovementId, PlunderRow, Yields, YieldKey } from '../core/types';
 import type { Elevation, FeatureId, TerrainId } from '../../world/types';
 
 /**
@@ -68,6 +68,9 @@ export interface ImprovementDef {
   engineer?: boolean;
   /** refuses a tile that still carries a feature. */
   noFeature?: boolean;
+  /** CIV6 (Pillaging, GS data): what wrecking it pays the pillager;
+   *  absent = NO_PLUNDER. */
+  plunder?: PlunderRow;
 }
 
 /** the BREATHTAKING appeal bar a Seaside Resort needs (real Civ 6
@@ -87,6 +90,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     id: 'FARM',
     name: 'Farm',
     code: 'Fa',
+    plunder: { kind: 'heal', amount: 50 },
     yields: { food: 1 },
     housing: 0.5,
     resourceOnly: false,
@@ -99,6 +103,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     appealAdjacent: -1,
     name: 'Mine',
     code: 'Mi',
+    plunder: { kind: 'gold', amount: 50 },
     yields: { production: 1 },
     housing: 0,
     resourceOnly: false,
@@ -111,6 +116,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     appealAdjacent: -1,
     name: 'Quarry',
     code: 'Qu',
+    plunder: { kind: 'faith', amount: 25 },
     yields: { production: 1 },
     housing: 0,
     resourceOnly: true,
@@ -120,6 +126,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     id: 'LUMBER_MILL',
     name: 'Lumber Mill',
     code: 'Lu',
+    plunder: { kind: 'gold', amount: 50 },
     yields: { production: 1 },
     housing: 0,
     resourceOnly: false,
@@ -129,6 +136,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     id: 'PASTURE',
     name: 'Pasture',
     code: 'Pa',
+    plunder: { kind: 'faith', amount: 25 },
     yields: { production: 1 },
     housing: 0.5,
     resourceOnly: true,
@@ -138,6 +146,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     id: 'CAMP',
     name: 'Camp',
     code: 'Ca',
+    plunder: { kind: 'faith', amount: 25 },
     yields: { gold: 2 },
     housing: 0.5,
     resourceOnly: true,
@@ -147,6 +156,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     id: 'PLANTATION',
     name: 'Plantation',
     code: 'Pl',
+    plunder: { kind: 'faith', amount: 25 },
     yields: { gold: 2 },
     housing: 0.5,
     resourceOnly: true,
@@ -156,6 +166,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     id: 'FISHING_BOATS',
     name: 'Fishing Boats',
     code: 'Fb',
+    plunder: { kind: 'heal', amount: 50 },
     yields: { food: 1 },
     housing: 0.5,
     resourceOnly: true,
@@ -168,6 +179,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     appealAdjacent: -1,
     name: 'Oil Well',
     code: 'Ow',
+    plunder: { kind: 'gold', amount: 50 },
     yields: { production: 2 },
     housing: 0,
     resourceOnly: true,
@@ -184,6 +196,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     id: 'SEASIDE_RESORT',
     name: 'Seaside Resort',
     code: 'Sr',
+    plunder: { kind: 'gold', amount: 50 },
     yields: {}, // dynamic: gold = tile appeal (see seasideResortGold)
     housing: 0,
     resourceOnly: false,
@@ -226,6 +239,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     id: 'BATEY',
     name: 'Batey',
     code: 'By',
+    plunder: { kind: 'faith', amount: 25 },
     yields: { culture: 1 },
     housing: 0,
     resourceOnly: false,
@@ -249,6 +263,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     id: 'COLOSSAL_HEADS',
     name: 'Colossal Heads',
     code: 'Ch',
+    plunder: { kind: 'faith', amount: 25 },
     yields: { faith: 2 },
     housing: 0,
     resourceOnly: false,
@@ -272,6 +287,7 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     id: 'MONASTERY',
     name: 'Monastery',
     code: 'My',
+    plunder: { kind: 'faith', amount: 25 },
     yields: { faith: 2 },
     // CIV6 [GS]: "+1 Housing" and "+1 additional Housing (with Colonialism)".
     housing: 1,

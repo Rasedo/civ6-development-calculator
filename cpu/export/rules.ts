@@ -14,7 +14,7 @@ import { PRESERVE_APPEAL_HOUSING } from '../core/appeal';
 import { IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL, PARK_MIN_APPEAL, PARK_AMENITIES_OWNER,
   PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../data/improvements';
 import { SHIPWRECK_CIVIC, RELIGIOUS_HEAL_PER_FAITH } from '../core/units';
-import type { ImprovementId } from '../core/types';
+import type { PlunderRow, ImprovementId } from '../core/types';
 import { GENERAL_AURA_CS, GENERAL_AURA_RANGE, BARB_SCOUT_OPENER_LIVE } from '../core/combat';
 import { GENERAL_AURA_MP } from '../core/aura';
 import { CARDIFF_HARBOR_POWER } from '../data/cityStates';
@@ -120,6 +120,7 @@ const effectRow = (fx: PolicyEffects) => ({
   cityRanged: fx.cityRanged ?? 0,
   reconXpMult: fx.reconXpMult ?? 1,
   routePlunderMult: fx.routePlunderMult ?? 1,
+  pillageMult: fx.pillageMult ?? 1,
   faithBuyLandUnits: fx.faithBuyLandUnits ? 1 : 0,
   routeGold: fx.routeGold ?? 0,
   influencePerTurn: fx.influencePerTurn ?? 0,
@@ -160,6 +161,11 @@ import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
 
 /** The REAL settler rule now: a 1-pop city may not train or buy one.
  *  Exported to the GPU as scenario.settlerPopGate. */
+// CIV6 (Pillaging): the shared plunder-kind enum — 0 none, 1 heal, 2 gold,
+// 3 faith, 4 science, 5 culture — over `PlunderRow`.
+const PLUNDER_KIND_IDX = { heal: 1, gold: 2, faith: 3, science: 4, culture: 5 } as const;
+const plunRow = (p?: PlunderRow): number[] => (p ? [PLUNDER_KIND_IDX[p.kind], p.amount] : [0, 0]);
+
 const SETTLER_POP_GATE = 2;
 
 const beliefRow = (def: { effects: BeliefEffects }) => ({
@@ -1050,6 +1056,7 @@ export function buildRules() {
       // than a hex away, REVEAL STEALTH sees one within `sight`, and the two
       // zone-of-control abilities are independent of both.
       stealth: u.stealth ? 1 : 0,
+      raider: u.raider ? 1 : 0, // CIV6: "Can perform Coastal Raids."
       revealStealth: u.revealStealth ? 1 : 0,
       ignoresZoc: u.ignoresZoc ? 1 : 0,
       exertsNoZoc: u.exertsNoZoc ? 1 : 0,
@@ -1111,6 +1118,7 @@ export function buildRules() {
           noFeat: def.noFeature ? 1 : 0,
           air: def.airSlots ?? 0,
           appeal: def.appealAdjacent ?? 0,
+          plun: plunRow(def.plunder),
         };
       }),
       luxAmenityCities: LUXURY_AMENITY_CITIES,
@@ -1185,6 +1193,7 @@ export function buildRules() {
         appealHousing: d.appealHousing ? 1 : 0,
         floodShield: d.floodShield ? 1 : 0,
         spyLevelPenalty: d.spyLevelPenalty ?? 0,
+        plun: plunRow(d.plunder),
         // specialist base yields, and the TOP building that upgrades them
         // (-1 none, -2 = any worship building)
         spec: YIELD_KEYS.map((k) => SPECIALIST_YIELDS[id]?.[k] ?? 0),
@@ -1253,6 +1262,8 @@ export function buildRules() {
       govTitle: b.govTitle ?? 0,
       spyCapacity: b.spyCapacity ?? 0,
       faithBuyUnits: b.faithBuyUnits ? 1 : 0,
+      pillageFaithImp: b.pillageFaithImp ?? 0,
+      pillageFaithDist: b.pillageFaithDist ?? 0,
       spyLevelPenalty: b.spyLevelPenalty ?? 0,
       influencePerTurn: b.influencePerTurn ?? 0,
       favorPerTurn: b.favorPerTurn ?? 0,

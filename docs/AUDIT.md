@@ -74,7 +74,6 @@ from the list below.
 | C-22 the district roster | 2 | the Canal carries no naval passage (C-35), five Government Plaza buildings have no effect body, the Preserve table is a stylization |
 | C-24 the climate arc | 1 | nothing is ever submerged (C-35), railroads emit nothing (C-36), Mitigation's award has no one-off grant channel |
 | C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — PARKED by owner decision |
-| C-27 pillaging pays no yields | 2 | nothing banks a pillage, and no hull is offered the verb (the Coastal Raid) |
 | C-28 tourism accrues to no one in particular | 2 | nothing ACCRUES tourism toward one rival, which the international modifiers and the Rock Band key on |
 | C-29 no RESOLVED suzerain | 1 | a rule that reweights envoys BY the current suzerain has no fixed point |
 | C-30 city-states carry no research | 1 | a minor's borders never close and the suzerain's passage lifts nothing |
@@ -84,8 +83,8 @@ from the list below.
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target — the reason a fighter exists — do not exist |
 | C-35 the land/water fact never moves | 2 | one overloaded static bit blocks submersion and the Canal's passage |
 | C-36 no railroad | 2 | no second movement tier, no per-hex Iron/Coal charge, no CO2 |
-| **C. Absent systems** | **38** | |
-| **OPEN, TOTAL** | **62** | |
+| **C. Absent systems** | **36** | |
+| **OPEN, TOTAL** | **60** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -452,7 +451,6 @@ under their blocker so the dependency is readable, and both halves count.
     you have a Trade Route"; blocked on C-28.
   - `CONTAINMENT` — envoys count double "if its Suzerain has a different
     government than you"; blocked on C-29.
-  - `TOTAL_WAR` ships its plunder half and not its pillage half — C-27.
 - **C-8. RANDOM DRAWS THE MODEL MAKES DETERMINISTIC.** Weight 2.
   - **THE GREAT PERSON REPLACEMENT WALKS A QUEUE.** SOURCED: "the
     replacement is chosen randomly from those available in the current
@@ -514,16 +512,6 @@ under their blocker so the dependency is readable, and both halves count.
     Improvements"** is a verb neither engine has for any unit.
   - (The Bath in the charge's district list is Rome's unique Aqueduct —
     C-26.)
-- **C-27. PILLAGING PAYS NO YIELDS.** Weight 2. The PILLAGE verb sets
-  `pillaged`, heals a food-improvement pillager and spends the move;
-  nothing is banked. Real Civ 6 pays the pillager a yield lump keyed to
-  what was wrecked. Waiting on it: `TOTAL_WAR`'s pillage half (C-6), the
-  Great Person pillage-percentage clause (B-61r), and **THE COASTAL
-  RAID** — all three naval raiders list it ("the Privateer must be next
-  to the land improvement or district, and must have at least 3 Movement
-  points remaining"), and neither engine offers a PILLAGE column to a
-  hull at all (`_seat_unit_mask` builds the verb over land movers), so
-  the raid needs the column before it can need a payout.
 - **C-28. TOURISM ACCRUES TO NO ONE IN PARTICULAR.** Weight 2. The bank
   is two lifetime scalars (`Seat.tourism` / `civ_tourism`,
   `Seat.tourismReligious` / `civ_tourism_rel`) divided by the civ count on

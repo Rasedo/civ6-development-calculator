@@ -10,15 +10,14 @@ import { isWater, isImpassable } from '../../world/query';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, tradeWalkStep, tradeWaterLevel, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt } from './units';
-import { PILLAGE_HEAL_IMPROVEMENTS } from './combat';  // the replay's pillage arm mirrors hostileUnitAct's
 import { cityStrikeStrength, airStrike } from './combat';
-import { UNIT_HP } from '../data/units';
 import { meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, terrainDefense, woundPenalty, embarkedDefenseCS, awardDefenseXp, trainXpPct, generalAuraCS, encircled, stackDefender, unitAttackRange } from './combat';
 import { promoCS, promoClassOf, promoValue, takePromotion } from './promotions';
 import { PROMO_COLS } from '../data/promotions';
 import { availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
-import { selectResearch } from './economy';
+import { selectResearch, pillagePlunder } from './economy';
+import { IMPROVEMENTS } from '../data/improvements';
 import { getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
 import { addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, stampTradingPost, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from './trade';
 import { addEnvoys, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, setMet, sueForPeaceWithCityState } from './cityStates';
@@ -1206,29 +1205,52 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         // row onto a MISSIONARY, which pillaged a mine here and silently
         // no-opped on the GPU (9029 rng 2026006086 t239, esc +3600).
         if (!((UNITS[unit.type]?.combat ?? 0) > 0)) return;
-        const hereOwned = isTerritorial(tileSeat(here))
-          && civsAtWar(state, unitSeat(unit), tileSeat(here));
-        // CIV6 (Depredation): "Pillaging costs only 1 Movement point."
+        const raidable = (t: Tile): boolean => isTerritorial(tileSeat(t))
+          && civsAtWar(state, unitSeat(unit), tileSeat(t));
+        const hereOwned = raidable(here);
+        // CIV6: pillaging takes "3 Movement Points, or all of your movement";
+        // Depredation prices it at 1.
         const pillageCost = promoValue(unit, 'PILLAGE_CHEAP');
         const spendPillage = (): void => {
-          unit.movesLeft = pillageCost > 0 ? Math.max(0, unit.movesLeft - pillageCost) : 0;
+          unit.movesLeft = Math.max(0, unit.movesLeft - (pillageCost > 0 ? pillageCost : 3));
         };
-        if (here.improvement && !here.pillaged && hereOwned) {
-          here.pillaged = true;
-          if (PILLAGE_HEAL_IMPROVEMENTS.has(here.improvement)) {
-            unit.hp = Math.min(UNIT_HP, unit.hp + 25);
-          }
+        const wreckDistrict = (t: Tile): void => {
+          t.districtPillaged = true;
+          pillagePlunder(state, unit, DISTRICTS[t.district as keyof typeof DISTRICTS].plunder, true);
+          displaceAirFrom(state, t.index);
           spendPillage();
-        } else if (
+        };
+        const districtWreckable = (t: Tile): boolean =>
           // CIV6: the Encampment "cannot be pillaged normally" -- a melee unit
           // conquers it instead, and that assault is what pillages it.
-          hereOwned && here.district && here.district !== 'CITY_CENTER' &&
-          here.district !== 'ENCAMPMENT' &&
-          here.districtComplete && !here.districtPillaged
-        ) {
-          here.districtPillaged = true;
-          displaceAirFrom(state, here.index);
+          t.district !== null && t.district !== 'CITY_CENTER' &&
+          t.district !== 'ENCAMPMENT' &&
+          !!t.districtComplete && !t.districtPillaged;
+        if (here.improvement && !here.pillaged && hereOwned) {
+          here.pillaged = true;
+          pillagePlunder(state, unit, IMPROVEMENTS[here.improvement as keyof typeof IMPROVEMENTS]?.plunder);
           spendPillage();
+        } else if (hereOwned && districtWreckable(here)) {
+          wreckDistrict(here);
+        } else if (UNITS[unit.type]?.raider && isWater(here) && unit.movesLeft >= 3) {
+          // CIV6 (Coastal Raid): the raider "must be next to the land
+          // improvement or district, and must have at least 3 Movement
+          // points remaining." One deterministic target: the lowest-index
+          // adjacent land tile with an unpillaged enemy improvement, else
+          // the lowest-index with a wreckable district — the GPU raid arm
+          // ranks by the same key.
+          const cand = neighbors(state.map, here)
+            .filter((t) => !isWater(t) && raidable(t))
+            .sort((x, y) => x.index - y.index);
+          const impT = cand.find((t) => t.improvement && !t.pillaged);
+          if (impT) {
+            impT.pillaged = true;
+            pillagePlunder(state, unit, IMPROVEMENTS[impT.improvement as keyof typeof IMPROVEMENTS]?.plunder);
+            spendPillage();
+          } else {
+            const disT = cand.find(districtWreckable);
+            if (disT) wreckDistrict(disT);
+          }
         }
       } else if ((a >= 13 && a < 18) || (a >= 18 && a < 18 + IMPROVEMENT_IDS.length - DEDICATED_IMPROVEMENTS)) {
         if ((unit.charges ?? 0) <= 0 && a !== 17) return;
@@ -1237,7 +1259,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           // the resource dependency, the feature-removal TECH, the LUMBER_MILL
           // that goes with the woods, the charge, and the YIELD LUMP into the
           // owning city. ORACLE: the GPU's `_A_CHOP` arm pays the same lump,
-          // `20 + 2.5*(techs+civics)`. Nothing in-gate drives this column —
+          // `20 * progressScale`. Nothing in-gate drives this column —
           // the driver's builder ladder offers 13-15/18-24 and REPAIR.
           builderRemoveFeature(state, unit.id, actor.seat);
         } else if (a === 17) {

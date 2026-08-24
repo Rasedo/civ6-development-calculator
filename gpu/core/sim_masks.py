@@ -2218,7 +2218,34 @@ class SimMasks:
             & ~self.district_pillaged.gather(1, tc)
             & (self.centre_slot_at.gather(1, tc) < 0)
         )
-        pillage = (present & (self._type_combat[utype] > 0) & _enemy & (_has_imp | _has_dis)).unsqueeze(2)
+        pillage = present & (self._type_combat[utype] > 0) & _enemy & (_has_imp | _has_dis)
+        # CIV6 (Coastal Raid): a NAVAL RAIDER "must be next to the land
+        # improvement or district, and must have at least 3 Movement points
+        # remaining" — the same column, over the adjacent ring.
+        if bool(self._type_raider.any()):
+            _nb = self.neigh[tc]                              # [B, N, 6]
+            _nbc = _nb.clamp(min=0).reshape(B, -1)
+            _nts = self.tile_seat.gather(1, _nbc)
+            _nown = (_nts >= 0) & (_nts < BARB_SEAT)
+            _nwar = _nown & self.war[:, row].gather(
+                1, self._seat_row[torch.where(_nown, _nts, torch.zeros_like(_nts))])
+            _nimp = (self.improvement.gather(1, _nbc) >= 0) & ~self.pillaged.gather(1, _nbc)
+            _ndis = (
+                (self.district.gather(1, _nbc) >= 0)
+                & (self.district.gather(1, _nbc) != self._encamp_didx)
+                & self.district_complete.gather(1, _nbc)
+                & ~self.district_pillaged.gather(1, _nbc)
+                & (self.centre_slot_at.gather(1, _nbc) < 0)
+            )
+            _nland = ~self.water.gather(1, _nbc)
+            _raidable = ((_nb >= 0).reshape(B, -1) & _nland & _nwar
+                         & (_nimp | _ndis)).reshape(B, N, 6).any(dim=2)
+            raid = (present & self._type_raider[utype]
+                    & self.water.gather(1, tc)
+                    & (self.unit_mp.gather(1, sc) >= 3)
+                    & _raidable)
+            pillage = pillage | raid
+        pillage = pillage.unsqueeze(2)
 
         _sn: list[torch.Tensor] = []
         if getattr(self, "_snipe_on", False):

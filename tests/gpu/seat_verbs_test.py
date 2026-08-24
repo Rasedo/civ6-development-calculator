@@ -406,6 +406,85 @@ def main() -> None:
             "FOREIGN territory must still refuse a settle"
         print("  10 FOUND on own ground OK (and foreign ground still refuses)")
 
+
+    # -- 11: PILLAGE PAYS — the plunder row, the progression, the 3-MP price
+    # CIV6 (GS data): a MINE plunders 50 gold on the harvest progression
+    # (1 + 9 * max(techs/67, civics/50)); a FARM heals 50 flat; the wreck
+    # takes 3 MP or all of them.
+    sim12 = fresh(rules, path)
+    slot12, tile12 = a_civ_soldier(sim12, row)
+    assert slot12 is not None
+    sim12.war[0, 0, row] = sim12.war[0, row, 0] = True
+    sim12.tile_seat[0, tile12] = 0
+    sim12.improvement[0, tile12] = sim12.MINE
+    sim12.pillaged[0, tile12] = False
+    sim12.district[0, tile12] = -1
+    sim12.major_unit_mp[0, slot12] = 4.0
+    sim12._tile_owner_ver += 1
+    g0 = float(sim12.civ_treasury[0, row])
+    _tn = int(sim12.civ_techs[0, row].sum())
+    _cn = int(sim12.civ_civics[0, row].sum())
+    _exp = round(50 * (1 + 9 * max(_tn / 67, _cn / 50)))
+    order(sim12, row, slot12, A_PIL)
+    assert bool(sim12.pillaged[0, tile12])
+    got = float(sim12.civ_treasury[0, row]) - g0
+    assert abs(got - _exp) < 1e-6, f"MINE plunder paid {got}, wanted {_exp}"
+    assert abs(float(sim12.major_unit_mp[0, slot12]) - 1.0) < 1e-6, \
+        f"pillage must price 3 MP of 4, left {float(sim12.major_unit_mp[0, slot12])}"
+    print(f"  11 PILLAGE pays OK (MINE gold {_exp} on the progression, 3 MP of 4 spent)")
+
+    sim13 = fresh(rules, path)
+    slot13, tile13 = a_civ_soldier(sim13, row)
+    sim13.war[0, 0, row] = sim13.war[0, row, 0] = True
+    sim13.tile_seat[0, tile13] = 0
+    sim13.improvement[0, tile13] = sim13.FARM
+    sim13.pillaged[0, tile13] = False
+    sim13.district[0, tile13] = -1
+    sim13.major_unit_hp[0, slot13] = 40
+    sim13._tile_owner_ver += 1
+    order(sim13, row, slot13, A_PIL)
+    assert int(sim13.major_unit_hp[0, slot13]) == 90, \
+        f"FARM plunder must heal 50 flat (40 -> 90), got {int(sim13.major_unit_hp[0, slot13])}"
+    print("  12 FARM plunder heals 50 flat OK")
+
+    # -- 13: the COASTAL RAID — a raider hull wrecks the adjacent land
+    # improvement with 3+ MP, and 2 MP refuses.
+    # CIV6 (Privateer): "must be next to the land improvement or district,
+    # and must have at least 3 Movement points remaining."
+    if bool(sim13._type_raider.any()):
+        for mp14, want14 in ((3.0, True), (2.0, False)):
+            sim14 = fresh(rules, path)
+            slot14, t14 = a_civ_soldier(sim14, row)
+            # a water tile beside a land tile, both free
+            pick = None
+            for cand in (sim14.wpass[0] & ~sim14.ocean_tile[0]).nonzero(as_tuple=True)[0].tolist():
+                if int(sim14.military_at[0, cand]) >= 0:
+                    continue
+                for d14 in range(6):
+                    nb14 = int(sim14.neigh[cand, d14])
+                    if nb14 >= 0 and not bool(sim14.water[0, nb14]) and bool(sim14.passable[0, nb14]) \
+                            and int(sim14.centre_slot_at[0, nb14]) < 0 and int(sim14.district[0, nb14]) < 0:
+                        pick = (int(cand), nb14)
+                        break
+                if pick:
+                    break
+            assert pick is not None, "fixture has no free water-beside-land pair"
+            wt14, lt14 = pick
+            sim14.military_at[0, t14] = -1
+            sim14.major_unit_type[0, slot14] = int(sim14._type_raider.nonzero(as_tuple=True)[0][0])
+            sim14.major_unit_tile[0, slot14] = wt14
+            sim14.military_at[0, wt14] = slot14 + sim14.POOL_LO["major"]
+            sim14.major_unit_mp[0, slot14] = mp14
+            sim14.war[0, 0, row] = sim14.war[0, row, 0] = True
+            sim14.tile_seat[0, lt14] = 0
+            sim14.improvement[0, lt14] = sim14.MINE
+            sim14.pillaged[0, lt14] = False
+            sim14._tile_owner_ver += 1
+            order(sim14, row, slot14, A_PIL)
+            assert bool(sim14.pillaged[0, lt14]) == want14, \
+                f"COASTAL RAID at {mp14} MP: wrecked={bool(sim14.pillaged[0, lt14])}, wanted {want14}"
+        print("  13 COASTAL RAID OK (3 MP raids the adjacent mine, 2 MP refuses)")
+
     print("CIV VERBS OK — including the upgrade ladder")
 
 

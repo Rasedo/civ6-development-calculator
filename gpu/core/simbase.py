@@ -163,6 +163,8 @@ class Rules:
     b_walls: torch.Tensor  # long [NB] — the WALLS TIER this row supplies (0 = not a walls row)
     b_no_purchase: torch.Tensor  # bool [NB] — refuses a gold purchase (the upgraded walls)
     b_faith_units: torch.Tensor  # bool [NB] — grants the seat the faith LAND-UNIT purchase (Grand Master's Chapel)
+    b_pill_faith_imp: torch.Tensor  # long [NB] — the Chapel's flat faith per pillaged improvement
+    b_pill_faith_dist: torch.Tensor  # long [NB] — ...and per pillaged district
     #: THE PROMOTION CATALOG, per class and in COLUMN order (the PROMOTE head's
     #: layout). `promo_req[c, k]` is the bitmask of columns that open row k of
     #: class c; `promo_kind/v/mask[c, k, s]` are its effect slots.
@@ -320,6 +322,8 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_walls=torch.tensor([int(b.get("walls", 0)) for b in B], dtype=torch.long),
         b_no_purchase=torch.tensor([bool(b.get("noPurchase", 0)) for b in B], dtype=torch.bool),
         b_faith_units=torch.tensor([bool(b.get("faithBuyUnits", 0)) for b in B], dtype=torch.bool),
+        b_pill_faith_imp=torch.tensor([int(b.get("pillageFaithImp", 0)) for b in B], dtype=torch.long),
+        b_pill_faith_dist=torch.tensor([int(b.get("pillageFaithDist", 0)) for b in B], dtype=torch.long),
         b_era=torch.tensor([int(b.get("eraIdx", 0)) for b in B], dtype=torch.long),
         promo_classes=list(_P.get("classes", [])),
         promo_kinds=list(_P.get("kinds", [])),

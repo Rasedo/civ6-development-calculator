@@ -1369,6 +1369,7 @@ class SimEconomy:
         fx: dict = {
             "prod": [], "bcharge": _z.clone(), "mcut": _z.clone(), "vbarb": _z.clone(),
             "cdef": _z.clone(), "crng": _z.clone(), "rxp": _o.clone(), "rplun": _o.clone(),
+            "pillm": _o.clone(),
             "rgold": _z.clone(), "infl": _z.clone(),
             "envoy1": torch.zeros(B, dtype=torch.bool, device=dev),
             "culsuz": _z.clone(),
@@ -1414,6 +1415,7 @@ class SimEconomy:
                 fx[_k] = fx[_k] + _t[adopted] * _gf
             fx["rxp"] = fx["rxp"] * torch.where(has_gov, self._gov_rxp[adopted], _o)
             fx["rplun"] = fx["rplun"] * torch.where(has_gov, self._gov_rplun[adopted], _o)
+            fx["pillm"] = fx["pillm"] * torch.where(has_gov, self._gov_pillm[adopted], _o)
             fx["gppmult"] = fx["gppmult"] * torch.where(
                 has_gov, self._gov_gppmult[adopted], torch.ones_like(fx["gppmult"]))
             fx["envoy1"] = fx["envoy1"] | (has_gov & self._gov_envoy1[adopted])
@@ -1465,6 +1467,7 @@ class SimEconomy:
                 _ones_p = torch.ones(B, self._npol, dtype=dt, device=dev)
                 fx["rxp"] = fx["rxp"] * torch.where(slotted, self._pol_rxp.unsqueeze(0).expand(B, -1), _ones_p).prod(dim=1)
                 fx["rplun"] = fx["rplun"] * torch.where(slotted, self._pol_rplun.unsqueeze(0).expand(B, -1), _ones_p).prod(dim=1)
+                fx["pillm"] = fx["pillm"] * torch.where(slotted, self._pol_pillm.unsqueeze(0).expand(B, -1), _ones_p).prod(dim=1)
                 fx["gppmult"] = fx["gppmult"] * torch.where(
                     slotted, self._pol_gppmult.unsqueeze(0).expand(B, -1),
                     torch.ones(B, self._npol, dtype=torch.float64, device=dev)).prod(dim=1)

@@ -12,7 +12,7 @@
  * strategic resources the Industrial Zone also reads.
  */
 
-import type { DistrictId, YieldKey } from '../core/types';
+import type { PlunderRow, DistrictId, YieldKey } from '../core/types';
 
 export type AdjacencySource =
   | 'MOUNTAIN' // +amount per adjacent mountain
@@ -71,6 +71,10 @@ export interface DistrictDef {
    * new district row carries its own appeal without touching either walk.
    */
   appealAdjacent: number;
+  /** CIV6 (Pillaging, GS data): what wrecking it pays the pillager; absent =
+   *  NO_PLUNDER (the City Center and the Encampment, which is conquered
+   *  instead — and the Dam, whose row is a 0 HP heal). */
+  plunder?: PlunderRow;
   /** CIV6 (Government Plaza): "+8 Loyalty to this city." A flat per-turn term
    *  like a building's, paid while the district stands complete. */
   loyalty?: number;
@@ -140,6 +144,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   CAMPUS: D({
     id: 'CAMPUS',
+    plunder: { kind: 'science', amount: 25 },
     name: 'Campus',
     code: 'CA',
     color: '#3f8fce',
@@ -164,6 +169,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   HOLY_SITE: D({
     id: 'HOLY_SITE',
+    plunder: { kind: 'faith', amount: 25 },
     name: 'Holy Site',
     code: 'HS',
     color: '#cfd4dc',
@@ -185,6 +191,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   THEATER_SQUARE: D({
     id: 'THEATER_SQUARE',
+    plunder: { kind: 'culture', amount: 25 },
     name: 'Theater Square',
     code: 'TS',
     color: '#b75fb3',
@@ -206,6 +213,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   COMMERCIAL_HUB: D({
     id: 'COMMERCIAL_HUB',
+    plunder: { kind: 'gold', amount: 50 },
     name: 'Commercial Hub',
     code: 'CH',
     color: '#e0b62e',
@@ -226,6 +234,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   HARBOR: D({
     id: 'HARBOR',
+    plunder: { kind: 'gold', amount: 50 },
     name: 'Harbor',
     code: 'HB',
     color: '#3fa7a0',
@@ -248,6 +257,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   INDUSTRIAL_ZONE: D({
     id: 'INDUSTRIAL_ZONE',
+    plunder: { kind: 'science', amount: 25 },
     name: 'Industrial Zone',
     code: 'IZ',
     color: '#c0622b',
@@ -285,6 +295,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   AQUEDUCT: D({
     id: 'AQUEDUCT',
+    plunder: { kind: 'gold', amount: 50 },
     name: 'Aqueduct',
     code: 'AQ',
     color: '#6fb8d8',
@@ -299,6 +310,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   ENTERTAINMENT_COMPLEX: D({
     id: 'ENTERTAINMENT_COMPLEX',
+    plunder: { kind: 'heal', amount: 50 },
     name: 'Entertainment Complex',
     code: 'EC',
     color: '#d86fa0',
@@ -315,6 +327,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   NEIGHBORHOOD: D({
     id: 'NEIGHBORHOOD',
+    plunder: { kind: 'gold', amount: 50 },
     name: 'Neighborhood',
     code: 'NH',
     color: '#7c8b4f',
@@ -334,6 +347,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   // appeal to adjacent tiles, and it hosts all four Science Victory projects.
   AERODROME: D({
     id: 'AERODROME',
+    plunder: { kind: 'gold', amount: 50 },
     name: 'Aerodrome',
     code: 'AER',
     color: '#7f8fa6',
@@ -349,6 +363,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   }),
   SPACEPORT: D({
     id: 'SPACEPORT',
+    plunder: { kind: 'science', amount: 25 },
     name: 'Spaceport',
     code: 'SPT',
     color: '#8d97ad',
@@ -387,6 +402,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   // number that can be built per city".
   CANAL: D({
     id: 'CANAL',
+    plunder: { kind: 'gold', amount: 50 },
     name: 'Canal',
     code: 'CN',
     color: '#4f9fbf',
@@ -405,6 +421,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   // this city".
   WATER_PARK: D({
     id: 'WATER_PARK',
+    plunder: { kind: 'heal', amount: 50 },
     name: 'Water Park',
     code: 'WP',
     color: '#4fb0c6',
@@ -424,6 +441,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   // "Cannot be built next to the City Center".
   PRESERVE: D({
     id: 'PRESERVE',
+    plunder: { kind: 'gold', amount: 50 },
     name: 'Preserve',
     code: 'PR',
     color: '#4f9f6a',
@@ -443,6 +461,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   // civilization".
   GOVERNMENT_PLAZA: D({
     id: 'GOVERNMENT_PLAZA',
+    plunder: { kind: 'culture', amount: 25 },
     name: 'Government Plaza',
     code: 'GP',
     color: '#b0894f',
@@ -463,6 +482,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   // or adjacent districts", "Limit of one per civilization".
   DIPLOMATIC_QUARTER: D({
     id: 'DIPLOMATIC_QUARTER',
+    plunder: { kind: 'culture', amount: 25 },
     name: 'Diplomatic Quarter',
     code: 'DQ',
     color: '#8f7fc6',

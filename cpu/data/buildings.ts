@@ -51,6 +51,10 @@ export interface BuildingDef {
   /** CIV6 (Grand Master's Chapel): "Grants the ability to buy land military
    *  units with Faith" — an empire-wide grant, like every Plaza building. */
   faithBuyUnits?: boolean;
+  /** CIV6 (Grand Master's Chapel): "Pillaging improvements and Districts
+   *  provides bonus Faith" — the data's flat 15 / 30 per wreck. */
+  pillageFaithImp?: number;
+  pillageFaithDist?: number;
   /** CIV6 (Consulate): "Spies operate at one level lower when targeting this
    *  city" — the Diplomatic Quarter itself carries the other two levels. */
   spyLevelPenalty?: number;
@@ -226,7 +230,7 @@ const rawList: BuildingDef[] = [
   { id: 'AUDIENCE_CHAMBER', name: 'Audience Chamber', district: 'GOVERNMENT_PLAZA', cost: 150, maintenance: 1, govTier: 1, govTitle: 1, noPurchase: true, exclusiveWith: ['ANCESTRAL_HALL', 'WARLORDS_THRONE'], loyaltyWithoutGovernor: -2 },
   { id: 'WARLORDS_THRONE', name: "Warlord's Throne", district: 'GOVERNMENT_PLAZA', cost: 150, maintenance: 1, govTier: 1, govTitle: 1, noPurchase: true, exclusiveWith: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER'] },
   { id: 'FOREIGN_MINISTRY', name: 'Foreign Ministry', district: 'GOVERNMENT_PLAZA', cost: 290, maintenance: 2, govTier: 2, govTitle: 1, noPurchase: true, favorPerTurn: 3, requiresAny: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER', 'WARLORDS_THRONE'], exclusiveWith: ['GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'] },
-  { id: 'GRAND_MASTERS_CHAPEL', name: "Grand Master's Chapel", district: 'GOVERNMENT_PLAZA', cost: 290, maintenance: 2, govTier: 2, govTitle: 1, noPurchase: true, faithBuyUnits: true, yields: { faith: 5 }, requiresAny: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER', 'WARLORDS_THRONE'], exclusiveWith: ['FOREIGN_MINISTRY', 'INTELLIGENCE_AGENCY'] },
+  { id: 'GRAND_MASTERS_CHAPEL', name: "Grand Master's Chapel", district: 'GOVERNMENT_PLAZA', cost: 290, maintenance: 2, govTier: 2, govTitle: 1, noPurchase: true, faithBuyUnits: true, pillageFaithImp: 15, pillageFaithDist: 30, yields: { faith: 5 }, requiresAny: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER', 'WARLORDS_THRONE'], exclusiveWith: ['FOREIGN_MINISTRY', 'INTELLIGENCE_AGENCY'] },
   { id: 'INTELLIGENCE_AGENCY', name: 'Intelligence Agency', district: 'GOVERNMENT_PLAZA', cost: 290, maintenance: 2, govTier: 2, govTitle: 1, noPurchase: true, spyCapacity: 1, requiresAny: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER', 'WARLORDS_THRONE'], exclusiveWith: ['FOREIGN_MINISTRY', 'GRAND_MASTERS_CHAPEL'] },
   { id: 'NATIONAL_HISTORY_MUSEUM', name: 'National History Museum', district: 'GOVERNMENT_PLAZA', cost: 440, maintenance: 3, govTier: 3, govTitle: 1, noPurchase: true, requiresAny: ['FOREIGN_MINISTRY', 'GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'], exclusiveWith: ['ROYAL_SOCIETY', 'WAR_DEPARTMENT'] },
   { id: 'ROYAL_SOCIETY', name: 'Royal Society', district: 'GOVERNMENT_PLAZA', cost: 440, maintenance: 3, govTier: 3, govTitle: 1, noPurchase: true, requiresAny: ['FOREIGN_MINISTRY', 'GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'], exclusiveWith: ['NATIONAL_HISTORY_MUSEUM', 'WAR_DEPARTMENT'] },

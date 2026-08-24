@@ -1221,12 +1221,12 @@ class SimInit:
         self.LUMBER = ids.index("LUMBER_MILL") if "LUMBER_MILL" in ids else -1
         self.SEASIDE = ids.index("SEASIDE_RESORT") if "SEASIDE_RESORT" in ids else -1
         self.FORT = ids.index("FORT") if "FORT" in ids else -1
-        # Food improvements heal their pillager (cpu/core/combat.ts
-        # PILLAGE_HEAL_IMPROVEMENTS); indexed by improvement code.
-        heal_names = ("FARM", "PASTURE", "CAMP", "PLANTATION", "FISHING_BOATS")
-        self._imp_heals = torch.tensor(
-            [n in heal_names for n in ids] or [False], dtype=torch.bool, device=device
-        )
+        # CIV6 (Pillaging): each improvement's plunder row — kind (0 none,
+        # 1 heal, 2 gold, 3 faith, 4 science, 5 culture) and base amount.
+        self._imp_plun_kind = torch.tensor(
+            [int(r.get("plun", [0, 0])[0]) for r in imp.get("rows", [])] or [0], dtype=torch.long, device=device)
+        self._imp_plun_amt = torch.tensor(
+            [int(r.get("plun", [0, 0])[1]) for r in imp.get("rows", [])] or [0], dtype=torch.long, device=device)
         self._farm_food = float(imp.get("farmFood", 1))
         self._farm_housing = float(imp.get("farmHousing", 0.5))
         self._mine_prod = float(imp.get("mineProd", 1))       # base MINE production
@@ -1484,6 +1484,7 @@ class SimInit:
             self._gov_crng = torch.tensor([float(r.get("cityRanged", 0)) for r in _govs], dtype=dtype, device=device)
             self._gov_rxp = torch.tensor([float(r.get("reconXpMult", 1)) for r in _govs], dtype=dtype, device=device)
             self._gov_rplun = torch.tensor([float(r.get("routePlunderMult", 1)) for r in _govs], dtype=dtype, device=device)
+            self._gov_pillm = torch.tensor([float(r.get("pillageMult", 1)) for r in _govs], dtype=dtype, device=device)
             self._gov_faith_units = torch.tensor([bool(r.get("faithBuyLandUnits", 0)) for r in _govs], dtype=torch.bool, device=device)
             self._gov_rgold = torch.tensor([float(r.get("routeGold", 0)) for r in _govs], dtype=dtype, device=device)
             self._gov_infl = torch.tensor([float(r.get("influencePerTurn", 0)) for r in _govs], dtype=dtype, device=device)
@@ -1512,6 +1513,7 @@ class SimInit:
                 + self._gov_vbarb.abs().sum() + self._gov_cdef.abs().sum()
                 + self._gov_crng.abs().sum() + (self._gov_rxp - 1).abs().sum()
                 + (self._gov_rplun - 1).abs().sum() + self._gov_rgold.abs().sum()
+                + (self._gov_pillm - 1).abs().sum()
                 + self._gov_infl.abs().sum() + self._gov_envoy1.sum()
                 + self._gov_culsuz.abs().sum() + self._gov_gpp.abs().sum()
                 + (self._gov_ucs_cs.abs() * ((self._gov_ucs_mask != 0) | self._gov_ucs_allc).double()).sum()
@@ -1558,6 +1560,7 @@ class SimInit:
             self._pol_crng = torch.tensor([float(r.get("cityRanged", 0)) for r in _pols], dtype=dtype, device=device)
             self._pol_rxp = torch.tensor([float(r.get("reconXpMult", 1)) for r in _pols], dtype=dtype, device=device)
             self._pol_rplun = torch.tensor([float(r.get("routePlunderMult", 1)) for r in _pols], dtype=dtype, device=device)
+            self._pol_pillm = torch.tensor([float(r.get("pillageMult", 1)) for r in _pols], dtype=dtype, device=device)
             self._pol_rgold = torch.tensor([float(r.get("routeGold", 0)) for r in _pols], dtype=dtype, device=device)
             self._pol_infl = torch.tensor([float(r.get("influencePerTurn", 0)) for r in _pols], dtype=dtype, device=device)
             self._pol_envoy1 = torch.tensor([bool(r.get("firstEnvoyDouble", 0)) for r in _pols], dtype=torch.bool, device=device)
@@ -1585,6 +1588,7 @@ class SimInit:
                 + self._pol_vbarb.abs().sum() + self._pol_cdef.abs().sum()
                 + self._pol_crng.abs().sum() + (self._pol_rxp - 1).abs().sum()
                 + (self._pol_rplun - 1).abs().sum() + self._pol_rgold.abs().sum()
+                + (self._pol_pillm - 1).abs().sum()
                 + self._pol_infl.abs().sum() + self._pol_envoy1.sum()
                 + self._pol_culsuz.abs().sum() + self._pol_gpp.abs().sum()
                 + (self._pol_ucs_cs.abs() * ((self._pol_ucs_mask != 0) | self._pol_ucs_allc).double()).sum()
@@ -1655,6 +1659,8 @@ class SimInit:
         self._b_walls = rules.b_walls.to(device)  # [NB] walls tier per building row
         self._b_no_purchase = rules.b_no_purchase.to(device)  # [NB] bool
         self._b_faith_units = rules.b_faith_units.to(device)  # [NB] bool
+        self._b_pill_faith_imp = rules.b_pill_faith_imp.to(device)  # [NB] long
+        self._b_pill_faith_dist = rules.b_pill_faith_dist.to(device)  # [NB] long
         self._walls_rows = [i for i, t in enumerate(rules.b_walls.tolist()) if int(t) > 0]
         # the ANCIENT tier's pool, which is what a fresh set of Walls is worth
         self._walls_hp = int(self._walls_tier_hp[1])
@@ -1702,6 +1708,10 @@ class SimInit:
         self._d_flood_shield = torch.tensor([bool(d.get("floodShield", 0)) for d in self.districts_cat], dtype=torch.bool, device=device)
         self._d_bomb_unowned = torch.tensor([bool(d.get("cultureBombUnowned", 0)) for d in self.districts_cat], dtype=torch.bool, device=device)
         self._d_spy_pen = torch.tensor([int(d.get("spyLevelPenalty", 0)) for d in self.districts_cat], dtype=torch.long, device=device)
+        # CIV6 (Pillaging): the district plunder rows, same enum as the
+        # improvements'
+        self._d_plun_kind = torch.tensor([int(d.get("plun", [0, 0])[0]) for d in self.districts_cat], dtype=torch.long, device=device)
+        self._d_plun_amt = torch.tensor([int(d.get("plun", [0, 0])[1]) for d in self.districts_cat], dtype=torch.long, device=device)
         self._preserve_housing = [int(x) for x in _er2.get("preserveHousing", [0, 0, 0, 0, 0])]
         self._d_unlock_t = torch.tensor([int(d.get("unlockTech", -1)) for d in self.districts_cat], dtype=torch.long, device=device)
         self._d_unlock_c = torch.tensor([int(d.get("unlockCivic", -1)) for d in self.districts_cat], dtype=torch.long, device=device)
@@ -2035,6 +2045,8 @@ class SimInit:
         # THE NAVAL RAIDER AXIS. `_type_sight` is the chassis override; 0 means
         # the SIGHT_RANGE default, which `_unit_sight` supplies.
         self._type_stealth = torch.tensor([bool(u.get("stealth", 0)) for u in ru], dtype=torch.bool, device=device)
+        # CIV6: the NAVAL RAIDER class — "Can perform Coastal Raids."
+        self._type_raider = torch.tensor([bool(u.get("raider", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_reveal = torch.tensor([bool(u.get("revealStealth", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_zoc_ignore = torch.tensor([bool(u.get("ignoresZoc", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_zoc_none = torch.tensor([bool(u.get("exertsNoZoc", 0)) for u in ru], dtype=torch.bool, device=device)

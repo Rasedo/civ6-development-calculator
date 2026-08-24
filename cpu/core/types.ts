@@ -4,6 +4,12 @@ import type { DistrictId, GameMap, YieldKey } from '../../world/types';
 
 export type FocusId = 'balanced' | YieldKey;
 
+/** CIV6 (Pillaging): what a wrecked improvement or district pays its
+ *  pillager. HEAL is a flat HP lump; every other kind is a yield lump that
+ *  scales with game progress (`progressScale`). */
+export type PlunderKind = 'heal' | 'gold' | 'faith' | 'science' | 'culture';
+export interface PlunderRow { kind: PlunderKind; amount: number }
+
 export type QueueItem =
   | { kind: 'district'; district: DistrictId; tileIndex: number; progress: number; cost?: number }
   | { kind: 'building'; building: string; progress: number }

@@ -128,6 +128,8 @@ export interface UnitDef {
   revealStealth?: boolean;
   /** CIV6: "Ignores enemy zone of control" — the mover is never halted. */
   ignoresZoc?: boolean;
+  /** CIV6: the NAVAL RAIDER class — "Can perform Coastal Raids." */
+  raider?: boolean;
   /** CIV6: "Does not exert zone of control" — the two submarines neither
    *  halt a passing enemy nor count toward a city's encirclement. */
   exertsNoZoc?: boolean;
@@ -665,6 +667,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     }),
     U({
       id: 'PRIVATEER',
+      raider: true,
       name: 'Privateer',
       cost: 280,
       maintenance: 4,
@@ -870,6 +873,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     }),
     U({
       id: 'SUBMARINE',
+      raider: true,
       name: 'Submarine',
       cost: 480,
       maintenance: 6,
@@ -1050,6 +1054,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     }),
     U({
       id: 'NUCLEAR_SUBMARINE',
+      raider: true,
       name: 'Nuclear Submarine',
       cost: 680,
       maintenance: 8,

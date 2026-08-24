@@ -498,8 +498,11 @@ class SimOrders:
                         was_l = self.improvement[cr, ct] == self.LUMBER
                         self.improvement[cr, ct] = torch.where(
                             was_l, torch.full_like(self.improvement[cr, ct], -1), self.improvement[cr, ct])
-                    done = (techs.sum(dim=1) + civics.sum(dim=1)).to(self.dtype)
-                    amount = js_round(20.0 + 2.5 * done)
+                    # CIV6 (harvest progression): x10 at 100% of the
+                    # LARGER tree — 1 + 9 * max(techs/67, civics/50)
+                    _psc = 1.0 + 9.0 * torch.maximum(techs.sum(dim=1).double() / 67.0,
+                                                     civics.sum(dim=1).double() / 50.0)
+                    amount = js_round(20.0 * _psc).to(self.dtype)
                     # the Deforestation Treaty pays a SECOND lump, in gold —
                     # decided over the WHOLE batch, because `ct` is narrowed
                     _dgold = self._congress_chop(self.feat_id.gather(1, hc.unsqueeze(1)).squeeze(1))[1]
@@ -612,10 +615,12 @@ class SimOrders:
 
             if _rk_pillage[n]:
                 _ts = self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1)
+                # a WAR with the tile's owner, city-state owners included —
+                # the mask's own clause, and `phase.ts`' replay arm
                 _en = (
-                    ((_ts >= 0) & (_ts < 100)
-                     & self.war[:, row].gather(1, _ts.clamp(min=0, max=self.NS - 1).unsqueeze(1)).squeeze(1))
-                    | ((_ts >= 100) & (_ts < BARB_SEAT))
+                    ((_ts >= 0) & (_ts < BARB_SEAT))
+                    & self.war[:, row].gather(
+                        1, self._seat_row[_ts.clamp(min=0)].unsqueeze(1)).squeeze(1)
                 )
                 _hi = (self.improvement.gather(1, hc.unsqueeze(1)).squeeze(1) >= 0) & ~self.pillaged.gather(1, hc.unsqueeze(1)).squeeze(1)
                 _hd = (
@@ -625,26 +630,106 @@ class SimOrders:
                     & (self.centre_slot_at.gather(1, hc.unsqueeze(1)).squeeze(1) < 0)
                 )
                 _pl = act & (a == self._A_PILLAGE) & (self._type_combat[utp.clamp(min=0)] > 0) & _en & (_hi | _hd)
-                if bool(_pl.any()):
-                    _r = _pl.nonzero(as_tuple=True)[0]
-                    _tt = hc[_r]
-                    _pi = _hi[_r]
+                # CIV6 (Coastal Raid): a NAVAL RAIDER on water beside enemy
+                # land infrastructure, holding 3+ MP, raids the adjacent tile
+                # — the same column, fired only when the tile underfoot
+                # offers nothing.
+                _rd = (act & (a == self._A_PILLAGE) & self._type_raider[utp.clamp(min=0)]
+                       & self.water.gather(1, hc.unsqueeze(1)).squeeze(1)
+                       & (self.unit_mp[torch.arange(B, device=self.device), sc] >= 3)
+                       & ~(_en & (_hi | _hd)))
+                if bool((_pl | _rd).any()):
+                    _r = (_pl | _rd).nonzero(as_tuple=True)[0]
+                    _tt = hc[_r].clone()
+                    _isr = _rd[_r]
+                    if bool(_isr.any()):
+                        # the raid target: the lowest-index adjacent enemy
+                        # LAND tile with an unpillaged improvement, else with
+                        # a wreckable district — `phase.ts`' raid arm ranks
+                        # by the same key.
+                        _rr = _r[_isr]
+                        _cand = self.neigh[hc[_rr]]                    # [n, 6]
+                        _cc = _cand.clamp(min=0)
+                        _ri = _rr.unsqueeze(1)
+                        _cts = self.tile_seat[_ri, _cc]
+                        _cown = (_cts >= 0) & (_cts < BARB_SEAT)
+                        _csr = self._seat_row[torch.where(_cown, _cts, torch.zeros_like(_cts))]
+                        _cwar = _cown & self.war[:, row][_ri, _csr]
+                        _ok0 = (_cand >= 0) & ~self.water[_ri, _cc] & _cwar
+                        _cimp = _ok0 & (self.improvement[_ri, _cc] >= 0) & ~self.pillaged[_ri, _cc]
+                        _cdis = (_ok0 & (self.district[_ri, _cc] >= 0)
+                                 & (self.district[_ri, _cc] != self._encamp_didx)
+                                 & self.district_complete[_ri, _cc]
+                                 & ~self.district_pillaged[_ri, _cc]
+                                 & (self.centre_slot_at[_ri, _cc] < 0))
+                        _big = torch.full_like(_cand, 1 << 30)
+                        _ki = torch.where(_cimp, _cand, _big).min(dim=1).values
+                        _kd = torch.where(_cdis, _cand, _big).min(dim=1).values
+                        _pick = torch.where(_ki < (1 << 30), _ki, _kd)
+                        _tt[_isr] = torch.where(_pick < (1 << 30), _pick, _tt[_isr])
+                    # one wreck body for underfoot and raid alike, keyed on
+                    # the RESOLVED tile — a raid with no live target no-ops
+                    _hi2 = (self.improvement[_r, _tt] >= 0) & ~self.pillaged[_r, _tt]
+                    _hd2 = ((self.district[_r, _tt] >= 0)
+                            & (self.district[_r, _tt] != self._encamp_didx)
+                            & self.district_complete[_r, _tt]
+                            & ~self.district_pillaged[_r, _tt]
+                            & (self.centre_slot_at[_r, _tt] < 0))
+                    _live = _hi2 | _hd2
+                    _r, _tt = _r[_live], _tt[_live]
+                    _pi = _hi2[_live]
+                    _pd = ~_pi
                     self.pillaged[_r[_pi], _tt[_pi]] = True
-                    _impv = self.improvement[_r[_pi], _tt[_pi]]
-                    _hl = self._imp_heals[_impv.clamp(min=0)] & (_impv >= 0)
-                    _hr = _r[_pi][_hl]
-                    if _hr.numel():
-                        _cap = int(self.rules.combat.get("unitHp", 100))
-                        self.unit_hp[_hr, sc[_hr]] = (self.unit_hp[_hr, sc[_hr]] + 25).clamp(max=_cap)
-                    _pd = ~_pi & _hd[_r]
                     self.district_pillaged[_r[_pd], _tt[_pd]] = True
                     self._air_scatter_from(_r[_pd], _tt[_pd])
-                    # CIV6 (Depredation): "Pillaging costs only 1 Movement
-                    # point" — without it the raid takes the whole turn.
+                    # ---- the plunder rows (`pillagePlunder`) ----
+                    _kind = torch.zeros(len(_r), dtype=torch.long, device=self.device)
+                    _amt = torch.zeros_like(_kind)
+                    _iv = self.improvement[_r, _tt].clamp(min=0)
+                    _kind[_pi] = self._imp_plun_kind[_iv[_pi]]
+                    _amt[_pi] = self._imp_plun_amt[_iv[_pi]]
+                    _dv = self.district[_r, _tt].clamp(min=0)
+                    _kind[_pd] = self._d_plun_kind[_dv[_pd]]
+                    _amt[_pd] = self._d_plun_amt[_dv[_pd]]
+                    # CIV6 (Grand Master's Chapel): "Pillaging improvements
+                    # and Districts provides bonus Faith" — the data's flat
+                    # 15 / 30 per wreck, whatever the plunder row says.
+                    if bool((self._b_pill_faith_imp > 0).any()):
+                        _ownb = self.city_bldg[:, row].any(dim=1)  # [B, NB]
+                        _fa_i = (_ownb.long() * self._b_pill_faith_imp.reshape(1, -1)).amax(dim=1)
+                        _fa_d = (_ownb.long() * self._b_pill_faith_dist.reshape(1, -1)).amax(dim=1)
+                        _fadd = torch.where(_pi, _fa_i[_r], _fa_d[_r])
+                        _fr2 = _fadd > 0
+                        if bool(_fr2.any()):
+                            self.civ_faith[_r[_fr2], row] += _fadd[_fr2].to(self.dtype)
+                    _hl = (_kind == 1) & (_amt > 0)
+                    if bool(_hl.any()):
+                        _hr = _r[_hl]
+                        _cap = int(self.rules.combat.get("unitHp", 100))
+                        self.unit_hp[_hr, sc[_hr]] = (self.unit_hp[_hr, sc[_hr]] + _amt[_hl]).clamp(max=_cap)
+                    _bk = (_kind >= 2) & (_amt > 0)
+                    if bool(_bk.any()):
+                        # a progress-scaled lump into the pillager's own
+                        # purse, times the policy multiplier (`TOTAL_WAR`)
+                        _br = _r[_bk]
+                        _psc = 1.0 + 9.0 * torch.maximum(techs.sum(dim=1).double() / 67.0,
+                                                         civics.sum(dim=1).double() / 50.0)
+                        _mult = torch.ones(len(_br), dtype=torch.float64, device=self.device)
+                        if self._gov_has_effects:
+                            _mult = self._fx_at_seat("pillm", torch.full_like(_br, row), _br).double()
+                        _lump = js_round(_amt[_bk].double() * _psc[_br] * _mult).to(self.dtype)
+                        _kk = _kind[_bk]
+                        for _kv, _purse in ((2, self.civ_treasury), (3, self.civ_faith),
+                                            (4, self.civ_tech_prog), (5, self.civ_civic_prog)):
+                            _m2 = _kk == _kv
+                            if bool(_m2.any()):
+                                _purse[_br[_m2], row] += _lump[_m2]
+                    # CIV6: pillaging takes "3 Movement Points, or all of
+                    # your movement"; Depredation prices it at 1.
                     _pc = self._promo_val(utp[_r], self.unit_promos[_r, sc[_r]], "PILLAGE_CHEAP")
+                    _cost = torch.where(_pc > 0, _pc, torch.full_like(_pc, 3))
                     _left = self.unit_mp[_r, sc[_r]]
-                    self.unit_mp[_r, sc[_r]] = torch.where(_pc > 0, (_left - _pc).clamp(min=0),
-                                                           torch.zeros_like(_left))
+                    self.unit_mp[_r, sc[_r]] = (_left - _cost).clamp(min=0)
                     self._eff_version += 1
 
             if _rk_spread[n]:
@@ -1269,13 +1354,18 @@ class SimOrders:
                 pillage = act & ~attack & h_imp & h_unpil & h_owned
                 if bool(pillage.any()):
                     rows = pillage.nonzero(as_tuple=True)[0]
-                    heal_r = self._imp_heals[self.improvement[rows, here[rows]].clamp(min=0)]
+                    _impv = self.improvement[rows, here[rows]].clamp(min=0)
+                    # the plunder row's HEAL pays anyone; a barbarian has no
+                    # purse to bank the other kinds (`pillagePlunder`)
+                    heal_amt = torch.where(self._imp_plun_kind[_impv] == 1,
+                                           self._imp_plun_amt[_impv], torch.zeros_like(_impv))
                     self.pillaged[rows, here[rows]] = True
                     self.barb_unit_mp[rows, u] = 0  # the turn is spent (TS movesLeft = 0)
                     self._eff_version += 1  # a farm's yield just dropped
                     hp_cap = self.rules.combat.get("unitHp", 100)
                     self.barb_unit_hp[rows, u] = torch.where(
-                        heal_r, (self.barb_unit_hp[rows, u] + 25).clamp(max=hp_cap), self.barb_unit_hp[rows, u]
+                        heal_amt > 0, (self.barb_unit_hp[rows, u] + heal_amt).clamp(max=hp_cap),
+                        self.barb_unit_hp[rows, u]
                     )
 
             dist_pillage = torch.zeros_like(act)
@@ -1292,9 +1382,18 @@ class SimOrders:
                                 & h_dcomp & h_dunpil & h_downed)
                 if bool(dist_pillage.any()):
                     rows = dist_pillage.nonzero(as_tuple=True)[0]
+                    _dvv = h_dist[rows].clamp(min=0)
+                    # a HEAL-plunder district pays its wrecker like a farm
+                    _dheal = torch.where(self._d_plun_kind[_dvv] == 1,
+                                         self._d_plun_amt[_dvv], torch.zeros_like(_dvv))
                     self.district_pillaged[rows, here[rows]] = True
                     self._air_scatter_from(rows, here[rows])
                     self.barb_unit_mp[rows, u] = 0  # the turn is spent (TS movesLeft = 0)
+                    hp_cap = self.rules.combat.get("unitHp", 100)
+                    self.barb_unit_hp[rows, u] = torch.where(
+                        _dheal > 0, (self.barb_unit_hp[rows, u] + _dheal).clamp(max=hp_cap),
+                        self.barb_unit_hp[rows, u]
+                    )
                     self._eff_version += 1  # district yields just dropped
 
             march = act & ~attack & ~pillage & ~dist_pillage

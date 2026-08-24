@@ -1,7 +1,10 @@
 
-import { seatOf, tileSeat, cityAtTile } from './seats';
+import { seatOf, tileSeat, cityAtTile, citiesOf, isCiv, unitSeat } from './seats';
 
-import type { City, GameState, ResearchState, Tile, YieldKey } from './types';
+import type { City, GameState, PlunderRow, ResearchState, Tile, Unit, YieldKey } from './types';
+import { getModifiers } from './effects';
+import { UNIT_HP } from '../data/units';
+import { BUILDINGS } from '../data/buildings';
 import { computeUnlocksIn } from './effects';
 import { repairDrip } from './rules';
 import { FEATURES } from '../../world/features';
@@ -38,13 +41,55 @@ export function selectResearch(rsr: ResearchState, id: string | null, isCivic = 
 }
 
 /**
- * Era-scaled value of a chop/harvest (Civ 6 scales with game progress;
- * we scale with completed research: ~20 ancient, ~150 late).
+ * CIV6 (harvest/plunder progression): a lump scales with the LARGER of tech
+ * progress (of the 67-tech tree) and civic progress (of the 50-civic tree),
+ * x10 at 100% — the chop's 20 becomes 200, a quarry harvest's 25 becomes 250.
  */
+export function progressScale(r: ResearchState | undefined): number {
+  return 1 + 9 * Math.max((r?.techs.length ?? 0) / 67, (r?.civics.length ?? 0) / 50);
+}
+
+/** CIV6: the base 20 of a feature chop, on the progression above. */
 export function chopValue(state: GameState, seat: number): number {
-  const r = seatOf(state, seat)?.research;
-  const done = (r?.techs.length ?? 0) + (r?.civics.length ?? 0);
-  return Math.round(20 + 2.5 * done);
+  return Math.round(20 * progressScale(seatOf(state, seat)?.research));
+}
+
+/**
+ * CIV6 (Pillaging): pay the pillager what the wrecked target's plunder row
+ * says. HEAL is a flat HP lump; every other kind is a progress-scaled yield
+ * lump into the pillager's own purse, times the policy multiplier
+ * (`TOTAL_WAR`). A seat with no purse — barbarians, a minor's walker —
+ * still heals; only a major banks. The Grand Master's Chapel's flat faith
+ * rides EVERY wreck a major makes, whatever the plunder row says.
+ */
+export function pillagePlunder(state: GameState, unit: Unit, row: PlunderRow | undefined, district = false): void {
+  const seat = unitSeat(unit);
+  if (isCiv(seat)) {
+    const cs = seatOf(state, seat);
+    if (cs) {
+      let chap = 0;
+      for (const c of citiesOf(state, seat)) {
+        for (const b of c.buildings) {
+          const v = district ? BUILDINGS[b]?.pillageFaithDist : BUILDINGS[b]?.pillageFaithImp;
+          if (v && v > chap) chap = v;
+        }
+      }
+      if (chap) cs.faith += chap;
+    }
+  }
+  if (!row || row.amount <= 0) return;
+  if (row.kind === 'heal') {
+    unit.hp = Math.min(UNIT_HP, unit.hp + row.amount);
+    return;
+  }
+  if (!isCiv(seat)) return;
+  const s = seatOf(state, seat);
+  if (!s) return;
+  const lump = Math.round(row.amount * progressScale(s.research) * getModifiers(state, seat).pillageMult);
+  if (row.kind === 'gold') s.treasury += lump;
+  else if (row.kind === 'faith') s.faith += lump;
+  else if (row.kind === 'science') s.research.techProgress += lump;
+  else s.research.civicProgress += lump;
 }
 
 export interface LumpGrant {
