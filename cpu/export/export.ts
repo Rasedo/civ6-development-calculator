@@ -19,8 +19,13 @@ import { buildFixture } from './planes';
 import { buildRules } from './rules';
 import { exportStamp } from './stamp';
 
-const DIR = process.argv[2] ?? 'seeder/worlds';
-const LOCK_PATH = 'seeder/worlds.lock';
+const eargs = process.argv.slice(2);
+const epi = eargs.indexOf('--preset');
+const PRESET = epi >= 0 ? eargs.splice(epi, 2)[1] : null;
+// a preset family lives in its own directory with its own lock; the baseline
+// keeps today's paths, so `npm run export` alone still means the gate set.
+const DIR = eargs[0] ?? (PRESET ? `seeder/worlds/presets/${PRESET}` : 'seeder/worlds');
+const LOCK_PATH = PRESET ? `${DIR}/worlds.lock` : 'seeder/worlds.lock';
 
 const worldFiles = readdirSync(DIR)
   .filter((f) => /^seed\d+\.world\.json$/.test(f))

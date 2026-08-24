@@ -25,7 +25,11 @@ from pathlib import Path
 
 import torch
 
-FIXTURES = Path(__file__).resolve().parent.parent.parent / "seeder" / "worlds"
+# CIV6_WORLDS_DIR points the whole python side — fixture loads, serve_gate
+# and the TS children it spawns, the probes — at another fixture family
+# (e.g. seeder/worlds/presets/<name>). Unset = the baseline gate set.
+FIXTURES = Path(os.environ.get("CIV6_WORLDS_DIR")
+                or Path(__file__).resolve().parent.parent.parent / "seeder" / "worlds").resolve()
 
 # ---------------------------------------------------------------------------
 # Hex math (mirrors world/hex.ts: pointy-top, odd-r offset)

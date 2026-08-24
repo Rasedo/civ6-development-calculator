@@ -26,27 +26,45 @@ import { RESOURCES } from '../world/resources';
 import { WONDERS } from '../world/wonders';
 import type { WorldFile } from '../world/file';
 import { placeCivs, placeCityStates, PLACEMENT_VERSION } from './place';
+import { WORLD_PRESETS } from './presets';
 import { genStamp } from './stamp';
 
 const args = process.argv.slice(2).filter((a) => a !== '--check');
 const CHECK = process.argv.includes('--check');
-const N_SEEDS = Number(args[0] ?? 12);
-const CITY_STATE_MAX = Number(args[1] ?? 3);
-const CIV_COUNT = Number(args[2] ?? 3);
-const OUT = args[3] ?? 'seeder/worlds';
-const WIDTH = 44;
-const HEIGHT = 26;
-const LOCK_PATH = 'seeder/worlds.lock';
+const pi = args.indexOf('--preset');
+const PRESET_NAME = pi >= 0 ? args.splice(pi, 2)[1] : 'baseline';
+const P = WORLD_PRESETS[PRESET_NAME];
+if (!P) throw new Error(`unknown world preset '${PRESET_NAME}' — have: ${Object.keys(WORLD_PRESETS).join(', ')}`);
+const N_SEEDS = Number(args[0] ?? P.nSeeds);
+const CITY_STATE_MAX = Number(args[1] ?? P.cityStateMax);
+const CIV_COUNT = Number(args[2] ?? P.civCount);
+// baseline keeps today's paths; any other preset gets ITS OWN directory and
+// ITS OWN lock, so seeding a preset can never clobber the baseline family.
+const OUT = args[3] ?? (PRESET_NAME === 'baseline' ? 'seeder/worlds' : `seeder/worlds/presets/${PRESET_NAME}`);
+const WIDTH = P.width;
+const HEIGHT = P.height;
+const LOCK_PATH = PRESET_NAME === 'baseline' ? 'seeder/worlds.lock' : `${OUT}/worlds.lock`;
 
-const seeds = Array.from({ length: N_SEEDS }, (_, s) => 9001 + s * 13);
+const seeds = Array.from({ length: N_SEEDS }, (_, s) => P.firstSeed + s * 13);
 
-const params = { width: WIDTH, height: HEIGHT, cityStateMax: CITY_STATE_MAX, civCount: CIV_COUNT };
+const params = {
+  width: WIDTH, height: HEIGHT, cityStateMax: CITY_STATE_MAX, civCount: CIV_COUNT,
+  layout: P.layout, landFraction: P.landFraction,
+  resourceMult: P.resourceMult, resourceWeights: P.resourceWeights,
+};
 const stamp = genStamp({ ...params, seeds, placement: PLACEMENT_VERSION });
 
 const ELEVATIONS = ['FLAT', 'HILLS', 'MOUNTAIN'];
 
 function buildWorld(seed: number): WorldFile {
-  const map = generateMap({ width: WIDTH, height: HEIGHT, seed, withResources: true, withWonders: true, withVillages: false });
+  const map = generateMap({
+    width: WIDTH, height: HEIGHT, seed, withResources: true, withWonders: true, withVillages: false,
+    layout: P.layout, landFraction: P.landFraction, resourceMult: P.resourceMult,
+    // the default triple keeps the picker's LITERAL 0.45/0.8 boundaries — the
+    // normalised quotient of the same weights is a different float.
+    resourceWeights: P.resourceWeights[0] === 0.45 && P.resourceWeights[1] === 0.35 && P.resourceWeights[2] === 0.2
+      ? undefined : P.resourceWeights,
+  });
   const catalogs = {
     terrains: Object.keys(TERRAINS),
     elevations: ELEVATIONS,

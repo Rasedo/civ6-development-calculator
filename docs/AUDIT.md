@@ -42,7 +42,8 @@ from the list below.
 | Open item | Weight | What is open |
 |---|---|---|
 | A-1r the district registry holds ONE tile per TYPE | 1 | registry-counted columns undercount a repeatable district; every such column is zero today, so it is a trap, not a live bug |
-| **A. Engine vs engine** | **1** | |
+| A-2 the road apply arm skips the wonder clause | 1 | TS `canBuildRoad` accepts a natural-wonder tile the GPU mask refuses; unreachable until the driver fuzzes a road order |
+| **A. Engine vs engine** | **2** | |
 | B-20r tourism tails | 1 | the Naturalist's progressive cost is unsourced; the park rhombus has no canonical vertical |
 | B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
 | B-22r World Congress | 2 | the observation renders the standing slate, four resolutions have no carrier, the culture bomb spares unfinished construction, scored competitions and peace TERMS are absent |
@@ -114,6 +115,13 @@ exporter.
   three repeatable districts, so nothing diverges today — this is a trap for
   the next repeatable row. Closing it means a per-city COUNT plane beside
   the registry, or moving each column onto the tile walk.
+
+- **A-2. THE ROAD APPLY ARM SKIPS THE WONDER CLAUSE.** The GPU's
+  `_seat_engineer_job_mask` refuses a road on a natural-wonder tile
+  (`~self.nwonder`); the TS apply arm validates with `canBuildRoad`, which
+  asks `engineerTileOk` and never the wonder. No driven trajectory reaches
+  it (the mask never offers the tile), but the driver may fuzz decisions,
+  and then TS lays a road the GPU refused. One clause in `canBuildRoad`.
 
 What is NOT a source of new members: a seat asymmetry. Seat 0 rides the same
 machinery as every other row, and `tools/gpu/seat_symmetry_check.py` holds
@@ -514,10 +522,14 @@ under their blocker so the dependency is readable, and both halves count.
   - **THE CONGRESS SLATE ROTATES BY SESSION** where the real slate is a
     random draw among era-eligible resolutions — the ORDER of the slate,
     not its contents.
-  - **WHICH CITY-STATES A GAME GETS.** `seeder/place.ts` places the same
-    eighteen minors in order, so the catalog's later rows (Caguana,
-    Hunza, Cardiff, Valletta, Akkad, Armagh) are placed by no seed and
-    their suzerain rules are gate-unreachable. Drawing here would move
+  - **WHICH CITY-STATES A GAME GETS.** `seeder/place.ts` carries its own
+    eighteen-name pool (a copy of the cpu catalog's twenty-four, six rows
+    absent from it entirely: Caguana, Hunza, Cardiff, Valletta, Akkad,
+    Armagh) and places three per world by a type draw plus first-unused
+    name. Across the twelve gate seeds eleven names appear, so THIRTEEN
+    of the twenty-four catalog rows — their suzerain rules with them —
+    are placed by no seed; the `islands` world preset raises
+    `cityStateMax` but draws from the same pool. Drawing here would move
     `genStamp` and re-seed every fixture.
 - **C-16. THE SPY'S SECOND HALF.** Weight 2. The Spy, its capacity, the
   jump, the eleven-mission catalog, the counterspy post and the capture
@@ -703,6 +715,19 @@ A green serve run proves the two engines agree over the regime the scripted
 seeds actually enter. MEASURED, 12 seeds x 250 turns driven
 (`tools/gpu/reachability_probe.py`) — counts, not estimates. Re-measure
 every row whenever the DRIVEN policy changes.
+
+Two levers widen the regime without touching the fixed seed set, and both
+are gates in their own right (each preset family holds a 250-turn serve
+green): DRIVER STYLES (`--styles` on the probe and the serve gate, presets
+in `policy/ladder.py::STYLE_PRESETS`) and WORLD PRESETS
+(`seeder/presets.ts`; per-family fixtures under `seeder/worlds/presets/`,
+selected with `CIV6_WORLDS_DIR`). Their first outing reached and killed
+three latent divergences the baseline regime never entered: the embarked
+civilian counted as Support (islands), the un-validated TS building-queue
+replay arm plus `availableBuildings` refusing every government-tier row
+(islands), and the jobs twin's missing MILITARY ENGINEER arm (abundant).
+The table below stays measured on the BASELINE family; a preset run's
+coverage is measured the same way with `CIV6_WORLDS_DIR` set.
 
 | mechanic | seeds reaching | first |
 |---|---|---|

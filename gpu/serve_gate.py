@@ -201,10 +201,13 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     sc_man = statecompare.load_manifest()
     statecompare.check_extractors(sc_man)
     dig_dumped = False
+    _cb = os.environ.get("CIV6_CBLOG_B")
+    if _cb is not None:
+        sim._log_combat_b = int(_cb)
     for row in seats:
         drive.take_seat(sim, row)
     NT, NC = sim.civ_techs.shape[2], sim.civ_civics.shape[2]
-    ctx_lo = env.observe(1).shape[1] - ladder.CTX_SEAT
+    ctx_lo = env.observe(0).shape[1] - ladder.CTX_SEAT
 
     t0 = 0
     if ckpt_every or resume:
@@ -229,7 +232,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             assert ckpt_dir is not None
             child_env["CIV6_SERVE_LOAD"] = str(ckpt_dir / f"b_seed{sd}_t{resume}.json")
         children.append(subprocess.Popen(
-            ["npx", "vite-node", "cpu/driver/serve.ts", "--", str(turns), "seeder/worlds"],
+            ["npx", "vite-node", "cpu/driver/serve.ts", "--", str(turns), str(FIXTURES)],
             cwd=ROOT, env=child_env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL, text=True, encoding="utf-8", shell=True,
         ))
@@ -382,6 +385,11 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                                                       statecompare.group_dump(sim, b, gname, sc_man),
                                                       dmp["dumps"][gname]):
                                     print(line)
+                            if sim._log_combat_b == b:
+                                for ev in sim._combat_events[-16:]:
+                                    print(f"  CB-GPU {ev}")
+                                for ev in dmp.get("cb", []):
+                                    print(f"  CB-TS  {ev}")
                 if ckpt_every and (t + 1) % ckpt_every == 0:
                     assert ckpt_dir is not None
                     ch.stdin.write(json.dumps({"ckpt": str(ckpt_dir / f"b_seed{seeds[b]}_t{t + 1}.json")}) + "\n")
@@ -440,12 +448,20 @@ def main() -> None:
     ap.add_argument("--ckpt-every", type=int, default=0, help="checkpoint both engines every K completed turns (0 = off)")
     ap.add_argument("--ckpt-dir", default=".claude/scratchpad/serve_ckpt", help="where checkpoints live (GPU .pt + per-seed TS .json)")
     ap.add_argument("--resume", type=int, default=0, help="resume from the checkpoint taken at this turn (a prior --ckpt-every run, same seeds)")
+    ap.add_argument("--styles", default=None,
+                    help="comma list of ladder.STYLE_PRESETS names assigned per seat (cycled); "
+                         "omit for today's drawn styles — the battery runs without it")
     ap.add_argument("--profile", action="store_true", help="batched only: print the turn-loop wall-time split (TS-children wait vs GPU vs digest)")
     ap.add_argument("--cprofile", default="", help="batched only: 'T0-T1' — cProfile the loop body over that turn window, in situ")
     ap.add_argument("--cprofile-out", default="", help="with --cprofile: also dump the raw pstats there, for caller attribution")
     args = ap.parse_args()
     ckpt_dir = Path(args.ckpt_dir)
 
+    if args.styles:
+        names = args.styles.split(",")
+        bad = [n for n in names if n not in ladder.STYLE_PRESETS]
+        assert not bad, f"unknown style preset(s) {bad}; have {sorted(ladder.STYLE_PRESETS)}"
+        drive.STYLE_TABLE = names
     if args.batched:
         only = None
         if args.seeds and args.seeds != "all":
@@ -484,10 +500,13 @@ def main() -> None:
     sc_man = statecompare.load_manifest()
     statecompare.check_extractors(sc_man)
     dig_dumped = False
+    _cb = os.environ.get("CIV6_CBLOG_B")
+    if _cb is not None:
+        sim._log_combat_b = int(_cb)
     for row in seats:
         drive.take_seat(sim, row)
     NT, NC = sim.civ_techs.shape[2], sim.civ_civics.shape[2]
-    ctx_lo = env.observe(1).shape[1] - ladder.CTX_SEAT
+    ctx_lo = env.observe(0).shape[1] - ladder.CTX_SEAT
 
     # Resume — the batched path's twin (GPU snapshot + TS state dump).
     t0 = 0
@@ -509,7 +528,7 @@ def main() -> None:
     if args.resume:
         child_env["CIV6_SERVE_LOAD"] = str(ckpt_dir / f"s{args.seed}_t{args.resume}.json")
     child = subprocess.Popen(
-        ["npx", "vite-node", "cpu/driver/serve.ts", "--", str(args.turns), "seeder/worlds"],
+        ["npx", "vite-node", "cpu/driver/serve.ts", "--", str(args.turns), str(FIXTURES)],
         cwd=ROOT, env=child_env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL, text=True, encoding="utf-8", shell=True,
     )

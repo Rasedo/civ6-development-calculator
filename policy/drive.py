@@ -1,12 +1,27 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import torch
 
 import ladder
 from core import simbase
+
+
+# The per-seat STYLE assignment. None = today's behaviour exactly: every
+# knob at its default and the deep/diplo booleans drawn per (seed, seat).
+# A list of ladder.STYLE_PRESETS names assigns seat r the r-th entry
+# (cycled). The draws are salted hashes, not a consumed stream, so a pinned
+# boolean skips nothing for anybody else.
+STYLE_TABLE: list | None = None
+
+
+def _seat_style(row: int) -> dict:
+    if STYLE_TABLE is None:
+        return ladder.STYLE_KNOBS
+    return ladder.style_of(STYLE_TABLE[row % len(STYLE_TABLE)])
 
 
 def _prod_ctx(blocks: dict, sim, seat: int) -> dict:
@@ -30,12 +45,21 @@ def _prod_ctx(blocks: dict, sim, seat: int) -> dict:
     # seat-0 arm this replaced read a `sim.C` that was itself
     # `rules.seats.maxCities`, so the fork never carried a difference; the
     # storage rename left the name dangling and the branch pointless.)
-    cap = int(sim.rules.seats.get("maxCities", 6))
+    style = _seat_style(seat)
+    cap = (int(sim.rules.seats.get("maxCities", 6)) if style["city_cap"] is None
+           else int(style["city_cap"]))
     nS = len(sim._scaffold) if sim.districts_on else 0
+    # WHICH district to place is a decision, and the driver rotates it so
+    # the whole scaffold is reached rather than only its head; a style's
+    # dist_pref pins the rotation START to a named district, keeping the
+    # legal fallthrough.
+    rot = ((seat + sim.turn) % nS) if nS else None
+    if nS and style["dist_pref"] is not None:
+        si = next((k for k, (di, *_r) in enumerate(sim._scaffold)
+                   if sim.districts_cat[di].get("id") == style["dist_pref"]), None)
+        rot = si if si is not None else rot
     return {
-        # WHICH district to place is a decision, and the driver rotates it so
-        # the whole scaffold is reached rather than only its head.
-        "dist_rot": ((seat + sim.turn) % nS) if nS else None,
+        "dist_rot": rot,
         "settler_queued": emp[:, 6] > 0.5,  # raw queued-settler count
         "is_capital": is_cap,  # the wonder tier's capital heuristic (city col 9)
         "melee": ctx[:, 2].long(),
@@ -780,9 +804,15 @@ def _geo_turn(sim, seeds=None):
         for b in range(nrow):
             if a != b:
                 prox[a, b] = sim._seat_proximity(a, b)
-    diplo = (torch.stack([_policy_rng(sim, seeds, 0, r, 5) for r in range(nrow)], dim=1)
-             < ladder.DIPLO_SHARE
-             if seeds is not None else torch.zeros(B, nrow, dtype=torch.bool, device=dev))
+    def _diplo_row(r: int) -> torch.Tensor:
+        pin = _seat_style(r)["diplo"]
+        if pin is not None:
+            return torch.full((B,), bool(pin), dtype=torch.bool, device=dev)
+        if seeds is None:
+            return torch.zeros(B, dtype=torch.bool, device=dev)
+        return _policy_rng(sim, seeds, 0, r, 5) < ladder.DIPLO_SHARE
+
+    diplo = torch.stack([_diplo_row(r) for r in range(nrow)], dim=1)
     ob_civic = (sim.civ_civics[:, :nrow, sim._open_borders_civic]
                 if sim._open_borders_civic >= 0 else torch.zeros_like(alive_row))
     al_civic = (sim.civ_civics[:, :nrow, sim._alliance_civic]
@@ -882,11 +912,16 @@ def _district_tiles(sim, row: int, prod: torch.Tensor):
 def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int = 4, seeds=None, turn=None, pre: dict | None = None):
     m = sim.seat_masks(row)
     blocks = _blocks(env, sim, row, obs=None if pre is None else pre.get("obs"))
-    prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(blocks, sim, row))
+    style = _seat_style(row)
+    prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(blocks, sim, row),
+                                  tier_order=style["tier_order"])
     dtile = _district_tiles(sim, row, prod)
     # turn 0 keeps the draw PERSISTENT: a seat's style is fixed for the game.
-    deep = (_policy_rng(sim, seeds, 0, row, 4) < ladder.DEEP_SHARE
-            if seeds is not None else None)
+    if style["deep"] is not None:
+        deep = torch.full((sim.B,), bool(style["deep"]), dtype=torch.bool, device=sim.device)
+    else:
+        deep = (_policy_rng(sim, seeds, 0, row, 4) < ladder.DEEP_SHARE
+                if seeds is not None else None)
     tech = ladder.pick_research(blocks, m["tech"], "tech", deep) if bool(m["tech"].any()) else None
     civic = ladder.pick_research(blocks, m["civic"], "civic", deep) if bool(m["civic"].any()) else None
     war = None
@@ -896,7 +931,7 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
             "peace": _policy_rng(sim, seeds, turn, row, 2),
             "raid": _policy_rng(sim, seeds, turn, row, 3),
         }
-        war = ladder.pick_war(m["war"], _war_ctx(blocks), rng_w)
+        war = ladder.pick_war(m["war"], _war_ctx(blocks), rng_w, style=style)
     env_seq = None
     if seeds is not None and turn is not None and sim.S > 0:
         env_seq = _seat_envoys(sim, row)
@@ -1265,7 +1300,8 @@ def drive_batched(env, turns: int, seats=None, seeds=None) -> list:
     seats = list(range(1, sim.n_majors)) if seats is None else list(seats)
     NB = sim.rules_dev.b_cost.shape[0]
     classes = ladder.prod_classes(NB, sim.NU, len(sim._scaffold), sim._wond_n if sim.districts_on else 0, len(sim._proj_rows) if sim.districts_on else 0)
-    rj = json.loads((Path(__file__).resolve().parent.parent / "seeder" / "worlds" / "rules.json").read_text(encoding="utf-8"))
+    _wdir = Path(os.environ.get("CIV6_WORLDS_DIR") or Path(__file__).resolve().parent.parent / "seeder" / "worlds")
+    rj = json.loads((_wdir / "rules.json").read_text(encoding="utf-8"))
     roster = ladder.unit_roster(rj["units"])
     for row in seats:
         take_seat(sim, row)

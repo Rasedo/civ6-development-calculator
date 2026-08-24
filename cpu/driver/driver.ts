@@ -21,7 +21,7 @@ import { GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT } from '../data/constants';
 import { PEACE_GOLD_COST, DED_MONUMENTALITY } from '../data/seats';
 import { tradeCapacity, freeTrader, routeYields, routeYieldsInternational, cityStateRouteYields, routeInRange, routePostGold } from '../core/trade';
 import { isExplored } from '../core/fog';
-import { buildingFaithCost, endTurn, goldAffordable, naturalistCost, settlerCost, tilePurchaseCost, unitPurchaseCost } from '../core/game';
+import { buildingFaithCost, endTurn, engineerFinishCity, goldAffordable, naturalistCost, settlerCost, tilePurchaseCost, unitPurchaseCost } from '../core/game';
 import { goldenDedication, monumentalityBuyMult } from '../core/eras';
 import { builderCost, goldBuyableUnits } from '../core/units';
 import { hasMet, isSuzerain } from '../core/cityStates';
@@ -30,7 +30,7 @@ import { WORSHIP_BUILDINGS, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, ENHANCE
 import { LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { observeSeat } from '../core/observe';
 import { stateDigest, groupDump } from '../core/statecompare';
-import { availableBuildings, buildingCompletable, validImprovementsIn } from '../core/rules';
+import { availableBuildings, buildingCompletable, canBuildRoad, validImprovementsIn } from '../core/rules';
 import { computeUnlocksIn, getModifiers, isCivicComplete } from '../core/effects';
 import { hexDistance } from '../../world/hex';
 import { isWater } from '../../world/query';
@@ -300,6 +300,15 @@ for (let t = 0; t < N_TURNS; t++) {
         const spreadTargets = actor.religion.founded
           ? allCities(state).filter((c) => c.followedReligion !== seat)
           : [];
+        // `_seat_engineer_job_mask`'s twin, built only when an engineer with
+        // charges will ask: an unroaded engineer tile (never a natural
+        // wonder), an engineer improvement site, or a 20%-charge site (a
+        // queued AQUEDUCT/CANAL/DAM dig or the Flood Barrier's centre).
+        let engJobTiles: Tile[] | null = null;
+        const engTiles = () => (engJobTiles ??= state.map.tiles.filter((t) =>
+          (canBuildRoad(t, owns) && !t.wonder)
+          || validImprovementsIn(t, { unlocks: unl, ownsTile: owns, map: state.map, camps, builder: 'MILITARY_ENGINEER' }).length > 0
+          || engineerFinishCity(state, seat, t.index) !== undefined));
         for (const u of state.units) {
           if (u.seat !== seat) continue;
           let jt = -1;
@@ -307,6 +316,13 @@ for (let t = 0; t < N_TURNS; t++) {
             const ut = state.map.tiles[u.tileIndex];
             let bk = Infinity;
             for (const t of jobTiles) {
+              const k = hexDistance(ut.col, ut.row, t.col, t.row) * nT + t.index;
+              if (k < bk) { bk = k; jt = t.index; }
+            }
+          } else if (u.type === 'MILITARY_ENGINEER' && (u.charges ?? 0) > 0) {
+            const ut = state.map.tiles[u.tileIndex];
+            let bk = Infinity;
+            for (const t of engTiles()) {
               const k = hexDistance(ut.col, ut.row, t.col, t.row) * nT + t.index;
               if (k < bk) { bk = k; jt = t.index; }
             }
@@ -370,7 +386,8 @@ for (let t = 0; t < N_TURNS; t++) {
     if (!ctl.dump) break;
     const dumps: Record<string, unknown> = {};
     for (const g of ctl.dump) dumps[g] = groupDump(state, g);
-    o.send({ dumps });
+    const cb = (globalThis as { __cbLog?: string[] }).__cbLog;
+    o.send(cb ? { dumps, cb: cb.slice(-16) } : { dumps });
   }
 }
 }

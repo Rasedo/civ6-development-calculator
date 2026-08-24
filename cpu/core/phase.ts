@@ -36,7 +36,7 @@ import { CIVICS } from '../data/civics';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { UNITS, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_TECH } from '../data/units';
-import { buildingCostIn, outerPool, wallsMax, urbanDefensesFit, repairDrip } from './rules';
+import { availableBuildings, buildingCostIn, outerPool, wallsMax, urbanDefensesFit, repairDrip } from './rules';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEON_FAITH_COST, RELIGION_NAMES } from '../data/religion';
 import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, borderGrowthCost } from '../data/constants';
@@ -1002,7 +1002,11 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
     if (a < NB) {
       const id = buildings[a];
       const def = id ? BUILDINGS[id] : undefined;
-      if (def) commitProduction(state, civCity.seat, civCity, { kind: 'building', building: id, progress: 0 });
+      // Re-validate AVAILABILITY at apply, exactly as the unit arm does with
+      // trainableUnits: the GPU applier refuses what _seat_buildable refuses,
+      // and the walls clause can flip mid-turn — this turn's city strikes
+      // damage the defenses after the mask that justified the pick.
+      if (def && availableBuildings(state, civCity).some((b) => b.id === id)) commitProduction(state, civCity.seat, civCity, { kind: 'building', building: id, progress: 0 });
     } else if (a === NB) {
       if (state.sandbox || civCity.population >= 2) {
         commitProduction(state, civCity.seat, civCity, { kind: 'settler', progress: 0, cost: settlerCost(state, actor.seat) });

@@ -67,14 +67,22 @@ export function generateMap(opts: MapGenOptions): GameMap {
   }
 
   const elevNoise = fbm(deriveSeed(seed, 'elev'), 5);
-  const FREQ = 0.085;
+  // continents: a Gaussian mid-map ocean trench splits the world in two.
+  // pangaea: no trench, a centre bias pulls the one landmass together.
+  // islands: no trench, a doubled noise frequency scatters the landmass.
+  const layout = opts.layout ?? 'continents';
+  const FREQ = layout === 'islands' ? 0.085 * 2.2 : 0.085;
   const elev = new Float64Array(width * height);
   for (const t of map.tiles) {
     const distToEdge = Math.min(t.col, t.row, width - 1 - t.col, height - 1 - t.row);
     const falloff = Math.min(1, distToEdge / 4);
     const x = t.col / (width - 1);
-    const split = 1 - 0.42 * Math.exp(-Math.pow((x - 0.5) / 0.07, 2));
-    elev[t.index] = elevNoise(t.col * FREQ, t.row * FREQ) * falloff * split;
+    const split = layout === 'continents' ? 1 - 0.42 * Math.exp(-Math.pow((x - 0.5) / 0.07, 2)) : 1;
+    const y = t.row / (height - 1);
+    const centre = layout === 'pangaea'
+      ? 1 - 0.55 * ((2 * x - 1) * (2 * x - 1) * 0.7 + (2 * y - 1) * (2 * y - 1) * 0.3)
+      : 1;
+    elev[t.index] = elevNoise(t.col * FREQ, t.row * FREQ) * falloff * split * centre;
   }
 
   // Sea level chosen so that ~landFraction of tiles end up land.
@@ -211,7 +219,7 @@ export function generateMap(opts: MapGenOptions): GameMap {
   }
 
   if (withResources) {
-    placeResources(map, deriveSeed(seed, 'resources'));
+    placeResources(map, deriveSeed(seed, 'resources'), opts);
   }
 
   {
@@ -441,13 +449,13 @@ function resourceValidOnTile(tile: Tile, def: ResourceDef): boolean {
   return true;
 }
 
-function placeResources(map: GameMap, seed: number): void {
+function placeResources(map: GameMap, seed: number, opts: MapGenOptions): void {
   const rng = mulberry32(seed);
   const all = Object.values(RESOURCES);
   const landCount = map.tiles.filter(
     (t) => t.terrain !== 'OCEAN' && t.terrain !== 'COAST' && t.terrain !== 'LAKE',
   ).length;
-  let quota = Math.round(landCount / 9);
+  let quota = Math.round((landCount / 9) * (opts.resourceMult ?? 1));
 
   const order = shuffle(rng, [...map.tiles]);
   for (const t of order) {
@@ -460,18 +468,21 @@ function placeResources(map: GameMap, seed: number): void {
     const valid = all.filter((d) => resourceValidOnTile(t, d));
     if (valid.length === 0) continue;
 
-    const cat = pickCategory(rng, valid);
+    const cat = pickCategory(rng, valid, opts.resourceWeights);
     const pool = valid.filter((d) => d.category === cat);
     t.resource = pool[Math.floor(rng() * pool.length)].id;
     quota--;
   }
 }
 
-function pickCategory(rng: Rng, valid: ResourceDef[]): ResourceDef['category'] {
+function pickCategory(rng: Rng, valid: ResourceDef[], rw?: [number, number, number]): ResourceDef['category'] {
   const has = (c: ResourceDef['category']) => valid.some((d) => d.category === c);
   const roll = rng();
-  if (roll < 0.45 && has('bonus')) return 'bonus';
-  if (roll < 0.8 && has('luxury')) return 'luxury';
+  const wsum = rw ? rw[0] + rw[1] + rw[2] : 1;
+  const b1 = rw ? rw[0] / wsum : 0.45;
+  const b2 = rw ? (rw[0] + rw[1]) / wsum : 0.8;
+  if (roll < b1 && has('bonus')) return 'bonus';
+  if (roll < b2 && has('luxury')) return 'luxury';
   if (has('strategic')) return 'strategic';
   if (has('luxury')) return 'luxury';
   return 'bonus';

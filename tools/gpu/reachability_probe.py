@@ -89,11 +89,19 @@ def main() -> None:
                     help="override ladder.DEEP_SHARE for a coverage sweep")
     ap.add_argument("--diplo-share", type=float, default=None,
                     help="override ladder.DIPLO_SHARE for a coverage sweep")
+    ap.add_argument("--styles", default=None,
+                    help="comma list of ladder.STYLE_PRESETS names assigned per seat "
+                         "(cycled); omit for today's drawn styles")
     args = ap.parse_args()
     if args.deep_share is not None:
         ladder.DEEP_SHARE = args.deep_share
     if args.diplo_share is not None:
         ladder.DIPLO_SHARE = args.diplo_share
+    if args.styles:
+        names = args.styles.split(",")
+        bad = [n for n in names if n not in ladder.STYLE_PRESETS]
+        assert not bad, f"unknown style preset(s) {bad}; have {sorted(ladder.STYLE_PRESETS)}"
+        drive.STYLE_TABLE = names
 
     rules = load_rules()
     fixtures = [load_fixture(p) for p in fixture_paths()]

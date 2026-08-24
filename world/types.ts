@@ -190,6 +190,9 @@ export interface MapGenOptions {
   height: number;
   seed: number;
   landFraction?: number;
+  layout?: 'continents' | 'pangaea' | 'islands';
+  resourceMult?: number;
+  resourceWeights?: [number, number, number];
   withResources?: boolean;
   withWonders?: boolean;
   withVillages?: boolean;

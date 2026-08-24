@@ -1873,6 +1873,13 @@ class SimInit:
 
         self.units_mode = bool(f0.get("unitsMode", 0))
         assert all(bool(f.get("unitsMode", 0)) == self.units_mode for f in fixtures)
+        # ONE BATCH IS ONE WORLD PRESET: every plane dimension above was baked
+        # from fixtures[0], so a mixed-shape batch would mis-index silently.
+        for _k in ("width", "height", "cityStateMax"):
+            assert all(f.get(_k) == fixtures[0].get(_k) for f in fixtures), \
+                f"mixed-preset batch: {_k} differs across fixtures"
+        assert all(len(f["civs"]) == self.n_majors for f in fixtures), \
+            "mixed-preset batch: civ count differs across fixtures"
         cb = rules.combat
         self.max_camps = torch.tensor([f.get("maxCamps", 0) for f in fixtures], dtype=torch.long, device=device)
         self.K = int(self.max_camps.max().item()) if self.units_mode else 0

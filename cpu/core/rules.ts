@@ -16,6 +16,8 @@ import { GOVERNMENTS } from '../data/policies';
 import { seatGovernmentId } from './seatTurn';
 import { cityLowlands, floodBarrierCost } from './climate';
 import { BUILDINGS, type BuildingDef, buildingsForDistrict } from '../data/buildings';
+import { TECHS } from '../data/techs';
+import { CIVICS } from '../data/civics';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { CITY_MIN_DIST } from '../../world/types';
 import { URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN } from '../data/units';
@@ -474,6 +476,13 @@ export function buildingCostIn(state: GameState, city: City, id: string): number
   return Math.round(base * congressEnergyDiscount(state, id));
 }
 
+/** building ids some tech or civic unlocks — the rows `computeUnlocks` can ever grant */
+const RESEARCH_GATED_BUILDINGS: ReadonlySet<string> = new Set(
+  [...Object.values(TECHS), ...Object.values(CIVICS)]
+    .flatMap((d) => d.effects)
+    .flatMap((fx) => (fx.kind === 'unlockBuilding' ? [fx.building] : [])),
+);
+
 export function availableBuildings(state: GameState, city: City): BuildingDef[] {
   const map = state.map;
   const unlocks = gates(state, city.seat);
@@ -495,7 +504,11 @@ export function availableBuildings(state: GameState, city: City): BuildingDef[] 
       if (have.has(def.id) || queued.has(def.id)) continue;
       if (def.worship) {
         if (seatOf(state, city.seat)?.religion.worship !== def.id) continue;
-      } else if (unlocks && !unlocks.buildings.has(def.id)) {
+      } else if (unlocks && RESEARCH_GATED_BUILDINGS.has(def.id) && !unlocks.buildings.has(def.id)) {
+        // the research gate holds only rows some tech or civic GRANTS: a
+        // Government Plaza tier building (or Hangar/Airport) is unlocked by
+        // no research, so its own clauses below are its whole gate — the
+        // GPU's `b_unlock` reads -1 there and admits the row the same way.
         continue;
       }
       if (def.requiresAny && !def.requiresAny.some((r) => have.has(r) || queued.has(r))) continue;

@@ -1013,7 +1013,12 @@ class SimMasks:
         e_here = (eslot >= 0) & on
         e_seat = torch.where(e_here, self.unit_seat.gather(1, eslot.clamp(min=0)),
                              torch.full_like(nbc, -1))
-        friendly = (here & (n_seat == def_seat.unsqueeze(1))).long()             + (e_here & (e_seat == def_seat.unsqueeze(1))).long()
+        # "embarked LAND units" = the military domain: an embarked civilian
+        # (a settler crossing water) provides no Support (supportCount's
+        # unitDomain gate)
+        e_mil = ~self._type_civilian[
+            self.unit_type.gather(1, eslot.clamp(min=0)).clamp(min=0, max=self.NU - 1)]
+        friendly = (here & (n_seat == def_seat.unsqueeze(1))).long()             + (e_here & e_mil & (e_seat == def_seat.unsqueeze(1))).long()
         sup = friendly.sum(dim=1) * self._flank_support_live(def_seat).long()
         in_district = (self._centre_seat_plane().gather(1, dt.unsqueeze(1)).squeeze(1) >= 0) \
             | self._encamp_live().gather(1, dt.unsqueeze(1)).squeeze(1)

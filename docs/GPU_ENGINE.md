@@ -125,6 +125,41 @@ edit sources while one is in flight.
 - **Reachability** — a green gate proves the two engines agree, never
   that a mechanic fired. When landing a mechanic, measure which lane
   can REACH it and record that in its AUDIT entry.
+- **The combat-roll log** — `CIV6_CBLOG_B=<batch row>` arms the GPU's
+  keyed roll log (`_damage_roll`), `CIV6_CBLOG=1` arms the TS twin
+  (`damageRoll` via `__cbLog`); on a digest red the gate prints both
+  tails side by side (`CB-GPU` / `CB-TS`). Rolls pair by the rng counter
+  `c` (absolute stream position), so one mismatched `diff` names the
+  divergent strength term directly and an inserted or missing roll shows
+  as a counter slip — no bisect.
+
+## World presets and driver styles
+
+Both are coverage levers over the SAME engines and the same gate.
+
+- **World presets** (`seeder/presets.ts`): named knob sets over the
+  seeder — map size, layout (`continents` / `pangaea` / `islands`),
+  civ and city-state counts, land fraction, resource quota and
+  category weights. `npm run seed -- --preset <name>` and
+  `npm run export -- --preset <name>` write a preset's fixtures to
+  `seeder/worlds/presets/<name>/` with its OWN `worlds.lock`; the
+  baseline keeps today's paths, and the battery's globs never see a
+  preset. `CIV6_WORLDS_DIR=<dir>` points the whole python side (fixture
+  loads, the gate, the TS children it spawns, the probes) at a family.
+  One batch is ONE preset — `sim_init` asserts shape uniformity — and
+  the observation width moves with civCount/cityStateMax, so nets and
+  checkpoints are per-preset. Preset seed families are disjoint
+  (firstSeed + 13k). Re-baseline protocol: any `.ts` change under
+  `world/` or `seeder/` moves every genStamp — re-seed and re-export
+  the baseline AND every preset family you intend to keep, in the same
+  commit.
+- **Driver styles** (`policy/ladder.py::STYLE_PRESETS`): named per-seat
+  decision profiles (deep/diplo pins, war and peace appetite, city cap,
+  district preference, production tier order). `--styles a,b,c` on
+  `serve_gate.py` and `reachability_probe.py` assigns them per seat
+  (cycled); omitted, every knob multiplies by 1.0 and the drive is
+  byte-identical to the unstyled driver. Styles change DECISIONS only —
+  the applier validates and TS replays, so the gate stays the judge.
 
 ## Running
 

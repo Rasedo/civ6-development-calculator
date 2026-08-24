@@ -48,6 +48,10 @@ if (process.env.CIV6_SERVE_LOAD) {
   state.autoResearch = false;
 }
 
+// CIV6_CBLOG arms the combat-roll log (combat.ts appends to the global when
+// it exists); the {dump} reply ships its tail beside the keyed group dumps.
+if (process.env.CIV6_CBLOG) (globalThis as { __cbLog?: string[] }).__cbLog = [];
+
 const rd = createInterface({ input: process.stdin, crlfDelay: Infinity })[Symbol.asyncIterator]();
 const techList = Object.values(TECHS);
 const civicList = Object.values(CIVICS);

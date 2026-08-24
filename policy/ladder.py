@@ -128,6 +128,10 @@ def split(obs: torch.Tensor, n_cs: int, n_opponents: int, n_cities: int,
 
 
 def first_legal(mask: torch.Tensor) -> torch.Tensor:
+    # a zero-width head slice is a legal shape (a 1-major world has no
+    # declare-war targets) and means "nothing legal", not a reduction error
+    if mask.shape[-1] == 0:
+        return torch.full(mask.shape[:-1], -1, dtype=torch.long, device=mask.device)
     any_legal = mask.any(dim=-1)
     idx = mask.float().argmax(dim=-1)
     return torch.where(any_legal, idx, torch.full_like(idx, -1))
@@ -193,6 +197,47 @@ DEEP_SHARE = 0.34
 DIPLO_SHARE = 0.5
 # Writing, art, music — the Great Work kinds the gift verb indexes.
 GW_KINDS = 3
+
+# ---- STYLES ---------------------------------------------------------------
+# A style is a dict of NAMED KNOBS over the scripted picks. Every default
+# reproduces today's behaviour exactly: the pinnable booleans fall back to
+# the per-(seed, seat) draws above, every rate multiplier is 1.0, every
+# order the module constant. A style only changes DECISIONS — the applier
+# validates and the TS child replays — so variation is free coverage, and
+# the bar for a preset is the reachability-probe diff: it earns its place by
+# ADDING rows without losing any.
+STYLE_KNOBS = {
+    "deep": None,           # None = draw at DEEP_SHARE; True/False pins it
+    "diplo": None,          # None = draw at DIPLO_SHARE; True/False pins it
+    "war_appetite": 1.0,    # multiplies the declare/raid rates in pick_war
+    "peace_appetite": 1.0,  # multiplies the sue rate in pick_war
+    "war_ratio": 1.3,       # the strength edge a declaration wants
+    "city_cap": None,       # None = the rules' maxCities
+    "dist_pref": None,      # a district id the scaffold rotation starts from
+    "tier_order": None,     # None = PROD_PRIORITY
+}
+STYLE_PRESETS = {
+    "default": {},
+    "deep": {"deep": True},
+    "broad": {"deep": False},
+    "diplomat": {"diplo": True},
+    "warlord": {"diplo": False, "war_appetite": 4.0, "war_ratio": 1.1, "city_cap": 5},
+    "pacifist": {"war_appetite": 0.0, "peace_appetite": 4.0},
+    "expander": {"city_cap": 10},
+    "scientist": {"deep": True, "dist_pref": "CAMPUS"},
+    "faithful": {"dist_pref": "HOLY_SITE"},
+    "culturist": {"dist_pref": "THEATER_SQUARE"},
+    "navalist": {"dist_pref": "HARBOR",
+                 "tier_order": ("settler", "trader", "galley", "district", "building",
+                                "wonder", "builder", "archaeologist", "engineer",
+                                "unit", "project")},
+}
+
+
+def style_of(name: str) -> dict:
+    s = dict(STYLE_KNOBS)
+    s.update(STYLE_PRESETS[name])
+    return s
 
 
 def pick_research(blocks: dict, mask: torch.Tensor, kind: str,
@@ -287,24 +332,29 @@ CS_RAID_RATE = 0.02
 SPEC_PIN_POP = 8
 
 
-def pick_war(mask: torch.Tensor, ctx: dict, rng: dict) -> torch.Tensor:
+def pick_war(mask: torch.Tensor, ctx: dict, rng: dict, style: dict | None = None) -> torch.Tensor:
     """The war head: `[declare per target, sue per target]` over
-    `war_targets(row)` — the other majors, then the city-state roster."""
+    `war_targets(row)` — the other majors, then the city-state roster. The
+    style's appetite knobs multiply the rates; every default multiplies by
+    1.0 and compares against the same floats as always."""
     B, W2 = mask.shape
     n = W2 // 2
     out = torch.full((B,), -1, dtype=torch.long, device=mask.device)
     if n == 0:
         return out
-    sue_k = first_legal(mask[:, n:] & (rng["peace"] < 0.25).unsqueeze(1))
+    wa = 1.0 if style is None else float(style["war_appetite"])
+    pa = 1.0 if style is None else float(style["peace_appetite"])
+    ratio = 1.3 if style is None else float(style["war_ratio"])
+    sue_k = first_legal(mask[:, n:] & (rng["peace"] < 0.25 * pa).unsqueeze(1))
     out = torch.where(sue_k >= 0, n + sue_k, out)
     n_opp = int(ctx["opp_str"].shape[1])
     dow_k = first_legal(
         mask[:, :n_opp]
         & ctx["has_cities"]
         & (ctx["prox"] <= 9)
-        & (ctx["gang"] | (ctx["own_str"].unsqueeze(1) > ctx["opp_str"] * 1.3))
+        & (ctx["gang"] | (ctx["own_str"].unsqueeze(1) > ctx["opp_str"] * ratio))
         & (ctx["peace_turns"] > 20).unsqueeze(1)
-        & (rng["dow"] < 0.08 * (0.5 + ctx["aggression"])).unsqueeze(1)
+        & (rng["dow"] < 0.08 * wa * (0.5 + ctx["aggression"])).unsqueeze(1)
     )
     out = torch.where((out < 0) & (dow_k >= 0), dow_k, out)
     if n == n_opp:
@@ -314,7 +364,7 @@ def pick_war(mask: torch.Tensor, ctx: dict, rng: dict) -> torch.Tensor:
         & (ctx["cs_envoys"] <= 0)
         & (ctx["own_str"] > CS_RAID_STRENGTH).unsqueeze(1)
         & (ctx["peace_turns"] > 20).unsqueeze(1)
-        & (rng["raid"] < CS_RAID_RATE * (0.5 + ctx["aggression"])).unsqueeze(1)
+        & (rng["raid"] < CS_RAID_RATE * wa * (0.5 + ctx["aggression"])).unsqueeze(1)
     )
     return torch.where((out < 0) & (raid_k >= 0), n_opp + raid_k, out)
 
@@ -397,6 +447,7 @@ def pick_production(
     classes: dict,
     roster: dict | None = None,
     ctx: dict | None = None,
+    tier_order: tuple | None = None,
 ) -> torch.Tensor:
     """[B, C] long — the PRODUCTION verb.
 
@@ -465,7 +516,7 @@ def pick_production(
     for j in range(C):
         best = torch.full((B,), -1, dtype=torch.long, device=dev)
         under_cap = n_units < cap
-        for name in PROD_PRIORITY:
+        for name in (tier_order or PROD_PRIORITY):
             if name in SOLO_TIERS:
                 key, capped = SOLO_TIERS[name]
                 idx = roster[key] if roster else -1
