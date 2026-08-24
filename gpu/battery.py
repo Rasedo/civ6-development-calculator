@@ -136,6 +136,27 @@ def lane(steps: list[tuple[str, list[str], int]]) -> None:
 
 
 def main() -> int:
+    # OWNER RULE (2026-08-24): the battery runs every FOUR commits, not every
+    # round — batched hunts run at ~15 min/bug where isolated ones paid ~80
+    # (stats/battery.jsonl audit). The per-commit bar is the compile bar plus
+    # a single-seed smoke serve. A RED run never resets the clock (only a
+    # green does), so the closing re-run of a hunt is always allowed.
+    # CIV6_BATTERY_OWNER=1 is the owner's own door, nobody else's.
+    since = _stats._last_pass_head(_stats._rows())
+    if since and os.environ.get("CIV6_BATTERY_OWNER") != "1":
+        try:
+            n = int(_stats._git("rev-list", "--count", f"{since}..HEAD"))
+        except ValueError:
+            n = -1  # unknown sha (rebase?) — the clock is unprovable, run
+        if 0 <= n < 4:
+            print(
+                f"BATTERY REFUSED — cadence rule: {n} commit(s) in git history "
+                f"since the last green run ({since[:12]}); the battery unlocks "
+                f"at 4."
+            )
+            print("Per-commit bar: compile bar + single-seed smoke serve "
+                  "(python gpu/serve_gate.py --batched --seeds <s> --turns 250).")
+            return 2
     npx = "npx.cmd" if os.name == "nt" else "npx"
     npm = "npm.cmd" if os.name == "nt" else "npm"
     py = sys.executable
