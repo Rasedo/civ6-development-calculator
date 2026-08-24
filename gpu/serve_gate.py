@@ -359,11 +359,12 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             # groups are dumped keyed from both engines and diffed BY NAME;
             # later ones get one line each, capped so a persistent drift cannot
             # flood the output.
+            _t = _pc()
+            gdigs = statecompare.state_digest_all(sim, sc_man)
+            prof["state_digest (GPU extract)"] += _pc() - _t
             for b, ch in enumerate(children):
                 if True:
-                    _t = _pc()
-                    gdig = statecompare.state_digest(sim, b, sc_man)
-                    prof["state_digest (GPU extract)"] += _pc() - _t
+                    gdig = gdigs[b]
                     _t = _pc()
                     bad_groups, reps = digest_diff(sc_man, gdig, trs[b].get("digest"))
                     prof["digest_diff (compare)"] += _pc() - _t

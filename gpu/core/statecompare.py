@@ -767,10 +767,11 @@ def _q_np(arr, scale: int):
     return q * scale if scale != 1 else q
 
 
-def _fold_rows_np(keys, cols) -> dict | None:
-    """`fold_rows` with the rows in PARALLEL — the identical arithmetic on
+def _chain_np(keys, cols):
+    """The per-row hash chains in PARALLEL — the identical arithmetic on
     int64 vectors (multiplication wraps mod 2^64; `& _MASK` right after makes
-    that exactly mod-2^32, which is all `_mix32` ever keeps).
+    that exactly mod-2^32, which is all `_mix32` ever keeps). Returns the
+    {exact, milli} per-row hash vectors.
 
     Scalar columns fold as one vector; a UNIFORM-length list column folds as
     `len` plus one vector per element position (every row's chain has the
@@ -779,14 +780,6 @@ def _fold_rows_np(keys, cols) -> dict | None:
     none of those paths handle — the digest VALUE is the seam and must not
     depend on which path ran.
     """
-    if _np is None:
-        return None
-    # Below ~64 rows the per-op numpy overhead LOSES to the scalar loop —
-    # the seat/city/game groups are 1-15 rows and vectorising them QUADRUPLED
-    # digest time. The vector path exists for the tile group's 1144 rows and
-    # the unit group's mid-game hundreds.
-    if len(keys) < _VEC_MIN_ROWS:
-        return None
     qs = []
     for cmp, vals in cols:
         scale = 1000 if cmp == "milli" else 1
@@ -822,11 +815,73 @@ def _fold_rows_np(keys, cols) -> dict | None:
                     hr = _step(hr, (v // _2_32) & _MASK)
                 t[r] = hr
         h[cmp] = t
-    out = {}
-    for cmp in ("exact", "milli"):
-        a = int(h[cmp].sum()) & _MASK
-        b = int(_mix32_np(h[cmp] ^ 0x5BF03635).sum()) & _MASK
-        out[cmp] = f"{b:08x}{a:08x}"
+    return h
+
+
+def _acc_hex(h_seg) -> str:
+    a = int(h_seg.sum()) & _MASK
+    b = int(_mix32_np(h_seg ^ 0x5BF03635).sum()) & _MASK
+    return f"{b:08x}{a:08x}"
+
+
+def _fold_rows_np(keys, cols) -> dict | None:
+    """`fold_rows` with the rows in parallel — `_chain_np` plus the summed
+    accumulators."""
+    if _np is None:
+        return None
+    # Below ~64 rows the per-op numpy overhead LOSES to the scalar loop —
+    # the seat/city/game groups are 1-15 rows and vectorising them QUADRUPLED
+    # digest time. The vector path exists for the tile group's 1144 rows, the
+    # unit group's mid-game hundreds — and `fold_rows_multi`, whose
+    # whole-batch concatenation clears the floor for every group.
+    if len(keys) < _VEC_MIN_ROWS:
+        return None
+    h = _chain_np(keys, cols)
+    if h is None:
+        return None
+    return {cmp: _acc_hex(h[cmp]) for cmp in ("exact", "milli")}
+
+
+def fold_rows_multi(per_b) -> list | None:
+    """`fold_rows` for EVERY game of a batch in one vector pass. A row's
+    chain never reads the game, so the games' rows concatenate into one
+    `_chain_np` call and each game's accumulators are its contiguous
+    segment's sums — same bits as `fold_rows` per game. None (numpy absent,
+    too few total rows, or a value type the chain declines) means: take the
+    per-game path instead.
+
+    `per_b[b]` is `(keys, cols)` exactly as `fold_rows` takes them, every
+    game over the SAME column list (one manifest group)."""
+    if _np is None:
+        return None
+    lens = [len(k) for k, _ in per_b]
+    if sum(lens) < _VEC_MIN_ROWS:
+        return None
+    keys = [k for ks, _ in per_b for k in ks]
+    cols = []
+    for i in range(len(per_b[0][1])):
+        cmp = per_b[0][1][i][0]
+        parts = [cs[i][1] for _, cs in per_b if len(cs[i][1])]
+        if parts and all(isinstance(p, _np.ndarray) for p in parts):
+            try:
+                cat = _np.concatenate(parts)
+            except ValueError:
+                return None  # shape-mismatched games — per-game path
+        else:
+            cat = []
+            for p in parts:
+                cat.extend(p.tolist() if isinstance(p, _np.ndarray) else list(p))
+        if len(cat) != len(keys):
+            return None
+        cols.append((cmp, cat))
+    h = _chain_np(keys, cols)
+    if h is None:
+        return None
+    out = []
+    off = 0
+    for n in lens:
+        out.append({cmp: _acc_hex(h[cmp][off:off + n]) for cmp in ("exact", "milli")})
+        off += n
     return out
 
 
@@ -840,9 +895,10 @@ def fold_rows(keys, cols) -> dict:
     Column ORDER is folded in, so two fields swapping places changes the digest;
     ROW order is not, because the per-row hashes are summed.
 
-    Scalar-only groups take `_fold_rows_np` (the tile group is 1144 rows x 16
-    fields, every turn, every game — the scalar loop was half the serve lane's
-    wall); list-valued groups keep the loop below. Same bits either way.
+    Groups above the row floor take `_fold_rows_np` (the tile group is 1144
+    rows x 16 fields, every turn, every game — the scalar loop was half the
+    serve lane's wall); small groups keep the loop below, unless a whole
+    batch folds at once through `fold_rows_multi`. Same bits every way.
     """
     vec = _fold_rows_np(keys, cols)
     if vec is not None:
@@ -874,6 +930,30 @@ def state_digest(sim, b: int, manifest: dict | None = None, include_gaps: bool =
                 for f in g["fields"] if include_gaps or "gap" not in f]
         out[name] = dict(fold_rows(keys, cols), rows=len(rows))
     return out
+
+
+def state_digest_all(sim, manifest: dict | None = None, include_gaps: bool = False) -> list[dict]:
+    """`state_digest` for every game of the batch — one `fold_rows_multi`
+    pass per group instead of a per-game scalar loop (the serve gate digests
+    every game every turn, and the sub-floor groups' Python folds were the
+    cost). Extraction stays per game because the row sets differ."""
+    man = manifest or load_manifest()
+    outs: list[dict] = [{} for _ in range(sim.B)]
+    for g in man["groups"]:
+        name = g["name"]
+        fields = [f for f in g["fields"] if include_gaps or "gap" not in f]
+        per_b = []
+        for b in range(sim.B):
+            rows = group_rows(sim, b, name)
+            keys = group_keys(sim, b, name, rows)
+            per_b.append((keys, [(f["compare"], EXTRACTORS[name][f["name"]](sim, b, rows))
+                                 for f in fields]))
+        digs = fold_rows_multi(per_b)
+        if digs is None:
+            digs = [fold_rows(k, c) for k, c in per_b]
+        for b in range(sim.B):
+            outs[b][name] = dict(digs[b], rows=len(per_b[b][0]))
+    return outs
 
 
 def _py(v):
@@ -974,7 +1054,7 @@ def _fold_ab_check() -> list[str]:
         # A column no path handles must DECLINE, so fold_rows keeps the loop.
         if _fold_rows_np([5, 6], [("exact", [[1], "x"])]) is not None:
             out.append("fold A/B: np path accepted a mixed-type column")
-        return out + _fold_ab_cases(cases)
+        return out + _fold_ab_cases(cases) + _fold_multi_ab(cases)
     finally:
         _VEC_MIN_ROWS = keep_min
 
@@ -994,6 +1074,23 @@ def _fold_ab_cases(cases) -> list[str]:
         want = {"exact": ref["exact"].hex(), "milli": ref["milli"].hex()}
         if vec != want:
             out.append(f"fold A/B split on keys[:3]={keys[:3]}: np {vec} vs scalar {want}")
+    return out
+
+
+def _fold_multi_ab(cases) -> list[str]:
+    """Every case becomes a 3-game batch — front half, back half, an EMPTY
+    game — and `fold_rows_multi` per game must equal `fold_rows` per game.
+    A decline (None) is not a complaint: the caller falls back per game."""
+    out = []
+    for keys, cols in cases:
+        cut = len(keys) // 2
+        per_b = [(keys[lo:hi], [(cmp, vals[lo:hi]) for cmp, vals in cols])
+                 for lo, hi in ((0, cut), (cut, len(keys)), (len(keys), len(keys)))]
+        got = fold_rows_multi(per_b)
+        if got is not None:
+            want = [fold_rows(k, c) for k, c in per_b]
+            if got != want:
+                out.append(f"fold MULTI split on keys[:3]={keys[:3]}: {got} vs per-game {want}")
     return out
 
 

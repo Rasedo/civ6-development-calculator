@@ -46,6 +46,21 @@ class SimMinors:
             ok = ok & self.civ_civics[:, row, int(wrow["uc"])]
         return ok
 
+    def _wadj_plane(self, key: tuple, build) -> torch.Tensor:
+        """[B, T] adjacency planes under `_wonder_cand`, memoised on
+        `_eff_version`: each plane depends on the catalog row's adjacency
+        arguments alone (plus the seat, for the capital plane), and the mask
+        walk asks for the same plane once per (city, wonder row). Every
+        engine write that could move one bumps `_eff_version`."""
+        if self._wadj_cache is None or self._wadj_cache[0] != self._eff_version:
+            self._wadj_cache = (self._eff_version, {})
+        d = self._wadj_cache[1]
+        v = d.get(key)
+        if v is None:
+            v = build()
+            d[key] = v
+        return v
+
     def _wonder_cand(self, row: int, j: int, wi: int, base_ok: torch.Tensor) -> torch.Tensor:
         """`canPlaceWonder`'s live half. The terrain half rides the static
         `wok` bitmask the exporter baked out of `wonderTerrainOk`, so nothing
@@ -55,17 +70,20 @@ class SimMinors:
         adjD = int(wrow.get("adjD", -1))
         adjDB = int(wrow.get("adjDB", -1))
         if adjD == -2:
-            cand_w = cand_w & (self._adj_center_count() > 0)
+            cand_w = cand_w & self._wadj_plane(("ctr",), lambda: self._adj_center_count() > 0)
         elif adjD >= 0:
-            near = (self._adj_district_with(adjD, adjDB) if adjDB >= 0
-                    else self._adj_dtype_complete(adjD))
+            near = (self._wadj_plane(("dw", adjD, adjDB), lambda: self._adj_district_with(adjD, adjDB))
+                    if adjDB >= 0
+                    else self._wadj_plane(("dt", adjD), lambda: self._adj_dtype_complete(adjD)))
             cand_w = cand_w & near
         if int(wrow.get("adjR", -1)) >= 0:
-            cand_w = cand_w & self._adj_res_live(int(wrow["adjR"]))
+            ri = int(wrow["adjR"])
+            cand_w = cand_w & self._wadj_plane(("res", ri), lambda: self._adj_res_live(ri))
         if int(wrow.get("adjI", -1)) >= 0:
-            cand_w = cand_w & self._adj_improvement(int(wrow["adjI"]))
+            ii = int(wrow["adjI"])
+            cand_w = cand_w & self._wadj_plane(("imp", ii), lambda: self._adj_improvement(ii))
         if int(wrow.get("adjCap", 0)):
-            cand_w = cand_w & self._adj_capital(row)
+            cand_w = cand_w & self._wadj_plane(("cap", row), lambda: self._adj_capital(row))
         if int(wrow.get("needRel", 0)):
             cand_w = cand_w & self.civ_religion_done[:, row].unsqueeze(1)
         return cand_w
@@ -83,10 +101,8 @@ class SimMinors:
         has = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         for r in range(self.n_majors):
             sl = self.city_slot_at(r)  # [B, T] owning city SLOT, -1 = not this row's
-            for c in range(self.RC):
-                mine = (sl == c) & self.city_bldg[:, r, c, bi].unsqueeze(1)
-                if bool(mine.any()):
-                    has |= mine
+            bl = self.city_bldg[:, r, :, bi]
+            has |= (sl >= 0) & bl.gather(1, sl.clamp(min=0))
         return (hit & has[:, nbc]).any(dim=2)
 
     def _adj_improvement(self, ii: int) -> torch.Tensor:

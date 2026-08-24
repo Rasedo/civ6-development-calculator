@@ -1721,6 +1721,7 @@ class SimInit:
         self._bel_add_memo = None        # (_bel_version, {(fn,key,r): tensor})
         self._gov_pol_cache = None       # (_eff_version, {seat_tag: 5-tuple})
         self._dadj_cache = None          # (_eff_version, {di: floored [B,T] adjacency})
+        self._wadj_cache = None          # (_eff_version, {key: [B,T] wonder-adjacency plane})
         self._fx_row_cache = None        # (_eff_version, {channel: [B, n_majors]})
         self._hs_faith_cache = None      # (_eff_version, [B,T] Holy Site faith output)
         # Static candidate lists for _pick_static: the k-th candidate in
