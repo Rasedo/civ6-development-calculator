@@ -30,7 +30,7 @@ import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf
 import { wwMax } from './weariness';
 import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
 
-import { gpCityPermOf } from '../data/greatPeople';
+import { gpCityPermOf, gpPermOf } from '../data/greatPeople';
 export interface CityStats {
   city: City;
   housing: number;
@@ -725,6 +725,13 @@ export function computeCityStats(
   addYields(buildings, regional.yields);
   for (const w of wonders) {
     if (w.def.cityYields) addYields(buildings, w.def.cityYields);
+    // CIV6 (Great Bath): "+1 Faith for every time a tile belonging to this
+    // city has been Flooded."
+    if (w.def.effects?.faithPerFlood) {
+      let floods = 0;
+      for (const t of state.map.tiles) if (tileBelongsTo(t, city)) floods += t.floodCount ?? 0;
+      buildings.faith += w.def.effects.faithPerFlood * floods;
+    }
     // CIV6 (Ruhr Valley): "+1 Production for each Mine and Quarry in this
     // city" — the improvements on the tiles this city OWNS, a pillaged one
     // producing nothing.
@@ -744,6 +751,10 @@ export function computeCityStats(
   // THIS CITY'S OWNER's dedication, which is the row the GPU reads.
   buildings.culture += goldenCulturePerDistrict(state, city.seat) * completedDistrictCount(state, city, true);
   buildings.faith += relicFaith(city);
+  // CIV6 (Leonardo da Vinci): "Workshops provide +3 Culture" — seat-wide,
+  // per standing Workshop.
+  const wcult = gpPermOf(seatOf(state, city.seat), 'workshopCulture');
+  if (wcult && city.buildings.includes('WORKSHOP')) buildings.culture += wcult;
   // CIV6 (Monument): "+1 additional Culture if city is at maximum Loyalty."
   if ((city.loyalty ?? LOYALTY_MAX) >= LOYALTY_MAX) {
     for (const b of city.buildings) if (BUILDINGS[b]?.special === 'MONUMENT') buildings.culture += 1;

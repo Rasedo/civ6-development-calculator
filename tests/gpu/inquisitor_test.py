@@ -39,6 +39,8 @@ def build():
 def religious_city(sim) -> int:
     """Give row 0's first city everything `purchaseReligiousUnit` asks for."""
     sim.civ_religion_done[:, ROW] = True
+    # CIV6: the purchase also wants "a city that has a majority religion"
+    sim.city_followed[:, ROW, 0] = ROW
     sim.city_bldg[:, ROW, 0, sim._shrine_bidx] = True
     sim.city_bldg[:, ROW, 0, sim._temple_bidx] = True
     ctr = int(sim.city_center[0, ROW, 0])

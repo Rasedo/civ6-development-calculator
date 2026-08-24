@@ -1618,48 +1618,42 @@ class SimMasks:
         return can
 
 
-    def _dig_at(self, gd: torch.Tensor, td: torch.Tensor, row, civ) -> None:
+    def _dig_at(self, gd: torch.Tensor, td: torch.Tensor, civ) -> None:
         """Mark a DIG for the games in `gd` on the tiles in `td` — the
         row-index form of `_mark_antiquity`, which takes a [B] mask.
         Every COMBAT death goes through here, exactly as every TS combat death
         goes through `combat.ts:killUnit`. Maintenance disbands and builder
         charge-exhaustion are NOT deaths and must not call it.
 
-        `row` is the ACTING seat's row — `killUnit(state, unit, seat)` passes
-        the seat whose ORDER this is, and the era gate reads that seat. `civ`
-        is the EVENT's own civilization as a SEAT id: the unit that died, or
-        the barbarians whose outpost was razed. Either may be an int or a
-        tensor ALIGNED WITH `gd`, like `td`."""
+        `civ` is the EVENT's own civilization as a SEAT id: the unit that
+        died, or the barbarians whose outpost was razed — an int or a tensor
+        ALIGNED WITH `gd`, like `td`."""
         if len(gd) == 0:
             return
         m = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         m[gd] = True
         t = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
         t[gd] = td
-        if not isinstance(row, int):
-            r = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
-            r[gd] = row
-            row = r
         c = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
         c[gd] = int(civ) if isinstance(civ, int) else civ
-        self._mark_antiquity(m, t, row, c)
-        self._mark_shipwreck(m, t, row, c)
+        self._mark_antiquity(m, t, c)
+        self._mark_shipwreck(m, t, c)
         self._air_orphans_die()
 
-    def _mark_antiquity(self, mask: torch.Tensor, tile: torch.Tensor, row, civ: torch.Tensor) -> None:
+    def _mark_antiquity(self, mask: torch.Tensor, tile: torch.Tensor, civ: torch.Tensor) -> None:
         """The markAntiquitySite twin — stamp an ANTIQUITY SITE on
         `tile` for the rows in `mask`. Real Civ 6 creates these from PRE-MODERN
         events (a razed barbarian outpost, a unit dying), so the era gate is the
         sourced part; a tile already carrying a dig does not stack, and water,
         districts and wonder tiles are refused exactly as TS refuses them.
 
-        The era is the ACTING seat's, never one fixed seat's:
-        `markAntiquitySite` takes the actor and reads ITS research, while the
-        stored civilization is the EVENT's own."""
+        The dig is dated by the WORLD era at the moment of the event — CIV6
+        dates an Artifact by WHEN its battle happened — while the stored
+        civilization is the EVENT's own."""
         if not bool(mask.any()):
             return
         t = tile.clamp(min=0)
-        era = self._row_era(row)
+        era = self._world_era()
         okr = (
             mask
             & (tile >= 0)
@@ -1696,24 +1690,21 @@ class SimMasks:
         self.antiquity_era[rows, t[rows]] = era[rows] if era.dim() else era
         self.antiquity_seat[rows, t[rows]] = civ[rows]
 
-    def _mark_shipwreck(self, mask: torch.Tensor, tile: torch.Tensor, row, civ: torch.Tensor) -> None:
+    def _mark_shipwreck(self, mask: torch.Tensor, tile: torch.Tensor, civ: torch.Tensor) -> None:
         """The markShipwreck twin — the WATER dig. This model sources
         dig placement from DEATHS rather than map generation, so a hull going
         down leaves the wreck, under `markAntiquitySite`'s own era gate and
-        one-per-tile rule, and it splits actor from civilization the same way;
-        the two bodies are disjoint because one refuses water and the other
-        requires it. The era still needs a research row to read, so a
-        barbarian or city-state ACTOR sinks a hull that leaves no wreck —
-        which is what `row < 0` says here."""
+        one-per-tile rule, and dated by the same WORLD era; the two bodies
+        are disjoint because one refuses water and the other requires it, so
+        a barbarian or a minor sinking a hull leaves a wreck like any
+        major's."""
         if not bool(mask.any()):
             return
         t = tile.clamp(min=0)
-        era = self._row_era(row)
-        _r = row if torch.is_tensor(row) else torch.full((self.B,), int(row), dtype=torch.long, device=self.device)
+        era = self._world_era()
         okr = (
             mask
             & (tile >= 0)
-            & (_r >= 0)
             & (era < self._modern_era_index)
             & self.water.gather(1, t.unsqueeze(1)).squeeze(1)
             & ~self.shipwreck.gather(1, t.unsqueeze(1)).squeeze(1)
@@ -1956,7 +1947,7 @@ class SimMasks:
         if not bool(hit.any()):
             return
         # the outpost was the BARBARIANS' — theirs is the civilization buried
-        self._mark_antiquity(hit, tile, row, torch.full_like(tile, BARB_SEAT))
+        self._mark_antiquity(hit, tile, torch.full_like(tile, BARB_SEAT))
         reward = self.rules.combat.get("campClearReward", 50)
         for b in hit.nonzero(as_tuple=True)[0].tolist():
             camps = self.camp_tile[b]

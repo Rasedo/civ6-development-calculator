@@ -680,11 +680,20 @@ class SimOrders:
                             # strength in cities of other civilizations."
                             _tr = self._promo_val(utp[pb], self.unit_promos[pb, sc[pb]], "TRANSLATOR")
                             _mul = torch.where((pr != row) & (_tr > 1), _tr, torch.ones_like(_tr))
-                            self.city_pressure[pb, pr, pj, row] += lump[pb] * _mul
+                            # CIV6 (Spread Religion): "Pressure = 2.2 * the
+                            # spreader's current HP" — floor(lump * hp / 100),
+                            # the full-health lump being the enhancer's own.
+                            _hp = self.unit_hp[pb, sc[pb]]
+                            _lp = torch.div(lump[pb] * _hp, 100, rounding_mode="floor")
+                            self.city_pressure[pb, pr, pj, row] += _lp * _mul
                             # CIV6 (Proselytizer): "Religious spread eliminates
                             # 75% of existing pressure from other Religions in
                             # the target city."
-                            _st = self._promo_val(utp[pb], self.unit_promos[pb, sc[pb]], "PROSELYTIZER")
+                            # CIV6 (Spread Religion): the spread itself
+                            # "reduces total Religious Pressure of all foreign
+                            # religions in the city by 25%"; PROSELYTIZER
+                            # raises the strip to its 75.
+                            _st = self._promo_val(utp[pb], self.unit_promos[pb, sc[pb]], "PROSELYTIZER").clamp(min=25)
                             _hit = _st > 0
                             if bool(_hit.any()):
                                 _hb, _hr, _hj, _hs = pb[_hit], pr[_hit], pj[_hit], _st[_hit]
@@ -783,6 +792,8 @@ class SimOrders:
             self.seat_route_dcity[b] = torch.where(dead_cs, torch.full_like(self.seat_route_dcity[b], -1), self.seat_route_dcity[b])
             self.seat_route_exp[b] = torch.where(dead_cs, torch.full_like(self.seat_route_exp[b], -1), self.seat_route_exp[b])
             ring = (self.pair_dist[c_t] <= 2) & (self.tile_seat[b] == 100 + s)
+            # a plot changing HANDS drops its LOCK (`setTileOwner`'s clear)
+            self.tile_locked[b] &= ~ring
             self.tile_seat[b] = torch.where(ring, torch.full_like(self.tile_seat[b], NO_SEAT), self.tile_seat[b])
             self._tile_owner_ver += 1
             if int(self.city_alive[b, row].sum()) >= max_cities:

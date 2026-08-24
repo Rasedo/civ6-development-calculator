@@ -20,6 +20,11 @@ export function tileSeat(t: Tile): number {
 }
 
 export function setTileOwner(t: Tile, seat: number, city = -1): void {
+  // Real Civ 6 loses citizen management with the city, so a plot changing
+  // HANDS drops its LOCK — the specialist pin is city-borne and already dies
+  // with the city; this is the plot-side twin. A same-seat retag between two
+  // of the owner's cities keeps it.
+  if (t.ownerSeat !== seat) t.locked = undefined;
   t.ownerSeat = seat;
   t.ownerCity = isCityStateSeat(seat) || seat === NO_SEAT ? -1 : city;
 }

@@ -182,6 +182,7 @@ class Rules:
     woods_features: list  # the feature indices a 1-MP woods step waives (hills are their own plane)
     worship_bidx: list  # the 5 worship rows in WORSHIP_BUILDINGS order (religion id % 5 indexes THIS)
     temple_bidx: int  # TEMPLE row (worship prerequisite), -1 if absent
+    workshop_bidx: int  # WORKSHOP row (Leonardo's culture perm), -1 if absent
     worship_faith_cost: float  # flat worship faith price (round(190·GAME_SPEED))
     shrine_bidx: int  # SHRINE row (the missionary buy's gate), -1 if absent
     t_cost: torch.Tensor  # [NT]
@@ -336,6 +337,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         woods_features=list(_P.get("woodsFeatures", [])),
         worship_bidx=r.get("worshipBidx", []),
         temple_bidx=int(r.get("templeBidx", -1)),
+        workshop_bidx=int(r.get("workshopBidx", -1)),
         worship_faith_cost=float(r.get("worshipFaithCost", 114)),
         shrine_bidx=int(r.get("shrineBidx", -1)),
         t_cost=torch.tensor([t["cost"] for t in r["techs"]], dtype=torch.float64),
@@ -665,5 +667,5 @@ _MUTABLE = [
     "civ_culture", "civ_faith", "civ_tourism", "civ_tourism_rel", "civ_gpp", "civ_grievance",
     "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_founder", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts", "city_artifact_era", "city_artifact_seat", "city_gwart_type", "city_gwart_artist", "city_spec_pin", "city_bldg",
     "war_turns", "treaty_turns", "peace_turns",
-    "civ_co2", "climate_idx", "tile_flooded",
+    "civ_co2", "climate_idx", "tile_flooded", "tile_flood_ct", "tile_air_bonus",
 ]

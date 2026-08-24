@@ -288,10 +288,9 @@ class SimPhase:
         reg = self.city_dist_tile[:, row]  # [B, RC, nD]
         alive = self.city_alive[:, row]
         if self.districts_on and reg.shape[-1]:
-            flat = reg.clamp(min=0).reshape(self.B, -1)
-            live = (reg >= 0) & self.district_complete.gather(1, flat).reshape_as(reg) \
-                & ~self.district_pillaged.gather(1, flat).reshape_as(reg) & alive.unsqueeze(2)
-            out = out + torch.einsum("bjn,n->b", live.long(), self._d_gov_title)
+            # per INSTANCE off the tile plane — the registry keeps one per type
+            live = self._dist_counts(row) * alive.unsqueeze(2).long()
+            out = out + torch.einsum("bjn,n->b", live, self._d_gov_title)
         if bool((self._b_gov_title > 0).any()):
             out = out + self._seat_building_sum(row, self._b_gov_title)
         return out

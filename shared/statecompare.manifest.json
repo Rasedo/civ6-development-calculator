@@ -1969,6 +1969,26 @@
           "planes": [
             "tile_flooded"
           ]
+        },
+        {
+          "name": "floodCount",
+          "compare": "exact",
+          "covers": [
+            "Tile.floodCount"
+          ],
+          "planes": [
+            "tile_flood_ct"
+          ]
+        },
+        {
+          "name": "airSlotBonus",
+          "compare": "exact",
+          "covers": [
+            "Tile.airSlotBonus"
+          ],
+          "planes": [
+            "tile_air_bonus"
+          ]
         }
       ]
     }

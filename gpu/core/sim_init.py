@@ -908,6 +908,7 @@ class SimInit:
             # ...and the ones a wonder pays only to the city that holds it.
             self._wond_cityamen = torch.tensor([float(w["cityAmenities"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
             self._wond_cityhouse = torch.tensor([float(w["cityHousing"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
+            self._wond_faithflood = torch.tensor([float(w.get("faithPerFlood", 0)) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
             self._wond_dvp = torch.tensor([int(w["dvp"]) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] DVP paid at completion
             # Policy slots [nW, 4] in SLOT_KINDS order (military, economic,
             # diplomatic, wildcard) — the counts `_gov_policy_mods` adds.
@@ -1128,6 +1129,9 @@ class SimInit:
         # a CITIZEN is PINNED to this plot (Tile.locked): the work ranking takes
         # every locked plot a city can reach before it ranks anything by score.
         self.tile_locked = torch.zeros(B, T, dtype=torch.bool, device=device)
+        # CIV6 (Marina Raskova): the permanent "+1 air unit slots" a retired
+        # general leaves on a district tile (`Tile.airSlotBonus`)
+        self.tile_air_bonus = torch.zeros(B, T, dtype=torch.long, device=device)
         self.drought = torch.zeros(B, T, dtype=torch.long, device=device)
         self._init_climate(fixtures)
 
@@ -1883,6 +1887,7 @@ class SimInit:
         self._temple_bidx = int(rules.temple_bidx)
         self._worship_cost = float(rules.worship_faith_cost)
         self._shrine_bidx = int(rules.shrine_bidx)  # missionary buy gate
+        self._workshop_bidx = int(rules.workshop_bidx)  # Leonardo's culture perm
         # The completion-overflow / chop bank on the city-block seat axis
         # (row 0 = seat 0, rows 1.. = the civ seats, then the city-state rows
         # for family-shape consistency; every city starts with an empty bank,
@@ -2231,6 +2236,9 @@ class SimInit:
             [[int(t.get("lw", 0)) for t in f["tiles"]] for f in fixtures],
             dtype=torch.long, device=dev)
         self.tile_flooded = torch.zeros(B, T, dtype=torch.bool, device=dev)
+        # every river-flood EPISODE a tile has taken — the Great Bath's faith
+        # counts them (`Tile.floodCount`)
+        self.tile_flood_ct = torch.zeros(B, T, dtype=torch.long, device=dev)
         # -1 = no climate change yet; monotone, so it never steps back.
         self.climate_idx = torch.full((B,), -1, dtype=torch.long, device=dev)
 

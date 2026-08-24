@@ -36,7 +36,10 @@ export function spreadFromUnit(state: GameState, unit: Unit, actor: Seat, toTile
   // CIV6 (Translator): "Religious spread is triple strength in cities of other
   // civilizations" — and the page's note extends it to city-states.
   const foreign = tcity.seat !== actor.seat ? Math.max(1, promoValue(unit, 'TRANSLATOR')) : 1;
-  const lump = Math.round(SPREAD_PRESSURE * (eb?.spreadPressureMult ?? 1)) * foreign;
+  // CIV6 (Spread Religion): "Pressure = 2.2 * Apostle's current HP" — the
+  // lump scales with the spreader's health, on this model's compressed scale
+  // where the full-health lump is SPREAD_PRESSURE.
+  const lump = Math.floor(Math.round(SPREAD_PRESSURE * (eb?.spreadPressureMult ?? 1)) * unit.hp / 100) * foreign;
   let pres = tcity.religionPressure;
   if (!pres || pres.length !== nRel) {
     pres = new Array(nRel).fill(0);
@@ -44,9 +47,10 @@ export function spreadFromUnit(state: GameState, unit: Unit, actor: Seat, toTile
   }
   const wasFollowed = argmaxPressure(pres);
   pres[actor.seat] += lump;
-  // CIV6 (Proselytizer): "Religious spread eliminates 75% of existing pressure
-  // from other Religions in the target city."
-  const strip = promoValue(unit, 'PROSELYTIZER');
+  // CIV6 (Spread Religion): the spread itself "reduces total Religious
+  // Pressure of all foreign religions in the city by 25%", and PROSELYTIZER
+  // raises the strip to its 75.
+  const strip = Math.max(25, promoValue(unit, 'PROSELYTIZER'));
   if (strip > 0) {
     for (let g = 0; g < pres.length; g++) {
       if (g !== actor.seat) pres[g] = Math.floor(pres[g] * (100 - strip) / 100);

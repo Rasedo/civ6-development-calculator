@@ -161,14 +161,14 @@ describe('shipwrecks', () => {
     // the synthetic map is all grassland; make one tile water for the wreck
     const water = tileAtCoords(state.map, 8, 8);
     water.terrain = 'COAST';
-    markShipwreck(state, water.index, 0, 0);
+    markShipwreck(state, water.index, 0);
     expect(water.shipwreck).toBe(true);
     // no stacking, exactly like the land dig
-    markShipwreck(state, water.index, 0, 0);
+    markShipwreck(state, water.index, 0);
     expect(water.shipwreck).toBe(true);
     // a LAND tile never takes one
     const land = tileAtCoords(state.map, 6, 5);
-    markShipwreck(state, land.index, 0, 0);
+    markShipwreck(state, land.index, 0);
     expect(land.shipwreck).toBeFalsy();
 
     // the wreck is invisible work until CULTURAL_HERITAGE
@@ -217,7 +217,7 @@ describe('theming', () => {
     state.seats.push(emptySeat(1)); // a second civilization to bury the find
     const dig = tileAtCoords(state.map, 6, 5);
     setTileOwner(dig, 0, city.id);
-    markAntiquitySite(state, dig.index, 0, 1);
+    markAntiquitySite(state, dig.index, 1);
     expect(dig.antiquitySeat).toBe(1);
     expect(dig.antiquityEra).toBe(0); // nothing researched yet: Ancient
     const arch = spawnUnit(state, 'ARCHAEOLOGIST', dig.index, 0)!;

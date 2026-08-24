@@ -1191,10 +1191,8 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           // `hostileRangedStrike` carries the major-vs-major scope-out and
           // belongs to the SNIPE column and the hostile phases.
           //
-          // The ACTING seat, not the phase's ambient 0: both bodies thread it
-          // to `killUnit` -> `markAntiquitySite`, whose ERA gate reads that
-          // seat's own research.
-          if (UNITS[unit.type]?.ranged) rangedAttack(state, unit.id, to.index, actor.seat);
+          // The melee arm threads the ACTING seat, not the phase's ambient 0.
+          if (UNITS[unit.type]?.ranged) rangedAttack(state, unit.id, to.index);
           else meleeAttack(state, unit.id, to.index, actor.seat);
         }
       } else if (a === A_PILLAGE) {
@@ -1930,7 +1928,7 @@ export function seatPhase(state: GameState): void {
           // the GPU passes `striker_row` at the same site.
           if (defender.hp <= 0) {
             unitKillEvent(state, civCity.seat, undefined, defender);
-            killUnit(state, defender, civCity.seat);
+            killUnit(state, defender);
           }
         }
       }
@@ -1973,7 +1971,7 @@ export function seatPhase(state: GameState): void {
           // the GPU passes `striker_row` at the same site.
           if (defender.hp <= 0) {
             unitKillEvent(state, civCity.seat, undefined, defender);
-            killUnit(state, defender, civCity.seat);
+            killUnit(state, defender);
           }
         }
       }

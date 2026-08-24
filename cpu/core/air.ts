@@ -57,7 +57,9 @@ export function airSlotsAt(state: GameState, seat: number, tileIndex: number): n
   const extra = (city?.buildings ?? []).reduce(
     (n, id) => n + (BUILDINGS[id]?.district === 'AERODROME' ? BUILDINGS[id]?.airSlots ?? 0 : 0), 0,
   );
-  return AERODROME_AIR_SLOTS + extra;
+  // CIV6 (Marina Raskova): the retired general's permanent "+1 air unit
+  // slots" on this district tile.
+  return AERODROME_AIR_SLOTS + extra + (tile.airSlotBonus ?? 0);
 }
 
 export function airBaseFree(state: GameState, seat: number, tileIndex: number): boolean {

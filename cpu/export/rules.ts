@@ -309,6 +309,8 @@ function gpFxRow(p: GreatPersonDef): number[] {
     gppAll: fx.gppAll ?? 0,
     strategicSlot: fx.strategic ? strategicSlot(fx.strategic.resource) : -1,
     strategicAmount: fx.strategic?.amount ?? 0,
+    artifactScience: fx.artifactScience ?? 0,
+    airSlotBonus: fx.airSlotBonus ?? 0,
   };
   return [
     ...GP_FX.map((k) => v[k] ?? 0),
@@ -549,6 +551,7 @@ export function buildRules() {
       gwPrintingTech: techIdx.get(GW_PRINTING_TECH) ?? -1,
       gwPrintingWritingMult: GW_PRINTING_WRITING_MULT,
       artifactBidx: buildingIdx.get(ARTIFACT_BUILDING) ?? -1,
+      workshopBidx: buildingIdx.get('WORKSHOP') ?? -1,
       artifactSlots: ARTIFACT_SLOTS,
       artifactCulture: ARTIFACT_CULTURE,
       artifactTourism: ARTIFACT_TOURISM,
@@ -762,6 +765,7 @@ export function buildRules() {
         regionalAmenities: w.effects?.regionalAmenities ?? 0,
         cityAmenities: w.effects?.cityAmenities ?? 0,
         cityHousing: w.effects?.cityHousing ?? 0,
+        faithPerFlood: w.effects?.faithPerFlood ?? 0,
         dvp: w.effects?.dvp ?? 0,
         // policy slots, parallel to SLOT_KINDS
         slots: SLOT_KINDS.map((k) => w.effects?.extraSlots?.[k] ?? 0),

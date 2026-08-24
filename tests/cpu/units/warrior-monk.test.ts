@@ -55,7 +55,7 @@ describe('the attack budget', () => {
     expect(meleeAttack(state, atk.id, foe.tileIndex, 0).reason).toBe('The attack is spent.');
     const arch = spawnUnit(state, 'ARCHER', tileAtCoords(state.map, 10, 12).index, 0)!;
     arch.attacksLeft = 0;
-    expect(rangedAttack(state, arch.id, foe.tileIndex, 0).reason).toBe('The attack is spent.');
+    expect(rangedAttack(state, arch.id, foe.tileIndex).reason).toBe('The attack is spent.');
   });
 
   it('MOVE_AFTER_ATTACK keeps the movement and still spends the attack', () => {

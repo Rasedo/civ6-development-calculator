@@ -323,7 +323,7 @@ def main() -> None:
     assert int(sim._air_slots_at(row)[0, sea]) == int(sim._type_air_slots[CARRIER]), (
         "CIV6: an Aircraft Carrier 'starts with 2' slots, wherever it floats")
     sim.major_unit_alive[0, cs] = False
-    sim._dig_at(torch.tensor([0]), torch.tensor([sea]), row, torch.tensor([row]))
+    sim._dig_at(torch.tensor([0]), torch.tensor([sea]), torch.tensor([row]))
     assert not bool(sim.major_unit_alive[0, fs2]), (
         "CIV6: 'should your Aircraft Carrier be destroyed, your aircraft stationed "
         "within will be destroyed'")

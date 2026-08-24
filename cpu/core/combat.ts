@@ -13,7 +13,7 @@ import { CITY_STATE_MAX_HP, KABUL_XP_MULT, PRESLAV_HILL_CS } from '../data/cityS
 import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
-import { addEraScore } from './eras';
+import { addEraScore, worldEraIndex } from './eras';
 import { nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc } from './units';
 import { isAirUnit, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirOf, displaceAirFrom } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
@@ -49,7 +49,7 @@ const no = (reason: string): RuleResult => ({ ok: false, reason });
 export const CAMP_CLEAR_REWARD = 50;
 export const MAX_BARB_PER_CAMP = 3;
 
-export function clearCampFor(state: GameState, unit: Unit, tileIndex: number, seat: number): void {
+export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): void {
   // You do not clear your OWN camps. This was `isBarbSeat(...)` —
   // an identity test standing in for that rule, which only became sayable once
   // the camps belonged to a seat and `seatOf` answered for every seat.
@@ -58,7 +58,7 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number, se
   if (camp < 0) return;
   state.barbSeat.camps.splice(camp, 1);
   // the outpost was the BARBARIANS' — theirs is the civilization buried here
-  markAntiquitySite(state, tileIndex, seat, BARB_SEAT);
+  markAntiquitySite(state, tileIndex, BARB_SEAT);
   const clearer = seatOf(state, unit.seat);
   if (clearer) clearer.treasury += CAMP_CLEAR_REWARD;
 }
@@ -721,12 +721,12 @@ export function congressUnitCS(state: GameState, unit: { type: string; seat: num
   return congressPromoClassCs(state, UNIT_PROMO_CLASS[unit.type]) + monk;
 }
 
-export function killUnit(state: GameState, unit: Unit, seat: number): void {
+export function killUnit(state: GameState, unit: Unit): void {
   // CIV6 (Air combat): "Should your Aircraft Carrier be destroyed, your
   // aircraft stationed within will be destroyed."
   if ((UNITS[unit.type]?.airSlots ?? 0) > 0) displaceAirFrom(state, unit.tileIndex, false);
-  markAntiquitySite(state, unit.tileIndex, seat, unitSeat(unit)); // a death leaves a dig
-  markShipwreck(state, unit.tileIndex, seat, unitSeat(unit)); // ...at sea, a wreck
+  markAntiquitySite(state, unit.tileIndex, unitSeat(unit)); // a death leaves a dig
+  markShipwreck(state, unit.tileIndex, unitSeat(unit)); // ...at sea, a wreck
   disbandUnit(state, unit.id);
 }
 
@@ -739,14 +739,16 @@ export function killUnit(state: GameState, unit: Unit, seat: number): void {
  * reaches the MODERN era (ERAS index 5).
  * A tile already carrying a site does not stack — one dig per tile, like Civ 6.
  *
- * `actor` is whose ORDER buried the find and dates it; `civSeat` is the
- * EVENT's own civilization — the unit that died, the barbarians whose outpost
- * was razed — which is what a themed museum reads.
+ * The dig is dated by the WORLD era at the moment of the event — CIV6 dates
+ * an Artifact by WHEN its battle happened, never by how advanced whoever
+ * ordered it was — and `civSeat` is the EVENT's own civilization: the unit
+ * that died, the barbarians whose outpost was razed, what a themed museum
+ * reads.
  */
-export function markAntiquitySite(state: GameState, tileIndex: number, actor: number, civSeat: number): void {
+export function markAntiquitySite(state: GameState, tileIndex: number, civSeat: number): void {
   const t = state.map.tiles[tileIndex];
   if (!t || t.antiquity || isWater(t) || t.district || t.builtWonder) return;
-  const era = civEraIndex(seatOf(state, actor)!.research.techs, seatOf(state, actor)!.research.civics);
+  const era = worldEraIndex(state);
   if (era >= MODERN_ERA_INDEX) return;
   t.antiquity = true;
   // The dig REMEMBERS when and whose: a themed Archaeological Museum wants
@@ -762,16 +764,14 @@ export function markAntiquitySite(state: GameState, tileIndex: number, actor: nu
  * removes it from the map and excavates an Artifact. This model sources its
  * dig placement from DEATHS rather than map generation (see
  * `markAntiquitySite`), so a hull going down leaves the wreck, under the same
- * pre-Modern era gate and the same one-per-tile rule, and it splits `actor`
- * from `civSeat` the same way. The era still needs a research row to read, so
- * a barbarian or city-state ACTOR sinks a hull that leaves no wreck.
+ * pre-Modern era gate and the same one-per-tile rule, dated by the same
+ * WORLD era — so a barbarian or a minor sinking a hull leaves a wreck like
+ * any major's.
  */
-export function markShipwreck(state: GameState, tileIndex: number, actor: number, civSeat: number): void {
+export function markShipwreck(state: GameState, tileIndex: number, civSeat: number): void {
   const t = state.map.tiles[tileIndex];
   if (!t || t.shipwreck || !isWater(t)) return;
-  const owner = seatOf(state, actor);
-  if (!owner) return;
-  const era = civEraIndex(owner.research.techs, owner.research.civics);
+  const era = worldEraIndex(state);
   if (era >= MODERN_ERA_INDEX) return;
   t.shipwreck = true;
   t.shipwreckEra = era;
@@ -847,7 +847,7 @@ function cityAssault(
   attacker: Unit,
   city: City | City,
   kCity: string,
-  kAttacker: string, seat: number): void {
+  kAttacker: string): void {
   const atkCS = assaultAtkCS(state, attacker, city.centerIndex);
   const defCS = cityDefenseStrength(state, city);
   if ((globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.CIV6_BATTLE_PROBE) {
@@ -871,7 +871,7 @@ function cityAssault(
     { aDied: attacker.hp <= 0, city: true });
   if (attacker.hp <= 0) {
     unitKillEvent(state, city.seat, undefined, attacker);
-    killUnit(state, attacker, seat);
+    killUnit(state, attacker);
   }
 }
 
@@ -886,11 +886,11 @@ function cityAssault(
  * A SHOT never conquers, exactly as it never captures a city, so this runs
  * only off the melee assault.
  */
-export function conquerEncampment(state: GameState, tile: Tile, attacker: Unit, seat: number): void {
+export function conquerEncampment(state: GameState, tile: Tile, attacker: Unit): void {
   tile.districtPillaged = true;
   displaceAirFrom(state, tile.index);
   for (const shelter of unitsAt(state, tile.index).filter((u) => unitSeat(u) !== attacker.seat)) {
-    killUnit(state, shelter, seat);
+    killUnit(state, shelter);
   }
 }
 
@@ -963,7 +963,7 @@ function attackEncampment(
   state: GameState,
   attacker: Unit,
   tileIndex: number,
-  defCS: number, seat: number): void {
+  defCS: number): void {
   const tile = state.map.tiles[tileIndex];
   const atkCS = assaultAtkCS(state, attacker, tileIndex);
   const dmgToEncamp = damageRoll(state, atkCS - defCS, 'enc', tileIndex);
@@ -971,12 +971,12 @@ function attackEncampment(
   awardCityXp(state, attacker, XP_CITY_ATTACK);
   tile.encampHp = Math.max(0, (tile.encampHp ?? ENCAMPMENT_HP)
     - encampSplit(state, tile, attacker, dmgToEncamp, false));
-  if (tile.encampHp <= 0) conquerEncampment(state, tile, attacker, seat);
+  if (tile.encampHp <= 0) conquerEncampment(state, tile, attacker);
   attacker.hp -= dmgToAttacker;
   spendAttack(attacker, true);
   warWearinessBattle(state, attacker.seat, tileSeat(tile), tileIndex,
     { aDied: attacker.hp <= 0, city: true });
-  if (attacker.hp <= 0) killUnit(state, attacker, seat);
+  if (attacker.hp <= 0) killUnit(state, attacker);
 }
 
 /**
@@ -1140,7 +1140,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     return no('Nothing to attack there.');
   }
   if (encamp && !seatTarget && !cityStateTarget) {
-    attackEncampment(state, attacker, targetIndex, encamp.defCS, seat);
+    attackEncampment(state, attacker, targetIndex, encamp.defCS);
     return ok;
   }
 
@@ -1161,12 +1161,12 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
         && !civsAtWar(state, seatTarget.holder.seat, seat)) {
       return no(`You are at peace with ${seatTarget.holder.name} — declare war first.`);
     }
-    attackCity(state, attacker, seatTarget.holder, seatTarget.city, seat);
+    attackCity(state, attacker, seatTarget.holder, seatTarget.city);
     return ok;
   }
 
   if (cityStateTarget) {
-    attackCityState(state, attacker, cityStateTarget, seat);
+    attackCityState(state, attacker, cityStateTarget);
     return ok;
   }
 
@@ -1178,7 +1178,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
 
   if ((defDef?.combat ?? 0) <= 0) {
     if (isBarbSeat(attacker.seat)) {
-      killUnit(state, defender, seat);
+      killUnit(state, defender);
     } else {
       defender.seat = attacker.seat; // one field carries the whole ownership change
       defender.movesLeft = 0;
@@ -1221,12 +1221,12 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     if (defender.hp <= 0) {
       unitKillEvent(state, unitSeat(attacker), attacker, defender);
       disciplesSpread(state, unitSeat(attacker), attacker, defender.seat, targetIndex);
-      killUnit(state, defender, seat);
+      killUnit(state, defender);
       if (attacker.hp <= 0) attacker.hp = 1; // victor survives
     } else if (attacker.hp <= 0) {
       unitKillEvent(state, unitSeat(defender), defender, attacker);
       disciplesSpread(state, unitSeat(defender), defender, attacker.seat, targetIndex);
-      killUnit(state, attacker, seat);
+      killUnit(state, attacker);
       attacker.movesLeft = 0;
       return ok;
     }
@@ -1236,7 +1236,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     attacker.tileIndex = targetIndex;
     // an amphibious victor comes ashore: `stepUnit`'s own transition rule
     if (!def.naval) attacker.embarked = isWater(state.map.tiles[targetIndex]);
-    clearCampFor(state, attacker, targetIndex, seat); // every seat clears it
+    clearCampFor(state, attacker, targetIndex); // every seat clears it
   }
   return ok;
 }
@@ -1277,7 +1277,7 @@ export function airStrike(state: GameState, attackerId: number, targetIndex: num
   }
   const holder = cityAtIndex(state, targetIndex);
   if (kind === 'BOMBER' && holder && civsAtWar(state, seat, holder.holder.seat)) {
-    const r = rangedAttack(state, attackerId, targetIndex, seat);
+    const r = rangedAttack(state, attackerId, targetIndex);
     if (r.ok) attacker.movesLeft = 0;
     return r;
   }
@@ -1307,13 +1307,13 @@ export function airStrike(state: GameState, attackerId: number, targetIndex: num
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, {
     aDied: attacker.hp <= 0, dDied: defender.hp <= 0,
   });
-  if (defender.hp <= 0) killUnit(state, defender, seat);
+  if (defender.hp <= 0) killUnit(state, defender);
   logUnitOrder(state, seat, attackerId, 'ranged', targetIndex);
   return { ok: true };
 }
 
-export function rangedAttack(state: GameState, attackerId: number, targetIndex: number, seat: number): RuleResult {
-  const r = rangedAttackInner(state, attackerId, targetIndex, seat);
+export function rangedAttack(state: GameState, attackerId: number, targetIndex: number): RuleResult {
+  const r = rangedAttackInner(state, attackerId, targetIndex);
   if (r.ok) {
     const u = state.units.find((x) => x.id === attackerId);
     if (u) {
@@ -1323,7 +1323,7 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
   }
   return r;
 }
-function rangedAttackInner(state: GameState, attackerId: number, targetIndex: number, seat: number): RuleResult {
+function rangedAttackInner(state: GameState, attackerId: number, targetIndex: number): RuleResult {
   const attacker = state.units.find((u) => u.id === attackerId);
   if (!attacker) return no('No such unit.');
   const def = UNITS[attacker.type];
@@ -1402,7 +1402,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   if (defender.hp <= 0) {
     unitKillEvent(state, unitSeat(attacker), attacker, defender);
     disciplesSpread(state, unitSeat(attacker), attacker, defender.seat, targetIndex);
-    killUnit(state, defender, seat);
+    killUnit(state, defender);
   }
   spendAttack(attacker);
   return ok;
@@ -1438,7 +1438,6 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
 
 /** Did the strike actually resolve? Only a shot that lands reveals a raider. */
 function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex: number): boolean {
-  const seat = attacker.seat;
   if (attacksLeftOf(attacker) <= 0) return false;
   const def = UNITS[attacker.type];
   if (!def?.ranged) return false;
@@ -1492,7 +1491,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
   if (defender.hp <= 0) {
     unitKillEvent(state, unitSeat(attacker), attacker, defender);
     disciplesSpread(state, unitSeat(attacker), attacker, defender.seat, targetIndex);
-    killUnit(state, defender, seat);
+    killUnit(state, defender);
   }
   spendAttack(attacker);
   return true;
@@ -1550,14 +1549,14 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
 }
 
 
-function attackCity(state: GameState, attacker: Unit, holder: Seat, city: City, seat: number): void {
-  cityAssault(state, attacker, city, 'rcty', 'rctyc', seat);
+function attackCity(state: GameState, attacker: Unit, holder: Seat, city: City): void {
+  cityAssault(state, attacker, city, 'rcty', 'rctyc');
   if (city.hp > 0) return;
   // CIV6: "when a city is captured, all units within it are destroyed" — the
   // garrison falls with the centre it was holding. Array order, and the centre
   // carries a district so no death leaves a dig.
   for (const garrison of unitsAt(state, city.centerIndex).filter((u) => unitSeat(u) !== attacker.seat)) {
-    killUnit(state, garrison, seat);
+    killUnit(state, garrison);
   }
   const captor = seatOf(state, attacker.seat);
   if (captor && !isBarbSeat(attacker.seat)) {
@@ -1568,7 +1567,7 @@ function attackCity(state: GameState, attacker: Unit, holder: Seat, city: City, 
   }
 }
 
-function attackCityState(state: GameState, attacker: Unit, cityState: CityState, seat: number): void {
+function attackCityState(state: GameState, attacker: Unit, cityState: CityState): void {
   const atkCS = assaultAtkCS(state, attacker, cityState.centerIndex);
   const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0);
   cityState.hp = (cityState.hp ?? CITY_STATE_MAX_HP) - damageRoll(state, atkCS - defCS, 'csty', cityState.centerIndex);
@@ -1580,7 +1579,7 @@ function attackCityState(state: GameState, attacker: Unit, cityState: CityState,
     { aDied: attacker.hp <= 0, city: true });
   spendAttack(attacker, true);
   awardCityXp(state, attacker, (cityState.hp ?? 0) <= 0 ? XP_CITY_FELLED : XP_CITY_ATTACK);
-  if (attacker.hp <= 0) killUnit(state, attacker, seat);
+  if (attacker.hp <= 0) killUnit(state, attacker);
   if ((cityState.hp ?? 0) <= 0) {
     if (isCiv(attacker.seat)) {
       const civSeat = seatOf(state, attacker.seat);

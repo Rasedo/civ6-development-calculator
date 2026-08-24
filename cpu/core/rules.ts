@@ -23,6 +23,7 @@ import { CITY_MIN_DIST } from '../../world/types';
 import { URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN } from '../data/units';
 import { PROJECTS } from '../data/projects';
 import { CITY_WORK_RADIUS, maxSpecialtyDistricts } from '../data/constants';
+import { gpCityPermOf } from '../data/greatPeople';
 import { allCities, campTiles, citiesOf, seatOf, tileBelongsTo, tileClaimed, tileSeat } from './seats';
 
 export interface RuleResult {
@@ -318,8 +319,11 @@ export function canPlaceDistrictIn(
   }
   if (def.countsTowardLimit) {
     const specialty = city.districts.filter((d) => DISTRICTS[d.type].countsTowardLimit).length;
-    if (specialty >= maxSpecialtyDistricts(city.population)) {
-      return no(`Needs more population (${specialty}/${maxSpecialtyDistricts(city.population)} district slots used).`);
+    // CIV6 (Bi Sheng, Ada Lovelace): "Lets this city build one more district
+    // than the Population limit allows" — a permanent per-city raise.
+    const cap = maxSpecialtyDistricts(city.population) + gpCityPermOf(city, 'districtLimit');
+    if (specialty >= cap) {
+      return no(`Needs more population (${specialty}/${cap} district slots used).`);
     }
   }
 

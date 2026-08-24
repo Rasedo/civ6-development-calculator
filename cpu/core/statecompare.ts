@@ -638,6 +638,8 @@ const TILE: Record<string, Extractor> = {
   hasFeature: overTiles((t) => (t.feature === null ? 0 : 1)),
   lowland: overTiles((t) => t.lowland ?? 0),
   flooded: overTiles((t) => (t.flooded ? 1 : 0)),
+  floodCount: overTiles((t) => t.floodCount ?? 0),
+  airSlotBonus: overTiles((t) => t.airSlotBonus ?? 0),
   hasResource: overTiles((t) => (t.resource === null ? 0 : 1)),
 };
 

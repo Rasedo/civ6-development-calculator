@@ -709,7 +709,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
       && (to.encampHp ?? ENCAMPMENT_HP) <= 0
       && unitDomain(unit.type) === 'military' && !UNITS[unit.type]?.ranged) {
     const side = tileOwnerSide(to);
-    if (side !== null && unitsHostile(state, unit, side)) conquerEncampment(state, to, unit, unit.seat);
+    if (side !== null && unitsHostile(state, unit, side)) conquerEncampment(state, to, unit);
   }
   if (unit.seat === seat) {
     revealAround(state, unit.seat, to.index, unitSight(unit));
@@ -721,7 +721,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
     }
     claimGoodyHut(state, unit);
   }
-  clearCampFor(state, unit, to.index, seat);
+  clearCampFor(state, unit, to.index);
   if (inEnemyZoc(state, unit.tileIndex, unit)) {
     unit.movesLeft = 0;
     return 'halted';

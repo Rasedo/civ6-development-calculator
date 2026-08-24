@@ -160,6 +160,12 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   const era = person.era;
 
   if (fx.science) owner.research.techProgress += fx.science;
+  // CIV6 (Mary Leakey): "Gain 350 Science for every Artifact in this city."
+  if (fx.artifactScience && city) {
+    owner.research.techProgress += fx.artifactScience * (city.artifactEras?.length ?? 0);
+  }
+  // CIV6 (Marina Raskova): "District in this tile gains +1 air unit slots."
+  if (fx.airSlotBonus) tile.airSlotBonus = (tile.airSlotBonus ?? 0) + fx.airSlotBonus;
   if (GW_WORK_CLASSES.has(person.class) && city) {
     const kind = GW_CLASS_KIND[person.class]!;
     const overflow = placeGreatWorks([city], kind, wonderGwSlots(state, kind), unit.gpAt ?? 0);

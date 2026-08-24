@@ -387,9 +387,9 @@ class SimSpy:
         that names a district but not a tile can address. `cityCounterLevels`'
         twin."""
         reg = self.city_dist_tile[b, hr, hc]              # [nD]
-        live = (reg >= 0) & self.district_complete[b, reg.clamp(min=0)] \
-            & ~self.district_pillaged[b, reg.clamp(min=0)]
-        n = int((live.long() * self._d_spy_pen).sum())
+        # per INSTANCE off the tile plane — the registry keeps one per type
+        live = self._dist_counts(hr)[b, hc]
+        n = int((live * self._d_spy_pen).sum())
         if bool((self._b_spy_pen > 0).any()):
             stand = self.city_bldg[b, hr, hc] & ~self._bldg_dark(reg.reshape(1, 1, -1))[0, 0]
             n += int((stand.long() * self._b_spy_pen).sum())

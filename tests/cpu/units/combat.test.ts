@@ -145,7 +145,7 @@ describe('combat', () => {
     barb.tileIndex = tileAtCoords(state.map, 13, 9).index;
 
     expect(attackTargets(state, archer)).toContain(barb.tileIndex); // range 2
-    expect(rangedAttack(state, archer.id, barb.tileIndex, 0).ok).toBe(true);
+    expect(rangedAttack(state, archer.id, barb.tileIndex).ok).toBe(true);
     expect(barb.hp).toBeLessThan(100);
     expect(archer.hp).toBe(100);
 
@@ -367,7 +367,7 @@ describe('flanking & support', () => {
     };
 
     const plain = setup();
-    const d0 = rollDiff('rng', () => rangedAttack(plain.state, plain.archer.id, plain.defTile, 0));
+    const d0 = rollDiff('rng', () => rangedAttack(plain.state, plain.archer.id, plain.defTile));
 
     const supported = setup();
     const sn = freeNeighbor(supported.state, supported.defTile, supported.atkTile);
@@ -375,7 +375,7 @@ describe('flanking & support', () => {
     helper.tileIndex = sn.index;
     // the support is REAL — a melee attack would feel it
     expect(supportCount(supported.state, supported.defTile, helper)).toBe(1);
-    const d1 = rollDiff('rng', () => rangedAttack(supported.state, supported.archer.id, supported.defTile, 0));
+    const d1 = rollDiff('rng', () => rangedAttack(supported.state, supported.archer.id, supported.defTile));
 
     expect(d1).toBe(d0);
   });

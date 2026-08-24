@@ -820,11 +820,12 @@ export const GP_PERM = [
   'healBonus',           // extra HP healed per turn
   'tradeCapacity',       // extra simultaneous trade routes
   'policySlotEconomic',  // extra Economic policy slots
+  'workshopCulture',     // CIV6 (Leonardo da Vinci): "Workshops provide +3 Culture"
 ] as const;
 export type GpPermKey = (typeof GP_PERM)[number];
 
 /** PERMANENT per-city channels, same contract — the ACTIVATING city keeps them. */
-export const GP_CITY_PERM = ['housing', 'amenities', 'appeal', 'loyalty'] as const;
+export const GP_CITY_PERM = ['housing', 'amenities', 'appeal', 'loyalty', 'districtLimit'] as const;
 export type GpCityPermKey = (typeof GP_CITY_PERM)[number];
 
 export type GpYieldKey = 'science' | 'culture' | 'gold' | 'faith';
@@ -886,6 +887,11 @@ export interface GpEffect {
   gppAll?: number;
   /** a strategic resource straight into the stockpile. */
   strategic?: { resource: string; amount: number };
+  /** CIV6 (Mary Leakey): science "for every Artifact in this city", instant. */
+  artifactScience?: number;
+  /** CIV6 (Marina Raskova): "District in this tile gains +1 air unit
+   *  slots" — a permanent per-tile add on the activating tile. */
+  airSlotBonus?: number;
   perm?: Partial<Record<GpPermKey, number>>;
   cityPerm?: Partial<Record<GpCityPermKey, number>>;
 }
@@ -904,6 +910,7 @@ export const GP_FX = [
   'perAdjSource', 'perAdjYield', 'perAdjAmount', 'perAdjHere',
   'luxuryCopies', 'luxuryAmenities', 'greatWorkKind', 'gppAll',
   'strategicSlot', 'strategicAmount',
+  'artifactScience', 'airSlotBonus',
 ] as const;
 
 /** what a `perAdjacent` clause counts, in the wire's own order. */
@@ -955,7 +962,7 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_ALFRED_NOBEL: { eurekaRandom: 1, eurekaHi: 1, gppAll: 100 },
   GP_ERWIN_SCHRODINGER: { eurekaRandom: 3, eurekaHi: 1 },
   GP_JANAKI_AMMAL: { perAdjacent: { source: 'RAINFOREST', yield: 'science', amount: 400, here: true } },
-  GP_MARY_LEAKEY: { unmodelled: true },
+  GP_MARY_LEAKEY: { artifactScience: 350 }, // the tourism clause waits on the tourism system
   GP_MARGARET_MEAD: { science: 1000, culture: 1000 },
   GP_CARL_SAGAN: { spaceProduction: 3000 },
   GP_STEPHANIE_KWOLEK: { perm: { spaceProdPct: 100 } },
@@ -963,13 +970,13 @@ export const GP_ABILITY: Record<string, GpAbility> = {
 
   // ---- ENGINEER: wonders, buildings and the Space Race ----
   GP_IMHOTEP: { charges: 2, wonderProduction: 175, wonderEraDouble: 1 },
-  GP_BI_SHENG: { eurekaTechs: ['PRINTING'] },
+  GP_BI_SHENG: { eurekaTechs: ['PRINTING'], cityPerm: { districtLimit: 1 } },
   GP_ISIDORE_OF_MILETUS: { charges: 2, wonderProduction: 215 },
   GP_JAMES_OF_ST_GEORGE: { charges: 3, buildings: ['ANCIENT_WALLS', 'MEDIEVAL_WALLS'] },
   GP_FILIPPO_BRUNELLESCHI: { charges: 2, wonderProduction: 315 },
-  GP_LEONARDO_DA_VINCI: { eurekaRandom: 1, eurekaLo: 2, eurekaHi: 2 },
+  GP_LEONARDO_DA_VINCI: { eurekaRandom: 1, eurekaLo: 2, eurekaHi: 2, perm: { workshopCulture: 3 } },
   GP_MIMAR_SINAN: { cityPerm: { housing: 1, amenities: 1 } },
-  GP_ADA_LOVELACE: { eurekaTechs: ['COMPUTERS'] },
+  GP_ADA_LOVELACE: { eurekaTechs: ['COMPUTERS'], cityPerm: { districtLimit: 1 } },
   GP_GUSTAVE_EIFFEL: { charges: 2, wonderProduction: 480 },
   GP_JAMES_WATT: { buildings: ['WORKSHOP', 'FACTORY'] },
   GP_SHAH_JAHAN: { unmodelled: true },
@@ -1027,7 +1034,7 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_RANI_LAKSHMIBAI: { unit: 'CAVALRY', unitPromotions: 1 },
   GP_TUPAC_AMARU: { unmodelled: true },
   GP_JOHN_MONASH: { promotionLevels: 1, xpPct: 75 },
-  GP_MARINA_RASKOVA: { siteDistrict: 'AERODROME', unmodelled: true },
+  GP_MARINA_RASKOVA: { siteDistrict: 'AERODROME', airSlotBonus: 1 },
   GP_SAMORI_TOURE: { unit: 'INFANTRY', unitPromotions: 1 },
   GP_DOUGLAS_MACARTHUR: { unit: 'TANK', unitPromotions: 1 },
   GP_DWIGHT_EISENHOWER: { perm: { unitProdPct: 5 } },

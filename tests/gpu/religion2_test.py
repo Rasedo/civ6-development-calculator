@@ -734,6 +734,7 @@ def poke_religious_heal(rules, rj, path):
     hs = make_holy_site(sim, r, j)
     sim.tile_seat[0, hs] = g
     sim.tile_city[0, hs] = int(sim.city_id[0, g, j])
+    sim._tile_owner_ver += 1  # `city_slot_at` keys on it
     # a SHRINE stands INSIDE the Holy Site, so its faith is the site's output
     sim.city_bldg[:, g, :, sim._shrine_bidx] = False
     sim.city_bldg[0, g, j, sim._shrine_bidx] = True

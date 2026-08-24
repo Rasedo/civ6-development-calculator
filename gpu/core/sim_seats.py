@@ -105,7 +105,10 @@ class SimSeats:
                 ok_u[:, _ui] = tr_j[:, _ui] & _gate
             ok_d = torch.zeros(B, nS, dtype=torch.bool, device=dev)
             if self.districts_on and self._scaffold:
-                cap_max = torch.div(self.city_pop[:, row, j] - 1, 3, rounding_mode="floor") + 1
+                # CIV6 (Bi Sheng, Ada Lovelace): "one more district than the
+                # Population limit allows" — the per-city permanent raise
+                cap_max = (torch.div(self.city_pop[:, row, j] - 1, 3, rounding_mode="floor") + 1
+                           + self._gp_city_perm(row, "districtLimit")[:, j].long())
                 spec_cnt = ((self.city_dist_tile[:, row, j] >= 0) & self._is_specialty).sum(dim=1)
                 site = self._district_elig_site(row, j)  # every type in this city shares it
                 for si, (di, _ut, _uc, plc, _fc) in enumerate(self._scaffold):
@@ -759,12 +762,16 @@ class SimSeats:
         """[B, RC] the cities that may sell a religious unit. CIV6: "the
         Apostle and the Guru require a Temple, and the Inquisitor requires both
         a Temple and an Apostle ... to have previously Launched an
-        Inquisition" — a Shrine alone sells only the Missionary."""
+        Inquisition" — a Shrine alone sells only the Missionary. And every
+        tier is purchased "in a city that has a majority religion", whichever
+        religion that is — `city_followed` is the gate, as the Warrior Monk
+        arm reads it."""
         if self._shrine_bidx < 0 or self._hs_idx < 0:
             return torch.zeros(self.B, self.RC, dtype=torch.bool, device=self.device)
         hs = self.city_dist_tile[:, row, :, self._hs_idx]
         hs_ok = (hs >= 0) & self.district_complete.gather(1, hs.clamp(min=0)) & ~self.district_pillaged.gather(1, hs.clamp(min=0))
-        out = self.city_alive[:, row] & self.city_bldg[:, row, :, self._shrine_bidx] & hs_ok
+        out = (self.city_alive[:, row] & self.city_bldg[:, row, :, self._shrine_bidx] & hs_ok
+               & (self.city_followed[:, row] >= 0))
         if temple and self._temple_bidx >= 0:
             out = out & self.city_bldg[:, row, :, self._temple_bidx]
         return out
@@ -1360,7 +1367,8 @@ class SimSeats:
                 d_cost = torch.floor(dcp.get("base", 32) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct))).to(self.dtype)
                 reg_j = self.city_dist_tile[:, row, j]  # [B, nD] THIS city's registry — the list TS counts
                 spec_cnt = ((reg_j >= 0) & self._is_specialty.reshape(1, -1)).sum(dim=1)
-                cap_j = torch.div(self.city_pop[:, row, j] - 1, 3, rounding_mode="floor") + 1
+                cap_j = (torch.div(self.city_pop[:, row, j] - 1, 3, rounding_mode="floor") + 1
+                         + self._gp_city_perm(row, "districtLimit")[:, j].long())
                 for si, (di, utech, uciv, plc, fc) in enumerate(self._scaffold):
                     want_d = is_d & (a == self.DISTRICT_BASE + si)
                     if not bool(want_d.any()):
@@ -1656,7 +1664,7 @@ class SimSeats:
         gd, td = g[dead], ttc[g[dead]]
         if len(gd) > 0:
             self.unit_alive[gd, ds[dead]] = False
-            self._dig_at(gd, td, row, d_seat[gd])
+            self._dig_at(gd, td, d_seat[gd])
             self._occ_clear(gd, td, ds[dead])
             self._unit_kill_event(a_seat, d_type, d_seat == BARB_SEAT, d_died, at0)
             self._gen_ver += 1
@@ -2911,9 +2919,9 @@ class SimSeats:
         out = torch.zeros(bidx.shape[0], dtype=torch.float64, device=self.device)
         reg = self.city_dist_tile[bidx, row, col]  # [n, nD]
         if self.districts_on and reg.shape[-1]:
-            flat = reg.clamp(min=0)
-            live = (reg >= 0) & self.district_complete[bidx.unsqueeze(1), flat] \
-                & ~self.district_pillaged[bidx.unsqueeze(1), flat]
+            # counted off the TILE plane — a repeatable district pays per
+            # INSTANCE, which the one-tile-per-type registry cannot say
+            live = self._dist_counts(row)[bidx, col]
             out = out + (live.double() * self._d_loyalty.double().unsqueeze(0)).sum(dim=1)
         w = self.rules.b_loyalty
         if w.numel() and bool((w != 0).any()):
@@ -3807,12 +3815,12 @@ class SimSeats:
             return self._belief_feat_cache[1]
         suz = self._imp_adjacency(row)
         if not self._seat_has_beliefs(row):
-            pres = self._preserve_plane(row)
-            plane = (pres if pres is not None
-                     else torch.zeros(self.B, self.T, 6, dtype=self.dtype, device=self.device))
+            plane = torch.zeros(self.B, self.T, 6, dtype=self.dtype, device=self.device)
             if suz is not None:
-                plane = plane + suz
-            plane = plane * self._tile_add_live()
+                plane = plane + suz * self._tile_add_live()
+            pres = self._preserve_plane(row)
+            if pres is not None:
+                plane = plane + pres * self._preserve_live()
             self._belief_feat_cache = (key, plane)
             return plane
         featA = self._bel_add("featY", row)
@@ -3832,23 +3840,48 @@ class SimSeats:
         impY = self._bel_add("impY", row)  # [B, nImp, 6]
         imp_live = ((self.improvement >= 0) & ~self.pillaged).unsqueeze(2).to(plane.dtype)
         plane = plane + impY.gather(1, self.improvement.clamp(min=0).unsqueeze(2).expand(-1, -1, 6)) * imp_live
+        plane = plane * self._tile_add_live()
         pres = self._preserve_plane(row)
         if pres is not None:
-            plane = plane + pres
-        plane = plane * self._tile_add_live()
+            plane = plane + pres * self._preserve_live()
         self._belief_feat_cache = (key, plane)
         return plane
 
+    def _dist_counts(self, row: int, pillage_gate: bool = True) -> torch.Tensor:
+        """[B, RC, nD] COMPLETE district instances per (city, type), counted
+        off the TILE plane — `city.districts` may hold a repeatable type (a
+        NEIGHBORHOOD, DAM or CANAL) more than once, and the one-tile-per-type
+        registry cannot say so. The registry keeps the ADDRESS; this keeps
+        the COUNT, each tile under its OWN complete/pillage state."""
+        nD = self._d_maint.shape[0]
+        sl = self.city_slot_at(row)  # [B, T]
+        ok = (self.district >= 0) & self.district_complete & (sl >= 0)
+        if pillage_gate:
+            ok = ok & ~self.district_pillaged
+        key = sl.clamp(min=0) * nD + self.district.clamp(min=0)
+        flat = torch.zeros(self.B, self.RC * nD, dtype=torch.long, device=self.device)
+        flat.scatter_add_(1, key, ok.long())
+        return flat.reshape(self.B, self.RC, nD)
+
     def _tile_add_live(self) -> torch.Tensor:
-        """[B, T, 1] 1 where a runtime tile add lands at all. ORACLE:
-        `tileYields` LEAVES before it reaches any of them on a NATURAL WONDER
-        (which pays its own roster row and nothing else) and on an impassable
-        tile, so beliefs, a Preserve's bands and a suzerain improvement's
-        adjacency are all dark there. The paved half of that early return
-        (a district or a built wonder) is masked by each consumer instead,
-        because the CENTRE is evaluated with its district stripped."""
+        """[B, T, 1] 1 where a generic runtime tile add lands. ORACLE:
+        `tileYields` LEAVES before it reaches beliefs or a suzerain
+        improvement's adjacency on a NATURAL WONDER and on an impassable
+        tile, so both are dark there — the PRESERVE band alone reaches the
+        wonder arm, through `_preserve_live`. The paved half of that early
+        return (a district or a built wonder) is masked by each consumer
+        instead, because the CENTRE is evaluated with its district
+        stripped."""
         live = (~self.nwonder & self.work_ok).unsqueeze(2)
         return live.to(self.dtype)
+
+    def _preserve_live(self) -> torch.Tensor:
+        """[B, T, 1] where a PRESERVE band lands: everywhere a generic add
+        does, PLUS the natural wonder tiles — CIV6 (Grove): the band pays
+        "adjacent unimproved tiles" by APPEAL, and a natural wonder is
+        unimproved and Breathtaking by construction, so `tileYields`' wonder
+        arm adds the band on top of the roster row."""
+        return (self.work_ok | self.nwonder).unsqueeze(2).to(self.dtype)
 
     def _seat_route_income(self, row: int) -> torch.Tensor | None:
         """cityTradeYields for ANY seat row — per-COLUMN ORIGIN income from this
@@ -4448,7 +4481,9 @@ class SimSeats:
         # pillage and no regional skip; cityMaintenance has neither), + the
         # capital's PALACE, which TS carries as an autoCapital entry in
         # city.buildings and the GPU carries as an is_cap bonus.
-        maint = (self._d_maint.double().reshape(1, 1, -1) * dcomp.double()).sum(dim=2)
+        # per INSTANCE off the tile plane — the registry keeps one per type
+        maint = (self._d_maint.double().reshape(1, 1, -1)
+                 * self._dist_counts(row, pillage_gate=False)[:, :cols].double()).sum(dim=2)
         maint = maint + torch.einsum("bjn,n->bj", bldg.double(), rd.b_maintenance.double())
         maint = maint + float(self.rules.palace_maintenance) * is_cap_a
         # WATER: fresh > coastal > none, then the Aqueduct — a fresh city gains
@@ -4566,11 +4601,9 @@ class SimSeats:
         # CIV6 (Entertainment Complex, Water Park): "+1 Amenity from
         # entertainment to parent city" — the DISTRICT's own, before any
         # building, and dark while it is pillaged.
-        _dc = self.city_dist_tile[:, row, :cols]
-        _df = _dc.clamp(min=0).reshape(self.B, -1)
-        _dlive = (_dc >= 0) & self.district_complete.gather(1, _df).reshape_as(_dc) \
-            & ~self.district_pillaged.gather(1, _df).reshape_as(_dc)
-        have = have + torch.einsum("bjn,n->bj", _dlive.double(), self._d_amenity.double())
+        have = have + torch.einsum("bjn,n->bj",
+                                   self._dist_counts(row)[:, :cols].double(),
+                                   self._d_amenity.double())
         if bool((selb & (self._b_pow_am > 0).reshape(1, 1, -1)).any()):
             _powam = torch.einsum("bjn,n->bj", selb.to(torch.float64), self._b_pow_am)
             have = have + _powam * self.city_powered[:, row, :cols].double()
@@ -4763,6 +4796,8 @@ class SimSeats:
         self.seat_route_walk[b, src_row][kill] = -1
         self.seat_route_leg[b, src_row][kill] = -1
         owned = (self.tile_seat[b] == src_row) & (self.tile_city[b] == cid)
+        # a plot changing HANDS drops its LOCK (`setTileOwner`'s clear)
+        self.tile_locked[b] &= ~owned
         if conquest and int(self.city_alive[b, dst_row].sum()) >= int(self.rules.seats.get("maxCities", 6)):
             # The city simply ceases: tiles freed, centre unpaved (centre_slot_at
             # above — the `district` plane never encodes CITY_CENTER), no plunder.
@@ -4895,6 +4930,9 @@ class SimSeats:
             if not bool(take.any()):
                 continue
             rr, tt = rows[take], tk[take]
+            # a plot changing HANDS drops its LOCK (`setTileOwner`'s clear);
+            # a same-seat retag between two of the row's cities keeps it
+            self.tile_locked[rr, tt] &= self.tile_seat[rr, tt] == row
             self.tile_seat[rr, tt] = row  # setTileOwner's two halves
             self.tile_city[rr, tt] = cid[take]
             self.city_acquired[rr, row, cols[take]] += 1
@@ -5300,7 +5338,7 @@ class SimSeats:
             if bool(atk_dead.any()):
                 ar = atk_dead.nonzero(as_tuple=True)[0]
                 a_alive[:, u] = a_alive[:, u] & ~atk_dead
-                self._dig_at(ar, here[ar], self._row_of(a_seat[ar, u]), a_seat[ar, u])
+                self._dig_at(ar, here[ar], a_seat[ar, u])
                 self._occ_clear(ar, here[ar], torch.full_like(ar, u + a_lo))
             adv_terr = self._advance_terrain(a_type[:, u], a_seat[:, u], tgt)
             _anav = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)]
@@ -5324,8 +5362,7 @@ class SimSeats:
             if major:
                 self._capture_unit(rows, cslot_raw[rows], atk_kind, a_seat[rows, u], ttc[rows])
             else:
-                self._dig_at(rows, ttc[rows], self._row_of(a_seat[rows, u]),
-                             self.unit_seat[rows, cslot_raw[rows]])
+                self._dig_at(rows, ttc[rows], self.unit_seat[rows, cslot_raw[rows]])
                 self._occ_clear(rows, ttc[rows], cslot_raw[rows])
                 self.unit_alive[rows, cslot_raw[rows]] = False
                 self._gen_ver += 1
@@ -6090,7 +6127,7 @@ class SimSeats:
             dr = died.nonzero(as_tuple=True)[0]
             _as = self._atk_seat(atk_kind, u)[dr]
             a_alive[:, u] = a_alive[:, u] & ~died
-            self._dig_at(dr, a_tile[dr, u], self._row_of(_as), _as)
+            self._dig_at(dr, a_tile[dr, u], _as)
             self._occ_clear(dr, a_tile[dr, u], torch.full_like(dr, u + self.POOL_LO[atk_kind]))
 
     def _capture_unit(self, rows: torch.Tensor, src: torch.Tensor, pool: str,
@@ -6354,7 +6391,7 @@ class SimSeats:
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
             a_alive[:, u] = a_alive[:, u] & ~died
-            self._dig_at(dr, a_tile[dr, u], self._row_of(a_seat[dr, u]), a_seat[dr, u])
+            self._dig_at(dr, a_tile[dr, u], a_seat[dr, u])
             self._occ_clear(dr, a_tile[dr, u], torch.full_like(dr, u + self.POOL_LO[atk_kind]))
         return rows, hrow, slot, died, ttc
 
@@ -6375,7 +6412,7 @@ class SimSeats:
                 continue
             ri, si = hit.nonzero(as_tuple=True)
             gr = rows[ri]
-            self._dig_at(gr, centres[ri], self._row_of(captor[ri]), seats[ri, si])
+            self._dig_at(gr, centres[ri], seats[ri, si])
             getattr(self, f"{pool}_unit_alive")[gr, si] = False
             self._vacate(pool, gr, si)
 
@@ -6482,7 +6519,7 @@ class SimSeats:
         if bool(atk_dead.any()):
             ar = atk_dead.nonzero(as_tuple=True)[0]
             a_alive[:, u] = a_alive[:, u] & ~atk_dead
-            self._dig_at(ar, here[ar], self._row_of(a_seat[ar, u]), a_seat[ar, u])
+            self._dig_at(ar, here[ar], a_seat[ar, u])
             self._occ_clear(ar, here[ar], torch.full_like(ar, u + self.POOL_LO[atk_kind]))
         self._ww_battle(att, self._row_of(a_seat[:, u]), self._row_of(100 + citystate_sc), tgt,
                         a_died=atk_dead, city=True)
@@ -6516,7 +6553,7 @@ class SimSeats:
             self.unit_alive[gd, ds[dead]] = False
             # a combat death leaves a DIG on the tile the dead unit stood on —
             # `combat.ts:killUnit`, not only at a razed outpost.
-            self._dig_at(gd, td, striker_row, d_seat[gd])
+            self._dig_at(gd, td, d_seat[gd])
             if bool(dead.any()):
                 self._rp_kill_version += 1
         # a surviving MILITARY defender banks the flat defense base; the
@@ -6562,7 +6599,7 @@ class SimSeats:
             gd, td = rows[dead], tile_c[rows[dead]]
             self.unit_alive[gd, ds[dead]] = False
             self._occ_clear(gd, td, ds[dead])
-            self._dig_at(gd, td, atk_row[gd], self.unit_seat[gd, ds[dead]])
+            self._dig_at(gd, td, self.unit_seat[gd, ds[dead]])
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
         atk_raw = att & (a_hp[:, u] <= 0)
         both = def_dead & atk_raw
@@ -6718,7 +6755,7 @@ class SimSeats:
             dead = self.unit_hp[g, ds] <= 0
             gd, td = g[dead], ttc[g[dead]]
             self.unit_alive[gd, ds[dead]] = False
-            self._dig_at(gd, td, self._row_of(self._atk_seat(atk_kind, u)[gd]), d_seat[gd])
+            self._dig_at(gd, td, d_seat[gd])
             # Clearing both maps is branch-free and exact: only one of them is
             # set on that tile.
             self._occ_clear(gd, td, ds[dead])
@@ -6912,7 +6949,7 @@ class SimSeats:
             dead = self.unit_hp[g, ds] <= 0
             gd, td = g[dead], ttc[g[dead]]
             self.unit_alive[gd, ds[dead]] = False
-            self._dig_at(gd, td, self._row_of(self._atk_seat(atk_kind, u)[gd]), d_seat[gd])
+            self._dig_at(gd, td, d_seat[gd])
             # Clearing both maps is branch-free and exact: only one of them is
             # set on that tile.
             self._occ_clear(gd, td, ds[dead])

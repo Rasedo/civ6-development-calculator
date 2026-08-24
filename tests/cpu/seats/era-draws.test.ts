@@ -77,7 +77,7 @@ describe("an artifact's civilization is the event's own", () => {
     state.seats.push(emptySeat(1));
     const t = tileAtCoords(state.map, 5, 5);
     const dead = spawnUnit(state, 'WARRIOR', t.index, 1)!;
-    killUnit(state, dead, 0); // seat 0 struck the blow
+    killUnit(state, dead);
     expect(t.antiquity).toBe(true);
     expect(t.antiquitySeat).toBe(1);
   });
@@ -88,7 +88,7 @@ describe("an artifact's civilization is the event's own", () => {
     const t = tileAtCoords(state.map, 5, 5);
     state.barbSeat.camps.push(t.index);
     const razer = spawnUnit(state, 'WARRIOR', t.index, 0)!;
-    clearCampFor(state, razer, t.index, 0);
+    clearCampFor(state, razer, t.index);
     expect(t.antiquity).toBe(true);
     expect(t.antiquitySeat).toBe(BARB_SEAT);
   });
@@ -98,7 +98,7 @@ describe("an artifact's civilization is the event's own", () => {
     state.seats.push(emptySeat(1));
     state.seats[0].research.techs.push('POTTERY', 'ANIMAL_HUSBANDRY');
     const t = tileAtCoords(state.map, 5, 5);
-    markAntiquitySite(state, t.index, 0, 1);
+    markAntiquitySite(state, t.index, 1);
     expect(t.antiquitySeat).toBe(1);
     expect(t.antiquityEra).toBe(0); // seat 0 is still Ancient
   });

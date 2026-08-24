@@ -193,7 +193,7 @@ describe('the support units at a real city', () => {
   it('a Catapult bombardment breaches a perimeter a Swordsman barely scratches', () => {
     const a = scene(['ANCIENT_WALLS']);
     const cat = place(a.state, a.city.centerIndex, 'CATAPULT', 2);
-    expect(rangedAttack(a.state, cat.id, a.city.centerIndex, ATK).ok).toBe(true);
+    expect(rangedAttack(a.state, cat.id, a.city.centerIndex).ok).toBe(true);
     const byBombard = WALLS_TIER_HP[1] - a.city.outerHp!;
 
     const b = scene(['ANCIENT_WALLS']);
@@ -376,14 +376,14 @@ describe('the move-and-shoot rule', () => {
   it('CIV6: "if a unit has not moved, it can always shoot"', () => {
     const { state, city, cat } = scene();
     expect(siegeMayShoot(state, cat)).toBe(true);
-    expect(rangedAttack(state, cat.id, city.centerIndex, ATK).ok).toBe(true);
+    expect(rangedAttack(state, cat.id, city.centerIndex).ok).toBe(true);
   });
 
   it('CIV6: having moved, a siege unit at its normal Movement may not shoot', () => {
     const { state, city, cat } = scene();
     cat.movesLeft = cat.movesFull! - 1;
     expect(siegeMayShoot(state, cat)).toBe(false);
-    expect(rangedAttack(state, cat.id, city.centerIndex, ATK).ok).toBe(false);
+    expect(rangedAttack(state, cat.id, city.centerIndex).ok).toBe(false);
     expect(attackTargets(state, cat)).toEqual([]);
   });
 
@@ -393,7 +393,7 @@ describe('the move-and-shoot rule', () => {
     cat.movesFull = UNITS.CATAPULT.moves + 1; // what refreshUnits granted beside the general
     cat.movesLeft = cat.movesFull - 1;        // and it spent one of them
     expect(siegeMayShoot(state, cat)).toBe(true);
-    expect(rangedAttack(state, cat.id, city.centerIndex, ATK).ok).toBe(true);
+    expect(rangedAttack(state, cat.id, city.centerIndex).ok).toBe(true);
   });
 
   it("the gate is the siege class's alone — an Archer shoots after moving", () => {
@@ -402,7 +402,7 @@ describe('the move-and-shoot rule', () => {
     arc.movesFull = UNITS.ARCHER.moves;
     arc.movesLeft = arc.movesFull! - 1;
     expect(siegeMayShoot(state, arc)).toBe(true);
-    expect(rangedAttack(state, arc.id, city.centerIndex, ATK).ok).toBe(true);
+    expect(rangedAttack(state, arc.id, city.centerIndex).ok).toBe(true);
   });
 });
 

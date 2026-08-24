@@ -35,9 +35,9 @@ describe('artifacts and archaeology', () => {
   it('a pre-Modern death leaves an antiquity site; a tile never stacks two', () => {
     const state = makeState();
     const t = tileAtCoords(state.map, 5, 5);
-    markAntiquitySite(state, t.index, 0, 0);
+    markAntiquitySite(state, t.index, 0);
     expect(t.antiquity).toBe(true);
-    markAntiquitySite(state, t.index, 0, 0); // no stacking
+    markAntiquitySite(state, t.index, 0); // no stacking
     expect(t.antiquity).toBe(true);
   });
 
@@ -48,7 +48,7 @@ describe('artifacts and archaeology', () => {
     city.buildings.push(ARTIFACT_BUILDING);
     const dig = tileAtCoords(state.map, 6, 5);
     setTileOwner(dig, city.seat, city.id);
-    markAntiquitySite(state, dig.index, 0, 0);
+    markAntiquitySite(state, dig.index, 0);
 
     const arch = spawnUnit(state, 'ARCHAEOLOGIST', dig.index, 0)!;
     arch.tileIndex = dig.index;
@@ -75,7 +75,7 @@ describe('artifacts and archaeology', () => {
     city.artifacts = ARTIFACT_SLOTS; // full
     const dig = tileAtCoords(state.map, 6, 5);
     setTileOwner(dig, city.seat, city.id);
-    markAntiquitySite(state, dig.index, 0, 0);
+    markAntiquitySite(state, dig.index, 0);
     const arch = spawnUnit(state, 'ARCHAEOLOGIST', dig.index, 0)!;
     arch.tileIndex = dig.index;
 

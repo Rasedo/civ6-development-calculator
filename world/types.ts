@@ -163,9 +163,16 @@ export interface Tile {
   /** a CITIZEN is PINNED to this plot. `assignWorkedTiles` takes every
    *  locked plot the city can work before it ranks anything by score, so a
    *  lock is how a player overrides the automatic allocation for tiles the
-   *  way a specialist pin overrides it for slots. The lock is a property of
-   *  the PLOT and outlives whichever city works it. */
+   *  way a specialist pin overrides it for slots. The lock lives on the PLOT
+   *  and dies when the plot changes hands (`setTileOwner`). */
   locked?: boolean;
+  /** how many times a river flood has reached this tile — the Great Bath's
+   *  "+1 Faith for every time a tile belonging to this city has been
+   *  Flooded" reads it. A flood counts once per episode (`floodTile`). */
+  floodCount?: number;
+  /** CIV6 (Marina Raskova): a permanent "+1 air unit slots" on this
+   *  district tile, written at the general's retirement. */
+  airSlotBonus?: number;
   /** the COASTAL LOWLAND band, 1 (drowns first) to 3; absent = highland or
    *  inland, which the rising sea never reaches. Derived from the map at
    *  creation by `deriveLowlands`, never read off the world file. */

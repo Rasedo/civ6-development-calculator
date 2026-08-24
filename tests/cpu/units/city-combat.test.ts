@@ -113,7 +113,7 @@ describe('a city under attack', () => {
     city.outerHp = WALLS_HP;
     const c = state.map.tiles[city.centerIndex];
     const att = spawnUnit(state, 'ARCHER', tileAtCoords(state.map, c.col - 2, c.row).index, 0)!;
-    expect(rangedAttack(state, att.id, city.centerIndex, 0).ok).toBe(true);
+    expect(rangedAttack(state, att.id, city.centerIndex).ok).toBe(true);
     expect(city.outerHp).toBeLessThan(WALLS_HP);
     expect(city.hp).toBe(200 - 1);
   });
@@ -182,7 +182,7 @@ describe('an Encampment under attack', () => {
     const { state, city, enc, shelter, arch } = scene();
     city.outerHp = 0; // the perimeter already breached, so the roll lands whole
     enc.encampHp = 1;
-    rangedAttack(state, arch.id, enc.index, 0);
+    rangedAttack(state, arch.id, enc.index);
     expect(enc.encampHp).toBe(0);
     expect(enc.districtPillaged).toBe(false);
     expect(shelter.hp).toBe(100);

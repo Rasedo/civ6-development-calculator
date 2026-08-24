@@ -850,6 +850,11 @@ export function purchaseReligiousUnit(
     ? Math.round(UNITS.MISSIONARY.cost * (eb?.missionaryCostMult ?? 1))
     : Math.round(UNITS[unitType].cost);
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
+  // CIV6 (Missionary / Apostle / Inquisitor): purchased "in a city that has a
+  // majority religion and a Holy Site" with the tier's building — the
+  // majority is its own gate, whichever religion it is, exactly as the
+  // Warrior Monk arm reads it.
+  if ((city.followedReligion ?? -1) < 0) return { ok: false, reason: 'The city follows no religion.' };
   if (!city.buildings.includes('SHRINE')) return { ok: false, reason: 'Needs a Shrine.' };
   // CIV6: "the Apostle and the Guru require a Temple, and the Inquisitor
   // requires both a Temple and an Apostle ... to have previously Launched an

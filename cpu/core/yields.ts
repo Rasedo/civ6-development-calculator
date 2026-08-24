@@ -57,6 +57,13 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
 
   if (tile.wonder) {
     addYields(out, WONDERS[tile.wonder]?.tileYields ?? {});
+    // CIV6 (Grove): "+1 Food and Faith to adjacent unimproved tiles with
+    // Charming Appeal. Yields increased ... for adjacent unimproved tiles
+    // with Breathtaking Appeal." A natural wonder is unimproved and
+    // Breathtaking by construction, so a Preserve's bands pay it on top of
+    // its roster row — the one runtime add that reaches this arm.
+    const near = ctx.preserve?.get(tile.index);
+    if (near) addYields(out, near);
     return out;
   }
   if (isMountain(tile)) return out;

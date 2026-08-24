@@ -182,6 +182,20 @@ class SimGp:
 
         # ---- the lumps
         self.civ_tech_prog[:, row] = self.civ_tech_prog[:, row] + col("science")
+        # CIV6 (Mary Leakey): "Gain 350 Science for every Artifact in this
+        # city."
+        _asci = col("artifactScience")
+        if bool((_asci != 0).any()):
+            _n = self.city_artifacts[:, row].gather(1, cc.unsqueeze(1)).squeeze(1)
+            self.civ_tech_prog[:, row] = (self.civ_tech_prog[:, row]
+                                          + _asci * (_n.to(dt) * has_city.to(dt)))
+        # CIV6 (Marina Raskova): "District in this tile gains +1 air unit
+        # slots" — permanent, on the activating tile.
+        _asb = col("airSlotBonus")
+        _ab = m & (_asb > 0)
+        if bool(_ab.any()):
+            _r = _ab.nonzero(as_tuple=True)[0]
+            self.tile_air_bonus[_r, hc[_r]] += _asb[_r].long()
         gw_cls = [k for k, c in enumerate(self._gw_cls) if c >= 0]
         wrote = torch.zeros_like(m)
         for kind in gw_cls:

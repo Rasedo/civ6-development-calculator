@@ -41,33 +41,29 @@ from the list below.
 
 | Open item | Weight | What is open |
 |---|---|---|
-| A-1r the district registry holds ONE tile per TYPE | 1 | registry-counted columns undercount a repeatable district; every such column is zero today, so it is a trap, not a live bug |
 | A-2 the road apply arm skips the wonder clause | 1 | TS `canBuildRoad` accepts a natural-wonder tile the GPU mask refuses; unreachable until the driver fuzzes a road order |
-| **A. Engine vs engine** | **2** | |
+| **A. Engine vs engine** | **1** | |
 | B-20r tourism tails | 1 | the Naturalist's progressive cost is unsourced; the park rhombus has no canonical vertical |
 | B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
 | B-22r World Congress | 2 | the observation renders the standing slate, four resolutions have no carrier, the culture bomb spares unfinished construction, scored competitions and peace TERMS are absent |
 | B-24r Ages/governors | 1 | governor identity/promotions, dark-age policies, To Arms!'s casus belli, the corps/army kill event, per-civ era drift |
-| B-30r specialists | 1 | a plot LOCK outlives the city that set it |
 | B-31r trade-route tails | 1 | the pass-through post gold has no stored path; plunder gold is a stylization; the summed-yield key and one-candidate head are P8-surface |
 | B-53r the great-person queue | 1 | the offer is re-derived rather than frozen, and faith never patronizes anyone |
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
 | B-36r appeal adjacency terms | 1 | the CIVILIZATION-unique improvements' terms (C-26) |
-| B-39r wonder effects still dropped | 1 | two residuals, blocked on B-20r or B-34r |
+| B-39r wonder effects still dropped | 1 | two residuals, blocked on B-20r's per-work TYPE names |
 | B-45r sourced-sweep finds in the other rows | 1 | five effects need a unit-granting wonder channel, faith patronage (B-53r), a rival-recruit event, or B-31r's route yields |
 | B-54r flanking and support vs their own page | 1 | the two stacks a UNIQUE UNIT raises wait on C-26 |
 | B-56r the five inert promotions | 1 | five rows name a mechanic neither engine has — sight-blocking, escort formations, an air-roll promotion term, a NAVAL RAIDER class |
-| B-58r the religious purchase asks for a Shrine | 1 | Civ 6 asks for a MAJORITY RELIGION and a Temple; neither engine reads what the city follows |
-| B-59r the religious spread is a flat lump | 2 | no HP scaling, no base 25% strip, and a city-state cannot be converted |
+| B-59r a city-state cannot be converted | 1 | minors carry no religion (C-30's family), so the spread scan stops at the majors |
 | B-51r Encampment residuals | 1 | the district's strike is measured from the CITY CENTRE's tile, and a capture leaves its own pool standing (unsourced either way) |
 | B-44r city-state war tails | 1 | a ranged raider never shoots a minor centre (the seat verbs' own ranged-vs-city-state scope-out) |
 | B-65 religious zone of control | 1 | Civ 6 scopes a religious unit's ZOC to other religious units BOTH ways; the engines run one military-only rule |
-| B-61r the Great Person clauses with no carrier | 2 | 20 rows name a mechanic nothing here has; eight sweep-found channels dropped with their blockers |
-| B-60r the dig's DATE, and the hull nobody dates | 1 | the era is the ACTOR's research, and a barbarian or minor kill leaves no wreck |
-| B-34r flood tails | 1 | no per-tile flood count (the Great Bath's faith), and the climate/coastal tails wait on their systems |
+| B-61r the Great Person clauses with no carrier | 2 | 18 rows name a mechanic nothing here has; Mary Leakey's tourism clause waits on C-28 |
+| B-34r flood tails | 1 | the climate/coastal tails wait on systems that do not exist here |
 | B-63r the grievance ledger's magnitudes | 1 | the occupied/razed rows ship at their published CEILING; the gang-up bar is a heuristic |
-| B-62r a natural wonder takes no tile adds | 1 | no pantheon feature yield, suzerain adjacency or Preserve band on a natural-wonder tile, against the Grove's own text |
-| **B. Fidelity vs real Civ 6** | **27** | |
+| B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
+| **B. Fidelity vs real Civ 6** | **23** | |
 | C-1 POWER | 2 | four renewables, the Biosphere, the Hydroelectric Dam building, decommission/recommission, the reactor age, minors never powered |
 | C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, diplomatic visibility, the negotiated two-sided deal, and the agreements that need one |
 | C-5 strategic-resource stockpiles | 2 | the shortage penalty's magnitude is unpublished; resource trading waits on C-2 |
@@ -89,7 +85,7 @@ from the list below.
 | C-35 the land/water fact never moves | 2 | one overloaded static bit blocks submersion and the Canal's passage |
 | C-36 no railroad | 2 | no second movement tier, no per-hex Iron/Coal charge, no CO2 |
 | **C. Absent systems** | **38** | |
-| **OPEN, TOTAL** | **67** | |
+| **OPEN, TOTAL** | **62** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -102,18 +98,6 @@ equally faithful to Civ 6 and still disagree with each other. Its green
 bounds nothing the gate does not reach ("Reachability" below), and a round
 that widens coverage is worth more here than a round that re-reads the
 exporter.
-
-- **A-1r. THE DISTRICT REGISTRY HOLDS ONE TILE PER TYPE.** `city_dist_tile`
-  is [B, row, slot, nD] — one tile per (city, district type) — while TS keeps
-  `city.districts` as a LIST that may hold the same type twice (the
-  NEIGHBORHOOD, DAM and CANAL are `allowMultiple`). The consumers that COUNT
-  instances are off the tile plane already (`_seat_housing`'s repeatable
-  loop, `_detect_seat_boosts`' repeatable branch); what is still
-  registry-counted is district MAINTENANCE, amenities, loyalty, governor
-  titles and the spy penalty. Every one of those columns is ZERO for all
-  three repeatable districts, so nothing diverges today — this is a trap for
-  the next repeatable row. Closing it means a per-city COUNT plane beside
-  the registry, or moving each column onto the tile walk.
 
 - **A-2. THE ROAD APPLY ARM SKIPS THE WONDER CLAUSE.** The GPU's
   `_seat_engineer_job_mask` refuses a road on a natural-wonder tile
@@ -203,14 +187,6 @@ Civ 6 source or is recorded as unverifiable.
   - **The corps/army kill event** — no formations exist (a faithful zero
     only before Nationalism).
   - **Per-civ tech-era drift** — eras are global 50-turn blocks.
-- **B-30r. SPECIALIST residuals.** The mechanic ships (slots, sourced
-  yields/tiers, pins, locks, overflow; `citizens_test` and
-  `district_breadth_test` section i are the poke bar). OPEN:
-  - **A LOCK OUTLIVES THE CITY THAT SET IT.** The lock lives on the PLOT
-    on both engines, so a plot that changes hands carries it to the new
-    owner, where real Civ 6 loses citizen management with the city.
-    Closing it: clear the lock wherever tile ownership moves. (The
-    specialist PIN is city-borne and already drops at capture.)
 - **B-31r. Trade-route tails.** The Trader unit, sea legs, trading posts,
   chained reach and the whole-destination-set candidate all ship. OPEN:
   - **The PASS-THROUGH half of the post gold** ("+1 Gold to the yields of
@@ -226,10 +202,9 @@ Civ 6 source or is recorded as unverifiable.
     sees one candidate — the free-choice head is P8-surface work,
     alongside the route verb joining `env.step`.
 - **B-34r. Flood tails.** The GS flood ships whole (severity ladder, river
-  reach, river-scoped shield, the Dam; `flood_severity_test` poke f pins
-  the reach). OPEN:
-  - **The Great Bath's "+1 Faith for every time a tile belonging to this
-    city has been Flooded"** needs a per-tile flood COUNT nothing stores.
+  reach, river-scoped shield, the Dam, the Great Bath's per-flood faith
+  over `Tile.floodCount` / `tile_flood_ct`; `flood_severity_test` poke f
+  pins the reach). OPEN:
   - Climate change ending fertilization at Phase IV, the Egyptian
     ability, the Soothsayer and COASTAL floods all wait on systems that
     do not exist here.
@@ -243,7 +218,7 @@ Civ 6 source or is recorded as unverifiable.
   fourteen channels, the Mausoleum's engineer charge and Cristo Redentor's
   shield. OPEN, each blocked: Apadana's "+2 Great Work slots (any type)"
   and the Hermitage's LANDSCAPE-only art slots, both waiting on the
-  per-work TYPE B-20r names; the Great Bath's per-flood faith (B-34r).
+  per-work TYPE B-20r names.
 - **B-45r. The effects the SOURCED sweep found in the other rows.** Three
   of eight have channels (`cityYieldPerImprovement`,
   `boostTechsThroughEra`, `districtGpPoints`; the gate finishes wonders
@@ -281,25 +256,10 @@ Civ 6 source or is recorded as unverifiable.
     `airDefenseOf` / `_type_anti_air` alone and never call `promoCS` /
     `_promo_cs` — threading the promotion term into the sortie changes
     every defensive promotion's reach at once (C-34's pass).
-- **B-58r. The religious purchase asks for a Shrine, not a majority
-  religion.** CIV6 (Apostle; the Inquisitor page verbatim): the unit "can
-  only be purchased with Faith in a city that has a majority religion and
-  a Holy Site with a Temple (or one of its replacements)".
-  `purchaseReligiousUnit` / `_seat_religious_city_ok` ask for a SHRINE
-  plus the Holy Site (Temple for Apostle/Inquisitor) and never read
-  `city.followedReligion` / `city_followed`. The WARRIOR MONK's counter
-  (`purchaseWarriorMonk` / `_seat_monk_city_ok`) already reads what the
-  city follows — the shape the other three want is written next door.
-- **B-59r. The religious spread is a flat lump.** CIV6 (Apostle): Spread
-  Religion "converts Citizens in adjacent city to Apostle's religion
-  (Pressure = 2.2 * Apostle's current HP) and reduces total Religious
-  Pressure of all foreign religions in the city by 25%". `spreadFromUnit`
-  / the `_A_SPREAD` arm add a constant `SPREAD_PRESSURE` and strip
-  nothing. Open:
-  - **THE PRESSURE DOES NOT SCALE WITH HP** — a wounded Apostle converts
-    as hard as a fresh one.
-  - **THE BASE 25% STRIP IS ABSENT** — only Proselytizer strips (75%,
-    sourced); the two are meant to stack as base-and-upgrade.
+- **B-59r. A city-state cannot be converted.** The spread's magnitude
+  ships against the Apostle page — the lump scales with the unit's HP and
+  the base 25% strip stacks under the Proselytizer's 75%
+  (`spreadFromUnit` / the `_A_SPREAD` arm). OPEN:
   - **A CITY-STATE CANNOT BE CONVERTED.** `allCities` is majors-only and
     the GPU spread scans `city_alive[:, :n_majors]` to match — minors
     carry no religion (C-30's family), which is also why Translator's
@@ -402,16 +362,18 @@ Civ 6 source or is recorded as unverifiable.
     `FAITH_PURCHASE_MULT`) and `unitFaithCost` /
     `_seat_faith_unit_candidate` reuse it because no page states the unit
     one.
-- **B-62r. A natural wonder's tile pays its own roster row and nothing
-  else.** `tileYields` LEAVES on `tile.wonder`, so such a tile takes the
-  wonder's published yields and none of the runtime adds every other tile
-  gets — a pantheon's `featureYields`, a suzerain improvement's adjacency,
-  the PRESERVE's bands (the GPU masks them in `_tile_add_live` to match).
-  SOURCED (Grove): "+1 Food and Faith to adjacent unimproved tiles with
-  Charming Appeal. Yields increased ... for adjacent unimproved tiles with
-  Breathtaking Appeal." A natural wonder is unimproved and Breathtaking by
-  construction (`tileAppeal` answers 5), so the real building pays it and
-  both engines refuse.
+- **B-62r. A suzerain improvement's adjacency stops at the wonder
+  tile.** The PRESERVE's bands pay a natural-wonder tile (`tileYields`'
+  wonder arm / `_preserve_live` — SOURCED, Grove: the band pays "adjacent
+  unimproved tiles" by APPEAL, and a natural wonder is unimproved and
+  Breathtaking by construction, `tileAppeal` answers 5). A pantheon's
+  `featureYields` clause is VACUOUS there — the wonder stands where the
+  feature would, so no feature row exists to pay. OPEN:
+  - **THE ADJACENCY HALF IS UNSOURCED EITHER WAY.** `tileYields` leaves
+    on `tile.wonder` before a suzerain improvement's adjacency add, and
+    `_tile_add_live` masks the same tiles; no source says whether real
+    Civ 6 pays it there, so both engines refuse and the question stays
+    open.
 - **B-63r. The grievance ledger's two unpublished magnitudes.** The
   mechanic is whole (every published row pays, the spread, the decay, the
   favor ladder, PUBLIC RELATIONS). OPEN, neither closable from a source:

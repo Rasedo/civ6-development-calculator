@@ -654,7 +654,7 @@ describe('the naval raider is invisible', () => {
   it('its own owner always sees it, and so does everyone once it fires', () => {
     const { state, eye, raider } = scene('FRIGATE', 2);
     expect(unitVisibleTo(state, raider, raider.seat)).toBe(true);
-    expect(rangedAttack(state, raider.id, eye.tileIndex, raider.seat).ok).toBe(true);
+    expect(rangedAttack(state, raider.id, eye.tileIndex).ok).toBe(true);
     expect(raider.revealedTurn).toBe(state.turn);
     expect(unitVisibleTo(state, raider, 0)).toBe(true);
     state.turn += 1;

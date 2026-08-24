@@ -127,6 +127,9 @@ export function floodRiver(state: GameState, start: Tile): Tile[] {
  * condition-for-condition on the other engine.
  */
 function floodTile(state: GameState, tile: Tile, sev: number, mitigated: boolean): void {
+  // the tile REMEMBERS each flood episode — the Great Bath's faith counts
+  // them (`Tile.floodCount`), mitigated floods included
+  tile.floodCount = (tile.floodCount ?? 0) + 1;
   const rDestroy = nextRandom(state);
   const rDistrict = nextRandom(state);
   const rDamage = nextRandom(state);

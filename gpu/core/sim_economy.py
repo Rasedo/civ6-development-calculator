@@ -810,6 +810,10 @@ class SimEconomy:
         what stood there.
         """
         B, dev = self.B, self.device
+        # the tile REMEMBERS each flood episode — the Great Bath's faith
+        # counts them (`Tile.floodCount`), mitigated floods included
+        _fr = hit.nonzero(as_tuple=True)[0]
+        self.tile_flood_ct[_fr, tile[_fr]] += 1
         r_destroy = self._next_random(hit)
         r_district = self._next_random(hit)
         r_damage = self._next_random(hit)
@@ -1102,7 +1106,10 @@ class SimEconomy:
                                      (self.city_bldg[:, row, :cols]
                                       & (self._b_req_district == self._aerodrome_didx).reshape(1, 1, -1)).long(),
                                      self._b_air_slots)
-                out.scatter_add_(1, atc, good.long() * (self._aerodrome_air_slots + extra))
+                # CIV6 (Marina Raskova): the permanent per-tile "+1 air
+                # unit slots" rides the aerodrome's own arm
+                out.scatter_add_(1, atc, good.long() * (self._aerodrome_air_slots + extra
+                                                        + self.tile_air_bonus.gather(1, atc)))
         # a CARRIER is a base wherever it floats
         alive_u = self.major_unit_alive & (self.major_unit_seat == row)
         typ = self.major_unit_type.clamp(min=0, max=self.NU - 1)
@@ -2453,23 +2460,6 @@ class SimEconomy:
             we = torch.maximum(we, self._civ_era(self.civ_techs[:, r], self.civ_civics[:, r]))
         return we
 
-    def _row_era(self, row) -> torch.Tensor:
-        """[B] — `civEraIndex(seatOf(state, seat).research)` for an arbitrary
-        seat ROW: an int, or a [B] tensor of rows (-1 = nobody).
-
-        A CITY-STATE or BARBARIAN row reads ANCIENT, not an error: `seatOf`
-        answers for them and `seats.ts` builds both with empty `techs`/`civics`,
-        so `civEraIndex` returns 0 there."""
-        if isinstance(row, int):
-            if 0 <= row < self.n_majors:
-                return self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row])
-            return torch.zeros(self.B, dtype=torch.long, device=self.device)
-        major = (row >= 0) & (row < self.n_majors)
-        idx = torch.where(major, row, torch.zeros_like(row))
-        b = torch.arange(self.B, device=self.device)
-        era = self._civ_era(self.civ_techs[b, idx], self.civ_civics[b, idx])
-        return torch.where(major, era, torch.zeros_like(era))
-
     def _museum_themed(self, row: int) -> torch.Tensor:
         """[B, RC] bool — is this city's ARCHAEOLOGICAL MUSEUM themed?
         CIV6: every slot full, all Artifacts from ONE era, no two from the
@@ -3010,6 +3000,12 @@ class SimEconomy:
         if bool(selb.any()):
             selbf = selb.double()
             bld_y = bld_y + selbf @ rd.b_yields.double()
+            # CIV6 (Leonardo da Vinci): "Workshops provide +3 Culture" — the
+            # seat-wide permanent, per standing Workshop.
+            if self._workshop_bidx >= 0:
+                _wc = self._gp_perm(row, "workshopCulture").double()
+                if bool((_wc != 0).any()):
+                    bld_y[:, :, 4] = bld_y[:, :, 4] + _wc.unsqueeze(1) * selbf[:, :, self._workshop_bidx]
             if has_bel or fol_live:
                 if has_bel:
                     bld_y = bld_y + torch.einsum("bjn,bnk->bjk", selbf, self._bel_add_pf("bldgY", row))
@@ -3069,6 +3065,17 @@ class SimEconomy:
             bld_y = bld_y + _reg[0][:, sl]
         if compw is not None and bool(compw.any()):
             bld_y = bld_y + compw.double() @ self._wond_cy
+            # CIV6 (Great Bath): "+1 Faith for every time a tile belonging to
+            # this city has been Flooded."
+            if bool((self._wond_faithflood != 0).any()):
+                _ffw = compw.double() @ self._wond_faithflood  # [B, cols]
+                if bool((_ffw != 0).any()):
+                    _sl = self.city_slot_at(row)
+                    _fc = torch.zeros(self.B, self.RC, dtype=torch.long, device=self.device)
+                    _fc.scatter_add_(1, _sl.clamp(min=0),
+                                     torch.where(_sl >= 0, self.tile_flood_ct,
+                                                 torch.zeros_like(self.tile_flood_ct)))
+                    bld_y[:, :, 5] = bld_y[:, :, 5] + _ffw * _fc[:, :bld_y.shape[1]].double()
             _impy = self._wonder_improvement_yields(row)
             if _impy is not None:
                 bld_y = bld_y + _impy[:, sl]
