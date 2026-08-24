@@ -68,6 +68,10 @@ export function greatPersonPointsPerTurn(
   // CIV6 (Patronage resolution): the factor covers every source, the golden
   // prophet term included — so it applies after all of them.
   for (const cls of GP_CLASSES) out[cls] *= congressGppFactor(state, cls);
+  // CIV6 (Classical Republic): "+15% Great Person points" — the government's
+  // factor covers every per-turn source the same way.
+  const gppMult = getModifiers(state, seat).gppMult;
+  for (const cls of GP_CLASSES) out[cls] *= gppMult;
   return out;
 }
 

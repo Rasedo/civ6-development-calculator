@@ -62,7 +62,7 @@ nothing carries forward.
 | B-30r specialists | 1 | the mechanic, both citizen overrides and the three-plant Industrial tier ship; a LOCK still outlives the city that set it |
 | B-31r trade-route tails | 1 | sea legs, trading posts and the whole-destination-set candidate ship; the pass-through half of the post gold has no carrier, plunder gold is a stylization, the summed-yield key is a heuristic and the free-choice head is P8's |
 | B-53r the great-person queue | 1 | 205 sourced people, the era gate, the scaled price and each person's own ability ship; the offer is re-derived each turn rather than frozen, and faith never patronizes one |
-| B-D unsourced data values | 2 | the Monument, the Lighthouse and the Engineer's Armory shipped and one bullet was false; the governments are half-shipped, and the rest are shape differences or model tuning that no source can close |
+| B-D unsourced data values | 2 | the sourced government terms ship and the invented ones are deleted; what remains is channel-blocked government tails, shape differences and model tuning that no source can close |
 | B-36r appeal adjacency terms | 1 | every district AND improvement term ships off one catalog column, and a Great Person can now grant a city's tiles appeal; the CIVILIZATION-unique improvements' terms (C-26) do not |
 | B-39r wonder effects still dropped | 1 | the sourced sweep shipped fourteen channels, the Mausoleum's engineer charge and Cristo Redentor's shield; two residuals, blocked on B-20r or B-34r |
 | B-45r sourced-sweep finds in the other rows | 1 | three of the eight now have a channel; the five that do not need a wonder that grants a UNIT, faith patronage (B-53r), a rival-recruit event, or B-31r's route yields |
@@ -995,24 +995,43 @@ Civ 6 source or is recorded as unverifiable.
 
   What remains open, each with what a source would have to publish:
   - **The GOVERNMENTS' inherent bonuses.** The GS rows ARE published, and
-    three of them now ship verbatim: Classical Republic's "+1 Housing and
-    +1 Amenity in cities with a district" (it paid +1 amenity everywhere),
-    Communism's "+10% Science" (it paid +10% production), and Autocracy's
-    Palace half, which its capital term already was. The rest need channels
-    this model does not have, and each names what: Oligarchy and Fascism
-    want a combat-CLASS axis, which the roster now carries (`UnitDef.melee` /
-    `antiCavalry` / `cavalry`, read by `classMatchupCS`), so those two are
-    unblocked and waiting on nothing but their own round; Monarchy wants
-    housing per WALL LEVEL
-    and a Renaissance-Walls favor term; Merchant Republic, Theocracy and
-    Communism's other half want a per-city GOVERNOR gate on a yield;
-    Theocracy and Democracy want a PURCHASE-price discount channel;
-    Democracy's GS row wants ALLIANCES (C-2); Autocracy's "+1 to all yields
-    for each government building" wants a per-city count of GOVERNMENT
-    BUILDINGS folded into the yield bucket, which the Government Plaza's rows
-    now make countable (`BuildingDef.govTier` / `_b_gov_tier`) and no channel
-    yet reads. Every legacy bonus is out of scope by construction — R&F phased
-    them out.
+    the expressible terms now ship: Classical Republic's "+1 Housing and
+    +1 Amenity" pays every city with ANY completed district
+    (`cityWithDistrict` — the specialty-gated channels stay the cards')
+    and its "+15% Great Person points" multiplies beside the Patronage
+    factor (`gppMult`); Oligarchy's "+4 Combat Strength" rides the
+    PROMOTION-class axis MELEE/ANTICAV/NAVAL_MELEE and Fascism's "+5" the
+    all-combat arm (`governmentUnitCS` / `_gov_unit_cs`), with "+20% Unit
+    Experience" as percentage points in every award (`governmentXpPct`),
+    "War Weariness reduced by 15%" joining the permanent cut in `addWw` /
+    `_ww_battle`, and "+50% Production toward Units" as the class-free
+    prodBoost arm; Autocracy adds "+10% Production toward Wonders";
+    Communism's "+10% Science" was already sourced. THE UNSOURCED
+    MAGNITUDES ARE DELETED: Monarchy's flat +1 housing and the ungated
+    x1.1 gold/faith/culture on Merchant Republic, Theocracy and Democracy
+    each stood in for a term the model cannot express, and a row now
+    carries only what its page states. OPEN, each with what it waits on:
+    Monarchy's "+1 Housing per level of Walls" (a per-city WALLS-LEVEL
+    count), its "+2 Diplomatic Favor for every Renaissance Walls" (a
+    favor-per-building term) and "+50% Influence Points" (an influence
+    MULTIPLIER — `influencePerTurn` is flat); Merchant Republic's "+10%
+    Gold in all cities with an established Governor", Theocracy's "+0.5
+    Faith per Citizen in cities with Governors" and Communism's "+0.6
+    Production per Citizen in cities with Governors" (a per-city GOVERNOR
+    gate on a yield term); Merchant Republic's "+15% Production toward
+    Districts" (a DISTRICT prodBoost target); Theocracy's "+5 Religious
+    Strength in Theological Combat" (a government channel into the
+    theological roll) and its "15% Discount on Purchases with Faith" with
+    Democracy's gold twin (a purchase-price multiplier); Democracy's GS
+    route and alliance-point terms (C-2's alliances); Autocracy's "+1 to
+    all yields for each government building" (a per-city count the
+    Government Plaza rows make countable — `BuildingDef.govTier` /
+    `_b_gov_tier` — that no channel yet reads). Every legacy bonus is out
+    of scope by construction — R&F phased them out. ADOPTION REACHABILITY:
+    `computeAdoption` / `_adopted_gov` take the newest unlocked tier on
+    table order, so Oligarchy and Classical Republic are adopted in NO
+    game on either engine — their rows are held by the two government
+    test lanes' borrowed-row drills, not by the serve gate.
   - **The per-CITY war-weariness split is NOT published, and the empire-wide
     rule we implement IS.** SOURCED (War weariness): "At the end of each
     turn, you receive -1 Amenity for every 400 WWP you currently have, which

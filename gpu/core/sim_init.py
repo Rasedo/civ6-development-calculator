@@ -1473,6 +1473,20 @@ class SimInit:
             self._gov_gpp = torch.tensor(
                 [[float(x) for x in r.get("gpp", [0] * n_gp)] for r in _govs],
                 dtype=torch.float64, device=device)
+            # unitCombatCS [promotion-class mask, allCombat, cs] — the
+            # PROMOTION-class axis (`governmentUnitCS`): Oligarchy names
+            # MELEE, ANTICAV and NAVAL_MELEE; Fascism's `all` arm reaches
+            # every combat unit.
+            _gucs = [r.get("unitCombatCS", [0, 0, 0]) for r in _govs]
+            self._gov_ucs_mask = torch.tensor([int(x[0]) for x in _gucs], dtype=torch.long, device=device)
+            self._gov_ucs_allc = torch.tensor([bool(x[1]) for x in _gucs], dtype=torch.bool, device=device)
+            self._gov_ucs_cs = torch.tensor([float(x[2]) for x in _gucs], dtype=torch.float64, device=device)
+            self._gov_xppct = torch.tensor([float(r.get("xpPct", 0)) for r in _govs], dtype=dtype, device=device)
+            self._gov_wwcut = torch.tensor([float(r.get("wwCutPct", 0)) for r in _govs], dtype=dtype, device=device)
+            self._gov_gppmult = torch.tensor([float(r.get("gppMult", 1)) for r in _govs], dtype=torch.float64, device=device)
+            _gdc = [r.get("cityWithDistrict", [0, 0]) for r in _govs]
+            self._gov_dc_house = torch.tensor([float(x[0]) for x in _gdc], dtype=dtype, device=device)
+            self._gov_dc_amen = torch.tensor([float(x[1]) for x in _gdc], dtype=dtype, device=device)
             self._gov_fx_mag = float(
                 (self._gov_prodb[:, 0] >= 0).sum()
                 + self._gov_bcharge.abs().sum() + self._gov_mcut.abs().sum()
@@ -1480,7 +1494,11 @@ class SimInit:
                 + self._gov_crng.abs().sum() + (self._gov_rxp - 1).abs().sum()
                 + (self._gov_rplun - 1).abs().sum() + self._gov_rgold.abs().sum()
                 + self._gov_infl.abs().sum() + self._gov_envoy1.sum()
-                + self._gov_culsuz.abs().sum() + self._gov_gpp.abs().sum())
+                + self._gov_culsuz.abs().sum() + self._gov_gpp.abs().sum()
+                + (self._gov_ucs_cs.abs() * ((self._gov_ucs_mask != 0) | self._gov_ucs_allc).double()).sum()
+                + self._gov_xppct.abs().sum()
+                + self._gov_wwcut.abs().sum() + (self._gov_gppmult - 1).abs().sum()
+                + self._gov_dc_house.abs().sum() + self._gov_dc_amen.abs().sum())
             self._gov_arange = torch.arange(self._ngov, dtype=torch.long, device=device)
         if self._npol:
             self._pol_kind = torch.tensor([int(p["kind"]) for p in _pols], dtype=torch.long, device=device)
@@ -1532,6 +1550,16 @@ class SimInit:
             # per-suzerainty culture; the government table has always had it.
             self._pol_ymult = torch.tensor([[float(x) for x in p.get("yieldMult", [1] * 6)] for p in _pols], dtype=dtype, device=device)  # [nPol,6]
             # the civic that RETIRES the card; -1 = it never leaves the pool
+            _pucs = [r.get("unitCombatCS", [0, 0, 0]) for r in _pols]
+            self._pol_ucs_mask = torch.tensor([int(x[0]) for x in _pucs], dtype=torch.long, device=device)
+            self._pol_ucs_allc = torch.tensor([bool(x[1]) for x in _pucs], dtype=torch.bool, device=device)
+            self._pol_ucs_cs = torch.tensor([float(x[2]) for x in _pucs], dtype=torch.float64, device=device)
+            self._pol_xppct = torch.tensor([float(r.get("xpPct", 0)) for r in _pols], dtype=dtype, device=device)
+            self._pol_wwcut = torch.tensor([float(r.get("wwCutPct", 0)) for r in _pols], dtype=dtype, device=device)
+            self._pol_gppmult = torch.tensor([float(r.get("gppMult", 1)) for r in _pols], dtype=torch.float64, device=device)
+            _pdc = [r.get("cityWithDistrict", [0, 0]) for r in _pols]
+            self._pol_dc_house = torch.tensor([float(x[0]) for x in _pdc], dtype=dtype, device=device)
+            self._pol_dc_amen = torch.tensor([float(x[1]) for x in _pdc], dtype=dtype, device=device)
             self._pol_fx_mag = float(
                 (self._pol_prodb[:, 0] >= 0).sum()
                 + self._pol_bcharge.abs().sum() + self._pol_mcut.abs().sum()
@@ -1539,7 +1567,11 @@ class SimInit:
                 + self._pol_crng.abs().sum() + (self._pol_rxp - 1).abs().sum()
                 + (self._pol_rplun - 1).abs().sum() + self._pol_rgold.abs().sum()
                 + self._pol_infl.abs().sum() + self._pol_envoy1.sum()
-                + self._pol_culsuz.abs().sum() + self._pol_gpp.abs().sum())
+                + self._pol_culsuz.abs().sum() + self._pol_gpp.abs().sum()
+                + (self._pol_ucs_cs.abs() * ((self._pol_ucs_mask != 0) | self._pol_ucs_allc).double()).sum()
+                + self._pol_xppct.abs().sum()
+                + self._pol_wwcut.abs().sum() + (self._pol_gppmult - 1).abs().sum()
+                + self._pol_dc_house.abs().sum() + self._pol_dc_amen.abs().sum())
             self._pol_obsolete_civic = torch.tensor([int(p.get("obsoleteCivic", -1)) for p in _pols], dtype=torch.long, device=device)
         # Master switch (rules.governmentsLive), mirroring the TS
         # GOVERNMENTS_ADOPTION_LIVE. Gates every gov/policy application and the
@@ -1949,6 +1981,20 @@ class SimInit:
         # help MELEE and ANTI-CAVALRY attackers and nobody else.
         self._type_melee = torch.tensor([bool(u.get("melee", 0)) for u in ru], dtype=torch.bool, device=device)
         self._type_anticav = torch.tensor([bool(u.get("antiCavalry", 0)) for u in ru], dtype=torch.bool, device=device)
+        # the per-TYPE flat Combat Strength each government/policy row grants
+        # (`_gov_unit_cs`): a promotion-class mask hit, or the all-combat
+        # arm, both gated on the chassis carrying any strength at all.
+        _pcls = self.rules_dev.u_promo_class
+        _pbit = torch.where(_pcls >= 0, torch.ones_like(_pcls) << _pcls.clamp(min=0), torch.zeros_like(_pcls))
+        _pcbt = self._type_combat > 0
+        if self._ngov:
+            _ghit = (((self._gov_ucs_mask.unsqueeze(1) & _pbit.unsqueeze(0)) != 0)
+                     | self._gov_ucs_allc.unsqueeze(1)) & _pcbt.unsqueeze(0)
+            self._gov_ucs_by_type = self._gov_ucs_cs.unsqueeze(1) * _ghit.double()
+        if self._npol:
+            _phit = (((self._pol_ucs_mask.unsqueeze(1) & _pbit.unsqueeze(0)) != 0)
+                     | self._pol_ucs_allc.unsqueeze(1)) & _pcbt.unsqueeze(0)
+            self._pol_ucs_by_type = self._pol_ucs_cs.unsqueeze(1) * _phit.double()
         self._type_bombard = torch.tensor([int(u.get("bombard", 0)) for u in ru], dtype=torch.long, device=device)
         # the CLASS bit mask and the ERA index a production card reads
         self._type_cls = torch.tensor([int(u.get("cls", 0)) for u in ru], dtype=torch.long, device=device)

@@ -5,7 +5,7 @@ import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef, type SlotKind, type BuildingYieldBoost, type ProdBoost } from '../data/policies';
 import { congressPolicyBlocked, congressWildcardDelta } from './congress';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
-import { seatOf, citiesOf, campTiles } from './seats';
+import { seatOf, citiesOf, campTiles, isCiv } from './seats';
 import { BUILDINGS } from '../data/buildings';
 import { neighbors } from '../../world/hex';
 import { tileAppeal, appealBand, gpAppealResolver, type GpAppeal } from './appeal';
@@ -16,6 +16,7 @@ import { cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus, isSuzerain } from
 
 
 import { GP_PERM } from '../data/greatPeople';
+import { CLASS_BIT, classBitOf } from '../data/promotions';
 import { PROJECTS } from '../data/projects';
 export interface Unlocks {
   improvements: Set<string>;
@@ -164,6 +165,11 @@ export interface Modifiers {
   influencePerTurn: number;
   firstEnvoyDouble: boolean;
   culturePerSuzerain: number;
+  unitCombatCS: { classMask: number; all: boolean; cs: number }[];
+  xpPct: number;
+  wwCutPct: number;
+  gppMult: number;
+  cityWithDistrict: { housing: number; amenities: number }[];
 }
 
 export function defaultModifiers(): Modifiers {
@@ -209,6 +215,11 @@ export function defaultModifiers(): Modifiers {
     influencePerTurn: 0,
     firstEnvoyDouble: false,
     culturePerSuzerain: 0,
+    unitCombatCS: [],
+    xpPct: 0,
+    wwCutPct: 0,
+    gppMult: 1,
+    cityWithDistrict: [],
   };
 }
 
@@ -252,6 +263,15 @@ function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.influencePerTurn) mods.influencePerTurn += fx.influencePerTurn;
   if (fx.firstEnvoyDouble) mods.firstEnvoyDouble = true;
   if (fx.culturePerSuzerain) mods.culturePerSuzerain += fx.culturePerSuzerain;
+  if (fx.unitCombatCS) {
+    let mask = 0;
+    for (const c of fx.unitCombatCS.classes ?? []) mask |= CLASS_BIT[c] ?? 0;
+    mods.unitCombatCS.push({ classMask: mask, all: !!fx.unitCombatCS.all, cs: fx.unitCombatCS.cs });
+  }
+  if (fx.xpPct) mods.xpPct += fx.xpPct;
+  if (fx.wwCutPct) mods.wwCutPct += fx.wwCutPct;
+  if (fx.gppMult) mods.gppMult *= fx.gppMult;
+  if (fx.cityWithDistrict) mods.cityWithDistrict.push(fx.cityWithDistrict);
   for (const [cls, n] of Object.entries(fx.gppFlat ?? {})) {
     const key = cls as GreatPersonClass;
     mods.gppFlat[key] = (mods.gppFlat[key] ?? 0) + (n ?? 0);
@@ -334,11 +354,34 @@ export function prodBoostPct(mods: Modifiers, q: QueueItem, gpPerm?: number[]): 
       const def = id ? UNITS[id] : undefined;
       if (!id || !def) continue;
       if (b.eraMax >= 0 && (UNIT_ERA_INDEX[id] ?? 0) > b.eraMax) continue;
-      if (!b.classes.some((c) => unitHasClass(def, c))) continue;
+      if (b.target !== 'anyUnit' && !b.classes.some((c) => unitHasClass(def, c))) continue;
     }
     pct += b.pct;
   }
   return pct;
+}
+
+/** CIV6 (Oligarchy, Fascism): the government's flat Combat Strength for one
+ *  unit — "All land melee, anti-cavalry, and naval melee class units gain +4
+ *  Combat Strength" (the PROMOTION-class axis: MELEE, ANTICAV, NAVAL_MELEE)
+ *  and "All units gain +5 Combat Strength" — read beside `congressUnitCS` at
+ *  every roll that composes a unit's strength. */
+export function governmentUnitCS(state: GameState, unit: { type: string; seat: number }): number {
+  if (!isCiv(unit.seat)) return 0;
+  const def = UNITS[unit.type];
+  if (!def?.combat) return 0;
+  const bit = classBitOf(unit.type);
+  let cs = 0;
+  for (const r of getModifiers(state, unit.seat).unitCombatCS) {
+    if (r.all || (bit & r.classMask) !== 0) cs += r.cs;
+  }
+  return cs;
+}
+
+/** CIV6 (Oligarchy): "+20% Unit Experience" — percentage POINTS joining the
+ *  unit's building percentage in every experience award. */
+export function governmentXpPct(state: GameState, seat: number): number {
+  return isCiv(seat) ? getModifiers(state, seat).xpPct : 0;
 }
 
 /** The gold per turn one unit of this type costs a seat carrying `mods` —

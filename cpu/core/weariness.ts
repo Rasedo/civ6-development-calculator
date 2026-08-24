@@ -4,6 +4,7 @@ import { atWarWithAny, isBarbSeat, isCiv, seatOf, seatsAllied, tileSeat, warIsFo
 import { civEraIndex } from './city';
 
 import { gpPermOf } from '../data/greatPeople';
+import { getModifiers } from './effects';
 /**
  * WAR WEARINESS, one seat-generic model.
  *
@@ -80,8 +81,10 @@ function addWw(state: GameState, seat: number, other: number, amount: number): v
   (s.ww ??= {});
   (s.wwTurn ??= {});
   // CIV6 (Trung Trac, Joaquim Marques Lisboa): a permanent percentage off
-  // everything this seat accrues from here on.
-  const cut = Math.min(100, gpPermOf(s, 'warWearyPct'));
+  // everything this seat accrues from here on. CIV6 (Fascism): "War
+  // Weariness reduced by 15%" — the government's cut joins additively.
+  const cut = Math.min(100, gpPermOf(s, 'warWearyPct')
+    + (isCiv(seat) ? getModifiers(state, seat).wwCutPct : 0));
   s.ww[other] = Math.max(0, (s.ww[other] ?? 0) + Math.floor((amount * (100 - cut)) / 100));
   s.wwTurn[other] = state.turn;
 }

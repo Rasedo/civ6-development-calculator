@@ -792,6 +792,24 @@ class SimMasks:
             return adv
         return adv + torch.where(utype == self._monk_idx, self._congress_relig_cs(seat), z)
 
+    def _gov_unit_cs(self, utype: torch.Tensor, seat: torch.Tensor) -> torch.Tensor:
+        """[B] long — `governmentUnitCS`' twin, the adopted government's flat
+        Combat Strength for one unit. CIV6 (Oligarchy): "All land melee,
+        anti-cavalry, and naval melee class units gain +4 Combat Strength" —
+        the three are PROMOTION classes (`u_promo_class`), so the Galley
+        rides NAVAL_MELEE. CIV6 (Fascism): "All units gain +5 Combat
+        Strength" — every COMBAT unit; a civilian has no strength to add
+        to."""
+        z = torch.zeros(utype.shape, dtype=torch.long, device=self.device)
+        if not self._gov_has_effects:
+            return z
+        t = utype.clamp(min=0, max=self.NU - 1)
+        tab = self._fx_by_row("ucst")  # [B, n_majors, NU]
+        ok = (seat >= 0) & (seat < self.n_majors)
+        s0 = seat.clamp(min=0, max=self.n_majors - 1)
+        v = tab[torch.arange(self.B, device=self.device), s0, t]
+        return torch.where(ok & (utype >= 0), v.long(), z)
+
     def _class_matchup_cs(self, own_type: torch.Tensor, foe_type: torch.Tensor) -> torch.Tensor:
         """[B] long `classMatchupCS` — CIV6 (Combat, "Unit class modifiers"):
         "Melee units receive a +5 CS bonus against anti-cavalry units.

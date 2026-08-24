@@ -48,7 +48,7 @@ import {
 import { CARBON_PER_RESOURCE } from '../core/climate';
 import { BUILDINGS } from '../data/buildings';
 import {
-  PROMO_CLASSES, PROMO_COLS, PROMO_KINDS, UNIT_PROMO_CLASS, promoRows,
+  CLASS_BIT, PROMO_CLASSES, PROMO_COLS, PROMO_KINDS, UNIT_PROMO_CLASS, promoRows,
 } from '../data/promotions';
 
 /** the widest effect list any promotion carries. */
@@ -105,10 +105,11 @@ const effectRow = (fx: PolicyEffects) => ({
   housingIfDistricts: fx.housingIfDistricts ? [fx.housingIfDistricts.min, fx.housingIfDistricts.housing] : [-1, 0],
   amenitiesIfSpecialty: fx.amenitiesIfSpecialty ? [fx.amenitiesIfSpecialty.min, fx.amenitiesIfSpecialty.amenities] : [-1, 0],
   newDeal: fx.newDeal ? [fx.newDeal.min, fx.newDeal.housing, fx.newDeal.amenities] : [-1, 0, 0],
-  // [wonderTarget, unit-class mask over UNIT_CLASSES, eraMax, pct];
-  // wonderTarget -1 = the row carries no production boost.
+  // [target, unit-class mask over UNIT_CLASSES, eraMax, pct]; target -1 =
+  // the row carries no production boost, 0 = the named unit classes,
+  // 1 = wonders, 2 = EVERY unit (Fascism's class-free arm).
   prodBoost: fx.prodBoost
-    ? [fx.prodBoost.target === 'wonder' ? 1 : 0,
+    ? [fx.prodBoost.target === 'wonder' ? 1 : fx.prodBoost.target === 'anyUnit' ? 2 : 0,
        fx.prodBoost.classes.reduce((m, c) => m | (1 << UNIT_CLASSES.indexOf(c)), 0),
        fx.prodBoost.eraMax, fx.prodBoost.pct]
     : [-1, 0, 0, 0],
@@ -124,6 +125,17 @@ const effectRow = (fx: PolicyEffects) => ({
   influencePerTurn: fx.influencePerTurn ?? 0,
   firstEnvoyDouble: fx.firstEnvoyDouble ? 1 : 0,
   culturePerSuzerain: fx.culturePerSuzerain ?? 0,
+  // [promotion-class mask (CLASS_BIT bits), allCombat, cs]
+  unitCombatCS: fx.unitCombatCS
+    ? [(fx.unitCombatCS.classes ?? []).reduce((m, c) => m | (CLASS_BIT[c] ?? 0), 0),
+       fx.unitCombatCS.all ? 1 : 0, fx.unitCombatCS.cs]
+    : [0, 0, 0],
+  xpPct: fx.xpPct ?? 0,
+  wwCutPct: fx.wwCutPct ?? 0,
+  gppMult: fx.gppMult ?? 1,
+  cityWithDistrict: fx.cityWithDistrict
+    ? [fx.cityWithDistrict.housing, fx.cityWithDistrict.amenities]
+    : [0, 0],
   gpp: GP_CLASSES.map((c) => fx.gppFlat?.[c] ?? 0),
 });
 import { BOOSTS, BOOST_FRACTION } from '../data/boosts';

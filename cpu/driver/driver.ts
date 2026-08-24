@@ -17,7 +17,6 @@
 import { writeFileSync } from 'node:fs';
 import type { DistrictId, GameState, Seat, Tile } from '../core/types';
 import { allCities, campTiles, civsAtWar, seatOf, tileOwnedByCiv } from '../core/seats';
-import { isWater } from '../../world/query';
 import { GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT } from '../data/constants';
 import { PEACE_GOLD_COST, DED_MONUMENTALITY } from '../data/seats';
 import { tradeCapacity, freeTrader, routeYields, routeYieldsInternational, cityStateRouteYields, routeInRange, routePostGold } from '../core/trade';
@@ -34,6 +33,7 @@ import { stateDigest, groupDump } from '../core/statecompare';
 import { availableBuildings, buildingCompletable, validImprovementsIn } from '../core/rules';
 import { computeUnlocksIn, getModifiers, isCivicComplete } from '../core/effects';
 import { hexDistance } from '../../world/hex';
+import { isWater } from '../../world/query';
 import { prodLayout } from '../core/prodLayout';
 import { UNITS } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
@@ -289,10 +289,14 @@ for (let t = 0; t < N_TURNS; t++) {
         const owns = (t: Tile) => tileOwnedByCiv(t, seat);
         const unl = computeUnlocksIn(actor.research);
         const camps = campTiles(state);
+        // `_job_mask_core`'s twin: the REPAIR arms take ANY owned pillaged
+        // tile or district (a pillaged Harbor repairs from its own water
+        // tile); only the IMPROVE arm stays on land, because sea-resource
+        // improvements are out of roster on both engines.
         const jobTiles = state.map.tiles.filter((t) =>
-          owns(t) && !isWater(t)
+          owns(t)
           && (t.pillaged || t.districtPillaged
-            || (!t.improvement && validImprovementsIn(t, { unlocks: unl, ownsTile: owns, map: state.map, camps }).length > 0)));
+            || (!isWater(t) && !t.improvement && validImprovementsIn(t, { unlocks: unl, ownsTile: owns, map: state.map, camps }).length > 0)));
         const spreadTargets = actor.religion.founded
           ? allCities(state).filter((c) => c.followedReligion !== seat)
           : [];

@@ -5,8 +5,9 @@ adoption + greedy slot-fill directly (the occupancy_test pattern), asserting
 the GPU's `_adopted_gov` / `_adopted_gov_tier` / `_gov_policy_mods` match the
 TS `computeAdoption` / `applyGovernment` rule at the boundaries: newest-tier
 government with table-order tie-break, greedy slot fill incl. the wildcard
-overflow, housingAll/yieldMult/housingIfDistricts channels, and the
-influence tier."""
+overflow, the influence tier, and the SOURCED government rows — the combat
+CS / xp / weariness / GPP / any-district channels, and the deleted
+unsourced magnitudes staying deleted."""
 
 from __future__ import annotations
 
@@ -92,9 +93,10 @@ def main() -> None:
             "(+1 all yields, and +1 more on gold/faith from GOD_KING in the wildcard)"
         )
     assert int(sim._adopted_gov_tier(c2)[0]) == 1, "AUTOCRACY influence tier is 1"
-    assert float(hous.abs().sum()) == 0.0, "no housingAll below MONARCHY"
+    assert float(hous.abs().sum()) == 0.0, "no housingAll at tier 1"
 
-    # 4) MONARCHY (tier 2) -> housingAll +1 AND the wildcard-overflow fill:
+    # 4) MONARCHY (tier 2) -> NO modeled bonus (its sourced walls-level
+    #    terms have no channel) AND the wildcard-overflow fill:
     #    slots [M,M,E,D,W,W] (Civilopedia 2M/1E/1D/2W); VETERANCY -> M1,
     #    URBAN_PLANNING -> E, GOD_KING (economic, E full) spills into a W slot
     #    -> +1 gold +1 faith on the capital ON TOP of nothing else (MONARCHY
@@ -103,20 +105,19 @@ def main() -> None:
     adopted, has_gov = sim._adopted_gov(c3)
     assert int(adopted[0]) == gov_idx["MONARCHY"], "newest tier-2 government => MONARCHY"
     city_y, cap_y, hous, ymult, _sl, _em, _tp, *_ = sim._gov_policy_mods(c3)
-    assert float(hous[0]) == 1.0, "MONARCHY housingAll +1 (seat-0-only channel; civ sites discard it)"
+    assert float(hous[0]) == 0.0, "MONARCHY carries no modeled housing (the walls-level term has no channel)"
     GOLD, FAITH = 2, 5
     assert float(cap_y[0, GOLD]) == 1.0 and float(cap_y[0, FAITH]) == 1.0, "GOD_KING spills into MONARCHY's wildcard slot (+1 gold/+1 faith capital)"
     assert float(city_y[0, PROD]) == 1.0, "URBAN_PLANNING keeps the economic slot"
 
-    # 4b) yieldMult + the single-Wildcard contest: EXPLORATION without
-    #     DIVINE_RIGHT -> MERCHANT_REPUBLIC (the only unlocked tier-2):
-    #     gold ×1.1.
+    # 4b) The single-Wildcard contest: EXPLORATION without DIVINE_RIGHT ->
+    #     MERCHANT_REPUBLIC (the only unlocked tier-2), which carries no
+    #     modeled bonus since its sourced terms are governor-gated.
     c4 = civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "FOREIGN_TRADE", "MILITARY_TRADITION", "STATE_WORKFORCE", "EARLY_EMPIRE", "POLITICAL_PHILOSOPHY", "CIVIL_SERVICE", "FEUDALISM", "GUILDS", "MEDIEVAL_FAIRES", "GAMES_AND_RECREATION", "EXPLORATION"])
     adopted, has_gov = sim._adopted_gov(c4)
     assert int(adopted[0]) == gov_idx["MERCHANT_REPUBLIC"], "EXPLORATION without DIVINE_RIGHT => MERCHANT_REPUBLIC"
     city_y, cap_y, hous, ymult, sl4, _em, _tp, *_ = sim._gov_policy_mods(c4)
-    GOLD2 = 2
-    assert abs(float(ymult[0, GOLD2]) - 1.1) < 1e-12, "MERCHANT_REPUBLIC gold ×1.1 (the rng-2026006082 t249 catch)"
+    assert float((ymult[0] - 1).abs().sum()) == 0.0, "MERCHANT_REPUBLIC carries no modeled bonus (its sourced terms are governor-gated)"
     pol_idx = {p["id"]: i for i, p in enumerate(rj["policies"])}
     pol_by_id = {p["id"]: p for p in rj["policies"]}
     # MERCHANT_REPUBLIC's slots are the sourced [M,E,E,D,D,W] (Civilopedia
@@ -191,7 +192,89 @@ def main() -> None:
         )
         assert not bool(simr.civ_civic_boosted[0, 0, mf_idx]), "a civ's inspiration landed on seat 0's row"
 
-    print("government_test OK — adoption, slot fill incl. wildcard overflow, housingAll, influence tier, card slotting + the two inert cards + MEDIEVAL_FAIRES policies inspiration")
+    # 9) The sourced government rows, channel by channel — what each ships,
+    #    and the DELETED unsourced magnitudes staying deleted.
+    ui = {u["id"]: i for i, u in enumerate(rj["units"])}
+    oli, fas = gov_idx["OLIGARCHY"], gov_idx["FASCISM"]
+    bt = sim._gov_ucs_by_type
+    for uid, o_want, f_want in (("WARRIOR", 4, 5), ("SPEARMAN", 4, 5), ("GALLEY", 4, 5),
+                                ("ARCHER", 0, 5), ("CATAPULT", 0, 5),
+                                ("SETTLER", 0, 0), ("TRADER", 0, 0)):
+        assert float(bt[oli, ui[uid]]) == o_want, f"OLIGARCHY {uid}: want {o_want}"
+        assert float(bt[fas, ui[uid]]) == f_want, f"FASCISM {uid}: want {f_want}"
+    assert not bool((sim._type_melee & sim._type_anticav).any()), "no unit type is melee AND antiCavalry"
+    assert float(sim._gov_xppct[oli]) == 20.0, "OLIGARCHY +20% unit experience"
+    assert float(sim._gov_wwcut[fas]) == 15.0, "FASCISM war weariness -15%"
+    assert [float(x) for x in sim._gov_prodb[fas]] == [2.0, 0.0, -1.0, 0.5], "FASCISM +50% production toward EVERY unit (target 2)"
+    assert [float(x) for x in sim._gov_prodb[gov_idx["AUTOCRACY"]]] == [1.0, 0.0, -1.0, 0.1], "AUTOCRACY +10% production toward wonders"
+    cr = gov_idx["CLASSICAL_REPUBLIC"]
+    assert float(sim._gov_gppmult[cr]) == 1.15, "CLASSICAL_REPUBLIC x1.15 great person points"
+    assert float(sim._gov_dc_house[cr]) == 1.0 and float(sim._gov_dc_amen[cr]) == 1.0, "CLASSICAL_REPUBLIC +1/+1 in cities with ANY district"
+    assert int(sim._gov_hid_min[cr]) == -1, "CLASSICAL_REPUBLIC no longer rides the SPECIALTY channel"
+    assert float(sim._gov_housing[gov_idx["MONARCHY"]]) == 0.0, "MONARCHY's unsourced flat housing stays deleted"
+    for gname in ("MERCHANT_REPUBLIC", "THEOCRACY", "DEMOCRACY"):
+        assert float((sim._gov_ymult[gov_idx[gname]] - 1).abs().sum()) == 0.0, f"{gname}'s unsourced yield multiplier stays deleted"
+    SCI = 3
+    assert abs(float(sim._gov_ymult[gov_idx["COMMUNISM"], SCI]) - 1.1) < 1e-12, "COMMUNISM keeps the sourced +10% science"
+    assert bool(sim._gov_faith_units[gov_idx["THEOCRACY"]]), "THEOCRACY keeps the sourced faith-purchase verb"
+
+    # 10) FASCISM through the fold: TOTALITARIANISM alone at tier 3 adopts
+    #     it, and every new channel lands in the fx dict.
+    cF = civics_with(["CODE_OF_LAWS", "POLITICAL_PHILOSOPHY", "TOTALITARIANISM"])
+    adoptedF, hasF = sim._adopted_gov(cF)
+    assert int(adoptedF[0]) == fas and bool(hasF[0]), "TOTALITARIANISM alone at tier 3 => FASCISM"
+    fxF = sim._gov_policy_mods(cF)[12]
+    assert float(fxF["wwcut"][0]) == 15.0 and float(fxF["xppct"][0]) == 0.0, "FASCISM fx: -15% weariness, no xp term"
+    assert float(fxF["gppmult"][0]) == 1.0, "FASCISM fx: no GPP factor"
+    _prows = [(int(w), int(cm), int(e), float(p)) for _a, w, cm, e, p in fxF["prod"] if bool(_a[0])]
+    assert (2, 0, -1, 0.5) in _prows, "FASCISM fx: the class-free +50% unit production row is live"
+
+    # 11) `_gov_unit_cs` — seat 0 under FASCISM pays +5 to combatants only;
+    #     a city-state seat adopts nothing; OLIGARCHY's row borrowed onto
+    #     the adopted slot proves the promotion-class mask arms.
+    simc = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    simc._gov_live = True
+    simc._gov_has_effects = True
+    simc.civ_civics[:, 0].copy_(cF)
+    simc._eff_version += 1
+    s0 = torch.zeros(simc.B, dtype=torch.long)
+
+    def ucs(sim_, uid, seat_t):
+        return int(sim_._gov_unit_cs(torch.full((sim_.B,), ui[uid], dtype=torch.long), seat_t)[0])
+
+    for uid, want in (("WARRIOR", 5), ("ARCHER", 5), ("GALLEY", 5), ("SETTLER", 0), ("TRADER", 0)):
+        assert ucs(simc, uid, s0) == want, f"FASCISM _gov_unit_cs {uid}: want {want}"
+    cs_seat = torch.full((simc.B,), 100, dtype=torch.long)
+    assert ucs(simc, "WARRIOR", cs_seat) == 0, "a city-state seat adopts no government"
+    simc._gov_ucs_by_type[fas] = simc._gov_ucs_by_type[oli]
+    simc._eff_version += 1
+    for uid, want in (("WARRIOR", 4), ("SPEARMAN", 4), ("GALLEY", 4), ("ARCHER", 0), ("SETTLER", 0)):
+        assert ucs(simc, uid, s0) == want, f"OLIGARCHY-row _gov_unit_cs {uid}: want {want}"
+
+    # 12) The ANY-district walk arms, borrowed onto the adopted row: one
+    #     completed CANAL (no housing or amenity of its own) opens exactly
+    #     the granted point, and a districtless city reads nothing.
+    canal_i = next(i for i, d in enumerate(simc.districts_cat) if d.get("id") == "CANAL")
+    h0 = simc._seat_housing(0)[1].clone()
+    ctr = int(simc.city_center[0, 0, 0])
+    simc._gov_dc_house[fas] = 1.0
+    simc._eff_version += 1
+    h_no_district = simc._seat_housing(0)[1]
+    assert float((h_no_district - h0).abs().sum()) == 0.0, "the grant pays NOTHING to a districtless city"
+    simc.city_dist_tile[0, 0, 0, canal_i] = ctr + 1
+    simc.district_complete[0, ctr + 1] = True
+    h1 = simc._seat_housing(0)[1]
+    assert float(h1[0, 0] - h0[0, 0]) == 1.0, "one completed CANAL opens exactly the +1 housing grant"
+    simc._gov_dc_amen[fas] = -30.0
+    simc._eff_version += 1
+    t_lo = simc._seat_amenity(0)[0]
+    simc._gov_dc_amen[fas] = 30.0
+    simc._eff_version += 1
+    t_hi = simc._seat_amenity(0)[0]
+    # the tier INDEX ranks best-first, so more amenities is a SMALLER index
+    assert int(t_hi[0, 0]) < int(t_lo[0, 0]), "the amenity grant reaches the tier balance of the districted city"
+
+    print("government_test OK — adoption, slot fill incl. wildcard overflow, influence tier, card slotting + the two inert cards + MEDIEVAL_FAIRES inspiration + the sourced rows (unit CS by promotion class, xp/weariness/GPP factors, the any-district grant)")
 
 
 if __name__ == "__main__":

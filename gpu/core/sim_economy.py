@@ -193,7 +193,10 @@ class SimEconomy:
             # CIV6 (Trung Trac, Joaquim Marques Lisboa): a permanent percentage
             # off everything this seat accrues from here on. Integer both
             # sides — `ww` is a long plane and the TS twin floors to match.
-            _cut = self._gp_perm_at(self_row, "warWearyPct").long().clamp(min=0, max=100)
+            # CIV6 (Fascism): "War Weariness reduced by 15%" — the adopted
+            # government's cut joins additively, capped together.
+            _cut = (self._gp_perm_at(self_row, "warWearyPct").long()
+                    + self._fx_at_seat("wwcut", self_row).long()).clamp(min=0, max=100)
             gain = torch.div(gain * (100 - _cut), 100, rounding_mode="floor")
             idx = (self_row.clamp(min=0) * NS + foe_row.clamp(min=0)).unsqueeze(1)
             flat_ww.scatter_add_(1, idx, torch.where(score, gain, zeros).unsqueeze(1))
@@ -1362,6 +1365,10 @@ class SimEconomy:
             "rgold": _z.clone(), "infl": _z.clone(),
             "envoy1": torch.zeros(B, dtype=torch.bool, device=dev),
             "culsuz": _z.clone(),
+            "ucst": torch.zeros(B, self.NU, dtype=torch.float64, device=dev),
+            "xppct": _z.clone(), "wwcut": _z.clone(),
+            "dch": _z.clone(), "dca": _z.clone(),
+            "gppmult": torch.ones(B, dtype=torch.float64, device=dev),
             "gpp": torch.zeros(B, self._gov_gpp.shape[1], dtype=torch.float64, device=dev),
         }
         if not self._gov_has_effects or not self._ngov:
@@ -1393,12 +1400,18 @@ class SimEconomy:
             for _k, _t in (("bcharge", self._gov_bcharge), ("mcut", self._gov_mcut),
                            ("vbarb", self._gov_vbarb), ("cdef", self._gov_cdef),
                            ("crng", self._gov_crng), ("rgold", self._gov_rgold),
-                           ("infl", self._gov_infl), ("culsuz", self._gov_culsuz)):
+                           ("infl", self._gov_infl), ("culsuz", self._gov_culsuz),
+                           ("xppct", self._gov_xppct),
+                           ("wwcut", self._gov_wwcut), ("dch", self._gov_dc_house),
+                           ("dca", self._gov_dc_amen)):
                 fx[_k] = fx[_k] + _t[adopted] * _gf
             fx["rxp"] = fx["rxp"] * torch.where(has_gov, self._gov_rxp[adopted], _o)
             fx["rplun"] = fx["rplun"] * torch.where(has_gov, self._gov_rplun[adopted], _o)
+            fx["gppmult"] = fx["gppmult"] * torch.where(
+                has_gov, self._gov_gppmult[adopted], torch.ones_like(fx["gppmult"]))
             fx["envoy1"] = fx["envoy1"] | (has_gov & self._gov_envoy1[adopted])
             fx["gpp"] = fx["gpp"] + self._gov_gpp[adopted] * _gf.double().unsqueeze(1)
+            fx["ucst"] = fx["ucst"] + self._gov_ucs_by_type[adopted] * _gf.double().unsqueeze(1)
             for _gi in range(self._ngov):
                 if float(self._gov_prodb[_gi, 0]) >= 0:
                     _r = self._gov_prodb[_gi]
@@ -1437,13 +1450,20 @@ class SimEconomy:
                 for _k, _t in (("bcharge", self._pol_bcharge), ("mcut", self._pol_mcut),
                                ("vbarb", self._pol_vbarb), ("cdef", self._pol_cdef),
                                ("crng", self._pol_crng), ("rgold", self._pol_rgold),
-                               ("infl", self._pol_infl), ("culsuz", self._pol_culsuz)):
+                               ("infl", self._pol_infl), ("culsuz", self._pol_culsuz),
+                               ("xppct", self._pol_xppct),
+                               ("wwcut", self._pol_wwcut), ("dch", self._pol_dc_house),
+                               ("dca", self._pol_dc_amen)):
                     fx[_k] = fx[_k] + sd @ _t
                 _ones_p = torch.ones(B, self._npol, dtype=dt, device=dev)
                 fx["rxp"] = fx["rxp"] * torch.where(slotted, self._pol_rxp.unsqueeze(0).expand(B, -1), _ones_p).prod(dim=1)
                 fx["rplun"] = fx["rplun"] * torch.where(slotted, self._pol_rplun.unsqueeze(0).expand(B, -1), _ones_p).prod(dim=1)
+                fx["gppmult"] = fx["gppmult"] * torch.where(
+                    slotted, self._pol_gppmult.unsqueeze(0).expand(B, -1),
+                    torch.ones(B, self._npol, dtype=torch.float64, device=dev)).prod(dim=1)
                 fx["envoy1"] = fx["envoy1"] | (slotted & self._pol_envoy1.unsqueeze(0)).any(dim=1)
                 fx["gpp"] = fx["gpp"] + slotted.double() @ self._pol_gpp
+                fx["ucst"] = fx["ucst"] + slotted.double() @ self._pol_ucs_by_type
                 for _pi in range(self._npol):
                     if float(self._pol_prodb[_pi, 0]) >= 0:
                         _r = self._pol_prodb[_pi]

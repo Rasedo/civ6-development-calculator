@@ -471,12 +471,19 @@ class SimPhase:
             _pb = self._gov_mods(row)[12]["prod"]
             if _pb:
                 for _pact, _isw, _cmask, _eramax, _pct in _pb:
-                    if _isw:
+                    if _isw == 1:
                         _nw = self._wonder_era.shape[0]
                         _wid = (cur - self.WONDER_BASE).clamp(min=0, max=_nw - 1)
                         _hit = (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + _nw)
                         if _eramax >= 0:
                             _hit = _hit & (self._wonder_era[_wid] <= _eramax)
+                    elif _isw == 2:
+                        # CIV6 (Fascism): "+50% Production toward Units" —
+                        # class-FREE, every unit the queue can hold.
+                        _ui = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
+                        _hit = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU)
+                        if _eramax >= 0:
+                            _hit = _hit & (self._type_era[_ui] <= _eramax)
                     else:
                         _ui = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
                         _hit = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU) \
@@ -981,6 +988,10 @@ class SimPhase:
             # CIV6 (Patronage resolution): the factor covers every per-turn
             # source, the golden prophet term included.
             pts = pts * self._congress_gpp_factor(cls)
+            # CIV6 (Classical Republic): "+15% Great Person points" — the
+            # government's factor covers every per-turn source the same way.
+            if self._gov_has_effects:
+                pts = pts * self._gov_mods(row)[12]["gppmult"]
             self.civ_gpp[:, row, cls] = torch.where(
                 active & (pts > 0), self.civ_gpp[:, row, cls] + pts, self.civ_gpp[:, row, cls]
             )

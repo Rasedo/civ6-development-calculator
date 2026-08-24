@@ -18,6 +18,7 @@
 
 import type { DistrictId, GreatPersonClass, Yields } from '../core/types';
 import type { UnitClass } from './units';
+import type { PromoClass } from './promotions';
 
 export type SlotKind = 'military' | 'economic' | 'diplomatic' | 'wildcard';
 /** Slot kinds in the order a wonder-granted slot appends to a government's
@@ -56,9 +57,10 @@ export interface BuildingYieldBoost {
  * ADD across the slotted cards, the way Civ 6 stacks production modifiers.
  */
 export interface ProdBoost {
-  /** the queue item the card pays for */
-  target: 'unit' | 'wonder';
-  /** the classes it reaches; a wonder card names none */
+  /** the queue item the card pays for; 'anyUnit' is the class-free arm
+   *  that reaches every unit the queue can hold */
+  target: 'unit' | 'wonder' | 'anyUnit';
+  /** the classes it reaches; a wonder or anyUnit card names none */
   classes: UnitClass[];
   /** the highest era index it still pays; -1 = every era */
   eraMax: number;
@@ -106,6 +108,17 @@ export interface PolicyEffects {
   firstEnvoyDouble?: boolean;
   /** culture multiplier added per city-state this seat is suzerain of */
   culturePerSuzerain?: number;
+  /** flat Combat Strength by PROMOTION class (`UNIT_PROMO_CLASS`); `all`
+   *  covers every combat unit instead */
+  unitCombatCS?: { classes?: PromoClass[]; all?: boolean; cs: number };
+  /** percentage POINTS joining every experience award's building percentage */
+  xpPct?: number;
+  /** percentage taken off every war-weariness accrual this seat scores */
+  wwCutPct?: number;
+  /** multiplies every per-turn Great Person point source */
+  gppMult?: number;
+  /** housing and amenities in every city with ANY completed district */
+  cityWithDistrict?: { housing: number; amenities: number };
   gppFlat?: Partial<Record<GreatPersonClass, number>>;
 }
 
@@ -319,32 +332,72 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
     G('CHIEFDOM', 'Chiefdom', 0, [M, E], {}, 'The starting government.'),
     // Slots sourced from the Gathering Storm Civilopedia: 1 Military,
     // 1 Economic, 1 Diplomatic, 1 Wildcard.
-    // CIV6 (GS): "+1 to all yields for each government building and Palace in
-    // a city. +10% Production toward Wonders." Only the PALACE half is paid
-    // here; the per-government-building half has no channel yet.
-    G('AUTOCRACY', 'Autocracy', 1, [M, E, D, W], { capitalYields: { food: 1, production: 1, gold: 1, science: 1, culture: 1, faith: 1 } },
-      '+1 to all yields in the capital, for its Palace.'),
-    G('OLIGARCHY', 'Oligarchy', 1, [M, M, E, W], {},
-      'Combat bonuses.'),
+    // CIV6 (GS): "+1 to all yields for each Government Plaza building,
+    // Diplomatic Quarter building and Palace in a city. +10% Production
+    // toward Wonders." Only the PALACE half of the yield term is paid here;
+    // the per-government-building half has no channel yet.
+    G('AUTOCRACY', 'Autocracy', 1, [M, E, D, W],
+      { capitalYields: { food: 1, production: 1, gold: 1, science: 1, culture: 1, faith: 1 },
+        prodBoost: { target: 'wonder', classes: [], eraMax: -1, pct: 0.1 } },
+      '+1 to all yields in the capital, for its Palace; +10% production toward wonders.'),
+    // CIV6: "All land melee, anti-cavalry, and naval melee class units gain
+    // +4 Combat Strength. +20% Unit Experience." The three are PROMOTION
+    // classes (`UNIT_PROMO_CLASS`), so the Galley rides NAVAL_MELEE.
+    G('OLIGARCHY', 'Oligarchy', 1, [M, M, E, W],
+      { unitCombatCS: { classes: ['MELEE', 'ANTICAV', 'NAVAL_MELEE'], cs: 4 }, xpPct: 20 },
+      '+4 combat strength for melee and anti-cavalry units; +20% unit experience.'),
     // CIV6 (GS): "All cities with a district receive +1 Housing and +1
-    // Amenity. +15% Great Person points."
+    // Amenity. +15% Great Person points." ANY completed district -- the
+    // specialty-gated channels are the CARDS' shape (Insulae, Medina
+    // Quarter), not this row's.
     G('CLASSICAL_REPUBLIC', 'Classical Republic', 1, [E, E, D, W],
-      { housingIfDistricts: { min: 1, housing: 1 }, amenitiesIfSpecialty: { min: 1, amenities: 1 } },
-      '+1 housing and +1 amenity in every city with a district.'),
-    G('MONARCHY', 'Monarchy', 2, [M, M, E, D, W, W], { housingAll: 1 },
-      '+1 housing in all cities.'),
-    G('MERCHANT_REPUBLIC', 'Merchant Republic', 2, [M, E, E, D, D, W], { yieldMult: { gold: 1.1 } },
-      '+10% gold in all cities.'),
-    G('THEOCRACY', 'Theocracy', 2, [M, M, E, E, D, W], { yieldMult: { faith: 1.1 }, faithBuyLandUnits: true },
-      '+10% faith in all cities. Can buy land combat units with Faith.'),
-    G('DEMOCRACY', 'Democracy', 3, [M, E, E, E, D, D, W, W], { yieldMult: { culture: 1.1 } },
-      '+10% culture in all cities.'),
+      { cityWithDistrict: { housing: 1, amenities: 1 }, gppMult: 1.15 },
+      '+1 housing and +1 amenity in every city with a district; +15% great person points.'),
+    // CIV6 (GS): "+1 Housing per level of Walls. +2 Diplomatic Favor for
+    // every Renaissance Walls. +50% Influence Points." All three want
+    // channels this model does not have (a per-city walls-level count, a
+    // favor-per-building term, an influence multiplier); the flat +1
+    // housing that stood here was unsourced.
+    G('MONARCHY', 'Monarchy', 2, [M, M, E, D, W, W], {},
+      'No modeled bonus yet.'),
+    // CIV6 (GS): "+10% Gold in all cities with an established Governor.
+    // +15% Production toward Districts." The gold term wants a per-city
+    // GOVERNOR gate on a yield multiplier, the production term a DISTRICT
+    // prodBoost target; the ungated gold multiplier that stood here was
+    // unsourced.
+    G('MERCHANT_REPUBLIC', 'Merchant Republic', 2, [M, E, E, D, D, W], {},
+      'No modeled bonus yet.'),
+    // CIV6: "Can buy land combat units with Faith. All units +5 Religious
+    // Strength in theological combat." CIV6 (GS): "+5 Religious Strength in
+    // Theological Combat. +0.5 Faith per Citizen in cities with Governors.
+    // 15% Discount on Purchases with Faith." Only the purchase verb ships:
+    // the strength term wants a government channel into the theological
+    // roll, the faith term a per-city GOVERNOR gate, the discount a
+    // faith-price multiplier; the flat faith multiplier that stood here was
+    // unsourced.
+    G('THEOCRACY', 'Theocracy', 2, [M, M, E, E, D, W], { faithBuyLandUnits: true },
+      'Can buy land combat units with Faith.'),
+    // CIV6 (GS): "Your Trade Routes to an Ally's city or a city-state that
+    // you are the Suzerain of provide +4 Gold and +4 Production for both
+    // cities. Alliance Points with all allies increase by an additional .25
+    // per turn. 15% Discount on Purchases with Gold." The route term wants
+    // a per-destination bonus, the alliance term an alliance-points clock,
+    // the discount a gold-price multiplier; the culture multiplier that
+    // stood here was unsourced.
+    G('DEMOCRACY', 'Democracy', 3, [M, E, E, E, D, D, W, W], {},
+      'No modeled bonus yet.'),
     // CIV6 (GS): "+0.6 Production per Citizen in cities with Governors.
-    // +10% Science."
+    // +10% Science." The production term wants a per-city GOVERNOR gate and
+    // a per-citizen yield; only the science half ships.
     G('COMMUNISM', 'Communism', 3, [M, M, M, E, E, E, D, W], { yieldMult: { science: 1.1 } },
       '+10% science in all cities.'),
-    G('FASCISM', 'Fascism', 3, [M, M, M, M, E, D, W, W], {},
-      'Combat bonuses.'),
+    // CIV6: "All units gain +5 Combat Strength. War Weariness reduced by
+    // 15%. +50% Production toward Units." The production arm is class-FREE:
+    // it reaches every unit the queue can hold, the class-less ones too.
+    G('FASCISM', 'Fascism', 3, [M, M, M, M, E, D, W, W],
+      { unitCombatCS: { all: true, cs: 5 }, wwCutPct: 15,
+        prodBoost: { target: 'anyUnit', classes: [], eraMax: -1, pct: 0.5 } },
+      '+5 combat strength for all units; -15% war weariness; +50% production toward units.'),
   ].map((g) => [g.id, g]),
 );
 

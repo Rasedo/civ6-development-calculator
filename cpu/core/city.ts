@@ -299,6 +299,12 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
   for (const rule of m.newDeal) {
     if (specialtyCount >= rule.min) total += rule.housing;
   }
+  /* CIV6 (Classical Republic): "All cities with a district receive +1
+   * Housing and +1 Amenity" — ANY completed district, where the
+   * specialty-gated rules above ask for more. */
+  if (m.cityWithDistrict.length && completedDistrictCount(state, city, false) >= 1) {
+    for (const rule of m.cityWithDistrict) total += rule.housing;
+  }
   return total;
 }
 
@@ -779,6 +785,9 @@ export function computeCityStats(
   }
   for (const rule of m.newDeal) {
     if (specialtyCount >= rule.min) have += rule.amenities;
+  }
+  if (m.cityWithDistrict.length && completedDistrictCount(state, city, false) >= 1) {
+    for (const rule of m.cityWithDistrict) have += rule.amenities;
   }
   const needed = amenitiesNeeded(city.population);
   const balance = have - needed;
