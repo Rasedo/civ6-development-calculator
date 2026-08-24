@@ -6,13 +6,14 @@
 Stage 0 is serial because everything below depends on it: the TS and Python
 static gates, the seeder-drift check against the committed worlds.lock, then
 the world seed and the fixture export.
-Two lanes then run concurrently:
+Three lanes then run concurrently:
 
-    vitest + serve : the TS suite, then the decision-server gate
-                     (serve_gate --batched) — ONE B=12 GPU sim against twelve
-                     TS children, with per-turn obs/job/spread/buy equality
-                     and a state-digest compare
-    pokes          : the per-mechanic GPU self-tests, through a bounded pool
+    vitest + serve_a : the TS suite, then the decision-server gate's first
+                       shard — a third of the fixture seeds in one GPU sim
+                       against one TS child each, with per-turn
+                       obs/job/spread/buy equality and a state-digest compare
+    serve_b, serve_c : the gate's other two thirds, the same shape
+    pokes            : the per-mechanic GPU self-tests, through a bounded pool
 
 Wall-clock is stage 0 plus the slowest lane. Each step's OMP thread count is
 capped so concurrent torch processes do not oversubscribe the box. Exit code
@@ -33,33 +34,26 @@ ROOT = Path(__file__).resolve().parent.parent
 FULL = "--full" in sys.argv
 NO_BAIL = "--no-bail" in sys.argv
 
-# Poke pool: 4 workers x OMP 2 = 8 threads. Deliberately small — the box is 24
-# cores and the serve lane's twelve TS children already claim most of them.
-POKE_WORKERS = 4
+# Poke pool: 6 workers x OMP 2 = 12 threads beside the serve shards' 4 each.
+# The TS children cost nothing: profiled at under 1% of the serve lane, whose
+# wall is the gate's own process — sim.step, the decide pass and the digest
+# extract — which is also why the gate runs as two processes at all.
+POKE_WORKERS = 6
 POKE_OMP = 2
 
-POKE_COST = {
-    "great_works": 2.7, "religion_gp": 3.2, "government": 3.3,
-    "relics": 3.4, "trade2": 3.5, "parks": 3.5, "bankruptcy": 3.7, "domination": 3.8,
-    "culture_victory": 4.3, "space_race": 4.8, "encampment": 4.9, "citystate_verbs": 6.6,
-    "citystate_bonus": 7.9, "buy_wire": 9.2, "city_registry": 12.4, "controlled": 13.8,
-    "combat_mod": 17.1, "ranged": 18.5, "occupancy": 21.0,
-    "governors": 22.2, "war_weariness": 23.2, "geopolitics": 23.8, "seat": 29.0,
-    "gp_aura": 31.6, "war": 32.5, "religion2": 51.7,
-    "naval": 53.7, "districts": 87.9, "watermill": 12.0, "fort": 6.0,
-    "festival": 4.0, "citystate_war": 6.0, "snapshot": 30.0, "golden_move": 3.0, "pref_apply": 8.0, "seat_verbs": 10.0, "drive": 60.0,
-    "civ_pair_strike": 12.0,
-    "spawn_reclaim": 6.0,
-    "centre_defence": 14.0,
-    "wonder_effects": 20.0,
-    "city_perimeter": 20.0,
-    "flood_severity": 12.0,
-    "climate": 20.0,
-    "engineer": 14.0,
-    "placement": 14.0,
-    "citizens": 10.0,
-    "congress_vote": 8.0,
-}
+def lane_cost() -> dict[str, float]:
+    """Measured lane cost — the median of each lane's last five OK timings
+    from the recorded runs (stats/battery.jsonl). A lane with no history yet
+    is priced at 30s until its first green run records one."""
+    hist: dict[str, list[float]] = {}
+    try:
+        for row in _stats._rows()[-25:]:
+            for st in row.get("steps", []):
+                if st.get("status") == "ok":
+                    hist.setdefault(str(st["lane"]), []).append(float(st["secs"]))
+    except Exception:
+        return {}
+    return {k: sorted(v[-5:])[len(v[-5:]) // 2] for k, v in hist.items()}
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "gpu"))
 import test_stats as _stats  # noqa: E402
@@ -174,14 +168,23 @@ def main() -> int:
             break
 
     if not failed.is_set():
-        print("lanes (parallel): vitest+serve | gpu pokes", flush=True)
+        print("lanes (parallel): vitest+serve_a | serve_b | serve_c | gpu pokes", flush=True)
+        # The DECISION-SERVER gate in three shards over ALL fixture seeds:
+        # per-turn obs/unit-target equality and a state-digest compare. The
+        # lane's wall is the gate process itself, not the TS children, so
+        # more processes split what one batch serializes; single-seed hunt
+        # reruns prove the digests are batch-size independent. The split is
+        # derived from the fixture directory so a reseeded set reshards itself.
+        _seeds = sorted(int(q.stem[4:]) for q in (ROOT / "seeder" / "worlds").glob("seed*.json")
+                        if q.stem[4:].isdigit())
+        _k = 3
+        _cut = [round(i * len(_seeds) / _k) for i in range(_k + 1)]
+        serve_cmd = [py, "gpu/serve_gate.py", "--batched", "--turns", "250", "--seeds"]
+        _shards = [("serve_" + "abc"[i], serve_cmd + [",".join(map(str, _seeds[_cut[i]:_cut[i + 1]]))], 4)
+                   for i in range(_k)]
         lanes = [
-            [
-                ("vitest", [npm, "test"], 8),
-                # The DECISION-SERVER gate: one B=12 sim, twelve TS children,
-                # per-turn obs/unit-target equality and a state-digest compare.
-                ("serve", [py, "gpu/serve_gate.py", "--batched", "--turns", "250"], 6),
-            ],
+            [("vitest", [npm, "test"], 8), _shards[0]],
+            *[[sh] for sh in _shards[1:]],
             [
                 ("buy_wire", [py, "tests/gpu/buy_wire_test.py"], 4),
                 ("war", [py, "tests/gpu/war_test.py"], 4),
@@ -275,9 +278,13 @@ def main() -> int:
         if _missing or _loose:
             print(f"BATTERY LANE DRIFT — missing: {_missing or 'none'}; unregistered: {_loose or 'none'}")
             return 1
+        _cost = lane_cost()
         for L in lanes:
             if len(L) > 5:
-                L.sort(key=lambda s: POKE_COST.get(s[0], 30.0))
+                # longest first: the pool wall is total/workers OR the last
+                # long poke's finish, whichever is later — so long pokes start
+                # at t=0, never at the tail.
+                L.sort(key=lambda s: -_cost.get(s[0], 30.0))
 
         threads = [
             threading.Thread(target=lane_parallel, args=(l, POKE_WORKERS, POKE_OMP))
