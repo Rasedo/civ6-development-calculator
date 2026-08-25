@@ -24,7 +24,7 @@ import { GP_CITY_PERM, GP_FX, GP_PERM, GP_PER_ADJ_SOURCES, GP_SITES, GP_YIELD_KE
 import { strategicSlot } from '../core/stockpile';
 import { MAX_LEVEL, XP_PER_LEVEL } from '../core/promotions';
 import { KILL_SPREAD_RANGE } from '../data/promotions';
-import { GP_CLASSES, GREAT_PEOPLE, GP_ERA_GPP, GP_FIRST_OF_ERA, GP_FLAT_COST_CLASSES, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, RELIC_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_CULTURE, ARTIFACT_TOURISM, THEMING_MULT, ARTIST_WORKS, SPECIALIST_YIELDS, SPECIALIST_TIERS } from '../data/greatPeople';
+import { GP_CLASSES, GREAT_PEOPLE, GP_ERA_GPP, GP_FLAT_COST_CLASSES, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, RELIC_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_CULTURE, ARTIFACT_TOURISM, THEMING_MULT, ARTIST_WORKS, SPECIALIST_YIELDS, SPECIALIST_TIERS } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, APOSTLE_PROMO_OFFER, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, LASER_POWER_LOAD, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -317,6 +317,7 @@ function gpFxRow(p: GreatPersonDef): number[] {
     strategicAmount: fx.strategic?.amount ?? 0,
     artifactScience: fx.artifactScience ?? 0,
     airSlotBonus: fx.airSlotBonus ?? 0,
+    suzerainSeize: fx.suzerainSeize ? 1 : 0,
   };
   return [
     ...GP_FX.map((k) => v[k] ?? 0),
@@ -611,7 +612,6 @@ export function buildRules() {
       // [person era][eras the world is behind them].
       gpCostTable: GP_ERA_GPP.map((base) => GP_ERA_GPP.map((_, d) => Math.floor(base * (1 + 0.3 * d) ** d))),
       gpEra: GP_CLASSES.map((c) => GREAT_PEOPLE[c].map((p) => p.era)),
-      gpFirstOfEra: GP_CLASSES.map((c) => [...GP_FIRST_OF_ERA[c]]),
       gpFlatCost: GP_CLASSES.map((c) => (GP_FLAT_COST_CLASSES.has(c) ? 1 : 0)),
       gpRoster: GP_CLASSES.map((c) => GREAT_PEOPLE[c].length),
       gpClassDistrict: GP_CLASSES.map((c) => PLACEABLE_DISTRICTS.indexOf(GP_CLASS_DISTRICT[c])),
@@ -745,6 +745,7 @@ export function buildRules() {
         impYYields: YIELD_KEYS.map((k) => w.effects?.cityYieldPerImprovement?.yields[k] ?? 0),
         boostTechEra: w.effects?.boostTechsThroughEra ?? -1,
         distGpp: w.effects?.districtGpPoints ?? 0,
+        patronPct: w.effects?.patronageFaithPct ?? 0,
         mult: YIELD_KEYS.map((k) => w.effects?.cityYieldMult?.[k] ?? 1),
         // adjacency requirement: -1 none, -2 CITY_CENTER, -3 required but
         // out-of-catalog (never placeable — Colosseum/Ruhr), else the
@@ -773,6 +774,9 @@ export function buildRules() {
         cityHousing: w.effects?.cityHousing ?? 0,
         faithPerFlood: w.effects?.faithPerFlood ?? 0,
         dvp: w.effects?.dvp ?? 0,
+        grantUnit: w.effects?.grantUnit ? Object.values(UNITS).findIndex((u) => u.id === w.effects!.grantUnit) : -1,
+        grantProphet: w.effects?.grantProphet ? 1 : 0,
+        religionSite: w.effects?.religionSite ? 1 : 0,
         // policy slots, parallel to SLOT_KINDS
         slots: SLOT_KINDS.map((k) => w.effects?.extraSlots?.[k] ?? 0),
         envoysPerWonder: w.effects?.envoysPerWonder ?? 0,
@@ -1264,6 +1268,7 @@ export function buildRules() {
       faithBuyUnits: b.faithBuyUnits ? 1 : 0,
       pillageFaithImp: b.pillageFaithImp ?? 0,
       pillageFaithDist: b.pillageFaithDist ?? 0,
+      grantUnit: b.grantUnit ? Object.values(UNITS).findIndex((u) => u.id === b.grantUnit) : -1,
       spyLevelPenalty: b.spyLevelPenalty ?? 0,
       influencePerTurn: b.influencePerTurn ?? 0,
       favorPerTurn: b.favorPerTurn ?? 0,
@@ -1293,11 +1298,15 @@ export function buildRules() {
       id: t.id,
       cost: t.cost,
       prereqs: (t.prereqs ?? []).map((p) => techIdx.get(p)!),
+      awardEnvoys: t.effects.reduce((n, e) => n + (e.kind === 'award' ? e.envoys ?? 0 : 0), 0),
+      awardDvp: t.effects.reduce((n, e) => n + (e.kind === 'award' ? e.dvp ?? 0 : 0), 0),
     })),
     civics: civicList.map((c) => ({
       id: c.id,
       cost: c.cost,
       prereqs: (c.prereqs ?? []).map((p) => civicIdx.get(p)!),
+      awardEnvoys: c.effects.reduce((n, e) => n + (e.kind === 'award' ? e.envoys ?? 0 : 0), 0),
+      awardDvp: c.effects.reduce((n, e) => n + (e.kind === 'award' ? e.dvp ?? 0 : 0), 0),
     })),
     // The adoption master switch, mirrored to the GPU so both engines gate
     // adoption identically — see GOVERNMENTS_ADOPTION_LIVE.

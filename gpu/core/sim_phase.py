@@ -613,6 +613,15 @@ class SimPhase:
             # full and used again, along with anything that's on them".
             if self._barrier_bidx >= 0:
                 self._repair_behind_barrier(row, col, made_b2 & (bi == self._barrier_bidx))
+            # CIV6 (Intelligence Agency): "+1 Spy" — the free unit, at the
+            # completing city.
+            if bool((self._b_grant_unit >= 0).any()):
+                bg = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+                bg[br] = self._b_grant_unit[bi[br]]
+                ctr_b = self.city_center[bidx, row, col]
+                for u_i in sorted(set(int(x) for x in bg[bg >= 0].tolist())):
+                    self._spawn_unit(row, made_b2 & (bg == u_i), ctr_b, u_i)
+                    self._gen_ver += 1
 
         if self._wond_n:
             made_w = done & (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + self._wond_n)
@@ -667,6 +676,21 @@ class SimPhase:
                         newly = want & ~self.civ_techs[:, row, :nt] & ~self.civ_tech_boosted[:, row, :nt]
                         self.civ_tech_boosted[:, row, :nt] |= newly
                         self._dedication_event(row, 1, newly.sum(dim=1))
+                # CIV6 (Pyramids): "Grants a free Builder" — at the
+                # completing city.
+                if bool((self._wond_grant_unit >= 0).any()):
+                    gu = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+                    gu[wr] = self._wond_grant_unit[wi[wr]]
+                    ctr_w = self.city_center[bidx, row, col]
+                    for u_i in sorted(set(int(x) for x in gu[gu >= 0].tolist())):
+                        self._spawn_unit(row, made_w & (gu == u_i), ctr_w, u_i)
+                        self._gen_ver += 1
+                # CIV6 (Stonehenge): the free Great Prophet, with the
+                # Apostle fallback.
+                if bool(self._wond_grant_prophet.any()):
+                    sto = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                    sto[wr] = self._wond_grant_prophet[wi[wr]]
+                    self._grant_free_prophet(row, sto & made_w, self.city_center[bidx, row, col])
 
         if self._proj_rows:
             made_p = done & (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
@@ -866,6 +890,11 @@ class SimPhase:
             self.civ_techs[rows, row, curt[rows]] = True
             self._eff_version += 1
             self._urban_defenses_fit(row, fin & (curt == self._urban_def_tech))
+            # CIV6 (Global Warming Mitigation): "Awards 3 Envoys / Awards 1
+            # Diplomatic Victory point" — once, at completion.
+            if int(rdv.t_award_env.sum()) or int(rdv.t_award_dvp.sum()):
+                self.civ_envoys_avail[:, row] += torch.where(fin, rdv.t_award_env.gather(0, curt.clamp(min=0)), torch.zeros_like(curt))
+                self.civ_diplo_points[:, row] += torch.where(fin, rdv.t_award_dvp.gather(0, curt.clamp(min=0)), torch.zeros_like(curt))
             self.civ_tech_prog[:, row] = torch.where(fin, self.civ_tech_prog[:, row] - cost_t, self.civ_tech_prog[:, row])
             # A finished tech holds no parked science — its slot was emptied
             # when it became current — but clear it anyway, so the partition
@@ -937,6 +966,11 @@ class SimPhase:
             rows = fin.nonzero(as_tuple=True)[0]
             self.civ_civics[rows, row, curc[rows]] = True
             self._eff_version += 1
+            # CIV6 (Global Warming Mitigation): "Awards 3 Envoys / Awards 1
+            # Diplomatic Victory point" — once, at completion.
+            if int(rdv.c_award_env.sum()) or int(rdv.c_award_dvp.sum()):
+                self.civ_envoys_avail[:, row] += torch.where(fin, rdv.c_award_env.gather(0, curc.clamp(min=0)), torch.zeros_like(curc))
+                self.civ_diplo_points[:, row] += torch.where(fin, rdv.c_award_dvp.gather(0, curc.clamp(min=0)), torch.zeros_like(curc))
             self.civ_civic_prog[:, row] = torch.where(fin, self.civ_civic_prog[:, row] - cost_c, self.civ_civic_prog[:, row])
             self.civ_civic_retain[rows, row, curc[rows]] = 0
             self.civ_cur_civic[:, row] = torch.where(fin, torch.full_like(curc, -1), self.civ_cur_civic[:, row])
@@ -960,7 +994,6 @@ class SimPhase:
         if self._gp_nc == 0:
             return
         B, dev = self.B, self.device
-        world_era = self._world_era()
         # CIV6 (Oracle): "Districts in this city provide +2 Great Person points
         # of their type" — the HOLDING city's own districts only.
         dgpp = (self._city_wonder_flat(row, self._wond_distgpp)
@@ -1007,43 +1040,128 @@ class SimPhase:
                 active & (pts > 0), self.civ_gpp[:, row, cls] + pts, self.civ_gpp[:, row, cls]
             )
             maxN = self._gp_effects.shape[1]
-            floor_c = self._gp_first_of_era[cls][world_era.clamp(min=0, max=8)]
-            for _ in range(maxN):
-                # the OFFER: never behind the queue, never behind the era gate
-                at_c = torch.maximum(self.gp_next[:, cls], floor_c)
-                has_person = at_c < self._gp_roster[cls]
-                gcost = self._gp_cost(cls, at_c.clamp(max=maxN - 1), world_era)
+            # maxN + 1: a turn claiming the WHOLE roster still reaches the
+            # exhaustion draw, so both engines convert the same turn.
+            for _ in range(maxN + 1):
+                self._gp_ensure_offer(active, cls)
+                has_person = self.gp_offer[:, cls] >= 0
+                gcost = self.gp_price[:, cls]
                 hit = active & has_person & (self.civ_gpp[:, row, cls] >= gcost)
                 if not bool(hit.any()):
                     break
                 self.civ_gpp[:, row, cls] = torch.where(hit, self.civ_gpp[:, row, cls] - gcost, self.civ_gpp[:, row, cls])
-                self.gp_earned[:, cls] = self.gp_earned[:, cls] + hit.long()
-                self.gp_next[:, cls] = torch.where(hit, at_c + 1, self.gp_next[:, cls])
-                self._add_era_score(row, self._era_pts["gp"], hit.long())  # per GP earned
-                # CIV6 (Sky and Stars): "+1 Era Score each time a Great
-                # Person is Earned."
-                self._dedication_event(row, self._ded_sky, hit)
-                # CIV6: the recruit is a UNIT and nothing is paid out here.
-                # It arrives in the city holding a completed district of its
-                # own class (lowest centre tile), the capital otherwise, and
-                # carries the queue position its charge will spend. Draws no RNG.
-                guidx = int(self._gp_class_unit[cls]) if cls < int(self._gp_class_unit.numel()) else -1
-                if guidx >= 0 and bool(hit.any()):
-                    cap_t = torch.where(self.city_is_cap[:, row] & self.city_alive[:, row],
-                                        self.city_center[:, row],
-                                        torch.full_like(self.city_center[:, row], -1)).max(dim=1).values
-                    if d_cls >= 0 and self.districts_on:
-                        _okc = comp_c & self.city_alive[:, row]
-                        _cand = torch.where(_okc, self.city_center[:, row],
-                                            torch.full_like(self.city_center[:, row], 1 << 30))
-                        _at = _cand.min(dim=1).values
-                        born_t = torch.where(_at >= (1 << 30), cap_t, _at)
-                    else:
-                        born_t = cap_t
-                    self._spawn_unit(row, hit & (born_t >= 0), born_t, guidx,
-                                     charges=self._gp_charges[cls, at_c.clamp(max=maxN - 1)],
-                                     gp_at=at_c.clamp(max=maxN - 1))
-                    self._gen_ver += 1
+                self._gp_claim(row, hit, cls)
+            # CIV6: "GPPs that can no longer be used are converted to Faith,
+            # in a 1:1 ratio" — the exhausted class's stock and flow alike.
+            exh = active & (self.gp_offer[:, cls] == -2) & (self.civ_gpp[:, row, cls] > 0)
+            if bool(exh.any()):
+                self.civ_faith[:, row] = torch.where(
+                    exh, self.civ_faith[:, row] + self.civ_gpp[:, row, cls].to(self.dtype),
+                    self.civ_faith[:, row])
+                self.civ_gpp[:, row, cls] = torch.where(
+                    exh, torch.zeros_like(self.civ_gpp[:, row, cls]), self.civ_gpp[:, row, cls])
+
+    def _gp_ensure_offer(self, active: torch.Tensor, cls: int) -> None:
+        """The DRAW, where pending. CIV6: "the replacement is chosen randomly
+        from those available in the current era, or the next if all those
+        from the current era have been claimed" — the pool is the FIRST era
+        at or past the world's with an unclaimed member; the price freezes
+        with the pick; no pool anywhere ahead = -2 for good, and that
+        verdict draws no random (`ensureGpOffer`)."""
+        nR = int(self._gp_roster[cls]) if cls < int(self._gp_roster.numel()) else 0
+        need = active & (self.gp_offer[:, cls] == -1)
+        if not bool(need.any()) or nR <= 0:
+            return
+        dev = self.device
+        world_era = self._world_era()
+        uncl = ~self.gp_claimed[:, cls, :nR]
+        p_eras = self._gp_era[cls, :nR].clamp(min=0, max=8)
+        e9 = torch.arange(9, device=dev)
+        era_open = (uncl.unsqueeze(2)
+                    & (p_eras.reshape(1, -1, 1) == e9.reshape(1, 1, 9))).sum(dim=1)
+        e_ok = (e9.reshape(1, 9) >= world_era.unsqueeze(1)) & (era_open > 0)
+        has_pool = e_ok.any(dim=1)
+        e_pick = e_ok.long().argmax(dim=1)
+        pool = uncl & (p_eras.reshape(1, -1) == e_pick.unsqueeze(1))
+        rp = self._next_random(need & has_pool)
+        n_open = pool.sum(dim=1)
+        k = torch.floor(rp * n_open.to(torch.float64)).to(torch.long)
+        cum = pool.long().cumsum(dim=1)
+        sel = pool & (cum == (k + 1).unsqueeze(1))
+        pid = sel.long().argmax(dim=1)
+        dr = (need & has_pool).nonzero(as_tuple=True)[0]
+        self.gp_offer[dr, cls] = pid[dr]
+        self.gp_price[:, cls] = torch.where(
+            need & has_pool, self._gp_cost(cls, pid, world_era), self.gp_price[:, cls])
+        xr = (need & ~has_pool).nonzero(as_tuple=True)[0]
+        self.gp_offer[xr, cls] = -2
+
+    def _grant_free_prophet(self, row: int, sto: torch.Tensor, centre: torch.Tensor) -> None:
+        """CIV6 (Stonehenge): "Grants a free Great Prophet (or a free Apostle
+        if no Prophets are available)" — religion founded or the class spent
+        pays an Apostle; a standing Prophet with no religion pays nothing;
+        otherwise the class's offer is claimed FREE (`grantFreeProphet`)."""
+        if not bool(sto.any()):
+            return
+        cls = self._prophet_cls
+        if cls < 0 or cls >= self._gp_nc:
+            return
+        founded = self.civ_religion_done[:, row]
+        p_ut = int(self._gp_class_unit[cls]) if cls < int(self._gp_class_unit.numel()) else -1
+        if p_ut >= 0:
+            standing = (self.major_unit_alive & (self.major_unit_seat == row)
+                        & (self.major_unit_type == p_ut)).any(dim=1)
+        else:
+            standing = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        self._gp_ensure_offer(sto, cls)
+        none_m = sto & ~founded & standing  # the page's "you will not receive a unit"
+        free = sto & ~founded & ~standing & (self.gp_offer[:, cls] >= 0)
+        self._gp_claim(row, free, cls)
+        apo = sto & ~none_m & ~free
+        if self._apostle_idx >= 0 and bool(apo.any()):
+            self._spawn_unit(row, apo, centre, self._apostle_idx)
+            self._gen_ver += 1
+
+    def _gp_claim(self, row: int, hit: torch.Tensor, cls: int) -> None:
+        """The CLAIM shared by the seat-phase race and patronage (the
+        `recruit` twin): mark the person claimed, retire the offer, pay era
+        score and the dedication, and stand the person up as a UNIT — in the
+        city holding a completed district of its own class (lowest centre
+        tile), the capital otherwise. Nothing is paid out here and no RNG is
+        drawn; the redraw waits for the race loop."""
+        if not bool(hit.any()):
+            return
+        maxN = self._gp_effects.shape[1]
+        at_c = self.gp_offer[:, cls].clamp(min=0)
+        self.gp_earned[:, cls] = self.gp_earned[:, cls] + hit.long()
+        hr = hit.nonzero(as_tuple=True)[0]
+        self.gp_claimed[hr, cls, at_c[hr]] = True
+        self.gp_offer[:, cls] = torch.where(hit, torch.full_like(at_c, -1), self.gp_offer[:, cls])
+        self._add_era_score(row, self._era_pts["gp"], hit.long())  # per GP earned
+        # CIV6 (Sky and Stars): "+1 Era Score each time a Great
+        # Person is Earned."
+        self._dedication_event(row, self._ded_sky, hit)
+        guidx = int(self._gp_class_unit[cls]) if cls < int(self._gp_class_unit.numel()) else -1
+        if guidx < 0:
+            return
+        cap_t = torch.where(self.city_is_cap[:, row] & self.city_alive[:, row],
+                            self.city_center[:, row],
+                            torch.full_like(self.city_center[:, row], -1)).max(dim=1).values
+        d_cls = int(self._gp_class_district[cls]) if cls < self._gp_nc else -1
+        if d_cls >= 0 and self.districts_on:
+            reg_c = self.city_dist_tile[:, row, :, d_cls]
+            comp_c = (reg_c >= 0) & self.district_complete.gather(1, reg_c.clamp(min=0)) & ~self.district_pillaged.gather(1, reg_c.clamp(min=0))
+            _okc = comp_c & self.city_alive[:, row]
+            _cand = torch.where(_okc, self.city_center[:, row],
+                                torch.full_like(self.city_center[:, row], 1 << 30))
+            _at = _cand.min(dim=1).values
+            born_t = torch.where(_at >= (1 << 30), cap_t, _at)
+        else:
+            born_t = cap_t
+        self._spawn_unit(row, hit & (born_t >= 0), born_t, guidx,
+                         charges=self._gp_charges[cls, at_c.clamp(max=maxN - 1)],
+                         gp_at=at_c.clamp(max=maxN - 1))
+        self._gen_ver += 1
 
     def _seat_belief_claims(self, row: int, active: torch.Tensor) -> None:
         """The BELIEF RACES for ONE seat row, at the
@@ -1081,6 +1199,10 @@ class SimPhase:
             has_hs = ((reg_hs >= 0) & self.district_complete.gather(1, reg_hs.clamp(min=0))).any(dim=1)
         else:
             has_hs = torch.zeros(B, dtype=torch.bool, device=dev)
+        # CIV6 (Stonehenge): "Prophets may found a religion on Stonehenge
+        # instead of a Holy Site."
+        if self._wond_n and bool(self._wond_religion_site.any()):
+            has_hs = has_hs | self._seat_wonder_any(row, self._wond_religion_site)
         rdue = active & ~self.civ_religion_done[:, row] & self.civ_pantheon_done[:, row] & (self.civ_prophets[:, row] > 0) & has_hs
         ropen = rdue & (self.claimed_f_n < rr.get("followerPool", 8)) & (self.claimed_o_n < rr.get("founderPool", 8))
         rf_ = self._next_random(ropen)  # follower first, founder second — the TS draw order

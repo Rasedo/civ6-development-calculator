@@ -80,9 +80,10 @@ describe('world congress', () => {
     state.turn = CONGRESS_INTERVAL;
     seatOf(state, 0)!.diplomaticFavor = 50;
     (state.seats[1] as Seat).diplomaticFavor = 90;
+    // the slate is ANNOUNCED state — pin the draw deterministically
+    state.congressSlate = [CONGRESS_UDT, CONGRESS_PATRONAGE];
     worldCongress(state);
     expect(state.congressSessions).toBe(1);
-    // the Medieval-eligible slate is Urban Development Treaty + Patronage
     expect(state.congress!.map((a) => a.res)).toEqual([CONGRESS_UDT, CONGRESS_PATRONAGE]);
     expect(state.congress!.every((a) => a.outcome === 0)).toBe(true);
     // favor is only walked on the DV resolution, which needs Modern
@@ -112,6 +113,7 @@ describe('world congress', () => {
     seatOf(state, 0)!.research.techs.push('RADIO'); // the world era is Modern
     state.turn = CONGRESS_INTERVAL;
     seatOf(state, 0)!.diplomaticPoints = 5; // seat 0 leads
+    state.congressSlate = [CONGRESS_UDT, CONGRESS_PATRONAGE]; // pin the announced draw
     // 65 favor walks 3 extra votes (10+20+30=60, 5 short of the 4th)
     seatOf(state, 0)!.diplomaticFavor = 65;
     // 100 favor walks exactly 4 (10+20+30+40)

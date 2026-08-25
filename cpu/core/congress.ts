@@ -9,6 +9,7 @@
  * falls back to the deterministic self-interest rule below — the AI vote.
  * Both engines only TALLY.
  */
+import { nextRandom } from './rand';
 import type { CongressVote, DistrictId, GameState, GreatPersonClass, Seat } from './types';
 import { PLACEABLE_DISTRICTS } from '../data/districts';
 import { GP_CLASSES } from '../data/greatPeople';
@@ -303,25 +304,39 @@ function runDvResolution(state: GameState, recorded: readonly (CongressVote | nu
   t.diplomaticPoints = (t.diplomaticPoints ?? 0) + (win.outcome === 0 ? CONGRESS_DV_DELTA : -CONGRESS_DV_DELTA);
 }
 
-/** One Regular Session: two era-eligible resolutions off the deterministic
- * rotation, then the Diplomatic Victory resolution from Modern. The standing
- * effects REPLACE the previous session's and hold until the next one. */
+/** One Regular Session: the ANNOUNCED slate (CIV6 — a random draw among
+ * the era-eligible resolutions, drawn at the previous session's close),
+ * then the Diplomatic Victory resolution from Modern. The standing effects
+ * REPLACE the previous session's and hold until the next one. Each draw
+ * advances the stream only where its pool is non-empty, in step with the
+ * GPU `_congress_draw_slate`. */
 export function congressSession(state: GameState, worldEra: number,
                                 recorded: readonly (CongressVote | null)[],
                                 voters: readonly CongressVoterCtx[]): void {
   state.congressSessions = (state.congressSessions ?? 0) + 1;
-  const sess = state.congressSessions;
-  const eligible: number[] = [];
-  for (let i = 0; i < CONGRESS_RESOLUTIONS.length; i++) {
-    if (worldEra >= CONGRESS_RESOLUTIONS[i].minEra && worldEra <= CONGRESS_RESOLUTIONS[i].maxEra) eligible.push(i);
-  }
+  const slate = (state.congressSlate ??= [-1, -1]);
+  const draw = (): void => {
+    const pool: number[] = [];
+    for (let i = 0; i < CONGRESS_RESOLUTIONS.length; i++) {
+      if (worldEra >= CONGRESS_RESOLUTIONS[i].minEra && worldEra <= CONGRESS_RESOLUTIONS[i].maxEra) pool.push(i);
+    }
+    slate[0] = slate[1] = -1;
+    if (pool.length > 0) {
+      const a = Math.floor(nextRandom(state) * pool.length);
+      slate[0] = pool[a];
+      pool.splice(a, 1);
+    }
+    if (pool.length > 0) slate[1] = pool[Math.floor(nextRandom(state) * pool.length)];
+  };
+  // a session whose slate was never announced (the FIRST one, or an
+  // announcement that found nothing eligible) draws its own, now
+  if (slate[0] === -1 && slate[1] === -1) draw();
   state.congress = [];
-  if (eligible.length > 0) {
-    const s0 = eligible[(2 * (sess - 1)) % eligible.length];
-    const s1 = eligible[(2 * (sess - 1) + 1) % eligible.length];
-    (s0 === s1 ? [s0] : [s0, s1]).forEach((res, slot) => runResolution(state, res, slot, recorded, voters));
-  }
+  [slate[0], slate[1]].filter((r) => r >= 0)
+    .forEach((res, slot) => runResolution(state, res, slot, recorded, voters));
   if (worldEra >= CONGRESS_DV_MIN_ERA) runDvResolution(state, recorded);
+  // ANNOUNCE the next session's slate (era-eligibility at announcement)
+  draw();
 }
 
 function congressEffect(state: GameState, res: number): { outcome: number; target: number } | null {

@@ -39,7 +39,10 @@ export type ResearchEffect =
   | { kind: 'farmAdjacency' }
   | { kind: 'hillFarms' }
   | { kind: 'unlockGovernment'; government: string }
-  | { kind: 'unlockPolicy'; policy: string };
+  | { kind: 'unlockPolicy'; policy: string }
+  /** a ONE-OFF paid at completion (Global Warming Mitigation: "Awards 3
+   *  Envoys / Awards 1 Diplomatic Victory point"). */
+  | { kind: 'award'; envoys?: number; dvp?: number };
 
 export interface TechDef {
   id: string;

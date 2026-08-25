@@ -363,6 +363,9 @@ class SimInit:
         self.seat_ally_turns = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
         self.seat_borders_turns = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
         self.congress_sessions = torch.zeros(B, dtype=torch.long, device=device)
+        # the ANNOUNCED slate for the next Regular Session (resolution
+        # indices; -1 = empty slot), drawn at the previous session's close.
+        self.congress_slate = torch.full((B, 2), -1, dtype=torch.long, device=device)
         # Standing World Congress resolutions of the LAST session, 2 slots x
         # (res, outcome 0=A/1=B, target); -1 empty. Replaced every session.
         self.congress_active = torch.full((B, 2, 3), -1, dtype=torch.long, device=device)
@@ -749,9 +752,11 @@ class SimInit:
         # passenger, and the passenger needs a plane of its own.
         self.embarked_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.gp_earned = torch.zeros(B, n_gp, dtype=torch.long, device=device)
-        # the QUEUE POSITION each class offers next, which runs AHEAD of
-        # `gp_earned` whenever the world era steps past an unclaimed person.
-        self.gp_next = torch.zeros(B, n_gp, dtype=torch.long, device=device)
+        # the FROZEN offer per class (`GameState.gpOffer`): a roster index,
+        # -1 = a draw is pending, -2 = exhausted for good; and the price
+        # frozen with it.
+        self.gp_offer = torch.full((B, n_gp), -1, dtype=torch.long, device=device)
+        self.gp_price = torch.zeros(B, n_gp, dtype=torch.float64, device=device)
         self.pantheon_claimed_n = torch.zeros(B, dtype=torch.long, device=device)
         self.claimed_f_n = torch.zeros(B, dtype=torch.long, device=device)
         self.claimed_o_n = torch.zeros(B, dtype=torch.long, device=device)
@@ -910,6 +915,9 @@ class SimInit:
             self._wond_cityhouse = torch.tensor([float(w["cityHousing"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
             self._wond_faithflood = torch.tensor([float(w.get("faithPerFlood", 0)) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
             self._wond_dvp = torch.tensor([int(w["dvp"]) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] DVP paid at completion
+            self._wond_grant_unit = torch.tensor([int(w.get("grantUnit", -1)) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] unit granted FREE at completion
+            self._wond_grant_prophet = torch.tensor([bool(w.get("grantProphet", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)
+            self._wond_religion_site = torch.tensor([bool(w.get("religionSite", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)
             # Policy slots [nW, 4] in SLOT_KINDS order (military, economic,
             # diplomatic, wildcard) — the counts `_gov_policy_mods` adds.
             self._wond_slots = torch.tensor([list(w["slots"]) for w in self._wond_rows], dtype=torch.long, device=device)
@@ -937,6 +945,7 @@ class SimInit:
             self._wond_boost_era = torch.tensor([int(w["boostTechEra"]) for w in self._wond_rows], dtype=torch.long, device=device)
             # Oracle: what each of the holding city's districts adds to its own class.
             self._wond_distgpp = torch.tensor([float(w["distGpp"]) for w in self._wond_rows], dtype=torch.float64, device=device)
+            self._wond_patron = torch.tensor([float(w.get("patronPct", 0)) for w in self._wond_rows], dtype=torch.float64, device=device)
             self._wond_envoy = torch.tensor([int(w["envoysPerWonder"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_spread = torch.tensor([int(w["spreadCharges"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_build_ch = torch.tensor([int(w["buildCharges"]) for w in self._wond_rows], dtype=torch.long, device=device)
@@ -980,6 +989,10 @@ class SimInit:
         self._gp_cost_table = torch.tensor(
             rr.get("gpCostTable", [[60] * 9] * 9), dtype=torch.float64, device=device)
         self._gp_roster = torch.tensor(rr.get("gpRoster", [4, 4, 4, 4, 4]), dtype=torch.long, device=device)
+        # who is CLAIMED, per (class, roster position) — the draw pool's
+        # complement (`GameState.claimedGreatPeople`)
+        self.gp_claimed = torch.zeros(B, n_gp, int(self._gp_roster.max()) if self._gp_roster.numel() else 1,
+                                      dtype=torch.bool, device=device)
         self._gp_flat_cost = torch.tensor(
             rr.get("gpFlatCost", [0] * n_gp), dtype=torch.bool, device=device)
         gp_cd = rr.get("gpClassDistrict", [])
@@ -1026,8 +1039,6 @@ class SimInit:
             rr.get("gpClassUnitIdx", [-1] * n_gp), dtype=torch.long, device=device)
         self._gp_work_class = [bool(x) for x in rr.get("gpWorkClasses", [0] * n_gp)]
         self._gp_any_fx = bool((self._gp_effects != 0).any()) if self._gp_effects.numel() else False
-        self._gp_first_of_era = torch.tensor(
-            rr.get("gpFirstOfEra", [[0] * 9] * n_gp), dtype=torch.long, device=device)
         self._prophet_cls = int(rr.get("prophetCls", 3))  # PROPHET's class index
         self._gp_engineer_cls = int(rr.get("engineerCls", -1))  # the Great ENGINEER's
         self._promo_max_level = int(rr.get("promoMaxLevel", 8))
@@ -1661,6 +1672,7 @@ class SimInit:
         self._b_faith_units = rules.b_faith_units.to(device)  # [NB] bool
         self._b_pill_faith_imp = rules.b_pill_faith_imp.to(device)  # [NB] long
         self._b_pill_faith_dist = rules.b_pill_faith_dist.to(device)  # [NB] long
+        self._b_grant_unit = rules.b_grant_unit.to(device)  # [NB] long
         self._walls_rows = [i for i, t in enumerate(rules.b_walls.tolist()) if int(t) > 0]
         # the ANCIENT tier's pool, which is what a fresh set of Walls is worth
         self._walls_hp = int(self._walls_tier_hp[1])
@@ -2152,6 +2164,7 @@ class SimInit:
         self._driven_buy_nat: dict = {}
         self._driven_buy_cls: dict = {}
         self._driven_buy_ucls: dict = {}
+        self._driven_buy_pat: dict = {}
         self._driven_tech: dict = {}
         self._driven_civic: dict = {}
         self._driven_envoys: dict = {}

@@ -173,7 +173,8 @@ def poke_seat0_spawn(rules, rj, path):
         # fund EXACTLY the offered person; the +1 district accrual keeps the
         # leftover well under the NEXT one, so the claim loop fires once.
         sim.gp_earned[:, cls] = 0
-        sim.gp_next[:, cls] = 0
+        sim.gp_offer[:, cls] = -1
+        sim.gp_claimed[:, cls, :] = False
         _at0 = torch.zeros(sim.B, dtype=torch.long, device=sim.device)
         sim.civ_gpp[0, 0, cls] = float(sim._gp_cost(cls, _at0, sim._world_era())[0])
         before = int((sim.major_unit_alive[0] & (sim.major_unit_type[0] == uidx)).sum())

@@ -459,9 +459,11 @@ def poke_gp_district_accrual(rules, rj, path):
         assert cls is not None, f"no GP class maps to district {dcls}"
         targets.append((cls, dcls))
 
-    # prevent the shared-pool earn/consume from decrementing civ_only_gpp mid-phase
+    # park an unaffordable standing offer so the claim loop never consumes
+    # the accrual this poke measures (and no draw fires)
     for cls, _ in targets:
-        sim.gp_next[:, cls] = int(sim._gp_roster[cls])
+        sim.gp_offer[:, cls] = 0
+        sim.gp_price[:, cls] = 1e18
 
     tiles = free_tiles(sim, len(targets))
     before = {}

@@ -152,9 +152,13 @@ export interface SeatActionRecord {
   tech: number | null;
   civic: number | null;
   units: number[][];
+  /** the ONE gold purchase: [kind, a, b]. Kind 0 building (a=centre,
+   *  b=layout idx), 1 settler, 2 unit, 3 tile (a=tile, b=centre),
+   *  4 Great Person patronage (a=class index). */
   buy?: [number, number, number] | null;
   /** [kind, city CENTRE tile] per faith purchase; kind 12 (a Valletta-class
-   *  building) carries a third slot naming the building's prodLayout index. */
+   *  building) carries a third slot naming the building's prodLayout index;
+   *  kind 15 (patronage) carries the GP class there and no city. */
   buyFaith?: ([number, number] | [number, number, number])[];
   /** The city-state LEVY: the CS index to levy, or null/absent.
    * Gold, but NOT the one-gold-purchase slot — a levy is a diplomacy
@@ -215,6 +219,9 @@ export interface GameState {
   victoryRow?: number;
   roadBridges?: boolean;
   congressSessions?: number;
+  /** the ANNOUNCED slate for the next Regular Session: resolution indices
+   *  drawn at the previous session's close (-1 = empty slot). */
+  congressSlate?: [number, number];
   /** Standing World Congress resolutions from the LAST session (res index
    * into CONGRESS_RESOLUTIONS, winning outcome 0=A/1=B, target index),
    * replaced wholesale each session. */
@@ -259,7 +266,12 @@ export interface GameState {
   claimedGreatPeople: string[];
   /** per GP class, the QUEUE POSITION the next recruit is offered from;
    *  it steps PAST anyone the world era has already left behind. */
-  gpNext?: number[];
+  /** the FROZEN offer per class: a roster index, -1 = a draw is pending,
+   *  -2 = the class is exhausted (no unclaimed person at or past the world
+   *  era — final, the pool only shrinks). */
+  gpOffer?: number[];
+  /** the price FROZEN when the offer was drawn. */
+  gpPrice?: number[];
   unitsMode: boolean;
   units: Unit[];
   nextUnitId: number;

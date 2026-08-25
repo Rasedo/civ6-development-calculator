@@ -16,6 +16,7 @@ import {
   type GpEffect, type GreatPersonDef,
 } from '../data/greatPeople';
 import { wonderGwSlots } from './greatPeople';
+import { SUZERAIN_ENVOYS } from '../data/cityStates';
 import { ERAS, TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { WONDER_ERA_INDEX } from '../data/builtWonders';
@@ -259,6 +260,21 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   }
   // THE SEAT'S OWN LEDGERS.
   if (fx.envoys) owner.envoysAvailable = (owner.envoysAvailable ?? 0) + fx.envoys;
+  // CIV6 (Matthew Perry): "Grants enough Envoys to become Suzerain at this
+  // City-state, then removes all other players' Envoys" — the rivals' bar is
+  // read BEFORE the removal, the clause's own order.
+  if (fx.suzerainSeize) {
+    const csSeat = tileSeat(state.map.tiles[unit.tileIndex]);
+    const cs = (state.cityStates ?? []).find((c) => c.seat === csSeat);
+    if (cs) {
+      const rivalMax = Math.max(
+        0, ...Object.entries(cs.envoys).filter(([s]) => Number(s) !== unit.seat).map(([, n]) => n));
+      cs.envoys[unit.seat] = Math.max(cs.envoys[unit.seat] ?? 0, rivalMax + 1, SUZERAIN_ENVOYS);
+      for (const s of Object.keys(cs.envoys)) {
+        if (Number(s) !== unit.seat) cs.envoys[Number(s)] = 0;
+      }
+    }
+  }
   if (fx.gppAll) for (const c of GP_CLASSES) owner.gpp[c] = (owner.gpp[c] ?? 0) + fx.gppAll;
   if (fx.strategic) grantStockpile(state, unit.seat, fx.strategic.resource, fx.strategic.amount);
 

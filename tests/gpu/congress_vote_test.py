@@ -48,7 +48,11 @@ def build():
 
 
 def session(sim, turn: int) -> None:
-    """Run one Regular Session at `turn`, exactly as the turn tail would."""
+    """Run one Regular Session at `turn`, exactly as the turn tail would.
+    The slate is ANNOUNCED state — pin it deterministically first, so every
+    section reads the same slots whatever the draw did last session."""
+    sim.congress_slate[:, 0] = 0
+    sim.congress_slate[:, 1] = 1 if len(sim._congress_res) > 1 else -1
     sim.turn = turn
     sim._world_congress()
 
@@ -63,7 +67,11 @@ def main() -> None:
     # --- 1) THE SLATE a ballot addresses ------------------------------------
     fires, res0, res1, dv = sim._congress_upcoming(iv)
     assert bool(fires[0]), "a session must fire on an interval turn"
-    assert int(res0[0]) >= 0, "the slate's first slot must name a resolution"
+    assert int(res0[0]) == -1, "no slate stands before the first announcement"
+    sim.congress_slate[:, 0] = 0
+    sim.congress_slate[:, 1] = 1 if NR > 1 else -1
+    fires, res0, res1, dv = sim._congress_upcoming(iv)
+    assert int(res0[0]) == 0, "the announced slate must read back"
     quiet, _, _, _ = sim._congress_upcoming(iv + 1)
     assert not bool(quiet[0]), "no session on an off-interval turn"
     print(f"  the slate at turn {iv}: slots {int(res0[0])}, {int(res1[0])}; dv={bool(dv[0])}")

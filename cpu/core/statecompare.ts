@@ -308,6 +308,7 @@ const GAME: Record<string, Extractor> = {
   victoryType: (s) => [s.victoryType ?? 0],
   victoryRow: (s) => [s.victoryRow ?? -1],
   congressSessions: (s) => [s.congressSessions ?? 0],
+  congressSlate: (s) => [s.congressSlate ?? [-1, -1]],
   congressActive: (s) => [0, 1].flatMap((i) => {
     const a = s.congress?.[i];
     return a ? [a.res, a.outcome, a.target] : [-1, -1, -1];
@@ -332,11 +333,14 @@ const GAME: Record<string, Extractor> = {
   pantheonsClaimed: (s) => [s.claimedPantheons.length],
   beliefsClaimed: (s) => [s.claimedBeliefs.length],
   enhancerBeliefsClaimed: (s) => [(s.claimedEnhancers ?? []).length],
-  greatPeopleByClass: (s) => [
-    GP_CLASSES.map((c) => s.claimedGreatPeople.filter(
-      (id) => GREAT_PEOPLE[c].some((p) => p.id === id)).length),
-    GP_CLASSES.map((_, i) => s.gpNext?.[i] ?? 0),
-  ],
+  greatPeopleByClass: (s) => {
+    const claimed = new Set(s.claimedGreatPeople);
+    return [
+      ...GP_CLASSES.map((c) => GREAT_PEOPLE[c].flatMap((p, at) => (claimed.has(p.id) ? [at] : []))),
+      GP_CLASSES.map((_, i) => s.gpOffer?.[i] ?? -1),
+      GP_CLASSES.map((_, i) => s.gpPrice?.[i] ?? 0),
+    ];
+  },
   barbCamps: (s) => [[...s.barbSeat.camps].sort((a, b) => a - b)],
   cityCount: (s) => [civSeats(s).reduce((n, x) => n + x.cities.length, 0)],
   unitCount: (s) => [s.units.length],

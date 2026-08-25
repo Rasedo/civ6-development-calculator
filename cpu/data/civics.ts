@@ -219,6 +219,9 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     // CIV6 (Global Warming Mitigation): a Future civic that "unlocks the
     // Carbon Recapture project and awards 3 Envoys and 1 Diplomatic Victory
     // point".
-    C('GLOBAL_WARMING_MITIGATION', 'Global Warming Mitigation', 'Future', 3200, ['NEAR_FUTURE_GOVERNANCE']),
+    C('GLOBAL_WARMING_MITIGATION', 'Global Warming Mitigation', 'Future', 3200, ['NEAR_FUTURE_GOVERNANCE'], [
+      // CIV6: "Awards 3 Envoys. Awards 1 Diplomatic Victory point."
+      { kind: 'award', envoys: 3, dvp: 1 },
+    ]),
   ].map((c) => [c.id, c]),
 );

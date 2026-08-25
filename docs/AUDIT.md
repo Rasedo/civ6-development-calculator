@@ -48,18 +48,18 @@ from the list below.
 | B-22r World Congress | 2 | the observation renders the standing slate, four resolutions have no carrier, the culture bomb spares unfinished construction, scored competitions and peace TERMS are absent |
 | B-24r Ages/governors | 1 | governor identity/promotions, dark-age policies, To Arms!'s casus belli, the corps/army kill event, per-civ era drift |
 | B-31r trade-route tails | 1 | the pass-through post gold has no stored path; plunder gold is a stylization; the summed-yield key and one-candidate head are P8-surface |
-| B-53r the great-person queue | 1 | the offer is re-derived rather than frozen, and faith never patronizes anyone |
+| B-53r the great-person PASS | 1 | the standing offer can never be rejected — no per-seat passed flag |
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
 | B-36r appeal adjacency terms | 1 | the CIVILIZATION-unique improvements' terms (C-26) |
 | B-39r wonder effects still dropped | 1 | two residuals, blocked on B-20r's per-work TYPE names |
-| B-45r sourced-sweep finds in the other rows | 1 | five effects need a unit-granting wonder channel, faith patronage (B-53r), a rival-recruit event, or B-31r's route yields |
+| B-45r sourced-sweep finds in the other rows | 1 | the rival-recruit event and B-31r's route yields carry the last two effect families |
 | B-54r flanking and support vs their own page | 1 | the two stacks a UNIQUE UNIT raises wait on C-26 |
 | B-56r the five inert promotions | 1 | five rows name a mechanic neither engine has — sight-blocking, escort formations, an air-roll promotion term, a NAVAL RAIDER class |
 | B-59r a city-state cannot be converted | 1 | minors carry no religion (C-30's family), so the spread scan stops at the majors |
 | B-51r Encampment residuals | 1 | the district's strike is measured from the CITY CENTRE's tile, and a capture leaves its own pool standing (unsourced either way) |
 | B-44r city-state war tails | 1 | a ranged raider never shoots a minor centre (the seat verbs' own ranged-vs-city-state scope-out) |
 | B-65 religious zone of control | 1 | Civ 6 scopes a religious unit's ZOC to other religious units BOTH ways; the engines run one military-only rule |
-| B-61r the Great Person clauses with no carrier | 2 | 18 rows name a mechanic nothing here has; Mary Leakey's tourism clause waits on C-28 |
+| B-61r the Great Person clauses with no carrier | 2 | 16 rows name a mechanic nothing here has (formations x4, tourism x4, regional range x2, CS absorption, diplomatic visibility, barbarian conversion, ocean passage, the queue gold-buyout, Tupac Amaru's per-district undefended grant walk); Mary Leakey's tourism clause waits on C-28 |
 | B-34r flood tails | 1 | the climate/coastal tails wait on systems that do not exist here |
 | B-63r the grievance ledger's magnitudes | 1 | the occupied/razed rows ship at their published CEILING; the gang-up bar is a heuristic |
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
@@ -68,11 +68,10 @@ from the list below.
 | C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, diplomatic visibility, the negotiated two-sided deal, and the agreements that need one |
 | C-5 strategic-resource stockpiles | 2 | the shortage penalty's magnitude is unpublished; resource trading waits on C-2 |
 | C-6 policy-card modifiers | 1 | two of the 49 cards are inert, each blocked on a system below |
-| C-8 draws made deterministic | 2 | the Great Person replacement walks a queue and the Congress slate rotates, where Civ 6 draws both; the seeder places a fixed minor roster |
 | C-16 the spy's second half | 2 | the escape sequence, captured spies, the promotion pool, counterspy levels, the same-mission gate, two carrier-less missions |
 | C-20 the Military Engineer's build list | 1 | the Missile Silo (C-31), Mountain Tunnel (C-35), railroad (C-36), clean-fallout and remove-improvement verbs |
 | C-22 the district roster | 2 | the Canal carries no naval passage (C-35), five Government Plaza buildings have no effect body, the Preserve table is a stylization |
-| C-24 the climate arc | 1 | nothing is ever submerged (C-35), railroads emit nothing (C-36), Mitigation's award has no one-off grant channel |
+| C-24 the climate arc | 1 | nothing is ever submerged (C-35), railroads emit nothing (C-36), the Flood Barrier keeps for nothing |
 | C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — PARKED by owner decision |
 | C-28 tourism accrues to no one in particular | 2 | nothing ACCRUES tourism toward one rival, which the international modifiers and the Rock Band key on |
 | C-29 no RESOLVED suzerain | 1 | a rule that reweights envoys BY the current suzerain has no fixed point |
@@ -83,8 +82,8 @@ from the list below.
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target — the reason a fighter exists — do not exist |
 | C-35 the land/water fact never moves | 2 | one overloaded static bit blocks submersion and the Canal's passage |
 | C-36 no railroad | 2 | no second movement tier, no per-hex Iron/Coal charge, no CO2 |
-| **C. Absent systems** | **36** | |
-| **OPEN, TOTAL** | **60** | |
+| **C. Absent systems** | **34** | |
+| **OPEN, TOTAL** | **58** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -218,16 +217,12 @@ Civ 6 source or is recorded as unverifiable.
   shield. OPEN, each blocked: Apadana's "+2 Great Work slots (any type)"
   and the Hermitage's LANDSCAPE-only art slots, both waiting on the
   per-work TYPE B-20r names.
-- **B-45r. The effects the SOURCED sweep found in the other rows.** Three
+- **B-45r. The effects the SOURCED sweep found in the other rows.** Six
   of eight have channels (`cityYieldPerImprovement`,
-  `boostTechsThroughEra`, `districtGpPoints`; the gate finishes wonders
-  but `wonder_effects_test` sections 13-15 are the proof for these).
-  OPEN — the five with nowhere to live:
-  - Stonehenge's free Prophet and its found-a-religion-on-the-wonder
-    clause, and the Pyramids' free Builder: no wonder effect channel
-    GRANTS A UNIT, and the completion body has nowhere to spawn one from.
-  - The Oracle's 25%-cheaper Great Person patronage: faith never buys a
-    Great Person (B-53r), so there is nothing to discount.
+  `boostTechsThroughEra`, `districtGpPoints`, the completion unit grant
+  `grantUnit` / `_wond_grant_unit`, Stonehenge's free Prophet +
+  `religionSite` founding gate, the Oracle's `patronageFaithPct`).
+  OPEN — the two with nowhere to live:
   - The Great Library's boost when a RIVAL recruits a Great Scientist: no
     engine raises an event on another seat's recruit.
   - The Colossus' and Great Zimbabwe's +1 route capacity and free Trader,
@@ -298,19 +293,15 @@ Civ 6 source or is recorded as unverifiable.
   run one military-only rule: a Missionary is halted at a hostile
   Musketman's ring, and no religious unit exerts anything against
   another.
-- **B-53r. The Great Person QUEUE.** All 205 people ship with the era
-  gate and the scaled price (`gpOffer` / `_gp_first_of_era`, `gpCost`).
-  OPEN:
-  - **THE OFFER IS RE-DERIVED, NOT FROZEN.** Real Civ 6 fixes WHICH
-    person is on offer and WHAT it costs when they enter the queue; here
-    both are computed fresh each turn from the world era. An exact model
-    needs two per-class state fields — frozen index, frozen price — on
-    both engines and on the wire.
-  - **FAITH NEVER PATRONIZES ONE.** CIV6 (Faith): "Faith can be used at
-    all times to purchase Great People via Patronage." The only currency
-    here is the class's own points, so the Oracle's discount (B-45r) has
-    nothing to discount. The queue and price exist; missing is the second
-    purse on the same offer.
+- **B-53r. The Great Person PASS.** All 205 people ship with the era
+  gate, the frozen randomly-drawn offer and its frozen price
+  (`ensureGpOffer` / `_gp_ensure_offer`, `gpCost`), and both patronage
+  purses with the Oracle discount (`patronageCost` /
+  `_seat_patronage_cost`). OPEN:
+  - **NOBODY CAN PASS.** Real Civ 6 lets a player REJECT the standing
+    offer — the class's own points freeze and the passed person stays on
+    offer to everyone else. Needs a per-seat passed flag beside the
+    shared offer, and the rejoin rule when the next person stands.
 - **B-D. UNSOURCED DATA VALUES — swept once; the named stylizations are
   OPEN, not closed.** The cpu/data walk fetched every magnitude from the
   GS Civilopedia row by row (wonders, units, both trees, buildings, all 49
@@ -451,27 +442,6 @@ under their blocker so the dependency is readable, and both halves count.
     you have a Trade Route"; blocked on C-28.
   - `CONTAINMENT` — envoys count double "if its Suzerain has a different
     government than you"; blocked on C-29.
-- **C-8. RANDOM DRAWS THE MODEL MAKES DETERMINISTIC.** Weight 2.
-  - **THE GREAT PERSON REPLACEMENT WALKS A QUEUE.** SOURCED: "the
-    replacement is chosen randomly from those available in the current
-    era, or the next if all those from the current era have been
-    claimed." `gpOffer` / `GP_FIRST_OF_ERA` answer with the first roster
-    position the world era has not passed. The blocker is storage:
-    `gpNext` is a per-class COUNTER, so WHICH people are unclaimed is not
-    a fact either engine holds — a draw needs a per-person claimed set on
-    both engines and in `shared/statecompare.manifest.json`.
-  - **THE CONGRESS SLATE ROTATES BY SESSION** where the real slate is a
-    random draw among era-eligible resolutions — the ORDER of the slate,
-    not its contents.
-  - **WHICH CITY-STATES A GAME GETS.** `seeder/place.ts` carries its own
-    eighteen-name pool (a copy of the cpu catalog's twenty-four, six rows
-    absent from it entirely: Caguana, Hunza, Cardiff, Valletta, Akkad,
-    Armagh) and places three per world by a type draw plus first-unused
-    name. Across the twelve gate seeds eleven names appear, so THIRTEEN
-    of the twenty-four catalog rows — their suzerain rules with them —
-    are placed by no seed; the `islands` world preset raises
-    `cityStateMax` but draws from the same pool. Drawing here would move
-    `genStamp` and re-seed every fixture.
 - **C-16. THE SPY'S SECOND HALF.** Weight 2. The Spy, its capacity, the
   jump, the eleven-mission catalog, the counterspy post and the capture
   roll ship (`spy_test.py`, `spy.test.ts`; gate reach unmeasured — treat
@@ -486,7 +456,8 @@ under their blocker so the dependency is readable, and both halves count.
     (C-2).
   - **THE SPY PROMOTION POOL** — fourteen sourced promotions, three
     offered at random per level; the chassis has no promotion class
-    (C-32) and the random offer is C-8's territory.
+    (C-32), and the random offer needs a shared-stream draw at a fixed
+    position (the `ensureGpOffer` pattern).
   - **LEVELS FROM COUNTER-ESPIONAGE** — a counterspy that catches earns
     nothing here.
   - **"NO TWO SPIES MAY PERFORM THE SAME MISSION IN THE SAME CITY"** —
@@ -549,7 +520,8 @@ under their blocker so the dependency is readable, and both halves count.
   `PROMO_COLS`, a wire change. Waiting on it:
   - **SKY AND STARS' golden half** — "+100% Experience for all Air
     Units" has no tree to accelerate.
-  - **THE SPY PROMOTION POOL** (C-16), whose random offer is also C-8's.
+  - **THE SPY PROMOTION POOL** (C-16), whose random offer needs the
+    same shared-stream draw as its entry describes.
   - **CREEPING ATTACK** needs a raider `CLASS_BIT` as a TARGET (B-56r).
   - The GDR is faithful by exception — it "cannot earn experience or
     Promotions" — so only air, support, raider and spy are the gap.
@@ -600,10 +572,6 @@ under their blocker so the dependency is readable, and both halves count.
   - **THE FLOOD BARRIER KEEPS FOR NOTHING** — its maintenance is
     published only as "Variable"; the row carries 0.
   - **RAILROAD CONSTRUCTION EMITS NOTHING** — C-36.
-  - **GLOBAL WARMING MITIGATION PAYS NOTHING OF ITS OWN** — its award
-    ("3 Envoys and 1 Diplomatic Victory point") has nowhere to land:
-    `ResearchEffect` carries unlock kinds only, so no tech or civic can
-    make a one-off grant.
 - **C-22. THE DISTRICT ROSTER.** Weight 2. All eighteen districts exist
   with catalog-column effects and sourced placement clauses; the Preserve
   and Government Plaza ride the gate on 12/12 seeds, the Canal on none
@@ -628,8 +596,6 @@ under their blocker so the dependency is readable, and both halves count.
     governor TITLE — B-24r's governor promotions.
   - **THE CONSULATE'S "or cities with Encampments" half** — the widening
     clause reads a district count the influence body never asks for.
-  - **THE INTELLIGENCE AGENCY'S "+1 Spy"** is a free UNIT at completion —
-    the same absent shape as B-45r's wonder unit grants.
 - **C-26. NO CIVILIZATION UNIQUES.** Weight 5. A major seat is a name, a
   colour and a city list (`CIV_LEADERS`). Real Civ 6 gives every
   civilization an ability, its leader an ability and an agenda, a unique
@@ -716,7 +682,7 @@ coverage is measured the same way with `CIV6_WORLDS_DIR` set.
   cost three thin rows.
 - POKE-ONLY CLASSES, each named at its entry: the faith-purchase classes
   (no Valletta suzerain, no Theocracy/Grand Master's Chapel in-gate), the
-  Warrior Monk and its tree (AKKAD is placed by no seed — C-8), the
+  Warrior Monk and its tree (whether AKKAD lands is a seeder draw), the
   climate arc (CO2 never leaves zero), the Military Engineer (0/12), the
   space race (Information-era techs), the emergencies' CITY_STATE trigger.
 - THE POLICY CARDS ARE MOSTLY UNREACHED: 16 of 49 ever slot (greedy fill,

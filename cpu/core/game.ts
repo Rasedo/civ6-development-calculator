@@ -133,7 +133,8 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     turn: 1,
     sandbox,
     claimedGreatPeople: [],
-    gpNext: GP_CLASSES.map(() => 0),
+    gpOffer: GP_CLASSES.map(() => -1),
+    gpPrice: GP_CLASSES.map(() => 0),
     unitsMode,
     units: [],
     nextUnitId: 0,
@@ -1614,7 +1615,8 @@ export function deserialize(json: string): GameState {
     );
   }
   state.claimedGreatPeople ??= [];
-  if (!state.gpNext || state.gpNext.length !== GP_CLASSES.length) state.gpNext = GP_CLASSES.map((_, i) => state.gpNext?.[i] ?? 0);
+  if (!state.gpOffer || state.gpOffer.length !== GP_CLASSES.length) state.gpOffer = GP_CLASSES.map((_, i) => state.gpOffer?.[i] ?? -1);
+  if (!state.gpPrice || state.gpPrice.length !== GP_CLASSES.length) state.gpPrice = GP_CLASSES.map((_, i) => state.gpPrice?.[i] ?? 0);
   for (const t of state.map.tiles as (Tile & { wonder?: string | null })[]) {
     t.wonder ??= null;
     t.builtWonder ??= null;
@@ -1732,7 +1734,11 @@ export function canFoundReligion(state: GameState, seat: number): RuleResult {
   const hasHolySite = seatOf(state, seat)!.cities.some((c) =>
     c.districts.some((d) => d.type === 'HOLY_SITE' && state.map.tiles[d.tileIndex].districtComplete),
   );
-  if (!hasHolySite) return { ok: false, reason: 'Needs a completed Holy Site.' };
+  // CIV6 (Stonehenge): "Prophets may found a religion on Stonehenge
+  // instead of a Holy Site."
+  if (!hasHolySite && !seatWonderFlag(state, seat, 'religionSite')) {
+    return { ok: false, reason: 'Needs a completed Holy Site.' };
+  }
   if (!state.sandbox && greatPeopleEarned(state, 'PROPHET') === 0) {
     return { ok: false, reason: 'Needs a Great Prophet (earn Prophet great-person points).' };
   }

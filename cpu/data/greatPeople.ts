@@ -386,25 +386,6 @@ export const GREAT_PEOPLE: Record<GreatPersonClass, GreatPersonDef[]> = {
 };
 export const GP_CLASSES = Object.keys(GP_CLASS_DISTRICT) as GreatPersonClass[];
 
-/**
- * Per class, the QUEUE POSITION of the first person whose era is at least e.
- * CIV6: "When a Great Person is claimed, the replacement is chosen randomly
- * from those available in the current era, or the next if all those from the
- * current era have been claimed" — a person the world has already passed can
- * never be offered again, and a class whose roster ends before the world era
- * offers nobody at all.
- */
-export const GP_FIRST_OF_ERA: Record<GreatPersonClass, readonly number[]> = {
-  SCIENTIST: [0, 0, 4, 7, 11, 14, 17, 21, 24],
-  ENGINEER: [0, 0, 0, 4, 7, 10, 14, 17, 21],
-  MERCHANT: [0, 0, 3, 7, 11, 14, 18, 21, 24],
-  PROPHET: [0, 0, 6, 11, 16, 16, 16, 16, 16],
-  ARTIST: [0, 0, 0, 0, 5, 10, 14, 18, 23],
-  ADMIRAL: [0, 0, 4, 8, 12, 15, 19, 22, 23],
-  GENERAL: [0, 0, 4, 8, 12, 17, 21, 25, 27],
-  WRITER: [0, 0, 5, 9, 14, 19, 25, 27, 29],
-  MUSICIAN: [0, 0, 0, 0, 0, 6, 12, 16, 18],
-};
 
 /**
  * GREAT WORKS. A claimed WRITER, ARTIST or MUSICIAN carries
@@ -868,6 +849,9 @@ export interface GpEffect {
   promotionLevels?: number;
   xpPct?: number;
   envoys?: number;
+  /** CIV6 (Matthew Perry): "Grants enough Envoys to become Suzerain at this
+   *  City-state, then removes all other players' Envoys." */
+  suzerainSeize?: boolean;
   /** production into a WONDER under construction in the activating city,
    *  doubled when that wonder's era is at or below `wonderEraDouble`. */
   wonderProduction?: number;
@@ -910,7 +894,7 @@ export const GP_FX = [
   'perAdjSource', 'perAdjYield', 'perAdjAmount', 'perAdjHere',
   'luxuryCopies', 'luxuryAmenities', 'greatWorkKind', 'gppAll',
   'strategicSlot', 'strategicAmount',
-  'artifactScience', 'airSlotBonus',
+  'artifactScience', 'airSlotBonus', 'suzerainSeize',
 ] as const;
 
 /** what a `perAdjacent` clause counts, in the wire's own order. */
@@ -1027,7 +1011,7 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_ANA_NZINGA: { envoys: 1 },
   GP_AMINA: { envoys: 1 },
   GP_GUSTAVUS_ADOLPHUS: { unit: 'BOMBARD', unitPromotions: 1 },
-  GP_DANDARA: { unmodelled: true },
+  GP_DANDARA: { unit: 'WARRIOR_MONK', unitPromotions: 1 }, // "Grants a Warrior Monk with one promotion level."
   GP_SIMON_BOLIVAR_UNIT: { envoys: 2 },
   GP_JOSE_DE_SAN_MARTIN: { envoys: 2 },
   GP_NAPOLEON_BONAPARTE: { unmodelled: true },
@@ -1059,7 +1043,7 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_CHING_SHIH: { gold: 100, perm: { routePlunderPct: 60 } },
   GP_HORATIO_NELSON: { siteDistrict: 'HARBOR', buildings: ['LIGHTHOUSE', 'SHIPYARD'], perm: { flankPctNaval: 50 } },
   GP_LASKARINA_BOUBOULINA: { promotionLevels: 1, xpPct: 50 },
-  GP_MATTHEW_PERRY: { site: 'cityState', unmodelled: true },
+  GP_MATTHEW_PERRY: { site: 'cityState', suzerainSeize: true },
   GP_FRANZ_VON_HIPPER: { unit: 'BATTLESHIP', unitPromotions: 1 },
   GP_JOAQUIM_MARQUES_LISBOA: { perm: { warWearyPct: 25 } },
   GP_TOGO_HEIHACHIRO: { promotionLevels: 1, xpPct: 75 },

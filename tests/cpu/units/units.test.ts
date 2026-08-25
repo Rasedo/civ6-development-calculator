@@ -136,8 +136,9 @@ describe('builders', () => {
 
     expect(queueUnit(state, city.id, 'BUILDER', 0).ok).toBe(true);
     let guard = 0;
-    while (state.units.length === 0 && guard++ < 40) endTurn(state);
-    const builder = state.units[0];
+    // a barbarian scout can stand up before the Builder trains — pick by type
+    while (!state.units.some((u) => u.type === 'BUILDER' && u.seat === 0) && guard++ < 40) endTurn(state);
+    const builder = state.units.find((u) => u.type === 'BUILDER' && u.seat === 0)!;
     expect(builder).toBeDefined();
 
     // walk to the farm tile, then build

@@ -9,7 +9,7 @@ import { districtAdjacency } from '../../../cpu/core/yields';
 import { governmentSlots } from '../../../cpu/core/effects';
 import { grantCivics, expandBorders } from '../helpers';
 import { GREAT_PEOPLE, GP_ERA_GPP } from '../../../cpu/data/greatPeople';
-import { gpOfferCost } from '../../../cpu/core/greatPeople';
+import { ensureGpOffer, gpOfferCost } from '../../../cpu/core/greatPeople';
 
 function sandboxCity() {
   const state = makeState(makeMap(16, 16));
@@ -143,10 +143,18 @@ describe('great people', () => {
     expect(greatPersonPointsPerTurn(state, 0).SCIENTIST).toBe(2); // district + library
 
     const before = seatOf(state, 0)!.research.techProgress;
+    // the draw is random within the era pool — claim the other era-mates so
+    // it lands the roster's first scientist
+    const e0 = GREAT_PEOPLE.SCIENTIST[0].era;
+    for (const p of GREAT_PEOPLE.SCIENTIST) {
+      if (p.era === e0 && p.id !== GREAT_PEOPLE.SCIENTIST[0].id) state.claimedGreatPeople.push(p.id);
+    }
+    ensureGpOffer(state, 'SCIENTIST'); // the offer is drawn state, not a formula
+    const earned0 = greatPeopleEarned(state, 'SCIENTIST'); // the pre-claims count here too
     const turns = Math.ceil(gpOfferCost(state, 'SCIENTIST') / 2);
     for (let i = 0; i < turns; i++) endTurn(state);
-    expect(greatPeopleEarned(state, 'SCIENTIST')).toBe(1);
-    expect(state.claimedGreatPeople[0]).toBe(GREAT_PEOPLE.SCIENTIST[0].id);
+    expect(greatPeopleEarned(state, 'SCIENTIST')).toBe(earned0 + 1);
+    expect(state.claimedGreatPeople).toContain(GREAT_PEOPLE.SCIENTIST[0].id);
     // +50 science landed somewhere in tech progress (research also ticked normally)
     expect(seatOf(state, 0)!.research.techProgress + 1e-9).toBeGreaterThanOrEqual(before);
   });

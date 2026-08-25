@@ -48,9 +48,9 @@ def main() -> None:
     # the Industrial era, and the Prophets run out after the Renaissance.
     assert min(min(c) for c in rr["gpEra"]) == 1, "no Great Person is Ancient"
     assert rr["gpEra"][4][0] == 3 and rr["gpEra"][8][0] == 4, "Artist/Musician first eras"
-    assert rr["gpFirstOfEra"][3][4] == rr["gpRoster"][3], "Industrial: no more Great Prophets"
-    for c, fe in enumerate(rr["gpFirstOfEra"]):
-        assert fe == sorted(fe) and fe[0] == 0, f"class {c} era index must ascend from 0"
+    assert max(rr["gpEra"][3]) < 4, "Industrial: no more Great Prophets"
+    for c, es in enumerate(rr["gpEra"]):
+        assert es == sorted(es), f"class {c} roster must ascend by era"
     # GP_CLASSES order: SCIENTIST,ENGINEER,MERCHANT,PROPHET,ARTIST,ADMIRAL,
     # GENERAL,WRITER,MUSICIAN. The three culture classes share the Theater
     # Square district index; PROPHET keeps index 3 (prophetCls).
@@ -157,21 +157,30 @@ def main() -> None:
 
     # --- the ERA GATE: a class whose roster the world has passed offers nobody
     _pc = int(rr["prophetCls"])
-    assert int(sim._gp_first_of_era[_pc][4]) == int(sim._gp_roster[_pc]),         "Industrial: no more Great Prophets"
-    sim.gp_next[:, _pc] = 0
+    assert int(sim._gp_era[_pc, : int(sim._gp_roster[_pc])].max()) < 4,         "Industrial: no more Great Prophets"
+    sim.gp_offer[:, _pc] = -1
+    sim.gp_claimed[:, _pc, :] = False
     sim.gp_earned[:, _pc] = 0
     _pro0 = sim.civ_prophets[:, 0].clone()
+    _fa0 = sim.civ_faith[:, 0].clone()
     sim.civ_gpp[:, 0, _pc] = 100_000.0
     for _r in range(sim.n_majors):
         sim.civ_techs[:, _r, :] = True  # push the world era past the roster
         sim.civ_civics[:, _r, :] = True
     sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
-    assert int(sim.gp_earned[0, _pc]) == 0 and int(sim.gp_next[0, _pc]) == 0,         "an exhausted class must claim nobody, however fat the bank"
+    assert int(sim.gp_earned[0, _pc]) == 0 and int(sim.gp_offer[0, _pc]) == -2,         "an exhausted class must claim nobody, however fat the bank"
+    assert float(sim.civ_faith[0, 0] - _fa0[0]) == 100_000.0,         "the dead bank must convert to faith 1:1"
     for _r in range(sim.n_majors):
         sim.civ_techs[:, _r, :] = False
         sim.civ_civics[:, _r, :] = False
     sim.civ_prophets[:, 0] = _pro0
+    sim.civ_faith[:, 0] = _fa0
     sim.civ_gpp[:, 0, _pc] = 0.0
+    # the probe froze every class's offer at the era-8 world — reset the
+    # draw state so the claims below draw from the real pools again
+    sim.gp_offer[:, :] = -1
+    sim.gp_price[:, :] = 0.0
+    sim.gp_claimed[:, :, :] = False
 
     # --- a Writer (class 7) is earnable through the seat-0 advance loop,
     # proving the widened tensors flow end to end. The CLAIM only stands the
@@ -211,6 +220,14 @@ def main() -> None:
         assert float(sim._gp_effects[pc, 0, 4]) == 60.0, "Confucius pays the Classical lump"
         faith0 = sim.civ_faith[:, 0].clone()
         pe0 = sim.gp_earned[:, pc].clone()
+        # the draw is random within the era pool — claim the OTHER Classical
+        # Prophets so it lands Confucius (roster idx 0), leaving the later
+        # eras open so the class does not exhaust (and convert the leftover)
+        sim.gp_offer[:, pc] = -1
+        _nr_p = int(sim._gp_roster[pc])
+        _cls_same = sim._gp_era[pc, :_nr_p] == sim._gp_era[pc, 0]
+        _cls_same[0] = False
+        sim.gp_claimed[:, pc, :_nr_p] |= _cls_same.reshape(1, -1)
         sim.civ_gpp[:, 0, pc] = 100.0  # >= the flat Classical 60, earns one Prophet
         sim._advance_great_people(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device))
         assert bool((sim.gp_earned[:, pc] == pe0 + 1).all()), "Prophet not earned"
@@ -234,9 +251,13 @@ def main() -> None:
     sim.holy_tile[0, 0] = 42  # pressure state to restore
     sim.city_pressure[0, 0, 0, 0] = 5
     sim.city_followed[0, 0, 0] = 0
+    _off7 = int(sim.gp_offer[0, 7])
+    _pr7 = float(sim.gp_price[0, 7])
     snap = sim.snapshot()
     sim.gp_earned[:, 7] = 0
-    sim.gp_next[:, 7] = 0
+    sim.gp_claimed[:, 7, :] = False
+    sim.gp_offer[:, 7] = -1
+    sim.gp_price[:, 7] = 0.0
     sim.civ_faith[:, 0] = -1.0
     sim.enh_claimed[0, 2] = False
     sim.civ_enhancer[0, 1] = -1
@@ -246,7 +267,8 @@ def main() -> None:
     sim.city_followed[0, 0, 0] = -1
     sim.restore(snap)
     assert int(sim.gp_earned[0, 7]) >= 1, "gp_earned not preserved across snapshot"
-    assert int(sim.gp_next[0, 7]) >= 1, "gp_next not preserved across snapshot"
+    assert bool(sim.gp_claimed[0, 7].any()), "gp_claimed not preserved across snapshot"
+    assert int(sim.gp_offer[0, 7]) == _off7 and float(sim.gp_price[0, 7]) == _pr7,         "gp_offer/gp_price not preserved across snapshot"
     assert float(sim.civ_faith[0, 0]) >= 60.0, "faith not preserved across snapshot"
     assert bool(sim.enh_claimed[0, 2]) and int(sim.civ_enhancer[0, 1]) == 2 and int(sim.claimed_e_n[0]) == 1, \
         "enhancer race state not preserved across snapshot"

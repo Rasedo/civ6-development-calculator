@@ -234,6 +234,7 @@ GAME = {
     "victoryType": lambda sim, b, rows: [int(sim.victory_type[b])],
     "victoryRow": lambda sim, b, rows: [int(sim.victory_row[b])],
     "congressSessions": lambda sim, b, rows: [int(sim.congress_sessions[b])],
+    "congressSlate": lambda sim, b, rows: [[int(x) for x in sim.congress_slate[b].tolist()]],
     "congressActive": lambda sim, b, rows: [int(x) for x in sim.congress_active[b].reshape(-1).tolist()],
     "emergencyTable": lambda sim, b, rows: _emg_table(sim, b),
     "lastSessionTurn": lambda sim, b, rows: [int(sim.last_session_turn[b])],
@@ -241,8 +242,12 @@ GAME = {
     "pantheonsClaimed": lambda sim, b, rows: [int(sim.pantheon_claimed_n[b])],
     "beliefsClaimed": lambda sim, b, rows: [int(sim.claimed_f_n[b]) + int(sim.claimed_o_n[b])],
     "enhancerBeliefsClaimed": lambda sim, b, rows: [int(sim.claimed_e_n[b])],
-    "greatPeopleByClass": lambda sim, b, rows: [[int(x) for x in sim.gp_earned[b].tolist()],
-                                                [int(x) for x in sim.gp_next[b].tolist()]],
+    "greatPeopleByClass": lambda sim, b, rows: [
+        *[[int(i) for i in sim.gp_claimed[b, c, : int(sim._gp_roster[c])].nonzero(as_tuple=True)[0].tolist()]
+          for c in range(sim.gp_claimed.shape[1])],
+        [int(x) for x in sim.gp_offer[b].tolist()],
+        [float(x) for x in sim.gp_price[b].tolist()],
+    ],
     "barbCamps": lambda sim, b, rows: [sorted(int(t) for t in sim.camp_tile[b].tolist() if t >= 0)],
     "cityCount": lambda sim, b, rows: [len(_city_rows(sim, b))],
     "unitCount": lambda sim, b, rows: [len(_unit_rows(sim, b))],

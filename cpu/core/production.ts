@@ -17,6 +17,7 @@ import { CULTURE_BOMB_RANGE, DED_FREE_INQUIRY, DED_MONUMENTALITY, ERA_SCORE_WOND
 import { ERAS, TECHS } from '../data/techs';
 import { addEraScore, buildingDedications, dedicationEvent } from './eras';
 import { spawnUnit } from './units';
+import { grantFreeProphet } from './greatPeople';
 import { airTrainTile } from './air';
 import { wallsMax, urbanDefensesFit, fitEncampOuter } from './rules';
 import { trainXpPct } from './combat';
@@ -170,6 +171,10 @@ export function completeQueueItem(
       // itself included — so the count is read AFTER this tile went complete.
       const envoys = completedWonders(state, city).reduce((n, w) => n + (w.def.effects?.envoysPerWonder ?? 0), 0);
       if (envoys) owner.envoysAvailable = (owner.envoysAvailable ?? 0) + envoys;
+      // CIV6 (Pyramids): "Grants a free Builder" — at the completing city.
+      if (fx?.grantUnit) spawnUnit(state, fx.grantUnit, city.centerIndex, city.seat);
+      // CIV6 (Stonehenge): the free Great Prophet, with the Apostle fallback.
+      if (fx?.grantProphet) grantFreeProphet(state, city.seat, city.centerIndex);
       // CIV6 (Oxford, Bolshoi): free technologies and civics, drawn at random
       // in the real game and taken here in the same available-order the
       // research chooser uses.
@@ -221,6 +226,8 @@ export function completeQueueItem(
     case 'building':
       city.buildings.push(item.building);
       buildingDedications(state, city.seat, item.building);
+      // CIV6 (Intelligence Agency): "+1 Spy" — the free unit, here.
+      if (BUILDINGS[item.building]?.grantUnit) spawnUnit(state, BUILDINGS[item.building].grantUnit!, city.centerIndex, city.seat);
       if (BUILDINGS[item.building]?.walls) { city.outerHp = wallsMax(state, city); fitEncampOuter(state, city); }
       // CIV6 (Flood Barrier): built late, "those tiles can be repaired in
       // full and used again, along with anything that's on them".

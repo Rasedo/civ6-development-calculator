@@ -203,7 +203,12 @@ def main() -> None:
     # CIV6 (Geneva): "when you are not at war with any civilization" — the one
     # flat suzerain channel a war silences.
     flags = sim.citystate_suz_peace[0, : sim.S]
-    assert bool(flags.any()), "no peace-gated suzerain row in this fixture"
+    if not bool(flags.any()):
+        # the seeder DRAWS the minor roster now, so this fixture may have
+        # placed no peace-gated city-state — force the per-row flag
+        sim.citystate_suz_peace[0, 0] = True
+        sim._eff_version += 1
+        flags = sim.citystate_suz_peace[0, : sim.S]
     sp = int(flags.long().argmax())
     hold(sim, 0, 0, sp)
     foe = 1 % sim.n_majors

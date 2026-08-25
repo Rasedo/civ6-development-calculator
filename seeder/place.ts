@@ -51,11 +51,11 @@ const CITY_STATE_TYPES = ['scientific', 'cultural', 'trade', 'industrial', 'mili
 // every name here has a catalog row of the same type.
 const CITY_STATE_NAMES: Record<(typeof CITY_STATE_TYPES)[number], string[]> = {
   scientific: ['Geneva', 'Bologna', 'Anshan'],
-  cultural: ['Vilnius', 'Nan Madol', 'Kumasi'],
-  trade: ['Venice', 'Zanzibar', 'Bandar Brunei'],
-  industrial: ['Mexico City', 'Buenos Aires', 'Hong Kong'],
-  militaristic: ['Kabul', 'Ngazargamu', 'Preslav'],
-  religious: ['Jerusalem', 'La Venta', 'Yerevan'],
+  cultural: ['Vilnius', 'Nan Madol', 'Kumasi', 'Caguana'],
+  trade: ['Venice', 'Zanzibar', 'Bandar Brunei', 'Hunza'],
+  industrial: ['Mexico City', 'Buenos Aires', 'Hong Kong', 'Cardiff'],
+  militaristic: ['Kabul', 'Ngazargamu', 'Preslav', 'Valletta', 'Akkad'],
+  religious: ['Jerusalem', 'La Venta', 'Yerevan', 'Armagh'],
 };
 
 function startLegal(t: Tile): boolean {
@@ -128,7 +128,10 @@ export function placeCityStates(map: GameMap, seed: number, nCs: number, civStar
       if (cands.length === 0) continue;
       const tile = cands[randInt(rng, cands.length)];
       const type = CITY_STATE_TYPES[randInt(rng, CITY_STATE_TYPES.length)];
-      const name = CITY_STATE_NAMES[type].find((n) => !used.has(n)) ?? `${CITY_STATE_NAMES[type][0]} ${s}`;
+      // the NAME is a draw among the type's unused rows, so every catalog
+      // city-state — its suzerain rule with it — can appear in some world
+      const open = CITY_STATE_NAMES[type].filter((n) => !used.has(n));
+      const name = open.length > 0 ? open[randInt(rng, open.length)] : `${CITY_STATE_NAMES[type][0]} ${s}`;
       used.add(name);
       placed.push(tile);
       out.push({ name, type, center: tile.index });

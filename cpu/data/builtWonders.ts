@@ -89,6 +89,20 @@ export interface BuiltWonderDef {
     /** CIV6 (Oracle): "Districts in this city provide +2 Great Person points
      *  of their type." */
     districtGpPoints?: number;
+    /** CIV6 (Oracle): "diminishes all Patronage Faith costs by 25%" —
+     *  Faith only, never the Gold price. */
+    patronageFaithPct?: number;
+    /** CIV6 (Pyramids): "Grants a free Builder" — the unit id spawned at
+     *  the completing city, free. */
+    grantUnit?: string;
+    /** CIV6 (Stonehenge): "Grants a free Great Prophet (or a free Apostle
+     *  if no Prophets are available)" — the class offer claimed FREE at
+     *  completion, with the page's Apostle fallback. */
+    grantProphet?: boolean;
+    /** CIV6 (Stonehenge): "Prophets may found a religion on Stonehenge
+     *  instead of a Holy Site" — widens the founding gate; the Holy City
+     *  stays the capital-centre convention either way. */
+    religionSite?: boolean;
     cityYieldMult?: Partial<Yields>;
     /** Policy slots the wonder appends to its owner's government. */
     extraSlots?: Partial<Record<SlotKind, number>>;
@@ -148,7 +162,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       requiresTech: 'ASTROLOGY',
       placement: { flatOnly: true, adjacentResource: 'STONE' },
       cityYields: { faith: 2 },
-      description: '+2 faith. Flat land adjacent to Stone.',
+      effects: { grantProphet: true, religionSite: true },
+      description: '+2 faith, a free Great Prophet, and a religion may be founded here instead of at a Holy Site. Flat land adjacent to Stone.',
     }),
     W({
       id: 'PYRAMIDS',
@@ -158,8 +173,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       requiresTech: 'MASONRY',
       placement: { terrains: ['DESERT'], flatOnly: true, allowFloodplains: true },
       cityYields: { culture: 2 },
-      effects: { buildCharges: 1 },
-      description: '+2 culture; every Builder trained carries an extra build charge. Desert (floodplains allowed).',
+      effects: { buildCharges: 1, grantUnit: 'BUILDER' },
+      description: '+2 culture, a free Builder; every Builder trained carries an extra build charge. Desert (floodplains allowed).',
     }),
     W({
       id: 'HANGING_GARDENS',
@@ -179,8 +194,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       requiresCivic: 'MYSTICISM',
       placement: { hillsOnly: true },
       cityYields: { culture: 1, faith: 1 },
-      effects: { districtGpPoints: 2 },
-      description: '+1 culture, +1 faith, districts in this city give +2 Great Person points of their type. Hills.',
+      effects: { districtGpPoints: 2, patronageFaithPct: 25 },
+      description: '+1 culture, +1 faith, districts in this city give +2 Great Person points of their type, Patronage faith costs -25%. Hills.',
     }),
     W({
       id: 'GREAT_LIBRARY',

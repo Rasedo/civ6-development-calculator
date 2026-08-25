@@ -5,6 +5,8 @@ import { foundCity } from '../../../cpu/core/game';
 import { initFog } from '../../../cpu/core/fog';
 import { seatPhase } from '../../../cpu/core/phase';
 import { envoysOf, isSuzerain, setMet } from '../../../cpu/core/cityStates';
+import { ensureGpOffer } from '../../../cpu/core/greatPeople';
+import { GP_CLASSES } from '../../../cpu/data/greatPeople';
 import { hexDistance, tilesWithin } from '../../../world/hex';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, QUEST_ENVOYS, QUEST_COOLDOWN, CITY_STATE_TYPE_DISTRICT } from '../../../cpu/data/cityStates';
 import type { CityState, CityStateType, GameState, Seat, City } from '../../../cpu/core/types';
@@ -202,6 +204,9 @@ describe('civ quests (deterministic, zero-draw)', () => {
 
   it('issues buildDistrict when no camp is near and the district is unbuilt (zero-draw)', () => {
     const { state, civ, cityState } = scenario('scientific');
+    // the seat phase DRAWS the Great Person offers on its first pass — drain
+    // them so the zero-draw pin below reads only the quest path
+    for (const c of GP_CLASSES) ensureGpOffer(state, c);
     const rng0 = state.rngState;
     seatPhase(state);
     expect(cityState.seatQuest?.[civ.seat]?.kind).toBe('buildDistrict');
@@ -216,6 +221,9 @@ describe('civ quests (deterministic, zero-draw)', () => {
     const far = near[near.length - 1].index;
     const close = near[0].index;
     state.barbSeat.camps = [far, close]; // out of array order — nearest must still win
+    // the seat phase DRAWS the Great Person offers on its first pass — drain
+    // them so the zero-draw pin below reads only the quest path
+    for (const c of GP_CLASSES) ensureGpOffer(state, c);
     const rng0 = state.rngState;
     seatPhase(state);
     const q = cityState.seatQuest?.[civ.seat];
@@ -236,6 +244,9 @@ describe('civ quests (deterministic, zero-draw)', () => {
     cityState.seatQuestIssuedTurn[civ.seat] = state.turn;
     state.barbSeat.camps = []; // camp 999 gone
     const env0 = envoysOf(cityState, civ.seat);
+    // the seat phase DRAWS the Great Person offers on its first pass — drain
+    // them so the zero-draw pin below reads only the quest path
+    for (const c of GP_CLASSES) ensureGpOffer(state, c);
     const rng0 = state.rngState;
     seatPhase(state);
     expect(cityState.seatQuest?.[civ.seat]).toBeNull();
@@ -282,6 +293,9 @@ describe('SEAT-0 quest draw-count neutrality', () => {
     cs2.envoys = {  };
     cs2.envoys[civ.seat] = 3;
     state.barbSeat.camps = [];
+    // the seat phase DRAWS the Great Person offers on its first pass — drain
+    // them so the zero-draw pin below reads only the quest path
+    for (const c of GP_CLASSES) ensureGpOffer(state, c);
     const rng0 = state.rngState;
     seatPhase(state);
     // both a resolve and an issue happened, drawing nothing
@@ -300,6 +314,9 @@ describe('SEAT-0 quest draw-count neutrality', () => {
     const cityState = addCs(state, 16, 10, { type: 'scientific', met: [0] });
     cityState.seatQuestIssuedTurn = [state.turn - QUEST_COOLDOWN]; // due to issue
     state.barbSeat.camps = [];
+    // the seat phase DRAWS the Great Person offers on its first pass — drain
+    // them so the zero-draw pin below reads only the quest path
+    for (const c of GP_CLASSES) ensureGpOffer(state, c);
     const rng0 = state.rngState;
     seatPhase(state);
     expect(cityState.seatQuest?.[0]).not.toBeNull();

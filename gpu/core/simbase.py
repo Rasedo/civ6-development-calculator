@@ -165,6 +165,7 @@ class Rules:
     b_faith_units: torch.Tensor  # bool [NB] — grants the seat the faith LAND-UNIT purchase (Grand Master's Chapel)
     b_pill_faith_imp: torch.Tensor  # long [NB] — the Chapel's flat faith per pillaged improvement
     b_pill_faith_dist: torch.Tensor  # long [NB] — ...and per pillaged district
+    b_grant_unit: torch.Tensor  # long [NB] — unit granted FREE at completion (Intelligence Agency's Spy); -1 none
     #: THE PROMOTION CATALOG, per class and in COLUMN order (the PROMOTE head's
     #: layout). `promo_req[c, k]` is the bitmask of columns that open row k of
     #: class c; `promo_kind/v/mask[c, k, s]` are its effect slots.
@@ -188,6 +189,10 @@ class Rules:
     worship_faith_cost: float  # flat worship faith price (round(190·GAME_SPEED))
     shrine_bidx: int  # SHRINE row (the missionary buy's gate), -1 if absent
     t_cost: torch.Tensor  # [NT]
+    t_award_env: torch.Tensor  # long [NT] — envoys paid ONCE at completion
+    t_award_dvp: torch.Tensor  # long [NT] — Diplomatic Victory points, same
+    c_award_env: torch.Tensor  # long [NC] — the civic twins (Global Warming Mitigation)
+    c_award_dvp: torch.Tensor  # long [NC]
     t_prereqs: list  # list of lists
     c_cost: torch.Tensor
     c_prereqs: list
@@ -324,6 +329,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_faith_units=torch.tensor([bool(b.get("faithBuyUnits", 0)) for b in B], dtype=torch.bool),
         b_pill_faith_imp=torch.tensor([int(b.get("pillageFaithImp", 0)) for b in B], dtype=torch.long),
         b_pill_faith_dist=torch.tensor([int(b.get("pillageFaithDist", 0)) for b in B], dtype=torch.long),
+        b_grant_unit=torch.tensor([int(b.get("grantUnit", -1)) for b in B], dtype=torch.long),
         b_era=torch.tensor([int(b.get("eraIdx", 0)) for b in B], dtype=torch.long),
         promo_classes=list(_P.get("classes", [])),
         promo_kinds=list(_P.get("kinds", [])),
@@ -345,6 +351,10 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         worship_faith_cost=float(r.get("worshipFaithCost", 114)),
         shrine_bidx=int(r.get("shrineBidx", -1)),
         t_cost=torch.tensor([t["cost"] for t in r["techs"]], dtype=torch.float64),
+        t_award_env=torch.tensor([int(t.get("awardEnvoys", 0)) for t in r["techs"]], dtype=torch.long),
+        t_award_dvp=torch.tensor([int(t.get("awardDvp", 0)) for t in r["techs"]], dtype=torch.long),
+        c_award_env=torch.tensor([int(c.get("awardEnvoys", 0)) for c in r["civics"]], dtype=torch.long),
+        c_award_dvp=torch.tensor([int(c.get("awardDvp", 0)) for c in r["civics"]], dtype=torch.long),
         t_prereqs=[t["prereqs"] for t in r["techs"]],
         c_cost=torch.tensor([c["cost"] for c in r["civics"]], dtype=torch.float64),
         c_prereqs=[c["prereqs"] for c in r["civics"]],
@@ -638,7 +648,7 @@ _MUTABLE = [
     # only here (`citystate_at` is a view of it), so it must round-trip.
     "tile_seat", "tile_city",
     "citystate_last_levy",
-    "seat_warkind", "seat_denounced", "seat_friend_turns", "seat_ally_turns", "seat_borders_turns", "congress_sessions", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank",
+    "seat_warkind", "seat_denounced", "seat_friend_turns", "seat_ally_turns", "seat_borders_turns", "congress_sessions", "congress_slate", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank",
     "city_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dseat", "seat_route_dcity",  # international dest (seat row, city id), else -1/-1 (domestic/CS)
@@ -646,7 +656,7 @@ _MUTABLE = [
     "trading_post",  # Trading Posts by (major row, centre tile)
     "city_id",
     "unit_next",
-    "gp_earned", "gp_next", "civ_gp_used", "civ_gp_perm", "civ_gp_lux", "civ_gp_lux_n", "city_gp_perm", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
+    "gp_earned", "gp_offer", "gp_price", "gp_claimed", "civ_gp_used", "civ_gp_perm", "civ_gp_lux", "civ_gp_lux_n", "city_gp_perm", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
     "pan_claimed", "fol_claimed", "fou_claimed",  # belief-claim masks
     "enh_claimed",  # enhancer-claim mask
     "holy_tile", "city_pressure", "city_followed",  # ONE seat-indexed pressure+followed plane pair

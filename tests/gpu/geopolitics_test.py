@@ -844,6 +844,10 @@ def main() -> None:
     assert _era_ok is not None, "no tech reaches the Medieval era — check the era table"
     if s6.n_majors > 1:
         s6.civ_diplo_favor[:, 1] = 90
+    # the slate is ANNOUNCED a session ahead (a first session draws its own,
+    # at random) — hand this one its announcement so the order is pinned
+    s6.congress_slate[0, 0] = 0
+    s6.congress_slate[0, 1] = 1
     s6._world_congress()
     assert int(s6.congress_sessions[0]) == 1, "the session must convene"
     # pre-Modern there is no DV resolution, so the favor curve never walks
@@ -867,15 +871,17 @@ def main() -> None:
     assert _era_ind is not None, "no tech lands exactly on the Industrial era"
     s7.turn = s7._congress_interval
     s7.congress_sessions[:] = 1  # pretend session 1 already ran
-    s7._world_congress()
-    # the rotation is a WINDOW over the era-eligible rows, so the expectation
-    # is computed from the catalog rather than pinned to catalog positions
+    # session 2 convenes on the slate ANNOUNCED at session 1's close — hand it
+    # the announcement, computed from the catalog rather than pinned positions
     _elig = [i for i, r in enumerate(s7._congress_res) if r["min"] <= 4 <= r["max"]]
-    assert len(_elig) >= 4, "the Industrial window wants at least four eligible rows"
+    assert len(_elig) >= 4, "the Industrial pool wants at least four eligible rows"
+    s7.congress_slate[0, 0] = _elig[2]
+    s7.congress_slate[0, 1] = _elig[3]
+    s7._world_congress()
     assert s7.congress_active[0, :, 0].tolist() == [_elig[2], _elig[3]], (
-        f"session 2 must start its window at rank 2, got {s7.congress_active[0, :, 0].tolist()}"
+        f"the announced slate must convene as announced, got {s7.congress_active[0, :, 0].tolist()}"
     )
-    assert s7._congress_res[_elig[2]]["id"] == "MIGRATION_TREATY", "rank 2 at Industrial is Migration"
+    assert s7._congress_res[_elig[2]]["id"] == "MIGRATION_TREATY", "the announced pair lands on Migration"
     # Migration's scripted vote is A-on-self; ties keep the LOWER seat
     assert s7.congress_active[0, 0, 1].tolist() == 0 and s7.congress_active[0, 0, 2].tolist() == 0
 
@@ -936,7 +942,7 @@ def main() -> None:
         s9.civ_diplo_points[:, 0].zero_()
         s9.civ_diplo_points[:, 1] = s9._dvp_win
         assert int(s9._diplomatic_victor()[0]) == 1, "a civ wins at the threshold"
-    print("world congress OK — schedule, slate rotation, combo DVP, DV curve+refunds, effect readers, UDT ban, victory")
+    print("world congress OK — schedule, announced slate, combo DVP, DV curve+refunds, effect readers, UDT ban, victory")
 
 
 

@@ -1,6 +1,6 @@
 
 import type { City, CongressVote, DistrictId, Emergency, GameState, ImprovementId, SeatActionRecord, Seat, Tile, TradeRoute, Unit } from './types';
-import { advanceGreatPeople, wonderGwSlots } from './greatPeople';
+import { advanceGreatPeople, patronizeGreatPerson, wonderGwSlots } from './greatPeople';
 import { activateGreatPerson } from './gpAbility';
 import { drainRelicReserve, gwCapacity, gwCount, gwGive, gwTake, GW_KINDS, RELIC_WONDER_SLOTS } from '../data/greatPeople';
 import { completeQueueItem } from './production';
@@ -1621,6 +1621,11 @@ export function seatPhase(state: GameState): void {
         const rc3 = actor.cities.find((c) => c.centerIndex === bv3[2]);
         if (rc3) bought = buyTile(state, rc3.id, bv3[1], actor.seat).ok;
       }
+      // kind 4 — GOLD patronage of a class's standing Great Person offer;
+      // the class rides the second slot.
+      if (bv3 && bv3[0] === 4 && !bought) {
+        bought = patronizeGreatPerson(state, actor.seat, bv3[1], 'gold').ok;
+      }
     }
 
     // kinds 4-6, the FAITH purchases — faith is its own currency, so
@@ -1637,8 +1642,15 @@ export function seatPhase(state: GameState): void {
       let boughtNaturalist = false;
       let boughtClass = false;
       let boughtLandUnit = false;
+      let boughtPatron = false;
       for (const ent of rec?.buyFaith ?? []) {
         const [fk, centre] = ent;
+        if (fk === 15) {
+          // kind 15 — FAITH patronage; no city involved, the class rides
+          // the third slot.
+          if (!boughtPatron) boughtPatron = patronizeGreatPerson(state, actor.seat, ent[2] ?? -1, 'faith').ok;
+          continue;
+        }
         const civCityF = actor.cities.find((c) => c.centerIndex === centre);
         if (!civCityF) continue;
         if (fk === 4) buyWorshipBuilding(state, civCityF.id, actor.seat);
@@ -2036,6 +2048,14 @@ export function seatPhase(state: GameState): void {
     while (rsr.tech && rsr.techProgress >= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech)) {
       rsr.techProgress -= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech);
       if (rsr.tech === URBAN_DEFENSES_TECH) urbanDefensesFit(state, actor.seat);
+      for (const fx of TECHS[rsr.tech].effects) {
+        // CIV6 (Global Warming Mitigation): "Awards 3 Envoys / Awards 1
+        // Diplomatic Victory point" — once, at completion.
+        if (fx.kind === 'award') {
+          if (fx.envoys) actor.envoysAvailable = (actor.envoysAvailable ?? 0) + fx.envoys;
+          if (fx.dvp) actor.diplomaticPoints = (actor.diplomaticPoints ?? 0) + fx.dvp;
+        }
+      }
       rsr.techs.push(rsr.tech);
       delete rsr.techRetained[rsr.tech];
       rsr.tech = null;
@@ -2068,6 +2088,14 @@ export function seatPhase(state: GameState): void {
     }
     while (rsr.civic && rsr.civicProgress >= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic)) {
       rsr.civicProgress -= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic);
+      for (const fx of CIVICS[rsr.civic].effects) {
+        // CIV6 (Global Warming Mitigation): "Awards 3 Envoys / Awards 1
+        // Diplomatic Victory point" — once, at completion.
+        if (fx.kind === 'award') {
+          if (fx.envoys) actor.envoysAvailable = (actor.envoysAvailable ?? 0) + fx.envoys;
+          if (fx.dvp) actor.diplomaticPoints = (actor.diplomaticPoints ?? 0) + fx.dvp;
+        }
+      }
       rsr.civics.push(rsr.civic);
       delete rsr.civicRetained[rsr.civic];
       rsr.civic = null;

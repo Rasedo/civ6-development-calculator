@@ -252,6 +252,28 @@ class SimGp:
 
         # ---- the seat's own ledgers
         self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] + col("envoys").to(self.civ_envoys_avail.dtype)
+        # CIV6 (Matthew Perry): "Grants enough Envoys to become Suzerain at
+        # this City-state, then removes all other players' Envoys" — the
+        # rivals' bar is read BEFORE the removal, the clause's own order.
+        _sz = col("suzerainSeize") != 0
+        if bool(_sz.any()):
+            _cst = self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1) - 100
+            _S = self.seat_citystate_envoys.shape[2]
+            _ok = _sz & (_cst >= 0) & (_cst < _S)
+            if bool(_ok.any()):
+                _r = _ok.nonzero(as_tuple=True)[0]
+                _cs2 = _cst[_r]
+                _env = self.seat_citystate_envoys
+                _suzmin = int(self.rules.citystate.get("suzerainEnvoys", 3))
+                _rmax = torch.zeros_like(_cs2)
+                for _o in range(self.n_majors):
+                    if _o != row:
+                        _rmax = torch.maximum(_rmax, _env[_r, _o, _cs2])
+                _env[_r, row, _cs2] = torch.maximum(
+                    _env[_r, row, _cs2], torch.maximum(_rmax + 1, torch.full_like(_rmax, _suzmin)))
+                for _o in range(self.n_majors):
+                    if _o != row:
+                        _env[_r, _o, _cs2] = 0
         _gpp = col("gppAll")
         if bool((_gpp != 0).any()):
             self.civ_gpp[:, row] = self.civ_gpp[:, row] + _gpp.unsqueeze(1)

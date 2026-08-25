@@ -93,6 +93,17 @@
           ]
         },
         {
+          "name": "congressSlate",
+          "compare": "exact",
+          "covers": [
+            "GameState.congressSlate"
+          ],
+          "planes": [
+            "congress_slate"
+          ],
+          "note": "the ANNOUNCED slate for the next Regular Session — resolution indices drawn at the previous session's close, -1 for an empty slot."
+        },
+        {
           "name": "congressActive",
           "compare": "exact",
           "covers": [
@@ -180,13 +191,16 @@
           "compare": "exact",
           "covers": [
             "GameState.claimedGreatPeople",
-            "GameState.gpNext"
+            "GameState.gpOffer",
+            "GameState.gpPrice"
           ],
           "planes": [
-            "gp_earned",
-            "gp_next"
+            "gp_claimed",
+            "gp_offer",
+            "gp_price",
+            "gp_earned"
           ],
-          "note": "great people are drawn from ONE global pool on both engines, so the per-class QUEUE POSITION is a game-level fact, not a per-seat one. It is the position and not the count because the queue steps past anyone the world era has left behind; `claimedGreatPeople` is the id list that position walks."
+          "note": "great people are drawn from ONE global pool on both engines: the CLAIMED set per class (roster indices), the FROZEN offer (-1 pending, -2 exhausted) and its frozen price. `gp_earned` stays a per-class recruit count off this set."
         },
         {
           "name": "barbCamps",

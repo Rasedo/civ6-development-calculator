@@ -181,6 +181,7 @@ class SimSeats:
         nat: tuple | None = None,   # kind 10: (kind [B], slot [B]) — the NATURALIST, bought with faith alone
         cls: tuple | None = None,   # kind 12: (slot [B], building [B]) — Valletta's faith-bought class building
         ucls: tuple | None = None,  # kind 13: (slot [B], unit [B]) — the land combat unit faith buys
+        pat: torch.Tensor | None = None,  # kind 15: [B] class of the FAITH patronage claim (-1 = none)
         route: tuple | None = None,  # the route verb: (origin CENTRE [B], dest code [B]) — a CENTRE tile or -(2+csIndex); -1 = none
         spec: torch.Tensor | None = None,  # [B, RC, nD] citizens PINNED per district; -1 = automatic, SPEC_KEEP = unchanged
         lock: torch.Tensor | None = None,  # [B, L] plots whose citizen pin this seat FLIPS this turn; -1 = padding
@@ -211,7 +212,7 @@ class SimSeats:
         `pick_district_tile` is the body that chooses."""
         self._stash_record(row, tech=tech, civic=civic, envoys=envoys, war=war,
                            production=production, pref=production_pref, dtile=production_tile)
-        self._stash_buy(row, buy=buy, worship=worship, relig=relig, levy=levy, monu=monu, nat=nat, cls=cls, ucls=ucls)
+        self._stash_buy(row, buy=buy, worship=worship, relig=relig, levy=levy, monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat)
         if route is not None:
             self._driven_route[row] = route
         if spec is not None or lock is not None:
@@ -523,7 +524,7 @@ class SimSeats:
                     self.tile_locked[rows, tc[rows]] = ~self.tile_locked[rows, tc[rows]]
                     self._eff_version += 1
 
-    def _stash_buy(self, row: int, buy=None, worship=None, relig=None, levy=None, monu=None, nat=None, cls=None, ucls=None) -> None:
+    def _stash_buy(self, row: int, buy=None, worship=None, relig=None, levy=None, monu=None, nat=None, cls=None, ucls=None, pat=None) -> None:
         if buy is not None:
             self._driven_buy[row] = buy
         if worship is not None:
@@ -540,6 +541,8 @@ class SimSeats:
             self._driven_buy_cls[row] = cls
         if ucls is not None:
             self._driven_buy_ucls[row] = ucls
+        if pat is not None:
+            self._driven_buy_pat[row] = pat
 
     def _seat_buy_candidates(self, row: int, active: torch.Tensor):
         """The gold-purchase BUILDING candidate for seat row `row` — ONE
@@ -996,6 +999,69 @@ class SimSeats:
             (alive_row & (self.city_current[:, row] == self.SETTLER)).sum(dim=1),
         )
 
+    def _seat_patronage_cost(self, row: int):
+        """([B, nC] faith, [B, nC] gold) — the patronage price of each class's
+        standing offer. CIV6 (Great People page): Faith "150 + 10 per missing
+        point", Gold "200 + 15 per missing point", "fractional costs are
+        always rounded down"; (Oracle): "diminishes all Patronage Faith costs
+        by 25%" — Faith only (`patronageCost`)."""
+        d = (self.gp_price - self.civ_gpp[:, row, :].double()).clamp(min=0)
+        pct = (self._seat_wonder_sum(row, self._wond_patron) if self._wond_n
+               else torch.zeros(self.B, dtype=torch.float64, device=self.device))
+        fcost = torch.floor((150.0 + 10.0 * d) * (1.0 - pct / 100.0).unsqueeze(1))
+        gcost = torch.floor(200.0 + 15.0 * d)
+        return fcost, gcost
+
+    def _seat_patronage_candidates(self, row: int, active: torch.Tensor):
+        """(pf_ok, pf_cls, pg_ok, pg_cls) — the DRIVER's patronage pick per
+        purse: the affordable class CLOSEST to its claim (fewest missing
+        points, ties to the lower class). A policy choice; the applier
+        re-validates everything."""
+        neg = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        no = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        if self._gp_nc == 0:
+            return no, neg, no.clone(), neg.clone()
+        fcost, gcost = self._seat_patronage_cost(row)
+        stand = self.gp_offer >= 0  # [B, nC]
+        d = (self.gp_price - self.civ_gpp[:, row, :].double()).clamp(min=0)
+        aff_f = stand & self._afford(self.civ_faith[:, row].unsqueeze(1), fcost) & active.unsqueeze(1)
+        aff_g = stand & self._afford(self.civ_treasury[:, row].unsqueeze(1), gcost) & active.unsqueeze(1)
+        inf = torch.tensor(float("inf"), dtype=torch.float64, device=self.device)
+        kf = torch.where(aff_f, d, inf)
+        kg = torch.where(aff_g, d, inf)
+        pf_cls = kf.argmin(dim=1)
+        pg_cls = kg.argmin(dim=1)
+        pf_ok = torch.isfinite(kf.gather(1, pf_cls.unsqueeze(1)).squeeze(1))
+        pg_ok = torch.isfinite(kg.gather(1, pg_cls.unsqueeze(1)).squeeze(1))
+        return pf_ok, torch.where(pf_ok, pf_cls, neg), pg_ok, torch.where(pg_ok, pg_cls, neg.clone())
+
+    def _patronize(self, row: int, want: torch.Tensor, cls_t: torch.Tensor, gold: bool) -> torch.Tensor:
+        """PATRONAGE: buy the class's STANDING offer outright. The price is
+        `_seat_patronage_cost`'s; the accumulated points are consumed by the
+        claim; the redraw waits for the race loop. Returns who bought
+        (`patronizeGreatPerson`)."""
+        done = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        if self._gp_nc == 0:
+            return done
+        fcost, gcost = self._seat_patronage_cost(row)
+        for c in sorted(set(int(x) for x in cls_t[want].tolist())):
+            if c < 0 or c >= self._gp_nc:
+                continue
+            sel = want & (cls_t == c) & (self.gp_offer[:, c] >= 0)
+            price = gcost[:, c] if gold else fcost[:, c]
+            purse = self.civ_treasury[:, row] if gold else self.civ_faith[:, row]
+            ok = sel & self._afford(purse, price)
+            if not bool(ok.any()):
+                continue
+            if gold:
+                self.civ_treasury[:, row] = torch.where(ok, self.civ_treasury[:, row] - price, self.civ_treasury[:, row])
+            else:
+                self.civ_faith[:, row] = torch.where(ok, self.civ_faith[:, row] - price, self.civ_faith[:, row])
+            self.civ_gpp[:, row, c] = torch.where(ok, torch.zeros_like(self.civ_gpp[:, row, c]), self.civ_gpp[:, row, c])
+            self._gp_claim(row, ok, c)
+            done = done | ok
+        return done
+
     def _seat_buy_ladder(self, row: int, active: torch.Tensor, army0: torch.Tensor) -> None:
         """THE gold/faith spending block for seat row `row`, at the seatPhase
         position (after the production picks, before the trade block) — ONE
@@ -1079,6 +1145,11 @@ class SimSeats:
                     for _ui, _sl, _c in self._res_slot_units:
                         self._charge_unit_resource(row, landed_u & (pick_ty == _ui), _ui)
                     bought = bought | landed_u
+            # kind 4 — GOLD patronage of a class's standing Great Person
+            # offer; the class rides `a` (`jjw`).
+            want_p = active & ext & ~bought & (kind == 4) & (jjw >= 0)
+            if bool(want_p.any()):
+                bought = bought | self._patronize(row, want_p, jjw, gold=True)
         if row in self._driven_buy_worship:
             wj = self._driven_buy_worship.pop(row)
             wb = self._worship_bidx_of(row)
@@ -1216,6 +1287,12 @@ class SimSeats:
                 self.civ_faith[:, row] = torch.where(landed_u, self.civ_faith[:, row] - price_u, self.civ_faith[:, row])
                 for _ui, _sl, _c in self._res_slot_units:
                     self._charge_unit_resource(row, landed_u & (bu == _ui), _ui)
+        if row in self._driven_buy_pat:
+            pcls = self._driven_buy_pat.pop(row)
+            # kind 15 — FAITH patronage; the class rides the wire's third slot.
+            want_pf = active & ext & (pcls >= 0)
+            if bool(want_pf.any()):
+                self._patronize(row, want_pf, pcls, gold=False)
 
         if kind is not None:
             want_t = (kind == 3) & active & ext & ~bought & (bbw >= 0) & (jjw >= 0)
@@ -2506,9 +2583,9 @@ class SimSeats:
         the turn ahead and `_world_congress` inside it read one body. Pure:
         `congress_sessions` is not touched here.
 
-        The slate keys on the MAX era across majors (the wiki's "topics
-        relevant for the current world") and rotates deterministically by
-        session; a one-eligible slate runs its resolution once."""
+        The slate is the ANNOUNCED one (the wiki's "topics relevant for
+        the current world", drawn at announcement); a one-eligible slate
+        runs its resolution once."""
         B, dev = self.B, self.device
         zero = torch.zeros(B, dtype=torch.bool, device=dev)
         neg = torch.full((B,), -1, dtype=torch.long, device=dev)
@@ -2516,23 +2593,42 @@ class SimSeats:
             return zero, neg, neg.clone(), zero
         world_era = self._world_era()
         fires = world_era >= self._congress_min_era
-        res0, res1 = neg.clone(), neg.clone()
-        NR = len(self._congress_res)
-        if NR:
-            elig = torch.stack([
-                fires & (world_era >= r["min"]) & (world_era <= r["max"]) for r in self._congress_res
-            ], dim=1)  # [B, NR]
-            E = elig.long().sum(dim=1)
-            rank = elig.long().cumsum(dim=1) - 1
-            sess = self.congress_sessions + fires.long()
-            j0 = (2 * (sess - 1)) % E.clamp(min=1)
-            j1 = (2 * (sess - 1) + 1) % E.clamp(min=1)
-            for r in range(NR):
-                er = elig[:, r]
-                res0 = torch.where(er & (rank[:, r] == j0), torch.full_like(res0, r), res0)
-                res1 = torch.where(er & (rank[:, r] == j1), torch.full_like(res1, r), res1)
-            res1 = torch.where(res1 == res0, torch.full_like(res1, -1), res1)
+        # the ANNOUNCED slate — drawn at the previous session's close
+        # (`_congress_draw_slate`); [-1, -1] before the first announcement.
+        res0 = torch.where(fires, self.congress_slate[:, 0], neg)
+        res1 = torch.where(fires, self.congress_slate[:, 1], neg.clone())
         return fires, res0, res1, fires & (world_era >= self._congress_dv_min)
+
+    def _congress_draw_slate(self, fires: torch.Tensor) -> None:
+        """ANNOUNCE a session's slate: CIV6 — the slate is a random draw
+        among the era-eligible resolutions, two distinct (one when only one
+        is eligible, none when none is). Era-eligibility is read AT THE
+        ANNOUNCEMENT; the session later runs what was announced. Each draw
+        advances the stream only where its pool is non-empty, in step with
+        the TS `congressSession` draw block."""
+        NR = len(self._congress_res)
+        if NR == 0 or not bool(fires.any()):
+            return
+        neg2 = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        world_era = self._world_era()
+        elig = torch.stack([
+            (world_era >= r["min"]) & (world_era <= r["max"]) for r in self._congress_res
+        ], dim=1) & fires.unsqueeze(1)  # [B, NR]
+        E = elig.long().sum(dim=1)
+        r0 = self._next_random(fires & (E > 0))
+        k0 = torch.floor(r0 * E.to(torch.float64)).to(torch.long)
+        sel0 = elig & (elig.long().cumsum(dim=1) == (k0 + 1).unsqueeze(1))
+        p0 = sel0.long().argmax(dim=1)
+        self.congress_slate[:, 0] = torch.where(
+            fires, torch.where(E > 0, p0, neg2), self.congress_slate[:, 0])
+        elig1 = elig & ~sel0
+        E1 = elig1.long().sum(dim=1)
+        r1 = self._next_random(fires & (E1 > 0))
+        k1 = torch.floor(r1 * E1.to(torch.float64)).to(torch.long)
+        sel1 = elig1 & (elig1.long().cumsum(dim=1) == (k1 + 1).unsqueeze(1))
+        p1 = sel1.long().argmax(dim=1)
+        self.congress_slate[:, 1] = torch.where(
+            fires, torch.where(E1 > 0, p1, neg2.clone()), self.congress_slate[:, 1])
 
     def _world_congress(self) -> None:
         """The `worldCongress`/`congressSession` mirror — one Regular Session
@@ -2552,6 +2648,13 @@ class SimSeats:
         fires, res0, res1, dv = self._congress_upcoming(int(self.turn))
         if not bool(fires.any()):
             return
+        # a session whose slate was never announced (the FIRST one, or an
+        # announcement that found nothing eligible) draws its own, now.
+        first = fires & (self.congress_slate == -1).all(dim=1)
+        if bool(first.any()):
+            self._congress_draw_slate(first)
+            res0 = torch.where(first, self.congress_slate[:, 0], res0)
+            res1 = torch.where(first, self.congress_slate[:, 1], res1)
         self.congress_sessions.add_(fires.long())
         self.last_session_turn.copy_(torch.where(
             fires, torch.full_like(self.last_session_turn, int(self.turn)), self.last_session_turn))
@@ -2570,6 +2673,8 @@ class SimSeats:
         if bool(dv.any()):
             self._congress_dv(dv, votes)
         self._congress_cancel_banned_intl()
+        # ANNOUNCE the next session's slate (era-eligibility at announcement).
+        self._congress_draw_slate(fires)
 
     # --- EMERGENCIES -------------------------------------------------------
     #

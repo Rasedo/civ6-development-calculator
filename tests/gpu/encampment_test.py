@@ -329,6 +329,11 @@ def test_district_heal_gate(rules, path) -> None:
     def run(occupy: bool) -> int:
         sim, enc_tile, _t, _v = build_strike_scene(rules, path)
         sim.encamp_hp[0, enc_tile] = 10
+        # both strikes roll BEFORE the heal in the same body and can kill the
+        # occupier, which lawfully un-occupies the tile — zero the perimeter
+        # pools so nothing fires and the heal gate alone is measured
+        sim.city_outer_hp[0, 0, 0] = 0
+        sim.encamp_outer_hp[0, enc_tile] = 0
         for n in [int(x) for x in sim.neigh[int(sim.city_center[0, 0, 0])].tolist() if x >= 0]:
             sim.military_at[0, n] = -1
         sim.military_at[0, enc_tile] = -1
