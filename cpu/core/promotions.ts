@@ -239,6 +239,11 @@ export interface PromoCtx {
   foeInDistrict?: boolean;
   /** the other side IS a city or a defensible district. */
   vsCity?: boolean;
+  /** the blow being defended is an AIR STRIKE (`PROXIMITY_FUSES`). */
+  vsAir?: boolean;
+  /** this AIRCRAFT is the one being shot at by anti-air fire
+   *  (`COCKPIT_ARMOR`, `EVASIVE_MANEUVERS`). */
+  vsAntiAir?: boolean;
   /** the tile THIS unit stands on. */
   tile?: Tile;
 }
@@ -265,6 +270,8 @@ export function promoCS(unit: { promos?: number; type: string }, ctx: PromoCtx):
       case 'CS_DEF_RANGED': if (!ctx.attacking && ctx.ranged) n += e.v; break;
       case 'CS_DEF_ANY': if (!ctx.attacking) n += e.v; break;
       case 'CS_DEF_VS_CITY': if (!ctx.attacking && ctx.vsCity) n += e.v; break;
+      case 'CS_DEF_VS_AIR': if (!ctx.attacking && ctx.vsAir) n += e.v; break;
+      case 'CS_DEF_VS_AA': if (!ctx.attacking && ctx.vsAntiAir) n += e.v; break;
       case 'CS_DEF_TERRAIN': if (!ctx.attacking && TERRAIN_COVER(ctx.tile)) n += e.v; break;
       case 'CS_IN_DISTRICT': if (IN_DISTRICT(ctx.tile)) n += e.v; break;
       case 'CS_ATK_DISTRICT': if (ctx.attacking && !ctx.ranged && (ctx.vsCity || ctx.foeInDistrict)) n += e.v; break;

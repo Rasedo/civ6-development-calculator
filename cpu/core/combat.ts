@@ -15,9 +15,9 @@ import { BUILDINGS } from '../data/buildings';
 import { governorSum, governorTileSum } from './governors';
 import { CITY_STATE_MAX_HP, KABUL_XP_MULT, PRESLAV_HILL_CS } from '../data/cityStates';
 import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
-import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER } from '../data/seats';
+import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER, DED_SKY, SKY_AIR_XP_PCT } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
-import { addEraScore, worldEraIndex } from './eras';
+import { addEraScore, goldenDedication, worldEraIndex } from './eras';
 import { formationCS, escortRiders, nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc } from './units';
 import { isAirUnit, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirOf, displaceAirFrom } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
@@ -139,9 +139,22 @@ function xpMult(state: GameState, unit: Unit, initiated: boolean): number {
 }
 
 /** may this unit bank XP at all? Barbarians have no promotions in Civ 6
- *  (`caps.xp`), and civilians never fight. */
+ *  (`caps.xp`), and civilians never fight. CIV6 (Experience): "every time a
+ *  unit enters and survives combat ... it will gain XP", and the Aerodrome's
+ *  own XP buildings say plainly that an aircraft is such a unit. A Spy earns
+ *  its levels through its missions, not through a roll. */
 function xpEligible(unit: Unit): boolean {
-  return capsOf(unit.seat).xp && unitDomain(unit.type) === 'military';
+  const d = unitDomain(unit.type);
+  return capsOf(unit.seat).xp && (d === 'military' || d === 'air');
+}
+
+/** every percentage XP modifier a unit answers to: the training city's own,
+ *  carried for life, the government's, and CIV6 (Sky and Stars, Golden face):
+ *  "+100% XP earned for all Air Units". */
+function seatXpPct(state: GameState, unit: Unit): number {
+  const sky = isAirUnit(unit.type) && goldenDedication(state, unit.seat, DED_SKY)
+    ? SKY_AIR_XP_PCT : 0;
+  return unitXpPct(unit) + governmentXpPct(state, unit.seat) + sky;
 }
 
 /** the strength a chassis brings to the XP ratio: its Ranged Strength when it
@@ -172,7 +185,7 @@ export function awardBattleXp(
       ? XP_BARB_VETERAN
       : battleXp(ownCS, foeCS, {
         foeDied, ranged: o.ranged, initiated,
-        pct: unitXpPct(self) + governmentXpPct(state, self.seat), mult: xpMult(state, self, initiated),
+        pct: seatXpPct(state, self), mult: xpMult(state, self, initiated),
       });
     bankXp(self, gain);
   }
@@ -183,14 +196,14 @@ export function awardBattleXp(
  *  and no cap. */
 export function awardCityXp(state: GameState, unit: Unit, base: number): void {
   if (unit.hp <= 0 || !xpEligible(unit)) return;
-  bankXp(unit, cityXp(base, unitXpPct(unit) + governmentXpPct(state, unit.seat), xpMult(state, unit, true)));
+  bankXp(unit, cityXp(base, seatXpPct(state, unit), xpMult(state, unit, true)));
 }
 
 /** the defender of a CITY strike: "Base XP gained from defending against city
  *  attacks is 2". Exported for the walls strike in phase.ts. */
 export function awardDefenseXp(state: GameState, defender: Unit): void {
   if (defender.hp <= 0 || !xpEligible(defender)) return;
-  bankXp(defender, cityXp(XP_CITY_DEFEND, unitXpPct(defender) + governmentXpPct(state, defender.seat), xpMult(state, defender, false)));
+  bankXp(defender, cityXp(XP_CITY_DEFEND, seatXpPct(state, defender), xpMult(state, defender, false)));
 }
 
 /**
@@ -1314,8 +1327,17 @@ export function airStrike(state: GameState, attackerId: number, targetIndex: num
   const defender = stackDefender(state, enemies, true);
   const atk = UNITS[attacker.type]?.ranged?.strength ?? 0;
   const def = airDefenseOf(defender.type);
-  const atkE = atk - woundPenalty(attacker);
-  const defE = def - woundPenalty(defender);
+  // CIV6 (Air combat): "all air attacks are ranged", so the sortie is a ranged
+  // roll and both trees speak into it — the striker's class terms, and the
+  // defender's own "+7 Combat Strength when defending vs. air attacks".
+  const fromTile = state.map.tiles[attacker.tileIndex];
+  const atkE = atk - woundPenalty(attacker)
+    + promoCS(attacker, { attacking: true, ranged: true, foeType: defender.type, tile: fromTile });
+  const defE = def - woundPenalty(defender)
+    + promoCS(defender, {
+      attacking: false, ranged: true, vsAir: true, foeType: attacker.type,
+      tile: state.map.tiles[targetIndex],
+    });
   defender.hp -= damageRoll(state, atkE - defE, 'air', targetIndex);
   spendAttack(attacker, true);
   // the answer. CIV6 (Air combat): a plane "doesn't suffer damage in return
@@ -1324,9 +1346,16 @@ export function airStrike(state: GameState, attackerId: number, targetIndex: num
   // defenses, which activate when they are attacked by an aircraft". A land
   // anti-air unit answers by intercepting, which no engine here can do.
   if (antiAirOf(defender.type) > 0 && UNITS[defender.type]?.naval) {
-    attacker.hp -= damageRoll(state, defE - atkE, 'airc', targetIndex);
+    // the burst answers the AIRCRAFT, which is the defender of this roll
+    const airD = atk - woundPenalty(attacker)
+      + promoCS(attacker, {
+        attacking: false, vsAntiAir: true, foeType: defender.type, tile: fromTile,
+      });
+    attacker.hp -= damageRoll(state, defE - airD, 'airc', targetIndex);
     if (attacker.hp <= 0) disbandUnit(state, attacker.id);
   }
+  awardBattleXp(state, attacker, defender,
+    { ranged: true, aDied: attacker.hp <= 0, dDied: defender.hp <= 0 });
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, {
     aDied: attacker.hp <= 0, dDied: defender.hp <= 0,
   });

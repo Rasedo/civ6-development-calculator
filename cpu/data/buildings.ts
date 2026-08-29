@@ -191,8 +191,8 @@ const rawList: BuildingDef[] = [
   // CIV6: "+1 Food. +1 Food in Coast and Lake tiles controlled by the city.
   // +1 Gold. +1 Housing."
   { id: 'LIGHTHOUSE', name: 'Lighthouse', district: 'HARBOR', cost: 120, yields: { food: 1, gold: 1 }, housing: 1, special: 'LIGHTHOUSE', maintenance: 0 },
-  { id: 'SHIPYARD', name: 'Shipyard', district: 'HARBOR', cost: 290, requiresAny: ['LIGHTHOUSE'], special: 'SHIPYARD', maintenance: 1, trainXpPct: 25, trainXpClasses: ['NAVAL_MELEE', 'NAVAL_RANGED'] },
-  { id: 'SEAPORT', name: 'Seaport', district: 'HARBOR', cost: 440, requiresAny: ['SHIPYARD'], yields: { food: 2, gold: 2 }, housing: 1, maintenance: 0, trainXpPct: 25, trainXpClasses: ['NAVAL_MELEE', 'NAVAL_RANGED'] },
+  { id: 'SHIPYARD', name: 'Shipyard', district: 'HARBOR', cost: 290, requiresAny: ['LIGHTHOUSE'], special: 'SHIPYARD', maintenance: 1, trainXpPct: 25, trainXpClasses: ['NAVAL_MELEE', 'NAVAL_RANGED', 'NAVAL_RAIDER'] },
+  { id: 'SEAPORT', name: 'Seaport', district: 'HARBOR', cost: 440, requiresAny: ['SHIPYARD'], yields: { food: 2, gold: 2 }, housing: 1, maintenance: 0, trainXpPct: 25, trainXpClasses: ['NAVAL_MELEE', 'NAVAL_RANGED', 'NAVAL_RAIDER'] },
 
   { id: 'WORKSHOP', name: 'Workshop', district: 'INDUSTRIAL_ZONE', cost: 195, yields: { production: 3 }, maintenance: 1 },
   { id: 'FACTORY', name: 'Factory', district: 'INDUSTRIAL_ZONE', cost: 330, requiresAny: ['WORKSHOP'], yields: { production: 3 }, power: 2, poweredYields: { production: 3 }, regional: true, maintenance: 2 },
@@ -208,8 +208,8 @@ const rawList: BuildingDef[] = [
   { id: 'ARMORY', name: 'Armory', district: 'ENCAMPMENT', cost: 195, requiresAny: ['BARRACKS', 'STABLE'], yields: { production: 3 }, maintenance: 2, trainXpPct: 25, trainXpClasses: ['MELEE', 'ANTICAV', 'RANGED', 'LIGHT_CAV', 'HEAVY_CAV', 'SIEGE'] },
   { id: 'MILITARY_ACADEMY', name: 'Military Academy', district: 'ENCAMPMENT', cost: 330, requiresAny: ['ARMORY'], yields: { production: 4 }, housing: 1, maintenance: 2, trainXpPct: 25, trainXpClasses: ['MELEE', 'ANTICAV', 'RANGED', 'LIGHT_CAV', 'HEAVY_CAV', 'SIEGE'] },
 
-  { id: 'HANGAR', name: 'Hangar', district: 'AERODROME', cost: 380, yields: { production: 2 }, maintenance: 1, airSlots: 1 },
-  { id: 'AIRPORT', name: 'Airport', district: 'AERODROME', cost: 480, requiresAny: ['HANGAR'], yields: { production: 3 }, maintenance: 2, airSlots: 1 },
+  { id: 'HANGAR', name: 'Hangar', district: 'AERODROME', cost: 380, yields: { production: 2 }, maintenance: 1, airSlots: 1, trainXpPct: 25, trainXpClasses: ['AIR_FIGHTER', 'AIR_BOMBER'] },
+  { id: 'AIRPORT', name: 'Airport', district: 'AERODROME', cost: 480, requiresAny: ['HANGAR'], yields: { production: 3 }, maintenance: 2, airSlots: 1, trainXpPct: 50, trainXpClasses: ['AIR_FIGHTER', 'AIR_BOMBER'] },
 
   { id: 'ARENA', name: 'Arena', district: 'ENTERTAINMENT_COMPLEX', cost: 150, amenities: 2, yields: { culture: 1 }, maintenance: 1 },
   { id: 'ZOO', name: 'Zoo', district: 'ENTERTAINMENT_COMPLEX', cost: 360, requiresAny: ['ARENA'], amenities: 1, regional: true, maintenance: 2 },

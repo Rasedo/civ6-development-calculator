@@ -1891,8 +1891,22 @@ class SimSeats:
         d_hp0 = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
         aa = self._type_anti_air[d_type]
         def_cs = torch.where(aa > 0, aa, self._type_combat[d_type])
-        atk_e = self._type_ranged_strength[at0] - self._wound(_hp_p[:, u])
+        # CIV6 (Air combat): "all air attacks are ranged", so the sortie is a
+        # ranged roll and both trees speak into it — the striker's class terms,
+        # and the defender's own "+7 Combat Strength when defending vs. air
+        # attacks".
+        a_promos = self._promo_pool(atk_kind)[0][:, u]
+        d_promos = self.unit_promos.gather(1, ds0.unsqueeze(1)).squeeze(1)
+        a_tile = _tile_p[:, u]
+        _t = torch.ones_like(unit_att)
+        a_base = self._type_ranged_strength[at0] - self._wound(_hp_p[:, u])
+        atk_e = a_base + self._promo_cs(
+            at0, a_promos, attacking=_t, ranged=_t, foe_type=d_type,
+            tile=a_tile).to(a_base.dtype)
         def_e = def_cs - self._wound(d_hp0)
+        def_e = def_e + self._promo_cs(
+            d_type, d_promos, attacking=~_t, ranged=_t, vs_air=_t, foe_type=at0,
+            tile=ttc).to(def_e.dtype)
         d_dmg = self._damage_roll(unit_att, atk_e - def_e, k="air", tile=tgt)
         g = unit_att.nonzero(as_tuple=True)[0]
         ds = d_slot[g]
@@ -1909,12 +1923,20 @@ class SimSeats:
         ret = unit_att & (aa > 0) & self.unit_naval[d_type]
         a_died = torch.zeros_like(unit_att)
         if bool(ret.any()):
-            a_dmg = self._damage_roll(ret, def_e - atk_e, k="airc", tile=tgt)
+            # the burst answers the AIRCRAFT, which is the defender of this roll
+            air_d = a_base + self._promo_cs(
+                at0, a_promos, attacking=~_t, vs_anti_air=_t, foe_type=d_type,
+                tile=a_tile).to(a_base.dtype)
+            a_dmg = self._damage_roll(ret, def_e - air_d, k="airc", tile=tgt)
             _hp_p[:, u] = torch.where(ret, _hp_p[:, u] - a_dmg, _hp_p[:, u])
             a_died = ret & (_hp_p[:, u] <= 0)
             if bool(a_died.any()):
                 _alive_p[:, u] = _alive_p[:, u] & ~a_died
         d_died = unit_att & ((d_hp0 - d_dmg) <= 0)
+        self._award_pair_xp(
+            unit_att, a_kind=atk_kind, u=u, a_type=_type_p[:, u], a_seat=a_seat,
+            d_slot=d_slot, d_type=d_type, d_is_barb=d_seat == BARB_SEAT,
+            ranged=True, a_died=a_died, d_died=d_died)
         self._ww_battle(unit_att, row, self._row_of(d_seat), tgt,
                         a_died=a_died, d_died=d_died)
         dead = self.unit_hp[g, ds] <= 0
@@ -6872,6 +6894,31 @@ class SimSeats:
         mp[:, u] = torch.where(fired & ~keep, torch.zeros_like(mp[:, u]), mp[:, u])
         self._spend_one_attack(pre, u, fired)
 
+    def _xp_eligible(self, utype: torch.Tensor) -> torch.Tensor:
+        """`xpEligible`'s chassis half: a civilian never fights, and a Spy earns
+        its levels through its missions rather than through a roll."""
+        t = utype.clamp(min=0, max=self.NU - 1)
+        out = ~self._type_civilian[t]
+        if self._spy_idx >= 0:
+            out = out & (t != self._spy_idx)
+        return out
+
+    def _seat_xp_pct(self, utype: torch.Tensor, seat: torch.Tensor,
+                     rows: torch.Tensor | None = None) -> torch.Tensor:
+        """the percentage XP modifiers a unit's SEAT carries — CIV6
+        (Oligarchy): "+20% Unit Experience" and its siblings, plus CIV6 (Sky
+        and Stars, Golden face): "+100% XP earned for all Air Units"."""
+        pct = self._fx_at_seat("xppct", seat, rows).long()
+        if not self._any_air or self._sky_air_xp <= 0:
+            return pct
+        air = self._type_air[utype.clamp(min=0, max=self.NU - 1)] > 0
+        ok = (seat >= 0) & (seat < self.n_majors)
+        s0 = seat.clamp(min=0, max=self.n_majors - 1)
+        tab = self._golden_ded_table(self._ded_sky)
+        holds = tab[rows, s0] if rows is not None else tab.gather(1, s0.unsqueeze(1)).squeeze(1)
+        return pct + torch.where(air & ok & holds, torch.full_like(pct, self._sky_air_xp),
+                                 torch.zeros_like(pct))
+
     def _award_pair_xp(
         self, live: torch.Tensor, *, a_kind: str, u: int,
         a_type: torch.Tensor, a_seat: torch.Tensor, d_slot: torch.Tensor,
@@ -6883,18 +6930,15 @@ class SimSeats:
         _pro, a_lvl, a_pct = self._promo_pool(a_kind)
         a_barb = a_seat == BARB_SEAT
         if SEAT_CAPS[POOL_CLASS[a_kind]]["xp"]:
-            # CIV6 (Oligarchy): "+20% Unit Experience" — the government's
-            # percentage POINTS join the unit's building percentage.
             gain = self._battle_gain(a_type, d_type, a_seat, a_lvl[:, u],
-                                     a_pct[:, u] + self._fx_at_seat("xppct", a_seat).long(),
+                                     a_pct[:, u] + self._seat_xp_pct(a_type, a_seat),
                                      ranged=ranged, initiated=True, foe_died=d_died,
                                      foe_is_barb=d_is_barb)
-            ok = live & ~a_died & ~self._type_civilian[a_type.clamp(min=0)]
+            ok = live & ~a_died & self._xp_eligible(a_type)
             a_xp_p = self._pool_of(a_kind)[3]
             a_xp_p[:, u] = torch.where(
                 ok, self._bank_xp(a_xp_p[:, u], a_lvl[:, u], gain), a_xp_p[:, u])
-        okd = (live & ~d_died & ~d_is_barb & (d_slot >= 0)
-               & ~self._type_civilian[d_type.clamp(min=0)])
+        okd = live & ~d_died & ~d_is_barb & (d_slot >= 0) & self._xp_eligible(d_type)
         rows = okd.nonzero(as_tuple=True)[0]
         if len(rows) == 0:
             return
@@ -6903,7 +6947,7 @@ class SimSeats:
             d_type[rows], a_type[rows], self.unit_seat[rows, ds],
             self.unit_level[rows, ds],
             self.unit_xp_pct[rows, ds]
-            + self._fx_at_seat("xppct", self.unit_seat[rows, ds], rows).long(),
+            + self._seat_xp_pct(d_type[rows], self.unit_seat[rows, ds], rows),
             ranged=ranged, initiated=False, foe_died=a_died[rows], foe_is_barb=a_barb[rows])
         self.unit_xp[rows, ds] = self._bank_xp(
             self.unit_xp[rows, ds], self.unit_level[rows, ds], gd)
@@ -6918,8 +6962,8 @@ class SimSeats:
         _pro, a_lvl, a_pct = self._promo_pool(a_kind)
         mult = self._recon_xp_mult(a_seat, a_type) * self._suz_xp_mult(a_seat)
         gain = self._city_xp(
-            base, a_pct[:, u] + self._fx_at_seat("xppct", a_seat).long(), mult)
-        ok = live & ~self._type_civilian[a_type.clamp(min=0)]
+            base, a_pct[:, u] + self._seat_xp_pct(a_type, a_seat), mult)
+        ok = live & self._xp_eligible(a_type)
         a_xp_p = self._pool_of(a_kind)[3]
         a_xp_p[:, u] = torch.where(
             ok, self._bank_xp(a_xp_p[:, u], a_lvl[:, u], gain), a_xp_p[:, u])
@@ -6936,8 +6980,9 @@ class SimSeats:
         base = torch.full_like(ds, XP_CITY_DEFEND)
         gain = self._city_xp(
             base,
-            self.unit_xp_pct[rows, ds] + self._fx_at_seat("xppct", seat, rows).long(),
+            self.unit_xp_pct[rows, ds] + self._seat_xp_pct(types, seat, rows),
             mult)
+        gain = torch.where(self._xp_eligible(types), gain, torch.zeros_like(gain))
         self.unit_xp[rows, ds] = self._bank_xp(
             self.unit_xp[rows, ds], self.unit_level[rows, ds], gain)
 

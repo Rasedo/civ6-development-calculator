@@ -54,7 +54,7 @@ from the list below.
 | B-39r wonder effects still dropped | 1 | two residuals, blocked on B-20r's per-work TYPE names |
 | B-45r sourced-sweep finds in the other rows | 1 | the rival-recruit event and B-31r's route yields carry the last two effect families |
 | B-54r flanking and support vs their own page | 1 | the two stacks a UNIQUE UNIT raises wait on C-26 |
-| B-56r the three inert promotions | 1 | three rows name a mechanic neither engine has — sight-blocking, an air-roll promotion term, a NAVAL RAIDER class |
+| B-56r the inert promotions | 1 | four of a hundred rows name a mechanic neither engine has — sight-blocking, a PATROL order, an air pillage, and one magnitude the source never published |
 | B-51r Encampment residuals | 1 | the district's strike is measured from the CITY CENTRE's tile, and a capture leaves its own pool standing (unsourced either way) |
 | B-44r city-state war tails | 1 | a ranged raider never shoots a minor centre (the seat verbs' own ranged-vs-city-state scope-out) |
 | B-65 religious zone of control | 1 | Civ 6 scopes a religious unit's ZOC to other religious units BOTH ways; the engines run one military-only rule |
@@ -73,13 +73,13 @@ from the list below.
 | C-24 the climate arc | 1 | nothing is ever submerged (C-35), railroads emit nothing (C-36), the Flood Barrier keeps for nothing |
 | C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — PARKED by owner decision |
 | C-31 the nuclear device has no system behind it | 1 | an area attack, persistent fallout, the delivery chassis and the diplomatic reaction |
-| C-32 the new classes have no promotion tree | 2 | air, GDR, support, naval-raider and spy chassis are offered no promotion |
+| C-32 the classes with no promotion tree | 1 | the AIRCRAFT CARRIER and the SPY are offered no promotion; the air and naval-raider trees ship |
 | C-33 the Giant Death Robot is only its stats | 2 | its water walk, heal gate, district penalty and Future-era upgrades have no carrier |
-| C-34 air combat's second half | 2 | Interception, Patrol and Priority Target — the reason a fighter exists — do not exist |
+| C-34 air combat's second half | 2 | Interception, Patrol and Priority Target — the reason a fighter exists — do not exist; the promotion term in the sortie ships |
 | C-35 the land/water fact never moves | 2 | one overloaded static bit blocks submersion and the Canal's passage |
 | C-36 no railroad | 2 | no second movement tier, no per-hex Iron/Coal charge, no CO2 |
 | C-37 no legacy policy cards | 2 | eight governments' legacy bonuses have no Wildcard card row and no switched-away record to unlock one |
-| **C. Absent systems** | **31** | |
+| **C. Absent systems** | **30** | |
 | **OPEN, TOTAL** | **55** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
@@ -368,20 +368,22 @@ Civ 6 source or is recorded as unverifiable.
     poke-only; `tests/gpu/escort_test.py` and `tests/cpu/units/escort.test.ts`
     are their whole bar.
 
-- **B-56r. The three inert promotions.** 76 of the 79 catalog rows in
+- **B-56r. The inert promotions.** 96 of the 100 catalog rows in
   `cpu/data/promotions.ts` reach a rule; the poke bar is
-  `tests/gpu/promotions_test.py` + `tests/gpu/promo_effects_test.py`. FIVE
-  carry `none`, each with its blocker:
+  `tests/gpu/promotions_test.py` + `tests/gpu/promo_effects_test.py` +
+  `tests/gpu/air_promo_test.py`. FOUR carry `none`, each with its blocker:
   - **SENTRY** ("can see through Woods and Rainforest") — `revealAround`
     / `_reveal_around` reveal a flat radius; nothing blocks sight.
-  - **CREEPING_ATTACK** is "+14 Combat Strength vs. naval raider units",
-    and no NAVAL RAIDER class exists to name in a `CS_VS_CLASS_*` mask —
-    C-32.
-  - **PROXIMITY_FUSES** is "+7 Combat Strength when defending against air
-    attacks". `airStrike` / `_air_strike` roll the defender at
-    `airDefenseOf` / `_type_anti_air` alone and never call `promoCS` /
-    `_promo_cs` — threading the promotion term into the sortie changes
-    every defensive promotion's reach at once (C-34's pass).
+  - **GROUND_CREWS** ("heal while patrolling or deployed") — PATROL is
+    C-34's own gap, and without it there is no state to heal in.
+  - **SUPERFORTRESS** ("no minimum health requirement to air pillage") —
+    the AIR PILLAGE it relaxes does not exist here at all (C-34):
+    `_A_PILLAGE` reads the tile UNDERFOOT or a NAVAL RAIDER's adjacent
+    hex, and a plane is based rather than standing.
+  - **BOARDING** ("obtain Gold from naval victories") — the Civilopedia
+    publishes no magnitude, and no other row prices a kill in gold. An
+    invented number is worse than an empty row; this one waits on a
+    source, not on a mechanic.
 - **B-51r. Encampment residuals.** The district holds its OWN
   outer-defense pool (`Tile.encampOuterHp` / `encamp_outer_hp` — CIV6:
   one set of Walls "supplies both", yet "destroying the one does not
@@ -566,10 +568,10 @@ under their blocker so the dependency is readable, and both halves count.
   - **CAPTURED SPIES** — "imprisoned, but not killed", counting against
     capacity, tradeable back. A prisoner store plus a two-sided deal
     (C-2).
-  - **THE SPY PROMOTION POOL** — fourteen sourced promotions, three
-    offered at random per level; the chassis has no promotion class
-    (C-32), and the random offer needs a shared-stream draw at a fixed
-    position (the `ensureGpOffer` pattern).
+  - **THE SPY PROMOTION POOL** — the Civilopedia's Espionage class lists
+    SEVENTEEN promotions, three offered at random per level; the chassis
+    has no promotion class (C-32), and the random offer needs a
+    shared-stream draw at a fixed position (the `ensureGpOffer` pattern).
   - **LEVELS FROM COUNTER-ESPIONAGE** — a counterspy that catches earns
     nothing here.
   - **"NO TWO SPIES MAY PERFORM THE SAME MISSION IN THE SAME CITY"** —
@@ -608,18 +610,38 @@ under their blocker so the dependency is readable, and both halves count.
     persistent fallout tiles, and a diplomatic reaction. Neither engine
     has an area-effect attack, a fallout tile state, or the Missile Silo
     (C-20).
-- **C-32. THE NEW CLASSES HAVE NO PROMOTION TREE.** Weight 2. The AIR,
-  GIANT DEATH ROBOT, SUPPORT and NAVAL RAIDER classes have no
-  `PROMO_CLASSES` entry, and neither does the SPY — `promoOffer` /
-  `_promo_offer_mask` open no column for them. Adding trees widens
-  `PROMO_COLS`, a wire change. Waiting on it:
-  - **SKY AND STARS' golden half** — "+100% Experience for all Air
-    Units" has no tree to accelerate.
+- **C-32. THE CLASSES WITH NO PROMOTION TREE.** Weight 1. AIR FIGHTER,
+  AIR BOMBER and NAVAL RAIDER now hold seven sourced rows each, and with
+  them: the chassis map (`UNIT_PROMO_CLASS` / `u_promo_class`), the two
+  new roll conditions `CS_DEF_VS_AIR` and `CS_DEF_VS_AA`, the Hangar's
+  "+25%" and the Airport's "+50%" experience lines, the Shipyard's and
+  Seaport's "for all naval units" widened to the raider, an aircraft that
+  banks XP at all (`xpEligible` / `_xp_eligible`), and Sky and Stars'
+  "+100% XP earned for all Air Units". `PROMO_COLS` did NOT widen — the
+  APOSTLE's nine still sets it, so no wire width moved. TWO CORRECTIONS
+  to this row's own earlier text: the Civilopedia's promotion index lists
+  no SUPPORT class at all, so the support chassis was never a gap; and
+  the GDR's four rows (Drone Air Defense, Enhanced Mobility, Particle Beam
+  Siege Cannon, Reinforced Armor Plating) are its Future-era upgrades,
+  which is C-33's item, not this one. What is left:
+  - **THE NAVAL CARRIER TREE** — the Civilopedia lists a seventh naval
+    class with seven rows (Advanced Engines, Deck Crews, Flight Deck,
+    Folding Wings, Hangar Deck, Scout Planes, Supercarrier). The
+    AIRCRAFT_CARRIER chassis holds no `UNIT_PROMO_CLASS` entry here and
+    none of the seven effects is sourced yet. Several of them read on
+    C-34's missing half (a carrier's own air slots and sorties), so the
+    tree wants sourcing and gap-splitting in one pass.
   - **THE SPY PROMOTION POOL** (C-16), whose random offer needs the
     same shared-stream draw as its entry describes.
-  - **CREEPING ATTACK** needs a raider `CLASS_BIT` as a TARGET (B-56r).
-  - The GDR is faithful by exception — it "cannot earn experience or
-    Promotions" — so only air, support, raider and spy are the gap.
+  - **THE ROCK BAND's twelve promotions** — the chassis carries its own
+    level and album state instead (C-28); no `PROMO_CLASSES` entry, and
+    the twelve rows are unsourced here.
+
+  GATE REACHABILITY IS ZERO for all three new trees: no seed trains an
+  aircraft, a Privateer or a Submarine inside 250 turns, so the whole pass
+  is proved by `tests/gpu/air_promo_test.py` and
+  `tests/cpu/units/air-promotions.test.ts` and by nothing the battery's
+  serve lane runs.
 - **C-33. THE GIANT DEATH ROBOT IS ONLY ITS STATS.** Weight 2. The
   chassis, its fuel bill and Automaton Warfare's hooks ship. Every
   ABILITY on its page is absent: it moves and fights on Coast and Ocean
@@ -629,7 +651,10 @@ under their blocker so the dependency is readable, and both halves count.
   Future-era upgrades need per-unit upgrade state keyed on a FUTURE-era
   tech, where the era ladder stops at Information.
 - **C-34. AIR COMBAT'S SECOND HALF.** Weight 2. Bases, both heads, the
-  sortie, the carrier and the scatter ship. OPEN:
+  sortie, the carrier and the scatter ship — and the sortie now rolls
+  the promotion term on both sides (`promoCS` / `_promo_cs` with `vsAir`
+  and `vsAntiAir`), pays both sides' XP, and reads the operational range
+  through `RANGE`. OPEN:
   - **INTERCEPTION** — fighters "automatically attack incoming aircraft
     within their operational range"; there is no reactive attack anywhere
     in either engine.
@@ -642,8 +667,18 @@ under their blocker so the dependency is readable, and both halves count.
     damage it through is Interception.
   - **THE NUCLEAR DELIVERY**'s interception half (devices are C-31, the
     silo C-20).
-  - The promotion term in the air roll (B-56r's PROXIMITY_FUSES) belongs
-    to this pass.
+  - **AIR PILLAGE.** The Superfortress promotion reads "no minimum health
+    requirement to air pillage", so a healthy aircraft can wreck a tile
+    improvement from its base — a strike whose target is the TILE and
+    whose gate is the striker's own HP. Neither engine has it, and
+    B-56r's SUPERFORTRESS is the row that waits on it.
+  - **THE AERODROME'S SLOT COUNT HAS TWO SOURCES THAT DISAGREE.** The Air
+    Combat page says an Aerodrome "has 2 slots initially, and can reach 4
+    slots after constructing the Hangar and the Airport"; each building's
+    own Civilopedia entry says "+2 air unit slots in Aerodrome district",
+    which would reach 6. Both engines carry the page's reading (`airSlots`
+    1 apiece, `_aerodrome_air_slots` + `_b_air_slots`). Neither number is
+    invented, and nothing here decides between them.
 - **C-35. THE LAND/WATER FACT NEVER MOVES.** Weight 2. Sea-ness is decided
   at map generation: TS `isWater`, GPU static `water` / `wpass` and their
   derivations, none in `_MUTABLE`. The bit is OVERLOADED — "is this sea",

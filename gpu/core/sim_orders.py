@@ -822,6 +822,12 @@ class SimOrders:
                             _m2 = _kk == _kv
                             if bool(_m2.any()):
                                 _purse[_br[_m2], row] += _lump[_m2]
+                    # CIV6 (Loot): "+50 Gold from coastal raids", flat and on
+                    # top of whatever the wrecked target's plunder row pays.
+                    _lg = self._promo_val(utp[_r], self.unit_promos[_r, sc[_r]], "RAID_GOLD")
+                    _lm = _isr[_live] & (_lg > 0)
+                    if bool(_lm.any()):
+                        self.civ_treasury[_r[_lm], row] += _lg[_lm].to(self.dtype)
                     # CIV6: pillaging takes "3 Movement Points, or all of
                     # your movement"; Depredation prices it at 1.
                     _pc = self._promo_val(utp[_r], self.unit_promos[_r, sc[_r]], "PILLAGE_CHEAP")

@@ -194,6 +194,7 @@ class Rules:
     promo_col_max: torch.Tensor  # long [NK, NPC, PCOL] — per-column max of kind k's values
     promo_rows: torch.Tensor  # long [NPC] — how many rows each class actually holds
     u_promo_class: torch.Tensor  # long [NU] — the class each chassis promotes from, -1 = none
+    promo_class_bit: torch.Tensor  # long [NPC] — the bit a class presents to a `CS_VS_*` mask, 0 = never a target
     choke_features: list  # the feature indices CHOKE POINTS defends in (hills are their own plane)
     woods_features: list  # the feature indices a 1-MP woods step waives (hills are their own plane)
     worship_bidx: list  # the 5 worship rows in WORSHIP_BUILDINGS order (religion id % 5 indexes THIS)
@@ -369,6 +370,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         promo_col_max=_pf_colm,
         promo_rows=torch.tensor([len(x) for x in _P.get("ids", [])], dtype=torch.long),
         u_promo_class=torch.tensor(_P.get("unitClass", []), dtype=torch.long),
+        promo_class_bit=torch.tensor(_P.get("classBit", []), dtype=torch.long),
         choke_features=list(_P.get("chokeFeatures", [])),
         woods_features=list(_P.get("woodsFeatures", [])),
         worship_bidx=r.get("worshipBidx", []),

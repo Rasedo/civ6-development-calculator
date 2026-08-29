@@ -1244,6 +1244,9 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         // CIV6: pillaging takes "3 Movement Points, or all of your movement";
         // Depredation prices it at 1.
         const pillageCost = promoValue(unit, 'PILLAGE_CHEAP');
+        // CIV6 (Loot): "+50 Gold from coastal raids", flat and on top of
+        // whatever the wrecked target's own plunder row pays.
+        const raidGold = (): void => { actor.treasury += promoValue(unit, 'RAID_GOLD'); };
         const spendPillage = (): void => {
           unit.movesLeft = Math.max(0, unit.movesLeft - (pillageCost > 0 ? pillageCost : 3));
         };
@@ -1280,9 +1283,10 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
             impT.pillaged = true;
             pillagePlunder(state, unit, IMPROVEMENTS[impT.improvement as keyof typeof IMPROVEMENTS]?.plunder);
             spendPillage();
+            raidGold();
           } else {
             const disT = cand.find(districtWreckable);
-            if (disT) wreckDistrict(disT);
+            if (disT) { wreckDistrict(disT); raidGold(); }
           }
         }
       } else if ((a >= 13 && a < 18) || (a >= 18 && a < 18 + IMPROVEMENT_IDS.length - DEDICATED_IMPROVEMENTS)) {

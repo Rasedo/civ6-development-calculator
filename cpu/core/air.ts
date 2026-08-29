@@ -14,6 +14,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { hexDistance } from '../../world/hex';
 import { citiesOf, seatOf, tileSeat } from './seats';
 import { cityAtIndex, unitsAt, unitsHostile, unitVisibleTo } from './units';
+import { promoValue } from './promotions';
 import type { GameState, ImprovementId, Tile, Unit } from './types';
 
 export const CITY_CENTER_AIR_SLOTS = 1;
@@ -185,15 +186,15 @@ export function carryAirWith(state: GameState, hull: Unit, from: number): void {
  * BOMBER's bombard damage is "effective against cities and naval units but not
  * against land units".
  */
-export function airRange(type: string): number {
-  return UNITS[type]?.ranged?.range ?? 0;
+export function airRange(unit: { type: string; promos?: number }): number {
+  return (UNITS[unit.type]?.ranged?.range ?? 0) + promoValue(unit, 'RANGE');
 }
 
 export function airStrikeReaches(state: GameState, unit: Unit, tileIndex: number): boolean {
   const a = state.map.tiles[unit.tileIndex];
   const b = state.map.tiles[tileIndex];
   if (!a || !b) return false;
-  return hexDistance(a.col, a.row, b.col, b.row) <= airRange(unit.type);
+  return hexDistance(a.col, a.row, b.col, b.row) <= airRange(unit);
 }
 
 /**
@@ -213,7 +214,7 @@ export function airStrikeTargets(state: GameState, unit: Unit, width: number): n
   if (!here || !isAirUnit(unit.type)) return out;
   for (const t of state.map.tiles) {
     if (t.index === unit.tileIndex) continue;
-    if (hexDistance(here.col, here.row, t.col, t.row) > airRange(unit.type)) continue;
+    if (hexDistance(here.col, here.row, t.col, t.row) > airRange(unit)) continue;
     if (airStrikeOffers(state, unit, t.index)) out.push(t.index);
     if (out.length >= width) break;
   }

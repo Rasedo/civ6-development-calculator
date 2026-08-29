@@ -705,7 +705,8 @@ class SimMasks:
         attacking: torch.Tensor, ranged: torch.Tensor | None = None,
         foe_type: torch.Tensor | None = None, foe_damaged: torch.Tensor | None = None,
         foe_fortified: torch.Tensor | None = None, foe_in_district: torch.Tensor | None = None,
-        vs_city: torch.Tensor | None = None, tile: torch.Tensor | None = None,
+        vs_city: torch.Tensor | None = None, vs_air: torch.Tensor | None = None,
+        vs_anti_air: torch.Tensor | None = None, tile: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """[B] the whole Combat Strength adder a unit's promotions contribute to
         ONE roll — `promoCS`'s twin, an integer add beside the support terms."""
@@ -722,6 +723,8 @@ class SimMasks:
         frt = false_b if foe_fortified is None else foe_fortified
         fid = false_b if foe_in_district is None else foe_in_district
         cty = false_b if vs_city is None else vs_city
+        air = false_b if vs_air is None else vs_air
+        aaf = false_b if vs_anti_air is None else vs_anti_air
         cover = false_b if tile is None else self._choke_cover(tile)
         mine = false_b if tile is None else self._on_district(tile)
         cond = torch.zeros(B, NK, dtype=torch.bool, device=dev)
@@ -739,6 +742,8 @@ class SimMasks:
         put("CS_DEF_RANGED", ~atk & rng)
         put("CS_DEF_ANY", ~atk)
         put("CS_DEF_VS_CITY", ~atk & cty)
+        put("CS_DEF_VS_AIR", ~atk & air)
+        put("CS_DEF_VS_AA", ~atk & aaf)
         put("CS_DEF_TERRAIN", ~atk & cover)
         put("CS_IN_DISTRICT", mine)
         put("CS_ATK_DISTRICT", atk & ~rng & (cty | fid))
@@ -758,7 +763,8 @@ class SimMasks:
             bit = torch.zeros(B, dtype=torch.long, device=dev)
         else:
             fcls = rd.u_promo_class[foe_type.clamp(min=0)]
-            bit = torch.where(fcls >= 0, torch.ones_like(fcls) << fcls.clamp(min=0), torch.zeros_like(fcls))
+            bit = torch.where(fcls >= 0, rd.promo_class_bit[fcls.clamp(min=0)],
+                              torch.zeros_like(fcls))
         maskhit = (masks & bit.view(B, 1, 1)) != 0
         ok = live & hit & (~uses | maskhit)
         return torch.where(ok, vs, torch.zeros_like(vs)).sum(dim=(1, 2))
@@ -854,7 +860,7 @@ class SimMasks:
     def _congress_unit_cs(self, utype: torch.Tensor, seat: torch.Tensor) -> torch.Tensor:
         """`congressUnitCS`' twin — the flat Combat Strength the WORLD
         CONGRESS hands one unit. MILITARY ADVISORY pays the chassis's promotion
-        class, and air units carry no class, so no air roll can see that half;
+        class, which every fighting chassis now holds;
         CIV6 (World Religion, outcome A): "this outcome also gives Warrior Monks
         +10 Combat Strength", where the monk's religion is its owner's."""
         out, tgt = self._congress_by_id("MILITARY_ADVISORY")
@@ -2691,7 +2697,9 @@ class SimMasks:
             return out
         k, t2 = kind[:, cols], tc[:, cols]
         dist = self.pair_dist[t2.reshape(-1)].reshape(B, cols.numel(), self.T).long()
-        rngv = self._type_ranged_range[ti[:, cols]].unsqueeze(2)
+        rngv = (self._type_ranged_range[ti[:, cols]]
+                + self._promo_val(ti[:, cols], self.unit_promos.gather(1, sc[:, cols]),
+                                  "RANGE")).unsqueeze(2)
         land, sea, ctr = self._air_tile_offer(row)
         bomb = (k == 2).unsqueeze(2)
         offer = torch.where(bomb, (ctr | sea).unsqueeze(1), (land & ~ctr).unsqueeze(1))

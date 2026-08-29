@@ -610,6 +610,9 @@ export const SKY_EUREKAS: Readonly<Record<number, readonly string[]>> = {
 /** CIV6 (Sky and Stars, Golden face, GS): "Aluminum mines accumulate +2 more
  *  resources per turn." */
 export const SKY_ALUMINUM_PER_TURN = 2;
+/** CIV6 (Sky and Stars, Golden face): "+100% XP earned for all Air Units" —
+ *  percentage POINTS, joining the unit's own building modifier. */
+export const SKY_AIR_XP_PCT = 100;
 /** CIV6 (Automaton Warfare, Golden face): "Receive 3 Uranium per turn." */
 export const AUTOMATON_URANIUM_PER_TURN = 3;
 /** CIV6 (Automaton Warfare, Golden face): "Uranium mines accumulate +1 more

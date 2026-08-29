@@ -2537,6 +2537,15 @@ class SimEconomy:
         `unit.movesLeft < grantedLast` and nothing else."""
         return getattr(self, f"{pre}_unit_mp") < getattr(self, f"{pre}_unit_mp_full")
 
+    def _heal_blocked(self, pre: str) -> torch.Tensor:
+        """[B, U] — did this unit spend its turn in the way that silences its
+        heal? CIV6 (Tactical Maintenance): "Can heal after attacking" — the kind
+        lives on the bomber's list alone, and a sortie is the only thing that
+        spends an aircraft's turn, so a spent attack excuses the spent movement.
+        The fortify gate keeps `_spent_mp` itself — no aircraft digs in."""
+        struck = getattr(self, f"{pre}_unit_attacks") < self._full_attacks(pre)
+        return self._spent_mp(pre) & ~(struck & self._promo_pool_flag(pre, "HEAL_AFTER_ATTACK"))
+
     def _sea_move_mp(self, seat: torch.Tensor, emb: torch.Tensor, naval: torch.Tensor) -> torch.Tensor:
         """[B, U] — `seaMoveBonus` + `embarkTechMoves`. The Mathematics rung
         reaches anything AT SEA (a hull or a passenger); the three embark rungs

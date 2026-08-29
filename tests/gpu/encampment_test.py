@@ -40,30 +40,38 @@ def bidx_of(bid: str) -> int:
 
 
 def test_catalog(sim) -> None:
-    """CIV6: every experience line reads "+25% combat experience", and the
-    classes each building reaches are what tell them apart."""
+    """CIV6: nearly every experience line reads "+25% combat experience" — the
+    Airport's "+50%" is the one exception — and the classes each building
+    reaches are what tell them apart."""
     rd = sim.rules_dev
-    want = {"BARRACKS", "STABLE", "ARMORY", "MILITARY_ACADEMY", "SHIPYARD", "SEAPORT"}
-    for bid in want:
+    want = {"BARRACKS": 25, "STABLE": 25, "ARMORY": 25, "MILITARY_ACADEMY": 25,
+            "SHIPYARD": 25, "SEAPORT": 25, "HANGAR": 25, "AIRPORT": 50}
+    for bid, pct in want.items():
         got = int(rd.b_train_xp_pct[bidx_of(bid)])
-        assert got == 25, f"trainXpPct[{bid}] = {got}, want 25"
+        assert got == pct, f"trainXpPct[{bid}] = {got}, want {pct}"
         assert bool(rd.b_train_xp_cls[bidx_of(bid)].any()), f"{bid} reaches no unit class"
     for i, bid in enumerate(BUILDING_IDS):
         if bid not in want:
             assert int(rd.b_train_xp_pct[i]) == 0, f"trainXpPct[{bid}] should be 0"
     cls = list(rd.promo_classes)
-    naval = [cls.index(c) for c in ("NAVAL_MELEE", "NAVAL_RANGED") if c in cls]
+    # CIV6 (Shipyard/Seaport): "for all naval units", the raider among them
+    naval = [cls.index(c) for c in ("NAVAL_MELEE", "NAVAL_RANGED", "NAVAL_RAIDER") if c in cls]
     assert all(bool(rd.b_train_xp_cls[bidx_of("SHIPYARD"), c]) for c in naval), "Shipyard misses the fleet"
+    # CIV6 (Hangar/Airport): "for air units trained in this city"
+    air = [cls.index(c) for c in ("AIR_FIGHTER", "AIR_BOMBER") if c in cls]
+    assert air and all(bool(rd.b_train_xp_cls[bidx_of("HANGAR"), c]) for c in air), "Hangar misses the wing"
+    assert not bool(rd.b_train_xp_cls[bidx_of("HANGAR"), cls.index("MELEE")]), "and reaches nothing else"
     assert not bool(rd.b_train_xp_cls[bidx_of("BARRACKS"), cls.index("HEAVY_CAV")]), \
         "Barracks names melee, ranged and anti-cavalry — never cavalry"
-    print(f"  catalog OK: six +25% lines over {len(BUILDING_IDS)} buildings, each to its own classes")
+    print(f"  catalog OK: eight experience lines over {len(BUILDING_IDS)} buildings, "
+          "each to its own classes")
 
 
 def test_training_xp_wiring(rules, path) -> None:
     sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64))
     # a MELEE chassis by its own promotion class — the Barracks and the Armory
-    # name melee, ranged and anti-cavalry, and the roster carries classes
-    # (support, naval raider, GDR) that no XP building addresses at all.
+    # name melee, ranged and anti-cavalry, and the Giant Death Robot carries no
+    # promotion class for any XP building to address.
     _melee = list(sim.rules.promo_classes).index("MELEE")
     mil_ty = next(i for i in range(sim.NU)
                   if int(sim.rules_dev.u_promo_class[i]) == _melee

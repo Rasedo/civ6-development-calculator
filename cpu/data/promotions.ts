@@ -16,17 +16,28 @@
 export const PROMO_CLASSES = [
   'RECON', 'MELEE', 'RANGED', 'ANTICAV', 'LIGHT_CAV', 'HEAVY_CAV',
   'SIEGE', 'NAVAL_MELEE', 'NAVAL_RANGED', 'APOSTLE', 'MONK',
+  'AIR_FIGHTER', 'AIR_BOMBER', 'NAVAL_RAIDER',
 ] as const;
 export type PromoClass = (typeof PROMO_CLASSES)[number];
 
-/** the class bits a `CS_VS_*` mask addresses; APOSTLE is never a target. */
+/** the classes a `CS_VS_*` mask can address, in BIT order — the wire's own
+ *  numbering, so a new class appends and never renumbers an exported mask.
+ *  APOSTLE and MONK are never targets. */
+const TARGET_CLASSES = [
+  'RECON', 'MELEE', 'RANGED', 'ANTICAV', 'LIGHT_CAV', 'HEAVY_CAV',
+  'SIEGE', 'NAVAL_MELEE', 'NAVAL_RANGED',
+  'AIR_FIGHTER', 'AIR_BOMBER', 'NAVAL_RAIDER',
+] as const;
 export const CLASS_BIT: Readonly<Record<string, number>> = Object.fromEntries(
-  PROMO_CLASSES.slice(0, 9).map((c, i) => [c, 1 << i]),
+  TARGET_CLASSES.map((c, i) => [c, 1 << i]),
 );
 export const MASK_LAND = CLASS_BIT.RECON | CLASS_BIT.MELEE | CLASS_BIT.RANGED
   | CLASS_BIT.ANTICAV | CLASS_BIT.LIGHT_CAV | CLASS_BIT.HEAVY_CAV | CLASS_BIT.SIEGE;
-export const MASK_NAVAL = CLASS_BIT.NAVAL_MELEE | CLASS_BIT.NAVAL_RANGED;
+/** CIV6 groups every hull under "naval units", the raider included. */
+export const MASK_NAVAL = CLASS_BIT.NAVAL_MELEE | CLASS_BIT.NAVAL_RANGED
+  | CLASS_BIT.NAVAL_RAIDER;
 export const MASK_CAVALRY = CLASS_BIT.LIGHT_CAV | CLASS_BIT.HEAVY_CAV;
+export const MASK_AIR = CLASS_BIT.AIR_FIGHTER | CLASS_BIT.AIR_BOMBER;
 
 export const PROMO_KINDS = [
   'NONE',
@@ -37,6 +48,8 @@ export const PROMO_KINDS = [
   'CS_DEF_RANGED',       // +v defending against a RANGED attack
   'CS_DEF_ANY',          // +v whenever this unit defends
   'CS_DEF_VS_CITY',      // +v defending against a CITY's strike
+  'CS_DEF_VS_AIR',       // +v defending against an AIR strike
+  'CS_DEF_VS_AA',        // +v when an aircraft defends against anti-air fire
   'CS_DEF_TERRAIN',      // +v defending on woods / rainforest / hills / marsh
   'CS_IN_DISTRICT',      // +v while this unit occupies a district or a Fort
   'CS_ATK_DISTRICT',     // +v on a MELEE attack into a district
@@ -54,6 +67,8 @@ export const PROMO_KINDS = [
   'MOVE_AFTER_ATTACK',   // attacking does not consume the turn
   'SIEGE_MOVE_SHOOT',    // a siege unit may attack after moving
   'HEAL_ANYWHERE',       // heals outside friendly territory
+  'HEAL_AFTER_ATTACK',   // attacking does not silence this turn's heal
+  'RAID_GOLD',           // +v gold on top of a coastal raid's own take
   'PILLAGE_CHEAP',       // pillaging costs v movement
   'HOLD_THE_LINE',       // adjacent OWN units of another class get +v vs cavalry
   'TERRAIN_MOVE_WOODS',  // woods and rainforest cost 1
@@ -191,7 +206,8 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('CONVOY', 'NAVAL_MELEE', 3, ['RUTTER', 'REINFORCED_HULL'],
     cs('CS_IN_FORMATION', 10)),
   P('AUXILIARY_SHIPS', 'NAVAL_MELEE', 3, ['RUTTER', 'REINFORCED_HULL'], { kind: 'HEAL_ANYWHERE' }),
-  P('CREEPING_ATTACK', 'NAVAL_MELEE', 4, ['CONVOY', 'AUXILIARY_SHIPS'], none),
+  P('CREEPING_ATTACK', 'NAVAL_MELEE', 4, ['CONVOY', 'AUXILIARY_SHIPS'],
+    cs('CS_VS_CLASS_ANY', 14, CLASS_BIT.NAVAL_RAIDER)),
 
   // ---- NAVAL RANGED ---------------------------------------------------
   P('LINE_OF_BATTLE', 'NAVAL_RANGED', 1, [], cs('CS_VS_CLASS_ANY', 7, MASK_NAVAL)),
@@ -199,7 +215,8 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('PREPARATORY_FIRE', 'NAVAL_RANGED', 2, ['LINE_OF_BATTLE'], cs('CS_VS_CLASS_ATK', 7, MASK_LAND)),
   P('ROLLING_BARRAGE', 'NAVAL_RANGED', 2, ['BOMBARDMENT'], cs('CS_VS_DISTRICT_DEF', 10)),
   P('SUPPLY_FLEET', 'NAVAL_RANGED', 3, ['PREPARATORY_FIRE', 'ROLLING_BARRAGE'], { kind: 'HEAL_ANYWHERE' }),
-  P('PROXIMITY_FUSES', 'NAVAL_RANGED', 3, ['PREPARATORY_FIRE', 'ROLLING_BARRAGE'], none),
+  P('PROXIMITY_FUSES', 'NAVAL_RANGED', 3, ['PREPARATORY_FIRE', 'ROLLING_BARRAGE'],
+    cs('CS_DEF_VS_AIR', 7)),
   P('COINCIDENCE_RANGEFINDING', 'NAVAL_RANGED', 4, ['SUPPLY_FLEET', 'PROXIMITY_FUSES'], cs('RANGE', 1)),
 
   // ---- APOSTLE (a LIST: tier 0, no prerequisites) ----------------------
@@ -223,6 +240,47 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('SWEEPING_WIND', 'MONK', 3, ['EXPLODING_PALMS', 'DISCIPLES'], cs('EXTRA_ATTACK', 1)),
   P('DANCING_CRANE', 'MONK', 3, ['EXPLODING_PALMS', 'DISCIPLES'], cs('MOVES', 1)),
   P('COBRA_STRIKE', 'MONK', 4, ['SWEEPING_WIND', 'DANCING_CRANE'], cs('CS_ALL', 15)),
+
+  // ---- AIR FIGHTER ----------------------------------------------------
+  // The two roots split by what the fighter is FOR: killing other aircraft,
+  // or surviving the guns pointed at it.
+  P('DOGFIGHTING', 'AIR_FIGHTER', 1, [], cs('CS_VS_CLASS_ANY', 7, CLASS_BIT.AIR_FIGHTER)),
+  P('COCKPIT_ARMOR', 'AIR_FIGHTER', 1, [], cs('CS_DEF_VS_AA', 7)),
+  P('INTERCEPTOR', 'AIR_FIGHTER', 2, ['DOGFIGHTING'],
+    cs('CS_VS_CLASS_ANY', 7, CLASS_BIT.AIR_BOMBER)),
+  P('STRAFE', 'AIR_FIGHTER', 2, ['COCKPIT_ARMOR'],
+    cs('CS_VS_CLASS_ANY', 17, MASK_LAND & ~MASK_CAVALRY)),
+  P('GROUND_CREWS', 'AIR_FIGHTER', 3, ['INTERCEPTOR'], none),
+  P('TANK_BUSTER', 'AIR_FIGHTER', 3, ['STRAFE'], cs('CS_VS_CLASS_ANY', 17, MASK_CAVALRY)),
+  P('DROP_TANKS', 'AIR_FIGHTER', 4, ['GROUND_CREWS', 'TANK_BUSTER'], cs('RANGE', 2)),
+
+  // ---- AIR BOMBER -----------------------------------------------------
+  // Both roots are DEFENSIVE, against the two things that shoot a bomber
+  // down: a fighter, and the guns below it.
+  P('BOX_FORMATION', 'AIR_BOMBER', 1, [],
+    cs('CS_DEF_VS_CLASS', 7, CLASS_BIT.AIR_FIGHTER)),
+  P('EVASIVE_MANEUVERS', 'AIR_BOMBER', 1, [], cs('CS_DEF_VS_AA', 7)),
+  P('CLOSE_AIR_SUPPORT', 'AIR_BOMBER', 2, ['BOX_FORMATION', 'EVASIVE_MANEUVERS'],
+    cs('CS_VS_CLASS_ANY', 12, MASK_LAND)),
+  P('TORPEDO_BOMBER', 'AIR_BOMBER', 2, ['BOX_FORMATION', 'EVASIVE_MANEUVERS'],
+    cs('CS_VS_CLASS_ANY', 17, MASK_NAVAL)),
+  P('LONG_RANGE', 'AIR_BOMBER', 3, ['CLOSE_AIR_SUPPORT'], cs('RANGE', 2)),
+  P('TACTICAL_MAINTENANCE', 'AIR_BOMBER', 3, ['TORPEDO_BOMBER'],
+    { kind: 'HEAL_AFTER_ATTACK' }),
+  P('SUPERFORTRESS', 'AIR_BOMBER', 4, ['LONG_RANGE', 'TACTICAL_MAINTENANCE'], none),
+
+  // ---- NAVAL RAIDER ---------------------------------------------------
+  // The raider's tree is money first and the hunt second, which is what the
+  // class is: "Obtain Gold from naval victories" beside "+50 Gold from
+  // coastal raids".
+  P('BOARDING', 'NAVAL_RAIDER', 1, [], none),
+  P('LOOT', 'NAVAL_RAIDER', 1, [], cs('RAID_GOLD', 50)),
+  P('HOMING_TORPEDOES', 'NAVAL_RAIDER', 2, ['BOARDING'],
+    cs('CS_VS_CLASS_ANY', 10, MASK_NAVAL)),
+  P('SWIFT_KEEL', 'NAVAL_RAIDER', 2, ['LOOT'], cs('MOVES', 1)),
+  P('OBSERVATION', 'NAVAL_RAIDER', 3, ['SWIFT_KEEL'], cs('SIGHT', 1)),
+  P('SILENT_RUNNING', 'NAVAL_RAIDER', 3, ['HOMING_TORPEDOES'], { kind: 'MOVE_AFTER_ATTACK' }),
+  P('WOLFPACK', 'NAVAL_RAIDER', 4, ['OBSERVATION', 'SILENT_RUNNING'], cs('EXTRA_ATTACK', 1)),
 ];
 
 /** the promotions of one class, in catalog order — the ORDER IS THE WIRE:
@@ -257,12 +315,16 @@ export const UNIT_PROMO_CLASS: Readonly<Record<string, PromoClass>> = {
   BATTLESHIP: 'NAVAL_RANGED', MISSILE_CRUISER: 'NAVAL_RANGED',
   APOSTLE: 'APOSTLE',
   WARRIOR_MONK: 'MONK',
+  BIPLANE: 'AIR_FIGHTER', FIGHTER: 'AIR_FIGHTER', JET_FIGHTER: 'AIR_FIGHTER',
+  BOMBER: 'AIR_BOMBER', JET_BOMBER: 'AIR_BOMBER',
+  PRIVATEER: 'NAVAL_RAIDER', SUBMARINE: 'NAVAL_RAIDER',
+  NUCLEAR_SUBMARINE: 'NAVAL_RAIDER',
 };
 
 /** the class BIT a chassis presents to another unit's `CS_VS_*` mask. */
 export function classBitOf(unitType: string): number {
   const c = UNIT_PROMO_CLASS[unitType];
-  return c && c !== 'APOSTLE' && c !== 'MONK' ? CLASS_BIT[c] : 0;
+  return (c && CLASS_BIT[c]) ?? 0;
 }
 
 /** the catalog index of a promotion id — the bit it occupies in a unit's

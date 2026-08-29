@@ -587,6 +587,7 @@ class SimInit:
         self._sky_eurekas = [[int(x) for x in w if int(x) >= 0] for w in _er["skyEurekas"]]
         self._sky_alu_slot = int(_er["skyAluminumSlot"])
         self._sky_alu_rate = int(_er["skyAluminumPerTurn"])
+        self._sky_air_xp = int(_er["skyAirXpPct"])
         self._auto_ura_slot = int(_er["automatonUraniumSlot"])
         self._auto_ura_rate = int(_er["automatonUraniumPerTurn"])
         self._auto_ura_mine = int(_er["automatonUraniumPerMine"])

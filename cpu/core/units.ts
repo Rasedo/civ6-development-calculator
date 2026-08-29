@@ -37,7 +37,7 @@ import { UNITS, UNIT_HP, ENCAMPMENT_HP, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE
 import { UNIT_PROMO_CLASS } from '../data/promotions';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import {
-  attacksPerTurn, promoFirstUse, promoFlag, promoValue, stepAttacksLeft,
+  attacksLeftOf, attacksPerTurn, promoFirstUse, promoFlag, promoValue, stepAttacksLeft,
 } from './promotions';
 import { dedicationEvent, goldenMoveBonus } from './eras'; // MONUMENTALITY / EXODUS +2 MP
 import { DED_WISH, OPEN_BORDERS_CIVIC } from '../data/seats';
@@ -1462,7 +1462,13 @@ export function refreshUnits(state: GameState): void {
       && !civHasStrategic(state, unit.seat, need);
     // CIV6 (Twilight Valor): "Cannot heal outside your territory."
     const homeOnly = getModifiers(state, unit.seat).healOnlyHome;
-    if (unit.movesLeft >= grantedLast && !starved && !(homeOnly && tileSeat(tile) !== unit.seat)) {
+    // CIV6 (Tactical Maintenance): "Can heal after attacking." The kind lives
+    // on the bomber's list alone, and a sortie is the only thing that spends an
+    // aircraft's turn, so a spent attack excuses the spent movement. The
+    // fortify gate below keeps the plain reading — no aircraft digs in.
+    const rested = unit.movesLeft >= grantedLast
+      || (attacksLeftOf(unit) < attacksPerTurn(unit) && promoFlag(unit, 'HEAL_AFTER_ATTACK'));
+    if (rested && !starved && !(homeOnly && tileSeat(tile) !== unit.seat)) {
       const home = tileSeat(tile) === unit.seat;
       const onCamp = seatOf(state, unit.seat)?.camps.includes(unit.tileIndex) ?? false;
       const heal = (UNITS[unit.type]?.religiousStrength ?? 0) > 0
