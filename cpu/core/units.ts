@@ -252,14 +252,17 @@ export function unitsAt(state: GameState, tileIndex: number): Unit[] {
 }
 
 /**
- * The STACKING slot a chassis holds. Three, not two: CIV6 bases an air unit
+ * The STACKING slot a chassis holds. Four, not two: CIV6 bases an air unit
  * INSIDE a city centre, an Aerodrome or a carrier, where it neither blocks a
- * land unit nor defends the tile. Every `=== 'military'` reader therefore
- * keeps its meaning — a plane is no garrison, exerts no zone of control, is
- * nobody's melee defender and never fortifies.
+ * land unit nor defends the tile; and a SPY carries no Combat Strength at all,
+ * standing in its own promotion class ("Espionage") and holding no tile.
+ * Every `=== 'military'` reader therefore keeps its meaning — neither a plane
+ * nor a spy is a garrison, exerts zone of control, is anybody's melee
+ * defender, banks experience or ever fortifies.
  */
-export function unitDomain(type: string): 'civilian' | 'military' | 'air' {
+export function unitDomain(type: string): 'civilian' | 'military' | 'air' | 'spy' {
   if (UNITS[type]?.air !== undefined) return 'air';
+  if (isSpy(type)) return 'spy';
   return UNITS[type]?.charges !== undefined ? 'civilian' : 'military';
 }
 
@@ -271,10 +274,28 @@ export function unitDomain(type: string): 'civilian' | 'military' | 'air' {
  * and an Admiral." So a water tile holds up to three: the hull, the Admiral,
  * and ONE passenger of either domain.
  */
-export type StackSlot = 'civilian' | 'military' | 'air' | 'embarked';
+export type StackSlot = 'civilian' | 'military' | 'air' | 'spy' | 'embarked';
 export function unitStackSlot(u: { type: string; embarked?: boolean }): StackSlot {
   const d = unitDomain(u.type);
   return u.embarked && d !== 'air' ? 'embarked' : d;
+}
+
+/**
+ * A unit changes owner. Three fields move together, so the capture and the
+ * conversion cannot answer differently: the new side's flag, a spent turn, and
+ * NO fortification — a unit that has just changed hands holds none, which is
+ * also what `movesLeft = 0` makes the fortify gate say at the next refresh.
+ *
+ * The re-seated unit then goes to the END of `state.units`: the pooled engine
+ * despawns its merged slot and appends at the receiving pool's head, so both
+ * engines must iterate it LAST in every array-order walk.
+ */
+export function reseatUnit(state: GameState, unit: Unit, seat: number): void {
+  unit.seat = seat;
+  unit.movesLeft = 0;
+  unit.fortifyTurns = 0;
+  state.units = state.units.filter((u) => u.id !== unit.id);
+  state.units.push(unit);
 }
 
 export function unitsHostile(

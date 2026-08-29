@@ -12,7 +12,7 @@ import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canR
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, isCivicComplete } from './effects';
 import type { Modifiers, Unlocks } from './effects';
 import { effectiveResearchCostIn } from './boosts';
-import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, tileFreeForUnit, builderCost, traderCost, settlerCount, unitsAt } from './units';
+import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, settlerCount, unitsAt } from './units';
 import { promoClassOf, promoFlag, unitPromoRows, XP_PER_LEVEL } from './promotions';
 import { barbarianPhase, damageRoll, trainXpPct, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
 import { revealAround } from './fog';
@@ -778,12 +778,7 @@ export function convertHeathens(state: GameState, unit: Unit, actor: Seat): Rule
     for (const u of unitsAt(state, t.index)) if (isBarbSeat(u.seat)) got.push(u);
   }
   if (got.length === 0) return { ok: false, reason: 'No Barbarians adjacent.' };
-  for (const u of got) {
-    u.seat = actor.seat;
-    u.movesLeft = 0;
-    state.units = state.units.filter((x) => x.id !== u.id);
-    state.units.push(u);
-  }
+  for (const u of got) reseatUnit(state, u, actor.seat);
   unit.charges = (unit.charges ?? 1) - 1;
   unit.movesLeft = 0;
   if ((unit.charges ?? 0) <= 0) disbandUnit(state, unit.id);

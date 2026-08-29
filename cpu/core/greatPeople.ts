@@ -183,7 +183,7 @@ export function relicSlotsIn(state: GameState) {
   return (c: WorkCity): number => {
     const w = wonderRelicSlots(state, c);
     const dedicated = (c.buildings.includes(RELIC_BUILDING) ? RELIC_SLOTS_PER_BUILDING : 0) + w;
-    return w + Math.max(0, (c.relics ?? 0) - dedicated) + anyWorkFree(state, c);
+    return w + inPool(state, c, dedicated, c.relics ?? 0) + anyWorkFree(state, c);
   };
 }
 
@@ -221,8 +221,15 @@ export function gwExtraSlots(state: GameState, kind: number) {
   const wonders = wonderGwSlots(state, kind);
   return (c: WorkCity): number => {
     const w = wonders(c);
-    return w + Math.max(0, gwCount(c, kind) - gwCapacity(c, kind, w)) + anyWorkFree(state, c);
+    return w + inPool(state, c, gwCapacity(c, kind, w), gwCount(c, kind)) + anyWorkFree(state, c);
   };
+}
+
+/** How many of the any-work POOL's slots one kind already stands in. Never
+ *  more than the pool: a city that loses a dedicated slot under an occupied
+ *  work keeps the work, not a slot conjured to hold it. */
+function inPool(state: GameState, c: WorkCity, dedicated: number, held: number): number {
+  return Math.min(Math.max(0, held - dedicated), cityBuildingSum(state, c, 'anyWorkSlots'));
 }
 
 /**

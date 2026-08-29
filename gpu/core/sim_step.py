@@ -23,7 +23,10 @@ class SimStep:
                 _typ = getattr(self, f"{_pre}_unit_type")
                 _spent = self._spent_mp(_pre)
                 _fort = getattr(self, f"{_pre}_unit_fortify")
-                _mil = (self._type_combat[_typ] > 0) & ~self.unit_naval[_typ]
+                # CIV6: a plane is based inside a city centre, an Aerodrome or a
+                # carrier and a Spy carries no Combat Strength — neither digs in.
+                _mil = ((self._type_combat[_typ] > 0) & ~self.unit_naval[_typ]
+                        & (self._type_air[_typ] == 0))
                 _dug = torch.where(
                     _alive & _mil & ~_spent, (_fort + 1).clamp(max=2),
                     torch.where(_alive & _mil & _spent, torch.zeros_like(_fort), _fort),

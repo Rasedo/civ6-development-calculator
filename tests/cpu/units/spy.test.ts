@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
-import { spawnUnit, trainableUnits, tileFreeForUnit } from '../../../cpu/core/units';
+import { spawnUnit, trainableUnits, tileFreeForUnit, refreshUnits, unitExertsZoc, unitDomain } from '../../../cpu/core/units';
 import { UNITS } from '../../../cpu/data/units';
 import { emptySeat, seatOf, setAllyTurnsWith, setTileOwner } from '../../../cpu/core/seats';
 import {
@@ -106,6 +106,22 @@ describe('a spy is fielded, not stationed', () => {
     expect(tileFreeForUnit(state, mine.centerIndex, 0, { type: 'BUILDER', seat: 0 })).toBe(true);
     const second = spawnUnit(state, SPY_UNIT, mine.centerIndex, 0)!;
     expect(second.tileIndex).toBe(mine.centerIndex);
+  });
+
+  it('carries no Combat Strength: no zone of control, and it never digs in', () => {
+    const { state, mine } = spyState();
+    const spy = spyAt(state, 0, mine);
+    expect(unitDomain(SPY_UNIT)).toBe('spy');
+    expect(unitExertsZoc(spy)).toBe(false);
+    // the control: a WARRIOR that stands still digs in over two refreshes.
+    const open = state.map.tiles.find(
+      (x) => x.index !== mine.centerIndex && !x.district && x.terrain !== 'OCEAN',
+    )!;
+    const w = spawnUnit(state, 'WARRIOR', open.index, 0)!;
+    refreshUnits(state);
+    refreshUnits(state);
+    expect(w.fortifyTurns).toBe(2);
+    expect(spy.fortifyTurns ?? 0).toBe(0);
   });
 });
 

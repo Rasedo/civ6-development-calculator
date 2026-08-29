@@ -1620,10 +1620,9 @@ class SimEconomy:
     def _bsum_by_row(self, key: str, w: torch.Tensor) -> torch.Tensor:
         """[B, n_majors] — `_seat_building_sum` for EVERY major row at once,
         for the sites that read the OWNER off a unit rather than a loop index.
-        Memoised beside the effect channels: every `city_bldg` write moves
-        `_eff_version`."""
-        if self._bsum_row_cache is None or self._bsum_row_cache[0] != self._eff_version:
-            self._bsum_row_cache = (self._eff_version, {})
+        Memoised on `_bldg_version`, which every `city_bldg` write moves."""
+        if self._bsum_row_cache is None or self._bsum_row_cache[0] != self._bldg_version:
+            self._bsum_row_cache = (self._bldg_version, {})
         d = self._bsum_row_cache[1]
         v = d.get(key)
         if v is None:
@@ -1973,8 +1972,28 @@ class SimEconomy:
         more, plus whatever is left of the any-work pool. `gwCapacity`'s twin
         under `gwExtraSlots`, and `_place_works`' own `cap`."""
         held = (self.city_gw_writing, self.city_gw_art, self.city_gw_music)[kind][:, row]
-        return torch.maximum(self._gw_dedicated(row, kind), held) \
+        ded = self._gw_dedicated(row, kind)
+        return ded + self._in_pool(ded, held, self._any_work_pool_all()[:, row]) \
             + self._any_work_free_all()[:, row]
+
+    @staticmethod
+    def _in_pool(dedicated: torch.Tensor, held: torch.Tensor,
+                 pool: torch.Tensor) -> torch.Tensor:
+        """How many of the any-work POOL's slots one kind already stands in.
+        Never more than the pool: a city that loses a dedicated slot under an
+        occupied work keeps the work, not a slot conjured to hold it."""
+        return torch.minimum((held - dedicated).clamp(min=0), pool)
+
+    def _any_work_pool_all(self) -> torch.Tensor:
+        """[B, n_majors, RC] long — the any-work slots each city's STANDING
+        buildings open, before anything takes one."""
+        pool = torch.zeros(self.B, self.n_majors, self.RC, dtype=torch.long, device=self.device)
+        if not self._any_work_live:
+            return pool
+        for r in range(self.n_majors):
+            stand = self.city_bldg[:, r] & ~self._bldg_dark(self.city_dist_tile[:, r])
+            pool[:, r] = torch.einsum("bjn,n->bj", stand.long(), self._b_any_work)
+        return pool
 
     def _any_work_free_all(self) -> torch.Tensor:
         """[B, n_majors, RC] long — CIV6 (National History Museum): "Provides 4
@@ -1985,12 +2004,10 @@ class SimEconomy:
         z = torch.zeros(self.B, self.n_majors, self.RC, dtype=torch.long, device=self.device)
         if not self._any_work_live:
             return z
-        pool = z.clone()
+        pool = self._any_work_pool_all()
         used = z.clone()
         rded = self._relic_dedicated()
         for r in range(self.n_majors):
-            stand = self.city_bldg[:, r] & ~self._bldg_dark(self.city_dist_tile[:, r])
-            pool[:, r] = torch.einsum("bjn,n->bj", stand.long(), self._b_any_work)
             for k in range(3):
                 held = (self.city_gw_writing, self.city_gw_art, self.city_gw_music)[k][:, r]
                 used[:, r] = used[:, r] + (held - self._gw_dedicated(r, k)).clamp(min=0)

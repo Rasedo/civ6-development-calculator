@@ -18,7 +18,7 @@ import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
 import { addEraScore, worldEraIndex } from './eras';
-import { nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc } from './units';
+import { nextRandom, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc } from './units';
 import { isAirUnit, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirOf, displaceAirFrom } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { EMBARKED_DEFENSE_CS_BY_ERA, embarkState } from '../data/constants';
@@ -1203,19 +1203,8 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     if (isBarbSeat(attacker.seat)) {
       killUnit(state, defender);
     } else {
-      defender.seat = attacker.seat; // one field carries the whole ownership change
-      defender.movesLeft = 0;
+      reseatUnit(state, defender, attacker.seat);
       spendAttack(attacker, true);
-      // GPU parity: the batch engine transfers the captured unit to the END
-      // of the winning pool (append at next_slot). Mirror that here — splice
-      // it out of state.units and push it back — so both engines iterate the
-      // captured unit LAST in every array-order loop (builderActions,
-      // the war loop, the builder walker). Flipping owner in place would keep
-      // the unit at its original SEAT 0-spawn index, which the pooled GPU has
-      // no way to reproduce; the resulting order desync surfaces (dormant)
-      // when two same-civ builders contend for a job the same turn.
-      state.units = state.units.filter((u) => u.id !== defender.id);
-      state.units.push(defender);
       return ok;
     }
   } else {

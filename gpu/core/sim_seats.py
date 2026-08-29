@@ -646,6 +646,7 @@ class SimSeats:
     def _seat_buy_building(self, row: int, can6: torch.Tensor, jj6: torch.Tensor, bb6: torch.Tensor, price6: torch.Tensor) -> None:
         rows6 = can6.nonzero(as_tuple=True)[0]
         self.city_bldg[rows6, row, jj6[rows6], bb6[rows6]] = True
+        self._bldg_version += 1
         self._building_dedications(row, bb6, can6)  # a purchased building is constructed too
         self._eff_version += 1
         if self._walls_rows:
@@ -660,6 +661,7 @@ class SimSeats:
         """The class purchase's write — the gold buy's twin, paid out of faith."""
         rows = ok.nonzero(as_tuple=True)[0]
         self.city_bldg[rows, row, jj[rows], bb[rows]] = True
+        self._bldg_version += 1
         self._building_dedications(row, bb, ok)
         self._eff_version += 1
         if self._walls_rows:
@@ -1214,6 +1216,7 @@ class SimSeats:
                 if bool(buy_w.any()):
                     rows_w = buy_w.nonzero(as_tuple=True)[0]
                     self.city_bldg[rows_w, row, jw[rows_w], wb] = True
+                    self._bldg_version += 1
                     self._eff_version += 1
                     self.civ_faith[:, row] = torch.where(buy_w, self.civ_faith[:, row] - self._worship_cost, self.civ_faith[:, row])
         rel_kind, rel_j = self._driven_buy_relig.pop(row) if row in self._driven_buy_relig else (None, None)
@@ -2436,8 +2439,9 @@ class SimSeats:
         slots, or what it already holds where that is more, plus whatever is
         left of the any-work pool. The `placeRelic` capacity expression under
         `relicSlotsIn`."""
-        return torch.maximum(self._relic_dedicated(), self.city_relics[:, : self.n_majors]) \
-            + self._any_work_free_all()
+        ded = self._relic_dedicated()
+        return ded + self._in_pool(ded, self.city_relics[:, : self.n_majors],
+                                   self._any_work_pool_all()) + self._any_work_free_all()
 
     def _relic_dedicated(self) -> torch.Tensor:
         """[B, n_majors, RC] long — the relic slots each city owns outright: the
@@ -5026,7 +5030,7 @@ class SimSeats:
         self.city_spec_pin[b, row, col, :] = -1
         self.city_wonder[b, row, col, :] = -1
         self.city_bldg[b, row, col, :] = False
-        self._eff_version += 1
+        self._bldg_version += 1
         self.city_followed[b, row, col] = -1
         self.city_pressure[b, row, col, :] = 0
 
@@ -5189,6 +5193,7 @@ class SimSeats:
                            "city_gwart_type", "city_gwart_artist"), old_prov):
             getattr(self, _p)[b, dst_row, col, :] = _v
         self.city_bldg[b, dst_row, col, :] = old_bldg
+        self._bldg_version += 1
         # the CONQUEROR manages nothing yet: TS's flipped literal carries no
         # `specialistPref`, so every slot goes back to the automatic rule.
         self.city_spec_pin[b, dst_row, col, :] = -1
@@ -5478,6 +5483,7 @@ class SimSeats:
         self.city_dist_tile[rows, row, slot, :] = -1
         self.city_wonder[rows, row, slot, :] = -1
         self.city_bldg[rows, row, slot, :] = False
+        self._bldg_version += 1
         # Persistent id — foundCityAt's `nextCityId++`; tile_city stores it
         # (TS ownerCity), the slot stays a storage address only.
         _new_cid = self.civ_next_city_id[rows, row].clone()
@@ -7065,11 +7071,14 @@ class SimSeats:
         a_hp[:, u] = self._heal_on_kill(atk_row, def_dead, a_hp[:, u])
         d_won = atk_raw & ~def_dead
         if self._heal_kill_live and bool(d_won.any()):
+            # the whole batch, narrowed after: a gather over a SUBSET index
+            # reads batch rows 0..n-1, which are the wrong games
+            ds_all = d_slot.clamp(min=0)
+            d_seat_all = self.unit_seat.gather(1, ds_all.unsqueeze(1)).squeeze(1)
+            hp_all = self.unit_hp.gather(1, ds_all.unsqueeze(1)).squeeze(1)
+            healed = self._heal_on_kill(self._row_of(d_seat_all), d_won, hp_all)
             dr = d_won.nonzero(as_tuple=True)[0]
-            dsl = d_slot[dr]
-            self.unit_hp[dr, dsl] = self._heal_on_kill(
-                self._row_of(self.unit_seat[dr, dsl]),
-                torch.ones_like(dr, dtype=torch.bool), self.unit_hp[dr, dsl])
+            self.unit_hp[dr, ds_all[dr]] = healed[dr]
         return rows, def_dead, atk_raw & ~def_dead, atk_raw
 
     def _hostile_ranged_strike(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int) -> torch.Tensor:

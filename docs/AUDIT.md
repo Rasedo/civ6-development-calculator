@@ -503,6 +503,13 @@ under their blocker so the dependency is readable, and both halves count.
     nothing here.
   - **"NO TWO SPIES MAY PERFORM THE SAME MISSION IN THE SAME CITY"** —
     the mission mask asks nothing about other spies on the tile.
+  - **"TO ARMS!" PAYS FOR A SPY.** The golden-age dedication is "+15%
+    Production towards military units", and both engines spend it on
+    every queued unit that is not a CIVILIAN — a set the Spy is outside,
+    since it carries no charges and no `civilian` flag. The published
+    chassis is a civilian unit in its own promotion class ("Espionage")
+    with no Combat Strength: the Combat-Strength readers refuse it on
+    both engines, the production one does not.
   - **LISTENING POST** — its payload is diplomatic VISIBILITY (C-2).
   - **FABRICATE SCANDAL** targets a city-state — R&F's ruleset; the
     majors-only scan is vanilla-faithful and the minor city block carries

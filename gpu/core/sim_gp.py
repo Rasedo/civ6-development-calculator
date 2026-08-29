@@ -382,7 +382,7 @@ class SimGp:
         nb = min(want.shape[1], self.city_bldg.shape[3])
         r = m.nonzero(as_tuple=True)[0]
         self.city_bldg[r, row, cc[r], :nb] |= want[r, :nb]
-        self._eff_version += 1
+        self._bldg_version += 1
         # CIV6: a city never holds two of one building, so a granted one comes
         # off the production slot; the hammers already spent BANK, which is
         # where every carried-over hammer goes. `dropQueuedBuilding` is the twin.

@@ -1997,6 +1997,7 @@ class SimInit:
         self._b_heal_kill = rules.b_heal_kill.to(device)
         self._heal_kill_live = bool((self._b_heal_kill != 0).any())
         self._bsum_row_cache = None
+        self._bldg_version = 0  # every `city_bldg` write moves it
         # CIV6 (Water Works): housing per Neighborhood/Aqueduct, amenities per
         # Canal/Dam — the district roster, by catalog id.
         _dids = [str(d.get("id", "")) for d in self.districts_cat]

@@ -130,12 +130,17 @@ describe('promotion effects that are not Combat Strength', () => {
     ap.charges = 2;
     hold(ap, 'HEATHEN');
     const b1 = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 10, 9).index, BARB_SEAT)!;
+    b1.fortifyTurns = 2;
     const b2 = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 8, 9).index, BARB_SEAT)!;
     const r = convertHeathens(state, ap, state.seats[0]);
     expect(r.ok).toBe(true);
     expect(b1.seat).toBe(0);
     expect(b2.seat).toBe(0);
     expect(ap.charges).toBe(1);
+    // a unit that changes hands keeps neither the turn nor the fortification
+    // it dug in for its old side
+    expect(b1.movesLeft).toBe(0);
+    expect(b1.fortifyTurns).toBe(0);
     // both converts sit at the END of the array, in neighbour-ring order
     expect(state.units.slice(-2).map((u) => u.id)).toEqual(
       state.units.filter((u) => u.id === b1.id || u.id === b2.id).map((u) => u.id),

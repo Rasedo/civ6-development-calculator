@@ -312,6 +312,7 @@ def test_heathen(sim) -> None:
         sim.barb_unit_type[0, b] = int(sim.major_unit_type[0, ap]) * 0 + 2
         sim.barb_unit_tile[0, b] = n
         sim.barb_unit_hp[0, b] = 70
+        sim.barb_unit_fortify[0, b] = 2
         sim.military_at[0, n] = gslot
         barbs.append((b, n, gslot))
         if len(barbs) == 2:
@@ -331,9 +332,13 @@ def test_heathen(sim) -> None:
         assert held >= 0, f"tile {n} lost its unit"
         assert int(sim.unit_seat[0, held]) == ROW, "the convert did not change sides"
         assert held < sim.POOL_LO["barb"], "the convert stayed in the barbarian pool"
+        assert int(sim.unit_hp[0, held]) == 70, "the convert lost the damage it carried"
+        assert int(sim.unit_mp[0, held]) == 0, "the convert kept a turn it no longer has"
+        assert int(sim.unit_fortify[0, held]) == 0, \
+            "the convert kept the fortification it dug in for the barbarians"
     assert int(sim.major_unit_charges[0, ap]) == 1, "the conversion cost no charge"
     assert int(sim.major_unit_mp[0, ap]) == 0, "the conversion left the turn unspent"
-    print("  HEATHEN OK — both adjacent raiders changed sides for one charge")
+    print("  HEATHEN OK — both raiders changed sides for one charge, undug and spent")
 
 
 def test_range(sim) -> None:

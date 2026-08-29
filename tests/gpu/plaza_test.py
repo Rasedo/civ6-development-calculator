@@ -58,6 +58,7 @@ def stand(sim, row, col, name):
     bi = BLD.index(name)
     sim.city_bldg[0, row, col, bi] = True
     sim._eff_version += 1
+    sim._bldg_version += 1  # every `city_bldg` write moves it, engine or poke
     return bi
 
 

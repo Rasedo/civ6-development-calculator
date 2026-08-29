@@ -665,6 +665,7 @@ class SimPhase:
             br = made_b2.nonzero(as_tuple=True)[0]
             bi = cur.clamp(min=0, max=self.NB - 1)
             self.city_bldg[br, row, col[br], bi[br]] = True
+            self._bldg_version += 1
             self._building_dedications(row, bi, made_b2)
             # A completed REGIONAL building reaches OTHER cities' yields, so
             # the caches must see the write even though this turn's own walk
