@@ -267,6 +267,7 @@ def main() -> None:
     assert ucs(simc, "WARRIOR", cs_seat) == 0, "a city-state seat adopts no government"
     simc._gov_ucs_by_type[fas] = simc._gov_ucs_by_type[oli]
     simc._eff_version += 1
+    simc._gov_cat_version += 1
     for uid, want in (("WARRIOR", 4), ("SPEARMAN", 4), ("GALLEY", 4), ("ARCHER", 0), ("SETTLER", 0)):
         assert ucs(simc, uid, s0) == want, f"OLIGARCHY-row _gov_unit_cs {uid}: want {want}"
 
@@ -278,6 +279,7 @@ def main() -> None:
     ctr = int(simc.city_center[0, 0, 0])
     simc._gov_dc_house[fas] = 1.0
     simc._eff_version += 1
+    simc._gov_cat_version += 1
     h_no_district = simc._seat_housing(0)[1]
     assert float((h_no_district - h0).abs().sum()) == 0.0, "the grant pays NOTHING to a districtless city"
     simc.city_dist_tile[0, 0, 0, canal_i] = ctr + 1
@@ -286,9 +288,11 @@ def main() -> None:
     assert float(h1[0, 0] - h0[0, 0]) == 1.0, "one completed CANAL opens exactly the +1 housing grant"
     simc._gov_dc_amen[fas] = -30.0
     simc._eff_version += 1
+    simc._gov_cat_version += 1
     t_lo = simc._seat_amenity(0)[0]
     simc._gov_dc_amen[fas] = 30.0
     simc._eff_version += 1
+    simc._gov_cat_version += 1
     t_hi = simc._seat_amenity(0)[0]
     # the tier INDEX ranks best-first, so more amenities is a SMALLER index
     assert int(t_hi[0, 0]) < int(t_lo[0, 0]), "the amenity grant reaches the tier balance of the districted city"

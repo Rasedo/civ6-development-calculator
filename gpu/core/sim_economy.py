@@ -1577,13 +1577,16 @@ class SimEconomy:
 
         `_eff_version` is the cheap gate; when it moves, the four INPUTS are
         re-derived (under a millisecond) and the standing answer kept if they
-        match, because `_gov_policy_mods` reads nothing else. A building
-        completing anywhere moves the version many times a turn and changes
-        none of them."""
+        match, because `_gov_policy_mods` reads nothing else BUT the catalog.
+        A building completing anywhere moves the version many times a turn and
+        changes none of them. `_gov_cat_version` carries the catalog half of
+        that key — the four inputs cannot speak for a row that was rewritten
+        underneath them."""
         if self._gov_pol_cache is None:
             self._gov_pol_cache = {}
+        ver = (self._eff_version, self._gov_cat_version)
         ent = self._gov_pol_cache.get(row)
-        if ent is not None and ent[0] == self._eff_version:
+        if ent is not None and ent[0] == ver:
             return ent[5]
         # `_seat_civics` hands back a VIEW of the live plane; a key that is not
         # a copy compares equal to itself forever and freezes the answer.
@@ -1591,12 +1594,13 @@ class SimEconomy:
         slots = self._wonder_extra_slots(row)
         dark = self.civ_age[:, row] == 0
         era = self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row])
-        if ent is not None and torch.equal(ent[1], civ) and torch.equal(ent[2], slots) \
+        if ent is not None and ent[0][1] == self._gov_cat_version \
+                and torch.equal(ent[1], civ) and torch.equal(ent[2], slots) \
                 and torch.equal(ent[3], dark) and torch.equal(ent[4], era):
             val = ent[5]
         else:
             val = self._gov_policy_mods(civ, slots, dark, era)
-        self._gov_pol_cache[row] = (self._eff_version, civ, slots, dark, era, val)
+        self._gov_pol_cache[row] = (ver, civ, slots, dark, era, val)
         return val
 
     def _seat_slotted(self, row: int) -> torch.Tensor:

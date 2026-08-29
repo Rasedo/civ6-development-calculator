@@ -1894,7 +1894,12 @@ class SimInit:
         self._suz_rows_cache = None  # ((turn, _eff_version), {code: [B, n_majors] bool})
         self._belief_feat_cache = None   # ((r,_eff_version,_bel_version), [B,T,6])
         self._bel_add_memo = None        # (_bel_version, {(fn,key,r): tensor})
-        self._gov_pol_cache = None       # {row: (_eff_version, civ, slots, dark, era, mods)}
+        self._gov_pol_cache = None       # {row: (ver, civ, slots, dark, era, mods)}
+        # `_gov_mods` memoises an answer the government CATALOG feeds, and
+        # the catalog is written once at load. Anything that rewrites a
+        # `_gov_*` or `_pol_*` row after that must move this counter, or the
+        # memo keeps answering off the row it replaced.
+        self._gov_cat_version = 0
         self._dadj_cache = None          # (_eff_version, {di: floored [B,T] adjacency})
         self._wadj_cache = None          # (_eff_version, {key: [B,T] wonder-adjacency plane})
         self._fx_row_cache = None        # (_eff_version, {channel: [B, n_majors]})
