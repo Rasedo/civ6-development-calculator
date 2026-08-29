@@ -62,6 +62,7 @@ class SimOrders:
         _gpc = getattr(self, "_A_GP", -1)
         _pfc = getattr(self, "_A_PERFORM", -1)
         _bpc = getattr(self, "_A_BOOST", -1)
+        _fuc = getattr(self, "_A_FORM_UP", -1)
         _stw = self._spy_travel_cols
         _smw = self._n_spy_missions
         _pcol = self.rules.promo_cols
@@ -97,13 +98,14 @@ class SimOrders:
             ((_ab == _gpc) if _gpc >= 0 else _no).any(dim=0),  # activate a great person
             ((_ab == _pfc) if _pfc >= 0 else _no).any(dim=0),   # perform a concert
             ((_ab == _bpc) if _bpc >= 0 else _no).any(dim=0),   # pay a district project
+            (((_ab >= _fuc) & (_ab < _fuc + 6)) if _fuc >= 0 else _no).any(dim=0),  # form up
         ]).tolist()
         (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
          _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread,
          _rk_excavate, _rk_park, _rk_promote, _rk_condemn,
          _rk_heresy, _rk_inquis, _rk_heathen, _rk_upgrade,
          _rk_air, _rk_rebase, _rk_travel, _rk_mission,
-         _rk_road, _rk_finish, _rk_gp, _rk_perform, _rk_boost) = _tab
+         _rk_road, _rk_finish, _rk_gp, _rk_perform, _rk_boost, _rk_form) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -196,6 +198,34 @@ class SimOrders:
                         # this roster's Apostle picks its promotion.
                         self.unit_charges[pr, ps] += self._promo_val(
                             utp[pr], self.unit_promos[pr, ps], "SPREAD_CHARGES")
+
+            if _rk_form[n] and _fuc >= 0:
+                fum = act & (a >= _fuc) & (a < _fuc + 6)
+                if bool(fum.any()):
+                    dfu = (a - _fuc).clamp(min=0, max=5)
+                    ftg = nb.gather(1, dfu.unsqueeze(1)).squeeze(1)
+                    ftc = ftg.clamp(min=0)
+                    hsl = self.military_at.gather(1, ftc.unsqueeze(1)).squeeze(1)
+                    hcl = hsl.clamp(min=0)
+                    _live = hsl >= 0
+                    h_seat = torch.where(_live, self.unit_seat.gather(1, hcl.unsqueeze(1)).squeeze(1),
+                                         torch.full_like(hsl, -1))
+                    h_type = torch.where(_live, self.unit_type.gather(1, hcl.unsqueeze(1)).squeeze(1),
+                                         torch.full_like(hsl, -1))
+                    h_form = torch.where(_live, self.unit_formation.gather(1, hcl.unsqueeze(1)).squeeze(1),
+                                         torch.zeros_like(hsl))
+                    tier = h_form + self.unit_formation.gather(1, sc.unsqueeze(1)).squeeze(1) + 1
+                    civ_ok = torch.zeros_like(fum)
+                    for _k in range(1, self._form_max + 1):
+                        _ci = self._formation_civic[_k] if _k < len(self._formation_civic) else -1
+                        if _ci < 0:
+                            continue
+                        civ_ok = civ_ok | ((tier == _k) & self.civ_civics[:, row, _ci])
+                    okf = (fum & (ftg >= 0) & _live & (h_seat == row) & (h_type == utp)
+                           & (self._type_combat[utp.clamp(min=0)] > 0)
+                           & (self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1) > 0) & civ_ok)
+                    if bool(okf.any()):
+                        self._form_up(row, okf, hcl, sc, tier)
 
             if _rk_condemn[n] and _cn >= 0:
                 cdm = act & (a >= _cn) & (a < _cn + 6)

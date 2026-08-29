@@ -1825,7 +1825,8 @@ class SimSeats:
             self.unit_alive[gd, ds[dead]] = False
             self._dig_at(gd, td, d_seat[gd])
             self._occ_clear(gd, td, ds[dead])
-            self._unit_kill_event(a_seat, d_type, d_seat == BARB_SEAT, d_died, at0)
+            self._unit_kill_event(a_seat, d_type, d_seat == BARB_SEAT, d_died, at0,
+                                  vict_form=self._form_tier(ds0))
             self._gen_ver += 1
         _hp_p[:, u] = self._heal_on_kill(self._row_of(a_seat), d_died, _hp_p[:, u])
 
@@ -2175,6 +2176,53 @@ class SimSeats:
             mcol = int((rd.promo_kind[cls] == self._pk["MARTYR"]).any(dim=1).long().argmax())
             got = self._seat_wonder_any(row, self._wond_martyr)[rows]
             self.major_unit_promos[rows, slot] |= got.long() << mcol
+
+    def _form_cs(self, slot: torch.Tensor) -> torch.Tensor:
+        """what a MERGED-pool unit's formation adds to Combat, Ranged and
+        Bombard Strength alike — the `formationCS` twin. ONE reader of the
+        plane, so no strength site spells its own default."""
+        flat = slot.dim() == 1
+        s = (slot.unsqueeze(1) if flat else slot).clamp(min=0)
+        out = self._formation_cs[
+            self.unit_formation.gather(1, s).clamp(min=0, max=self._form_max)]
+        return out.squeeze(1) if flat else out
+
+    def _form_tier(self, slot: torch.Tensor) -> torch.Tensor:
+        """[B] the formation TIER of a merged-pool slot — what To Arms! scores
+        on, as against the strength `_form_cs` reads."""
+        return self.unit_formation.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1)
+
+    def _form_cs_pool(self, atk_kind: str, u: int) -> torch.Tensor:
+        """the same term for unit `u` of one POOL, whose index is pool-local."""
+        return self._formation_cs[
+            getattr(self, f"{atk_kind}_unit_formation")[:, u].clamp(min=0, max=self._form_max)]
+
+    def _form_up(self, row: int, live: torch.Tensor, host: torch.Tensor,
+                 sc: torch.Tensor, tier: torch.Tensor) -> None:
+        """`formUp` — the acting unit merges into a same-type unit one step away.
+
+        CIV6 (Formations): "the experience and promotions of the highest
+        experience unit is preserved". XP banks toward the NEXT level rather
+        than accumulating, so the LEVEL leads and the banked remainder breaks
+        the tie; the HOST keeps a dead heat, which is the side TS keeps too.
+        The ACTOR is the one spent, and the survivor holds the target's tile.
+        """
+        fr = live.nonzero(as_tuple=True)[0]
+        if fr.numel() == 0:
+            return
+        h, a = host[fr], sc[fr]
+        take = ((self.unit_level[fr, a] > self.unit_level[fr, h])
+                | ((self.unit_level[fr, a] == self.unit_level[fr, h])
+                   & (self.unit_xp[fr, a] > self.unit_xp[fr, h])))
+        for _pl in ("level", "xp", "xp_pct", "promos", "promo_used", "hp"):
+            _p = getattr(self, f"unit_{_pl}")
+            _p[fr, h] = torch.where(take, _p[fr, a], _p[fr, h])
+        self.unit_formation[fr, h] = tier[fr]
+        self.unit_mp[fr, h] = 0
+        self.unit_fortify[fr, h] = 0
+        self.unit_alive[fr, a] = False
+        self._occ_clear(fr, self.unit_tile[fr, a], a)
+        self._gen_ver += 1
 
     def _condemn_heretic(self, row: int, live: torch.Tensor, tile: torch.Tensor,
                          rel: torch.Tensor, sc: torch.Tensor) -> None:
@@ -2692,11 +2740,14 @@ class SimSeats:
         return 1 + (self._suz_xp_mult_k - 1) * suz.long()
 
     def _unit_kill_event(self, killer, vict_type: torch.Tensor, vict_barb: torch.Tensor,
-                         killed: torch.Tensor, killer_type: torch.Tensor | None = None) -> None:
+                         killed: torch.Tensor, killer_type: torch.Tensor | None = None,
+                         vict_form: torch.Tensor | None = None) -> None:
         """`unitKillEvent`'s twin — CIV6 (Hic Sunt Dracones, dark face): "+1
         Era Score each time you kill a non-Barbarian naval unit in combat";
         (Automaton Warfare): "+1 Era Score each time you kill a non-Barbarian
-        unit with a Giant Death Robot". `killer` is a row int or a [B] seat
+        unit with a Giant Death Robot"; (To Arms!): "+1 Era Score each time you
+        kill a non-Barbarian Corps in combat and +2 Era Score each time you
+        kill a non-Barbarian Army in combat". `killer` is a row int or a [B] seat
         tensor; a non-major killer (a city-state or a camp) holds no
         dedications and scores 0, and a CITY has no chassis to check."""
         alive = killed & ~vict_barb
@@ -2704,6 +2755,11 @@ class SimSeats:
             gdr = alive & (killer_type == self._gdr_idx)
             if bool(gdr.any()):
                 self._ded_by_killer(killer, self._ded_automaton, gdr)
+        if vict_form is not None:
+            for _tier in range(1, self._form_max + 1):
+                _tm = alive & (vict_form == _tier)
+                if bool(_tm.any()):
+                    self._ded_by_killer(killer, self._ded_to_arms, _tm, _tier)
         ev = alive & self.unit_naval[vict_type.clamp(min=0, max=self.NU - 1)]
         if not bool(ev.any()):
             return
@@ -2738,15 +2794,19 @@ class SimSeats:
                 continue
             self.city_pressure[k, msk, int(ks[k])] += int(val[k])
 
-    def _ded_by_killer(self, killer, kind: int, ev: torch.Tensor) -> None:
+    def _ded_by_killer(self, killer, kind: int, ev: torch.Tensor, events: int = 1) -> None:
+        # `events` is how many times this kill FIRED the dedication, which is
+        # what `_dedication_event` counts: an Army killed is two occurrences.
+        def _n(m: torch.Tensor) -> torch.Tensor:
+            return m if events == 1 else m.long() * events
         if isinstance(killer, int):
             if 0 <= killer < self.n_majors:
-                self._dedication_event(killer, kind, ev)
+                self._dedication_event(killer, kind, _n(ev))
             return
         for g in range(self.n_majors):
             m = ev & (killer == g)
             if bool(m.any()):
-                self._dedication_event(g, self._ded_dracones, m)
+                self._dedication_event(g, kind, _n(m))
 
 
 
@@ -5594,7 +5654,7 @@ class SimSeats:
         it may hit from `_seats_hostile`."""
         a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
         a_lo = self.POOL_LO[atk_kind]
-        atk_cs_all = self._type_combat[a_type[:, u]]
+        atk_cs_all = self._type_combat[a_type[:, u]] + self._form_cs_pool(atk_kind, u)
         major = POOL_CLASS[atk_kind] == "major"
         ttc = tgt.clamp(min=0)
         here = a_tile[:, u]
@@ -5630,6 +5690,7 @@ class SimSeats:
             if bool(d_emb.any()):
                 def_cs = torch.where(
                     d_emb, self._embarked_def_cs(m_seat).to(def_cs.dtype), def_cs)
+            def_cs = def_cs + self._form_cs(ds0)
             def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
             a_promos = self._promo_pool(atk_kind)[0][:, u]
             _true = torch.ones_like(mslot_raw, dtype=torch.bool)
@@ -5715,10 +5776,12 @@ class SimSeats:
                 mil_att, a_kind=atk_kind, u=u, a_type=a_type[:, u], a_seat=a_seat[:, u],
                 d_slot=d_slot, d_type=d_type, d_is_barb=def_is_barb,
                 ranged=False, a_died=atk_raw, d_died=def_dead)
-            self._unit_kill_event(a_seat[:, u], d_type, def_is_barb, def_dead, a_type[:, u])
+            self._unit_kill_event(a_seat[:, u], d_type, def_is_barb, def_dead, a_type[:, u],
+                                  vict_form=self._form_tier(d_slot))
             self._disciples_spread(a_seat[:, u], a_type[:, u], a_promos, def_is_barb,
                                    tgt, def_dead)
-            self._unit_kill_event(d_seat_m, a_type[:, u], a_seat[:, u] == BARB_SEAT, atk_dead, d_type)
+            self._unit_kill_event(d_seat_m, a_type[:, u], a_seat[:, u] == BARB_SEAT, atk_dead, d_type,
+                                  vict_form=getattr(self, f"{atk_kind}_unit_formation")[:, u])
             self._disciples_spread(d_seat_m, d_type, d_promos,
                                    a_seat[:, u] == BARB_SEAT, tgt, atk_dead)
             self._ww_battle(mil_att, self._row_of(self._atk_seat(atk_kind, u)),
@@ -6520,7 +6583,8 @@ class SimSeats:
         outer = torch.where(held,
                             torch.minimum(self.encamp_outer_hp[bidx, tc], self._walls_tier_hp[_wt]),
                             torch.zeros_like(def_cs))
-        atk_e = (self._city_ranged_strength(at0, outer) - self._wound(a_hp[:, u])
+        atk_e = (self._city_ranged_strength(at0, outer) + self._form_cs_pool(atk_kind, u)
+                 - self._wound(a_hp[:, u])
                  + self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
                  + rel.to(def_cs.dtype)
                  + self._gen_aura_cs(a_seat[:, u], a_tile[:, u],
@@ -6552,7 +6616,7 @@ class SimSeats:
         the defense floor above is already one row-generic read. Draw ORDER is
         TS's: damage-to-district, then counter."""
         a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
-        atk_cs = (self._type_combat[a_type[:, u]]
+        atk_cs = (self._type_combat[a_type[:, u]] + self._form_cs_pool(atk_kind, u)
                   + self._congress_unit_cs(a_type[:, u], a_seat[:, u])
                   + self._gov_unit_cs(a_type[:, u], a_seat[:, u]))
         major = POOL_CLASS[atk_kind] == "major"
@@ -6811,6 +6875,7 @@ class SimSeats:
             def_cs = def_cs + self._governor_city_defense(hrow, slot).to(def_cs.dtype)
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         atk_e = (self._type_combat[a_type[:, u].clamp(min=0, max=self.NU - 1)]
+                 + self._form_cs_pool(atk_kind, u)
                  - self._wound(a_hp[:, u])
                  + self._assault_promo_cs(a_type[:, u], a_promos, a_tile[:, u])
                  - self._atk_pens(a_type[:, u], a_promos, a_tile[:, u], tgt, a_emb[:, u]))
@@ -6856,7 +6921,8 @@ class SimSeats:
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
         died = att & (a_hp[:, u] <= 0)
         self._ww_battle(att, self._row_of(a_seat[:, u]), hrow, tgt, a_died=died, city=True)
-        self._unit_kill_event(hrow, a_type[:, u], a_seat[:, u] == BARB_SEAT, died)
+        self._unit_kill_event(hrow, a_type[:, u], a_seat[:, u] == BARB_SEAT, died,
+                              vict_form=getattr(self, f"{atk_kind}_unit_formation")[:, u])
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
             a_alive[:, u] = a_alive[:, u] & ~died
@@ -6955,7 +7021,8 @@ class SimSeats:
             + (self.citystate_type.gather(1, citystate_sc.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
         )
         a_promos = self._promo_pool(atk_kind)[0][:, u]
-        atk_e = (self._type_combat[at0] - self._wound(a_hp[:, u])
+        atk_e = (self._type_combat[at0] + self._form_cs_pool(atk_kind, u)
+                 - self._wound(a_hp[:, u])
                  + self._assault_promo_cs(at0, a_promos, here)
                  - self._atk_pens(at0, a_promos, here, tgt, a_emb[:, u]))
         if self._city_rel_live:
@@ -7124,7 +7191,7 @@ class SimSeats:
         _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(atk_kind)
         barb = POOL_CLASS[atk_kind] == "hostile"
         ut0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
-        atk_rs = self._type_ranged_strength[ut0]
+        atk_rs = self._type_ranged_strength[ut0] + self._form_cs_pool(atk_kind, u)
         a_hp, a_tile, a_seat = _hp_p[:, u], _tile_p[:, u], _seat_p[:, u]
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         a_naval = self.unit_naval[ut0] | _emb_p[:, u]
@@ -7151,7 +7218,8 @@ class SimSeats:
             if self.n_governors:
                 def_cs = def_cs + self._governor_city_defense(hrow, hcol).to(def_cs.dtype)
             outer_all = self.city_outer_hp[_bidx, hrow, hcol]
-            atk_e = (self._city_ranged_strength(ut0, outer_all) - self._wound(a_hp)
+            atk_e = (self._city_ranged_strength(ut0, outer_all)
+                     + self._form_cs_pool(atk_kind, u) - self._wound(a_hp)
                      + self._assault_promo_cs(ut0, a_promos, a_tile, ranged=True))
             if not barb:
                 # aura inside hostileRangedStrike's ranged-strength
@@ -7225,6 +7293,7 @@ class SimSeats:
             if bool(d_emb.any()):
                 def_cs = torch.where(
                     d_emb, self._embarked_def_cs(d_seat).to(def_cs.dtype), def_cs)
+            def_cs = def_cs + self._form_cs(ds0)
             def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)  # wounded defender
             _t = torch.ones_like(mslot, dtype=torch.bool)
             atk_e = atk_rs - self._wound(a_hp) + self._promo_cs(
@@ -7280,7 +7349,8 @@ class SimSeats:
                             self._row_of(d_seat), tgt,
                             d_died=unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
             self._unit_kill_event(self._atk_seat(atk_kind, u), d_type, d_barb,
-                                  unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0), ut0)
+                                  unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0), ut0,
+                                  vict_form=self._form_tier(d_slot))
             self._disciples_spread(
                 self._atk_seat(atk_kind, u), ut0, self._promo_pool(atk_kind)[0][:, u],
                 d_barb, ttc, unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
@@ -7328,7 +7398,7 @@ class SimSeats:
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         a_naval = self.unit_naval[at0] | a_emb[:, u]
         atk_rs0 = self._type_ranged_strength[at0]
-        atk_base = atk_rs0 - self._wound(a_hp[:, u])
+        atk_base = atk_rs0 + self._form_cs_pool(atk_kind, u) - self._wound(a_hp[:, u])
         atk_base = atk_base + self._gen_aura_cs(aseat, a_tile[:, u], a_naval).to(atk_base.dtype)
         atk_base = atk_base + (self._congress_unit_cs(at0, aseat)
                                + self._gov_unit_cs(at0, aseat)).to(atk_base.dtype)
@@ -7430,6 +7500,7 @@ class SimSeats:
             if bool(d_emb.any()):
                 def_cs = torch.where(
                     d_emb, self._embarked_def_cs(d_seat).to(def_cs.dtype), def_cs)
+            def_cs = def_cs + self._form_cs(ds0)
             def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
             _t = torch.ones_like(mslot, dtype=torch.bool)
             def_e = def_cs - self._wound(def_hp)
@@ -7480,7 +7551,8 @@ class SimSeats:
                             self._row_of(d_seat), tgt,
                             d_died=unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
             self._unit_kill_event(self._atk_seat(atk_kind, u), d_type, d_barb,
-                                  unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0), at0)
+                                  unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0), at0,
+                                  vict_form=self._form_tier(d_slot))
             self._disciples_spread(
                 self._atk_seat(atk_kind, u), at0, self._promo_pool(atk_kind)[0][:, u],
                 d_barb, ttc, unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))

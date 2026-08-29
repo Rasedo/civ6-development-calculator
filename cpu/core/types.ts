@@ -386,6 +386,12 @@ export interface Unit {
   gpAt?: number;
   path: number[] | null;
   mission?: 'explore' | null;
+  /**
+   * FORMATION TIER: 0 a lone unit, 1 a Corps or Fleet, 2 an Army or Armada.
+   * Undefined is 0 — read it through `formationCS`, never inline, so no site
+   * carries its own default.
+   */
+  formation?: number;
   /** A LAND unit currently on a water tile (embarked). Moves
    * at EMBARK_MOVES, cannot fortify/exert ZOC, and (N2) defends at a flat CS.
    * Naval units are never `embarked` — they belong on water natively. */

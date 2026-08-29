@@ -1893,6 +1893,17 @@
             "unit_revealed_turn"
           ],
           "note": "TS spells 'never revealed' as absent and the GPU as -1; both read as -1 here. Only a STEALTH chassis ever writes it, so every other unit compares -1 on both engines forever."
+        },
+        {
+          "name": "formation",
+          "compare": "exact",
+          "covers": [
+            "Unit.formation"
+          ],
+          "planes": [
+            "unit_formation"
+          ],
+          "note": "0 a lone unit, 1 a Corps or Fleet, 2 an Army or Armada."
         }
       ]
     },

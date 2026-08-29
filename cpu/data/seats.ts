@@ -504,11 +504,9 @@ export const ADMIRAL_MARCH_LIVE = true;
  * standing bonus instead.
  *
  * Verified against the Gathering Storm Civilopedia's "Dedications" concept.
- * The four modeled here are the ones whose EVENT already exists as a hook on
- * both engines. The rest of the catalog is OPEN: To Arms!, Hic Sunt Dracones,
- * Reform the Coinage and Heartbeat of Steam each need an event this model does
- * not raise, and four more wait on spies / air units / artifacts / Giant Death
- * Robots.
+ * The rest of the catalog is OPEN: Hic Sunt Dracones, Reform the Coinage and
+ * Heartbeat of Steam each need an event this model does not raise, and four
+ * more wait on spies / air units / artifacts / Giant Death Robots.
  *
  *   0 MONUMENTALITY       +1 era score per specialty DISTRICT completed
  *   1 FREE_INQUIRY        +1 era score per EUREKA (tech boost) triggered, and
@@ -517,8 +515,7 @@ export const ADMIRAL_MARCH_LIVE = true;
  *                         and per building constructed with a GREAT WORK slot
  *   3 EXODUS_OF_THE_EVANGELISTS  +2 era score per city converted to your religion
  *   4 TO_ARMS             +1 era score per non-barbarian CORPS killed (+2 per
- *                         ARMY) — formations do not exist here, so the event
- *                         cannot occur, exactly as in Civ 6 before Nationalism
+ *                         ARMY)
  *   5 HIC_SUNT_DRACONES   +3 era score per natural wonder discovered, +1 per
  *                         non-barbarian NAVAL unit killed in combat (the
  *                         new-continent clause cannot occur: one continent)

@@ -471,6 +471,15 @@ def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
     if A_PK >= 0 and um.shape[2] > A_PK:
         take_pk = present & um[:, :, A_PK]
         orders0 = torch.where(take_pk, torch.full_like(orders0, A_PK), orders0)
+    A_FU = getattr(sim, "_A_FORM_UP", -1)
+    if A_FU >= 0 and um.shape[2] >= A_FU + 6:
+        # a unit with a target FIGHTS; one with nothing to hit and a twin of its
+        # own chassis next door merges into it. Both civics sit in the Industrial
+        # and Modern trees, so this is the only way a formation is ever reached.
+        _fu = um[:, :, A_FU:A_FU + 6]
+        _idle = ~um[:, :, 6:12].any(dim=2)
+        orders0 = torch.where(present & _idle & _fu.any(dim=2),
+                              A_FU + _fu.float().argmax(dim=2), orders0)
     A_BS = getattr(sim, "_A_BOOST", -1)
     if A_BS >= 0 and um.shape[2] > A_BS:
         # a Builder standing on a District Project pays its whole bank in. The

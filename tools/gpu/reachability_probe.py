@@ -34,6 +34,9 @@ of the DRIVEN GAME, not of the comparison. What it answers, in order:
   royalSociety  the Royal Society standing anywhere, and
   boostOffer    a turn on which the mask offers a Builder its District
                 Project payment
+  formOffer     a turn on which the mask offers a unit the FORM_UP column
+  corps         a Corps or Fleet standing anywhere, and
+  army          an Army or Armada
   tourists      visiting vs domestic at the final turn, per seat: the culture
                 victory's own comparison (`_culture_victor`)
   policyCards   which policy cards the greedy slot fill ever puts in a slot,
@@ -82,6 +85,7 @@ KEYS = ("apostleBuy", "urbanization", "secondShip",
         "defensivePact", "carbon", "climatePhase",
         "engineer", "engImp", "engRoadOffer", "engFinishOffer",
         "royalSociety", "boostOffer",
+        "formOffer", "corps", "army",
         "gpUnit", "gpOffer", "gpSpent", "gpPerm", "gpCityPerm",
         "vallettaSuz", "vallettaBuy", "faithUnitGrant", "faithUnitBuy",
         "govTitle", "govAppointed", "govSeated", "govEstablished", "govPromoted",
@@ -228,6 +232,15 @@ def main() -> None:
                 for _row in seats:
                     _off_b |= sim._seat_unit_mask(_row)[:, :, sim._A_BOOST].any(dim=1)
                 mark("boostOffer", _off_b, t)
+        # FORMATIONS: the column offered, then a Corps and an Army standing.
+        if getattr(sim, "_A_FORM_UP", -1) >= 0:
+            _off_f = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
+            for _row in seats:
+                _off_f |= sim._seat_unit_mask(_row)[:, :, sim._A_FORM_UP:sim._A_FORM_UP + 6].any(dim=2).any(dim=1)
+            mark("formOffer", _off_f, t)
+            _live_f = sim.unit_alive & (sim.unit_seat < 100)
+            mark("corps", (_live_f & (sim.unit_formation == 1)).any(dim=1), t)
+            mark("army", (_live_f & (sim.unit_formation == 2)).any(dim=1), t)
         # THE GREAT PERSON, end to end: a unit on the map, the verb offered,
         # a charge spent, and the two permanent channels a spent one leaves.
         _gp_t = torch.zeros(sim.NU, dtype=torch.bool)

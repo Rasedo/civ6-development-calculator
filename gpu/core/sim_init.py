@@ -775,6 +775,9 @@ class SimInit:
             # the turn a STEALTH hull last attacked: CIV6 (Unit) says one that
             # attacks "will become visible for a turn". -1 = never.
             ("revealed_turn", torch.long),
+            # FORMATION TIER: 0 a lone unit, 1 a Corps or Fleet, 2 an Army or
+            # Armada. A tier holds `tier + 1` units and never comes apart.
+            ("formation", torch.long),
         ):
             _base = torch.zeros(B, self.UNIT_MAX, dtype=_dt, device=device)
             setattr(self, f"unit_{_pl}", _base)
@@ -1249,6 +1252,7 @@ class SimInit:
             self._A_GP = self._act.get("ACTIVATE_GP", -1)           # the great person's
             self._A_PERFORM = self._act.get("PERFORM_CONCERT", -1)   # the rock band's
             self._A_BOOST = self._act.get("BOOST_PROJECT", -1)       # the Royal Society's
+            self._A_FORM_UP = self._act.get("FORM_UP_0", -1)          # merge into a same-type neighbour
             self._air_strike_cols = sum(1 for n in self._act_names if n.startswith("AIR_STRIKE_"))
             self._air_rebase_cols = sum(1 for n in self._act_names if n.startswith("REBASE_"))
             _stc = sum(1 for n in self._act_names if n.startswith("SPY_TRAVEL_"))
@@ -1268,6 +1272,7 @@ class SimInit:
                 + (1 if self._A_GP >= 0 else 0) \
                 + (1 if self._A_PERFORM >= 0 else 0) \
                 + (1 if self._A_BOOST >= 0 else 0) \
+                + (6 if self._A_FORM_UP >= 0 else 0) \
                 + self._air_strike_cols + self._air_rebase_cols + _stc + _smc
             assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
             self._A_CHOP = self._act["CHOP"]
@@ -1286,6 +1291,7 @@ class SimInit:
             self._A_PARK = -1
             self._A_PERFORM = -1
             self._A_BOOST = -1
+            self._A_FORM_UP = -1
             self._A_PROMOTE = -1
             self._A_CONDEMN = -1
             self._A_HERESY = -1
@@ -1818,6 +1824,10 @@ class SimInit:
         self._wall_dmg_ranged = float(rules.combat["wallDamageRanged"])
         self._wall_breach = float(rules.combat["wallBreachFraction"])
         self._ranged_city_pen = float(rules.combat["rangedCityPenalty"])
+        self._formation_cs = torch.tensor(
+            [int(x) for x in rules.combat.get("formationCs", [0])], dtype=torch.long, device=device)
+        self._formation_civic = [int(x) for x in rules.combat.get("formationCivic", [-1])]
+        self._form_max = self._formation_cs.numel() - 1
         # The ENCAMPMENT garrison pool cap (TS ENCAMPMENT_HP).
         self._encamp_hp_max = int(rules.combat.get("encampHp", 100))
         # Which district types count toward the specialty cap (Aqueduct/Neighborhood

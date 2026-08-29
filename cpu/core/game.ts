@@ -12,7 +12,7 @@ import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canR
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, isCivicComplete } from './effects';
 import type { Modifiers, Unlocks } from './effects';
 import { effectiveResearchCostIn } from './boosts';
-import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, settlerCount, unitsAt } from './units';
+import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, settlerCount, unitsAt, unitDomain } from './units';
 import { promoClassOf, promoFlag, unitPromoRows, XP_PER_LEVEL } from './promotions';
 import { barbarianPhase, damageRoll, trainXpPct, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
 import { revealAround } from './fog';
@@ -25,7 +25,7 @@ import { commitProduction, commitResearch } from './seatTurn';
 import { seatWonderFlag } from './wonders';
 import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH } from '../data/seats';
 import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
-import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS, ROCK_BAND_COST_STEP } from '../data/units';
+import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS, ROCK_BAND_COST_STEP, FORMATION_CIVIC, FORMATION_MAX } from '../data/units';
 import { buildingCostIn, outerPool, wallsMax, fitEncampOuter, encampOuterMissing } from './rules';
 import { laserSpeed } from './yields';
 import { canRunProject, chargeUnitResource } from './stockpile';
@@ -705,6 +705,62 @@ export function purchaseUnitWithFaith(state: GameState, cityId: number, unitType
  * military unit does not gain influence." The action's own condition is "Must
  * be at war with the owner of the religious unit."
  */
+/** which of two units real Civ 6 keeps when they merge: "the experience and
+ *  promotions of the highest experience unit is preserved". XP banks toward
+ *  the NEXT level rather than accumulating, so the LEVEL leads and the banked
+ *  remainder breaks the tie. */
+function veteranOf(a: Unit, b: Unit): Unit {
+  const la = a.level ?? 1;
+  const lb = b.level ?? 1;
+  if (la !== lb) return la > lb ? a : b;
+  return (a.xp ?? 0) >= (b.xp ?? 0) ? a : b;
+}
+
+/**
+ * FORM UP — the acting unit merges into a unit of its OWN type one step away.
+ *
+ * CIV6 (Formations): two military units of the same type combine into a Corps
+ * once Nationalism is in, three into an Army once Mobilization is; at sea the
+ * pair is a Fleet and the trio an Armada, under those same two civics. A tier
+ * holds `tier + 1` units, so merging an a-tier into a b-tier makes tier
+ * `a + b + 1` and anything past an Army has no formation to be.
+ *
+ * "Once a Corps or Army has been formed, the units may not be broken apart
+ * into individual units again" — there is no inverse verb, by the rule.
+ *
+ * The ACTOR is the one spent: the survivor holds the target's tile, which is
+ * where the merged unit stands in Civ 6 too, and this engine seats one
+ * military unit to a tile either way. What the survivor keeps beyond the
+ * veteran's promotions — its hit points, and that it ends the turn — is this
+ * model's, recorded: no source publishes either.
+ */
+export function formUp(state: GameState, unit: Unit, tileIndex: number): RuleResult {
+  const seat = unitSeat(unit);
+  if (unitDomain(unit.type) !== 'military') return { ok: false, reason: 'Not a military unit.' };
+  if (unit.movesLeft <= 0) return { ok: false, reason: 'No movement left.' };
+  const host = state.units.find(
+    (u) => u.tileIndex === tileIndex && u.id !== unit.id && u.type === unit.type
+      && unitSeat(u) === seat,
+  );
+  if (!host) return { ok: false, reason: 'No unit of this type to join.' };
+  const tier = (host.formation ?? 0) + (unit.formation ?? 0) + 1;
+  if (tier > FORMATION_MAX) return { ok: false, reason: 'Nothing larger than an Army.' };
+  const civic = FORMATION_CIVIC[tier];
+  if (civic && !isCivicComplete(state, civic, seat)) return { ok: false, reason: `${civic} is not in.` };
+  const vet = veteranOf(host, unit);
+  host.formation = tier;
+  host.level = vet.level;
+  host.xp = vet.xp;
+  host.xpPct = vet.xpPct;
+  host.promos = vet.promos;
+  host.promoUsed = vet.promoUsed;
+  host.hp = vet.hp;
+  host.movesLeft = 0;
+  host.fortifyTurns = 0;
+  disbandUnit(state, unit.id);
+  return { ok: true };
+}
+
 export function condemnHeretic(state: GameState, unit: Unit, tileIndex: number): RuleResult {
   if ((UNITS[unit.type]?.combat ?? 0) <= 0) return { ok: false, reason: 'Not a military unit.' };
   const target = state.units.find(

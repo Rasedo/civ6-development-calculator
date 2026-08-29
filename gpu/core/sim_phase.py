@@ -95,7 +95,8 @@ class SimPhase:
         def_promo = self._promo_cs(
             d_type, self.unit_promos[bidx, ds0],
             attacking=~_t, ranged=_t, vs_city=_t, tile=tt)
-        def_cs = self._type_combat[d_type] + self._tdef_i(bidx, tt) + def_promo
+        def_cs = (self._type_combat[d_type] + self._tdef_i(bidx, tt) + def_promo
+                  + self._formation_cs[self.unit_formation[bidx, ds0].clamp(min=0, max=self._form_max)])
         # An embarked target (military or civilian; barbs never embark) → the
         # era's normalized CS, no terrain and no support.
         d_emb = self.unit_emb[bidx, ds0] & (d_slot >= 0)

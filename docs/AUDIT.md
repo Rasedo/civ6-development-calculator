@@ -46,7 +46,7 @@ from the list below.
 | B-20r tourism tails | 1 | the Naturalist's progressive cost is unsourced; the park rhombus has no canonical vertical |
 | B-21r suzerain rows | 1 | the descoped rows each need a whole absent system; Geneva's magnitude is flat where the source scales |
 | B-22r World Congress | 2 | the observation renders the standing slate, three resolutions have no carrier, the culture bomb spares unfinished construction, scored competitions and peace TERMS are absent |
-| B-24r Ages/governors | 2 | the governor at a CITY-STATE and its three channels, fourteen promotion clauses with no channel, Grants' per-city GPP, To Arms!'s casus belli, the corps/army kill event, per-civ era drift |
+| B-24r Ages/governors | 2 | the governor at a CITY-STATE and its three channels, fourteen promotion clauses with no channel, Grants' per-city GPP, To Arms!'s casus belli, per-civ era drift |
 | B-31r trade-route tails | 1 | the pass-through post gold has no stored path; plunder gold is a stylization; the summed-yield key and one-candidate head are P8-surface |
 | B-53r the great-person PASS | 1 | the standing offer can never be rejected — no per-seat passed flag; a SWITCHED-AWAY item loses its hammers (no per-item retained-progress store) |
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
@@ -62,7 +62,8 @@ from the list below.
 | B-34r flood tails | 1 | the climate/coastal tails wait on systems that do not exist here |
 | B-63r the grievance ledger's magnitudes | 1 | the occupied/razed rows ship at their published CEILING; the gang-up bar is a heuristic |
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
-| **B. Fidelity vs real Civ 6** | **23** | |
+| B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; training a Corps or Army outright (Military Academy / Seaport) has no queue tier |
+| **B. Fidelity vs real Civ 6** | **24** | |
 | C-1 POWER | 2 | four renewables, the Biosphere, the Hydroelectric Dam building, decommission/recommission, the reactor age, minors never powered |
 | C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, diplomatic visibility, the negotiated two-sided deal, and the agreements that need one |
 | C-5 strategic-resource stockpiles | 2 | the shortage penalty's magnitude is unpublished; resource trading waits on C-2 |
@@ -243,8 +244,6 @@ Civ 6 source or is recorded as unverifiable.
   - **To Arms!'s special Casus Belli.** The denouncement it rides on
     ships now (C-2); what is missing is the casus-belli KIND itself — a
     war declaration variant the war table does not carry.
-  - **The corps/army kill event** — no formations exist (a faithful zero
-    only before Nationalism).
   - **Per-civ tech-era drift** — eras are global 50-turn blocks.
 - **B-31r. Trade-route tails.** The Trader unit, sea legs, trading posts,
   chained reach and the whole-destination-set candidate all ship. OPEN:
@@ -294,15 +293,53 @@ Civ 6 source or is recorded as unverifiable.
   raises. OPEN: **the two stacks a UNIQUE UNIT raises** — Zulu's Impi and
   Macedon's Hypaspist raise flanking or support for themselves alone, and
   no civilization unique exists (C-26).
+- **B-66. FORMATIONS.** Weight 1 — the mechanic SHIPS; two tails stay open.
+  Corps, Armies, Fleets and Armadas exist on both engines: one
+  `formation` tier per unit (`formationCS` / `_form_cs`, `_form_cs_pool`),
+  the FORM_UP head merging a unit into a same-type neighbour (`formUp` /
+  `_form_up`), and the strength term on every duel read — melee, ranged,
+  bombard, the city and city-state assaults, the stack-defender choice and
+  the embarked defence. CIV6 (Formations): two of a type make a Corps after
+  Nationalism and three an Army after Mobilization; the magnitudes are the
+  game's own COMBAT_CORPS_STRENGTH_MODIFIER 10 and
+  COMBAT_ARMY_STRENGTH_MODIFIER 17; "the experience and promotions of the
+  highest experience unit is preserved"; and "once a Corps or Army has been
+  formed, the units may not be broken apart into individual units again",
+  so there is no inverse verb. `tests/gpu/formation_test.py` and
+  `tests/cpu/units/formation.test.ts` are the bar. OPEN:
+  - **WHAT THE MERGED UNIT KEEPS BEYOND THE VETERAN'S RECORD IS THIS
+    MODEL'S.** No source publishes the hit points a formation carries out
+    of a merge, nor whether it may act afterwards. Both engines take the
+    veteran's own hit points — the same unit the sourced rule already keeps
+    the promotions and experience of — and end its turn. Recorded as a
+    stylization, not a sourced rule.
+  - **TRAINING A FORMATION DIRECTLY IS ABSENT.** Real Civ 6 lets a city with
+    a Military Academy (or a Seaport at sea) train a Corps or Army outright
+    rather than merging two units, at a reduced cost. Both buildings exist
+    here; the production queue carries no formation tier, so the only road
+    to a Corps is the merge.
+
 - **B-56r. The five inert promotions.** 74 of the 79 catalog rows in
   `cpu/data/promotions.ts` reach a rule; the poke bar is
   `tests/gpu/promotions_test.py` + `tests/gpu/promo_effects_test.py`. FIVE
   carry `none`, each with its blocker:
   - **SENTRY** ("can see through Woods and Rainforest") — `revealAround`
     / `_reveal_around` reveal a flat radius; nothing blocks sight.
-  - **CONVOY and ESCORT_MOBILITY** move an escorted unit with its escort;
-    nothing binds one occupant's move to another's, so there is no
-    formation to move.
+  - **CONVOY and ESCORT_MOBILITY** name the ESCORT formation, which is a
+    different mechanic from the Corps/Army one that now ships. CIV6
+    (Formations): "A military unit can create a formation with a support or
+    civilian unit at any time. Naval military units may also create a
+    formation with embarked land units" — nothing here binds one occupant's
+    move to another's, which is what both rows want.
+    - ESCORT_MOBILITY is "Formation units all inherit escort's Movement
+      speed" (Light Cavalry): it asks for that binding outright and is
+      blocked on it.
+    - CONVOY is "+10 Combat Strength when in a formation" (Naval Melee). An
+      earlier reading of this row called it a movement clause; no source
+      supports that, and the correction is why the row is re-stated here.
+      Its "in a formation" is a FORK the sources do not settle — a Fleet is
+      a formation and so is an escort — so NEITHER branch ships and the
+      question is the owner's.
   - **CREEPING_ATTACK** is "+14 Combat Strength vs. naval raider units",
     and no NAVAL RAIDER class exists to name in a `CS_VS_CLASS_*` mask —
     C-32.

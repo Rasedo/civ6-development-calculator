@@ -622,6 +622,7 @@ const UNIT_G: Record<string, Extractor> = {
   movesFull: overUnits((u) => u.movesFull ?? UNITS[u.type]?.moves ?? 0),
   attacksLeft: overUnits((u) => u.attacksLeft ?? 1),
   revealedTurn: overUnits((u) => u.revealedTurn ?? -1),
+  formation: overUnits((u) => u.formation ?? 0),
   spyMission: overUnits((u) => u.spyMission ?? SPY_IDLE),
   spyTurns: overUnits((u) => u.spyTurns ?? 0),
   spyTarget: overUnits((u) => u.spyTarget ?? -1),

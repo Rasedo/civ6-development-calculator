@@ -247,6 +247,7 @@ def main() -> int:
                 ("seat", [py, "tests/gpu/seat_test.py"], 4),
                 ("government", [py, "tests/gpu/government_test.py"], 4),
                 ("plaza", [py, "tests/gpu/plaza_test.py"], 2),  # the four Government Plaza effect bodies, none of them in the gate's reach
+                ("formation", [py, "tests/gpu/formation_test.py"], 2),  # corps/army/fleet/armada: the civics sit past the gate's reach
                 ("policy_cards", [py, "tests/gpu/policy_cards_test.py"], 4),  # every policy-card CHANNEL the assembler returns, and the two appliers with a direction
                 ("controlled", [py, "tests/gpu/controlled_test.py"], 4),
                 ("pref_apply", [py, "tests/gpu/pref_apply_test.py"], 4),  # preference-order apply — the ONLY lane that reaches it

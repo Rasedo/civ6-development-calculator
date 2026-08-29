@@ -3,7 +3,7 @@ import { civEraIndex } from './city';
 import { seatOf, isBarbSeat, isCiv } from './seats';
 import { seatWonderSum } from './wonders';
 import { UNITS } from '../data/units';
-import { DED_AUTOMATON, DED_DRACONES, DED_SKY, DED_STEAM, SKY_EUREKAS } from '../data/seats';
+import { DED_AUTOMATON, DED_DRACONES, DED_SKY, DED_STEAM, DED_TO_ARMS, SKY_EUREKAS } from '../data/seats';
 import { TECHS } from '../data/techs';
 import { spawnUnit } from './units';
 import { BUILDINGS, BUILDING_ERA_INDEX } from '../data/buildings';
@@ -125,9 +125,14 @@ export function unitKillEvent(
   state: GameState,
   killerSeat: number,
   killer: { type: string } | undefined,
-  victim: { type: string; seat: number },
+  victim: { type: string; seat: number; formation?: number },
 ): void {
   if (!isCiv(killerSeat) || isBarbSeat(victim.seat)) return;
+  // CIV6 (To Arms!): "+1 Era Score each time you kill a non-Barbarian Corps in
+  // combat and +2 Era Score each time you kill a non-Barbarian Army in
+  // combat." A Fleet and an Armada are the same two tiers at sea.
+  const form = victim.formation ?? 0;
+  if (form > 0) dedicationEvent(state, killerSeat, DED_TO_ARMS, form >= 2 ? 2 : 1);
   // CIV6 (Hic Sunt Dracones, dark face): "+1 Era Score each time you kill a
   // non-Barbarian Naval unit in combat."
   if (UNITS[victim.type]?.naval) dedicationEvent(state, killerSeat, DED_DRACONES);

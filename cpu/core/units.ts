@@ -7,6 +7,15 @@
 import type { GameState, City, Seat, Tile, Unit } from './types';
 import { seatWonderSum } from './wonders';
 import { BUILT_WONDERS } from '../data/builtWonders';
+import { FORMATION_CS } from '../data/units';
+
+/** what a unit's FORMATION adds to Combat, Ranged and Bombard Strength alike.
+ *  ONE reader of the optional field, so no strength site spells its own
+ *  default and none of them can drift apart. */
+export function formationCS(unit: Unit): number {
+  return FORMATION_CS[unit.formation ?? 0] ?? 0;
+}
+
 /** CIV6: fortification tops out at two turns dug in. */
 const FORTIFY_MAX_TURNS = 2;
 import { logUnitOrder } from './seatTurn';

@@ -9,6 +9,25 @@ import { GAME_SPEED } from './constants';
 import { TECHS, ERAS } from './techs';
 import { CIVICS } from './civics';
 
+/**
+ * FORMATIONS, indexed by tier: 0 a lone unit, 1 a Corps (a Fleet at sea), 2 an
+ * Army (an Armada). CIV6 (Formations): after Nationalism "two military units
+ * of the same type will be able to combine to create a Corps", and after
+ * Mobilization "three units of the same type may be combined into an Army";
+ * "the experience and promotions of the highest experience unit is preserved",
+ * and "once a Corps or Army has been formed, the units may not be broken apart
+ * into individual units again". The two magnitudes are the game's own
+ * GlobalParameters COMBAT_CORPS_STRENGTH_MODIFIER and
+ * COMBAT_ARMY_STRENGTH_MODIFIER; each raises Combat, Ranged and Bombard
+ * Strength alike, embarked included.
+ */
+export const FORMATION_CS: readonly number[] = [0, 10, 17];
+
+/** the civic each tier waits on — index by the tier being FORMED. */
+export const FORMATION_CIVIC: readonly string[] = ['', 'NATIONALISM', 'MOBILIZATION'];
+
+export const FORMATION_MAX = 2;
+
 export interface UnitDef {
   id: string;
   name: string;

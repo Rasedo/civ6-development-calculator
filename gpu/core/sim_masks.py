@@ -977,8 +977,10 @@ class SimMasks:
         take = e_mil & ~ok_m
         if ranged:
             m_type = self.unit_type.gather(1, mslot.clamp(min=0).unsqueeze(1)).squeeze(1)
-            cs_m = self._type_combat[m_type.clamp(min=0, max=self.NU - 1)]
-            take = take | (e_mil & ok_m & (self._embarked_def_cs(e_seat) > cs_m))
+            cs_m = (self._type_combat[m_type.clamp(min=0, max=self.NU - 1)]
+                    + self._form_cs(mslot))
+            take = take | (e_mil & ok_m
+                           & (self._embarked_def_cs(e_seat) + self._form_cs(eslot) > cs_m))
         e_pax = ok_e & e_civ
         take_c = e_pax & ~ok_c
         return (torch.where(take, eslot, mslot),
@@ -1684,6 +1686,9 @@ class SimMasks:
         # a reclaimed slot carries the dead occupant's ROCK BAND career and SPY
         # record; TS builds a fresh object, so each starts at its own default
         # and only the chassis that owns the fact ever writes one.
+        # a reclaimed slot carries the dead occupant's FORMATION too, and a
+        # freshly trained unit is always a single one.
+        getattr(self, f"{pre}_unit_formation")[rows, slot] = 0
         getattr(self, f"{pre}_unit_band_level")[rows, slot] = 0
         getattr(self, f"{pre}_unit_band_album")[rows, slot] = 0
         getattr(self, f"{pre}_unit_spy_mission")[rows, slot] = self._spy_idle
@@ -2448,6 +2453,33 @@ class SimMasks:
         if getattr(self, "_A_BOOST", -1) >= 0:
             _bp = [(present & self._boost_ok(row, tc, utype, u_charges)).unsqueeze(2)]
 
+        _fu: list[torch.Tensor] = []
+        if getattr(self, "_A_FORM_UP", -1) >= 0:
+            # CIV6 (Formations): two military units of the same type make a
+            # Corps once Nationalism is in and three an Army once Mobilization
+            # is — a Fleet and an Armada at sea. A tier holds `tier + 1` units,
+            # so merging an a-tier into a b-tier asks for tier a + b + 1 and the
+            # civic THAT tier waits on. The neighbour is where the second one of
+            # a type can stand: this engine seats one military unit to a tile.
+            _hm = self.military_at.gather(1, nbc)
+            _hok = _hm >= 0
+            _hcl = _hm.clamp(min=0)
+            _h_seat = torch.where(_hok, self.unit_seat.gather(1, _hcl), neg)
+            _h_type = torch.where(_hok, self.unit_type.gather(1, _hcl), neg)
+            _h_form = torch.where(_hok, self.unit_formation.gather(1, _hcl),
+                                  torch.zeros_like(_hm))
+            _tier = _h_form.reshape(B, N, 6) + self.unit_formation.gather(1, sc).unsqueeze(2) + 1
+            _civ_ok = torch.zeros(B, N, 6, dtype=torch.bool, device=dev)
+            for _k in range(1, self._form_max + 1):
+                _ci = self._formation_civic[_k] if _k < len(self._formation_civic) else -1
+                if _ci < 0:
+                    continue
+                _civ_ok = _civ_ok | ((_tier == _k) & civics[:, _ci].view(B, 1, 1))
+            _fu = [can_fight & has_mp & alive & on_map
+                   & _hok.reshape(B, N, 6) & (_h_seat.reshape(B, N, 6) == row)
+                   & (_h_type.reshape(B, N, 6) == utype.unsqueeze(2))
+                   & _civ_ok]
+
         _pr: list[torch.Tensor] = []
         if getattr(self, "_A_PROMOTE", -1) >= 0:
             _pr = [present.unsqueeze(2) & self._promo_offer_mask(sc, utype)]
@@ -2560,7 +2592,7 @@ class SimMasks:
         out = torch.cat(
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
             + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc
-            + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3 + _pc + _bp,
+            + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3 + _pc + _bp + _fu,
             dim=2,
         )
         if self._act_names and self.improvements_on and self._builder_idx >= 0:

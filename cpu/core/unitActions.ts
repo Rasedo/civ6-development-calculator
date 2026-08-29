@@ -73,6 +73,12 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // the District Project it stands on. Appended last, like every verb since
   // FOUND_CITY.
   names.push('BOOST_PROJECT');
+  // FORM UP: the acting unit merges into the same-type unit one step away,
+  // which is the only place a second one of its own kind can stand — this
+  // engine seats ONE military unit to a tile. Which formation the pair makes
+  // is the pair's business, not the column's: two singles make a Corps and a
+  // Corps plus a single makes an Army, exactly as the two civics allow.
+  for (let d = 0; d < 6; d++) names.push(`FORM_UP_${d}`);
   return names;
 }
 
