@@ -778,6 +778,9 @@ class SimInit:
             # FORMATION TIER: 0 a lone unit, 1 a Corps or Fleet, 2 an Army or
             # Armada. A tier holds `tier + 1` units and never comes apart.
             ("formation", torch.long),
+            # IN AN ESCORT FORMATION with the military unit on its own tile —
+            # the CIVILIAN half carries it, and the tile names the escort.
+            ("escorted", torch.bool),
         ):
             _base = torch.zeros(B, self.UNIT_MAX, dtype=_dt, device=device)
             setattr(self, f"unit_{_pl}", _base)
@@ -1253,6 +1256,8 @@ class SimInit:
             self._A_PERFORM = self._act.get("PERFORM_CONCERT", -1)   # the rock band's
             self._A_BOOST = self._act.get("BOOST_PROJECT", -1)       # the Royal Society's
             self._A_FORM_UP = self._act.get("FORM_UP_0", -1)          # merge into a same-type neighbour
+            self._A_ESCORT = self._act.get("ESCORT", -1)              # a civilian joins the tile's military unit
+            self._A_UNESCORT = self._act.get("BREAK_ESCORT", -1)      # and leaves again
             self._air_strike_cols = sum(1 for n in self._act_names if n.startswith("AIR_STRIKE_"))
             self._air_rebase_cols = sum(1 for n in self._act_names if n.startswith("REBASE_"))
             _stc = sum(1 for n in self._act_names if n.startswith("SPY_TRAVEL_"))
@@ -1273,6 +1278,8 @@ class SimInit:
                 + (1 if self._A_PERFORM >= 0 else 0) \
                 + (1 if self._A_BOOST >= 0 else 0) \
                 + (6 if self._A_FORM_UP >= 0 else 0) \
+                + (1 if self._A_ESCORT >= 0 else 0) \
+                + (1 if self._A_UNESCORT >= 0 else 0) \
                 + self._air_strike_cols + self._air_rebase_cols + _stc + _smc
             assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
             self._A_CHOP = self._act["CHOP"]
@@ -1292,6 +1299,8 @@ class SimInit:
             self._A_PERFORM = -1
             self._A_BOOST = -1
             self._A_FORM_UP = -1
+            self._A_ESCORT = -1
+            self._A_UNESCORT = -1
             self._A_PROMOTE = -1
             self._A_CONDEMN = -1
             self._A_HERESY = -1
@@ -2176,6 +2185,7 @@ class SimInit:
         self._fort_def_cs = int(cb.get("fortDefenseCs", 4))
         self._embark_live = bool(cb.get("embarkLive", 0))
         self._shipbuilding_tech = int(cb.get("shipbuildingTech", -1))
+        self._sailing_tech = int(cb.get("sailingTech", -1))
         self._cartography_tech = int(cb.get("cartographyTech", -1))
         self._celestial_tech = int(cb.get("celestialTech", -1))
         ru = rules.units or [{"id": "WARRIOR", "cost": 40, "combat": 20, "maintenance": 0, "civilian": 0, "requiresTech": -1}]

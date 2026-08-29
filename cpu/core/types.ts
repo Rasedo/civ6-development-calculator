@@ -392,6 +392,14 @@ export interface Unit {
    * carries its own default.
    */
   formation?: number;
+  /**
+   * IN AN ESCORT FORMATION with the military unit on its own tile. CIV6
+   * (Formations): "A military unit can create a formation with a support or
+   * civilian unit at any time" — the pair then moves as one. Only a CIVILIAN
+   * carries the flag; who escorts it is whoever holds the tile's military
+   * slot, so read it through `inEscort`, never inline.
+   */
+  escorted?: boolean;
   /** A LAND unit currently on a water tile (embarked). Moves
    * at EMBARK_MOVES, cannot fortify/exert ZOC, and (N2) defends at a flat CS.
    * Naval units are never `embarked` — they belong on water natively. */

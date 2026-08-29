@@ -1729,6 +1729,88 @@ class SimSeats:
             key = torch.where(free, d * big + span, torch.full_like(span, big * big))
             self.unit_tile[b, v] = int(key.argmin())
 
+    def _escort_rider(self, gslot: torch.Tensor, here: torch.Tensor, dest: torch.Tensor,
+                      u_type: torch.Tensor, u_promos: torch.Tensor, cost: torch.Tensor):
+        """(rider slot, dragged free, the pair may go) — `escortRider` plus the
+        two clauses `stepUnit` puts in front of its own write.
+
+        CIV6 (Formations): a formation's Movement "is equal to that of the
+        slowest unit that belongs to it", so a rider that cannot afford the
+        step or cannot stand on the destination stops the escort too; (Escort
+        Mobility): "Formation units all inherit escort's Movement speed", and
+        the rider then rides free."""
+        none = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        no_free = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        all_ok = torch.ones(self.B, dtype=torch.bool, device=self.device)
+        if not bool(self.unit_escorted.any()):
+            return none, no_free, all_ok
+        hc = here.clamp(min=0)
+        dc = dest.clamp(min=0)
+        ut = u_type.clamp(min=0, max=self.NU - 1)
+        cand = self.civilian_at.gather(1, hc.unsqueeze(1)).squeeze(1)
+        cc = cand.clamp(min=0)
+        seat = self.unit_seat.gather(1, gslot.unsqueeze(1)).squeeze(1)
+        live = (
+            (cand >= 0) & (here >= 0) & (dest >= 0)
+            & ~self._type_civilian[u_type.clamp(min=0)]
+            & self.unit_escorted.gather(1, cc.unsqueeze(1)).squeeze(1)
+            & (self.unit_seat.gather(1, cc.unsqueeze(1)).squeeze(1) == seat)
+        )
+        if not bool(live.any()):
+            return none, no_free, all_ok
+        free = live & self._promo_flag(ut, u_promos, "ESCORT_SPEED")
+        r_mp = self.unit_mp.gather(1, cc.unsqueeze(1)).squeeze(1)
+        r_full = self.unit_mp_full.gather(1, cc.unsqueeze(1)).squeeze(1)
+        rt = self.unit_type.gather(1, cc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+        r_naval = self.unit_naval[rt]
+        wet = self.water.gather(1, dc.unsqueeze(1)).squeeze(1)
+        wet_ok = (
+            self.wpass.gather(1, dc.unsqueeze(1)).squeeze(1)
+            & (~self.ocean_tile.gather(1, dc.unsqueeze(1)).squeeze(1)
+               | self._seat_tech(seat, self._cartography_tech))
+            & (r_naval | (self._seat_tech(seat, self._sailing_tech) & self._embark_live))
+        )
+        dry_ok = self.passable.gather(1, dc.unsqueeze(1)).squeeze(1) & ~r_naval
+        stand = torch.where(wet, wet_ok, dry_ok) & ~self._blocked_for(
+            dc.unsqueeze(1), seat.unsqueeze(1), is_civilian=True).squeeze(1)
+        may = free | (r_mp >= cost) | (r_mp >= r_full)
+        okm = ~live | (stand & may)
+        return torch.where(live, cand, none), free, okm
+
+    def _escort_carry_with(self, moved: torch.Tensor, rider: torch.Tensor,
+                           free: torch.Tensor, frm: torch.Tensor, dest: torch.Tensor,
+                           cost: torch.Tensor) -> None:
+        """The escort takes its rider along, and the pair pays the same way
+        (`stepUnit`'s rider block)."""
+        take = moved & (rider >= 0)
+        if not bool(take.any()):
+            return
+        g = take.nonzero(as_tuple=True)[0]
+        s = rider[g]
+        wet = self.water.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1)[g]
+        if self._embark_live:
+            naval = self.unit_naval[self.unit_type[g, s].clamp(min=0, max=self.NU - 1)]
+            was = self.unit_emb[g, s]
+            now = wet & ~naval
+            self.unit_emb[g, s] = now
+        self._occ_clear(g, frm[g], s)
+        self.unit_tile[g, s] = dest[g]
+        spent = torch.where(free[g], self.unit_mp[g, s],
+                            (self.unit_mp[g, s] - cost[g]).clamp(min=0))
+        if self._embark_live:
+            flip = was != now
+            if bool(flip.any()):
+                for _pre in ("major", "barb"):
+                    _lo = self.POOL_LO[_pre]
+                    _in = flip & (s >= _lo) & (s < self.POOL_HI[_pre])
+                    if not bool(_in.any()):
+                        continue
+                    _f = self._full_mp(_pre)[g, s - _lo]
+                    self.unit_mp_full[g, s] = torch.where(_in, _f, self.unit_mp_full[g, s])
+                    spent = torch.where(_in, torch.minimum(spent, _f), spent)
+        self.unit_mp[g, s] = spent
+        self._occ_set(g, dest[g], s)
+
     def _air_carry_with(self, moved: torch.Tensor, gslot: torch.Tensor,
                         frm: torch.Tensor, dest: torch.Tensor) -> None:
         """A moving carrier takes its based aircraft along (`carryAirWith`)."""
@@ -6335,7 +6417,11 @@ class SimSeats:
             )
         else:
             cost = land_cost
-        moved = ok & ((mp >= cost) | (mp >= full))
+        # THE FORMATION MOVES AS ONE — no further than its slowest member, and
+        # free of it under Escort Mobility.
+        rider, rider_free, rider_ok = self._escort_rider(
+            gslot, here, dest, u_type, u_promos, cost)
+        moved = ok & ((mp >= cost) | (mp >= full)) & rider_ok
         if not bool(moved.any()):
             return moved
         rows = moved.nonzero(as_tuple=True)[0]
@@ -6346,6 +6432,7 @@ class SimSeats:
         self._occ_clear(rows, here[rows], gs)
         self.unit_tile[rows, gs] = dest[rows]
         self._air_carry_with(moved, gslot, here, dest)
+        self._escort_carry_with(moved, rider, rider_free, here, dest, cost)
         # stepUnit's revealAround: EVERY hop lifts the mover's fog, at
         # SIGHT_RANGE plus what CIV6 (Spyglass / Rutter) calls "+1 sight range".
         # Major seats only — revealAround gates to isCiv on TS the same way,

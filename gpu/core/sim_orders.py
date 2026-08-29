@@ -63,6 +63,8 @@ class SimOrders:
         _pfc = getattr(self, "_A_PERFORM", -1)
         _bpc = getattr(self, "_A_BOOST", -1)
         _fuc = getattr(self, "_A_FORM_UP", -1)
+        _ecc = getattr(self, "_A_ESCORT", -1)
+        _uec = getattr(self, "_A_UNESCORT", -1)
         _stw = self._spy_travel_cols
         _smw = self._n_spy_missions
         _pcol = self.rules.promo_cols
@@ -99,13 +101,16 @@ class SimOrders:
             ((_ab == _pfc) if _pfc >= 0 else _no).any(dim=0),   # perform a concert
             ((_ab == _bpc) if _bpc >= 0 else _no).any(dim=0),   # pay a district project
             (((_ab >= _fuc) & (_ab < _fuc + 6)) if _fuc >= 0 else _no).any(dim=0),  # form up
+            ((_ab == _ecc) if _ecc >= 0 else _no).any(dim=0),   # join an escort
+            ((_ab == _uec) if _uec >= 0 else _no).any(dim=0),   # and leave it
         ]).tolist()
         (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
          _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread,
          _rk_excavate, _rk_park, _rk_promote, _rk_condemn,
          _rk_heresy, _rk_inquis, _rk_heathen, _rk_upgrade,
          _rk_air, _rk_rebase, _rk_travel, _rk_mission,
-         _rk_road, _rk_finish, _rk_gp, _rk_perform, _rk_boost, _rk_form) = _tab
+         _rk_road, _rk_finish, _rk_gp, _rk_perform, _rk_boost, _rk_form,
+         _rk_escort, _rk_unescort) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -198,6 +203,27 @@ class SimOrders:
                         # this roster's Apostle picks its promotion.
                         self.unit_charges[pr, ps] += self._promo_val(
                             utp[pr], self.unit_promos[pr, ps], "SPREAD_CHARGES")
+
+            if _rk_escort[n] and _ecc >= 0:
+                # CIV6 (Formations): the civilian joins the military unit
+                # already standing with it, and the pair moves as one.
+                _em = act & (a == _ecc) & is_civ & (here >= 0)
+                if bool(_em.any()):
+                    _mh = self.military_at.gather(1, hc.unsqueeze(1)).squeeze(1)
+                    _ms = torch.where(
+                        _mh >= 0,
+                        self.unit_seat.gather(1, _mh.clamp(min=0).unsqueeze(1)).squeeze(1),
+                        torch.full_like(_mh, -1))
+                    _em = _em & (_mh >= 0) & (_ms == row)
+                    if bool(_em.any()):
+                        _r = _em.nonzero(as_tuple=True)[0]
+                        self.unit_escorted[_r, sc[_r]] = True
+
+            if _rk_unescort[n] and _uec >= 0:
+                _bm = act & (a == _uec)
+                if bool(_bm.any()):
+                    _r = _bm.nonzero(as_tuple=True)[0]
+                    self.unit_escorted[_r, sc[_r]] = False
 
             if _rk_form[n] and _fuc >= 0:
                 fum = act & (a >= _fuc) & (a < _fuc + 6)

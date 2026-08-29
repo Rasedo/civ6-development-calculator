@@ -79,6 +79,12 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // is the pair's business, not the column's: two singles make a Corps and a
   // Corps plus a single makes an Army, exactly as the two civics allow.
   for (let d = 0; d < 6; d++) names.push(`FORM_UP_${d}`);
+  // THE ESCORT FORMATION: a civilian joins the military unit already standing
+  // with it, and the pair moves as one until it is broken. Two columns rather
+  // than a toggle, because "form" and "break" are two orders in Civ 6 and a
+  // toggle would tell the mask nothing about which one is legal.
+  names.push('ESCORT');
+  names.push('BREAK_ESCORT');
   return names;
 }
 

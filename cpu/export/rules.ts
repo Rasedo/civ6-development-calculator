@@ -1070,6 +1070,7 @@ export function buildRules() {
       flankSupportCivic: civicIdx.get(FLANK_SUPPORT_CIVIC) ?? -1,
       embarkLive: embarkState.live ? 1 : 0,
       shipbuildingTech: techIdx.get('SHIPBUILDING') ?? -1,
+      sailingTech: techIdx.get('SAILING') ?? -1,
       cartographyTech: techIdx.get('CARTOGRAPHY') ?? -1,
       celestialTech: techIdx.get('CELESTIAL_NAVIGATION') ?? -1,
     },

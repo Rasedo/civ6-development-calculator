@@ -1689,6 +1689,7 @@ class SimMasks:
         # a reclaimed slot carries the dead occupant's FORMATION too, and a
         # freshly trained unit is always a single one.
         getattr(self, f"{pre}_unit_formation")[rows, slot] = 0
+        getattr(self, f"{pre}_unit_escorted")[rows, slot] = False
         getattr(self, f"{pre}_unit_band_level")[rows, slot] = 0
         getattr(self, f"{pre}_unit_band_album")[rows, slot] = 0
         getattr(self, f"{pre}_unit_spy_mission")[rows, slot] = self._spy_idle
@@ -2234,7 +2235,18 @@ class SimMasks:
                                          self._promo_flag(ut, self.unit_promos.gather(1, sc), "CLIFFS")) & alive
                   if self._embark_live else torch.zeros(B, N, 6, dtype=torch.bool, device=dev))
         shut = self._border_closed(nb, row, utype.unsqueeze(2).expand(B, N, 6))
-        move = on_map & terr & ~_blk & alive & has_mp & ~cliff6 & ~shut
+        # THE ESCORT FORMATION. CIV6 (Formations): "A military unit can create a
+        # formation with a support or civilian unit at any time" and the pair
+        # then moves as one — so a formed civilian has no step of its own. A
+        # flag with no military unit beside it is no formation, which is what
+        # frees the civilian the moment its escort dies.
+        _mil_here = self.military_at.gather(1, tc)
+        _esc_here = ((_mil_here >= 0) & (torch.where(
+            _mil_here >= 0, self.unit_seat.gather(1, _mil_here.clamp(min=0)),
+            torch.full_like(_mil_here, -1)) == row)).unsqueeze(2)
+        _u_esc = self.unit_escorted.gather(1, sc).unsqueeze(2)
+        in_esc = _u_esc & _esc_here
+        move = on_map & terr & ~_blk & alive & has_mp & ~cliff6 & ~shut & ~in_esc
 
         # ---- ATTACK 6-11 -----------------------------------------------------
         # `unitsHostile` for the units, the centre plane for the cities: ONE
@@ -2480,6 +2492,14 @@ class SimMasks:
                    & (_h_type.reshape(B, N, 6) == utype.unsqueeze(2))
                    & _civ_ok]
 
+        _ec: list[torch.Tensor] = []
+        if getattr(self, "_A_ESCORT", -1) >= 0:
+            _ec = [alive & is_civ & (tile >= 0).unsqueeze(2) & ~_u_esc & _esc_here]
+
+        _ue: list[torch.Tensor] = []
+        if getattr(self, "_A_UNESCORT", -1) >= 0:
+            _ue = [alive & in_esc]
+
         _pr: list[torch.Tensor] = []
         if getattr(self, "_A_PROMOTE", -1) >= 0:
             _pr = [present.unsqueeze(2) & self._promo_offer_mask(sc, utype)]
@@ -2592,7 +2612,8 @@ class SimMasks:
         out = torch.cat(
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
             + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc
-            + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3 + _pc + _bp + _fu,
+            + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3 + _pc + _bp + _fu
+            + _ec + _ue,
             dim=2,
         )
         if self._act_names and self.improvements_on and self._builder_idx >= 0:

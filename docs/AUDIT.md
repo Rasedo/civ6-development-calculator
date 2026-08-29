@@ -54,7 +54,7 @@ from the list below.
 | B-39r wonder effects still dropped | 1 | two residuals, blocked on B-20r's per-work TYPE names |
 | B-45r sourced-sweep finds in the other rows | 1 | the rival-recruit event and B-31r's route yields carry the last two effect families |
 | B-54r flanking and support vs their own page | 1 | the two stacks a UNIQUE UNIT raises wait on C-26 |
-| B-56r the five inert promotions | 1 | five rows name a mechanic neither engine has — sight-blocking, escort formations, an air-roll promotion term, a NAVAL RAIDER class |
+| B-56r the four inert promotions | 1 | four rows name a mechanic neither engine has or a reading no source settles — sight-blocking, CONVOY's "a formation", an air-roll promotion term, a NAVAL RAIDER class |
 | B-51r Encampment residuals | 1 | the district's strike is measured from the CITY CENTRE's tile, and a capture leaves its own pool standing (unsourced either way) |
 | B-44r city-state war tails | 1 | a ranged raider never shoots a minor centre (the seat verbs' own ranged-vs-city-state scope-out) |
 | B-65 religious zone of control | 1 | Civ 6 scopes a religious unit's ZOC to other religious units BOTH ways; the engines run one military-only rule |
@@ -62,7 +62,7 @@ from the list below.
 | B-34r flood tails | 1 | the climate/coastal tails wait on systems that do not exist here |
 | B-63r the grievance ledger's magnitudes | 1 | the occupied/razed rows ship at their published CEILING; the gang-up bar is a heuristic |
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
-| B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; training a Corps or Army outright (Military Academy / Seaport) has no queue tier |
+| B-66 formations | 1 | the merged unit's hit points and spent turn are unsourced; training a Corps or Army outright (Military Academy / Seaport) has no queue tier; an escort formation is a PAIR here, and a dragged rider lifts no fog |
 | **B. Fidelity vs real Civ 6** | **24** | |
 | C-1 POWER | 2 | four renewables, the Biosphere, the Hydroelectric Dam building, decommission/recommission, the reactor age, minors never powered |
 | C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, diplomatic visibility, the negotiated two-sided deal, and the agreements that need one |
@@ -313,7 +313,23 @@ Civ 6 source or is recorded as unverifiable.
   not a Corps or an Army", so an already-formed unit is passed over.
   `tests/gpu/formation_test.py` and `tests/cpu/units/formation.test.ts` are
   the bar; the Great Person clause is pinned in the first and in
-  `tests/cpu/units/greatPerson.test.ts`. OPEN:
+  `tests/cpu/units/greatPerson.test.ts`.
+
+  The ESCORT formation ships beside it (`escortUnit` / `breakEscort` /
+  `inEscort`, `_escort_rider` / `_escort_carry_with`, the ESCORT and
+  BREAK_ESCORT columns). CIV6 (Formations): "A military unit can create a
+  formation with a support or civilian unit at any time", the formation's
+  Movement "is equal to that of the slowest unit that belongs to it", and
+  "all attacks against this tile will be absorbed by the military unit of the
+  formation" — the last of those is already the engine's stacking rule
+  (`stackDefender` takes a military unit whenever the tile holds one),
+  formation or not. Only the CIVILIAN carries the flag and the tile names its
+  escort, so a flag with no military unit beside it is not a formation and
+  the rider is free the moment its escort dies — no sweep, and nothing to
+  clear at a capture. `ESCORT_MOBILITY` rides it: "Formation units all
+  inherit escort's Movement speed", and the rider is then dragged free of its
+  own pool. `tests/gpu/escort_test.py` and `tests/cpu/units/escort.test.ts`
+  are that bar. OPEN:
   - **WHAT THE MERGED UNIT KEEPS BEYOND THE VETERAN'S RECORD IS THIS
     MODEL'S.** No source publishes the hit points a formation carries out
     of a merge, nor whether it may act afterwards. Both engines take the
@@ -325,28 +341,37 @@ Civ 6 source or is recorded as unverifiable.
     rather than merging two units, at a reduced cost. Both buildings exist
     here; the production queue carries no formation tier, so the only road
     to a Corps is the merge.
+  - **AN ESCORT FORMATION IS A PAIR.** Real Civ 6 links up to THREE units of
+    different classes — military, civilian and support. Support units are
+    modelled here as civilians and a tile seats ONE of them, so the third
+    member has nowhere to stand; widening it waits on a support stacking
+    class of its own.
+  - **A DRAGGED RIDER LIFTS NO FOG.** `_step_verb` / `stepUnit` reveal around
+    the MOVER; the escorted unit arrives without a reveal of its own, which
+    matters only where the rider's sight is the wider of the two. It follows
+    the carried-aircraft precedent (`_air_carry_with` / `carryAirWith`)
+    rather than a source.
+  - **REACHABILITY: POKE ONLY.** No driver takes the ESCORT column, so no
+    gate lane forms a pair; the two poke files are the whole bar. The two
+    civics the Corps and Army wait on are out of the battery's reach too —
+    Urbanization, which requires Nationalism, first lands at t233 on 3 of 12
+    seeds, and Mobilization is Modern.
 
-- **B-56r. The five inert promotions.** 74 of the 79 catalog rows in
+- **B-56r. The four inert promotions.** 75 of the 79 catalog rows in
   `cpu/data/promotions.ts` reach a rule; the poke bar is
   `tests/gpu/promotions_test.py` + `tests/gpu/promo_effects_test.py`. FIVE
   carry `none`, each with its blocker:
   - **SENTRY** ("can see through Woods and Rainforest") — `revealAround`
     / `_reveal_around` reveal a flat radius; nothing blocks sight.
-  - **CONVOY and ESCORT_MOBILITY** name the ESCORT formation, which is a
-    different mechanic from the Corps/Army one that now ships. CIV6
-    (Formations): "A military unit can create a formation with a support or
-    civilian unit at any time. Naval military units may also create a
-    formation with embarked land units" — nothing here binds one occupant's
-    move to another's, which is what both rows want.
-    - ESCORT_MOBILITY is "Formation units all inherit escort's Movement
-      speed" (Light Cavalry): it asks for that binding outright and is
-      blocked on it.
-    - CONVOY is "+10 Combat Strength when in a formation" (Naval Melee). An
-      earlier reading of this row called it a movement clause; no source
-      supports that, and the correction is why the row is re-stated here.
-      Its "in a formation" is a FORK the sources do not settle — a Fleet is
-      a formation and so is an escort — so NEITHER branch ships and the
-      question is the owner's.
+  - **CONVOY** is "+10 Combat Strength when in a formation" (Naval Melee,
+    behind Reinforced Hull and Rutter). An earlier reading of this row called
+    it a movement clause; no source supports that, and the correction is why
+    the row is re-stated here. Both senses of "a formation" now exist on both
+    engines — a Fleet or Armada, and an escort — and no source says which one
+    the promotion means, or whether it means either. It is therefore a FORK
+    rather than a missing mechanic: NEITHER branch ships and the question is
+    the owner's. `ESCORT_MOBILITY`, which shared this row's blocker, ships
+    with the escort formation.
   - **CREEPING_ATTACK** is "+14 Combat Strength vs. naval raider units",
     and no NAVAL RAIDER class exists to name in a `CS_VS_CLASS_*` mask —
     C-32.

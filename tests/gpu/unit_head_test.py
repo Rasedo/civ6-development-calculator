@@ -64,7 +64,7 @@ def main() -> None:
         ("SPY_TRAVEL_", esp["travelCols"]),
         ("SPY_MISSION_", len(esp["missions"])),
     ]
-    want = 13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads) + 3 + 26
+    want = 13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads) + 3 + 28
     assert len(acts) == want, (
         f"enum is {len(acts)} wide, expected {want} for {len(imp_ids)} improvements, "
         f"a {pcol}-wide PROMOTE head and heads {heads}"
@@ -76,8 +76,9 @@ def main() -> None:
     _last = (["BUILD_ROAD", "FINISH_DISTRICT", "ACTIVATE_GP"]
              + [f"SNIPE3_{k}" for k in range(18)]  # the distance-3 ring
              + ["PERFORM_CONCERT", "BOOST_PROJECT"]
-             + [f"FORM_UP_{d}" for d in range(6)])  # the newest last-append
-    assert acts[-len(_last):] == _last, f"the trailing verbs must close the enum, got {acts[-28:]}"
+             + [f"FORM_UP_{d}" for d in range(6)]
+             + ["ESCORT", "BREAK_ESCORT"])  # the newest last-append
+    assert acts[-len(_last):] == _last, f"the trailing verbs must close the enum, got {acts[-30:]}"
     _tailstart = len(acts) - len(_last) - sum(w for _p, w in heads)
     assert acts[_tailstart - 4:_tailstart] == [
         "REMOVE_HERESY", "LAUNCH_INQUISITION", "CONVERT_HEATHEN", "UPGRADE"], \

@@ -72,6 +72,7 @@ export const PROMO_KINDS = [
   'EXTRA_ATTACK_STILL',  // +v attacks per turn, and only if it has not moved
   'KILL_SPREAD',         // v religious pressure nearby on a non-barbarian kill
   'ZOC_EXERT',           // a RANGED-class unit exerts zone of control
+  'ESCORT_SPEED',        // an escorted unit is dragged free of its own MP
 ] as const;
 export type PromoKind = (typeof PROMO_KINDS)[number];
 
@@ -153,7 +154,10 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('SPIKING_THE_GUNS', 'LIGHT_CAV', 3, ['DEPREDATION', 'DOUBLE_ENVELOPMENT'],
     cs('CS_VS_CLASS_ANY', 7, CLASS_BIT.SIEGE)),
   P('PURSUIT', 'LIGHT_CAV', 3, ['DEPREDATION', 'DOUBLE_ENVELOPMENT'], cs('MOVES', 1)),
-  P('ESCORT_MOBILITY', 'LIGHT_CAV', 4, ['SPIKING_THE_GUNS', 'PURSUIT'], none),
+  // CIV6 (Escort Mobility): "Formation units all inherit escort's Movement
+  // speed" — the pair stops paying the slower member's way.
+  P('ESCORT_MOBILITY', 'LIGHT_CAV', 4, ['SPIKING_THE_GUNS', 'PURSUIT'],
+    { kind: 'ESCORT_SPEED' }),
 
   // ---- HEAVY CAVALRY --------------------------------------------------
   P('CHARGE', 'HEAVY_CAV', 1, [], cs('CS_VS_FORTIFIED', 10)),

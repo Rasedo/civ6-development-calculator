@@ -703,6 +703,7 @@ UNIT = {
     "gpAt": _unit("unit_gp_at"),
     "revealedTurn": _unit("unit_revealed_turn"),
     "formation": _unit("unit_formation"),
+        "escorted": _unit("unit_escorted"),
 }
 
 

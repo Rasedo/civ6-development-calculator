@@ -51,7 +51,7 @@ import { canBuildRoad, canPlaceDistrictIn, canPlaceWonder, validImprovementsIn, 
 import { hasRiver, hasFreshWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
-import { disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit } from './units';
+import { escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit } from './units';
 import { killUnit } from './combat';
 import { landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, condemnHeretic, formUp, convertHeathens, districtCostIn, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
@@ -70,6 +70,8 @@ const A_PARK = unitActionIndex(IMPROVEMENT_IDS).PARK;
 const A_PERFORM = unitActionIndex(IMPROVEMENT_IDS).PERFORM_CONCERT;
 const A_BOOST = unitActionIndex(IMPROVEMENT_IDS).BOOST_PROJECT;
 const A_FORM_UP = unitActionIndex(IMPROVEMENT_IDS).FORM_UP_0;
+const A_ESCORT = unitActionIndex(IMPROVEMENT_IDS).ESCORT;
+const A_BREAK_ESCORT = unitActionIndex(IMPROVEMENT_IDS).BREAK_ESCORT;
 const A_PROMOTE = unitActionIndex(IMPROVEMENT_IDS).PROMOTE_0;
 const A_CONDEMN = unitActionIndex(IMPROVEMENT_IDS).CONDEMN_0;
 const A_REMOVE_HERESY = unitActionIndex(IMPROVEMENT_IDS).REMOVE_HERESY;
@@ -1110,6 +1112,14 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
       }
       if (a >= A_PROMOTE && a < A_PROMOTE + PROMO_COLS) {
         takePromotion(unit, a - A_PROMOTE);
+        return;
+      }
+      if (a === A_ESCORT) {
+        escortUnit(state, unit);
+        return;
+      }
+      if (a === A_BREAK_ESCORT) {
+        breakEscort(unit);
         return;
       }
       if (a >= A_FORM_UP && a < A_FORM_UP + 6) {

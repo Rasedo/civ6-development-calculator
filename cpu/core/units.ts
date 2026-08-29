@@ -680,6 +680,57 @@ export type StepOutcome =
  * seatPhase and spawnUnit — and a bonus added to one of them is a bonus the
  * other three silently disagree about. The GPU's twin is `_full_mp`.
  */
+/**
+ * THE ESCORT FORMATION. CIV6 (Formations): "A military unit can create a
+ * formation with a support or civilian unit at any time"; the formation's
+ * Movement "is equal to that of the slowest unit that belongs to it", and
+ * every attack on the tile is answered by its military member.
+ *
+ * The engine already seats one military and one civilian unit to a tile, so
+ * the formation is a LINK rather than a stack: the civilian carries the flag
+ * and the tile names its escort. A flag with no military unit beside it is
+ * not a formation, which is what frees the civilian the moment its escort
+ * dies — no sweep, and no stale link to clear at a capture.
+ */
+export function escortOf(state: GameState, unit: Unit): Unit | undefined {
+  if (!unit.escorted) return undefined;
+  return state.units.find(
+    (u) => u.id !== unit.id && u.tileIndex === unit.tileIndex && u.seat === unit.seat
+      && unitDomain(u.type) === 'military',
+  );
+}
+
+/** the civilian this military unit is escorting, if any. */
+export function escortRider(state: GameState, unit: Unit): Unit | undefined {
+  if (unitDomain(unit.type) !== 'military') return undefined;
+  return state.units.find(
+    (u) => !!u.escorted && u.id !== unit.id && u.tileIndex === unit.tileIndex
+      && u.seat === unit.seat && unitDomain(u.type) === 'civilian',
+  );
+}
+
+export function inEscort(state: GameState, unit: Unit): boolean {
+  return escortOf(state, unit) !== undefined;
+}
+
+export function escortUnit(state: GameState, unit: Unit): RuleResult {
+  if (unitDomain(unit.type) !== 'civilian') return no('Only a civilian joins an escort.');
+  if (unit.escorted) return no('Already in a formation.');
+  const esc = state.units.find(
+    (u) => u.id !== unit.id && u.tileIndex === unit.tileIndex && u.seat === unit.seat
+      && unitDomain(u.type) === 'military',
+  );
+  if (!esc) return no('No military unit here to escort it.');
+  unit.escorted = true;
+  return ok;
+}
+
+export function breakEscort(unit: Unit): RuleResult {
+  if (!unit.escorted) return no('Not in a formation.');
+  unit.escorted = false;
+  return ok;
+}
+
 export function unitFullMoves(state: GameState, unit: { type: string; seat: number; embarked?: boolean; tileIndex?: number }): number {
   const def = UNITS[unit.type];
   // CIV6 (Commando): the +1 Movement "also applies while the unit is
@@ -713,6 +764,9 @@ export function embarkTechMoves(state: GameState, seat: number): number {
 
 export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   const seat = unit.seat;
+  // a formed civilian has no step of its own: the formation moves as one, and
+  // Civ 6 asks for it to be broken first.
+  if (inEscort(state, unit)) return 'blocked';
   const from = state.map.tiles[unit.tileIndex];
   const naval = !!UNITS[unit.type]?.naval;
   // CIV6 (Movement): the one-step allowance reads "full Movement" as "has
@@ -730,6 +784,15 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
     ? moveCostInto(from, to, unit) + (easyDock ? 0 : 2)
     : moveCostInto(from, to, unit) + riverCharge(state, from, to); // roads
   if (unit.movesLeft < cost && unit.movesLeft < full) return 'cantAfford';
+  // THE FORMATION MOVES AS ONE — and no further than its slowest member,
+  // unless the escort carries Escort Mobility.
+  const rider = escortRider(state, unit);
+  const riderFree = rider ? promoFlag(unit, 'ESCORT_SPEED') : false;
+  if (rider) {
+    if (!tileFreeForUnit(state, to.index, seat, rider, true)) return 'blocked';
+    const rFull = rider.movesFull ?? unitFullMoves(state, rider);
+    if (!riderFree && rider.movesLeft < cost && rider.movesLeft < rFull) return 'cantAfford';
+  }
   if (transition) unit.embarked = isWater(to);
   unit.tileIndex = to.index;
   carryAirWith(state, unit, from.index);
@@ -741,6 +804,17 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
     const modeFull = unitFullMoves(state, unit);
     unit.movesLeft = Math.min(unit.movesLeft, modeFull);
     unit.movesFull = modeFull;
+  }
+  if (rider) {
+    const rTrans = !UNITS[rider.type]?.naval && isWater(from) !== isWater(to);
+    if (rTrans) rider.embarked = isWater(to);
+    rider.tileIndex = to.index;
+    if (!riderFree) rider.movesLeft = Math.max(0, rider.movesLeft - cost);
+    if (rTrans) {
+      const rModeFull = unitFullMoves(state, rider);
+      rider.movesLeft = Math.min(rider.movesLeft, rModeFull);
+      rider.movesFull = rModeFull;
+    }
   }
   unit.attacksLeft = stepAttacksLeft(unit);
   // CIV6 (Combat): an Encampment emptied of its garrison is not walk-over

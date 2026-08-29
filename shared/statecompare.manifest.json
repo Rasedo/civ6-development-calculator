@@ -1904,6 +1904,17 @@
             "unit_formation"
           ],
           "note": "0 a lone unit, 1 a Corps or Fleet, 2 an Army or Armada."
+        },
+        {
+          "name": "escorted",
+          "compare": "exact",
+          "covers": [
+            "Unit.escorted"
+          ],
+          "planes": [
+            "unit_escorted"
+          ],
+          "note": "the civilian half of an escort formation; the escort is whoever holds the tile's military slot."
         }
       ]
     },
