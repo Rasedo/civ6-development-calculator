@@ -48,7 +48,7 @@ from the list below.
 | B-22r World Congress | 2 | the observation renders the standing slate, three resolutions have no carrier, the culture bomb spares unfinished construction, scored competitions and peace TERMS are absent |
 | B-24r Ages/governors | 2 | the governor at a CITY-STATE and its three channels, fourteen promotion clauses with no channel, Grants' per-city GPP, To Arms!'s casus belli, the corps/army kill event, per-civ era drift |
 | B-31r trade-route tails | 1 | the pass-through post gold has no stored path; plunder gold is a stylization; the summed-yield key and one-candidate head are P8-surface |
-| B-53r the great-person PASS | 1 | the standing offer can never be rejected — no per-seat passed flag |
+| B-53r the great-person PASS | 1 | the standing offer can never be rejected — no per-seat passed flag; a grant onto a half-built building burns the production, unsourced |
 | B-D unsourced data values | 2 | channel-blocked government tails, and the shape differences / model tuning no source can close |
 | B-36r appeal adjacency terms | 1 | the CIVILIZATION-unique improvements' terms (C-26) |
 | B-39r wonder effects still dropped | 1 | two residuals, blocked on B-20r's per-work TYPE names |
@@ -354,6 +354,16 @@ Civ 6 source or is recorded as unverifiable.
     offer — the class's own points freeze and the passed person stays on
     offer to everyone else. Needs a per-seat passed flag beside the
     shared offer, and the rejoin rule when the next person stands.
+  - **A GRANT ONTO A HALF-BUILT BUILDING BURNS THE PRODUCTION.** Hypatia
+    and Isaac Newton instantly build a Library (and a University) in the
+    city the charge lands in, which can be the very building that city is
+    still producing. No city holds two copies, so both engines now let
+    the queued item complete into nothing and the hammers already spent
+    buy nothing. What real Civ 6 does with those hammers is UNSOURCED —
+    the base game has one production slot and no way to reach this state
+    by hand, and the sources found describe a production-queue MOD, not
+    the base rule. The alternative shape is to drop the item at the grant
+    and bank its progress; picking it needs a source, not a preference.
 - **B-D. UNSOURCED DATA VALUES — swept once; the named stylizations are
   OPEN, not closed.** The cpu/data walk fetched every magnitude from the
   GS Civilopedia row by row (wonders, units, both trees, buildings, all 49

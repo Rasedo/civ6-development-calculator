@@ -6,11 +6,11 @@ import { DED_MONUMENTALITY, DED_EXODUS, DED_EVENT_SCORE } from '../../../cpu/dat
 import { makeState, tileAtCoords } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
 import { addEraScore, eraBoundary, agePressureFactor } from '../../../cpu/core/eras';
-import { governorAt, governorPhase, governorsOf, governorTitlesAvailable, governorTitlesEarned, governorTitlesSpent } from '../../../cpu/core/governors';
-import { GOVERNORS, GOVERNOR_PROMOTIONS, GOVERNOR_TITLE_CIVICS } from '../../../cpu/data/governors';
+import { governorAt, governorPhase, governorsOf, governorTitlesAvailable, governorTitlesEarned, governorTitlesSpent, hasPromotion } from '../../../cpu/core/governors';
+import { GOVERNORS, GOVERNOR_PROMOTIONS, GOVERNOR_PROMOTION_INDEX, GOVERNOR_TITLE_CIVICS, promotionBit, promotionBitValue } from '../../../cpu/data/governors';
 import { tilesWithin } from '../../../world/hex';
 import { ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOVERNOR_LOYALTY, LOYALTY_MAX } from '../../../cpu/data/seats';
-import type { GameState, City, Seat } from '../../../cpu/core/types';
+import type { GameState, City, Governor, Seat } from '../../../cpu/core/types';
 
 // -- local builders (the geopolitics.test.ts / the other civs.test.ts pattern) --------
 function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> = {}): Seat {
@@ -294,5 +294,42 @@ describe('named dedications', () => {
     seatOf(st, 0)!.dedicationPicks = [];
     dedicationEvent(st, 0, DED_MONUMENTALITY);
     expect(seatOf(st, 0)?.eraScore ?? 0).toBe(0);
+  });
+});
+
+// The catalog is longer than 32 rows, which is exactly where JavaScript's
+// bitwise operators stop: `1 << 36` is `1 << 4`. Every held-promotion mask
+// therefore rides exact powers of two, and the GPU's int64 twin must read the
+// same bits back.
+describe('the promotion mask outlives 32 bits', () => {
+  it('one held row reads as itself and as nothing else', () => {
+    expect(GOVERNOR_PROMOTIONS.length).toBeGreaterThan(32);
+    for (let i = 0; i < GOVERNOR_PROMOTIONS.length; i++) {
+      const g: Governor = { appointed: true, cityId: 0, minorId: -1, establishTurns: 0, outTurns: 0, promotions: promotionBitValue(i) };
+      for (let j = 0; j < GOVERNOR_PROMOTIONS.length; j++) {
+        expect(hasPromotion(g, j), `bit ${i} read at ${j}`).toBe(i === j);
+      }
+    }
+  });
+
+  it('a full mask is exact, and counts every row', () => {
+    let mask = 0;
+    for (let i = 0; i < GOVERNOR_PROMOTIONS.length; i++) mask += promotionBitValue(i);
+    expect(mask).toBe(2 ** GOVERNOR_PROMOTIONS.length - 1);
+    expect(Number.isSafeInteger(mask)).toBe(true);
+    const roster: Governor[] = GOVERNORS.map((_, i) => (
+      { appointed: i === 0, cityId: -1, minorId: -1, establishTurns: 0, outTurns: 0, promotions: i === 0 ? mask : 0 }));
+    // one title bought the appointment, one bought each promotion
+    expect(governorTitlesSpent({ governors: roster } as unknown as Seat)).toBe(1 + GOVERNOR_PROMOTIONS.length);
+  });
+
+  it('a prerequisite mask names the rows it was built from', () => {
+    for (const p of GOVERNOR_PROMOTIONS) {
+      const want = (p.requires ?? []).map((r) => GOVERNOR_PROMOTION_INDEX[r]!);
+      const mask = want.reduce((m, i) => m + promotionBitValue(i), 0);
+      for (let j = 0; j < GOVERNOR_PROMOTIONS.length; j++) {
+        expect(promotionBit(mask, j), `${p.id} requires ${j}?`).toBe(want.includes(j));
+      }
+    }
   });
 });

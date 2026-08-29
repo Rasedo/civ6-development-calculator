@@ -152,13 +152,24 @@ def main() -> None:
     #    ONLINE_COMMUNITIES' row IS the neutral row, so any card matching it
     #    everywhere carries no effect at all. It is a deferral on an absent
     #    system, not a stub.
-    META = {"id", "kind", "unlockCivic", "obsoleteCivic"}
+    META = {"id", "kind", "unlockCivic", "obsoleteCivic", "dark"}
     neutral = {k: v for k, v in pol_by_id["ONLINE_COMMUNITIES"].items() if k not in META}
     inert = sorted(p["id"] for p in rj["policies"] if all(p[k] == v for k, v in neutral.items()))
     assert inert == ["ONLINE_COMMUNITIES"], f"the inert set moved: {inert}"
+    n_era = int(rj["eras"]["count"])
     for p in rj["policies"]:
-        assert p["unlockCivic"] >= 0, f"{p['id']} is adoptable but no civic grants it"
-        assert p["obsoleteCivic"] == -1 or 0 <= p["obsoleteCivic"] < len(rj["civics"]), f"{p['id']} retires to nothing"
+        # a DARK AGE card is granted by the age and its era window, never by a
+        # civic; every other card is granted by exactly one civic
+        lo, hi = p["dark"]
+        if lo >= 0:
+            assert p["unlockCivic"] == -1, f"{p['id']} is a dark card — no civic grants it"
+            assert p["obsoleteCivic"] == -1, f"{p['id']} is a dark card — no civic retires it"
+            assert p["kind"] == 3, f"{p['id']} is a dark card — wildcard only"
+            assert lo <= hi < n_era, f"{p['id']} has an era window outside the ladder"
+        else:
+            assert hi == -1, f"{p['id']} carries half an era window"
+            assert p["unlockCivic"] >= 0, f"{p['id']} is adoptable but no civic grants it"
+            assert p["obsoleteCivic"] == -1 or 0 <= p["obsoleteCivic"] < len(rj["civics"]), f"{p['id']} retires to nothing"
 
     # 8) The MEDIEVAL_FAIRES "run 4 policy cards" inspiration: drive
     #    _detect_seat_boosts and assert it fires at >=4 slotted policies, not

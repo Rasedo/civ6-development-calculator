@@ -8,7 +8,8 @@ import {
   GP_SITES, gpSiteOf, gpChargesOf, gpEffectOf, gpPermOf, gpCityPermOf,
 } from '../../../cpu/data/greatPeople';
 import { activateGreatPerson, gpActivateOk, gpPersonOf } from '../../../cpu/core/gpAbility';
-import type { GameState, Unit } from '../../../cpu/core/types';
+import { completeQueueItem } from '../../../cpu/core/production';
+import type { GameState, QueueItem, Unit } from '../../../cpu/core/types';
 
 // — A GREAT PERSON IS PLACED AND USED. CIV6 ("Activating Great People"): the
 // person arrives as a UNIT, walks to a site its own ability names, and spends
@@ -198,5 +199,35 @@ describe('the spend', () => {
     }
     expect(activateGreatPerson(state, u)).toBe(true);
     expect(gpCityPermOf(city, key)).toBe(want);
+  });
+
+  // CIV6 (Isaac Newton): "Instantly builds a Library and University in this
+  // city" — the grant can land the very building the city is still producing.
+  // No city holds two of one building, so the queued copy completes into
+  // nothing; every reader of `city.buildings` treats it as a set, and the GPU
+  // stores it as one bit.
+  it('a building granted while the city still produces it is never held twice', () => {
+    const state = newGame();
+    const found = GP_CLASSES.flatMap((c) => GREAT_PEOPLE[c].map((p, i) => ({ c, i, p })))
+      .find((e) => ((gpEffectOf(e.p) as { buildings?: string[] }).buildings ?? []).length > 0);
+    if (!found) return;
+    const grant = (gpEffectOf(found.p) as { buildings: string[] }).buildings[0]!;
+    const city = state.seats[0].cities[0];
+    const { site, district } = gpSiteOf(found.p);
+    if (site !== 'district' && site !== 'anywhere') return;
+    const u = person(state, found.c, found.i, site === 'district' ? ownBare(state) : city.centerIndex);
+    if (site === 'district') {
+      const tile = state.map.tiles[u.tileIndex];
+      tile.district = district;
+      tile.districtComplete = true;
+      city.districts.push({ type: district, tileIndex: tile.index });
+    }
+    const item: QueueItem = { kind: 'building', building: grant, progress: 0 };
+    city.queue.push(item);
+    expect(activateGreatPerson(state, u)).toBe(true);
+    expect(city.buildings.filter((b) => b === grant)).toHaveLength(1);
+    city.queue.shift();
+    completeQueueItem(state, city, item, 1);
+    expect(city.buildings.filter((b) => b === grant)).toHaveLength(1);
   });
 });

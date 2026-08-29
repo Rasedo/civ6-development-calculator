@@ -16,6 +16,7 @@
   },
   "censusTypes": [
     "GameState",
+    "Governor",
     "GameMap",
     "Seat",
     "City",
@@ -359,6 +360,7 @@
           "name": "governorAppointed",
           "compare": "exact",
           "covers": [
+            "Seat.governors",
             "Governor.appointed"
           ],
           "planes": [
@@ -2172,6 +2174,10 @@
       {
         "path": "GameState.map",
         "why": "the map's dynamic surface is the `tile` group; the container itself holds nothing else."
+      },
+      {
+        "path": "Governor.minorId",
+        "why": "the city-state posting has no GPU plane and no writer on either engine; the mechanic it waits on is a governor assigned to a city-state."
       },
       {
         "path": "GameState.seatActions",

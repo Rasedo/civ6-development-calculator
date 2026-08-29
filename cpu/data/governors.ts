@@ -118,6 +118,14 @@ export interface GovernorEffects {
   minorLuxuries?: boolean;
 }
 
+/** The promotion catalog is longer than 32 rows and JavaScript's bitwise
+ *  operators are 32-bit — `1 << 36` is `1 << 4` — so the held-promotion mask
+ *  is built from exact powers of two, which a number carries to 2^53. The
+ *  GPU's twin is an int64 plane and needs no such care. */
+export const promotionBitValue = (index: number): number => 2 ** index;
+export const promotionBit = (mask: number, index: number): boolean =>
+  Math.floor(mask / 2 ** index) % 2 === 1;
+
 export interface GovernorPromotionDef {
   id: string;
   name: string;

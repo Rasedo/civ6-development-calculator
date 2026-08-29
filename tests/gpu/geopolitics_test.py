@@ -901,14 +901,30 @@ def main() -> None:
     s8.civ_diplo_favor[:, 1] = 60      # walks exactly 3
     s8.civ_diplo_favor[:, 2] = 0       # the free vote only
     s8._world_congress()
-    # regular slates pay every voter +2 first; then the leader scan finds
-    # seat 1 (7 vs 2), seat 1 votes A-on-self weight 4, seats 0+2 vote
-    # B-on-leader weights 4+1: B wins 5-4
+    # the leader scan finds seat 1 (7 vs 2), seat 1 votes A-on-self weight 4,
+    # seats 0+2 vote B-on-leader weights 4+1: B wins 5-4
     assert int(s8.civ_diplo_favor[0, 1]) == 60, "the losing outcome is refunded 100%"
     assert int(s8.civ_diplo_favor[0, 0]) == 5, "a winning-combo voter keeps no refund"
     assert int(s8.civ_diplo_favor[0, 2]) == 0
-    assert int(s8.civ_diplo_points[0, 1]) == 5 + 2 - s8._congress_dv_delta, "the leader loses the DV delta"
-    assert int(s8.civ_diplo_points[0, 0]) == 3 and int(s8.civ_diplo_points[0, 2]) == 3, "B voters take the combo point"
+    # What the two REGULAR resolutions pay is their own slate's business, so
+    # measure it: a twin whose Modern gate can never open runs the identical
+    # session (the session draws nothing) minus the DV resolution.
+    s8b = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
+    s8b._congress_dv_min = 99
+    s8b.civ_techs[:, 0].zero_(); s8b.civ_techs[:, 0, _era_mod] = True
+    s8b.turn = s8b._congress_interval
+    s8b.civ_diplo_points[:, 1] = 5
+    s8b.civ_diplo_favor[:, 0] = 65
+    s8b.civ_diplo_favor[:, 1] = 60
+    s8b.civ_diplo_favor[:, 2] = 0
+    s8b._world_congress()
+    assert s8b.congress_active[0, :, 0].tolist() == s8.congress_active[0, :, 0].tolist(), (
+        "the twin must convene the same regular slate"
+    )
+    _reg = s8b.civ_diplo_points[0].tolist()
+    assert int(s8.civ_diplo_points[0, 1]) == _reg[1] - s8._congress_dv_delta, "the leader loses the DV delta"
+    assert (int(s8.civ_diplo_points[0, 0]) == _reg[0] + s8._dvp_per_res
+            and int(s8.civ_diplo_points[0, 2]) == _reg[2] + s8._dvp_per_res), "B voters take the combo point"
 
     # the standing effects: write the plane directly, read every helper
     s8.congress_active[:, 0, :] = torch.tensor([1, 0, 2], dtype=torch.long)   # Patronage A on class 2

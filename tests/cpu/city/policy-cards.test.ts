@@ -12,7 +12,7 @@ import { spawnUnit } from '../../../cpu/core/units';
 import { seatOf, BARB_SEAT } from '../../../cpu/core/seats';
 
 describe('the policy catalog', () => {
-  it('every card is unlocked by exactly one civic and retires to a real one', () => {
+  it('every card is unlocked by exactly one civic, or by a Dark Age', () => {
     const unlockedBy = new Map<string, string>();
     for (const c of Object.values(CIVICS)) {
       for (const fx of c.effects) {
@@ -23,6 +23,15 @@ describe('the policy catalog', () => {
       }
     }
     for (const p of POLICY_LIST) {
+      if (p.dark) {
+        // a Dark Age card is granted by the age and its era window, and no
+        // civic ever grants or retires it
+        expect(unlockedBy.get(p.id), `${p.id} is a dark card — no civic grants it`).toBeUndefined();
+        expect(p.obsoleteCivic, `${p.id} is a dark card — no civic retires it`).toBeUndefined();
+        expect(p.kind, `${p.id} is a dark card — wildcard only`).toBe('wildcard');
+        expect(p.dark.firstEra <= p.dark.lastEra, `${p.id} has an inverted era window`).toBe(true);
+        continue;
+      }
       expect(unlockedBy.get(p.id), `${p.id} has no enabling civic`).toBeTruthy();
       if (p.obsoleteCivic) expect(CIVICS[p.obsoleteCivic], `${p.id} retires to nothing`).toBeTruthy();
     }

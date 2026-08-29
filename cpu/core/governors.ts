@@ -6,7 +6,7 @@ import { cityDistrictSum } from './yields';
 import { congressGovernorFavorType } from './congress';
 import {
   GOVERNORS, GOVERNOR_PROMOTIONS, GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_TITLE_CIVICS,
-  GOVERNANCE_DOCTRINE_FAVOR, type GovernorEffects,
+  GOVERNANCE_DOCTRINE_FAVOR, promotionBit, promotionBitValue, type GovernorEffects,
 } from '../data/governors';
 
 /**
@@ -57,9 +57,9 @@ export function governorTitlesSpent(seat: Seat): number {
 function promotionCount(g: Governor): number {
   let bits = g.promotions;
   let n = 0;
-  while (bits) {
-    bits &= bits - 1;
-    n += 1;
+  while (bits >= 1) {
+    n += bits % 2;
+    bits = Math.floor(bits / 2);
   }
   return n;
 }
@@ -71,7 +71,7 @@ export function governorTitlesAvailable(state: GameState, seat: number): number 
 }
 
 export function hasPromotion(g: Governor, promoIndex: number): boolean {
-  return (g.promotions & (1 << promoIndex)) !== 0;
+  return promotionBit(g.promotions, promoIndex);
 }
 
 /** Is this promotion legal for `g` right now — its governor's, not already
@@ -174,7 +174,7 @@ export function governorPhase(state: GameState, seat: number): void {
     for (let i = 0; i < roster.length && !took; i++) {
       for (let p = 0; p < GOVERNOR_PROMOTIONS.length; p++) {
         if (!promotionLegal(roster[i], i, p)) continue;
-        roster[i].promotions |= 1 << p;
+        roster[i].promotions += promotionBitValue(p);
         payGovernanceDoctrine(state, s, i);
         took = true;
         break;

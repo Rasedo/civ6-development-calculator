@@ -224,7 +224,7 @@ import { clearableFeatures } from '../../world/features';
 import { DED_TO_ARMS, DED_DRACONES, DED_COINAGE, DED_STEAM, DED_WISH, DEDICATION_ERAS, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN, TO_ARMS_MIL_PROD_MULT, DRACONES_DISCOVERY_SCORE, COINAGE_INTL_GOLD_PER_SPEC, STEAM_WONDER_PROD_MULT } from '../data/seats';
 import { BUILDING_ERA_INDEX } from '../data/buildings';
 import { INDUSTRIAL_ERA_INDEX } from '../data/techs';
-import { GOVERNORS, GOVERNOR_INDEX, GOVERNOR_PROMOTIONS, GOVERNOR_PROMOTION_INDEX, GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_TITLE_CIVICS, GOVERNOR_NEUTRALIZE_TURNS, GOVERNANCE_DOCTRINE_FAVOR, WATER_WORKS_HOUSING, WATER_WORKS_AMENITIES, type GovernorEffects } from '../data/governors';
+import { GOVERNORS, GOVERNOR_INDEX, GOVERNOR_PROMOTIONS, GOVERNOR_PROMOTION_INDEX, GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_TITLE_CIVICS, GOVERNOR_NEUTRALIZE_TURNS, GOVERNANCE_DOCTRINE_FAVOR, WATER_WORKS_HOUSING, WATER_WORKS_AMENITIES, promotionBitValue, type GovernorEffects } from '../data/governors';
 
 /** The REAL settler rule now: a 1-pop city may not train or buy one.
  *  Exported to the GPU as scenario.settlerPopGate. */
@@ -1432,7 +1432,7 @@ export function buildRules() {
       gov: GOVERNOR_INDEX[p.governor],
       tier: p.tier,
       // a bitmask over this list: at least ONE of these must be held
-      requires: (p.requires ?? []).reduce((m, r) => m | (1 << GOVERNOR_PROMOTION_INDEX[r]), 0),
+      requires: (p.requires ?? []).reduce((m, r) => m + promotionBitValue(GOVERNOR_PROMOTION_INDEX[r]!), 0),
       ...governorEffectRow(p.effects),
     })),
     policies: Object.values(POLICIES).map((p) => ({

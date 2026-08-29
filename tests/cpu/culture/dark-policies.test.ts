@@ -4,7 +4,7 @@ import { POLICIES, POLICY_LIST, GOVERNMENTS, type PolicyDef, type SlotKind } fro
 import { CIVICS } from '../../../cpu/data/civics';
 import { civEraIndex } from '../../../cpu/core/city';
 import { governorsOf } from '../../../cpu/core/governors';
-import { GOVERNORS, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX } from '../../../cpu/data/governors';
+import { GOVERNORS, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBitValue } from '../../../cpu/data/governors';
 import { seatOf } from '../../../cpu/core/seats';
 import { makeState } from '../helpers';
 import type { City, ResearchState } from '../../../cpu/core/types';
@@ -100,7 +100,7 @@ describe('the governor overlay on a seat modifier', () => {
     expect(live.perCitizen.culture ?? 0).toBeCloseTo(0, 12);
 
     // CIV6 (Connoisseur): "+1 Culture per turn for each Citizen in the city."
-    roster[gi]!.promotions |= 1 << promo('CONNOISSEUR');
+    roster[gi]!.promotions += promotionBitValue(promo('CONNOISSEUR'));
     const promoted = withGovernor(state, getModifiers(state, 0), city);
     expect(promoted.perCitizen.culture ?? 0).toBeCloseTo(1, 12);
     expect(promoted.yieldMult.science ?? 1).toBeCloseTo(sci * 1.15, 12); // the default is not paid twice

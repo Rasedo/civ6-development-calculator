@@ -252,7 +252,11 @@ export function completeQueueItem(
       completeProject(state, city, item.project, cost, sciPerTurn);
       break;
     case 'building':
-      city.buildings.push(item.building);
+      // CIV6 (Isaac Newton): "Instantly builds a Library and University in
+      // this city" — a grant can land the very building this city is still
+      // producing, and no city holds two of one building. The production
+      // already spent buys nothing.
+      if (!city.buildings.includes(item.building)) city.buildings.push(item.building);
       buildingDedications(state, city.seat, item.building);
       // CIV6 (Intelligence Agency): "+1 Spy" — the free unit, here.
       if (BUILDINGS[item.building]?.grantUnit) spawnUnit(state, BUILDINGS[item.building].grantUnit!, city.centerIndex, city.seat);
