@@ -399,7 +399,10 @@ export function theoStrength(state: GameState, unit: Unit): number {
     + promoValue(unit, 'RELIG_CS') + congressReligiousCs(state, unitSeat(unit)) + card;
   // CIV6 (Grand Inquisitor): "+10 Religious Strength in theological combat in
   // tiles of this city."
-  const gov = here ? governorTileSum(state, here, (e) => e.theologyCS) : 0;
+  // CIV6 (Theocracy): "+5 Religious Strength in Theological Combat" — the
+  // seat's own, wherever its unit fights, beside the governor's local one.
+  const gov = (here ? governorTileSum(state, here, (e) => e.theologyCS) : 0)
+    + getModifiers(state, unitSeat(unit)).theologyCS;
   return unit.type === 'INQUISITOR' && here && tileSeat(here) === unitSeat(unit)
     ? base + gov + INQUISITOR_HOME_STRENGTH
     : base + gov;

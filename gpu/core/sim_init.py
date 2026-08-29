@@ -1594,6 +1594,9 @@ class SimInit:
             _gdc = [r.get("cityWithDistrict", [0, 0]) for r in _govs]
             self._gov_dc_house = torch.tensor([float(x[0]) for x in _gdc], dtype=dtype, device=device)
             self._gov_dc_amen = torch.tensor([float(x[1]) for x in _gdc], dtype=dtype, device=device)
+            self._gov_wallhouse = torch.tensor([float(r.get("housingPerWallLevel", 0)) for r in _govs], dtype=dtype, device=device)
+            self._gov_theocs = torch.tensor([float(r.get("theologyCS", 0)) for r in _govs], dtype=dtype, device=device)
+            self._gov_govbldy = torch.tensor([float(r.get("yieldsPerGovBuilding", 0)) for r in _govs], dtype=dtype, device=device)
             self._gov_fx_mag = float(
                 (self._gov_prodb[:, 0] >= 0).sum()
                 + self._gov_bcharge.abs().sum() + self._gov_mcut.abs().sum()
@@ -1606,7 +1609,9 @@ class SimInit:
                 + (self._gov_ucs_cs.abs() * ((self._gov_ucs_mask != 0) | self._gov_ucs_allc).double()).sum()
                 + self._gov_xppct.abs().sum()
                 + self._gov_wwcut.abs().sum() + (self._gov_gppmult - 1).abs().sum()
-                + self._gov_dc_house.abs().sum() + self._gov_dc_amen.abs().sum())
+                + self._gov_dc_house.abs().sum() + self._gov_dc_amen.abs().sum()
+                + self._gov_wallhouse.abs().sum() + self._gov_theocs.abs().sum()
+                + self._gov_govbldy.abs().sum())
             self._gov_arange = torch.arange(self._ngov, dtype=torch.long, device=device)
         if self._npol:
             self._pol_kind = torch.tensor([int(p["kind"]) for p in _pols], dtype=torch.long, device=device)
@@ -1708,6 +1713,9 @@ class SimInit:
             _pdc = [r.get("cityWithDistrict", [0, 0]) for r in _pols]
             self._pol_dc_house = torch.tensor([float(x[0]) for x in _pdc], dtype=dtype, device=device)
             self._pol_dc_amen = torch.tensor([float(x[1]) for x in _pdc], dtype=dtype, device=device)
+            self._pol_wallhouse = torch.tensor([float(r.get("housingPerWallLevel", 0)) for r in _pols], dtype=dtype, device=device)
+            self._pol_theocs = torch.tensor([float(r.get("theologyCS", 0)) for r in _pols], dtype=dtype, device=device)
+            self._pol_govbldy = torch.tensor([float(r.get("yieldsPerGovBuilding", 0)) for r in _pols], dtype=dtype, device=device)
             self._pol_fx_mag = float(
                 (self._pol_prodb[:, 0] >= 0).sum()
                 + self._pol_bcharge.abs().sum() + self._pol_mcut.abs().sum()
@@ -1720,7 +1728,9 @@ class SimInit:
                 + (self._pol_ucs_cs.abs() * ((self._pol_ucs_mask != 0) | self._pol_ucs_allc).double()).sum()
                 + self._pol_xppct.abs().sum()
                 + self._pol_wwcut.abs().sum() + (self._pol_gppmult - 1).abs().sum()
-                + self._pol_dc_house.abs().sum() + self._pol_dc_amen.abs().sum())
+                + self._pol_dc_house.abs().sum() + self._pol_dc_amen.abs().sum()
+                + self._pol_wallhouse.abs().sum() + self._pol_theocs.abs().sum()
+                + self._pol_govbldy.abs().sum())
             self._pol_obsolete_civic = torch.tensor([int(p.get("obsoleteCivic", -1)) for p in _pols], dtype=torch.long, device=device)
         # Master switch (rules.governmentsLive), mirroring the TS
         # GOVERNMENTS_ADOPTION_LIVE. Gates every gov/policy application and the
@@ -1973,6 +1983,8 @@ class SimInit:
         self._b_loy_no_gov = rules.b_loy_no_gov.to(device)
         self._b_amen_gov = rules.b_amen_gov.to(device)
         self._b_house_gov = rules.b_house_gov.to(device)
+        self._b_gov_yield = rules.b_gov_yield.to(device)
+        self._palace_gov_yield = bool(rules.palace_gov_yield)
         # CIV6 (Water Works): housing per Neighborhood/Aqueduct, amenities per
         # Canal/Dam — the district roster, by catalog id.
         _dids = [str(d.get("id", "")) for d in self.districts_cat]

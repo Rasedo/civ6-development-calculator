@@ -412,13 +412,20 @@ export function districtPlacementTiles(state: GameState, city: City, type: Distr
  * future cities" with no production at all, otherwise the highest tier among
  * the walls buildings it has finished.
  */
+/** The walls LEVEL this city has BUILT — Ancient 1, Medieval 2, Renaissance
+ *  3, and 0 with none. `wallsTier` is the DEFENCE tier, which Urban Defenses
+ *  raises without a wall standing; a housing or yield term wants this one. */
+export function wallsLevel(city: { buildings: string[] }): number {
+  let level = 0;
+  for (const b of city.buildings) level = Math.max(level, BUILDINGS[b]?.walls ?? 0);
+  return level;
+}
+
 export function wallsTier(state: GameState, city: { buildings: string[]; seat: number }): number {
   // a city-state's centre arrives here as a stand-in City whose seat has no
   // Seat record at all, so the tech read has to tolerate one
   if (seatOf(state, city.seat)?.research.techs.includes(URBAN_DEFENSES_TECH)) return WALLS_TIER_URBAN;
-  let tier = 0;
-  for (const b of city.buildings) tier = Math.max(tier, BUILDINGS[b]?.walls ?? 0);
-  return tier;
+  return wallsLevel(city);
 }
 
 /**

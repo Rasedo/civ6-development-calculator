@@ -74,29 +74,36 @@ def main() -> None:
     assert int(sim._adopted_gov_tier(c1)[0]) == 0, "CHIEFDOM influence tier is 0"
 
     # 3) + POLITICAL_PHILOSOPHY -> AUTOCRACY (tier 1, table-order tie-break over
-    #    OLIGARCHY/CLASSICAL_REPUBLIC): +1 all yields in the capital, URBAN_PLANNING
-    #    still slotted in the economic slot, influence tier 1.
+    #    OLIGARCHY/CLASSICAL_REPUBLIC): URBAN_PLANNING still slotted in the
+    #    economic slot, influence tier 1.
     #    AUTOCRACY's slots are the sourced [M,E,D,W] (Civilopedia: 1 Military,
     #    1 Economic, 1 Diplomatic, 1 Wildcard), so GOD_KING (economic, E taken
     #    by URBAN_PLANNING) spills into the Wildcard exactly as it does under
-    #    MONARCHY in step 4. The capital therefore reads AUTOCRACY's +1 on
-    #    every yield PLUS GOD_KING's +1 gold / +1 faith on top.
+    #    MONARCHY in step 4. AUTOCRACY itself pays NO capital yields: its
+    #    inherent bonus counts GOVERNMENT BUILDINGS, so the capital reads
+    #    GOD_KING's +1 gold / +1 faith and nothing else.
     c2 = civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "POLITICAL_PHILOSOPHY"])
     adopted, has_gov = sim._adopted_gov(c2)
     assert int(adopted[0]) == gov_idx["AUTOCRACY"], "newest tier-1 government, table-order tie-break => AUTOCRACY"
     city_y, cap_y, hous, ymult, _sl, _em, _tp, *_ = sim._gov_policy_mods(c2)
     assert float(city_y[0, PROD]) == 1.0, "URBAN_PLANNING still slotted in AUTOCRACY's economic slot"
     for k in range(6):
-        want = 2.0 if k in (2, 5) else 1.0  # gold, faith carry GOD_KING's wildcard spill
+        want = 1.0 if k in (2, 5) else 0.0  # gold, faith carry GOD_KING's wildcard spill
         assert float(cap_y[0, k]) == want, (
             f"AUTOCRACY capital yield column {k}: expected {want} "
-            "(+1 all yields, and +1 more on gold/faith from GOD_KING in the wildcard)"
+            "(GOD_KING's gold/faith in the wildcard, and nothing from the government)"
         )
     assert int(sim._adopted_gov_tier(c2)[0]) == 1, "AUTOCRACY influence tier is 1"
     assert float(hous.abs().sum()) == 0.0, "no housingAll at tier 1"
 
-    # 4) MONARCHY (tier 2) -> NO modeled bonus (its sourced walls-level
-    #    terms have no channel) AND the wildcard-overflow fill:
+    # The three channels the government rows opened, straight off the loader:
+    # a government pays its INHERENT bonus and never its legacy one.
+    assert float(sim._gov_govbldy[gov_idx["AUTOCRACY"]]) == 1.0, "AUTOCRACY: +1 all yields per government building"
+    assert float(sim._gov_wallhouse[gov_idx["MONARCHY"]]) == 1.0, "MONARCHY: +1 housing per walls level"
+    assert float(sim._gov_theocs[gov_idx["THEOCRACY"]]) == 5.0, "THEOCRACY: +5 religious strength"
+
+    # 4) MONARCHY (tier 2) -> its housing rides `wallhouse`, not `housingAll`,
+    #    so the flat channel stays empty; plus the wildcard-overflow fill:
     #    slots [M,M,E,D,W,W] (Civilopedia 2M/1E/1D/2W); VETERANCY -> M1,
     #    URBAN_PLANNING -> E, GOD_KING (economic, E full) spills into a W slot
     #    -> +1 gold +1 faith on the capital ON TOP of nothing else (MONARCHY
@@ -105,7 +112,7 @@ def main() -> None:
     adopted, has_gov = sim._adopted_gov(c3)
     assert int(adopted[0]) == gov_idx["MONARCHY"], "newest tier-2 government => MONARCHY"
     city_y, cap_y, hous, ymult, _sl, _em, _tp, *_ = sim._gov_policy_mods(c3)
-    assert float(hous[0]) == 0.0, "MONARCHY carries no modeled housing (the walls-level term has no channel)"
+    assert float(hous[0]) == 0.0, "MONARCHY's housing is per walls LEVEL, never the flat `housingAll`"
     GOLD, FAITH = 2, 5
     assert float(cap_y[0, GOLD]) == 1.0 and float(cap_y[0, FAITH]) == 1.0, "GOD_KING spills into MONARCHY's wildcard slot (+1 gold/+1 faith capital)"
     assert float(city_y[0, PROD]) == 1.0, "URBAN_PLANNING keeps the economic slot"
@@ -214,20 +221,21 @@ def main() -> None:
         assert float(bt[oli, ui[uid]]) == o_want, f"OLIGARCHY {uid}: want {o_want}"
         assert float(bt[fas, ui[uid]]) == f_want, f"FASCISM {uid}: want {f_want}"
     assert not bool((sim._type_melee & sim._type_anticav).any()), "no unit type is melee AND antiCavalry"
-    assert float(sim._gov_xppct[oli]) == 20.0, "OLIGARCHY +20% unit experience"
     assert float(sim._gov_wwcut[fas]) == 15.0, "FASCISM war weariness -15%"
-    assert [float(x) for x in sim._gov_prodb[fas]] == [2.0, 0.0, -1.0, 0.5], "FASCISM +50% production toward EVERY unit (target 2)"
-    assert [float(x) for x in sim._gov_prodb[gov_idx["AUTOCRACY"]]] == [1.0, 0.0, -1.0, 0.1], "AUTOCRACY +10% production toward wonders"
     cr = gov_idx["CLASSICAL_REPUBLIC"]
-    assert float(sim._gov_gppmult[cr]) == 1.15, "CLASSICAL_REPUBLIC x1.15 great person points"
     assert float(sim._gov_dc_house[cr]) == 1.0 and float(sim._gov_dc_amen[cr]) == 1.0, "CLASSICAL_REPUBLIC +1/+1 in cities with ANY district"
     assert int(sim._gov_hid_min[cr]) == -1, "CLASSICAL_REPUBLIC no longer rides the SPECIALTY channel"
     assert float(sim._gov_housing[gov_idx["MONARCHY"]]) == 0.0, "MONARCHY's unsourced flat housing stays deleted"
-    for gname in ("MERCHANT_REPUBLIC", "THEOCRACY", "DEMOCRACY"):
-        assert float((sim._gov_ymult[gov_idx[gname]] - 1).abs().sum()) == 0.0, f"{gname}'s unsourced yield multiplier stays deleted"
-    SCI = 3
-    assert abs(float(sim._gov_ymult[gov_idx["COMMUNISM"], SCI]) - 1.1) < 1e-12, "COMMUNISM keeps the sourced +10% science"
-    assert bool(sim._gov_faith_units[gov_idx["THEOCRACY"]]), "THEOCRACY keeps the sourced faith-purchase verb"
+    # A government pays its INHERENT bonus and never its LEGACY one — Rise and
+    # Fall made every legacy bonus a Wildcard card you can only hold once you
+    # have left that government, so no row here may carry one.
+    for gname in gov_idx:
+        g = gov_idx[gname]
+        assert float(sim._gov_xppct[g]) == 0.0, f"{gname}: unit experience is a legacy row"
+        assert float(sim._gov_gppmult[g]) == 1.0, f"{gname}: the GPP factor is a legacy row"
+        assert float(sim._gov_prodb[g, 0]) == -1.0, f"{gname}: production toward wonders/units is a legacy row"
+        assert float((sim._gov_ymult[g] - 1).abs().sum()) == 0.0, f"{gname}: a yield multiplier is a legacy row"
+        assert not bool(sim._gov_faith_units[g]), f"{gname}: GS moved the faith purchase to the Grand Master's Chapel"
 
     # 10) FASCISM through the fold: TOTALITARIANISM alone at tier 3 adopts
     #     it, and every new channel lands in the fx dict.
@@ -238,7 +246,7 @@ def main() -> None:
     assert float(fxF["wwcut"][0]) == 15.0 and float(fxF["xppct"][0]) == 0.0, "FASCISM fx: -15% weariness, no xp term"
     assert float(fxF["gppmult"][0]) == 1.0, "FASCISM fx: no GPP factor"
     _prows = [(int(w), int(cm), int(e), float(p)) for _a, w, cm, e, p in fxF["prod"] if bool(_a[0])]
-    assert (2, 0, -1, 0.5) in _prows, "FASCISM fx: the class-free +50% unit production row is live"
+    assert (2, 0, -1, 0.5) not in _prows, "FASCISM fx: +50% toward units is its LEGACY row, not the government's"
 
     # 11) `_gov_unit_cs` — seat 0 under FASCISM pays +5 to combatants only;
     #     a city-state seat adopts nothing; OLIGARCHY's row borrowed onto

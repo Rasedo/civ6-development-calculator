@@ -175,6 +175,9 @@ export interface Modifiers {
   wwCutPct: number;
   gppMult: number;
   cityWithDistrict: { housing: number; amenities: number }[];
+  housingPerWallLevel: number;
+  theologyCS: number;
+  yieldsPerGovBuilding: number;
   /** yields per CITIZEN of the city — a governor's Tax Collector, Connoisseur
    *  and Researcher, and the two governments that pay by citizen. */
   perCitizen: Partial<Yields>;
@@ -258,6 +261,9 @@ export function defaultModifiers(): Modifiers {
     wwCutPct: 0,
     gppMult: 1,
     cityWithDistrict: [],
+    housingPerWallLevel: 0,
+    theologyCS: 0,
+    yieldsPerGovBuilding: 0,
     perCitizen: {},
     faithPerSpecialty: 0,
     waterWorks: false,
@@ -335,6 +341,9 @@ function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.wwCutPct) mods.wwCutPct += fx.wwCutPct;
   if (fx.gppMult) mods.gppMult *= fx.gppMult;
   if (fx.cityWithDistrict) mods.cityWithDistrict.push(fx.cityWithDistrict);
+  if (fx.housingPerWallLevel) mods.housingPerWallLevel += fx.housingPerWallLevel;
+  if (fx.theologyCS) mods.theologyCS += fx.theologyCS;
+  if (fx.yieldsPerGovBuilding) mods.yieldsPerGovBuilding += fx.yieldsPerGovBuilding;
   for (const [imp, y] of Object.entries(fx.improvementYields ?? {})) {
     const cur = (mods.improvementYields[imp as ImprovementId] ??= {});
     addPartial(cur, y);

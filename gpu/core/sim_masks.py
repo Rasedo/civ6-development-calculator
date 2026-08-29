@@ -337,6 +337,18 @@ class SimMasks:
                                torch.full_like(tier, self._walls_tier_urban), tier)
         return tier
 
+    def _walls_level_all(self, row: int) -> torch.Tensor:
+        """[B, RC] the walls LEVEL each of this row's columns has BUILT.
+        `_walls_tier_all` is the DEFENCE tier, which Urban Defenses raises
+        with no wall standing; a housing or yield term wants this one."""
+        bl = self.city_bldg[:, row]
+        level = torch.zeros(self.B, self.RC, dtype=torch.long, device=self.device)
+        for bi in self._walls_rows:
+            t = int(self._b_walls[bi])
+            level = torch.maximum(level, torch.where(bl[:, :, bi], torch.full_like(level, t),
+                                                     torch.zeros_like(level)))
+        return level
+
     def _walls_max_all(self, row: int) -> torch.Tensor:
         """[B, RC] the perimeter pool every one of this row's columns carries."""
         return self._walls_tier_hp[self._walls_tier_all(row)]
@@ -1152,6 +1164,10 @@ class SimMasks:
             _card = self._fx_at_seat("relighome", seat).double() * _home_t.double()
         # CIV6 (Grand Inquisitor): "+10 Religious Strength in theological
         # combat in tiles of this city."
+        # CIV6 (Theocracy): "+5 Religious Strength in Theological Combat" —
+        # the seat's own, wherever its unit fights.
+        if self._gov_has_effects:
+            _card = _card + self._fx_at_seat("theocs", seat).double()
         _gov = torch.zeros_like(_card)
         if self.n_governors:
             for _g in range(self.n_majors):

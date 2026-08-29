@@ -246,6 +246,15 @@ const rawList: BuildingDef[] = [
 
 const list: BuildingDef[] = rawList.map((b) => ({ ...b, cost: Math.round(b.cost * GAME_SPEED) }));
 
+/**
+ * CIV6 (Autocracy): "+1 to all yields for each Government Plaza building,
+ * Diplomatic Quarter building, and palace in a city." Derived from the
+ * district rather than transcribed, so a new row in either district counts
+ * itself; the exporter hands the same answer to the GPU.
+ */
+export const isGovYieldBuilding = (b: { id: string; district: string }): boolean =>
+  b.district === 'GOVERNMENT_PLAZA' || b.district === 'DIPLOMATIC_QUARTER' || b.id === 'PALACE';
+
 export const BUILDINGS: Record<string, BuildingDef> = Object.fromEntries(list.map((b) => [b.id, b]));
 
 /** The power plants, in catalog order — the order both engines walk when they

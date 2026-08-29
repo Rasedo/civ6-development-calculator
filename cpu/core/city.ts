@@ -14,7 +14,9 @@ import { hasRiver } from '../../world/query';
 import { revealAround } from './fog';
 import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
-import { BUILDINGS } from '../data/buildings';
+import { BUILDINGS, isGovYieldBuilding } from '../data/buildings';
+import { YIELD_KEYS } from '../../world/types';
+import { wallsLevel } from './rules';
 import { governorMult } from './governors';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { completedWonders } from './wonders';
@@ -307,7 +309,23 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
   if (m.cityWithDistrict.length && completedDistrictCount(state, city, false) >= 1) {
     for (const rule of m.cityWithDistrict) total += rule.housing;
   }
+  /* CIV6 (Monarchy): "+1 Housing per level of Walls" — the level BUILT, so a
+   * city with no wall standing is paid nothing however far its tech ran. */
+  if (m.housingPerWallLevel) total += m.housingPerWallLevel * wallsLevel(city);
   return total;
+}
+
+/** CIV6 (Autocracy): how many government buildings STAND in this city — the
+ *  Government Plaza's and the Diplomatic Quarter's, and the Palace. A dark
+ *  district takes its buildings with it, as it does for their yields. */
+export function govYieldBuildingCount(state: GameState, city: City): number {
+  const dark = pillagedDistrictTypes(state.map, city.districts);
+  let n = 0;
+  for (const b of city.buildings) {
+    const def = BUILDINGS[b];
+    if (def && !dark.has(def.district) && isGovYieldBuilding(def)) n += 1;
+  }
+  return n;
 }
 
 export function luxuryAmenities(state: GameState, seat: number): Map<number, number> {
@@ -816,6 +834,12 @@ export function computeCityStats(
   const bonuses = emptyYields();
   addYields(bonuses, m.cityYields);
   if (city.isCapital) addYields(bonuses, m.capitalYields);
+  // CIV6 (Autocracy): "+1 to all yields for each Government Plaza building,
+  // Diplomatic Quarter building, and palace in a city."
+  if (m.yieldsPerGovBuilding) {
+    const n = m.yieldsPerGovBuilding * govYieldBuildingCount(state, city);
+    for (const k of YIELD_KEYS) bonuses[k] += n;
+  }
   // per-CITIZEN yields: a governor's Tax Collector, Connoisseur and
   // Researcher, and the two governments that pay by citizen in a governed
   // city. Flat adds, so they ride the multipliers below like every bonus.

@@ -1408,6 +1408,7 @@ class SimEconomy:
             "distym": [], "bldgym": [],
             "govymul": torch.ones(B, 6, dtype=dt, device=dev),
             "govpercit": torch.zeros(B, 6, dtype=dt, device=dev),
+            "wallhouse": _z.clone(), "theocs": _z.clone(), "govbldy": _z.clone(),
         }
         if not self._gov_has_effects or not self._ngov:
             return (city_y, cap_y, hous_all, ymult, slotted, emult, tpmult,
@@ -1443,7 +1444,8 @@ class SimEconomy:
                            ("infl", self._gov_infl), ("culsuz", self._gov_culsuz),
                            ("xppct", self._gov_xppct),
                            ("wwcut", self._gov_wwcut), ("dch", self._gov_dc_house),
-                           ("dca", self._gov_dc_amen)):
+                           ("dca", self._gov_dc_amen), ("wallhouse", self._gov_wallhouse),
+                           ("theocs", self._gov_theocs), ("govbldy", self._gov_govbldy)):
                 fx[_k] = fx[_k] + _t[adopted] * _gf
             fx["rxp"] = fx["rxp"] * torch.where(has_gov, self._gov_rxp[adopted], _o)
             fx["rplun"] = fx["rplun"] * torch.where(has_gov, self._gov_rplun[adopted], _o)
@@ -1495,7 +1497,8 @@ class SimEconomy:
                                ("infl", self._pol_infl), ("culsuz", self._pol_culsuz),
                                ("xppct", self._pol_xppct),
                                ("wwcut", self._pol_wwcut), ("dch", self._pol_dc_house),
-                               ("dca", self._pol_dc_amen)):
+                               ("dca", self._pol_dc_amen), ("wallhouse", self._pol_wallhouse),
+                               ("theocs", self._pol_theocs), ("govbldy", self._pol_govbldy)):
                     fx[_k] = fx[_k] + sd @ _t
                 _ones_p = torch.ones(B, self._npol, dtype=dt, device=dev)
                 fx["rxp"] = fx["rxp"] * torch.where(slotted, self._pol_rxp.unsqueeze(0).expand(B, -1), _ones_p).prod(dim=1)
@@ -3299,6 +3302,19 @@ class SimEconomy:
             _times = torch.where(perF[:, 0] > 0, torch.floor(_fol / perF[:, 0].clamp(min=1)), torch.zeros_like(_fol))
             b_cap = b_cap + perF[:, 1:] * _times.unsqueeze(1) + perC * _liv.sum(dim=1).double().unsqueeze(1)
         bon = b_city.unsqueeze(1) * alivef.unsqueeze(2) + b_cap.unsqueeze(1) * is_cap.unsqueeze(2)
+        # CIV6 (Autocracy): "+1 to all yields for each Government Plaza
+        # building, Diplomatic Quarter building, and palace in a city."
+        if self._gov_has_effects:
+            _gby = self._gov_mods(row)[12]["govbldy"]
+            if bool((_gby != 0).any()):
+                _stand = self.city_bldg[:, row, :cols] & ~self._bldg_dark(self.city_dist_tile[:, row, :cols])
+                _n = (_stand & self._b_gov_yield.reshape(1, 1, -1)).sum(dim=2).double()
+                # the PALACE is a capital TERM on this engine, never a
+                # `city_bldg` bit, so the count adds it by hand
+                if self._palace_gov_yield:
+                    _n = _n + is_cap
+                bon = bon + (_gby.double().reshape(B, 1, 1) * _n.unsqueeze(2)
+                             * alivef.unsqueeze(2))
         # the GOVERNOR's share: its flat cityYields, the per-CITIZEN yields
         # (the promotions' plus the two governments that pay by citizen in a
         # governed city) and the faith per SPECIALTY district.

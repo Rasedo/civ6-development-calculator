@@ -128,6 +128,13 @@ export interface PolicyEffects {
   gppFlat?: Partial<Record<GreatPersonClass, number>>;
   /** yield multipliers that apply ONLY in a city with an ESTABLISHED governor
    *  (Merchant Republic's gold). */
+  /** CIV6 (Monarchy): housing per LEVEL of the city's walls. */
+  housingPerWallLevel?: number;
+  /** CIV6 (Theocracy): religious strength in theological combat. */
+  theologyCS?: number;
+  /** CIV6 (Autocracy): yields to a city per government building standing in
+   *  it (`isGovYieldBuilding`), paid to every yield alike. */
+  yieldsPerGovBuilding?: number;
   governorYieldMult?: Partial<Yields>;
   /** yields per CITIZEN, only in a city with a governor (Theocracy's faith,
    *  Communism's production). */
@@ -475,72 +482,54 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
     G('CHIEFDOM', 'Chiefdom', 0, [M, E], {}, 'The starting government.'),
     // Slots sourced from the Gathering Storm Civilopedia: 1 Military,
     // 1 Economic, 1 Diplomatic, 1 Wildcard.
-    // CIV6 (GS): "+1 to all yields for each Government Plaza building,
-    // Diplomatic Quarter building and Palace in a city. +10% Production
-    // toward Wonders." Only the PALACE half of the yield term is paid here;
-    // the per-government-building half has no channel yet.
+    // CIV6 (GS) INHERENT: "+1 to all yields for each Government Plaza
+    // building, Diplomatic Quarter building, and palace in a city."
     G('AUTOCRACY', 'Autocracy', 1, [M, E, D, W],
-      { capitalYields: { food: 1, production: 1, gold: 1, science: 1, culture: 1, faith: 1 },
-        prodBoost: { target: 'wonder', classes: [], eraMax: -1, pct: 0.1 } },
-      '+1 to all yields in the capital, for its Palace; +10% production toward wonders.'),
-    // CIV6: "All land melee, anti-cavalry, and naval melee class units gain
-    // +4 Combat Strength. +20% Unit Experience." The three are PROMOTION
-    // classes (`UNIT_PROMO_CLASS`), so the Galley rides NAVAL_MELEE.
+      { yieldsPerGovBuilding: 1 },
+      '+1 to all yields per government building in a city.'),
+    // CIV6 (GS) INHERENT: "All land melee, anti-cavalry, and naval melee
+    // class units gain +4 Combat Strength." The three are PROMOTION classes
+    // (`UNIT_PROMO_CLASS`), so the Galley rides NAVAL_MELEE.
     G('OLIGARCHY', 'Oligarchy', 1, [M, M, E, W],
-      { unitCombatCS: { classes: ['MELEE', 'ANTICAV', 'NAVAL_MELEE'], cs: 4 }, xpPct: 20 },
-      '+4 combat strength for melee and anti-cavalry units; +20% unit experience.'),
-    // CIV6 (GS): "All cities with a district receive +1 Housing and +1
-    // Amenity. +15% Great Person points." ANY completed district -- the
-    // specialty-gated channels are the CARDS' shape (Insulae, Medina
-    // Quarter), not this row's.
+      { unitCombatCS: { classes: ['MELEE', 'ANTICAV', 'NAVAL_MELEE'], cs: 4 } },
+      '+4 combat strength for melee and anti-cavalry units.'),
+    // CIV6 (GS) INHERENT: "All cities with a district receive +1 Housing
+    // and +1 Amenity." ANY completed district -- the specialty-gated
+    // channels are the CARDS' shape (Insulae, Medina Quarter), not this
+    // row's.
     G('CLASSICAL_REPUBLIC', 'Classical Republic', 1, [E, E, D, W],
-      { cityWithDistrict: { housing: 1, amenities: 1 }, gppMult: 1.15 },
-      '+1 housing and +1 amenity in every city with a district; +15% great person points.'),
-    // CIV6 (GS): "+1 Housing per level of Walls. +2 Diplomatic Favor for
-    // every Renaissance Walls. +50% Influence Points." All three want
-    // channels this model does not have (a per-city walls-level count, a
-    // favor-per-building term, an influence multiplier); the flat +1
-    // housing that stood here was unsourced.
-    G('MONARCHY', 'Monarchy', 2, [M, M, E, D, W, W], {},
-      'No modeled bonus yet.'),
-    // CIV6 (GS): "+10% Gold in all cities with an established Governor.
-    // +15% Production toward Districts." The gold term wants a per-city
-    // GOVERNOR gate on a yield multiplier, the production term a DISTRICT
-    // prodBoost target; the ungated gold multiplier that stood here was
-    // unsourced.
+      { cityWithDistrict: { housing: 1, amenities: 1 } },
+      '+1 housing and +1 amenity in every city with a district.'),
+    // CIV6 (GS) INHERENT: "+1 Housing per level of Walls." `wallsLevel`
+    // answers it — the level BUILT, where `wallsTier` is the DEFENCE tier
+    // Urban Defenses raises with no wall standing.
+    G('MONARCHY', 'Monarchy', 2, [M, M, E, D, W, W], { housingPerWallLevel: 1 },
+      '+1 housing per level of walls.'),
+    // CIV6 (GS) INHERENT: "+10% Gold in all cities with an established
+    // Governor."
     G('MERCHANT_REPUBLIC', 'Merchant Republic', 2, [M, E, E, D, D, W], { governorYieldMult: { gold: 1.1 } },
       '+10% gold in cities with an established governor.'),
-    // CIV6: "Can buy land combat units with Faith. All units +5 Religious
-    // Strength in theological combat." CIV6 (GS): "+5 Religious Strength in
-    // Theological Combat. +0.5 Faith per Citizen in cities with Governors.
-    // 15% Discount on Purchases with Faith." Only the purchase verb ships:
-    // the strength term wants a government channel into the theological
-    // roll, the faith term a per-city GOVERNOR gate, the discount a
-    // faith-price multiplier; the flat faith multiplier that stood here was
-    // unsourced.
-    G('THEOCRACY', 'Theocracy', 2, [M, M, E, E, D, W], { faithBuyLandUnits: true, governorPerCitizen: { faith: 0.5 } },
-      'Can buy land combat units with Faith; +0.5 faith per citizen in cities with governors.'),
-    // CIV6 (GS): "Your Trade Routes to an Ally's city or a city-state that
-    // you are the Suzerain of provide +4 Gold and +4 Production for both
-    // cities. Alliance Points with all allies increase by an additional .25
-    // per turn. 15% Discount on Purchases with Gold." The route term wants
-    // a per-destination bonus, the alliance term an alliance-points clock,
-    // the discount a gold-price multiplier; the culture multiplier that
-    // stood here was unsourced.
+    // CIV6 (GS) INHERENT: "+5 Religious Strength in Theological Combat.
+    // +0.5 Faith per Citizen in cities with Governors." Buying land units
+    // with Faith was VANILLA Theocracy's; Gathering Storm moved it to the
+    // Grand Master's Chapel, which carries it (`faithBuyUnits`).
+    G('THEOCRACY', 'Theocracy', 2, [M, M, E, E, D, W], { theologyCS: 5, governorPerCitizen: { faith: 0.5 } },
+      '+5 religious strength in theological combat; +0.5 faith per citizen in cities with governors.'),
+    // CIV6 (GS) INHERENT: "Your Trade Routes to an Ally or Suzerain's city
+    // provide +4 Food and +4 Production for both cities. Alliance Points
+    // with all allies increase by an additional .25 per turn." Both halves
+    // want ALLIANCES, which this model has not got.
     G('DEMOCRACY', 'Democracy', 3, [M, E, E, E, D, D, W, W], {},
       'No modeled bonus yet.'),
-    // CIV6 (GS): "+0.6 Production per Citizen in cities with Governors.
-    // +10% Science." The production term wants a per-city GOVERNOR gate and
-    // a per-citizen yield; only the science half ships.
-    G('COMMUNISM', 'Communism', 3, [M, M, M, E, E, E, D, W], { yieldMult: { science: 1.1 }, governorPerCitizen: { production: 0.6 } },
-      '+10% science in all cities; +0.6 production per citizen in cities with governors.'),
-    // CIV6: "All units gain +5 Combat Strength. War Weariness reduced by
-    // 15%. +50% Production toward Units." The production arm is class-FREE:
-    // it reaches every unit the queue can hold, the class-less ones too.
+    // CIV6 (GS) INHERENT: "+0.6 Production per Citizen in cities with
+    // Governors."
+    G('COMMUNISM', 'Communism', 3, [M, M, M, E, E, E, D, W], { governorPerCitizen: { production: 0.6 } },
+      '+0.6 production per citizen in cities with governors.'),
+    // CIV6 (GS) INHERENT: "All units gain +5 Combat Strength. War
+    // Weariness reduced by 15%."
     G('FASCISM', 'Fascism', 3, [M, M, M, M, E, D, W, W],
-      { unitCombatCS: { all: true, cs: 5 }, wwCutPct: 15,
-        prodBoost: { target: 'anyUnit', classes: [], eraMax: -1, pct: 0.5 } },
-      '+5 combat strength for all units; -15% war weariness; +50% production toward units.'),
+      { unitCombatCS: { all: true, cs: 5 }, wwCutPct: 15 },
+      '+5 combat strength for all units; -15% war weariness.'),
   ].map((g) => [g.id, g]),
 );
 

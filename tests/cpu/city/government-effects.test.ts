@@ -40,26 +40,39 @@ function borrowingRow(fx: PolicyEffects, body: () => void): void {
 }
 
 describe('the sourced government rows', () => {
-  it('ships what each GS page states and nothing it does not', () => {
+  // A government row carries its INHERENT bonus and nothing else. Its LEGACY
+  // bonus is a separate thing you cannot have at the same time: Rise and Fall
+  // made it a Wildcard policy card, unlocked only once you have SWITCHED AWAY
+  // from that government. Paying it here would hand a player both halves at
+  // once, which no version of Civ 6 does.
+  it('ships each page INHERENT bonus, and never the legacy one', () => {
+    expect(GOVERNMENTS.AUTOCRACY.effects).toEqual({ yieldsPerGovBuilding: 1 });
     expect(GOVERNMENTS.OLIGARCHY.effects).toEqual(
-      { unitCombatCS: { classes: ['MELEE', 'ANTICAV', 'NAVAL_MELEE'], cs: 4 }, xpPct: 20 });
-    expect(GOVERNMENTS.FASCISM.effects).toEqual(
-      { unitCombatCS: { all: true, cs: 5 }, wwCutPct: 15,
-        prodBoost: { target: 'anyUnit', classes: [], eraMax: -1, pct: 0.5 } });
-    expect(GOVERNMENTS.AUTOCRACY.effects.prodBoost).toEqual(
-      { target: 'wonder', classes: [], eraMax: -1, pct: 0.1 });
+      { unitCombatCS: { classes: ['MELEE', 'ANTICAV', 'NAVAL_MELEE'], cs: 4 } });
     expect(GOVERNMENTS.CLASSICAL_REPUBLIC.effects).toEqual(
-      { cityWithDistrict: { housing: 1, amenities: 1 }, gppMult: 1.15 });
-    // the unsourced magnitudes are GONE: Monarchy's flat housing, the three
-    // ungated yield multipliers. What survives is what each page states —
-    // including the three terms that name a GOVERNED city.
-    expect(GOVERNMENTS.MONARCHY.effects).toEqual({});
-    expect(GOVERNMENTS.DEMOCRACY.effects).toEqual({});
+      { cityWithDistrict: { housing: 1, amenities: 1 } });
+    expect(GOVERNMENTS.MONARCHY.effects).toEqual({ housingPerWallLevel: 1 });
     expect(GOVERNMENTS.MERCHANT_REPUBLIC.effects).toEqual({ governorYieldMult: { gold: 1.1 } });
     expect(GOVERNMENTS.THEOCRACY.effects).toEqual(
-      { faithBuyLandUnits: true, governorPerCitizen: { faith: 0.5 } });
-    expect(GOVERNMENTS.COMMUNISM.effects).toEqual(
-      { yieldMult: { science: 1.1 }, governorPerCitizen: { production: 0.6 } });
+      { theologyCS: 5, governorPerCitizen: { faith: 0.5 } });
+    expect(GOVERNMENTS.FASCISM.effects).toEqual({ unitCombatCS: { all: true, cs: 5 }, wwCutPct: 15 });
+    expect(GOVERNMENTS.COMMUNISM.effects).toEqual({ governorPerCitizen: { production: 0.6 } });
+    // Democracy's inherent bonus is its ally/suzerain trade route and its
+    // alliance points, and this model has no alliances.
+    expect(GOVERNMENTS.DEMOCRACY.effects).toEqual({});
+    expect(GOVERNMENTS.CHIEFDOM.effects).toEqual({});
+  });
+
+  it('no government pays a legacy channel', () => {
+    // +10% wonder production, +20% unit XP, +15% GPP, +50% unit production,
+    // +10% Science, +50% Influence, +15% district production and the two
+    // purchase discounts are LEGACY rows, every one.
+    for (const g of Object.values(GOVERNMENTS)) {
+      expect(g.effects.prodBoost, `${g.id} prodBoost`).toBeUndefined();
+      expect(g.effects.xpPct, `${g.id} xpPct`).toBeUndefined();
+      expect(g.effects.gppMult, `${g.id} gppMult`).toBeUndefined();
+      expect(g.effects.yieldMult, `${g.id} yieldMult`).toBeUndefined();
+    }
   });
 });
 
@@ -91,9 +104,11 @@ describe('governmentUnitCS — the promotion-class axis', () => {
   });
 });
 
-describe('OLIGARCHY xpPct — "+20% Unit Experience"', () => {
+describe('the xpPct channel — "+20% Unit Experience"', () => {
+  // Oligarchy's LEGACY row, so no government carries it; the channel is a
+  // card's now, and this drill borrows the magnitude onto an adopted row.
   it('joins the building percentage of a CITY award, integer-exact', () => {
-    borrowingRow(GOVERNMENTS.OLIGARCHY.effects, () => {
+    borrowingRow({ xpPct: 20 }, () => {
       const state = makeState();
       adopt(state);
       expect(governmentXpPct(state, 0)).toBe(20);
@@ -190,7 +205,8 @@ describe('CLASSICAL REPUBLIC — the ANY-district gate and the GPP factor', () =
     city.districts.push({ type: 'CAMPUS', tileIndex: t.index });
     const bare = { ...greatPersonPointsPerTurn(state, 0) };
     expect(bare.SCIENTIST).toBeGreaterThan(0);
-    borrowingRow(GOVERNMENTS.CLASSICAL_REPUBLIC.effects, () => {
+    // Classical Republic's LEGACY row — the channel is a card's now.
+    borrowingRow({ gppMult: 1.15 }, () => {
       const boosted = greatPersonPointsPerTurn(state, 0);
       for (const cls of GP_CLASSES) {
         expect(boosted[cls]).toBeCloseTo(bare[cls] * 1.15, 12);
@@ -199,19 +215,21 @@ describe('CLASSICAL REPUBLIC — the ANY-district gate and the GPP factor', () =
   });
 });
 
-describe('the government production boosts', () => {
-  it("FASCISM's anyUnit arm reaches class-carrying and class-free units alike", () => {
+// Both rows below are LEGACY bonuses, so no government carries them; the
+// prodBoost channel is a card's, and these pin its two targets.
+describe('the prodBoost targets', () => {
+  it('an anyUnit arm reaches class-carrying and class-free units alike', () => {
     const m = defaultModifiers();
-    m.prodBoosts.push(GOVERNMENTS.FASCISM.effects.prodBoost!);
+    m.prodBoosts.push({ target: 'anyUnit', classes: [], eraMax: -1, pct: 0.5 });
     expect(prodBoostPct(m, { kind: 'unit', unit: 'WARRIOR', progress: 0 })).toBeCloseTo(0.5);
     expect(prodBoostPct(m, { kind: 'unit', unit: 'TRADER', progress: 0 })).toBeCloseTo(0.5);
     expect(prodBoostPct(m, { kind: 'settler', progress: 0, cost: 80 })).toBeCloseTo(0.5);
     expect(prodBoostPct(m, { kind: 'wonder', wonder: 'PYRAMIDS', tileIndex: 0, progress: 0 })).toBe(0);
   });
 
-  it('AUTOCRACY pays wonders only', () => {
+  it('a wonder arm pays wonders only', () => {
     const m = defaultModifiers();
-    m.prodBoosts.push(GOVERNMENTS.AUTOCRACY.effects.prodBoost!);
+    m.prodBoosts.push({ target: 'wonder', classes: [], eraMax: -1, pct: 0.1 });
     expect(prodBoostPct(m, { kind: 'wonder', wonder: 'PYRAMIDS', tileIndex: 0, progress: 0 })).toBeCloseTo(0.1);
     expect(prodBoostPct(m, { kind: 'unit', unit: 'WARRIOR', progress: 0 })).toBe(0);
   });
@@ -222,6 +240,7 @@ describe('the government production boosts', () => {
     const mods = getModifiers(state, 0);
     expect(mods.wwCutPct).toBe(15);
     expect(mods.unitCombatCS).toEqual([{ classMask: 0, all: true, cs: 5 }]);
-    expect(prodBoostPct(mods, { kind: 'unit', unit: 'TRADER', progress: 0 })).toBeCloseTo(0.5);
+    // and NOT Fascism's legacy +50% toward units
+    expect(prodBoostPct(mods, { kind: 'unit', unit: 'TRADER', progress: 0 })).toBe(0);
   });
 });

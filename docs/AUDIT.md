@@ -77,8 +77,9 @@ from the list below.
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target — the reason a fighter exists — do not exist |
 | C-35 the land/water fact never moves | 2 | one overloaded static bit blocks submersion and the Canal's passage |
 | C-36 no railroad | 2 | no second movement tier, no per-hex Iron/Coal charge, no CO2 |
-| **C. Absent systems** | **29** | |
-| **OPEN, TOTAL** | **53** | |
+| C-37 no legacy policy cards | 2 | eight governments' legacy bonuses have no Wildcard card row and no switched-away record to unlock one |
+| **C. Absent systems** | **31** | |
+| **OPEN, TOTAL** | **55** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -368,22 +369,14 @@ Civ 6 source or is recorded as unverifiable.
   OPEN, not closed.** The cpu/data walk fetched every magnitude from the
   GS Civilopedia row by row (wonders, units, both trees, buildings, all 49
   policy cards, the city-state roster). What remains open:
-  - **The GOVERNMENTS' channel-blocked tails.** The expressible terms
-    ship and the invented magnitudes are deleted; each remaining term
-    waits on a channel: Monarchy's "+1 Housing per level of Walls" (a
-    per-city WALLS-LEVEL count), its "+2 Diplomatic Favor for every
-    Renaissance Walls" (a favor-per-building term) and "+50% Influence
-    Points" (an influence MULTIPLIER — `influencePerTurn` is flat);
-    Merchant Republic's "+15% Production toward
-    Districts" (a DISTRICT prodBoost target); Theocracy's "+5 Religious
-    Strength in Theological Combat" (a government channel into the
-    theological roll) and its "15% Discount on Purchases with Faith" with
-    Democracy's gold twin (a purchase-price multiplier); Democracy's GS
-    route and alliance-point terms (C-2); Autocracy's "+1 to all yields
-    for each government building" (a per-city count the Government Plaza
-    rows make countable — `BuildingDef.govTier` / `_b_gov_tier` — that no
-    channel reads). Legacy bonuses are out of scope by construction — R&F
-    phased them out. ADOPTION REACHABILITY: `computeAdoption` /
+  - **The GOVERNMENTS' channel-blocked tails.** Every row ships its
+    INHERENT bonus and nothing else, re-sourced page by page. One term
+    stays open: Democracy's, whose Trade Route to an Ally or Suzerain's
+    city and whose alliance points both want ALLIANCES (C-2). The LEGACY
+    bonuses are a second catalog that does not exist here (C-37) — an
+    earlier reading of this row had five governments paying theirs as
+    inherent, which no version of the game does.
+    ADOPTION REACHABILITY: `computeAdoption` /
     `_adopted_gov` take the newest unlocked tier on table order, so
     Oligarchy and Classical Republic are adopted in NO game — the two
     government test lanes' borrowed-row drills hold their rows.
@@ -580,6 +573,24 @@ under their blocker so the dependency is readable, and both halves count.
   water housing" — so moving it for one meaning moves all four. Waiting on
   it: submersion (C-24), the Canal's naval passage (C-22), the Mountain
   Tunnel (C-20), and the GDR's water walk (C-33).
+- **C-37. NO LEGACY POLICY CARDS.** Weight 2. Rise and Fall turned every
+  government's LEGACY bonus into a WILDCARD policy card, unlocked only
+  once the seat has switched AWAY from that government — so a government
+  and its own legacy card can never run together. The catalog has no such
+  rows, and neither engine carries the record the unlock would read: a
+  seat's government is one current id (`seatGovernmentId` /
+  `civ_government`) with no set of the governments it has already left.
+  OPEN:
+  - **EIGHT LEGACY BONUSES PAY NOTHING** — Autocracy's "+10% Production
+    toward Wonders", Oligarchy's "+20% Unit Experience", Classical
+    Republic's "+15% Great Person points", Monarchy's "+50% Influence
+    Points", Merchant Republic's "+15% Production toward Districts",
+    Communism's "+10% Science", Fascism's "+50% Production toward Units"
+    and the two purchase discounts (Theocracy's 15% on Faith, Democracy's
+    25% on Gold). Five of the seven percentage rows have a live channel
+    already (`prodBoost`, `xpPct`, `gppMult`, `yieldMult`); what they
+    lack is a card to sit on and the switched-away record above.
+    Chiefdom alone has no legacy bonus.
 - **C-36. NO RAILROAD.** Weight 2. `Tile.road` / `sim.road` is ONE boolean
   tier. The railroad is a second tier — its own movement rate, "1 Iron and
   1 Coal per hex" against the existing stockpiles, and CO2 "quite a bit at

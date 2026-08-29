@@ -119,6 +119,7 @@ class Rules:
     palace_housing: float
     palace_amenities: float
     palace_maintenance: float  # buildingMaintenance('PALACE') — 0 while the Palace is cost-0
+    palace_gov_yield: bool  # does the Palace count for Autocracy's per-government-building yields
     b_cost: torch.Tensor  # [NB]
     b_yields: torch.Tensor  # [NB, 6]
     b_housing: torch.Tensor
@@ -155,6 +156,7 @@ class Rules:
     b_loy_no_gov: torch.Tensor  # f64 [NB] — loyalty per turn in every one of the seat's UNGOVERNED cities
     b_amen_gov: torch.Tensor  # f64 [NB] — amenities in every city that HOLDS a governor
     b_house_gov: torch.Tensor  # f64 [NB] — housing in every city that HOLDS a governor
+    b_gov_yield: torch.Tensor  # bool [NB] — counts for Autocracy's per-government-building yields
     b_power_supply: torch.Tensor  # f64 [NB] — renewable Power it supplies its own city, no stockpile behind it
     b_flood_barrier: torch.Tensor  # bool [NB] — the FLOOD BARRIER row, whose price is its city's lowland tiles
     b_regional_range: torch.Tensor  # long [NB] — this row's own regional reach, 0 = the shared default
@@ -288,6 +290,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         palace_housing=r["palace"]["housing"],
         palace_amenities=r["palace"]["amenities"],
         palace_maintenance=r["palace"].get("maintenance", 0),
+        palace_gov_yield=bool(r["palace"].get("govYieldBuilding", 0)),
         b_cost=torch.tensor([b["cost"] for b in B], dtype=torch.float64),
         b_yields=torch.tensor([b["yields"] for b in B], dtype=torch.float64),
         b_housing=torch.tensor([b["housing"] for b in B], dtype=torch.float64),
@@ -324,6 +327,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_loy_no_gov=torch.tensor([float(b.get("loyaltyWithoutGovernor", 0)) for b in B], dtype=torch.float64),
         b_amen_gov=torch.tensor([float(b.get("amenitiesWithGovernor", 0)) for b in B], dtype=torch.float64),
         b_house_gov=torch.tensor([float(b.get("housingWithGovernor", 0)) for b in B], dtype=torch.float64),
+        b_gov_yield=torch.tensor([bool(b.get("govYieldBuilding", 0)) for b in B], dtype=torch.bool),
         b_power_supply=torch.tensor([float(b.get("powerSupply", 0)) for b in B], dtype=torch.float64),
         b_flood_barrier=torch.tensor([bool(b["floodBarrier"]) for b in B], dtype=torch.bool),
         b_regional_range=torch.tensor([int(b.get("regionalRange", 0)) for b in B], dtype=torch.long),

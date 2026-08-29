@@ -46,7 +46,7 @@ import {
   FAVOR_PER_POLLUTION_OVER, FAVOR_POLLUTION_CAP,
 } from '../data/climate';
 import { CARBON_PER_RESOURCE } from '../core/climate';
-import { BUILDINGS } from '../data/buildings';
+import { BUILDINGS, isGovYieldBuilding } from '../data/buildings';
 import {
   CLASS_BIT, PROMO_CLASSES, PROMO_COLS, PROMO_KINDS, UNIT_PROMO_CLASS, promoRows,
 } from '../data/promotions';
@@ -133,6 +133,9 @@ const effectRow = (fx: PolicyEffects) => ({
   capitalYields: YIELD_KEYS.map((k) => fx.capitalYields?.[k] ?? 0),
   housingAll: fx.housingAll ?? 0,
   amenitiesAll: fx.amenitiesAll ?? 0,
+  housingPerWallLevel: fx.housingPerWallLevel ?? 0,
+  theologyCS: fx.theologyCS ?? 0,
+  yieldsPerGovBuilding: fx.yieldsPerGovBuilding ?? 0,
   yieldMult: YIELD_KEYS.map((k) => fx.yieldMult?.[k] ?? 1),
   adjacencyMult: PLACEABLE_DISTRICTS.map((d) => fx.adjacencyMult?.[d] ?? 1),
   buildingYieldBoost: boostRow(fx.buildingYieldBoost),
@@ -1313,6 +1316,9 @@ export function buildRules() {
       ),
     },
     palace: {
+      // The GPU has no `city_bldg` bit for the Palace — it is a capital TERM
+      // there — so any per-building rule that names it needs this flag.
+      govYieldBuilding: BUILDINGS.PALACE && isGovYieldBuilding(BUILDINGS.PALACE) ? 1 : 0,
       yields: YIELD_KEYS.map((k) => BUILDINGS.PALACE?.yields?.[k] ?? 0),
       housing: BUILDINGS.PALACE?.housing ?? 0,
       amenities: BUILDINGS.PALACE?.amenities ?? 0,
@@ -1362,6 +1368,9 @@ export function buildRules() {
       loyaltyWithoutGovernor: b.loyaltyWithoutGovernor ?? 0,
       amenitiesWithGovernor: b.amenitiesWithGovernor ?? 0,
       housingWithGovernor: b.housingWithGovernor ?? 0,
+      // CIV6 (Autocracy): does this building count for its per-government-
+      // building yields — derived from the district, never transcribed.
+      govYieldBuilding: isGovYieldBuilding(b) ? 1 : 0,
       powerSupply: b.powerSupply ?? 0,
       regionalRange: b.regionalRange ?? 0,
       // the PRESERVE rows: what they pay an adjacent unimproved tile at

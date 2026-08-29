@@ -4875,6 +4875,12 @@ class SimSeats:
             # +1 Housing and +1 Amenity" — ANY completed district, where the
             # specialty-gated card rules ask for more.
             housing = housing + (_all_d > 0).double() * gm[12]["dch"].double().unsqueeze(1)
+            # CIV6 (Monarchy): "+1 Housing per level of Walls" — the level
+            # BUILT, so a city with no wall standing is paid nothing however
+            # far its tech ran.
+            _wh = gm[12]["wallhouse"]
+            if bool((_wh != 0).any()):
+                housing = housing + _wh.double().unsqueeze(1) * self._walls_level_all(row)[:, :cols].double()
         housing = housing + self._city_wonder_flat(row, self._wond_cityhouse)[:, :cols]
         housing = housing + self._gp_city_perm(row, "housing").double()
         if self.n_governors and row < self.n_majors:
