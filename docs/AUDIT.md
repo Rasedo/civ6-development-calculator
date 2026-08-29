@@ -54,7 +54,7 @@ from the list below.
 | B-39r wonder effects still dropped | 1 | two residuals, blocked on B-20r's per-work TYPE names |
 | B-45r sourced-sweep finds in the other rows | 1 | the rival-recruit event and B-31r's route yields carry the last two effect families |
 | B-54r flanking and support vs their own page | 1 | the two stacks a UNIQUE UNIT raises wait on C-26 |
-| B-56r the four inert promotions | 1 | four rows name a mechanic neither engine has or a reading no source settles — sight-blocking, CONVOY's "a formation", an air-roll promotion term, a NAVAL RAIDER class |
+| B-56r the three inert promotions | 1 | three rows name a mechanic neither engine has — sight-blocking, an air-roll promotion term, a NAVAL RAIDER class |
 | B-51r Encampment residuals | 1 | the district's strike is measured from the CITY CENTRE's tile, and a capture leaves its own pool standing (unsourced either way) |
 | B-44r city-state war tails | 1 | a ranged raider never shoots a minor centre (the seat verbs' own ranged-vs-city-state scope-out) |
 | B-65 religious zone of control | 1 | Civ 6 scopes a religious unit's ZOC to other religious units BOTH ways; the engines run one military-only rule |
@@ -326,9 +326,16 @@ Civ 6 source or is recorded as unverifiable.
   formation or not. Only the CIVILIAN carries the flag and the tile names its
   escort, so a flag with no military unit beside it is not a formation and
   the rider is free the moment its escort dies — no sweep, and nothing to
-  clear at a capture. `ESCORT_MOBILITY` rides it: "Formation units all
-  inherit escort's Movement speed", and the rider is then dragged free of its
-  own pool. `tests/gpu/escort_test.py` and `tests/cpu/units/escort.test.ts`
+  clear at a capture. A naval hull forms with its PASSENGER, which is the other half of
+  "Naval military units may also create a formation with embarked land
+  units". Two promotions ride it: `ESCORT_MOBILITY` ("Formation units all
+  inherit escort's Movement speed" — the rider is dragged free of its own
+  pool) and `CONVOY` ("+10 Combat Strength when in a formation", Naval Melee
+  behind Reinforced Hull and Rutter). An earlier reading of the CONVOY row
+  called it a movement clause; no source supports that. Which formation its
+  "a formation" names is not settled by any source — a Fleet is one and so is
+  an escort — and it ships as the ESCORT reading by OWNER DECISION, on the
+  hull that is carrying a rider (`convoyCS` / `_convoy_cs`). `tests/gpu/escort_test.py` and `tests/cpu/units/escort.test.ts`
   are that bar. OPEN:
   - **WHAT THE MERGED UNIT KEEPS BEYOND THE VETERAN'S RECORD IS THIS
     MODEL'S.** No source publishes the hit points a formation carries out
@@ -343,35 +350,30 @@ Civ 6 source or is recorded as unverifiable.
     to a Corps is the merge.
   - **AN ESCORT FORMATION IS A PAIR.** Real Civ 6 links up to THREE units of
     different classes — military, civilian and support. Support units are
-    modelled here as civilians and a tile seats ONE of them, so the third
-    member has nowhere to stand; widening it waits on a support stacking
-    class of its own.
+    modelled here as civilians, and the drag takes ONE rider, so `escortUnit`
+    refuses a second flag on a tile rather than leave a member behind.
+    Widening it needs a support stacking class of its own and a two-rider
+    drag on both engines.
   - **A DRAGGED RIDER LIFTS NO FOG.** `_step_verb` / `stepUnit` reveal around
     the MOVER; the escorted unit arrives without a reveal of its own, which
     matters only where the rider's sight is the wider of the two. It follows
     the carried-aircraft precedent (`_air_carry_with` / `carryAirWith`)
     rather than a source.
-  - **REACHABILITY: POKE ONLY.** No driver takes the ESCORT column, so no
-    gate lane forms a pair; the two poke files are the whole bar. The two
-    civics the Corps and Army wait on are out of the battery's reach too —
-    Urbanization, which requires Nationalism, first lands at t233 on 3 of 12
-    seeds, and Mobilization is Modern.
+  - **REACHABILITY, MEASURED.** The Corps IS reached: the driver takes
+    FORM_UP, the column is offered on 4 of 12 seeds from t211 and a Corps
+    stands on 3 of 12 from t212, so the gate compares the tier-1 strength
+    term over the last ~40 turns of those games. The ARMY is not — its civic
+    is Modern. The ESCORT column is offered on 12 of 12 seeds from t14 and
+    NO driver ever takes it, so the pair, the drag and Escort Mobility are
+    poke-only; `tests/gpu/escort_test.py` and `tests/cpu/units/escort.test.ts`
+    are their whole bar.
 
-- **B-56r. The four inert promotions.** 75 of the 79 catalog rows in
+- **B-56r. The three inert promotions.** 76 of the 79 catalog rows in
   `cpu/data/promotions.ts` reach a rule; the poke bar is
   `tests/gpu/promotions_test.py` + `tests/gpu/promo_effects_test.py`. FIVE
   carry `none`, each with its blocker:
   - **SENTRY** ("can see through Woods and Rainforest") — `revealAround`
     / `_reveal_around` reveal a flat radius; nothing blocks sight.
-  - **CONVOY** is "+10 Combat Strength when in a formation" (Naval Melee,
-    behind Reinforced Hull and Rutter). An earlier reading of this row called
-    it a movement clause; no source supports that, and the correction is why
-    the row is re-stated here. Both senses of "a formation" now exist on both
-    engines — a Fleet or Armada, and an escort — and no source says which one
-    the promotion means, or whether it means either. It is therefore a FORK
-    rather than a missing mechanic: NEITHER branch ships and the question is
-    the owner's. `ESCORT_MOBILITY`, which shared this row's blocker, ships
-    with the escort formation.
   - **CREEPING_ATTACK** is "+14 Combat Strength vs. naval raider units",
     and no NAVAL RAIDER class exists to name in a `CS_VS_CLASS_*` mask —
     C-32.
@@ -741,6 +743,7 @@ coverage is measured the same way with `CIV6_WORLDS_DIR` set.
 | mechanic | seeds reaching | first |
 |---|---|---|
 | a PLOT LOCK held by a citizen | 12/12 | t2 |
+| the ESCORT column offered to a civilian | 12/12 | t14 |
 | a PRESERVE placed | 12/12 | t27 |
 | a GOVERNOR TITLE earned | 12/12 | t28 |
 | a GOVERNOR APPOINTED, and SEATED in a city | 12/12 | t29 |
@@ -749,41 +752,49 @@ coverage is measured the same way with `CIV6_WORLDS_DIR` set.
 | a GREAT PERSON standing on the map as a unit | 12/12 | t53 |
 | the ACTIVATE_GP column offered to one | 12/12 | t54 |
 | a Great Person CHARGE SPENT | 12/12 | t55 |
-| faith-buy kind 6 (APOSTLE purchase) | 12/12 | t70 |
-| a WORLD CONGRESS ballot on the wire | 12/12 | t89 |
+| faith-buy kind 6 (APOSTLE purchase) | 12/12 | t87 |
 | a SPECIALIST pinned into a slot | 12/12 | t116 |
-| a governor PROMOTION taken | 11/12 | t135 |
 | an OPEN BORDERS grant standing | 11/12 | t34 |
-| a second HULL on any seat | 11/12 | t122 |
+| a governor PROMOTION taken | 11/12 | t134 |
 | a seat entering a DARK AGE (the card pool's own gate) | 10/12 | t49 |
-| NATURAL_HISTORY (the Archaeologist's civic) | 10/12 | t172 |
-| a DECLARATION OF FRIENDSHIP | 9/12 | t19 |
-| an ALLIANCE | 9/12 | t105 |
-| a DIPLOMATIC QUARTER placed | 8/12 | t101 |
-| a permanent PER-SEAT channel left by a spent Great Person | 8/12 | t110 |
-| an INTERNATIONAL trade leg | 7/12 | t95 |
-| a permanent PER-CITY channel left by a spent Great Person | 6/12 | t155 |
-| two enemy religious units ADJACENT (theological combat) | 4/12 | t94 |
-| a DAM placed | 4/12 | t163 |
-| CONSERVATION (the Naturalist's civic) | 3/12 | t188 |
-| WAR with a city-state | 2/12 | t142 |
-| a WATER PARK placed | 2/12 | t205 |
-| a unit standing against a CLOSED BORDER | 1/12 | t154 |
-| PEACE with a city-state, through the sue column | 1/12 | t155 |
-| a CANAL placed | 1/12 | t230 |
-| URBANIZATION civic | 0/12 | NEVER |
-| a NEIGHBORHOOD placed | 0/12 | NEVER |
-| an antiquity dig (artifact in a slot) | 0/12 | NEVER |
-| a GREAT WORK given away | 0/12 | NEVER |
+| a DIPLOMATIC QUARTER placed | 10/12 | t104 |
+| a second HULL on any seat | 10/12 | t118 |
+| NATURAL_HISTORY (the Archaeologist's civic) | 10/12 | t170 |
+| a unit standing against a CLOSED BORDER | 9/12 | t65 |
+| a DECLARATION OF FRIENDSHIP | 8/12 | t19 |
+| an INTERNATIONAL trade leg | 8/12 | t61 |
+| an ALLIANCE | 8/12 | t105 |
+| a WORLD CONGRESS ballot on the wire | 8/12 | t148 |
+| a permanent PER-SEAT channel left by a spent Great Person | 7/12 | t136 |
+| WAR with a city-state | 6/12 | t78 |
+| PEACE with a city-state, through the sue column | 6/12 | t91 |
+| a permanent PER-CITY channel left by a spent Great Person | 5/12 | t156 |
+| two enemy religious units ADJACENT (theological combat) | 4/12 | t96 |
+| a GREAT WORK given away | 4/12 | t159 |
+| the FORM_UP column offered to a unit | 4/12 | t211 |
+| a DAM placed | 3/12 | t157 |
+| CONSERVATION (the Naturalist's civic) | 3/12 | t189 |
+| a CORPS or FLEET standing | 3/12 | t212 |
+| URBANIZATION civic | 3/12 | t233 |
+| a NEIGHBORHOOD placed | 3/12 | t235 |
+| any seat's lifetime CO2 above zero | 2/12 | t203 |
+| a Valletta-shaped SUZERAIN, and the class purchase it sells | 1/12 | t117 |
+| a CANAL placed | 1/12 | t228 |
+| an antiquity dig (artifact in a slot) | 1/12 | t230 |
+| a WATER PARK placed | 1/12 | t246 |
+| an ARMY or ARMADA standing (Mobilization is Modern) | 0/12 | NEVER |
+| a civilian actually IN an escort formation (no driver takes it) | 0/12 | NEVER |
 | an ally dragged in by the DEFENSIVE PACT | 0/12 | NEVER |
-| any seat's lifetime CO2 above zero | 0/12 | NEVER |
 | the world crossing into climate PHASE I | 0/12 | NEVER |
 | a MILITARY ENGINEER alive at all (and so its three verbs) | 0/12 | NEVER |
-| a Valletta-shaped SUZERAIN, and the class purchase it sells | 0/12 | NEVER |
+| the ROYAL SOCIETY standing (and so the district-project payment) | 0/12 | NEVER |
 | a seat that may buy LAND COMBAT UNITS with faith | 0/12 | NEVER |
-| PROFESSIONAL_SPORTS (the Rock Band's civic, and so the concert) | 0/12 | NEVER |
 | a DARK AGE CARD slotted (the greedy fill spends the wildcards first) | 0/12 | NEVER |
 
+- EVERY ROW IS ONE MARK the probe emits, and the table holds no row the
+  probe cannot measure. The ROCK BAND's concert had such a row and no mark
+  behind it; `concert` now exists in the probe and the row lands with the
+  next run.
 - THE DISTRICT LANE ROTATES ITS PICK by (seat + turn) — a DECISION the
   applier re-validates, widening coverage without changing legality.
 - THE TAIL OF THIS TABLE IS TRAJECTORY, NOT RULE. Every row below 8/12

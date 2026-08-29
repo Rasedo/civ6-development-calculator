@@ -23,6 +23,7 @@ Covered here:
   4. the slowest member: a rider that cannot afford the step stops the escort.
   5. Escort Mobility: the rider rides free and stops nothing.
   6. a flag with no escort beside it is no formation.
+  7. a naval hull forms with its PASSENGER, and CONVOY pays the escort +10.
 """
 
 from __future__ import annotations
@@ -112,11 +113,28 @@ def _dir_of(sim, frm, to):
     return d[0]
 
 
+def _promo(sim, slot_merged, cls, pid):
+    """give the unit in this slot one named promotion of `cls`."""
+    ci = PRO["classes"].index(cls)
+    sim.unit_promos[0, slot_merged] = 1 << PRO["ids"][ci].index(pid)
+
+
 def _mobility(sim, slot_merged):
-    """give the unit in this slot Escort Mobility."""
-    ci = PRO["classes"].index("LIGHT_CAV")
-    col = PRO["ids"][ci].index("ESCORT_MOBILITY")
-    sim.unit_promos[0, slot_merged] = 1 << col
+    _promo(sim, slot_merged, "LIGHT_CAV", "ESCORT_MOBILITY")
+
+
+def water_pair(sim):
+    """two adjacent open water tiles with nothing standing on either."""
+    def bare(x):
+        return (bool(sim.wpass[0, x]) and int(sim.military_at[0, x]) < 0
+                and int(sim.embarked_at[0, x]) < 0)
+    for x in range(sim.T):
+        if not bare(x):
+            continue
+        for n in sim.neigh[x].tolist():
+            if n >= 0 and bare(n):
+                return x, n
+    raise AssertionError("no adjacent free water pair on the map")
 
 
 # ------------------------------------------------------------------- 1 wire
@@ -234,6 +252,41 @@ def poke_orphan(rules, path):
     print("  6 orphan OK — a flag alone is not a formation")
 
 
+# CIV6 (Formations): "Naval military units may also create a formation with
+# embarked land units"; (Convoy, Naval Melee): "+10 Combat Strength when in a
+# formation" — the escort formation, so the term rides the HULL.
+def poke_convoy(rules, path):
+    sim = fresh(rules, path)
+    # a hull sails and a passenger stands at sea only behind their own techs;
+    # both engines ask `tileFreeForUnit` at the destination either way.
+    for _tech in (sim._sailing_tech, sim._cartography_tech, sim._shipbuilding_tech):
+        if _tech >= 0:
+            sim.civ_techs[0, ROW, _tech] = True
+    a_t, b_t = water_pair(sim)
+    hull = put(sim, ROW, a_t, "GALLEY")
+    rider = put(sim, ROW, a_t, "WARRIOR")
+    # the WARRIOR rides as a PASSENGER, which is its stacking class on water
+    sim.military_at[0, a_t] = hull
+    sim.unit_emb[0, rider] = True
+    sim.embarked_at[0, a_t] = rider
+    sim._gen_ver += 1
+
+    assert bool(mask_of(sim, ROW, rider)[sim._A_ESCORT]), "a passenger was refused its hull"
+    _promo(sim, hull, "NAVAL_MELEE", "CONVOY")
+    assert int(sim._convoy_cs(torch.tensor([hull]))[0]) == 0,         "Convoy paid a hull that carries nobody"
+    order(sim, ROW, rider, sim._A_ESCORT)
+    assert bool(sim.unit_escorted[0, rider]), "the passenger did not form up"
+    assert int(sim._convoy_cs(torch.tensor([hull]))[0]) == 10,         "Convoy did not pay the escort of a formation"
+    assert int(sim._convoy_cs(torch.tensor([rider]))[0]) == 0,         "Convoy paid the carried unit rather than the carrier"
+
+    order(sim, ROW, hull, _dir_of(sim, a_t, b_t))
+    assert int(sim.unit_tile[0, hull]) == b_t, "the hull did not sail"
+    assert int(sim.unit_tile[0, rider]) == b_t, "the passenger was left at sea"
+    assert int(sim.embarked_at[0, b_t]) == rider, "the passenger plane did not follow"
+    assert int(sim.embarked_at[0, a_t]) < 0, "the passenger still holds the water it left"
+    print("  7 convoy OK — a hull forms with its passenger, and the escort is paid 10")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -246,6 +299,7 @@ def main() -> None:
     poke_slowest(rules, p)
     poke_mobility(rules, p)
     poke_orphan(rules, p)
+    poke_convoy(rules, p)
     print("ESCORT POKES OK")
 
 

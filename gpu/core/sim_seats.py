@@ -1731,14 +1731,17 @@ class SimSeats:
 
     def _escort_rider(self, gslot: torch.Tensor, here: torch.Tensor, dest: torch.Tensor,
                       u_type: torch.Tensor, u_promos: torch.Tensor, cost: torch.Tensor):
-        """(rider slot, dragged free, the pair may go) — `escortRider` plus the
-        two clauses `stepUnit` puts in front of its own write.
+        """(rider slot, dragged free, the pair may go) — `escortRiders` plus
+        the two clauses `stepUnit` puts in front of its own write.
 
         CIV6 (Formations): a formation's Movement "is equal to that of the
         slowest unit that belongs to it", so a rider that cannot afford the
         step or cannot stand on the destination stops the escort too; (Escort
         Mobility): "Formation units all inherit escort's Movement speed", and
-        the rider then rides free."""
+        the rider then rides free. A rider is whichever of the two non-military
+        stacking classes holds the tile — a civilian ashore, a PASSENGER at
+        sea, which is the naval half of "may also create a formation with
+        embarked land units"."""
         none = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
         no_free = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         all_ok = torch.ones(self.B, dtype=torch.bool, device=self.device)
@@ -1747,15 +1750,22 @@ class SimSeats:
         hc = here.clamp(min=0)
         dc = dest.clamp(min=0)
         ut = u_type.clamp(min=0, max=self.NU - 1)
-        cand = self.civilian_at.gather(1, hc.unsqueeze(1)).squeeze(1)
-        cc = cand.clamp(min=0)
         seat = self.unit_seat.gather(1, gslot.unsqueeze(1)).squeeze(1)
-        live = (
-            (cand >= 0) & (here >= 0) & (dest >= 0)
-            & ~self._type_civilian[u_type.clamp(min=0)]
-            & self.unit_escorted.gather(1, cc.unsqueeze(1)).squeeze(1)
-            & (self.unit_seat.gather(1, cc.unsqueeze(1)).squeeze(1) == seat)
-        )
+        carrier = (~self._type_civilian[u_type.clamp(min=0)]
+                   & ~self.unit_emb.gather(1, gslot.unsqueeze(1)).squeeze(1))
+
+        def _pick(plane: torch.Tensor) -> torch.Tensor:
+            s = plane.gather(1, hc.unsqueeze(1)).squeeze(1)
+            k = s.clamp(min=0)
+            good = ((s >= 0) & carrier
+                    & self.unit_escorted.gather(1, k.unsqueeze(1)).squeeze(1)
+                    & (self.unit_seat.gather(1, k.unsqueeze(1)).squeeze(1) == seat))
+            return torch.where(good, s, none)
+
+        cand = _pick(self.civilian_at)
+        cand = torch.where(cand >= 0, cand, _pick(self.embarked_at))
+        cc = cand.clamp(min=0)
+        live = (cand >= 0) & (here >= 0) & (dest >= 0)
         if not bool(live.any()):
             return none, no_free, all_ok
         free = live & self._promo_flag(ut, u_promos, "ESCORT_SPEED")
@@ -1771,8 +1781,11 @@ class SimSeats:
             & (r_naval | (self._seat_tech(seat, self._sailing_tech) & self._embark_live))
         )
         dry_ok = self.passable.gather(1, dc.unsqueeze(1)).squeeze(1) & ~r_naval
+        # the class the rider will STAND in at the destination, which is what
+        # `_blocked_for` asks: a civilian ashore, a passenger on water.
         stand = torch.where(wet, wet_ok, dry_ok) & ~self._blocked_for(
-            dc.unsqueeze(1), seat.unsqueeze(1), is_civilian=True).squeeze(1)
+            dc.unsqueeze(1), seat.unsqueeze(1),
+            is_civilian=(self._type_civilian[rt] & ~wet).unsqueeze(1)).squeeze(1)
         may = free | (r_mp >= cost) | (r_mp >= r_full)
         okm = ~live | (stand & may)
         return torch.where(live, cand, none), free, okm
@@ -1792,9 +1805,12 @@ class SimSeats:
             naval = self.unit_naval[self.unit_type[g, s].clamp(min=0, max=self.NU - 1)]
             was = self.unit_emb[g, s]
             now = wet & ~naval
-            self.unit_emb[g, s] = now
+        # `_occ_clear` reads the OLD stacking class and `_occ_set` the new one,
+        # so the embarked flag flips between them.
         self._occ_clear(g, frm[g], s)
         self.unit_tile[g, s] = dest[g]
+        if self._embark_live:
+            self.unit_emb[g, s] = now
         spent = torch.where(free[g], self.unit_mp[g, s],
                             (self.unit_mp[g, s] - cost[g]).clamp(min=0))
         if self._embark_live:
@@ -2268,6 +2284,42 @@ class SimSeats:
         out = self._formation_cs[
             self.unit_formation.gather(1, s).clamp(min=0, max=self._form_max)]
         return out.squeeze(1) if flat else out
+
+    def _carrying(self, slot: torch.Tensor) -> torch.Tensor:
+        """[B] this unit is the ESCORT of a formation — `escortRiders` is not
+        empty for it."""
+        s = slot.clamp(min=0).unsqueeze(1)
+        tile = self.unit_tile.gather(1, s).squeeze(1)
+        seat = self.unit_seat.gather(1, s).squeeze(1)
+        ty = self.unit_type.gather(1, s).squeeze(1).clamp(min=0)
+        out = (~self._type_civilian[ty]
+               & ~self.unit_emb.gather(1, s).squeeze(1) & (tile >= 0))
+        hit = torch.zeros_like(out)
+        for plane in (self.civilian_at, self.embarked_at):
+            r = plane.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1)
+            k = r.clamp(min=0).unsqueeze(1)
+            hit = hit | ((r >= 0) & (r != slot)
+                         & self.unit_escorted.gather(1, k).squeeze(1)
+                         & (self.unit_seat.gather(1, k).squeeze(1) == seat))
+        return out & hit
+
+    def _convoy_cs(self, slot: torch.Tensor) -> torch.Tensor:
+        """CIV6 (Convoy): "+10 Combat Strength when in a formation" — the term
+        a unit CARRYING a rider adds to every strength read (`convoyCS`)."""
+        s = slot.clamp(min=0).unsqueeze(1)
+        v = self._promo_val(
+            self.unit_type.gather(1, s).squeeze(1).clamp(min=0, max=self.NU - 1),
+            self.unit_promos.gather(1, s).squeeze(1), "CS_IN_FORMATION")
+        return torch.where(self._carrying(slot), v, torch.zeros_like(v))
+
+    def _convoy_cs_pool(self, atk_kind: str, u: int) -> torch.Tensor:
+        """the same term for unit `u` of one POOL, whose index is pool-local."""
+        lo = self.POOL_LO[atk_kind]
+        alive = getattr(self, f"{atk_kind}_unit_alive")[:, u]
+        return torch.where(
+            alive,
+            self._convoy_cs(torch.full((self.B,), lo + u, dtype=torch.long, device=self.device)),
+            torch.zeros(self.B, dtype=torch.long, device=self.device))
 
     def _form_tier(self, slot: torch.Tensor) -> torch.Tensor:
         """[B] the formation TIER of a merged-pool slot — what To Arms! scores
@@ -5736,7 +5788,8 @@ class SimSeats:
         it may hit from `_seats_hostile`."""
         a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
         a_lo = self.POOL_LO[atk_kind]
-        atk_cs_all = self._type_combat[a_type[:, u]] + self._form_cs_pool(atk_kind, u)
+        atk_cs_all = (self._type_combat[a_type[:, u]] + self._form_cs_pool(atk_kind, u)
+                      + self._convoy_cs_pool(atk_kind, u))
         major = POOL_CLASS[atk_kind] == "major"
         ttc = tgt.clamp(min=0)
         here = a_tile[:, u]
@@ -5772,7 +5825,7 @@ class SimSeats:
             if bool(d_emb.any()):
                 def_cs = torch.where(
                     d_emb, self._embarked_def_cs(m_seat).to(def_cs.dtype), def_cs)
-            def_cs = def_cs + self._form_cs(ds0)
+            def_cs = def_cs + self._form_cs(ds0) + self._convoy_cs(ds0)
             def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
             a_promos = self._promo_pool(atk_kind)[0][:, u]
             _true = torch.ones_like(mslot_raw, dtype=torch.bool)
@@ -6671,6 +6724,7 @@ class SimSeats:
                             torch.minimum(self.encamp_outer_hp[bidx, tc], self._walls_tier_hp[_wt]),
                             torch.zeros_like(def_cs))
         atk_e = (self._city_ranged_strength(at0, outer) + self._form_cs_pool(atk_kind, u)
+                 + self._convoy_cs_pool(atk_kind, u)
                  - self._wound(a_hp[:, u])
                  + self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
                  + rel.to(def_cs.dtype)
@@ -6704,6 +6758,7 @@ class SimSeats:
         TS's: damage-to-district, then counter."""
         a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
         atk_cs = (self._type_combat[a_type[:, u]] + self._form_cs_pool(atk_kind, u)
+                  + self._convoy_cs_pool(atk_kind, u)
                   + self._congress_unit_cs(a_type[:, u], a_seat[:, u])
                   + self._gov_unit_cs(a_type[:, u], a_seat[:, u]))
         major = POOL_CLASS[atk_kind] == "major"
@@ -6962,7 +7017,7 @@ class SimSeats:
             def_cs = def_cs + self._governor_city_defense(hrow, slot).to(def_cs.dtype)
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         atk_e = (self._type_combat[a_type[:, u].clamp(min=0, max=self.NU - 1)]
-                 + self._form_cs_pool(atk_kind, u)
+                 + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u)
                  - self._wound(a_hp[:, u])
                  + self._assault_promo_cs(a_type[:, u], a_promos, a_tile[:, u])
                  - self._atk_pens(a_type[:, u], a_promos, a_tile[:, u], tgt, a_emb[:, u]))
@@ -7109,6 +7164,7 @@ class SimSeats:
         )
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         atk_e = (self._type_combat[at0] + self._form_cs_pool(atk_kind, u)
+                 + self._convoy_cs_pool(atk_kind, u)
                  - self._wound(a_hp[:, u])
                  + self._assault_promo_cs(at0, a_promos, here)
                  - self._atk_pens(at0, a_promos, here, tgt, a_emb[:, u]))
@@ -7278,7 +7334,8 @@ class SimSeats:
         _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(atk_kind)
         barb = POOL_CLASS[atk_kind] == "hostile"
         ut0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
-        atk_rs = self._type_ranged_strength[ut0] + self._form_cs_pool(atk_kind, u)
+        atk_rs = (self._type_ranged_strength[ut0] + self._form_cs_pool(atk_kind, u)
+                  + self._convoy_cs_pool(atk_kind, u))
         a_hp, a_tile, a_seat = _hp_p[:, u], _tile_p[:, u], _seat_p[:, u]
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         a_naval = self.unit_naval[ut0] | _emb_p[:, u]
@@ -7306,7 +7363,8 @@ class SimSeats:
                 def_cs = def_cs + self._governor_city_defense(hrow, hcol).to(def_cs.dtype)
             outer_all = self.city_outer_hp[_bidx, hrow, hcol]
             atk_e = (self._city_ranged_strength(ut0, outer_all)
-                     + self._form_cs_pool(atk_kind, u) - self._wound(a_hp)
+                     + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u)
+                     - self._wound(a_hp)
                      + self._assault_promo_cs(ut0, a_promos, a_tile, ranged=True))
             if not barb:
                 # aura inside hostileRangedStrike's ranged-strength
@@ -7380,7 +7438,7 @@ class SimSeats:
             if bool(d_emb.any()):
                 def_cs = torch.where(
                     d_emb, self._embarked_def_cs(d_seat).to(def_cs.dtype), def_cs)
-            def_cs = def_cs + self._form_cs(ds0)
+            def_cs = def_cs + self._form_cs(ds0) + self._convoy_cs(ds0)
             def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)  # wounded defender
             _t = torch.ones_like(mslot, dtype=torch.bool)
             atk_e = atk_rs - self._wound(a_hp) + self._promo_cs(
@@ -7485,7 +7543,8 @@ class SimSeats:
         a_promos = self._promo_pool(atk_kind)[0][:, u]
         a_naval = self.unit_naval[at0] | a_emb[:, u]
         atk_rs0 = self._type_ranged_strength[at0]
-        atk_base = atk_rs0 + self._form_cs_pool(atk_kind, u) - self._wound(a_hp[:, u])
+        atk_base = (atk_rs0 + self._form_cs_pool(atk_kind, u)
+                    + self._convoy_cs_pool(atk_kind, u) - self._wound(a_hp[:, u]))
         atk_base = atk_base + self._gen_aura_cs(aseat, a_tile[:, u], a_naval).to(atk_base.dtype)
         atk_base = atk_base + (self._congress_unit_cs(at0, aseat)
                                + self._gov_unit_cs(at0, aseat)).to(atk_base.dtype)
@@ -7587,7 +7646,7 @@ class SimSeats:
             if bool(d_emb.any()):
                 def_cs = torch.where(
                     d_emb, self._embarked_def_cs(d_seat).to(def_cs.dtype), def_cs)
-            def_cs = def_cs + self._form_cs(ds0)
+            def_cs = def_cs + self._form_cs(ds0) + self._convoy_cs(ds0)
             def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
             _t = torch.ones_like(mslot, dtype=torch.bool)
             def_e = def_cs - self._wound(def_hp)

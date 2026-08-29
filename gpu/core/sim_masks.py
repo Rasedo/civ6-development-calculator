@@ -978,9 +978,10 @@ class SimMasks:
         if ranged:
             m_type = self.unit_type.gather(1, mslot.clamp(min=0).unsqueeze(1)).squeeze(1)
             cs_m = (self._type_combat[m_type.clamp(min=0, max=self.NU - 1)]
-                    + self._form_cs(mslot))
+                    + self._form_cs(mslot) + self._convoy_cs(mslot))
             take = take | (e_mil & ok_m
-                           & (self._embarked_def_cs(e_seat) + self._form_cs(eslot) > cs_m))
+                           & (self._embarked_def_cs(e_seat) + self._form_cs(eslot)
+                              + self._convoy_cs(eslot) > cs_m))
         e_pax = ok_e & e_civ
         take_c = e_pax & ~ok_c
         return (torch.where(take, eslot, mslot),
@@ -2246,6 +2247,15 @@ class SimMasks:
             torch.full_like(_mil_here, -1)) == row)).unsqueeze(2)
         _u_esc = self.unit_escorted.gather(1, sc).unsqueeze(2)
         in_esc = _u_esc & _esc_here
+        # ONE rider to an escort — a second flag on the tile would be a
+        # formation nothing moves.
+        _rider_here = torch.zeros(B, N, dtype=torch.bool, device=dev)
+        for _pl in (self.civilian_at, self.embarked_at):
+            _r = _pl.gather(1, tc)
+            _rc = _r.clamp(min=0)
+            _rider_here = _rider_here | (
+                (_r >= 0) & (_r != smap) & self.unit_escorted.gather(1, _rc)
+                & (self.unit_seat.gather(1, _rc) == row))
         move = on_map & terr & ~_blk & alive & has_mp & ~cliff6 & ~shut & ~in_esc
 
         # ---- ATTACK 6-11 -----------------------------------------------------
@@ -2494,7 +2504,8 @@ class SimMasks:
 
         _ec: list[torch.Tensor] = []
         if getattr(self, "_A_ESCORT", -1) >= 0:
-            _ec = [alive & is_civ & (tile >= 0).unsqueeze(2) & ~_u_esc & _esc_here]
+            _ec = [alive & (is_civ | u_emb.unsqueeze(2)) & (tile >= 0).unsqueeze(2)
+                   & ~_u_esc & _esc_here & ~_rider_here.unsqueeze(2)]
 
         _ue: list[torch.Tensor] = []
         if getattr(self, "_A_UNESCORT", -1) >= 0:

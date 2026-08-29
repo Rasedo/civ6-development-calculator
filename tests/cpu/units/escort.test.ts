@@ -14,6 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState } from '../helpers';
 import { spawnUnit, stepUnit, escortUnit, breakEscort, inEscort } from '../../../cpu/core/units';
+import { convoyCS } from '../../../cpu/core/combat';
 import { promoRows } from '../../../cpu/data/promotions';
 import { neighbors } from '../../../world/hex';
 import { isWater, isImpassable } from '../../../world/query';
@@ -124,6 +125,33 @@ describe('the escort formation', () => {
     expect(hor.tileIndex).toBe(b);
     expect(bld.tileIndex).toBe(b);
     expect(bld.movesLeft).toBe(0);
+  });
+
+  // CIV6 (Formations): "Naval military units may also create a formation with
+  // embarked land units"; (Convoy, Naval Melee): "+10 Combat Strength when in a
+  // formation" — the escort formation, so the term rides the HULL.
+  it('a hull forms with its passenger, and Convoy pays the hull', () => {
+    const state = makeState(makeMap(8, 8));
+    const [a, b] = twoAdjacent(state);
+    for (const i of [a, b]) state.map.tiles[i].terrain = 'COAST';
+    for (const id of ['SAILING', 'SHIPBUILDING', 'CARTOGRAPHY']) {
+      state.seats[SEAT].research.techs.push(id);
+    }
+    const hull = put(state, a, 'GALLEY');
+    const rider = put(state, a, 'WARRIOR', { embarked: true });
+    const col = promoRows('NAVAL_MELEE').findIndex((p) => p.id === 'CONVOY');
+    expect(col).toBeGreaterThanOrEqual(0);
+    hull.promos = 1 << col;
+
+    expect(convoyCS(state, hull)).toBe(0);      // it carries nobody yet
+    expect(escortUnit(state, rider).ok).toBe(true);
+    expect(convoyCS(state, hull)).toBe(10);
+    expect(convoyCS(state, rider)).toBe(0);     // the carried unit is not the escort
+
+    expect(stepUnit(state, hull, state.map.tiles[b])).not.toBe('blocked');
+    expect(hull.tileIndex).toBe(b);
+    expect(rider.tileIndex).toBe(b);
+    expect(rider.embarked).toBe(true);
   });
 
   it('a flag with no escort beside it is no formation', () => {

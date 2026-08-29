@@ -73,6 +73,7 @@ export const PROMO_KINDS = [
   'KILL_SPREAD',         // v religious pressure nearby on a non-barbarian kill
   'ZOC_EXERT',           // a RANGED-class unit exerts zone of control
   'ESCORT_SPEED',        // an escorted unit is dragged free of its own MP
+  'CS_IN_FORMATION',     // +v Combat Strength while this unit escorts one
 ] as const;
 export type PromoKind = (typeof PROMO_KINDS)[number];
 
@@ -185,7 +186,10 @@ export const PROMOTIONS: readonly PromoDef[] = [
   P('EMBOLON', 'NAVAL_MELEE', 1, [], cs('CS_VS_CLASS_ANY', 7, MASK_NAVAL)),
   P('RUTTER', 'NAVAL_MELEE', 2, ['HELMSMAN'], cs('SIGHT', 1)),
   P('REINFORCED_HULL', 'NAVAL_MELEE', 2, ['EMBOLON'], cs('CS_DEF_RANGED', 10)),
-  P('CONVOY', 'NAVAL_MELEE', 3, ['RUTTER', 'REINFORCED_HULL'], none),
+  // CIV6 (Convoy): "+10 Combat Strength when in a formation" — the ESCORT
+  // formation, which for a naval hull is the embarked unit it carries.
+  P('CONVOY', 'NAVAL_MELEE', 3, ['RUTTER', 'REINFORCED_HULL'],
+    cs('CS_IN_FORMATION', 10)),
   P('AUXILIARY_SHIPS', 'NAVAL_MELEE', 3, ['RUTTER', 'REINFORCED_HULL'], { kind: 'HEAL_ANYWHERE' }),
   P('CREEPING_ATTACK', 'NAVAL_MELEE', 4, ['CONVOY', 'AUXILIARY_SHIPS'], none),
 

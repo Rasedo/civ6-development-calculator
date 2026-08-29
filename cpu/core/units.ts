@@ -696,17 +696,29 @@ export function escortOf(state: GameState, unit: Unit): Unit | undefined {
   if (!unit.escorted) return undefined;
   return state.units.find(
     (u) => u.id !== unit.id && u.tileIndex === unit.tileIndex && u.seat === unit.seat
-      && unitDomain(u.type) === 'military',
+      && unitDomain(u.type) === 'military' && !u.embarked,
   );
 }
 
-/** the civilian this military unit is escorting, if any. */
-export function escortRider(state: GameState, unit: Unit): Unit | undefined {
-  if (unitDomain(unit.type) !== 'military') return undefined;
-  return state.units.find(
-    (u) => !!u.escorted && u.id !== unit.id && u.tileIndex === unit.tileIndex
-      && u.seat === unit.seat && unitDomain(u.type) === 'civilian',
-  );
+/** MAY this unit be the escorted half of a formation? CIV6 (Formations): a
+ *  military unit forms with "a support or civilian unit", and a naval one
+ *  "may also create a formation with embarked land units" — which is exactly
+ *  the two stacking classes that are not the tile's military slot. */
+export function escortable(unit: Unit): boolean {
+  return !!unit.embarked || unitDomain(unit.type) === 'civilian';
+}
+
+/** the units this military one is escorting — at most one of each stacking
+ *  class, which is Civ 6's three-unit formation on a tile that holds all
+ *  three. */
+export function escortRiders(state: GameState, unit: Unit): Unit[] {
+  if (unitDomain(unit.type) === 'military' && !unit.embarked) {
+    return state.units.filter(
+      (u) => !!u.escorted && u.id !== unit.id && u.tileIndex === unit.tileIndex
+        && u.seat === unit.seat && escortable(u),
+    );
+  }
+  return [];
 }
 
 export function inEscort(state: GameState, unit: Unit): boolean {
@@ -714,13 +726,16 @@ export function inEscort(state: GameState, unit: Unit): boolean {
 }
 
 export function escortUnit(state: GameState, unit: Unit): RuleResult {
-  if (unitDomain(unit.type) !== 'civilian') return no('Only a civilian joins an escort.');
+  if (!escortable(unit)) return no('Only a civilian or a passenger joins an escort.');
   if (unit.escorted) return no('Already in a formation.');
   const esc = state.units.find(
     (u) => u.id !== unit.id && u.tileIndex === unit.tileIndex && u.seat === unit.seat
-      && unitDomain(u.type) === 'military',
+      && unitDomain(u.type) === 'military' && !u.embarked,
   );
   if (!esc) return no('No military unit here to escort it.');
+  // ONE rider to an escort: the drag takes a single passenger, so a second
+  // flag on the tile would be a formation nothing moves.
+  if (escortRiders(state, esc).length > 0) return no('That unit already escorts one.');
   unit.escorted = true;
   return ok;
 }
@@ -786,9 +801,9 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   if (unit.movesLeft < cost && unit.movesLeft < full) return 'cantAfford';
   // THE FORMATION MOVES AS ONE — and no further than its slowest member,
   // unless the escort carries Escort Mobility.
-  const rider = escortRider(state, unit);
-  const riderFree = rider ? promoFlag(unit, 'ESCORT_SPEED') : false;
-  if (rider) {
+  const riders = escortRiders(state, unit);
+  const riderFree = riders.length > 0 && promoFlag(unit, 'ESCORT_SPEED');
+  for (const rider of riders) {
     if (!tileFreeForUnit(state, to.index, seat, rider, true)) return 'blocked';
     const rFull = rider.movesFull ?? unitFullMoves(state, rider);
     if (!riderFree && rider.movesLeft < cost && rider.movesLeft < rFull) return 'cantAfford';
@@ -805,7 +820,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
     unit.movesLeft = Math.min(unit.movesLeft, modeFull);
     unit.movesFull = modeFull;
   }
-  if (rider) {
+  for (const rider of riders) {
     const rTrans = !UNITS[rider.type]?.naval && isWater(from) !== isWater(to);
     if (rTrans) rider.embarked = isWater(to);
     rider.tileIndex = to.index;

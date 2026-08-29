@@ -207,7 +207,7 @@ class SimOrders:
             if _rk_escort[n] and _ecc >= 0:
                 # CIV6 (Formations): the civilian joins the military unit
                 # already standing with it, and the pair moves as one.
-                _em = act & (a == _ecc) & is_civ & (here >= 0)
+                _em = act & (a == _ecc) & (is_civ | u_emb) & (here >= 0)
                 if bool(_em.any()):
                     _mh = self.military_at.gather(1, hc.unsqueeze(1)).squeeze(1)
                     _ms = torch.where(
@@ -215,6 +215,12 @@ class SimOrders:
                         self.unit_seat.gather(1, _mh.clamp(min=0).unsqueeze(1)).squeeze(1),
                         torch.full_like(_mh, -1))
                     _em = _em & (_mh >= 0) & (_ms == row)
+                    for _pl in (self.civilian_at, self.embarked_at):
+                        _r = _pl.gather(1, hc.unsqueeze(1)).squeeze(1)
+                        _rc = _r.clamp(min=0).unsqueeze(1)
+                        _em = _em & ~((_r >= 0) & (_r != slot)
+                                      & self.unit_escorted.gather(1, _rc).squeeze(1)
+                                      & (self.unit_seat.gather(1, _rc).squeeze(1) == row))
                     if bool(_em.any()):
                         _r = _em.nonzero(as_tuple=True)[0]
                         self.unit_escorted[_r, sc[_r]] = True

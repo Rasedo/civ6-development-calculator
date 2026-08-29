@@ -37,6 +37,9 @@ of the DRIVEN GAME, not of the comparison. What it answers, in order:
   formOffer     a turn on which the mask offers a unit the FORM_UP column
   corps         a Corps or Fleet standing anywhere, and
   army          an Army or Armada
+  escOffer      a turn on which the mask offers a civilian the ESCORT column
+  escorted      a civilian actually in an escort formation
+  concert       a turn on which the mask offers a Rock Band its concert
   tourists      visiting vs domestic at the final turn, per seat: the culture
                 victory's own comparison (`_culture_victor`)
   policyCards   which policy cards the greedy slot fill ever puts in a slot,
@@ -85,7 +88,7 @@ KEYS = ("apostleBuy", "urbanization", "secondShip",
         "defensivePact", "carbon", "climatePhase",
         "engineer", "engImp", "engRoadOffer", "engFinishOffer",
         "royalSociety", "boostOffer",
-        "formOffer", "corps", "army",
+        "formOffer", "corps", "army", "escOffer", "escorted", "concert",
         "gpUnit", "gpOffer", "gpSpent", "gpPerm", "gpCityPerm",
         "vallettaSuz", "vallettaBuy", "faithUnitGrant", "faithUnitBuy",
         "govTitle", "govAppointed", "govSeated", "govEstablished", "govPromoted",
@@ -241,6 +244,18 @@ def main() -> None:
             _live_f = sim.unit_alive & (sim.unit_seat < 100)
             mark("corps", (_live_f & (sim.unit_formation == 1)).any(dim=1), t)
             mark("army", (_live_f & (sim.unit_formation == 2)).any(dim=1), t)
+        # THE ESCORT FORMATION: the column offered, then a pair actually formed.
+        if getattr(sim, "_A_ESCORT", -1) >= 0:
+            _off_e = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
+            for _row in seats:
+                _off_e |= sim._seat_unit_mask(_row)[:, :, sim._A_ESCORT].any(dim=1)
+            mark("escOffer", _off_e, t)
+            mark("escorted", (sim.unit_alive & sim.unit_escorted).any(dim=1), t)
+        if getattr(sim, "_A_PERFORM", -1) >= 0:
+            _off_c = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
+            for _row in seats:
+                _off_c |= sim._seat_unit_mask(_row)[:, :, sim._A_PERFORM].any(dim=1)
+            mark("concert", _off_c, t)
         # THE GREAT PERSON, end to end: a unit on the map, the verb offered,
         # a charge spent, and the two permanent channels a spent one leaves.
         _gp_t = torch.zeros(sim.NU, dtype=torch.bool)
