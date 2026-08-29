@@ -60,6 +60,7 @@ class SimInit:
             ("hp", torch.long, 0, int((rules.combat or {}).get("cityMaxHp", 200)), None),
             ("outer_hp", torch.long, 0, None, None),
             ("last_hit", torch.long, 0, None, None),
+            ("boost_turn", torch.long, 0, None, None),
             ("is_cap", torch.bool, False, None, None),
             ("orig_cap", torch.long, -1, None, None),
             ("founder", torch.long, -1, None, None),
@@ -926,6 +927,8 @@ class SimInit:
         # Projects — rows {d: district idx, y: yield col, g: GP class}
         _pj = rules.projects or {}
         self._proj_rows = list(_pj.get("rows", []))
+        self._proj_didx = torch.tensor([int(p.get("d", -1)) for p in self._proj_rows]
+                                       or [-1], dtype=torch.long, device=device)
         self._proj_yf = float(_pj.get("yieldFraction", 0.15))
         self._proj_gf = float(_pj.get("gppFraction", 0.22))
         # The space-race chain. Space rows carry sp/vic flags (+ rt tech gate,
@@ -1245,6 +1248,7 @@ class SimInit:
             self._A_FINISH = self._act.get("FINISH_DISTRICT", -1)   # its 20% charge
             self._A_GP = self._act.get("ACTIVATE_GP", -1)           # the great person's
             self._A_PERFORM = self._act.get("PERFORM_CONCERT", -1)   # the rock band's
+            self._A_BOOST = self._act.get("BOOST_PROJECT", -1)       # the Royal Society's
             self._air_strike_cols = sum(1 for n in self._act_names if n.startswith("AIR_STRIKE_"))
             self._air_rebase_cols = sum(1 for n in self._act_names if n.startswith("REBASE_"))
             _stc = sum(1 for n in self._act_names if n.startswith("SPY_TRAVEL_"))
@@ -1263,6 +1267,7 @@ class SimInit:
                 + (1 if self._A_ROAD >= 0 else 0) + (1 if self._A_FINISH >= 0 else 0) \
                 + (1 if self._A_GP >= 0 else 0) \
                 + (1 if self._A_PERFORM >= 0 else 0) \
+                + (1 if self._A_BOOST >= 0 else 0) \
                 + self._air_strike_cols + self._air_rebase_cols + _stc + _smc
             assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
             self._A_CHOP = self._act["CHOP"]
@@ -1280,6 +1285,7 @@ class SimInit:
             self._A_EXCAVATE = -1
             self._A_PARK = -1
             self._A_PERFORM = -1
+            self._A_BOOST = -1
             self._A_PROMOTE = -1
             self._A_CONDEMN = -1
             self._A_HERESY = -1
@@ -1996,6 +2002,8 @@ class SimInit:
         self._any_work_live = bool((self._b_any_work != 0).any())
         self._b_heal_kill = rules.b_heal_kill.to(device)
         self._heal_kill_live = bool((self._b_heal_kill != 0).any())
+        self._b_project_charge = rules.b_project_charge.to(device)
+        self._project_charge_live = bool((self._b_project_charge != 0).any())
         self._bsum_row_cache = None
         self._bldg_version = 0  # every `city_bldg` write moves it
         # CIV6 (Water Works): housing per Neighborhood/Aqueduct, amenities per

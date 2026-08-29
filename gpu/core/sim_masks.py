@@ -1937,6 +1937,19 @@ class SimMasks:
         foreign = (owner >= 0) & (owner < self.n_majors) & (owner != row)
         return (utype == self._band_idx) & foreign & (self._concert_venue(tc) > 0)
 
+    def _boost_ok(self, row: int, tc: torch.Tensor, utype: torch.Tensor,
+                  u_charges: torch.Tensor) -> torch.Tensor:
+        """[B, N] bool — the BOOST column: CIV6 (Royal Society) "Builders gain
+        the ability to use all of their charges to provide bonus Production to a
+        District Project. Once per city per turn"."""
+        if getattr(self, "_builder_idx", -1) < 0 or not self._project_charge_live:
+            return torch.zeros_like(tc, dtype=torch.bool)
+        pct = self._bsum_by_row("projcharge", self._b_project_charge)[:, row]
+        col = self._project_boost_slot(row, tc)
+        fresh = self.city_boost_turn[:, row].gather(1, col.clamp(min=0)) != self.turn
+        return ((utype == self._builder_idx) & (u_charges > 0) & (col >= 0) & fresh
+                & (pct > 0).unsqueeze(1))
+
     def _park_ok(self, row: int, tc: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:
         """[B, N] bool — the PARK column: a Naturalist standing on a tile that
         anchors at least one legal rhombus."""
@@ -2431,6 +2444,10 @@ class SimMasks:
         if getattr(self, "_A_PERFORM", -1) >= 0:
             _pc = [(present & self._perform_ok(row, tc, utype)).unsqueeze(2)]
 
+        _bp: list[torch.Tensor] = []
+        if getattr(self, "_A_BOOST", -1) >= 0:
+            _bp = [(present & self._boost_ok(row, tc, utype, u_charges)).unsqueeze(2)]
+
         _pr: list[torch.Tensor] = []
         if getattr(self, "_A_PROMOTE", -1) >= 0:
             _pr = [present.unsqueeze(2) & self._promo_offer_mask(sc, utype)]
@@ -2543,7 +2560,7 @@ class SimMasks:
         out = torch.cat(
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
             + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc
-            + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3 + _pc,
+            + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3 + _pc + _bp,
             dim=2,
         )
         if self._act_names and self.improvements_on and self._builder_idx >= 0:

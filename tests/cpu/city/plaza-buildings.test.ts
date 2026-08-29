@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { makeState, settleFirstCity } from '../helpers';
-import { endTurn, queueSettler, foundCityAt } from '../../../cpu/core/game';
+import { boostProject, endTurn, queueSettler, foundCityAt, projectBoostCity } from '../../../cpu/core/game';
 import { transferCity } from '../../../cpu/core/phase';
 import { cityBuildingSum, newCityGrantUnit, seatBuildingSum } from '../../../cpu/core/city';
 import { anyWorkFree, gwExtraSlots, relicSlotsIn } from '../../../cpu/core/greatPeople';
 import { gwCapacity, gwCount, gwGive, placeRelic, GW_WRITING, GW_ART } from '../../../cpu/data/greatPeople';
 import { healOnEliminate } from '../../../cpu/core/combat';
 import { spawnUnit } from '../../../cpu/core/units';
-import { emptySeat, seatOf } from '../../../cpu/core/seats';
+import { emptySeat, seatOf, setTileOwner } from '../../../cpu/core/seats';
 import { UNIT_HP } from '../../../cpu/data/units';
 import type { City, GameState } from '../../../cpu/core/types';
 
@@ -162,6 +162,82 @@ describe('the National History Museum — four slots for any Great Work', () => 
     city.districts.push({ type: 'THEATER_SQUARE', tileIndex: city.centerIndex });
     expect(anyWorkFree(state, city)).toBe(0);
     expect(gwCapacity(city, GW_WRITING, gwExtraSlots(state, GW_WRITING)(city))).toBe(2);
+  });
+});
+
+describe('the Royal Society — a Builder pays a District Project', () => {
+  /** a city with the Society, a finished CAMPUS of its own, and the Campus
+   *  project on the queue head. */
+  function working(cost = 300) {
+    const { state, city } = cityWith('ROYAL_SOCIETY');
+    const plot = state.map.tiles.find((x) => x.index !== city.centerIndex && !x.district)!;
+    plot.district = 'CAMPUS';
+    plot.districtComplete = true;
+    setTileOwner(plot, 0, city.id);
+    city.districts.push({ type: 'CAMPUS', tileIndex: plot.index });
+    city.queue = [{ kind: 'project', project: 'RESEARCH_GRANTS', progress: 0, cost }];
+    return { state, city, plot };
+  }
+
+  it('pays 2% of the cost per charge, and spends the whole Builder', () => {
+    const { state, city, plot } = working(300);
+    const b = spawnUnit(state, 'BUILDER', plot.index, 0)!;
+    b.charges = 3;
+    expect(boostProject(state, b, seatOf(state, 0)!).ok).toBe(true);
+    // 3 charges x 2% x 300
+    expect(city.queue[0].progress).toBe(18);
+    expect(state.units.some((u) => u.id === b.id)).toBe(false);
+  });
+
+  it('takes ONE payment per city per turn', () => {
+    const { state, city, plot } = working(300);
+    const first = spawnUnit(state, 'BUILDER', plot.index, 0)!;
+    first.charges = 1;
+    expect(boostProject(state, first, seatOf(state, 0)!).ok).toBe(true);
+    expect(city.projectBoostTurn).toBe(state.turn);
+    const second = spawnUnit(state, 'BUILDER', plot.index, 0)!;
+    second.charges = 1;
+    const r = boostProject(state, second, seatOf(state, 0)!);
+    expect(r.ok).toBe(false);
+    expect(city.queue[0].progress).toBe(6);
+    // ...and the clock is a TURN, not a latch
+    state.turn += 1;
+    expect(boostProject(state, second, seatOf(state, 0)!).ok).toBe(true);
+    expect(city.queue[0].progress).toBe(12);
+  });
+
+  it('answers only where the project\'s own district stands', () => {
+    const { state, city, plot } = working();
+    expect(projectBoostCity(state, 0, plot.index)?.id).toBe(city.id);
+    // the CENTRE runs no district project of its own
+    expect(projectBoostCity(state, 0, city.centerIndex)).toBeUndefined();
+    // an unfinished district is no site
+    plot.districtComplete = false;
+    expect(projectBoostCity(state, 0, plot.index)).toBeUndefined();
+    plot.districtComplete = true;
+    // nor is one whose project is not the head
+    city.queue = [];
+    expect(projectBoostCity(state, 0, plot.index)).toBeUndefined();
+  });
+
+  it('refuses without the Society, and refuses a chargeless Builder', () => {
+    const { state, city } = cityWith();
+    const plot = state.map.tiles.find((x) => x.index !== city.centerIndex && !x.district)!;
+    plot.district = 'CAMPUS';
+    plot.districtComplete = true;
+    setTileOwner(plot, 0, city.id);
+    city.districts.push({ type: 'CAMPUS', tileIndex: plot.index });
+    city.queue = [{ kind: 'project', project: 'RESEARCH_GRANTS', progress: 0, cost: 300 }];
+    const b = spawnUnit(state, 'BUILDER', plot.index, 0)!;
+    b.charges = 3;
+    expect(seatBuildingSum(state, 0, 'projectChargePct')).toBe(0);
+    expect(boostProject(state, b, seatOf(state, 0)!).ok).toBe(false);
+    expect(city.queue[0].progress).toBe(0);
+
+    const armed = working();
+    const flat = spawnUnit(armed.state, 'BUILDER', armed.plot.index, 0)!;
+    flat.charges = 0;
+    expect(boostProject(armed.state, flat, seatOf(armed.state, 0)!).ok).toBe(false);
   });
 });
 

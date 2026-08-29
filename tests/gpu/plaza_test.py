@@ -19,6 +19,8 @@ Covered here:
      slots are.
   5. the War Department: 20 hit points off a kill, capped at full, and paid to
      nobody who does not hold the building.
+  6. the Royal Society: a Builder's whole charge bank into the District Project
+     it stands on, 2% of the cost each, once per city per turn.
 """
 
 from __future__ import annotations
@@ -37,6 +39,7 @@ ROW = 1  # a civ row: every body below is seat-generic
 RJ = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
 BLD = [b["id"] for b in RJ["buildings"]]
 UNI = [u["id"] for u in RJ["units"]]
+SCF = RJ["districtScaffold"]
 
 
 def fresh(rules, path, turns=20):
@@ -67,6 +70,7 @@ def poke_catalog(rules, path):
     cat = BLD
     ah, wt = cat.index("ANCESTRAL_HALL"), cat.index("WARLORDS_THRONE")
     nh, wd = cat.index("NATIONAL_HISTORY_MUSEUM"), cat.index("WAR_DEPARTMENT")
+    rs = cat.index("ROYAL_SOCIETY")
     u = UNI
     assert float(sim._b_settler_prod[ah]) == 50.0, "Ancestral Hall +50% settler production"
     assert int(sim._b_grant_new_city[ah]) == u.index("BUILDER"), "Ancestral Hall grants a BUILDER"
@@ -74,6 +78,7 @@ def poke_catalog(rules, path):
     assert int(sim._b_conquest_turns[wt]) == 5, "Warlord's Throne runs five turns"
     assert int(sim._b_any_work[nh]) == 4, "National History Museum: four any-work slots"
     assert int(sim._b_heal_kill[wd]) == 20, "War Department heals 20"
+    assert float(sim._b_project_charge[rs]) == 2.0, "Royal Society pays 2% a charge"
     for i in range(len(cat)):
         if i != ah:
             assert float(sim._b_settler_prod[i]) == 0.0 and int(sim._b_grant_new_city[i]) < 0, cat[i]
@@ -83,8 +88,11 @@ def poke_catalog(rules, path):
             assert int(sim._b_any_work[i]) == 0, cat[i]
         if i != wd:
             assert int(sim._b_heal_kill[i]) == 0, cat[i]
+        if i != rs:
+            assert float(sim._b_project_charge[i]) == 0.0, cat[i]
     assert sim._heal_kill_live and sim._any_work_live, "both catalog gates arm"
-    print("  1 catalog OK — four rows, four channels, nothing else carrying them")
+    assert sim._project_charge_live and sim._A_BOOST >= 0, "the Royal Society's verb is wired"
+    print("  1 catalog OK — five rows, five channels, nothing else carrying them")
 
 
 def poke_settler_prod(rules, path):
@@ -249,6 +257,120 @@ def poke_heal_on_kill(rules, path):
     print("  7 War Department OK — 20 off a kill, capped at full, its own seat only")
 
 
+def _working_campus(sim, col):
+    """Give ROW's city `col` a finished CAMPUS of its own and put the Campus
+    project on its queue head. Returns (tile, project index)."""
+    ctr = int(sim.city_center[0, ROW, col])
+    cid = int(sim.city_id[0, ROW, col])
+    didx = int(SCF["campusIdx"])
+    pi = next(i for i, p in enumerate(sim._proj_rows) if int(p["d"]) == didx)
+    for n in sim.neigh[ctr].tolist():
+        if n < 0 or not bool(sim.passable[0, n]) or int(sim.district[0, n]) >= 0:
+            continue
+        sim.district[0, n] = didx
+        sim.district_complete[0, n] = True
+        sim.district_pillaged[0, n] = False
+        sim.tile_seat[0, n] = ROW
+        sim.tile_city[0, n] = cid
+        sim.city_current[0, ROW, col] = sim.PROJECT_BASE + pi
+        sim.city_cost[0, ROW, col] = 300
+        sim.city_progress[0, ROW, col] = 0
+        return n, pi
+    raise AssertionError("no free plot beside the centre for a Campus")
+
+
+def poke_project_boost(rules, path):
+    """the Royal Society: the whole bank in one blow, once a city a turn."""
+    sim = fresh(rules, path)
+    col = bidx_of(sim, ROW)
+    stand(sim, ROW, col, "ROYAL_SOCIETY")
+    tile, _pi = _working_campus(sim, col)
+    bi = UNI.index("BUILDER")
+
+    # the site predicate answers for the district and for nothing else
+    span = torch.arange(sim.T).reshape(1, -1)
+    slots = sim._project_boost_slot(ROW, span)
+    assert int(slots[0, tile]) == col, "the campus is no boost site"
+    assert int((slots[0] >= 0).sum()) == 1, "some other plot answers too"
+    assert int(slots[0, int(sim.city_center[0, ROW, col])]) < 0, "the centre is not a district project"
+
+    slot = int(sim.unit_next[0])
+    sim.unit_next[0] += 1
+    sim.major_unit_alive[0, slot] = True
+    sim.major_unit_seat[0, slot] = ROW
+    sim.major_unit_type[0, slot] = bi
+    sim.major_unit_tile[0, slot] = tile
+    sim.major_unit_hp[0, slot] = 100
+    sim.major_unit_charges[0, slot] = 3
+    sim.major_unit_mp[0, slot] = 2
+    sim.major_unit_mp_full[0, slot] = 2
+    sim.civilian_at[0, tile] = slot + sim.POOL_LO["major"]
+
+    sim.seat_ext[:, ROW] = True
+    um = sim._seat_unit_mask(ROW)
+    smap = sim._seat_slot_map(ROW)
+    rank = int((smap[0] == slot + sim.POOL_LO["major"]).long().argmax())
+    assert bool(um[0, rank, sim._A_BOOST]), "the mask refuses a legal payment"
+
+    a = torch.full(smap.shape, -1, dtype=torch.long)
+    a[0, rank] = sim._A_BOOST
+    sim._apply_seat_unit_actions(ROW, a)
+    assert float(sim.city_progress[0, ROW, col]) == 18.0, (
+        f"3 charges x 2% x 300 = 18, got {float(sim.city_progress[0, ROW, col])}")
+    assert not bool(sim.unit_alive[0, slot]), "the Builder survived its whole bank"
+    assert int(sim.city_boost_turn[0, ROW, col]) == sim.turn, "the city took no stamp"
+
+    # a second Builder the same turn finds the column shut
+    slot2 = int(sim.unit_next[0])
+    sim.unit_next[0] += 1
+    sim.major_unit_alive[0, slot2] = True
+    sim.major_unit_seat[0, slot2] = ROW
+    sim.major_unit_type[0, slot2] = bi
+    sim.major_unit_tile[0, slot2] = tile
+    sim.major_unit_hp[0, slot2] = 100
+    sim.major_unit_charges[0, slot2] = 3
+    sim.major_unit_mp[0, slot2] = 2
+    sim.major_unit_mp_full[0, slot2] = 2
+    sim.civilian_at[0, tile] = slot2 + sim.POOL_LO["major"]
+    um2 = sim._seat_unit_mask(ROW)
+    smap2 = sim._seat_slot_map(ROW)
+    rank2 = int((smap2[0] == slot2 + sim.POOL_LO["major"]).long().argmax())
+    assert not bool(um2[0, rank2, sim._A_BOOST]), "the city paid twice in one turn"
+
+    # ...and opens again next turn
+    sim.turn += 1
+    um3 = sim._seat_unit_mask(ROW)
+    assert bool(um3[0, rank2, sim._A_BOOST]), "the stamp never expires"
+    print("  8 royal society OK — 2% a charge, the bank in one blow, one payment a turn")
+
+
+def poke_boost_needs_the_building(rules, path):
+    """no Royal Society, no column — the same city, the same project."""
+    sim = fresh(rules, path)
+    col = bidx_of(sim, ROW)
+    tile, _pi = _working_campus(sim, col)
+    span = torch.arange(sim.T).reshape(1, -1)
+    assert int(sim._project_boost_slot(ROW, span)[0, tile]) == col, "the site itself is unconditional"
+    bi = UNI.index("BUILDER")
+    slot = int(sim.unit_next[0])
+    sim.unit_next[0] += 1
+    sim.major_unit_alive[0, slot] = True
+    sim.major_unit_seat[0, slot] = ROW
+    sim.major_unit_type[0, slot] = bi
+    sim.major_unit_tile[0, slot] = tile
+    sim.major_unit_hp[0, slot] = 100
+    sim.major_unit_charges[0, slot] = 3
+    sim.major_unit_mp[0, slot] = 2
+    sim.major_unit_mp_full[0, slot] = 2
+    sim.civilian_at[0, tile] = slot + sim.POOL_LO["major"]
+    sim.seat_ext[:, ROW] = True
+    um = sim._seat_unit_mask(ROW)
+    smap = sim._seat_slot_map(ROW)
+    rank = int((smap[0] == slot + sim.POOL_LO["major"]).long().argmax())
+    assert not bool(um[0, rank, sim._A_BOOST]), "a seat with no Society still pays"
+    print("  9 the verb needs the building — the column is shut without it")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -262,6 +384,8 @@ def main() -> None:
     poke_conquest_prod(rules, p)
     poke_any_work_pool(rules, p)
     poke_heal_on_kill(rules, p)
+    poke_project_boost(rules, p)
+    poke_boost_needs_the_building(rules, p)
     print("PLAZA POKES OK")
 
 

@@ -69,6 +69,10 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // THE ROCK BAND'S ONE VERB: perform where it stands. Appended last, like
   // every verb since FOUND_CITY.
   names.push('PERFORM_CONCERT');
+  // THE ROYAL SOCIETY'S ONE VERB: a Builder pays its whole charge bank into
+  // the District Project it stands on. Appended last, like every verb since
+  // FOUND_CITY.
+  names.push('BOOST_PROJECT');
   return names;
 }
 

@@ -2054,6 +2054,43 @@ class SimSeats:
             out = torch.where(hit & (out < 0), torch.full_like(out, j), out)
         return out
 
+    def _project_boost_slot(self, row: int, tiles: torch.Tensor) -> torch.Tensor:
+        """[B, N] — the CITY COLUMN whose DISTRICT PROJECT a Builder standing at
+        each of `tiles` would pay into, -1 where none (`projectBoostCity`). The
+        charges are spent ON the district running the project, so the plot
+        carries that project's own district and belongs to the city whose queue
+        head it is. The City Center project names no district plot, so nothing
+        answers for it."""
+        B, N = tiles.shape
+        out = torch.full((B, N), -1, dtype=torch.long, device=self.device)
+        nP = len(self._proj_rows)
+        if not self._project_charge_live or nP == 0:
+            return out
+        tc = tiles.clamp(min=0)
+        dis = self.district.gather(1, tc)
+        site = ((tiles >= 0) & (dis >= 0)
+                & self.district_complete.gather(1, tc)
+                & ~self.district_pillaged.gather(1, tc)
+                & (self.tile_seat.gather(1, tc) == row))
+        if not bool(site.any()):
+            return out
+        town = self.tile_city.gather(1, tc)
+        cur = self.city_current[:, row]
+        alive = self.city_alive[:, row]
+        for j in range(self.RC):
+            live = alive[:, j]
+            if not bool(live.any()):
+                continue
+            pi = cur[:, j] - self.PROJECT_BASE
+            isp = live & (pi >= 0) & (pi < nP)
+            if not bool(isp.any()):
+                continue
+            want = self._proj_didx[pi.clamp(min=0, max=nP - 1)]
+            hit = (site & isp.unsqueeze(1) & (dis == want.unsqueeze(1))
+                   & (town == self.city_id[:, row, j].unsqueeze(1)))
+            out = torch.where(hit & (out < 0), torch.full_like(out, j), out)
+        return out
+
     def _eng_finish_at(self, row: int) -> torch.Tensor:
         """[B, T] — every tile `_eng_finish_slot` would answer for, as a tile
         plane for the mask column."""

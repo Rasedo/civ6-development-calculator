@@ -619,6 +619,7 @@ CITY = {
     "hp": _cty("city_hp"),
     "outerHp": _cty("city_outer_hp"),
     "lastHitTurn": _cty("city_last_hit"),
+    "projectBoostTurn": _cty("city_boost_turn"),
     "isCapital": _cty("city_is_cap"),
     "foodBox": _cty("city_growth"),
     "cultureBox": _cty("city_cbox"),

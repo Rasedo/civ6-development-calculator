@@ -68,7 +68,7 @@ from the list below.
 | C-5 strategic-resource stockpiles | 2 | the shortage penalty's magnitude is unpublished; resource trading waits on C-2 |
 | C-16 the spy's second half | 2 | the escape sequence, captured spies, the promotion pool, counterspy levels, the same-mission gate, two carrier-less missions |
 | C-20 the Military Engineer's build list | 1 | the Missile Silo (C-31), Mountain Tunnel (C-35), railroad (C-36), clean-fallout and remove-improvement verbs |
-| C-22 the district roster | 2 | the Canal carries no naval passage (C-35), the Royal Society has no unit verb, the any-work pool does not reach artifacts, the Preserve table is a stylization |
+| C-22 the district roster | 2 | the Canal carries no naval passage (C-35), the any-work pool does not reach artifacts, the Preserve table is a stylization |
 | C-24 the climate arc | 1 | nothing is ever submerged (C-35), railroads emit nothing (C-36), the Flood Barrier keeps for nothing |
 | C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — PARKED by owner decision |
 | C-31 the nuclear device has no system behind it | 1 | an area attack, persistent fallout, the delivery chassis and the diplomatic reaction |
@@ -617,22 +617,15 @@ under their blocker so the dependency is readable, and both halves count.
 - **C-22. THE DISTRICT ROSTER.** Weight 2. All eighteen districts exist
   with catalog-column effects and sourced placement clauses; the Preserve
   and Government Plaza ride the gate on 12/12 seeds, the Canal on none
-  (`canalPassageOk` / `_canal_plot` poke-proven). OPEN:
+  (`canalPassageOk` / `_canal_plot` poke-proven). The Government Plaza's
+  five effect rows all ship, the Royal Society's BOOST_PROJECT verb last
+  (`projectBoostCity` / `_project_boost_slot`,
+  `tests/cpu/city/plaza-buildings.test.ts`, `tests/gpu/plaza_test.py`);
+  its measured gate reach is ZERO — no seed of the twelve builds the
+  building, so no Builder is ever offered the column — which puts it
+  beside the Military Engineer's two verbs as poke-proven only. OPEN:
   - **THE CANAL CARRIES NO NAVAL PASSAGE** — the passage wants its own
     plane, not a bit borrowed from the water one (C-35).
-  - **THE ROYAL SOCIETY HAS NO VERB.** "Builders gain the ability to use
-    all of their charges to provide bonus Production to a District
-    Project. Once per city per turn" — 2% of the project's cost per
-    charge (Civilization wiki, GS). The magnitude and the rule are
-    sourced; what is missing is a unit ORDER: a new mask column, its
-    applier on both engines, a per-city per-turn flag and the driver's
-    twin. The other four rows ship (`settlerProdPct` /
-    `grantUnitNewCity`, `conquestProdPct` / `conquest_turns`,
-    `anyWorkSlots` / `_any_work_free_all`, `healOnKill` /
-    `_heal_on_kill`; `tests/gpu/plaza_test.py`,
-    `tests/cpu/city/plaza-buildings.test.ts`), as do the Audience
-    Chamber, the Grand Master's Chapel, the Foreign Ministry and the
-    Intelligence Agency.
   - **THE ANY-WORK POOL DOES NOT REACH ARTIFACTS.** The National History
     Museum's four slots take a Great Work of any kind, and this model
     lets them take writing, art, music and relics. An ARTIFACT cannot

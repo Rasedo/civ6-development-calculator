@@ -471,6 +471,11 @@ def _seat_unit_orders(sim, seat: int, job_t=None, spread_t=None):
     if A_PK >= 0 and um.shape[2] > A_PK:
         take_pk = present & um[:, :, A_PK]
         orders0 = torch.where(take_pk, torch.full_like(orders0, A_PK), orders0)
+    A_BS = getattr(sim, "_A_BOOST", -1)
+    if A_BS >= 0 and um.shape[2] > A_BS:
+        # a Builder standing on a District Project pays its whole bank in. The
+        # mask carries every term the Royal Society's clause asks for.
+        orders0 = torch.where(present & um[:, :, A_BS], torch.full_like(orders0, A_BS), orders0)
     A_GP = getattr(sim, "_A_GP", -1)
     if A_GP >= 0 and um.shape[2] > A_GP:
         # standing where the charge may be spent: spend it. The mask carries

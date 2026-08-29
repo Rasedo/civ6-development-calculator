@@ -141,6 +141,10 @@ export interface BuildingDef {
   /** CIV6 (War Department): "All units heal up to 20 hit points when they
    *  eliminate a unit." */
   healOnKill?: number;
+  /** CIV6 (Royal Society): "Builders gain the ability to use all of their
+   *  charges to provide bonus Production to a District Project. Once per city
+   *  per turn" — this many percent of the project's own cost per charge. */
+  projectChargePct?: number;
   /**
    * CIV6 (Flood Barrier): "Constructed automatically around each Coastal
    * Lowland tile belonging to the city; it protects them from flooding when
@@ -257,7 +261,7 @@ const rawList: BuildingDef[] = [
   { id: 'GRAND_MASTERS_CHAPEL', name: "Grand Master's Chapel", district: 'GOVERNMENT_PLAZA', cost: 290, maintenance: 2, govTier: 2, govTitle: 1, noPurchase: true, faithBuyUnits: true, pillageFaithImp: 15, pillageFaithDist: 30, yields: { faith: 5 }, requiresAny: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER', 'WARLORDS_THRONE'], exclusiveWith: ['FOREIGN_MINISTRY', 'INTELLIGENCE_AGENCY'] },
   { id: 'INTELLIGENCE_AGENCY', name: 'Intelligence Agency', district: 'GOVERNMENT_PLAZA', cost: 290, maintenance: 2, govTier: 2, govTitle: 1, noPurchase: true, spyCapacity: 1, grantUnit: 'SPY', requiresAny: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER', 'WARLORDS_THRONE'], exclusiveWith: ['FOREIGN_MINISTRY', 'GRAND_MASTERS_CHAPEL'] },
   { id: 'NATIONAL_HISTORY_MUSEUM', name: 'National History Museum', district: 'GOVERNMENT_PLAZA', cost: 440, maintenance: 3, govTier: 3, govTitle: 1, noPurchase: true, requiresAny: ['FOREIGN_MINISTRY', 'GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'], exclusiveWith: ['ROYAL_SOCIETY', 'WAR_DEPARTMENT'], anyWorkSlots: 4 },
-  { id: 'ROYAL_SOCIETY', name: 'Royal Society', district: 'GOVERNMENT_PLAZA', cost: 440, maintenance: 3, govTier: 3, govTitle: 1, noPurchase: true, requiresAny: ['FOREIGN_MINISTRY', 'GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'], exclusiveWith: ['NATIONAL_HISTORY_MUSEUM', 'WAR_DEPARTMENT'] },
+  { id: 'ROYAL_SOCIETY', name: 'Royal Society', district: 'GOVERNMENT_PLAZA', cost: 440, maintenance: 3, govTier: 3, govTitle: 1, noPurchase: true, requiresAny: ['FOREIGN_MINISTRY', 'GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'], exclusiveWith: ['NATIONAL_HISTORY_MUSEUM', 'WAR_DEPARTMENT'], projectChargePct: 2 },
   { id: 'WAR_DEPARTMENT', name: 'War Department', district: 'GOVERNMENT_PLAZA', cost: 440, maintenance: 3, govTier: 3, govTitle: 1, noPurchase: true, requiresAny: ['FOREIGN_MINISTRY', 'GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'], exclusiveWith: ['NATIONAL_HISTORY_MUSEUM', 'ROYAL_SOCIETY'], healOnKill: 20 },
 ];
 

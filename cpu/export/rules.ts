@@ -1368,6 +1368,7 @@ export function buildRules() {
       conquestProdTurns: b.conquestProdTurns ?? 0,
       anyWorkSlots: b.anyWorkSlots ?? 0,
       healOnKill: b.healOnKill ?? 0,
+      projectChargePct: b.projectChargePct ?? 0,
       spyLevelPenalty: b.spyLevelPenalty ?? 0,
       influencePerTurn: b.influencePerTurn ?? 0,
       favorPerTurn: b.favorPerTurn ?? 0,

@@ -61,6 +61,7 @@ class SimOrders:
         _fnc = getattr(self, "_A_FINISH", -1)
         _gpc = getattr(self, "_A_GP", -1)
         _pfc = getattr(self, "_A_PERFORM", -1)
+        _bpc = getattr(self, "_A_BOOST", -1)
         _stw = self._spy_travel_cols
         _smw = self._n_spy_missions
         _pcol = self.rules.promo_cols
@@ -95,13 +96,14 @@ class SimOrders:
             ((_ab == _fnc) if _fnc >= 0 else _no).any(dim=0),                    # finish district
             ((_ab == _gpc) if _gpc >= 0 else _no).any(dim=0),  # activate a great person
             ((_ab == _pfc) if _pfc >= 0 else _no).any(dim=0),   # perform a concert
+            ((_ab == _bpc) if _bpc >= 0 else _no).any(dim=0),   # pay a district project
         ]).tolist()
         (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
          _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread,
          _rk_excavate, _rk_park, _rk_promote, _rk_condemn,
          _rk_heresy, _rk_inquis, _rk_heathen, _rk_upgrade,
          _rk_air, _rk_rebase, _rk_travel, _rk_mission,
-         _rk_road, _rk_finish, _rk_gp, _rk_perform) = _tab
+         _rk_road, _rk_finish, _rk_gp, _rk_perform, _rk_boost) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -150,6 +152,26 @@ class SimOrders:
                     row, here.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
                 if bool(pfm.any()):
                     self._do_concert(row, pfm, here, sc)
+
+            # THE ROYAL SOCIETY'S ONE VERB: the whole charge bank in one blow,
+            # 2% of the project's own cost each, and the city takes one such
+            # payment a turn. The site predicate is the mask's own.
+            if _rk_boost[n] and _bpc >= 0:
+                _bpm = act & (a == _bpc) & self._boost_ok(
+                    row, hc.unsqueeze(1), utp.unsqueeze(1), u_charges.unsqueeze(1)).squeeze(1)
+                if bool(_bpm.any()):
+                    _r = _bpm.nonzero(as_tuple=True)[0]
+                    _c = self._project_boost_slot(row, hc.unsqueeze(1)).squeeze(1)[_r]
+                    _pct = self._bsum_by_row("projcharge", self._b_project_charge)[_r, row]
+                    _ch = self.unit_charges[_r, sc[_r]].double()
+                    _cst = self.city_cost[_r, row, _c].double()
+                    self.city_progress[_r, row, _c] += js_round(
+                        _cst * _pct.double() * _ch / 100).to(self.city_progress.dtype)
+                    self.city_boost_turn[_r, row, _c] = self.turn
+                    self.unit_charges[_r, sc[_r]] = 0
+                    self.unit_mp[_r, sc[_r]] = 0
+                    self.unit_alive[_r, sc[_r]] = False
+                    self._occ_clear(_r, hc[_r], sc[_r])
 
             if _rk_promote[n] and _pm >= 0:
                 pmv = act & (a >= _pm) & (a < _pm + _pcol)

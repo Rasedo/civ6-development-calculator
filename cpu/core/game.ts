@@ -7,7 +7,7 @@ import { placeRelic, GP_CLASSES } from '../data/greatPeople';
 import { VALLETTA_FAITH_DISTRICTS } from '../data/cityStates';
 import { generateMap } from '../../world/mapgen';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
-import { acquireTile, borderCandidates, newCityGrantUnit } from './city';
+import { acquireTile, borderCandidates, newCityGrantUnit, seatBuildingSum } from './city';
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, isCivicComplete } from './effects';
 import type { Modifiers, Unlocks } from './effects';
@@ -1075,6 +1075,51 @@ export function engineerFinish(state: GameState, seat: number, tileIndex: number
   const q = city.queue[0];
   q.progress += Math.round(itemCost(q, state, city) * ENGINEER_FINISH_FRACTION);
   return true;
+}
+
+/**
+ * CIV6 (Royal Society): the city whose DISTRICT PROJECT a Builder standing at
+ * `tileIndex` would pay into. The charge is spent ON the district running the
+ * project, so the plot must carry that project's own district and belong to
+ * the city whose queue head it is. The City Center project answers for
+ * nobody — a repair is not a district project.
+ */
+export function projectBoostCity(state: GameState, seat: number, tileIndex: number): City | undefined {
+  const t = state.map.tiles[tileIndex];
+  if (!t?.district || !t.districtComplete || t.districtPillaged) return undefined;
+  if (tileSeat(t) !== seat) return undefined;
+  for (const city of citiesOf(state, seat)) {
+    const q = city.queue[0];
+    if (q?.kind !== 'project') continue;
+    if (PROJECTS[q.project]?.district !== t.district) continue;
+    if (city.districts.some((d) => d.tileIndex === tileIndex)) return city;
+  }
+  return undefined;
+}
+
+/**
+ * CIV6 (Royal Society): "Builders gain the ability to use ALL of their charges
+ * to provide bonus Production to a District Project. Once per city per turn"
+ * — 2% of the project's Production cost per charge spent. The whole bank goes
+ * in one blow, so the Builder is spent with it.
+ */
+export function boostProject(state: GameState, unit: Unit, actor: Seat): RuleResult {
+  if (unit.type !== 'BUILDER') return { ok: false, reason: 'Not a Builder.' };
+  const charges = unit.charges ?? 0;
+  if (charges <= 0) return { ok: false, reason: 'No charges left.' };
+  const pct = seatBuildingSum(state, actor.seat, 'projectChargePct');
+  if (pct <= 0) return { ok: false, reason: 'No Royal Society.' };
+  const city = projectBoostCity(state, actor.seat, unit.tileIndex);
+  if (!city) return { ok: false, reason: 'No district project here.' };
+  if ((city.projectBoostTurn ?? 0) === state.turn) return { ok: false, reason: 'Already paid this turn.' };
+  const q = city.queue[0];
+  if (q.kind !== 'project') return { ok: false, reason: 'No district project here.' };
+  q.progress += Math.round(q.cost * pct * charges / 100);
+  city.projectBoostTurn = state.turn;
+  unit.charges = 0;
+  unit.movesLeft = 0;
+  disbandUnit(state, unit.id);
+  return { ok: true };
 }
 
 export function itemLabel(item: QueueItem): string {

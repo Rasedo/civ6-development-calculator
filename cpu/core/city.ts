@@ -90,7 +90,7 @@ export function seatBuildingSum(
   seat: number,
   key: 'spyCapacity' | 'influencePerTurn' | 'favorPerTurn' | 'govTitle' | 'loyaltyWithoutGovernor'
     | 'amenitiesWithGovernor' | 'housingWithGovernor' | 'healOnKill' | 'conquestProdPct'
-    | 'conquestProdTurns',
+    | 'conquestProdTurns' | 'projectChargePct',
 ): number {
   let n = 0;
   for (const city of citiesOf(state, seat)) {

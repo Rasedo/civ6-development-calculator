@@ -31,6 +31,9 @@ of the DRIVEN GAME, not of the comparison. What it answers, in order:
   engImp        one of the engineer's own improvements standing somewhere
   engRoadOffer  a turn on which the mask offers it the road column
   engFinishOffer  ... and the 20% charge column
+  royalSociety  the Royal Society standing anywhere, and
+  boostOffer    a turn on which the mask offers a Builder its District
+                Project payment
   tourists      visiting vs domestic at the final turn, per seat: the culture
                 victory's own comparison (`_culture_victor`)
   policyCards   which policy cards the greedy slot fill ever puts in a slot,
@@ -78,6 +81,7 @@ KEYS = ("apostleBuy", "urbanization", "secondShip",
         "friendship", "alliance", "openBorders", "closedStep", "workGift",
         "defensivePact", "carbon", "climatePhase",
         "engineer", "engImp", "engRoadOffer", "engFinishOffer",
+        "royalSociety", "boostOffer",
         "gpUnit", "gpOffer", "gpSpent", "gpPerm", "gpCityPerm",
         "vallettaSuz", "vallettaBuy", "faithUnitGrant", "faithUnitBuy",
         "govTitle", "govAppointed", "govSeated", "govEstablished", "govPromoted",
@@ -215,6 +219,15 @@ def main() -> None:
             mark("engImp", _std, t)
             mark("engRoadOffer", _off_r, t)
             mark("engFinishOffer", _off_f, t)
+        # THE ROYAL SOCIETY: the building, then the column it unlocks.
+        if getattr(sim, "_project_charge_live", False):
+            _rs = (sim._b_project_charge > 0).reshape(1, 1, 1, -1)
+            mark("royalSociety", (sim.city_bldg[:, : sim.n_majors] & _rs).any(dim=3).any(dim=2).any(dim=1), t)
+            if sim._A_BOOST >= 0:
+                _off_b = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
+                for _row in seats:
+                    _off_b |= sim._seat_unit_mask(_row)[:, :, sim._A_BOOST].any(dim=1)
+                mark("boostOffer", _off_b, t)
         # THE GREAT PERSON, end to end: a unit on the map, the verb offered,
         # a charge spent, and the two permanent channels a spent one leaves.
         _gp_t = torch.zeros(sim.NU, dtype=torch.bool)
