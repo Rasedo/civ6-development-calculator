@@ -750,7 +750,10 @@ class SimOrders:
                         & self.civ_religion_done[:, row]
                     )
                     if bool(ok_sp.any()):
-                        nrows = self.n_majors
+                        # the minor city rows are spread targets too — a
+                        # city-state CAN be converted (`spreadFromUnit` finds
+                        # the minor by centre tile the same way)
+                        nrows = self.n_majors + self.S
                         tc_sp = tgt_sp.clamp(min=0)
                         lump = self._enh["mlump"][self.civ_enhancer[:, row] + 1]
                         pm = (

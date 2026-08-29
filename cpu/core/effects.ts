@@ -1,5 +1,5 @@
 
-import type { DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Yields } from './types';
+import type { CityState, DistrictId, GameState, GreatPersonClass, ImprovementId, QueueItem, ResearchState, ResourceCategory, Seat, Yields } from './types';
 import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef, type SlotKind, type BuildingYieldBoost, type ProdBoost } from '../data/policies';
@@ -12,7 +12,7 @@ import { tileAppeal, appealBand, gpAppealResolver, type GpAppeal } from './appea
 import { addYields, emptyYields } from './types';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { UNITS, UNIT_ERA_INDEX, unitHasClass } from '../data/units';
-import { cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus, isSuzerain } from './cityStates';
+import { cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus, isSuzerain, suzerainOf } from './cityStates';
 
 
 import { GP_PERM } from '../data/greatPeople';
@@ -164,6 +164,7 @@ export interface Modifiers {
   faithBuyLandUnits: boolean;
   influencePerTurn: number;
   firstEnvoyDouble: boolean;
+  envoyDoubleDiffGov: boolean;
   culturePerSuzerain: number;
   unitCombatCS: { classMask: number; all: boolean; cs: number }[];
   xpPct: number;
@@ -214,6 +215,7 @@ export function defaultModifiers(): Modifiers {
     routeGold: 0,
     influencePerTurn: 0,
     firstEnvoyDouble: false,
+    envoyDoubleDiffGov: false,
     culturePerSuzerain: 0,
     unitCombatCS: [],
     xpPct: 0,
@@ -262,6 +264,7 @@ function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.routeGold) mods.routeGold += fx.routeGold;
   if (fx.influencePerTurn) mods.influencePerTurn += fx.influencePerTurn;
   if (fx.firstEnvoyDouble) mods.firstEnvoyDouble = true;
+  if (fx.envoyDoubleDiffGov) mods.envoyDoubleDiffGov = true;
   if (fx.culturePerSuzerain) mods.culturePerSuzerain += fx.culturePerSuzerain;
   if (fx.unitCombatCS) {
     let mask = 0;
@@ -646,4 +649,19 @@ export function governmentSlots(state: GameState, seat: number): SlotKind[] {
   const xs = wonderExtraSlots(state, seat);
   for (const k of SLOT_KINDS) for (let i = 0; i < xs[k]; i++) slots.push(k);
   return slots;
+}
+
+/**
+ * CIV6 (Containment): "Each Envoy you send to a city-state counts as two, if
+ * its Suzerain has a different government than you" — ADDITIVE with the
+ * League's first-envoy double (the two together land 3, never 4). Reads the
+ * STORED suzerain, so the weight is fixed before the send lands.
+ */
+export function containmentBonus(state: GameState, cityState: CityState, sender: Seat): number {
+  if (!getModifiers(state, sender.seat).envoyDoubleDiffGov) return 0;
+  const suzSeat = suzerainOf(cityState);
+  if (suzSeat < 0 || suzSeat === sender.seat) return 0;
+  const suz = seatOf(state, suzSeat);
+  if (!suz) return 0;
+  return computeAdoption(suz.research).government !== computeAdoption(sender.research).government ? 1 : 0;
 }

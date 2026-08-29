@@ -106,6 +106,9 @@ export interface PolicyEffects {
   influencePerTurn?: number;
   /** the FIRST envoy sent to each city-state counts as two */
   firstEnvoyDouble?: boolean;
+  /** a sent envoy counts as two when the city-state's suzerain runs a
+   *  different government than the sender */
+  envoyDoubleDiffGov?: boolean;
   /** culture multiplier added per city-state this seat is suzerain of */
   culturePerSuzerain?: number;
   /** flat Combat Strength by PROMOTION class (`UNIT_PROMO_CLASS`); `all`
@@ -280,7 +283,9 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     P('CHARISMATIC_LEADER', 'Charismatic Leader', 'diplomatic', '+2 influence points per turn.', 'TOTALITARIANISM', {
       influencePerTurn: 2,
     }),
-    P('CONTAINMENT', 'Containment', 'diplomatic', 'Each envoy counts double against a city-state whose suzerain has a different government.', undefined, {}),
+    P('CONTAINMENT', 'Containment', 'diplomatic', 'Each envoy counts double against a city-state whose suzerain has a different government.', undefined, {
+      envoyDoubleDiffGov: true,
+    }),
     P('COLLECTIVE_ACTIVISM', 'Collective Activism', 'diplomatic', '+5% culture per city-state this seat is suzerain of.', undefined, {
       culturePerSuzerain: 0.05,
     }),

@@ -532,6 +532,13 @@ CITY_STATE = {
     "questDistrict": lambda sim, b, rows: [
         [int(sim._citystate_didx[b, s]) if int(sim.seat_citystate_quest[b, c, s]) == 3 else -1
          for c in _civ_seats(sim)] for s in rows],
+    "suzerain": lambda sim, b, rows: [int(sim.citystate_suzerain[b, s]) for s in rows],
+    "techs": lambda sim, b, rows: [[i for i, on in enumerate(sim.citystate_techs[b, s].tolist()) if on] for s in rows],
+    "civics": lambda sim, b, rows: [[i for i, on in enumerate(sim.citystate_civics[b, s].tolist()) if on] for s in rows],
+    "techProgress": lambda sim, b, rows: [int(sim.citystate_tech_prog[b, s]) for s in rows],
+    "civicProgress": lambda sim, b, rows: [int(sim.citystate_civic_prog[b, s]) for s in rows],
+    "religionPressure": lambda sim, b, rows: [
+        [int(sim.city_pressure[b, sim._CITY_MINOR0 + s, 0, c]) for c in _civ_seats(sim)] for s in rows],
     "lastLevyTurn": lambda sim, b, rows: [int(sim.citystate_last_levy[b, s]) for s in rows],
     "warTurns": lambda sim, b, rows: [_war_clock_line(sim, b, 100 + s) for s in rows],
     "treatyTurns": lambda sim, b, rows: [_treaty_clock_line(sim, b, 100 + s) for s in rows],

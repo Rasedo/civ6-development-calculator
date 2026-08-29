@@ -477,7 +477,25 @@ class SimSeats:
                         _first = (self.seat_citystate_envoys[rows, row, ei[rows]] == 0) \
                             & self._gov_mods(row)[12]["envoy1"][rows]
                         _n = _n + _first.to(_n.dtype)
+                        # CIV6 (Containment): the sent envoy "counts as two, if
+                        # its Suzerain has a different government than you" —
+                        # ADDITIVE with the League's first-envoy double, and it
+                        # reads the STORED suzerain before this send lands.
+                        _suz = self.citystate_suzerain[rows, ei[rows]]
+                        _tw = self._gov_mods(row)[12]["envoy2"][rows] & (_suz >= 0) & (_suz != row)
+                        if bool(_tw.any()):
+                            _ga, _ha = self._adopted_gov(self.civ_civics[:, row])
+                            _gb = torch.stack([self._adopted_gov(self.civ_civics[:, _o])[0]
+                                               for _o in range(self.n_majors)], dim=1)
+                            _hb = torch.stack([self._adopted_gov(self.civ_civics[:, _o])[1]
+                                               for _o in range(self.n_majors)], dim=1)
+                            _sc = _suz.clamp(min=0).unsqueeze(1)
+                            _gb2 = _gb[rows].gather(1, _sc).squeeze(1)
+                            _hb2 = _hb[rows].gather(1, _sc).squeeze(1)
+                            _diff = (_ha[rows] != _hb2) | (_ha[rows] & _hb2 & (_ga[rows] != _gb2))
+                            _n = _n + (_tw & _diff).to(_n.dtype)
                     self.seat_citystate_envoys[rows, row, ei[rows]] += _n
+                    self._cs_resolve_suzerain()
                     self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] - ok.long()
                     self._eff_version += 1
         if war is not None:
@@ -2438,6 +2456,20 @@ class SimSeats:
             out = torch.where((out < 0) & (2 * nf > n), torch.full_like(out, g), out)
         return out
 
+    def _cs_resolve_suzerain(self) -> None:
+        """Refresh the STORED suzerain from the envoy record (`resolveSuzerain`
+        twin): at least suzerainEnvoys, STRICTLY more than every other seat, a
+        tie leaves nobody. Every envoy write ends here, so a rule that
+        reweights envoys BY the suzerain reads a fixed point."""
+        if self.S == 0:
+            return
+        suz_min = int(self.rules.citystate.get("suzerainEnvoys", 3))
+        env = self.seat_citystate_envoys[:, : self.n_majors, : self.S].to(torch.long)
+        best, arg = env.max(dim=1)
+        tied = ((env == best.unsqueeze(1)) & (best.unsqueeze(1) > 0)).sum(dim=1) > 1
+        ok = (best >= suz_min) & ~tied
+        self.citystate_suzerain[:, : self.S] = torch.where(ok, arg, torch.full_like(arg, -1))
+
     def _suzerain_mask(self, row: int) -> torch.Tensor:
         """[B, S] city-states seat row `row` is Suzerain of — the `isSuzerain`
         twin: >= suzerainEnvoys, alive, and STRICTLY more envoys than every
@@ -3151,6 +3183,25 @@ class SimSeats:
             for t, fid in enumerate(self._congress_feat):
                 counts[:, t] = (mine & (self.feat_id == fid)).sum(dim=1).double()
             return a, self._argmax_low(counts)
+        if name == "PUBLIC_RELATIONS":
+            # A DOUBLES the target's grievance flow — the self-serving ballot
+            # is B on yourself, halving your own.
+            return a + 1, me
+        if name == "MILITARY_ADVISORY":
+            # A pays +5 Combat Strength to ONE promotion class — a seat names
+            # the class it fields the most units of; with none, the first row.
+            rd = self.rules_dev
+            nC = max(1, len(self.rules.promo_classes))
+            mine = self.major_unit_alive & (self.major_unit_seat == row)
+            ucls = rd.u_promo_class[self.major_unit_type.clamp(min=0)]
+            counts = torch.zeros(B, nC, dtype=torch.float64, device=dev)
+            for t in range(nC):
+                counts[:, t] = (mine & (ucls == t)).sum(dim=1).double()
+            return a, self._argmax_low(counts)
+        if name == "WORLD_RELIGION":
+            # A pays +10 religious strength to one religion, and a religion IS
+            # its founder's seat here — every ballot names its own.
+            return a, me
         if kind == 3:
             return a, me
         if kind == 0:
@@ -7182,6 +7233,7 @@ class SimSeats:
                 resolved, torch.full_like(cur, -1), self.seat_citystate_quest_camp[:, row, :S])
             self.seat_citystate_quest_issued[:, row, :S] = torch.where(resolved, torch.full_like(cur, self.turn), self.seat_citystate_quest_issued[:, row, :S])
             self.seat_citystate_envoys[:, row, :S] = self.seat_citystate_envoys[:, row, :S] + resolved.long() * q_env
+            self._cs_resolve_suzerain()
             self._eff_version += 1
 
         # --- ISSUE on cooldown (deterministic first-satisfiable) ------------

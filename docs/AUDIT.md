@@ -55,7 +55,6 @@ from the list below.
 | B-45r sourced-sweep finds in the other rows | 1 | the rival-recruit event and B-31r's route yields carry the last two effect families |
 | B-54r flanking and support vs their own page | 1 | the two stacks a UNIQUE UNIT raises wait on C-26 |
 | B-56r the five inert promotions | 1 | five rows name a mechanic neither engine has — sight-blocking, escort formations, an air-roll promotion term, a NAVAL RAIDER class |
-| B-59r a city-state cannot be converted | 1 | minors carry no religion (C-30's family), so the spread scan stops at the majors |
 | B-51r Encampment residuals | 1 | the district's strike is measured from the CITY CENTRE's tile, and a capture leaves its own pool standing (unsourced either way) |
 | B-44r city-state war tails | 1 | a ranged raider never shoots a minor centre (the seat verbs' own ranged-vs-city-state scope-out) |
 | B-65 religious zone of control | 1 | Civ 6 scopes a religious unit's ZOC to other religious units BOTH ways; the engines run one military-only rule |
@@ -63,27 +62,25 @@ from the list below.
 | B-34r flood tails | 1 | the climate/coastal tails wait on systems that do not exist here |
 | B-63r the grievance ledger's magnitudes | 1 | the occupied/razed rows ship at their published CEILING; the gang-up bar is a heuristic |
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
-| **B. Fidelity vs real Civ 6** | **23** | |
+| **B. Fidelity vs real Civ 6** | **22** | |
 | C-1 POWER | 2 | four renewables, the Biosphere, the Hydroelectric Dam building, decommission/recommission, the reactor age, minors never powered |
 | C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, diplomatic visibility, the negotiated two-sided deal, and the agreements that need one |
 | C-5 strategic-resource stockpiles | 2 | the shortage penalty's magnitude is unpublished; resource trading waits on C-2 |
-| C-6 policy-card modifiers | 1 | two of the 49 cards are inert, each blocked on a system below |
+| C-6 policy-card modifiers | 1 | `ONLINE_COMMUNITIES` is inert, blocked on C-28 |
 | C-16 the spy's second half | 2 | the escape sequence, captured spies, the promotion pool, counterspy levels, the same-mission gate, two carrier-less missions |
 | C-20 the Military Engineer's build list | 1 | the Missile Silo (C-31), Mountain Tunnel (C-35), railroad (C-36), clean-fallout and remove-improvement verbs |
 | C-22 the district roster | 2 | the Canal carries no naval passage (C-35), five Government Plaza buildings have no effect body, the Preserve table is a stylization |
 | C-24 the climate arc | 1 | nothing is ever submerged (C-35), railroads emit nothing (C-36), the Flood Barrier keeps for nothing |
 | C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — PARKED by owner decision |
 | C-28 tourism accrues to no one in particular | 2 | nothing ACCRUES tourism toward one rival, which the international modifiers and the Rock Band key on |
-| C-29 no RESOLVED suzerain | 1 | a rule that reweights envoys BY the current suzerain has no fixed point |
-| C-30 city-states carry no research | 1 | a minor's borders never close and the suzerain's passage lifts nothing |
 | C-31 the two chassis with a system behind them | 1 | nuclear devices (an area attack + fallout + delivery) and the Rock Band (C-28) |
 | C-32 the new classes have no promotion tree | 2 | air, GDR, support, naval-raider and spy chassis are offered no promotion |
 | C-33 the Giant Death Robot is only its stats | 2 | its water walk, heal gate, district penalty and Future-era upgrades have no carrier |
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target — the reason a fighter exists — do not exist |
 | C-35 the land/water fact never moves | 2 | one overloaded static bit blocks submersion and the Canal's passage |
 | C-36 no railroad | 2 | no second movement tier, no per-hex Iron/Coal charge, no CO2 |
-| **C. Absent systems** | **34** | |
-| **OPEN, TOTAL** | **58** | |
+| **C. Absent systems** | **32** | |
+| **OPEN, TOTAL** | **54** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -250,14 +247,6 @@ Civ 6 source or is recorded as unverifiable.
     `airDefenseOf` / `_type_anti_air` alone and never call `promoCS` /
     `_promo_cs` — threading the promotion term into the sortie changes
     every defensive promotion's reach at once (C-34's pass).
-- **B-59r. A city-state cannot be converted.** The spread's magnitude
-  ships against the Apostle page — the lump scales with the unit's HP and
-  the base 25% strip stacks under the Proselytizer's 75%
-  (`spreadFromUnit` / the `_A_SPREAD` arm). OPEN:
-  - **A CITY-STATE CANNOT BE CONVERTED.** `allCities` is majors-only and
-    the GPU spread scans `city_alive[:, :n_majors]` to match — minors
-    carry no religion (C-30's family), which is also why Translator's
-    "this also applies to city-states" has nothing to triple.
 - **B-51r. Encampment residuals.** The district holds its OWN
   outer-defense pool (`Tile.encampOuterHp` / `encamp_outer_hp` — CIV6:
   one set of Walls "supplies both", yet "destroying the one does not
@@ -422,8 +411,6 @@ under their blocker so the dependency is readable, and both halves count.
     (C-16) wait on this.
   - **JOINT WAR, JOIN ONGOING WAR, RESEARCH AGREEMENT and
     ASK-FOR-PROMISE** — each a two-sided deal by construction.
-  - **CITY-STATE BORDERS** never close (C-30), so a suzerain's passage
-    lifts nothing.
   - The **+25% Open-Borders tourism** is an INTERNATIONAL modifier,
     applied per foreign civilization; blocked on C-28.
 - **C-5. STRATEGIC-RESOURCE STOCKPILES — the bank ships; two tails.**
@@ -436,12 +423,10 @@ under their blocker so the dependency is readable, and both halves count.
   - **RESOURCE TRADING** — "lump quantities of Consumable resources", a
     two-sided deal; blocked on C-2.
   - **ZANZIBAR'S TWO EXISTS-NOWHERE-ELSE LUXURIES** — B-21r.
-- **C-6. POLICY-CARD MODIFIERS — two of the 49 cards are inert.** Weight
-  1. Each blocked on a system:
+- **C-6. POLICY-CARD MODIFIERS — one of the 49 cards is inert.** Weight
+  1. Blocked on a system:
   - `ONLINE_COMMUNITIES` — "+50% Tourism output to civilizations to which
     you have a Trade Route"; blocked on C-28.
-  - `CONTAINMENT` — envoys count double "if its Suzerain has a different
-    government than you"; blocked on C-29.
 - **C-16. THE SPY'S SECOND HALF.** Weight 2. The Spy, its capacity, the
   jump, the eleven-mission catalog, the counterspy post and the capture
   roll ship (`spy_test.py`, `spy.test.ts`; gate reach unmeasured — treat
@@ -493,17 +478,6 @@ under their blocker so the dependency is readable, and both halves count.
   (Open Borders — C-2 — and the trade-route pair), the up-to--40%
   different-governments penalty, `ONLINE_COMMUNITIES` (C-6) and the Rock
   Band (C-31) all key on.
-- **C-29. THERE IS NO RESOLVED SUZERAIN.** Weight 1. `isSuzerain` answers
-  from the raw envoy store on every read, and nothing stores the answer —
-  a rule that changes envoy WEIGHT by who the suzerain is has no fixed
-  point. Waiting on it: `CONTAINMENT` (C-6).
-- **C-30. A CITY-STATE CARRIES NO RESEARCH RECORD.** Weight 1. A minor
-  has no techs and no civics, and real Civ 6 minors research like anyone
-  else. Waiting on it: the border close at Early Empire ("a civ (or
-  city-state) develops the Early Empire civic") and the suzerain's
-  passage exemption — a minor's ground stays open to everyone. The
-  minors-carry-no-religion family (B-59r's conversion bullet) sits here
-  too.
 - **C-31. THE TWO CHASSIS WITH A SYSTEM BEHIND THEM.** Weight 1.
   - **THE NUCLEAR AND THERMONUCLEAR DEVICE** — a one-shot weapon
     delivered by a bomber, a silo or a submarine, with a blast radius,

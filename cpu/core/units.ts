@@ -39,7 +39,8 @@ import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { congressChopGold } from './congress';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { NO_SEAT, borderTurnsFrom, capsOf, campTiles, cityAtTile, civHasStrategic, civsAtWar, isCiv, seatOf, seatsAllied, tileSeat } from './seats';
+import { NO_SEAT, borderTurnsFrom, capsOf, campTiles, cityAtTile, civHasStrategic, civsAtWar, isCiv, isCityStateSeat, seatOf, seatsAllied, tileSeat } from './seats';
+import { suzerainOf } from './cityStates';
 import { canPayStockpile, canPayUpgradeGold, spendStockpile, upgradeGoldCost, upgradeResourceCost } from './stockpile';
 import { canTrainAir, carryAirWith, isAirUnit } from './air';
 import { canTrainSpy, isSpy } from './espionage';
@@ -461,10 +462,10 @@ export function cliffBlocksStep(
  * Open Borders." "Traders ignore borders", and "Religious units also ignore
  * borders".
  *
- * CITY-STATE ground never closes: a city-state carries no research record, so
- * nothing here can say when it took Early Empire, and the suzerain's passage
- * has no border to lift. For the same reason only a MAJOR's units are bound —
- * a barbarian was never going to ask permission anyway.
+ * CITY-STATE ground closes like anyone's, off the MINOR's own research
+ * record; CIV6 (Borders): "For city-states, Open Borders is granted to
+ * players that have reached Suzerain status." Only a MAJOR's units are
+ * bound — a barbarian was never going to ask permission anyway.
  */
 export function borderClosedTo(
   state: GameState,
@@ -474,7 +475,7 @@ export function borderClosedTo(
 ): boolean {
   const owner = tileSeat(tile);
   if (owner === NO_SEAT || owner === seat) return false;
-  if (!isCiv(seat) || !isCiv(owner)) return false;
+  if (!isCiv(seat)) return false;
   // CIV6 (Movement): "Traders ignore borders" and "Religious units also ignore
   // borders" — with the one exception the Inquisitor page names for itself:
   // it "cannot enter another civilization's territory without Open Borders".
@@ -482,6 +483,13 @@ export function borderClosedTo(
     const def = UNITS[unitType];
     if (def?.trader || (def?.religiousStrength ?? 0) > 0) return false;
   }
+  if (isCityStateSeat(owner)) {
+    const cs = state.cityStates.find((c) => c.seat === owner);
+    if (!cs?.research.civics.includes(OPEN_BORDERS_CIVIC)) return false;
+    if (suzerainOf(cs) === seat) return false;
+    return !civsAtWar(state, seat, owner);
+  }
+  if (!isCiv(owner)) return false;
   const host = seatOf(state, owner);
   if (!host?.research.civics.includes(OPEN_BORDERS_CIVIC)) return false;
   if (civsAtWar(state, seat, owner)) return false;

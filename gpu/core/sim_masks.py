@@ -1291,9 +1291,10 @@ class SimMasks:
         Inquisitor page names for itself: it "cannot enter another
         civilization's territory without Open Borders".
 
-        CITY-STATE ground never closes: a city-state carries no research
-        record, so nothing here can say when it took Early Empire. For the same
-        reason only a MAJOR's units are bound - `row` outside the major range
+        CITY-STATE ground closes like anyone's, off the MINOR's own research
+        record; CIV6 (Borders): "For city-states, Open Borders is granted to
+        players that have reached Suzerain status" - and a war opens any
+        border. Only a MAJOR's units are bound: `row` outside the major range
         walks free, which is what a barbarian was going to do anyway.
         """
         zero = torch.zeros(tiles.shape, dtype=torch.bool, device=tiles.device)
@@ -1302,16 +1303,26 @@ class SimMasks:
         R, B = self.n_majors, self.B
         tc = tiles.clamp(min=0).reshape(B, -1)
         owner = self.tile_seat.gather(1, tc)
-        foreign = (tiles >= 0).reshape(B, -1) & (owner >= 0) & (owner < R) & (owner != row)
-        if not bool(foreign.any()):
+        valid = (tiles >= 0).reshape(B, -1)
+        foreign = valid & (owner >= 0) & (owner < R) & (owner != row)
+        cs_own = valid & (owner >= 100) & (owner < 100 + self.S)
+        if not bool(foreign.any()) and not bool(cs_own.any()):
             return zero
-        oc = owner.clamp(min=0, max=R - 1)
-        civic = self.civ_civics[:, :R, self._open_borders_civic].gather(1, oc)
-        at_war = self.war[:, row, :R].gather(1, oc)
-        allied = (self.seat_ally_turns[:, row, :R] > 0).gather(1, oc)
-        # column `row` of the grant matrix: what each GRANTOR gives this seat.
-        granted = (self.seat_borders_turns[:, :R, row] > 0).gather(1, oc)
-        closed = foreign & civic & ~at_war & ~allied & ~granted
+        closed = torch.zeros_like(foreign)
+        if bool(foreign.any()):
+            oc = owner.clamp(min=0, max=R - 1)
+            civic = self.civ_civics[:, :R, self._open_borders_civic].gather(1, oc)
+            at_war = self.war[:, row, :R].gather(1, oc)
+            allied = (self.seat_ally_turns[:, row, :R] > 0).gather(1, oc)
+            # column `row` of the grant matrix: what each GRANTOR gives this seat.
+            granted = (self.seat_borders_turns[:, :R, row] > 0).gather(1, oc)
+            closed = foreign & civic & ~at_war & ~allied & ~granted
+        if bool(cs_own.any()):
+            sc = (owner - 100).clamp(min=0, max=self.S - 1)
+            civic_cs = self.citystate_civics[:, :, self._open_borders_civic].gather(1, sc)
+            suz = self.citystate_suzerain.gather(1, sc) == row
+            hostile = self._seats_hostile(row, owner)
+            closed = closed | (cs_own & civic_cs & ~suz & ~hostile)
         if utype is not None:
             ut = utype.clamp(min=0).reshape(B, -1)
             free = (ut == self._trader_idx) | ((self._rel_strength[ut] > 0) & (ut != self._inquisitor_idx))

@@ -17,7 +17,7 @@ import { CITY_STATE_TYPES } from '../data/cityStates';
 import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
 import { clearableFeatures } from '../../world/features';
-import { tileSeat } from './seats';
+import { tileSeat, unitsOf } from './seats';
 import {
   CONGRESS_RESOLUTIONS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION,
   CONGRESS_HERITAGE, CONGRESS_DV_MIN_ERA, CONGRESS_DV_DELTA, CONGRESS_VOTE_STEP,
@@ -34,7 +34,7 @@ import {
   CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR,
 } from '../data/seats';
 import { POWER_PLANT_IDS } from '../data/buildings';
-import { PROMO_CLASSES } from '../data/promotions';
+import { PROMO_CLASSES, UNIT_PROMO_CLASS } from '../data/promotions';
 
 const CLEARABLE_FEATURES = clearableFeatures();
 
@@ -112,6 +112,24 @@ export function preference(state: GameState, res: number, seat: number,
       return { outcome: 0, target: ctx.government };
     case CONGRESS_BORDER_CONTROL:
       // A is the gift (culture bombs), B the attack — a seat votes itself the gift.
+      return { outcome: 0, target: seat };
+    case CONGRESS_PUBLIC_RELATIONS:
+      // A DOUBLES the target's grievance flow — the self-serving ballot is B
+      // on yourself, halving your own.
+      return { outcome: 1, target: seat };
+    case CONGRESS_MILITARY_ADVISORY: {
+      // A pays +5 Combat Strength to ONE promotion class — a seat names the
+      // class it fields the most units of; with none it names the first row.
+      const counts = PROMO_CLASSES.map(() => 0);
+      for (const u of unitsOf(state, seat)) {
+        const i = PROMO_CLASSES.indexOf(UNIT_PROMO_CLASS[u.type] ?? '');
+        if (i >= 0) counts[i]++;
+      }
+      return { outcome: 0, target: argmaxLow(counts) };
+    }
+    case CONGRESS_WORLD_RELIGION:
+      // A pays +10 religious strength to one religion, and a religion IS its
+      // founder's seat here — every ballot names its own.
       return { outcome: 0, target: seat };
     case CONGRESS_TREATY_ORG:
     case CONGRESS_SOVEREIGNTY: {

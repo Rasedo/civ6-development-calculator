@@ -1109,6 +1109,68 @@
           "gap": "Both engines DERIVE the asked district (a kind-3 quest always asks the CS type's own): TS digests PLACEABLE_DISTRICTS.indexOf(quest.district), the GPU digests _citystate_didx (a districts_cat index). Different lists — the numbers only agree where the orders coincide."
         },
         {
+          "name": "suzerain",
+          "compare": "exact",
+          "covers": [
+            "CityState.suzerain"
+          ],
+          "planes": [
+            "citystate_suzerain"
+          ],
+          "note": "the RESOLVED contest, refreshed at every envoy write; -1 while nobody holds it."
+        },
+        {
+          "name": "techs",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.techs"
+          ],
+          "planes": [
+            "citystate_techs"
+          ]
+        },
+        {
+          "name": "civics",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.civics"
+          ],
+          "planes": [
+            "citystate_civics"
+          ]
+        },
+        {
+          "name": "techProgress",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.techProgress"
+          ],
+          "planes": [
+            "citystate_tech_prog"
+          ]
+        },
+        {
+          "name": "civicProgress",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.civicProgress"
+          ],
+          "planes": [
+            "citystate_civic_prog"
+          ]
+        },
+        {
+          "name": "religionPressure",
+          "compare": "exact",
+          "covers": [
+            "CityState.religionPressure"
+          ],
+          "planes": [
+            "city_pressure"
+          ],
+          "note": "the minor's one city holds pressure like any other city row."
+        },
+        {
           "name": "lastLevyTurn",
           "compare": "exact",
           "covers": [

@@ -148,14 +148,14 @@ def main() -> None:
     assert not bool(sl6[0, pol_i["SURVEY"]]), "SURVEY is dropped — CHIEFDOM has only one military slot"
     assert bool(sl6[0, pol_i["URBAN_PLANNING"]]), "URBAN_PLANNING keeps the economic slot"
 
-    # 7) Exactly two cards stay inert, and the export says so channel by
-    #    channel: CONTAINMENT's row IS the neutral row, so any card matching
-    #    it everywhere carries no effect at all. Both are deferrals on an
-    #    absent system, not stubs.
+    # 7) ONE card stays inert, and the export says so channel by channel:
+    #    ONLINE_COMMUNITIES' row IS the neutral row, so any card matching it
+    #    everywhere carries no effect at all. It is a deferral on an absent
+    #    system, not a stub.
     META = {"id", "kind", "unlockCivic", "obsoleteCivic"}
-    neutral = {k: v for k, v in pol_by_id["CONTAINMENT"].items() if k not in META}
+    neutral = {k: v for k, v in pol_by_id["ONLINE_COMMUNITIES"].items() if k not in META}
     inert = sorted(p["id"] for p in rj["policies"] if all(p[k] == v for k, v in neutral.items()))
-    assert inert == ["CONTAINMENT", "ONLINE_COMMUNITIES"], f"the inert set moved: {inert}"
+    assert inert == ["ONLINE_COMMUNITIES"], f"the inert set moved: {inert}"
     for p in rj["policies"]:
         assert p["unlockCivic"] >= 0, f"{p['id']} is adoptable but no civic grants it"
         assert p["obsoleteCivic"] == -1 or 0 <= p["obsoleteCivic"] < len(rj["civics"]), f"{p['id']} retires to nothing"

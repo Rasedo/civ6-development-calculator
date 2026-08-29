@@ -1372,6 +1372,7 @@ class SimEconomy:
             "pillm": _o.clone(),
             "rgold": _z.clone(), "infl": _z.clone(),
             "envoy1": torch.zeros(B, dtype=torch.bool, device=dev),
+            "envoy2": torch.zeros(B, dtype=torch.bool, device=dev),
             "culsuz": _z.clone(),
             "ucst": torch.zeros(B, self.NU, dtype=torch.float64, device=dev),
             "xppct": _z.clone(), "wwcut": _z.clone(),
@@ -1419,6 +1420,7 @@ class SimEconomy:
             fx["gppmult"] = fx["gppmult"] * torch.where(
                 has_gov, self._gov_gppmult[adopted], torch.ones_like(fx["gppmult"]))
             fx["envoy1"] = fx["envoy1"] | (has_gov & self._gov_envoy1[adopted])
+            fx["envoy2"] = fx["envoy2"] | (has_gov & self._gov_envoy2[adopted])
             fx["gpp"] = fx["gpp"] + self._gov_gpp[adopted] * _gf.double().unsqueeze(1)
             fx["ucst"] = fx["ucst"] + self._gov_ucs_by_type[adopted] * _gf.double().unsqueeze(1)
             for _gi in range(self._ngov):
@@ -1472,6 +1474,7 @@ class SimEconomy:
                     slotted, self._pol_gppmult.unsqueeze(0).expand(B, -1),
                     torch.ones(B, self._npol, dtype=torch.float64, device=dev)).prod(dim=1)
                 fx["envoy1"] = fx["envoy1"] | (slotted & self._pol_envoy1.unsqueeze(0)).any(dim=1)
+                fx["envoy2"] = fx["envoy2"] | (slotted & self._pol_envoy2.unsqueeze(0)).any(dim=1)
                 fx["gpp"] = fx["gpp"] + slotted.double() @ self._pol_gpp
                 fx["ucst"] = fx["ucst"] + slotted.double() @ self._pol_ucs_by_type
                 for _pi in range(self._npol):

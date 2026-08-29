@@ -17,6 +17,7 @@ import {
 } from '../data/greatPeople';
 import { wonderGwSlots } from './greatPeople';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
+import { resolveSuzerain } from './cityStates';
 import { ERAS, TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { WONDER_ERA_INDEX } from '../data/builtWonders';
@@ -273,6 +274,7 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
       for (const s of Object.keys(cs.envoys)) {
         if (Number(s) !== unit.seat) cs.envoys[Number(s)] = 0;
       }
+      resolveSuzerain(cs);
     }
   }
   if (fx.gppAll) for (const c of GP_CLASSES) owner.gpp[c] = (owner.gpp[c] ?? 0) + fx.gppAll;

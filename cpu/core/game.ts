@@ -17,7 +17,7 @@ import { barbarianPhase, damageRoll, trainXpPct, theoStrength, theoFlankCount, t
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { climateTurn, deriveLowlands, standingRemovable } from './climate';
-import { placeCityStates, cityStatePhase, suzerainEffect } from './cityStates';
+import { placeCityStates, cityStatePhase, resolveSuzerain, suzerainEffect } from './cityStates';
 import { placeSeats, seatPhase, worldCongress, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
 import { commitProduction, commitResearch } from './seatTurn';
@@ -1629,7 +1629,10 @@ export function deserialize(json: string): GameState {
   const legacyCamps = (state as unknown as { barbCamps?: number[] }).barbCamps;
   state.barbSeat ??= { ...emptySeat(BARB_SEAT), camps: legacyCamps ?? [] };
   state.barbSeat.camps ??= legacyCamps ?? [];
-  for (const cityState of state.cityStates ?? []) Object.assign(cityState, { ...emptySeat(seatOfCityState(cityState.id)), ...cityState });
+  for (const cityState of state.cityStates ?? []) {
+    Object.assign(cityState, { ...emptySeat(seatOfCityState(cityState.id)), ...cityState });
+    resolveSuzerain(cityState);
+  }
   for (const s of allSeats(state)) {
     s.wars ??= [];
     s.formalWars ??= [];

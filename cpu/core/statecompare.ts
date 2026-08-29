@@ -515,6 +515,12 @@ const CITY_STATE_G: Record<string, Extractor> = {
       return d === undefined ? -1 : PLACEABLE_DISTRICTS.indexOf(d);
     }),
   ),
+  suzerain: overCityStates((cityState) => cityState.suzerain ?? -1),
+  techs: overCityStates((cityState) => cityState.research.techs.map((x) => idx(TECH_IDX, x)).sort((a, b) => a - b)),
+  civics: overCityStates((cityState) => cityState.research.civics.map((x) => idx(CIVIC_IDX, x)).sort((a, b) => a - b)),
+  techProgress: overCityStates((cityState) => cityState.research.techProgress),
+  civicProgress: overCityStates((cityState) => cityState.research.civicProgress),
+  religionPressure: overCityStates((cityState, st) => perCiv(st, (seat) => cityState.religionPressure?.[seat] ?? 0)),
   lastLevyTurn: overCityStates((cityState) => cityState.lastLevyTurn ?? -LEVY_COOLDOWN),
   warTurns: overCityStates((cityState, state) => warClockLine(state, cityState.seat)),
   treatyTurns: overCityStates((cityState, state) => treatyClockLine(state, cityState.seat)),

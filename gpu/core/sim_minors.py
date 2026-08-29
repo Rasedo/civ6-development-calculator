@@ -13,6 +13,34 @@ class SimMinors:
             self.citystate_pop.copy_(torch.where(self.citystate_alive, (self.citystate_pop + 1).clamp(max=10), self.citystate_pop))
         citystate_max = int(self.rules.citystate.get("maxHp", 150))
         self.citystate_hp.copy_(torch.where(self.citystate_alive & (self.citystate_hp < citystate_max), (self.citystate_hp + 10).clamp(max=citystate_max), self.citystate_hp))
+        # CIV6 (City-state): a minor "develops scientifically and culturally...
+        # it will apparently research certain techs" — the record is real, the
+        # pace unpublished. POPULATION points a turn into each pot; the
+        # cheapest available row completes (table order on a price tie), at
+        # most one per pot per turn (`minorResearch` twin). Early Empire is
+        # the row the border refusal reads.
+        alive = self.citystate_alive
+        pop = torch.where(alive, self.citystate_pop.to(torch.float64), torch.zeros_like(self.citystate_tech_prog))
+        self.citystate_tech_prog += pop
+        self.citystate_civic_prog += pop
+        rdv = self.rules_dev
+        for have, prog, cost, pre in (
+            (self.citystate_techs, self.citystate_tech_prog, rdv.t_cost.to(self.device), self._prereq_t),
+            (self.citystate_civics, self.citystate_civic_prog, rdv.c_cost.to(self.device), self._prereq_c),
+        ):
+            for s in range(self.S):
+                avail = self._available_mask(have[:, s], pre)
+                if not bool(avail.any()):
+                    continue
+                key = torch.where(avail, cost.unsqueeze(0).expand_as(avail),
+                                  torch.full((1, 1), float("inf"), dtype=torch.float64, device=self.device).expand_as(avail))
+                key = key + torch.arange(key.shape[1], device=self.device, dtype=torch.float64) * 1e-6
+                pick = key.argmin(dim=1)
+                cval = cost[pick]
+                fire = alive[:, s] & avail.any(dim=1) & (prog[:, s] >= cval)
+                if bool(fire.any()):
+                    have[fire, s, pick[fire]] = True
+                    prog[fire, s] = prog[fire, s] - cval[fire]
 
 
     def _wonder_base_ok(self, row: int, j: int) -> torch.Tensor:

@@ -18,7 +18,7 @@ import { availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } f
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
-import { getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
+import { containmentBonus, getModifiers, makeYieldCtx, prodBoostPct, unitUpkeep } from './effects';
 import { addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, routeDestCenter, routePlunderer, stampTradingPost, PLUNDER_ROUTE_GOLD, TRADE_WALK_EXPIRY_RAIL } from './trade';
 import { addEnvoys, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, setMet, sueForPeaceWithCityState } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPES } from '../data/cityStates';
@@ -932,7 +932,7 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
     actor.envoysAvailable = (actor.envoysAvailable ?? 0) - 1;
     const first = envoysOf(cityState, actor.seat) === 0
       && getModifiers(state, actor.seat).firstEnvoyDouble;
-    addEnvoys(cityState, actor.seat, first ? 2 : 1);
+    addEnvoys(cityState, actor.seat, (first ? 2 : 1) + containmentBonus(state, cityState, actor));
   }
   const warCol = rec.war;
   if (warCol !== null && warCol !== undefined && warCol >= 0) {

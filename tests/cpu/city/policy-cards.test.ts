@@ -186,9 +186,9 @@ describe('the empire-wide channels', () => {
     }
   });
 
-  it('the two cards that stay inert carry an EMPTY effect set', () => {
+  it('the one card that stays inert carries an EMPTY effect set', () => {
     const inert = POLICY_LIST.filter((p) => Object.keys(p.effects).length === 0).map((p) => p.id);
-    expect(inert.sort()).toEqual(['CONTAINMENT', 'ONLINE_COMMUNITIES']);
+    expect(inert.sort()).toEqual(['ONLINE_COMMUNITIES']);
   });
 });
 

@@ -179,6 +179,13 @@ class SimInit:
         self.register_alias("citystate_pop", lambda sim: sim.city_pop[:, sim._CITY_MINOR0:sim._CITY_MINOR0 + max(sim.S, 1), 0])
         self.citystate_suz_key = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         self.citystate_suz_peace = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
+        # the RESOLVED suzerain contest (-1 none) and the minor's own research
+        # record — `resolveSuzerain` / `minorResearch` storage
+        self.citystate_suzerain = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
+        self.citystate_techs = torch.zeros(B, s_pad, len(rules.t_cost), dtype=torch.bool, device=device)
+        self.citystate_civics = torch.zeros(B, s_pad, len(rules.c_cost), dtype=torch.bool, device=device)
+        self.citystate_tech_prog = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
+        self.citystate_civic_prog = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
         self.citystate_suz_code = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         # the IMPROVEMENT this minor's suzerain may build, by roster index
         self.citystate_suz_imp = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
@@ -1500,6 +1507,7 @@ class SimInit:
             self._gov_rgold = torch.tensor([float(r.get("routeGold", 0)) for r in _govs], dtype=dtype, device=device)
             self._gov_infl = torch.tensor([float(r.get("influencePerTurn", 0)) for r in _govs], dtype=dtype, device=device)
             self._gov_envoy1 = torch.tensor([bool(r.get("firstEnvoyDouble", 0)) for r in _govs], dtype=torch.bool, device=device)
+            self._gov_envoy2 = torch.tensor([bool(r.get("envoyDoubleDiffGov", 0)) for r in _govs], dtype=torch.bool, device=device)
             self._gov_culsuz = torch.tensor([float(r.get("culturePerSuzerain", 0)) for r in _govs], dtype=dtype, device=device)
             self._gov_gpp = torch.tensor(
                 [[float(x) for x in r.get("gpp", [0] * n_gp)] for r in _govs],
@@ -1575,6 +1583,7 @@ class SimInit:
             self._pol_rgold = torch.tensor([float(r.get("routeGold", 0)) for r in _pols], dtype=dtype, device=device)
             self._pol_infl = torch.tensor([float(r.get("influencePerTurn", 0)) for r in _pols], dtype=dtype, device=device)
             self._pol_envoy1 = torch.tensor([bool(r.get("firstEnvoyDouble", 0)) for r in _pols], dtype=torch.bool, device=device)
+            self._pol_envoy2 = torch.tensor([bool(r.get("envoyDoubleDiffGov", 0)) for r in _pols], dtype=torch.bool, device=device)
             self._pol_culsuz = torch.tensor([float(r.get("culturePerSuzerain", 0)) for r in _pols], dtype=dtype, device=device)
             self._pol_gpp = torch.tensor(
                 [[float(x) for x in r.get("gpp", [0] * n_gp)] for r in _pols],

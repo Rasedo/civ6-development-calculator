@@ -543,6 +543,12 @@ export interface CityState extends Seat {
   met: number[];
   hp?: number;
   lastLevyTurn?: number;
+  /** The STORED answer to the suzerain contest (-1 none), refreshed at every
+   *  envoy write — the fixed point that rules reweighting envoys BY the
+   *  current suzerain read (Containment, the border passage). */
+  suzerain?: number;
+  /** The minor's one city holds pressure like any other city (index = seat). */
+  religionPressure?: number[];
   /** The per-seat quest, keyed by ABSOLUTE SEAT. The kind is the first
    *  satisfiable option in a fixed order, no RNG. */
   seatQuest?: (CityStateQuest | null)[];

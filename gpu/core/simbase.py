@@ -677,6 +677,7 @@ _MUTABLE = [
     "civ_enhancer", "civ_enhancer_done", "civ_follower", "civ_founder", "civ_next_city_id",
     "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_inquisition", "civ_tiles_purchased",
     "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_camp", "seat_citystate_quest_issued",
+    "citystate_suzerain", "citystate_techs", "citystate_civics", "citystate_tech_prog", "citystate_civic_prog",
     "seat_explored",
     "civ_culture", "civ_faith", "civ_tourism", "civ_tourism_rel", "civ_gpp", "civ_grievance",
     "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_founder", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_writing", "city_gw_art", "city_gw_music", "city_relics", "city_artifacts", "city_artifact_era", "city_artifact_seat", "city_gwart_type", "city_gwart_artist", "city_spec_pin", "city_bldg",

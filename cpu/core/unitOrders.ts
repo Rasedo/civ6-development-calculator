@@ -30,20 +30,22 @@ export function spreadFromUnit(state: GameState, unit: Unit, actor: Seat, toTile
   if (unit.type !== 'MISSIONARY' && unit.type !== 'APOSTLE') return;
   if ((unit.charges ?? 0) <= 0 || !actor.religion.founded) return;
   const tcity = allCities(state).find((c) => c.centerIndex === toTile.index);
-  if (!tcity) return;
+  const tcs = tcity ? undefined : state.cityStates.find((c) => c.centerIndex === toTile.index);
+  const target = tcity ?? tcs;
+  if (!target) return;
   const nRel = state.seats.length;
   const eb = actor.religion.enhancer ? ENHANCER_BELIEFS[actor.religion.enhancer]?.effects : undefined;
   // CIV6 (Translator): "Religious spread is triple strength in cities of other
   // civilizations" — and the page's note extends it to city-states.
-  const foreign = tcity.seat !== actor.seat ? Math.max(1, promoValue(unit, 'TRANSLATOR')) : 1;
+  const foreign = target.seat !== actor.seat ? Math.max(1, promoValue(unit, 'TRANSLATOR')) : 1;
   // CIV6 (Spread Religion): "Pressure = 2.2 * Apostle's current HP" — the
   // lump scales with the spreader's health, on this model's compressed scale
   // where the full-health lump is SPREAD_PRESSURE.
   const lump = Math.floor(Math.round(SPREAD_PRESSURE * (eb?.spreadPressureMult ?? 1)) * unit.hp / 100) * foreign;
-  let pres = tcity.religionPressure;
+  let pres = target.religionPressure;
   if (!pres || pres.length !== nRel) {
     pres = new Array(nRel).fill(0);
-    tcity.religionPressure = pres;
+    target.religionPressure = pres;
   }
   const wasFollowed = argmaxPressure(pres);
   pres[actor.seat] += lump;

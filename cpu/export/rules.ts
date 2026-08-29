@@ -125,6 +125,7 @@ const effectRow = (fx: PolicyEffects) => ({
   routeGold: fx.routeGold ?? 0,
   influencePerTurn: fx.influencePerTurn ?? 0,
   firstEnvoyDouble: fx.firstEnvoyDouble ? 1 : 0,
+  envoyDoubleDiffGov: fx.envoyDoubleDiffGov ? 1 : 0,
   culturePerSuzerain: fx.culturePerSuzerain ?? 0,
   // [promotion-class mask (CLASS_BIT bits), allCombat, cs]
   unitCombatCS: fx.unitCombatCS
