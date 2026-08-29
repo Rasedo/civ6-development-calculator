@@ -382,6 +382,21 @@ class SimGp:
         nb = min(want.shape[1], self.city_bldg.shape[3])
         r = m.nonzero(as_tuple=True)[0]
         self.city_bldg[r, row, cc[r], :nb] |= want[r, :nb]
+        # CIV6: a city never holds two of one building, so a granted one comes
+        # off the production slot; the hammers already spent BANK, which is
+        # where every carried-over hammer goes. `dropQueuedBuilding` is the twin.
+        col = cc[r]
+        cur = self.city_current[r, row, col]
+        gone = (cur >= 0) & (cur < nb) & want[r, :nb].gather(
+            1, cur.clamp(min=0, max=nb - 1).unsqueeze(1)).squeeze(1)
+        if bool(gone.any()):
+            hit = r[gone]
+            hcol = col[gone]
+            self.city_prod_bank[hit, row, hcol] = (self.city_prod_bank[hit, row, hcol]
+                                                   + self.city_progress[hit, row, hcol])
+            self.city_progress[hit, row, hcol] = 0
+            self.city_cost[hit, row, hcol] = 0
+            self.city_current[hit, row, hcol] = -1
 
     def _gp_wonder_charge(self, row: int, m: torch.Tensor, cls: torch.Tensor,
                           at: torch.Tensor, cc: torch.Tensor) -> None:

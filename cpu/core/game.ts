@@ -1,5 +1,6 @@
 
 import type { City, DistrictId, GameState, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, Seat, Unit } from './types';
+import { dropQueuedBuilding } from './production';
 import { greatPeopleEarned } from './greatPeople';
 import { airTrainTile } from './air';
 import { placeRelic, GP_CLASSES, RELIC_WONDER_SLOTS } from '../data/greatPeople';
@@ -551,6 +552,7 @@ export function purchaseBuilding(state: GameState, cityId: number, buildingId: s
     }
   }
   city.buildings.push(buildingId);
+  dropQueuedBuilding(city, buildingId);
   buildingDedications(state, city.seat, buildingId);
   if (BUILDINGS[buildingId]?.walls) { city.outerHp = wallsMax(state, city); fitEncampOuter(state, city); }
   return { ok: true };
@@ -631,6 +633,7 @@ export function buyWorshipBuilding(state: GameState, cityId: number, seat: numbe
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   buyer.faith = (buyer.faith ?? 0) - cost;
   city.buildings.push(wid);
+  dropQueuedBuilding(city, wid);
   return { ok: true };
 }
 
@@ -655,6 +658,7 @@ export function purchaseBuildingWithFaith(state: GameState, cityId: number, buil
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   buyer.faith = (buyer.faith ?? 0) - cost;
   city.buildings.push(buildingId);
+  dropQueuedBuilding(city, buildingId);
   buildingDedications(state, city.seat, buildingId);
   if (BUILDINGS[buildingId]?.walls) { city.outerHp = wallsMax(state, city); fitEncampOuter(state, city); }
   return { ok: true };

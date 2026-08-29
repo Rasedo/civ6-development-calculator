@@ -330,6 +330,39 @@ def poke_arms(rules, path):
     print("  6 arms OK — the site code selects, it does not fall through")
 
 
+# ------------------------------------------ 8 the grant onto a half-built one
+def poke_grant_drops_queue(rules, path):
+    """CIV6 (Isaac Newton): "Instantly builds a Library and University in this
+    city" — which can be the very building the city is producing. No city holds
+    two of one building, so the granted one comes off the production slot and
+    the hammers already spent BANK. `dropQueuedBuilding` is the TS twin."""
+    sim = fresh(rules, path)
+    cls, at = 0, 0
+    sim._gp_site[cls, at] = 1
+    sim._gp_charges[cls, at] = 1
+    sim._gp_effects[cls, at, :] = 0
+    sim._gp_any_fx = True
+    bidx = 0
+    # the seat's first live city, producing building 0 with hammers on it
+    col = int(sim.city_alive[bidx, ROW].long().argmax())
+    assert bool(sim.city_alive[bidx, ROW, col]), "the row holds no live city"
+    sim._gp_bldg[cls, at, :] = False
+    sim._gp_bldg[cls, at, 0] = True
+    sim.city_bldg[bidx, ROW, col, 0] = False
+    sim.city_current[bidx, ROW, col] = 0
+    sim.city_progress[bidx, ROW, col] = 37.0
+    sim.city_cost[bidx, ROW, col] = 200.0
+    sim.city_prod_bank[bidx, ROW, col] = 5.0
+    ctr = int(sim.city_center[bidx, ROW, col])
+    v = make_person(sim, ROW, cls, at, ctr)
+    order(sim, ROW, v, sim._A_GP)
+    assert bool(sim.city_bldg[bidx, ROW, col, 0]), "the grant did not land"
+    assert int(sim.city_current[bidx, ROW, col]) == -1,         "the granted building stayed on the production slot"
+    assert float(sim.city_prod_bank[bidx, ROW, col]) == 42.0,         f"the hammers burned instead of banking ({float(sim.city_prod_bank[bidx, ROW, col])})"
+    assert float(sim.city_progress[bidx, ROW, col]) == 0.0, "the slot kept its progress"
+    print("  8 grant drops the queue OK — slot cleared, 37 hammers banked onto the 5 already there")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -343,6 +376,7 @@ def main() -> None:
     poke_spend(rules, p)
     poke_perm(rules, p)
     poke_arms(rules, p)
+    poke_grant_drops_queue(rules, p)
     print("GREAT_PERSON POKES OK")
 
 

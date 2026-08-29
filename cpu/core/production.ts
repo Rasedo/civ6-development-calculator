@@ -128,6 +128,24 @@ export function completeProject(state: GameState, city: City, projectId: string,
   }
 }
 
+/**
+ * CIV6: a city never holds two of one building, so obtaining one any other
+ * way — a Great Person's instant build, a purchase — takes it off the
+ * production queue. The hammers already spent are NOT lost: they bank, which
+ * is where this model puts every carried-over hammer.
+ *
+ * Only the queue HEAD accrues (every `progress +=` in the engine reads
+ * `queue[0]`), so a deeper item banks the zero it carries.
+ */
+export function dropQueuedBuilding(city: City, buildingId: string): void {
+  for (let i = city.queue.length - 1; i >= 0; i--) {
+    const it = city.queue[i];
+    if (it?.kind !== 'building' || it.building !== buildingId) continue;
+    city.productionBank = (city.productionBank ?? 0) + it.progress;
+    city.queue.splice(i, 1);
+  }
+}
+
 export function completeQueueItem(
   state: GameState,
   city: City,
@@ -252,10 +270,8 @@ export function completeQueueItem(
       completeProject(state, city, item.project, cost, sciPerTurn);
       break;
     case 'building':
-      // CIV6 (Isaac Newton): "Instantly builds a Library and University in
-      // this city" — a grant can land the very building this city is still
-      // producing, and no city holds two of one building. The production
-      // already spent buys nothing.
+      // `city.buildings` is a SET — every reader tests it with `includes`,
+      // and the GPU carries it as one bit per building.
       if (!city.buildings.includes(item.building)) city.buildings.push(item.building);
       buildingDedications(state, city.seat, item.building);
       // CIV6 (Intelligence Agency): "+1 Spy" — the free unit, here.

@@ -6,6 +6,7 @@
  */
 
 import type { City, GameState, GreatPersonClass, Unit } from './types';
+import { dropQueuedBuilding } from './production';
 import type { Tile } from '../../world/types';
 import { neighbors } from '../../world/hex';
 import { RESOURCES } from '../../world/resources';
@@ -227,7 +228,12 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
 
   // THE CITY THE CHARGE LANDS IN.
   if (fx.buildings?.length && city) {
-    for (const b of fx.buildings) if (!city.buildings.includes(b)) city.buildings.push(b);
+    // CIV6 (Isaac Newton): "Instantly builds a Library and University in this
+    // city" — which can be the very building the city is producing.
+    for (const b of fx.buildings) {
+      if (!city.buildings.includes(b)) city.buildings.push(b);
+      dropQueuedBuilding(city, b);
+    }
   }
   if (fx.wonderProduction && city) {
     const q = city.queue[0];

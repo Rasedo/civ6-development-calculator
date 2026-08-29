@@ -3,7 +3,7 @@ import type { City, CongressVote, DistrictId, Emergency, GameState, ImprovementI
 import { advanceGreatPeople, patronizeGreatPerson, wonderGwSlots } from './greatPeople';
 import { activateGreatPerson } from './gpAbility';
 import { drainRelicReserve, gwCapacity, gwCount, gwGive, gwTake, GW_KINDS, RELIC_WONDER_SLOTS } from '../data/greatPeople';
-import { completeQueueItem } from './production';
+import { completeQueueItem, dropQueuedBuilding } from './production';
 import { isExplored, revealAround } from './fog';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { isWater, isImpassable } from '../../world/query';
@@ -1595,6 +1595,7 @@ export function seatPhase(state: GameState): void {
               if (Math.round((actor.treasury ?? 0) * 1000) >= Math.round((price + reserve) * 1000)) {
                 actor.treasury = (actor.treasury ?? 0) - price;
                 civCity.buildings.push(def.id);
+                dropQueuedBuilding(civCity, def.id);
                 buildingDedications(state, civCity.seat, def.id);
                 if (def.walls) { civCity.outerHp = wallsMax(state, civCity); fitEncampOuter(state, civCity); }
                 bought = true;

@@ -203,10 +203,9 @@ describe('the spend', () => {
 
   // CIV6 (Isaac Newton): "Instantly builds a Library and University in this
   // city" — the grant can land the very building the city is still producing.
-  // No city holds two of one building, so the queued copy completes into
-  // nothing; every reader of `city.buildings` treats it as a set, and the GPU
-  // stores it as one bit.
-  it('a building granted while the city still produces it is never held twice', () => {
+  // No city holds two of one building, so the queued copy comes OFF the
+  // queue, and the hammers already spent bank rather than burn.
+  it('a building granted while the city still produces it drops off the queue and banks', () => {
     const state = newGame();
     const found = GP_CLASSES.flatMap((c) => GREAT_PEOPLE[c].map((p, i) => ({ c, i, p })))
       .find((e) => ((gpEffectOf(e.p) as { buildings?: string[] }).buildings ?? []).length > 0);
@@ -222,12 +221,21 @@ describe('the spend', () => {
       tile.districtComplete = true;
       city.districts.push({ type: district, tileIndex: tile.index });
     }
-    const item: QueueItem = { kind: 'building', building: grant, progress: 0 };
+    const item: QueueItem = { kind: 'building', building: grant, progress: 37 };
     city.queue.push(item);
+    city.productionBank = 5;
     expect(activateGreatPerson(state, u)).toBe(true);
     expect(city.buildings.filter((b) => b === grant)).toHaveLength(1);
-    city.queue.shift();
+    expect(city.queue.some((q) => q.kind === 'building' && q.building === grant)).toBe(false);
+    expect(city.productionBank).toBe(5 + 37);
+  });
+
+  it('a city never holds two of one building, whatever completes it', () => {
+    const state = newGame();
+    const city = state.seats[0].cities[0];
+    const item: QueueItem = { kind: 'building', building: 'MONUMENT', progress: 0 };
+    city.buildings.push('MONUMENT');
     completeQueueItem(state, city, item, 1);
-    expect(city.buildings.filter((b) => b === grant)).toHaveLength(1);
+    expect(city.buildings.filter((b) => b === 'MONUMENT')).toHaveLength(1);
   });
 });
