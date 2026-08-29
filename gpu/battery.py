@@ -6,19 +6,22 @@
 Stage 0 is serial because everything below depends on it: the TS and Python
 static gates, the seeder-drift check against the committed worlds.lock, then
 the world seed and the fixture export.
-Three lanes then run concurrently:
+Lanes then run concurrently:
 
     vitest + serve_a : the TS suite, then the decision-server gate's first
-                       shard — a third of the fixture seeds in one GPU sim
+                       shard — a sixth of the fixture seeds in one GPU sim
                        against one TS child each, with per-turn
                        obs/job/spread/buy equality and a state-digest compare
-    serve_b, serve_c : the gate's other two thirds, the same shape
+    serve_b..serve_f : the gate's other five sixths, the same shape
     pokes            : the per-mechanic GPU self-tests, through a bounded pool
 
-Wall-clock is stage 0 plus the slowest lane. Each step's OMP thread count is
-capped so concurrent torch processes do not oversubscribe the box. Exit code
-is nonzero if ANY step fails; the table at the end gives per-step wall time
-and status.
+Wall-clock is stage 0 plus the slowest lane, and the serve shards are that
+lane. The gate process is small-tensor and DISPATCH bound, not BLAS bound:
+measured over one shard, OMP 1, 2 and 4 land within noise of each other and
+24 threads runs 16% SLOWER than 1. Threads therefore buy nothing here and
+processes buy everything, so the seeds spread over as many shards as the box
+can hold at one thread each. Exit code is nonzero if ANY step fails; the
+table at the end gives per-step wall time and status.
 """
 
 from __future__ import annotations
@@ -34,12 +37,14 @@ ROOT = Path(__file__).resolve().parent.parent
 FULL = "--full" in sys.argv
 NO_BAIL = "--no-bail" in sys.argv
 
-# Poke pool: 6 workers x OMP 2 = 12 threads beside the serve shards' 4 each.
+# Poke pool: 9 workers x OMP 1 = 9 threads beside the serve shards' 1 each,
+# sized so the pool's total/workers lands beside the serve lane rather than
+# behind it — whichever of the two finishes last IS the battery's wall.
 # The TS children cost nothing: profiled at under 1% of the serve lane, whose
 # wall is the gate's own process — sim.step, the decide pass and the digest
 # extract — which is also why the gate runs as two processes at all.
-POKE_WORKERS = 6
-POKE_OMP = 2
+POKE_WORKERS = 9
+POKE_OMP = 1
 
 def lane_cost() -> dict[str, float]:
     """Measured lane cost — the median of each lane's last five OK timings
@@ -189,20 +194,23 @@ def main() -> int:
             break
 
     if not failed.is_set():
-        print("lanes (parallel): vitest+serve_a | serve_b | serve_c | gpu pokes", flush=True)
-        # The DECISION-SERVER gate in three shards over ALL fixture seeds:
-        # per-turn obs/unit-target equality and a state-digest compare. The
-        # lane's wall is the gate process itself, not the TS children, so
-        # more processes split what one batch serializes; single-seed hunt
-        # reruns prove the digests are batch-size independent. The split is
-        # derived from the fixture directory so a reseeded set reshards itself.
+        # The DECISION-SERVER gate sharded over ALL fixture seeds: per-turn
+        # obs/unit-target equality and a state-digest compare. The lane's wall
+        # is the gate process itself, not the TS children, so more processes
+        # split what one batch serializes; single-seed hunt reruns prove the
+        # digests are batch-size independent. The split is derived from the
+        # fixture directory so a reseeded set reshards itself. A shard pays a
+        # fixed per-turn dispatch price plus a per-seed one, so narrower shards
+        # spend total CPU to buy wall — the trade this box has cores for.
         _seeds = sorted(int(q.stem[4:]) for q in (ROOT / "seeder" / "worlds").glob("seed*.json")
                         if q.stem[4:].isdigit())
-        _k = 3
+        _k = min(6, len(_seeds))
         _cut = [round(i * len(_seeds) / _k) for i in range(_k + 1)]
         serve_cmd = [py, "gpu/serve_gate.py", "--batched", "--turns", "250", "--seeds"]
-        _shards = [("serve_" + "abc"[i], serve_cmd + [",".join(map(str, _seeds[_cut[i]:_cut[i + 1]]))], 4)
+        _shards = [("serve_" + "abcdef"[i], serve_cmd + [",".join(map(str, _seeds[_cut[i]:_cut[i + 1]]))], 1)
                    for i in range(_k)]
+        print("lanes (parallel): vitest+" + _shards[0][0] + " | "
+              + " | ".join(s[0] for s in _shards[1:]) + " | gpu pokes", flush=True)
         lanes = [
             [("vitest", [npm, "test"], 8), _shards[0]],
             *[[sh] for sh in _shards[1:]],
