@@ -1,8 +1,8 @@
 
 import type { City, CongressVote, DistrictId, Emergency, GameState, ImprovementId, SeatActionRecord, Seat, Tile, TradeRoute, Unit } from './types';
-import { advanceGreatPeople, patronizeGreatPerson, wonderGwSlots } from './greatPeople';
+import { advanceGreatPeople, gwExtraSlots, patronizeGreatPerson, relicSlotsIn } from './greatPeople';
 import { activateGreatPerson } from './gpAbility';
-import { drainRelicReserve, gwCapacity, gwCount, gwGive, gwTake, GW_KINDS, RELIC_WONDER_SLOTS } from '../data/greatPeople';
+import { drainRelicReserve, gwCapacity, gwCount, gwGive, gwTake, GW_KINDS } from '../data/greatPeople';
 import { completeQueueItem, dropQueuedBuilding } from './production';
 import { isExplored, revealAround } from './fog';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
@@ -41,7 +41,7 @@ import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, PANTHEO
 import { CITY_WORK_RADIUS, GAME_SPEED, GOLD_PURCHASE_MULT, borderGrowthCost } from '../data/constants';
 import { cityDistrictSum, pillagedDistrictTypes } from './yields';
 import type { CityStats } from './city';
-import { computeCityStats, luxuryAmenities, pickBorderTile, acquireTile, seatBuildingSum } from './city';
+import { computeCityStats, cityBuildingSum, luxuryAmenities, pickBorderTile, acquireTile, seatBuildingSum } from './city';
 import { accrueStockpiles, chargeUnitUpkeep, resolveSeatPower } from './stockpile';
 import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressUdtProdDistrict, type CongressVoterCtx } from './congress';
 import { buyVotes } from './congress';
@@ -740,6 +740,11 @@ export function transferCity(
   // The losing seat's city list — one lookup, because every seat holds its own.
   const loser = seatOf(state, fromSeat);
   if (why === 'conquered') {
+    // CIV6 (Warlord's Throne): "Capturing an enemy City grants 20% bonus
+    // Production in all Cities for 5 turns" — the window opens on the CAPTURE,
+    // so a city taken only to be razed opens it too.
+    const _cq = seatBuildingSum(state, to.seat, 'conquestProdTurns');
+    if (_cq > 0) to.conquestProdTurns = _cq;
     grievanceCityTaken(state, to.seat, fromSeat, to.cities.length >= MAX_CITIES_PER_SEAT);
     // "Captured the final city of a civilization: 150 (all remaining civs
     // gain Grievances against you)" — the loser's list is about to lose this
@@ -1419,7 +1424,7 @@ export function seatPhase(state: GameState): void {
       // counts, not identities, so both engines take the giver's FIRST city
       // holding one and the receiver's first with a free slot, in the city
       // order `placeGreatWorks` already walks.
-      const slots = wonderGwSlots(state, kind);
+      const slots = gwExtraSlots(state, kind);
       const from = actor.cities.find((c) => gwCount(c, kind) > 0);
       const home = target.cities.find((c) => gwCount(c, kind) < gwCapacity(c, kind, slots(c)));
       if (!from || !home) continue;
@@ -1456,12 +1461,7 @@ export function seatPhase(state: GameState): void {
     // A Relic held for want of a slot goes out at the owner's next turn —
     // before the yield walk, so a slot opened last turn pays this one.
     if ((actor.relicReserve ?? 0) > 0) {
-      const relicSlots = (c: { wonders?: { id: string; tileIndex: number }[] }) =>
-        (c.wonders ?? []).reduce(
-          (n, w) => n + (state.map.tiles[w.tileIndex].builtWonderComplete ? RELIC_WONDER_SLOTS[w.id] ?? 0 : 0),
-          0,
-        );
-      actor.relicReserve = drainRelicReserve(actor.relicReserve, actor.cities, relicSlots);
+      actor.relicReserve = drainRelicReserve(actor.relicReserve, actor.cities, relicSlotsIn(state));
     }
 
     warWearinessTurn(state, actor.seat);
@@ -1887,7 +1887,15 @@ export function seatPhase(state: GameState): void {
         if (q.kind === 'unit') _em /= landUnitPriceMult(state, civCity.seat, q.unit);
         if (q.kind === 'district') _em *= governorMult(state, civCity, (e) => e.districtProdMult);
         if (q.kind === 'project') _em *= governorMult(state, civCity, (e) => e.projectProdMult) * seatMods.projectProdMult;
-        _em *= 1 + prodBoostPct(seatMods, q, actor.gpPerm);
+        // CIV6 (Ancestral Hall): "50% increased Production toward Settlers in
+        // this city"; (Warlord's Throne): "Capturing an enemy City grants 20%
+        // bonus Production in all Cities for 5 turns". Both are percentages, so
+        // they join the cards' additive stack rather than compounding on it.
+        let _bpct = q.kind === 'settler' ? cityBuildingSum(state, civCity, 'settlerProdPct') / 100 : 0;
+        if ((actor.conquestProdTurns ?? 0) > 0) {
+          _bpct += seatBuildingSum(state, actor.seat, 'conquestProdPct') / 100;
+        }
+        _em *= 1 + prodBoostPct(seatMods, q, actor.gpPerm) + _bpct;
         const progressBefore = q.progress;
         q.progress += production * _em;
         // Pay in the bank, exactly where the seat 0's endTurn does
@@ -2231,6 +2239,9 @@ export function seatPhase(state: GameState): void {
       }
     }
     if (!anyWar) actor.peaceTurns += 1;
+    // CIV6 (Warlord's Throne): the conquest window runs 5 turns and expires by
+    // reaching zero, beside every other per-seat clock.
+    if ((actor.conquestProdTurns ?? 0) > 0) actor.conquestProdTurns = (actor.conquestProdTurns ?? 0) - 1;
     if (recU) applySeatUnitOrders(state, actor, recU.units);
   }
 

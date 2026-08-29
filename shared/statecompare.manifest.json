@@ -666,6 +666,17 @@
           ]
         },
         {
+          "name": "conquestProdTurns",
+          "compare": "exact",
+          "covers": [
+            "Seat.conquestProdTurns"
+          ],
+          "planes": [
+            "conquest_turns"
+          ],
+          "note": "the Warlord's Throne window: turns of empire-wide bonus production still to run after a capture."
+        },
+        {
           "name": "warWeariness",
           "compare": "exact",
           "covers": [

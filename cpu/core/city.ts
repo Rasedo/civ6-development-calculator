@@ -89,7 +89,8 @@ export function seatBuildingSum(
   state: GameState,
   seat: number,
   key: 'spyCapacity' | 'influencePerTurn' | 'favorPerTurn' | 'govTitle' | 'loyaltyWithoutGovernor'
-    | 'amenitiesWithGovernor' | 'housingWithGovernor',
+    | 'amenitiesWithGovernor' | 'housingWithGovernor' | 'healOnKill' | 'conquestProdPct'
+    | 'conquestProdTurns',
 ): number {
   let n = 0;
   for (const city of citiesOf(state, seat)) {
@@ -101,6 +102,38 @@ export function seatBuildingSum(
     }
   }
   return n;
+}
+
+/**
+ * The same sum over ONE city — the shape of a Plaza term that names "this
+ * city" rather than the empire, and of the any-Great-Work slot pool.
+ */
+export function cityBuildingSum(
+  state: GameState,
+  city: { buildings: string[]; districts?: City['districts'] },
+  key: 'settlerProdPct' | 'anyWorkSlots',
+): number {
+  const dark = pillagedDistrictTypes(state.map, city.districts ?? []);
+  let n = 0;
+  for (const id of city.buildings) {
+    const def = BUILDINGS[id];
+    if (!def || dark.has(def.district)) continue;
+    n += def[key] ?? 0;
+  }
+  return n;
+}
+
+/** CIV6 (Ancestral Hall): "New cities receive a free Builder" — what a
+ *  standing building hands every city this seat founds, or null. */
+export function newCityGrantUnit(state: GameState, seat: number): string | null {
+  for (const city of citiesOf(state, seat)) {
+    const dark = pillagedDistrictTypes(state.map, city.districts);
+    for (const id of city.buildings) {
+      const def = BUILDINGS[id];
+      if (def?.grantUnitNewCity && !dark.has(def.district)) return def.grantUnitNewCity;
+    }
+  }
+  return null;
 }
 
 export function cityMaintenance(state: GameState, city: City): number {

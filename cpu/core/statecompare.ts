@@ -385,6 +385,7 @@ const SEAT: Record<string, Extractor> = {
   envoysAvailable: overSeats((s) => s.envoysAvailable),
   buildersTrained: overSeats((s) => s.buildersTrained),
   relicReserve: overSeats((s) => s.relicReserve ?? 0),
+  conquestProdTurns: overSeats((s) => s.conquestProdTurns ?? 0),
   // what past emergencies left standing: envoy gold, minor-leg gold, then the
   // per-seat heal and city-strike counts, both dense over the roster
   emergencyRewards: overSeats((s, st) => [

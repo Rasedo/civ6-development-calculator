@@ -68,7 +68,7 @@ from the list below.
 | C-5 strategic-resource stockpiles | 2 | the shortage penalty's magnitude is unpublished; resource trading waits on C-2 |
 | C-16 the spy's second half | 2 | the escape sequence, captured spies, the promotion pool, counterspy levels, the same-mission gate, two carrier-less missions |
 | C-20 the Military Engineer's build list | 1 | the Missile Silo (C-31), Mountain Tunnel (C-35), railroad (C-36), clean-fallout and remove-improvement verbs |
-| C-22 the district roster | 2 | the Canal carries no naval passage (C-35), five Government Plaza buildings have no effect body beyond their title, the Preserve table is a stylization |
+| C-22 the district roster | 2 | the Canal carries no naval passage (C-35), the Royal Society has no unit verb, the any-work pool does not reach artifacts, the Preserve table is a stylization |
 | C-24 the climate arc | 1 | nothing is ever submerged (C-35), railroads emit nothing (C-36), the Flood Barrier keeps for nothing |
 | C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — PARKED by owner decision |
 | C-31 the nuclear device has no system behind it | 1 | an area attack, persistent fallout, the delivery chassis and the diplomatic reaction |
@@ -613,18 +613,27 @@ under their blocker so the dependency is readable, and both halves count.
   (`canalPassageOk` / `_canal_plot` poke-proven). OPEN:
   - **THE CANAL CARRIES NO NAVAL PASSAGE** — the passage wants its own
     plane, not a bit borrowed from the water one (C-35).
-  - **FIVE GOVERNMENT PLAZA BUILDINGS PAY ONLY THEIR GOVERNOR TITLE.**
-    The Ancestral Hall's Builder in every new city, the Warlord's
-    Throne's post-conquest production, the National History Museum's
-    Great Work slots, the Royal Society's charge-into-production and the
-    War Department's combat bonus each need a channel this model does not
-    have. (The Grand Master's Chapel's faith purchase ships —
-    `unitFaithCost` / `_seat_faith_unit_candidate`.) The Audience
-    Chamber ships whole — "-2 Loyalty in Cities without Governors" and
-    the governor-CONDITIONAL amenities and housing both. The circle that
-    blocked the conditional (the governor pick was decided from loyalty,
-    which reads the amenity tier, which reads the city walk) is gone:
-    the roster is STATE carried into the turn, so the walk can read it.
+  - **THE ROYAL SOCIETY HAS NO VERB.** "Builders gain the ability to use
+    all of their charges to provide bonus Production to a District
+    Project. Once per city per turn" — 2% of the project's cost per
+    charge (Civilization wiki, GS). The magnitude and the rule are
+    sourced; what is missing is a unit ORDER: a new mask column, its
+    applier on both engines, a per-city per-turn flag and the driver's
+    twin. The other four rows ship (`settlerProdPct` /
+    `grantUnitNewCity`, `conquestProdPct` / `conquest_turns`,
+    `anyWorkSlots` / `_any_work_free_all`, `healOnKill` /
+    `_heal_on_kill`; `tests/gpu/plaza_test.py`,
+    `tests/cpu/city/plaza-buildings.test.ts`), as do the Audience
+    Chamber, the Grand Master's Chapel, the Foreign Ministry and the
+    Intelligence Agency.
+  - **THE ANY-WORK POOL DOES NOT REACH ARTIFACTS.** The National History
+    Museum's four slots take a Great Work of any kind, and this model
+    lets them take writing, art, music and relics. An ARTIFACT cannot
+    reach them: `ARTIFACT_SLOTS` / `_artifact_slots` is a bare three that
+    the Archaeological Museum's theming walk counts on, and the
+    Archaeologist's own training gate names that building. Closing it
+    wants the artifact slot count to become a per-city capacity like the
+    other four.
   - **THE PRESERVE'S HOUSING TABLE IS THIS MODEL'S OWN** —
     `PRESERVE_APPEAL_HOUSING` / `preserveHousing` state the published
     ceiling at Breathtaking; no source can close the middle.

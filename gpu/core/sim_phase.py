@@ -273,6 +273,10 @@ class SimPhase:
             inb = hi & (ob[:, :, row] > 0)
             ob[:, :, row] -= inb.long()
         self.peace_turns[:, row] = self.peace_turns[:, row] + (active & ~any_war).long()
+        # CIV6 (Warlord's Throne): the conquest window runs 5 turns and expires
+        # by reaching zero, beside every other per-seat clock.
+        _cq = active & (self.conquest_turns[:, row] > 0)
+        self.conquest_turns[:, row] -= _cq.long()
 
     def _seat_governor_seats(self, row: int) -> torch.Tensor:
         """[B, RC] — the row's governor-held cities, straight off the roster.
@@ -524,6 +528,18 @@ class SimPhase:
                         if _eramax >= 0:
                             _hit = _hit & (self._type_era[_ui] <= _eramax)
                     _add = _add + (_pact & _hit).to(_add.dtype) * _pct
+        # CIV6 (Ancestral Hall): "50% increased Production toward Settlers in
+        # this city"; (Warlord's Throne): "Capturing an enemy City grants 20%
+        # bonus Production in all Cities for 5 turns". Percentages both, so
+        # they join the SAME additive sum rather than compounding on it.
+        if bool((self._b_settler_prod != 0).any()):
+            _stand_b = self.city_bldg[bidx, row, col] & ~self._bldg_dark(self.city_dist_tile[bidx, row, col])
+            _sp = (_stand_b.double() * self._b_settler_prod.unsqueeze(0)).sum(dim=1) / 100
+            _add = _add + torch.where(cur == self.SETTLER, _sp, torch.zeros_like(_sp)).to(_add.dtype)
+        if bool((self._b_conquest_pct != 0).any()):
+            _cqp = self._seat_building_sum(row, self._b_conquest_pct) / 100
+            _add = _add + torch.where(self.conquest_turns[:, row] > 0,
+                                      _cqp, torch.zeros_like(_cqp)).to(_add.dtype)
         # A Great Person's permanent share joins the SAME additive sum.
         _add = _add + self._gp_prod_pct(row, cur).to(_add.dtype)
         _emall = _emall * (1 + _add)

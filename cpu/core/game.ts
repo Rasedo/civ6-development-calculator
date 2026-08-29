@@ -1,13 +1,13 @@
 
 import type { City, DistrictId, GameState, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, Seat, Unit } from './types';
 import { dropQueuedBuilding } from './production';
-import { greatPeopleEarned } from './greatPeople';
+import { greatPeopleEarned, relicSlotsIn } from './greatPeople';
 import { airTrainTile } from './air';
-import { placeRelic, GP_CLASSES, RELIC_WONDER_SLOTS } from '../data/greatPeople';
+import { placeRelic, GP_CLASSES } from '../data/greatPeople';
 import { VALLETTA_FAITH_DISTRICTS } from '../data/cityStates';
 import { generateMap } from '../../world/mapgen';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
-import { acquireTile, borderCandidates } from './city';
+import { acquireTile, borderCandidates, newCityGrantUnit } from './city';
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, isCivicComplete } from './effects';
 import type { Modifiers, Unlocks } from './effects';
@@ -226,6 +226,11 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     if (owner) owner.capitalTile = tile.index;  // static once founded
   }
   revealAround(state, seat, tile.index, 3);
+  // CIV6 (Ancestral Hall): "New cities receive a free Builder." The grant is
+  // the SEAT's, so the first city — founded before any Plaza stands — never
+  // sees it.
+  const grant = newCityGrantUnit(state, seat);
+  if (grant) spawnUnit(state, grant, tile.index, seat);
   return city;
 }
 
@@ -1518,13 +1523,10 @@ function theologicalCombatPhase(state: GameState): void {
     // Granted in the SAME order as the two disbands below (defender first,
     // then attacker) so the relic's slot is order-exact across engines.
     const martyrs = (u: Unit): boolean => promoFlag(u, 'MARTYR');
-    // Capacity is the TEMPLE's slot plus any wonder's, so the closure resolves
-    // completeness off the tile the way the Great-Works path does.
-    const relicSlots = (c: { wonders?: { id: string; tileIndex: number }[] }) =>
-      (c.wonders ?? []).reduce(
-        (n, w) => n + (state.map.tiles[w.tileIndex].builtWonderComplete ? RELIC_WONDER_SLOTS[w.id] ?? 0 : 0),
-        0,
-      );
+    // Capacity is the TEMPLE's slot plus any wonder's and the any-work pool's,
+    // so the closure resolves completeness off the tile the way the
+    // Great-Works path does.
+    const relicSlots = relicSlotsIn(state);
     // CIV6: a Relic that finds no open slot waits in reserve for one to open;
     // `drainRelicReserve` hands it out at the owner's next turn.
     const reserve = (sx: number) => {

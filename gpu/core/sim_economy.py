@@ -1617,6 +1617,20 @@ class SimEconomy:
             d[key] = v
         return v
 
+    def _bsum_by_row(self, key: str, w: torch.Tensor) -> torch.Tensor:
+        """[B, n_majors] — `_seat_building_sum` for EVERY major row at once,
+        for the sites that read the OWNER off a unit rather than a loop index.
+        Memoised beside the effect channels: every `city_bldg` write moves
+        `_eff_version`."""
+        if self._bsum_row_cache is None or self._bsum_row_cache[0] != self._eff_version:
+            self._bsum_row_cache = (self._eff_version, {})
+        d = self._bsum_row_cache[1]
+        v = d.get(key)
+        if v is None:
+            v = torch.stack([self._seat_building_sum(r, w) for r in range(self.n_majors)], dim=1)
+            d[key] = v
+        return v
+
     def _fx_at_seat(self, key: str, seat: torch.Tensor,
                     rows: torch.Tensor | None = None) -> torch.Tensor:
         """One effect channel for the seat each row names, 0 off the major
@@ -1955,8 +1969,37 @@ class SimEconomy:
 
     def _gw_capacity(self, row: int, kind: int) -> torch.Tensor:
         """[B, RC] — how many works of `kind` each of this row's cities holds
-        room for: the slot BUILDING's own plus whatever its completed wonders
-        add. `gwCapacity`'s twin, and `_place_works`' own `cap`."""
+        room for: its DEDICATED slots, or what it already holds where that is
+        more, plus whatever is left of the any-work pool. `gwCapacity`'s twin
+        under `gwExtraSlots`, and `_place_works`' own `cap`."""
+        held = (self.city_gw_writing, self.city_gw_art, self.city_gw_music)[kind][:, row]
+        return torch.maximum(self._gw_dedicated(row, kind), held) \
+            + self._any_work_free_all()[:, row]
+
+    def _any_work_free_all(self) -> torch.Tensor:
+        """[B, n_majors, RC] long — CIV6 (National History Museum): "Provides 4
+        slots for any Great Work". ONE shared pool per city, which a work of any
+        kind falls into once the slots of its OWN kind are full, so what is left
+        of it is the pool minus everything already standing in it.
+        `anyWorkFree`'s twin."""
+        z = torch.zeros(self.B, self.n_majors, self.RC, dtype=torch.long, device=self.device)
+        if not self._any_work_live:
+            return z
+        pool = z.clone()
+        used = z.clone()
+        rded = self._relic_dedicated()
+        for r in range(self.n_majors):
+            stand = self.city_bldg[:, r] & ~self._bldg_dark(self.city_dist_tile[:, r])
+            pool[:, r] = torch.einsum("bjn,n->bj", stand.long(), self._b_any_work)
+            for k in range(3):
+                held = (self.city_gw_writing, self.city_gw_art, self.city_gw_music)[k][:, r]
+                used[:, r] = used[:, r] + (held - self._gw_dedicated(r, k)).clamp(min=0)
+            used[:, r] = used[:, r] + (self.city_relics[:, r] - rded[:, r]).clamp(min=0)
+        return (pool - used).clamp(min=0)
+
+    def _gw_dedicated(self, row: int, kind: int) -> torch.Tensor:
+        """[B, RC] — the slots of `kind` each of this row's cities owns outright:
+        the slot BUILDING's own plus whatever its completed wonders add."""
         bcol, nslots = self._gw_bidx[kind], self._gw_slots_k[kind]
         base = self.city_gw_writing[:, row]
         if bcol < 0:

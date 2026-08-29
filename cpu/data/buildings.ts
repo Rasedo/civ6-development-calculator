@@ -124,6 +124,23 @@ export interface BuildingDef {
   trainXpPct?: number;
   /** the promotion classes `trainXpPct` reaches. */
   trainXpClasses?: readonly PromoClass[];
+  /** CIV6 (Ancestral Hall): "50% increased Production toward Settlers in this
+   *  city" — the building's OWN city, unlike every other Plaza term. */
+  settlerProdPct?: number;
+  /** CIV6 (Ancestral Hall): "New cities receive a free Builder" — the unit
+   *  every city this seat FOUNDS is handed, from the one city that built it. */
+  grantUnitNewCity?: string;
+  /** CIV6 (Warlord's Throne): "Capturing an enemy City grants 20% bonus
+   *  Production in all Cities for 5 turns." */
+  conquestProdPct?: number;
+  conquestProdTurns?: number;
+  /** CIV6 (National History Museum): "Provides 4 slots for any Great Work" —
+   *  ONE shared pool, which a work of any kind falls into once the slots of
+   *  its own kind are full. */
+  anyWorkSlots?: number;
+  /** CIV6 (War Department): "All units heal up to 20 hit points when they
+   *  eliminate a unit." */
+  healOnKill?: number;
   /**
    * CIV6 (Flood Barrier): "Constructed automatically around each Coastal
    * Lowland tile belonging to the city; it protects them from flooding when
@@ -233,15 +250,15 @@ const rawList: BuildingDef[] = [
   // of a tier exclude each other: a Plaza ends the game holding three
   // buildings, one per tier. CIV6: "Government Plaza buildings, unlike those
   // of other districts, cannot be purchased with Gold."
-  { id: 'ANCESTRAL_HALL', name: 'Ancestral Hall', district: 'GOVERNMENT_PLAZA', cost: 150, maintenance: 1, govTier: 1, govTitle: 1, noPurchase: true, exclusiveWith: ['AUDIENCE_CHAMBER', 'WARLORDS_THRONE'] },
+  { id: 'ANCESTRAL_HALL', name: 'Ancestral Hall', district: 'GOVERNMENT_PLAZA', cost: 150, maintenance: 1, govTier: 1, govTitle: 1, noPurchase: true, exclusiveWith: ['AUDIENCE_CHAMBER', 'WARLORDS_THRONE'], settlerProdPct: 50, grantUnitNewCity: 'BUILDER' },
   { id: 'AUDIENCE_CHAMBER', name: 'Audience Chamber', district: 'GOVERNMENT_PLAZA', cost: 150, maintenance: 1, govTier: 1, govTitle: 1, noPurchase: true, exclusiveWith: ['ANCESTRAL_HALL', 'WARLORDS_THRONE'], loyaltyWithoutGovernor: -2, amenitiesWithGovernor: 2, housingWithGovernor: 4 },
-  { id: 'WARLORDS_THRONE', name: "Warlord's Throne", district: 'GOVERNMENT_PLAZA', cost: 150, maintenance: 1, govTier: 1, govTitle: 1, noPurchase: true, exclusiveWith: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER'] },
+  { id: 'WARLORDS_THRONE', name: "Warlord's Throne", district: 'GOVERNMENT_PLAZA', cost: 150, maintenance: 1, govTier: 1, govTitle: 1, noPurchase: true, exclusiveWith: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER'], conquestProdPct: 20, conquestProdTurns: 5 },
   { id: 'FOREIGN_MINISTRY', name: 'Foreign Ministry', district: 'GOVERNMENT_PLAZA', cost: 290, maintenance: 2, govTier: 2, govTitle: 1, noPurchase: true, favorPerTurn: 3, requiresAny: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER', 'WARLORDS_THRONE'], exclusiveWith: ['GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'] },
   { id: 'GRAND_MASTERS_CHAPEL', name: "Grand Master's Chapel", district: 'GOVERNMENT_PLAZA', cost: 290, maintenance: 2, govTier: 2, govTitle: 1, noPurchase: true, faithBuyUnits: true, pillageFaithImp: 15, pillageFaithDist: 30, yields: { faith: 5 }, requiresAny: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER', 'WARLORDS_THRONE'], exclusiveWith: ['FOREIGN_MINISTRY', 'INTELLIGENCE_AGENCY'] },
   { id: 'INTELLIGENCE_AGENCY', name: 'Intelligence Agency', district: 'GOVERNMENT_PLAZA', cost: 290, maintenance: 2, govTier: 2, govTitle: 1, noPurchase: true, spyCapacity: 1, grantUnit: 'SPY', requiresAny: ['ANCESTRAL_HALL', 'AUDIENCE_CHAMBER', 'WARLORDS_THRONE'], exclusiveWith: ['FOREIGN_MINISTRY', 'GRAND_MASTERS_CHAPEL'] },
-  { id: 'NATIONAL_HISTORY_MUSEUM', name: 'National History Museum', district: 'GOVERNMENT_PLAZA', cost: 440, maintenance: 3, govTier: 3, govTitle: 1, noPurchase: true, requiresAny: ['FOREIGN_MINISTRY', 'GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'], exclusiveWith: ['ROYAL_SOCIETY', 'WAR_DEPARTMENT'] },
+  { id: 'NATIONAL_HISTORY_MUSEUM', name: 'National History Museum', district: 'GOVERNMENT_PLAZA', cost: 440, maintenance: 3, govTier: 3, govTitle: 1, noPurchase: true, requiresAny: ['FOREIGN_MINISTRY', 'GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'], exclusiveWith: ['ROYAL_SOCIETY', 'WAR_DEPARTMENT'], anyWorkSlots: 4 },
   { id: 'ROYAL_SOCIETY', name: 'Royal Society', district: 'GOVERNMENT_PLAZA', cost: 440, maintenance: 3, govTier: 3, govTitle: 1, noPurchase: true, requiresAny: ['FOREIGN_MINISTRY', 'GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'], exclusiveWith: ['NATIONAL_HISTORY_MUSEUM', 'WAR_DEPARTMENT'] },
-  { id: 'WAR_DEPARTMENT', name: 'War Department', district: 'GOVERNMENT_PLAZA', cost: 440, maintenance: 3, govTier: 3, govTitle: 1, noPurchase: true, requiresAny: ['FOREIGN_MINISTRY', 'GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'], exclusiveWith: ['NATIONAL_HISTORY_MUSEUM', 'ROYAL_SOCIETY'] },
+  { id: 'WAR_DEPARTMENT', name: 'War Department', district: 'GOVERNMENT_PLAZA', cost: 440, maintenance: 3, govTier: 3, govTitle: 1, noPurchase: true, requiresAny: ['FOREIGN_MINISTRY', 'GRAND_MASTERS_CHAPEL', 'INTELLIGENCE_AGENCY'], exclusiveWith: ['NATIONAL_HISTORY_MUSEUM', 'ROYAL_SOCIETY'], healOnKill: 20 },
 ];
 
 const list: BuildingDef[] = rawList.map((b) => ({ ...b, cost: Math.round(b.cost * GAME_SPEED) }));

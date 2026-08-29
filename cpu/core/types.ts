@@ -454,6 +454,9 @@ export interface Seat {
   buildersTrained: number;
   /** CIV6: a Relic with no open slot is held until one opens, not lost. */
   relicReserve: number;
+  /** CIV6 (Warlord's Throne): "Capturing an enemy City grants 20% bonus
+   *  Production in all Cities for 5 turns" — the turns still to run. */
+  conquestProdTurns?: number;
   bestMeleeCS: number;
   tilesPurchased: number;
   spaceProjects: string[];

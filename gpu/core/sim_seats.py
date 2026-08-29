@@ -1824,6 +1824,7 @@ class SimSeats:
             self._occ_clear(gd, td, ds[dead])
             self._unit_kill_event(a_seat, d_type, d_seat == BARB_SEAT, d_died, at0)
             self._gen_ver += 1
+        _hp_p[:, u] = self._heal_on_kill(self._row_of(a_seat), d_died, _hp_p[:, u])
 
     def _air_spawn_at(self, row: int, ty: torch.Tensor, col: torch.Tensor,
                       ctr: torch.Tensor) -> torch.Tensor:
@@ -2431,10 +2432,18 @@ class SimSeats:
             self.embarked_at[(rows[emb], t[emb])] = -1
 
     def _relic_cap(self) -> torch.Tensor:
-        """[B, n_majors, RC] long — each city's relic capacity: the relic
-        building's slots plus every COMPLETE wonder it holds. The `placeRelic`
-        capacity expression, computed for every major row at once (the wonder
-        registry is majors-only, which is who can hold a wonder)."""
+        """[B, n_majors, RC] long — each city's relic capacity: its DEDICATED
+        slots, or what it already holds where that is more, plus whatever is
+        left of the any-work pool. The `placeRelic` capacity expression under
+        `relicSlotsIn`."""
+        return torch.maximum(self._relic_dedicated(), self.city_relics[:, : self.n_majors]) \
+            + self._any_work_free_all()
+
+    def _relic_dedicated(self) -> torch.Tensor:
+        """[B, n_majors, RC] long — the relic slots each city owns outright: the
+        relic building's plus every COMPLETE wonder it holds, for every major
+        row at once (the wonder registry is majors-only, which is who can hold a
+        wonder)."""
         cap = self.city_bldg[:, : self.n_majors, :, self._relic_bidx].long() * self._relic_slots
         if getattr(self, "_wond_relic", None) is None or int(self._wond_relic.sum()) == 0:
             return cap
@@ -5017,6 +5026,7 @@ class SimSeats:
         self.city_spec_pin[b, row, col, :] = -1
         self.city_wonder[b, row, col, :] = -1
         self.city_bldg[b, row, col, :] = False
+        self._eff_version += 1
         self.city_followed[b, row, col] = -1
         self.city_pressure[b, row, col, :] = 0
 
@@ -5072,6 +5082,13 @@ class SimSeats:
         # a raze at the cap earns them too, and the loser's LAST city pays the
         # whole world. A LOYALTY FLIP earns none: nobody declared anything.
         if conquest and src_row < self.n_majors and dst_row < self.n_majors:
+            # CIV6 (Warlord's Throne): "Capturing an enemy City grants 20% bonus
+            # Production in all Cities for 5 turns" — the window opens on the
+            # CAPTURE, so a city taken only to be razed opens it too.
+            if bool((self._b_conquest_turns != 0).any()):
+                _cqt = int(self._seat_building_sum(dst_row, self._b_conquest_turns)[b])
+                if _cqt > 0:
+                    self.conquest_turns[b, dst_row] = _cqt
             self._grievance_city_taken(
                 b, dst_row, src_row,
                 bool(self.city_alive[b, dst_row].sum() >= int(self.rules.seats.get("maxCities", 6))))
@@ -5509,6 +5526,16 @@ class SimSeats:
             self._tile_owner_ver += 1
         self._eff_version += 1
         return found
+
+    def _grant_new_city_unit(self, row: int, made: torch.Tensor, tile: torch.Tensor) -> None:
+        """CIV6 (Ancestral Hall): "New cities receive a free Builder." The grant
+        is the SEAT's, so the first city — founded before any Plaza stands —
+        never sees it. Called once the founding SETTLER is off the tile, which
+        is where `foundCity` grants it: TS disbands the settler before
+        `foundCityAt` runs, so the centre is free when the Builder lands."""
+        _gu = self._seat_new_city_unit(row)
+        for _ui in sorted({int(x) for x in self._b_grant_new_city.tolist() if x >= 0}):
+            self._spawn_unit(row, made & (_gu == _ui), tile, _ui)
 
     def _hostile_vs_unit(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int) -> None:
         """`meleeAttackInner`'s unit arm — the ONE melee-vs-unit
@@ -6964,6 +6991,36 @@ class SimSeats:
             live[sp] = True
             self._award_defense_xp(live, d_slot)
 
+    def _seat_new_city_unit(self, row: int) -> torch.Tensor:
+        """[B] long — CIV6 (Ancestral Hall): "New cities receive a free
+        Builder"; the unit index a STANDING building hands every city this seat
+        founds, -1 where it holds none. `newCityGrantUnit`'s twin."""
+        out = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        have = (self._b_grant_new_city >= 0).nonzero(as_tuple=True)[0].tolist()
+        if not have:
+            return out
+        reg = self.city_dist_tile[:, row]
+        stand = self.city_bldg[:, row] & ~self._bldg_dark(reg) & self.city_alive[:, row].unsqueeze(2)
+        for bi in have:
+            hit = stand[:, :, bi].any(dim=1)
+            out = torch.where((out < 0) & hit,
+                              torch.full_like(out, int(self._b_grant_new_city[bi])), out)
+        return out
+
+    def _heal_on_kill(self, row: torch.Tensor, won: torch.Tensor,
+                      hp: torch.Tensor) -> torch.Tensor:
+        """`healOnEliminate`'s twin — CIV6 (War Department): "All units heal up
+        to 20 hit points when they eliminate a unit." The victor's OWN seat
+        holds the building, so a barbarian's or a city-state's kill heals
+        nothing, and a city is not a unit."""
+        if not self._heal_kill_live:
+            return hp
+        cap = int(self.rules.combat.get("unitHp", 100))
+        ok = won & (row >= 0) & (row < self.n_majors)
+        tab = self._bsum_by_row("healkill", self._b_heal_kill)
+        amt = tab.gather(1, row.clamp(min=0, max=self.n_majors - 1).unsqueeze(1)).squeeze(1)
+        return torch.where(ok & (amt > 0), (hp + amt.to(hp.dtype)).clamp(max=cap), hp)
+
     def _melee_exchange(self, att: torch.Tensor, tgt: torch.Tensor, tile_c: torch.Tensor,
                         d_slot: torch.Tensor, a_hp: torch.Tensor, u: int,
                         atk_e: torch.Tensor, def_e: torch.Tensor,
@@ -7003,6 +7060,16 @@ class SimSeats:
         atk_raw = att & (a_hp[:, u] <= 0)
         both = def_dead & atk_raw
         a_hp[:, u] = torch.where(both, torch.ones_like(a_hp[:, u]), a_hp[:, u])
+        # The WAR DEPARTMENT's heal, both ways: the attacker whose blow landed
+        # and, where the counter killed instead, the defender who stood.
+        a_hp[:, u] = self._heal_on_kill(atk_row, def_dead, a_hp[:, u])
+        d_won = atk_raw & ~def_dead
+        if self._heal_kill_live and bool(d_won.any()):
+            dr = d_won.nonzero(as_tuple=True)[0]
+            dsl = d_slot[dr]
+            self.unit_hp[dr, dsl] = self._heal_on_kill(
+                self._row_of(self.unit_seat[dr, dsl]),
+                torch.ones_like(dr, dtype=torch.bool), self.unit_hp[dr, dsl])
         return rows, def_dead, atk_raw & ~def_dead, atk_raw
 
     def _hostile_ranged_strike(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int) -> torch.Tensor:
@@ -7171,6 +7238,9 @@ class SimSeats:
             self._disciples_spread(
                 self._atk_seat(atk_kind, u), ut0, self._promo_pool(atk_kind)[0][:, u],
                 d_barb, ttc, unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
+            _hp_p[:, u] = self._heal_on_kill(
+                self._row_of(self._atk_seat(atk_kind, u)),
+                unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0), _hp_p[:, u])
             if bool((unit_att & civ_def).any()):
                 self._gen_ver += 1
             self._award_pair_xp(
@@ -7368,6 +7438,9 @@ class SimSeats:
             self._disciples_spread(
                 self._atk_seat(atk_kind, u), at0, self._promo_pool(atk_kind)[0][:, u],
                 d_barb, ttc, unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
+            a_hp[:, u] = self._heal_on_kill(
+                self._row_of(self._atk_seat(atk_kind, u)),
+                unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0), a_hp[:, u])
             if bool((unit_att & ~ok_m).any()):
                 self._gen_ver += 1
             self._award_pair_xp(

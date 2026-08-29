@@ -239,6 +239,9 @@ class SimInit:
         self.war_turns = torch.zeros(B, self.NS, self.NS, dtype=torch.long, device=device)
         self.treaty_turns = torch.zeros(B, self.NS, self.NS, dtype=torch.long, device=device)
         self.peace_turns = torch.zeros(B, self.NS, dtype=torch.long, device=device)
+        # `conquest_turns[b, row]` is the WARLORD'S THRONE window: turns of
+        # empire-wide bonus production still to run after a capture.
+        self.conquest_turns = torch.zeros(B, self.NS, dtype=torch.long, device=device)
         citystate_yidx = rules.citystate.get("typeYieldIdx", [3, 4, 2, 1, 1, 5])
         self._cs_type_n = len(citystate_yidx)  # CITY_STATE_TYPES' width
         self._citystate_yidx = torch.tensor(citystate_yidx, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S]
@@ -1985,6 +1988,15 @@ class SimInit:
         self._b_house_gov = rules.b_house_gov.to(device)
         self._b_gov_yield = rules.b_gov_yield.to(device)
         self._palace_gov_yield = bool(rules.palace_gov_yield)
+        self._b_grant_new_city = rules.b_grant_new_city.to(device)
+        self._b_settler_prod = rules.b_settler_prod.to(device)
+        self._b_conquest_pct = rules.b_conquest_pct.to(device)
+        self._b_conquest_turns = rules.b_conquest_turns.to(device)
+        self._b_any_work = rules.b_any_work.to(device)
+        self._any_work_live = bool((self._b_any_work != 0).any())
+        self._b_heal_kill = rules.b_heal_kill.to(device)
+        self._heal_kill_live = bool((self._b_heal_kill != 0).any())
+        self._bsum_row_cache = None
         # CIV6 (Water Works): housing per Neighborhood/Aqueduct, amenities per
         # Canal/Dam — the district roster, by catalog id.
         _dids = [str(d.get("id", "")) for d in self.districts_cat]
@@ -2374,7 +2386,7 @@ class SimInit:
         self._adjd_cache = self._adjc_cache = self._adjh_cache = self._adjt_cache = None
         self._dadj_cache = None
         self._fx_row_cache = None
-        self._fadjq_cache = self._rcy_cache = None
+        self._fadjq_cache = self._rcy_cache = self._bsum_row_cache = None
         self._bld_cache = {}
         self._bel_version += 1
         self._rp_kill_version += 1
@@ -2589,7 +2601,7 @@ class SimInit:
         self._adjd_cache = self._adjc_cache = self._adjh_cache = self._adjt_cache = None
         self._dadj_cache = None
         self._fx_row_cache = None
-        self._fadjq_cache = self._rcy_cache = None
+        self._fadjq_cache = self._rcy_cache = self._bsum_row_cache = None
         self._bld_cache = {}
         self._bel_version += 1
         self._gen_ver += 1

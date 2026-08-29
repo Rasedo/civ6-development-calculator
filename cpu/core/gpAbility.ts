@@ -16,7 +16,7 @@ import {
   gpChargesOf, gpEffectOf, gpSiteOf, gwCapacity, gwCount, placeGreatWorks,
   type GpEffect, type GreatPersonDef,
 } from '../data/greatPeople';
-import { wonderGwSlots } from './greatPeople';
+import { gwExtraSlots } from './greatPeople';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
 import { resolveSuzerain } from './cityStates';
 import { ERAS, TECHS } from '../data/techs';
@@ -54,7 +54,7 @@ export function gpCityAt(state: GameState, seat: number, tile: Tile): City | und
 
 /** an open Great Work slot of `kind` in this city, wonders included. */
 function gwOpen(state: GameState, city: City, kind: number): boolean {
-  return gwCount(city, kind) < gwCapacity(city, kind, wonderGwSlots(state, kind)(city));
+  return gwCount(city, kind) < gwCapacity(city, kind, gwExtraSlots(state, kind)(city));
 }
 
 /** MAY this person's charge be spent on the tile the unit is standing on? */
@@ -171,7 +171,7 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   if (fx.airSlotBonus) tile.airSlotBonus = (tile.airSlotBonus ?? 0) + fx.airSlotBonus;
   if (GW_WORK_CLASSES.has(person.class) && city) {
     const kind = GW_CLASS_KIND[person.class]!;
-    const overflow = placeGreatWorks([city], kind, wonderGwSlots(state, kind), unit.gpAt ?? 0);
+    const overflow = placeGreatWorks([city], kind, gwExtraSlots(state, kind), unit.gpAt ?? 0);
     if (fx.culture) owner.research.civicProgress += fx.culture * overflow;
   } else if (fx.culture) {
     owner.research.civicProgress += fx.culture;
@@ -263,7 +263,7 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
     for (let i = 0; i < fx.luxuryCopies; i++) inv.push(fx.luxuryAmenities ?? 1);
   }
   if (fx.greatWorkKind !== undefined && city) {
-    placeGreatWorks([city], fx.greatWorkKind, wonderGwSlots(state, fx.greatWorkKind), 0);
+    placeGreatWorks([city], fx.greatWorkKind, gwExtraSlots(state, fx.greatWorkKind), 0);
   }
   // THE SEAT'S OWN LEDGERS.
   if (fx.envoys) owner.envoysAvailable = (owner.envoysAvailable ?? 0) + fx.envoys;

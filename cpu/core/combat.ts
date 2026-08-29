@@ -2,7 +2,7 @@
 import type { City, CityState, GameState, ImprovementId, Seat, Tile, Unit } from './types';
 import { neighbors, hexDistance, tilesWithin } from '../../world/hex';
 import { isWater, isImpassable } from '../../world/query';
-import { civEraIndex } from './city';
+import { civEraIndex, seatBuildingSum } from './city';
 import { logUnitOrder } from './seatTurn';
 import { MODERN_ERA_INDEX } from '../data/techs';
 import { emergencyAttackCS, raiseEmergency, EMERGENCY_CITY_STATE } from './emergency';
@@ -731,6 +731,19 @@ export function congressUnitCS(state: GameState, unit: { type: string; seat: num
   return congressPromoClassCs(state, UNIT_PROMO_CLASS[unit.type]) + monk;
 }
 
+/**
+ * CIV6 (War Department): "All units heal up to 20 hit points when they
+ * eliminate a unit." The victor's own seat holds the building, so a barbarian
+ * or a city-state kill pays nothing; a victor that fell in the same exchange
+ * heals only once the mutual-kill rule has stood it back up.
+ */
+export function healOnEliminate(state: GameState, victor: Unit): void {
+  const seat = unitSeat(victor);
+  if (victor.hp <= 0 || !isCiv(seat)) return;
+  const n = seatBuildingSum(state, seat, 'healOnKill');
+  if (n > 0) victor.hp = Math.min(UNIT_HP, victor.hp + n);
+}
+
 export function killUnit(state: GameState, unit: Unit): void {
   // CIV6 (Air combat): "Should your Aircraft Carrier be destroyed, your
   // aircraft stationed within will be destroyed."
@@ -1233,10 +1246,12 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
       disciplesSpread(state, unitSeat(attacker), attacker, defender.seat, targetIndex);
       killUnit(state, defender);
       if (attacker.hp <= 0) attacker.hp = 1; // victor survives
+      healOnEliminate(state, attacker);
     } else if (attacker.hp <= 0) {
       unitKillEvent(state, unitSeat(defender), defender, attacker);
       disciplesSpread(state, unitSeat(defender), defender, attacker.seat, targetIndex);
       killUnit(state, attacker);
+      healOnEliminate(state, defender);
       attacker.movesLeft = 0;
       return ok;
     }
@@ -1317,7 +1332,10 @@ export function airStrike(state: GameState, attackerId: number, targetIndex: num
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, {
     aDied: attacker.hp <= 0, dDied: defender.hp <= 0,
   });
-  if (defender.hp <= 0) killUnit(state, defender);
+  if (defender.hp <= 0) {
+    killUnit(state, defender);
+    healOnEliminate(state, attacker);
+  }
   logUnitOrder(state, seat, attackerId, 'ranged', targetIndex);
   return { ok: true };
 }
@@ -1413,6 +1431,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     unitKillEvent(state, unitSeat(attacker), attacker, defender);
     disciplesSpread(state, unitSeat(attacker), attacker, defender.seat, targetIndex);
     killUnit(state, defender);
+    healOnEliminate(state, attacker);
   }
   spendAttack(attacker);
   return ok;
@@ -1502,6 +1521,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
     unitKillEvent(state, unitSeat(attacker), attacker, defender);
     disciplesSpread(state, unitSeat(attacker), attacker, defender.seat, targetIndex);
     killUnit(state, defender);
+    healOnEliminate(state, attacker);
   }
   spendAttack(attacker);
   return true;
