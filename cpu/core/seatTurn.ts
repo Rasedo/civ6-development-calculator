@@ -1,14 +1,15 @@
 
-import type { City, GameState, QueueItem } from './types';
+import type { City, GameState, QueueItem, Seat } from './types';
 import { seatOf, civsAtWar, seatsAllied } from './seats';
 import { decayGrievances, grievanceFavorPenalty, grievanceHeldCapitals } from './grievance';
 import { chargeProjectResource, chargeUnitResource } from './stockpile';
 import { isSuzerain } from './cityStates';
-import { seatTourism, seatTourismReligious, seatBuildingSum } from './city';
+import { seatTourism, seatTourismReligious, seatBuildingSum, tourismIntlPct } from './city';
 import { computeAdoption } from './effects';
 import { selectResearch } from './economy';
 import { GOVERNMENTS, GOVERNMENTS_ADOPTION_LIVE, POLICY_LIST } from '../data/policies';
-import { DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, FAVOR_PER_ALLIANCE } from '../data/seats';
+import { DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, FAVOR_PER_ALLIANCE, ENLIGHTENMENT_CIVIC, TOURISM_RELIGIOUS_PENALTY_PCT } from '../data/seats';
+import { seatWonderFlag } from './wonders';
 import { CITY_STATE_TYPES } from '../data/cityStates';
 import { emergencyEnvoyGold } from './emergency';
 import { pollutionFavorPenalty } from './climate';
@@ -87,8 +88,11 @@ export function seatAccumulators(state: GameState, seat: number, govCityIds?: Re
   const s = seatOf(state, seat);
   if (!s) return;
   s.treasury = (s.treasury ?? 0) + emergencyEnvoyIncome(state, seat);
-  s.tourism = (s.tourism ?? 0) + seatTourism(state, seat, govCityIds);
-  s.tourismReligious = (s.tourismReligious ?? 0) + seatTourismReligious(state, seat);
+  const natGeneral = seatTourism(state, seat, govCityIds);
+  const natReligious = seatTourismReligious(state, seat);
+  s.tourism = (s.tourism ?? 0) + natGeneral;
+  s.tourismReligious = (s.tourismReligious ?? 0) + natReligious;
+  bankTourismPerRival(state, s, natGeneral, natReligious);
   s.diplomaticFavor = Math.max(0, (s.diplomaticFavor ?? 0)
     + diplomaticFavorPerTurn(seatGovernmentId(state, seat), suzerainCount(state, seat),
                              policyTreatyFavor(state, seat), occupiedCapitals(state, seat),
@@ -144,4 +148,46 @@ export function logUnitOrder(state: GameState, seat: number, unitId: number, ver
   if (process.env.CIV6_ALOG) {
     console.error(`ALOG t${state.turn} s${seat} ${verb} unit=${unitId} tile=${tileIndex}`);
   }
+}
+
+/**
+ * The national output lands on EACH foreign civ through its own summed
+ * international modifier (`tourismIntlPct`), and the two sourced
+ * RELIGIOUS-ONLY halvings — "-50% for Different Religions", which "doesn't
+ * apply if you haven't founded a religion", and "-50% if the foreign
+ * civilization has The Enlightenment", which Cristo Redentor's shield
+ * cancels — are summed into the religious half's own percent. A total below
+ * -100% pays nothing rather than draining the bank.
+ */
+function bankTourismPerRival(state: GameState, s: Seat, general: number, religious: number): void {
+  const n = state.seats.length;
+  s.tourismTo ??= [];
+  s.tourismReligiousTo ??= [];
+  const shielded = seatWonderFlag(state, s.seat, 'holyTourismShield');
+  for (let o = 0; o < n; o++) {
+    if (o === s.seat) continue;
+    const other = state.seats[o];
+    if (!other) continue;
+    const pct = tourismIntlPct(state, s.seat, o);
+    let relPct = pct;
+    if (other.research.civics.includes(ENLIGHTENMENT_CIVIC) && !shielded) relPct -= TOURISM_RELIGIOUS_PENALTY_PCT;
+    const dom = dominantReligionOf(other);
+    if (s.religion.founded && dom >= 0 && dom !== s.seat) relPct -= TOURISM_RELIGIOUS_PENALTY_PCT;
+    s.tourismTo[o] = (s.tourismTo[o] ?? 0) + Math.floor(general * Math.max(0, 100 + pct) / 100);
+    s.tourismReligiousTo[o] = (s.tourismReligiousTo[o] ?? 0)
+      + Math.floor(religious * Math.max(0, 100 + relPct) / 100);
+  }
+}
+
+/** The religion MORE THAN HALF of a seat's cities follow, or -1 — religion
+ *  ids are founder seat ids, so at most one can pass the bar. */
+export function dominantReligionOf(s: { cities: { followedReligion?: number | null }[] }): number {
+  const n = s.cities.length;
+  const count = new Map<number, number>();
+  for (const c of s.cities) {
+    if (c.followedReligion == null || c.followedReligion < 0) continue;
+    count.set(c.followedReligion, (count.get(c.followedReligion) ?? 0) + 1);
+  }
+  for (const [g, k] of count) if (k * 2 > n) return g;
+  return -1;
 }

@@ -109,6 +109,9 @@ export interface PolicyEffects {
   /** a sent envoy counts as two when the city-state's suzerain runs a
    *  different government than the sender */
   envoyDoubleDiffGov?: boolean;
+  /** extra international tourism percent toward a civ this seat has a trade
+   *  route with, SUMMED with the standing route bonus */
+  tourismRouteBonus?: number;
   /** culture multiplier added per city-state this seat is suzerain of */
   culturePerSuzerain?: number;
   /** flat Combat Strength by PROMOTION class (`UNIT_PROMO_CLASS`); `all`
@@ -289,7 +292,9 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     P('COLLECTIVE_ACTIVISM', 'Collective Activism', 'diplomatic', '+5% culture per city-state this seat is suzerain of.', undefined, {
       culturePerSuzerain: 0.05,
     }),
-    P('ONLINE_COMMUNITIES', 'Online Communities', 'economic', '+50% tourism toward civs this seat has a trade route to.', undefined, {}),
+    P('ONLINE_COMMUNITIES', 'Online Communities', 'economic', '+50% tourism toward civs this seat has a trade route to.', undefined, {
+      tourismRouteBonus: 50,
+    }),
 
     P('STRATEGOS', 'Strategos', 'wildcard', '+2 Great General points per turn.', 'SCORCHED_EARTH', {
       gppFlat: { GENERAL: 2 },

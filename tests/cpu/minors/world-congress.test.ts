@@ -210,10 +210,9 @@ describe('diplomatic victory', () => {
   it('a CULTURE victory outranks a diplomatic one on the same turn', () => {
     const state = newGame(1);
     // seat 0 would win on culture ...
-    seatOf(state, 0)!.tourism = 5 * 2 * 200;
+    seatOf(state, 0)!.tourismTo = [0, 5 * 2 * 200];
     seatOf(state, 0)!.cultureTotal = 100;
     (state.seats[(0) + 1] as Seat).cultureTotal = 400;
-    (state.seats[(0) + 1] as Seat).tourism = 0;
     // ... and on diplomacy
     seatOf(state, 0)!.diplomaticPoints = DIPLO_VICTORY_POINTS;
     endTurn(state);

@@ -66,6 +66,9 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // EXPERT_MARKSMAN promotion on siege) may strike the distance-3 ring. Same
   // contract as the SNIPE head one hex out: column order is TILE INDEX order.
   for (let k = 0; k < 18; k++) names.push(`SNIPE3_${k}`);
+  // THE ROCK BAND'S ONE VERB: perform where it stands. Appended last, like
+  // every verb since FOUND_CITY.
+  names.push('PERFORM_CONCERT');
   return names;
 }
 

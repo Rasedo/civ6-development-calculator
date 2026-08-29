@@ -58,7 +58,7 @@ from the list below.
 | B-51r Encampment residuals | 1 | the district's strike is measured from the CITY CENTRE's tile, and a capture leaves its own pool standing (unsourced either way) |
 | B-44r city-state war tails | 1 | a ranged raider never shoots a minor centre (the seat verbs' own ranged-vs-city-state scope-out) |
 | B-65 religious zone of control | 1 | Civ 6 scopes a religious unit's ZOC to other religious units BOTH ways; the engines run one military-only rule |
-| B-61r the Great Person clauses with no carrier | 2 | 16 rows name a mechanic nothing here has (formations x4, tourism x4, regional range x2, CS absorption, diplomatic visibility, barbarian conversion, ocean passage, the queue gold-buyout, Tupac Amaru's per-district undefended grant walk); Mary Leakey's tourism clause waits on C-28 |
+| B-61r the Great Person clauses with no carrier | 2 | 16 rows name a mechanic nothing here has (formations x4, tourism x4, regional range x2, CS absorption, diplomatic visibility, barbarian conversion, ocean passage, the queue gold-buyout, Tupac Amaru's per-district undefended grant walk); Mary Leakey's tourism clause has a per-rival bank to read now and still no carrier |
 | B-34r flood tails | 1 | the climate/coastal tails wait on systems that do not exist here |
 | B-63r the grievance ledger's magnitudes | 1 | the occupied/razed rows ship at their published CEILING; the gang-up bar is a heuristic |
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
@@ -66,21 +66,19 @@ from the list below.
 | C-1 POWER | 2 | four renewables, the Biosphere, the Hydroelectric Dam building, decommission/recommission, the reactor age, minors never powered |
 | C-2 diplomatic agreements | 3 | alliance TYPES and LEVELS, diplomatic visibility, the negotiated two-sided deal, and the agreements that need one |
 | C-5 strategic-resource stockpiles | 2 | the shortage penalty's magnitude is unpublished; resource trading waits on C-2 |
-| C-6 policy-card modifiers | 1 | `ONLINE_COMMUNITIES` is inert, blocked on C-28 |
 | C-16 the spy's second half | 2 | the escape sequence, captured spies, the promotion pool, counterspy levels, the same-mission gate, two carrier-less missions |
 | C-20 the Military Engineer's build list | 1 | the Missile Silo (C-31), Mountain Tunnel (C-35), railroad (C-36), clean-fallout and remove-improvement verbs |
 | C-22 the district roster | 2 | the Canal carries no naval passage (C-35), five Government Plaza buildings have no effect body, the Preserve table is a stylization |
 | C-24 the climate arc | 1 | nothing is ever submerged (C-35), railroads emit nothing (C-36), the Flood Barrier keeps for nothing |
 | C-26 no civilization uniques | 5 | no civ ability, leader ability/agenda, unique unit or unique infrastructure — PARKED by owner decision |
-| C-28 tourism accrues to no one in particular | 2 | nothing ACCRUES tourism toward one rival, which the international modifiers and the Rock Band key on |
-| C-31 the two chassis with a system behind them | 1 | nuclear devices (an area attack + fallout + delivery) and the Rock Band (C-28) |
+| C-31 the nuclear device has no system behind it | 1 | an area attack, persistent fallout, the delivery chassis and the diplomatic reaction |
 | C-32 the new classes have no promotion tree | 2 | air, GDR, support, naval-raider and spy chassis are offered no promotion |
 | C-33 the Giant Death Robot is only its stats | 2 | its water walk, heal gate, district penalty and Future-era upgrades have no carrier |
 | C-34 air combat's second half | 2 | Interception, Patrol and Priority Target — the reason a fighter exists — do not exist |
 | C-35 the land/water fact never moves | 2 | one overloaded static bit blocks submersion and the Canal's passage |
 | C-36 no railroad | 2 | no second movement tier, no per-hex Iron/Coal charge, no CO2 |
-| **C. Absent systems** | **32** | |
-| **OPEN, TOTAL** | **54** | |
+| **C. Absent systems** | **29** | |
+| **OPEN, TOTAL** | **52** | |
 
 RULE FOR THE NEXT ROUND: when an entry closes, delete its row here in the
 SAME commit. When one opens, add a row with its weight and its reason. Do
@@ -411,8 +409,6 @@ under their blocker so the dependency is readable, and both halves count.
     (C-16) wait on this.
   - **JOINT WAR, JOIN ONGOING WAR, RESEARCH AGREEMENT and
     ASK-FOR-PROMISE** — each a two-sided deal by construction.
-  - The **+25% Open-Borders tourism** is an INTERNATIONAL modifier,
-    applied per foreign civilization; blocked on C-28.
 - **C-5. STRATEGIC-RESOURCE STOCKPILES — the bank ships; two tails.**
   Weight 2. The bank, the ceiling, the charges, the plant fuel and the
   heal denial all ship. OPEN:
@@ -423,10 +419,6 @@ under their blocker so the dependency is readable, and both halves count.
   - **RESOURCE TRADING** — "lump quantities of Consumable resources", a
     two-sided deal; blocked on C-2.
   - **ZANZIBAR'S TWO EXISTS-NOWHERE-ELSE LUXURIES** — B-21r.
-- **C-6. POLICY-CARD MODIFIERS — one of the 49 cards is inert.** Weight
-  1. Blocked on a system:
-  - `ONLINE_COMMUNITIES` — "+50% Tourism output to civilizations to which
-    you have a Trade Route"; blocked on C-28.
 - **C-16. THE SPY'S SECOND HALF.** Weight 2. The Spy, its capacity, the
   jump, the eleven-mission catalog, the counterspy post and the capture
   roll ship (`spy_test.py`, `spy.test.ts`; gate reach unmeasured — treat
@@ -468,25 +460,12 @@ under their blocker so the dependency is readable, and both halves count.
     Improvements"** is a verb neither engine has for any unit.
   - (The Bath in the charge's district list is Rome's unique Aqueduct —
     C-26.)
-- **C-28. TOURISM ACCRUES TO NO ONE IN PARTICULAR.** Weight 2. The bank
-  is two lifetime scalars (`Seat.tourism` / `civ_tourism`,
-  `Seat.tourismReligious` / `civ_tourism_rel`) divided by the civ count on
-  read; the two sourced religious halvings apply per rival at the
-  culture-victory read (`cultureVictor` / `_culture_victor`). What is
-  missing is ACCRUAL per foreign civ: real Civ 6 banks tourism toward
-  each rival separately, which is what the international +25% modifiers
-  (Open Borders — C-2 — and the trade-route pair), the up-to--40%
-  different-governments penalty, `ONLINE_COMMUNITIES` (C-6) and the Rock
-  Band (C-31) all key on.
-- **C-31. THE TWO CHASSIS WITH A SYSTEM BEHIND THEM.** Weight 1.
+- **C-31. THE NUCLEAR DEVICE HAS NO SYSTEM BEHIND IT.** Weight 1.
   - **THE NUCLEAR AND THERMONUCLEAR DEVICE** — a one-shot weapon
     delivered by a bomber, a silo or a submarine, with a blast radius,
     persistent fallout tiles, and a diplomatic reaction. Neither engine
     has an area-effect attack, a fallout tile state, or the Missile Silo
     (C-20).
-  - **THE ROCK BAND** — a GS civilian performing in a foreign city for a
-    tourism lump against a level-scaled failure roll; reads per-rival
-    tourism (C-28).
 - **C-32. THE NEW CLASSES HAVE NO PROMOTION TREE.** Weight 2. The AIR,
   GIANT DEATH ROBOT, SUPPORT and NAVAL RAIDER classes have no
   `PROMO_CLASSES` entry, and neither does the SPY — `promoOffer` /
@@ -638,6 +617,7 @@ coverage is measured the same way with `CIV6_WORLDS_DIR` set.
 | a MILITARY ENGINEER alive at all (and so its three verbs) | 0/12 | NEVER |
 | a Valletta-shaped SUZERAIN, and the class purchase it sells | 0/12 | NEVER |
 | a seat that may buy LAND COMBAT UNITS with faith | 0/12 | NEVER |
+| PROFESSIONAL_SPORTS (the Rock Band's civic, and so the concert) | 0/12 | NEVER |
 
 - THE DISTRICT LANE ROTATES ITS PICK by (seat + turn) — a DECISION the
   applier re-validates, widening coverage without changing legality.
@@ -658,13 +638,16 @@ coverage is measured the same way with `CIV6_WORLDS_DIR` set.
   (no Valletta suzerain, no Theocracy/Grand Master's Chapel in-gate), the
   Warrior Monk and its tree (whether AKKAD lands is a seeder draw), the
   climate arc (CO2 never leaves zero), the Military Engineer (0/12), the
-  space race (Information-era techs), the emergencies' CITY_STATE trigger.
+  space race (Information-era techs), the emergencies' CITY_STATE trigger,
+  the ROCK BAND and its concert (Professional Sports is Information-era).
 - THE POLICY CARDS ARE MOSTLY UNREACHED: 16 of 49 ever slot (greedy fill,
   table order within a kind); THIRTEEN effect channels ride the digest,
   the other nine are `policy_cards_test` + the TS `policy-cards` suite
   alone.
 - The CULTURE VICTORY's distance at t250: visiting peaks at 5 (mean ~0.7)
   against a domestic peak of 78 (mean ~39) — read B-20r's scope off this.
+  The per-rival bank narrows it further: each rival's cell floors on its
+  own, so the same national output buys no more tourists and often fewer.
 - A barbarian march choosing a CIV row's city while a row-0 city stands in
   reach — the tie key was verified by reading, never by the gate.
 - The `R = 0` phantom row: no seeder configuration produces a one-major

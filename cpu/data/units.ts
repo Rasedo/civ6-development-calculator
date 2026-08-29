@@ -1223,6 +1223,22 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       faithOnly: true,
       description: 'Faith-bought combat unit with its own promotion tree.',
     }),
+    // APPENDED LAST — the roster's order IS the GPU's unit-type id space.
+    // CIV6 (Rock Band): an Atomic-era CIVILIAN (charges = 1, combat 0) that
+    // "must be purchased with Faith" at a progressive price and "must always
+    // perform in foreign lands".
+    U({
+      id: 'ROCK_BAND',
+      name: 'Rock Band',
+      cost: 500,
+      maintenance: 0,
+      moves: 4,
+      combat: 0,
+      charges: 1,
+      faithOnly: true,
+      requiresCivic: 'PROFESSIONAL_SPORTS',
+      description: 'Performs a concert at a foreign venue for a tourism burst (faith purchase only).',
+    }),
   ].map((u) => [u.id, u]),
 );
 
@@ -1323,3 +1339,46 @@ export const WALL_BREACH_FRACTION = 0.25;
  * "do not suffer the -17 RS penalty against cities (but still suffer against
  * Walls, just like other ranged units)". */
 export const RANGED_CITY_PENALTY = 17;
+
+/**
+ * THE ROCK BAND's concert, sourced whole from the Rock Band page.
+ *
+ * CIV6: "Tourism = Venue Tourism Value * (1 + (Tourism Bomb Value / 100) +
+ * (Album Sales / 100))", the venue value depending on where it plays and the
+ * bomb on the tier it rolls.
+ */
+export const ROCK_BAND_VENUES: Readonly<Record<string, number>> = {
+  BROADCAST_CENTER: 750, STADIUM: 750,
+  UNIVERSITY: 500, SHIPYARD: 500,
+  AMPHITHEATER: 250, ARENA: 250,
+};
+/** a World Wonder is the top venue at 1000. */
+export const ROCK_BAND_WONDER_VENUE = 1000;
+/**
+ * The six performance tiers, BEST first (6 stars down to 1). CIV6's own
+ * table: album sales 200/150/100/50/0/0, tourism bomb 200/0/150/-25/100/-25,
+ * a promotion on the two best, and the unit dies on the two worst.
+ */
+export const ROCK_BAND_TIERS: readonly { album: number; bomb: number; promote: boolean; dies: boolean }[] = [
+  { album: 200, bomb: 200, promote: true, dies: false },
+  { album: 150, bomb: 0, promote: true, dies: false },
+  { album: 100, bomb: 150, promote: false, dies: false },
+  { album: 50, bomb: -25, promote: false, dies: false },
+  { album: 0, bomb: 100, promote: false, dies: true },
+  { album: 0, bomb: -25, promote: false, dies: true },
+];
+/**
+ * Tier odds per BAND LEVEL (1..4), in PER MILLE, best tier first — the
+ * published percentages x10. Level 2's published row sums to 99.9%, so its
+ * modal rung carries the rounding.
+ */
+export const ROCK_BAND_TIER_ODDS: readonly (readonly number[])[] = [
+  [20, 82, 184, 265, 265, 184],
+  [49, 121, 223, 263, 223, 121],
+  [94, 170, 245, 245, 170, 76],
+  [163, 214, 251, 214, 116, 42],
+];
+export const ROCK_BAND_MAX_LEVEL = 4;
+/** CIV6: the faith "cost is progressive" — each band this seat has bought
+ *  raises the next one's price by its base. */
+export const ROCK_BAND_COST_STEP = 1;

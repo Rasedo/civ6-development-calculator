@@ -324,6 +324,38 @@
           ]
         },
         {
+          "name": "tourismTo",
+          "compare": "exact",
+          "covers": [
+            "Seat.tourismTo"
+          ],
+          "planes": [
+            "civ_tourism_to"
+          ],
+          "note": "a vector over civ seats: lifetime tourism SENT to each, through its own summed international modifier. The self column is 0."
+        },
+        {
+          "name": "tourismReligiousTo",
+          "compare": "exact",
+          "covers": [
+            "Seat.tourismReligiousTo"
+          ],
+          "planes": [
+            "civ_tourism_rel_to"
+          ]
+        },
+        {
+          "name": "rockBandsBought",
+          "compare": "exact",
+          "covers": [
+            "Seat.rockBandsBought"
+          ],
+          "planes": [
+            "civ_rock_bands"
+          ],
+          "note": "how many Rock Bands this seat has bought — the progressive faith price reads it."
+        },
+        {
           "name": "tourismReligious",
           "compare": "exact",
           "covers": [
@@ -1750,6 +1782,28 @@
           "planes": [
             "unit_spy_level"
           ]
+        },
+        {
+          "name": "bandLevel",
+          "compare": "exact",
+          "covers": [
+            "Unit.bandLevel"
+          ],
+          "planes": [
+            "unit_band_level"
+          ],
+          "note": "a Rock Band's level picks its tier-odds row; 0 on every other chassis."
+        },
+        {
+          "name": "bandAlbum",
+          "compare": "exact",
+          "covers": [
+            "Unit.bandAlbum"
+          ],
+          "planes": [
+            "unit_band_album"
+          ],
+          "note": "album sales, a percentage added to every later performance's burst."
         },
         {
           "name": "gpAt",

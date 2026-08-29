@@ -717,6 +717,7 @@ def _decide_buys(sim, row: int, bctx: dict | None = None):
     monu_j = torch.where(monu_kind >= 0, bctx["spawn_slot"], torch.full_like(bctx["spawn_slot"], -1))
     nat_ok, nat_j = bctx["nat_ok"], bctx["nat_j"]
     nat_kind = torch.where(nat_ok, torch.full_like(monu_kind, 10), torch.full_like(monu_kind, -1))
+    band_j = torch.where(bctx["band_ok"], bctx["band_j"], torch.full_like(bctx["band_j"], -1))
     # FAITH patronage: its own once-per-turn slot, never the same turn as
     # the gold arm — one claim per turn keeps both engines' appliers aligned.
     pat = torch.where(bctx["pat_f_ok"] & (buy_kind != 4), bctx["pat_f_cls"],
@@ -729,7 +730,8 @@ def _decide_buys(sim, row: int, bctx: dict | None = None):
             (nat_kind, nat_j),
             (bctx["cls_j"], bctx["cls_b"]),
             (bctx["ucls_j"], bctx["ucls_b"]),
-            pat)
+            pat,
+            band_j)
 
 
 def _buy_ctx(sim, row: int) -> dict:
@@ -754,6 +756,7 @@ def _buy_ctx(sim, row: int) -> dict:
     tile_j, tile_t, _tile_cost, tile_ok = sim._seat_tile_buy_candidate(row, active)
     w_ok, w_j, m_ok, m_j, a_ok, a_j, q_ok, q_j, k_ok, k_j = sim._seat_faith_buy_candidates(row, active)
     nat_ok, nat_j = sim._seat_naturalist_candidate(row, active)
+    band_ok, band_j = sim._seat_rock_band_candidate(row, active)
     # CIV6 (GS Civilopedia, Monumentality, Golden face): "May purchase civilian
     # units with Faith. Builders and Settlers are 30% cheaper to purchase with
     # Faith and Gold." FAITH_PURCHASE_MULT with the literal 0.7 LAST; the
@@ -781,6 +784,7 @@ def _buy_ctx(sim, row: int) -> dict:
             "monk_ok": k_ok, "monk_j": k_j,
             "levy_ok": levy_ok, "levy_cs": levy_cs,
             "nat_ok": nat_ok, "nat_j": nat_j,
+            "band_ok": band_ok, "band_j": band_j,
             "cls_ok": cls_ok, "cls_j": cls_j, "cls_b": cls_b,
             "ucls_ok": ucls_ok, "ucls_j": ucls_j, "ucls_b": ucls_b,
             "pat_f_ok": pat_f_ok, "pat_f_cls": pat_f_cls,
@@ -946,7 +950,7 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     env_seq = None
     if seeds is not None and turn is not None and sim.S > 0:
         env_seq = _seat_envoys(sim, row)
-    buy, worship, relig, levy, monu, nat, cls, ucls, pat = _decide_buys(sim, row, bctx=None if pre is None else pre.get("bctx"))
+    buy, worship, relig, levy, monu, nat, cls, ucls, pat, band = _decide_buys(sim, row, bctx=None if pre is None else pre.get("bctx"))
     route = _decide_route(sim, row, pre=None if pre is None else pre.get("route"))
     spec, lock = _decide_citizens(sim, row)
     vote = _decide_vote(sim, row)
@@ -955,7 +959,7 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     # replay side passes the recorded tile and places it.
     sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic,
                            war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
-                           monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, route=route, spec=spec, lock=lock, vote=vote)
+                           monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band, route=route, spec=spec, lock=lock, vote=vote)
 
     # units, and the draw order: the driver PLANS, the PHASE executes.
     # Applying steps pre-step to re-observe would consume combat draws at a
@@ -1024,10 +1028,10 @@ def _decide_turn(env, sim, row: int, roster: dict, classes: dict, max_steps: int
     if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
         sim._driven_useq = {}
     sim._driven_useq[row] = seq
-    return prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, route, spec, lock, vote
+    return prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, route, spec, lock, vote
 
 
-def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, route, spec, lock, vote, b: int) -> dict:
+def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, route, spec, lock, vote, b: int) -> dict:
     _pr = prod[b]
     _ctr = sim.city_center[b, row]
     _alive_c = sim.city_alive[b, row]
@@ -1050,7 +1054,7 @@ def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, 
     _w = None if war is None or int(war[b]) < 0 else int(war[b])
     _e = [] if env_seq is None else [int(x) for x in env_seq[b].tolist() if int(x) >= 0]
     rec = {"production": prod_pairs, "tech": _t, "civic": _c, "war": _w, "envoys": _e, "units": rows}
-    rec.update(_buy_record_fields(sim, row, b, buy, worship, relig, levy, monu, nat, cls, ucls, pat))
+    rec.update(_buy_record_fields(sim, row, b, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band))
     if route is not None and int(route[0][b]) >= 0:
         rec["route"] = [int(route[0][b]), int(route[1][b])]
     if spec is not None:
@@ -1071,7 +1075,7 @@ def _extract_record(sim, row: int, prod, dtile, tech, civic, war, env_seq, seq, 
     return rec
 
 
-def _buy_record_fields(sim, row: int, b: int, buy, worship, relig, levy, monu=None, nat=None, cls=None, ucls=None, pat=None) -> dict:
+def _buy_record_fields(sim, row: int, b: int, buy, worship, relig, levy, monu=None, nat=None, cls=None, ucls=None, pat=None, band=None) -> dict:
     """The GOLD/FAITH/LEVY half of a seat's record, for ANY seat row — every
     city reference is CENTRE-KEYED like production, because ids are
     engine-local and centres are the shared vocabulary. Every field is
@@ -1115,6 +1119,10 @@ def _buy_record_fields(sim, row: int, b: int, buy, worship, relig, levy, monu=No
         _c = _centre(int(nat[1][b]))
         if _c is not None:
             bf.append([10, _c])
+    if band is not None and int(band[b]) >= 0:
+        _c = _centre(int(band[b]))
+        if _c is not None:
+            bf.append([16, _c])
     if cls is not None and int(cls[1][b]) >= 0:
         _c = _centre(int(cls[0][b]))
         if _c is not None:
@@ -1199,7 +1207,7 @@ def replay_seat(sim, row: int, rec: dict) -> None:
             hj = torch.where(mm, torch.full_like(hj, j), hj)
         return hj
 
-    worship = relig = monu = nat = cls = ucls = pat = None
+    worship = relig = monu = nat = cls = ucls = pat = band = None
     for _ent in rec.get("buyFaith") or []:
         _fk, _fc = int(_ent[0]), int(_ent[1])
         if _fk == 15:
@@ -1224,6 +1232,8 @@ def replay_seat(sim, row: int, rec: dict) -> None:
         elif _fk == 10:
             _njt = _centre_slot(_fc)
             nat = (torch.where(_njt >= 0, torch.full_like(_njt, 10), torch.full_like(_njt, -1)), _njt)
+        elif _fk == 16:
+            band = _centre_slot(_fc)
     _lv = rec.get("levy")
     levy = None if _lv is None else torch.full((sim.B,), int(_lv), dtype=torch.long, device=dev)
     _rv = rec.get("route")
@@ -1256,7 +1266,7 @@ def replay_seat(sim, row: int, rec: dict) -> None:
                 vote[:, _k, _f] = int(_ent[_f])
     sim.apply_seat_actions(row, production=prod, production_tile=dtile, tech=tech, civic=civic,
                            war=war, envoys=env_seq, buy=buy, worship=worship, relig=relig, levy=levy,
-                           monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, route=route, spec=spec, lock=lock, vote=vote)
+                           monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band, route=route, spec=spec, lock=lock, vote=vote)
 
     def _geo_mask(seats) -> torch.Tensor:
         m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=dev)

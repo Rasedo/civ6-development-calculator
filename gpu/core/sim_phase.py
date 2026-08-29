@@ -846,6 +846,39 @@ class SimPhase:
             cur = self.encamp_hp[bidx, e0]
             self.encamp_hp[bidx, e0] = torch.where(rep, (cur + heal).clamp(max=self._encamp_hp_max), cur)
 
+    def _bank_tourism_per_rival(self, row: int, active: torch.Tensor,
+                                general: torch.Tensor, religious: torch.Tensor) -> None:
+        """`bankTourismPerRival`'s twin: the national output lands on EACH
+        foreign civ through its own summed international modifier, and the two
+        RELIGIOUS-ONLY halvings — CIV6 (Tourism): "-50% (Religious Tourism
+        only) for Different Religions. Note that this penalty doesn't apply if
+        you haven't founded a religion" and "-50% ... if the foreign
+        civilization has The Enlightenment", which Cristo Redentor's shield
+        cancels — are summed into the religious half's own percent. Below
+        -100% the rival takes nothing rather than draining the bank."""
+        B, dev = self.B, self.device
+        half = int(self.rules.seats.get("tourismReligiousPenaltyPct", 50))
+        shielded = (self._seat_wonder_any(row, self._wond_holy_shield) if self._wond_n
+                    else torch.zeros(B, dtype=torch.bool, device=dev))
+        founded = self.civ_religion_done[:, row]
+        dom = self._dominant_religion()  # [B, nrow]
+        gen_l, rel_l = general.long(), religious.long()
+        for o in range(self.n_majors):
+            if o == row:
+                continue
+            pct = self._tourism_intl_pct(row, o)
+            rel_pct = pct.clone()
+            enl = (self._seat_civics(o)[:, self._enl_cidx] if self._enl_cidx >= 0
+                   else torch.zeros(B, dtype=torch.bool, device=dev))
+            rel_pct = rel_pct - (enl & ~shielded).long() * half
+            other = founded & (dom[:, o] >= 0) & (dom[:, o] != row)
+            rel_pct = rel_pct - other.long() * half
+            add_g = torch.div(gen_l * (100 + pct).clamp(min=0), 100, rounding_mode="floor")
+            add_r = torch.div(rel_l * (100 + rel_pct).clamp(min=0), 100, rounding_mode="floor")
+            zero = torch.zeros_like(add_g)
+            self.civ_tourism_to[:, row, o] += torch.where(active, add_g, zero)
+            self.civ_tourism_rel_to[:, row, o] += torch.where(active, add_r, zero)
+
     def _seat_research_tail(self, row: int, active: torch.Tensor, sci_sum: torch.Tensor,
                             cul_sum: torch.Tensor, gold_sum: torch.Tensor,
                             faith_sum: torch.Tensor, gov: torch.Tensor) -> None:
@@ -904,7 +937,7 @@ class SimPhase:
             self.civ_cur_tech[:, row] = torch.where(fin, torch.full_like(curt, -1), self.civ_cur_tech[:, row])
         no_t = active & (self.civ_cur_tech[:, row] == -1) & ~self._available_mask(self.civ_techs[:, row], self._prereq_t).any(dim=1)
         self.civ_tech_prog[:, row] = torch.where(no_t, torch.minimum(self.civ_tech_prog[:, row], torch.zeros_like(self.civ_tech_prog[:, row])), self.civ_tech_prog[:, row])
-        bank(self.civ_tourism, self._tourism_of(
+        _nat_gen = self._tourism_of(
             self.city_gw_writing[:, row],
             self.city_gw_art[:, row] + self._art_themed_works(row),
             self.city_gw_music[:, row],
@@ -921,8 +954,10 @@ class SimPhase:
                                   torch.ones(self.B, dtype=torch.long, device=self.device)),
             gov_tile=self._governor_tiles(row, gov),
             suz_tour=self._suzerain_tourism(row, self.tile_seat == row),
-        ))
+        )
+        bank(self.civ_tourism, _nat_gen)
         bank(self.civ_tourism_rel, self._tourism_religious_of(row))
+        self._bank_tourism_per_rival(row, active, _nat_gen, self._tourism_religious_of(row))
         # POLICY TREATY outcome A pays every seat holding the named card, on
         # top of the government tier, the (Treaty-Organization-weighted)
         # suzerain term and CIV6 (Alliance): "In Gathering Storm, each Alliance

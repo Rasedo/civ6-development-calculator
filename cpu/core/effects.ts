@@ -165,6 +165,7 @@ export interface Modifiers {
   influencePerTurn: number;
   firstEnvoyDouble: boolean;
   envoyDoubleDiffGov: boolean;
+  tourismRouteBonus: number;
   culturePerSuzerain: number;
   unitCombatCS: { classMask: number; all: boolean; cs: number }[];
   xpPct: number;
@@ -216,6 +217,7 @@ export function defaultModifiers(): Modifiers {
     influencePerTurn: 0,
     firstEnvoyDouble: false,
     envoyDoubleDiffGov: false,
+    tourismRouteBonus: 0,
     culturePerSuzerain: 0,
     unitCombatCS: [],
     xpPct: 0,
@@ -265,6 +267,7 @@ function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.influencePerTurn) mods.influencePerTurn += fx.influencePerTurn;
   if (fx.firstEnvoyDouble) mods.firstEnvoyDouble = true;
   if (fx.envoyDoubleDiffGov) mods.envoyDoubleDiffGov = true;
+  if (fx.tourismRouteBonus) mods.tourismRouteBonus += fx.tourismRouteBonus;
   if (fx.culturePerSuzerain) mods.culturePerSuzerain += fx.culturePerSuzerain;
   if (fx.unitCombatCS) {
     let mask = 0;

@@ -58,14 +58,16 @@ def main() -> None:
 
     def victor(tour, cul, alive_civs=None):
         """Drive _culture_victor directly on planted totals. tour/cul are
-        per-unified-civ lists (index 0 = seat 0)."""
+        per-seat lists (index 0 = seat 0); a row's whole total is planted in
+        ONE rival's cell, which the per-rival floor reads the same way a
+        lifetime scalar used to."""
         s = _sim(1)
-        s.civ_tourism[:, 0] = tour[0]
-        s.civ_culture[:, 0] = cul[0]
-        for row in range(1, s.n_majors):
-            s.civ_tourism[:, row] = tour[row]
+        s.civ_tourism_to.zero_()
+        s.civ_tourism_rel_to.zero_()
+        for row in range(s.n_majors):
+            s.civ_tourism_to[:, row, (row + 1) % s.n_majors] = int(tour[row])
             s.civ_culture[:, row] = cul[row]
-            if alive_civs is not None and not alive_civs[row - 1]:
+            if row and alive_civs is not None and not alive_civs[row - 1]:
                 s.city_alive[:, row] = False
         return int(s._culture_victor()[0]), s
 
@@ -127,7 +129,10 @@ def main() -> None:
     # civilization has The Enlightenment" (Cristo Redentor's shield cancels
     # it) and "-50% (Religious Tourism only) for Different Religions" (only
     # once this seat FOUNDED one, against the rival's majority religion).
+    # Both are INTERNATIONAL modifiers, so they are SUMMED into the rival's
+    # own percent at BANK time — the victory read is a plain division.
     assert "civ_tourism_rel" in _MUTABLE, "the religious bank must ride snapshot/restore"
+    assert "civ_tourism_rel_to" in _MUTABLE, "the per-rival religious bank must ride it too"
     s9 = _sim(1)
     assert s9._holy_city_tour == 8, s9._holy_city_tour
     assert s9._enl_cidx >= 0, "the Enlightenment civic must export its index"
@@ -142,13 +147,12 @@ def main() -> None:
     assert int(s9._tourism_religious_of(0)[0]) == 2 * s9._relic_tour
     assert int(s9._tourism_religious_of(1)[0]) == s9._holy_city_tour
 
-    def victor_rel(enl_o: bool, shield_c: bool, dom_diff: bool, civ_cul: int = 6) -> int:
+    def banked_rel(enl_o: bool, shield_c: bool, dom_diff: bool) -> int:
+        """What 100 religious tourism banks toward seat 1."""
         s = _sim(1)
-        s.civ_tourism[:, 0] = tourism_for(2)
-        s.civ_tourism_rel[:, 0] = tourism_for(6)
-        s.civ_culture[:, 0] = culture_for(1)
-        for row in range(1, s.n_majors):
-            s.civ_culture[:, row] = culture_for(civ_cul if row == 1 else 1)
+        s.civ_tourism_rel_to.zero_()
+        s.seat_borders_turns.zero_()
+        s.seat_route_dseat.fill_(-1)
         if enl_o:
             s.civ_civics[0, 1, s._enl_cidx] = True
         if shield_c:
@@ -160,17 +164,21 @@ def main() -> None:
         if dom_diff:
             s.civ_religion_done[0, 0] = True
             s.city_followed[0, 1, : s.RC] = 1
-        return int(s._culture_victor()[0])
+        one = torch.ones(s.B, dtype=torch.bool, device=s.device)
+        zero = torch.zeros(s.B, dtype=s.dtype, device=s.device)
+        rel = torch.full((s.B,), 100.0, dtype=s.dtype, device=s.device)
+        s._bank_tourism_per_rival(0, one, zero, rel)
+        return int(s.civ_tourism_rel_to[0, 0, 1])
 
-    assert victor_rel(False, False, False) == 0, "2 + 6 = 8 > 6 must win"
-    assert victor_rel(True, False, False) == -1, "Enlightenment: 2 + 3 = 5 <= 6 must not"
-    assert victor_rel(True, False, False, civ_cul=4) == 0, "the GENERAL half is untouched: 5 > 4"
-    assert victor_rel(True, True, False) == 0, "Cristo Redentor keeps all 8"
-    assert victor_rel(False, False, True) == -1, "a different majority religion halves it too"
-    assert victor_rel(False, True, True) == -1, "the shield answers ENLIGHTENMENT only"
+    assert banked_rel(False, False, False) == 100, "an untouched rival takes the half in full"
+    assert banked_rel(True, False, False) == 50, "Enlightenment halves it"
+    assert banked_rel(True, True, False) == 100, "Cristo Redentor keeps all of it"
+    assert banked_rel(False, False, True) == 50, "a different majority religion halves it too"
+    assert banked_rel(False, True, True) == 50, "the shield answers ENLIGHTENMENT only"
+    assert banked_rel(True, False, True) == 0, "the two SUM to -100% and pay nothing"
 
-    print("culture victory OK — kind 5 + a named victor + the religious half's "
-          "per-rival halvings + _MUTABLE round-trip")
+    print("culture victory OK — kind 5 + a named victor read off the per-rival "
+          "matrix + the religious half's banked halvings + _MUTABLE round-trip")
 
 
 if __name__ == "__main__":

@@ -53,8 +53,8 @@ def main() -> None:
     # +12 SNIPE, +7 SPREAD, +1 FOUND_CITY, +1 EXCAVATE, +1 PARK, the PROMOTE
     # head, +6 CONDEMN, +1 REMOVE_HERESY, +1 LAUNCH_INQUISITION,
     # +1 CONVERT_HEATHEN, +1 UPGRADE, the four VARIABLE-width heads, the
-    # engineer's +1 BUILD_ROAD and +1 FINISH_DISTRICT, then the Great Person's
-    # +1 ACTIVATE_GP.
+    # engineer's +1 BUILD_ROAD and +1 FINISH_DISTRICT, the Great Person's
+    # +1 ACTIVATE_GP, then the Rock Band's +1 PERFORM_CONCERT.
     pcol = rj["promotions"]["cols"]
     esp = rj["eras"]["espionage"]
     heads = [
@@ -63,7 +63,7 @@ def main() -> None:
         ("SPY_TRAVEL_", esp["travelCols"]),
         ("SPY_MISSION_", len(esp["missions"])),
     ]
-    want = 13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads) + 3 + 18
+    want = 13 + len(imp_ids) + 3 + 12 + 7 + 3 + pcol + 10 + sum(w for _p, w in heads) + 3 + 19
     assert len(acts) == want, (
         f"enum is {len(acts)} wide, expected {want} for {len(imp_ids)} improvements, "
         f"a {pcol}-wide PROMOTE head and heads {heads}"
@@ -72,8 +72,10 @@ def main() -> None:
     # keys on: the religious tail, the ladder's own verb, the four heads in the
     # order the exporter appends them, the engineer's two, then the Great
     # Person's spend.
-    _last = ["BUILD_ROAD", "FINISH_DISTRICT", "ACTIVATE_GP"]         + [f"SNIPE3_{k}" for k in range(18)]  # the distance-3 ring, the newest last-append
-    assert acts[-len(_last):] == _last, f"the trailing verbs must close the enum, got {acts[-21:]}"
+    _last = (["BUILD_ROAD", "FINISH_DISTRICT", "ACTIVATE_GP"]
+             + [f"SNIPE3_{k}" for k in range(18)]  # the distance-3 ring
+             + ["PERFORM_CONCERT"])                # the newest last-append
+    assert acts[-len(_last):] == _last, f"the trailing verbs must close the enum, got {acts[-22:]}"
     _tailstart = len(acts) - len(_last) - sum(w for _p, w in heads)
     assert acts[_tailstart - 4:_tailstart] == [
         "REMOVE_HERESY", "LAUNCH_INQUISITION", "CONVERT_HEATHEN", "UPGRADE"], \

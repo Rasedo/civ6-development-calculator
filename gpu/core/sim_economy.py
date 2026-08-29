@@ -1373,6 +1373,7 @@ class SimEconomy:
             "rgold": _z.clone(), "infl": _z.clone(),
             "envoy1": torch.zeros(B, dtype=torch.bool, device=dev),
             "envoy2": torch.zeros(B, dtype=torch.bool, device=dev),
+            "tourroute": torch.zeros(B, dtype=torch.long, device=dev),
             "culsuz": _z.clone(),
             "ucst": torch.zeros(B, self.NU, dtype=torch.float64, device=dev),
             "xppct": _z.clone(), "wwcut": _z.clone(),
@@ -1475,6 +1476,7 @@ class SimEconomy:
                     torch.ones(B, self._npol, dtype=torch.float64, device=dev)).prod(dim=1)
                 fx["envoy1"] = fx["envoy1"] | (slotted & self._pol_envoy1.unsqueeze(0)).any(dim=1)
                 fx["envoy2"] = fx["envoy2"] | (slotted & self._pol_envoy2.unsqueeze(0)).any(dim=1)
+                fx["tourroute"] = fx["tourroute"] + (slotted.long() * self._pol_tourroute.unsqueeze(0)).sum(dim=1)
                 fx["gpp"] = fx["gpp"] + slotted.double() @ self._pol_gpp
                 fx["ucst"] = fx["ucst"] + slotted.double() @ self._pol_ucs_by_type
                 for _pi in range(self._npol):

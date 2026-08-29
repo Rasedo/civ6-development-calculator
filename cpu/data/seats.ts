@@ -465,6 +465,22 @@ export const EMERGENCY_ENVOY_GOLD = 1;
 export const EMERGENCY_CS_ROUTE_GOLD = 2;
 
 export const TOURISM_PER_VISITOR_PER_CIV = 200;
+/** CIV6 (Tourism, "Different government penalty"): the penalty is
+ *  "(Your OtherGovernmentIntolerance + Foreign OtherGovernmentIntolerance) x
+ *  TOURISM_CONFLICTING_GOVERNMENT_MULTIPLIER", and SAME government pays
+ *  nothing. Gathering Storm values: 20 for the three tier-3 governments,
+ *  0 for everything earlier, multiplier 1 — so the worst pair is -40%. */
+export const GOV_INTOLERANCE: Readonly<Record<string, number>> = {
+  CHIEFDOM: 0, AUTOCRACY: 0, OLIGARCHY: 0, CLASSICAL_REPUBLIC: 0,
+  MONARCHY: 0, MERCHANT_REPUBLIC: 0, THEOCRACY: 0,
+  DEMOCRACY: 20, COMMUNISM: 20, FASCISM: 20,
+};
+export const TOURISM_GOV_MULT = 1;
+/** CIV6 (Tourism, "International Modifiers"), each SUMMED, per foreign civ. */
+export const TOURISM_OPEN_BORDERS_PCT = 25;
+export const TOURISM_ROUTE_PCT = 25;
+/** the two RELIGIOUS-only halvings, summed with the rest. */
+export const TOURISM_RELIGIOUS_PENALTY_PCT = 50;
 export const CULTURE_PER_DOMESTIC_TOURIST = 100;
 /** CIV6 (Tourism): "Holy Cities generate +8 Religious Tourism per turn" —
  *  paid to the holy city's CURRENT owner. */

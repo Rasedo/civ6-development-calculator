@@ -369,6 +369,9 @@ const SEAT: Record<string, Extractor> = {
   faith: overSeats((s) => s.faith),
   tourism: overSeats((s) => s.tourism ?? 0),
   tourismReligious: overSeats((s) => s.tourismReligious ?? 0),
+  tourismTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismTo?.[seat] ?? 0))),
+  tourismReligiousTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismReligiousTo?.[seat] ?? 0))),
+  rockBandsBought: overSeats((s) => s.rockBandsBought ?? 0),
   grievances: overSeats((s, state) => grievanceLine(state, s.seat)),
   diplomaticFavor: overSeats((s) => s.diplomaticFavor),
   diplomaticPoints: overSeats((s) => s.diplomaticPoints),
@@ -616,6 +619,8 @@ const UNIT_G: Record<string, Extractor> = {
   spyTurns: overUnits((u) => u.spyTurns ?? 0),
   spyTarget: overUnits((u) => u.spyTarget ?? -1),
   spyLevel: overUnits((u) => u.spyLevel ?? 0),
+  bandLevel: overUnits((u) => u.bandLevel ?? 0),
+  bandAlbum: overUnits((u) => u.bandAlbum ?? 0),
   gpAt: overUnits((u) => u.gpAt ?? -1),
 };
 

@@ -182,6 +182,7 @@ class SimSeats:
         cls: tuple | None = None,   # kind 12: (slot [B], building [B]) — Valletta's faith-bought class building
         ucls: tuple | None = None,  # kind 13: (slot [B], unit [B]) — the land combat unit faith buys
         pat: torch.Tensor | None = None,  # kind 15: [B] class of the FAITH patronage claim (-1 = none)
+        band: torch.Tensor | None = None,  # kind 16: [B] city slot buying a ROCK BAND (-1 = none)
         route: tuple | None = None,  # the route verb: (origin CENTRE [B], dest code [B]) — a CENTRE tile or -(2+csIndex); -1 = none
         spec: torch.Tensor | None = None,  # [B, RC, nD] citizens PINNED per district; -1 = automatic, SPEC_KEEP = unchanged
         lock: torch.Tensor | None = None,  # [B, L] plots whose citizen pin this seat FLIPS this turn; -1 = padding
@@ -212,7 +213,7 @@ class SimSeats:
         `pick_district_tile` is the body that chooses."""
         self._stash_record(row, tech=tech, civic=civic, envoys=envoys, war=war,
                            production=production, pref=production_pref, dtile=production_tile)
-        self._stash_buy(row, buy=buy, worship=worship, relig=relig, levy=levy, monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat)
+        self._stash_buy(row, buy=buy, worship=worship, relig=relig, levy=levy, monu=monu, nat=nat, cls=cls, ucls=ucls, pat=pat, band=band)
         if route is not None:
             self._driven_route[row] = route
         if spec is not None or lock is not None:
@@ -542,7 +543,7 @@ class SimSeats:
                     self.tile_locked[rows, tc[rows]] = ~self.tile_locked[rows, tc[rows]]
                     self._eff_version += 1
 
-    def _stash_buy(self, row: int, buy=None, worship=None, relig=None, levy=None, monu=None, nat=None, cls=None, ucls=None, pat=None) -> None:
+    def _stash_buy(self, row: int, buy=None, worship=None, relig=None, levy=None, monu=None, nat=None, cls=None, ucls=None, pat=None, band=None) -> None:
         if buy is not None:
             self._driven_buy[row] = buy
         if worship is not None:
@@ -561,6 +562,8 @@ class SimSeats:
             self._driven_buy_ucls[row] = ucls
         if pat is not None:
             self._driven_buy_pat[row] = pat
+        if band is not None:
+            self._driven_buy_band[row] = band
 
     def _seat_buy_candidates(self, row: int, active: torch.Tensor):
         """The gold-purchase BUILDING candidate for seat row `row` — ONE
@@ -960,6 +963,35 @@ class SimSeats:
         slot = torch.where(ok, spawn, slot)
         return ok, slot
 
+    def _seat_rock_band_candidate(self, row: int, active: torch.Tensor):
+        """Buy-kind 16: the ROCK BAND. CIV6: it "can only be purchased with
+        Faith" behind Professional Sports, and its "Faith cost is
+        progressive". Returns (ok [B], slot [B])."""
+        B, dev = self.B, self.device
+        ok = torch.zeros(B, dtype=torch.bool, device=dev)
+        slot = torch.full((B,), -1, dtype=torch.long, device=dev)
+        if getattr(self, "_band_idx", -1) < 0:
+            return ok, slot
+        civ_i = int(self._type_civic[self._band_idx])
+        if civ_i < 0:
+            return ok, slot
+        alive = self.city_alive[:, row]
+        is_cap = self.city_is_cap[:, row]
+        spawn = torch.where(is_cap.any(dim=1), is_cap.long().argmax(dim=1), alive.long().argmax(dim=1))
+        ok = (
+            active
+            & alive.any(dim=1)
+            & self.civ_civics[:, row, civ_i]
+            & self._afford(self.civ_faith[:, row], self._rock_band_cost(row))
+        )
+        slot = torch.where(ok, spawn, slot)
+        return ok, slot
+
+    def _rock_band_cost(self, row: int) -> torch.Tensor:
+        """[B] f64 — `rockBandCost`'s twin: base x (1 + bands already bought)."""
+        base = float(self._type_cost[self._band_idx]) if getattr(self, "_band_idx", -1) >= 0 else 0.0
+        return base * (1 + self.civ_rock_bands[:, row].double() * self._band_cost_step)
+
     def _seat_levy_candidate(self, row: int, active: torch.Tensor):
         """Buy-kind 7: the LEVY candidate — the RULE half only (militaristic
         CS, this seat suzerain, cooldown ready, afford) over the FIRST
@@ -1275,6 +1307,29 @@ class SimSeats:
             if bool(buy_n.any()):
                 landed_n = self._spawn_unit(row, buy_n, at_n, self._naturalist_idx)
                 self.civ_faith[:, row] = torch.where(landed_n, self.civ_faith[:, row] - n_price, self.civ_faith[:, row])
+        if row in self._driven_buy_band and getattr(self, "_band_idx", -1) >= 0:
+            b_j = self._driven_buy_band.pop(row)
+            # CIV6 (Rock Band): FAITH only, behind Professional Sports, at a
+            # PROGRESSIVE price — each band already bought raises the next.
+            civ_b = int(self._type_civic[self._band_idx])
+            jb = b_j.clamp(min=0, max=self.RC - 1)
+            at_b = self.city_center[bidx, row, jb].clamp(min=0)
+            b_price = self._rock_band_cost(row)
+            base_b = active & ext & (b_j >= 0) & self.city_alive[bidx, row, jb]
+            if civ_b >= 0:
+                base_b = base_b & self.civ_civics[:, row, civ_b]
+            buy_b = base_b & self._afford(self.civ_faith[:, row], b_price)
+            if bool(buy_b.any()):
+                landed_b = self._spawn_unit(row, buy_b, at_b, self._band_idx)
+                self.civ_faith[:, row] = torch.where(landed_b, self.civ_faith[:, row] - b_price, self.civ_faith[:, row])
+                self.civ_rock_bands[:, row] = self.civ_rock_bands[:, row] + landed_b.long()
+                lb = landed_b.nonzero(as_tuple=True)[0]
+                if lb.numel():
+                    _sb = self.civilian_at[lb, at_b[lb]] - self.POOL_LO["major"]
+                    _ok = (_sb >= 0) & (_sb < self.UNIT_MAX)
+                    if bool(_ok.any()):
+                        self.unit_band_level[lb[_ok], _sb[_ok]] = 1
+                        self.unit_band_album[lb[_ok], _sb[_ok]] = 0
         if row in self._driven_buy_cls and self._suz_c_faith_bldg >= 0:
             cj, cb = self._driven_buy_cls.pop(row)
             jc = cj.clamp(min=0, max=self.RC - 1)
@@ -2444,7 +2499,7 @@ class SimSeats:
     def _dominant_religion(self) -> torch.Tensor:
         """[B, n_majors] — the religion MORE THAN HALF of each seat's cities
         follow (religion ids are founder seat ids), -1 none — the
-        `dominantReligion` twin, `_religious_victor`'s count read per seat.
+        `dominantReligionOf` twin, `_religious_victor`'s count read per seat.
         At most one id can pass the bar, so the ascending scan is exact."""
         nrow = self.n_majors
         alive = self.city_alive[:, :nrow]
@@ -2455,6 +2510,29 @@ class SimSeats:
             nf = (alive & (fol == g)).sum(dim=2)
             out = torch.where((out < 0) & (2 * nf > n), torch.full_like(out, g), out)
         return out
+
+    def _tourism_intl_pct(self, frm: int, to: int) -> torch.Tensor:
+        """[B] long — CIV6 (Tourism, "International Modifiers"): "further
+        modifiers affect the output to each individual civilization.
+        International Modifiers are SUMMED (not compounded) and calculated per
+        each foreign civilization." +25% Open Borders, +25% an international
+        Trade Route, +50% more with Online Communities, and the
+        different-government penalty (nothing when the two run the same one).
+        `tourismIntlPct`'s twin."""
+        B, dev = self.B, self.device
+        pct = torch.zeros(B, dtype=torch.long, device=dev)
+        ob = self.seat_borders_turns[:, to, frm] > 0
+        pct = pct + ob.long() * int(self.rules.seats.get("tourismOpenBordersPct", 25))
+        routed = (self.seat_route_dseat[:, frm] == to).any(dim=1)
+        extra = self._gov_mods(frm)[12]["tourroute"] if self._gov_has_effects else torch.zeros_like(pct)
+        pct = pct + routed.long() * (int(self.rules.seats.get("tourismRoutePct", 25)) + extra)
+        ga, ha = self._adopted_gov(self._seat_civics(frm))
+        gb, hb = self._adopted_gov(self._seat_civics(to))
+        same = (ha & hb & (ga == gb)) | (~ha & ~hb)
+        ia = torch.where(ha, self._gov_intol[ga], torch.zeros_like(pct))
+        ib = torch.where(hb, self._gov_intol[gb], torch.zeros_like(pct))
+        pen = (ia + ib) * int(self.rules.seats.get("tourismGovMult", 1))
+        return pct - torch.where(same, torch.zeros_like(pen), pen)
 
     def _cs_resolve_suzerain(self) -> None:
         """Refresh the STORED suzerain from the envoy record (`resolveSuzerain`
@@ -3710,14 +3788,11 @@ class SimSeats:
         """The `cultureVictor` mirror: [B] the lowest seat id whose VISITING
         tourists exceed EVERY other seat's DOMESTIC tourists; -1 none.
 
-        visiting(c vs o) = (general + religious // 2**pen)
-                           // (nCivs * TOURISM_PER_VISITOR_PER_CIV), where
-        pen counts the two CIV6 religious-tourism halvings against rival o:
-        "-50% (Religious Tourism only) if the foreign civilization has The
-        Enlightenment" (cancelled by Cristo Redentor's shield) and "-50%
-        (Religious Tourism only) for Different Religions" (only once this
-        seat FOUNDED one, against o's majority religion). The general bank
-        is never diminished.
+        visiting(c) sums, over each rival o, the tourism c has already banked
+        TOWARD o — every international modifier is spent at bank time, so this
+        read is a division and nothing else:
+        (civ_tourism_to[c, o] + civ_tourism_rel_to[c, o])
+            // (nCivs * TOURISM_PER_VISITOR_PER_CIV), floored per rival.
         domestic = lifetime culture // CULTURE_PER_DOMESTIC_TOURIST.
 
         Both floor to whole tourists, so the comparison is integer-exact and
@@ -3729,15 +3804,7 @@ class SimSeats:
         vis_div = n_civs * self._tourism_per_visitor
         nrow = self.n_majors
         alive = [self.city_alive[:, row].any(dim=1) for row in range(nrow)]
-        tour = [self.civ_tourism[:, row] for row in range(nrow)]
-        rel = [self.civ_tourism_rel[:, row] for row in range(nrow)]
         cul = [self.civ_culture[:, row] for row in range(nrow)]
-        enl = [self._seat_civics(row)[:, self._enl_cidx] if self._enl_cidx >= 0
-               else torch.zeros(B, dtype=torch.bool, device=dev) for row in range(nrow)]
-        shield = [self._seat_wonder_any(row, self._wond_holy_shield) if self._wond_n
-                  else torch.zeros(B, dtype=torch.bool, device=dev) for row in range(nrow)]
-        founded = [self.civ_religion_done[:, row] for row in range(nrow)]
-        dom = self._dominant_religion()  # [B, nrow]
         domestic = [
             torch.div(js_round(c * 1000).long(), 1000 * self._culture_per_tourist, rounding_mode="floor")
             for c in cul
@@ -3745,13 +3812,15 @@ class SimSeats:
         winner = torch.full((B,), -1, dtype=torch.long, device=dev)
         for c in range(n_civs):
             ok = alive[c]
+            vis = torch.zeros(B, dtype=torch.long, device=dev)
             for o in range(n_civs):
                 if o == c:
                     continue
-                pen = ((enl[o] & ~shield[c]).long()
-                       + (founded[c] & (dom[:, o] >= 0) & (dom[:, o] != c)).long())
-                vis = torch.div(tour[c].long() + torch.div(rel[c].long(), 2 ** pen, rounding_mode="floor"),
-                                vis_div, rounding_mode="floor")
+                vis = vis + torch.div(self.civ_tourism_to[:, c, o] + self.civ_tourism_rel_to[:, c, o],
+                                      vis_div, rounding_mode="floor")
+            for o in range(n_civs):
+                if o == c:
+                    continue
                 ok = ok & (vis > domestic[o])
             winner = torch.where((winner < 0) & ok, torch.full_like(winner, c), winner)
         return winner
@@ -5793,6 +5862,44 @@ class SimSeats:
             dr = rows[spent]
             self.unit_alive[dr, sc[spent]] = False
             self._occ_clear(dr, tc[dr], sc[spent])
+        self._eff_version += 1
+
+    def _do_concert(self, row: int, mask: torch.Tensor, tile: torch.Tensor, slot: torch.Tensor) -> None:
+        """PERFORM A ROCK CONCERT — `performConcert`'s twin. ONE draw picks the
+        tier off the band's OWN level row (per-mille cumulative, best tier
+        first); CIV6: "Tourism = Venue Tourism Value * (1 + (Tourism Bomb
+        Value / 100) + (Album Sales / 100))", the burst landing on the
+        civilization "within whose borders it takes place". The two best tiers
+        promote the band, the two worst end it."""
+        if not bool(mask.any()) or getattr(self, "_band_idx", -1) < 0:
+            return
+        tc = tile.clamp(min=0)
+        venue = self._concert_venue(tc.unsqueeze(1)).squeeze(1)
+        roll = (self._next_random(mask) * 1000).long()
+        lvl = self.unit_band_level.gather(1, slot.unsqueeze(1)).squeeze(1).clamp(min=1, max=self._band_max_level)
+        odds = self._band_odds[lvl - 1]                      # [B, 6]
+        cum = odds.cumsum(dim=1)
+        tier = (roll.unsqueeze(1) >= cum).long().sum(dim=1).clamp(max=self._band_tiers.shape[0] - 1)
+        rowt = self._band_tiers[tier]                        # [B, 4] album, bomb, promote, dies
+        album = self.unit_band_album.gather(1, slot.unsqueeze(1)).squeeze(1)
+        lump = torch.div(venue * (100 + rowt[:, 1] + album), 100, rounding_mode="floor").clamp(min=0)
+        owner = self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1)
+        rows = mask.nonzero(as_tuple=True)[0]
+        for r in rows.tolist():
+            o = int(owner[r])
+            if 0 <= o < self.n_majors and o != row:
+                self.civ_tourism_to[r, row, o] += int(lump[r])
+        sc = slot[rows]
+        self.unit_band_album[rows, sc] = album[rows] + rowt[rows, 0]
+        promo = rowt[rows, 2] > 0
+        self.unit_band_level[rows, sc] = torch.where(
+            promo, (lvl[rows] + 1).clamp(max=self._band_max_level), lvl[rows])
+        self.unit_mp[rows, sc] = 0
+        dies = rowt[rows, 3] > 0
+        if bool(dies.any()):
+            dr = rows[dies]
+            self.unit_alive[dr, sc[dies]] = False
+            self._occ_clear(dr, tc[dr], sc[dies])
         self._eff_version += 1
 
     def _do_park(self, row: int, mask: torch.Tensor, tile: torch.Tensor, slot: torch.Tensor) -> None:

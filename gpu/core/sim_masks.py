@@ -1605,6 +1605,15 @@ class SimMasks:
         # (and every reclaimed slot) carries the -1 sentinel.
         getattr(self, f"{pre}_unit_gp_at")[rows, slot] = (
             torch.full_like(slot, -1) if gp_at is None else gp_at[rows])
+        # a reclaimed slot carries the dead occupant's ROCK BAND career and SPY
+        # record; TS builds a fresh object, so each starts at its own default
+        # and only the chassis that owns the fact ever writes one.
+        getattr(self, f"{pre}_unit_band_level")[rows, slot] = 0
+        getattr(self, f"{pre}_unit_band_album")[rows, slot] = 0
+        getattr(self, f"{pre}_unit_spy_mission")[rows, slot] = self._spy_idle
+        getattr(self, f"{pre}_unit_spy_turns")[rows, slot] = 0
+        getattr(self, f"{pre}_unit_spy_target")[rows, slot] = -1
+        getattr(self, f"{pre}_unit_spy_level")[rows, slot] = 0
         _ch = self._type_charges[type_idx[rows]] if charges is None else charges[rows]
         getattr(self, f"{pre}_unit_charges")[rows, slot] = _ch + self._extra_charges(row, type_idx)[rows]
         off = self.POOL_LO[pre]
@@ -1816,6 +1825,41 @@ class SimMasks:
         city = self.city_slot_at(row).gather(1, q).reshape(B, N, D, 4)
         one_city = (city == city[:, :, :, :1]).all(dim=3) & (city[:, :, :, 0] >= 0)
         return (quad >= 0).all(dim=3) & good.all(dim=3) & one_city
+
+    def _concert_venue(self, tc: torch.Tensor) -> torch.Tensor:
+        """[B, N] long — the tile's VENUE value, 0 where a Rock Band cannot
+        play. `concertVenue`'s twin: a completed World Wonder is 1000, and a
+        completed DISTRICT tile is worth the best venue building its own city
+        holds in that district."""
+        out = torch.zeros_like(tc)
+        wnd = (self.built_wonder.gather(1, tc) >= 0) & self.built_wonder_complete.gather(1, tc)
+        out = torch.where(wnd, torch.full_like(out, self._band_wonder_venue), out)
+        di = self.district.gather(1, tc)
+        dc = self.district_complete.gather(1, tc)
+        live = ~wnd & (di >= 0) & dc
+        if not bool(live.any()):
+            return out
+        best = torch.zeros_like(tc)
+        for r in range(self.n_majors):
+            sl = self.city_slot_at(r).gather(1, tc)          # owning city SLOT, -1 = not this row's
+            hit = live & (sl >= 0)
+            if not bool(hit.any()):
+                continue
+            slc = sl.clamp(min=0)
+            for bi, dix, v in self._band_venue:
+                has = self.city_bldg[:, r, :, bi].gather(1, slc)
+                best = torch.where(hit & has & (di == dix) & (best < v),
+                                   torch.full_like(best, v), best)
+        return torch.where(live, best, out)
+
+    def _perform_ok(self, row: int, tc: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:
+        """[B, N] bool — the PERFORM column: CIV6 "Rock Bands must always
+        perform in foreign lands", on a tile carrying a venue."""
+        if getattr(self, "_band_idx", -1) < 0:
+            return torch.zeros_like(tc, dtype=torch.bool)
+        owner = self.tile_seat.gather(1, tc)
+        foreign = (owner >= 0) & (owner < self.n_majors) & (owner != row)
+        return (utype == self._band_idx) & foreign & (self._concert_venue(tc) > 0)
 
     def _park_ok(self, row: int, tc: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:
         """[B, N] bool — the PARK column: a Naturalist standing on a tile that
@@ -2307,6 +2351,10 @@ class SimMasks:
         if getattr(self, "_A_PARK", -1) >= 0:
             _pk = [(present & self._park_ok(row, tc, utype)).unsqueeze(2)]
 
+        _pc: list[torch.Tensor] = []
+        if getattr(self, "_A_PERFORM", -1) >= 0:
+            _pc = [(present & self._perform_ok(row, tc, utype)).unsqueeze(2)]
+
         _pr: list[torch.Tensor] = []
         if getattr(self, "_A_PROMOTE", -1) >= 0:
             _pr = [present.unsqueeze(2) & self._promo_offer_mask(sc, utype)]
@@ -2419,7 +2467,7 @@ class SimMasks:
         out = torch.cat(
             [move, attack, hold, build_f, build_m, build_l, chop, repair]
             + _res_cols + [pillage] + _sn + _sp + _fd + _ex + _pk + _pr + _cd + _rh + _li + _hc
-            + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3,
+            + _ug + _as + _rb + _st + _sm + _rd + _fi + _gp + _sn3 + _pc,
             dim=2,
         )
         if self._act_names and self.improvements_on and self._builder_idx >= 0:

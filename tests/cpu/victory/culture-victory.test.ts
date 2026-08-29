@@ -6,11 +6,13 @@ import { settleFirstCity } from '../helpers';
 import { TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, ENLIGHTENMENT_CIVIC, HOLY_CITY_TOURISM } from '../../../cpu/data/seats';
 import { RELIC_TOURISM } from '../../../cpu/data/greatPeople';
 import { seatTourism, seatTourismReligious } from '../../../cpu/core/city';
+import { seatAccumulators } from '../../../cpu/core/seatTurn';
 
 // CULTURE victory. Real Civ 6 (Gathering Storm): a civ's VISITING
-// tourists come from its lifetime TOURISM (divided by nCivs * 200) and its
-// DOMESTIC tourists from its lifetime CULTURE (divided by 100); a civ wins the
-// moment its visiting tourists exceed EVERY other civ's domestic tourists.
+// tourists come from the lifetime tourism it has sent TO EACH RIVAL (each
+// cell divided by nCivs * 200 on its own) and its DOMESTIC tourists from its
+// lifetime CULTURE (divided by 100); a civ wins the moment its visiting
+// tourists exceed EVERY other civ's domestic tourists.
 //
 // MEASURED gate-unreachable: across the 24 scripted seeds at 250 turns the
 // best any civ manages is a gap of -12 (visiting peaks at 7, domestic reaches
@@ -39,14 +41,19 @@ function cultureFor(n: number) {
   return n * CULTURE_PER_DOMESTIC_TOURIST;
 }
 
+/** Bank `n` tourists' worth of GENERAL tourism from `s` toward rival `to`. */
+function sendTo(s: Seat, to: number, n: number, nCivs: number) {
+  s.tourismTo ??= [];
+  s.tourismTo[to] = (s.tourismTo[to] ?? 0) + tourismFor(n, nCivs);
+}
+
 describe('culture victory', () => {
   it('seat 0 out-touring every civ wins the culture victory', () => {
     const state = newGame(1);
     const civSeat = (state.seats[(0) + 1] as Seat);
-    seatOf(state, 0)!.tourism = tourismFor(5, 2);
+    sendTo(seatOf(state, 0)!, 1, 5, 2);
     seatOf(state, 0)!.cultureTotal = cultureFor(1);
     civSeat.cultureTotal = cultureFor(4); // 5 visiting > 4 domestic
-    civSeat.tourism = 0;
     endTurn(state);
     expect(state.victoryType).toBe(5);
     expect(state.victoryRow).toBe(0);
@@ -56,10 +63,9 @@ describe('culture victory', () => {
   it('a civ out-touring everyone wins the SAME way — only the victor differs', () => {
     const state = newGame(1);
     const civSeat = (state.seats[(0) + 1] as Seat);
-    civSeat.tourism = tourismFor(9, 2);
+    sendTo(civSeat, 0, 9, 2);
     civSeat.cultureTotal = cultureFor(1);
     seatOf(state, 0)!.cultureTotal = cultureFor(3); // civ 9 visiting > seat-0 3 domestic
-    seatOf(state, 0)!.tourism = 0;
     endTurn(state);
     expect(state.victoryType).toBe(5);
     expect(state.victoryRow).toBe(1);
@@ -69,10 +75,9 @@ describe('culture victory', () => {
   it('EQUAL counts do not win — the bar is strictly greater', () => {
     const state = newGame(1);
     const civSeat = (state.seats[(0) + 1] as Seat);
-    seatOf(state, 0)!.tourism = tourismFor(4, 2);
+    sendTo(seatOf(state, 0)!, 1, 4, 2);
     seatOf(state, 0)!.cultureTotal = cultureFor(1);
     civSeat.cultureTotal = cultureFor(4); // 4 visiting vs 4 domestic — not a win
-    civSeat.tourism = 0;
     endTurn(state);
     expect(state.victoryType).not.toBe(5);
     expect(state.gameOver).toBe(false);
@@ -80,11 +85,11 @@ describe('culture victory', () => {
 
   it('it must beat EVERY other civ, not just one', () => {
     const state = newGame(2);
-    seatOf(state, 0)!.tourism = tourismFor(6, 3);
+    sendTo(seatOf(state, 0)!, 1, 3, 3);
+    sendTo(seatOf(state, 0)!, 2, 3, 3); // 6 visiting in all
     seatOf(state, 0)!.cultureTotal = cultureFor(1);
     (state.seats[(0) + 1] as Seat).cultureTotal = cultureFor(2); // beaten
     (state.seats[(1) + 1] as Seat).cultureTotal = cultureFor(9); // NOT beaten
-    for (const civSeat of state.seats.slice(1)) civSeat.tourism = 0;
     endTurn(state);
     expect(state.victoryType).not.toBe(5);
     expect(state.gameOver).toBe(false);
@@ -94,32 +99,51 @@ describe('culture victory', () => {
     // The SAME lifetime tourism buys fewer visiting tourists in a bigger game:
     // 6 tourists' worth at nCivs=2 is only 4 at nCivs=3.
     const two = newGame(1);
-    seatOf(two, 0)!.tourism = tourismFor(6, 2);
+    sendTo(seatOf(two, 0)!, 1, 6, 2);
     seatOf(two, 0)!.cultureTotal = cultureFor(1);
     (two.seats[(0) + 1] as Seat).cultureTotal = cultureFor(5);
-    (two.seats[(0) + 1] as Seat).tourism = 0;
     endTurn(two);
     expect(two.victoryType).toBe(5); // 6 > 5
 
     const three = newGame(2);
-    seatOf(three, 0)!.tourism = tourismFor(6, 2); // same raw tourism as above
+    sendTo(seatOf(three, 0)!, 1, 6, 2); // the same raw tourism, in one cell
     seatOf(three, 0)!.cultureTotal = cultureFor(1);
-    for (const civSeat of three.seats.slice(1)) {
-      civSeat.cultureTotal = cultureFor(5);
-      civSeat.tourism = 0;
-    }
+    for (const civSeat of three.seats.slice(1)) civSeat.cultureTotal = cultureFor(5);
     endTurn(three);
     expect(three.victoryType).not.toBe(5); // only 4 visiting now — 4 < 5
+  });
+
+  it('each rival cell floors on its OWN — tourism has an address', () => {
+    // Two cells one short of a tourist buy NOTHING; the same total in one
+    // cell buys one. A lifetime SCALAR could not tell the two apart.
+    const split = newGame(2);
+    const div = 3 * TOURISM_PER_VISITOR_PER_CIV;
+    const own = seatOf(split, 0)!;
+    own.tourismTo = [];
+    own.tourismTo[1] = div - 1;
+    own.tourismTo[2] = div - 1;
+    own.cultureTotal = cultureFor(1);
+    for (const civSeat of split.seats.slice(1)) civSeat.cultureTotal = 0;
+    endTurn(split);
+    expect(split.victoryType).not.toBe(5); // 0 + 0 visiting, and 0 > 0 is false
+
+    const whole = newGame(2);
+    const mine = seatOf(whole, 0)!;
+    mine.tourismTo = [];
+    mine.tourismTo[1] = 2 * div - 2; // the same total, one address
+    mine.cultureTotal = cultureFor(1);
+    for (const civSeat of whole.seats.slice(1)) civSeat.cultureTotal = 0;
+    endTurn(whole);
+    expect(whole.victoryType).toBe(5); // 1 visiting > 0 domestic
   });
 
   it('a CITYLESS civ cannot win on tourism it banked while alive', () => {
     const state = newGame(1);
     const civSeat = (state.seats[(0) + 1] as Seat);
-    civSeat.tourism = tourismFor(9, 2);
+    sendTo(civSeat, 0, 9, 2);
     civSeat.cultureTotal = cultureFor(1);
     civSeat.cities = []; // wiped off the map, but its lifetime totals remain
     seatOf(state, 0)!.cultureTotal = cultureFor(3);
-    seatOf(state, 0)!.tourism = 0;
     endTurn(state);
     expect(state.victoryType).not.toBe(5);
   });
@@ -137,10 +161,9 @@ describe('culture victory', () => {
       c.religionPressure = pres;
     }
     // … while seat 0 would ALSO win on culture this very turn.
-    seatOf(state, 0)!.tourism = tourismFor(5, 2);
+    sendTo(seatOf(state, 0)!, 1, 5, 2);
     seatOf(state, 0)!.cultureTotal = cultureFor(1);
     civSeat.cultureTotal = cultureFor(4);
-    civSeat.tourism = 0;
     endTurn(state);
     expect(state.victoryType).toBe(4);
   });
@@ -149,103 +172,85 @@ describe('the RELIGIOUS half and its per-rival halvings', () => {
   // CIV6 (Tourism): "-50% (Religious Tourism only) if the foreign
   // civilization has The Enlightenment" — cancelled by Cristo Redentor —
   // and "-50% (Religious Tourism only) for Different Religions", which
-  // "doesn't apply if you haven't founded a religion".
+  // "doesn't apply if you haven't founded a religion". Both are INTERNATIONAL
+  // modifiers, so they are summed per rival at BANK time, not applied to a
+  // lifetime total.
+  const RELICS = 4;
+
+  /** A 2-civ game whose seat 0 generates `RELICS * RELIC_TOURISM` religious
+   *  tourism a turn and nothing general, with a fresh matrix. */
+  function relicGame() {
+    const state = newGame(1);
+    const own = seatOf(state, 0)!;
+    own.cities[0].relics = RELICS;
+    own.tourismTo = [];
+    own.tourismReligiousTo = [];
+    return { state, own, rival: state.seats[1] as Seat };
+  }
+
+  const banked = (own: Seat) => own.tourismReligiousTo?.[1] ?? 0;
+
+  it('an untouched rival banks the religious half in full', () => {
+    const { state, own } = relicGame();
+    seatAccumulators(state, 0);
+    expect(banked(own)).toBe(RELICS * RELIC_TOURISM);
+  });
+
   it('a rival with The Enlightenment halves the religious half only', () => {
-    const win = (civCulture: number, enlightened: boolean): boolean => {
-      const state = newGame(1);
-      const civSeat = state.seats[1] as Seat;
-      seatOf(state, 0)!.tourism = tourismFor(2, 2);
-      seatOf(state, 0)!.tourismReligious = tourismFor(6, 2);
-      seatOf(state, 0)!.cultureTotal = cultureFor(1);
-      civSeat.cultureTotal = cultureFor(civCulture);
-      civSeat.tourism = 0;
-      if (enlightened) civSeat.research.civics.push(ENLIGHTENMENT_CIVIC);
-      endTurn(state);
-      return state.victoryType === 5;
-    };
-    expect(win(4, false)).toBe(true);  // 2 + 6 = 8 > 4
-    expect(win(4, true)).toBe(true);   // 2 + 3 = 5 > 4 — the GENERAL half is untouched
-    expect(win(6, false)).toBe(true);  // 8 > 6
-    expect(win(6, true)).toBe(false);  // 2 + 3 = 5 <= 6 — the halving costs the win
+    const { state, own, rival } = relicGame();
+    rival.research.civics.push(ENLIGHTENMENT_CIVIC);
+    const generalBefore = own.tourismTo?.[1] ?? 0;
+    seatAccumulators(state, 0);
+    expect(banked(own)).toBe(Math.floor(RELICS * RELIC_TOURISM / 2));
+    expect(own.tourismTo?.[1] ?? 0).toBe(generalBefore); // the GENERAL half is untouched
   });
 
   it('Cristo Redentor shields the religious half from Enlightenment', () => {
-    const state = newGame(1);
-    const civSeat = state.seats[1] as Seat;
-    civSeat.research.civics.push(ENLIGHTENMENT_CIVIC);
-    civSeat.cultureTotal = cultureFor(6);
-    civSeat.tourism = 0;
-    const own = seatOf(state, 0)!;
-    own.tourism = tourismFor(2, 2);
-    own.tourismReligious = tourismFor(6, 2);
-    own.cultureTotal = cultureFor(1);
+    const { state, own, rival } = relicGame();
+    rival.research.civics.push(ENLIGHTENMENT_CIVIC);
     const t = state.map.tiles[own.cities[0].centerIndex + 1];
     t.builtWonder = 'CRISTO_REDENTOR';
     t.builtWonderComplete = true;
     own.cities[0].wonders.push({ id: 'CRISTO_REDENTOR', tileIndex: t.index });
-    endTurn(state);
-    expect(state.victoryType).toBe(5); // all 8 kept: 8 > 6
+    seatAccumulators(state, 0);
+    expect(banked(own)).toBe(RELICS * RELIC_TOURISM);
   });
 
   it('a rival following a DIFFERENT religion halves it — once founded', () => {
-    const win = (foundedOwn: boolean, civFollows: number | null): boolean => {
-      const state = newGame(1);
-      const civSeat = state.seats[1] as Seat;
-      const own = seatOf(state, 0)!;
-      own.tourism = tourismFor(2, 2);
-      own.tourismReligious = tourismFor(6, 2);
-      own.cultureTotal = cultureFor(1);
+    const half = Math.floor(RELICS * RELIC_TOURISM / 2);
+    const bank = (foundedOwn: boolean, civFollows: number | null): number => {
+      const { state, own, rival } = relicGame();
       // founded WITHOUT a holy tile: the flag the penalty reads, minus the
-      // pressure source — with no source the turn spreads nothing, so the
-      // hand-set followers survive and no RELIGIOUS victory can outrank the
-      // culture check this test is about.
+      // pressure source that would otherwise pay a holy city too.
       if (foundedOwn) {
         own.religion.founded = true;
         own.religion.holyTile = null;
       }
-      for (const c of civSeat.cities) c.followedReligion = civFollows;
-      civSeat.cultureTotal = cultureFor(6);
-      civSeat.tourism = 0;
-      endTurn(state);
-      return state.victoryType === 5;
+      for (const c of rival.cities) c.followedReligion = civFollows;
+      seatAccumulators(state, 0);
+      return banked(own);
     };
-    expect(win(true, 1)).toBe(false);  // majority religion 1 != 0: 5 <= 6
-    expect(win(true, 0)).toBe(true);   // the SAME religion: 8 > 6
-    expect(win(true, null)).toBe(true); // no majority religion: 8 > 6
-    expect(win(false, 1)).toBe(true);  // seat 0 founded nothing: no penalty
+    expect(bank(true, 1)).toBe(half);  // a majority religion that is not mine
+    expect(bank(true, 0)).toBe(RELICS * RELIC_TOURISM);  // the SAME religion
+    expect(bank(true, null)).toBe(RELICS * RELIC_TOURISM); // no majority religion
+    expect(bank(false, 1)).toBe(RELICS * RELIC_TOURISM); // founded nothing: no penalty
   });
 
-  it('both halvings stack to a quarter', () => {
-    const state = newGame(1);
-    const civSeat = state.seats[1] as Seat;
-    const own = seatOf(state, 0)!;
-    own.tourism = tourismFor(2, 2);
-    own.tourismReligious = tourismFor(8, 2);
-    own.cultureTotal = cultureFor(1);
+  it('the two halvings SUM to -100% and pay nothing', () => {
+    // International modifiers are summed, not compounded — so the pair is
+    // -100%, not a quarter, and a total below -100% still pays 0 rather than
+    // draining the bank.
+    const { state, own, rival } = relicGame();
     own.religion.founded = true;
     own.religion.holyTile = null;
-    civSeat.research.civics.push(ENLIGHTENMENT_CIVIC);
-    for (const c of civSeat.cities) c.followedReligion = 1;
-    civSeat.cultureTotal = cultureFor(3);
-    civSeat.tourism = 0;
-    endTurn(state);
-    // 2 + 8/4 = 4 visiting vs 3 domestic: still a win at a quarter …
-    expect(state.victoryType).toBe(5);
-    // … and one more domestic tourist would block what 2 + 8 would have beaten
-    const again = newGame(1);
-    const rival = again.seats[1] as Seat;
-    const me = seatOf(again, 0)!;
-    me.tourism = tourismFor(2, 2);
-    me.tourismReligious = tourismFor(8, 2);
-    me.cultureTotal = cultureFor(1);
-    me.religion.founded = true;
-    me.religion.holyTile = null;
     rival.research.civics.push(ENLIGHTENMENT_CIVIC);
     for (const c of rival.cities) c.followedReligion = 1;
-    rival.cultureTotal = cultureFor(4);
-    rival.tourism = 0;
-    endTurn(again);
-    expect(again.victoryType).not.toBe(5); // 4 <= 4
+    seatAccumulators(state, 0);
+    expect(banked(own)).toBe(0);
+
+    // and a third -50% cannot take the cell negative
+    seatAccumulators(state, 0);
+    expect(banked(own)).toBe(0);
   });
 });
 

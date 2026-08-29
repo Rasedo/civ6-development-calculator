@@ -324,6 +324,11 @@ export interface Unit {
   spyTurns?: number;
   spyTarget?: number;
   spyLevel?: number;
+  /** ROCK BAND STATE. `bandLevel` is 1..4 ("Rock Bands start at level 1 and
+   *  can be promoted up to level 4"); `bandAlbum` its accumulated Album
+   *  Sales, "the expected Tourism strength at their next concert". */
+  bandLevel?: number;
+  bandAlbum?: number;
   fortifyTurns?: number;
   /** how many attacks this unit has left this turn. CIV6: a unit attacks
    *  ONCE per turn; Sweeping Wind is the only row that buys a second. Reset
@@ -416,6 +421,13 @@ export interface Seat {
   cultureTotal: number;
   faith: number;
   tourism: number;
+  /** Lifetime tourism SENT to each rival seat (index = seat), the general
+   *  half and the religious half apart — real Civ 6 accrues per foreign
+   *  civilization, and the international modifiers are per pair. */
+  tourismTo?: number[];
+  tourismReligiousTo?: number[];
+  /** how many Rock Bands this seat has bought — the progressive price. */
+  rockBandsBought?: number;
   /** the RELIGIOUS half (relics + holy cities), banked apart because a
    *  rival's Enlightenment or a different religion halves it at the read
    *  (`cultureVictor`) — the general bank above is never diminished. */

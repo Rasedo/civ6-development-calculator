@@ -60,6 +60,7 @@ class SimOrders:
         _rdc = getattr(self, "_A_ROAD", -1)
         _fnc = getattr(self, "_A_FINISH", -1)
         _gpc = getattr(self, "_A_GP", -1)
+        _pfc = getattr(self, "_A_PERFORM", -1)
         _stw = self._spy_travel_cols
         _smw = self._n_spy_missions
         _pcol = self.rules.promo_cols
@@ -93,13 +94,14 @@ class SimOrders:
             ((_ab == _rdc) if _rdc >= 0 else _no).any(dim=0),                    # build road
             ((_ab == _fnc) if _fnc >= 0 else _no).any(dim=0),                    # finish district
             ((_ab == _gpc) if _gpc >= 0 else _no).any(dim=0),  # activate a great person
+            ((_ab == _pfc) if _pfc >= 0 else _no).any(dim=0),   # perform a concert
         ]).tolist()
         (_rank_held, _rank_cmd, _rk_move, _rk_atk, _rk_found,
          _rk_snipe, _rk_chop, _rk_imp, _rk_pillage, _rk_spread,
          _rk_excavate, _rk_park, _rk_promote, _rk_condemn,
          _rk_heresy, _rk_inquis, _rk_heathen, _rk_upgrade,
          _rk_air, _rk_rebase, _rk_travel, _rk_mission,
-         _rk_road, _rk_finish, _rk_gp) = _tab
+         _rk_road, _rk_finish, _rk_gp, _rk_perform) = _tab
         for n in range(_n):
             if not _rank_held[n]:
                 break
@@ -141,6 +143,12 @@ class SimOrders:
                 pkm = act & (a == _pk) & self._park_ok(row, here.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
                 if bool(pkm.any()):
                     self._do_park(row, pkm, here, sc)
+
+            if _rk_perform[n] and _pfc >= 0:
+                pfm = act & (a == _pfc) & self._perform_ok(
+                    row, here.unsqueeze(1), utp.unsqueeze(1)).squeeze(1)
+                if bool(pfm.any()):
+                    self._do_concert(row, pfm, here, sc)
 
             if _rk_promote[n] and _pm >= 0:
                 pmv = act & (a >= _pm) & (a < _pm + _pcol)

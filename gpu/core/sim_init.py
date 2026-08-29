@@ -179,6 +179,11 @@ class SimInit:
         self.register_alias("citystate_pop", lambda sim: sim.city_pop[:, sim._CITY_MINOR0:sim._CITY_MINOR0 + max(sim.S, 1), 0])
         self.citystate_suz_key = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         self.citystate_suz_peace = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
+        # tourism SENT per (from, to) major pair — real Civ 6 accrues toward
+        # each foreign civ separately, through its own summed modifier
+        self.civ_rock_bands = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
+        self.civ_tourism_to = torch.zeros(B, self.n_majors, self.n_majors, dtype=torch.long, device=device)
+        self.civ_tourism_rel_to = torch.zeros(B, self.n_majors, self.n_majors, dtype=torch.long, device=device)
         # the RESOLVED suzerain contest (-1 none) and the minor's own research
         # record — `resolveSuzerain` / `minorResearch` storage
         self.citystate_suzerain = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
@@ -723,6 +728,10 @@ class SimInit:
             ("spy_turns", torch.long),
             ("spy_target", torch.long),
             ("spy_level", torch.long),
+            # THE ROCK BAND. `band_level` is 1..4 (0 on every other unit),
+            # `band_album` its accumulated Album Sales.
+            ("band_level", torch.long),
+            ("band_album", torch.long),
             # a GREAT PERSON chassis's QUEUE POSITION — which person it is
             # carrying, and so which sourced row its charge spends. -1 on
             # every other unit.
@@ -1097,6 +1106,16 @@ class SimInit:
         self._gw_printing_mult = int(rr.get("gwPrintingWritingMult", 2))
         self._wonder_tour_base = int(rr.get("wonderTourismBase", 2))
         self._tourism_per_visitor = int(rr.get("tourismPerVisitorPerCiv", 200))
+        # (building idx, district idx, venue value) — the exporter carries the
+        # district because no other wire row does
+        self._band_venue = [(int(_b), int(_d), int(_v))
+                            for _b, _d, _v in rr.get("rockBandVenues", [])
+                            if int(_b) >= 0 and int(_d) >= 0]
+        self._band_wonder_venue = int(rr.get("rockBandWonderVenue", 1000))
+        self._band_tiers = torch.tensor(rr.get("rockBandTiers", []), dtype=torch.long, device=device)
+        self._band_odds = torch.tensor(rr.get("rockBandOdds", []), dtype=torch.long, device=device)
+        self._band_max_level = int(rr.get("rockBandMaxLevel", 4))
+        self._band_cost_step = int(rr.get("rockBandCostStep", 1))
         self._holy_city_tour = int(rr.get("holyCityTourism", 8))
         self._enl_cidx = int(rr.get("enlightenmentCidx", -3))
         self._culture_per_tourist = int(rr.get("culturePerDomesticTourist", 100))
@@ -1128,6 +1147,7 @@ class SimInit:
         self._slinger_idx = ids.index("SLINGER") if "SLINGER" in ids else -1
         self._archaeologist_idx = ids.index("ARCHAEOLOGIST") if "ARCHAEOLOGIST" in ids else -1
         self._naturalist_idx = next((i for i, u in enumerate(rules.units or []) if bool(u.get("naturalist", 0))), -1)
+        self._band_idx = next((i for i, u in enumerate(rules.units or []) if u.get("id") == "ROCK_BAND"), -1)
         self._archer_idx = ids.index("ARCHER") if "ARCHER" in ids else -1
 
         self.disasters = bool(f0.get("disasters", 0))
@@ -1182,6 +1202,7 @@ class SimInit:
             self._A_ROAD = self._act.get("BUILD_ROAD", -1)          # the engineer's
             self._A_FINISH = self._act.get("FINISH_DISTRICT", -1)   # its 20% charge
             self._A_GP = self._act.get("ACTIVATE_GP", -1)           # the great person's
+            self._A_PERFORM = self._act.get("PERFORM_CONCERT", -1)   # the rock band's
             self._air_strike_cols = sum(1 for n in self._act_names if n.startswith("AIR_STRIKE_"))
             self._air_rebase_cols = sum(1 for n in self._act_names if n.startswith("REBASE_"))
             _stc = sum(1 for n in self._act_names if n.startswith("SPY_TRAVEL_"))
@@ -1199,6 +1220,7 @@ class SimInit:
                 + (1 if self._A_UPGRADE >= 0 else 0) \
                 + (1 if self._A_ROAD >= 0 else 0) + (1 if self._A_FINISH >= 0 else 0) \
                 + (1 if self._A_GP >= 0 else 0) \
+                + (1 if self._A_PERFORM >= 0 else 0) \
                 + self._air_strike_cols + self._air_rebase_cols + _stc + _smc
             assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
             self._A_CHOP = self._act["CHOP"]
@@ -1215,6 +1237,7 @@ class SimInit:
             self._A_FOUND = -1  # no names -> no FOUND column
             self._A_EXCAVATE = -1
             self._A_PARK = -1
+            self._A_PERFORM = -1
             self._A_PROMOTE = -1
             self._A_CONDEMN = -1
             self._A_HERESY = -1
@@ -1456,6 +1479,7 @@ class SimInit:
         self._npol = len(_pols)
         if self._ngov:
             self._gov_tier = torch.tensor([int(g["tier"]) for g in _govs], dtype=torch.long, device=device)
+            self._gov_intol = torch.tensor([int(g.get("intolerance", 0)) for g in _govs], dtype=torch.long, device=device)
             self._gov_unlock_civic = torch.tensor([int(g["unlockCivic"]) for g in _govs], dtype=torch.long, device=device)
             self._gov_slots = torch.tensor([[int(x) for x in g["slots"]] for g in _govs], dtype=torch.long, device=device)  # [nGov,4] m/e/d/w
             self._gov_city_y = torch.tensor([[float(x) for x in g["cityYields"]] for g in _govs], dtype=dtype, device=device)  # [nGov,6]
@@ -1584,6 +1608,7 @@ class SimInit:
             self._pol_infl = torch.tensor([float(r.get("influencePerTurn", 0)) for r in _pols], dtype=dtype, device=device)
             self._pol_envoy1 = torch.tensor([bool(r.get("firstEnvoyDouble", 0)) for r in _pols], dtype=torch.bool, device=device)
             self._pol_envoy2 = torch.tensor([bool(r.get("envoyDoubleDiffGov", 0)) for r in _pols], dtype=torch.bool, device=device)
+            self._pol_tourroute = torch.tensor([int(r.get("tourismRouteBonus", 0)) for r in _pols], dtype=torch.long, device=device)
             self._pol_culsuz = torch.tensor([float(r.get("culturePerSuzerain", 0)) for r in _pols], dtype=dtype, device=device)
             self._pol_gpp = torch.tensor(
                 [[float(x) for x in r.get("gpp", [0] * n_gp)] for r in _pols],
@@ -2174,6 +2199,7 @@ class SimInit:
         self._driven_buy_cls: dict = {}
         self._driven_buy_ucls: dict = {}
         self._driven_buy_pat: dict = {}
+        self._driven_buy_band: dict = {}
         self._driven_tech: dict = {}
         self._driven_civic: dict = {}
         self._driven_envoys: dict = {}

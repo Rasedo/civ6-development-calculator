@@ -22,9 +22,9 @@ import { placeSeats, seatPhase, worldCongress, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitBuyMult, CONGRESS_CUR_GOLD } from './congress';
 import { commitProduction, commitResearch } from './seatTurn';
 import { seatWonderFlag } from './wonders';
-import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, ENLIGHTENMENT_CIVIC, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH } from '../data/seats';
+import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, ERA_LENGTH } from '../data/seats';
 import { addEraScore, eraBoundary, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
-import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS } from '../data/units';
+import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP, REPAIR_QUIET_TURNS, ROCK_BAND_COST_STEP } from '../data/units';
 import { buildingCostIn, outerPool, wallsMax, fitEncampOuter, encampOuterMissing } from './rules';
 import { laserSpeed } from './yields';
 import { canRunProject, chargeUnitResource } from './stockpile';
@@ -957,6 +957,37 @@ export function purchaseNaturalist(state: GameState, cityId: number, seat: numbe
   return { ok: true };
 }
 
+/**
+ * BUY a ROCK BAND with faith. CIV6: it "can only be purchased with Faith"
+ * and its "Faith cost is progressive" — each band this seat has already
+ * bought raises the next one's price by the base.
+ */
+export function purchaseRockBand(state: GameState, cityId: number, seat: number): RuleResult {
+  const buyer = seatOf(state, seat);
+  if (!buyer) return { ok: false, reason: 'No such seat.' };
+  const def = UNITS.ROCK_BAND;
+  if (def.requiresCivic && !isCivicComplete(state, def.requiresCivic, seat)) {
+    return { ok: false, reason: 'Needs the Professional Sports civic.' };
+  }
+  const city = citiesOf(state, seat).find((c) => c.id === cityId);
+  if (!city) return { ok: false, reason: 'No such city.' };
+  const cost = rockBandCost(state, seat);
+  if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
+  const u = spawnUnit(state, 'ROCK_BAND', city.centerIndex, seat);
+  if (!u) return { ok: false, reason: 'No free tile near the city center.' };
+  u.bandLevel = 1;
+  u.bandAlbum = 0;
+  buyer.faith = (buyer.faith ?? 0) - cost;
+  buyer.rockBandsBought = (buyer.rockBandsBought ?? 0) + 1;
+  return { ok: true };
+}
+
+/** the live faith price: base x (1 + bands already bought). */
+export function rockBandCost(state: GameState, seat: number): number {
+  const bought = seatOf(state, seat)?.rockBandsBought ?? 0;
+  return UNITS.ROCK_BAND.cost * (1 + bought * ROCK_BAND_COST_STEP);
+}
+
 /** the live faith price of a Naturalist. Real Civ 6 makes it
  *  PROGRESSIVE; the progression's own magnitude is unsourced, so the flat GS
  *  price stands and the progression is an open AUDIT residual. */
@@ -1255,20 +1286,6 @@ function diplomaticVictor(state: GameState): number {
   return -1;
 }
 
-/** The religion MORE THAN HALF of this seat's cities follow, or -1 —
- *  religion ids are founder seat ids, and at most one id can pass the bar,
- *  the `religiousVictor` count read per seat. */
-function dominantReligion(s: { cities: { followedReligion?: number | null }[] }): number {
-  const n = s.cities.length;
-  const count = new Map<number, number>();
-  for (const c of s.cities) {
-    if (c.followedReligion == null || c.followedReligion < 0) continue;
-    count.set(c.followedReligion, (count.get(c.followedReligion) ?? 0) + 1);
-  }
-  for (const [g, k] of count) if (k * 2 > n) return g;
-  return -1;
-}
-
 /**
  * The CULTURE victory. Real Civ 6 (Gathering Storm) counts two
  * populations — DOMESTIC tourists, which a civ attracts from its own lifetime
@@ -1276,18 +1293,14 @@ function dominantReligion(s: { cities: { followedReligion?: number | null }[] })
  * lifetime TOURISM — and a civ wins the moment its visiting tourists exceed
  * EVERY other civ's domestic tourists.
  *
- * The tourism bank is split: the RELIGIOUS half (relics + holy cities) is
- * halved per rival by the two CIV6 modifiers — "-50% (Religious Tourism
- * only) if the foreign civilization has The Enlightenment", cancelled by
- * Cristo Redentor's shield, and "-50% (Religious Tourism only) for Different
- * Religions", which "doesn't apply if you haven't founded a religion" and
- * reads the rival's MAJORITY religion. The general half is never diminished.
+ * CIV6 (Victory): "The visiting tourists from each opponent are calculated
+ * as the total amount of Tourism you've sent to them over the entire game,
+ * divided by (200 * number of civs)", and a civ is culturally dominant over
+ * an opponent when its COMBINED visiting total beats that opponent's
+ * domestic count. Both halves of the per-rival bank already carry their
+ * international modifiers from the accrual (`bankTourismPerRival`).
  *
  * Both counts floor to whole tourists, so this is integer-exact and zero-draw.
- * The divisor carries the number of civs because tourism in real Civ 6 is
- * accrued per foreign civ; this engine banks ONE lifetime figure per half,
- * so the per-civ divisor is applied to the total instead — the same
- * threshold, without per-pair bookkeeping the engines do not have.
  *
  * Returns the winning SEAT id, or -1. A civ
  * with NO cities cannot win (a dead civ attracts nobody); the ascending scan
@@ -1298,25 +1311,22 @@ function cultureVictor(state: GameState): number {
   const nCivs = state.seats.length;
   const visitDiv = nCivs * TOURISM_PER_VISITOR_PER_CIV;
   const alive = state.seats.map((sx) => sx.cities.length > 0);
-  const tourism = state.seats.map((sx) => sx.tourism ?? 0);
-  const relTourism = state.seats.map((sx) => sx.tourismReligious ?? 0);
   const culture = state.seats.map((sx) => sx.cultureTotal ?? 0);
-  const enlightened = state.seats.map((sx) => sx.research.civics.includes(ENLIGHTENMENT_CIVIC));
-  const shielded = state.seats.map((sx) => seatWonderFlag(state, sx.seat, 'holyTourismShield'));
-  const founded = state.seats.map((sx) => !!sx.religion.founded);
-  const dominant = state.seats.map((sx) => dominantReligion(sx));
   // Milli-rounded before the floor: culture is a non-dyadic float accumulator,
   // so a sub-milli drift must not move a tourist count across engines (the
   // GS bankruptcy-test convention).
   const domestic = culture.map((c) => Math.floor(Math.round(c * 1000) / 1000 / CULTURE_PER_DOMESTIC_TOURIST));
   for (let c = 0; c < nCivs; c++) {
     if (!alive[c]) continue;
+    const sx = state.seats[c];
+    let visiting = 0;
+    for (let o = 0; o < nCivs; o++) {
+      if (o === c) continue;
+      visiting += Math.floor(((sx.tourismTo?.[o] ?? 0) + (sx.tourismReligiousTo?.[o] ?? 0)) / visitDiv);
+    }
     let all = true;
     for (let o = 0; o < nCivs; o++) {
       if (o === c) continue;
-      const pen = (enlightened[o] && !shielded[c] ? 1 : 0)
-        + (founded[c] && dominant[o] >= 0 && dominant[o] !== c ? 1 : 0);
-      const visiting = Math.floor((tourism[c] + Math.floor(relTourism[c] / 2 ** pen)) / visitDiv);
       if (visiting <= domestic[o]) {
         all = false;
         break;

@@ -19,10 +19,11 @@ import { PARK_MIN_APPEAL } from '../data/improvements';
 import { isTechComplete, isCivicComplete, makeYieldCtx, getModifiers, unitUpkeep, type YieldCtx } from './effects';
 import { effectiveAdjacency } from './yields';
 import { BUILDINGS } from '../data/buildings';
+import { nextRandom } from './rand';
 import { ARTIFACT_BUILDING, ARTIFACT_SLOTS } from '../data/greatPeople';
 import { clearCampFor, conquerEncampment } from './combat';
 import { emergencyHeal, emergencyMoveBonus } from './emergency';
-import { UNITS, UNIT_HP, ENCAMPMENT_HP, type UnitDef } from '../data/units';
+import { UNITS, UNIT_HP, ENCAMPMENT_HP, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, type UnitDef } from '../data/units';
 import { UNIT_PROMO_CLASS } from '../data/promotions';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import {
@@ -1072,6 +1073,69 @@ export function naturalistPark(state: GameState, unitId: number, seat: number): 
     return ok;
   }
   return no('No legal National Park cluster here.');
+}
+
+/**
+ * The tile's VENUE value, 0 where a Rock Band cannot play. CIV6 lists a World
+ * Wonder at 1000, the Broadcast Center and Stadium at 750, the University and
+ * Shipyard at 500 and the Amphitheater and Arena at 250 — a building venue
+ * being the DISTRICT tile whose city holds it.
+ */
+export function concertVenue(state: GameState, tileIndex: number): number {
+  const tile = state.map.tiles[tileIndex];
+  if (!tile) return 0;
+  if (tile.builtWonder && tile.builtWonderComplete) return ROCK_BAND_WONDER_VENUE;
+  if (!tile.district || !tile.districtComplete) return 0;
+  const city = cityAtTile(state, tile);
+  if (!city) return 0;
+  let best = 0;
+  for (const bid of Object.keys(ROCK_BAND_VENUES)) {
+    const value = ROCK_BAND_VENUES[bid];
+    if (!city.buildings.includes(bid)) continue;
+    if (BUILDINGS[bid]?.district !== tile.district) continue;
+    if (value > best) best = value;
+  }
+  return best;
+}
+
+/**
+ * PERFORM A ROCK CONCERT. CIV6: "Rock Bands must always perform in foreign
+ * lands", each performance applying "a one-time Tourism pressure burst
+ * towards the civilization within whose borders it takes place", and
+ * "Tourism = Venue Tourism Value * (1 + (Tourism Bomb Value / 100) + (Album
+ * Sales / 100))". ONE draw picks the tier off the band's own level row; the
+ * two best promote it, the two worst end it.
+ */
+export function performConcert(state: GameState, unitId: number, seat: number): RuleResult {
+  const unit = state.units.find((u) => u.id === unitId);
+  if (!unit || unit.seat !== seat) return no('No such unit.');
+  if (unit.type !== 'ROCK_BAND') return no('Only a Rock Band can perform.');
+  const owner = tileSeat(state.map.tiles[unit.tileIndex]);
+  if (!isCiv(owner) || owner === seat) return no('A Rock Band performs only in foreign lands.');
+  const venue = concertVenue(state, unit.tileIndex);
+  if (venue <= 0) return no('No venue on this tile.');
+  const level = Math.min(ROCK_BAND_MAX_LEVEL, Math.max(1, unit.bandLevel ?? 1));
+  const odds = ROCK_BAND_TIER_ODDS[level - 1];
+  const roll = Math.floor(nextRandom(state) * 1000);
+  let acc = 0;
+  let tier = odds.length - 1;
+  for (let i = 0; i < odds.length; i++) {
+    acc += odds[i];
+    if (roll < acc) { tier = i; break; }
+  }
+  const row = ROCK_BAND_TIERS[tier];
+  const album = unit.bandAlbum ?? 0;
+  const lump = Math.floor(venue * (100 + row.bomb + album) / 100);
+  const band = seatOf(state, seat);
+  if (band && lump > 0) {
+    band.tourismTo ??= [];
+    band.tourismTo[owner] = (band.tourismTo[owner] ?? 0) + lump;
+  }
+  unit.bandAlbum = album + row.album;
+  if (row.promote) unit.bandLevel = Math.min(ROCK_BAND_MAX_LEVEL, level + 1);
+  unit.movesLeft = 0;
+  if (row.dies) disbandUnit(state, unit.id);
+  return ok;
 }
 
 export function queueUnit(state: GameState, cityId: number, unitType: string, seat: number): RuleResult {

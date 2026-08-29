@@ -3,7 +3,7 @@ import { addYields, emptyYields, type City, type DistrictId, type GameState, typ
 import { tilesWithin, hexDistance } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable } from '../../world/query';
 import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, regionalEffects, localAmenities, pillagedDistrictTypes, effectiveAdjacency, completedDistrictCount } from './yields';
-import { getModifiers, makeYieldCtx, withFollowerBelief, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
+import { computeAdoption, getModifiers, makeYieldCtx, withFollowerBelief, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier, appealBand, gpAppealResolver, PRESERVE_APPEAL_HOUSING } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
 import { CIVICS } from '../data/civics';
@@ -23,10 +23,10 @@ import { SPECIALIST_YIELDS, SPECIALIST_TIERS, greatWorkCulture, greatWorkTourism
 import { congressGrowthMult, congressGwMult } from './congress';
 import { suzerainEffect } from './cityStates';
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE } from '../data/cityStates';
-import { warWearinessPenalty, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, LOYALTY_MAX } from '../data/seats';
+import { warWearinessPenalty, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { RESOURCES } from '../../world/resources';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, REGIONAL_RANGE, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, type AmenityTier } from '../data/constants';
-import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf, tileClaimed, campTiles } from './seats';
+import { tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf, tileClaimed, campTiles, borderTurnsFrom } from './seats';
 import { wwMax } from './weariness';
 import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
 
@@ -629,6 +629,30 @@ export function seatTourismReligious(state: GameState, seat: number): number {
     if (cities.some((c) => c.centerIndex === ht)) t += HOLY_CITY_TOURISM;
   }
   return t;
+}
+
+/**
+ * CIV6 (Tourism, "International Modifiers"): "After national modifiers have
+ * been applied to generate the national Tourism output, further modifiers
+ * affect the output to each individual civilization. International Modifiers
+ * are SUMMED (not compounded) and calculated per each foreign civilization."
+ *
+ * The percent `from` sends toward `to`: +25% Open Borders, +25% for an
+ * international Trade Route, +50% more for a route with Online Communities,
+ * and the different-government penalty (0 when the two run the same one).
+ * The religious half adds its own two halvings at the accrual site.
+ */
+export function tourismIntlPct(state: GameState, from: number, to: number): number {
+  let pct = 0;
+  if (borderTurnsFrom(state, to, from) > 0) pct += TOURISM_OPEN_BORDERS_PCT;
+  const routed = (seatOf(state, from)?.tradeRoutes ?? []).some((r) => r.toSeat === to);
+  if (routed) pct += TOURISM_ROUTE_PCT + getModifiers(state, from).tourismRouteBonus;
+  const ga = computeAdoption(seatOf(state, from)!.research).government;
+  const gb = computeAdoption(seatOf(state, to)!.research).government;
+  if (ga !== gb) {
+    pct -= ((GOV_INTOLERANCE[ga ?? ''] ?? 0) + (GOV_INTOLERANCE[gb ?? ''] ?? 0)) * TOURISM_GOV_MULT;
+  }
+  return pct;
 }
 
 export function computeCityStats(

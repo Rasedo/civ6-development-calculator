@@ -420,6 +420,11 @@ SEAT = {
     "faith": _civ_scalar("civ_faith"),
     "tourism": _civ_scalar("civ_tourism"),
     "tourismReligious": _civ_scalar("civ_tourism_rel"),
+    "tourismTo": lambda sim, b, rows: [
+        [int(sim.civ_tourism_to[b, c, o]) if o != c else 0 for o in _civ_seats(sim)] for c in rows],
+    "tourismReligiousTo": lambda sim, b, rows: [
+        [int(sim.civ_tourism_rel_to[b, c, o]) if o != c else 0 for o in _civ_seats(sim)] for c in rows],
+    "rockBandsBought": _civ_scalar("civ_rock_bands"),
     "grievances": _grievance_line,
     "diplomaticFavor": _civ_scalar("civ_diplo_favor"),
     "diplomaticPoints": _civ_scalar("civ_diplo_points"),
@@ -677,6 +682,8 @@ UNIT = {
     "spyTurns": _unit("unit_spy_turns"),
     "spyTarget": _unit("unit_spy_target"),
     "spyLevel": _unit("unit_spy_level"),
+    "bandLevel": _unit("unit_band_level"),
+    "bandAlbum": _unit("unit_band_album"),
     "gpAt": _unit("unit_gp_at"),
     "revealedTurn": _unit("unit_revealed_turn"),
 }

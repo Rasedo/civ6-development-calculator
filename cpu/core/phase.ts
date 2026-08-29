@@ -51,9 +51,9 @@ import { canBuildRoad, canPlaceDistrictIn, canPlaceWonder, validImprovementsIn, 
 import { hasRiver, hasFreshWater } from '../../world/query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
-import { disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, archaeologistExcavate, naturalistPark, upgradeUnit } from './units';
+import { disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit } from './units';
 import { killUnit } from './combat';
-import { availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, condemnHeretic, convertHeathens, districtCostIn, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost } from './game';
+import { availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, condemnHeretic, convertHeathens, districtCostIn, districtDiscounted, engineerFinish, foundCity, foundCityAt, goldAffordable, isEncampHarborItem, launchInquisition, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, settlerCost, unitPurchaseCost } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
 import { airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom } from './air';
@@ -67,6 +67,7 @@ const A_REBASE = unitActionIndex(IMPROVEMENT_IDS).REBASE_0;
 const A_SPY_TRAVEL = unitActionIndex(IMPROVEMENT_IDS).SPY_TRAVEL_0;
 const A_SPY_MISSION = unitActionIndex(IMPROVEMENT_IDS).SPY_MISSION_0;
 const A_PARK = unitActionIndex(IMPROVEMENT_IDS).PARK;
+const A_PERFORM = unitActionIndex(IMPROVEMENT_IDS).PERFORM_CONCERT;
 const A_PROMOTE = unitActionIndex(IMPROVEMENT_IDS).PROMOTE_0;
 const A_CONDEMN = unitActionIndex(IMPROVEMENT_IDS).CONDEMN_0;
 const A_REMOVE_HERESY = unitActionIndex(IMPROVEMENT_IDS).REMOVE_HERESY;
@@ -1090,6 +1091,10 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         naturalistPark(state, unit.id, actor.seat);
         return;
       }
+      if (a === A_PERFORM) {
+        performConcert(state, unit.id, actor.seat);
+        return;
+      }
       if (a >= A_PROMOTE && a < A_PROMOTE + PROMO_COLS) {
         takePromotion(unit, a - A_PROMOTE);
         return;
@@ -1643,6 +1648,7 @@ export function seatPhase(state: GameState): void {
       let boughtClass = false;
       let boughtLandUnit = false;
       let boughtPatron = false;
+      let boughtBand = false;
       for (const ent of rec?.buyFaith ?? []) {
         const [fk, centre] = ent;
         if (fk === 15) {
@@ -1670,6 +1676,9 @@ export function seatPhase(state: GameState): void {
           // Chapel sell for faith.
           const cuid = prodLayout().units[ent[2] ?? -1];
           if (cuid) boughtLandUnit = purchaseUnitWithFaith(state, civCityF.id, cuid, actor.seat).ok;
+        } else if (fk === 16 && !boughtBand) {
+          // kind 16 — the ROCK BAND, faith-only at a progressive price.
+          boughtBand = purchaseRockBand(state, civCityF.id, actor.seat).ok;
         } else if (fk === 10 && !boughtNaturalist) {
           // kind 10 — the NATURALIST, faith-only in any city (no Holy Site,
           // no dedication), one per turn like the other faith civilians.
