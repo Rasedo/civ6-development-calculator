@@ -193,6 +193,8 @@ def main() -> int:
         if failed.is_set():
             break
 
+    _serve_names: list[str] = []
+    _poke_names: list[str] = []
     if not failed.is_set():
         # The DECISION-SERVER gate sharded over ALL fixture seeds: per-turn
         # obs/unit-target equality and a state-digest compare. The lane's wall
@@ -209,6 +211,7 @@ def main() -> int:
         serve_cmd = [py, "gpu/serve_gate.py", "--batched", "--turns", "250", "--seeds"]
         _shards = [("serve_" + "abcdef"[i], serve_cmd + [",".join(map(str, _seeds[_cut[i]:_cut[i + 1]]))], 1)
                    for i in range(_k)]
+        _serve_names = [s[0] for s in _shards]
         print("lanes (parallel): vitest+" + _shards[0][0] + " | "
               + " | ".join(s[0] for s in _shards[1:]) + " | gpu pokes", flush=True)
         lanes = [
@@ -319,6 +322,7 @@ def main() -> int:
                 # at t=0, never at the tail.
                 L.sort(key=lambda s: -_cost.get(s[0], 30.0))
 
+        _poke_names = [s[0] for l in lanes if len(l) > 5 for s in l]
         threads = [
             threading.Thread(target=lane_parallel, args=(l, POKE_WORKERS, POKE_OMP))
             if len(l) > 5
@@ -336,6 +340,23 @@ def main() -> int:
         print(f"{name:<14} {dt:6.1f}s  {'ok' if rc == 0 else 'SKIP' if rc == -1 else 'BAIL' if rc == -3 else 'FAIL'}")
     serial = sum(dt for _, dt, _ in results)
     print(f"\nwall {wall:.0f}s (serial-equivalent {serial:.0f}s, {serial / max(wall, 1):.1f}x)")
+    # WHICH lane is the wall. The serve shards take one lane each (the first
+    # behind vitest) and the pokes share a pool, so the wall is stage 0 plus
+    # whichever of those two finishes last. A wall that moves without either
+    # of them moving is the harness; a wall that moves with one of them names
+    # its own suspect.
+    if _serve_names and _poke_names:
+        _t = {n: dt for n, dt, _ in results}
+        _srv = max([_t.get(_serve_names[0], 0.0) + _t.get("vitest", 0.0)]
+                   + [_t.get(n, 0.0) for n in _serve_names[1:]])
+        _pk = [_t.get(n, 0.0) for n in _poke_names]
+        _pool = max(sum(_pk) / POKE_WORKERS, max(_pk, default=0.0))
+        _s0 = sum(dt for n, dt, _ in results
+                  if n not in set(_serve_names) | set(_poke_names) | {"vitest"})
+        print(f"budget: stage 0 {_s0:.0f}s + slowest lane {max(_srv, _pool):.0f}s"
+              f"  |  serve {_srv:.0f}s over {len(_serve_names)} shards"
+              f"  vs  pokes {sum(_pk):.0f}s/{POKE_WORKERS} workers = {_pool:.0f}s"
+              f"  ->  {'SERVE' if _srv >= _pool else 'POKES'} is the wall")
     # Every run records itself — stats/battery.jsonl, read by
     # tools/gpu/test_stats.py. Which lanes ever catch anything is a
     # question for data, not for memory.
