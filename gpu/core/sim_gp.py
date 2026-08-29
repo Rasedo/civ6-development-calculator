@@ -505,6 +505,7 @@ class SimGp:
                 born = self._spawn_unit(row, hit, hc, u)
                 if bool((born & _xp).any()):
                     self._gp_fill_xp(row, born & _xp)
+        self._gp_form_up(m, cls, at, hc)
         lvl = self._gp_fx(cls, at, "promotionLevels").long()
         pct = self._gp_fx(cls, at, "xpPct").long()
         touch = m & ((lvl > 0) | (pct > 0))
@@ -519,6 +520,25 @@ class SimGp:
         need = self._xp_to_next(self.unit_level[r, t])
         self.unit_xp[r, t] = torch.where(lvl[r] > 0, need, self.unit_xp[r, t])
         self.unit_xp_pct[r, t] = self.unit_xp_pct[r, t] + pct[r]
+
+    def _gp_form_up(self, m: torch.Tensor, cls: torch.Tensor, at: torch.Tensor,
+                    hc: torch.Tensor) -> None:
+        """the tier a retiring General or Admiral hands to ONE unit standing
+        with it — the `formation` clause of `gpAbility.ts`."""
+        tier = self._gp_fx(cls, at, "formation").long()
+        touch = m & (tier > 0)
+        if not bool(touch.any()):
+            return
+        tgt = self.military_at.gather(1, hc.unsqueeze(1)).squeeze(1)
+        hit = touch & (tgt >= 0)
+        if not bool(hit.any()):
+            return
+        r = hit.nonzero(as_tuple=True)[0]
+        s = tgt[r]
+        want_naval = self._gp_fx(cls, at, "formationNaval")[r] > 0
+        naval = self.unit_naval[self.unit_type[r, s].clamp(min=0, max=self.NU - 1)]
+        ok = (naval == want_naval) & (self.unit_formation[r, s] == 0)
+        self.unit_formation[r, s] = torch.where(ok, tier[r], self.unit_formation[r, s])
 
     def _gp_fill_xp(self, row: int, m: torch.Tensor) -> None:
         """the unit just spawned starts at its next level's threshold — a

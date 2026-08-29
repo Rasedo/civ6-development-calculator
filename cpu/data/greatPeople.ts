@@ -848,6 +848,15 @@ export interface GpEffect {
    *  permanent percentage experience bonus for that unit. */
   promotionLevels?: number;
   xpPct?: number;
+  /** the formation TIER a retiring Great General or Great Admiral makes out
+   *  of ONE unit standing with it — 1 a Corps or Fleet, 2 an Army or Armada,
+   *  and no civic is asked for. CIV6 (Napoleon Bonaparte): the target "must
+   *  be a military unit that is not a Corps or an Army", so an already-formed
+   *  unit is no target. `formationNaval` picks the domain the clause names —
+   *  "a military land unit" for a General, "a military naval unit" for an
+   *  Admiral. */
+  formation?: number;
+  formationNaval?: boolean;
   envoys?: number;
   /** CIV6 (Matthew Perry): "Grants enough Envoys to become Suzerain at this
    *  City-state, then removes all other players' Envoys." */
@@ -895,6 +904,7 @@ export const GP_FX = [
   'luxuryCopies', 'luxuryAmenities', 'greatWorkKind', 'gppAll',
   'strategicSlot', 'strategicAmount',
   'artifactScience', 'airSlotBonus', 'suzerainSeize',
+  'formation', 'formationNaval',
 ] as const;
 
 /** what a `perAdjacent` clause counts, in the wire's own order. */
@@ -1005,7 +1015,7 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_SUN_TZU: { greatWorkKind: 0 }, // GW_WRITING
   GP_TRUNG_TRAC: { perm: { warWearyPct: 25 } },
   GP_THELFLD: { unit: 'KNIGHT' },
-  GP_EL_CID: { unmodelled: true },
+  GP_EL_CID: { formation: 1 },
   GP_GENGHIS_KHAN_UNIT: { promotionLevels: 1, xpPct: 25 },
   GP_TIMUR: { promotionLevels: 1, xpPct: 25 },
   GP_ANA_NZINGA: { envoys: 1 },
@@ -1014,7 +1024,7 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_DANDARA: { unit: 'WARRIOR_MONK', unitPromotions: 1 }, // "Grants a Warrior Monk with one promotion level."
   GP_SIMON_BOLIVAR_UNIT: { envoys: 2 },
   GP_JOSE_DE_SAN_MARTIN: { envoys: 2 },
-  GP_NAPOLEON_BONAPARTE: { unmodelled: true },
+  GP_NAPOLEON_BONAPARTE: { formation: 2 },
   GP_RANI_LAKSHMIBAI: { unit: 'CAVALRY', unitPromotions: 1 },
   GP_TUPAC_AMARU: { unmodelled: true },
   GP_JOHN_MONASH: { promotionLevels: 1, xpPct: 75 },
@@ -1029,7 +1039,7 @@ export const GP_ABILITY: Record<string, GpAbility> = {
 
   // ---- ADMIRAL: the same shape at sea, plus the plunder rewards ----
   GP_ARTEMISIA: { promotionLevels: 1 },
-  GP_GAIUS_DUILIUS: { unmodelled: true },
+  GP_GAIUS_DUILIUS: { formation: 1, formationNaval: true },
   GP_THEMISTOCLES: { unit: 'QUADRIREME' },
   GP_HANNO_THE_NAVIGATOR: { unit: 'GALLEY' },
   GP_HIMERIOS: { promotionLevels: 1, xpPct: 25 },
@@ -1037,7 +1047,7 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   GP_RAJENDRA_CHOLA: { gold: 50 },
   GP_ZHENG_HE: { envoys: 1 },
   GP_FRANCIS_DRAKE: { gold: 75, perm: { routePlunderPct: 50 } },
-  GP_SANTA_CRUZ: { unmodelled: true },
+  GP_SANTA_CRUZ: { formation: 2, formationNaval: true },
   GP_YI_SUN_SIN: { unit: 'IRONCLAD', unitPromotions: 1 },
   GP_FERDINAND_MAGELLAN: { cityPerm: { loyalty: 4 } },
   GP_CHING_SHIH: { gold: 100, perm: { routePlunderPct: 60 } },

@@ -388,6 +388,8 @@ function gpFxRow(p: GreatPersonDef): number[] {
     artifactScience: fx.artifactScience ?? 0,
     airSlotBonus: fx.airSlotBonus ?? 0,
     suzerainSeize: fx.suzerainSeize ? 1 : 0,
+    formation: fx.formation ?? 0,
+    formationNaval: fx.formationNaval ? 1 : 0,
   };
   return [
     ...GP_FX.map((k) => v[k] ?? 0),

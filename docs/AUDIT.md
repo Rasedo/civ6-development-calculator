@@ -58,7 +58,7 @@ from the list below.
 | B-51r Encampment residuals | 1 | the district's strike is measured from the CITY CENTRE's tile, and a capture leaves its own pool standing (unsourced either way) |
 | B-44r city-state war tails | 1 | a ranged raider never shoots a minor centre (the seat verbs' own ranged-vs-city-state scope-out) |
 | B-65 religious zone of control | 1 | Civ 6 scopes a religious unit's ZOC to other religious units BOTH ways; the engines run one military-only rule |
-| B-61r the Great Person clauses with no carrier | 2 | 16 rows name a mechanic nothing here has (formations x4, tourism x4, regional range x2, CS absorption, diplomatic visibility, barbarian conversion, ocean passage, the queue gold-buyout, Tupac Amaru's per-district undefended grant walk); Mary Leakey's tourism clause has a per-rival bank to read now and still no carrier |
+| B-61r the Great Person clauses with no carrier | 2 | 12 rows name a mechanic nothing here has (tourism x4, regional range x2, CS absorption, diplomatic visibility, barbarian conversion, ocean passage, the queue gold-buyout, Tupac Amaru's per-district undefended grant walk); Mary Leakey's tourism clause has a per-rival bank to read now and still no carrier |
 | B-34r flood tails | 1 | the climate/coastal tails wait on systems that do not exist here |
 | B-63r the grievance ledger's magnitudes | 1 | the occupied/razed rows ship at their published CEILING; the gang-up bar is a heuristic |
 | B-62r a suzerain improvement's adjacency stops at the wonder tile | 1 | the Preserve band pays it (Grove) and a pantheon feature yield is vacuous there; the adjacency half is unsourced either way |
@@ -305,8 +305,15 @@ Civ 6 source or is recorded as unverifiable.
   COMBAT_ARMY_STRENGTH_MODIFIER 17; "the experience and promotions of the
   highest experience unit is preserved"; and "once a Corps or Army has been
   formed, the units may not be broken apart into individual units again",
-  so there is no inverse verb. `tests/gpu/formation_test.py` and
-  `tests/cpu/units/formation.test.ts` are the bar. OPEN:
+  so there is no inverse verb. The four Great People who make a formation
+  out of ONE unit ship with it (`GP_ABILITY`'s `formation` clause,
+  `_gp_form_up`): El Cid a Corps and Napoleon Bonaparte an Army "out of a
+  military land unit", Gaius Duilius a Fleet and Santa Cruz an Armada out of
+  a naval one, asking no civic — the target "must be a military unit that is
+  not a Corps or an Army", so an already-formed unit is passed over.
+  `tests/gpu/formation_test.py` and `tests/cpu/units/formation.test.ts` are
+  the bar; the Great Person clause is pinned in the first and in
+  `tests/cpu/units/greatPerson.test.ts`. OPEN:
   - **WHAT THE MERGED UNIT KEEPS BEYOND THE VETERAN'S RECORD IS THIS
     MODEL'S.** No source publishes the hit points a formation carries out
     of a merge, nor whether it may act afterwards. Both engines take the

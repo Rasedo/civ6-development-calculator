@@ -292,6 +292,17 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
     const made = spawnUnit(state, fx.unit, unit.tileIndex, unit.seat);
     if (made && fx.unitPromotions) made.xp = xpToNextLevel(made);
   }
+  // CIV6 (El Cid): "Forms a Corps out of a military land unit" — the tier is
+  // handed over outright, no second unit and no civic.
+  if (fx.formation) {
+    const target = state.units.find(
+      (u) => u.seat === unit.seat && u.tileIndex === unit.tileIndex
+        && (UNITS[u.type]?.combat ?? 0) > 0
+        && (UNITS[u.type]?.naval ?? false) === !!fx.formationNaval
+        && (u.formation ?? 0) === 0,
+    );
+    if (target) target.formation = fx.formation;
+  }
   if (fx.promotionLevels || fx.xpPct) {
     const target = state.units.find(
       (u) => u.seat === unit.seat && u.tileIndex === unit.tileIndex && (UNITS[u.type]?.combat ?? 0) > 0,

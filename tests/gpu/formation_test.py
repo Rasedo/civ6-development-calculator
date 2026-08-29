@@ -24,6 +24,9 @@ Covered here:
   5. the strength term reaches a duel: +10 for a Corps, +17 for an Army.
   6. To Arms!: a killed Corps pays 1 Era Score and a killed Army 2, and a
      lone unit pays nothing.
+  7. the Great Person clause: a retiring General or Admiral hands the tier its
+     own row names to one unit standing with it, in that unit's own domain,
+     and passes over a unit that is already a formation.
 """
 
 from __future__ import annotations
@@ -237,6 +240,82 @@ def poke_to_arms(rules, path):
     print("  6 to arms OK — 1 for a Corps, 2 for an Army, 0 for a single")
 
 
+# CIV6 (El Cid): "Retire (1 charge) - Forms a Corps out of a military land
+# unit."; (Napoleon Bonaparte) an Army out of one; (Gaius Duilius) a Fleet and
+# (Santa Cruz) an Armada out of a military NAVAL unit. The target "must be a
+# military unit that is not a Corps or an Army".
+def _order(sim, row, slot_merged, col):
+    smap = sim._seat_slot_map(row)[0]
+    acts = torch.full((1, smap.shape[0]), -1, dtype=torch.long)
+    acts[0, int((smap == slot_merged).long().argmax())] = col
+    sim.seat_ext[0, row] = True
+    sim._apply_seat_unit_actions(row, acts)
+
+
+def _person(sim, row, cls, at, tile):
+    """stand a fresh person of class `cls` at queue position `at` on `tile`."""
+    slot = int(sim.unit_next[0])
+    sim.unit_next[0] += 1
+    lo = sim.POOL_LO["major"]
+    ty = int(sim._gp_class_unit[cls])
+    sim.major_unit_alive[0, slot] = True
+    sim.major_unit_seat[0, slot] = row
+    sim.major_unit_type[0, slot] = ty
+    sim.major_unit_tile[0, slot] = tile
+    sim.major_unit_hp[0, slot] = 100
+    sim.major_unit_mp[0, slot] = float(sim._type_moves[ty])
+    sim.major_unit_charges[0, slot] = int(sim._gp_charges[cls, at])
+    sim.major_unit_gp_at[0, slot] = at
+    sim.civilian_at[0, tile] = slot + lo
+    sim._gen_ver += 1
+    return slot + lo
+
+
+def _clause_rows(sim):
+    """every (cls, at, tier, naval) the exported catalog carries."""
+    k = sim._GPFX["formation"]
+    kn = sim._GPFX["formationNaval"]
+    out = []
+    for c in range(sim._gp_effects.shape[0]):
+        for a in range(sim._gp_effects.shape[1]):
+            tier = int(sim._gp_effects[c, a, k])
+            if tier:
+                out.append((c, a, tier, int(sim._gp_effects[c, a, kn])))
+    return out
+
+
+def poke_great_person(rules, path):
+    sim = fresh(rules, path, turns=1)
+    rows = _clause_rows(sim)
+    assert len(rows) == 4, f"four people form a unit outright, the catalog has {len(rows)}"
+    assert sorted(t for _, _, t, _ in rows) == [1, 1, 2, 2], "a Corps/Fleet pair and an Army/Armada pair"
+    assert sorted(n for *_, n in rows) == [0, 0, 1, 1], "two on land and two at sea"
+
+    land = UNI.index("WARRIOR")
+    sea = next(i for i, u in enumerate(UNI)
+               if bool(sim.unit_naval[i]) and float(sim._type_combat[i]) > 0)
+    for cls, at, tier, naval in rows:
+        for kind, want in ((sea if naval else land, tier), (land if naval else sea, 0)):
+            sim = fresh(rules, path, turns=1)
+            t_, _ = free_pair(sim, ROW)
+            tgt = put(sim, ROW, t_, UNI[kind])
+            gp = _person(sim, ROW, cls, at, t_)
+            _order(sim, ROW, gp, sim._A_GP)
+            got = int(sim.unit_formation[0, tgt])
+            assert got == want, (
+                f"class {cls} person {at} on {UNI[kind]}: formation {got}, want {want}")
+
+    # "not a Corps or an Army" — an already-formed unit is no target
+    cls, at, tier, _ = next(r for r in rows if r[3] == 0)
+    sim = fresh(rules, path, turns=1)
+    t_, _ = free_pair(sim, ROW)
+    tgt = put(sim, ROW, t_, "WARRIOR", formation=1)
+    gp = _person(sim, ROW, cls, at, t_)
+    _order(sim, ROW, gp, sim._A_GP)
+    assert int(sim.unit_formation[0, tgt]) == 1, "the clause overwrote a formation it may not target"
+    print("  7 great person OK — four rows, the named tier, the named domain, no re-forming")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -249,6 +328,7 @@ def main() -> None:
     poke_ladder(rules, p)
     poke_strength(rules, p)
     poke_to_arms(rules, p)
+    poke_great_person(rules, p)
     print("FORMATION POKES OK")
 
 

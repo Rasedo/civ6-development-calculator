@@ -84,6 +84,63 @@ describe('Great Person catalog', () => {
   });
 });
 
+// CIV6 (El Cid): "Retire (1 charge) - Forms a Corps out of a military land
+// unit."; (Napoleon Bonaparte) an Army out of one; (Gaius Duilius) a Fleet and
+// (Santa Cruz) an Armada out of a military NAVAL unit. The target "must be a
+// military unit that is not a Corps or an Army".
+describe('the formation clause', () => {
+  const found = (id: string) => {
+    for (const c of GP_CLASSES) {
+      const at = GREAT_PEOPLE[c].findIndex((p) => p.id === id);
+      if (at >= 0) return { cls: c as string, at };
+    }
+    throw new Error(`${id} is not in the roster`);
+  };
+
+  /** stand `id` on a bare owned tile beside a pinned unit of `type`. */
+  function scene(id: string, type: string, formation = 0) {
+    const state = newGame();
+    const { cls, at } = found(id);
+    const u = person(state, cls, at, ownBare(state));
+    const target = spawnUnit(state, type, u.tileIndex, 0)!;
+    Object.assign(target, { tileIndex: u.tileIndex, formation });
+    return { state, u, target };
+  }
+
+  it('a General hands a land unit the tier its own row names', () => {
+    for (const [id, tier] of [['GP_EL_CID', 1], ['GP_NAPOLEON_BONAPARTE', 2]] as const) {
+      const { state, u, target } = scene(id, 'WARRIOR');
+      expect(activateGreatPerson(state, u)).toBe(true);
+      expect(target.formation).toBe(tier);
+    }
+  });
+
+  it('an Admiral hands a naval unit the tier, and refuses a land one', () => {
+    for (const [id, tier] of [['GP_GAIUS_DUILIUS', 1], ['GP_SANTA_CRUZ', 2]] as const) {
+      const wet = scene(id, 'GALLEY');
+      expect(activateGreatPerson(wet.state, wet.u)).toBe(true);
+      expect(wet.target.formation).toBe(tier);
+
+      const dry = scene(id, 'WARRIOR');
+      expect(activateGreatPerson(dry.state, dry.u)).toBe(true);
+      expect(dry.target.formation ?? 0).toBe(0);
+    }
+  });
+
+  it('refuses a unit that is already a Corps or an Army', () => {
+    const { state, u, target } = scene('GP_NAPOLEON_BONAPARTE', 'WARRIOR', 1);
+    expect(activateGreatPerson(state, u)).toBe(true);
+    expect(target.formation).toBe(1);
+  });
+
+  it('asks for no civic — the clause is the whole gate', () => {
+    const { state, u, target } = scene('GP_EL_CID', 'WARRIOR');
+    expect(state.seats[0].research.civics).not.toContain('NATIONALISM');
+    expect(activateGreatPerson(state, u)).toBe(true);
+    expect(target.formation).toBe(1);
+  });
+});
+
 describe('the activation site', () => {
   it('a class-district person needs a COMPLETE, unpillaged own district of its own type', () => {
     const state = newGame();
